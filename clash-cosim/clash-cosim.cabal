@@ -51,7 +51,7 @@ custom-setup
                  directory,
                  neat-interpolation >= 0.3.0,
                  process,
-                 template-haskell >= 2.0.0,
+                 template-haskell >= 2.20.0,
                  text,
                  yaml
 

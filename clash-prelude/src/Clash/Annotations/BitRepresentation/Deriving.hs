@@ -162,15 +162,9 @@ integerLog2Ceil n =
 bitsNeeded :: Integer -> Int
 bitsNeeded = integerLog2Ceil
 
-#if MIN_VERSION_template_haskell(2,17,0)
 tyVarBndrName :: TyVarBndr f -> Name
 tyVarBndrName (PlainTV n _f) = n
 tyVarBndrName (KindedTV n _f _k) = n
-#else
-tyVarBndrName :: TyVarBndr -> Name
-tyVarBndrName (PlainTV n) = n
-tyVarBndrName (KindedTV n _k) = n
-#endif
 
 -- | Replace Vars types given in mapping
 resolve :: NameMap -> Type -> Type
@@ -210,11 +204,7 @@ typeSize typ = do
       fail $ unwords [
           "Could not find custom bit representation nor BitSize instance"
         , "for", show typ ++ "." ]
-#if MIN_VERSION_template_haskell(2,15,0)
     [TySynInstD (TySynEqn _ _ (LitT (NumTyLit n)))] ->
-#else
-    [TySynInstD _ (TySynEqn _ (LitT (NumTyLit n)))] ->
-#endif
       [| n |]
     [_impl] ->
       [| fromIntegral $ natVal (Proxy :: Proxy (BitSize $(return typ))) |]
@@ -895,11 +885,7 @@ buildPackMatch dataRepr cRepr@(ConstrRepr name _ _ fieldanns) = do
               (\v1 v2 -> [| $v1 ++# $v2 |])
               (map (select $ map VarE fieldPackedNames) origins)
 
-#if MIN_VERSION_template_haskell(2,18,0)
   return $ Match (ConP name [] (VarP <$> fieldNames)) (NormalB vec) fieldPackedDecls
-#else
-  return $ Match (ConP name (VarP <$> fieldNames)) (NormalB vec) fieldPackedDecls
-#endif
 
 -- | Build a /pack/ function corresponding to given DataRepr
 buildPack

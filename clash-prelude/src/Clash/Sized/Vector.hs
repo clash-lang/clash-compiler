@@ -123,9 +123,7 @@ import qualified GHC.Magic
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
 import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
                                           foldl, foldl1, foldr, foldr1, head,
                                           init, iterate, last, length, map,
@@ -2768,9 +2766,7 @@ forceVX v =
 instance Lift a => Lift (Vec n a) where
   lift Nil           = [| Nil |]
   lift (x `Cons` xs) = [| x `Cons` $(lift xs) |]
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
 instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
   arbitrary = traverse# id $ repeat arbitrary
