@@ -351,7 +351,7 @@ Library
                       string-interpolate        ^>= 0.3,
                       tagged                    >= 0.8     && < 0.9,
                       template-haskell          >= 2.20.0.0 && < 2.23,
-                      th-abstraction            >= 0.2.10 && < 0.8.0,
+                      th-abstraction            >= 0.3.0 && < 0.8.0,
                       th-lift                   >= 0.7.0    && < 0.9,
                       th-orphans                >= 0.13.1   && < 1.0,
                       text                      >= 0.11.3.1 && < 2.2,

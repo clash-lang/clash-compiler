@@ -121,11 +121,7 @@ import qualified Clash.Util.Interpolate  as I
 import Clash.Util.Supply
 
 hmFindWithDefault :: (Eq k, Hashable k) => v -> k -> HashMap k v -> v
-#if MIN_VERSION_unordered_containers(0,2,11)
 hmFindWithDefault = HashMap.findWithDefault
-#else
-hmFindWithDefault = HashMap.lookupDefault
-#endif
 
 -- | Generate a simple port_name expression. See:
 --

@@ -7,12 +7,10 @@
 
 module Main where
 
-#if MIN_VERSION_aeson(2,0,0)
 import qualified Data.Aeson.KeyMap as Aeson
 import Data.String (IsString)
 import qualified Data.Text.Lazy as LazyText
 import qualified Data.Text.Lazy.Encoding as LazyText
-#endif
 
 import qualified Data.Aeson.Extra as AesonExtra
 import qualified Data.Aeson as Aeson
@@ -70,7 +68,6 @@ We accomplice this here by renaming those keys to something there sorts where
 we like them to be. And find-and-replace those temporary names back
 in the resulting ByteString.
 -}
-#if MIN_VERSION_aeson(2,0,0)
 keySortingRenames :: IsString str => [(str,str)]
 keySortingRenames =
   [ ("name", "aaaa_really_should_be_name_but_renamed_to_get_the_sorting_we_like")
@@ -94,15 +91,6 @@ removeTempKey inp =
   LazyText.encodeUtf8 (foldl go (LazyText.decodeUtf8 inp) keySortingRenames)
  where
   go txt (orig,temp) = LazyText.replace temp orig txt
-#else
--- < aeson-2.0 stores keys in HashMaps, whose order we can't possibly predict.
-removeTempKey :: ByteString -> ByteString
-removeTempKey = id
-
-customSortOutput:: Aeson.Value -> Aeson.Value
-customSortOutput = id
-#endif
-
 
 main :: IO ()
 main = do
