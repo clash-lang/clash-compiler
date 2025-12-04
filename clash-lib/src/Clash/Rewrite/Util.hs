@@ -30,11 +30,7 @@ import           Control.Lens ((%=), (+=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.State.Strict  as State
-#if MIN_VERSION_transformers(0,5,6)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
-#else
-import qualified Control.Monad.Trans.RWS.Strict as RWS
-#endif
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)

@@ -26,16 +26,11 @@ import Control.Lens                          (Lens', use, (.=))
 import qualified Control.Lens as Lens
 import Control.Monad.Fix                     (MonadFix)
 import Control.Monad.State.Strict            (State)
-#if MIN_VERSION_transformers(0,5,6)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Trans.RWS.CPS           (RWST)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import Control.Monad.Writer                  (MonadWriter (..))
-#else
-import Control.Monad.Trans.RWS.Strict        (RWST)
-import qualified Control.Monad.Trans.RWS.Strict as RWS
-#endif
 import Data.Binary                           (Binary)
 import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
@@ -174,14 +169,10 @@ newtype RewriteMonad extra a = R
     , Functor
     , Monad
     , MonadFix
-    )
-#if MIN_VERSION_transformers(0,5,6) && MIN_VERSION_mtl(2,3,0)
-  deriving newtype
-    ( MonadState (RewriteState extra)
+    , MonadState (RewriteState extra)
     , MonadWriter Any
     , MonadReader RewriteEnv
     )
-#endif
 
 -- | Run the computation in the RewriteMonad
 runR
@@ -190,37 +181,6 @@ runR
   -> RewriteState extra
   -> IO (a, RewriteState extra, Any)
 runR m = RWS.runRWST (unR m)
-
-#if MIN_VERSION_transformers(0,5,6) && !MIN_VERSION_mtl(2,3,0)
--- For Control.Monad.Trans.RWS.Strict these are already defined, however the
--- CPS version of RWS is not included in `mtl` yet.
-
-instance MonadState (RewriteState extra) (RewriteMonad extra) where
-  get = R RWS.get
-  {-# INLINE get #-}
-  put = R . RWS.put
-  {-# INLINE put #-}
-  state = R . RWS.state
-  {-# INLINE state #-}
-
-instance MonadWriter Any (RewriteMonad extra) where
-  writer = R . RWS.writer
-  {-# INLINE writer #-}
-  tell = R . RWS.tell
-  {-# INLINE tell #-}
-  listen = R . RWS.listen . unR
-  {-# INLINE listen #-}
-  pass = R . RWS.pass . unR
-  {-# INLINE pass #-}
-
-instance MonadReader RewriteEnv (RewriteMonad extra) where
-   ask = R RWS.ask
-   {-# INLINE ask #-}
-   local f = R . RWS.local f . unR
-   {-# INLINE local #-}
-   reader = R . RWS.reader
-   {-# INLINE reader #-}
-#endif
 
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
