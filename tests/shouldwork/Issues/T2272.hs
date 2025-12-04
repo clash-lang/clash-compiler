@@ -9,8 +9,7 @@ data Ex where
 
 f :: Ex
 f = ExT (errorX @(forall b . String -> b) "qq")
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 topEntity :: Int
 topEntity = case f of

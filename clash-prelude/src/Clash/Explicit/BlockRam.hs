@@ -945,8 +945,7 @@ blockRamU# clk en SNat =
     (CV.map
       (\i -> deepErrorX $ "Initial value at index " <> show i <> " undefined.")
       (iterateI @n succ (0 :: Int)))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE blockRamU# #-}
+{-# OPAQUE blockRamU# #-}
 {-# ANN blockRamU# hasBlackBox #-}
 
 -- | A version of 'blockRam' that is initialized with the same value on all
@@ -1035,8 +1034,7 @@ blockRam1#
 blockRam1# clk en n a =
   -- TODO: Generalize to single BRAM primitive taking an initialization function
   blockRam# clk en (replicate n a)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE blockRam1# #-}
+{-# OPAQUE blockRam1# #-}
 {-# ANN blockRam1# hasBlackBox #-}
 
 -- | blockRAM primitive
@@ -1133,8 +1131,7 @@ blockRam# (Clock _ Nothing) gen content = \rd wen waS wd -> runST $ do
   {-# INLINE safeUpdate #-}
 blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 {-# ANN blockRam# hasBlackBox #-}
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE blockRam# #-}
+{-# OPAQUE blockRam# #-}
 
 -- | Create a read-after-write block RAM from a read-before-write one
 readNew
@@ -1276,11 +1273,9 @@ trueDualPortBlockRam = \clkA clkB opA opB ->
 -- into its own module / architecture.
 trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
   trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE trueDualPortBlockRamWrapper #-}
+{-# OPAQUE trueDualPortBlockRamWrapper #-}
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE trueDualPortBlockRam# #-}
+{-# OPAQUE trueDualPortBlockRam# #-}
 {-# ANN trueDualPortBlockRam# hasBlackBox #-}
 {-# ANN trueDualPortBlockRam# (
   let

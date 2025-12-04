@@ -41,8 +41,7 @@ foo !x1
     !x17 !x18
     = False
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE foo #-}
+{-# OPAQUE foo #-}
 {-# ANN foo (InlinePrimitive [Verilog] $ [I.i|
   [ { "BlackBox" :
       { "name"      : "LITrendering.foo"

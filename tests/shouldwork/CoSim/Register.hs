@@ -28,8 +28,7 @@ verilog_register clk (unsafeToActiveHigh -> arst) x = [verilog|
       end
     end
   |]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE verilog_register #-}
+{-# OPAQUE verilog_register #-}
 
 topEntity
   :: Clock System

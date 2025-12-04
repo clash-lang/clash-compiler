@@ -8,8 +8,7 @@ import qualified Integral
 expected = $(lift $ map Integral.topEntity $ Integral.inputs)
 
 topEntity = Integral.topEntity
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

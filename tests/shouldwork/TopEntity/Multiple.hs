@@ -14,19 +14,16 @@ import Debug.Trace
 topEntity1 :: Int
 topEntity1 = 11111111
 {-# ANN topEntity1 (defSyn "topentity1") #-}
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity1 #-}
+{-# OPAQUE topEntity1 #-}
 
 topEntity2 :: Int
 topEntity2 = topEntity1
 {-# ANN topEntity2 (defSyn "topentity2") #-}
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity2 #-}
+{-# OPAQUE topEntity2 #-}
 
 topEntity3 :: Int
 topEntity3 = topEntity2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity3 #-}
+{-# OPAQUE topEntity3 #-}
 
 -- | Make sure topEntity2 is not compiled when -main-is topEntity1
 mainSystemVerilog :: IO ()

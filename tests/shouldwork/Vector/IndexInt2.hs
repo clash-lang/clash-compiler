@@ -24,8 +24,7 @@ topEntity xs ix0 =
   where
     ix1 :: Signed 8
     ix1 = fold (+) (1 :> (-1) :> 1 :> Nil)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -16,7 +16,7 @@ import System.FilePath
 -- | Primitive that should result in a blackbox instantiation that
 -- copies a file to the output directory.
 prim !_srcPath = True
-{-# CLASH_OPAQUE prim #-}
+{-# OPAQUE prim #-}
 {-# ANN
   prim
   (
@@ -37,7 +37,7 @@ prim !_srcPath = True
 -- We expect that since they point to the same file, only one copy of the file
 -- ends up in the output directory.
 topEntity = (prim "T3008.hs", prim "../Issues/T3008.hs")
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 verify :: IO ()
 verify = do

@@ -45,8 +45,7 @@ topEntity clk2 clk7 clk9 i =
           clk7
           clk2
           (delay clk7 enableGen 0 i))))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench
   :: Signal Dom9 Bool

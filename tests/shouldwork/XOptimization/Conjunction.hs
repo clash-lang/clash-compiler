@@ -18,8 +18,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
 f x y = x && y
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 topEntity (x :: Bool) = f (let y :: Bool = y in y) True
 

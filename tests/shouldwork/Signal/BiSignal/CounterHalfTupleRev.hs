@@ -26,8 +26,7 @@ counter (write, prevread) i = ((write', prevread'), output)
     output    = if write then Just (succ prevread) else Nothing
     prevread' = if write then prevread else i
     write' = not write
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE counter #-}
+{-# OPAQUE counter #-}
 
 -- | Write on odd cyles
 f :: Clock System
@@ -38,8 +37,7 @@ f :: Clock System
      , Signal System Int
      )
 f clk rst en s = (writeToBiSignal s (mealy clk rst en counter (False, 0) (readFromBiSignal s)), 6)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 -- | Write on even cyles
 g :: Clock System
@@ -50,8 +48,7 @@ g :: Clock System
      , Signal System Int
      )
 g clk rst en s = (writeToBiSignal s (mealy clk rst en counter (True, 0) (readFromBiSignal s)), 7)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE g #-}
+{-# OPAQUE g #-}
 
 
 topEntity
@@ -69,8 +66,7 @@ topEntity clk rst en =
 
   bus  = mergeBiSignalOuts (fBus :> gBus :> Nil)
   bus' = veryUnsafeToBiSignalIn bus
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 
 main :: IO()

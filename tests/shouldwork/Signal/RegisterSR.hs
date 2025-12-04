@@ -35,8 +35,7 @@ topEntity clk rst = head <$> r
 topEntitySR clk rst = topEntity clk srst
   where
     srst = unsafeFromActiveHigh (resetInput clk rst enableGen)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntitySR #-}
+{-# OPAQUE topEntitySR #-}
 
 testBench :: Signal System Bool
 testBench = done

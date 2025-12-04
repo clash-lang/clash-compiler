@@ -222,6 +222,5 @@ romFile# clk en sz file rd =
       deepErrorX ("romFile: address " ++ show i ++
                   " not in range [0.." ++ show szI ++ ")")
   {-# INLINE safeAt #-}
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE romFile# #-}
+{-# OPAQUE romFile# #-}
 {-# ANN romFile# hasBlackBox #-}

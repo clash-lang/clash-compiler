@@ -233,8 +233,7 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
        in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
   {-# INLINE safeUpdate #-}
 {-# ANN blockRamBlob# hasBlackBox #-}
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE blockRamBlob# #-}
+{-# OPAQUE blockRamBlob# #-}
 
 {- | Create a 'MemBlob' binding from a list of values
 

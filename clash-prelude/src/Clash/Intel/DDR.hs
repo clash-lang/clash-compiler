@@ -82,8 +82,7 @@ altddioIn#
   -> Signal domDDR (BitVector n)
   -> Signal dom (BitVector n, BitVector n)
 altddioIn# SSymbol clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE altddioIn# #-}
+{-# OPAQUE altddioIn# #-}
 {-# ANN altddioIn# hasBlackBox #-}
 
 -- | Intel specific variant of 'ddrOut' implemented using the ALTDDIO_OUT IP core.
@@ -136,6 +135,5 @@ altddioOut#
   -> Signal dom (BitVector n)
   -> Signal domDDR (BitVector n)
 altddioOut# SSymbol clk rst en = ddrOut# clk rst en 0
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE altddioOut# #-}
+{-# OPAQUE altddioOut# #-}
 {-# ANN altddioOut# hasBlackBox #-}

@@ -13,8 +13,7 @@ topEntity
 topEntity = exposeClock board
   where
     board = id
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 {-# ANN topEntity (defSyn "top1") #-}
 
 -- type equality is symmetrical so this should also work:

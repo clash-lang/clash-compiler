@@ -25,8 +25,7 @@ topEntity = exposeClockResetEnable go where
   go rd = zeroAt0 dout where
     dout = asyncRamPow2 rd (Just <$> bundle (wr, bundle (wr,wr)))
     wr   = register 1 (wr + 1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

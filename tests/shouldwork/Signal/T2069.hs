@@ -13,8 +13,7 @@ topEntity
   -> Signal System (RamOp 1 (Unsigned 8))
   -> (Signal System (Unsigned 8), Signal System (Unsigned 8))
 topEntity = trueDualPortBlockRam
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -27,5 +26,4 @@ testBench = done
     clk = tbSystemClockGen (not <$> done)
     rst = systemResetGen
     en = enableGen
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}

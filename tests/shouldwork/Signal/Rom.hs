@@ -24,8 +24,7 @@ topEntity
 topEntity = exposeClockResetEnable go where
   go rd = zeroAt0 dout where
     dout = rom $(listToVecTH $ L.map (\x -> (x,x))  [0::Unsigned 8,1,2,3,4,5,6,7,8])  rd
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

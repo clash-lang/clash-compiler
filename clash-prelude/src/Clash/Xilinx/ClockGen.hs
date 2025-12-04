@@ -338,8 +338,7 @@ unsafeClockWizard ::
   Reset domIn ->
   t
 unsafeClockWizard = clocks
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeClockWizard #-}
+{-# OPAQUE unsafeClockWizard #-}
 {-# ANN unsafeClockWizard hasBlackBox #-}
 
 -- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
@@ -390,6 +389,5 @@ unsafeClockWizardDifferential ::
   Reset domIn ->
   t
 unsafeClockWizardDifferential (DiffClock clk _) = clocks clk
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeClockWizardDifferential #-}
+{-# OPAQUE unsafeClockWizardDifferential #-}
 {-# ANN unsafeClockWizardDifferential hasBlackBox #-}

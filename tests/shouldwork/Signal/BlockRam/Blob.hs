@@ -19,8 +19,7 @@ topEntity clk en rd wrM =
   let ram en0 = unpack <$> blockRamBlob clk en0 content rd wrM0
       wrM0 = fmap (fmap (\(wr, din) -> (wr, pack din))) wrM
   in bundle (ram enableGen, ram en)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 samples :: Vec _ (Unsigned 2, Maybe (Unsigned 2, Unsigned 4), Unsigned 4)
 samples =
@@ -52,5 +51,4 @@ testBench = done
     clk = tbSystemClockGen (not <$> done)
     rst = systemResetGen
     en = enableGen
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}

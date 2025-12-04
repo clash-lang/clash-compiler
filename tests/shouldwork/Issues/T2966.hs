@@ -8,4 +8,4 @@ data T = A | B { f :: Int}
 
 topEntity :: T -> Int
 topEntity = f
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}

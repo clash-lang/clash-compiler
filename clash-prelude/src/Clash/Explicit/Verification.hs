@@ -248,8 +248,7 @@ check !_clk !_rst !_propName !_renderAs !_prop =
   pure (errorX (concat [
       "Simulation for Clash.Verification not yet implemented. If you need this,"
     , " create an issue at https://github.com/clash-compiler/clash-lang/issues." ]))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE check #-}
+{-# OPAQUE check #-}
 {-# ANN check (InlineYamlPrimitive [Verilog, SystemVerilog, VHDL] [__i|
   BlackBoxHaskell:
     name: Clash.Explicit.Verification.check

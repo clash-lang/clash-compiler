@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 incr :: Index 3 -> Index 3
 incr i = if i == maxBound then 0 else i + 1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE incr #-}
+{-# OPAQUE incr #-}
 
 topEntity :: Index 10 -> Index 3
 topEntity j = case j < 1 of
@@ -28,8 +27,7 @@ topEntity j = case j < 1 of
         xs = init (Cons 2 (Cons (incr (head ys)) Nil))
         {-# NOINLINE ys #-}
     in incr (incr (head ys))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

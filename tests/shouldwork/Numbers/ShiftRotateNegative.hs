@@ -57,8 +57,7 @@ testBench = done
     , 4042322160
     ) :> Nil
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 topEntity
   :: (BitVector 32, Int)
   -> Vec 2

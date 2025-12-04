@@ -16,7 +16,7 @@ intelOut = altddioOut (SSymbol @"Arria II GX")
 
 topEntityUA :: TopEntityNoEna System DDRA
 topEntityUA clk rst = topEntityGeneric intelIn intelOut clk rst enableGen
-{-# CLASH_OPAQUE topEntityUA #-}
+{-# OPAQUE topEntityUA #-}
 {-# ANN topEntityUA (topEntityNoEnaAnn "topEntityUA") #-}
 
 expOutUA :: Vec TestLen2 D
@@ -28,14 +28,14 @@ expInUA = $(listToVecTH $ inAsyncReset expIn)
 testBenchUA :: TestBenchT System DDRA
 testBenchUA =
   testBenchGeneric (noEnable topEntityUA) expInUA expOutUA expOutUA
-{-# CLASH_OPAQUE testBenchUA #-}
+{-# OPAQUE testBenchUA #-}
 {-# ANN testBenchUA (TestBench 'topEntityUA) #-}
 
 makeTopEntity 'testBenchUA
 
 topEntityUS :: TopEntityNoEna XilinxSystem DDRS
 topEntityUS clk rst = topEntityGeneric intelIn intelOut clk rst enableGen
-{-# CLASH_OPAQUE topEntityUS #-}
+{-# OPAQUE topEntityUS #-}
 {-# ANN topEntityUS (topEntityNoEnaAnn "topEntityUS") #-}
 
 expOutUS :: Vec TestLen2 D
@@ -47,14 +47,14 @@ expInUS = $(listToVecTH $ inSyncReset expIn)
 testBenchUS :: TestBenchT XilinxSystem DDRS
 testBenchUS =
   testBenchGeneric (noEnable topEntityUS) expInUS expOutUS expOutUS
-{-# CLASH_OPAQUE testBenchUS #-}
+{-# OPAQUE testBenchUS #-}
 {-# ANN testBenchUS (TestBench 'topEntityUS) #-}
 
 makeTopEntity 'testBenchUS
 
 topEntityGA :: TopEntityEna System DDRA
 topEntityGA = topEntityGeneric intelIn intelOut
-{-# CLASH_OPAQUE topEntityGA #-}
+{-# OPAQUE topEntityGA #-}
 {-# ANN topEntityGA (topEntityEnaAnn "topEntityGA") #-}
 
 expOutGA :: Vec TestLen2 D
@@ -65,14 +65,14 @@ expInGA = $(listToVecTH $ inEnable $ inAsyncReset expIn)
 
 testBenchGA :: TestBenchT System DDRA
 testBenchGA = testBenchGeneric topEntityGA expInGA expOutGA expOutGA
-{-# CLASH_OPAQUE testBenchGA #-}
+{-# OPAQUE testBenchGA #-}
 {-# ANN testBenchGA (TestBench 'topEntityGA) #-}
 
 makeTopEntity 'testBenchGA
 
 topEntityGS :: TopEntityEna XilinxSystem DDRS
 topEntityGS = topEntityGeneric intelIn intelOut
-{-# CLASH_OPAQUE topEntityGS #-}
+{-# OPAQUE topEntityGS #-}
 {-# ANN topEntityGS (topEntityEnaAnn "topEntityGS") #-}
 
 expOutGS :: Vec TestLen2 D
@@ -83,7 +83,7 @@ expInGS = $(listToVecTH $ inEnable $ inSyncReset expIn)
 
 testBenchGS :: TestBenchT XilinxSystem DDRS
 testBenchGS = testBenchGeneric topEntityGS expInGS expOutGS expOutGS
-{-# CLASH_OPAQUE testBenchGS #-}
+{-# OPAQUE testBenchGS #-}
 {-# ANN testBenchGS (TestBench 'topEntityGS) #-}
 
 makeTopEntity 'testBenchGS
@@ -104,5 +104,5 @@ testBenchAll = done
    done =
      doneUA `strictAnd` doneGA `strictAnd`
      unsafeSynchronizer (clockGen @DDRS) (clockGen @DDRA) doneS
-{-# CLASH_OPAQUE testBenchAll #-}
+{-# OPAQUE testBenchAll #-}
 {-# ANN testBenchAll (defSyn "testBenchAll") #-}

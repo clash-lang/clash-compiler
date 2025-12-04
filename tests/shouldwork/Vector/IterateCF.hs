@@ -23,8 +23,7 @@ topEntity = (a1, a2)
   a2 = case test of
     (_ :> _ :> s :> _) -> s == 257
     _ -> False
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 assertNotIn :: String -> String -> IO ()
 assertNotIn needle haystack

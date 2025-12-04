@@ -28,5 +28,4 @@ topEntity xClk xRst {- 1 xRst -} xEna iClk iRst {- 1 iRst -} iEna xa xb ia ib =
   , autoReg  iClk iRst iEna      (Just Nothing) ib -- 4 iRst
   , autoReg  iClk iRst enableGen (Just Nothing) ib -- 4 iRst
   )
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}

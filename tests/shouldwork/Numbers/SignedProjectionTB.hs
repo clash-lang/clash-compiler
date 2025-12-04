@@ -20,8 +20,7 @@ topEntity
   -> Signal System (Complex (Signed 3))
   -> Signal System (Signed 4)
 topEntity clk rst en = withClockResetEnable clk rst en top
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

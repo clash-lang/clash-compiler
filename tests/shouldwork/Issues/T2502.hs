@@ -28,7 +28,7 @@ instance X a => X (Signal System Int -> a) where
 
 bb :: X a => Int -> a
 bb !_ = x
-{-# CLASH_OPAQUE bb #-}
+{-# OPAQUE bb #-}
 {-# ANN bb hasBlackBox #-}
 {-# ANN bb (
   let bbName = show 'bb
@@ -41,11 +41,11 @@ bb !_ = x
 
 bbWrapper :: X a => Int -> a
 bbWrapper i = bb i
-{-# CLASH_OPAQUE bbWrapper #-}
+{-# OPAQUE bbWrapper #-}
 
 topEntity :: Int -> Signal System Int -> Signal System Int
 topEntity i0 i1 = bbWrapper i0 i1
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 mainVHDL :: IO ()
 mainVHDL = do

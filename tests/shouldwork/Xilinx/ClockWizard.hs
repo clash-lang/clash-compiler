@@ -29,8 +29,7 @@ topEntity clkInSE clkInDiff rstIn =
       o1 = f clkA rstA o1
       o2 = f clkB rstB o2
   in bundle (o1, o2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench ::
   Signal DomIn Bool
@@ -45,8 +44,7 @@ testBench = done
   clkSE = tbClockGen (not <$> done)
   clkDiff = clockToDiffClock clkSE
   rst = resetGen
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}
 
 -- Normally we end VHDL sim by stopping the clocks; usually simulation will
 -- notice nothing can ever change anymore and end. The @clockWizard@ simulation
@@ -62,8 +60,7 @@ endVhdlSim ::
   Bool ->
   Bool
 endVhdlSim = id
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE endVhdlSim #-}
+{-# OPAQUE endVhdlSim #-}
 {-# ANN endVhdlSim (
   let primName = 'endVhdlSim
   in InlineYamlPrimitive [VHDL] [__i|

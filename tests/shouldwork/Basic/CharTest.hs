@@ -8,8 +8,7 @@ import Data.Char
 
 topEntity :: (Int,Char) -> (Int,Char,Char)
 topEntity (i,c) = (ord c,chr i,'λ')
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

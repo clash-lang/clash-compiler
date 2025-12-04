@@ -44,8 +44,7 @@ import Clash.GHC.PartialEval
 import Test.Tasty.Clash
 import Test.Tasty.Clash.CoreTest
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE etaReducedData #-}
+{-# OPAQUE etaReducedData #-}
 {-# ANN etaReducedData (Synthesize
           { t_name   = "etaReducedData"
           , t_inputs = [PortName "x"]
@@ -55,8 +54,7 @@ import Test.Tasty.Clash.CoreTest
 etaReducedData :: Integer -> Maybe Integer
 etaReducedData = Just
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE etaExpandedData #-}
+{-# OPAQUE etaExpandedData #-}
 {-# ANN etaExpandedData (Synthesize
           { t_name   = "etaExpandedData"
           , t_inputs = [PortName "x"]
@@ -66,8 +64,7 @@ etaReducedData = Just
 etaExpandedData :: Integer -> Maybe Integer
 etaExpandedData x = Just x
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE etaReducedPrim1 #-}
+{-# OPAQUE etaReducedPrim1 #-}
 {-# ANN etaReducedPrim1 (Synthesize
           { t_name   = "etaReducedPrim1"
           , t_inputs = [PortName "x", PortName "y"]
@@ -77,8 +74,7 @@ etaExpandedData x = Just x
 etaReducedPrim1 :: Integer -> Integer -> Integer
 etaReducedPrim1 = (+)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE etaReducedPrim2 #-}
+{-# OPAQUE etaReducedPrim2 #-}
 {-# ANN etaReducedPrim2 (Synthesize
           { t_name   = "etaReducedPrim2"
           , t_inputs = [PortName "x", PortName "y"]
@@ -88,8 +84,7 @@ etaReducedPrim1 = (+)
 etaReducedPrim2 :: Integer -> Integer -> Integer
 etaReducedPrim2 x = (x+)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE etaExpandedPrim #-}
+{-# OPAQUE etaExpandedPrim #-}
 {-# ANN etaExpandedPrim (Synthesize
           { t_name   = "etaExpandedPrim"
           , t_inputs = [PortName "x", PortName "y"]

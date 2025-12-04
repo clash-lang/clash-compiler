@@ -23,8 +23,7 @@ topEntity clk rst =
     , mul (n :: Unsigned 16) (0 :: Unsigned 0)
     , mul (0 :: Unsigned 0)  (n :: Unsigned 16)
     ))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -35,5 +34,4 @@ testBench = done
     done           = expectedOutput (topEntity clk rst (pure n1))
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}

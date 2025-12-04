@@ -14,8 +14,7 @@ topEntity = suffixName @"after" $ setName @"foo" $ prefixName @"before" f
 
 f :: Bool -> Bool -> (Bool,Bool)
 f x y = (y,x)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 -- File content test
 assertIn :: String -> String -> IO ()

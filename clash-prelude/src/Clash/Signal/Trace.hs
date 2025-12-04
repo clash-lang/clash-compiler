@@ -144,8 +144,7 @@ type TraceMap  = Map.Map String (TypeRepBS, Period, Width, [Value])
 -- | Map of traces used by the non-internal trace and dumpvcd functions.
 traceMap# :: IORef TraceMap
 traceMap# = unsafePerformIO (newIORef Map.empty)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traceMap# #-}
+{-# OPAQUE traceMap# #-}
 
 mkTrace
   :: HasCallStack
@@ -188,8 +187,7 @@ traceSignal# traceMap period traceName signal =
       , signal)
  where
   width = snatToNum (SNat @(BitSize a))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traceSignal# #-}
+{-# OPAQUE traceSignal# #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
 -- a different trace. If the trace name already exists, this function will emit
@@ -215,8 +213,7 @@ traceVecSignal# traceMap period vecTraceName (unbundle -> vecSignal) =
  where
   trace' i s = traceSignal# traceMap period (name' i) s
   name' i    = vecTraceName ++ "_" ++ show i
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traceVecSignal# #-}
+{-# OPAQUE traceVecSignal# #-}
 
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
@@ -240,8 +237,7 @@ traceSignal traceName signal =
     SDomainConfiguration{sPeriod} ->
       unsafePerformIO $
         traceSignal# traceMap# (snatToNum sPeriod) traceName signal
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traceSignal #-}
+{-# OPAQUE traceSignal #-}
 {-# ANN traceSignal hasBlackBox #-}
 
 -- | Trace a single signal. Will emit an error if a signal with the same name
@@ -262,8 +258,7 @@ traceSignal1
   -> Signal dom a
 traceSignal1 traceName signal =
   unsafePerformIO (traceSignal# traceMap# 1 traceName signal)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traceSignal1 #-}
+{-# OPAQUE traceSignal1 #-}
 {-# ANN traceSignal1 hasBlackBox #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
@@ -290,8 +285,7 @@ traceVecSignal traceName signal =
     SDomainConfiguration{sPeriod} ->
       unsafePerformIO $
         traceVecSignal# traceMap# (snatToNum sPeriod) traceName signal
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traceVecSignal #-}
+{-# OPAQUE traceVecSignal #-}
 {-# ANN traceVecSignal hasBlackBox #-}
 
 -- | Trace a single vector signal: each element in the vector will show up as
@@ -314,8 +308,7 @@ traceVecSignal1
   -> Signal dom (Vec (n+1) a)
 traceVecSignal1 traceName signal =
   unsafePerformIO $ traceVecSignal# traceMap# 1 traceName signal
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE traceVecSignal1 #-}
+{-# OPAQUE traceVecSignal1 #-}
 {-# ANN traceVecSignal1 hasBlackBox #-}
 
 iso8601Format :: UTCTime -> String

@@ -33,8 +33,7 @@ topEntity = exposeClockResetEnable go where
         (SNat @1024)
         rd
         wr
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

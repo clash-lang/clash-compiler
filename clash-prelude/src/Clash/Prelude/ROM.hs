@@ -122,8 +122,7 @@ asyncRom# content = safeAt
         withFrozenCallStack
           (deepErrorX ("asyncRom: address " ++ show i ++
                        " not in range [0.." ++ show szI ++ ")"))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE asyncRom# #-}
+{-# OPAQUE asyncRom# #-}
 {-# ANN asyncRom# hasBlackBox #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements

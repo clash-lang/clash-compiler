@@ -61,8 +61,7 @@ bitMaster
   -> Unbundled System BitMasterI
   -> Unbundled System BitMasterO
 bitMaster = exposeClockResetEnable (mealyB bitMasterT bitMasterInit)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE bitMaster #-}
+{-# OPAQUE bitMaster #-}
 
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _busState       = busStartState

@@ -34,10 +34,8 @@ import qualified RotateC
 
 topEntity :: Top
 topEntity = RotateC.topEntity
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = tb topEntity
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}

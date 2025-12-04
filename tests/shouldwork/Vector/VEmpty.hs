@@ -11,13 +11,11 @@ topEntity
   -> Signal System Int
 topEntity x =
   delayBy (SNat @2) x
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 delayBy n signal =
   foldr (\_ s -> s + 10) signal (replicate n ())
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE delayBy #-}
+{-# OPAQUE delayBy #-}
 
 testBench :: Signal System Bool
 testBench = done

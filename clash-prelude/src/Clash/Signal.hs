@@ -1227,8 +1227,7 @@ sample
   -> [a]
 sample s =
   E.sample (exposeClockResetEnable @dom s clockGen resetGen enableGen)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE sample #-}
+{-# OPAQUE sample #-}
 
 -- | Get a list of /n/ samples from a 'Signal'
 --
@@ -1257,8 +1256,7 @@ sampleN
 sampleN n s0 =
   let s1 = exposeClockResetEnable @dom s0 clockGen resetGen enableGen in
   E.sampleN n s1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE sampleN #-}
+{-# OPAQUE sampleN #-}
 
 -- | Get an infinite list of samples from a 'Signal', while asserting the reset
 -- line for /m/ clock cycles. 'sampleWithReset' does not return the first /m/
@@ -1279,8 +1277,7 @@ sampleWithReset
 sampleWithReset nReset f0 =
   let f1 = exposeClockResetEnable f0 clockGen (resetGenN @dom nReset) enableGen in
   drop (snatToNum nReset) (E.sample f1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE sampleWithReset #-}
+{-# OPAQUE sampleWithReset #-}
 
 -- | Get a list of /n/ samples from a 'Signal', while asserting the reset line
 -- for /m/ clock cycles. 'sampleWithReset' does not return the first /m/ cycles,
@@ -1325,8 +1322,7 @@ sample_lazy
   -> [a]
 sample_lazy s =
   E.sample_lazy (exposeClockResetEnable @dom s clockGen resetGen enableGen)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE sample_lazy #-}
+{-# OPAQUE sample_lazy #-}
 
 -- | Lazily get a list of /n/ samples from a 'Signal'
 --
@@ -1351,8 +1347,7 @@ sampleN_lazy
   -> [a]
 sampleN_lazy n s =
   E.sampleN_lazy n (exposeClockResetEnable @dom s clockGen resetGen enableGen)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE sampleN_lazy #-}
+{-# OPAQUE sampleN_lazy #-}
 
 -- * Simulation functions
 
@@ -1474,8 +1469,7 @@ simulate_lazy
 simulate_lazy f0 =
   let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
   drop 1 . E.simulate_lazy f1 . dup1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE simulate_lazy #-}
+{-# OPAQUE simulate_lazy #-}
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type @a@
@@ -1509,8 +1503,7 @@ simulateB f0 =
       enableGen
       (const f0)
       (Proxy @dom)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE simulateB #-}
+{-# OPAQUE simulateB #-}
 
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
 -- list of samples of type @a@
@@ -1541,8 +1534,7 @@ simulateB_lazy f0 =
       enableGen
       (const f0)
       (Proxy @dom)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE simulateB_lazy #-}
+{-# OPAQUE simulateB_lazy #-}
 
 dup1 :: [a] -> [a]
 dup1 (x:xs) = x:x:xs
@@ -1693,5 +1685,4 @@ signalAutomaton
 signalAutomaton f0 =
   let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
   E.signalAutomaton f1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE signalAutomaton #-}
+{-# OPAQUE signalAutomaton #-}

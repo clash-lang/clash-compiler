@@ -127,6 +127,5 @@ topEntity
      , tWord64
      )
    )
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 #endif

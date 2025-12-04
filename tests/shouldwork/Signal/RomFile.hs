@@ -23,8 +23,7 @@ topEntity
 topEntity = exposeClockResetEnable go where
   go rd = zeroAt0 (unpack <$> dout) where
     dout = romFilePow2 "memory.list" rd
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

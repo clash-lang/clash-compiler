@@ -35,32 +35,27 @@ type Top n =
     => Signal System (Unsigned n)
     -> Signal System (Unsigned n)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE top0 #-}
+{-# OPAQUE top0 #-}
 {-# ANN top0 (defSyn "top_0") #-}
 top0 :: Top 24
 top0 = entity (SNat @24)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE top1 #-}
+{-# OPAQUE top1 #-}
 {-# ANN top1 (defSyn "top_1") #-}
 top1 :: Top 32
 top1 = entity (SNat @32)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE top2 #-}
+{-# OPAQUE top2 #-}
 {-# ANN top2 (defSyn "top_2") #-}
 top2 :: Top 48
 top2 = entity (SNat @48)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE top3 #-}
+{-# OPAQUE top3 #-}
 {-# ANN top3 (defSyn "top_3") #-}
 top3 :: Top 64
 top3 = entity (SNat @64)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE top4 #-}
+{-# OPAQUE top4 #-}
 {-# ANN top4 (defSyn "top_4") #-}
 top4 :: Top 96
 top4 = entity (SNat @96)

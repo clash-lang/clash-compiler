@@ -44,8 +44,7 @@ even :: Clock System
 even clk rst en s = writeToBiSignal s (mealy clk rst en counter (True, 0) (readFromBiSignal s))
 
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 topEntity :: Clock System
   -> Reset System
   -> Enable System

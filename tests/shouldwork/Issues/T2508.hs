@@ -19,7 +19,7 @@ accum s i = (s + i, s)
 
 opaqueAccum :: Unsigned 64 -> Unsigned 64 -> (Unsigned 64, Unsigned 64)
 opaqueAccum s i = accum s i
-{-# CLASH_OPAQUE opaqueAccum #-}
+{-# OPAQUE opaqueAccum #-}
 
 noAnnotationMealy clk rst en f iS i =
   let
@@ -30,7 +30,7 @@ noAnnotationMealy clk rst en f iS i =
 
 opaqueMealy clk rst en f iS =
   noAnnotationMealy clk rst en f iS
-{-# CLASH_OPAQUE opaqueMealy #-}
+{-# OPAQUE opaqueMealy #-}
 
 topEntity ::
   Clock System ->
@@ -43,7 +43,7 @@ topEntity clk rst ena i =
   + noAnnotationMealy clk rst ena opaqueAccum 0 i
   + opaqueMealy       clk rst ena accum       0 i
   + opaqueMealy       clk rst ena opaqueAccum 0 i
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 mainVHDL :: IO ()
 mainVHDL = do

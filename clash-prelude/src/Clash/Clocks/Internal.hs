@@ -53,7 +53,7 @@ deriveClocksInstance n =
 
         clocks (Clock _ Nothing) $(varP rst) = $funcImpl
         clocks _ _ = error "clocks: dynamic clocks unsupported"
-        {-# CLASH_OPAQUE clocks #-}
+        {-# OPAQUE clocks #-}
     |]
  where
   clkTyVar m = varT $ mkName $ "c" <> show m

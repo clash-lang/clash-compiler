@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: (Integer,Unsigned 4,Vec 8 (Unsigned 4)) -> Vec 8 (Vec 8 (Unsigned 4))
 topEntity (i,j,as) = zipWith (\i u -> replace i u as) (iterateI (+1) i) ((iterateI (subtract 1) j))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

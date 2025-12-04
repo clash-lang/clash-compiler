@@ -16,8 +16,7 @@ zeroF f a b =
 
 topEntity :: Signal System (Vec 5 Int)
 topEntity = pure (snd (mapAccumL (\acc _ -> (succ acc, acc)) 0 (map (const ()) indicesI)))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

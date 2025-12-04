@@ -18,8 +18,7 @@ f :: F (T (G ()))
   -> F (T (G ()))
 f = id
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 topEntity :: F (T (G ()))
           -> F (T (G ()))

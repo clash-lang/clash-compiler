@@ -13,13 +13,11 @@ data STy ty where
 sty :: STy ty -> ty
 sty (SBool b) = not b
 sty (SInt16 i) = i + 1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE sty #-}
+{-# OPAQUE sty #-}
 
 topEntity :: STy (Signed 16) -> Signed 16
 topEntity = sty
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

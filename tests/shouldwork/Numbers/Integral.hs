@@ -46,8 +46,7 @@ topEntity (x,y) =
     , test @(Index 128) (abs x) (abs y)
     )
   )
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 inputs :: Vec _ (Integer,Integer)
 inputs =

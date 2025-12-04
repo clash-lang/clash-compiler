@@ -23,8 +23,7 @@ topEntity
   -> Signal System (Vec 4 Bool)
 topEntity =
   bundle . fmap (go ()) . unbundle
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 
 testBench :: Signal System Bool

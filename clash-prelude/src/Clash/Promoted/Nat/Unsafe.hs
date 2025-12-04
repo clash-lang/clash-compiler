@@ -21,6 +21,5 @@ import Clash.Promoted.Nat (SNat, snatProxy)
 -- | I hope you know what you're doing
 unsafeSNat :: Integer -> SNat k
 unsafeSNat i = reifyNat i $ (\p -> unsafeCoerce (snatProxy p))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeSNat #-}
+{-# OPAQUE unsafeSNat #-}
 {-# ANN unsafeSNat hasBlackBox #-}

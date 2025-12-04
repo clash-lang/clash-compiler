@@ -6,8 +6,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity = work
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 work :: Vec 3 Int -> Vec 3 Int
 work xs = zipWith sel xs funs where

@@ -13,8 +13,7 @@ topEntity
   :: (Signal System Int, Signal System Int)
   -> Signal System (Int, Int)
 topEntity = bundle
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack

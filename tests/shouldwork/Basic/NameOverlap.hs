@@ -4,8 +4,7 @@ module NameOverlap where
 
 import Clash.Prelude
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 {-# ANN topEntity
   (Synthesize
     { t_name   = "nameoverlap"

@@ -15,8 +15,7 @@ topEntity
   :: (Integer, Int, Index 5, Signed 5)
   -> (Integer, Int, Index 5, Signed 5)
 topEntity (a, b, c, d) = (signum a, signum b, signum c, signum d)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

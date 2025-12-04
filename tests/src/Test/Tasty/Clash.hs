@@ -207,17 +207,11 @@ data ClashGenTest = ClashGenTest
   , cgHdlDirectory :: IO FilePath
   }
 
--- | See https://github.com/clash-lang/clash-compiler/pull/2511
-dOpaque :: String
-dOpaque =
-  "-DCLASH_OPAQUE=OPAQUE"
-
 commonArgs :: [String]
 commonArgs =
   [ "-fclash-debug", "DebugSilent"
   , "-fclash-ignore-broken-ghcs"
   , "-Werror=unrecognised-pragmas"
-  , dOpaque
   ]
 
 instance IsTest ClashGenTest where
@@ -531,7 +525,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
   clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
-    , cbExtraBuildArgs=dOpaque : "-DOUTPUTTEST" : extraGhcArgs
+    , cbExtraBuildArgs="-DOUTPUTTEST" : extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir

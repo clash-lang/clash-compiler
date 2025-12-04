@@ -13,12 +13,10 @@ index_ints
   -> (Int, Int)
 index_ints (mv, mi) (nv, ni) =
   (mv !! mi, nv !! ni)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE index_ints #-}
+{-# OPAQUE index_ints #-}
 
 fst' ab = fst ab
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fst' #-}
+{-# OPAQUE fst' #-}
 
 topEntity
   :: (Vec 3 Int, Int)
@@ -26,8 +24,7 @@ topEntity
   -> Int
 topEntity (mv, mi) (nv, ni) =
   fst' (index_ints (mv, mi) (nv, ni))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

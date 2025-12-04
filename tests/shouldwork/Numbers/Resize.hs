@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: Signed 4 -> Signed 3
 topEntity = resize
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

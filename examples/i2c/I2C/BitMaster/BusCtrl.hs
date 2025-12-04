@@ -41,8 +41,7 @@ busStartState
   , _cmdStop        = False              -- STOP command
   }
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE busStatusCtrl #-}
+{-# OPAQUE busStatusCtrl #-}
 busStatusCtrl :: Bool
               -> Bool
               -> Unsigned 16

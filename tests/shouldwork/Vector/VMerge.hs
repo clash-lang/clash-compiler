@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: (Vec 2 Int,Vec 2 Int) -> Vec 4 Int
 topEntity (x,y) = merge x y
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

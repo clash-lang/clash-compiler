@@ -252,8 +252,7 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
     mem     = unsafePerformIO (initMem file)
     content = listArray (0,szI-1) mem
     szI     = snatToNum sz
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE asyncRomFile# #-}
+{-# OPAQUE asyncRomFile# #-}
 {-# ANN asyncRomFile# hasBlackBox #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements

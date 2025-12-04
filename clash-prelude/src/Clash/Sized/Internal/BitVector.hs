@@ -249,15 +249,13 @@ data Bit =
 
 -- * Constructions
 -- ** Initialisation
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE high #-}
+{-# OPAQUE high #-}
 {-# ANN high hasBlackBox #-}
 -- | logic '1'
 high :: Bit
 high = Bit 0 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE low #-}
+{-# OPAQUE low #-}
 {-# ANN low hasBlackBox #-}
 -- | logic '0'
 low :: Bit
@@ -295,14 +293,12 @@ instance Eq Bit where
 
 eq## :: Bit -> Bit -> Bool
 eq## b1 b2 = eq# (pack# b1) (pack# b2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE eq## #-}
+{-# OPAQUE eq## #-}
 {-# ANN eq## hasBlackBox #-}
 
 neq## :: Bit -> Bit -> Bool
 neq## b1 b2 = neq# (pack# b1) (pack# b2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE neq## #-}
+{-# OPAQUE neq## #-}
 {-# ANN neq## hasBlackBox #-}
 
 instance Ord Bit where
@@ -313,20 +309,16 @@ instance Ord Bit where
 
 lt##,ge##,gt##,le## :: Bit -> Bit -> Bool
 lt## b1 b2 = lt# (pack# b1) (pack# b2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE lt## #-}
+{-# OPAQUE lt## #-}
 {-# ANN lt## hasBlackBox #-}
 ge## b1 b2 = ge# (pack# b1) (pack# b2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ge## #-}
+{-# OPAQUE ge## #-}
 {-# ANN ge## hasBlackBox #-}
 gt## b1 b2 = gt# (pack# b1) (pack# b2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE gt## #-}
+{-# OPAQUE gt## #-}
 {-# ANN gt## hasBlackBox #-}
 le## b1 b2 = le# (pack# b1) (pack# b2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE le## #-}
+{-# OPAQUE le## #-}
 {-# ANN le## hasBlackBox #-}
 
 instance Enum Bit where
@@ -335,8 +327,7 @@ instance Enum Bit where
 
 toEnum## :: Int -> Bit
 toEnum## = fromInteger## 0## . toInteger
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE toEnum## #-}
+{-# OPAQUE toEnum## #-}
 {-# ANN toEnum## hasBlackBox #-}
 
 instance Bounded Bit where
@@ -357,8 +348,7 @@ instance Num Bit where
 
 fromInteger## :: Word# -> Integer -> Bit
 fromInteger## m# i = Bit ((W# m#) `mod` 2) (fromInteger i `mod` 2)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fromInteger## #-}
+{-# OPAQUE fromInteger## #-}
 {-# ANN fromInteger## hasBlackBox #-}
 
 instance Real Bit where
@@ -403,34 +393,29 @@ instance FiniteBits Bit where
 and##, or##, xor## :: Bit -> Bit -> Bit
 and## (Bit m1 v1) (Bit m2 v2) = Bit mask (v1 .&. v2 .&. complement mask)
   where mask = (m1.&.v2 .|. m1.&.m2 .|. m2.&.v1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE and## #-}
+{-# OPAQUE and## #-}
 {-# ANN and## hasBlackBox #-}
 
 or## (Bit m1 v1) (Bit m2 v2) = Bit mask ((v1 .|. v2) .&. complement mask)
   where mask = m1 .&. complement v2 .|.  m1.&.m2  .|.  m2 .&. complement v1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE or## #-}
+{-# OPAQUE or## #-}
 {-# ANN or## hasBlackBox #-}
 
 xor## (Bit m1 v1) (Bit m2 v2) = Bit mask ((v1 `xor` v2) .&. complement mask)
   where mask = m1 .|. m2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE xor## #-}
+{-# OPAQUE xor## #-}
 {-# ANN xor## hasBlackBox #-}
 
 complement## :: Bit -> Bit
 complement## (Bit m v) = Bit m (complementB v .&. complementB m)
   where complementB (W# b#) = W# (int2Word# (eqWord# b# 0##))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE complement## #-}
+{-# OPAQUE complement## #-}
 {-# ANN complement## hasBlackBox #-}
 
 -- *** BitPack
 pack# :: Bit -> BitVector 1
 pack# (Bit (W# m) (W# b)) = BV (NS m) (NS b)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE pack# #-}
+{-# OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}
 
 unpack# :: BitVector 1 -> Bit
@@ -438,8 +423,7 @@ unpack# (BV m b) = Bit (go m) (go b)
  where
   go (NS w) = W# w
   go (NB w) = bigNatToWord w
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unpack# #-}
+{-# OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
 
 -- * Instances
@@ -606,15 +590,13 @@ instance KnownNat n => Eq (BitVector n) where
   (==) = eq#
   (/=) = neq#
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE eq# #-}
+{-# OPAQUE eq# #-}
 {-# ANN eq# hasBlackBox #-}
 eq# :: KnownNat n => BitVector n -> BitVector n -> Bool
 eq# (BV 0 v1) (BV 0 v2 ) = v1 == v2
 eq# bv1 bv2 = undefErrorI "==" bv1 bv2
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE neq# #-}
+{-# OPAQUE neq# #-}
 {-# ANN neq# hasBlackBox #-}
 neq# :: KnownNat n => BitVector n -> BitVector n -> Bool
 neq# (BV 0 v1) (BV 0 v2) = v1 /= v2
@@ -627,23 +609,19 @@ instance KnownNat n => Ord (BitVector n) where
   (<=) = le#
 
 lt#,ge#,gt#,le# :: KnownNat n => BitVector n -> BitVector n -> Bool
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE lt# #-}
+{-# OPAQUE lt# #-}
 {-# ANN lt# hasBlackBox #-}
 lt# (BV 0 n) (BV 0 m) = n < m
 lt# bv1 bv2 = undefErrorI "<" bv1 bv2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ge# #-}
+{-# OPAQUE ge# #-}
 {-# ANN ge# hasBlackBox #-}
 ge# (BV 0 n) (BV 0 m) = n >= m
 ge# bv1 bv2 = undefErrorI ">=" bv1 bv2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE gt# #-}
+{-# OPAQUE gt# #-}
 {-# ANN gt# hasBlackBox #-}
 gt# (BV 0 n) (BV 0 m) = n > m
 gt# bv1 bv2 = undefErrorI ">" bv1 bv2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE le# #-}
+{-# OPAQUE le# #-}
 {-# ANN le# hasBlackBox #-}
 le# (BV 0 n) (BV 0 m) = n <= m
 le#  bv1 bv2 = undefErrorI "<=" bv1 bv2
@@ -662,22 +640,19 @@ instance KnownNat n => Enum (BitVector n) where
 
 toEnum# :: forall n. KnownNat n => Int -> BitVector n
 toEnum# = fromInteger# 0 . toInteger
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE toEnum# #-}
+{-# OPAQUE toEnum# #-}
 {-# ANN toEnum# hasBlackBox #-}
 
 fromEnum# :: forall n. KnownNat n => BitVector n -> Int
 fromEnum# = fromEnum . toInteger#
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fromEnum# #-}
+{-# OPAQUE fromEnum# #-}
 {-# ANN fromEnum# hasBlackBox #-}
 
 enumFrom# :: forall n. KnownNat n => BitVector n -> [BitVector n]
 enumFrom# (BV 0 x) = map (BV 0 . (`mod` m)) [x .. unsafeToNatural (maxBound :: BitVector n)]
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 enumFrom# bv = undefErrorU "enumFrom" bv
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFrom# #-}
+{-# OPAQUE enumFrom# #-}
 
 enumFromThen#
   :: forall n
@@ -692,8 +667,7 @@ enumFromThen# (BV 0 x) (BV 0 y) =
   toBvs = map (BV 0 . (`mod` m))
   m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 enumFromThen# bv1 bv2 = undefErrorP "enumFromThen" bv1 bv2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromThen# #-}
+{-# OPAQUE enumFromThen# #-}
 
 enumFromTo#
   :: forall n
@@ -704,8 +678,7 @@ enumFromTo#
 enumFromTo# (BV 0 x) (BV 0 y) = map (BV 0 . (`mod` m)) [x .. y]
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 enumFromTo# bv1 bv2 = undefErrorP "enumFromTo" bv1 bv2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromTo# #-}
+{-# OPAQUE enumFromTo# #-}
 
 enumFromThenTo#
   :: forall n
@@ -717,8 +690,7 @@ enumFromThenTo#
 enumFromThenTo# (BV 0 x1) (BV 0 x2) (BV 0 y) = map (BV 0 . (`mod` m)) [x1, x2 .. y]
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 enumFromThenTo# bv1 bv2 bv3 = undefErrorP3 "enumFromTo" bv1 bv2 bv3
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromThenTo# #-}
+{-# OPAQUE enumFromThenTo# #-}
 
 
 instance KnownNat n => Bounded (BitVector n) where
@@ -727,14 +699,12 @@ instance KnownNat n => Bounded (BitVector n) where
 
 minBound# :: BitVector n
 minBound# = BV 0 0
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE minBound# #-}
+{-# OPAQUE minBound# #-}
 {-# ANN minBound# hasBlackBox #-}
 
 maxBound# :: forall n. KnownNat n => BitVector n
 maxBound# = let m = 1 `shiftL` natToNum @n in BV 0 (m-1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE maxBound# #-}
+{-# OPAQUE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
 -- | __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
@@ -750,8 +720,7 @@ instance KnownNat n => Num (BitVector n) where
   fromInteger = fromInteger# 0
 
 (+#),(-#),(*#) :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (+#) #-}
+{-# OPAQUE (+#) #-}
 {-# ANN (+#) hasBlackBox #-}
 (+#) = go
   where
@@ -760,8 +729,7 @@ instance KnownNat n => Num (BitVector n) where
 
     m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (-#) #-}
+{-# OPAQUE (-#) #-}
 {-# ANN (-#) hasBlackBox #-}
 (-#) = go
   where
@@ -770,8 +738,7 @@ instance KnownNat n => Num (BitVector n) where
 
     m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (*#) #-}
+{-# OPAQUE (*#) #-}
 {-# ANN (*#) hasBlackBox #-}
 (*#) = go
  where
@@ -780,8 +747,7 @@ instance KnownNat n => Num (BitVector n) where
 
   m = (1 `naturalShiftL` naturalToWord (natVal (Proxy @n))) - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE negate# #-}
+{-# OPAQUE negate# #-}
 {-# ANN negate# hasBlackBox #-}
 negate# :: forall n . KnownNat n => BitVector n -> BitVector n
 negate# = go
@@ -791,8 +757,7 @@ negate# = go
 
   m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fromInteger# #-}
+{-# OPAQUE fromInteger# #-}
 {-# ANN fromInteger# hasBlackBox #-}
 fromInteger# :: KnownNat n => Natural -> Integer -> BitVector n
 fromInteger# m i = sz `seq` mx
@@ -808,15 +773,13 @@ instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) wh
   type MResult (BitVector m) (BitVector n) = BitVector (m + n)
   mul = times#
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE plus# #-}
+{-# OPAQUE plus# #-}
 {-# ANN plus# hasBlackBox #-}
 plus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
 plus# (BV 0 a) (BV 0 b) = BV 0 (a + b)
 plus# bv1 bv2 = undefErrorP "add" bv1 bv2
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE minus# #-}
+{-# OPAQUE minus# #-}
 {-# ANN minus# hasBlackBox #-}
 minus# :: forall m n . (KnownNat m, KnownNat n) => BitVector m -> BitVector n
                                                 -> BitVector (Max m n + 1)
@@ -827,8 +790,7 @@ minus# = go
 
   m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @(Max m n + 1)))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE times# #-}
+{-# OPAQUE times# #-}
 {-# ANN times# hasBlackBox #-}
 times# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (m + n)
 times# (BV 0 a) (BV 0 b) = BV 0 (a * b)
@@ -850,19 +812,16 @@ instance KnownNat n => Integral (BitVector n) where
   toInteger   = toInteger#
 
 quot#,rem# :: KnownNat n => BitVector n -> BitVector n -> BitVector n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE quot# #-}
+{-# OPAQUE quot# #-}
 {-# ANN quot# hasBlackBox #-}
 quot# (BV 0 i) (BV 0 j) = BV 0 (i `quot` j)
 quot# bv1 bv2 = undefErrorP "quot" bv1 bv2
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rem# #-}
+{-# OPAQUE rem# #-}
 {-# ANN rem# hasBlackBox #-}
 rem# (BV 0 i) (BV 0 j) = BV 0 (i `rem` j)
 rem# bv1 bv2 = undefErrorP "rem" bv1 bv2
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE toInteger# #-}
+{-# OPAQUE toInteger# #-}
 {-# ANN toInteger# hasBlackBox #-}
 toInteger# :: KnownNat n => BitVector n -> Integer
 toInteger# (BV 0 i) = naturalToInteger i
@@ -901,8 +860,7 @@ countTrailingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
 countTrailingZerosBV = V.foldl (\l r -> if eq## r low then 1 + l else 0) 0 . V.bv2v
 {-# INLINE countTrailingZerosBV #-}
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE reduceAnd# #-}
+{-# OPAQUE reduceAnd# #-}
 {-# ANN reduceAnd# hasBlackBox #-}
 reduceAnd# :: KnownNat n => BitVector n -> Bit
 reduceAnd# bv@(BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
@@ -921,8 +879,7 @@ reduceAnd# bv@(BV m i) =
     sz    = natVal bv
     maxI  = (2 ^ sz) - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE reduceOr# #-}
+{-# OPAQUE reduceOr# #-}
 {-# ANN reduceOr# hasBlackBox #-}
 reduceOr# :: KnownNat n => BitVector n -> Bit
 reduceOr# (BV 0 i) = Bit 0 (W# (int2Word# (dataToTag# check)))
@@ -934,8 +891,7 @@ reduceOr# bv@(BV m i) | defI /= 0 = Bit 0 1
   complementN = complementMod $ natVal bv
   defI = i .&. (complementN m)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE reduceXor# #-}
+{-# OPAQUE reduceXor# #-}
 {-# ANN reduceXor# hasBlackBox #-}
 reduceXor# :: KnownNat n => BitVector n -> Bit
 reduceXor# (BV 0 i) = Bit 0 (fromIntegral (popCount i `mod` 2))
@@ -946,21 +902,18 @@ instance Default (BitVector n) where
 
 -- * Accessors
 -- ** Length information
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE size# #-}
+{-# OPAQUE size# #-}
 {-# ANN size# hasBlackBox #-}
 size# :: KnownNat n => BitVector n -> Int
 size# bv = fromIntegral (natVal bv)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE maxIndex# #-}
+{-# OPAQUE maxIndex# #-}
 {-# ANN maxIndex# hasBlackBox #-}
 maxIndex# :: KnownNat n => BitVector n -> Int
 maxIndex# bv = fromIntegral (natVal bv) - 1
 
 -- ** Indexing
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE index# #-}
+{-# OPAQUE index# #-}
 {-# ANN index# hasBlackBox #-}
 index# :: KnownNat n => BitVector n -> Int -> Bit
 index# bv@(BV m v) i
@@ -975,8 +928,7 @@ index# bv@(BV m v) i
                          , formatRange 0 (sz - 1)
                          ]
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE msb# #-}
+{-# OPAQUE msb# #-}
 {-# ANN msb# hasBlackBox #-}
 -- | MSB
 msb# :: forall n . KnownNat n => BitVector n -> Bit
@@ -992,16 +944,14 @@ msb# (BV m v)
     else W# (w `uncheckedShiftRL#` (word2Int# (i# `minusWord#` 1##)))
   msbN (NB bn) = bigNatToWord (bigNatShiftR# bn (i# `minusWord#` 1##))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE lsb# #-}
+{-# OPAQUE lsb# #-}
 {-# ANN lsb# hasBlackBox #-}
 -- | LSB
 lsb# :: BitVector n -> Bit
 lsb# (BV m v) = Bit (W# (int2Word# (dataToTag# (testBit m 0))))
                     (W# (int2Word# (dataToTag# (testBit v 0))))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE slice# #-}
+{-# OPAQUE slice# #-}
 {-# ANN slice# hasBlackBox #-}
 slice# :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
 slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
@@ -1015,8 +965,7 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
 -- * Constructions
 
 -- ** Concatenation
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (++#) #-}
+{-# OPAQUE (++#) #-}
 {-# ANN (++#) hasBlackBox #-}
 -- | Concatenate two 'BitVector's
 (++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
@@ -1027,8 +976,7 @@ slice# (BV msk i) m n = BV (shiftR (msk .&. mask) n')
     m1' = naturalShiftL m1 size2
 
 -- * Modifying BitVectors
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE replaceBit# #-}
+{-# OPAQUE replaceBit# #-}
 {-# ANN replaceBit# hasBlackBox #-}
 replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
 replaceBit# bv@(BV m v) i (Bit mb b)
@@ -1043,8 +991,7 @@ replaceBit# bv@(BV m v) i (Bit mb b)
                           , formatRange 0 (sz - 1)
                           ]
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE setSlice# #-}
+{-# OPAQUE setSlice# #-}
 {-# ANN setSlice# hasBlackBox #-}
 setSlice#
   :: forall m i n
@@ -1066,8 +1013,7 @@ setSlice# SNat =
  where
   complementN = complementMod (natVal (Proxy @(m + 1 + i)))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE split# #-}
+{-# OPAQUE split# #-}
 {-# ANN split# hasBlackBox #-}
 split#
   :: forall n m
@@ -1084,8 +1030,7 @@ split# (BV m i) =
   in  (BV lMask l, BV rMask r)
 
 and#, or#, xor# :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE and# #-}
+{-# OPAQUE and# #-}
 {-# ANN and# hasBlackBox #-}
 and# =
   \(BV m1 v1) (BV m2 v2) ->
@@ -1094,8 +1039,7 @@ and# =
   where
     complementN = complementMod (natVal (Proxy @n))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE or# #-}
+{-# OPAQUE or# #-}
 {-# ANN or# hasBlackBox #-}
 or# =
   \(BV m1 v1) (BV m2 v2) ->
@@ -1104,8 +1048,7 @@ or# =
   where
     complementN = complementMod (natVal (Proxy @n))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE xor# #-}
+{-# OPAQUE xor# #-}
 {-# ANN xor# hasBlackBox #-}
 xor# =
   \(BV m1 v1) (BV m2 v2) ->
@@ -1114,8 +1057,7 @@ xor# =
   where
     complementN = complementMod (natVal (Proxy @n))
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE complement# #-}
+{-# OPAQUE complement# #-}
 {-# ANN complement# hasBlackBox #-}
 complement# :: forall n . KnownNat n => BitVector n -> BitVector n
 complement# = \(BV m v) -> BV m (complementN v .&. complementN m)
@@ -1124,8 +1066,7 @@ complement# = \(BV m v) -> BV m (complementN v .&. complementN m)
 shiftL#, shiftR#, rotateL#, rotateR#
   :: forall n . KnownNat n => BitVector n -> Int -> BitVector n
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE shiftL# #-}
+{-# OPAQUE shiftL# #-}
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(BV msk v) i ->
   if | i < 0
@@ -1138,16 +1079,14 @@ shiftL# = \(BV msk v) i ->
   sz = naturalToWord (natVal (Proxy @n))
   m = 1 `naturalShiftL` sz
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE shiftR# #-}
+{-# OPAQUE shiftR# #-}
 {-# ANN shiftR# hasBlackBox #-}
 shiftR# (BV m v) i
   | i < 0     = error
               $ "'shiftR' undefined for negative number: " ++ show i
   | otherwise = BV (shiftR m i) (shiftR v i)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rotateL# #-}
+{-# OPAQUE rotateL# #-}
 {-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(BV msk v) b ->
@@ -1167,8 +1106,7 @@ rotateL# =
   sz = naturalToWord (natVal (Proxy @n))
   m  = 1 `naturalShiftL` sz
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rotateR# #-}
+{-# OPAQUE rotateR# #-}
 {-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(BV msk v) b ->
@@ -1207,8 +1145,7 @@ resizeBV = case compareSNat @n @m (SNat @n) (SNat @m) of
 truncateB# :: forall a b . KnownNat a => BitVector (a + b) -> BitVector a
 truncateB# = \(BV msk i) -> BV (msk `mod` m) (i `mod` m)
   where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @a))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE truncateB# #-}
+{-# OPAQUE truncateB# #-}
 {-# ANN truncateB# hasBlackBox #-}
 
 instance KnownNat n => Lift (BitVector n) where
@@ -1339,8 +1276,7 @@ checkUnpackUndef _ bv = res
   where
     ty = typeOf res
     res = undefError (show ty ++ ".unpack") [bv]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE checkUnpackUndef #-}
+{-# OPAQUE checkUnpackUndef #-}
 {-# ANN checkUnpackUndef hasBlackBox #-}
 
 -- | Create a BitVector with all its bits undefined
@@ -1348,8 +1284,7 @@ undefined# :: forall n . KnownNat n => BitVector n
 undefined# =
   let m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
   in  BV (m-1) 0
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE undefined# #-}
+{-# OPAQUE undefined# #-}
 {-# ANN undefined# hasBlackBox #-}
 
 -- | Check if one BitVector is similar to another, interpreting undefined bits
@@ -1378,8 +1313,7 @@ isLike# =
     in  e' == c' && e' == c''
  where
   complementN = complementMod (natVal (Proxy @n))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE isLike# #-}
+{-# OPAQUE isLike# #-}
 
 fromBits :: [Bit] -> Integer
 fromBits = L.foldl (\v b -> v `shiftL` 1 .|. fromIntegral b) 0
@@ -1449,6 +1383,5 @@ xToBV :: KnownNat n => BitVector n -> BitVector n
 xToBV x =
   unsafeDupablePerformIO (catch (evaluate x)
                                 (\(XException _) -> return undefined#))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE xToBV #-}
+{-# OPAQUE xToBV #-}
 {-# ANN xToBV hasBlackBox #-}

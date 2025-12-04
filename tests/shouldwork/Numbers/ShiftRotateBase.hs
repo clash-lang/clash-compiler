@@ -22,8 +22,7 @@ testall v i
     , testAs @(Int8)        v i
     , testAs @(Unsigned 70) v i
     )
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testall #-}
+{-# OPAQUE testall #-}
 
 testAs
   :: (Num b, Bits b) => Integer -> Int -> Vec Ops b

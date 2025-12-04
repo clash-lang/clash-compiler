@@ -12,8 +12,7 @@ import Data.Word
 import Control.Monad.RWS
 import Data.Monoid
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 topEntity
     :: Clock System
     -> Reset System

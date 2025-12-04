@@ -61,8 +61,7 @@ topEntity = exposeClockResetEnable go where
      :> f negate       -- if address == 3 negate
      :> Nil
     f xK = fmap (fmap xK)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

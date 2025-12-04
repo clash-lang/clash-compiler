@@ -36,8 +36,7 @@ topEntity clk rst = head <$> r
 topEntityAR clk rst = topEntity clk arst
   where
     arst = unsafeFromActiveHigh (resetInput clk rst enableGen)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntityAR #-}
+{-# OPAQUE topEntityAR #-}
 
 -- | Doing this case inline trips GHC 8.4 due to dead code. We sometimes
 -- want to run our whole testsuite with a different System domain though, so

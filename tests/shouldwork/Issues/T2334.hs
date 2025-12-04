@@ -21,8 +21,7 @@ topEntity ::
   Signal System Int ->
   Signal System Int
 topEntity clk rst = assert clk rst "FileOrder"
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 assertBool :: HasCallStack => Bool -> IO ()
 assertBool b = Exception.assert b pure ()

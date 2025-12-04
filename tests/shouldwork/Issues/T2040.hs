@@ -9,8 +9,7 @@ topEntity
   :: Signal System (Unsigned 8)
   -> Signal System (Unsigned 8)
 topEntity = id
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

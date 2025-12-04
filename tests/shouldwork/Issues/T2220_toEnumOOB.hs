@@ -8,8 +8,7 @@ import Clash.Explicit.Testbench
 topEntity :: BitVector 2 -> Maybe A_Index
 topEntity x | x == 3    = Nothing
             | otherwise = Just $ toEnum $ fromIntegral x
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 {-
 Because of the concurrent nature of the VHDL generate by clash,

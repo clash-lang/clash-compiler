@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: (BitVector 16,BitVector 128) -> BitVector 128
 topEntity = uncurry (setSlice d127 d112)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
