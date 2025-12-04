@@ -30,7 +30,7 @@ module Clash.Prelude.Testbench
   )
 where
 
-import GHC.TypeLits                       (KnownNat, type (<=))
+import GHC.TypeLits                       (KnownNat)
 
 import qualified Clash.Explicit.Testbench as E
 import           Clash.Signal
@@ -169,7 +169,6 @@ outputVerifier'
      , ShowX a
      , HiddenClock dom
      , HiddenReset dom
-     , 1 <= l
      )
   => Vec l a
   -- ^ Samples to compare with
@@ -188,7 +187,6 @@ outputVerifierBitVector'
      , KnownNat n
      , HiddenClock dom
      , HiddenReset dom
-     , 1 <= l
      )
   => Vec l (BitVector n)
   -- ^ Samples to compare with

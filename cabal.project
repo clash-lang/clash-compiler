@@ -15,7 +15,7 @@ write-ghc-environment-files: always
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2025-07-19T09:09:36Z
+index-state: 2025-11-19T10:56:47Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
@@ -59,6 +59,11 @@ optional-packages:
 allow-newer:
   brick:base,
   brick:deepseq,
+  -- >>> temporarily added for testing purposes
+  ghc-typelits-knownnat,
+  ghc-typelits-natnormalise,
+  ghc-typelits-extra,
+  -- <<<
   hashable,
   hedgehog-fakedata:hedgehog,
   rewrite-inspector:binary,
@@ -84,3 +89,8 @@ package regex-tdfa
 
 -- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
 constraints: vty < 6.0
+
+source-repository-package
+  type: git
+  location: https://github.com/clash-lang/ghc-typelits-extra.git
+  tag: fd532b0a643e70692b9c32be09950a4748702897
