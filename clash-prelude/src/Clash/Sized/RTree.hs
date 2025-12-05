@@ -61,9 +61,6 @@ module Clash.Sized.RTree
   )
 where
 
-#if !MIN_VERSION_base(4,18,0)
-import Control.Applicative         (liftA2)
-#endif
 import Control.DeepSeq             (NFData(..))
 import qualified Control.Lens      as Lens
 import Data.Default                (Default (..))
@@ -74,9 +71,7 @@ import Data.Singletons             (Apply, TyFun, type (@@))
 import Data.Proxy                  (Proxy (..))
 import GHC.TypeLits                (KnownNat, Nat, type (+), type (^), type (*))
 import Language.Haskell.TH.Syntax  (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
 import Prelude                     hiding ((++), (!!), map)
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
@@ -128,20 +123,14 @@ instance NFData a => NFData (RTree d a) where
 
 textract :: RTree 0 a -> a
 textract (RLeaf x)   = x
-#if __GLASGOW_HASKELL__ != 902
 textract (RBranch _ _) = error $ "textract: nodes hold no values"
-#endif
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE textract #-}
+{-# OPAQUE textract #-}
 {-# ANN textract hasBlackBox #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
 tsplit (RBranch l r) = (l,r)
-#if __GLASGOW_HASKELL__ != 902
 tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
-#endif
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE tsplit #-}
+{-# OPAQUE tsplit #-}
 {-# ANN tsplit hasBlackBox #-}
 
 -- | RLeaf of a perfect depth tree
@@ -237,9 +226,7 @@ instance (KnownNat d, Default a) => Default (RTree d a) where
 instance Lift a => Lift (RTree d a) where
   lift (RLeaf a)     = [| RLeaf a |]
   lift (RBranch t1 t2) = [| RBranch $(lift t1) $(lift t2) |]
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
 instance (KnownNat d, Arbitrary a) => Arbitrary (RTree d a) where
   arbitrary = sequenceA (trepeat arbitrary)
@@ -326,7 +313,7 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
           (bound at ...)
 <BLANKLINE>
 
-#elif __GLASGOW_HASKELL__ >= 900
+#else
 >>> :{
 let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                      => BitVector (2^d) -> Index (2^d+1)
@@ -341,29 +328,6 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
         Actual: Index ((2 ^ d) + 1)
                 -> Index ((2 ^ d) + 1)
                 -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
-    • In the second argument of ‘tfold’, namely ‘add’
-      In the first argument of ‘(.)’, namely
-        ‘tfold (resize . bv2i . pack) add’
-      In the expression: tfold (resize . bv2i . pack) add . v2t . bv2v
-    • Relevant bindings include
-        populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
-          (bound at ...)
-
-#else
->>> :{
-let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
-                     => BitVector (2^d) -> Index (2^d+1)
-    populationCount' = tfold (resize . bv2i . pack) add . v2t . bv2v
-:}
-<BLANKLINE>
-<interactive>:...
-    • Couldn't match type ‘(((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1’
-                     with ‘(2 ^ d) + 1’
-      Expected type: Index ((2 ^ d) + 1)
-                     -> Index ((2 ^ d) + 1) -> Index ((2 ^ d) + 1)
-        Actual type: Index ((2 ^ d) + 1)
-                     -> Index ((2 ^ d) + 1)
-                     -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
     • In the second argument of ‘tfold’, namely ‘add’
       In the first argument of ‘(.)’, namely
         ‘tfold (resize . bv2i . pack) add’
@@ -418,8 +382,7 @@ tdfold _ f g = go SNat
     go _  (RLeaf a)   = f a
     go sn (RBranch l r) = let sn' = sn `subSNat` d1
                       in  g sn' (go sn' l) (go sn' r)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE tdfold #-}
+{-# OPAQUE tdfold #-}
 {-# ANN tdfold hasBlackBox #-}
 
 data TfoldTree (a :: Type) (f :: TyFun Nat Type) :: Type
@@ -448,8 +411,7 @@ treplicate sn a = go (toUNat sn)
     go :: UNat n -> RTree n a
     go UZero      = LR a
     go (USucc un) = BR (go un) (go un)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE treplicate #-}
+{-# OPAQUE treplicate #-}
 {-# ANN treplicate hasBlackBox #-}
 
 -- | \"'trepeat' @a@\" creates a tree with as many copies of /a/ as demanded by

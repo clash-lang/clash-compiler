@@ -15,8 +15,7 @@ import Data.Bits
 
 topEntity :: Int -> Integer
 topEntity = bit
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

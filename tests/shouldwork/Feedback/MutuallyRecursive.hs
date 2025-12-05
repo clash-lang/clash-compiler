@@ -31,8 +31,7 @@ hdlSimTest n topEntity testInput expectedOutput = done
     testInput' = withClockResetEnable tbClk tbRst tbEn testInput
 
     done = expectedOutput' (topEntity' testInput')
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE hdlSimTest #-}
+{-# OPAQUE hdlSimTest #-}
 
 testBench :: Signal System Bool
 testBench = done

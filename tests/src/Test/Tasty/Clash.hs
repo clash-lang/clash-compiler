@@ -207,21 +207,11 @@ data ClashGenTest = ClashGenTest
   , cgHdlDirectory :: IO FilePath
   }
 
--- | See https://github.com/clash-lang/clash-compiler/pull/2511
-dOpaque :: String
-dOpaque =
-#if __GLASGOW_HASKELL__ >= 904
-  "-DCLASH_OPAQUE=OPAQUE"
-#else
-  "-DCLASH_OPAQUE=NOINLINE"
-#endif
-
 commonArgs :: [String]
 commonArgs =
   [ "-fclash-debug", "DebugSilent"
   , "-fclash-ignore-broken-ghcs"
   , "-Werror=unrecognised-pragmas"
-  , dOpaque
   ]
 
 instance IsTest ClashGenTest where
@@ -535,7 +525,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
   clashBuild workDir = singleTest "clash (exec)" (ClashBinaryTest {
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
-    , cbExtraBuildArgs=dOpaque : "-DOUTPUTTEST" : extraGhcArgs
+    , cbExtraBuildArgs="-DOUTPUTTEST" : extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir
@@ -582,7 +572,6 @@ clashLibTest' modName target extraGhcArgs path =
       cbBuildTarget=target
     , cbSourceDirectory=sourceDir
     , cbExtraBuildArgs="-DCLASHLIBTEST" :
-#if __GLASGOW_HASKELL__ >= 906
         "-dynamic" :
         -- All libraries in the GHC environment file are passed to the GHC
         -- linking stage, even when they are not used by the particular target.
@@ -591,7 +580,6 @@ clashLibTest' modName target extraGhcArgs path =
         -- the linker to shut up and continue producing an executable, as the
         -- undefined references will not be an issue at run-time.
         "-optl" : "-Wl,--allow-shlib-undefined" :
-#endif
 #ifdef CLASH_WORKAROUND_GHC_MMAP_CRASH
         "-with-rtsopts=-xm20000000" :
 #endif

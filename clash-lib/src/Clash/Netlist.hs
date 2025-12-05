@@ -44,13 +44,8 @@ import qualified Data.Set                         as Set
 import qualified Data.Text                        as StrictText
 import           GHC.Stack                        (HasCallStack)
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
 import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
-#else
-import           Outputable                       (ppr, showSDocUnsafe)
-import           SrcLoc                           (isGoodSrcSpan)
-#endif
 
 import           Clash.Annotations.Primitive      (HDL)
 import           Clash.Annotations.BitRepresentation.ClashLib
@@ -556,14 +551,12 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
       LitPat  (CharLiteral c) -> return (Just (NumLit . toInteger $ ord c), altExpr)
       LitPat  (Int64Literal i) -> return (Just (NumLit i), altExpr)
       LitPat  (Word64Literal w) -> return (Just (NumLit w), altExpr)
-#if MIN_VERSION_base(4,16,0)
       LitPat  (Int8Literal i) -> return (Just (NumLit i), altExpr)
       LitPat  (Int16Literal i) -> return (Just (NumLit i), altExpr)
       LitPat  (Int32Literal i) -> return (Just (NumLit i), altExpr)
       LitPat  (Word8Literal w) -> return (Just (NumLit w), altExpr)
       LitPat  (Word16Literal w) -> return (Just (NumLit w), altExpr)
       LitPat  (Word32Literal w) -> return (Just (NumLit w), altExpr)
-#endif
       LitPat  (NaturalLiteral n) -> return (Just (NumLit n), altExpr)
       _  -> do
         (_,sp) <- Lens.use curCompNm
@@ -1091,42 +1084,22 @@ mkDcApplication declType [dstHType] bndr dc args = do
         in  return dc'
       Void {} -> return Noop
       Signed _
-#if MIN_VERSION_base(4,15,0)
         | dcNm == "GHC.Num.Integer.IS"
-#else
-        | dcNm == "GHC.Integer.Type.S#"
-#endif
         , (a:_) <- argExprsFiltered
         -> pure a
         -- ByteArray# are non-translatable / void, except when they're literals
-#if MIN_VERSION_base(4,15,0)
         | dcNm == "GHC.Num.Integer.IP"
-#else
-        | dcNm == "GHC.Integer.Type.Jp#"
-#endif
         , (a@(HW.Literal Nothing (NumLit _)):_) <- argExprs
         -> pure a
-#if MIN_VERSION_base(4,15,0)
         | dcNm == "GHC.Num.Integer.IN"
-#else
-        | dcNm == "GHC.Integer.Type.Jn#"
-#endif
         -- ByteArray# are non-translatable / void, except when they're literals
         , (HW.Literal Nothing (NumLit i):_) <- argExprs
         -> pure (HW.Literal Nothing (NumLit (negate i)))
       Unsigned _
-#if MIN_VERSION_base(4,15,0)
         | dcNm == "GHC.Num.Natural.NS"
-#else
-        | dcNm == "GHC.Natural.NatS#"
-#endif
         , (a:_) <- argExprsFiltered
         -> pure a
-#if MIN_VERSION_base(4,15,0)
         | dcNm == "GHC.Num.Natural.NB"
-#else
-        | dcNm == "GHC.Natural.NatJ#"
-#endif
         -- ByteArray# are non-translatable / void, except when they're literals
         , (a@(HW.Literal Nothing (NumLit _)):_) <- argExprs
         -> pure a

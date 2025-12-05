@@ -27,11 +27,7 @@ module Clash.Normalize.Transformations.Case
   ) where
 
 import Control.Exception.Base (patError)
-#if MIN_VERSION_base(4,16,0)
 import GHC.Prim.Panic (absentError)
-#else
-import Control.Exception.Base (absentError)
-#endif
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (evalState)
 import Data.Bifunctor (second)
@@ -44,11 +40,7 @@ import qualified Data.Primitive.ByteArray as BA
 import qualified Data.Text.Extra as Text (showt)
 import GHC.Stack (HasCallStack)
 
-#if MIN_VERSION_base(4,15,0)
 import GHC.Num.Integer (Integer(..))
-#else
-import GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
-#endif
 
 import Clash.Sized.Internal.BitVector as BV (BitVector, eq#)
 import Clash.Sized.Internal.Index as I (Index, eq#)
@@ -388,11 +380,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
             else changed e
     | dcTag dc == 2
     , l >= 2^(63::Int)
-#if MIN_VERSION_base(4,15,0)
     = let !(IP ba) = l
-#else
-    = let !(Jp# !(BN# ba)) = l
-#endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           bind      = NonRec x (Literal (ByteArrayLiteral ba'))
@@ -401,11 +389,7 @@ matchLiteralContructor c (IntegerLiteral l) alts = go (reverse alts)
             else changed e
     | dcTag dc == 3
     , l < ((-2)^(63::Int))
-#if MIN_VERSION_base(4,15,0)
     = let !(IN ba) = l
-#else
-    = let !(Jn# !(BN# ba)) = l
-#endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           bind      = NonRec x (Literal (ByteArrayLiteral ba'))
@@ -434,11 +418,7 @@ matchLiteralContructor c (NaturalLiteral l) alts = go (reverse alts)
             else changed e
     | dcTag dc == 2
     , l >= 2^(64::Int)
-#if MIN_VERSION_base(4,15,0)
     = let !(IP ba) = l
-#else
-    = let !(Jp# !(BN# ba)) = l
-#endif
           ba'       = BA.ByteArray ba
           fvs       = Lens.foldMapOf freeLocalIds unitVarSet e
           bind      = NonRec x (Literal (ByteArrayLiteral ba'))

@@ -21,9 +21,6 @@ module Clash.Core.TysPrim
   , integerPrimTy
   , charPrimTy
   , stringPrimTy
-#if !MIN_VERSION_ghc(9,2,0)
-  , voidPrimTy
-#endif
   , wordPrimTy
   , int64PrimTy
   , word64PrimTy
@@ -42,21 +39,14 @@ module Clash.Core.TysPrim
   )
 where
 
-
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names
-#else
-import           PrelNames
-#endif
 
 import           GHC.Base hiding (Type, TyCon)
 import           Data.Text.Extra (showt)
 
-#if MIN_VERSION_base(4,17,0)
 import           Clash.Core.DataCon (DataCon(..), DcStrictness(..))
 import           GHC.Num.Integer (Integer(..))
 import           GHC.Num.Natural (Natural(..))
-#endif
 
 import           Clash.Core.Name
 import           Clash.Core.TyCon
@@ -69,12 +59,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
 liftedTypeKindTyConName   = mkUnsafeSystemName "Type"
                               (fromGhcUnique liftedTypeKindTyConKey)
-#if MIN_VERSION_ghc(9,2,0)
 typeNatKindTyConName      = naturalPrimTyConName
-#else
-typeNatKindTyConName      = mkUnsafeSystemName "Nat"
-                              (fromGhcUnique typeNatKindConNameKey)
-#endif
 typeSymbolKindTyConName   = mkUnsafeSystemName "Symbol"
                               (fromGhcUnique typeSymbolKindConNameKey)
 
@@ -95,13 +80,8 @@ intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   naturalPrimTyConName, byteArrayPrimTyConName, eqPrimTyConName :: TyConName
 intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
                                 (fromGhcUnique intPrimTyConKey)
-#if MIN_VERSION_base(4,15,0)
 integerPrimTyConName = mkUnsafeSystemName "GHC.Num.Integer.Integer"
                                 (fromGhcUnique integerTyConKey)
-#else
-integerPrimTyConName = mkUnsafeSystemName "GHC.Integer.Type.Integer"
-                                (fromGhcUnique integerTyConKey)
-#endif
 stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#"
                         (fromGhcUnique addrPrimTyConKey)
 charPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Char#"
@@ -116,22 +96,13 @@ floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
                                 (fromGhcUnique floatPrimTyConKey)
 doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
                                 (fromGhcUnique doublePrimTyConKey)
-#if MIN_VERSION_base(4,15,0)
 naturalPrimTyConName = mkUnsafeSystemName "GHC.Num.Natural.Natural"
                                 (fromGhcUnique naturalTyConKey)
-#else
-naturalPrimTyConName = mkUnsafeSystemName "GHC.Natural.Natural"
-                                (fromGhcUnique naturalTyConKey)
-#endif
 byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
                           (fromGhcUnique byteArrayPrimTyConKey)
 
 eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (fromGhcUnique eqPrimTyConKey)
 
-#if !MIN_VERSION_ghc(9,2,0)
-voidPrimTyConName :: TyConName
-voidPrimTyConName    = mkUnsafeSystemName "Void#" (fromGhcUnique voidPrimTyConKey)
-#endif
 
 int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, word8PrimTyConName,
   word16PrimTyConName, word32PrimTyConName :: TyConName
@@ -157,7 +128,6 @@ intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, wordPrimTc,
   int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc, naturalPrimTc,
   byteArrayPrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
-#if MIN_VERSION_base(4,17,0)
 -- While GHC might have dropped Integer and Natural literals, in Clash it is
 -- still nice to have them around. However, Integer and Natural are also no
 -- longer primitive types in GHC, but we still want to give the Integer and
@@ -241,10 +211,6 @@ naturalPrimTc =
     rhs = DataTyCon [nsDc,nbDc]
    in
     AlgTyCon uniq name liftedTypeKind 0 rhs False
-#else
-integerPrimTc = liftedPrimTC integerPrimTyConName
-naturalPrimTc = liftedPrimTC naturalPrimTyConName
-#endif
 charPrimTc    = liftedPrimTC charPrimTyConName
 stringPrimTc  = liftedPrimTC stringPrimTyConName
 wordPrimTc    = liftedPrimTC wordPrimTyConName
@@ -254,10 +220,6 @@ floatPrimTc   = liftedPrimTC floatPrimTyConName
 doublePrimTc  = liftedPrimTC doublePrimTyConName
 byteArrayPrimTc = liftedPrimTC  byteArrayPrimTyConName
 
-#if !MIN_VERSION_ghc(9,2,0)
-voidPrimTc :: TyCon
-voidPrimTc    = liftedPrimTC voidPrimTyConName
-#endif
 
 int8PrimTc, int16PrimTc, int32PrimTc, word8PrimTc, word16PrimTc,
   word32PrimTc :: TyCon
@@ -297,11 +259,6 @@ naturalPrimTy = mkTyConTy naturalPrimTyConName
 byteArrayPrimTy = mkTyConTy byteArrayPrimTyConName
 eqPrimTy = mkTyConTy eqPrimTyConName
 
-#if !MIN_VERSION_ghc(9,2,0)
-voidPrimTy :: Type
-voidPrimTy    = mkTyConTy voidPrimTyConName
-#endif
-
 int8PrimTy, int16PrimTy, int32PrimTy, word8PrimTy, word16PrimTy,
   word32PrimTy :: Type
 int8PrimTy    = mkTyConTy int8PrimTyConName
@@ -320,9 +277,6 @@ tysPrimMap = UniqMap.fromList
   ,  (integerPrimTyConName , integerPrimTc)
   ,  (charPrimTyConName , charPrimTc)
   ,  (stringPrimTyConName , stringPrimTc)
-#if !MIN_VERSION_ghc(9,2,0)
-  ,  (voidPrimTyConName , voidPrimTc)
-#endif
   ,  (wordPrimTyConName , wordPrimTc)
   ,  (int64PrimTyConName , int64PrimTc)
   ,  (word64PrimTyConName , word64PrimTc)

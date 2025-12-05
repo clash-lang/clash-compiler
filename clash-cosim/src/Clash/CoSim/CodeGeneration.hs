@@ -79,13 +79,8 @@ coSimGen' clks args = do
     -- Function declaration and body
     let coSim = FunD coSimName [Clause [] (NormalB $ VarE $ mkName "coSimN") []]
 
-#if __GLASGOW_HASKELL__ >= 904
     -- OPAQUE pragma
     let inline = PragmaD $ OpaqueP coSimName
-#else
-    -- NOINLINE pragma
-    let inline = PragmaD $ InlineP coSimName NoInline FunLike AllPhases
-#endif
 
     -- Clash blackbox pragma
     primDir        <- runIO $ getDataFileName "src/prims/verilog"
@@ -130,8 +125,4 @@ coSimTypeGen clks args = do
 
     let ctx = (fixedArgs ++ clkSignalTypes ++ argSignalTypes) `arrowsR` resSignalType
     let varNames = resultName : domName : argNames
-#if MIN_VERSION_template_haskell(2,17,0)
     return $ ForallT (map (`PlainTV` SpecifiedSpec) varNames) constraints ctx
-#else
-    return $ ForallT (map PlainTV varNames) constraints ctx
-#endif

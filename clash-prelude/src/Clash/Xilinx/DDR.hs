@@ -77,8 +77,7 @@ iddr#
   -> Signal domDDR (BitVector n)
   -> Signal dom (BitVector n, BitVector n)
 iddr# clk rst en = withFrozenCallStack ddrIn# clk rst en 0 0 0
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE iddr# #-}
+{-# OPAQUE iddr# #-}
 {-# ANN iddr# hasBlackBox #-}
 
 -- | Xilinx specific variant of 'ddrOut' implemented using the Xilinx ODDR
@@ -125,6 +124,5 @@ oddr#
   -> Signal dom (BitVector n)
   -> Signal domDDR (BitVector n)
 oddr# clk rst en = ddrOut# clk rst en 0
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE oddr# #-}
+{-# OPAQUE oddr# #-}
 {-# ANN oddr# hasBlackBox #-}

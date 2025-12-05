@@ -826,12 +826,7 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
                            (mkLocalId (inferCoreTypeOf tcm e)
                                       (mkUnsafeSystemName "mealyres" 0))
           in  ([(u,e)], u)
-#if __GLASGOW_HASKELL__ >= 900
       args1 = args0
-#else
-      -- Drop the 'State# World' argument
-      args1 = init args0
-#endif
       -- Take into account that the state argument is split over multiple
       -- binders because it contained types that are not allowed to occur in
       -- a HDL aggregate type
@@ -956,11 +951,7 @@ collectMealy _ _ _ _ = error "internal error"
 
 -- | Collect the sequential declarations for 'bindIO'
 collectBindIO :: NetlistId -> [Term] -> NetlistMonad (Expr,[Declaration])
-#if __GLASGOW_HASKELL__ >= 900
 collectBindIO dst (m:Lam x q@e:_) = do
-#else
-collectBindIO dst (m:Lam x q@(Lam _ e):_) = do
-#endif
   tcm <- Lens.view tcCache
   (ds0,subst) <- collectAction tcm
   let qS = substTm "collectBindIO1" subst q

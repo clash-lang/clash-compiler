@@ -45,14 +45,9 @@ module Clash.Explicit.SimIO
 where
 
 import Control.Monad (when)
-#if __GLASGOW_HASKELL__ < 900
-import Data.Coerce
-#endif
 import Data.IORef
 import GHC.TypeLits
-#if MIN_VERSION_base(4,18,0)
   hiding (SNat)
-#endif
 import Prelude hiding (getChar, putChar, getLine)
 import qualified System.IO as IO
 import System.IO.Unsafe
@@ -68,11 +63,7 @@ import Clash.XException (seqX)
 -- itself is unlikely to be synthesisable to a digital circuit.
 --
 -- See 'mealyIO' as to its use.
-#if __GLASGOW_HASKELL__ >= 900
 data SimIO a = SimIO {unSimIO :: !(IO a)}
-#else
-newtype SimIO a = SimIO {unSimIO :: IO a}
-#endif
 {-# ANN unSimIO hasBlackBox #-}
 
 instance Functor SimIO where
@@ -80,8 +71,7 @@ instance Functor SimIO where
 
 fmapSimIO# :: (a -> b) -> SimIO a -> SimIO b
 fmapSimIO# f (SimIO m) = SimIO (fmap f m)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fmapSimIO# #-}
+{-# OPAQUE fmapSimIO# #-}
 {-# ANN fmapSimIO# hasBlackBox #-}
 
 instance Applicative SimIO where
@@ -90,30 +80,20 @@ instance Applicative SimIO where
 
 pureSimIO# :: a -> SimIO a
 pureSimIO# a = SimIO (pure a)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE pureSimIO# #-}
+{-# OPAQUE pureSimIO# #-}
 {-# ANN pureSimIO# hasBlackBox #-}
 
 apSimIO# :: SimIO (a -> b) -> SimIO a -> SimIO b
 apSimIO# (SimIO f) (SimIO m) = SimIO (f <*> m)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE apSimIO# #-}
+{-# OPAQUE apSimIO# #-}
 {-# ANN apSimIO# hasBlackBox #-}
 
 instance Monad SimIO where
-#if !MIN_VERSION_base(4,16,0)
-  return = pureSimIO#
-#endif
   (>>=)  = bindSimIO#
 
 bindSimIO# :: SimIO a -> (a -> SimIO b) -> SimIO b
-#if __GLASGOW_HASKELL__ >= 900
 bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` unSimIO (k x)))
-#else
-bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` coerce k x))
-#endif
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE bindSimIO# #-}
+{-# OPAQUE bindSimIO# #-}
 {-# ANN bindSimIO# hasBlackBox #-}
 
 -- | Display a string on /stdout/
@@ -122,8 +102,7 @@ display
   -- ^ String you want to display
   -> SimIO ()
 display s = SimIO (putStrLn s)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE display #-}
+{-# OPAQUE display #-}
 {-# ANN display hasBlackBox #-}
 
 -- | Finish the simulation with an exit code
@@ -132,16 +111,11 @@ finish
   -- ^ The exit code you want to return at the end of the simulation
   -> SimIO a
 finish i = return (error (show i))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE finish #-}
+{-# OPAQUE finish #-}
 {-# ANN finish hasBlackBox #-}
 
 -- | Mutable reference
-#if __GLASGOW_HASKELL__ >= 900
 data Reg a = Reg !(IORef a)
-#else
-newtype Reg a = Reg (IORef a)
-#endif
 
 -- | Create a new mutable reference with the given starting value
 reg
@@ -149,15 +123,13 @@ reg
   -- ^ The starting value
   -> SimIO (Reg a)
 reg a = SimIO (Reg <$> newIORef a)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE reg #-}
+{-# OPAQUE reg #-}
 {-# ANN reg hasBlackBox #-}
 
 -- | Read value from a mutable reference
 readReg :: Reg a -> SimIO a
 readReg (Reg a) = SimIO (readIORef a)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE readReg #-}
+{-# OPAQUE readReg #-}
 {-# ANN readReg hasBlackBox #-}
 
 -- | Write new value to the mutable reference
@@ -168,16 +140,11 @@ writeReg
   -- ^ The new value
   -> SimIO ()
 writeReg (Reg r) a = SimIO (writeIORef r a)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE writeReg #-}
+{-# OPAQUE writeReg #-}
 {-# ANN writeReg hasBlackBox #-}
 
 -- | File handle
-#if __GLASGOW_HASKELL__ >= 900
 data File = File !IO.Handle
-#else
-newtype File = File IO.Handle
-#endif
 
 -- | Open a file
 openFile
@@ -193,7 +160,6 @@ openFile
   -- * "w+": Create for update
   -- * "a+": Append, open or create for update at end-of-file
   -> SimIO File
-#if __GLASGOW_HASKELL__ >= 900
 openFile fp "r"   = SimIO $ fmap File (IO.openFile fp IO.ReadMode)
 openFile fp "w"   = SimIO $ fmap File (IO.openFile fp IO.WriteMode)
 openFile fp "a"   = SimIO $ fmap File (IO.openFile fp IO.AppendMode)
@@ -209,26 +175,8 @@ openFile fp "a+b" = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
 openFile fp "rb+" = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadWriteMode)
 openFile fp "wb+" = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
 openFile fp "ab+" = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
-#else
-openFile fp "r"   = coerce (IO.openFile fp IO.ReadMode)
-openFile fp "w"   = coerce (IO.openFile fp IO.WriteMode)
-openFile fp "a"   = coerce (IO.openFile fp IO.AppendMode)
-openFile fp "rb"  = coerce (IO.openBinaryFile fp IO.ReadMode)
-openFile fp "wb"  = coerce (IO.openBinaryFile fp IO.WriteMode)
-openFile fp "ab"  = coerce (IO.openBinaryFile fp IO.AppendMode)
-openFile fp "r+"  = coerce (IO.openFile fp IO.ReadWriteMode)
-openFile fp "w+"  = coerce (IO.openFile fp IO.WriteMode)
-openFile fp "a+"  = coerce (IO.openFile fp IO.AppendMode)
-openFile fp "r+b" = coerce (IO.openBinaryFile fp IO.ReadWriteMode)
-openFile fp "w+b" = coerce (IO.openBinaryFile fp IO.WriteMode)
-openFile fp "a+b" = coerce (IO.openBinaryFile fp IO.AppendMode)
-openFile fp "rb+" = coerce (IO.openBinaryFile fp IO.ReadWriteMode)
-openFile fp "wb+" = coerce (IO.openBinaryFile fp IO.WriteMode)
-openFile fp "ab+" = coerce (IO.openBinaryFile fp IO.AppendMode)
-#endif
 openFile _  m     = error ("openFile unknown mode: " ++ show m)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE openFile #-}
+{-# OPAQUE openFile #-}
 {-# ANN openFile hasBlackBox #-}
 
 -- | Close a file
@@ -236,8 +184,7 @@ closeFile
   :: File
   -> SimIO ()
 closeFile (File fp) = SimIO (IO.hClose fp)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE closeFile #-}
+{-# OPAQUE closeFile #-}
 {-# ANN closeFile hasBlackBox #-}
 
 -- | Read one character from a file
@@ -246,8 +193,7 @@ getChar
   -- ^ File to read from
   -> SimIO Char
 getChar (File fp) = SimIO (IO.hGetChar fp)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE getChar #-}
+{-# OPAQUE getChar #-}
 {-# ANN getChar hasBlackBox #-}
 
 -- | Insert a character into a buffer specified by the file
@@ -258,8 +204,7 @@ putChar
   -- ^ Buffer to insert to
   -> SimIO ()
 putChar c (File fp) = SimIO (IO.hPutChar fp c)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE putChar #-}
+{-# OPAQUE putChar #-}
 {-# ANN putChar hasBlackBox #-}
 
 -- | Read one line from a file
@@ -282,8 +227,7 @@ getLine (File fp) (Reg r) = SimIO $ do
    rep []     vs          = vs
    rep (x:xs) (Cons _ vs) = Cons (toEnum (fromEnum x)) (rep xs vs)
    rep _      Nil         = Nil
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE getLine #-}
+{-# OPAQUE getLine #-}
 {-# ANN getLine hasBlackBox #-}
 
 -- | Determine whether we've reached the end of the file
@@ -292,8 +236,7 @@ isEOF
   -- ^ File we want to inspect
   -> SimIO Bool
 isEOF (File fp) = SimIO (IO.hIsEOF fp)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE isEOF #-}
+{-# OPAQUE isEOF #-}
 {-# ANN isEOF hasBlackBox #-}
 
 -- | Set the position of the next operation on the file
@@ -310,8 +253,7 @@ seek
   -- * 2: From the end of the file
   -> SimIO Int
 seek (File fp) pos mode = SimIO (IO.hSeek fp (toEnum mode) pos >> return 0)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE seek #-}
+{-# OPAQUE seek #-}
 {-# ANN seek hasBlackBox #-}
 
 -- | Set the position of the next operation to the beginning of the file
@@ -319,8 +261,7 @@ rewind
   :: File
   -> SimIO Int
 rewind (File fp) = SimIO (IO.hSeek fp IO.AbsoluteSeek 0 >> return 0)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rewind #-}
+{-# OPAQUE rewind #-}
 {-# ANN rewind hasBlackBox #-}
 
 -- | Returns the offset from the beginning of the file (in bytes).
@@ -329,8 +270,7 @@ tell
   -- ^ File we want to inspect
   -> SimIO Integer
 tell (File fp) = SimIO (IO.hTell fp)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE tell #-}
+{-# OPAQUE tell #-}
 {-# ANN tell hasBlackBox #-}
 
 -- | Write any buffered output to file
@@ -338,8 +278,7 @@ flush
   :: File
   -> SimIO ()
 flush (File fp) = SimIO (IO.hFlush fp)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE flush #-}
+{-# OPAQUE flush #-}
 {-# ANN flush hasBlackBox #-}
 
 -- | Simulation-level I/O environment that can be synthesized to HDL-level I\/O.
@@ -397,5 +336,4 @@ mealyIO !_ f (SimIO i) inp = unsafePerformIO (i >>= go inp)
  where
   go q@(~(k :- ks)) s =
     (:-) <$> unSimIO (f s k) <*> unsafeInterleaveIO ((q `seq` go ks s))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE mealyIO #-}
+{-# OPAQUE mealyIO #-}

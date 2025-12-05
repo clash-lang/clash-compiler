@@ -18,8 +18,7 @@ topEntity = pure @(Signal System)
   ,test @Word16
   ,test @Int32
   )
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 test :: Integral a => (a,a,a,a)
 test = (div0,quot0,mod0,rem0)

@@ -158,8 +158,7 @@ ddrIn# (Clock _ Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 
 
 ddrIn# _ _ _ _ _ _ =
   error "ddrIn#: dynamic clocks not supported"
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ddrIn# #-}
+{-# OPAQUE ddrIn# #-}
 {-# ANN ddrIn# hasBlackBox #-}
 
 -- | DDR output primitive
@@ -227,8 +226,7 @@ ddrOut# clk rst en i0 xs ys =
     xs' = register# clk rst en (errorX "ddrOut: unreachable error") i0 xs
     ys' = register# clk rst en (deepErrorX "ddrOut: initial value undefined") i0 ys
     zipSig (a :- as) (b :- bs) = a :- b :- zipSig as bs
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ddrOut# #-}
+{-# OPAQUE ddrOut# #-}
 {-# ANN ddrOut# hasBlackBox #-}
 
 -- | Use a DDR output primitive to forward a clock to an output pin
@@ -309,8 +307,7 @@ ddrForwardClock#
   -> Clock domOut
 ddrForwardClock# (Clock SSymbol periods) ddrSignal =
   Clock (ddrSignal `seq` SSymbol) (unsafeCoerce periods)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ddrForwardClock# #-}
+{-# OPAQUE ddrForwardClock# #-}
 {-# ANN ddrForwardClock# (
   let
     bbName = show 'ddrForwardClock#

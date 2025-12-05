@@ -18,8 +18,7 @@ topEntity = fmap head r
       where
         f :: Vec 1 Word8 -> Vec 1 Word8
         f regs = replace 0 (regs!!0 + 1) regs
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
@@ -28,5 +27,4 @@ testBench = done
     done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen)
     clk            = tbSystemClockGen (not <$> done)
     rst            = systemResetGen
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE testBench #-}
+{-# OPAQUE testBench #-}

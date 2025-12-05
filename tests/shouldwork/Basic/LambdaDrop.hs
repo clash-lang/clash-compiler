@@ -15,22 +15,18 @@ topEntity = (++#) <$> (pack <$> outport1) <*> (pack <$> outport2)
 
 core :: Signal dom (Maybe Bit) -> Signal dom Bit
 core = fmap (maybe low id)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE core #-}
+{-# OPAQUE core #-}
 
 ram :: Signal dom Bit -> Signal dom (Maybe Bit)
 ram = fmap pure
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ram #-}
+{-# OPAQUE ram #-}
 
 decodeReq :: Integer -> Signal dom Bit -> Signal dom Bit
 decodeReq 0 = fmap (const low)
 decodeReq 1 = id
 decodeReq _ = fmap complement
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE decodeReq #-}
+{-# OPAQUE decodeReq #-}
 
 gpio :: Signal dom Bit -> (Signal dom Bit,Signal dom (Maybe Bit))
 gpio i = (i,pure <$> i)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE gpio #-}
+{-# OPAQUE gpio #-}

@@ -54,20 +54,13 @@ import           Data.Text.Encoding          (decodeUtf8)
 import qualified Data.Traversable            as T
 import           Data.String.Interpolate     (__i)
 import qualified Text.Read                   as Text
-#if MIN_VERSION_ghc(9,4,0)
 import           Data.Primitive.ByteArray    (ByteArray(ByteArray))
 import qualified GHC.Data.Strict             as GHC
 import           GHC.Num.Integer             (integerToBigNatClamp#)
-#endif
-#if MIN_VERSION_ghc(9,6,0)
 import           Language.Haskell.Syntax.Basic (FieldLabelString (..))
-#endif
 
 -- GHC API
-#if MIN_VERSION_ghc(9,4,0)
 import GHC.Core.Reduction (Reduction(Reduction), HetReduction(..))
-#endif
-#if MIN_VERSION_ghc(9,0,0)
 import GHC.Builtin.Types (falseDataCon)
 import GHC.Core.Coercion.Axiom
   (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), fromBranches)
@@ -75,15 +68,9 @@ import GHC.Core.Coercion (Role (Nominal), coercionType, coercionKind)
 import GHC.Core.FVs  (exprSomeFreeVars)
 import GHC.Core
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..),
-#if MIN_VERSION_ghc(9,2,0)
    Alt(..),
-#else
-   Tickish (..),
-#endif
    collectArgs, rhssOfAlts, unfoldingTemplate)
-#if MIN_VERSION_ghc(9,2,0)
 import GHC.Types.Tickish (GenTickish (..))
-#endif
 import GHC.Core.DataCon
   (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
    dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel,
@@ -108,12 +95,8 @@ import GHC.Core.TyCon
    isNewTyCon, isPrimTyCon, isTupleTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
    tyConDataCons, tyConKind, tyConName, tyConUnique, isClassTyCon, isPromotedDataCon_maybe)
-#if MIN_VERSION_ghc(9,6,0)
 import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type (tyConAppFunTy_maybe)
-#else
-import GHC.Core.TyCon (isFunTyCon)
-#endif
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
 import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
 import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
@@ -121,56 +104,6 @@ import GHC.Types.Var
   (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
    varUnique, idInfo, isGlobalId)
 import GHC.Types.Var.Set (isEmptyVarSet)
-#else
-import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
-                   fromBranches, Role (Nominal, Representational))
-import Coercion   (coercionType, coercionKind, mkTransCo)
-import CoreFVs    (exprSomeFreeVars)
-import CoreSyn
-  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), Tickish (..),
-   collectArgs, rhssOfAlts, unfoldingTemplate)
-import TysWiredIn (falseDataCon)
-import DataCon    (DataCon, HsImplBang(..),
-                   dataConExTyCoVars,
-                   dataConName, dataConRepArgTys,
-                   dataConTag, dataConTyCon,
-                   dataConUnivTyVars, dataConWorkId,
-                   dataConFieldLabels, flLabel, dataConImplBangs)
-import FamInstEnv (FamInst (..), FamInstEnvs,
-                   familyInstances, normaliseType, emptyFamInstEnvs,
-                   normaliseTcArgs, reduceTyFamApp_maybe)
-
-import FastString (unpackFS, bytesFS)
-
-import Id         (isDataConId_maybe)
-import IdInfo     (IdDetails (..), unfoldingInfo)
-import Literal    (Literal (..), LitNumType (..))
-import Literal    (literalType)
-import Module     (moduleName, moduleNameString)
-import Name       (Name, nameModule_maybe,
-                   nameOccName, nameUnique, getSrcSpan)
-import PrelNames  (integerTyConKey, naturalTyConKey)
-import OccName    (occNameString)
-import Pair       (Pair (..))
-import SrcLoc     (SrcSpan (..), isGoodSrcSpan)
-import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
-                   algTyConRhs, isAlgTyCon, isFamilyTyCon,
-                   isFunTyCon, isNewTyCon, isPromotedDataCon_maybe,
-                   isPrimTyCon, isTupleTyCon,
-                   isClosedSynFamilyTyConWithAxiom_maybe,
-                   expandSynTyCon_maybe,
-                   tyConArity,
-                   tyConDataCons, tyConKind,
-                   tyConName, tyConUnique, isClassTyCon)
-import Type       (mkTvSubstPrs, substTy, coreView)
-import TyCoRep    (Coercion (..), TyLit (..), Type (..))
-import Unique     (Uniquable (..), Unique, getKey, hasKey)
-import Var        (Id, TyVar, Var, idDetails,
-                   isTyVar, varName, varType,
-                   varUnique, idInfo, isGlobalId)
-import Var        (VarBndr (..))
-import VarSet     (isEmptyVarSet)
-#endif
 
 -- Local imports
 import           Clash.Annotations.Primitive (extractPrim)
@@ -546,15 +479,8 @@ coreToTerm primMap unlocs = term
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
     term' (Tick (SourceNote rsp _) e) =
-#if MIN_VERSION_ghc(9,4,0)
       C.Tick (C.SrcSpan (RealSrcSpan rsp GHC.Nothing)) <$>
              addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
-#elif MIN_VERSION_ghc(9,0,0)
-      C.Tick (C.SrcSpan (RealSrcSpan rsp Nothing)) <$>
-             addUsefull (RealSrcSpan rsp Nothing) (term e)
-#else
-      C.Tick (C.SrcSpan (RealSrcSpan rsp)) <$> addUsefull (RealSrcSpan rsp) (term e)
-#endif
     term' (Tick _ e) = term e
     term' (Type t) =
       C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
@@ -650,15 +576,9 @@ coreToTerm primMap unlocs = term
               | otherwise
               -> C.Var <$> coreToId x
 
-#if MIN_VERSION_ghc(9,2,0)
     alt _   (Alt DEFAULT      _  e) = (C.DefaultPat,) <$> term e
     alt _   (Alt (LitAlt l)   _  e) = (C.LitPat (coreToLiteral l),) <$> term e
     alt sp0 (Alt (DataAlt dc) xs e) = case span isTyVar xs of
-#else
-    alt _   (DEFAULT   , _ , e) = (C.DefaultPat,) <$> term e
-    alt _   (LitAlt l  , _ , e) = (C.LitPat (coreToLiteral l),) <$> term e
-    alt sp0 (DataAlt dc, xs, e) = case span isTyVar xs of
-#endif
       (tyvs,tmvs) -> do
         (e',sp1) <- termSP sp0 e
         (,) <$> (C.DataPat <$> coreToDataCon dc
@@ -674,29 +594,18 @@ coreToTerm primMap unlocs = term
       LitRubbish{}   ->
         error $ "coreToTerm: Encountered LibRubbish. This is a bug in Clash. "
              ++ "Report on https://github.com/clash-lang/clash-compiler/issues."
-#if MIN_VERSION_ghc(9,0,0)
       LitNumber lt i -> case lt of
-#else
-      LitNumber lt i _ -> case lt of
-#endif
-#if MIN_VERSION_ghc(9,4,0)
         LitNumBigNat  -> C.ByteArrayLiteral (ByteArray (integerToBigNatClamp# i))
-#else
-        LitNumInteger -> C.IntegerLiteral i
-        LitNumNatural -> C.NaturalLiteral i
-#endif
         LitNumInt     -> C.IntLiteral i
         LitNumInt64   -> C.Int64Literal i
         LitNumWord    -> C.WordLiteral i
         LitNumWord64  -> C.Word64Literal i
-#if MIN_VERSION_ghc(9,2,0)
         LitNumInt8    -> C.Int8Literal i
         LitNumInt16   -> C.Int16Literal i
         LitNumInt32   -> C.Int32Literal i
         LitNumWord8   -> C.Word8Literal i
         LitNumWord16  -> C.Word16Literal i
         LitNumWord32  -> C.Word32Literal i
-#endif
       LitFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
       LitDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
       LitNullAddr   -> C.StringLiteral []
@@ -785,11 +694,7 @@ hasPrimCo (AxiomRuleCo _ coers) = do
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
 
-#if MIN_VERSION_ghc(9,6,0)
 hasPrimCo (SelCo _ co) = hasPrimCo co
-#else
-hasPrimCo (NthCo _ _ co)  = hasPrimCo co
-#endif
 hasPrimCo (LRCo _ co)   = hasPrimCo co
 hasPrimCo (InstCo co _) = hasPrimCo co
 hasPrimCo (SubCo co)    = hasPrimCo co
@@ -799,20 +704,12 @@ hasPrimCo _ = return Nothing
 coreToDataCon :: DataCon
               -> C2C C.DataCon
 coreToDataCon dc = do
-#if MIN_VERSION_ghc(9,0,0)
     repTys <- mapM (coreToType . scaledThing) (dataConRepArgTys dc)
-#else
-    repTys <- mapM coreToType (dataConRepArgTys dc)
-#endif
     dcTy   <- coreToType (varType $ dataConWorkId dc)
     mkDc dcTy repTys
   where
     mkDc dcTy repTys = do
-#if MIN_VERSION_ghc(9,6,0)
       let decLabel = decodeUtf8 . bytesFS . field_label . flLabel
-#else
-      let decLabel = decodeUtf8 . bytesFS . flLabel
-#endif
       let repBangs = fmap hsImplBangToBool (dataConImplBangs dc)
       let fLabels  = map decLabel (dataConFieldLabels dc)
 
@@ -889,13 +786,8 @@ coreToAttr t0@(TyConApp ty args) = do
     --      doesn't have a second field.
     key = args !! 1
     value = args !! 2
-#if MIN_VERSION_ghc(9,4,0)
   let Reduction _ key1 = normaliseType envs Nominal key
       Reduction _ value1 = normaliseType envs Nominal value
-#else
-  let (_,key1) = normaliseType envs Nominal key
-      (_,value1) = normaliseType envs Nominal value
-#endif
   if
     | name == show 'StringAttr ->
       return $ StringAttr (tyLitToText key1) (tyLitToText value1)
@@ -995,42 +887,17 @@ coreToType ty = ty'' >>= annotateType ty
              envs <- view famInstEnvs
              case topReduceTyFamApp_maybe envs tc xs of
                Nothing -> coreToType' ty
-#if MIN_VERSION_ghc(9,4,0)
                Just (HetReduction (Reduction _ ty') _) -> coreToType ty'
-#else
-               Just (_, ty', _) -> coreToType ty'
-#endif
          | otherwise = coreToType' ty
-
-#if !MIN_VERSION_ghc(9,0,0)
-    -- taken and adapted from GHC.Core.FamInstEnv (GHC 9.0.2)
-    topReduceTyFamApp_maybe envs fam_tc arg_tys
-      | isFamilyTyCon fam_tc
-      , Just (co, rhs) <- reduceTyFamApp_maybe envs role fam_tc ntys
-      = Just (args_co `mkTransCo` co, rhs, res_co)
-      | otherwise
-      = Nothing
-      where
-        role = Representational
-        (args_co, ntys, res_co) = normaliseTcArgs envs role fam_tc arg_tys
-#endif
 
 coreToType'
   :: Type
   -> C2C C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToTyVar tv
 coreToType' (TyConApp tc args)
-#if MIN_VERSION_ghc(9,6,0)
   | Just (FunTy _ _ ty1 ty2) <- tyConAppFunTy_maybe tc args = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-#else
-  | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
-#endif
   | otherwise     = case expandSynTyCon_maybe tc args of
-#if MIN_VERSION_ghc(9,6,0)
                       ExpandsSyn substs synTy remArgs -> do
-#else
-                      Just (substs,synTy,remArgs) -> do
-#endif
                         let substs' = mkTvSubstPrs substs
                             synTy'  = substTy substs' synTy
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
@@ -1040,11 +907,7 @@ coreToType' (TyConApp tc args)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
 -- TODO: save the distinction between => and ->
-#if MIN_VERSION_ghc(9,0,0)
 coreToType' (FunTy _ _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-#else
-coreToType' (FunTy _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-#endif
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
 coreToType' (CastTy t (Refl{})) = coreToType' t
@@ -1055,9 +918,7 @@ coreToTyLit :: TyLit
             -> C.LitTy
 coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
-#if MIN_VERSION_ghc(9,2,0)
 coreToTyLit (CharTyLit c) = C.CharTy c
-#endif
 
 coreToTyVar :: TyVar
             -> C2C C.TyVar

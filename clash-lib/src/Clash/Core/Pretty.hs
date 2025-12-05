@@ -48,11 +48,7 @@ import Data.Text.Prettyprint.Doc.Internal
 #endif
 import GHC.Show                         (showMultiLineString)
 import GHC.Stack                        (HasCallStack)
-#if MIN_VERSION_ghc(9,0,0)
 import qualified GHC.Utils.Outputable   as GHC
-#else
-import qualified Outputable             as GHC
-#endif
 import System.Environment               (lookupEnv)
 import System.IO.Unsafe                 (unsafePerformIO)
 import Text.Read                        (readMaybe)

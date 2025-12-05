@@ -7,13 +7,11 @@ import Clash.Explicit.Testbench
 
 head' :: Vec (n+1) (Signed 16) -> Signed 16
 head' (Cons x xs) = x
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE head' #-}
+{-# OPAQUE head' #-}
 
 topEntity :: Vec 3 (Signed 16) -> Signed 16
 topEntity = head'
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

@@ -28,8 +28,7 @@ topEntity
   -> Enable System
   -> Signal System (BitVector 8) -> Signal System (Unsigned 32)
 topEntity = exposeClockResetEnable (fmap unpack . crc32)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 -- test bench
 testBench :: Signal System Bool

@@ -22,13 +22,8 @@ module Clash.Hedgehog.Sized.BitVector
   , genSomeBitVector
   ) where
 
-#if !MIN_VERSION_base(4,16,0)
-import GHC.Natural (Natural)
-#endif
 import GHC.TypeNats
-#if MIN_VERSION_base(4,18,0)
   hiding (SNat)
-#endif
 import Hedgehog (MonadGen, Range)
 import Hedgehog.Internal.Range (constantBounded, constant)
 import qualified Hedgehog.Gen as Gen

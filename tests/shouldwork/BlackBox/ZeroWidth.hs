@@ -23,8 +23,7 @@ answer = "A nervous wreck."
 -- | Inserts given comment in HDL. Returns "nothing".
 comment :: String -> ()
 comment !_s = ()
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE comment #-}
+{-# OPAQUE comment #-}
 {-# ANN comment (InlinePrimitive [VHDL] [__i|
   [ { "BlackBox" :
       { "name"      : "ZeroWidth.comment"
@@ -42,8 +41,7 @@ implicitComment n =
     5 -> ()
     _ ->
       comment question
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE implicitComment #-}
+{-# OPAQUE implicitComment #-}
 
 topEntity :: Int -> (Int, (), ())
 topEntity a = (succ a, comment luckyNumber, implicitComment a)

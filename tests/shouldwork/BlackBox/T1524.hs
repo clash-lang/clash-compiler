@@ -7,8 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: Vec 2 (Vec 3 Int) -> Vec 2 Int
 topEntity = f @2 @(3-1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 f :: Vec k (Vec (l+1) Int) -> Vec k Int
 f input = map g input

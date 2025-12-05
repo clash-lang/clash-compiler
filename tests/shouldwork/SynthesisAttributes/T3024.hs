@@ -13,16 +13,16 @@ import Clash.Annotations.TopEntity
 f :: Unsigned 8 -> Unsigned 8
 f x = x + 1
 {-# ANN f (Synthesize {t_name = "f", t_inputs = [PortName "x"], t_output = PortName "y"}) #-}
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 g :: (Unsigned 8 -> Unsigned 8) -> Unsigned 8 -> Unsigned 8
 g h x = (h x + h (x * 8))
-{-# CLASH_OPAQUE g #-}
+{-# OPAQUE g #-}
 
 q :: Unsigned 8 -> Unsigned 8
 q = g f
 {-# ANN q (Synthesize {t_name = "q", t_inputs = [PortName "a"], t_output = PortName "b"}) #-}
-{-# CLASH_OPAQUE q #-}
+{-# OPAQUE q #-}
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack

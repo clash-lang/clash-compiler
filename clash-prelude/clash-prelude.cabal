@@ -148,12 +148,6 @@ Library
   ghc-options:        -Wall -Wcompat -fexpose-all-unfoldings -fno-worker-wrapper
   CPP-Options:        -DCABAL
 
-  -- See https://github.com/clash-lang/clash-compiler/pull/2511
-  if impl(ghc >= 9.4)
-    CPP-Options: -DCLASH_OPAQUE=OPAQUE
-  else
-    CPP-Options: -DCLASH_OPAQUE=NOINLINE
-
   if flag(large-tuples)
     CPP-Options: -DLARGE_TUPLES
 
@@ -325,7 +319,7 @@ Library
   Build-depends:      adjunctions               >= 4.0     && < 5.0,
                       array                     >= 0.5.1.0 && < 0.6,
                       arrows                    >= 0.4     && < 0.5,
-                      base                      >= 4.11    && < 5,
+                      base                      >= 4.18    && < 5,
                       binary                    >= 0.8.5   && < 0.11,
                       bytestring                >= 0.10.8  && < 0.13,
                       constraints               >= 0.9     && < 1.0,
@@ -335,6 +329,7 @@ Library
                       deepseq                   >= 1.4.1.0 && < 1.6,
                       distributive              >= 0.1     && < 1.0,
                       extra                     >= 1.6.17  && < 1.9,
+                      ghc-bignum                >= 1.0     && < 1.4,
                       ghc-prim                  >= 0.5.1.0 && < 0.13,
                       ghc-typelits-extra        >= 0.4     && < 0.5,
                       ghc-typelits-knownnat     >= 0.7.2   && < 0.8,
@@ -349,8 +344,8 @@ Library
                       singletons                >= 2.0     && < 3.1,
                       string-interpolate        ^>= 0.3,
                       tagged                    >= 0.8     && < 0.9,
-                      template-haskell          >= 2.12.0.0 && < 2.23,
-                      th-abstraction            >= 0.2.10 && < 0.8.0,
+                      template-haskell          >= 2.20.0.0 && < 2.23,
+                      th-abstraction            >= 0.3.0 && < 0.8.0,
                       th-lift                   >= 0.7.0    && < 0.9,
                       th-orphans                >= 0.13.1   && < 1.0,
                       text                      >= 0.11.3.1 && < 2.2,
@@ -361,12 +356,8 @@ Library
                       vector                    >= 0.11    && < 1.0,
                       mtl                       >= 2.0     && < 3.0
 
-  if impl(ghc >= 9.0.0)
-    Build-Depends:    ghc-bignum                >= 1.0      && < 1.4
-  else
-    Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
   if flag(large-tuples)
-    Build-Depends:    ghc
+    Build-Depends:    ghc                       >= 9.6.0 && < 9.11
 
 test-suite doctests
   type:             exitcode-stdio-1.0

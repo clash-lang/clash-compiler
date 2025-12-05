@@ -10,8 +10,7 @@ topEntity = scatter defvec to
   where
     defvec = replicate d5 99
     to = 0 :> 4 :> 2 :> 3 :> 1 :> Nil
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

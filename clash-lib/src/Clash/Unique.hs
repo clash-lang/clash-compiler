@@ -30,11 +30,7 @@ import GHC.Exts (Word64#)
 import GHC.Int (Int(I#))
 import GHC.Exts (Int#)
 #endif
-#if MIN_VERSION_ghc(9,0,0)
 import qualified GHC.Types.Unique as GHC
-#else
-import qualified Unique as GHC
-#endif
 
 #ifdef UNIQUE_IS_WORD64
 type Unique = Word64

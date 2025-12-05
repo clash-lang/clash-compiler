@@ -101,13 +101,8 @@ ghcTypeToHWType iw = go
                       _  -> throwE $ $(curLoc) ++ "Word64 DC has unexpected amount of arguments"
                     _    -> throwE $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
              else returnN (Unsigned 64)
-#if MIN_VERSION_ghc(9,0,0)
         "GHC.Num.Integer.Integer"       -> returnN (Signed iw)
         "GHC.Num.Natural.Natural"       -> returnN (Unsigned iw)
-#else
-        "GHC.Integer.Type.Integer"      -> returnN (Signed iw)
-        "GHC.Natural.Natural"           -> returnN (Unsigned iw)
-#endif
         "GHC.Prim.Char#"                -> returnN (Unsigned 21)
         "GHC.Prim.Int#"                 -> returnN (Signed iw)
         "GHC.Prim.Word#"                -> returnN (Unsigned iw)

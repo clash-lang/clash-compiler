@@ -10,7 +10,6 @@ type instance QQ (Signal dom a) = a
 
 f :: forall a . Proxy a -> QQ a -> QQ a
 f Proxy = id
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 topEntity = f @(Signal System Bool)

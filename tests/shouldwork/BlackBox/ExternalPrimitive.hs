@@ -13,14 +13,12 @@ import Clash.Annotations.Primitive (hasBlackBox)
 
 jsonPrim :: Int
 jsonPrim = 0
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE jsonPrim #-}
+{-# OPAQUE jsonPrim #-}
 {-# ANN jsonPrim hasBlackBox #-}
 
 yamlPrim :: Int
 yamlPrim = 1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE yamlPrim #-}
+{-# OPAQUE yamlPrim #-}
 {-# ANN yamlPrim hasBlackBox #-}
 
 topEntity :: Vec _ Int

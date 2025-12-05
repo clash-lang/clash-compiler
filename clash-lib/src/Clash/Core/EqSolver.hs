@@ -19,12 +19,8 @@ import Clash.Core.Type
 import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
 import Clash.Unique (fromGhcUnique)
-#if MIN_VERSION_ghc(9,0,0)
 import Clash.Core.DataCon (dcUniq)
 import GHC.Builtin.Names (unsafeReflDataConKey, eqPrimTyConKey, typeNatAddTyFamNameKey)
-#else
-import PrelNames (eqPrimTyConKey, typeNatAddTyFamNameKey)
-#endif
 
 -- | Data type that indicates what kind of solution (if any) was found
 data TypeEqSolution
@@ -139,12 +135,10 @@ isAbsurdPat
   :: TyConMap
   -> Pat
   -> Bool
-#if MIN_VERSION_base(4,15,0)
 isAbsurdPat _tcm (DataPat dc _ _)
   -- unsafeCoerce is not absurd in the way intended by /isAbsurdPat/
   | dcUniq dc == fromGhcUnique unsafeReflDataConKey
   = False
-#endif
 isAbsurdPat tcm pat =
   any (isAbsurdEq tcm exts) (patEqs tcm pat)
  where

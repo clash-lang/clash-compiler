@@ -11,8 +11,7 @@ primitive
 primitive i =
   (i+5)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE primitive #-}
+{-# OPAQUE primitive #-}
 {-# ANN primitive dontTranslate #-}
 
 topEntity = primitive

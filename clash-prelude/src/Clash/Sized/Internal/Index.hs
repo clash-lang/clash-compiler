@@ -82,14 +82,8 @@ import Text.Printf                (PrintfArg (..), printf)
 import Data.Ix                    (Ix(..))
 import Language.Haskell.TH        (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
-#if MIN_VERSION_template_haskell(2,17,0)
 import Language.Haskell.TH        (Quote, Type)
-#else
-import Language.Haskell.TH        (TypeQ)
-#endif
 import GHC.Generics               (Generic)
 import GHC.Natural                (Natural, naturalFromInteger)
 import GHC.Natural                (naturalToInteger)
@@ -166,8 +160,7 @@ data Index (n :: Nat) =
 
 {-# ANN I hasBlackBox #-}
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE size# #-}
+{-# OPAQUE size# #-}
 size# :: (KnownNat n, 1 <= n) => Index n -> Int
 size# = BV.size# . pack#
 
@@ -186,14 +179,12 @@ instance (KnownNat n, 1 <= n) => BitPack (Index n) where
 fromSNat :: (KnownNat m, n + 1 <= m) => SNat n -> Index m
 fromSNat = snatToNum
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE pack# #-}
+{-# OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}
 pack# :: Index n -> BitVector (CLog 2 n)
 pack# (I i) = BV 0 (naturalFromInteger i)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unpack# #-}
+{-# OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
 unpack# :: (KnownNat n, 1 <= n) => BitVector (CLog 2 n) -> Index n
 unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
@@ -203,14 +194,12 @@ instance Eq (Index n) where
   (==) = eq#
   (/=) = neq#
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE eq# #-}
+{-# OPAQUE eq# #-}
 {-# ANN eq# hasBlackBox #-}
 eq# :: (Index n) -> (Index n) -> Bool
 (I n) `eq#` (I m) = n == m
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE neq# #-}
+{-# OPAQUE neq# #-}
 {-# ANN neq# hasBlackBox #-}
 neq# :: (Index n) -> (Index n) -> Bool
 (I n) `neq#` (I m) = n /= m
@@ -222,20 +211,16 @@ instance Ord (Index n) where
   (<=) = le#
 
 lt#,ge#,gt#,le# :: Index n -> Index n -> Bool
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE lt# #-}
+{-# OPAQUE lt# #-}
 {-# ANN lt# hasBlackBox #-}
 lt# (I n) (I m) = n < m
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ge# #-}
+{-# OPAQUE ge# #-}
 {-# ANN ge# hasBlackBox #-}
 ge# (I n) (I m) = n >= m
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE gt# #-}
+{-# OPAQUE gt# #-}
 {-# ANN gt# hasBlackBox #-}
 gt# (I n) (I m) = n > m
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE le# #-}
+{-# OPAQUE le# #-}
 {-# ANN le# hasBlackBox #-}
 le# (I n) (I m) = n <= m
 
@@ -253,35 +238,29 @@ instance KnownNat n => Enum (Index n) where
 
 toEnum# :: forall n. KnownNat n => Int -> Index n
 toEnum# = fromInteger# . toInteger
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE toEnum# #-}
+{-# OPAQUE toEnum# #-}
 {-# ANN toEnum# hasBlackBox #-}
 
 fromEnum# :: forall n. KnownNat n => Index n -> Int
 fromEnum# = fromEnum . toInteger#
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fromEnum# #-}
+{-# OPAQUE fromEnum# #-}
 {-# ANN fromEnum# hasBlackBox #-}
 
 enumFrom# :: forall n. KnownNat n => Index n -> [Index n]
 enumFrom# x = [x .. maxBound]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFrom# #-}
+{-# OPAQUE enumFrom# #-}
 
 enumFromThen# :: forall n. KnownNat n => Index n -> Index n -> [Index n]
 enumFromThen# x y = if x <= y then [x, y .. maxBound] else [x, y .. minBound]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromThen# #-}
+{-# OPAQUE enumFromThen# #-}
 
 enumFromTo# :: Index n -> Index n -> [Index n]
 enumFromTo# x y = map I [unsafeToInteger x .. unsafeToInteger y]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromTo# #-}
+{-# OPAQUE enumFromTo# #-}
 
 enumFromThenTo# :: Index n -> Index n -> Index n -> [Index n]
 enumFromThenTo# x1 x2 y = map I [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromThenTo# #-}
+{-# OPAQUE enumFromThenTo# #-}
 
 instance KnownNat n => Bounded (Index n) where
   minBound = fromInteger# 0
@@ -292,8 +271,7 @@ maxBound# =
   case natToInteger @n of
     0 -> errorX "maxBound of 'Index 0' is undefined"
     n -> fromInteger_INLINE (n - 1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE maxBound# #-}
+{-# OPAQUE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
 -- | Operators report an error on overflow and underflow
@@ -311,18 +289,15 @@ instance KnownNat n => Num (Index n) where
   fromInteger = fromInteger#
 
 (+#),(-#),(*#) :: KnownNat n => Index n -> Index n -> Index n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (+#) #-}
+{-# OPAQUE (+#) #-}
 {-# ANN (+#) hasBlackBox #-}
 (+#) (I a) (I b) = fromInteger_INLINE $ a + b
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (-#) #-}
+{-# OPAQUE (-#) #-}
 {-# ANN (-#) hasBlackBox #-}
 (-#) (I a) (I b) = fromInteger_INLINE $ a - b
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (*#) #-}
+{-# OPAQUE (*#) #-}
 {-# ANN (*#) hasBlackBox #-}
 (*#) (I a) (I b) = fromInteger_INLINE $ a * b
 
@@ -331,8 +306,7 @@ negate# 0 = 0
 negate# i = maxBound -# i +# 1
 
 fromInteger# :: KnownNat n => Integer -> Index n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fromInteger# #-}
+{-# OPAQUE fromInteger# #-}
 {-# ANN fromInteger# hasBlackBox #-}
 fromInteger# = fromInteger_INLINE
 {-# INLINE fromInteger_INLINE #-}
@@ -351,13 +325,11 @@ instance ExtendingNum (Index m) (Index n) where
   mul = times#
 
 plus#, minus# :: Index m -> Index n -> Index (m + n - 1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE plus# #-}
+{-# OPAQUE plus# #-}
 {-# ANN plus# hasBlackBox #-}
 plus# (I a) (I b) = I (a + b)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE minus# #-}
+{-# OPAQUE minus# #-}
 {-# ANN minus# hasBlackBox #-}
 minus# (I a) (I b) =
   let z   = a - b
@@ -366,8 +338,7 @@ minus# (I a) (I b) =
       res = if z < 0 then err else I z
   in  res
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE times# #-}
+{-# OPAQUE times# #-}
 {-# ANN times# hasBlackBox #-}
 times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
@@ -476,17 +447,14 @@ instance KnownNat n => Integral (Index n) where
   toInteger   = toInteger#
 
 quot#,rem# :: Index n -> Index n -> Index n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE quot# #-}
+{-# OPAQUE quot# #-}
 {-# ANN quot# hasBlackBox #-}
 (I a) `quot#` (I b) = I (a `div` b)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rem# #-}
+{-# OPAQUE rem# #-}
 {-# ANN rem# hasBlackBox #-}
 (I a) `rem#` (I b) = I (a `rem` b)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE toInteger# #-}
+{-# OPAQUE toInteger# #-}
 {-# ANN toInteger# hasBlackBox #-}
 toInteger# :: Index n -> Integer
 toInteger# (I n) = n
@@ -530,22 +498,15 @@ instance Resize Index where
 
 resize# :: KnownNat m => Index n -> Index m
 resize# (I i) = fromInteger_INLINE i
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE resize# #-}
+{-# OPAQUE resize# #-}
 {-# ANN resize# hasBlackBox #-}
 
 instance KnownNat n => Lift (Index n) where
   lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))
   {-# NOINLINE lift #-}
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
-#if MIN_VERSION_template_haskell(2,17,0)
 decIndex :: Quote m => Integer -> m Type
-#else
-decIndex :: Integer -> TypeQ
-#endif
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 
 instance Show (Index n) where

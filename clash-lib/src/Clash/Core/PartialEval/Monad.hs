@@ -63,10 +63,6 @@ import           Control.Applicative (Alternative)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask)
 import           Control.Monad.IO.Class (MonadIO)
 
-#if !MIN_VERSION_base(4,13,0)
-import           Control.Monad.Fail (MonadFail)
-#endif
-
 import           Control.Monad.RWS.Strict (RWST, MonadReader, MonadState)
 import qualified Control.Monad.RWS.Strict as RWS
 import qualified Data.IntMap.Strict as IntMap

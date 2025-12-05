@@ -12,8 +12,7 @@ topEntity
   -> Signal System Int
   -> Signal System Int
 topEntity clk rst en ps = register clk rst en 0 (ps + 1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

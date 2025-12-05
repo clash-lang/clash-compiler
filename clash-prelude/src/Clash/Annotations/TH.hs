@@ -162,15 +162,7 @@ visit name a = local (\t -> t & _1 %~ Set.insert name
 
 -- | Grab the 'Name's of type variables in a datatype
 datatypeVars' :: DatatypeInfo -> [Name]
-#if MIN_VERSION_th_abstraction(0,3,0)
 datatypeVars' d = tvName <$> datatypeVars d
-#else
-datatypeVars' d = name <$> datatypeVars d
- where
-  name (VarT n) = n
-  name (SigT n _) = name n
-  name e = error $ "Unexpected datatype variable name of type " ++ show e
-#endif
 
 -- | Run a 'Name' through the template haskell machinery, getting a
 -- 'DatatypeInfo' if the 'Name' specified a datatype. The result is processed by
@@ -321,11 +313,7 @@ typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
         --     port tree from the constructor
         _ | familyArity info == Just (length xs) -> do
           (lift $ reifyInstances x xs) >>= \case
-#if MIN_VERSION_template_haskell(2,15,0)
             [TySynInstD (TySynEqn _ _ r)] ->
-#else
-            [TySynInstD _ (TySynEqn _ r)] ->
-#endif
                 gatherNames (applyFamilyBindings xs info r)
 
             [NewtypeInstD _ _ _ _ c _] -> constructorToPorts c (familyTyMap xs info)
@@ -374,17 +362,9 @@ typeTreeToPorts f@(AppTF (a,a') (b,b')) = do
     = applyContext ctx (tvName <$> holes) t
   applyFamilyBindings _ _ _ = error "familyTyMap called with non family argument!"
 
-#if MIN_VERSION_template_haskell(2,15,0)
   tySynArgs (TySynEqn _ args _) = drop 1 (unapp args)
-#else
-  tySynArgs (TySynEqn args _) = args
-#endif
 
-#if MIN_VERSION_template_haskell(2,15,0)
   tySynRHS (TySynEqn _ _ r) = r
-#else
-  tySynRHS (TySynEqn _ r) = r
-#endif
 
   familyBindings (FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ xs _ _) _) _) = Just xs
   familyBindings (FamilyI (OpenTypeFamilyD (TypeFamilyHead _ xs _ _)) _) = Just xs
@@ -485,11 +465,7 @@ buildTopEntity topName (name, ty) = do
           Just name' -> name'          -- user specified name
           Nothing    -> nameBase name  -- auto-generated from Haskell name
 
-#if MIN_VERSION_template_haskell(2,17,0)
     (examineCode
-#else
-    (
-#endif
                   [|| Synthesize
                      { t_name   = outName
                      , t_inputs = ins
@@ -500,15 +476,9 @@ buildTopEntity topName (name, ty) = do
 -- This will return an 'TExp' of 'Nothing' if 'TopEntity' generation failed.
 maybeBuildTopEntity :: Maybe String -> Name -> Q (TExp (Maybe TopEntity))
 maybeBuildTopEntity topName name = do
-#if MIN_VERSION_template_haskell(2,17,0)
   recover (examineCode [|| Nothing ||]) $ do
     let expr = liftCode (getNameBinding name >>= buildTopEntity topName)
     examineCode [|| Just ($$expr) ||]
-#else
-  recover ([|| Nothing ||]) $ do
-    let expr = getNameBinding name >>= buildTopEntity topName
-    [|| Just ($$expr) ||]
-#endif
 
 -- | Turn the 'Name' of a value to a @('Name', 'Type')@
 getNameBinding :: Name -> Q (Name, Type)

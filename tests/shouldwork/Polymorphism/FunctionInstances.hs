@@ -16,13 +16,11 @@ f x =
   case x + 1 of
     2 -> 3
     _ -> 5
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 topEntity :: Signal System Int -> Signal System Int
 topEntity = fmap f
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

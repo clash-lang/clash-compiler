@@ -39,11 +39,7 @@ import           Clash.Core.Name                 (nameOcc)
 -- module Clash.Core.Subst cannot be linked; it is only available as a boot module
 import Clash.Core.Subst ()
 
-#if __GLASGOW_HASKELL__ >= 900
 type CompatTyVarBndr = TyVarBndr ()
-#else
-type CompatTyVarBndr = TyVarBndr
-#endif
 
 dcName' :: DataCon -> String
 dcName' = Text.unpack . nameOcc . dcName
@@ -66,15 +62,9 @@ termLiteralName = mkName "Clash.Core.TermLiteral.TermLiteral"
 -- | Extracts variable names from a 'TyVarBndr'.
 typeVarName :: CompatTyVarBndr -> Q (Name, Maybe Type)
 typeVarName = \case
-#if __GLASGOW_HASKELL__ >= 900
   PlainTV typVarName ()        -> pure (typVarName, Nothing)
   KindedTV typVarName () StarT -> pure (typVarName, Nothing)
   KindedTV typVarName () kind  -> pure (typVarName, Just kind)
-#else
-  PlainTV typVarName        -> pure (typVarName, Nothing)
-  KindedTV typVarName StarT -> pure (typVarName, Nothing)
-  KindedTV typVarName kind  -> pure (typVarName, Just kind)
-#endif
 
 -- | Derive a t'Clash.Core.TermLiteral.TermLiteral' instance for given type
 deriveTermLiteral :: Name -> Q [Dec]
@@ -222,11 +212,7 @@ deriveTermToData1 constrs =
       termName
       (ViewP
         (VarE 'collectArgs)
-#if MIN_VERSION_template_haskell(2,18,0)
         (TupP [ ConP 'Data [] [ViewP (VarE 'dcName') (VarP nameName)]
-#else
-        (TupP [ ConP 'Data [ViewP (VarE 'dcName') (VarP nameName)]
-#endif
               , ViewP
                  (VarE 'lefts)
                  (if nArgs == 0 then WildP else VarP argsName)]))

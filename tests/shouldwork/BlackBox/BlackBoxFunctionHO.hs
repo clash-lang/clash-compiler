@@ -34,8 +34,7 @@ myMultiply
   -> Signed 64
 myMultiply a b =
   a * b
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE myMultiply #-}
+{-# OPAQUE myMultiply #-}
 
 topEntity
   :: Signal System (Signed 64, Vec 3 (Signed 64))

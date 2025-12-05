@@ -6,7 +6,6 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -33,13 +32,8 @@ import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
 
 import qualified GHC                     as GHC (Ghc)
-#if MIN_VERSION_ghc(9,0,0)
-#if MIN_VERSION_ghc(9,4,0)
 import qualified GHC.Types.SourceText    as GHC
-#endif
-#if MIN_VERSION_ghc(9,2,0)
 import qualified GHC.Utils.Panic         as GHC
-#endif
 import qualified GHC.Types.Basic         as GHC
 import qualified GHC.Core                as GHC
 import qualified GHC.Types.Demand        as GHC
@@ -54,22 +48,6 @@ import qualified GHC.Builtin.Types       as GHC
 import qualified GHC.Settings.Constants  as GHC
 import qualified GHC.Types.Var           as GHC
 import qualified GHC.Types.SrcLoc        as GHC
-#else
-import qualified BasicTypes              as GHC
-import qualified Constants               as GHC
-import qualified CoreSyn                 as GHC
-import qualified Demand                  as GHC
-import qualified DynFlags                as GHC
-import qualified FamInstEnv              as GHC
-import qualified IdInfo                  as GHC
-import qualified Outputable              as GHC
-import qualified Name                    as GHC hiding (varName)
-import qualified TyCon                   as GHC
-import qualified Type                    as GHC
-import qualified TysWiredIn              as GHC
-import qualified Var                     as GHC
-import qualified SrcLoc                  as GHC
-#endif
 import           GHC.BasicTypes.Extra (isOpaque)
 
 import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
@@ -157,11 +135,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                                     -- selectors, no need to check free vars.
       clsMap =
         fmap (\(v,i) ->
-#if MIN_VERSION_ghc(9,4,0)
                (Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
-#else
-               (Binding v GHC.noSrcSpan GHC.Inline IsFun
-#endif
                   (mkClassSelector inScope0 allTcCache (varType v) i) False))
              clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
@@ -212,11 +186,7 @@ setNoInlineTopEntities bm tes =
 
   go b@Binding{bindingId}
     | bindingId `elemVarSet` ids
-#if MIN_VERSION_ghc(9,4,0)
     = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
-#else
-    = b { bindingSpec = GHC.NoInline }
-#endif
     | otherwise = b
 
 -- TODO This function should be changed to provide the information that
@@ -318,30 +288,14 @@ checkPrimitive primMap v = do
       let
         info = GHC.idInfo v
         inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
-#if MIN_VERSION_ghc(9,4,0)
         strictness = GHC.dmdSigInfo info
-#else
-        strictness = GHC.strictnessInfo info
-#endif
         ty = GHC.varType v
-#if MIN_VERSION_ghc(9,2,0)
         (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
-#else
-        (argTys,_resTy) = GHC.splitFunTys . snd . GHC.splitForAllTys $ ty
-#endif
-#if MIN_VERSION_ghc(9,4,0)
         (dmdArgs,_dmdRes) = GHC.splitDmdSig strictness
-#else
-        (dmdArgs,_dmdRes) = GHC.splitStrictSig strictness
-#endif
         nrOfArgs = length argTys
         loc = case GHC.getSrcLoc v of
                 GHC.UnhelpfulLoc _ -> ""
-#if MIN_VERSION_ghc(9,0,0)
                 GHC.RealSrcLoc l _ -> showPpr l ++ ": "
-#else
-                GHC.RealSrcLoc l   -> showPpr l ++ ": "
-#endif
         warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
@@ -362,19 +316,9 @@ checkPrimitive primMap v = do
 
       unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
         warnIf (not (isOpaque inline))
-#if MIN_VERSION_ghc(9,4,0)
           (primStr ++ "isn't marked OPAQUE."
-#else
-          (primStr ++ "isn't marked NOINLINE."
-#endif
           ++ "\nThis might make Clash ignore this primitive.")
-#if MIN_VERSION_ghc(9,2,0)
         warnIf (GHC.isDeadEndAppSig strictness nrOfArgs)
-#elif MIN_VERSION_ghc(9,0,0)
-        warnIf (GHC.appIsDeadEnd strictness nrOfArgs)
-#else
-        warnIf (GHC.appIsBottom strictness nrOfArgs)
-#endif
           ("The Haskell implementation of " ++ primStr
           ++ "produces a result that always results in an error.\n"
           ++ "This can lead to compile failures because GHC can replace entire "

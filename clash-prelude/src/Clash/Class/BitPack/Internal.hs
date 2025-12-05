@@ -308,14 +308,12 @@ instance BitPack Float where
 
 packFloat# :: Float -> BitVector 32
 packFloat# = fromIntegral . floatToWord
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE packFloat# #-}
+{-# OPAQUE packFloat# #-}
 {-# ANN packFloat# hasBlackBox #-}
 
 unpackFloat# :: BitVector 32 -> Float
 unpackFloat# (unsafeToNatural -> w) = wordToFloat (fromIntegral w)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unpackFloat# #-}
+{-# OPAQUE unpackFloat# #-}
 {-# ANN unpackFloat# hasBlackBox #-}
 
 instance BitPack Double where
@@ -325,14 +323,12 @@ instance BitPack Double where
 
 packDouble# :: Double -> BitVector 64
 packDouble# = fromIntegral . doubleToWord
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE packDouble# #-}
+{-# OPAQUE packDouble# #-}
 {-# ANN packDouble# hasBlackBox #-}
 
 unpackDouble# :: BitVector 64 -> Double
 unpackDouble# (unsafeToNatural -> w) = wordToDouble (fromIntegral w)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unpackDouble# #-}
+{-# OPAQUE unpackDouble# #-}
 {-# ANN unpackDouble# hasBlackBox #-}
 
 instance BitPack CUShort where
@@ -357,14 +353,12 @@ instance BitPack Char where
 
 packChar# :: Char -> BitVector 21
 packChar# = fromIntegral . ord
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE packChar# #-}
+{-# OPAQUE packChar# #-}
 {-# ANN packChar# hasBlackBox #-}
 
 unpackChar# :: BitVector 21 -> Char
 unpackChar# = chr . fromIntegral
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unpackChar# #-}
+{-# OPAQUE unpackChar# #-}
 {-# ANN unpackChar# hasBlackBox #-}
 
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By

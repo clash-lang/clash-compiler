@@ -70,33 +70,22 @@ module Clash.Promoted.Nat
   )
 where
 
-#if MIN_VERSION_base(4,16,0)
 import Data.Constraint    (Dict(..), (:-)(..))
 import Data.Constraint.Nat (euclideanNat)
-#endif
 import Data.Kind          (Type)
-#if MIN_VERSION_base(4,16,0)
 import Data.Type.Equality ((:~:)(..))
 import Data.Type.Ord      (OrderingI(..))
-#endif
 import GHC.Show           (appPrec)
 import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=),
-#if MIN_VERSION_base(4,16,0)
                            cmpNat, sameNat,
-#endif
                            natVal)
 import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod, Min, Max)
 import GHC.Natural        (naturalFromInteger)
 import Language.Haskell.TH (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift (..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
 import Numeric.Natural    (Natural)
-#if !MIN_VERSION_base(4,16,0)
-import Unsafe.Coerce      (unsafeCoerce)
-#endif
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.XException   (ShowX (..), showsPrecXWith)
@@ -117,9 +106,7 @@ data SNat (n :: Nat) where
 instance Lift (SNat n) where
   lift s = sigE [| SNat |]
                 (appT (conT ''SNat) (litT $ numTyLit (snatToInteger s)))
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
 -- | Create an @`SNat` n@ from a proxy for /n/
 snatProxy :: KnownNat n => proxy n -> SNat n
@@ -198,20 +185,12 @@ instance KnownNat n => ShowX (UNat n) where
 --
 -- __NB__: Not synthesizable
 toUNat :: forall n . SNat n -> UNat n
-#if MIN_VERSION_base(4,16,0)
 toUNat p@SNat = case cmpNat (SNat @1) p of
   LTI -> USucc (toUNat @(n - 1) (predSNat p))
   EQI -> USucc UZero
   GTI -> case sameNat p (SNat @0) of
     Just Refl -> UZero
     _ -> error "toUNat: impossible: 1 > n and n /= 0 for (n :: Nat)"
-#else
-toUNat p@SNat = fromI @n (snatToInteger p)
-  where
-    fromI :: forall m . Integer -> UNat m
-    fromI 0 = unsafeCoerce @(UNat 0) @(UNat m) UZero
-    fromI n = unsafeCoerce @(UNat ((m-1)+1)) @(UNat m) (USucc (fromI @(m-1) (n - 1)))
-#endif
 
 -- | Convert a unary-encoded natural number to its singleton representation
 --
@@ -248,10 +227,8 @@ powUNat x (USucc y) = mulUNat x (powUNat x y)
 -- __NB__: Not synthesizable
 predUNat :: UNat (n+1) -> UNat n
 predUNat (USucc x) = x
-#if __GLASGOW_HASKELL__ != 902
 predUNat UZero     =
   error "predUNat: impossible: 0 minus 1, -1 is not a natural number"
-#endif
 
 -- | Subtract two unary-encoded natural numbers
 --
@@ -292,8 +269,7 @@ infixl 7 `mulSNat`
 -- | Power of two singleton natural numbers
 powSNat :: SNat a -> SNat b -> SNat (a^b)
 powSNat SNat SNat = SNat
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE powSNat #-}
+{-# OPAQUE powSNat #-}
 {-# ANN powSNat hasBlackBox #-}
 infixr 8 `powSNat`
 
@@ -321,8 +297,7 @@ flogBaseSNat :: (2 <= base, 1 <= x)
              -> SNat x
              -> SNat (FLog base x)
 flogBaseSNat SNat SNat = SNat
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE flogBaseSNat #-}
+{-# OPAQUE flogBaseSNat #-}
 {-# ANN flogBaseSNat hasBlackBox #-}
 
 -- | Ceiling of the logarithm of a natural number
@@ -331,8 +306,7 @@ clogBaseSNat :: (2 <= base, 1 <= x)
              -> SNat x
              -> SNat (CLog base x)
 clogBaseSNat SNat SNat = SNat
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE clogBaseSNat #-}
+{-# OPAQUE clogBaseSNat #-}
 {-# ANN clogBaseSNat hasBlackBox #-}
 
 -- | Exact integer logarithm of a natural number
@@ -343,8 +317,7 @@ logBaseSNat :: (FLog base x ~ CLog base x)
             -> SNat x
             -> SNat (Log base x)
 logBaseSNat SNat SNat = SNat
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE logBaseSNat #-}
+{-# OPAQUE logBaseSNat #-}
 {-# ANN logBaseSNat hasBlackBox #-}
 
 -- | Power of two of a singleton natural number
@@ -361,7 +334,6 @@ deriving instance Show (SNatLE a b)
 
 -- | Get an ordering relation between two SNats
 compareSNat :: forall a b . SNat a -> SNat b -> SNatLE a b
-#if MIN_VERSION_base(4,16,0)
 compareSNat a@SNat b@SNat = case cmpNat a b of
   LTI -> SNatLE
   EQI -> SNatLE
@@ -369,12 +341,6 @@ compareSNat a@SNat b@SNat = case cmpNat a b of
     LTI -> SNatGT
     EQI -> SNatGT
     GTI -> error "compareSNat: impossible: a > b and b + 1 > a"
-#else
-compareSNat a b =
-  if snatToInteger a <= snatToInteger b
-     then unsafeCoerce (SNatLE @0 @0)
-     else unsafeCoerce (SNatGT @1 @0)
-#endif
 
 -- | Base-2 encoded natural number
 --
@@ -438,7 +404,6 @@ showBNat = go []
 --
 -- __NB__: Not synthesizable
 toBNat :: forall n. SNat n -> BNat n
-#if MIN_VERSION_base(4,16,0)
 toBNat s@SNat = case cmpNat (SNat @1) s of
   LTI -> case euclideanNat @2 @n of
     Sub Dict -> case sameNat (SNat @(n `Mod` 2)) (SNat @0) of
@@ -450,15 +415,6 @@ toBNat s@SNat = case cmpNat (SNat @1) s of
   GTI -> case sameNat s (SNat @0) of
     Just Refl -> BT
     _ -> error "toBNat: impossible: 1 > n and n /= 0 for (n :: Nat)"
-#else
-toBNat s@SNat = toBNat' (snatToInteger s)
-  where
-    toBNat' :: forall m . Integer -> BNat m
-    toBNat' 0 = unsafeCoerce BT
-    toBNat' n = case n `divMod` 2 of
-      (n',1) -> unsafeCoerce (B1 (toBNat' @(Div (m-1) 2) n'))
-      (n',_) -> unsafeCoerce (B0 (toBNat' @(Div m 2) n'))
-#endif
 
 -- | Convert a base-2 encoded natural number to its singleton representation
 --
@@ -535,9 +491,7 @@ div2Sub1BNat _      = error "div2Sub1BNat: impossible: 2*n+1 ~ 2*n"
 --
 -- __NB__: Not synthesizable
 log2BNat :: BNat (2^n) -> BNat n
-#if __GLASGOW_HASKELL__ != 902
 log2BNat BT = error "log2BNat: log2(0) not defined"
-#endif
 log2BNat (B1 x) = case stripZeros x of
   BT -> BT
   _  -> error "log2BNat: impossible: 2^n ~ 2x+1"

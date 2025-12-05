@@ -20,8 +20,7 @@ import           Clash.Prelude
 example :: Signal System (BitVector 1) -> Signal System (BitVector 1, BitVector 1)
 example input = foo $ bundle (input, pure 0)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE foo #-}
+{-# OPAQUE foo #-}
 foo :: Signal dom (BitVector 1, BitVector 1)
     -> Signal dom (BitVector 1, BitVector 1)
 foo input = input

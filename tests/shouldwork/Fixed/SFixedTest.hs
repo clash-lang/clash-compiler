@@ -9,8 +9,7 @@ type SF = SFixed 4 18
 
 topEntity :: SF -> SF
 topEntity x = x * 2.56
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

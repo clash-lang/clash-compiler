@@ -18,8 +18,7 @@ data ABCD = A | B | C | D
 
 twice :: Int -> Int
 twice a = 2 * a
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE twice #-}
+{-# OPAQUE twice #-}
 
 -- | 'f' should have one call to twice in the netlist
 f :: Int -> ABCD -> Int
@@ -29,8 +28,7 @@ f n abcd =
     B -> 5 + n
     C -> n - 3
     D -> twice (3 + n)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 
 -- | 'g' should have two calls to twice in the netlist
 g :: Int -> ABCD -> Int
@@ -40,8 +38,7 @@ g n abcd =
     B -> 5 + n
     C -> n - 3
     D -> noDeDup (twice (3 + n))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE g #-}
+{-# OPAQUE g #-}
 
 topEntity :: Int -> ABCD -> Int
 topEntity n abcd = (f n abcd) - (g n abcd)

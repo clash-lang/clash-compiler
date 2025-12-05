@@ -25,8 +25,7 @@ clockPeriod =
   case knownDomain @dom of
     SDomainConfiguration{sPeriod} ->
       sPeriod
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE clockPeriod #-}
+{-# OPAQUE clockPeriod #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'ActiveEdge' from a KnownDomain context. Example usage:
@@ -46,8 +45,7 @@ activeEdge =
   case knownDomain @dom of
     SDomainConfiguration{sActiveEdge} ->
       sActiveEdge
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE activeEdge #-}
+{-# OPAQUE activeEdge #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'ResetKind' from a KnownDomain context. Example usage:
@@ -67,8 +65,7 @@ resetKind =
   case knownDomain @dom of
     SDomainConfiguration{sResetKind} ->
       sResetKind
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE resetKind #-}
+{-# OPAQUE resetKind #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'InitBehavior' from a KnownDomain context. Example usage:
@@ -88,8 +85,7 @@ initBehavior =
   case knownDomain @dom of
     SDomainConfiguration{sInitBehavior} ->
       sInitBehavior
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE initBehavior #-}
+{-# OPAQUE initBehavior #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Get 'ResetPolarity' from a KnownDomain context. Example usage:
@@ -109,8 +105,7 @@ resetPolarity =
   case knownDomain @dom of
     SDomainConfiguration{sResetPolarity} ->
       sResetPolarity
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE resetPolarity #-}
+{-# OPAQUE resetPolarity #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
 -- | Like 'knownDomain but yields a 'VDomainConfiguration'. Should only be used

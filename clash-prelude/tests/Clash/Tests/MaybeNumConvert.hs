@@ -43,15 +43,7 @@ import Test.Tasty (TestTree, defaultMain)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase)
 import Test.Tasty.TH (testGroupGenerator)
 
-#if MIN_VERSION_base(4,18,0)
 import Clash.Prelude hiding (someNatVal, withSomeSNat)
-#else
-import Clash.Prelude hiding (someNatVal)
-#endif
-
-#if !MIN_VERSION_base(4,16,0)
-import Numeric.Natural (Natural)
-#endif
 
 import qualified Data.List as L
 

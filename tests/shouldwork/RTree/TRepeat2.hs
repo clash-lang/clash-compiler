@@ -6,8 +6,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 topEntity x = register @System (trepeat @2 True) x
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

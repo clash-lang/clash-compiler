@@ -155,8 +155,7 @@ instance KnownNat n => Bundle (Vec n a) where
   bundle   = vecBundle#
   unbundle = sequenceA . fmap lazyV
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE vecBundle# #-}
+{-# OPAQUE vecBundle# #-}
 {-# ANN vecBundle# hasBlackBox #-}
 vecBundle# :: Vec n (Signal t a) -> Signal t (Vec n a)
 vecBundle# = traverse# id

@@ -68,12 +68,6 @@ common basic-config
     clash-lib,
     clash-prelude
 
-  -- See https://github.com/clash-lang/clash-compiler/pull/2511
-  if impl(ghc >= 9.4)
-    CPP-Options: -DCLASH_OPAQUE=OPAQUE
-  else
-    CPP-Options: -DCLASH_OPAQUE=NOINLINE
-
   if flag(cosim)
     build-depends:     clash-cosim
 
@@ -145,16 +139,7 @@ executable clash-testsuite
     containers,
     extra,
     retry,
-
-  if impl(ghc >= 9.0)
-    build-depends:
-      tasty-flaky >= 0.1.2.0,
-
-  if impl(ghc >= 9.0.0)
-    build-depends:
-      singletons,
-      singletons-base,
-      singletons-th
-  else
-    build-depends:
-      singletons < 3.0
+    tasty-flaky >= 0.1.2.0,
+    singletons,
+    singletons-base,
+    singletons-th

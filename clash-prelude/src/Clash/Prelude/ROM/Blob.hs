@@ -119,8 +119,7 @@ asyncRomBlob# content@MemBlob{} = safeAt
           (deepErrorX ("asyncRom: address " ++ show i ++
                        " not in range [0.." ++ show szI ++ ")"))
 {-# ANN asyncRomBlob# hasBlackBox #-}
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE asyncRomBlob# #-}
+{-# OPAQUE asyncRomBlob# #-}
 
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --

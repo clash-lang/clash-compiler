@@ -19,8 +19,7 @@ topEntity clk rst =
     , (0  :: BitVector 0)  ++# (22 :: BitVector 16)
     , (22 :: BitVector 16) ++# (22 :: BitVector 16)
     )
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

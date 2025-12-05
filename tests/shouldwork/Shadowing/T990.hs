@@ -42,8 +42,7 @@ topEntity
     -> Signal System Bool
     -> Signal System Bool
 topEntity = exposeClock $ runSA risingEdgeA
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done

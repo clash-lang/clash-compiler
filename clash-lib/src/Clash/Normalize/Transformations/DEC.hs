@@ -37,9 +37,6 @@ module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
   ) where
 
-#if !MIN_VERSION_base(4,18,0)
-import Control.Applicative (liftA2)
-#endif
 import Control.Lens ((^.), _1)
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
@@ -61,17 +58,9 @@ import Data.Text.Extra (showt)
 import GHC.Stack (HasCallStack)
 import qualified Language.Haskell.TH as TH
 
-#if MIN_VERSION_ghc(9,6,0)
 import GHC.Core.Make (chunkify, mkChunkified)
-#else
-import GHC.Hs.Utils (chunkify, mkChunkified)
-#endif
 
-#if MIN_VERSION_ghc(9,0,0)
 import GHC.Settings.Constants (mAX_TUPLE_SIZE)
-#else
-import Constants (mAX_TUPLE_SIZE)
-#endif
 
 -- internal
 import Clash.Core.DataCon (DataCon)
@@ -110,13 +99,7 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified GHC.Base
 import qualified GHC.Classes
-#if MIN_VERSION_base(4,15,0)
 import qualified GHC.Num.Integer
-#else
--- interger-gmp primitives are defined in the hidden module GHC.Integer.Type,
--- but exported from GHC.Integer
-import qualified GHC.Integer as GHC.Integer.Type
-#endif
 import qualified GHC.Prim
 
 -- | This transformation lifts applications of global binders out of
@@ -761,19 +744,11 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
       ,('GHC.Base.modInt,lastNotPow2)
       ,('GHC.Classes.divInt#,lastNotPow2)
       ,('GHC.Classes.modInt#,lastNotPow2)
-#if MIN_VERSION_base(4,15,0)
       ,('GHC.Num.Integer.integerMul,bothNotPow2)
       ,('GHC.Num.Integer.integerDiv,lastNotPow2)
       ,('GHC.Num.Integer.integerMod,lastNotPow2)
       ,('GHC.Num.Integer.integerQuot,lastNotPow2)
       ,('GHC.Num.Integer.integerRem,lastNotPow2)
-#else
-      ,('GHC.Integer.Type.timesInteger,bothNotPow2)
-      ,('GHC.Integer.Type.divInteger,lastNotPow2)
-      ,('GHC.Integer.Type.modInteger,lastNotPow2)
-      ,('GHC.Integer.Type.quotInteger,lastNotPow2)
-      ,('GHC.Integer.Type.remInteger,lastNotPow2)
-#endif
       ,('(GHC.Prim.*#),bothNotPow2)
       ,('GHC.Prim.quotInt#,lastNotPow2)
       ,('GHC.Prim.remInt#,lastNotPow2)

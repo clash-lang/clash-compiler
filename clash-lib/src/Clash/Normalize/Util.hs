@@ -46,11 +46,7 @@ import           Data.Text               (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Builtin.Names       (eqTyConKey)
-#else
-import           PrelNames               (eqTyConKey)
-#endif
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars

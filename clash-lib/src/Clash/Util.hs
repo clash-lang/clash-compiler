@@ -18,9 +18,7 @@ module Clash.Util
   ( module Clash.Util
   , SrcSpan
   , noSrcSpan
-#if MIN_VERSION_transformers(0,6,0)
   , hoistMaybe
-#endif
   )
 where
 
@@ -28,11 +26,7 @@ import qualified Control.Exception    as Exception
 import Control.Lens
 import Control.Monad.State            (MonadState,StateT)
 import qualified Control.Monad.State  as State
-#if MIN_VERSION_transformers(0,6,0)
 import Control.Monad.Trans.Maybe      (hoistMaybe)
-#else
-import Control.Monad.Trans.Maybe      (MaybeT (..))
-#endif
 import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
@@ -61,11 +55,7 @@ import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
 import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 
-#if MIN_VERSION_ghc(9,0,0)
 import GHC.Types.SrcLoc               (SrcSpan, noSrcSpan)
-#else
-import SrcLoc                         (SrcSpan, noSrcSpan)
-#endif
 
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -347,8 +337,3 @@ unwantedLanguageExtensions =
 thenCompare :: Ordering -> Ordering -> Ordering
 thenCompare EQ rel = rel
 thenCompare rel _  = rel
-
-#if !MIN_VERSION_transformers(0,6,0)
-hoistMaybe :: (Applicative m) => Maybe b -> MaybeT m b
-hoistMaybe = MaybeT . pure
-#endif

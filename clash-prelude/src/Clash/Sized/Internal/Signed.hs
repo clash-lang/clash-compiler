@@ -102,14 +102,8 @@ import GHC.TypeLits.Extra             (Max)
 import Data.Ix                        (Ix(..))
 import Language.Haskell.TH            (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
-#if MIN_VERSION_template_haskell(2,16,0)
 import Language.Haskell.TH.Compat
-#endif
-#if MIN_VERSION_template_haskell(2,17,0)
 import Language.Haskell.TH            (Quote, Type)
-#else
-import Language.Haskell.TH            (TypeQ)
-#endif
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral, shrinkIntegral)
@@ -197,8 +191,7 @@ instance NFDataX (Signed n) where
   ensureSpine = id
   rnfX = rwhnfX
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE size# #-}
+{-# OPAQUE size# #-}
 {-# ANN size# hasBlackBox #-}
 size# :: KnownNat n => Signed n -> Int
 size# bv = fromInteger (natVal bv)
@@ -225,15 +218,13 @@ instance KnownNat n => BitPack (Signed n) where
   pack   = packXWith pack#
   unpack = unpack#
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE pack# #-}
+{-# OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}
 pack# :: forall n . KnownNat n => Signed n -> BitVector n
 pack# (S i) = let m = 1 `shiftL0` fromInteger (natVal (Proxy @n))
               in  if i < 0 then BV 0 (naturalFromInteger (m + i)) else BV 0 (naturalFromInteger i)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unpack# #-}
+{-# OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
 unpack# (BV 0 i) =
@@ -246,14 +237,12 @@ instance Eq (Signed n) where
   (==) = eq#
   (/=) = neq#
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE eq# #-}
+{-# OPAQUE eq# #-}
 {-# ANN eq# hasBlackBox #-}
 eq# :: Signed n -> Signed n -> Bool
 eq# (S v1) (S v2) = v1 == v2
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE neq# #-}
+{-# OPAQUE neq# #-}
 {-# ANN neq# hasBlackBox #-}
 neq# :: Signed n -> Signed n -> Bool
 neq# (S v1) (S v2) = v1 /= v2
@@ -265,20 +254,16 @@ instance Ord (Signed n) where
   (<=) = le#
 
 lt#,ge#,gt#,le# :: Signed n -> Signed n -> Bool
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE lt# #-}
+{-# OPAQUE lt# #-}
 {-# ANN lt# hasBlackBox #-}
 lt# (S n) (S m) = n < m
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE ge# #-}
+{-# OPAQUE ge# #-}
 {-# ANN ge# hasBlackBox #-}
 ge# (S n) (S m) = n >= m
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE gt# #-}
+{-# OPAQUE gt# #-}
 {-# ANN gt# hasBlackBox #-}
 gt# (S n) (S m) = n > m
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE le# #-}
+{-# OPAQUE le# #-}
 {-# ANN le# hasBlackBox #-}
 le# (S n) (S m) = n <= m
 
@@ -310,14 +295,12 @@ instance KnownNat n => Enum (Signed n) where
 
 toEnum# :: forall n. KnownNat n => Int -> Signed n
 toEnum# = fromInteger# . toInteger
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE toEnum# #-}
+{-# OPAQUE toEnum# #-}
 {-# ANN toEnum# hasBlackBox #-}
 
 fromEnum# :: forall n. KnownNat n => Signed n -> Int
 fromEnum# = fromEnum . toInteger#
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fromEnum# #-}
+{-# OPAQUE fromEnum# #-}
 {-# ANN fromEnum# hasBlackBox #-}
 
 enumFrom# :: forall n. KnownNat n => Signed n -> [Signed n]
@@ -325,8 +308,7 @@ enumFrom# x = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeTo
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFrom# #-}
+{-# OPAQUE enumFrom# #-}
 
 enumFromThen# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
 enumFromThen# x y =
@@ -337,24 +319,21 @@ enumFromThen# x y =
   sz = fromInteger (natVal (Proxy @n)) - 1
   mB = 1 `shiftL` sz
   mask = mB - 1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromThen# #-}
+{-# OPAQUE enumFromThen# #-}
 
 enumFromTo# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
 enumFromTo# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromTo# #-}
+{-# OPAQUE enumFromTo# #-}
 
 enumFromThenTo# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
 enumFromThenTo# x1 x2 y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE enumFromThenTo# #-}
+{-# OPAQUE enumFromThenTo# #-}
 
 
 instance KnownNat n => Bounded (Signed n) where
@@ -366,8 +345,7 @@ minBound# =
   case natToNatural @n of
     0 -> 0
     n -> S (negate $ 2 ^ (n - 1))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE minBound# #-}
+{-# OPAQUE minBound# #-}
 {-# ANN minBound# hasBlackBox #-}
 
 maxBound# :: forall n. KnownNat n => Signed n
@@ -375,8 +353,7 @@ maxBound# =
   case natToNatural @n of
     0 -> 0
     n -> S (2 ^ (n - 1) - 1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE maxBound# #-}
+{-# OPAQUE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
 -- | Operators do @wrap-around@ on overflow
@@ -395,8 +372,7 @@ instance KnownNat n => Num (Signed n) where
   fromInteger = fromInteger#
 
 (+#), (-#), (*#) :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (+#) #-}
+{-# OPAQUE (+#) #-}
 {-# ANN (+#) hasBlackBox #-}
 (+#) =
   \(S a) (S b) ->
@@ -410,8 +386,7 @@ instance KnownNat n => Num (Signed n) where
  where
   m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (-#) #-}
+{-# OPAQUE (-#) #-}
 {-# ANN (-#) hasBlackBox #-}
 (-#) =
   \(S a) (S b) ->
@@ -425,8 +400,7 @@ instance KnownNat n => Num (Signed n) where
  where
   m  = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE (*#) #-}
+{-# OPAQUE (*#) #-}
 {-# ANN (*#) hasBlackBox #-}
 (*#) = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a * b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
@@ -434,8 +408,7 @@ instance KnownNat n => Num (Signed n) where
         mask = mB - 1
 
 negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE negate# #-}
+{-# OPAQUE negate# #-}
 {-# ANN negate# hasBlackBox #-}
 negate# =
   \(S n) ->
@@ -444,8 +417,7 @@ negate# =
  where
   m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE abs# #-}
+{-# OPAQUE abs# #-}
 {-# ANN abs# hasBlackBox #-}
 abs# =
   \(S n) ->
@@ -454,8 +426,7 @@ abs# =
  where
   m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE fromInteger# #-}
+{-# OPAQUE fromInteger# #-}
 {-# ANN fromInteger# hasBlackBox #-}
 fromInteger# :: forall n . KnownNat n => Integer -> Signed (n :: Nat)
 fromInteger# = fromInteger_INLINE sz mB mask
@@ -480,18 +451,15 @@ instance ExtendingNum (Signed m) (Signed n) where
   mul = times#
 
 plus#, minus# :: Signed m -> Signed n -> Signed (Max m n + 1)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE plus# #-}
+{-# OPAQUE plus# #-}
 {-# ANN plus# hasBlackBox #-}
 plus# (S a) (S b) = S (a + b)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE minus# #-}
+{-# OPAQUE minus# #-}
 {-# ANN minus# hasBlackBox #-}
 minus# (S a) (S b) = S (a - b)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE times# #-}
+{-# OPAQUE times# #-}
 {-# ANN times# hasBlackBox #-}
 times# :: Signed m -> Signed n -> Signed (m + n)
 times# (S a) (S b) = S (a * b)
@@ -511,8 +479,7 @@ instance KnownNat n => Integral (Signed n) where
   divMod  n d = (n `div#`  d,n `mod#` d)
   toInteger   = toInteger#
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE quot# #-}
+{-# OPAQUE quot# #-}
 {-# ANN quot# hasBlackBox #-}
 quot# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
 quot# (S a) (S b)
@@ -521,14 +488,12 @@ quot# (S a) (S b)
  where
   S minB = minBound @(Signed n)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rem# #-}
+{-# OPAQUE rem# #-}
 {-# ANN rem# hasBlackBox #-}
 rem# :: Signed n -> Signed n -> Signed n
 rem# (S a) (S b) = S (a `rem` b)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE div# #-}
+{-# OPAQUE div# #-}
 {-# ANN div# hasBlackBox #-}
 div# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
 div# (S a) (S b)
@@ -537,14 +502,12 @@ div# (S a) (S b)
  where
   S minB = minBound @(Signed n)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE mod# #-}
+{-# OPAQUE mod# #-}
 {-# ANN mod# hasBlackBox #-}
 mod# :: Signed n -> Signed n -> Signed n
 mod# (S a) (S b) = S (a `mod` b)
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE toInteger# #-}
+{-# OPAQUE toInteger# #-}
 {-# ANN toInteger# hasBlackBox #-}
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
@@ -577,32 +540,28 @@ instance KnownNat n => Bits (Signed n) where
   popCount s        = popCount (pack# s)
 
 and#,or#,xor# :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE and# #-}
+{-# OPAQUE and# #-}
 {-# ANN and# hasBlackBox #-}
 and# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .&. b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE or# #-}
+{-# OPAQUE or# #-}
 {-# ANN or# hasBlackBox #-}
 or# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .|. b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE xor# #-}
+{-# OPAQUE xor# #-}
 {-# ANN xor# hasBlackBox #-}
 xor# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (xor a b)
   where sz   = fromInteger (natVal (Proxy @n)) - 1
         mB   = 1 `shiftL` sz
         mask = mB - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE complement# #-}
+{-# OPAQUE complement# #-}
 {-# ANN complement# hasBlackBox #-}
 complement# :: forall n . KnownNat n => Signed n -> Signed n
 complement# = \(S a) -> fromInteger_INLINE sz mB mask (complement a)
@@ -611,8 +570,7 @@ complement# = \(S a) -> fromInteger_INLINE sz mB mask (complement a)
         mask = mB - 1
 
 shiftL#,shiftR#,rotateL#,rotateR# :: forall n . KnownNat n => Signed n -> Int -> Signed n
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE shiftL# #-}
+{-# OPAQUE shiftL# #-}
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(S n) b ->
   if | b < 0     -> error $ "'shiftL' undefined for negative number: " ++ show b
@@ -623,8 +581,7 @@ shiftL# = \(S n) b ->
   mB   = 1 `shiftL` sz
   mask = mB - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE shiftR# #-}
+{-# OPAQUE shiftR# #-}
 {-# ANN shiftR# hasBlackBox #-}
 shiftR# =
   \(S n) b ->
@@ -637,8 +594,7 @@ shiftR# =
   mB   = 1 `shiftL` sz
   mask = mB - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rotateL# #-}
+{-# OPAQUE rotateL# #-}
 {-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(S n) b ->
@@ -658,8 +614,7 @@ rotateL# =
   mB    = 1 `shiftL` sz1
   maskM = mB - 1
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE rotateR# #-}
+{-# OPAQUE rotateR# #-}
 {-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(S n) b ->
@@ -689,8 +644,7 @@ instance Resize Signed where
   zeroExtend s = unpack# (0 ++# pack s)
   truncateB    = truncateB#
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE resize# #-}
+{-# OPAQUE resize# #-}
 {-# ANN resize# hasBlackBox #-}
 resize# :: forall m n . (KnownNat n, KnownNat m) => Signed n -> Signed m
 resize# s@(S i)
@@ -709,8 +663,7 @@ resize# s@(S i)
                    then S (i' - mask)
                    else S i'
 
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE truncateB# #-}
+{-# OPAQUE truncateB# #-}
 {-# ANN truncateB# hasBlackBox #-}
 truncateB# :: forall m n . KnownNat m => Signed (m + n) -> Signed m
 truncateB# = \(S n) -> fromInteger_INLINE sz mB mask n
@@ -724,15 +677,9 @@ instance KnownNat n => Default (Signed n) where
 instance KnownNat n => Lift (Signed n) where
   lift s@(S i) = sigE [| fromInteger# i |] (decSigned (natVal s))
   {-# NOINLINE lift #-}
-#if MIN_VERSION_template_haskell(2,16,0)
   liftTyped = liftTypedFromUntyped
-#endif
 
-#if MIN_VERSION_template_haskell(2,17,0)
 decSigned :: Quote m => Integer -> m Type
-#else
-decSigned :: Integer -> TypeQ
-#endif
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Signed n) where
@@ -880,9 +827,5 @@ instance (KnownNat n) => Ix (Signed n) where
 
 -- | Shift left that ties to zero on negative shifts
 shiftL0 :: Integer -> Int -> Integer
-#if MIN_VERSION_base(4,15,0)
 shiftL0 = \a sh -> if sh >= 0 then shiftL a sh else 0
-#else
-shiftL0 = shiftL -- True for use with this module
-#endif
 {-# INLINE shiftL0 #-}

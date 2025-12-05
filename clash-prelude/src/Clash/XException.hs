@@ -101,7 +101,7 @@ infixr 0 `defaultSeqX`
 -- out with an exception.
 errorX :: HasCallStack => String -> a
 errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
-{-# NOINLINE errorX #-}
+{-# OPAQUE errorX #-}
 {-# ANN errorX hasBlackBox #-}
 
 -- | Convert 'XException' to 'ErrorCall'
@@ -154,8 +154,7 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
   (catch (evaluate a >> return a)
          (\(XException msg) ->
            throw (ErrorCall (unlines [ctx,msg]))))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE xToErrorCtx #-}
+{-# OPAQUE xToErrorCtx #-}
 
 -- | Convert 'XException' to 'ErrorCall'
 --
@@ -225,8 +224,7 @@ xToError = xToErrorCtx (prettyCallStack callStack)
 seqX :: a -> b -> b
 seqX a b = unsafeDupablePerformIO
   (catch (evaluate a >> return b) (\(XException _) -> return b))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE seqX #-}
+{-# OPAQUE seqX #-}
 {-# ANN seqX hasBlackBox #-}
 infixr 0 `seqX`
 
@@ -242,8 +240,7 @@ seqErrorX a b = unsafeDupablePerformIO
      [ Handler (\(XException _) -> return b)
      , Handler (\(ErrorCall _) -> return b)
      ])
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE seqErrorX #-}
+{-# OPAQUE seqErrorX #-}
 {-# ANN seqErrorX hasBlackBox #-}
 infixr 0 `seqErrorX`
 
@@ -262,8 +259,7 @@ infixr 0 `seqErrorX`
 -- uses 'Clash.Netlist.BlackBox.Types.RenderVoid'
 hwSeqX :: a -> b -> b
 hwSeqX = seqX
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE hwSeqX #-}
+{-# OPAQUE hwSeqX #-}
 {-# ANN hwSeqX hasBlackBox #-}
 infixr 0 `hwSeqX`
 
@@ -336,8 +332,7 @@ hasX a =
     (catch
       (evaluate (rnf a) >> return (Right a))
       (\(XException msg) -> evaluate (rnfX a) >> return (Left msg)))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE hasX #-}
+{-# OPAQUE hasX #-}
 
 -- | Evaluate a value to WHNF, returning @'Left' msg@ if is a 'XException'.
 --
@@ -352,8 +347,7 @@ isX a =
     (catch
       (evaluate a >> return (Right a))
       (\(XException msg) -> return (Left msg)))
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE isX #-}
+{-# OPAQUE isX #-}
 
 -- | Like the 'Show' class, but values that normally throw an 'XException' are
 -- converted to @undefined@, instead of error'ing out with an exception.
@@ -488,8 +482,7 @@ forceX x = x `deepseqX` x
 -- second. Does not propagate 'XException's.
 deepseqX :: NFDataX a => a -> b -> b
 deepseqX a b = rnfX a `seq` b
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE deepseqX #-}
+{-# OPAQUE deepseqX #-}
 {-# ANN deepseqX hasBlackBox #-}
 infixr 0 `deepseqX`
 
@@ -735,13 +728,6 @@ instance NFDataX a => NFDataX (SG.Product a)
 instance NFDataX a => NFDataX (SG.Sum a)
 instance NFDataX a => NFDataX (M.First a)
 instance NFDataX a => NFDataX (M.Last a)
-
--- Sg.Option will be removed in 9.2. We can't locally disable deprecation
--- warnings (i.e., for this instance only) so we're prematurely removing it
--- instead.
-#if __GLASGOW_HASKELL__ < 900
-instance NFDataX a => NFDataX (SG.Option a)
-#endif
 
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag

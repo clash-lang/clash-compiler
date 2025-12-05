@@ -30,11 +30,7 @@ import           Control.Lens ((%=), (+=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.State.Strict  as State
-#if MIN_VERSION_transformers(0,5,6)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
-#else
-import qualified Control.Monad.Trans.RWS.Strict as RWS
-#endif
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
@@ -55,11 +51,7 @@ import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Types.Basic             (InlineSpec (..))
-#else
-import           BasicTypes                  (InlineSpec (..))
-#endif
 
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
@@ -628,11 +620,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                     -- function at this moment for a reason!
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
-#if MIN_VERSION_ghc(9,2,0)
                                     (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
-#else
-                                    (Binding newBodyId sp NoUserInline IsFun newBody r)
-#endif
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder

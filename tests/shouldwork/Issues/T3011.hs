@@ -12,15 +12,15 @@ import System.FilePath ((</>), takeDirectory)
 
 opaquePow1 :: Integer -> Integer -> Integer
 opaquePow1 a b = a ^ b
-{-# CLASH_OPAQUE opaquePow1 #-}
+{-# OPAQUE opaquePow1 #-}
 
 opaquePow2 :: Integer -> Int -> Integer
 opaquePow2 a b = a ^ b
-{-# CLASH_OPAQUE opaquePow2 #-}
+{-# OPAQUE opaquePow2 #-}
 
 opaquePow3 :: Int -> Int -> Int
 opaquePow3 a b = a ^ b
-{-# CLASH_OPAQUE opaquePow3 #-}
+{-# OPAQUE opaquePow3 #-}
 
 
 topEntity :: (Integer, Integer, Int)
@@ -29,7 +29,7 @@ topEntity =
   , opaquePow2 2 12
   , opaquePow3 2 13
   )
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 -- File content test
 assertIn :: String -> String -> IO ()

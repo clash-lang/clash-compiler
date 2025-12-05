@@ -68,15 +68,7 @@ import Test.Tasty.TH (testGroupGenerator)
 
 import qualified Data.List as L
 
-#if MIN_VERSION_base(4,18,0)
 import Clash.Prelude hiding (someNatVal, withSomeSNat)
-#else
-import Clash.Prelude hiding (someNatVal)
-#endif
-
-#if !MIN_VERSION_base(4,16,0)
-import Numeric.Natural (Natural)
-#endif
 
 convertLaw1 :: forall a b. (NumConvert a b, MaybeNumConvert b a, Eq a) => Proxy b -> a -> Bool
 convertLaw1 _ x = Just x == maybeNumConvert (numConvert @a @b x)

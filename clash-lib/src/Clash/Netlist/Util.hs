@@ -59,23 +59,14 @@ import           Data.Text.Extra         (showt)
 import           Data.Text.Lazy          (toStrict)
 import           Data.Text.Prettyprint.Doc.Extra
 
-#if MIN_VERSION_base(4,15,0)
 import           GHC.Num.Integer                  (Integer (..))
-#else
-import           GHC.Integer.GMP.Internals        (Integer (..), BigNat (..))
-#endif
 
 import           GHC.Stack               (HasCallStack)
 import           GHC.TypeLits (someNatVal)
 import           GHC.TypeNats (SomeNat(..))
 
-#if MIN_VERSION_ghc(9,0,0)
 import           GHC.Utils.Monad         (zipWith3M)
 import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
-#else
-import           MonadUtils              (zipWith3M)
-import           Outputable              (ppr, showSDocUnsafe)
-#endif
 
 import           Clash.Annotations.TopEntity
   (TopEntity(..), PortName(..), defSyn)
@@ -130,11 +121,7 @@ import qualified Clash.Util.Interpolate  as I
 import Clash.Util.Supply
 
 hmFindWithDefault :: (Eq k, Hashable k) => v -> k -> HashMap k v -> v
-#if MIN_VERSION_unordered_containers(0,2,11)
 hmFindWithDefault = HashMap.findWithDefault
-#else
-hmFindWithDefault = HashMap.lookupDefault
-#endif
 
 -- | Generate a simple port_name expression. See:
 --
@@ -2196,9 +2183,5 @@ mkLiteral iw lit = case lit of
   C.FloatLiteral w   -> HW.Literal (Just (BitVector 32,32)) (NumLit $ toInteger w)
   C.DoubleLiteral w  -> HW.Literal (Just (BitVector 64,64)) (NumLit $ toInteger w)
   C.NaturalLiteral n -> HW.Literal (Just (Unsigned iw,iw)) $ NumLit n
-#if MIN_VERSION_base(4,15,0)
   C.ByteArrayLiteral (ByteArray ba) -> HW.Literal Nothing (NumLit (IP ba))
-#else
-  C.ByteArrayLiteral (ByteArray ba) -> HW.Literal Nothing (NumLit (Jp# (BN# ba)))
-#endif
   C.StringLiteral s  -> HW.Literal Nothing $ StringLit s

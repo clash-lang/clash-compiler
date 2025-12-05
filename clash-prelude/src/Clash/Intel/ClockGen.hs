@@ -373,8 +373,7 @@ unsafeAltpll ::
   Reset domIn ->
   t
 unsafeAltpll = clocks
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeAltpll #-}
+{-# OPAQUE unsafeAltpll #-}
 {-# ANN unsafeAltpll hasBlackBox #-}
 
 -- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
@@ -450,6 +449,5 @@ unsafeAlteraPll ::
   Reset domIn ->
   t
 unsafeAlteraPll = clocks
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE unsafeAlteraPll #-}
+{-# OPAQUE unsafeAlteraPll #-}
 {-# ANN unsafeAlteraPll hasBlackBox #-}

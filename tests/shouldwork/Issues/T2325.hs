@@ -19,26 +19,22 @@ type T = Unsigned 8 -> Unsigned 8
 
 f :: T
 f = g . h
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE f #-}
+{-# OPAQUE f #-}
 {-# ANN f (defSyn "f") #-}
 
 g :: T
 g = h . j
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE g #-}
+{-# OPAQUE g #-}
 {-# ANN g (defSyn "g") #-}
 
 h :: T
 h = (+ 5)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE h #-}
+{-# OPAQUE h #-}
 {-# ANN h (defSyn "h") #-}
 
 j :: T
 j = (+ 10)
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE j #-}
+{-# OPAQUE j #-}
 {-# ANN j (defSyn "j") #-}
 
 assertBool :: HasCallStack => Bool -> IO ()

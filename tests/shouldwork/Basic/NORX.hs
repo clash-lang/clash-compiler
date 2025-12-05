@@ -48,8 +48,7 @@ h x y = (x `xor` y) `xor` ((x .&. y) `shiftL` 1)
 
 topEntity :: Vec 16 W -> Vec 16 W
 topEntity = norx
--- See: https://github.com/clash-lang/clash-compiler/pull/2511
-{-# CLASH_OPAQUE topEntity #-}
+{-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
