@@ -49,7 +49,9 @@ main = do
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
@@ -79,7 +81,9 @@ module Clash.Signal.Trace
   , Width
   , TraceMap
   , TypeRepBS
+  , Time
   -- ** Functions
+  , timePs, timeNs, timeUs, timeMs, timeToPs, clkCycles, tracedCycles
   , traceSignal#
   , traceVecSignal#
   , dumpVCD#
@@ -92,7 +96,7 @@ module Clash.Signal.Trace
 import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.Signal.Internal (fromList)
 import           Clash.Signal
-  (KnownDomain(..), SDomainConfiguration(..), Signal, bundle, unbundle)
+  (KnownDomain(..), SDomainConfiguration(..), Signal, Domain, bundle, unbundle, clockPeriod)
 import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)
@@ -108,6 +112,7 @@ import           Data.Bits             (testBit)
 import           Data.Binary           (encode, decodeOrFail)
 import           Data.ByteString.Lazy  (ByteString)
 import qualified Data.ByteString.Lazy  as ByteStringLazy
+import           Data.Int              (Int64)
 import           Data.Char             (ord, chr)
 import           Data.IORef
   (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
@@ -132,7 +137,7 @@ import qualified Data.Version
 import qualified Paths_clash_prelude
 #endif
 
-type Period   = Int
+type Period   = Int64
 type Changed  = Bool
 type Value    = (Natural, Natural) -- (Mask, Value)
 type Width    = Int
@@ -166,7 +171,7 @@ traceSignal#
      , Typeable a )
   => IORef TraceMap
   -- ^ Map to store the trace
-  -> Int
+  -> Int64
   -- ^ The associated clock period for the trace
   -> String
   -- ^ Name of signal in the VCD output
@@ -201,7 +206,7 @@ traceVecSignal#
      , Typeable a )
   => IORef TraceMap
   -- ^ Map to store the traces
-  -> Int
+  -> Int64
   -- ^ Associated clock period for the trace
   -> String
   -- ^ Name of signal in the VCD output. Will be appended by _0, _1, ..., _n.
@@ -329,18 +334,65 @@ flattenMap m = concat [[(a, b) | b <- bs] | (a, bs) <- Map.assocs m]
 printable :: Char -> Bool
 printable (ord -> c) = 33 <= c && c <= 126
 
+-- | Data type for time slicing
+data Time (dom::Domain) = Time{timeInPs::Int64} deriving (Eq)
+instance Show (Time dom) where
+  show Time{timeInPs} = show timeInPs ++ "ps"
+
+instance KnownDomain dom => Num (Time dom) where
+  (+) Time{timeInPs=a} Time{timeInPs=b} = Time (a+b)
+  (-) Time{timeInPs=a} Time{timeInPs=b} = Time (a-b)
+  abs = Time . abs . timeInPs
+  fromInteger = Time . (* clockPeriod' @dom) . fromInteger
+  (*) _ _ = error "Cannot multiply time values"
+  signum _ = error "Cannot turn time into unitless value"
+
+-- | Get the clock period of a domain as a 'Period' value.
+clockPeriod' :: forall dom. KnownDomain dom => Int64
+clockPeriod' = fromInteger . snatToNum $ clockPeriod @dom
+
+instance Ord (Time dom) where
+  (<=) (Time a) (Time b) = a<=b
+
+-- | Time in picoseconds
+timePs :: forall dom. Int64 -> Time dom
+timePs = Time
+-- | Time in nanoseconds
+timeNs :: forall dom. Int64 -> Time dom
+timeNs = Time . (*1000)
+-- | Time in microseconds
+timeUs :: forall dom. Int64 -> Time dom
+timeUs = Time . (*1000_000)
+-- | Time in milliseconds
+timeMs :: forall dom. Int64 -> Time dom
+timeMs = Time . (*1000_000_000)
+-- | Time in clock cycles of the specified domain, i.e. `clkCycles @DomB 5`
+clkCycles :: forall dom1 dom2. KnownDomain dom1 => Int64 -> Time dom2
+clkCycles = Time . (* clockPeriod' @dom1)
+-- | Time in clock cycles in the same domain as the provided signal.
+-- This is the same as using number literals.
+tracedCycles :: forall dom. KnownDomain dom => Int64 -> Time dom
+tracedCycles = Time . (* clockPeriod' @dom)
+-- | Get the number of picoseconds.
+timeToPs :: forall dom. Time dom -> Int64
+timeToPs (Time ps) = ps
+
 -- | Same as @dumpVCD@, but supplied with a custom tracemap and a custom timestamp
 dumpVCD##
-  :: (Int, Int)
-  -- ^ (offset, number of samples)
-  -> TraceMap
+  :: (Int64,Int64)
+  -- ^ [start, stop) in ps
+  -> Int64
+  -- ^ clock start time in ps (can be negative!)
+  -> [(String,Period)]
+  -- ^ clock signals as (name, period in ps)
+  -> TraceMap --name::String -> (TypeRepBS, Period, Width, [Value])
   -> UTCTime
   -> Either String Text.Text
-dumpVCD## (offset, cycles) traceMap now
-  | offset < 0 =
-      error $ "dumpVCD: offset was " ++ show offset ++ ", but cannot be negative."
-  | cycles < 0 =
-      error $ "dumpVCD: cycles was " ++ show cycles ++ ", but cannot be negative."
+dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
+  | startPs < 0 =
+      error $ "dumpVCD: start was " ++ show startPs ++ "ps, but cannot be negative."
+  | stopPs < startPs =
+      error $ "dumpVCD: stop was " ++ show stopPs ++ "ps, which is earlier than start (" ++ show startPs ++ "ps)."
   | null traceMap =
       error $ "dumpVCD: no traces found. Extend the given trace names."
   | (nm:_) <- offensiveNames =
@@ -356,47 +408,54 @@ dumpVCD## (offset, cycles) traceMap now
                            , Text.intercalate "\n" headerWires
                            , "$upscope $end"
                            , "$enddefinitions $end"
-                           , "#0"
+                           , Text.pack ('#':show start)
                            , "$dumpvars"
-                           , Text.intercalate "\n" initValues
+                           , Text.intercalate "\n" $ map Text.pack inits
                            , "$end"
-                           , Text.intercalate "\n" $ catMaybes bodyParts
+                           , Text.intercalate "\n" $ bodyParts
                            ]
  where
   offensiveNames = filter (any (not . printable)) traceNames
 
-  -- Generate labels like reversed digits: 0:[1,2,01,11,21,02,12,22,001,...]
+  -- Generate labels
   labels = concatMap (\s -> map (snoc s) alphabet) ([]: labels)
    where
     alphabet = map chr [33..126]
 
-  timescale = foldl1' gcd (Map.keys periodMap)
-  periodMap = toPeriodMap traceMap
+  -- PREPROCESSING (mostly time related)
+  startFs = 1000*startPs
+  stopFs = 1000*stopPs
+  clkStartFs = 1000*clkStartPs
 
-  -- Normalize traces until they have the "same" period. That is, assume
-  -- we have two traces; trace A with a period of 20 ps and trace B with
-  -- a period of 40 ps:
-  --
-  --   A: [A1, A2, A3, ...]
-  --   B: [B1, B2, B3, ...]
-  --
-  -- After normalization these look like:
-  --
-  --   A: [A1, A2, A3, A4, A5, A6, ...]
-  --   B: [B1, B1, B2, B2, B3, B3, ...]
-  --
-  -- ..because B is "twice as slow" as A.
-  (periods, traceNames, widths, valuess) =
-    unzip4 $ map
-      (\(a, (b, c, d)) -> (a, b, c, d))
-      (flattenMap periodMap)
+  -- Individual lists to make everything easier
+  -- Periods are in fs
+  (traceNames, periodsFs, widths, valuess) =
+    unzip4 $
+      ( map
+        (\(name, (_rep, period, width, values)) -> (name, 1000*period, width, values))
+        (Map.toList traceMap) )
+      ++
+      ( map (\(name,period) -> (name,500*period,1,cycle [(0,0),(0,1)])) clockWaves)
 
-  periods' = map (`quot` timescale) periods
-  valuess' = map slice $ zipWith normalize periods' valuess
-  normalize period (initial:values) = initial : concatMap (replicate period) values
-  normalize _      []               = []
-  slice values = drop offset $ take cycles values
+  timescaleFs = 10^(leadingZeros $ reverse $ show timeGCD)
+   where
+    timeGCD = foldl1' gcd (startFs:stopFs:clkStartFs:periods)
+    leadingZeros ('0':r) = 1 + leadingZeros r
+    leadingZeros _ = 0
+  timescaleWithUnit = go timescaleFs "fs" ["ps","ns","us","ms","s"]
+   where
+    go x _ (u:us) | x>=1000 = go (x `div` 1000) u us
+    go x u _ = show x ++ u
 
+  start    = startFs    `div` timescaleFs
+  stop     = stopFs     `div` timescaleFs
+  clkStart = clkStartFs `div` timescaleFs
+  periods = map (`div` timescaleFs) periodsFs
+
+  -- from here on, all time units are in $timescale
+
+
+  -- HEADER
   headerDate       = ["$date", Text.pack $ iso8601Format now, "$end"]
 
 #ifdef CABAL
@@ -406,15 +465,12 @@ dumpVCD## (offset, cycles) traceMap now
 #endif
   headerVersion    = ["$version", "Generated by Clash", Text.pack clashVer , "$end"]
   headerComment    = ["$comment", "No comment", "$end"]
-  headerTimescale  = ["$timescale", (show timescale) ++ "ps", "$end"]
+  headerTimescale  = ["$timescale", timescaleWithUnit, "$end"]
   headerWires      = [ Text.unwords $ headerWire w l n
                      | (w, l, n) <- (zip3 widths labels traceNames)]
   headerWire w l n = map Text.pack ["$var wire", show w, l, n, "$end"]
-  initValues       = map Text.pack $ zipWith ($) formatters inits
 
-  formatters = zipWith format widths labels
-  inits = map (maybe (error "dumpVCD##: empty value") fst . uncons) valuess'
-  tails = map changed valuess'
+  -- FORMAT SIGNALS
 
   -- | Format single value according to VCD spec
   format :: Width -> String -> Value -> String
@@ -431,42 +487,78 @@ dumpVCD## (offset, cycles) traceMap now
         (False,True)  -> '1'
         (True,_)      -> 'x'
 
-  -- | Given a list of values, return a list of list of bools indicating
-  -- if a value changed. The first value is *not* included in the result.
-  changed :: [Value] -> [(Changed, Value)]
-  changed (s:ss) = zip (zipWith (/=) (s:ss) ss) ss
-  changed []     = []
+  formatters = zipWith format widths labels
 
-  bodyParts :: [Maybe Text.Text]
-  bodyParts = zipWith go [0..] (map bodyPart (Data.List.transpose tails))
-    where
-      go :: Int -> Maybe Text.Text -> Maybe Text.Text
-      go (Text.pack . show -> n) t =
-        let pre = Text.concat ["#", n, "\n"] in
-        fmap (Text.append pre) t
+  {-
+  Turn a signal into (from,value) tuples, bounded by START and STOP (end >= START, begin < STOP)
+  Join blocks with the same values (i.e. make a difference list), only caring about the start time.
+  Take the first value  as the initial value at START and the rest as value changes.
+  -}
 
-  bodyPart :: [(Changed, Value)] -> Maybe Text.Text
-  bodyPart values =
-    let formatted  = [(c, f v) | (f, (c,v)) <- zip formatters values]
-        formatted' = map (Text.pack . snd) $ filter fst $ formatted in
-    if null formatted' then Nothing else Just $ Text.intercalate "\n" formatted'
+  mkSignal :: [Value] -> Int64 -> (Value->String) -> (String,[(Int64,String)])
+  mkSignal values' period fmt = (initial, changes)
+   where
+    clkEdges = [clkStart,clkStart+period..]
+    values = zip (-1:clkEdges) values' -- -1 is ugly but safe since start>0, even if clkStart < 0
 
--- | Same as @dumpVCD@, but supplied with a custom tracemap
+    mkSlice :: [(Int64,Value)] -> [(Int64,Value)]
+    mkSlice ((from,v):(rest@((to,_):_))) =
+      if to < start then -- value ends before clock edge
+        mkSlice rest
+      else if from < stop then
+        (from,v) : mkSlice rest
+      else [] -- value starts after stop
+    mkSlice _ = error "unreachable: finite signal" --just to get rid of warnings
+
+    mkChanges :: [(Int64,Value)] -> [(Int64,String)]
+    mkChanges ((t,v):(t',v'):rest) | v==v' = mkChanges ((t,v):rest)
+    mkChanges ((t,v):rest) = (t,fmt v) : mkChanges rest
+    mkChanges [] = []
+
+    events = mkChanges $ mkSlice values
+    initial = snd (head events)
+    changes = tail events
+
+  (inits,changess) = unzip $ zipWith3 mkSignal valuess periods formatters
+
+  groupChanges :: [[(Int64,String)]] -> [(Int64,[String])]
+  groupChanges [] = []
+  groupChanges (sig:rest) = zipPrep sig $ groupChanges rest
+   where
+    zipPrep (a@((ta,va):as)) (b@((tb,vbs):bs)) =
+      if ta == tb then (ta,va:vbs):zipPrep as bs
+      else if ta<tb then (ta,[va]):zipPrep as b
+      else (tb,vbs):zipPrep a bs
+    zipPrep [] b = b
+    zipPrep a [] = map (\(t,v)->(t,[v])) a
+
+  bodyParts = map bodyPart (groupChanges changess)
+
+  bodyPart ((Text.pack . show -> t),vals) = Text.intercalate "\n" (pre:changeblock)
+   where
+    pre = Text.concat ["#",t,"\n"]
+    changeblock = map Text.pack vals
+
+-- | Same as @advancedDumpVCD@, but supplied with a custom tracemap
 dumpVCD#
   :: NFDataX a
   => IORef TraceMap
   -- ^ Map with collected traces
-  -> (Int, Int)
+  -> (Time dom, Time dom)
   -- ^ (offset, number of samples)
+  -> Time dom
+  -- ^ Clock start time
   -> Signal dom a
   -- ^ (One of) the output(s) the circuit containing the traces
+  -> [(String,Period)]
+  -- ^ Clock waves to generate
   -> [String]
   -- ^ The names of the traces you definitely want to be dumped to the VCD file
   -> IO (Either String Text.Text)
-dumpVCD# traceMap slice signal traceNames = do
+dumpVCD# traceMap (Time start, Time stop) (Time clkStart) signal clks traceNames = do
   waitForTraces# traceMap signal traceNames
   m <- readIORef traceMap
-  fmap (dumpVCD## slice m) getCurrentTime
+  fmap (dumpVCD## (start,stop) clkStart clks m) getCurrentTime
 
 -- | Produce a four-state VCD (Value Change Dump) according to IEEE
 -- 1364-{1995,2001}. This function fails if a trace name contains either
@@ -479,21 +571,88 @@ dumpVCD# traceMap slice signal traceNames = do
 -- For example:
 --
 -- @
--- vcd <- dumpVCD (0, 100) cntrOut ["main", "sub"]
+-- vcd <- dumpVCD 0 100 cntrOut ["main", "sub"]
 -- @
+--
+-- Clocks start after 100ns, or after 1 clock cycle of the supplied signal.
+-- For more options, see 'advancedDumpVCD'.
 --
 -- Evaluates /cntrOut/ long enough in order for to guarantee that the @main@,
 -- and @sub@ traces end up in the generated VCD file.
 dumpVCD
   :: NFDataX a
-  => (Int, Int)
-  -- ^ (offset, number of samples)
+  => KnownDomain dom
+  => Time dom
+  -- ^ Start
+  -> Time dom
+  -- ^ Duration
   -> Signal dom a
   -- ^ (One of) the outputs of the circuit containing the traces
   -> [String]
   -- ^ The names of the traces you definitely want to be dumped in the VCD file
   -> IO (Either String Text.Text)
-dumpVCD = dumpVCD# traceMap#
+dumpVCD start duration sig = dumpVCD# traceMap# (start,start+duration) (max 1 (timeNs 100)) sig []
+
+-- | Produce a four-state VCD (Value Change Dump) according to IEEE
+-- 1364-{1995,2001}. This function fails if a trace name contains either
+-- non-printable or non-VCD characters.
+--
+-- Due to lazy evaluation, the created VCD files might not contain all the
+-- traces you were expecting. You therefore have to provide a list of names
+-- you definately want to be dumped in the VCD file.
+--
+-- For example:
+--
+-- @
+-- vcd <- dumpVCD 0 100 cntrOut ["main", "sub"]
+-- @
+--
+--
+--
+-- Evaluates /cntrOut/ long enough in order for to guarantee that the @main@,
+-- and @sub@ traces end up in the generated VCD file.
+advancedDumpVCD
+  :: NFDataX a
+  => KnownDomain dom
+  => Time dom
+  -- ^ Start
+  -> Time dom
+  -- ^ Duration
+  -> Time dom
+  -- ^ Clock start time
+  -> Bool
+  -- ^ Shift the start of the simulation to `t=0`
+  -> Signal dom a
+  -- ^ (One of) the outputs of the circuit containing the traces
+  -> [(String,Period)]
+  -- ^ List of clock waves to generate
+  -> [String]
+  -- ^ The names of the traces you definitely want to be dumped in the VCD file
+  -> IO (Either String Text.Text)
+advancedDumpVCD start duration clkStart shift =
+  if shift then dumpVCD# traceMap# (    0,      duration) (clkStart-start)
+  else          dumpVCD# traceMap# (start,start+duration)  clkStart
+
+-- | Like 'advancedDumpVCD', but uses `(start,stop)` instead of a start and duration.
+advancedDumpVCDWindow
+  :: NFDataX a
+  => KnownDomain dom
+  => (Time dom, Time dom)
+  -- ^ (start,stop)
+  -> Time dom
+  -- ^ Clock start
+  -> Bool
+  -- ^ Shift the start of the simulation to `t=0`
+  -> Signal dom a
+  -- ^ (One of) the outputs of the circuit containing the traces
+  -> [(String,Period)]
+  -- ^ List of clock waves to generate
+  -> [String]
+  -- ^ The names of the traces you definitely want to be dumped in the VCD file
+  -> IO (Either String Text.Text)
+advancedDumpVCDWindow (start,stop) clkStart shift =
+  if shift then dumpVCD# traceMap# (    0,stop-start) (clkStart-start)
+  else          dumpVCD# traceMap# (start,stop      )  clkStart
 
 -- | Dump a number of samples to a replayable bytestring.
 dumpReplayable
