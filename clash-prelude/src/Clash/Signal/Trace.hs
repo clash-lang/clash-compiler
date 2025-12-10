@@ -49,6 +49,7 @@ main = do
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
@@ -73,6 +74,14 @@ module Clash.Signal.Trace
 
   -- * Internal
   -- ** Types
+  , VCDFile(..)
+  , VCDTime
+  , IDCode
+  , TimeUnit(..)
+  , DeclarationCommand(..)
+  , Var(..)
+  , SimulationCommand(..)
+  , ValueChange(..)
   , Period
   , Changed
   , Value
@@ -83,7 +92,8 @@ module Clash.Signal.Trace
   , traceSignal#
   , traceVecSignal#
   , dumpVCD#
-  , dumpVCD##
+  , dumpVCD0#
+  , dumpVCD1#
   , waitForTraces#
   , traceMap#
   ) where
@@ -311,6 +321,50 @@ traceVecSignal1 traceName signal =
 {-# OPAQUE traceVecSignal1 #-}
 {-# ANN traceVecSignal1 hasBlackBox #-}
 
+data VCDFile = VCDFile [DeclarationCommand] [SimulationCommand]
+  deriving (Show)
+
+type VCDTime = Int
+
+type IDCode = Char
+
+data TimeUnit = S | MS | US | NS | PS | FS
+
+instance Show TimeUnit where
+  showsPrec _ S = ('s' :)
+  showsPrec _ MS = showString "ms"
+  showsPrec _ US = showString "us"
+  showsPrec _ NS = showString "ns"
+  showsPrec _ PS = showString "ps"
+  showsPrec _ FS = showString "fs"
+
+data DeclarationCommand
+  = TimeScale VCDTime TimeUnit
+  | Vars [Var]
+  deriving (Show)
+
+data Var
+  = Var
+  { varSize :: Width
+  , varIDCode :: IDCode
+  , varReference :: String
+  }
+  deriving (Show)
+
+data SimulationCommand
+  = DumpVars [ValueChange]
+  | SimulationTime VCDTime
+  | SimulationValueChange ValueChange
+  deriving (Show)
+
+data ValueChange
+  = ValueChange
+  { changeSize :: Width
+  , changeIDCode :: IDCode
+  , changeValue :: Value
+  }
+  deriving (Show)
+
 iso8601Format :: UTCTime -> String
 iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"
 
@@ -328,14 +382,14 @@ flattenMap m = concat [[(a, b) | b <- bs] | (a, bs) <- Map.assocs m]
 printable :: Char -> Bool
 printable (ord -> c) = 33 <= c && c <= 126
 
--- | Same as @dumpVCD@, but supplied with a custom tracemap and a custom timestamp
-dumpVCD##
+-- | Worker for @dumpVCD0#@, containing all the actual work and producing a
+-- 'VCDFile' representation of the VCD output
+dumpVCD1#
   :: (Int, Int)
   -- ^ (offset, number of samples)
   -> TraceMap
-  -> UTCTime
-  -> Either String Text.Text
-dumpVCD## (offset, cycles) traceMap now
+  -> Either String VCDFile
+dumpVCD1# (offset, cycles) traceMap
   | offset < 0 =
       error $ "dumpVCD: offset was " ++ show offset ++ ", but cannot be negative."
   | cycles < 0 =
@@ -349,20 +403,17 @@ dumpVCD## (offset, cycles) traceMap now
                      , "non-printable ASCII characters, which is not"
                      , "supported by VCD." ]
   | otherwise =
-      Right $ Text.unlines [ Text.unwords headerDate
-                           , Text.unwords headerVersion
-                           , Text.unwords headerComment
-                           , Text.pack $ unwords headerTimescale
-                           , "$scope module logic $end"
-                           , Text.intercalate "\n" headerWires
-                           , "$upscope $end"
-                           , "$enddefinitions $end"
-                           , "#0"
-                           , "$dumpvars"
-                           , Text.intercalate "\n" initValues
-                           , "$end"
-                           , Text.intercalate "\n" $ catMaybes bodyParts
-                           ]
+      Right
+        ( VCDFile
+            [ TimeScale timescale PS
+            , Vars [Var w l n | (w, l, n) <- zip3 widths labels traceNames]
+            ]
+            ( [ SimulationTime 0
+              , DumpVars initValues
+              ]
+                ++ concat (catMaybes bodyParts)
+            )
+        )
  where
   offensiveNames = filter (any (not . printable)) traceNames
 
@@ -395,6 +446,111 @@ dumpVCD## (offset, cycles) traceMap now
   normalize _      []               = []
   slice values = drop offset $ take cycles values
 
+  initValues = zipWith ($) formatters inits
+
+  formatters = zipWith ValueChange widths labels
+  inits = map (maybe (error "dumpVCD##: empty value") fst . uncons) valuess'
+  tails = map changed valuess'
+
+  -- Given a list of values, return a list of list of bools indicating
+  -- if a value changed. The first value is *not* included in the result.
+  changed :: [Value] -> [(Changed, Value)]
+  changed (s:ss) = zip (zipWith (/=) (s:ss) ss) ss
+  changed []     = []
+
+  bodyParts :: [Maybe [SimulationCommand]]
+  bodyParts = zipWith go [0 ..] (map bodyPart (Data.List.transpose tails))
+   where
+    go :: VCDTime -> Maybe [SimulationCommand] -> Maybe [SimulationCommand]
+    go t vc = fmap (SimulationTime t :) vc
+
+  bodyPart :: [(Changed, Value)] -> Maybe [SimulationCommand]
+  bodyPart values =
+    let
+      formatted = [(c, SimulationValueChange (f v)) | (f, (c, v)) <- zip formatters values]
+      formatted' = map snd $ filter fst $ formatted
+     in
+      if null formatted' then Nothing else Just formatted'
+
+-- | Same as @dumpVCD@, but supplied with a custom tracemap and a custom timestamp
+dumpVCD0#
+  :: (Int, Int)
+  -- ^ (offset, number of samples)
+  -> TraceMap
+  -> UTCTime
+  -> Either String Text.Text
+dumpVCD0# slice traceMap now =
+  fmap renderVCD (dumpVCD1# slice traceMap)
+ where
+  renderVCD (VCDFile decCmds simCmds) =
+    Text.unlines $
+      [ Text.unwords headerDate
+      , Text.unwords headerVersion
+      , Text.unwords headerComment
+      ]
+        ++ renderDecCmds decCmds
+        ++ "$enddefinitions $end"
+        : renderSimCmds simCmds
+
+  renderDecCmds [] = []
+  renderDecCmds ((TimeScale s u) : cmds) =
+    [ Text.unwords
+        [ "$timescale"
+        , Text.pack $ shows s $ show u
+        , "$end"
+        ]
+    ]
+      ++ renderDecCmds cmds
+  renderDecCmds ((Vars vs) : cmds) =
+    [ "$scope module logic $end"
+    , Text.intercalate "\n" (map renderVar vs)
+    , "$upscope $end"
+    ]
+      ++ renderDecCmds cmds
+
+  renderVar Var{..} =
+    (Text.unwords . map Text.pack)
+      [ "$var wire"
+      , show varSize
+      , [varIDCode]
+      , varReference
+      , "$end"
+      ]
+
+  renderSimCmds [] = []
+  renderSimCmds ((DumpVars vars) : cmds) =
+    "$dumpvars"
+      : map renderValueChange vars
+      ++ "$end"
+      : renderSimCmds cmds
+  renderSimCmds ((SimulationTime t) : cmds) =
+    Text.pack ('#' : show t) : renderSimCmds cmds
+  renderSimCmds ((SimulationValueChange vc) : cmds) =
+    renderValueChange vc : renderSimCmds cmds
+
+  renderValueChange (ValueChange 1 idCode (0, 0)) =
+    Text.pack ['0', idCode, '\n']
+  renderValueChange (ValueChange 1 idCode (0, 1)) =
+    Text.pack ['1', idCode, '\n']
+  renderValueChange (ValueChange 1 idCode (1, _)) =
+    Text.pack ['x', idCode, '\n']
+  renderValueChange (ValueChange 1 idCode (mask, val)) =
+    error $
+      "Can't format 1 bit wide value for "
+        ++ show idCode
+        ++ ": value "
+        ++ show val
+        ++ " and mask "
+        ++ show mask
+  renderValueChange ValueChange{..} =
+    Text.pack $ 'b' : map digit (reverse [0 .. changeSize - 1]) ++ ([' ', changeIDCode])
+   where
+    (mask, val) = changeValue
+    digit d = case (testBit mask d, testBit val d) of
+      (False,False) -> '0'
+      (False,True)  -> '1'
+      (True,_)      -> 'x'
+
   headerDate       = ["$date", Text.pack $ iso8601Format now, "$end"]
 
 #ifdef CABAL
@@ -402,52 +558,9 @@ dumpVCD## (offset, cycles) traceMap now
 #else
   clashVer         = "development"
 #endif
+
   headerVersion    = ["$version", "Generated by Clash", Text.pack clashVer , "$end"]
   headerComment    = ["$comment", "No comment", "$end"]
-  headerTimescale  = ["$timescale", (show timescale) ++ "ps", "$end"]
-  headerWires      = [ Text.unwords $ headerWire w l n
-                     | (w, l, n) <- (zip3 widths labels traceNames)]
-  headerWire w l n = map Text.pack ["$var wire", show w, [l], n, "$end"]
-  initValues       = map Text.pack $ zipWith ($) formatters inits
-
-  formatters = zipWith format widths labels
-  inits = map (maybe (error "dumpVCD##: empty value") fst . uncons) valuess'
-  tails = map changed valuess'
-
-  -- | Format single value according to VCD spec
-  format :: Width -> Char -> Value -> String
-  format 1 label (0,0)   = ['0', label, '\n']
-  format 1 label (0,1)   = ['1', label, '\n']
-  format 1 label (1,_)   = ['x', label, '\n']
-  format 1 label (mask,val) =
-    error $ "Can't format 1 bit wide value for " ++ show label ++ ": value " ++ show val ++ " and mask " ++ show mask
-  format n label (mask,val) =
-    "b" ++ map digit (reverse [0..n-1]) ++ " " ++ [label]
-    where
-      digit d = case (testBit mask d, testBit val d) of
-        (False,False) -> '0'
-        (False,True)  -> '1'
-        (True,_)      -> 'x'
-
-  -- | Given a list of values, return a list of list of bools indicating
-  -- if a value changed. The first value is *not* included in the result.
-  changed :: [Value] -> [(Changed, Value)]
-  changed (s:ss) = zip (zipWith (/=) (s:ss) ss) ss
-  changed []     = []
-
-  bodyParts :: [Maybe Text.Text]
-  bodyParts = zipWith go [0..] (map bodyPart (Data.List.transpose tails))
-    where
-      go :: Int -> Maybe Text.Text -> Maybe Text.Text
-      go (Text.pack . show -> n) t =
-        let pre = Text.concat ["#", n, "\n"] in
-        fmap (Text.append pre) t
-
-  bodyPart :: [(Changed, Value)] -> Maybe Text.Text
-  bodyPart values =
-    let formatted  = [(c, f v) | (f, (c,v)) <- zip formatters values]
-        formatted' = map (Text.pack . snd) $ filter fst $ formatted in
-    if null formatted' then Nothing else Just $ Text.intercalate "\n" formatted'
 
 -- | Same as @dumpVCD@, but supplied with a custom tracemap
 dumpVCD#
@@ -464,7 +577,7 @@ dumpVCD#
 dumpVCD# traceMap slice signal traceNames = do
   waitForTraces# traceMap signal traceNames
   m <- readIORef traceMap
-  fmap (dumpVCD## slice m) getCurrentTime
+  fmap (dumpVCD0# slice m) getCurrentTime
 
 -- | Produce a four-state VCD (Value Change Dump) according to IEEE
 -- 1364-{1995,2001}. This function fails if a trace name contains either
