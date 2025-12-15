@@ -1,0 +1,1 @@
+FIXED: Removed the limit on the number of traces in `dumpVCD`. Also removed unnecessary double newlines after 1-bit signals. [#3082](https://github.com/clash-lang/clash-compiler/issues/3082)
