@@ -424,9 +424,9 @@ dumpVCD## (offset, cycles) traceMap now
 
   -- | Format single value according to VCD spec
   format :: Width -> String -> Value -> String
-  format 1 label (0,0)   = '0': label ++ "\n"
-  format 1 label (0,1)   = '1': label ++ "\n"
-  format 1 label (1,_)   = 'x': label ++ "\n"
+  format 1 label (0,0)   = '0': label
+  format 1 label (0,1)   = '1': label
+  format 1 label (1,_)   = 'x': label
   format 1 label (mask,val) =
     error $ "Can't format 1 bit wide value for " ++ show label ++ ": value " ++ show val ++ " and mask " ++ show mask
   format n label (mask,val) =
