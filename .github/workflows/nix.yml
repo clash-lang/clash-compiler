@@ -5,11 +5,17 @@ on:
     branches:
       - '*'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   packages_common:
     name: Build Common (${{matrix.ghc}})
     runs-on: self-hosted
     strategy:
+      # If caching fails for one package, then we are still interested in caching other packages
+      fail-fast: false
       matrix:
         ghc: [
           "ghc9101",
@@ -56,6 +62,7 @@ jobs:
     name: Build Other (${{matrix.ghc}}, ${{matrix.package}})
     runs-on: self-hosted
     strategy:
+      fail-fast: false
       matrix:
         ghc: [
           "ghc9101",
@@ -98,6 +105,7 @@ jobs:
     name: Build Developer Shells (${{matrix.ghc}})
     runs-on: self-hosted
     strategy:
+      fail-fast: false
       matrix:
         ghc: [
           ghc9101,
