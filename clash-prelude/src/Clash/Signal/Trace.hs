@@ -372,7 +372,7 @@ dumpVCD## (offset, cycles) traceMap now
  where
   offensiveNames = filter (any (not . printable)) traceNames
 
-  -- Generate labels like reversed digits: 0:[1,2,01,11,21,02,12,22,001,...]
+  -- Generate labels in the pattern a,b,c,aa,ab,ac,ba,bb,bc,ca,cb,cc,aaa,...
   labels = concatMap (\s -> map (snoc s) alphabet) ([]: labels)
    where
     alphabet = map chr [33..126]
