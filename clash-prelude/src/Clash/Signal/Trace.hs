@@ -68,6 +68,8 @@ module Clash.Signal.Trace
 
   -- * VCD dump functions
   , dumpVCD
+  , advancedDumpVCD
+  , advancedDumpVCDWindow
 
   -- * Replay functions
   , dumpReplayable
@@ -439,7 +441,7 @@ dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
 
   timescaleFs = 10^(leadingZeros $ reverse $ show timeGCD)
    where
-    timeGCD = foldl1' gcd (startFs:stopFs:clkStartFs:periods)
+    timeGCD = foldl1' gcd (startFs:stopFs:clkStartFs:periodsFs)
     leadingZeros ('0':r) = 1 + leadingZeros r
     leadingZeros _ = 0
   timescaleWithUnit = go timescaleFs "fs" ["ps","ns","us","ms","s"]
@@ -490,34 +492,51 @@ dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
   formatters = zipWith format widths labels
 
   {-
-  Turn a signal into (from,value) tuples, bounded by START and STOP (end >= START, begin < STOP)
-  Join blocks with the same values (i.e. make a difference list), only caring about the start time.
-  Take the first value  as the initial value at START and the rest as value changes.
+  1) Turn a signal into (from,value) tuples, bounded by START and STOP (end >= START, begin < STOP)
+  2) Join blocks with the same values (i.e. make a difference list), only caring about the start time.
+  3) Take the first value  as the initial value at START and the rest as value changes.
   -}
 
-  mkSignal :: [Value] -> Int64 -> (Value->String) -> (String,[(Int64,String)])
-  mkSignal values' period fmt = (initial, changes)
+  -- Peter's rewrite, which is somehow rather slow when there aren't many changes?
+  mkSignal values period fmt = (fmt $ snd initial, events)
    where
-    clkEdges = [clkStart,clkStart+period..]
-    values = zip (-1:clkEdges) values' -- -1 is ugly but safe since start>0, even if clkStart < 0
+    clkEdges = [clkStart, clkStart + period ..]
+    valuesEdges = zip (minBound : clkEdges) values
+    skip = map fst $ dropWhile ((<= start) . snd) $ zip valuesEdges clkEdges
+    (initial, rest) = fromMaybe (error "Finite signal") $ uncons skip
+    samples = takeWhile ((< stop) . fst) rest
 
-    mkSlice :: [(Int64,Value)] -> [(Int64,Value)]
-    mkSlice ((from,v):(rest@((to,_):_))) =
-      if to < start then -- value ends before clock edge
-        mkSlice rest
-      else if from < stop then
-        (from,v) : mkSlice rest
-      else [] -- value starts after stop
-    mkSlice _ = error "unreachable: finite signal" --just to get rid of warnings
+    events = catMaybes $ zipWith hasChange skip samples
 
-    mkChanges :: [(Int64,Value)] -> [(Int64,String)]
-    mkChanges ((t,v):(t',v'):rest) | v==v' = mkChanges ((t,v):rest)
-    mkChanges ((t,v):rest) = (t,fmt v) : mkChanges rest
-    mkChanges [] = []
+    hasChange (_t1, v1) (t2, v2)
+      | v1 /= v2 = Just (t2, fmt v2)
+      | otherwise = Nothing
 
-    events = mkChanges $ mkSlice values
-    initial = snd (head events)
-    changes = tail events
+  -- -- uglier version of mkSignal - but it seems to be quite a bit faster when changes
+  -- -- are sparse? what's up with that?
+  -- mkSignal :: [Value] -> Int64 -> (Value->String) -> (String,[(Int64,String)])
+  -- mkSignal values' period fmt = (initial, changes)
+  --  where
+  --   clkEdges = [clkStart,clkStart+period..]
+  --   values = zip (-1:clkEdges) values' -- -1 is ugly but safe since start>0, even if clkStart < 0
+
+  --   mkSlice :: [(Int64,Value)] -> [(Int64,Value)]
+  --   mkSlice ((from,v):(rest@((to,_):_))) =
+  --     if to < start then -- value ends before clock edge
+  --       mkSlice rest
+  --     else if from < stop then
+  --       (from,v) : mkSlice rest
+  --     else [] -- value starts after stop
+  --   mkSlice _ = error "unreachable: finite signal" --just to get rid of warnings
+
+  --   mkChanges :: [(Int64,Value)] -> [(Int64,String)]
+  --   mkChanges ((t,v):(t',v'):rest) | v==v' = mkChanges ((t,v):rest)
+  --   mkChanges ((t,v):rest) = (t,fmt v) : mkChanges rest
+  --   mkChanges [] = []
+
+  --   events = mkChanges $ mkSlice values
+  --   initial = snd (head events)
+  --   changes = tail events
 
   (inits,changess) = unzip $ zipWith3 mkSignal valuess periods formatters
 
@@ -525,12 +544,13 @@ dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
   groupChanges [] = []
   groupChanges (sig:rest) = zipPrep sig $ groupChanges rest
    where
-    zipPrep (a@((ta,va):as)) (b@((tb,vbs):bs)) =
-      if ta == tb then (ta,va:vbs):zipPrep as bs
-      else if ta<tb then (ta,[va]):zipPrep as b
-      else (tb,vbs):zipPrep a bs
-    zipPrep [] b = b
-    zipPrep a [] = map (\(t,v)->(t,[v])) a
+    zipPrep (aa@((ta,va):as)) (bb@((tb,vbs):bs)) =
+      case compare ta tb of
+        LT -> (ta,  [va]):zipPrep as bb
+        EQ -> (ta,va:vbs):zipPrep as bs
+        GT -> (tb,   vbs):zipPrep aa bs
+    zipPrep [] bb = bb
+    zipPrep aa [] = map (\(t,v)->(t,[v])) aa
 
   bodyParts = map bodyPart (groupChanges changess)
 
