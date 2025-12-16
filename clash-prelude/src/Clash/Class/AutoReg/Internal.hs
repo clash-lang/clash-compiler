@@ -20,7 +20,7 @@ module Clash.Class.AutoReg.Internal
   where
 
 import           Data.List                    (nub,zipWith4)
-import           Data.Maybe                   (fromMaybe,isJust)
+import           Data.Maybe                   (catMaybes,fromMaybe,isJust)
 
 import           GHC.Stack                    (HasCallStack)
 import           GHC.TypeNats                 (KnownNat,Nat,type (+))
@@ -326,13 +326,35 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
             [] -> [| $tyConE |]
 
     autoRegDec <- funD 'autoReg [clause argsP (normalB body) decls]
-    ctxAutoReg <- calculateRequiredContext conInfo
+    ctxAutoReg <- fmap nub $ calculateRequiredContext conInfo
     -- look up if the NFDataX superclass has any (extra) constraints
-    ctxNFDataX <- constraintsWantedFor ''NFDataX [ty]
-    let ctx = nub (ctxAutoReg ++ ctxNFDataX)
+    ctxNFDataX <- fmap nub $ constraintsWantedFor ''NFDataX [ty]
+    let ctxNFDataXfiltered = removedImpliedNFXby ctxAutoReg ctxNFDataX
+    let ctx = nub (ctxAutoReg ++ ctxNFDataXfiltered)
     return [InstanceD Nothing ctx (AppT (ConT ''AutoReg) ty)
               [ autoRegDec
               , PragmaD (InlineP 'autoReg Inline FunLike AllPhases) ]]
+
+-- | Looks through the constraits in the 2nd argument and
+-- drops any `NFDataX a`, when there is a corresponding `AutoReg a` in the first argument
+removedImpliedNFXby :: Cxt -> Cxt -> Cxt
+removedImpliedNFXby autoreg nfdatx = filter (not . isImplied) nfdatx
+ where
+  autoregs = catMaybes $ map (isTyClass ''AutoReg) autoreg
+  isImplied x = case isTyClass ''NFDataX x of
+    Nothing -> False
+    Just tys -> elem (map viewType tys) autoregs
+
+  isTyClass :: Name -> Pred -> Maybe [Type]
+  isTyClass nm x = case unfoldType x of
+    (ConT nm',tys) | nm == nm' -> Just tys
+    _ -> Nothing
+
+  -- | look through kind signatures
+  viewType :: Type -> Type
+  viewType x = case x of
+    SigT ty _kind -> ty
+    ty -> ty
 
 -- Calculate the required constraint to call autoReg on all the fields of a
 -- given constructor
