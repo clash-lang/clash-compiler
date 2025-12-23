@@ -6,59 +6,26 @@ in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
   # is basically abandonware it catches fire with brick 1.0+.
-  brick = doJailbreak prev.brick_0_70_1;
+  brick = doJailbreak(prev.callHackage "brick" "0.70.1" { });
 
-  vty = prev.callHackage "vty" "5.39" { };
-
-  # Marked as broken in nixpkgs, since it needs on a newer hashable than the
-  # .cabal file currently uploaded to hackage.
-  concurrent-supply = doJailbreak (markUnbroken prev.concurrent-supply);
-
-  # Use a branch with changes to support GHC 9.6.1.
-  hint =
-    prev.hint.overrideAttrs (_: {
-      src =
-        pkgs.fetchFromGitHub {
-          owner = "haskell-hint";
-          repo = "hint";
-          rev = "7803c34c8ae1d83c0f7c13fe6b30fcb3abd0ac51";
-          hash = "sha256-ZFusrioxjDmWnDktD1evu7EjPG6brYpmmcaE2NWQKGA=";
-        };
-    });
+  # brick 0.70.1 requires vty < 6.0.
+  vty = doJailbreak (prev.callHackage "vty" "5.39" { });
 
   # Marked as broken in nixpkgs, since it specifies much older dependencies
   # than the defaults in nixpkgs.
   rewrite-inspector = doJailbreak (markUnbroken prev.rewrite-inspector);
 
-  # Needs a newer text than the .cabal file currently uploaded to hackage.
-  string-qq = doJailbreak prev.string-qq;
+  derive-storable-plugin = markUnbroken prev.derive-storable-plugin;
 
-  # Needs a newer base than the .cabal file currently uploaded to hackage.
-  vector-binary-instances = doJailbreak prev.vector-binary-instances;
+  # singletons-base/th 3.2 is the last version working on GHC 9.6
+  singletons-th = prev.callHackage "singletons-th" "3.2" { };
+  # Some tests fail, seems to be golden tests which might fail when output
+  # changes?
+  singletons-base = dontCheck (prev.callHackage "singletons-base" "3.2" { });
 
-  # type-errors 0.2.0.2 is bounded on doctest >=0.16.0.1 && <0.22
-  doctest = prev.callHackage "doctest" "0.21.1" { };
+  # singletons-th 3.2 requires th-desugar 1.15
+  th-desugar = prev.callHackage "th-desugar" "1.15" { };
 
-  # Marken as broken, but compiles anyway.
-  hedgehog-fakedata = doJailbreak (markUnbroken prev.hedgehog-fakedata);
-
-  # We need a new tasty-flaky. The one from Hackage doesn't build for some weird
-  # reason..
-  tasty-flaky = prev.callCabal2nix "tasty-flaky" (pkgs.fetchFromGitHub {
-    owner = "LaurentRDC";
-    repo  = "tasty-flaky";
-    rev = "fc31a9d622c1eb60030a50152258a9bef785e365";
-    sha256 = "sha256-irLM3aVMxpBgsM72ArulMXcoLY2glalVkG//Lrj2JBI=";
-  }) {};
-
-  # This version of tasty isn't available in the nix ghc96 package set
-  tasty = prev.callHackageDirect {
-    pkg = "tasty";
-    ver = "1.5.3";
-    sha256 = "sha256-Ogd8J4aHNeL+xmcRWuJeGBNaePyLs5yo1IoMzvWrVPY=";
-  } {};
-
-  # The tests (not the package itself!) require a tasty <1.5, which won't work as we pull in
-  # tasty 1.5.3. Solution: don't test!
-  time-compat = dontCheck prev.time-compat;
+  # th-desugar 1.15 requires th-abstraction 0.6
+  th-abstraction = prev.callHackage "th-abstraction" "0.6.0.0" { };
 }
