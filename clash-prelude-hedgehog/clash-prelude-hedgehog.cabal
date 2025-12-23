@@ -49,8 +49,8 @@ library
     Clash.Hedgehog.Sized.Vector
 
   build-depends:
-    ghc-typelits-knownnat     >= 0.7.2   && < 0.8,
-    ghc-typelits-natnormalise >= 0.7.2   && < 0.8,
+    ghc-typelits-knownnat     >= 0.7.2   && < 0.9,
+    ghc-typelits-natnormalise >= 0.7.2   && < 0.10,
     text                      >= 1.2.2   && < 2.2,
 
     clash-prelude             == 1.9.0,
