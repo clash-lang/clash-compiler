@@ -117,10 +117,11 @@ import           Data.Int              (Int64)
 import           Data.Char             (ord, chr)
 import           Data.IORef
   (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
-import           Data.List             (foldl1', unzip4, transpose, uncons, isInfixOf)
+import           Data.List             (foldl1', unzip4, transpose, uncons, isInfixOf, zip4)
 import           Data.List.Extra       (snoc)
 import qualified Data.Map.Strict       as Map
 -- import qualified Data.MultiMap         as MMap
+-- import           Data.Tuple.Select     (sel1)
 import           Data.Bifunctor        (second)
 import           Data.Maybe            (fromMaybe)
 import qualified Data.Text             as Text
@@ -437,7 +438,7 @@ dumpVCD### (startPs, stopPs) clkStartPs clockWaves traceMap now
       ++
       ( map (\(name,period) -> (name,500*period,1,cycle [(0,0),(0,1)])) clockWaves)
 
-  changess = zipWith map (zipWith ValueChange widths labels) valuess
+  -- changess = zipWith map (zipWith ValueChange widths labels) valuess
 
   labels = concatMap (\s -> map (snoc s) alphabet) ([]: labels)
     where alphabet = map chr [33..126]
@@ -477,8 +478,9 @@ dumpVCD### (startPs, stopPs) clkStartPs clockWaves traceMap now
     ] ++ bodyParts
 
   -- domains = Map.toList $ MMap.toMap $ MMap.fromList $ zip periods changess
-  domains :: [(VCDTime,[[ValueChange]])]
-  domains = map (\traces -> (fst $ head traces, map snd traces)) $ groupWith fst $ zip periods changess
+  domains :: [(VCDTime,([Width],[String],[[Value]]))]
+  domains = map (\traces -> (fst $ head traces, unzip3 $ map (snd) traces)) $ groupWith fst $ zip periods $ zip3 widths labels valuess --changess
+    -- where sel1 (a,_,_,_) = a
   changesPerDomain = map mkDomain domains
   initials = concatMap fst changesPerDomain
   bodyParts = concatMap (\(t,v) -> [SimulationTime t, ValueChanges v]) $
@@ -494,24 +496,25 @@ dumpVCD### (startPs, stopPs) clkStartPs clockWaves traceMap now
       EQ -> (ta,va<>vb) : zipTimed as bs
       GT -> (tb,    vb) : zipTimed aa bs
 
-  mkDomain :: (VCDTime,[[ValueChange]]) -> ([ValueChange],[(VCDTime,[ValueChange])])
-  mkDomain (period,changess') = (initial', samples'')
+  mkDomain :: (VCDTime,([Width],[String],[[Value]])) -> ([ValueChange],[(VCDTime,[ValueChange])])
+  mkDomain (period,(widths',labels',valuess')) = (initial', samples'')
     where
+
       clkEdges = [clkStart, clkStart + period ..] :: [VCDTime]
 
-      changessT = transpose changess' :: [[ValueChange]]
-      changesFrom = zip (minBound:clkEdges) changessT :: [(VCDTime,[ValueChange])]
-      skipStart = map fst $ dropWhile ((<= start) . snd) $ zip changesFrom clkEdges :: [(VCDTime,[ValueChange])]
-      (initial , rest) = fromMaybe (error "Finite signal") $ uncons skipStart :: ((VCDTime,[ValueChange]),[(VCDTime,[ValueChange])])
-      samples = takeWhile ((< stop) . fst) rest :: [(VCDTime,[ValueChange])]
+      valuessT = transpose valuess' :: [[Value]]
+      valuessFrom = zip (minBound:clkEdges) valuessT :: [(VCDTime,[Value])]
+      skipStart = map fst $ dropWhile ((<= start) . snd) $ zip valuessFrom clkEdges :: [(VCDTime,[Value])]
+      (initial , rest) = fromMaybe (error "Finite signal") $ uncons skipStart :: ((VCDTime,[Value]),[(VCDTime,[Value])])
+      samples = takeWhile ((< stop) . fst) rest :: [(VCDTime,[Value])]
 
-      samples' = zipWith removeDuplicates skipStart samples :: [(VCDTime,[ValueChange])]
-      removeDuplicates (_ta,va) (tb,vb) =
+      samples' = zipWith filterChanges skipStart samples :: [(VCDTime,[ValueChange])]
+      filterChanges (_ta,va) (tb,vb) =
         (tb
-        , [b | (a,b) <- zip va vb, changeValue a /= changeValue b]
+        , [ValueChange w l b | (a,b,w,l) <- zip4 va vb widths' labels', a /= b]
         )
 
-      initial' = snd initial
+      initial' = zipWith3 ValueChange widths labels $ snd initial
       samples'' = filter (not . null . snd) samples'
 
   {-
