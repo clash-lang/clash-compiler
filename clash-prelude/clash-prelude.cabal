@@ -261,6 +261,7 @@ Library
                       Clash.Signal.Internal
                       Clash.Signal.Internal.Ambiguous
                       Clash.Signal.Trace
+                      Clash.Signal.Trace.VCD
 
                       Clash.Sized.BitVector
                       Clash.Sized.Fixed
@@ -336,7 +337,7 @@ Library
                       ghc-typelits-natnormalise >= 0.7.2   && < 0.8,
                       hashable                  >= 1.2.1.0  && < 1.6,
                       half                      >= 0.2.2.3 && < 1.0,
-                      infinite-list           ^>= 0.1,
+                      infinite-list            ^>= 0.1,
                       lens                      >= 4.10    && < 5.4,
                       QuickCheck                >= 2.7     && < 2.16,
                       recursion-schemes         >= 5.1     && < 5.3,

@@ -78,7 +78,6 @@ module Clash.Signal.Trace
   -- * Internal
   -- ** Types
   , Period
-  , Changed
   , Value
   , Width
   , TraceMap
@@ -110,7 +109,7 @@ import           Clash.Sized.Internal.BitVector
 
 -- Haskell / GHC:
 import           Control.Monad         (foldM)
-import           Data.Bits             (testBit)
+-- import           Data.Bits             (testBit)
 import           Data.Binary           (encode, decodeOrFail)
 import           Data.ByteString.Lazy  (ByteString)
 import qualified Data.ByteString.Lazy  as ByteStringLazy
@@ -118,21 +117,22 @@ import           Data.Int              (Int64)
 import           Data.Char             (ord, chr)
 import           Data.IORef
   (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
-#if !MIN_VERSION_base(4,20,0)
-import           Data.List             (foldl')
-#endif
-import           Data.List             (foldl1', unzip4, transpose, uncons)
+import           Data.List             (foldl1', unzip4, transpose, uncons, isInfixOf)
 import           Data.List.Extra       (snoc)
 import qualified Data.Map.Strict       as Map
-import           Data.Maybe            (fromMaybe, catMaybes)
+-- import qualified Data.MultiMap         as MMap
+import           Data.Bifunctor        (second)
+import           Data.Maybe            (fromMaybe)
 import qualified Data.Text             as Text
 import           Data.Time.Clock       (UTCTime, getCurrentTime)
-import           Data.Time.Format      (formatTime, defaultTimeLocale)
-import           GHC.Natural           (Natural)
+-- import           GHC.Natural           (Natural)
 import           GHC.Stack             (HasCallStack)
 import           GHC.TypeLits          (KnownNat, type (+))
 import           System.IO.Unsafe      (unsafePerformIO)
 import           Type.Reflection       (Typeable, TypeRep, typeRep)
+import           GHC.Exts              (groupWith)
+
+import           Clash.Signal.Trace.VCD
 
 #ifdef CABAL
 import qualified Data.Version
@@ -140,9 +140,7 @@ import qualified Paths_clash_prelude
 #endif
 
 type Period   = Int64
-type Changed  = Bool
-type Value    = (Natural, Natural) -- (Mask, Value)
-type Width    = Int
+-- type Changed  = Bool
 
 -- | Serialized TypeRep we need to store for dumpReplayable / replay
 type TypeRepBS = ByteString
@@ -319,20 +317,6 @@ traceVecSignal1 traceName signal =
 {-# OPAQUE traceVecSignal1 #-}
 {-# ANN traceVecSignal1 hasBlackBox #-}
 
-iso8601Format :: UTCTime -> String
-iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"
-
-toPeriodMap :: TraceMap -> Map.Map Period [(String, Width, [Value])]
-toPeriodMap m = foldl' go Map.empty (Map.assocs m)
-  where
-    go periodMap (traceName, (_rep, period, width, values)) =
-      Map.alter (Just . go') period periodMap
-        where
-          go' = ((traceName, width, values):) . (fromMaybe [])
-
-flattenMap :: Map.Map a [b] -> [(a, b)]
-flattenMap m = concat [[(a, b) | b <- bs] | (a, bs) <- Map.assocs m]
-
 printable :: Char -> Bool
 printable (ord -> c) = 33 <= c && c <= 126
 
@@ -379,7 +363,6 @@ tracedCycles = Time . (* clockPeriod' @dom)
 timeToPs :: forall dom. Time dom -> Int64
 timeToPs (Time ps) = ps
 
--- | Same as @dumpVCD@, but supplied with a custom tracemap and a custom timestamp
 dumpVCD##
   :: (Int64,Int64)
   -- ^ [start, stop) in ps
@@ -390,7 +373,22 @@ dumpVCD##
   -> TraceMap --name::String -> (TypeRepBS, Period, Width, [Value])
   -> UTCTime
   -> Either String Text.Text
-dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
+dumpVCD## startstop clkStart clockWaves traceMap now = second renderVCD $
+  dumpVCD### startstop clkStart clockWaves traceMap now
+
+
+-- | Same as @dumpVCD@, but supplied with a custom tracemap and a custom timestamp
+dumpVCD###
+  :: (Int64,Int64)
+  -- ^ [start, stop) in ps
+  -> Int64
+  -- ^ clock start time in ps (can be negative!)
+  -> [(String,Period)]
+  -- ^ clock signals as (name, period in ps)
+  -> TraceMap --name::String -> (TypeRepBS, Period, Width, [Value])
+  -> UTCTime
+  -> Either String VCDFile
+dumpVCD### (startPs, stopPs) clkStartPs clockWaves traceMap now
   | startPs < 0 =
       error $ "dumpVCD: start was " ++ show startPs ++ "ps, but cannot be negative."
   | stopPs < startPs =
@@ -401,36 +399,36 @@ dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
       Left $ unwords [ "Trace '" ++ nm ++ "' contains"
                      , "non-printable ASCII characters, which is not"
                      , "supported by VCD." ]
+  | (nm:_) <- emptyScopes =
+      Left $ unwords [ "Trace '" ++ nm ++ "' contains"
+                     , "empty scope names, which is not"
+                     , "supported by VCD." ]
   | otherwise =
-      Right $ Text.unlines [ Text.unwords headerDate
-                           , Text.unwords headerVersion
-                           , Text.unwords headerComment
-                           , Text.pack $ unwords headerTimescale
-                           , "$scope module logic $end"
-                           , Text.intercalate "\n" headerWires
-                           , "$upscope $end"
-                           , "$enddefinitions $end"
-                           , Text.pack ('#':show start)
-                           , "$dumpvars"
-                           , Text.intercalate "\n" $ map Text.pack inits
-                           , "$end"
-                           , Text.intercalate "\n" $ bodyParts
-                           ]
+      Right $ VCDFile
+        ( headers ++ variables )
+        simulation
  where
   offensiveNames = filter (any (not . printable)) traceNames
+  emptyScopes = filter (\nm -> ".." `isInfixOf` ('.':nm++".")) traceNames
 
-  -- Generate labels
-  labels = concatMap (\s -> map (snoc s) alphabet) ([]: labels)
-   where
-    alphabet = map chr [33..126]
+  -- HEADERS
+  headers =
+    [ Date now
+    , Version clashVer
+    -- , Comment "No comment"
+    , uncurry TimeScale timescaleWithUnit
+    ]
+#ifdef CABAL
+  clashVer         = Data.Version.showVersion Paths_clash_prelude.version
+#else
+  clashVer         = "development"
+#endif
 
-  -- PREPROCESSING (mostly time related)
-  startFs = 1000*startPs
-  stopFs = 1000*stopPs
-  clkStartFs = 1000*clkStartPs
+  -- VARIABLES/SCOPES
+  variables = mkScopes $ zipWith3 mkScopedVar traceNames widths labels
 
-  -- Individual lists to make everything easier
-  -- Periods are in fs
+  -- PREPROCESSING
+
   (traceNames, periodsFs, widths, valuess) =
     unzip4 $
       ( map
@@ -439,57 +437,82 @@ dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
       ++
       ( map (\(name,period) -> (name,500*period,1,cycle [(0,0),(0,1)])) clockWaves)
 
-  timescaleFs = 10^(leadingZeros $ reverse $ show timeGCD)
+  changess = zipWith map (zipWith ValueChange widths labels) valuess
+
+  labels = concatMap (\s -> map (snoc s) alphabet) ([]: labels)
+    where alphabet = map chr [33..126]
+
+  -- TIMESCALE
+  startFs = 1000*startPs
+  stopFs = 1000*stopPs
+  clkStartFs = 1000*clkStartPs
+
+  -- take the GCD of all time values and take the biggest power of 10 unit
+  timescaleFs = 10^(leadingZeros $ reverse $ show timeGCD) :: Int64
    where
     timeGCD = foldl1' gcd (startFs:stopFs:clkStartFs:periodsFs)
     leadingZeros ('0':r) = 1 + leadingZeros r
-    leadingZeros _ = 0
-  timescaleWithUnit = go timescaleFs "fs" ["ps","ns","us","ms","s"]
+    leadingZeros _ = 0 :: Int
+
+  -- turn the timescale in fs into the largest possible time unit
+  timescaleWithUnit :: (Int,TimeUnit)
+  timescaleWithUnit = go timescaleFs TimeFS [TimePS,TimeNS,TimeUS,TimeMS,TimeS]
    where
+    go :: Int64 -> TimeUnit -> [TimeUnit] -> (Int,TimeUnit)
     go x _ (u:us) | x>=1000 = go (x `div` 1000) u us
-    go x u _ = show x ++ u
+    go x u _ = (fromIntegral x,u)
 
   start    = startFs    `div` timescaleFs
   stop     = stopFs     `div` timescaleFs
   clkStart = clkStartFs `div` timescaleFs
   periods = map (`div` timescaleFs) periodsFs
 
-  -- from here on, all time units are in $timescale
+  -- from here on all time units are in multiples of $timescale
 
+  -- VALUE CHANGES
 
-  -- HEADER
-  headerDate       = ["$date", Text.pack $ iso8601Format now, "$end"]
+  simulation =
+    [ SimulationTime start
+    , DumpVars initials
+    ] ++ bodyParts
 
-#ifdef CABAL
-  clashVer         = Data.Version.showVersion Paths_clash_prelude.version
-#else
-  clashVer         = "development"
-#endif
-  headerVersion    = ["$version", "Generated by Clash", Text.pack clashVer , "$end"]
-  headerComment    = ["$comment", "No comment", "$end"]
-  headerTimescale  = ["$timescale", timescaleWithUnit, "$end"]
-  headerWires      = [ Text.unwords $ headerWire w l n
-                     | (w, l, n) <- (zip3 widths labels traceNames)]
-  headerWire w l n = map Text.pack ["$var wire", show w, l, n, "$end"]
+  -- domains = Map.toList $ MMap.toMap $ MMap.fromList $ zip periods changess
+  domains :: [(VCDTime,[[ValueChange]])]
+  domains = map (\traces -> (fst $ head traces, map snd traces)) $ groupWith fst $ zip periods changess
+  changesPerDomain = map mkDomain domains
+  initials = concatMap fst changesPerDomain
+  bodyParts = concatMap (\(t,v) -> [SimulationTime t, ValueChanges v]) $
+              foldl1 zipTimed $
+              map snd changesPerDomain
 
-  -- FORMAT SIGNALS
+  zipTimed :: [(VCDTime,[a])] -> [(VCDTime,[a])] -> [(VCDTime,[a])]
+  zipTimed aa [] = aa
+  zipTimed [] bb = bb
+  zipTimed (aa@((ta,va):as)) (bb@((tb,vb):bs)) =
+    case compare ta tb of
+      LT -> (ta,    va) : zipTimed as bb
+      EQ -> (ta,va<>vb) : zipTimed as bs
+      GT -> (tb,    vb) : zipTimed aa bs
 
-  -- | Format single value according to VCD spec
-  format :: Width -> String -> Value -> String
-  format 1 label (0,0)   = '0': label ++ "\n"
-  format 1 label (0,1)   = '1': label ++ "\n"
-  format 1 label (1,_)   = 'x': label ++ "\n"
-  format 1 label (mask,val) =
-    error $ "Can't format 1 bit wide value for " ++ show label ++ ": value " ++ show val ++ " and mask " ++ show mask
-  format n label (mask,val) =
-    "b" ++ map digit (reverse [0..n-1]) ++ " " ++ label
+  mkDomain :: (VCDTime,[[ValueChange]]) -> ([ValueChange],[(VCDTime,[ValueChange])])
+  mkDomain (period,changess') = (initial', samples'')
     where
-      digit d = case (testBit mask d, testBit val d) of
-        (False,False) -> '0'
-        (False,True)  -> '1'
-        (True,_)      -> 'x'
+      clkEdges = [clkStart, clkStart + period ..] :: [VCDTime]
 
-  formatters = zipWith format widths labels
+      changessT = transpose changess' :: [[ValueChange]]
+      changesFrom = zip (minBound:clkEdges) changessT :: [(VCDTime,[ValueChange])]
+      skipStart = map fst $ dropWhile ((<= start) . snd) $ zip changesFrom clkEdges :: [(VCDTime,[ValueChange])]
+      (initial , rest) = fromMaybe (error "Finite signal") $ uncons skipStart :: ((VCDTime,[ValueChange]),[(VCDTime,[ValueChange])])
+      samples = takeWhile ((< stop) . fst) rest :: [(VCDTime,[ValueChange])]
+
+      samples' = zipWith removeDuplicates skipStart samples :: [(VCDTime,[ValueChange])]
+      removeDuplicates (_ta,va) (tb,vb) =
+        (tb
+        , [b | (a,b) <- zip va vb, changeValue a /= changeValue b]
+        )
+
+      initial' = snd initial
+      samples'' = filter (not . null . snd) samples'
 
   {-
   1) Turn a signal into (from,value) tuples, bounded by START and STOP (end >= START, begin < STOP)
@@ -498,19 +521,19 @@ dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
   -}
 
   -- Peter's rewrite, which is somehow rather slow when there aren't many changes?
-  mkSignal values period fmt = (fmt $ snd initial, events)
-   where
-    clkEdges = [clkStart, clkStart + period ..]
-    valuesEdges = zip (minBound : clkEdges) values
-    skip = map fst $ dropWhile ((<= start) . snd) $ zip valuesEdges clkEdges
-    (initial, rest) = fromMaybe (error "Finite signal") $ uncons skip
-    samples = takeWhile ((< stop) . fst) rest
+  -- mkSignal values period fmt = (fmt $ snd initial, events)
+  --  where
+  --   clkEdges = [clkStart, clkStart + period ..]
+  --   valuesEdges = zip (minBound : clkEdges) values
+  --   skip = map fst $ dropWhile ((<= start) . snd) $ zip valuesEdges clkEdges
+  --   (initial, rest) = fromMaybe (error "Finite signal") $ uncons skip
+  --   samples = takeWhile ((< stop) . fst) rest
 
-    events = catMaybes $ zipWith hasChange skip samples
+  --   events = catMaybes $ zipWith hasChange skip samples
 
-    hasChange (_t1, v1) (t2, v2)
-      | v1 /= v2 = Just (t2, fmt v2)
-      | otherwise = Nothing
+  --   hasChange (_t1, v1) (t2, v2)
+  --     | v1 /= v2 = Just (t2, fmt v2)
+  --     | otherwise = Nothing
 
   -- -- uglier version of mkSignal - but it seems to be quite a bit faster when changes
   -- -- are sparse? what's up with that?
@@ -537,27 +560,6 @@ dumpVCD## (startPs, stopPs) clkStartPs clockWaves traceMap now
   --   events = mkChanges $ mkSlice values
   --   initial = snd (head events)
   --   changes = tail events
-
-  (inits,changess) = unzip $ zipWith3 mkSignal valuess periods formatters
-
-  groupChanges :: [[(Int64,String)]] -> [(Int64,[String])]
-  groupChanges [] = []
-  groupChanges (sig:rest) = zipPrep sig $ groupChanges rest
-   where
-    zipPrep (aa@((ta,va):as)) (bb@((tb,vbs):bs)) =
-      case compare ta tb of
-        LT -> (ta,  [va]):zipPrep as bb
-        EQ -> (ta,va:vbs):zipPrep as bs
-        GT -> (tb,   vbs):zipPrep aa bs
-    zipPrep [] bb = bb
-    zipPrep aa [] = map (\(t,v)->(t,[v])) aa
-
-  bodyParts = map bodyPart (groupChanges changess)
-
-  bodyPart ((Text.pack . show -> t),vals) = Text.intercalate "\n" (pre:changeblock)
-   where
-    pre = Text.concat ["#",t,"\n"]
-    changeblock = map Text.pack vals
 
 -- | Same as @advancedDumpVCD@, but supplied with a custom tracemap
 dumpVCD#
