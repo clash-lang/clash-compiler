@@ -18,9 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          "ghc9101",
-          "ghc982",
-          "ghc964"
+          ghc9102,
+          ghc984,
+          ghc967
         ]
     steps:
       - uses: actions/checkout@v4
@@ -108,9 +108,9 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          ghc9101,
-          ghc982,
-          ghc964
+          ghc9102,
+          ghc984,
+          ghc967
         ]
     steps:
       - uses: actions/checkout@v4
