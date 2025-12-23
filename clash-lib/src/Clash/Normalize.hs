@@ -18,7 +18,7 @@ module Clash.Normalize where
 
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
-import           Control.Monad                    (when)
+import           Control.Monad                    ((>=>), when)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
@@ -143,11 +143,24 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
 normalize
   :: [Id]
   -> NormalizeSession BindingMap
-normalize []  = return emptyVarEnv
-normalize top = do
-  (new,topNormalized) <- unzip <$> mapM normalize' top
-  newNormalized <- normalize (concat new)
-  return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
+normalize = go >=> unionWithCache
+ where
+  go []  = return emptyVarEnv
+  go top = do
+    (new,topNormalized) <- unzip <$> mapM normalize' top
+    newNormalized <- normalize (concat new)
+    return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
+
+  unionWithCache :: BindingMap -> NormalizeSession BindingMap
+  unionWithCache env = do
+    cache <- Lens.use (extra.normalized)
+    -- We need to include the cache in our final result, forgetting to do so
+    -- leads to https://github.com/clash-lang/clash-compiler/issues/3109
+    --
+    -- On the other hand, just returning the cache as our final result could
+    -- not be enough, because normalize' might return a non-normalized binder
+    -- that is later picked up and cleaned up by flattenCallTree.
+    return (unionVarEnv cache env)
 
 normalize' :: Id -> NormalizeSession ([Id], (Id, Binding Term))
 normalize' nm = do
