@@ -91,9 +91,7 @@ let
         });
 
       clash-ffi =
-        hprev.callCabal2nix "clash-ffi" ../clash-ffi {
-          inherit (hfinal) clash-prelude;
-        };
+        hprev.callCabal2nix "clash-ffi" ../clash-ffi { };
 
       clash-ghc =
         let
@@ -197,23 +195,25 @@ let
             prev.makeWrapper
           ];
 
-          postInstall = (old.postInstall or "") + ''
+          postInstall = let
+            # depends on gnat14 which doesn't work ATM on aarch64:
+            # https://github.com/NixOS/nixpkgs/issues/469109
+            ghdl-llvm-opt = prev.lib.optional (!prev.stdenv.hostPlatform.isAarch64) [prev.ghdl-llvm];
+          in (old.postInstall or "") + ''
             wrapProgram $out/bin/clash-testsuite \
               --add-flags "--no-modelsim --no-vivado" \
               --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
               --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:" \
               --prefix PATH : ${prev.lib.makeBinPath [
                 prev.gcc
-                prev.ghdl-llvm
                 prev.symbiyosys
                 prev.verilator
                 prev.verilog
                 prev.yosys
-              ]} \
+              ] ++ ghdl-llvm-opt} \
               --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
-                prev.ghdl-llvm
                 prev.zlib.static
-              ]}
+              ] ++ ghdl-llvm-opt}
           '';
         });
     };
