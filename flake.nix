@@ -45,7 +45,7 @@
 
       # Overlays are not per-system, so let's only compute them once.
       # For each version of GHC we produce a `pkgs.clashPackages-ghcVER`, e.g.
-      # `pkgs.clashPackages-ghc962`.
+      # `pkgs.clashPackages-ghc967`.
       overlays =
         let
           makeOverlay =
