@@ -34,5 +34,5 @@ pkgs.mkShell {
   ] ++
   # depends on gnat14 which doesn't work ATM on aarch64:
   # https://github.com/NixOS/nixpkgs/issues/469109
-  pkgs.lib.optional (!pkgs.stdenv.hostPlatform.isAarch64) [pkgs.ghdl-llvm];
+  pkgs.lib.optional (!pkgs.stdenv.hostPlatform.isAarch64) pkgs.ghdl-llvm;
 }

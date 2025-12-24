@@ -198,22 +198,24 @@ let
           postInstall = let
             # depends on gnat14 which doesn't work ATM on aarch64:
             # https://github.com/NixOS/nixpkgs/issues/469109
-            ghdl-llvm-opt = prev.lib.optional (!prev.stdenv.hostPlatform.isAarch64) [prev.ghdl-llvm];
-          in (old.postInstall or "") + ''
-            wrapProgram $out/bin/clash-testsuite \
-              --add-flags "--no-modelsim --no-vivado" \
-              --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
-              --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:" \
-              --prefix PATH : ${prev.lib.makeBinPath [
+            ghdl-llvm-opt = prev.lib.optional (!prev.stdenv.hostPlatform.isAarch64) prev.ghdl-llvm;
+            lib-deps = [
+                prev.zlib.static
+              ] ++ ghdl-llvm-opt;
+            bin-deps = [
                 prev.gcc
                 prev.sby
                 prev.verilator
                 prev.iverilog
                 prev.yosys
-              ] ++ ghdl-llvm-opt} \
-              --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
-                prev.zlib.static
-              ] ++ ghdl-llvm-opt}
+              ] ++ ghdl-llvm-opt;
+          in (old.postInstall or "") + ''
+            wrapProgram $out/bin/clash-testsuite \
+              --add-flags "--no-modelsim --no-vivado" \
+              --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
+              --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:" \
+              --prefix PATH : ${prev.lib.makeBinPath bin-deps} \
+              --set LIBRARY_PATH ${prev.lib.makeLibraryPath lib-deps}
           '';
         });
     };
