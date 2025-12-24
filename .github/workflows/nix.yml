@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          ghc9102,
+          ghc9103,
           ghc984,
           ghc967
         ]
@@ -65,9 +65,9 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          "ghc9101",
-          "ghc982",
-          "ghc964"
+          ghc9103,
+          ghc984,
+          ghc967
         ]
         package: [
             "clash-benchmark",
@@ -108,7 +108,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          ghc9102,
+          ghc9103,
           ghc984,
           ghc967
         ]
