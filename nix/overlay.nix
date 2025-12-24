@@ -86,7 +86,7 @@ let
         in
         unmodified.overrideAttrs (old: {
           nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-            prev.verilog
+            prev.iverilog
           ];
         });
 
@@ -206,9 +206,9 @@ let
               --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:" \
               --prefix PATH : ${prev.lib.makeBinPath [
                 prev.gcc
-                prev.symbiyosys
+                prev.sby
                 prev.verilator
-                prev.verilog
+                prev.iverilog
                 prev.yosys
               ] ++ ghdl-llvm-opt} \
               --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
