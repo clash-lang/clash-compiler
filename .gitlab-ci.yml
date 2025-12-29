@@ -34,7 +34,7 @@ tests:
     CI_PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
   parallel:
     matrix:
-      - GHC_VERSION: 9.10.2
+      - GHC_VERSION: 9.10.3
         # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
         # is fixed
         SKIP_CLASH_FFI_EXAMPLE: "yes"
