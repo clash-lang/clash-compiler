@@ -28,7 +28,6 @@ cabal v2-build all --write-ghc-environment-files=always
 # Put all the test binaries in a predictable location
 TESTS="
 clash-cosim:test
-clash-ffi:ffi-interface-tests
 clash-lib:doctests
 clash-lib:unittests
 clash-prelude:doctests
@@ -39,3 +38,12 @@ mkdir bin
 for TEST in $TESTS; do
   ln -s "$(realpath --relative-to=bin "$(cabal list-bin $TEST)")" bin/$TEST
 done
+
+# TODO: remove this and put it back into tests when
+# https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
+# is fixed
+set +u
+if [[ "$SKIP_CLASH_FFI_EXAMPLE" != "yes" ]]; then
+  ln -s "$(realpath --relative-to=bin "$(cabal list-bin clash-ffi:ffi-interface-tests)")" bin/clash-ffi:ffi-interface-tests
+fi
+set -u
