@@ -80,6 +80,10 @@ jobs:
             "clash-term",
             "clash-testsuite"
         ]
+        exclude:
+          - ghc: ghc984
+            package: clash-ffi
+
     needs: packages_common
     steps:
       - uses: actions/checkout@v4

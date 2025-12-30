@@ -1,7 +1,7 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak markUnbroken;
+  inherit (pkgs.haskell.lib) doJailbreak markUnbroken overrideCabal;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
@@ -21,4 +21,9 @@ in
 
   # singletons-th 3.3 requires th-desugar 1.16
   th-desugar = prev.callHackage "th-desugar" "1.16" { };
+
+  # Broken on GHC 9.8.4 see clash-ffi cabal file for details
+  clash-ffi = overrideCabal prev.clash-ffi (drv: {
+    broken = true;
+  });
 }
