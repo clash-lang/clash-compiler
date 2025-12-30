@@ -35,9 +35,6 @@ tests:
   parallel:
     matrix:
       - GHC_VERSION: 9.10.3
-        # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-        # is fixed
-        SKIP_CLASH_FFI_EXAMPLE: "yes"
         RUN_TESTS: "always"
 
       - GHC_VERSION: 9.8.4
