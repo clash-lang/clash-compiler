@@ -77,8 +77,9 @@ library
     Clash.FFI.VPI.Port.Direction
     Clash.FFI.VPI.Reg
 
-executable ffi-interface-tests
+test-suite ffi-interface-tests
   import: common-options
+  type: exitcode-stdio-1.0
   default-extensions:
     DataKinds
     RankNTypes
