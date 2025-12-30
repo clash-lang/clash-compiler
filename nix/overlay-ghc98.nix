@@ -21,4 +21,7 @@ in
 
   # singletons-th 3.3 requires th-desugar 1.16
   th-desugar = prev.callHackage "th-desugar" "1.16" { };
+
+  # Marked broken and bounds exclude newer GHC. But seems to work fine.
+  derive-storable-plugin = doJailbreak (markUnbroken prev.derive-storable-plugin);
 }

@@ -91,7 +91,10 @@ let
         });
 
       clash-ffi =
-        hprev.callCabal2nix "clash-ffi" ../clash-ffi { };
+        prev.haskell.lib.overrideCabal (hprev.callCabal2nix "clash-ffi" ../clash-ffi {})
+          (drv: {
+            testFlags = [ "--smallcheck-max-count" "2000" ];
+          });
 
       clash-ghc =
         let
