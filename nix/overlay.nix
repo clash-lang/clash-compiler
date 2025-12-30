@@ -90,6 +90,7 @@ let
           ];
         });
 
+      # Broken on GHC 9.8.4
       clash-ffi =
         prev.haskell.lib.overrideCabal (hprev.callCabal2nix "clash-ffi" ../clash-ffi {})
           (drv: {
@@ -225,9 +226,9 @@ let
 
   haskellOverlays =
     prev.lib.composeManyExtensions [
-      ghcOverlay
       haskellExternalPackages
       haskellInternalPackages
+      ghcOverlay
     ];
 in
 {
