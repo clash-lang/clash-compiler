@@ -18,9 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          "ghc9101",
-          "ghc982",
-          "ghc964"
+          ghc9103,
+          ghc984,
+          ghc967
         ]
     steps:
       - uses: actions/checkout@v4
@@ -65,9 +65,9 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          "ghc9101",
-          "ghc982",
-          "ghc964"
+          ghc9103,
+          ghc984,
+          ghc967
         ]
         package: [
             "clash-benchmark",
@@ -80,6 +80,10 @@ jobs:
             "clash-term",
             "clash-testsuite"
         ]
+        exclude:
+          - ghc: ghc984
+            package: clash-ffi
+
     needs: packages_common
     steps:
       - uses: actions/checkout@v4
@@ -108,9 +112,9 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
-          ghc9101,
-          ghc982,
-          ghc964
+          ghc9103,
+          ghc984,
+          ghc967
         ]
     steps:
       - uses: actions/checkout@v4

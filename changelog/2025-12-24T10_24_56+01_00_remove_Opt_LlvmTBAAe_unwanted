@@ -1,0 +1,1 @@
+clash-ghc: Remove "Opt_LlvmTBAA" from unwanted flags. See [#2508](https://github.com/clash-lang/clash-compiler/issues/2823).
