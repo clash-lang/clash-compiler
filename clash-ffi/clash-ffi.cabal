@@ -78,7 +78,7 @@ library
     Clash.FFI.VPI.Reg
   -- TODO: remove this once https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
   -- is fixed
-  if impl(ghc < 9.8.3) || impl(ghc == 9.10.1)
+  if impl(ghc < 9.8.3) || impl(ghc == 9.10.1) || impl(ghc > 9.10.2)
     buildable: True
   else
     buildable: False
@@ -116,7 +116,7 @@ test-suite ffi-interface-tests
     , tasty-smallcheck
   -- TODO: remove this once https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
   -- is fixed
-  if impl(ghc < 9.8.3) || impl(ghc == 9.10.1)
+  if impl(ghc < 9.8.3) || impl(ghc == 9.10.1) || impl(ghc > 9.10.2)
     buildable: True
   else
     buildable: False
