@@ -1,3 +1,9 @@
+{- |
+Copyright  :  (C) 2021-2026, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -20,7 +26,7 @@ import Data.Bifunctor (bimap)
 import Data.Functor.Identity (Identity(..))
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
-import GHC.TypeLits (KnownNat, type (<=))
+import GHC.TypeLits (KnownNat)
 
 -- $setup
 -- >>> :m -Prelude
@@ -79,7 +85,7 @@ class Counter a where
     | a == minBound = (True, countMax)
     | otherwise = (False, pred a)
 
-instance (1 <= n, KnownNat n) => Counter (Index n)
+instance KnownNat n => Counter (Index n)
 instance KnownNat n => Counter (Unsigned n)
 instance KnownNat n => Counter (Signed n)
 instance KnownNat n => Counter (BitVector n)
@@ -214,7 +220,7 @@ rippleR f = mapAccumR step True
 -- 1 :> 0 :> Nil
 -- >>> iterate (SNat @5) (countSucc @T) (9 :> 8 :> Nil)
 -- (9 :> 8 :> Nil) :> (9 :> 9 :> Nil) :> (0 :> 0 :> Nil) :> (0 :> 1 :> Nil) :> (0 :> 2 :> Nil) :> Nil
-instance (Counter a, KnownNat n, 1 <= n) => Counter (Vec n a) where
+instance (Counter a, KnownNat n) => Counter (Vec n a) where
     countMin = Vec.repeat countMin
     countMax = Vec.repeat countMax
 

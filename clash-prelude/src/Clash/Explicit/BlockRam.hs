@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021-2023, QBayLogic B.V.,
+                  2021-2026, QBayLogic B.V.,
                   2022     , Google Inc.,
                   2024     , Alex Mason,
 License    :  BSD2 (see the file LICENSE)
@@ -441,7 +441,7 @@ import Data.String.Interpolate (__i)
 import GHC.Arr (STArray, unsafeReadSTArray, unsafeWriteSTArray)
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits (KnownNat, type (^), type (<=))
+import GHC.TypeLits (KnownNat, type (^))
 import Unsafe.Coerce (unsafeCoerce)
 
 import Clash.Annotations.Primitive
@@ -451,7 +451,7 @@ import Clash.Class.BitPack (bitToBool, msb)
 import Clash.Class.Num (SaturationMode(SatBound), satSucc)
 import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
 import Clash.Explicit.Signal (KnownDomain, Enable, register, fromEnable, andEnable)
-import Clash.Promoted.Nat (SNat(..))
+import Clash.Promoted.Nat (SNat(..), UNat(..), toUNat)
 import Clash.Signal.Bundle (unbundle)
 import Clash.Signal.Internal
   (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
@@ -867,7 +867,7 @@ blockRamU
      , NFDataX a
      , Enum addr
      , NFDataX addr
-     , 1 <= n )
+     )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -887,8 +887,11 @@ blockRamU
   -- ^ (write address @w@, value to write)
   -> Signal dom a
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamU clk rst0 en rstStrategy n@SNat rd0 mw0 =
-  case rstStrategy of
+blockRamU clk rst0 en rstStrategy n@SNat rd0 mw0 = case toUNat n of
+  UZero -> case rstStrategy of
+    ClearOnReset f -> pure $ f undefined
+    NoClearOnReset -> pure undefined
+  USucc _ -> case rstStrategy of
     ClearOnReset initF ->
       -- Use reset infrastructure
       blockRamU# clk en n rd1 we1 wa1 w1
@@ -957,7 +960,7 @@ blockRam1
      , NFDataX a
      , Enum addr
      , NFDataX addr
-     , 1 <= n )
+     )
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
@@ -979,8 +982,9 @@ blockRam1
   -- ^ (write address @w@, value to write)
   -> Signal dom a
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 =
-  case rstStrategy of
+blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 = case toUNat n of
+  UZero -> pure a
+  USucc _ -> case rstStrategy of
     ClearOnReset () ->
       -- Use reset infrastructure
       blockRam1# clk en n a rd1 we1 wa1 w1

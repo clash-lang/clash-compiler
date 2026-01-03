@@ -10,8 +10,8 @@
       flake = false;
     };
 
-    ghc-tcplugins-extra = {
-      url = "github:clash-lang/ghc-tcplugins-extra";
+    ghc-tcplugin-api = {
+      url = "github:sheaf/ghc-tcplugin-api";
       flake = false;
     };
 
@@ -51,7 +51,7 @@
           makeOverlay =
             import (./. + "/nix/overlay.nix") {
               inherit (args)
-                ghc-tcplugins-extra
+                ghc-tcplugin-api
                 ghc-typelits-extra
                 ghc-typelits-knownnat
                 ghc-typelits-natnormalise;
