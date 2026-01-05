@@ -85,6 +85,7 @@ module Clash.Signal.Trace
   , Time
   -- ** Functions
   , timePs, timeNs, timeUs, timeMs, timeToPs, clkCycles, tracedCycles
+  , clockWave
   , traceSignal#
   , traceVecSignal#
   , dumpVCD#
@@ -335,7 +336,7 @@ instance KnownDomain dom => Num (Time dom) where
   signum _ = error "Cannot turn time into unitless value"
 
 -- | Get the clock period of a domain as a 'Period' value.
-clockPeriod' :: forall dom. KnownDomain dom => Int64
+clockPeriod' :: forall dom. KnownDomain dom => Period
 clockPeriod' = fromInteger . snatToNum $ clockPeriod @dom
 
 instance Ord (Time dom) where
@@ -363,6 +364,9 @@ tracedCycles = Time . (* clockPeriod' @dom)
 -- | Get the number of picoseconds.
 timeToPs :: forall dom. Time dom -> Int64
 timeToPs (Time ps) = ps
+
+clockWave :: forall dom. KnownDomain dom => String -> (String,Period)
+clockWave traceName = (traceName, clockPeriod' @dom)
 
 dumpVCD##
   :: (Int64,Int64)
@@ -440,7 +444,7 @@ dumpVCD### (startPs, stopPs) clkStartPs clockWaves traceMap now
 
   -- changess = zipWith map (zipWith ValueChange widths labels) valuess
 
-  labels = concatMap (\s -> map (snoc s) alphabet) ([]: labels)
+  labels = concatMap (\s -> map (snoc s) alphabet) ("": labels)
     where alphabet = map chr [33..126]
 
   -- TIMESCALE
