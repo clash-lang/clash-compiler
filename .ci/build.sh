@@ -34,16 +34,15 @@ clash-prelude:doctests
 clash-prelude:unittests
 clash-testsuite:clash-testsuite
 "
+
+# GHC 9.8.3, 9.8.4 and 9.10.2 have issues, see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
+set +u
+if [[ "$SKIP_CLASH_FFI_EXAMPLE" != "yes" ]]; then
+  TESTS="$TESTS clash-ffi:ffi-interface-tests"
+fi
+set -u
+
 mkdir bin
 for TEST in $TESTS; do
   ln -s "$(realpath --relative-to=bin "$(cabal list-bin $TEST)")" bin/$TEST
 done
-
-# TODO: remove this and put it back into tests when
-# https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-# is fixed
-set +u
-if [[ "$SKIP_CLASH_FFI_EXAMPLE" != "yes" ]]; then
-  ln -s "$(realpath --relative-to=bin "$(cabal list-bin clash-ffi:ffi-interface-tests)")" bin/clash-ffi:ffi-interface-tests
-fi
-set -u
