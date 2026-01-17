@@ -18,6 +18,7 @@ module Clash.Class.NumConvert.Internal.MaybeNumConvert where
 
 import Clash.Class.BitPack
 import Clash.Class.Resize
+import Clash.Promoted.Nat
 import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
@@ -81,7 +82,10 @@ class MaybeNumConvert a b where
   maybeNumConvert :: a -> Maybe b
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (Index m) where
-  maybeNumConvert !a = maybeResize a
+  maybeNumConvert !a =
+    case natToInteger @m of
+      0 -> Nothing
+      _ -> maybeResize a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (Unsigned m) where
   maybeNumConvert !a = maybeResize $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
@@ -93,7 +97,10 @@ instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (BitVector m) whe
   maybeNumConvert !a = maybeResize $ pack a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Unsigned n) (Index m) where
-  maybeNumConvert !a = maybeResize $ bitCoerce @_ @(Index (2 ^ n)) a
+  maybeNumConvert !a =
+    case natToInteger @m of
+      0 -> Nothing
+      _ -> maybeResize $ bitCoerce @_ @(Index (2 ^ n)) a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Unsigned n) (Unsigned m) where
   maybeNumConvert !a = maybeResize a
@@ -105,9 +112,11 @@ instance (KnownNat n, KnownNat m) => MaybeNumConvert (Unsigned n) (BitVector m) 
   maybeNumConvert !a = maybeResize $ pack a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Signed n) (Index m) where
-  maybeNumConvert n
-    | n < 0 = Nothing
-    | otherwise = maybeResize (bitCoerce @_ @(Index (2 ^ n)) (resize n))
+  maybeNumConvert !n =
+    case natToInteger @m of
+      0 -> Nothing
+      _ | n < 0 -> Nothing
+        | otherwise -> maybeResize (bitCoerce @_ @(Index (2 ^ n)) (resize n))
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Signed n) (Unsigned m) where
   maybeNumConvert n
@@ -123,7 +132,10 @@ instance (KnownNat n, KnownNat m) => MaybeNumConvert (Signed n) (BitVector m) wh
     | otherwise = maybeResize (pack @(Signed (n + 1)) (extend n))
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (BitVector n) (Index m) where
-  maybeNumConvert !a = maybeResize $ unpack @(Index (2 ^ n)) a
+  maybeNumConvert !a =
+    case natToInteger @m of
+      0 -> Nothing
+      _ -> maybeResize $ unpack @(Index (2 ^ n)) a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (BitVector n) (Unsigned m) where
   maybeNumConvert !a = maybeResize $ unpack @(Unsigned n) a
