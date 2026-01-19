@@ -1,5 +1,5 @@
 - BlackBox:
-    name: Clash.Explicit.Testbench.assert
+    name: Clash.Explicit.Testbench.assertReal
     imports:
     - ~INCLUDENAME[0].all
     includes:

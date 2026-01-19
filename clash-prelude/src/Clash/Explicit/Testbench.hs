@@ -61,6 +61,23 @@ import Clash.Sized.Internal.BitVector
 import Clash.Sized.Vector    (Vec, (!!), length)
 import Clash.XException      (ShowX (..), XException)
 
+assert
+  :: (KnownDomain dom, Eq a, ShowX a)
+  => Clock dom
+  -> Reset dom
+  -> String
+  -- ^ Additional message
+  -> Signal dom a
+  -- ^ Checked value
+  -> Signal dom a
+  -- ^ Expected value
+  -> Signal dom b
+  -- ^ Return value
+  -> Signal dom b
+assert clk rst msg checked expected = assertReal clk rst msg checkIt (pure True)
+ where
+  checkIt = liftA2 (==) checked expected
+
 -- Note that outputVerifier' is used in $setup, while the examples mention
 -- outputVerifier. This is fine, as the examples have explicit type
 -- signatures, turning 'outputVerifier' into 'outputVerifier''.
@@ -85,7 +102,7 @@ import Clash.XException      (ShowX (..), XException)
 -- computation, and warnings will once again be emitted.
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
-assert
+assertReal
   :: (KnownDomain dom, Eq a, ShowX a)
   => Clock dom
   -> Reset dom
@@ -98,7 +115,7 @@ assert
   -> Signal dom b
   -- ^ Return value
   -> Signal dom b
-assert clk (Reset _) msg checked expected returned =
+assertReal clk (Reset _) msg checked expected returned =
   (\c e cnt r ->
       if eqX c e
          then r
@@ -115,8 +132,8 @@ assert clk (Reset _) msg checked expected returned =
   where
     eqX a b = unsafeDupablePerformIO (catch (evaluate (a == b))
                                             (\(_ :: XException) -> return False))
-{-# OPAQUE assert #-}
-{-# ANN assert hasBlackBox #-}
+{-# OPAQUE assertReal #-}
+{-# ANN assertReal hasBlackBox #-}
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
 assertBitVector
