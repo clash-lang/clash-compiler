@@ -265,11 +265,11 @@ data HDL
 -- @
 data Primitive
   = Primitive [HDL] FilePath
-  -- ^ Description of a primitive for a given 'HDL's in a file at 'FilePath'
+  -- ^ Description of a primitive for given 'HDL's in a file at 'FilePath'
   | InlinePrimitive [HDL] String
-  -- ^ Description of a primitive for a given 'HDL's as an inline JSON 'String'
+  -- ^ Description of a primitive for given 'HDL's as an inline JSON 'String'
   | InlineYamlPrimitive [HDL] String
-  -- ^ Description of a primitive for a given 'HDL's as an inline YAML 'String'
+  -- ^ Description of a primitive for given 'HDL's as an inline YAML 'String'
   deriving (Show, Read, Data, Generic, NFData, Hashable, Eq)
 
 -- | Primitive guard to mark a value as either not translatable or as having a
