@@ -52,6 +52,8 @@ import           Clash.Signal
 import           Clash.Verification.Internal
 import           Data.Text                       (Text)
 
+-- | Print property as PSL/SVA in HDL. Clash simulation support not yet
+-- implemented.
 check
   :: ( KnownDomain dom
      , HiddenClock dom
@@ -65,6 +67,8 @@ check
   -> Signal dom AssertionResult
 check = EV.check hasClock hasReset
 
+-- | Same as 'check', but doesn't require a design to explicitly carried to
+-- top-level.
 checkI
   :: ( KnownDomain dom
      , HiddenClock dom

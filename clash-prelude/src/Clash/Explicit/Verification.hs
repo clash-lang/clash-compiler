@@ -167,7 +167,7 @@ nextN n = Assertion IsTemporal . CvNext n . assertion . toAssertionValue
 {-# INLINE nextN #-}
 
 -- | Same as @a && next b@ but with a nice syntax. E.g., @a && next b@ could
--- be written as @a `before` b@. Might be read as "a happens one cycle before b".
+-- be written as @a \`before\` b@. Might be read as "a happens one cycle before b".
 before :: (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom
 before a0 b0 = Assertion IsTemporal (CvBefore a1 b1)
  where
@@ -175,8 +175,8 @@ before a0 b0 = Assertion IsTemporal (CvBefore a1 b1)
   b1 = assertion (toAssertionValue b0)
 {-# INLINE before #-}
 
--- | Same as @a `implies` next b@ but with a nice syntax. E.g.,
--- @a `implies` next b@ could be written as @a `timplies` b@. Might be read
+-- | Same as @a \`implies\` next b@ but with a nice syntax. E.g.,
+-- @a \`implies\` next b@ could be written as @a \`timplies\` b@. Might be read
 -- as "a at cycle n implies b at cycle n+1".
 timplies :: (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom
 timplies a0 b0 = Assertion IsTemporal (CvTemporalImplies 1 a1 b1)
