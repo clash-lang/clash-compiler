@@ -7,7 +7,7 @@ Development happens on the `master` branch. Released versions live in `1.0`,
 `1.2`, etc. Changes made to these branches automatically get published every
 night. This is achieved through [GitLab Pipeline Schedules](https://gitlab.com/clash-lang/clash-compiler/pipeline_schedules).
 (You need admin access to see that page.) At the time of writing it gets
-triggered on `master` and `1.6`. A release candidate gets pushed out
+triggered on `master` and `1.8`. A release candidate gets pushed out
 with the version numbers in the various cabal files. Candidates can be previewed
 on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/candidates/).
 
@@ -28,7 +28,9 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
-2. Update the CHANGELOG (see changelog/README.md).
+2. Update the CHANGELOG (see `changelog/README.md`). Each entry should normally
+   end with a link to a PR or issue. The script `changelog/blame-pr.py` will
+   tell you for a single file which PR('s) introduced it.
 3. Create a release branch named after the major version of Clash you're trying to
    release. For example, if you're planning on releasing Clash 1.6.0, create a
    branch called `1.6`.
@@ -59,7 +61,9 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
-2. Update the CHANGELOG (see changelog/README.md).
+2. Update the CHANGELOG (see `changelog/README.md`). Each entry should normally
+   end with a link to a PR or issue. The script `changelog/blame-pr.py` will
+   tell you for a single file which PR('s) introduced it.
 3. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
    or simply wait a day. Verify that the Hackage release deploys well, and
    preview the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
