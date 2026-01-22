@@ -168,7 +168,7 @@ packXWith f = xToBV . f
 
 -- | Pack both arguments to a 'BitVector' and use
 -- 'Clash.Sized.Internal.BitVector.isLike#' to compare them. This is a more
--- lentiant comparison than '(==)', behaving more like (but not necessarily
+-- lenient comparison than '(==)', behaving more like (but not necessarily
 -- exactly the same as) @std_match@ in VHDL or @casez@ in Verilog.
 --
 -- Unlike '(==)', isLike is not symmetric. The reason for this is that a
