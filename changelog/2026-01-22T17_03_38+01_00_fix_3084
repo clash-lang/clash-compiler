@@ -1,0 +1,1 @@
+FIXED: Added an evaluator rule for `bigNatEq#` with compile-time constant arguments [#3084](https://github.com/clash-lang/clash-compiler/issues/3084)
