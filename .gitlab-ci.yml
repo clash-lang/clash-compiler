@@ -55,7 +55,7 @@ stack-build:
   needs: []
   stage: test
   variables:
-    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$CI_JOB_IMAGE-$CACHE_BUST_TOKEN-3-non_protected
+    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$CI_JOB_IMAGE-$CACHE_BUST_TOKEN-3-protected
   before_script:
     - apt-get update
     - apt-get install -y zstd
