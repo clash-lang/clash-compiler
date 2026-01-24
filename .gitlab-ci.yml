@@ -54,8 +54,6 @@ stack-build:
   image: fpco/stack-build:lts-22.43
   needs: []
   stage: test
-  variables:
-    CACHE_FALLBACK_KEY: $CI_JOB_NAME-master-$CI_JOB_IMAGE-$CACHE_BUST_TOKEN-3-non_protected
   before_script:
     - apt-get update
     - apt-get install -y zstd
