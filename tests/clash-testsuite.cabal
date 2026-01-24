@@ -169,3 +169,7 @@ executable clash-testsuite
   else
     build-depends:
       singletons < 3.0
+
+  if impl(ghc >= 9.6)
+    build-depends:
+      ghc-bignum
