@@ -100,7 +100,7 @@ for ty in TYPES+["OTHER"]:
     if per_type[ty]:
         out.append(ty.capitalize()+":")
         for e in per_type[ty]:
-            out.append("- "+e.replace("\n","\n  ").rstrip())
+            out.append("* "+e.replace("\n","\n  ").rstrip())
         out.append("")
 print("\nOUTPUT:")
 print("\n".join(out))
