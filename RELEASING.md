@@ -53,7 +53,7 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
 12. Enjoy!
 
 ## Releasing a new version minor version (1.x.x)
-0. Create a release branch (`v<VERSION>_release`, i.e. `v1.8.5_release`) from
+0. Create a release branch (i.e. `v1.8.5_release`) from
    the branch of the version you are releasing.
 1. Change version numbers in:
   * `clash-prelude/clash-prelude.cabal`
@@ -63,7 +63,9 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
-2. Update the CHANGELOG (see `changelog/README.md`).
+
+   The script `changelog/update-version.py` can do this for you.
+2. In a **separate commit**, update the CHANGELOG (see `changelog/README.md`).
    `aggregate-entries.py` can help to generate this text, though it still needs
    to be checked afterwards. Each entry should normally end with a link to a PR
    or issue. The script `changelog/blame-pr.py` will tell you for a single file
