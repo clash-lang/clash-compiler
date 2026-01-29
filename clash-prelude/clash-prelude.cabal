@@ -52,7 +52,7 @@ Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
                                   2016-2017, Myrtle Software Ltd,
                                   2017-2019, QBayLogic B.V., Google Inc.,
-                                  2021-2025, QBayLogic B.V.
+                                  2021-2026, QBayLogic B.V.
 Category:             Hardware
 Build-type:           Simple
 
@@ -331,9 +331,9 @@ Library
                       extra                     >= 1.6.17  && < 1.9,
                       ghc-bignum                >= 1.0     && < 1.4,
                       ghc-prim                  >= 0.5.1.0 && < 0.13,
-                      ghc-typelits-extra        >= 0.4     && < 0.6,
-                      ghc-typelits-knownnat     >= 0.7.2   && < 0.9,
-                      ghc-typelits-natnormalise >= 0.7.2   && < 0.10,
+                      ghc-typelits-extra        >= 0.5.2   && < 0.6,
+                      ghc-typelits-knownnat     >= 0.8.2   && < 0.9,
+                      ghc-typelits-natnormalise >= 0.9.3   && < 0.10,
                       hashable                  >= 1.2.1.0  && < 1.6,
                       half                      >= 0.2.2.3 && < 1.0,
                       infinite-list           ^>= 0.1,

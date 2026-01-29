@@ -1,3 +1,9 @@
+{- |
+Copyright  :  (C) 2021-2026, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -214,7 +220,7 @@ rippleR f = mapAccumR step True
 -- 1 :> 0 :> Nil
 -- >>> iterate (SNat @5) (countSucc @T) (9 :> 8 :> Nil)
 -- (9 :> 8 :> Nil) :> (9 :> 9 :> Nil) :> (0 :> 0 :> Nil) :> (0 :> 1 :> Nil) :> (0 :> 2 :> Nil) :> Nil
-instance (Counter a, KnownNat n, 1 <= n) => Counter (Vec n a) where
+instance (Counter a, KnownNat n) => Counter (Vec n a) where
     countMin = Vec.repeat countMin
     countMax = Vec.repeat countMax
 
