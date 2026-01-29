@@ -962,6 +962,7 @@ runClashTest = defaultMain
         , outputTest "PortNamesWithRTree" def{hdlTargets=[Verilog]}
         , clashLibTest "T1182A" def
         , clashLibTest "T1182B" def
+        , runTest "T3129" def{hdlSim=[], clashFlags=["-fclash-spec-limit=400"]}
         ]
       , clashTestGroup "Unit"
         [ runTest "Imap" def
