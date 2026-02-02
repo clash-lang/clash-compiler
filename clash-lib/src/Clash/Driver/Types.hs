@@ -3,7 +3,7 @@
                     2016-2017, Myrtle Software Ltd,
                     2017     , QBayLogic, Google Inc.,
                     2020-2022, QBayLogic,
-                    2022     , Google Inc.,
+                    2026     , Google Inc.,
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -315,6 +315,12 @@ data ClashOpts = ClashOpts
   -- Command line flag: -fclash-evaluator-fuel-limit
   , opt_debug :: DebugOpts
   -- ^ Options which control debugging. See 'DebugOpts'.
+  , opt_ghcDebugInfo :: Bool
+  -- ^ Whether GHC debug info is enabled (e.g. @-g@).
+  --
+  -- Clash uses this to decide whether to preserve source-location ticks from
+  -- GHC Core, which in turn end up as source-location comments in the
+  -- generated HDL.
   , opt_cachehdl :: Bool
   -- ^ Reuse previously generated output from Clash. Only caches topentities.
   --
@@ -407,6 +413,7 @@ defClashOpts
   , opt_inlineConstantLimit = 0
   , opt_evaluatorFuelLimit  = 20
   , opt_debug               = debugNone
+  , opt_ghcDebugInfo        = False
   , opt_cachehdl            = True
   , opt_clear               = False
   , opt_primWarn            = True

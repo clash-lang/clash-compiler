@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                           2017, QBayLogic, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -123,7 +123,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                  primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
-                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs)
+                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs (opt_ghcDebugInfo opts))
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
@@ -140,7 +140,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
              clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
-        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
+        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs (opt_ghcDebugInfo opts)) tcMap')) $
           mapM (\(topEnt,annM,isTb) -> do
             topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
             return (topEnt', annM, isTb)) topEntities
@@ -366,7 +366,7 @@ mkTupTyCons tcMap = (tcMap'',tupTcCache)
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
                                           qualifiedNameString tc) tupTyCons)
-                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs)
+                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs False)
                  tcMap
     tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
     tupHM            = UniqMap.fromList (zip tcNames tupTyCons)

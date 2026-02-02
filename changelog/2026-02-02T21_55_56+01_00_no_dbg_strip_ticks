@@ -1,0 +1,1 @@
+Fixed: Suppress ticks if `-g` is not passed to clash [#3132](https://github.com/clash-lang/clash-compiler/issues/3132).

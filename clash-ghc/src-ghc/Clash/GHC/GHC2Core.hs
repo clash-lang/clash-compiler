@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.
-                     2021-2025, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -139,6 +139,7 @@ data GHC2CoreEnv
   = GHC2CoreEnv
   { _srcSpan :: SrcSpan
   , _famInstEnvs :: FamInstEnvs
+  , _preserveSourceTicks :: Bool
   }
 
 makeLenses ''GHC2CoreEnv
@@ -170,7 +171,7 @@ makeAllTyCons hm fiEnvs = go hm hm
         | otherwise                = tcm <> tcm'
       where
         (tcm,old', _) = RWS.runRWS (T.mapM makeTyCon (new ^. tyConMap))
-                                   (GHC2CoreEnv noSrcSpan fiEnvs)
+                                   (GHC2CoreEnv noSrcSpan fiEnvs False)
                                    old
         tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
 
@@ -304,7 +305,7 @@ coreToTerm primMap unlocs = term
     term e
       | (Var x,args) <- collectArgs e
       , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
-                                  (GHC2CoreEnv noSrcSpan emptyFamInstEnvs)
+                                  (GHC2CoreEnv noSrcSpan emptyFamInstEnvs False)
                                   emptyGHC2CoreState
       = go nm args
       | otherwise
@@ -478,9 +479,13 @@ coreToTerm primMap unlocs = term
         Just _ | sizedCast
           -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
         _ -> term e
-    term' (Tick (SourceNote rsp _) e) =
-      C.Tick (C.SrcSpan (RealSrcSpan rsp GHC.Nothing)) <$>
-             addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
+    term' (Tick (SourceNote rsp _) e) = do
+      keep <- view preserveSourceTicks
+      if keep then
+        C.Tick (C.SrcSpan (RealSrcSpan rsp GHC.Nothing)) <$>
+          addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
+      else
+        term e
     term' (Tick _ e) = term e
     term' (Type t) =
       C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
@@ -491,9 +496,9 @@ coreToTerm primMap unlocs = term
 
 
     termSP sp = fmap (second unSrcSpanRB) . RWS.listen . addUsefullR sp . term
-    coreToIdSP sp = RWS.local (\r@(GHC2CoreEnv _ e) ->
+    coreToIdSP sp = RWS.local (\r@(GHC2CoreEnv _ e keep) ->
                                   if isGoodSrcSpan sp then
-                                    GHC2CoreEnv sp e
+                                    GHC2CoreEnv sp e keep
                                   else
                                     r)
                   . coreToId
@@ -614,20 +619,24 @@ coreToTerm primMap unlocs = term
 addUsefull :: SrcSpan
            -> C2C a
            -> C2C a
-addUsefull x m =
-  if isGoodSrcSpan x
-  then do a <- RWS.local (srcSpan .~ x) m
-          RWS.tell (SrcSpanRB x)
-          return a
-  else m
+addUsefull x m = do
+  keep <- view preserveSourceTicks
+  if keep && isGoodSrcSpan x then do
+    a <- RWS.local (srcSpan .~ x) m
+    RWS.tell (SrcSpanRB x)
+    return a
+  else
+    m
 
 addUsefullR :: SrcSpan
             -> C2C a
             -> C2C a
-addUsefullR x m =
-  if isGoodSrcSpan x
-  then RWS.local (srcSpan .~ x) m
-  else m
+addUsefullR x m = do
+  keep <- view preserveSourceTicks
+  if keep && isGoodSrcSpan x then
+    RWS.local (srcSpan .~ x) m
+  else
+    m
 
 isSizedCast :: Type -> Type -> C2C Bool
 isSizedCast (TyConApp tc1 _) (TyConApp tc2 _) = do
@@ -956,8 +965,11 @@ coreToName toName toUnique toString v = do
            = C.System
            | otherwise
            = C.User
+  keep <- view preserveSourceTicks
   locR <- view srcSpan
-  let loc = if isGoodSrcSpan locI then locI else locR
+  let loc
+        | keep = if isGoodSrcSpan locI then locI else locR
+        | otherwise = noSrcSpan
   return (C.Name sort ns key loc)
 
 qualifiedNameString'

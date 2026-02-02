@@ -97,6 +97,7 @@ library
     Test.Tasty.Iverilog
     Test.Tasty.Modelsim
     Test.Tasty.Program
+    Test.Tasty.SourceLoc
     Test.Tasty.SymbiYosys
     Test.Tasty.Verilator
     Test.Tasty.Vivado

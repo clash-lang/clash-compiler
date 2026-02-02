@@ -24,6 +24,7 @@ import           Text.Printf               (printf)
 import           Test.Tasty
 import           Test.Tasty.Common
 import           Test.Tasty.Clash
+import           Test.Tasty.SourceLoc          (sourceLocTests)
 
 import           Control.Retry        (RetryAction(ConsultPolicy, DontRetry), RetryPolicyM, RetryStatus)
 import           Data.List            (isInfixOf)
@@ -1058,6 +1059,7 @@ runClashTest = defaultMain
                          }
           in runTest "ClockWizard" _opts
         ]
+      , sourceLocTests
       , clashTestGroup "XOptimization"
         [ outputTest "Conjunction" def
         , outputTest "Disjunction" def
