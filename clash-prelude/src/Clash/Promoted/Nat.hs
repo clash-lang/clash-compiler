@@ -70,7 +70,7 @@ module Clash.Promoted.Nat
   )
 where
 
-import Data.Constraint    (Dict(..), (:-)(..))
+import Data.Constraint    (Dict(..), (:-)(Sub))
 import Data.Constraint.Nat (euclideanNat)
 import Data.Kind          (Type)
 import Data.Type.Equality ((:~:)(..))

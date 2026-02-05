@@ -102,7 +102,7 @@ where
 import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
 import Data.Bits                  ((.|.), shiftL)
-import Data.Constraint            ((:-)(..), Dict (..))
+import Data.Constraint            ((:-)(Sub), Dict (..))
 import Data.Constraint.Nat        (leZero)
 import Data.Data
   (Data (..), Constr, DataType, Fixity (..), Typeable, mkConstr, mkDataType)

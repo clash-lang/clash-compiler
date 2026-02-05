@@ -314,7 +314,7 @@ Added:
 Added:
   * `Clash.Class.Counter`: a class that defines a odometer-style supercounter. [#1763](https://github.com/clash-lang/clash-compiler/pull/1763)
   * `isLike` function for BitPack types. [#1774](https://github.com/clash-lang/clash-compiler/pull/1774)
-  * 'seqErrorX' for catching both `XException` and `ErrorCall`. [#1774](https://github.com/clash-lang/clash-compiler/pull/1774)
+  * 'seqErrorX' for catching both `XException` and `ErrorCall`. [#1839](https://github.com/clash-lang/clash-compiler/pull/1839)
   * `Clash.Explicit.BlockRam.File.memFile`, a function for creating the contents of the data files this blockRAM uses. Can also be imported from `Clash.Prelude.BlockRam.File`, `Clash.Prelude.ROM.File` and `Clash.Explicit.ROM.File`. [#1840](https://github.com/clash-lang/clash-compiler/pull/1840)
   * Support for Yosys compatible SVA to `Clash.Verification`. This enables formal verification using SymbiYosis for Verilog and SystemVerilog. [#1798](https://github.com/clash-lang/clash-compiler/pull/1798)
   * `Clash.Explicit.Signal.Delayed.forward`, a function that can be used to retime a `DSignal` into the future without applying any logic. [#1882](https://github.com/clash-lang/clash-compiler/pull/1882)
