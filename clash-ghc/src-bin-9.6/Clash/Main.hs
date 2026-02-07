@@ -268,9 +268,12 @@ main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
   (dflags3, fileish_args, dynamicFlagWarnings) <-
       GHC.parseDynamicFlags logger2 dflags2 args'
 
-  -- Propagate -Werror to Clash
+  -- Propagate some GHC flags to Clash
   liftIO . modifyIORef' clashOpts $ \opts ->
-    opts { opt_werror = EnumSet.member Opt_WarnIsError (generalFlags dflags3) }
+    opts
+      { opt_werror = EnumSet.member Opt_WarnIsError (generalFlags dflags3)
+      , opt_ghcDebugLevel = debugLevel dflags3
+      }
 
   let dflags4 = if backendNeedsFullWays bcknd &&
                    not (gopt Opt_ExternalInterpreter dflags3)
