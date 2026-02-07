@@ -2,8 +2,8 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.
-                     2022     , Google Inc.
+                     2022     , Google Inc.,
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -319,13 +319,25 @@ mkNetDecl (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ withT
         Annotated attrs hty0 -> Annotated (attrs ++ lAttrs) hty0
         hty0 -> annotated lAttrs hty0
 
+  -- GHC starts including sources notes on any debug level greater than 0
+  -- we copy this behaviour here.
+  emitLocs <- (>0) . opt_ghcDebugLevel <$> Lens.view clashOpts
+  let
+    srcNote =
+      if emitLocs then
+        addSrcNote $ case tm of
+          Tick (SrcSpan s) _ -> s
+          _ -> nameLoc (varName id_)
+      else
+        Nothing
+
   if | not (shouldRenderDecl hwTy tm) -> return []
      | (Prim pInfo@PrimInfo{primMultiResult=MultiResult}, args) <- collectArgs tm ->
-          multiDecls pInfo args
-     | otherwise -> pure <$> singleDecl hwTy
+          multiDecls srcNote pInfo args
+     | otherwise -> pure <$> singleDecl srcNote hwTy
 
   where
-    multiDecls pInfo args0 = do
+    multiDecls srcNote pInfo args0 = do
       tcm <- Lens.view tcCache
       resInits0 <- getResInits (id_, tm)
       let
@@ -339,17 +351,13 @@ mkNetDecl (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ withT
       hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (mpi_resultTypes mpInfo)
       pure (zipWith3 netdecl res hwTys resInits1)
 
-    singleDecl hwTy = do
+    singleDecl srcNote hwTy = do
       rIM <- listToMaybe <$> getResInits (id_, tm)
       return (NetDecl' srcNote (Id.unsafeFromCoreId id_) hwTy rIM)
 
     addSrcNote loc
       | isGoodSrcSpan loc = Just (StrictText.pack (showSDocUnsafe (ppr loc)))
       | otherwise = Nothing
-
-    srcNote = addSrcNote $ case tm of
-      Tick (SrcSpan s) _ -> s
-      _ -> nameLoc (varName id_)
 
     isMultiPrimSelect :: Term -> Bool
     isMultiPrimSelect t = case collectArgs t of
