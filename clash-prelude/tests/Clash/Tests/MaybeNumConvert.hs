@@ -37,7 +37,9 @@ module Clash.Tests.MaybeNumConvert where
 
 import Control.Monad (forM_)
 import Data.Data (Proxy (..))
+import Data.Int (Int64)
 import Data.Maybe (fromMaybe, isJust)
+import Data.Word (Word64)
 import GHC.TypeNats (someNatVal)
 import Test.Tasty (TestTree, defaultMain)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase)
@@ -52,6 +54,32 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = $(testGroupGenerator)
+
+-- Tests for maybeNumConvertVia (conversions that can fail)
+
+case_throughMaybeInt64Word64 :: Assertion
+case_throughMaybeInt64Word64 = do
+  -- Successful conversions (non-negative values)
+  assertBool "0" $ maybeNumConvertVia (0 :: Int64) == Just (0 :: Word64)
+  assertBool "1" $ maybeNumConvertVia (1 :: Int64) == Just (1 :: Word64)
+  assertBool "42" $ maybeNumConvertVia (42 :: Int64) == Just (42 :: Word64)
+  assertBool "maxBound" $ maybeNumConvertVia (maxBound :: Int64) == Just (9223372036854775807 :: Word64)
+  -- Failed conversions (negative values)
+  assertBool "-1" $ maybeNumConvertVia (-1 :: Int64) == (Nothing :: Maybe Word64)
+  assertBool "-42" $ maybeNumConvertVia (-42 :: Int64) == (Nothing :: Maybe Word64)
+  assertBool "minBound" $ maybeNumConvertVia (minBound :: Int64) == (Nothing :: Maybe Word64)
+
+case_throughMaybeWord64Unsigned32 :: Assertion
+case_throughMaybeWord64Unsigned32 = do
+  -- Successful conversions (small values)
+  assertBool "0" $ maybeNumConvertVia (0 :: Word64) == Just (0 :: Unsigned 32)
+  assertBool "1" $ maybeNumConvertVia (1 :: Word64) == Just (1 :: Unsigned 32)
+  assertBool "42" $ maybeNumConvertVia (42 :: Word64) == Just (42 :: Unsigned 32)
+  assertBool "maxBound32" $ maybeNumConvertVia (4294967295 :: Word64) == Just (maxBound :: Unsigned 32)
+  -- Failed conversions (values too large)
+  assertBool "overflow1" $ maybeNumConvertVia (4294967296 :: Word64) == (Nothing :: Maybe (Unsigned 32))
+  assertBool "overflow2" $ maybeNumConvertVia (5000000000 :: Word64) == (Nothing :: Maybe (Unsigned 32))
+  assertBool "maxBound64" $ maybeNumConvertVia (maxBound :: Word64) == (Nothing :: Maybe (Unsigned 32))
 
 withSomeSNat :: Natural -> (forall (n :: Nat). SNat n -> r) -> r
 withSomeSNat n f = case someNatVal n of

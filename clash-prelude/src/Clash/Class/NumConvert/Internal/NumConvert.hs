@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -19,6 +20,7 @@ module Clash.Class.NumConvert.Internal.NumConvert where
 import Prelude
 
 import Clash.Class.BitPack
+import Clash.Class.NumConvert.Internal.Canonical
 import Clash.Class.Resize
 import Clash.Sized.BitVector
 import Clash.Sized.Index
@@ -34,6 +36,7 @@ import Data.Word (Word16, Word32, Word64, Word8)
 {- $setup
 >>> import Clash.Prelude
 >>> import Clash.Class.NumConvert
+>>> import Data.Word
 -}
 
 {- | Conversions that are, based on their types, guaranteed to succeed. A
@@ -79,6 +82,31 @@ class NumConvert a b where
     the output is too. This property might be relaxed in the future.
   -}
   numConvert :: a -> b
+
+{- | Convert a value by explicitly going through the canonical "unwrapped" form
+of the source type. This function is useful when direct 'numConvert' fails due
+to overlapping instances.
+
+For example, converting @Word32@ to @Word64@ creates overlapping instances, but
+'numConvertVia' resolves this by explicitly routing through @Unsigned 32@:
+
+>>> numConvertVia (42 :: Word32) :: Word64
+42
+
+The conversion path is: @Word32 -> Unsigned 32 -> Unsigned 64 -> Word64@
+-}
+numConvertVia ::
+  forall a b.
+  ( NumConvert a (Canonical a)
+  , NumConvert (Canonical a) (Canonical b)
+  , NumConvert (Canonical b) b
+  ) =>
+  a ->
+  b
+numConvertVia =
+    numConvert @(Canonical b) @b
+  . numConvert @(Canonical a) @(Canonical b)
+  . numConvert @a @(Canonical a)
 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Index n) (Index m) where
   numConvert = resize
@@ -128,51 +156,60 @@ instance (KnownNat n, KnownNat m, n + 1 <= m) => NumConvert (BitVector n) (Signe
 instance (KnownNat n, KnownNat m, n <= m) => NumConvert (BitVector n) (BitVector m) where
   numConvert = resize
 
-instance (NumConvert (Unsigned WORD_SIZE_IN_BITS) a) => NumConvert Word a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned 64) a
-instance (NumConvert (Unsigned 64) a) => NumConvert Word64 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned 64) a
-instance (NumConvert (Unsigned 32) a) => NumConvert Word32 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned 32) a
-instance (NumConvert (Unsigned 16) a) => NumConvert Word16 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned 16) a
-instance (NumConvert (Unsigned 8) a) => NumConvert Word8 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned 8) a
+-- Concrete bidirectional instances for Word types
+instance NumConvert Word (Unsigned WORD_SIZE_IN_BITS) where
+  numConvert = bitCoerce
+instance NumConvert (Unsigned WORD_SIZE_IN_BITS) Word where
+  numConvert = bitCoerce
 
-instance (NumConvert (Signed WORD_SIZE_IN_BITS) a) => NumConvert Int a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Signed 64) a
-instance (NumConvert (Signed 64) a) => NumConvert Int64 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Signed 64) a
-instance (NumConvert (Signed 32) a) => NumConvert Int32 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Signed 32) a
-instance (NumConvert (Signed 16) a) => NumConvert Int16 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Signed 16) a
-instance (NumConvert (Signed 8) a) => NumConvert Int8 a where
-  numConvert !a = numConvert $ bitCoerce @_ @(Signed 8) a
+instance NumConvert Word64 (Unsigned 64) where
+  numConvert = bitCoerce
+instance NumConvert (Unsigned 64) Word64 where
+  numConvert = bitCoerce
 
-instance (NumConvert a (Unsigned WORD_SIZE_IN_BITS)) => NumConvert a Word where
-  numConvert = bitCoerce @(Unsigned 64) . numConvert
-instance (NumConvert a (Unsigned 64)) => NumConvert a Word64 where
-  numConvert = bitCoerce @(Unsigned 64) . numConvert
-instance (NumConvert a (Unsigned 32)) => NumConvert a Word32 where
-  numConvert = bitCoerce @(Unsigned 32) . numConvert
-instance (NumConvert a (Unsigned 16)) => NumConvert a Word16 where
-  numConvert = bitCoerce @(Unsigned 16) . numConvert
-instance (NumConvert a (Unsigned 8)) => NumConvert a Word8 where
-  numConvert = bitCoerce @(Unsigned 8) . numConvert
+instance NumConvert Word32 (Unsigned 32) where
+  numConvert = bitCoerce
+instance NumConvert (Unsigned 32) Word32 where
+  numConvert = bitCoerce
 
-instance (NumConvert a (Signed WORD_SIZE_IN_BITS)) => NumConvert a Int where
-  numConvert = bitCoerce @(Signed 64) . numConvert
-instance (NumConvert a (Signed 64)) => NumConvert a Int64 where
-  numConvert = bitCoerce @(Signed 64) . numConvert
-instance (NumConvert a (Signed 32)) => NumConvert a Int32 where
-  numConvert = bitCoerce @(Signed 32) . numConvert
-instance (NumConvert a (Signed 16)) => NumConvert a Int16 where
-  numConvert = bitCoerce @(Signed 16) . numConvert
-instance (NumConvert a (Signed 8)) => NumConvert a Int8 where
-  numConvert = bitCoerce @(Signed 8) . numConvert
+instance NumConvert Word16 (Unsigned 16) where
+  numConvert = bitCoerce
+instance NumConvert (Unsigned 16) Word16 where
+  numConvert = bitCoerce
 
-instance (NumConvert a (BitVector 1)) => NumConvert a Bit where
-  numConvert = unpack . numConvert
-instance (NumConvert (BitVector 1) a) => NumConvert Bit a where
-  numConvert = numConvert . pack
+instance NumConvert Word8 (Unsigned 8) where
+  numConvert = bitCoerce
+instance NumConvert (Unsigned 8) Word8 where
+  numConvert = bitCoerce
+
+-- Concrete bidirectional instances for Int types
+instance NumConvert Int (Signed WORD_SIZE_IN_BITS) where
+  numConvert = bitCoerce
+instance NumConvert (Signed WORD_SIZE_IN_BITS) Int where
+  numConvert = bitCoerce
+
+instance NumConvert Int64 (Signed 64) where
+  numConvert = bitCoerce
+instance NumConvert (Signed 64) Int64 where
+  numConvert = bitCoerce
+
+instance NumConvert Int32 (Signed 32) where
+  numConvert = bitCoerce
+instance NumConvert (Signed 32) Int32 where
+  numConvert = bitCoerce
+
+instance NumConvert Int16 (Signed 16) where
+  numConvert = bitCoerce
+instance NumConvert (Signed 16) Int16 where
+  numConvert = bitCoerce
+
+instance NumConvert Int8 (Signed 8) where
+  numConvert = bitCoerce
+instance NumConvert (Signed 8) Int8 where
+  numConvert = bitCoerce
+
+-- Concrete bidirectional instances for Bit
+instance NumConvert Bit (BitVector 1) where
+  numConvert = pack
+instance NumConvert (BitVector 1) Bit where
+  numConvert = unpack
