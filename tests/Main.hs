@@ -692,6 +692,8 @@ runClashTest = defaultMain
           , clashLibTest "NoDeDup" def{hdlTargets=[VHDL]}
           , clashLibTest "T1766" def
           , clashLibTest "T1935" def
+          , outputTest "HDLContainsLoc" def{hdlSim=[], clashFlags=["-g"]}
+          , outputTest "HDLNotContainsLoc" def{hdlSim=[]}
           ]
       , clashTestGroup "Numbers"
         [ runTest "BitInteger" def
