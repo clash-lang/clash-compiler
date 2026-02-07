@@ -188,6 +188,7 @@ Library
                       Clash.Class.NumConvert
                       Clash.Class.NumConvert.Internal.NumConvert
                       Clash.Class.NumConvert.Internal.MaybeNumConvert
+                      Clash.Class.NumConvert.Internal.Canonical
                       Clash.Class.Parity
                       Clash.Class.Resize
 

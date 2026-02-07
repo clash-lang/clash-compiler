@@ -26,7 +26,11 @@ ways:
 module Clash.Class.NumConvert (
   NumConvert (..),
   MaybeNumConvert (..),
+  numConvertVia,
+  maybeNumConvertVia,
+  Canonical,
 ) where
 
 import Clash.Class.NumConvert.Internal.MaybeNumConvert
 import Clash.Class.NumConvert.Internal.NumConvert
+import Clash.Class.NumConvert.Internal.Canonical

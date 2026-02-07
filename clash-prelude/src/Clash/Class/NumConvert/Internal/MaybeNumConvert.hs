@@ -16,6 +16,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 module Clash.Class.NumConvert.Internal.MaybeNumConvert where
 
 import Clash.Class.BitPack
+import Clash.Class.NumConvert.Internal.NumConvert (NumConvert (..))
+import Clash.Class.NumConvert.Internal.Canonical (Canonical)
 import Clash.Class.Resize
 import Clash.Sized.BitVector
 import Clash.Sized.Index
@@ -25,12 +27,11 @@ import Clash.Sized.Unsigned
 import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
 import GHC.TypeLits.Extra (CLog)
 
-import Data.Int (Int16, Int32, Int64, Int8)
-import Data.Word (Word16, Word32, Word64, Word8)
-
 {- $setup
 >>> import Clash.Prelude
 >>> import Clash.Class.NumConvert
+>>> import Data.Word
+>>> import Data.Int
 -}
 
 {- | Conversions that may fail for some values. A successful conversion retains
@@ -78,6 +79,35 @@ class MaybeNumConvert a b where
     the output is too. This property might be relaxed in the future.
   -}
   maybeNumConvert :: a -> Maybe b
+
+{- | Convert a value by explicitly going through the canonical "unwrapped" form
+of the source and target types. This function is useful when direct 'maybeNumConvert'
+fails due to overlapping instances.
+
+For example, converting @Int64@ to @Word64@ creates overlapping instances, but
+'maybeNumConvertVia' resolves this by explicitly routing through canonical forms:
+
+>>> maybeNumConvertVia (42 :: Int64) :: Maybe Word64
+Just 42
+>>> maybeNumConvertVia (-1 :: Int64) :: Maybe Word64
+Nothing
+
+The conversion uses 'NumConvert' for the conversions to/from canonical forms (which
+always succeed) and 'MaybeNumConvert' for the Clash-to-Clash conversion (which may fail).
+The conversion path is: @Int64 -> Signed 64 -> Unsigned 64 -> Word64@
+-}
+maybeNumConvertVia ::
+  forall a b.
+  ( NumConvert a (Canonical a)
+  , MaybeNumConvert (Canonical a) (Canonical b)
+  , NumConvert (Canonical b) b
+  ) =>
+  a ->
+  Maybe b
+maybeNumConvertVia a =
+    fmap (numConvert @(Canonical b) @b)
+  $ maybeNumConvert @(Canonical a) @(Canonical b)
+  $ numConvert @a @(Canonical a) a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (Index n) (Index m) where
   maybeNumConvert !a = maybeResize a
@@ -132,50 +162,3 @@ instance (KnownNat n, KnownNat m) => MaybeNumConvert (BitVector n) (Signed m) wh
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvert (BitVector n) (BitVector m) where
   maybeNumConvert !a = maybeResize a
-
-instance (MaybeNumConvert (Unsigned 64) a) => MaybeNumConvert Word a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Unsigned 64) a
-instance (MaybeNumConvert (Unsigned 64) a) => MaybeNumConvert Word64 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Unsigned 64) a
-instance (MaybeNumConvert (Unsigned 32) a) => MaybeNumConvert Word32 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Unsigned 32) a
-instance (MaybeNumConvert (Unsigned 16) a) => MaybeNumConvert Word16 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Unsigned 16) a
-instance (MaybeNumConvert (Unsigned 8) a) => MaybeNumConvert Word8 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Unsigned 8) a
-
-instance (MaybeNumConvert (Signed 64) a) => MaybeNumConvert Int a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Signed 64) a
-instance (MaybeNumConvert (Signed 64) a) => MaybeNumConvert Int64 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Signed 64) a
-instance (MaybeNumConvert (Signed 32) a) => MaybeNumConvert Int32 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Signed 32) a
-instance (MaybeNumConvert (Signed 16) a) => MaybeNumConvert Int16 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Signed 16) a
-instance (MaybeNumConvert (Signed 8) a) => MaybeNumConvert Int8 a where
-  maybeNumConvert !a = maybeNumConvert $ bitCoerce @_ @(Signed 8) a
-
-instance (MaybeNumConvert a (Unsigned 64)) => MaybeNumConvert a Word where
-  maybeNumConvert !a = fmap (bitCoerce @(Unsigned 64)) $ maybeNumConvert a
-instance (MaybeNumConvert a (Unsigned 64)) => MaybeNumConvert a Word64 where
-  maybeNumConvert !a = fmap (bitCoerce @(Unsigned 64)) $ maybeNumConvert a
-instance (MaybeNumConvert a (Unsigned 32)) => MaybeNumConvert a Word32 where
-  maybeNumConvert !a = fmap (bitCoerce @(Unsigned 32)) $ maybeNumConvert a
-instance (MaybeNumConvert a (Unsigned 16)) => MaybeNumConvert a Word16 where
-  maybeNumConvert !a = fmap (bitCoerce @(Unsigned 16)) $ maybeNumConvert a
-instance (MaybeNumConvert a (Unsigned 8)) => MaybeNumConvert a Word8 where
-  maybeNumConvert !a = fmap (bitCoerce @(Unsigned 8)) $ maybeNumConvert a
-
-instance (MaybeNumConvert a (Signed 64)) => MaybeNumConvert a Int64 where
-  maybeNumConvert !a = fmap (bitCoerce @(Signed 64)) $ maybeNumConvert a
-instance (MaybeNumConvert a (Signed 32)) => MaybeNumConvert a Int32 where
-  maybeNumConvert !a = fmap (bitCoerce @(Signed 32)) $ maybeNumConvert a
-instance (MaybeNumConvert a (Signed 16)) => MaybeNumConvert a Int16 where
-  maybeNumConvert !a = fmap (bitCoerce @(Signed 16)) $ maybeNumConvert a
-instance (MaybeNumConvert a (Signed 8)) => MaybeNumConvert a Int8 where
-  maybeNumConvert !a = fmap (bitCoerce @(Signed 8)) $ maybeNumConvert a
-
-instance (MaybeNumConvert a (BitVector 1)) => MaybeNumConvert a Bit where
-  maybeNumConvert !a = unpack <$> maybeNumConvert a
-instance (MaybeNumConvert (BitVector 1) a) => MaybeNumConvert Bit a where
-  maybeNumConvert !a = maybeNumConvert (pack a)
