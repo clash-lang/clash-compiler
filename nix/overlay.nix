@@ -6,7 +6,7 @@
 # packages to the environment, or need to change the configuration of the
 # different packages maintained by QBayLogic.
 
-{ ghc-tcplugins-extra
+{ ghc-tcplugin-api
 , ghc-typelits-extra
 , ghc-typelits-knownnat
 , ghc-typelits-natnormalise
@@ -27,10 +27,10 @@ let
   # standalone repositories, e.g. the typechecker plugins needed for Clash.
   haskellExternalPackages =
     hfinal: hprev: {
-      ghc-tcplugins-extra =
+      ghc-tcplugin-api =
         hprev.callCabal2nix
-          "ghc-tcplugins-extra"
-          "${ghc-tcplugins-extra}"
+          "ghc-tcplugin-api"
+          "${ghc-tcplugin-api}"
           { };
 
       ghc-typelits-extra =
