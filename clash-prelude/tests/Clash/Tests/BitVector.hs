@@ -24,7 +24,7 @@ import qualified Test.Tasty.Hedgehog.Extra as H
 import qualified Test.Tasty.QuickCheck as Q
 
 import Clash.Prelude
-  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit, hLit, oLit)
+  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit, hLit, oLit, rotateL, rotateR)
 import Clash.Sized.Internal.BitVector (BitVector (..))
 
 import Clash.Tests.SizedNum
@@ -96,6 +96,10 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
   , testGroup "Bounds"
     [ testCase "maxBound :: BitVector 0" $ maxBound @(BitVector 0) @?= 0
     , testCase "minBound :: BitVector 0" $ minBound @(BitVector 0) @?= 0
+    ]
+  , testGroup "Rotate"
+    [ testCase "rotateL BitVector 0" $ rotateL @(BitVector 0) 0 2 @?= 0
+    , testCase "rotateR BitVector 0" $ rotateR @(BitVector 0) 0 2 @?= 0
     ]
   , testGroup "MSB"
     [ H.testPropertyXXX "msb @(BitVector 1)" (msbTest @1)
