@@ -148,7 +148,7 @@ errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStac
 -- X: QQ
 -- CallStack (from HasCallStack):
 --   errorX, called at ...
--- <BLANKLINE>
+-- ...
 xToErrorCtx :: String -> a -> a
 xToErrorCtx ctx a = unsafeDupablePerformIO
   (catch (evaluate a >> return a)
@@ -208,7 +208,7 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
 -- X: QQ
 -- CallStack (from HasCallStack):
 --   errorX, called at ...
--- <BLANKLINE>
+-- ...
 xToError :: HasCallStack => a -> a
 xToError = xToErrorCtx (prettyCallStack callStack)
 {-# INLINE xToError #-}

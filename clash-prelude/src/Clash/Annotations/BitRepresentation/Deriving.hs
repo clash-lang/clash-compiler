@@ -74,7 +74,9 @@ import           Data.Data                    (Data)
 import           Data.Containers.ListUtils    (nubOrd)
 import           Data.List
   (mapAccumL, zipWith4, sortOn, partition, uncons)
+#if __GLASGOW_HASKELL__ < 912
 import           Data.Typeable                (Typeable)
+#endif
 import qualified Data.Map                     as Map
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Set                     as Set
@@ -93,7 +95,10 @@ data BitMaskOrigin
   -- ^ Constructor bit should be stored externally
   | Embedded BitMask Value
   -- ^ Constructor bit should be stored in one of the constructor's fields
-    deriving (Show, Data, Typeable, Lift)
+    deriving (Show, Data, Lift)
+#if __GLASGOW_HASKELL__ < 912
+    deriving (Typeable)
+#endif
 
 isExternal :: BitMaskOrigin -> Bool
 isExternal External = True
