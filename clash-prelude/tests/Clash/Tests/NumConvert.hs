@@ -71,6 +71,11 @@ import Test.Tasty.TH (testGroupGenerator)
 
 import qualified Data.List as L
 
+import Clash.Num.Erroring (Erroring, fromErroring, toErroring)
+import Clash.Num.Overflowing (Overflowing, fromOverflowing, toOverflowing)
+import Clash.Num.Saturating (Saturating, fromSaturating, toSaturating)
+import Clash.Num.Wrapping (Wrapping, fromWrapping, toWrapping)
+import Clash.Num.Zeroing (Zeroing, fromZeroing, toZeroing)
 import Clash.Prelude hiding (someNatVal, withSomeSNat)
 
 convertLaw1 :: forall a b. (NumConvert a b, MaybeNumConvert b a, Eq a) => Proxy b -> a -> Bool
@@ -95,6 +100,37 @@ convertXException :: forall a b. (NumConvert a b) => Proxy a -> Proxy b -> Bool
 convertXException _ _ = case isX $ numConvert @a @b (errorX "BOO" :: a) of
   Left s -> "BOO" `L.isInfixOf` s
   Right _ -> False
+
+-- Tests for wrapped number types
+case_ErroringWord8Word16 :: Assertion
+case_ErroringWord8Word16 = do
+  assertBool "Erroring 0" $ numConvert (toErroring (0 :: Unsigned 8)) == (0 :: Word16)
+  assertBool "Erroring 42" $ numConvert (toErroring (42 :: Unsigned 8)) == (42 :: Word16)
+  assertBool "to Erroring" $ fromErroring (numConvert (0 :: Word8) :: Erroring (Unsigned 16)) == (0 :: Unsigned 16)
+
+case_SaturatingWord8Word16 :: Assertion
+case_SaturatingWord8Word16 = do
+  assertBool "Saturating 0" $ numConvert (toSaturating (0 :: Unsigned 8)) == (0 :: Word16)
+  assertBool "Saturating 42" $ numConvert (toSaturating (42 :: Unsigned 8)) == (42 :: Word16)
+  assertBool "to Saturating" $ fromSaturating (numConvert (0 :: Word8) :: Saturating (Unsigned 16)) == (0 :: Unsigned 16)
+
+case_WrappingWord8Word16 :: Assertion
+case_WrappingWord8Word16 = do
+  assertBool "Wrapping 0" $ numConvert (toWrapping (0 :: Unsigned 8)) == (0 :: Word16)
+  assertBool "Wrapping 42" $ numConvert (toWrapping (42 :: Unsigned 8)) == (42 :: Word16)
+  assertBool "to Wrapping" $ fromWrapping (numConvert (0 :: Word8) :: Wrapping (Unsigned 16)) == (0 :: Unsigned 16)
+
+case_ZeroingWord8Word16 :: Assertion
+case_ZeroingWord8Word16 = do
+  assertBool "Zeroing 0" $ numConvert (toZeroing (0 :: Unsigned 8)) == (0 :: Word16)
+  assertBool "Zeroing 42" $ numConvert (toZeroing (42 :: Unsigned 8)) == (42 :: Word16)
+  assertBool "to Zeroing" $ fromZeroing (numConvert (0 :: Word8) :: Zeroing (Unsigned 16)) == (0 :: Unsigned 16)
+
+case_OverflowingWord8Word16 :: Assertion
+case_OverflowingWord8Word16 = do
+  assertBool "Overflowing 0" $ numConvert (toOverflowing (0 :: Unsigned 8)) == (0 :: Word16)
+  assertBool "Overflowing 42" $ numConvert (toOverflowing (42 :: Unsigned 8)) == (42 :: Word16)
+  assertBool "to Overflowing" $ fromOverflowing (numConvert (0 :: Word8) :: Overflowing (Unsigned 16)) == (0 :: Unsigned 16)
 
 main :: IO ()
 main = defaultMain tests

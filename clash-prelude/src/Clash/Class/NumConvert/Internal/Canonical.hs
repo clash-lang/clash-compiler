@@ -11,6 +11,11 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 module Clash.Class.NumConvert.Internal.Canonical where
 
+import Clash.Num.Erroring (Erroring)
+import Clash.Num.Overflowing (Overflowing)
+import Clash.Num.Saturating (Saturating)
+import Clash.Num.Wrapping (Wrapping)
+import Clash.Num.Zeroing (Zeroing)
 import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
@@ -46,3 +51,10 @@ type instance Canonical (Unsigned n) = Unsigned n
 type instance Canonical (Signed n) = Signed n
 type instance Canonical (BitVector n) = BitVector n
 type instance Canonical (Index n) = Index n
+
+-- Instances for wrapped number types
+type instance Canonical (Erroring a) = Canonical a
+type instance Canonical (Overflowing a) = Canonical a
+type instance Canonical (Saturating a) = Canonical a
+type instance Canonical (Wrapping a) = Canonical a
+type instance Canonical (Zeroing a) = Canonical a

@@ -21,8 +21,14 @@ module Clash.Class.NumConvert.Internal.NumConvert where
 import Prelude
 
 import Clash.Class.BitPack
+import Clash.Class.Num (SaturatingNum)
 import Clash.Class.NumConvert.Internal.Canonical
 import Clash.Class.Resize
+import Clash.Num.Erroring (Erroring, fromErroring, toErroring)
+import Clash.Num.Overflowing (Overflowing, fromOverflowing, toOverflowing)
+import Clash.Num.Saturating (Saturating, fromSaturating, toSaturating)
+import Clash.Num.Wrapping (Wrapping, fromWrapping, toWrapping)
+import Clash.Num.Zeroing (Zeroing, fromZeroing, toZeroing)
 import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
@@ -225,3 +231,32 @@ instance NumConvertCanonical Bit (BitVector 1) where
   numConvertCanonical = pack
 instance NumConvertCanonical (BitVector 1) Bit where
   numConvertCanonical = unpack
+
+-- Concrete bidirectional instances for wrapped number types. These are a bit
+-- weird: typically we ask users to provide a mapping from their type to the
+-- canonical type. Given the polymorphic nature of 'Erroring' and the link, we
+-- can't do that.
+instance NumConvertCanonical a b => NumConvertCanonical (Erroring a) b where
+  numConvertCanonical = numConvertCanonical . fromErroring
+instance (SaturatingNum a, NumConvertCanonical b a) => NumConvertCanonical b (Erroring a) where
+  numConvertCanonical = toErroring . numConvertCanonical
+
+instance NumConvertCanonical a b => NumConvertCanonical (Overflowing a) b where
+  numConvertCanonical = numConvertCanonical . fromOverflowing
+instance (SaturatingNum a, NumConvertCanonical b a) => NumConvertCanonical b (Overflowing a) where
+  numConvertCanonical = toOverflowing . numConvertCanonical
+
+instance NumConvertCanonical a b => NumConvertCanonical (Saturating a) b where
+  numConvertCanonical = numConvertCanonical . fromSaturating
+instance (SaturatingNum a, NumConvertCanonical b a) => NumConvertCanonical b (Saturating a) where
+  numConvertCanonical = toSaturating . numConvertCanonical
+
+instance NumConvertCanonical a b => NumConvertCanonical (Wrapping a) b where
+  numConvertCanonical = numConvertCanonical . fromWrapping
+instance (SaturatingNum a, NumConvertCanonical b a) => NumConvertCanonical b (Wrapping a) where
+  numConvertCanonical = toWrapping . numConvertCanonical
+
+instance NumConvertCanonical a b => NumConvertCanonical (Zeroing a) b where
+  numConvertCanonical = numConvertCanonical . fromZeroing
+instance (SaturatingNum a, NumConvertCanonical b a) => NumConvertCanonical b (Zeroing a) where
+  numConvertCanonical = toZeroing . numConvertCanonical
