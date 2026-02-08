@@ -1090,7 +1090,9 @@ shiftR# (BV m v) i
 {-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(BV msk v) b ->
-    if b >= 0 then
+    if sz == 0 then
+      BV msk v
+    else if b >= 0 then
       let vl    = naturalShiftL v b'
           vr    = naturalShiftR v b''
 
@@ -1110,7 +1112,9 @@ rotateL# =
 {-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(BV msk v) b ->
-    if b >= 0 then
+    if sz == 0 then
+      BV msk v
+    else if b >= 0 then
       let vl   = naturalShiftR v b'
           vr   = naturalShiftL v b''
           ml   = naturalShiftR msk b'
