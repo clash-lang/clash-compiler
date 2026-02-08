@@ -48,7 +48,7 @@ failure is expressed by returning 'Nothing', never by an 'Clash.XException.XExce
 
 == __Laws__
 A conversion is either successful or it fails gracefully. I.e., it does not
-produces produce errors (also see "Clash.XException"). I.e.,
+produce errors (also see "Clash.XException"). I.e.,
 
 > x == fromMaybe x (maybeNumConvert @a @b x >>= maybeNumConvert @b @a)
 
@@ -56,7 +56,7 @@ for all values @x@ of type @a@. It should also preserve the numerical value
 interpretation of the bits. For types that have an @Integral@ instance, this
 intuition is captured by:
 
-> toInteger x == fromMaybe (toInteger x) (toInteger (numConvert @a @b x))
+> toInteger x == fromMaybe (toInteger x) (toInteger <$> maybeNumConvert @a @b x)
 
 If a conversion succeeds one way, it should also succeed the other way. I.e.,
 
