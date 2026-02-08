@@ -1,0 +1,1 @@
+ADDED: `SaturatingNum` and `Bounded` instances for `Signal dom a`. The `sat` family (`satAdd`, `satSucc`, ...) can now be used on `Signal`s and `{min,max}Bound` can be used to construct them [#2931](github.com/clash-lang/clash-compiler/issues/2931)

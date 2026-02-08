@@ -211,6 +211,7 @@ import System.IO.Unsafe           (unsafeInterleaveIO, unsafePerformIO)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
+import Clash.Class.Num            (SaturatingNum(..))
 import Clash.CPP                  (fStrictMapSignal)
 import Clash.NamedTypes
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
@@ -909,6 +910,17 @@ instance Num a => Num (Signal dom a) where
   abs         = fmap abs
   signum      = fmap signum
   fromInteger = signal# . fromInteger
+
+instance Bounded a => Bounded (Signal dom a) where
+  minBound = pure minBound
+  maxBound = pure maxBound
+
+instance SaturatingNum a => SaturatingNum (Signal dom a) where
+  satAdd mode = liftA2 (satAdd mode)
+  satSub mode = liftA2 (satSub mode)
+  satMul mode = liftA2 (satMul mode)
+  satSucc mode = fmap (satSucc mode)
+  satPred mode = fmap (satPred mode)
 
 -- | __NB__: Not synthesizable
 --

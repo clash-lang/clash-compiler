@@ -61,6 +61,12 @@ tests =
             in
               evaluate a >> pure ()
         ]
+    , testGroup "SaturatingNum"
+      [ testCase "satSucc SatWrap" case_satSuccSatWrap
+      , testCase "satSucc SatBound" case_satSuccSatBound
+      , testCase "satPred SatWrap" case_satPredSatWrap
+      , testCase "satPred SatBound" case_satPredSatBound
+      ]
     , testGroup "unsafeSynchronizer"
       [ testCase "case_dynamicStaticEq" case_dynamicStaticEq
       , testCase "case_dynamicHasEffect" case_dynamicHasEffect
@@ -180,3 +186,31 @@ case_F6_F1 = do
     , 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
     , 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6
     ]
+
+-- | Test that satSucc SatWrap works on signals
+case_satSuccSatWrap :: Assertion
+case_satSuccSatWrap = do
+  let s = fromList [255, 254] :: Signal System (Unsigned 8)
+      result = satSucc SatWrap s
+  sampleN @System 2 result @?= [0, 255]
+
+-- | Test that satSucc SatBound works on signals
+case_satSuccSatBound :: Assertion
+case_satSuccSatBound = do
+  let s = fromList [255, 254] :: Signal System (Unsigned 8)
+      result = satSucc SatBound s
+  sampleN @System 2 result @?= [255, 255]
+
+-- | Test that satPred SatWrap works on signals
+case_satPredSatWrap :: Assertion
+case_satPredSatWrap = do
+  let s = fromList [0, 1] :: Signal System (Unsigned 8)
+      result = satPred SatWrap s
+  sampleN @System 2 result @?= [255, 0]
+
+-- | Test that satPred SatBound works on signals
+case_satPredSatBound :: Assertion
+case_satPredSatBound = do
+  let s = fromList [0, 1] :: Signal System (Unsigned 8)
+      result = satPred SatBound s
+  sampleN @System 2 result @?= [0, 0]
