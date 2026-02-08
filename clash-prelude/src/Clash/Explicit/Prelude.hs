@@ -125,12 +125,16 @@ module Clash.Explicit.Prelude
     -- ** Template Haskell
   , Lift (..)
     -- ** Type classes
+    -- *** Number conversion
+  , NumConvert
+  , numConvert
+  , MaybeNumConvert
+  , maybeNumConvert
     -- *** Clash
   , module Clash.Class.AutoReg
   , module Clash.Class.BitPack
   , module Clash.Class.Exp
   , module Clash.Class.Num
-  , module Clash.Class.NumConvert
   , module Clash.Class.Resize
     -- *** Other
   , module Control.Applicative

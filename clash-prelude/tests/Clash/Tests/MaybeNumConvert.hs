@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -55,31 +56,31 @@ main = defaultMain tests
 tests :: TestTree
 tests = $(testGroupGenerator)
 
--- Tests for maybeNumConvertVia (conversions that can fail)
+-- Tests for maybeNumConvert (conversions that can fail)
 
-case_throughMaybeInt64Word64 :: Assertion
-case_throughMaybeInt64Word64 = do
+case_MaybeInt64Word64 :: Assertion
+case_MaybeInt64Word64 = do
   -- Successful conversions (non-negative values)
-  assertBool "0" $ maybeNumConvertVia (0 :: Int64) == Just (0 :: Word64)
-  assertBool "1" $ maybeNumConvertVia (1 :: Int64) == Just (1 :: Word64)
-  assertBool "42" $ maybeNumConvertVia (42 :: Int64) == Just (42 :: Word64)
-  assertBool "maxBound" $ maybeNumConvertVia (maxBound :: Int64) == Just (9223372036854775807 :: Word64)
+  assertBool "0" $ maybeNumConvert (0 :: Int64) == Just (0 :: Word64)
+  assertBool "1" $ maybeNumConvert (1 :: Int64) == Just (1 :: Word64)
+  assertBool "42" $ maybeNumConvert (42 :: Int64) == Just (42 :: Word64)
+  assertBool "maxBound" $ maybeNumConvert (maxBound :: Int64) == Just (9223372036854775807 :: Word64)
   -- Failed conversions (negative values)
-  assertBool "-1" $ maybeNumConvertVia (-1 :: Int64) == (Nothing :: Maybe Word64)
-  assertBool "-42" $ maybeNumConvertVia (-42 :: Int64) == (Nothing :: Maybe Word64)
-  assertBool "minBound" $ maybeNumConvertVia (minBound :: Int64) == (Nothing :: Maybe Word64)
+  assertBool "-1" $ maybeNumConvert (-1 :: Int64) == (Nothing :: Maybe Word64)
+  assertBool "-42" $ maybeNumConvert (-42 :: Int64) == (Nothing :: Maybe Word64)
+  assertBool "minBound" $ maybeNumConvert (minBound :: Int64) == (Nothing :: Maybe Word64)
 
-case_throughMaybeWord64Unsigned32 :: Assertion
-case_throughMaybeWord64Unsigned32 = do
+case_MaybeWord64Unsigned32 :: Assertion
+case_MaybeWord64Unsigned32 = do
   -- Successful conversions (small values)
-  assertBool "0" $ maybeNumConvertVia (0 :: Word64) == Just (0 :: Unsigned 32)
-  assertBool "1" $ maybeNumConvertVia (1 :: Word64) == Just (1 :: Unsigned 32)
-  assertBool "42" $ maybeNumConvertVia (42 :: Word64) == Just (42 :: Unsigned 32)
-  assertBool "maxBound32" $ maybeNumConvertVia (4294967295 :: Word64) == Just (maxBound :: Unsigned 32)
+  assertBool "0" $ maybeNumConvert (0 :: Word64) == Just (0 :: Unsigned 32)
+  assertBool "1" $ maybeNumConvert (1 :: Word64) == Just (1 :: Unsigned 32)
+  assertBool "42" $ maybeNumConvert (42 :: Word64) == Just (42 :: Unsigned 32)
+  assertBool "maxBound32" $ maybeNumConvert (4294967295 :: Word64) == Just (maxBound :: Unsigned 32)
   -- Failed conversions (values too large)
-  assertBool "overflow1" $ maybeNumConvertVia (4294967296 :: Word64) == (Nothing :: Maybe (Unsigned 32))
-  assertBool "overflow2" $ maybeNumConvertVia (5000000000 :: Word64) == (Nothing :: Maybe (Unsigned 32))
-  assertBool "maxBound64" $ maybeNumConvertVia (maxBound :: Word64) == (Nothing :: Maybe (Unsigned 32))
+  assertBool "overflow1" $ maybeNumConvert (4294967296 :: Word64) == (Nothing :: Maybe (Unsigned 32))
+  assertBool "overflow2" $ maybeNumConvert (5000000000 :: Word64) == (Nothing :: Maybe (Unsigned 32))
+  assertBool "maxBound64" $ maybeNumConvert (maxBound :: Word64) == (Nothing :: Maybe (Unsigned 32))
 
 withSomeSNat :: Natural -> (forall (n :: Nat). SNat n -> r) -> r
 withSomeSNat n f = case someNatVal n of

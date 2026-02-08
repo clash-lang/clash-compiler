@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -37,7 +38,34 @@ import Data.Word (Word16, Word32, Word64, Word8)
 >>> import Clash.Prelude
 >>> import Clash.Class.NumConvert
 >>> import Data.Word
+>>> import Data.Int
 -}
+
+{- | Internal class for concrete conversions. This class is used internally by
+'NumConvert' and should not be used directly. Use 'NumConvert' instead.
+
+If you want to provide an instance for your own type, please only make an
+instance for a direct mapping from and to Clash types and tell the instance
+what Clash type it corresponds to. For example, implementing 'Int16' looks like:
+
+> instance NumConvertCanonical Int16 (Signed 16) where
+>   numConvertCanonical = bitCoerce
+>
+> instance NumConvertCanonical (Signed 16) Int16 where
+>   numConvertCanonical = bitCoerce
+>
+> type instance Canonical Int16 = Signed 16
+
+By doing this, your type will be convertable from and to any other type. For
+example:
+
+>>> numConvert (10 :: Int16) :: Int32
+10
+>>> numConvert (15 :: Signed 8) :: Int16
+15
+-}
+class NumConvertCanonical a b where
+  numConvertCanonical :: a -> b
 
 {- | Conversions that are, based on their types, guaranteed to succeed. A
 successful conversion retains the numerical value interpretation of the source
@@ -65,151 +93,135 @@ All implementations should be total, i.e., they should not produce \"bottoms\".
 
 Additionally, any implementation should be translatable to synthesizable HDL.
 -}
-class NumConvert a b where
-  {- | Convert a supplied value of type @a@ to a value of type @b@. The conversion
-    is guaranteed to succeed.
+type NumConvert a b =
+  ( NumConvertCanonical a (Canonical a)
+  , NumConvertCanonical (Canonical a) (Canonical b)
+  , NumConvertCanonical (Canonical b) b
+  )
 
-    >>> numConvert (3 :: Index 8) :: Unsigned 8
-    3
+{- | Convert a supplied value of type @a@ to a value of type @b@. The conversion
+is guaranteed to succeed.
 
-    The following will fail with a type error, as we cannot prove that all values
-    of @Index 8@ can be represented by an @Unsigned 2@:
+>>> numConvert (3 :: Index 8) :: Unsigned 8
+3
 
-    >>> numConvert (3 :: Index 8) :: Unsigned 2
-    ...
+The following will fail with a type error, as we cannot prove that all values
+of @Index 8@ can be represented by an @Unsigned 2@:
 
-    For the time being, if the input is an 'Clash.XException.XException', then
-    the output is too. This property might be relaxed in the future.
-  -}
-  numConvert :: a -> b
+>>> numConvert (3 :: Index 8) :: Unsigned 2
+...
 
-{- | Convert a value by explicitly going through the canonical "unwrapped" form
-of the source type. This function is useful when direct 'numConvert' fails due
-to overlapping instances.
-
-For example, converting @Word32@ to @Word64@ creates overlapping instances, but
-'numConvertVia' resolves this by explicitly routing through @Unsigned 32@:
-
->>> numConvertVia (42 :: Word32) :: Word64
-42
-
-The conversion path is: @Word32 -> Unsigned 32 -> Unsigned 64 -> Word64@
+For the time being, if the input is an 'Clash.XException.XException', then
+the output is too. This property might be relaxed in the future.
 -}
-numConvertVia ::
-  forall a b.
-  ( NumConvert a (Canonical a)
-  , NumConvert (Canonical a) (Canonical b)
-  , NumConvert (Canonical b) b
-  ) =>
-  a ->
-  b
-numConvertVia =
-    numConvert @(Canonical b) @b
-  . numConvert @(Canonical a) @(Canonical b)
-  . numConvert @a @(Canonical a)
+numConvert :: forall a b. NumConvert a b => a -> b
+numConvert =
+    numConvertCanonical @(Canonical b) @b
+  . numConvertCanonical @(Canonical a) @(Canonical b)
+  . numConvertCanonical @a @(Canonical a)
 
-instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Index n) (Index m) where
-  numConvert = resize
+instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Index n) (Index m) where
+  numConvertCanonical = resize
 
-instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvert (Index n) (Unsigned m) where
-  numConvert !a = resize $ bitCoerce a
+instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvertCanonical (Index n) (Unsigned m) where
+  numConvertCanonical !a = resize $ bitCoerce a
 
 {- | Note: Conversion from @Index 1@ to @Signed 0@ is lossless, but not within the
 constraints of the instance.
 -}
-instance (KnownNat n, KnownNat m, 1 <= n, CLog 2 n + 1 <= m) => NumConvert (Index n) (Signed m) where
-  numConvert !a = numConvert $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m, 1 <= n, CLog 2 n + 1 <= m) => NumConvertCanonical (Index n) (Signed m) where
+  numConvertCanonical !a = numConvertCanonical $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvert (Index n) (BitVector m) where
-  numConvert !a = resize $ pack a
+instance (KnownNat n, KnownNat m, 1 <= n, n <= 2 ^ m) => NumConvertCanonical (Index n) (BitVector m) where
+  numConvertCanonical !a = resize $ pack a
 
-instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvert (Unsigned n) (Index m) where
-  numConvert !a = bitCoerce $ resize a
+instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvertCanonical (Unsigned n) (Index m) where
+  numConvertCanonical !a = bitCoerce $ resize a
 
-instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Unsigned n) (Unsigned m) where
-  numConvert = resize
+instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Unsigned n) (Unsigned m) where
+  numConvertCanonical = resize
 
 {- | Note: Conversion from @Unsigned 0@ to @Signed 0@ is lossless, but not within the
 constraints of the instance.
 -}
-instance (KnownNat n, KnownNat m, n + 1 <= m) => NumConvert (Unsigned n) (Signed m) where
-  numConvert !a = bitCoerce $ resize a
+instance (KnownNat n, KnownNat m, n + 1 <= m) => NumConvertCanonical (Unsigned n) (Signed m) where
+  numConvertCanonical !a = bitCoerce $ resize a
 
-instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Unsigned n) (BitVector m) where
-  numConvert !a = resize $ pack a
+instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Unsigned n) (BitVector m) where
+  numConvertCanonical !a = resize $ pack a
 
-instance (KnownNat n, KnownNat m, n <= m) => NumConvert (Signed n) (Signed m) where
-  numConvert !a = resize a
+instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Signed n) (Signed m) where
+  numConvertCanonical !a = resize a
 
-instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvert (BitVector n) (Index m) where
-  numConvert = unpack . resize
+instance (KnownNat n, KnownNat m, 1 <= m, 2 ^ n <= m) => NumConvertCanonical (BitVector n) (Index m) where
+  numConvertCanonical = unpack . resize
 
-instance (KnownNat n, KnownNat m, n <= m) => NumConvert (BitVector n) (Unsigned m) where
-  numConvert = unpack . resize
+instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (BitVector n) (Unsigned m) where
+  numConvertCanonical = unpack . resize
 
 {- | Note: Conversion from @BitVector 0@ to @Signed 0@ is lossless, but not within the
 constraints of the instance.
 -}
-instance (KnownNat n, KnownNat m, n + 1 <= m) => NumConvert (BitVector n) (Signed m) where
-  numConvert = unpack . resize
+instance (KnownNat n, KnownNat m, n + 1 <= m) => NumConvertCanonical (BitVector n) (Signed m) where
+  numConvertCanonical = unpack . resize
 
-instance (KnownNat n, KnownNat m, n <= m) => NumConvert (BitVector n) (BitVector m) where
-  numConvert = resize
+instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (BitVector n) (BitVector m) where
+  numConvertCanonical = resize
 
 -- Concrete bidirectional instances for Word types
-instance NumConvert Word (Unsigned WORD_SIZE_IN_BITS) where
-  numConvert = bitCoerce
-instance NumConvert (Unsigned WORD_SIZE_IN_BITS) Word where
-  numConvert = bitCoerce
+instance NumConvertCanonical Word (Unsigned WORD_SIZE_IN_BITS) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Unsigned WORD_SIZE_IN_BITS) Word where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Word64 (Unsigned 64) where
-  numConvert = bitCoerce
-instance NumConvert (Unsigned 64) Word64 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Word64 (Unsigned 64) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Unsigned 64) Word64 where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Word32 (Unsigned 32) where
-  numConvert = bitCoerce
-instance NumConvert (Unsigned 32) Word32 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Word32 (Unsigned 32) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Unsigned 32) Word32 where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Word16 (Unsigned 16) where
-  numConvert = bitCoerce
-instance NumConvert (Unsigned 16) Word16 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Word16 (Unsigned 16) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Unsigned 16) Word16 where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Word8 (Unsigned 8) where
-  numConvert = bitCoerce
-instance NumConvert (Unsigned 8) Word8 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Word8 (Unsigned 8) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Unsigned 8) Word8 where
+  numConvertCanonical = bitCoerce
 
 -- Concrete bidirectional instances for Int types
-instance NumConvert Int (Signed WORD_SIZE_IN_BITS) where
-  numConvert = bitCoerce
-instance NumConvert (Signed WORD_SIZE_IN_BITS) Int where
-  numConvert = bitCoerce
+instance NumConvertCanonical Int (Signed WORD_SIZE_IN_BITS) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Signed WORD_SIZE_IN_BITS) Int where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Int64 (Signed 64) where
-  numConvert = bitCoerce
-instance NumConvert (Signed 64) Int64 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Int64 (Signed 64) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Signed 64) Int64 where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Int32 (Signed 32) where
-  numConvert = bitCoerce
-instance NumConvert (Signed 32) Int32 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Int32 (Signed 32) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Signed 32) Int32 where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Int16 (Signed 16) where
-  numConvert = bitCoerce
-instance NumConvert (Signed 16) Int16 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Int16 (Signed 16) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Signed 16) Int16 where
+  numConvertCanonical = bitCoerce
 
-instance NumConvert Int8 (Signed 8) where
-  numConvert = bitCoerce
-instance NumConvert (Signed 8) Int8 where
-  numConvert = bitCoerce
+instance NumConvertCanonical Int8 (Signed 8) where
+  numConvertCanonical = bitCoerce
+instance NumConvertCanonical (Signed 8) Int8 where
+  numConvertCanonical = bitCoerce
 
 -- Concrete bidirectional instances for Bit
-instance NumConvert Bit (BitVector 1) where
-  numConvert = pack
-instance NumConvert (BitVector 1) Bit where
-  numConvert = unpack
+instance NumConvertCanonical Bit (BitVector 1) where
+  numConvertCanonical = pack
+instance NumConvertCanonical (BitVector 1) Bit where
+  numConvertCanonical = unpack

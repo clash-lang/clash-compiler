@@ -22,12 +22,20 @@ ways:
  1. It offers no partial functions
  2. All its conversions are translatable to synthesizable HDL
  3. It is focused on (Clash's) number types
+
+== __Implementing 'NumConvert' for your own type__
+If you want to implement 'NumConvert' and 'MaybeNumConvert' for your own type,
+see 'NumConvertCanonical'.
 -}
 module Clash.Class.NumConvert (
-  NumConvert (..),
-  MaybeNumConvert (..),
-  numConvertVia,
-  maybeNumConvertVia,
+  NumConvert,
+  numConvert,
+  MaybeNumConvert,
+  maybeNumConvert,
+
+  -- * For implementers only
+  NumConvertCanonical(..),
+  MaybeNumConvertCanonical(..),
   Canonical,
 ) where
 
