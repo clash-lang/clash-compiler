@@ -128,20 +128,44 @@ instance NFData a => NFData (RTree d a) where
 
 textract :: RTree 0 a -> a
 textract (RLeaf x)   = x
+<<<<<<< HEAD
 #if __GLASGOW_HASKELL__ != 902
+||||||| parent of c1b102aa (Add GHC 9.12 support to `clash-prelude`)
+=======
+#if __GLASGOW_HASKELL__ < 912
+>>>>>>> c1b102aa (Add GHC 9.12 support to `clash-prelude`)
 textract (RBranch _ _) = error $ "textract: nodes hold no values"
+<<<<<<< HEAD
 #endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE textract #-}
+||||||| parent of c1b102aa (Add GHC 9.12 support to `clash-prelude`)
+{-# OPAQUE textract #-}
+=======
+#endif
+{-# OPAQUE textract #-}
+>>>>>>> c1b102aa (Add GHC 9.12 support to `clash-prelude`)
 {-# ANN textract hasBlackBox #-}
 
 tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
 tsplit (RBranch l r) = (l,r)
+<<<<<<< HEAD
 #if __GLASGOW_HASKELL__ != 902
+||||||| parent of c1b102aa (Add GHC 9.12 support to `clash-prelude`)
+=======
+#if __GLASGOW_HASKELL__ < 912
+>>>>>>> c1b102aa (Add GHC 9.12 support to `clash-prelude`)
 tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
+<<<<<<< HEAD
 #endif
 -- See: https://github.com/clash-lang/clash-compiler/pull/2511
 {-# CLASH_OPAQUE tsplit #-}
+||||||| parent of c1b102aa (Add GHC 9.12 support to `clash-prelude`)
+{-# OPAQUE tsplit #-}
+=======
+#endif
+{-# OPAQUE tsplit #-}
+>>>>>>> c1b102aa (Add GHC 9.12 support to `clash-prelude`)
 {-# ANN tsplit hasBlackBox #-}
 
 -- | RLeaf of a perfect depth tree

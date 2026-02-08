@@ -151,8 +151,16 @@ Library
                       base16-bytestring       >= 0.1.1    && < 1.1,
                       binary                  >= 0.8.5    && < 0.11,
                       bytestring              >= 0.10.0.2 && < 0.13,
+<<<<<<< HEAD
                       clash-prelude           == 1.8.5,
                       containers              >= 0.5.0.0  && < 0.8,
+||||||| parent of c1b102aa (Add GHC 9.12 support to `clash-prelude`)
+                      clash-prelude           == 1.9.0,
+                      containers              >= 0.6.7    && < 0.8,
+=======
+                      clash-prelude           == 1.9.0,
+                      containers              >= 0.6.7    && < 0.9,
+>>>>>>> c1b102aa (Add GHC 9.12 support to `clash-prelude`)
                       cryptohash-sha256       >= 0.11     && < 0.12,
                       data-binary-ieee754     >= 0.4.4    && < 0.6,
                       data-default            >= 0.7      && < 0.9,
@@ -162,7 +170,15 @@ Library
                       exceptions              >= 0.8.3    && < 0.11.0,
                       extra                   >= 1.6.17   && < 1.9,
                       filepath                >= 1.3.0.1  && < 1.6,
+<<<<<<< HEAD
                       ghc                     >= 8.6.0    && < 9.11,
+||||||| parent of c1b102aa (Add GHC 9.12 support to `clash-prelude`)
+                      ghc                     >= 9.6.0    && < 9.11,
+                      ghc-boot,
+=======
+                      ghc                     >= 9.6.0    && < 9.13,
+                      ghc-boot,
+>>>>>>> c1b102aa (Add GHC 9.12 support to `clash-prelude`)
                       ghc-boot-th,
                       ghc-prim,
                       hashable                >= 1.2.1.0  && < 1.6,
@@ -177,7 +193,13 @@ Library
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
                       string-interpolate      ^>= 0.3,
+<<<<<<< HEAD
                       template-haskell        >= 2.8.0.0  && < 2.23,
+||||||| parent of c1b102aa (Add GHC 9.12 support to `clash-prelude`)
+                      template-haskell        >= 2.20.0.0  && < 2.23,
+=======
+                      template-haskell        >= 2.20.0.0  && < 2.24,
+>>>>>>> c1b102aa (Add GHC 9.12 support to `clash-prelude`)
                       temporary               >= 1.2.1    && < 1.4,
                       terminal-size           >= 0.3      && < 0.4,
                       text                    >= 1.2.2    && < 2.2,
