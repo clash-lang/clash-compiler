@@ -1,0 +1,1 @@
+FIXED: `rotateL` and `rotateR` no longer error when used on `BitVector 0` [#2980](https://github.com/clash-lang/clash-compiler/issues/2980)
