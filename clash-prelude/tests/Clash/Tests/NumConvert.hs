@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -60,7 +61,9 @@ module Clash.Tests.NumConvert where
 
 import Control.Monad (forM_)
 import Data.Data (Proxy (..))
+import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Maybe (isNothing)
+import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeNats (someNatVal)
 import Test.Tasty (TestTree, defaultMain)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase)
@@ -98,6 +101,74 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = $(testGroupGenerator)
+
+-- Tests for numConvert (Word-to-Word conversions)
+
+case_Word8Word16 :: Assertion
+case_Word8Word16 = do
+  assertBool "0" $ numConvert (0 :: Word8) == (0 :: Word16)
+  assertBool "1" $ numConvert (1 :: Word8) == (1 :: Word16)
+  assertBool "42" $ numConvert (42 :: Word8) == (42 :: Word16)
+  assertBool "maxBound" $ numConvert (maxBound :: Word8) == (255 :: Word16)
+
+case_Word8Word32 :: Assertion
+case_Word8Word32 = do
+  assertBool "0" $ numConvert (0 :: Word8) == (0 :: Word32)
+  assertBool "1" $ numConvert (1 :: Word8) == (1 :: Word32)
+  assertBool "42" $ numConvert (42 :: Word8) == (42 :: Word32)
+  assertBool "maxBound" $ numConvert (maxBound :: Word8) == (255 :: Word32)
+
+case_Word16Word32 :: Assertion
+case_Word16Word32 = do
+  assertBool "0" $ numConvert (0 :: Word16) == (0 :: Word32)
+  assertBool "1" $ numConvert (1 :: Word16) == (1 :: Word32)
+  assertBool "42" $ numConvert (42 :: Word16) == (42 :: Word32)
+  assertBool "maxBound" $ numConvert (maxBound :: Word16) == (65535 :: Word32)
+
+case_Word32Word64 :: Assertion
+case_Word32Word64 = do
+  assertBool "0" $ numConvert (0 :: Word32) == (0 :: Word64)
+  assertBool "1" $ numConvert (1 :: Word32) == (1 :: Word64)
+  assertBool "42" $ numConvert (42 :: Word32) == (42 :: Word64)
+  assertBool "maxBound" $ numConvert (maxBound :: Word32) == (4294967295 :: Word64)
+
+-- Tests for numConvert (Int-to-Int conversions)
+
+case_Int8Int16 :: Assertion
+case_Int8Int16 = do
+  assertBool "0" $ numConvert (0 :: Int8) == (0 :: Int16)
+  assertBool "1" $ numConvert (1 :: Int8) == (1 :: Int16)
+  assertBool "42" $ numConvert (42 :: Int8) == (42 :: Int16)
+  assertBool "-1" $ numConvert (-1 :: Int8) == (-1 :: Int16)
+  assertBool "-42" $ numConvert (-42 :: Int8) == (-42 :: Int16)
+  assertBool "minBound" $ numConvert (minBound :: Int8) == (-128 :: Int16)
+  assertBool "maxBound" $ numConvert (maxBound :: Int8) == (127 :: Int16)
+
+case_Int32Int64 :: Assertion
+case_Int32Int64 = do
+  assertBool "0" $ numConvert (0 :: Int32) == (0 :: Int64)
+  assertBool "1" $ numConvert (1 :: Int32) == (1 :: Int64)
+  assertBool "42" $ numConvert (42 :: Int32) == (42 :: Int64)
+  assertBool "-1" $ numConvert (-1 :: Int32) == (-1 :: Int64)
+  assertBool "-42" $ numConvert (-42 :: Int32) == (-42 :: Int64)
+  assertBool "minBound" $ numConvert (minBound :: Int32) == (-2147483648 :: Int64)
+  assertBool "maxBound" $ numConvert (maxBound :: Int32) == (2147483647 :: Int64)
+
+-- Tests for mixed conversions (cross Haskell/Clash boundary)
+
+case_Word32Unsigned64 :: Assertion
+case_Word32Unsigned64 = do
+  assertBool "0" $ numConvert (0 :: Word32) == (0 :: Unsigned 64)
+  assertBool "1" $ numConvert (1 :: Word32) == (1 :: Unsigned 64)
+  assertBool "42" $ numConvert (42 :: Word32) == (42 :: Unsigned 64)
+  assertBool "maxBound" $ numConvert (maxBound :: Word32) == (4294967295 :: Unsigned 64)
+
+case_Unsigned32Word64 :: Assertion
+case_Unsigned32Word64 = do
+  assertBool "0" $ numConvert (0 :: Unsigned 32) == (0 :: Word64)
+  assertBool "1" $ numConvert (1 :: Unsigned 32) == (1 :: Word64)
+  assertBool "42" $ numConvert (42 :: Unsigned 32) == (42 :: Word64)
+  assertBool "maxBound" $ numConvert (maxBound :: Unsigned 32) == (4294967295 :: Word64)
 
 withSomeSNat :: Natural -> (forall (n :: Nat). SNat n -> r) -> r
 withSomeSNat n f = case someNatVal n of
