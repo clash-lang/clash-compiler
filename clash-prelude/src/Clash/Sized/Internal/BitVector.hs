@@ -277,7 +277,7 @@ instance ShowX Bit where
   showsPrecX = showsPrecXWith showsPrec
 
 instance NFDataX Bit where
-  deepErrorX = errorX
+  deepErrorX s = unpack# (deepErrorX s)
   ensureSpine = unpack# . xToBV . pack#
   rnfX = rwhnfX
   hasUndefined bv = isLeft (isX bv) || unsafeMask# bv /= 0

@@ -25,7 +25,8 @@ import qualified Test.Tasty.QuickCheck as Q
 
 import Clash.Prelude
   (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit, hLit, oLit, rotateL, rotateR)
-import Clash.Sized.Internal.BitVector (BitVector (..))
+import Clash.Sized.Internal.BitVector (BitVector (..), Bit(..))
+import Clash.XException (ensureSpine, errorX, deepErrorX)
 
 import Clash.Tests.SizedNum
 
@@ -134,6 +135,32 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "show16" $ show @(BitVector 12) $(oLit "77.4") @?= "0b1111_11.._.100"
     , testCase "show17" $ show @(BitVector 12) $(oLit "5324") @?= "0b1010_1101_0100"
     , testCase "show17" $ show @(BitVector 12) $(oLit ".324") @?= "0b...0_1101_0100"
+    ]
+  , testGroup "NFDataX"
+    [ testCase
+        "ensureSpine should yield BV constructor"
+        (case ensureSpine (errorX "" :: BitVector 2) of
+          BV m v -> do
+            m @?= 3
+            v @?= 0)
+    , testCase
+        "deepErrorX should yield BV constructor"
+        (case deepErrorX "" :: BitVector 2 of
+          BV m v -> do
+            m @?= 3
+            v @?= 0)
+    , testCase
+        "ensureSpine should yield Bit constructor"
+        (case ensureSpine (errorX "" :: Bit) of
+          Bit m v -> do
+            m @?= 1
+            v @?= 0)
+    , testCase
+        "deepErrorX should yield Bit constructor"
+        (case deepErrorX "" :: Bit of
+          Bit m v -> do
+            m @?= 1
+            v @?= 0)
     ]
   ]
 

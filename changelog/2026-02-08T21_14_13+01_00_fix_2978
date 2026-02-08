@@ -1,0 +1,1 @@
+FIXED: `ensureSpine` for `Bit` now yields its data constructor instead of `XException` [#2978](https://github.com/clash-lang/clash-compiler/issues/2978)
