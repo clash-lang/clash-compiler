@@ -1,0 +1,1 @@
+FIXED: Behavior of `shiftR` is now documented for `Unsigned`, `BitVector`, `Index`, and `Signed` [#2959](https://github.com/clash-lang/clash-compiler/issues/2959)

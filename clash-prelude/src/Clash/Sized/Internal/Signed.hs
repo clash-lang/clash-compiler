@@ -519,6 +519,11 @@ instance KnownNat n => Parity (Signed n) where
   even = even . pack
   odd = odd . pack
 
+-- | @'shiftR' a n@:
+--
+-- * Returns 0 if @a >= 0@ and @n >= 'bitSize' a@
+-- * Returns -1 if @a < 0@ and @n >= 'bitSize' a@
+-- * 'Clash.XException.XException' if @n < 0@
 instance KnownNat n => Bits (Signed n) where
   (.&.)             = and#
   (.|.)             = or#

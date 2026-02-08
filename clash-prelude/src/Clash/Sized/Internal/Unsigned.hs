@@ -440,6 +440,10 @@ instance KnownNat n => Parity (Unsigned n) where
   even = even . pack
   odd = odd . pack
 
+-- | @'shiftR' a n@:
+--
+-- * Returns 0 if @n >= 'bitSize' a@
+-- * 'Clash.XException.XException' if @n < 0@
 instance KnownNat n => Bits (Unsigned n) where
   (.&.)             = and#
   (.|.)             = or#
