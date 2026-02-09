@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2023, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -90,7 +90,7 @@ import Clash.Rewrite.Types
   , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
-  , normalizeTermTypes, normalizeId)
+  , normalizeTermTypes, normalizeId, whnfRW)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
@@ -293,9 +293,17 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
   = do specInfo<- constantSpecInfo ctx e2
        if csrFoundConstant specInfo then
          let newBindings = csrNewBindings specInfo in
-         if null newBindings then
-           -- Whole of e2 is constant
-           specialize ctx (App e1 e2)
+         if null newBindings then do
+           -- Whole of e2 is constant, we reduce it here eagerly before specialization
+           -- because we have observed long running compile times when having
+           -- recursively defined constants, see:
+           -- https://github.com/clash-lang/clash-compiler/issues/3129
+            e2Red <- case collectArgs e2 of
+                           (Prim p0, _) -> whnfRW False ctx e2 $ \_ctx1 e2Red -> case e2Red of
+                             (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e2
+                             _ -> changed e2Red
+                           _ -> return e2
+            specialize ctx (App e1 e2Red)
          else do
            -- Parts of e2 are constant
            let is1 = extendInScopeSetList is0 (fst <$> csrNewBindings specInfo)

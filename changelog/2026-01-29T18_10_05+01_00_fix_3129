@@ -1,0 +1,1 @@
+FIXED: Reduce constants to NF before specialization [#3129](https://github.com/clash-lang/clash-compiler/issues/3129)
