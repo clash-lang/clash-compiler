@@ -8,6 +8,7 @@ bit representation for a data type. See @DataReprAnn@ for documentation.
 
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -28,7 +29,9 @@ module Clash.Annotations.BitRepresentation
  ) where
 
 import           Data.Data                  (Data)
+#if __GLASGOW_HASKELL__ <= 910
 import           Data.Typeable              (Typeable)
+#endif
 import           Language.Haskell.TH.Instances ()
 import qualified Language.Haskell.TH.Lift   ()
 import qualified Language.Haskell.TH.Syntax as TH
@@ -112,7 +115,10 @@ data DataReprAnn =
     Size
     -- Constructors:
     [ConstrRepr]
-      deriving (Show, Data, Typeable, Eq, Generic, TH.Lift)
+      deriving (Show, Data, Eq, Generic, TH.Lift)
+#if __GLASGOW_HASKELL__ <= 910
+      deriving Typeable
+#endif
 
 -- | Annotation for constructors. Indicates how to match this constructor based
 -- off of the whole datatype.
@@ -126,4 +132,7 @@ data ConstrRepr =
     Value
     -- Masks for fields. Indicates where fields are stored:
     [FieldAnn]
-      deriving (Show, Data, Typeable, Eq, Generic, TH.Lift)
+      deriving (Show, Data, Eq, Generic, TH.Lift)
+#if __GLASGOW_HASKELL__ <= 910
+      deriving Typeable
+#endif

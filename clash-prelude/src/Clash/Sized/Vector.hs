@@ -431,10 +431,12 @@ singleton = (`Cons` Nil)
 -}
 head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
+#if __GLASGOW_HASKELL__ < 912
 head xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> a
   unreachable (x `Cons` _) = x
+#endif
 
 {-# OPAQUE tail #-}
 {-# ANN tail hasBlackBox #-}
@@ -469,10 +471,12 @@ head xs = unreachable xs
 -}
 tail :: Vec (n + 1) a -> Vec n a
 tail (_ `Cons` xr) = xr
+#if __GLASGOW_HASKELL__ < 912
 tail xs = unreachable xs
  where
   unreachable :: forall n a. 1 <= n => Vec n a -> Vec (n - 1) a
   unreachable (_ `Cons` xr) = xr
+#endif
 
 {-# OPAQUE last #-}
 {-# ANN last hasBlackBox #-}
@@ -508,10 +512,12 @@ tail xs = unreachable xs
 last :: Vec (n + 1) a -> a
 last (x `Cons` Nil)         = x
 last (_ `Cons` y `Cons` xr) = last (y `Cons` xr)
+#if __GLASGOW_HASKELL__ < 912
 last xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> a
   unreachable ys@(Cons _ _) = last ys
+#endif
 
 {-# OPAQUE init #-}
 {-# ANN init hasBlackBox #-}
@@ -547,10 +553,12 @@ last xs = unreachable xs
 init :: Vec (n + 1) a -> Vec n a
 init (_ `Cons` Nil)         = Nil
 init (x `Cons` y `Cons` xr) = x `Cons` init (y `Cons` xr)
+#if __GLASGOW_HASKELL__ < 912
 init xs = unreachable xs
  where
   unreachable :: 1 <= n => Vec n a -> Vec (n - 1) a
   unreachable ys@(Cons _ _) = init ys
+#endif
 
 {-# INLINE shiftInAt0 #-}
 -- | Shift in elements to the head of a vector, bumping out elements at the
@@ -2535,9 +2543,11 @@ dtfold _ f g = go (SNat :: SNat k)
           sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
+#if __GLASGOW_HASKELL__ < 912
     go _  Nil =
       case (const Dict :: forall m. Proxy m -> Dict (1 <= 2 ^ m)) (Proxy @n) of
         {}
+#endif
 {-# OPAQUE dtfold #-}
 {-# ANN dtfold hasBlackBox #-}
 

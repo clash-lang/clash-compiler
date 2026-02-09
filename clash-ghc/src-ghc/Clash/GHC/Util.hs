@@ -28,7 +28,10 @@ import GHC.Types.Error (UnknownDiagnostic(..))
 #endif
 import GHC                (GhcMonad(..), printException)
 
-import Control.Exception  (Exception(..), ErrorCall(..))
+#if !MIN_VERSION_ghc(9,12,0)
+import Control.Exception  (ErrorCall(..))
+#endif
+import Control.Exception  (Exception(..))
 import GHC.Exception      (SomeException)
 import System.Exit        (ExitCode(ExitFailure), exitWith)
 
@@ -61,6 +64,7 @@ handleClashException _df opts e = case fromException e of
 #endif
         (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
   _ -> case fromException e of
+#if !MIN_VERSION_ghc(9,12,0)
     Just (ErrorCallWithLocation _ _) ->
       throwOneError
 #if MIN_VERSION_ghc(9,8,0)
@@ -70,6 +74,7 @@ handleClashException _df opts e = case fromException e of
 #endif
         (text "Clash error call:" $$ textLines (show e)))
     _ -> case fromException e of
+#endif
       Just (e' :: SourceError) -> do
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)

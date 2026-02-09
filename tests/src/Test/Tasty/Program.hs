@@ -58,6 +58,7 @@
   Program's output and error streams are ignored.
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
@@ -77,7 +78,9 @@ import qualified Clash.Util.Interpolate  as I
 import qualified Data.List as List
 
 import Control.Applicative     ( Alternative (..) )
+#if __GLASGOW_HASKELL__ <= 910
 import Data.Typeable           ( Typeable                                 )
+#endif
 import Data.Maybe              ( fromMaybe, isNothing, listToMaybe        )
 import System.FilePath.Glob    ( globDir1, compile                        )
 import System.FilePath.Posix   ( getSearchPath )
@@ -136,7 +139,9 @@ data TestProgram =
     -- ^ Work directory
     [(String, String)]
     -- ^ Additional environment variables
-      deriving (Typeable)
+#if __GLASGOW_HASKELL__ <= 910
+      deriving Typeable
+#endif
 
 data TestFailingProgram =
   TestFailingProgram
@@ -160,7 +165,9 @@ data TestFailingProgram =
     -- ^ Work directory
     [(String, String)]
     -- ^ Additional environment variables
-      deriving (Typeable)
+#if __GLASGOW_HASKELL__ <= 910
+      deriving Typeable
+#endif
 
 testOutput
   :: PrintOutput

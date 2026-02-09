@@ -1,5 +1,7 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 {-|
@@ -11,7 +13,10 @@ be housed in Simulator.hs, but FFI code crashes Template Haskell.
 -}
 module Clash.CoSim.Types where
 
-import Data.Data (Data, Typeable)
+import Data.Data (Data)
+#if __GLASGOW_HASKELL__ <= 910
+import Data.Data (Typeable)
+#endif
 
 import Clash.Prelude (BitPack, BitSize, KnownNat)
 import Clash.XException (NFDataX)
@@ -28,7 +33,10 @@ data CoSimSettings = CoSimSettings
     -- ^ Include files while running simulator
     , enableStdout :: Bool
     -- ^ Print verbose output to stdout
-    } deriving (Show, Typeable, Data)
+    } deriving (Show, Data)
+#if __GLASGOW_HASKELL__ <= 910
+      deriving Typeable
+#endif
 
 -- | Default simulator settings use Icarus, have a period of 20 and all other
 -- options disabled.
@@ -53,4 +61,7 @@ data CoSimulator = Icarus
                 -- ^ https://github.com/steveicarus/iverilog
                  | ModelSim
                 -- ^ https://www.mentor.com/products/fv/modelsim/
-                   deriving (Show, Eq, Typeable, Data)
+                   deriving (Show, Eq, Data)
+#if __GLASGOW_HASKELL__ <= 910
+                   deriving Typeable
+#endif

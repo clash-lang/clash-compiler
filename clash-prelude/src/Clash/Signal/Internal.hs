@@ -182,7 +182,9 @@ module Clash.Signal.Internal
 where
 
 import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
+#if __GLASGOW_HASKELL__ < 912
 import Type.Reflection            (Typeable)
+#endif
 import Control.Arrow.Transformer.Automaton
 import Control.Applicative        (liftA3)
 import Control.DeepSeq            (NFData)
@@ -344,7 +346,9 @@ data DomainConfiguration
   , _resetPolarity :: ResetPolarity
   -- ^ Whether resets are active high or active low
   }
+#if __GLASGOW_HASKELL__ < 912
   deriving (Typeable)
+#endif
 
 -- | Helper type family for 'DomainPeriod'
 type family DomainConfigurationPeriod (config :: DomainConfiguration) :: Nat where
