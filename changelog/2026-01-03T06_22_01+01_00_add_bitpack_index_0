@@ -1,2 +1,3 @@
-ADDED: `Index 0` instances for `BitPack`, `Bits`, `Counter`, `FiniteBits`, `MaybeNumConvert`, `NumConvert`, `Partiy`, and `SaturatingNum`.
+ADDED: `Index 0` instances for `BitPack`, `Bits`, `Counter`, `FiniteBits`, `Parity`, and `SaturatingNum`.
 ADDED: Zero-sized block RAM implementations for `blockRam1` and `blockRamU`.
+ADDED: `Counter a => Counter (Vec 0 a)` instance.
