@@ -11,6 +11,7 @@
 
 {- |
 Copyright  :  (C) 2025     , Martijn Bastiaan
+                  2025-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -20,13 +21,14 @@ import Clash.Class.BitPack
 import Clash.Class.NumConvert.Internal.NumConvert (NumConvertCanonical (..))
 import Clash.Class.NumConvert.Internal.Canonical (Canonical)
 import Clash.Class.Resize
+import Clash.Promoted.Nat
 import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 
-import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
-import GHC.TypeLits.Extra (CLog)
+import GHC.TypeLits (KnownNat, type (+), type (^))
+import GHC.TypeLits.Extra (CLogWZ)
 
 {- $setup
 >>> import Clash.Prelude
@@ -98,19 +100,23 @@ maybeNumConvert a =
   $ numConvertCanonical @a @(Canonical a) a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (Index m) where
-  maybeNumConvertCanonical !a = maybeResize a
+  maybeNumConvertCanonical !a = case natToInteger @m of
+    0 -> Nothing
+    _ -> maybeResize a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvertCanonical (Index n) (Unsigned m) where
-  maybeNumConvertCanonical !a = maybeResize $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (Unsigned m) where
+  maybeNumConvertCanonical !a = maybeResize $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvertCanonical (Index n) (Signed m) where
-  maybeNumConvertCanonical !a = maybeNumConvertCanonical $ bitCoerce @_ @(Unsigned (CLog 2 n)) a
+instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (Signed m) where
+  maybeNumConvertCanonical !a = maybeNumConvertCanonical $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
-instance (KnownNat n, KnownNat m, 1 <= n) => MaybeNumConvertCanonical (Index n) (BitVector m) where
+instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (BitVector m) where
   maybeNumConvertCanonical !a = maybeResize $ pack a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Unsigned n) (Index m) where
-  maybeNumConvertCanonical !a = maybeResize $ bitCoerce @_ @(Index (2 ^ n)) a
+  maybeNumConvertCanonical !a = case natToInteger @m of
+    0 -> Nothing
+    _ -> maybeResize $ bitCoerce @_ @(Index (2 ^ n)) a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Unsigned n) (Unsigned m) where
   maybeNumConvertCanonical !a = maybeResize a
@@ -122,9 +128,10 @@ instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Unsigned n) (BitV
   maybeNumConvertCanonical !a = maybeResize $ pack a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Signed n) (Index m) where
-  maybeNumConvertCanonical n
-    | n < 0 = Nothing
-    | otherwise = maybeResize (bitCoerce @_ @(Index (2 ^ n)) (resize n))
+  maybeNumConvertCanonical n = case natToInteger @m of
+    0 -> Nothing
+    _ | n < 0 -> Nothing
+      | otherwise -> maybeResize (bitCoerce @_ @(Index (2 ^ n)) (resize n))
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Signed n) (Unsigned m) where
   maybeNumConvertCanonical n
@@ -140,7 +147,9 @@ instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Signed n) (BitVec
     | otherwise = maybeResize (pack @(Signed (n + 1)) (extend n))
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (BitVector n) (Index m) where
-  maybeNumConvertCanonical !a = maybeResize $ unpack @(Index (2 ^ n)) a
+  maybeNumConvertCanonical !a = case natToInteger @m of
+    0 -> Nothing
+    _ -> maybeResize $ unpack @(Index (2 ^ n)) a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (BitVector n) (Unsigned m) where
   maybeNumConvertCanonical !a = maybeResize $ unpack @(Unsigned n) a
