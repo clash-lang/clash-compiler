@@ -2,7 +2,7 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2022, Google Inc.,
-                     2017-2024, QBayLogic B.V.
+                     2017-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -51,6 +51,7 @@ import           GHC.Int
 import           GHC.Integer
   (decodeDoubleInteger,encodeDoubleInteger,compareInteger,orInteger,andInteger,
    xorInteger,complementInteger,absInteger,signumInteger)
+import           GHC.Num.BigNat      (bigNatEq#)
 #if MIN_VERSION_base(4,16,0)
 import           GHC.Num.Integer (Integer (..), integerEncodeFloat#)
 #elif MIN_VERSION_base(4,15,0)
@@ -2151,6 +2152,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i] <- naturalLiterals' args
     -> reduce (Literal (WordLiteral (signum i)))
 #endif
+
+  $(namePat 'GHC.Num.BigNat.bigNatEq#)
+    | [ Lit (ByteArrayLiteral (BA.ByteArray i))
+      , Lit (ByteArrayLiteral (BA.ByteArray j))] <- args
+    -> reduce (Literal (IntLiteral (IS (bigNatEq# i j))))
 
   -- GHC.Real.^  -- XXX: Very fragile
   --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
