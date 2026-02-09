@@ -46,6 +46,7 @@ import           Control.Monad.State             (State, StateT (..), lift, gets
 import           Data.Bitraversable              (bitraverse)
 import           Data.Bool                       (bool)
 import           Data.Coerce                     (coerce)
+import           Data.Containers.ListUtils       (nubOrd)
 import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.HashMap.Strict             as HashMap
@@ -332,7 +333,7 @@ canonicalizeDataFilePath idirs toCanonicalize
       (canonicalizePath toCanonicalize)
       (error [I.i|Could not find data file #{show toCanonicalize}. Does it exist?|])
   | otherwise = unsafePerformIO $ do
-      let candidates = map (</> toCanonicalize) idirs
+      let candidates = map (</> toCanonicalize) (nubOrd idirs)
       found <- filterM doesFileExist candidates
       case found of
         [] -> error [I.i|
