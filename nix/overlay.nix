@@ -21,6 +21,19 @@ let
     pkgs = prev;
   };
 
+  # Some type checker plugins have tests that invoke GHC which requires the package
+  # themselves to be available.
+  ghc-typelits-plugins-preCheck-script = pkgName: ''
+    unset GHC_ENVIRONMENT
+    wrapper="''${TMPDIR:-/tmp}/ghc-for-tests"
+    cat > "$wrapper" <<'EOF'
+    #!/bin/sh
+    exec ghc -package-db "$PWD/dist/package.conf.inplace" -package ${pkgName} "$@"
+    EOF
+    chmod +x "$wrapper"
+    export HC="$wrapper"
+  '';
+
   # An overlay with the packages we pull in as inputs to this flake.
   #
   # This is mostly intended for packages developed by QBayLogic which are
@@ -34,10 +47,15 @@ let
           { };
 
       ghc-typelits-extra =
-        hprev.callCabal2nix
-          "ghc-typelits-extra"
-          "${ghc-typelits-extra}"
-          { };
+        prev.haskell.lib.overrideCabal
+          (hprev.callCabal2nix
+            "ghc-typelits-extra"
+            "${ghc-typelits-extra}"
+            { }
+          )
+          (drv: {
+            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-extra";
+          });
 
       ghc-typelits-knownnat =
         hprev.callCabal2nix
@@ -46,10 +64,15 @@ let
           { };
 
       ghc-typelits-natnormalise =
-        hprev.callCabal2nix
-          "ghc-typelits-natnormalise"
-          "${ghc-typelits-natnormalise}"
-          { };
+        prev.haskell.lib.overrideCabal
+          (hprev.callCabal2nix
+            "ghc-typelits-natnormalise"
+            "${ghc-typelits-natnormalise}"
+            { }
+          )
+          (drv: {
+            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-natnormalise";
+          });
     };
 
   # An overlay with the packages in this repository.
