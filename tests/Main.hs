@@ -979,6 +979,8 @@ runClashTest = defaultMain
                                                         , "testBench53"]}
             in runTest "RWMultiTop" _opts
           ]
+        , runTest "HoldResetAsync" def
+        , runTest "HoldResetSync" def
         , runTest "ResetGen" def
         ,
           -- TODO: we do not support memory files in Vivado

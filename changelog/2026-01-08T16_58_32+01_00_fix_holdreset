@@ -1,0 +1,1 @@
+FIXED: Fix `holdReset` glitch behaviour for asynchronous resets and wrong hold cycles for sync resets. [#3115](https://github.com/clash-lang/clash-compiler/issues/3115)
