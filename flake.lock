@@ -85,11 +85,11 @@
     "ghc-typelits-natnormalise": {
       "flake": false,
       "locked": {
-        "lastModified": 1770518534,
-        "narHash": "sha256-0yqhL1LPzOQ3ii2/DMI9yWWeOaZV1OL6VlOhudmE7rs=",
+        "lastModified": 1770072492,
+        "narHash": "sha256-YyJoKI0+HicJpXuUYEr3oS2L8Es3Z11GYayT0hj6+Bw=",
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-        "rev": "043fa655347e999ff8b61620b2569d330b1a5546",
+        "rev": "ffba84b9ad1eab91cec25d7c265aac8e2cc2bc53",
         "type": "github"
       },
       "original": {
