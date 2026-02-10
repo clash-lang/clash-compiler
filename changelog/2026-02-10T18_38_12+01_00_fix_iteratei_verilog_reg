@@ -1,0 +1,1 @@
+FIXED: Higher order blackboxes not propagating usage metadata for generated results [#3147](https://github.com/clash-lang/clash-compiler/issues/3147)
