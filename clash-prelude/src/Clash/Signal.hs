@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
                   2017     , Google Inc.,
-                  2021-2024, QBayLogic B.V.
+                  2021-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -156,6 +156,7 @@ module Clash.Signal
   , unsafeFromActiveLow
   , resetSynchronizer
   , resetGlitchFilter
+  , registerSyncReset
   , holdReset
     -- * Enabling
   , Enable
@@ -1635,22 +1636,61 @@ testFor
   -> Property
 testFor n s = property (and (Clash.Signal.sampleN n s))
 
--- | Hold reset for a number of cycles relative to an implicit reset signal.
+
+-- | Register a synchronous reset signal.
+--
+--   `registerSyncReset` delays an incoming reset by one clock cycle using a
+--   register. This can be useful to break combinational paths involving reset
+--   logic.
+--
+--   __NB__: This is not a synchronizer. Use `resetSynchronizer` to synchronize
+--   a reset.
+--
+--   Example:
+--
+-- >>> registerSyncResetBool = unsafeToActiveHigh . (registerSyncReset @XilinxSystem)
+-- >>> let rst = unsafeFromActiveHigh (fromList [False, True, False, False, True, False])
+-- >>> sampleN 7 (exposeReset (registerSyncResetBool True) rst)
+-- [True,False,True,False,False,True,False]
+--
+registerSyncReset
+  :: forall dom
+   . HiddenClockResetEnable dom
+  => KnownDomain dom
+  => DomainResetKind dom ~ 'Synchronous
+  => Bool
+  -- ^ Initial assert value of the register if supported by the domain.
+  --   If True the initial reset value is asserted.
+  --   If False the initial reset value is de-asserted.
+  -> Reset dom
+registerSyncReset initialValue = hideClockResetEnable E.registerSyncReset initialValue
+
+-- | Hold reset for a number of cycles relative to an incoming reset
+-- signal.
+--
+-- __NB__: The output of this function is combinational for @n > 1@ on domains
+-- with a synchronous reset. Use `registerSyncReset` to add an output register if
+-- desired.
 --
 -- Example:
 --
--- >>> sampleN @System 8 (unsafeToActiveHigh (holdReset (SNat @2)))
--- [True,True,True,False,False,False,False,False]
+-- >>> holdResetBool = unsafeToActiveHigh . (holdReset @System)
+-- >>> sampleN 8 (exposeReset (holdResetBool (SNat @2)) (resetGenN (SNat @3)))
+-- [True,True,True,True,True,False,False,False]
 --
 -- 'holdReset' holds the reset for an additional 2 clock cycles for a total
--- of 3 clock cycles where the reset is asserted.
+-- of 5 clock cycles where the reset is asserted. 'holdReset' also works on
+-- intermediate assertions of the reset signal:
+--
+-- >>> let rst = fromList [True, False, False, False, True, False, False, False]
+-- >>> sampleN 8 (exposeReset (holdResetBool (SNat @2)) (unsafeFromActiveHigh rst))
+-- [True,True,True,False,True,True,True,False]
 --
 holdReset
   :: forall dom m
    . HiddenClockResetEnable dom
   => SNat m
-  -- ^ Hold for /m/ cycles, counting from the moment the incoming reset
-  -- signal becomes deasserted.
+  -- ^ Hold for /m/ cycles
   -> Reset dom
 holdReset m =
   hideClockResetEnable (\clk rst en -> E.holdReset clk en m rst)

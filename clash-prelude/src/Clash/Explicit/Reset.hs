@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2020-2023, QBayLogic B.V.,
+Copyright  :  (C) 2020-2026, QBayLogic B.V.,
                   2022-2023, Google LLC
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -23,6 +23,7 @@ module Clash.Explicit.Reset
   , resetGlitchFilter
   , resetGlitchFilterWithReset
   , unsafeResetGlitchFilter
+  , registerSyncReset
   , holdReset
   , convertReset
   , noReset
@@ -399,12 +400,54 @@ resetGlitchFilter# SNat reg dffSync rstIn0 =
       SActiveHigh -> True
       SActiveLow -> False
 
--- | Hold reset for a number of cycles relative to an incoming reset signal.
+-- | Register a synchronous reset signal.
+--
+--   `registerSyncReset` delays an incoming reset by one clock cycle using a
+--   register. This can be useful to break combinational paths involving reset
+--   logic.
+--
+--   __NB__: This is not a synchronizer. Use `resetSynchronizer` to synchronize
+--   a reset.
+--
+--   Example:
+--
+-- >>> let sampleReset = sampleN 7 . unsafeToActiveHigh
+-- >>> let rst = unsafeFromActiveHigh (fromList [False, True, False, False, True, False])
+-- >>> sampleReset (registerSyncReset @XilinxSystem clockGen rst enableGen True)
+-- [True,False,True,False,False,True,False]
+--
+registerSyncReset
+  :: forall dom
+   . KnownDomain dom
+  => HasSynchronousReset dom
+  => Clock dom
+  -> Reset dom
+  -> Enable dom
+  -> Bool
+  -- ^ Initial assert value of the register if supported by the domain.
+  --   If True the initial reset value is asserted.
+  --   If False the initial reset value is de-asserted.
+  -> Reset dom
+registerSyncReset clk (unsafeFromReset -> rst) en initialValue = unsafeToReset outRst
+  where
+    intialRst :: Bool
+    intialRst =
+      case resetPolarity @dom of
+        SActiveHigh -> initialValue
+        SActiveLow -> not initialValue
+    outRst = delay clk en intialRst rst
+
+-- | Hold reset for a number of cycles relative to an incoming reset
+-- signal.
+--
+-- __NB__: The output of this function is combinational for @n > 0@ on domains
+-- with a synchronous reset. Use `registerSyncReset` to add an output register if
+-- desired.
 --
 -- Example:
 --
--- >>> let sampleWithReset = sampleN 8 . unsafeToActiveHigh
--- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
+-- >>> let sampleReset = sampleN 8 . unsafeToActiveHigh
+-- >>> sampleReset (holdReset @System clockGen enableGen (SNat @2) (resetGenN (SNat @3)))
 -- [True,True,True,True,True,False,False,False]
 --
 -- 'holdReset' holds the reset for an additional 2 clock cycles for a total
@@ -412,7 +455,7 @@ resetGlitchFilter# SNat reg dffSync rstIn0 =
 -- intermediate assertions of the reset signal:
 --
 -- >>> let rst = fromList [True, False, False, False, True, False, False, False]
--- >>> sampleWithReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromActiveHigh rst))
+-- >>> sampleReset (holdReset @System clockGen enableGen (SNat @2) (unsafeFromActiveHigh rst))
 -- [True,True,True,False,True,True,True,False]
 --
 holdReset
@@ -427,11 +470,66 @@ holdReset
   -> Reset dom
   -- ^ Reset to extend
   -> Reset dom
-holdReset clk en SNat rst =
-  unsafeFromActiveHigh ((/=maxBound) <$> counter)
+holdReset clk en n rst = case resetKind @dom of
+  SSynchronous -> holdResetSync clk en n rst
+  SAsynchronous -> holdResetAsync clk en n rst
+
+holdResetSync
+  :: forall dom n
+   . KnownDomain dom
+  => DomainResetKind dom ~ 'Synchronous
+  => Clock dom
+  -> Enable dom
+  -- ^ Global enable
+  -> SNat n
+  -- ^ Hold for /n/ cycles
+  -> Reset dom
+  -- ^ Reset to extend
+  -> Reset dom
+holdResetSync clk en sn@SNat rst = rstOut
  where
-  counter :: Signal dom (Index (n+1))
-  counter = register clk rst en 0 (satSucc SatBound <$> counter)
+  rstOut = case snatToInteger sn of
+    0 -> rst
+    1 -> orReset rst (unsafeToReset regReset)
+      where
+        isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
+        regReset = register clk rst en isActiveHigh (pure (not isActiveHigh))
+    _ -> orReset rst (unsafeToReset rawRst)
+      where
+        counter :: Signal dom (Index (n + 1))
+        counter = register clk rst en 0 (satSucc SatBound <$> counter)
+        rawRst :: Signal dom Bool
+        rawRst = case resetPolarity @dom of
+          SActiveHigh -> (/=maxBound) <$> counter
+          SActiveLow -> (==maxBound) <$> counter
+
+holdResetAsync
+  :: forall dom n
+   . KnownDomain dom
+  => DomainResetKind dom ~ 'Asynchronous
+  => Clock dom
+  -> Enable dom
+  -- ^ Global enable
+  -> SNat n
+  -- ^ Hold for /n/ cycles
+  -> Reset dom
+  -- ^ Reset to extend
+  -> Reset dom
+holdResetAsync clk en sn@SNat rst = rstOut
+ where
+  isActiveHigh = case resetPolarity @dom of { SActiveHigh -> True; _ -> False }
+  rstOut = case toUNat sn of
+    UZero -> rst
+    USucc UZero -> unsafeToReset (register clk rst en isActiveHigh (pure (not isActiveHigh)))
+    USucc (USucc _) -> unsafeToReset (register clk rst en isActiveHigh rawRst)
+      where
+        counter :: Signal dom (Index n)
+        counter = register clk rst en 0 (satSucc SatBound <$> counter)
+        rawRst :: Signal dom Bool
+        rawRst = case resetPolarity @dom of
+          SActiveHigh -> (/=maxBound) <$> counter
+          SActiveLow -> (==maxBound) <$> counter
+
 
 -- | Convert between different types of reset, adding a synchronizer when
 -- the domains are not the same. See 'resetSynchronizer' for further details
