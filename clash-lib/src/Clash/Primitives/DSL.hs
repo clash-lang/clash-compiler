@@ -104,7 +104,7 @@ import           Data.IntMap                     (IntMap)
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (intersperse)
 import           Data.List.Extra                 (zipEqual)
-import           Data.Maybe                      (fromMaybe)
+import           Data.Maybe                      (fromMaybe, listToMaybe)
 import           Data.Monoid                     (Ap(getAp))
 import           Data.Semigroup                  hiding (Product)
 import           Data.String
@@ -837,6 +837,10 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
 
   resName <- declare' (ctxName <> "_" <> "ho" <> showt fPos <> "_"
                                <> showt fSubPos <> "_res") resTy
+  -- Pick the fSubPos-th HO instantiation (if present) and reuse its usage.
+  case IntMap.lookup fPos (bbFunctions bbCtx) >>= listToMaybe . drop fSubPos of
+    Just (_, usage, _, _, _, _) -> declareUseOnce usage resName
+    Nothing -> pure ()
   let res = ([Text (Id.toLazyText resName)], bbResTy)
 
   -- Render HO argument to plain text
