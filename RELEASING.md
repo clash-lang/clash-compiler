@@ -53,6 +53,8 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
 12. Enjoy!
 
 ## Releasing a new version minor version (1.x.x)
+0. Create a release branch (i.e. `v1.8.5_release`) from
+   the branch of the version you are releasing.
 1. Change version numbers in:
   * `clash-prelude/clash-prelude.cabal`
   * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
@@ -61,17 +63,22 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-ghc/clash-ghc.cabal`
   * `clash-cores/clash-cores.cabal`
   * `docs/conf.py`
-2. Update the CHANGELOG (see `changelog/README.md`). Each entry should normally
-   end with a link to a PR or issue. The script `changelog/blame-pr.py` will
-   tell you for a single file which PR('s) introduced it.
-3. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
+
+   The script `changelog/update-version.py` can do this for you.
+2. In a **separate commit**, update the CHANGELOG (see `changelog/README.md`).
+   `aggregate-entries.py` can help to generate this text, though it still needs
+   to be checked afterwards. Each entry should normally end with a link to a PR
+   or issue. The script `changelog/blame-pr.py` will tell you for a single file
+   which PR('s) introduced it.
+3. Merge the release branch into the version branch.
+4. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
    or simply wait a day. Verify that the Hackage release deploys well, and
    preview the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
-4. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-5. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
-6. Cherry-pick commit made in (2) to `master`
-7. After the release is on Hackage: run `changelog/comment-gh.py` and execute
+5. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
+6. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
+7. Cherry-pick commit made in (2) to `master`
+8. After the release is on Hackage: run `changelog/comment-gh.py` and execute
    the commands it lists. This will inform users subscribed to specific issues
    that a fix for their issue is now in a released version.
-8. Update these docs if anything is missing :-)
-9. Enjoy!
+9. Update these docs if anything is missing :-)
+10. Enjoy!
