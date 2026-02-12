@@ -610,8 +610,8 @@ neededInterpRequests (Primitive {}) = []
 interpretFunctions
   :: [FilePath]
   -- ^ Import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package databases
+  -> [String]
+  -- ^ Extra args passed to interpreter used to pass along -package-* flags
   -> FilePath
   -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
   -- can be found
@@ -619,7 +619,7 @@ interpretFunctions
   -- ^ Functions to interpret
   -> IO InterpretResults
 interpretFunctions _ _ _ [] = pure HashMap.empty
-interpretFunctions idirs pkgDbs topDir reqs = do
+interpretFunctions idirs interpreterArgs topDir reqs = do
   sessionRes <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
     -- NB: capture the pristine search path once; 'Hint.get' returns the
     -- current (possibly already extended) value in a shared session.
@@ -653,8 +653,6 @@ interpretFunctions idirs pkgDbs topDir reqs = do
     Left e -> pure (HashMap.fromList [(req, Left (e :| [])) | req <- reqs])
     Right results -> pure (HashMap.fromList results)
  where
-  interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
-
   tryInterp
     :: Hint.InterpreterT IO InterpretFunctionResult
     -> Hint.InterpreterT IO (Either Hint.InterpreterError InterpretFunctionResult)
@@ -736,21 +734,21 @@ knownTemplateFunctions =
 compilePrimitives
   :: [FilePath]
   -- ^ Import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package databases
+  -> [String]
+  -- ^ Extra args passed to interpreter used to pass along -package-* flags
   -> FilePath
   -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
   -- can be found
   -> ResolvedPrimMap
   -- ^ Primitives to compile
   -> IO CompiledPrimMap
-compilePrimitives idirs pkgDbs topDir primMapR = do
+compilePrimitives idirs interpreterArgs topDir primMapR = do
   let reqs =
         List.nubOrd $
         concatMap
           neededInterpRequests
           (mapMaybe extractPrim (HashMap.elems primMapR))
-  results <- interpretFunctions idirs pkgDbs topDir reqs
+  results <- interpretFunctions idirs interpreterArgs topDir reqs
   traverse (traverse (compilePrimitiveWith (lookupInterpResult results))) primMapR
 
 -- | Compiles a single primitive. Provided for backwards compatibility; when
@@ -759,17 +757,17 @@ compilePrimitives idirs pkgDbs topDir primMapR = do
 compilePrimitive
   :: [FilePath]
   -- ^ Import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package databases
+  -> [String]
+  -- ^ Extra args passed to interpreter used to pass along -package-* flags
   -> FilePath
   -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
   -- can be found
   -> ResolvedPrimitive
   -- ^ Primitive to compile
   -> IO CompiledPrimitive
-compilePrimitive idirs pkgDbs topDir prim = do
+compilePrimitive idirs interpreterArgs topDir prim = do
   let reqs = HashSet.toList (HashSet.fromList (neededInterpRequests prim))
-  results <- interpretFunctions idirs pkgDbs topDir reqs
+  results <- interpretFunctions idirs interpreterArgs topDir reqs
   compilePrimitiveWith (lookupInterpResult results) prim
 
 -- | Look up the interpreter result of a request. All requests are
