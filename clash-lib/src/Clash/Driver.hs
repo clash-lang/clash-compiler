@@ -599,15 +599,15 @@ knownTemplateFunctions =
 compilePrimitive
   :: [FilePath]
   -- ^ Import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package databases
+  -> [String]
+  -- ^ Extra args passed to interpreter used to pass along -package-* flags
   -> FilePath
   -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
   -- can be found
   -> ResolvedPrimitive
   -- ^ Primitive to compile
   -> IO CompiledPrimitive
-compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName source) = do
+compilePrimitive idirs interpreterArgs topDir (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName source) = do
   bbFunc <-
     -- TODO: Use cache for hint targets. Right now Hint will fire multiple times
     -- TODO: if multiple functions use the same blackbox haskell function.
@@ -615,7 +615,6 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRe
       Just f -> pure f
       Nothing -> do
         Monad.when debugIsOn (putStr "Hint: interpreting " >> putStrLn (show fullName))
-        let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
         -- Compile a blackbox template function or fetch it from an already compiled file.
         r <- go interpreterArgs source
         processHintErrors (show bbGenName) bbName r
@@ -653,7 +652,7 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRe
     go args Nothing = do
       loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
 
-compilePrimitive idirs pkgDbs topDir
+compilePrimitive idirs iArgs topDir
   (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM imps fPlural incs rM riM templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
@@ -663,7 +662,6 @@ compilePrimitive idirs pkgDbs topDir
   riM'   <- traverse parseBB riM
   return (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM' imps' fPlural incs' rM' riM' templ')
  where
-  iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 
   parseTempl
     :: Applicative m

@@ -48,6 +48,7 @@ import qualified GHC.Builtin.Types       as GHC
 import qualified GHC.Settings.Constants  as GHC
 import qualified GHC.Types.Var           as GHC
 import qualified GHC.Types.SrcLoc        as GHC
+import qualified GHC.Unit.Types          as Unit
 import           GHC.BasicTypes.Extra (isOpaque)
 
 import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
@@ -97,8 +98,8 @@ generateBindings
   -- ^ primitives (blackbox) directories
   -> [FilePath]
   -- ^ import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package database
+  -> [GHC.PackageDBFlag]
+  -- ^ Package database flags
   -> HDL
   -- ^ HDL target
   -> String
@@ -117,9 +118,10 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
+  let interpreterArgs = maybe [] (packageFlagArgs dbs) dflagsM
   primMapC <-
     sequence $ HashMap.map
-                 (sequence . fmap (compilePrimitive importDirs dbs tdir))
+                 (sequence . fmap (compilePrimitive importDirs interpreterArgs tdir))
                  primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
@@ -174,6 +176,41 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
         , designBindings = allBindings'
         }
     )
+
+packageFlagArgs :: [GHC.PackageDBFlag] -> GHC.DynFlags -> [String]
+packageFlagArgs pkgDbFlags dflags =
+  concatMap pkgDbFlagToArgs pkgDbFlags <> concatMap pkgFlagToArgs (GHC.packageFlags dflags)
+ where
+  pkgDbFlagToArgs (GHC.PackageDB pkgDbRef) =
+    pkgDbRefToArgs pkgDbRef
+  pkgDbFlagToArgs GHC.NoUserPackageDB =
+    ["-no-user-package-db"]
+  pkgDbFlagToArgs GHC.NoGlobalPackageDB =
+    ["-no-global-package-db"]
+  pkgDbFlagToArgs GHC.ClearPackageDBs =
+    ["-clear-package-db"]
+
+  pkgDbRefToArgs GHC.GlobalPkgDb =
+    ["-global-package-db"]
+  pkgDbRefToArgs GHC.UserPkgDb =
+    ["-user-package-db"]
+  pkgDbRefToArgs (GHC.PkgDbPath pkgDbPath) =
+    ["-package-db", pkgDbPath]
+
+  pkgFlagToArgs (GHC.HidePackage pkg) =
+    ["-hide-package", pkg]
+  pkgFlagToArgs (GHC.ExposePackage _ pkgArg renaming) =
+    pkgArgToArgs pkgArg <> renamingToArgs renaming
+
+  pkgArgToArgs (GHC.PackageArg pkg) =
+    ["-package", pkg]
+  pkgArgToArgs (GHC.UnitIdArg unit) =
+    ["-package-id", Unit.unitString unit]
+
+  renamingToArgs (GHC.ModRenaming True []) =
+    []
+  renamingToArgs _ =
+    []
 
 setNoInlineTopEntities
   :: BindingMap
