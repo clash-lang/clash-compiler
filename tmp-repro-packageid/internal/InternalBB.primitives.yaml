@@ -1,0 +1,4 @@
+- BlackBox:
+    name: Repro.InternalBB.bbV
+    kind: Expression
+    template: "~ARG[0]"
