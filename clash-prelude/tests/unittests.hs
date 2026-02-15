@@ -13,6 +13,7 @@ import qualified Clash.Tests.Counter
 import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.Fixed
 import qualified Clash.Tests.FixedExhaustive
+import qualified Clash.Tests.Index
 import qualified Clash.Tests.MaybeNumConvert
 import qualified Clash.Tests.MaybeX
 import qualified Clash.Tests.NFDataX
@@ -45,6 +46,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.DerivingDataRepr.tests
   , Clash.Tests.Fixed.tests
   , Clash.Tests.FixedExhaustive.tests
+  , Clash.Tests.Index.tests
   , Clash.Tests.MaybeNumConvert.tests
   , Clash.Tests.MaybeX.tests
   , Clash.Tests.NFDataX.tests
