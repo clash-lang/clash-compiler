@@ -23,9 +23,13 @@ import Test.Tasty.HUnit
 import qualified Test.Tasty.Hedgehog.Extra as H
 import qualified Test.Tasty.QuickCheck as Q
 
+import Data.Bits (Bits(shiftR))
+
 import Clash.Prelude
   (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit, hLit, oLit, rotateL, rotateR)
 import Clash.Sized.Internal.BitVector (BitVector (..))
+
+import Test.Tasty.HUnit.Extra (expectException)
 
 import Clash.Tests.SizedNum
 
@@ -109,6 +113,18 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , H.testPropertyXXX "msb @(BitVector 64)" (msbTest @64)
     , H.testPropertyXXX "msb @(BitVector 128)" (msbTest @128)
     , H.testPropertyXXX "msb @(BitVector 129)" (msbTest @129)
+    ]
+  , testGroup "shiftR"
+    [ testCase "shiftR 5 0 == 5" $
+        shiftR (5 :: BitVector 8) 0 @?= 5
+    , testCase "returns 0 when n == bitSize" $
+        shiftR (0xFF :: BitVector 8) 8 @?= 0
+    , testCase "returns 0 when n > bitSize" $
+        shiftR (0xFF :: BitVector 8) (8 + 1) @?= 0
+    , testCase "returns 0 when n >> bitSize" $
+        shiftR (0xFF :: BitVector 8) (8 + 1000) @?= 0
+    , testCase "undefined when n < 0" $
+        expectException (shiftR (1 :: BitVector 8) (-1))
     ]
   , testGroup "show"
     [ testCase "show0"  $ show @(BitVector 0) 0b0 @?= "0"

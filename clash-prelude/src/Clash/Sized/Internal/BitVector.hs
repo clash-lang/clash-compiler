@@ -827,6 +827,10 @@ toInteger# :: KnownNat n => BitVector n -> Integer
 toInteger# (BV 0 i) = naturalToInteger i
 toInteger# bv = undefErrorU "toInteger" bv
 
+-- | @'shiftR' a n@:
+--
+-- * Returns 0 if @n >= 'bitSize' a@
+-- * 'Clash.XException.XException' if @n < 0@
 instance KnownNat n => Bits (BitVector n) where
   (.&.)             = and#
   (.|.)             = or#

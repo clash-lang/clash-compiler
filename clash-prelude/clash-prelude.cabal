@@ -430,6 +430,7 @@ test-suite unittests
                  Clash.Tests.DerivingDataReprTypes
                  Clash.Tests.Fixed
                  Clash.Tests.FixedExhaustive
+                 Clash.Tests.Index
                  Clash.Tests.MaybeNumConvert
                  Clash.Tests.MaybeX
                  Clash.Tests.NFDataX

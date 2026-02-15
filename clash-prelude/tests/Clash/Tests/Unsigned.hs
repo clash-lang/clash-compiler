@@ -6,8 +6,12 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
+import Data.Bits (Bits(shiftR))
+
 import Clash.Sized.Internal.Unsigned
 import Clash.Tests.SizedNum
+
+import Test.Tasty.HUnit.Extra (expectException)
 
 tests :: TestTree
 tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
@@ -35,6 +39,18 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
   , testGroup "Bounds"
     [ testCase "maxBound :: Unsigned 0" $ maxBound @(Unsigned 0) @?= 0
     , testCase "minBound :: Unsigned 0" $ minBound @(Unsigned 0) @?= 0
+    ]
+  , testGroup "shiftR"
+    [ testCase "shiftR 5 0 == 5" $
+        shiftR (5 :: Unsigned 8) 0 @?= 5
+    , testCase "returns 0 when n == bitSize" $
+        shiftR (0xFF :: Unsigned 8) 8 @?= 0
+    , testCase "returns 0 when n > bitSize" $
+        shiftR (0xFF :: Unsigned 8) (8 + 1) @?= 0
+    , testCase "returns 0 when n >> bitSize" $
+        shiftR (0xFF :: Unsigned 8) (8 + 1000) @?= 0
+    , testCase "undefined when n < 0" $
+        expectException (shiftR (1 :: Unsigned 8) (-1))
     ]
   ]
 
