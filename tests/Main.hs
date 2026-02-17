@@ -438,6 +438,8 @@ runClashTest = defaultMain
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
         , runTest "AppendZero" def
+        , runTest "PackGHCNums" def
+        , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
         , runTest "UnpackUndefined" def{hdlSim=[]}
         ]

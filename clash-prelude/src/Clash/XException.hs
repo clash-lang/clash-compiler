@@ -460,6 +460,9 @@ instance ShowX Word32 where
 instance ShowX Word64 where
   showsPrecX = showsPrecXWith showsPrec
 
+instance ShowX CUShort where
+  showsPrecX = showsPrecXWith showsPrec
+
 instance ShowX a => ShowX (Maybe a)
 
 instance ShowX a => ShowX (Ratio a) where
