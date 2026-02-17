@@ -1,0 +1,2 @@
+FIXED: Clash no longer gives `Dubious primitive instantiation warning`
+when using `unpack` [#2386](https://github.com/clash-lang/clash-compiler/issues/2386).
