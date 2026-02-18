@@ -246,7 +246,7 @@ instance PrettyPrec Text where
   pprPrec _ = pure . pretty
 
 instance PrettyPrec Type where
-  pprPrec _ t = annotate (AnnSyntax Type) <$> pprType t
+  pprPrec _ t = pprType t
 
 instance ClashPretty Type where
   clashPretty = fromPpr
@@ -265,7 +265,7 @@ instance PrettyPrec TyCon where
         name <- pprPrec prec dc
         ty <- pprType (dcType dc)
 
-        pure (name <+> dcolon <+> ty)
+        pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> ty))
 
     AlgTyCon _ nm kn _ (NewTyCon dc _) _ -> do
       name <- pprPrec prec nm
@@ -275,7 +275,7 @@ instance PrettyPrec TyCon where
       conName <- pprPrec prec (dcName dc)
       conType <- pprType (dcType dc)
 
-      pure (vsep [newtype_ <+> decl, conName <+> dcolon <+> conType])
+      pure (vsep [newtype_ <+> decl, conName <> annotate (AnnSyntax Type) (space <> dcolon <+> conType)])
 
     PromotedDataCon _ _ _ _ dc ->
       fmap ("promoted" <+>) (pprPrec prec dc)
@@ -313,7 +313,7 @@ instance PrettyPrec Term where
     Var x           -> do
       v <- pprPrec prec (varName x)
       s <- pprPrecIdScope x
-      pure (v <> brackets s)
+      pure (v <> annotate (AnnSyntax Unique) (brackets s))
     Data dc         -> pprPrec prec dc
     Literal l       -> pprPrec prec l
     Prim p          -> pprPrecPrim prec (primName p)

@@ -47,11 +47,11 @@ import Clash.Util (ClashException(..), curLoc)
 --
 -- The reason d'etre for this transformation is that we hope to end up with
 -- and expression where two casts are "back-to-back" after which we can
--- eliminate them in 'eliminateCastCast'.
+-- eliminate them in 'elimCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
 argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  -- Don't specialise when the arguments are casts-of-casts, these casts-of-casts
- -- will be eliminated by 'eliminateCastCast' during the normalization of the
+ -- will be eliminated by 'elimCastCast' during the normalization of the
  -- "current" function. We thus prevent the unnecessary introduction of a
  -- specialized version of 'f'.
  | not (isCast e')
