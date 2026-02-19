@@ -222,27 +222,23 @@ let
             prev.makeWrapper
           ];
 
-          postInstall = let
-            # depends on gnat14 which doesn't work ATM on aarch64:
-            # https://github.com/NixOS/nixpkgs/issues/469109
-            ghdl-llvm-opt = prev.lib.optional (!prev.stdenv.hostPlatform.isAarch64) prev.ghdl-llvm;
-            lib-deps = [
-                prev.zlib.static
-              ] ++ ghdl-llvm-opt;
-            bin-deps = [
-                prev.gcc
-                prev.sby
-                prev.verilator
-                prev.iverilog
-                prev.yosys
-              ] ++ ghdl-llvm-opt;
-          in (old.postInstall or "") + ''
+          postInstall = (old.postInstall or "") + ''
             wrapProgram $out/bin/clash-testsuite \
               --add-flags "--no-modelsim --no-vivado" \
               --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
               --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:" \
-              --prefix PATH : ${prev.lib.makeBinPath bin-deps} \
-              --set LIBRARY_PATH ${prev.lib.makeLibraryPath lib-deps}
+              --prefix PATH : ${prev.lib.makeBinPath [
+                prev.gcc
+                prev.ghdl-llvm
+                prev.sby
+                prev.verilator
+                prev.iverilog
+                prev.yosys
+              ]} \
+              --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
+                prev.ghdl-llvmf
+                prev.zlib.static
+              ]}
           '';
         });
     };
@@ -255,6 +251,10 @@ let
     ];
 in
 {
+  # gnat13 which si the default as of 11.03.2026 does not support aarch64
+  # but ghdl-llvm works fine with gnat14 sos witch to it.
+  ghdl-llvm = prev.ghdl-llvm.override { gnat = prev.gnat14; };
+
   "clashPackages-${compilerVersion}" =
     prev.haskell.packages.${compilerVersion}.extend haskellOverlays;
 }

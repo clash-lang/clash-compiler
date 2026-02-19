@@ -26,13 +26,11 @@ pkgs.mkShell {
     # https://discourse.nixos.org/t/non-interactive-bash-errors-from-flake-nix-mkshell/33310
     pkgs.bashInteractive
 
+    pkgs.ghdl-llvm
     pkgs.nixpkgs-fmt
     pkgs.sby
     pkgs.verilator
     pkgs.iverilog
     pkgs.yosys
-  ] ++
-  # depends on gnat14 which doesn't work ATM on aarch64:
-  # https://github.com/NixOS/nixpkgs/issues/469109
-  pkgs.lib.optional (!pkgs.stdenv.hostPlatform.isAarch64) pkgs.ghdl-llvm;
+  ];
 }
