@@ -21,6 +21,19 @@ let
     pkgs = prev;
   };
 
+  # Some type checker plugins have tests that invoke GHC which requires the package
+  # themselves to be available.
+  ghc-typelits-plugins-preCheck-script = pkgName: ''
+    unset GHC_ENVIRONMENT
+    wrapper="''${TMPDIR:-/tmp}/ghc-for-tests"
+    cat > "$wrapper" <<'EOF'
+    #!/bin/sh
+    exec ghc -package-db "$PWD/dist/package.conf.inplace" -package ${pkgName} "$@"
+    EOF
+    chmod +x "$wrapper"
+    export HC="$wrapper"
+  '';
+
   # An overlay with the packages we pull in as inputs to this flake.
   #
   # This is mostly intended for packages developed by QBayLogic which are
@@ -34,10 +47,15 @@ let
           { };
 
       ghc-typelits-extra =
-        hprev.callCabal2nix
-          "ghc-typelits-extra"
-          "${ghc-typelits-extra}"
-          { };
+        prev.haskell.lib.overrideCabal
+          (hprev.callCabal2nix
+            "ghc-typelits-extra"
+            "${ghc-typelits-extra}"
+            { }
+          )
+          (drv: {
+            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-extra";
+          });
 
       ghc-typelits-knownnat =
         hprev.callCabal2nix
@@ -46,10 +64,15 @@ let
           { };
 
       ghc-typelits-natnormalise =
-        hprev.callCabal2nix
-          "ghc-typelits-natnormalise"
-          "${ghc-typelits-natnormalise}"
-          { };
+        prev.haskell.lib.overrideCabal
+          (hprev.callCabal2nix
+            "ghc-typelits-natnormalise"
+            "${ghc-typelits-natnormalise}"
+            { }
+          )
+          (drv: {
+            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-natnormalise";
+          });
     };
 
   # An overlay with the packages in this repository.
@@ -86,14 +109,16 @@ let
         in
         unmodified.overrideAttrs (old: {
           nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-            prev.verilog
+            prev.iverilog
           ];
         });
 
+      # Broken on GHC 9.8.4
       clash-ffi =
-        hprev.callCabal2nix "clash-ffi" ../clash-ffi {
-          inherit (hfinal) clash-prelude;
-        };
+        prev.haskell.lib.overrideCabal (hprev.callCabal2nix "clash-ffi" ../clash-ffi {})
+          (drv: {
+            testFlags = [ "--smallcheck-max-count" "2000" ];
+          });
 
       clash-ghc =
         let
@@ -197,32 +222,36 @@ let
             prev.makeWrapper
           ];
 
-          postInstall = (old.postInstall or "") + ''
+          postInstall = let
+            # depends on gnat14 which doesn't work ATM on aarch64:
+            # https://github.com/NixOS/nixpkgs/issues/469109
+            ghdl-llvm-opt = prev.lib.optional (!prev.stdenv.hostPlatform.isAarch64) prev.ghdl-llvm;
+            lib-deps = [
+                prev.zlib.static
+              ] ++ ghdl-llvm-opt;
+            bin-deps = [
+                prev.gcc
+                prev.sby
+                prev.verilator
+                prev.iverilog
+                prev.yosys
+              ] ++ ghdl-llvm-opt;
+          in (old.postInstall or "") + ''
             wrapProgram $out/bin/clash-testsuite \
               --add-flags "--no-modelsim --no-vivado" \
               --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
               --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:" \
-              --prefix PATH : ${prev.lib.makeBinPath [
-                prev.gcc
-                prev.ghdl-llvm
-                prev.symbiyosys
-                prev.verilator
-                prev.verilog
-                prev.yosys
-              ]} \
-              --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
-                prev.ghdl-llvm
-                prev.zlib.static
-              ]}
+              --prefix PATH : ${prev.lib.makeBinPath bin-deps} \
+              --set LIBRARY_PATH ${prev.lib.makeLibraryPath lib-deps}
           '';
         });
     };
 
   haskellOverlays =
     prev.lib.composeManyExtensions [
-      ghcOverlay
       haskellExternalPackages
       haskellInternalPackages
+      ghcOverlay
     ];
 in
 {

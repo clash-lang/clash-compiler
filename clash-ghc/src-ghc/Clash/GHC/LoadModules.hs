@@ -887,9 +887,6 @@ unwantedOptimizationFlags df =
                , Opt_RegsGraph -- Don't care
                , Opt_RegsGraph -- Don't care
                , Opt_PedanticBottoms -- Stops eta-expansion through case: avoid
-#if !MIN_VERSION_ghc(9,10,0)
-               , Opt_LlvmTBAA -- Don't care
-#endif
                , Opt_CmmSink -- Don't care
                , Opt_CmmElimCommonBlocks -- Don't care
                , Opt_OmitYields -- Don't care

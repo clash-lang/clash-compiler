@@ -1,12 +1,12 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak markUnbroken dontCheck;
+  inherit (pkgs.haskell.lib) doJailbreak markUnbroken overrideCabal;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
   # is basically abandonware it catches fire with brick 1.0+.
-  brick = doJailbreak prev.brick_0_70_1;
+  brick = doJailbreak(prev.callHackage "brick" "0.70.1" { });
 
   # brick 0.70.1 requires vty < 6.0.
   vty = doJailbreak (prev.callHackage "vty" "5.39" { });
@@ -15,29 +15,15 @@ in
   # than the defaults in nixpkgs.
   rewrite-inspector = doJailbreak (markUnbroken prev.rewrite-inspector);
 
-  # Requires some old versions of libraries, but still works.
-  derive-storable-plugin = doJailbreak prev.derive-storable-plugin;
+  # singletons-base/th 3.3 is the last version working on GHC 9.8
+  singletons-th = prev.callHackage "singletons-th" "3.3" { };
+  singletons-base = prev.callHackage "singletons-base" "3.3" { };
 
-  # Marken as broken, but compiles anyway.
-  hedgehog-fakedata = doJailbreak (markUnbroken prev.hedgehog-fakedata);
+  # singletons-th 3.3 requires th-desugar 1.16
+  th-desugar = prev.callHackage "th-desugar" "1.16" { };
 
-  # We need a new tasty-flaky. The one from Hackage doesn't build for some weird
-  # reason..
-  tasty-flaky = prev.callCabal2nix "tasty-flaky" (pkgs.fetchFromGitHub {
-    owner = "LaurentRDC";
-    repo  = "tasty-flaky";
-    rev = "fc31a9d622c1eb60030a50152258a9bef785e365";
-    sha256 = "sha256-irLM3aVMxpBgsM72ArulMXcoLY2glalVkG//Lrj2JBI=";
-  }) {};
-
-  # This version of tasty isn't available in the nix ghc96 package set
-  tasty = prev.callHackageDirect {
-    pkg = "tasty";
-    ver = "1.5.3";
-    sha256 = "sha256-Ogd8J4aHNeL+xmcRWuJeGBNaePyLs5yo1IoMzvWrVPY=";
-  } {};
-
-  # The tests (not the package itself!) require a tasty <1.5, which won't work as we pull in
-  # tasty 1.5.3. Solution: don't test!
-  time-compat = dontCheck prev.time-compat;
+  # Broken on GHC 9.8.4 see clash-ffi cabal file for details
+  clash-ffi = overrideCabal prev.clash-ffi (drv: {
+    broken = true;
+  });
 }
