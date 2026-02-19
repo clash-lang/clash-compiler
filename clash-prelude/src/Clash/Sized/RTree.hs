@@ -297,13 +297,13 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
     populationCount' = tfold (resize . bv2i . pack) add . v2t . bv2v
 :}
 <interactive>:...
-    • Couldn't match type: (((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1
-                     with: (2 ^ d) + 1
+    • Couldn't match type...
       Expected: Index ((2 ^ d) + 1)
                 -> Index ((2 ^ d) + 1) -> Index ((2 ^ d) + 1)
         Actual: Index ((2 ^ d) + 1)
                 -> Index ((2 ^ d) + 1)
                 -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
+...
     • In the second argument of ‘tfold’, namely ‘add’
       In the first argument of ‘(.)’, namely
         ‘tfold (resize . bv2i . pack) add’
@@ -321,13 +321,13 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
 :}
 <BLANKLINE>
 <interactive>:...
-    • Couldn't match type: (((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1
-                     with: (2 ^ d) + 1
+    • Couldn't match type...
       Expected: Index ((2 ^ d) + 1)
                 -> Index ((2 ^ d) + 1) -> Index ((2 ^ d) + 1)
         Actual: Index ((2 ^ d) + 1)
                 -> Index ((2 ^ d) + 1)
                 -> AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
+...
     • In the second argument of ‘tfold’, namely ‘add’
       In the first argument of ‘(.)’, namely
         ‘tfold (resize . bv2i . pack) add’
