@@ -1,1 +1,0 @@
-FIXED: The `Clash.Explicit.Verification.check` blackbox now correctly uses the given clock line, not assuming any longer that it is already bound to an identifier in the first place.
