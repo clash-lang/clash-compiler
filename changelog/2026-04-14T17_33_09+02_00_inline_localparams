@@ -1,0 +1,1 @@
+FIXES: Bug where localparams introduced by higher order function blackboxes would cause vivado to segfault
