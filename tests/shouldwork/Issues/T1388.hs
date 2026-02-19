@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE NoDeriveAnyClass #-}
 
 module T1388 where
 
@@ -12,21 +11,23 @@ import Test.Tasty.Clash.NetlistTest
 
 newtype Byte = Byte
   { _byte :: BitVector 8}
-  deriving (Generic, NFDataX, Show, Eq)
-
+  deriving (Generic, Show, Eq)
+  deriving anyclass (NFDataX)
 newtype Word = Word
   { _word :: BitVector 16}
-  deriving (Generic, NFDataX, Show, Eq)
+  deriving (Generic, Show, Eq)
+  deriving anyclass (NFDataX)
 
 type Bytes n = Vec n (Byte)
 
 type Words n = Vec n (Word)
 
 newtype TypeA = TypeA (Bytes 4)
-  deriving (Generic, NFDataX, Show, Eq)
-
+  deriving (Generic, Show, Eq)
+  deriving anyclass (NFDataX)
 newtype TypeB = TypeB (Words 4)
-  deriving (Generic, NFDataX, Show, Eq)
+  deriving (Generic, Show, Eq)
+  deriving anyclass (NFDataX)
 
 {-# OPAQUE bytesToWords #-}
 bytesToWords :: Bytes 4 -> TypeB
