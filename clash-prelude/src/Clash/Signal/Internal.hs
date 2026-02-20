@@ -217,7 +217,7 @@ import Clash.NamedTypes
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
 import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
 import Clash.XException
-  (NFDataX(..), errorX, isX, deepseqX, defaultSeqX, seqX)
+  (NFDataX(..), isX, deepseqX, defaultSeqX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -1926,8 +1926,8 @@ sampleN n = take n . sample
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-fromList :: NFDataX a => [a] -> Signal dom a
-fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
+fromList :: (HasCallStack,NFDataX a) => [a] -> Signal dom a
+fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (pure $ error "finite list")
 
 -- * Simulation functions (not synthesizable)
 
@@ -1985,8 +1985,8 @@ sampleN_lazy n = take n . sample_lazy
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-fromList_lazy :: [a] -> Signal dom a
-fromList_lazy = Prelude.foldr (:-) (error "finite list")
+fromList_lazy :: HasCallStack => [a] -> Signal dom a
+fromList_lazy = Prelude.foldr (:-) (pure $ error "finite list")
 
 -- * Simulation functions (not synthesizable)
 
