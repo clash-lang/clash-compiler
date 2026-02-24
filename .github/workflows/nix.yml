@@ -112,6 +112,7 @@ jobs:
           ghc982,
           ghc964
         ]
+    needs: packages_common
     steps:
       - uses: actions/checkout@v4
 
