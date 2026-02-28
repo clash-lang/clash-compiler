@@ -51,7 +51,7 @@ tests:
 
 stack-build:
   extends: .common-local
-  image: fpco/stack-build:lts-22.43
+  image: fpco/stack-build:lts-24.32
   needs: []
   stage: test
   variables:
