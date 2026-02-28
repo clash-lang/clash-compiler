@@ -63,6 +63,12 @@ tests:
 
 stack-build:
   extends: .common-local
+<<<<<<< HEAD
+||||||| parent of 1b272298 (Update stack.yaml and stack-9.10.yaml (#3154))
+  image: fpco/stack-build:lts-22.43
+=======
+  image: fpco/stack-build:lts-24.32
+>>>>>>> 1b272298 (Update stack.yaml and stack-9.10.yaml (#3154))
   needs: []
   stage: test
   variables:
