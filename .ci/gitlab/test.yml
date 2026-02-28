@@ -117,8 +117,7 @@ lib:unittests:
 
 ffi:interface-tests:
   extends: .test-nocache
-  # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-  # is fixed
+  # GHC 9.8.3, 9.8.4 and 9.10.2 have issues, see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
   rules:
     - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
   script:
@@ -154,8 +153,7 @@ ffi:example:
   extends:
     - .common-local
     - .nightly-rules
-  # TODO: remove this when https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-  # is fixed
+  # GHC 9.8.3, 9.8.4 and 9.10.2 have issues, see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
   rules:
     - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
   stage: test
