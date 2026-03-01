@@ -404,17 +404,21 @@ test-suite unittests
       ghc-typelits-extra,
 
       base,
+      binary,
       bytestring,
+      containers,
       deepseq,
       hedgehog      >= 1.0.3    && < 1.6,
       hint          >= 0.7      && < 0.10,
+      mmorph        >= 1.1.5    && < 1.3,
       quickcheck-classes-base >= 0.6 && < 1.0,
       tasty         >= 1.2      && < 1.6,
       tasty-hedgehog >= 1.2.0,
       tasty-hunit,
       tasty-th,
       tasty-quickcheck,
-      template-haskell
+      template-haskell,
+      text
 
   Other-Modules:
                  Clash.Tests.AsyncFIFOSynchronizer
@@ -425,6 +429,7 @@ test-suite unittests
                  Clash.Tests.BlockRam.Blob
                  Clash.Tests.Clocks
                  Clash.Tests.Counter
+                 Clash.Tests.DumpVCD
                  Clash.Tests.NumConvert
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
