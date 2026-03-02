@@ -8,6 +8,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 
 {-# OPTIONS_HADDOCK hide #-}
+{- ORMOLU_DISABLE -}
 
 module Clash.CPP
  ( maxTupleSize

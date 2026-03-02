@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -32,11 +31,7 @@ module Clash.CoSim.Simulator (
 ---------------------------
 ---- IMPORTS --------------
 ---------------------------
-#ifdef CABAL
-import Paths_clash_cosim
-#else
-import Clash.CoSim.Paths_clash_cosim
-#endif
+import Clash.CoSim.Paths (getDataFileName)
 
 -- Haskell
 import Data.List (mapAccumL, mapAccumR, transpose)

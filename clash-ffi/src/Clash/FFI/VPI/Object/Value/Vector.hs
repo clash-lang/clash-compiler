@@ -5,8 +5,6 @@ Copyright:    (C) 2022 Google Inc.
 License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-#if defined(VERILOG_2005) && defined(VPI_VECVAL)
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -26,6 +24,9 @@ module Clash.FFI.VPI.Object.Value.Vector
   , bitVectorToVector
   , vectorToBitVector
   ) where
+
+{- ORMOLU_DISABLE -}
+#if defined(VERILOG_2005) && defined(VPI_VECVAL)
 
 import           Data.Bits (clearBit, setBit, testBit)
 import           Data.Proxy
@@ -189,5 +190,14 @@ instance (KnownNat n) => UnsafeReceive (BitVector n) where
 instance (KnownNat n) => Receive (BitVector n) where
   receive = fmap vectorToBitVector . receive
 #else
-module Clash.FFI.VPI.Object.Value.Vector () where
+data CVector
+
+bitVectorToVector :: HasCallStack => BitVector n -> CVector
+bitVectorToVector _ =
+  error "bitVectorToVector requires VERILOG_2005 && VPI_VECVAL"
+
+vectorToBitVector :: HasCallStack => CVector -> BitVector n
+vectorToBitVector _ =
+  error "vectorToBitVector requires VERILOG_2005 && VPI_VECVAL"
 #endif
+{- ORMOLU_ENABLE -}

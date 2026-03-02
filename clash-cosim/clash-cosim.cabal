@@ -93,7 +93,8 @@ Library
                     Clash.CoSim,
                     Paths_clash_cosim
 
-  Autogen-Modules:  Paths_clash_cosim
+  Other-Modules:    Clash.CoSim.Paths
+
   cpp-options:      -DCABAL
 
 test-suite test

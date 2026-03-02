@@ -24,12 +24,14 @@ import           Text.Printf               (printf)
 import           Test.Tasty
 import           Test.Tasty.Common
 import           Test.Tasty.Clash
+import           Test.Flags              (cosimEnabled)
 
 import           Control.Retry        (RetryAction(ConsultPolicy, DontRetry), RetryPolicyM, RetryStatus)
 import           Data.List            (isInfixOf)
 import           Test.Tasty.Flaky     (flakyTestWithRetryAction, limitRetries)
 import           Test.Tasty.Providers (Result)
 
+{- ORMOLU_DISABLE -}
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
 ghcVersion3 =
@@ -45,6 +47,7 @@ ghcVersion3 =
   let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__ in
   intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
 #endif
+{- ORMOLU_ENABLE -}
 
 -- Directory clash binary is expected to live in
 cabalClashBinDir :: IO String
@@ -350,7 +353,7 @@ runClashTest = defaultMain
 --        }
       ]
     , clashTestGroup "shouldwork"
-      [ clashTestGroup "AutoReg"
+      ( [ clashTestGroup "AutoReg"
         [ outputTest "AutoReg" def
         , runTest "T1507" def{hdlSim=[]}
         , let _opts = def{hdlSim=[], hdlTargets=[VHDL]}
@@ -473,13 +476,17 @@ runClashTest = defaultMain
         [ runTest "MAC" def{hdlSim=[]}
         , runTest "CBlockRamTest" def{hdlSim=[]}
         ]
-#ifdef COSIM
-      , clashTestGroup "CoSim"
-        [ runTest "Multiply" def{hdlTargets=[Verilog]}
-        , runTest "Register" def{hdlTargets=[Verilog]}
-        ]
-#endif
-      , clashTestGroup "CustomReprs"
+      ]
+      <> (if cosimEnabled
+            then
+              [ clashTestGroup "CoSim"
+                [ runTest "Multiply" def{hdlTargets=[Verilog]}
+                , runTest "Register" def{hdlTargets=[Verilog]}
+                ]
+              ]
+            else []
+         )
+      <> [ clashTestGroup "CustomReprs"
         [ clashTestGroup "RotateC"
           [ runTest "RotateC" def
           , runTest "ReprCompact" def
@@ -1083,7 +1090,7 @@ runClashTest = defaultMain
 --      , clashLibTest "LazyEvaluation" def
 --      , clashLibTest "MutualRecursion" def
 --      ]
-      ] -- end shouldwork
+      ] ) -- end shouldwork
     ] -- end tests
   ] -- end .
 
