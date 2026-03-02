@@ -1,7 +1,7 @@
 module Clash.Verification.DSL where
 
-import qualified Clash.Verification           as Cv
-import           Clash.Verification.Internal
+import qualified Clash.Verification as Cv
+import Clash.Verification.Internal
 
 -- Precedences taken from:
 --

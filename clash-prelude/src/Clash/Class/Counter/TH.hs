@@ -18,11 +18,11 @@ mkTup :: [Exp] -> Exp
 mkTup = TupE . map Just
 
 genTupleInstances :: Int -> Q [Dec]
-genTupleInstances maxTupleSize = mapM genTupleInstance [3..maxTupleSize]
+genTupleInstances maxTupleSize = mapM genTupleInstance [3 .. maxTupleSize]
 
 genTupleInstance :: Int -> Q Dec
 genTupleInstance tupSize = do
-  typeVars <- mapM (\n -> VarT <$> newName ("a" <> show n)) [0..tupSize-1]
+  typeVars <- mapM (\n -> VarT <$> newName ("a" <> show n)) [0 .. tupSize - 1]
 
   succOverflowBody <- genCountOverflow countSuccName tupSize
   predOverflowBody <- genCountOverflow countPredName tupSize
@@ -46,14 +46,14 @@ genCount nm n = Clause [] (NormalB (mkTup (replicate n (VarE nm)))) []
 
 genCountOverflow :: Name -> Int -> Q Clause
 genCountOverflow nm tupSize = do
-  varNms <- mapM (\n -> newName ("a" <> show n)) [0..tupSize-1]
+  varNms <- mapM (\n -> newName ("a" <> show n)) [0 .. tupSize - 1]
   let vars = map VarE varNms
 
   overflowLastNm <- newName "overflowLast"
   lastNm <- newName "last"
 
   overflowInitNm <- newName "overflowInit"
-  initNms <- mapM (\n -> newName ("a" <> show n)) [0..tupSize-2]
+  initNms <- mapM (\n -> newName ("a" <> show n)) [0 .. tupSize - 2]
 
   let
     body =
@@ -67,7 +67,6 @@ genCountOverflow nm tupSize = do
           (TupP [VarP overflowLastNm, VarP lastNm])
           (NormalB (VarE nm `AppE` last vars))
           []
-
       , ValD
           (TupP [VarP overflowInitNm, TupP (map VarP initNms)])
           (NormalB (VarE nm `AppE` mkTup (init vars)))

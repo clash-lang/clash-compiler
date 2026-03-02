@@ -1,13 +1,13 @@
 module Simple where
 
-import qualified Prelude as P
 import Prelude ((++))
+import qualified Prelude as P
 
-import Clash.Prelude hiding (assert, (++))
 import Clash.Annotations.SynthesisAttributes
+import Clash.Prelude hiding (assert, (++))
 
-import Data.String (IsString)
 import Data.List (isInfixOf)
+import Data.String (IsString)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
@@ -16,26 +16,31 @@ import qualified Data.Text.IO as T
 
 --------------- Logic -------------------
 mac xy = mealy macT 0 xy
-  where
-    macT acc (x,y) = (acc',o)
-      where
-        acc' = acc + x * y
-        o    = acc
+ where
+  macT acc (x, y) = (acc', o)
+   where
+    acc' = acc + x * y
+    o = acc
 
-topEntity
-  :: SystemClockResetEnable
-  => Signal System (Signed 9) `Annotate` 'StringAttr "top" "input1"
-  -> Signal System (Signed 9) `Annotate` 'StringAttr "top" "input2"
-  -> Signal System (Signed 9) `Annotate` 'StringAttr "top" "outp"
+topEntity ::
+  (SystemClockResetEnable) =>
+  Signal System (Signed 9) `Annotate` 'StringAttr "top" "input1" ->
+  Signal System (Signed 9) `Annotate` 'StringAttr "top" "input2" ->
+  Signal System (Signed 9) `Annotate` 'StringAttr "top" "outp"
 topEntity x y = mac $ bundle (x, y)
-
 
 --------------- Actual tests for generated HDL -------------------
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 -- VHDL test
 mainVHDL :: IO ()

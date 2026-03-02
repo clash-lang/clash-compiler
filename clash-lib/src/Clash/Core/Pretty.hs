@@ -1,4 +1,11 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+{- |
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
                      2021-2022, QBayLogic B.V.
@@ -7,38 +14,31 @@
 
   PrettyPrec printing class and instances for CoreHW
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
-module Clash.Core.Pretty
-  ( PrettyPrec (..)
-  , PrettyOptions (..)
-  , ClashDoc
-  , ClashAnnotation (..)
-  , SyntaxElement (..)
-  , ppr, ppr'
-  , showPpr, showPpr'
-  , tracePprId
-  , tracePpr
-  , fromPpr
-  , unsafeLookupEnvBool
-  )
+module Clash.Core.Pretty (
+  PrettyPrec (..),
+  PrettyOptions (..),
+  ClashDoc,
+  ClashAnnotation (..),
+  SyntaxElement (..),
+  ppr,
+  ppr',
+  showPpr,
+  showPpr',
+  tracePprId,
+  tracePpr,
+  fromPpr,
+  unsafeLookupEnvBool,
+)
 where
 
-import Data.Char                        (isSymbol, isUpper, ord)
-import Data.Default                     (Default(..))
-import Data.Text                        (Text)
 import Control.Monad.Identity
-import Data.Binary.IEEE754              (wordToDouble, wordToFloat)
-import Data.List.Extra                  ((<:>))
-import qualified Data.Text              as T
-import Data.Maybe                       (fromMaybe)
+import Data.Binary.IEEE754 (wordToDouble, wordToFloat)
+import Data.Char (isSymbol, isUpper, ord)
+import Data.Default (Default (..))
+import Data.List.Extra ((<:>))
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import qualified Data.Text as T
 #if MIN_VERSION_prettyprinter(1,7,0)
 import Prettyprinter
 import Prettyprinter.Internal
@@ -46,32 +46,55 @@ import Prettyprinter.Internal
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Internal
 #endif
-import GHC.Show                         (showMultiLineString)
-import GHC.Stack                        (HasCallStack)
-import qualified GHC.Utils.Outputable   as GHC
-import System.Environment               (lookupEnv)
-import System.IO.Unsafe                 (unsafePerformIO)
-import Text.Read                        (readMaybe)
+import GHC.Show (showMultiLineString)
+import GHC.Stack (HasCallStack)
+import qualified GHC.Utils.Outputable as GHC
+import System.Environment (lookupEnv)
+import System.IO.Unsafe (unsafePerformIO)
+import Text.Read (readMaybe)
 
-import Clash.Core.DataCon               (DataCon (..))
-import Clash.Core.Literal               (Literal (..))
-import Clash.Core.Name                  (Name (..))
-import Clash.Core.Term
-  (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg, PrimInfo(primName),Bind(..))
-import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike, AlgTyConRhs(..))
-import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
-                                         Type (..), TypeView (..), tyView,mkTyConApp)
-import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
-import Clash.Debug                      (trace)
+import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.Literal (Literal (..))
+import Clash.Core.Name (Name (..))
+import Clash.Core.Term (
+  Bind (..),
+  CoreContext (..),
+  NameMod (..),
+  Pat (..),
+  PrimInfo (primName),
+  Term (..),
+  TickInfo (..),
+  primArg,
+ )
+import Clash.Core.TyCon (
+  AlgTyConRhs (..),
+  TyCon (..),
+  TyConName,
+  isTupleTyConLike,
+ )
+import Clash.Core.Type (
+  ConstTy (..),
+  Kind,
+  LitTy (..),
+  Type (..),
+  TypeView (..),
+  mkTyConApp,
+  tyView,
+ )
+import Clash.Core.Var (Id, IdScope (..), TyVar, Var (..))
+import Clash.Debug (trace)
+import Clash.Pretty
 import Clash.Util
 import qualified Clash.Util.Interpolate as I
-import Clash.Pretty
 
-unsafeLookupEnvBool :: HasCallStack =>  String -> Bool -> Bool
+unsafeLookupEnvBool :: (HasCallStack) => String -> Bool -> Bool
 unsafeLookupEnvBool key dflt =
   case unsafePerformIO (lookupEnv key) of
     Nothing -> dflt
-    Just a -> flip fromMaybe (readMaybe a) $ error [I.i|
+    Just a ->
+      flip fromMaybe (readMaybe a) $
+        error
+          [I.i|
       'unsafeLookupEnvBool' tried to lookup #{key} in the environment. It found
       it, but couldn't interpret it to as a Bool. Expected one of: True, False.
       But found:
@@ -81,31 +104,32 @@ unsafeLookupEnvBool key dflt =
 
 -- | Options for the pretty-printer, controlling which elements to hide.
 data PrettyOptions = PrettyOptions
-  { displayUniques    :: Bool
+  { displayUniques :: Bool
   -- ^ whether to display unique identifiers
-  , displayTypes      :: Bool
+  , displayTypes :: Bool
   -- ^ whether to display type information
   , displayQualifiers :: Bool
   -- ^ whether to display module qualifiers
-  , displayTicks      :: Bool
+  , displayTicks :: Bool
   -- ^ whether to display ticks
   }
 
 instance Default PrettyOptions where
-  def = PrettyOptions
-    { displayUniques    = unsafeLookupEnvBool "CLASH_PPR_UNIQUES" True
-    , displayTypes      = unsafeLookupEnvBool "CLASH_PPR_TYPES" True
-    , displayQualifiers = unsafeLookupEnvBool "CLASH_PPR_QUALIFIERS" True
-    , displayTicks      = unsafeLookupEnvBool "CLASH_PPR_TICKS" True
-    }
+  def =
+    PrettyOptions
+      { displayUniques = unsafeLookupEnvBool "CLASH_PPR_UNIQUES" True
+      , displayTypes = unsafeLookupEnvBool "CLASH_PPR_TYPES" True
+      , displayQualifiers = unsafeLookupEnvBool "CLASH_PPR_QUALIFIERS" True
+      , displayTicks = unsafeLookupEnvBool "CLASH_PPR_TICKS" True
+      }
 
 -- | Annotations carried on pretty-printed code.
 data ClashAnnotation
-  = AnnContext CoreContext
-  -- ^ marking navigation to a different context
-  | AnnSyntax  SyntaxElement
-  -- ^ marking a specific sort of syntax
-  deriving Eq
+  = -- | marking navigation to a different context
+    AnnContext CoreContext
+  | -- | marking a specific sort of syntax
+    AnnSyntax SyntaxElement
+  deriving (Eq)
 
 -- | Specific places in the program syntax.
 data SyntaxElement = Keyword | LitS | Type | Unique | Qualifier | Ticky
@@ -116,31 +140,30 @@ type ClashDoc = Doc ClashAnnotation
 
 -- | PrettyPrec printing Show-like typeclass
 class PrettyPrec p where
-
   -- default pretty-printing without hiding
-  pprPrec :: Monad m => Rational -> p -> m ClashDoc
+  pprPrec :: (Monad m) => Rational -> p -> m ClashDoc
 
   -- pretty-printing with hiding options
   -- NB: we utilise the syntax annotations to hide the requested parts of syntax
-  pprPrec' :: Monad m => PrettyOptions -> Rational -> p -> m ClashDoc
+  pprPrec' :: (Monad m) => PrettyOptions -> Rational -> p -> m ClashDoc
   pprPrec' opts p = fmap hide . pprPrec p
-    where
-      hide = \case
-        FlatAlt d d'         -> FlatAlt (hide d) (hide d')
-        Cat d d'             -> Cat (hide d) (hide d')
-        Nest i d             -> Nest i (hide d)
-        Union d d'           -> Union (hide d) (hide d')
-        Column f             -> Column (hide . f)
-        WithPageWidth f      -> WithPageWidth (hide . f)
-        Nesting f            -> Nesting (hide . f)
-        Annotated ann d'     ->
-          if not (displayTypes opts)      && ann == AnnSyntax Type
-          || not (displayUniques opts)    && ann == AnnSyntax Unique
+   where
+    hide = \case
+      FlatAlt d d' -> FlatAlt (hide d) (hide d')
+      Cat d d' -> Cat (hide d) (hide d')
+      Nest i d -> Nest i (hide d)
+      Union d d' -> Union (hide d) (hide d')
+      Column f -> Column (hide . f)
+      WithPageWidth f -> WithPageWidth (hide . f)
+      Nesting f -> Nesting (hide . f)
+      Annotated ann d' ->
+        if not (displayTypes opts) && ann == AnnSyntax Type
+          || not (displayUniques opts) && ann == AnnSyntax Unique
           || not (displayQualifiers opts) && ann == AnnSyntax Qualifier
-          || not (displayTicks opts)      && ann == AnnSyntax Ticky
-            then Empty
-            else Annotated ann (hide d')
-        d -> d
+          || not (displayTicks opts) && ann == AnnSyntax Ticky
+          then Empty
+          else Annotated ann (hide d')
+      d -> d
 
 pprM :: (Monad m, PrettyPrec p) => p -> m ClashDoc
 pprM = pprPrec 0
@@ -148,83 +171,102 @@ pprM = pprPrec 0
 pprM' :: (Monad m, PrettyPrec p) => PrettyOptions -> p -> m ClashDoc
 pprM' opts = pprPrec' opts 0
 
-ppr :: PrettyPrec p => p -> ClashDoc
+ppr :: (PrettyPrec p) => p -> ClashDoc
 ppr = runIdentity . pprM
 
-ppr' :: PrettyPrec p => PrettyOptions -> p -> ClashDoc
+ppr' :: (PrettyPrec p) => PrettyOptions -> p -> ClashDoc
 ppr' opts = runIdentity . pprM' opts
 
-fromPpr :: PrettyPrec a => a -> Doc ()
+fromPpr :: (PrettyPrec a) => a -> Doc ()
 fromPpr = removeAnnotations . ppr
 
-noPrec, opPrec, appPrec :: Num a => a
+noPrec, opPrec, appPrec :: (Num a) => a
 noPrec = 0
 opPrec = 1
 appPrec = 2
 
 -- | Print a PrettyPrec thing to a String
-showPpr :: PrettyPrec p => p -> String
+showPpr :: (PrettyPrec p) => p -> String
 showPpr = showPpr' def
 
-showPpr' :: PrettyPrec p => PrettyOptions -> p -> String
+showPpr' :: (PrettyPrec p) => PrettyOptions -> p -> String
 showPpr' opts = showDoc . ppr' opts
 
-tracePprId :: PrettyPrec p => p -> p
+tracePprId :: (PrettyPrec p) => p -> p
 tracePprId p = trace (showPpr p) p
 
-tracePpr :: PrettyPrec p => p -> a -> a
+tracePpr :: (PrettyPrec p) => p -> a -> a
 tracePpr p a = trace (showPpr p) a
 
 parensIf :: Bool -> ClashDoc -> ClashDoc
 parensIf False = id
-parensIf True  = parens
+parensIf True = parens
 
 tyParens :: ClashDoc -> ClashDoc
-tyParens = enclose (annotate (AnnSyntax Type) lparen)
-                   (annotate (AnnSyntax Type) rparen)
+tyParens =
+  enclose
+    (annotate (AnnSyntax Type) lparen)
+    (annotate (AnnSyntax Type) rparen)
 
 tyParensIf :: Bool -> ClashDoc -> ClashDoc
 tyParensIf False = id
-tyParensIf True  = tyParens
+tyParensIf True = tyParens
 
 vsepHard :: [ClashDoc] -> ClashDoc
 vsepHard = concatWith (\x y -> x <> hardline <> y)
 
 viewName :: Name a -> (Text, Text, Text)
 viewName n = (qual, occ, T.pack $ show $ nameUniq n)
-  where (qual, occ) = T.breakOnEnd "." $ nameOcc n
+ where
+  (qual, occ) = T.breakOnEnd "." $ nameOcc n
 
 instance PrettyPrec (Name a) where
   pprPrec p (viewName -> (qual, occ, uniq)) = do
     qual' <- annotate (AnnSyntax Qualifier) <$> pprPrec p qual
-    occ'  <- pprPrec p occ
+    occ' <- pprPrec p occ
     uniq' <- annotate (AnnSyntax Unique) . brackets <$> (pprPrec p uniq)
     return $ qual' <> occ' <> uniq'
 
 instance ClashPretty (Name a) where
   clashPretty = fromPpr
 
-instance PrettyPrec a => PrettyPrec [a] where
+instance (PrettyPrec a) => PrettyPrec [a] where
   pprPrec prec = fmap vcat . mapM (pprPrec prec)
 
 instance PrettyPrec (Id, Term) where
   pprPrec _ = pprTopLevelBndr
 
-pprTopLevelBndr :: Monad m => (Id,Term) -> m ClashDoc
-pprTopLevelBndr (bndr,expr) = do
-  bndr'    <- pprM bndr
+pprTopLevelBndr :: (Monad m) => (Id, Term) -> m ClashDoc
+pprTopLevelBndr (bndr, expr) = do
+  bndr' <- pprM bndr
   bndrName <- pprM (varName bndr)
-  expr'    <- pprM expr
+  expr' <- pprM expr
   return $ bndr' <> line <> hang 2 (sep [(bndrName <+> equals), expr']) <> line
 
-dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_,
-  data_,newtype_,type_,family_,instance_
-  :: ClashDoc
+dcolon
+  , rarrow
+  , lam
+  , tylam
+  , at
+  , cast
+  , coerce
+  , let_
+  , letrec
+  , in_
+  , case_
+  , of_
+  , forall_
+  , data_
+  , newtype_
+  , type_
+  , family_
+  , instance_ ::
+    ClashDoc
 dcolon = annotate (AnnSyntax Keyword) "::"
 rarrow = annotate (AnnSyntax Keyword) "->"
-lam = annotate (AnnSyntax Keyword)  "λ"
+lam = annotate (AnnSyntax Keyword) "λ"
 tylam = annotate (AnnSyntax Keyword) "Λ"
-at = annotate (AnnSyntax Keyword)  "@"
+at = annotate (AnnSyntax Keyword) "@"
 cast = annotate (AnnSyntax Keyword) "▷"
 coerce = annotate (AnnSyntax Keyword) "~"
 let_ = annotate (AnnSyntax Keyword) "let"
@@ -263,7 +305,6 @@ instance PrettyPrec TyCon where
         ty <- pprType (dcType dc)
 
         pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> ty))
-
     AlgTyCon _ nm kn _ (NewTyCon dc _) _ -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
@@ -272,11 +313,12 @@ instance PrettyPrec TyCon where
       conName <- pprPrec prec (dcName dc)
       conType <- pprType (dcType dc)
 
-      pure (vsep [newtype_ <+> decl, conName <> annotate (AnnSyntax Type) (space <> dcolon <+> conType)])
-
+      pure
+        ( vsep
+            [newtype_ <+> decl, conName <> annotate (AnnSyntax Type) (space <> dcolon <+> conType)]
+        )
     PromotedDataCon _ _ _ _ dc ->
       fmap ("promoted" <+>) (pprPrec prec dc)
-
     FunTyCon _ nm kn _ ss -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
@@ -290,7 +332,6 @@ instance PrettyPrec TyCon where
         rhs <- pprType y
 
         pure (type_ <+> instance_ <+> lhs <+> "=" <+> rhs)
-
     PrimTyCon _ nm kn _ -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
@@ -307,41 +348,44 @@ instance PrettyPrec LitTy where
 
 instance PrettyPrec Term where
   pprPrec prec e = case e of
-    Var x           -> do
+    Var x -> do
       v <- pprPrec prec (varName x)
       s <- pprPrecIdScope x
       pure (v <> annotate (AnnSyntax Unique) (brackets s))
-    Data dc         -> pprPrec prec dc
-    Literal l       -> pprPrec prec l
-    Prim p          -> pprPrecPrim prec (primName p)
-    Lam  v e1       -> annotate (AnnContext $ LamBody v) <$>
-                         pprPrecLam prec [v] e1
-    TyLam tv e1     -> annotate (AnnContext $ TyLamBody tv) <$>
-                         pprPrecTyLam prec [tv] e1
-    App fun arg     -> pprPrecApp prec fun arg
-    TyApp e' ty     -> annotate (AnnContext TyAppC) <$>
-                         pprPrecTyApp prec e' ty
-    Let (NonRec i x) e1 -> pprPrecLetrec prec False [(i,x)] e1
-    Let (Rec xes) e1   -> pprPrecLetrec prec True xes e1
-    Case e' _ alts  -> pprPrecCase prec e' alts
+    Data dc -> pprPrec prec dc
+    Literal l -> pprPrec prec l
+    Prim p -> pprPrecPrim prec (primName p)
+    Lam v e1 ->
+      annotate (AnnContext $ LamBody v)
+        <$> pprPrecLam prec [v] e1
+    TyLam tv e1 ->
+      annotate (AnnContext $ TyLamBody tv)
+        <$> pprPrecTyLam prec [tv] e1
+    App fun arg -> pprPrecApp prec fun arg
+    TyApp e' ty ->
+      annotate (AnnContext TyAppC)
+        <$> pprPrecTyApp prec e' ty
+    Let (NonRec i x) e1 -> pprPrecLetrec prec False [(i, x)] e1
+    Let (Rec xes) e1 -> pprPrecLetrec prec True xes e1
+    Case e' _ alts -> pprPrecCase prec e' alts
     Cast e' ty1 ty2 -> pprPrecCast prec e' ty1 ty2
-    Tick t e'       -> do
+    Tick t e' -> do
       tDoc <- pprPrec prec t
       eDoc <- pprPrec prec e'
       return (annotate (AnnSyntax Ticky) (tDoc <> line') <> eDoc)
 
 instance PrettyPrec TickInfo where
-  pprPrec prec (SrcSpan sp)   = pprPrec prec sp
+  pprPrec prec (SrcSpan sp) = pprPrec prec sp
   pprPrec prec (NameMod PrefixName t) = ("<prefixName>" <>) <$> pprPrec prec t
   pprPrec prec (NameMod SuffixName t) = ("<suffixName>" <>) <$> pprPrec prec t
   pprPrec prec (NameMod SuffixNameP t) = ("<suffixNameP>" <>) <$> pprPrec prec t
-  pprPrec prec (NameMod SetName t)    = ("<setName>" <>) <$> pprPrec prec t
-  pprPrec _    DeDup                  = pure "<deDup>"
-  pprPrec _    NoDeDup                = pure "<noDeDup>"
-  pprPrec prec (Attributes _ attrs)   = ("<attributes>" <>) <$> pprPrec prec attrs
+  pprPrec prec (NameMod SetName t) = ("<setName>" <>) <$> pprPrec prec t
+  pprPrec _ DeDup = pure "<deDup>"
+  pprPrec _ NoDeDup = pure "<noDeDup>"
+  pprPrec prec (Attributes _ attrs) = ("<attributes>" <>) <$> pprPrec prec attrs
 
 instance PrettyPrec SrcSpan where
-  pprPrec _ sp = return ("<src>"<>pretty (GHC.showSDocUnsafe (GHC.ppr sp)))
+  pprPrec _ sp = return ("<src>" <> pretty (GHC.showSDocUnsafe (GHC.ppr sp)))
 
 instance ClashPretty Term where
   clashPretty = fromPpr
@@ -349,9 +393,9 @@ instance ClashPretty Term where
 data BindingSite = LambdaBind | CaseBind | LetBind
 
 instance PrettyPrec (Var a) where
-  pprPrec _ v@(TyVar {}) = pprM $ varName v
-  pprPrec _ v@(Id {})    = do
-    v'  <- pprM (varName v)
+  pprPrec _ v@(TyVar{}) = pprM $ varName v
+  pprPrec _ v@(Id{}) = do
+    v' <- pprM (varName v)
     ty' <- pprM (varType v)
     return $ v' <> (annotate (AnnSyntax Type) $ align (space <> dcolon <+> ty'))
 
@@ -363,84 +407,97 @@ instance PrettyPrec DataCon where
 
 instance PrettyPrec Literal where
   pprPrec _ l = return $ annotate (AnnSyntax LitS) $ case l of
-    IntegerLiteral i   -> parensIf (i < 0) (pretty i)
-    IntLiteral i       -> parensIf (i < 0) (pretty i <> "#")
-    Int64Literal i     -> parensIf (i < 0) (pretty i <> "#64")
-    WordLiteral w      -> pretty w <> "##"
-    Word64Literal w    -> pretty w <> "##64"
-    Int8Literal i      -> parensIf (i < 0) (pretty i <> "#8")
-    Int16Literal i     -> parensIf (i < 0) (pretty i <> "#16")
-    Int32Literal i     -> parensIf (i < 0) (pretty i <> "#32")
-    Word8Literal w     -> pretty w <> "##8"
-    Word16Literal w    -> pretty w <> "##16"
-    Word32Literal w    -> pretty w <> "##32"
-    FloatLiteral w     -> pretty (wordToFloat w) <> "#"
-    DoubleLiteral w    -> pretty (wordToDouble w) <> "##"
-    CharLiteral c      -> pretty c <> "#"
-    StringLiteral s    -> vcat $ map pretty $ showMultiLineString s
-    NaturalLiteral n   -> pretty n
+    IntegerLiteral i -> parensIf (i < 0) (pretty i)
+    IntLiteral i -> parensIf (i < 0) (pretty i <> "#")
+    Int64Literal i -> parensIf (i < 0) (pretty i <> "#64")
+    WordLiteral w -> pretty w <> "##"
+    Word64Literal w -> pretty w <> "##64"
+    Int8Literal i -> parensIf (i < 0) (pretty i <> "#8")
+    Int16Literal i -> parensIf (i < 0) (pretty i <> "#16")
+    Int32Literal i -> parensIf (i < 0) (pretty i <> "#32")
+    Word8Literal w -> pretty w <> "##8"
+    Word16Literal w -> pretty w <> "##16"
+    Word32Literal w -> pretty w <> "##32"
+    FloatLiteral w -> pretty (wordToFloat w) <> "#"
+    DoubleLiteral w -> pretty (wordToDouble w) <> "##"
+    CharLiteral c -> pretty c <> "#"
+    StringLiteral s -> vcat $ map pretty $ showMultiLineString s
+    NaturalLiteral n -> pretty n
     ByteArrayLiteral s -> pretty $ show s
 
 instance PrettyPrec Pat where
   pprPrec prec pat = case pat of
     DataPat dc txs xs -> do
-      dc'  <- pprM dc
+      dc' <- pprM dc
       txs' <- mapM (pprBndr LetBind) txs
-      xs'  <- mapM (pprBndr CaseBind) xs
-      return $ parensIf (prec >= appPrec) $
-        sep [ hsep (dc':txs')
-            , nest 2 (sep xs') ]
-    LitPat l   -> pprM l
+      xs' <- mapM (pprBndr CaseBind) xs
+      return $
+        parensIf (prec >= appPrec) $
+          sep
+            [ hsep (dc' : txs')
+            , nest 2 (sep xs')
+            ]
+    LitPat l -> pprM l
     DefaultPat -> return "_"
 
-pprPrecIdScope :: Monad m => Var a -> m ClashDoc
-pprPrecIdScope (TyVar {}) = pure "TyVar"
+pprPrecIdScope :: (Monad m) => Var a -> m ClashDoc
+pprPrecIdScope (TyVar{}) = pure "TyVar"
 pprPrecIdScope (Id _ _ _ GlobalId) = pure "GlobalId"
 pprPrecIdScope (Id _ _ _ LocalId) = pure "LocalId"
 
-pprPrecPrim :: Monad m => Rational -> Text -> m ClashDoc
+pprPrecPrim :: (Monad m) => Rational -> Text -> m ClashDoc
 pprPrecPrim prec nm =
-  (<>) <$> (annotate (AnnSyntax Qualifier) <$> pprPrec prec qual)
-       <*> pprPrec prec occ
-  where (qual, occ) = T.breakOnEnd "." nm
+  (<>)
+    <$> (annotate (AnnSyntax Qualifier) <$> pprPrec prec qual)
+    <*> pprPrec prec occ
+ where
+  (qual, occ) = T.breakOnEnd "." nm
 
-pprPrecLam :: Monad m => Rational -> [Id] -> Term -> m ClashDoc
+pprPrecLam :: (Monad m) => Rational -> [Id] -> Term -> m ClashDoc
 pprPrecLam prec xs e = do
   xs' <- mapM (pprBndr LambdaBind) xs
-  e'  <- pprPrec noPrec e
-  return $ parensIf (prec > noPrec) $
-    lam <> hsep xs' <+> rarrow <> line <> e'
+  e' <- pprPrec noPrec e
+  return $
+    parensIf (prec > noPrec) $
+      lam <> hsep xs' <+> rarrow <> line <> e'
 
-pprPrecTyLam :: Monad m => Rational -> [TyVar] -> Term -> m ClashDoc
+pprPrecTyLam :: (Monad m) => Rational -> [TyVar] -> Term -> m ClashDoc
 pprPrecTyLam prec tvs e = do
   tvs' <- mapM pprM tvs
-  e'   <- pprPrec noPrec e
-  return $ tyParensIf (prec > noPrec) $
-    annotate (AnnSyntax Type) (tylam <> hsep tvs' <+> rarrow <> line) <> e'
+  e' <- pprPrec noPrec e
+  return $
+    tyParensIf (prec > noPrec) $
+      annotate (AnnSyntax Type) (tylam <> hsep tvs' <+> rarrow <> line) <> e'
 
-pprPrecApp :: Monad m => Rational -> Term -> Term -> m ClashDoc
+pprPrecApp :: (Monad m) => Rational -> Term -> Term -> m ClashDoc
 pprPrecApp prec e1 e2 = do
   e1' <- annotate (AnnContext AppFun) <$> pprPrec opPrec e1
   e2' <- annotate (AnnContext $ AppArg $ primArg e2) <$> pprPrec appPrec e2
-  return $ parensIf (prec >= appPrec) $
-    hang 2 (sep [e1',e2'])
+  return $
+    parensIf (prec >= appPrec) $
+      hang 2 (sep [e1', e2'])
 
-pprPrecTyApp :: Monad m => Rational -> Term -> Type -> m ClashDoc
+pprPrecTyApp :: (Monad m) => Rational -> Term -> Type -> m ClashDoc
 pprPrecTyApp prec e ty = do
-  e'  <- pprPrec opPrec e
+  e' <- pprPrec opPrec e
   ty' <- pprParendType ty
-  return $ tyParensIf (prec >= appPrec) $
-    hang 2 $ group $
-      e' <> annotate (AnnSyntax Type) (line <> at <> ty')
+  return $
+    tyParensIf (prec >= appPrec) $
+      hang 2 $
+        group $
+          e' <> annotate (AnnSyntax Type) (line <> at <> ty')
 
-pprPrecCast :: Monad m => Rational -> Term -> Type -> Type -> m ClashDoc
+pprPrecCast :: (Monad m) => Rational -> Term -> Type -> Type -> m ClashDoc
 pprPrecCast prec e ty1 ty2 = do
-  e'   <- annotate (AnnContext CastBody) <$> pprPrec appPrec e
+  e' <- annotate (AnnContext CastBody) <$> pprPrec appPrec e
   ty1' <- pprType ty1
   ty2' <- pprType ty2
-  return $ tyParensIf (prec >= appPrec) $
-    e' <> annotate (AnnSyntax Type)
-                   (softline <> nest 2 (vsep [cast, ty1', coerce, ty2']))
+  return $
+    tyParensIf (prec >= appPrec) $
+      e'
+        <> annotate
+          (AnnSyntax Type)
+          (softline <> nest 2 (vsep [cast, ty1', coerce, ty2']))
 
 -- TODO Since Clash now keeps non-recursive let expressions separately, the
 -- result of normalization will contain more nested let expressions as the old
@@ -448,141 +505,165 @@ pprPrecCast prec e ty1 ty2 = do
 -- good idea to change pprPrecLetrec to encourage more compact forms such as
 -- printing the entire binding on one line if possible.
 
-pprPrecLetrec :: Monad m => Rational -> Bool -> [(Id, Term)] -> Term -> m ClashDoc
+pprPrecLetrec :: (Monad m) => Rational -> Bool -> [(Id, Term)] -> Term -> m ClashDoc
 pprPrecLetrec prec isRec xes body = do
   let bndrs = fst <$> xes
   body' <- annotate (AnnContext $ LetBody xes) <$> pprPrec noPrec body
-  xes'  <- mapM (\(x,e) -> do
-                  x' <- pprBndr LetBind x
-                  e' <- pprPrec noPrec e
-                  return $ annotate (AnnContext $ LetBinding x bndrs) $
-                    vsepHard [x', equals <+> e']
-                ) xes
-  let xes'' = case xes' of { [] -> ["EmptyLetrec"]; _  -> xes' }
+  xes' <-
+    mapM
+      ( \(x, e) -> do
+          x' <- pprBndr LetBind x
+          e' <- pprPrec noPrec e
+          return $
+            annotate (AnnContext $ LetBinding x bndrs) $
+              vsepHard [x', equals <+> e']
+      )
+      xes
+  let xes'' = case xes' of [] -> ["EmptyLetrec"]; _ -> xes'
   let kw = if isRec then letrec else let_
-  return $ parensIf (prec > noPrec) $
-    vsepHard [hang 2 (vsepHard $ kw : xes''), in_ <+> body']
+  return $
+    parensIf (prec > noPrec) $
+      vsepHard [hang 2 (vsepHard $ kw : xes''), in_ <+> body']
 
-pprPrecCase :: Monad m => Rational -> Term -> [(Pat,Term)] -> m ClashDoc
+pprPrecCase :: (Monad m) => Rational -> Term -> [(Pat, Term)] -> m ClashDoc
 pprPrecCase prec e alts = do
-  e'    <- annotate (AnnContext CaseScrut) <$> pprPrec prec e
+  e' <- annotate (AnnContext CaseScrut) <$> pprPrec prec e
   alts' <- mapM (pprPrecAlt noPrec) alts
-  return $ parensIf (prec > noPrec) $
-    hang 2 $ vsepHard $ (case_ <+> e' <+> of_) : alts'
+  return $
+    parensIf (prec > noPrec) $
+      hang 2 $
+        vsepHard $
+          (case_ <+> e' <+> of_) : alts'
 
-pprPrecAlt :: Monad m => Rational -> (Pat,Term) -> m ClashDoc
+pprPrecAlt :: (Monad m) => Rational -> (Pat, Term) -> m ClashDoc
 pprPrecAlt _ (altPat, altE) = do
   altPat' <- pprPrec noPrec altPat
-  altE'   <- pprPrec noPrec altE
-  return $ annotate (AnnContext $ CaseAlt altPat) $
-    hang 2 $ vsepHard [(altPat' <+> rarrow), altE']
+  altE' <- pprPrec noPrec altE
+  return $
+    annotate (AnnContext $ CaseAlt altPat) $
+      hang 2 $
+        vsepHard [(altPat' <+> rarrow), altE']
 
 pprBndr :: (Monad m, PrettyPrec a) => BindingSite -> a -> m ClashDoc
 pprBndr LetBind = pprM
-pprBndr _       = fmap tyParens . pprM
+pprBndr _ = fmap tyParens . pprM
 
-data TypePrec = TopPrec | FunPrec | TyConPrec deriving (Eq,Ord)
+data TypePrec = TopPrec | FunPrec | TyConPrec deriving (Eq, Ord)
 
 maybeParen :: TypePrec -> TypePrec -> ClashDoc -> ClashDoc
 maybeParen ctxt_prec inner_prec = parensIf (ctxt_prec >= inner_prec)
 
-pprType :: Monad m => Type -> m ClashDoc
+pprType :: (Monad m) => Type -> m ClashDoc
 pprType = ppr_type TopPrec
 
-pprParendType :: Monad m => Type -> m ClashDoc
+pprParendType :: (Monad m) => Type -> m ClashDoc
 pprParendType = ppr_type TyConPrec
 
-ppr_type :: Monad m => TypePrec -> Type -> m ClashDoc
-ppr_type _ (VarTy tv)                   = pprM tv
-ppr_type _ (LitTy tyLit)                = pprM tyLit
-ppr_type p ty@(ForAllTy {})             = pprForAllType p ty
-ppr_type p (ConstTy (TyCon tc))         = pprTcApp p ppr_type tc []
-ppr_type p (AnnType _ann typ)           = ppr_type p typ
+ppr_type :: (Monad m) => TypePrec -> Type -> m ClashDoc
+ppr_type _ (VarTy tv) = pprM tv
+ppr_type _ (LitTy tyLit) = pprM tyLit
+ppr_type p ty@(ForAllTy{}) = pprForAllType p ty
+ppr_type p (ConstTy (TyCon tc)) = pprTcApp p ppr_type tc []
+ppr_type p (AnnType _ann typ) = ppr_type p typ
 ppr_type p (tyView -> TyConApp tc args) = pprTcApp p ppr_type tc args
-ppr_type p (tyView -> FunTy ty1 ty2)
-  = pprArrowChain <$> ppr_type FunPrec ty1 <:> pprFunTail ty2
-  where
-    pprFunTail (tyView -> FunTy ty1' ty2')
-      = ppr_type FunPrec ty1' <:> pprFunTail ty2'
-    pprFunTail otherTy
-      = ppr_type TopPrec otherTy <:> pure []
+ppr_type p (tyView -> FunTy ty1 ty2) =
+  pprArrowChain <$> ppr_type FunPrec ty1 <:> pprFunTail ty2
+ where
+  pprFunTail (tyView -> FunTy ty1' ty2') =
+    ppr_type FunPrec ty1' <:> pprFunTail ty2'
+  pprFunTail otherTy =
+    ppr_type TopPrec otherTy <:> pure []
 
-    pprArrowChain []
-      = emptyDoc
-    pprArrowChain (arg:args)
-      = maybeParen p FunPrec $ sep [arg, sep (map (rarrow <+>) args)]
-
-ppr_type p (AppTy ty1 ty2) = maybeParen p TyConPrec <$> ((<+>) <$> pprType ty1
-                                                               <*> ppr_type TyConPrec ty2)
+  pprArrowChain [] =
+    emptyDoc
+  pprArrowChain (arg : args) =
+    maybeParen p FunPrec $ sep [arg, sep (map (rarrow <+>) args)]
+ppr_type p (AppTy ty1 ty2) =
+  maybeParen p TyConPrec
+    <$> ( (<+>)
+            <$> pprType ty1
+            <*> ppr_type TyConPrec ty2
+        )
 ppr_type _ (ConstTy Arrow) = return (parens rarrow)
 
-pprForAllType :: Monad m => TypePrec -> Type -> m ClashDoc
+pprForAllType :: (Monad m) => TypePrec -> Type -> m ClashDoc
 pprForAllType p ty = maybeParen p FunPrec <$> pprSigmaType True ty
 
-pprSigmaType :: Monad m => Bool -> Type -> m ClashDoc
+pprSigmaType :: (Monad m) => Bool -> Type -> m ClashDoc
 pprSigmaType showForalls ty = do
-    (tvs, rho)     <- split1 [] ty
-    sep <$> sequenceA [ if showForalls then pprForAll tvs else pure emptyDoc
-                      , pprType rho
-                      ]
-  where
-    split1 tvs (ForAllTy tv resTy) = split1 (tv:tvs) resTy
-    split1 tvs resTy               = return (reverse tvs,resTy)
+  (tvs, rho) <- split1 [] ty
+  sep
+    <$> sequenceA
+      [ if showForalls then pprForAll tvs else pure emptyDoc
+      , pprType rho
+      ]
+ where
+  split1 tvs (ForAllTy tv resTy) = split1 (tv : tvs) resTy
+  split1 tvs resTy = return (reverse tvs, resTy)
 
-pprForAll :: Monad m => [TyVar] -> m ClashDoc
-pprForAll []  = return emptyDoc
+pprForAll :: (Monad m) => [TyVar] -> m ClashDoc
+pprForAll [] = return emptyDoc
 pprForAll tvs = do
   tvs' <- mapM pprTvBndr tvs
   return $ forall_ <+> sep tvs' <> dot
 
-pprTvBndr :: Monad m => TyVar -> m ClashDoc
+pprTvBndr :: (Monad m) => TyVar -> m ClashDoc
 pprTvBndr tv = do
-  tv'   <- pprM tv
+  tv' <- pprM tv
   kind' <- pprKind (varType tv)
   return $ tyParens $ tv' <> (annotate (AnnSyntax Type) $ space <> dcolon <+> kind')
 
-pprKind :: Monad m => Kind -> m ClashDoc
+pprKind :: (Monad m) => Kind -> m ClashDoc
 pprKind = pprType
 
-pprTcApp :: Monad m => TypePrec -> (TypePrec -> Type -> m ClashDoc)
-  -> TyConName -> [Type] -> m ClashDoc
+pprTcApp ::
+  (Monad m) =>
+  TypePrec ->
+  (TypePrec -> Type -> m ClashDoc) ->
+  TyConName ->
+  [Type] ->
+  m ClashDoc
 pprTcApp p pp tc tys
-  | null tys
-  = pprM tc
-
-  | isTupleTyConLike tc
-  = do tys' <- mapM (pp TopPrec) tys
-       return $ parens $ sep $ punctuate comma tys'
-
+  | null tys =
+      pprM tc
+  | isTupleTyConLike tc =
+      do
+        tys' <- mapM (pp TopPrec) tys
+        return $ parens $ sep $ punctuate comma tys'
   | isSym
-  , [ty1, ty2] <- tys
-  = do ty1' <- pp FunPrec ty1
-       ty2' <- pp FunPrec ty2
-       tc' <- pprM tc
-       return $ maybeParen p FunPrec $
-         sep [ty1', enclose "`" "`" tc' <+> ty2']
-
-  | otherwise
-  = do tys' <- mapM (pp TyConPrec) tys
-       tc' <- parensIf isSym <$> pprM tc
-       return $ maybeParen p TyConPrec $
-         hang 2 $ sep (tc':tys')
-
-  where isSym = isSymName tc
+  , [ty1, ty2] <- tys =
+      do
+        ty1' <- pp FunPrec ty1
+        ty2' <- pp FunPrec ty2
+        tc' <- pprM tc
+        return $
+          maybeParen p FunPrec $
+            sep [ty1', enclose "`" "`" tc' <+> ty2']
+  | otherwise =
+      do
+        tys' <- mapM (pp TyConPrec) tys
+        tc' <- parensIf isSym <$> pprM tc
+        return $
+          maybeParen p TyConPrec $
+            hang 2 $
+              sep (tc' : tys')
+ where
+  isSym = isSymName tc
 
 isSymName :: Name a -> Bool
 isSymName n = go (nameOcc n)
-  where
-    go s | T.null s           = False
-         | isUpper $ T.head s = isLexConSym s
-         | otherwise          = isLexSym s
+ where
+  go s
+    | T.null s = False
+    | isUpper $ T.head s = isLexConSym s
+    | otherwise = isLexSym s
 
 isLexSym :: Text -> Bool
 isLexSym cs = isLexConSym cs || isLexVarSym cs
 
 isLexConSym :: Text -> Bool
 isLexConSym "->" = True
-isLexConSym cs   = startsConSym (T.head cs)
+isLexConSym cs = startsConSym (T.head cs)
 
 isLexVarSym :: Text -> Bool
 isLexVarSym cs = startsVarSym (T.head cs)

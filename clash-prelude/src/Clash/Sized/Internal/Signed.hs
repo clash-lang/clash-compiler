@@ -1,11 +1,3 @@
-{-|
-Copyright  :  (C) 2013-2016, University of Twente,
-                  2016     , Myrtle Software Ltd,
-                  2021-2025, QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -14,113 +6,144 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 {-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_HADDOCK show-extensions not-home #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_HADDOCK show-extensions not-home #-}
 
-module Clash.Sized.Internal.Signed
-  ( -- * Datatypes
-    Signed (..)
-    -- * Accessors
-    -- ** Length information
-  , size#
-    -- * Type classes
-    -- ** BitPack
-  , pack#
-  , unpack#
-    -- ** Eq
-  , eq#
-  , neq#
-    -- ** Ord
-  , lt#
-  , ge#
-  , gt#
-  , le#
-    -- ** Enum
-  , toEnum#
-  , fromEnum#
-    -- ** Enum (not synthesizable)
-  , enumFrom#
-  , enumFromThen#
-  , enumFromTo#
-  , enumFromThenTo#
-    -- ** Bounded
-  , minBound#
-  , maxBound#
-    -- ** Num
-  , (+#)
-  , (-#)
-  , (*#)
-  , negate#
-  , abs#
-  , fromInteger#
-    -- ** ExtendingNum
-  , plus#
-  , minus#
-  , times#
-    -- ** Integral
-  , quot#
-  , rem#
-  , div#
-  , mod#
-  , toInteger#
-    -- ** Bits
-  , and#
-  , or#
-  , xor#
-  , complement#
-  , shiftL#
-  , shiftR#
-  , rotateL#
-  , rotateR#
-    -- ** Resize
-  , resize#
-  , truncateB#
-    -- ** SaturatingNum
-  , minBoundSym#
-  )
+{- |
+Copyright  :  (C) 2013-2016, University of Twente,
+                  2016     , Myrtle Software Ltd,
+                  2021-2025, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+module Clash.Sized.Internal.Signed (
+  -- * Datatypes
+  Signed (..),
+
+  -- * Accessors
+
+  -- ** Length information
+  size#,
+
+  -- * Type classes
+
+  -- ** BitPack
+  pack#,
+  unpack#,
+
+  -- ** Eq
+  eq#,
+  neq#,
+
+  -- ** Ord
+  lt#,
+  ge#,
+  gt#,
+  le#,
+
+  -- ** Enum
+  toEnum#,
+  fromEnum#,
+
+  -- ** Enum (not synthesizable)
+  enumFrom#,
+  enumFromThen#,
+  enumFromTo#,
+  enumFromThenTo#,
+
+  -- ** Bounded
+  minBound#,
+  maxBound#,
+
+  -- ** Num
+  (+#),
+  (-#),
+  (*#),
+  negate#,
+  abs#,
+  fromInteger#,
+
+  -- ** ExtendingNum
+  plus#,
+  minus#,
+  times#,
+
+  -- ** Integral
+  quot#,
+  rem#,
+  div#,
+  mod#,
+  toInteger#,
+
+  -- ** Bits
+  and#,
+  or#,
+  xor#,
+  complement#,
+  shiftL#,
+  shiftR#,
+  rotateL#,
+  rotateR#,
+
+  -- ** Resize
+  resize#,
+  truncateB#,
+
+  -- ** SaturatingNum
+  minBoundSym#,
+)
 where
 
-import Prelude hiding                 (odd, even)
+import Prelude hiding (even, odd)
 
-import Control.DeepSeq                (NFData (..))
-import Control.Lens                   (Index, Ixed (..), IxValue)
-import Data.Bits                      (Bits (..), FiniteBits (..))
-import Data.Data                      (Data)
-import Data.Default                   (Default (..))
-import Data.Proxy                     (Proxy (..))
-import Text.Read                      (Read (..), ReadPrec)
-import Text.Printf                    (PrintfArg (..), printf)
-import GHC.Generics                   (Generic)
-import GHC.Natural                    (naturalFromInteger, naturalToInteger)
+import Control.DeepSeq (NFData (..))
+import Control.Lens (Index, IxValue, Ixed (..))
+import Data.Bits (Bits (..), FiniteBits (..))
+import Data.Data (Data)
+import Data.Default (Default (..))
+import Data.Proxy (Proxy (..))
+import GHC.Generics (Generic)
+import GHC.Natural (naturalFromInteger, naturalToInteger)
+import Text.Printf (PrintfArg (..), printf)
+import Text.Read (Read (..), ReadPrec)
 
-import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
-import GHC.TypeLits.Extra             (Max)
-import Data.Ix                        (Ix(..))
-import Language.Haskell.TH            (appT, conT, litT, numTyLit, sigE)
-import Language.Haskell.TH.Syntax     (Lift(..))
+import Data.Ix (Ix (..))
+import GHC.TypeLits (KnownNat, Nat, natVal, type (+))
+import GHC.TypeLits.Extra (Max)
+import Language.Haskell.TH (Quote, Type, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Compat
-import Language.Haskell.TH            (Quote, Type)
-import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
-                                       arbitraryBoundedIntegral,
-                                       coarbitraryIntegral, shrinkIntegral)
+import Language.Haskell.TH.Syntax (Lift (..))
+import Test.QuickCheck.Arbitrary (
+  Arbitrary (..),
+  CoArbitrary (..),
+  arbitraryBoundedIntegral,
+  coarbitraryIntegral,
+  shrinkIntegral,
+ )
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.BitPack            (BitPack (..), packXWith)
-import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
-                                       SaturationMode (..))
-import Clash.Class.Parity             (Parity (..))
-import Clash.Class.Resize             (Resize (..))
-import Clash.Class.BitPack.BitIndex   ((!), msb, replaceBit, split)
+import Clash.Class.BitPack (BitPack (..), packXWith)
+import Clash.Class.BitPack.BitIndex (msb, replaceBit, split, (!))
 import Clash.Class.BitPack.BitReduction (reduceAnd, reduceOr)
-import Clash.Promoted.Nat             (natToNatural)
-import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low, undefError)
+import Clash.Class.Num (
+  ExtendingNum (..),
+  SaturatingNum (..),
+  SaturationMode (..),
+ )
+import Clash.Class.Parity (Parity (..))
+import Clash.Class.Resize (Resize (..))
+import Clash.Promoted.Nat (natToNatural)
+import Clash.Sized.Internal.BitVector (Bit, BitVector (BV), high, low, undefError, (++#))
 import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.XException
-  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
+import Clash.XException (
+  NFDataX (..),
+  ShowX (..),
+  errorX,
+  rwhnfX,
+  showsPrecXWith,
+ )
 
 {- $setup
 >>> :m -Prelude
@@ -129,59 +152,61 @@ import Clash.XException
 
 type role Signed nominal
 
--- | Arbitrary-width signed integer represented by @n@ bits, including the sign
--- bit
---
--- Uses standard 2-complements representation. Meaning that, given @n@ bits,
--- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1] for
--- @n > 0@. When @n = 0@, both the min and max bound are 0.
---
--- * __NB__: The usual Haskell method of converting an integral numeric type to
--- another, 'fromIntegral', is not well suited for Clash as it will go through
--- 'Integer' which is arbitrarily bounded in HDL. Instead use
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
--- * __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
--- saturation on overflow, check out the 'SaturatingNum' class.
---
--- >>>  maxBound :: Signed 3
--- 3
--- >>> minBound :: Signed 3
--- -4
--- >>> read (show (minBound :: Signed 3)) :: Signed 3
--- -4
--- >>> 1 + 2 :: Signed 3
--- 3
--- >>> 2 + 3 :: Signed 3
--- -3
--- >>> (-2) + (-3) :: Signed 3
--- 3
--- >>> 2 * 3 :: Signed 4
--- 6
--- >>> 2 * 4 :: Signed 4
--- -8
--- >>> (2 :: Signed 3) `mul` (4 :: Signed 4) :: Signed 7
--- 8
--- >>> (2 :: Signed 3) `add` (3 :: Signed 3) :: Signed 4
--- 5
--- >>> (-2 :: Signed 3) `add` (-3 :: Signed 3) :: Signed 4
--- -5
--- >>> satAdd SatSymmetric 2 3 :: Signed 3
--- 3
--- >>> satAdd SatSymmetric (-2) (-3) :: Signed 3
--- -3
---
--- Signed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
---
--- >>> :i Signed
--- type role Signed nominal
--- ...
---
--- as it is not safe to coerce between different width Signed. To change the
--- width, use the functions in the 'Clash.Class.Resize.Resize' class.
-data Signed (n :: Nat) =
-    -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
-    -- synthesizable.
-    S { unsafeToInteger :: !Integer}
+{- | Arbitrary-width signed integer represented by @n@ bits, including the sign
+bit
+
+Uses standard 2-complements representation. Meaning that, given @n@ bits,
+a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1] for
+@n > 0@. When @n = 0@, both the min and max bound are 0.
+
+* __NB__: The usual Haskell method of converting an integral numeric type to
+another, 'fromIntegral', is not well suited for Clash as it will go through
+'Integer' which is arbitrarily bounded in HDL. Instead use
+'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+* __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
+saturation on overflow, check out the 'SaturatingNum' class.
+
+>>>  maxBound :: Signed 3
+3
+>>> minBound :: Signed 3
+-4
+>>> read (show (minBound :: Signed 3)) :: Signed 3
+-4
+>>> 1 + 2 :: Signed 3
+3
+>>> 2 + 3 :: Signed 3
+-3
+>>> (-2) + (-3) :: Signed 3
+3
+>>> 2 * 3 :: Signed 4
+6
+>>> 2 * 4 :: Signed 4
+-8
+>>> (2 :: Signed 3) `mul` (4 :: Signed 4) :: Signed 7
+8
+>>> (2 :: Signed 3) `add` (3 :: Signed 3) :: Signed 4
+5
+>>> (-2 :: Signed 3) `add` (-3 :: Signed 3) :: Signed 4
+-5
+>>> satAdd SatSymmetric 2 3 :: Signed 3
+3
+>>> satAdd SatSymmetric (-2) (-3) :: Signed 3
+-3
+
+Signed has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
+
+>>> :i Signed
+type role Signed nominal
+...
+
+as it is not safe to coerce between different width Signed. To change the
+width, use the functions in the 'Clash.Class.Resize.Resize' class.
+-}
+data Signed (n :: Nat)
+  = {- | The constructor, 'S', and the field, 'unsafeToInteger', are not
+    synthesizable.
+    -}
+    S {unsafeToInteger :: !Integer}
   deriving (Data, Generic)
 
 {-# ANN S hasBlackBox #-}
@@ -193,14 +218,15 @@ instance NFDataX (Signed n) where
 
 {-# OPAQUE size# #-}
 {-# ANN size# hasBlackBox #-}
-size# :: KnownNat n => Signed n -> Int
+size# :: (KnownNat n) => Signed n -> Int
 size# bv = fromInteger (natVal bv)
 
 instance NFData (Signed n) where
   rnf (S i) = rnf i `seq` ()
   {-# NOINLINE rnf #-}
-  -- NOINLINE is needed so that Clash doesn't trip on the "Signed ~# Integer"
-  -- coercion
+
+-- NOINLINE is needed so that Clash doesn't trip on the "Signed ~# Integer"
+-- coercion
 
 instance Show (Signed n) where
   show (S i) = show i
@@ -210,27 +236,28 @@ instance ShowX (Signed n) where
   showsPrecX = showsPrecXWith showsPrec
 
 -- | None of the 'Read' class' methods are synthesizable.
-instance KnownNat n => Read (Signed n) where
+instance (KnownNat n) => Read (Signed n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Integer)
 
-instance KnownNat n => BitPack (Signed n) where
+instance (KnownNat n) => BitPack (Signed n) where
   type BitSize (Signed n) = n
-  pack   = packXWith pack#
+  pack = packXWith pack#
   unpack = unpack#
 
 {-# OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}
-pack# :: forall n . KnownNat n => Signed n -> BitVector n
-pack# (S i) = let m = 1 `shiftL0` fromInteger (natVal (Proxy @n))
-              in  if i < 0 then BV 0 (naturalFromInteger (m + i)) else BV 0 (naturalFromInteger i)
+pack# :: forall n. (KnownNat n) => Signed n -> BitVector n
+pack# (S i) =
+  let m = 1 `shiftL0` fromInteger (natVal (Proxy @n))
+   in if i < 0 then BV 0 (naturalFromInteger (m + i)) else BV 0 (naturalFromInteger i)
 
 {-# OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
-unpack# :: forall n . KnownNat n => BitVector n -> Signed n
+unpack# :: forall n. (KnownNat n) => BitVector n -> Signed n
 unpack# (BV 0 i) =
   let m = 1 `shiftL0` fromInteger (natVal (Proxy @n) - 1)
       n = naturalToInteger i
-  in  if n >= m then S (n-2*m) else S n
+   in if n >= m then S (n - 2 * m) else S n
 unpack# bv = undefError "Signed.unpack" [bv]
 
 instance Eq (Signed n) where
@@ -248,12 +275,12 @@ neq# :: Signed n -> Signed n -> Bool
 neq# (S v1) (S v2) = v1 /= v2
 
 instance Ord (Signed n) where
-  (<)  = lt#
+  (<) = lt#
   (>=) = ge#
-  (>)  = gt#
+  (>) = gt#
   (<=) = le#
 
-lt#,ge#,gt#,le# :: Signed n -> Signed n -> Bool
+lt#, ge#, gt#, le# :: Signed n -> Signed n -> Bool
 {-# OPAQUE lt# #-}
 {-# ANN lt# hasBlackBox #-}
 lt# (S n) (S m) = n < m
@@ -267,50 +294,65 @@ gt# (S n) (S m) = n > m
 {-# ANN le# hasBlackBox #-}
 le# (S n) (S m) = n <= m
 
--- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
--- 'enumFromThenTo', are not synthesizable.
-instance KnownNat n => Enum (Signed n) where
+{- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
+'enumFromThenTo', are not synthesizable.
+-}
+instance (KnownNat n) => Enum (Signed n) where
   succ n
     | n == maxBound =
-        error $ "'succ' was called on (" <> show @(Signed n) maxBound <> " :: "
-             <> "Signed " <> show (natToNatural @n) <> ") and caused an "
-             <> "overflow. Use 'satSucc' and specify a SaturationMode if you "
-             <> "need other behavior."
+        error $
+          "'succ' was called on ("
+            <> show @(Signed n) maxBound
+            <> " :: "
+            <> "Signed "
+            <> show (natToNatural @n)
+            <> ") and caused an "
+            <> "overflow. Use 'satSucc' and specify a SaturationMode if you "
+            <> "need other behavior."
     | otherwise = n +# fromInteger# 1
 
   pred n
     | n == minBound =
-        error $ "'pred' was called on (" <> show @(Signed n) maxBound <> " :: "
-             <> "Signed " <> show (natToNatural @n) <> ") and caused an "
-             <> "underflow. Use 'satPred' and specify a SaturationMode if you "
-             <> "need other behavior."
+        error $
+          "'pred' was called on ("
+            <> show @(Signed n) maxBound
+            <> " :: "
+            <> "Signed "
+            <> show (natToNatural @n)
+            <> ") and caused an "
+            <> "underflow. Use 'satPred' and specify a SaturationMode if you "
+            <> "need other behavior."
     | otherwise = n -# fromInteger# 1
 
-  toEnum         = toEnum#
-  fromEnum       = fromEnum#
-  enumFrom       = enumFrom#
-  enumFromThen   = enumFromThen#
-  enumFromTo     = enumFromTo#
+  toEnum = toEnum#
+  fromEnum = fromEnum#
+  enumFrom = enumFrom#
+  enumFromThen = enumFromThen#
+  enumFromTo = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
-toEnum# :: forall n. KnownNat n => Int -> Signed n
+toEnum# :: forall n. (KnownNat n) => Int -> Signed n
 toEnum# = fromInteger# . toInteger
 {-# OPAQUE toEnum# #-}
 {-# ANN toEnum# hasBlackBox #-}
 
-fromEnum# :: forall n. KnownNat n => Signed n -> Int
+fromEnum# :: forall n. (KnownNat n) => Signed n -> Int
 fromEnum# = fromEnum . toInteger#
 {-# OPAQUE fromEnum# #-}
 {-# ANN fromEnum# hasBlackBox #-}
 
-enumFrom# :: forall n. KnownNat n => Signed n -> [Signed n]
-enumFrom# x = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+enumFrom# :: forall n. (KnownNat n) => Signed n -> [Signed n]
+enumFrom# x =
+  map
+    (fromInteger_INLINE sz mB mask)
+    [unsafeToInteger x .. unsafeToInteger (maxBound :: Signed n)]
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 {-# OPAQUE enumFrom# #-}
 
-enumFromThen# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromThen# :: forall n. (KnownNat n) => Signed n -> Signed n -> [Signed n]
 enumFromThen# x y =
   toSigneds [unsafeToInteger x, unsafeToInteger y .. unsafeToInteger bound]
  where
@@ -321,26 +363,30 @@ enumFromThen# x y =
   mask = mB - 1
 {-# OPAQUE enumFromThen# #-}
 
-enumFromTo# :: forall n. KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromTo# :: forall n. (KnownNat n) => Signed n -> Signed n -> [Signed n]
 enumFromTo# x y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x .. unsafeToInteger y]
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 {-# OPAQUE enumFromTo# #-}
 
-enumFromThenTo# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
-enumFromThenTo# x1 x2 y = map (fromInteger_INLINE sz mB mask) [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+enumFromThenTo# :: forall n. (KnownNat n) => Signed n -> Signed n -> Signed n -> [Signed n]
+enumFromThenTo# x1 x2 y =
+  map
+    (fromInteger_INLINE sz mB mask)
+    [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 {-# OPAQUE enumFromThenTo# #-}
 
-
-instance KnownNat n => Bounded (Signed n) where
+instance (KnownNat n) => Bounded (Signed n) where
   minBound = minBound#
   maxBound = maxBound#
 
-minBound# :: forall n. KnownNat n => Signed n
+minBound# :: forall n. (KnownNat n) => Signed n
 minBound# =
   case natToNatural @n of
     0 -> 0
@@ -348,7 +394,7 @@ minBound# =
 {-# OPAQUE minBound# #-}
 {-# ANN minBound# hasBlackBox #-}
 
-maxBound# :: forall n. KnownNat n => Signed n
+maxBound# :: forall n. (KnownNat n) => Signed n
 maxBound# =
   case natToNatural @n of
     0 -> 0
@@ -356,96 +402,107 @@ maxBound# =
 {-# OPAQUE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
--- | Operators do @wrap-around@ on overflow
---
--- __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
--- 'Integer' is arbitrarily bounded during synthesis.  Prefer
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
-instance KnownNat n => Num (Signed n) where
-  (+)         = (+#)
-  (-)         = (-#)
-  (*)         = (*#)
-  negate      = negate#
-  abs         = abs#
-  signum s    = if s < 0 then (-1) else
-                   if s > 0 then 1 else 0
+{- | Operators do @wrap-around@ on overflow
+
+__NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
+'Integer' is arbitrarily bounded during synthesis.  Prefer
+'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-}
+instance (KnownNat n) => Num (Signed n) where
+  (+) = (+#)
+  (-) = (-#)
+  (*) = (*#)
+  negate = negate#
+  abs = abs#
+  signum s =
+    if s < 0
+      then (-1)
+      else
+        if s > 0 then 1 else 0
   fromInteger = fromInteger#
 
-(+#), (-#), (*#) :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
+(+#), (-#), (*#) :: forall n. (KnownNat n) => Signed n -> Signed n -> Signed n
 {-# OPAQUE (+#) #-}
 {-# ANN (+#) hasBlackBox #-}
 (+#) =
   \(S a) (S b) ->
     let z = a + b
-    in  if z >= m then
-          S (z - 2*m)
-        else if z < negate m then
-          S (z + 2*m)
-        else
-          S z
+     in if z >= m
+          then
+            S (z - 2 * m)
+          else
+            if z < negate m
+              then
+                S (z + 2 * m)
+              else
+                S z
  where
-  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
-
+  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) - 1)
 {-# OPAQUE (-#) #-}
 {-# ANN (-#) hasBlackBox #-}
 (-#) =
   \(S a) (S b) ->
     let z = a - b
-    in  if z < negate m then
-          S (z + 2*m)
-        else if z >= m then
-          S (z - 2*m)
-        else
-          S z
+     in if z < negate m
+          then
+            S (z + 2 * m)
+          else
+            if z >= m
+              then
+                S (z - 2 * m)
+              else
+                S z
  where
-  m  = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
-
+  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) - 1)
 {-# OPAQUE (*#) #-}
 {-# ANN (*#) hasBlackBox #-}
 (*#) = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a * b)
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 
-negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
+negate#, abs# :: forall n. (KnownNat n) => Signed n -> Signed n
 {-# OPAQUE negate# #-}
 {-# ANN negate# hasBlackBox #-}
 negate# =
   \(S n) ->
     let z = negate n
-    in  if z == m then S n else S z
+     in if z == m then S n else S z
  where
-  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
-
+  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) - 1)
 {-# OPAQUE abs# #-}
 {-# ANN abs# hasBlackBox #-}
 abs# =
   \(S n) ->
     let z = abs n
-    in  if z == m then S n else S z
+     in if z == m then S n else S z
  where
-  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) -1)
+  m = 1 `shiftL0` fromInteger (natVal (Proxy @n) - 1)
 
 {-# OPAQUE fromInteger# #-}
 {-# ANN fromInteger# hasBlackBox #-}
-fromInteger# :: forall n . KnownNat n => Integer -> Signed (n :: Nat)
+fromInteger# :: forall n. (KnownNat n) => Integer -> Signed (n :: Nat)
 fromInteger# = fromInteger_INLINE sz mB mask
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 
 {-# INLINE fromInteger_INLINE #-}
 fromInteger_INLINE :: Int -> Integer -> Integer -> Integer -> Signed n
 fromInteger_INLINE sz mb mask =
-  \i -> let i1 = i .&. mask
-            i2 = case i `shiftR` sz of
-                   q | q .&. 1 == 0 -> i1
-                     | otherwise    -> i1 - mb
-        in  if sz < 0 then S 0 else S i2
+  \i ->
+    let i1 = i .&. mask
+        i2 = case i `shiftR` sz of
+          q
+            | q .&. 1 == 0 -> i1
+            | otherwise -> i1 - mb
+     in if sz < 0 then S 0 else S i2
 
 instance ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
-  add  = plus#
+  add = plus#
   sub = minus#
   type MResult (Signed m) (Signed n) = Signed (m + n)
   mul = times#
@@ -454,7 +511,6 @@ plus#, minus# :: Signed m -> Signed n -> Signed (Max m n + 1)
 {-# OPAQUE plus# #-}
 {-# ANN plus# hasBlackBox #-}
 plus# (S a) (S b) = S (a + b)
-
 {-# OPAQUE minus# #-}
 {-# ANN minus# hasBlackBox #-}
 minus# (S a) (S b) = S (a - b)
@@ -464,24 +520,25 @@ minus# (S a) (S b) = S (a - b)
 times# :: Signed m -> Signed n -> Signed (m + n)
 times# (S a) (S b) = S (a * b)
 
-instance KnownNat n => Real (Signed n) where
+instance (KnownNat n) => Real (Signed n) where
   toRational = toRational . toInteger#
 
--- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
--- 'Integer' is arbitrarily bounded during synthesis.  Prefer
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
-instance KnownNat n => Integral (Signed n) where
-  quot        = quot#
-  rem         = rem#
-  div         = div#
-  mod         = mod#
-  quotRem n d = (n `quot#` d,n `rem#` d)
-  divMod  n d = (n `div#`  d,n `mod#` d)
-  toInteger   = toInteger#
+{- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
+'Integer' is arbitrarily bounded during synthesis.  Prefer
+'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-}
+instance (KnownNat n) => Integral (Signed n) where
+  quot = quot#
+  rem = rem#
+  div = div#
+  mod = mod#
+  quotRem n d = (n `quot#` d, n `rem#` d)
+  divMod n d = (n `div#` d, n `mod#` d)
+  toInteger = toInteger#
 
 {-# OPAQUE quot# #-}
 {-# ANN quot# hasBlackBox #-}
-quot# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
+quot# :: forall n. (KnownNat n) => Signed n -> Signed n -> Signed n
 quot# (S a) (S b)
   | a == minB && b == (-1) = S minB
   | otherwise = S (a `quot` b)
@@ -495,7 +552,7 @@ rem# (S a) (S b) = S (a `rem` b)
 
 {-# OPAQUE div# #-}
 {-# ANN div# hasBlackBox #-}
-div# :: forall n. KnownNat n => Signed n -> Signed n -> Signed n
+div# :: forall n. (KnownNat n) => Signed n -> Signed n -> Signed n
 div# (S a) (S b)
   | a == minB && b == (-1) = S minB
   | otherwise = S (a `div` b)
@@ -512,207 +569,213 @@ mod# (S a) (S b) = S (a `mod` b)
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
 
-instance KnownNat n => PrintfArg (Signed n) where
+instance (KnownNat n) => PrintfArg (Signed n) where
   formatArg = formatArg . toInteger
 
-instance KnownNat n => Parity (Signed n) where
+instance (KnownNat n) => Parity (Signed n) where
   even = even . pack
   odd = odd . pack
 
--- | @'shiftR' a n@:
---
--- * Returns 0 if @a >= 0@ and @n >= 'bitSize' a@
--- * Returns -1 if @a < 0@ and @n >= 'bitSize' a@
--- * 'Clash.XException.XException' if @n < 0@
-instance KnownNat n => Bits (Signed n) where
-  (.&.)             = and#
-  (.|.)             = or#
-  xor               = xor#
-  complement        = complement#
-  zeroBits          = 0
-  bit i             = replaceBit i high 0
-  setBit v i        = replaceBit i high v
-  clearBit v i      = replaceBit i low  v
-  complementBit v i = replaceBit i (BV.complement## (v ! i)) v
-  testBit v i       = v ! i == 1
-  bitSizeMaybe v    = Just (size# v)
-  bitSize           = size#
-  isSigned _        = True
-  shiftL v i        = shiftL# v i
-  shiftR v i        = shiftR# v i
-  rotateL v i       = rotateL# v i
-  rotateR v i       = rotateR# v i
-  popCount s        = popCount (pack# s)
+{- | @'shiftR' a n@:
 
-and#,or#,xor# :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
+* Returns 0 if @a >= 0@ and @n >= 'bitSize' a@
+* Returns -1 if @a < 0@ and @n >= 'bitSize' a@
+* 'Clash.XException.XException' if @n < 0@
+-}
+instance (KnownNat n) => Bits (Signed n) where
+  (.&.) = and#
+  (.|.) = or#
+  xor = xor#
+  complement = complement#
+  zeroBits = 0
+  bit i = replaceBit i high 0
+  setBit v i = replaceBit i high v
+  clearBit v i = replaceBit i low v
+  complementBit v i = replaceBit i (BV.complement## (v ! i)) v
+  testBit v i = v ! i == 1
+  bitSizeMaybe v = Just (size# v)
+  bitSize = size#
+  isSigned _ = True
+  shiftL v i = shiftL# v i
+  shiftR v i = shiftR# v i
+  rotateL v i = rotateL# v i
+  rotateR v i = rotateR# v i
+  popCount s = popCount (pack# s)
+
+and#, or#, xor# :: forall n. (KnownNat n) => Signed n -> Signed n -> Signed n
 {-# OPAQUE and# #-}
 {-# ANN and# hasBlackBox #-}
 and# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .&. b)
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
-
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 {-# OPAQUE or# #-}
 {-# ANN or# hasBlackBox #-}
 or# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (a .|. b)
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
-
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 {-# OPAQUE xor# #-}
 {-# ANN xor# hasBlackBox #-}
 xor# = \(S a) (S b) -> fromInteger_INLINE sz mB mask (xor a b)
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 
 {-# OPAQUE complement# #-}
 {-# ANN complement# hasBlackBox #-}
-complement# :: forall n . KnownNat n => Signed n -> Signed n
+complement# :: forall n. (KnownNat n) => Signed n -> Signed n
 complement# = \(S a) -> fromInteger_INLINE sz mB mask (complement a)
-  where sz   = fromInteger (natVal (Proxy @n)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+ where
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 
-shiftL#,shiftR#,rotateL#,rotateR# :: forall n . KnownNat n => Signed n -> Int -> Signed n
+shiftL#, shiftR#, rotateL#, rotateR# :: forall n. (KnownNat n) => Signed n -> Int -> Signed n
 {-# OPAQUE shiftL# #-}
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(S n) b ->
-  if | b < 0     -> error $ "'shiftL' undefined for negative number: " ++ show b
-     | b > sz    -> S 0
-     | otherwise -> fromInteger_INLINE sz mB mask (shiftL n b)
+  if
+    | b < 0 -> error $ "'shiftL' undefined for negative number: " ++ show b
+    | b > sz -> S 0
+    | otherwise -> fromInteger_INLINE sz mB mask (shiftL n b)
  where
-  sz   = fromInteger (natVal (Proxy @n)) - 1
-  mB   = 1 `shiftL` sz
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
   mask = mB - 1
-
 {-# OPAQUE shiftR# #-}
 {-# ANN shiftR# hasBlackBox #-}
 shiftR# =
   \(S n) b ->
-    if b >= 0 then
-      fromInteger_INLINE sz mB mask (shiftR n b)
-    else
-      error $ "'shiftR' undefined for negative number: " ++ show b
+    if b >= 0
+      then
+        fromInteger_INLINE sz mB mask (shiftR n b)
+      else
+        error $ "'shiftR' undefined for negative number: " ++ show b
  where
-  sz   = fromInteger (natVal (Proxy @n)) - 1
-  mB   = 1 `shiftL` sz
+  sz = fromInteger (natVal (Proxy @n)) - 1
+  mB = 1 `shiftL` sz
   mask = mB - 1
-
 {-# OPAQUE rotateL# #-}
 {-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(S n) b ->
-    if b >= 0 then
-      let l    = shiftL n b'
-          r    = shiftR n b'' .&. mask
-          mask = 2 ^ b' - 1
+    if b >= 0
+      then
+        let l = shiftL n b'
+            r = shiftR n b'' .&. mask
+            mask = 2 ^ b' - 1
 
-          b'   = b `mod` sz
-          b''  = sz - b'
-      in  fromInteger_INLINE sz1 mB maskM (l .|. r)
-    else
-      error $ "'rotateL undefined for negative number: " ++ show b
+            b' = b `mod` sz
+            b'' = sz - b'
+         in fromInteger_INLINE sz1 mB maskM (l .|. r)
+      else
+        error $ "'rotateL undefined for negative number: " ++ show b
  where
-  sz    = fromInteger (natVal (Proxy @n))
-  sz1   = sz-1
-  mB    = 1 `shiftL` sz1
+  sz = fromInteger (natVal (Proxy @n))
+  sz1 = sz - 1
+  mB = 1 `shiftL` sz1
   maskM = mB - 1
-
 {-# OPAQUE rotateR# #-}
 {-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(S n) b ->
-    if b >= 0 then
-      let l    = shiftR n b' .&. mask
-          r    = shiftL n b''
-          mask = 2 ^ b'' - 1
+    if b >= 0
+      then
+        let l = shiftR n b' .&. mask
+            r = shiftL n b''
+            mask = 2 ^ b'' - 1
 
-          b'  = b `mod` sz
-          b'' = sz - b'
-      in  fromInteger_INLINE sz1 mB maskM (l .|. r)
-    else
-      error $ "'rotateR' undefined for negative number: " ++ show b
+            b' = b `mod` sz
+            b'' = sz - b'
+         in fromInteger_INLINE sz1 mB maskM (l .|. r)
+      else
+        error $ "'rotateR' undefined for negative number: " ++ show b
  where
-  sz    = fromInteger (natVal (Proxy @n))
-  sz1   = sz - 1
-  mB    = 1 `shiftL` sz1
+  sz = fromInteger (natVal (Proxy @n))
+  sz1 = sz - 1
+  mB = 1 `shiftL` sz1
   maskM = mB - 1
 
-instance KnownNat n => FiniteBits (Signed n) where
-  finiteBitSize        = size#
-  countLeadingZeros  s = countLeadingZeros  (pack# s)
+instance (KnownNat n) => FiniteBits (Signed n) where
+  finiteBitSize = size#
+  countLeadingZeros s = countLeadingZeros (pack# s)
   countTrailingZeros s = countTrailingZeros (pack# s)
 
 instance Resize Signed where
-  resize       = resize#
+  resize = resize#
   zeroExtend s = unpack# (0 ++# pack s)
-  truncateB    = truncateB#
+  truncateB = truncateB#
 
 {-# OPAQUE resize# #-}
 {-# ANN resize# hasBlackBox #-}
-resize# :: forall m n . (KnownNat n, KnownNat m) => Signed n -> Signed m
+resize# :: forall m n. (KnownNat n, KnownNat m) => Signed n -> Signed m
 resize# s@(S i)
   | natToNatural @m == 0 = S 0
-  | n' <= m'  = extended
+  | n' <= m' = extended
   | otherwise = truncated
-  where
-    n  = fromInteger (natVal s)
-    n' = shiftL 1 n
-    m' = shiftL mask 1
-    extended = S i
+ where
+  n = fromInteger (natVal s)
+  n' = shiftL 1 n
+  m' = shiftL mask 1
+  extended = S i
 
-    mask      = 1 `shiftL` fromInteger (natVal (Proxy @m) -1)
-    i'        = i `mod` mask
-    truncated = if testBit i (n-1)
-                   then S (i' - mask)
-                   else S i'
+  mask = 1 `shiftL` fromInteger (natVal (Proxy @m) - 1)
+  i' = i `mod` mask
+  truncated =
+    if testBit i (n - 1)
+      then S (i' - mask)
+      else S i'
 
 {-# OPAQUE truncateB# #-}
 {-# ANN truncateB# hasBlackBox #-}
-truncateB# :: forall m n . KnownNat m => Signed (m + n) -> Signed m
+truncateB# :: forall m n. (KnownNat m) => Signed (m + n) -> Signed m
 truncateB# = \(S n) -> fromInteger_INLINE sz mB mask n
-  where sz   = fromInteger (natVal (Proxy @m)) - 1
-        mB   = 1 `shiftL` sz
-        mask = mB - 1
+ where
+  sz = fromInteger (natVal (Proxy @m)) - 1
+  mB = 1 `shiftL` sz
+  mask = mB - 1
 
-instance KnownNat n => Default (Signed n) where
+instance (KnownNat n) => Default (Signed n) where
   def = fromInteger# 0
 
-instance KnownNat n => Lift (Signed n) where
-  lift s@(S i) = sigE [| fromInteger# i |] (decSigned (natVal s))
+instance (KnownNat n) => Lift (Signed n) where
+  lift s@(S i) = sigE [|fromInteger# i|] (decSigned (natVal s))
   {-# NOINLINE lift #-}
   liftTyped = liftTypedFromUntyped
 
-decSigned :: Quote m => Integer -> m Type
+decSigned :: (Quote m) => Integer -> m Type
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
-instance KnownNat n => SaturatingNum (Signed n) where
-  satAdd SatWrap  a b = a +# b
+instance (KnownNat n) => SaturatingNum (Signed n) where
+  satAdd SatWrap a b = a +# b
   satAdd SatBound a b =
-    let r      = plus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = plus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> case msb a .&. msb b of
             0 -> maxBound#
             _ -> minBound#
   satAdd SatZero a b =
-    let r      = plus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = plus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> fromInteger# 0
   satAdd SatError a b =
-    let r      = plus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = plus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> errorX "Signed.satAdd: overflow/underflow"
   satAdd SatSymmetric a b =
-    let r      = plus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = plus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> case msb a .&. msb b of
             0 -> maxBound#
@@ -720,29 +783,29 @@ instance KnownNat n => SaturatingNum (Signed n) where
 
   satSub SatWrap a b = a -# b
   satSub SatBound a b =
-    let r      = minus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = minus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> case BV.pack# (msb a) ++# BV.pack# (msb b) of
             2 -> minBound#
             _ -> maxBound#
   satSub SatZero a b =
-    let r      = minus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = minus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> fromInteger# 0
   satSub SatError a b =
-    let r      = minus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = minus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> errorX "Signed.satSub: overflow/underflow"
   satSub SatSymmetric a b =
-    let r      = minus# a b
-        (_,r') = split r
-    in  case msb r `xor` msb r' of
+    let r = minus# a b
+        (_, r') = split r
+     in case msb r `xor` msb r' of
           0 -> unpack# r'
           _ -> case BV.pack# (msb a) ++# BV.pack# (msb b) of
             2 -> minBoundSym#
@@ -750,37 +813,41 @@ instance KnownNat n => SaturatingNum (Signed n) where
 
   satMul SatWrap a b = a *# b
   satMul SatBound a b =
-    let r        = times# a b
-        (rL,rR)  = split r
-        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
-                   reduceAnd (BV.pack# (msb rR) ++# pack rL)
-    in  case overflow of
+    let r = times# a b
+        (rL, rR) = split r
+        overflow =
+          complement (reduceOr (BV.pack# (msb rR) ++# pack rL))
+            .|. reduceAnd (BV.pack# (msb rR) ++# pack rL)
+     in case overflow of
           1 -> unpack# rR
           _ -> case msb rL of
             0 -> maxBound#
             _ -> minBound#
   satMul SatZero a b =
-    let r        = times# a b
-        (rL,rR)  = split r
-        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
-                   reduceAnd (BV.pack# (msb rR) ++# pack rL)
-    in  case overflow of
+    let r = times# a b
+        (rL, rR) = split r
+        overflow =
+          complement (reduceOr (BV.pack# (msb rR) ++# pack rL))
+            .|. reduceAnd (BV.pack# (msb rR) ++# pack rL)
+     in case overflow of
           1 -> unpack# rR
           _ -> fromInteger# 0
   satMul SatError a b =
-    let r        = times# a b
-        (rL,rR)  = split r
-        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
-                   reduceAnd (BV.pack# (msb rR) ++# pack rL)
-    in  case overflow of
+    let r = times# a b
+        (rL, rR) = split r
+        overflow =
+          complement (reduceOr (BV.pack# (msb rR) ++# pack rL))
+            .|. reduceAnd (BV.pack# (msb rR) ++# pack rL)
+     in case overflow of
           1 -> unpack# rR
           _ -> errorX "Signed.satMul: overflow/underflow"
   satMul SatSymmetric a b =
-    let r        = times# a b
-        (rL,rR)  = split r
-        overflow = complement (reduceOr (BV.pack# (msb rR) ++# pack rL)) .|.
-                   reduceAnd (BV.pack# (msb rR) ++# pack rL)
-    in  case overflow of
+    let r = times# a b
+        (rL, rR) = split r
+        overflow =
+          complement (reduceOr (BV.pack# (msb rR) ++# pack rL))
+            .|. reduceAnd (BV.pack# (msb rR) ++# pack rL)
+     in case overflow of
           1 -> unpack# rR
           _ -> case msb rL of
             0 -> maxBound#
@@ -796,35 +863,38 @@ instance KnownNat n => SaturatingNum (Signed n) where
   satPred satMode a = satAdd satMode a $ fromInteger# (-1)
   {-# INLINE satPred #-}
 
-minBoundSym# :: KnownNat n => Signed n
+minBoundSym# :: (KnownNat n) => Signed n
 minBoundSym# = minBound# +# fromInteger# 1
 
-instance KnownNat n => Arbitrary (Signed n) where
+instance (KnownNat n) => Arbitrary (Signed n) where
   arbitrary = arbitraryBoundedIntegral
-  shrink    = shrinkSizedSigned
+  shrink = shrinkSizedSigned
 
 shrinkSizedSigned :: (KnownNat n, Integral (p n)) => p n -> [p n]
-shrinkSizedSigned x | natVal x < 2 = case toInteger x of
-                                       0 -> []
-                                       _ -> [0]
-                    -- 'shrinkIntegral' uses "`quot` 2", which for sized types
-                    -- less than 2 bits wide results in a division by zero.
-                    --
-                    -- See: https://github.com/clash-lang/clash-compiler/issues/153
-                    | otherwise    = shrinkIntegral x
+shrinkSizedSigned x
+  | natVal x < 2 = case toInteger x of
+      0 -> []
+      _ -> [0]
+  -- 'shrinkIntegral' uses "`quot` 2", which for sized types
+  -- less than 2 bits wide results in a division by zero.
+  --
+  -- See: https://github.com/clash-lang/clash-compiler/issues/153
+  | otherwise = shrinkIntegral x
 {-# INLINE shrinkSizedSigned #-}
 
-instance KnownNat n => CoArbitrary (Signed n) where
+instance (KnownNat n) => CoArbitrary (Signed n) where
   coarbitrary = coarbitraryIntegral
 
-type instance Index   (Signed n) = Int
+type instance Index (Signed n) = Int
 type instance IxValue (Signed n) = Bit
-instance KnownNat n => Ixed (Signed n) where
-  ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
-                     <$> f (BV.index# (pack# s) i)
+instance (KnownNat n) => Ixed (Signed n) where
+  ix i f s =
+    unpack#
+      <$> BV.replaceBit# (pack# s) i
+      <$> f (BV.index# (pack# s) i)
 
 instance (KnownNat n) => Ix (Signed n) where
-  range (a, b) = [a..b]
+  range (a, b) = [a .. b]
   index ab@(a, b) x
     | inRange ab x = fromIntegral $ x - a
     | otherwise = error $ printf "Index (%d) out of range ((%d, %d))" x a b

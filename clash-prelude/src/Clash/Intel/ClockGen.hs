@@ -1,4 +1,8 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
+{- |
 Copyright  :  (C) 2017-2018, Google Inc
                   2019     , Myrtle Software
                   2022-2023, QBayLogic B.V.
@@ -24,51 +28,57 @@ the design from the oscillator input. There are use cases not covered by this
 simpler approach, and the [unsafe functions](#g:unsafe) are provided as a means
 to build advanced reset managers for the output domains.
 -}
+module Clash.Intel.ClockGen (
+  -- * Choosing domains
+  -- $domains
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+  -- ** Caution: actual output frequency
+  -- $caution
 
-module Clash.Intel.ClockGen
-  ( -- * Choosing domains
-    -- $domains
+  -- * Using
+  -- $using
 
-    -- ** Caution: actual output frequency
-    -- $caution
+  -- ** Example
+  -- $example
 
-    -- * Using
-    -- $using
+  -- ** Type checking errors
+  -- $error
 
-    -- ** Example
-    -- $example
+  -- * Regular functions #regular#
+  altpllSync,
+  alteraPllSync,
 
-    -- ** Type checking errors
-    -- $error
+  -- * Unsafe functions #unsafe#
+  -- $unsafe
 
-    -- * Regular functions #regular#
-    altpllSync
-  , alteraPllSync
-    -- * Unsafe functions #unsafe#
-    -- $unsafe
+  -- ** Example
+  -- $unsafe_example
+  unsafeAltpll,
+  unsafeAlteraPll,
 
-    -- ** Example
-    -- $unsafe_example
-  , unsafeAltpll
-  , unsafeAlteraPll
-    -- * Deprecated
-  , altpll
-  , alteraPll
-  ) where
+  -- * Deprecated
+  altpll,
+  alteraPll,
+) where
 
 import GHC.TypeLits (type (<=))
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Clocks
-  (Clocks(..), ClocksSync(..), ClocksSyncCxt, NumOutClocksSync)
+import Clash.Clocks (
+  Clocks (..),
+  ClocksSync (..),
+  ClocksSyncCxt,
+  NumOutClocksSync,
+ )
 import Clash.Magic (setName)
 import Clash.Promoted.Symbol (SSymbol)
-import Clash.Signal.Internal
-  (Signal, Clock, Reset, KnownDomain, HasAsynchronousReset)
+import Clash.Signal.Internal (
+  Clock,
+  HasAsynchronousReset,
+  KnownDomain,
+  Reset,
+  Signal,
+ )
 
 {- $domains
 Synthesis domains are denoted by the type-parameter
@@ -295,19 +305,20 @@ topEntity clkIn rstIn = 'Clash.Signal.exposeClockResetEnable' (register 0) clk r
 'False', hence the use of @'Clash.Signal.unsafeFromActiveLow' locked@.
 -}
 
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
--- Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
--- reference clock input and a reset input and 1 to 5 output clocks and a
--- @locked@ output.
---
--- This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
--- @locked@ output port into proper 'Reset' signals for the output domains which
--- will keep the circuit in reset while the clock is still stabilizing.
---
--- See also the [ALTPLL (Phase-Locked Loop) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_altpll.pdf)
+{- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
+\"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
+Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
+reference clock input and a reset input and 1 to 5 output clocks and a
+@locked@ output.
+
+This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
+@locked@ output port into proper 'Reset' signals for the output domains which
+will keep the circuit in reset while the clock is still stabilizing.
+
+See also the [ALTPLL (Phase-Locked Loop) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_altpll.pdf)
+-}
 altpllSync ::
-  forall t domIn .
+  forall t domIn.
   ( HasAsynchronousReset domIn
   , ClocksSyncCxt t domIn
   , NumOutClocksSync t domIn <= 5
@@ -320,25 +331,27 @@ altpllSync ::
 altpllSync clkIn rstIn =
   clocksResetSynchronizer (unsafeAltpll clkIn rstIn) clkIn
 
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
--- Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
--- reference clock input and a reset input and 1 output clock and a @locked@
--- output.
---
--- This function is deprecated because the @locked@ output is an asynchronous
--- signal. This means the user is required to add a synchronizer and as such
--- this function is unsafe. The common use case is now covered by 'altpllSync'
--- and 'unsafeAltpll' offers the functionality of this deprecated function for
--- advanced use cases.
+{- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
+\"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
+Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
+reference clock input and a reset input and 1 output clock and a @locked@
+output.
+
+This function is deprecated because the @locked@ output is an asynchronous
+signal. This means the user is required to add a synchronizer and as such
+this function is unsafe. The common use case is now covered by 'altpllSync'
+and 'unsafeAltpll' offers the functionality of this deprecated function for
+advanced use cases.
+-}
 altpll ::
-  forall domOut domIn name .
+  forall domOut domIn name.
   ( HasAsynchronousReset domIn
   , KnownDomain domOut
   ) =>
-  -- | Name of the component instance
-  --
-  -- Instantiate as follows: @(SSymbol \@\"altpll50\")@
+  {- | Name of the component instance
+
+  Instantiate as follows: @(SSymbol \@\"altpll50\")@
+  -}
   SSymbol name ->
   -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
   Clock domIn ->
@@ -348,20 +361,24 @@ altpll ::
   (Clock domOut, Signal domOut Bool)
 altpll _ = setName @name unsafeAltpll
 {-# INLINE altpll #-}
-{-# DEPRECATED altpll "This function is unsafe. Please see documentation of the function for alternatives." #-}
+{-# DEPRECATED
+  altpll
+  "This function is unsafe. Please see documentation of the function for alternatives."
+  #-}
 
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
--- Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
--- reference clock input and a reset input and 1 to 5 output clocks and a
--- @locked@ output.
---
--- __NB__: Because the clock generator reacts asynchronously to the incoming
--- reset input, the signal __must__ be glitch-free.
---
--- See also the [ALTPLL (Phase-Locked Loop) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_altpll.pdf)
+{- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
+\"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
+Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
+reference clock input and a reset input and 1 to 5 output clocks and a
+@locked@ output.
+
+__NB__: Because the clock generator reacts asynchronously to the incoming
+reset input, the signal __must__ be glitch-free.
+
+See also the [ALTPLL (Phase-Locked Loop) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/ug_altpll.pdf)
+-}
 unsafeAltpll ::
-  forall t domIn .
+  forall t domIn.
   ( KnownDomain domIn
   , Clocks t
   , ClocksCxt t
@@ -376,17 +393,18 @@ unsafeAltpll = clocks
 {-# OPAQUE unsafeAltpll #-}
 {-# ANN unsafeAltpll hasBlackBox #-}
 
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
--- input and a reset input and 1 to 18 output clocks and a @locked@ output.
---
--- This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
--- @locked@ output port into proper 'Reset' signals for the output domains which
--- will keep the circuit in reset while the clock is still stabilizing.
---
--- See also the [Altera Phase-Locked Loop (Altera PLL) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/altera_pll.pdf)
+{- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
+\"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
+input and a reset input and 1 to 18 output clocks and a @locked@ output.
+
+This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
+@locked@ output port into proper 'Reset' signals for the output domains which
+will keep the circuit in reset while the clock is still stabilizing.
+
+See also the [Altera Phase-Locked Loop (Altera PLL) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/altera_pll.pdf)
+-}
 alteraPllSync ::
-  forall t domIn .
+  forall t domIn.
   ( HasAsynchronousReset domIn
   , ClocksSyncCxt t domIn
   , NumOutClocksSync t domIn <= 18
@@ -399,25 +417,27 @@ alteraPllSync ::
 alteraPllSync clkIn rstIn =
   clocksResetSynchronizer (unsafeAlteraPll clkIn rstIn) clkIn
 
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
--- input and a reset input and 1 to 18 output clocks and a @locked@ output.
---
--- This function is deprecated because the @locked@ output is an asynchronous
--- signal. This means the user is required to add a synchronizer and as such
--- this function is unsafe. The common use case is now covered by
--- 'alteraPllSync' and 'unsafeAlteraPll' offers the functionality of this
--- deprecated function for advanced use cases.
+{- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
+\"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
+input and a reset input and 1 to 18 output clocks and a @locked@ output.
+
+This function is deprecated because the @locked@ output is an asynchronous
+signal. This means the user is required to add a synchronizer and as such
+this function is unsafe. The common use case is now covered by
+'alteraPllSync' and 'unsafeAlteraPll' offers the functionality of this
+deprecated function for advanced use cases.
+-}
 alteraPll ::
-  forall t domIn name .
+  forall t domIn name.
   ( HasAsynchronousReset domIn
   , Clocks t
   , ClocksCxt t
   , NumOutClocks t <= 18
   ) =>
-  -- | Name of the component instance
-  --
-  -- Instantiate as follows: @(SSymbol \@\"alterapll50\")@
+  {- | Name of the component instance
+
+  Instantiate as follows: @(SSymbol \@\"alterapll50\")@
+  -}
   SSymbol name ->
   -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
   Clock domIn ->
@@ -426,18 +446,22 @@ alteraPll ::
   t
 alteraPll _ = setName @name unsafeAlteraPll
 {-# INLINE alteraPll #-}
-{-# DEPRECATED alteraPll "This function is unsafe. Please see documentation of the function for alternatives." #-}
+{-# DEPRECATED
+  alteraPll
+  "This function is unsafe. Please see documentation of the function for alternatives."
+  #-}
 
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
--- input and a reset input and 1 to 18 output clocks and a @locked@ output.
---
--- __NB__: Because the clock generator reacts asynchronously to the incoming
--- reset input, the signal __must__ be glitch-free.
---
--- See also the [Altera Phase-Locked Loop (Altera PLL) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/altera_pll.pdf)
+{- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
+\"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
+input and a reset input and 1 to 18 output clocks and a @locked@ output.
+
+__NB__: Because the clock generator reacts asynchronously to the incoming
+reset input, the signal __must__ be glitch-free.
+
+See also the [Altera Phase-Locked Loop (Altera PLL) IP Core User Guide](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/ug/altera_pll.pdf)
+-}
 unsafeAlteraPll ::
-  forall t domIn .
+  forall t domIn.
   ( KnownDomain domIn
   , Clocks t
   , ClocksCxt t

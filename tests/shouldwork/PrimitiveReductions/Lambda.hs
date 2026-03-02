@@ -6,8 +6,8 @@ module Lambda where
 -- is marked NOINLINE and even though it is a "complex" expression. Register
 -- needs myConstant to be constant.
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 -- TODO: Figure out why compilation time scales super-linearly upon increasing
 -- TODO: VecSize.
@@ -18,22 +18,22 @@ g b xs = (+ 1) (head xs) :> tail xs
 {-# OPAQUE g #-}
 
 myConstant :: Bool -> Vec VecSize Int
-myConstant b = g b (map (+1) (repeat 3))
+myConstant b = g b (map (+ 1) (repeat 3))
 {-# OPAQUE myConstant #-}
 
-topEntity
-  :: SystemClockResetEnable
-  => Signal System (Vec VecSize Int)
-  -> Signal System (Vec VecSize Int)
+topEntity ::
+  (SystemClockResetEnable) =>
+  Signal System (Vec VecSize Int) ->
+  Signal System (Vec VecSize Int)
 topEntity = register (myConstant True)
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst (repeat 8 :> repeat 9 :> Nil)
-    expectedOutput = outputVerifier' clk rst ((5 :> repeat 4) :> repeat 8 :> repeat 9 :> Nil)
-    done           = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+ where
+  testInput = stimuliGenerator clk rst (repeat 8 :> repeat 9 :> Nil)
+  expectedOutput = outputVerifier' clk rst ((5 :> repeat 4) :> repeat 8 :> repeat 9 :> Nil)
+  done = expectedOutput (exposeClockResetEnable topEntity clk rst enableGen testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 {-# OPAQUE testBench #-}

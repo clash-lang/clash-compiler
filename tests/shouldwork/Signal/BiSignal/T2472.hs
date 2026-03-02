@@ -1,34 +1,43 @@
 module T2472 where
 
-import Clash.Prelude
 import Clash.Annotations.SynthesisAttributes
+import Clash.Prelude
 
 import Data.List (isInfixOf)
-import qualified Prelude as P
 import System.Environment (getArgs)
 import System.FilePath ((</>))
+import qualified Prelude as P
 
 -- BiSignalIn must be present at the top level.
 -- Putting it inside a multifield record caused the assign to drive an internal wire.
-type FtdiIO dom = "FTDI_D" ::: BiSignalIn 'Floating dom 8
-                  `Annotate` 'StringAttr "LOC" "P1, P2, P4, N5, P5, M6, N6, M7"
-                  `Annotate` 'StringAttr "IOSTANDARD" "LVTTL"
+type FtdiIO dom =
+  "FTDI_D"
+    ::: BiSignalIn 'Floating dom 8
+    `Annotate` 'StringAttr "LOC" "P1, P2, P4, N5, P5, M6, N6, M7"
+    `Annotate` 'StringAttr "IOSTANDARD" "LVTTL"
 
-topEntity
-  :: Clock System -- -> Reset System -> Enable System
-  -> FtdiIO System -> BiSignalOut 'Floating System 8
-topEntity clk io
-  = withClockResetEnable clk rst en $ writeToBiSignal io (pure out)
-  where
-    out = Nothing :: Maybe (BitVector 8)
-    rst = unsafeToReset $ pure False -- resetGen
-    en = enableGen
+topEntity ::
+  Clock System -> -- -> Reset System -> Enable System
+  FtdiIO System ->
+  BiSignalOut 'Floating System 8
+topEntity clk io =
+  withClockResetEnable clk rst en $ writeToBiSignal io (pure out)
+ where
+  out = Nothing :: Maybe (BitVector 8)
+  rst = unsafeToReset $ pure False -- resetGen
+  en = enableGen
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 -- VHDL test
 main :: FilePath -> IO ()

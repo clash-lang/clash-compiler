@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module T2508 where
@@ -7,7 +7,7 @@ module T2508 where
 import Clash.Explicit.Prelude
 import qualified Prelude as P
 
-import Control.Exception (AssertionFailed(..), throwIO)
+import Control.Exception (AssertionFailed (..), throwIO)
 import Control.Monad (when)
 import Data.List (sort)
 import System.Environment (getArgs)
@@ -24,8 +24,8 @@ opaqueAccum s i = accum s i
 noAnnotationMealy clk rst en f iS i =
   let
     (s', o) = unbundle $ f <$> s <*> i
-    s       = register clk rst en iS s'
-  in
+    s = register clk rst en iS s'
+   in
     o
 
 opaqueMealy clk rst en f iS =
@@ -39,10 +39,10 @@ topEntity ::
   Signal System (Unsigned 64) ->
   Signal System (Unsigned 64)
 topEntity clk rst ena i =
-    noAnnotationMealy clk rst ena accum       0 i
-  + noAnnotationMealy clk rst ena opaqueAccum 0 i
-  + opaqueMealy       clk rst ena accum       0 i
-  + opaqueMealy       clk rst ena opaqueAccum 0 i
+  noAnnotationMealy clk rst ena accum 0 i
+    + noAnnotationMealy clk rst ena opaqueAccum 0 i
+    + opaqueMealy clk rst ena accum 0 i
+    + opaqueMealy clk rst ena opaqueAccum 0 i
 {-# OPAQUE topEntity #-}
 
 mainVHDL :: IO ()

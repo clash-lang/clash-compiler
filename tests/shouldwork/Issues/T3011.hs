@@ -5,10 +5,10 @@ module T3011 where
 import Clash.Prelude hiding ((^))
 import Prelude ((^))
 
-import qualified Prelude as P
 import Data.List (isInfixOf)
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
+import qualified Prelude as P
 
 opaquePow1 :: Integer -> Integer -> Integer
 opaquePow1 a b = a ^ b
@@ -22,7 +22,6 @@ opaquePow3 :: Int -> Int -> Int
 opaquePow3 a b = a ^ b
 {-# OPAQUE opaquePow3 #-}
 
-
 topEntity :: (Integer, Integer, Int)
 topEntity =
   ( opaquePow1 2 11
@@ -35,8 +34,14 @@ topEntity =
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 check :: FilePath -> IO ()
 check fileName = do
@@ -45,7 +50,6 @@ check fileName = do
   assertIn "2048" content
   assertIn "4096" content
   assertIn "8192" content
-
 
 mainVHDL :: IO ()
 mainVHDL = check "topEntity.vhdl"

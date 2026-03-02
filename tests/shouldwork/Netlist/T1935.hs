@@ -1,26 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module T1935 where
 
 import qualified Prelude as P
 
 import Clash.Prelude
 
-import Clash.Netlist.Types
 import Clash.Backend (Backend)
+import Clash.Netlist.Types
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
 
 import Control.Monad (when)
 
-topEntity
-  :: Clock System
-  -> Reset System
-  -> Signal System (Unsigned 8)
+topEntity ::
+  Clock System ->
+  Reset System ->
+  Signal System (Unsigned 8)
 topEntity clk rst = withClockResetEnable clk rst enableGen x
-  where
-    x :: SystemClockResetEnable => Signal System (Unsigned 8)
-    x = register 4 (x+1)
+ where
+  x :: (SystemClockResetEnable) => Signal System (Unsigned 8)
+  x = register 4 (x + 1)
 
 testPath :: FilePath
 testPath = "tests/shouldwork/Netlist/T1935.hs"
@@ -34,7 +35,7 @@ countRegisters (Component _nm _inps _outs ds) =
     | nm == "Clash.Signal.Internal.register#" = True
   isRegister _ = False
 
-mainGeneric :: Backend (TargetToState target) => SBuildTarget target -> IO ()
+mainGeneric :: (Backend (TargetToState target)) => SBuildTarget target -> IO ()
 mainGeneric hdl = do
   netlist <- runToNetlistStage hdl id testPath
   let regs = sum $ fmap (countRegisters . snd) netlist

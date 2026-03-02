@@ -1,4 +1,9 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+{- |
 Copyright   : (C) 2020-2021, QBayLogic B.V.,
                   2022     , Google Inc.
 License     : BSD2 (see the file LICENSE)
@@ -8,60 +13,53 @@ This module provides the "evaluation" part of the partial evaluator. This
 is implemented in the classic "eval/apply" style, with a variant of apply for
 performing type applications.
 -}
+module Clash.GHC.PartialEval.Eval (
+  eval,
+  apply,
+  applyTy,
+) where
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE OverloadedStrings #-}
+import Control.Monad (foldM)
+import Data.Bifunctor
+import Data.Bitraversable
+import Data.Either
+import Data.Maybe
+import Data.Primitive.ByteArray (ByteArray (..))
+import GHC.Num.Integer (Integer (..))
 
-module Clash.GHC.PartialEval.Eval
-  ( eval
-  , apply
-  , applyTy
-  ) where
+import GHC.BasicTypes.Extra (isNoInline)
 
-import           Control.Monad (foldM)
-import           Data.Bifunctor
-import           Data.Bitraversable
-import           Data.Either
-import           Data.Maybe
-import           Data.Primitive.ByteArray (ByteArray(..))
-import           GHC.Num.Integer (Integer (..))
-
-import           GHC.BasicTypes.Extra (isNoInline)
-
-import           Clash.Core.DataCon (DataCon(..))
-import           Clash.Core.HasType
-import           Clash.Core.Literal (Literal(..))
-import           Clash.Core.PartialEval.AsTerm
-import           Clash.Core.PartialEval.Monad
-import           Clash.Core.PartialEval.NormalForm
-import           Clash.Core.Subst (substTy)
-import           Clash.Core.Term
-import           Clash.Core.TyCon (tyConDataCons)
-import           Clash.Core.Type
-import           Clash.Core.TysPrim (integerPrimTy)
-import           Clash.Core.Var
+import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.HasType
+import Clash.Core.Literal (Literal (..))
+import Clash.Core.PartialEval.AsTerm
+import Clash.Core.PartialEval.Monad
+import Clash.Core.PartialEval.NormalForm
+import Clash.Core.Subst (substTy)
+import Clash.Core.Term
+import Clash.Core.TyCon (tyConDataCons)
+import Clash.Core.Type
+import Clash.Core.TysPrim (integerPrimTy)
+import Clash.Core.Var
 import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Driver.Types (Binding(..), IsPrim(..))
+import Clash.Driver.Types (Binding (..), IsPrim (..))
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 
 -- | Evaluate a term to WHNF.
---
 eval :: Term -> Eval Value
 eval = \case
-  Var i           -> evalVar i
-  Literal lit     -> pure (VLiteral lit)
-  Data dc         -> evalData dc
-  Prim pr         -> evalPrim pr
-  Lam i x         -> evalLam i x
-  TyLam i x       -> evalTyLam i x
-  App x y         -> evalApp x (Left y)
-  TyApp x ty      -> evalApp x (Right ty)
-  Let bs x        -> evalLet bs x
-  Case x ty alts  -> evalCase x ty alts
-  Cast x a b      -> evalCast x a b
-  Tick tick x     -> evalTick tick x
+  Var i -> evalVar i
+  Literal lit -> pure (VLiteral lit)
+  Data dc -> evalData dc
+  Prim pr -> evalPrim pr
+  Lam i x -> evalLam i x
+  TyLam i x -> evalTyLam i x
+  App x y -> evalApp x (Left y)
+  TyApp x ty -> evalApp x (Right ty)
+  Let bs x -> evalLet bs x
+  Case x ty alts -> evalCase x ty alts
+  Cast x a b -> evalCast x a b
+  Tick tick x -> evalTick tick x
 
 delayEval :: Term -> Eval Value
 delayEval = \case
@@ -79,7 +77,6 @@ forceEvalWith tvs ids = \case
   VThunk term env -> do
     tvs' <- traverse (traverse evalType) tvs
     setLocalEnv env (withTyVars tvs' . withIds ids $ eval term)
-
   value -> pure value
 
 delayArg :: Arg Term -> Eval (Arg Value)
@@ -98,19 +95,18 @@ evalType ty = do
 evalVar :: Id -> Eval Value
 evalVar i
   | isLocalId i = lookupLocal i
-  | otherwise   = lookupGlobal i
+  | otherwise = lookupGlobal i
 
 lookupLocal :: Id -> Eval Value
 lookupLocal i = do
   var <- findId i
   varTy <- evalType (varType i)
-  let i' = i { varType = varTy }
+  let i' = i{varType = varTy}
 
   case var of
-    Just x  -> do
+    Just x -> do
       workFree <- workFreeValue x
       if workFree then forceEval x else pure (VNeutral (NeVar i'))
-
     Nothing -> pure (VNeutral (NeVar i'))
 
 lookupGlobal :: Id -> Eval Value
@@ -123,29 +119,25 @@ lookupGlobal i = do
     Just x
       -- The binding cannot be inlined. Note that this is limited to bindings
       -- which are not primitives in Clash, as these must be marked NOINLINE.
-      |  isNoInline (bindingSpec x)
-      ,  bindingIsPrim x == IsFun
-      -> pure (VNeutral (NeVar i))
-
+      | isNoInline (bindingSpec x)
+      , bindingIsPrim x == IsFun ->
+          pure (VNeutral (NeVar i))
       -- There is no fuel, meaning no more inlining can occur.
-      |  fuel == 0
-      -> pure (VNeutral (NeVar i))
-
+      | fuel == 0 ->
+          pure (VNeutral (NeVar i))
       -- Inlining can occur, using one unit of fuel in the process.
-      |  otherwise
-      -> withContext i . withFuel $ do
-           val <- forceEval (bindingTerm x)
-           replaceBinding (x { bindingTerm = val })
-           pure val
-
-    Nothing
-      -> pure (VNeutral (NeVar i))
+      | otherwise ->
+          withContext i . withFuel $ do
+            val <- forceEval (bindingTerm x)
+            replaceBinding (x{bindingTerm = val})
+            pure val
+    Nothing ->
+      pure (VNeutral (NeVar i))
 
 evalData :: DataCon -> Eval Value
 evalData dc
   | fullyApplied (dcType dc) [] =
       VData dc [] <$> getLocalEnv
-
   | otherwise =
       etaExpand (Data dc) >>= eval
 
@@ -153,7 +145,6 @@ evalPrim :: PrimInfo -> Eval Value
 evalPrim pr
   | fullyApplied (primType pr) [] =
       evalPrimOp pr []
-
   | otherwise =
       etaExpand (Prim pr) >>= eval
 
@@ -181,14 +172,15 @@ etaExpand term = do
     let (missingTys, _) = splitFunForallTy (applyTypeToArgs tm tcm ty args)
     missingArgs <- traverse etaNameOf missingTys
 
-    pure $ mkAbstraction
-      (mkApps term (fmap (bimap Var VarTy) missingArgs))
-      missingArgs
+    pure $
+      mkAbstraction
+        (mkApps term (fmap (bimap Var VarTy) missingArgs))
+        missingArgs
 
 evalLam :: Id -> Term -> Eval Value
 evalLam i x = do
   varTy <- evalType (varType i)
-  let i' = i { varType = varTy }
+  let i' = i{varType = varTy}
   env <- getLocalEnv
 
   pure (VLam i' x env)
@@ -196,48 +188,43 @@ evalLam i x = do
 evalTyLam :: TyVar -> Term -> Eval Value
 evalTyLam i x = do
   varTy <- evalType (varType i)
-  let i' = i { varType = varTy }
+  let i' = i{varType = varTy}
   env <- getLocalEnv
 
   pure (VTyLam i' x env)
 
 evalApp :: Term -> Arg Term -> Eval Value
 evalApp x y
-  | Data dc <- f
-  = if fullyApplied (dcType dc) args
-      then do
-        argThunks <- delayArgs args
-        VData dc argThunks <$> getLocalEnv
-
-      else etaExpand term >>= eval
-
+  | Data dc <- f =
+      if fullyApplied (dcType dc) args
+        then do
+          argThunks <- delayArgs args
+          VData dc argThunks <$> getLocalEnv
+        else etaExpand term >>= eval
   | Prim pr <- f
-  , prArgs  <- fst $ splitFunForallTy (primType pr)
-  , numArgs <- length prArgs
-  = case compare (length args) numArgs of
-      LT ->
-        etaExpand term >>= eval
+  , prArgs <- fst $ splitFunForallTy (primType pr)
+  , numArgs <- length prArgs =
+      case compare (length args) numArgs of
+        LT ->
+          etaExpand term >>= eval
+        EQ -> do
+          argThunks <- delayArgs args
+          let tyVars = lefts prArgs
+              tyArgs = rights args
 
-      EQ -> do
+          withTyVars (zip tyVars tyArgs) (evalPrimOp pr argThunks)
+        GT -> do
+          let (pArgs, rArgs) = splitAt numArgs args
+          pArgThunks <- delayArgs pArgs
+          primRes <- evalPrimOp pr pArgThunks
+          rArgThunks <- delayArgs rArgs
+
+          foldM applyArg primRes rArgThunks
+  | otherwise =
+      preserveFuel $ do
+        evalF <- eval f
         argThunks <- delayArgs args
-        let tyVars = lefts prArgs
-            tyArgs = rights args
-
-        withTyVars (zip tyVars tyArgs) (evalPrimOp pr argThunks)
-
-      GT -> do
-        let (pArgs, rArgs) = splitAt numArgs args
-        pArgThunks <- delayArgs pArgs
-        primRes <- evalPrimOp pr pArgThunks
-        rArgThunks <- delayArgs rArgs
-
-        foldM applyArg primRes rArgThunks
-
-  | otherwise
-  = preserveFuel $ do
-      evalF <- eval f
-      argThunks <- delayArgs args
-      foldM applyArg evalF argThunks
+        foldM applyArg evalF argThunks
  where
   term = either (App x) (TyApp x) y
   (f, args, _ticks) = collectArgsTicks term
@@ -245,7 +232,7 @@ evalApp x y
 evalLet :: Bind Term -> Term -> Eval Value
 evalLet (NonRec i x) body = do
   iTy <- evalType (varType i)
-  eX  <- delayEval x
+  eX <- delayEval x
   wfX <- workFreeValue eX
 
   eBody <- withId i eX (eval body)
@@ -253,8 +240,7 @@ evalLet (NonRec i x) body = do
   -- Only keep the let binding if it performs work.
   if wfX
     then pure eBody
-    else pure (VNeutral (NeLet (NonRec i{varType=iTy} eX) eBody))
-
+    else pure (VNeutral (NeLet (NonRec i{varType = iTy} eX) eBody))
 evalLet (Rec xs) body = do
   binds <- traverse evalBind xs
   eBody <- withIds binds (eval body)
@@ -265,7 +251,7 @@ evalLet (Rec xs) body = do
     iTy <- evalType (varType i)
     eX <- delayEval x
 
-    pure (i{varType=iTy}, eX)
+    pure (i{varType = iTy}, eX)
 
 evalCase :: Term -> Type -> [Alt] -> Eval Value
 evalCase term ty as = do
@@ -275,48 +261,48 @@ evalCase term ty as = do
 
   caseCon subject resTy alts
 
--- | Attempt to apply the case-of-known-constructor transformation on a case
--- expression. If no suitable alternative can be chosen, attempt to transform
--- the case expression to try and expose more opportunities.
---
+{- | Attempt to apply the case-of-known-constructor transformation on a case
+expression. If no suitable alternative can be chosen, attempt to transform
+the case expression to try and expose more opportunities.
+-}
 caseCon :: Value -> Type -> [(Pat, Value)] -> Eval Value
 caseCon subject ty alts = do
   forcedSubject <- keepLifted (forceEval subject)
 
   -- If the subject is undefined, the whole expression is undefined.
   case isUndefinedX forcedSubject of
-   True -> eval (TyApp (Prim NP.undefinedX) ty)
-   False -> case isUndefined forcedSubject of
-    True -> eval (TyApp (Prim NP.undefined) ty)
-    False ->
-      case stripValue forcedSubject of
-        -- Known literal: attempt to match or throw an error.
-        VLiteral lit -> do
-          let def = error ("caseCon: No pattern matched " <> show lit <> " in " <> show alts)
-          match <- findBestAlt (matchLiteral lit) alts
-          evalAlt def match
+    True -> eval (TyApp (Prim NP.undefinedX) ty)
+    False -> case isUndefined forcedSubject of
+      True -> eval (TyApp (Prim NP.undefined) ty)
+      False ->
+        case stripValue forcedSubject of
+          -- Known literal: attempt to match or throw an error.
+          VLiteral lit -> do
+            let def = error ("caseCon: No pattern matched " <> show lit <> " in " <> show alts)
+            match <- findBestAlt (matchLiteral lit) alts
+            evalAlt def match
 
-        -- Known data constructor: attempt to match or throw an error.
-        -- The environment here is the same as the current environment.
-        VData dc args _env -> do
-          let def = error ("caseCon: No pattern matched " <> show dc <> " in " <> show alts)
-          match <- findBestAlt (matchData dc args) alts
-          evalAlt def match
+          -- Known data constructor: attempt to match or throw an error.
+          -- The environment here is the same as the current environment.
+          VData dc args _env -> do
+            let def = error ("caseCon: No pattern matched " <> show dc <> " in " <> show alts)
+            match <- findBestAlt (matchData dc args) alts
+            evalAlt def match
 
-        -- Neutral primitives may be clash primitives which are treated as
-        -- values, like fromInteger# for various types in clash-prelude.
-        VNeutral (NePrim pr args) -> do
-          let def = VNeutral (NeCase forcedSubject ty alts)
-          match <- findBestAlt (matchClashPrim pr args) alts
-          evalAlt def match
+          -- Neutral primitives may be clash primitives which are treated as
+          -- values, like fromInteger# for various types in clash-prelude.
+          VNeutral (NePrim pr args) -> do
+            let def = VNeutral (NeCase forcedSubject ty alts)
+            match <- findBestAlt (matchClashPrim pr args) alts
+            evalAlt def match
 
-        -- We know nothing: attempt case-of-case / case-of-let.
-        _ -> tryTransformCase forcedSubject ty alts
+          -- We know nothing: attempt case-of-case / case-of-let.
+          _ -> tryTransformCase forcedSubject ty alts
 
--- | Attempt to apply a transformation to a case expression to expose more
--- opportunities for caseCon. If no transformations can be applied the
--- case expression can only be neutral.
---
+{- | Attempt to apply a transformation to a case expression to expose more
+opportunities for caseCon. If no transformations can be applied the
+case expression can only be neutral.
+-}
 tryTransformCase :: Value -> Type -> [(Pat, Value)] -> Eval Value
 tryTransformCase subject ty alts =
   case stripValue subject of
@@ -326,10 +312,10 @@ tryTransformCase subject ty alts =
       forcedAlts <- forceAlts innerAlts
 
       if all (isKnown . snd) forcedAlts
-       then let asCase v = VNeutral (NeCase v ty alts)
-                newAlts  = second asCase <$> innerAlts
-             in caseCon innerSubject ty newAlts
-
+        then
+          let asCase v = VNeutral (NeCase v ty alts)
+              newAlts = second asCase <$> innerAlts
+           in caseCon innerSubject ty newAlts
         else pure (VNeutral (NeCase subject ty alts))
 
     -- A case of let: Pull out the let expression if possible and attempt
@@ -349,14 +335,13 @@ tryTransformCase subject ty alts =
   --
   isKnown = \case
     VNeutral (NePrim pr _) ->
-      primName pr `elem`
-        [ "Clash.Sized.Internal.BitVector.fromInteger##"
-        , "Clash.Sized.Internal.BitVector.fromInteger#"
-        , "Clash.Sized.Internal.Index.fromInteger#"
-        , "Clash.Sized.Internal.Signed.fromInteger#"
-        , "Clash.Sized.Internal.Unsigned.fromInteger#"
-        ]
-
+      primName pr
+        `elem` [ "Clash.Sized.Internal.BitVector.fromInteger##"
+               , "Clash.Sized.Internal.BitVector.fromInteger#"
+               , "Clash.Sized.Internal.Index.fromInteger#"
+               , "Clash.Sized.Internal.Signed.fromInteger#"
+               , "Clash.Sized.Internal.Unsigned.fromInteger#"
+               ]
     VLiteral{} -> True
     VData{} -> True
     _ -> False
@@ -369,60 +354,49 @@ delayAlts = traverse (bitraverse delayPat delayEval)
       tvsTys <- traverse evalType (fmap varType tvs)
       idsTys <- traverse evalType (fmap varType ids)
 
-      let setTy v ty = v { varType = ty }
+      let setTy v ty = v{varType = ty}
           tvs' = zipWith setTy tvs tvsTys
           ids' = zipWith setTy ids idsTys
 
       pure (DataPat dc tvs' ids')
-
     pat -> pure pat
 
 forceAlts :: [(Pat, Value)] -> Eval [(Pat, Value)]
 forceAlts = traverse (traverse forceEval)
 
 data PatResult
-  = Match   (Pat, Value) [(TyVar, Type)] [(Id, Value)]
+  = Match (Pat, Value) [(TyVar, Type)] [(Id, Value)]
   | NoMatch
 
 evalAlt :: Value -> PatResult -> Eval Value
 evalAlt def = \case
   Match (_, val) tvs ids ->
     forceEvalWith tvs ids val
-
   NoMatch -> pure def
 
 matchLiteral :: Literal -> (Pat, Value) -> Eval PatResult
 matchLiteral lit alt@(pat, _) =
   case pat of
     DataPat dc [] [i]
-      |  IntegerLiteral n <- lit
-      -> case n of
-           IS _
-             | dcTag dc == 1 -> pure $ Match alt [] [(i, VLiteral (IntLiteral n))]
-
-           IP bn
-             | dcTag dc == 2 -> matchBigNat i bn
-
-           IN bn
-             | dcTag dc == 3 -> matchBigNat i bn
-
-           _ -> pure NoMatch
-
-      |  NaturalLiteral n <- lit
-      -> case n of
-           IS _
-             | dcTag dc == 1 -> pure $ Match alt [] [(i, VLiteral (WordLiteral n))]
-
-           IP bn
-             | dcTag dc == 2 -> matchBigNat i bn
-
-           _ -> pure NoMatch
-
+      | IntegerLiteral n <- lit ->
+          case n of
+            IS _
+              | dcTag dc == 1 -> pure $ Match alt [] [(i, VLiteral (IntLiteral n))]
+            IP bn
+              | dcTag dc == 2 -> matchBigNat i bn
+            IN bn
+              | dcTag dc == 3 -> matchBigNat i bn
+            _ -> pure NoMatch
+      | NaturalLiteral n <- lit ->
+          case n of
+            IS _
+              | dcTag dc == 1 -> pure $ Match alt [] [(i, VLiteral (WordLiteral n))]
+            IP bn
+              | dcTag dc == 2 -> matchBigNat i bn
+            _ -> pure NoMatch
     LitPat n
       | lit == n -> pure $ Match alt [] []
-
     DefaultPat -> pure $ Match alt [] []
-
     _ -> pure NoMatch
  where
   -- Somewhat of a hack: We find the constructor for BigNat and apply a
@@ -431,9 +405,9 @@ matchLiteral lit alt@(pat, _) =
     tcm <- getTyConMap
     let bnDcM = do
           integerTcName <- fmap fst (splitTyConAppM integerPrimTy)
-          [_, jpDc, _]  <- pure (tyConDataCons (UniqMap.find integerTcName tcm))
-          ([bnTy], _)   <- pure (splitFunTys tcm (dcType jpDc))
-          bnTcName      <- fmap fst (splitTyConAppM bnTy)
+          [_, jpDc, _] <- pure (tyConDataCons (UniqMap.find integerTcName tcm))
+          ([bnTy], _) <- pure (splitFunTys tcm (dcType jpDc))
+          bnTcName <- fmap fst (splitTyConAppM bnTy)
           listToMaybe (tyConDataCons (UniqMap.find bnTcName tcm))
 
         bnDc = fromMaybe (error "Cannot find BigNat constructor") bnDcM
@@ -447,10 +421,10 @@ matchData :: DataCon -> Args Value -> (Pat, Value) -> Eval PatResult
 matchData dc args alt@(pat, _) =
   case pat of
     DataPat c tvs ids
-      |  dc == c
-      -> do let (tms, tys) = bimap (zip ids) (zip tvs) (partitionEithers args)
+      | dc == c ->
+          do
+            let (tms, tys) = bimap (zip ids) (zip tvs) (partitionEithers args)
             pure (Match alt tys tms)
-
     DefaultPat -> pure (Match alt [] [])
     _ -> pure NoMatch
 
@@ -462,9 +436,10 @@ matchClashPrim pr args alt@(pat, _) =
   case pat of
     LitPat lit
       -- Bit literals
-      |  primName pr == "Clash.Sized.BitVector.fromInteger##"
-      ,  [Left mask, Left val] <- args
-      -> do VLiteral (WordLiteral m) <- forceEval mask
+      | primName pr == "Clash.Sized.BitVector.fromInteger##"
+      , [Left mask, Left val] <- args ->
+          do
+            VLiteral (WordLiteral m) <- forceEval mask
             VLiteral l <- forceEval val
 
             if m == 0 && l == lit
@@ -472,9 +447,10 @@ matchClashPrim pr args alt@(pat, _) =
               else pure NoMatch
 
       -- BitVector literals
-      |  primName pr == "Clash.Sized.BitVector.fromInteger#"
-      ,  [Right _n, Left _knN, Left mask, Left val] <- args
-      -> do VLiteral (NaturalLiteral m) <- forceEval mask
+      | primName pr == "Clash.Sized.BitVector.fromInteger#"
+      , [Right _n, Left _knN, Left mask, Left val] <- args ->
+          do
+            VLiteral (NaturalLiteral m) <- forceEval mask
             VLiteral l <- forceEval val
 
             if m == 0 && l == lit
@@ -482,9 +458,10 @@ matchClashPrim pr args alt@(pat, _) =
               else pure NoMatch
 
       -- Sized integer / natural literals
-      |  primName pr `elem` clashSizedNumbers
-      ,  [Right _n, Left _knN, Left val] <- args
-      -> do VLiteral l <- forceEval val
+      | primName pr `elem` clashSizedNumbers
+      , [Right _n, Left _knN, Left val] <- args ->
+          do
+            VLiteral l <- forceEval val
 
             if l == lit
               then pure (Match alt [] [])
@@ -499,26 +476,25 @@ matchClashPrim pr args alt@(pat, _) =
     , "Clash.Sized.Internal.Unsigned.fromInteger#"
     ]
 
--- | Given a predicate to check if an alternative is a match, find the best
--- alternative that matches the predicate. Best is defined as being the most
--- specific matching pattern (meaning DefaultPat is only used if no other
--- pattern tried matches).
---
-findBestAlt
-  :: ((Pat, Value) -> Eval PatResult)
-  -> [(Pat, Value)]
-  -> Eval PatResult
+{- | Given a predicate to check if an alternative is a match, find the best
+alternative that matches the predicate. Best is defined as being the most
+specific matching pattern (meaning DefaultPat is only used if no other
+pattern tried matches).
+-}
+findBestAlt ::
+  ((Pat, Value) -> Eval PatResult) ->
+  [(Pat, Value)] ->
+  Eval PatResult
 findBestAlt checkAlt =
   go NoMatch
  where
   go !acc [] = pure acc
-  go !acc (a:as) = do
+  go !acc (a : as) = do
     match <- checkAlt a
     case match of
       Match (pat, _term) _tvs _ids
         | pat == DefaultPat -> go match as
         | otherwise -> pure match
-
       NoMatch -> go acc as
 
 evalCast :: Term -> Type -> Type -> Eval Value
@@ -541,10 +517,9 @@ apply val arg = do
     -- If the LHS of application evaluates to a letrec, then add any bindings
     -- that do work to this letrec instead of creating a new one.
     VNeutral (NeLet bs x)
-      | canApply  -> do
+      | canApply -> do
           inner <- apply x arg
           pure (VNeutral (NeLet bs inner))
-
       | otherwise -> do
           varTy <- evalType (valueType tcm arg)
           var <- getUniqueId "workArg" varTy
@@ -554,7 +529,7 @@ apply val arg = do
     -- If the LHS of application is neutral, make a letrec around the neutral
     -- application if the argument performs work.
     VNeutral neu
-      | canApply  -> pure (VNeutral (NeApp neu arg))
+      | canApply -> pure (VNeutral (NeApp neu arg))
       | otherwise -> do
           varTy <- evalType (valueType tcm arg)
           var <- getUniqueId "workArg" varTy
@@ -564,11 +539,10 @@ apply val arg = do
     -- If the LHS of application is a lambda, make a letrec with the name of
     -- the argument around the result of evaluation if it performs work.
     VLam i x env
-      | canApply  -> setLocalEnv env $ withId i arg (eval x)
+      | canApply -> setLocalEnv env $ withId i arg (eval x)
       | otherwise -> setLocalEnv env $ do
           inner <- withId i arg (eval x)
           pure (VNeutral (NeLet (NonRec i arg) inner))
-
     f ->
       error ("apply: Cannot apply " <> show arg <> " to " <> show f)
  where
@@ -583,9 +557,7 @@ applyTy val ty = do
   case stripValue forcedVal of
     VNeutral n ->
       pure (VNeutral (NeTyApp n argTy))
-
     VTyLam i x env ->
       setLocalEnv env $ withTyVar i argTy (eval x)
-
     f ->
       error ("applyTy: Cannot apply " <> show argTy <> " to " <> show f)

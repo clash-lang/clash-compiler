@@ -2,8 +2,8 @@
 
 module T2334 where
 
-import qualified Prelude as P
 import Clash.Explicit.Prelude
+import qualified Prelude as P
 
 import Clash.Driver
 import Clash.Driver.Manifest
@@ -23,7 +23,7 @@ topEntity ::
 topEntity clk rst = assert clk rst "FileOrder"
 {-# OPAQUE topEntity #-}
 
-assertBool :: HasCallStack => Bool -> IO ()
+assertBool :: (HasCallStack) => Bool -> IO ()
 assertBool b = Exception.assert b pure ()
 
 mainVHDL :: IO ()

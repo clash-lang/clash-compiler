@@ -1,14 +1,3 @@
-{-|
-  Copyright  :  (C) 2012-2016, University of Twente,
-                    2016     , Myrtle Software Ltd,
-                    2017     , Google Inc.,
-                    2021-2022, QBayLogic B.V.
-  License    :  BSD2 (see the file LICENSE)
-  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
-
-  Type and instance definitions for Rewrite modules
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -19,79 +8,91 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{- |
+  Copyright  :  (C) 2012-2016, University of Twente,
+                    2016     , Myrtle Software Ltd,
+                    2017     , Google Inc.,
+                    2021-2022, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Type and instance definitions for Rewrite modules
+-}
 module Clash.Rewrite.Types where
 
-import Control.DeepSeq                       (NFData)
-import Control.Lens                          (Lens', use, (.=))
+import Control.DeepSeq (NFData)
+import Control.Lens (Lens', use, (.=))
 import qualified Control.Lens as Lens
-import Control.Monad.Fix                     (MonadFix)
-import Control.Monad.State.Strict            (State)
-import Control.Monad.Reader                  (MonadReader (..))
-import Control.Monad.State                   (MonadState (..))
-import Control.Monad.Trans.RWS.CPS           (RWST)
+import Control.Monad.Fix (MonadFix)
+import Control.Monad.Reader (MonadReader (..))
+import Control.Monad.State (MonadState (..))
+import Control.Monad.State.Strict (State)
+import Control.Monad.Trans.RWS.CPS (RWST)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
-import Control.Monad.Writer                  (MonadWriter (..))
-import Data.Binary                           (Binary)
-import Data.HashMap.Strict                   (HashMap)
-import Data.IntMap.Strict                    (IntMap)
-import Data.Monoid                           (Any)
-import Data.Text                             (Text)
+import Control.Monad.Writer (MonadWriter (..))
+import Data.Binary (Binary)
+import Data.HashMap.Strict (HashMap)
+import Data.IntMap.Strict (IntMap)
+import Data.Monoid (Any)
+import Data.Text (Text)
 import GHC.Generics
 
-import Clash.Core.PartialEval as PE          (Evaluator)
-import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
+import Clash.Core.Evaluator.Types as WHNF (Evaluator, PrimHeap)
+import Clash.Core.PartialEval as PE (Evaluator)
 
-import Clash.Core.Term           (Term, Context)
-import Clash.Core.Type           (Type)
-import Clash.Core.TyCon          (TyConMap, TyConName)
-import Clash.Core.Var            (Id)
-import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
-import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts)
-import Clash.Netlist.Types       (FilteredHWType, HWMap)
-import Clash.Primitives.Types    (CompiledPrimMap)
-import Clash.Rewrite.WorkFree    (isWorkFree)
+import Clash.Core.Term (Context, Term)
+import Clash.Core.TyCon (TyConMap, TyConName)
+import Clash.Core.Type (Type)
+import Clash.Core.Var (Id)
+import Clash.Core.VarEnv (InScopeSet, VarEnv, VarSet)
+import Clash.Driver.Types (BindingMap, ClashEnv (..), ClashOpts (..), DebugOpts)
+import Clash.Netlist.Types (FilteredHWType, HWMap)
+import Clash.Primitives.Types (CompiledPrimMap)
+import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Util
-import Clash.Util.Supply         (Supply, freshId)
+import Clash.Util.Supply (Supply, freshId)
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 
 -- | State used by the inspection mechanism for recording rewrite steps.
 data RewriteStep
   = RewriteStep
-  { t_ctx    :: Context
+  { t_ctx :: Context
   -- ^ current context
-  , t_name   :: String
+  , t_name :: String
   -- ^ Name of the transformation
-  , t_bndrS  :: String
+  , t_bndrS :: String
   -- ^ Name of the current binder
   , t_before :: Term
   -- ^ Term before `apply`
-  , t_after  :: Term
+  , t_after :: Term
   -- ^ Term after `apply`
-  } deriving (Show, Generic, NFData, Binary)
+  }
+  deriving (Show, Generic, NFData, Binary)
 
 -- | State of a rewriting session
 data RewriteState extra
   = RewriteState
-    -- TODO Given we now keep transformCounters, this should just be 'fold'
-    -- over that map, otherwise the two counts could fall out of sync.
+  -- TODO Given we now keep transformCounters, this should just be 'fold'
+  -- over that map, otherwise the two counts could fall out of sync.
   { _transformCounter :: {-# UNPACK #-} !Word
   -- ^ Total number of applied transformations
   , _transformCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation is applied
-  , _bindings         :: !BindingMap
+  , _bindings :: !BindingMap
   -- ^ Global binders
-  , _uniqSupply       :: !Supply
+  , _uniqSupply :: !Supply
   -- ^ Supply of unique numbers
-  , _curFun           :: (Id,SrcSpan) -- Initially set to undefined: no strictness annotation
+  , _curFun :: (Id, SrcSpan) -- Initially set to undefined: no strictness annotation
+
   -- ^ Function which is currently normalized
-  , _nameCounter      :: {-# UNPACK #-} !Int
+  , _nameCounter :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
-  , _globalHeap       :: PrimHeap
+  , _globalHeap :: PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _workFreeBinders  :: VarEnv Bool
+  , _workFreeBinders :: VarEnv Bool
   -- ^ Map telling whether a binder's definition is work-free
-  , _extra            :: !extra
+  , _extra :: !extra
   -- ^ Additional state
   }
 
@@ -100,18 +101,19 @@ Lens.makeLenses ''RewriteState
 -- | Read-only environment of a rewriting session
 data RewriteEnv
   = RewriteEnv
-  { _clashEnv       :: ClashEnv
+  { _clashEnv :: ClashEnv
   -- ^ The global environment of the compiler
-  , _typeTranslator :: CustomReprs
-                    -> TyConMap
-                    -> Type
-                    -> State HWMap (Maybe (Either String FilteredHWType))
+  , _typeTranslator ::
+      CustomReprs ->
+      TyConMap ->
+      Type ->
+      State HWMap (Maybe (Either String FilteredHWType))
   -- ^ Hardcode Type -> FilteredHWType translator
-  , _peEvaluator    :: PE.Evaluator
+  , _peEvaluator :: PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
-  , _evaluator      :: WHNF.Evaluator
+  , _evaluator :: WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
-  , _topEntities    :: VarSet
+  , _topEntities :: VarSet
   -- ^ Functions that are considered TopEntities
   }
 
@@ -159,11 +161,12 @@ specializationLimit = clashEnv . Lens.to (opt_specLimit . envOpts)
 normalizeUltra :: Lens.Getter RewriteEnv Bool
 normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
 
--- | Monad that keeps track how many transformations have been applied and can
--- generate fresh variables and unique identifiers. In addition, it keeps track
--- if a transformation/rewrite has been successfully applied.
+{- | Monad that keeps track how many transformations have been applied and can
+generate fresh variables and unique identifiers. In addition, it keeps track
+if a transformation/rewrite has been successfully applied.
+-}
 newtype RewriteMonad extra a = R
-  { unR :: RWST RewriteEnv Any (RewriteState extra) IO a }
+  {unR :: RWST RewriteEnv Any (RewriteState extra) IO a}
   deriving newtype
     ( Applicative
     , Functor
@@ -175,17 +178,17 @@ newtype RewriteMonad extra a = R
     )
 
 -- | Run the computation in the RewriteMonad
-runR
-  :: RewriteMonad extra a
-  -> RewriteEnv
-  -> RewriteState extra
-  -> IO (a, RewriteState extra, Any)
+runR ::
+  RewriteMonad extra a ->
+  RewriteEnv ->
+  RewriteState extra ->
+  IO (a, RewriteState extra, Any)
 runR m = RWS.runRWST (unR m)
 
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
     sup <- use uniqSupply
-    let (a,sup') = freshId sup
+    let (a, sup') = freshId sup
     uniqSupply .= sup'
     a `seq` return a
 
@@ -206,9 +209,9 @@ type Transform m = TransformContext -> Term -> m Term
 type Rewrite extra = Transform (RewriteMonad extra)
 
 -- Moved into Clash.Rewrite.WorkFree
-{-# SPECIALIZE isWorkFree
-      :: Lens' (RewriteState extra) (VarEnv Bool)
-      -> BindingMap
-      -> Term
-      -> RewriteMonad extra Bool
+{-# SPECIALIZE isWorkFree ::
+  Lens' (RewriteState extra) (VarEnv Bool) ->
+  BindingMap ->
+  Term ->
+  RewriteMonad extra Bool
   #-}

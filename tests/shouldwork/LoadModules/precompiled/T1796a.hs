@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module T1796a where
 
@@ -9,7 +9,7 @@ import Clash.Explicit.Testbench
 
 tb :: Signal System Bool
 tb = done
-  where
-    done = register clk rst enableGen False $ id (pure True)
-    clk = tbClockGen @System (not <$> done)
-    rst = resetGen @System
+ where
+  done = register clk rst enableGen False $ id (pure True)
+  clk = tbClockGen @System (not <$> done)
+  rst = resetGen @System

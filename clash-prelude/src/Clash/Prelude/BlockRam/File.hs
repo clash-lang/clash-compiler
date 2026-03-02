@@ -1,4 +1,9 @@
-{-|
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE Unsafe #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{- |
 Copyright  :  (C) 2015-2016, University of Twente,
                   2019     , Myrtle Software Ltd,
                   2017     , Google Inc.,
@@ -69,129 +74,131 @@ __>>> import qualified Data.List as L__
 __>>> L.tail $ sampleN 4 $ g (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
-
 -}
+module Clash.Prelude.BlockRam.File (
+  -- * Block RAM synchronized to an arbitrary clock
+  blockRamFile,
+  blockRamFilePow2,
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
-module Clash.Prelude.BlockRam.File
-  ( -- * Block RAM synchronized to an arbitrary clock
-    blockRamFile
-  , blockRamFilePow2
-    -- * Producing files
-  , E.memFile
-  )
+  -- * Producing files
+  E.memFile,
+)
 where
 
-import GHC.TypeLits                           (KnownNat)
-import GHC.Stack                              (HasCallStack, withFrozenCallStack)
-
+import GHC.Stack (HasCallStack, withFrozenCallStack)
+import GHC.TypeLits (KnownNat)
 
 import qualified Clash.Explicit.BlockRam.File as E
-import           Clash.Promoted.Nat           (SNat)
-import           Clash.Signal
-  (HiddenClock, HiddenEnable, Signal, hideClock, hideEnable)
-import           Clash.Sized.BitVector        (BitVector)
-import           Clash.Sized.Unsigned         (Unsigned)
-import           Clash.XException             (NFDataX)
+import Clash.Promoted.Nat (SNat)
+import Clash.Signal (
+  HiddenClock,
+  HiddenEnable,
+  Signal,
+  hideClock,
+  hideEnable,
+ )
+import Clash.Sized.BitVector (BitVector)
+import Clash.Sized.Unsigned (Unsigned)
+import Clash.XException (NFDataX)
 
--- | Create a block RAM with space for 2^@n@ elements
---
--- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is /undefined/, reading it will throw an
--- 'Clash.XException.XException'
--- * __NB__: This function might not work for specific combinations of
--- code-generation backends and hardware targets. Please check the support table
--- below:
---
--- +----------------+----------+----------+---------------+
--- |                | VHDL     | Verilog  | SystemVerilog |
--- +================+==========+==========+===============+
--- | Altera/Quartus | Broken   | Works    | Works         |
--- +----------------+----------+----------+---------------+
--- | Xilinx/ISE     | Works    | Works    | Works         |
--- +----------------+----------+----------+---------------+
--- | ASIC           | Untested | Untested | Untested      |
--- +----------------+----------+----------+---------------+
---
--- === See also:
---
--- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- block RAM.
--- * Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' ('blockRamFilePow2' file) rd wrM@.
--- * See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
--- to instantiate a block RAM with the contents of a data file.
--- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
--- own data files.
-blockRamFilePow2
-  :: forall dom  n m
-   . ( KnownNat m
-     , KnownNat n
-     , HiddenClock dom
-     , HiddenEnable dom
-     , HasCallStack )
-  => FilePath
-  -- ^ File describing the initial content of the BRAM
-  -> Signal dom (Unsigned n)
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (Unsigned n, BitVector m))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom (BitVector m)
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
-  (hideEnable (hideClock E.blockRamFilePow2) fp rd wrM)
+{- | Create a block RAM with space for 2^@n@ elements
+
+* __NB__: Read value is delayed by 1 cycle
+* __NB__: Initial output value is /undefined/, reading it will throw an
+'Clash.XException.XException'
+* __NB__: This function might not work for specific combinations of
+code-generation backends and hardware targets. Please check the support table
+below:
+
++----------------+----------+----------+---------------+
+|                | VHDL     | Verilog  | SystemVerilog |
++================+==========+==========+===============+
+| Altera/Quartus | Broken   | Works    | Works         |
++----------------+----------+----------+---------------+
+| Xilinx/ISE     | Works    | Works    | Works         |
++----------------+----------+----------+---------------+
+| ASIC           | Untested | Untested | Untested      |
++----------------+----------+----------+---------------+
+
+=== See also:
+
+* See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
+block RAM.
+* Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' ('blockRamFilePow2' file) rd wrM@.
+* See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
+to instantiate a block RAM with the contents of a data file.
+* See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+own data files.
+-}
+blockRamFilePow2 ::
+  forall dom n m.
+  ( KnownNat m
+  , KnownNat n
+  , HiddenClock dom
+  , HiddenEnable dom
+  , HasCallStack
+  ) =>
+  -- | File describing the initial content of the BRAM
+  FilePath ->
+  -- | Read address @r@
+  Signal dom (Unsigned n) ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (Unsigned n, BitVector m)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom (BitVector m)
+blockRamFilePow2 = \fp rd wrM ->
+  withFrozenCallStack
+    (hideEnable (hideClock E.blockRamFilePow2) fp rd wrM)
 {-# INLINE blockRamFilePow2 #-}
 
--- | Create a block RAM with space for @n@ elements
---
--- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is /undefined/, reading it will throw an
--- 'Clash.XException.XException'
--- * __NB__: This function might not work for specific combinations of
--- code-generation backends and hardware targets. Please check the support table
--- below:
---
--- +----------------+----------+----------+---------------+
--- |                | VHDL     | Verilog  | SystemVerilog |
--- +================+==========+==========+===============+
--- | Altera/Quartus | Broken   | Works    | Works         |
--- +----------------+----------+----------+---------------+
--- | Xilinx/ISE     | Works    | Works    | Works         |
--- +----------------+----------+----------+---------------+
--- | ASIC           | Untested | Untested | Untested      |
--- +----------------+----------+----------+---------------+
---
--- === See also:
---
--- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- block RAM.
--- * Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' ('blockRamFile' size file) rd wrM@.
--- * See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
--- to instantiate a block RAM with the contents of a data file.
--- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
--- own data files.
-blockRamFile
-  :: ( KnownNat m
-     , Enum addr
-     , NFDataX addr
-     , HiddenClock dom
-     , HiddenEnable dom
-     , HasCallStack )
-  => SNat n
-  -- ^ Size of the BRAM
-  -> FilePath
-  -- ^ File describing the initial content of the BRAM
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, BitVector m))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom (BitVector m)
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamFile = \sz fp rd wrM -> withFrozenCallStack
-  (hideEnable (hideClock E.blockRamFile) sz fp rd wrM)
+{- | Create a block RAM with space for @n@ elements
+
+* __NB__: Read value is delayed by 1 cycle
+* __NB__: Initial output value is /undefined/, reading it will throw an
+'Clash.XException.XException'
+* __NB__: This function might not work for specific combinations of
+code-generation backends and hardware targets. Please check the support table
+below:
+
++----------------+----------+----------+---------------+
+|                | VHDL     | Verilog  | SystemVerilog |
++================+==========+==========+===============+
+| Altera/Quartus | Broken   | Works    | Works         |
++----------------+----------+----------+---------------+
+| Xilinx/ISE     | Works    | Works    | Works         |
++----------------+----------+----------+---------------+
+| ASIC           | Untested | Untested | Untested      |
++----------------+----------+----------+---------------+
+
+=== See also:
+
+* See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
+block RAM.
+* Use the adapter 'Clash.Prelude.BlockRam.readNew' for obtaining write-before-read semantics like this: @'Clash.Prelude.BlockRam.readNew' ('blockRamFile' size file) rd wrM@.
+* See "Clash.Prelude.BlockRam.File#usingramfiles" for more information on how
+to instantiate a block RAM with the contents of a data file.
+* See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+own data files.
+-}
+blockRamFile ::
+  ( KnownNat m
+  , Enum addr
+  , NFDataX addr
+  , HiddenClock dom
+  , HiddenEnable dom
+  , HasCallStack
+  ) =>
+  -- | Size of the BRAM
+  SNat n ->
+  -- | File describing the initial content of the BRAM
+  FilePath ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, BitVector m)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom (BitVector m)
+blockRamFile = \sz fp rd wrM ->
+  withFrozenCallStack
+    (hideEnable (hideClock E.blockRamFile) sz fp rd wrM)
 {-# INLINE blockRamFile #-}

@@ -3,11 +3,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 
 module Clash.CoSimTest where
 
@@ -16,9 +14,9 @@ module Clash.CoSimTest where
 ------------------------------------------------------
 
 import Clash.Explicit.Prelude
-import qualified Prelude as P
-import qualified Data.List as L
 import Data.Int
+import qualified Data.List as L
+import qualified Prelude as P
 
 -- CoSim
 import Clash.CoSim
@@ -31,53 +29,51 @@ import Language.Haskell.TH.Syntax
 ------- FIR -------
 -------------------
 
-dotp
-  :: SaturatingNum a
-  => Vec (n + 1) a
-  -> Vec (n + 1) a
-  -> a
+dotp ::
+  (SaturatingNum a) =>
+  Vec (n + 1) a ->
+  Vec (n + 1) a ->
+  a
 dotp as bs = fold boundedAdd (zipWith boundedMul as bs)
 
-fir
-  :: ( Default a
-     , KnownNat n
-     , SaturatingNum a
-     , KnownDomain d
-     , NFDataX a
-     )
-  => Clock d
-  -> Reset d
-  -> Vec (n + 1) a
-  -> Signal d a
-  -> Signal d a
+fir ::
+  ( Default a
+  , KnownNat n
+  , SaturatingNum a
+  , KnownDomain d
+  , NFDataX a
+  ) =>
+  Clock d ->
+  Reset d ->
+  Vec (n + 1) a ->
+  Signal d a ->
+  Signal d a
 fir clk rst coeffs x_t = y_t
-  where
-    y_t = dotp coeffs <$> bundle xs
-    xs = window clk rst enableGen x_t
+ where
+  y_t = dotp coeffs <$> bundle xs
+  xs = window clk rst enableGen x_t
 
-topEntity
-  :: Clock System
-  -> Reset System
-  -> Signal System (Signed 64)
-  -> Signal System (Signed 64)
+topEntity ::
+  Clock System ->
+  Reset System ->
+  Signal System (Signed 64) ->
+  Signal System (Signed 64)
 topEntity clk rst s = verilog_mult s s
 
+testInput ::
+  Clock System ->
+  Reset System ->
+  Signal System (Signed 64)
+testInput clk rst = stimuliGenerator clk rst (2 :> 3 :> 4 :> 8 :> 9 :> 10 :> Nil)
 
-testInput
-    :: Clock System
-    -> Reset System
-    -> Signal System (Signed 64)
-testInput clk rst = stimuliGenerator clk rst (2:>3:>4:>8:>9:>10:>Nil)
-
-
-expectedOutput
-  :: Signal System (Signed 64)
-  -> Signal System Bool
+expectedOutput ::
+  Signal System (Signed 64) ->
+  Signal System Bool
 expectedOutput =
-    outputVerifier'
-        systemClockGen
-        systemResetGen
-        (4:>12:>1:>20:>Nil)
+  outputVerifier'
+    systemClockGen
+    systemResetGen
+    (4 :> 12 :> 1 :> 20 :> Nil)
 
 ------------------------------------------------------
 ------- CO-SIMUlATION --------------------------------
@@ -107,12 +103,13 @@ verilog_fir x = [verilog|
                        }
 -}
 
-verilog_mult
-  :: (t ~ Signed 64, KnownDomain d)
-  => Signal d t
-  -> Signal d t
-  -> Signal d t
-verilog_mult x y = [verilog|
+verilog_mult ::
+  (t ~ Signed 64, KnownDomain d) =>
+  Signal d t ->
+  Signal d t ->
+  Signal d t
+verilog_mult x y =
+  [verilog|
   parameter data_width = 64;
 
   input  signed [0:data_width-1] ${y};
@@ -121,7 +118,9 @@ verilog_mult x y = [verilog|
 
   assign result = ${x} * ${y};
 
-  |] --defaultSettings
+  |]
+
+-- defaultSettings
 
 {-
 verilog_reg
@@ -161,9 +160,10 @@ verilog_reg x = s
 
 main :: IO ()
 main =
-    putStrLn $ show
-             $ sampleN 5
-             $ topEntity
-                  systemClockGen
-                  systemResetGen
-                  (testInput systemClockGen systemResetGen)
+  putStrLn
+    $ show
+    $ sampleN 5
+    $ topEntity
+      systemClockGen
+      systemResetGen
+      (testInput systemClockGen systemResetGen)

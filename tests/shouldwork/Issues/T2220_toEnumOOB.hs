@@ -2,12 +2,13 @@
 
 module T2220_toEnumOOB where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 topEntity :: BitVector 2 -> Maybe A_Index
-topEntity x | x == 3    = Nothing
-            | otherwise = Just $ toEnum $ fromIntegral x
+topEntity x
+  | x == 3 = Nothing
+  | otherwise = Just $ toEnum $ fromIntegral x
 {-# OPAQUE topEntity #-}
 
 {-
@@ -19,13 +20,12 @@ which used to throw an exception on out-of-bound values.
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst ( 0 :> 1 :> 2 :> 3 :> Nil)
-    expectedOutput = outputVerifier' clk rst (Just A_0 :> Just A_1 :> Just A_2 :> Nothing :> Nil)
-    done           = expectedOutput (topEntity <$> testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
-
+ where
+  testInput = stimuliGenerator clk rst (0 :> 1 :> 2 :> 3 :> Nil)
+  expectedOutput = outputVerifier' clk rst (Just A_0 :> Just A_1 :> Just A_2 :> Nothing :> Nil)
+  done = expectedOutput (topEntity <$> testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 
 data A_Index = A_0 | A_1 | A_2
-      deriving (Show,Bounded,Enum,Generic,BitPack,Eq,ShowX)
+  deriving (Show, Bounded, Enum, Generic, BitPack, Eq, ShowX)

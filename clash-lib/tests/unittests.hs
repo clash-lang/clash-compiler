@@ -18,18 +18,20 @@ setDefaultQuickCheckTests (QuickCheckTests 100) = 10000
 setDefaultQuickCheckTests opt = opt
 
 tests :: TestTree
-tests = testGroup "Unittests"
-  [ Clash.Tests.Core.FreeVars.tests
-  , Clash.Tests.Core.Subst.tests
-  , Clash.Tests.Core.TermLiteral.tests
-  , Clash.Tests.Driver.Manifest.tests
-  , Clash.Tests.Netlist.Id.tests
-  , Clash.Tests.Normalize.Transformations.tests
-  , Clash.Tests.Util.Interpolate.tests
-  ]
+tests =
+  testGroup
+    "Unittests"
+    [ Clash.Tests.Core.FreeVars.tests
+    , Clash.Tests.Core.Subst.tests
+    , Clash.Tests.Core.TermLiteral.tests
+    , Clash.Tests.Driver.Manifest.tests
+    , Clash.Tests.Netlist.Id.tests
+    , Clash.Tests.Normalize.Transformations.tests
+    , Clash.Tests.Util.Interpolate.tests
+    ]
 
 main :: IO ()
 main =
-    defaultMain
-  $ adjustOption setDefaultQuickCheckTests
-  $ tests
+  defaultMain $
+    adjustOption setDefaultQuickCheckTests $
+      tests

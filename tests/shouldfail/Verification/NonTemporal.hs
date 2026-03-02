@@ -3,41 +3,43 @@
 
 module NonTemporal where
 
-import           Data.Coerce
+import Data.Coerce
 
-import qualified Prelude                         as P
+import qualified Prelude as P
 
-import           Clash.Explicit.Prelude          hiding (assert, (&&), (||), not)
-import           Clash.Explicit.Testbench        hiding (assert, (&&), (||))
-import qualified Clash.Explicit.Verification     as V
-import           Clash.Explicit.Verification
-import           Clash.Verification.DSL
-import           Clash.Verification.Internal
-import           Clash.XException                (hwSeqX)
+import Clash.Explicit.Prelude hiding (assert, not, (&&), (||))
+import Clash.Explicit.Testbench hiding (assert, (&&), (||))
+import Clash.Explicit.Verification
+import qualified Clash.Explicit.Verification as V
+import Clash.Verification.DSL
+import Clash.Verification.Internal
+import Clash.XException (hwSeqX)
 
-assertCvResult
-  :: forall n dom
-   . (Bounded n, Enum n, Eq n, NFDataX n, KnownDomain dom)
-  => Clock dom -> Reset dom -> Enable dom
-  -> n
-  -> Signal dom AssertionResult
-  -> Signal dom Bool
+assertCvResult ::
+  forall n dom.
+  (Bounded n, Enum n, Eq n, NFDataX n, KnownDomain dom) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  n ->
+  Signal dom AssertionResult ->
+  Signal dom Bool
 assertCvResult clk rst gen max results = done
  where
   counter = register clk rst gen (minBound :: n) (succ <$> counter)
   done = hideAssertion results (counter .== maxBound)
 {-# INLINE assertCvResult #-}
 
-binaryTest
-  :: ( dom ~ System
-     , AssertionValue dom x
-     , AssertionValue dom y
-     )
-  => RenderAs
-  -> x
-  -> y
-  -> (forall a b. (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom)
-  -> Signal dom Bool
+binaryTest ::
+  ( dom ~ System
+  , AssertionValue dom x
+  , AssertionValue dom y
+  ) =>
+  RenderAs ->
+  x ->
+  y ->
+  (forall a b. (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom) ->
+  Signal dom Bool
 binaryTest t x y f = done
  where
   done = outputVerifier' clk rst (False :> True :> Nil) asserted
@@ -49,7 +51,6 @@ binaryTest t x y f = done
 
 -- Tests below are single cycle non-temporal tests testing basic operators such
 -- as "&&", "||", "->", ..
-
 
 -- == && ==
 fails1 :: RenderAs -> Signal System Bool

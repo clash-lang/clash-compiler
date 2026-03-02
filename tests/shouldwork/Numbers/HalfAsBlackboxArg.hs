@@ -1,11 +1,11 @@
 module HalfAsBlackboxArg where
 
-import Clash.Prelude
-import Numeric.Half
 import Clash.Explicit.Testbench
+import Clash.Prelude
 import Foreign.C.Types
+import Numeric.Half
 
-g :: KnownNat n => Vec n Half -> Half
+g :: (KnownNat n) => Vec n Half -> Half
 g v =
   case v of
     Nil -> Half 5

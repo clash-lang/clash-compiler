@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
-
 {-# OPTIONS_GHC -fno-strictness #-}
+
 module CaseOfErr where
 
 import Clash.Prelude

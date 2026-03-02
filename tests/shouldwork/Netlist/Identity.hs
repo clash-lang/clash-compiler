@@ -1,12 +1,13 @@
 {-# LANGUAGE QuasiQuotes #-}
+
 module Identity where
 
 import Prelude as P
 
-import Clash.Prelude
-import Clash.Netlist.Types
-import qualified Clash.Util.Interpolate as I
 import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+import Clash.Prelude
+import qualified Clash.Util.Interpolate as I
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
@@ -22,9 +23,11 @@ assertAssignsInOut (Component _ [i] [o] ds) =
   case ds of
     [Assignment oName _ (Identifier iName Nothing)]
       | Id.toText iName == Id.toText (fst i)
-      , Id.toText oName == Id.toText ((\(_,(n,_),_) -> n) o)
-      -> return ()
-      | otherwise -> P.error [I.i|
+      , Id.toText oName == Id.toText ((\(_, (n, _), _) -> n) o) ->
+          return ()
+      | otherwise ->
+          P.error
+            [I.i|
           Incorrect input/output names:
 
            oName: #{oName}
@@ -35,9 +38,7 @@ assertAssignsInOut (Component _ [i] [o] ds) =
 
            i: #{i}
         |]
-
     _ -> P.error "Identity circuit performs more than just one assignment"
-
 assertAssignsInOut _ = error "Unexpected number of inputs and outputs"
 
 mainVHDL :: IO ()

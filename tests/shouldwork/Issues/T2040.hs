@@ -5,9 +5,9 @@ module T2040 where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-topEntity
-  :: Signal System (Unsigned 8)
-  -> Signal System (Unsigned 8)
+topEntity ::
+  Signal System (Unsigned 8) ->
+  Signal System (Unsigned 8)
 topEntity = id
 {-# OPAQUE topEntity #-}
 
@@ -16,7 +16,7 @@ testBench = done
  where
   testInput = register clk rst en 0 (testInput + 1)
   expectedOutput =
-    outputVerifier' clk rst $(listToVecTH [0 :: Unsigned 8 .. 3])
+    outputVerifier' clk rst $ (listToVecTH [0 :: Unsigned 8 .. 3])
   done = expectedOutput $ topEntity testInput
   clk = tbSystemClockGen (not <$> done)
   rst = systemResetGen

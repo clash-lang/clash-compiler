@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+
 module Strict where
-import Clash.Prelude
+
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 {-
 Test the strict evaluation of Unsigned values
@@ -15,35 +17,34 @@ Also we need to be careful to not store the intermediate result as Integer,
 The testbench checks that we don't accidentally truncate to 64bits.
 -}
 
-type Nr = Unsigned (64+4)
+type Nr = Unsigned (64 + 4)
 
-big1,big2 :: Nr
+big1, big2 :: Nr
 big1 = 0x0ffffffffffffffff -- == maxBound :: Unsigned 64
 big2 = 0xb0000000000000001
 
 topEntity :: Nr -> Nr -> Vec 4 Nr
-topEntity a b = f a b
-                ++ g a b
-                ++ concat (map (f a) (b:>b:>Nil))
-
+topEntity a b =
+  f a b
+    ++ g a b
+    ++ concat (map (f a) (b :> b :> Nil))
 
 f :: Nr -> Nr -> Vec 1 Nr
-f x y = let res = x + y
-        in res `seq` res :> Nil
+f x y =
+  let res = x + y
+   in res `seq` res :> Nil
 {-# OPAQUE f #-}
-
 
 g :: Nr -> Nr -> Vec 1 Nr
 g x !y = x `seq` x + y :> Nil
 {-# OPAQUE g #-}
 
-
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput    = stimuliGenerator clk rst ((big1,big2) :> Nil)
-    testEntity   = fmap $ map (`shiftR` 64) . uncurry topEntity
-    expectOutput = outputVerifier' clk rst (repeat 0xc :> Nil)
-    done         = expectOutput (testEntity testInput)
-    clk          = tbSystemClockGen (not <$> done)
-    rst          = systemResetGen
+ where
+  testInput = stimuliGenerator clk rst ((big1, big2) :> Nil)
+  testEntity = fmap $ map (`shiftR` 64) . uncurry topEntity
+  expectOutput = outputVerifier' clk rst (repeat 0xc :> Nil)
+  done = expectOutput (testEntity testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

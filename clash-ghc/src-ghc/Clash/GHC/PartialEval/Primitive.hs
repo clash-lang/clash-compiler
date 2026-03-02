@@ -1,4 +1,4 @@
-{-|
+{- |
 Copyright   : (C) 2020, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
@@ -6,27 +6,26 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Evaluation of primitive operations in the partial evaluator. This is used
 by the Clash.GHC.PartialEval.Eval module to implement fully applied primitives.
 -}
-
-module Clash.GHC.PartialEval.Primitive
-  ( evalPrimitive
-  ) where
+module Clash.GHC.PartialEval.Primitive (
+  evalPrimitive,
+) where
 
 import Clash.Core.PartialEval.Monad
 import Clash.Core.PartialEval.NormalForm
-import Clash.Core.Term (Term, PrimInfo)
+import Clash.Core.Term (PrimInfo, Term)
 
--- | Evaluate a primitive with the given arguments.
--- See NOTE [Evaluating primitives] for more information.
---
-evalPrimitive
-  :: (Term -> Eval Value)
-  -- ^ Evaluation function for forcing arguments
-  -> PrimInfo
-  -- ^ The primitive to evaluate
-  -> Args Value
-  -- ^ The arguments supplied to the primitive
-  -> Eval Value
-  -- ^ The result of evaluating the primitive
+{- | Evaluate a primitive with the given arguments.
+See NOTE [Evaluating primitives] for more information.
+-}
+evalPrimitive ::
+  -- | Evaluation function for forcing arguments
+  (Term -> Eval Value) ->
+  -- | The primitive to evaluate
+  PrimInfo ->
+  -- | The arguments supplied to the primitive
+  Args Value ->
+  -- | The result of evaluating the primitive
+  Eval Value
 evalPrimitive _eval pr args =
   -- TODO Implement evaluation of primitives.
   pure (VNeutral (NePrim pr args))

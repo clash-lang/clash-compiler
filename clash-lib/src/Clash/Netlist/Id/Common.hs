@@ -1,19 +1,19 @@
-{-|
+{-# LANGUAGE OverloadedStrings #-}
+
+{- |
   Copyright  :  (C) 2020-2021, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com
 -}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Clash.Netlist.Id.Common where
 
-import           Control.Arrow (first)
-import           Control.Applicative ((<|>))
-import           Data.Maybe (fromMaybe)
-import           Data.Text (Text)
-import           Data.Text.Extra (showt)
-import qualified Data.Text as Text
+import Control.Applicative ((<|>))
+import Control.Arrow (first)
 import qualified Data.Char as Char
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import Data.Text.Extra (showt)
 
 parseWhiteSpace :: Text -> Maybe Text
 parseWhiteSpace = parseSingle isWhiteSpace
@@ -42,52 +42,55 @@ parseLetterOrDigit :: Text -> Maybe Text
 parseLetterOrDigit s = parseLetter s <|> parseDigit s
 
 parseUnderscore :: Text -> Maybe Text
-parseUnderscore = parseSingle (=='_')
+parseUnderscore = parseSingle (== '_')
 
 parseDollar :: Text -> Maybe Text
-parseDollar = parseSingle (=='$')
+parseDollar = parseSingle (== '$')
 
 parseTab :: Text -> Maybe Text
-parseTab = parseSingle (=='\t')
+parseTab = parseSingle (== '\t')
 
 parseBackslash :: Text -> Maybe Text
-parseBackslash = parseSingle (=='\\')
+parseBackslash = parseSingle (== '\\')
 
 failNonEmpty :: Text -> Maybe Text
-failNonEmpty s | Text.null s = Just Text.empty
-               | otherwise = Nothing
+failNonEmpty s
+  | Text.null s = Just Text.empty
+  | otherwise = Nothing
 
 repeatParseN :: (Text -> Maybe Text) -> Text -> Maybe (Int, Text)
 repeatParseN parser = go 0
  where
   go n s0 =
     case parser s0 of
-      Just s1 -> go (n+1) s1
+      Just s1 -> go (n + 1) s1
       Nothing -> Just (n, s0)
 
 repeatParse :: (Text -> Maybe Text) -> Text -> Maybe Text
 repeatParse parser s0 = snd <$> repeatParseN parser s0
 
--- | Encodes tuples as "TupN" and removes all characters not matching a
--- predicate.
-zEncode
-  :: (Char -> Bool)
-  -- ^ Characters to keep
-  -> Text
-  -> Text
+{- | Encodes tuples as "TupN" and removes all characters not matching a
+predicate.
+-}
+zEncode ::
+  -- | Characters to keep
+  (Char -> Bool) ->
+  Text ->
+  Text
 zEncode keep s =
-  let go = zEncode keep in
-  case maybeTuple s of
-    Just (tupName, rest) ->
-      tupName <> go rest
-    Nothing ->
-      case Text.uncons s of
-        Just (c, rest) ->
-          if keep c then
-            Text.cons c (go rest)
-          else
-            go rest
-        Nothing -> s
+  let go = zEncode keep
+   in case maybeTuple s of
+        Just (tupName, rest) ->
+          tupName <> go rest
+        Nothing ->
+          case Text.uncons s of
+            Just (c, rest) ->
+              if keep c
+                then
+                  Text.cons c (go rest)
+                else
+                  go rest
+            Nothing -> s
 
 prettyName :: Text -> Text
 prettyName t = maybe t (uncurry (<>)) (maybeTuple t)
@@ -99,9 +102,9 @@ maybeTuple t = first (\n -> "Tuple" <> showt n) <$> parseTuple t
 
 parseTuple :: Text -> Maybe (Int, Text)
 parseTuple t0 = do
-  t1 <- parseSingle (=='(') t0
-  t2 <- parseMaybeSingle (=='#') t1
+  t1 <- parseSingle (== '(') t0
+  t2 <- parseMaybeSingle (== '#') t1
   (n, t3) <- repeatParseN (parseSingle (== ',')) t2
-  t4 <- parseMaybeSingle (=='#') t3
-  t5 <- parseSingle (==')') t4
-  pure (n+1, t5)
+  t4 <- parseMaybeSingle (== '#') t3
+  t5 <- parseSingle (== ')') t4
+  pure (n + 1, t5)

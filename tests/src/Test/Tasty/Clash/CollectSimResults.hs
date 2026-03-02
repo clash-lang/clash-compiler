@@ -1,7 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Test.Tasty.Clash.CollectSimResults where
+
 import Clash.Prelude
 import Language.Haskell.TH.Lib
 

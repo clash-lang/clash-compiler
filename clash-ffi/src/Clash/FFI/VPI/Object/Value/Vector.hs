@@ -1,10 +1,10 @@
-{-|
+{-# LANGUAGE CPP #-}
+
+{- |
 Copyright:    (C) 2022 Google Inc.
 License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE CPP #-}
 
 #if defined(VERILOG_2005) && defined(VPI_VECVAL)
 {-# LANGUAGE DataKinds #-}

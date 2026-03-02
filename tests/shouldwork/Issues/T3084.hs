@@ -1,7 +1,7 @@
 module T3084 where
 
-import Clash.Prelude hiding (SNat, Mod)
 import Clash.Annotations.TH (makeTopEntity)
+import Clash.Prelude hiding (Mod, SNat)
 
 import Data.Type.Equality
 import GHC.TypeLits (SNat)
@@ -13,17 +13,17 @@ topEntity = f
 
 f :: forall m. (KnownNat m, 1 <= m) => Unsigned (CLog 2 m) -> Index m
 f =
- case testEquality (natSing :: SNat m) (natSing :: SNat P) of
-  Just Refl -> g -- g @P would work
-  Nothing   -> bitCoerce
+  case testEquality (natSing :: SNat m) (natSing :: SNat P) of
+    Just Refl -> g -- g @P would work
+    Nothing -> bitCoerce
 
 g :: forall m. (KnownNat m, 1 <= m) => Unsigned (CLog 2 m) -> Index m
 g =
   case testEquality (natSing :: SNat m) (natSing :: SNat P) of
     Just Refl -> h
-    Nothing   -> bitCoerce
+    Nothing -> bitCoerce
 
-h :: forall m . (KnownNat m, 1 <= m) => Unsigned (CLog 2 m) -> Index m
+h :: forall m. (KnownNat m, 1 <= m) => Unsigned (CLog 2 m) -> Index m
 h i = 1 + bitCoerce i
 
 makeTopEntity 'topEntity

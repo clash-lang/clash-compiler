@@ -4,21 +4,21 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Test.Tasty.Clash.CoreTest
-  ( TargetToState
-  , runToCoreStage
-  , findBinding
-  ) where
+module Test.Tasty.Clash.CoreTest (
+  TargetToState,
+  runToCoreStage,
+  findBinding,
+) where
 
 import qualified Data.List as List (find)
 
-import Clash.Annotations.Primitive (HDL(..))
+import Clash.Annotations.Primitive (HDL (..))
 import Clash.Backend
 import Clash.Backend.SystemVerilog
-import Clash.Backend.Verilog
 import Clash.Backend.VHDL
-import Clash.Core.PartialEval
+import Clash.Backend.Verilog
 import Clash.Core.Name
+import Clash.Core.PartialEval
 import Clash.Core.Term
 import Clash.Core.Var
 import Clash.Core.VarEnv
@@ -32,14 +32,15 @@ import Test.Tasty.Clash
 
 type family TargetToState (target :: HDL) where
   TargetToState 'SystemVerilog = SystemVerilogState
-  TargetToState 'VHDL          = VHDLState
-  TargetToState 'Verilog       = VerilogState
+  TargetToState 'VHDL = VHDLState
+  TargetToState 'Verilog = VerilogState
 
 mkClashOpts :: ClashOpts
-mkClashOpts = defClashOpts
-  { opt_cachehdl     = False
-  , opt_errorExtra   = True
-  }
+mkClashOpts =
+  defClashOpts
+    { opt_cachehdl = False
+    , opt_errorExtra = True
+    }
 
 -- Run clash as far as having access to core for all bindings. This is used
 -- to test operations on core, such as transformations and evaluation.
@@ -48,33 +49,41 @@ mkClashOpts = defClashOpts
 -- to run the compiler up to a given stage. There are currently numerous
 -- problems standing in the way of this however.
 --
-runToCoreStage
-  :: forall target
-   . (Backend (TargetToState target))
-  => SBuildTarget target
-  -> (ClashOpts -> ClashOpts)
-  -> FilePath
-  -> IO (ClashEnv, ClashDesign, Supply)
+runToCoreStage ::
+  forall target.
+  (Backend (TargetToState target)) =>
+  SBuildTarget target ->
+  (ClashOpts -> ClashOpts) ->
+  FilePath ->
+  IO (ClashEnv, ClashDesign, Supply)
 runToCoreStage _target f src = do
   ids <- newSupply
   pds <- primDirs backend
-  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+  (env, design) <-
+    generateBindings
+      opts
+      (return ())
+      pds
+      (opt_importPaths opts)
+      []
+      (hdlKind backend)
+      src
+      Nothing
 
   return (env, design, ids)
  where
   opts = f mkClashOpts
   backend = initBackend @(TargetToState target) opts
 
-findBinding
-  :: OccName
-  -> (ClashEnv, ClashDesign, Supply)
-  -> IO Term
+findBinding ::
+  OccName ->
+  (ClashEnv, ClashDesign, Supply) ->
+  IO Term
 findBinding nm (envTyConMap -> tcm, designBindings -> bm, ids) =
   case List.find byName (eltsVarEnv bm) of
     Just bd ->
       let env = mkGlobalEnv bm tcm emptyInScopeSet ids 20 mempty 0
        in fst <$> nf ghcEvaluator env False (bindingId bd) (bindingTerm bd)
-
     Nothing -> error ("Not in binding map: " <> show nm)
  where
   byName b = nm == nameOcc (varName $ bindingId b)

@@ -4,23 +4,23 @@
 
 module Test.Tasty.Ghdl where
 
-import           Clash.Driver.Manifest     (Manifest(..), manifestFilename)
-import           Control.Monad             (foldM, forM_)
-import           Data.Char                 (toLower)
-import           Data.Coerce               (coerce)
-import qualified Data.List                 as List
-import           Data.Proxy
-import           Data.Tagged
-import qualified Data.Text                 as T
-import           System.Directory          (createDirectory, listDirectory, copyFile)
-import           System.FilePath           ((</>), replaceFileName)
-import           System.FilePath.Glob      (glob)
+import Clash.Driver.Manifest (Manifest (..), manifestFilename)
+import Control.Monad (foldM, forM_)
+import Data.Char (toLower)
+import Data.Coerce (coerce)
+import qualified Data.List as List
+import Data.Proxy
+import Data.Tagged
+import qualified Data.Text as T
+import System.Directory (copyFile, createDirectory, listDirectory)
+import System.FilePath (replaceFileName, (</>))
+import System.FilePath.Glob (glob)
 
-import           Test.Tasty.Common
-import           Test.Tasty.Options
-import           Test.Tasty.Program
-import           Test.Tasty.Providers
-import           Test.Tasty.Runners
+import Test.Tasty.Common
+import Test.Tasty.Options
+import Test.Tasty.Program
+import Test.Tasty.Providers
+import Test.Tasty.Runners
 
 -- | @--ghdl@ flag for enabling tests that use GHDL.
 newtype Ghdl = Ghdl Bool
@@ -33,24 +33,24 @@ instance IsOption Ghdl where
   optionHelp = pure "Skip GHDL tests"
   optionCLParser = flagCLParser Nothing (Ghdl False)
 
--- | Search through a directory with VHDL files produced by Clash
--- and produces /work/ files using @ghdl -i@ for each library.
---
--- For example, for I2C it would execute:
---
--- > ghdl -i --work=bitMaster --workdir=bitMaster --std=93 <files>
--- > ghdl -i --work=byteMaster --workdir=byteMaster --std=93 <files>
--- > ghdl -i --work=i2c --workdir=i2c --std=93 <files>
---
--- After executing this test, $tmpDir/work contains a directory for each
--- top entity: @bitMaster@, @byteMaster@, @i2c@. A more typical test case might
--- produce @topEntity@ and @testBench@ instead.
---
+{- | Search through a directory with VHDL files produced by Clash
+and produces /work/ files using @ghdl -i@ for each library.
+
+For example, for I2C it would execute:
+
+> ghdl -i --work=bitMaster --workdir=bitMaster --std=93 <files>
+> ghdl -i --work=byteMaster --workdir=byteMaster --std=93 <files>
+> ghdl -i --work=i2c --workdir=i2c --std=93 <files>
+
+After executing this test, $tmpDir/work contains a directory for each
+top entity: @bitMaster@, @byteMaster@, @i2c@. A more typical test case might
+produce @topEntity@ and @testBench@ instead.
+-}
 data GhdlImportTest = GhdlImportTest
   { gitParentDirectory :: IO FilePath
-    -- ^ Shared temporary directory
+  -- ^ Shared temporary directory
   , gitSourceDirectory :: IO FilePath
-    -- ^ Directory to work from
+  -- ^ Directory to work from
   }
 
 instance IsTest GhdlImportTest where
@@ -62,11 +62,10 @@ instance IsTest GhdlImportTest where
         createDirectory workDir
         manifests <- getManifests (src </> "*" </> manifestFilename)
         foldM (goManifest workDir) (testPassed "") manifests
-
     | otherwise =
         pure (testPassed "Ignoring test: due to --no-ghdl")
    where
-    stdArgs  = ["-i", "--std=93"]
+    stdArgs = ["-i", "--std=93"]
     runGhdlI workDir args =
       run optionSet (ghdlI workDir args) progressCallback
     ghdlI workDir args =
@@ -75,36 +74,35 @@ instance IsTest GhdlImportTest where
     -- Read a manifest file, error if its malformed / inaccessible. Run @ghdl -i@
     -- on files associated with the component.
     goManifest :: FilePath -> Result -> (FilePath, Manifest) -> IO Result
-    goManifest workDir result (manifestPath, Manifest{topComponent,fileNames})
+    goManifest workDir result (manifestPath, Manifest{topComponent, fileNames})
       | resultSuccessful result = do
-        let
-          top = T.unpack topComponent
-          relVhdlFiles = filter (".vhdl" `List.isSuffixOf`) (map fst fileNames)
-          absVhdlFiles = map (replaceFileName manifestPath) relVhdlFiles
-        createDirectory (workDir </> top)
-        runGhdlI workDir (["--work=" <> top, "--workdir=" <> top] <> absVhdlFiles)
-
+          let
+            top = T.unpack topComponent
+            relVhdlFiles = filter (".vhdl" `List.isSuffixOf`) (map fst fileNames)
+            absVhdlFiles = map (replaceFileName manifestPath) relVhdlFiles
+          createDirectory (workDir </> top)
+          runGhdlI workDir (["--work=" <> top, "--workdir=" <> top] <> absVhdlFiles)
       | otherwise = pure result
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Ghdl)])
 
--- | Create an executable given directory 'GhdlImportTest' produced work files
--- in.
---
--- For example, for I2C it would execute:
---
--- > ghdl -m -fpsl --work=i2c --workdir=i2c -PbitMaster -PbyteMaster -Pi2c -o i2c_exe i2c
---
+{- | Create an executable given directory 'GhdlImportTest' produced work files
+in.
+
+For example, for I2C it would execute:
+
+> ghdl -m -fpsl --work=i2c --workdir=i2c -PbitMaster -PbyteMaster -Pi2c -o i2c_exe i2c
+-}
 data GhdlMakeTest = GhdlMakeTest
   { gmtSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
+  -- ^ Directory containing VHDL files produced by Clash
   , gmtTop :: String
-    -- ^ Entry point to be converted to executables
+  -- ^ Entry point to be converted to executables
   }
 
 instance IsTest GhdlMakeTest where
-  run optionSet GhdlMakeTest{gmtSourceDirectory,gmtTop} progressCallback
+  run optionSet GhdlMakeTest{gmtSourceDirectory, gmtTop} progressCallback
     | Ghdl True <- lookupOption optionSet = do
         src <- gmtSourceDirectory
         let workDir = src </> "work"
@@ -113,7 +111,6 @@ instance IsTest GhdlMakeTest where
           ["-m", "-fpsl", "--work=" <> gmtTop, "--workdir=" <> gmtTop]
             <> ["-P" <> lib | lib <- libs]
             <> ["-o", map toLower (gmtTop <> "_exe"), gmtTop]
-
     | otherwise =
         pure (testPassed "Ignoring test due to --no-ghdl")
    where
@@ -123,19 +120,19 @@ instance IsTest GhdlMakeTest where
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Ghdl)])
 
--- | Run executable generated by 'GhdlMakeTest'.
---
--- For examples, for I2C it would execute:
---
--- > ghdl -r --workdir=i2c --work=i2c i2c_exe --assert-level=error
---
+{- | Run executable generated by 'GhdlMakeTest'.
+
+For examples, for I2C it would execute:
+
+> ghdl -r --workdir=i2c --work=i2c i2c_exe --assert-level=error
+-}
 data GhdlSimTest = GhdlSimTest
   { gstExpectFailure :: Maybe (TestExitCode, T.Text)
-    -- ^ Expected failure code and output (if any)
+  -- ^ Expected failure code and output (if any)
   , gstSourceDirectory :: IO FilePath
-    -- ^ Directory containing executables produced by 'GhdlMakeTest'
+  -- ^ Directory containing executables produced by 'GhdlMakeTest'
   , gstTop :: String
-    -- ^ Entry point to be executed
+  -- ^ Entry point to be executed
   }
 
 instance IsTest GhdlSimTest where
@@ -152,7 +149,6 @@ instance IsTest GhdlSimTest where
         case gstExpectFailure of
           Nothing -> run optionSet (program workDir gstTop) progressCallback
           Just exit -> run optionSet (failingProgram workDir gstTop exit) progressCallback
-
     | otherwise =
         pure (testPassed "Ignoring test due to --no-ghdl")
    where
@@ -161,8 +157,16 @@ instance IsTest GhdlSimTest where
 
     failingProgram workDir top (testExit, expectedErr) =
       TestFailingProgram
-        (testExitCode testExit) "ghdl" (args top) NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
+        (testExitCode testExit)
+        "ghdl"
+        (args top)
+        NoGlob
+        PrintNeither
+        False
+        (specificExitCode testExit)
+        (ExpectEither expectedErr)
+        (Just workDir)
+        []
 
     args work =
       [ "-r"

@@ -1,25 +1,30 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+
 module T1786 where
 
-import           Clash.Prelude
+import Clash.Prelude
 
-import           Clash.Explicit.Testbench
-import           Clash.Annotations.Primitive
+import Clash.Annotations.Primitive
+import Clash.Explicit.Testbench
 
-import           Data.String.Interpolate (__i)
+import Data.String.Interpolate (__i)
 
 testEnable :: Signal System Bool
 testEnable = testAlwaysEnabled enableGen
 {-# OPAQUE testEnable #-}
 
 -- Only call with always-enabled Enable if you want the model to match the HDL.
-testAlwaysEnabled
-  :: Enable System
-  -> Signal System Bool
+testAlwaysEnabled ::
+  Enable System ->
+  Signal System Bool
 testAlwaysEnabled !_ = pure True
 {-# OPAQUE testAlwaysEnabled #-}
-{-# ANN testAlwaysEnabled (InlinePrimitive [VHDL] [__i|
+{-# ANN
+  testAlwaysEnabled
+  ( InlinePrimitive
+      [VHDL]
+      [__i|
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabled"
       , "kind"      : "Expression"
@@ -27,14 +32,16 @@ testAlwaysEnabled !_ = pure True
       }
     }
   ]
-  |]) #-}
+  |]
+  )
+  #-}
 
 testEnableTB :: Signal System Bool
 testEnableTB = done
  where
   done = outputVerifier' clk rst (True :> Nil) testEnable
-  clk  = tbSystemClockGen (not <$> done)
-  rst  = systemResetGen
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 {-# OPAQUE testEnableTB #-}
 {-# ANN testEnableTB (TestBench 'testEnable) #-}
 
@@ -43,12 +50,16 @@ testBool = testAlwaysEnabledBool (pure True)
 {-# OPAQUE testBool #-}
 
 -- Only call with always-true input if you want the model to match the HDL.
-testAlwaysEnabledBool
-  :: Signal System Bool
-  -> Signal System Bool
+testAlwaysEnabledBool ::
+  Signal System Bool ->
+  Signal System Bool
 testAlwaysEnabledBool !_ = pure True
 {-# OPAQUE testAlwaysEnabledBool #-}
-{-# ANN testAlwaysEnabledBool (InlinePrimitive [VHDL] [__i|
+{-# ANN
+  testAlwaysEnabledBool
+  ( InlinePrimitive
+      [VHDL]
+      [__i|
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabledBool"
       , "kind"      : "Expression"
@@ -56,14 +67,15 @@ testAlwaysEnabledBool !_ = pure True
       }
     }
   ]
-  |]) #-}
+  |]
+  )
+  #-}
 
 testBoolTB :: Signal System Bool
-
 testBoolTB = done
  where
   done = outputVerifier' clk rst (True :> Nil) testBool
-  clk  = tbSystemClockGen (not <$> done)
-  rst  = systemResetGen
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 {-# OPAQUE testBoolTB #-}
 {-# ANN testBoolTB (TestBench 'testBool) #-}

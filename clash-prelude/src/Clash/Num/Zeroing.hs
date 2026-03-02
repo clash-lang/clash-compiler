@@ -3,38 +3,37 @@ Copyright   : (C) 2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Clash.Num.Zeroing
-  ( Zeroing
-  , fromZeroing  -- exported here because haddock https://github.com/haskell/haddock/issues/456
-  , toZeroing
-  ) where
+module Clash.Num.Zeroing (
+  Zeroing,
+  fromZeroing, -- exported here because haddock https://github.com/haskell/haddock/issues/456
+  toZeroing,
+) where
 
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
 import Data.Bits (Bits, FiniteBits)
 import Data.Coerce (coerce)
-import Data.Functor.Compose (Compose(..))
+import Data.Functor.Compose (Compose (..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
 import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
-import Clash.Class.Num (SaturationMode(SatZero), SaturatingNum(..))
+import Clash.Class.Num (SaturatingNum (..), SaturationMode (SatZero))
 import Clash.Class.Parity (Parity)
-import Clash.Class.Resize (Resize(..))
+import Clash.Class.Resize (Resize (..))
 import Clash.XException (NFDataX, ShowX)
 
--- | A zeroing number type is one where all operations return zero if they go
--- out of bounds for the underlying type.
---
--- Numbers can be converted to zero by default using `toZeroing`.
---
-newtype Zeroing a =
-  Zeroing { fromZeroing :: a }
+{- | A zeroing number type is one where all operations return zero if they go
+out of bounds for the underlying type.
+
+Numbers can be converted to zero by default using `toZeroing`.
+-}
+newtype Zeroing a
+  = Zeroing {fromZeroing :: a}
   deriving newtype
     ( Arbitrary
     , Binary
@@ -58,27 +57,27 @@ toZeroing = Zeroing
 
 instance (Resize f) => Resize (Compose Zeroing f) where
   {-# INLINE resize #-}
-  resize
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Zeroing f a
-    -> Compose Zeroing f b
+  resize ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Zeroing f a ->
+    Compose Zeroing f b
   resize = coerce (resize @f @a @b)
 
   {-# INLINE zeroExtend #-}
-  zeroExtend
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Zeroing f a
-    -> Compose Zeroing f (b + a)
+  zeroExtend ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Zeroing f a ->
+    Compose Zeroing f (b + a)
   zeroExtend = coerce (zeroExtend @f @a @b)
 
   {-# INLINE truncateB #-}
-  truncateB
-    :: forall a b
-     . (KnownNat a)
-    => Compose Zeroing f (a + b)
-    -> Compose Zeroing f a
+  truncateB ::
+    forall a b.
+    (KnownNat a) =>
+    Compose Zeroing f (a + b) ->
+    Compose Zeroing f a
   truncateB = coerce (truncateB @f @a @b)
 
 instance (Bounded a, Ord a, SaturatingNum a) => Num (Zeroing a) where

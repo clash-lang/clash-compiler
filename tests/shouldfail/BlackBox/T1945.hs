@@ -1,18 +1,23 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module T1945 where
 
-import           Clash.Annotations.Primitive  (Primitive(..), HDL(..), hasBlackBox)
-import           Clash.Netlist.Types          (TemplateFunction (..))
-import           Clash.Prelude
+import Clash.Annotations.Primitive (HDL (..), Primitive (..), hasBlackBox)
+import Clash.Netlist.Types (TemplateFunction (..))
+import Clash.Prelude
 
-import           Data.String.Interpolate      (__i)
+import Data.String.Interpolate (__i)
 
 bb :: a -> a
 bb x = x
 {-# OPAQUE bb #-}
 {-# ANN bb hasBlackBox #-}
-{-# ANN bb (InlinePrimitive [VHDL,Verilog,SystemVerilog] [__i|
+{-# ANN
+  bb
+  ( InlinePrimitive
+      [VHDL, Verilog, SystemVerilog]
+      [__i|
    [ { "BlackBox" :
         { "name" : "T1945.bb",
           "kind" : "Expression",
@@ -27,7 +32,9 @@ bb x = x
         }
      }
    ]
-   |]) #-}
+   |]
+  )
+  #-}
 
 tf :: TemplateFunction
 tf = TemplateFunction used valid (const (pure "QQ"))

@@ -3,47 +3,45 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-import Control.Exception (IOException, SomeException, try, throwIO, catch)
-import Control.Monad     (unless)
-import Data.Char         (isSpace)
-import Data.List         (isPrefixOf, isInfixOf, dropWhileEnd, intercalate)
-import Data.Maybe        (fromJust)
+import Control.Exception (IOException, SomeException, catch, throwIO, try)
+import Control.Monad (unless)
+import Data.Char (isSpace)
+import Data.List (dropWhileEnd, intercalate, isInfixOf, isPrefixOf)
+import Data.Maybe (fromJust)
 import NeatInterpolation (text)
-import System.IO         (stderr, hPutStrLn)
-import System.Directory  (removeFile)
-import System.Process    (callProcess, readProcessWithExitCode)
+import System.Directory (removeFile)
 import System.Environment (setEnv)
-import Text.Printf       (printf)
+import System.IO (hPutStrLn, stderr)
+import System.Process (callProcess, readProcessWithExitCode)
+import Text.Printf (printf)
 
-
-
-import qualified Data.Text    as Text
+import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 
-import Distribution.Simple ( Args
-                           , postClean
-                           , postConf
-                           , simpleUserHooks
-                           , defaultMainWithHooks
-                           , UserHooks
-                           )
+import Distribution.Simple (
+  Args,
+  UserHooks,
+  defaultMainWithHooks,
+  postClean,
+  postConf,
+  simpleUserHooks,
+ )
 
-import Distribution.Simple.Setup          (ConfigFlags)
-import Distribution.Simple.Setup          (CleanFlags)
-import Distribution.PackageDescription    (PackageDescription, ccOptions)
-import Distribution.PackageDescription    (HookedBuildInfo, setupBuildInfo)
-import Distribution.Simple.LocalBuildInfo (LocalBuildInfo, configFlags)
-import Distribution.Simple.LocalBuildInfo
 import Distribution.PackageDescription
+import Distribution.PackageDescription (HookedBuildInfo, PackageDescription, ccOptions, setupBuildInfo)
+import Distribution.Simple.LocalBuildInfo
+import Distribution.Simple.LocalBuildInfo (LocalBuildInfo, configFlags)
+import Distribution.Simple.Setup (CleanFlags, ConfigFlags)
 
 -- Blackbox generation
-import GHC.Exts (fromList)
-import Language.Haskell.TH
-import Data.Aeson (Value (Array, String, Object))
-import qualified Data.Yaml as Yaml
-import Text.Printf (printf)
+
+import Data.Aeson (Value (Array, Object, String))
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
+import qualified Data.Yaml as Yaml
+import GHC.Exts (fromList)
+import Language.Haskell.TH
+import Text.Printf (printf)
 
 import qualified Data.Aeson.KeyMap as KM
 
@@ -52,41 +50,43 @@ __COSIM_MAX_NUMBER_OF_CLOCKS__ = 1
 __COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.primitives.yaml"
 
 main = do
-    setEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS" $ show __COSIM_MAX_NUMBER_OF_ARGUMENTS__
-    setEnv "COSIM_MAX_NUMBER_OF_CLOCKS" $ show __COSIM_MAX_NUMBER_OF_CLOCKS__
-    defaultMainWithHooks simpleUserHooks { postConf  = cosimBuild
-                                         , postClean = cosimClean
-                                         }
-
+  setEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS" $ show __COSIM_MAX_NUMBER_OF_ARGUMENTS__
+  setEnv "COSIM_MAX_NUMBER_OF_CLOCKS" $ show __COSIM_MAX_NUMBER_OF_CLOCKS__
+  defaultMainWithHooks
+    simpleUserHooks
+      { postConf = cosimBuild
+      , postClean = cosimClean
+      }
 
 supportsMinusN :: String -> Bool
 supportsMinusN s = any (isPrefixOf "-N ") (map trim $ lines s)
-    where
-        trim :: String -> String
-        trim = dropWhileEnd isSpace . dropWhile isSpace
+ where
+  trim :: String -> String
+  trim = dropWhileEnd isSpace . dropWhile isSpace
 
-tryIO :: IO a ->  IO (Either IOException a)
+tryIO :: IO a -> IO (Either IOException a)
 tryIO = try
 
 trySome :: IO a -> IO (Either SomeException a)
 trySome = try
 
-
 -- | Runs Makefile
-cosimBuild
-    :: Args
-    -> ConfigFlags
-    -> PackageDescription
-    -> LocalBuildInfo
-    -> IO ()
+cosimBuild ::
+  Args ->
+  ConfigFlags ->
+  PackageDescription ->
+  LocalBuildInfo ->
+  IO ()
 cosimBuild args flags pkgDescription localBuildInfo = do
-    postConf simpleUserHooks args flags pkgDescription localBuildInfo
+  postConf simpleUserHooks args flags pkgDescription localBuildInfo
 
-    -- Check if correct vvp version is installed
-    vvpHelp <- tryIO $ readProcessWithExitCode "vvp" ["-h"] []
-    let vvpHelp' = case vvpHelp of
-          Left (Text.pack . show -> err) ->
-              error $ Text.unpack $ [text|
+  -- Check if correct vvp version is installed
+  vvpHelp <- tryIO $ readProcessWithExitCode "vvp" ["-h"] []
+  let vvpHelp' = case vvpHelp of
+        Left (Text.pack . show -> err) ->
+          error $
+            Text.unpack $
+              [text|
                   Failed to execute vvp. System reported:
 
                       ${err}
@@ -95,14 +95,17 @@ cosimBuild args flags pkgDescription localBuildInfo = do
 
                       sudo apt install iverilog
                   |]
-          Right (_exitCode, _stdout, stderr) -> stderr
+        Right (_exitCode, _stdout, stderr) -> stderr
 
-    -- HACK: Fetch Ubuntu 18.04 version of iverilog. Although this is not
-    -- guaranteed to install the latest patched version, it is a pretty safe
-    -- bet as this package has been stable for almost two years now. We use
-    -- a Danish mirror (one.com) as the *.archive.ubuntu.com do not support
-    -- HTTPS (this is usually no problem due to APT handling auth logic).
-    unless (supportsMinusN vvpHelp') $ error $ Text.unpack [text|
+  -- HACK: Fetch Ubuntu 18.04 version of iverilog. Although this is not
+  -- guaranteed to install the latest patched version, it is a pretty safe
+  -- bet as this package has been stable for almost two years now. We use
+  -- a Danish mirror (one.com) as the *.archive.ubuntu.com do not support
+  -- HTTPS (this is usually no problem due to APT handling auth logic).
+  unless (supportsMinusN vvpHelp') $
+    error $
+      Text.unpack
+        [text|
         Installed version of vvp does not support the flag '-N'. Upgrade
         your version to >= 11.0. On Ubuntu <= 16.04, run:
 
@@ -120,31 +123,36 @@ cosimBuild args flags pkgDescription localBuildInfo = do
             5aab60f8f7cbae29205c47684c5fce41a60e6d8e1b8fea31013747407e95bf0b  iverilog_10.1-0.1build1_amd64.deb
         |]
 
-    -- Pass compile options mentioned in clash-cosim.cabal to 'make'
-    let ccOpts = ccOptions
-                   $ libBuildInfo
-                   $ fromJust
-                   $ library
-                   $ localPkgDescr localBuildInfo
+  -- Pass compile options mentioned in clash-cosim.cabal to 'make'
+  let ccOpts =
+        ccOptions $
+          libBuildInfo $
+            fromJust $
+              library $
+                localPkgDescr localBuildInfo
 
-    let ldOpts = ldOptions
-                   $ libBuildInfo
-                   $ fromJust
-                   $ library
-                   $ localPkgDescr localBuildInfo
+  let ldOpts =
+        ldOptions $
+          libBuildInfo $
+            fromJust $
+              library $
+                localPkgDescr localBuildInfo
 
-
-    makeResult <- trySome $ callProcess
-                                "make"
-                                [ "-C"
-                                , "src/cbits"
-                                , "-s"
-                                , printf "CFLAGS=%s" (intercalate " " ccOpts)
-                                , printf "LFLAGS=%s" (intercalate " " ldOpts)
-                                ]
-    case makeResult of
-        Left (Text.pack . show -> err) ->
-            error $ Text.unpack $ [text|
+  makeResult <-
+    trySome $
+      callProcess
+        "make"
+        [ "-C"
+        , "src/cbits"
+        , "-s"
+        , printf "CFLAGS=%s" (intercalate " " ccOpts)
+        , printf "LFLAGS=%s" (intercalate " " ldOpts)
+        ]
+  case makeResult of
+    Left (Text.pack . show -> err) ->
+      error $
+        Text.unpack $
+          [text|
                 Running 'make' on 'src/cbits/Makefile' failed. System reported:
 
                     ${err}
@@ -153,101 +161,115 @@ cosimBuild args flags pkgDescription localBuildInfo = do
 
                     sudo apt install build-essential
                 |]
-        Right _ ->
-            return ()
+    Right _ ->
+      return ()
 
-    writeFile
-        __COSIM_PRIMITIVE_PATH__
-        (blackboxYamlString __COSIM_MAX_NUMBER_OF_CLOCKS__ __COSIM_MAX_NUMBER_OF_ARGUMENTS__)
+  writeFile
+    __COSIM_PRIMITIVE_PATH__
+    (blackboxYamlString __COSIM_MAX_NUMBER_OF_CLOCKS__ __COSIM_MAX_NUMBER_OF_ARGUMENTS__)
 
 -- | Cleans binaries made by cosimPostBuild
-cosimClean
-    :: Args
-    -> CleanFlags
-    -> PackageDescription
-    -> ()
-    -> IO ()
+cosimClean ::
+  Args ->
+  CleanFlags ->
+  PackageDescription ->
+  () ->
+  IO ()
 cosimClean args flags pkgDescription stub = do
-    postClean simpleUserHooks args flags pkgDescription stub
-    callProcess "make" ["-C", "src/cbits", "clean", "-s"]
+  postClean simpleUserHooks args flags pkgDescription stub
+  callProcess "make" ["-C", "src/cbits", "clean", "-s"]
 
 --------------------------------------
 ---- BLACKBOX GENERATION -------------
 --------------------------------------
--- | Create a blackbox object of the following structure:
---
---    - Blackbox
---        name: name
---        type: type
---        template: template
---
--- TODO: preferably, this function should be in Clash.CoSim.CodeGeneration. But
--- I can't figure out how to run a function in that module from here, so this
--- will have to do. Alternatively, Clash could support blackbox annotation which
--- contain json contents instead of directory names.
-blackboxObject
-    :: String
-    -- ^ name
-    -> String
-    -- ^ type
-    -> String
-    -- ^ templateD
-    -> Value
+
+{- | Create a blackbox object of the following structure:
+
+   - Blackbox
+       name: name
+       type: type
+       template: template
+
+TODO: preferably, this function should be in Clash.CoSim.CodeGeneration. But
+I can't figure out how to run a function in that module from here, so this
+will have to do. Alternatively, Clash could support blackbox annotation which
+contain json contents instead of directory names.
+-}
+blackboxObject ::
+  -- | name
+  String ->
+  -- | type
+  String ->
+  -- | templateD
+  String ->
+  Value
 blackboxObject bbname type_ templateD =
-  Object (KM.fromList [("BlackBox", Object (KM.fromList [
-      ("name", String $ Text.pack bbname)
-    , ("kind", "Declaration")
-    , ("type", String $ Text.pack type_)
-    , ("template", String $ Text.pack templateD)
-    ]))])
+  Object
+    ( KM.fromList
+        [
+          ( "BlackBox"
+          , Object
+              ( KM.fromList
+                  [ ("name", String $ Text.pack bbname)
+                  , ("kind", "Declaration")
+                  , ("type", String $ Text.pack type_)
+                  , ("template", String $ Text.pack templateD)
+                  ]
+              )
+          )
+        ]
+    )
 
 -- | Create blackbox for a given number of arguments
-blackboxYaml'
-    :: Int
-    -- ^ Number of clocks of coSimN
-    -> Int
-    -- ^ Number of arguments of coSimN
-    -> Value
-    -- ^ Blackbox object
+blackboxYaml' ::
+  -- | Number of clocks of coSimN
+  Int ->
+  -- | Number of arguments of coSimN
+  Int ->
+  -- | Blackbox object
+  Value
 blackboxYaml' clks args = blackboxObject bbname "" templateD
-    where
-      -- Offset where 'real' arguments start, instead of constraints
-      argsOffset = 1    -- result constraint
-                 + 1    -- knowndomain constraint
-                 + args -- argument constraints
+ where
+  -- Offset where 'real' arguments start, instead of constraints
+  argsOffset =
+    1 -- result constraint
+      + 1 -- knowndomain constraint
+      + args -- argument constraints
 
-      -- Offset where signal arguments start
-      signalOffset = argsOffset -- constraints
-                   + 3          -- source, module name, simulation settings
+  -- Offset where signal arguments start
+  signalOffset =
+    argsOffset -- constraints
+      + 3 -- source, module name, simulation settings
+  sourceOffset = argsOffset
+  moduleOffset = argsOffset + 1
 
-      sourceOffset = argsOffset
-      moduleOffset = argsOffset + 1
-
-      bbname    = "Clash.CoSim.CoSimInstances.coSimC" ++ show clks ++ "_A" ++ show args
-      arguments = concat [printf "~ARG[%d], " i | i <- [signalOffset..signalOffset+(clks+args)-1]] :: String
-      template  = printf "~TEMPLATE[~LIT[%d].v][~LIT[%d]]" moduleOffset sourceOffset
-      compname  = printf "~NAME[%d]" moduleOffset
-      instanc_  = printf "~GENSYM[~NAME[%d]_inst][0] (%s~RESULT)" moduleOffset arguments
-      templateD = unwords [template, compname, instanc_, ";"]
+  bbname = "Clash.CoSim.CoSimInstances.coSimC" ++ show clks ++ "_A" ++ show args
+  arguments =
+    concat [printf "~ARG[%d], " i | i <- [signalOffset .. signalOffset + (clks + args) - 1]] :: String
+  template = printf "~TEMPLATE[~LIT[%d].v][~LIT[%d]]" moduleOffset sourceOffset
+  compname = printf "~NAME[%d]" moduleOffset
+  instanc_ = printf "~GENSYM[~NAME[%d]_inst][0] (%s~RESULT)" moduleOffset arguments
+  templateD = unwords [template, compname, instanc_, ";"]
 
 -- | Create blackbox for all coSim functions up to n
-blackboxYaml
-    :: Int
-    -- ^ Number of clock arguments
-    -> Int
-    -- ^ Number of non-clock arguments
-    -> Value
-    -- ^ Array of blackbox objects
-blackboxYaml clks args = Array $ fromList [blackboxYaml' clk arg | clk <- [0..clks], arg <- [1..args] ]
+blackboxYaml ::
+  -- | Number of clock arguments
+  Int ->
+  -- | Number of non-clock arguments
+  Int ->
+  -- | Array of blackbox objects
+  Value
+blackboxYaml clks args = Array $ fromList [blackboxYaml' clk arg | clk <- [0 .. clks], arg <- [1 .. args]]
 
--- | Create blackbox for all coSim functions up to n. This function will encode
--- the json structure as a string, using a pretty printer.
-blackboxYamlString
-    :: Int
-    -- ^ Number of clock arguments
-    -> Int
-    -- ^ Number of non-clock arguments
-    -> String
-    -- ^ Encoded json file
+{- | Create blackbox for all coSim functions up to n. This function will encode
+the json structure as a string, using a pretty printer.
+-}
+blackboxYamlString ::
+  -- | Number of clock arguments
+  Int ->
+  -- | Number of non-clock arguments
+  Int ->
+  -- | Encoded json file
+  String
 blackboxYamlString clks =
   Text.unpack . Text.decodeUtf8 . Yaml.encode . blackboxYaml clks

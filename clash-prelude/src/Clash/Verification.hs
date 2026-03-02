@@ -1,4 +1,4 @@
-{-|
+{- |
 Copyright  :  (C) 2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -6,79 +6,84 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 See "Clash.Explicit.Verification" for an introduction.
 
 The verification API is currently experimental and subject to change.
-
 -}
+module Clash.Verification (
+  -- * Types
+  Assertion,
+  Property,
+  RenderAs (..),
 
-module Clash.Verification
-  ( -- * Types
-    Assertion
-  , Property
-  , RenderAs(..)
+  -- * Bootstrapping functions
+  EV.name,
+  EV.lit,
 
-    -- * Bootstrapping functions
-  , EV.name
-  , EV.lit
-
-    -- * Functions to build a PSL/SVA expressions
-  , EV.not
-  , EV.and
-  , EV.or
-  , EV.implies
-  , EV.next
-  , EV.nextN
-  , EV.before
-  , EV.timplies
-  , EV.timpliesOverlapping
-  , EV.always
-  , EV.never
-  , EV.eventually
+  -- * Functions to build a PSL/SVA expressions
+  EV.not,
+  EV.and,
+  EV.or,
+  EV.implies,
+  EV.next,
+  EV.nextN,
+  EV.before,
+  EV.timplies,
+  EV.timpliesOverlapping,
+  EV.always,
+  EV.never,
+  EV.eventually,
 
   -- * Asserts
-  , EV.assert
-  , EV.cover
+  EV.assert,
+  EV.cover,
 
   -- * Assertion checking
-  , check
-  , checkI
+  check,
+  checkI,
 
   -- * Functions to deal with assertion results
-  , EV.hideAssertion
-  ) where
+  EV.hideAssertion,
+) where
 
+import qualified Clash.Explicit.Verification as EV
+import Clash.Signal (
+  HiddenClock,
+  HiddenReset,
+  KnownDomain,
+  Signal,
+  hasClock,
+  hasReset,
+ )
+import Clash.Verification.Internal
+import Data.Text (Text)
 
-import qualified Clash.Explicit.Verification     as EV
-import           Clash.Signal
-  (KnownDomain, HiddenClock, HiddenReset, Signal, hasClock, hasReset)
-import           Clash.Verification.Internal
-import           Data.Text                       (Text)
-
--- | Print property as PSL/SVA in HDL. Clash simulation support not yet
--- implemented.
-check
-  :: ( KnownDomain dom
-     , HiddenClock dom
-     , HiddenReset dom
-     )
-  => Text
-  -- ^ Property name (used in reports and error messages)
-  -> RenderAs
-  -- ^ Assertion language to use in HDL
-  -> Property dom
-  -> Signal dom AssertionResult
+{- | Print property as PSL/SVA in HDL. Clash simulation support not yet
+implemented.
+-}
+check ::
+  ( KnownDomain dom
+  , HiddenClock dom
+  , HiddenReset dom
+  ) =>
+  -- | Property name (used in reports and error messages)
+  Text ->
+  -- | Assertion language to use in HDL
+  RenderAs ->
+  Property dom ->
+  Signal dom AssertionResult
 check = EV.check hasClock hasReset
 
--- | Same as 'check', but doesn't require a design to explicitly carried to
--- top-level.
-checkI
-  :: ( KnownDomain dom
-     , HiddenClock dom
-     , HiddenReset dom
-     )
-  => Text
-  -- ^ Property name (used in reports and error messages)
-  -> RenderAs
-  -- ^ Assertion language to use in HDL
-  -> Property dom
-  -> Signal dom a
-  -> Signal dom a
+{- | Same as 'check', but doesn't require a design to explicitly carried to
+top-level.
+-}
+checkI ::
+  ( KnownDomain dom
+  , HiddenClock dom
+  , HiddenReset dom
+  ) =>
+  -- | Property name (used in reports and error messages)
+  Text ->
+  -- | Assertion language to use in HDL
+  RenderAs ->
+  Property dom ->
+  Signal dom a ->
+  Signal dom a
 checkI = EV.checkI hasClock hasReset

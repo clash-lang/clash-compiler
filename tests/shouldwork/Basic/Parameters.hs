@@ -10,7 +10,7 @@ import qualified Prelude as P
 
 import Control.Monad.State (State)
 import Data.List (isInfixOf)
-import Data.Monoid (Ap(getAp))
+import Data.Monoid (Ap (getAp))
 import Data.Text.Prettyprint.Doc.Extra (Doc)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
@@ -18,44 +18,55 @@ import System.FilePath ((</>))
 import Clash.Backend (blockDecl)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
-import Clash.Netlist.Util (typeSize, instPort)
+import Clash.Netlist.Util (instPort, typeSize)
 
-import Clash.Prelude
+import Clash.Annotations.Primitive (HDL (..), Primitive (..))
 import Clash.Backend (Backend)
-import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 import qualified Data.String.Interpolate as I
 
 myAddTF :: TemplateFunction
 myAddTF = TemplateFunction used valid myAddTemplate
  where
-  used    = [1,2]
+  used = [1, 2]
   valid _ = True
 
-myAddTemplate
-  :: Backend s
-  => BlackBoxContext
-  -> State s Doc
+myAddTemplate ::
+  (Backend s) =>
+  BlackBoxContext ->
+  State s Doc
 myAddTemplate bbCtx = do
   let [_, (xExp, xTy, _), (yExp, yTy, _)] = bbInputs bbCtx
       [(resExp, resTy)] = bbResults bbCtx
   blockId <- Id.make "my_add_block"
   myAddInstId <- Id.make "my_add_inst"
   let myAddId = Id.unsafeMake "my_add"
-  getAp $ blockDecl blockId
-    [ InstDecl Comp Nothing [] myAddId myAddInstId
-        [ (instPort "size", Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
-        ]
-        (NamedPortMap
-          [ (instPort "x", In, xTy, xExp)
-          , (instPort "y", In, yTy, yExp)
-          , (instPort "result", Out, resTy, resExp)
-          ])
-    ]
+  getAp
+    $ blockDecl
+      blockId
+      [ InstDecl
+          Comp
+          Nothing
+          []
+          myAddId
+          myAddInstId
+          [ (instPort "size", Integer, Literal Nothing (NumLit . fromIntegral $ typeSize xTy))
+          ]
+          ( NamedPortMap
+              [ (instPort "x", In, xTy, xExp)
+              , (instPort "y", In, yTy, yExp)
+              , (instPort "result", Out, resTy, resExp)
+              ]
+          )
+      ]
 
-{-# ANN myAdd
-  (InlinePrimitive [VHDL] [I.i|
+{-# ANN
+  myAdd
+  ( InlinePrimitive
+      [VHDL]
+      [I.i|
   [ { "BlackBox" :
        { "name" : "Parameters.myAdd"
        , "templateFunction" : "Parameters.myAddTF"
@@ -81,11 +92,14 @@ end;
 architecture structural of my_add is
 begin
   result <= x + y;
-end;" }] } } ] |] )
- #-}
-
-{-# ANN myAdd
-  (InlinePrimitive [Verilog] [I.i|
+end;" }] } } ] |]
+  )
+  #-}
+{-# ANN
+  myAdd
+  ( InlinePrimitive
+      [Verilog]
+      [I.i|
   [ { "BlackBox" :
       { "name" : "Parameters.myAdd"
       , "templateFunction" : "Parameters.myAddTF"
@@ -104,11 +118,14 @@ end;" }] } } ] |] )
   parameter size;
 
   assign result = x + y;
-endmodule"       }] } } ] |] )
- #-}
-
-{-# ANN myAdd
-  (InlinePrimitive [SystemVerilog] [I.i|
+endmodule"       }] } } ] |]
+  )
+  #-}
+{-# ANN
+  myAdd
+  ( InlinePrimitive
+      [SystemVerilog]
+      [I.i|
   [ { "BlackBox" :
       { "name" : "Parameters.myAdd"
       , "templateFunction" : "Parameters.myAddTF"
@@ -127,27 +144,27 @@ endmodule"       }] } } ] |] )
   parameter size;
 
   assign result = x + y;
-endmodule"       }] } } ] |] )
- #-}
-
-myAdd
-  :: KnownNat n
-  => Unsigned n
-  -> Unsigned n
-  -> Unsigned n
+endmodule"       }] } } ] |]
+  )
+  #-}
+myAdd ::
+  (KnownNat n) =>
+  Unsigned n ->
+  Unsigned n ->
+  Unsigned n
 myAdd a b = a + b
 {-# OPAQUE myAdd #-}
 
-topEntity
-  :: Unsigned 32
-  -> Unsigned 32
+topEntity ::
+  Unsigned 32 ->
+  Unsigned 32
 topEntity a = myAdd a a
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst $(listToVecTH [1,2,3,4,5::Unsigned 32])
-    expectedOutput = outputVerifier'   clk rst $(listToVecTH [2,4,6,8,10::Unsigned 32])
-    done           = expectedOutput (topEntity <$> testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+ where
+  testInput = stimuliGenerator clk rst $(listToVecTH [1, 2, 3, 4, 5 :: Unsigned 32])
+  expectedOutput = outputVerifier' clk rst $(listToVecTH [2, 4, 6, 8, 10 :: Unsigned 32])
+  done = expectedOutput (topEntity <$> testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

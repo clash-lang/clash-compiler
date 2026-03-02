@@ -1,11 +1,12 @@
 {-# LANGUAGE CPP #-}
+
 module T1933 where
 
 import Clash.Prelude
+import Clash.Signal.Internal
 import Clash.Sized.Internal.Unsigned
 import Data.Coerce
 import GHC.Natural
-import Clash.Signal.Internal
 
 data T = MkT (Unsigned 12) (Unsigned 12)
 
@@ -15,7 +16,7 @@ f x = x
 
 p :: Unsigned 12
 p = case clockGen @System of
-      Clock _ -> 4
+  Clock _ -> 4
 {-# OPAQUE p #-}
 
 q :: Natural

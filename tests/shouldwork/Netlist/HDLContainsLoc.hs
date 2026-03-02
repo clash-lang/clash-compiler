@@ -4,10 +4,10 @@ module HDLContainsLoc where
 
 import Clash.Prelude
 
-import qualified Prelude as P
 import Data.List (isInfixOf)
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
+import qualified Prelude as P
 
 topEntity :: Maybe Int -> Int
 topEntity x = case x of Nothing -> 0; Just x -> x
@@ -15,8 +15,14 @@ topEntity x = case x of Nothing -> 0; Just x -> x
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 mainVHDL :: IO ()
 mainVHDL = do

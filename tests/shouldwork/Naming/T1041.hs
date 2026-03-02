@@ -6,45 +6,50 @@ module T1041 where
 
 import Prelude as P
 
-import Clash.Prelude
-import Clash.Netlist.Types
 import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+import Clash.Prelude
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
 
 data VGASync dom = VGASync
-    { vgaHSync :: Signal dom (Unsigned 8)
-    , vgaVSync :: Signal dom (Unsigned 8)
-    , vgaDE    :: Signal dom (Unsigned 8)
-    }
+  { vgaHSync :: Signal dom (Unsigned 8)
+  , vgaVSync :: Signal dom (Unsigned 8)
+  , vgaDE :: Signal dom (Unsigned 8)
+  }
 
 data VGAOut dom = VGAOut
-    { vgaSync  :: VGASync dom
-    , vgaR     :: Signal dom (Unsigned 8)
-    , vgaG     :: Signal dom (Unsigned 8)
-    , vgaB     :: Signal dom (Unsigned 8)
-    }
+  { vgaSync :: VGASync dom
+  , vgaR :: Signal dom (Unsigned 8)
+  , vgaG :: Signal dom (Unsigned 8)
+  , vgaB :: Signal dom (Unsigned 8)
+  }
 
-{-# ANN getVgaOut
-   (Synthesize
-     { t_name   = "Pattern"
-     , t_inputs =
-        [ PortName "CLK_25MHZ"
-        , PortName "RESET"
-        ]
-     , t_output =
-        PortProduct "VGA"
-          [ PortProduct ""
-            [ PortName "HSYNC"
-            , PortName "VSYNC"
-            , PortName "DE"
-            ]
-          , PortName "RED"
-          , PortName "GREEN"
-          , PortName "BLUE"
+{-# ANN
+  getVgaOut
+  ( Synthesize
+      { t_name = "Pattern"
+      , t_inputs =
+          [ PortName "CLK_25MHZ"
+          , PortName "RESET"
           ]
-     }) #-}
+      , t_output =
+          PortProduct
+            "VGA"
+            [ PortProduct
+                ""
+                [ PortName "HSYNC"
+                , PortName "VSYNC"
+                , PortName "DE"
+                ]
+            , PortName "RED"
+            , PortName "GREEN"
+            , PortName "BLUE"
+            ]
+      }
+  )
+  #-}
 getVgaOut :: Clock System -> Reset System -> VGAOut System
 getVgaOut clk rst = VGAOut{..}
  where

@@ -2,26 +2,34 @@ module Annotate where
 
 import qualified Prelude as P
 
-import Clash.Prelude
 import Clash.Annotations.SynthesisAttributes
+import Clash.Prelude
 
 import Data.List
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
 topEntity :: Signal System Int -> Signal System Int
-topEntity = setName @"my_signal" $ annotate $
-     BoolAttr "bool_attr" True
-  :> IntegerAttr "int_attr" 3
-  :> StringAttr "str_attr" "foo"
-  :> Attr "attr"
-  :> Nil
+topEntity =
+  setName @"my_signal"
+    $ annotate
+    $ BoolAttr "bool_attr" True
+    :> IntegerAttr "int_attr" 3
+    :> StringAttr "str_attr" "foo"
+    :> Attr "attr"
+    :> Nil
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 mainVHDL :: IO ()
 mainVHDL = do

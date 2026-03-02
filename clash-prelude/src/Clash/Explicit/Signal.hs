@@ -1,4 +1,16 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{- |
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
                   2017-2022, Google Inc.
@@ -128,188 +140,227 @@ can potentially introduce situations prone to meta-stability:
         domain, there is no guarantee that they actually originate from the same
         source. They could hence be connected to completely unrelated clock
         sources, and components can then induce metastable states in others.
-
 -}
+module Clash.Explicit.Signal (
+  -- * Synchronous signal
+  Signal,
+  BiSignalIn,
+  BiSignalOut,
+  BiSignalDefault (..),
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
+  -- * Domain
+  Domain,
+  KnownDomain (..),
+  KnownConfiguration,
+  ActiveEdge (..),
+  SActiveEdge (..),
+  InitBehavior (..),
+  SInitBehavior (..),
+  ResetKind (..),
+  SResetKind (..),
+  ResetPolarity (..),
+  SResetPolarity (..),
+  DomainConfiguration (..),
+  SDomainConfiguration (..),
 
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
-module Clash.Explicit.Signal
-  ( -- * Synchronous signal
-    Signal
-  , BiSignalIn
-  , BiSignalOut
-  , BiSignalDefault(..)
-    -- * Domain
-  , Domain
-  , KnownDomain(..)
-  , KnownConfiguration
-  , ActiveEdge(..)
-  , SActiveEdge(..)
-  , InitBehavior(..)
-  , SInitBehavior(..)
-  , ResetKind(..)
-  , SResetKind(..)
-  , ResetPolarity(..)
-  , SResetPolarity(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
   -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
-    -- *** Convenience types #conveniencetypes#
-    -- $conveniencetypes
+  DomainPeriod,
+  DomainActiveEdge,
+  DomainResetKind,
+  DomainInitBehavior,
+  DomainResetPolarity,
 
-  , HasSynchronousReset
-  , HasAsynchronousReset
-  , HasDefinedInitialValues
+  -- *** Convenience types #conveniencetypes#
+  -- $conveniencetypes
+  HasSynchronousReset,
+  HasAsynchronousReset,
+  HasDefinedInitialValues,
+
   -- **** Time representations
-  , Seconds
-  , Milliseconds
-  , Microseconds
-  , Nanoseconds
-  , Picoseconds
+  Seconds,
+  Milliseconds,
+  Microseconds,
+  Nanoseconds,
+  Picoseconds,
+
   -- **** Time conversions
-  , DomainToHz
-  , HzToPeriod
-  , PeriodToHz
-  , PeriodToCycles
-  , ClockDivider
-    -- ** Default domains
-  , System
-  , XilinxSystem
-  , IntelSystem
-  , vSystem
-  , vIntelSystem
-  , vXilinxSystem
-    -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , createDomain
-  , knownVDomain
-  , clockPeriod
-  , activeEdge
-  , resetKind
-  , initBehavior
-  , resetPolarity
-    -- ** Enabling
-  , Enable
-  , toEnable
-  , fromEnable
-  , enableGen
-    -- * Clock
-  , Clock
-  , DiffClock
-  , periodToHz
-  , hzToPeriod
-    -- ** Synchronization primitive
-  , unsafeSynchronizer
-  , veryUnsafeSynchronizer
-    -- * Reset
-  , Reset
-  , unsafeToReset
-  , unsafeFromReset
-  , unsafeToActiveHigh
-  , unsafeToActiveLow
-  , unsafeFromActiveHigh
-  , unsafeFromActiveLow
-    -- * Basic circuit functions
-  , andEnable
-  , dflipflop
-  , delay
-  , delayMaybe
-  , delayEn
-  , register
-  , regMaybe
-  , regEn
-  , mux
-    -- * Simulation and testbench functions
-  , clockGen
-  , resetGen
-  , resetGenN
-  , systemClockGen
-  , systemResetGen
-    -- * Boolean connectives
-  , (.&&.), (.||.)
-    -- * Product/Signal isomorphism
-  , Bundle(..)
-  , EmptyTuple(..)
-  , TaggedEmptyTuple(..)
-    -- * Simulation functions (not synthesizable)
-  , simulate
-  , simulateB
-  , simulateWithReset
-  , simulateWithResetN
-  , runUntil
-    -- ** lazy versions
-  , simulate_lazy
-  , simulateB_lazy
-    -- ** Automaton
-  , signalAutomaton
-    -- * List \<-\> Signal conversion (not synthesizable)
-  , sample
-  , sampleN
-  , sampleWithReset
-  , sampleWithResetN
-  , fromList
-  , fromListWithReset
-    -- ** lazy versions
-  , sample_lazy
-  , sampleN_lazy
-  , fromList_lazy
-    -- * QuickCheck combinators
-  , testFor
-    -- * Type classes
-    -- ** 'Eq'-like
-  , (.==.), (.==), (==.), (./=.), (./=), (/=.)
-    -- ** 'Ord'-like
-  , (.<.), (.<), (<.), (.<=.), (.<=), (<=.), (.>=.), (.>=), (>=.), (.>.), (.>), (>.)
-    -- * Bisignal functions
-  , veryUnsafeToBiSignalIn
-  , readFromBiSignal
-  , writeToBiSignal
-  , mergeBiSignalOuts
+  DomainToHz,
+  HzToPeriod,
+  PeriodToHz,
+  PeriodToCycles,
+  ClockDivider,
+
+  -- ** Default domains
+  System,
+  XilinxSystem,
+  IntelSystem,
+  vSystem,
+  vIntelSystem,
+  vXilinxSystem,
+
+  -- ** Domain utilities
+  VDomainConfiguration (..),
+  vDomain,
+  createDomain,
+  knownVDomain,
+  clockPeriod,
+  activeEdge,
+  resetKind,
+  initBehavior,
+  resetPolarity,
+
+  -- ** Enabling
+  Enable,
+  toEnable,
+  fromEnable,
+  enableGen,
+
+  -- * Clock
+  Clock,
+  DiffClock,
+  periodToHz,
+  hzToPeriod,
+
+  -- ** Synchronization primitive
+  unsafeSynchronizer,
+  veryUnsafeSynchronizer,
+
+  -- * Reset
+  Reset,
+  unsafeToReset,
+  unsafeFromReset,
+  unsafeToActiveHigh,
+  unsafeToActiveLow,
+  unsafeFromActiveHigh,
+  unsafeFromActiveLow,
+
+  -- * Basic circuit functions
+  andEnable,
+  dflipflop,
+  delay,
+  delayMaybe,
+  delayEn,
+  register,
+  regMaybe,
+  regEn,
+  mux,
+
+  -- * Simulation and testbench functions
+  clockGen,
+  resetGen,
+  resetGenN,
+  systemClockGen,
+  systemResetGen,
+
+  -- * Boolean connectives
+  (.&&.),
+  (.||.),
+
+  -- * Product/Signal isomorphism
+  Bundle (..),
+  EmptyTuple (..),
+  TaggedEmptyTuple (..),
+
+  -- * Simulation functions (not synthesizable)
+  simulate,
+  simulateB,
+  simulateWithReset,
+  simulateWithResetN,
+  runUntil,
+
+  -- ** lazy versions
+  simulate_lazy,
+  simulateB_lazy,
+
+  -- ** Automaton
+  signalAutomaton,
+
+  -- * List \<-\> Signal conversion (not synthesizable)
+  sample,
+  sampleN,
+  sampleWithReset,
+  sampleWithResetN,
+  fromList,
+  fromListWithReset,
+
+  -- ** lazy versions
+  sample_lazy,
+  sampleN_lazy,
+  fromList_lazy,
+
+  -- * QuickCheck combinators
+  testFor,
+
+  -- * Type classes
+
+  -- ** 'Eq'-like
+  (.==.),
+  (.==),
+  (==.),
+  (./=.),
+  (./=),
+  (/=.),
+
+  -- ** 'Ord'-like
+  (.<.),
+  (.<),
+  (<.),
+  (.<=.),
+  (.<=),
+  (<=.),
+  (.>=.),
+  (.>=),
+  (>=.),
+  (.>.),
+  (.>),
+  (>.),
+
+  -- * Bisignal functions
+  veryUnsafeToBiSignalIn,
+  readFromBiSignal,
+  writeToBiSignal,
+  mergeBiSignalOuts,
 
   -- * Deprecated
-  , unsafeFromHighPolarity
-  , unsafeFromLowPolarity
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
-  )
+  unsafeFromHighPolarity,
+  unsafeFromLowPolarity,
+  unsafeToHighPolarity,
+  unsafeToLowPolarity,
+)
 where
 
-import           Data.Bifunctor                 (bimap)
-import           Data.Int                       (Int64)
-import           Data.List                      (uncons)
-import           Data.Maybe                     (isJust)
-import           GHC.TypeLits                   (type (<=))
+import Data.Bifunctor (bimap)
+import Data.Int (Int64)
+import Data.List (uncons)
+import Data.Maybe (isJust)
+import GHC.TypeLits (type (<=))
 
-import           Clash.Annotations.Primitive    (hasBlackBox)
-import           Clash.Promoted.Nat             (SNat(..), snatToNum)
-import           Clash.Signal.Bundle
-  (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..), vecBundle#)
-import           Clash.Signal.BiSignal
-import           Clash.Signal.Internal
-import           Clash.Signal.Internal.Ambiguous
-  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Promoted.Nat (SNat (..), snatToNum)
+import Clash.Signal.BiSignal
+import Clash.Signal.Bundle (
+  Bundle (..),
+  EmptyTuple (..),
+  TaggedEmptyTuple (..),
+  vecBundle#,
+ )
+import Clash.Signal.Internal
+import Clash.Signal.Internal.Ambiguous (
+  activeEdge,
+  clockPeriod,
+  initBehavior,
+  knownVDomain,
+  resetKind,
+  resetPolarity,
+ )
 import qualified Clash.Sized.Vector
-import           Clash.XException
-  (NFDataX, deepErrorX, fromJustX, seqX, ShowX(..))
+import Clash.XException (
+  NFDataX,
+  ShowX (..),
+  deepErrorX,
+  fromJustX,
+  seqX,
+ )
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XFlexibleInstances -XMultiParamTypeClasses -XTypeFamilies
@@ -352,7 +403,6 @@ countSometimes clk rst en = s where
   s = regMaybe clk rst en 0 (plusM (pure <$> s) (sometimes1 clk rst en))
   plusM = liftA2 (liftA2 (+))
 :}
-
 -}
 
 {- $conveniencetypes
@@ -385,168 +435,177 @@ This way, you don't have to think about which constraints the function you're
 writing has exactly, and the constraint is succinct.
 -}
 
--- **Clock
--- | Clock generator for the 'System' clock domain.
---
--- __NB__: Should only be used for simulation, and __not__ for the /testBench/
--- function. For the /testBench/ function, used 'Clash.Explicit.Testbench.tbSystemClockGen'
-systemClockGen
-  :: Clock System
+-- ** Clock
+
+{- | Clock generator for the 'System' clock domain.
+
+__NB__: Should only be used for simulation, and __not__ for the /testBench/
+function. For the /testBench/ function, used 'Clash.Explicit.Testbench.tbSystemClockGen'
+-}
+systemClockGen ::
+  Clock System
 systemClockGen = clockGen
 
--- | Reset generator for use in simulation, for the 'System' clock domain.
--- Asserts the reset for a single cycle.
---
--- __NB__: While this can be used in the @testBench@ function, it cannot be
--- synthesized to hardware.
---
--- === __Example__
---
--- @
--- topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
--- topEntity = concat
---
--- testBench :: Signal System Bool
--- testBench = done
---   where
---     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
---     expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
---     done           = exposeClockResetEnable (expectedOutput (topEntity \<$\> testInput)) clk rst
---     clk            = tbSystemClockGen (not <\$\> done)
---     rst            = 'systemResetGen'
--- @
-systemResetGen ::Reset System
+{- | Reset generator for use in simulation, for the 'System' clock domain.
+Asserts the reset for a single cycle.
+
+__NB__: While this can be used in the @testBench@ function, it cannot be
+synthesized to hardware.
+
+=== __Example__
+
+@
+topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
+topEntity = concat
+
+testBench :: Signal System Bool
+testBench = done
+  where
+    testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
+    expectedOutput = outputVerifier' ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+    done           = exposeClockResetEnable (expectedOutput (topEntity \<$\> testInput)) clk rst
+    clk            = tbSystemClockGen (not <\$\> done)
+    rst            = 'systemResetGen'
+@
+-}
+systemResetGen :: Reset System
 systemResetGen = resetGen
 
 -- ** Synchronization primitive
--- | The 'unsafeSynchronizer' function is a primitive that must be used to
--- connect one clock domain to the other, and will be synthesized to a (bundle
--- of) wire(s) in the eventual circuit. This function should only be used as
--- part of a proper synchronization component, such as the following dual
--- flip-flop synchronizer:
---
--- @
--- dualFlipFlop
---   :: Clock domA
---   -> Clock domB
---   -> Enable domA
---   -> Enable domB
---   -> Bit
---   -> Signal domA Bit
---   -> Signal domB Bit
--- dualFlipFlop clkA clkB enA enB dflt =
---   'delay' clkB enB dflt . 'delay' clkB enB dflt . 'unsafeSynchronizer' clkA clkB
--- @
---
--- The 'unsafeSynchronizer' works in such a way that, given 2 clocks:
---
--- @
--- createDomain vSystem{vName=\"Dom7\", vPeriod=7}
---
--- clk7 :: 'Clock' Dom7
--- clk7 = 'clockGen'
---
--- en7 :: 'Enable' Dom7
--- en7 = 'enableGen'
--- @
---
--- and
---
--- @
--- createDomain vSystem{vName=\"Dom2\", vPeriod=2}
---
--- clk2 :: 'Clock' Dom2
--- clk2 = 'clockGen'
---
--- en2 :: 'Enable' Dom2
--- en2 = 'enableGen'
--- @
---
--- Oversampling followed by compression is the identity function plus 2 initial
--- values:
---
--- @
--- 'delay' clkB enB dflt $
--- 'unsafeSynchronizer' clkA clkB $
--- 'delay' clkA enA dflt $
--- 'unsafeSynchronizer' clkB clkA $
--- 'delay' clkB enB s
---
--- ==
---
--- dflt :- dflt :- s
--- @
---
--- Something we can easily observe:
---
--- @
--- oversampling clkA clkB enA enB dflt =
---   'delay' clkB enB dflt
---     . 'unsafeSynchronizer' clkA clkB
---     . 'delay' clkA enA dflt
--- almostId clkA clkB enA enB dflt =
---   'delay' clkB enB dflt
---     . 'unsafeSynchronizer' clkA clkB
---     . 'delay' clkA enA dflt
---     . 'unsafeSynchronizer' clkB clkA
---     . 'delay' clkB enB dflt
--- @
---
--- >>> sampleN 37 (oversampling clk7 clk2 en7 en2 0 (fromList [(1::Int)..10]))
--- [0,0,1,1,1,2,2,2,2,3,3,3,4,4,4,4,5,5,5,6,6,6,6,7,7,7,8,8,8,8,9,9,9,10,10,10,10]
--- >>> sampleN 12 (almostId clk2 clk7 en2 en7 0 (fromList [(1::Int)..10]))
--- [0,0,1,2,3,4,5,6,7,8,9,10]
-unsafeSynchronizer
-  :: forall dom1 dom2 a
-   . ( KnownDomain dom1
-     , KnownDomain dom2 )
-  => Clock dom1
-  -- ^ 'Clock' of the incoming signal
-  -> Clock dom2
-  -- ^ 'Clock' of the outgoing signal
-  -> Signal dom1 a
-  -> Signal dom2 a
+
+{- | The 'unsafeSynchronizer' function is a primitive that must be used to
+connect one clock domain to the other, and will be synthesized to a (bundle
+of) wire(s) in the eventual circuit. This function should only be used as
+part of a proper synchronization component, such as the following dual
+flip-flop synchronizer:
+
+@
+dualFlipFlop
+  :: Clock domA
+  -> Clock domB
+  -> Enable domA
+  -> Enable domB
+  -> Bit
+  -> Signal domA Bit
+  -> Signal domB Bit
+dualFlipFlop clkA clkB enA enB dflt =
+  'delay' clkB enB dflt . 'delay' clkB enB dflt . 'unsafeSynchronizer' clkA clkB
+@
+
+The 'unsafeSynchronizer' works in such a way that, given 2 clocks:
+
+@
+createDomain vSystem{vName=\"Dom7\", vPeriod=7}
+
+clk7 :: 'Clock' Dom7
+clk7 = 'clockGen'
+
+en7 :: 'Enable' Dom7
+en7 = 'enableGen'
+@
+
+and
+
+@
+createDomain vSystem{vName=\"Dom2\", vPeriod=2}
+
+clk2 :: 'Clock' Dom2
+clk2 = 'clockGen'
+
+en2 :: 'Enable' Dom2
+en2 = 'enableGen'
+@
+
+Oversampling followed by compression is the identity function plus 2 initial
+values:
+
+@
+'delay' clkB enB dflt $
+'unsafeSynchronizer' clkA clkB $
+'delay' clkA enA dflt $
+'unsafeSynchronizer' clkB clkA $
+'delay' clkB enB s
+
+==
+
+dflt :- dflt :- s
+@
+
+Something we can easily observe:
+
+@
+oversampling clkA clkB enA enB dflt =
+  'delay' clkB enB dflt
+    . 'unsafeSynchronizer' clkA clkB
+    . 'delay' clkA enA dflt
+almostId clkA clkB enA enB dflt =
+  'delay' clkB enB dflt
+    . 'unsafeSynchronizer' clkA clkB
+    . 'delay' clkA enA dflt
+    . 'unsafeSynchronizer' clkB clkA
+    . 'delay' clkB enB dflt
+@
+
+>>> sampleN 37 (oversampling clk7 clk2 en7 en2 0 (fromList [(1::Int)..10]))
+[0,0,1,1,1,2,2,2,2,3,3,3,4,4,4,4,5,5,5,6,6,6,6,7,7,7,8,8,8,8,9,9,9,10,10,10,10]
+>>> sampleN 12 (almostId clk2 clk7 en2 en7 0 (fromList [(1::Int)..10]))
+[0,0,1,2,3,4,5,6,7,8,9,10]
+-}
+unsafeSynchronizer ::
+  forall dom1 dom2 a.
+  ( KnownDomain dom1
+  , KnownDomain dom2
+  ) =>
+  -- | 'Clock' of the incoming signal
+  Clock dom1 ->
+  -- | 'Clock' of the outgoing signal
+  Clock dom2 ->
+  Signal dom1 a ->
+  Signal dom2 a
 unsafeSynchronizer clk1 clk2 =
   go (clockTicks clk1 clk2)
  where
   go :: [ClockAB] -> Signal dom1 a -> Signal dom2 a
   go [] _ = error "unsafeSynchronizer.go: `ticks` should have been an infinite list"
-  go (tick:ticks) ass@(~(a :- as)) =
+  go (tick : ticks) ass@(~(a :- as)) =
     case tick of
-      ClockA  -> go ticks as
-      ClockB  -> a :- go ticks ass
-      ClockAB -> go (ClockB:ClockA:ticks) ass
+      ClockA -> go ticks as
+      ClockB -> a :- go ticks ass
+      ClockAB -> go (ClockB : ClockA : ticks) ass
 {-# OPAQUE unsafeSynchronizer #-}
 {-# ANN unsafeSynchronizer hasBlackBox #-}
 
--- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.
---
--- Note: this unsafeSynchronizer is defined to be consistent with the vhdl and verilog
--- implementations however as only synchronous signals are represented in Clash this
--- cannot be done precisely and can lead to odd behavior. For example,
---
--- @
--- sample $ unsafeSynchronizer \@Dom2 \@Dom7 . unsafeSynchronizer \@Dom7 \@Dom2 $ fromList [0..10]
--- > [0,4,4,4,7,7,7,7,11,11,11..
--- @
---
--- is quite different from the identity,
---
--- @
--- sample $ fromList [0..10]
--- > [0,1,2,3,4,5,6,7,8,9,10..
--- @
---
--- with values appearing from the "future".
-veryUnsafeSynchronizer
-  :: Either Int (Signal dom1 Int)
-  -- ^ Period of clock belonging to @dom1@. 'Left' if clock has a static period,
-  -- 'Right' if periods are dynamic.
-  -> Either Int (Signal dom2 Int)
-  -- ^ Period of clock belonging to @dom2@. 'Left' if clock has a static period,
-  -- 'Right' if periods are dynamic.
-  -> Signal dom1 a
-  -> Signal dom2 a
+{- | Same as 'unsafeSynchronizer', but with manually supplied clock periods.
+
+Note: this unsafeSynchronizer is defined to be consistent with the vhdl and verilog
+implementations however as only synchronous signals are represented in Clash this
+cannot be done precisely and can lead to odd behavior. For example,
+
+@
+sample $ unsafeSynchronizer \@Dom2 \@Dom7 . unsafeSynchronizer \@Dom7 \@Dom2 $ fromList [0..10]
+> [0,4,4,4,7,7,7,7,11,11,11..
+@
+
+is quite different from the identity,
+
+@
+sample $ fromList [0..10]
+> [0,1,2,3,4,5,6,7,8,9,10..
+@
+
+with values appearing from the "future".
+-}
+veryUnsafeSynchronizer ::
+  {- | Period of clock belonging to @dom1@. 'Left' if clock has a static period,
+  'Right' if periods are dynamic.
+  -}
+  Either Int (Signal dom1 Int) ->
+  {- | Period of clock belonging to @dom2@. 'Left' if clock has a static period,
+  'Right' if periods are dynamic.
+  -}
+  Either Int (Signal dom2 Int) ->
+  Signal dom1 a ->
+  Signal dom2 a
 veryUnsafeSynchronizer t1e t2e =
   go (clockTicksEither (toInt64 t1e) (toInt64 t2e))
  where
@@ -554,41 +613,44 @@ veryUnsafeSynchronizer t1e t2e =
   --       'Int64' to prevent issues down the road if/when we switch to represent
   --       clock periods using femtoseconds.
   toInt64 ::
-    forall dom .
+    forall dom.
     Either Int (Signal dom Int) ->
     Either Int64 (Signal dom Int64)
   toInt64 = bimap fromIntegral (fmap fromIntegral)
 
   go :: [ClockAB] -> Signal dom1 a -> Signal dom2 a
   go [] _ = error "veryUnsafeSynchronizer.go: `ticks` should have been an infinite list"
-  go (tick:ticks) ass@(~(a :- as)) =
+  go (tick : ticks) ass@(~(a :- as)) =
     case tick of
-      ClockA  -> go ticks as
-      ClockB  -> a :- go ticks ass
-      ClockAB -> go (ClockB:ClockA:ticks) ass
+      ClockA -> go ticks as
+      ClockB -> a :- go ticks ass
+      ClockAB -> go (ClockB : ClockA : ticks) ass
 {-# OPAQUE veryUnsafeSynchronizer #-}
 {-# ANN veryUnsafeSynchronizer hasBlackBox #-}
 
 -- * Basic circuit functions
 
--- | Merge enable signal with signal of bools by applying the boolean AND
--- operation.
-andEnable
-  :: Enable dom
-  -> Signal dom Bool
-  -> Enable dom
+{- | Merge enable signal with signal of bools by applying the boolean AND
+operation.
+-}
+andEnable ::
+  Enable dom ->
+  Signal dom Bool ->
+  Enable dom
 andEnable e0 e1 =
   toEnable (fromEnable e0 .&&. e1)
 {-# INLINE andEnable #-}
 
--- | Special version of 'delay' that doesn't take enable signals of any kind.
--- Initial value will be undefined.
-dflipflop
-  :: ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -> Signal dom a
-  -> Signal dom a
+{- | Special version of 'delay' that doesn't take enable signals of any kind.
+Initial value will be undefined.
+-}
+dflipflop ::
+  ( KnownDomain dom
+  , NFDataX a
+  ) =>
+  Clock dom ->
+  Signal dom a ->
+  Signal dom a
 dflipflop = \clk i ->
   delay#
     clk
@@ -597,276 +659,297 @@ dflipflop = \clk i ->
     i
 {-# INLINE dflipflop #-}
 
--- | \"@'delay' clk s@\" delays the values in 'Signal' /s/ for once cycle, the
--- value at time 0 is /dflt/.
---
--- >>> sampleN 3 (delay systemClockGen enableGen 0 (fromList [1,2,3,4]))
--- [0,1,2]
-delay
-  :: ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock
-  -> Enable dom
-  -- ^ Global enable
-  -> a
-  -- ^ Initial value
-  -> Signal dom a
-  -> Signal dom a
+{- | \"@'delay' clk s@\" delays the values in 'Signal' /s/ for once cycle, the
+value at time 0 is /dflt/.
+
+>>> sampleN 3 (delay systemClockGen enableGen 0 (fromList [1,2,3,4]))
+[0,1,2]
+-}
+delay ::
+  ( KnownDomain dom
+  , NFDataX a
+  ) =>
+  -- | Clock
+  Clock dom ->
+  -- | Global enable
+  Enable dom ->
+  -- | Initial value
+  a ->
+  Signal dom a ->
+  Signal dom a
 delay = delay#
 {-# INLINE delay #-}
 
--- | Version of 'delay' that only updates when its third argument is a 'Just'
--- value.
---
--- >>> let input = fromList [Just 1, Just 2, Nothing, Nothing, Just 5, Just 6, Just (7::Int)]
--- >>> sampleN 7 (delayMaybe systemClockGen enableGen 0 input)
--- [0,1,2,2,2,5,6]
-delayMaybe
-  :: ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock
-  -> Enable dom
-  -- ^ Global enable
-  -> a
-  -- ^ Initial value
-  -> Signal dom (Maybe a)
-  -> Signal dom a
+{- | Version of 'delay' that only updates when its third argument is a 'Just'
+value.
+
+>>> let input = fromList [Just 1, Just 2, Nothing, Nothing, Just 5, Just 6, Just (7::Int)]
+>>> sampleN 7 (delayMaybe systemClockGen enableGen 0 input)
+[0,1,2,2,2,5,6]
+-}
+delayMaybe ::
+  ( KnownDomain dom
+  , NFDataX a
+  ) =>
+  -- | Clock
+  Clock dom ->
+  -- | Global enable
+  Enable dom ->
+  -- | Initial value
+  a ->
+  Signal dom (Maybe a) ->
+  Signal dom a
 delayMaybe = \clk gen dflt i ->
   delay# clk (andEnable gen (isJust <$> i)) dflt (fromJustX <$> i)
 {-# INLINE delayMaybe #-}
 
--- | Version of 'delay' that only updates when its third argument is asserted.
---
--- >>> let input = fromList [1,2,3,4,5,6,7::Int]
--- >>> let enable = fromList [True,True,False,False,True,True,True]
--- >>> sampleN 7 (delayEn systemClockGen enableGen 0 enable input)
--- [0,1,2,2,2,5,6]
-delayEn
-  :: ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock
-  -> Enable dom
-  -- ^ Global enable
-  -> a
-  -- ^ Initial value
-  -> Signal dom Bool
-  -- ^ Enable
-  -> Signal dom a
-  -> Signal dom a
+{- | Version of 'delay' that only updates when its third argument is asserted.
+
+>>> let input = fromList [1,2,3,4,5,6,7::Int]
+>>> let enable = fromList [True,True,False,False,True,True,True]
+>>> sampleN 7 (delayEn systemClockGen enableGen 0 enable input)
+[0,1,2,2,2,5,6]
+-}
+delayEn ::
+  ( KnownDomain dom
+  , NFDataX a
+  ) =>
+  -- | Clock
+  Clock dom ->
+  -- | Global enable
+  Enable dom ->
+  -- | Initial value
+  a ->
+  -- | Enable
+  Signal dom Bool ->
+  Signal dom a ->
+  Signal dom a
 delayEn = \clk gen dflt en i ->
   delay# clk (andEnable gen en) dflt i
 {-# INLINE delayEn #-}
 
--- | \"@'register' clk rst en i s@\" delays the values in 'Signal' /s/ for one
--- cycle, and sets the value to @i@ the moment the reset becomes 'False'.
---
--- >>> sampleN 5 (register systemClockGen resetGen enableGen 8 (fromList [1,1,2,3,4]))
--- [8,8,1,2,3]
-register
-  :: ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ clock
-  -> Reset dom
-  -- ^ Reset, 'register' outputs the reset value when the reset is active
-  -> Enable dom
-  -- ^ Global enable
-  -> a
-  -- ^ Reset value. If the domain has initial values enabled, the reset value
-  -- will also be the initial value.
-  -> Signal dom a
-  -> Signal dom a
+{- | \"@'register' clk rst en i s@\" delays the values in 'Signal' /s/ for one
+cycle, and sets the value to @i@ the moment the reset becomes 'False'.
+
+>>> sampleN 5 (register systemClockGen resetGen enableGen 8 (fromList [1,1,2,3,4]))
+[8,8,1,2,3]
+-}
+register ::
+  ( KnownDomain dom
+  , NFDataX a
+  ) =>
+  -- | clock
+  Clock dom ->
+  -- | Reset, 'register' outputs the reset value when the reset is active
+  Reset dom ->
+  -- | Global enable
+  Enable dom ->
+  {- | Reset value. If the domain has initial values enabled, the reset value
+  will also be the initial value.
+  -}
+  a ->
+  Signal dom a ->
+  Signal dom a
 register = \clk rst gen initial i ->
   register# clk rst gen initial initial i
 {-# INLINE register #-}
 
--- | Version of 'register' that only updates its content when its fourth
--- argument is a 'Just' value. So given:
---
--- @
--- sometimes1 clk rst en = s where
---   s = 'register' clk rst en Nothing (switch '<$>' s)
---
---   switch Nothing = Just 1
---   switch _       = Nothing
---
--- countSometimes clk rst en = s where
---   s     = 'regMaybe' clk rst en 0 (plusM ('pure' '<$>' s) (sometimes1 clk rst en))
---   plusM = liftA2 (liftA2 (+))
--- @
---
--- We get:
---
--- >>> sampleN 9 (sometimes1 systemClockGen resetGen enableGen)
--- [Nothing,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
--- >>> sampleN 9 (count systemClockGen resetGen enableGen)
--- [0,0,0,1,1,2,2,3,3]
-regMaybe
-  :: ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock
-  -> Reset dom
-  -- ^ Reset, 'regMaybe' outputs the reset value when the reset value is active
-  -> Enable dom
-  -- ^ Global enable
-  -> a
-  -- ^ Reset value. If the domain has initial values enabled, the reset value
-  -- will also be the initial value.
-  -> Signal dom (Maybe a)
-  -> Signal dom a
+{- | Version of 'register' that only updates its content when its fourth
+argument is a 'Just' value. So given:
+
+@
+sometimes1 clk rst en = s where
+  s = 'register' clk rst en Nothing (switch '<$>' s)
+
+  switch Nothing = Just 1
+  switch _       = Nothing
+
+countSometimes clk rst en = s where
+  s     = 'regMaybe' clk rst en 0 (plusM ('pure' '<$>' s) (sometimes1 clk rst en))
+  plusM = liftA2 (liftA2 (+))
+@
+
+We get:
+
+>>> sampleN 9 (sometimes1 systemClockGen resetGen enableGen)
+[Nothing,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
+>>> sampleN 9 (count systemClockGen resetGen enableGen)
+[0,0,0,1,1,2,2,3,3]
+-}
+regMaybe ::
+  ( KnownDomain dom
+  , NFDataX a
+  ) =>
+  -- | Clock
+  Clock dom ->
+  -- | Reset, 'regMaybe' outputs the reset value when the reset value is active
+  Reset dom ->
+  -- | Global enable
+  Enable dom ->
+  {- | Reset value. If the domain has initial values enabled, the reset value
+  will also be the initial value.
+  -}
+  a ->
+  Signal dom (Maybe a) ->
+  Signal dom a
 regMaybe = \clk rst en initial iM ->
   register# clk rst (andEnable en (fmap isJust iM)) initial initial (fmap fromJustX iM)
 {-# INLINE regMaybe #-}
 
--- | Version of 'register' that only updates its content when its fourth
--- argument is asserted. So given:
---
--- @
--- oscillate clk rst en = let s = 'register' clk rst en False (not \<$\> s) in s
--- count clk rst en     = let s = 'regEn clk rst en 0 (oscillate clk rst en) (s + 1) in s
--- @
---
--- We get:
---
--- >>> sampleN 9 (oscillate systemClockGen resetGen enableGen)
--- [False,False,True,False,True,False,True,False,True]
--- >>> sampleN 9 (count systemClockGen resetGen enableGen)
--- [0,0,0,1,1,2,2,3,3]
-regEn
-  :: ( KnownDomain dom
-     , NFDataX a
-     )
-  => Clock dom
-  -- ^ Clock
-  -> Reset dom
-  -- ^ Reset, 'regEn' outputs the reset value when the reset value is active
-  -> Enable dom
-  -- ^ Global enable
-  -> a
-  -- ^ Reset value. If the domain has initial values enabled, the reset value
-  -- will also be the initial value.
-  -> Signal dom Bool
-  -- ^ Enable signal
-  -> Signal dom a
-  -> Signal dom a
+{- | Version of 'register' that only updates its content when its fourth
+argument is asserted. So given:
+
+@
+oscillate clk rst en = let s = 'register' clk rst en False (not \<$\> s) in s
+count clk rst en     = let s = 'regEn clk rst en 0 (oscillate clk rst en) (s + 1) in s
+@
+
+We get:
+
+>>> sampleN 9 (oscillate systemClockGen resetGen enableGen)
+[False,False,True,False,True,False,True,False,True]
+>>> sampleN 9 (count systemClockGen resetGen enableGen)
+[0,0,0,1,1,2,2,3,3]
+-}
+regEn ::
+  ( KnownDomain dom
+  , NFDataX a
+  ) =>
+  -- | Clock
+  Clock dom ->
+  -- | Reset, 'regEn' outputs the reset value when the reset value is active
+  Reset dom ->
+  -- | Global enable
+  Enable dom ->
+  {- | Reset value. If the domain has initial values enabled, the reset value
+  will also be the initial value.
+  -}
+  a ->
+  -- | Enable signal
+  Signal dom Bool ->
+  Signal dom a ->
+  Signal dom a
 regEn = \clk rst gen initial en i ->
   register# clk rst (andEnable gen en) initial initial i
 {-# INLINE regEn #-}
 
 -- * Simulation functions
 
--- | Same as 'simulate', but with the reset line asserted for /n/ cycles. Similar
--- to 'simulate', 'simulateWithReset' will drop the output values produced while
--- the reset is asserted. While the reset is asserted, the first value from
--- @[a]@ is fed to the circuit.
-simulateWithReset
-  :: forall dom a b m
-   . ( KnownDomain dom
-     , NFDataX a
-     , NFDataX b
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> a
-  -- ^ Reset value
-  -> ( KnownDomain dom
-    => Clock dom
-    -> Reset dom
-    -> Enable dom
-    -> Signal dom a
-    -> Signal dom b )
-  -- ^ Circuit to simulate
-  -> [a]
-  -> [b]
+{- | Same as 'simulate', but with the reset line asserted for /n/ cycles. Similar
+to 'simulate', 'simulateWithReset' will drop the output values produced while
+the reset is asserted. While the reset is asserted, the first value from
+@[a]@ is fed to the circuit.
+-}
+simulateWithReset ::
+  forall dom a b m.
+  ( KnownDomain dom
+  , NFDataX a
+  , NFDataX b
+  , 1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | Reset value
+  a ->
+  -- | Circuit to simulate
+  ( (KnownDomain dom) =>
+    Clock dom ->
+    Reset dom ->
+    Enable dom ->
+    Signal dom a ->
+    Signal dom b
+  ) ->
+  [a] ->
+  [b]
 simulateWithReset m resetVal f as =
   drop (snatToNum m) out
  where
   inp = replicate (snatToNum m) resetVal ++ as
   rst = resetGenN @dom m
   clk = clockGen
-  en  = enableGen
+  en = enableGen
   out = simulate (f clk rst en) inp
 {-# OPAQUE simulateWithReset #-}
 
 -- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
-simulateWithResetN
-  :: ( KnownDomain dom
-     , NFDataX a
-     , NFDataX b
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> a
-  -- ^ Reset value
-  -> Int
-  -- ^ Number of cycles to simulate (excluding cycle spent in reset)
-  -> ( KnownDomain dom
-    => Clock dom
-    -> Reset dom
-    -> Enable dom
-    -> Signal dom a
-    -> Signal dom b )
-  -- ^ Circuit to simulate
-  -> [a]
-  -> [b]
+simulateWithResetN ::
+  ( KnownDomain dom
+  , NFDataX a
+  , NFDataX b
+  , 1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | Reset value
+  a ->
+  -- | Number of cycles to simulate (excluding cycle spent in reset)
+  Int ->
+  -- | Circuit to simulate
+  ( (KnownDomain dom) =>
+    Clock dom ->
+    Reset dom ->
+    Enable dom ->
+    Signal dom a ->
+    Signal dom b
+  ) ->
+  [a] ->
+  [b]
 simulateWithResetN nReset resetVal nSamples f as =
   take nSamples (simulateWithReset nReset resetVal f as)
 {-# INLINE simulateWithResetN #-}
 
--- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
--- samples of type /a/
---
--- >>> simulateB (unbundle . register systemClockGen resetGen enableGen (8,8) . bundle) [(1,1), (1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8),(8,8),(1,1),(2,2),(3,3)...
--- ...
---
--- __NB__: This function is not synthesizable
-simulateB
-  :: (Bundle a, Bundle b, NFDataX a, NFDataX b)
-  => (Unbundled dom1 a -> Unbundled dom2 b)
-  -- ^ The function we want to simulate
-  -> [a]
-  -- ^ Input samples
-  -> [b]
+{- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
+samples of type /a/
+
+>>> simulateB (unbundle . register systemClockGen resetGen enableGen (8,8) . bundle) [(1,1), (1,1), (2,2), (3,3)] :: [(Int,Int)]
+[(8,8),(8,8),(1,1),(2,2),(3,3)...
+...
+
+__NB__: This function is not synthesizable
+-}
+simulateB ::
+  (Bundle a, Bundle b, NFDataX a, NFDataX b) =>
+  -- | The function we want to simulate
+  (Unbundled dom1 a -> Unbundled dom2 b) ->
+  -- | Input samples
+  [a] ->
+  [b]
 simulateB f = simulate (bundle . f . unbundle)
 
--- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
--- list of samples of type /a/
---
--- >>> simulateB (unbundle . register systemClockGen resetGen enableGen (8,8) . bundle) [(1,1), (1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8),(8,8),(1,1),(2,2),(3,3)...
--- ...
---
--- __NB__: This function is not synthesizable
-simulateB_lazy
-  :: (Bundle a, Bundle b)
-  => (Unbundled dom1 a -> Unbundled dom2 b)
-  -- ^ The function we want to simulate
-  -> [a]
-  -- ^ Input samples
-  -> [b]
+{- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
+list of samples of type /a/
+
+>>> simulateB (unbundle . register systemClockGen resetGen enableGen (8,8) . bundle) [(1,1), (1,1), (2,2), (3,3)] :: [(Int,Int)]
+[(8,8),(8,8),(1,1),(2,2),(3,3)...
+...
+
+__NB__: This function is not synthesizable
+-}
+simulateB_lazy ::
+  (Bundle a, Bundle b) =>
+  -- | The function we want to simulate
+  (Unbundled dom1 a -> Unbundled dom2 b) ->
+  -- | Input samples
+  [a] ->
+  [b]
 simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
 
+{- | Like 'fromList', but resets on reset and has a defined reset value.
 
--- | Like 'fromList', but resets on reset and has a defined reset value.
---
--- >>> let rst = unsafeFromActiveHigh (fromList [True, True, False, False, True, False])
--- >>> let res = fromListWithReset @System rst Nothing [Just 'a', Just 'b', Just 'c']
--- >>> sampleN 6 res
--- [Nothing,Nothing,Just 'a',Just 'b',Nothing,Just 'a']
---
--- __NB__: This function is not synthesizable
-fromListWithReset
-  :: forall dom a
-   . (KnownDomain dom, NFDataX a)
-  => Reset dom
-  -> a
-  -> [a]
-  -> Signal dom a
+>>> let rst = unsafeFromActiveHigh (fromList [True, True, False, False, True, False])
+>>> let res = fromListWithReset @System rst Nothing [Just 'a', Just 'b', Just 'c']
+>>> sampleN 6 res
+[Nothing,Nothing,Just 'a',Just 'b',Nothing,Just 'a']
+
+__NB__: This function is not synthesizable
+-}
+fromListWithReset ::
+  forall dom a.
+  (KnownDomain dom, NFDataX a) =>
+  Reset dom ->
+  a ->
+  [a] ->
+  Signal dom a
 fromListWithReset rst resetValue vals =
   go (unsafeToActiveHigh rst) vals
  where
@@ -874,132 +957,142 @@ fromListWithReset rst resetValue vals =
   go (_ :- rs) [] = deepErrorX "fromListWithReset: input ran out" :- go rs []
   go (_ :- rs) (a : as) = a :- go rs as
 
--- | Get a list of samples from a 'Signal', while asserting the reset line
--- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
--- i.e., when the reset is asserted.
---
--- __NB__: This function is not synthesizable
-sampleWithReset
-  :: forall dom a m
-   . ( KnownDomain dom
-     , NFDataX a
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> (KnownDomain dom
-      => Clock dom
-      -> Reset dom
-      -> Enable dom
-      -> Signal dom a)
-  -- ^ 'Signal' to sample
-  -> [a]
+{- | Get a list of samples from a 'Signal', while asserting the reset line
+for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
+i.e., when the reset is asserted.
+
+__NB__: This function is not synthesizable
+-}
+sampleWithReset ::
+  forall dom a m.
+  ( KnownDomain dom
+  , NFDataX a
+  , 1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | 'Signal' to sample
+  ( (KnownDomain dom) =>
+    Clock dom ->
+    Reset dom ->
+    Enable dom ->
+    Signal dom a
+  ) ->
+  [a]
 sampleWithReset nReset f0 =
-  let f1 = f0 clockGen (resetGenN @dom nReset) enableGen in
-  drop (snatToNum nReset) (sample f1)
+  let f1 = f0 clockGen (resetGenN @dom nReset) enableGen
+   in drop (snatToNum nReset) (sample f1)
 {-# OPAQUE sampleWithReset #-}
 
--- | Get a fine list of /m/ samples from a 'Signal', while asserting the reset line
--- for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
--- i.e., while the reset is asserted.
---
--- __NB__: This function is not synthesizable
-sampleWithResetN
-  :: forall dom a m
-   . ( KnownDomain dom
-     , NFDataX a
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> Int
-  -- ^ Number of samples to produce
-  -> (KnownDomain dom
-      => Clock dom
-      -> Reset dom
-      -> Enable dom
-      -> Signal dom a)
-  -- ^ 'Signal' to sample
-  -> [a]
+{- | Get a fine list of /m/ samples from a 'Signal', while asserting the reset line
+for /n/ clock cycles. 'sampleWithReset' does not return the first /n/ cycles,
+i.e., while the reset is asserted.
+
+__NB__: This function is not synthesizable
+-}
+sampleWithResetN ::
+  forall dom a m.
+  ( KnownDomain dom
+  , NFDataX a
+  , 1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | Number of samples to produce
+  Int ->
+  -- | 'Signal' to sample
+  ( (KnownDomain dom) =>
+    Clock dom ->
+    Reset dom ->
+    Enable dom ->
+    Signal dom a
+  ) ->
+  [a]
 sampleWithResetN nReset nSamples f =
   take nSamples (sampleWithReset nReset f)
 
--- | Simulate a component until it matches a condition
---
--- It prints a message of the form
---
--- > Signal sampled for N cycles until value X
---
--- __NB__: This function is not synthesizable
---
--- === __Example with test bench__
---
--- A common usage is with a test bench using
--- 'Clash.Explicit.Testbench.outputVerifier'.
---
--- __NB__: Since this uses 'Clash.Explicit.Testbench.assert', when using
--- @clashi@, read the note at "Clash.Explicit.Testbench#assert-clashi".
---
--- @
--- import Clash.Prelude
--- import Clash.Explicit.Testbench
---
--- topEntity
---   :: 'Signal' 'System' Int
---   -> 'Signal' 'System' Int
--- topEntity = id
---
--- testBench
---   :: 'Signal' 'System' Bool
--- testBench = done
---  where
---   testInput = 'Clash.Explicit.Testbench.stimuliGenerator' clk rst $('Clash.Sized.Vector.listToVecTH' [1 :: Int .. 10])
---   expectedOutput =
---     'Clash.Explicit.Testbench.outputVerifier'' clk rst $('Clash.Sized.Vector.listToVecTH' $ [1 :: Int .. 9] '<>' [42])
---   done = expectedOutput $ topEntity testInput
---   clk = 'Clash.Explicit.Testbench.tbSystemClockGen' (not \<$\> done)
---   rst = 'systemResetGen'
--- @
---
--- @
--- > runUntil id testBench
---
---
--- cycle(\<Clock: System\>): 10, outputVerifier
--- expected value: 42, not equal to actual value: 10
--- Signal sampled for 11 cycles until value True
--- @
---
--- When you need to verify multiple test benches, the following invocations come
--- in handy:
---
--- @
--- > 'mapM_' (runUntil id) [ testBenchA, testBenchB ]
--- @
---
--- or when the test benches are in different clock domains:
---
--- @
--- testBenchA :: Signal DomA Bool
--- testBenchB :: Signal DomB Bool
--- @
---
--- @
--- > 'sequence_' [ runUntil id testBenchA, runUntil id testBenchB ]
--- @
-runUntil
-  :: forall dom a
-   . (KnownDomain dom, NFDataX a, ShowX a)
-  => (a -> Bool)
-  -- ^ Condition checking function, should return @True@ to finish run
-  -> Signal dom a
-  -- ^ 'Signal' we want to sample for the condition
-  -> IO ()
+{- | Simulate a component until it matches a condition
+
+It prints a message of the form
+
+> Signal sampled for N cycles until value X
+
+__NB__: This function is not synthesizable
+
+=== __Example with test bench__
+
+A common usage is with a test bench using
+'Clash.Explicit.Testbench.outputVerifier'.
+
+__NB__: Since this uses 'Clash.Explicit.Testbench.assert', when using
+@clashi@, read the note at "Clash.Explicit.Testbench#assert-clashi".
+
+@
+import Clash.Prelude
+import Clash.Explicit.Testbench
+
+topEntity
+  :: 'Signal' 'System' Int
+  -> 'Signal' 'System' Int
+topEntity = id
+
+testBench
+  :: 'Signal' 'System' Bool
+testBench = done
+ where
+  testInput = 'Clash.Explicit.Testbench.stimuliGenerator' clk rst $('Clash.Sized.Vector.listToVecTH' [1 :: Int .. 10])
+  expectedOutput =
+    'Clash.Explicit.Testbench.outputVerifier'' clk rst $('Clash.Sized.Vector.listToVecTH' $ [1 :: Int .. 9] '<>' [42])
+  done = expectedOutput $ topEntity testInput
+  clk = 'Clash.Explicit.Testbench.tbSystemClockGen' (not \<$\> done)
+  rst = 'systemResetGen'
+@
+
+@
+> runUntil id testBench
+
+
+cycle(\<Clock: System\>): 10, outputVerifier
+expected value: 42, not equal to actual value: 10
+Signal sampled for 11 cycles until value True
+@
+
+When you need to verify multiple test benches, the following invocations come
+in handy:
+
+@
+> 'mapM_' (runUntil id) [ testBenchA, testBenchB ]
+@
+
+or when the test benches are in different clock domains:
+
+@
+testBenchA :: Signal DomA Bool
+testBenchB :: Signal DomB Bool
+@
+
+@
+> 'sequence_' [ runUntil id testBenchA, runUntil id testBenchB ]
+@
+-}
+runUntil ::
+  forall dom a.
+  (KnownDomain dom, NFDataX a, ShowX a) =>
+  -- | Condition checking function, should return @True@ to finish run
+  (a -> Bool) ->
+  -- | 'Signal' we want to sample for the condition
+  Signal dom a ->
+  IO ()
 runUntil check s =
   -- Ensure invocations of 'trace' are printed before the result message
   value `seqX`
-  putStrLn msg
+    putStrLn msg
  where
-  msg =   ("Signal sampled for " ++) . shows nSamples
-        . (" cycles until value " ++) $ showX value
+  msg =
+    ("Signal sampled for " ++)
+      . shows nSamples
+      . (" cycles until value " ++)
+      $ showX value
   (before, after) = break check $ sample s
   nSamples = length before
   value = maybe (error "impossible") fst (uncons after)

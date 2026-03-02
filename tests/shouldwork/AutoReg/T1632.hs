@@ -1,4 +1,5 @@
 module T1632 where
+
 import Clash.Prelude
 
 data MCause
@@ -6,5 +7,5 @@ data MCause
   deriving (Generic, NFDataX)
 deriveAutoReg ''MCause
 
-topEntity :: SystemClockResetEnable => Signal System MCause -> Signal System MCause
+topEntity :: (SystemClockResetEnable) => Signal System MCause -> Signal System MCause
 topEntity = autoReg (MCause 0)

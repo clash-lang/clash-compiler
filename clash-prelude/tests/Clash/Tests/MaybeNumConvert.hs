@@ -64,7 +64,9 @@ case_MaybeInt64Word64 = do
   assertBool "0" $ maybeNumConvert (0 :: Int64) == Just (0 :: Word64)
   assertBool "1" $ maybeNumConvert (1 :: Int64) == Just (1 :: Word64)
   assertBool "42" $ maybeNumConvert (42 :: Int64) == Just (42 :: Word64)
-  assertBool "maxBound" $ maybeNumConvert (maxBound :: Int64) == Just (9223372036854775807 :: Word64)
+  assertBool "maxBound"
+    $ maybeNumConvert (maxBound :: Int64)
+    == Just (9223372036854775807 :: Word64)
   -- Failed conversions (negative values)
   assertBool "-1" $ maybeNumConvert (-1 :: Int64) == (Nothing :: Maybe Word64)
   assertBool "-42" $ maybeNumConvert (-42 :: Int64) == (Nothing :: Maybe Word64)
@@ -76,11 +78,19 @@ case_MaybeWord64Unsigned32 = do
   assertBool "0" $ maybeNumConvert (0 :: Word64) == Just (0 :: Unsigned 32)
   assertBool "1" $ maybeNumConvert (1 :: Word64) == Just (1 :: Unsigned 32)
   assertBool "42" $ maybeNumConvert (42 :: Word64) == Just (42 :: Unsigned 32)
-  assertBool "maxBound32" $ maybeNumConvert (4294967295 :: Word64) == Just (maxBound :: Unsigned 32)
+  assertBool "maxBound32"
+    $ maybeNumConvert (4294967295 :: Word64)
+    == Just (maxBound :: Unsigned 32)
   -- Failed conversions (values too large)
-  assertBool "overflow1" $ maybeNumConvert (4294967296 :: Word64) == (Nothing :: Maybe (Unsigned 32))
-  assertBool "overflow2" $ maybeNumConvert (5000000000 :: Word64) == (Nothing :: Maybe (Unsigned 32))
-  assertBool "maxBound64" $ maybeNumConvert (maxBound :: Word64) == (Nothing :: Maybe (Unsigned 32))
+  assertBool "overflow1"
+    $ maybeNumConvert (4294967296 :: Word64)
+    == (Nothing :: Maybe (Unsigned 32))
+  assertBool "overflow2"
+    $ maybeNumConvert (5000000000 :: Word64)
+    == (Nothing :: Maybe (Unsigned 32))
+  assertBool "maxBound64"
+    $ maybeNumConvert (maxBound :: Word64)
+    == (Nothing :: Maybe (Unsigned 32))
 
 withSomeSNat :: Natural -> (forall (n :: Nat). SNat n -> r) -> r
 withSomeSNat n f = case someNatVal n of
@@ -111,7 +121,8 @@ maybeConvertLaw3 ::
   a ->
   Bool
 maybeConvertLaw3 Proxy x =
-  isJust (maybeNumConvert @_ @b x) `implies` isJust (maybeNumConvert @_ @a =<< maybeNumConvert @_ @b x)
+  isJust (maybeNumConvert @_ @b x)
+    `implies` isJust (maybeNumConvert @_ @a =<< maybeNumConvert @_ @b x)
  where
   implies :: Bool -> Bool -> Bool
   implies True False = False
@@ -147,7 +158,9 @@ case_maybeConvertIndexIndex =
     forM_ [0 .. indexMax] $ \m ->
       withSomeSNat n $ \(SNat :: SNat n) ->
         withSomeSNat m $ \(SNat :: SNat m) -> do
-          assertBool (show (n, m)) (convertXException (Proxy @(Index (n + 1))) (Proxy @(Index (m + 1))))
+          assertBool
+            (show (n, m))
+            (convertXException (Proxy @(Index (n + 1))) (Proxy @(Index (m + 1))))
           forM_ [minBound .. maxBound] $ \(i :: Index (n + 1)) -> do
             assertBool (show (n, m, i)) (maybeConvertLaw1 (Proxy @(Index (m + 1))) i)
             assertBool (show (n, m, i)) (maybeConvertLaw2 (Proxy @(Index (m + 1))) i)
@@ -160,7 +173,9 @@ case_maybeConvertIndexUnsigned =
     forM_ [0 .. otherMax] $ \m ->
       withSomeSNat n $ \(SNat :: SNat n) ->
         withSomeSNat m $ \(SNat :: SNat m) -> do
-          assertBool (show (n, m)) (convertXException (Proxy @(Index (n + 1))) (Proxy @(Unsigned m)))
+          assertBool
+            (show (n, m))
+            (convertXException (Proxy @(Index (n + 1))) (Proxy @(Unsigned m)))
           forM_ [minBound .. maxBound] $ \(i :: Index (n + 1)) -> do
             assertBool (show (n, m, i)) (maybeConvertLaw1 (Proxy @(Unsigned m)) i)
             assertBool (show (n, m, i)) (maybeConvertLaw2 (Proxy @(Unsigned m)) i)
@@ -186,7 +201,9 @@ case_maybeConvertIndexBitVector =
     forM_ [0 .. otherMax] $ \m ->
       withSomeSNat n $ \(SNat :: SNat n) ->
         withSomeSNat m $ \(SNat :: SNat m) -> do
-          assertBool (show (n, m)) (convertXException (Proxy @(Index (n + 1))) (Proxy @(BitVector m)))
+          assertBool
+            (show (n, m))
+            (convertXException (Proxy @(Index (n + 1))) (Proxy @(BitVector m)))
           forM_ [minBound .. maxBound] $ \(i :: Index (n + 1)) -> do
             assertBool (show (n, m, i)) (maybeConvertLaw1 (Proxy @(BitVector m)) i)
             assertBool (show (n, m, i)) (maybeConvertLaw2 (Proxy @(BitVector m)) i)
@@ -199,7 +216,9 @@ case_maybeConvertUnsignedIndex =
     forM_ [0 .. indexMax] $ \m ->
       withSomeSNat n $ \(SNat :: SNat n) ->
         withSomeSNat m $ \(SNat :: SNat m) -> do
-          assertBool (show (n, m)) (convertXException (Proxy @(Unsigned n)) (Proxy @(Index (m + 1))))
+          assertBool
+            (show (n, m))
+            (convertXException (Proxy @(Unsigned n)) (Proxy @(Index (m + 1))))
           forM_ [minBound .. maxBound] $ \(i :: Unsigned n) -> do
             assertBool (show (n, m, i)) (maybeConvertLaw1 (Proxy @(Index (m + 1))) i)
             assertBool (show (n, m, i)) (maybeConvertLaw2 (Proxy @(Index (m + 1))) i)
@@ -303,7 +322,9 @@ case_maybeConvertBitVectorIndex =
     forM_ [0 .. indexMax] $ \m ->
       withSomeSNat n $ \(SNat :: SNat n) ->
         withSomeSNat m $ \(SNat :: SNat m) -> do
-          assertBool (show (n, m)) (convertXException (Proxy @(BitVector n)) (Proxy @(Index (m + 1))))
+          assertBool
+            (show (n, m))
+            (convertXException (Proxy @(BitVector n)) (Proxy @(Index (m + 1))))
           forM_ [minBound .. maxBound] $ \(i :: BitVector n) -> do
             assertBool (show (n, m, i)) (maybeConvertLaw1 (Proxy @(Index (m + 1))) i)
             assertBool (show (n, m, i)) (maybeConvertLaw2 (Proxy @(Index (m + 1))) i)

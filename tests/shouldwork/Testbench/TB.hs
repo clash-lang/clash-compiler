@@ -2,37 +2,48 @@
 
 module TB where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
-type Inp   = (Signed 4,Outp)
-type Outp  = (Maybe (Signed 8,Bool),Bit)
+type Inp = (Signed 4, Outp)
+type Outp = (Maybe (Signed 8, Bool), Bit)
 
-topEntity
-  :: Clock System
-  -> Reset System
-  -> Enable System
-  -> Signal System Inp -> Signal System Outp
+topEntity ::
+  Clock System ->
+  Reset System ->
+  Enable System ->
+  Signal System Inp ->
+  Signal System Outp
 topEntity = exposeClockResetEnable (transfer `mealy` initS)
 {-# OPAQUE topEntity #-}
 
-transfer s i = (i,o)
-  where
-    o = snd s
+transfer s i = (i, o)
+ where
+  o = snd s
 
-initS = (0,(Nothing,0))
+initS = (0, (Nothing, 0))
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst
-                      $(listToVecTH ([ (1,(Just (4,True), 0))
-                                     , (3,(Nothing, 1))
-                                     ]::[(Signed 4,(Maybe (Signed 8,Bool),Bit))]))
-    expectedOutput = outputVerifier' clk rst
-                      $(listToVecTH ([(Nothing,0)
-                                     ,(Just (4,True), 0)
-                                     ]::[(Maybe (Signed 8,Bool),Bit)]))
-    done           = expectedOutput (topEntity clk rst enableGen testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+ where
+  testInput =
+    stimuliGenerator clk rst $
+      ( listToVecTH
+          ( [ (1, (Just (4, True), 0))
+            , (3, (Nothing, 1))
+            ] ::
+              [(Signed 4, (Maybe (Signed 8, Bool), Bit))]
+          )
+      )
+  expectedOutput =
+    outputVerifier' clk rst $
+      ( listToVecTH
+          ( [ (Nothing, 0)
+            , (Just (4, True), 0)
+            ] ::
+              [(Maybe (Signed 8, Bool), Bit)]
+          )
+      )
+  done = expectedOutput (topEntity clk rst enableGen testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

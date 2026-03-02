@@ -4,16 +4,16 @@ module ShiftRotateNegative where
 
 import GHC.Num.Natural (Natural)
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 import Clash.Sized.Internal.BitVector
 
 testBench :: Signal System Bool
 testBench = done
  where
   done = expectedOutput (pack . topEntity <$> testInput)
-  clk  = tbSystemClockGen (not <$> done)
-  rst  = systemResetGen
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 
   testInput =
     stimuliGenerator clk rst $
@@ -24,17 +24,18 @@ testBench = done
 
   -- Integer and Natural are stored as BitVector 64: this is how they render in
   -- HDL, and they have no BitPack instance needed to use 'pack'.
-  testOutput
-    :: Vec 2
-         ( Int
-         , Word
-         , BitVector 64
-         , BitVector 64
-         , Bit
-         , BitVector 32
-         , Signed 32
-         , Unsigned 32
-         )
+  testOutput ::
+    Vec
+      2
+      ( Int
+      , Word
+      , BitVector 64
+      , BitVector 64
+      , Bit
+      , BitVector 32
+      , Signed 32
+      , Unsigned 32
+      )
   testOutput =
     -- Exceptions when shiftL / shiftR gets a negative count.
     ( deepErrorX "X"
@@ -45,51 +46,54 @@ testBench = done
     , deepErrorX "X"
     , deepErrorX "X"
     , deepErrorX "X"
-    ) :>
-    -- shift accepts negative counts.
-    ( 4042322160
-    , 4042322160
-    , 4042322160
-    , 4042322160
-    , 0
-    , 0b1111_0000_1111_0000_1111_0000_1111_0000
-    , (-252645135)
-    , 4042322160
-    ) :> Nil
+    )
+      :>
+      -- shift accepts negative counts.
+      ( 4042322160
+      , 4042322160
+      , 4042322160
+      , 4042322160
+      , 0
+      , 0b1111_0000_1111_0000_1111_0000_1111_0000
+      , (-252645135)
+      , 4042322160
+      )
+      :> Nil
 
 {-# OPAQUE topEntity #-}
-topEntity
-  :: (BitVector 32, Int)
-  -> Vec 2
-       ( Int
-       , Word
-       , BitVector 64
-       , BitVector 64
-       , Bit
-       , BitVector 32
-       , Signed 32
-       , Unsigned 32
-       )
+topEntity ::
+  (BitVector 32, Int) ->
+  Vec
+    2
+    ( Int
+    , Word
+    , BitVector 64
+    , BitVector 64
+    , Bit
+    , BitVector 32
+    , Signed 32
+    , Unsigned 32
+    )
 topEntity (x, i) =
   ( f (fromIntegral x) i
   , f (fromIntegral x) i
   , fromIntegral $! f (fromIntegral @_ @Integer x) i
   , BV 0 $! f (unsafeToNatural x) i
-  , f (x!0) i
+  , f (x ! 0) i
   , f x i
   , f (unpack x) i
   , f (unpack x) i
-  ) :>
-  ( g (fromIntegral x) i
-  , g (fromIntegral x) i
-  , fromIntegral $! g (fromIntegral @_ @Integer x) i
-  , BV 0 $! g (unsafeToNatural x) i
-  , g (x!0) i
-  , g x i
-  , g (unpack x) i
-  , g (unpack x) i
-  ) :>
-  Nil
+  )
+    :> ( g (fromIntegral x) i
+       , g (fromIntegral x) i
+       , fromIntegral $! g (fromIntegral @_ @Integer x) i
+       , BV 0 $! g (unsafeToNatural x) i
+       , g (x ! 0) i
+       , g x i
+       , g (unpack x) i
+       , g (unpack x) i
+       )
+    :> Nil
 
 f :: (Bits a) => a -> Int -> a
 f x i = x `shiftL` (-i) `rotateL` (-i) `shiftR` (-i) `rotateR` (-i)

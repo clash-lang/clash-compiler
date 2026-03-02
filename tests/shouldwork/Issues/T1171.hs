@@ -11,10 +11,13 @@ import System.FilePath
 
 import Clash.Prelude
 
-{-# ANN f (Synthesize
-      { t_name   = "f"
+{-# ANN
+  f
+  ( Synthesize
+      { t_name = "f"
       , t_inputs =
-          [ PortProduct ""
+          [ PortProduct
+              ""
               [ PortName "clk"
               , PortName "rst"
               , PortName "en"
@@ -22,37 +25,44 @@ import Clash.Prelude
           , PortName "bv"
           ]
       , t_output = PortName "res"
-      })
+      }
+  )
   #-}
-f
-  :: (HiddenClockResetEnable System)
-  => Signal System (BitVector 4)
-  -> Signal System Bool
+f ::
+  (HiddenClockResetEnable System) =>
+  Signal System (BitVector 4) ->
+  Signal System Bool
 f = fmap (\x -> msb x == lsb x)
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise = P.error $ mconcat [ "Expected:\n\n  ", needle
-                                  , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error $
+        mconcat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content  <- readFile (topDir </> show 'f </> "f.vhdl")
+  content <- readFile (topDir </> show 'f </> "f.vhdl")
 
   assertIn "en  : in f_types.en_System;" content
 
 mainVerilog :: IO ()
 mainVerilog = do
   [topDir] <- getArgs
-  content  <- readFile (topDir </> show 'f </> "f.v")
+  content <- readFile (topDir </> show 'f </> "f.v")
 
   assertIn "input wire  en // enable" content
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   [topDir] <- getArgs
-  content  <- readFile (topDir </> show 'f </> "f.sv")
+  content <- readFile (topDir </> show 'f </> "f.sv")
 
   assertIn "input wire logic en  // enable" content

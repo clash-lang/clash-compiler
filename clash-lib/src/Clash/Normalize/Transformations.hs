@@ -1,4 +1,4 @@
-{-|
+{- |
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
@@ -8,10 +8,9 @@
 
   Transformations of the Normalization process
 -}
-
-module Clash.Normalize.Transformations
-  ( module X
-  ) where
+module Clash.Normalize.Transformations (
+  module X,
+) where
 
 import Clash.Normalize.Transformations.ANF as X
 import Clash.Normalize.Transformations.Case as X
