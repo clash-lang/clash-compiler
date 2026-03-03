@@ -2,14 +2,14 @@
 
 module FunctionInstances where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 class Bus p where
- type MasterToSlave p
+  type MasterToSlave p
 
 instance Bus (a -> b) where
- type MasterToSlave (a -> b) = a
+  type MasterToSlave (a -> b) = a
 
 f :: (Eq a, Num a) => a -> (MasterToSlave (a -> a))
 f x =
@@ -24,9 +24,9 @@ topEntity = fmap f
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput    = stimuliGenerator clk rst (0 :> 1 :> 2 :> Nil)
-    expectOutput = outputVerifier' clk rst (5 :> 3 :> 5 :> Nil)
-    done         = expectOutput (topEntity testInput)
-    clk          = tbSystemClockGen (not <$> done)
-    rst          = systemResetGen
+ where
+  testInput = stimuliGenerator clk rst (0 :> 1 :> 2 :> Nil)
+  expectOutput = outputVerifier' clk rst (5 :> 3 :> 5 :> Nil)
+  done = expectOutput (topEntity testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

@@ -5,30 +5,31 @@ module ResetGen where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-topEntity
-  :: Clock System
-  -> Signal System Bool
+topEntity ::
+  Clock System ->
+  Signal System Bool
 topEntity clk = bundle (unsafeToActiveHigh r)
-  where
-    r  = resetGenN (SNat @3)
+ where
+  r = resetGenN (SNat @3)
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    expectedOutput =
-      outputVerifier'
-        clk
-        rst
-        -- Note that outputVerifier' skips first sample
-        (  True
-        :> True
-        :> False
-        :> False
-        :> False
-        :> False
-        :> Nil )
+ where
+  expectedOutput =
+    outputVerifier'
+      clk
+      rst
+      -- Note that outputVerifier' skips first sample
+      ( True
+          :> True
+          :> False
+          :> False
+          :> False
+          :> False
+          :> Nil
+      )
 
-    done = expectedOutput (topEntity clk)
-    clk  = tbClockGen (not <$> done)
-    rst  = resetGen
+  done = expectedOutput (topEntity clk)
+  clk = tbClockGen (not <$> done)
+  rst = resetGen

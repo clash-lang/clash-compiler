@@ -1,30 +1,31 @@
 {-# LANGUAGE CPP #-}
 
 module TyEqConstraints where
-import GHC.Stack
+
 import Clash.Prelude
+import GHC.Stack
 
 -- see https://github.com/clash-lang/clash-compiler/issues/347
-topEntity
-    :: (dom ~ System)
-    => Clock dom
-    -> Signal dom Bit
-    -> Signal dom Bit
+topEntity ::
+  (dom ~ System) =>
+  Clock dom ->
+  Signal dom Bit ->
+  Signal dom Bit
 topEntity = exposeClock board
-  where
-    board = id
+ where
+  board = id
 {-# OPAQUE topEntity #-}
 {-# ANN topEntity (defSyn "top1") #-}
 
 -- type equality is symmetrical so this should also work:
-topEntity2
-    :: (System ~ dom)
-    => Clock dom
-    -> Signal dom Bit
-    -> Signal dom Bit
+topEntity2 ::
+  (System ~ dom) =>
+  Clock dom ->
+  Signal dom Bit ->
+  Signal dom Bit
 topEntity2 = exposeClock board
-  where
-    board = id
+ where
+  board = id
 {-# ANN topEntity2 (defSyn "top2") #-}
 
 -- Test constrained tyvar as a result
@@ -37,7 +38,6 @@ topEntity3 = id
 topEntity4 :: Clock System -> Signal System Bit -> Signal System Bit
 topEntity4 = topEntity
 {-# ANN topEntity4 (defSyn "top4") #-}
-
 
 -- test substituting one TyVar with another TyVar
 topEntity5 :: (b ~ a, a ~ Int, dom ~ System) => Signal dom b -> Signal System a

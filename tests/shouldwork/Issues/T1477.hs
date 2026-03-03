@@ -8,7 +8,7 @@ import Data.Proxy
 type family QQ a
 type instance QQ (Signal dom a) = a
 
-f :: forall a . Proxy a -> QQ a -> QQ a
+f :: forall a. Proxy a -> QQ a -> QQ a
 f Proxy = id
 {-# OPAQUE f #-}
 

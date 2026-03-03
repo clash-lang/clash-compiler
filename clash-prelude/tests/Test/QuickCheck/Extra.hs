@@ -1,13 +1,13 @@
-module Test.QuickCheck.Extra
-  ( expectException
-  , expectXException
-  , expectExceptionNoX
-  ) where
+module Test.QuickCheck.Extra (
+  expectException,
+  expectXException,
+  expectExceptionNoX,
+) where
 
-import Test.Tasty.QuickCheck
 import Control.DeepSeq (NFData)
-import Control.Exception (SomeException, try, evaluate)
+import Control.Exception (SomeException, evaluate, try)
 import Data.Either (isLeft)
+import Test.Tasty.QuickCheck
 
 import Clash.XException (XException)
 

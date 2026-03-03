@@ -3,39 +3,38 @@ Copyright   : (C) 2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Clash.Num.Erroring
-  ( Erroring
-  , fromErroring  -- exported here because haddock https://github.com/haskell/haddock/issues/456
-  , toErroring
-  ) where
+module Clash.Num.Erroring (
+  Erroring,
+  fromErroring, -- exported here because haddock https://github.com/haskell/haddock/issues/456
+  toErroring,
+) where
 
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
 import Data.Bits (Bits, FiniteBits)
 import Data.Coerce (coerce)
-import Data.Functor.Compose (Compose(..))
+import Data.Functor.Compose (Compose (..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
 import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
-import Clash.Class.Num (SaturationMode(SatError), SaturatingNum(..))
+import Clash.Class.Num (SaturatingNum (..), SaturationMode (SatError))
 import Clash.Class.Parity (Parity)
-import Clash.Class.Resize (Resize(..))
+import Clash.Class.Resize (Resize (..))
 import Clash.XException (NFDataX, ShowX, errorX)
 
--- | An erroring number type is one where all operations return a
--- 'Clash.XException.XExecption' if they would go out of bounds for the
--- underlying type.
---
--- Numbers can be converted to error by default using 'toErroring'.
---
-newtype Erroring a =
-  Erroring { fromErroring :: a }
+{- | An erroring number type is one where all operations return a
+'Clash.XException.XExecption' if they would go out of bounds for the
+underlying type.
+
+Numbers can be converted to error by default using 'toErroring'.
+-}
+newtype Erroring a
+  = Erroring {fromErroring :: a}
   deriving newtype
     ( Arbitrary
     , Binary
@@ -59,27 +58,27 @@ toErroring = Erroring
 
 instance (Resize f) => Resize (Compose Erroring f) where
   {-# INLINE resize #-}
-  resize
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Erroring f a
-    -> Compose Erroring f b
+  resize ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Erroring f a ->
+    Compose Erroring f b
   resize = coerce (resize @f @a @b)
 
   {-# INLINE zeroExtend #-}
-  zeroExtend
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Erroring f a
-    -> Compose Erroring f (b + a)
+  zeroExtend ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Erroring f a ->
+    Compose Erroring f (b + a)
   zeroExtend = coerce (zeroExtend @f @a @b)
 
   {-# INLINE truncateB #-}
-  truncateB
-    :: forall a b
-     . (KnownNat a)
-    => Compose Erroring f (a + b)
-    -> Compose Erroring f a
+  truncateB ::
+    forall a b.
+    (KnownNat a) =>
+    Compose Erroring f (a + b) ->
+    Compose Erroring f a
   truncateB = coerce (truncateB @f @a @b)
 
 instance (Bounded a, Ord a, SaturatingNum a) => Num (Erroring a) where

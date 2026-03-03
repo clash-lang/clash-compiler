@@ -3,7 +3,7 @@ module T1507 where
 import Clash.Prelude
 
 topEntity ::
-  SystemClockResetEnable =>
+  (SystemClockResetEnable) =>
   Signal System (Maybe Int) ->
   Signal System (Maybe Int)
-topEntity = autoReg  (errorX "foo bar")
+topEntity = autoReg (errorX "foo bar")

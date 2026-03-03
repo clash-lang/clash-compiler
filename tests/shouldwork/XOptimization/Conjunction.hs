@@ -1,16 +1,16 @@
 {-# LANGUAGE CPP #-}
-
 {-# OPTIONS_GHC -fno-strictness #-}
+
 module Conjunction where
 
-import qualified Prelude as P
 import Prelude ((++))
+import qualified Prelude as P
 
-import Clash.Prelude hiding (assert, (++))
 import Clash.Annotations.SynthesisAttributes
+import Clash.Prelude hiding (assert, (++))
 
-import Data.String (IsString)
 import Data.List (isInfixOf)
+import Data.String (IsString)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
@@ -25,11 +25,15 @@ topEntity (x :: Bool) = f (let y :: Bool = y in y) True
 --------------- Actual tests for generated HDL -------------------
 assertNotIn :: String -> String -> IO ()
 assertNotIn needle haystack
-  | needle `isInfixOf` haystack = P.error $ P.concat [ "Did not Expect:\n\n  "
-                                                     , needle
-                                                     , "\n\nIn:\n\n"
-                                                     , haystack ]
-  | otherwise                   = return ()
+  | needle `isInfixOf` haystack =
+      P.error
+        $ P.concat
+          [ "Did not Expect:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
+  | otherwise = return ()
 
 -- VHDL test
 mainVHDL :: IO ()

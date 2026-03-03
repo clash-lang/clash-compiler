@@ -1,14 +1,12 @@
-{-|
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
+{- |
 Copyright : © 2015-2016, Christiaan Baaij,
               2017     , Google Inc.
               2019     , Myrtle Software Ltd
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 -}
-
-{-# LANGUAGE NoImplicitPrelude #-}
-
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-
 module Clash.Examples (
   -- * Decoders and Encoders
   -- $decoders_and_encoders
@@ -21,7 +19,7 @@ module Clash.Examples (
 
   -- * UART model
   -- $uart
-  )
+)
 where
 
 import Clash.Prelude

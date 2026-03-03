@@ -14,12 +14,13 @@ data TP a = TP Bool
 
 type instance F (T Bool) = TP Bool
 
-f :: F (T (G ()))
-  -> F (T (G ()))
+f ::
+  F (T (G ())) ->
+  F (T (G ()))
 f = id
-
 {-# OPAQUE f #-}
 
-topEntity :: F (T (G ()))
-          -> F (T (G ()))
+topEntity ::
+  F (T (G ())) ->
+  F (T (G ()))
 topEntity = f

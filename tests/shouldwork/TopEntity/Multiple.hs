@@ -2,12 +2,12 @@
 
 module Multiple where
 
-import Prelude
 import Clash.Prelude (defSyn)
+import Data.List (sort)
+import System.Directory (listDirectory)
 import System.Environment (getArgs)
 import System.FilePath (splitFileName)
-import System.Directory (listDirectory)
-import Data.List (sort)
+import Prelude
 
 import Debug.Trace
 
@@ -30,19 +30,22 @@ mainSystemVerilog :: IO ()
 mainSystemVerilog = do
   [(dir, _fname)] <- map splitFileName <$> getArgs
   files <- listDirectory dir
-  if any (`elem` files) [show 'topEntity2, show 'topEntity3] then
-    error ("Unexpected files / directories: " ++ show files)
-  else
-    pure ()
+  if any (`elem` files) [show 'topEntity2, show 'topEntity3]
+    then
+      error ("Unexpected files / directories: " ++ show files)
+    else
+      pure ()
 
--- | Check whether we can compile a binder that doesn't have a synthesize
--- annotation _and_ isn't called 'topEntity' using -main-is.
+{- | Check whether we can compile a binder that doesn't have a synthesize
+annotation _and_ isn't called 'topEntity' using -main-is.
+-}
 mainVHDL :: IO ()
 mainVHDL = do
   [dir] <- getArgs
   files <- listDirectory dir
   let expected = [show 'topEntity1, show 'topEntity2, show 'topEntity3]
-  if all (`elem` files) expected then
-    pure ()
-  else
-    error ("Unexpected files / directories: " ++ show (sort files))
+  if all (`elem` files) expected
+    then
+      pure ()
+    else
+      error ("Unexpected files / directories: " ++ show (sort files))

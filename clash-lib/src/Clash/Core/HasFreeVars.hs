@@ -1,23 +1,22 @@
-{-|
+{-# LANGUAGE FlexibleInstances #-}
+
+{- |
 Copyright   : (C) 2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Utility class to extract free variables from data which has variables.
 -}
-
-{-# LANGUAGE FlexibleInstances #-}
-
-module Clash.Core.HasFreeVars
-  ( HasFreeVars(..)
-  ) where
+module Clash.Core.HasFreeVars (
+  HasFreeVars (..),
+) where
 
 import Control.Lens as Lens (foldMapOf)
-import Data.Monoid (All(..), Any(..))
+import Data.Monoid (All (..), Any (..))
 
 import Clash.Core.FreeVars
 import Clash.Core.Term (Term)
-import Clash.Core.Type (Type(..))
+import Clash.Core.Type (Type (..))
 import Clash.Core.Var (Var)
 import Clash.Core.VarEnv
 
@@ -27,32 +26,42 @@ class HasFreeVars a where
   freeVarsOf :: a -> VarSet
 
   {-# INLINE isClosed #-}
-  -- | Something is closed if it has no free variables.
-  -- This function may be replaced with a more efficient implementation.
+
+  {- | Something is closed if it has no free variables.
+  This function may be replaced with a more efficient implementation.
+  -}
   isClosed :: a -> Bool
   isClosed = nullVarSet . freeVarsOf
 
   {-# INLINE elemFreeVars #-}
-  -- | Check if a variable is free in the given value.
-  -- This function may be replaced with a more efficient implementation.
+
+  {- | Check if a variable is free in the given value.
+  This function may be replaced with a more efficient implementation.
+  -}
   elemFreeVars :: Var a -> a -> Bool
   elemFreeVars v = elemVarSet v . freeVarsOf
 
   {-# INLINE notElemFreeVars #-}
-  -- | Check if a variable is not free in the given value.
-  -- This function may be replaced with a more efficient implementation.
+
+  {- | Check if a variable is not free in the given value.
+  This function may be replaced with a more efficient implementation.
+  -}
   notElemFreeVars :: Var a -> a -> Bool
   notElemFreeVars x = notElemVarSet x . freeVarsOf
 
   {-# INLINE subsetFreeVars #-}
-  -- | Check if all variables in a set are free in the given value.
-  -- This function may be replaced with a more efficient implementation.
+
+  {- | Check if all variables in a set are free in the given value.
+  This function may be replaced with a more efficient implementation.
+  -}
   subsetFreeVars :: VarSet -> a -> Bool
   subsetFreeVars xs = subsetVarSet xs . freeVarsOf
 
   {-# INLINE disjointFreeVars #-}
-  -- | Check if no variables in a set are free in the given value.
-  -- This function may be replaced with a more efficient implementation.
+
+  {- | Check if no variables in a set are free in the given value.
+  This function may be replaced with a more efficient implementation.
+  -}
   disjointFreeVars :: VarSet -> a -> Bool
   disjointFreeVars xs = disjointVarSet xs . freeVarsOf
 

@@ -1,9 +1,9 @@
 module T1881 where
 
-import qualified Prelude as P
 import Data.List (isInfixOf)
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
+import qualified Prelude as P
 
 import Clash.Prelude
 
@@ -13,9 +13,14 @@ topEntity a b = (a && b, a || b, not a)
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise = P.error $ mconcat [ "Expected:\n\n  ", needle
-                                  , "\n\nIn:\n\n", haystack ]
-
+  | otherwise =
+      P.error
+        $ mconcat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 mainVHDL :: IO ()
 mainVHDL = do

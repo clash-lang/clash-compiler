@@ -6,15 +6,14 @@ module GenericBitPackTypes where
 
 import Clash.Prelude
 
---type MyTuple = (Int, Int, Char)
+-- type MyTuple = (Int, Int, Char)
 
 -- | Product type
 data FooProduct a b
   = FooProduct a b
-    deriving Generic
+  deriving (Generic)
 
 instance (BitPack a, BitPack b) => BitPack (FooProduct a b)
-
 
 -- | Sum type
 data FooSum
@@ -25,23 +24,24 @@ data FooSum
   | FooSumE
   | FooSumF
   | FooSumG
-    deriving (Generic, BitPack)
+  deriving (Generic, BitPack)
 
 -- | Foo sum-of-products aligned
 data FooSP1 a b
   = FooSP1_AB a b
   | FooSP1_BA b a
-    deriving (Generic)
+  deriving (Generic)
 
 instance (BitPack a, BitPack b) => BitPack (FooSP1 a b)
+
 --
+
 -- | Foo sum-of-products non-aligned
 data FooSP2 a b
   = FooSP2_AB a b
   | FooSP2_A a
   | FooSP2_B b
-    deriving (Generic)
-
+  deriving (Generic)
 
 instance (BitPack a, BitPack b) => BitPack (FooSP2 a b)
 
@@ -68,7 +68,6 @@ hT = FooSP2_AB 2 1
 
 iT :: FooSP2 U1 U2
 iT = FooSP2_A 2
-
 
 jT :: FooSP2 U1 U2
 jT = FooSP2_B 1

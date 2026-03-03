@@ -1,11 +1,11 @@
-module Data.Text.Extra
-  ( showt
-  , showtl
-  ) where
+module Data.Text.Extra (
+  showt,
+  showtl,
+) where
 
-import Prelude
 import qualified Data.Text as TS
 import qualified Data.Text.Lazy as TL
+import Prelude
 
 showt :: (Show a) => a -> TS.Text
 showt = TS.pack . show

@@ -2,10 +2,10 @@
 
 module TailOfTail where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
-tailOfTail :: Vec (n+2) (Signed 16) -> Vec n (Signed 16)
+tailOfTail :: Vec (n + 2) (Signed 16) -> Vec n (Signed 16)
 tailOfTail (Cons _ (Cons _ xs)) = xs
 {-# OPAQUE tailOfTail #-}
 
@@ -15,10 +15,10 @@ topEntity = tailOfTail
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst ((1 :> 2 :> 3 :> 4 :> Nil) :> Nil)
-    expectedOutput = outputVerifier' clk rst ((3 :> 4 :> Nil) :> Nil)
+ where
+  testInput = stimuliGenerator clk rst ((1 :> 2 :> 3 :> 4 :> Nil) :> Nil)
+  expectedOutput = outputVerifier' clk rst ((3 :> 4 :> Nil) :> Nil)
 
-    done           = expectedOutput (topEntity <$> testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+  done = expectedOutput (topEntity <$> testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

@@ -7,9 +7,9 @@ module NoDeDup where
 import Prelude as P
 
 import Clash.Magic
-import Clash.Prelude
-import Clash.Netlist.Types
 import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+import Clash.Prelude
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
@@ -52,14 +52,24 @@ isTwiceInst _ = False
 assertNumTwiceInsts :: Component -> IO ()
 assertNumTwiceInsts (Component nm inps outs ds) =
   case Id.toText nm of
-    "f" | nTwiceInsts == 1 -> pure ()
-        | otherwise ->
-            error ( "Found " <> show nTwiceInsts <> " instances of twice in f. "
-                 <> "Expected 1.")
-    "g" | nTwiceInsts == 2 -> pure ()
-        | otherwise ->
-            error ( "Found " <> show nTwiceInsts <> " instances of twice in g. "
-                 <> "Expected 2.")
+    "f"
+      | nTwiceInsts == 1 -> pure ()
+      | otherwise ->
+          error
+            ( "Found "
+                <> show nTwiceInsts
+                <> " instances of twice in f. "
+                <> "Expected 1."
+            )
+    "g"
+      | nTwiceInsts == 2 -> pure ()
+      | otherwise ->
+          error
+            ( "Found "
+                <> show nTwiceInsts
+                <> " instances of twice in g. "
+                <> "Expected 2."
+            )
     "twice" -> pure ()
     "topEntity" -> pure ()
     _ -> error ("Unexpected component: " <> show nm)

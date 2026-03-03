@@ -16,11 +16,7 @@ module Clash.CoSim.CodeGeneration
     , applyE
     ) where
 
-#ifdef CABAL
-import Paths_clash_cosim
-#else
-import Clash.CoSim.Paths_clash_cosim
-#endif
+import Clash.CoSim.Paths (getDataFileName)
 
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 import Clash.CoSim.Types
@@ -47,6 +43,22 @@ arrowsR (t0:ts) t = arrow t0 (arrowsR ts t)
 applyE :: Foldable t => ExpQ -> t Name -> ExpQ
 applyE = foldl (\f x -> [| $f $(varE x) |])
 
+-- We're running in a CABAL environment, so we know these environment
+-- variables are set:
+maxClocks :: IO Int
+#ifdef CABAL
+maxClocks = read <$> getEnv "COSIM_MAX_NUMBER_OF_CLOCKS"
+#else
+maxClocks = pure 1
+#endif
+
+maxArgs :: IO Int
+#ifdef CABAL
+maxArgs = read <$> getEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS"
+#else
+maxArgs = pure 16
+#endif
+
 --------------------------------------
 ---- CODE GENERATION -----------------
 --------------------------------------
@@ -56,16 +68,8 @@ applyE = foldl (\f x -> [| $f $(varE x) |])
 -- to 16.)
 coSimGen :: Q [Dec]
 coSimGen = do
-#ifdef CABAL
-    -- We're running in a CABAL environment, so we know this environment
-    -- variable is set:
-    m <- read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_CLOCKS")
-    n <- read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS")
-#else
-    let m = 1
-    let n = 16
-#endif
-
+    m <- runIO maxClocks
+    n <- runIO maxArgs
 
     concat <$> (sequence  [coSimGen' clks args | clks <- [0..m], args <-  [1..n]])
 

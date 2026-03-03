@@ -1,29 +1,32 @@
-{-|
+{-# LANGUAGE TypeFamilies #-}
+
+{- |
 Copyright  :  (C) 2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
-{-# LANGUAGE TypeFamilies #-}
-
-module Clash.Class.HasDomain.Common {-# DEPRECATED "Experimental feature multiple hidden has been removed. This module will therefore be removed in Clash 1.12." #-}
-  ( Unlines
-  , (:<<>>:)
-  , (:$$$:)
-  , (:++:)
+module Clash.Class.HasDomain.Common
+  {-# DEPRECATED
+    "Experimental feature multiple hidden has been removed. This module will therefore be removed in Clash 1.12."
+    #-} (
+  Unlines,
+  (:<<>>:),
+  (:$$$:),
+  (:++:),
 
   -- * Internal
-  , ToEM
-  ) where
+  ToEM,
+) where
 
-import           GHC.TypeLits               (Symbol)
-import           Type.Errors
-  (ErrorMessage(Text, ShowType, (:<>:), (:$$:)))
+import GHC.TypeLits (Symbol)
+import Type.Errors (
+  ErrorMessage (ShowType, Text, (:$$:), (:<>:)),
+ )
 
 type family ToEM (k :: t) :: ErrorMessage where
-  ToEM (k :: Symbol)       = 'Text k
+  ToEM (k :: Symbol) = 'Text k
   ToEM (k :: ErrorMessage) = k
-  ToEM (k :: t)            = 'ShowType k
+  ToEM (k :: t) = 'ShowType k
 
 infixl 5 :<<>>:
 type (:<<>>:) (k1 :: t1) (k2 :: t2) = ToEM k1 ':<>: ToEM k2
@@ -31,9 +34,9 @@ type (:<<>>:) (k1 :: t1) (k2 :: t2) = ToEM k1 ':<>: ToEM k2
 infixl 4 :$$$:
 type (:$$$:) (k1 :: t1) (k2 :: t2) = ToEM k1 ':$$: ToEM k2
 
-
 {- | Combine multiple lines with line break. Type-level version of the @unlines@
-function but for ErrorMessage. -}
+function but for ErrorMessage.
+-}
 type family Unlines (ln :: [k]) :: ErrorMessage where
   Unlines '[] = 'Text ""
   Unlines ((x :: Symbol) ': xs) = 'Text x ':$$: Unlines xs

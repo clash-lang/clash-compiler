@@ -3,13 +3,13 @@
 
 module ExternalPrimitive where
 
-import qualified Prelude as P
 import Data.List (isInfixOf)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
+import qualified Prelude as P
 
-import Clash.Prelude
 import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Prelude
 
 jsonPrim :: Int
 jsonPrim = 0
@@ -23,15 +23,21 @@ yamlPrim = 1
 
 topEntity :: Vec _ Int
 topEntity =
-     jsonPrim
-  :> yamlPrim
-  :> Nil
+  jsonPrim
+    :> yamlPrim
+    :> Nil
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 mainVHDL :: IO ()
 mainVHDL = do

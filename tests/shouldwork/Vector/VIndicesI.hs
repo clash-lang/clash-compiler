@@ -2,8 +2,8 @@
 
 module VIndicesI where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 topEntity :: Signal System (Vec 4 (Index 4))
 topEntity = pure indicesI
@@ -11,8 +11,8 @@ topEntity = pure indicesI
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    expectedOutput = outputVerifier' clk rst ((0:>1:>2:>3:>Nil):>Nil)
-    done           = expectedOutput topEntity
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+ where
+  expectedOutput = outputVerifier' clk rst ((0 :> 1 :> 2 :> 3 :> Nil) :> Nil)
+  done = expectedOutput topEntity
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

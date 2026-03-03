@@ -1,30 +1,31 @@
-{-# OPTIONS_GHC -Wno-orphans    #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module SerialiseInstances where
 
 import Data.Binary
 
 import Data.Hashable (Hashable)
 
-import           Clash.Annotations.Primitive                  (PrimitiveGuard)
 import qualified Clash.Annotations.BitRepresentation.Internal as CP
+import Clash.Annotations.Primitive (PrimitiveGuard)
 
-import qualified Clash.Primitives.Types                       as CL
-import qualified Clash.Netlist.Types                          as CL (BlackBox, TopEntityT)
-import qualified Clash.Netlist.BlackBox.Types                 as CL
+import qualified Clash.Netlist.BlackBox.Types as CL
+import qualified Clash.Netlist.Types as CL (BlackBox, TopEntityT)
+import qualified Clash.Primitives.Types as CL
 
-import qualified Data.HashMap.Strict                          as HM
+import qualified Data.HashMap.Strict as HM
 
-import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Core.Var (Id)
-import           Clash.Core.TyCon (TyConMap,TyConName)
-import           Clash.Driver.Types (BindingMap, DomainMap)
-import           Data.IntMap.Strict (IntMap)
-
+import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import Clash.Core.TyCon (TyConMap, TyConName)
+import Clash.Core.Var (Id)
+import Clash.Driver.Types (BindingMap, DomainMap)
+import Data.IntMap.Strict (IntMap)
 
 -- | Like C.CompiledPrimitive but without the functions BlackBoxFunction so we can serialise it
 type CompiledPrimitive' = CL.Primitive CL.BlackBoxTemplate CL.BlackBox () ()
+
 type CompiledPrimMap' = CL.PrimMap (PrimitiveGuard CompiledPrimitive')
 
 -- Remove BlackBoxFunctions

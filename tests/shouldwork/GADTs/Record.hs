@@ -5,24 +5,26 @@
 
 module Record where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 import Data.Kind (Type)
 
 -- Real-world example of a GADT stolen from:
 --   https://stackoverflow.com/questions/21505975/write-gadt-record-with-constrained-type
 class HasData (a :: Type) where
-    type Data a :: Type
+  type Data a :: Type
 
 instance HasData Int where
-    type Data Int = Maybe Int
+  type Data Int = Maybe Int
 
 data Foo :: Type -> Type where
-    Foo :: HasData a => {
-        getChar :: Char,
-        getData :: Data a,
-        getInt :: Int
-    } -> Foo a
+  Foo ::
+    (HasData a) =>
+    { getChar :: Char
+    , getData :: Data a
+    , getInt :: Int
+    } ->
+    Foo a
 
 deriving instance Eq (Foo Int)
 
@@ -36,17 +38,17 @@ succIntChar (Foo chr dt int) =
 
 topEntity :: Foo Int -> Foo Int
 topEntity foo = Foo chr (succ <$> dt) int
-  where
-    Foo chr dt int = succIntChar foo
+ where
+  Foo chr dt int = succIntChar foo
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst (Foo 'c' (Just 4) 6 :> Nil)
-    expectedOutput = outputVerifier' clk rst (Foo 'd' (Just 5) 7 :> Nil)
+ where
+  testInput = stimuliGenerator clk rst (Foo 'c' (Just 4) 6 :> Nil)
+  expectedOutput = outputVerifier' clk rst (Foo 'd' (Just 5) 7 :> Nil)
 
-    done           = expectedOutput (topEntity <$> testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+  done = expectedOutput (topEntity <$> testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 {-# OPAQUE testBench #-}

@@ -1,13 +1,17 @@
 module Test.Tasty.Common where
 
-import           Control.Monad.Extra       (forM_, ifM)
-import           Clash.Driver.Manifest     (readManifest, Manifest(..))
-import           Data.Default              (Default, def)
-import           Data.Maybe                (fromMaybe)
-import           System.Directory
-  (copyFile, createDirectory, doesDirectoryExist, listDirectory)
-import           System.FilePath           ((</>))
-import           System.FilePath.Glob      (glob)
+import Clash.Driver.Manifest (Manifest (..), readManifest)
+import Control.Monad.Extra (forM_, ifM)
+import Data.Default (Default, def)
+import Data.Maybe (fromMaybe)
+import System.Directory (
+  copyFile,
+  createDirectory,
+  doesDirectoryExist,
+  listDirectory,
+ )
+import System.FilePath ((</>))
+import System.FilePath.Glob (glob)
 
 data TestExitCode
   = TestExitCode
@@ -16,7 +20,6 @@ data TestExitCode
 
 instance Default TestExitCode where
   def = TestExitCode
-
 
 getManifests :: String -> IO [(FilePath, Manifest)]
 getManifests pattern = mapM go =<< glob pattern
@@ -36,10 +39,10 @@ specificExitCode :: TestExitCode -> Maybe Int
 specificExitCode (TestSpecificExitCode n) = Just n
 specificExitCode _ = Nothing
 
-buildTargetDir
-  :: IO FilePath
-  -> IO FilePath
-  -> IO ()
+buildTargetDir ::
+  IO FilePath ->
+  IO FilePath ->
+  IO ()
 buildTargetDir parentDir targetDir = do
   hdlDir <- fmap (</> "hdl") parentDir
   targetDir1 <- targetDir
@@ -52,6 +55,7 @@ buildTargetDir parentDir targetDir = do
     forM_ es $ \e -> do
       let srcE = src </> e
           dstE = dst </> e
-      ifM (doesDirectoryExist srcE)
+      ifM
+        (doesDirectoryExist srcE)
         (copyDir srcE dstE)
         (copyFile srcE dstE)

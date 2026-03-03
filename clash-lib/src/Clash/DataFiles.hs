@@ -1,4 +1,4 @@
-{-|
+{- |
 Copyright   :  (C) 2022     , Google Inc.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -6,7 +6,6 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 This module provides a way to access static files that are useful when working
 with Clash designs.
 -}
-
 module Clash.DataFiles where
 
 import System.FilePath ((</>))

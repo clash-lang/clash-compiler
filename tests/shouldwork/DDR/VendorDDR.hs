@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -10,6 +9,7 @@ import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
 import qualified Prelude as P
+import Test.Flags (intelVerilog)
 
 createDomain vSystem{vName="DDRA", vPeriod=5000}
 createDomain vXilinxSystem{vName="DDRS", vPeriod=5000}
@@ -266,32 +266,33 @@ testBenchGeneric0 expIn0 expGenOut expVendorOut inOut outOut =
   cToDSlow = unsafeSynchronizer clk4 clkSlow . fmap (truncateB . (`shiftR` 2))
   cntr4 :: Signal Dom4 C
   cntr4 = register clk4 noReset enableGen 0 $ cntr4 + 1
-#ifndef INTEL_VERILOG
-  done1 = outputVerifierWith (\clk rst -> assert clk rst "genOutOut")
-    clkFast clkFast noReset expGenOut $
-      ignoreFor clkFast noReset enableGen d1 0 genOutOut
-#else
-  -- The test contains a number of (implicit) parallel, coinciding processes.
-  -- Execution for these processes is left undefined in the Verilog spec, nor is
-  -- there a mechanism to get consistent behavior (like in VHDL). Therefore,
-  -- simulators are free to pick any execution order they'd like. With Verilog
-  -- HDL, ModelSim executes the processes in an order that makes this particular
-  -- `outputVerifier` fail. SystemVerilog however is unaffected, as of course is
-  -- VHDL.
-  --
-  -- CI never runs @IntelDDR.hs@ (which imports this module), but to enable
-  -- manual verification with @IntelDDR.hs@, you can define the macro
-  -- INTEL_VERILOG when compiling. That way, you can disable this
-  -- `outputVerifier` so you can still verify the vendor primitives, which is
-  -- the main purpose of the test.
-  --
-  -- Note that @IntelDDR.hs@ still suffers from the issue described in
-  -- https://github.com/clash-lang/clash-compiler/issues/2854
-  --
-  -- The `const` is just there to prevent a @-Wunused-matches@ on @expGenOut@
-  -- and @genOutOut@.
-  done1 = pure $ const True (expGenOut, genOutOut)
-#endif
+  done1 =
+    if intelVerilog
+      then
+        -- The test contains a number of (implicit) parallel, coinciding processes.
+        -- Execution for these processes is left undefined in the Verilog spec, nor is
+        -- there a mechanism to get consistent behavior (like in VHDL). Therefore,
+        -- simulators are free to pick any execution order they'd like. With Verilog
+        -- HDL, ModelSim executes the processes in an order that makes this particular
+        -- `outputVerifier` fail. SystemVerilog however is unaffected, as of course is
+        -- VHDL.
+        --
+        -- CI never runs @IntelDDR.hs@ (which imports this module), but to enable
+        -- manual verification with @IntelDDR.hs@, you can define the macro
+        -- INTEL_VERILOG when compiling. That way, you can disable this
+        -- `outputVerifier` so you can still verify the vendor primitives, which is
+        -- the main purpose of the test.
+        --
+        -- Note that @IntelDDR.hs@ still suffers from the issue described in
+        -- https://github.com/clash-lang/clash-compiler/issues/2854
+        --
+        -- The `const` is just there to prevent a @-Wunused-matches@ on @expGenOut@
+        -- and @genOutOut@.
+        pure $ const True (expGenOut, genOutOut)
+      else
+        outputVerifierWith (\clk rst -> assert clk rst "genOutOut")
+          clkFast clkFast noReset expGenOut $
+            ignoreFor clkFast noReset enableGen d1 0 genOutOut
   done2 = outputVerifierWith (\clk rst -> assert clk rst "vendorOutOut")
     clkFast clkFast noReset expVendorOut vendorOutOut
   done3 = outputVerifierWith (\clk rst -> assert clk rst "genInOut1")

@@ -2,21 +2,22 @@ module AnnotateReg where
 
 import qualified Prelude as P
 
-import Clash.Explicit.Prelude
 import Clash.Annotations.SynthesisAttributes
+import Clash.Explicit.Prelude
 import Data.Proxy
-
 
 import Data.List
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
-
 annotateFlipflop ::
-  forall (name :: Symbol) n dom a .
+  forall (name :: Symbol) n dom a.
   (KnownDomain dom, NFDataX a) =>
   Proxy name ->
-  Vec n (Attr String) -> Clock dom -> Signal dom a -> Signal dom a
+  Vec n (Attr String) ->
+  Clock dom ->
+  Signal dom a ->
+  Signal dom a
 annotateFlipflop _ attrs clk x = setName @name (annotateReg attrs (dflipflop clk x))
 
 topEntity ::
@@ -28,8 +29,14 @@ topEntity clk = fmap not . annotateFlipflop (Proxy @"my_signal") (Attr "ASYNC_RE
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 mainVHDL :: IO ()
 mainVHDL = do

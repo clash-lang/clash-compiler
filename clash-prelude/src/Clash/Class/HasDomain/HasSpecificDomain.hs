@@ -1,4 +1,14 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-missing-methods -Wno-deprecations #-}
+{-# OPTIONS_HADDOCK not-home #-}
+
+{- |
 Copyright  :  (C) 2019, Myrtle Software Ltd
                   2022-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -6,73 +16,77 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 Internals for "Clash.Class.HasDomain"
 -}
+module Clash.Class.HasDomain.HasSpecificDomain
+  {-# DEPRECATED
+    "Experimental feature multiple hidden has been removed. This module will therefore be removed in Clash 1.12."
+    #-} where
 
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+import Clash.Class.HasDomain.CodeGen (mkHasDomainTuples)
+import Clash.Class.HasDomain.Common
 
-{-# OPTIONS_GHC -Wno-missing-methods -Wno-deprecations #-}
-{-# OPTIONS_HADDOCK not-home #-}
+import Clash.Signal.Delayed.Internal (DSignal)
+import Clash.Signal.Internal (
+  Clock,
+  Domain,
+  Enable,
+  Reset,
+  Signal,
+ )
+import Clash.Sized.Vector (Vec)
 
-module Clash.Class.HasDomain.HasSpecificDomain {-# DEPRECATED "Experimental feature multiple hidden has been removed. This module will therefore be removed in Clash 1.12." #-} where
-
-import           Clash.Class.HasDomain.CodeGen  (mkHasDomainTuples)
-import           Clash.Class.HasDomain.Common
-
-import           Clash.Sized.Vector             (Vec)
-import           Clash.Signal.Internal
-  (Signal, Domain, Clock, Reset, Enable)
-import           Clash.Signal.Delayed.Internal  (DSignal)
-
-import           Data.Proxy                     (Proxy)
-import           Data.Kind                      (Type)
-import           Type.Errors
-  (IfStuck, DelayError, Pure, ErrorMessage(ShowType))
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
+import Type.Errors (
+  DelayError,
+  ErrorMessage (ShowType),
+  IfStuck,
+  Pure,
+ )
 
 type Outro =
-         ""
-   :$$$: "------"
-   :$$$: ""
-   :$$$: "You tried to apply an explicitly routed clock, reset, or enable line"
-   :$$$: "to a construct with, possibly, an implicitly routed one. Clash failed to"
-   :$$$: "unambigously link the given domain (by passing in a 'Clock', 'Reset', or"
-   :$$$: "'Enable') to the component passed in."
-   :$$$: ""
+  ""
+    :$$$: "------"
+    :$$$: ""
+    :$$$: "You tried to apply an explicitly routed clock, reset, or enable line"
+    :$$$: "to a construct with, possibly, an implicitly routed one. Clash failed to"
+    :$$$: "unambigously link the given domain (by passing in a 'Clock', 'Reset', or"
+    :$$$: "'Enable') to the component passed in."
+    :$$$: ""
 
 type NotFoundError (dom :: Domain) (t :: Type) =
-       "Could not find domain '" :<<>>: 'ShowType dom :<<>>: "' in the following type:"
-  :$$$: ""
-  :$$$: "  " :<<>>: t
-  :$$$: ""
-  :$$$: "If that type contains that domain anyway, you might need to provide an"
-  :$$$: "additional type instance of HasDomain. Example implementations:"
-  :$$$: ""
-  :$$$: " * type instance HasDomain dom  (MyVector n a)     = HasDomain dom a"
-  :$$$: " * type instance HasDomain dom1 (MyCircuit dom2 a) = DomEq dom1 dom2"
-  :$$$: " * type instance HasDomain dom1 (MyTuple a b)      = Merge dom a b"
-  :$$$: ""
-  :$$$: Outro
+  "Could not find domain '" :<<>>: 'ShowType dom :<<>>: "' in the following type:"
+    :$$$: ""
+    :$$$: "  " :<<>>: t
+    :$$$: ""
+    :$$$: "If that type contains that domain anyway, you might need to provide an"
+    :$$$: "additional type instance of HasDomain. Example implementations:"
+    :$$$: ""
+    :$$$: " * type instance HasDomain dom  (MyVector n a)     = HasDomain dom a"
+    :$$$: " * type instance HasDomain dom1 (MyCircuit dom2 a) = DomEq dom1 dom2"
+    :$$$: " * type instance HasDomain dom1 (MyTuple a b)      = Merge dom a b"
+    :$$$: ""
+    :$$$: Outro
 
--- | Type that forces /dom/ to be present in /r/ at least once. Will resolve to
--- a type error if it doesn't. It will always fail if given /dom/ is completely
--- polymorphic and can't be tied to /r/ in any way.
+{- | Type that forces /dom/ to be present in /r/ at least once. Will resolve to
+a type error if it doesn't. It will always fail if given /dom/ is completely
+polymorphic and can't be tied to /r/ in any way.
+-}
 type WithSpecificDomain dom r =
   (HasSpecificDomain dom r, dom ~ GetDomain dom r)
 
 -- TODO: Extend HasDomainWrapperResult such that it keeps track of what it found /
 -- TODO: which types are stuck, so that we can report better errors.
 data HasDomainWrapperResult
-  = NotFound
-  -- ^ No domain found
-  | Found
-  -- ^ Found the specific domain caller was looking for
+  = -- | No domain found
+    NotFound
+  | -- | Found the specific domain caller was looking for
+    Found
 
 -- | Merge two 'HasDomainWrapperResult's according to the semantics of 'HasDomain.
-type family MergeWorker (n :: HasDomainWrapperResult) (m :: HasDomainWrapperResult) :: HasDomainWrapperResult where
+type family
+  MergeWorker (n :: HasDomainWrapperResult) (m :: HasDomainWrapperResult) ::
+    HasDomainWrapperResult
+  where
   MergeWorker 'Found b = 'Found
   MergeWorker a 'Found = 'Found
   MergeWorker 'NotFound 'NotFound = 'NotFound
@@ -84,31 +98,33 @@ type family DomEqWorker (n :: Domain) (m :: Domain) :: HasDomainWrapperResult wh
   DomEqWorker n n = 'Found
   DomEqWorker n m = 'NotFound
 
--- | Check domain for equality. Return @'Found@ if so, return @'NotFound@ if not.
--- The reason d'etre for this type family is that _open_ type families don't
--- allow overlapping types. We therefore defer equality checking to a closed
--- type family.
+{- | Check domain for equality. Return @'Found@ if so, return @'NotFound@ if not.
+The reason d'etre for this type family is that _open_ type families don't
+allow overlapping types. We therefore defer equality checking to a closed
+type family.
+-}
 type DomEq (n :: Domain) (m :: Domain) =
   IfStuck (DomEqWorker n m) ('NotFound) (Pure (DomEqWorker n m))
 
--- | Type family that searches a type and checks whether a specific domain is
--- present. Will result in either "domain not found, and no others either",
--- "domain not found, but found another", or "found domain".
+{- | Type family that searches a type and checks whether a specific domain is
+present. Will result in either "domain not found, and no others either",
+"domain not found, but found another", or "found domain".
+-}
 type family HasDomain (dom :: Domain) (n :: Type) :: HasDomainWrapperResult
 
-type instance HasDomain dom1 (Proxy dom2)           = DomEq dom1 dom2
-type instance HasDomain dom1 (Signal dom2 a)        = DomEq dom1 dom2
+type instance HasDomain dom1 (Proxy dom2) = DomEq dom1 dom2
+type instance HasDomain dom1 (Signal dom2 a) = DomEq dom1 dom2
 type instance HasDomain dom1 (DSignal dom2 delay a) = DomEq dom1 dom2
-type instance HasDomain dom1 (Clock dom2)           = DomEq dom1 dom2
-type instance HasDomain dom1 (Reset dom2)           = DomEq dom1 dom2
-type instance HasDomain dom1 (Enable dom2)          = DomEq dom1 dom2
-type instance HasDomain dom (Vec n a)               = HasDomain dom a
-type instance HasDomain dom (a, b)                  = Merge dom a b
-type instance HasDomain dom (a -> b)                = Merge dom a b
+type instance HasDomain dom1 (Clock dom2) = DomEq dom1 dom2
+type instance HasDomain dom1 (Reset dom2) = DomEq dom1 dom2
+type instance HasDomain dom1 (Enable dom2) = DomEq dom1 dom2
+type instance HasDomain dom (Vec n a) = HasDomain dom a
+type instance HasDomain dom (a, b) = Merge dom a b
+type instance HasDomain dom (a -> b) = Merge dom a b
 
 type family ErrOnNotFound (dom :: Domain) (n :: HasDomainWrapperResult) (t :: Type) :: Domain where
-  ErrOnNotFound dom  'NotFound t = DelayError (NotFoundError dom t)
-  ErrOnNotFound dom  'Found    t = dom
+  ErrOnNotFound dom 'NotFound t = DelayError (NotFoundError dom t)
+  ErrOnNotFound dom 'Found t = dom
 
 -- | Wrapper that checks for stuckness and returns @'NotFound@ if so
 type family HasDomainWrapper (dom :: Domain) (n :: Type) :: HasDomainWrapperResult where
@@ -118,9 +134,10 @@ type family HasDomainWrapper (dom :: Domain) (n :: Type) :: HasDomainWrapperResu
       ('NotFound)
       (Pure (HasDomain dom n))
 
--- | Helper function for HasSpecificDomain class (I don't really understand
--- why this one is necessary. HasDomainWrapper _should_ check for stuckness
--- and does so according to tests..
+{- | Helper function for HasSpecificDomain class (I don't really understand
+why this one is necessary. HasDomainWrapper _should_ check for stuckness
+and does so according to tests..
+-}
 type family ResolveOrErr (dom :: Domain) (t :: Type) :: Domain where
   ResolveOrErr dom t =
     IfStuck
@@ -128,13 +145,14 @@ type family ResolveOrErr (dom :: Domain) (t :: Type) :: Domain where
       (ErrOnNotFound dom 'NotFound t)
       (Pure (ErrOnNotFound dom (HasDomainWrapper dom t) t))
 
--- | Type class that specifies that a certain domain, /dom/, needs to be present
--- in some other type, /r/. This is used to disambiguate what hidden clock,
--- reset, and enable lines should be exposed in functions such as
--- 'Clash.Signal.withSpecificReset'.
---
--- Functions in need of this class should use 'WithSpecificDomain' though, to
--- force Clash to display an error instead of letting it silently pass.
+{- | Type class that specifies that a certain domain, /dom/, needs to be present
+in some other type, /r/. This is used to disambiguate what hidden clock,
+reset, and enable lines should be exposed in functions such as
+'Clash.Signal.withSpecificReset'.
+
+Functions in need of this class should use 'WithSpecificDomain' though, to
+force Clash to display an error instead of letting it silently pass.
+-}
 class HasSpecificDomain (dom :: Domain) (r :: Type) where
   type GetDomain dom r :: Domain
   type GetDomain dom r = ResolveOrErr dom r

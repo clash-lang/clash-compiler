@@ -13,8 +13,8 @@ import Numeric.Natural
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.PartialEval
 import Clash.Core.Literal
+import Clash.Core.PartialEval
 import Clash.Core.Subst
 import Clash.Debug
 
@@ -25,11 +25,11 @@ import Test.Tasty.Clash.CoreTest
 
 f :: Natural -> Natural
 f 0 = 1
-f n = n - m (f $ n-1)
+f n = n - m (f $ n - 1)
 
 m :: Natural -> Natural
 m 0 = 0
-m n = n - f (m $ n-1)
+m n = n - f (m $ n - 1)
 
 topEntity :: Natural
 topEntity = f 10
@@ -37,10 +37,10 @@ topEntity = f 10
 testPath :: FilePath
 testPath = "tests/shouldwork/PartialEvaluation/MutualRecursion.hs"
 
-mainCommon
-  :: (Backend (TargetToState target))
-  => SBuildTarget target
-  -> IO ()
+mainCommon ::
+  (Backend (TargetToState target)) =>
+  SBuildTarget target ->
+  IO ()
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
 
@@ -62,4 +62,3 @@ mainVerilog = mainCommon SVerilog
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = mainCommon SSystemVerilog
-

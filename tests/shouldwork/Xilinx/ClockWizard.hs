@@ -2,7 +2,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module ClockWizard where
@@ -14,8 +13,8 @@ import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 import Clash.Xilinx.ClockGen
 
-createDomain vSystem{vName="DomIn", vPeriod=hzToPeriod 24_000_000}
-createDomain vXilinxSystem{vName="DomOut", vPeriod=hzToPeriod 300_000_000}
+createDomain vSystem{vName = "DomIn", vPeriod = hzToPeriod 24_000_000}
+createDomain vXilinxSystem{vName = "DomOut", vPeriod = hzToPeriod 300_000_000}
 
 topEntity ::
   Clock DomIn ->
@@ -28,7 +27,7 @@ topEntity clkInSE clkInDiff rstIn =
       (clkB, rstB) = clockWizardDifferential clkInDiff rstIn
       o1 = f clkA rstA o1
       o2 = f clkB rstB o2
-  in bundle (o1, o2)
+   in bundle (o1, o2)
 {-# OPAQUE topEntity #-}
 
 testBench ::
@@ -38,8 +37,10 @@ testBench = done
   (o1, o2) = unbundle $ topEntity clkSE clkDiff rst
   done1 = o1 .== maxBound
   done2 = o2 .== maxBound
-  done  = unsafeSynchronizer clockGen clkSE $ fmap endVhdlSim $
-            strictAnd <$> done1 <*> done2
+  done =
+    unsafeSynchronizer clockGen clkSE $
+      fmap endVhdlSim $
+        strictAnd <$> done1 <*> done2
   strictAnd !a !b = a && b
   clkSE = tbClockGen (not <$> done)
   clkDiff = clockToDiffClock clkSE
@@ -61,9 +62,12 @@ endVhdlSim ::
   Bool
 endVhdlSim = id
 {-# OPAQUE endVhdlSim #-}
-{-# ANN endVhdlSim (
-  let primName = 'endVhdlSim
-  in InlineYamlPrimitive [VHDL] [__i|
+{-# ANN
+  endVhdlSim
+  ( let primName = 'endVhdlSim
+     in InlineYamlPrimitive
+          [VHDL]
+          [__i|
     BlackBox:
       name: #{primName}
       kind: Declaration
@@ -72,12 +76,19 @@ endVhdlSim = id
         assert (not ~ARG[0]) report "Simulation finished" severity failure;
         ~RESULT <= ~ARG[0];
         -- endVhdlSim end
-  |]) #-}
-{-# ANN endVhdlSim (
-  let primName = 'endVhdlSim
-  in InlineYamlPrimitive [Verilog, SystemVerilog] [__i|
+  |]
+  )
+  #-}
+{-# ANN
+  endVhdlSim
+  ( let primName = 'endVhdlSim
+     in InlineYamlPrimitive
+          [Verilog, SystemVerilog]
+          [__i|
     BlackBox:
       name: #{primName}
       kind: Expression
       template: ~ARG[0]
-  |]) #-}
+  |]
+  )
+  #-}

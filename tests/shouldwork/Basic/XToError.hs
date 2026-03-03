@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+
 module XToError where
 
 import Clash.Prelude

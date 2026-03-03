@@ -19,9 +19,10 @@ import Clash.Sized.Unsigned
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Word (Word16, Word32, Word64, Word8)
 
--- | Type family mapping types to their canonical \"unwrapped\" Clash form.
--- This is used by 'Clash.Class.NumConvert.numConvert' and
--- 'Clash.Class.NumConvert.maybeNumConvert' to determine the intermediate type.
+{- | Type family mapping types to their canonical \"unwrapped\" Clash form.
+This is used by 'Clash.Class.NumConvert.numConvert' and
+'Clash.Class.NumConvert.maybeNumConvert' to determine the intermediate type.
+-}
 type family Canonical a
 
 -- Instances for Data.Word types

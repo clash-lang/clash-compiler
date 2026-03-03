@@ -1,21 +1,20 @@
-{-|
-  Copyright   :  (C) 2024, QBayLogic B.V.
-  License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
-module Clash.Unique
-  ( Unique
-  , pattern Unique#
-  , Unique#
-  , Uniquable (..)
-  , fromGhcUnique
-  ) where
+{- |
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+module Clash.Unique (
+  Unique,
+  pattern Unique#,
+  Unique#,
+  Uniquable (..),
+  fromGhcUnique,
+) where
 
 #if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
 #define UNIQUE_IS_WORD64

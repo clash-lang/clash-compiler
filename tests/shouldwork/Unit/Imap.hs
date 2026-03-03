@@ -1,16 +1,15 @@
 -- See: https://github.com/clash-lang/clash-compiler/issues/507
-
 {-# LANGUAGE CPP #-}
 
 module Imap where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 data AB = A | B deriving (Eq, Generic, ShowX)
 
-ab :: KnownNat n => Index n -> AB -> AB
-ab n A = if n >  0 then A else B
+ab :: (KnownNat n) => Index n -> AB -> AB
+ab n A = if n > 0 then A else B
 ab n B = if n == 0 then B else A
 {-# OPAQUE ab #-}
 
@@ -20,10 +19,10 @@ topEntity = imap ab
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst ((A :> Nil) :> (B :> Nil) :> Nil)
-    expectedOutput = outputVerifier' clk rst ((B :> Nil) :> (B :> Nil) :> Nil)
+ where
+  testInput = stimuliGenerator clk rst ((A :> Nil) :> (B :> Nil) :> Nil)
+  expectedOutput = outputVerifier' clk rst ((B :> Nil) :> (B :> Nil) :> Nil)
 
-    done           = expectedOutput (topEntity <$> testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+  done = expectedOutput (topEntity <$> testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

@@ -1,5 +1,8 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses, UndecidableInstances #-} -- Needed for `TypeError` only
+-- Needed for `TypeError` only
+{-# LANGUAGE MultiParamTypeClasses #-}
+-- Needed for `TypeError` only
+{-# LANGUAGE UndecidableInstances #-}
 
 module T1536 where
 
@@ -15,22 +18,24 @@ mysteps :: Steps 2 'False 'False
 mysteps = step1 `More` (One $ step2)
 
 data IMaybe (isJust :: Bool) a where
-    INothing :: IMaybe 'False a
-    IJust :: a -> IMaybe 'True a
+  INothing :: IMaybe 'False a
+  IJust :: a -> IMaybe 'True a
 
 class Impossible where
-    impossible :: a
+  impossible :: a
 
 type family Compat post1 pre2 :: Constraint where
-    Compat 'True 'True = (TypeError ('Text "Conflict between postamble and next preamble"), Impossible)
-    Compat post1 pre2 = ()
+  Compat 'True 'True =
+    (TypeError ('Text "Conflict between postamble and next preamble"), Impossible)
+  Compat post1 pre2 = ()
 
 data Step pre post where
-    Step :: IMaybe pre () -> IMaybe post () -> Step pre post
+  Step :: IMaybe pre () -> IMaybe post () -> Step pre post
 
 data Steps (l :: Nat) pre post where
-    One :: Step pre post -> Steps 1 pre post
-    More :: (Compat post1 pre2) => Step pre1 post1 -> Steps n pre2 post2 -> Steps (1 + n) pre1 post2
+  One :: Step pre post -> Steps 1 pre post
+  More ::
+    (Compat post1 pre2) => Step pre1 post1 -> Steps n pre2 post2 -> Steps (1 + n) pre1 post2
 
 from :: IMaybe free m -> Maybe m
 from INothing = Nothing

@@ -19,12 +19,10 @@ module Clash.FFI.VPI.Callback
   , Callback(..)
   , registerCallback
   , removeCallback
-#ifndef IVERILOG
   , getCallbackInfo
   , withCallbackInfo
   , unsafeReceiveCallbackInfo
   , receiveCallbackInfo
-#endif
   , module Clash.FFI.VPI.Callback.Reason
   ) where
 
@@ -32,9 +30,7 @@ import           Control.Exception (Exception, throwIO)
 import qualified Control.Monad as Monad (unless)
 import           Foreign.C.String (CString)
 import           Foreign.C.Types (CInt(..))
-#ifndef IVERILOG
 import qualified Foreign.Marshal.Alloc as FFI (alloca, malloc)
-#endif
 import           Foreign.Ptr (FunPtr, Ptr)
 import qualified Foreign.Ptr as FFI (castPtr)
 import           Foreign.Storable (Storable)
@@ -179,6 +175,7 @@ removeCallback cb = do
     throwIO $ CouldNotUnregisterCallback cb callStack
 
 -- iverilog just decided not to implement this VPI call...
+{- ORMOLU_DISABLE -}
 #ifndef IVERILOG
 foreign import ccall "vpi_user.h vpi_get_cb_info"
   c_vpi_get_cb_info :: Callback -> Ptr CCallbackInfo -> IO ()
@@ -233,4 +230,39 @@ receiveCallbackInfo
   -> IO (CallbackInfo extra)
 receiveCallbackInfo callback =
   getCallbackInfo callback >>= peekReceive
+#else
+-- | Get the low-level representation of the information for the given callback
+-- object. Not supported on iverilog.
+getCallbackInfo :: Callback -> IO (Ptr CCallbackInfo)
+getCallbackInfo _ =
+  fail "getCallbackInfo is not supported on iverilog"
+
+-- | Get the low-level representation of the information for the given callback
+-- object. Not supported on iverilog.
+withCallbackInfo :: Callback -> (Ptr CCallbackInfo -> IO a) -> IO a
+withCallbackInfo _ _ =
+  fail "withCallbackInfo is not supported on iverilog"
+
+-- | Get the high-level representation of the information for the given
+-- callback object. Not supported on iverilog.
+unsafeReceiveCallbackInfo
+  :: forall extra a
+   . UnsafeReceive extra
+  => CRepr extra ~ Ptr a
+  => Callback
+  -> IO (CallbackInfo extra)
+unsafeReceiveCallbackInfo _ =
+  fail "unsafeReceiveCallbackInfo is not supported on iverilog"
+
+-- | Get the high-level representation of the information for the given
+-- callback object. Not supported on iverilog.
+receiveCallbackInfo
+  :: forall extra a
+   . Receive extra
+  => CRepr extra ~ Ptr a
+  => Callback
+  -> IO (CallbackInfo extra)
+receiveCallbackInfo _ =
+  fail "receiveCallbackInfo is not supported on iverilog"
 #endif
+{- ORMOLU_ENABLE -}

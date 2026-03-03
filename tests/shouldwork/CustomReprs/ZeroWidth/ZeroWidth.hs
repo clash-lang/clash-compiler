@@ -15,46 +15,58 @@
 
 module ZeroWidth where
 
-import Clash.Prelude.Testbench
-import Clash.Prelude
-import GHC.Generics
 import Clash.Annotations.BitRepresentation
+import Clash.Prelude
+import Clash.Prelude.Testbench
 import Data.Maybe
+import GHC.Generics
 
 data SProduct
   = S Bool String
   | P Bool String Bool
-{-# ANN module ( DataReprAnn
-                   $(liftQ [t|SProduct|])
-                   3
-                   [ ConstrRepr 'S 0b100 0b100 [0b001, 0b000]
-                   , ConstrRepr 'P 0b100 0b000 [0b010, 0b000, 0b001]
-                   ] ) #-}
+{-# ANN
+  module
+  ( DataReprAnn $
+      (liftQ [t|SProduct|])
+        3
+        [ ConstrRepr 'S 0b100 0b100 [0b001, 0b000]
+        , ConstrRepr 'P 0b100 0b000 [0b010, 0b000, 0b001]
+        ]
+  )
+  #-}
 
 data Product = Product Bool String
-{-# ANN module ( DataReprAnn
-                   $(liftQ [t|Product|])
-                   1
-                   [ ConstrRepr 'Product 0b0 0b0 [0b1, 0b0] ] ) #-}
+{-# ANN
+  module
+  ( DataReprAnn $
+      (liftQ [t|Product|])
+        1
+        [ConstrRepr 'Product 0b0 0b0 [0b1, 0b0]]
+  )
+  #-}
 
-data Record = Record { myBool :: Bool, myString :: String }
-{-# ANN module ( DataReprAnn
-                   $(liftQ [t|Record|])
-                   1
-                   [ ConstrRepr 'Record 0b0 0b0 [0b1, 0b0] ] ) #-}
+data Record = Record {myBool :: Bool, myString :: String}
+{-# ANN
+  module
+  ( DataReprAnn $
+      (liftQ [t|Record|])
+        1
+        [ConstrRepr 'Record 0b0 0b0 [0b1, 0b0]]
+  )
+  #-}
 
-topEntity
-  :: SProduct
-  -> Product
-  -> Record
-  -> ( SProduct
-     , SProduct
-     , Product
-     , Product
-     , Record
-     , Record
-     , Record
-     )
+topEntity ::
+  SProduct ->
+  Product ->
+  Record ->
+  ( SProduct
+  , SProduct
+  , Product
+  , Product
+  , Record
+  , Record
+  , Record
+  )
 topEntity sp (Product pb ps) r@(Record rb rs) =
   ( sp1
   , sp2

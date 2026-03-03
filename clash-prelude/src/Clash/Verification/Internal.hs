@@ -1,52 +1,56 @@
-{-|
-Copyright  :  (C) 2019, Myrtle Software Ltd
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
-
-Verification
--}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Verification.Internal
- ( AssertionResult(..)
- , Property(..)
- , Assertion(..)
- , RenderAs(..)
- , IsTemporal(..)
- , AssertionValue(toAssertionValue)
- , Assertion'(..)
- , Property'(..)
- , toTemporal
- , isTemporal
- , assertion
+{- |
+Copyright  :  (C) 2019, Myrtle Software Ltd
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+Verification
+-}
+module Clash.Verification.Internal (
+  AssertionResult (..),
+  Property (..),
+  Assertion (..),
+  RenderAs (..),
+  IsTemporal (..),
+  AssertionValue (toAssertionValue),
+  Assertion' (..),
+  Property' (..),
+  toTemporal,
+  isTemporal,
+  assertion,
+)
+where
+
+import Data.Text (Text)
+
+import Clash.Annotations.BitRepresentation (
+  ConstrRepr (..),
+  DataReprAnn (..),
+  liftQ,
  )
- where
-
-import           Data.Text                      (Text)
-
-import Clash.Annotations.BitRepresentation
-  (ConstrRepr(..), DataReprAnn(..), liftQ)
-import           Clash.Signal.Internal          (Domain, Signal)
+import Clash.Signal.Internal (Domain, Signal)
 
 -- | Render target for HDL
 data RenderAs
-  = PSL
-  -- ^ Property Specification Language
-  | SVA
-  -- ^ SystemVerilog Assertions
-  | AutoRenderAs
-  -- ^ Use SVA for SystemVerilog, PSL for others
-  | YosysFormal
-  -- ^ Yosys Formal Extensions for Verilog and SystemVerilog. See:
-  -- https://symbiyosys.readthedocs.io/en/latest/verilog.html and
-  -- https://symbiyosys.readthedocs.io/en/latest/verific.html
-  --
-  -- Falls back to PSL for VHDL, however currently Clash's PSL syntax isn't
-  -- suported by GHDL+SymbiYosys;
+  = -- | Property Specification Language
+    PSL
+  | -- | SystemVerilog Assertions
+    SVA
+  | -- | Use SVA for SystemVerilog, PSL for others
+    AutoRenderAs
+  | {- | Yosys Formal Extensions for Verilog and SystemVerilog. See:
+    https://symbiyosys.readthedocs.io/en/latest/verilog.html and
+    https://symbiyosys.readthedocs.io/en/latest/verific.html
+
+    Falls back to PSL for VHDL, however currently Clash's PSL syntax isn't
+    suported by GHDL+SymbiYosys;
+    -}
+    YosysFormal
   deriving (Show, Eq)
 
 data IsTemporal
@@ -56,51 +60,50 @@ data IsTemporal
 
 -- | Internal version of 'Assertion'.
 data Assertion' a
-  = CvPure a
-  -- ^ (Bootstrapping) signal of booleans
-  | CvToTemporal (Assertion' a)
-  -- ^ Tag to force a non-temporal assertion to a temporal one
-  | CvLit Bool
-  -- ^ Boolean literal
+  = -- | (Bootstrapping) signal of booleans
+    CvPure a
+  | -- | Tag to force a non-temporal assertion to a temporal one
+    CvToTemporal (Assertion' a)
+  | -- | Boolean literal
+    CvLit Bool
+  | -- | Logical not
+    CvNot (Assertion' a)
+  | -- | Logical and
+    CvAnd (Assertion' a) (Assertion' a)
+  | -- | Logical or
+    CvOr (Assertion' a) (Assertion' a)
+  | -- | Logical implies
+    CvImplies (Assertion' a) (Assertion' a)
+  | -- | Moves start point of assertion /n/ cycles forward
+    CvNext Word (Assertion' a)
+  | -- | Before @CvBefore a b@ is the same as @CvAnd a (CvNext 1 b)@
+    CvBefore (Assertion' a) (Assertion' a)
+  | {- | Temporal implies @CvTemporalImplies n a b@:
 
-  | CvNot (Assertion' a)
-  -- ^ Logical not
-  | CvAnd (Assertion' a) (Assertion' a)
-  -- ^ Logical and
-  | CvOr (Assertion' a) (Assertion' a)
-  -- ^ Logical or
-  | CvImplies (Assertion' a) (Assertion' a)
-  -- ^ Logical implies
-
-  | CvNext Word (Assertion' a)
-  -- ^ Moves start point of assertion /n/ cycles forward
-  | CvBefore (Assertion' a) (Assertion' a)
-  -- ^ Before @CvBefore a b@ is the same as @CvAnd a (CvNext 1 b)@
-  | CvTemporalImplies Word (Assertion' a) (Assertion' a)
-  -- ^ Temporal implies @CvTemporalImplies n a b@:
-  --
-  --   n | n == 0    -> same as @CvImplies a b@
-  --     | otherwise -> same as @CvImplies a (CvNextN n b)@
-  --
-  | CvAlways (Assertion' a)
-  -- ^ Assertion should _always_ hold
-  | CvNever (Assertion' a)
-  -- ^ Assertion should _never_ hold (not supported by SVA)
-  | CvEventually (Assertion' a)
-  -- ^ Assertion should _eventually_ hold
+    n | n == 0    -> same as @CvImplies a b@
+    | otherwise -> same as @CvImplies a (CvNextN n b)@
+    -}
+    CvTemporalImplies Word (Assertion' a) (Assertion' a)
+  | -- | Assertion should _always_ hold
+    CvAlways (Assertion' a)
+  | -- | Assertion should _never_ hold (not supported by SVA)
+    CvNever (Assertion' a)
+  | -- | Assertion should _eventually_ hold
+    CvEventually (Assertion' a)
   deriving (Show, Functor, Foldable, Traversable)
 
--- | Internal version of 'Property'. All user facing will instantiate @a@
--- with @(Maybe Text, Signal dom Bool)@. Blackboxes will instantiate it with
--- @(Maybe Text, Term)@ instead.
+{- | Internal version of 'Property'. All user facing will instantiate @a@
+with @(Maybe Text, Signal dom Bool)@. Blackboxes will instantiate it with
+@(Maybe Text, Term)@ instead.
+-}
 data Property' a
   = CvAssert (Assertion' a)
   | CvCover (Assertion' a)
   | CvAssume (Assertion' a)
   deriving (Show, Functor, Foldable, Traversable)
 
-data Assertion (dom :: Domain) =
-  Assertion IsTemporal (Assertion' (Maybe Text, Signal dom Bool))
+data Assertion (dom :: Domain)
+  = Assertion IsTemporal (Assertion' (Maybe Text, Signal dom Bool))
 
 toTemporal :: Assertion dom -> Assertion' (Maybe Text, Signal dom Bool)
 toTemporal (Assertion IsTemporal a) = a
@@ -115,33 +118,42 @@ assertion :: Assertion dom -> Assertion' (Maybe Text, Signal dom Bool)
 assertion (Assertion _it assert) = assert
 {-# INLINE assertion #-}
 
--- | A property is a temporal or basic assertion that's specified to either
--- used as an _assert_ or _cover_ statement. See
--- 'Clash.Explicit.Verification.assert' and 'Clash.Explicit.Verification.cover'.
-newtype Property (dom :: Domain) =
-  Property (Property' (Maybe Text, Signal dom Bool))
+{- | A property is a temporal or basic assertion that's specified to either
+used as an _assert_ or _cover_ statement. See
+'Clash.Explicit.Verification.assert' and 'Clash.Explicit.Verification.cover'.
+-}
+newtype Property (dom :: Domain)
+  = Property (Property' (Maybe Text, Signal dom Bool))
 
--- | A result of some property. Besides carrying the actual boolean result, it
--- carries some properties used to make reports.
+{- | A result of some property. Besides carrying the actual boolean result, it
+carries some properties used to make reports.
+-}
 data AssertionResult = AssertionResult
-  { cvPropName :: !String  -- I'd like text, but Clash complains :[
+  { cvPropName :: !String -- I'd like text, but Clash complains :[
+
   -- ^ Name of property belonging to this result
   , cvPass :: !Bool
   -- ^ False whenever property is violated, True otherwise
   }
   deriving (Eq)
-{-# ANN module (
-  DataReprAnn
-    $(liftQ [t| AssertionResult |])
-    0
-    [ ConstrRepr 'AssertionResult 0 0 [0b0, 0b0]
-    ]) #-}
+
+{-# ANN
+  module
+  ( DataReprAnn
+      $(liftQ [t|AssertionResult|])
+      0
+      [ ConstrRepr 'AssertionResult 0 0 [0b0, 0b0]
+      ]
+  )
+  #-}
+
 {- Marked as zero-width so Clash won't stumble on the fact it's unrepresentable. ^ -}
 
--- | An AssertionValue is a bool-like value or stream that can be used in
--- property specifications. Clash implements two: a stream of booleans
--- (Signal dom Bool), and the result of a property expression (Assertion
--- dom).
+{- | An AssertionValue is a bool-like value or stream that can be used in
+property specifications. Clash implements two: a stream of booleans
+(Signal dom Bool), and the result of a property expression (Assertion
+dom).
+-}
 class AssertionValue dom a | a -> dom where
   -- | Convert given type into a Assertion.
   toAssertionValue :: a -> Assertion dom

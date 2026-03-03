@@ -4,7 +4,6 @@ License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -21,9 +20,7 @@ module Clash.FFI.VPI.Object.Value
   , module Clash.FFI.VPI.Object.Value.Delay
   , module Clash.FFI.VPI.Object.Value.Format
   , module Clash.FFI.VPI.Object.Value.Scalar
-#if defined(VERILOG_2005) && defined(VPI_VECVAL)
   , module Clash.FFI.VPI.Object.Value.Vector
-#endif
   ) where
 
 import qualified Control.Exception as IO (throwIO)

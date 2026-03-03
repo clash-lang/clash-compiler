@@ -7,10 +7,10 @@ module T1182B where
 
 import qualified Prelude as P
 
-import Clash.Prelude
-import qualified Clash.Netlist.Types as N
-import qualified Clash.Netlist.Id as Id
 import Clash.Annotations.TH
+import qualified Clash.Netlist.Id as Id
+import qualified Clash.Netlist.Types as N
+import Clash.Prelude
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
@@ -18,34 +18,44 @@ import Test.Tasty.Clash.NetlistTest
 import qualified Data.Text as T
 
 data SevenSegment dom (n :: Nat) = SevenSegment
-    { anodes :: "AN" ::: Signal dom (Vec n Bool)
-    , segments :: "SEG" ::: Signal dom (Vec 7 Bool)
-    , dp :: "DP" ::: Signal dom Bool
-    }
+  { anodes :: "AN" ::: Signal dom (Vec n Bool)
+  , segments :: "SEG" ::: Signal dom (Vec 7 Bool)
+  , dp :: "DP" ::: Signal dom Bool
+  }
 
-topEntity
-    :: "CLK" ::: Clock System
-    -> "SS" ::: SevenSegment System 8
-topEntity clk = withClockResetEnable clk resetGen enableGen $
-    SevenSegment{ anodes = pure $ repeat False
-                , segments = pure $ repeat False
-                , dp = pure False }
+topEntity ::
+  "CLK" ::: Clock System ->
+  "SS" ::: SevenSegment System 8
+topEntity clk =
+  withClockResetEnable clk resetGen enableGen
+    $ SevenSegment
+      { anodes = pure $ repeat False
+      , segments = pure $ repeat False
+      , dp = pure False
+      }
 makeTopEntity 'topEntity
 
 testPath :: FilePath
 testPath = "tests/shouldwork/TopEntity/T1182B.hs"
 
-assertInputs :: N.HWType-> N.HWType -> N.Component -> IO ()
-assertInputs exp1 exp2 (N.Component _ [(clk, N.Clock _)]
-  [ (_, (ssan, act1), Nothing)
-  , (_, (ssseg, act2), Nothing)
-  , (_, (ssdp, N.Bool), Nothing)
-  ] ds)
-  | Id.toText clk == T.pack "CLK"
-  , Id.toText ssan == T.pack "SS_AN"
-  , Id.toText ssseg == T.pack "SS_SEG"
-  , Id.toText ssdp == T.pack "SS_DP"
-  = pure ()
+assertInputs :: N.HWType -> N.HWType -> N.Component -> IO ()
+assertInputs
+  exp1
+  exp2
+  ( N.Component
+      _
+      [(clk, N.Clock _)]
+      [ (_, (ssan, act1), Nothing)
+        , (_, (ssseg, act2), Nothing)
+        , (_, (ssdp, N.Bool), Nothing)
+        ]
+      ds
+    )
+    | Id.toText clk == T.pack "CLK"
+    , Id.toText ssan == T.pack "SS_AN"
+    , Id.toText ssseg == T.pack "SS_SEG"
+    , Id.toText ssdp == T.pack "SS_DP" =
+        pure ()
 assertInputs _ _ c = error $ "Component mismatch: " P.++ show c
 
 mainVHDL :: IO ()

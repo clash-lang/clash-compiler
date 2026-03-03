@@ -1,25 +1,24 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+
+{- |
 Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random generation of RTree.
 -}
+module Clash.Hedgehog.Sized.RTree (
+  genRTree,
+  genNonEmptyRTree,
+  SomeRTree (..),
+  genSomeRTree,
+) where
 
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-
-module Clash.Hedgehog.Sized.RTree
-  ( genRTree
-  , genNonEmptyRTree
-  , SomeRTree(..)
-  , genSomeRTree
-  ) where
-
-import GHC.TypeNats
-  hiding (SNat)
+import GHC.TypeNats hiding (
+  SNat,
+ )
 import Hedgehog (MonadGen, Range)
 import qualified Hedgehog.Gen as Gen
 
@@ -38,12 +37,12 @@ data SomeRTree atLeast a where
 instance (KnownNat atLeast, Show a) => Show (SomeRTree atLeast a) where
   show (SomeRTree SNat x) = show x
 
-genSomeRTree
-  :: forall atLeast a m
-   . (MonadGen m, KnownNat atLeast)
-  => Range Natural
-  -> m a
-  -> m (SomeRTree atLeast a)
+genSomeRTree ::
+  forall atLeast a m.
+  (MonadGen m, KnownNat atLeast) =>
+  Range Natural ->
+  m a ->
+  m (SomeRTree atLeast a)
 genSomeRTree rangeElems genElem = do
   numExtra <- Gen.integral rangeElems
 

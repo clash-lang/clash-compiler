@@ -1,4 +1,8 @@
-{-|
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ViewPatterns #-}
+
+{- |
   Copyright   :  (C) 2018     , Google Inc.,
                      2021-2023, QBayLogic B.V.,
                      2022     , Google Inc.
@@ -7,16 +11,11 @@
 
   Blackbox template functions for Clash.Intel.ClockGen
 -}
-
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
-{-# LANGUAGE ViewPatterns      #-}
-
 module Clash.Primitives.Intel.ClockGen where
 
 import Control.Monad.State
 import Data.List (zip4)
-import Data.List.Infinite (Infinite(..), (...))
+import Data.List.Infinite (Infinite (..), (...))
 import Data.Maybe (fromMaybe)
 import Data.Text.Prettyprint.Doc.Extra
 import Text.Show.Pretty (ppShow)
@@ -36,7 +35,7 @@ import qualified Prettyprinter.Interpolate as I
 data Variant = Altpll | AlteraPll
 
 hdlUsed :: [Int]
-hdlUsed = [ clk, rst ]
+hdlUsed = [clk, rst]
  where
   _knownDomIn
     :< _clocksClass
@@ -44,19 +43,19 @@ hdlUsed = [ clk, rst ]
     :< _numOutClocks
     :< clk
     :< rst
-    :< _ = (0...)
+    :< _ = (0 ...)
 
 hdlValid :: BlackBoxContext -> Bool
-hdlValid bbCtx | [(_,Product {})] <- bbResults bbCtx = True
+hdlValid bbCtx | [(_, Product{})] <- bbResults bbCtx = True
 hdlValid _ = False
 
 qsysUsed :: [Int]
-qsysUsed = [ knownDomIn, clocksCxt ]
+qsysUsed = [knownDomIn, clocksCxt]
  where
   knownDomIn
     :< _clocksClass
     :< clocksCxt
-    :< _ = (0...)
+    :< _ = (0 ...)
 
 altpllTF :: TemplateFunction
 altpllTF = TemplateFunction hdlUsed hdlValid (hdlTemplate Altpll)
@@ -75,134 +74,144 @@ alteraPllQsysTF = TemplateFunction qsysUsed valid alteraPllQsysTemplate
   valid = const True
 
 hdlTemplate ::
-  forall s .
-  Backend s =>
+  forall s.
+  (Backend s) =>
   Variant ->
   BlackBoxContext ->
   State s Doc
 hdlTemplate variant bbCtx
   | [ _knownDomIn
-    , _clocksClass
-    , _clocksCxt
-    , _numOutClocks
-    , clk
-    , rst
-    ] <- map fst (DSL.tInputs bbCtx)
+      , _clocksClass
+      , _clocksCxt
+      , _numOutClocks
+      , clk
+      , rst
+      ] <-
+      map fst (DSL.tInputs bbCtx)
   , [DSL.ety -> resultTy] <- DSL.tResults bbCtx
   , Product _ _ (init -> pllOutTys) <- resultTy
-  , [compName] <- bbQsysIncName bbCtx
-  = do
-    let
-      stdName Altpll = "altpll"
-      stdName AlteraPll = "altera_pll"
-      pllOutName Altpll = "c"
-      pllOutName AlteraPll = "outclk_"
-      clkInName Altpll = "clk"
-      clkInName AlteraPll = "refclk"
-      rstName Altpll = "areset"
-      rstName AlteraPll = "rst"
+  , [compName] <- bbQsysIncName bbCtx =
+      do
+        let
+          stdName Altpll = "altpll"
+          stdName AlteraPll = "altera_pll"
+          pllOutName Altpll = "c"
+          pllOutName AlteraPll = "outclk_"
+          clkInName Altpll = "clk"
+          clkInName AlteraPll = "refclk"
+          rstName Altpll = "areset"
+          rstName AlteraPll = "rst"
 
-    instName <- Id.makeBasic $ fromMaybe (stdName variant) $ bbCtxName bbCtx
+        instName <- Id.makeBasic $ fromMaybe (stdName variant) $ bbCtxName bbCtx
 
-    -- TODO: unsafeMake is dubious here: I don't think we take names in
-    -- TODO: bbQsysIncName into account when generating fresh ids
-    let compNameId = Id.unsafeMake compName
+        -- TODO: unsafeMake is dubious here: I don't think we take names in
+        -- TODO: bbQsysIncName into account when generating fresh ids
+        let compNameId = Id.unsafeMake compName
 
-    DSL.declarationReturn bbCtx (stdName variant <> "_block") $ do
+        DSL.declarationReturn bbCtx (stdName variant <> "_block") $ do
+          rstHigh <- DSL.unsafeToActiveHigh "reset" rst
+          pllOuts <- DSL.declareN "pllOut" pllOutTys
+          locked <- DSL.declare "locked" Bit
+          pllLock <- DSL.boolFromBit "pllLock" locked
 
-      rstHigh <- DSL.unsafeToActiveHigh "reset" rst
-      pllOuts <- DSL.declareN "pllOut" pllOutTys
-      locked <- DSL.declare "locked" Bit
-      pllLock <- DSL.boolFromBit "pllLock" locked
+          let
+            pllOutNames =
+              map
+                (\n -> pllOutName variant <> showt n)
+                [0 .. length pllOutTys - 1]
+            compInps =
+              [ (clkInName variant, DSL.ety clk)
+              , (rstName variant, DSL.ety rstHigh)
+              ]
+            compOuts = zip pllOutNames pllOutTys <> [("locked", Bit)]
+            inps =
+              [ (clkInName variant, clk)
+              , (rstName variant, rstHigh)
+              ]
+            outs = zip pllOutNames pllOuts <> [("locked", locked)]
 
-      let
-        pllOutNames =
-          map (\n -> pllOutName variant <> showt n)
-            [0 .. length pllOutTys - 1]
-        compInps =
-          [ (clkInName variant, DSL.ety clk)
-          , (rstName variant, DSL.ety rstHigh)
-          ]
-        compOuts = zip pllOutNames pllOutTys  <> [("locked", Bit)]
-        inps =
-          [ (clkInName variant, clk)
-          , (rstName variant, rstHigh)
-          ]
-        outs = zip pllOutNames pllOuts <> [("locked", locked)]
+          DSL.compInBlock compName compInps compOuts
+          DSL.instDecl Empty compNameId instName [] inps outs
 
-      DSL.compInBlock compName compInps compOuts
-      DSL.instDecl Empty compNameId instName [] inps outs
+          pure [DSL.constructProduct resultTy (pllOuts <> [pllLock])]
+  | otherwise =
+      error $ ppShow bbCtx
 
-      pure [DSL.constructProduct resultTy (pllOuts <> [pllLock])]
-  | otherwise
-  = error $ ppShow bbCtx
-
-altpllQsysTemplate
-  :: Backend s
-  => BlackBoxContext
-  -> State s Doc
+altpllQsysTemplate ::
+  (Backend s) =>
+  BlackBoxContext ->
+  State s Doc
 altpllQsysTemplate bbCtx
-  |   (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_)
-    : _clocksClass
-    : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
-    : _ <- bbInputs bbCtx
-  = let
-    clkPeriod (KnownDomain _ p _ _ _ _) = p
-    clkPeriod _ =
-      error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
+  | (_, stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _), _)
+      : _clocksClass
+      : (_, stripVoid -> Product _ _ (init -> kdOuts), _)
+      : _ <-
+      bbInputs bbCtx =
+      let
+        clkPeriod (KnownDomain _ p _ _ _ _) = p
+        clkPeriod _ =
+          error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 
-    clkFreq p = periodToHz (fromInteger p) / 1e6 :: Double
+        clkFreq p = periodToHz (fromInteger p) / 1e6 :: Double
 
-    clkOutPeriods = map clkPeriod kdOuts
-    clkLcms = map (lcm clkInPeriod) clkOutPeriods
-    clkMults = zipWith quot clkLcms clkOutPeriods
-    clkDivs = map (`quot` clkInPeriod) clkLcms
-    clkOutFreqs = map clkFreq clkOutPeriods
+        clkOutPeriods = map clkPeriod kdOuts
+        clkLcms = map (lcm clkInPeriod) clkOutPeriods
+        clkMults = zipWith quot clkLcms clkOutPeriods
+        clkDivs = map (`quot` clkInPeriod) clkLcms
+        clkOutFreqs = map clkFreq clkOutPeriods
 
-    qsysParams = TextS.intercalate "\n  "
-      [[I.__i|
+        qsysParams =
+          TextS.intercalate
+            "\n  "
+            [ [I.__i|
         <parameter name="PORT_clk#{n}" value="PORT_USED" />
           <parameter name="CLK#{n}_MULTIPLY_BY" value="#{clkMult}" />
           <parameter name="CLK#{n}_DIVIDE_BY" value="#{clkDiv}" />
           <parameter name="CLK#{n}_DUTY_CYCLE" value="50" />
           <parameter name="CLK#{n}_PHASE_SHIFT" value="0" />
         |]
-      | (clkMult, clkDiv, n) <- zip3 clkMults clkDivs [(0 :: Word)..]
-      ]
+            | (clkMult, clkDiv, n) <- zip3 clkMults clkDivs [(0 :: Word) ..]
+            ]
 
-    qsysConsts = TextS.intercalate "\n    "
-      [[I.__i|
+        qsysConsts =
+          TextS.intercalate
+            "\n    "
+            [ [I.__i|
         CT\#PORT_clk#{n} PORT_USED
             CT\#CLK#{n}_MULTIPLY_BY #{clkMult}
             CT\#CLK#{n}_DIVIDE_BY #{clkDiv}
             CT\#CLK#{n}_DUTY_CYCLE 50
             CT\#CLK#{n}_PHASE_SHIFT 0
         |]
-      | (clkMult, clkDiv, n) <- zip3 clkMults clkDivs [(0 :: Word)..]
-      ]
+            | (clkMult, clkDiv, n) <- zip3 clkMults clkDivs [(0 :: Word) ..]
+            ]
 
-    qsysPorts =
-      TextS.intercalate "\n    "
-        [[I.i|IF\#c#{n} {output 0}|] | n <- [0 .. length kdOuts - 1]]
+        qsysPorts =
+          TextS.intercalate
+            "\n    "
+            [[I.i|IF\#c#{n} {output 0}|] | n <- [0 .. length kdOuts - 1]]
 
-    qsysPrivs = TextS.intercalate "\n    "
-      [[I.__i|
+        qsysPrivs =
+          TextS.intercalate
+            "\n    "
+            [ [I.__i|
         PT\#MULT_FACTOR#{n} #{clkMult}
             PT\#DIV_FACTOR#{n} #{clkDiv}
             PT\#EFF_OUTPUT_FREQ_VALUE#{n} #{clkOutFreq}
             PT\#DUTY_CYCLE#{n} 50.00000000
             PT\#PHASE_SHIFT0 0.00000000
         |]
-      | (clkMult, clkDiv, clkOutFreq, n) <-
-          zip4 clkMults clkDivs clkOutFreqs [(0 :: Word)..]
-      ]
+            | (clkMult, clkDiv, clkOutFreq, n) <-
+                zip4 clkMults clkDivs clkOutFreqs [(0 :: Word) ..]
+            ]
 
-    -- Note [QSys file templates]
-    -- This QSys file template was derived from a "full" QSys system with a single
-    -- "altpll" IP. Module parameters were then stripped on a trial-and-error
-    -- basis to get a template that has the minimal number of parameters, but
-    -- still has the desired, working, configuration.
-    bbText = [I.__di|
+        -- Note [QSys file templates]
+        -- This QSys file template was derived from a "full" QSys system with a single
+        -- "altpll" IP. Module parameters were then stripped on a trial-and-error
+        -- basis to get a template that has the minimal number of parameters, but
+        -- still has the desired, working, configuration.
+        bbText =
+          [I.__di|
       <?xml version="1.0" encoding="UTF-8"?>
       <system name="$${FILENAME}">
         <module
@@ -265,33 +274,37 @@ altpllQsysTemplate bbCtx
         </module>
       </system>
       |]
-    in
-      pure bbText
-  | otherwise
-  = error $ ppShow bbCtx
+       in
+        pure bbText
+  | otherwise =
+      error $ ppShow bbCtx
 
-alteraPllQsysTemplate
-  :: Backend s
-  => BlackBoxContext
-  -> State s Doc
+alteraPllQsysTemplate ::
+  (Backend s) =>
+  BlackBoxContext ->
+  State s Doc
 alteraPllQsysTemplate bbCtx
-  |   (_,stripVoid -> kdIn,_)
-    : _clocksClass
-    : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
-    : _ <- bbInputs bbCtx
-  = let
-    clkFreq (KnownDomain _ p _ _ _ _)
-      = periodToHz (fromIntegral p) / 1e6 :: Double
-    clkFreq _ =
-      error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
+  | (_, stripVoid -> kdIn, _)
+      : _clocksClass
+      : (_, stripVoid -> Product _ _ (init -> kdOuts), _)
+      : _ <-
+      bbInputs bbCtx =
+      let
+        clkFreq (KnownDomain _ p _ _ _ _) =
+          periodToHz (fromIntegral p) / 1e6 :: Double
+        clkFreq _ =
+          error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 
-    clkOuts = TextS.intercalate "\n"
-      [[I.i|  <parameter name="gui_output_clock_frequency#{n}" value="#{f}"/>|]
-      | (n,f) <- zip [(0 :: Word)..] (map clkFreq kdOuts)
-      ]
+        clkOuts =
+          TextS.intercalate
+            "\n"
+            [ [I.i|  <parameter name="gui_output_clock_frequency#{n}" value="#{f}"/>|]
+            | (n, f) <- zip [(0 :: Word) ..] (map clkFreq kdOuts)
+            ]
 
-    -- See Note [QSys file templates] on how this qsys template was derived.
-    bbText = [I.__di|
+        -- See Note [QSys file templates] on how this qsys template was derived.
+        bbText =
+          [I.__di|
       <?xml version="1.0" encoding="UTF-8"?>
       <system name="$${FILENAME}">
       <module
@@ -309,7 +322,7 @@ alteraPllQsysTemplate bbCtx
       </module>
       </system>
       |]
-    in
-      pure bbText
-  | otherwise
-  = error $ ppShow bbCtx
+       in
+        pure bbText
+  | otherwise =
+      error $ ppShow bbCtx

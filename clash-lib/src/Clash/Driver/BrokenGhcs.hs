@@ -1,4 +1,9 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE QuasiQuotes #-}
+
+{- |
 Copyright   :  (C) 2024, Martijn Bastiaan
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -6,17 +11,11 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 Utilities to detect and report GHC / operating system combinations that are
 known to be buggy.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE QuasiQuotes #-}
-
 module Clash.Driver.BrokenGhcs where
 
 import Data.Maybe (listToMaybe)
-import Data.Version (Version(Version, versionBranch))
-import GHC.Platform (OS(..))
+import Data.Version (Version (Version, versionBranch))
+import GHC.Platform (OS (..))
 
 import System.Info (fullCompilerVersion)
 
@@ -54,24 +53,26 @@ ghcInRange ghc GhcRange{from, to} = from <= ghc && ghc < to
 
 -- | Construct a range of all GHC versions matching a major version
 ghcMajor :: Int -> Int -> GhcRange
-ghcMajor major0 major1 = GhcRange
-  { from=Ghc major0 major1 0
-  , to=Ghc major0 (major1 + 1) 0
-  }
+ghcMajor major0 major1 =
+  GhcRange
+    { from = Ghc major0 major1 0
+    , to = Ghc major0 (major1 + 1) 0
+    }
 
 data Why = Why
   { what :: String
-    -- ^ What is broken
+  -- ^ What is broken
   , solution :: String
-    -- ^ What can be done to work around or solve the issue
+  -- ^ What can be done to work around or solve the issue
   , issue :: String
-    -- ^ Link to issue
+  -- ^ Link to issue
   , brokenOn :: [(BrokenOn, GhcRange)]
-    -- ^ What operation systems are affected
+  -- ^ What operation systems are affected
   }
 
--- | Get current GHC version expressed as a triple. It probably does something
--- non-sensible on unreleased GHCs.
+{- | Get current GHC version expressed as a triple. It probably does something
+non-sensible on unreleased GHCs.
+-}
 ghcVersion :: GhcVersion
 ghcVersion = Ghc{major0, major1, patch}
  where
@@ -83,11 +84,12 @@ ghcVersion = Ghc{major0, major1, patch}
           [a] -> (a, 0, 1)
           [a, b] -> (a, b, 1)
           [a, b, c] -> (a, b, c)
-          (a:b:c:_) -> (a, b, c)
+          (a : b : c : _) -> (a, b, c)
 
 -- | Pretty print 'Why' into an error message
 whyPp :: Why -> String
-whyPp Why{what, solution, issue}= [I.i|
+whyPp Why{what, solution, issue} =
+  [I.i|
   Clash has known issues on #{major0}.#{major1}.#{patch} on your current
   OS. While not completely preventing the compiler from working, we recommend
   switching to another GHC version. Symptoms:
@@ -116,26 +118,30 @@ whyPp Why{what, solution, issue}= [I.i|
 brokenGhcs :: [Why]
 brokenGhcs = [brokenClashCores, brokenTypeErrors, slowStarts]
  where
-  brokenClashCores = Why
-    { what = "GHC is known to fail compilation of libraries used by the Clash compiler test suite"
-    , solution = "Upgrade to GHC 9.4 or downgrade to GHC 8.10"
-    , issue = "<no link>"
-    , brokenOn = [(SomeOs OSMinGW32, ghcMajor 9 0)]
-    }
+  brokenClashCores =
+    Why
+      { what =
+          "GHC is known to fail compilation of libraries used by the Clash compiler test suite"
+      , solution = "Upgrade to GHC 9.4 or downgrade to GHC 8.10"
+      , issue = "<no link>"
+      , brokenOn = [(SomeOs OSMinGW32, ghcMajor 9 0)]
+      }
 
-  brokenTypeErrors = Why
-    { what = "Clash type error messages are indecipherable"
-    , solution = "Upgrade to GHC 9.4 or downgrade to GHC 9.0"
-    , issue = "<no link>"
-    , brokenOn = [(All, ghcMajor 9 2)]
-    }
+  brokenTypeErrors =
+    Why
+      { what = "Clash type error messages are indecipherable"
+      , solution = "Upgrade to GHC 9.4 or downgrade to GHC 9.0"
+      , issue = "<no link>"
+      , brokenOn = [(All, ghcMajor 9 2)]
+      }
 
-  slowStarts = Why
-    { what = "Clash starts really slowly from GHC 9.4.8 up to and including 9.6.2"
-    , solution = "Upgrade to GHC 9.6.3 or newer, or downgrade to GHC 9.4.7"
-    , issue = "https://github.com/clash-lang/clash-compiler/issues/2710"
-    , brokenOn = [(All, GhcRange{from=Ghc 9 4 8, to=Ghc 9 6 3})]
-    }
+  slowStarts =
+    Why
+      { what = "Clash starts really slowly from GHC 9.4.8 up to and including 9.6.2"
+      , solution = "Upgrade to GHC 9.6.3 or newer, or downgrade to GHC 9.4.7"
+      , issue = "https://github.com/clash-lang/clash-compiler/issues/2710"
+      , brokenOn = [(All, GhcRange{from = Ghc 9 4 8, to = Ghc 9 6 3})]
+      }
 
 -- | Given a 'BrokenOn', determine whether current OS matches
 matchOs :: BrokenOn -> Bool

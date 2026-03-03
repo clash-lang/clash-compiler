@@ -34,11 +34,11 @@ module Clash.Class.NumConvert (
   maybeNumConvert,
 
   -- * For implementers only
-  NumConvertCanonical(..),
-  MaybeNumConvertCanonical(..),
+  NumConvertCanonical (..),
+  MaybeNumConvertCanonical (..),
   Canonical,
 ) where
 
+import Clash.Class.NumConvert.Internal.Canonical
 import Clash.Class.NumConvert.Internal.MaybeNumConvert
 import Clash.Class.NumConvert.Internal.NumConvert
-import Clash.Class.NumConvert.Internal.Canonical

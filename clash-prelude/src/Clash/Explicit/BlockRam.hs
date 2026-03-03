@@ -1,4 +1,19 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+-- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
+-- as to why we need this.
+{-# OPTIONS_GHC -fno-cpr-anal #-}
+-- See [Note: eta port names for trueDualPortBlockRam]
+{-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{- |
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2017, Myrtle Software Ltd,
                   2017     , Google Inc.,
@@ -384,47 +399,29 @@ to conveniently filter out the undefinedness and replace it with the string @\"u
 @
 
 This concludes the short introduction to using 'blockRam'.
-
 -}
+module Clash.Explicit.BlockRam (
+  -- * Block RAM synchronized to an arbitrary clock
+  blockRam,
+  blockRamPow2,
+  blockRamU,
+  blockRam1,
+  ResetStrategy (..),
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
+  -- ** Read/write conflict resolution
+  readNew,
 
-{-# LANGUAGE Trustworthy #-}
+  -- * True dual-port block RAM
+  -- $tdpbram
+  trueDualPortBlockRam,
+  RamOp (..),
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
-
--- See [Note: eta port names for trueDualPortBlockRam]
-{-# OPTIONS_GHC -fno-do-lambda-eta-expansion #-}
-
--- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
--- as to why we need this.
-{-# OPTIONS_GHC -fno-cpr-anal #-}
-
-module Clash.Explicit.BlockRam
-  ( -- * Block RAM synchronized to an arbitrary clock
-    blockRam
-  , blockRamPow2
-  , blockRamU
-  , blockRam1
-  , ResetStrategy(..)
-    -- ** Read/write conflict resolution
-  , readNew
-    -- * True dual-port block RAM
-    -- $tdpbram
-  , trueDualPortBlockRam
-  , RamOp(..)
-    -- * Internal
-  , blockRam#
-  , blockRamU#
-  , blockRam1#
-  , trueDualPortBlockRam#
-  )
+  -- * Internal
+  blockRam#,
+  blockRamU#,
+  blockRam1#,
+  trueDualPortBlockRam#,
+)
 where
 
 import Clash.HaskellPrelude
@@ -432,9 +429,9 @@ import Clash.HaskellPrelude
 import Control.Exception (catch, throw)
 import Control.Monad (forM_)
 import Control.Monad.ST (ST, runST)
-import Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
+import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeInterleaveST, unsafeSTToIO)
 import Data.Array.MArray (newListArray)
-import Data.List.Infinite (Infinite(..), (...))
+import Data.List.Infinite (Infinite (..), (...))
 import Data.Maybe (isJust)
 import Data.Sequence (Seq)
 import Data.String.Interpolate (__i)
@@ -444,28 +441,44 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits (KnownNat, type (^))
 import Unsafe.Coerce (unsafeCoerce)
 
-import Clash.Annotations.Primitive
-  (Primitive(InlineYamlPrimitive), HDL(..), hasBlackBox)
-import Clash.Class.AutoReg (AutoReg(autoReg))
+import Clash.Annotations.Primitive (
+  HDL (..),
+  Primitive (InlineYamlPrimitive),
+  hasBlackBox,
+ )
+import Clash.Class.AutoReg (AutoReg (autoReg))
 import Clash.Class.BitPack (bitToBool, msb)
-import Clash.Class.Num (SaturationMode(SatBound), satSucc)
-import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
-import Clash.Explicit.Signal (KnownDomain, Enable, register, fromEnable, andEnable)
-import Clash.Promoted.Nat (SNat(..), UNat(..), toUNat)
+import Clash.Class.Num (SaturationMode (SatBound), satSucc)
+import Clash.Explicit.BlockRam.Model (TdpbramModelConfig (..), tdpbramModel)
+import Clash.Explicit.Signal (Enable, KnownDomain, andEnable, fromEnable, register)
+import Clash.Promoted.Nat (SNat (..), UNat (..), toUNat)
 import Clash.Signal.Bundle (unbundle)
-import Clash.Signal.Internal
-  (Clock(..), Reset, Signal (..), invertReset, (.&&.), mux)
+import Clash.Signal.Internal (
+  Clock (..),
+  Reset,
+  Signal (..),
+  invertReset,
+  mux,
+  (.&&.),
+ )
 import Clash.Sized.BitVector (BitVector)
 import Clash.Sized.Index (Index)
 import Clash.Sized.Unsigned (Unsigned)
-import Clash.Sized.Vector (Vec, replicate, iterateI)
-import Clash.XException
- (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
- XException (..), seqX, errorX)
-import Clash.XException.MaybeX (MaybeX(..), andX)
+import Clash.Sized.Vector (Vec, iterateI, replicate)
+import Clash.XException (
+  NFDataX (deepErrorX),
+  XException (..),
+  defaultSeqX,
+  errorX,
+  fromJustX,
+  maybeIsX,
+  seqX,
+  undefined,
+ )
+import Clash.XException.MaybeX (MaybeX (..), andX)
 
-import qualified Data.Sequence as Seq
 import qualified Data.List as L
+import qualified Data.Sequence as Seq
 
 import qualified Clash.Sized.Vector as CV
 
@@ -747,146 +760,155 @@ prog2 = -- 0 := 4
        Load 2 RegC :>
        Nil
 :}
-
 -}
 
--- | Create a block RAM with space for @n@ elements
---
--- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is /undefined/, reading it will throw an
--- 'XException'
---
--- === See also:
---
--- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
--- block RAM.
--- * Use the adapter 'readNew' for obtaining write-before-read semantics like
--- this: @'readNew' clk rst en ('blockRam' clk inits) rd wrM@.
--- * A large 'Vec' for the initial content may be too inefficient, depending
--- on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFile' and
--- 'Clash.Explicit.BlockRam.Blob.blockRamBlob' for different approaches that
--- scale well.
---
--- === __Example__
--- @
--- bram40
---   :: 'Clock'  dom
---   -> 'Enable'  dom
---   -> 'Signal' dom ('Unsigned' 6)
---   -> 'Signal' dom (Maybe ('Unsigned' 6, 'Clash.Sized.BitVector.Bit'))
---   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
--- bram40 clk en = 'blockRam' clk en ('Clash.Sized.Vector.replicate' d40 1)
--- @
-blockRam
-  :: ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> Vec n a
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
-   --
-   -- __NB__: __MUST__ be a constant
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+{- | Create a block RAM with space for @n@ elements
+
+* __NB__: Read value is delayed by 1 cycle
+* __NB__: Initial output value is /undefined/, reading it will throw an
+'XException'
+
+=== See also:
+
+* See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
+block RAM.
+* Use the adapter 'readNew' for obtaining write-before-read semantics like
+this: @'readNew' clk rst en ('blockRam' clk inits) rd wrM@.
+* A large 'Vec' for the initial content may be too inefficient, depending
+on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFile' and
+'Clash.Explicit.BlockRam.Blob.blockRamBlob' for different approaches that
+scale well.
+
+=== __Example__
+@
+bram40
+  :: 'Clock'  dom
+  -> 'Enable'  dom
+  -> 'Signal' dom ('Unsigned' 6)
+  -> 'Signal' dom (Maybe ('Unsigned' 6, 'Clash.Sized.BitVector.Bit'))
+  -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
+bram40 clk en = 'blockRam' clk en ('Clash.Sized.Vector.replicate' d40 1)
+@
+-}
+blockRam ::
+  ( KnownDomain dom
+  , HasCallStack
+  , NFDataX a
+  , Enum addr
+  , NFDataX addr
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  {- | Initial content of the BRAM, also determines the size, @n@, of the BRAM
+
+  __NB__: __MUST__ be a constant
+  -}
+  Vec n a ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRam = \clk gen content rd wrM ->
-  let en       = isJust <$> wrM
-      (wr,din) = unbundle (fromJustX <$> wrM)
-  in  withFrozenCallStack
-      (blockRam# clk gen content (fromEnum <$> rd) en (fromEnum <$> wr) din)
+  let en = isJust <$> wrM
+      (wr, din) = unbundle (fromJustX <$> wrM)
+   in withFrozenCallStack
+        (blockRam# clk gen content (fromEnum <$> rd) en (fromEnum <$> wr) din)
 {-# INLINE blockRam #-}
 
--- | Create a block RAM with space for 2^@n@ elements
---
--- * __NB__: Read value is delayed by 1 cycle
--- * __NB__: Initial output value is /undefined/, reading it will throw an
--- 'XException'
---
--- === See also:
---
--- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
--- block RAM.
--- * Use the adapter 'readNew' for obtaining write-before-read semantics like
--- this: @'readNew' clk rst en ('blockRamPow2' clk inits) rd wrM@.
--- * A large 'Vec' for the initial content may be too inefficient, depending
--- on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFilePow2'
--- and 'Clash.Explicit.BlockRam.Blob.blockRamBlobPow2' for different approaches
--- that scale well.
---
--- === __Example__
--- @
--- bram32
---   :: 'Clock' dom
---   -> 'Enable' dom
---   -> 'Signal' dom ('Unsigned' 5)
---   -> 'Signal' dom (Maybe ('Unsigned' 5, 'Clash.Sized.BitVector.Bit'))
---   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
--- bram32 clk en = 'blockRamPow2' clk en ('Clash.Sized.Vector.replicate' d32 1)
--- @
-blockRamPow2
-  :: ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , KnownNat n )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> Vec (2^n) a
-  -- ^ Initial content of the BRAM
-  --
-  -- __NB__: __MUST__ be a constant
-  -> Signal dom (Unsigned n)
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (Unsigned n, a))
-  -- ^ (Write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamPow2 = \clk en cnt rd wrM -> withFrozenCallStack
-  (blockRam clk en cnt rd wrM)
+{- | Create a block RAM with space for 2^@n@ elements
+
+* __NB__: Read value is delayed by 1 cycle
+* __NB__: Initial output value is /undefined/, reading it will throw an
+'XException'
+
+=== See also:
+
+* See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
+block RAM.
+* Use the adapter 'readNew' for obtaining write-before-read semantics like
+this: @'readNew' clk rst en ('blockRamPow2' clk inits) rd wrM@.
+* A large 'Vec' for the initial content may be too inefficient, depending
+on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFilePow2'
+and 'Clash.Explicit.BlockRam.Blob.blockRamBlobPow2' for different approaches
+that scale well.
+
+=== __Example__
+@
+bram32
+  :: 'Clock' dom
+  -> 'Enable' dom
+  -> 'Signal' dom ('Unsigned' 5)
+  -> 'Signal' dom (Maybe ('Unsigned' 5, 'Clash.Sized.BitVector.Bit'))
+  -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
+bram32 clk en = 'blockRamPow2' clk en ('Clash.Sized.Vector.replicate' d32 1)
+@
+-}
+blockRamPow2 ::
+  ( KnownDomain dom
+  , HasCallStack
+  , NFDataX a
+  , KnownNat n
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  {- | Initial content of the BRAM
+
+  __NB__: __MUST__ be a constant
+  -}
+  Vec (2 ^ n) a ->
+  -- | Read address @r@
+  Signal dom (Unsigned n) ->
+  -- | (Write address @w@, value to write)
+  Signal dom (Maybe (Unsigned n, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
+blockRamPow2 = \clk en cnt rd wrM ->
+  withFrozenCallStack
+    (blockRam clk en cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
 data ResetStrategy (r :: Bool) a where
   ClearOnReset :: a -> ResetStrategy 'True a
   NoClearOnReset :: ResetStrategy 'False a
 
--- | A version of 'blockRam' that has no default values set. May be cleared to
--- an arbitrary state using a reset function.
-blockRamU
-   :: forall n dom a r addr
-   . ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Reset dom
-  -- ^ 'Reset' line. This needs to be asserted for at least /n/ cycles in order
-  -- for the BRAM to be reset to its initial state.
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> ResetStrategy r (Index n -> a)
-  -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
-  -- not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
-  -- cycles to clear the BRAM.
-  -> SNat n
-  -- ^ Number of elements in BRAM
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+{- | A version of 'blockRam' that has no default values set. May be cleared to
+an arbitrary state using a reset function.
+-}
+blockRamU ::
+  forall n dom a r addr.
+  ( KnownDomain dom
+  , HasCallStack
+  , NFDataX a
+  , Enum addr
+  , NFDataX addr
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  {- | 'Reset' line. This needs to be asserted for at least /n/ cycles in order
+  for the BRAM to be reset to its initial state.
+  -}
+  Reset dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  {- | Whether to clear BRAM on asserted reset ('ClearOnReset') or
+  not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
+  cycles to clear the BRAM.
+  -}
+  ResetStrategy r (Index n -> a) ->
+  -- | Number of elements in BRAM
+  SNat n ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRamU clk rst0 en rstStrategy n@SNat rd0 mw0 = case toUNat n of
   UZero -> case rstStrategy of
     ClearOnReset f -> pure $ f undefined
@@ -895,14 +917,17 @@ blockRamU clk rst0 en rstStrategy n@SNat rd0 mw0 = case toUNat n of
     ClearOnReset initF ->
       -- Use reset infrastructure
       blockRamU# clk en n rd1 we1 wa1 w1
-      where
-        rd1 = mux rstBool 0 (fromEnum <$> rd0)
-        we1 = mux rstBool (pure True) we0
-        wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
-        w1  = mux rstBool (initF <$> waCounter) w0
+     where
+      rd1 = mux rstBool 0 (fromEnum <$> rd0)
+      we1 = mux rstBool (pure True) we0
+      wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
+      w1 = mux rstBool (initF <$> waCounter) w0
     NoClearOnReset ->
       -- Ignore reset infrastructure, pass values unchanged
-      blockRamU# clk en n
+      blockRamU#
+        clk
+        en
+        n
         (fromEnum <$> rd0)
         we0
         (fromEnum <$> wa0)
@@ -915,73 +940,78 @@ blockRamU clk rst0 en rstStrategy n@SNat rd0 mw0 = case toUNat n of
   waCounter = register clk rstInv en 0 (satSucc SatBound <$> waCounter)
 
   wa0 = fst . fromJustX <$> mw0
-  w0  = snd . fromJustX <$> mw0
+  w0 = snd . fromJustX <$> mw0
   we0 = isJust <$> mw0
 
 -- | blockRAMU primitive
-blockRamU#
-  :: forall n dom a
-   . ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> SNat n
-  -- ^ Number of elements in BRAM
-  -> Signal dom Int
-  -- ^ Read address @r@
-  -> Signal dom Bool
-  -- ^ Write enable
-  -> Signal dom Int
-  -- ^ Write address @w@
-  -> Signal dom a
-  -- ^ Value to write (at address @w@)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+blockRamU# ::
+  forall n dom a.
+  ( KnownDomain dom
+  , HasCallStack
+  , NFDataX a
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  -- | Number of elements in BRAM
+  SNat n ->
+  -- | Read address @r@
+  Signal dom Int ->
+  -- | Write enable
+  Signal dom Bool ->
+  -- | Write address @w@
+  Signal dom Int ->
+  -- | Value to write (at address @w@)
+  Signal dom a ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRamU# clk en SNat =
   -- TODO: Generalize to single BRAM primitive taking an initialization function
   blockRam#
     clk
     en
-    (CV.map
-      (\i -> deepErrorX $ "Initial value at index " <> show i <> " undefined.")
-      (iterateI @n succ (0 :: Int)))
+    ( CV.map
+        (\i -> deepErrorX $ "Initial value at index " <> show i <> " undefined.")
+        (iterateI @n succ (0 :: Int))
+    )
 {-# OPAQUE blockRamU# #-}
 {-# ANN blockRamU# hasBlackBox #-}
 
--- | A version of 'blockRam' that is initialized with the same value on all
--- memory positions
-blockRam1
-   :: forall n dom a r addr
-   . ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Reset dom
-  -- ^ 'Reset' line. This needs to be asserted for at least /n/ cycles in order
-  -- for the BRAM to be reset to its initial state.
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> ResetStrategy r ()
-  -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
-  -- not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
-  -- cycles to clear the BRAM.
-  -> SNat n
-  -- ^ Number of elements in BRAM
-  -> a
-  -- ^ Initial content of the BRAM (replicated /n/ times)
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+{- | A version of 'blockRam' that is initialized with the same value on all
+memory positions
+-}
+blockRam1 ::
+  forall n dom a r addr.
+  ( KnownDomain dom
+  , HasCallStack
+  , NFDataX a
+  , Enum addr
+  , NFDataX addr
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  {- | 'Reset' line. This needs to be asserted for at least /n/ cycles in order
+  for the BRAM to be reset to its initial state.
+  -}
+  Reset dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  {- | Whether to clear BRAM on asserted reset ('ClearOnReset') or
+  not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
+  cycles to clear the BRAM.
+  -}
+  ResetStrategy r () ->
+  -- | Number of elements in BRAM
+  SNat n ->
+  -- | Initial content of the BRAM (replicated /n/ times)
+  a ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 = case toUNat n of
   UZero -> pure a
   USucc _ -> case rstStrategy of
@@ -990,7 +1020,11 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 = case toUNat n of
       blockRam1# clk en n a rd1 we1 wa1 w1
     NoClearOnReset ->
       -- Ignore reset infrastructure, pass values unchanged
-      blockRam1# clk en n a
+      blockRam1#
+        clk
+        en
+        n
+        a
         (fromEnum <$> rd0)
         we0
         (fromEnum <$> wa0)
@@ -1003,38 +1037,39 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 = case toUNat n of
   waCounter = register clk rstInv en 0 (satSucc SatBound <$> waCounter)
 
   wa0 = fst . fromJustX <$> mw0
-  w0  = snd . fromJustX <$> mw0
+  w0 = snd . fromJustX <$> mw0
   we0 = isJust <$> mw0
 
   rd1 = mux rstBool 0 (fromEnum <$> rd0)
   we1 = mux rstBool (pure True) we0
   wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
-  w1  = mux rstBool (pure a) w0
+  w1 = mux rstBool (pure a) w0
 
 -- | blockRAM1 primitive
-blockRam1#
-  :: forall n dom a
-   . ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> SNat n
-  -- ^ Number of elements in BRAM
-  -> a
-  -- ^ Initial content of the BRAM (replicated /n/ times)
-  -> Signal dom Int
-  -- ^ Read address @r@
-  -> Signal dom Bool
-  -- ^ Write enable
-  -> Signal dom Int
-  -- ^ Write address @w@
-  -> Signal dom a
-  -- ^ Value to write (at address @w@)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+blockRam1# ::
+  forall n dom a.
+  ( KnownDomain dom
+  , HasCallStack
+  , NFDataX a
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  -- | Number of elements in BRAM
+  SNat n ->
+  -- | Initial content of the BRAM (replicated /n/ times)
+  a ->
+  -- | Read address @r@
+  Signal dom Int ->
+  -- | Write enable
+  Signal dom Bool ->
+  -- | Write address @w@
+  Signal dom Int ->
+  -- | Value to write (at address @w@)
+  Signal dom a ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRam1# clk en n a =
   -- TODO: Generalize to single BRAM primitive taking an initialization function
   blockRam# clk en (replicate n a)
@@ -1042,31 +1077,33 @@ blockRam1# clk en n a =
 {-# ANN blockRam1# hasBlackBox #-}
 
 -- | blockRAM primitive
-blockRam#
-  :: forall dom a n
-   . ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> Vec n a
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
-  --
-  -- __NB__: __MUST__ be a constant
-  -> Signal dom Int
-  -- ^ Read address @r@
-  -> Signal dom Bool
-  -- ^ Write enable
-  -> Signal dom Int
-  -- ^ Write address @w@
-  -> Signal dom a
-  -- ^ Value to write (at address @w@)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+blockRam# ::
+  forall dom a n.
+  ( KnownDomain dom
+  , HasCallStack
+  , NFDataX a
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  {- | Initial content of the BRAM, also determines the size, @n@, of the BRAM
+
+  __NB__: __MUST__ be a constant
+  -}
+  Vec n a ->
+  -- | Read address @r@
+  Signal dom Int ->
+  -- | Write enable
+  Signal dom Bool ->
+  -- | Write address @w@
+  Signal dom Int ->
+  -- | Value to write (at address @w@)
+  Signal dom a ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRam# (Clock _ Nothing) gen content = \rd wen waS wd -> runST $ do
-  ramStart <- newListArray (0,szI-1) contentL
+  ramStart <- newListArray (0, szI - 1) contentL
   -- start benchmark only
   -- ramStart <- unsafeThawSTArray ramArr
   -- end benchmark only
@@ -1085,182 +1122,234 @@ blockRam# (Clock _ Nothing) gen content = \rd wen waS wd -> runST $ do
   -- ramArr = listArray (0,szI-1) contentL
   -- end benchmark only
 
-  go :: STArray s Int a -> a -> Signal dom Bool -> Signal dom Int
-     -> Signal dom Bool -> Signal dom Int -> Signal dom a
-     -> ST s (Signal dom a)
+  go ::
+    STArray s Int a ->
+    a ->
+    Signal dom Bool ->
+    Signal dom Int ->
+    Signal dom Bool ->
+    Signal dom Int ->
+    Signal dom a ->
+    ST s (Signal dom a)
   go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr)) dt@(~(d :- din)) = do
-    o `seqX` (o :-) <$> (ret `seq` rt `seq` et `seq` wt `seq` dt `seq`
-      unsafeInterleaveST
-        (do o' <- unsafeIOToST
-                    (catch (if re then unsafeSTToIO (ram `safeAt` r) else pure o)
-                    (\err@XException {} -> pure (throw err)))
-            d `defaultSeqX` upd ram e (fromEnum w) d
-            go ram o' res rs en wr din))
+    o `seqX`
+      (o :-)
+        <$> ( ret `seq`
+                rt `seq`
+                  et `seq`
+                    wt `seq`
+                      dt `seq`
+                        unsafeInterleaveST
+                          ( do
+                              o' <-
+                                unsafeIOToST
+                                  ( catch
+                                      (if re then unsafeSTToIO (ram `safeAt` r) else pure o)
+                                      (\err@XException{} -> pure (throw err))
+                                  )
+                              d `defaultSeqX` upd ram e (fromEnum w) d
+                              go ram o' res rs en wr din
+                          )
+            )
 
   upd :: STArray s Int a -> Bool -> Int -> a -> ST s ()
   upd ram we waddr d = case maybeIsX we of
     Nothing -> case maybeIsX waddr of
-      Nothing -> -- Put the XException from `waddr` as the value in all
-                 -- locations of `ram`.
-                 forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
-      Just wa -> -- Put the XException from `we` as the value at address
-                 -- `waddr`.
-                 safeUpdate wa (seq we d) ram
+      Nothing ->
+        -- Put the XException from `waddr` as the value in all
+        -- locations of `ram`.
+        forM_ [0 .. (szI - 1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+      Just wa ->
+        -- Put the XException from `we` as the value at address
+        -- `waddr`.
+        safeUpdate wa (seq we d) ram
     Just True -> case maybeIsX waddr of
-      Nothing -> -- Put the XException from `waddr` as the value in all
-                 -- locations of `ram`.
-                 forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+      Nothing ->
+        -- Put the XException from `waddr` as the value in all
+        -- locations of `ram`.
+        forM_ [0 .. (szI - 1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
       Just wa -> safeUpdate wa d ram
     _ -> return ()
 
-  safeAt :: HasCallStack => STArray s Int a -> Int -> ST s a
+  safeAt :: (HasCallStack) => STArray s Int a -> Int -> ST s a
   safeAt s i =
-    if (0 <= i) && (i < szI) then
-      unsafeReadSTArray s i
-    else pure $
-      withFrozenCallStack
-        (deepErrorX ("blockRam: read address " <> show i <>
-                     " not in range [0.." <> show szI <> ")"))
+    if (0 <= i) && (i < szI)
+      then
+        unsafeReadSTArray s i
+      else
+        pure $
+          withFrozenCallStack
+            ( deepErrorX
+                ( "blockRam: read address "
+                    <> show i
+                    <> " not in range [0.."
+                    <> show szI
+                    <> ")"
+                )
+            )
   {-# INLINE safeAt #-}
 
-  safeUpdate :: HasCallStack => Int -> a -> STArray s Int a -> ST s ()
+  safeUpdate :: (HasCallStack) => Int -> a -> STArray s Int a -> ST s ()
   safeUpdate i a s =
-    if (0 <= i) && (i < szI) then
-      unsafeWriteSTArray s i a
-    else
-      let d = withFrozenCallStack
-                (deepErrorX ("blockRam: write address " <> show i <>
-                             " not in range [0.." <> show szI <> ")"))
-       in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
+    if (0 <= i) && (i < szI)
+      then
+        unsafeWriteSTArray s i a
+      else
+        let d =
+              withFrozenCallStack
+                ( deepErrorX
+                    ( "blockRam: write address "
+                        <> show i
+                        <> " not in range [0.."
+                        <> show szI
+                        <> ")"
+                    )
+                )
+         in forM_ [0 .. (szI - 1)] (\j -> unsafeWriteSTArray s j d)
   {-# INLINE safeUpdate #-}
 blockRam# _ _ _ = error "blockRam#: dynamic clocks not supported"
 {-# ANN blockRam# hasBlackBox #-}
 {-# OPAQUE blockRam# #-}
 
 -- | Create a read-after-write block RAM from a read-before-write one
-readNew
-  :: ( KnownDomain dom
-     , NFDataX a
-     , Eq addr )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)
-  -- ^ The BRAM component
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-  -- ^ (Write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+readNew ::
+  ( KnownDomain dom
+  , NFDataX a
+  , Eq addr
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | The BRAM component
+  (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a) ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (Write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 readNew clk rst en ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
-  where readNewT rd (Just (wr, wrdata)) = (wr == rd, wrdata)
-        readNewT _  Nothing             = (False   , undefined)
+ where
+  readNewT rd (Just (wr, wrdata)) = (wr == rd, wrdata)
+  readNewT _ Nothing = (False, undefined)
 
-        (wasSame,wasWritten) =
-          unbundle (register clk rst en (False, undefined)
-                             (readNewT <$> rdAddr <*> wrM))
+  (wasSame, wasWritten) =
+    unbundle
+      ( register
+          clk
+          rst
+          en
+          (False, undefined)
+          (readNewT <$> rdAddr <*> wrM)
+      )
 
 -- | Port operation
 data RamOp n a
-  = RamRead (Index n)
-  -- ^ Read from address
-  | RamWrite (Index n) a
-  -- ^ Write data to address
-  | RamNoOp
-  -- ^ No operation
+  = -- | Read from address
+    RamRead (Index n)
+  | -- | Write data to address
+    RamWrite (Index n) a
+  | -- | No operation
+    RamNoOp
   deriving (Generic, NFDataX, Show)
 
 instance (AutoReg a, KnownNat n) => AutoReg (RamOp n a) where
   autoReg clk rst en initVal input =
     createRamOp <$> tagR <*> valAddr <*> valValue
-    where
-      tag = toTag <$> input
+   where
+    tag = toTag <$> input
 
-      toTag op = case op of
-        RamNoOp    -> 0b00 :: BitVector 2
-        RamRead{}  -> 0b01
-        RamWrite{} -> 0b10
+    toTag op = case op of
+      RamNoOp -> 0b00 :: BitVector 2
+      RamRead{} -> 0b01
+      RamWrite{} -> 0b10
 
-      tagInit = toTag initVal
-      tagR = register clk rst en tagInit tag
+    tagInit = toTag initVal
+    tagR = register clk rst en tagInit tag
 
-      toAddr op = case op of
-        RamNoOp         -> deepErrorX "autoReg'.ramOpAddr"
-        RamRead addr    -> addr
-        RamWrite addr _ -> addr
+    toAddr op = case op of
+      RamNoOp -> deepErrorX "autoReg'.ramOpAddr"
+      RamRead addr -> addr
+      RamWrite addr _ -> addr
 
-      toValue op = case op of
-        RamWrite _ a -> a
-        _ -> deepErrorX "autoReg'.ramOpValue"
+    toValue op = case op of
+      RamWrite _ a -> a
+      _ -> deepErrorX "autoReg'.ramOpValue"
 
+    opAddr = toAddr <$> input
+    opValue = toValue <$> input
 
-      opAddr  = toAddr  <$> input
-      opValue = toValue <$> input
+    addrInit = toAddr initVal
+    valInit = toValue initVal
 
-      addrInit = toAddr  initVal
-      valInit  = toValue initVal
+    valAddr = autoReg clk rst (andEnable en ((/= 0) <$> tag)) addrInit opAddr
+    valValue = autoReg clk rst (andEnable en (bitToBool . msb <$> tag)) valInit opValue
 
-      valAddr  = autoReg clk rst (andEnable en           ((/=0) <$> tag)) addrInit opAddr
-      valValue = autoReg clk rst (andEnable en (bitToBool . msb <$> tag)) valInit opValue
-
-      createRamOp t addr val = case t of
-        0b00 -> RamNoOp
-        0b01 -> RamRead addr
-        0b10 -> RamWrite addr val
-        _ -> deepErrorX  "autoReg'.createRamOp: impossible"
-
+    createRamOp t addr val = case t of
+      0b00 -> RamNoOp
+      0b01 -> RamRead addr
+      0b10 -> RamWrite addr val
+      _ -> deepErrorX "autoReg'.createRamOp: impossible"
   {-# INLINE autoReg #-}
 
 ramOpAddr :: RamOp n a -> Index n
-ramOpAddr (RamRead addr)    = addr
+ramOpAddr (RamRead addr) = addr
 ramOpAddr (RamWrite addr _) = addr
-ramOpAddr RamNoOp           = errorX "Address for No operation undefined"
+ramOpAddr RamNoOp = errorX "Address for No operation undefined"
 
 isRamWrite :: RamOp n a -> Bool
-isRamWrite (RamWrite {}) = True
-isRamWrite _             = False
+isRamWrite (RamWrite{}) = True
+isRamWrite _ = False
 
 ramOpWriteVal :: RamOp n a -> Maybe a
 ramOpWriteVal (RamWrite _ val) = Just val
-ramOpWriteVal _                = Nothing
+ramOpWriteVal _ = Nothing
 
 isOp :: RamOp n a -> Bool
 isOp RamNoOp = False
-isOp _       = True
+isOp _ = True
 
--- | Produces vendor-agnostic HDL that will be inferred as a true dual-port
--- block RAM
---
--- Any value that is being written on a particular port is also the
--- value that will be read on that port, i.e. the same-port read/write behavior
--- is: WriteFirst. For mixed-port read/write, when port A writes to the address
--- port B reads from, the output of port B is undefined, and vice versa.
+{- | Produces vendor-agnostic HDL that will be inferred as a true dual-port
+block RAM
+
+Any value that is being written on a particular port is also the
+value that will be read on that port, i.e. the same-port read/write behavior
+is: WriteFirst. For mixed-port read/write, when port A writes to the address
+port B reads from, the output of port B is undefined, and vice versa.
+-}
 trueDualPortBlockRam ::
-  forall nAddrs domA domB a .
+  forall nAddrs domA domB a.
   ( HasCallStack
   , KnownNat nAddrs
   , KnownDomain domA
   , KnownDomain domB
   , NFDataX a
-  )
-  => Clock domA
-  -- ^ Clock for port A
-  -> Clock domB
-  -- ^ Clock for port B
-  -> Signal domA (RamOp nAddrs a)
-  -- ^ RAM operation for port A
-  -> Signal domB (RamOp nAddrs a)
-  -- ^ RAM operation for port B
-  -> (Signal domA a, Signal domB a)
-  -- ^ Outputs data on /next/ cycle. When writing, the data written
-  -- will be echoed. When reading, the read data is returned.
-
+  ) =>
+  -- | Clock for port A
+  Clock domA ->
+  -- | Clock for port B
+  Clock domB ->
+  -- | RAM operation for port A
+  Signal domA (RamOp nAddrs a) ->
+  -- | RAM operation for port B
+  Signal domB (RamOp nAddrs a) ->
+  {- | Outputs data on /next/ cycle. When writing, the data written
+  will be echoed. When reading, the read data is returned.
+  -}
+  (Signal domA a, Signal domB a)
 {-# INLINE trueDualPortBlockRam #-}
 trueDualPortBlockRam = \clkA clkB opA opB ->
   trueDualPortBlockRamWrapper
-    clkA (isOp <$> opA) (isRamWrite <$> opA) (ramOpAddr <$> opA) (fromJustX . ramOpWriteVal <$> opA)
-    clkB (isOp <$> opB) (isRamWrite <$> opB) (ramOpAddr <$> opB) (fromJustX . ramOpWriteVal <$> opB)
+    clkA
+    (isOp <$> opA)
+    (isRamWrite <$> opA)
+    (ramOpAddr <$> opA)
+    (fromJustX . ramOpWriteVal <$> opA)
+    clkB
+    (isOp <$> opB)
+    (isRamWrite <$> opB)
+    (ramOpAddr <$> opB)
+    (fromJustX . ramOpWriteVal <$> opB)
 
 -- [Note: eta port names for trueDualPortBlockRam]
 --
@@ -1281,34 +1370,35 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
 
 {-# OPAQUE trueDualPortBlockRam# #-}
 {-# ANN trueDualPortBlockRam# hasBlackBox #-}
-{-# ANN trueDualPortBlockRam# (
-  let
-    bbName = show 'trueDualPortBlockRam#
-    _hasCallStack
-     :< knownNatAddrs
-     :< _knownDomainA
-     :< _knownDomainB
-     :< _nfdataX
+{-# ANN
+  trueDualPortBlockRam#
+  ( let
+      bbName = show 'trueDualPortBlockRam#
+      _hasCallStack
+        :< knownNatAddrs
+        :< _knownDomainA
+        :< _knownDomainB
+        :< _nfdataX
+        :< clockA
+        :< enaA
+        :< wenaA
+        :< addrA
+        :< datA
+        :< clockB
+        :< enaB
+        :< wenaB
+        :< addrB
+        :< datB
+        :< _ = ((0 :: Int) ...)
 
-     :< clockA
-     :< enaA
-     :< wenaA
-     :< addrA
-     :< datA
-
-     :< clockB
-     :< enaB
-     :< wenaB
-     :< addrB
-     :< datB
-
-     :< _ = ((0 :: Int)...)
-
-    symBlockName
-     :< symDoutA
-     :< symDoutB
-     :< _ = ((0 :: Int)...)
-  in InlineYamlPrimitive [VHDL] [__i|
+      symBlockName
+        :< symDoutA
+        :< symDoutB
+        :< _ = ((0 :: Int) ...)
+     in
+      InlineYamlPrimitive
+        [VHDL]
+        [__i|
     BlackBox:
       name: "#{bbName}"
       kind: Declaration
@@ -1351,34 +1441,37 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
           ~RESULT <= (~SYM[#{symDoutA}], ~SYM[#{symDoutB}]);
         end block;
         -- end trueDualPortBlockRam
-|]) #-}
-{-# ANN trueDualPortBlockRam# (
-  let
-    bbName = show 'trueDualPortBlockRam#
-    _hasCallStack
-     :< knownNatAddrs
-     :< knownDomainA
-     :< knownDomainB
-     :< _nfdataX
-
-     :< clockA
-     :< enaA
-     :< wenaA
-     :< addrA
-     :< datA
-
-     :< clockB
-     :< enaB
-     :< wenaB
-     :< addrB
-     :< datB
-
-     :< _ = ((0 :: Int)...)
-    symMem
-     :< symDoutA
-     :< symDoutB
-     :< _ = ((0 :: Int)...)
-  in InlineYamlPrimitive [SystemVerilog] [__i|
+|]
+  )
+  #-}
+{-# ANN
+  trueDualPortBlockRam#
+  ( let
+      bbName = show 'trueDualPortBlockRam#
+      _hasCallStack
+        :< knownNatAddrs
+        :< knownDomainA
+        :< knownDomainB
+        :< _nfdataX
+        :< clockA
+        :< enaA
+        :< wenaA
+        :< addrA
+        :< datA
+        :< clockB
+        :< enaB
+        :< wenaB
+        :< addrB
+        :< datB
+        :< _ = ((0 :: Int) ...)
+      symMem
+        :< symDoutA
+        :< symDoutB
+        :< _ = ((0 :: Int) ...)
+     in
+      InlineYamlPrimitive
+        [SystemVerilog]
+        [__i|
     BlackBox:
       name: "#{bbName}"
       kind: Declaration
@@ -1414,35 +1507,38 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
 
         assign ~RESULT = {~SYM[#{symDoutA}], ~SYM[#{symDoutB}]};
         // end trueDualPortBlockRam
-|]) #-}
-{-# ANN trueDualPortBlockRam# (
-  let
-    bbName = show 'trueDualPortBlockRam#
-    _hasCallStack
-     :< knownNatAddrs
-     :< knownDomainA
-     :< knownDomainB
-     :< _nfdataX
+|]
+  )
+  #-}
+{-# ANN
+  trueDualPortBlockRam#
+  ( let
+      bbName = show 'trueDualPortBlockRam#
+      _hasCallStack
+        :< knownNatAddrs
+        :< knownDomainA
+        :< knownDomainB
+        :< _nfdataX
+        :< clockA
+        :< enaA
+        :< wenaA
+        :< addrA
+        :< datA
+        :< clockB
+        :< enaB
+        :< wenaB
+        :< addrB
+        :< datB
+        :< _ = ((0 :: Int) ...)
 
-     :< clockA
-     :< enaA
-     :< wenaA
-     :< addrA
-     :< datA
-
-     :< clockB
-     :< enaB
-     :< wenaB
-     :< addrB
-     :< datB
-
-     :< _ = ((0 :: Int)...)
-
-    symMem
-     :< symDoutA
-     :< symDoutB
-     :< _ = ((0 :: Int)...)
-  in InlineYamlPrimitive [Verilog] [__i|
+      symMem
+        :< symDoutA
+        :< symDoutB
+        :< _ = ((0 :: Int) ...)
+     in
+      InlineYamlPrimitive
+        [Verilog]
+        [__i|
     BlackBox:
       name: "#{bbName}"
       kind: Declaration
@@ -1479,54 +1575,66 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         assign ~RESULT = {~SYM[#{symDoutA}], ~SYM[#{symDoutB}]};
 
         // end trueDualPortBlockRam
-|]) #-}
+|]
+  )
+  #-}
 
 -- | Primitive for 'trueDualPortBlockRam'
---
-trueDualPortBlockRam#, trueDualPortBlockRamWrapper ::
-  forall nAddrs domA domB a .
-  ( HasCallStack
-  , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
-  , NFDataX a
-  ) =>
-
-  Clock domA ->
-  -- | Enable
-  Signal domA Bool ->
-  -- | Write enable
-  Signal domA Bool ->
-  -- | Address
-  Signal domA (Index nAddrs) ->
-  -- | Write data
-  Signal domA a ->
-
-  Clock domB ->
-  -- | Enable
-  Signal domB Bool ->
-  -- | Write enable
-  Signal domB Bool ->
-  -- | Address
-  Signal domB (Index nAddrs) ->
-  -- | Write data
-  Signal domB a ->
-
-  (Signal domA a, Signal domB a)
+trueDualPortBlockRam#
+  , trueDualPortBlockRamWrapper ::
+    forall nAddrs domA domB a.
+    ( HasCallStack
+    , KnownNat nAddrs
+    , KnownDomain domA
+    , KnownDomain domB
+    , NFDataX a
+    ) =>
+    Clock domA ->
+    -- | Enable
+    Signal domA Bool ->
+    -- | Write enable
+    Signal domA Bool ->
+    -- | Address
+    Signal domA (Index nAddrs) ->
+    -- | Write data
+    Signal domA a ->
+    Clock domB ->
+    -- | Enable
+    Signal domB Bool ->
+    -- | Write enable
+    Signal domB Bool ->
+    -- | Address
+    Signal domB (Index nAddrs) ->
+    -- | Write data
+    Signal domB a ->
+    (Signal domA a, Signal domB a)
 trueDualPortBlockRam# clkA enA weA addrA datA clkB enB weB addrB datB =
   tdpbramModel
     TdpbramModelConfig
       { tdpIsActiveWriteEnable = id
       , tdpMergeWriteEnable = andX
-      , tdpUpdateRam = updateRam }
-    clkA enA addrA weA datA
-    clkB enB addrB weB datB
+      , tdpUpdateRam = updateRam
+      }
+    clkA
+    enA
+    addrA
+    weA
+    datA
+    clkB
+    enB
+    addrB
+    weB
+    datB
  where
   updateRam :: Int -> MaybeX Bool -> a -> Seq a -> Seq a
   updateRam addr writeEnable dat mem =
     case writeEnable of
       IsDefined False -> mem
       IsDefined True -> Seq.update addr dat mem
-      IsX msg -> Seq.update addr dat $ deepErrorX $
-          "Write enable unknown; position" <> show addr <>
-        "\nWrite enable error message: " <> msg
+      IsX msg ->
+        Seq.update addr dat $
+          deepErrorX $
+            "Write enable unknown; position"
+              <> show addr
+              <> "\nWrite enable error message: "
+              <> msg

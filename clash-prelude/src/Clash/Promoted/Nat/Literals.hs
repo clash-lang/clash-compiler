@@ -1,4 +1,9 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_HADDOCK show-extensions, prune #-}
+
+{- |
 Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
@@ -18,14 +23,6 @@ d1024 = SNat :: SNat 1024
 You can generate more 'Clash.Promoted.Nat.SNat' literals using 'decLiteralsD'
 from "Clash.Promoted.Nat.TH"
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions, prune #-}
-
 module Clash.Promoted.Nat.Literals where
 
 import Clash.Promoted.Nat.TH

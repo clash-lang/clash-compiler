@@ -45,51 +45,66 @@ import Test.Tasty.Clash
 import Test.Tasty.Clash.CoreTest
 
 {-# OPAQUE etaReducedData #-}
-{-# ANN etaReducedData (Synthesize
-          { t_name   = "etaReducedData"
-          , t_inputs = [PortName "x"]
-          , t_output = PortName "res"
-          })
+{-# ANN
+  etaReducedData
+  ( Synthesize
+      { t_name = "etaReducedData"
+      , t_inputs = [PortName "x"]
+      , t_output = PortName "res"
+      }
+  )
   #-}
 etaReducedData :: Integer -> Maybe Integer
 etaReducedData = Just
 
 {-# OPAQUE etaExpandedData #-}
-{-# ANN etaExpandedData (Synthesize
-          { t_name   = "etaExpandedData"
-          , t_inputs = [PortName "x"]
-          , t_output = PortName "res"
-          })
+{-# ANN
+  etaExpandedData
+  ( Synthesize
+      { t_name = "etaExpandedData"
+      , t_inputs = [PortName "x"]
+      , t_output = PortName "res"
+      }
+  )
   #-}
 etaExpandedData :: Integer -> Maybe Integer
 etaExpandedData x = Just x
 
 {-# OPAQUE etaReducedPrim1 #-}
-{-# ANN etaReducedPrim1 (Synthesize
-          { t_name   = "etaReducedPrim1"
-          , t_inputs = [PortName "x", PortName "y"]
-          , t_output = PortName "res"
-          })
+{-# ANN
+  etaReducedPrim1
+  ( Synthesize
+      { t_name = "etaReducedPrim1"
+      , t_inputs = [PortName "x", PortName "y"]
+      , t_output = PortName "res"
+      }
+  )
   #-}
 etaReducedPrim1 :: Integer -> Integer -> Integer
 etaReducedPrim1 = (+)
 
 {-# OPAQUE etaReducedPrim2 #-}
-{-# ANN etaReducedPrim2 (Synthesize
-          { t_name   = "etaReducedPrim2"
-          , t_inputs = [PortName "x", PortName "y"]
-          , t_output = PortName "res"
-          })
+{-# ANN
+  etaReducedPrim2
+  ( Synthesize
+      { t_name = "etaReducedPrim2"
+      , t_inputs = [PortName "x", PortName "y"]
+      , t_output = PortName "res"
+      }
+  )
   #-}
 etaReducedPrim2 :: Integer -> Integer -> Integer
-etaReducedPrim2 x = (x+)
+etaReducedPrim2 x = (x +)
 
 {-# OPAQUE etaExpandedPrim #-}
-{-# ANN etaExpandedPrim (Synthesize
-          { t_name   = "etaExpandedPrim"
-          , t_inputs = [PortName "x", PortName "y"]
-          , t_output = PortName "res"
-          })
+{-# ANN
+  etaExpandedPrim
+  ( Synthesize
+      { t_name = "etaExpandedPrim"
+      , t_inputs = [PortName "x", PortName "y"]
+      , t_output = PortName "res"
+      }
+  )
   #-}
 etaExpandedPrim :: Integer -> Integer -> Integer
 etaExpandedPrim x y = x + y
@@ -97,10 +112,10 @@ etaExpandedPrim x y = x + y
 testPath :: FilePath
 testPath = "tests/shouldwork/PartialEvaluation/EtaExpansion.hs"
 
-mainCommon
-  :: (Backend (TargetToState target))
-  => SBuildTarget target
-  -> IO ()
+mainCommon ::
+  (Backend (TargetToState target)) =>
+  SBuildTarget target ->
+  IO ()
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
 
@@ -117,7 +132,8 @@ mainCommon hdl = do
   prim3 <- findBinding "EtaExpansion.etaExpandedPrim" entities
 
   unless (aeqTerm prim1 prim2 && aeqTerm prim1 prim3) $
-    error ("Not alpha equivalent: " <> show prim1 <> "\n\n" <> show prim2 <> "\n\n" <> show prim3)
+    error
+      ("Not alpha equivalent: " <> show prim1 <> "\n\n" <> show prim2 <> "\n\n" <> show prim3)
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL

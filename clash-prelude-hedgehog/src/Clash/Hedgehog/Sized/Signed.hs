@@ -1,24 +1,23 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+
+{- |
 Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random generation of Signed numbers.
 -}
+module Clash.Hedgehog.Sized.Signed (
+  genSigned,
+  SomeSigned (..),
+  genSomeSigned,
+) where
 
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-
-module Clash.Hedgehog.Sized.Signed
-  ( genSigned
-  , SomeSigned(..)
-  , genSomeSigned
-  ) where
-
-import GHC.TypeNats
-  hiding (SNat)
+import GHC.TypeNats hiding (
+  SNat,
+ )
 import Hedgehog (MonadGen, Range)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -37,14 +36,14 @@ genSigned range =
 data SomeSigned atLeast where
   SomeSigned :: SNat n -> Signed (atLeast + n) -> SomeSigned atLeast
 
-instance KnownNat atLeast => Show (SomeSigned atLeast) where
+instance (KnownNat atLeast) => Show (SomeSigned atLeast) where
   show (SomeSigned SNat x) = show x
 
-genSomeSigned
-  :: forall atLeast m
-   . (MonadGen m, KnownNat atLeast)
-  => Range Natural
-  -> m (SomeSigned atLeast)
+genSomeSigned ::
+  forall atLeast m.
+  (MonadGen m, KnownNat atLeast) =>
+  Range Natural ->
+  m (SomeSigned atLeast)
 genSomeSigned rangeSigned = do
   numExtra <- Gen.integral rangeSigned
 

@@ -1,6 +1,7 @@
 module MultipleGuards where
-import Clash.Prelude
+
 import Clash.Annotations.Primitive
+import Clash.Prelude
 import Clash.Util.Interpolate (i)
 import Data.String.Interpolate (__i)
 
@@ -11,12 +12,17 @@ test = True
 {-# ANN test (warnAlways "WARN1") #-}
 {-# ANN test (warnAlways "WARN2: You should know that ...") #-}
 {-# ANN test (warnAlways "WARN3") #-}
-{-# ANN test (InlineYamlPrimitive [VHDL] $  [__i|
+{-# ANN
+  test
+  ( InlineYamlPrimitive [VHDL] $
+      [__i|
   BlackBox:
     name: MultipleGuards.test
     kind: Expression
     template: "true"
- |]) #-}
+ |]
+  )
+  #-}
 
 topEntity :: Bool
 topEntity = test

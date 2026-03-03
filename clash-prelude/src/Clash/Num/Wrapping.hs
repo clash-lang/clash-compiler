@@ -3,38 +3,37 @@ Copyright   : (C) 2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Clash.Num.Wrapping
-  ( Wrapping(..)
-  , toWrapping
-  ) where
+module Clash.Num.Wrapping (
+  Wrapping (..),
+  toWrapping,
+) where
 
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
 import Data.Bits (Bits, FiniteBits)
 import Data.Coerce (coerce)
-import Data.Functor.Compose (Compose(..))
+import Data.Functor.Compose (Compose (..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
 import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
-import Clash.Class.Num (SaturationMode(SatWrap), SaturatingNum(..))
+import Clash.Class.Num (SaturatingNum (..), SaturationMode (SatWrap))
 import Clash.Class.Parity (Parity)
-import Clash.Class.Resize (Resize(..))
+import Clash.Class.Resize (Resize (..))
 import Clash.XException (NFDataX, ShowX)
 
--- | A wrapping number type is one where all operations wrap between minBound
--- and maxBound (and vice-versa) if the result goes out of bounds for the
--- underlying type.
---
--- Numbers can be converted to wrap by default using 'toWrapping'.
---
-newtype Wrapping a =
-  Wrapping { fromWrapping :: a }
+{- | A wrapping number type is one where all operations wrap between minBound
+and maxBound (and vice-versa) if the result goes out of bounds for the
+underlying type.
+
+Numbers can be converted to wrap by default using 'toWrapping'.
+-}
+newtype Wrapping a
+  = Wrapping {fromWrapping :: a}
   deriving newtype
     ( Arbitrary
     , Binary
@@ -58,27 +57,27 @@ toWrapping = Wrapping
 
 instance (Resize f) => Resize (Compose Wrapping f) where
   {-# INLINE resize #-}
-  resize
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Wrapping f a
-    -> Compose Wrapping f b
+  resize ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Wrapping f a ->
+    Compose Wrapping f b
   resize = coerce (resize @f @a @b)
 
   {-# INLINE zeroExtend #-}
-  zeroExtend
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Wrapping f a
-    -> Compose Wrapping f (b + a)
+  zeroExtend ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Wrapping f a ->
+    Compose Wrapping f (b + a)
   zeroExtend = coerce (zeroExtend @f @a @b)
 
   {-# INLINE truncateB #-}
-  truncateB
-    :: forall a b
-     . (KnownNat a)
-    => Compose Wrapping f (a + b)
-    -> Compose Wrapping f a
+  truncateB ::
+    forall a b.
+    (KnownNat a) =>
+    Compose Wrapping f (a + b) ->
+    Compose Wrapping f a
   truncateB = coerce (truncateB @f @a @b)
 
 instance (SaturatingNum a) => Num (Wrapping a) where

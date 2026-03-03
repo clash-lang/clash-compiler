@@ -1,7 +1,7 @@
 module BitPackGHCNumConstants where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 import Data.Int
 import Data.Word
 import Foreign.C.Types

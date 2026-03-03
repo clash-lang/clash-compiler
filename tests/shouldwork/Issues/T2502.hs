@@ -1,16 +1,16 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module T2502 where
 
 import qualified Prelude as P
 
-import Data.String.Interpolate (__i)
-import Clash.Explicit.Prelude
 import Clash.Annotations.Primitive
+import Clash.Explicit.Prelude
+import Data.String.Interpolate (__i)
 
-import Control.Exception (AssertionFailed(..), throwIO)
+import Control.Exception (AssertionFailed (..), throwIO)
 import Control.Monad (when)
 import Data.List (sort)
 import System.Environment (getArgs)
@@ -23,23 +23,28 @@ class X a where
 instance X (Signal System Int) where
   x = pure 3
 
-instance X a => X (Signal System Int -> a) where
+instance (X a) => X (Signal System Int -> a) where
   x !_i = x
 
-bb :: X a => Int -> a
+bb :: (X a) => Int -> a
 bb !_ = x
 {-# OPAQUE bb #-}
 {-# ANN bb hasBlackBox #-}
-{-# ANN bb (
-  let bbName = show 'bb
-  in InlineYamlPrimitive [minBound..] [__i|
+{-# ANN
+  bb
+  ( let bbName = show 'bb
+     in InlineYamlPrimitive
+          [minBound ..]
+          [__i|
     BlackBox:
       name: "#{bbName}"
       kind: Expression
       template: "~ARG[2]"
-|]) #-}
+|]
+  )
+  #-}
 
-bbWrapper :: X a => Int -> a
+bbWrapper :: (X a) => Int -> a
 bbWrapper i = bb i
 {-# OPAQUE bbWrapper #-}
 
