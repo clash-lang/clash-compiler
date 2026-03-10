@@ -73,7 +73,7 @@ files = [files[i-1] for i in ix]
 entries = []
 for f in files:
     with open(f,"r") as fp:
-        entries.append((f,fp.read()))
+        entries.append((f,fp.read().rstrip()))
 
 # check that something is linked
 link = re.compile(r"\[.*\]\(.*\)")

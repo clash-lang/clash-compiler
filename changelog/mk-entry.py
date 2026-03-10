@@ -37,19 +37,12 @@ while True:
 # type
 while True:
     ty = input("Enter entry type ([F]IXED/[A]DDED/[C]HANGED/[R]EMOVED/[D]EPRICATED): ").upper()
-    match ty:
-        case "F" | "FIX" | "FIXED":
-            ty = "FIXED"
-        case "A" | "ADD" | "ADDED":
-            ty = "ADDED"
-        case "C" | "CHANGE" | "CHANGED":
-            ty = "CHANGED"
-        case "R" | "REMOVE" | "REMOVED":
-            ty = "REMOVED"
-        case "D" | "DEPRICATE" | "DEPRICATED":
-            ty = "DEPRICATED"
-        case _:
-            continue
+    for validty in ["FIXED","ADDED","CHANGED","REMOVED","DEPRICATED"]:
+        if validty.startswith(ty):
+            ty=validty
+            break
+    else:
+        continue
     break
 
 # content
@@ -65,4 +58,4 @@ content = "\n".join(content[:-N])
 
 # store:
 with open(fname,"w") as fp:
-    fp.write(f"{ty}: {content}")
+    fp.write(f"{ty}: {content}\n")

@@ -19,7 +19,9 @@ somewhat manageable:
   `CHANGELOG.md`. `aggregate-entries.py` helps to combine these entries into
   a changelog section, but the output still needs to be checked.
 
-  After adding them to `CHANGELOG.md`, the entry files are deleted.
+  After adding them to `CHANGELOG.md`, delete the changelog entry files.
+* Changes to the changelog are done in release branches and then cherry-picked
+  back into `master`.
 
 
 I've added an example to the commit introducing this change.
