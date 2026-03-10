@@ -75,6 +75,9 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
 5. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
    or simply wait a day. Verify that the Hackage release deploys well, and
    preview the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
+   (be aware that Hackage may update slowly and partially, and as such documentation
+   changes made to a version that already had documentation may not
+   show up properly)
 6. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
 7. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
 8. Cherry-pick commit made in (3) (changelog updates) to `master`
