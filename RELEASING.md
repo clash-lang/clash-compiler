@@ -19,7 +19,7 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * Only members of the `devops` team can merge to it
   * Warning: matches `1.0`, `1.2`, but NOT `1.22` (GitHub limitation).
 
-## Releasing a new version major version (1.x)
+## Releasing a new major version (1.x)
 1. Change version numbers in:
   * `clash-prelude/clash-prelude.cabal`
   * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
@@ -50,10 +50,10 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
 11. Update these docs if anything is missing :-)
 12. Enjoy!
 
-## Releasing a new version minor version (1.x.x)
-0. Create a release branch (i.e. `v1.8.5_release`) from
+## Releasing a new minor version (1.x.x)
+1. Create a release branch (i.e. `v1.8.5_release`) from
    the branch of the version you are releasing.
-1. Change version numbers in:
+2. Change version numbers in:
   * `clash-prelude/clash-prelude.cabal`
   * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
   * `clash-lib/clash-lib.cabal`
@@ -61,21 +61,25 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
   * `clash-ghc/clash-ghc.cabal`
   * `docs/conf.py`
 
-   The script `changelog/update-version.py` can do this for you.
-2. In a **separate commit**, update the CHANGELOG (see `changelog/README.md`).
+   This both includes the version number at the top of many files, and the
+   listed Clash dependecies.
+
+   The script `changelog/update-version.py` can do this for you (execute inside
+   `changelog/`) but also search for any occurances of the old version.
+3. In a **single separate commit**, update the CHANGELOG (see `changelog/README.md`).
    `aggregate-entries.py` can help to generate this text, though it still needs
    to be checked afterwards. Each entry should normally end with a link to a PR
    or issue. The script `changelog/blame-pr.py` will tell you for a single file
    which PR('s) introduced it.
-3. Merge the release branch into the version branch.
-4. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
+4. Merge the release branch into the version branch.
+5. Ask someone with admin permissions on GitLab to trigger a nightly schedule,
    or simply wait a day. Verify that the Hackage release deploys well, and
    preview the release. [Preview on Hackage](http://hackage.haskell.org/package/clash-prelude/candidates/)
-5. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
-6. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
-7. Cherry-pick commit made in (2) to `master`
-8. After the release is on Hackage: run `changelog/comment-gh.py` and execute
+6. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
+7. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
+8. Cherry-pick commit made in (3) (changelog updates) to `master`
+9. After the release is on Hackage: run `changelog/comment-gh.py` and execute
    the commands it lists. This will inform users subscribed to specific issues
    that a fix for their issue is now in a released version.
-9. Update these docs if anything is missing :-)
-10. Enjoy!
+10. Update these docs if anything is missing :-)
+11. Enjoy!
