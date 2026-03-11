@@ -1,0 +1,1 @@
+FIXED: Another `caseCon` now runs after `inlineCleanup` [#3159](https://github.com/clash-lang/clash-compiler/issues/3159)
