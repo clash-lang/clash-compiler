@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
@@ -31,6 +30,7 @@ import           Test.Tasty.Modelsim hiding (ModelSim)
 import           Test.Tasty.SymbiYosys
 import           Test.Tasty.Verilator hiding (Verilator)
 import           Test.Tasty.Vivado hiding (Vivado)
+import           Test.Flags                 (clashWorkaroundGhcMmapCrash)
 
 {- Note [copy data files hack]
 
@@ -580,10 +580,8 @@ clashLibTest' modName target extraGhcArgs path =
         -- the linker to shut up and continue producing an executable, as the
         -- undefined references will not be an issue at run-time.
         "-optl" : "-Wl,--allow-shlib-undefined" :
-#ifdef CLASH_WORKAROUND_GHC_MMAP_CRASH
-        "-with-rtsopts=-xm20000000" :
-#endif
-        extraGhcArgs
+        (if clashWorkaroundGhcMmapCrash then ["-with-rtsopts=-xm20000000"] else [])
+        ++ extraGhcArgs
     , cbExtraExecArgs=[]
     , cbModName=modName
     , cbOutputDirectory=workDir

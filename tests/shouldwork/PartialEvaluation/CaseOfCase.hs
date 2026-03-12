@@ -22,8 +22,8 @@ module CaseOfCase where
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.PartialEval
 import Clash.Core.Name
+import Clash.Core.PartialEval
 import Clash.Core.Subst
 import Clash.Core.Term
 import Clash.Core.TyCon
@@ -47,45 +47,43 @@ topEntity x a b =
  where
   {-# NOINLINE go #-}
   go y = case y of
-         A -> a
-         B -> b
+    A -> a
+    B -> b
 
 testPath :: FilePath
 testPath = "tests/shouldwork/PartialEvaluation/CaseOfCase.hs"
 
 checkAlts :: Id -> Id -> [(Pat, Term)] -> IO ()
 checkAlts a b alts
-  | [(aP, aA), (bP, bA)] <- alts
-  = checkAlt a aP aA >> checkAlt b bP bA
-
-  | otherwise
-  = error ("Expected two patterns [A,B], got " <> show alts)
+  | [(aP, aA), (bP, bA)] <- alts =
+      checkAlt a aP aA >> checkAlt b bP bA
+  | otherwise =
+      error ("Expected two patterns [A,B], got " <> show alts)
  where
   checkAlt var (DataPat dc [] []) alt
     | Case s _ as <- alt
     , Var v <- s
-    , v == var
-    = pure ()
-
+    , v == var =
+        pure ()
   checkAlt _ _ alt =
     error ("Expected inner case expression, got " <> show alt)
 
-mainCommon
-  :: (Backend (TargetToState target))
-  => SBuildTarget target
-  -> IO ()
+mainCommon ::
+  (Backend (TargetToState target)) =>
+  SBuildTarget target ->
+  IO ()
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
   te <- findBinding "CaseOfCase.topEntity" entities
 
-  if |  Lam x (Lam a (Lam b e)) <- te
-     ,  Case s _ alts <- e
-     ,  Var v <- s
-     ,  v == x
-     -> checkAlts a b alts
-
-     |  otherwise
-     -> error ("case-of-case transformation not applied")
+  if
+    | Lam x (Lam a (Lam b e)) <- te
+    , Case s _ alts <- e
+    , Var v <- s
+    , v == x ->
+        checkAlts a b alts
+    | otherwise ->
+        error ("case-of-case transformation not applied")
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL
@@ -95,4 +93,3 @@ mainVerilog = mainCommon SVerilog
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = mainCommon SSystemVerilog
-

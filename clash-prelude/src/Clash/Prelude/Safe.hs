@@ -1,4 +1,11 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_HADDOCK show-extensions, not-home #-}
+
+{- |
   Copyright   :  (C) 2013-2016, University of Twente,
                      2017-2019, Myrtle Software Ltd
                      2017     , Google Inc.,
@@ -30,147 +37,168 @@
   https://docs.clash-lang.org/tutorial. Some circuit examples can be found in
   "Clash.Examples".
 -}
+module Clash.Prelude.Safe (
+  -- * Creating synchronous sequential circuits
+  mealy,
+  mealyS,
+  mealyB,
+  mealySB,
+  (<^>),
+  moore,
+  mooreB,
+  registerB,
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+  -- * ROMs
+  asyncRom,
+  asyncRomPow2,
+  rom,
+  romPow2,
 
-{-# LANGUAGE Safe #-}
+  -- ** ROMs defined by a 'MemBlob'
+  asyncRomBlob,
+  asyncRomBlobPow2,
+  romBlob,
+  romBlobPow2,
 
-{-# OPTIONS_HADDOCK show-extensions, not-home #-}
+  -- * RAM primitives with a combinational read port
+  asyncRam,
+  asyncRamPow2,
 
-module Clash.Prelude.Safe
-  ( -- * Creating synchronous sequential circuits
-    mealy
-  , mealyS
-  , mealyB
-  , mealySB
-  , (<^>)
-  , moore
-  , mooreB
-  , registerB
-    -- * ROMs
-  , asyncRom
-  , asyncRomPow2
-  , rom
-  , romPow2
-    -- ** ROMs defined by a 'MemBlob'
-  , asyncRomBlob
-  , asyncRomBlobPow2
-  , romBlob
-  , romBlobPow2
-    -- * RAM primitives with a combinational read port
-  , asyncRam
-  , asyncRamPow2
-    -- * BlockRAM primitives
-  , blockRam
-  , blockRamPow2
-    -- ** BlockRAM primitives initialized with a 'MemBlob'
-  , blockRamBlob
-  , blockRamBlobPow2
-    -- *** Creating and inspecting 'MemBlob'
-  , MemBlob
-  , createMemBlob
-  , memBlobTH
-  , unpackMemBlob
-    -- ** BlockRAM read/write conflict resolution
-  , readNew
-    -- ** True dual-port block RAM
-  , trueDualPortBlockRam
-  , RamOp(..)
-    -- * Utility functions
-  , isRising
-  , isFalling
-  , riseEvery
-  , oscillate
-    -- * Exported modules
-    -- ** Synchronous signals
-  , module Clash.Signal
-  , module Clash.Signal.Delayed
-    -- ** Datatypes
-    -- *** Bit vectors
-  , module Clash.Sized.BitVector
-    -- *** Arbitrary-width numbers
-  , module Clash.Sized.Signed
-  , module Clash.Sized.Unsigned
-  , module Clash.Sized.Index
-    -- *** Fixed point numbers
-  , module Clash.Sized.Fixed
-    -- *** Fixed size vectors
-  , module Clash.Sized.Vector
-    -- *** Perfect depth trees
-  , module Clash.Sized.RTree
-    -- ** Annotations
-  , module Clash.Annotations.TopEntity
-    -- ** Generics type-classes
-  , Generic
-  , Generic1
-    -- ** Type-level natural numbers
-  , module GHC.TypeLits
-  , module GHC.TypeLits.Extra
-  , module Clash.Promoted.Nat
-  , module Clash.Promoted.Nat.Literals
-  , module Clash.Promoted.Nat.TH
-    -- ** Type-level strings
-  , module Clash.Promoted.Symbol
-    -- ** Type classes
-    -- *** Clash
-  , module Clash.Class.BitPack
-  , module Clash.Class.Num
-  , module Clash.Class.Resize
-    -- *** Other
-  , module Control.Applicative
-  , module Data.Bits
-      -- ** Exceptions
-  , module Clash.XException
-    -- ** Named types
-  , module Clash.NamedTypes
-    -- ** Hidden arguments
-  , module Clash.Hidden
-    -- ** Haskell Prelude
-    -- $hiding
-  , module Clash.HaskellPrelude
-  )
+  -- * BlockRAM primitives
+  blockRam,
+  blockRamPow2,
+
+  -- ** BlockRAM primitives initialized with a 'MemBlob'
+  blockRamBlob,
+  blockRamBlobPow2,
+
+  -- *** Creating and inspecting 'MemBlob'
+  MemBlob,
+  createMemBlob,
+  memBlobTH,
+  unpackMemBlob,
+
+  -- ** BlockRAM read/write conflict resolution
+  readNew,
+
+  -- ** True dual-port block RAM
+  trueDualPortBlockRam,
+  RamOp (..),
+
+  -- * Utility functions
+  isRising,
+  isFalling,
+  riseEvery,
+  oscillate,
+
+  -- * Exported modules
+
+  -- ** Synchronous signals
+  module Clash.Signal,
+  module Clash.Signal.Delayed,
+
+  -- ** Datatypes
+
+  -- *** Bit vectors
+  module Clash.Sized.BitVector,
+
+  -- *** Arbitrary-width numbers
+  module Clash.Sized.Signed,
+  module Clash.Sized.Unsigned,
+  module Clash.Sized.Index,
+
+  -- *** Fixed point numbers
+  module Clash.Sized.Fixed,
+
+  -- *** Fixed size vectors
+  module Clash.Sized.Vector,
+
+  -- *** Perfect depth trees
+  module Clash.Sized.RTree,
+
+  -- ** Annotations
+  module Clash.Annotations.TopEntity,
+
+  -- ** Generics type-classes
+  Generic,
+  Generic1,
+
+  -- ** Type-level natural numbers
+  module GHC.TypeLits,
+  module GHC.TypeLits.Extra,
+  module Clash.Promoted.Nat,
+  module Clash.Promoted.Nat.Literals,
+  module Clash.Promoted.Nat.TH,
+
+  -- ** Type-level strings
+  module Clash.Promoted.Symbol,
+
+  -- ** Type classes
+
+  -- *** Clash
+  module Clash.Class.BitPack,
+  module Clash.Class.Num,
+  module Clash.Class.Resize,
+
+  -- *** Other
+  module Control.Applicative,
+  module Data.Bits,
+
+  -- ** Exceptions
+  module Clash.XException,
+
+  -- ** Named types
+  module Clash.NamedTypes,
+
+  -- ** Hidden arguments
+  module Clash.Hidden,
+
+  -- ** Haskell Prelude
+  -- $hiding
+  module Clash.HaskellPrelude,
+)
 where
 
-import           Control.Applicative
-import           Data.Bits
-import           GHC.Generics (Generic, Generic1)
+import Control.Applicative
+import Data.Bits
+import GHC.Generics (Generic, Generic1)
 
-import           GHC.TypeLits
-  hiding (SNat, SSymbol, fromSNat)
-import           GHC.TypeLits.Extra
-import           Clash.HaskellPrelude
+import Clash.HaskellPrelude
+import GHC.TypeLits hiding (
+  SNat,
+  SSymbol,
+  fromSNat,
+ )
+import GHC.TypeLits.Extra
 
-import           Clash.Annotations.TopEntity
-import           Clash.Class.BitPack
-import           Clash.Class.Num
-import           Clash.Class.Resize
-import           Clash.Hidden
-import           Clash.NamedTypes
-import           Clash.Prelude.BlockRam
-import           Clash.Prelude.BlockRam.Blob
+import Clash.Annotations.TopEntity
+import Clash.Class.BitPack
+import Clash.Class.Num
+import Clash.Class.Resize
 import qualified Clash.Explicit.Prelude.Safe as E
-import           Clash.Prelude.Mealy         (mealy, mealyB, mealyS, mealySB, (<^>))
-import           Clash.Prelude.Moore         (moore, mooreB)
-import           Clash.Prelude.RAM           (asyncRam,asyncRamPow2)
-import           Clash.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
-import           Clash.Prelude.ROM.Blob
-import           Clash.Promoted.Nat
-import           Clash.Promoted.Nat.TH
-import           Clash.Promoted.Nat.Literals
-import           Clash.Promoted.Symbol
-import           Clash.Sized.BitVector
-import           Clash.Sized.Fixed
-import           Clash.Sized.Index
-import           Clash.Sized.RTree
-import           Clash.Sized.Signed
-import           Clash.Sized.Unsigned
-import           Clash.Sized.Vector hiding (fromList, unsafeFromList)
-import           Clash.Signal
-import           Clash.Signal.Delayed
-import           Clash.XException
+import Clash.Hidden
+import Clash.NamedTypes
+import Clash.Prelude.BlockRam
+import Clash.Prelude.BlockRam.Blob
+import Clash.Prelude.Mealy (mealy, mealyB, mealyS, mealySB, (<^>))
+import Clash.Prelude.Moore (moore, mooreB)
+import Clash.Prelude.RAM (asyncRam, asyncRamPow2)
+import Clash.Prelude.ROM (asyncRom, asyncRomPow2, rom, romPow2)
+import Clash.Prelude.ROM.Blob
+import Clash.Promoted.Nat
+import Clash.Promoted.Nat.Literals
+import Clash.Promoted.Nat.TH
+import Clash.Promoted.Symbol
+import Clash.Signal
+import Clash.Signal.Delayed
+import Clash.Sized.BitVector
+import Clash.Sized.Fixed
+import Clash.Sized.Index
+import Clash.Sized.RTree
+import Clash.Sized.Signed
+import Clash.Sized.Unsigned
+import Clash.Sized.Vector hiding (fromList, unsafeFromList)
+import Clash.XException
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
@@ -189,101 +217,108 @@ functions a type class called 'Clash.Class.Parity.Parity' is available at
 "Clash.Class.Parity".
 -}
 
--- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
---
--- > rP :: HiddenClockResetEnable dom
--- >    => (Signal dom Int, Signal dom Int)
--- >    -> (Signal dom Int, Signal dom Int)
--- > rP = registerB (8,8)
---
--- >>> simulateB @System rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
--- [(8,8),(1,1),(2,2),(3,3)...
--- ...
-registerB
-  :: ( HiddenClockResetEnable dom
-     , NFDataX a
-     , Bundle a )
-  => a
-  -> Unbundled dom a
-  -> Unbundled dom a
+{- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
+
+> rP :: HiddenClockResetEnable dom
+>    => (Signal dom Int, Signal dom Int)
+>    -> (Signal dom Int, Signal dom Int)
+> rP = registerB (8,8)
+
+>>> simulateB @System rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
+[(8,8),(1,1),(2,2),(3,3)...
+...
+-}
+registerB ::
+  ( HiddenClockResetEnable dom
+  , NFDataX a
+  , Bundle a
+  ) =>
+  a ->
+  Unbundled dom a ->
+  Unbundled dom a
 registerB = hideClockResetEnable E.registerB
+
 infixr 3 `registerB`
 {-# INLINE registerB #-}
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
-isRising
-  :: ( HiddenClockResetEnable dom
-     , NFDataX a
-     , Bounded a
-     , Eq a )
-  => a
-  -- ^ Starting value
-  -> Signal dom a
-  -> Signal dom Bool
+isRising ::
+  ( HiddenClockResetEnable dom
+  , NFDataX a
+  , Bounded a
+  , Eq a
+  ) =>
+  -- | Starting value
+  a ->
+  Signal dom a ->
+  Signal dom Bool
 isRising = hideClockResetEnable E.isRising
 {-# INLINE isRising #-}
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
-isFalling
-  :: ( HiddenClockResetEnable dom
-     , NFDataX a
-     , Bounded a
-     , Eq a )
-  => a
-  -- ^ Starting value
-  -> Signal dom a
-  -> Signal dom Bool
+isFalling ::
+  ( HiddenClockResetEnable dom
+  , NFDataX a
+  , Bounded a
+  , Eq a
+  ) =>
+  -- | Starting value
+  a ->
+  Signal dom a ->
+  Signal dom Bool
 isFalling = hideClockResetEnable E.isFalling
 {-# INLINE isFalling #-}
 
--- | Give a pulse every @n@ clock cycles. This is a useful helper function when
--- combined with functions like @'Clash.Signal.regEn'@ or @'Clash.Signal.mux'@,
--- in order to delay a register by a known amount.
---
--- To be precise: the given signal will be @'False'@ for the next @n-1@ cycles,
--- followed by a single @'True'@ value:
---
--- >>> Prelude.last (sampleN @System 1025 (riseEvery d1024)) == True
--- True
--- >>> Prelude.or (sampleN @System 1024 (riseEvery d1024)) == False
--- True
---
--- For example, to update a counter once every 10 million cycles:
---
--- @
--- counter = 'Clash.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
--- @
-riseEvery
-  :: HiddenClockResetEnable dom
-  => SNat n
-  -> Signal dom Bool
+{- | Give a pulse every @n@ clock cycles. This is a useful helper function when
+combined with functions like @'Clash.Signal.regEn'@ or @'Clash.Signal.mux'@,
+in order to delay a register by a known amount.
+
+To be precise: the given signal will be @'False'@ for the next @n-1@ cycles,
+followed by a single @'True'@ value:
+
+>>> Prelude.last (sampleN @System 1025 (riseEvery d1024)) == True
+True
+>>> Prelude.or (sampleN @System 1024 (riseEvery d1024)) == False
+True
+
+For example, to update a counter once every 10 million cycles:
+
+@
+counter = 'Clash.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
+@
+-}
+riseEvery ::
+  (HiddenClockResetEnable dom) =>
+  SNat n ->
+  Signal dom Bool
 riseEvery = hideClockResetEnable E.riseEvery
 {-# INLINE riseEvery #-}
 
--- | Oscillate a @'Bool'@ for a given number of cycles. This is a convenient
--- function when combined with something like @'regEn'@, as it allows you to
--- easily hold a register value for a given number of cycles. The input @'Bool'@
--- determines what the initial value is.
---
--- To oscillate on an interval of 5 cycles:
---
--- >>> sampleN @System 11 (oscillate False d5)
--- [False,False,False,False,False,False,True,True,True,True,True]
---
--- To oscillate between @'True'@ and @'False'@:
---
--- >>> sampleN @System 11 (oscillate False d1)
--- [False,False,True,False,True,False,True,False,True,False,True]
---
--- An alternative definition for the above could be:
---
--- >>> let osc' = register False (not <$> osc')
--- >>> sampleN @System 200 (oscillate False d1) == sampleN @System 200 osc'
--- True
-oscillate
-  :: HiddenClockResetEnable dom
-  => Bool
-  -> SNat n
-  -> Signal dom Bool
+{- | Oscillate a @'Bool'@ for a given number of cycles. This is a convenient
+function when combined with something like @'regEn'@, as it allows you to
+easily hold a register value for a given number of cycles. The input @'Bool'@
+determines what the initial value is.
+
+To oscillate on an interval of 5 cycles:
+
+>>> sampleN @System 11 (oscillate False d5)
+[False,False,False,False,False,False,True,True,True,True,True]
+
+To oscillate between @'True'@ and @'False'@:
+
+>>> sampleN @System 11 (oscillate False d1)
+[False,False,True,False,True,False,True,False,True,False,True]
+
+An alternative definition for the above could be:
+
+>>> let osc' = register False (not <$> osc')
+>>> sampleN @System 200 (oscillate False d1) == sampleN @System 200 osc'
+True
+-}
+oscillate ::
+  (HiddenClockResetEnable dom) =>
+  Bool ->
+  SNat n ->
+  Signal dom Bool
 oscillate = hideClockResetEnable E.oscillate
 {-# INLINE oscillate #-}

@@ -3,38 +3,43 @@
 
 module Clash.Tests.Core.FreeVars (tests) where
 
-import           GHC.Types.SrcLoc        (noSrcSpan)
-import qualified Control.Lens            as Lens
+import qualified Control.Lens as Lens
+import GHC.Types.SrcLoc (noSrcSpan)
 
-import           Test.Tasty
-import           Test.Tasty.HUnit
+import Test.Tasty
+import Test.Tasty.HUnit
 
-import           Clash.Core.FreeVars     (globalIds)
-import           Clash.Core.Name         (Name(..), NameSort(..))
-import           Clash.Core.Term         (Term(Var, App, Lam))
-import           Clash.Core.Type         (ConstTy(..), Type(ConstTy))
-import           Clash.Core.Var          (IdScope(..), Var(..))
+import Clash.Core.FreeVars (globalIds)
+import Clash.Core.Name (Name (..), NameSort (..))
+import Clash.Core.Term (Term (App, Lam, Var))
+import Clash.Core.Type (ConstTy (..), Type (ConstTy))
+import Clash.Core.Var (IdScope (..), Var (..))
 
 -- TODO: We need tooling to create these mock constructs
 fakeName :: Name a
 fakeName =
   Name
-    { nameSort=User
-    , nameOcc="fake"
-    , nameUniq=0
-    , nameLoc=noSrcSpan
+    { nameSort = User
+    , nameOcc = "fake"
+    , nameUniq = 0
+    , nameLoc = noSrcSpan
     }
 
 f :: IdScope -> Var Term
 f scope =
-  let unique = 20 in
-  Id { varName = Name { nameSort=User
-                      , nameOcc="f"
-                      , nameUniq=unique
-                      , nameLoc=noSrcSpan }
-     , varUniq = unique
-     , varType = ConstTy (TyCon fakeName)
-     , idScope = scope }
+  let unique = 20
+   in Id
+        { varName =
+            Name
+              { nameSort = User
+              , nameOcc = "f"
+              , nameUniq = unique
+              , nameLoc = noSrcSpan
+              }
+        , varUniq = unique
+        , varType = ConstTy (TyCon fakeName)
+        , idScope = scope
+        }
 
 fLocalId, fGlobalId :: Var Term
 fLocalId = f LocalId
@@ -57,12 +62,12 @@ term1 =
 
 tests :: TestTree
 tests =
-  let globs1 = Lens.toListOf globalIds term1 in
-  testGroup
-    "Clash.Tests.Core.FreeVars"
-    [ testCase "globalIds1" $ globs1 @=? [fGlobalId]
-    , testCase "globalIds2" $
-        assertBool
-          "Global and local id can't BOTH be in globs1"
-          (fLocalId `notElem` globs1)
-    ]
+  let globs1 = Lens.toListOf globalIds term1
+   in testGroup
+        "Clash.Tests.Core.FreeVars"
+        [ testCase "globalIds1" $ globs1 @=? [fGlobalId]
+        , testCase "globalIds2" $
+            assertBool
+              "Global and local id can't BOTH be in globs1"
+              (fLocalId `notElem` globs1)
+        ]

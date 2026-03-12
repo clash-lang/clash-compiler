@@ -1,16 +1,16 @@
 module OneDefinedDataPat where
 
-import Clash.Prelude
 import Clash.Driver.Types
 import Clash.Netlist.Types
+import Clash.Prelude
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
 
 topEntity :: Maybe (Unsigned 8) -> Unsigned 8
 topEntity m = case m of
-    Nothing -> errorX "Nothing: Expected Just"
-    Just x  -> x
+  Nothing -> errorX "Nothing: Expected Just"
+  Just x -> x
 
 assertNoMux :: Component -> IO ()
 assertNoMux c =
@@ -18,15 +18,15 @@ assertNoMux c =
     0 -> return ()
     n -> error $ "Expected 0 multiplexers, found " <> show n
  where
-  go acc []                    = acc
-  go acc (CondAssignment{}:ds) = go (acc + 1) ds
-  go acc (_:ds)                = go acc ds
+  go acc [] = acc
+  go acc (CondAssignment{} : ds) = go (acc + 1) ds
+  go acc (_ : ds) = go acc ds
 
 testPath :: FilePath
 testPath = "tests/shouldwork/XOptimization/OneDefinedDataPat.hs"
 
 enableXOpt :: ClashOpts -> ClashOpts
-enableXOpt c = c { opt_aggressiveXOpt = True }
+enableXOpt c = c{opt_aggressiveXOpt = True}
 
 mainVHDL :: IO ()
 mainVHDL = do

@@ -1,4 +1,5 @@
 {-# LANGUAGE StrictData #-}
+
 module BangData where
 
 import Clash.Prelude
@@ -9,4 +10,4 @@ data BangData
   , d2 :: !(Unsigned 8)
   }
 
-topEntity (BangData x y) = BangData (x+1) (2*y)
+topEntity (BangData x y) = BangData (x + 1) (2 * y)

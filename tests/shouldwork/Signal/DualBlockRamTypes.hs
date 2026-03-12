@@ -11,13 +11,12 @@ type Addr = Index 73
 
 type TdpRam (domA :: Domain) (domB :: Domain) =
   -- Clocks
-  Clock  domA ->
-  Clock  domB ->
-
-  --Operations
+  Clock domA ->
+  Clock domB ->
+  -- Operations
   Signal domA (RamOp 73 ThisOrThat) ->
   Signal domB (RamOp 73 ThisOrThat) ->
-
-  --Output
+  -- Output
   ( Signal domA ThisOrThat
-  , Signal domB ThisOrThat )
+  , Signal domB ThisOrThat
+  )

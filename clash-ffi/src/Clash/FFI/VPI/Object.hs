@@ -133,18 +133,19 @@ instance IsObject Object where
     objectPtr obj == FFI.nullPtr
 
   freeObject obj =
-    Monad.unless (isNullObject obj)
-      . Monad.void
-#if defined(VERILOG)
-      $ c_vpi_free_object obj
-#elif defined(SYSTEMVERILOG)
-      $ c_vpi_release_handle obj
-#else
-#error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
-#endif
+    Monad.unless (isNullObject obj) (freeObjectImpl obj)
 
   compareObjects =
     c_vpi_compare_objects
+
+freeObjectImpl :: Object -> IO ()
+#if defined(VERILOG)
+freeObjectImpl obj = Monad.void (c_vpi_free_object obj)
+#elif defined(SYSTEMVERILOG)
+freeObjectImpl obj = Monad.void (c_vpi_release_handle obj)
+#else
+#error "Neither VERILOG or SYSTEMVERILOG is defined in VPI implementation"
+#endif
 
 {-
 NOTE [use of Coercible in public API]

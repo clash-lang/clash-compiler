@@ -1,11 +1,11 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
+{- |
   Copyright   :  (C) 2024, Martijn Bastiaan
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-
 module Clash.Driver.Bool where
 
 import Control.DeepSeq (NFData)

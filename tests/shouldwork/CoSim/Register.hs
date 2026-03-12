@@ -1,18 +1,20 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
+
 module Register where
 
 import Clash.CoSim
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-verilog_register
-  :: KnownDomain d
-  => Clock  d
-  -> Reset d
-  -> Signal d (Signed 64)
-  -> Signal d (Signed 64)
-verilog_register clk (unsafeToActiveHigh -> arst) x = [verilog|
+verilog_register ::
+  (KnownDomain d) =>
+  Clock d ->
+  Reset d ->
+  Signal d (Signed 64) ->
+  Signal d (Signed 64)
+verilog_register clk (unsafeToActiveHigh -> arst) x =
+  [verilog|
   parameter data_width = 64;
 
   input  #{clk};
@@ -30,18 +32,19 @@ verilog_register clk (unsafeToActiveHigh -> arst) x = [verilog|
   |]
 {-# OPAQUE verilog_register #-}
 
-topEntity
-  :: Clock System
-  -> Reset System
-  -> Signal System (Signed 64)
-topEntity clk arst = let s  = verilog_register clk arst (s' + 1)
-                         s' = register clk arst enableGen 0 s
-                     in  s'
+topEntity ::
+  Clock System ->
+  Reset System ->
+  Signal System (Signed 64)
+topEntity clk arst =
+  let s = verilog_register clk arst (s' + 1)
+      s' = register clk arst enableGen 0 s
+   in s'
 
 testBench :: Signal System Bool
 testBench = done
  where
-  done = outputVerifier' clk aclr (0:>0:>1:>1:>2:>2:>3:>3:>4:>4:>Nil) res
-  res  = topEntity clk aclr
-  clk  = tbSystemClockGen (not <$> done)
+  done = outputVerifier' clk aclr (0 :> 0 :> 1 :> 1 :> 2 :> 2 :> 3 :> 3 :> 4 :> 4 :> Nil) res
+  res = topEntity clk aclr
+  clk = tbSystemClockGen (not <$> done)
   aclr = systemResetGen

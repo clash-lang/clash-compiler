@@ -1,13 +1,3 @@
-{-|
-  Copyright   :  (C) 2012-2016, University of Twente,
-                          2017, Google Inc.
-                     2021-2024, QBayLogic B.V.
-  License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
-
-  Term representation in the CoreHW language: System F + LetRec + Case
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -17,112 +7,137 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Clash.Core.Term
-  ( Term (.., Letrec)
-  , mkAbstraction
-  , mkTyLams
-  , mkLams
-  , mkApps
-  , mkTyApps
-  , mkTmApps
-  , mkTicks
-  , TmName
-  , varToId
-  , Bind(..)
-  , LetBinding
-  , Pat (..)
-  , patIds
-  , patVars
-  , Alt
-  , TickInfo (..)
-  , stripTicks
-  , stripAllTicks
-  , partitionTicks
-  , NameMod (..)
-  , PrimInfo (..)
-  , PrimUnfolding (..)
-  , IsMultiPrim (..)
-  , MultiPrimInfo (..)
-  , WorkInfo (..)
-  , CoreContext (..)
-  , Context
-  , isLambdaBodyCtx
-  , isTickCtx
-  , walkTerm
-  , collectArgs
-  , collectArgsTicks
-  , collectTicks
-  , collectTermIds
-  , collectBndrs
-  , primArg
-  ) where
+{- |
+  Copyright   :  (C) 2012-2016, University of Twente,
+                          2017, Google Inc.
+                     2021-2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Term representation in the CoreHW language: System F + LetRec + Case
+-}
+module Clash.Core.Term (
+  Term (.., Letrec),
+  mkAbstraction,
+  mkTyLams,
+  mkLams,
+  mkApps,
+  mkTyApps,
+  mkTmApps,
+  mkTicks,
+  TmName,
+  varToId,
+  Bind (..),
+  LetBinding,
+  Pat (..),
+  patIds,
+  patVars,
+  Alt,
+  TickInfo (..),
+  stripTicks,
+  stripAllTicks,
+  partitionTicks,
+  NameMod (..),
+  PrimInfo (..),
+  PrimUnfolding (..),
+  IsMultiPrim (..),
+  MultiPrimInfo (..),
+  WorkInfo (..),
+  CoreContext (..),
+  Context,
+  isLambdaBodyCtx,
+  isTickCtx,
+  walkTerm,
+  collectArgs,
+  collectArgsTicks,
+  collectTicks,
+  collectTermIds,
+  collectBndrs,
+  primArg,
+) where
 
 -- External Modules
 import Control.DeepSeq
-import Data.Binary                             (Binary)
-import Data.Coerce                             (coerce)
-import qualified Data.DList                    as DList
-import Data.Either                             (lefts, rights)
+import Data.Binary (Binary)
+import Data.Coerce (coerce)
+import qualified Data.DList as DList
+import Data.Either (lefts, rights)
 #if !MIN_VERSION_base(4,20,0)
 import Data.Foldable                           (foldl')
 #endif
-import Data.Hashable                           (Hashable)
-import Data.Maybe                              (catMaybes)
-import Data.List                               (nub, partition)
-import Data.Text                               (Text)
+import Data.Hashable (Hashable)
+import Data.List (nub, partition)
+import Data.Maybe (catMaybes)
+import Data.Text (Text)
 import GHC.Generics
-import GHC.Types.SrcLoc                        (SrcSpan, leftmost_smallest)
+import GHC.Types.SrcLoc (SrcSpan, leftmost_smallest)
 
 -- Internal Modules
-import Clash.Core.DataCon                      (DataCon)
-import Clash.Core.Literal                      (Literal)
-import Clash.Core.Name                         (Name (..))
-import {-# SOURCE #-} Clash.Core.Subst         (acmpTerm) -- instance Eq/Ord Type, Eq Term
-import {-# SOURCE #-} Clash.Core.Type          (Type)
-import Clash.Core.Var                          (Var, Id, TyVar)
-import Clash.Util                              (curLoc, thenCompare)
+import Clash.Core.DataCon (DataCon)
+import Clash.Core.Literal (Literal)
+import Clash.Core.Name (Name (..))
+import {-# SOURCE #-} Clash.Core.Subst (acmpTerm) -- instance Eq/Ord Type, Eq Term
+import {-# SOURCE #-} Clash.Core.Type (Type)
+import Clash.Core.Var (Id, TyVar, Var)
+import Clash.Util (curLoc, thenCompare)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
-  = Var     !Id                             -- ^ Variable reference
-  | Data    !DataCon                        -- ^ Datatype constructor
-  | Literal !Literal                        -- ^ Literal
-  | Prim    !PrimInfo                       -- ^ Primitive
-  | Lam     !Id Term                        -- ^ Term-abstraction
-  | TyLam   !TyVar Term                     -- ^ Type-abstraction
-  | App     !Term !Term                     -- ^ Application
-  | TyApp   !Term !Type                     -- ^ Type-application
-  | Let     !(Bind Term) Term               -- ^ Recursive let-binding
-  | Case    !Term !Type [Alt]               -- ^ Case-expression: subject, type of
-                                            -- alternatives, list of alternatives
-  | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
-  | Tick    !TickInfo !Term                 -- ^ Annotated term
+  = -- | Variable reference
+    Var !Id
+  | -- | Datatype constructor
+    Data !DataCon
+  | -- | Literal
+    Literal !Literal
+  | -- | Primitive
+    Prim !PrimInfo
+  | -- | Term-abstraction
+    Lam !Id Term
+  | -- | Type-abstraction
+    TyLam !TyVar Term
+  | -- | Application
+    App !Term !Term
+  | -- | Type-application
+    TyApp !Term !Type
+  | -- | Recursive let-binding
+    Let !(Bind Term) Term
+  | {- | Case-expression: subject, type of
+    alternatives, list of alternatives
+    -}
+    Case !Term !Type [Alt]
+  | -- | Cast a term from one type to another
+    Cast !Term !Type !Type
+  | -- | Annotated term
+    Tick !TickInfo !Term
   deriving (Show, Generic, NFData, Binary)
 
 -- TODO When it is possible, remove this pattern.
 pattern Letrec :: [LetBinding] -> Term -> Term
 pattern Letrec bs x <- Let (bindToList -> bs) x
- where
-  Letrec bs x = Let (Rec bs) x
+  where
+    Letrec bs x = Let (Rec bs) x
 
 bindToList :: Bind a -> [(Id, a)]
 bindToList (NonRec i x) = [(i, x)]
 bindToList (Rec xs) = xs
 
 data TickInfo
-  = SrcSpan !SrcSpan
-  -- ^ Source tick, will get added by GHC by running clash with `-g`
-  | NameMod !NameMod !Type
-  -- ^ Modifier for naming module instantiations and registers, are added by
-  -- the user by using the functions @Clash.Magic.[prefixName,suffixName,setName]@
-  | DeDup
-  -- ^ Deduplicate, i.e. try to share expressions between multiple branches.
-  | NoDeDup
-  -- ^ Do not deduplicate, i.e. /keep/, an expression inside a case-alternative;
-  -- do not try to share expressions between multiple branches.
-  | Attributes Type Term
-  -- ^ Synthesis attributes brough into scope by
-  -- 'Clash.Annotations.SynthesisAttributes.annotateReg'
+  = -- | Source tick, will get added by GHC by running clash with `-g`
+    SrcSpan !SrcSpan
+  | {- | Modifier for naming module instantiations and registers, are added by
+    the user by using the functions @Clash.Magic.[prefixName,suffixName,setName]@
+    -}
+    NameMod !NameMod !Type
+  | -- | Deduplicate, i.e. try to share expressions between multiple branches.
+    DeDup
+  | {- | Do not deduplicate, i.e. /keep/, an expression inside a case-alternative;
+    do not try to share expressions between multiple branches.
+    -}
+    NoDeDup
+  | {- | Synthesis attributes brough into scope by
+    'Clash.Annotations.SynthesisAttributes.annotateReg'
+    -}
+    Attributes Type Term
   deriving (Eq, Show, Generic, NFData, Binary)
 
 instance Ord TickInfo where
@@ -132,25 +147,25 @@ instance Ord TickInfo where
   compare (Attributes t1 a1) (Attributes t2 a2) =
     compare t1 t2 `thenCompare` acmpTerm a1 a2
   compare t1 t2 = compare (getRank t1) (getRank t2)
-    where
-      getRank :: TickInfo -> Word
-      getRank SrcSpan{}     = 0
-      getRank NameMod{}     = 1
-      getRank DeDup         = 2
-      getRank NoDeDup       = 3
-      getRank Attributes {} = 4
+   where
+    getRank :: TickInfo -> Word
+    getRank SrcSpan{} = 0
+    getRank NameMod{} = 1
+    getRank DeDup = 2
+    getRank NoDeDup = 3
+    getRank Attributes{} = 4
 
 -- | Tag to indicate which instance/register name modifier was used
 data NameMod
-  = PrefixName
-  -- ^ @Clash.Magic.prefixName@
-  | SuffixName
-  -- ^ @Clash.Magic.suffixName@
-  | SuffixNameP
-  -- ^ @Clash.Magic.suffixNameP@
-  | SetName
-  -- ^ @Clash.Magic.setName@
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  = -- | @Clash.Magic.prefixName@
+    PrefixName
+  | -- | @Clash.Magic.suffixName@
+    SuffixName
+  | -- | @Clash.Magic.suffixNameP@
+    SuffixNameP
+  | -- | @Clash.Magic.setName@
+    SetName
+  deriving (Eq, Ord, Show, Generic, NFData, Hashable, Binary)
 
 data IsMultiPrim
   = SingleResult
@@ -162,14 +177,16 @@ data PrimInfo = PrimInfo
   , primType :: !Type
   , primWorkInfo :: !WorkInfo
   , primMultiResult :: !IsMultiPrim
-  -- ^ Primitive with multiple return values. Useful for primitives that cannot
-  -- return their results as a single product type, due to limitation of
-  -- synthesis tooling. It will be applied to its normal arguments, followed by
-  -- the variables it should assign its results to.
-  --
-  -- See: 'Clash.Normalize.Transformations.setupMultiResultPrim'
+  {- ^ Primitive with multiple return values. Useful for primitives that cannot
+  return their results as a single product type, due to limitation of
+  synthesis tooling. It will be applied to its normal arguments, followed by
+  the variables it should assign its results to.
+
+  See: 'Clash.Normalize.Transformations.setupMultiResultPrim'
+  -}
   , primUnfolding :: !PrimUnfolding
-  } deriving (Show, Generic, NFData, Binary)
+  }
+  deriving (Show, Generic, NFData, Binary)
 
 data PrimUnfolding
   = NoUnfolding
@@ -183,23 +200,26 @@ data MultiPrimInfo = MultiPrimInfo
   }
 
 data WorkInfo
-  = WorkConstant
-  -- ^ Ignores its arguments, and outputs a constant
-  | WorkNever
-  -- ^ Never adds any work
-  | WorkVariable
-  -- ^ Does work when the arguments are variable
-  | WorkAlways
-  -- ^ Performs work regardless of whether the variables are constant or
-  -- variable; these are things like clock or reset generators
-  | WorkIdentity Int [Int]
-  -- ^ A more restrictive version of 'WorkNever', where the value is the
-  -- argument at the given position if all arguments for the given list of
-  -- positions are also 'WorkIdentity'
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
+  = -- | Ignores its arguments, and outputs a constant
+    WorkConstant
+  | -- | Never adds any work
+    WorkNever
+  | -- | Does work when the arguments are variable
+    WorkVariable
+  | {- | Performs work regardless of whether the variables are constant or
+    variable; these are things like clock or reset generators
+    -}
+    WorkAlways
+  | {- | A more restrictive version of 'WorkNever', where the value is the
+    argument at the given position if all arguments for the given list of
+    positions are also 'WorkIdentity'
+    -}
+    WorkIdentity Int [Int]
+  deriving (Eq, Show, Generic, NFData, Hashable, Binary)
 
 -- | Term reference
-type TmName     = Name Term
+type TmName = Name Term
+
 -- | Binding in a LetRec construct
 type LetBinding = (Id, Term)
 
@@ -207,25 +227,27 @@ data Bind a
   = NonRec Id a
   | Rec [(Id, a)]
   deriving (Eq, Show, Generic, NFData, Hashable, Binary, Functor)
-  -- Structural equivalence instead of alpha equivalance
+
+-- Structural equivalence instead of alpha equivalance
 
 -- | Patterns in the LHS of a case-decomposition
 data Pat
-  = DataPat !DataCon [TyVar] [Id]
-  -- ^ Datatype pattern, '[TyVar]' bind existentially-quantified
-  -- type-variables of a DataCon
-  | LitPat  !Literal
-  -- ^ Literal pattern
-  | DefaultPat
-  -- ^ Default pattern
+  = {- | Datatype pattern, '[TyVar]' bind existentially-quantified
+    type-variables of a DataCon
+    -}
+    DataPat !DataCon [TyVar] [Id]
+  | -- | Literal pattern
+    LitPat !Literal
+  | -- | Default pattern
+    DefaultPat
   deriving (Eq, Ord, Show, Generic, NFData, Binary)
 
-type Alt = (Pat,Term)
+type Alt = (Pat, Term)
 
 -- | Get the list of term-binders out of a DataType pattern
-patIds :: Pat -> ([TyVar],[Id])
-patIds (DataPat _  tvs ids) = (tvs,ids)
-patIds _                    = ([],[])
+patIds :: Pat -> ([TyVar], [Id])
+patIds (DataPat _ tvs ids) = (tvs, ids)
+patIds _ = ([], [])
 
 patVars :: Pat -> [Var a]
 patVars (DataPat _ tvs ids) = coerce tvs ++ coerce ids
@@ -260,34 +282,36 @@ mkTicks tm ticks = foldl' (\e s -> Tick s e) tm (nub ticks)
 
 -- | Context in which a term appears
 data CoreContext
-  = AppFun
-  -- ^ Function position of an application
-  | AppArg (Maybe (Text, Int, Int))
-  -- ^ Argument position of an application. If this is an argument applied to
-  -- a primitive, a tuple is defined containing (name of the primitive, #type
-  -- args, #term args)
-  | TyAppC
-  -- ^ Function position of a type application
-  | LetBinding Id [Id]
-  -- ^ RHS of a Let-binder with the sibling LHS'
-  | LetBody [LetBinding]
-  -- ^ Body of a Let-binding with the bound LHS'
-  | LamBody Id
-  -- ^ Body of a lambda-term with the abstracted variable
-  | TyLamBody TyVar
-  -- ^ Body of a TyLambda-term with the abstracted type-variable
-  | CaseAlt Pat
-  -- ^ RHS of a case-alternative with the bound pattern on the LHS
-  | CaseScrut
-  -- ^ Subject of a case-decomposition
-  | CastBody
-  -- ^ Body of a Cast
-  | TickC TickInfo
-  -- ^ Body of a Tick
+  = -- | Function position of an application
+    AppFun
+  | {- | Argument position of an application. If this is an argument applied to
+    a primitive, a tuple is defined containing (name of the primitive, #type
+    args, #term args)
+    -}
+    AppArg (Maybe (Text, Int, Int))
+  | -- | Function position of a type application
+    TyAppC
+  | -- | RHS of a Let-binder with the sibling LHS'
+    LetBinding Id [Id]
+  | -- | Body of a Let-binding with the bound LHS'
+    LetBody [LetBinding]
+  | -- | Body of a lambda-term with the abstracted variable
+    LamBody Id
+  | -- | Body of a TyLambda-term with the abstracted type-variable
+    TyLamBody TyVar
+  | -- | RHS of a case-alternative with the bound pattern on the LHS
+    CaseAlt Pat
+  | -- | Subject of a case-decomposition
+    CaseScrut
+  | -- | Body of a Cast
+    CastBody
+  | -- | Body of a Tick
+    TickC TickInfo
   deriving (Show, Generic, NFData, Binary)
 
--- | A list of @CoreContext@ describes the complete navigation path from the
--- top-level to a specific sub-expression.
+{- | A list of @CoreContext@ describes the complete navigation path from the
+top-level to a specific sub-expression.
+-}
 type Context = [CoreContext]
 
 -- [Note] Custom @Eq@ instance for @CoreContext@
@@ -302,29 +326,29 @@ type Context = [CoreContext]
 -- we will get inequality from the derived `Eq`.
 instance Eq CoreContext where
   c == c' = case (c, c') of
-    (AppFun,          AppFun)            -> True
-    (AppArg _,        AppArg _)          -> True
+    (AppFun, AppFun) -> True
+    (AppArg _, AppArg _) -> True
     -- NB: we do not see inside the argument here
-    (TyAppC,          TyAppC)            -> True
+    (TyAppC, TyAppC) -> True
     (LetBinding i is, LetBinding i' is') -> i == i' && is == is'
-    (LetBody is,      LetBody is')       -> map fst is == map fst is'
-    (LamBody i,       LamBody i')        -> i == i'
-    (TyLamBody tv,    TyLamBody tv')     -> tv == tv'
-    (CaseAlt p,       CaseAlt p')        -> p == p'
-    (CaseScrut,       CaseScrut)         -> True
-    (CastBody,        CastBody)          -> True
-    (TickC sp,        TickC sp')         -> sp == sp'
-    (_,               _)                 -> False
+    (LetBody is, LetBody is') -> map fst is == map fst is'
+    (LamBody i, LamBody i') -> i == i'
+    (TyLamBody tv, TyLamBody tv') -> tv == tv'
+    (CaseAlt p, CaseAlt p') -> p == p'
+    (CaseScrut, CaseScrut) -> True
+    (CastBody, CastBody) -> True
+    (TickC sp, TickC sp') -> sp == sp'
+    (_, _) -> False
 
 -- | Is the Context a Lambda/Term-abstraction context?
 isLambdaBodyCtx :: CoreContext -> Bool
 isLambdaBodyCtx (LamBody _) = True
-isLambdaBodyCtx _           = False
+isLambdaBodyCtx _ = False
 
 -- | Is the Context a Tick context?
 isTickCtx :: CoreContext -> Bool
 isTickCtx (TickC _) = True
-isTickCtx _         = False
+isTickCtx _ = False
 
 stripTicks :: Term -> Term
 stripTicks (Tick _ e) = stripTicks e
@@ -350,41 +374,42 @@ stripAllTicks = go
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term -> (Term, [Either Term Type])
 collectArgs = go []
-  where
-    go args (App e1 e2) = go (Left e2:args) e1
-    go args (TyApp e t) = go (Right t:args) e
-    go args (Tick _ e)  = go args e
-    go args e           = (e, args)
+ where
+  go args (App e1 e2) = go (Left e2 : args) e1
+  go args (TyApp e t) = go (Right t : args) e
+  go args (Tick _ e) = go args e
+  go args e = (e, args)
 
 collectTicks :: Term -> (Term, [TickInfo])
 collectTicks = go []
  where
-  go ticks (Tick s e) = go (s:ticks) e
-  go ticks e          = (e,ticks)
+  go ticks (Tick s e) = go (s : ticks) e
+  go ticks e = (e, ticks)
 
 collectArgsTicks :: Term -> (Term, [Either Term Type], [TickInfo])
 collectArgsTicks = go [] []
  where
-  go args ticks (App e1 e2) = go (Left e2:args) ticks     e1
-  go args ticks (TyApp e t) = go (Right t:args) ticks     e
-  go args ticks (Tick s e)  = go args           (s:ticks) e
-  go args ticks e           = (e, args, ticks)
+  go args ticks (App e1 e2) = go (Left e2 : args) ticks e1
+  go args ticks (TyApp e t) = go (Right t : args) ticks e
+  go args ticks (Tick s e) = go args (s : ticks) e
+  go args ticks e = (e, args, ticks)
 
 -- | Split a (Type)Abstraction in the bound variables and the abstracted term
 collectBndrs :: Term -> ([Either Id TyVar], Term)
 collectBndrs = go []
  where
-  go bs (Lam v e')    = go (Left v:bs) e'
-  go bs (TyLam tv e') = go (Right tv:bs) e'
-  go bs e'            = (reverse bs,e')
+  go bs (Lam v e') = go (Left v : bs) e'
+  go bs (TyLam tv e') = go (Right tv : bs) e'
+  go bs e' = (reverse bs, e')
 
--- | Given a function application, find the primitive it's applied. Yields
--- Nothing if given term is not an application or if it is not a primitive.
-primArg
-  :: Term
-  -- ^ Function application
-  -> Maybe (Text, Int, Int)
-  -- ^ If @Term@ was a primitive: (name of primitive, #type args, #term args)
+{- | Given a function application, find the primitive it's applied. Yields
+Nothing if given term is not an application or if it is not a primitive.
+-}
+primArg ::
+  -- | Function application
+  Term ->
+  -- | If @Term@ was a primitive: (name of primitive, #type args, #term args)
+  Maybe (Text, Int, Int)
 primArg (collectArgs -> t) =
   case t of
     (Prim p, args) ->
@@ -393,15 +418,16 @@ primArg (collectArgs -> t) =
       Nothing
 
 -- | Partition ticks in source ticks and nameMod ticks
-partitionTicks
-  :: [TickInfo]
-  -> ([TickInfo], [TickInfo])
-  -- ^ (source ticks, nameMod ticks)
-partitionTicks = partition (\case {SrcSpan {} -> True; _ -> False})
+partitionTicks ::
+  [TickInfo] ->
+  -- | (source ticks, nameMod ticks)
+  ([TickInfo], [TickInfo])
+partitionTicks = partition (\case SrcSpan{} -> True; _ -> False)
 
--- | Visit all terms in a term, testing it with a predicate, and returning
--- a list of predicate yields.
-walkTerm :: forall a . (Term -> Maybe a) -> Term -> [a]
+{- | Visit all terms in a term, testing it with a predicate, and returning
+a list of predicate yields.
+-}
+walkTerm :: forall a. (Term -> Maybe a) -> Term -> [a]
 walkTerm f = catMaybes . DList.toList . go
  where
   go :: Term -> DList.DList (Maybe a)
@@ -444,10 +470,11 @@ collectTermIds = concat . walkTerm (Just . go)
   pat (LitPat _) = []
   pat DefaultPat = []
 
--- | Make a term variable out of a variable reference or ticked variable
--- reference
+{- | Make a term variable out of a variable reference or ticked variable
+reference
+-}
 varToId :: Term -> Id
 varToId = \case
-  Var i    -> i
+  Var i -> i
   Tick _ e -> varToId e
-  e        -> error $ $(curLoc) ++ "varToId: not a var: " ++ show e
+  e -> error $ $(curLoc) ++ "varToId: not a var: " ++ show e

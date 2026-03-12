@@ -1,4 +1,13 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+{- |
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
@@ -10,177 +19,240 @@
 
   Module that connects all the parts of the Clash compiler library
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Driver where
 
-import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
-import           Control.Concurrent.Async         (mapConcurrently_)
-import           Control.DeepSeq
-import           Control.Exception                (throw, Exception)
-import qualified Control.Monad                    as Monad
-import           Control.Monad                    (unless, foldM, forM)
-import           Control.Monad.Catch              (MonadMask, MonadThrow (throwM))
-import           Control.Monad.Extra              (whenM, ifM, unlessM)
-import           Control.Monad.IO.Class           (MonadIO)
-import           Control.Monad.State              (evalState, get)
-import           Control.Monad.State.Strict       (State)
-import qualified Control.Monad.State.Strict       as State
-import qualified Crypto.Hash.SHA256               as Sha256
-import           Data.Bifunctor                   (first, second)
-import           Data.ByteString                  (ByteString)
-import qualified Data.ByteString                  as ByteString
-import qualified Data.ByteString.Lazy             as ByteStringLazy
-import qualified Data.ByteString.Lazy.Char8       as ByteStringLazyChar8
-import           Data.Char                        (isAscii, isAlphaNum)
-import           Data.Default
-import           Data.Hashable                    (hash)
-import           Data.HashMap.Strict              (HashMap)
-import qualified Data.HashMap.Strict              as HashMap
-import qualified Data.HashSet                     as HashSet
-import           Data.Proxy                       (Proxy(..))
-import           Data.List                        (intercalate)
-import qualified Data.List                        as List
-import           Data.List.NonEmpty               (NonEmpty((:|)))
-import qualified Data.List.NonEmpty               as NonEmpty
-import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
-import qualified Data.Map.Ordered                 as OMap
-import           Data.Map.Ordered.Extra           ()
-import           Data.Monoid                      (Ap(..))
+import Control.Concurrent (
+  MVar,
+  modifyMVar,
+  modifyMVar_,
+  newMVar,
+  withMVar,
+ )
+import Control.Concurrent.Async (mapConcurrently_)
+import Control.DeepSeq
+import Control.Exception (Exception, throw)
+import Control.Monad (foldM, forM, unless)
+import qualified Control.Monad as Monad
+import Control.Monad.Catch (MonadMask, MonadThrow (throwM))
+import Control.Monad.Extra (ifM, unlessM, whenM)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.State (evalState, get)
+import Control.Monad.State.Strict (State)
+import qualified Control.Monad.State.Strict as State
+import qualified Crypto.Hash.SHA256 as Sha256
+import Data.Bifunctor (first, second)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Lazy as ByteStringLazy
+import qualified Data.ByteString.Lazy.Char8 as ByteStringLazyChar8
+import Data.Char (isAlphaNum, isAscii)
+import Data.Default
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as HashSet
+import Data.Hashable (hash)
+import Data.List (intercalate)
+import qualified Data.List as List
+import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Ordered as OMap
+import Data.Map.Ordered.Extra ()
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
+import Data.Monoid (Ap (..))
+import Data.Proxy (Proxy (..))
 import qualified Data.Text
-import           Data.Text.Lazy                   (Text)
-import qualified Data.Text.Lazy                   as Text
-import           Data.Text.Lazy.Encoding          as Text
-import qualified Data.Text.Lazy.IO                as Text
-import           Data.Text.Prettyprint.Doc.Extra
-  (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
-import qualified Data.Time.Clock                  as Clock
-import           GHC.Stack                        (HasCallStack)
-import qualified Language.Haskell.Interpreter     as Hint
+import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as Text
+import Data.Text.Lazy.Encoding as Text
+import qualified Data.Text.Lazy.IO as Text
+import Data.Text.Prettyprint.Doc.Extra (
+  Doc,
+  LayoutOptions (..),
+  PageWidth (..),
+  layoutPretty,
+  renderLazy,
+ )
+import qualified Data.Time.Clock as Clock
+import GHC.Stack (HasCallStack)
+import qualified Language.Haskell.Interpreter as Hint
 import qualified Language.Haskell.Interpreter.Extension as Hint
 import qualified Language.Haskell.Interpreter.Unsafe as Hint
-import qualified System.Directory                 as Directory
-import           System.Directory
-  (doesPathExist, listDirectory, doesDirectoryExist, createDirectoryIfMissing,
-   removeDirectoryRecursive, doesFileExist)
-import           System.Environment               (getExecutablePath)
-import           System.FilePath                  ((</>), (<.>), takeDirectory, takeFileName, isAbsolute)
-import qualified System.FilePath                  as FilePath
-import qualified System.IO                        as IO
-import           System.IO.Temp
-  (getCanonicalTemporaryDirectory, withTempDirectory)
-import           Text.Trifecta.Result
-  (Result(Success, Failure), _errDoc)
+import System.Directory (
+  createDirectoryIfMissing,
+  doesDirectoryExist,
+  doesFileExist,
+  doesPathExist,
+  listDirectory,
+  removeDirectoryRecursive,
+ )
+import qualified System.Directory as Directory
+import System.Environment (getExecutablePath)
+import System.FilePath (
+  isAbsolute,
+  takeDirectory,
+  takeFileName,
+  (<.>),
+  (</>),
+ )
+import qualified System.FilePath as FilePath
+import qualified System.IO as IO
+import System.IO.Temp (
+  getCanonicalTemporaryDirectory,
+  withTempDirectory,
+ )
+import Text.Trifecta.Result (
+  Result (Failure, Success),
+  _errDoc,
+ )
 
-import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
+import GHC.Builtin.Names (eqTyConKey, ipClassKey)
 
-import           GHC.Types.SrcLoc                  (SrcSpan)
-import           GHC.BasicTypes.Extra             ()
+import GHC.BasicTypes.Extra ()
+import GHC.Types.SrcLoc (SrcSpan)
 
-import           Clash.Annotations.Primitive
-  (HDL (..))
-import           Clash.Annotations.BitRepresentation.Internal
-  (CustomReprs)
-import           Clash.Annotations.TopEntity
-  (TopEntity (..), PortName(PortName, PortProduct))
-import           Clash.Annotations.TopEntity.Extra ()
-import           Clash.Backend
-import           Clash.Core.PartialEval as PE     (Evaluator)
-import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
-import           Clash.Core.HasType
-import           Clash.Core.Name                  (Name (..))
-import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
-import           Clash.Core.Type
-  (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
-import           Clash.Core.TyCon                 (TyConMap)
-import           Clash.Core.Util                  (shouldSplit)
-import           Clash.Core.Var
-  (Id, varName, varUniq, varType)
-import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
-import           Clash.Debug                      (debugIsOn)
-import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
-import           Clash.Driver.Types
-import           Clash.Driver.Manifest
-  (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
-   mkManifest, writeManifest, manifestFilename)
-import           Clash.Edalize.Edam
-import           Clash.Netlist                    (genNetlist, genTopNames)
-import           Clash.Netlist.BlackBox.Parser    (runParse)
-import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
-import qualified Clash.Netlist.Id                 as Id
-import           Clash.Netlist.Types
-  (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
-   TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
-import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
-                                                   normalize, runNormalization)
-import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
-import qualified Clash.Primitives.Sized.Signed    as P
+import Clash.Annotations.BitRepresentation.Internal (
+  CustomReprs,
+ )
+import Clash.Annotations.Primitive (
+  HDL (..),
+ )
+import Clash.Annotations.TopEntity (
+  PortName (PortName, PortProduct),
+  TopEntity (..),
+ )
+import Clash.Annotations.TopEntity.Extra ()
+import Clash.Backend
+import Clash.Core.Evaluator.Types as WHNF (Evaluator)
+import Clash.Core.HasType
+import Clash.Core.Name (Name (..))
+import Clash.Core.PartialEval as PE (Evaluator)
+import Clash.Core.Pretty (PrettyOptions (..), showPpr')
+import Clash.Core.TyCon (TyConMap)
+import Clash.Core.Type (
+  LitTy (SymTy),
+  Type (AnnType, ForAllTy, LitTy),
+  TypeView (..),
+  mkFunTy,
+  tyView,
+ )
+import Clash.Core.Util (shouldSplit)
+import Clash.Core.Var (
+  Id,
+  varName,
+  varType,
+  varUniq,
+ )
+import Clash.Core.VarEnv (
+  VarEnv,
+  elemVarEnv,
+  eltsVarEnv,
+  emptyVarEnv,
+  lookupVarEnv,
+  lookupVarEnv',
+  lookupVarEnvDirectly,
+  mkVarEnv,
+ )
+import Clash.Debug (debugIsOn)
+import qualified Clash.Driver.BrokenGhcs as BrokenGhcs
+import Clash.Driver.Manifest (
+  Manifest (..),
+  UnexpectedModification,
+  manifestFilename,
+  mkManifest,
+  pprintUnexpectedModifications,
+  readFreshManifest,
+  writeManifest,
+ )
+import Clash.Driver.Types
+import Clash.Edalize.Edam
+import Clash.Netlist (genNetlist, genTopNames)
+import Clash.Netlist.BlackBox.Parser (runParse)
+import Clash.Netlist.BlackBox.Types (BlackBoxFunction, BlackBoxTemplate)
+import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types (
+  BlackBox (..),
+  Component (..),
+  ComponentMap,
+  ComponentMeta (..),
+  FilteredHWType,
+  HWMap,
+  IdentifierText,
+  SomeBackend (..),
+  TemplateFunction,
+  TopEntityT (..),
+  findClocks,
+ )
+import Clash.Normalize (
+  checkNonRecursive,
+  cleanupGraph,
+  normalize,
+  runNormalization,
+ )
+import Clash.Normalize.Util (callGraph, tvSubstWithTyEq)
+import qualified Clash.Primitives.GHC.Int as P
+import qualified Clash.Primitives.GHC.Word as P
+import qualified Clash.Primitives.Intel.ClockGen as P
+import qualified Clash.Primitives.Magic as P
+import qualified Clash.Primitives.Sized.Signed as P
 import qualified Clash.Primitives.Sized.ToInteger as P
-import qualified Clash.Primitives.Sized.Vector    as P
-import qualified Clash.Primitives.GHC.Int         as P
-import qualified Clash.Primitives.GHC.Word        as P
-import qualified Clash.Primitives.Intel.ClockGen  as P
-import qualified Clash.Primitives.Magic           as P
-import qualified Clash.Primitives.Verification    as P
+import qualified Clash.Primitives.Sized.Vector as P
+import Clash.Primitives.Types
+import qualified Clash.Primitives.Verification as P
 import qualified Clash.Primitives.Xilinx.ClockGen as P
-import           Clash.Primitives.Types
-import           Clash.Signal.Internal
-import           Clash.Unique                     (Unique, getUnique, fromGhcUnique)
-import           Clash.Util
-  (ClashException(..), reportTimeDiff,
-   wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
-import           Clash.Util.Graph                 (reverseTopSort)
-import qualified Clash.Util.Interpolate           as I
-import qualified Clash.Util.Supply                as Supply
+import Clash.Signal.Internal
+import Clash.Unique (Unique, fromGhcUnique, getUnique)
+import Clash.Util (
+  ClashException (..),
+  curLoc,
+  reportTimeDiff,
+  unwantedLanguageExtensions,
+  wantedLanguageExtensions,
+ )
+import Clash.Util.Graph (reverseTopSort)
+import qualified Clash.Util.Interpolate as I
+import qualified Clash.Util.Supply as Supply
 
 -- | Worker function of 'splitTopEntityT'
-splitTopAnn
-  :: TyConMap
-  -> SrcSpan
-  -- ^ Source location of top entity (for error reporting)
-  -> Type
-  -- ^ Top entity body
-  -> TopEntity
-  -- ^ Port annotations for top entity
-  -> TopEntity
-  -- ^ New top entity with split ports (or the old one if not applicable)
-splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
-  t{t_inputs=go typ t_inputs}
+splitTopAnn ::
+  TyConMap ->
+  -- | Source location of top entity (for error reporting)
+  SrcSpan ->
+  -- | Top entity body
+  Type ->
+  -- | Port annotations for top entity
+  TopEntity ->
+  -- | New top entity with split ports (or the old one if not applicable)
+  TopEntity
+splitTopAnn tcm sp typ@(tyView -> FunTy{}) t@Synthesize{t_inputs} =
+  t{t_inputs = go typ t_inputs}
  where
   go :: Type -> [PortName] -> [PortName]
   go _ [] = []
-  go (tyView -> FunTy a res) (p:ps)
-   | shouldNotHavePortName a
-     -- Insert dummy PortName for args for which the user shouldn't have
-     -- to provide a name.
-     -- Ideally this would be any (non Hidden{Clock,Reset,Enable}) constraint.
-     -- But because we can't properly detect constraints,
-     -- we only skip some specific one. see "shouldNotHavePortName"
-     = PortName "" : go res (p:ps)
-   | otherwise =
-    case shouldSplit tcm a of
-      Just (_,_,argTys@(_:_:_)) ->
-        -- Port must be split up into 'n' pieces.. can it?
-        case p of
-          PortProduct nm portNames0 ->
-            let
-              n = length argTys
-              newPortNames = map (PortName . show) [(0::Int)..]
-              portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
-              newLam = foldr1 mkFunTy (argTys ++ [res])
-            in
-              go newLam (take n portNames1 ++ ps)
-          PortName nm ->
-            throw (flip (ClashException sp) Nothing $ [I.i|
+  go (tyView -> FunTy a res) (p : ps)
+    | shouldNotHavePortName a =
+        -- Insert dummy PortName for args for which the user shouldn't have
+        -- to provide a name.
+        -- Ideally this would be any (non Hidden{Clock,Reset,Enable}) constraint.
+        -- But because we can't properly detect constraints,
+        -- we only skip some specific one. see "shouldNotHavePortName"
+        PortName "" : go res (p : ps)
+    | otherwise =
+        case shouldSplit tcm a of
+          Just (_, _, argTys@(_ : _ : _)) ->
+            -- Port must be split up into 'n' pieces.. can it?
+            case p of
+              PortProduct nm portNames0 ->
+                let
+                  n = length argTys
+                  newPortNames = map (PortName . show) [(0 :: Int) ..]
+                  portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
+                  newLam = foldr1 mkFunTy (argTys ++ [res])
+                 in
+                  go newLam (take n portNames1 ++ ps)
+              PortName nm ->
+                throw
+                  ( flip (ClashException sp) Nothing $
+                      [I.i|
               Couldn't separate clock, reset, or enable from a product type due
               to a malformed Synthesize annotation. All clocks, resets, and
               enables should be given a unique port name. Type to be split:
@@ -190,10 +262,11 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
               Given port annotation: #{p}. You might want to use the
               following instead: PortProduct #{show nm} []. This allows Clash to
               autogenerate names based on the name #{show nm}.
-            |])
-      _ ->
-        -- No need to split the port, carrying on..
-        p : go res ps
+            |]
+                  )
+          _ ->
+            -- No need to split the port, carrying on..
+            p : go res ps
   go (ForAllTy _tyVar ty) ps = go ty ps
   go _ty ps = ps
 
@@ -209,9 +282,9 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
   shouldNotHavePortName (tyView -> TyConApp (nameUniq -> tcUniq) tcArgs)
     | tcUniq == fromGhcUnique eqTyConKey = True
     | tcUniq == fromGhcUnique ipClassKey
-    , [LitTy (SymTy "callStack"), _] <- tcArgs = True
+    , [LitTy (SymTy "callStack"), _] <- tcArgs =
+        True
   shouldNotHavePortName _ = False
-
 splitTopAnn tcm sp (ForAllTy _tyVar typ) t = splitTopAnn tcm sp typ t
 splitTopAnn tcm sp (AnnType _anns typ) t = splitTopAnn tcm sp typ t
 splitTopAnn _tcm _sp _typ t = t
@@ -219,16 +292,16 @@ splitTopAnn _tcm _sp _typ t = t
 -- When splitting up a single argument into multiple arguments (see docs of
 -- 'separateArguments') we should make sure to update TopEntity annotations
 -- accordingly. See: https://github.com/clash-lang/clash-compiler/issues/1033
-splitTopEntityT
-  :: HasCallStack
-  => TyConMap
-  -> BindingMap
-  -> TopEntityT
-  -> TopEntityT
-splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
+splitTopEntityT ::
+  (HasCallStack) =>
+  TyConMap ->
+  BindingMap ->
+  TopEntityT ->
+  TopEntityT
+splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize{})) _) =
   case lookupVarEnv id_ bindingsMap of
     Just (Binding _id sp _ _ _ _) ->
-      tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf id_) t)}
+      tt{topAnnotation = Just (splitTopAnn tcm sp (coreTypeOf id_) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
 splitTopEntityT _ _ t = t
@@ -236,11 +309,12 @@ splitTopEntityT _ _ t = t
 -- | Remove constraints such as 'a ~ 3'.
 removeForAll :: TopEntityT -> TopEntityT
 removeForAll (TopEntityT var annM isTb) =
-  TopEntityT var{varType=tvSubstWithTyEq (coreTypeOf var)} annM isTb
+  TopEntityT var{varType = tvSubstWithTyEq (coreTypeOf var)} annM isTb
 
--- | Given a list of all found top entities and _maybe_ a top entity (+dependencies)
--- passed in by '-main-is', return the list of top entities Clash needs to
--- compile.
+{- | Given a list of all found top entities and _maybe_ a top entity (+dependencies)
+passed in by '-main-is', return the list of top entities Clash needs to
+compile.
+-}
 selectTopEntities :: [TopEntityT] -> Maybe (TopEntityT, [TopEntityT]) -> [TopEntityT]
 selectTopEntities topEntities mainTopEntity =
   maybe topEntities (uncurry (:)) mainTopEntity
@@ -249,7 +323,7 @@ selectTopEntities topEntities mainTopEntity =
 getClashModificationDate :: IO Clock.UTCTime
 getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
 
-hdlFromBackend :: forall backend. Backend backend => Proxy backend -> HDL
+hdlFromBackend :: forall backend. (Backend backend) => Proxy backend -> HDL
 hdlFromBackend _ = hdlKind (undefined :: backend)
 
 replaceChar :: Char -> Char -> String -> String
@@ -266,12 +340,12 @@ removeHistoryFile =
   removeHistory path =
     whenM (Directory.doesFileExist path) (Directory.removeFile path)
 
-prefixModuleName
-  :: HDL
-  -> Maybe Data.Text.Text
-  -> Maybe TopEntity
-  -> String
-  -> (String, Maybe String)
+prefixModuleName ::
+  HDL ->
+  Maybe Data.Text.Text ->
+  Maybe TopEntity ->
+  String ->
+  (String, Maybe String)
 prefixModuleName hdl compPrefix annM modName =
   case compPrefix of
     Just (Data.Text.unpack -> p)
@@ -279,14 +353,11 @@ prefixModuleName hdl compPrefix annM modName =
           Just ann ->
             let nm = p <> "_" <> t_name ann
              in (nm, Just nm)
-
           Nothing ->
             (p <> "_" <> modName, Just p)
-
       | Just ann <- annM -> case hdl of
           VHDL -> (t_name ann, Just modName)
           _ -> (t_name ann, Nothing)
-
     _ -> case annM of
       Just ann -> case hdl of
         VHDL -> (t_name ann, Just modName)
@@ -294,243 +365,279 @@ prefixModuleName hdl compPrefix annM modName =
       _ -> (modName, Nothing)
 
 -- | Create a set of target HDL files for a set of functions
-generateHDL
-  :: forall backend . Backend backend
-  => ClashEnv
-  -> ClashDesign
-  -> Maybe backend
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
-  -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> PE.Evaluator
-  -- ^ Hardcoded evaluator for partial evaluation
-  -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF (old evaluator)
-  -> Maybe (TopEntityT, [TopEntityT])
-  -- ^ Main top entity to compile. If Nothing, all top entities in the
-  -- 'ClashDesign' argument will be compiled.
-  -> Clock.UTCTime
-  -> IO ()
+generateHDL ::
+  forall backend.
+  (Backend backend) =>
+  ClashEnv ->
+  ClashDesign ->
+  Maybe backend ->
+  -- | Hardcoded 'Type' -> 'HWType' translator
+  ( CustomReprs ->
+    TyConMap ->
+    Type ->
+    State HWMap (Maybe (Either String FilteredHWType))
+  ) ->
+  -- | Hardcoded evaluator for partial evaluation
+  PE.Evaluator ->
+  -- | Hardcoded evaluator for WHNF (old evaluator)
+  WHNF.Evaluator ->
+  {- | Main top entity to compile. If Nothing, all top entities in the
+  'ClashDesign' argument will be compiled.
+  -}
+  Maybe (TopEntityT, [TopEntityT]) ->
+  Clock.UTCTime ->
+  IO ()
 generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = do
-    let bindingsMap = designBindings design
-    let tcm = envTyConMap env
-    let topEntities0 = designEntities design
-    let opts = envOpts env
-
-    -- Detect "broken" GHCs and throw an error (unless silenced)
-    unless (opt_ignoreBrokenGhcs opts) BrokenGhcs.assertWorking
-
-    removeHistoryFile (dbg_historyFile (opt_debug opts))
-
-    unless (opt_cachehdl opts) $
-      putStrLn "Clash: Ignoring previously made caches"
-
-    let topEntities1 = fmap (removeForAll . splitTopEntityT tcm bindingsMap)
-                         (selectTopEntities topEntities0 mainTopEntity)
-        hdl = hdlFromBackend (Proxy @backend)
-        (compNames, initIs) = genTopNames opts hdl topEntities1
-        (tes, deps) = sortTop bindingsMap topEntities1
-
-    -- TODO This is here because of some minimal effort refactoring. At some
-    -- point generateHDL should be better laid out so this can be closer to
-    -- the few places it is needed.
-    let topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
-
-    -- Data which is updated and used when updating the different top entities
-    -- is kept in an MVar.
-    idSet <- newMVar initIs
-    edamFiles <- newMVar HashMap.empty
-    ioLock <- newMVar ()
-
-    mapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
-
-    time <- Clock.getCurrentTime
-    let diff = reportTimeDiff time startTime
-    putStrLn $ "Clash: Total compilation took " ++ diff
- where
-  go
-    :: VarEnv Id.Identifier
-    -> MVar Id.IdentifierSet
-    -> MVar (HashMap Unique [EdamFile])
-    -> MVar ()
-    -> HashMap Unique [Unique]
-    -> VarEnv TopEntityT
-    -> TopEntityT
-    -> IO ()
-  go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
-  let domainConfs = envDomains env
   let bindingsMap = designBindings design
-  let primMap = envPrimitives env
+  let tcm = envTyConMap env
   let topEntities0 = designEntities design
   let opts = envOpts env
-  prevTime <- Clock.getCurrentTime
-  let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
 
-  withMVar ioLockV . const $
-    putStrLn ("Clash: Compiling " ++ topEntityS)
+  -- Detect "broken" GHCs and throw an error (unless silenced)
+  unless (opt_ignoreBrokenGhcs opts) BrokenGhcs.assertWorking
 
-  let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
+  removeHistoryFile (dbg_historyFile (opt_debug opts))
 
-  modifyMVar_ seenV $ \seen ->
-    pure $! State.execState (Id.addRaw (Data.Text.pack modName1)) seen
+  unless (opt_cachehdl opts) $
+    putStrLn "Clash: Ignoring previously made caches"
 
-  let topNm = lookupVarEnv' compNames topEntity
-      (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
-      modNameT  = Data.Text.pack modNameS
-      hdlState' = setDomainConfigurations domainConfs
-                $ setModName modNameT
-                $ setTopName topNm
-                $ fromMaybe (initBackend @backend opts) hdlState
-      hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
-      manPath   = hdlDir </> manifestFilename
-      ite       = ifThenElseExpr hdlState'
-      topNmT    = Id.toText topNm
+  let topEntities1 =
+        fmap
+          (removeForAll . splitTopEntityT tcm bindingsMap)
+          (selectTopEntities topEntities0 mainTopEntity)
+      hdl = hdlFromBackend (Proxy @backend)
+      (compNames, initIs) = genTopNames opts hdl topEntities1
+      (tes, deps) = sortTop bindingsMap topEntities1
 
-  -- Get manifest file if cache is not stale and caching is enabled. This is used
-  -- to prevent unnecessary recompilation.
-  clashModDate <- getClashModificationDate
-  (userModifications, maybeManifest, topHash) <-
-    readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
+  -- TODO This is here because of some minimal effort refactoring. At some
+  -- point generateHDL should be better laid out so this can be closer to
+  -- the few places it is needed.
+  let topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
 
-  let topEntityNames = map topId (eltsVarEnv topEntityMap)
+  -- Data which is updated and used when updating the different top entities
+  -- is kept in an MVar.
+  idSet <- newMVar initIs
+  edamFiles <- newMVar HashMap.empty
+  ioLock <- newMVar ()
 
-  case maybeManifest of
-    Just manifest0@Manifest{fileNames} | Just [] <- userModifications -> do
-      -- Found a 'manifest' files. Use it to extend "seen" set. Generate EDAM
-      -- files if necessary.
-      withMVar ioLockV . const $
-        putStrLn ("Clash: Using cached result for: " ++ topEntityS)
+  mapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
 
-      modifyMVar_ seenV $ \seen ->
-        pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
+  time <- Clock.getCurrentTime
+  let diff = reportTimeDiff time startTime
+  putStrLn $ "Clash: Total compilation took " ++ diff
+ where
+  go ::
+    VarEnv Id.Identifier ->
+    MVar Id.IdentifierSet ->
+    MVar (HashMap Unique [EdamFile]) ->
+    MVar () ->
+    HashMap Unique [Unique] ->
+    VarEnv TopEntityT ->
+    TopEntityT ->
+    IO ()
+  go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
+    let domainConfs = envDomains env
+    let bindingsMap = designBindings design
+    let primMap = envPrimitives env
+    let topEntities0 = designEntities design
+    let opts = envOpts env
+    prevTime <- Clock.getCurrentTime
+    let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
 
-      fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
-        if opt_edalize opts
-          then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles fileNames
-          else pure (edamFiles, fileNames)
+    withMVar ioLockV . const $
+      putStrLn ("Clash: Compiling " ++ topEntityS)
 
-      writeManifest manPath manifest0{fileNames=fileNames1}
+    let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
 
-      topTime <- Clock.getCurrentTime
-      let topDiff = reportTimeDiff topTime prevTime
+    modifyMVar_ seenV $ \seen ->
+      pure $! State.execState (Id.addRaw (Data.Text.pack modName1)) seen
 
-      withMVar ioLockV . const $
-        putStrLn ("Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff)
+    let topNm = lookupVarEnv' compNames topEntity
+        (modNameS, fmap Data.Text.pack -> prefixM) =
+          prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
+        modNameT = Data.Text.pack modNameS
+        hdlState' =
+          setDomainConfigurations domainConfs $
+            setModName modNameT $
+              setTopName topNm $
+                fromMaybe (initBackend @backend opts) hdlState
+        hdlDir = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
+        manPath = hdlDir </> manifestFilename
+        ite = ifThenElseExpr hdlState'
+        topNmT = Id.toText topNm
 
-      return ()
+    -- Get manifest file if cache is not stale and caching is enabled. This is used
+    -- to prevent unnecessary recompilation.
+    clashModDate <- getClashModificationDate
+    (userModifications, maybeManifest, topHash) <-
+      readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
 
-    _ -> do
-      -- 1. Prepare HDL directory
-      --
-      -- [Note] Create HDL dir before netlist generation
-      --
-      -- Already create the directory where the HDL ends up being generated, as
-      -- we use directories relative to this final directory to find manifest
-      -- files belonging to other top entities. Failing to do so leads to #463
-      prepareDir hdlDir opts userModifications
+    let topEntityNames = map topId (eltsVarEnv topEntityMap)
 
-      -- 2. Normalize topEntity
-      supplyN <- Supply.newSupply
-      transformedBindings <- normalizeEntity env bindingsMap typeTrans peEval
-                               eval topEntityNames supplyN topEntity
+    case maybeManifest of
+      Just manifest0@Manifest{fileNames} | Just [] <- userModifications -> do
+        -- Found a 'manifest' files. Use it to extend "seen" set. Generate EDAM
+        -- files if necessary.
+        withMVar ioLockV . const $
+          putStrLn ("Clash: Using cached result for: " ++ topEntityS)
 
-      normTime <- transformedBindings `deepseq` Clock.getCurrentTime
-      let prepNormDiff = reportTimeDiff normTime prevTime
+        modifyMVar_ seenV $ \seen ->
+          pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
 
-      withMVar ioLockV . const $
-        putStrLn ("Clash: Normalization took " ++ prepNormDiff)
+        fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
+          if opt_edalize opts
+            then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles fileNames
+            else pure (edamFiles, fileNames)
 
-      -- 3. Generate netlist for topEntity
-      (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
-        (topComponent, netlist, seen') <-
-          -- TODO My word, this has far too many arguments.
-          genNetlist env peEval isTb transformedBindings topEntityMap compNames
-            typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+        writeManifest manPath manifest0{fileNames = fileNames1}
 
-        pure (seen', (topComponent, netlist))
+        topTime <- Clock.getCurrentTime
+        let topDiff = reportTimeDiff topTime prevTime
 
-      netlistTime <- netlist `deepseq` Clock.getCurrentTime
-      let normNetDiff = reportTimeDiff netlistTime normTime
+        withMVar ioLockV . const $
+          putStrLn ("Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff)
 
-      withMVar ioLockV . const $
-        putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
+        return ()
+      _ -> do
+        -- 1. Prepare HDL directory
+        --
+        -- [Note] Create HDL dir before netlist generation
+        --
+        -- Already create the directory where the HDL ends up being generated, as
+        -- we use directories relative to this final directory to find manifest
+        -- files belonging to other top entities. Failing to do so leads to #463
+        prepareDir hdlDir opts userModifications
 
-      -- 4. Generate topEntity wrapper
-      (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
-        pure $! createHDL hdlState' opts modNameT seen netlist domainConfs topComponent topNmT
+        -- 2. Normalize topEntity
+        supplyN <- Supply.newSupply
+        transformedBindings <-
+          normalizeEntity
+            env
+            bindingsMap
+            typeTrans
+            peEval
+            eval
+            topEntityNames
+            supplyN
+            topEntity
 
-      -- TODO: Data files should go into their own directory
-      -- FIXME: Files can silently overwrite each other
-      hdlDocDigests <- mapM (writeHDL hdlDir) hdlDocs
-      dataFilesDigests <- copyDataFiles hdlDir dfiles
-      memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
+        normTime <- transformedBindings `deepseq` Clock.getCurrentTime
+        let prepNormDiff = reportTimeDiff normTime prevTime
 
-      let
-        components = map (snd . snd) (OMap.assocs netlist)
-        filesAndDigests0 =
-          -- FIXME: We should track dependencies of `mfiles` and `dfiles` and
-          -- maintain the proper topological sort of all these.
-             zip (map fst mfiles) memoryFilesDigests
-          <> zip (map fst dfiles) dataFilesDigests
-          <> zip (map fst hdlDocs) hdlDocDigests
+        withMVar ioLockV . const $
+          putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
-      filesAndDigests1 <- modifyMVar edamFilesV $ \edamFiles ->
-        if opt_edalize opts
-          then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles filesAndDigests0
-          else pure (edamFiles, filesAndDigests0)
+        -- 3. Generate netlist for topEntity
+        (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
+          (topComponent, netlist, seen') <-
+            -- TODO My word, this has far too many arguments.
+            genNetlist
+              env
+              peEval
+              isTb
+              transformedBindings
+              topEntityMap
+              compNames
+              typeTrans
+              ite
+              (SomeBackend hdlState')
+              seen
+              hdlDir
+              prefixM
+              topEntity
 
-      let
-        depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
-        depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
-        depIds = map bindingId depBindings
+          pure (seen', (topComponent, netlist))
 
-        manifest =
-          mkManifest
-            hdlState' domainConfs opts topComponent components depIds
-            filesAndDigests1 topHash
-      writeManifest manPath manifest
+        netlistTime <- netlist `deepseq` Clock.getCurrentTime
+        let normNetDiff = reportTimeDiff netlistTime normTime
 
-      topTime <- hdlDocs `seq` Clock.getCurrentTime
-      let topDiff = reportTimeDiff topTime prevTime
+        withMVar ioLockV . const $
+          putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
 
-      withMVar ioLockV . const $
-        putStrLn ("Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff)
+        -- 4. Generate topEntity wrapper
+        (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
+          pure $! createHDL hdlState' opts modNameT seen netlist domainConfs topComponent topNmT
 
--- | Interpret a specific function from a specific module. This action tries
--- two things:
---
---   1. Interpret without explicitly loading the module. This will succeed if
---      the module was already loaded through a package database (set using
---      'interpreterArgs').
---
---   2. If (1) fails, it does try to load it explicitly. If this also fails,
---      an error is returned.
---
-loadImportAndInterpret
-  :: (MonadIO m, MonadMask m)
-  => [String]
-  -- ^ Extra search path (usually passed as -i)
-  -> [String]
-  -- ^ Interpreter args
-  -> String
-  -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
-  -- can be found
-  -> Hint.ModuleName
-  -- ^ Module function lives in
-  -> String
-  -- ^ Function name
-  -> String
-  -- ^ Type name ('BlackBoxFunction' or 'TemplateFunction')
-  -> m (Either (NonEmpty Hint.InterpreterError) a)
+        -- TODO: Data files should go into their own directory
+        -- FIXME: Files can silently overwrite each other
+        hdlDocDigests <- mapM (writeHDL hdlDir) hdlDocs
+        dataFilesDigests <- copyDataFiles hdlDir dfiles
+        memoryFilesDigests <- writeMemoryDataFiles hdlDir mfiles
+
+        let
+          components = map (snd . snd) (OMap.assocs netlist)
+          filesAndDigests0 =
+            -- FIXME: We should track dependencies of `mfiles` and `dfiles` and
+            -- maintain the proper topological sort of all these.
+            zip (map fst mfiles) memoryFilesDigests
+              <> zip (map fst dfiles) dataFilesDigests
+              <> zip (map fst hdlDocs) hdlDocDigests
+
+        filesAndDigests1 <- modifyMVar edamFilesV $ \edamFiles ->
+          if opt_edalize opts
+            then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles filesAndDigests0
+            else pure (edamFiles, filesAndDigests0)
+
+        let
+          depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
+          depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
+          depIds = map bindingId depBindings
+
+          manifest =
+            mkManifest
+              hdlState'
+              domainConfs
+              opts
+              topComponent
+              components
+              depIds
+              filesAndDigests1
+              topHash
+        writeManifest manPath manifest
+
+        topTime <- hdlDocs `seq` Clock.getCurrentTime
+        let topDiff = reportTimeDiff topTime prevTime
+
+        withMVar ioLockV . const $
+          putStrLn ("Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff)
+
+{- | Interpret a specific function from a specific module. This action tries
+two things:
+
+  1. Interpret without explicitly loading the module. This will succeed if
+     the module was already loaded through a package database (set using
+     'interpreterArgs').
+
+  2. If (1) fails, it does try to load it explicitly. If this also fails,
+     an error is returned.
+-}
+loadImportAndInterpret ::
+  (MonadIO m, MonadMask m) =>
+  -- | Extra search path (usually passed as -i)
+  [String] ->
+  -- | Interpreter args
+  [String] ->
+  {- | The folder in which the GHC bootstrap libraries (base, containers, etc.)
+  can be found
+  -}
+  String ->
+  -- | Module function lives in
+  Hint.ModuleName ->
+  -- | Function name
+  String ->
+  -- | Type name ('BlackBoxFunction' or 'TemplateFunction')
+  String ->
+  m (Either (NonEmpty Hint.InterpreterError) a)
 loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
-  Hint.liftIO $ Monad.when debugIsOn $
-    putStr "Hint: Interpreting " >> putStrLn (qualMod ++ "." ++ funcName)
+  Hint.liftIO $
+    Monad.when debugIsOn $
+      putStr "Hint: Interpreting " >> putStrLn (qualMod ++ "." ++ funcName)
   -- Try to interpret function *without* loading module explicitly. If this
   -- succeeds, the module was already in the global package database(s).
   bbfE <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
-    iPaths1 <- (++iPaths0) <$> Hint.get Hint.searchPath
+    iPaths1 <- (++ iPaths0) <$> Hint.get Hint.searchPath
     Hint.set [Hint.searchPath Hint.:= iPaths1]
-    Hint.setImports [ "Clash.Netlist.Types", "Clash.Netlist.BlackBox.Types", qualMod]
+    Hint.setImports ["Clash.Netlist.Types", "Clash.Netlist.BlackBox.Types", qualMod]
     Hint.unsafeInterpret funcName typ
 
   case bbfE of
@@ -539,74 +646,81 @@ loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
       -- global package database(s).
       localRes <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
         Hint.reset
-        iPaths1 <- (iPaths0++) <$> Hint.get Hint.searchPath
-        Hint.set [ Hint.searchPath Hint.:= iPaths1
-                 , Hint.languageExtensions Hint.:= langExts]
+        iPaths1 <- (iPaths0 ++) <$> Hint.get Hint.searchPath
+        Hint.set
+          [ Hint.searchPath Hint.:= iPaths1
+          , Hint.languageExtensions Hint.:= langExts
+          ]
         Hint.loadModules [qualMod]
-        Hint.setImports [ "Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", qualMod]
+        Hint.setImports ["Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", qualMod]
         Hint.unsafeInterpret funcName typ
 
       case localRes of
         Left localException -> pure (Left (globalException :| [localException]))
         Right res -> pure (Right res)
-
     Right res -> do
       return (Right res)
  where
-   langExts = map Hint.asExtension $
-                map show wantedLanguageExtensions ++
-                map ("No" ++ ) (map show unwantedLanguageExtensions)
+  langExts =
+    map Hint.asExtension $
+      map show wantedLanguageExtensions
+        ++ map ("No" ++) (map show unwantedLanguageExtensions)
 
--- | List of known BlackBoxFunctions used to prevent Hint from firing. This
---  improves Clash startup times.
+{- | List of known BlackBoxFunctions used to prevent Hint from firing. This
+ improves Clash startup times.
+-}
 knownBlackBoxFunctions :: HashMap String BlackBoxFunction
 knownBlackBoxFunctions =
-  HashMap.fromList $ map (first show) $
-    [ ('P.checkBBF, P.checkBBF)
-    , ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
-    , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
-    , ('P.clashCompileErrorBBF, P.clashCompileErrorBBF)
-    , ('P.foldBBF, P.foldBBF)
-    , ('P.indexIntVerilog, P.indexIntVerilog)
-    , ('P.indexToIntegerVerilog, P.indexToIntegerVerilog)
-    , ('P.indexToIntegerVHDL, P.indexToIntegerVHDL)
-    , ('P.intTF, P.intTF)
-    , ('P.iterateBBF, P.iterateBBF)
-    , ('P.signedToIntegerVerilog, P.signedToIntegerVerilog)
-    , ('P.signedToIntegerVHDL, P.signedToIntegerVHDL)
-    , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
-    , ('P.unsignedToIntegerVHDL, P.unsignedToIntegerVHDL)
-    , ('P.wordTF, P.wordTF)
-    ]
+  HashMap.fromList $
+    map (first show) $
+      [ ('P.checkBBF, P.checkBBF)
+      , ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
+      , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
+      , ('P.clashCompileErrorBBF, P.clashCompileErrorBBF)
+      , ('P.foldBBF, P.foldBBF)
+      , ('P.indexIntVerilog, P.indexIntVerilog)
+      , ('P.indexToIntegerVerilog, P.indexToIntegerVerilog)
+      , ('P.indexToIntegerVHDL, P.indexToIntegerVHDL)
+      , ('P.intTF, P.intTF)
+      , ('P.iterateBBF, P.iterateBBF)
+      , ('P.signedToIntegerVerilog, P.signedToIntegerVerilog)
+      , ('P.signedToIntegerVHDL, P.signedToIntegerVHDL)
+      , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
+      , ('P.unsignedToIntegerVHDL, P.unsignedToIntegerVHDL)
+      , ('P.wordTF, P.wordTF)
+      ]
 
--- | List of known TemplateFunctions used to prevent Hint from firing. This
---  improves Clash startup times.
+{- | List of known TemplateFunctions used to prevent Hint from firing. This
+ improves Clash startup times.
+-}
 knownTemplateFunctions :: HashMap String TemplateFunction
 knownTemplateFunctions =
-  HashMap.fromList $ map (first show) $
-    [ ('P.altpllQsysTF, P.altpllQsysTF)
-    , ('P.alteraPllQsysTF, P.alteraPllQsysTF)
-    , ('P.alteraPllTF, P.alteraPllTF)
-    , ('P.altpllTF, P.altpllTF)
-    , ('P.fromIntegerTFvhdl, P.fromIntegerTFvhdl)
-    , ('P.clockWizardTF, P.clockWizardTF)
-    , ('P.clockWizardDifferentialTF, P.clockWizardDifferentialTF)
-    , ('P.clockWizardTclTF, P.clockWizardTclTF)
-    , ('P.clockWizardDifferentialTclTF, P.clockWizardDifferentialTclTF)
-    ]
+  HashMap.fromList $
+    map (first show) $
+      [ ('P.altpllQsysTF, P.altpllQsysTF)
+      , ('P.alteraPllQsysTF, P.alteraPllQsysTF)
+      , ('P.alteraPllTF, P.alteraPllTF)
+      , ('P.altpllTF, P.altpllTF)
+      , ('P.fromIntegerTFvhdl, P.fromIntegerTFvhdl)
+      , ('P.clockWizardTF, P.clockWizardTF)
+      , ('P.clockWizardDifferentialTF, P.clockWizardDifferentialTF)
+      , ('P.clockWizardTclTF, P.clockWizardTclTF)
+      , ('P.clockWizardDifferentialTclTF, P.clockWizardDifferentialTclTF)
+      ]
 
 -- | Compiles blackbox functions and parses blackbox templates.
-compilePrimitive
-  :: [FilePath]
-  -- ^ Import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package databases
-  -> FilePath
-  -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
-  -- can be found
-  -> ResolvedPrimitive
-  -- ^ Primitive to compile
-  -> IO CompiledPrimitive
+compilePrimitive ::
+  -- | Import directories (-i flag)
+  [FilePath] ->
+  -- | Package databases
+  [FilePath] ->
+  {- | The folder in which the GHC bootstrap libraries (base, containers, etc.)
+  can be found
+  -}
+  FilePath ->
+  -- | Primitive to compile
+  ResolvedPrimitive ->
+  IO CompiledPrimitive
 compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName source) = do
   bbFunc <-
     -- TODO: Use cache for hint targets. Right now Hint will fire multiple times
@@ -615,98 +729,118 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRe
       Just f -> pure f
       Nothing -> do
         Monad.when debugIsOn (putStr "Hint: interpreting " >> putStrLn (show fullName))
-        let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
+        let interpreterArgs = concatMap (("-package-db" :) . (: [])) pkgDbs
         -- Compile a blackbox template function or fetch it from an already compiled file.
         r <- go interpreterArgs source
         processHintErrors (show bbGenName) bbName r
 
   pure (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName (hash source, bbFunc))
  where
-    fullName = qualMod ++ "." ++ funcName
-    qualMod = intercalate "." modNames
-    BlackBoxFunctionName modNames funcName = bbGenName
+  fullName = qualMod ++ "." ++ funcName
+  qualMod = intercalate "." modNames
+  BlackBoxFunctionName modNames funcName = bbGenName
 
-    -- | Create directory based on base name and directory. Return path
-    -- of directory just created.
-    createDirectory'
-      :: FilePath
-      -> FilePath
-      -> IO FilePath
-    createDirectory' base sub =
-      let new = base </> sub in
-      Directory.createDirectory new >> return new
+  -- \| Create directory based on base name and directory. Return path
+  -- of directory just created.
+  createDirectory' ::
+    FilePath ->
+    FilePath ->
+    IO FilePath
+  createDirectory' base sub =
+    let new = base </> sub
+     in Directory.createDirectory new >> return new
 
-    go
-      :: [String]
-      -> Maybe Text
-      -> IO (Either (NonEmpty Hint.InterpreterError) BlackBoxFunction)
-    go args (Just source') = do
-      -- Create a temporary directory with user module in it, add it to the
-      -- list of import direcotries, and run as if it were a "normal" compiled
-      -- module.
-      tmpDir0 <- getCanonicalTemporaryDirectory
-      withTempDirectory tmpDir0 "clash-prim-compile" $ \tmpDir1 -> do
-        modDir <- foldM createDirectory' tmpDir1 (init modNames)
-        Text.writeFile (modDir </> (last modNames ++ ".hs")) source'
-        loadImportAndInterpret (tmpDir1:idirs) args topDir qualMod funcName "BlackBoxFunction"
-
-    go args Nothing = do
-      loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
-
-compilePrimitive idirs pkgDbs topDir
+  go ::
+    [String] ->
+    Maybe Text ->
+    IO (Either (NonEmpty Hint.InterpreterError) BlackBoxFunction)
+  go args (Just source') = do
+    -- Create a temporary directory with user module in it, add it to the
+    -- list of import direcotries, and run as if it were a "normal" compiled
+    -- module.
+    tmpDir0 <- getCanonicalTemporaryDirectory
+    withTempDirectory tmpDir0 "clash-prim-compile" $ \tmpDir1 -> do
+      modDir <- foldM createDirectory' tmpDir1 (init modNames)
+      Text.writeFile (modDir </> (last modNames ++ ".hs")) source'
+      loadImportAndInterpret (tmpDir1 : idirs) args topDir qualMod funcName "BlackBoxFunction"
+  go args Nothing = do
+    loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
+compilePrimitive
+  idirs
+  pkgDbs
+  topDir
   (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM imps fPlural incs rM riM templ) = do
-  libM'  <- mapM parseTempl libM
-  imps'  <- mapM parseTempl imps
-  incs'  <- mapM (traverse parseBB) incs
-  templ' <- parseBB templ
-  rM'    <- traverse parseBB rM
-  riM'   <- traverse parseBB riM
-  return (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM' imps' fPlural incs' rM' riM' templ')
- where
-  iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
+    libM' <- mapM parseTempl libM
+    imps' <- mapM parseTempl imps
+    incs' <- mapM (traverse parseBB) incs
+    templ' <- parseBB templ
+    rM' <- traverse parseBB rM
+    riM' <- traverse parseBB riM
+    return
+      ( BlackBox
+          pNm
+          wf
+          rVoid
+          multiRes
+          tkind
+          ()
+          outputUsage
+          libM'
+          imps'
+          fPlural
+          incs'
+          rM'
+          riM'
+          templ'
+      )
+   where
+    iArgs = concatMap (("-package-db" :) . (: [])) pkgDbs
 
-  parseTempl
-    :: Applicative m
-    => Text
-    -> m BlackBoxTemplate
-  parseTempl t = case runParse t of
-    Failure errInfo
-      -> error ("Parsing template for blackbox " ++ Data.Text.unpack pNm ++ " failed:\n"
-               ++ show (_errDoc errInfo))
-    Success t'
-      -> pure t'
+    parseTempl ::
+      (Applicative m) =>
+      Text ->
+      m BlackBoxTemplate
+    parseTempl t = case runParse t of
+      Failure errInfo ->
+        error
+          ( "Parsing template for blackbox "
+              ++ Data.Text.unpack pNm
+              ++ " failed:\n"
+              ++ show (_errDoc errInfo)
+          )
+      Success t' ->
+        pure t'
 
-  parseBB
-    :: ((TemplateFormat,BlackBoxFunctionName), Maybe Text)
-    -> IO BlackBox
-  parseBB ((TTemplate,_),Just t)     = BBTemplate <$> parseTempl t
-  parseBB ((TTemplate,_),Nothing)    =
-    error ("No template specified for blackbox: " ++ show pNm)
-  parseBB ((THaskell,bbGenName),Just source) = do
-    let BlackBoxFunctionName modNames funcName = bbGenName
-        qualMod = intercalate "." modNames
-    tmpDir <- getCanonicalTemporaryDirectory
-    r <- withTempDirectory tmpDir "clash-prim-compile" $ \tmpDir' -> do
-      let modDir = foldl (</>) tmpDir' (init modNames)
-      Directory.createDirectoryIfMissing True modDir
-      Text.writeFile (modDir </> last modNames <.>  "hs") source
-      loadImportAndInterpret (tmpDir':idirs) iArgs topDir qualMod funcName "TemplateFunction"
-    let hsh = hash (qualMod, source)
-    BBFunction (Data.Text.unpack pNm) hsh <$>
-      processHintErrors (show bbGenName) pNm  r
-  parseBB ((THaskell,bbGenName),Nothing) = do
-    let BlackBoxFunctionName modNames funcName = bbGenName
-        qualMod = intercalate "." modNames
-        hsh     = hash qualMod
-        fullName = qualMod ++ "." ++ funcName
-    tf <-
-      case HashMap.lookup fullName knownTemplateFunctions of
-        Just f -> pure f
-        Nothing -> do
-          r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
-          processHintErrors (show bbGenName) pNm r
-    pure (BBFunction (Data.Text.unpack pNm) hsh tf)
-
+    parseBB ::
+      ((TemplateFormat, BlackBoxFunctionName), Maybe Text) ->
+      IO BlackBox
+    parseBB ((TTemplate, _), Just t) = BBTemplate <$> parseTempl t
+    parseBB ((TTemplate, _), Nothing) =
+      error ("No template specified for blackbox: " ++ show pNm)
+    parseBB ((THaskell, bbGenName), Just source) = do
+      let BlackBoxFunctionName modNames funcName = bbGenName
+          qualMod = intercalate "." modNames
+      tmpDir <- getCanonicalTemporaryDirectory
+      r <- withTempDirectory tmpDir "clash-prim-compile" $ \tmpDir' -> do
+        let modDir = foldl (</>) tmpDir' (init modNames)
+        Directory.createDirectoryIfMissing True modDir
+        Text.writeFile (modDir </> last modNames <.> "hs") source
+        loadImportAndInterpret (tmpDir' : idirs) iArgs topDir qualMod funcName "TemplateFunction"
+      let hsh = hash (qualMod, source)
+      BBFunction (Data.Text.unpack pNm) hsh
+        <$> processHintErrors (show bbGenName) pNm r
+    parseBB ((THaskell, bbGenName), Nothing) = do
+      let BlackBoxFunctionName modNames funcName = bbGenName
+          qualMod = intercalate "." modNames
+          hsh = hash qualMod
+          fullName = qualMod ++ "." ++ funcName
+      tf <-
+        case HashMap.lookup fullName knownTemplateFunctions of
+          Just f -> pure f
+          Nothing -> do
+            r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
+            processHintErrors (show bbGenName) pNm r
+      pure (BBFunction (Data.Text.unpack pNm) hsh tf)
 compilePrimitive _ _ _ (Primitive pNm wf typ) =
   return (Primitive pNm wf typ)
 {-# SCC compilePrimitive #-}
@@ -730,50 +864,55 @@ processHintErrors fun bb r = case r of
   Left es -> throwM $ HintError (formatExceptions (NonEmpty.toList es))
   Right f -> pure f
  where
-  formatExceptions es = [I.i|
+  formatExceptions es =
+    [I.i|
     Encountered one or more exceptions when compiling blackbox template function
     '#{fun}' for function '#{bb}'.
-  |] <> "\n\n" <> intercalate "\n\n" (map formatException es)
+  |]
+      <> "\n\n"
+      <> intercalate "\n\n" (map formatException es)
 
-  formatException e = [I.i|
+  formatException e =
+    [I.i|
     Encountered:
 
       #{e}
   |]
 
 -- | Pretty print Components to HDL Documents
-createHDL
-  :: Backend backend
-  => backend
-  -- ^ Backend
-  -> ClashOpts
-  -- ^ Global Clash options
-  -> IdentifierText
-  -- ^ Module hierarchy root
-  -> Id.IdentifierSet
-  -- ^ Component names
-  -> ComponentMap
-  -- ^ List of components
-  -> HashMap Data.Text.Text VDomainConfiguration
-  -- ^ Known domains to configurations
-  -> Component
-  -- ^ Top component
-  -> IdentifierText
-  -- ^ Name of the manifest file
-  -> ([(String,Doc)],[(String,FilePath)],[(String,String)])
-  -- ^ The pretty-printed HDL documents
-  -- + The data files that need to be copied
+createHDL ::
+  (Backend backend) =>
+  -- | Backend
+  backend ->
+  -- | Global Clash options
+  ClashOpts ->
+  -- | Module hierarchy root
+  IdentifierText ->
+  -- | Component names
+  Id.IdentifierSet ->
+  -- | List of components
+  ComponentMap ->
+  -- | Known domains to configurations
+  HashMap Data.Text.Text VDomainConfiguration ->
+  -- | Top component
+  Component ->
+  -- | Name of the manifest file
+  IdentifierText ->
+  {- | The pretty-printed HDL documents
+  + The data files that need to be copied
+  -}
+  ([(String, Doc)], [(String, FilePath)], [(String, String)])
 createHDL backend opts modName seen components domainConfs top topName = flip evalState backend $ getAp $ do
   let componentsL = map snd (OMap.assocs components)
-  (hdlNmDocs0,incs) <-
+  (hdlNmDocs0, incs) <-
     fmap unzip $
-      forM componentsL $ \(ComponentMeta{cmLoc, cmScope,cmUsage}, comp) ->
-         genHDL opts modName cmLoc (Id.union seen cmScope) cmUsage comp
+      forM componentsL $ \(ComponentMeta{cmLoc, cmScope, cmUsage}, comp) ->
+        genHDL opts modName cmLoc (Id.union seen cmScope) cmUsage comp
 
   hwtys <- HashSet.toList <$> extractTypes <$> Ap get
   typesPkg0 <- mkTyPackage modName hwtys
   dataFiles <- Ap getDataFiles
-  memFiles  <- Ap getMemoryDataFiles
+  memFiles <- Ap getMemoryDataFiles
   let
     typesPkg1 = map (first (<.> Clash.Backend.extension backend)) typesPkg0
     hdlNmDocs1 = map (first (<.> Clash.Backend.extension backend)) hdlNmDocs0
@@ -782,7 +921,7 @@ createHDL backend opts modName seen components domainConfs top topName = flip ev
     topClks = findClocks top
     sdcInfo = fmap findDomainConfig <$> topClks
     sdcFile = Data.Text.unpack topName <.> "sdc"
-    sdcDoc  = (sdcFile, pprSDC (SdcInfo sdcInfo))
+    sdcDoc = (sdcFile, pprSDC (SdcInfo sdcInfo))
     sdc = if null sdcInfo then Nothing else Just sdcDoc
 
   return (maybeToList sdc <> topFiles, dataFiles, memFiles)
@@ -807,9 +946,10 @@ writeEdam hdlDir (topNm, topEntity) deps edamFiles0 filesAndDigests = do
   edamDigest <- writeHDL hdlDir ("edam.py", pprEdam edamInfo)
   pure (edamFiles1, ("edam.py", edamDigest) : filesAndDigests)
 
--- | Create an Edalize metadata file for using Edalize to build the project.
---
--- TODO: Handle libraries. Also see: https://github.com/olofk/edalize/issues/220
+{- | Create an Edalize metadata file for using Edalize to build the project.
+
+TODO: Handle libraries. Also see: https://github.com/olofk/edalize/issues/220
+-}
 createEDAM ::
   -- Top entity name and unique
   (Id.Identifier, Unique) ->
@@ -824,12 +964,13 @@ createEDAM ::
 createEDAM (topName, topUnique) deps edamFileMap files =
   (HashMap.insert topUnique (edamFiles edam) edamFileMap, edam)
  where
-  edam = Edam
-    { edamProjectName = Id.toText topName
-    , edamTopEntity   = Id.toText topName
-    , edamFiles       = fmap (asEdamFile topName) files <> fmap asIncFile incFiles
-    , edamToolOptions = def
-    }
+  edam =
+    Edam
+      { edamProjectName = Id.toText topName
+      , edamTopEntity = Id.toText topName
+      , edamFiles = fmap (asEdamFile topName) files <> fmap asIncFile incFiles
+      , edamToolOptions = def
+      }
 
   incFiles =
     concatMap
@@ -837,7 +978,7 @@ createEDAM (topName, topUnique) deps edamFileMap files =
       (HashMap.lookupDefault [] topUnique deps)
 
   asIncFile f =
-    f { efName = ".." </> Data.Text.unpack (efLogicalName f) </> efName f }
+    f{efName = ".." </> Data.Text.unpack (efLogicalName f) </> efName f}
 
 asEdamFile :: Id.Identifier -> FilePath -> EdamFile
 asEdamFile topName path =
@@ -865,12 +1006,12 @@ prepareDir ::
 prepareDir hdlDir ClashOpts{opt_clear} mods = do
   ifM
     (doesPathExist hdlDir)
-    (ifM
-      (doesDirectoryExist hdlDir)
-      (detectCaseIssues >> clearOrError >> createDir)
-      (error [I.i|Tried to write HDL files to #{hdlDir}, but it wasn't a directory.|]))
+    ( ifM
+        (doesDirectoryExist hdlDir)
+        (detectCaseIssues >> clearOrError >> createDir)
+        (error [I.i|Tried to write HDL files to #{hdlDir}, but it wasn't a directory.|])
+    )
     createDir
-
  where
   createDir = createDirectoryIfMissing True hdlDir
 
@@ -878,7 +1019,10 @@ prepareDir hdlDir ClashOpts{opt_clear} mods = do
   -- to synthesize two top entities with conflicting (in this sense) names.
   detectCaseIssues = do
     allPaths <- listDirectory (takeDirectory hdlDir)
-    unless (takeFileName hdlDir `elem` allPaths) (error [I.i|
+    unless
+      (takeFileName hdlDir `elem` allPaths)
+      ( error
+          [I.i|
       OS indicated #{hdlDir} existed, but Clash could not find it among the
       list of existing directories in #{takeDirectory hdlDir}:
 
@@ -886,20 +1030,23 @@ prepareDir hdlDir ClashOpts{opt_clear} mods = do
 
       This probably means your OS or filesystem is case-insensitive. Rename your
       top level binders in order to prevent this error message.
-    |])
+    |]
+      )
 
   clearOrError =
     case mods of
       Just [] ->
         -- No unexpected changes, so no user work will get lost
         removeDirectoryRecursive hdlDir
-      _ | opt_clear ->
-        -- Unexpected changes / non-empty directory, but @-fclash-clear@ was
-        -- set, so remove directory anyway.
-        removeDirectoryRecursive hdlDir
+      _
+        | opt_clear ->
+            -- Unexpected changes / non-empty directory, but @-fclash-clear@ was
+            -- set, so remove directory anyway.
+            removeDirectoryRecursive hdlDir
       Just unexpected ->
         -- Unexpected changes; i.e. modifications were made after last Clash run
-        error [I.i|
+        error
+          [I.i|
           Changes were made to #{hdlDir} after last Clash run:
 
             #{pprintUnexpectedModifications 5 unexpected}
@@ -912,7 +1059,8 @@ prepareDir hdlDir ClashOpts{opt_clear} mods = do
         -- No manifest file was found. Refuse to write if directory isn't empty.
         unlessM
           (null <$> listDirectory hdlDir)
-          (error [I.i|
+          ( error
+              [I.i|
             Tried to write HDL files to #{hdlDir}, but directory wasn't empty. This
             message will be supressed if Clash can detect that no files have
             changed since it was last run. If you're seeing this message even
@@ -923,23 +1071,25 @@ prepareDir hdlDir ClashOpts{opt_clear} mods = do
             Use '-fclash-clear' if you want Clash to clear out the directory.
             Warning: this will remove the complete directory, be cautious of data
             loss.
-          |])
+          |]
+          )
 
 -- | Write a file to disk in chunks. Returns SHA256 sum of file contents.
 writeAndHash :: FilePath -> ByteStringLazy.ByteString -> IO ByteString
 writeAndHash path bs =
   IO.withFile path IO.WriteMode $ \handle ->
-      fmap Sha256.finalize
-    $ foldM (writeChunk handle) Sha256.init
-    $ ByteStringLazy.toChunks bs
+    fmap Sha256.finalize $
+      foldM (writeChunk handle) Sha256.init $
+        ByteStringLazy.toChunks bs
  where
   writeChunk :: IO.Handle -> Sha256.Ctx -> ByteString -> IO Sha256.Ctx
   writeChunk h !ctx chunk = do
     ByteString.hPut h chunk
     pure (Sha256.update ctx chunk)
 
--- | Writes a HDL file to the given directory. Returns SHA256 hash of written
--- file.
+{- | Writes a HDL file to the given directory. Returns SHA256 hash of written
+file.
+-}
 writeHDL :: FilePath -> (FilePath, Doc) -> IO ByteString
 writeHDL dir (cname, hdl) = do
   let
@@ -949,76 +1099,94 @@ writeHDL dir (cname, hdl) = do
   writeAndHash (dir </> cname) (Text.encodeUtf8 (rendered1 <> "\n"))
 
 -- | Copy given files
-writeMemoryDataFiles
-    :: FilePath
-    -- ^ Directory to copy  files to
-    -> [(FilePath, String)]
-    -- ^ (filename, content)
-    -> IO [ByteString]
+writeMemoryDataFiles ::
+  -- | Directory to copy  files to
+  FilePath ->
+  -- | (filename, content)
+  [(FilePath, String)] ->
+  IO [ByteString]
 writeMemoryDataFiles dir files =
   forM files $ \(fname, content) ->
     writeAndHash (dir </> fname) (ByteStringLazyChar8.pack content)
 
--- | Copy data files added with ~FILE, assumes the files are canonicalized already.
--- Throws an error on relative paths as sanity check.
-copyDataFiles
-  :: FilePath
-  -- ^ Directory to copy to
-  -> [(FilePath,FilePath)]
-  -- ^ [(name of newly made file in HDL output dir, file to copy)]
-  -> IO [ByteString]
-  -- ^ SHA256 hashes of written files
+{- | Copy data files added with ~FILE, assumes the files are canonicalized already.
+Throws an error on relative paths as sanity check.
+-}
+copyDataFiles ::
+  -- | Directory to copy to
+  FilePath ->
+  -- | [(name of newly made file in HDL output dir, file to copy)]
+  [(FilePath, FilePath)] ->
+  -- | SHA256 hashes of written files
+  IO [ByteString]
 copyDataFiles targetDir = mapM copyDataFile
  where
   copyDataFile :: (FilePath, FilePath) -> IO ByteString
   copyDataFile (newName, toCopy)
     | isAbsolute toCopy = do
-      ifM
-        (doesFileExist toCopy)
-        (copyAndHash toCopy (targetDir </> newName))
-        (error [I.i|Could not find data file #{show toCopy}. Does it exist?|])
-    | otherwise = error [I.i|copyDataFiles received a relative path #{show toCopy}. This is a bug in Clash, please report it.|]
+        ifM
+          (doesFileExist toCopy)
+          (copyAndHash toCopy (targetDir </> newName))
+          (error [I.i|Could not find data file #{show toCopy}. Does it exist?|])
+    | otherwise =
+        error
+          [I.i|copyDataFiles received a relative path #{show toCopy}. This is a bug in Clash, please report it.|]
 
   copyAndHash src dst = do
     ifM
       (doesPathExist dst)
-      (error [I.i|
+      ( error
+          [I.i|
         Tried to copy data file #{src} to #{dst} but a file or directory with
         that name already existed. This is a bug in Clash, please report it.
-      |])
+      |]
+      )
       (ByteStringLazy.readFile src >>= writeAndHash dst)
 
 -- | Normalize a complete hierarchy
-normalizeEntity
-  :: ClashEnv
-  -> BindingMap
-  -- ^ All bindings
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
-  -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> PE.Evaluator
-  -- ^ Hardcoded evaluator for partial evaluation
-  -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF (old evaluator)
-  -> [Id]
-  -- ^ TopEntities
-  -> Supply.Supply
-  -- ^ Unique supply
-  -> Id
-  -- ^ root of the hierarchy
-  -> IO BindingMap
+normalizeEntity ::
+  ClashEnv ->
+  -- | All bindings
+  BindingMap ->
+  -- | Hardcoded 'Type' -> 'HWType' translator
+  ( CustomReprs ->
+    TyConMap ->
+    Type ->
+    State HWMap (Maybe (Either String FilteredHWType))
+  ) ->
+  -- | Hardcoded evaluator for partial evaluation
+  PE.Evaluator ->
+  -- | Hardcoded evaluator for WHNF (old evaluator)
+  WHNF.Evaluator ->
+  -- | TopEntities
+  [Id] ->
+  -- | Unique supply
+  Supply.Supply ->
+  -- | root of the hierarchy
+  Id ->
+  IO BindingMap
 normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
-  where
-    doNorm = do norm <- normalize [tm]
-                let normChecked = checkNonRecursive norm
-                cleaned <- cleanupGraph tm normChecked
-                return cleaned
-    transformedBindings = runNormalization env supply bindingsMap
-                            typeTrans peEval eval emptyVarEnv
-                            topEntities doNorm
+ where
+  doNorm = do
+    norm <- normalize [tm]
+    let normChecked = checkNonRecursive norm
+    cleaned <- cleanupGraph tm normChecked
+    return cleaned
+  transformedBindings =
+    runNormalization
+      env
+      supply
+      bindingsMap
+      typeTrans
+      peEval
+      eval
+      emptyVarEnv
+      topEntities
+      doNorm
 
--- | Reverse topologically sort given top entities. Also returns a mapping that
--- maps a top entity to its reverse topologically sorted transitive dependencies.
+{- | Reverse topologically sort given top entities. Also returns a mapping that
+maps a top entity to its reverse topologically sorted transitive dependencies.
+-}
 sortTop ::
   BindingMap ->
   [TopEntityT] ->
@@ -1027,7 +1195,7 @@ sortTop ::
   )
 sortTop bindingsMap topEntities =
   case reverseTopSort nodes edges of
-    Left msg   -> error msg
+    Left msg -> error msg
     Right tops -> (tops, mapFrom tops)
  where
   nodes = [(varUniq topE, t) | t@(TopEntityT topE _ _) <- topEntities]
@@ -1040,14 +1208,14 @@ sortTop bindingsMap topEntities =
 
   getTransitiveRefs top =
     let allDeps = callGraph bindingsMap top
-    in  filter (\t -> topId t /= top && topId t `elemVarEnv` allDeps) topEntities
+     in filter (\t -> topId t /= top && topId t `elemVarEnv` allDeps) topEntities
 
   topToUnique = varUniq . topId
 
   mapFrom tops =
     let
-      topIndices = HashMap.fromList (zip (map topToUnique tops) [(0 :: Unique)..])
+      topIndices = HashMap.fromList (zip (map topToUnique tops) [(0 :: Unique) ..])
       nonOrdered = HashMap.fromListWith (<>) (map (second pure) edges)
       orderFunc k = HashMap.lookup k topIndices
-    in
+     in
       HashMap.map (List.sortOn orderFunc) nonOrdered

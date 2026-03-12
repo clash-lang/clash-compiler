@@ -39,7 +39,17 @@ import GHC.Num.BigNat
    bigNatSize#, bigNatSubUnsafe, bigNatSubWordUnsafe#, bigNatToWord#, bigNatXor)
 import GHC.Num.Natural (Natural (..))
 
+{- ORMOLU_DISABLE -}
 #include "MachDeps.h"
+
+#if WORD_SIZE_IN_BITS == 64
+#define WORD_SIZE_MASK 0xFFFFFFFFFFFFFFFF##
+#elif WORD_SIZE_IN_BITS == 32
+#define WORD_SIZE_MASK 0xFFFFFFFF##
+#else
+#error Unhandled value for WORD_SIZE_IN_BITS
+#endif
+{- ORMOLU_ENABLE -}
 
 -- | modular subtraction
 subMod :: Natural -> Natural -> Natural -> Natural
@@ -127,16 +137,9 @@ complementMod
   -> (Natural -> Natural)
 complementMod (NS sz#) =
   if isTrue# (sz# `leWord#` WORD_SIZE_IN_BITS##) then
-    let m# = if isTrue# (sz# `eqWord#` WORD_SIZE_IN_BITS##) then
-#if WORD_SIZE_IN_BITS == 64
-                0xFFFFFFFFFFFFFFFF##
-#elif WORD_SIZE_IN_BITS == 32
-                0xFFFFFFFF##
-#else
-#error Unhandled value for WORD_SIZE_IN_BITS
-#endif
-             else
-               (1## `uncheckedShiftL#` (word2Int# sz#)) `minusWord#` 1##
+    let m# = if isTrue# (sz# `eqWord#` WORD_SIZE_IN_BITS##)
+             then WORD_SIZE_MASK
+             else (1## `uncheckedShiftL#` (word2Int# sz#)) `minusWord#` 1##
         go (NS x#) = NS (x# `xor#` m#)
         go (NB r#) = NS (bigNatToWord# r# `xor#` m#)
     in  go

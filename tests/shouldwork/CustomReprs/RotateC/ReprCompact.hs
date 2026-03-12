@@ -1,52 +1,58 @@
 {-# LANGUAGE CPP #-}
 
-module ReprCompact
-  ( testBench
-  , topEntity
-  ) where
+module ReprCompact (
+  testBench,
+  topEntity,
+) where
 
-import Clash.Prelude
 import Clash.Annotations.BitRepresentation
+import Clash.Prelude
 
-import RotateC (Color(..), MaybeColor(..), Top, tb)
+import RotateC (Color (..), MaybeColor (..), Top, tb)
 import qualified RotateC
 
-{-# ANN module (
-  DataReprAnn
-    $(liftQ [t| Color |])
-    2
-    [ ConstrRepr
-        'Red
-        0b11
-        0b00
-        []
-    , ConstrRepr
-        'Blue
-        0b11
-        0b10
-        []
-    , ConstrRepr
-        'Green
-        0b11
-        0b01
-        []
-    ]) #-}
+{-# ANN
+  module
+  ( DataReprAnn $
+      (liftQ [t| Color |])
+        2
+        [ ConstrRepr
+            'Red
+            0b11
+            0b00
+            []
+        , ConstrRepr
+            'Blue
+            0b11
+            0b10
+            []
+        , ConstrRepr
+            'Green
+            0b11
+            0b01
+            []
+        ]
+  )
+  #-}
 
-{-# ANN module (
-  DataReprAnn
-    $(liftQ [t| MaybeColor |])
-    2
-    [ ConstrRepr
-        'NothingC
-        0b11 -- Mask
-        0b11 -- Value
-        []
-    , ConstrRepr
-        'JustC
-        0b00   -- Mask
-        0b00   -- Value
-        [0b11] -- Masks
-    ]) #-}
+{-# ANN
+  module
+  ( DataReprAnn $
+      (liftQ [t| MaybeColor |])
+        2
+        [ ConstrRepr
+            'NothingC
+            0b11 -- Mask
+            0b11 -- Value
+            []
+        , ConstrRepr
+            'JustC
+            0b00 -- Mask
+            0b00 -- Value
+            [0b11] -- Masks
+        ]
+  )
+  #-}
 
 topEntity :: Top
 topEntity = RotateC.topEntity

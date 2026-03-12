@@ -1,4 +1,8 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+
+{- |
 Copyright  :  (C) 2017, Google Inc,
                   2023, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -24,49 +28,54 @@ the design from the oscillator input. There are use cases not covered by this
 simpler approach, and the [unsafe functions](#g:unsafe) are provided as a means
 to build advanced reset managers for the output domains.
 -}
+module Clash.Xilinx.ClockGen (
+  -- * Choosing domains
+  -- $domains
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
+  -- ** Caution: actual output frequency
+  -- $caution
 
-module Clash.Xilinx.ClockGen
-  ( -- * Choosing domains
-    -- $domains
+  -- * Using
+  -- $using
 
-    -- ** Caution: actual output frequency
-    -- $caution
+  -- ** Example
+  -- $example
 
-    -- * Using
-    -- $using
+  -- ** Type checking errors
+  -- $error
 
-    -- ** Example
-    -- $example
+  -- ** Tcl
+  -- $tcl
 
-    -- ** Type checking errors
-    -- $error
+  -- * Regular functions #regular#
+  clockWizard,
+  clockWizardDifferential,
 
-    -- ** Tcl
-    -- $tcl
+  -- * Unsafe functions #unsafe#
+  -- $unsafe
 
-    -- * Regular functions #regular#
-    clockWizard
-  , clockWizardDifferential
-    -- * Unsafe functions #unsafe#
-    -- $unsafe
-
-    -- ** Example
-    -- $unsafe_example
-  , unsafeClockWizard
-  , unsafeClockWizardDifferential
-  ) where
+  -- ** Example
+  -- $unsafe_example
+  unsafeClockWizard,
+  unsafeClockWizardDifferential,
+) where
 
 import GHC.TypeLits (type (<=))
 
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Clocks
-  (Clocks(..), ClocksSync(..), ClocksSyncCxt, NumOutClocksSync)
-import Clash.Signal.Internal
-  (Clock, DiffClock(..), Reset, KnownDomain, HasAsynchronousReset)
+import Clash.Clocks (
+  Clocks (..),
+  ClocksSync (..),
+  ClocksSyncCxt,
+  NumOutClocksSync,
+ )
+import Clash.Signal.Internal (
+  Clock,
+  DiffClock (..),
+  HasAsynchronousReset,
+  KnownDomain,
+  Reset,
+ )
 
 {- $domains
 Synthesis domains are denoted by the type-parameter
@@ -298,15 +307,16 @@ topEntity clkIn rstIn = 'Clash.Signal.exposeClockResetEnable' (register 0) clk r
 'False', hence the use of @'Clash.Signal.unsafeFromActiveLow' locked@.
 -}
 
--- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
--- \"Clock Wizard\" with 1 single-ended reference clock input and a reset input,
--- and 1 to 7 output clocks and a @locked@ output.
---
--- This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
--- @locked@ output port into proper 'Reset' signals for the output domains which
--- will keep the circuit in reset while the clock is still stabilizing.
+{- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
+\"Clock Wizard\" with 1 single-ended reference clock input and a reset input,
+and 1 to 7 output clocks and a @locked@ output.
+
+This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
+@locked@ output port into proper 'Reset' signals for the output domains which
+will keep the circuit in reset while the clock is still stabilizing.
+-}
 clockWizard ::
-  forall t domIn .
+  forall t domIn.
   ( HasAsynchronousReset domIn
   , ClocksSyncCxt t domIn
   , NumOutClocksSync t domIn <= 7
@@ -319,14 +329,15 @@ clockWizard ::
 clockWizard clkIn rstIn =
   clocksResetSynchronizer (unsafeClockWizard clkIn rstIn) clkIn
 
--- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
--- \"Clock Wizard\" with 1 single-ended reference clock input and a reset input,
--- and 1 to 7 output clocks and a @locked@ output.
---
--- __NB__: Because the clock generator reacts asynchronously to the incoming
--- reset input, the signal __must__ be glitch-free.
+{- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
+\"Clock Wizard\" with 1 single-ended reference clock input and a reset input,
+and 1 to 7 output clocks and a @locked@ output.
+
+__NB__: Because the clock generator reacts asynchronously to the incoming
+reset input, the signal __must__ be glitch-free.
+-}
 unsafeClockWizard ::
-  forall t domIn .
+  forall t domIn.
   ( KnownDomain domIn
   , Clocks t
   , ClocksCxt t
@@ -341,24 +352,26 @@ unsafeClockWizard = clocks
 {-# OPAQUE unsafeClockWizard #-}
 {-# ANN unsafeClockWizard hasBlackBox #-}
 
--- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
--- \"Clock Wizard\" with 1 differential reference clock input and a reset input,
--- and 1 to 7 output clocks and a @locked@ output.
---
--- This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
--- @locked@ output port into proper 'Reset' signals for the output domains which
--- will keep the circuit in reset while the clock is still stabilizing.
---
--- To create a differential clock in a test bench, you can use
--- 'Clash.Explicit.Testbench.clockToDiffClock'.
+{- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
+\"Clock Wizard\" with 1 differential reference clock input and a reset input,
+and 1 to 7 output clocks and a @locked@ output.
+
+This function incorporates 'Clash.Signal.resetSynchronizer's to convert the
+@locked@ output port into proper 'Reset' signals for the output domains which
+will keep the circuit in reset while the clock is still stabilizing.
+
+To create a differential clock in a test bench, you can use
+'Clash.Explicit.Testbench.clockToDiffClock'.
+-}
 clockWizardDifferential ::
-  forall t domIn .
+  forall t domIn.
   ( HasAsynchronousReset domIn
   , ClocksSyncCxt t domIn
   , NumOutClocksSync t domIn <= 7
   ) =>
-  -- | Free running clock (e.g. a clock pin pair connected to a crystal
-  -- oscillator)
+  {- | Free running clock (e.g. a clock pin pair connected to a crystal
+  oscillator)
+  -}
   DiffClock domIn ->
   -- | Reset for the clock generator
   Reset domIn ->
@@ -366,24 +379,26 @@ clockWizardDifferential ::
 clockWizardDifferential clkIn@(DiffClock clkInP _) rstIn =
   clocksResetSynchronizer (unsafeClockWizardDifferential clkIn rstIn) clkInP
 
--- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
--- \"Clock Wizard\" with 1 differential reference clock input and a reset input,
--- and 1 to 7 output clocks and a @locked@ output.
---
--- __NB__: Because the clock generator reacts asynchronously to the incoming
--- reset input, the signal __must__ be glitch-free.
---
--- To create a differential clock in a test bench, you can use
--- 'Clash.Explicit.Testbench.clockToDiffClock'.
+{- | Instantiate a Xilinx MMCM clock generator corresponding to the Xilinx
+\"Clock Wizard\" with 1 differential reference clock input and a reset input,
+and 1 to 7 output clocks and a @locked@ output.
+
+__NB__: Because the clock generator reacts asynchronously to the incoming
+reset input, the signal __must__ be glitch-free.
+
+To create a differential clock in a test bench, you can use
+'Clash.Explicit.Testbench.clockToDiffClock'.
+-}
 unsafeClockWizardDifferential ::
-  forall t domIn .
+  forall t domIn.
   ( KnownDomain domIn
   , Clocks t
   , ClocksCxt t
   , NumOutClocks t <= 7
   ) =>
-  -- | Free running clock (e.g. a clock pin pair connected to a crystal
-  -- oscillator)
+  {- | Free running clock (e.g. a clock pin pair connected to a crystal
+  oscillator)
+  -}
   DiffClock domIn ->
   -- | Reset for the clock generator
   Reset domIn ->

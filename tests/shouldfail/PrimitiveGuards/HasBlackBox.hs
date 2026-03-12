@@ -2,15 +2,14 @@
 
 module HasBlackBox where
 
-import Clash.Prelude
 import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Prelude
 
-primitive
-  :: Signal System Int
-  -> Signal System Int
+primitive ::
+  Signal System Int ->
+  Signal System Int
 primitive =
-  (+5)
-
+  (+ 5)
 {-# OPAQUE primitive #-}
 {-# ANN primitive hasBlackBox #-}
 

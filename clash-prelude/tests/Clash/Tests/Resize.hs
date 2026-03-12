@@ -2,26 +2,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
-
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 
 module Clash.Tests.Resize (tests, main) where
 
-import Clash.Prelude (Unsigned, Signed, BitVector, Index)
-import Clash.Promoted.Nat (SNat(..))
+import Clash.Prelude (BitVector, Index, Signed, Unsigned)
+import Clash.Promoted.Nat (SNat (..))
 import Clash.XException (XException)
 import Control.DeepSeq (NFData)
-import Control.Exception (SomeException, try, evaluate)
+import Control.Exception (SomeException, evaluate, try)
 import Data.Either (isLeft)
-import Data.Proxy (Proxy(Proxy))
-import GHC.TypeNats (KnownNat, SomeNat(..), type (<=), type (+), Nat, someNatVal)
+import Data.Proxy (Proxy (Proxy))
+import GHC.TypeNats (KnownNat, Nat, SomeNat (..), someNatVal, type (+), type (<=))
 import Hedgehog ((===))
 import Numeric.Natural (Natural)
-import Test.Tasty (TestTree, testGroup, defaultMain)
+import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Hedgehog (testPropertyNamed)
-import Test.Tasty.QuickCheck (testProperty, discard, ioProperty, counterexample)
+import Test.Tasty.QuickCheck (counterexample, discard, ioProperty, testProperty)
 
 import qualified Clash.Class.Resize as Resize
 import qualified Hedgehog as H
@@ -47,14 +46,15 @@ indexFailProp ::
   ((b <= a), KnownNat a, KnownNat b) =>
   Proxy b -> Index a -> Q.Property
 indexFailProp Proxy v =
-  let checked = Resize.checkedResize @a @b v in
-  if toInteger v > toInteger (maxBound @(Index b)) then
-    expectExceptionNoX checked
-  else
-    discard
+  let checked = Resize.checkedResize @a @b v
+   in if toInteger v > toInteger (maxBound @(Index b))
+        then
+          expectExceptionNoX checked
+        else
+          discard
 
 maybeResizePropT ::
-  forall f a b .
+  forall f a b.
   ( Integral (f a)
   , Bounded (f a)
   , Show (f a)
@@ -83,8 +83,8 @@ maybeResizePropT _ _ = do
   input <- H.forAll $ Gen.integral (Range.constant minFa maxFa)
   let output = Resize.maybeResize @a @b @f (fromIntegral input)
   if minFb <= input && input <= maxFb
-  then output === Just (fromIntegral input)
-  else output === Nothing
+    then output === Just (fromIntegral input)
+    else output === Nothing
 
 maybeResizeUnsignedProp :: H.Property
 maybeResizeUnsignedProp = H.property $ do
@@ -104,8 +104,8 @@ maybeResizeSignedProp = H.property $ do
 
 maybeResizeIndexProp :: H.Property
 maybeResizeIndexProp = H.property $ do
-  a <- H.forAll $ Gen.integral (Range.linear 1 (2^(128::Natural)))
-  b <- H.forAll $ Gen.integral (Range.linear 1 (2^(128::Natural)))
+  a <- H.forAll $ Gen.integral (Range.linear 1 (2 ^ (128 :: Natural)))
+  b <- H.forAll $ Gen.integral (Range.linear 1 (2 ^ (128 :: Natural)))
   withSomeSNat a $ \(SNat :: SNat a) -> do
     withSomeSNat b $ \(SNat :: SNat b) -> do
       maybeResizePropT @Index @a @b Proxy Proxy
@@ -119,7 +119,7 @@ maybeResizeBitVectorProp = H.property $ do
       maybeResizePropT @BitVector @a @b Proxy Proxy
 
 maybeTruncatePropT ::
-  forall f a b .
+  forall f a b.
   ( Integral (f a)
   , Bounded (f a)
   , Show (f a)
@@ -148,8 +148,8 @@ maybeTruncatePropT _ _ = do
   input <- H.forAll $ Gen.integral (Range.constant minFa maxFa)
   let output = Resize.maybeTruncateB @a @b @f (fromIntegral input)
   if minFab <= input && input <= maxFab
-  then output === Just (fromIntegral input)
-  else output === Nothing
+    then output === Just (fromIntegral input)
+    else output === Nothing
 
 maybeTruncateUnsignedProp :: H.Property
 maybeTruncateUnsignedProp = H.property $ do
@@ -169,8 +169,8 @@ maybeTruncateSignedProp = H.property $ do
 
 maybeTruncateIndexProp :: H.Property
 maybeTruncateIndexProp = H.property $ do
-  a <- H.forAll $ Gen.integral (Range.linear 1 (2^(128::Natural)))
-  b <- H.forAll $ Gen.integral (Range.linear 1 (2^(128::Natural)))
+  a <- H.forAll $ Gen.integral (Range.linear 1 (2 ^ (128 :: Natural)))
+  b <- H.forAll $ Gen.integral (Range.linear 1 (2 ^ (128 :: Natural)))
   withSomeSNat a $ \(SNat :: SNat a) -> do
     withSomeSNat b $ \(SNat :: SNat b) -> do
       maybeTruncatePropT @Index @a @b Proxy Proxy
@@ -193,23 +193,43 @@ expectExceptionNoX a0 = ioProperty $ do
       (isLeft a1)
 
 tests :: TestTree
-tests = testGroup "Resize"
-  [ testGroup "checkedResize"
-    [ testProperty "indexProp @17 @19" (indexProp @17 @19 Proxy)
-    , testProperty "indexProp @19 @19" (indexProp @19 @19 Proxy)
-    , testProperty "indexFailProp @37 @7" (indexFailProp @37 @7 Proxy)
-    , testPropertyNamed "maybeResizeUnsignedProp" "maybeResizeUnsignedProp" maybeResizeUnsignedProp
-    , testPropertyNamed "maybeResizeSignedProp" "maybeResizeSignedProp" maybeResizeSignedProp
-    , testPropertyNamed "maybeResizeIndexProp" "maybeResizeIndexProp" maybeResizeIndexProp
-    , testPropertyNamed "maybeResizeBitVectorProp" "maybeResizeBitVectorProp" maybeResizeBitVectorProp
-    , testPropertyNamed "maybeTruncateUnsignedProp" "maybeTruncateUnsignedProp" maybeTruncateUnsignedProp
-    , testPropertyNamed "maybeTruncateSignedProp" "maybeTruncateSignedProp" maybeTruncateSignedProp
-    , testPropertyNamed "maybeTruncateIndexProp" "maybeTruncateIndexProp" maybeTruncateIndexProp
-    , testPropertyNamed "maybeTruncateBitVectorProp" "maybeTruncateBitVectorProp" maybeTruncateBitVectorProp
+tests =
+  testGroup
+    "Resize"
+    [ testGroup
+        "checkedResize"
+        [ testProperty "indexProp @17 @19" (indexProp @17 @19 Proxy)
+        , testProperty "indexProp @19 @19" (indexProp @19 @19 Proxy)
+        , testProperty "indexFailProp @37 @7" (indexFailProp @37 @7 Proxy)
+        , testPropertyNamed
+            "maybeResizeUnsignedProp"
+            "maybeResizeUnsignedProp"
+            maybeResizeUnsignedProp
+        , testPropertyNamed "maybeResizeSignedProp" "maybeResizeSignedProp" maybeResizeSignedProp
+        , testPropertyNamed "maybeResizeIndexProp" "maybeResizeIndexProp" maybeResizeIndexProp
+        , testPropertyNamed
+            "maybeResizeBitVectorProp"
+            "maybeResizeBitVectorProp"
+            maybeResizeBitVectorProp
+        , testPropertyNamed
+            "maybeTruncateUnsignedProp"
+            "maybeTruncateUnsignedProp"
+            maybeTruncateUnsignedProp
+        , testPropertyNamed
+            "maybeTruncateSignedProp"
+            "maybeTruncateSignedProp"
+            maybeTruncateSignedProp
+        , testPropertyNamed "maybeTruncateIndexProp" "maybeTruncateIndexProp" maybeTruncateIndexProp
+        , testPropertyNamed
+            "maybeTruncateBitVectorProp"
+            "maybeTruncateBitVectorProp"
+            maybeTruncateBitVectorProp
+        ]
     ]
-  ]
 
 main :: IO ()
-main = defaultMain
-  -- $ adjustOption (\_ -> HedgehogTestLimit (Just 1_000_000))
-  $ tests
+main =
+  defaultMain
+  -- \$ adjustOption (\_ -> HedgehogTestLimit (Just 1_000_000))
+  $
+    tests

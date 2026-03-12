@@ -93,6 +93,7 @@ library
     Test.Tasty.Clash.CoreTest
     Test.Tasty.Clash.NetlistTest
     Test.Tasty.Common
+    Test.Flags
     Test.Tasty.Ghdl
     Test.Tasty.Iverilog
     Test.Tasty.Modelsim

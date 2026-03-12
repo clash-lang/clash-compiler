@@ -1,6 +1,6 @@
-{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 -- Case alternatives should be selected by the partial evalautor when they
 -- can be statically determined. This means we need to show that each type of
@@ -20,8 +20,8 @@ import Control.Monad (unless)
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.PartialEval
 import Clash.Core.Name
+import Clash.Core.PartialEval
 import Clash.Core.Subst
 import Clash.Core.Term
 import Clash.Core.TyCon
@@ -39,21 +39,27 @@ matchedAlt :: [Integer]
 matchedAlt = [1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862]
 
 {-# OPAQUE caseOfData #-}
-{-# ANN caseOfData (Synthesize
-          { t_name   = "caseOfData"
-          , t_inputs = []
-          , t_output = PortName "res"
-          })
+{-# ANN
+  caseOfData
+  ( Synthesize
+      { t_name = "caseOfData"
+      , t_inputs = []
+      , t_output = PortName "res"
+      }
+  )
   #-}
 caseOfData :: [Integer]
 caseOfData = maybe [] (const matchedAlt) (Just 0)
 
 {-# OPAQUE caseOfLit #-}
-{-# ANN caseOfLit (Synthesize
-          { t_name   = "caseOfLit"
-          , t_inputs = []
-          , t_output = PortName "res"
-          })
+{-# ANN
+  caseOfLit
+  ( Synthesize
+      { t_name = "caseOfLit"
+      , t_inputs = []
+      , t_output = PortName "res"
+      }
+  )
   #-}
 caseOfLit :: [Integer]
 caseOfLit =
@@ -63,11 +69,14 @@ caseOfLit =
     _ -> []
 
 {-# OPAQUE caseOfDefault #-}
-{-# ANN caseOfDefault (Synthesize
-          { t_name   = "caseOfDefault"
-          , t_inputs = []
-          , t_output = PortName "res"
-          })
+{-# ANN
+  caseOfDefault
+  ( Synthesize
+      { t_name = "caseOfDefault"
+      , t_inputs = []
+      , t_output = PortName "res"
+      }
+  )
   #-}
 caseOfDefault :: [Integer]
 caseOfDefault =
@@ -77,17 +86,17 @@ caseOfDefault =
 testPath :: FilePath
 testPath = "tests/shouldwork/PartialEvaluation/KnownCase.hs"
 
-mainCommon
-  :: (Backend (TargetToState target))
-  => SBuildTarget target
-  -> IO ()
+mainCommon ::
+  (Backend (TargetToState target)) =>
+  SBuildTarget target ->
+  IO ()
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
 
-  alt  <- findBinding "KnownCase.matchedAlt" entities
+  alt <- findBinding "KnownCase.matchedAlt" entities
   just <- findBinding "KnownCase.caseOfData" entities
-  lit  <- findBinding "KnownCase.caseOfLit" entities
-  def  <- findBinding "KnownCase.caseOfDefault" entities
+  lit <- findBinding "KnownCase.caseOfLit" entities
+  def <- findBinding "KnownCase.caseOfDefault" entities
 
   unless (aeqTerm just alt) $
     error ("Not alpha equivalent: " <> show just <> "\n\n" <> show alt)

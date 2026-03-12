@@ -1,55 +1,55 @@
-{-|
+{-# LANGUAGE TypeFamilies #-}
+
+{- |
 Copyright:    (C) 2022 Google Inc.
 License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
+module Clash.FFI.VPI.Port.Direction (
+  Direction (..),
+  UnknownDirection (..),
+) where
 
-{-# LANGUAGE TypeFamilies #-}
+import Control.Exception (Exception, throwIO)
+import Foreign.C.Types (CInt)
+import GHC.Stack (CallStack, callStack, prettyCallStack)
 
-module Clash.FFI.VPI.Port.Direction
-  ( Direction(..)
-  , UnknownDirection(..)
-  ) where
+import Clash.FFI.View
 
-import           Control.Exception (Exception, throwIO)
-import           Foreign.C.Types (CInt)
-import           GHC.Stack (CallStack, callStack, prettyCallStack)
-
-import           Clash.FFI.View
-
--- | The direction of a port in a module. This does not include the mixed IO
--- or no direction port types from the specification, as they do not seem
--- possible with syntactically correct verilog (also according to the
--- specification).
---
+{- | The direction of a port in a module. This does not include the mixed IO
+or no direction port types from the specification, as they do not seem
+possible with syntactically correct verilog (also according to the
+specification).
+-}
 data Direction
-  = Input
-  -- ^ An input port.
-  | Output
-  -- ^ An output port.
-  | InOut
-  -- ^ A bidirectional port.
-  | MixedIO
-  -- ^ A mixed IO port.
-  | NoDirection
-  -- ^ No direction.
+  = -- | An input port.
+    Input
+  | -- | An output port.
+    Output
+  | -- | A bidirectional port.
+    InOut
+  | -- | A mixed IO port.
+    MixedIO
+  | -- | No direction.
+    NoDirection
   deriving stock (Show)
 
--- | An exception thrown when decoding a port direction if an invalid value is
--- given for the C enum that specifies the constructor of 'Direction'.
---
+{- | An exception thrown when decoding a port direction if an invalid value is
+given for the C enum that specifies the constructor of 'Direction'.
+-}
 data UnknownDirection
   = UnknownDirection CInt CallStack
   deriving anyclass (Exception)
 
 instance Show UnknownDirection where
   show = \case
-    UnknownDirection d c -> mconcat
-      [ "Unknown port direction: "
-      , show d
-      , "\n"
-      , prettyCallStack c
-      ]
+    UnknownDirection d c ->
+      mconcat
+        [ "Unknown port direction: "
+        , show d
+        , "\n"
+        , prettyCallStack c
+        ]
 
 type instance CRepr Direction = CInt
 

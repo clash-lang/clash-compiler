@@ -3,9 +3,9 @@
 
 module Data.Primitive.ByteArray.Extra where
 
-import Data.Binary (Binary(..))
+import Data.Binary (Binary (..))
 import Data.Primitive.ByteArray (ByteArray)
-import GHC.Exts (IsList(..))
+import GHC.Exts (IsList (..))
 
 #if !MIN_VERSION_primitive(0,7,1)
 import Control.DeepSeq (NFData(..))

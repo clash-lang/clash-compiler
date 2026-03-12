@@ -299,6 +299,7 @@ Library
                       Clash.Class.AutoReg.Instances
                       Clash.Clocks.Internal
                       Clash.CPP
+                      Clash.Prelude.Paths
                       Clash.Signal.Bundle.Internal
                       Clash.Sized.Internal
                       Language.Haskell.TH.Compat

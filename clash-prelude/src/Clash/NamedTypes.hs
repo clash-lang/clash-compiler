@@ -1,3 +1,7 @@
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {- |
 Copyright  :  (C) 2017, Myrtle Software Ltd, QBayLogic, Google Inc.
 License    :  BSD2 (see the file LICENSE)
@@ -30,17 +34,8 @@ fifo @System
      -> ("write request" ::: Signal System (Maybe (BitVector dataSize)))
      -> ("q" ::: Signal System (BitVector dataSize),
          "full" ::: Signal System Bool, "empty" ::: Signal System Bool)
-
 -}
-
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
-module Clash.NamedTypes
-  ((:::))
+module Clash.NamedTypes ((:::))
 where
 
 type (name :: k) ::: a = a
@@ -62,5 +57,4 @@ let fifo
          )
     fifo = Clash.Explicit.Prelude.undefined
 :}
-
 -}

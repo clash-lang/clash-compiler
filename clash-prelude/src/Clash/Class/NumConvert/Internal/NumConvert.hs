@@ -115,11 +115,11 @@ of @Index 8@ can be represented by an @Unsigned 2@:
 For the time being, if the input is an 'Clash.XException.XException', then
 the output is too. This property might be relaxed in the future.
 -}
-numConvert :: forall a b. NumConvert a b => a -> b
+numConvert :: forall a b. (NumConvert a b) => a -> b
 numConvert =
-    numConvertCanonical @(Canonical b) @b
-  . numConvertCanonical @(Canonical a) @(Canonical b)
-  . numConvertCanonical @a @(Canonical a)
+  numConvertCanonical @(Canonical b) @b
+    . numConvertCanonical @(Canonical a) @(Canonical b)
+    . numConvertCanonical @a @(Canonical a)
 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Index n) (Index m) where
   numConvertCanonical = resize
@@ -130,7 +130,10 @@ instance (KnownNat n, KnownNat m, n <= 2 ^ m) => NumConvertCanonical (Index n) (
 {- | Note: Conversion from @Index 1@ to @Signed 0@ is lossless, but not within the
 constraints of the instance.
 -}
-instance (KnownNat n, KnownNat m, CLogWZ 2 n 0 + 1 <= m) => NumConvertCanonical (Index n) (Signed m) where
+instance
+  (KnownNat n, KnownNat m, CLogWZ 2 n 0 + 1 <= m) =>
+  NumConvertCanonical (Index n) (Signed m)
+  where
   numConvertCanonical !a = numConvertCanonical $ bitCoerce @_ @(Unsigned (CLogWZ 2 n 0)) a
 
 instance (KnownNat n, KnownNat m, n <= 2 ^ m) => NumConvertCanonical (Index n) (BitVector m) where

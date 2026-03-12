@@ -9,7 +9,7 @@ import Data.Proxy
 import Data.Tagged
 import Data.Text (Text)
 import System.Directory (copyFile, doesDirectoryExist, listDirectory)
-import System.FilePath ((</>), takeFileName)
+import System.FilePath (takeFileName, (</>))
 import System.FilePath.Glob (glob)
 import System.Info (os)
 
@@ -46,36 +46,37 @@ instance IsTest VerilatorMakeTest where
 
         -- Types modules have to be given first, or verilator will complain that
         -- they are not already declared when it sees them being imported.
-        svSrc <- mappend
-          <$> (fmap takeFileName <$> glob (dir </> "*" </> "*_types.sv"))
-          <*> (fmap takeFileName <$> glob (dir </> "*" </> vmTop <> ".sv"))
+        svSrc <-
+          mappend
+            <$> (fmap takeFileName <$> glob (dir </> "*" </> "*_types.sv"))
+            <*> (fmap takeFileName <$> glob (dir </> "*" </> vmTop <> ".sv"))
 
         -- Clash by default will not mix HDLs in it's output. If this ever changes,
         -- and it is possible to have `clash` output both Verilog and SystemVerilog
         -- then this will need to change.
         runVerilator dir (mkArgs libs (vSrc <> svSrc))
-
     | otherwise =
         pure (testPassed "Ignoring test due to --no-verilator")
    where
     mkArgs libs srcs =
       ["-I" <> lib | lib <- libs]
-        <> [ "-Wno-fatal"         -- Do not abort on warnings
+        <> [ "-Wno-fatal" -- Do not abort on warnings
            , "-Wall"
-           -- https://veripool.org/guide/latest/faq.html#why-do-i-get-undefined-reference-to-sc-time-stamp
-           , "-CFLAGS", "-DVL_TIME_CONTEXT"
-           , "+1364-2001ext+v"    -- Default to Verilog 2001
-           , "+1800-2005ext+sv"   -- Default to SystemVerilog 2005
-           , "--top"              -- This is used to set the C++ class names
+           , -- https://veripool.org/guide/latest/faq.html#why-do-i-get-undefined-reference-to-sc-time-stamp
+             "-CFLAGS"
+           , "-DVL_TIME_CONTEXT"
+           , "+1364-2001ext+v" -- Default to Verilog 2001
+           , "+1800-2005ext+sv" -- Default to SystemVerilog 2005
+           , "--top" -- This is used to set the C++ class names
            , vmTop
-           , "--cc"               -- Build for C++, not SystemC
-           , "--build"            -- Build the verilated code immediately
-           , "--binary"           -- Create an binary to execute
+           , "--cc" -- Build for C++, not SystemC
+           , "--build" -- Build the verilated code immediately
+           , "--binary" -- Create an binary to execute
            ]
         <> srcs
 
     verilator workDir args =
-      let program = case os of {"mingw32" -> "verilator_bin"; _ -> "verilator"}
+      let program = case os of "mingw32" -> "verilator_bin"; _ -> "verilator"
        in TestProgram program args NoGlob PrintNeither False (Just workDir) []
 
     runVerilator workDir args =
@@ -106,7 +107,6 @@ instance IsTest VerilatorSimTest where
         case expectFail of
           Nothing -> run optionSet (verilated dir topExe) progressCallback
           Just exit -> run optionSet (failingVerilated dir topExe exit) progressCallback
-
     | otherwise =
         pure (testPassed "Ignoring test due to --no-verilator")
    where
@@ -114,8 +114,17 @@ instance IsTest VerilatorSimTest where
       TestProgram exe [] NoGlob PrintNeither nonEmptyFail (Just workDir) []
 
     failingVerilated workDir exe (exit, expectedErr) =
-      TestFailingProgram (testExitCode exit) exe [] NoGlob PrintNeither False
-        (specificExitCode exit) (ExpectEither expectedErr) (Just workDir) []
+      TestFailingProgram
+        (testExitCode exit)
+        exe
+        []
+        NoGlob
+        PrintNeither
+        False
+        (specificExitCode exit)
+        (ExpectEither expectedErr)
+        (Just workDir)
+        []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Verilator)])

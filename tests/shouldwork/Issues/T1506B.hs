@@ -1,18 +1,17 @@
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-
+{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module T1506B where
 
 import Clash.Prelude
 
-import qualified T1506A
-import Control.Monad (when)
 import qualified Clash.Util.Interpolate as I
+import Control.Monad (when)
 import qualified Data.List as L
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
+import qualified T1506A
 
 topEntity = T1506A.topEntity
 
@@ -29,12 +28,14 @@ mainHDL topFile = do
     xRstCountExp = 7
     iRstCountExp = 13
 
-  when (xRstCountExp /= xRstCount || iRstCountExp /= iRstCount) $ error $ [I.i|
+  when (xRstCountExp /= xRstCount || iRstCountExp /= iRstCount) $
+    error $
+      [I.i|
     Found #{xRstCount} xRst and #{iRstCount} iRst occurrences, but expected
     #{xRstCountExp} and #{iRstCountExp} instead in #{topFile}.
   |]
 
 mainSystemVerilog, mainVerilog, mainVHDL :: IO ()
 mainSystemVerilog = mainHDL "topEntity_0.sv"
-mainVerilog       = mainHDL "topEntity_0.v"
-mainVHDL          = mainHDL "topEntity_0.vhdl"
+mainVerilog = mainHDL "topEntity_0.v"
+mainVHDL = mainHDL "topEntity_0.vhdl"

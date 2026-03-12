@@ -3,8 +3,8 @@
 
 module BangPatterns where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 topEntity :: Signal System (BitVector 1)
 topEntity = f @System (pure False)
@@ -15,8 +15,8 @@ f !e = fmap pack e
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    expectedOutput = outputVerifier' clk rst (0 :> Nil)
-    done           = expectedOutput topEntity
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+ where
+  expectedOutput = outputVerifier' clk rst (0 :> Nil)
+  done = expectedOutput topEntity
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

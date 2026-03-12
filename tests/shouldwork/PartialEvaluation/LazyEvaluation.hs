@@ -8,8 +8,8 @@ import qualified Data.List as List (find)
 import Clash.Prelude
 
 import Clash.Backend
-import Clash.Core.PartialEval
 import Clash.Core.Name
+import Clash.Core.PartialEval
 import Clash.Core.Subst
 import Clash.Core.Term
 import Clash.Core.TyCon
@@ -32,20 +32,20 @@ topEntity = flip const nats
 testPath :: FilePath
 testPath = "tests/shouldwork/PartialEvaluation/LazyEvaluation.hs"
 
-mainCommon
-  :: (Backend (TargetToState target))
-  => SBuildTarget target
-  -> IO ()
+mainCommon ::
+  (Backend (TargetToState target)) =>
+  SBuildTarget target ->
+  IO ()
 mainCommon hdl = do
   entities <- runToCoreStage hdl id testPath
   te <- findBinding "LazyEvaluation.topEntity" entities
 
-  if |  Lam i (Var j) <- te
-     ,  i == j
-     -> pure ()
-
-     |  otherwise
-     -> error ("Evaluation was not lazy: " <> show te)
+  if
+    | Lam i (Var j) <- te
+    , i == j ->
+        pure ()
+    | otherwise ->
+        error ("Evaluation was not lazy: " <> show te)
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL
@@ -55,4 +55,3 @@ mainVerilog = mainCommon SVerilog
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = mainCommon SSystemVerilog
-

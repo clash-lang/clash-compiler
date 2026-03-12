@@ -3,54 +3,56 @@
 
 module InstDeclAnnotations where
 
-import           Clash.Annotations.SynthesisAttributes (Attr(..))
-import           Clash.Annotations.Primitive     (HDL (..), Primitive (..))
-import           Clash.Backend
-import qualified Clash.Netlist.Id                as Id
-import           Clash.Netlist.Types
-import           Clash.Prelude
-import           Control.Monad.State
-import           GHC.Stack
-import           Data.List                       (isInfixOf)
-import           Data.Monoid                     (Ap(getAp))
-import           Data.String.Interpolate         (__i)
+import Clash.Annotations.Primitive (HDL (..), Primitive (..))
+import Clash.Annotations.SynthesisAttributes (Attr (..))
+import Clash.Backend
+import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+import Clash.Prelude
+import Control.Monad.State
+import Data.List (isInfixOf)
+import Data.Monoid (Ap (getAp))
+import Data.String.Interpolate (__i)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import           Data.Text.Prettyprint.Doc.Extra (Doc (..))
+import Data.Text.Prettyprint.Doc.Extra (Doc (..))
+import GHC.Stack
+import System.Environment (getArgs)
+import System.FilePath ((</>))
 import qualified Prelude as P
-import           System.Environment              (getArgs)
-import           System.FilePath                 ((</>))
-
 
 myTF :: TemplateFunction
 myTF = TemplateFunction used valid myTemplate
  where
-  used    = []
+  used = []
   valid _ = True
 
-myTemplate
-  :: Backend s
-  => BlackBoxContext
-  -> State s Doc
+myTemplate ::
+  (Backend s) =>
+  BlackBoxContext ->
+  State s Doc
 myTemplate bbCtx = do
-  blkName  <- Id.makeBasic "blkName"
+  blkName <- Id.makeBasic "blkName"
   compInst <- Id.makeBasic "test_inst"
   compName <- Id.makeBasic "TEST"
   let
     attrs =
-      [ IntegerAttr "my_int_attr"    7
-      , StringAttr  "my_string_attr" "Hello World!"
+      [ IntegerAttr "my_int_attr" 7
+      , StringAttr "my_string_attr" "Hello World!"
       ]
   getAp
-    $ blockDecl blkName [InstDecl Comp Nothing attrs compName compInst [] (NamedPortMap []) ]
+    $ blockDecl blkName [InstDecl Comp Nothing attrs compName compInst [] (NamedPortMap [])]
 
-
-myBlackBox
-  :: Signal System Int
-  -> Signal System Int
+myBlackBox ::
+  Signal System Int ->
+  Signal System Int
 myBlackBox _ = pure (errorX "not implemented")
 {-# OPAQUE myBlackBox #-}
-{-# ANN myBlackBox (InlinePrimitive [VHDL,Verilog,SystemVerilog] [__i|
+{-# ANN
+  myBlackBox
+  ( InlinePrimitive
+      [VHDL, Verilog, SystemVerilog]
+      [__i|
    [ { "BlackBox" :
         { "name" : "InstDeclAnnotations.myBlackBox",
           "kind" : "Declaration",
@@ -59,22 +61,28 @@ myBlackBox _ = pure (errorX "not implemented")
         }
      }
    ]
-   |]) #-}
+   |]
+  )
+  #-}
 
-
-topEntity
-  :: SystemClockResetEnable
-  => Signal System Int
-  -> Signal System Int
+topEntity ::
+  (SystemClockResetEnable) =>
+  Signal System Int ->
+  Signal System Int
 topEntity = myBlackBox
-
 
 --------------- Actual tests for generated HDL -------------------
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | needle `isInfixOf` haystack = return ()
-  | otherwise                   = P.error $ P.concat [ "Expected:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | otherwise =
+      P.error
+        $ P.concat
+          [ "Expected:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
 
 -- VHDL test
 mainVHDL :: IO ()

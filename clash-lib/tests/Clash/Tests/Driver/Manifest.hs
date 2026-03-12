@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns  #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Clash.Tests.Driver.Manifest where
 
@@ -8,15 +8,15 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as Base16
 import Data.Coerce (coerce)
 import Data.Either (fromRight)
-import Data.Text (Text)
 import qualified Data.HashMap.Strict as HashMap
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
 import Test.Tasty
 
-import qualified Test.Tasty.QuickCheck as Q
 import qualified Test.QuickCheck.Utf8 as Q
+import qualified Test.Tasty.QuickCheck as Q
 
 import Clash.Driver.Manifest
 import Clash.Explicit.Signal
@@ -69,7 +69,7 @@ genManifest =
     <*> Q.arbitrary -- flags
     <*> Q.listOf genPort -- ports
     <*> coerce @(Q.Gen [ArbitraryText]) @(Q.Gen [Text]) Q.arbitrary -- comp names
-    <*> coerce @(Q.Gen ArbitraryText)   @(Q.Gen Text)   Q.arbitrary -- top name
+    <*> coerce @(Q.Gen ArbitraryText) @(Q.Gen Text) Q.arbitrary -- top name
     <*> Q.listOf ((,) <$> genString <*> genDigest) -- files
     <*> (HashMap.fromList <$> Q.listOf genDomain) -- domains
     <*> coerce @(Q.Gen [ArbitraryText]) @(Q.Gen [Text]) Q.arbitrary -- dependencies
@@ -77,21 +77,21 @@ genManifest =
 tests :: TestTree
 tests =
   adjustOption (\_ -> Q.QuickCheckTests 100) $
-  testGroup
-    "Clash.Tests.Driver.Manifest"
-    [ Q.testProperty "decode . encode ~ id" $ do
-        manifest <- genManifest
-        let
-          encoded = Aeson.encodePretty manifest
-          decoded = Aeson.eitherDecode encoded
+    testGroup
+      "Clash.Tests.Driver.Manifest"
+      [ Q.testProperty "decode . encode ~ id" $ do
+          manifest <- genManifest
+          let
+            encoded = Aeson.encodePretty manifest
+            decoded = Aeson.eitherDecode encoded
 
-        pure (decoded Q.=== Right manifest)
-    , Q.testProperty "FilesManifest can decode encoded Manifest" $ do
-        manifest@Manifest{fileNames} <- genManifest
-        let
-          encoded = Aeson.encodePretty manifest
-          FilesManifest fileNamesDecoded =
-            fromRight (error "Failed to decode manifest") (Aeson.eitherDecode encoded)
+          pure (decoded Q.=== Right manifest)
+      , Q.testProperty "FilesManifest can decode encoded Manifest" $ do
+          manifest@Manifest{fileNames} <- genManifest
+          let
+            encoded = Aeson.encodePretty manifest
+            FilesManifest fileNamesDecoded =
+              fromRight (error "Failed to decode manifest") (Aeson.eitherDecode encoded)
 
-        pure (fileNamesDecoded Q.=== fileNames)
-    ]
+          pure (fileNamesDecoded Q.=== fileNames)
+      ]

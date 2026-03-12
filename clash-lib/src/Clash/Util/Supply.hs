@@ -1,42 +1,50 @@
-{-# LANGUAGE MagicHash, UnboxedTuples, CPP, PatternSynonyms #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE Trustworthy #-}
-{-# OPTIONS_GHC -fno-full-laziness #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -fno-full-laziness #-}
+
 -----------------------------------------------------------------------------
--- |
--- Module      :  Clash.Util.Supply
--- Copyright   :  (C) 2011-2013 Edward Kmett
--- License     :  BSD-style (see the file LICENSE)
---
--- Maintainer  :  Edward Kmett <ekmett@gmail.com>
--- Stability   :  provisional
--- Portability :  portable
---
--- A fast unique identifier supply with local pooling and replay
--- support.
---
--- One often has a desire to generate a bunch of integer identifiers within
--- a single process that are unique within that process. You could use
--- UUIDs, but they can be expensive to generate; you don't want to have
--- your threads contending for a single external counter if the identifier
--- is not going to be used outside the process.
---
--- @concurrent-supply@ builds a tree-like structure which can be split; you
--- can make smaller unique supplies and then you allocate from your supplies
--- locally. Internally it pulls from a unique supply one block at a time as
--- you walk into parts of the tree that haven't been explored.
---
+
 ----------------------------------------------------------------------------
-module Clash.Util.Supply
-  ( Supply
+
+{- |
+Module      :  Clash.Util.Supply
+Copyright   :  (C) 2011-2013 Edward Kmett
+License     :  BSD-style (see the file LICENSE)
+
+Maintainer  :  Edward Kmett <ekmett@gmail.com>
+Stability   :  provisional
+Portability :  portable
+
+A fast unique identifier supply with local pooling and replay
+support.
+
+One often has a desire to generate a bunch of integer identifiers within
+a single process that are unique within that process. You could use
+UUIDs, but they can be expensive to generate; you don't want to have
+your threads contending for a single external counter if the identifier
+is not going to be used outside the process.
+
+@concurrent-supply@ builds a tree-like structure which can be split; you
+can make smaller unique supplies and then you allocate from your supplies
+locally. Internally it pulls from a unique supply one block at a time as
+you walk into parts of the tree that haven't been explored.
+-}
+module Clash.Util.Supply (
+  Supply,
+
   -- * Variables
-  , newSupply
-  , freshId
-  , splitSupply
+  newSupply,
+  freshId,
+  splitSupply,
+
   -- * Unboxed API
-  , freshId#
-  , splitSupply#
-  ) where
+  freshId#,
+  splitSupply#,
+) where
 
 import Data.Hashable
 import Data.IORef
@@ -66,8 +74,13 @@ instance Ord Block where
   Block a (Block b _ :- _) `compare` Block c (Block d _ :- _) = compare a c `mappend` compare b d
 
 instance Show Block where
-  showsPrec d (Block a (Block b _ :- _)) = showParen (d >= 10) $
-    showString "Block " . showsPrec 10 a . showString " (Block " . showsPrec 10 b . showString " ... :- ...)"
+  showsPrec d (Block a (Block b _ :- _)) =
+    showParen (d >= 10) $
+      showString "Block "
+        . showsPrec 10 a
+        . showString " (Block "
+        . showsPrec 10 b
+        . showString " ... :- ...)"
 
 instance Hashable Block where
   hashWithSalt s (Block a (Block b _ :- _)) = s `hashWithSalt` a `hashWithSalt` b
@@ -86,7 +99,7 @@ blockCounter = unsafePerformIO (newIORef 0)
 {-# NOINLINE blockCounter #-}
 
 modifyBlock :: a -> IO Unique
-modifyBlock _ = atomicModifyIORef blockCounter $ \ i -> let i' = i + blockSize in i' `seq` (i', i)
+modifyBlock _ = atomicModifyIORef blockCounter $ \i -> let i' = i + blockSize in i' `seq` (i', i)
 {-# NOINLINE modifyBlock #-}
 
 gen :: a -> Block
@@ -103,7 +116,7 @@ splitBlock# (Block i (x :- xs)) = (# x, Block i xs #)
 
 -- | A user managed globally unique variable supply.
 data Supply = Supply {-# UNPACK #-} !Unique {-# UNPACK #-} !Unique Block
-  deriving (Eq,Ord,Show)
+  deriving (Eq, Ord, Show)
 
 instance Hashable Supply where
   hashWithSalt s (Supply i j b) = s `hashWithSalt` i `hashWithSalt` j `hashWithSalt` b
@@ -112,9 +125,10 @@ blockSupply :: Block -> Supply
 blockSupply (Block i bs) = Supply i (i + blockSize - 1) (extract bs)
 {-# INLINE blockSupply #-}
 
--- | Grab a new supply. Any two supplies obtained with newSupply are guaranteed to return
--- disjoint sets of identifiers. Replaying the same sequence of operations on the same
--- Supply will yield the same results.
+{- | Grab a new supply. Any two supplies obtained with newSupply are guaranteed to return
+disjoint sets of identifiers. Replaying the same sequence of operations on the same
+Supply will yield the same results.
+-}
 newSupply :: IO Supply
 newSupply = blockSupply <$> newBlock
 {-# INLINE newSupply #-}
@@ -141,12 +155,12 @@ freshId# (Supply i@(Unique# i#) j b)
 -- | An unboxed version of splitSupply
 splitSupply# :: Supply -> (# Supply, Supply #)
 splitSupply# (Supply i k b) = case splitBlock# b of
-    (# bl, br #)
-      | k - i >= minSplitSupplySize
-      , j <- i + div (k - i) 2 ->
+  (# bl, br #)
+    | k - i >= minSplitSupplySize
+    , j <- i + div (k - i) 2 ->
         (# Supply i j bl, Supply (j + 1) k br #)
-      | Block x (l :- r :- _) <- bl
-      , y <- x + div blockSize 2
-      , z <- x + blockSize - 1 ->
+    | Block x (l :- r :- _) <- bl
+    , y <- x + div blockSize 2
+    , z <- x + blockSize - 1 ->
         (# Supply x (y - 1) l, Supply y z r #)
 {-# INLINE splitSupply# #-}

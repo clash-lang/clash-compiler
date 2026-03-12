@@ -1,4 +1,6 @@
-{-|
+{-# LANGUAGE LambdaCase #-}
+
+{- |
 Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
@@ -7,26 +9,23 @@ The AsTerm class and relevant instances for the partial evaluator. This
 defines how to convert normal forms back into Terms which can be given as the
 result of evaluation.
 -}
-
-{-# LANGUAGE LambdaCase #-}
-
-module Clash.Core.PartialEval.AsTerm
-  ( AsTerm(..)
-  ) where
+module Clash.Core.PartialEval.AsTerm (
+  AsTerm (..),
+) where
 
 import Data.Bifunctor (first, second)
 
 import Clash.Core.HasFreeVars
 import Clash.Core.PartialEval.NormalForm
-import Clash.Core.Term (Bind(..), Term(..), Pat, Alt, mkApps)
+import Clash.Core.Term (Alt, Bind (..), Pat, Term (..), mkApps)
 import Clash.Core.VarEnv (elemVarSet)
 
--- | Convert a term in some normal form back into a Term. This is important,
--- as it may perform substitutions which have not yet been performed (i.e. when
--- converting from WHNF where heads contain the environment at that point).
---
+{- | Convert a term in some normal form back into a Term. This is important,
+as it may perform substitutions which have not yet been performed (i.e. when
+converting from WHNF where heads contain the environment at that point).
+-}
 class AsTerm a where
-  asTerm:: a -> Term
+  asTerm :: a -> Term
 
 instance (AsTerm a) => AsTerm (Neutral a) where
   asTerm = \case

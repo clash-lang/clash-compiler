@@ -494,246 +494,149 @@ instance Show UnknownCallbackReason where
       , prettyCallStack c
       ]
 
-instance UnsafeReceive CallbackReason where
-  unsafeReceive (creason, object, ctime, cvalue) =
-    let mObject = if isNullObject object then Nothing else Just object in
-    case creason of
-      1 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterValueChange object timeTy valueFmt
+receiveCallbackReason
+  :: HasCallStack
+  => CInt
+  -> Object
+  -> FFI.Ptr Time
+  -> FFI.Ptr Value
+  -> IO CallbackReason
+receiveCallbackReason creason object ctime cvalue =
+  let mObject = if isNullObject object then Nothing else Just object in
+  case creason of
+    1 -> do
+      timeTy <- FFI.peekByteOff ctime 0 >>= receive
+      valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+      pure $ AfterValueChange object timeTy valueFmt
 
-      2 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        pure $ BeforeStatement object timeTy
+    2 -> do
+      timeTy <- FFI.peekByteOff ctime 0 >>= receive
+      pure $ BeforeStatement object timeTy
 
-      3 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterForce mObject timeTy valueFmt
+    3 -> do
+      timeTy <- FFI.peekByteOff ctime 0 >>= receive
+      valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+      pure $ AfterForce mObject timeTy valueFmt
 
-      4 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterRelease mObject timeTy valueFmt
+    4 -> do
+      timeTy <- FFI.peekByteOff ctime 0 >>= receive
+      valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+      pure $ AfterRelease mObject timeTy valueFmt
 
-      5 -> do
-        time <- peekReceive ctime
-        pure $ AtStartOfSimTime mObject time
+    5 -> do
+      time <- peekReceive ctime
+      pure $ AtStartOfSimTime mObject time
 
-      6 -> do
-        time <- peekReceive ctime
-        pure $ ReadWriteSynch mObject time
+    6 -> do
+      time <- peekReceive ctime
+      pure $ ReadWriteSynch mObject time
 
-      7 -> do
-        time <- peekReceive ctime
-        pure $ ReadOnlySynch mObject time
+    7 -> do
+      time <- peekReceive ctime
+      pure $ ReadOnlySynch mObject time
 
-      8 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        pure $ NextSimTime mObject timeTy
+    8 -> do
+      timeTy <- FFI.peekByteOff ctime 0 >>= receive
+      pure $ NextSimTime mObject timeTy
 
-      9 -> do
-        time <- peekReceive ctime
-        pure $ AfterDelay mObject time
+    9 -> do
+      time <- peekReceive ctime
+      pure $ AfterDelay mObject time
 
-      10 ->
-        pure EndOfCompile
+    10 ->
+      pure EndOfCompile
 
-      11 ->
-        pure StartOfSimulation
+    11 ->
+      pure StartOfSimulation
 
-      12 ->
-        pure EndOfSimulation
+    12 ->
+      pure EndOfSimulation
 
-      13 ->
-        pure RuntimeError
+    13 ->
+      pure RuntimeError
 
-      14 ->
-        pure TchkViolation
+    14 ->
+      pure TchkViolation
 
-      15 ->
-        pure StartOfSave
+    15 ->
+      pure StartOfSave
 
-      16 ->
-        pure EndOfSave
+    16 ->
+      pure EndOfSave
 
-      17 ->
-        pure StartOfRestart
+    17 ->
+      pure StartOfRestart
 
-      18 ->
-        pure EndOfRestart
+    18 ->
+      pure EndOfRestart
 
-      19 ->
-        pure StartOfReset
+    19 ->
+      pure StartOfReset
 
-      20 ->
-        pure EndOfReset
+    20 ->
+      pure EndOfReset
 
-      21 ->
-        pure EnterInteractive
+    21 ->
+      pure EnterInteractive
 
-      22 ->
-        pure ExitInteractive
+    22 ->
+      pure ExitInteractive
 
-      23 ->
-        pure InteractiveScopeChange
+    23 ->
+      pure InteractiveScopeChange
 
-      24 ->
-        pure UnresolvedSysTf
+    24 ->
+      pure UnresolvedSysTf
 
+    n ->
+      receiveCallbackReasonExtra n object mObject ctime cvalue
+
+receiveCallbackReasonExtra
+  :: HasCallStack
+  => CInt
+  -> Object
+  -> Maybe Object
+  -> FFI.Ptr Time
+  -> FFI.Ptr Value
+  -> IO CallbackReason
 #if defined(VERILOG_2001)
-      25 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterAssign object timeTy valueFmt
+receiveCallbackReasonExtra 25 object _ ctime cvalue = do
+  timeTy <- FFI.peekByteOff ctime 0 >>= receive
+  valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+  pure $ AfterAssign object timeTy valueFmt
 
-      26 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterDeassign object timeTy valueFmt
+receiveCallbackReasonExtra 26 object _ ctime cvalue = do
+  timeTy <- FFI.peekByteOff ctime 0 >>= receive
+  valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+  pure $ AfterDeassign object timeTy valueFmt
 
-      27 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterDisable object timeTy valueFmt
+receiveCallbackReasonExtra 27 object _ ctime cvalue = do
+  timeTy <- FFI.peekByteOff ctime 0 >>= receive
+  valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
+  pure $ AfterDisable object timeTy valueFmt
 
-      28 ->
-        pure PliError
+receiveCallbackReasonExtra 28 _ _ _ _ =
+  pure PliError
 
-      29 ->
-        pure Signal
+receiveCallbackReasonExtra 29 _ _ _ _ =
+  pure Signal
 #endif
 #if defined(VERILOG_2005)
-      30 -> do
-        time <- peekReceive ctime
-        pure $ NbaSynch mObject time
+receiveCallbackReasonExtra 30 _ mObject ctime _ = do
+  time <- peekReceive ctime
+  pure $ NbaSynch mObject time
 
-      31 -> do
-        time <- peekReceive ctime
-        pure $ AtEndOfSimTime mObject time
+receiveCallbackReasonExtra 31 _ mObject ctime _ = do
+  time <- peekReceive ctime
+  pure $ AtEndOfSimTime mObject time
 #endif
+receiveCallbackReasonExtra n _ _ _ _ =
+  throwIO $ UnknownCallbackReason n callStack
 
-      n  -> throwIO $ UnknownCallbackReason n callStack
+instance UnsafeReceive CallbackReason where
+  unsafeReceive (creason, object, ctime, cvalue) =
+    receiveCallbackReason creason object ctime cvalue
 
 instance Receive CallbackReason where
   receive (creason, object, ctime, cvalue) =
-    let mObject = if isNullObject object then Nothing else Just object in
-    case creason of
-      1 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterValueChange object timeTy valueFmt
-
-      2 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        pure $ BeforeStatement object timeTy
-
-      3 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterForce mObject timeTy valueFmt
-
-      4 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterRelease mObject timeTy valueFmt
-
-      5 -> do
-        time <- peekReceive ctime
-        pure $ AtStartOfSimTime mObject time
-
-      6 -> do
-        time <- peekReceive ctime
-        pure $ ReadWriteSynch mObject time
-
-      7 -> do
-        time <- peekReceive ctime
-        pure $ ReadOnlySynch mObject time
-
-      8 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        pure $ NextSimTime mObject timeTy
-
-      9 -> do
-        time <- peekReceive ctime
-        pure $ AfterDelay mObject time
-
-      10 ->
-        pure EndOfCompile
-
-      11 ->
-        pure StartOfSimulation
-
-      12 ->
-        pure EndOfSimulation
-
-      13 ->
-        pure RuntimeError
-
-      14 ->
-        pure TchkViolation
-
-      15 ->
-        pure StartOfSave
-
-      16 ->
-        pure EndOfSave
-
-      17 ->
-        pure StartOfRestart
-
-      18 ->
-        pure EndOfRestart
-
-      19 ->
-        pure StartOfReset
-
-      20 ->
-        pure EndOfReset
-
-      21 ->
-        pure EnterInteractive
-
-      22 ->
-        pure ExitInteractive
-
-      23 ->
-        pure InteractiveScopeChange
-
-      24 ->
-        pure UnresolvedSysTf
-
-#if defined(VERILOG_2001)
-      25 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterAssign object timeTy valueFmt
-
-      26 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterDeassign object timeTy valueFmt
-
-      27 -> do
-        timeTy <- FFI.peekByteOff ctime 0 >>= receive
-        valueFmt <- FFI.peekByteOff cvalue 0 >>= receive
-        pure $ AfterDisable object timeTy valueFmt
-
-      28 ->
-        pure PliError
-
-      29 ->
-        pure Signal
-#endif
-#if defined(VERILOG_2005)
-      30 -> do
-        time <- peekReceive ctime
-        pure $ NbaSynch mObject time
-
-      31 -> do
-        time <- peekReceive ctime
-        pure $ AtEndOfSimTime mObject time
-#endif
-
-      n  -> throwIO $ UnknownCallbackReason n callStack
+    receiveCallbackReason creason object ctime cvalue

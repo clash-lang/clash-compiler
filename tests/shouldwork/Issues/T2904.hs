@@ -2,8 +2,8 @@
 
 module T2904 where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 topEntity :: Vec 3 (Unsigned 8)
 topEntity = case imap f (5 :> 6 :> 7 :> Nil) of
@@ -20,6 +20,6 @@ testBench :: Signal System Bool
 testBench = done
  where
   done = outputVerifier' clk rst ((maxBound :> 8 :> 10 :> Nil) :> Nil) (pure topEntity)
-  clk  = tbSystemClockGen (not <$> done)
-  rst  = systemResetGen
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 {-# OPAQUE testBench #-}

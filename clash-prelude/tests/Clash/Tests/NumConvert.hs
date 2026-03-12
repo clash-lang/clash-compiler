@@ -74,10 +74,12 @@ import qualified Data.List as L
 
 import Clash.Prelude hiding (someNatVal, withSomeSNat)
 
-convertLaw1 :: forall a b. (NumConvert a b, MaybeNumConvert b a, Eq a) => Proxy b -> a -> Bool
+convertLaw1 ::
+  forall a b. (NumConvert a b, MaybeNumConvert b a, Eq a) => Proxy b -> a -> Bool
 convertLaw1 _ x = Just x == maybeNumConvert (numConvert @a @b x)
 
-convertLaw2 :: forall a b. (NumConvert a b, Eq a, Integral b, Integral a) => Proxy b -> a -> Bool
+convertLaw2 ::
+  forall a b. (NumConvert a b, Eq a, Integral b, Integral a) => Proxy b -> a -> Bool
 convertLaw2 _ x = toInteger x == toInteger (numConvert @a @b x)
 
 {- | Tightness law: this law is tested for if there is _no_ instance of
@@ -86,7 +88,8 @@ once when converting the domain of @a@ to @b@. If all conversions are possible,
 the constraints of the instances should be relaxed. If the domain of @a@ is
 empty, this law is considered satisfied too.
 -}
-convertLaw3 :: forall a b. (MaybeNumConvert a b, Bounded a, Enum a) => Proxy a -> Proxy b -> Bool
+convertLaw3 ::
+  forall a b. (MaybeNumConvert a b, Bounded a, Enum a) => Proxy a -> Proxy b -> Bool
 convertLaw3 _ _ = L.any isNothing results
  where
   results = L.map (maybeNumConvert @a @b) [minBound ..]
@@ -189,12 +192,15 @@ case_convertIndexIndex =
         withSomeSNat m $ \(SNat :: SNat m) ->
           case SNat @(n + 1) `compareSNat` SNat @(m + 1) of
             SNatLE -> do
-              assertBool (show (n, m)) (convertXException (Proxy @(Index (n + 1))) (Proxy @(Index (m + 1))))
+              assertBool
+                (show (n, m))
+                (convertXException (Proxy @(Index (n + 1))) (Proxy @(Index (m + 1))))
               forM_ [minBound .. maxBound] $ \(i :: Index (n + 1)) -> do
                 assertBool (show (n, m, i)) (convertLaw1 (Proxy @(Index (m + 1))) i)
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Index (m + 1))) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
-            _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Index (n + 1))) (Proxy @(Index (m + 1))))
+            _ ->
+              assertBool (show (n, m)) (convertLaw3 (Proxy @(Index (n + 1))) (Proxy @(Index (m + 1))))
  where
   zeroWidthSkip = False
 
@@ -206,7 +212,9 @@ case_convertIndexUnsigned =
         withSomeSNat m $ \(SNat :: SNat m) ->
           case SNat @(n + 1) `compareSNat` SNat @(2 ^ m) of
             SNatLE -> do
-              assertBool (show (n, m)) (convertXException (Proxy @(Index (n + 1))) (Proxy @(Unsigned m)))
+              assertBool
+                (show (n, m))
+                (convertXException (Proxy @(Index (n + 1))) (Proxy @(Unsigned m)))
               forM_ [minBound .. maxBound] $ \(i :: Index (n + 1)) -> do
                 assertBool (show (n, m, i)) (convertLaw1 (Proxy @(Unsigned m)) i)
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Unsigned m)) i)
@@ -240,7 +248,9 @@ case_convertIndexBitVector =
         withSomeSNat m $ \(SNat :: SNat m) ->
           case SNat @(n + 1) `compareSNat` SNat @(2 ^ m) of
             SNatLE -> do
-              assertBool (show (n, m)) (convertXException (Proxy @(Index (n + 1))) (Proxy @(BitVector m)))
+              assertBool
+                (show (n, m))
+                (convertXException (Proxy @(Index (n + 1))) (Proxy @(BitVector m)))
               forM_ [minBound .. maxBound] $ \(i :: Index (n + 1)) -> do
                 assertBool (show (n, m, i)) (convertLaw1 (Proxy @(BitVector m)) i)
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(BitVector m)) i)
@@ -257,7 +267,9 @@ case_convertUnsignedIndex =
         withSomeSNat m $ \(SNat :: SNat m) ->
           case SNat @(2 ^ n) `compareSNat` SNat @(m + 1) of
             SNatLE -> do
-              assertBool (show (n, m)) (convertXException (Proxy @(Unsigned n)) (Proxy @(Index (m + 1))))
+              assertBool
+                (show (n, m))
+                (convertXException (Proxy @(Unsigned n)) (Proxy @(Index (m + 1))))
               forM_ [minBound .. maxBound] $ \(i :: Unsigned n) -> do
                 assertBool (show (n, m, i)) (convertLaw1 (Proxy @(Index (m + 1))) i)
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Index (m + 1))) i)
@@ -342,7 +354,9 @@ case_convertBitVectorIndex =
         withSomeSNat m $ \(SNat :: SNat m) ->
           case SNat @(2 ^ n) `compareSNat` SNat @(m + 1) of
             SNatLE -> do
-              assertBool (show (n, m)) (convertXException (Proxy @(BitVector n)) (Proxy @(Index (m + 1))))
+              assertBool
+                (show (n, m))
+                (convertXException (Proxy @(BitVector n)) (Proxy @(Index (m + 1))))
               forM_ [minBound .. maxBound] $ \(i :: BitVector n) -> do
                 assertBool (show (n, m, i)) (convertLaw1 (Proxy @(Index (m + 1))) i)
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Index (m + 1))) i)

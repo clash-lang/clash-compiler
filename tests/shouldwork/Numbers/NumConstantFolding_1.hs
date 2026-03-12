@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
+
 module NumConstantFolding_1 (module NumConstantFolding_1, module ConstantFoldingUtil) where
+
 import ConstantFoldingUtil
 
 #ifndef OUTPUTTEST

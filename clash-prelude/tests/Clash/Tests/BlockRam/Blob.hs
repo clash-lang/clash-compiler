@@ -16,21 +16,29 @@ roundTripProperty :: Property
 roundTripProperty = property $ do
   len <- forAll $ Gen.integral $ Range.linear 0 256
   width <- forAll $ Gen.integral $ Range.linear 1 128
-  es <- forAll $ Gen.list (Range.singleton len) $
-    Gen.integral_ $ Range.constant 0 (2 ^ width - 1)
+  es <-
+    forAll $
+      Gen.list (Range.singleton len) $
+        Gen.integral_ $
+          Range.constant 0 (2 ^ width - 1)
   tripping (len, width, es) encode decode
  where
   encode :: (Int, Int, [Natural]) -> (Int, Int, B.ByteString, B.ByteString)
-  encode (len, width, es) = let (runs, ends) = packAsNats width id es
-                            in (len, width, L.toStrict runs, L.toStrict ends)
-  decode :: (Int, Int, B.ByteString, B.ByteString)
-         -> Identity (Int, Int, [Natural])
+  encode (len, width, es) =
+    let (runs, ends) = packAsNats width id es
+     in (len, width, L.toStrict runs, L.toStrict ends)
+  decode ::
+    (Int, Int, B.ByteString, B.ByteString) ->
+    Identity (Int, Int, [Natural])
   decode (len, width, runs, ends) =
     let es = take 300 $ unpackNats len width runs ends
-    in Identity (len, width, es)
+     in Identity (len, width, es)
 
 tests :: TestTree
-tests = testGroup "BlockRam"
-  [ testGroup "Blob"
-    [ testPropertyXXX "Round trip" roundTripProperty ]
-  ]
+tests =
+  testGroup
+    "BlockRam"
+    [ testGroup
+        "Blob"
+        [testPropertyXXX "Round trip" roundTripProperty]
+    ]

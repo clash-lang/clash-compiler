@@ -5,15 +5,21 @@
 
 module SymbiYosys where
 
-import           Clash.Class.Counter
-import           Clash.Prelude
-import           Clash.Verification  (RenderAs (YosysFormal), assert, checkI,
-                                      cover, eventually)
+import Clash.Class.Counter
+import Clash.Prelude
+import Clash.Verification (
+  RenderAs (YosysFormal),
+  assert,
+  checkI,
+  cover,
+  eventually,
+ )
 
-topEntity :: Clock System -> Reset System -> Enable System -> Signal System (Bool, Bool, Bool)
+topEntity ::
+  Clock System -> Reset System -> Enable System -> Signal System (Bool, Bool, Bool)
 topEntity = exposeClockResetEnable go
 
-go :: HiddenClockResetEnable dom => Signal dom (Bool, Bool, Bool)
+go :: (HiddenClockResetEnable dom) => Signal dom (Bool, Bool, Bool)
 go =
   let c = register (0 :: Index 20) (countSucc <$> c)
       r = (< 10) <$> c

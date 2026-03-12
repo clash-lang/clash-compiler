@@ -8,7 +8,6 @@ Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.FFI.VPI.Control
-#if defined(VERILOG_2001)
   ( Control(..)
   , StopValue(..)
   , DiagnosticLevel(..)
@@ -93,17 +92,19 @@ instance Show CouldNotControl where
       , prettyCallStack c
       ]
 
+-- | Send a control signal to the simulator, allowing simulation to be stopped,
+-- restarted or reset. If the simulator does not accept the control action, a
+-- 'CouldNotControl' exception is thrown.
+--
+controlSimulator :: Control -> IO ()
+{- ORMOLU_DISABLE -}
+#if defined(VERILOG_2001)
 foreign import ccall "vpi_user.h vpi_control"
   c_vpi_control_end :: CInt -> CInt -> IO Bool
 
 foreign import ccall "vpi_user.h vpi_control"
   c_vpi_control_restart :: CInt -> CInt -> CInt -> CInt -> IO Bool
 
--- | Send a control signal to the simulator, allowing simulation to be stopped,
--- restarted or reset. If the simulator does not accept the control action, a
--- 'CouldNotControl' exception is thrown.
---
-controlSimulator :: Control -> IO ()
 controlSimulator control = do
   (c, s, r, d) <- send control
 
@@ -113,7 +114,8 @@ controlSimulator control = do
 
   Monad.unless success $
     throwIO $ CouldNotControl control callStack
-
 #else
-  () where
+controlSimulator control =
+  throwIO $ CouldNotControl control callStack
 #endif
+{- ORMOLU_ENABLE -}

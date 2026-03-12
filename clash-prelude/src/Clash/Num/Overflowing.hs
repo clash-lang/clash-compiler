@@ -1,21 +1,20 @@
-{-|
-Copyright  :  (C) 2021-2022, QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Clash.Num.Overflowing
-  ( Overflowing
-  , fromOverflowing
-  , hasOverflowed
-  , toOverflowing
-  , clearOverflow
-  ) where
+{- |
+Copyright  :  (C) 2021-2022, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+module Clash.Num.Overflowing (
+  Overflowing,
+  fromOverflowing,
+  hasOverflowed,
+  toOverflowing,
+  clearOverflow,
+) where
 
 import Prelude hiding (even, odd)
 
@@ -26,22 +25,22 @@ import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, type (+))
 
-import Clash.Class.BitPack (BitPack(..))
-import Clash.Class.Num (SaturationMode(SatWrap, SatZero), SaturatingNum(..))
-import Clash.Class.Parity (Parity(..))
+import Clash.Class.BitPack (BitPack (..))
+import Clash.Class.Num (SaturatingNum (..), SaturationMode (SatWrap, SatZero))
+import Clash.Class.Parity (Parity (..))
 import Clash.XException (NFDataX, ShowX)
 
--- | An overflowing number behaves similarly to a 'Clash.Num.Wrapping.Wrapping'
--- number, but also includes an overflow status flag which can be used to more
--- easily check if an overflow has occurred.
---
--- Numbers can be converted to be 'Overflowing' using 'toOverflowing'.
---
+{- | An overflowing number behaves similarly to a 'Clash.Num.Wrapping.Wrapping'
+number, but also includes an overflow status flag which can be used to more
+easily check if an overflow has occurred.
+
+Numbers can be converted to be 'Overflowing' using 'toOverflowing'.
+-}
 data Overflowing a = Overflowing
   { fromOverflowing :: a
-    -- ^ Retrieve the value
+  -- ^ Retrieve the value
   , hasOverflowed :: Bool
-    -- ^ 'True' when a computation has overflowed
+  -- ^ 'True' when a computation has overflowed
   }
   deriving stock (Generic, Show)
   deriving anyclass (Binary, Hashable, NFData, NFDataX, ShowX)
@@ -51,9 +50,10 @@ toOverflowing :: a -> Overflowing a
 toOverflowing x = Overflowing x False
 
 {-# INLINE clearOverflow #-}
+
 -- | Reset the overflow status flag to False.
 clearOverflow :: Overflowing a -> Overflowing a
-clearOverflow x = x { hasOverflowed = False }
+clearOverflow x = x{hasOverflowed = False}
 
 instance (Eq a) => Eq (Overflowing a) where
   {-# INLINE (==) #-}
@@ -65,7 +65,8 @@ instance (Ord a) => Ord (Overflowing a) where
 
 instance (BitPack a, KnownNat (BitSize a + 1)) => BitPack (Overflowing a) where
   type BitSize (Overflowing a) = BitSize a + 1
-  -- Default instance, no explicit implementations.
+
+-- Default instance, no explicit implementations.
 
 instance (Parity a) => Parity (Overflowing a) where
   {-# INLINE even #-}
@@ -77,40 +78,35 @@ instance (Parity a) => Parity (Overflowing a) where
 instance (Bounded a, Ord a, SaturatingNum a) => Num (Overflowing a) where
   Overflowing x a + Overflowing y b
     | y > 0
-    , x > satSub SatWrap maxBound y
-    = withOverflow True
-
+    , x > satSub SatWrap maxBound y =
+        withOverflow True
     | y < 0
-    , x < satSub SatWrap minBound y
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
+    , x < satSub SatWrap minBound y =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
    where
     withOverflow = Overflowing (satAdd SatWrap x y)
 
   Overflowing x a - Overflowing y b
     | y < 0
-    , x > satAdd SatWrap maxBound y
-    = withOverflow True
-
+    , x > satAdd SatWrap maxBound y =
+        withOverflow True
     | y > 0
-    , x < satAdd SatWrap minBound y
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
+    , x < satAdd SatWrap minBound y =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
    where
     withOverflow = Overflowing (satSub SatWrap x y)
 
   Overflowing x a * Overflowing y b
     | x /= 0
     , y /= 0
-    , satMul SatZero x y == 0
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
+    , satMul SatZero x y == 0 =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
    where
     withOverflow = Overflowing (satMul SatWrap x y)
 
@@ -163,7 +159,6 @@ instance (Integral a, SaturatingNum a) => Integral (Overflowing a) where
   quotRem (Overflowing x a) (Overflowing y b)
     | x == minBound && y < 0 && y == -1 =
         withOverflow True
-
     | otherwise =
         withOverflow (a || b)
    where
@@ -174,7 +169,6 @@ instance (Integral a, SaturatingNum a) => Integral (Overflowing a) where
   divMod (Overflowing x a) (Overflowing y b)
     | x == minBound && y < 0 && y == -1 =
         withOverflow True
-
     | otherwise =
         withOverflow (a || b)
    where
@@ -186,7 +180,7 @@ instance (Integral a, SaturatingNum a) => Integral (Overflowing a) where
 
 instance (Fractional a, Ord a, SaturatingNum a) => Fractional (Overflowing a) where
   recip x =
-    x { fromOverflowing = recip (fromOverflowing x) }
+    x{fromOverflowing = recip (fromOverflowing x)}
 
   -- TODO This does what the underlying representation does if the Rational
   -- is not in range (typically wrapping). It would be better if this also

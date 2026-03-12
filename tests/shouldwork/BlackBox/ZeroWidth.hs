@@ -3,28 +3,30 @@
 
 module ZeroWidth where
 
-import qualified Prelude                      as P
-import           Control.Monad                (forM_)
-import           Clash.Annotations.Primitive
-import           Clash.Prelude
-import           GHC.Exts
-import           Data.String.Interpolate      (__i)
-import           Data.List                    (isInfixOf)
-import           System.Environment           (getArgs)
-import           System.FilePath              ((</>), takeDirectory)
-
+import Clash.Annotations.Primitive
+import Clash.Prelude
+import Control.Monad (forM_)
+import Data.List (isInfixOf)
+import Data.String.Interpolate (__i)
+import GHC.Exts
+import System.Environment (getArgs)
+import System.FilePath (takeDirectory, (</>))
+import qualified Prelude as P
 
 luckyNumber, question, answer :: String
 luckyNumber = "Your lucky number is 3552664958674928."
 question = "What lies on the bottom of the ocean and twitches?"
 answer = "A nervous wreck."
 
-
 -- | Inserts given comment in HDL. Returns "nothing".
 comment :: String -> ()
 comment !_s = ()
 {-# OPAQUE comment #-}
-{-# ANN comment (InlinePrimitive [VHDL] [__i|
+{-# ANN
+  comment
+  ( InlinePrimitive
+      [VHDL]
+      [__i|
   [ { "BlackBox" :
       { "name"      : "ZeroWidth.comment"
       , "kind"      : "Declaration"
@@ -33,7 +35,8 @@ comment !_s = ()
       }
     }
   ] |]
-  ) #-}
+  )
+  #-}
 
 implicitComment :: Int -> ()
 implicitComment n =
@@ -52,19 +55,25 @@ mainHDL topFile implFile = do
   contentTopEntity <- readFile (topDir </> show 'topEntity </> topFile)
   contentImplicitComment <- readFile (topDir </> show 'topEntity </> implFile)
 
-  if luckyNumber `isInfixOf` contentTopEntity then
-    pure ()
-  else
-    error $ "Expected:\n\n" P.++ luckyNumber
-       P.++ "\n\nBut did not find it in:\n\n" P.++ contentTopEntity
+  if luckyNumber `isInfixOf` contentTopEntity
+    then
+      pure ()
+    else
+      error $ "Expected:\n\n"
+        P.++ luckyNumber
+        P.++ "\n\nBut did not find it in:\n\n"
+        P.++ contentTopEntity
 
-  if question `isInfixOf` contentImplicitComment then
-    pure ()
-  else
-    error $ "Expected:\n\n" P.++ question
-       P.++ "\n\nBut did not find it in:\n\n" P.++ contentImplicitComment
+  if question `isInfixOf` contentImplicitComment
+    then
+      pure ()
+    else
+      error $ "Expected:\n\n"
+        P.++ question
+        P.++ "\n\nBut did not find it in:\n\n"
+        P.++ contentImplicitComment
 
 mainSystemVerilog, mainVerilog, mainVHDL :: IO ()
 mainSystemVerilog = error "NYI"
-mainVerilog       = error "NYI"
-mainVHDL          = mainHDL "topEntity.vhdl" "implicitComment.vhdl"
+mainVerilog = error "NYI"
+mainVHDL = mainHDL "topEntity.vhdl" "implicitComment.vhdl"

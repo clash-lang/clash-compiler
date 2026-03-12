@@ -3,8 +3,8 @@
 
 module T2325 where
 
-import qualified Prelude as P
 import Clash.Explicit.Prelude
+import qualified Prelude as P
 
 import Clash.Driver
 import Clash.Driver.Manifest
@@ -37,10 +37,10 @@ j = (+ 10)
 {-# OPAQUE j #-}
 {-# ANN j (defSyn "j") #-}
 
-assertBool :: HasCallStack => Bool -> IO ()
+assertBool :: (HasCallStack) => Bool -> IO ()
 assertBool b = Exception.assert b pure ()
 
-assertJustTrue :: HasCallStack => Maybe Bool -> IO ()
+assertJustTrue :: (HasCallStack) => Maybe Bool -> IO ()
 assertJustTrue = assertBool . (== Just True)
 
 mainVHDL :: IO ()

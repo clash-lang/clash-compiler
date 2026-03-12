@@ -1,19 +1,18 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+{- |
   Copyright   :  (C) 2017, Google Inc.
                      2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module GHC.BasicTypes.Extra where
 
-import GHC.Types.Basic
 import Control.DeepSeq
 import Data.Binary
 import GHC.Generics
+import GHC.Types.Basic
 
 import GHC.Types.SourceText
 
@@ -47,9 +46,10 @@ isNoInline NoInline{} = True
 isNoInline Opaque{} = True
 isNoInline _ = False
 
--- | Determine whether given 'InlineSpec' is OPAQUE. If this function is used on
--- a GHC that does not support OPAQUE yet (<9.4), it will return 'True' if given
--- 'InlineSpec' is NOINLINE instead.
+{- | Determine whether given 'InlineSpec' is OPAQUE. If this function is used on
+a GHC that does not support OPAQUE yet (<9.4), it will return 'True' if given
+'InlineSpec' is NOINLINE instead.
+-}
 isOpaque :: InlineSpec -> Bool
 isOpaque Opaque{} = True
 isOpaque _ = False

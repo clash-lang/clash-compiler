@@ -4,10 +4,10 @@ import qualified Prelude as P
 
 import qualified Data.List as List
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 
-import Clash.Prelude
 import Clash.Annotations.SynthesisAttributes
+import Clash.Prelude
 
 -- Keeping a single annotation in a type synonym should not prevent it from
 -- being rendered, or throw an error during compilation.
@@ -15,29 +15,35 @@ type AttrSingle x = 'StringAttr "foo" x
 
 -- Keeping multiple annotations in a type synonym should not prevent them from
 -- being rendered, or throw an error during compilation.
-type AttrMulti = '[ AttrSingle "BB", 'BoolAttr "bar" 'True ]
+type AttrMulti = '[AttrSingle "BB", 'BoolAttr "bar" 'True]
 
 -- Hiding the Annotate synonym in another type synonym should not prevent it
 -- from being rendered, or throw an error during compilation.
-type PinC = Annotate (BitVector 1) '[ AttrSingle "CC" ]
+type PinC = Annotate (BitVector 1) '[AttrSingle "CC"]
 
-{-# ANN topEntity (Synthesize
-      { t_name   = "topEntity"
+{-# ANN
+  topEntity
+  ( Synthesize
+      { t_name = "topEntity"
       , t_inputs = [PortName "pin_a", PortName "pin_b", PortName "pin_c"]
       , t_output = PortName "res"
-      }) #-}
-topEntity
-  :: BitVector 1 `Annotate` AttrSingle "AA"
-  -> BitVector 1 `Annotate` AttrMulti
-  -> PinC
-  -> BitVector 1
+      }
+  )
+  #-}
+topEntity ::
+  BitVector 1 `Annotate` AttrSingle "AA" ->
+  BitVector 1 `Annotate` AttrMulti ->
+  PinC ->
+  BitVector 1
 topEntity = \x y -> const const x y
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | List.isInfixOf needle haystack = pure ()
-  | otherwise = P.error $ mconcat
-      [ "Expected:\n\n  ", needle, "\n\nIn:\n\n", haystack]
+  | otherwise =
+      P.error
+        $ mconcat
+          ["Expected:\n\n  ", needle, "\n\nIn:\n\n", haystack]
 
 mainVHDL :: IO ()
 mainVHDL = do

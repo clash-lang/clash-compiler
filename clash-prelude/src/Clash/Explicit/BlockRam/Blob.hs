@@ -18,7 +18,6 @@ generates practically the same HDL as "Clash.Explicit.BlockRam" and is
 compatible with all tools consuming the generated HDL.
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
@@ -274,7 +273,6 @@ x = 1
 0b1_0000_0111
 0b1_0000_1000
 
-#if __GLASGOW_HASKELL__ >= 910
 >>> :{
 createMemBlob "contentN" Nothing es
 x = 1
@@ -282,17 +280,6 @@ x = 1
 <interactive>:...: error:...
     packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
 <BLANKLINE>
-
-#else
->>> :{
-createMemBlob "contentN" Nothing es
-x = 1
-:}
-<BLANKLINE>
-<interactive>:...: error:...
-    packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
-
-#endif
 Note how we hinted to @clashi@ that our multi-line command was a list of
 declarations by including a dummy declaration @x = 1@. Without this trick,
 @clashi@ would expect an expression and the Template Haskell would not work.
@@ -365,21 +352,11 @@ does not matter. But the bits need a defined value in the memory. Either 0 or
 0b1_0000_0111
 0b1_0000_1000
 
-#if __GLASGOW_HASKELL__ >= 910
 >>> $(memBlobTH Nothing es)
 <interactive>:...: error:...
     • packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
     • In the untyped splice: $(memBlobTH Nothing es)
 <BLANKLINE>
-
-#else
->>> $(memBlobTH Nothing es)
-<BLANKLINE>
-<interactive>:...: error:...
-    • packBVs: cannot convert don't care values. Please specify a mapping to a definite value.
-    • In the untyped splice: $(memBlobTH Nothing es)
-
-#endif
 -}
 memBlobTH
   :: forall a f

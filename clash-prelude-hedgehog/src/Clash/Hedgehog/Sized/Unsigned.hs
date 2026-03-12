@@ -1,24 +1,23 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+
+{- |
 Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random generation of Unsigned numbers.
 -}
+module Clash.Hedgehog.Sized.Unsigned (
+  genUnsigned,
+  SomeUnsigned (..),
+  genSomeUnsigned,
+) where
 
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-
-module Clash.Hedgehog.Sized.Unsigned
-  ( genUnsigned
-  , SomeUnsigned(..)
-  , genSomeUnsigned
-  ) where
-
-import GHC.TypeNats
-  hiding (SNat)
+import GHC.TypeNats hiding (
+  SNat,
+ )
 import Hedgehog (MonadGen, Range)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -26,7 +25,8 @@ import qualified Hedgehog.Range as Range
 import Clash.Promoted.Nat
 import Clash.Sized.Internal.Unsigned
 
-genUnsigned :: forall n m. (MonadGen m, KnownNat n) => Range (Unsigned n) -> m (Unsigned n)
+genUnsigned ::
+  forall n m. (MonadGen m, KnownNat n) => Range (Unsigned n) -> m (Unsigned n)
 genUnsigned range =
   Gen.frequency
     [ (70, Gen.integral range)
@@ -36,14 +36,14 @@ genUnsigned range =
 data SomeUnsigned atLeast where
   SomeUnsigned :: SNat n -> Unsigned (atLeast + n) -> SomeUnsigned atLeast
 
-instance KnownNat atLeast => Show (SomeUnsigned atLeast) where
+instance (KnownNat atLeast) => Show (SomeUnsigned atLeast) where
   show (SomeUnsigned SNat x) = show x
 
-genSomeUnsigned
-  :: forall atLeast m
-   . (MonadGen m, KnownNat atLeast)
-  => Range Natural
-  -> m (SomeUnsigned atLeast)
+genSomeUnsigned ::
+  forall atLeast m.
+  (MonadGen m, KnownNat atLeast) =>
+  Range Natural ->
+  m (SomeUnsigned atLeast)
 genSomeUnsigned rangeUnsigned = do
   numExtra <- Gen.integral rangeUnsigned
 

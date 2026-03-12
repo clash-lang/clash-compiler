@@ -1,29 +1,35 @@
-{-|
+{-# LANGUAGE QuasiQuotes #-}
+
+{- |
 Copyright   :  (C) 2022     , Google Inc.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Produce static files that are useful when working with Clash designs.
 -}
-
-{-# LANGUAGE QuasiQuotes #-}
-
 module Main where
 
 import Control.Monad (when)
-import Control.Monad.Extra (whenM, unlessM)
-import Prelude
-import System.Console.Docopt
-  (Docopt, docopt, isPresent, getArg, longOption, parseArgsOrExit)
+import Control.Monad.Extra (unlessM, whenM)
+import System.Console.Docopt (
+  Docopt,
+  docopt,
+  getArg,
+  isPresent,
+  longOption,
+  parseArgsOrExit,
+ )
 import System.Directory (copyFile, doesDirectoryExist, doesFileExist)
 import System.Environment (getArgs)
 import System.Exit (die)
 import System.FilePath (takeDirectory)
+import Prelude
 
 import Clash.DataFiles
 
 patterns :: Docopt
-patterns = [docopt|
+patterns =
+  [docopt|
 Obtain static files useful when working with Clash designs
 
 Currently, only the Tcl connector is available.
@@ -49,13 +55,17 @@ createOkayOrDie ::
 createOkayOrDie path force = do
   let pathDir = takeDirectory path
   unlessM (doesDirectoryExist pathDir) $
-    die $ "Directory not found: " ++ pathDir
+    die $
+      "Directory not found: " ++ pathDir
   whenM (doesDirectoryExist path) $
-    die $ path ++ " is a directory. Please specify a file name."
+    die $
+      path ++ " is a directory. Please specify a file name."
   exists <- doesFileExist path
   when (exists && not force) $
-    die $ path ++ " already exists and --force not specified. " ++
-                  "Refusing to overwrite."
+    die $
+      path
+        ++ " already exists and --force not specified. "
+        ++ "Refusing to overwrite."
 
 main :: IO ()
 main = do

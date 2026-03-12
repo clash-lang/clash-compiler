@@ -7,13 +7,13 @@ module Clash.Tests.NumNewtypes (tests) where
 
 import Control.DeepSeq (NFData, force)
 import Data.Kind (Type)
-import Data.Proxy (Proxy(..))
+import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
 import Hedgehog
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
 import Hedgehog.Extra
+import qualified Hedgehog.Gen as Gen
 import Hedgehog.Internal.Exception (tryEvaluate)
+import qualified Hedgehog.Range as Range
 import Test.Tasty
 import Test.Tasty.Hedgehog.Extra
 
@@ -28,42 +28,50 @@ import Clash.Sized.Signed (Signed)
 import Clash.Sized.Unsigned (Unsigned)
 
 tests :: TestTree
-tests = testGroup "Numeric Newtypes"
-  [ testGroup "Erroring"
-      [ testIntegral "Index 4" Error (genErroring (genIndex @4))
-      , testIntegral "Signed 4" Error (genErroring (genSigned @4))
-      , testIntegral "Unsigned 4" Error (genErroring (genUnsigned @4))
-      ]
-  , testGroup "Overflowing"
-      [ testIntegral "Index 4" Over (genOverflowing (genIndex @4))
-      , testIntegral "Signed 4" Over (genOverflowing (genSigned @4))
-      , testIntegral "Unsigned 4" Over (genOverflowing (genUnsigned @4))
-      ]
-  , testGroup "Saturating"
-      [ testIntegral "Index 4" Sat (genSaturating (genIndex @4))
-      , testIntegral "Signed 4" Sat (genSaturating (genSigned @4))
-      , testIntegral "Unsigned 4" Sat (genSaturating (genUnsigned @4))
-      ]
-  , testGroup "Wrapping"
-      [ testIntegral "Index 4" Wrap (genWrapping (genIndex @4))
-      , testIntegral "Signed 4" Wrap (genWrapping (genSigned @4))
-      , testIntegral "Unsigned 4" Wrap (genWrapping (genUnsigned @4))
-      ]
-  , testGroup "Zeroing"
-      [ testIntegral "Index 4" Zero (genZeroing (genIndex @4))
-      , testIntegral "Signed 4" Zero (genZeroing (genSigned @4))
-      , testIntegral "Unsigned 4" Zero (genZeroing (genUnsigned @4))
-      ]
-  ]
+tests =
+  testGroup
+    "Numeric Newtypes"
+    [ testGroup
+        "Erroring"
+        [ testIntegral "Index 4" Error (genErroring (genIndex @4))
+        , testIntegral "Signed 4" Error (genErroring (genSigned @4))
+        , testIntegral "Unsigned 4" Error (genErroring (genUnsigned @4))
+        ]
+    , testGroup
+        "Overflowing"
+        [ testIntegral "Index 4" Over (genOverflowing (genIndex @4))
+        , testIntegral "Signed 4" Over (genOverflowing (genSigned @4))
+        , testIntegral "Unsigned 4" Over (genOverflowing (genUnsigned @4))
+        ]
+    , testGroup
+        "Saturating"
+        [ testIntegral "Index 4" Sat (genSaturating (genIndex @4))
+        , testIntegral "Signed 4" Sat (genSaturating (genSigned @4))
+        , testIntegral "Unsigned 4" Sat (genSaturating (genUnsigned @4))
+        ]
+    , testGroup
+        "Wrapping"
+        [ testIntegral "Index 4" Wrap (genWrapping (genIndex @4))
+        , testIntegral "Signed 4" Wrap (genWrapping (genSigned @4))
+        , testIntegral "Unsigned 4" Wrap (genWrapping (genUnsigned @4))
+        ]
+    , testGroup
+        "Zeroing"
+        [ testIntegral "Index 4" Zero (genZeroing (genIndex @4))
+        , testIntegral "Signed 4" Zero (genZeroing (genSigned @4))
+        , testIntegral "Unsigned 4" Zero (genZeroing (genUnsigned @4))
+        ]
+    ]
 
-testIntegral
-  :: (Bounded (f a), Integral (f a), Show (f a), NFData (f a))
-  => TestName
-  -> Mode f
-  -> Gen (f a)
-  -> TestTree
+testIntegral ::
+  (Bounded (f a), Integral (f a), Show (f a), NFData (f a)) =>
+  TestName ->
+  Mode f ->
+  Gen (f a) ->
+  TestTree
 testIntegral name mode gen =
-  testGroup name
+  testGroup
+    name
     [ testPropertyXXX "Addition" $ checkIntegral2 mode gen (+)
     , testPropertyXXX "Subtraction" $ checkIntegral2 mode gen (-)
     , testPropertyXXX "Multiplication" $ checkIntegral2 mode gen (*)
@@ -79,26 +87,26 @@ testIntegral name mode gen =
 
 data Mode :: (Type -> Type) -> Type where
   Error :: Mode Erroring
-  Over  :: Mode Overflowing
-  Sat   :: Mode Saturating
-  Wrap  :: Mode Wrapping
-  Zero  :: Mode Zeroing
+  Over :: Mode Overflowing
+  Sat :: Mode Saturating
+  Wrap :: Mode Wrapping
+  Zero :: Mode Zeroing
 
 data BoundsCheck
-  = Overflow | Underflow
+  = Overflow
+  | Underflow
   deriving (Show)
 
-boundsIntegral
-  :: forall a
-   . (Bounded a, Integral a)
-  => Proxy a
-  -> Maybe Integer
-  -> Maybe BoundsCheck
+boundsIntegral ::
+  forall a.
+  (Bounded a, Integral a) =>
+  Proxy a ->
+  Maybe Integer ->
+  Maybe BoundsCheck
 boundsIntegral Proxy (Just x)
   | toInteger (maxBound @a) < x = Just Overflow
   | x < toInteger (minBound @a) = Just Underflow
   | otherwise = Nothing
-
 boundsIntegral Proxy Nothing = Just Overflow
 
 tryArithmetic :: (Show a, NFData a) => a -> PropertyT IO (Maybe a)
@@ -107,29 +115,28 @@ tryArithmetic x =
     Left err -> do
       footnoteShow err
       pure Nothing
-
     Right res ->
       pure (Just res)
 
 -- fromInteger wraps for most types, but not Index. So we need this to get the
 -- wrapping behaviour we expect.
-wrapIntegral
-  :: forall a
-   . (Bounded a, Integral a)
-  => Integer
-  -> a
+wrapIntegral ::
+  forall a.
+  (Bounded a, Integral a) =>
+  Integer ->
+  a
 wrapIntegral x =
   let minB = toInteger (minBound @a)
       maxB = toInteger (maxBound @a) + 1
    in fromInteger $! minB + (x - minB) `mod` (maxB - minB)
 
-checkIntegral
-  :: forall f a
-   . (Bounded (f a), Integral (f a), Show (f a), NFData (f a))
-  => Mode f
-  -> Gen (f a)
-  -> (forall b. Integral b => b -> b)
-  -> Property
+checkIntegral ::
+  forall f a.
+  (Bounded (f a), Integral (f a), Show (f a), NFData (f a)) =>
+  Mode f ->
+  Gen (f a) ->
+  (forall b. (Integral b) => b -> b) ->
+  Property
 checkIntegral mode gen op =
   property $ do
     x <- forAll gen
@@ -139,61 +146,54 @@ checkIntegral mode gen op =
       Nothing -> do
         label "InBounds"
         goInBounds result x
-
       Just info -> do
         collect info
         goOutBounds info result x
  where
   goInBounds mInteger x
     | Over <- mode
-    , Just i <- mInteger
-    = do let result = op x
-         assert (not (hasOverflowed result))
-         fromInteger i === result
-
-    | Just i <- mInteger
-    = fromInteger i === op x
-
-    | otherwise
-    -- If we reach here, the operation which should be in bounds and valid
-    -- resulted in an exception being thrown.
-    = error "checkIntegral.goInBounds: mInteger should not be Nothing"
+    , Just i <- mInteger =
+        do
+          let result = op x
+          assert (not (hasOverflowed result))
+          fromInteger i === result
+    | Just i <- mInteger =
+        fromInteger i === op x
+    | otherwise =
+        -- If we reach here, the operation which should be in bounds and valid
+        -- resulted in an exception being thrown.
+        error "checkIntegral.goInBounds: mInteger should not be Nothing"
 
   goOutBounds info mInteger x
-    | Nothing <- mInteger
-    = throwsDeepException (op x)
-
-    | Error <- mode
-    = throwsDeepException (op x)
-
+    | Nothing <- mInteger =
+        throwsDeepException (op x)
+    | Error <- mode =
+        throwsDeepException (op x)
     | Over <- mode
-    , Just i <- mInteger
-    = do let result = op x
-         assert (hasOverflowed result)
-         wrapIntegral i === result
-
+    , Just i <- mInteger =
+        do
+          let result = op x
+          assert (hasOverflowed result)
+          wrapIntegral i === result
     | Sat <- mode
-    , Overflow <- info
-    = maxBound === op x
-
+    , Overflow <- info =
+        maxBound === op x
     | Sat <- mode
-    , Underflow <- info
-    = minBound === op x
-
+    , Underflow <- info =
+        minBound === op x
     | Wrap <- mode
-    , Just i <- mInteger
-    = wrapIntegral i === op x
+    , Just i <- mInteger =
+        wrapIntegral i === op x
+    | Zero <- mode =
+        0 === op x
 
-    | Zero <- mode
-    = 0 === op x
-
-checkIntegral2
-  :: forall f a
-   . (Bounded (f a), Integral (f a), Show (f a), NFData (f a))
-  => Mode f
-  -> Gen (f a)
-  -> (forall b. Integral b => b -> b -> b)
-  -> Property
+checkIntegral2 ::
+  forall f a.
+  (Bounded (f a), Integral (f a), Show (f a), NFData (f a)) =>
+  Mode f ->
+  Gen (f a) ->
+  (forall b. (Integral b) => b -> b -> b) ->
+  Property
 checkIntegral2 mode gen op =
   property $ do
     x <- forAll gen
@@ -206,7 +206,6 @@ checkIntegral2 mode gen op =
         label "InBounds"
         footnote "InBounds"
         goInBounds result x y
-
       Just info -> do
         collect info
         footnoteShow info
@@ -214,44 +213,38 @@ checkIntegral2 mode gen op =
  where
   goInBounds mInteger x y
     | Over <- mode
-    , Just i <- mInteger
-    = do let result = op x y
-         assert (not (hasOverflowed result))
-         fromInteger i === result
-
-    | Just i <- mInteger
-    = fromInteger i === op x y
-
-    | otherwise
-    = error "checkIntegral2.goInBounds: mInteger should not be Nothing"
+    , Just i <- mInteger =
+        do
+          let result = op x y
+          assert (not (hasOverflowed result))
+          fromInteger i === result
+    | Just i <- mInteger =
+        fromInteger i === op x y
+    | otherwise =
+        error "checkIntegral2.goInBounds: mInteger should not be Nothing"
 
   goOutBounds info mInteger x y
-    | Nothing <- mInteger
-    = throwsDeepException (op x y)
-
-    | Error <- mode
-    = throwsDeepException (op x y)
-
+    | Nothing <- mInteger =
+        throwsDeepException (op x y)
+    | Error <- mode =
+        throwsDeepException (op x y)
     | Over <- mode
-    , Just i <- mInteger
-    = do let result = op x y
-         assert (hasOverflowed result)
-         wrapIntegral i === result
-
+    , Just i <- mInteger =
+        do
+          let result = op x y
+          assert (hasOverflowed result)
+          wrapIntegral i === result
     | Sat <- mode
-    , Overflow <- info
-    = maxBound === op x y
-
+    , Overflow <- info =
+        maxBound === op x y
     | Sat <- mode
-    , Underflow <- info
-    = minBound === op x y
-
+    , Underflow <- info =
+        minBound === op x y
     | Wrap <- mode
-    , Just i <- mInteger
-    = wrapIntegral i === op x y
-
-    | Zero <- mode
-    = 0 === op x y
+    , Just i <- mInteger =
+        wrapIntegral i === op x y
+    | Zero <- mode =
+        0 === op x y
 
 genErroring :: forall a. (SaturatingNum a) => Gen a -> Gen (Erroring a)
 genErroring = fmap toErroring
@@ -269,12 +262,13 @@ genZeroing :: forall a. (SaturatingNum a) => Gen a -> Gen (Zeroing a)
 genZeroing = fmap toZeroing
 
 genBoundedIntegral :: forall a. (Bounded a, Integral a) => Gen a
-genBoundedIntegral = Gen.frequency
-  [ (10, pure minBound)
-  , (10, pure 0)
-  , (40, Gen.integral (Range.linear minBound maxBound))
-  , (40, pure maxBound)
-  ]
+genBoundedIntegral =
+  Gen.frequency
+    [ (10, pure minBound)
+    , (10, pure 0)
+    , (40, Gen.integral (Range.linear minBound maxBound))
+    , (40, pure maxBound)
+    ]
 
 genIndex :: forall n. (KnownNat n) => Gen (Index n)
 genIndex = genBoundedIntegral

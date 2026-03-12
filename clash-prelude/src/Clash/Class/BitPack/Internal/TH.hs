@@ -1,38 +1,38 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+{- |
 Copyright  :  (C) 2019-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Class.BitPack.Internal.TH where
 
-import           Clash.CPP             (maxTupleSize)
-import           Language.Haskell.TH.Compat (mkTySynInstD,mkTupE)
-import           Control.Monad         (replicateM)
+import Clash.CPP (maxTupleSize)
+import Control.Monad (replicateM)
+import Language.Haskell.TH.Compat (mkTupE, mkTySynInstD)
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List             (foldl')
 #endif
-import           GHC.TypeLits          (KnownNat)
-import           Language.Haskell.TH
+import GHC.TypeLits (KnownNat)
+import Language.Haskell.TH
 
 -- | Contruct all the tuple (starting at size 3) instances for BitPack.
-deriveBitPackTuples
-  :: Name
-  -- ^ BitPack
-  -> Name
-  -- ^ BitSize
-  -> Name
-  -- ^ pack
-  -> Name
-  -- ^ unpack
-  -> DecsQ
+deriveBitPackTuples ::
+  -- | BitPack
+  Name ->
+  -- | BitSize
+  Name ->
+  -- | pack
+  Name ->
+  -- | unpack
+  Name ->
+  DecsQ
 deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
-  let bitPack  = ConT bitPackName
-      bitSize  = ConT bitSizeName
+  let bitPack = ConT bitPackName
+      bitSize = ConT bitSizeName
       knownNat = ConT ''KnownNat
-      plus     = ConT $ mkName "+"
+      plus = ConT $ mkName "+"
 
   allNames <- replicateM maxTupleSize (newName "a")
   retupName <- newName "retup"
@@ -40,11 +40,11 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
   y <- newName "y"
   tup <- newName "tup"
 
-  pure $ flip map [3..maxTupleSize] $ \tupleNum ->
-    let names  = take tupleNum allNames
-        (v,vs) = case map VarT names of
-                    (z:zs) -> (z,zs)
-                    _ -> error "maxTupleSize <= 3"
+  pure $ flip map [3 .. maxTupleSize] $ \tupleNum ->
+    let names = take tupleNum allNames
+        (v, vs) = case map VarT names of
+          (z : zs) -> (z, zs)
+          _ -> error "maxTupleSize <= 3"
         tuple xs = foldl' AppT (TupleT $ length xs) xs
 
         -- Instance declaration
@@ -54,13 +54,14 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
           , bitPack `AppT` tuple vs
           , knownNat `AppT` (bitSize `AppT` tuple vs)
           ]
-        instTy = AppT bitPack $ tuple (v:vs)
+        instTy = AppT bitPack $ tuple (v : vs)
 
         -- Associated type BitSize
         bitSizeType =
-          mkTySynInstD bitSizeName [tuple (v:vs)]
-            $ plus `AppT` (bitSize `AppT` v) `AppT`
-              (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
+          mkTySynInstD bitSizeName [tuple (v : vs)] $
+            plus
+              `AppT` (bitSize `AppT` v)
+              `AppT` (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
 
         pack =
           FunD
@@ -68,14 +69,14 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
             [ Clause
                 [VarP tup]
                 (NormalB (AppE (VarE packName) (AppE (VarE retupName) (VarE tup))))
-                [FunD
+                [ FunD
                     retupName
                     [ Clause
-                        [ TupP $ map VarP names ]
-                        ( let (e,es) = case map VarE names of
-                                          (z:zs) -> (z,zs)
-                                          _ -> error "maxTupleSize <= 3"
-                          in NormalB (mkTupE [e,mkTupE es])
+                        [TupP $ map VarP names]
+                        ( let (e, es) = case map VarE names of
+                                (z : zs) -> (z, zs)
+                                _ -> error "maxTupleSize <= 3"
+                           in NormalB (mkTupE [e, mkTupE es])
                         )
                         []
                     ]
@@ -86,25 +87,23 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
           FunD
             unpackName
             [ Clause
-                [ VarP x ]
+                [VarP x]
                 ( NormalB $
-                    let (p,ps) = case map VarP names of
-                                   (z:zs) -> (z,zs)
-                                   _ -> error "maxTupleSize <= 3"
-                    in
-                    LetE
-                      [ ValD
-                          ( TupP [ p, VarP y ] )
-                          ( NormalB $ VarE unpackName `AppE` VarE x )
-                          []
-                      , ValD
-                          ( TupP ps )
-                          ( NormalB $ VarE unpackName `AppE` VarE y )
-                          []
-                      ]
-                      ( mkTupE $ map VarE names )
+                    let (p, ps) = case map VarP names of
+                          (z : zs) -> (z, zs)
+                          _ -> error "maxTupleSize <= 3"
+                     in LetE
+                          [ ValD
+                              (TupP [p, VarP y])
+                              (NormalB $ VarE unpackName `AppE` VarE x)
+                              []
+                          , ValD
+                              (TupP ps)
+                              (NormalB $ VarE unpackName `AppE` VarE y)
+                              []
+                          ]
+                          (mkTupE $ map VarE names)
                 )
                 []
             ]
-
-    in InstanceD Nothing context instTy [bitSizeType, pack, unpack]
+     in InstanceD Nothing context instTy [bitSizeType, pack, unpack]

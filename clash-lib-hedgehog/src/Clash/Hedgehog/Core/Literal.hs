@@ -1,16 +1,15 @@
-{-|
+{-# LANGUAGE CPP #-}
+
+{- |
 Copyright   : (C) 2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random type-directed generation of literals.
 -}
-
-{-# LANGUAGE CPP #-}
-
-module Clash.Hedgehog.Core.Literal
-  ( genLiteralFrom
-  ) where
+module Clash.Hedgehog.Core.Literal (
+  genLiteralFrom,
+) where
 
 import Data.Binary.IEEE754 (doubleToWord, floatToWord)
 import qualified Data.Primitive.ByteArray as BA (byteArrayFromList)
@@ -24,16 +23,16 @@ import Clash.Core.Subst (aeqType)
 import Clash.Core.Type (Type)
 import Clash.Core.TysPrim
 
--- | Generate a 'Literal' with the specified core type. If the type does not
--- correspond to a known @PrimTyCon@ (as defined in @Clash.Core.TysPrim@) then
--- an error is returned.
---
-genLiteralFrom
-  :: forall m
-   . MonadGen m
-  => Type
-  -- ^ The type of the literal to generate
-  -> m Literal
+{- | Generate a 'Literal' with the specified core type. If the type does not
+correspond to a known @PrimTyCon@ (as defined in @Clash.Core.TysPrim@) then
+an error is returned.
+-}
+genLiteralFrom ::
+  forall m.
+  (MonadGen m) =>
+  -- | The type of the literal to generate
+  Type ->
+  m Literal
 genLiteralFrom ty
   | aeqType ty integerPrimTy = genIntegerLiteral
   | aeqType ty intPrimTy = genIntLiteral
@@ -53,10 +52,11 @@ genLiteralFrom ty
   | aeqType ty naturalPrimTy = genNaturalLiteral
   | aeqType ty byteArrayPrimTy = genByteArrayLiteral
   | otherwise =
-      error $ unlines
-        [ "genLiteralFrom: No constructors for " <> showPpr ty
-        , "Check that this type is a primitive, and is not a void type."
-        ]
+      error $
+        unlines
+          [ "genLiteralFrom: No constructors for " <> showPpr ty
+          , "Check that this type is a primitive, and is not a void type."
+          ]
 
 -- TODO It would be nice to pass ranges into these types instead of just
 -- guessing using some default range. However, that makes 'genLiteralFrom'
@@ -65,78 +65,78 @@ genLiteralFrom ty
 -- Without passing ranges to these, they may bias towards unrealistic values
 -- which makes generating entire random programs less realistic.
 
-genIntegerLiteral :: forall m. MonadGen m => m Literal
+genIntegerLiteral :: forall m. (MonadGen m) => m Literal
 genIntegerLiteral =
   fmap IntegerLiteral . Gen.sized $ \size ->
     let upper = 2 ^ Range.unSize size
         lower = negate upper
      in Gen.integral (Range.linear lower upper)
 
-genIntLiteral :: forall m. MonadGen m => m Literal
+genIntLiteral :: forall m. (MonadGen m) => m Literal
 genIntLiteral =
   IntLiteral <$> (toInteger <$> Gen.int Range.linearBounded)
 
-genWordLiteral :: forall m. MonadGen m => m Literal
+genWordLiteral :: forall m. (MonadGen m) => m Literal
 genWordLiteral =
   WordLiteral <$> (toInteger <$> Gen.word Range.linearBounded)
 
-genInt64Literal :: forall m. MonadGen m => m Literal
+genInt64Literal :: forall m. (MonadGen m) => m Literal
 genInt64Literal =
   Int64Literal <$> (toInteger <$> Gen.int64 Range.linearBounded)
 
-genWord64Literal :: forall m. MonadGen m => m Literal
+genWord64Literal :: forall m. (MonadGen m) => m Literal
 genWord64Literal =
   Word64Literal <$> (toInteger <$> Gen.word64 Range.linearBounded)
 
-genInt8Literal :: forall m. MonadGen m => m Literal
+genInt8Literal :: forall m. (MonadGen m) => m Literal
 genInt8Literal =
   Int8Literal <$> (toInteger <$> Gen.int8 Range.linearBounded)
 
-genInt16Literal :: forall m. MonadGen m => m Literal
+genInt16Literal :: forall m. (MonadGen m) => m Literal
 genInt16Literal =
   Int16Literal <$> (toInteger <$> Gen.int16 Range.linearBounded)
 
-genInt32Literal :: forall m. MonadGen m => m Literal
+genInt32Literal :: forall m. (MonadGen m) => m Literal
 genInt32Literal =
   Int32Literal <$> (toInteger <$> Gen.int32 Range.linearBounded)
 
-genWord8Literal :: forall m. MonadGen m => m Literal
+genWord8Literal :: forall m. (MonadGen m) => m Literal
 genWord8Literal =
   Word8Literal <$> (toInteger <$> Gen.word8 Range.linearBounded)
 
-genWord16Literal :: forall m. MonadGen m => m Literal
+genWord16Literal :: forall m. (MonadGen m) => m Literal
 genWord16Literal =
   Word16Literal <$> (toInteger <$> Gen.word16 Range.linearBounded)
 
-genWord32Literal :: forall m. MonadGen m => m Literal
+genWord32Literal :: forall m. (MonadGen m) => m Literal
 genWord32Literal =
   Word32Literal <$> (toInteger <$> Gen.word32 Range.linearBounded)
 
-genStringLiteral :: forall m. MonadGen m => m Literal
+genStringLiteral :: forall m. (MonadGen m) => m Literal
 genStringLiteral =
   StringLiteral <$> Gen.string (Range.linear 10 50) Gen.unicode
 
-genFloatLiteral :: forall m. MonadGen m => m Literal
+genFloatLiteral :: forall m. (MonadGen m) => m Literal
 genFloatLiteral =
   let range = Range.linearFrac 1.17549435e-38 3.40282347e+38
    in FloatLiteral <$> (floatToWord <$> Gen.float range)
 
-genDoubleLiteral :: forall m. MonadGen m => m Literal
+genDoubleLiteral :: forall m. (MonadGen m) => m Literal
 genDoubleLiteral =
   let range = Range.linearFrac 2.2250738585072014e-308 1.7976931348623157e+308
    in DoubleLiteral <$> (doubleToWord <$> Gen.double range)
 
-genCharLiteral :: forall m. MonadGen m => m Literal
+genCharLiteral :: forall m. (MonadGen m) => m Literal
 genCharLiteral =
   CharLiteral <$> Gen.ascii
 
-genNaturalLiteral :: forall m. MonadGen m => m Literal
+genNaturalLiteral :: forall m. (MonadGen m) => m Literal
 genNaturalLiteral =
   fmap NaturalLiteral . Gen.sized $ \size ->
     let upper = 2 ^ Range.unSize size
      in Gen.integral (Range.linear 0 upper)
 
-genByteArrayLiteral :: forall m. MonadGen m => m Literal
+genByteArrayLiteral :: forall m. (MonadGen m) => m Literal
 genByteArrayLiteral = do
   bytes <- Gen.list (Range.linear 0 16) (Gen.word8 Range.linearBounded)
   pure (ByteArrayLiteral (BA.byteArrayFromList bytes))

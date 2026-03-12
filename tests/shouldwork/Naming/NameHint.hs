@@ -3,28 +3,29 @@
 
 module NameHint where
 
-import Clash.Prelude
-import Clash.Netlist.Types
 import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+import Clash.Prelude
 
-import Prelude as P
 import Data.Text (isInfixOf)
+import Prelude as P
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
 
 import Debug.Trace
 
-topEntity
-  :: Signal System Bool
-  -> Signal System Bool
+topEntity ::
+  Signal System Bool ->
+  Signal System Bool
 topEntity = liftA $ nameHint (SSymbol @"someSignalName")
 
 testPath :: FilePath
 testPath = "tests/shouldwork/Naming/NameHint.hs"
 
--- | Assert that a signal named "someSignalName", optionally expanded, is
--- declared once and used in an assignment once.
+{- | Assert that a signal named "someSignalName", optionally expanded, is
+declared once and used in an assignment once.
+-}
 assertOneDecl :: Component -> IO ()
 assertOneDecl (Component _ _ _ ds) =
   case P.concatMap isSigDecl ds of
@@ -33,11 +34,15 @@ assertOneDecl (Component _ _ _ ds) =
         1 ->
           pure ()
         n ->
-          error $ "Expected one assignment of a signal named "
-                  <> "\"someSignalName\", got " <> show n
+          error $
+            "Expected one assignment of a signal named "
+              <> "\"someSignalName\", got "
+              <> show n
     is ->
-      error $ "Expected one declaration of a signal named "
-           <> "\"someSignalName\", got " <> show (P.length is)
+      error $
+        "Expected one declaration of a signal named "
+          <> "\"someSignalName\", got "
+          <> show (P.length is)
  where
   isSigDecl (NetDecl' _ i@(isInfixOf "someSignalName" . Id.toText -> True) _ _) = [i]
   isSigDecl _ = []

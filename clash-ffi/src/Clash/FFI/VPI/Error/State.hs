@@ -1,47 +1,47 @@
-{-|
+{-# LANGUAGE TypeFamilies #-}
+
+{- |
 Copyright:    (C) 2022 Google Inc.
 License:      BSD2 (see the file LICENSE)
 Maintainer:   QBayLogic B.V. <devops@qbaylogic.com>
 -}
+module Clash.FFI.VPI.Error.State (
+  ErrorState (..),
+  UnknownErrorState (..),
+) where
 
-{-# LANGUAGE TypeFamilies #-}
+import Control.Exception (Exception, throwIO)
+import Foreign.C.Types (CInt)
+import GHC.Stack (CallStack, callStack, prettyCallStack)
 
-module Clash.FFI.VPI.Error.State
-  ( ErrorState(..)
-  , UnknownErrorState(..)
-  ) where
+import Clash.FFI.View (CRepr, Receive (..))
 
-import           Control.Exception (Exception, throwIO)
-import           Foreign.C.Types (CInt)
-import           GHC.Stack (CallStack, callStack, prettyCallStack)
-
-import           Clash.FFI.View (CRepr, Receive(..))
-
--- | The state of the simulator when an error occurred. This specifies whether
--- the error occurred before a simulation started, while in a PLI/VPI call, or
--- while the simulation was running.
---
+{- | The state of the simulator when an error occurred. This specifies whether
+the error occurred before a simulation started, while in a PLI/VPI call, or
+while the simulation was running.
+-}
 data ErrorState
   = CompileError
   | PliError
   | RunError
   deriving stock (Eq, Show)
 
--- | An exception thrown when decoding an error state if an invalid value is
--- given for the C enum that specifies the constructor of 'ErrorState'.
---
+{- | An exception thrown when decoding an error state if an invalid value is
+given for the C enum that specifies the constructor of 'ErrorState'.
+-}
 data UnknownErrorState
   = UnknownErrorState CInt CallStack
   deriving anyclass (Exception)
 
 instance Show UnknownErrorState where
   show = \case
-    UnknownErrorState x c -> mconcat
-      [ "Unknown error state: "
-      , show x
-      , "\n"
-      , prettyCallStack c
-      ]
+    UnknownErrorState x c ->
+      mconcat
+        [ "Unknown error state: "
+        , show x
+        , "\n"
+        , prettyCallStack c
+        ]
 
 type instance CRepr ErrorState = CInt
 

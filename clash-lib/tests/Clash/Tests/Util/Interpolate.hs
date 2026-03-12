@@ -1,10 +1,10 @@
-{-|
+{-# LANGUAGE QuasiQuotes #-}
+
+{- |
 Copyright  :  (C) 2019, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-{-# LANGUAGE QuasiQuotes #-}
-
 module Clash.Tests.Util.Interpolate where
 
 import qualified Clash.Util.Interpolate as I
@@ -14,43 +14,50 @@ import Test.Tasty.HUnit
 
 test1, test2, test3, test4, test5, test6, test7, test8, test9 :: String
 test1 = [I.i| Simple |]
-test2 = [I.i|
+test2 =
+  [I.i|
   Single line
 |]
-test3 = [I.i|
+test3 =
+  [I.i|
 
   Surrounded by newlines
 
 |]
-test4 = [I.i|
+test4 =
+  [I.i|
   One
   Two
   Three
 |]
-test5 = [I.i|
+test5 =
+  [I.i|
   One
     Two
   Three
 |]
-test6 = [I.i|
+test6 =
+  [I.i|
   #{test5}
 |]
-
-test7 = [I.i|
+test7 =
+  [I.i|
   The big test:
 
   #{test5}
 |]
-
-test8 = [I.i|
+test8 =
+  [I.i|
   looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong word
 |]
 
-data SomeRecord = SomeRecord { getField :: Int }
+data SomeRecord = SomeRecord {getField :: Int}
 someRecord :: SomeRecord
 someRecord = SomeRecord 5
+
 -- test that we can escape closing '}'
-test9 = [I.i| #{ "\\" ++ show (getField someRecord { getField=6*7
+test9 =
+  [I.i| #{ "\\" ++ show (getField someRecord { getField=6*7
                                                   \}
                               )
                }
@@ -67,6 +74,8 @@ tests =
     , testCase "test5" $ "One\n  Two\nThree" @=? test5
     , testCase "test6" $ test5 @=? test6
     , testCase "test7" $ test7 @?= ("The big test:\n\n" ++ test5)
-    , testCase "test8" $ test8 @?= "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong \nword"
+    , testCase "test8" $
+        test8
+          @?= "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong \nword"
     , testCase "test9" $ test9 @?= "\\42"
     ]

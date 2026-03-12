@@ -1,12 +1,13 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 
 module T2988 where
 
 import Clash.Prelude
 import Prelude ()
 
-topEntity :: Signal System (Vec 4 (Vec 4 (Unsigned 32))) -> Signal System (Vec 4 (Unsigned 32))
+topEntity ::
+  Signal System (Vec 4 (Vec 4 (Unsigned 32))) -> Signal System (Vec 4 (Unsigned 32))
 topEntity = f
 {-# OPAQUE topEntity #-}
 

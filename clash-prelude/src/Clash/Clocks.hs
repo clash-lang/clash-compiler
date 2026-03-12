@@ -1,4 +1,11 @@
-{-|
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC "-Wno-orphans" #-}
+
+{- |
 Copyright  :  (C) 2018, Google Inc
                   2019, Myrtle Software Ltd
                   2023,      QBayLogic B.V.
@@ -7,24 +14,19 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Generic clock related utilities.
 -}
+module Clash.Clocks (
+  Clocks (..),
+  ClocksSync (..),
+  ClocksSyncCxt,
+  NumOutClocksSync,
+) where
 
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# OPTIONS_GHC "-Wno-orphans" #-}
-
-module Clash.Clocks
-  ( Clocks(..)
-  , ClocksSync(..)
-  , ClocksSyncCxt
-  , NumOutClocksSync
-  ) where
-
-import Clash.Clocks.Internal
-  (Clocks(..), ClocksSync(..), deriveClocksInstances, deriveClocksSyncInstances)
+import Clash.Clocks.Internal (
+  Clocks (..),
+  ClocksSync (..),
+  deriveClocksInstances,
+  deriveClocksSyncInstances,
+ )
 import Clash.Signal.Internal (Domain, KnownDomain)
 
 deriveClocksInstances

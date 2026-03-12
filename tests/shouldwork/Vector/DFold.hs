@@ -1,28 +1,29 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE KindSignatures #-}
+
 module DFold where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
-import Data.Singletons hiding (type (+))
-import Data.Proxy
+import Clash.Prelude
 import Data.Kind (Type)
+import Data.Proxy
+import Data.Singletons hiding (type (+))
 
 data Append (m :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (Append m a) l = Vec (l + m) a
 
-append' :: forall a k m. KnownNat k => Vec k a -> Vec m a -> Vec (k + m) a
+append' :: forall a k m. (KnownNat k) => Vec k a -> Vec m a -> Vec (k + m) a
 append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const ((:>) @a)) ys xs
 
-topEntity :: (Vec 3 Int,Vec 7 Int) -> Vec 10 Int
+topEntity :: (Vec 3 Int, Vec 7 Int) -> Vec 10 Int
 topEntity = uncurry append'
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = pure (7:>8:>9:>Nil,0:>1:>2:>3:>4:>5:>6:>Nil)
-    expectedOutput = outputVerifier' clk rst ((7:>8:>9:>0:>1:>2:>3:>4:>5:>6:>Nil):>Nil)
-    done           = expectedOutput (topEntity <$> testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+ where
+  testInput = pure (7 :> 8 :> 9 :> Nil, 0 :> 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> Nil)
+  expectedOutput = outputVerifier' clk rst ((7 :> 8 :> 9 :> 0 :> 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> Nil) :> Nil)
+  done = expectedOutput (topEntity <$> testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

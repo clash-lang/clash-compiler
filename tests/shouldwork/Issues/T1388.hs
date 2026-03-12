@@ -10,11 +10,11 @@ import Test.Tasty.Clash
 import Test.Tasty.Clash.NetlistTest
 
 newtype Byte = Byte
-  { _byte :: BitVector 8}
+  {_byte :: BitVector 8}
   deriving (Generic, Show, Eq)
   deriving anyclass (NFDataX)
 newtype Word = Word
-  { _word :: BitVector 16}
+  {_word :: BitVector 16}
   deriving (Generic, Show, Eq)
   deriving anyclass (NFDataX)
 
@@ -31,7 +31,7 @@ newtype TypeB = TypeB (Words 4)
 
 {-# OPAQUE bytesToWords #-}
 bytesToWords :: Bytes 4 -> TypeB
-bytesToWords = TypeB . fmap (\(Byte a) -> Word $ ((unpack . resize .  pack) a))
+bytesToWords = TypeB . fmap (\(Byte a) -> Word $ ((unpack . resize . pack) a))
 
 data TypeAs = Nop | TypeAS TypeA
 
@@ -65,7 +65,6 @@ assertNoSLVInPortMap =
   goPort (_, _, _, Identifier _ m)
     | isNothing m = True
   goPort p = False
-
 
 mainVHDL :: IO ()
 mainVHDL = do

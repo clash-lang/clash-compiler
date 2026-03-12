@@ -2,17 +2,17 @@
 
 module T1524 where
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
 topEntity :: Vec 2 (Vec 3 Int) -> Vec 2 Int
-topEntity = f @2 @(3-1)
+topEntity = f @2 @(3 - 1)
 {-# OPAQUE topEntity #-}
 
-f :: Vec k (Vec (l+1) Int) -> Vec k Int
+f :: Vec k (Vec (l + 1) Int) -> Vec k Int
 f input = map g input
 
-g :: Vec (l+1) Int -> Int
+g :: Vec (l + 1) Int -> Int
 g = fold (+)
 
 case1 :: Vec 2 (Vec 3 Int)
@@ -26,6 +26,6 @@ testBench :: Signal System Bool
 testBench = done
  where
   done = outputVerifier' clk aclr expected (topEntity <$> inp)
-  clk  = tbSystemClockGen (not <$> done)
-  inp  = stimuliGenerator clk aclr input
+  clk = tbSystemClockGen (not <$> done)
+  inp = stimuliGenerator clk aclr input
   aclr = systemResetGen

@@ -1,35 +1,36 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+
 module T2117 where
 
-import Clash.Prelude
-import Clash.Explicit.Testbench
 import Clash.Annotations.Primitive
+import Clash.Explicit.Testbench
+import Clash.Prelude
 import Data.String.Interpolate (__i)
 
-undefBV
-  :: Signal System Bool
+undefBV ::
+  Signal System Bool
 undefBV = testUndefined @(BitVector 8) (deepErrorX "undefined value")
 {-# OPAQUE undefBV #-}
 
-undefTup
-  :: Signal System Bool
+undefTup ::
+  Signal System Bool
 undefTup = testUndefined @(Bit, Bit) (deepErrorX "undefined value")
 {-# OPAQUE undefTup #-}
 
-partialDefTup
-  :: Signal System Bool
+partialDefTup ::
+  Signal System Bool
 partialDefTup = testDefined @(Bit, Bit) (errorX "undefined value", 0)
 {-# OPAQUE partialDefTup #-}
 
-testBenchG
-  :: Signal System Bool
-  -> Signal System Bool
+testBenchG ::
+  Signal System Bool ->
+  Signal System Bool
 testBenchG f = done
  where
   done = outputVerifier' clk rst (True :> Nil) f
-  clk  = tbSystemClockGen (not <$> done)
-  rst  = systemResetGen
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen
 {-# INLINE testBenchG #-}
 
 testBenchUndefBV :: Signal System Bool
@@ -48,13 +49,17 @@ testBenchPartialDefTup = testBenchG partialDefTup
 {-# ANN testBenchPartialDefTup (TestBench 'partialDefTup) #-}
 
 -- Only call with XException-argument if you want the model to match the HDL.
-testUndefined
-  :: NFDataX a
-  => a
-  -> Signal System Bool
+testUndefined ::
+  (NFDataX a) =>
+  a ->
+  Signal System Bool
 testUndefined !_ = pure True
 {-# OPAQUE testUndefined #-}
-{-# ANN testUndefined (InlinePrimitive [VHDL] [__i|
+{-# ANN
+  testUndefined
+  ( InlinePrimitive
+      [VHDL]
+      [__i|
   [ { "BlackBox" :
       { "name"      : "T2117.testUndefined"
       , "kind"      : "Expression"
@@ -62,17 +67,23 @@ testUndefined !_ = pure True
       }
     }
   ]
-  |]) #-}
+  |]
+  )
+  #-}
 
 -- Only call with an argument that has bits defined if you want the model to
 -- match the HDL.
-testDefined
-  :: NFDataX a
-  => a
-  -> Signal System Bool
+testDefined ::
+  (NFDataX a) =>
+  a ->
+  Signal System Bool
 testDefined !_ = pure True
 {-# OPAQUE testDefined #-}
-{-# ANN testDefined (InlinePrimitive [VHDL] [__i|
+{-# ANN
+  testDefined
+  ( InlinePrimitive
+      [VHDL]
+      [__i|
   [ { "BlackBox" :
       { "name"      : "T2117.testDefined"
       , "kind"      : "Expression"
@@ -80,4 +91,6 @@ testDefined !_ = pure True
       }
     }
   ]
-  |]) #-}
+  |]
+  )
+  #-}

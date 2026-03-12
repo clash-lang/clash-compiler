@@ -1,10 +1,10 @@
-{-# LANGUAGE CPP                   #-}
-{-# LANGUAGE AllowAmbiguousTypes   #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module NumConstantFolding_2 (module NumConstantFolding_2, module ConstantFoldingUtil) where
+
 import ConstantFoldingUtil
 
 #ifndef OUTPUTTEST

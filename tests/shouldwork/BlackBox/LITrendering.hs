@@ -2,7 +2,6 @@
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 module LITrendering where
 import Clash.Prelude
 import Control.Monad (when)

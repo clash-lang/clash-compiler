@@ -163,9 +163,16 @@ import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 >>> import qualified Clash.Sized.Vector as Vec
 -}
 
+-- The infixr doesn't work with a top level binding with `Cons` but later
+-- on works with :>. Seems to be some esoteric parsing by GHC.
+{- ORMOLU_DISABLE -}
 #define CONS_PREC 5
 
+consPrec :: Int
+consPrec = CONS_PREC
+
 infixr CONS_PREC `Cons`
+{- ORMOLU_ENABLE -}
 -- | Fixed size vectors.
 --
 -- * Lists with their length encoded in their type
@@ -271,18 +278,20 @@ pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
   where
     (:>) x xs = Cons x xs
 
+{- ORMOLU_DISABLE -}
 infixr CONS_PREC :>
+{- ORMOLU_ENABLE -}
 
 instance Show a => Show (Vec n a) where
   showsPrec n = \case
     Nil -> showString "Nil"
-    vs -> showParen (n > CONS_PREC) (go vs)
+    vs -> showParen (n > consPrec) (go vs)
 
    where
     go :: Vec m a -> ShowS
     go Nil = showString "Nil"
     go (x `Cons` xs) =
-        showsPrec (CONS_PREC + 1) x
+        showsPrec (consPrec + 1) x
       . showString " :> "
       . go xs
 
@@ -291,13 +300,13 @@ instance ShowX a => ShowX (Vec n a) where
     case isX vs of
       Right Nil -> showString "Nil"
       Left _ -> showString "undefined"
-      _ -> showParen (n > CONS_PREC) (go vs)
+      _ -> showParen (n > consPrec) (go vs)
    where
     go :: Vec m a -> ShowS
     go (isX -> Left _) = showString "undefined"
     go Nil = showString "Nil"
     go (x `Cons` xs) =
-        showsPrecX (CONS_PREC + 1) x
+        showsPrecX (consPrec + 1) x
       . showString " :> "
       . go xs
 

@@ -1,14 +1,13 @@
-{-|
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+
+{- |
 Copyright   :  (C) 2022, Google Inc.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Tests for 'Clash.Core.TermLiteral'.
 -}
-{-# LANGUAGE TemplateHaskell #-}
-
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 module Clash.Tests.Core.TermLiteral where
 
 import Data.Proxy
@@ -22,7 +21,7 @@ import Clash.Promoted.Nat
 
 import Clash.Tests.Core.TermLiteral.Types
 
-showTypeable :: Typeable a => Proxy a -> String
+showTypeable :: (Typeable a) => Proxy a -> String
 showTypeable proxy = showsPrec 0 (typeRep proxy) ""
 
 eqTest :: (TermLiteral a, Typeable a) => Proxy a -> Assertion

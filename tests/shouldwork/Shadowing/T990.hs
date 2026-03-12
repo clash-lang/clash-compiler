@@ -4,51 +4,50 @@
 
 module T990 (topEntity, testBench) where
 
-import qualified Control.Category as CC
 import Control.Arrow
+import qualified Control.Category as CC
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 
-data SignalA dom a b = SA { runSA :: Signal dom a -> Signal dom b }
+data SignalA dom a b = SA {runSA :: Signal dom a -> Signal dom b}
 
 instance CC.Category (SignalA dom) where
-    id = SA id
-    SA f . SA g = SA (f . g)
+  id = SA id
+  SA f . SA g = SA (f . g)
 
 instance Arrow (SignalA dom) where
-    arr f = SA $ fmap f
-    first (SA f) = SA $ unbundle >>> f *** id >>> bundle
-    second (SA f) = SA $ unbundle >>> id *** f >>> bundle
-    (SA f) *** (SA g) = SA $ unbundle >>> f *** g >>> bundle
-    (SA f) &&& (SA g) = SA $ f &&& g >>> bundle
+  arr f = SA $ fmap f
+  first (SA f) = SA $ unbundle >>> f *** id >>> bundle
+  second (SA f) = SA $ unbundle >>> id *** f >>> bundle
+  (SA f) *** (SA g) = SA $ unbundle >>> f *** g >>> bundle
+  (SA f) &&& (SA g) = SA $ f &&& g >>> bundle
 
-
-alwaysEnable :: KnownDomain dom => (HiddenEnable dom => a) -> a
+alwaysEnable :: (KnownDomain dom) => ((HiddenEnable dom) => a) -> a
 alwaysEnable a = exposeEnable a enableGen
 
 alwaysDelayA ::
-    (KnownDomain dom, HiddenClock dom, NFDataX a) =>
-    a -> SignalA dom a a
+  (KnownDomain dom, HiddenClock dom, NFDataX a) =>
+  a -> SignalA dom a a
 alwaysDelayA a = SA $ alwaysEnable $ delay a
 
-risingEdgeA :: HiddenClock dom => SignalA dom Bool Bool
+risingEdgeA :: (HiddenClock dom) => SignalA dom Bool Bool
 risingEdgeA = proc x -> do
-    x' <- alwaysDelayA False -< x
-    returnA -< x && not x'
+  x' <- alwaysDelayA False -< x
+  returnA -< x && not x'
 
-topEntity
-    :: Clock System
-    -> Signal System Bool
-    -> Signal System Bool
+topEntity ::
+  Clock System ->
+  Signal System Bool ->
+  Signal System Bool
 topEntity = exposeClock $ runSA risingEdgeA
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
-  where
-    testInput      = stimuliGenerator clk rst (False:>False:>True:>True:>Nil)
-    expectedOutput = outputVerifier'  clk rst (False:>False:>True:>False:>Nil)
-    done           = expectedOutput (topEntity clk testInput)
-    clk            = tbSystemClockGen (not <$> done)
-    rst            = systemResetGen
+ where
+  testInput = stimuliGenerator clk rst (False :> False :> True :> True :> Nil)
+  expectedOutput = outputVerifier' clk rst (False :> False :> True :> False :> Nil)
+  done = expectedOutput (topEntity clk testInput)
+  clk = tbSystemClockGen (not <$> done)
+  rst = systemResetGen

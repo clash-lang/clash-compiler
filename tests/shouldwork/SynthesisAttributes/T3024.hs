@@ -1,18 +1,22 @@
-{-# LANGUAGE  CPP #-}
+{-# LANGUAGE CPP #-}
+
 module T3024 where
 
 import qualified Prelude as P
 
 import qualified Data.List as List
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 
-import Clash.Prelude
 import Clash.Annotations.TopEntity
+import Clash.Prelude
 
 f :: Unsigned 8 -> Unsigned 8
 f x = x + 1
-{-# ANN f (Synthesize {t_name = "f", t_inputs = [PortName "x"], t_output = PortName "y"}) #-}
+{-# ANN
+  f
+  (Synthesize{t_name = "f", t_inputs = [PortName "x"], t_output = PortName "y"})
+  #-}
 {-# OPAQUE f #-}
 
 g :: (Unsigned 8 -> Unsigned 8) -> Unsigned 8 -> Unsigned 8
@@ -21,14 +25,19 @@ g h x = (h x + h (x * 8))
 
 q :: Unsigned 8 -> Unsigned 8
 q = g f
-{-# ANN q (Synthesize {t_name = "q", t_inputs = [PortName "a"], t_output = PortName "b"}) #-}
+{-# ANN
+  q
+  (Synthesize{t_name = "q", t_inputs = [PortName "a"], t_output = PortName "b"})
+  #-}
 {-# OPAQUE q #-}
 
 assertIn :: String -> String -> IO ()
 assertIn needle haystack
   | List.isInfixOf needle haystack = pure ()
-  | otherwise = P.error $ mconcat
-      [ "Expected:\n\n  ", needle, "\n\nIn:\n\n", haystack]
+  | otherwise =
+      P.error
+        $ mconcat
+          ["Expected:\n\n  ", needle, "\n\nIn:\n\n", haystack]
 
 mainVHDL :: IO ()
 mainVHDL = do

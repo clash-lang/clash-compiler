@@ -5,7 +5,7 @@ module T2342B where
 import Clash.Prelude
 import Data.Proxy
 
-foo :: forall n. KnownNat n => Proxy n -> Double
+foo :: forall n. (KnownNat n) => Proxy n -> Double
 foo Proxy = natToNum @n
 {-# OPAQUE foo #-}
 

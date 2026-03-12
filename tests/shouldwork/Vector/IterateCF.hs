@@ -4,11 +4,11 @@ module IterateCF where
 
 import qualified Prelude as P
 
-import Clash.Prelude
 import Clash.Explicit.Testbench
+import Clash.Prelude
 import Data.List (isInfixOf)
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 
 topEntity :: (Bool, Bool)
 topEntity = (a1, a2)
@@ -27,14 +27,20 @@ topEntity = (a1, a2)
 
 assertNotIn :: String -> String -> IO ()
 assertNotIn needle haystack
-  | needle `isInfixOf` haystack = P.error $ P.concat [ "Did not expect:\n\n  ", needle
-                                                     , "\n\nIn:\n\n", haystack ]
+  | needle `isInfixOf` haystack =
+      P.error
+        $ P.concat
+          [ "Did not expect:\n\n  "
+          , needle
+          , "\n\nIn:\n\n"
+          , haystack
+          ]
   | otherwise = pure ()
 
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
-  content  <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
+  content <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
 
   assertNotIn "255" content
   assertNotIn "256" content

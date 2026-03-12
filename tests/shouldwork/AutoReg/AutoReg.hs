@@ -1,23 +1,23 @@
-{-|
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+{-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
+
+{- |
   Copyright   :  (C) 2019, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-{-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
-
 module AutoReg where
-import Data.Int
+
 import Clash.Prelude
 import Clash.Sized.Internal.BitVector
 import Control.Monad (when)
+import Data.Int
 import qualified Data.List as L
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory)
+import System.FilePath (takeDirectory, (</>))
 
 #ifndef OUTPUTTEST
 data Tup2 a b = MkTup2 { getA :: a, getB :: b } deriving (Generic,NFDataX)
@@ -85,21 +85,22 @@ topEntity clk rst xs = withClockResetEnable clk rst enableGen $
   )
 #endif
 
-expectedRegCount = sum
-  [ 1   -- Unsigned
-  , 1   -- Bool
-  , 2   -- Tup2
-  , 3   -- Tup3
-  , 2   -- Maybe Bool
-  , 3   -- Maybe (Maybe Bool)
-  , 2   -- OtherPair Int8 Int16
-  , 2   -- Concrete
-  , 2   -- InfixDataCon Bool Bool
-  , 1   -- ((),Bool)
-  , 2   -- Vec 2 Bool
-  , 2*2 -- Vec 2 (Maybe Bool)
-  , 1+2*2 -- Maybe (Vec 2 (Maybe Bool))
-  ]
+expectedRegCount =
+  sum
+    [ 1 -- Unsigned
+    , 1 -- Bool
+    , 2 -- Tup2
+    , 3 -- Tup3
+    , 2 -- Maybe Bool
+    , 3 -- Maybe (Maybe Bool)
+    , 2 -- OtherPair Int8 Int16
+    , 2 -- Concrete
+    , 2 -- InfixDataCon Bool Bool
+    , 1 -- ((),Bool)
+    , 2 -- Vec 2 Bool
+    , 2 * 2 -- Vec 2 (Maybe Bool)
+    , 1 + 2 * 2 -- Maybe (Vec 2 (Maybe Bool))
+    ]
 
 countLinesContaining :: String -> String -> Int
 countLinesContaining needle haystack = L.length $ L.filter (needle `L.isInfixOf`) $ lines haystack
@@ -109,14 +110,17 @@ mainHDL topFile = do
   [topDir] <- getArgs
   content <- readFile (topDir </> "AutoReg.topEntity" </> topFile)
   let regCount = countLinesContaining "register begin" content
-  when (expectedRegCount /= regCount)
-    (error $ unlines
-      [ ""
-      , "Error: Found " <> show regCount <> " registers in " <> topFile
-      , "But expected " <> show expectedRegCount
-      ])
+  when
+    (expectedRegCount /= regCount)
+    ( error $
+        unlines
+          [ ""
+          , "Error: Found " <> show regCount <> " registers in " <> topFile
+          , "But expected " <> show expectedRegCount
+          ]
+    )
 
 mainSystemVerilog, mainVerilog, mainVHDL :: IO ()
 mainSystemVerilog = mainHDL "topEntity.sv"
-mainVerilog       = mainHDL "topEntity.v"
-mainVHDL          = mainHDL "topEntity.vhdl"
+mainVerilog = mainHDL "topEntity.v"
+mainVHDL = mainHDL "topEntity.vhdl"

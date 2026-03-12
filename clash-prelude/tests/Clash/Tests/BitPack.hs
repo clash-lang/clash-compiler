@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
-
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
 module Clash.Tests.BitPack where
@@ -17,14 +16,14 @@ import Clash.XException
 
 import GHC.Generics (Generic)
 
-data Unit    = Unit                        deriving (Generic, BitPack, Eq, Show)
-data Wrapper = Wrapper Int                 deriving (Generic, BitPack, Eq, Show)
-data Sum     = SumTypeA | SumTypeB         deriving (Generic, BitPack, Eq, Show)
-data BigSum  = BS1 | BS2 | BS3 | BS4 | BS5 deriving (Generic, BitPack, Eq, Show)
-data Product = Product Int Int             deriving (Generic, BitPack, Eq, Show)
-data SP      = S Int Int | P Int           deriving (Generic, BitPack, Eq, Show)
-data Rec1    = Rec1 { a :: Int }           deriving (Generic, BitPack, Eq, Show)
-data Rec2    = Rec2 { b :: Int, c :: Int } deriving (Generic, BitPack, Eq, Show)
+data Unit = Unit deriving (Generic, BitPack, Eq, Show)
+data Wrapper = Wrapper Int deriving (Generic, BitPack, Eq, Show)
+data Sum = SumTypeA | SumTypeB deriving (Generic, BitPack, Eq, Show)
+data BigSum = BS1 | BS2 | BS3 | BS4 | BS5 deriving (Generic, BitPack, Eq, Show)
+data Product = Product Int Int deriving (Generic, BitPack, Eq, Show)
+data SP = S Int Int | P Int deriving (Generic, BitPack, Eq, Show)
+data Rec1 = Rec1 {a :: Int} deriving (Generic, BitPack, Eq, Show)
+data Rec2 = Rec2 {b :: Int, c :: Int} deriving (Generic, BitPack, Eq, Show)
 
 rtt :: (Eq a, Show a, BitPack a) => a -> Assertion
 rtt u = unpack (pack u) @?= u

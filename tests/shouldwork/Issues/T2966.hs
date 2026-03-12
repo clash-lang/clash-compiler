@@ -4,7 +4,7 @@ module T2966 where
 
 import Clash.Prelude
 
-data T = A | B { f :: Int}
+data T = A | B {f :: Int}
 
 topEntity :: T -> Int
 topEntity = f
