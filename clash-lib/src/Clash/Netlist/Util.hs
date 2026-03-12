@@ -1822,6 +1822,7 @@ bindsExistentials exts tms = any (`elem` freeVars) exts
  where
   freeVars = concatMap (Lens.toListOf typeFreeVars) (map coreTypeOf tms)
 
+-- | Attempt to make an if-then-else construction out of this Case
 iteAlts :: HWType -> [Alt] -> Maybe (Term,Term)
 iteAlts sHTy [(pat0,alt0),(pat1,alt1)] | validIteSTy sHTy = case pat0 of
   DataPat dc _ _ -> case dcTag dc of

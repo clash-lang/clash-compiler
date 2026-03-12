@@ -268,7 +268,7 @@ genComponentT compName0 componentExpr = do
           -- HACK: Determine resulttype of this function by looking at its definition
           -- instead of looking at its last binder (which obscures any attributes
           -- [see: Clash.Annotations.SynthesisAttributes]).
-          ((args, binds, res{varType=varType1}))
+          (args, binds, res{varType=varType1})
       Left err ->
         throw (ClashException sp ($curLoc ++ err) Nothing)
 
