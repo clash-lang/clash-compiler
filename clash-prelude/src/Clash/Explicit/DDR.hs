@@ -51,9 +51,12 @@ import Clash.Signal.Internal
 >>> import Clash.Explicit.DDR
 >>> :{
 type DDR = "DDR" :: Domain
-instance KnownDomain "DDR" where
-  type KnownConf "DDR" = 'DomainConfiguration "DDR" 5000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+instance KnownDomain DDR where
+  type DomainPeriod DDR        = 5000
+  type DomainActiveEdge DDR    = 'Rising
+  type DomainResetKind DDR     = 'Asynchronous
+  type DomainInitBehavior DDR  = 'Defined
+  type DomainResetPolarity DDR = 'ActiveHigh
 :}
 
 -}
