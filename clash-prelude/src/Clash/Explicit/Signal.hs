@@ -46,9 +46,12 @@ made. Clash provides a standard implementation, called 'System', that is
 configured as follows:
 
 @
-instance KnownDomain 'System' where
-  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = 'SDomainConfiguration' SSymbol SNat 'SRising' 'SAsynchronous' 'SDefined' 'SActiveHigh'
+instance KnownDomain System where
+  type DomainPeriod System        = 10000
+  type DomainActiveEdge System    = 'Rising
+  type DomainResetKind System     = 'Asynchronous
+  type DomainInitBehavior System  = 'Defined
+  type DomainResetPolarity System = 'ActiveHigh
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -166,12 +169,6 @@ module Clash.Explicit.Signal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
     -- *** Convenience types #conveniencetypes#
     -- $conveniencetypes
 
@@ -200,6 +197,7 @@ module Clash.Explicit.Signal
     -- ** Domain utilities
   , VDomainConfiguration(..)
   , vDomain
+  , knownDomain
   , createDomain
   , knownVDomain
   , clockPeriod
@@ -320,14 +318,20 @@ import           Clash.XException
 >>> import qualified Data.List as L
 >>> :{
 instance KnownDomain "Dom2" where
-  type KnownConf "Dom2" = 'DomainConfiguration "Dom2" 2 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+  type DomainPeriod "Dom2"        = 2
+  type DomainActiveEdge "Dom2"    = 'Rising
+  type DomainResetKind "Dom2"     = 'Asynchronous
+  type DomainInitBehavior "Dom2"  = 'Defined
+  type DomainResetPolarity "Dom2" = 'ActiveHigh
 :}
 
 >>> :{
 instance KnownDomain "Dom7" where
-  type KnownConf "Dom7" = 'DomainConfiguration "Dom7" 7 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+  type DomainPeriod "Dom7"        = 7
+  type DomainActiveEdge "Dom7"    = 'Rising
+  type DomainResetKind "Dom7"     = 'Asynchronous
+  type DomainInitBehavior "Dom7"  = 'Defined
+  type DomainResetPolarity "Dom7" = 'ActiveHigh
 :}
 
 >>> type Dom2 = "Dom2"
