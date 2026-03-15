@@ -45,9 +45,12 @@ made. Clash provides an implementation 'System' with some common options
 chosen:
 
 @
-instance KnownDomain 'System' where
-  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+instance KnownDomain System where
+  type DomainPeriod System        = 10000
+  type DomainActiveEdge System    = 'Rising
+  type DomainResetKind System     = 'Asynchronous
+  type DomainInitBehavior System  = 'Defined
+  type DomainResetPolarity System = 'ActiveHigh
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -100,12 +103,6 @@ module Clash.Signal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
     -- *** Convenience types
     -- $conveniencetypes
 
@@ -134,6 +131,7 @@ module Clash.Signal
     -- ** Domain utilities
   , VDomainConfiguration(..)
   , vDomain
+  , knownDomain
   , createDomain
   , knownVDomain
   , clockPeriod

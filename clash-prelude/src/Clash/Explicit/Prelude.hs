@@ -16,6 +16,7 @@ defined in "Clash.Prelude".
 
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions, not-home #-}
 
