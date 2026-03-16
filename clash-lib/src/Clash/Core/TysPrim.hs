@@ -78,27 +78,27 @@ intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   wordPrimTyConName,  int64PrimTyConName, word64PrimTyConName,
   floatPrimTyConName, doublePrimTyConName,
   naturalPrimTyConName, byteArrayPrimTyConName, eqPrimTyConName :: TyConName
-intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
+intPrimTyConName     = mkUnsafeSystemName (showt ''Int#)
                                 (fromGhcUnique intPrimTyConKey)
-integerPrimTyConName = mkUnsafeSystemName "GHC.Num.Integer.Integer"
+integerPrimTyConName = mkUnsafeSystemName (showt ''Integer)
                                 (fromGhcUnique integerTyConKey)
-stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#"
+stringPrimTyConName  = mkUnsafeSystemName (showt ''Addr#)
                         (fromGhcUnique addrPrimTyConKey)
-charPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Char#"
+charPrimTyConName    = mkUnsafeSystemName (showt ''Char#)
                                 (fromGhcUnique charPrimTyConKey)
-wordPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Word#"
+wordPrimTyConName    = mkUnsafeSystemName (showt ''Word#)
                                 (fromGhcUnique wordPrimTyConKey)
-int64PrimTyConName   = mkUnsafeSystemName "GHC.Prim.Int64#"
+int64PrimTyConName   = mkUnsafeSystemName (showt ''Int64#)
                                 (fromGhcUnique int64PrimTyConKey)
-word64PrimTyConName  = mkUnsafeSystemName "GHC.Prim.Word64#"
+word64PrimTyConName  = mkUnsafeSystemName (showt ''Word64#)
                                 (fromGhcUnique word64PrimTyConKey)
-floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
+floatPrimTyConName   = mkUnsafeSystemName (showt ''Float#)
                                 (fromGhcUnique floatPrimTyConKey)
-doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
+doublePrimTyConName  = mkUnsafeSystemName (showt ''Double#)
                                 (fromGhcUnique doublePrimTyConKey)
-naturalPrimTyConName = mkUnsafeSystemName "GHC.Num.Natural.Natural"
+naturalPrimTyConName = mkUnsafeSystemName (showt ''Natural)
                                 (fromGhcUnique naturalTyConKey)
-byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
+byteArrayPrimTyConName = mkUnsafeSystemName (showt ''ByteArray#)
                           (fromGhcUnique byteArrayPrimTyConKey)
 
 eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (fromGhcUnique eqPrimTyConKey)
