@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                (C) 2021,      QBayLogic B.V.
+                (C) 2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -36,6 +36,7 @@ normalization =
   bindConst >-> letTL
   >-> evalConst
   >-!-> cse >-!-> cleanup >->
+  elimBigNum >-> -- TODO where to put me?
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
@@ -50,6 +51,9 @@ normalization =
     evalConst  = bottomupR (apply "evalConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
+
+    elimBigNum = topdownR (apply "elimBigNum" elimCaseBigNumInternals)
+
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
                  topdownSucR (apply "inlineCleanup" inlineCleanup) !->
                  innerMost (applyMany [("caseCon"        , caseCon)

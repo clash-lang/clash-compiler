@@ -24,6 +24,7 @@ module Clash.Normalize.Transformations.Case
   , caseLet
   , caseOneAlt
   , elimExistentials
+  , elimCaseBigNumInternals
   ) where
 
 import Control.Exception.Base (patError)
@@ -60,6 +61,7 @@ import Clash.Core.Term
   , collectTicks, mkApps, mkTicks, patIds, stripTicks, Bind(..))
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
+import Clash.Core.TysPrim ({-integerPrimTc, naturalPrimTc, -} integerIsDc, naturalNsDc)
 import Clash.Core.Util (listToLets, mkInternalVar)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
@@ -702,3 +704,24 @@ elimExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
 
 elimExistentials _ e = return e
 {-# SCC elimExistentials #-}
+
+
+elimCaseBigNumInternals :: HasCallStack => NormRewrite
+elimCaseBigNumInternals _ e@(Case scrut altsTy alts0@(_:_:_)) =
+  go alts0
+ where
+  go [] = return e
+  go ((pat,altE):alts) = case pat of
+    DataPat dc [] [x] | (dc == integerIsDc || dc == naturalNsDc) ->
+      if elemVarSet x fvs then
+        -- field used, turn the case into a projection
+        -- TODO does this even happen?
+        changed (Case scrut altsTy [(DataPat dc [] [x],altE)])
+      else
+        -- field not used, eliminate the case completely
+        changed altE
+    _ -> go alts
+   where
+    fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
+
+elimCaseBigNumInternals _ e = return e
