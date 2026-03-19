@@ -56,7 +56,7 @@ import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
-import           Clash.Core.Pretty                (showPpr)
+import           Clash.Core.Pretty                (showPpr, unsafeLookupEnvBool)
 import           Clash.Core.Term
   (IsMultiPrim (..), PrimInfo (..), mpi_resultTypes,  Alt, Pat (..), Term (..),
    TickInfo (..), collectArgs, collectArgsTicks,
@@ -66,6 +66,7 @@ import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPri
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
+import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
@@ -498,6 +499,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
   altHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
+  let e = Case scrut altTy (NE.toList alts0)
   case iteAlts scrutHTy alts0 of
     Just (altT,altF)
       | ite
@@ -525,6 +527,10 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
          | otherwise
           -> do dstAssign <- contAssign dstId (IfThenElse scrutExpr altTExpr altFExpr)
                 return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++ [dstAssign]
+    _ | scrutTy == integerPrimTy && not unsafeNetlistCaseDisabled
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Integer) of ...") (Just $ showPpr e))
+    _ | scrutTy == naturalPrimTy && not unsafeNetlistCaseDisabled
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Integer) of ...") (Just $ showPpr e))
     _ -> do
       reprs <- Lens.view customReprs
       let alts1 = (reorderDefault . reorderCustom tcm reprs scrutTy) alts0
@@ -593,6 +599,10 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
    where
     isNet NetDecl' {} = True
     isNet _ = False
+
+-- TODO remove this escape hatch
+unsafeNetlistCaseDisabled :: Bool
+unsafeNetlistCaseDisabled = unsafeLookupEnvBool "CLASH_DISABLE_UNSAFE_CASE_CHECK" False
 
 -- GHC puts default patterns in the first position, we want them in the
 -- last position.
