@@ -498,7 +498,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
   altHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
-  case iteAlts scrutHTy (NE.toList alts0) of
+  case iteAlts scrutHTy alts0 of
     Just (altT,altF)
       | ite
       , Concurrent <- declType
