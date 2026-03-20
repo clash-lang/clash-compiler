@@ -28,9 +28,9 @@ pkgs.mkShell {
 
     pkgs.ghdl-llvm
     pkgs.nixpkgs-fmt
-    pkgs.symbiyosys
+    pkgs.sby
     pkgs.verilator
-    pkgs.verilog
+    pkgs.iverilog
     pkgs.yosys
   ];
 }

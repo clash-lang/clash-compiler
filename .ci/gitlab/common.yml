@@ -12,7 +12,7 @@ default:
   timeout: 10 minutes
   stage: build
   variables:
-    CLASH_DOCKER_TAG: 20251007
+    CLASH_DOCKER_TAG: 20251229
     CACHE_BUST_TOKEN: 3
     # Note that the fallback key has two cache bust tokens. `$CACHE_BUST_TOKEN`
     # is our own, defined right above, and the `-3` at the end in the fallback
