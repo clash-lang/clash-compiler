@@ -236,7 +236,7 @@ let
                 prev.yosys
               ]} \
               --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
-                prev.ghdl-llvmf
+                prev.ghdl-llvm
                 prev.zlib.static
               ]}
           '';
