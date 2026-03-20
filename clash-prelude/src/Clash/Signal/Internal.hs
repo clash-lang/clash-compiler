@@ -44,7 +44,9 @@ module Clash.Signal.Internal
   , Domain
   , sameDomain
   , KnownDomain(..)
+  , KnownConf
   , KnownConfiguration
+  , knownDomain
   , knownDomainByName
   , ActiveEdge(..)
   , SActiveEdge(..)
@@ -57,18 +59,11 @@ module Clash.Signal.Internal
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
   -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
-
   , DomainConfigurationPeriod
   , DomainConfigurationActiveEdge
   , DomainConfigurationResetKind
   , DomainConfigurationInitBehavior
   , DomainConfigurationResetPolarity
-
   -- *** Convenience types
   , HasSynchronousReset
   , HasAsynchronousReset
@@ -201,7 +196,7 @@ import Data.Type.Equality         ((:~:))
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits
-  (Div, KnownSymbol, KnownNat, Nat, Symbol, type (<=), type (*), sameSymbol)
+  (Div, KnownSymbol, KnownNat, Nat, Symbol, type (<=), type (*), type (-), sameSymbol)
 import GHC.TypeLits.Extra         (DivRU)
 import GHC.Records                (HasField(getField))
 import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
@@ -366,32 +361,6 @@ type family DomainConfigurationInitBehavior (config :: DomainConfiguration) :: I
 type family DomainConfigurationResetPolarity (config :: DomainConfiguration) :: ResetPolarity where
   DomainConfigurationResetPolarity ('DomainConfiguration name period edge reset init polarity) = polarity
 
--- | Convenience type to help to extract a period from a domain. Example usage:
---
--- @
--- myFunc :: (KnownDomain dom, DomainPeriod dom ~ 6000) => ...
--- @
-type DomainPeriod (dom :: Domain) =
-  DomainConfigurationPeriod (KnownConf dom)
-
--- | Convenience type to help to extract the active edge from a domain. Example
--- usage:
---
--- @
--- myFunc :: (KnownDomain dom, DomainActiveEdge dom ~ 'Rising) => ...
--- @
-type DomainActiveEdge (dom :: Domain) =
-  DomainConfigurationActiveEdge (KnownConf dom)
-
--- | Convenience type to help to extract the reset synchronicity from a
--- domain. Example usage:
---
--- @
--- myFunc :: (KnownDomain dom, DomainResetKind dom ~ 'Synchronous) => ...
--- @
-type DomainResetKind (dom :: Domain) =
-  DomainConfigurationResetKind (KnownConf dom)
-
 -- | Convenience type to constrain a domain to have synchronous resets. Example
 -- usage:
 --
@@ -418,15 +387,6 @@ type HasSynchronousReset (dom :: Domain) =
 type HasAsynchronousReset (dom :: Domain) =
   (KnownDomain dom, DomainResetKind dom ~ 'Asynchronous)
 
--- | Convenience type to help to extract the initial value behavior from a
--- domain. Example usage:
---
--- @
--- myFunc :: (KnownDomain dom, DomainInitBehavior dom ~ 'Defined) => ...
--- @
-type DomainInitBehavior (dom :: Domain) =
-  DomainConfigurationInitBehavior (KnownConf dom)
-
 -- | Convenience type to constrain a domain to have initial values. Example
 -- usage:
 --
@@ -442,15 +402,6 @@ type DomainInitBehavior (dom :: Domain) =
 -- [Click here for usage hints]("Clash.Explicit.Signal#g:conveniencetypes")
 type HasDefinedInitialValues (dom :: Domain) =
   (KnownDomain dom, DomainInitBehavior dom ~ 'Defined)
-
--- | Convenience type to help to extract the reset polarity from a domain.
--- Example usage:
---
--- @
--- myFunc :: (KnownDomain dom, DomainResetPolarity dom ~ 'ActiveHigh) => ...
--- @
-type DomainResetPolarity (dom :: Domain) =
-  DomainConfigurationResetPolarity (KnownConf dom)
 
 -- * Time representation
 
@@ -508,17 +459,73 @@ deriving instance Show (SDomainConfiguration dom conf)
 
 type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
 
+-- | Evidence for the active edge to be known.
+class KnownActiveEdge (edge :: ActiveEdge) where
+  knownActiveEdge :: SActiveEdge edge
+instance KnownActiveEdge Rising  where knownActiveEdge = SRising
+instance KnownActiveEdge Falling where knownActiveEdge = SFalling
+
+-- | Evidence for the reset kind to be known.
+class KnownResetKind (resetKind :: ResetKind) where
+  knownResetKind :: SResetKind resetKind
+instance KnownResetKind Asynchronous where knownResetKind = SAsynchronous
+instance KnownResetKind Synchronous  where knownResetKind = SSynchronous
+
+-- | Evidence for the init behavior to be known.
+class KnownInitBehavior (init :: InitBehavior) where
+  knownInitBehavior :: SInitBehavior init
+instance KnownInitBehavior Unknown where knownInitBehavior = SUnknown
+instance KnownInitBehavior Defined where knownInitBehavior = SDefined
+
+-- | Evidence for the reset polarity to be known.
+class KnownResetPolarity (polarity :: ResetPolarity) where
+  knownResetPolarity :: SResetPolarity polarity
+instance KnownResetPolarity ActiveLow  where knownResetPolarity = SActiveLow
+instance KnownResetPolarity ActiveHigh where knownResetPolarity = SActiveHigh
+
+-- | The configuration parameters of a known domain given as a
+-- 'DomainConfiguration'.
+type KnownConf dom = 'DomainConfiguration dom
+  (DomainPeriod dom)
+  (DomainActiveEdge dom)
+  (DomainResetKind dom)
+  (DomainInitBehavior dom)
+  (DomainResetPolarity dom)
+
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.
-class (KnownSymbol dom, KnownNat (DomainPeriod dom)) => KnownDomain (dom :: Domain) where
-  type KnownConf dom :: DomainConfiguration
-  -- | Returns 'SDomainConfiguration' corresponding to an instance's 'DomainConfiguration'.
-  --
-  -- Example usage:
-  --
-  -- >>> knownDomain @System
-  -- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
-  knownDomain :: SDomainConfiguration dom (KnownConf dom)
+class
+  ( KnownSymbol dom
+  , KnownNat (DomainPeriod dom)
+  , KnownNat (DomainPeriod dom - 1)
+  , KnownActiveEdge (DomainActiveEdge dom)
+  , KnownResetKind (DomainResetKind dom)
+  , KnownInitBehavior (DomainInitBehavior dom)
+  , KnownResetPolarity (DomainResetPolarity dom)
+  ) =>
+  KnownDomain (dom :: Domain)
+ where
+  type DomainPeriod dom :: Nat
+  type DomainActiveEdge dom :: ActiveEdge
+  type DomainResetKind dom :: ResetKind
+  type DomainInitBehavior dom :: InitBehavior
+  type DomainResetPolarity dom :: ResetPolarity
+
+-- | Returns 'SDomainConfiguration' corresponding to an instance's 'KnownDomain'.
+--
+-- Example usage:
+--
+-- >>> knownDomain @System
+-- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
+knownDomain :: KnownDomain dom => SDomainConfiguration dom (KnownConf dom)
+knownDomain = SDomainConfiguration
+  { sName          = SSymbol
+  , sPeriod        = SNat
+  , sActiveEdge    = knownActiveEdge
+  , sResetKind     = knownResetKind
+  , sInitBehavior  = knownInitBehavior
+  , sResetPolarity = knownResetPolarity
+  }
 
 -- | Version of 'knownDomain' that takes a 'SSymbol'. For example:
 --
@@ -535,18 +542,27 @@ knownDomainByName =
 
 -- | A /clock/ (and /reset/) dom with clocks running at 100 MHz
 instance KnownDomain System where
-  type KnownConf System = 'DomainConfiguration System 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+  type DomainPeriod System        = 10000
+  type DomainActiveEdge System    = 'Rising
+  type DomainResetKind System     = 'Asynchronous
+  type DomainInitBehavior System  = 'Defined
+  type DomainResetPolarity System = 'ActiveHigh
 
 -- | System instance with defaults set for Xilinx FPGAs
 instance KnownDomain XilinxSystem where
-  type KnownConf XilinxSystem = 'DomainConfiguration XilinxSystem 10000 'Rising 'Synchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SSynchronous SDefined SActiveHigh
+  type DomainPeriod XilinxSystem        = 10000
+  type DomainActiveEdge XilinxSystem    = 'Rising
+  type DomainResetKind XilinxSystem     = 'Synchronous
+  type DomainInitBehavior XilinxSystem  = 'Defined
+  type DomainResetPolarity XilinxSystem = 'ActiveHigh
 
 -- | System instance with defaults set for Intel FPGAs
 instance KnownDomain IntelSystem where
-  type KnownConf IntelSystem = 'DomainConfiguration IntelSystem 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+  type DomainPeriod IntelSystem        = 10000
+  type DomainActiveEdge IntelSystem    = 'Rising
+  type DomainResetKind IntelSystem     = 'Asynchronous
+  type DomainInitBehavior IntelSystem  = 'Defined
+  type DomainResetPolarity IntelSystem = 'ActiveHigh
 
 -- | Convenience value to allow easy "subclassing" of System domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
@@ -679,12 +695,18 @@ createDomain :: VDomainConfiguration -> Q [Dec]
 createDomain (VDomainConfiguration name period edge reset init_ polarity) =
   if isValidDomainName name then do
     kdType <- [t| KnownDomain $nameT |]
-    kcType <- [t| ('DomainConfiguration $nameT $periodT $edgeT $resetKindT $initT $polarityT) |]
-    sDom <- [| SDomainConfiguration SSymbol SNat $edgeE $resetKindE $initE $polarityE |]
+    kpType <- [t| $periodT |]
+    keType <- [t| $edgeT |]
+    krType <- [t| $resetKindT |]
+    kiType <- [t| $initT |]
+    koType <- [t| $polarityT |]
 
     let vNameImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
-        kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
-        kcImpl = mkTySynInstD ''KnownConf [LitT (StrTyLit name)] kcType
+        kpImpl = mkTySynInstD ''DomainPeriod [LitT (StrTyLit name)] kpType
+        keImpl = mkTySynInstD ''DomainActiveEdge [LitT (StrTyLit name)] keType
+        krImpl = mkTySynInstD ''DomainResetKind [LitT (StrTyLit name)] krType
+        kiImpl = mkTySynInstD ''DomainInitBehavior [LitT (StrTyLit name)] kiType
+        koImpl = mkTySynInstD ''DomainResetPolarity [LitT (StrTyLit name)] koType
         vName' = mkName ('v':name)
 
     tySynExists <- isJust <$> lookupTypeName name
@@ -705,37 +727,13 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
         | not vHelperExists
         ]
       , [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)
-          InstanceD Nothing [] kdType [kcImpl, kdImpl]
+          InstanceD Nothing [] kdType [kpImpl, keImpl, krImpl, kiImpl, koImpl]
         ]
       ]
 
   else
     error ("Domain names should be a valid Haskell type name, not: " ++ name)
  where
-
-  edgeE =
-    pure $
-    case edge of
-      Rising -> ConE 'SRising
-      Falling -> ConE 'SFalling
-
-  resetKindE =
-    pure $
-    case reset of
-      Asynchronous -> ConE 'SAsynchronous
-      Synchronous -> ConE 'SSynchronous
-
-  initE =
-    pure $
-    case init_ of
-      Unknown -> ConE 'SUnknown
-      Defined -> ConE 'SDefined
-
-  polarityE =
-    pure $
-    case polarity of
-      ActiveHigh -> ConE 'SActiveHigh
-      ActiveLow -> ConE 'SActiveLow
 
   nameT   = pure (LitT (StrTyLit name))
   periodT = pure (LitT (NumTyLit (toInteger period)))
