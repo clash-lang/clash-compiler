@@ -181,13 +181,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-<<<<<<< HEAD
-      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20251015
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20251007
-=======
-      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20251229
->>>>>>> 4e6fc5c5 (Update flake (#3112))
+      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20260320
 
       env:
         THREADS: 2
