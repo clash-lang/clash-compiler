@@ -21,6 +21,19 @@ let
     pkgs = prev;
   };
 
+  # Some type checker plugins have tests that invoke GHC which requires the package
+  # themselves to be available.
+  ghc-typelits-plugins-preCheck-script = pkgName: ''
+    unset GHC_ENVIRONMENT
+    wrapper="''${TMPDIR:-/tmp}/ghc-for-tests"
+    cat > "$wrapper" <<'EOF'
+    #!/bin/sh
+    exec ghc -package-db "$PWD/dist/package.conf.inplace" -package ${pkgName} "$@"
+    EOF
+    chmod +x "$wrapper"
+    export HC="$wrapper"
+  '';
+
   # An overlay with the packages we pull in as inputs to this flake.
   #
   # This is mostly intended for packages developed by QBayLogic which are
@@ -34,10 +47,15 @@ let
           { };
 
       ghc-typelits-extra =
-        hprev.callCabal2nix
-          "ghc-typelits-extra"
-          "${ghc-typelits-extra}"
-          { };
+        prev.haskell.lib.overrideCabal
+          (hprev.callCabal2nix
+            "ghc-typelits-extra"
+            "${ghc-typelits-extra}"
+            { }
+          )
+          (drv: {
+            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-extra";
+          });
 
       ghc-typelits-knownnat =
         hprev.callCabal2nix
@@ -46,10 +64,15 @@ let
           { };
 
       ghc-typelits-natnormalise =
-        hprev.callCabal2nix
-          "ghc-typelits-natnormalise"
-          "${ghc-typelits-natnormalise}"
-          { };
+        prev.haskell.lib.overrideCabal
+          (hprev.callCabal2nix
+            "ghc-typelits-natnormalise"
+            "${ghc-typelits-natnormalise}"
+            { }
+          )
+          (drv: {
+            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-natnormalise";
+          });
     };
 
   # An overlay with the packages in this repository.
@@ -112,14 +135,16 @@ let
         in
         unmodified.overrideAttrs (old: {
           nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-            prev.verilog
+            prev.iverilog
           ];
         });
 
+      # Broken on GHC 9.8.4
       clash-ffi =
-        hprev.callCabal2nix "clash-ffi" ../clash-ffi {
-          inherit (hfinal) clash-prelude;
-        };
+        prev.haskell.lib.overrideCabal (hprev.callCabal2nix "clash-ffi" ../clash-ffi {})
+          (drv: {
+            testFlags = [ "--smallcheck-max-count" "2000" ];
+          });
 
       clash-ghc =
         let
@@ -231,9 +256,9 @@ let
               --prefix PATH : ${prev.lib.makeBinPath [
                 prev.gcc
                 prev.ghdl-llvm
-                prev.symbiyosys
+                prev.sby
                 prev.verilator
-                prev.verilog
+                prev.iverilog
                 prev.yosys
               ]} \
               --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
@@ -246,12 +271,16 @@ let
 
   haskellOverlays =
     prev.lib.composeManyExtensions [
-      ghcOverlay
       haskellExternalPackages
       haskellInternalPackages
+      ghcOverlay
     ];
 in
 {
+  # gnat13 which si the default as of 11.03.2026 does not support aarch64
+  # but ghdl-llvm works fine with gnat14 sos witch to it.
+  ghdl-llvm = prev.ghdl-llvm.override { gnat = prev.gnat14; };
+
   "clashPackages-${compilerVersion}" =
     prev.haskell.packages.${compilerVersion}.extend haskellOverlays;
 }

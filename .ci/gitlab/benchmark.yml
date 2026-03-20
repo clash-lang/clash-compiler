@@ -1,5 +1,11 @@
 .benchmark:
+<<<<<<< HEAD
   image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20250307
+||||||| parent of 4e6fc5c5 (Update flake (#3112))
+  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20251007
+=======
+  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20251229
+>>>>>>> 4e6fc5c5 (Update flake (#3112))
   stage: test
   timeout: 2 hours
   variables:
