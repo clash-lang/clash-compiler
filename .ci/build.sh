@@ -48,7 +48,6 @@ mkdir bin
 for TEST in $TESTS; do
   ln -s "$(realpath --relative-to=bin "$(cabal list-bin $TEST)")" bin/$TEST
 done
-<<<<<<< HEAD
 
 # `CI_COMMIT_TAG` is set when a tag has been created on GitHub. We use this to
 # trigger a release pipeline (release to Snap / Hackage).
@@ -62,24 +61,3 @@ if [[ ${CI_COMMIT_TAG:-} != "" ]]; then
     fi
     set -e
 fi
-
-# TODO: remove this and put it back into tests when
-# https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-# is fixed
-set +u
-if [[ "$SKIP_CLASH_FFI_EXAMPLE" != "yes" ]]; then
-  ln -s "$(realpath --relative-to=bin "$(cabal list-bin clash-ffi:ffi-interface-tests)")" bin/clash-ffi:ffi-interface-tests
-fi
-set -u
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-
-# TODO: remove this and put it back into tests when
-# https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-# is fixed
-set +u
-if [[ "$SKIP_CLASH_FFI_EXAMPLE" != "yes" ]]; then
-  ln -s "$(realpath --relative-to=bin "$(cabal list-bin clash-ffi:ffi-interface-tests)")" bin/clash-ffi:ffi-interface-tests
-fi
-set -u
-=======
->>>>>>> 4e6fc5c5 (Update flake (#3112))
