@@ -389,13 +389,7 @@ test-suite doctests
     build-depends:
       base,
       clash-prelude,
-<<<<<<< HEAD
-      doctest-parallel >= 0.2 && < 0.4,
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-      doctest-parallel >= 0.3.1 && < 0.4,
-=======
-      doctest-parallel >= 0.3.1 && < 0.5,
->>>>>>> 4e6fc5c5 (Update flake (#3112))
+      doctest-parallel >= 0.2 && < 0.5,
       filepath
 
   if arch(x86_64) && flag(workaround-ghc-mmap-crash)

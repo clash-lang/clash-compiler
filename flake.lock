@@ -37,25 +37,11 @@
     "ghc-tcplugins-extra": {
       "flake": false,
       "locked": {
-<<<<<<< HEAD
-        "lastModified": 1716385093,
-        "narHash": "sha256-pXQoPP22TicWFwpWub9CX1J+rpOKfyX2IyzlCg1qG84=",
-        "owner": "clash-lang",
-        "repo": "ghc-tcplugins-extra",
-        "rev": "702dda2095c66c4f5148a749c8b7dbcc8a09f5c1",
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-        "lastModified": 1760038054,
-        "narHash": "sha256-8cF5dPdAT1cf3OdQwgcOy5BbfnJRNcxFgmSHgv+tB+4=",
-        "owner": "sheaf",
-        "repo": "ghc-tcplugin-api",
-        "rev": "b6407ef2ae4bfa0c25c628c8c6f69058257228eb",
-=======
         "lastModified": 1768388673,
         "narHash": "sha256-3RriTela4iwbvHhF3UigmBOfxJv0+YQGAlXQbnXsX74=",
         "owner": "sheaf",
         "repo": "ghc-tcplugin-api",
         "rev": "c583750b5899846cb455f3fe2d58b3ba9bc910d0",
->>>>>>> 4e6fc5c5 (Update flake (#3112))
         "type": "github"
       },
       "original": {
@@ -67,25 +53,11 @@
     "ghc-typelits-extra": {
       "flake": false,
       "locked": {
-<<<<<<< HEAD
-        "lastModified": 1716411282,
-        "narHash": "sha256-YH03Ce+TEWKHGAm7BhynitZomfpYeKpqvZAviw8yEPA=",
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-        "lastModified": 1764765869,
-        "narHash": "sha256-ynlFGRhTcXwG/fgpIk/GAy+mpvo8eBCptTuRWGl/YC4=",
-=======
         "lastModified": 1773994244,
         "narHash": "sha256-BPOTj6Dqv2Nt+C47MCayXzItXRf3HC4f2kV7lnAjAEY=",
->>>>>>> 4e6fc5c5 (Update flake (#3112))
         "owner": "clash-lang",
         "repo": "ghc-typelits-extra",
-<<<<<<< HEAD
-        "rev": "4dadc824a3ef9a511fcf6605167715a5a655ba0d",
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-        "rev": "db8cfbd17a8c8984d28c8af254cc81860d8430a9",
-=======
         "rev": "1d38c49f456406937c5e9e3b3e382af6ccbff0e1",
->>>>>>> 4e6fc5c5 (Update flake (#3112))
         "type": "github"
       },
       "original": {
@@ -97,25 +69,11 @@
     "ghc-typelits-knownnat": {
       "flake": false,
       "locked": {
-<<<<<<< HEAD
-        "lastModified": 1716408841,
-        "narHash": "sha256-A2v6GkMtSJqZXpTwWfIcwshieyRySeR1bP+NogUHNoo=",
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-        "lastModified": 1760704938,
-        "narHash": "sha256-l1rQk8hQ7ywYGkfT9TtRuP4E1SH4n1LioxquHgzf+rY=",
-=======
         "lastModified": 1774000279,
         "narHash": "sha256-41mjxMsWHXmAS2bxYVsE3OOav3sWnwPbpP56aRDVUNU=",
->>>>>>> 4e6fc5c5 (Update flake (#3112))
         "owner": "clash-lang",
         "repo": "ghc-typelits-knownnat",
-<<<<<<< HEAD
-        "rev": "2e57de3b709dab085fb1657cf73d4f5e833229ee",
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-        "rev": "47ed62f90218ecf74246caabbbeaeb22e8be8246",
-=======
         "rev": "21fb8294266484b2e267f3850f5437e87d8b241f",
->>>>>>> 4e6fc5c5 (Update flake (#3112))
         "type": "github"
       },
       "original": {
@@ -127,25 +85,11 @@
     "ghc-typelits-natnormalise": {
       "flake": false,
       "locked": {
-<<<<<<< HEAD
-        "lastModified": 1716387676,
-        "narHash": "sha256-G5p0NUy4CpjxGO1VNhb38fhkXESFPxGaZJM0qd6L74U=",
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-        "lastModified": 1764714063,
-        "narHash": "sha256-fBjB3ms0rfIDmMFGx5z4aTfldpwfEqoliFePlRVoI7w=",
-=======
         "lastModified": 1773940027,
         "narHash": "sha256-MGdoDIOWAHk9IERWtGQhxB5AlBAVbmtCUouKJUv122g=",
->>>>>>> 4e6fc5c5 (Update flake (#3112))
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-<<<<<<< HEAD
-        "rev": "84f500a9735675e96253181939c3473a567f6f7a",
-||||||| parent of 4e6fc5c5 (Update flake (#3112))
-        "rev": "c8131585b04c5c55f3e1da6e564107147306e274",
-=======
         "rev": "5adf333887f5f9f00e47f69368a2b5e9705c9cbc",
->>>>>>> 4e6fc5c5 (Update flake (#3112))
         "type": "github"
       },
       "original": {
