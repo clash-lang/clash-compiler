@@ -67,7 +67,7 @@ stack-build:
     - .ci/stack_build.sh
 
 nix-build:
-  image: nixos/nix:2.10.1
+  image: nixos/nix:2.34.2
   needs: []
   stage: test
   before_script:
