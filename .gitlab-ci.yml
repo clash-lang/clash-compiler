@@ -74,6 +74,7 @@ nix-build:
    - nix-env -i gawk
   script:
     - .ci/setup_cachix.sh
+    - export NIX_CONFIG="experimental-features = nix-command flakes"
     - nix-build -j$(./.ci/effective_cpus.sh) --log-format raw --max-silent-time 3600
     - nix-build | cachix push clash-lang
   tags:
