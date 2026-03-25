@@ -357,8 +357,7 @@ let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
 :}
 <BLANKLINE>
 <interactive>:...
-    • Couldn't match type ‘(((2 ^ d) + 1) + ((2 ^ d) + 1)) - 1’
-                     with ‘(2 ^ d) + 1’
+...
       Expected type: Index ((2 ^ d) + 1)
                      -> Index ((2 ^ d) + 1) -> Index ((2 ^ d) + 1)
         Actual type: Index ((2 ^ d) + 1)
