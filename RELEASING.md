@@ -80,6 +80,9 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
    show up properly)
 6. Create a release on [GitHub's new release page](https://github.com/clash-lang/clash-compiler/releases/new)
 7. Update the [starter projects](https://github.com/clash-lang/stack-templates/)
+   This requires obtaining the hashes and lengths of some `.cabal` files.
+   Use `echo "sha256:$(sha256sum *cabal | cut -f1 -d' '),$(wc -c *.cabal | cut -f1 -d' ')"`
+   in the containing folder (i.e. in `clash-prelude` etc.).
 8. Cherry-pick commit made in (3) (changelog updates) to `master`
 9. After the release is on Hackage: run `changelog/comment-gh.py` and execute
    the commands it lists. This will inform users subscribed to specific issues
