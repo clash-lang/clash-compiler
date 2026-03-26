@@ -84,8 +84,9 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
    Use `echo "sha256:$(sha256sum *cabal | cut -f1 -d' '),$(wc -c *.cabal | cut -f1 -d' ')"`
    in the containing folder (i.e. in `clash-prelude` etc.).
 8. Cherry-pick commit made in (3) (changelog updates) to `master`
-9. After the release is on Hackage: run `changelog/comment-gh.py` and execute
-   the commands it lists. This will inform users subscribed to specific issues
-   that a fix for their issue is now in a released version.
+9. After the release is on Hackage, run `changelog/comment-gh.py`
+   (`cd changelog/`, then `./comment-gh.py <version number>`).
+   Execute the commands it lists. This will inform users subscribed to specific
+   issues that a fix for their issue is now in a released version.
 10. Update these docs if anything is missing :-)
 11. Enjoy!
