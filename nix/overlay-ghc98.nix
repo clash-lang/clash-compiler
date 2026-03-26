@@ -1,7 +1,7 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak markUnbroken overrideCabal;
+  inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken overrideCabal;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
@@ -21,6 +21,16 @@ in
 
   # singletons-th 3.3 requires th-desugar 1.16
   th-desugar = prev.callHackage "th-desugar" "1.16" { };
+
+  # This version of tasty isn't available in the nix ghc98 package set
+  tasty = prev.callHackageDirect {
+    pkg = "tasty";
+    ver = "1.5.4";
+    sha256 = "sha256-C6VyZuM+rcqllVlhk52snAKpw3sqrrzncz8Da1yE03Q=";
+  } {};
+
+  # Criterion test fails with tasty 1.5.4
+  criterion = dontCheck prev.criterion;
 
   # Broken on GHC 9.8.4 see clash-ffi cabal file for details
   clash-ffi = overrideCabal prev.clash-ffi (drv: {

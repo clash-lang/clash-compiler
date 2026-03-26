@@ -55,7 +55,7 @@ common basic-config
     process,
     random >= 1.2,
     tagged,
-    tasty >= 1.5,
+    tasty >= 1.5.4,
     tasty-hunit,
     temporary,
     text,
