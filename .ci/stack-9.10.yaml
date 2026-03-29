@@ -1,4 +1,4 @@
-resolver: lts-24.32
+resolver: lts-24.34
 
 ghc-options:
   "$locals": -Wall -Wcompat
@@ -16,4 +16,5 @@ extra-deps:
 - ghc-typelits-extra-0.5.2@sha256:0d04483a660be3987213418316d2bd9c1a3dcb4227df0a0f80c32e98b87f76fe
 - ghc-typelits-knownnat-0.8.2@sha256:6e9ef33bd2cf462e7d66f5b28608c0156007947b3a7a95fd5b90bfa4a0365d1e
 - ghc-typelits-natnormalise-0.9.3@sha256:aa48d0755cd246643155704b0082ce8d0bf421f445bf568289d1a8c791257743
+- tasty-1.5.4@sha256:49f8307d78c7d6b1959d4448152858efe102ca5e9b289be082b9bf221e798084,2759
 - tasty-flaky-0.1.2.0@sha256:2f91ab9f55ae0c472474087f98bb54076aca18f8b058343479d24597a3aa181b,1858
