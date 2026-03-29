@@ -20,4 +20,14 @@ in
 
   # Marked broken and bounds exclude newer GHC. But seems to work fine.
   derive-storable-plugin = doJailbreak (markUnbroken prev.derive-storable-plugin);
+
+  # This version of tasty isn't available in the nix ghc910 package set
+  tasty = prev.callHackageDirect {
+    pkg = "tasty";
+    ver = "1.5.4";
+    sha256 = "sha256-C6VyZuM+rcqllVlhk52snAKpw3sqrrzncz8Da1yE03Q=";
+  } {};
+
+  # Criterion test fails with tasty 1.5.4
+  criterion = dontCheck prev.criterion;
 }

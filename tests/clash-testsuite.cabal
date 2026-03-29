@@ -63,7 +63,7 @@ common basic-config
     optparse-applicative,
     process,
     tagged,
-    tasty >= 1.5,
+    tasty >= 1.5.4,
     tasty-hunit,
     temporary,
     text,

@@ -28,4 +28,14 @@ in
 
   # th-desugar 1.15 requires th-abstraction 0.6
   th-abstraction = prev.callHackage "th-abstraction" "0.6.0.0" { };
+
+  # This version of tasty isn't available in the nix ghc96 package set
+  tasty = prev.callHackageDirect {
+    pkg = "tasty";
+    ver = "1.5.4";
+    sha256 = "sha256-C6VyZuM+rcqllVlhk52snAKpw3sqrrzncz8Da1yE03Q=";
+  } {};
+
+  # Criterion test fails with tasty 1.5.4
+  criterion = dontCheck prev.criterion;
 }

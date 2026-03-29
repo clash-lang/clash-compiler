@@ -423,7 +423,7 @@ runTest1
   -> TestTree
 runTest1 modName opts@TestOptions{..} path target =
   withResource mkTmpDir rmTmpDir $ \tmpDir ->
-    sequentialTestGroup (show target) AllSucceed
+    dependentTestGroup (show target) AllSucceed
       [ clashTest tmpDir
       , testGroup "tools" (verifTests tmpDir : hdlTests tmpDir)
       ]
@@ -449,7 +449,7 @@ runTest1 modName opts@TestOptions{..} path target =
     | isJust expectClashFail = []
     | otherwise =
         flip map tests $ \TestTarget{..} ->
-          sequentialTestGroup (show sim) AllSucceed $
+          dependentTestGroup (show sim) AllSucceed $
             (if sim `elem` hdlLoad then buildTests else []) <>
             (if sim `elem` hdlSim then simTests else [])
 
@@ -504,7 +504,7 @@ outputTest'
   -> TestTree
 outputTest' modName target extraClashArgs extraGhcArgs path =
   withResource mkTmpDir rmTmpDir $ \tmpDir ->
-    sequentialTestGroup (show target) AllSucceed
+    dependentTestGroup (show target) AllSucceed
       [ clashGenHdl tmpDir
       , clashBuild tmpDir
       ]
@@ -561,7 +561,7 @@ clashLibTest'
   -> TestTree
 clashLibTest' modName target extraGhcArgs path =
   withResource mkTmpDir rmTmpDir $ \tmpDir ->
-    sequentialTestGroup (show target) AllSucceed
+    dependentTestGroup (show target) AllSucceed
       [ clashBuild tmpDir
       ]
  where
@@ -604,7 +604,7 @@ clashLibTest modName opts path =
   -- HACK: clashLibTests are run sequentially to prevent race issues. See:
   -- HACK: https://github.com/clash-lang/clash-compiler/pull/1416
   let testName = modName ++ " [clash-lib test]"
-   in sequentialTestGroup testName AllFinish
+   in dependentTestGroup testName AllFinish
         [ clashLibTest' modName target (ghcFlags opts) (testName:path)
         | target <- hdlTargets opts
         ]
