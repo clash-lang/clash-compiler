@@ -30,5 +30,6 @@ pkgs.mkShell {
     pkgs.verilator
     pkgs.iverilog
     pkgs.yosys
+    clashPkgs.haskell-language-server
   ];
 }
