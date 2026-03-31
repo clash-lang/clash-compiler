@@ -73,6 +73,15 @@ let
           (drv: {
             preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-natnormalise";
           });
+
+      # Upstream nixpkgs has this fix but they have not landed in a release yet
+      cabal-add = prev.haskell.lib.appendPatches hprev.cabal-add [
+        (prev.fetchpatch {
+          name = "cabal-add-absolute-build-tool-paths.patch";
+          url = "https://github.com/Bodigrim/cabal-add/commit/3b94b0175c294c2d0a30b6d8da3f56189216816c.patch";
+          hash = "sha256-4Nbro9Gl+RC78yprO8fYG/IWS7QvJPd0dKqSZb5jq9k=";
+        })
+      ];
     };
 
   # An overlay with the packages in this repository.
