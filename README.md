@@ -117,7 +117,7 @@ Or [use Nix](https://nixos.org/download/) to get a shell with the `clash` and `c
 nix develop .
 
 # Start a dev shell with a specific GHC version
-nix develop .#ghc9101
+nix develop .#ghc9103
 ```
 
 You will need a modern version of nix with support for the new-style `nix`
