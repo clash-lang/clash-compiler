@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
-                    2021-2023, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , LUMI GUIDE FIETSDETECTIE B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
@@ -22,6 +22,7 @@
 
 module Clash.Netlist.BlackBox.Util
     ( renderTemplate
+    , lookupFunctionInstantiation
     , walkElement
     , verifyBlackBoxContext
     , onBlackBox
@@ -150,6 +151,41 @@ inputHole = \case
   CtxName          -> Nothing
   EscapedSymbol _  -> Nothing
 
+lookupFunctionInstantiation
+  :: BlackBoxContext
+  -> Int
+  -> Int
+  -> Either
+      String
+      ( Either N.BlackBox (Id.Identifier, [Declaration])
+      , N.Usage
+      , [BlackBoxTemplate]
+      , [BlackBoxTemplate]
+      , [((Data.Text.Text, Data.Text.Text), N.BlackBox)]
+      , BlackBoxContext
+      )
+lookupFunctionInstantiation bbCtx n subn =
+  case IntMap.lookup n (bbFunctions bbCtx) of
+    Nothing ->
+      Left
+        ( "Blackbox requested instantiation of function at argument "
+            ++ show n
+            ++ ", but BlackBoxContext did not contain one."
+        )
+    Just funcs ->
+      case indexMaybe funcs subn of
+        Nothing ->
+          Left
+            ( "Blackbox requested at least "
+                ++ show (subn + 1)
+                ++ " renders of function at argument "
+                ++ show n
+                ++ " but found only "
+                ++ show (length funcs)
+            )
+        Just func ->
+          Right func
+
 -- | Determine if the number of normal\/literal\/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
 -- template.
@@ -186,21 +222,14 @@ verifyBlackBoxContext bbCtx (N.BBTemplate t) =
                   ++ "used ~CONST[" ++ show n ++ "], but was:\n\n" ++ show inp)
             _ -> Nothing
         Component (Decl n subn l') ->
-          case IntMap.lookup n (bbFunctions bbCtx) of
-            Just funcs ->
-              case indexMaybe funcs subn of
-                Nothing ->
-                  Just ( "Blackbox requested at least " ++ show (subn+1)
-                      ++ " renders of function at argument " ++ show n ++ " but "
-                      ++ "found only " ++ show (length funcs) )
-                Just _ ->
-                  orElses $
-                    map
-                      (verifyBlackBoxContext bbCtx . N.BBTemplate)
-                      (concatTups l')
-            Nothing ->
-              Just ( "Blackbox requested instantiation of function at argument "
-                  ++ show n ++ ", but BlackBoxContext did not contain one.")
+          case lookupFunctionInstantiation bbCtx n subn of
+            Left lookupErr ->
+              Just lookupErr
+            Right _ ->
+              orElses $
+                map
+                  (verifyBlackBoxContext bbCtx . N.BBTemplate)
+                  (concatTups l')
         _ ->
           case inputHole e of
             Nothing ->
@@ -481,11 +510,8 @@ renderElem b (Component (Decl n subN (l:ls))) = do
   (o,oTy,_) <- idToExpr <$> bitraverse (lineToIdentifier b) (return . lineToType b) l
   is <- mapM (fmap idToExpr . bitraverse (lineToIdentifier b) (return . lineToType b)) ls
   sp <- getSrcSpan
-  let func0 = IntMap.lookup n (bbFunctions b)
-      errr = concat [ "renderElem: not enough functions rendered? Needed "
-                    , show (subN +1 ), " got only ", show (length (fromJust func0)) ]
-  case indexNote' errr subN <$> func0 of
-    Just (templ0,_,libs,imps,inc,pCtx) -> do
+  case lookupFunctionInstantiation b n subN of
+    Right (templ0,_,libs,imps,inc,pCtx) -> do
       let b' = pCtx { bbResults = [(o,oTy)], bbInputs = bbInputs pCtx ++ is }
           layoutOptions = LayoutOptions (AvailablePerLine 120 0.4)
           render = N.BBTemplate . parseFail b' . renderLazy . layoutPretty layoutOptions
@@ -524,12 +550,8 @@ renderElem b (Component (Decl n subN (l:ls))) = do
                             , Data.Text.unpack (bbName b), ". Verification procedure "
                             , "reported:\n\n" ++ err0 ]
           throw (ClashException sp ($(curLoc) ++ err1) Nothing)
-    Nothing ->
-      let err1 = concat [show n
-                        , "'th argument isn't a function, only "
-                        , show (IntMap.keys (bbFunctions b))
-                        , "are."]
-       in throw (ClashException sp ($(curLoc) ++ err1) Nothing)
+    Left err0 ->
+      throw (ClashException sp ($(curLoc) ++ "renderElem: " ++ err0) Nothing)
 
 renderElem b (SigD e m) = do
   e' <- Text.concat <$> mapM (fmap ($ 0) . renderElem b) e

@@ -832,6 +832,17 @@ runClashTest = defaultMain
         , outputTest "T3011" def{hdlSim=[]}
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
            in runTest "T3021" _opts
+<<<<<<< HEAD
+||||||| parent of 1d91e451 (Fix higher order blackboxes not propagating usage metadata)
+        , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
+           in runTest "T3084" _opts
+        , runTest "T3141" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141"]}
+=======
+        , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
+           in runTest "T3084" _opts
+        , runTest "T3141" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141"]}
+        , outputTest "T3147" def{hdlTargets=[Verilog], hdlSim=[]}
+>>>>>>> 1d91e451 (Fix higher order blackboxes not propagating usage metadata)
         , runTest "T3159" def{hdlSim=[], hdlLoad=[] }
         , runTest "T3185" def
         ] <>
