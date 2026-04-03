@@ -277,6 +277,7 @@ Library
                       Clash.Sized.Vector.ToTuple.TH
 
                       Clash.Sized.Internal.BitVector
+                      Clash.Sized.Internal.CheckedLiterals
                       Clash.Sized.Internal.Index
                       Clash.Sized.Internal.Mod
                       Clash.Sized.Internal.Signed
@@ -345,6 +346,7 @@ Library
                       QuickCheck                >= 2.7     && < 2.16,
                       recursion-schemes         >= 5.1     && < 5.3,
                       reflection                >= 2       && < 2.2,
+                      checked-literals          >= 0.1     && < 0.2,
                       singletons                >= 2.0     && < 3.1,
                       string-interpolate        ^>= 0.3,
                       tagged                    >= 0.8     && < 0.9,

@@ -11,6 +11,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RoleAnnotations #-}
@@ -143,6 +144,7 @@ import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Either                (isLeft)
 import Data.Proxy                 (Proxy (..))
+import Data.Type.Bool             (If)
 import Data.Typeable              (Typeable, typeOf)
 import GHC.Generics               (Generic)
 import Data.Maybe                 (fromMaybe)
@@ -156,9 +158,20 @@ import GHC.Num.Natural
   (Natural (..), naturalFromWord, naturalShiftL, naturalShiftR, naturalToWord)
 import GHC.Natural                (naturalToInteger)
 import GHC.Stack                  (withFrozenCallStack)
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (-))
+import GHC.TypeError
+  ( Assert
+  , ErrorMessage (ShowType)
+  )
+import GHC.TypeLits
+  ( KnownNat
+  , Nat
+  , type (+)
+  , type (-)
+  , type (<=?)
+  , type (^)
+  )
 import GHC.TypeNats               (natVal)
-import GHC.TypeLits.Extra         (Max)
+import GHC.TypeLits.Extra         (CLog, Max)
 import Language.Haskell.TH
   (Lit (..), ExpQ, Type(ConT, AppT, LitT), Exp(VarE, AppE, SigE, LitE),
    TyLit(NumTyLit), Pat, Q, appT, conT, litE, litP, litT, mkName, numTyLit,
@@ -178,10 +191,20 @@ import Clash.Class.Resize         (Resize (..))
 import Clash.Promoted.Nat
   (SNat (..), SNatLE (..), compareSNat, snatToInteger, snatToNum, natToNum)
 import Clash.Sized.Internal (formatRange)
+import Clash.Sized.Internal.CheckedLiterals
+  ( OutOfBounds
+  , PotentiallyOutOfBounds
+  , UnsignedBounds
+  )
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, isX, showsPrecXWith, rwhnfX, XException(..))
 
 import Clash.Sized.Internal.Mod
+import CheckedLiterals.Class.Integer
+  ( NegativeUnsignedError
+  , CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
 
 import {-# SOURCE #-} qualified Clash.Sized.Vector         as V
 import {-# SOURCE #-} qualified Clash.Sized.Internal.Index as I
@@ -389,6 +412,17 @@ instance FiniteBits Bit where
   finiteBitSize _      = 1
   countLeadingZeros b  = if eq## b low then 1 else 0
   countTrailingZeros b = if eq## b low then 1 else 0
+
+type BitPositiveLiteralError lit =
+  OutOfBounds ('ShowType lit) (UnsignedBounds Bit 1)
+
+instance
+  (Assert (lit <=? 1) (BitPositiveLiteralError lit)) =>
+  CheckedPositiveIntegerLiteral lit Bit
+
+instance
+  (NegativeUnsignedError lit Bit 1) =>
+  CheckedNegativeIntegerLiteral lit Bit
 
 and##, or##, xor## :: Bit -> Bit -> Bit
 and## (Bit m1 v1) (Bit m2 v2) = Bit mask (v1 .&. v2 .&. complement mask)
@@ -855,6 +889,24 @@ instance KnownNat n => FiniteBits (BitVector n) where
   finiteBitSize       = size#
   countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV
   countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
+
+type BitVectorPositiveLiteralError lit n =
+  PotentiallyOutOfBounds
+    ('ShowType lit)
+    (UnsignedBounds (BitVector n) ((2 ^ n) - 1))
+    (CLog 2 (lit + 1))
+    n
+
+instance
+  ( Assert
+      (If (lit <=? 0) (lit <=? 0) (CLog 2 (lit + 1) <=? n))
+      (BitVectorPositiveLiteralError lit n)
+  ) =>
+  CheckedPositiveIntegerLiteral lit (BitVector n)
+
+instance
+  (NegativeUnsignedError lit (BitVector n) ((2 ^ n) - 1)) =>
+  CheckedNegativeIntegerLiteral lit (BitVector n)
 
 countLeadingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
 countLeadingZerosBV = V.foldr (\l r -> if eq## l low then 1 + r else 0) 0 . V.bv2v
