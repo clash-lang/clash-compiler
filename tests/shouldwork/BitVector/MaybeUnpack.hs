@@ -32,18 +32,30 @@ wasJust (Just _) = True
 wasNothing :: Maybe a -> Bool
 wasNothing = Clash.Prelude.not . wasJust
 
-topEntity :: BitVector 2 -> Bool
-topEntity x =
+smallMaybeUnpackWorks :: BitVector 2 -> Bool
+smallMaybeUnpackWorks x =
   if x == 3
     then wasNothing (maybeUnpack @Small x)
     else wasJust (maybeUnpack @Small x)
+
+wrappedMaybeUnpackWorks :: BitVector 2 -> Bool
+wrappedMaybeUnpackWorks x =
+  if x == 3
+    then wasNothing (maybeUnpack @Wrapped x)
+    else wasJust (maybeUnpack @Wrapped x)
+topEntity :: BitVector 2 -> (Bool, Bool)
+topEntity x = (smallMaybeUnpackWorks x, wrappedMaybeUnpackWorks x)
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done
  where
   testInput = stimuliGenerator clk rst (0 :> 1 :> 2 :> 3 :> Nil)
-  expectedOutput = outputVerifier' clk rst (True :> True :> True :> True :> Nil)
+  expectedOutput =
+    outputVerifier'
+      clk
+      rst
+      ((True, True) :> (True, True) :> (True, True) :> (True, True) :> Nil)
   done = expectedOutput (topEntity <$> testInput)
   clk = tbSystemClockGen (Clash.Prelude.not <$> done)
   rst = systemResetGen
@@ -68,6 +80,10 @@ assertNothing label (Just _) =
 mainCommon :: IO ()
 mainCommon = do
   _ <- getArgs
+
+  assertEqual "Generic sum valid 0" (Just Small0) (maybeUnpack @Small 0)
+  assertEqual "Generic sum valid 2" (Just Small2) (maybeUnpack @Small 2)
+  assertNothing "Generic sum invalid 3" (maybeUnpack @Small 3)
 
   assertEqual "Index valid 0" (Just 0) (maybeUnpack @(Index 3) 0)
   assertEqual "Index valid 2" (Just 2) (maybeUnpack @(Index 3) 2)
