@@ -440,6 +440,7 @@ runClashTest = defaultMain
         [ runTest "Box" def
         , runTest "BoxGrow" def
         , runTest "CLZ" def
+        , runTest "MaybeUnpack" def
         , outputTest "MaybeUnpack" def{hdlTargets=[VHDL]}
         , runTest "RePack" def{hdlSim=[]}
         , runTest "ReduceZero" def
