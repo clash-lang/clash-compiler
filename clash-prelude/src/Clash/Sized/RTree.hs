@@ -212,8 +212,9 @@ instance KnownNat d => Traversable (RTree d) where
 instance (KnownNat d, BitPack a) =>
   BitPack (RTree d a) where
   type BitSize (RTree d a) = (2^d) * (BitSize a)
-  pack   = pack . t2v . lazyT
-  unpack = v2t . unpack
+  pack        = pack . t2v . lazyT
+  unpack      = v2t . unpack
+  maybeUnpack = fmap v2t . maybeUnpack
 
 type instance Lens.Index   (RTree d a) = Int
 type instance Lens.IxValue (RTree d a) = a

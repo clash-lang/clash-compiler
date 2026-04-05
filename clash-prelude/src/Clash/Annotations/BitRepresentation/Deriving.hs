@@ -59,7 +59,7 @@ import qualified Clash.Annotations.BitRepresentation.Util
 
 import           Clash.Annotations.Primitive  (hasBlackBox)
 import           Clash.Class.BitPack
-  (BitPack, BitSize, pack, packXWith, unpack)
+  (BitPack, BitSize, pack, packXWith, unpack, maybeUnpack)
 import           Clash.Class.Resize           (resize)
 import           Language.Haskell.TH.Compat   (mkTySynInstD)
 import           Clash.Sized.BitVector        (BitVector, low, (++#))
@@ -948,6 +948,21 @@ buildUnpack (DataReprAnn _name _size constrs) = do
   let func          = FunD 'unpack [Clause [VarP argNameIn] (NormalB unpackApplied) []]
   return [func]
 
+buildMaybeUnpack
+  :: DataReprAnn
+  -> Q [Dec]
+buildMaybeUnpack (DataReprAnn _name _size constrs) = do
+  argNameIn   <- newName "toBeUnpackedIn"
+  argName     <- newName "toBeUnpacked"
+  matches     <- mapM (buildUnpackIfE argName) constrs
+  let justMatches      = map (\(g, e) -> (g, AppE (ConE 'Just) e)) matches
+      otherwiseNothing = [(NormalG (ConE 'True), ConE 'Nothing)]
+      unpackBody       = MultiIfE (justMatches ++ otherwiseNothing)
+      unpackLambda     = LamE [VarP argName] unpackBody
+      unpackApplied    = (VarE 'dontApplyInHDL) `AppE` unpackLambda `AppE` (VarE (argNameIn))
+      func             = FunD 'maybeUnpack [Clause [VarP argNameIn] (NormalB unpackApplied) []]
+  return [func]
+
 -- | Derives BitPack instances for given type. Will account for custom bit
 -- representation annotations in the module where the splice is ran. Note that
 -- the generated instance might conflict with existing implementations (for
@@ -987,8 +1002,9 @@ deriveBitPack typQ = do
               []  -> fail "No custom bit annotation found."
               _   -> fail "Overlapping bit annotations found."
 
-  packFunc   <- buildPack ann
-  unpackFunc <- buildUnpack ann
+  packFunc        <- buildPack ann
+  unpackFunc      <- buildUnpack ann
+  maybeUnpackFunc <- buildMaybeUnpack ann
 
   let (DataReprAnn _name dataSize _constrs) = ann
 
@@ -1001,7 +1017,7 @@ deriveBitPack typQ = do
                    -- Context
                    (AppT (ConT ''BitPack) typ)
                    -- Type
-                   (bitSizeInst : packFunc ++ unpackFunc)
+                   (bitSizeInst : packFunc ++ unpackFunc ++ maybeUnpackFunc)
                    -- Declarations
                ]
   alreadyIsInstance <- isInstance ''BitPack [typ]

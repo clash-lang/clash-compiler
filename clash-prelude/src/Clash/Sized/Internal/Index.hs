@@ -172,8 +172,9 @@ instance NFData (Index n) where
 
 instance KnownNat n => BitPack (Index n) where
   type BitSize (Index n) = CLogWZ 2 n 0
-  pack   = packXWith pack#
-  unpack = unpack#
+  pack        = packXWith pack#
+  unpack      = unpack#
+  maybeUnpack = maybeUnpack#
 
 -- | Safely convert an `SNat` value to an `Index`
 fromSNat :: (KnownNat m, n + 1 <= m) => SNat n -> Index m
@@ -189,6 +190,18 @@ pack# (I i) = BV 0 (naturalFromInteger i)
 unpack# :: KnownNat n => BitVector (CLogWZ 2 n 0) -> Index n
 unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
 unpack# bv = undefError "Index.unpack" [bv]
+
+{-# OPAQUE maybeUnpack# #-}
+{-# ANN unpack# hasBlackBox #-}
+maybeUnpack# :: KnownNat n => BitVector (CLogWZ 2 n 0) -> Maybe (Index n)
+maybeUnpack# (BV 0 i) = maybeFromInteger_INLINE (naturalToInteger i)
+maybeUnpack# bv = undefError "Index.maybeUnpack" [bv]
+
+{-# INLINE maybeFromInteger_INLINE #-}
+maybeFromInteger_INLINE :: forall n . (HasCallStack, KnownNat n) => Integer -> Maybe (Index n)
+maybeFromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then Just (I i) else Nothing
+  where
+    bound = natToInteger @n
 
 instance Eq (Index n) where
   (==) = eq#
