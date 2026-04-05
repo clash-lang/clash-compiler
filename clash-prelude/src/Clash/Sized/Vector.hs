@@ -2640,8 +2640,9 @@ smapWithBounds f xs = reverse
 
 instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
-  pack   = concatBitVector# . map pack . lazyV
-  unpack = map unpack . unconcatBitVector#
+  pack        = concatBitVector# . map pack . lazyV
+  unpack      = map unpack . unconcatBitVector#
+  maybeUnpack = sequenceA . map maybeUnpack . unconcatBitVector#
 
 concatBitVector#
   :: forall n m
