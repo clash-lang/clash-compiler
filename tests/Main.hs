@@ -440,6 +440,7 @@ runClashTest = defaultMain
         [ runTest "Box" def
         , runTest "BoxGrow" def
         , runTest "CLZ" def
+        , outputTest "MaybeUnpack" def{hdlTargets=[VHDL]}
         , runTest "RePack" def{hdlSim=[]}
         , runTest "ReduceZero" def
         , runTest "ReduceOne" def
@@ -448,6 +449,7 @@ runClashTest = defaultMain
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
+        , runTest "MaybeUnpackUndefined" def{hdlSim=[]}
         , runTest "UnpackUndefined" def{hdlSim=[]}
         ]
       , clashTestGroup "BlackBox"
@@ -505,6 +507,7 @@ runClashTest = defaultMain
           ]
         , clashTestGroup "Deriving"
           [ runTest "BitPackDerivation" def
+          , runTest "MaybeUnpackDerivation" def{hdlTargets=[Verilog]}
           ]
         , clashTestGroup "Indexed"
           [ runTest "Indexed" def
