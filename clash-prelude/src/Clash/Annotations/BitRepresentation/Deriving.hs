@@ -913,22 +913,43 @@ dontApplyInHDL f a = f a
 
 buildUnpackField
   :: Name
+  -> Name
   -> Integer
   -> Q Exp
-buildUnpackField valueName mask =
-  let ranges = bitRanges mask in
-  let vec = select' (VarE valueName) ranges in
-  [| unpack $vec |]
+buildUnpackField decoderName valueName mask = do
+  let ranges = bitRanges mask
+  vec <- select' (VarE valueName) ranges
+  pure (AppE (VarE decoderName) vec)
+
+buildConstr
+  :: Name
+  -> [Exp]
+  -> Exp
+buildConstr name = foldl AppE (ConE name)
+
+buildMaybeConstr
+  :: Name
+  -> [Exp]
+  -> Exp
+buildMaybeConstr name [] =
+  AppE (ConE 'Just) (ConE name)
+buildMaybeConstr name (field:rest) =
+  foldl
+    (\acc arg -> InfixE (Just acc) (VarE '(<*>)) (Just arg))
+    (AppE (AppE (VarE 'fmap) (ConE name)) field)
+    rest
 
 buildUnpackIfE
-  :: Name
+  :: (Name -> [Exp] -> Exp)
+  -> Name
+  -> Name
   -> ConstrRepr
   -> Q (Guard, Exp)
-buildUnpackIfE valueName (ConstrRepr name mask value fieldanns) = do
-  let valueName' = return $ VarE valueName
+buildUnpackIfE buildResult decoderName valueName (ConstrRepr name mask value fieldanns) = do
+  let valueName' = pure (VarE valueName)
   guard  <- NormalG <$> [| ((.&.) $valueName' mask) == value |]
-  fields <- mapM (buildUnpackField valueName) fieldanns
-  return (guard, foldl AppE (ConE name) fields)
+  fields <- mapM (buildUnpackField decoderName valueName) fieldanns
+  pure (guard, buildResult name fields)
 
 -- | Build an /unpack/ function corresponding to given DataRepr
 buildUnpack
@@ -937,7 +958,7 @@ buildUnpack
 buildUnpack (DataReprAnn _name _size constrs) = do
   argNameIn   <- newName "toBeUnpackedIn"
   argName     <- newName "toBeUnpacked"
-  matches     <- mapM (buildUnpackIfE argName) constrs
+  matches     <- mapM (buildUnpackIfE buildConstr 'unpack argName) constrs
   let fallThroughLast []      = []
       fallThroughLast [(_,e)] = [(NormalG (ConE 'True), e)]
       fallThroughLast (x:xs)  = x:fallThroughLast xs
@@ -952,15 +973,11 @@ buildMaybeUnpack
   :: DataReprAnn
   -> Q [Dec]
 buildMaybeUnpack (DataReprAnn _name _size constrs) = do
-  argNameIn   <- newName "toBeUnpackedIn"
   argName     <- newName "toBeUnpacked"
-  matches     <- mapM (buildUnpackIfE argName) constrs
-  let justMatches      = map (\(g, e) -> (g, AppE (ConE 'Just) e)) matches
-      otherwiseNothing = [(NormalG (ConE 'True), ConE 'Nothing)]
-      unpackBody       = MultiIfE (justMatches ++ otherwiseNothing)
-      unpackLambda     = LamE [VarP argName] unpackBody
-      unpackApplied    = (VarE 'dontApplyInHDL) `AppE` unpackLambda `AppE` (VarE (argNameIn))
-      func             = FunD 'maybeUnpack [Clause [VarP argNameIn] (NormalB unpackApplied) []]
+  matches     <- mapM (buildUnpackIfE buildMaybeConstr 'maybeUnpack argName) constrs
+  let otherwiseNothing = [(NormalG (ConE 'True), ConE 'Nothing)]
+      unpackBody       = MultiIfE (matches ++ otherwiseNothing)
+      func             = FunD 'maybeUnpack [Clause [VarP argName] (NormalB unpackBody) []]
   return [func]
 
 -- | Derives BitPack instances for given type. Will account for custom bit
