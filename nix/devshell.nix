@@ -21,7 +21,6 @@ pkgs.mkShell {
 
   buildInputs = [
     clashPkgs.cabal-install
-    clashPkgs.haskell-language-server
 
     # https://discourse.nixos.org/t/non-interactive-bash-errors-from-flake-nix-mkshell/33310
     pkgs.bashInteractive
