@@ -1065,7 +1065,7 @@ blockRam#
   -- ^ Value to write (at address @w@)
   -> Signal dom a
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRam# (Clock _ Nothing) gen content = \rd wen waS wd -> runST $ do
+blockRam# (Clock Nothing) gen content = \rd wen waS wd -> runST $ do
   ramStart <- newListArray (0,szI-1) contentL
   -- start benchmark only
   -- ramStart <- unsafeThawSTArray ramArr

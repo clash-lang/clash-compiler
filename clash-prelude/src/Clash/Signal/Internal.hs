@@ -177,7 +177,7 @@ module Clash.Signal.Internal
 where
 
 import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
-import Type.Reflection            (Typeable)
+import Type.Reflection            (Typeable, typeRep)
 import Control.Arrow.Transformer.Automaton
 import Control.Applicative        (liftA3)
 import Control.DeepSeq            (NFData)
@@ -192,14 +192,14 @@ import Data.Int                   (Int64)
 import Data.Maybe                 (isJust)
 import Data.Proxy                 (Proxy(..))
 import Data.Ratio                 (Ratio)
-import Data.Type.Equality         ((:~:))
+import Data.Type.Equality         ((:~:), testEquality)
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits
-  (Div, KnownSymbol, KnownNat, Nat, Symbol, type (<=), type (*), type (-), sameSymbol)
+import GHC.Types                  (Type)
+import GHC.TypeLits               (Div, KnownNat, Nat, type (<=), type (*), type (-))
 import GHC.TypeLits.Extra         (DivRU)
 import GHC.Records                (HasField(getField))
-import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
+import Language.Haskell.TH.Syntax hiding (Type) -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
 import Numeric.Natural            (Natural)
 import System.IO.Unsafe           (unsafeInterleaveIO, unsafePerformIO)
@@ -210,7 +210,6 @@ import Clash.Class.Num            (SaturatingNum(..))
 import Clash.CPP                  (fStrictMapSignal)
 import Clash.NamedTypes
 import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
-import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
 import Clash.XException
   (NFDataX(..), errorX, isX, deepseqX, defaultSeqX, seqX)
 
@@ -440,9 +439,7 @@ type ClockDivider (dom :: Domain) (period :: Nat) = PeriodToCycles dom period
 data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
   SDomainConfiguration ::
     1 <= period =>
-    { sName :: SSymbol dom
-      -- ^ Domain name
-    , sPeriod :: SNat period
+    { sPeriod :: SNat period
     -- ^ Period of clock in /ps/
     , sActiveEdge :: SActiveEdge edge
     -- ^ Active edge of the clock (not yet implemented)
@@ -495,7 +492,7 @@ type KnownConf dom = 'DomainConfiguration dom
 -- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
 -- some properties of a domain. See 'DomainConfiguration' for more information.
 class
-  ( KnownSymbol dom
+  ( Typeable dom
   , KnownNat (DomainPeriod dom)
   , KnownNat (DomainPeriod dom - 1)
   , KnownActiveEdge (DomainActiveEdge dom)
@@ -519,8 +516,7 @@ class
 -- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
 knownDomain :: KnownDomain dom => SDomainConfiguration dom (KnownConf dom)
 knownDomain = SDomainConfiguration
-  { sName          = SSymbol
-  , sPeriod        = SNat
+  { sPeriod        = SNat
   , sActiveEdge    = knownActiveEdge
   , sResetKind     = knownResetKind
   , sInitBehavior  = knownInitBehavior
@@ -534,7 +530,7 @@ knownDomain = SDomainConfiguration
 knownDomainByName
   :: forall dom
    . KnownDomain dom
-  => SSymbol dom
+  => Proxy dom
   -> SDomainConfiguration dom (KnownConf dom)
 knownDomainByName =
   const knownDomain
@@ -579,8 +575,7 @@ vSystem = vDomain (knownDomain @System)
 --
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
-type System = ("System" :: Domain)
-
+data System
 
 -- | Convenience value to allow easy "subclassing" of IntelSystem domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
@@ -597,7 +592,7 @@ vIntelSystem = vDomain (knownDomain @IntelSystem)
 --
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
-type IntelSystem = ("IntelSystem" :: Domain)
+data IntelSystem
 
 -- | Convenience value to allow easy "subclassing" of XilinxSystem domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
@@ -614,7 +609,7 @@ vXilinxSystem = vDomain (knownDomain @XilinxSystem)
 --
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
-type XilinxSystem = ("XilinxSystem" :: Domain)
+data XilinxSystem
 
 -- | Same as SDomainConfiguration but allows for easy updates through record update syntax.
 -- Should be used in combination with 'vDomain' and 'createDomain'. Example:
@@ -646,10 +641,14 @@ data VDomainConfiguration
 
 -- | Convert 'SDomainConfiguration' to 'VDomainConfiguration'. Should be used in combination with
 -- 'createDomain' only.
-vDomain :: SDomainConfiguration dom conf -> VDomainConfiguration
-vDomain (SDomainConfiguration dom period edge reset init_ polarity) =
+vDomain ::
+  forall dom conf.
+  Typeable dom =>
+  SDomainConfiguration dom conf ->
   VDomainConfiguration
-    (ssymbolToString dom)
+vDomain (SDomainConfiguration period edge reset init_ polarity) =
+  VDomainConfiguration
+    (show (typeRep @dom))
     (snatToNatural period)
     (case edge of {SRising -> Rising; SFalling -> Falling})
     (case reset of {SAsynchronous -> Asynchronous; SSynchronous -> Synchronous})
@@ -701,12 +700,12 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
     kiType <- [t| $initT |]
     koType <- [t| $polarityT |]
 
-    let vNameImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
-        kpImpl = mkTySynInstD ''DomainPeriod [LitT (StrTyLit name)] kpType
-        keImpl = mkTySynInstD ''DomainActiveEdge [LitT (StrTyLit name)] keType
-        krImpl = mkTySynInstD ''DomainResetKind [LitT (StrTyLit name)] krType
-        kiImpl = mkTySynInstD ''DomainInitBehavior [LitT (StrTyLit name)] kiType
-        koImpl = mkTySynInstD ''DomainResetPolarity [LitT (StrTyLit name)] koType
+    let vNameImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (ConT name'))
+        kpImpl = mkTySynInstD ''DomainPeriod [ConT name'] kpType
+        keImpl = mkTySynInstD ''DomainActiveEdge [ConT name'] keType
+        krImpl = mkTySynInstD ''DomainResetKind [ConT name'] krType
+        kiImpl = mkTySynInstD ''DomainInitBehavior [ConT name'] kiType
+        koImpl = mkTySynInstD ''DomainResetPolarity [ConT name'] koType
         vName' = mkName ('v':name)
 
     tySynExists <- isJust <$> lookupTypeName name
@@ -714,8 +713,8 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
 
     pure $ concat
       [
-        [ -- Type synonym (ex: type System = "System")
-          TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
+        [ -- Type declaration (ex: data System :: Domain)
+          DataD [] name' [] (Just (ConT ''Domain)) [] []
         | not tySynExists
         ]
 
@@ -734,8 +733,8 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
   else
     error ("Domain names should be a valid Haskell type name, not: " ++ name)
  where
-
-  nameT   = pure (LitT (StrTyLit name))
+  name' = mkName name
+  nameT   = pure (ConT name')
   periodT = pure (LitT (NumTyLit (toInteger period)))
 
   edgeT =
@@ -763,7 +762,7 @@ createDomain (VDomainConfiguration name period edge reset init_ polarity) =
       ActiveLow -> PromotedT 'ActiveLow
 
 
-type Domain = Symbol
+type Domain = Type
 
 -- | We either get evidence that this function was instantiated with the same
 -- domains, or Nothing.
@@ -771,7 +770,7 @@ sameDomain
   :: forall (domA :: Domain) (domB :: Domain)
    . (KnownDomain domA, KnownDomain domB)
   => Maybe (domA :~: domB)
-sameDomain = sameSymbol (Proxy @domA) (Proxy @domB)
+sameDomain = testEquality (typeRep @domA) (typeRep @domB)
 
 infixr 5 :-
 {- | Clash has synchronous 'Signal's in the form of:
@@ -972,26 +971,23 @@ enableGen = toEnable (pure True)
 
 -- | A clock signal belonging to a domain named /dom/.
 data Clock (dom :: Domain) = Clock
-  { -- | Domain associated with the clock
-    clockTag :: SSymbol dom
-
-    -- | Periods of the clock. This is an experimental feature used to simulate
+  { -- | Periods of the clock. This is an experimental feature used to simulate
     -- clock frequency correction mechanisms. Currently, all ways to contruct
     -- such a clock are hidden from the public API.
-  , clockPeriods :: Maybe (Signal dom Femtoseconds)
+    clockPeriods :: Maybe (Signal dom Femtoseconds)
   }
 
-instance Show (Clock dom) where
-  show (Clock dom Nothing) = "<Clock: " ++ ssymbolToString dom ++ ">"
-  show (Clock dom _) = "<Dynamic clock: " ++ ssymbolToString dom ++ ">"
+instance Typeable dom => Show (Clock dom) where
+  show (Clock Nothing) = "<Clock: " ++ show (typeRep @dom) ++ ">"
+  show (Clock _) = "<Dynamic clock: " ++ show (typeRep @dom) ++ ">"
 
 -- | The negative or inverted phase of a differential clock signal. HDL
 -- generation will treat it the same as 'Clock', except that no @create_clock@
 -- command is issued in the SDC file for 'ClockN'. Used in 'DiffClock'.
-newtype ClockN (dom :: Domain) = ClockN { clockNTag :: SSymbol dom }
+newtype ClockN (dom :: Domain) = ClockN { clockNTag :: Proxy dom }
 
-instance Show (ClockN dom) where
-  show (ClockN dom) = "<ClockN: " ++ ssymbolToString dom ++ ">"
+instance Typeable dom => Show (ClockN dom) where
+  show (ClockN _) = "<ClockN: " ++ show (typeRep @dom) ++ ">"
 
 -- | A differential clock signal belonging to a domain named /dom/. The clock
 -- input of a design with such an input has two ports which are in antiphase.
@@ -1004,11 +1000,11 @@ instance Show (ClockN dom) where
 data DiffClock (dom :: Domain) =
   DiffClock ("p" ::: Clock dom) ("n" ::: ClockN dom)
 
-instance Show (DiffClock dom) where
-  show (DiffClock (Clock dom Nothing) _) =
-    "<DiffClock: " ++ ssymbolToString dom ++ ">"
-  show (DiffClock (Clock dom _) _) =
-    "<Dynamic DiffClock: " ++ ssymbolToString dom ++ ">"
+instance Typeable dom => Show (DiffClock dom) where
+  show (DiffClock (Clock Nothing) _) =
+    "<DiffClock: " ++ show (typeRep @dom) ++ ">"
+  show (DiffClock (Clock _) _) =
+    "<Dynamic DiffClock: " ++ show (typeRep @dom) ++ ">"
 
 -- | Clock generator for simulations. Do __not__ use this clock generator for
 -- the /testBench/ function, use 'tbClockGen' instead.
@@ -1076,7 +1072,7 @@ tbClockGen
   :: KnownDomain testDom
   => Signal testDom Bool
   -> Clock testDom
-tbClockGen done = Clock (done `seq` SSymbol) Nothing
+tbClockGen done = Clock (done `seq` Nothing)
 {-# OPAQUE tbClockGen #-}
 {-# ANN tbClockGen hasBlackBox #-}
 
@@ -1154,7 +1150,7 @@ tbDynamicClockGen ::
   Signal dom Bool ->
   Clock dom
 tbDynamicClockGen periods ena =
-  Clock (ena `seq` periods `seq` SSymbol) (Just periods)
+  Clock (ena `seq` periods `seq` Just periods)
 {-# OPAQUE tbDynamicClockGen #-}
 {-# ANN tbDynamicClockGen hasBlackBox #-}
 
@@ -1221,7 +1217,7 @@ resetPolarityProxy
   -> SResetPolarity polarity
 resetPolarityProxy _proxy =
   case knownDomain @dom of
-    SDomainConfiguration _dom _period _edge _sync _init polarity ->
+    SDomainConfiguration _period _edge _sync _init polarity ->
       polarity
 
 -- | Convert a reset to an active high reset. Has no effect if reset is already
@@ -1506,16 +1502,16 @@ delay#
   -> a
   -> Signal dom a
   -> Signal dom a
-delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
+delay# (Clock _) (fromEnable -> en) powerUpVal0 =
     go powerUpVal1 en
   where
     powerUpVal1 :: a
     powerUpVal1 =
-      case knownDomainByName dom of
-        SDomainConfiguration _dom _period _edge _sync SDefined _polarity ->
+      case knownDomainByName (Proxy @dom) of
+        SDomainConfiguration _period _edge _sync SDefined _polarity ->
           powerUpVal0
-        SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
-          deepErrorX ("First value of `delay` unknown on domain " ++ show dom)
+        SDomainConfiguration _period _edge _sync SUnknown _polarity ->
+          deepErrorX ("First value of `delay` unknown on domain " ++ show (typeRep @dom))
 
     go o (e :- es) as@(~(x :- xs)) =
       let o' = if e then x else o
@@ -1548,11 +1544,11 @@ register#
   -- ^ Reset value
   -> Signal dom a
   -> Signal dom a
-register# clk@(Clock dom _) rst ena powerUpVal resetVal =
-  case knownDomainByName dom of
-    SDomainConfiguration _name _period _edge SSynchronous _init _polarity ->
+register# clk@(Clock _) rst ena powerUpVal resetVal =
+  case knownDomainByName (Proxy @dom) of
+    SDomainConfiguration _period _edge SSynchronous _init _polarity ->
       syncRegister# clk rst ena powerUpVal resetVal
-    SDomainConfiguration _name _period _edge SAsynchronous _init _polarity ->
+    SDomainConfiguration _period _edge SAsynchronous _init _polarity ->
       asyncRegister# clk rst ena powerUpVal resetVal
 {-# OPAQUE register# #-}
 {-# ANN register# hasBlackBox #-}
@@ -1567,11 +1563,11 @@ registerPowerup#
   => Clock dom
   -> a
   -> a
-registerPowerup# (Clock dom _) a =
-  case knownDomainByName dom of
-    SDomainConfiguration _dom _period _edge _sync SDefined _polarity -> a
-    SDomainConfiguration _dom _period _edge _sync SUnknown _polarity ->
-      deepErrorX ("First value of register undefined on domain " ++ show dom)
+registerPowerup# (Clock _) a =
+  case knownDomainByName (Proxy @dom) of
+    SDomainConfiguration _period _edge _sync SDefined _polarity -> a
+    SDomainConfiguration _period _edge _sync SUnknown _polarity ->
+      deepErrorX ("First value of register undefined on domain " ++ show (typeRep @dom))
 
 -- | Version of 'register#' that simulates a register on an asynchronous
 -- domain. Is synthesizable.
@@ -2147,7 +2143,7 @@ clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
     KnownDomain dom =>
     Clock dom ->
     Either Int64 (Signal dom Int64)
-  toEither (Clock _ maybePeriods)
+  toEither (Clock maybePeriods)
     | Just periods <- maybePeriods =
         Right (unFemtosecondsSignal periods)
     | SDomainConfiguration{sPeriod} <- knownDomain @dom =
