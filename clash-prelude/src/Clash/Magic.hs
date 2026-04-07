@@ -20,6 +20,7 @@ Refer to "Clash.Annotations.TopEntity" for controlling naming of entities
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE Trustworthy #-}
 
 module Clash.Magic
   (
