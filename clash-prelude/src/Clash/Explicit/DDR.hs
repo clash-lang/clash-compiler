@@ -118,7 +118,7 @@ ddrIn#
   -> a
   -> Signal domDDR a
   -> Signal dom (a,a)
-ddrIn# (Clock _ Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 i2 =
+ddrIn# (Clock Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 i2 =
   case resetKind @domDDR of
     SAsynchronous ->
       goAsync
@@ -308,8 +308,8 @@ ddrForwardClock#
   => Clock domIn
   -> Signal domDDR Bit
   -> Clock domOut
-ddrForwardClock# (Clock SSymbol periods) ddrSignal =
-  Clock (ddrSignal `seq` SSymbol) (unsafeCoerce periods)
+ddrForwardClock# (Clock periods) ddrSignal =
+  Clock (ddrSignal `seq` unsafeCoerce periods)
 {-# OPAQUE ddrForwardClock# #-}
 {-# ANN ddrForwardClock# (
   let
