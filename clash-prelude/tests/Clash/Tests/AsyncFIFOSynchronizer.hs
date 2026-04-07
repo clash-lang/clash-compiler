@@ -9,6 +9,7 @@ module Clash.Tests.AsyncFIFOSynchronizer (tests) where
 
 import Data.Maybe (isJust, catMaybes)
 import qualified Prelude as P
+import Type.Reflection (typeRep)
 
 import Hedgehog as H
 import qualified Hedgehog.Range as Range
@@ -983,8 +984,8 @@ data DomProxy (dom :: Domain) where
 
 -- A more useful Show instance than the one for 'Proxy'
 instance Show (DomProxy dom) where
-  showsPrec d dom@DomProxy =
-    showParen (d > app_prec) $ ("DomProxy @" <>) . (symbolVal dom <>)
+  showsPrec d DomProxy =
+    showParen (d > app_prec) $ ("DomProxy @" <>) . (show (typeRep @dom) <>)
    where app_prec = 10
 
 data NamedTest a = NamedTest

@@ -38,6 +38,7 @@ where
 
 import Data.List.Infinite (Infinite(..), (...))
 import Data.String.Interpolate (__i)
+import GHC.Magic (noinline)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -118,7 +119,7 @@ ddrIn#
   -> a
   -> Signal domDDR a
   -> Signal dom (a,a)
-ddrIn# (Clock _ Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 i2 =
+ddrIn# (Clock Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 i2 =
   case resetKind @domDDR of
     SAsynchronous ->
       goAsync
@@ -308,8 +309,10 @@ ddrForwardClock#
   => Clock domIn
   -> Signal domDDR Bit
   -> Clock domOut
-ddrForwardClock# (Clock SSymbol periods) ddrSignal =
-  Clock (ddrSignal `seq` SSymbol) (unsafeCoerce periods)
+ddrForwardClock# (Clock periods) ddrSignal =
+  -- The HDL drives the forwarded clock with the waveform. Simulation only
+  -- needs the input periods, even when the waveform uses the forwarded clock.
+  noinline const (Clock (unsafeCoerce periods)) ddrSignal
 {-# OPAQUE ddrForwardClock# #-}
 {-# ANN ddrForwardClock# (
   let

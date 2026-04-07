@@ -15,7 +15,6 @@ import Clash.Explicit.Prelude
 import qualified Prelude as P
 
 -- Testing with explicit declaration of the Low type alias
-type Low = ("Low" :: Domain)
 createDomain vSystem{vName="Low", vResetPolarity=ActiveLow}
 
 sampleResetN :: KnownDomain dom => Int -> Reset dom -> [Bool]

@@ -333,7 +333,7 @@ blockRamFile#
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
   -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamFile# (Clock _ Nothing) ena sz file = \rd wen waS wd -> runST $ do
+blockRamFile# (Clock Nothing) ena sz file = \rd wen waS wd -> runST $ do
   ramStart <- newArray_ (0,szI)
   unsafeIOToST (withFile file ReadMode (\h ->
     forM_ [0..(szI-1)] (\i -> do
