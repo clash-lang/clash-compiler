@@ -27,6 +27,7 @@ import Data.Proxy (Proxy(Proxy))
 import GHC.Stack (HasCallStack)
 import GHC.TypeLits (Nat, KnownNat, type (+))
 
+import Clash.Magic (clashSimulation)
 import Clash.Sized.Internal (formatRange)
 
 -- | Coerce a value to be represented by a different number of bits
@@ -54,20 +55,21 @@ class Resize (f :: Nat -> Type) where
   truncateB :: KnownNat a => f (a + b) -> f a
 
 -- | Helper function of 'checkedFromIntegral', 'checkedResize' and 'checkedTruncateB'
-checkIntegral ::
+checkIntegralSimOnly ::
   forall a b.
   HasCallStack =>
   (Integral a, Integral b, Bounded b) =>
   Proxy b ->
-  a -> ()
-checkIntegral Proxy v =
-  if toInteger v > toInteger (maxBound @b)
-  || toInteger v < toInteger (minBound @b) then
+  a -> a
+checkIntegralSimOnly Proxy v =
+  if clashSimulation
+  && (toInteger v > toInteger (maxBound @b)
+  || toInteger v < toInteger (minBound @b)) then
     error $ "Given integral " <> show (toInteger v) <> " is out of bounds for" <>
             " target type. Bounds of target type are: " <>
             formatRange (toInteger (minBound @b)) (toInteger (maxBound @b)) <> "."
   else
-    ()
+    v
 
 -- | Like 'fromIntegral', but errors if /a/ is out of bounds for /b/. Useful when
 -- you "know" /a/ can't be out of bounds, but would like to have your assumptions
@@ -83,8 +85,7 @@ checkedFromIntegral ::
   HasCallStack =>
   (Integral a, Integral b, Bounded b) =>
   a -> b
-checkedFromIntegral v =
-  checkIntegral (Proxy @b) v `seq` fromIntegral v
+checkedFromIntegral v = fromIntegral (checkIntegralSimOnly (Proxy @b) v)
 
 -- | Like 'resize', but errors if /f a/ is out of bounds for /f b/. Useful when
 -- you "know" /f a/ can't be out of bounds, but would like to have your
@@ -99,8 +100,7 @@ checkedResize ::
   , KnownNat a, Integral (f a)
   , KnownNat b, Integral (f b), Bounded (f b) ) =>
   f a -> f b
-checkedResize v =
-  checkIntegral (Proxy @(f b)) v `seq` resize v
+checkedResize v = resize (checkIntegralSimOnly (Proxy @(f b)) v)
 
 -- | Like 'truncateB', but errors if /f (a + b)/ is out of bounds for /f a/. Useful
 -- when you "know" /f (a + b)/ can't be out of bounds, but would like to have your
@@ -115,5 +115,68 @@ checkedTruncateB ::
   , KnownNat b, Integral (f (a + b))
   , KnownNat a, Integral (f a), Bounded (f a) ) =>
   f (a + b) -> f a
+<<<<<<< HEAD
 checkedTruncateB v =
   checkIntegral (Proxy @(f a)) v `seq` truncateB v
+||||||| parent of 494c7ea2 (Use clashSimulation for checked* resize function)
+checkedTruncateB v =
+  checkIntegral (Proxy @(f a)) v `seq` truncateB v
+
+-- | Like 'resize', but returns 'Nothing' if the argument is out of bounds for
+-- the result type.
+maybeResize ::
+  forall a b f.
+  ( Resize f
+  , KnownNat a, Integral (f a)
+  , KnownNat b, Integral (f b), Bounded (f b) ) =>
+  f a -> Maybe (f b)
+maybeResize v =
+  case Proxy @a `cmpNat` Proxy @b of
+    GTI | v > resize (maxBound @(f b)) -> Nothing
+    GTI | v < resize (minBound @(f b)) -> Nothing
+    EQI -> Just v
+    _ -> Just (resize v)
+
+-- | Like 'truncateB', but returns 'Nothing' if the argument is out of bounds for
+-- the result type.
+maybeTruncateB ::
+  forall a b f.
+  ( Resize f
+  , KnownNat b, Integral (f (a + b))
+  , KnownNat a, Integral (f a), Bounded (f a) ) =>
+  f (a + b) -> Maybe (f a)
+maybeTruncateB v
+  | v > resize (maxBound @(f a)) = Nothing
+  | v < resize (minBound @(f a)) = Nothing
+  | otherwise = Just (truncateB v)
+=======
+checkedTruncateB v = truncateB (checkIntegralSimOnly (Proxy @(f a)) v)
+
+-- | Like 'resize', but returns 'Nothing' if the argument is out of bounds for
+-- the result type.
+maybeResize ::
+  forall a b f.
+  ( Resize f
+  , KnownNat a, Integral (f a)
+  , KnownNat b, Integral (f b), Bounded (f b) ) =>
+  f a -> Maybe (f b)
+maybeResize v =
+  case Proxy @a `cmpNat` Proxy @b of
+    GTI | v > resize (maxBound @(f b)) -> Nothing
+    GTI | v < resize (minBound @(f b)) -> Nothing
+    EQI -> Just v
+    _ -> Just (resize v)
+
+-- | Like 'truncateB', but returns 'Nothing' if the argument is out of bounds for
+-- the result type.
+maybeTruncateB ::
+  forall a b f.
+  ( Resize f
+  , KnownNat b, Integral (f (a + b))
+  , KnownNat a, Integral (f a), Bounded (f a) ) =>
+  f (a + b) -> Maybe (f a)
+maybeTruncateB v
+  | v > resize (maxBound @(f a)) = Nothing
+  | v < resize (minBound @(f a)) = Nothing
+  | otherwise = Just (truncateB v)
+>>>>>>> 494c7ea2 (Use clashSimulation for checked* resize function)
