@@ -111,7 +111,7 @@
     kind: Expression
     type: 'integerGt# :: Integer
       -> Integer -> Int#'
-    template: '(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
+    template: '(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]''sd1 : ~SIZE[~TYPO]''sd0'
     warning: 'GHC.Num.Integer.integerGt#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
