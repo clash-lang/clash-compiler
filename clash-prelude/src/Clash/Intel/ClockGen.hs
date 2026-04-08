@@ -1,7 +1,7 @@
 {-|
 Copyright  :  (C) 2017-2018, Google Inc
                   2019     , Myrtle Software
-                  2022-2023, QBayLogic B.V.
+                  2022-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -55,9 +55,6 @@ module Clash.Intel.ClockGen
     -- $unsafe_example
   , unsafeAltpll
   , unsafeAlteraPll
-    -- * Deprecated
-  , altpll
-  , alteraPll
   ) where
 
 import GHC.TypeLits (type (<=))
@@ -65,10 +62,8 @@ import GHC.TypeLits (type (<=))
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Clocks
   (Clocks(..), ClocksSync(..), ClocksSyncCxt, NumOutClocksSync)
-import Clash.Magic (setName)
-import Clash.Promoted.Symbol (SSymbol)
 import Clash.Signal.Internal
-  (Signal, Clock, Reset, KnownDomain, HasAsynchronousReset)
+  (Clock, Reset, KnownDomain, HasAsynchronousReset)
 
 {- $domains
 Synthesis domains are denoted by the type-parameter
@@ -323,36 +318,6 @@ altpllSync clkIn rstIn =
 -- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
 -- \"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
 -- Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
--- reference clock input and a reset input and 1 output clock and a @locked@
--- output.
---
--- This function is deprecated because the @locked@ output is an asynchronous
--- signal. This means the user is required to add a synchronizer and as such
--- this function is unsafe. The common use case is now covered by 'altpllSync'
--- and 'unsafeAltpll' offers the functionality of this deprecated function for
--- advanced use cases.
-altpll ::
-  forall domOut domIn name .
-  ( HasAsynchronousReset domIn
-  , KnownDomain domOut
-  ) =>
-  -- | Name of the component instance
-  --
-  -- Instantiate as follows: @(SSymbol \@\"altpll50\")@
-  SSymbol name ->
-  -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
-  Clock domIn ->
-  -- | Reset for the clock generator
-  Reset domIn ->
-  -- | (Output clock, Clock generator locked)
-  (Clock domOut, Signal domOut Bool)
-altpll _ = setName @name unsafeAltpll
-{-# INLINE altpll #-}
-{-# DEPRECATED altpll "This function is unsafe. Please see documentation of the function for alternatives." #-}
-
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"ALTPLL\" IP core (Arria GX, Arria II, Stratix IV, Stratix III, Stratix II,
--- Stratix, Cyclone 10 LP, Cyclone IV, Cyclone III, Cyclone II, Cyclone) with 1
 -- reference clock input and a reset input and 1 to 5 output clocks and a
 -- @locked@ output.
 --
@@ -398,35 +363,6 @@ alteraPllSync ::
   t
 alteraPllSync clkIn rstIn =
   clocksResetSynchronizer (unsafeAlteraPll clkIn rstIn) clkIn
-
--- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
--- \"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
--- input and a reset input and 1 to 18 output clocks and a @locked@ output.
---
--- This function is deprecated because the @locked@ output is an asynchronous
--- signal. This means the user is required to add a synchronizer and as such
--- this function is unsafe. The common use case is now covered by
--- 'alteraPllSync' and 'unsafeAlteraPll' offers the functionality of this
--- deprecated function for advanced use cases.
-alteraPll ::
-  forall t domIn name .
-  ( HasAsynchronousReset domIn
-  , Clocks t
-  , ClocksCxt t
-  , NumOutClocks t <= 18
-  ) =>
-  -- | Name of the component instance
-  --
-  -- Instantiate as follows: @(SSymbol \@\"alterapll50\")@
-  SSymbol name ->
-  -- | Free running clock (e.g. a clock pin connected to a crystal oscillator)
-  Clock domIn ->
-  -- | Reset for the clock generator
-  Reset domIn ->
-  t
-alteraPll _ = setName @name unsafeAlteraPll
-{-# INLINE alteraPll #-}
-{-# DEPRECATED alteraPll "This function is unsafe. Please see documentation of the function for alternatives." #-}
 
 -- | Instantiate an Intel clock generator corresponding to the Intel/Quartus
 -- \"Altera PLL\" IP core (Arria V, Stratix V, Cyclone V) with 1 reference clock
