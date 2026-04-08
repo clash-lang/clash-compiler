@@ -32,8 +32,8 @@ the most of Clash.
 
 - [Discourse: long form discussions and questions](https://clash-lang.discourse.group/)
 - [Discord: short form discussions and community chat room](https://discord.gg/rebGq25FB4)
-- [Slack: short form discussions and questions](https://functionalprogramming.slack.com/archives/CPGMJFF50)
-  (Invite yourself at [fpslack.com](https://fpslack.com))
+- [Fosstodon: microblogging and community chat room](https://fosstodon.org/@ClashHDL)
+- [Bluesky: microblogging and community chat room](https://bsky.app/profile/clash-lang.bsky.social)
 - [Github: issue tracker](https://github.com/clash-lang/clash-compiler/issues)
 
 # Get Clash
