@@ -295,7 +295,27 @@ defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
 However, we cannot simply use 'Clash.Sized.Vector.fold' to create a tree-structure of
 'Clash.Class.Num.add's:
 
-#if __GLASGOW_HASKELL__ >= 910
+#if __GLASGOW_HASKELL__ >= 914
+>>> :{
+let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
+                     => BitVector (2^d) -> Index (2^d+1)
+    populationCount' = tfold (resize . bv2i . pack) add . v2t . bv2v
+:}
+<interactive>:...
+...
+      Expected: Index ((2 ^ d) + 1)
+        Actual: AResult (Index ((2 ^ d) + 1)) (Index ((2 ^ d) + 1))
+...
+    • In the second argument of ‘tfold’, namely ‘add’
+      In the first argument of ‘(.)’, namely
+        ‘tfold (resize . bv2i . pack) add’
+      In the expression: tfold (resize . bv2i . pack) add . v2t . bv2v
+    • Relevant bindings include
+        populationCount' :: BitVector (2 ^ d) -> Index ((2 ^ d) + 1)
+          (bound at ...)
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 910
 >>> :{
 let populationCount' :: (KnownNat (2^d), KnownNat d, KnownNat (2^d+1))
                      => BitVector (2^d) -> Index (2^d+1)
