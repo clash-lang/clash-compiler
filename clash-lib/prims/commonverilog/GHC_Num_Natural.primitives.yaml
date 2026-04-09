@@ -74,7 +74,7 @@
     kind: Expression
     type: 'naturalGt# :: Natural
       -> Natural -> Int#'
-    template: '(~ARG[0] > ~ARG[1] ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
+    template: '(~ARG[0] > ~ARG[1]) ? ~SIZE[~TYPO]''d1 : ~SIZE[~TYPO]''d0'
     warning: 'GHC.Num.Natural.naturalGt#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
