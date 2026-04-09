@@ -390,13 +390,26 @@ Library
                       uniplate                  >= 1.6.12  && < 1.7,
                       vector                    >= 0.11    && < 1.0,
                       mtl                       >= 2.0     && < 3.0
+<<<<<<< HEAD
 
   if impl(ghc >= 9.0.0)
     Build-Depends:    ghc-bignum                >= 1.0      && < 1.4
   else
     Build-Depends:    integer-gmp               >= 1.0.1.0  && < 2.0
+||||||| parent of 3a6e7f4f (Clarify large-tuple ghc depend)
+
+=======
+  -- Depend on GHC to obtain the maximum tuple size via
+  -- import GHC.Settings.Constants (mAX_TUPLE_SIZE)
+>>>>>>> 3a6e7f4f (Clarify large-tuple ghc depend)
   if flag(large-tuples)
+<<<<<<< HEAD
     Build-Depends:    ghc
+||||||| parent of 3a6e7f4f (Clarify large-tuple ghc depend)
+    Build-Depends:    ghc                       >= 9.6.0 && < 9.11
+=======
+    Build-Depends:    ghc                       >= 9.6.0 && < 9.13
+>>>>>>> 3a6e7f4f (Clarify large-tuple ghc depend)
 
 test-suite doctests
   type:             exitcode-stdio-1.0
