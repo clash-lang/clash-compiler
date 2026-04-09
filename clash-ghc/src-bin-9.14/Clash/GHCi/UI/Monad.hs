@@ -9,7 +9,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHCi.UI.Monad (
+module Clash.GHCi.UI.Monad (
         GHCi(..), startGHCi,
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
@@ -34,7 +34,7 @@ module GHCi.UI.Monad (
         mkEvalWrapper
     ) where
 
-import GHCi.UI.Info (ModInfo)
+import Clash.GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
 import GHC.Utils.Outputable
@@ -77,7 +77,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHCi.UI.Print
+import Clash.GHCi.UI.Print
 
 -----------------------------------------------------------------------------
 -- GHCi monad
