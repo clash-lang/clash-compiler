@@ -54,12 +54,12 @@ on [a special Hackage page](http://hackage.haskell.org/package/clash-prelude/can
 1. Create a release branch (i.e. `v1.8.5_release`) from
    the branch of the version you are releasing.
 2. Change version numbers in:
-  * `clash-prelude/clash-prelude.cabal`
-  * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
-  * `clash-lib/clash-lib.cabal`
-  * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
-  * `clash-ghc/clash-ghc.cabal`
-  * `docs/conf.py`
+   * `clash-prelude/clash-prelude.cabal`
+   * `clash-prelude-hedgehog/clash-prelude-hedgehog.cabal`
+   * `clash-lib/clash-lib.cabal`
+   * `clash-lib-hedgehog/clash-lib-hedgehog.cabal`
+   * `clash-ghc/clash-ghc.cabal`
+   * `docs/conf.py`
 
    This both includes the version number at the top of many files, and the
    listed Clash dependecies.
