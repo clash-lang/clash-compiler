@@ -1,4 +1,4 @@
-module GHCi.UI.Print
+module Clash.GHCi.UI.Print
   ( printForUserNeverQualify
   , printForUserGlobalRdrEnv
   , printForUser
@@ -28,7 +28,7 @@ import qualified GHC.Driver.Ppr as Ppr
 import Prelude hiding ((<>))
 import System.IO
 
-import GHCi.UI.Exception
+import Clash.GHCi.UI.Exception
 
 
 printForUserNeverQualify :: GhcMonad m => SDoc -> m ()

@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TupleSections #-}
-module GHC.Driver.Session.Mode where
+module Clash.GHC.Driver.Session.Mode where
 
 import GHC.Driver.CmdLine
 import GHC.Driver.Phases
@@ -90,15 +90,22 @@ data PostLoadMode
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
+  | DoVHDL                  -- ghc --vhdl
+  | DoVerilog               -- ghc --verilog
+  | DoSystemVerilog         -- ghc --systemverilog
 
 doMkDependHSMode, doMakeMode, doInteractiveMode, doRunMode,
-  doAbiHashMode, showUnitsMode :: Mode
+  doAbiHashMode, showUnitsMode, doVHDLMode, doVerilogMode,
+  doSystemVerilogMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doRunMode = mkPostLoadMode DoRun
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showUnitsMode = mkPostLoadMode ShowPackages
+doVHDLMode = mkPostLoadMode DoVHDL
+doVerilogMode = mkPostLoadMode DoVerilog
+doSystemVerilogMode = mkPostLoadMode DoSystemVerilog
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -150,6 +157,9 @@ needsInputsMode :: PostLoadMode -> Bool
 needsInputsMode DoMkDependHS    = True
 needsInputsMode (StopBefore _)  = True
 needsInputsMode DoMake          = True
+needsInputsMode DoVHDL          = True
+needsInputsMode DoVerilog       = True
+needsInputsMode DoSystemVerilog = True
 needsInputsMode _               = False
 
 -- True if we are going to attempt to link in this mode.
@@ -167,6 +177,9 @@ isCompManagerMode DoRun         = True
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
+isCompManagerMode DoVHDL        = True
+isCompManagerMode DoVerilog     = True
+isCompManagerMode DoSystemVerilog = True
 isCompManagerMode _             = False
 
 -- -----------------------------------------------------------------------------
@@ -252,6 +265,9 @@ mode_flags =
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   , defFlag "-frontend"    (SepArg   (\s -> setMode (doFrontendMode s) "-frontend"))
+  , defFlag "-vhdl"        (PassFlag (setMode doVHDLMode))
+  , defFlag "-verilog"     (PassFlag (setMode doVerilogMode))
+  , defFlag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
   ]
 
 addUnit :: String -> String -> EwM ModeM ()

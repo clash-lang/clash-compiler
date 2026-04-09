@@ -231,3 +231,5 @@ library
 
   if impl(ghc >= 9.14.0)
     Other-Modules:    Clash.GHCi.UI.Print
+                      Clash.GHC.Driver.Session.Lint
+                      Clash.GHC.Driver.Session.Mode

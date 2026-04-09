@@ -1,17 +1,17 @@
 {-# LANGUAGE RecordWildCards, LambdaCase #-}
-module GHCi.Leak
+module Clash.GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators
   , checkLeakIndicators
   ) where
 
+import Clash.GHCi.Util
 import Control.Monad
 import Data.Bits
 import Data.IORef
 import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
 import GHC.Ptr (Ptr (..))
-import GHCi.Util
 import GHC.Driver.Env
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable

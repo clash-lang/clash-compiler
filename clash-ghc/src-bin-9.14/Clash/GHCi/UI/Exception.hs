@@ -4,7 +4,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
-module GHCi.UI.Exception
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+module Clash.GHCi.UI.Exception
   ( GhciCommandError(..)
   , throwGhciCommandError
   , handleGhciCommandError
