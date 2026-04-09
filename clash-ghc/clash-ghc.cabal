@@ -121,7 +121,9 @@ common common-options
 library
   import:             common-options
   HS-Source-Dirs:     src-ghc, src-bin-common
-  if impl(ghc >= 9.12.0)
+  if impl(ghc >= 9.14.0)
+    HS-Source-Dirs: src-bin-9.14
+  elif impl(ghc >= 9.12.0)
     HS-Source-Dirs: src-bin-9.12
   elif impl(ghc >= 9.10.2)
     HS-Source-Dirs: src-bin-9.10.2
@@ -164,17 +166,17 @@ library
                       ghc-typelits-knownnat     >= 0.6      && < 0.9,
                       ghc-typelits-natnormalise >= 0.6      && < 0.10,
                       deepseq                   >= 1.3.0.2  && < 1.6,
-                      time                      >= 1.4.0.1  && < 1.15,
-                      ghc                       >= 9.6.0    && < 9.13,
-                      ghc-bignum                >= 1.0      && < 1.4,
-                      ghc-boot                  >= 9.6.0    && < 9.13,
+                      time                      >= 1.4.0.1  && < 1.16,
+                      ghc                       >= 9.6.0    && < 9.15,
+                      ghc-bignum                >= 1.0      && < 1.5,
+                      ghc-boot                  >= 9.6.0    && < 9.15,
                       ghc-prim                  >= 0.10     && < 0.14,
-                      ghci                      >= 9.6.0    && < 9.13,
+                      ghci                      >= 9.6.0    && < 9.15,
                       uniplate                  >= 1.6.12   && < 1.8,
                       reflection                >= 2.1.2    && < 3.0,
                       primitive                 >= 0.5.0.1  && < 1.0,
                       string-interpolate        ^>= 0.3,
-                      template-haskell          >= 2.8.0.0  && < 2.24,
+                      template-haskell          >= 2.8.0.0  && < 2.25,
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0,
                       exceptions                >= 0.10.4   && < 0.11,
@@ -226,3 +228,6 @@ library
     Other-Modules:    Clash.GHCi.UI.Exception
   else
     Other-Modules:    Clash.GHCi.UI.Tags
+
+  if impl(ghc >= 9.14.0)
+    Other-Modules:    Clash.GHCi.UI.Print
