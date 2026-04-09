@@ -15,7 +15,7 @@ write-ghc-environment-files: always
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2026-03-26T08:23:35Z
+index-state: 2026-04-07T06:28:37Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
@@ -63,6 +63,8 @@ allow-newer:
   hedgehog-fakedata:hedgehog,
   rewrite-inspector:binary,
   rewrite-inspector:containers,
+  config-ini:containers,
+  config-ini:megaparsec,
   vty:deepseq,
   derive-storable-plugin:ghc,
   derive-storable-plugin:ghci,
@@ -70,7 +72,23 @@ allow-newer:
   string-random:containers,
   string-interpolate:template-haskell,
   string-interpolate:text,
-  hint:ghc
+  aeson:containers,
+  aeson:template-haskell,
+  aeson:time,
+  binary-orphans:base,
+  indexed-traversable-instances:base,
+  indexed-traversable:base,
+  indexed-traversable:containers,
+  microstache:base,
+  microstache:containers,
+  semialign:base,
+  semialign:containers,
+  text-iso8601:time,
+  these:base,
+  time-compat:time,
+  uuid-types:template-haskell,
+  ordered-containers:containers,
+  boring:base,
 
 -- Works around: https://github.com/recursion-schemes/recursion-schemes/issues/128. This
 -- shouldn't harm (runtime) performance of Clash, as we only use recursion-schemes with
