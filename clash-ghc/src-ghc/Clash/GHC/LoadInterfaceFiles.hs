@@ -438,8 +438,8 @@ loadExprFromTyThing bndr tyThing = case tyThing of
     let _idInfo    = Var.idInfo _id
         unfolding  = IdInfo.realUnfoldingInfo _idInfo
     in case unfolding of
-      CoreSyn.CoreUnfolding {} ->
-        Just (CoreSyn.unfoldingTemplate unfolding)
+      CoreSyn.CoreUnfolding {uf_tmpl} ->
+        Just uf_tmpl
       CoreSyn.DFunUnfolding dfbndrs dc es ->
         Just (MkCore.mkCoreLams dfbndrs (MkCore.mkCoreConApps dc es))
       CoreSyn.NoUnfolding

@@ -11,6 +11,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -69,12 +70,12 @@ import GHC.Core.FVs  (exprSomeFreeVars)
 import GHC.Core
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..),
    Alt(..),
-   collectArgs, rhssOfAlts, unfoldingTemplate)
+   collectArgs, isTypeArg, isValArg, rhssOfAlts)
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Core.DataCon
-  (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
-   dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel,
-   HsImplBang(..), dataConImplBangs)
+  (DataCon, dataConExTyCoVars, dataConName, dataConOrigArgTys, dataConRepArgTys,
+   dataConTag, dataConTyCon, dataConUnivTyVars, dataConWorkId,
+   dataConFieldLabels, flLabel, HsImplBang(..), dataConImplBangs)
 import GHC.Core.FamInstEnv
   ( FamInst (..), FamInstEnvs
   , familyInstances, normaliseType, emptyFamInstEnvs, topReduceTyFamApp_maybe
@@ -94,7 +95,11 @@ import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
    isNewTyCon, isPrimTyCon, isTupleTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
-   tyConDataCons, tyConKind, tyConName, tyConUnique, isClassTyCon, isPromotedDataCon_maybe)
+   tyConDataCons, tyConKind, tyConName, tyConTyVars, tyConUnique, isClassTyCon,
+#if MIN_VERSION_ghc(9,14,0)
+   isUnaryClassTyCon,
+#endif
+   isPromotedDataCon_maybe)
 import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type (tyConAppFunTy_maybe)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
@@ -191,7 +196,7 @@ makeTyCon tc = tycon
         mkAlgTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          tcRhsM <- makeAlgTyConRhs $ algTyConRhs tc
+          tcRhsM <- makeAlgTyConRhs tc $ algTyConRhs tc
           case tcRhsM of
             Just tcRhs ->
               return
@@ -278,9 +283,27 @@ makeTyCon tc = tycon
           ty  <- coreToType (fi_rhs fi)
           return (tys,ty)
 
-makeAlgTyConRhs :: AlgTyConRhs
+makeAlgTyConRhs :: TyCon
+                -> AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
-makeAlgTyConRhs algTcRhs = case algTcRhs of
+makeAlgTyConRhs tc algTcRhs = case algTcRhs of
+#if MIN_VERSION_ghc(9,14,0)
+  -- GHC 9.14 represents unary classes (a class with a single method or a single
+  -- superclass) with their own AlgTyConRhs constructor instead of as a newtype.
+  -- See Note [Unary class magic] in GHC.Core.TyCon. We map it back to Clash's
+  -- 'NewTyCon' so that the wrapper data constructor (e.g. 'C:KnownNat') is
+  -- treated as identity by clash's normalizer, which is what its semantics is.
+  UnaryClassTyCon {data_con = dc} -> do
+    let tvs = tyConTyVars tc
+        -- The DataCon for a unary class has exactly one field; that's the
+        -- newtype's RHS (e.g. 'SNat n' for 'KnownNat n').
+        rhsEtad = case dataConOrigArgTys dc of
+          [scaled] -> scaledThing scaled
+          _ -> error "makeAlgTyConRhs: UnaryClassTyCon DataCon does not have one field"
+    Just <$> (C.NewTyCon <$> coreToDataCon dc
+                         <*> ((,) <$> mapM coreToTyVar tvs
+                                  <*> coreToType rhsEtad))
+#endif
   DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 
@@ -302,6 +325,26 @@ coreToTerm primMap unlocs = term
   where
     term :: CoreExpr -> C2C C.Term
     term e
+#if MIN_VERSION_ghc(9,14,0)
+      -- See Note [Unary class magic] in GHC.Core.TyCon. The worker for a unary
+      -- class data constructor (e.g. 'C:KnownNat') is semantically the identity
+      -- on its single value field. Peel it off here so that downstream
+      -- transformations (in particular the evaluator's literal extractors) see
+      -- the underlying value directly, as they would have on GHC < 9.14 when
+      -- unary classes were represented as newtypes.
+      -- Match a fully-saturated worker application: all type args, then
+      -- exactly one value arg. A naive '[Type _, val]' pattern would also
+      -- match a partial application like 'C:IP @"callStack" @CallStack'
+      -- (two 'Type' args, no value yet), binding 'val' to a 'Type' node
+      -- and producing '_TY_'-wrapped junk when peeled.
+      | (Var x, args) <- collectArgs e
+      , Just dc <- isDataConId_maybe x
+      , isUnaryClassTyCon (dataConTyCon dc)
+      , (tyArgs, [val]) <- break isValArg args
+      , all isTypeArg tyArgs
+      , isValArg val
+      = term val
+#endif
       | (Var x,args) <- collectArgs e
       , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
                                   (GHC2CoreEnv noSrcSpan emptyFamInstEnvs)
@@ -516,9 +559,9 @@ coreToTerm primMap unlocs = term
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
                    in  case unfolding of
-                          CoreUnfolding {} -> do
+                          CoreUnfolding {uf_tmpl} -> do
                             sp <- view srcSpan
-                            RWS.censor (const (SrcSpanRB sp)) (term (unfoldingTemplate unfolding))
+                            RWS.censor (const (SrcSpanRB sp)) (term uf_tmpl)
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPprUnsafe x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPprUnsafe x)
               else C.Data <$> coreToDataCon dc
