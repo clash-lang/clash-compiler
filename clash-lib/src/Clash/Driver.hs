@@ -272,6 +272,8 @@ prefixModuleName
   -> Maybe TopEntity
   -> String
   -> (String, Maybe String)
+prefixModuleName _hdl _compPrefix (Just (tb@(TestBench _))) _modName =
+  error $ "Internal error: prefixModuleName: unexpected TestBench: " <> show tb
 prefixModuleName hdl compPrefix annM modName =
   case compPrefix of
     Just (Data.Text.unpack -> p)

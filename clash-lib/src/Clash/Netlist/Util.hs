@@ -1448,6 +1448,8 @@ genTopName
   -- ^ Top entity annotation
   -> m Identifier
   -- ^ New identifier
+genTopName _prefixM tb@(TestBench {}) =
+  error $ "Internal error: genTopName: unexpected TestBench: " <> show tb
 genTopName prefixM ann =
   case prefixM of
     Just prefix | not (Text.null prefix) ->
