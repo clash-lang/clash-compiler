@@ -45,7 +45,9 @@ import           Control.Monad.Catch             (catch, throwM)
 import           Control.Monad.Catch             as MC (try)
 import           Control.Monad.IO.Class          (liftIO)
 import           Data.Char                       (isDigit)
+#if !MIN_VERSION_ghc(9,14,0)
 import           Data.Generics.Uniplate.DataOnly (transform)
+#endif
 import           Data.Data                       (Data)
 import           Data.Functor                    ((<&>))
 import           Data.Foldable                   (toList)
@@ -91,8 +93,6 @@ import           GHC.Driver.Pipeline.Phases (TPhase(T_HscPostTc))
 import           GHC.Data.Bool (OverridingBool)
 import           GHC.Driver.Config.Tidy (initTidyOpts)
 import           GHC.Driver.Errors.Types (GhcMessage(GhcTcRnMessage))
-import           GHC.Driver.Monad (modifySession)
-import           GHC.Unit.Env (addHomeModInfoToHug)
 import           GHC.Unit.Home.ModInfo (HomeModInfo(HomeModInfo))
 import           GHC.Unit.Module.ModSummary (findTarget)
 import qualified GHC.Driver.Env as HscTypes
@@ -134,6 +134,12 @@ import qualified GHC.Types.Unique.Set as UniqSet
 import qualified GHC.Types.Var as Var
 import qualified GHC.Unit.Module.Env as ModuleEnv
 import qualified GHC.Types.Name.Env as NameEnv
+
+#if MIN_VERSION_ghc(9,14,0)
+import GHC.Unit.Home.Graph (addHomeModInfoToHug)
+#else
+import GHC.Unit.Env (addHomeModInfoToHug)
+#endif
 
 -- Internal Modules
 import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
@@ -289,11 +295,15 @@ loadLocalModule hdl modName = do
   let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
       -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
       -- are in topological order, i.e. the root module is last.
-      modGraph2 = Digraph.flattenSCCs $
-                  -- TODO: this might break backpack
-                  Graph.filterToposortToModules $
-                  GHC.topSortModuleGraph True modGraph' Nothing
-
+      modGraph2 =
+        mapMaybe
+          (\case
+             Graph.ModuleNodeCompile ms -> Just ms
+             _ -> Nothing) $
+        Digraph.flattenSCCs $
+        -- TODO: this might break backpack
+        Graph.filterToposortToModules $
+        GHC.topSortModuleGraph True modGraph' Nothing
   liftIO $ mapM_ checkMonoLocalBindsMod modGraph2
 
   tidiedMods <- forM modGraph2 $ \m -> do
@@ -368,7 +378,7 @@ loadLocalModule hdl modName = do
                                   (homeMod_bytecode linkable))
     let linkable2 = linkable {homeMod_bytecode = linkable1}
     let mod_info = HomeModInfo iface details linkable2
-    modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
+    liftIO $ addHomeModInfoToHug mod_info (HscTypes.hsc_HUG hsc_env)
     let pgm        = HscTypes.cg_binds tidy_guts
     let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
     _ <- GHC.setSessionDynFlags oldDFlags
@@ -1001,8 +1011,14 @@ removeStrictnessAnnotations pm =
 
 #if MIN_VERSION_ghc(9,10,0)
     rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
+#if MIN_VERSION_ghc(9,14,0)
+    rmGConDetails (GHC.PrefixConGADT tkn args) = GHC.PrefixConGADT tkn (fmap rmConDeclF args)
+    rmGConDetails (GHC.RecConGADT tkn rec) =
+      GHC.RecConGADT tkn ((fmap . fmap . fmap) rmConDeclRecF rec)
+#else
     rmGConDetails (GHC.PrefixConGADT tkn args) = GHC.PrefixConGADT tkn (fmap rmHsScaledType args)
     rmGConDetails (GHC.RecConGADT tkn rec) = GHC.RecConGADT tkn ((fmap . fmap . fmap) rmConDeclF rec)
+#endif
 #else
     rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
     rmGConDetails (GHC.PrefixConGADT args) = GHC.PrefixConGADT (fmap rmHsScaledType args)
@@ -1011,30 +1027,52 @@ removeStrictnessAnnotations pm =
 
     -- type HsConDeclDetails name = HsConDetails (LBangType name) (Located [LConDeclField name])
     -- rmConDetails :: _ => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
+#if MIN_VERSION_ghc(9,14,0)
+    rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmConDeclF args)
+    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmConDeclF l) (rmConDeclF r)
+    rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclRecF rec)
+#else
     rmConDetails (GHC.PrefixCon tys args) = GHC.PrefixCon tys (fmap rmHsScaledType args)
     rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
     rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
+#endif
 
 
+#if MIN_VERSION_ghc(9,14,0)
+    rmHsType = id
+
+    -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
+    rmConDeclF cdf =
+      cdf
+        { GHC.cdf_unpack = GHC.NoSrcUnpack
+        , GHC.cdf_bang = GHC.NoSrcStrict
+        , GHC.cdf_type = rmHsType (GHC.cdf_type cdf)
+        }
+
+    rmConDeclRecF (GHC.HsConDeclRecField ext names spec) =
+      GHC.HsConDeclRecField ext names (rmConDeclF spec)
+    rmConDeclRecF x@(GHC.XConDeclRecField _) = x
+#else
     -- rmHsType :: GHC.DataId name => GHC.Located (GHC.HsType name) -> GHC.Located (GHC.HsType name)
     rmHsType = transform go
       where
-        go ::
-          GHC.LBangType GHC.GhcPs ->
-          GHC.LBangType GHC.GhcPs
+        -- go ::
+        --   GHC.LBangType GHC.GhcPs ->
+        --   GHC.LBangType GHC.GhcPs
         go (GHC.unLoc -> GHC.HsBangTy _ _ ty) = ty
         go ty                               = ty
 
     rmHsScaledType = transform go
       where
-        go ::
-          GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs) ->
-          GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs)
+        -- go ::
+        --   GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs) ->
+        --   GHC.HsScaled GHC.GhcPs (GHC.LBangType GHC.GhcPs)
         go (GHC.HsScaled m (GHC.unLoc -> GHC.HsBangTy _ _ ty)) = GHC.HsScaled m ty
         go ty = ty
 
     -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
+#endif
 
 -- | The package id of the clash-prelude we were built with
 preludePkgId :: String
@@ -1050,7 +1088,11 @@ checkForInvalidPrelude guts =
     (x:_) -> throw (ClashException noSrcSpan (msgWrongPrelude x) Nothing)
   where
     pkgs = HscTypes.dep_direct_pkgs . HscTypes.mg_deps $ guts
+#if MIN_VERSION_ghc(9,14,0)
+    pkgIds = map (UnitTypes.unitIdString . snd) (toList pkgs)
+#else
     pkgIds = map (UnitTypes.unitIdString) (toList pkgs)
+#endif
     prelude = "clash-prelude-"
     isPrelude pkg = case splitAt (length prelude) pkg of
       (x,y:_) | x == prelude && isDigit y -> True     -- check for a digit so we don't match clash-prelude-extras
