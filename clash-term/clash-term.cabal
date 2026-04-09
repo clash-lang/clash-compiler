@@ -26,8 +26,8 @@ executable clash-term
   Main-Is:            Main.hs
   Build-Depends:      base              >= 4.3.1.0  && < 5,
                       clash-lib,
-                      binary            >= 0.8.5    && < 0.11,
-                      bytestring        >= 0.10.0.2 && < 0.13,
+                      binary            >= 0.8.5,
+                      bytestring        >= 0.10.0.2,
                       rewrite-inspector == 0.1.0.11
 
   GHC-Options:        -Wall -Wcompat -threaded
