@@ -355,9 +355,10 @@ Library
                       uniplate                  >= 1.6.12  && < 1.7,
                       vector                    >= 0.11    && < 1.0,
                       mtl                       >= 2.0     && < 3.0
-
+  -- Depend on GHC to obtain the maximum tuple size via
+  -- import GHC.Settings.Constants (mAX_TUPLE_SIZE)
   if flag(large-tuples)
-    Build-Depends:    ghc                       >= 9.6.0 && < 9.11
+    Build-Depends:    ghc                       >= 9.6.0 && < 9.13
 
 test-suite doctests
   type:             exitcode-stdio-1.0
