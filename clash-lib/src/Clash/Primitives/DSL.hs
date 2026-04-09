@@ -46,8 +46,13 @@ module Clash.Primitives.DSL
   -- ** Literals
   , bvLit
   , LitHDL (..)
+#if __GLASGOW_HASKELL__ >= 914
+  , data High
+  , data Low
+#else
   , pattern High
   , pattern Low
+#endif
   , constructProduct
   , tuple
   , vec

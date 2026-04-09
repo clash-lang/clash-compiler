@@ -42,7 +42,11 @@ import Data.Hashable
 import Data.IORef
 import GHC.IO (unsafeDupablePerformIO, unsafePerformIO)
 
+#if __GLASGOW_HASKELL__ >= 914
+import Clash.Unique (Unique, Unique#, data Unique#)
+#else
 import Clash.Unique (Unique, Unique#, pattern Unique#)
+#endif
 
 infixr 5 :-
 data Stream a = a :- Stream a

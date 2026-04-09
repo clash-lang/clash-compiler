@@ -22,7 +22,7 @@
 module Clash.Rewrite.Types where
 
 import Control.DeepSeq                       (NFData)
-import Control.Lens                          (Lens', use, (.=))
+import Control.Lens                          (use, (.=))
 import qualified Control.Lens as Lens
 import Control.Monad.Fix                     (MonadFix)
 import Control.Monad.IO.Class                (MonadIO)
@@ -50,7 +50,6 @@ import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
 import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
-import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Util
 import Clash.Util.Supply         (Supply, freshId)
 
@@ -208,9 +207,11 @@ type Transform m = TransformContext -> Term -> m Term
 type Rewrite extra = Transform (RewriteMonad extra)
 
 -- Moved into Clash.Rewrite.WorkFree
-{-# SPECIALIZE isWorkFree
-      :: Lens' (RewriteState extra) (VarEnv Bool)
-      -> BindingMap
-      -> Term
-      -> RewriteMonad extra Bool
-  #-}
+
+-- TODO:
+-- {-# SPECIALIZE isWorkFree
+--       :: Lens' (RewriteState extra) (VarEnv Bool)
+--       -> BindingMap
+--       -> Term
+--       -> RewriteMonad extra Bool
+--   #-}

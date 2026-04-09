@@ -47,6 +47,8 @@ import qualified Clash.Netlist.Id.Common as Common
 -- is "foo_12_13" this function would return "Just 25". In this case, "foo_12_26"
 -- is guaranteed to be a fresh identifier.
 lookupFreshCache# :: FreshCache -> Identifier -> Maybe Word
+lookupFreshCache# _fresh0 rawId@RawIdentifier {} =
+  error $ "Internal error: unexpected raw identifier: " <> show rawId
 lookupFreshCache# fresh0 id0 = do
   fresh1 <- HashMap.lookup (i_baseNameCaseFold id0) fresh0
   IntMap.lookup (length (i_extensionsRev id0)) fresh1
@@ -75,7 +77,7 @@ mkUnique#
   -> (IdentifierSet, Identifier)
 mkUnique# _is0 (RawIdentifier {}) =
   error "Internal error: mkUnique# cannot be used on RawIdentifiers"
-mkUnique# is0 id_@(i_extensionsRev -> []) = deepen# is0 id_
+mkUnique# is0 id_@UniqueIdentifier{i_extensionsRev=[]} = deepen# is0 id_
 mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id2)
  where
   freshCache = updateFreshCache# (is_freshCache is) id2
@@ -147,7 +149,7 @@ makeBasicOr# is0 hint altHint = make# is0 id1
 next# :: HasCallStack => IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
 next# is0 (RawIdentifier t Nothing _) = uncurry next# (make# is0 t)
 next# is0 (RawIdentifier _ (Just id_) _) = next# is0 id_
-next# is0 id_@(i_extensionsRev -> []) = deepen# is0 id_
+next# is0 id_@UniqueIdentifier{i_extensionsRev=[]} = deepen# is0 id_
 next# is0 id_ = mkUnique# is0 id_
 
 -- | Non-monadic, internal version of 'nextN'
