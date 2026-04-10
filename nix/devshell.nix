@@ -2,6 +2,11 @@
 compilerVersion:
 let
   clashPkgs = pkgs."clashPackages-${compilerVersion}";
+  haskellLanguageServer =
+    if compilerVersion == "ghc9141" then
+      [ ]
+    else
+      [ clashPkgs.haskell-language-server ];
 in
 clashPkgs.shellFor {
   # shellFor combines the dependencies of these packages while filtering the
@@ -22,8 +27,7 @@ clashPkgs.shellFor {
   ];
 
   buildInputs = [
-    clashPkgs.cabal-install
-    clashPkgs.haskell-language-server
+    pkgs.cabal-install
 
     # https://discourse.nixos.org/t/non-interactive-bash-errors-from-flake-nix-mkshell/33310
     pkgs.bashInteractive
@@ -37,5 +41,5 @@ clashPkgs.shellFor {
 
     # Tool used to manage the changelog, see 'changelog/README.md'.
     qlog
-  ];
+  ] ++ haskellLanguageServer;
 }
