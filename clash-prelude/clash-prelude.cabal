@@ -237,7 +237,6 @@ Library
                       Clash.Prelude.BlockRam
                       Clash.Prelude.BlockRam.Blob
                       Clash.Prelude.BlockRam.File
-                      Clash.Prelude.DataFlow
                       Clash.Prelude.Mealy
                       Clash.Prelude.Moore
                       Clash.Prelude.RAM
