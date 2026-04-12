@@ -342,7 +342,12 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     edamFiles <- newMVar HashMap.empty
     ioLock <- newMVar ()
 
-    mapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
+    let
+      maybeMapConcurrently_
+        | opt_concurrentTopEntities opts = mapConcurrently_
+        | otherwise = mapM_
+
+    maybeMapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
 
     time <- Clock.getCurrentTime
     let diff = reportTimeDiff time startTime
