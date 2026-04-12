@@ -399,6 +399,11 @@ data ClashOpts = ClashOpts
   , opt_ignoreBrokenGhcs :: Bool
   -- ^ Don't error if we see a (potentially) broken GHC / platform combination.
   -- See the project's @README.md@ for more information.
+  , opt_concurrentTopEntities :: Bool
+  -- ^ Compile top entities concurrently. Disabling this is useful when
+  -- investigating bugs, because it will make log output deterministic.
+  --
+  -- Command line flag: -fclash-no-concurrent-topentity-compilation
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
 
@@ -438,6 +443,7 @@ defClashOpts
   -- XXX: We probe environment variables until we've found a proper solution to
   --      https://github.com/clash-lang/clash-compiler/issues/2762.
   , opt_ignoreBrokenGhcs    = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
+  , opt_concurrentTopEntities = True
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.
