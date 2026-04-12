@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
                      2017     , Google Inc.,
-                     2021-2023, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -399,7 +399,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       -- Note that we do this as the very last step, after all constant propagation
       -- has been done to avoid #3036.
       topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
-      topdownSucR (apply "inlineCleanup" inlineCleanup)
+      topdownSucR (apply "inlineCleanup" inlineCleanup) >->
+      topdownSucR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159
+      bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+      topdownSucR (apply "topLet" topLet)
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
       | isNoInline inl2  = (Nothing     ,[c])
