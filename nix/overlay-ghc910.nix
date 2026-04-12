@@ -30,4 +30,7 @@ in
 
   # Criterion test fails with tasty 1.5.4
   criterion = dontCheck prev.criterion;
+
+  # Randomly GHC panics with heap overflows during testing
+  row-types = dontCheck prev.row-types;
 }

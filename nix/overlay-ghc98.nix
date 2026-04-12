@@ -36,4 +36,7 @@ in
   clash-ffi = overrideCabal prev.clash-ffi (drv: {
     broken = true;
   });
+
+  # Randomly GHC panics with heap overflows during testing
+  row-types = dontCheck prev.row-types;
 }
