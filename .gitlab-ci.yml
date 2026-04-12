@@ -106,6 +106,12 @@ hackage-release-candidate:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "trigger"
 
+  allow_failure:
+    # .ci/publish_sdist.sh uses this magic exit code to signal allowed-to-fail.
+    # .ci/functions.sh defines a wrapper to prevent accidentally emitting this
+    # code.
+    exit_codes: 64
+
 # Release new version of Clash to Hackage
 hackage-release:
   extends: .hackage

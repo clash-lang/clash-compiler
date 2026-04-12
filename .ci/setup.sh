@@ -1,6 +1,10 @@
 #!/bin/bash
 set -xou pipefail
 
+. .ci/functions.sh
+
+trap exit_trap EXIT
+
 grep -E ' $' -n -r . --include=*.{hs,hs-boot,sh} --exclude-dir=dist-newstyle
 if [[ $? == 0 ]]; then
     echo "EOL whitespace detected. See ^"

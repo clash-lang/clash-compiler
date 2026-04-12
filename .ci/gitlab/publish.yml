@@ -20,8 +20,10 @@ hackage-sdist:
   cache:
     key: hackage-$CI_JOB_IMAGE
   script:
-    - .ci/publish_sdist.sh clash-prelude
-    - .ci/publish_sdist.sh clash-prelude-hedgehog
-    - .ci/publish_sdist.sh clash-lib
-    - .ci/publish_sdist.sh clash-lib-hedgehog
-    - .ci/publish_sdist.sh clash-ghc
+    # Currently, GitLab runners do not propagate the error code, but we need to
+    # match on it for allowed-to-fail
+    - .ci/publish_sdist.sh clash-prelude || exit $?
+    - .ci/publish_sdist.sh clash-prelude-hedgehog || exit $?
+    - .ci/publish_sdist.sh clash-lib || exit $?
+    - .ci/publish_sdist.sh clash-lib-hedgehog || exit $?
+    - .ci/publish_sdist.sh clash-ghc || exit $?
