@@ -833,6 +833,7 @@ runClashTest = defaultMain
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
            in runTest "T3021" _opts
         , runTest "T3159" def{hdlSim=[], hdlLoad=[] }
+        , runTest "T3185" def
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
