@@ -1,0 +1,1 @@
+FIXED: Failure to generate binder assignments in very specific cases [#3185](https://github.com/clash-lang/clash-compiler/issues/3185)
