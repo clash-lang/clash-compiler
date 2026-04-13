@@ -30,6 +30,11 @@ jobs:
           ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
         run: .ci/attic-auth.sh
 
+      - name: Trust Attic cache
+        run: |
+          attic use public
+          nix config show
+
         # Most clash- related packages depend on these three packages, having them be build
         # sequentially and then the other packages in parallel speeds up CI
         #
@@ -93,6 +98,11 @@ jobs:
           ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
         run: .ci/attic-auth.sh
 
+      - name: Trust Attic cache
+        run: |
+          attic use public
+          nix config show | grep -E '^(substituters|trusted-public-keys) ='
+
       - name: Building ${{matrix.ghc}}
         run: nix build -L .#clashPackages-${{matrix.ghc}}.${{matrix.package}}
 
@@ -124,6 +134,11 @@ jobs:
         env:
           ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
         run: .ci/attic-auth.sh
+
+      - name: Trust Attic cache
+        run: |
+          attic use public
+          nix config show | grep -E '^(substituters|trusted-public-keys) ='
 
       - name: Nix devShell ${{matrix.ghc}}
         run: nix build -L .#devShells.x86_64-linux.${{matrix.ghc}}
