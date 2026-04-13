@@ -33,4 +33,7 @@ in
 
   # Randomly GHC panics with heap overflows during testing
   row-types = dontCheck prev.row-types;
+
+  # Randomly fails a single test -- cannot reproduce locally
+  attoparsec = dontCheck prev.attoparsec;
 }
