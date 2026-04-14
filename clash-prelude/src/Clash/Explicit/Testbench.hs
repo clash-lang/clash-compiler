@@ -41,6 +41,7 @@ where
 
 import Control.Exception     (catch, evaluate)
 import Debug.Trace           (trace)
+import Data.Proxy            (Proxy(..))
 import GHC.TypeLits          (KnownNat, type (+), type (<=))
 import Prelude               hiding ((!!), length)
 import System.IO.Unsafe      (unsafeDupablePerformIO)
@@ -48,7 +49,6 @@ import System.IO.Unsafe      (unsafeDupablePerformIO)
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
 import Clash.Promoted.Nat    (SNat(..))
-import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Explicit.Signal
   (Clock, Reset, System, Signal, toEnable, fromList, register,
   unbundle, unsafeSynchronizer)
@@ -475,7 +475,7 @@ clockToDiffClock ::
   Clock dom ->
   -- | Differential output
   DiffClock dom
-clockToDiffClock clk = DiffClock clk (ClockN SSymbol)
+clockToDiffClock clk = DiffClock clk (ClockN Proxy)
 {-# OPAQUE clockToDiffClock #-}
 {-# ANN clockToDiffClock hasBlackBox #-}
 
