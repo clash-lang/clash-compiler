@@ -44,6 +44,9 @@ mkClashOpts = defClashOpts
 -- Run clash as far as having access to core for all bindings. This is used
 -- to test operations on core, such as transformations and evaluation.
 --
+-- NOTE This does /not/ do any normalization!
+-- It only runs GHC and translates GHC Core to Clash Core.
+--
 -- TODO This is somewhat of a hack. Ideally, Clash.Driver would provide a means
 -- to run the compiler up to a given stage. There are currently numerous
 -- problems standing in the way of this however.
