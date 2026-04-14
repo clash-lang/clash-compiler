@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["macos-latest", "windows-latest"]
+        os: ["macos-26", "windows-latest"]
         ghc: ["9.6", "9.8", "9.10"]
         exclude:
           # GHC/Clash starts extremely slowly, see
