@@ -31,7 +31,9 @@ import           Data.Hashable                            (Hashable)
 import qualified Data.Map                                 as Map
 import           Data.Maybe                               (fromMaybe)
 import qualified Data.Text                                as Text
+#if __GLASGOW_HASKELL__ <= 910
 import           Data.Typeable                            (Typeable)
+#endif
 import qualified Language.Haskell.TH.Syntax               as TH
 import           GHC.Generics                             (Generic)
 import           GHC.Stack                                (HasCallStack)
@@ -47,7 +49,10 @@ data Type'
   -- ^ Numeral literal (used in BitVector 10, for example)
   | SymLitTy' Text.Text
   -- ^ Symbol literal (used in for example (Signal "System" Int))
-  deriving (Generic, NFData, Eq, Typeable, Hashable, Ord, Show)
+  deriving (Generic, NFData, Eq, Hashable, Ord, Show)
+#if __GLASGOW_HASKELL__ <= 910
+  deriving Typeable
+#endif
 
 -- | Internal version of DataRepr
 data DataRepr' = DataRepr'
@@ -58,7 +63,10 @@ data DataRepr' = DataRepr'
   , drConstrs :: [ConstrRepr']
   -- ^ Constructors
   }
-  deriving (Show, Generic, NFData, Eq, Typeable, Hashable, Ord)
+  deriving (Show, Generic, NFData, Eq, Hashable, Ord)
+#if __GLASGOW_HASKELL__ <= 910
+  deriving Typeable
+#endif
 
 -- | Internal version of ConstrRepr
 data ConstrRepr' = ConstrRepr'
@@ -73,7 +81,10 @@ data ConstrRepr' = ConstrRepr'
   , crFieldAnns :: [FieldAnn]
   -- ^ Indicates where fields are stored
   }
-  deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
+  deriving (Show, Generic, NFData, Eq, Ord, Hashable)
+#if __GLASGOW_HASKELL__ <= 910
+  deriving Typeable
+#endif
 
 constrReprToConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
 constrReprToConstrRepr' n (ConstrRepr name mask value fieldanns) =

@@ -18,6 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
+          ghc9124,
           ghc9103,
           ghc984,
           ghc967
@@ -65,6 +66,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
+          ghc9124,
           ghc9103,
           ghc984,
           ghc967
@@ -112,6 +114,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
+          ghc9124,
           ghc9103,
           ghc984,
           ghc967

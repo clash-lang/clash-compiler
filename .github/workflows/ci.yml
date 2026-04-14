@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macos-26", "windows-latest"]
-        ghc: ["9.6", "9.8", "9.10"]
+        ghc: ["9.6", "9.8", "9.10", "9.12"]
         exclude:
           # GHC/Clash starts extremely slowly, see
           # https://github.com/clash-lang/clash-compiler/issues/2684
@@ -37,6 +37,11 @@ jobs:
           # issue as 9.6?
           - os: "windows-latest"
             ghc: "9.10"
+
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: "windows-latest"
+            ghc: "9.12"
 
     steps:
       - uses: actions/checkout@v5
@@ -147,7 +152,7 @@ jobs:
 
     # Run steps inside the clash CI docker image
     container:
-      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20251229
+      image: ghcr.io/clash-lang/clash-ci:${{ matrix.ghc }}-20260331
 
       env:
         THREADS: 2

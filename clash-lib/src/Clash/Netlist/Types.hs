@@ -54,7 +54,9 @@ import Data.Monoid                          (Ap(..))
 import qualified Data.Set                   as Set
 import Data.Text                            (Text)
 
+#if __GLASGOW_HASKELL__ <= 910
 import Data.Typeable                        (Typeable)
+#endif
 import Data.Text.Prettyprint.Doc.Extra      (Doc)
 import GHC.Generics                         (Generic)
 import GHC.Stack
@@ -828,7 +830,10 @@ data Bit
   | L -- ^ Low
   | U -- ^ Undefined
   | Z -- ^ High-impedance
-  deriving (Eq,Show,Typeable,Lift)
+  deriving (Eq,Show,Lift)
+#if __GLASGOW_HASKELL__ <= 910
+  deriving Typeable
+#endif
 
 
 toBit :: Integer -- ^ mask
