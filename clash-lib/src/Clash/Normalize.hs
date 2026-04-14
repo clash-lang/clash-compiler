@@ -91,7 +91,7 @@ import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Lazy             as BL
 
 import           Clash.Rewrite.Types (RewriteStep(..))
-import Control.Concurrent.Async.Lifted (mapConcurrently_)
+import           Control.Concurrent.Async.Lifted (mapConcurrently_, mapConcurrently)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
@@ -364,8 +364,8 @@ flattenCallTree
   -> NormalizeSession CallTree
 flattenCallTree c@(CLeaf _) = return c
 flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
-  flattenedUsed   <- mapM flattenCallTree used
-  (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
+  flattenedUsed   <- mapConcurrently flattenCallTree used
+  (newUsed,il_ct) <- partitionEithers <$> mapConcurrently flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
       subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
   newExpr <- case toInline of
