@@ -406,6 +406,8 @@ This concludes the short introduction to using 'blockRam'.
 -- as to why we need this.
 {-# OPTIONS_GHC -fno-cpr-anal #-}
 
+{-# OPTIONS_GHC -fconstraint-solver-iterations=12 #-}
+
 module Clash.Explicit.BlockRam
   ( -- * Block RAM synchronized to an arbitrary clock
     blockRam
@@ -448,7 +450,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import Clash.Annotations.Primitive
   (Primitive(InlineYamlPrimitive), HDL(..), hasBlackBox)
 import Clash.Class.AutoReg (AutoReg(autoReg))
-import Clash.Class.BitPack (bitToBool, msb)
+import Clash.Class.BitPack (BitPack, bitToBool, msb)
 import Clash.Class.Num (SaturationMode(SatBound), satSucc)
 import Clash.Explicit.BlockRam.Model (TdpbramModelConfig(..), tdpbramModel)
 import Clash.Explicit.Signal (KnownDomain, Enable, register, fromEnable, andEnable)
@@ -1170,7 +1172,7 @@ data RamOp n a
   -- ^ Write data to address
   | RamNoOp
   -- ^ No operation
-  deriving (Eq, Generic, NFData, NFDataX, Show, ShowX)
+  deriving (Eq, Generic, NFData, NFDataX, Show, ShowX, BitPack)
 
 instance (AutoReg a, KnownNat n) => AutoReg (RamOp n a) where
   autoReg clk rst en initVal input =
