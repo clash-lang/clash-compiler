@@ -31,12 +31,13 @@ data NormalizeState
   = NormalizeState
   { _normalized          :: MVar (VarEnv (MVar (Binding Term)))
   -- ^ Global binders
-  , _specialisationCache :: MVar (Map (Id,Int,Either Term Type) Id)
+  , _specialisationCache :: MVar (Map (Id,Int,Either Term Type) (MVar Id))
   -- ^ Cache of previously specialized functions:
   --
   -- * Key: (name of the original function, argument position, specialized term/type)
   --
-  -- * Elem: (name of specialized function,type of specialized function)
+  -- * Elem: MVar containing the name of the specialized function. An empty
+  -- MVar indicates a specialization is in progress by another thread.
   , _specialisationHistory :: MVar (VarEnv Int)
   -- ^ Cache of how many times a function was specialized
   , _inlineHistory   :: MVar (VarEnv (VarEnv Int))
