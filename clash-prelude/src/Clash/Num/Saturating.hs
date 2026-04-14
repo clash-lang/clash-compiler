@@ -1,5 +1,5 @@
-{-
-Copyright   : (C) 2021, QBayLogic B.V.
+{-|
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -109,6 +109,22 @@ instance (Ord a, SaturatingNum a) => Num (Saturating a) where
   -- is not in range (typically wrapping). It would be better if this also
   -- saturated, but in a way which remained synthesizable.
   fromInteger = coerce (fromInteger @a)
+
+instance (Ord a, SaturatingNum a) => SaturatingNum (Saturating a) where
+  {-# INLINE satAdd #-}
+  satAdd mode (Saturating a) (Saturating b) = Saturating $ satAdd mode a b
+
+  {-# INLINE satSub #-}
+  satSub mode (Saturating a) (Saturating b) = Saturating $ satSub mode a b
+
+  {-# INLINE satMul #-}
+  satMul mode (Saturating a) (Saturating b) = Saturating $ satMul mode a b
+
+  {-# INLINE satSucc #-}
+  satSucc mode (Saturating a) = Saturating $ satSucc mode a
+
+  {-# INLINE satPred #-}
+  satPred mode (Saturating a) = Saturating $ satPred mode a
 
 instance (Enum a, SaturatingNum a) => Enum (Saturating a) where
   {-# INLINE succ #-}
