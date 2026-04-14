@@ -87,6 +87,7 @@ flagsClash r = [
   , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
+  , defFlag "fclash-concurrent-normalization"    $ NoArg (liftEwM (setConcurrentNormalization r))
   ]
 
 -- | Print deprecated flag warning
@@ -325,6 +326,9 @@ setAggressiveXOptBB r = modifyIORef r (\c -> c { opt_aggressiveXOptBB = True })
 
 setEdalize :: IORef ClashOpts -> IO ()
 setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
+
+setConcurrentNormalization :: IORef ClashOpts -> IO ()
+setConcurrentNormalization r = modifyIORef r (\c -> c { opt_concurrentNormalization = True })
 
 setRewriteHistoryFile :: IORef ClashOpts -> String -> IO ()
 setRewriteHistoryFile r arg = do
