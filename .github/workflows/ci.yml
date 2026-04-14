@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["macos-latest", "windows-latest"]
-        ghc: ["9.6", "9.8", "9.10", "9.12"]
+        ghc: ["9.6", "9.8", "9.10", "9.12", "9.14"]
         exclude:
           # GHC/Clash starts extremely slowly, see
           # https://github.com/clash-lang/clash-compiler/issues/2684
@@ -42,6 +42,9 @@ jobs:
           # issue as 9.6?
           - os: "windows-latest"
             ghc: "9.12"
+
+          - os: "windows-latest"
+            ghc: "9.14"
 
     steps:
       - uses: actions/checkout@v5
