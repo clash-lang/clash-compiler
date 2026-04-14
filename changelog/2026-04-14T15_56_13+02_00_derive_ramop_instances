@@ -1,0 +1,1 @@
+ADDED: `Eq`, `NFData`, `ShowX` and `BitPack` instances for `RamOp`.

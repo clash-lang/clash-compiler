@@ -429,6 +429,7 @@ where
 
 import Clash.HaskellPrelude
 
+import Control.DeepSeq (NFData)
 import Control.Exception (catch, throw)
 import Control.Monad (forM_)
 import Control.Monad.ST (ST, runST)
@@ -460,7 +461,7 @@ import Clash.Sized.Index (Index)
 import Clash.Sized.Unsigned (Unsigned)
 import Clash.Sized.Vector (Vec, replicate, iterateI)
 import Clash.XException
- (maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
+ (ShowX, maybeIsX, NFDataX(deepErrorX), defaultSeqX, fromJustX, undefined,
  XException (..), seqX, errorX)
 import Clash.XException.MaybeX (MaybeX(..), andX)
 
@@ -1169,7 +1170,7 @@ data RamOp n a
   -- ^ Write data to address
   | RamNoOp
   -- ^ No operation
-  deriving (Generic, NFDataX, Show)
+  deriving (Eq, Generic, NFData, NFDataX, Show, ShowX)
 
 instance (AutoReg a, KnownNat n) => AutoReg (RamOp n a) where
   autoReg clk rst en initVal input =
