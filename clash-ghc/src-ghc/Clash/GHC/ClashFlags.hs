@@ -88,6 +88,8 @@ flagsClash r = [
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
   , defFlag "fclash-debug-manifest-hash"         $ NoArg (liftEwM (setDebugManifestHash r))
+  , defFlag "fclash-concurrent-normalization"    $ NoArg (liftEwM (setConcurrentNormalization r))
+  , defFlag "fclash-no-concurrent-normalization" $ NoArg (liftEwM (setNoConcurrentNormalization r))
   ]
 
 -- | Print deprecated flag warning
@@ -326,6 +328,12 @@ setAggressiveXOptBB r = modifyIORef r (\c -> c { opt_aggressiveXOptBB = True })
 
 setEdalize :: IORef ClashOpts -> IO ()
 setEdalize r = modifyIORef r (\c -> c { opt_edalize = True })
+
+setConcurrentNormalization :: IORef ClashOpts -> IO ()
+setConcurrentNormalization r = modifyIORef r (\c -> c { opt_concurrentNormalization = True })
+
+setNoConcurrentNormalization :: IORef ClashOpts -> IO ()
+setNoConcurrentNormalization r = modifyIORef r (\c -> c { opt_concurrentNormalization = False })
 
 setRewriteHistoryFile :: IORef ClashOpts -> String -> IO ()
 setRewriteHistoryFile r arg = do

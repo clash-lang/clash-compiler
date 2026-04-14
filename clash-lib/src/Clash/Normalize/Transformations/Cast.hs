@@ -15,9 +15,13 @@ module Clash.Normalize.Transformations.Cast
   , splitCastWorkWorker
   ) where
 
+import Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Normalize.TracedMVar as MVar
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
+import qualified Control.Monad as Monad (when)
 import Control.Monad.Writer (listen)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Monoid as Monoid (Any(..))
 import GHC.Stack (HasCallStack)
 
@@ -29,13 +33,13 @@ import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (Type, normalizeType)
 import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet)
-import Clash.Debug (trace)
+import Clash.Debug (traceM)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onCast, onLet, toTransformation)
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
+  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, ioLock)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Util (ClashException(..), curLoc)
@@ -73,18 +77,22 @@ argCastSpecWorker ctx node f (stripTicks -> Cast e' _ _)
  -- We can only push casts into global binders
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
-  bndrs <- Lens.use bindings
-  isWorkFree workFreeBinders bndrs e' >>= \case
-    True -> specializeNode
-    False -> warn specializeNode
+  bndrsV <- Lens.use bindings
+  wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
+
+  ioLockV <- Lens.use ioLock
+
+  Monad.when (not wf) $
+    MVar.withMVar "ioLock" ioLockV $ \() -> traceM warn
+
+  specialize ctx node
  where
-  specializeNode = specialize ctx node
-  warn = trace (unwords
+  warn = unwords
     [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
     , "cast. Generated HDL implementation might contain duplicate work."
     , "Please report this as a bug.", "\n\nExpression where this occured:"
     , "\n\n" ++ showPpr node
-    ])
+    ]
 argCastSpecWorker _ctx node _function _argument = return node
 {-# SCC argCastSpecWorker #-}
 
@@ -124,7 +132,9 @@ elimCastCastWorker _ctx node (stripTicks -> Cast e tyA tyB) tyB' tyC = do
                                    else throwError
  where
   throwError = do
-    (nm,sp) <- Lens.use curFun
+    curFunsV <- Lens.use curFun
+    thread <- myThreadId
+    Just (nm,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
     throw (ClashException sp ($(curLoc) ++ showPpr nm
             ++ ": Found 2 nested casts whose types don't line up:\n"
             ++ showPpr node)

@@ -1,0 +1,1 @@
+ADDED: Concurrent normalization, enabled by default. It can be disabled with `-fclash-no-concurrent-normalization`. [#3196](https://github.com/clash-lang/clash-compiler/pull/3196).

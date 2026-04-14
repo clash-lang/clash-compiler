@@ -103,7 +103,7 @@ executable clash
 executable clashi
   Main-Is:            src-ghc/Interactive.hs
   Build-Depends:      base, clash-ghc
-  GHC-Options:        -Wall -Wcompat -rtsopts "-with-rtsopts=-K512M -H -I5 -T"
+  GHC-Options:        -Wall -Wcompat -threaded -rtsopts "-with-rtsopts=-K512M -H -I5 -T"
   if flag(dynamic)
     GHC-Options: -dynamic
   if arch(x86_64) && flag(workaround-ghc-mmap-crash)

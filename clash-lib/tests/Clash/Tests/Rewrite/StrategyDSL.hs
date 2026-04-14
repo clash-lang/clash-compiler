@@ -22,6 +22,7 @@
 
 module Clash.Tests.Rewrite.StrategyDSL (tests) where
 
+import Control.Concurrent.MVar (readMVar)
 import Data.Default (def)
 
 import Clash.Core.Literal (Literal (..))
@@ -32,7 +33,7 @@ import Clash.Rewrite.StrategyDSL.TH
 import Clash.Rewrite.Types (Rewrite, RewriteState (..), TransformContext (..), runR)
 import Clash.Rewrite.Util (apply)
 import Clash.Tests.Rewrite.StrategyDSL.Stubs
-import Test.Clash.Rewrite ()
+import Test.Clash.Rewrite (defRewriteState)
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -50,8 +51,12 @@ emptyContext = TransformContext emptyInScopeSet []
 -- the result term, the transformation counter, and the change flag.
 runRewriteOn :: Rewrite () -> Term -> IO (Term, Word, Bool)
 runRewriteOn rewrite term = do
-  (result, state, anyChanged) <- runR (rewrite emptyContext term) def def
-  pure (result, _transformCounter state, Monoid.getAny anyChanged)
+  st <- defRewriteState ()
+  (result, state, anyChanged) <- runR (rewrite emptyContext term) def st
+  -- The total number of applied transformations is the sum of the per-
+  -- transformation counters.
+  nTrans <- sum <$> readMVar (_transformAppliedCounters state)
+  pure (result, nTrans, Monoid.getAny anyChanged)
 
 -- | Assert that two rewrites agree on a term: same result (syntactically),
 -- same transformation count, same change flag.
