@@ -3,6 +3,7 @@
 module Clash.Debug
   ( debugIsOn
   , traceIf
+  , traceWhen
   , module Debug.Trace
   ) where
 
@@ -19,4 +20,8 @@ debugIsOn = False
 traceIf :: Bool -> String -> a -> a
 traceIf True  msg = trace msg
 traceIf False _   = id
-{-# INLINE traceIf #-}
+
+traceWhen :: Monad m => Bool -> String -> m ()
+traceWhen True = traceM
+traceWhen False = const (pure ())
+

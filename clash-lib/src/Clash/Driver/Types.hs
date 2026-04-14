@@ -404,6 +404,8 @@ data ClashOpts = ClashOpts
   -- investigating bugs, because it will make log output deterministic.
   --
   -- Command line flag: -fclash-no-concurrent-topentity-compilation
+  , opt_concurrentNormalization :: Bool
+  -- ^ Toggle concurrent normalization (usually slower, faster on large designs)
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
 
@@ -444,6 +446,7 @@ defClashOpts
   --      https://github.com/clash-lang/clash-compiler/issues/2762.
   , opt_ignoreBrokenGhcs    = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
   , opt_concurrentTopEntities = True
+  , opt_concurrentNormalization = False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.
