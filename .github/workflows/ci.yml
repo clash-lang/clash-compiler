@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["macOS-15", "windows-latest"]
+        os: ["macos-latest", "windows-latest"]
         ghc: ["9.6", "9.8", "9.10"]
         exclude:
           # GHC/Clash starts extremely slowly, see
@@ -46,8 +46,8 @@ jobs:
           enable-stack: true
           stack-no-global: true
 
-      - name: Install IVerilog (macOS)
-        if: ${{ startsWith(matrix.os, 'macOS') }}
+      - name: Install IVerilog (macos)
+        if: ${{ startsWith(matrix.os, 'macos') }}
         run: brew install icarus-verilog
 
       - name: Install IVerilog (Windows)
