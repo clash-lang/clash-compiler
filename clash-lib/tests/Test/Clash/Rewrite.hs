@@ -32,6 +32,7 @@ import Clash.Util.Supply (newSupply)
 import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
+import Control.Concurrent.MVar (newMVar)
 import Control.DeepSeq (NFData, force)
 import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
@@ -41,7 +42,6 @@ import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
 import Language.Haskell.Exts.Parser
   (ParseMode (..), defaultParseMode, fromParseResult, parseExpWithMode)
-import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase)
 import Text.Read (readMaybe)
@@ -85,30 +85,28 @@ instance Default RewriteEnv where
     , _topEntities=emptyVarSet
     }
 
-instance Default extra => Default (RewriteState extra) where
-  def = RewriteState
-    { _transformCounter=0
-    , _transformAppliedCounters=mempty
-    , _transformTriedCounters=mempty
-    , _bindings=emptyVarEnv
-    , _uniqSupply=unsafePerformIO newSupply
-    , _curFun=error "_curFun: NYI"
-    , _nameCounter=2
-    , _workFreeBinders=emptyVarEnv
-    , _hwTypeCache=mempty
-    , _globalHeap=error "_globalHeap: NYI"
-    , _extra=def
-    }
+defRewriteState :: IO (RewriteState NormalizeState)
+defRewriteState = do
+  normState <- NormalizeState
+    <$> newMVar emptyVarEnv
+    <*> newMVar Map.empty
+    <*> newMVar emptyVarEnv
+    <*> newMVar emptyVarEnv
+    <*> newMVar Map.empty
+    <*> newMVar emptyVarEnv
 
-instance Default NormalizeState where
-  def = NormalizeState
-    { _normalized=emptyVarEnv
-    , _specialisationCache=Map.empty
-    , _specialisationHistory=emptyVarEnv
-    , _inlineHistory=emptyVarEnv
-    , _primitiveArgs=Map.empty
-    , _recursiveComponents=emptyVarEnv
-    }
+  RewriteState
+    <$> newMVar mempty
+    <*> newMVar mempty
+    <*> newMVar emptyVarEnv
+    <*> newSupply
+    <*> pure (error "_curFun: NYI")
+    <*> newMVar 2
+    <*> newMVar (error "_globalHeap: NYI")
+    <*> newMVar emptyVarEnv
+    <*> pure mempty
+    <*> newMVar ()
+    <*> pure normState
 
 instance Default InScopeSet where
   def = emptyInScopeSet
@@ -138,8 +136,10 @@ runSingleTransformation rwEnv rwState is trans term = do
 -- include a type translator, evaluator, current function, or global heap. Maps,
 -- like the primitive and tycon map, are also empty. If the transformation under
 -- test needs these definitions, you should add them manually.
-runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> IO C.Term
-runSingleTransformationDef = runSingleTransformation def def def
+runSingleTransformationDef :: Rewrite NormalizeState -> C.Term -> IO C.Term
+runSingleTransformationDef rewrite term = do
+  st <- defRewriteState
+  runSingleTransformation def st def rewrite term
 
 
 parseType :: (HasCallStack, Show l) => Type l -> C.Type

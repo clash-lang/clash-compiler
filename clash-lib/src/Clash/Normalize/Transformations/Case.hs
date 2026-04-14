@@ -27,10 +27,10 @@ module Clash.Normalize.Transformations.Case
   , elimCaseBigNumInternals
   ) where
 
+import qualified Clash.Normalize.TracedMVar as MVar
+import qualified Control.Lens as Lens
 import Control.Exception.Base (patError)
 import GHC.Prim.Panic (absentError)
-import qualified Control.Lens as Lens
-
 import Data.Bifunctor (second)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
@@ -66,7 +66,7 @@ import Clash.Core.Util (listToLets, mkInternalVar)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
-import Clash.Debug (traceIf)
+import Clash.Debug (traceM)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
@@ -75,7 +75,7 @@ import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
-  , typeTranslator, workFreeBinders)
+  , typeTranslator, workFreeBinders, ioLock)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatableType, runWithHWTypeCache, whnfRW)
 import Clash.Rewrite.WorkFree
@@ -235,8 +235,9 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- based on the fact on whether the argument has the potential to make
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
-        bndrs <- Lens.use bindings
-        isWorkFree workFreeBinders bndrs arg >>= \case
+        bindingsV <- Lens.use bindings
+        wf <- MVar.withMVar "bindings" bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+        case wf of
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->
             let
@@ -315,14 +316,21 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
           _ -> do
             opts <- Lens.view debugOpts
+            ioLockV <- Lens.use ioLock
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
-            traceIf (dbg_invariants opts && isConstant subj)
-              ("Unmatchable constant as case subject: " ++ showPpr subj ++
-                 "\nWHNF is: " ++ showPpr subj1)
+            let shouldTrace = dbg_invariants opts && isConstant subj
+            if shouldTrace then do
+              MVar.withMVar "ioLock" ioLockV $ \() ->
+                traceM ("Unmatchable constant as case subject: " ++ showPpr subj ++
+                       "\nWHNF is: " ++ showPpr subj1)
               -- Otherwise check whether the entire case-expression has a
               -- single alternative, and pick that one.
-              (caseOneAlt e)
+              caseOneAlt e
+            else
+              -- Otherwise check whether the entire case-expression has a
+              -- single alternative, and pick that one.
+              caseOneAlt e
 
   -- The subject is a variable
   (Var v, [], _) | isNum0 (coreTypeOf v) ->
