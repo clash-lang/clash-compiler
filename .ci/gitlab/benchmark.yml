@@ -1,5 +1,5 @@
 .benchmark:
-  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20251229
+  image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-20260331
   stage: test
   timeout: 2 hours
   variables:

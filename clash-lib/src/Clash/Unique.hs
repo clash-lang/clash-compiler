@@ -11,7 +11,7 @@
 
 module Clash.Unique
   ( Unique
-  , pattern Unique#
+  , data Unique#
   , Unique#
   , Uniquable (..)
   , fromGhcUnique

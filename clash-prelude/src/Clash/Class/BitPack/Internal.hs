@@ -19,6 +19,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fconstraint-solver-iterations=12 #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 #include "MachDeps.h"

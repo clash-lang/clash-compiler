@@ -46,8 +46,8 @@ module Clash.Primitives.DSL
   -- ** Literals
   , bvLit
   , LitHDL (..)
-  , pattern High
-  , pattern Low
+  , data High
+  , data Low
   , constructProduct
   , tuple
   , vec

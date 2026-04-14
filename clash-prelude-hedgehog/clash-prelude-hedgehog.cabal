@@ -32,7 +32,7 @@ common basic-config
 
   build-depends:
     base      >= 4.11  && < 5,
-    hedgehog  >= 1.0.3 && < 1.6,
+    hedgehog  >= 1.0.3 && < 1.8,
 
 library
   import: basic-config

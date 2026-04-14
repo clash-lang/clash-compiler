@@ -1,7 +1,7 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken;
+  inherit (pkgs.haskell.lib) appendPatches doJailbreak dontCheck markUnbroken;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
@@ -30,6 +30,15 @@ in
 
   # Criterion test fails with tasty 1.5.4
   criterion = dontCheck prev.criterion;
+
+  # Upstream nixpkgs has this fix but they have not landed in a release yet
+  fourmolu = appendPatches prev.fourmolu [
+    (pkgs.fetchpatch {
+      name = "fourmolu-absolute-build-tool-paths.patch";
+      url = "https://github.com/fourmolu/fourmolu/commit/9217bc926ab80d20b815f0486be2184db07df4fc.patch";
+      hash = "sha256-ANzuKy5WfWCGZ7HFVBpTtuyUqzFfef/xR/v1KiyJEX4=";
+    })
+  ];
 
   # Randomly GHC panics with heap overflows during testing
   row-types = dontCheck prev.row-types;

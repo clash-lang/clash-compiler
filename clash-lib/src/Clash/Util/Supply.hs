@@ -42,7 +42,7 @@ import Data.Hashable
 import Data.IORef
 import GHC.IO (unsafeDupablePerformIO, unsafePerformIO)
 
-import Clash.Unique (Unique, Unique#, pattern Unique#)
+import Clash.Unique (Unique, Unique#, data Unique#)
 
 infixr 5 :-
 data Stream a = a :- Stream a

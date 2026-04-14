@@ -11,6 +11,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -69,7 +70,7 @@ import GHC.Core.FVs  (exprSomeFreeVars)
 import GHC.Core
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..),
    Alt(..),
-   collectArgs, rhssOfAlts, unfoldingTemplate)
+   collectArgs, rhssOfAlts)
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Core.DataCon
   (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
@@ -281,6 +282,14 @@ makeTyCon tc = tycon
 makeAlgTyConRhs :: AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
+#if MIN_VERSION_ghc(9,14,0)
+  -- XXX: GHC 9.14 introduced a new AlgTyConRhs constructor, UnaryClassTyCon, which
+  -- is used for single-constructor class tycons. It contains the single DataCon of
+  -- the class. Investigate whether we can treat this as a normal AlgTyConRhs with a
+  -- single constructor, or whether we need to introduce a new AlgTyConRhs constructor
+  -- for it.
+  UnaryClassTyCon {data_con} -> Just <$> C.DataTyCon <$> fmap pure (coreToDataCon data_con)
+#endif
   DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 
@@ -516,9 +525,9 @@ coreToTerm primMap unlocs = term
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
                    in  case unfolding of
-                          CoreUnfolding {} -> do
+                          CoreUnfolding {uf_tmpl} -> do
                             sp <- view srcSpan
-                            RWS.censor (const (SrcSpanRB sp)) (term (unfoldingTemplate unfolding))
+                            RWS.censor (const (SrcSpanRB sp)) (term uf_tmpl)
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPprUnsafe x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPprUnsafe x)
               else C.Data <$> coreToDataCon dc
@@ -609,7 +618,11 @@ coreToTerm primMap unlocs = term
       LitFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
       LitDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
       LitNullAddr   -> C.StringLiteral []
+#if MIN_VERSION_ghc(9,12,0)
+      LitLabel fs _ -> C.StringLiteral (unpackFS fs)
+#else
       LitLabel fs _ _ -> C.StringLiteral (unpackFS fs)
+#endif
 
 addUsefull :: SrcSpan
            -> C2C a
@@ -663,6 +676,7 @@ hasPrimCo (ForAllCo {fco_body = co}) = hasPrimCo co
 hasPrimCo (ForAllCo _ _ co) = hasPrimCo co
 #endif
 
+#if !MIN_VERSION_ghc(9,12,0)
 hasPrimCo co@(AxiomInstCo _ _ coers) = do
     let (Pair ty1 _) = coercionKind co
     ty1PM <- isPrimTc ty1
@@ -681,6 +695,7 @@ hasPrimCo co@(AxiomInstCo _ _ coers) = do
                           ,"Clash.Sized.Internal.Unsigned.Unsigned"
                           ])
     isPrimTc _ = return False
+#endif
 
 hasPrimCo (SymCo co) = hasPrimCo co
 
@@ -690,7 +705,11 @@ hasPrimCo (TransCo co1 co2) = do
     Just _ -> return tc1M
     _ -> hasPrimCo co2
 
+#if MIN_VERSION_ghc(9,12,0)
+hasPrimCo (AxiomCo _ coers) = do
+#else
 hasPrimCo (AxiomRuleCo _ coers) = do
+#endif
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
 
@@ -699,7 +718,13 @@ hasPrimCo (LRCo _ co)   = hasPrimCo co
 hasPrimCo (InstCo co _) = hasPrimCo co
 hasPrimCo (SubCo co)    = hasPrimCo co
 
-hasPrimCo _ = return Nothing
+hasPrimCo (Refl {}) = return Nothing
+hasPrimCo (GRefl {}) = return Nothing
+hasPrimCo (FunCo {}) = return Nothing
+hasPrimCo (CoVarCo {}) = return Nothing
+hasPrimCo (UnivCo {}) = return Nothing
+hasPrimCo (KindCo {}) = return Nothing
+hasPrimCo (HoleCo {}) = return Nothing
 
 coreToDataCon :: DataCon
               -> C2C C.DataCon

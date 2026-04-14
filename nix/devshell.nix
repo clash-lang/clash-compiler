@@ -2,6 +2,11 @@
 compilerVersion:
 let
   clashPkgs = pkgs."clashPackages-${compilerVersion}";
+  haskellLanguageServer =
+    if compilerVersion == "ghc9141" then
+      [ ]
+    else
+      [ clashPkgs.haskell-language-server ];
 in
 pkgs.mkShell {
   inputsFrom = [
@@ -20,8 +25,7 @@ pkgs.mkShell {
   ];
 
   buildInputs = [
-    clashPkgs.cabal-install
-    clashPkgs.haskell-language-server
+    pkgs.cabal-install
 
     # https://discourse.nixos.org/t/non-interactive-bash-errors-from-flake-nix-mkshell/33310
     pkgs.bashInteractive
@@ -32,5 +36,5 @@ pkgs.mkShell {
     pkgs.verilator
     pkgs.iverilog
     pkgs.yosys
-  ];
+  ] ++ haskellLanguageServer;
 }
