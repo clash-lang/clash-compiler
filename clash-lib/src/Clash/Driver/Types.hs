@@ -175,6 +175,11 @@ data DebugOpts = DebugOpts
   -- for use with @clash-term@.
   --
   -- Command line flag: -fclash-debug-history[=FILE]
+  , dbg_enterExitTerm :: Bool
+  -- ^ Print a message when Clash starts and stops normalizing or flattening
+  -- a binder.
+  --
+  -- Command line flag: -fclash-debug-enter-exit-term
   } deriving (Generic, NFData, Show, Eq)
 
 instance Hashable DebugOpts where
@@ -186,7 +191,8 @@ instance Hashable DebugOpts where
     dbg_countTransformations `hashWithSalt`
     dbg_transformationsFrom `hashWithSalt`
     dbg_transformationsLimit `hashWithSalt`
-    dbg_historyFile
+    dbg_historyFile `hashWithSalt`
+    dbg_enterExitTerm
    where
     hashSet = Set.foldl' hashWithSalt
     infixl 0 `hashSet`
@@ -210,6 +216,7 @@ isDebugging opts = or
   , dbg_transformationInfo opts > None
   , dbg_countTransformations opts
   , isJust (dbg_transformationsLimit opts)
+  , dbg_enterExitTerm opts
   ]
 
 -- | Check whether the requested information is available to the specified
@@ -253,6 +260,7 @@ debugNone = DebugOpts
   , dbg_transformationsFrom = Nothing
   , dbg_transformationsLimit = Nothing
   , dbg_historyFile = Nothing
+  , dbg_enterExitTerm = False
   }
 
 -- | -fclash-debug DebugSilent

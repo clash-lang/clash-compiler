@@ -64,7 +64,7 @@ import           Clash.Core.VarEnv
   (VarEnv, VarSet, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv, emptyVarSet,
    extendVarSet, lookupVarEnv, mapMaybeVarEnv,
    mkVarEnv, mkVarSet, nullVarEnv)
-import           Clash.Debug                      (traceIf)
+import           Clash.Debug                      (traceIf, traceM)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
 import           Clash.Netlist.Types
@@ -183,8 +183,13 @@ normalize' nm = do
   bndrsV <- Lens.use bindings
   exprM <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv nm)
   let nmS = showPpr (varName nm)
+  opts <- Lens.view debugOpts
+  ioLockV <- Lens.use ioLock
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do
+      when (dbg_enterExitTerm opts) $
+        MVar.withMVar "ioLock" ioLockV $ \() ->
+          traceM ("Entering normalization: " ++ nmS)
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
       let isTop = nm `elemVarSet` topEnts
@@ -220,6 +225,10 @@ normalize' nm = do
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
 
+            when (dbg_enterExitTerm opts) $
+              MVar.withMVar "ioLock" ioLockV $ \() ->
+                traceM ("Exiting normalization: " ++ nmS)
+
             s <- Lens.use uniqSupply
             let ss = supplies (length usedBndrs) s
             pure ((nm, tmNorm), zip usedBndrs ss)
@@ -238,7 +247,6 @@ normalize' nm = do
             -- for the ByteArray# inside of a Natural constant.
             -- (GHC-8.4 does this with tests/shouldwork/Numbers/Exp.hs)
             -- It will later be inlined by flattenCallTree.
-            opts <- Lens.view debugOpts
             traceIf (dbg_invariants opts)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
                             , showPpr (coreTypeOf nm')
@@ -364,6 +372,12 @@ flattenCallTree
   -> NormalizeSession CallTree
 flattenCallTree c@(CLeaf _) = return c
 flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
+  opts <- Lens.view debugOpts
+  ioLockV <- Lens.use ioLock
+  let nmS = showPpr (varName nm)
+  when (dbg_enterExitTerm opts) $
+    MVar.withMVar "ioLock" ioLockV $ \() ->
+      traceM ("Entering flattening: " ++ nmS)
   flattenedUsed   <- mapConcurrently flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapConcurrently flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
@@ -374,13 +388,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
 
       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-      opts <- Lens.view debugOpts
       let rewriteHistFile = dbg_historyFile opts
 
-      when (Maybe.isJust rewriteHistFile) $ do
-        lock <- Lens.use ioLock
-
-        MVar.withMVar "ioLock" lock $ \() ->
+      when (Maybe.isJust rewriteHistFile) $
+        MVar.withMVar "ioLock" ioLockV $ \() ->
           Monad.liftIO
             . BS.appendFile (Maybe.fromJust rewriteHistFile)
             . BL.toStrict
@@ -397,15 +408,20 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   -- inline all components when the resulting expression after flattening
   -- is still considered "cheap". This happens often at the topEntity which
   -- wraps another functions and has some selectors and data-constructors.
-  if not (isNoInline inl) && isCheapFunction newExpr
-     then do
-        let (toInline',allUsed') = unzip (map goCheap allUsed)
-            subst' = extendGblSubstList (mkSubst emptyInScopeSet)
-                                        (Maybe.catMaybes toInline')
-        let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
-        newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
-        return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
-     else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
+  result <-
+    if not (isNoInline inl) && isCheapFunction newExpr
+       then do
+          let (toInline',allUsed') = unzip (map goCheap allUsed)
+              subst' = extendGblSubstList (mkSubst emptyInScopeSet)
+                                          (Maybe.catMaybes toInline')
+          let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
+          newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
+          return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
+       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
+  when (dbg_enterExitTerm opts) $
+    MVar.withMVar "ioLock" ioLockV $ \() ->
+      traceM ("Exiting flattening: " ++ nmS)
+  return result
   where
     flatten =
       repeatR (topdownR (apply "appProp" appProp >->

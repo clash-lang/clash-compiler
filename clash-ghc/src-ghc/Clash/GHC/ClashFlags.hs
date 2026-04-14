@@ -57,6 +57,7 @@ flagsClash r = [
   , defFlag "fclash-debug-transformations-from"  $ IntSuffix (setDebugTransformationsFrom r)
   , defFlag "fclash-debug-transformations-limit" $ IntSuffix (setDebugTransformationsLimit r)
   , defFlag "fclash-debug-history"               $ AnySuffix (liftEwM . (setRewriteHistoryFile r))
+  , defFlag "fclash-debug-enter-exit-term"       $ NoArg (liftEwM (setDebugEnterExitTerm r))
   , defFlag "fclash-hdldir"                      $ SepArg (setHdlDir r)
   , defFlag "fclash-hdlsyn"                      $ SepArg (setHdlSyn r)
   , defFlag "fclash-nocache"                     $ NoArg (deprecated "nocache" "no-cache" setNoCache r)
@@ -149,6 +150,11 @@ setDebugCountTransformations :: IORef ClashOpts -> IO ()
 setDebugCountTransformations r =
   modifyIORef r $ \c ->
     c { opt_debug = (opt_debug c) { dbg_countTransformations = True } }
+
+setDebugEnterExitTerm :: IORef ClashOpts -> IO ()
+setDebugEnterExitTerm r =
+  modifyIORef r $ \c ->
+    c { opt_debug = (opt_debug c) { dbg_enterExitTerm = True } }
 
 setDebugTransformations :: IORef ClashOpts -> String -> EwM IO ()
 setDebugTransformations r s =
