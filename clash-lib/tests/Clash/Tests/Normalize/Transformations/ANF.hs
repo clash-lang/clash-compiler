@@ -28,7 +28,6 @@ import Clash.Normalize.Transformations.ANF (makeANF, nonRepANF)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.Combinators ((>->))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Unique (Unique)
 import Clash.Util.Supply (Supply, newSupply)
 
@@ -36,7 +35,8 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, globalId, inScopeOf
   , intFunTy, intId
   , intLit, intTy, letBinders, mkDataCon, parseTyConTy, runSingleTransformation
-  , showPprU )
+  , showPprU
+  , defRewriteState, setCurFun, setUniqSupply )
 
 nonRepANFR :: NormRewrite
 nonRepANFR = $(asRewriteQ nonRepANF)
@@ -49,7 +49,7 @@ mkP = mkDataCon "MkP" 1001 [] [] [intTy, intFunTy 1] (parseTyConTy "P")
 -- must not move the first argument under the let-binder @x@.
 nonRepANFCapture :: IO Term
 nonRepANFCapture =
-  runSingleTransformation def def (inScopeOf [u, x]) nonRepANFR $
+  runSingleTransformation def defRewriteState (inScopeOf [u, x]) nonRepANFR $
     mkApps (Data mkP)
       [ Left (Var x)
       , Left (Let (NonRec x (Var u)) (Lam y (Var x))) ]
@@ -95,7 +95,7 @@ anfTerm bUniq =
 -- | Run 'makeANF' on a term, with the given unique supply
 runANF :: Supply -> Term -> IO Term
 runANF supply =
-  runSingleTransformation def def{_uniqSupply = supply} (inScopeOf [xId]) makeANF
+  runSingleTransformation def (defRewriteState >>= setUniqSupply supply) (inScopeOf [xId]) makeANF
 
 -- | ANF creates new let-binders and moves all existing let-binders into a
 -- single let-expression. It used to pick uniques for the new binders that only
@@ -140,7 +140,7 @@ anfDoesNotLiftOutOfLambdas = do
       z = intId User "z" 71
       cf = globalId User "top" 42 (intFunTy 1)
       tm = App (Prim p) (Lam z (mkApps (Var kId) [Left (App (Var hId) (Var z)), Left (Var z)]))
-      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+      st = defRewriteState >>= setCurFun (cf, noSrcSpan) >>= setUniqSupply supply
   runSingleTransformation def st emptyInScopeSet (nonRepANFR >-> makeANF) tm
     >>= assertNoFreeLocals
 

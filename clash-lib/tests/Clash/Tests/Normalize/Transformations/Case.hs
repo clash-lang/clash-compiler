@@ -26,7 +26,8 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertStructurallyEqual, inScopeOf, intFunTy, intId, intTy
-  , localId, mkDataCon, pairDataCon, parseTyConTy, runSingleTransformation )
+  , localId, mkDataCon, pairDataCon, parseTyConTy, runSingleTransformation
+  , defRewriteState )
 
 caseCaseR, caseConR, caseLetR :: NormRewrite
 caseCaseR = $(asRewriteQ caseCase)
@@ -56,7 +57,7 @@ mkT = mkDataCon "MkT" 1000 [] [] [intTy] tTy
 -- https://github.com/clash-lang/clash-compiler/commit/e087036b76b65900dad4bbbff8bd291f42250a64
 caseConShadowedFreeVar :: IO Term
 caseConShadowedFreeVar =
-  runSingleTransformation def def (inScopeOf [c, aOuter]) caseConR term
+  runSingleTransformation def defRewriteState (inScopeOf [c, aOuter]) caseConR term
  where
   c = intId User "c" 3
   b = intId User "b" 2
@@ -74,7 +75,7 @@ aOuter = intId User "a" 1
 -- binder @x@ of the inner one.
 caseCaseCapture :: IO Term
 caseCaseCapture =
-  runSingleTransformation def def (inScopeOf [a, f, x]) caseCaseR $
+  runSingleTransformation def defRewriteState (inScopeOf [a, f, x]) caseCaseR $
     Case
       (Case (Var a) (intFunTy 1) [(DataPat mkT [] [x], Var f)])
       intTy
@@ -99,7 +100,7 @@ caseCaseCaptureExpected =
 -- 'caseLet' must not move the alternative under the let-binder @x@.
 caseLetCapture :: IO Term
 caseLetCapture =
-  runSingleTransformation def def (inScopeOf [u, x]) caseLetR $
+  runSingleTransformation def defRewriteState (inScopeOf [u, x]) caseLetR $
     Case (Let (NonRec x (Var u)) (Var x)) intTy [(DefaultPat, Var x)]
  where
   u = intId User "u" 1

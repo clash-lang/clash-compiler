@@ -8,7 +8,10 @@
 
 module Clash.Tests.Rewrite.Util (tests) where
 
+import Control.Concurrent.MVar (newMVar)
 import Data.Default (def)
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Text as Text
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -26,7 +29,8 @@ import Clash.Util.Supply (newSupply)
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals
   , globalId, inScopeOf, intFunTy, intId, intLit, localId, runRewriteTest
-  , runSingleTransformation, showPprU )
+  , runSingleTransformation, showPprU
+  , defRewriteState, getBindings, setCurFun, setUniqSupply )
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
 
@@ -39,7 +43,7 @@ import Test.Clash.Rewrite
 applyShadowCheck :: Assertion
 applyShadowCheck =
   assertErrorContainsIO "accidentally creates shadowing" $
-    runSingleTransformation def def emptyInScopeSet bad (intLit 0)
+    runSingleTransformation def defRewriteState emptyInScopeSet bad (intLit 0)
  where
   bad :: NormRewrite
   bad _ _ = changed (Let (Rec [(x, intLit 1), (x, intLit 2)]) (Var x))
@@ -60,14 +64,18 @@ applyUnsignalledChange =
   sneaky _ _ = pure (intLit 1)
   -- 'applyDebug' skips its checks until the first transformation that signals
   -- a change, so pretend one already did
-  st = def { _transformCounter = 1 }
+  st = do
+    st0 <- defRewriteState
+    -- Counted under an unused transformation name
+    countersV <- newMVar (HashMap.singleton (Text.pack "previous") 1)
+    pure st0{_transformAppliedCounters = countersV}
 
 -- | Run a rewrite that replaces a term by the given variable, under the given
 -- transformation name, with the given variables in scope. The free variable
 -- check of 'Clash.Rewrite.Util.applyDebug' then checks the result.
 replaceBy :: String -> [Id] -> Term -> Id -> IO Term
 replaceBy name inScope before new = do
-  (t, _, _) <- runRewriteTest def def (runRewrite name (inScopeOf inScope) rw before)
+  (t, _, _) <- runRewriteTest def defRewriteState (runRewrite name (inScopeOf inScope) rw before)
   pure t
  where
   rw :: NormRewrite
@@ -93,14 +101,15 @@ liftBindingSubstitutesBeforeAbstracting = do
       cf = globalId User "top" 42 (intFunTy 1)
       -- r = \z -> k (r z) x
       e = Lam z (mkApps (Var k) [Left (App (Var r) (Var z)), Left (Var x)])
-      st :: RewriteState NormalizeState
-      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+      st :: IO (RewriteState NormalizeState)
+      st = defRewriteState >>= setCurFun (cf, noSrcSpan) >>= setUniqSupply supply
   ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
   case collectArgs newExpr of
     (Var rLifted, args) -> do
       assertEqual ("Arguments of the lifted function in:\n" <> showPprU newExpr)
         [Just (varUniq x)] (argUniques args)
-      case lookupVarEnv rLifted (_bindings st1) of
+      bndrs1 <- getBindings st1
+      case lookupVarEnv rLifted bndrs1 of
         Nothing -> assertFailure "Lifted function not found in global bindings"
         Just b -> assertNoFreeLocals (bindingTerm b)
     _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)

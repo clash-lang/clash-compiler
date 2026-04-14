@@ -414,6 +414,10 @@ data ClashOpts = ClashOpts
   -- /which/ input changed.
   --
   -- Command line flag: -fclash-debug-manifest-hash
+  , opt_concurrentNormalization :: Bool
+  -- ^ Toggle concurrent normalization (usually slower, faster on large designs)
+  --
+  -- Command line flag: -fclash-no-concurrent-normalization
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
 
@@ -455,6 +459,7 @@ defClashOpts
   , opt_ignoreBrokenGhcs    = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
   , opt_concurrentTopEntities = True
   , opt_debugManifestHash   = False
+  , opt_concurrentNormalization = True
   }
 
 -- | Monads that can get at the options Clash was invoked with.

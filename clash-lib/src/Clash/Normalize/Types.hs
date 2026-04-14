@@ -12,8 +12,10 @@
 
 module Clash.Normalize.Types where
 
+import Control.Concurrent.MVar    (MVar)
+import Control.Exception          (SomeException)
 import qualified Control.Lens as Lens
-import Control.Monad.State.Strict (State)
+import Control.Monad.State.Strict (StateT)
 import Data.HashMap.Strict        (HashMap)
 import Data.Map                   (Map)
 import Data.Set                   (Set)
@@ -23,31 +25,33 @@ import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
-import Clash.Driver.Types     (BindingMap)
+import Clash.Driver.Types     (Binding)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: BindingMap
+  { _normalized          :: MVar (VarEnv (MVar (Binding Term)))
   -- ^ Global binders
-  , _specialisationCache :: Map (Id,Int,Either Term Type) Id
+  , _specialisationCache ::
+      MVar (Map (Id,Int,Either Term Type) (MVar (Either SomeException (Maybe Id))))
   -- ^ Cache of previously specialized functions:
   --
   -- * Key: (name of the original function, argument position, specialized term/type)
   --
-  -- * Elem: (name of specialized function,type of specialized function)
-  , _specialisationHistory :: VarEnv Int
+  -- * Elem: MVar containing the result of a specialization attempt. An empty
+  -- MVar indicates a specialization is in progress by another thread.
+  , _specialisationHistory :: MVar (VarEnv Int)
   -- ^ Cache of how many times a function was specialized
-  , _inlineHistory   :: VarEnv (VarEnv Int)
+  , _inlineHistory   :: MVar (VarEnv (VarEnv Int))
   -- ^ Cache of function where inlining took place:
   --
   -- * Key: function where inlining took place
   --
   -- * Elem: (functions which were inlined, number of times inlined)
-  , _primitiveArgs :: Map Text (Set Int)
+  , _primitiveArgs :: MVar (Map Text (Set Int))
   -- ^ Cache for looking up constantness of blackbox arguments
-  , _recursiveComponents :: VarEnv Bool
+  , _recursiveComponents :: MVar (VarEnv Bool)
   -- ^ Map telling whether a components is recursively defined.
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
@@ -61,7 +65,7 @@ data NormalizeState
   , _constantPropagationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
   -- for "Clash.Normalize.PrimitiveReductions". See '_normalizationStrategy'.
-  , _workFreeAppCache :: HashMap Term Term
+  , _workFreeAppCache :: MVar (HashMap Term Term)
   -- ^ Cache of normalized work-free applications, i.e. global functions
   -- applied to closed arguments:
   --
@@ -69,13 +73,16 @@ data NormalizeState
   --
   -- * Elem: the normalized body of @f@ applied to the arguments
   --
+  -- The lock is not held while an application is normalized, so concurrent
+  -- threads may normalize the same application. Either result is valid.
+  --
   -- See 'Clash.Normalize.Util.normalizeWorkFreeApp'.
   }
 
 Lens.makeLenses ''NormalizeState
 
 -- | State monad that stores specialisation and inlining information
-type NormalizeMonad = State NormalizeState
+type NormalizeMonad = StateT NormalizeState IO
 
 -- | RewriteSession with extra Normalisation information
 type NormalizeSession = RewriteMonad NormalizeState

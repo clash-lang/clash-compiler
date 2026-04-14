@@ -24,7 +24,7 @@ import Clash.Driver.Types (ClashEnv (..), ClashOpts (..), debugNone)
 import Clash.Normalize.Transformations.Letrec (flattenLet, topLet)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
+import Clash.Rewrite.Types (RewriteEnv (..))
 import Clash.Rewrite.Util (runRewrite)
 
 import Clash.Util.Supply (freshId, newSupply)
@@ -32,7 +32,8 @@ import Clash.Util.Supply (freshId, newSupply)
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoShadowing, assertWellScoped, inScopeOf, intId
   , intLit, letBinders, parseToTermQQ, runRewriteTest, runSingleTransformation
-  , runSingleTransformationDef, showPprU )
+  , runSingleTransformationDef, showPprU
+  , defRewriteState, setUniqSupply )
 
 flattenLetR, topLetR :: NormRewrite
 flattenLetR = $(asRewriteQ flattenLet)
@@ -58,7 +59,7 @@ topLetFreshBinder = do
   supply <- newSupply
   let x = intId User "x" (fst (freshId supply))
   actual <-
-    runSingleTransformation envNoChecks def{_uniqSupply = supply}
+    runSingleTransformation envNoChecks (defRewriteState >>= setUniqSupply supply)
       emptyInScopeSet topLetR (Let (Rec [(x, intLit 1)]) (intLit 2))
   case actual of
     Let (Rec [(x1, l1), (r, l2)]) (Var res)
@@ -114,7 +115,7 @@ tests =
     -- merges two let-expressions, so no other code path in 'flattenLet' does).
     -- Without it, the strategy might not run to a fixed point.
     , testCase "flattenLet signals change when flattening nested letrec (#1837)" $ do
-        (_, _, hasChanged) <- runRewriteTest def def $
+        (_, _, hasChanged) <- runRewriteTest def defRewriteState $
           runRewrite "flattenLet" emptyInScopeSet flattenLetR [parseToTermQQ|
             let
               a_1, b_2 :: Int
@@ -144,7 +145,7 @@ tests =
     -- https://github.com/clash-lang/clash-compiler/pull/1103
     , testCase "flattenLet deshadows nested let-bindings when needed (#1103)" $ do
         let x = intId User "x" 9
-        actual <- runSingleTransformation def def (inScopeOf [x]) flattenLetR
+        actual <- runSingleTransformation def defRewriteState (inScopeOf [x]) flattenLetR
           [parseToTermQQ|
             let
               a_1, b_2 :: Int

@@ -29,11 +29,11 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (emptyVarEnv, lookupVarEnv, mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize (cleanupGraph)
-import Clash.Rewrite.Types (RewriteState (..))
 
 import Test.Clash.Rewrite
   ( assertWellScoped, globalId, intFunTy, mkBindingMap, nameToUnique
-  , parseToTermQQ, runRewriteTest, showPprU )
+  , parseToTermQQ, runRewriteTest, showPprU
+  , defRewriteState, setBindings )
 
 -- | A global binder, as parsed from @<nm>_G@, of type @Int -> .. -> Int@ with
 -- the given number of arguments
@@ -51,7 +51,7 @@ withTypes globals = unsafeSubstTm (mkVarEnv [(i, Var i) | i <- globals]) emptyVa
 cleanup :: [Id] -> Id -> [(Id, Term)] -> IO Term
 cleanup globals top bndrs = do
   let bm = mkBindingMap [(i, withTypes globals tm) | (i, tm) <- bndrs]
-  (bm1, _, _) <- runRewriteTest def def{_bindings = bm} (cleanupGraph top bm)
+  (bm1, _, _) <- runRewriteTest def (defRewriteState >>= setBindings bm) (cleanupGraph top bm)
   case lookupVarEnv top bm1 of
     Just b -> pure (bindingTerm b)
     Nothing -> assertFailure ("cleanupGraph dropped " <> showPprU top)

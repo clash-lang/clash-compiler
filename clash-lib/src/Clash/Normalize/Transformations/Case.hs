@@ -35,15 +35,18 @@ module Clash.Normalize.Transformations.Case
   , elimCaseBigNumInternalsWorker
   ) where
 
+import qualified Clash.Normalize.TracedMVar as MVar
+import qualified Control.Lens as Lens
+import Control.Concurrent.Lifted (myThreadId)
 import Control.Exception.Base (patError)
 import Control.Monad (when)
 import GHC.Prim.Panic (absentError)
-import qualified Control.Lens as Lens
 import qualified Control.Monad.Writer as Writer
 import qualified Data.Monoid as Monoid
 import Data.Bifunctor (second)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.List.Extra as List
 import qualified Data.Maybe as Maybe
@@ -273,8 +276,9 @@ caseCon' ctx@(TransformContext is0 _) e subj ty alts = do
       -- based on the fact on whether the argument has the potential to make
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
-        bndrs <- Lens.use bindings
-        isWorkFree workFreeBinders bndrs arg >>= \case
+        bindingsV <- Lens.use bindings
+        wf <- MVar.withMVar "bindings" bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+        case wf of
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->
             let
@@ -353,14 +357,17 @@ caseCon' ctx@(TransformContext is0 _) e subj ty alts = do
             -> caseConOn ctx1 (Literal (IntegerLiteral 0)) ty alts
           _ -> do
             opts <- Lens.view debugOpts
-            (curFunId,sp) <- Lens.use curFun
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
-            when (dbg_invariants opts && isConstant subj)
-              $ warnAboutM WarnUnmatchableConstant sp
-              $ "Unmatchable constant as case subject in " ++
-                  showPpr (varName curFunId) ++ ": " ++ showPpr subj ++
-                  "\nWHNF is: " ++ showPpr subj1
+            when (dbg_invariants opts && isConstant subj) $ do
+              curFunsV <- Lens.use curFun
+              thread <- myThreadId
+              Just (curFunId,sp) <-
+                MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
+              warnAboutM WarnUnmatchableConstant sp
+                $ "Unmatchable constant as case subject in " ++
+                    showPpr (varName curFunId) ++ ": " ++ showPpr subj ++
+                    "\nWHNF is: " ++ showPpr subj1
             -- Otherwise check whether the entire case-expression has a
             -- single alternative, and pick that one.
             caseOneAlt e

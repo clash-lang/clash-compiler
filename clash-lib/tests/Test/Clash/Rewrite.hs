@@ -42,6 +42,8 @@ import Clash.Util.Supply (Supply, freshId, newSupply)
 import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
+import Control.Concurrent (myThreadId)
+import Control.Concurrent.MVar (newMVar, readMVar)
 import qualified Control.Lens as Lens
 import Control.Monad.Trans.State.Strict (State)
 import Control.DeepSeq (NFData, force)
@@ -51,11 +53,11 @@ import Data.Default
 import Data.Maybe (fromMaybe)
 import Data.Monoid (Any (..))
 import GHC.Types.Basic (InlineSpec (NoUserInlinePrag))
+import GHC.Types.SrcLoc (SrcSpan)
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
 import Language.Haskell.Exts.Parser
   (ParseMode (..), defaultParseMode, fromParseResult, parseExpWithMode)
-import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
   (Assertion, assertBool, assertEqual, assertFailure, testCase)
@@ -115,33 +117,61 @@ testTypeTranslator _reprs _tcm ty = pure $ Just $ case C.tyView ty of
   C.FunTy {} -> Left "function types are not representable"
   _ -> Right (FilteredHWType (Signed 64) [])
 
-instance Default extra => Default (RewriteState extra) where
-  def = RewriteState
-    { _transformCounter=0
-    , _transformAppliedCounters=mempty
-    , _transformTriedCounters=mempty
-    , _bindings=emptyVarEnv
-    , _uniqSupply=unsafePerformIO newSupply
-    , _curFun=error "_curFun: NYI"
-    , _nameCounter=2
-    , _workFreeBinders=emptyVarEnv
-    , _hwTypeCache=mempty
-    , _globalHeap=error "_globalHeap: NYI"
-    , _extra=def
-    }
+-- | A fresh 'NormalizeState'. Every call creates new 'MVar's, so states are
+-- never shared between tests.
+defNormalizeState :: IO NormalizeState
+defNormalizeState =
+  NormalizeState
+    <$> newMVar emptyVarEnv
+    <*> newMVar Map.empty
+    <*> newMVar emptyVarEnv
+    <*> newMVar emptyVarEnv
+    <*> newMVar Map.empty
+    <*> newMVar emptyVarEnv
+    <*> pure normalization
+    <*> pure constantPropagation
+    <*> newMVar HashMap.empty
 
-instance Default NormalizeState where
-  def = NormalizeState
-    { _normalized=emptyVarEnv
-    , _specialisationCache=Map.empty
-    , _specialisationHistory=emptyVarEnv
-    , _inlineHistory=emptyVarEnv
-    , _primitiveArgs=Map.empty
-    , _recursiveComponents=emptyVarEnv
-    , _normalizationStrategy=normalization
-    , _constantPropagationStrategy=constantPropagation
-    , _workFreeAppCache=HashMap.empty
-    }
+-- | A fresh 'RewriteState' with the given additional state. Every call creates
+-- new 'MVar's, so states are never shared between tests.
+defRewriteStateWith :: extra -> IO (RewriteState extra)
+defRewriteStateWith ext =
+  RewriteState
+    <$> newMVar mempty
+    <*> newMVar mempty
+    <*> newMVar emptyVarEnv
+    <*> newSupply
+    <*> newMVar HashMap.empty -- curFun
+    <*> newMVar 2
+    <*> newMVar (error "_globalHeap: NYI")
+    <*> newMVar emptyVarEnv
+    <*> pure mempty
+    <*> newMVar ()
+    <*> pure ext
+
+defRewriteState :: IO (RewriteState NormalizeState)
+defRewriteState = defNormalizeState >>= defRewriteStateWith
+
+-- | Set the global binders of a 'RewriteState'
+setBindings :: BindingMap -> RewriteState extra -> IO (RewriteState extra)
+setBindings bs st = do
+  bsV <- newMVar bs
+  pure st{_bindings = bsV}
+
+-- | Set the function currently being normalized by the calling thread
+setCurFun :: (C.Id, SrcSpan) -> RewriteState extra -> IO (RewriteState extra)
+setCurFun cf st = do
+  thread <- myThreadId
+  curFunV <- newMVar (HashMap.singleton thread cf)
+  pure st{_curFun = curFunV}
+
+-- | Set the supply of unique numbers of a 'RewriteState'
+setUniqSupply :: Supply -> RewriteState extra -> IO (RewriteState extra)
+setUniqSupply supply st = pure st{_uniqSupply = supply}
+
+-- | Get the global binders of a 'RewriteState'
+getBindings :: RewriteState extra -> IO BindingMap
+getBindings = readMVar . _bindings
 
 instance Default InScopeSet where
   def = emptyInScopeSet
@@ -150,8 +180,8 @@ instance Default InScopeSet where
 runSingleTransformation
   :: RewriteEnv
   -- ^ Rewrite environment
-  -> RewriteState extra
-  -- ^ Rewrite state
+  -> IO (RewriteState extra)
+  -- ^ Rewrite state, see 'defRewriteState'
   -> InScopeSet
   -- ^ Variables in scope in transformation
   -> Rewrite extra
@@ -168,10 +198,12 @@ runSingleTransformation rwEnv rwState is trans term = do
 -- whether any transformation signalled a change.
 runRewriteTest
   :: RewriteEnv
-  -> RewriteState extra
+  -> IO (RewriteState extra)
+  -- ^ Rewrite state, see 'defRewriteState'
   -> RewriteMonad extra a
   -> IO (a, RewriteState extra, Bool)
-runRewriteTest rwEnv rwState m = do
+runRewriteTest rwEnv mkRwState m = do
+  rwState <- mkRwState
   (a, rwState1, anyChanged) <- runR m rwEnv rwState
   pure (a, rwState1, getAny anyChanged)
 
@@ -183,8 +215,8 @@ runRewriteTest rwEnv rwState m = do
 -- include a type translator, evaluator, current function, or global heap. Maps,
 -- like the primitive and tycon map, are also empty. If the transformation under
 -- test needs these definitions, you should add them manually.
-runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> IO C.Term
-runSingleTransformationDef = runSingleTransformation def def def
+runSingleTransformationDef :: Rewrite NormalizeState -> C.Term -> IO C.Term
+runSingleTransformationDef = runSingleTransformation def defRewriteState def
 
 
 parseType :: (HasCallStack, Show l) => Type l -> C.Type

@@ -15,9 +15,13 @@ module Clash.Normalize.Transformations.Cast
   , splitCastWorkWorker
   ) where
 
+import Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Normalize.TracedMVar as MVar
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
+import qualified Control.Monad as Monad (unless)
 import Control.Monad.Writer (listen)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Monoid as Monoid (Any(..))
 import GHC.Stack (HasCallStack)
 
@@ -74,14 +78,16 @@ argCastSpecWorker ctx node f (stripTicks -> Cast e' _ _)
  -- We can only push casts into global binders
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
-  bndrs <- Lens.use bindings
-  isWorkFree workFreeBinders bndrs e' >>= \case
-    True -> specializeNode
-    False -> warn >> specializeNode
+  bndrsV <- Lens.use bindings
+  wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
+  Monad.unless wf warn
+  specializeNode
  where
   specializeNode = specialize ctx node
   warn = do
-    (_,sp) <- Lens.use curFun
+    curFunsV <- Lens.use curFun
+    thread <- myThreadId
+    Just (_,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
     warnAboutM WarnCastSpecialization sp $ unwords
       [ $(curLoc) ++ "specializing a function on a non work-free"
       , "cast. Generated HDL implementation might contain duplicate work."
@@ -127,7 +133,9 @@ elimCastCastWorker _ctx node (stripTicks -> Cast e tyA tyB) tyB' tyC = do
                                    else throwError
  where
   throwError = do
-    (nm,sp) <- Lens.use curFun
+    curFunsV <- Lens.use curFun
+    thread <- myThreadId
+    Just (nm,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
     throw (ClashException sp ($(curLoc) ++ showPpr nm
             ++ ": Found 2 nested casts whose types don't line up:\n"
             ++ showPpr node)

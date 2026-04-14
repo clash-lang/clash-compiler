@@ -11,6 +11,7 @@
 
 module Clash.Tests.Normalize.Transformations.Specialize (tests) where
 
+import Control.Concurrent.MVar (readMVar)
 import qualified Control.Lens as Lens
 import Data.Default (def)
 import qualified Data.Map.Strict as Map
@@ -35,7 +36,8 @@ import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
   , intFunTy, intId, intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy
   , parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
-  , showPprU )
+  , showPprU
+  , defRewriteState, getBindings, setBindings, setCurFun, setUniqSupply )
 
 appPropR :: NormRewrite
 appPropR = $(asRewriteQ appProp)
@@ -45,7 +47,7 @@ bindConstantVarR = $(asRewriteQ bindConstantVar)
 
 -- | Run 'appProp' on a term, with the given variables in scope
 runAppProp :: [Id] -> Term -> IO Term
-runAppProp inScope = runSingleTransformation def def (inScopeOf inScope) appPropR
+runAppProp inScope = runSingleTransformation def defRewriteState (inScopeOf inScope) appPropR
 
 -- | Run 'bindConstantVar' on @let a = .. in \\x -> e@, and 'appProp' on the
 -- body of the resulting lambda
@@ -57,7 +59,7 @@ bindConstantVarThenAppProp inScope term = do
     _ -> assertFailure ("Unexpected result of bindConstantVar: " <> showPprU inlined)
  where
   -- 'bindConstantVar' looks at the function being normalized
-  st = def { _curFun = (globalId User "top" 200 intTy, noSrcSpan) }
+  st = defRewriteState >>= setCurFun (globalId User "top" 200 intTy, noSrcSpan)
 
 -- * appProp (#492, #1040, #1035, #3479)
 --
@@ -210,7 +212,7 @@ gId = globalId User "g" 11 (intFunTy 2)
 -- | Specialize @f@ on @g x y@. Returns the result, the body of the specialized
 -- function, and the final state.
 specializeF
-  :: RewriteState NormalizeState
+  :: IO (RewriteState NormalizeState)
   -> Id
   -> Id
   -> IO (Term, Maybe Term, RewriteState NormalizeState)
@@ -218,8 +220,9 @@ specializeF st x y = do
   let tm = App (Var fId) (mkApps (Var gId) [Left (Var x), Left (Var y)])
   (res, st1, _) <-
     runRewriteTest def st (runRewrite "specialize" (inScopeOf [x, y]) specialize tm)
+  bndrs1 <- getBindings st1
   let newBody = case collectArgs res of
-        (Var fSpec, _) -> bindingTerm <$> lookupVarEnv fSpec (_bindings st1)
+        (Var fSpec, _) -> bindingTerm <$> lookupVarEnv fSpec bndrs1
         _ -> Nothing
   pure (res, newBody, st1)
 
@@ -238,7 +241,8 @@ specializeLocalShadowingGlobal = do
       xLocal = intId User "x" 12
       yLocal = intId User "y" 13
       bs = mkBindingMap [fBinding, (xGlobal, intLit 1)]
-  (res, newBody, _) <- specializeF def{_bindings = bs, _uniqSupply = supply} xLocal yLocal
+  (res, newBody, _) <-
+    specializeF (defRewriteState >>= setBindings bs >>= setUniqSupply supply) xLocal yLocal
   case (collectArgs res, newBody) of
     ((Var fSpec, args), Just body) -> do
       assertBool ("Expected a new specialized function, but got:\n" <> showPprU res)
@@ -258,14 +262,14 @@ specializeLocalShadowingGlobal = do
 specializeCacheFreeVarOrder :: Assertion
 specializeCacheFreeVarOrder = do
   supply <- newSupply
-  let st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
+  let st0 = defRewriteState >>= setBindings (mkBindingMap [fBinding]) >>= setUniqSupply supply
       x123 = intId User "x" 123
       y456 = intId User "y" 456
       x456 = intId User "x" 456
       y123 = intId User "y" 123
   (res1, _, st1) <- specializeF st0 x123 y456
-  (res2, _, st2) <- specializeF st1 x456 y123
-  let cacheSize = Map.size (Lens.view (extra . specialisationCache) st2)
+  (res2, _, st2) <- specializeF (pure st1) x456 y123
+  cacheSize <- Map.size <$> readMVar (Lens.view (extra . specialisationCache) st2)
   assertEqual "Number of specializations" 1 cacheSize
   case (collectArgs res1, collectArgs res2) of
     ((Var f1, _), (Var f2, args2)) -> do
@@ -292,14 +296,15 @@ specializeDoesNotOverwriteBinders = do
       x = intId User "x" 12
       y = intId User "y" 13
       bs = mkBindingMap (fBinding : victims)
-  (res, _, st1) <- specializeF def{_bindings = bs, _uniqSupply = supply} x y
+  (res, _, st1) <- specializeF (defRewriteState >>= setBindings bs >>= setUniqSupply supply) x y
   case collectArgs res of
     (Var fSpec, _) ->
       assertBool ("Specialized function reuses a unique of an existing binder:\n" <> showPprU res)
         (varUniq fSpec `notElem` map (varUniq . fst) (fBinding : victims))
     _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU res)
+  bndrs1 <- getBindings st1
   mapM_
-    (\(v, t) -> case lookupVarEnv v (_bindings st1) of
+    (\(v, t) -> case lookupVarEnv v bndrs1 of
         Just b | showPprU (bindingId b) == showPprU v, bindingTerm b == t -> pure ()
         b -> assertFailure
           ("Binder " <> showPprU v <> " was overwritten by: " <> maybe "nothing" (showPprU . bindingId) b))

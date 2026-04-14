@@ -39,6 +39,8 @@ module Clash.Core.VarEnv
     -- ** Conversions
     -- *** Lists
   , eltsVarEnv
+  , toListVarEnv
+  , listToVarEnv
     -- * Sets of variables
   , VarSet
     -- ** Construction
@@ -263,6 +265,15 @@ eltsVarEnv
   :: VarEnv a
   -> [a]
 eltsVarEnv = UniqMap.elems
+
+toListVarEnv :: VarEnv a -> [(Unique, a)]
+toListVarEnv = UniqMap.toList
+
+listToVarEnv
+  :: Uniquable a
+  => [(a, b)]
+  -> VarEnv b
+listToVarEnv = UniqMap.fromList
 
 -- | Does the variable exist in the environment
 elemVarEnv

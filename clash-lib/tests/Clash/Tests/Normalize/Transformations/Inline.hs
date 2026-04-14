@@ -21,11 +21,11 @@ import Clash.Core.Var (Id)
 import Clash.Normalize.Transformations.Inline (inlineSmall, inlineWorkFree)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..))
 
 import Test.Clash.Rewrite
   ( assertStructurallyEqual, globalId, inScopeOf, intId, intLit, intTy
-  , mkBindingMap, runSingleTransformation )
+  , mkBindingMap, runSingleTransformation
+  , defRewriteState, setBindings )
 
 inlineSmallR, inlineWorkFreeR :: NormRewrite
 inlineSmallR = $(asRewriteQ inlineSmall)
@@ -42,7 +42,7 @@ inlineWorkFreeR = $(asRewriteQ inlineWorkFree)
 inlineLocalVar :: NormRewrite -> IO Term
 inlineLocalVar rw = runSingleTransformation def st (inScopeOf [fLocal]) rw (Var fLocal)
  where
-  st = def { _bindings = mkBindingMap [(globalId User "f" 7 intTy, intLit 42)] }
+  st = defRewriteState >>= setBindings (mkBindingMap [(globalId User "f" 7 intTy, intLit 42)])
 
 -- | See 'inlineLocalVar'
 fLocal :: Id

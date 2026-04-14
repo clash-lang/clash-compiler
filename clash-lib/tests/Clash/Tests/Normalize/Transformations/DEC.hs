@@ -25,13 +25,13 @@ import Clash.Core.Var (Id, Var (..))
 import Clash.Normalize.Transformations.DEC (disjointExpressionConsolidation)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Unique (Unique)
 import Clash.Util.Supply (Supply, newSupply)
 
 import Test.Clash.Rewrite
   ( assertNoShadowing, globalId, inScopeOf, intFunTy, intId, intLit, intTy
-  , letBinders, mkBindingMap, runSingleTransformation, showPprU )
+  , letBinders, mkBindingMap, runSingleTransformation, showPprU
+  , defRewriteState, setBindings, setUniqSupply )
 
 decR :: NormRewrite
 decR = $(asRewriteQ disjointExpressionConsolidation)
@@ -67,7 +67,10 @@ decTerm bUniq =
 runDEC :: Supply -> Term -> IO Term
 runDEC supply = runSingleTransformation def st (inScopeOf [sId, xId, yId]) decR
  where
-  st = def{_bindings = mkBindingMap [(fId, Lam a (Var a))], _uniqSupply = supply}
+  st =
+    defRewriteState
+      >>= setBindings (mkBindingMap [(fId, Lam a (Var a))])
+      >>= setUniqSupply supply
   a = intId User "a" 20
 
 -- | DEC substitutes a reference to the lifted @f_out@ for every application of
