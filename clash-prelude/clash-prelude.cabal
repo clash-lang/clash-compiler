@@ -55,6 +55,10 @@ Copyright:            Copyright © 2013-2016, University of Twente,
                                   2021-2026, QBayLogic B.V.
 Category:             Hardware
 Build-type:           Simple
+tested-with:          GHC == 9.6.7,
+                      GHC == 9.8.4,
+                      GHC == 9.10.3,
+                      GHC == 9.12.4
 
 Extra-source-files:   README.md
                       CHANGELOG.md
