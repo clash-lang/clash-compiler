@@ -261,7 +261,7 @@ let
                 prev.gcc
                 final.ghdl-llvm
                 prev.sby
-                prev.verilator
+                final.verilator
                 prev.iverilog
                 prev.yosys
                 prev.z3
@@ -282,6 +282,12 @@ let
     ];
 in
 {
+  verilator = prev.verilator.overrideAttrs (old: {
+    patches = prev.lib.unique ((old.patches or [ ]) ++ [
+      ./verilator-fix-side-effect-loss-when-slicing-astexprstmt-array-expressions.patch
+    ]);
+  });
+
   # gnat13 which si the default as of 11.03.2026 does not support aarch64
   # but ghdl-llvm works fine with gnat14 sos witch to it.
   ghdl-llvm = prev.ghdl-llvm.override { gnat = prev.gnat14; };
