@@ -49,14 +49,14 @@ RUN curl -L "https://github.com/steveicarus/iverilog/archive/${iverilog_version}
 
 FROM builder AS build-symbiyosys
 
-ARG DEPS_YOSYS="libffi-dev libreadline-dev pkg-config tcl-dev"
+ARG DEPS_YOSYS="libffi-dev libfl-dev libreadline-dev pkg-config tcl-dev"
 ARG DEPS_Z3="python3 python3-distutils"
 RUN apt-get install -y --no-install-recommends $DEPS_YOSYS $DEPS_Z3
 
-ARG yosys_version="8cfed1a97957e4c096d1e0a0304d978bcb27e116"
-RUN git clone https://github.com/YosysHQ/yosys.git yosys \
+ARG yosys_version="v0.64"
+RUN git clone --branch $yosys_version --depth 1 https://github.com/YosysHQ/yosys.git yosys \
  && cd yosys \
- && git checkout $yosys_version \
+ && git submodule update --init --recursive \
  && make PREFIX=$PREFIX -j$(nproc) \
  && make PREFIX=$PREFIX install \
  && cd .. \
@@ -85,10 +85,9 @@ RUN curl -L "https://github.com/Boolector/boolector/archive/refs/tags/$boolector
  && cd .. \
  && rm -Rf boolector-$boolector_version
 
-ARG symbiyosys_version="66a458958dc93f8e12418d425e4c31848889937b"
-RUN git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
+ARG symbiyosys_version="v0.64"
+RUN git clone --branch $symbiyosys_version --depth 1 https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys \
  && cd SymbiYosys \
- && git checkout $symbiyosys_version \
  && make PREFIX=$PREFIX -j$(nproc) install \
  && cd .. \
  && rm -Rf SymbiYosys
@@ -128,7 +127,7 @@ FROM ubuntu:$UBUNTU_VERSION AS run
 LABEL vendor="QBayLogic B.V." maintainer="devops@qbaylogic.com"
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH="$PATH:/opt/bin:/root/.ghcup/bin"
 
-ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-10 libllvm13 libreadline8 libtinfo-dev libtcl8.6 make perl python3 ssh zlib1g-dev zstd locales libtinfo5 libx11-6"
+ARG DEPS_RUNTIME="ca-certificates ccache curl g++ gcc git jq libc6-dev libgmp10-dev libgnat-10 libllvm13 libreadline8 libtinfo-dev libtcl8.6 make perl python3 python3-click ssh zlib1g-dev zstd locales libtinfo5 libx11-6"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends $DEPS_RUNTIME \
  && apt-get clean \
