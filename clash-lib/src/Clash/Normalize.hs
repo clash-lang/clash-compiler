@@ -132,7 +132,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap lock entities s
     <*> MVar.newMVar "curFun" HashMap.empty
     <*> MVar.newMVar "nameCounter" 0
     <*> MVar.newMVar "globalHeap" (mempty, 0)
-    <*> MVar.newMVar "workFreeBinders" mempty
+    <*> MVar.newIORef "workFreeBinders" mempty
     <*> pure lock
     <*> pure normState
 

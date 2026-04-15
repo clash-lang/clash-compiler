@@ -119,8 +119,8 @@ data RewriteState extra
   -- ^ Used for 'Fresh'
   , _globalHeap       :: MVar PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _workFreeBinders  :: MVar (VarEnv Bool)
-  -- ^ Map telling whether a binder's definition is work-free
+  , _workFreeBinders  :: IORef (VarEnv Bool)
+  -- ^ Map telling whether a binder's definition is work-free (IORef for lock-free CAS updates)
   , _ioLock           :: MVar ()
   -- ^ Synchronization for logging to stdout
   , _extra            :: !extra
@@ -272,7 +272,7 @@ type Rewrite extra = Transform (RewriteMonad extra)
 
 -- Moved into Clash.Rewrite.WorkFree
 {-# SPECIALIZE isWorkFree
-      :: Lens' (RewriteState extra) (MVar (VarEnv Bool))
+      :: Lens' (RewriteState extra) (IORef (VarEnv Bool))
       -> BindingMap
       -> Term
       -> RewriteMonad extra Bool

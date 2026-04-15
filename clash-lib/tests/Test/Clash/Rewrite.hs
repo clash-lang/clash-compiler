@@ -92,7 +92,7 @@ defRewriteState = do
     <*> pure (error "_curFun: NYI")
     <*> newMVar 2
     <*> newMVar (error "_globalHeap: NYI")
-    <*> newMVar emptyVarEnv
+    <*> newIORef emptyVarEnv
     <*> newMVar ()
     <*> pure normState
 
