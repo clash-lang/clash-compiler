@@ -32,6 +32,7 @@ import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
 import Control.Concurrent.MVar (newMVar)
+import Data.IORef (newIORef)
 import Data.Default
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Parser (parseExp, fromParseResult)
@@ -86,7 +87,7 @@ defRewriteState = do
 
   RewriteState
     <$> newMVar mempty
-    <*> newMVar emptyVarEnv
+    <*> newIORef emptyVarEnv
     <*> newSupply
     <*> pure (error "_curFun: NYI")
     <*> newMVar 2

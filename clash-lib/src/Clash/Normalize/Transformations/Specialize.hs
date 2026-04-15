@@ -203,7 +203,8 @@ appProp ctx@(TransformContext is _) = \case
   go is0 (Lam v e) (Left arg:args) ticks = do
     setChanged
     bndrsV <- Lens.use bindings
-    wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+    bndrs <- MVar.readIORef "bindings" bndrsV
+    wf <- isWorkFree workFreeBinders bndrs arg
 
     case isVar arg || wf of
       True ->
@@ -270,7 +271,8 @@ appProp ctx@(TransformContext is _) = \case
     let argTy = inferCoreTypeOf tcm arg
         ty1   = applyFunTy tcm ty0 argTy
     bndrsV <- Lens.use bindings
-    wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+    bndrs <- MVar.readIORef "bindings" bndrsV
+    wf <- isWorkFree workFreeBinders bndrs arg
 
     case isVar arg || wf of
       True -> do
@@ -448,7 +450,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
     Right myMVar -> do
       -- We're responsible for creating the specialization
       bndrsV <- Lens.use bindings
-      bodyMaybe <- MVar.withMVar "bindings" bndrsV $ \bndrs -> pure $ UniqMap.lookup f bndrs
+      bodyMaybe <- UniqMap.lookup f <$> MVar.readIORef "bindings" bndrsV
       case bodyMaybe of
         Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specializations on a growing argument
@@ -511,7 +513,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                       -- of functions with a Synthesize annotation, as that would
                       -- duplicate Clash compiler work. See also issue #3024
                       bndrsV2 <- Lens.use bindings
-                      gTmM <- MVar.withMVar "bindings" bndrsV2 $ \bndrs -> pure $ UniqMap.lookup g bndrs
+                      gTmM <- UniqMap.lookup g <$> MVar.readIORef "bindings" bndrsV2
                       let gBody = if g `elemVarSet` topEnts then
                                     Nothing
                                   else
@@ -577,7 +579,7 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
   bndrsV3 <- Lens.use bindings
-  existing <- MVar.withMVar "bindings" bndrsV3 $ \bndrs -> pure $ UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) bndrs
+  existing <- UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) <$> MVar.readIORef "bindings" bndrsV3
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case UniqMap.elems existing of
     [] -> do curFunsV <- Lens.use curFun
@@ -676,7 +678,7 @@ nonRepSpec ctx e@(App e1 e2)
       | (Var f,fArgs,ticks) <- collectArgsTicks app
       = do
         bndrsV <- Lens.use bindings
-        fTmM <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv f)
+        fTmM <- lookupVarEnv f <$> MVar.readIORef "bindings" bndrsV
         case fTmM of
           Just b
             | nameSort (varName (bindingId b)) == Internal

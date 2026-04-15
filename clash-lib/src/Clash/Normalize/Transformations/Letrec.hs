@@ -204,7 +204,8 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
     case binds1 of
       [(_,e1)] -> do
         bndrsV <- Lens.use bindings
-        MVar.withMVar "bindings" bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e1)
+        bndrs <- MVar.readIORef "bindings" bndrsV
+        isWorkFree workFreeBinders bndrs e1
 
       _ -> pure (error "flattenLet: unreachable")
 
@@ -248,7 +249,8 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
         case binds2 of
           [(_,e2)] -> do
             bndrsV <- Lens.use bindings
-            MVar.withMVar "bindings" bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e2)
+            bndrs <- MVar.readIORef "bindings" bndrsV
+            isWorkFree workFreeBinders bndrs e2
 
           _ -> pure (error "flattenLet: unreachable")
 

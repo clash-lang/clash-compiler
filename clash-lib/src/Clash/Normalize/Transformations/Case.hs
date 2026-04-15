@@ -239,7 +239,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
         bindingsV <- Lens.use bindings
-        wf <- MVar.withMVar "bindings" bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+        bndrs <- MVar.readIORef "bindings" bindingsV
+        wf <- isWorkFree workFreeBinders bndrs arg
         case wf of
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->

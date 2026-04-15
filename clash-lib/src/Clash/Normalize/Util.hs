@@ -183,7 +183,7 @@ isRecursiveBndr f = do
       Just isR -> pure (cg, isR)
       Nothing -> do
         bindingsV <- Lens.use bindings
-        mBind <- MVar.withMVar "bindings" bindingsV (pure . lookupVarEnv f)
+        mBind <- lookupVarEnv f <$> MVar.readIORef "bindings" bindingsV
 
         case mBind of
           Nothing -> pure (cg, False)

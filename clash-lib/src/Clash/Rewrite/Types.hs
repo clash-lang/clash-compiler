@@ -30,6 +30,7 @@ module Clash.Rewrite.Types where
 
 import           Control.Applicative                   (Alternative)
 import           Control.Concurrent                    (MVar, ThreadId)
+import           Data.IORef                            (IORef)
 import           Clash.Util.Supply                     (Supply, freshId)
 import           Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
@@ -108,8 +109,8 @@ data RewriteState extra
   = RewriteState
   { _transformCounters :: MVar (HashMap Text Word)
   -- ^ Map that tracks how many times each transformation is applied
-  , _bindings         :: MVar BindingMap
-  -- ^ Global binders
+  , _bindings         :: IORef BindingMap
+  -- ^ Global binders (IORef for lock-free reads; writes use atomicModifyIORef')
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
   , _curFun           :: MVar (HashMap ThreadId (Id,SrcSpan))

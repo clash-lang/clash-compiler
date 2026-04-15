@@ -408,7 +408,7 @@ collapseRHSNoops _ letrec@(Let letBind body) = do
   thread <- myThreadId
   Just (curFunId, _) <- MVar.withMVar "curFun" curFunsV (pure . HashMapS.lookup thread)
   bindingsV <- Lens.use bindings
-  curBinding <- MVar.withMVar "bindings" bindingsV (pure . lookupVarEnv curFunId)
+  curBinding <- lookupVarEnv curFunId <$> MVar.readIORef "bindings" bindingsV
   case curBinding of
     Just binding | isNoInline (bindingSpec binding) -> do
       -- Explicitly match on Let instead of using LetRec, because we need to
@@ -453,7 +453,7 @@ collapseRHSNoops _ letrec@(Let letBind body) = do
     isNoop :: Term -> MaybeT NormalizeSession Bool
     isNoop (Var i) = do
       bindingsV <- Lens.use bindings
-      binding <- MVar.withMVar "bindings" bindingsV (MaybeT . pure . lookupVarEnv i)
+      binding <- MaybeT $ lookupVarEnv i <$> MVar.readIORef "bindings" bindingsV
       isRecursive <- lift $ isRecursiveBndr (bindingId binding)
 
       Monad.guard $ not isRecursive
@@ -554,7 +554,7 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
 
 
     bindingsV <- Lens.use bindings
-    bodyMaybe <- MVar.withMVar "bindings" bindingsV (pure . lookupVarEnv f)
+    bodyMaybe <- lookupVarEnv f <$> MVar.readIORef "bindings" bindingsV
     nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
                                               <*> Lens.view customReprs
                                               <*> pure False
@@ -646,7 +646,7 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
     else do
       sizeLimit <- Lens.view inlineFunctionLimit
       bndrsV <- Lens.use bindings
-      mBind <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv f)
+      mBind <- lookupVarEnv f <$> MVar.readIORef "bindings" bndrsV
 
       case mBind of
         -- Don't inline recursive expressions
@@ -682,7 +682,7 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
       then return e
       else do
         bndrsV <- Lens.use bindings
-        bndr <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv f)
+        bndr <- lookupVarEnv f <$> MVar.readIORef "bindings" bndrsV
         case bndr of
           -- Don't inline recursive expressions
           Just b -> do
@@ -716,7 +716,7 @@ inlineWorkFree _ e@(Var f) = do
   if closed && f `notElemVarSet` topEnts && not untranslatable && not isSignal && gv
     then do
       bndrsV <- Lens.use bindings
-      bndr <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv f)
+      bndr <- lookupVarEnv f <$> MVar.readIORef "bindings" bndrsV
       case bndr of
         -- Don't inline recursive expressions
         Just top -> do

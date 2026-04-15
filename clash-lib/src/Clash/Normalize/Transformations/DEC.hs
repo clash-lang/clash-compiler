@@ -326,10 +326,10 @@ collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ti
 
     ghV <- Lens.use globalHeap
 
-    eval <-
-      MVar.withMVar "bindings" bndrsV $ \bndrs ->
-        MVar.withMVar "globalHeap" ghV $ \gh ->
-          pure $ (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
+    eval <- do
+      bndrs <- MVar.readIORef "bindings" bndrsV
+      MVar.withMVar "globalHeap" ghV $ \gh ->
+        pure $ (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
 
     let eTy  = inferCoreTypeOf tcm e
     untran <- isUntranslatableType False eTy

@@ -63,7 +63,8 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
   bndrsV <- Lens.use bindings
-  wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
+  bndrs <- MVar.readIORef "bindings" bndrsV
+  wf <- isWorkFree workFreeBinders bndrs e'
 
   ioLockV <- Lens.use ioLock
 

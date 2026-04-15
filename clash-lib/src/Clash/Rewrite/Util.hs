@@ -628,7 +628,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
   thread <- myThreadId
   Just (cf,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
   bindersV <- Lens.use bindings
-  binders <- MVar.takeMVar "bindings" bindersV
+  binders <- MVar.readIORef "bindings" bindersV
   newBodyNm <-
     cloneNameWithBindingMap
       binders
@@ -655,16 +655,17 @@ liftBinding (var@Id {varName = idName} ,e) = do
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
              let r = newBodyId `globalIdOccursIn` newBody
-             MVar.putMVar "bindings" bindersV $
-               UniqMap.insert
-                 newBodyNm
-                 -- We mark this function as internal so that it can be inlined
-                 -- at the very end of the normalization pipeline as part of the
-                 -- flattening pass. We don't inline right away because we are
-                 -- lifting this function at this moment for a reason!
-                 -- (termination, CSE and DEC opportunities, etc.)
-                 (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
-                 binders
+             MVar.atomicModifyIORef' "bindings" bindersV $ \bndrs ->
+               ( UniqMap.insert
+                   newBodyNm
+                   -- We mark this function as internal so that it can be inlined
+                   -- at the very end of the normalization pipeline as part of the
+                   -- flattening pass. We don't inline right away because we are
+                   -- lifting this function at this moment for a reason!
+                   -- (termination, CSE and DEC opportunities, etc.)
+                   (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
+                   bndrs
+               , () )
 
              return (var, newExpr)
     -- If it does, use the existing binder
@@ -673,7 +674,6 @@ liftBinding (var@Id {varName = idName} ,e) = do
                       (mkTyApps (Var $ bindingId b)
                                 (map VarTy boundFTVs))
                       (map Var boundFVs)
-      MVar.putMVar "bindings" bindersV binders
       return (var, newExpr')
 
 liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
@@ -693,14 +693,15 @@ mkFunction bndrNm sp inl body = do
   let bodyTy = inferCoreTypeOf tcm body
   bindersV <- Lens.use bindings
 
-  MVar.modifyMVar "bindings" bindersV $ \binders -> do
-    bodyNm <- cloneNameWithBindingMap binders bndrNm
-    let vId = mkGlobalId bodyTy bodyNm
-        r = vId `globalIdOccursIn` body
-        bind = Binding vId sp inl IsFun body r
-        binders' = UniqMap.insert vId bind binders
+  binders <- MVar.readIORef "bindings" bindersV
+  bodyNm <- cloneNameWithBindingMap binders bndrNm
+  let vId = mkGlobalId bodyTy bodyNm
+      r = vId `globalIdOccursIn` body
+      bind = Binding vId sp inl IsFun body r
 
-    bodyTy `deepseq` body `deepseq` binders' `seq` pure (binders', vId)
+  bodyTy `deepseq` body `deepseq` bind `seq`
+    MVar.atomicModifyIORef' "bindings" bindersV $ \bndrs ->
+      (UniqMap.insert vId bind bndrs, vId)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.
@@ -783,7 +784,7 @@ whnfRW isSubj (TransformContext is0 hist) e0 rw = do
   ids <- Lens.use uniqSupply
   ghV <- Lens.use globalHeap
 
-  bndrs <- MVar.takeMVar "bindings" bndrsV
+  bndrs <- MVar.readIORef "bindings" bndrsV
   gh <- MVar.takeMVar "globalHeap" ghV
 
   let (ids1,ids2) = splitSupply ids
@@ -793,7 +794,6 @@ whnfRW isSubj (TransformContext is0 hist) e0 rw = do
   case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e0 of
     (!gh1,ph,v) -> do
       let result = bindPureHeap tcm bndrs (ph `differenceVarEnv` lh) v
-      MVar.putMVar "bindings" bndrsV bndrs
       MVar.putMVar "globalHeap" ghV gh1
       result
  where

@@ -21,6 +21,11 @@ module Clash.Normalize.TracedMVar
   , modifyMVar
   , modifyMVar_
   , withMVar
+  -- * IORef wrappers
+  , IORef
+  , newIORef
+  , readIORef
+  , atomicModifyIORef'
   ) where
 
 import Control.Concurrent.MVar (MVar)
@@ -28,6 +33,8 @@ import Control.Exception.Lifted (finally)
 import Control.Monad (when)
 import Control.Monad.Base (MonadBase, liftBase)
 import Control.Monad.Trans.Control (MonadBaseControl)
+import Data.IORef (IORef)
+import qualified Data.IORef as IORef
 import GHC.Stack (HasCallStack, callStack, getCallStack, SrcLoc(..), withFrozenCallStack)
 import System.IO (hPutStrLn, stderr)
 
@@ -140,3 +147,15 @@ withMVar lockName mvar f = withFrozenCallStack $ wrap (MVar.withMVar mvar f) $ d
     traceAcquire lockName
     f a `finally` traceReturn lockName
   return result
+
+-- | Create a new IORef with an initial value
+newIORef :: MonadBase IO m => String -> a -> m (IORef a)
+newIORef _name val = liftBase (IORef.newIORef val)
+
+-- | Read an IORef (lock-free)
+readIORef :: MonadBase IO m => String -> IORef a -> m a
+readIORef _name ref = liftBase (IORef.readIORef ref)
+
+-- | Atomically modify an IORef
+atomicModifyIORef' :: MonadBase IO m => String -> IORef a -> (a -> (a, b)) -> m b
+atomicModifyIORef' _name ref f = liftBase (IORef.atomicModifyIORef' ref f)

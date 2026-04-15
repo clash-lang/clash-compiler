@@ -127,7 +127,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap lock entities s
 
   rwState <- RewriteState
     <$> MVar.newMVar "transformCounters" mempty
-    <*> MVar.newMVar "bindings" globals
+    <*> MVar.newIORef "bindings" globals
     <*> pure supply
     <*> MVar.newMVar "curFun" HashMap.empty
     <*> MVar.newMVar "nameCounter" 0
@@ -181,7 +181,7 @@ normalizeStep binds (id', s) = do
 normalize' :: Id -> NormalizeSession ((Id, Binding Term), [(Id, Supply)])
 normalize' nm = do
   bndrsV <- Lens.use bindings
-  exprM <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv nm)
+  exprM <- lookupVarEnv nm <$> MVar.readIORef "bindings" bndrsV
   let nmS = showPpr (varName nm)
   opts <- Lens.view debugOpts
   ioLockV <- Lens.use ioLock
