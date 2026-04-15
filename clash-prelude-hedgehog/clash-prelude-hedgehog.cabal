@@ -9,7 +9,7 @@ license:            BSD-2-Clause
 license-file:       LICENSE
 author:             QBayLogic B.V.
 maintainer:         devops@qbaylogic.com
-copyright:          Copyright © 2021-2025, QBayLogic B.V.
+copyright:          Copyright © 2021-2026, QBayLogic B.V.
 category:           Hardware
 build-type:         Simple
 
@@ -40,6 +40,7 @@ library
 
   exposed-modules:
     Clash.Hedgehog.Annotations.SynthesisAttributes
+    Clash.Hedgehog.Promoted.Nat
     Clash.Hedgehog.Signal
     Clash.Hedgehog.Sized.BitVector
     Clash.Hedgehog.Sized.Index
@@ -52,5 +53,6 @@ library
     ghc-typelits-knownnat,
     ghc-typelits-natnormalise,
     text                      >= 1.2.2   && < 2.2,
+    string-interpolate        ^>= 0.3,
 
     clash-prelude             == 1.9.0,
