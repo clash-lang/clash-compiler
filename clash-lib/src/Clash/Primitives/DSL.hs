@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019,      Myrtle Software Ltd.
-                     2020-2024, QBayLogic B.V.
+                     2020-2026, QBayLogic B.V.
                      2021,      Myrtle.ai
                      2022-2023, Google Inc
   License     :  BSD2 (see the file LICENSE)
@@ -95,6 +95,7 @@ module Clash.Primitives.DSL
   ) where
 
 import           Control.Lens                    hiding (Indexed, assign)
+import           Control.Exception               (throw)
 import           Control.Monad                   (forM, forM_, zipWithM)
 import           Control.Monad.State
 import           Data.Default                    (Default(def))
@@ -117,13 +118,14 @@ import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Backend                   hiding (Usage, fromBV, toBV)
 import           Clash.Backend.VHDL              (VHDLState)
 import           Clash.Explicit.Signal           (ResetPolarity(..), vResetPolarity)
-import           Clash.Netlist.BlackBox.Util     (exprToString, getDomainConf, renderElem)
+import           Clash.Netlist.BlackBox.Util
+  (exprToString, getDomainConf, lookupFunctionInstantiation, renderElem)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, Element(Component, Text), Decl(..))
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types             hiding (Component, toBit)
 import           Clash.Netlist.Util
-import           Clash.Util                      (clogBase)
+import           Clash.Util                      (ClashException(..), clogBase, curLoc)
 import qualified Data.String.Interpolate         as I
 import qualified Language.Haskell.TH             as TH
 import qualified Language.Haskell.TH.Syntax      as TH
@@ -835,6 +837,13 @@ instHO bbCtx fPos (resTy, bbResTy) argsWithTypes = do
 
   resName <- declare' (ctxName <> "_" <> "ho" <> showt fPos <> "_"
                                <> showt fSubPos <> "_res") resTy
+  -- Pick the fSubPos-th HO instantiation (if present) and reuse its usage.
+  sp <- zoom bsBackend getSrcSpan
+  case lookupFunctionInstantiation bbCtx fPos fSubPos of
+    Left err0 ->
+      throw (ClashException sp ($(curLoc) ++ "instHO: " ++ err0) Nothing)
+    Right (_, usage, _, _, _, _) ->
+      declareUseOnce usage resName
   let res = ([Text (Id.toLazyText resName)], bbResTy)
 
   -- Render HO argument to plain text
