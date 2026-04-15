@@ -153,7 +153,7 @@ apply = \s rewrite ctx expr0 -> do
   (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
 
-  Monad.when hasChanged $ do
+  Monad.when (hasChanged && isDebugging opts) $ do
     countersV <- Lens.use transformCounters
     MVar.modifyMVar_ "transformCounters" countersV (pure . force . HashMap.insertWith (const succ) (Text.pack s) 1)
 
