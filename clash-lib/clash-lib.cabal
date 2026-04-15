@@ -54,6 +54,10 @@ Copyright:            Copyright © 2012-2016, University of Twente,
                                   2017-2023, QBayLogic B.V., Google Inc.
 Category:             Hardware
 Build-type:           Simple
+tested-with:          GHC == 9.6.7,
+                      GHC == 9.8.4,
+                      GHC == 9.10.3,
+                      GHC == 9.12.4
 
 Extra-source-files:
   README.md,

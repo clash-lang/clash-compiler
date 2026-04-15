@@ -12,6 +12,10 @@ maintainer:         devops@qbaylogic.com
 copyright:          Copyright © 2021-2026, QBayLogic B.V.
 category:           Hardware
 build-type:         Simple
+tested-with:        GHC == 9.6.7,
+                    GHC == 9.8.4,
+                    GHC == 9.10.3,
+                    GHC == 9.12.4
 
 Extra-source-files: CHANGELOG.md
 
