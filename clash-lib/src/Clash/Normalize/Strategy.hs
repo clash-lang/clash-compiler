@@ -39,26 +39,26 @@ normalization =
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
-    multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
-    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
+    multPrim   = topdownFixR (apply "setupMultiResultPrim" setupMultiResultPrim)
+    anf        = topdownFixR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownFixR (apply "caseCon" caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
     rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
-    bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
+    bindConst  = topdownFixR (apply "bindConstantVar" bindConstantVar)
     -- See [Note] bottomup traversal evalConst:
     evalConst  = bottomupR (apply "evalConst" reduceConst)
-    cse        = topdownR (apply "CSE" simpleCSE)
+    cse        = topdownFixR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
-    cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
+    cleanup    = topdownFixR (apply "etaExpandSyn" etaExpandSyn) >->
                  topdownSucR (apply "inlineCleanup" inlineCleanup) !->
                  innerMost (applyMany [("caseCon"        , caseCon)
                                       ,("bindConstantVar", bindConstantVar)
                                       ,("letFlat"        , flattenLet)])
                  >-> rmDeadcode >-> letTL
-    splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
+    splitArgs  = topdownFixR (apply "separateArguments" separateArguments) !->
                  bottomupR (apply "caseCon" caseCon)
-    bindSimIO  = topdownR (apply "bindSimIO" inlineSimIO)
+    bindSimIO  = topdownFixR (apply "bindSimIO" inlineSimIO)
 
 
 constantPropagation :: NormRewrite
@@ -71,7 +71,7 @@ constantPropagation =
   dec >->
   conSpec
   where
-    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
+    etaTL              = apply "etaTL" etaExpansionTL !-> topdownFixR (apply "applicationPropagation" appProp)
     -- Use topdownFixR instead of repeatR . topdownR: when a child change
     -- exposes a new redex at the parent, topdownFixR re-applies the
     -- transformation locally (bubble-up) rather than restarting the full
@@ -86,9 +86,9 @@ constantPropagation =
     -- caseFlattening: the outer repeatR is eliminated because topdownFixR
     -- handles all cascading caseFlat opportunities through bubble-up.
     caseFlattening     = topdownFixR (apply "caseFlat" caseFlat)
-    -- dec: keep outer repeatR conservatively; topdownFixR makes each pass
-    -- cheaper by handling child->parent redex propagation locally.
-    dec                = repeatR (topdownFixR (apply "DEC" disjointExpressionConsolidation))
+    -- dec: topdownFixR already runs to a global fixpoint (equivalent to
+    -- repeatR (topdownR r)), so the outer repeatR is redundant.
+    dec                = topdownFixR (apply "DEC" disjointExpressionConsolidation)
     conSpec            = bottomupR  ((apply "appPropCS" appProp !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)

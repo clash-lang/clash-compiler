@@ -81,7 +81,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Netlist.Util (representableType)
-import Clash.Rewrite.Combinators (topdownR)
+import Clash.Rewrite.Combinators (topdownFixR)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, curFun, customReprs, extra, tcCache
   , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit)
@@ -637,7 +637,7 @@ nonRepSpec ctx e@(App e1 e2)
           Just b
             | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
-                      (topdownR appProp ctx
+                      (topdownFixR appProp ctx
                         (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
           _ -> return app
       | otherwise = return app
