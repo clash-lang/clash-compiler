@@ -16,6 +16,7 @@ module Clash.Rewrite.Combinators
   , bottomupR
   , repeatR
   , topdownR
+  , topdownFixR
   ) where
 
 import           Control.DeepSeq             (deepseq)
@@ -117,6 +118,62 @@ Then we must repeat the transformation to let it also inline y.
 topdownR :: Rewrite m -> Rewrite m
 -- See Note [topdown repeatR]
 topdownR r = repeatR r >-> allR (topdownR r)
+
+{-
+Note [topdownFixR]
+~~~~~~~~~~~~~~~~~~
+'topdownFixR r' is semantically equivalent to 'repeatR (topdownR r)' for
+single-node transformations, but avoids restarting the full traversal from the
+global root of the term.
+
+In a standard 'topdownR r' traversal, if processing a child exposes a new
+redex at the parent (e.g. after 'caseCon' fires on a child scrutinee the
+parent Case now needs 'caseLet'), an outer 'repeatR' must restart the entire
+O(N) traversal from root to catch it.
+
+'topdownFixR r' handles this locally through "bubble-up":
+  1. Apply r at the current node until local fixpoint.
+  2. Recurse into all children, noting whether any changed.
+  3. If any child changed, re-apply r at the current node (step 2 may have
+     exposed a new redex here). If r fired, go back to step 2 with the new term.
+
+Changes bubble upward naturally through the recursive 'allR go' call: when
+'go' returns from a child with changes, the parent re-checks and may itself
+change, which in turn makes the grandparent re-check, and so on up to the
+root.
+
+This reduces work from O(K * N) for K outer restarts to O(N + K * D) where D
+is the depth of the fired nodes, since only the path to the root is
+re-examined rather than the full term.
+
+Only use 'topdownFixR' for single-node transformations (transforms that fire
+or fail based solely on the current node, without recursing into subtrees).
+-}
+
+-- | Like 'topdownR' but with an integrated local fixpoint that avoids
+-- the need for an outer 'repeatR'. After children are processed, if any child
+-- changed, the transformation is re-applied at the current node to catch
+-- newly-exposed redexes. Semantically equivalent to @repeatR (topdownR r)@
+-- for single-node transformations. See Note [topdownFixR].
+topdownFixR :: Rewrite m -> Rewrite m
+topdownFixR r = go
+ where
+  go ctx term = do
+    -- Apply r at the current node until local fixpoint (same as topdownR).
+    term1 <- repeatR r ctx term
+    -- Recurse into all children, listening for any change.
+    (term2, Monoid.getAny -> childChanged) <- Writer.listen (allR go ctx term1)
+    -- If any child changed, re-apply r at this node: processing the child
+    -- may have exposed a new redex here (e.g. after caseCon fires on a child
+    -- scrutinee the parent Case may now see a caseLet opportunity).
+    if childChanged
+      then do
+        (term3, Monoid.getAny -> parentChanged) <- Writer.listen (repeatR r ctx term2)
+        if parentChanged
+          then go ctx term3   -- new term at this node: re-process its subtree
+          else return term3
+      else return term2
+{-# INLINE topdownFixR #-}
 
 -- | Apply a transformation in a bottomup traversal
 bottomupR :: Monad m => Transform m -> Transform m

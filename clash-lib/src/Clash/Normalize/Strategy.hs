@@ -72,10 +72,23 @@ constantPropagation =
   conSpec
   where
     etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
-    inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
+    -- Use topdownFixR instead of repeatR . topdownR: when a child change
+    -- exposes a new redex at the parent, topdownFixR re-applies the
+    -- transformation locally (bubble-up) rather than restarting the full
+    -- traversal from the global root. See Note [topdownFixR] in
+    -- Clash.Rewrite.Combinators.
+    --
+    -- The outer repeatR for inlineAndPropagate is still needed because
+    -- inlineNR is a full traversal whose results can only be processed by
+    -- re-running topdownFixR from the (new) root.
+    inlineAndPropagate = repeatR (topdownFixR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
-    caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
-    dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
+    -- caseFlattening: the outer repeatR is eliminated because topdownFixR
+    -- handles all cascading caseFlat opportunities through bubble-up.
+    caseFlattening     = topdownFixR (apply "caseFlat" caseFlat)
+    -- dec: keep outer repeatR conservatively; topdownFixR makes each pass
+    -- cheaper by handling child->parent redex propagation locally.
+    dec                = repeatR (topdownFixR (apply "DEC" disjointExpressionConsolidation))
     conSpec            = bottomupR  ((apply "appPropCS" appProp !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)

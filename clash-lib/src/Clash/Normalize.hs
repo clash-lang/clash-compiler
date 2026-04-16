@@ -71,7 +71,7 @@ import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
-  ((>->), (!->), bottomupR, repeatR, topdownR)
+  ((>->), (!->), bottomupR, repeatR, topdownFixR, topdownR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities, newInlineStrategy)
@@ -387,7 +387,13 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
      else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
   where
     flatten =
-      repeatR (topdownR (apply "appProp" appProp >->
+      -- topdownFixR integrates the local fixpoint: when a child change
+      -- (e.g. caseCon on a scrutinee) exposes a new redex at the parent
+      -- (e.g. caseLet), only the path to that parent is re-examined rather
+      -- than restarting the entire traversal from the root. The outer
+      -- repeatR is retained because the bottomupR flattenLet pass can
+      -- expose new top-down opportunities.
+      repeatR (topdownFixR (apply "appProp" appProp >->
                  apply "bindConstantVar" bindConstantVar >->
                  apply "caseCon" caseCon >->
                  (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
