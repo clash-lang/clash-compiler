@@ -1,0 +1,1 @@
+FIXED: Post-normalization flattening could leave a `Just` constructor as the scrutinee of a `case` after simplifying tuple projections [#3204](https://github.com/clash-lang/clash-compiler/issues/3204)
