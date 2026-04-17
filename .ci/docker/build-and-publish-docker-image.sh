@@ -13,7 +13,7 @@ elif [[ "$1" != "" ]]; then
   echo "Unrecognized argument: $1" >&2
   exit 1
 fi
-UBUNTU_VERSION=jammy-20260217
+UBUNTU_VERSION=jammy-20260410
 GHC_VERSIONS=("9.12.4"  "9.10.3"   "9.8.4"    "9.6.7")
 CABAL_VERSIONS=("3.14.2.0" "3.14.2.0" "3.14.2.0" "3.14.2.0")
 
