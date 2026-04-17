@@ -24,6 +24,8 @@ import           Text.Printf               (printf)
 import           Test.Tasty
 import           Test.Tasty.Common
 import           Test.Tasty.Clash
+import           Test.Tasty.Program      (GlobArgs(NoGlob), PrintOutput(PrintNeither),
+                                          testProgram)
 
 import           Control.Retry        (RetryAction(ConsultPolicy, DontRetry), RetryPolicyM, RetryStatus)
 import           Data.List            (isInfixOf)
@@ -113,6 +115,15 @@ setClashEnvs Cabal = do
   let seperator = case os of { "mingw32" -> ";"; _ -> ":" }
   setEnv "PATH" (binDir <> seperator <> path)
   setCabalPackagePaths
+
+checkedLiteralPluginFlags :: [String]
+checkedLiteralPluginFlags =
+  [ "-package", "checked-literals"
+  , "-fplugin=CheckedLiterals"
+  , "-fplugin=GHC.TypeLits.KnownNat.Solver"
+  , "-fplugin=GHC.TypeLits.Normalise"
+  , "-fplugin=GHC.TypeLits.Extra.Solver"
+  ]
 
 clashTestRoot
   :: [[TestName] -> TestTree]
@@ -223,6 +234,32 @@ runClashTest = defaultMain
           , expectClashFail=Just (def, Text.pack [I.i|
             Can't translate data types with unconstrained existentials|])
           }
+        ]
+      , clashTestGroup "Numbers"
+        [ runTest "CheckedLiteralsUnsignedFail" def
+            { hdlTargets = [VHDL]
+            , hdlSim = []
+            , clashFlags = checkedLiteralPluginFlags
+            , expectClashFail = Just (def, "Unsigned 2 has bounds: [0 .. 3].")
+            }
+        , runTest "CheckedLiteralsIndexFail" def
+            { hdlTargets = [VHDL]
+            , hdlSim = []
+            , clashFlags = checkedLiteralPluginFlags
+            , expectClashFail = Just (def, "Index 4 has bounds: [0 .. 3].")
+            }
+        , runTest "CheckedLiteralsFixedFail" def
+            { hdlTargets = [VHDL]
+            , hdlSim = []
+            , clashFlags = checkedLiteralPluginFlags
+            , expectClashFail = Just (def, "The fractional part needs at least 2 bit(s).")
+            }
+        , runTest "CheckedLiteralsWrappingFail" def
+            { hdlTargets = [VHDL]
+            , hdlSim = []
+            , clashFlags = checkedLiteralPluginFlags
+            , expectClashFail = Just (def, "Unsigned 2 has bounds: [0 .. 3].")
+            }
         ]
       , clashTestGroup "PrimitiveGuards"
         [ runTest "DontTranslate" def{
@@ -708,6 +745,20 @@ runClashTest = defaultMain
                                                               , "bitsTB2"
                                                               , "bitsTB3"
                                                               ]}
+        , const $ testProgram
+            "CheckedLiteralsWork"
+            "ghc"
+            ( [ "-fforce-recomp"
+              , "-fno-code"
+              , "-i./tests/shouldwork/Numbers"
+              ]
+              <> checkedLiteralPluginFlags
+              <> [ "./tests/shouldwork/Numbers/CheckedLiteralsWork.hs" ]
+            )
+            NoGlob
+            PrintNeither
+            False
+            Nothing
         ,
           -- vivado segfaults
           runTest "Bounds" def { hdlSim=hdlSim def \\ [Vivado] }

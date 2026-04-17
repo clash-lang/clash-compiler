@@ -6,6 +6,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Clash.Num.Erroring
   ( Erroring
@@ -20,6 +21,14 @@ import Data.Coerce (coerce)
 import Data.Functor.Compose (Compose(..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral
+  , CheckedPositiveRationalLiteral
+  )
 import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
@@ -56,6 +65,22 @@ newtype Erroring a =
 {-# INLINE toErroring #-}
 toErroring :: (SaturatingNum a) => a -> Erroring a
 toErroring = Erroring
+
+instance
+  (CheckedPositiveIntegerLiteral lit a) =>
+  CheckedPositiveIntegerLiteral lit (Erroring a)
+
+instance
+  (CheckedNegativeIntegerLiteral lit a) =>
+  CheckedNegativeIntegerLiteral lit (Erroring a)
+
+instance
+  (CheckedPositiveRationalLiteral str num den a) =>
+  CheckedPositiveRationalLiteral str num den (Erroring a)
+
+instance
+  (CheckedNegativeRationalLiteral str num den a) =>
+  CheckedNegativeRationalLiteral str num den (Erroring a)
 
 instance (Resize f) => Resize (Compose Erroring f) where
   {-# INLINE resize #-}
