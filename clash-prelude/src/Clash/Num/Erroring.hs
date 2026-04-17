@@ -1,5 +1,5 @@
-{-
-Copyright   : (C) 2021, QBayLogic B.V.
+{-|
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -110,6 +110,22 @@ instance (Bounded a, Ord a, SaturatingNum a) => Num (Erroring a) where
   -- is not in range (typically wrapping). It would be better if this also
   -- threw an XException, but in a way which remained synthesizable.
   fromInteger = coerce (fromInteger @a)
+
+instance (Ord a, SaturatingNum a) => SaturatingNum (Erroring a) where
+  {-# INLINE satAdd #-}
+  satAdd mode (Erroring a) (Erroring b) = Erroring $ satAdd mode a b
+
+  {-# INLINE satSub #-}
+  satSub mode (Erroring a) (Erroring b) = Erroring $ satSub mode a b
+
+  {-# INLINE satMul #-}
+  satMul mode (Erroring a) (Erroring b) = Erroring $ satMul mode a b
+
+  {-# INLINE satSucc #-}
+  satSucc mode (Erroring a) = Erroring $ satSucc mode a
+
+  {-# INLINE satPred #-}
+  satPred mode (Erroring a) = Erroring $ satPred mode a
 
 instance (Enum a, SaturatingNum a) => Enum (Erroring a) where
   {-# INLINE succ #-}
