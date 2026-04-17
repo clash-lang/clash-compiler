@@ -21,8 +21,8 @@ module Clash.Normalize.Transformations.Reduce
 import qualified Control.Lens as Lens
 import Control.Monad.Trans.Except (runExcept)
 import qualified Data.Either as Either
-import qualified Data.List as List
 import qualified Data.List.Extra as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Maybe (fromMaybe, listToMaybe)
 import GHC.Stack (HasCallStack)
@@ -63,17 +63,28 @@ reduceBinders
   -> [LetBinding]
   -> [LetBinding]
   -> NormalizeSession (Subst, [LetBinding])
-reduceBinders !subst processed [] = return (subst,processed)
-reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
-  | (_,_,ticks) <- collectArgsTicks e
-  , NoDeDup `notElem` ticks
-  , Just (i1,_) <- List.find ((== e) . snd) processed
-  = do
-    let subst1 = extendIdSubst subst i (Var i1)
-    setChanged
-    reduceBinders subst1 processed rest
-  | otherwise
-  = reduceBinders subst ((i,e):processed) rest
+reduceBinders !subst processed0 binders0 =
+  go subst (indexProcessed processed0) processed0 binders0
+ where
+  go !substN _seen processed [] =
+    return (substN, processed)
+  go !substN seen processed ((i,substTm "reduceBinders" substN -> e):rest)
+    | (_,_,ticks) <- collectArgsTicks e
+    , NoDeDup `notElem` ticks
+    , Just (i1,_) <- Map.lookup e seen
+    = do
+      let subst1 = extendIdSubst substN i (Var i1)
+      setChanged
+      go subst1 seen processed rest
+    | otherwise
+    = let bndr = (i,e)
+          seen1 = Map.insert e bndr seen
+       in go substN seen1 (bndr:processed) rest
+
+  -- 'processed' keeps the most recently kept binder at the head. Preserve that
+  -- choice when seeding the index by letting earlier list elements win.
+  indexProcessed =
+    foldr (\bndr@(_, e) -> Map.insert e bndr) Map.empty
 {-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite

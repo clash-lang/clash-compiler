@@ -14,6 +14,8 @@
 
 module Clash.Normalize.Util
  ( ConstantSpecInfo(..)
+ , LetSummary(..)
+ , TermFeatures(..)
  , isConstantArg
  , shouldReduce
  , alreadyInlined
@@ -25,6 +27,9 @@ module Clash.Normalize.Util
  , isCheapFunction
  , isNonRecursiveGlobalVar
  , constantSpecInfo
+ , summarizeLet
+ , termFeaturesOf
+ , isWorkFreeCached
  , normalizeTopLvlBndr
  , rewriteExpr
  , mkInlineTick
@@ -50,7 +55,7 @@ import           GHC.Builtin.Names       (eqTyConKey)
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars
-  (globalIds, globalIdOccursIn)
+  (countFreeOccurances, globalIds, globalIdOccursIn)
 import           Clash.Core.HasFreeVars  (isClosed)
 import           Clash.Core.HasType
 import           Clash.Core.Name         (Name(nameOcc,nameUniq))
@@ -78,7 +83,8 @@ import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
-   tcCache, primitives)
+   tcCache, primitives, workFreeBinders)
+import           Clash.Rewrite.WorkFree  (isWorkFree)
 import           Clash.Rewrite.Util
   (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
@@ -397,6 +403,81 @@ isCheapFunction tm = case classifyFunction tm of
     | _primitive <= 1 -> _function  <= 0 && _selection <= 0
     | _selection <= 1 -> _function  <= 0 && _primitive <= 0
     | otherwise       -> False
+
+termFeaturesOf :: Term -> NormalizeSession TermFeatures
+termFeaturesOf term = do
+  cache <- Lens.use (extra.termFeaturesCache)
+  case Map.lookup term cache of
+    Just feats -> pure feats
+    Nothing -> do
+      let feats = go term
+      extra.termFeaturesCache %= Map.insert term feats
+      pure feats
+ where
+  emptyFeatures = TermFeatures False False False False
+
+  mergeFeatures l r =
+    TermFeatures
+      { tfHasApp = tfHasApp l || tfHasApp r
+      , tfHasCase = tfHasCase l || tfHasCase r
+      , tfHasMultiAltCase = tfHasMultiAltCase l || tfHasMultiAltCase r
+      , tfHasLet = tfHasLet l || tfHasLet r
+      }
+
+  go (Lam _ e) = go e
+  go (TyLam _ e) = go e
+  go (App l r) =
+    let feats = mergeFeatures (go l) (go r)
+     in feats {tfHasApp = True}
+  go (TyApp e _) = go e
+  go (Cast e _ _) = go e
+  go (Let bind body) =
+    let bindFeats = case bind of
+          NonRec _ rhs ->
+            go rhs
+          Rec xs ->
+            List.foldl' (\acc (_, rhs) -> mergeFeatures acc (go rhs)) emptyFeatures xs
+        bodyFeats = go body
+        feats = mergeFeatures bindFeats bodyFeats
+     in feats {tfHasLet = True}
+  go (Case scrut _ alts) =
+    let altFeats =
+          List.foldl' (\acc (_, altE) -> mergeFeatures acc (go altE)) emptyFeatures alts
+        feats = mergeFeatures (go scrut) altFeats
+     in feats
+          { tfHasCase = True
+          , tfHasMultiAltCase = tfHasMultiAltCase feats || length alts > 1
+          }
+  go (Tick _ e) = go e
+  go _ = emptyFeatures
+
+summarizeLet :: Term -> [LetBinding] -> Term -> NormalizeSession LetSummary
+summarizeLet _expr binds body = do
+  let (binderOccs, allBinderOccs) =
+        List.foldl'
+          (\(perBinder, allOccs) (bndr, rhs) ->
+            let occs = countFreeOccurances rhs
+             in ( extendVarEnv bndr occs perBinder
+                , unionVarEnvWith (+) allOccs occs
+                ))
+          (emptyVarEnv, emptyVarEnv)
+          binds
+  pure
+    LetSummary
+      { lsBinderOccs = binderOccs
+      , lsAllBinderOccs = allBinderOccs
+      , lsBodyOccs = countFreeOccurances body
+      }
+
+isWorkFreeCached :: BindingMap -> Term -> NormalizeSession Bool
+isWorkFreeCached bndrs term = do
+  cache <- Lens.use (extra.termWorkFreeCache)
+  case Map.lookup term cache of
+    Just isWf -> pure isWf
+    Nothing -> do
+      isWf <- isWorkFree workFreeBinders bndrs term
+      extra.termWorkFreeCache %= Map.insert term isWf
+      pure isWf
 
 normalizeTopLvlBndr
   :: Bool

@@ -139,6 +139,9 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   emptyVarEnv
                   Map.empty
                   rcsMap
+                  Map.empty
+                  Map.empty
+                  Map.empty
 
 normalize
   :: [Id]

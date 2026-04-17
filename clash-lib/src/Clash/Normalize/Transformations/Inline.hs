@@ -54,7 +54,7 @@ import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV), 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars
-  (countFreeOccurances, freeLocalIds)
+  (freeLocalIds)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
 import Clash.Core.Name (Name(..), NameSort(..))
@@ -70,10 +70,10 @@ import Clash.Core.Type
 import Clash.Core.Util (isSignalType, primUCo)
 import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
 import Clash.Core.VarEnv
-  ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarEnv, elemVarSet
+  ( InScopeSet, VarEnv, elemUniqInScopeSet, elemVarEnv, elemVarSet
   , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
   , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
-  , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
+  , notElemVarEnv, notElemVarSet, unionVarEnv)
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding(..))
 import Clash.Netlist.Util (representableType)
@@ -88,10 +88,10 @@ import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
   , isUntranslatable, isUntranslatableType, isVoidWrapper, zoomExtra)
 import Clash.Rewrite.WorkFree (isWorkFreeIsh)
-import Clash.Normalize.Types ( NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (LetSummary(..), NormRewrite, NormalizeSession)
 import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
-  , normalizeTopLvlBndr)
+  , normalizeTopLvlBndr, summarizeLet)
 import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
@@ -295,17 +295,23 @@ inlineCast = inlineBinders test
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: HasCallStack => NormRewrite
-inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
+inlineCleanup (TransformContext is0 _) expr@(Letrec binds body) = do
   prims <- Lens.view primitives
+  LetSummary
+    { lsBinderOccs = binderOccs
+    , lsAllBinderOccs = allOccs
+    , lsBodyOccs = bodyOccs
+    } <- summarizeLet expr binds body
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
   -- we would lose sharing.
   let is1       = extendInScopeSetList is0 (map fst binds)
-      bindsFvs  = map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-      allOccs   = List.foldl' (unionVarEnvWith (+)) emptyVarEnv
-                $ map (snd.snd) bindsFvs
-      bodyFVs   = Lens.foldMapOf freeLocalIds unitVarSet body
-      (il,keep) = List.partition (isInteresting allOccs prims bodyFVs)
+      lookupOccs bndr =
+        Maybe.fromMaybe
+          (error $ "inlineCleanup: missing cached occurrence count for " ++ showPpr bndr)
+          (lookupVarEnv bndr binderOccs)
+      bindsFvs  = map (\(v,e) -> (v,((v,e), lookupOccs v))) binds
+      (il,keep) = List.partition (isInteresting allOccs prims bodyOccs)
                                  bindsFvs
       keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
                 $ map snd keep
@@ -318,7 +324,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
     isInteresting
       :: VarEnv Int
       -> CompiledPrimMap
-      -> VarSet
+      -> VarEnv Int
       -> (Id,((Id, Term), VarEnv Int))
       -> Bool
     isInteresting allOccs prims bodyFVs (id_,((_,(fst.collectArgs) -> tm),_))
@@ -338,7 +344,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       --
       -- In that case, there's no harm in inlining f_arg.
       | nameSort (varName id_) /= User
-      , id_ `notElemVarSet` bodyFVs
+      , id_ `notElemVarEnv` bodyFVs
       = case tm of
           Prim pInfo
             | let nm = primName pInfo
@@ -356,7 +362,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
             , nameOcc nm == Text.showt ''SimIO.SimIO
             -> True
           _ -> False
-      | id_ `notElemVarSet` bodyFVs
+      | id_ `notElemVarEnv` bodyFVs
       = case tm of
           Prim pInfo
             | primName pInfo `elem`
@@ -570,11 +576,10 @@ inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
-inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
-    inlineOrLiftBinders nonRepTest inlineTest ctx eLet
+inlineOrLiftNonRep ctx eLet@(Letrec binds body) = do
+    LetSummary{lsBodyOccs = bodyFreeOccs} <- summarizeLet eLet binds body
+    inlineOrLiftBinders nonRepTest (inlineTest bodyFreeOccs) ctx eLet
   where
-    bodyFreeOccs = countFreeOccurances body
-
     nonRepTest :: (Id, Term) -> NormalizeSession Bool
     nonRepTest (Id {varType = ty}, _)
       = not <$> (representableType <$> Lens.view typeTranslator
@@ -584,8 +589,8 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
                                    <*> pure ty)
     nonRepTest _ = return False
 
-    inlineTest :: Term -> (Id, Term) -> Bool
-    inlineTest e (id_, e') =
+    inlineTest :: VarEnv Int -> Term -> (Id, Term) -> Bool
+    inlineTest bodyFreeOccs e (id_, e') =
       -- We do __NOT__ inline:
       not $ or
         [ -- 1. recursive let-binders

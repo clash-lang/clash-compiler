@@ -25,6 +25,22 @@ import Clash.Core.VarEnv      (VarEnv)
 import Clash.Driver.Types     (BindingMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
+data TermFeatures
+  = TermFeatures
+  { tfHasApp :: !Bool
+  , tfHasCase :: !Bool
+  , tfHasMultiAltCase :: !Bool
+  , tfHasLet :: !Bool
+  }
+  deriving (Eq, Show)
+
+data LetSummary
+  = LetSummary
+  { lsBinderOccs :: VarEnv (VarEnv Int)
+  , lsAllBinderOccs :: VarEnv Int
+  , lsBodyOccs :: VarEnv Int
+  }
+
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
@@ -51,6 +67,12 @@ data NormalizeState
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
+  , _termFeaturesCache :: Map Term TermFeatures
+  -- ^ Cache of cheap syntactic features of terms, used to skip whole passes.
+  , _letSummaryCache :: Map Term LetSummary
+  -- ^ Cache of per-let-group occurrence summaries.
+  , _termWorkFreeCache :: Map Term Bool
+  -- ^ Cache for work-free checks on local terms.
   }
 
 Lens.makeLenses ''NormalizeState

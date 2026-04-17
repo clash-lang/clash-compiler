@@ -44,7 +44,6 @@ import Clash.Sized.Vector as Vec (Vec(Cons), splitAt)
 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
-import Clash.Core.FreeVars (freeLocalIds)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
@@ -61,21 +60,20 @@ import Clash.Core.Type
 import Clash.Core.Util (inverseTopSortLetBindings, mkVec, tyNatSize)
 import Clash.Core.Var (isGlobalId)
 import Clash.Core.VarEnv
-  ( InScopeSet, elemInScopeSet, emptyVarEnv, extendInScopeSetList, lookupVarEnv
-  , unionVarEnvWith, unitVarEnv, mkVarSet)
+  ( InScopeSet, elemInScopeSet, extendInScopeSetList, lookupVarEnv, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (LetSummary(..), NormRewrite, NormalizeSession)
+import Clash.Normalize.Util (isWorkFreeCached, summarizeLet)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
+  (TransformContext(..), bindings, curFun, tcCache, primitives)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders, setChanged)
-import Clash.Rewrite.WorkFree
 
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in
@@ -190,16 +188,13 @@ flattenLet ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
     _ -> error "internal error"
 
 flattenLet (TransformContext is0 _) (Letrec binds body) = do
+  LetSummary{lsBodyOccs = bodyOccs} <- summarizeLet (Letrec binds body) binds body
   let is1 = extendInScopeSetList is0 (map fst binds)
-      bodyOccs = Lens.foldMapByOf
-                   freeLocalIds (unionVarEnvWith (+))
-                   emptyVarEnv (`unitVarEnv` (1 :: Int))
-                   body
   (is2,binds1) <- second concat <$> List.mapAccumLM go is1 binds
   bndrs <- Lens.use bindings
   e1WorkFree <-
     case binds1 of
-      [(_,e1)] -> isWorkFree workFreeBinders bndrs e1
+      [(_,e1)] -> isWorkFreeCached bndrs e1
       _ -> pure (error "flattenLet: unreachable")
   case binds1 of
     -- inline binders into the body when there's only a single binder, and only
@@ -231,15 +226,13 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                 _ -> error "internal error"
             else
               (binds1,body1,extendInScopeSetList isN bs1)
-      let bodyOccs = Lens.foldMapByOf
-                       freeLocalIds (unionVarEnvWith (+))
-                       emptyVarEnv (`unitVarEnv` (1 :: Int))
-                       body2
+      LetSummary{lsBodyOccs = bodyOccs} <- summarizeLet (Letrec binds2 body2) binds2 body2
+      let
           (srcTicks,nmTicks) = partitionTicks ticks
       bndrs <- Lens.use bindings
       e2WorkFree <-
         case binds2 of
-          [(_,e2)] -> isWorkFree workFreeBinders bndrs e2
+          [(_,e2)] -> isWorkFreeCached bndrs e2
           _ -> pure (error "flattenLet: unreachable")
       -- Distribute the name ticks of the let-expression over all the bindings
       (isN1,) . map (second (`mkTicks` nmTicks)) <$> case binds2 of

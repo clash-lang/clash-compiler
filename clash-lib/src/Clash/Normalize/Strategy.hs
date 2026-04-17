@@ -13,6 +13,7 @@ module Clash.Normalize.Strategy where
 
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types
+import Clash.Normalize.Util (termFeaturesOf)
 import Clash.Rewrite.Combinators
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util
@@ -45,20 +46,25 @@ normalization =
     recLetRec  = apply "recToLetRec" recToLetRec
     rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
-    bindConst  = topdownFixR (apply "bindConstantVar" bindConstantVar)
+    bindConst  = whenFeatures tfHasLet $
+                 topdownFixR (apply "bindConstantVar" bindConstantVar)
     -- See [Note] bottomup traversal evalConst:
     evalConst  = bottomupR (apply "evalConst" reduceConst)
-    cse        = topdownFixR (apply "CSE" simpleCSE)
-    xOptim     = bottomupR (apply "xOptimize" xOptimize)
+    cse        = whenFeatures tfHasLet $
+                 topdownFixR (apply "CSE" simpleCSE)
+    xOptim     = whenFeatures tfHasCase $
+                 bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownFixR (apply "etaExpandSyn" etaExpandSyn) >->
-                 topdownSucR (apply "inlineCleanup" inlineCleanup) !->
-                 innerMost (applyMany [("caseCon"        , caseCon)
-                                      ,("bindConstantVar", bindConstantVar)
-                                      ,("letFlat"        , flattenLet)])
+                 whenFeatures tfHasLet
+                   (topdownSucR (apply "inlineCleanup" inlineCleanup) !->
+                    innerMost (applyMany [("caseCon"        , caseCon)
+                                         ,("bindConstantVar", bindConstantVar)
+                                         ,("letFlat"        , flattenLet)]))
                  >-> rmDeadcode >-> letTL
     splitArgs  = topdownFixR (apply "separateArguments" separateArguments) !->
                  bottomupR (apply "caseCon" caseCon)
-    bindSimIO  = topdownFixR (apply "bindSimIO" inlineSimIO)
+    bindSimIO  = whenFeatures tfHasLet $
+                 topdownFixR (apply "bindSimIO" inlineSimIO)
 
 
 constantPropagation :: NormRewrite
@@ -85,10 +91,12 @@ constantPropagation =
     spec               = bottomupR (applyMany specTransformations)
     -- caseFlattening: the outer repeatR is eliminated because topdownFixR
     -- handles all cascading caseFlat opportunities through bubble-up.
-    caseFlattening     = topdownFixR (apply "caseFlat" caseFlat)
+    caseFlattening     = whenFeatures tfHasMultiAltCase $
+                         topdownFixR (apply "caseFlat" caseFlat)
     -- dec: topdownFixR already runs to a global fixpoint (equivalent to
     -- repeatR (topdownR r)), so the outer repeatR is redundant.
-    dec                = topdownFixR (apply "DEC" disjointExpressionConsolidation)
+    dec                = whenFeatures tfHasApp $
+                         topdownFixR (apply "DEC" disjointExpressionConsolidation)
     conSpec            = bottomupR  ((apply "appPropCS" appProp !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)
@@ -331,6 +339,14 @@ topdownSucR r = r >-! (allR (topdownSucR r))
 innerMost :: Rewrite extra -> Rewrite extra
 innerMost = let go r = bottomupR (r !-> innerMost r) in go
 {-# INLINE innerMost #-}
+
+whenFeatures :: (TermFeatures -> Bool) -> NormRewrite -> NormRewrite
+whenFeatures predicate rw ctx term = do
+  features <- termFeaturesOf term
+  if predicate features
+    then rw ctx term
+    else pure term
+{-# INLINE whenFeatures #-}
 
 applyMany :: [(String,Rewrite extra)] -> Rewrite extra
 applyMany = foldr1 (>->) . map (uncurry apply)
