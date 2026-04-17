@@ -107,6 +107,26 @@ jobs:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#clashPackages-${{matrix.ghc}}.${{matrix.package}} | cachix push clash-lang
 
+  testsuite:
+    name: Run Testsuite (${{matrix.ghc}})
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: [
+          ghc9124,
+          ghc9103,
+          ghc984,
+          ghc967
+        ]
+
+    needs: packages_other
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run clash-testsuite
+        run: nix run -L .#clashPackages-${{matrix.ghc}}.clash-testsuite
+
   developer_shells:
     name: Build Developer Shells (${{matrix.ghc}})
     runs-on: self-hosted
