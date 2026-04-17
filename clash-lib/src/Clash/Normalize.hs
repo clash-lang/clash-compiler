@@ -400,8 +400,8 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       -- has been done to avoid #3036.
       topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
       topdownSucR (apply "inlineCleanup" inlineCleanup) >->
-      topdownSucR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159
-      bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+      bottomupR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159
+      bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185 / #3204
       topdownSucR (apply "topLet" topLet)
 
     goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
