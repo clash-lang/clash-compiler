@@ -25,6 +25,7 @@ import Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
 import qualified Control.Lens as Lens
 import Control.Monad.Fix                     (MonadFix)
+import Control.Monad.IO.Class               (MonadIO)
 import Control.Monad.State.Strict            (State)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
@@ -36,6 +37,7 @@ import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import Data.Text                             (Text)
+import Data.Word                             (Word64)
 import GHC.Generics
 
 import Clash.Core.PartialEval as PE          (Evaluator)
@@ -70,6 +72,13 @@ data RewriteStep
   -- ^ Term after `apply`
   } deriving (Show, Generic, NFData, Binary)
 
+data TransformStats
+  = TransformStats
+  { tsVisited :: {-# UNPACK #-} !Word
+  , tsChanged :: {-# UNPACK #-} !Word
+  , tsTimeNs :: {-# UNPACK #-} !Word64
+  } deriving (Show, Generic, NFData)
+
 -- | State of a rewriting session
 data RewriteState extra
   = RewriteState
@@ -79,6 +88,8 @@ data RewriteState extra
   -- ^ Total number of applied transformations
   , _transformCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation is applied
+  , _transformStats :: HashMap Text TransformStats
+  -- ^ Map that tracks visits, successful rewrites, and time spent per transformation
   , _bindings         :: !BindingMap
   -- ^ Global binders
   , _uniqSupply       :: !Supply
@@ -169,6 +180,7 @@ newtype RewriteMonad extra a = R
     , Functor
     , Monad
     , MonadFix
+    , MonadIO
     , MonadState (RewriteState extra)
     , MonadWriter Any
     , MonadReader RewriteEnv

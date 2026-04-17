@@ -154,9 +154,10 @@ data DebugOpts = DebugOpts
   --
   -- Command line flag: -fclash-debug-transformations t1[,t2...]
   , dbg_countTransformations :: Bool
-  -- ^ Count how many times transformations are applied and provide a summary
-  -- at the end of normalization. This includes all transformations, not just
-  -- those in 'dbg_transformations'.
+  -- ^ Count how many times transformations are visited and applied, and
+  -- collect timing information to provide a summary at the end of
+  -- normalization. This includes all transformations, not just those in
+  -- 'dbg_transformations'.
   --
   -- Command line flag: -fclash-debug-count-transformations
   , dbg_transformationsFrom :: Maybe Word

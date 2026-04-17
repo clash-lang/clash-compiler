@@ -78,6 +78,7 @@ instance Default extra => Default (RewriteState extra) where
   def = RewriteState
     { _transformCounter=0
     , _transformCounters=mempty
+    , _transformStats=mempty
     , _bindings=emptyVarEnv
     , _uniqSupply=unsafePerformIO newSupply
     , _curFun=error "_curFun: NYI"

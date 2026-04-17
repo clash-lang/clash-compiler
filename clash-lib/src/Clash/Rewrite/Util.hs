@@ -29,6 +29,7 @@ import           Control.Exception           (throw)
 import           Control.Lens ((%=), (+=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
+import           Control.Monad.IO.Class      (liftIO)
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import qualified Control.Monad.Writer        as Writer
@@ -42,10 +43,13 @@ import qualified Data.List.Extra             as List
 import           Data.List.Extra             (partitionM)
 import           Data.Maybe
 import qualified Data.Monoid                 as Monoid
+import           Data.Ord                    (Down(..))
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
+import           Data.Word                   (Word64)
+import           GHC.Clock                   (getMonotonicTimeNSec)
 import           System.IO.Unsafe            (unsafePerformIO)
 import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
@@ -142,11 +146,21 @@ apply
   -> Rewrite extra
 apply = \s rewrite ctx expr0 -> do
   opts <- Lens.view debugOpts
+  let collectStats = dbg_countTransformations opts
   traceIf (hasDebugInfo TryName s opts) ("Trying: " <> s) (pure ())
 
+  startNs <- if collectStats then liftIO getMonotonicTimeNSec else pure 0
   (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
+  endNs <- if collectStats then liftIO getMonotonicTimeNSec else pure 0
   let hasChanged = Monoid.getAny anyChanged
+      elapsedNs = endNs - startNs
   Monad.when hasChanged (transformCounter += 1)
+  Monad.when collectStats $ do
+    let name = Text.pack s
+        stat = TransformStats 1 (if hasChanged then 1 else 0) elapsedNs
+    transformStats %= HashMap.insertWith mergeTransformStats name stat
+    Monad.when hasChanged $
+      transformCounters %= HashMap.insertWith (const succ) name 1
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
   let rewriteHistFile = dbg_historyFile opts
@@ -196,9 +210,6 @@ applyDebug ctx name exprOld hasChanged exprNew = do
  where
   go opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
     nTrans <- pred <$> Lens.use transformCounter
-
-    Monad.when (dbg_countTransformations opts && hasChanged) $ do
-      transformCounters %= HashMap.insertWith (const succ) (Text.pack name) 1
 
     Monad.when (dbg_invariants opts && hasChanged) $ do
       tcm                  <- Lens.view tcCache
@@ -295,7 +306,9 @@ runRewriteSession :: RewriteEnv
 runRewriteSession r s m = do
   (a, s', _) <- runR m r s
   traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
-    ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
+    ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))
+      ++ "\nClash: Transformation stats:\n"
+      ++ Text.unpack (showTransformStats (s' ^. transformStats))) $
     traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
       ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
       pure a
@@ -305,6 +318,58 @@ runRewriteSession r s m = do
         . map (\(nm,cnt) -> nm <> ": " <> Text.pack (show cnt))
         . sortOn snd
         . HashMap.toList
+
+    showTransformStats =
+      \statsMap ->
+        let total = foldl' mergeTransformStats (TransformStats 0 0 0) (HashMap.elems statsMap)
+            entries =
+              map showTransformStat
+                (List.sortOn (Down . tsTimeNs . snd) (HashMap.toList statsMap))
+         in Text.unlines (showTransformStat ("TOTAL", total) : entries)
+
+    showTransformStat (nm, stats) =
+      Text.concat
+        [ nm
+        , ": visits="
+        , showText (tsVisited stats)
+        , ", changed="
+        , showText (tsChanged stats)
+        , ", time="
+        , formatTimeNs (tsTimeNs stats)
+        , ", avg="
+        , formatAverage (tsTimeNs stats) (tsVisited stats)
+        ]
+
+    formatAverage :: Word64 -> Word -> Text
+    formatAverage _ 0 = "0 ns"
+    formatAverage total visits = formatTimeNs (total `div` fromIntegral visits)
+
+    formatTimeNs :: Word64 -> Text
+    formatTimeNs ns
+      | ns >= 1000000000 = showFixed 1000000000 "s"
+      | ns >= 1000000 = showFixed 1000000 "ms"
+      | ns >= 1000 = showFixed 1000 "us"
+      | otherwise = showText ns <> " ns"
+     where
+      showFixed scale suffix =
+        let whole = ns `div` scale
+            frac = (ns `mod` scale) * 100 `div` scale
+         in showText whole <> "." <> pad2 frac <> " " <> suffix
+
+    pad2 n
+      | n < 10 = "0" <> showText n
+      | otherwise = showText n
+
+    showText :: Show a => a -> Text
+    showText = Text.pack . show
+
+mergeTransformStats :: TransformStats -> TransformStats -> TransformStats
+mergeTransformStats new old =
+  TransformStats
+    { tsVisited = tsVisited old + tsVisited new
+    , tsChanged = tsChanged old + tsChanged new
+    , tsTimeNs = tsTimeNs old + tsTimeNs new
+    }
 
 -- | Notify that a transformation has changed the expression
 setChanged :: RewriteMonad extra ()
