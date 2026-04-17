@@ -58,6 +58,10 @@ import Clash.Sized.Internal.BitVector
 {- $setup
 >>> :m -Prelude
 >>> :set -XDataKinds
+>>> :set -XDeriveAnyClass
+>>> :set -fplugin GHC.TypeLits.KnownNat.Solver
+>>> :set -fplugin GHC.TypeLits.Extra.Solver
+>>> :set -fplugin GHC.TypeLits.Normalise
 >>> import Clash.Prelude
 >>> import Data.Proxy
 -}
@@ -161,6 +165,54 @@ class KnownNat (BitSize a) => BitPack a where
    where
     (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
 
+  -- | Attempt to convert a 'BitVector' to an element of type @a@. If the unpacking
+  -- is successful, outputs @Just a@, otherwise outputs @Nothing@.
+  --
+  -- >>> pack (maxBound :: Index 13)
+  -- 0b1100
+  -- >>> let y = pack (maxBound :: Index 13)
+  -- >>> maybeUnpack y :: Maybe (Index 13)
+  -- Just 12
+  -- >>> maybeUnpack (succ y) :: Maybe (Index 13)
+  -- Nothing
+  -- >>> data Example1 = Foo | Bar | Baz | Baq | Qux deriving (Generic, NFDataX, BitPack, Show, Eq)
+  -- >>> maybeUnpack @Example1 0b0000
+  -- Just Foo
+  -- >>> fmap (maybeUnpack @Example1 . pack) $ indicesI @(2 ^ (BitSize Example1))
+  -- Just Foo :> Just Bar :> Just Baz :> Just Baq :> Just Qux :> Nothing :> Nothing :> Nothing :> Nil
+  --
+  -- It should be noted that if the unpacking fails at any stage, the function returns @Nothing@:
+  --
+  -- >>> data Example2 = EIdx (Index 6) Example1 | EUns (Unsigned 3) Example1 deriving (Generic, NFDataX, BitPack, Show, Eq)
+  -- >>> maybeUnpack @Example2 0b0000000
+  -- Just (EIdx 0 Foo)
+  -- >>> maybeUnpack @Example2 0b0101000
+  -- Just (EIdx 5 Foo)
+  -- >>> maybeUnpack @Example2 0b0110000 -- Fails to unpack `Index 6`
+  -- Nothing
+  -- >>> maybeUnpack @Example2 0b1110000 -- Switching to `EUns` constructor with `Unsigned` arg works
+  -- Just (EUns 6 Foo)
+  -- >>> maybeUnpack @Example2 0b0101111 -- Fails to unpack `Example1`
+  -- Nothing
+  -- >>> maybeUnpack @Example2 0b1101111 -- Still fails to unpack `Example1`
+  -- Nothing
+  -- >>> maybeUnpack @Example2 0b0111111 -- Fails to unpack both `Index 6` and `Example 1`
+  -- Nothing
+  maybeUnpack :: BitVector (BitSize a) -> Maybe a
+  default maybeUnpack
+    :: ( Generic a
+       , GBitPack (Rep a)
+       , KnownNat constrSize
+       , KnownNat fieldSize
+       , constrSize ~ CLog 2 (GConstructorCount (Rep a))
+       , fieldSize ~ GFieldSize (Rep a)
+       , (constrSize + fieldSize) ~ BitSize a
+       )
+    => BitVector (BitSize a) -> Maybe a
+  maybeUnpack b = to <$> gMaybeUnpack sc 0 bFields
+   where
+    (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
+
 packXWith
   :: KnownNat n
   => (a -> BitVector n)
@@ -239,28 +291,33 @@ bitCoerceMap f = bitCoerce . f . bitCoerce
 
 instance BitPack Bool where
   type BitSize Bool = 1
-  pack   = let go b = if b then 1 else 0 in packXWith go
-  unpack = checkUnpackUndef $ \bv -> if bv == 1 then True else False
+  pack        = let go b = if b then 1 else 0 in packXWith go
+  unpack      = checkUnpackUndef $ \bv -> if bv == 1 then True else False
+  maybeUnpack = Just . unpack
 
 instance KnownNat n => BitPack (BitVector n) where
   type BitSize (BitVector n) = n
-  pack     = packXWith id
-  unpack v = v
+  pack        = packXWith id
+  unpack v    = v
+  maybeUnpack = Just . unpack
 
 instance BitPack Bit where
   type BitSize Bit = 1
-  pack   = packXWith pack#
-  unpack = unpack#
+  pack        = packXWith pack#
+  unpack      = unpack#
+  maybeUnpack = Just . unpack
 
 instance BitPack Int where
   type BitSize Int = WORD_SIZE_IN_BITS
-  pack   = packXWith toEnum
-  unpack = checkUnpackUndef fromEnum
+  pack        = packXWith toEnum
+  unpack      = checkUnpackUndef fromEnum
+  maybeUnpack = Just . unpack
 
 instance BitPack Int8 where
   type BitSize Int8 = 8
-  pack   = packXWith packInt8#
-  unpack = checkUnpackUndef unpackInt8#
+  pack        = packXWith packInt8#
+  unpack      = checkUnpackUndef unpackInt8#
+  maybeUnpack = Just . unpack
 
 packInt8# :: Int8 -> BitVector 8
 packInt8# = fromIntegral
@@ -274,8 +331,9 @@ unpackInt8# = fromIntegral
 
 instance BitPack Int16 where
   type BitSize Int16 = 16
-  pack   = packXWith packInt16#
-  unpack = checkUnpackUndef unpackInt16#
+  pack        = packXWith packInt16#
+  unpack      = checkUnpackUndef unpackInt16#
+  maybeUnpack = Just . unpack
 
 packInt16# :: Int16 -> BitVector 16
 packInt16# = fromIntegral
@@ -289,8 +347,9 @@ unpackInt16# = fromIntegral
 
 instance BitPack Int32 where
   type BitSize Int32 = 32
-  pack   = packXWith packInt32#
-  unpack = checkUnpackUndef unpackInt32#
+  pack        = packXWith packInt32#
+  unpack      = checkUnpackUndef unpackInt32#
+  maybeUnpack = Just . unpack
 
 packInt32# :: Int32 -> BitVector 32
 packInt32# = fromIntegral
@@ -304,8 +363,9 @@ unpackInt32# = fromIntegral
 
 instance BitPack Int64 where
   type BitSize Int64 = 64
-  pack   = packXWith packInt64#
-  unpack = checkUnpackUndef unpackInt64#
+  pack        = packXWith packInt64#
+  unpack      = checkUnpackUndef unpackInt64#
+  maybeUnpack = Just . unpack
 
 packInt64# :: Int64 -> BitVector 64
 packInt64# = fromIntegral
@@ -319,8 +379,9 @@ unpackInt64# = fromIntegral
 
 instance BitPack Word where
   type BitSize Word = WORD_SIZE_IN_BITS
-  pack   = packXWith packWord#
-  unpack = checkUnpackUndef unpackWord#
+  pack        = packXWith packWord#
+  unpack      = checkUnpackUndef unpackWord#
+  maybeUnpack = Just . unpack
 
 packWord# :: Word -> BitVector WORD_SIZE_IN_BITS
 packWord# = fromIntegral
@@ -334,8 +395,9 @@ unpackWord# = fromIntegral
 
 instance BitPack Word8 where
   type BitSize Word8 = 8
-  pack   = packXWith packWord8#
-  unpack = checkUnpackUndef unpackWord8#
+  pack        = packXWith packWord8#
+  unpack      = checkUnpackUndef unpackWord8#
+  maybeUnpack = Just . unpack
 
 packWord8# :: Word8 -> BitVector 8
 packWord8# = fromIntegral
@@ -349,8 +411,9 @@ unpackWord8# = fromIntegral
 
 instance BitPack Word16 where
   type BitSize Word16 = 16
-  pack   = packXWith packWord16#
-  unpack = checkUnpackUndef unpackWord16#
+  pack        = packXWith packWord16#
+  unpack      = checkUnpackUndef unpackWord16#
+  maybeUnpack = Just . unpack
 
 packWord16# :: Word16 -> BitVector 16
 packWord16# = fromIntegral
@@ -364,8 +427,9 @@ unpackWord16# = fromIntegral
 
 instance BitPack Word32 where
   type BitSize Word32 = 32
-  pack   = packXWith packWord32#
-  unpack = checkUnpackUndef unpackWord32#
+  pack        = packXWith packWord32#
+  unpack      = checkUnpackUndef unpackWord32#
+  maybeUnpack = Just . unpack
 
 packWord32# :: Word32 -> BitVector 32
 packWord32# = fromIntegral
@@ -379,8 +443,9 @@ unpackWord32# = fromIntegral
 
 instance BitPack Word64 where
   type BitSize Word64 = 64
-  pack   = packXWith packWord64#
-  unpack = checkUnpackUndef unpackWord64#
+  pack        = packXWith packWord64#
+  unpack      = checkUnpackUndef unpackWord64#
+  maybeUnpack = Just . unpack
 
 packWord64# :: Word64 -> BitVector 64
 packWord64# = fromIntegral
@@ -394,8 +459,9 @@ unpackWord64# = fromIntegral
 
 instance BitPack Float where
   type BitSize Float = 32
-  pack   = packXWith packFloat#
-  unpack = checkUnpackUndef unpackFloat#
+  pack        = packXWith packFloat#
+  unpack      = checkUnpackUndef unpackFloat#
+  maybeUnpack = Just . unpack
 
 packFloat# :: Float -> BitVector 32
 packFloat# = fromIntegral . floatToWord
@@ -409,8 +475,9 @@ unpackFloat# (unsafeToNatural -> w) = wordToFloat (fromIntegral w)
 
 instance BitPack Double where
   type BitSize Double = 64
-  pack   = packXWith packDouble#
-  unpack = checkUnpackUndef unpackDouble#
+  pack        = packXWith packDouble#
+  unpack      = checkUnpackUndef unpackDouble#
+  maybeUnpack = Just . unpack
 
 packDouble# :: Double -> BitVector 64
 packDouble# = fromIntegral . doubleToWord
@@ -424,8 +491,9 @@ unpackDouble# (unsafeToNatural -> w) = wordToDouble (fromIntegral w)
 
 instance BitPack CUShort where
   type BitSize CUShort = 16
-  pack   = packXWith packCUShort#
-  unpack = checkUnpackUndef unpackCUShort#
+  pack        = packXWith packCUShort#
+  unpack      = checkUnpackUndef unpackCUShort#
+  maybeUnpack = Just . unpack
 
 packCUShort# :: CUShort -> BitVector 16
 packCUShort# = fromIntegral
@@ -441,16 +509,19 @@ instance BitPack Half where
   type BitSize Half = 16
   pack (Half x) = pack x
   unpack        = checkUnpackUndef $ \x -> Half (unpack x)
+  maybeUnpack   = Just . unpack
 
 instance BitPack () where
   type BitSize () = 0
-  pack   _ = minBound
-  unpack _ = ()
+  pack    _   = minBound
+  unpack  _   = ()
+  maybeUnpack = Just . unpack
 
 instance BitPack Char where
   type BitSize Char = 21
-  pack   = packXWith packChar#
-  unpack = checkUnpackUndef unpackChar#
+  pack        = packXWith packChar#
+  unpack      = checkUnpackUndef unpackChar#
+  maybeUnpack = Just . unpack
 
 packChar# :: Char -> BitVector 21
 packChar# = fromIntegral . ord
@@ -470,6 +541,7 @@ instance (BitPack a, BitPack b) => BitPack (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
   pack = let go (a,b) = pack a ++# pack b in packXWith go
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
+  maybeUnpack ab = let (a,b) = split# ab in (,) <$> maybeUnpack a <*> maybeUnpack b
 
 class GBitPack f where
   -- | Size of fields. If multiple constructors exist, this is the maximum of
@@ -500,16 +572,29 @@ class GBitPack f where
     -> f a
     -- ^ Unpacked result
 
+  -- | Attempt to unpack whole type.
+  gMaybeUnpack
+    :: Int
+    -- ^ Construct with constructor /n/
+    -> Int
+    -- ^ Current constructor
+    -> BitVector (GFieldSize f)
+    -- ^ BitVector containing fields
+    -> Maybe (f a)
+    -- ^ Possibly unpacked result
+
 instance GBitPack a => GBitPack (M1 m d a) where
   type GFieldSize (M1 m d a) = GFieldSize a
   type GConstructorCount (M1 m d a) = GConstructorCount a
 
   gPackFields cc (M1 m1) = gPackFields cc m1
   gUnpack c cc b = M1 (gUnpack c cc b)
+  gMaybeUnpack c cc b = M1 <$> (gMaybeUnpack c cc b)
 
 instance ( KnownNat (GFieldSize g)
          , KnownNat (GFieldSize f)
          , KnownNat (GConstructorCount f)
+         , KnownNat (GConstructorCount g)
          , GBitPack f
          , GBitPack g
          ) => GBitPack (f :+: g) where
@@ -538,6 +623,19 @@ instance ( KnownNat (GFieldSize g)
     (f, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f)) = split# b
     (g, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g)) = split# b
 
+  gMaybeUnpack c cc b =
+    let
+      cLeft = snatToNum (SNat @(GConstructorCount f))
+      cTotal = snatToNum (SNat @(GConstructorCount (f :+: g)))
+    in
+    if c < cc + cTotal
+      then if c < cc + cLeft
+        then L1 <$> gMaybeUnpack c cc f
+        else R1 <$> gMaybeUnpack c (cc + cLeft) g
+      else Nothing
+   where
+    (f, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f)) = split# b
+    (g, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g)) = split# b
 
 instance (KnownNat (GFieldSize g), KnownNat (GFieldSize f), GBitPack f, GBitPack g) => GBitPack (f :*: g) where
   type GFieldSize (f :*: g) = GFieldSize f + GFieldSize g
@@ -556,12 +654,18 @@ instance (KnownNat (GFieldSize g), KnownNat (GFieldSize f), GBitPack f, GBitPack
    where
     (front, back) = split# b
 
+  gMaybeUnpack c cc b =
+    (:*:) <$> gMaybeUnpack c cc front <*> gMaybeUnpack c cc back
+   where
+    (front, back) = split# b
+
 instance BitPack c => GBitPack (K1 i c) where
   type GFieldSize (K1 i c) = BitSize c
   type GConstructorCount (K1 i c)  = 1
 
   gPackFields cc (K1 i) = (cc, pack i)
   gUnpack _c _cc b      = K1 (unpack b)
+  gMaybeUnpack _c _cc b = K1 <$> maybeUnpack b
 
 instance GBitPack U1 where
   type GFieldSize U1 = 0
@@ -569,6 +673,7 @@ instance GBitPack U1 where
 
   gPackFields cc U1 = (cc, 0)
   gUnpack _c _cc _b = U1
+  gMaybeUnpack _c _cc _b = Just U1
 
 -- Instances derived using Generic
 instance BitPack Ordering
@@ -616,4 +721,4 @@ bitToBool :: Bit -> Bool
 bitToBool = bitCoerce
 
 -- Derive the BitPack instance for tuples of size 3 to maxTupleSize
-deriveBitPackTuples ''BitPack ''BitSize 'pack 'unpack
+deriveBitPackTuples ''BitPack ''BitSize 'pack 'unpack 'maybeUnpack
