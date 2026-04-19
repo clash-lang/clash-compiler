@@ -54,7 +54,7 @@ import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV), 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars
-  (freeLocalIds)
+  (countFreeOccurances, freeLocalIds)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
 import Clash.Core.Name (Name(..), NameSort(..))
@@ -576,8 +576,8 @@ inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
-inlineOrLiftNonRep ctx eLet@(Letrec binds body) = do
-    LetSummary{lsBodyOccs = bodyFreeOccs} <- summarizeLet eLet binds body
+inlineOrLiftNonRep ctx eLet@(Letrec _ body) = do
+    let bodyFreeOccs = countFreeOccurances body
     inlineOrLiftBinders nonRepTest (inlineTest bodyFreeOccs) ctx eLet
   where
     nonRepTest :: (Id, Term) -> NormalizeSession Bool

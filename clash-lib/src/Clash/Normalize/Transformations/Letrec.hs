@@ -44,6 +44,7 @@ import Clash.Sized.Vector as Vec (Vec(Cons), splitAt)
 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
+import Clash.Core.FreeVars (countFreeOccurances)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
@@ -67,8 +68,8 @@ import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
-import Clash.Normalize.Types (LetSummary(..), NormRewrite, NormalizeSession)
-import Clash.Normalize.Util (isWorkFreeCached, summarizeLet)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Util (isWorkFreeCached)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, primitives)
@@ -188,8 +189,8 @@ flattenLet ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
     _ -> error "internal error"
 
 flattenLet (TransformContext is0 _) (Letrec binds body) = do
-  LetSummary{lsBodyOccs = bodyOccs} <- summarizeLet (Letrec binds body) binds body
-  let is1 = extendInScopeSetList is0 (map fst binds)
+  let bodyOccs = countFreeOccurances body
+      is1 = extendInScopeSetList is0 (map fst binds)
   (is2,binds1) <- second concat <$> List.mapAccumLM go is1 binds
   bndrs <- Lens.use bindings
   e1WorkFree <-
@@ -226,8 +227,7 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                 _ -> error "internal error"
             else
               (binds1,body1,extendInScopeSetList isN bs1)
-      LetSummary{lsBodyOccs = bodyOccs} <- summarizeLet (Letrec binds2 body2) binds2 body2
-      let
+      let bodyOccs = countFreeOccurances body2
           (srcTicks,nmTicks) = partitionTicks ticks
       bndrs <- Lens.use bindings
       e2WorkFree <-
