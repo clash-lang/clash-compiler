@@ -11,6 +11,7 @@
 
 module Clash.Normalize.Strategy where
 
+import Clash.Core.Term (Term(..), stripTicks)
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types
 import Clash.Normalize.Util (termFeaturesOf)
@@ -87,7 +88,7 @@ constantPropagation =
     -- The outer repeatR for inlineAndPropagate is still needed because
     -- inlineNR is a full traversal whose results can only be processed by
     -- re-running topdownFixR from the (new) root.
-    inlineAndPropagate = repeatR (topdownFixR (applyMany transPropagateAndInline) >-> inlineNR)
+    inlineAndPropagate = repeatR (topdownFixR propagateAndInline >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     -- caseFlattening: the outer repeatR is eliminated because topdownFixR
     -- handles all cascading caseFlat opportunities through bubble-up.
@@ -101,32 +102,69 @@ constantPropagation =
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)
 
-    transPropagateAndInline :: [(String,NormRewrite)]
-    transPropagateAndInline =
-      [ ("applicationPropagation", appProp              )
-      , ("bindConstantVar"       , bindConstantVar      )
-      , ("caseLet"               , caseLet              )
-      , ("caseCase"              , caseCase             )
-      , ("caseCon"               , caseCon              )
-      , ("elimExistentials"      , elimExistentials     )
-      , ("caseElemNonReachable"  , caseElemNonReachable )
-      , ("removeUnusedExpr"      , removeUnusedExpr     )
-      -- These transformations can safely be applied in a top-down traversal as
-      -- they themselves check whether the to-be-inlined binder is recursive or not.
-      , ("inlineWorkFree"  , inlineWorkFree)
-      , ("inlineSmall"     , inlineSmall)
-      , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
-                                                 -- See: [Note] bottom-up traversal for liftNonRep
-      , ("reduceNonRepPrim", reduceNonRepPrim)
+    -- The hot propagation loop used to try every rewrite on every visited node.
+    -- Most of those attempts were impossible based on the root constructor
+    -- alone. Dispatching by term shape cuts that failed-attempt volume while
+    -- relying on the existing repeatR/topdownFixR fixpoint machinery to pick up
+    -- newly exposed redexes after a successful rewrite changes the term shape.
+    propagateAndInline :: NormRewrite
+    propagateAndInline ctx term =
+      case term of
+        Var {}   -> appLike ctx term
+        App {}   -> appLike ctx term
+        TyApp {} -> appLike ctx term
+        Case {}  -> caseLike ctx term
+        Letrec {} -> letLike ctx term
+        Cast {}  -> castLike ctx term
+        Tick _ _ -> case stripTicks term of
+          Var {}   -> appLike ctx term
+          App {}   -> appLike ctx term
+          TyApp {} -> appLike ctx term
+          _        -> pure term
+        _ -> pure term
 
+    appLike :: NormRewrite
+    appLike =
+      applyMany
+        [ ("applicationPropagation", appProp)
+        , ("removeUnusedExpr"      , removeUnusedExpr)
+        -- These transformations can safely be applied in a top-down traversal
+        -- as they themselves check whether the to-be-inlined binder is
+        -- recursive or not.
+        , ("inlineWorkFree"        , inlineWorkFree)
+        , ("inlineSmall"           , inlineSmall)
+        , ("reduceNonRepPrim"      , reduceNonRepPrim)
+        , ("argCastSpec"           , argCastSpec)
+        ]
 
-      , ("caseCast"        , caseCast)
-      , ("letCast"         , letCast)
-      , ("splitCastWork"   , splitCastWork)
-      , ("argCastSpec"     , argCastSpec)
-      , ("inlineCast"      , inlineCast)
-      , ("elimCastCast"    , elimCastCast)
-      ]
+    caseLike :: NormRewrite
+    caseLike =
+      applyMany
+        [ ("caseLet"              , caseLet)
+        , ("caseCase"             , caseCase)
+        , ("caseCon"              , caseCon)
+        , ("elimExistentials"     , elimExistentials)
+        , ("caseElemNonReachable" , caseElemNonReachable)
+        , ("removeUnusedExpr"     , removeUnusedExpr)
+        ]
+
+    letLike :: NormRewrite
+    letLike =
+      applyMany
+        [ ("bindConstantVar"      , bindConstantVar)
+        , ("bindOrLiftNonRep"     , inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
+                                                        -- See: [Note] bottom-up traversal for liftNonRep
+        , ("splitCastWork"        , splitCastWork)
+        , ("inlineCast"           , inlineCast)
+        ]
+
+    castLike :: NormRewrite
+    castLike =
+      applyMany
+        [ ("caseCast"             , caseCast)
+        , ("letCast"              , letCast)
+        , ("elimCastCast"         , elimCastCast)
+        ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
     -- binder might be recursive. The idea is, is that if the recursive
