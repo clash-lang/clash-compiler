@@ -50,7 +50,7 @@ import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, s
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
-                                                  ,mkApps, mkTicks)
+                                                  ,mkApps, mkTicks, stripTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
@@ -390,6 +390,35 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
         return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
      else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
   where
+    flattenPropagate :: NormRewrite
+    flattenPropagate ctx term =
+      case term of
+        App {}   -> appLike ctx term
+        TyApp {} -> appLike ctx term
+        Case {}  -> caseLike ctx term
+        Letrec {} -> letLike ctx term
+        Tick _ _ -> case stripTicks term of
+          App {}   -> appLike ctx term
+          TyApp {} -> appLike ctx term
+          _        -> pure term
+        _ -> pure term
+
+    appLike :: NormRewrite
+    appLike =
+      apply "appProp" appProp >->
+      (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
+      apply "reduceNonRepPrim" reduceNonRepPrim >->
+      apply "removeUnusedExpr" removeUnusedExpr
+
+    caseLike :: NormRewrite
+    caseLike =
+      apply "caseCon" caseCon >->
+      apply "removeUnusedExpr" removeUnusedExpr
+
+    letLike :: NormRewrite
+    letLike =
+      apply "bindConstantVar" bindConstantVar
+
     flatten =
       -- topdownFixR integrates the local fixpoint: when a child change
       -- (e.g. caseCon on a scrutinee) exposes a new redex at the parent
@@ -397,12 +426,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       -- than restarting the entire traversal from the root. The outer
       -- repeatR is retained because the bottomupR flattenLet pass can
       -- expose new top-down opportunities.
-      repeatR (topdownFixR (apply "appProp" appProp >->
-                 apply "bindConstantVar" bindConstantVar >->
-                 apply "caseCon" caseCon >->
-                 (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
-                 apply "reduceNonRepPrim" reduceNonRepPrim >->
-                 apply "removeUnusedExpr" removeUnusedExpr) >->
+      repeatR (topdownFixR flattenPropagate >->
                bottomupR (apply "flattenLet" flattenLet)) !->
       topdownSucR (apply "topLet" topLet) >->
       -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
