@@ -405,14 +405,7 @@ isCheapFunction tm = case classifyFunction tm of
     | otherwise       -> False
 
 termFeaturesOf :: Term -> NormalizeSession TermFeatures
-termFeaturesOf term = do
-  cache <- Lens.use (extra.termFeaturesCache)
-  case Map.lookup term cache of
-    Just feats -> pure feats
-    Nothing -> do
-      let feats = go term
-      extra.termFeaturesCache %= Map.insert term feats
-      pure feats
+termFeaturesOf term = pure (go term)
  where
   emptyFeatures = TermFeatures False False False False
 
@@ -470,14 +463,8 @@ summarizeLet _expr binds body = do
       }
 
 isWorkFreeCached :: BindingMap -> Term -> NormalizeSession Bool
-isWorkFreeCached bndrs term = do
-  cache <- Lens.use (extra.termWorkFreeCache)
-  case Map.lookup term cache of
-    Just isWf -> pure isWf
-    Nothing -> do
-      isWf <- isWorkFree workFreeBinders bndrs term
-      extra.termWorkFreeCache %= Map.insert term isWf
-      pure isWf
+isWorkFreeCached bndrs term =
+  isWorkFree workFreeBinders bndrs term
 
 normalizeTopLvlBndr
   :: Bool
