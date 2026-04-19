@@ -618,7 +618,15 @@ inlineSimIO = inlineBinders test
 
 -- | Inline small functions
 inlineSmall :: HasCallStack => NormRewrite
-inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
+inlineSmall ctx e@Var{} = inlineSmallCollected ctx e
+inlineSmall ctx e@App{} = inlineSmallCollected ctx e
+inlineSmall ctx e@TyApp{} = inlineSmallCollected ctx e
+inlineSmall ctx e@Tick{} = inlineSmallCollected ctx e
+inlineSmall _ e = return e
+{-# SCC inlineSmall #-}
+
+inlineSmallCollected :: HasCallStack => NormRewrite
+inlineSmallCollected _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
   untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
   let lv = isLocalId f
@@ -639,13 +647,20 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
 
         _ -> return e
 
-inlineSmall _ e = return e
-{-# SCC inlineSmall #-}
+inlineSmallCollected _ e = return e
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
 inlineWorkFree :: HasCallStack => NormRewrite
-inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
+inlineWorkFree ctx e@Var{} = inlineWorkFreeCollected ctx e
+inlineWorkFree ctx e@App{} = inlineWorkFreeCollected ctx e
+inlineWorkFree ctx e@TyApp{} = inlineWorkFreeCollected ctx e
+inlineWorkFree ctx e@Tick{} = inlineWorkFreeCollected ctx e
+inlineWorkFree _ e = return e
+{-# SCC inlineWorkFree #-}
+
+inlineWorkFreeCollected :: HasCallStack => NormRewrite
+inlineWorkFreeCollected _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
   = do
     tcm <- Lens.view tcCache
     let eTy = inferCoreTypeOf tcm e
@@ -683,7 +698,7 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
           isSignal = isSignalType tcm e'Ty
       return (not (null fvIds) || isSignal)
 
-inlineWorkFree _ e@(Var f) = do
+inlineWorkFreeCollected _ e@(Var f) = do
   tcm <- Lens.view tcCache
   let fTy      = coreTypeOf f
       closed   = not (isPolyFunCoreTy tcm fTy)
@@ -713,5 +728,4 @@ inlineWorkFree _ e@(Var f) = do
         _ -> return e
     else return e
 
-inlineWorkFree _ e = return e
-{-# SCC inlineWorkFree #-}
+inlineWorkFreeCollected _ e = return e
