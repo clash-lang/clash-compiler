@@ -18,13 +18,13 @@ module Clash.Normalize where
 
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
-import           Control.Monad                    ((>=>), when)
+import           Control.Monad                    ((>=>), foldM, when)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import           Data.List
-  (intersect, mapAccumL)
+  (foldl', intersect)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
@@ -54,9 +54,9 @@ import           Clash.Core.Term                  (Term (..), collectArgsTicks
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Var                   (Id, varName, varType)
+import           Clash.Core.Var                   (Id, varName, varType, varUniq)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
+  (VarEnv, elemVarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
    extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Debug                      (traceIf)
@@ -78,6 +78,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
+import           Clash.Util.Graph                 (reverseTopSort)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)
 
@@ -261,34 +262,40 @@ cleanupGraph
   -> BindingMap
   -> NormalizeSession BindingMap
 cleanupGraph topEntity norm
-  | Just ct <- mkCallTree [] norm topEntity
-  = do ctFlat <- flattenCallTree ct
-       return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
-cleanupGraph _ norm = return norm
+  | not (topEntity `elemVarEnv` norm) = pure norm
+  | otherwise =
+      case reverseTopSort nodes edges of
+        Left msg -> error msg
+        Right order -> do
+          flatNodes <- foldM (flattenGraphNode norm cg) emptyVarEnv order
+          pure (collectFlatBindings flatNodes topEntity)
+ where
+  cg = callGraph norm topEntity
+  reachable =
+    filter (\bndr -> bindingId bndr `elemVarEnv` cg) (eltsVarEnv norm)
 
--- | A tree of identifiers and their bindings, with branches containing
--- additional bindings which are used. See "Clash.Driver.Types.Binding".
---
-data CallTree
-  = CLeaf   (Id, Binding Term)
-  | CBranch (Id, Binding Term) [CallTree]
+  nodes =
+    [ (varUniq (bindingId bndr), bindingId bndr)
+    | bndr <- reachable
+    ]
 
-mkCallTree
-  :: [Id]
-  -- ^ Visited
-  -> BindingMap
-  -- ^ Global binders
-  -> Id
-  -- ^ Root of the call graph
-  -> Maybe CallTree
-mkCallTree visited bindingMap root
-  | Just rootTm <- lookupVarEnv root bindingMap
-  = let used   = Set.toList $ Lens.setOf globalIds $ (bindingTerm rootTm)
-        other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
-    in  case used of
-          [] -> Just (CLeaf   (root,rootTm))
-          _  -> Just (CBranch (root,rootTm) other)
-mkCallTree _ _ _ = Nothing
+  edges =
+    concatMap graphEdges reachable
+
+  graphEdges bndr =
+    let nm = bindingId bndr
+    in [ (varUniq nm, varUniq dep)
+       | dep <- directDeps bndr
+       , dep `elemVarEnv` cg
+       ]
+
+data FlatNode =
+  FlatNode
+    { fnId :: !Id
+    , fnBinding :: !(Binding Term)
+    , fnUsed :: [Id]
+    , fnHadUses :: !Bool
+    }
 
 stripArgs
   :: [Id]
@@ -309,54 +316,72 @@ stripArgs allIds (id_:ids) (Left (Var nm):args)
       | otherwise = Nothing
 stripArgs _ _ _ = Nothing
 
-flattenNode
-  :: CallTree
-  -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
-flattenNode c@(CLeaf (_,(Binding _ _ spec _ _ _))) | isNoInline spec = return (Left c)
-flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
-  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
-  if isTopEntity then return (Left c) else do
-    tcm  <- Lens.view tcCache
-    let norm = splitNormalized tcm e
-    case norm of
-      Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args,ticks) = collectArgsTicks bExpr
-        case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `notElemFreeVars` bExpr ->
-               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
-          _ -> return (Right ((nm,e),[]))
-      _ -> return (Right ((nm,e),[]))
-flattenNode b@(CBranch (_,(Binding _ _ spec _ _ _)) _) | isNoInline spec =
-  return (Left b)
-flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
-  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
-  if isTopEntity then return (Left b) else do
-    tcm  <- Lens.view tcCache
-    let norm = splitNormalized tcm e
-    case norm of
-      Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args,ticks) = collectArgsTicks bExpr
-        case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `notElemFreeVars` bExpr ->
-               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),us))
-          _ -> return (Right ((nm,e),us))
-      _ -> do
-        newInlineStrat <- Lens.view newInlineStrategy
-        if newInlineStrat || isCheapFunction e
-           then return (Right ((nm,e),us))
-           else return (Left b)
+directDeps :: Binding Term -> [Id]
+directDeps = Set.toList . Lens.setOf globalIds . bindingTerm
 
-flattenCallTree
-  :: CallTree
-  -> NormalizeSession CallTree
-flattenCallTree c@(CLeaf _) = return c
-flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
-  flattenedUsed   <- mapM flattenCallTree used
-  (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
+lookupFlatNodes :: VarEnv FlatNode -> [Id] -> [FlatNode]
+lookupFlatNodes flatNodes =
+  Maybe.mapMaybe (`lookupVarEnv` flatNodes)
+
+flattenInlineable
+  :: FlatNode
+  -> NormalizeSession (Either FlatNode ((Id,Term),[Id]))
+flattenInlineable node@(FlatNode _ (Binding _ _ spec _ _ _) _ _)
+  | isNoInline spec
+  = pure (Left node)
+flattenInlineable node@(FlatNode nm (Binding _ _ _ _ e _) us hadUses) = do
+  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
+  if isTopEntity then pure (Left node) else do
+    tcm  <- Lens.view tcCache
+    case splitNormalized tcm e of
+      Right (ids,[(bId,bExpr)],_) -> do
+        let (fun,args,ticks) = collectArgsTicks bExpr
+        case stripArgs ids (reverse ids) (reverse args) of
+          Just remainder | bId `notElemFreeVars` bExpr ->
+               pure (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),us))
+          _ -> pure (Right ((nm,e),us))
+      _ -> do
+        if hadUses
+           then do
+             newInlineStrat <- Lens.view newInlineStrategy
+             if newInlineStrat || isCheapFunction e
+                then pure (Right ((nm,e),us))
+                else pure (Left node)
+           else pure (Right ((nm,e),[]))
+
+flattenGraphNode
+  :: BindingMap
+  -> VarEnv (VarEnv Word)
+  -> VarEnv FlatNode
+  -> Id
+  -> NormalizeSession (VarEnv FlatNode)
+flattenGraphNode norm cg flatNodes nm =
+  case lookupVarEnv nm norm of
+    Nothing -> pure flatNodes
+    Just bndr
+      | null allDeps ->
+          pure (extendVarEnv nm (FlatNode nm bndr [] False) flatNodes)
+      | otherwise -> do
+          node <- flattenBranch flatNodes nm bndr reachableDeps
+          pure (extendVarEnv nm node flatNodes)
+     where
+      allDeps = directDeps bndr
+      reachableDeps = filter (`elemVarEnv` cg) allDeps
+
+flattenBranch
+  :: VarEnv FlatNode
+  -> Id
+  -> Binding Term
+  -> [Id]
+  -> NormalizeSession FlatNode
+flattenBranch flatNodes nm (Binding nm' sp inl pr tm r) usedIds = do
+  let used = lookupFlatNodes flatNodes usedIds
+
+  (newUsed,il_ct) <- partitionEithers <$> mapM flattenInlineable used
   let (toInline,il_used) = unzip il_ct
       subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
   newExpr <- case toInline of
-    [] -> return tm
+    [] -> pure tm
     _  -> do
       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
 
@@ -376,7 +401,7 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
                  }
         in pure ()
       rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
-  let allUsed = newUsed ++ concat il_used
+  let allUsed = newUsed ++ lookupFlatNodes flatNodes (concat il_used)
   -- inline all components when the resulting expression after flattening
   -- is still considered "cheap". This happens often at the topEntity which
   -- wraps another functions and has some selectors and data-constructors.
@@ -387,8 +412,8 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
                                         (Maybe.catMaybes toInline')
         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
-        return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
-     else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
+        pure (FlatNode nm (Binding nm' sp inl pr newExpr' r) (concat allUsed') True)
+     else pure (FlatNode nm (Binding nm' sp inl pr newExpr r) (map fnId allUsed) True)
   where
     flattenPropagate :: NormRewrite
     flattenPropagate ctx term =
@@ -438,19 +463,19 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
       topdownSucR (apply "topLet" topLet)
 
-    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
-      | isNoInline inl2  = (Nothing     ,[c])
-      | otherwise        = (Just (nm2,e),[])
-    goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e _)) us)
-      | isNoInline inl2  = (Nothing, [c])
-      | otherwise        = (Just (nm2,e),us)
+    goCheap (FlatNode nm2 (Binding _ _ inl2 _ e _) us _)
+      | isNoInline inl2 = (Nothing, [nm2])
+      | otherwise       = (Just (nm2,e), us)
 
-callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding Term)])
-callTreeToList visited (CLeaf (nm,bndr))
-  | nm `elem` visited = (visited,[])
-  | otherwise         = (nm:visited,[(nm,bndr)])
-callTreeToList visited (CBranch (nm,bndr) used)
-  | nm `elem` visited = (visited,[])
-  | otherwise         = (visited',(nm,bndr):(concat others))
-  where
-    (visited',others) = mapAccumL callTreeToList (nm:visited) used
+collectFlatBindings :: VarEnv FlatNode -> Id -> BindingMap
+collectFlatBindings flatNodes =
+  go emptyVarEnv
+ where
+  go acc nm
+    | nm `elemVarEnv` acc
+    = acc
+    | otherwise
+    = case lookupVarEnv nm flatNodes of
+        Nothing -> acc
+        Just (FlatNode _ bndr used _) ->
+          foldl' go (extendVarEnv nm bndr acc) used
