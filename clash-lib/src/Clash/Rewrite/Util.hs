@@ -217,7 +217,7 @@ applyDebug ctx name exprOld hasChanged exprNew = do
           newFV             = not (afterFV `Set.isSubsetOf` beforeFV)
           accidentalShadows = findAccidentialShadows exprNew
           -- see NOTE [Filter free variables]
-          allowNewFVsFromCtx = name == "caseCon"
+          allowNewFVsFromCtx = name `elem` ["caseCon", "reduceConst", "constantSpec"]
           filterFVs | allowNewFVsFromCtx = Set.filter notInCtx
                     | otherwise = id
           notInCtx v = notElemInScopeSet v (tfInScope ctx)
@@ -273,15 +273,14 @@ applyDebug ctx name exprOld hasChanged exprNew = do
     after  = showPpr exprNew
 
 -- NOTE [Filter free variables]
--- Since [Give evaluator acces to inscope let-bindings #2571](https://github.com/clash-lang/clash-compiler/pull/2571)
--- the evaluator can rewrite expressions using let bindings from the 'TransformContext',
--- these bindings may reference other things bound in the context which weren't
--- in the expression before, and in doing so introduces new free variables and
--- fails this check for new free variables.
--- To prevent this we filter out all variables from bound in the context.
--- But only during a caseCon transformation, to not weaken this check unnecessarily.
-
-
+-- Since [Give evaluator access to in-scope let-bindings #2571](https://github.com/clash-lang/clash-compiler/pull/2571)
+-- the evaluator can rewrite expressions using let bindings from its 'TransformContext'.
+-- These bindings may reference other variables bound in the context which weren't
+-- in the expression before. By just looking at the expression (i.e., not accounting
+-- for the 'TransformContext'), it would therefore seem that free variables are
+-- introduce which would subsequently fail the freevar check. To prevent this we
+-- filter out all variables bound in the context, but only during a transformations
+-- that call 'whnfRW'.
 
 -- | Perform a transformation on a Term
 runRewrite

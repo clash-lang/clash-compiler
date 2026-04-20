@@ -17,7 +17,7 @@ import Clash.Rewrite.Combinators
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util
 
--- [Note: bottomup traversal evalConst]
+-- [Note: bottomup traversal reduceConst]
 --
 -- 2-May-2019: There is a bug in the evaluator where all data constructors are
 -- considered lazy, even though their declaration says they have strict fields.
@@ -46,8 +46,8 @@ normalization =
     rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
-    -- See [Note] bottomup traversal evalConst:
-    evalConst  = bottomupR (apply "evalConst" reduceConst)
+    -- See [Note] bottomup traversal reduceConst:
+    evalConst  = bottomupR (apply "reduceConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
