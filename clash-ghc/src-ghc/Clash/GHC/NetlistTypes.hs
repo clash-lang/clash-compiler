@@ -32,6 +32,7 @@ import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, coreView1, tyView)
 import Clash.Core.Util                  (tyNatSize, substArgTys)
 import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Driver.Types               (ClashOpts(..))
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
   (HWType(..), HWMap, FilteredHWType(..), PortDirection (..))
@@ -45,9 +46,7 @@ import Clash.Annotations.BitRepresentation.Internal
 import Clash.Signal.Internal (KnownDomain)
 
 ghcTypeToHWType
-  :: Int
-  -- ^ Integer width. The width Clash assumes an Integer to be (instead of it
-  -- begin an arbitrarily large, runtime sized construct).
+  :: ClashOpts
   -> CustomReprs
   -- ^ Custom bit representations
   -> TyConMap
@@ -55,8 +54,9 @@ ghcTypeToHWType
   -> Type
   -- ^ Type to convert to HWType
   -> State HWMap (Maybe (Either String FilteredHWType))
-ghcTypeToHWType iw = go
+ghcTypeToHWType opts = go
   where
+    iw = opt_intWidth opts
     -- returnN :: HWType ->
     returnN t = return (FilteredHWType t [])
 
