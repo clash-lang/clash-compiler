@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                (C) 2021,      QBayLogic B.V.
+                (C) 2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -36,6 +36,7 @@ normalization =
   bindConst >-> letTL
   >-> evalConst
   >-!-> cse >-!-> cleanup >->
+  elimCaseBigNum >->  -- see [Note] late elimCaseBigNum
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
@@ -49,6 +50,7 @@ normalization =
     -- See [Note] bottomup traversal evalConst:
     evalConst  = bottomupR (apply "evalConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
+    elimCaseBigNum = topdownR (apply "elimCaseBigNum" elimCaseBigNumInternals)
     xOptim     = bottomupR (apply "xOptimize" xOptimize)
     cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
                  topdownSucR (apply "inlineCleanup" inlineCleanup) !->
@@ -135,6 +137,17 @@ constantPropagation =
       , ("zeroWidthSpec", zeroWidthSpec)
         -- See Note [zeroWidthSpec enabling transformations]
       ]
+
+{-
+[Note] late elimCaseBigNum
+
+elimCaseBigNum is placed fairly late in the pipeline, after any constant folding and after caseCon.
+Because Naturals also hide inside SNat/Nat/KnownNats, and those can be bigger then 64bits.
+But they're ultimately monomorphic and thus static and will be evaluated.
+We just have to make sure that evaluation happens before we do elimCaseBigNum.
+
+For an example of where this can happen see foldableSNat in tests/shouldwork/Issues/T3157_IntegerNaturalInternals.hs
+-}
 
 {-
 Note [zeroWidthSpec enabling transformations]

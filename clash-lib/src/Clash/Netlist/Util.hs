@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd
                     2017-2018, Google Inc.
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -47,6 +47,7 @@ import           Data.Primitive.ByteArray (ByteArray (..))
 import           Control.Applicative     (Alternative((<|>)))
 import           Data.List               (unzip4, partition)
 import qualified Data.List               as List
+import           Data.List.NonEmpty      (NonEmpty((:|)))
 import qualified Data.Map                as Map
 import           Data.Map                (Map)
 import           Data.Maybe
@@ -1822,8 +1823,9 @@ bindsExistentials exts tms = any (`elem` freeVars) exts
  where
   freeVars = concatMap (Lens.toListOf typeFreeVars) (map coreTypeOf tms)
 
-iteAlts :: HWType -> [Alt] -> Maybe (Term,Term)
-iteAlts sHTy [(pat0,alt0),(pat1,alt1)] | validIteSTy sHTy = case pat0 of
+-- | Attempt to make an if-then-else construction out of this Case
+iteAlts :: HWType -> NonEmpty Alt -> Maybe (Term,Term)
+iteAlts sHTy ((pat0,alt0) :| [(pat1,alt1)]) | validIteSTy sHTy = case pat0 of
   DataPat dc _ _ -> case dcTag dc of
     2 -> Just (alt0,alt1)
     _ -> Just (alt1,alt0)

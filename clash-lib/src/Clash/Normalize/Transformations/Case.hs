@@ -24,6 +24,7 @@ module Clash.Normalize.Transformations.Case
   , caseLet
   , caseOneAlt
   , elimExistentials
+  , elimCaseBigNumInternals
   ) where
 
 import Control.Exception.Base (patError)
@@ -60,6 +61,7 @@ import Clash.Core.Term
   , collectTicks, mkApps, mkTicks, patIds, stripTicks, Bind(..))
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
+import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
 import Clash.Core.Util (listToLets, mkInternalVar)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
@@ -702,3 +704,41 @@ elimExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
 
 elimExistentials _ e = return e
 {-# SCC elimExistentials #-}
+
+-- | This finds cases on Integers and Naturals and rewrites them
+-- to remove the alternatives with bignums/bytearrays in them.
+--
+-- Natural and Integer are defined as:
+-- @
+-- data Natural = NS Word# | NB ByteArray#
+-- data Integer = IS Int#  | IP ByteArray#  | IN ByteArray#
+-- @
+-- Both 'Natural' and 'Integer' have invariants stating that they will only use NB/IP/IN
+-- when their values doesn't fit in NS/IS. And the code in base also makes use of that.
+-- So we can be sure that small values, that are representable in HDL, are always encoded with NS/IS.
+--
+-- Because the NB/IP/IN don't/can't exist in HDL, this transformation looks for case with
+-- patterns for NS/IS and just always picks those alternatives, and removes the other
+-- alternatives.
+--
+-- This is as "safe" as the rest of the Natural/Integer handling that clash does in HDL,
+-- because numbers bigger then Word/Int can't exist there anyway.
+elimCaseBigNumInternals :: HasCallStack => NormRewrite
+elimCaseBigNumInternals _ e@(Case scrut altsTy alts0@(_:_:_)) =
+  go alts0
+ where
+  go [] = return e
+  go ((pat,altE):alts) = case pat of
+    DataPat dc [] [x] | (dc == integerIsDc || dc == naturalNsDc) ->
+      if elemVarSet x fvs then
+        -- field used, turn the case into a projection
+        -- It seems this pattern never happens after ANF.
+        changed (Case scrut altsTy [(DataPat dc [] [x],altE)])
+      else
+        -- field not used, eliminate the case completely
+        changed altE
+    _ -> go alts
+   where
+    fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
+
+elimCaseBigNumInternals _ e = return e

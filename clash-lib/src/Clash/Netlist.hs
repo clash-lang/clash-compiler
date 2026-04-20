@@ -66,6 +66,7 @@ import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPri
 import           Clash.Core.Type
   (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
+import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
@@ -268,7 +269,7 @@ genComponentT compName0 componentExpr = do
           -- HACK: Determine resulttype of this function by looking at its definition
           -- instead of looking at its last binder (which obscures any attributes
           -- [see: Clash.Annotations.SynthesisAttributes]).
-          ((args, binds, res{varType=varType1}))
+          (args, binds, res{varType=varType1})
       Left err ->
         throw (ClashException sp ($curLoc ++ err) Nothing)
 
@@ -498,7 +499,8 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
   altHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
-  case iteAlts scrutHTy (NE.toList alts0) of
+  let e = Case scrut altTy (NE.toList alts0)
+  case iteAlts scrutHTy alts0 of
     Just (altT,altF)
       | ite
       , Concurrent <- declType
@@ -525,6 +527,10 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
          | otherwise
           -> do dstAssign <- contAssign dstId (IfThenElse scrutExpr altTExpr altFExpr)
                 return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++ [dstAssign]
+    _ | scrutTy == integerPrimTy
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Integer) of ...") (Just $ showPpr e))
+    _ | scrutTy == naturalPrimTy
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Natural) of ...") (Just $ showPpr e))
     _ -> do
       reprs <- Lens.view customReprs
       let alts1 = (reorderDefault . reorderCustom tcm reprs scrutTy) alts0

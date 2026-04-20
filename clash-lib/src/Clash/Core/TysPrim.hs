@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -36,6 +36,8 @@ module Clash.Core.TysPrim
   , byteArrayPrimTy
   , eqPrimTy
   , tysPrimMap
+  , integerIsDc
+  , naturalNsDc
   )
 where
 
@@ -78,27 +80,27 @@ intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   wordPrimTyConName,  int64PrimTyConName, word64PrimTyConName,
   floatPrimTyConName, doublePrimTyConName,
   naturalPrimTyConName, byteArrayPrimTyConName, eqPrimTyConName :: TyConName
-intPrimTyConName     = mkUnsafeSystemName "GHC.Prim.Int#"
+intPrimTyConName     = mkUnsafeSystemName (showt ''Int#)
                                 (fromGhcUnique intPrimTyConKey)
-integerPrimTyConName = mkUnsafeSystemName "GHC.Num.Integer.Integer"
+integerPrimTyConName = mkUnsafeSystemName (showt ''Integer)
                                 (fromGhcUnique integerTyConKey)
-stringPrimTyConName  = mkUnsafeSystemName "GHC.Prim.Addr#"
+stringPrimTyConName  = mkUnsafeSystemName (showt ''Addr#)
                         (fromGhcUnique addrPrimTyConKey)
-charPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Char#"
+charPrimTyConName    = mkUnsafeSystemName (showt ''Char#)
                                 (fromGhcUnique charPrimTyConKey)
-wordPrimTyConName    = mkUnsafeSystemName "GHC.Prim.Word#"
+wordPrimTyConName    = mkUnsafeSystemName (showt ''Word#)
                                 (fromGhcUnique wordPrimTyConKey)
-int64PrimTyConName   = mkUnsafeSystemName "GHC.Prim.Int64#"
+int64PrimTyConName   = mkUnsafeSystemName (showt ''Int64#)
                                 (fromGhcUnique int64PrimTyConKey)
-word64PrimTyConName  = mkUnsafeSystemName "GHC.Prim.Word64#"
+word64PrimTyConName  = mkUnsafeSystemName (showt ''Word64#)
                                 (fromGhcUnique word64PrimTyConKey)
-floatPrimTyConName   = mkUnsafeSystemName "GHC.Prim.Float#"
+floatPrimTyConName   = mkUnsafeSystemName (showt ''Float#)
                                 (fromGhcUnique floatPrimTyConKey)
-doublePrimTyConName  = mkUnsafeSystemName "GHC.Prim.Double#"
+doublePrimTyConName  = mkUnsafeSystemName (showt ''Double#)
                                 (fromGhcUnique doublePrimTyConKey)
-naturalPrimTyConName = mkUnsafeSystemName "GHC.Num.Natural.Natural"
+naturalPrimTyConName = mkUnsafeSystemName (showt ''Natural)
                                 (fromGhcUnique naturalTyConKey)
-byteArrayPrimTyConName = mkUnsafeSystemName "GHC.Prim.ByteArray#"
+byteArrayPrimTyConName = mkUnsafeSystemName (showt ''ByteArray#)
                           (fromGhcUnique byteArrayPrimTyConKey)
 
 eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (fromGhcUnique eqPrimTyConKey)
@@ -128,6 +130,7 @@ intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, wordPrimTc,
   int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc, naturalPrimTc,
   byteArrayPrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
+
 -- While GHC might have dropped Integer and Natural literals, in Clash it is
 -- still nice to have them around. However, Integer and Natural are also no
 -- longer primitive types in GHC, but we still want to give the Integer and
@@ -136,10 +139,9 @@ intPrimTc     = liftedPrimTC intPrimTyConName
 -- So instead of recording the primitive types, we record the algebraic types,
 -- i.e. the complete data type for Integer and Natural, data constructors and all.
 
-integerPrimTc =
-  let
-    name = integerPrimTyConName
-    uniq = nameUniq name
+integerIsDc, naturalNsDc :: DataCon
+integerIsDc = isDc
+  where
     isDcNm = mkUnsafeSystemName (showt 'IS) (fromGhcUnique integerISDataConKey)
     isDc = MkData
       { dcName = isDcNm
@@ -152,6 +154,12 @@ integerPrimTc =
       , dcArgStrict = [Strict]
       , dcFieldLabels = []
       }
+
+integerPrimTc =
+  let
+    name = integerPrimTyConName
+    uniq = nameUniq name
+    isDc = integerIsDc
     ipDcNm = mkUnsafeSystemName (showt 'IP) (fromGhcUnique integerIPDataConKey)
     ipDc = MkData
       { dcName = ipDcNm
@@ -180,10 +188,8 @@ integerPrimTc =
   in
     AlgTyCon uniq name liftedTypeKind 0 rhs False
 
-naturalPrimTc =
-  let
-    name = naturalPrimTyConName
-    uniq = nameUniq name
+naturalNsDc = nsDc
+  where
     nsDcNm = mkUnsafeSystemName (showt 'NS) (fromGhcUnique naturalNSDataConKey)
     nsDc = MkData
       { dcName = nsDcNm
@@ -196,6 +202,12 @@ naturalPrimTc =
       , dcArgStrict = [Strict]
       , dcFieldLabels = []
       }
+
+naturalPrimTc =
+  let
+    name = naturalPrimTyConName
+    uniq = nameUniq name
+    nsDc = naturalNsDc
     nbDcNm = mkUnsafeSystemName (showt 'NB) (fromGhcUnique naturalNBDataConKey)
     nbDc = MkData
       { dcName = nbDcNm
