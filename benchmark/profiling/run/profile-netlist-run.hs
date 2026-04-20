@@ -64,7 +64,7 @@ benchFile idirs src = do
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
     genNetlist env ghcEvaluator False transformedBindings topEntityMap compNames
-               (ghcTypeToHWType (opt_intWidth (envOpts env)))
+               (ghcTypeToHWType (envOpts env))
                ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 

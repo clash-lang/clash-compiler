@@ -58,7 +58,7 @@ doHDL Proxy opts src = do
   putStrLn $ "Loading dependencies took " ++ prepStartDiff
 
   generateHDL clashEnv clashDesign (Just backend)
-    (ghcTypeToHWType (opt_intWidth opts)) ghcEvaluator evaluator Nothing startTime
+    (ghcTypeToHWType opts) ghcEvaluator evaluator Nothing startTime
 
 main :: IO ()
 main =
