@@ -320,25 +320,25 @@ import           Clash.XException
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L
 >>> :{
-instance KnownDomain "Dom2" where
-  type DomainPeriod "Dom2"        = 2
-  type DomainActiveEdge "Dom2"    = 'Rising
-  type DomainResetKind "Dom2"     = 'Asynchronous
-  type DomainInitBehavior "Dom2"  = 'Defined
-  type DomainResetPolarity "Dom2" = 'ActiveHigh
+data Dom2 :: Domain
+instance KnownDomain Dom2 where
+  type DomainPeriod Dom2        = 2
+  type DomainActiveEdge Dom2    = 'Rising
+  type DomainResetKind Dom2     = 'Asynchronous
+  type DomainInitBehavior Dom2  = 'Defined
+  type DomainResetPolarity Dom2 = 'ActiveHigh
 :}
 
 >>> :{
-instance KnownDomain "Dom7" where
-  type DomainPeriod "Dom7"        = 7
-  type DomainActiveEdge "Dom7"    = 'Rising
-  type DomainResetKind "Dom7"     = 'Asynchronous
-  type DomainInitBehavior "Dom7"  = 'Defined
-  type DomainResetPolarity "Dom7" = 'ActiveHigh
+data Dom7 :: Domain
+instance KnownDomain Dom7 where
+  type DomainPeriod Dom7        = 7
+  type DomainActiveEdge Dom7    = 'Rising
+  type DomainResetKind Dom7     = 'Asynchronous
+  type DomainInitBehavior Dom7  = 'Defined
+  type DomainResetPolarity Dom7 = 'ActiveHigh
 :}
 
->>> type Dom2 = "Dom2"
->>> type Dom7 = "Dom7"
 >>> let clk2 = clockGen @Dom2
 >>> let clk7 = clockGen @Dom7
 >>> let en2 = enableGen @Dom2
