@@ -13,3 +13,15 @@ pull_request_rules:
         merge_conflict_style: diff3
         branches:
           - "1.8"
+
+  - name: backport patches to 1.10
+    conditions:
+      - base=master
+      - label=backport 1.10
+      - merged
+    actions:
+      copy:
+        ignore_conflicts: true
+        merge_conflict_style: diff3
+        branches:
+          - "1.10"
