@@ -166,7 +166,7 @@ upDownCounter upDown = s
 
 The following property holds:
 
-prop> \en -> en ==> testFor 1000 (upCounter (pure en) .==. upDownCounter (pure en) :: Signal "System" Bool)
+prop> \en -> en ==> testFor 1000 (upCounter (pure en) .==. upDownCounter (pure en) :: Signal System Bool)
 
 = LFSR
 
@@ -207,7 +207,7 @@ lfsrG seed = 'last' ('unbundle' r)
 
 The following property holds:
 
-prop> testFor 100 (lfsrF 0xACE1 .==. lfsrG 0x4645 :: Signal "System" Bool)
+prop> testFor 100 (lfsrF 0xACE1 .==. lfsrG 0x4645 :: Signal System Bool)
 
 = Gray counter
 
