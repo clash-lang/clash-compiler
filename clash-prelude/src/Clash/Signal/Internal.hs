@@ -231,14 +231,13 @@ import Clash.XException
 >>> :set -XDataKinds
 >>> :set -XMagicHash
 >>> :set -XTypeApplications
->>> import Clash.Prelude (SSymbol(..))
 >>> import Clash.Signal.Internal
 >>> import Clash.Promoted.Nat
 >>> import Clash.Promoted.Nat.Literals
 >>> import Clash.XException
+>>> import Data.Proxy (Proxy(..))
 >>> import Data.Ratio (Ratio)
 >>> import Numeric.Natural (Natural)
->>> type System = "System"
 >>> let systemClockGen = clockGen @System
 >>> let systemResetGen = resetGen @System
 >>> import Clash.Explicit.Signal (register)
@@ -529,7 +528,7 @@ class
 -- Example usage:
 --
 -- >>> knownDomain @System
--- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
+-- SDomainConfiguration {sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
 knownDomain :: KnownDomain dom => SDomainConfiguration dom (KnownConf dom)
 knownDomain = SDomainConfiguration
   { sPeriod        = SNat
@@ -541,8 +540,8 @@ knownDomain = SDomainConfiguration
 
 -- | Version of 'knownDomain' that takes a 'SSymbol'. For example:
 --
--- >>> knownDomainByName (SSymbol @"System")
--- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
+-- >>> knownDomainByName (Proxy @System)
+-- SDomainConfiguration {sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
 knownDomainByName
   :: forall dom
    . KnownDomain dom
