@@ -1,9 +1,0 @@
-REMOVED: The deprecated module `Clash.Prelude.DataFlow` was
-removed. The `clash-protocols` package provides dataflow-based protocols
-and circuits.[#3181](https://github.com/clash-lang/clash-compiler/pull/3181)
-
-REMOVED: The deprecated functions `altpll` and `alteraPll` were
-removed from the `Clash.Intel.ClockGen` module. Clash 1.8 introduced the new
-functions `altpllSync`, `alteraPllSync`, `unsafeAltpll` and `unsafeAlteraPll`.
-A name for the IP instantiation, handled by the _name_ argument to `altpll` and
-`alteraPll`, can be provided with the `Clash.Magic.setName` function.[#3181](https://github.com/clash-lang/clash-compiler/pull/3181)

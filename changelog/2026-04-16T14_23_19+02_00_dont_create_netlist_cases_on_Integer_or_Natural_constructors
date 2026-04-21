@@ -1,1 +1,0 @@
-FIXED: Clash won't create (invalid) netlist cases on Integer and Natural constructors anymore [#3157](https://github.com/clash-lang/clash-compiler/issues/3157)
