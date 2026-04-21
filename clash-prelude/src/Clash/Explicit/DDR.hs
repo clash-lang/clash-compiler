@@ -50,7 +50,7 @@ import Clash.Signal.Internal
 >>> import Clash.Explicit.Prelude
 >>> import Clash.Explicit.DDR
 >>> :{
-type DDR = "DDR" :: Domain
+data DDR :: Domain
 instance KnownDomain DDR where
   type DomainPeriod DDR        = 5000
   type DomainActiveEdge DDR    = 'Rising
