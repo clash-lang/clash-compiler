@@ -1,1 +1,0 @@
-ADDED: `-fclash-no-concurrent-topentity-compilation` flag to disable concurrent compilation of top entities. This is mostly useful to get a consistent debug output.
