@@ -8,6 +8,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RoleAnnotations #-}
@@ -90,6 +91,7 @@ import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
 import Data.Proxy                     (Proxy (..))
+import Data.Type.Bool                 (If)
 import Text.Read                      (Read (..), ReadPrec)
 import Text.Printf                    (PrintfArg (..), printf)
 import GHC.Exts                       (wordToWord8#, wordToWord16#, wordToWord32#)
@@ -100,9 +102,20 @@ import GHC.Num.Integer
 import GHC.Num.Natural
   (Natural (..), naturalShiftL, naturalShiftR, naturalToWord)
 import GHC.Natural                    (naturalToInteger)
-import GHC.TypeLits                   (KnownNat, Nat, type (+))
+import GHC.TypeError
+  ( Assert
+  , ErrorMessage (ShowType)
+  )
+import GHC.TypeLits
+  ( KnownNat
+  , Nat
+  , type (+)
+  , type (-)
+  , type (<=?)
+  , type (^)
+  )
 import GHC.TypeNats                   (natVal)
-import GHC.TypeLits.Extra             (Max)
+import GHC.TypeLits.Extra             (CLog, Max)
 import GHC.Word                       (Word (..), Word8 (..), Word16 (..), Word32 (..))
 import Data.Ix                        (Ix(..))
 import Language.Haskell.TH            (appT, conT, litT, numTyLit, sigE)
@@ -123,8 +136,17 @@ import Clash.Class.BitPack.BitIndex   ((!), msb, replaceBit, split)
 import Clash.Class.BitPack.BitReduction (reduceOr)
 import Clash.Promoted.Nat             (natToNum, natToNatural)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
+import Clash.Sized.Internal.CheckedLiterals
+  ( PotentiallyOutOfBounds
+  , UnsignedBounds
+  )
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Sized.Internal.Mod
+import CheckedLiterals.Class.Integer
+  ( NegativeUnsignedError
+  , CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
@@ -544,6 +566,24 @@ instance KnownNat n => FiniteBits (Unsigned n) where
   finiteBitSize        = size#
   countLeadingZeros  u = countLeadingZeros  (pack# u)
   countTrailingZeros u = countTrailingZeros (pack# u)
+
+type UnsignedPositiveLiteralError lit n =
+  PotentiallyOutOfBounds
+    ('ShowType lit)
+    (UnsignedBounds (Unsigned n) ((2 ^ n) - 1))
+    (CLog 2 (lit + 1))
+    n
+
+instance
+  ( Assert
+      (If (lit <=? 0) (lit <=? 0) (CLog 2 (lit + 1) <=? n))
+      (UnsignedPositiveLiteralError lit n)
+  ) =>
+  CheckedPositiveIntegerLiteral lit (Unsigned n)
+
+instance
+  (NegativeUnsignedError lit (Unsigned n) ((2 ^ n) - 1)) =>
+  CheckedNegativeIntegerLiteral lit (Unsigned n)
 
 instance Resize Unsigned where
   resize     = resize#

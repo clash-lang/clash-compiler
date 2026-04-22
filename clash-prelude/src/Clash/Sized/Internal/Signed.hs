@@ -8,6 +8,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RoleAnnotations #-}
@@ -92,13 +93,26 @@ import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
 import Data.Proxy                     (Proxy (..))
+import Data.Type.Bool                 (If)
 import Text.Read                      (Read (..), ReadPrec)
 import Text.Printf                    (PrintfArg (..), printf)
 import GHC.Generics                   (Generic)
 import GHC.Natural                    (naturalFromInteger, naturalToInteger)
 
-import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
-import GHC.TypeLits.Extra             (Max)
+import GHC.TypeError
+  ( Assert
+  , ErrorMessage (ShowType, Text, (:<>:))
+  )
+import GHC.TypeLits
+  ( KnownNat
+  , Nat
+  , natVal
+  , type (+)
+  , type (-)
+  , type (<=?)
+  , type (^)
+  )
+import GHC.TypeLits.Extra             (CLog, Max)
 import Data.Ix                        (Ix(..))
 import Language.Haskell.TH            (appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
@@ -118,7 +132,15 @@ import Clash.Class.BitPack.BitIndex   ((!), msb, replaceBit, split)
 import Clash.Class.BitPack.BitReduction (reduceAnd, reduceOr)
 import Clash.Promoted.Nat             (natToNatural)
 import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low, undefError)
+import Clash.Sized.Internal.CheckedLiterals
+  ( PotentiallyOutOfBounds
+  , SignedBounds
+  )
 import qualified Clash.Sized.Internal.BitVector as BV
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
 
@@ -643,6 +665,34 @@ instance KnownNat n => FiniteBits (Signed n) where
   finiteBitSize        = size#
   countLeadingZeros  s = countLeadingZeros  (pack# s)
   countTrailingZeros s = countTrailingZeros (pack# s)
+
+type SignedPositiveLiteralError lit n =
+  PotentiallyOutOfBounds
+    ('ShowType lit)
+    (SignedBounds (Signed n) (2 ^ (n - 1)) ((2 ^ (n - 1)) - 1))
+    (CLog 2 (lit + 1) + 1)
+    n
+
+instance
+  ( Assert
+      (If (lit <=? 0) (lit <=? 0) (CLog 2 (lit + 1) + 1 <=? n))
+      (SignedPositiveLiteralError lit n)
+  ) =>
+  CheckedPositiveIntegerLiteral lit (Signed n)
+
+type SignedNegativeLiteralError lit n =
+  PotentiallyOutOfBounds
+    ('Text "-" ':<>: 'ShowType lit)
+    (SignedBounds (Signed n) (2 ^ (n - 1)) ((2 ^ (n - 1)) - 1))
+    (CLog 2 lit + 1)
+    n
+
+instance
+  ( Assert
+      (If (lit <=? 0) (lit <=? 0) (CLog 2 lit + 1 <=? n))
+      (SignedNegativeLiteralError lit n)
+  ) =>
+  CheckedNegativeIntegerLiteral lit (Signed n)
 
 instance Resize Signed where
   resize       = resize#

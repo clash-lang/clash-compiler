@@ -8,6 +8,7 @@ import qualified Clash.Tests.BitPack
 import qualified Clash.Tests.BitVector
 import qualified Clash.Tests.BlockRam
 import qualified Clash.Tests.BlockRam.Blob
+import qualified Clash.Tests.CheckedLiterals
 import qualified Clash.Tests.Clocks
 import qualified Clash.Tests.Counter
 import qualified Clash.Tests.DerivingDataRepr
@@ -42,6 +43,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.BitVector.tests
   , Clash.Tests.BlockRam.Blob.tests
   , Clash.Tests.BlockRam.tests
+  , Clash.Tests.CheckedLiterals.tests
   , Clash.Tests.Clocks.tests
   , Clash.Tests.Counter.tests
   , Clash.Tests.DerivingDataRepr.tests

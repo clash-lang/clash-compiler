@@ -6,6 +6,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Clash.Num.Zeroing
   ( Zeroing
@@ -20,6 +21,14 @@ import Data.Coerce (coerce)
 import Data.Functor.Compose (Compose(..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral
+  , CheckedPositiveRationalLiteral
+  )
 import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
@@ -55,6 +64,22 @@ newtype Zeroing a =
 {-# INLINE toZeroing #-}
 toZeroing :: (SaturatingNum a) => a -> Zeroing a
 toZeroing = Zeroing
+
+instance
+  (CheckedPositiveIntegerLiteral lit a) =>
+  CheckedPositiveIntegerLiteral lit (Zeroing a)
+
+instance
+  (CheckedNegativeIntegerLiteral lit a) =>
+  CheckedNegativeIntegerLiteral lit (Zeroing a)
+
+instance
+  (CheckedPositiveRationalLiteral str num den a) =>
+  CheckedPositiveRationalLiteral str num den (Zeroing a)
+
+instance
+  (CheckedNegativeRationalLiteral str num den a) =>
+  CheckedNegativeRationalLiteral str num den (Zeroing a)
 
 instance (Resize f) => Resize (Compose Zeroing f) where
   {-# INLINE resize #-}

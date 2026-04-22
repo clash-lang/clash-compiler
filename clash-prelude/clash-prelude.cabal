@@ -277,6 +277,7 @@ Library
                       Clash.Sized.Vector.ToTuple.TH
 
                       Clash.Sized.Internal.BitVector
+                      Clash.Sized.Internal.CheckedLiterals
                       Clash.Sized.Internal.Index
                       Clash.Sized.Internal.Mod
                       Clash.Sized.Internal.Signed
@@ -345,6 +346,7 @@ Library
                       QuickCheck                >= 2.7     && < 2.16,
                       recursion-schemes         >= 5.1     && < 5.3,
                       reflection                >= 2       && < 2.2,
+                      checked-literals          >= 0.1     && < 0.2,
                       singletons                >= 2.0     && < 3.1,
                       string-interpolate        ^>= 0.3,
                       tagged                    >= 0.8     && < 0.9,
@@ -402,6 +404,7 @@ test-suite unittests
   else
     build-depends:
       clash-prelude,
+      checked-literals,
 
       ghc-typelits-knownnat,
       ghc-typelits-natnormalise,
@@ -412,16 +415,21 @@ test-suite unittests
       bytestring,
       containers,
       deepseq,
+      directory,
+      filepath,
       hedgehog      >= 1.0.3    && < 1.6,
       hint          >= 0.7      && < 0.10,
       mmorph        >= 1.1.5    && < 1.3,
+      process,
       quickcheck-classes-base >= 0.6 && < 1.0,
+      string-interpolate >=0.3.4.0,
       tasty         >= 1.2      && < 1.6,
       tasty-hedgehog >= 1.2.0,
       tasty-hunit,
       tasty-th,
       tasty-quickcheck,
       template-haskell,
+      temporary,
       text
 
   Other-Modules:
@@ -431,6 +439,15 @@ test-suite unittests
                  Clash.Tests.BitVector
                  Clash.Tests.BlockRam
                  Clash.Tests.BlockRam.Blob
+                 Clash.Tests.CheckedLiterals
+                 Clash.Tests.CheckedLiterals.BitVector
+                 Clash.Tests.CheckedLiterals.Common
+                 Clash.Tests.CheckedLiterals.Fixed
+                 Clash.Tests.CheckedLiterals.Index
+                 Clash.Tests.CheckedLiterals.Signals
+                 Clash.Tests.CheckedLiterals.Signed
+                 Clash.Tests.CheckedLiterals.Unsigned
+                 Clash.Tests.CheckedLiterals.Wrappers
                  Clash.Tests.Clocks
                  Clash.Tests.Counter
                  Clash.Tests.DumpVCD
@@ -461,6 +478,7 @@ test-suite unittests
 
                  Hedgehog.Extra
 
+                 Test.Tasty.AssertGhc
                  Test.Tasty.HUnit.Extra
                  Test.Tasty.Hedgehog.Extra
                  Test.QuickCheck.Extra

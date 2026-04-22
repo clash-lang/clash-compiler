@@ -9,6 +9,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -88,8 +89,20 @@ import GHC.Generics               (Generic)
 import GHC.Natural                (Natural, naturalFromInteger)
 import GHC.Natural                (naturalToInteger)
 import GHC.Stack                  (HasCallStack)
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (-),
-                                   type (*), type (<=), natVal)
+import GHC.TypeError
+  ( Assert
+  , ErrorMessage (ShowType)
+  )
+import GHC.TypeLits
+  ( KnownNat
+  , Nat
+  , natVal
+  , type (+)
+  , type (-)
+  , type (*)
+  , type (<=)
+  , type (<=?)
+  )
 import GHC.TypeLits.Extra         (CLogWZ)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
@@ -103,9 +116,18 @@ import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Class.BitPack.BitIndex (replaceBit)
 import Clash.Sized.Internal       (formatRange)
+import Clash.Sized.Internal.CheckedLiterals
+  ( PotentiallyOutOfBounds
+  , UnsignedBounds
+  )
 import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
 import qualified Clash.Sized.Internal.BitVector as BV
 import Clash.Promoted.Nat         (SNat(..), UNat(..), toUNat, snatToNum, natToInteger)
+import CheckedLiterals.Class.Integer
+  ( NegativeUnsignedError
+  , CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
 import Clash.XException
   (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX, seqX)
 
@@ -287,6 +309,24 @@ instance KnownNat n => Num (Index n) where
   abs         = id
   signum i    = if i == 0 then 0 else 1
   fromInteger = fromInteger#
+
+type IndexPositiveLiteralError lit n =
+  PotentiallyOutOfBounds
+    ('ShowType lit)
+    (UnsignedBounds (Index n) (n - 1))
+    (lit + 1)
+    n
+
+instance
+  ( Assert
+      (lit + 1 <=? n)
+      (IndexPositiveLiteralError lit n)
+  ) =>
+  CheckedPositiveIntegerLiteral lit (Index n)
+
+instance
+  (NegativeUnsignedError lit (Index n) (n - 1)) =>
+  CheckedNegativeIntegerLiteral lit (Index n)
 
 (+#),(-#),(*#) :: KnownNat n => Index n -> Index n -> Index n
 {-# OPAQUE (+#) #-}
