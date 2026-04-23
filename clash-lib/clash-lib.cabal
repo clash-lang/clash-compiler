@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-lib
-Version:              1.9.0
+Version:              1.11.0
 Synopsis:             Clash: a functional hardware description language - As a library
 Description:
   Clash is a functional hardware description language that borrows both its
@@ -51,7 +51,8 @@ Author:               The Clash Authors
 Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
 Copyright:            Copyright © 2012-2016, University of Twente,
                                   2016-2019, Myrtle Software Ltd,
-                                  2017-2023, QBayLogic B.V., Google Inc.
+                                  2017-2026, Google Inc.,
+                                  2017-2026, QBayLogic B.V.
 Category:             Hardware
 Build-type:           Simple
 tested-with:          GHC == 9.6.7,
@@ -155,7 +156,7 @@ Library
                       base16-bytestring       >= 0.1.1    && < 1.1,
                       binary                  >= 0.8.5    && < 0.11,
                       bytestring              >= 0.10.0.2 && < 0.13,
-                      clash-prelude           == 1.9.0,
+                      clash-prelude           == 1.11.0,
                       containers              >= 0.6.7    && < 0.9,
                       cryptohash-sha256       >= 0.11     && < 0.12,
                       data-binary-ieee754     >= 0.4.4    && < 0.6,
