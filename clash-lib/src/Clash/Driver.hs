@@ -120,8 +120,9 @@ import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
-import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
-                                                   normalize, runNormalization)
+import           Clash.Normalize                  (checkANF, checkNonRecursive,
+                                                   cleanupGraph, normalize,
+                                                   runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
@@ -1015,9 +1016,11 @@ normalizeEntity
 normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
-                let normChecked = checkNonRecursive norm
-                cleaned <- cleanupGraph tm normChecked
-                return cleaned
+                let normChecked  = checkNonRecursive norm
+                    anfChecked   = checkANF normChecked
+                cleaned <- cleanupGraph tm anfChecked
+                let cleanedANF   = checkANF cleaned
+                return cleanedANF
     transformedBindings = runNormalization env supply bindingsMap
                             typeTrans peEval eval emptyVarEnv
                             topEntities doNorm
