@@ -149,7 +149,7 @@ mkBlackBoxContext bbName declType resIds args@(lefts -> termArgs) = do
       resNms = fmap Id.unsafeFromCoreId resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
     resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . coreTypeOf) resIds
-    (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm declType) [0..] termArgs
+    (inps,inpDecls) <- unzip <$> zipWithM (mkArgument bbName resNm declType) [0..] termArgs
     (funs,funDecls) <-
       mapAccumLM
         (addFunction (map coreTypeOf resIds))
@@ -169,8 +169,8 @@ mkBlackBoxContext bbName declType resIds args@(lefts -> termArgs) = do
     -- `Clash.Magic.prefixName` and `Clash.Magic.suffixName`
     ctxName2 <- mapM affixName ctxName1
 
-    return ( Context bbName (zip ress resTys) imps funs [] lvl nm (listToMaybe ctxName2)
-           , concat impDecls ++ concat funDecls
+    return ( Context bbName (zip ress resTys) inps funs [] lvl nm (listToMaybe ctxName2)
+           , concat inpDecls ++ concat funDecls
            )
   where
     addFunction resTys im (arg,i) = do
