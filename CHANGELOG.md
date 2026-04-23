@@ -1,6 +1,9 @@
 # Changelog for the Clash project
 
-## 1.10.0 *Apr 21st, 2026*
+## 1.10.0 *Apr 23rd, 2026*
+
+Release highlight:
+* `Clash.Class.NumConvert`: Utilities for safely converting between various Clash number types [#2915](https://github.com/clash-lang/clash-compiler/pull/2915)
 
 Added:
 * Added GHC 9.12 support
