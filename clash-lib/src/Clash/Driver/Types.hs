@@ -46,7 +46,7 @@ import           GHC.Types.Basic                (InlineSpec)
 import           GHC.Types.SrcLoc               (SrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Signal.Internal
+import           Clash.Signal.Internal          (VDomainConfiguration(..))
 
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
