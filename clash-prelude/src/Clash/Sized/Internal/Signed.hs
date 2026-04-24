@@ -215,8 +215,9 @@ instance KnownNat n => Read (Signed n) where
 
 instance KnownNat n => BitPack (Signed n) where
   type BitSize (Signed n) = n
-  pack   = packXWith pack#
-  unpack = unpack#
+  pack        = packXWith pack#
+  unpack      = unpack#
+  maybeUnpack = Just . unpack#
 
 {-# OPAQUE pack# #-}
 {-# ANN pack# hasBlackBox #-}

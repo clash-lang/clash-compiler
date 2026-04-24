@@ -545,6 +545,7 @@ instance (BitPack (rep (int + frac)), KnownNat (BitSize (rep (int + frac)))) => 
   type BitSize (Fixed rep int frac) = BitSize (rep (int + frac))
   pack   (Fixed fRep) = pack fRep
   unpack bv           = Fixed (unpack bv)
+  maybeUnpack         = fmap Fixed . maybeUnpack
 
 instance (Lift (rep (int + frac)), KnownNat frac, KnownNat int, Typeable rep) =>
   Lift (Fixed rep int frac) where
