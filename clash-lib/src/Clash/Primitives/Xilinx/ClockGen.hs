@@ -142,8 +142,7 @@ clockWizardTclTemplate isDifferential bbCtx
     : _ <- bbInputs bbCtx
   , [compName] <- bbQsysIncName bbCtx
   = let
-    clkFreq (KnownDomain _ p _ _ _ _) =
-      periodToHz (fromInteger p) / 1e6 :: Double
+    clkFreq (KnownDomain _ p _ _ _ _) = periodToHz p / 1e6 :: Double
     clkFreq _ =
       error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 

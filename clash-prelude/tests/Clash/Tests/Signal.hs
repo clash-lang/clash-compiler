@@ -94,8 +94,8 @@ case_dynamicStaticEq = do
     -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
     -- of using 'hzToFs'), to prevent rounding errors between periods of the
     -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (1000 * hzToPeriod 11)
-    fs77 = Femtoseconds (1000 * hzToPeriod 77)
+    fs11 = Femtoseconds (1000 * floor (hzToPeriod @Rational 11))
+    fs77 = Femtoseconds (1000 * floor (hzToPeriod @Rational 77))
 
     dclk11 = dynamicClockGen @H11 (pure fs11)
     dclk77 = dynamicClockGen @H77 (pure fs77)
@@ -150,8 +150,8 @@ case_dynamicHasEffect = do
     -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
     -- of using 'hzToFs'), to prevent rounding errors between periods of the
     -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (1000 * hzToPeriod 11)
-    fs77lying = Femtoseconds (1000 * hzToPeriod 78)
+    fs11 = Femtoseconds (1000 * floor (hzToPeriod @Rational 11))
+    fs77lying = Femtoseconds (1000 * floor (hzToPeriod @Rational 78))
 
     clk11 = clockGen @H11
     clk77 = clockGen @H77
