@@ -65,7 +65,7 @@ import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
-import           Clash.Signal (VDomainConfiguration(..))
+import           Clash.Signal (VDomainConfiguration(..), Period(..))
 import           Clash.Util.Graph (callGraphBindings)
 
 data PortDirection
@@ -234,7 +234,7 @@ instance ToJSON Manifest where
       , "domains" .= HashMap.fromList
         [ ( domNm
           , Aeson.object
-            [ "period" .= vPeriod
+            [ "period" .= ((\(Period p) -> p) vPeriod)
             , "active_edge" .= show vActiveEdge
             , "reset_kind" .= show vResetKind
             , "init_behavior" .= show vInitBehavior
@@ -298,7 +298,7 @@ instance FromJSON Manifest where
     parseDomain nm v =
       VDomainConfiguration
         <$> pure (Text.unpack nm)
-        <*> (v .: "period")
+        <*> (Period <$> (v .: "period"))
         <*> parseWithRead "active_edge" v
         <*> parseWithRead "reset_kind" v
         <*> parseWithRead "init_behavior" v

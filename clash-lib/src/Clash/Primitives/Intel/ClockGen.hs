@@ -151,7 +151,7 @@ altpllQsysTemplate bbCtx
     clkPeriod _ =
       error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 
-    clkFreq p = periodToHz (fromInteger p) / 1e6 :: Double
+    clkFreq p = periodToHz p / 1e6 :: Double
 
     clkOutPeriods = map clkPeriod kdOuts
     clkLcms = map (lcm clkInPeriod) clkOutPeriods
@@ -280,8 +280,7 @@ alteraPllQsysTemplate bbCtx
     : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
     : _ <- bbInputs bbCtx
   = let
-    clkFreq (KnownDomain _ p _ _ _ _)
-      = periodToHz (fromIntegral p) / 1e6 :: Double
+    clkFreq (KnownDomain _ p _ _ _ _) = periodToHz p / 1e6 :: Double
     clkFreq _ =
       error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 
