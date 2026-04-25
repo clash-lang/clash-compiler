@@ -91,6 +91,9 @@ module Clash.Explicit.Prelude
   , traceVecSignal
     -- ** VCD dump functions
   , dumpVCD
+    -- * Signal portals
+  , portalSource
+  , portalSink
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Explicit.Reset
@@ -189,6 +192,7 @@ import Clash.Promoted.Nat
 import Clash.Promoted.Nat.TH
 import Clash.Promoted.Nat.Literals
 import Clash.Promoted.Symbol
+import Clash.Signal.Portal
 import Clash.Signal.Trace
 import Clash.Sized.BitVector
 import Clash.Sized.Fixed

@@ -24,6 +24,7 @@ import qualified Clash.Tests.Ram
 import qualified Clash.Tests.Reset
 import qualified Clash.Tests.Resize
 import qualified Clash.Tests.Signal
+import qualified Clash.Tests.SignalPortal
 import qualified Clash.Tests.Signed
 import qualified Clash.Tests.TopEntityGeneration
 import qualified Clash.Tests.Unsigned
@@ -58,6 +59,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Reset.tests
   , Clash.Tests.Resize.tests
   , Clash.Tests.Signal.tests
+  , Clash.Tests.SignalPortal.tests
   , Clash.Tests.Signed.tests
   , Clash.Tests.TopEntityGeneration.tests
   , Clash.Tests.Unsigned.tests

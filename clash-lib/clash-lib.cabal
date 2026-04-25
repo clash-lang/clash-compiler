@@ -256,6 +256,7 @@ Library
                       Clash.Netlist.Id.SystemVerilog
                       Clash.Netlist.Id.Verilog
                       Clash.Netlist.Id.VHDL
+                      Clash.Netlist.SignalPortal
                       Clash.Netlist.Types
                       Clash.Netlist.Util
 
@@ -289,6 +290,7 @@ Library
                       Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
                       Clash.Primitives.Magic
+                      Clash.Primitives.SignalPortal
                       Clash.Primitives.Sized.ToInteger
                       Clash.Primitives.Sized.Signed
                       Clash.Primitives.Sized.Vector

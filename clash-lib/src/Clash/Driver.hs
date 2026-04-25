@@ -117,6 +117,7 @@ import           Clash.Netlist                    (genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import qualified Clash.Netlist.Id                 as Id
+import           Clash.Netlist.SignalPortal       (resolveSignalPortals)
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
@@ -130,6 +131,7 @@ import qualified Clash.Primitives.GHC.Int         as P
 import qualified Clash.Primitives.GHC.Word        as P
 import qualified Clash.Primitives.Intel.ClockGen  as P
 import qualified Clash.Primitives.Magic           as P
+import qualified Clash.Primitives.SignalPortal    as P
 import qualified Clash.Primitives.Verification    as P
 import qualified Clash.Primitives.Xilinx.ClockGen as P
 import           Clash.Primitives.Types
@@ -447,10 +449,18 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       -- 3. Generate netlist for topEntity
       (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
-        (topComponent, netlist, seen') <-
+        (topComponent0, netlist0, seen') <-
           -- TODO My word, this has far too many arguments.
           genNetlist env peEval isTb transformedBindings topEntityMap compNames
             typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+        (topComponent, netlist, portalWarnings) <-
+          case resolveSignalPortals topComponent0 netlist0 of
+            Left err ->
+              throw (ClashException (nameLoc (varName topEntity)) err Nothing)
+            Right netlist1 ->
+              pure netlist1
+        Monad.forM_ portalWarnings $ \warning ->
+          signalPortalWarning (nameLoc (varName topEntity)) opts warning
 
         pure (seen', (topComponent, netlist))
 
@@ -577,12 +587,21 @@ knownBlackBoxFunctions =
     , ('P.indexToIntegerVHDL, P.indexToIntegerVHDL)
     , ('P.intTF, P.intTF)
     , ('P.iterateBBF, P.iterateBBF)
+    , ('P.portalSinkBBF, P.portalSinkBBF)
     , ('P.signedToIntegerVerilog, P.signedToIntegerVerilog)
     , ('P.signedToIntegerVHDL, P.signedToIntegerVHDL)
     , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
     , ('P.unsignedToIntegerVHDL, P.unsignedToIntegerVHDL)
+    , ('P.portalSourceBBF, P.portalSourceBBF)
     , ('P.wordTF, P.wordTF)
     ]
+
+signalPortalWarning :: SrcSpan -> ClashOpts -> String -> IO ()
+signalPortalWarning sp opts msg
+  | opt_werror opts =
+      throw (ClashException sp msg Nothing)
+  | otherwise =
+      IO.hPutStrLn IO.stderr ("[WARNING] " <> msg)
 
 -- | List of known TemplateFunctions used to prevent Hint from firing. This
 --  improves Clash startup times.

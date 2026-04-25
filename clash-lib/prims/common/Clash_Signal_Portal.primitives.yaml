@@ -1,0 +1,8 @@
+- BlackBoxHaskell:
+    name: Clash.Signal.Portal.portalSource
+    templateFunction: Clash.Primitives.SignalPortal.portalSourceBBF
+    workInfo: Always
+- BlackBoxHaskell:
+    name: Clash.Signal.Portal.portalSink
+    templateFunction: Clash.Primitives.SignalPortal.portalSinkBBF
+    workInfo: Always

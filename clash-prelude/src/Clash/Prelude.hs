@@ -109,6 +109,9 @@ module Clash.Prelude
   , traceVecSignal
     -- ** VCD dump functions
   , dumpVCD
+    -- * Signal portals
+  , portalSource
+  , portalSink
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Signal
@@ -216,6 +219,7 @@ import           Clash.Sized.Vector hiding (fromList, unsafeFromList)
 import           Clash.Signal hiding
   (HiddenClockName, HiddenResetName, HiddenEnableName)
 import           Clash.Signal.Delayed
+import           Clash.Signal.Portal
 import           Clash.Signal.Trace
 import           Clash.XException
 

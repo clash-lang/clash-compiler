@@ -370,6 +370,19 @@ runClashTest = defaultMain
         , outputTest "NameInstance" def
         , outputTest "SetName" def{hdlTargets=[VHDL]}
         , outputTest "SimulationMagic2736" def{hdlTargets=[VHDL]}
+        , let _opts = def { hdlSim = [GHDL, IVerilog, Verilator]
+                          , hdlLoad = [GHDL, IVerilog, Verilator]
+                          }
+           in runTest "SignalPortal" _opts
+        , outputTest "SignalPortal" def{hdlTargets=[VHDL]}
+        , runTest "SignalPortalUnused" def
+          { clashFlags = ["-Werror"]
+          , expectClashFail =
+              Just (def, "Signal portal source 'unused' in component")
+          , hdlTargets = [VHDL]
+          , hdlLoad = []
+          , hdlSim = []
+          }
         , runTest "PatError" def{hdlSim=[]}
         , runTest "ByteSwap32" def
         , runTest "CharTest" def

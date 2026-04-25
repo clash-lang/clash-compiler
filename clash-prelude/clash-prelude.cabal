@@ -264,6 +264,7 @@ Library
                       Clash.Signal.Delayed.Bundle
                       Clash.Signal.Internal
                       Clash.Signal.Internal.Ambiguous
+                      Clash.Signal.Portal
                       Clash.Signal.Trace
 
                       Clash.Sized.BitVector
@@ -448,6 +449,7 @@ test-suite unittests
                  Clash.Tests.Reset
                  Clash.Tests.Resize
                  Clash.Tests.Signal
+                 Clash.Tests.SignalPortal
                  Clash.Tests.Signed
                  Clash.Tests.SizedNum
                  Clash.Tests.TopEntityGeneration
