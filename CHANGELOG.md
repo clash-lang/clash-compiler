@@ -1,5 +1,105 @@
 # Changelog for the Clash project
 
+## 1.10.0 *Apr 23rd, 2026*
+
+Release highlight:
+* `Clash.Class.NumConvert`: Utilities for safely converting between various Clash number types [#2915](https://github.com/clash-lang/clash-compiler/pull/2915)
+
+Added:
+* Added GHC 9.12 support
+* `Clash.Class.NumConvert`: Utilities for safely converting between various Clash number types [#2915](https://github.com/clash-lang/clash-compiler/pull/2915)
+* Add `Clash.XException.ShowX` instance for `Foreign.C.Types.CUShort`. [#2397](https://github.com/clash-lang/clash-compiler/pull/2397)
+* Introduced various new types to `Clash.Signal` to more easily represent time and its relation to your clock domain. New types: `Seconds`, `Milliseconds`, `Microseconds`, `Nanoseconds`, `Picoseconds`, `DomainToHz`, `HzToPeriod`, `PeriodToHz`, `PeriodToCycles`, `ClockDivider`. [#2734](https://github.com/clash-lang/clash-compiler/pull/2734)
+* `Distributive` and `Representable` instances for `Vec`
+* Resize functions `maybeResize` and `maybeTruncateB` to `Clash.Class.Resize`. Can be used to resize without loss of information. [#2779](https://github.com/clash-lang/clash-compiler/issues/2779)
+* Alongside the existing Eq-like and Ord-like signal operators like `.==.` and `.<=.` etc., there are now new functions for comparing with constants: `.==`, `==.`, `./=`, `/=.`, `.<=`, `<=.`, `.>=`, `>=.`, `.>`, `>.`, `.<`, `<.`, `.&&`, `&&.`, `.||`, `||.`. These are useful for comparing signals with constants in a more readable way. For example, `a .==. pure True` can now be replaced with `a .== True`. [#2545](https://github.com/clash-lang/clash-compiler/pull/2545)
+* instance `HasField f (Signal dom r) (Signal dom a)`. This means record dot accesses will be passed to the underlying type. For example, this will work:
+
+  ```haskell
+  data MyRecord = MyRecord { myField :: Int }
+
+  a :: Signal dom MyRecord
+  a = pure (MyRecord 3)
+
+  b :: Signal dom Int
+  b = a.myField
+  ```
+* `BitPack` instance for `Data.Proxy.Proxy`
+* `apEn`, which is a `mux` that optionally applies an update function to a value. [#3029](https://github.com/clash-lang/clash-compiler/pull/3029)
+* `regEnN`, which is a chain of `regEn`s. [#3029](https://github.com/clash-lang/clash-compiler/pull/3029)
+* `Index 0` instances for `BitPack`, `Bits`, `Counter`, `FiniteBits`, `Parity`, and `SaturatingNum`. [#2784](https://github.com/clash-lang/clash-compiler/pull/2784)
+* Zero-sized block RAM implementations for `blockRam1` and `blockRamU`. [#2784](https://github.com/clash-lang/clash-compiler/pull/2784)
+* `Counter a => Counter (Vec 0 a)` instance. [#2784](https://github.com/clash-lang/clash-compiler/pull/2784)
+* `SaturatingNum` and `Bounded` instances for `Signal dom a`. The `sat` family (`satAdd`, `satSucc`, ...) can now be used on `Signal`s and `{min,max}Bound` can be used to construct them [#2931](https://github.com/clash-lang/clash-compiler/issues/2931)
+* `-fclash-no-concurrent-topentity-compilation` flag to disable concurrent compilation of top entities. This is mostly useful to get a consistent debug output.
+* `SomeBoundedSNat` and Hedgehog generators [#3183](https://github.com/clash-lang/clash-compiler/pull/3183)
+* `Eq`, `NFData`, `ShowX` and `BitPack` instances for `RamOp`.
+* `smapWithBounds` extending `smap` via offering a proof witness for the upper bound of the vector size to the mapping function. [#2686](https://github.com/clash-lang/clash-compiler/pull/2686)
+* The function `Clash.Explicit.DDR.ddrForwardClock`, which uses a DDR output primitive to forward a clock signal to a DDR-capable output pin. [#2876](https://github.com/clash-lang/clash-compiler/pull/2876)
+
+Removed:
+* Support for GHC versions 9.4 and older
+* Newer Verilators (> v5) can deal with delay statements, hence removing the need for Clash specific workarounds. If you relied on Clash-generated Verilator shims, consider using `verilator --build --binary` instead.
+* Experimental feature "multiple hidden domains" [#2750](https://github.com/clash-lang/clash-compiler/pull/2750)
+* The deprecated module `Clash.Prelude.DataFlow` was removed. The `clash-protocols` package provides dataflow-based protocols and circuits. [#3181](https://github.com/clash-lang/clash-compiler/pull/3181)
+* The deprecated functions `altpll` and `alteraPll` were removed from the `Clash.Intel.ClockGen` module. Clash 1.8 introduced the new functions `altpllSync`, `alteraPllSync`, `unsafeAltpll` and `unsafeAlteraPll`. A name for the IP instantiation, handled by the _name_ argument to `altpll` and `alteraPll`, can be provided with the `Clash.Magic.setName` function. [#3181](https://github.com/clash-lang/clash-compiler/pull/3181)
+
+Changed:
+* `dfold` now offers a proof witness for the upper bound of the vector size to the folding function. Note that this change may require additional type annotations, as solutions working in the past may complain with an untouchable type error now. [#2686](https://github.com/clash-lang/clash-compiler/pull/2686)
+* You can now only create an `SDomainConfiguration` when the `period` of the domain is at least `1`. Pattern matching on an `SDomainConfiguration` bring the `1 <= period` into scope. This in turns enables the following code to typecheck:
+  ```
+  import Clash.Prelude
+  import Data.Proxy
+
+  f ::
+    forall dom .
+    KnownDomain dom =>
+    Proxy dom ->
+    SNat (PeriodToCycles dom (Milliseconds 1))
+  f Proxy = case knownDomain @dom of
+      SDomainConfiguration {} -> SNat
+  ```
+  where the `DivRU` in
+  ```
+  type PeriodToCycles (dom :: Domain) (period :: Nat) =  period `DivRU` DomainPeriod dom
+  ```
+  requires that the `DomainPeriod dom` is at least `1`. [#2740](https://github.com/clash-lang/clash-compiler/pull/2740)
+* `select` and `selectI` now use `<=` constraints instead of `CmpNat`. [#2873](https://github.com/clash-lang/clash-compiler/pull/2873)
+* `ResetStrategy` now contains the reset function, to avoid dummy arguments on `NoClearOnReset` [#2849](https://github.com/clash-lang/clash-compiler/pull/2849)
+* `Clash.Explicit.DDR`, `Clash.Intel.DDR` and `Clash.Xilinx.DDR`: [#2833](https://github.com/clash-lang/clash-compiler/pull/2833)
+    - The constraints for the functions have been rewritten to use `DomainPeriod`, which makes them more readable and relaxes unnecessary constraints on the virtual DDR domain. The type-level variables for the domains have been renamed. `dom` is a real domain, `domDDR` is the virtual DDR domain.
+    - The Xilinx and Intel primitives only support domains where the rising edge is the active edge. This is now enforced at the type level by adding a constraint.
+    - The Xilinx and Intel primitives now directly support any data type that has a `BitPack` instance.
+* Order of type arguments for functions in `clash-prelude-hedgehog` now follows _size_, _domain_, _monad_. [#2880](https://github.com/clash-lang/clash-compiler/pull/2880)
+* The Clash Prelude now exports the `Default` class from the package `data-default` instead of from the now superseded `data-default-class`. If you import the `Default` class name or the `def` function from the `data-default-class` package _older than version 0.2_, or one of your dependencies does, you might get a bewildering error message. You might get the error "No instance for (Default T)" even though there appears to be such an instance. The best solution is to make sure all your packages and dependencies use the `data-default` package and not the `data-default-class` package. The next most obvious solution is to make sure `data-default-class` is of version 0.2 or higher, for instance by depending on it in your own package. If this creates a dependency conflict, another solution is to import the correct module. `Default` and `def` from `Clash.Prelude` or `Data.Default` are for the new `data-default` package. `Data.Default.Class` is for the `data-default-class` package. There are situations where this will still not be enough, but luckily the `Default` class is not used all that much. [#2891](https://github.com/clash-lang/clash-compiler/pull/2891)
+* Changed implementation of `(+>>)` to no longer require `KnownNat`
+* The `clash-prelude` package now uses `PolyKinds` by default, meaning all its type class instances are now more general than before. As an example, without `PolyKinds`, `BitPack (Proxy a)` would only be defined when `a :: Type`, with the extension it would be defined for any  `a :: k`. After this change, some instances in user code might now overlap. [#2994](https://github.com/clash-lang/clash-compiler/pull/2994)
+* When generating (System)Verilog, Clash now resets the default net type from none to the verilog default after the generated module. [#3005](https://github.com/clash-lang/clash-compiler/pull/3005)
+* The content from the `Clash.Tutorial` module and from https://clash-lang.readthedocs.io/ has been split and moved to two new locations.
+  1. The actual tutorial parts has been moved to: https://docs.clash-lang.org/tutorial/
+  2. Parts that fit better in the clash compiler user guide have been moved to: https://docs.clash-lang.org/compiler-user-guide/
+
+  Moving the documentation to these locations makes it easier to update their content as it is no longer needed to release a new version of the `clash-prelude` package for the publication of this content.
+* Vector functions in Verilog now have indices consistent with the Vec inputs/outputs (before they were reversed). This is convenient when writing design constraints, which can now be referenced consistently like `imap[0],imap[1],..`. See [#3088](https://github.com/clash-lang/clash-compiler/issues/3088).
+
+Fixed:
+* Clash no longer gives `Dubious primitive instantiation warning` when using `unpack` [#2386](https://github.com/clash-lang/clash-compiler/issues/2386).
+* Clash now generates more intuitive names for specialized binders. See [#2508](https://github.com/clash-lang/clash-compiler/issues/2508).
+* `foldl` on `Vec` is now strict. See [this GitHub discussion](https://github.com/hasura/graphql-engine/pull/2933#discussion_r328821960) and [this blog post](https://well-typed.com/blog/90/) for more information. [#2482](https://github.com/clash-lang/clash-compiler/issues/2482)
+* Type families that appear in GHC core types are now normalized before being translated into their Clash core equivalent. See [#3063](https://github.com/clash-lang/clash-compiler/issues/3063).
+* Added an evaluator rule for `bigNatEq#` with compile-time constant arguments [#3084](https://github.com/clash-lang/clash-compiler/issues/3084)
+* Reduce constants to NF before specialization [#3129](https://github.com/clash-lang/clash-compiler/issues/3129)
+* `rotateL` and `rotateR` no longer error when used on `BitVector 0` [#2980](https://github.com/clash-lang/clash-compiler/issues/2980)
+* Behavior of `shiftR` is now documented for `Unsigned`, `BitVector`, `Index`, and `Signed` [#2959](https://github.com/clash-lang/clash-compiler/issues/2959)
+* Clash will no longer error if it finds the same data file more than once due to duplicate `-i` flags [#3141](https://github.com/clash-lang/clash-compiler/issues/3141)
+* Higher order blackboxes not propagating usage metadata for generated results [#3147](https://github.com/clash-lang/clash-compiler/issues/3147)
+* Run `caseCon` after post-normalization `inlineCleanup` [#3159](https://github.com/clash-lang/clash-compiler/issues/3159)
+* Failure to generate binder assignments in very specific cases [#3185](https://github.com/clash-lang/clash-compiler/issues/3185)
+* Clash won't create (invalid) netlist cases on Integer and Natural constructors anymore [#3157](https://github.com/clash-lang/clash-compiler/issues/3157)
+* Post-normalization flattening could leave a `Just` constructor as the scrutinee of a `case` after simplifying tuple projections [#3204](https://github.com/clash-lang/clash-compiler/issues/3204)
+* Clash no longer crashes on false positive free variable introduction in `reduceConst` and `constantSpec`. Fixes [#3206](https://github.com/clash-lang/clash-compiler/issues/3206).
+* `negate` for `Num Bit` is now defined as the additive inverse, i.e., `negate = id`. [#2999](https://github.com/clash-lang/clash-compiler/issues/2999)
+
 ## 1.8.5 *Mar 24th, 2026*
 
 Added:
