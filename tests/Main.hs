@@ -305,7 +305,7 @@ runClashTest = defaultMain
           , hdlLoad=[]
           , hdlSim=[]
           , verificationTool=Just SymbiYosys
-          , expectVerificationFail=Just (def, "Unreached cover statement at B")
+          , expectVerificationFail=Just (def, "Unreached cover statement at topEntity: B")
           }
         ]
       , clashTestGroup "ZeroWidth"

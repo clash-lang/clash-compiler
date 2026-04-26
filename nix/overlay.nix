@@ -229,20 +229,42 @@ let
           ];
 
           postInstall = (old.postInstall or "") + ''
+            ghcBinDir=${dirOf "${old.passthru.env.NIX_GHC}"}
+            ghcLibDir="${old.passthru.env.NIX_GHC_LIBDIR}"
+            globalPackageDb="$ghcLibDir/package.conf.d"
+            testsuitePackageDb="$out/lib/''${ghcLibDir#*/lib/}/package.conf.d"
+            wrapperDir="$out/libexec/clash-testsuite-wrappers"
+
+            mkdir -p "$wrapperDir"
+
+            cat > "$wrapperDir/clash" <<EOF
+            #!${prev.runtimeShell}
+            exec ${hfinal.clash-ghc}/bin/clash \
+              -package-db "$globalPackageDb" \
+              -package-db "$testsuitePackageDb" \
+              "\$@"
+            EOF
+            chmod +x "$wrapperDir/clash"
+
+            "$ghcBinDir/ghc-pkg" recache --package-db="$testsuitePackageDb"
+
             wrapProgram $out/bin/clash-testsuite \
               --add-flags "--no-modelsim --no-vivado" \
-              --prefix PATH : ${dirOf "${old.passthru.env.NIX_GHC}"} \
-              --set GHC_PACKAGE_PATH "${old.passthru.env.NIX_GHC_LIBDIR}/package.conf.d:" \
+              --prefix PATH : "$ghcBinDir" \
+              --prefix PATH : "$wrapperDir" \
+              --set GHC_PACKAGE_PATH "$testsuitePackageDb:$globalPackageDb:" \
+              --set USE_GLOBAL_CLASH 1 \
               --prefix PATH : ${prev.lib.makeBinPath [
                 prev.gcc
-                prev.ghdl-llvm
+                final.ghdl-llvm
                 prev.sby
-                prev.verilator
+                final.verilator
                 prev.iverilog
                 prev.yosys
+                prev.z3
               ]} \
               --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
-                prev.ghdl-llvm
+                final.ghdl-llvm
                 prev.zlib.static
               ]}
           '';
@@ -257,6 +279,12 @@ let
     ];
 in
 {
+  verilator = prev.verilator.overrideAttrs (old: {
+    patches = prev.lib.unique ((old.patches or [ ]) ++ [
+      ./verilator-fix-side-effect-loss-when-slicing-astexprstmt-array-expressions.patch
+    ]);
+  });
+
   # gnat13 which si the default as of 11.03.2026 does not support aarch64
   # but ghdl-llvm works fine with gnat14 sos witch to it.
   ghdl-llvm = prev.ghdl-llvm.override { gnat = prev.gnat14; };
