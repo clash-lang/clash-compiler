@@ -73,6 +73,14 @@ data RecordWithSimOnlyField = RecordWithSimOnlyField
   , someOtherField :: "c" ::: Signal System ("wobble" ::: Int)
   }
 
+newtype N a = N a
+
+data NewtypedRecord =
+  NewtypedRecord
+    { nrA :: "a" ::: Bool
+    , nrB :: "b" ::: Bool
+    }
+
 
 topEntity1 :: "in1" ::: Signal System Int
            -> "in2" ::: Signal System Bool
@@ -261,6 +269,17 @@ expectedTopEntity10 =
     ]
     (PortName "out")
 
+-- See https://github.com/clash-lang/clash-compiler/issues/3066
+topEntity11 :: "o" ::: N NewtypedRecord
+topEntity11 = undefined
+makeTopEntity 'topEntity11
+
+expectedTopEntity11 :: TopEntity
+expectedTopEntity11 =
+  Synthesize "topEntity11"
+    []
+    (PortProduct "o" [PortName "a", PortName "b"])
+
 topEntityFailure1
   :: "int"     ::: Signal System Int
   -> "tuple"   ::: ("tup1" ::: Signal System (BitVector 7), "tup2" ::: Signal System (BitVector 9))
@@ -342,6 +361,9 @@ tests =
       , testCase "topEntity10" $
           $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity10)
           @?= Just expectedTopEntity10
+      , testCase "topEntity11" $
+          $(unTypeQ $ maybeBuildTopEntity Nothing 'topEntity11)
+          @?= Just expectedTopEntity11
       ]
     , testGroup "Expected failures"
       [ testCase "topEntityFailure1" $
