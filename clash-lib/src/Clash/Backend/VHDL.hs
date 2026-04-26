@@ -970,14 +970,18 @@ entity c = do
 architecture :: Component -> VHDLM Doc
 architecture c = do {
   ; syn <- Ap hdlSyn
-  ; let attrs = case syn of
+  -- The entity declarative region is implicitly visible inside the
+  -- architecture, so re-declaring `attribute X : T;` here for an `X` already
+  -- declared by the entity produces a duplicate declaration that GHDL rejects.
+  -- Skip declarations for any (name, type) pair already emitted by the entity.
+  ; let (entityDeclared, attrs) = case syn of
                   -- See: [Note] Hack entity attributes in architecture
-                  Other -> declAttrs
-                  _     -> inputAttrs ++ outputAttrs ++ declAttrs
+                  Other -> (entityDeclaredAttrTypes c, declAttrs)
+                  _     -> (mempty, inputAttrs ++ outputAttrs ++ declAttrs)
   ; nest 2
       (("architecture structural of" <+> pretty (componentName c) <+> "is" <> line <>
        decls (declarations c)) <> line <>
-       if null attrs then emptyDoc else line <> line <> renderAttrs (TextS.pack "signal") attrs) <> line <>
+       if null attrs then emptyDoc else line <> line <> renderAttrsSkippingDecls (TextS.pack "signal") entityDeclared attrs) <> line <>
     nest 2
       ("begin" <> line <>
        insts (declarations c)) <> line <>
@@ -992,6 +996,14 @@ architecture c = do {
    isNetDecl :: Declaration -> Bool
    isNetDecl NetDecl'{} = True
    isNetDecl _          = False
+
+-- | The (name, type) pairs of attribute declarations emitted by 'entity' for a
+-- given component. Only for input and output ports, not for any internal signals.
+entityDeclaredAttrTypes :: Component -> HashMap TextS.Text TextS.Text
+entityDeclaredAttrTypes c = attrTypes (map snd (inputAttrs ++ outputAttrs))
+ where
+  inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
+  outputAttrs = [(id_, attr) | (_, (id_, hwtype), _) <- outputs c, attr <- hwTypeAttrs hwtype]
 
 attrType ::
   HashMap TextS.Text TextS.Text ->
@@ -1054,15 +1066,28 @@ renderAttrs
   :: TextS.Text
   -> [(Identifier, Attr TextS.Text)]
   -> VHDLM Doc
-renderAttrs what (attrMap -> attrs) =
+renderAttrs what = renderAttrsSkippingDecls what HashMap.empty
+
+-- | Like 'renderAttrs', but skip emitting the @attribute X : T;@ declaration
+-- line for any name that appears in the supplied @name -> type@ map with the
+-- same type.
+renderAttrsSkippingDecls
+  :: TextS.Text
+  -> HashMap TextS.Text TextS.Text
+  -> [(Identifier, Attr TextS.Text)]
+  -> VHDLM Doc
+renderAttrsSkippingDecls what skipDecls (attrMap -> attrs) =
   vcat $ sequence $ intersperse " " $ map renderAttrGroup (HashMap.toList attrs)
  where
   renderAttrGroup
     :: (TextS.Text, (TextS.Text, [(TextS.Text, TextS.Text)]))
     -> VHDLM Doc
   renderAttrGroup (attrname, (typ, elems)) =
-    ("attribute" <+> stringS attrname <+> colon <+> stringS typ <> semi)
-    <> line <>
+    (if HashMap.lookup attrname skipDecls == Just typ
+       then emptyDoc
+       else ("attribute" <+> stringS attrname <+> colon <+> stringS typ <> semi)
+            <> line)
+    <>
     (vcat $ sequence $ map (renderAttrDecl attrname) elems)
 
   renderAttrDecl
