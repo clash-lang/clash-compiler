@@ -1,4 +1,4 @@
-name: Nix Packaging
+name: On push CI
 
 on: push
 
@@ -7,6 +7,99 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Nix by default runs tests, meaning that there's not much point in re-running tests in Cabal/Stack
+  # So for these we do a simple compilation test instead, checking that they still compile with
+  # whatever changes got made
+
+  cabal:
+    name: Cabal compilation test
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: [
+          9.12.4,
+          9.10.3,
+          9.8.4,
+          9.6.7
+        ]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup cache
+        run: mkdir .cache
+      - uses: tespkg/actions-cache@v1
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-checkout-cabal
+          path: .cache
+
+      # Perhaps we should preinstall these on the container?
+      # This step always takes a minute...
+      # We'd lose the ability to select the version of cabal inside of the runner though
+      - name: Install GHC
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: latest
+
+      - name: Version information
+        run:
+          cabal --version
+
+  stack:
+    name: Stack compilation test
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: [
+          9.12.4,
+          9.10.3,
+          9.8.4,
+          9.6.7
+        ]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup cache
+        run: mkdir .cache
+      - uses: tespkg/actions-cache@v1
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-checkout-stack
+          path: ~/.stack
+
+      # Perhaps we should preinstall these on the container?
+      # This step always takes a minute...
+      # We'd lose the ability to select the version of cabal inside of the runner though
+      - name: Install GHC
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          enable-stack: true
+          stack-version: latest
+
+      - name: Version information
+        run:
+          stack --version
+
   packages_common:
     name: Build Common (${{matrix.ghc}})
     runs-on: self-hosted
@@ -39,7 +132,6 @@ jobs:
       - run: |
           nix build -L .#clashPackages-${{matrix.ghc}}.clash-prelude
           attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-prelude)
-
       - run: |
           nix build -L .#clashPackages-${{matrix.ghc}}.clash-lib
           attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-lib)
