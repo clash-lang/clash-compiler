@@ -1,0 +1,1 @@
+FIXED: Clash no longer produces an error when using `dataToTag` in combination with custom bit representations. See [#2724](https://github.com/clash-lang/clash-compiler/issues/2724).

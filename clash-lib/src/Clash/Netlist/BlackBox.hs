@@ -553,18 +553,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               [Right _,Left (Data dc)] -> do
                 iw <- Lens.view intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
-              [Right _,Left scrut] -> do
-                tcm      <- Lens.view tcCache
-                let scrutTy = inferCoreTypeOf tcm scrut
-                scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-                (scrutExpr,scrutDecls) <-
-                  mkExpr False declType (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
-                case scrutExpr of
-                  Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
-                  _ -> do
-                    tmpRhs <- Id.make "c$dtt_rhs"
-                    netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
-                    return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
+              [Right _,Left scrut] -> mkDataToTag declType assignTy scrut
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
           | pNm `elem`
@@ -572,18 +561,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               [Right _, Right _,Left (Data dc)] -> do
                 iw <- Lens.view intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
-              [Right _, Right _,Left scrut] -> do
-                tcm      <- Lens.view tcCache
-                let scrutTy = inferCoreTypeOf tcm scrut
-                scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-                (scrutExpr,scrutDecls) <-
-                  mkExpr False declType (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
-                case scrutExpr of
-                  Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
-                  _ -> do
-                    tmpRhs <- Id.make "c$dtt_rhs"
-                    netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
-                    return (DataTag scrutHTy (Right tmpRhs),netDecl ++ scrutDecls)
+              [Right _, Right _,Left scrut] -> mkDataToTag declType assignTy scrut
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
           | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
@@ -789,6 +767,58 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
       Nothing -> pure Nothing
       Just ([id_],[nm_],decls) -> pure (Just (id_,nm_,decls))
       _ -> error "internal error"
+
+-- | Lower a non-constant @dataToTag# scrut@ to netlist. For plain @Sum@/@SP@
+-- types, the bits stored in @scrut@ /are/ the GHC tag, so a 'DataTag' netlist
+-- expression that the backend renders as a bit-extract is sufficient. For
+-- types with a user-defined bit representation (@CustomSum@, @CustomSP@,
+-- @CustomProduct@) the stored bits are arbitrary, so we lower to a
+-- 'CondAssignment' that maps each constructor's custom bit pattern back to
+-- its GHC tag (@dcTag - 1@). See issue #2724.
+mkDataToTag
+  :: HasCallStack
+  => DeclarationType
+  -> Usage
+  -> Term
+  -> NetlistMonad (Expr, [Declaration])
+mkDataToTag declType assignTy scrut = do
+  tcm      <- Lens.view tcCache
+  let scrutTy = inferCoreTypeOf tcm scrut
+  scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+  (scrutExpr, scrutDecls) <-
+    mkExpr False declType (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
+  (scrutId, scrutDecls') <- case scrutExpr of
+    Identifier id_ Nothing -> pure (id_, scrutDecls)
+    _ -> do
+      tmpRhs <- Id.make "c$dtt_rhs"
+      netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+      pure (tmpRhs, netDecl ++ scrutDecls)
+  let nReprs = case scrutHTy of
+        CustomSum _ _ _ reprs -> Just (length reprs)
+        CustomSP  _ _ _ reprs -> Just (length reprs)
+        CustomProduct {}      -> Just 1
+        _                     -> Nothing
+  case nReprs of
+    Nothing -> pure (DataTag scrutHTy (Right scrutId), scrutDecls')
+    Just k -> do
+      iw <- Lens.view intWidth
+      let sIw = Signed iw
+      if k <= 1
+        then pure ( N.Literal (Just (sIw, iw)) (NumLit 0)
+                  , scrutDecls' )
+        else do
+          tag <- Id.make "c$dtt_tag"
+          let alts = [ ( Just (NumLit (toInteger i))
+                       , N.Literal (Just (sIw, iw)) (NumLit (toInteger i)))
+                     | i <- [0 .. k - 1] ]
+              tagDecl = NetDecl' Nothing tag sIw Nothing
+          assn <- N.condAssign tag sIw (Identifier scrutId Nothing) scrutHTy alts
+          -- Wrap the tag identifier in an identity 'DataCon' so the caller's
+          -- catch-all assignment fires (an 'Identifier _ Nothing' would be
+          -- skipped, leaving the destination unassigned). All backends render
+          -- 'DataCon _ (DC (Void {}, -1)) [e]' as 'e' verbatim.
+          pure ( N.DataCon sIw (DC (Void Nothing, -1)) [Identifier tag Nothing]
+               , tagDecl : assn : scrutDecls' )
 
 -- | Turn a 'mealyIO' expression into a two sequential processes, one "initial"
 -- process for the starting state, and one clocked sequential process.
