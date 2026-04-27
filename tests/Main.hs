@@ -5,6 +5,7 @@ module Main (main) where
 
 import qualified Clash.Util.Interpolate    as I
 
+import           Control.Monad             (unless, forM_)
 import           Clash.Annotations.Primitive (HDL(..))
 import qualified Data.Text                 as Text
 import           Data.Default              (def)
@@ -12,7 +13,8 @@ import           Data.List                 ((\\), intercalate)
 import           Data.List.Extra           (trim)
 import           Data.Version              (versionBranch)
 import           System.Directory
-  (getCurrentDirectory, doesDirectoryExist, makeAbsolute, setCurrentDirectory)
+  ( findExecutable, getCurrentDirectory, doesDirectoryExist, makeAbsolute
+  , setCurrentDirectory)
 import           System.Environment
 import           System.Info
 import           System.Process            (readProcess)
@@ -1092,10 +1094,43 @@ runClashTest = defaultMain
     ] -- end tests
   ] -- end .
 
+-- | Mapping from tasty flag to executables that must be on @PATH@ for that
+-- backend to be considered available.
+autoDetectTools :: [(String, [String])]
+autoDetectTools =
+  [ ("--no-modelsim",   ["vsim"])
+  , ("--no-vivado",     ["vivado"])
+  , ("--no-verilator",  case os of {"mingw32" -> ["verilator_bin"]; _ -> ["verilator"]})
+  , ("--no-ghdl",       ["ghdl"])
+  , ("--no-symbiyosys", ["sby"])
+  , ("--no-iverilog",   ["iverilog"])
+  ]
+
+-- | Replace @--auto-detect-tools@ in the argument list with @--no-*@ flags for
+-- backends whose executables are not found on @PATH@.
+expandAutoDetectTools :: [String] -> IO [String]
+expandAutoDetectTools args
+  | autoFlag `elem` args = do
+    let rest = filter (/= autoFlag) args
+    missing <- mapM detectMissing autoDetectTools
+    let injected = [flag | (flag, Nothing) <- zip (map fst autoDetectTools) missing]
+    unless (null injected) $ do
+      putStrLn $ "Ignoring one or more tool due to " <> autoFlag <> ". Running with implicit flags: "
+      forM_ injected $ \i -> do
+        putStrLn $ "  " <> i
+    pure (injected <> rest)
+  | otherwise = pure args
+ where
+  autoFlag = "--auto-detect-tools"
+  detectMissing (_, exes) = findFirst exes
+  findFirst [] = pure Nothing
+  findFirst (e:es) = findExecutable e >>= maybe (findFirst es) (pure . Just)
+
 main :: IO ()
 main = do
+  args <- getArgs >>= expandAutoDetectTools
   projectRoot <- trim <$> readProcess "git" ["rev-parse", "--show-toplevel"] ""
   setCurrentDirectory projectRoot
   setEnv "TASTY_NUM_THREADS" (show numCapabilities)
   setClashEnvs compiledWith
-  runClashTest
+  withArgs args runClashTest
