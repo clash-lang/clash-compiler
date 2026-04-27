@@ -69,8 +69,8 @@ import Clash.Core.Term
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
-  , mkPolyFunTy, mkTyConApp)
+  (LitTy(NumTy), Type(LitTy,VarTy), TypeView(..), applyFunTy, splitTyConAppM
+  , normalizeType, mkPolyFunTy, mkTyConApp, tyView)
 import Clash.Core.TysPrim
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
@@ -248,6 +248,37 @@ appProp ctx@(TransformContext is _) = \case
   go is0 (Tick sp e) args ticks = do
     setChanged
     go is0 e args (sp:ticks)
+
+  -- Push a cast outward through an application:
+  --
+  --   App (Cast e (a -> b) (a' -> b')) x
+  --     ==> Cast (App e (Cast x a' a)) b b'
+  --
+  -- and continue propagating the remaining args. When the cast only adds or
+  -- strips a 'Signal _' wrapper around a function type, the cast can be
+  -- dropped entirely because Signal is representationally equal to its
+  -- payload at this point in the pipeline.
+  go is0 (Cast e tyA tyB) args0@(Left arg:args1) ticks = case (tyView tyA, tyView tyB) of
+    (FunTy aa ar, FunTy ba br) -> do
+      setChanged
+      Cast <$> go is0 e (Left (Cast arg ba aa) : args1) ticks
+           <*> pure ar
+           <*> pure br
+    (TyConApp sigTc [_domTy, fTy], FunTy ba br)
+      | nameOcc sigTc == "Clash.Signal.Internal.Signal"
+      , FunTy aa ar <- tyView fTy
+      , aa == ba
+      , ar == br
+      -> do setChanged
+            go is0 e args0 ticks
+    (FunTy aa ar, TyConApp sigTc [_domTy, fTy])
+      | nameOcc sigTc == "Clash.Signal.Internal.Signal"
+      , FunTy ba br <- tyView fTy
+      , aa == ba
+      , ar == br
+      -> do setChanged
+            go is0 e args0 ticks
+    _ -> return (mkApps (mkTicks (Cast e tyA tyB) ticks) args0)
 
   go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
 
