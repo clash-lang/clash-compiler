@@ -1,0 +1,1 @@
+FIXED: Due to HDL standards, when the result of a top entity is read by another binder Clash is forced to introduce an internal indirection signal. Clash no longer attaches the top entity's `Annotate` synthesis attributes to that internal signal, preventing duplicate synthesis attributes in the generated HDL. See [#3224](https://github.com/clash-lang/clash-compiler/issues/3224).
