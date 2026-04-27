@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2021-2022, QBayLogic B.V.
+Copyright  :  (C) 2021-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -138,6 +138,75 @@ instance (Bounded a, Ord a, SaturatingNum a) => Num (Overflowing a) where
 instance (Bounded a) => Bounded (Overflowing a) where
   minBound = Overflowing minBound False
   maxBound = Overflowing maxBound False
+
+-- | NOTE: Usage of this instance might introduce redundant circuitry
+-- for the overflow check (depending on the utilized 'SaturationMode'
+-- or inner type), which is not guaranteed to be optimized away at a
+-- later synthesis stage.
+--
+-- The 'hasOverflowed' flag still will be set even when the 'SaturatingNum'
+-- operation has prevented the overflow:
+-- @hasOverflowed (satSucc SatBound maxBound) == True@
+instance (Ord a, SaturatingNum a) => SaturatingNum (Overflowing a) where
+  {-# INLINE satAdd #-}
+  satAdd mode (Overflowing x a) (Overflowing y b)
+    | y > 0
+    , x > satSub SatWrap maxBound y
+    = withOverflow True
+
+    | y < 0
+    , x < satSub SatWrap minBound y
+    = withOverflow True
+
+    | otherwise
+    = withOverflow (a || b)
+   where
+    withOverflow =
+      let r = satAdd mode x y
+       in seq r $ Overflowing r
+
+  {-# INLINE satSub #-}
+  satSub mode (Overflowing x a) (Overflowing y b)
+    | y < 0
+    , x > satAdd SatWrap maxBound y
+    = withOverflow True
+
+    | y > 0
+    , x < satAdd SatWrap minBound y
+    = withOverflow True
+
+    | otherwise
+    = withOverflow (a || b)
+   where
+    withOverflow =
+      let r = satSub mode x y
+       in seq r $ Overflowing r
+
+  {-# INLINE satMul #-}
+  satMul mode (Overflowing x a) (Overflowing y b)
+    | x /= 0
+    , y /= 0
+    , satMul SatZero x y == 0
+    = withOverflow True
+
+    | otherwise
+    = withOverflow (a || b)
+   where
+    withOverflow =
+      let r = satMul mode x y
+       in seq r $ Overflowing r
+
+  {-# INLINE satSucc #-}
+  satSucc mode (Overflowing x a) =
+    let xSucc = satSucc mode x
+     in seq xSucc
+      $ Overflowing xSucc (a || x == maxBound)
+
+  {-# INLINE satPred #-}
+  satPred mode (Overflowing x a) =
+    let xPred = satPred mode x
+     in seq xPred
+      $ Overflowing (satPred mode x) (a || x == minBound)
 
 instance (Enum a, Eq a, SaturatingNum a) => Enum (Overflowing a) where
   succ (Overflowing x a)
