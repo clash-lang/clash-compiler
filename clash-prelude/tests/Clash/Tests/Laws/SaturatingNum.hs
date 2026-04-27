@@ -21,6 +21,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.HUnit.Extra
 
 import Clash.Class.Num
+import Clash.Num.Overflowing (Overflowing, toOverflowing)
 import Clash.Sized.Index (Index)
 import Clash.Sized.Signed (Signed)
 import Clash.Sized.Fixed (SFixed, UFixed)
@@ -151,11 +152,20 @@ genBoundedIntegral = Gen.frequency
 genIndex :: forall n. KnownNat n => Gen (Index n)
 genIndex = genBoundedIntegral
 
+genOIndex :: forall n. KnownNat n => Gen (Overflowing (Index n))
+genOIndex = toOverflowing <$> genIndex
+
 genUnsigned :: forall n. KnownNat n => Gen (Unsigned n)
 genUnsigned = genBoundedIntegral
 
+genOUnsigned :: forall n. KnownNat n => Gen (Overflowing (Unsigned n))
+genOUnsigned = toOverflowing <$> genUnsigned
+
 genSigned :: forall n. KnownNat n => Gen (Signed n)
 genSigned = genBoundedIntegral
+
+genOSigned :: forall n. KnownNat n => Gen (Overflowing (Signed n))
+genOSigned = toOverflowing <$> genSigned
 
 -- | Generates a bounded fractional with a bias towards extreme values:
 --
@@ -179,8 +189,14 @@ genBoundedFractional = Gen.frequency
 genSFixed :: forall a b. (KnownNat a, KnownNat b) => Gen (SFixed a b)
 genSFixed = genBoundedFractional
 
+genOSFixed :: forall a b. (KnownNat a, KnownNat b) => Gen (Overflowing (SFixed a b))
+genOSFixed = toOverflowing <$> genSFixed
+
 genUFixed :: forall a b. (KnownNat a, KnownNat b) => Gen (UFixed a b)
 genUFixed = genBoundedFractional
+
+genOUFixed :: forall a b. (KnownNat a, KnownNat b) => Gen (Overflowing (UFixed a b))
+genOUFixed = toOverflowing <$> genUFixed
 
 tests :: TestTree
 tests = testGroup "SaturatingNum"
@@ -225,4 +241,20 @@ tests = testGroup "SaturatingNum"
   , testSaturationLaws False "UFixed 7 7" (genUFixed @7 @7)
   , testSaturationLaws False "UFixed 121 121" (genUFixed @121 @121)
   , testSaturationLaws False "UFixed 128 128" (genUFixed @128 @128)
+
+  , testSaturationLaws True "Overflowing (Index 1)" (genOIndex @1)
+  , testSaturationLaws True "Overflowing (Index 10)" (genOIndex @10)
+  , testSaturationLaws True "Overflowing (Signed 0)" (genOSigned @0)
+  , testSaturationLaws True "Overflowing (Signed 8)" (genOSigned @8)
+  , testSaturationLaws True "Overflowing (Unsigned 0)" (genOUnsigned @0)
+  , testSaturationLaws True "Overflowing (Unsigned 8)" (genOUnsigned @8)
+  , testSaturationLaws False "Overflowing (UFixed 7 7)" (genOUFixed @7 @7)
+  , testSaturationLaws False "Overflowing (SFixed 0 0)" (genOSFixed @0 @0)
+  , testSaturationLaws False "Overflowing (SFixed 0 1)" (genOSFixed @0 @1)
+  , testSaturationLaws False "Overflowing (SFixed 1 0)" (genOSFixed @1 @0)
+  , testSaturationLaws False "Overflowing (SFixed 7 7)" (genOSFixed @7 @7)
+  , testSaturationLaws False "Overflowing (UFixed 0 0)" (genOUFixed @0 @0)
+  , testSaturationLaws False "Overflowing (UFixed 0 1)" (genOUFixed @0 @1)
+  , testSaturationLaws False "Overflowing (UFixed 1 0)" (genOUFixed @1 @0)
+  , testSaturationLaws False "Overflowing (UFixed 7 7)" (genOUFixed @7 @7)
   ]
