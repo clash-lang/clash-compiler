@@ -726,20 +726,27 @@ mkSelectorCase
   -> Int -- ^ n'th DataCon
   -> Int -- ^ n'th field
   -> m Term
-mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scrut)
+mkSelectorCase caller inScope tcm scrut0 dcI fieldI =
+  go scrut0 (inferCoreTypeOf tcm scrut0)
   where
-    go (coreView1 tcm -> Just ty') = go ty'
-    go scrutTy@(tyView -> TyConApp tc args) =
+    -- When stripping a Signal layer, insert an explicit Cast on the scrutinee
+    -- so the resulting Case is well-typed independent of the Signal arm of
+    -- coreView1. Newtypes / type families continue to be stripped implicitly.
+    go scrut sigTy@(tyView -> TyConApp tcNm [_domTy, elTy])
+      | nameOcc tcNm == "Clash.Signal.Internal.Signal"
+      = go (Cast scrut sigTy elTy) elTy
+    go scrut (coreView1 tcm -> Just ty') = go scrut ty'
+    go scrut scrutTy@(tyView -> TyConApp tc args) =
       case tyConDataCons (UniqMap.find tc tcm) of
-        [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy
-        dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
+        [] -> cantCreate $(curLoc) scrut ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy
+        dcs | dcI > length dcs -> cantCreate $(curLoc) scrut "DC index exceeds max" scrutTy
             | otherwise -> do
           let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
           let fieldTys =
-                fromMaybe (cantCreate $(curLoc) "Cannot instantiate dataCon" scrutTy)
+                fromMaybe (cantCreate $(curLoc) scrut "Cannot instantiate dataCon" scrutTy)
                           (dataConInstArgTysE inScope tcm dc args)
           if fieldI >= length fieldTys
-            then cantCreate $(curLoc) "Field index exceed max" scrutTy
+            then cantCreate $(curLoc) scrut "Field index exceed max" scrutTy
             else do
               wildBndrs <- mapM (mkWildValBinder inScope) fieldTys
               let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
@@ -748,10 +755,10 @@ mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scr
                   pat    = DataPat dc (dcExtTyVars dc) bndrs
                   retVal = Case scrut ty [ (pat, Var selBndr) ]
               return retVal
-    go scrutTy = cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy
+    go scrut scrutTy = cantCreate $(curLoc) scrut ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy
 
-    cantCreate :: String -> String -> Type -> a
-    cantCreate loc info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showPpr scrut ++ " :: " ++ showPpr scrutTy ++ ")\nAdditional info: " ++ info
+    cantCreate :: String -> Term -> String -> Type -> a
+    cantCreate loc scrut info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showPpr scrut ++ " :: " ++ showPpr scrutTy ++ ")\nAdditional info: " ++ info
 
 -- | Make a binder that should not be referenced
 mkWildValBinder
