@@ -101,7 +101,7 @@ import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
   (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, normalizeType,
-   splitTyConAppM, tyView)
+   splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
   (substArgTys, tyLitShow)
 import           Clash.Core.Var
@@ -815,8 +815,12 @@ mkUniqueNormalized is0 topMM (args, binds, res) = do
             pure (res1, Nothing, subst0)
           Just (_, newName0) -> do
             -- Result binder was renamed. We cannot rename 'res1', so we need
-            -- to create an indirection.
-            ([newName1], s) <- mkUnique subst0 [newName0]
+            -- to create an indirection. The indirection binder is an internal
+            -- signal, so it must not inherit any 'AnnType' synthesis attributes
+            -- attached to the top entity's return type; those belong on the
+            -- output port only. See #3224.
+            let newName0' = newName0 { varType = stripAnnTypes (coreTypeOf newName0) }
+            ([newName1], s) <- mkUnique subst0 [newName0']
             pure (newName1, Just (res1, Var newName1), s)
 
       let
