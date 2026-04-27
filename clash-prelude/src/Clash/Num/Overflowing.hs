@@ -157,7 +157,9 @@ instance (Ord a, SaturatingNum a) => SaturatingNum (Overflowing a) where
     | otherwise
     = withOverflow (a || b)
    where
-    withOverflow = Overflowing $ satAdd mode x y
+    withOverflow =
+      let r = satAdd mode x y
+       in seq r $ Overflowing r
 
   {-# INLINE satSub #-}
   satSub mode (Overflowing x a) (Overflowing y b)
@@ -172,7 +174,9 @@ instance (Ord a, SaturatingNum a) => SaturatingNum (Overflowing a) where
     | otherwise
     = withOverflow (a || b)
    where
-    withOverflow = Overflowing (satSub mode x y)
+    withOverflow =
+      let r = satSub mode x y
+       in seq r $ Overflowing r
 
   {-# INLINE satMul #-}
   satMul mode (Overflowing x a) (Overflowing y b)
@@ -184,15 +188,21 @@ instance (Ord a, SaturatingNum a) => SaturatingNum (Overflowing a) where
     | otherwise
     = withOverflow (a || b)
    where
-    withOverflow = Overflowing (satMul mode x y)
+    withOverflow =
+      let r = satMul mode x y
+       in seq r $ Overflowing r
 
   {-# INLINE satSucc #-}
   satSucc mode (Overflowing x a) =
-    Overflowing (satSucc mode x) (a || x == maxBound)
+    let xSucc = satSucc mode x
+     in seq xSucc
+      $ Overflowing xSucc (a || x == maxBound)
 
   {-# INLINE satPred #-}
   satPred mode (Overflowing x a) =
-    Overflowing (satPred mode x) (a || x == minBound)
+    let xPred = satPred mode x
+     in seq xPred
+      $ Overflowing (satPred mode x) (a || x == minBound)
 
 instance (Enum a, Eq a, SaturatingNum a) => Enum (Overflowing a) where
   succ (Overflowing x a)
