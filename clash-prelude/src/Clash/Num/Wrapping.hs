@@ -108,6 +108,22 @@ instance (SaturatingNum a) => Num (Wrapping a) where
   -- definitely wrapped, but in a way which remained synthesizable.
   fromInteger = coerce (fromInteger @a)
 
+instance (Bounded a, SaturatingNum a) => SaturatingNum (Wrapping a) where
+  {-# INLINE satAdd #-}
+  satAdd mode (Wrapping a) (Wrapping b) = Wrapping $ satAdd mode a b
+
+  {-# INLINE satSub #-}
+  satSub mode (Wrapping a) (Wrapping b) = Wrapping $ satSub mode a b
+
+  {-# INLINE satMul #-}
+  satMul mode (Wrapping a) (Wrapping b) = Wrapping $ satMul mode a b
+
+  {-# INLINE satSucc #-}
+  satSucc mode (Wrapping a) = Wrapping $ satSucc mode a
+
+  {-# INLINE satPred #-}
+  satPred mode (Wrapping a) = Wrapping $ satPred mode a
+
 instance (Enum a, SaturatingNum a) => Enum (Wrapping a) where
   {-# INLINE succ #-}
   -- Deliberately breaks the Enum law that succ maxBound ~> error
