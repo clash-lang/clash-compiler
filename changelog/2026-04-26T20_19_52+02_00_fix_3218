@@ -1,0 +1,1 @@
+FIXED: Clash will no longer generate duplicate `attribute` when they're both used for top entity ports and internal signals. See [#3218](https://github.com/clash-lang/clash-compiler/issues/3218).
