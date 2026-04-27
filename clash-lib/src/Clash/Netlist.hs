@@ -897,7 +897,10 @@ mkExpr bbEasD declType bndr app =
     Let _ _ -> invalid "application of let"
     TyApp _ _ -> invalid "application of type application"
     Tick _ _ -> invalid "application of tick"
-    Cast _ _ _ -> invalid "application of cast"
+    -- Casts are between representationally-equal types at netlist time
+    -- (e.g. 'Signal dom a' and 'a'). Peel and re-render. Mirrors the let-RHS
+    -- peel in 'mkDeclarations''.
+    Cast e _ _ -> mkExpr bbEasD declType bndr (mkApps (mkTicks e ticks) args)
     Lam _ _ -> invalid "application of lambda"
     TyLam _ _ -> invalid "application of type lambda"
     App _ _ -> invalid "application of application"
