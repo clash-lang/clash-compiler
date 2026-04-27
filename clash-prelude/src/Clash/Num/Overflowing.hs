@@ -143,6 +143,10 @@ instance (Bounded a) => Bounded (Overflowing a) where
 -- for the overflow check (depending on the utilized 'SaturationMode'
 -- or inner type), which is not guaranteed to be optimized away at a
 -- later synthesis stage.
+--
+-- The 'hasOverflowed' flag still will be set even when the 'SaturatingNum'
+-- operation has prevented the overflow:
+-- @hasOverflowed (satSucc SatBound maxBound) == True@
 instance (Ord a, SaturatingNum a) => SaturatingNum (Overflowing a) where
   {-# INLINE satAdd #-}
   satAdd mode (Overflowing x a) (Overflowing y b)
