@@ -247,6 +247,7 @@ instance IsTest ClashGenTest where
       , "-hidir", oDir
       ] <> commonArgs
         <> cgExtraArgs
+        <> ["+RTS", "-M2G", "-RTS"]
 
     target =
       case cgBuildTarget of
@@ -283,12 +284,14 @@ instance IsTest ClashBinaryTest where
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
       , "-outputdir", oDir
+      , "-rtsopts"
       ] <> commonArgs
         <> cbExtraBuildArgs
         <> [cbSourceDirectory </> cbModName <.> "hs"]
+        <> ["+RTS", "-M2G", "-RTS"]
 
     execProgram oDir =
-      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs) NoGlob PrintStdErr False Nothing []
+      TestProgram (oDir </> "out") (oDir:cbExtraExecArgs <> ["+RTS", "-M2G", "-RTS"]) NoGlob PrintStdErr False Nothing []
 
   testOptions = coerce (testOptions @TestProgram)
 
