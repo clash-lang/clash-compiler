@@ -1061,20 +1061,24 @@ mapSignalTerm :: C.Type
               -> C.Term
 mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy)))
   | (C.FunTy _ funTy'') <- C.tyView funTy
-  , (C.FunTy aTy bTy)   <- C.tyView funTy''
+  , (C.FunTy aSigTy bSigTy) <- C.tyView funTy''
+  , Just (_, [_,aTy]) <- C.splitTyConAppM aSigTy
+  , Just (_, [_,bTy]) <- C.splitTyConAppM bSigTy
   = let
       fName = C.mkUnsafeSystemName "f" 0
       xName = C.mkUnsafeSystemName "x" 1
       fTy   = C.mkFunTy aTy bTy
       fId   = C.mkLocalId fTy fName
-      xId   = C.mkLocalId aTy xName
+      xId   = C.mkLocalId aSigTy xName
     in
       C.TyLam aTV (
       C.TyLam bTV (
       C.TyLam clkTV (
       C.Lam   fId (
       C.Lam   xId (
-      C.App (C.Var fId) (C.Var xId))))))
+      C.Cast (C.App (C.Var fId) (C.Cast (C.Var xId) aSigTy aTy))
+             bTy
+             bSigTy)))))
 
 mapSignalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1088,15 +1092,15 @@ mapSignalTerm ty = error $ $(curLoc) ++ show ty
 signalTerm :: C.Type
            -> C.Term
 signalTerm (C.ForAllTy aTV (C.ForAllTy domTV funTy))
-  | (C.FunTy _ saTy) <- C.tyView funTy
+  | (C.FunTy aTy saTy) <- C.tyView funTy
   = let
       xName = C.mkUnsafeSystemName "x" 0
-      xId   = C.mkLocalId saTy xName
+      xId   = C.mkLocalId aTy xName
     in
       C.TyLam aTV (
       C.TyLam domTV (
       C.Lam   xId (
-      C.Var   xId)))
+      C.Cast (C.Var xId) aTy saTy)))
 
 signalTerm ty = error $ $(curLoc) ++ show ty
 
@@ -1116,21 +1120,26 @@ signalTerm ty = error $ $(curLoc) ++ show ty
 appSignalTerm :: C.Type
               -> C.Term
 appSignalTerm (C.ForAllTy domTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
-  | (C.FunTy _ funTy'') <- C.tyView funTy
-  , (C.FunTy saTy sbTy) <- C.tyView funTy''
+  | (C.FunTy fSigTy funTy'') <- C.tyView funTy
+  , (C.FunTy aSigTy bSigTy) <- C.tyView funTy''
+  , Just (_, [_, aTy])    <- C.splitTyConAppM aSigTy
+  , Just (_, [_, bTy])    <- C.splitTyConAppM bSigTy
   = let
       fName = C.mkUnsafeSystemName "f" 0
       xName = C.mkUnsafeSystemName "x" 1
-      fTy   = C.mkFunTy saTy sbTy
-      fId   = C.mkLocalId fTy fName
-      xId   = C.mkLocalId saTy xName
+      fTy   = C.mkFunTy aTy bTy
+      fId   = C.mkLocalId fSigTy fName
+      xId   = C.mkLocalId aSigTy xName
     in
       C.TyLam domTV (
       C.TyLam aTV (
       C.TyLam bTV (
       C.Lam   fId (
       C.Lam   xId (
-      C.App (C.Var fId) (C.Var xId))))))
+      C.Cast (C.App (C.Cast (C.Var fId) fSigTy fTy)
+                    (C.Cast (C.Var xId) aSigTy aTy))
+             bTy
+             bSigTy)))))
 
 appSignalTerm ty = error $ $(curLoc) ++ show ty
 

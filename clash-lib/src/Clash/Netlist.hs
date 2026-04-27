@@ -425,6 +425,14 @@ mkDeclarations'
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
+-- | Cast on the RHS of a let-binder: peel it. 'Signal dom a' is
+-- representationally equal to 'a' at netlist time, and the only casts that
+-- reach the netlist are between such representationally-equal types. Any
+-- other cast must have been eliminated by 'elimCastCast' / 'caseCast' /
+-- 'argCastSpec' during normalization.
+mkDeclarations' declType bndr (collectTicks -> (Cast e _ _,ticks)) =
+  mkDeclarations' declType bndr (mkTicks e ticks)
+
 mkDeclarations' declType bndr (collectTicks -> (Var v,ticks)) =
   withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) v [])
 
