@@ -74,10 +74,10 @@ Note that release branches might contain non-released patches.
 | 9.0  | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>2</sup>    | &#x2714;&#xfe0f;                | 1.4 - 1.8        | &#x274c;
 | 9.2  | &#x26a0;&#xfe0f;<sup>1</sup>    | &#x26a0;&#xfe0f;<sup>1</sup>    | &#x26a0;&#xfe0f;<sup>1</sup>    | 1.8              | &#x274c;
 | 9.4  | &#x26a0;&#xfe0f;<sup>3</sup> ️   | &#x26a0;&#xfe0f;<sup>3</sup>    | ️&#x26a0;&#xfe0f;<sup>3</sup> ️   | 1.8              | &#x274c;
-| 9.6  | &#x2714;&#xfe0f;<sup>3</sup>    | &#x2714;&#xfe0f;<sup>3,4</sup>  | &#x2714;&#xfe0f;<sup>3</sup>    | 1.8              | &#x2714;&#xfe0f;
-| 9.8  | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8              | ️&#x2714;&#xfe0f;
-| 9.10 | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8              | ️&#x2714;&#xfe0f;
-| 9.12 | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8              | ️&#x2714;&#xfe0f;
+| 9.6  | &#x2714;&#xfe0f;<sup>3</sup>    | &#x2714;&#xfe0f;<sup>3,4</sup>  | &#x2714;&#xfe0f;<sup>3</sup>    | 1.8 - 1.10       | &#x2714;&#xfe0f;
+| 9.8  | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8 - 1.10       | ️&#x2714;&#xfe0f;
+| 9.10 | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8 - 1.10       | ️&#x2714;&#xfe0f;
+| 9.12 | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.10             | ️&#x2714;&#xfe0f;
 
 
 <sup>1</sup> GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change was reverted in 9.4.
