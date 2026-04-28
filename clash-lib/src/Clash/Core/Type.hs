@@ -234,8 +234,12 @@ coreView tcm ty =
     Nothing  -> ty
     Just ty' -> coreView tcm ty'
 
--- | A view on types in which newtypes are transparent, the Signal type is
+-- | A view on types in which newtypes are transparent, BiSignal is
 -- transparent, and type functions are evaluated to WHNF (when possible).
+--
+-- The 'Signal' arm has been removed: GHC coercions between 'Signal dom a'
+-- and 'a' are now first-class 'Cast' terms in core. See the castSignal
+-- refactor.
 --
 -- Only strips away one "layer".
 coreView1 :: TyConMap -> Type -> Maybe Type
@@ -246,9 +250,6 @@ coreView1 tcMap ty = case tyView ty of
     -> Just elTy
     | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalOut"
     , [_,_,_,elTy] <- args
-    -> Just elTy
-    | nameOcc tcNm == "Clash.Signal.Internal.Signal"
-    , [_,elTy] <- args
     -> Just elTy
     | otherwise
     -> case UniqMap.find tcNm tcMap of

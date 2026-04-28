@@ -562,6 +562,13 @@ shouldSplit
 shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
   -- We also look through `SimIO` to find things like Files
   shouldSplit tcm tyArg
+shouldSplit tcm (tyView -> TyConApp (nameOcc -> "Clash.Signal.Internal.Signal") [_dom, tyArg]) =
+  -- Look through Signal: with the Signal arm of coreView1 removed (castSignal
+  -- refactor), coreView no longer strips Signal — but for splitting decisions
+  -- (HW-type purposes) Signal dom a and a behave identically. Without this
+  -- look-through, shouldSplit0 would treat Signal as a 1-constructor product
+  -- and recurse into Signal dom a -> Signal dom a -> ... infinitely.
+  shouldSplit tcm tyArg
 shouldSplit tcm ty = shouldSplit0 tcm (tyView (coreView tcm ty))
 
 -- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
@@ -569,6 +576,12 @@ shouldSplit0
   :: TyConMap
   -> TypeView
   -> Maybe ([Term] -> Term, Projections, [Type])
+-- Signal is a 1-DC product whose recursive second field would otherwise make
+-- the 1-DC arm below loop indefinitely (since coreView no longer strips
+-- Signal). Signal is never a thing we want to split apart for HW-type
+-- purposes anyway.
+shouldSplit0 _tcm (TyConApp (nameOcc -> "Clash.Signal.Internal.Signal") _) =
+  Nothing
 shouldSplit0 tcm (TyConApp tcNm tyArgs)
   | Just tc <- UniqMap.lookup tcNm tcm
   , [dc] <- tyConDataCons tc

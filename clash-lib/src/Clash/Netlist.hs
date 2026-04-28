@@ -64,7 +64,7 @@ import           Clash.Core.Term
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Type
-  (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
+  (Type (..), TypeView (..), coreView1, splitFunForallTy, splitCoreFunForallTy, tyView)
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
@@ -627,6 +627,12 @@ reorderCustom
   -> NonEmpty (Pat, Term)
 reorderCustom tcm reprs (coreView1 tcm -> Just ty) alts =
   reorderCustom tcm reprs ty alts
+-- Look through Signal: with the Signal arm of coreView1 removed (castSignal
+-- refactor), 'Signal dom T' no longer collapses to 'T' here, but for custom
+-- bit-rep ordering decisions we want to consult T's reprs.
+reorderCustom tcm reprs (tyView -> TyConApp tcNm [_dom, ty]) alts
+  | nameOcc tcNm == "Clash.Signal.Internal.Signal"
+  = reorderCustom tcm reprs ty alts
 reorderCustom _tcm reprs (coreToType' -> Right typeName) alts =
   case getDataRepr typeName reprs of
     Just (DataRepr' _name _size _constrReprs) ->
