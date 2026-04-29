@@ -1,0 +1,1 @@
+FIXED: Clash now recognizes `~` when solving GADT arms. Fixes [#3232](https://github.com/clash-lang/clash-compiler/issues/3232).
