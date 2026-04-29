@@ -90,7 +90,7 @@ constantPropagation =
       , ("caseCase"              , caseCase             )
       , ("caseCon"               , caseCon              )
       , ("elimExistentials"      , elimExistentials     )
-      , ("caseElemNonReachable"  , caseElemNonReachable )
+      , ("caseEliminateNonReachable"  , caseEliminateNonReachable )
       , ("removeUnusedExpr"      , removeUnusedExpr     )
       -- These transformations can safely be applied in a top-down traversal as
       -- they themselves check whether the to-be-inlined binder is recursive or not.
