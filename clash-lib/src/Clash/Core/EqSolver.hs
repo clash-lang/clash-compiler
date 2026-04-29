@@ -20,7 +20,8 @@ import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
 import Clash.Unique (fromGhcUnique)
 import Clash.Core.DataCon (dcUniq)
-import GHC.Builtin.Names (unsafeReflDataConKey, eqPrimTyConKey, typeNatAddTyFamNameKey)
+import GHC.Builtin.Names
+  (unsafeReflDataConKey, eqPrimTyConKey, eqTyConKey, typeNatAddTyFamNameKey)
 
 -- | Data type that indicates what kind of solution (if any) was found
 data TypeEqSolution
@@ -177,6 +178,14 @@ typeEq tcm ty =
  case tyView (coreView tcm ty) of
   TyConApp tc [_, _, left, right]
     | nameUniq tc == fromGhcUnique eqPrimTyConKey ->
+    Just (coreView tcm left, coreView tcm right)
+  TyConApp tc [_, left, right]
+    -- Lifted equality (~): @(~) :: forall k. k -> k -> Constraint@
+    --
+    -- Note that lifted equality exists to house "bogus" types, i.e. a deferred
+    -- type error. Clash doesn't support that, so we can treat lifted equality
+    -- (~) the same as unlifted equality (~#).
+    | nameUniq tc == fromGhcUnique eqTyConKey ->
     Just (coreView tcm left, coreView tcm right)
   _ ->
     Nothing
