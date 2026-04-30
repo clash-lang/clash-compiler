@@ -258,6 +258,10 @@ runClashTest = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Cannot use attribute annotations on product types of top entities")
           }
+        , runTest "ConflictingAttrTypes" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Synthesis attribute 'foo' was declared with conflicting types")
+          }
         ]
       , clashTestGroup "Testbench"
         [ runTest "UnsafeOutputVerifier" def{
@@ -682,6 +686,7 @@ runClashTest = defaultMain
         , runTest "T3159" def{hdlSim=[], hdlLoad=[] }
         , runTest "T3185" def
         , runTest "T3204" def{hdlSim=[], hdlLoad=[], hdlTargets=[Verilog]}
+        , runTest "T3218" def{hdlTargets=[VHDL], hdlSim=[]}
         , outputTest "T3232" def{hdlTargets=[Verilog], hdlSim=[]}
         , outputTest "T3224" def{hdlTargets=[VHDL], hdlSim=[], hdlLoad=[]}
         ] <>
