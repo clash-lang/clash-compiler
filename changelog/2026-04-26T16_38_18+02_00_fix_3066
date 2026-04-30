@@ -1,0 +1,1 @@
+FIXED: `makeTopEntity` now accounts for unary product types. See [#3066](https://github.com/clash-lang/clash-compiler/issues/3066).
