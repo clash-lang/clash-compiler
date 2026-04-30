@@ -54,6 +54,7 @@ module Clash.Core.Type
   , normalizeType
   , varAttrs
   , typeAttrs
+  , stripAnnTypes
   )
 where
 
@@ -364,6 +365,12 @@ isPolyFunCoreTy _ ty = case tyView ty of
 typeAttrs :: Type -> [Attr Text]
 typeAttrs (AnnType attrs _typ) = attrs
 typeAttrs _                    = []
+
+-- | Remove all 'AnnType' wrappers from a type, returning the underlying type
+-- without any synthesis attributes.
+stripAnnTypes :: Type -> Type
+stripAnnTypes (AnnType _ typ) = stripAnnTypes typ
+stripAnnTypes typ             = typ
 
 -- | Is a type a function type?
 isFunTy :: TyConMap
