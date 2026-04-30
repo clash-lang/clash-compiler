@@ -255,6 +255,7 @@ typeTreeToPorts (AppTF (AppT (ConT split) (LitT (StrTyLit name)), _) (_,c))
   = c >>= \case
     Complete []  -> return $ Complete [PortName name]
     Complete [PortName n2] -> return $ Complete [PortName (name ++ "_" ++ n2)]
+    Complete [PortProduct "" ys] -> return $ Complete [PortProduct name ys]
     Complete xs  -> return $ Complete [PortProduct name xs]
     x            -> return x
 
