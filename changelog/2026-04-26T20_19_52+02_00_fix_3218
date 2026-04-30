@@ -1,0 +1,1 @@
+FIXED: Clash will no longer generate duplicate `attribute` when they're both used for top entity ports and internal signals. See [#3218](https://github.com/clash-lang/clash-compiler/issues/3218). The VHDL backend now also reports a clearer error when a synthesis attribute is declared with conflicting types in the same design.
