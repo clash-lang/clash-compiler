@@ -713,6 +713,7 @@ runClashTest = defaultMain
           , clashLibTest "NoDeDup" def{hdlTargets=[VHDL]}
           , clashLibTest "T1766" def
           , clashLibTest "T1935" def
+          , clashLibTest "T3276" def{hdlTargets=[Verilog,SystemVerilog]}
           , outputTest "HDLContainsLoc" def{hdlSim=[], clashFlags=["-g"]}
           , outputTest "HDLNotContainsLoc" def{hdlSim=[]}
           ]

@@ -350,11 +350,10 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
-      subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
   newExpr <- case toInline of
     [] -> return tm
     _  -> do
-      let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
+      let tm1 = shareLetrecInlines toInline tm
 
       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
       opts <- Lens.view debugOpts
@@ -410,6 +409,56 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e _)) us)
       | isNoInline inl2  = (Nothing, [c])
       | otherwise        = (Just (nm2,e),us)
+
+-- | Share global inlines that are projections out of the same local recursive
+-- group. Without this, flattening two globals like @clk@ and @cntr@ below
+-- substitutes the whole @letrec@ twice:
+--
+--   clk  = letrec cntr = ... clk ...; clk = tbClockGen cntr in clk
+--   cntr = letrec cntr = ... clk ...; clk = tbClockGen cntr in cntr
+--
+-- The duplicated local group then survives to HDL as duplicated clock and
+-- register primitives. Instead, substitute the globals with their projected
+-- local variables and wrap the expression in the shared @letrec@ once.
+shareLetrecInlines :: [(Id, Term)] -> Term -> Term
+shareLetrecInlines toInline tm =
+  foldr Letrec tm1 sharedBinds
+ where
+  letrecGroups =
+    Map.fromListWith (<>)
+      [ (Set.fromList (map fst binds), [(binds, (globalId, body))])
+      | (globalId, Letrec binds body) <- toInline
+      , not (null binds)
+      ]
+
+  sharedGroups =
+    [ (binds, globalSubsts)
+    | group@((binds, _):_) <- Map.elems letrecGroups
+    , length group > 1
+    , let globalSubsts = map snd group
+    ]
+
+  sharedGlobals =
+    Set.fromList [globalId | (_, globalSubsts) <- sharedGroups, (globalId, _) <- globalSubsts]
+
+  regularSubsts =
+    [ inline
+    | inline@(globalId, _) <- toInline
+    , globalId `Set.notMember` sharedGlobals
+    ]
+
+  sharedSubsts =
+    [ inlineSubst
+    | (_, globalSubsts) <- sharedGroups
+    , inlineSubst <- globalSubsts
+    ]
+
+  subst =
+    extendGblSubstList (mkSubst emptyInScopeSet) (regularSubsts <> sharedSubsts)
+
+  tm1 = substTm "flattenCallTree.flattenExpr" subst tm
+
+  sharedBinds = map fst sharedGroups
 
 callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding Term)])
 callTreeToList visited (CLeaf (nm,bndr))
