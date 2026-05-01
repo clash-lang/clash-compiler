@@ -1,0 +1,1 @@
+FIXED: Run `bindConstantVar` after post-normalization `inlineCleanup`/`caseCon` so constant let-bindings exposed late are inlined before netlist generation [#3041](https://github.com/clash-lang/clash-compiler/issues/3041)
