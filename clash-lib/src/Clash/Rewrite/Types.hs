@@ -25,6 +25,7 @@ import Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
 import qualified Control.Lens as Lens
 import Control.Monad.Fix                     (MonadFix)
+import Control.Monad.IO.Class                (MonadIO)
 import Control.Monad.State.Strict            (State)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
@@ -169,6 +170,7 @@ newtype RewriteMonad extra a = R
     , Functor
     , Monad
     , MonadFix
+    , MonadIO
     , MonadState (RewriteState extra)
     , MonadWriter Any
     , MonadReader RewriteEnv
