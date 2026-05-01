@@ -29,6 +29,7 @@ import           Control.Exception           (throw)
 import           Control.Lens ((%=), (+=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
+import           Control.Monad.IO.Class      (liftIO)
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import qualified Control.Monad.Writer        as Writer
@@ -46,7 +47,6 @@ import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
-import           System.IO.Unsafe            (unsafePerformIO)
 import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
@@ -152,17 +152,16 @@ apply = \s rewrite ctx expr0 -> do
   let rewriteHistFile = dbg_historyFile opts
   Monad.when (isJust rewriteHistFile && hasChanged) $ do
     (curBndr, _) <- Lens.use curFun
-    let !_ = unsafePerformIO
-             $ BS.appendFile (fromJust rewriteHistFile)
-             $ BL.toStrict
-             $ encode RewriteStep
-                 { t_ctx    = tfContext ctx
-                 , t_name   = s
-                 , t_bndrS  = showPpr (varName curBndr)
-                 , t_before = expr0
-                 , t_after  = expr1
-                 }
-    return ()
+    liftIO
+      $ BS.appendFile (fromJust rewriteHistFile)
+      $ BL.toStrict
+      $ encode RewriteStep
+          { t_ctx    = tfContext ctx
+          , t_name   = s
+          , t_bndrS  = showPpr (varName curBndr)
+          , t_before = expr0
+          , t_after  = expr1
+          }
 
   if isDebugging opts
     then applyDebug ctx s expr0 hasChanged expr1

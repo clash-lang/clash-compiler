@@ -19,6 +19,7 @@ module Clash.Normalize where
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    ((>=>), when)
+import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
@@ -85,7 +86,6 @@ import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Lazy             as BL
 
-import           System.IO.Unsafe                 (unsafePerformIO)
 import           Clash.Rewrite.Types (RewriteStep(..))
 
 
@@ -360,17 +360,16 @@ flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       opts <- Lens.view debugOpts
       let rewriteHistFile = dbg_historyFile opts
       when (Maybe.isJust rewriteHistFile) $
-        let !_ = unsafePerformIO
-             $ BS.appendFile (Maybe.fromJust rewriteHistFile)
-             $ BL.toStrict
-             $ encode RewriteStep
-                 { t_ctx    = []
-                 , t_name   = "INLINE"
-                 , t_bndrS  = showPpr (varName nm')
-                 , t_before = tm
-                 , t_after  = tm1
-                 }
-        in pure ()
+        liftIO
+          $ BS.appendFile (Maybe.fromJust rewriteHistFile)
+          $ BL.toStrict
+          $ encode RewriteStep
+              { t_ctx    = []
+              , t_name   = "INLINE"
+              , t_bndrS  = showPpr (varName nm')
+              , t_before = tm
+              , t_after  = tm1
+              }
       rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
   let allUsed = newUsed ++ concat il_used
   -- inline all components when the resulting expression after flattening
