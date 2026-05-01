@@ -689,6 +689,11 @@ runClashTest = defaultMain
         , runTest "T3218" def{hdlTargets=[VHDL], hdlSim=[]}
         , outputTest "T3232" def{hdlTargets=[Verilog], hdlSim=[]}
         , outputTest "T3224" def{hdlTargets=[VHDL], hdlSim=[], hdlLoad=[]}
+        , runTest "T3234" def
+            { hdlTargets=[Verilog]
+            , hdlLoad=[IVerilog]
+            , hdlSim=[IVerilog]
+            }
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
