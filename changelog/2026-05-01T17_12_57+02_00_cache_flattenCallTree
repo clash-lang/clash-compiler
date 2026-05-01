@@ -1,0 +1,1 @@
+FIXED: `flattenCallTree` now caches intermediate results, reducing Clash normalization by 10% for realistic designs. Fixes #[3246](https://github.com/clash-lang/clash-compiler/issues/3246).
