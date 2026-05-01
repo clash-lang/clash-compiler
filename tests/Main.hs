@@ -676,6 +676,7 @@ runClashTest = defaultMain
         , outputTest "T3011" def{hdlSim=[]}
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
            in runTest "T3021" _opts
+        , runTest "T3041" def{hdlSim=[], hdlLoad=[]}
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
            in runTest "T3066" _opts
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
