@@ -56,8 +56,8 @@ topEntity
   :: Clock  System
   -> Reset  System
   -> Enable System
-  -> Signal System (Vec 6 Integer)
-  -> Signal System (Vec 12 Integer)
+  -> Signal System (Vec 6 Int)
+  -> Signal System (Vec 12 Int)
 topEntity = exposeClockResetEnable (c_frm `mealy` (c_ws0,c_ts0,c_hist0))
 
 -- Haskell

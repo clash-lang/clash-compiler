@@ -2,5 +2,5 @@ module HOPrim where
 
 import Clash.Prelude
 
-topEntity :: Vec 4 Integer -> Vec 4 (Unsigned 4)
-topEntity = map fromInteger
+topEntity :: Vec 4 Int -> Vec 4 Bool
+topEntity = map odd

@@ -5,10 +5,11 @@ import Data.Word
 
 -- ghc-8.10 adds new primitives: bitReverse8#, bitReverse16#, bitReverse32# and bitReverse64#
 
-topEntity x = ( bitReverse8  $ fromInteger x
-              , bitReverse16 $ fromInteger x
-              , bitReverse32 $ fromInteger x
-              , bitReverse64 $ fromInteger x
+topEntity :: Word8 -> (Word8, Word16, Word32, Word64)
+topEntity x = ( bitReverse8  $ numConvert x
+              , bitReverse16 $ numConvert x
+              , bitReverse32 $ numConvert x
+              , bitReverse64 $ numConvert x
               )
 
 testBench :: Signal System Bool
@@ -47,5 +48,5 @@ testBench = done
     clk  = tbSystemClockGen (not <$> done)
     rst  = systemResetGen
 
-expand :: Integer -> (Word8,Word16,Word32,Word64)
-expand x = (fromInteger x, fromInteger x `shiftL` 8, fromInteger x `shiftL` 24, fromInteger x `shiftL` 56)
+expand :: Word8 -> (Word8,Word16,Word32,Word64)
+expand x = (numConvert x, numConvert x `shiftL` 8, numConvert x `shiftL` 24, numConvert x `shiftL` 56)

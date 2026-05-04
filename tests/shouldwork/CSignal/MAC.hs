@@ -8,8 +8,8 @@ topEntity
   :: Clock DomA101
   -> Reset DomA101
   -> Enable DomA101
-  -> (Signal DomA101 Integer, Signal DomA101 Integer)
-  -> Signal DomA101 Integer
+  -> (Signal DomA101 Int, Signal DomA101 Int)
+  -> Signal DomA101 Int
 topEntity clk rst en = mealyB clk rst en macT 0
 
 macT s (x,y) = (s', o)
