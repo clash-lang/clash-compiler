@@ -9,13 +9,13 @@ fromEnumTest :: Signed 8 -> Int
 fromEnumTest = fromEnum
 
 fromIntegralTest :: Signed 4 -> Signed 6
-fromIntegralTest = fromIntegral
+fromIntegralTest = numConvert
 
 toEnumTest :: Int -> Signed 6
 toEnumTest = toEnum
 
 topEntity :: Signed 4 -> (Int, Signed 6, Signed 6)
-topEntity x = (fromEnumTest (fromIntegral x), fromIntegralTest x, toEnumTest (fromEnum x))
+topEntity x = (fromEnumTest (numConvert x), fromIntegralTest x, toEnumTest (fromEnum x))
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool

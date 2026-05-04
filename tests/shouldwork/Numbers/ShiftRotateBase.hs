@@ -7,6 +7,7 @@ import Clash.Explicit.Testbench
 import Data.Word
 import Data.Int
 
+testpattern :: Int64
 testpattern = 0b1010011000
 
 -- test with shift/rotate amounts: 0..16,200, and a really large
@@ -25,8 +26,8 @@ testall v i
 {-# OPAQUE testall #-}
 
 testAs
-  :: (Num b, Bits b) => Integer -> Int -> Vec Ops b
-testAs v i = map (\f -> f (fromInteger v) i) shiftsAndRots
+  :: (BitPack b, Bits b) => Int64 -> Int -> Vec Ops b
+testAs v i = map (\f -> f (unpack . resize . pack $ v) i) shiftsAndRots
 
 type Ops = 4
 

@@ -7,7 +7,7 @@ import Clash.Explicit.Testbench
 
 topEntity :: BitVector 2 -> Maybe A_Index
 topEntity x | x == 3    = Nothing
-            | otherwise = Just $ toEnum $ fromIntegral x
+            | otherwise = Just $ toEnum $ numConvert x
 {-# OPAQUE topEntity #-}
 
 {-
