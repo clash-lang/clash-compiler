@@ -3,7 +3,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -296,7 +296,7 @@ mkArgument bbName bndr declType nArg e = do
         (C.Var v,[],_) -> do
           return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
         (C.Literal l,[],_) ->
-          return ((mkLiteral iw l,hwTy,True),[])
+          return ((mkLiteral iw True l,hwTy,True),[])
 
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False declType (NetlistId bndr ty) pinfo args tickDecls

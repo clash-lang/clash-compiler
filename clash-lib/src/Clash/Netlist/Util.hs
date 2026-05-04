@@ -675,6 +675,7 @@ typeSize (Void {}) = 0
 typeSize FileType = 32 -- (ref. page 287 of IEEE 1364-2005)
 typeSize String = 0
 typeSize Integer = 0
+typeSize Natural = 0
 typeSize (KnownDomain {}) = 0
 typeSize Bool = 1
 typeSize Bit = 1
@@ -2172,9 +2173,13 @@ expandTopEntity _ _ topEntityM =
 
 -- | Convert a Core 'C.Literal' to a Netlist v'HW.Literal'
 mkLiteral :: Int -- ^ int width
+          -> Bool -- ^ whether to translate Integer/Natural to Signed/Unsigned
           -> C.Literal -> HW.Expr
-mkLiteral iw lit = case lit of
-  C.IntegerLiteral i -> HW.Literal (Just (Signed iw,iw)) $ NumLit i
+mkLiteral iw translBigNums lit = case lit of
+  C.IntegerLiteral i | translBigNums -> HW.Literal (Just (Signed iw,iw)) $ NumLit i
+                     | otherwise     -> HW.Literal (Just (Integer,0)) $ NumLit i
+  C.NaturalLiteral n | translBigNums -> HW.Literal (Just (Unsigned iw,iw)) $ NumLit n
+                     | otherwise     -> HW.Literal (Just (Natural,0)) $ NumLit n
   C.IntLiteral i     -> HW.Literal (Just (Signed iw,iw)) $ NumLit i
   C.WordLiteral w    -> HW.Literal (Just (Unsigned iw,iw)) $ NumLit w
   C.Int64Literal i   -> HW.Literal (Just (Signed 64,64)) $ NumLit i
@@ -2188,6 +2193,5 @@ mkLiteral iw lit = case lit of
   C.CharLiteral c    -> HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c
   C.FloatLiteral w   -> HW.Literal (Just (BitVector 32,32)) (NumLit $ toInteger w)
   C.DoubleLiteral w  -> HW.Literal (Just (BitVector 64,64)) (NumLit $ toInteger w)
-  C.NaturalLiteral n -> HW.Literal (Just (Unsigned iw,iw)) $ NumLit n
   C.ByteArrayLiteral (ByteArray ba) -> HW.Literal Nothing (NumLit (IP ba))
   C.StringLiteral s  -> HW.Literal Nothing $ StringLit s

@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -1245,6 +1245,7 @@ exprLit k (Just (hty,sz)) (NumLit i0) = case hty of
   Signed _
    | i < 0     -> string "-" <> int sz <> string "'sd" <> integer (abs i)
    | otherwise -> int sz <> string "'sd" <> integer i
+  Natural -> integer i0 -- used for SNat when -fclash-no-tranlate-integer-natural
   _ -> int sz <> string "'b" <> blit
   where
     blit = bits k (toBits sz i)
