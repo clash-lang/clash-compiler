@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2023, Myrtle Software Ltd,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -122,8 +122,12 @@ ghcTypeToHWType opts = go
                       _  -> throwE $ $(curLoc) ++ "Word64 DC has unexpected amount of arguments"
                     _    -> throwE $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
              else returnN (Unsigned 64)
-        $(namePat ''Integer)                       -> returnN (Signed iw)
-        $(namePat ''Natural)                       -> returnN (Unsigned iw)
+        $(namePat ''Integer)
+          | opt_translateBigNums opts -> returnN (Signed iw)
+          | otherwise -> returnN Integer
+        $(namePat ''Natural)
+          | opt_translateBigNums opts -> returnN (Unsigned iw)
+          | otherwise -> returnN Natural
         $(namePat ''GHC.Prim.Char#)                -> returnN (Unsigned 21)
         $(namePat ''GHC.Prim.Int#)                 -> returnN (Signed iw)
         $(namePat ''GHC.Prim.Word#)                -> returnN (Unsigned iw)

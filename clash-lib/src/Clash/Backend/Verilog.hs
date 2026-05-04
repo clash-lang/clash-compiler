@@ -1252,6 +1252,7 @@ exprLit k (Just hty) (NumLit i0) = case hty of
   Signed _
    | i < 0     -> string "-" <> int sz <> string "'sd" <> integer (abs i)
    | otherwise -> int sz <> string "'sd" <> integer i
+  Natural -> integer i0 -- used for SNat when -fclash-no-tranlate-integer-natural
   _ -> int sz <> string "'b" <> blit
   where
     sz = typeSize hty

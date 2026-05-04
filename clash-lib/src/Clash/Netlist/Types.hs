@@ -432,7 +432,9 @@ data HWType
   | String
   -- ^ String type
   | Integer
-  -- ^ Integer type (for parameters only)
+  -- ^ Integer type (for parameters and for reporting untranslated Integers)
+  | Natural
+  -- ^ Natural type (for reporting untranslated Naturals only)
   | Bool
   -- ^ Boolean type
   | Bit
@@ -990,6 +992,9 @@ Lens.makeLenses ''NetlistState
 
 intWidth :: Lens.Getter NetlistEnv Int
 intWidth = clashEnv . Lens.to (opt_intWidth . envOpts)
+
+translateBigNums :: Lens.Getter NetlistEnv Bool
+translateBigNums = clashEnv . Lens.to (opt_translateBigNums . envOpts)
 
 customReprs :: Lens.Getter NetlistEnv CustomReprs
 customReprs = clashEnv . Lens.to envCustomReprs

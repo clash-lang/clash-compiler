@@ -296,7 +296,7 @@ mkArgument bbName bndr declType nArg e = do
         (C.Var v,[],_) -> do
           return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
         (C.Literal l,[],_) ->
-          return ((mkLiteral iw l,hwTy,True),[])
+          return ((mkLiteral iw True l,hwTy,True),[])
 
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False declType (NetlistId bndr ty) pinfo args tickDecls
