@@ -70,7 +70,7 @@ import           Clash.Core.VarEnv
    mkVarEnv, mkVarSet, nullVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
+  (BindingMap, Binding(..), ClashEnv(..), ClashOpts(..), DebugOpts(..))
 import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
@@ -82,7 +82,7 @@ import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
   ((>->), (!->), bottomupR, repeatR, topdownR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, uniqSupply,
+  (RewriteEnv (..), RewriteState (..), bindings, clashEnv, debugOpts, uniqSupply,
    tcCache, topEntities, newInlineStrategy, ioLock)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
@@ -157,16 +157,22 @@ supplies n s = let (s0', s1') = splitSupply s in s0' : supplies (n-1) s1'
 normalize :: [Id] -> NormalizeSession BindingMap
 normalize tops = do
   binds <- MVar.newMVar "normalizeBinds" (emptyVarSet, [])
+  concurrent <- Lens.view (clashEnv . Lens.to (opt_concurrentNormalization . envOpts))
   uniq0 <- Lens.use uniqSupply
   let ss = supplies (length tops) uniq0
-  mapConcurrently_ (normalizeStep binds) (zip tops ss)
+  normalizeMany concurrent (normalizeStep concurrent binds) (zip tops ss)
   mkVarEnv . snd <$> MVar.readMVar "normalizeBinds" binds
 
+normalizeMany :: Bool -> (a -> NormalizeSession ()) -> [a] -> NormalizeSession ()
+normalizeMany True = mapConcurrently_
+normalizeMany False = mapM_
+
 normalizeStep
-    :: MVar (VarSet, [(Id, Binding Term)])
+    :: Bool
+    -> MVar (VarSet, [(Id, Binding Term)])
     -> (Id, Supply)
     -> NormalizeSession ()
-normalizeStep binds (id', s) = do
+normalizeStep concurrent binds (id', s) = do
   uniqSupply Lens..= s
   work <- MVar.modifyMVar "normalizeBinds" binds $ \(orig@(bound, pairs)) ->
     if id' `elemVarSet` bound
@@ -180,7 +186,7 @@ normalizeStep binds (id', s) = do
       )
 
   new <- work
-  mapConcurrently_ (normalizeStep binds) new
+  normalizeMany concurrent (normalizeStep concurrent binds) new
 
 normalize' :: Id -> NormalizeSession ((Id, Binding Term), [(Id, Supply)])
 normalize' nm = do
