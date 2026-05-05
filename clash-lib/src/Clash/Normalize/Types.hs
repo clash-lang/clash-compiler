@@ -13,6 +13,7 @@
 module Clash.Normalize.Types where
 
 import Control.Concurrent.MVar    (MVar)
+import Control.Exception          (SomeException)
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (StateT)
 import Data.Map                   (Map)
@@ -31,12 +32,13 @@ data NormalizeState
   = NormalizeState
   { _normalized          :: MVar (VarEnv (MVar (Binding Term)))
   -- ^ Global binders
-  , _specialisationCache :: MVar (Map (Id,Int,Either Term Type) (MVar Id))
+  , _specialisationCache ::
+      MVar (Map (Id,Int,Either Term Type) (MVar (Either SomeException (Maybe Id))))
   -- ^ Cache of previously specialized functions:
   --
   -- * Key: (name of the original function, argument position, specialized term/type)
   --
-  -- * Elem: MVar containing the name of the specialized function. An empty
+  -- * Elem: MVar containing the result of a specialization attempt. An empty
   -- MVar indicates a specialization is in progress by another thread.
   , _specialisationHistory :: MVar (VarEnv Int)
   -- ^ Cache of how many times a function was specialized

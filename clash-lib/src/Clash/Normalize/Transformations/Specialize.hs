@@ -32,6 +32,7 @@ import Control.Concurrent.Lifted (myThreadId)
 import qualified Clash.Normalize.TracedMVar as MVar
 import Control.DeepSeq (deepseq)
 import Control.Exception (throw)
+import qualified Control.Exception.Lifted as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Writer as Writer (listen)
@@ -425,7 +426,8 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   -- thread to arrive creates the specialization and fills the MVar; any other
   -- thread that arrives for the same key will find the placeholder and wait on
   -- it. This prevents duplicate specializations and duplicate history counter
-  -- increments.
+  -- increments. The future stores failures too, so waiting threads cannot get
+  -- stranded on an exception path.
   cacheV <- Lens.use (extra.specialisationCache)
   resultMVar <- MVar.newEmptyMVar "specResult"
   specDecision <- MVar.modifyMVar "specialisationCache" cacheV $ \cache ->
@@ -440,35 +442,63 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   case specDecision of
     Left existingMVar -> do
       -- Use previously (or concurrently) specialized function
-      f' <- MVar.readMVar "specCacheResult" existingMVar
-      traceIf (hasTransformationInfo AppliedTerm opts)
-        ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
-          (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
-        changed $ mkApps (mkTicks (Var f') ticks) (args ++ specVars)
+      MVar.readMVar "specCacheResult" existingMVar >>= \case
+        Left err ->
+          Exception.throwIO err
+
+        Right Nothing ->
+          return e
+
+        Right (Just f') ->
+          traceIf (hasTransformationInfo AppliedTerm opts)
+            ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
+              (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
+            changed $ mkApps (mkTicks (Var f') ticks) (args ++ specVars)
+
     Right myMVar -> do
       -- We're responsible for creating the specialization
+      Exception.mask $ \restore -> do
+        result <-
+          Exception.try (restore (createSpecialization tcm topEnts specArg specBndrs specVars argLen))
+        case result of
+          Left err -> do
+            MVar.modifyMVar_ "specialisationCache" cacheV $ \cache ->
+              pure $ Map.delete (f,argLen,specAbs) cache
+            MVar.putMVar "specCacheResult" myMVar (Left err)
+            Exception.throwIO err
+
+          Right Nothing -> do
+            MVar.modifyMVar_ "specialisationCache" cacheV $ \cache ->
+              pure $ Map.delete (f,argLen,specAbs) cache
+            MVar.putMVar "specCacheResult" myMVar (Right Nothing)
+            return e
+
+          Right (Just (newf, newExpr)) -> do
+            MVar.putMVar "specCacheResult" myMVar (Right (Just newf))
+            restore (newf `deepseq` changed newExpr)
+  where
+    createSpecialization tcm topEnts specArg specBndrs specVars argLen = do
       bndrsV <- Lens.use bindings
       bodyMaybe <- MVar.withMVar "bindings" bndrsV $ \bndrs -> pure $ UniqMap.lookup f bndrs
       case bodyMaybe of
+        Nothing ->
+          pure Nothing
+
         Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specializations on a growing argument
           histV <- Lens.use (extra.specialisationHistory)
           specLim <- Lens.view specializationLimit
           specHistM <- MVar.withMVar "specialisationHistory" histV $ \hist -> pure $ UniqMap.lookup f hist
           if maybe False (> specLim) specHistM
-            then do
-              -- Remove our placeholder from the cache before throwing
-              MVar.modifyMVar_ "specialisationCache" cacheV $ \cache ->
-                pure $ Map.delete (f,argLen,specAbs) cache
-              throw (ClashException
-                      sp
-                      (unlines [ "Hit specialization limit " ++ show specLim ++ " on function `" ++ showPpr (varName f) ++ "'.\n"
-                               , "The function `" ++ showPpr f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
-                               , "Body of `" ++ showPpr f ++ "':\n" ++ showPpr bodyTm ++ "\n"
-                               , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showPpr showPpr) specArg
-                               , "Run with '-fclash-spec-limit=N' to increase the specialization limit to N."
-                               ])
-                      Nothing)
+            then throw (ClashException
+                    sp
+                    (unlines [ "Hit specialization limit " ++ show specLim ++ " on function `" ++ showPpr (varName f) ++ "'.\n"
+                             , "The function `" ++ showPpr f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
+                             , "Body of `" ++ showPpr f ++ "':\n" ++ showPpr bodyTm ++ "\n"
+                             , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showPpr showPpr) specArg
+                             , "Run with '-fclash-spec-limit=N' to increase the specialization limit to N."
+                             ])
+                    Nothing)
             else do
               let existingNames = collectBndrsMinusApps bodyTm
                   newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
@@ -528,17 +558,10 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               newf <- mkFunction newName sp inl' newBody
               -- Remember specialization
               MVar.modifyMVar_ "specialisationHistory" histV $ \hist -> pure $ UniqMap.insertWith (+) f 1 hist
-              -- Fill the future so waiting threads can proceed
-              MVar.putMVar "specCacheResult" myMVar newf
               -- use specialized function
               let newExpr = mkApps (mkTicks (Var newf) ticks) (args ++ specVars)
-              newf `deepseq` changed newExpr
-        Nothing -> do
-          -- Remove placeholder; no specialization possible
-          MVar.modifyMVar_ "specialisationCache" cacheV $ \cache ->
-            pure $ Map.delete (f,argLen,specAbs) cache
-          return e
-  where
+              pure (Just (newf, newExpr))
+
     noUserInline :: InlineSpec
     noUserInline = NoUserInlinePrag
 
