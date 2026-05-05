@@ -19,10 +19,14 @@ module Clash.Normalize where
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    ((>=>), when)
+import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
 import qualified Data.IntMap                      as IntMap
+import qualified Data.IORef                       as IORef
+import           Clash.Data.UniqMap               (UniqMap)
+import qualified Clash.Data.UniqMap               as UniqMap
 import           Data.List
   (intersect, mapAccumL)
 import qualified Data.Map                         as Map
@@ -85,7 +89,6 @@ import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS
 import qualified Data.ByteString.Lazy             as BL
 
-import           System.IO.Unsafe                 (unsafePerformIO)
 import           Clash.Rewrite.Types (RewriteStep(..))
 
 
@@ -258,7 +261,8 @@ cleanupGraph
   -> NormalizeSession BindingMap
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
-  = do ctFlat <- flattenCallTree ct
+  = do cache <- liftIO (IORef.newIORef UniqMap.empty)
+       ctFlat <- flattenCallTree cache ct
        return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
@@ -342,75 +346,90 @@ flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
            then return (Right ((nm,e),us))
            else return (Left b)
 
+-- | Flatten a 'CallTree', memoizing results by binder Id within one cleanup
+-- pass. Without the cache, every binder reachable from the root is flattened
+-- as many times as it appears in the (un-deduplicated) call tree.
 flattenCallTree
-  :: CallTree
+  :: IORef.IORef (UniqMap CallTree)
+  -- ^ Memo cache, keyed by binder Id. Local to one 'cleanupGraph' call.
+  -> CallTree
   -> NormalizeSession CallTree
-flattenCallTree c@(CLeaf _) = return c
-flattenCallTree (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
-  flattenedUsed   <- mapM flattenCallTree used
-  (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
-  let (toInline,il_used) = unzip il_ct
-      subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
-  newExpr <- case toInline of
-    [] -> return tm
-    _  -> do
-      let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
+flattenCallTree _ c@(CLeaf _) = return c
+flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
+  -- XXX: Careful! If you ever add concurrency, this will have to be changed to
+  --      account for multiple workers.
+  cached <- liftIO (UniqMap.lookup nm <$> IORef.readIORef cache)
+  case cached of
+    Just ct -> pure ct
+    Nothing -> do
+      ct <- doFlatten
+      liftIO (IORef.modifyIORef' cache (UniqMap.insert nm ct))
+      pure ct
+ where
+  doFlatten = do
+   flattenedUsed   <- mapM (flattenCallTree cache) used
+   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
+   let (toInline,il_used) = unzip il_ct
+       subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
+   newExpr <- case toInline of
+     [] -> return tm
+     _  -> do
+       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
 
-      -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-      opts <- Lens.view debugOpts
-      let rewriteHistFile = dbg_historyFile opts
-      when (Maybe.isJust rewriteHistFile) $
-        let !_ = unsafePerformIO
-             $ BS.appendFile (Maybe.fromJust rewriteHistFile)
-             $ BL.toStrict
-             $ encode RewriteStep
-                 { t_ctx    = []
-                 , t_name   = "INLINE"
-                 , t_bndrS  = showPpr (varName nm')
-                 , t_before = tm
-                 , t_after  = tm1
-                 }
-        in pure ()
-      rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
-  let allUsed = newUsed ++ concat il_used
-  -- inline all components when the resulting expression after flattening
-  -- is still considered "cheap". This happens often at the topEntity which
-  -- wraps another functions and has some selectors and data-constructors.
-  if not (isNoInline inl) && isCheapFunction newExpr
-     then do
-        let (toInline',allUsed') = unzip (map goCheap allUsed)
-            subst' = extendGblSubstList (mkSubst emptyInScopeSet)
-                                        (Maybe.catMaybes toInline')
-        let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
-        newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
-        return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
-     else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
-  where
-    flatten =
-      repeatR (topdownR (apply "appProp" appProp >->
-                 apply "bindConstantVar" bindConstantVar >->
-                 apply "caseCon" caseCon >->
-                 (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
-                 apply "reduceNonRepPrim" reduceNonRepPrim >->
-                 apply "removeUnusedExpr" removeUnusedExpr) >->
-               bottomupR (apply "flattenLet" flattenLet)) !->
-      topdownSucR (apply "topLet" topLet) >->
-      -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
-      -- Note that we do this as the very last step, after all constant propagation
-      -- has been done to avoid #3036.
-      topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
-      topdownSucR (apply "inlineCleanup" inlineCleanup) >->
-      bottomupR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
-      bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
-      bottomupR (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
-      topdownSucR (apply "topLet" topLet)
+       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
+       opts <- Lens.view debugOpts
+       let rewriteHistFile = dbg_historyFile opts
+       when (Maybe.isJust rewriteHistFile) $
+         liftIO
+           $ BS.appendFile (Maybe.fromJust rewriteHistFile)
+           $ BL.toStrict
+           $ encode RewriteStep
+               { t_ctx    = []
+               , t_name   = "INLINE"
+               , t_bndrS  = showPpr (varName nm')
+               , t_before = tm
+               , t_after  = tm1
+               }
+       rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
+   let allUsed = newUsed ++ concat il_used
+   -- inline all components when the resulting expression after flattening
+   -- is still considered "cheap". This happens often at the topEntity which
+   -- wraps another functions and has some selectors and data-constructors.
+   if not (isNoInline inl) && isCheapFunction newExpr
+      then do
+         let (toInline',allUsed') = unzip (map goCheap allUsed)
+             subst' = extendGblSubstList (mkSubst emptyInScopeSet)
+                                         (Maybe.catMaybes toInline')
+         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
+         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
+         return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
+      else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
-    goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
-      | isNoInline inl2  = (Nothing     ,[c])
-      | otherwise        = (Just (nm2,e),[])
-    goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e _)) us)
-      | isNoInline inl2  = (Nothing, [c])
-      | otherwise        = (Just (nm2,e),us)
+  flatten =
+    repeatR (topdownR (apply "appProp" appProp >->
+               apply "bindConstantVar" bindConstantVar >->
+               apply "caseCon" caseCon >->
+               (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
+               apply "reduceNonRepPrim" reduceNonRepPrim >->
+               apply "removeUnusedExpr" removeUnusedExpr) >->
+             bottomupR (apply "flattenLet" flattenLet)) !->
+    topdownSucR (apply "topLet" topLet) >->
+    -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
+    -- Note that we do this as the very last step, after all constant propagation
+    -- has been done to avoid #3036.
+    topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
+    topdownSucR (apply "inlineCleanup" inlineCleanup) >->
+    bottomupR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
+    bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+    bottomupR (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
+    topdownSucR (apply "topLet" topLet)
+
+  goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
+    | isNoInline inl2  = (Nothing     ,[c])
+    | otherwise        = (Just (nm2,e),[])
+  goCheap c@(CBranch (nm2,(Binding _ _ inl2 _ e _)) us)
+    | isNoInline inl2  = (Nothing, [c])
+    | otherwise        = (Just (nm2,e),us)
 
 callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding Term)])
 callTreeToList visited (CLeaf (nm,bndr))
