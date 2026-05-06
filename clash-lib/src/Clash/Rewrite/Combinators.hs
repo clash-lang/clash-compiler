@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente
-                         2021, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -16,6 +16,7 @@ module Clash.Rewrite.Combinators
   , bottomupR
   , repeatR
   , topdownR
+  , topdownFixR
   ) where
 
 import           Control.DeepSeq             (deepseq)
@@ -117,6 +118,69 @@ Then we must repeat the transformation to let it also inline y.
 topdownR :: Rewrite m -> Rewrite m
 -- See Note [topdown repeatR]
 topdownR r = repeatR r >-> allR (topdownR r)
+
+{-
+Note [topdownFixR]
+~~~~~~~~~~~~~~~~~~
+'topdownFixR r' is an optimized alternative to some uses of
+'repeatR (topdownR r)'. It repeats 'r' top-down, but when a child changes it
+only rechecks the ancestors of that child instead of restarting traversal from
+the root.
+
+For example, suppose 'r' can rewrite both:
+
+> let x = True in x
+
+to:
+
+> True
+
+and:
+
+> case True of { True -> a; False -> b }
+
+to:
+
+> a
+
+When traversing:
+
+> h (case (let x = True in x) of { True -> a; False -> b })
+
+'topdownFixR r' first cannot rewrite the 'case', so it descends into the
+scrutinee. Rewriting the scrutinee exposes a new redex at the parent 'case', so
+the parent is checked again immediately and rewritten to 'a'. That change then
+bubbles up to 'h a'. With 'repeatR (topdownR r)' the same result is reached by
+starting another complete traversal from 'h'.
+
+Only use 'topdownFixR' as a replacement for 'repeatR (topdownR r)' when 'r' is
+local and context-stable: it should fire or fail based on the current node, and
+the relevant parts of 'TransformContext' should not change when sibling
+subtrees are rewritten. Rewrites that inspect let-bound context whose binding
+terms may have changed, for example through 'whnfRW', still need an outer
+repeat or a normal repeated top-down traversal.
+-}
+
+-- | Apply a transformation in a repeated top-down traversal.
+--
+-- Optimized for local, context-stable transformations. See Note [topdownFixR].
+topdownFixR :: Rewrite m -> Rewrite m
+topdownFixR r = go True
+ where
+  go tryParent ctx term = do
+    term1 <-
+      if tryParent
+        then repeatR r ctx term
+        else pure term
+    (term2, Monoid.getAny -> childChanged) <- Writer.listen (allR (go True) ctx term1)
+    if childChanged
+      then do
+        (term3, Monoid.getAny -> parentChanged) <- Writer.listen (repeatR r ctx term2)
+        if parentChanged
+          then go False ctx term3
+          else return term3
+      else return term2
+{-# INLINE topdownFixR #-}
 
 -- | Apply a transformation in a bottomup traversal
 bottomupR :: Monad m => Transform m -> Transform m

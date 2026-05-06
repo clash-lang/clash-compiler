@@ -75,7 +75,7 @@ import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
-  ((>->), (!->), bottomupR, repeatR, topdownR)
+  ((>->), (!->), bottomupR, repeatR, topdownFixR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities, newInlineStrategy)
@@ -406,7 +406,10 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   flatten =
-    repeatR (topdownR (apply "appProp" appProp >->
+    -- topdownFixR reaches a fixpoint for the top-down propagation bundle.
+    -- Keep flattenLet in the outer fixed-point loop: flattening can expose
+    -- fresh propagation redexes for the next top-down pass.
+    repeatR (topdownFixR (apply "appProp" appProp >->
                apply "bindConstantVar" bindConstantVar >->
                apply "caseCon" caseCon >->
                (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
