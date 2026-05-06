@@ -490,7 +490,7 @@ shiftL#, shiftR#, rotateL#, rotateR# :: forall n .KnownNat n => Unsigned n -> In
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(U v) i ->
   let i' = fromIntegral i in
-  if | i < 0     -> error $ "'shiftL' undefined for negative number: " ++ show i
+  if | i < 0     -> errorX $ "'shiftL' undefined for negative number: " ++ show i
      | i' >= sz  -> U 0
      | otherwise -> U ((naturalShiftL v i') `mod` m)
  where
@@ -503,7 +503,7 @@ shiftL# = \(U v) i ->
 -- But having the same type signature for all shift and rotate functions
 -- makes implementing the Evaluator easier.
 shiftR# (U v) i
-  | i < 0     = error
+  | i < 0     = errorX
               $ "'shiftR' undefined for negative number: " ++ show i
   | otherwise = U (shiftR v i)
 
@@ -518,7 +518,7 @@ rotateL# =
           b'' = sz - b'
       in  U ((l .|. r) `mod` m)
     else
-      error $ "'rotateL' undefined for negative number: " ++ show b
+      errorX $ "'rotateL' undefined for negative number: " ++ show b
   where
     sz = naturalToWord (natVal (Proxy @n))
     m  = 1 `naturalShiftL` sz
@@ -534,7 +534,7 @@ rotateR# =
           b'' = sz - b'
       in  U ((l .|. r) `mod` m)
     else
-      error $ "'rotateR' undefined for negative number: " ++ show b
+      errorX $ "'rotateR' undefined for negative number: " ++ show b
   where
     sz = naturalToWord (natVal (Proxy @n))
     m  = 1 `naturalShiftL` sz

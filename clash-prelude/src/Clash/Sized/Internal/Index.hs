@@ -333,8 +333,8 @@ plus# (I a) (I b) = I (a + b)
 {-# ANN minus# hasBlackBox #-}
 minus# (I a) (I b) =
   let z   = a - b
-      err = error ("Clash.Sized.Index.minus: result " ++ show z ++
-                   " is smaller than 0")
+      err = errorX ("Clash.Sized.Index.minus: result " ++ show z ++
+                    " is smaller than 0")
       res = if z < 0 then err else I z
   in  res
 

@@ -2921,28 +2921,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Sized.Internal.BitVector.shiftL#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (catchErrorCall (mkBitVectorLit ty nTy kn msk val))
+      in reduce (mkBitVectorLit ty nTy kn msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.shiftL# u i)
   $(namePat 'Clash.Sized.Internal.BitVector.shiftR#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (catchErrorCall (mkBitVectorLit ty nTy kn msk val))
+      in reduce (mkBitVectorLit ty nTy kn msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.shiftR# u i)
   $(namePat 'Clash.Sized.Internal.BitVector.rotateL#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (catchErrorCall (mkBitVectorLit ty nTy kn msk val))
+      in reduce (mkBitVectorLit ty nTy kn msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.rotateL# u i)
   $(namePat 'Clash.Sized.Internal.BitVector.rotateR#)
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
       -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (catchErrorCall (mkBitVectorLit ty nTy kn msk val))
+      in reduce (mkBitVectorLit ty nTy kn msk val)
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
         op u i _ = splitBV (BitVector.rotateR# u i)
@@ -3233,28 +3233,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Sized.Internal.Signed.shiftL#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkSignedLit ty nTy kn val))
+      in reduce (mkSignedLit ty nTy kn val)
       where
         op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Signed.shiftL# u i)
   $(namePat 'Clash.Sized.Internal.Signed.shiftR#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkSignedLit ty nTy kn val))
+      in reduce (mkSignedLit ty nTy kn val)
       where
         op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Signed.shiftR# u i)
   $(namePat 'Clash.Sized.Internal.Signed.rotateL#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkSignedLit ty nTy kn val))
+      in reduce (mkSignedLit ty nTy kn val)
       where
         op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Signed.rotateL# u i)
   $(namePat 'Clash.Sized.Internal.Signed.rotateR#)
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkSignedLit ty nTy kn val))
+      in reduce (mkSignedLit ty nTy kn val)
       where
         op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Signed.rotateR# u i)
@@ -3435,28 +3435,28 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'Clash.Sized.Internal.Unsigned.shiftL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkUnsignedLit ty nTy kn val))
+      in reduce (mkUnsignedLit ty nTy kn val)
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.shiftL# u i)
   $(namePat 'Clash.Sized.Internal.Unsigned.shiftR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkUnsignedLit ty nTy kn val))
+      in reduce (mkUnsignedLit ty nTy kn val)
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.shiftR# u i)
   $(namePat 'Clash.Sized.Internal.Unsigned.rotateL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkUnsignedLit ty nTy kn val))
+      in reduce (mkUnsignedLit ty nTy kn val)
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.rotateL# u i)
   $(namePat 'Clash.Sized.Internal.Unsigned.rotateR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (catchErrorCall (mkUnsignedLit ty nTy kn val))
+      in reduce (mkUnsignedLit ty nTy kn val)
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.rotateR# u i)

@@ -23,13 +23,13 @@ import Test.Tasty.HUnit
 import qualified Test.Tasty.Hedgehog.Extra as H
 import qualified Test.Tasty.QuickCheck as Q
 
-import Data.Bits (Bits(shiftR))
+import Data.Bits (Bits(shiftL, shiftR, rotateL, rotateR))
 
 import Clash.Prelude
-  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit, hLit, oLit, rotateL, rotateR)
-import Clash.Sized.Internal.BitVector (BitVector (..))
+  (Bit, high, low, bitPattern, type (<=), type (-), natToInteger, msb, bLit, hLit, oLit)
+import Clash.Sized.Internal.BitVector (BitVector (..), index#, replaceBit#)
 
-import Test.Tasty.HUnit.Extra (expectException)
+import Test.Tasty.HUnit.Extra (expectXException)
 
 import Clash.Tests.SizedNum
 
@@ -124,7 +124,19 @@ tests = localOption (Q.QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "returns 0 when n >> bitSize" $
         shiftR (0xFF :: BitVector 8) (8 + 1000) @?= 0
     , testCase "undefined when n < 0" $
-        expectException (shiftR (1 :: BitVector 8) (-1))
+        expectXException (shiftR (1 :: BitVector 8) (-1))
+    ]
+  , testGroup "XException on illegal input"
+    [ testCase "shiftL with negative arg" $
+        expectXException (shiftL (1 :: BitVector 8) (-1))
+    , testCase "rotateL with negative arg" $
+        expectXException (rotateL (1 :: BitVector 8) (-1))
+    , testCase "rotateR with negative arg" $
+        expectXException (rotateR (1 :: BitVector 8) (-1))
+    , testCase "index# out of range" $
+        expectXException (index# (1 :: BitVector 8) 99)
+    , testCase "replaceBit# out of range" $
+        expectXException (replaceBit# (1 :: BitVector 8) 99 high)
     ]
   , testGroup "show"
     [ testCase "show0"  $ show @(BitVector 0) 0b0 @?= "0"

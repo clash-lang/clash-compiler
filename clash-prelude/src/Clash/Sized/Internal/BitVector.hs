@@ -926,11 +926,11 @@ index# bv@(BV m v) i
     | otherwise        = err
   where
     sz  = fromIntegral (natVal bv)
-    err = error $ concat [ "(!): "
-                         , show i
-                         , " is out of range "
-                         , formatRange 0 (sz - 1)
-                         ]
+    err = errorX $ concat [ "(!): "
+                          , show i
+                          , " is out of range "
+                          , formatRange 0 (sz - 1)
+                          ]
 
 {-# OPAQUE msb# #-}
 {-# ANN msb# hasBlackBox #-}
@@ -989,11 +989,11 @@ replaceBit# bv@(BV m v) i (Bit mb b)
     | otherwise        = err
   where
     sz   = fromIntegral (natVal bv)
-    err  = error $ concat [ "replaceBit: "
-                          , show i
-                          , " is out of range "
-                          , formatRange 0 (sz - 1)
-                          ]
+    err  = errorX $ concat [ "replaceBit: "
+                           , show i
+                           , " is out of range "
+                           , formatRange 0 (sz - 1)
+                           ]
 
 {-# OPAQUE setSlice# #-}
 {-# ANN setSlice# hasBlackBox #-}
@@ -1074,7 +1074,7 @@ shiftL#, shiftR#, rotateL#, rotateR#
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(BV msk v) i ->
   if | i < 0
-     -> error $ "'shiftL' undefined for negative number: " ++ show i
+     -> errorX $ "'shiftL' undefined for negative number: " ++ show i
      | fromIntegral i >= sz
      -> BV 0 0
      | otherwise
@@ -1086,7 +1086,7 @@ shiftL# = \(BV msk v) i ->
 {-# OPAQUE shiftR# #-}
 {-# ANN shiftR# hasBlackBox #-}
 shiftR# (BV m v) i
-  | i < 0     = error
+  | i < 0     = errorX
               $ "'shiftR' undefined for negative number: " ++ show i
   | otherwise = BV (shiftR m i) (shiftR v i)
 
@@ -1107,7 +1107,7 @@ rotateL# =
           b''  = sz - b'
       in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
     else
-      error $ "'rotateL' undefined for negative number: " ++ show b
+      errorX $ "'rotateL' undefined for negative number: " ++ show b
  where
   sz = naturalToWord (natVal (Proxy @n))
   m  = 1 `naturalShiftL` sz
@@ -1127,7 +1127,7 @@ rotateR# =
           b''  = sz - b'
       in  BV ((ml .|. mr) `mod` m) ((vl .|. vr) `mod` m)
     else
-      error $ "'rotateR' undefined for negative number: " ++ show b
+      errorX $ "'rotateR' undefined for negative number: " ++ show b
  where
   sz = naturalToWord (natVal (Proxy @n))
   m  = 1 `naturalShiftL` sz
