@@ -1,0 +1,1 @@
+ADDED: `-fclash-concurrent-normalization`, a flag enabling concurrent normalization. [#3196](https://github.com/clash-lang/clash-compiler/pull/3196).
