@@ -4699,7 +4699,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
     reduce :: Term -> Maybe Machine
     reduce e = case isX e of
-      Left msg -> trace (unlines ["Warning: Not evaluating constant expression:", show (primName pInfo), "Because doing so generates an XException:", msg]) Nothing
+      Left msg ->
+        let resTy = getResultTy tcm ty tys
+            warning = unlines
+              [ "Warning: caught XException: \"" ++ msg ++ "\" while trying to evaluate: "
+              , showPpr (mkApps (Prim pInfo) (map (Left . valToTerm) args))
+              ]
+        in trace warning (Just (setTerm (TyApp (Prim NP.undefined) resTy) mach))
       Right e' -> Just (setTerm e' mach)
 
     reduceWHNF e =
