@@ -1,0 +1,16 @@
+CHANGED: `clash` and `clashi` now use GHC-style RTS defaults through executable `-with-rtsopts` flags instead of linking RTS hooks. The existing unused hooks have been removed. **Existing users should set `-with-rtsopts` to `-K512M -H -I5 -T` if they use their own Clash executable. These flags has been shown to give a ~25% compilation speed up in larger designs.** If you used a Clash starter project to initialize your design, you should change:
+
+```haskell
+executable clash
+  [..]
+```
+
+To:
+
+```haskell
+executable clash
+  [..]
+  ghc-options: "-with-rtsopts=-K512M -H -I5 -T"
+```
+
+in the cabal file. See [#3252](https://github.com/clash-lang/clash-compiler/issues/3252).
