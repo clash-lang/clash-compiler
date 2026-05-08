@@ -12,7 +12,7 @@ module Clash.Hedgehog.Core.Literal
   ( genLiteralFrom
   ) where
 
-import Data.Binary.IEEE754 (doubleToWord, floatToWord)
+import GHC.Float (castDoubleToWord64, castFloatToWord32)
 import qualified Data.Primitive.ByteArray as BA (byteArrayFromList)
 import Hedgehog (MonadGen)
 import qualified Hedgehog.Gen as Gen
@@ -119,12 +119,12 @@ genStringLiteral =
 genFloatLiteral :: forall m. MonadGen m => m Literal
 genFloatLiteral =
   let range = Range.linearFrac 1.17549435e-38 3.40282347e+38
-   in FloatLiteral <$> (floatToWord <$> Gen.float range)
+   in FloatLiteral <$> (castFloatToWord32 <$> Gen.float range)
 
 genDoubleLiteral :: forall m. MonadGen m => m Literal
 genDoubleLiteral =
   let range = Range.linearFrac 2.2250738585072014e-308 1.7976931348623157e+308
-   in DoubleLiteral <$> (doubleToWord <$> Gen.double range)
+   in DoubleLiteral <$> (castDoubleToWord64 <$> Gen.double range)
 
 genCharLiteral :: forall m. MonadGen m => m Literal
 genCharLiteral =

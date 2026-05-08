@@ -38,7 +38,6 @@ import qualified Control.Lens               as Lens
 import           Control.Monad.State.Strict (State, MonadState)
 import qualified Control.Monad.State.Strict as State
 import           Control.Monad.Trans.Except (runExcept)
-import           Data.Binary.IEEE754        (doubleToWord, floatToWord, wordToDouble, wordToFloat)
 import           Data.Bits
 import qualified Data.ByteString.Internal as BS
 import           Data.Char           (chr,ord)
@@ -358,17 +357,17 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   $(namePat 'GHC.Prim.int2Float#)
     | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . FloatLiteral  . floatToWord $ fromInteger i
+    -> reduce . Literal . FloatLiteral  . castFloatToWord32 $ fromInteger i
   $(namePat 'GHC.Prim.int2Double#)
     | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . DoubleLiteral . doubleToWord $ fromInteger i
+    -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ fromInteger i
 
   $(namePat 'GHC.Prim.word2Float#)
     | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . FloatLiteral  . floatToWord $ fromInteger i
+    -> reduce . Literal . FloatLiteral  . castFloatToWord32 $ fromInteger i
   $(namePat 'GHC.Prim.word2Double#)
     | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . DoubleLiteral . doubleToWord $ fromInteger i
+    -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ fromInteger i
 
   $(namePat 'GHC.Prim.uncheckedIShiftL#)
     | [ Lit (IntLiteral i)
@@ -1045,14 +1044,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
 
   $(namePat 'GHC.Prim.double2Int#) | [i] <- doubleLiterals' args
-    -> let !(D# a) = wordToDouble i
+    -> let !(D# a) = castWord64ToDouble i
            r = double2Int# a
        in  reduce . Literal . IntLiteral . toInteger $ I# r
   $(namePat 'GHC.Prim.double2Float#)
     | [Lit (DoubleLiteral d)] <- args
-    -> let !(D# a) = wordToDouble d
+    -> let !(D# a) = castWord64ToDouble d
            r = double2Float# a
-       in reduce . Literal . FloatLiteral . floatToWord $ F# r
+       in reduce . Literal . FloatLiteral . castFloatToWord32 $ F# r
 
   $(namePat 'GHC.Prim.expDouble#) | Just r <- liftDD expDouble# args
     -> reduce r
@@ -1092,7 +1091,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(D# a) = wordToDouble i
+           !(D# a) = castWord64ToDouble i
            !(# p, q, r, s #) = decodeDouble_2Int# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
@@ -1105,7 +1104,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(D# a) = wordToDouble i
+           !(D# a) = castWord64ToDouble i
            !(# p, q #) = decodeDouble_Int64# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
@@ -1143,7 +1142,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
 
   $(namePat 'GHC.Prim.float2Int#) | [i] <- floatLiterals' args
-    -> let !(F# a) = wordToFloat i
+    -> let !(F# a) = castWord32ToFloat i
            r = float2Int# a
        in  reduce . Literal . IntLiteral . toInteger $ I# r
 
@@ -1194,9 +1193,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce r
 
   $(namePat 'GHC.Prim.float2Double#) | [i] <- floatLiterals' args
-    -> let !(F# a) = wordToFloat i
+    -> let !(F# a) = castWord32ToFloat i
            r = float2Double# a
-       in  reduce . Literal . DoubleLiteral . doubleToWord $ D# r
+       in  reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# r
 
 
   $(namePat 'GHC.Prim.newByteArray#)
@@ -1398,7 +1397,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(F# a) = wordToFloat i
+           !(F# a) = castWord32ToFloat i
            !(# p, q #) = decodeFloat_Int# a
        in reduce $
           mkApps (Data tupDc) (map Right tyArgs ++
@@ -1535,12 +1534,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   $(namePat 'GHC.Float.integerToFloat#)
     | [v] <- args
     , Just i <- integerLiteral v
-    -> reduce . Literal . FloatLiteral . floatToWord $ F# (integerToFloat# i)
+    -> reduce . Literal . FloatLiteral . castFloatToWord32 $ F# (integerToFloat# i)
 
   $(namePat 'GHC.Float.integerToDouble#)
     | [v] <- args
     , Just i <- integerLiteral v
-    -> reduce . Literal . DoubleLiteral . doubleToWord $ D# (integerToDouble# i)
+    -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# (integerToDouble# i)
 
   $(namePat 'GHC.Num.naturalLogBase#)
     | Just (a,b) <- naturalLiterals args
@@ -1557,7 +1556,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = UniqMap.lookup tupTcNm tcm
            [tupDc] = tyConDataCons tupTc
-           !(D# a)  = wordToDouble i
+           !(D# a)  = castWord64ToDouble i
            !(# b, c #) = decodeDoubleInteger a
     in reduce $
        mkApps (Data tupDc) (map Right tyArgs ++
@@ -1569,14 +1568,14 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , [i] <- integerLiterals' [iV]
     -> let !(I# k') = fromInteger j
            r = encodeDoubleInteger i k'
-    in  reduce . Literal . DoubleLiteral . doubleToWord $ D# r
+    in  reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# r
 
   $(namePat 'GHC.Num.Integer.integerEncodeFloat#)
     | [iV, Lit (IntLiteral j)] <- args
     , [i] <- integerLiterals' [iV]
     -> let !(I# k') = fromInteger j
            r = integerEncodeFloat# i k'
-        in reduce . Literal . FloatLiteral . floatToWord $ F# r
+        in reduce . Literal . FloatLiteral . castFloatToWord32 $ F# r
 
   $(namePat 'GHC.Num.Integer.integerQuotRem#) -- :: Integer -> Integer -> (#Integer, Integer#)
     | [i, j] <- integerLiterals' args
@@ -2061,9 +2060,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> case fromInteger matDigs of
           matDigs'
             | matDigs' == floatDigits (undefined :: Float)
-            -> reduce (Literal (FloatLiteral (floatToWord (fromRational (n :% d)))))
+            -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
             | matDigs' == floatDigits (undefined :: Double)
-            -> reduce (Literal (DoubleLiteral (doubleToWord (fromRational (n :% d)))))
+            -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
 
   "GHC.Float.$w$sfromRat''1" -- XXX: Very fragile
@@ -2075,9 +2074,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> case fromInteger matDigs of
           matDigs'
             | matDigs' == floatDigits (undefined :: Float)
-            -> reduce (Literal (FloatLiteral (floatToWord (fromRational (n :% d)))))
+            -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
             | matDigs' == floatDigits (undefined :: Double)
-            -> reduce (Literal (DoubleLiteral (doubleToWord (fromRational (n :% d)))))
+            -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
 
   $(namePat 'GHC.Num.Integer.integerSignum#)
@@ -4647,10 +4646,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
     , Just tupTc <- UniqMap.lookup tupTcNm tcm
     , [tupDc] <- tyConDataCons tupTc
-    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (wordToDouble d)))
+    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
            ret = mkApps (Data tupDc) (map Right tyArgs ++
                   [ Left (mkSignedLit sty nTy kn sn)
-                  , Left (mkDoubleCLit tcm (doubleToWord d1) (last tyArgs))
+                  , Left (mkDoubleCLit tcm (castDoubleToWord64 d1) (last tyArgs))
                   ])
         in reduce ret
     where
@@ -4663,10 +4662,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
     , Just tupTc <- UniqMap.lookup tupTcNm tcm
     , [tupDc] <- tyConDataCons tupTc
-    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (wordToDouble d)))
+    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
            ret = mkApps (Data tupDc) (map Right tyArgs ++
                   [ Left (mkSignedLit sty nTy kn sn)
-                  , Left (mkDoubleCLit tcm (doubleToWord d1) (last tyArgs))
+                  , Left (mkDoubleCLit tcm (castDoubleToWord64 d1) (last tyArgs))
                   ])
         in reduce ret
     where
@@ -5432,21 +5431,21 @@ liftDD  f args = case doubleLiterals' args of
   _     -> Nothing
 runDDI :: (Double# -> Double# -> Int#) -> Word64 -> Word64 -> Term
 runDDI f i j
-  = let !(D# a) = wordToDouble i
-        !(D# b) = wordToDouble j
+  = let !(D# a) = castWord64ToDouble i
+        !(D# b) = castWord64ToDouble j
         r = f a b
     in  Literal . IntLiteral . toInteger $ I# r
 runDDD :: (Double# -> Double# -> Double#) -> Word64 -> Word64 -> Term
 runDDD f i j
-  = let !(D# a) = wordToDouble i
-        !(D# b) = wordToDouble j
+  = let !(D# a) = castWord64ToDouble i
+        !(D# b) = castWord64ToDouble j
         r = f a b
-    in  Literal . DoubleLiteral . doubleToWord $ D# r
+    in  Literal . DoubleLiteral . castDoubleToWord64 $ D# r
 runDD :: (Double# -> Double#) -> Word64 -> Term
 runDD f i
-  = let !(D# a) = wordToDouble i
+  = let !(D# a) = castWord64ToDouble i
         r = f a
-    in  Literal . DoubleLiteral . doubleToWord $ D# r
+    in  Literal . DoubleLiteral . castDoubleToWord64 $ D# r
 
 liftFFI :: (Float# -> Float# -> Int#) -> [Value] -> Maybe Term
 liftFFI f args = case floatLiterals' args of
@@ -5462,21 +5461,21 @@ liftFF  f args = case floatLiterals' args of
   _     -> Nothing
 runFFI :: (Float# -> Float# -> Int#) -> Word32 -> Word32 -> Term
 runFFI f i j
-  = let !(F# a) = wordToFloat i
-        !(F# b) = wordToFloat j
+  = let !(F# a) = castWord32ToFloat i
+        !(F# b) = castWord32ToFloat j
         r = f a b
     in  Literal . IntLiteral . toInteger $ I# r
 runFFF :: (Float# -> Float# -> Float#) -> Word32 -> Word32 -> Term
 runFFF f i j
-  = let !(F# a) = wordToFloat i
-        !(F# b) = wordToFloat j
+  = let !(F# a) = castWord32ToFloat i
+        !(F# b) = castWord32ToFloat j
         r = f a b
-    in  Literal . FloatLiteral . floatToWord $ F# r
+    in  Literal . FloatLiteral . castFloatToWord32 $ F# r
 runFF :: (Float# -> Float#) -> Word32 -> Term
 runFF f i
-  = let !(F# a) = wordToFloat i
+  = let !(F# a) = castWord32ToFloat i
         r = f a
-    in  Literal . FloatLiteral . floatToWord $ F# r
+    in  Literal . FloatLiteral . castFloatToWord32 $ F# r
 
 liftI8 :: (Int8# -> Int8# -> Int8#) -> [Value] -> Maybe Term
 liftI8 f args = case int8Literals' args of
