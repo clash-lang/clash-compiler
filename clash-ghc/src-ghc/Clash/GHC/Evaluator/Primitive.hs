@@ -2576,6 +2576,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (mkBitLit ty 0 1)
   $(namePat 'Clash.Sized.Internal.BitVector.low)
     -> reduce (mkBitLit ty 0 0)
+  $(namePat 'Clash.Sized.Internal.BitVector.undefined##)
+    -> reduce (mkBitLit ty 1 0)
 
   $(namePat 'Clash.Sized.Internal.BitVector.undefined#)
     | Just (_, kn) <- extractKnownNat tcm tys

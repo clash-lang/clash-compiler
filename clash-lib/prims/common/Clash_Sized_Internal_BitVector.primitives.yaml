@@ -5,6 +5,12 @@
       n . KnownNat n => BitVector n'
     template: ~ERRORO
     workInfo: Constant
+- BlackBox:
+    name: Clash.Sized.Internal.BitVector.undefined##
+    kind: Expression
+    type: 'undefined## :: Bit'
+    template: ~ERRORO
+    workInfo: Constant
 - Primitive:
     name: Clash.Sized.Internal.BitVector.checkUnpackUndef
     primType: Function
