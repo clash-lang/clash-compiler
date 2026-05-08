@@ -4,9 +4,9 @@ import Data.Bits (Bits(shiftR))
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Sized.Internal.Index (Index)
+import Clash.Sized.Internal.Index (Index, minus#)
 
-import Test.Tasty.HUnit.Extra (expectException)
+import Test.Tasty.HUnit.Extra (expectXException)
 
 tests :: TestTree
 tests = testGroup "Index"
@@ -20,6 +20,10 @@ tests = testGroup "Index"
     , testCase "returns 0 when n >> bitSize" $
         shiftR (127 :: Index 128) (7 + 1000) @?= 0
     , testCase "undefined when n < 0" $
-        expectException (shiftR (1 :: Index 128) (-1))
+        expectXException (shiftR (1 :: Index 128) (-1))
+    ]
+  , testGroup "XException on illegal input"
+    [ testCase "minus# underflow" $
+        expectXException (minus# (0 :: Index 8) (1 :: Index 8) :: Index 15)
     ]
   ]

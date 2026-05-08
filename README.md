@@ -152,6 +152,9 @@ nix build .#clash-ghc
 nix run .#clashi
 ```
 
+# Hacking
+Want to start hacking on Clash? Read [HACKING.md](HACKING.md) for tips and tricks.
+
 # Related libraries and initiatives
 
 * [Clashilator](https://github.com/gergoerdi/clashilator): tooling to integrate Clash with Verilator. Enables fast, multithreaded simulation by compiling Clash designs to C++.

@@ -6,12 +6,12 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import Data.Bits (Bits(shiftR))
+import Data.Bits (Bits(shiftL, shiftR, rotateL, rotateR))
 
 import Clash.Sized.Internal.Unsigned
 import Clash.Tests.SizedNum
 
-import Test.Tasty.HUnit.Extra (expectException)
+import Test.Tasty.HUnit.Extra (expectXException)
 
 tests :: TestTree
 tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
@@ -50,7 +50,15 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
     , testCase "returns 0 when n >> bitSize" $
         shiftR (0xFF :: Unsigned 8) (8 + 1000) @?= 0
     , testCase "undefined when n < 0" $
-        expectException (shiftR (1 :: Unsigned 8) (-1))
+        expectXException (shiftR (1 :: Unsigned 8) (-1))
+    ]
+  , testGroup "XException on illegal input"
+    [ testCase "shiftL with negative arg" $
+        expectXException (shiftL (1 :: Unsigned 8) (-1))
+    , testCase "rotateL with negative arg" $
+        expectXException (rotateL (1 :: Unsigned 8) (-1))
+    , testCase "rotateR with negative arg" $
+        expectXException (rotateR (1 :: Unsigned 8) (-1))
     ]
   ]
 

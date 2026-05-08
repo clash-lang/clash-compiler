@@ -578,7 +578,7 @@ shiftL#,shiftR#,rotateL#,rotateR# :: forall n . KnownNat n => Signed n -> Int ->
 {-# OPAQUE shiftL# #-}
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(S n) b ->
-  if | b < 0     -> error $ "'shiftL' undefined for negative number: " ++ show b
+  if | b < 0     -> errorX $ "'shiftL' undefined for negative number: " ++ show b
      | b > sz    -> S 0
      | otherwise -> fromInteger_INLINE sz mB mask (shiftL n b)
  where
@@ -593,7 +593,7 @@ shiftR# =
     if b >= 0 then
       fromInteger_INLINE sz mB mask (shiftR n b)
     else
-      error $ "'shiftR' undefined for negative number: " ++ show b
+      errorX $ "'shiftR' undefined for negative number: " ++ show b
  where
   sz   = fromInteger (natVal (Proxy @n)) - 1
   mB   = 1 `shiftL` sz
@@ -612,7 +612,7 @@ rotateL# =
           b''  = sz - b'
       in  fromInteger_INLINE sz1 mB maskM (l .|. r)
     else
-      error $ "'rotateL undefined for negative number: " ++ show b
+      errorX $ "'rotateL undefined for negative number: " ++ show b
  where
   sz    = fromInteger (natVal (Proxy @n))
   sz1   = sz-1
@@ -632,7 +632,7 @@ rotateR# =
           b'' = sz - b'
       in  fromInteger_INLINE sz1 mB maskM (l .|. r)
     else
-      error $ "'rotateR' undefined for negative number: " ++ show b
+      errorX $ "'rotateR' undefined for negative number: " ++ show b
  where
   sz    = fromInteger (natVal (Proxy @n))
   sz1   = sz - 1
