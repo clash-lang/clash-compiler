@@ -11,6 +11,7 @@ Tools to convert a 'Term' into its "real" representation
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -22,6 +23,7 @@ module Clash.Core.TermLiteral
   , showsTypePrec
   , showType
   , termToData
+  , termToData#
   , termToDataError
   , deriveTermLiteral
   ) where
@@ -46,7 +48,7 @@ import           Clash.Core.DataCon              (DataCon(..))
 import           Clash.Core.Literal
 import           Clash.Core.Name                 (Name(..))
 import           Clash.Core.Pretty               (showPpr)
-import           Clash.Core.Term                 (Term(Literal, Data, Tick), collectArgs)
+import           Clash.Core.Term                 (Term(Literal, Data), collectArgs, stripAllTicks)
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
 import           Clash.Sized.Index               (Index)
@@ -64,7 +66,11 @@ showType proxy = showsTypePrec 0 proxy ""
 class TermLiteral a where
   -- | Convert 'Term' to the constant it represents. Will return an error if
   -- (one of the subterms) fail to translate.
-  termToData
+  --
+  -- This is the primitive method instances must implement. Callers should
+  -- generally use 'termToData' instead, which strips ticks before delegating
+  -- to this method.
+  termToData#
     :: HasCallStack
     => Term
     -- ^ Term to convert
@@ -90,57 +96,55 @@ class TermLiteral a where
   showsTypePrec n _ = showsPrec n (typeRep (Proxy @a))
 
 instance TermLiteral Term where
-  termToData = pure
+  termToData# = pure
 
 instance TermLiteral String where
-  termToData (collectArgs -> (_, [Left (Literal (StringLiteral s))])) = Right s
-  termToData t = Left t
+  termToData# (collectArgs -> (_, [Left (Literal (StringLiteral s))])) = Right s
+  termToData# t = Left t
 
 instance TermLiteral Text where
-  termToData (collectArgs -> (_, [Left (Literal (StringLiteral s))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (StringLiteral s))])) =
     Right (Text.pack s)
-  termToData (collectArgs -> (_, [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
-                                 , Left (Literal (IntLiteral off))
-                                 , Left (Literal (IntLiteral len))])) =
+  termToData# (collectArgs -> (_, [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
+                                  , Left (Literal (IntLiteral off))
+                                  , Left (Literal (IntLiteral len))])) =
     Right (Text.Text (Text.ByteArray ba) (fromInteger off) (fromInteger len))
-  termToData t = Left t
+  termToData# t = Left t
 
 instance KnownNat n => TermLiteral (Index n) where
-  termToData t@(collectArgs -> (_, [_, _, Left (Literal (IntegerLiteral n))]))
+  termToData# t@(collectArgs -> (_, [_, _, Left (Literal (IntegerLiteral n))]))
     | n < 0 = Left t
     | n >= natToNum @n = Left t
     | otherwise = Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 instance TermLiteral Int where
-  termToData (collectArgs -> (_, [Left (Literal (IntLiteral n))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (IntLiteral n))])) =
     Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 instance TermLiteral Word where
-  termToData (collectArgs -> (_, [Left (Literal (WordLiteral n))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (WordLiteral n))])) =
     Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 instance TermLiteral Integer where
-  termToData (Tick _ e) = termToData e
-  termToData (Literal (IntegerLiteral n)) = Right n
-  termToData (collectArgs -> (_, [Left (Literal (IntLiteral n))])) = Right n
-  termToData (collectArgs -> (_, [Left (Literal (IntegerLiteral n))])) = Right n
-  termToData t = Left t
+  termToData# (Literal (IntegerLiteral n)) = Right n
+  termToData# (collectArgs -> (_, [Left (Literal (IntLiteral n))])) = Right n
+  termToData# (collectArgs -> (_, [Left (Literal (IntegerLiteral n))])) = Right n
+  termToData# t = Left t
 
 instance TermLiteral Char where
-  termToData (collectArgs -> (_, [Left (Literal (CharLiteral c))])) = Right c
-  termToData t = Left t
+  termToData# (collectArgs -> (_, [Left (Literal (CharLiteral c))])) = Right c
+  termToData# t = Left t
 
 instance TermLiteral Natural where
-  termToData (Tick _ e) = termToData e
-  termToData t@(Literal (NaturalLiteral n))
+  termToData# t@(Literal (NaturalLiteral n))
     | n < 0 = Left t
     | otherwise = Right (fromIntegral n)
-  termToData (collectArgs -> (_, [Left (Literal (NaturalLiteral n))])) =
+  termToData# (collectArgs -> (_, [Left (Literal (NaturalLiteral n))])) =
     Right (fromInteger n)
-  termToData t = Left t
+  termToData# t = Left t
 
 -- | Unsafe warning: If you use this instance in a monomorphic context (e.g.,
 -- @TermLiteral (SNat 5)@), you need to make very sure that the term corresponds
@@ -149,8 +153,7 @@ instance TermLiteral Natural where
 -- instance will therefore leave the /n/ polymorphic.
 --
 instance TermLiteral (SNat n) where
-  termToData = \case
-    Tick _ e                   -> termToData e
+  termToData# = \case
     Literal (NaturalLiteral n) -> Right (unsafeSNat n)
     t                          -> Left t
 
@@ -162,11 +165,11 @@ instance TermLiteral (SNat n) where
     = showParen (n > 10) $ showString "SNat _"
 
 instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
-  termToData (collectArgs -> (_, lefts -> [a, b])) = do
-    a' <- termToData a
-    b' <- termToData b
+  termToData# (collectArgs -> (_, lefts -> [a, b])) = do
+    a' <- termToData# a
+    b' <- termToData# b
     pure (a', b')
-  termToData t = Left t
+  termToData# t = Left t
 
   showsTypePrec _ _ =
     -- XXX: We pass in 11 here, but should really be passing in 0. We never want
@@ -180,7 +183,7 @@ instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
     . showChar ')'
 
 instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
-  termToData term = do
+  termToData# term = do
     res <- fromList <$> go term
     -- Check whether length of list constructed in 'go' corresponds to the
     -- @KnownNat n@ we've been given
@@ -196,7 +199,7 @@ instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
           | nameOcc == showt 'Cons ->
             case lefts args of
               [_gadtProof, c0, cs0] -> do
-                c1 <- termToData @a c0
+                c1 <- termToData# @a c0
                 cs1 <- go cs0
                 Right (c1:cs1)
               _ -> Left t
@@ -217,6 +220,12 @@ deriveTermLiteral ''Cv.RenderAs
 deriveTermLiteral ''Cv.Assertion'
 deriveTermLiteral ''Cv.Property'
 deriveTermLiteral ''Attr
+
+-- | Convert 'Term' to the constant it represents. Wraps 'termToData#': ticks
+-- are stripped from the term (recursively) before delegating, so instances
+-- never have to special-case them.
+termToData :: forall a. (HasCallStack, TermLiteral a) => Term -> Either Term a
+termToData = termToData# . stripAllTicks
 
 -- | Same as 'termToData', but returns printable error message if it couldn't
 -- translate a term.
