@@ -30,6 +30,7 @@ module Clash.Sized.Internal.BitVector
     -- ** Construction
   , high
   , low
+  , undefined##
     -- ** Type classes
     -- *** Eq
   , eq##
@@ -261,6 +262,13 @@ high = Bit 0 1
 low :: Bit
 low = Bit 0 0
 
+-- | An 'undefined' 'Bit', i.e. a 'Bit' whose mask is set. Mirrors
+-- 'undefined#' for 'BitVector'.
+undefined## :: Bit
+undefined## = Bit 1 0
+{-# OPAQUE undefined## #-}
+{-# ANN undefined## hasBlackBox #-}
+
 -- ** Instances
 instance NFData Bit where
   rnf (Bit m i) = rnf m `seq` rnf i `seq` ()
@@ -277,7 +285,7 @@ instance ShowX Bit where
   showsPrecX = showsPrecXWith showsPrec
 
 instance NFDataX Bit where
-  deepErrorX = errorX
+  deepErrorX _ = undefined##
   ensureSpine = unpack# . xToBV . pack#
   rnfX = rwhnfX
   hasUndefined bv = isLeft (isX bv) || unsafeMask# bv /= 0
