@@ -242,6 +242,14 @@ runClashTest = defaultMain
               this value was annotated with 'HasBlackBox'.
             |])
           }
+        , runTest "T3023" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, Text.pack [I.i|
+              Clash was forced to translate 'T3023.Q', but this value was
+              marked with DontTranslate. Did you forget to include a blackbox
+              for one of the constructs using this?
+            |])
+          }
         ]
       , clashTestGroup "Signal"
         [ runTest "MAC" def{

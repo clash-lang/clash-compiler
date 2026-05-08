@@ -108,7 +108,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral, shrinkIntegral)
 
-import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Annotations.Primitive (dontTranslate, hasBlackBox)
 import Clash.Class.BitPack            (BitPack (..), packXWith)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
@@ -184,7 +184,7 @@ data Signed (n :: Nat) =
     S { unsafeToInteger :: !Integer}
   deriving (Data, Generic)
 
-{-# ANN S hasBlackBox #-}
+{-# ANN S dontTranslate #-}
 
 instance NFDataX (Signed n) where
   deepErrorX = errorX

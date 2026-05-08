@@ -1,0 +1,1 @@
+FIXED: `PrimitiveGuard` annotations (`dontTranslate`, `hasBlackBox`) attached to data constructors are now recognized. Previously they were silently ignored because the compiler only looked them up on top-level binders. See [#3023](https://github.com/clash-lang/clash-compiler/issues/3023).

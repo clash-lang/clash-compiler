@@ -172,7 +172,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
-import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Annotations.Primitive (dontTranslate, hasBlackBox)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import Clash.Class.Resize         (Resize (..))
@@ -228,7 +228,7 @@ data BitVector (n :: Nat) =
        }
   deriving (Data, Generic)
 
-{-# ANN BV hasBlackBox #-}
+{-# ANN BV dontTranslate #-}
 
 -- * Bit
 
@@ -246,7 +246,7 @@ data Bit =
       }
   deriving (Data, Generic)
 
-{-# ANN Bit hasBlackBox #-}
+{-# ANN Bit dontTranslate #-}
 
 -- * Constructions
 -- ** Initialisation

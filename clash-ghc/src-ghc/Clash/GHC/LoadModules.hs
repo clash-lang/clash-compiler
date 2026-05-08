@@ -52,7 +52,8 @@ import           Data.Foldable                   (toList)
 import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
-import           Data.List                       (nub, find)
+import           Data.Function                   (on)
+import           Data.List                       (nub, nubBy, find)
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List                       (foldl')
 #endif
@@ -122,6 +123,7 @@ import qualified GHC.Tc.Types as TcRnTypes
 import qualified GHC.Iface.Tidy as TidyPgm
 import qualified GHC.Core.TyCon as TyCon
 import qualified GHC.Core.Type as Type
+import qualified GHC.Types.Id as Id
 import qualified GHC.Types.Unique as Unique
 import qualified GHC.Tc.Instance.Family as FamInst
 import qualified GHC.Core.FamInstEnv as FamInstEnv
@@ -497,7 +499,8 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     topSyn     <- map fst <$> findSynthesizeAnnotations rootIds
     benchAnn   <- findTestBenches rootIds
     reprs'     <- findCustomReprAnnotations
-    primGuards <- findPrimitiveGuardAnnotations allBinderIds
+    primGuards <- findPrimitiveGuardAnnotations
+                    allBinderIds (dataConsInBinds allBinders)
     let
       -- All binders synthesized with Synthesize, all binders annotated with
       -- TestBench and the binders they're pointing to, plus magically named
@@ -742,16 +745,74 @@ findNamedAnnotations bndrs =
 findPrimitiveGuardAnnotations
   :: GHC.GhcMonad m
   => [CoreSyn.CoreBndr]
+  -> [DataCon.DataCon]
+  -- ^ Data constructors to also check for guard annotations. Annotations on
+  -- data constructors are attached to the constructor's 'Name', not to the
+  -- worker 'Id', so they need a separate lookup path.
   -> m [(Text.Text, (PrimitiveGuard ()))]
-findPrimitiveGuardAnnotations bndrs = do
-  anns0 <- findNamedAnnotations bndrs
-  let anns1 = combineAnnotationsWith combinePrimGuards "PrimitiveGuard" bndrs anns0
-  pure (map (first (qualifiedNameString' . Var.varName)) anns1)
+findPrimitiveGuardAnnotations bndrs dcs = do
+  bndrAnns <- findNamedAnnotations bndrs
+  let bndrAnns1 = combineAnnotationsWith combinePrimGuards "PrimitiveGuard"
+                    bndrs bndrAnns
+  let dcNames = map DataCon.dataConName dcs
+  dcAnns <- findAnnotationsByTargets (map Annotations.NamedTarget dcNames)
+  let dcAnns1 = combineDcAnnotationsWith combinePrimGuards "PrimitiveGuard"
+                  dcNames dcAnns
+  pure $ map (first (qualifiedNameString' . Var.varName)) bndrAnns1
+      ++ map (first qualifiedNameString') dcAnns1
  where
   combinePrimGuards a b = case (a,b) of
     (HasBlackBox x _, HasBlackBox y _) -> Right (HasBlackBox (x++y) ())
     (DontTranslate  , DontTranslate)   -> Right DontTranslate
     (_,_) -> Left "One binder can't have both HasBlackBox and DontTranslate annotations."
+
+-- | Like 'combineAnnotationsWith', but works on 'Name.Name's directly rather
+-- than 'CoreBndr's. Used for data constructors, whose annotations are attached
+-- to a 'Name' rather than a 'Var'.
+combineDcAnnotationsWith
+  :: forall a. (a -> a -> Either String a)
+  -> String
+  -> [Name.Name]
+  -> [[a]]
+  -> [(Name.Name, a)]
+combineDcAnnotationsWith f nm names anns = go (zip names anns)
+ where
+  go [] = []
+  go ((_, []):ps) = go ps
+  go ((n, (a:as)):ps) = case foldM f a as of
+    Left err ->
+      Panic.pgmError $ "Error processing '" ++ nm ++ "' annotations on "
+                     ++ Outputable.showSDocUnsafe (ppr n) ++ ":\n" ++ err
+    Right x -> (n, x) : go ps
+
+-- | Collect every data constructor referenced in the given core bindings.
+-- Data constructors are not free variables of an expression (GHC's
+-- free-variable machinery skips them), but users can still attach
+-- 'PrimitiveGuard' annotations to them.
+dataConsInBinds :: [CoreSyn.CoreBind] -> [DataCon.DataCon]
+dataConsInBinds binds = nubBy ((==) `on` DataCon.dataConName)
+                              (concatMap goBind binds)
+ where
+  goBind (CoreSyn.NonRec _ e) = goExpr e
+  goBind (CoreSyn.Rec bs)     = concatMap (goExpr . snd) bs
+
+  goExpr e = case e of
+    CoreSyn.Var v
+      | Just dc <- Id.isDataConId_maybe v -> [dc]
+      | otherwise                         -> []
+    CoreSyn.Lit{}        -> []
+    CoreSyn.App e1 e2    -> goExpr e1 ++ goExpr e2
+    CoreSyn.Lam _ b      -> goExpr b
+    CoreSyn.Let bnd b    -> goBind bnd ++ goExpr b
+    CoreSyn.Case s _ _ alts ->
+      goExpr s ++ concatMap goAlt alts
+    CoreSyn.Cast e1 _    -> goExpr e1
+    CoreSyn.Tick _ e1    -> goExpr e1
+    CoreSyn.Type{}       -> []
+    CoreSyn.Coercion{}   -> []
+
+  goAlt (CoreSyn.Alt (CoreSyn.DataAlt dc) _ rhs) = dc : goExpr rhs
+  goAlt (CoreSyn.Alt _ _ rhs) = goExpr rhs
 
 
 -- | Find annotations of type @DataReprAnn@ and convert them to @DataRepr'@

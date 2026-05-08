@@ -95,7 +95,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
-import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Annotations.Primitive (dontTranslate, hasBlackBox)
 import Clash.Class.BitPack.Internal (BitPack (..), packXWith)
 import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
@@ -158,7 +158,7 @@ data Index (n :: Nat) =
     I { unsafeToInteger :: !Integer }
   deriving (Data, Generic)
 
-{-# ANN I hasBlackBox #-}
+{-# ANN I dontTranslate #-}
 
 {-# OPAQUE size# #-}
 size# :: KnownNat n => Index n -> Int

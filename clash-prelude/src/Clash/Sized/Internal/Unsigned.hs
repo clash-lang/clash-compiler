@@ -113,7 +113,7 @@ import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
                                        arbitraryBoundedIntegral,
                                        coarbitraryIntegral)
 
-import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Annotations.Primitive (dontTranslate, hasBlackBox)
 import Clash.Class.BitPack            (BitPack (..), packXWith, bitCoerce)
 import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
@@ -187,7 +187,7 @@ data Unsigned (n :: Nat) =
     U { unsafeToNatural :: !Natural }
   deriving (Data, Generic)
 
-{-# ANN U hasBlackBox #-}
+{-# ANN U dontTranslate #-}
 
 {-# OPAQUE size# #-}
 {-# ANN size# hasBlackBox #-}

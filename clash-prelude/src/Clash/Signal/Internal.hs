@@ -821,6 +821,8 @@ data Signal (dom :: Domain) a
   -- | The constructor, @(':-')@, is __not__ synthesizable.
   = a :- Signal dom a
 
+{-# ANN (:-) dontTranslate #-}
+
 head# :: Signal dom a -> a
 head# (x' :- _ )  = x'
 
