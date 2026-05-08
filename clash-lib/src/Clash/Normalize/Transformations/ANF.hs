@@ -28,6 +28,7 @@ import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text.Extra as Text (showt)
 import GHC.Stack (HasCallStack)
 
+import Clash.Explicit.SimIO (SimIO)
 import Clash.Signal.Internal (Signal(..))
 
 import Clash.Core.DataCon (DataCon(..))
@@ -183,7 +184,7 @@ isSimIOTy
   -> Bool
 isSimIOTy tcm ty = case tyView (coreView tcm ty) of
   TyConApp tcNm args
-    | nameOcc tcNm == "Clash.Explicit.SimIO.SimIO"
+    | nameOcc tcNm == Text.showt ''SimIO
     -> True
     | nameOcc tcNm == "GHC.Prim.(#,#)"
     , [_,_,st,_] <- args
