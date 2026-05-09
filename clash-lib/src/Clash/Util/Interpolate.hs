@@ -140,7 +140,9 @@ nodesToLines =
     maxLength = 80
 
     go :: Int -> [Node] -> [Node] -> [[Node]]
-    go accLen acc goNodes | accLen > maxLength = reverse acc : go 0 [] goNodes
+    -- Only break when there's still content to put on the next line; otherwise
+    -- we'd emit a trailing empty line. See issue #2753.
+    go accLen acc goNodes@(_:_) | accLen > maxLength = reverse acc : go 0 [] goNodes
     go accLen acc (l@(Literal s):goNodes) = go (accLen + length s) (l:acc) goNodes
     go accLen acc (e@(Expression s):goNodes) = go (accLen + length s) (e:acc) goNodes
     go _accLen acc [] = [reverse acc]

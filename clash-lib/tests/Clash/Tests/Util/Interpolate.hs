@@ -12,7 +12,7 @@ import qualified Clash.Util.Interpolate as I
 import Test.Tasty
 import Test.Tasty.HUnit
 
-test1, test2, test3, test4, test5, test6, test7, test8, test9 :: String
+test1, test2, test3, test4, test5, test6, test7, test8, test9, test10 :: String
 test1 = [I.i| Simple |]
 test2 = [I.i|
   Single line
@@ -46,6 +46,14 @@ test8 = [I.i|
   looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong word
 |]
 
+-- Regression test for issue #2753: a paragraph that wraps onto multiple lines
+-- followed by a blank line was emitting an extra blank line.
+test10 = [I.i|
+  Clash has known issues on 9.4.8 on your current OS. While not completely preventing the compiler from working, we recommend switching to another GHC version. Symptoms:
+
+  After.
+|]
+
 data SomeRecord = SomeRecord { getField :: Int }
 someRecord :: SomeRecord
 someRecord = SomeRecord 5
@@ -69,4 +77,9 @@ tests =
     , testCase "test7" $ test7 @?= ("The big test:\n\n" ++ test5)
     , testCase "test8" $ test8 @?= "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong \nword"
     , testCase "test9" $ test9 @?= "\\42"
+    , testCase "test10" $ test10 @?=
+        "Clash has known issues on 9.4.8 on your current OS. While not completely preventing \n\
+        \the compiler from working, we recommend switching to another GHC version. Symptoms:\n\
+        \\n\
+        \After."
     ]
