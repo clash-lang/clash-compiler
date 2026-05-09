@@ -17,6 +17,8 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 
+import qualified Clash.Core.Literal as L
+import Clash.Core.Term (Term(App, Literal, Tick), TickInfo(NoDeDup))
 import Clash.Core.TermLiteral
 import Clash.Promoted.Nat
 
@@ -62,6 +64,17 @@ deriveTermLiteral ''NatTypeArg
 
 case_natTypeArg :: Assertion
 case_natTypeArg = "NatTypeArg _" @=? showType (Proxy @(NatTypeArg 10))
+
+-- Regression test for #2926: 'termToData' must be transparent to ticks
+-- anywhere in the term. The 'String' instance pattern-matches via
+-- 'collectArgs', which strips ticks at the head but not around the literal
+-- argument. Without the fix, the test returns 'Left'.
+case_termToData_strips_ticks_in_subterm :: Assertion
+case_termToData_strips_ticks_in_subterm =
+  Right "hi"
+    @=? termToData @String
+          (App (Literal (L.IntegerLiteral 0))
+               (Tick NoDeDup (Literal (L.StringLiteral "hi"))))
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.TermLiteral" [$(testGroupGenerator)]

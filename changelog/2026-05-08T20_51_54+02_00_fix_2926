@@ -1,0 +1,1 @@
+FIXED: `termToData` now strips ticks (recursively) from its input before delegating to instances, so `TermLiteral` lookups no longer spuriously fail on tick-wrapped subterms. The class method has been renamed to `termToData#`. See [#2926](https://github.com/clash-lang/clash-compiler/issues/2926).
