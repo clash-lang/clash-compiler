@@ -682,6 +682,7 @@ runClashTest = defaultMain
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
            in runTest "T3084" _opts
         , runTest "T3141" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141"]}
+        , runTest "T3142" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141/."]}
         , outputTest "T3147" def{hdlTargets=[Verilog], hdlSim=[]}
         , clashLibTest "T3157_IntegerNaturalInternals" def{hdlTargets=[Verilog]}
         , runTest "T3159" def{hdlSim=[], hdlLoad=[] }

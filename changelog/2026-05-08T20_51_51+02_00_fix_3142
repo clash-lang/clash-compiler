@@ -1,0 +1,1 @@
+FIXED: Clash no longer errors when two `-i` import paths refer to the same directory via different syntactic spellings (e.g. `-isrc -isrc/.`) and a data file lives in that directory. See [#3142](https://github.com/clash-lang/clash-compiler/issues/3142).
