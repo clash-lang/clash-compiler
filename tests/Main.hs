@@ -361,6 +361,7 @@ runClashTest = defaultMain
         , runTest "T1507" def{hdlSim=[]}
         , let _opts = def{hdlSim=[], hdlTargets=[VHDL]}
            in runTest "T1632" _opts
+        , runTest "T3100" def{hdlSim=[]}
         ]
       , clashTestGroup "Basic"
         [ runTest "AES" def{hdlSim=[]}
