@@ -364,7 +364,8 @@ canonicalizeDataFilePath idirs toCanonicalize
   | otherwise = unsafePerformIO $ do
       let candidates = map (</> toCanonicalize) (nubOrd idirs)
       found <- filterM doesFileExist candidates
-      case found of
+      canonicalized <- nubOrd <$> mapM canonicalizePath found
+      case canonicalized of
         [] -> error [I.i|
           Could not find data file #{show toCanonicalize}. The following directories were
           searched:
@@ -373,11 +374,10 @@ canonicalizeDataFilePath idirs toCanonicalize
         (_:_:_) -> error [I.i|
           Multiple data files for #{show toCanonicalize} found. The following candidates
           were found:
-            #{found}
+            #{canonicalized}
           Please disambiguate data files.
         |]
-        [c] ->
-          canonicalizePath c
+        [c] -> pure c
 {-# NOINLINE canonicalizeDataFilePath #-} -- To contain unsafePerformIO
 
 -- | Select a new file name that doesn't collide with existing names. Might return
