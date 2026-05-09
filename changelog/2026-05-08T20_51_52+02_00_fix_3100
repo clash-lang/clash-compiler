@@ -1,0 +1,1 @@
+FIXED: `deriveAutoReg` no longer fails on GHC versions where `KnownNat` lives in `GHC.Internal.TypeNats` rather than `GHC.TypeNats`. See [#3100](https://github.com/clash-lang/clash-compiler/issues/3100).
