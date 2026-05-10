@@ -9,7 +9,7 @@ default:
 
 .common:
   image: ghcr.io/clash-lang/clash-ci:$GHC_VERSION-$CLASH_DOCKER_TAG
-  timeout: 10 minutes
+  timeout: 2 hours
   stage: build
   variables:
     CLASH_DOCKER_TAG: 20260331
@@ -38,15 +38,5 @@ default:
   after_script:
     - export THREADS=$(./.ci/effective_cpus.sh)
     - tar -cf - /root/.cabal | zstd -T$THREADS -3 > cache.tar.zst
-
-# We run tests on local machines if:
-#
-#   * A job may take more than 3 minutes to complete on public runners.
-#   * A job needs specific capabilities public runners cannot provide, e.g.
-#     more than 4GB memory of memory, proprietary synthesis tooling.
-#
-.common-local:
-  extends: .common
-  timeout: 2 hours
   tags:
     - local
