@@ -1,5 +1,5 @@
 hackage-sdist:
-  extends: .common-local
+  extends: .common
   needs: []
   stage: pack
   script:
