@@ -10,6 +10,7 @@ import           Test.Tasty.HUnit
 
 import           GHC.Generics         (Generic)
 import           Clash.Class.BitPack  (pack)
+import           Clash.Sized.Internal.BitVector (Bit, BitVector)
 import           Clash.Sized.Vector   (Vec(..))
 import           Clash.XException
   (NFDataX(rnfX, hasUndefined, deepErrorX), errorX, ensureSpine)
@@ -146,6 +147,15 @@ tests =
         , testCase "SP1"      $ hasUndefined (S 3 5 :: SP)                    @?= False
         , testCase "SP2"      $ hasUndefined (P 5 :: SP)                      @?= False
         , testCase "Rec2_3"   $ hasUndefined (Rec2 3 5)                       @?= False
+        ]
+    , testGroup
+        "Bit"
+        -- Regression test for #2978: 'deepErrorX' on 'Bit' should not throw
+        -- but produce an undefined 'Bit', mirroring the behavior of
+        -- 'BitVector n'.
+        [ testCase "deepErrorX-show"   $ show (deepErrorX "" :: Bit)             @?= "."
+        , testCase "deepErrorX-hasU"   $ hasUndefined (deepErrorX "" :: Bit)     @?= True
+        , testCase "deepErrorX-bv-show" $ show (deepErrorX "" :: BitVector 8)    @?= "0b...._...."
         ]
     , testGroup
         "ManualHasUndefined"
