@@ -74,6 +74,23 @@ let
             preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-natnormalise";
           });
 
+      # Not yet in nixpkgs.
+      checked-literals =
+        prev.haskell.lib.overrideCabal
+          (hprev.callHackageDirect {
+            pkg = "checked-literals";
+            ver = "0.1.2";
+            sha256 = "sha256-c+3EpY6A/Z88MQsNpQv0bMDGvpWcaBHHVg6wxh5ZQuU=";
+          } { })
+          (drv: {
+            # The test suite spawns a fresh `ghc` subprocess that loads CheckedLiterals
+            # as a plugin. Point GHC_PACKAGE_PATH at the cabal inplace db so the
+            # just-built library is visible.
+            preCheck = (drv.preCheck or "") + ''
+              export NIX_GHC_PACKAGE_PATH_FOR_TEST="$PWD/dist/package.conf.inplace:$packageConfDir:"
+            '';
+          });
+
       # Upstream nixpkgs has this fix but they have not landed in a release yet
       cabal-add = prev.haskell.lib.appendPatches hprev.cabal-add [
         (prev.fetchpatch {
