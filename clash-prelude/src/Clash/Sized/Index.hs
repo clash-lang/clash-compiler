@@ -13,7 +13,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module Clash.Sized.Index
-  (Index, bv2i, fromSNat)
+  ( Index, bv2i, fromSNat
+    -- * Type-level error messages
+  , IndexPositiveLiteralError
+  )
 where
 
 import GHC.TypeLits (KnownNat, type (^))

@@ -68,6 +68,7 @@ operator that uses truncation introduces an additional error of /0.109375/:
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NegativeLiterals #-}
@@ -106,6 +107,20 @@ module Clash.Sized.Fixed
   , NumFixedC, ENumFixedC, FracFixedC, ResizeFC, DivideC
     -- * Proxy
   , asRepProxy, asIntProxy
+    -- * Type-level error messages
+  , UFixedPositiveLiteralError
+  , UFixedNegativeLiteralError
+  , SFixedPositiveLiteralError
+  , SFixedNegativeLiteralError
+  , SFixedPositiveRationalRequiredIntBits
+  , SFixedNegativeRationalRequiredIntBits
+  , SFixedPositiveRationalLiteralError
+  , SFixedNegativeRationalLiteralError
+  , FitsPositiveSFixedRational
+  , FitsNegativeSFixedRational
+  , CheckFixedFrac
+  , FixedPointNotPow2Error
+  , FixedPointNotEnoughFracError
   )
 where
 
@@ -115,14 +130,27 @@ import Data.Bits                  (Bits (..), FiniteBits)
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Either                (isLeft)
-import Data.Kind                  (Type)
+import Data.Kind                  (Constraint, Type)
 import Text.Read                  (Read(..))
 import Data.List                  (find)
 import Data.Proxy                 (Proxy (..))
 import Data.Ratio                 ((%), denominator, numerator)
+import Data.Type.Bool             (If)
 import Data.Typeable              (Typeable, TypeRep, typeRep, typeOf)
-import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
-import GHC.TypeLits.Extra         (Max)
+import GHC.TypeError
+  ( Assert
+  , ErrorMessage (ShowType, Text, (:<>:))
+  )
+import GHC.TypeLits
+  ( Div
+  , KnownNat
+  , Nat
+  , natVal
+  , type (+)
+  , type (-)
+  , type (<=?)
+  )
+import GHC.TypeLits.Extra         (CLog, Max)
 import Language.Haskell.TH        (Q, appT, conT, litT, mkName,
                                    numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -141,7 +169,25 @@ import Clash.Class.BitPack.BitIndex (lsb, msb, split)
 import Clash.Class.BitPack.BitReduction (reduceAnd, reduceOr)
 import Clash.Sized.BitVector      (BitVector, (++#))
 import Clash.Sized.Signed         (Signed)
+import Clash.Sized.Internal.CheckedLiterals
+  ( FractionalBitsNote
+  , IntegerBitsNote
+  , NotExactlyRepresentable
+  , NotExactlyRepresentableWithConstraint
+  , OutOfBoundsBecause
+  , PotentiallyOutOfBounds
+  , SignedIntegerBitsNote
+  )
 import Clash.Sized.Unsigned       (Unsigned)
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral
+  , CheckedPositiveRationalLiteral
+  )
+import CheckedLiterals.Class.Rational.TypeNats (IsPowerOfTwo)
 import Clash.XException
   (ShowX (..), NFDataX (..), isX, errorX, showsPrecXWith, fromJustX)
 
@@ -223,6 +269,21 @@ deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 -- -5.0
 type SFixed = Fixed Signed
 
+type SFixedPositiveRationalRequiredIntBits (num :: Nat) (den :: Nat) =
+  CLog 2 (num + 1) + 1 - CLog 2 den
+
+type SFixedNegativeRationalRequiredIntBits (num :: Nat) (den :: Nat) =
+  CLog 2 num + 1 - CLog 2 den
+
+type family FitsPositiveSFixedRational (num :: Nat) (den :: Nat) (int :: Nat) :: Bool where
+  FitsPositiveSFixedRational 0 den int = 'True
+  FitsPositiveSFixedRational num den int =
+    SFixedPositiveRationalRequiredIntBits num den <=? int
+
+type family FitsNegativeSFixedRational (num :: Nat) (den :: Nat) (int :: Nat) :: Bool where
+  FitsNegativeSFixedRational num den int =
+    SFixedNegativeRationalRequiredIntBits num den <=? int
+
 -- | Unsigned 'Fixed'-point number, with @int@ integer bits and @frac@
 -- fractional bits
 --
@@ -253,6 +314,126 @@ type SFixed = Fixed Signed
 -- >>> (1 :: UFixed 3 4) `sub` (3 :: UFixed 3 4) :: UFixed 4 4
 -- 14.0
 type UFixed = Fixed Unsigned
+
+type UFixedPositiveLiteralError strLit lit int =
+  PotentiallyOutOfBounds
+    strLit
+    (IntegerBitsNote (CLog 2 (lit + 1)))
+    (CLog 2 (lit + 1))
+    int
+
+instance
+  ( Assert
+      (If (lit <=? 0) (lit <=? 0) (CLog 2 (lit + 1) <=? int))
+      (UFixedPositiveLiteralError (ShowType lit) lit int)
+  ) =>
+  CheckedPositiveIntegerLiteral lit (UFixed int frac)
+
+type UFixedNegativeLiteralError strLit =
+  OutOfBoundsBecause
+    strLit
+    ('Text "UFixed cannot represent negative numbers.")
+
+instance
+  (UFixedNegativeLiteralError ('Text "-" ':<>: 'ShowType lit)) =>
+  CheckedNegativeIntegerLiteral lit (UFixed int frac)
+
+type FixedPointNotPow2Error strLit den typ =
+  NotExactlyRepresentable
+    strLit
+    typ
+    ( 'Text "The reduced denominator "
+        ':<>: 'ShowType den
+        ':<>: 'Text " is not a power of 2."
+    )
+
+type FixedPointNotEnoughFracError strLit den frac typ =
+  NotExactlyRepresentableWithConstraint
+    strLit
+    typ
+    (FractionalBitsNote (CLog 2 den))
+    (CLog 2 den)
+    frac
+
+type family
+  CheckFixedFrac (isPow2 :: Bool) (strLit :: ErrorMessage) (den :: Nat) (frac :: Nat) (typ :: Type) ::
+    Constraint
+  where
+  CheckFixedFrac 'False strLit den frac typ = FixedPointNotPow2Error strLit den typ
+  CheckFixedFrac 'True strLit den frac typ =
+    Assert
+      (CLog 2 den <=? frac)
+      (FixedPointNotEnoughFracError strLit den frac typ)
+
+instance
+  ( Assert
+      (If (Div num den <=? 0) (Div num den <=? 0) (CLog 2 (Div num den + 1) <=? int))
+      (UFixedPositiveLiteralError ('Text str) (Div num den) int)
+  , CheckFixedFrac (IsPowerOfTwo den) ('Text str) den frac (UFixed int frac)
+  ) =>
+  CheckedPositiveRationalLiteral str num den (UFixed int frac)
+
+instance
+  (UFixedNegativeLiteralError ('Text str)) =>
+  CheckedNegativeRationalLiteral str num den (UFixed int frac)
+
+type SFixedPositiveLiteralError strLit lit int =
+  PotentiallyOutOfBounds
+    strLit
+    (SignedIntegerBitsNote (CLog 2 (lit + 1) + 1))
+    (CLog 2 (lit + 1) + 1)
+    int
+
+instance
+  ( Assert
+      (If (lit <=? 0) (lit <=? 0) (CLog 2 (lit + 1) + 1 <=? int))
+      (SFixedPositiveLiteralError (ShowType lit) lit int)
+  ) =>
+  CheckedPositiveIntegerLiteral lit (SFixed int frac)
+
+type SFixedNegativeLiteralError strLit lit int =
+  PotentiallyOutOfBounds
+    strLit
+    (SignedIntegerBitsNote (CLog 2 lit + 1))
+    (CLog 2 lit + 1)
+    int
+
+type SFixedPositiveRationalLiteralError strLit num den int =
+  PotentiallyOutOfBounds
+    strLit
+    (SignedIntegerBitsNote (SFixedPositiveRationalRequiredIntBits num den))
+    (SFixedPositiveRationalRequiredIntBits num den)
+    int
+
+type SFixedNegativeRationalLiteralError strLit num den int =
+  PotentiallyOutOfBounds
+    strLit
+    (SignedIntegerBitsNote (SFixedNegativeRationalRequiredIntBits num den))
+    (SFixedNegativeRationalRequiredIntBits num den)
+    int
+
+instance
+  ( Assert
+      (If (lit <=? 0) (lit <=? 0) (CLog 2 lit + 1 <=? int))
+      (SFixedNegativeLiteralError ('Text "-" ':<>: 'ShowType lit) lit int)
+  ) =>
+  CheckedNegativeIntegerLiteral lit (SFixed int frac)
+
+instance
+  ( CheckFixedFrac (IsPowerOfTwo den) ('Text str) den frac (SFixed int frac)
+  , Assert
+      (FitsPositiveSFixedRational num den int)
+      (SFixedPositiveRationalLiteralError ('Text str) num den int)
+  ) =>
+  CheckedPositiveRationalLiteral str num den (SFixed int frac)
+
+instance
+  ( CheckFixedFrac (IsPowerOfTwo den) ('Text str) den frac (SFixed int frac)
+  , Assert
+      (FitsNegativeSFixedRational num den int)
+      (SFixedNegativeRationalLiteralError ('Text str) num den int)
+  ) =>
+  CheckedNegativeRationalLiteral str num den (SFixed int frac)
 
 {-# INLINE sf #-}
 -- | Treat a 'Signed' integer as a @Signed@ 'Fixed'-@point@ integer

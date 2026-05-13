@@ -8,6 +8,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module Clash.Sized.Signed
   ( Signed
+    -- * Type-level error messages
+  , SignedPositiveLiteralError
+  , SignedNegativeLiteralError
   )
 where
 

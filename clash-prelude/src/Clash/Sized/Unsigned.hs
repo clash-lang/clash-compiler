@@ -7,7 +7,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE Trustworthy #-}
 
 module Clash.Sized.Unsigned
-  (Unsigned)
+  ( Unsigned
+    -- * Type-level error messages
+  , UnsignedPositiveLiteralError
+  )
 where
 
 import Clash.Sized.Internal.Unsigned

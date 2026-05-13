@@ -6,6 +6,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Clash.Num.Wrapping
   ( Wrapping(..)
@@ -19,6 +20,14 @@ import Data.Coerce (coerce)
 import Data.Functor.Compose (Compose(..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral
+  , CheckedPositiveRationalLiteral
+  )
 import Test.QuickCheck (Arbitrary)
 
 import Clash.Class.BitPack (BitPack)
@@ -55,6 +64,22 @@ newtype Wrapping a =
 {-# INLINE toWrapping #-}
 toWrapping :: (SaturatingNum a) => a -> Wrapping a
 toWrapping = Wrapping
+
+instance
+  (CheckedPositiveIntegerLiteral lit a) =>
+  CheckedPositiveIntegerLiteral lit (Wrapping a)
+
+instance
+  (CheckedNegativeIntegerLiteral lit a) =>
+  CheckedNegativeIntegerLiteral lit (Wrapping a)
+
+instance
+  (CheckedPositiveRationalLiteral str num den a) =>
+  CheckedPositiveRationalLiteral str num den (Wrapping a)
+
+instance
+  (CheckedNegativeRationalLiteral str num den a) =>
+  CheckedNegativeRationalLiteral str num den (Wrapping a)
 
 instance (Resize f) => Resize (Compose Wrapping f) where
   {-# INLINE resize #-}
