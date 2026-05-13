@@ -249,13 +249,15 @@ let
             "$ghcBinDir/ghc-pkg" recache --package-db="$testsuitePackageDb"
 
             wrapProgram $out/bin/clash-testsuite \
-              --add-flags "--no-modelsim --no-vivado" \
               --prefix PATH : "$ghcBinDir" \
               --prefix PATH : "$wrapperDir" \
               --set GHC_PACKAGE_PATH "$testsuitePackageDb:$globalPackageDb:" \
               --set USE_GLOBAL_CLASH 1 \
               --prefix PATH : ${prev.lib.makeBinPath [
                 prev.gcc
+                # make and python3 are used in verilator invocations
+                prev.gnumake
+                prev.python3
                 final.ghdl-llvm
                 prev.sby
                 final.verilator
@@ -279,6 +281,7 @@ let
     ];
 in
 {
+  # This patch can be removed once verilator 5.048 has reached nixpkgs.
   verilator = prev.verilator.overrideAttrs (old: {
     patches = prev.lib.unique ((old.patches or [ ]) ++ [
       ./verilator-fix-side-effect-loss-when-slicing-astexprstmt-array-expressions.patch
