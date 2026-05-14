@@ -50,6 +50,9 @@ import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
 import           Data.Text.Extra
+import           GHC.Num.Integer               (Integer(..))
+import           GHC.Num.Natural               (Natural(..))
+import qualified GHC.Prim
 import           GHC.Stack
   (HasCallStack, callStack, prettyCallStack)
 import qualified System.Console.ANSI           as ANSI
@@ -527,7 +530,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                     -- Otherwise don't render them
                     Nothing -> return (Identifier (Id.unsafeMake "__VOID__") Nothing,[])
         P.Primitive pNm _ _
-          | pNm == "GHC.Prim.tagToEnum#" -> do
+          | pNm == showt 'GHC.Prim.tagToEnum# -> do
               hwTy <- N.unsafeCoreTypeToHWTypeM' $(curLoc) ty
               case args of
                 [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
@@ -549,6 +552,9 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                       netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
                       return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
                 _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
+          -- 'dataToTag#' was removed from GHC.Prim in favor of
+          -- 'dataToTagSmall#' / 'dataToTagLarge#'. Kept as a literal for
+          -- compatibility with older GHCs where it may still appear.
           | pNm == "GHC.Prim.dataToTag#" -> case args of
               [Right _,Left (Data dc)] -> do
                 iw <- Lens.view intWidth
@@ -557,7 +563,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
           | pNm `elem`
-            ["GHC.Prim.dataToTagSmall#", "GHC.Prim.dataToTagLarge#"] -> case args of
+            [showt 'GHC.Prim.dataToTagSmall#, showt 'GHC.Prim.dataToTagLarge#] -> case args of
               [Right _, Right _,Left (Data dc)] -> do
                 iw <- Lens.view intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
@@ -647,14 +653,14 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 _ ->
                   return (Noop,decls)
 
-          | pNm == "GHC.Num.Integer.IS" -> do
+          | pNm == showt 'IS -> do
               (expr,decls) <- case lefts args of
                 (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
               iw <- Lens.view intWidth
               return (N.DataCon (Signed iw) (DC (Void Nothing,-1)) [expr],decls)
 
-          | pNm == "GHC.Num.Integer.IP" -> do
+          | pNm == showt 'IP -> do
               (expr,decls) <- case lefts args of
                 (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
@@ -662,7 +668,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 N.Literal Nothing (NumLit _) -> return (expr,decls)
                 _ -> error "non-constant ByteArray# not supported"
 
-          | pNm == "GHC.Num.Integer.IN" -> do
+          | pNm == showt 'IN -> do
               (expr,decls) <- case lefts args of
                 (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
@@ -671,14 +677,14 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   return (N.Literal Nothing (NumLit (negate i)),decls)
                 _ -> error "non-constant ByteArray# not supported"
 
-          | pNm == "GHC.Num.Natural.NS" -> do
+          | pNm == showt 'NS -> do
               (expr,decls) <- case lefts args of
                 (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"
               iw <- Lens.view intWidth
               return (N.DataCon (Unsigned iw) (DC (Void Nothing,-1)) [expr],decls)
 
-          | pNm == "GHC.Num.Integer.NB" -> do
+          | pNm == showt 'NB -> do
               (expr,decls) <- case lefts args of
                 (arg:_) -> mkExpr False declType dst arg
                 _ -> error "internal error: insufficient arguments"

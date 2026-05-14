@@ -39,6 +39,8 @@ import qualified Data.List.Extra as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Primitive.ByteArray as BA
 import qualified Data.Text.Extra as Text (showt)
+import qualified GHC.Classes
+import GHC.Exts (Int(..))
 import GHC.Stack (HasCallStack)
 
 import GHC.Num.Integer (Integer(..))
@@ -520,7 +522,7 @@ caseFlat (TransformContext is0 _) e@(Case (collectEqArgs -> Just (scrut',val)) t
       -- When we're pattern matching on `Int`, extract the `Int#` first before
       -- we do the Literal matching branches.
       (Data dc,_)
-        | nameOcc (dcName dc) == "GHC.Types.I#"
+        | nameOcc (dcName dc) == Text.showt 'I#
         , [argTy] <- dcArgTys dc
         -> do
           wild <- mkInternalVar is0 "wild" argTy
@@ -539,7 +541,7 @@ collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
   = case collectArgs val of
       (Prim p,args') | isFromInt (primName p) ->
         go (last args')
-      (Data dc,args') | nameOcc (dcName dc) == "GHC.Types.I#" ->
+      (Data dc,args') | nameOcc (dcName dc) == Text.showt 'I# ->
         go (last args')
       _ -> Nothing
   where
@@ -560,11 +562,11 @@ collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
     go _ = Nothing
 
     isFalseDcPat (DataPat p _ _)
-      = ((== "GHC.Types.False") . nameOcc . dcName) p
+      = ((== Text.showt 'False) . nameOcc . dcName) p
     isFalseDcPat _ = False
 
     isTrueDcPat (DataPat p _ _)
-      = ((== "GHC.Types.True") . nameOcc . dcName) p
+      = ((== Text.showt 'True) . nameOcc . dcName) p
     isTrueDcPat _ = False
 
 collectFlat _ _ = Nothing
@@ -582,7 +584,7 @@ collectEqArgs f@(collectArgsTicks -> (Prim p, args, ticks))
     = case args of
         [_,Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
         _ -> error (show nm <> " expects 3 arguments, but got: " <> showPpr f)
-  | nm == "GHC.Classes.eqInt"
+  | nm == Text.showt 'GHC.Classes.eqInt
     = case args of
         [Left scrut,Left val] -> Just (mkTicks scrut ticks,val)
         _ -> error ("eqInt expects 2 arguments, but got: " <> showPpr f)

@@ -526,11 +526,11 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
       [i1, i2] ->
         Just $ ConstTy $ TyCon $
           case compare i1 i2 of
-            LT -> Name User "GHC.Types.LT"
+            LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
-            EQ -> Name User "GHC.Types.EQ"
+            EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
-            GT -> Name User "GHC.Types.GT"
+            GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
       _ -> Nothing
 
@@ -539,11 +539,11 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
       [s1, s2] ->
         Just $ ConstTy $ TyCon $
           case compare s1 s2 of
-            LT -> Name User "GHC.Types.LT"
+            LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
-            EQ -> Name User "GHC.Types.EQ"
+            EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
-            GT -> Name User "GHC.Types.GT"
+            GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
       _ -> Nothing
 

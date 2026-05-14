@@ -374,8 +374,12 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
                in -- Inlines WW projection that exposes internals of the BitVector types
                   nm == Text.showt 'BV.BV  ||
                   nm == Text.showt 'BV.Bit ||
-                  -- Inlines projections out of constraint-tuples (e.g. HiddenClockReset)
-                  "GHC.Classes" `Text.isPrefixOf` nm
+                  -- Inlines projections out of constraint-tuples (e.g. HiddenClockReset).
+                  -- The 'GHC.Classes' module hosts these on GHC <= 9.12; on
+                  -- GHC >= 9.14 'base'\''s GHC.Classes re-exports them from
+                  -- 'ghc-internal:GHC.Internal.Classes'.
+                  "GHC.Classes" `Text.isPrefixOf` nm ||
+                  "GHC.Internal.Classes" `Text.isPrefixOf` nm
           Case _ aTy (_:_:_)
             | TyConApp nm _ <- tyView aTy
             , nameOcc nm == Text.showt ''SimIO.SimIO

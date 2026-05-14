@@ -14,6 +14,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -61,8 +62,13 @@ import           Data.Monoid                     (Ap(getAp))
 import qualified Data.Set                        as Set
 import           Data.Set                        (Set)
 import qualified Data.Text
+import           Data.Text.Extra                 (showt)
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as Text
+import qualified GHC.CString
+import           GHC.Exts                        (Int(..), Word(..))
+import           GHC.Int                         (Int8(..), Int16(..), Int32(..), Int64(..))
+import           GHC.Word                        (Word8(..), Word16(..), Word32(..), Word64(..))
 import           System.Directory                (doesFileExist, canonicalizePath)
 import           System.IO.Unsafe                (unsafePerformIO)
 
@@ -635,9 +641,9 @@ renderElem b (IF c t f) = do
           | DataCon (Unsigned _) _ [Literal _ (NumLit i)] <- l
             -> fromInteger i
           | BlackBoxE pNm _lib _use _incl _templ bbCtx _paren <- l
-          , pNm `elem` ["GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
-                       ,"GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"
-                       ,"GHC.Types.I#","GHC.Types.W#"
+          , pNm `elem` [ showt 'I8#, showt 'I16#, showt 'I32#, showt 'I64#
+                       , showt 'W8#, showt 'W16#, showt 'W32#, showt 'W64#
+                       , showt 'I#, showt 'W#
                        ]
           , [Literal _ (NumLit j)] <- extractLiterals bbCtx
           -> fromInteger j
@@ -855,9 +861,9 @@ renderTag b (Lit n) =
   mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i])   = Literal Nothing i  -- Int
   mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i  -- SNat, Word
 
-  mkLit (BlackBoxE pNm _ _ _ _ bbCtx _) | pNm `elem` ["GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
-                                                     ,"GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"
-                                                     ,"GHC.Types.I#","GHC.Types.W#"
+  mkLit (BlackBoxE pNm _ _ _ _ bbCtx _) | pNm `elem` [ showt 'I8#, showt 'I16#, showt 'I32#, showt 'I64#
+                                                     , showt 'W8#, showt 'W16#, showt 'W32#, showt 'W64#
+                                                     , showt 'I#, showt 'W#
                                                      ]
                                         , [Literal _ i] <- extractLiterals bbCtx
                                         = Literal Nothing i
@@ -1072,10 +1078,10 @@ exprToString (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
   case bbInputs ctx of
     (e0,_,_):_ -> exprToString e0
     _ -> error "internal error: insufficient bbInputs"
-exprToString (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
-  case bbInputs ctx of
-    (e0,_,_):_ -> exprToString e0
-    _ -> error "internal error: insufficient bbInputs"
+exprToString (BlackBoxE nm _ _ _ _ ctx _)
+  | nm == showt 'GHC.CString.unpackCString#,
+    (e0,_,_):_ <- bbInputs ctx
+  = exprToString e0
 exprToString _ = Nothing
 
 prettyBlackBox :: Monad m
