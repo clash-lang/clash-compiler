@@ -562,6 +562,10 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               [Right _,Left scrut] -> mkDataToTag declType assignTy scrut
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
+#if MIN_VERSION_ghc(9,10,0)
+          -- 'dataToTagSmall#' / 'dataToTagLarge#' only exist on GHC >= 9.10;
+          -- TH-quoting them requires the symbols to be in scope at compile
+          -- time, so this clause is CPP-gated.
           | pNm `elem`
             [showt 'GHC.Prim.dataToTagSmall#, showt 'GHC.Prim.dataToTagLarge#] -> case args of
               [Right _, Right _,Left (Data dc)] -> do
@@ -569,6 +573,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _, Right _,Left scrut] -> mkDataToTag declType assignTy scrut
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
+#endif
 
           | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
               resM <- resBndr1 True dst
