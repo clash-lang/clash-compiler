@@ -1,16 +1,16 @@
 - Primitive:
-    name: GHC.Types.MkCoercible
+    name: ["GHC.Types.MkCoercible", "GHC.Internal.Types.MkCoercible"]
     primType: Constructor
     workInfo: Never
 - BlackBox:
-    name: GHC.Types.I#
+    name: ["GHC.Types.I#", "GHC.Internal.Types.I#"]
     kind: Expression
     comment: Needed to make the evaluator handle this constructor strictly
     type: 'I# :: Int# -> Int'
     template: ~ARG[0]
     workInfo: Never
 - BlackBox:
-    name: GHC.Types.W#
+    name: ["GHC.Types.W#", "GHC.Internal.Types.W#"]
     kind: Expression
     comment: Needed to make the evaluator handle this constructor strictly
     type: 'W# :: Word# -> Word'

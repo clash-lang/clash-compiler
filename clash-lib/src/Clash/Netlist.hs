@@ -26,6 +26,9 @@ import           Control.Exception                (throw)
 import           Control.Lens                     ((.=), (<~))
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (zipWithM)
+import           Data.Text.Extra                  (showt)
+import           GHC.Num.Integer                  (Integer(..))
+import           GHC.Num.Natural                  (Natural(..))
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT, runState)
@@ -1098,22 +1101,22 @@ mkDcApplication declType [dstHType] bndr dc args = do
         in  return dc'
       Void {} -> return Noop
       Signed _
-        | dcNm == "GHC.Num.Integer.IS"
+        | dcNm == showt 'IS
         , (a:_) <- argExprsFiltered
         -> pure a
         -- ByteArray# are non-translatable / void, except when they're literals
-        | dcNm == "GHC.Num.Integer.IP"
+        | dcNm == showt 'IP
         , (a@(HW.Literal Nothing (NumLit _)):_) <- argExprs
         -> pure a
-        | dcNm == "GHC.Num.Integer.IN"
+        | dcNm == showt 'IN
         -- ByteArray# are non-translatable / void, except when they're literals
         , (HW.Literal Nothing (NumLit i):_) <- argExprs
         -> pure (HW.Literal Nothing (NumLit (negate i)))
       Unsigned _
-        | dcNm == "GHC.Num.Natural.NS"
+        | dcNm == showt 'NS
         , (a:_) <- argExprsFiltered
         -> pure a
-        | dcNm == "GHC.Num.Natural.NB"
+        | dcNm == showt 'NB
         -- ByteArray# are non-translatable / void, except when they're literals
         , (a@(HW.Literal Nothing (NumLit _)):_) <- argExprs
         -> pure a

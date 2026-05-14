@@ -585,8 +585,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce . Literal . Int8Literal . toInteger $ I# b
   $(namePat 'GHC.Prim.int8ToInt#) | [i] <- int8Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt8" | [i] <- int8Literals' args
+  $(namePat 'GHC.Prim.negateInt8#) | [i] <- int8Literals' args
     -> let !(I8# a) = fromInteger i
         in reduce (Literal (Int8Literal (toInteger (I8# (negateInt8# a)))))
   $(namePat 'GHC.Prim.plusInt8#) | Just r <- liftI8 plusInt8# args
@@ -641,8 +640,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce . Literal . Int16Literal . toInteger $ I# b
   $(namePat 'GHC.Prim.int16ToInt#) | [i] <- int16Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt16" | [i] <- int16Literals' args
+  $(namePat 'GHC.Prim.negateInt16#) | [i] <- int16Literals' args
     -> let !(I16# a) = fromInteger i
         in reduce (Literal (Int16Literal (toInteger (I16# (negateInt16# a)))))
   $(namePat 'GHC.Prim.plusInt16#) | Just r <- liftI16 plusInt16# args
@@ -697,8 +695,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce . Literal . Int32Literal . toInteger $ I# b
   $(namePat 'GHC.Prim.int32ToInt#) | [i] <- int32Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt32" | [i] <- int32Literals' args
+  $(namePat 'GHC.Prim.negateInt32#) | [i] <- int32Literals' args
     -> let !(I32# a) = fromInteger i
         in reduce (Literal (Int32Literal (toInteger (I32# (negateInt32# a)))))
   $(namePat 'GHC.Prim.plusInt32#) | Just r <- liftI32 plusInt32# args
@@ -751,8 +748,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (Literal (Int64Literal i))
   $(namePat 'GHC.Prim.int64ToInt#) | [i] <- int64Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt64" | [i] <- int64Literals' args
+  $(namePat 'GHC.Prim.negateInt64#) | [i] <- int64Literals' args
     -> let !(I64# a) = fromInteger i
         in reduce (Literal (Int64Literal (toInteger (I64# (negateInt64# a)))))
   $(namePat 'GHC.Prim.plusInt64#) | Just r <- liftI64 plusInt64# args
@@ -1275,6 +1271,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (Literal (WordLiteral (toInteger (W# w))))
 
   -- XXX: Primitive does not exist?
+#if !MIN_VERSION_ghc(9,14,0)
+  -- 'getSizeofMutBigNat#' was removed from GHC.Prim in GHC 9.14.
   "GHC.Prim.getSizeofMutBigNat#"
     | [PrimVal _mbaTy _ [baV]
       ,PrimVal rwTy _ _
@@ -1288,6 +1286,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
                       [Left (Prim rwTy)
                       ,Left lit])
+#endif
 
   $(namePat 'GHC.Prim.resizeMutableByteArray#)
     | [PrimVal mbaTy _ [baV]
@@ -4622,8 +4621,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     , Left (Literal (IntLiteral (toInteger len)))])
         in reduce ret
   -- XXX: Does not seem to exist?
-  "GHC.Magic.noinlineConstraint"
-    | [arg] <- args
+  -- 'noinlineConstraint' (if it exists) is a wired-in magic Id; not
+  -- user-importable and so not TH-quotable. Match both the pre-9.14
+  -- 'GHC.Magic' and the post-9.14 'GHC.Internal.Magic' module names.
+  nm | nm == "GHC.Magic.noinlineConstraint"
+       || nm == "GHC.Internal.Magic.noinlineConstraint"
+    , [arg] <- args
     -> reduce (valToTerm arg)
   $(namePat 'GHC.TypeNats.withSomeSNat)
     | Lit (NaturalLiteral n) : fun : _ <- args
@@ -4636,8 +4639,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            ret = mkApps (valToTerm fun) [Right nTy, Left snat]
         in reduce ret
   -- XXX: Does not seem to exist?
-  "GHC.Magic.nospec"
-    | [arg] <- args
+  -- 'nospec' is a wired-in magic Id; not user-importable and so not
+  -- TH-quotable. Match both the pre-9.14 'GHC.Magic' and the post-9.14
+  -- 'GHC.Internal.Magic' module names.
+  nm | nm == "GHC.Magic.nospec"
+       || nm == "GHC.Internal.Magic.nospec"
+    , [arg] <- args
     -> reduce (valToTerm arg)
   "GHC.Float.$wproperFractionDouble"
     | _ : Lit (DoubleLiteral d) : _ <- args

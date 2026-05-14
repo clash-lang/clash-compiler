@@ -52,6 +52,11 @@ import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
+import           Data.Text.Extra             (showt)
+import qualified GHC.Magic
+import qualified GHC.Prim
+import qualified GHC.Stack
+import qualified GHC.Stack.Types
 import qualified Data.Traversable            as T
 import           Data.String.Interpolate     (__i)
 import qualified Text.Read                   as Text
@@ -370,17 +375,21 @@ coreToTerm primMap unlocs = term
           | length args == 4
           = term (args!!3)
         --- Remove `$`
-        go "GHC.Base.$"                        args
-          | length args == 5
+        go nm args
+          | nm == showt '($), length args == 5
           = term (App (args!!3) (args!!4))
-        go "GHC.Magic.noinline"                args   -- noinline :: forall a. a -> a
-          | [_ty, x] <- args
+        go nm args  -- noinline :: forall a. a -> a
+          | nm == showt 'GHC.Magic.noinline, [_ty, x] <- args
           = term x
         -- Remove most CallStack logic
-        go "GHC.Stack.Types.PushCallStack"     args = term (last args)
-        go "GHC.Stack.Types.FreezeCallStack"   args = term (last args)
-        go "GHC.Stack.withFrozenCallStack"     args
-          | length args == 3
+        go nm args
+          | nm == showt 'GHC.Stack.Types.PushCallStack
+          = term (last args)
+        go nm args
+          | nm == showt 'GHC.Stack.Types.FreezeCallStack
+          = term (last args)
+        go nm args
+          | nm == showt 'GHC.Stack.withFrozenCallStack, length args == 3
           = term (App (args!!2) (args!!1))
         go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
           | [_nTy,_aTy,_kn,_typ,f] <- args
@@ -575,12 +584,17 @@ coreToTerm primMap unlocs = term
               | f == "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
               | f == "Clash.Signal.Internal.joinSignal#" -> return (joinTerm xType)
               | f == "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
-              | f == "GHC.Base.$"                       -> return (dollarTerm xType)
-              | f == "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
-              | f == "GHC.Magic.noinline"               -> return (idTerm xType)
-              | f == "GHC.Magic.lazy"                   -> return (idTerm xType)
-              | f == "GHC.Magic.nospec"                 -> return (idTerm xType)
-              | f == "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
+              | f == showt '($)                           -> return (dollarTerm xType)
+              | f == showt 'GHC.Stack.withFrozenCallStack -> return (withFrozenCallStackTerm xType)
+              | f == showt 'GHC.Magic.noinline            -> return (idTerm xType)
+              | f == showt 'GHC.Magic.lazy                -> return (idTerm xType)
+              -- 'nospec' is a wired-in magic Id in 'GHC.Magic' (resp.
+              -- 'GHC.Internal.Magic' on GHC >= 9.14). It is not user-importable,
+              -- so we can't quote it via TH. Both module names need a literal
+              -- match here so that this clause fires across GHC versions.
+              | f == "GHC.Magic.nospec"                   -> return (idTerm xType)
+              | f == "GHC.Internal.Magic.nospec"          -> return (idTerm xType)
+              | f == showt 'GHC.Magic.runRW#              -> return (runRWTerm xType)
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == "Clash.Magic.prefixName"
               -> return (nameModTerm C.PrefixName xType)
@@ -810,11 +824,11 @@ listTypeToListOfTypes ty                      =
 -- | Try to determine boolean value by looking at constructor name of type.
 boolTypeToBool :: Type -> C2C Bool
 boolTypeToBool (TyConApp constructor _args) = do
-  constructorName <- typeConstructorToString constructor
+  constructorName <- Text.pack <$> typeConstructorToString constructor
   return $ case constructorName of
-    "GHC.Types.True"  -> True
-    "GHC.Types.False" -> False
-    _ -> error $ "Expected boolean constructor, got:" ++ constructorName
+    _ | constructorName == showt 'True  -> True
+      | constructorName == showt 'False -> False
+      | otherwise -> error $ "Expected boolean constructor, got:" ++ Text.unpack constructorName
 boolTypeToBool s =
   error $ unwords [ "Could not unpack given type to bool:"
                   , showPprUnsafe s ]
@@ -1370,7 +1384,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy))
   = let
       fName            = C.mkUnsafeSystemName "f" 0
       fId              = C.mkLocalId fTy fName
-      rwNm             = pack "GHC.Prim.realWorld#"
+      rwNm             = showt 'GHC.Prim.realWorld#
     in
       C.TyLam rTV (
       C.TyLam oTV (

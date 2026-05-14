@@ -129,6 +129,9 @@ isTupleTyConLike nm = tupleName (T.takeWhileEnd (/= '.') (nameOcc nm))
       any (`T.isPrefixOf` (nameOcc nm)) $ map T.pack
         [ "GHC.Tuple.Prim.Tuple"
         , "GHC.Tuple.Tuple"
+        -- GHC >= 9.14 hosts the Tuple type constructors here, with
+        -- 'base'\''s 'GHC.Tuple' re-exporting them.
+        , "GHC.Internal.Tuple.Tuple"
         ]
 
 -- | Get the DataCons belonging to a TyCon

@@ -381,8 +381,9 @@ recToLetRec _ e = return e
 
 isClassConstraint :: Type -> Bool
 isClassConstraint (tyView -> TyConApp nm0 _) =
-  if -- Constraint tuple:
-     | "GHC.Classes.(%" `Text.isInfixOf` nm1 -> True
+  if -- Constraint tuple. The host module is 'GHC.Classes' on GHC <= 9.12 and
+     -- 'GHC.Internal.Classes' on GHC >= 9.14; both end in '.Classes.(%'.
+     | ".Classes.(%" `Text.isInfixOf` nm1 -> True
      -- Constraint class:
      | "C:" `Text.isInfixOf` nm2 -> True
      | otherwise -> False

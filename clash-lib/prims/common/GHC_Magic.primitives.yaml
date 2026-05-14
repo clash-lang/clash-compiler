@@ -1,18 +1,18 @@
 - Primitive:
-    name: GHC.Magic.lazy
+    name: ["GHC.Magic.lazy", "GHC.Internal.Magic.lazy"]
     primType: Function
     workInfo: Never
 - Primitive:
-    name: GHC.Magic.noinline
-    primType: Function
-    type: forall a. a -> a
-    workInfo: Never
-- Primitive:
-    name: GHC.Magic.nospec
+    name: ["GHC.Magic.noinline", "GHC.Internal.Magic.noinline"]
     primType: Function
     type: forall a. a -> a
     workInfo: Never
 - Primitive:
-    name: GHC.Magic.runRW#
+    name: ["GHC.Magic.nospec", "GHC.Internal.Magic.nospec"]
+    primType: Function
+    type: forall a. a -> a
+    workInfo: Never
+- Primitive:
+    name: ["GHC.Magic.runRW#", "GHC.Internal.Magic.runRW#"]
     primType: Function
     workInfo: Never

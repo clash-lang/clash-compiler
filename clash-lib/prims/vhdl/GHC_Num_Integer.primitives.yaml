@@ -1,5 +1,5 @@
 - BlackBox:
-    name: GHC.Num.Integer.integerToNatural
+    name: ["GHC.Num.Integer.integerToNatural", "GHC.Internal.Bignum.Integer.integerToNatural"]
     kind: Expression
     type: 'integerToNatural
       :: Integer -> Natural'
@@ -8,7 +8,7 @@
       simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerToNaturalThrow
+    name: ["GHC.Num.Integer.integerToNaturalThrow", "GHC.Internal.Bignum.Integer.integerToNaturalThrow"]
     kind: Declaration
     type: 'integerToNaturalThrow
       :: Integer -> Natural'
@@ -21,7 +21,7 @@
       in simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerToNaturalClamp
+    name: ["GHC.Num.Integer.integerToNaturalClamp", "GHC.Internal.Bignum.Integer.integerToNaturalClamp"]
     kind: Declaration
     type: 'integerToNatural
       :: Integer -> Natural'
@@ -34,7 +34,7 @@
       in simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerToInt#
+    name: ["GHC.Num.Integer.integerToInt#", "GHC.Internal.Bignum.Integer.integerToInt#"]
     kind: Expression
     type: 'integerToInt ::
       Integer -> Int#'
@@ -43,7 +43,7 @@
       but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerMul
+    name: ["GHC.Num.Integer.integerMul", "GHC.Internal.Bignum.Integer.integerMul"]
     kind: Declaration
     type: 'integerMul :: Integer
       -> Integer -> Integer'
@@ -57,7 +57,7 @@
     warning: 'GHC.Num.Integer.integerMul: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerNegate
+    name: ["GHC.Num.Integer.integerNegate", "GHC.Internal.Bignum.Integer.integerNegate"]
     kind: Expression
     type: 'integerNegate ::
       Integer -> Integer'
@@ -65,7 +65,7 @@
     warning: 'GHC.Num.Integer.integerNegate: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerAbs
+    name: ["GHC.Num.Integer.integerAbs", "GHC.Internal.Bignum.Integer.integerAbs"]
     kind: Expression
     type: 'integerAbs :: Integer
       -> Integer'
@@ -73,7 +73,7 @@
     warning: 'GHC.Num.Integer.integerAbs: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerDiv
+    name: ["GHC.Num.Integer.integerDiv", "GHC.Internal.Bignum.Integer.integerDiv"]
     kind: Declaration
     type: 'integerDiv :: Integer
       -> Integer -> Integer'
@@ -101,7 +101,7 @@
     warning: 'GHC.Num.Integer.integerDiv: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerMod
+    name: ["GHC.Num.Integer.integerMod", "GHC.Internal.Bignum.Integer.integerMod"]
     kind: Expression
     type: 'integerMod :: Integer
       -> Integer -> Integer'
@@ -109,7 +109,7 @@
     warning: 'GHC.Num.Integer.integerMod: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerDivMod#
+    name: ["GHC.Num.Integer.integerDivMod#", "GHC.Internal.Bignum.Integer.integerDivMod#"]
     kind: Declaration
     type: 'integerDivMod ::
       Integer -> Integer -> (# Integer, Integer #)'
@@ -145,7 +145,7 @@
     warning: 'GHC.Num.Integer.integerDivMod#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerQuotRem#
+    name: ["GHC.Num.Integer.integerQuotRem#", "GHC.Internal.Bignum.Integer.integerQuotRem#"]
     kind: Declaration
     type: 'integerQuotRem
       :: Integer -> Integer -> (# Integer, Integer #)'
@@ -158,7 +158,7 @@
     warning: 'GHC.Num.Integer.integerQuotRem#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerRem
+    name: ["GHC.Num.Integer.integerRem", "GHC.Internal.Bignum.Integer.integerRem"]
     kind: Declaration
     type: 'integerRem :: Integer
       -> Integer -> Integer'
@@ -171,7 +171,7 @@
     warning: 'GHC.Num.Integer.integerRem: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerEq
+    name: ["GHC.Num.Integer.integerEq", "GHC.Internal.Bignum.Integer.integerEq"]
     kind: Expression
     type: 'integerEq :: Integer
       -> Integer -> Bool'
@@ -179,7 +179,7 @@
     warning: 'GHC.Num.Integer.integerEq: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerNe
+    name: ["GHC.Num.Integer.integerNe", "GHC.Internal.Bignum.Integer.integerNe"]
     kind: Expression
     type: 'integerNe :: Integer
       -> Integer -> Bool'
@@ -187,7 +187,7 @@
     warning: 'GHC.Num.Integer.integerNe: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerEq#
+    name: ["GHC.Num.Integer.integerEq#", "GHC.Internal.Bignum.Integer.integerEq#"]
     kind: Declaration
     type: 'integerEq# :: Integer
       -> Integer -> Int#'
@@ -195,7 +195,7 @@
     warning: 'GHC.Num.Integer.integerEq#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerNe#
+    name: ["GHC.Num.Integer.integerNe#", "GHC.Internal.Bignum.Integer.integerNe#"]
     kind: Declaration
     type: 'integerNe# :: Integer
       -> Integer -> Int#'
@@ -203,7 +203,7 @@
     warning: 'GHC.Num.Integer.integerNe#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerLe#
+    name: ["GHC.Num.Integer.integerLe#", "GHC.Internal.Bignum.Integer.integerLe#"]
     kind: Declaration
     type: 'integerLe# :: Integer
       -> Integer -> Int#'
@@ -211,7 +211,7 @@
     warning: 'GHC.Num.Integer.integerLe#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerGt#
+    name: ["GHC.Num.Integer.integerGt#", "GHC.Internal.Bignum.Integer.integerGt#"]
     kind: Declaration
     type: 'integerGt# :: Integer
       -> Integer -> Int#'
@@ -219,7 +219,7 @@
     warning: 'GHC.Num.Integer.integerGt#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerLt#
+    name: ["GHC.Num.Integer.integerLt#", "GHC.Internal.Bignum.Integer.integerLt#"]
     kind: Declaration
     type: 'integerLt# :: Integer
       -> Integer -> Int#'
@@ -227,7 +227,7 @@
     warning: 'GHC.Num.Integer.integerLt#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerGe#
+    name: ["GHC.Num.Integer.integerGe#", "GHC.Internal.Bignum.Integer.integerGe#"]
     kind: Declaration
     type: 'integerGe# :: Integer
       -> Integer -> Int#'
@@ -235,7 +235,7 @@
     warning: 'GHC.Num.Integer.integerGe#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerShiftR#
+    name: ["GHC.Num.Integer.integerShiftR#", "GHC.Internal.Bignum.Integer.integerShiftR#"]
     kind: Declaration
     type: 'integerShiftR#
       :: Integer -> Word# -> Integer'
@@ -253,7 +253,7 @@
     warning: 'GHC.Num.Integer.integerShiftR#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerShiftL#
+    name: ["GHC.Num.Integer.integerShiftL#", "GHC.Internal.Bignum.Integer.integerShiftL#"]
     kind: Declaration
     type: 'integerShiftL#
       :: Integer -> Word# -> Integer'
@@ -271,7 +271,7 @@
     warning: 'GHC.Num.Integer.integerShiftL#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerTestBit#
+    name: ["GHC.Num.Integer.integerTestBit#", "GHC.Internal.Bignum.Integer.integerTestBit#"]
     kind: Declaration
     type: 'integerTestBit
       :: Integer -> Word# -> Int#'
@@ -279,7 +279,7 @@
     warning: 'GHC.Num.Integer.integerTestBit#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerFromWord#
+    name: ["GHC.Num.Integer.integerFromWord#", "GHC.Internal.Bignum.Integer.integerFromWord#"]
     kind: Expression
     type: 'integerFromWord
       :: Word# -> Integer'
@@ -288,7 +288,7 @@
       simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerToWord#
+    name: ["GHC.Num.Integer.integerToWord#", "GHC.Internal.Bignum.Integer.integerToWord#"]
     kind: Expression
     type: 'integerToWord ::
       Integer -> Word#'
@@ -297,7 +297,7 @@
       but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerToInt64#
+    name: ["GHC.Num.Integer.integerToInt64#", "GHC.Internal.Bignum.Integer.integerToInt64#"]
     kind: Expression
     type: 'integerToInt64# :: Integer -> Int64#'
     template: ~ARG[0]
@@ -305,7 +305,7 @@
       simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerToWord64#
+    name: ["GHC.Num.Integer.integerToWord64#", "GHC.Internal.Bignum.Integer.integerToWord64#"]
     comment: only used by 32 bit GHC
     kind: Expression
     type: 'integerToWord ::
@@ -315,7 +315,7 @@
       simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerFromWord64#
+    name: ["GHC.Num.Integer.integerFromWord64#", "GHC.Internal.Bignum.Integer.integerFromWord64#"]
     kind: Expression
     type: 'integerFromWord64# :: Word64# -> Integer'
     template: signed(std_logic_vector(~ARG[0]))
@@ -323,7 +323,7 @@
       simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Integer.integerBit#
+    name: ["GHC.Num.Integer.integerBit#", "GHC.Internal.Bignum.Integer.integerBit#"]
     kind: Expression
     type: 'integerBit :: Word#
       -> Integer'
@@ -331,7 +331,7 @@
     warning: 'GHC.Num.Integer.integerBit#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerComplement
+    name: ["GHC.Num.Integer.integerComplement", "GHC.Internal.Bignum.Integer.integerComplement"]
     kind: Expression
     type: 'integerComplement
       :: Integer -> Integer'
@@ -339,7 +339,7 @@
     warning: 'GHC.Num.Integer.integerComplement: Integers are dynamically sized in
       simulation, but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerXor
+    name: ["GHC.Num.Integer.integerXor", "GHC.Internal.Bignum.Integer.integerXor"]
     kind: Expression
     type: 'integerXor :: Integer
       -> Integer -> Integer'
@@ -347,7 +347,7 @@
     warning: 'GHC.Num.Integer.integerXor: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerOr
+    name: ["GHC.Num.Integer.integerOr", "GHC.Internal.Bignum.Integer.integerOr"]
     kind: Expression
     type: 'integerOr :: Integer
       -> Integer -> Integer'
@@ -355,7 +355,7 @@
     warning: 'GHC.Num.Integer.integerOr: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerAnd
+    name: ["GHC.Num.Integer.integerAnd", "GHC.Internal.Bignum.Integer.integerAnd"]
     kind: Expression
     type: 'integerAnd :: Integer
       -> Integer -> Integer'
@@ -363,7 +363,7 @@
     warning: 'GHC.Num.Integer.integerAnd: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerSignum
+    name: ["GHC.Num.Integer.integerSignum", "GHC.Internal.Bignum.Integer.integerSignum"]
     kind: Declaration
     type: 'integerSignum ::
       Integer -> Integer'
@@ -377,7 +377,7 @@
     warning: 'GHC.Num.Integer.integerSignum: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.$wintegerSignum
+    name: ["GHC.Num.Integer.$wintegerSignum", "GHC.Internal.Bignum.Integer.$wintegerSignum"]
     kind: Declaration
     type: '$wsignumInteger
       :: Integer -> Int#'
@@ -391,7 +391,7 @@
     warning: 'GHC.Num.Integer.$wintegerSignum: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerLogBase#
+    name: ["GHC.Num.Integer.integerLogBase#", "GHC.Internal.Bignum.Integer.integerLogBase#"]
     kind: Expression
     type: 'integerLogBase#
       :: Integer -> Integer -> Int#'
@@ -399,7 +399,7 @@
     warning: 'GHC.Num.Integer.integerLogBase#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerCompare
+    name: ["GHC.Num.Integer.integerCompare", "GHC.Internal.Bignum.Integer.integerCompare"]
     kind: Declaration
     type: 'integerCompare
       :: Integer -> Integer -> Ordering'
@@ -413,7 +413,7 @@
     warning: 'GHC.Num.Integer.integerCompare: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerQuot
+    name: ["GHC.Num.Integer.integerQuot", "GHC.Internal.Bignum.Integer.integerQuot"]
     kind: Declaration
     type: 'integerQuot ::
       Integer -> Integer -> Integer'
@@ -426,7 +426,7 @@
     warning: 'GHC.Num.Integer.integerQuot: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.$wintegerFromInt64#
+    name: ["GHC.Num.Integer.$wintegerFromInt64#", "GHC.Internal.Bignum.Integer.$wintegerFromInt64#"]
     kind: Expression
     type: '$wintegerFromInt64# :: Int64# -> Int#'
     template: resize(~ARG[0],~SIZE[~TYPO])

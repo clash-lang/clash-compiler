@@ -1,5 +1,5 @@
 - BlackBox:
-    name: GHC.Num.Natural.naturalMul
+    name: ["GHC.Num.Natural.naturalMul", "GHC.Internal.Bignum.Natural.naturalMul"]
     kind: Expression
     type: 'timesNatural ::
       Natural -> Natural -> Natural'
@@ -7,7 +7,7 @@
     warning: 'GHC.Num.Natural.timesNatural: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalFromWord#
+    name: ["GHC.Num.Natural.naturalFromWord#", "GHC.Internal.Bignum.Natural.naturalFromWord#"]
     kind: Expression
     type: 'naturalFromWord#
       :: Word# -> Natural'
@@ -16,7 +16,7 @@
       simulation, but fixed-length after synthesis. Use carefully.'
     workInfo: Never
 - BlackBox:
-    name: GHC.Num.Natural.naturalRem
+    name: ["GHC.Num.Natural.naturalRem", "GHC.Internal.Bignum.Natural.naturalRem"]
     kind: Declaration
     type: 'naturalRem :: Natural
       -> Natural -> Natural'
@@ -29,7 +29,7 @@
     warning: 'GHC.Num.Natural.naturalRem: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalLogBase#
+    name: ["GHC.Num.Natural.naturalLogBase#", "GHC.Internal.Bignum.Natural.naturalLogBase#"]
     kind: Expression
     type: 'naturalLogBase#
       :: Natural -> Natural -> Word#'
@@ -37,7 +37,7 @@
     warning: 'GHC.Num.Natural.naturalLogBase#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalEq#
+    name: ["GHC.Num.Natural.naturalEq#", "GHC.Internal.Bignum.Natural.naturalEq#"]
     kind: Declaration
     type: 'naturalEq# :: Natural
       -> Natural -> Int#'
@@ -45,7 +45,7 @@
     warning: 'GHC.Num.Natural.naturalEq#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalNe#
+    name: ["GHC.Num.Natural.naturalNe#", "GHC.Internal.Bignum.Natural.naturalNe#"]
     kind: Declaration
     type: 'naturalNe# :: Natural
       -> Natural -> Int#'
@@ -54,7 +54,7 @@
     warning: 'GHC.Num.Natural.naturalNe#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalLe#
+    name: ["GHC.Num.Natural.naturalLe#", "GHC.Internal.Bignum.Natural.naturalLe#"]
     kind: Declaration
     type: 'naturalLe# :: Natural
       -> Natural -> Int#'
@@ -63,7 +63,7 @@
     warning: 'GHC.Num.Natural.naturalLe#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalGt#
+    name: ["GHC.Num.Natural.naturalGt#", "GHC.Internal.Bignum.Natural.naturalGt#"]
     kind: Declaration
     type: 'naturalGt# :: Natural
       -> Natural -> Int#'
@@ -71,7 +71,7 @@
     warning: 'GHC.Num.Natural.naturalGt#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalLt#
+    name: ["GHC.Num.Natural.naturalLt#", "GHC.Internal.Bignum.Natural.naturalLt#"]
     kind: Declaration
     type: 'naturalLt# :: Natural
       -> Natural -> Int#'
@@ -79,7 +79,7 @@
     warning: 'GHC.Num.Natural.naturalLt#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalGe#
+    name: ["GHC.Num.Natural.naturalGe#", "GHC.Internal.Bignum.Natural.naturalGe#"]
     kind: Declaration
     type: 'naturalGe# :: Natural
       -> Natural -> Int#'
@@ -88,7 +88,7 @@
     warning: 'GHC.Num.Natural.naturalGe#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalShiftL#
+    name: ["GHC.Num.Natural.naturalShiftL#", "GHC.Internal.Bignum.Natural.naturalShiftL#"]
     kind: Declaration
     type: 'naturalShiftL#
       :: Natural -> Word# -> Natural'
@@ -106,7 +106,7 @@
     warning: 'GHC.Num.Natural.naturalShiftL#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalShiftR#
+    name: ["GHC.Num.Natural.naturalShiftR#", "GHC.Internal.Bignum.Natural.naturalShiftR#"]
     kind: Declaration
     type: 'naturalShiftR#
       :: Natural -> Word# -> Natural'
@@ -124,7 +124,7 @@
     warning: 'GHC.Num.Natural.naturalShiftR#: Naturals are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Natural.naturalCompare
+    name: ["GHC.Num.Natural.naturalCompare", "GHC.Internal.Bignum.Natural.naturalCompare"]
     kind: Declaration
     type: 'naturalCompare
       :: Natural -> Natural -> Ordering'
@@ -135,7 +135,7 @@
                "10";
       -- end naturalCompare
 - BlackBox:
-    name: GHC.Num.Natural.naturalQuot
+    name: ["GHC.Num.Natural.naturalQuot", "GHC.Internal.Bignum.Natural.naturalQuot"]
     kind: Declaration
     type: 'naturalQuot ::
       Natural -> Natural -> Natural'

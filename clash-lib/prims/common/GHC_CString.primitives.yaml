@@ -1,14 +1,14 @@
 - BlackBox:
-    name: GHC.CString.unpackCString#
+    name: ["GHC.CString.unpackCString#", "GHC.Internal.CString.unpackCString#"]
     kind: Expression
     template: ~LIT[0]
     workInfo: Never
 - BlackBox:
-    name: GHC.CString.unpackFoldrCString#
+    name: ["GHC.CString.unpackFoldrCString#", "GHC.Internal.CString.unpackFoldrCString#"]
     kind: Expression
     template: ~LIT[0]
     workInfo: Never
 - Primitive:
-    name: GHC.CString.unpackCStringUtf8#
+    name: ["GHC.CString.unpackCStringUtf8#", "GHC.Internal.CString.unpackCStringUtf8#"]
     primType: Function
     workInfo: Never
