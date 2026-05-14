@@ -651,8 +651,7 @@ primitives =
         -> reduce . Literal $ IntLiteral i
       _ -> Nothing
 
-  -- XXX: Primitive does not exist?
-  , primStepEntry "GHC.Prim.negateInt8" $ \case
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt8#) $ \case
       PrimStepContext{..} | [i] <- int8Literals' args
         -> let !(I8# a) = fromInteger i
             in reduce (Literal (Int8Literal (toInteger (I8# (negateInt8# a)))))
@@ -764,8 +763,7 @@ primitives =
         -> reduce . Literal $ IntLiteral i
       _ -> Nothing
 
-  -- XXX: Primitive does not exist?
-  , primStepEntry "GHC.Prim.negateInt16" $ \case
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt16#) $ \case
       PrimStepContext{..} | [i] <- int16Literals' args
         -> let !(I16# a) = fromInteger i
             in reduce (Literal (Int16Literal (toInteger (I16# (negateInt16# a)))))
@@ -877,8 +875,7 @@ primitives =
         -> reduce . Literal $ IntLiteral i
       _ -> Nothing
 
-  -- XXX: Primitive does not exist?
-  , primStepEntry "GHC.Prim.negateInt32" $ \case
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt32#) $ \case
       PrimStepContext{..} | [i] <- int32Literals' args
         -> let !(I32# a) = fromInteger i
             in reduce (Literal (Int32Literal (toInteger (I32# (negateInt32# a)))))
@@ -988,8 +985,7 @@ primitives =
         -> reduce . Literal $ IntLiteral i
       _ -> Nothing
 
-  -- XXX: Primitive does not exist?
-  , primStepEntry "GHC.Prim.negateInt64" $ \case
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt64#) $ \case
       PrimStepContext{..} | [i] <- int64Literals' args
         -> let !(I64# a) = fromInteger i
             in reduce (Literal (Int64Literal (toInteger (I64# (negateInt64# a)))))
@@ -1985,6 +1981,8 @@ primitives =
 
 
   -- XXX: Primitive does not exist?
+#if !MIN_VERSION_ghc(9,14,0)
+  -- 'getSizeofMutBigNat#' was removed from GHC.Prim in GHC 9.14.
   , primStepEntry "GHC.Prim.getSizeofMutBigNat#" $ \case
       PrimStepContext{..}
         | [PrimVal _mbaTy _ [baV]
@@ -2000,6 +1998,7 @@ primitives =
                           [Left (Prim rwTy)
                           ,Left lit])
       _ -> Nothing
+#endif
 
   , primStepEntry $(textNameLit 'GHC.Prim.resizeMutableByteArray#) $ \case
       PrimStepContext{..}
