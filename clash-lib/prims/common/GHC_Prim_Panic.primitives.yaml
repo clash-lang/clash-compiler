@@ -1,5 +1,5 @@
 - BlackBox:
-    name: GHC.Prim.Panic.absentError
+    name: ["GHC.Prim.Panic.absentError", "GHC.Internal.Prim.Panic.absentError"]
     kind: Expression
     type: 'absentError ::
       Addr# -> a'

@@ -9,8 +9,10 @@
   Transformations for converting to A-Normal Form.
 -}
 
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module Clash.Normalize.Transformations.ANF
   ( makeANF
@@ -26,6 +28,7 @@ import Control.Monad.Writer (listen)
 import Data.Bifunctor (second)
 import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text.Extra as Text (showt)
+import GHC.Exts (State#)
 import GHC.Stack (HasCallStack)
 
 import Clash.Explicit.SimIO (SimIO)
@@ -186,7 +189,7 @@ isSimIOTy tcm ty = case tyView (coreView tcm ty) of
   TyConApp tcNm args
     | nameOcc tcNm == Text.showt ''SimIO
     -> True
-    | nameOcc tcNm == "GHC.Prim.(#,#)"
+    | nameOcc tcNm == Text.showt ''(# , #)
     , [_,_,st,_] <- args
     -> isStateTokenTy tcm st
   FunTy _ res -> isSimIOTy tcm res
@@ -199,7 +202,7 @@ isStateTokenTy
   -- ^ Type to check for state tokenness
   -> Bool
 isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
-  TyConApp tcNm _ -> nameOcc tcNm == "GHC.Prim.State#"
+  TyConApp tcNm _ -> nameOcc tcNm == Text.showt ''State#
   _ -> False
 
 -- | Note [ANF InScopeSet]

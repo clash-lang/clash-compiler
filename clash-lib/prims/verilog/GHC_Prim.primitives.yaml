@@ -1,5 +1,5 @@
 - BlackBox:
-    name: GHC.Prim.quotRemInt#
+    name: ["GHC.Prim.quotRemInt#", "GHC.Internal.Prim.quotRemInt#"]
     kind: Declaration
     type: 'quotRemInt# ::
       Int# -> Int# -> (#Int#, Int##)'
@@ -13,7 +13,7 @@
       assign ~RESULT = {~SYM[0],~SYM[1]};
       // quotRemInt end
 - BlackBox:
-    name: GHC.Prim.quotRemWord#
+    name: ["GHC.Prim.quotRemWord#", "GHC.Internal.Prim.quotRemWord#"]
     kind: Declaration
     type: 'quotRemWord# ::
       Word# -> Word# -> (#Word#, Word##)'
@@ -27,7 +27,7 @@
       assign ~RESULT = {~SYM[0],~SYM[1]};
       // quotRemWord end
 - BlackBox:
-    name: GHC.Prim.popCnt8#
+    name: ["GHC.Prim.popCnt8#", "GHC.Internal.Prim.popCnt8#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -91,7 +91,7 @@
       assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
       // popCnt8 end
 - BlackBox:
-    name: GHC.Prim.popCnt16#
+    name: ["GHC.Prim.popCnt16#", "GHC.Internal.Prim.popCnt16#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -155,7 +155,7 @@
       assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
       // popCnt16 end
 - BlackBox:
-    name: GHC.Prim.popCnt32#
+    name: ["GHC.Prim.popCnt32#", "GHC.Internal.Prim.popCnt32#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -219,7 +219,7 @@
       assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
       // popCnt32 end
 - BlackBox:
-    name: GHC.Prim.popCnt64#
+    name: ["GHC.Prim.popCnt64#", "GHC.Internal.Prim.popCnt64#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -283,7 +283,7 @@
       assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
       // popCnt64 end
 - BlackBox:
-    name: GHC.Prim.popCnt#
+    name: ["GHC.Prim.popCnt#", "GHC.Internal.Prim.popCnt#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -347,7 +347,7 @@
       assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
       // popCnt end
 - BlackBox:
-    name: GHC.Prim.clz8#
+    name: ["GHC.Prim.clz8#", "GHC.Internal.Prim.clz8#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -413,7 +413,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // clz8 end
 - BlackBox:
-    name: GHC.Prim.clz16#
+    name: ["GHC.Prim.clz16#", "GHC.Internal.Prim.clz16#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -495,7 +495,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // clz16 end
 - BlackBox:
-    name: GHC.Prim.clz32#
+    name: ["GHC.Prim.clz32#", "GHC.Internal.Prim.clz32#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -593,7 +593,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // clz32 end
 - BlackBox:
-    name: GHC.Prim.clz64#
+    name: ["GHC.Prim.clz64#", "GHC.Internal.Prim.clz64#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -707,7 +707,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // clz64 end
 - BlackBox:
-    name: GHC.Prim.clz#
+    name: ["GHC.Prim.clz#", "GHC.Internal.Prim.clz#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -895,7 +895,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // clz end
 - BlackBox:
-    name: GHC.Prim.ctz8#
+    name: ["GHC.Prim.ctz8#", "GHC.Internal.Prim.ctz8#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -966,7 +966,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // ctz8 end
 - BlackBox:
-    name: GHC.Prim.ctz16#
+    name: ["GHC.Prim.ctz16#", "GHC.Internal.Prim.ctz16#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -1053,7 +1053,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // ctz16 end
 - BlackBox:
-    name: GHC.Prim.ctz32#
+    name: ["GHC.Prim.ctz32#", "GHC.Internal.Prim.ctz32#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -1156,7 +1156,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // ctz32 end
 - BlackBox:
-    name: GHC.Prim.ctz64#
+    name: ["GHC.Prim.ctz64#", "GHC.Internal.Prim.ctz64#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -1275,7 +1275,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // ctz64 end
 - BlackBox:
-    name: GHC.Prim.ctz#
+    name: ["GHC.Prim.ctz#", "GHC.Internal.Prim.ctz#"]
     imports:
     - ~INCLUDENAME[0].inc
     includes:
@@ -1473,7 +1473,7 @@
       assign ~RESULT = $unsigned(~SYM[7]);
       // ctz end
 - BlackBox:
-    name: GHC.Prim.quotRemInt8#
+    name: ["GHC.Prim.quotRemInt8#", "GHC.Internal.Prim.quotRemInt8#"]
     kind: Declaration
     type: 'quotRemInt8# ::
       Int8# -> Int8# -> (#Int8#, Int8##)'
@@ -1487,7 +1487,7 @@
       assign ~RESULT = {~SYM[0],~SYM[1]};
       // quotRemInt8 end
 - BlackBox:
-    name: GHC.Prim.quotRemWord8#
+    name: ["GHC.Prim.quotRemWord8#", "GHC.Internal.Prim.quotRemWord8#"]
     kind: Declaration
     type: 'quotRemWord8# ::
       Word8# -> Word8# -> (#Word8#, Word8##)'
@@ -1501,7 +1501,7 @@
       assign ~RESULT = {~SYM[0],~SYM[1]};
       // quotRemWord8 end
 - BlackBox:
-    name: GHC.Prim.quotRemInt16#
+    name: ["GHC.Prim.quotRemInt16#", "GHC.Internal.Prim.quotRemInt16#"]
     kind: Declaration
     type: 'quotRemInt16# ::
       Int16# -> Int16# -> (#Int16#, Int16##)'
@@ -1515,7 +1515,7 @@
       assign ~RESULT = {~SYM[0],~SYM[1]};
       // quotRemInt16 end
 - BlackBox:
-    name: GHC.Prim.quotRemWord16#
+    name: ["GHC.Prim.quotRemWord16#", "GHC.Internal.Prim.quotRemWord16#"]
     kind: Declaration
     type: 'quotRemWord16# ::
       Word16# -> Word16# -> (#Word16#, Word16##)'
@@ -1529,7 +1529,7 @@
       assign ~RESULT = {~SYM[0],~SYM[1]};
       // quotRemWord16 end
 - BlackBox:
-    name: GHC.Prim.quotRemInt32#
+    name: ["GHC.Prim.quotRemInt32#", "GHC.Internal.Prim.quotRemInt32#"]
     kind: Declaration
     type: 'quotRemInt32# ::
       Int32# -> Int32# -> (#Int32#, Int32##)'
@@ -1543,7 +1543,7 @@
       assign ~RESULT = {~SYM[0],~SYM[1]};
       // quotRemInt32 end
 - BlackBox:
-    name: GHC.Prim.quotRemWord32#
+    name: ["GHC.Prim.quotRemWord32#", "GHC.Internal.Prim.quotRemWord32#"]
     kind: Declaration
     type: 'quotRemWord32# ::
       Word32# -> Word32# -> (#Word32#, Word32##)'
