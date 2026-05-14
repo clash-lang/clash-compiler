@@ -9,6 +9,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -1922,27 +1923,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Real.$wf1" -- :: Int# -> Int# -> Int#
     | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
     -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.^_$s$spowImpl" -- :: Int -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
-    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
-    | [intLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
-    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
-    | [intLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+  -- Which specialization each worker name implements shifts between GHC
+  -- versions, so they all share one shape-dispatching implementation. See
+  -- 'powImplWorker'.
+  "GHC.Internal.Real.^_$s$spowImpl" | Just r <- powImplWorker args -> reduce r
+  "GHC.Internal.Real.^_$s$spowImpl1" | Just r <- powImplWorker args -> reduce r
+  "GHC.Internal.Real.^_$s$spowImpl2" | Just r <- powImplWorker args -> reduce r
+  "GHC.Internal.Real.$w$spowImpl" | Just r <- powImplWorker args -> reduce r
+  "GHC.Internal.Real.$w$spowImpl1" | Just r <- powImplWorker args -> reduce r
+  "GHC.Real.^_$s$spowImpl" | Just r <- powImplWorker args -> reduce r
+  "GHC.Real.^_$s$spowImpl1" | Just r <- powImplWorker args -> reduce r
+  "GHC.Real.^_$s$spowImpl2" | Just r <- powImplWorker args -> reduce r
+  "GHC.Real.$w$spowImpl" | Just r <- powImplWorker args -> reduce r
+  "GHC.Real.$w$spowImpl1" | Just r <- powImplWorker args -> reduce r
   "GHC.Real.^_$sf2" -- :: Int# -> Integer -> Integer
     | [intLiteral -> Just j, integerLiteral -> Just i] <- args
     -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
@@ -2114,7 +2107,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i, j] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (andInteger i j)))
 
+  -- On GHC >= 9.14 the bignum module moved into ghc-internal; the worker
+  -- name follows.
   "GHC.Num.Integer.$wintegerFromInt64#"
+    | [i] <- int64Literals' args
+    -> reduce . Literal $ IntLiteral i
+  "GHC.Internal.Bignum.Integer.$wintegerFromInt64#"
     | [i] <- int64Literals' args
     -> reduce . Literal $ IntLiteral i
 
@@ -4761,6 +4759,39 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     catchDivByZero = makeUndefinedIf (==DivideByZero)
 
     catchErrorCall = makeUndefinedIf (const True :: ErrorCall -> Bool)
+
+    -- Implementation shared by every worker of GHC's powImpl, i.e. the
+    -- internal function behind '(^)'.
+    --
+    -- GHC's powImpl workers come in five flavors and get renumbered across
+    -- versions: the (numeric-suffix -> signature) mapping changes between
+    -- 9.10, 9.12 and 9.14, and may shift again. Rather than hard-code a
+    -- fragile name->signature table, we register this single implementation
+    -- under every worker name and dispatch by argument shape: the worker
+    -- name is known, but which specialization it implements is inferred
+    -- from the arg literals.
+    --
+    -- Shapes:
+    --   [Int#, Integer]      -> Integer  (small-exponent path, IS exp#)
+    --   [Int#, Int#]         -> Int#     (Int -> Int -> Int spec, $w$*)
+    --   [Integer, Int#]      -> Integer  (Integer -> Int -> Integer spec, $w$*)
+    --   [ByteArray#, Integer]-> Integer  (large-exponent path, IP/IN)
+    --
+    -- For the ByteArray# variant we reconstruct the exponent as a positive
+    -- bignum (IP ba). The negative-bignum (IN) arm is in practice dead: (^)
+    -- errors on negative exponents before recursing, so reducing IN
+    -- positively only affects DCE-able code.
+    powImplWorker :: [Value] -> Maybe Term
+    powImplWorker = \case
+      [intLiteral -> Just j, integerLiteral -> Just i]
+        -> Just (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+      [integerLiteral -> Just i, intLiteral -> Just j]
+        -> Just (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+      [intLiteral -> Just i, intLiteral -> Just j]
+        -> Just (catchErrorCall (integerToIntLiteral $ i ^ j))
+      [Lit (ByteArrayLiteral (BA.ByteArray ba)), integerLiteral -> Just i]
+        -> Just (catchErrorCall (integerToIntegerLiteral $ i ^ IP ba))
+      _ -> Nothing
 
 -- Helper functions for literals
 
