@@ -257,8 +257,16 @@ setupGhc useColor dflagsM idirs = do
       ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
                     Just "YES" -> True
                     _          -> False
-      dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
-                              else dflags2
+
+  -- Apply package-env-derived flags first so 'DynFlags.ways' reflects whether
+  -- the target build is already dynamic; only then decide whether to request
+  -- '-dynamic-too' (GHC warns when it's combined with an already-dynamic build).
+  _ <- GHC.setSessionDynFlags dflags2
+  dflags2' <- GHC.getSessionDynFlags
+  let targetIsDynamic = DynFlags.ways dflags2' `Ways.hasWay` Ways.WayDyn
+      dflags3 = if ghcDynamic && not targetIsDynamic
+                  then DynFlags.gopt_set dflags2' DynFlags.Opt_BuildDynamicToo
+                  else dflags2'
 
   when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags3) $
     trace
