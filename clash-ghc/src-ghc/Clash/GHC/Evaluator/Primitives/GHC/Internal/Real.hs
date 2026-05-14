@@ -24,28 +24,12 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ primStepEntry "GHC.Internal.Real.^_$s$spowImpl2" $ \case
-      PrimStepContext{..} -- :: Int# -> Integer -> Integer
-        | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-      _ -> Nothing
-
-  , primStepEntry "GHC.Internal.Real.^_$s$spowImpl" $ \case
-      PrimStepContext{..} -- :: Int -> Integer -> Integer
-        | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-      _ -> Nothing
-
-  , primStepEntry "GHC.Internal.Real.$w$spowImpl" $ \case
-      PrimStepContext{..} -- :: Integer -> Int# -> Integer
-        | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-      _ -> Nothing
-
-  , primStepEntry "GHC.Internal.Real.$w$spowImpl1" $ \case
-      PrimStepContext{..} -- :: Int# -> Int# -> Integer
-        | [intLiteral -> Just i, intLiteral -> Just j] <- args
-        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-      _ -> Nothing
-
+  -- Which specialization each worker name implements shifts between GHC
+  -- versions, so they all share one shape-dispatching implementation. See
+  -- 'powImplWorker'.
+  [ primStepEntry "GHC.Internal.Real.^_$s$spowImpl" powImplWorker
+  , primStepEntry "GHC.Internal.Real.^_$s$spowImpl1" powImplWorker
+  , primStepEntry "GHC.Internal.Real.^_$s$spowImpl2" powImplWorker
+  , primStepEntry "GHC.Internal.Real.$w$spowImpl" powImplWorker
+  , primStepEntry "GHC.Internal.Real.$w$spowImpl1" powImplWorker
   ]

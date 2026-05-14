@@ -412,7 +412,15 @@ primitives =
         -> reduce (Literal (IntegerLiteral (andInteger i j)))
       _ -> Nothing
 
+  -- On GHC >= 9.14 the bignum module moved into ghc-internal; the worker
+  -- name follows.
   , primStepEntry "GHC.Num.Integer.$wintegerFromInt64#" $ \case
+      PrimStepContext{..}
+        | [i] <- int64Literals' args
+        -> reduce . Literal $ IntLiteral i
+      _ -> Nothing
+
+  , primStepEntry "GHC.Internal.Bignum.Integer.$wintegerFromInt64#" $ \case
       PrimStepContext{..}
         | [i] <- int64Literals' args
         -> reduce . Literal $ IntLiteral i
