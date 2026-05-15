@@ -81,7 +81,7 @@ executable clash
   GHC-Options:
     -- -T: Workaround for GHC #8754: if the GC stats aren't enabled because
     -- the -- compiler couldn't use -Bsymbolic to link the default hooks, then
-    -- initialize them sensibly. 
+    -- initialize them sensibly.
     --
     -- -I5: See GHC #3408: the default idle GC time of 0.3s is too short on
     -- Windows where we receive console events once per second or so.
@@ -181,7 +181,7 @@ library
                       ghc-typelits-knownnat,
                       ghc-typelits-natnormalise,
                       deepseq                   >= 1.3.0.2  && < 1.6,
-                      time                      >= 1.4.0.1  && < 1.16,
+                      time                      >= 1.4.0.1  && < 1.17,
                       ghc                       >= 9.6.0    && < 9.15,
                       ghc-bignum                >= 1.0      && < 1.5,
                       ghc-boot                  >= 9.6.0    && < 9.15,
