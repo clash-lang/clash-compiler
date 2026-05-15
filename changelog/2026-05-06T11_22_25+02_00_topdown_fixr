@@ -1,0 +1,1 @@
+CHANGED: Improved normalization performance for repeated top-down rewrite loops by avoiding full root restarts after every successful rewrite. This gives a ~17% performance improvements on larger designs [#3249](https://github.com/clash-lang/clash-compiler/issues/3249)
