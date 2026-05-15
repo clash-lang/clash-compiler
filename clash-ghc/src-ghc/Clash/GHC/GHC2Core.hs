@@ -75,10 +75,17 @@ import GHC.Core.FVs  (exprSomeFreeVars)
 import GHC.Core
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..),
    Alt(..),
-   collectArgs, isTypeArg, isValArg, rhssOfAlts)
+#if MIN_VERSION_ghc(9,14,0)
+   isTypeArg, isValArg,
+#endif
+   collectArgs, rhssOfAlts)
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Core.DataCon
-  (DataCon, dataConExTyCoVars, dataConName, dataConOrigArgTys, dataConRepArgTys,
+  (DataCon, dataConExTyCoVars, dataConName,
+#if MIN_VERSION_ghc(9,14,0)
+   dataConOrigArgTys,
+#endif
+   dataConRepArgTys,
    dataConTag, dataConTyCon, dataConUnivTyVars, dataConWorkId,
    dataConFieldLabels, flLabel, HsImplBang(..), dataConImplBangs)
 import GHC.Core.FamInstEnv
@@ -100,10 +107,12 @@ import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
    isNewTyCon, isPrimTyCon, isTupleTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
-   tyConDataCons, tyConKind, tyConName, tyConTyVars, tyConUnique, isClassTyCon,
+   tyConDataCons, tyConKind,
 #if MIN_VERSION_ghc(9,14,0)
+   tyConTyVars,
    isUnaryClassTyCon,
 #endif
+   tyConUnique, isClassTyCon,
    isPromotedDataCon_maybe)
 import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type (tyConAppFunTy_maybe)
@@ -291,7 +300,7 @@ makeTyCon tc = tycon
 makeAlgTyConRhs :: TyCon
                 -> AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
-makeAlgTyConRhs tc algTcRhs = case algTcRhs of
+makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
 #if MIN_VERSION_ghc(9,14,0)
   -- GHC 9.14 represents unary classes (a class with a single method or a single
   -- superclass) with their own AlgTyConRhs constructor instead of as a newtype.
@@ -299,7 +308,7 @@ makeAlgTyConRhs tc algTcRhs = case algTcRhs of
   -- 'NewTyCon' so that the wrapper data constructor (e.g. 'C:KnownNat') is
   -- treated as identity by clash's normalizer, which is what its semantics is.
   UnaryClassTyCon {data_con = dc} -> do
-    let tvs = tyConTyVars tc
+    let tvs = tyConTyVars _tc
         -- The DataCon for a unary class has exactly one field; that's the
         -- newtype's RHS (e.g. 'SNat n' for 'KnownNat n').
         rhsEtad = case dataConOrigArgTys dc of

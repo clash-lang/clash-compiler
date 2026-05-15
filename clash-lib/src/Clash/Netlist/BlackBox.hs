@@ -20,6 +20,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+-- 'dataToTagSmall#' and 'dataToTagLarge#' (used below in TH name quotes so that
+-- Clash can match the primops by their canonical names across GHC versions) are
+-- deprecated as of GHC 9.14 in favor of @dataToTag#@ from @GHC.Magic@.
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Clash.Netlist.BlackBox
     ( mkBlackBoxContext
     , extractPrimWarnOrFail
