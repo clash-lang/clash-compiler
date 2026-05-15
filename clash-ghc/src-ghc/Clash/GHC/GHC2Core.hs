@@ -41,7 +41,7 @@ import           Control.Monad.Extra         (ifM, andM)
 import           Control.Monad.RWS.Strict    (RWS)
 import qualified Control.Monad.RWS.Strict    as RWS
 import           Data.Bifunctor              (second)
-import           Data.Binary.IEEE754         (doubleToWord, floatToWord)
+import           GHC.Float                   (castDoubleToWord64, castFloatToWord32)
 import qualified Data.ByteString.Char8       as Char8
 import           Data.Char                   (isDigit)
 import           Data.Hashable               (Hashable (..))
@@ -606,8 +606,8 @@ coreToTerm primMap unlocs = term
         LitNumWord8   -> C.Word8Literal i
         LitNumWord16  -> C.Word16Literal i
         LitNumWord32  -> C.Word32Literal i
-      LitFloat r    -> C.FloatLiteral . floatToWord $ fromRational r
-      LitDouble r   -> C.DoubleLiteral . doubleToWord $ fromRational r
+      LitFloat r    -> C.FloatLiteral . castFloatToWord32 $ fromRational r
+      LitDouble r   -> C.DoubleLiteral . castDoubleToWord64 $ fromRational r
       LitNullAddr   -> C.StringLiteral []
 #if MIN_VERSION_ghc(9,12,0)
       LitLabel fs _ -> C.StringLiteral (unpackFS fs)
