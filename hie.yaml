@@ -24,8 +24,6 @@ cradle:
     # as a dependency of another module
     - path: "./clash-prelude"
       config: { cradle: {none: }}
-    - path: "./clash-term"
-      config: { cradle: {cabal: {component: "exe:clash-term"}}}
     # Skip examples for now
     - path: "./examples"
       config: { cradle: {none: }}

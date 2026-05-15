@@ -104,7 +104,6 @@
             clash-prelude-hedgehog
             clash-profiling
             clash-profiling-prepare
-            clash-term
             clash-testsuite;
 
           default =
@@ -124,7 +123,6 @@
                 clash-prelude-hedgehog
                 clash-profiling
                 clash-profiling-prepare
-                clash-term
                 clash-testsuite;
             };
           }) ghcVersions);
@@ -172,11 +170,6 @@
           clash-profile-normalization-run = {
             type = "app";
             program = "${self.packages.${system}.clash-profiling}/bin/clash-profile-normalization-run";
-          };
-
-          clash-term = {
-            type = "app";
-            program = "${self.packages.${system}.clash-term}/bin/clash-term";
           };
 
           clash-testsuite = {
