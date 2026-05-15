@@ -158,7 +158,6 @@ Library
                       clash-prelude           == 1.10.0,
                       containers              >= 0.6.7    && < 0.9,
                       cryptohash-sha256       >= 0.11     && < 0.12,
-                      data-binary-ieee754     >= 0.4.4    && < 0.6,
                       data-default            >= 0.7      && < 0.9,
                       deepseq                 >= 1.3.0.2  && < 1.6,
                       dlist                   >= 0.8      && < 1.1,

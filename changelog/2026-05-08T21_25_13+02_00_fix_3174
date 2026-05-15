@@ -1,0 +1,1 @@
+CHANGED: Replaced the deprecated `data-binary-ieee754` dependency with `castDoubleToWord64`, `castFloatToWord32`, `castWord32ToFloat`, and `castWord64ToDouble` from `GHC.Float`. See [#3174](https://github.com/clash-lang/clash-compiler/issues/3174).

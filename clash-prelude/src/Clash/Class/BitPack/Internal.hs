@@ -27,8 +27,8 @@ module Clash.Class.BitPack.Internal where
 
 import Prelude                        hiding (map)
 
-import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
-                                       wordToFloat)
+import GHC.Float                      (castDoubleToWord64, castFloatToWord32,
+                                       castWord32ToFloat, castWord64ToDouble)
 
 import Data.Char                      (chr, ord)
 import Data.Complex                   (Complex)
@@ -398,12 +398,12 @@ instance BitPack Float where
   unpack = checkUnpackUndef unpackFloat#
 
 packFloat# :: Float -> BitVector 32
-packFloat# = fromIntegral . floatToWord
+packFloat# = fromIntegral . castFloatToWord32
 {-# OPAQUE packFloat# #-}
 {-# ANN packFloat# hasBlackBox #-}
 
 unpackFloat# :: BitVector 32 -> Float
-unpackFloat# (unsafeToNatural -> w) = wordToFloat (fromIntegral w)
+unpackFloat# (unsafeToNatural -> w) = castWord32ToFloat (fromIntegral w)
 {-# OPAQUE unpackFloat# #-}
 {-# ANN unpackFloat# hasBlackBox #-}
 
@@ -413,12 +413,12 @@ instance BitPack Double where
   unpack = checkUnpackUndef unpackDouble#
 
 packDouble# :: Double -> BitVector 64
-packDouble# = fromIntegral . doubleToWord
+packDouble# = fromIntegral . castDoubleToWord64
 {-# OPAQUE packDouble# #-}
 {-# ANN packDouble# hasBlackBox #-}
 
 unpackDouble# :: BitVector 64 -> Double
-unpackDouble# (unsafeToNatural -> w) = wordToDouble (fromIntegral w)
+unpackDouble# (unsafeToNatural -> w) = castWord64ToDouble (fromIntegral w)
 {-# OPAQUE unpackDouble# #-}
 {-# ANN unpackDouble# hasBlackBox #-}
 

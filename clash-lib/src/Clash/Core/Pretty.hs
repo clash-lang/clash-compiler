@@ -35,7 +35,7 @@ import Data.Char                        (isSymbol, isUpper, ord)
 import Data.Default                     (Default(..))
 import Data.Text                        (Text)
 import Control.Monad.Identity
-import Data.Binary.IEEE754              (wordToDouble, wordToFloat)
+import GHC.Float                        (castWord32ToFloat, castWord64ToDouble)
 import Data.List.Extra                  ((<:>))
 import qualified Data.Text              as T
 import Data.Maybe                       (fromMaybe)
@@ -374,8 +374,8 @@ instance PrettyPrec Literal where
     Word8Literal w     -> pretty w <> "##8"
     Word16Literal w    -> pretty w <> "##16"
     Word32Literal w    -> pretty w <> "##32"
-    FloatLiteral w     -> pretty (wordToFloat w) <> "#"
-    DoubleLiteral w    -> pretty (wordToDouble w) <> "##"
+    FloatLiteral w     -> pretty (castWord32ToFloat w) <> "#"
+    DoubleLiteral w    -> pretty (castWord64ToDouble w) <> "##"
     CharLiteral c      -> pretty c <> "#"
     StringLiteral s    -> vcat $ map pretty $ showMultiLineString s
     NaturalLiteral n   -> pretty n
