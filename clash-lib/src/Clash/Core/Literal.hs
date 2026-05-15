@@ -58,8 +58,8 @@ data Literal
   | Word16Literal   !Integer
   | Word32Literal   !Integer
   | StringLiteral   !String
-  | FloatLiteral    !Word32
-  | DoubleLiteral   !Word64
+  | FloatLiteral    !Word32  -- See Note [Storage of floating point in Literal]
+  | DoubleLiteral   !Word64  -- See Note [Storage of floating point in Literal]
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
   | ByteArrayLiteral !ByteArray
