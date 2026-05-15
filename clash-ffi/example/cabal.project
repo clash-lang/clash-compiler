@@ -3,9 +3,5 @@ packages: . .. ../../clash-ghc ../../clash-lib ../../clash-prelude
 write-ghc-environment-files: always
 
 allow-newer:
-  hashable,
   derive-storable-plugin:ghc,
   derive-storable-plugin:ghci,
-  string-interpolate:template-haskell,
-  string-interpolate:text,
-  hint:ghc
