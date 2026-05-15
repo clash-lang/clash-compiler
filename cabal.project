@@ -54,18 +54,8 @@ optional-packages:
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
   ./clash-cosim
-  ./clash-term
 
 allow-newer:
-  brick:base,
-  brick:deepseq,
-  hedgehog-fakedata:hedgehog,
-  rewrite-inspector:binary,
-  rewrite-inspector:containers,
-  rewrite-inspector:hashable,
-  config-ini:containers,
-  config-ini:megaparsec,
-  vty:deepseq,
   derive-storable-plugin:ghc,
   derive-storable-plugin:ghci,
   string-random:text,
@@ -81,7 +71,3 @@ package recursion-schemes
 
 package regex-tdfa
     optimization: 2
-
-
--- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
-constraints: vty < 6.0
