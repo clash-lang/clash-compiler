@@ -195,8 +195,7 @@ jobs:
             "clash-prelude-hedgehog",
             "clash-profiling",
             "clash-profiling-prepare",
-            "clash-term",
-            "clash-testsuite"
+            "clash-term"
         ]
         exclude:
           - ghc: ghc984
@@ -255,3 +254,68 @@ jobs:
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#devShells.x86_64-linux.${{matrix.ghc}} | cachix push clash-lang
+
+  packages_testsuite:
+    name: Packaging clash-testsuite (${{matrix.ghc}})
+    runs-on: self-hosted
+    strategy:
+      # If caching fails for one package, then we are still interested in caching other packages
+      fail-fast: false
+      matrix:
+        ghc: [
+          ghc9124,
+          ghc9103,
+          ghc984,
+          ghc967
+        ]
+    needs: packages_common
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Build clash-testsuite
+        run: |
+          nix build -L .#clashPackages-${{matrix.ghc}}.clash-testsuite
+          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-prelude)
+
+      - name: Cachix
+        if: github.ref == 'refs/heads/master'
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
+        run: |
+          nix path-info .#clashPackages-${{matrix.ghc}}.clash-testsuite | cachix push clash-lang
+
+  running_testsuite:
+    name: Running clash-testsuite (${{matrix.ghc}}, ${{matrix.hdl}})
+    runs-on: self-hosted
+    strategy:
+      # If caching fails for one package, then we are still interested in caching other packages
+      fail-fast: false
+      matrix:
+        hdl: [
+          "VHDL",
+          "Verilog",
+          "SystemVerilog"
+        ]
+        ghc: [
+          ghc9124,
+          ghc9103,
+          ghc984,
+          ghc967
+        ]
+    needs: packages_testsuite
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Run clash-testsuite
+        run: |
+          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite -- -j$(nproc) --hide-successes -p .${{matrix.hdl}} --no-vivado --no-modelsim
