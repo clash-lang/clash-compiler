@@ -402,6 +402,7 @@ test-suite unittests
     build-depends:
       clash-prelude,
 
+      arrows,
       ghc-typelits-knownnat,
       ghc-typelits-natnormalise,
       ghc-typelits-extra,

@@ -3,7 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd,
                   2017-2022, Google Inc.,
                   2020     , Gergő Érdi,
-                  2021-2025, QBayLogic B.V.
+                  2021-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -2098,32 +2098,34 @@ fsToHz (Femtoseconds period)
 
 -- | Build an 'Automaton' from a function over 'Signal's.
 --
--- __NB__: Consumption of continuation of the 'Automaton' must be affine; that
--- is, you can only apply the continuation associated with a particular element
--- at most once.
+-- __NB__: Each continuation function must be called at most once.
 signalAutomaton ::
   forall dom a b .
-  (Signal dom a -> Signal dom b) -> Automaton (->) a b
-signalAutomaton dut = Automaton $ \input0 -> unsafePerformIO $ do
+  (Signal dom a -> Signal dom b) -> IO (Automaton (->) a b)
+signalAutomaton dut = do
   inputRefs <- infiniteRefList Nothing
-  let inputs = input0 :- fmap readInput inputRefs
-      readInput ref = unsafePerformIO $ do
+  let readInput ref = unsafePerformIO $ do
         val <- readIORef ref
         case val of
-          Nothing -> fail "signalAutomaton: non-affine use of continuation"
+          Nothing -> fail "signalAutomaton: input not set: did you call the continuation more than once?"
           Just x  -> return x
 
-  let go (inRef :- inRefs) (out :- rest) = do
-        let next :: Automaton (->) a b
-            next = Automaton $ \i -> unsafePerformIO $ do
-              old <- atomicModifyIORef inRef (\old -> (Just i,old))
-              case old of
-                Nothing -> return ()
-                Just _  -> fail "signalAutomaton: non-affine use of continuation"
-              unsafeInterleaveIO (go inRefs rest)
-        return (out, next)
+      step input0 = unsafePerformIO $ do
+        let inputs = input0 :- fmap readInput inputRefs
 
-  go inputRefs (dut inputs)
+        let go (inRef :- inRefs) (out :- rest) = do
+              let next :: Automaton (->) a b
+                  next = Automaton $ \i -> unsafePerformIO $ do
+                    old <- atomicModifyIORef inRef (\old -> (Just i,old))
+                    case old of
+                      Nothing -> return ()
+                      Just _  -> fail "signalAutomaton: input not consumed: did you call the continuation more than once?"
+                    unsafeInterleaveIO (go inRefs rest)
+              return (out, next)
+
+        go inputRefs (dut inputs)
+
+  return (Automaton step)
 {-# OPAQUE signalAutomaton #-}
 
 infiniteRefList :: a -> IO (Signal dom (IORef a))

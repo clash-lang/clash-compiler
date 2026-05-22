@@ -1,7 +1,7 @@
 {-|
-Copyright  :  (C) 2019, Myrtle Software Ltd
-                  2022, Google Inc.
-                  2023, QBayLogic B.V.
+Copyright  :  (C) 2019     , Myrtle Software Ltd
+                  2022     , Google Inc.
+                  2023-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -27,6 +27,8 @@ import           Clash.Prelude                  hiding (sample)
 import           Clash.Signal.Internal
   (Femtoseconds(..), dynamicClockGen, sample, head#)
 
+import           Control.Arrow.Transformer.Automaton
+  (Automaton(..))
 import           Control.Exception              (evaluate)
 import           Test.Tasty
 import           Test.Tasty.HUnit
@@ -60,6 +62,9 @@ tests =
               a = fst (head# s)
             in
               evaluate a >> pure ()
+
+        , testCase "signalAutomaton is fresh in IO" $
+            case_signalAutomatonFreshState
         ]
     , testGroup "SaturatingNum"
       [ testCase "satSucc SatWrap" case_satSuccSatWrap
@@ -107,6 +112,34 @@ case_dynamicStaticEq = do
     "clk11+dclk77 == dclk11+clk77"
     (sampleMagicN (E.unsafeSynchronizer clk11 dclk77 counter))
     (sampleMagicN (E.unsafeSynchronizer dclk11 clk77 counter))
+
+-- | Regression test for sharing of the mutable input state used by
+-- 'signalAutomaton'.
+case_signalAutomatonFreshState :: Assertion
+case_signalAutomatonFreshState = do
+  let
+    circuit :: HiddenClockResetEnable dom => Signal dom Int -> Signal dom Int
+    circuit = register 0
+
+    runSim :: Int -> IO Int
+    runSim x = do
+      automaton <- signalAutomaton @System circuit
+      pure (start automaton x)
+
+    start (Automaton step) x = load sim x
+      where
+        (_, sim) = step 0
+
+    load (Automaton step) x = consume sim
+      where
+        (_, sim) = step x
+
+    consume (Automaton step) = output
+      where
+        (output, _) = step 0
+
+  actual <- traverse runSim [1, 3]
+  actual @?= [1, 3]
 
 -- | Asserts that "lying" about a clock's frequency has effect.
 case_dynamicHasEffect :: Assertion
