@@ -21,17 +21,11 @@ let
     pkgs = prev;
   };
 
-  # Some type checker plugins have tests that invoke GHC which requires the package
-  # themselves to be available.
-  ghc-typelits-plugins-preCheck-script = pkgName: ''
-    unset GHC_ENVIRONMENT
-    wrapper="''${TMPDIR:-/tmp}/ghc-for-tests"
-    cat > "$wrapper" <<'EOF'
-    #!/bin/sh
-    exec ghc -package-db "$PWD/dist/package.conf.inplace" -package ${pkgName} "$@"
-    EOF
-    chmod +x "$wrapper"
-    export HC="$wrapper"
+  # The test suites for these packages spawn a fresh `ghc` subprocess that
+  # loads the package itself as a plugin. Point GHC_PACKAGE_PATH at the cabal
+  # inplace db so the just-built library is visible.
+  pluginPreCheck = ''
+    export NIX_GHC_PACKAGE_PATH_FOR_TEST="$PWD/dist/package.conf.inplace:$packageConfDir:"
   '';
 
   # An overlay with the packages we pull in as inputs to this flake.
@@ -51,11 +45,8 @@ let
           (hprev.callCabal2nix
             "ghc-typelits-extra"
             "${ghc-typelits-extra}"
-            { }
-          )
-          (drv: {
-            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-extra";
-          });
+            { })
+          (drv: { preCheck = pluginPreCheck; });
 
       ghc-typelits-knownnat =
         hprev.callCabal2nix
@@ -68,11 +59,8 @@ let
           (hprev.callCabal2nix
             "ghc-typelits-natnormalise"
             "${ghc-typelits-natnormalise}"
-            { }
-          )
-          (drv: {
-            preCheck = ghc-typelits-plugins-preCheck-script "ghc-typelits-natnormalise";
-          });
+            { })
+          (drv: { preCheck = pluginPreCheck; });
 
       # Not yet in nixpkgs.
       checked-literals =
@@ -82,14 +70,7 @@ let
             ver = "0.1.2";
             sha256 = "sha256-c+3EpY6A/Z88MQsNpQv0bMDGvpWcaBHHVg6wxh5ZQuU=";
           } { })
-          (drv: {
-            # The test suite spawns a fresh `ghc` subprocess that loads CheckedLiterals
-            # as a plugin. Point GHC_PACKAGE_PATH at the cabal inplace db so the
-            # just-built library is visible.
-            preCheck = (drv.preCheck or "") + ''
-              export NIX_GHC_PACKAGE_PATH_FOR_TEST="$PWD/dist/package.conf.inplace:$packageConfDir:"
-            '';
-          });
+          (drv: { preCheck = pluginPreCheck; });
 
       # Upstream nixpkgs has this fix but they have not landed in a release yet
       cabal-add = prev.haskell.lib.appendPatches hprev.cabal-add [
@@ -183,10 +164,12 @@ let
         };
 
       clash-prelude =
-        hprev.callCabal2nix
-          "clash-prelude"
-          ../clash-prelude
-          { };
+        prev.haskell.lib.overrideCabal
+          (hprev.callCabal2nix
+            "clash-prelude"
+            ../clash-prelude
+            { })
+          (drv: { preCheck = pluginPreCheck; });
 
       clash-prelude-hedgehog =
         hprev.callCabal2nix "clash-prelude-hedgehog" ../clash-prelude-hedgehog {
