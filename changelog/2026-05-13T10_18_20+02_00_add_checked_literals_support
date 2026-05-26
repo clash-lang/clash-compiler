@@ -1,0 +1,14 @@
+ADDED: Support for `checked-literals`. Numeric literals (e.g., `5` or `3.2`) can now be checked add compile time. That is, you'll get a compile error if the literal does not fit the target type -- even in polymorphic contexts. You can enable the checker by adding the following to your project's Cabal file:
+
+```
+library
+  [..]
+
+  build-depends:
+    [..]
+    checked-literals
+
+  ghc-options: -fplugin=CheckedLiterals
+```
+
+See https://clash-lang.org/blog/2026-04-07-checked-literals/.
