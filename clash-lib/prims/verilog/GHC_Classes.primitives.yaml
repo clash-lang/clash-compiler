@@ -1,5 +1,5 @@
 - BlackBox:
-    name: GHC.Classes.divInt#
+    name: ["GHC.Classes.divInt#", "GHC.Internal.Classes.divInt#"]
     kind: Declaration
     type: 'divInt# :: Int#
       -> Int# -> Int#'
@@ -25,7 +25,7 @@
       assign ~RESULT = $signed(~SYM[6][~SIZE[~TYPO]-1:0]);
       // divInt# end
 - BlackBox:
-    name: GHC.Classes.modInt#
+    name: ["GHC.Classes.modInt#", "GHC.Internal.Classes.modInt#"]
     kind: Declaration
     type: 'modInt# :: Int#
       -> Int# -> Int#'

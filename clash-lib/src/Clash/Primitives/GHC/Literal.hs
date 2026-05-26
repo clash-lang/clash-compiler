@@ -17,6 +17,8 @@ module Clash.Primitives.GHC.Literal
  )
  where
 
+import           Data.List.NonEmpty           (NonEmpty)
+import qualified Data.List.NonEmpty           as NE
 import qualified Data.Text.Lazy               as LT
 import           Data.Text
   (Text, stripPrefix, stripSuffix, unpack)
@@ -55,23 +57,29 @@ unsignedLiteral wordSize wordVal =
                   ])
 
 -- | Parse integer in strings of the form "GHC.Word.WordX#" where
--- "GHC.Word.Word" is the prefix given.
-readSize :: Text -> Text -> Maybe Int
-readSize prefix nm0 = do
-  nm1 <- stripPrefix prefix nm0
+-- "GHC.Word.Word" is the prefix given. The first prefix that matches wins.
+readSize :: NonEmpty Text -> Text -> Maybe Int
+readSize prefixes nm0 = do
+  let go [] = Nothing
+      go (p:ps) = case stripPrefix p nm0 of
+        Just nm1 -> Just nm1
+        Nothing  -> go ps
+  nm1 <- go (NE.toList prefixes)
   nm2 <- stripSuffix "#" nm1
   readMaybe (unpack nm2)
 
 -- | Constructs "clean" literals.
 literalTF
-  :: Text
-  -- ^ Base name of constructors (for example: "GHC.Word.W")
+  :: NonEmpty Text
+  -- ^ Base names of constructors (for example: @"GHC.Word.W" :| ["GHC.Internal.Word.W"]@).
+  -- The 'GHC.Internal.*' variant is needed for GHC >= 9.14, which moved the
+  -- constructors into 'ghc-internal'; 'base' re-exports them.
   -> (Bool -> [Either Term Type] -> Int -> (BlackBoxMeta, BlackBox))
   -- ^ Functions processing
   -> BlackBoxFunction
-literalTF baseName tf isDecl primName args _resTy = return $
-  case readSize baseName primName of
+literalTF baseNames tf isDecl primName args _resTy = return $
+  case readSize baseNames primName of
     Nothing ->
-      Left (concat ["Can only make blackboxes for '", unpack baseName, "X#'"])
+      Left (concat ["Can only make blackboxes for '", unpack (NE.head baseNames), "X#'"])
     Just n ->
       Right (tf isDecl args n)

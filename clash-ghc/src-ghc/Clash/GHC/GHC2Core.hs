@@ -11,6 +11,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -51,6 +52,11 @@ import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
+import           Data.Text.Extra             (showt)
+import qualified GHC.Magic
+import qualified GHC.Prim
+import qualified GHC.Stack
+import qualified GHC.Stack.Types
 import qualified Data.Traversable            as T
 import           Data.String.Interpolate     (__i)
 import qualified Text.Read                   as Text
@@ -69,12 +75,19 @@ import GHC.Core.FVs  (exprSomeFreeVars)
 import GHC.Core
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..),
    Alt(..),
-   collectArgs, rhssOfAlts, unfoldingTemplate)
+#if MIN_VERSION_ghc(9,14,0)
+   isTypeArg, isValArg,
+#endif
+   collectArgs, rhssOfAlts)
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Core.DataCon
-  (DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
-   dataConTyCon, dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel,
-   HsImplBang(..), dataConImplBangs)
+  (DataCon, dataConExTyCoVars, dataConName,
+#if MIN_VERSION_ghc(9,14,0)
+   dataConOrigArgTys,
+#endif
+   dataConRepArgTys,
+   dataConTag, dataConTyCon, dataConUnivTyVars, dataConWorkId,
+   dataConFieldLabels, flLabel, HsImplBang(..), dataConImplBangs)
 import GHC.Core.FamInstEnv
   ( FamInst (..), FamInstEnvs
   , familyInstances, normaliseType, emptyFamInstEnvs, topReduceTyFamApp_maybe
@@ -94,7 +107,13 @@ import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
    isNewTyCon, isPrimTyCon, isTupleTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
-   tyConDataCons, tyConKind, tyConName, tyConUnique, isClassTyCon, isPromotedDataCon_maybe)
+   tyConDataCons, tyConKind,
+#if MIN_VERSION_ghc(9,14,0)
+   tyConTyVars,
+   isUnaryClassTyCon,
+#endif
+   tyConUnique, isClassTyCon,
+   isPromotedDataCon_maybe)
 import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type (tyConAppFunTy_maybe)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
@@ -191,7 +210,7 @@ makeTyCon tc = tycon
         mkAlgTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          tcRhsM <- makeAlgTyConRhs $ algTyConRhs tc
+          tcRhsM <- makeAlgTyConRhs tc $ algTyConRhs tc
           case tcRhsM of
             Just tcRhs ->
               return
@@ -278,9 +297,27 @@ makeTyCon tc = tycon
           ty  <- coreToType (fi_rhs fi)
           return (tys,ty)
 
-makeAlgTyConRhs :: AlgTyConRhs
+makeAlgTyConRhs :: TyCon
+                -> AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
-makeAlgTyConRhs algTcRhs = case algTcRhs of
+makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
+#if MIN_VERSION_ghc(9,14,0)
+  -- GHC 9.14 represents unary classes (a class with a single method or a single
+  -- superclass) with their own AlgTyConRhs constructor instead of as a newtype.
+  -- See Note [Unary class magic] in GHC.Core.TyCon. We map it back to Clash's
+  -- 'NewTyCon' so that the wrapper data constructor (e.g. 'C:KnownNat') is
+  -- treated as identity by clash's normalizer, which is what its semantics is.
+  UnaryClassTyCon {data_con = dc} -> do
+    let tvs = tyConTyVars _tc
+        -- The DataCon for a unary class has exactly one field; that's the
+        -- newtype's RHS (e.g. 'SNat n' for 'KnownNat n').
+        rhsEtad = case dataConOrigArgTys dc of
+          [scaled] -> scaledThing scaled
+          _ -> error "makeAlgTyConRhs: UnaryClassTyCon DataCon does not have one field"
+    Just <$> (C.NewTyCon <$> coreToDataCon dc
+                         <*> ((,) <$> mapM coreToTyVar tvs
+                                  <*> coreToType rhsEtad))
+#endif
   DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 
@@ -302,6 +339,26 @@ coreToTerm primMap unlocs = term
   where
     term :: CoreExpr -> C2C C.Term
     term e
+#if MIN_VERSION_ghc(9,14,0)
+      -- See Note [Unary class magic] in GHC.Core.TyCon. The worker for a unary
+      -- class data constructor (e.g. 'C:KnownNat') is semantically the identity
+      -- on its single value field. Peel it off here so that downstream
+      -- transformations (in particular the evaluator's literal extractors) see
+      -- the underlying value directly, as they would have on GHC < 9.14 when
+      -- unary classes were represented as newtypes.
+      -- Match a fully-saturated worker application: all type args, then
+      -- exactly one value arg. A naive '[Type _, val]' pattern would also
+      -- match a partial application like 'C:IP @"callStack" @CallStack'
+      -- (two 'Type' args, no value yet), binding 'val' to a 'Type' node
+      -- and producing '_TY_'-wrapped junk when peeled.
+      | (Var x, args) <- collectArgs e
+      , Just dc <- isDataConId_maybe x
+      , isUnaryClassTyCon (dataConTyCon dc)
+      , (tyArgs, [val]) <- break isValArg args
+      , all isTypeArg tyArgs
+      , isValArg val
+      = term val
+#endif
       | (Var x,args) <- collectArgs e
       , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
                                   (GHC2CoreEnv noSrcSpan emptyFamInstEnvs)
@@ -327,17 +384,21 @@ coreToTerm primMap unlocs = term
           | length args == 4
           = term (args!!3)
         --- Remove `$`
-        go "GHC.Base.$"                        args
-          | length args == 5
+        go nm args
+          | nm == showt '($), length args == 5
           = term (App (args!!3) (args!!4))
-        go "GHC.Magic.noinline"                args   -- noinline :: forall a. a -> a
-          | [_ty, x] <- args
+        go nm args  -- noinline :: forall a. a -> a
+          | nm == showt 'GHC.Magic.noinline, [_ty, x] <- args
           = term x
         -- Remove most CallStack logic
-        go "GHC.Stack.Types.PushCallStack"     args = term (last args)
-        go "GHC.Stack.Types.FreezeCallStack"   args = term (last args)
-        go "GHC.Stack.withFrozenCallStack"     args
-          | length args == 3
+        go nm args
+          | nm == showt 'GHC.Stack.Types.PushCallStack
+          = term (last args)
+        go nm args
+          | nm == showt 'GHC.Stack.Types.FreezeCallStack
+          = term (last args)
+        go nm args
+          | nm == showt 'GHC.Stack.withFrozenCallStack, length args == 3
           = term (App (args!!2) (args!!1))
         go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
           | [_nTy,_aTy,_kn,_typ,f] <- args
@@ -516,9 +577,9 @@ coreToTerm primMap unlocs = term
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
                    in  case unfolding of
-                          CoreUnfolding {} -> do
+                          CoreUnfolding {uf_tmpl} -> do
                             sp <- view srcSpan
-                            RWS.censor (const (SrcSpanRB sp)) (term (unfoldingTemplate unfolding))
+                            RWS.censor (const (SrcSpanRB sp)) (term uf_tmpl)
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPprUnsafe x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPprUnsafe x)
               else C.Data <$> coreToDataCon dc
@@ -532,12 +593,17 @@ coreToTerm primMap unlocs = term
               | f == "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
               | f == "Clash.Signal.Internal.joinSignal#" -> return (joinTerm xType)
               | f == "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
-              | f == "GHC.Base.$"                       -> return (dollarTerm xType)
-              | f == "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
-              | f == "GHC.Magic.noinline"               -> return (idTerm xType)
-              | f == "GHC.Magic.lazy"                   -> return (idTerm xType)
-              | f == "GHC.Magic.nospec"                 -> return (idTerm xType)
-              | f == "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
+              | f == showt '($)                           -> return (dollarTerm xType)
+              | f == showt 'GHC.Stack.withFrozenCallStack -> return (withFrozenCallStackTerm xType)
+              | f == showt 'GHC.Magic.noinline            -> return (idTerm xType)
+              | f == showt 'GHC.Magic.lazy                -> return (idTerm xType)
+              -- 'nospec' is a wired-in magic Id in 'GHC.Magic' (resp.
+              -- 'GHC.Internal.Magic' on GHC >= 9.14). It is not user-importable,
+              -- so we can't quote it via TH. Both module names need a literal
+              -- match here so that this clause fires across GHC versions.
+              | f == "GHC.Magic.nospec"                   -> return (idTerm xType)
+              | f == "GHC.Internal.Magic.nospec"          -> return (idTerm xType)
+              | f == showt 'GHC.Magic.runRW#              -> return (runRWTerm xType)
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == "Clash.Magic.prefixName"
               -> return (nameModTerm C.PrefixName xType)
@@ -767,11 +833,11 @@ listTypeToListOfTypes ty                      =
 -- | Try to determine boolean value by looking at constructor name of type.
 boolTypeToBool :: Type -> C2C Bool
 boolTypeToBool (TyConApp constructor _args) = do
-  constructorName <- typeConstructorToString constructor
+  constructorName <- Text.pack <$> typeConstructorToString constructor
   return $ case constructorName of
-    "GHC.Types.True"  -> True
-    "GHC.Types.False" -> False
-    _ -> error $ "Expected boolean constructor, got:" ++ constructorName
+    _ | constructorName == showt 'True  -> True
+      | constructorName == showt 'False -> False
+      | otherwise -> error $ "Expected boolean constructor, got:" ++ Text.unpack constructorName
 boolTypeToBool s =
   error $ unwords [ "Could not unpack given type to bool:"
                   , showPprUnsafe s ]
@@ -1327,7 +1393,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy))
   = let
       fName            = C.mkUnsafeSystemName "f" 0
       fId              = C.mkLocalId fTy fName
-      rwNm             = pack "GHC.Prim.realWorld#"
+      rwNm             = showt 'GHC.Prim.realWorld#
     in
       C.TyLam rTV (
       C.TyLam oTV (

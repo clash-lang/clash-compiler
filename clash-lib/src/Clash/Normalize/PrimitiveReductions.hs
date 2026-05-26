@@ -54,6 +54,7 @@ import qualified Data.List.NonEmpty               as NE
 import qualified Data.Maybe                       as Maybe
 import           Data.Semigroup                   (sconcat)
 import           Data.Text.Extra                  (showt)
+import qualified GHC.Classes
 import           GHC.Stack                        (HasCallStack)
 
 import           GHC.Builtin.Names
@@ -1106,7 +1107,7 @@ reduceReplace_int n aTy vTy _kn v i newA (TransformContext is0 _ctx) = do
     -> Term
   eqIntPrim intTy boolTy =
     Prim (PrimInfo
-           "GHC.Classes.eqInt"
+           (showt 'GHC.Classes.eqInt)
            (mkFunTy intTy (mkFunTy intTy boolTy))
            WorkVariable
            SingleResult
@@ -1215,7 +1216,7 @@ reduceIndex_int n aTy _kn v i (TransformContext is0 _ctx) = do
     -> Term
   eqIntPrim intTy boolTy =
     Prim ( PrimInfo
-            "GHC.Classes.eqInt"
+            (showt 'GHC.Classes.eqInt)
             (mkFunTy intTy (mkFunTy intTy boolTy))
             WorkVariable
             SingleResult

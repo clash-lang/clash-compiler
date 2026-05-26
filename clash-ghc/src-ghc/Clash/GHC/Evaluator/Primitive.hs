@@ -585,8 +585,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce . Literal . Int8Literal . toInteger $ I# b
   $(namePat 'GHC.Prim.int8ToInt#) | [i] <- int8Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt8" | [i] <- int8Literals' args
+  $(namePat 'GHC.Prim.negateInt8#) | [i] <- int8Literals' args
     -> let !(I8# a) = fromInteger i
         in reduce (Literal (Int8Literal (toInteger (I8# (negateInt8# a)))))
   $(namePat 'GHC.Prim.plusInt8#) | Just r <- liftI8 plusInt8# args
@@ -641,8 +640,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce . Literal . Int16Literal . toInteger $ I# b
   $(namePat 'GHC.Prim.int16ToInt#) | [i] <- int16Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt16" | [i] <- int16Literals' args
+  $(namePat 'GHC.Prim.negateInt16#) | [i] <- int16Literals' args
     -> let !(I16# a) = fromInteger i
         in reduce (Literal (Int16Literal (toInteger (I16# (negateInt16# a)))))
   $(namePat 'GHC.Prim.plusInt16#) | Just r <- liftI16 plusInt16# args
@@ -697,8 +695,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce . Literal . Int32Literal . toInteger $ I# b
   $(namePat 'GHC.Prim.int32ToInt#) | [i] <- int32Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt32" | [i] <- int32Literals' args
+  $(namePat 'GHC.Prim.negateInt32#) | [i] <- int32Literals' args
     -> let !(I32# a) = fromInteger i
         in reduce (Literal (Int32Literal (toInteger (I32# (negateInt32# a)))))
   $(namePat 'GHC.Prim.plusInt32#) | Just r <- liftI32 plusInt32# args
@@ -751,8 +748,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (Literal (Int64Literal i))
   $(namePat 'GHC.Prim.int64ToInt#) | [i] <- int64Literals' args
     -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt64" | [i] <- int64Literals' args
+  $(namePat 'GHC.Prim.negateInt64#) | [i] <- int64Literals' args
     -> let !(I64# a) = fromInteger i
         in reduce (Literal (Int64Literal (toInteger (I64# (negateInt64# a)))))
   $(namePat 'GHC.Prim.plusInt64#) | Just r <- liftI64 plusInt64# args
@@ -1275,6 +1271,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce (Literal (WordLiteral (toInteger (W# w))))
 
   -- XXX: Primitive does not exist?
+#if !MIN_VERSION_ghc(9,14,0)
+  -- 'getSizeofMutBigNat#' was removed from GHC.Prim in GHC 9.14.
   "GHC.Prim.getSizeofMutBigNat#"
     | [PrimVal _mbaTy _ [baV]
       ,PrimVal rwTy _ _
@@ -1288,6 +1286,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
        in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
                       [Left (Prim rwTy)
                       ,Left lit])
+#endif
 
   $(namePat 'GHC.Prim.resizeMutableByteArray#)
     | [PrimVal mbaTy _ [baV]
@@ -1912,7 +1911,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (Literal (IntLiteral (IS (bigNatEq# i j))))
 
   -- GHC.Real.^  -- XXX: Very fragile
-  --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
+  --   ^_f, $wf, $wf1 are specializations of the internal function f in the implementation of (^) in GHC.Real
   "GHC.Real.^_f"  -- :: Integer -> Integer -> Integer
     | [i,j] <- integerLiterals' args
     -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
@@ -1923,27 +1922,35 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
   "GHC.Real.$wf1" -- :: Int# -> Int# -> Int#
     | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
     -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+  -- GHC's powImpl workers come in five flavors and get renumbered
+  -- across versions: the (numeric-suffix -> signature) mapping changes
+  -- between 9.10, 9.12 and 9.14, and may shift again. Rather than hard-
+  -- code a fragile name->signature table, dispatch by argument shape:
+  -- the worker name is known, but which specialization it implements is
+  -- inferred from the arg literals.
+  --
+  -- Shapes:
+  --   [Int#, Integer]      -> Integer  (small-exponent path, IS exp#)
+  --   [Int#, Int#]         -> Int#     (Int -> Int -> Int spec, $w$*)
+  --   [Integer, Int#]      -> Integer  (Integer -> Int -> Integer spec, $w$*)
+  --   [ByteArray#, Integer]-> Integer  (large-exponent path, IP/IN)
+  --
+  -- For the ByteArray# variant we reconstruct the exponent as a positive
+  -- bignum (IP ba). The negative-bignum (IN) arm is in practice dead:
+  -- (^) errors on negative exponents before recursing, so reducing IN
+  -- positively only affects DCE-able code.
+  nm | isPowImplWorker nm
+    , [intLiteral -> Just j, integerLiteral -> Just i] <- args
+    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+    | isPowImplWorker nm
+    , [integerLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+    | isPowImplWorker nm
+    , [intLiteral -> Just i, intLiteral -> Just j] <- args
     -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.^_$s$spowImpl" -- :: Int -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
-    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
-    | [intLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
-    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
-    | [intLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+    | isPowImplWorker nm
+    , [Lit (ByteArrayLiteral (BA.ByteArray ba)), integerLiteral -> Just i] <- args
+    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ IP ba))
   "GHC.Real.^_$sf2" -- :: Int# -> Integer -> Integer
     | [intLiteral -> Just j, integerLiteral -> Just i] <- args
     -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
@@ -2115,8 +2122,11 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | [i, j] <- integerLiterals' args
     -> reduce (Literal (IntegerLiteral (andInteger i j)))
 
-  "GHC.Num.Integer.$wintegerFromInt64#"
-    | [i] <- int64Literals' args
+  -- On GHC >= 9.14 the bignum module moved into ghc-internal; the worker
+  -- name follows.
+  nm | nm == "GHC.Num.Integer.$wintegerFromInt64#"
+       || nm == "GHC.Internal.Bignum.Integer.$wintegerFromInt64#"
+    , [i] <- int64Literals' args
     -> reduce . Literal $ IntLiteral i
 
   $(namePat 'GHC.Base.eqString)
@@ -4622,8 +4632,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                     , Left (Literal (IntLiteral (toInteger len)))])
         in reduce ret
   -- XXX: Does not seem to exist?
-  "GHC.Magic.noinlineConstraint"
-    | [arg] <- args
+  -- 'noinlineConstraint' (if it exists) is a wired-in magic Id; not
+  -- user-importable and so not TH-quotable. Match both the pre-9.14
+  -- 'GHC.Magic' and the post-9.14 'GHC.Internal.Magic' module names.
+  nm | nm == "GHC.Magic.noinlineConstraint"
+       || nm == "GHC.Internal.Magic.noinlineConstraint"
+    , [arg] <- args
     -> reduce (valToTerm arg)
   $(namePat 'GHC.TypeNats.withSomeSNat)
     | Lit (NaturalLiteral n) : fun : _ <- args
@@ -4636,8 +4650,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            ret = mkApps (valToTerm fun) [Right nTy, Left snat]
         in reduce ret
   -- XXX: Does not seem to exist?
-  "GHC.Magic.nospec"
-    | [arg] <- args
+  -- 'nospec' is a wired-in magic Id; not user-importable and so not
+  -- TH-quotable. Match both the pre-9.14 'GHC.Magic' and the post-9.14
+  -- 'GHC.Internal.Magic' module names.
+  nm | nm == "GHC.Magic.nospec"
+       || nm == "GHC.Internal.Magic.nospec"
+    , [arg] <- args
     -> reduce (valToTerm arg)
   "GHC.Float.$wproperFractionDouble"
     | _ : Lit (DoubleLiteral d) : _ <- args
@@ -5239,6 +5257,23 @@ integerToWord64Literal = Literal . Word64Literal . toInteger . (fromInteger :: I
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
+
+-- | Recognise the (^) implementation's worker names. These specialisations
+-- of `powImpl` get renumbered between GHC versions; see the dispatch
+-- site in 'ghcPrimStep' for how the matching shape is determined.
+isPowImplWorker :: Text -> Bool
+isPowImplWorker nm = nm `elem`
+  [ "GHC.Internal.Real.^_$s$spowImpl"
+  , "GHC.Internal.Real.^_$s$spowImpl1"
+  , "GHC.Internal.Real.^_$s$spowImpl2"
+  , "GHC.Internal.Real.$w$spowImpl"
+  , "GHC.Internal.Real.$w$spowImpl1"
+  , "GHC.Real.^_$s$spowImpl"
+  , "GHC.Real.^_$s$spowImpl1"
+  , "GHC.Real.^_$s$spowImpl2"
+  , "GHC.Real.$w$spowImpl"
+  , "GHC.Real.$w$spowImpl1"
+  ]
 
 naturalToNaturalLiteral :: Natural -> Term
 naturalToNaturalLiteral = Literal . NaturalLiteral . toInteger

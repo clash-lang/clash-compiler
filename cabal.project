@@ -15,7 +15,7 @@ write-ghc-environment-files: always
 -- index state, to go along with the cabal.project.freeze file. update the index
 -- state by running `cabal update` twice and looking at the index state it
 -- displays to you (as the second update will be a no-op)
-index-state: 2026-05-09T11:46:50Z
+index-state: 2026-05-15T04:09:15Z
 
 -- For some reason the `clash-testsuite` executable fails to run without
 -- this, as it cannot find the related library...
@@ -54,23 +54,14 @@ optional-packages:
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
   ./clash-cosim
-  ./clash-term
 
 allow-newer:
-  brick:base,
-  brick:deepseq,
-  hashable,
-  hedgehog-fakedata:hedgehog,
-  rewrite-inspector:binary,
-  rewrite-inspector:containers,
-  vty:deepseq,
   derive-storable-plugin:ghc,
   derive-storable-plugin:ghci,
   string-random:text,
   string-random:containers,
-  string-interpolate:template-haskell,
-  string-interpolate:text,
-  hint:ghc
+  ordered-containers:containers,
+  boring:base,
 
 -- Works around: https://github.com/recursion-schemes/recursion-schemes/issues/128. This
 -- shouldn't harm (runtime) performance of Clash, as we only use recursion-schemes with
@@ -80,7 +71,3 @@ package recursion-schemes
 
 package regex-tdfa
     optimization: 2
-
-
--- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
-constraints: vty < 6.0

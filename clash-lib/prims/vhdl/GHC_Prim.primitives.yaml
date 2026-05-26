@@ -1,47 +1,47 @@
 - BlackBox:
-    name: GHC.Prim.gtChar#
+    name: ["GHC.Prim.gtChar#", "GHC.Internal.Prim.gtChar#"]
     kind: Declaration
     type: 'gtChar# :: Char#
       -> Char# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geChar#
+    name: ["GHC.Prim.geChar#", "GHC.Internal.Prim.geChar#"]
     kind: Declaration
     type: 'geChar# :: Char#
       -> Char# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.eqChar#
+    name: ["GHC.Prim.eqChar#", "GHC.Internal.Prim.eqChar#"]
     kind: Declaration
     type: 'eqChar# :: Char#
       -> Char# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neChar#
+    name: ["GHC.Prim.neChar#", "GHC.Internal.Prim.neChar#"]
     kind: Declaration
     type: 'neChar# :: Char#
       -> Char# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltChar#
+    name: ["GHC.Prim.ltChar#", "GHC.Internal.Prim.ltChar#"]
     kind: Declaration
     type: 'ltChar# :: Char#
       -> Char# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leChar#
+    name: ["GHC.Prim.leChar#", "GHC.Internal.Prim.leChar#"]
     kind: Declaration
     type: 'leChar# :: Char#
       -> Char# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ord#
+    name: ["GHC.Prim.ord#", "GHC.Internal.Prim.ord#"]
     kind: Expression
     type: 'ord# :: Char# ->
       Int#'
     template: signed(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))
 - BlackBox:
-    name: GHC.Prim.*#
+    name: ["GHC.Prim.*#", "GHC.Internal.Prim.*#"]
     kind: Declaration
     type: '(*#) :: Int# ->
       Int# -> Int#'
@@ -53,7 +53,7 @@
         ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
       end block;
 - BlackBox:
-    name: GHC.Prim.remInt#
+    name: ["GHC.Prim.remInt#", "GHC.Internal.Prim.remInt#"]
     kind: Declaration
     type: 'remInt# :: Int#
       -> Int# -> Int#'
@@ -64,7 +64,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemInt#
+    name: ["GHC.Prim.quotRemInt#", "GHC.Internal.Prim.quotRemInt#"]
     kind: Declaration
     type: 'quotRemInt# ::
       Int# -> Int# -> (#Int#, Int##)'
@@ -76,87 +76,87 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.andI#
+    name: ["GHC.Prim.andI#", "GHC.Internal.Prim.andI#"]
     kind: Expression
     type: 'and# :: Int# ->
       Int# -> Int#'
     template: ~ARG[0] and ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.orI#
+    name: ["GHC.Prim.orI#", "GHC.Internal.Prim.orI#"]
     kind: Expression
     type: 'or# :: Int# ->
       Int# -> Int#'
     template: ~ARG[0] or ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.xorI#
+    name: ["GHC.Prim.xorI#", "GHC.Internal.Prim.xorI#"]
     kind: Expression
     type: 'xor# :: Int# ->
       Int# -> Int#'
     template: ~ARG[0] xor ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.notI#
+    name: ["GHC.Prim.notI#", "GHC.Internal.Prim.notI#"]
     kind: Expression
     type: 'not# :: Int# ->
       Int#'
     template: not ~ARG[0]
 - BlackBox:
-    name: GHC.Prim.negateInt#
+    name: ["GHC.Prim.negateInt#", "GHC.Internal.Prim.negateInt#"]
     kind: Expression
     type: 'negateInt# :: Int#
       -> Int#'
     template: -~ARG[0]
 - BlackBox:
-    name: GHC.Prim.>#
+    name: ["GHC.Prim.>#", "GHC.Internal.Prim.>#"]
     kind: Declaration
     type: '(>#) :: Int# ->
       Int# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.>=#
+    name: ["GHC.Prim.>=#", "GHC.Internal.Prim.>=#"]
     kind: Declaration
     type: '(>=#) :: Int# ->
       Int# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.==#
+    name: ["GHC.Prim.==#", "GHC.Internal.Prim.==#"]
     kind: Declaration
     type: '(==) :: Int# ->
       Int# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim./=#
+    name: ["GHC.Prim./=#", "GHC.Internal.Prim./=#"]
     kind: Declaration
     type: '(/=#) :: Int# ->
       Int# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.<#
+    name: ["GHC.Prim.<#", "GHC.Internal.Prim.<#"]
     kind: Declaration
     type: '(<#) :: Int# ->
       Int# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.<=#
+    name: ["GHC.Prim.<=#", "GHC.Internal.Prim.<=#"]
     kind: Declaration
     type: '(<=#) :: Int# ->
       Int# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.chr#
+    name: ["GHC.Prim.chr#", "GHC.Internal.Prim.chr#"]
     kind: Expression
     type: 'ord# :: Int# ->
       Chr#'
     template: resize(unsigned(std_logic_vector(~ARG[0])),21)
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.int2Word#
+    name: ["GHC.Prim.int2Word#", "GHC.Internal.Prim.int2Word#"]
     kind: Expression
     type: 'word2Int# :: Int#
       -> Word#'
     template: unsigned(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.uncheckedIShiftL#
+    name: ["GHC.Prim.uncheckedIShiftL#", "GHC.Internal.Prim.uncheckedIShiftL#"]
     kind: Declaration
     type: 'uncheckedIShiftL#
       :: Int# -> Int# -> Int#'
@@ -176,7 +176,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedIShiftRA#
+    name: ["GHC.Prim.uncheckedIShiftRA#", "GHC.Internal.Prim.uncheckedIShiftRA#"]
     kind: Declaration
     type: 'uncheckedIShiftRA#
       :: Int# -> Int# -> Int#'
@@ -196,7 +196,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedIShiftRL#
+    name: ["GHC.Prim.uncheckedIShiftRL#", "GHC.Internal.Prim.uncheckedIShiftRL#"]
     kind: Declaration
     type: 'uncheckedIShiftRL#
       :: Int# -> Int# -> Int#'
@@ -216,13 +216,13 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.timesWord#
+    name: ["GHC.Prim.timesWord#", "GHC.Internal.Prim.timesWord#"]
     kind: Expression
     type: 'timesWord# :: Word#
       -> Word# -> Word#'
     template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
 - BlackBox:
-    name: GHC.Prim.remWord#
+    name: ["GHC.Prim.remWord#", "GHC.Internal.Prim.remWord#"]
     kind: Declaration
     type: 'remWord# :: Word#
       -> Word# -> Word#'
@@ -233,7 +233,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemWord#
+    name: ["GHC.Prim.quotRemWord#", "GHC.Internal.Prim.quotRemWord#"]
     kind: Declaration
     type: 'quotRemWord# ::
       Word# -> Word# -> (#Word#, Word##)'
@@ -245,31 +245,31 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.and#
+    name: ["GHC.Prim.and#", "GHC.Internal.Prim.and#"]
     kind: Expression
     type: 'and# :: Word# ->
       Word# -> Word#'
     template: ~ARG[0] and ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.or#
+    name: ["GHC.Prim.or#", "GHC.Internal.Prim.or#"]
     kind: Expression
     type: 'or# :: Word# ->
       Word# -> Word#'
     template: ~ARG[0] or ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.xor#
+    name: ["GHC.Prim.xor#", "GHC.Internal.Prim.xor#"]
     kind: Expression
     type: 'xor# :: Word# ->
       Word# -> Word#'
     template: ~ARG[0] xor ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.not#
+    name: ["GHC.Prim.not#", "GHC.Internal.Prim.not#"]
     kind: Expression
     type: 'not# :: Word# ->
       Word#'
     template: not ~ARG[0]
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftL#
+    name: ["GHC.Prim.uncheckedShiftL#", "GHC.Internal.Prim.uncheckedShiftL#"]
     kind: Declaration
     type: 'uncheckedShiftL#
       :: Word# -> Int# -> Word#'
@@ -289,7 +289,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRL#
+    name: ["GHC.Prim.uncheckedShiftRL#", "GHC.Internal.Prim.uncheckedShiftRL#"]
     kind: Declaration
     type: 'uncheckedShiftR#
       :: Word# -> Int# -> Word#'
@@ -309,50 +309,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.word2Int#
+    name: ["GHC.Prim.word2Int#", "GHC.Internal.Prim.word2Int#"]
     kind: Expression
     type: 'word2Int# :: word#
       -> Int#'
     template: signed(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.gtWord#
+    name: ["GHC.Prim.gtWord#", "GHC.Internal.Prim.gtWord#"]
     kind: Declaration
     type: 'gtWord# :: Word#
       -> Word# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geWord#
+    name: ["GHC.Prim.geWord#", "GHC.Internal.Prim.geWord#"]
     kind: Declaration
     type: 'geWord# :: Word#
       -> Word# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.eqWord#
+    name: ["GHC.Prim.eqWord#", "GHC.Internal.Prim.eqWord#"]
     kind: Declaration
     type: 'eqWord# :: Word#
       -> Word# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neWord#
+    name: ["GHC.Prim.neWord#", "GHC.Internal.Prim.neWord#"]
     kind: Declaration
     type: 'neWord# :: Word#
       -> Word# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltWord#
+    name: ["GHC.Prim.ltWord#", "GHC.Internal.Prim.ltWord#"]
     kind: Declaration
     type: 'ltWord# :: Word#
       -> Word# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leWord#
+    name: ["GHC.Prim.leWord#", "GHC.Internal.Prim.leWord#"]
     kind: Declaration
     type: 'leWord# :: Word#
       -> Word# -> Int#'
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.popCnt8#
+    name: ["GHC.Prim.popCnt8#", "GHC.Internal.Prim.popCnt8#"]
     kind: Declaration
     type: 'popCnt8 :: Word#
       -> Word#'
@@ -392,7 +392,7 @@
       end block;
       -- popCnt8 end
 - BlackBox:
-    name: GHC.Prim.popCnt16#
+    name: ["GHC.Prim.popCnt16#", "GHC.Internal.Prim.popCnt16#"]
     kind: Declaration
     type: 'popCnt16 :: Word#
       -> Word#'
@@ -432,7 +432,7 @@
       end block;
       -- popCnt16 end
 - BlackBox:
-    name: GHC.Prim.popCnt32#
+    name: ["GHC.Prim.popCnt32#", "GHC.Internal.Prim.popCnt32#"]
     kind: Declaration
     type: 'popCnt32 :: Word#
       -> Word#'
@@ -472,7 +472,7 @@
       end block;
       -- popCnt32 end
 - BlackBox:
-    name: GHC.Prim.popCnt64#
+    name: ["GHC.Prim.popCnt64#", "GHC.Internal.Prim.popCnt64#"]
     kind: Declaration
     type: 'popCnt64 :: Word#
       -> Word#'
@@ -512,7 +512,7 @@
       end block;
       -- popCnt64 end
 - BlackBox:
-    name: GHC.Prim.popCnt#
+    name: ["GHC.Prim.popCnt#", "GHC.Internal.Prim.popCnt#"]
     kind: Declaration
     type: 'popCnt :: Word#
       -> Word#'
@@ -552,7 +552,7 @@
       end block;
       -- popCnt end
 - BlackBox:
-    name: GHC.Prim.clz8#
+    name: ["GHC.Prim.clz8#", "GHC.Internal.Prim.clz8#"]
     kind: Declaration
     type: 'clz8 :: Word# ->
       Word#'
@@ -594,7 +594,7 @@
       end block;
       -- clz8 end
 - BlackBox:
-    name: GHC.Prim.clz16#
+    name: ["GHC.Prim.clz16#", "GHC.Internal.Prim.clz16#"]
     kind: Declaration
     type: 'clz16 :: Word#
       -> Word#'
@@ -638,7 +638,7 @@
       end block;
       -- clz16 end
 - BlackBox:
-    name: GHC.Prim.clz32#
+    name: ["GHC.Prim.clz32#", "GHC.Internal.Prim.clz32#"]
     kind: Declaration
     type: 'clz32 :: Word#
       -> Word#'
@@ -684,7 +684,7 @@
       end block;
       -- clz32 end
 - BlackBox:
-    name: GHC.Prim.clz64#
+    name: ["GHC.Prim.clz64#", "GHC.Internal.Prim.clz64#"]
     kind: Declaration
     type: 'clz64 :: Word#
       -> Word#'
@@ -732,7 +732,7 @@
       end block;
       -- clz64 end
 - BlackBox:
-    name: GHC.Prim.clz#
+    name: ["GHC.Prim.clz#", "GHC.Internal.Prim.clz#"]
     kind: Declaration
     type: 'clz :: Word# ->
       Word#'
@@ -798,7 +798,7 @@
       end block;
       -- clz end
 - BlackBox:
-    name: GHC.Prim.ctz8#
+    name: ["GHC.Prim.ctz8#", "GHC.Internal.Prim.ctz8#"]
     kind: Declaration
     type: 'ctz8 :: Word# ->
       Word#'
@@ -849,7 +849,7 @@
       end block;
       -- ctz8 end
 - BlackBox:
-    name: GHC.Prim.ctz16#
+    name: ["GHC.Prim.ctz16#", "GHC.Internal.Prim.ctz16#"]
     kind: Declaration
     type: 'ctz16 :: Word#
       -> Word#'
@@ -902,7 +902,7 @@
       end block;
       -- ctz16 end
 - BlackBox:
-    name: GHC.Prim.ctz32#
+    name: ["GHC.Prim.ctz32#", "GHC.Internal.Prim.ctz32#"]
     kind: Declaration
     type: 'ctz32 :: Word#
       -> Word#'
@@ -957,7 +957,7 @@
       end block;
       -- ctz32 end
 - BlackBox:
-    name: GHC.Prim.ctz64#
+    name: ["GHC.Prim.ctz64#", "GHC.Internal.Prim.ctz64#"]
     kind: Declaration
     type: 'ctz64 :: Word#
       -> Word#'
@@ -1011,7 +1011,7 @@
       end block;
       -- ctz64 end
 - BlackBox:
-    name: GHC.Prim.ctz#
+    name: ["GHC.Prim.ctz#", "GHC.Internal.Prim.ctz#"]
     kind: Declaration
     type: 'ctz :: Word# ->
       Word#'
@@ -1083,7 +1083,7 @@
       end block;
       -- ctz end
 - BlackBox:
-    name: GHC.Prim.byteSwap16#
+    name: ["GHC.Prim.byteSwap16#", "GHC.Internal.Prim.byteSwap16#"]
     kind: Declaration
     type: 'byteSwap16# ::
       Word# -> Word#'
@@ -1094,7 +1094,7 @@
       -- byteSwap16 end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.byteSwap32#
+    name: ["GHC.Prim.byteSwap32#", "GHC.Internal.Prim.byteSwap32#"]
     kind: Declaration
     type: 'byteSwap32# ::
       Word# -> Word#'
@@ -1107,7 +1107,7 @@
       -- byteSwap32 end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.byteSwap64#
+    name: ["GHC.Prim.byteSwap64#", "GHC.Internal.Prim.byteSwap64#"]
     kind: Declaration
     type: 'byteSwap64# ::
       Word# -> Word#'
@@ -1120,7 +1120,7 @@
       -- byteSwap64 end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.byteSwap#
+    name: ["GHC.Prim.byteSwap#", "GHC.Internal.Prim.byteSwap#"]
     kind: Declaration
     type: 'byteSwap# :: Word#
       -> Word#'
@@ -1135,49 +1135,49 @@
       -- byteSwap end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.narrow8Int#
+    name: ["GHC.Prim.narrow8Int#", "GHC.Internal.Prim.narrow8Int#"]
     kind: Expression
     type: 'narrow8Int# ::
       Int# -> Int#'
     template: resize(~VAR[i][0](7 downto 0),~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.narrow16Int#
+    name: ["GHC.Prim.narrow16Int#", "GHC.Internal.Prim.narrow16Int#"]
     kind: Expression
     type: 'narrow16Int# ::
       Int# -> Int#'
     template: resize(~VAR[i][0](15 downto 0),~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.narrow32Int#
+    name: ["GHC.Prim.narrow32Int#", "GHC.Internal.Prim.narrow32Int#"]
     kind: Expression
     type: 'narrow32Int# ::
       Int# -> Int#'
     template: resize(~VAR[i][0](31 downto 0),~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.narrow8Word#
+    name: ["GHC.Prim.narrow8Word#", "GHC.Internal.Prim.narrow8Word#"]
     kind: Expression
     type: 'narrow8Word# ::
       Word# -> Word#'
     template: resize(~VAR[w][0](7 downto 0),~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.narrow16Word#
+    name: ["GHC.Prim.narrow16Word#", "GHC.Internal.Prim.narrow16Word#"]
     kind: Expression
     type: 'narrow16Word# ::
       Word# -> Word#'
     template: resize(~VAR[w][0](15 downto 0),~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.narrow32Word#
+    name: ["GHC.Prim.narrow32Word#", "GHC.Internal.Prim.narrow32Word#"]
     kind: Expression
     type: 'narrow32Word# ::
       Word# -> Word#'
     template: resize(~VAR[w][0](31 downto 0),~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.bitReverse#
+    name: ["GHC.Prim.bitReverse#", "GHC.Internal.Prim.bitReverse#"]
     kind: Declaration
     type: 'bitReverse# ::
       Word# -> Word#'
@@ -1190,7 +1190,7 @@
       -- bitReverse end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.bitReverse8#
+    name: ["GHC.Prim.bitReverse8#", "GHC.Internal.Prim.bitReverse8#"]
     kind: Declaration
     type: 'bitReverse8# ::
       Word# -> Word#'
@@ -1203,7 +1203,7 @@
       -- bitReverse8 end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.bitReverse16#
+    name: ["GHC.Prim.bitReverse16#", "GHC.Internal.Prim.bitReverse16#"]
     kind: Declaration
     type: 'bitReverse16# ::
       Word# -> Word#'
@@ -1216,7 +1216,7 @@
       -- bitReverse16 end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.bitReverse32#
+    name: ["GHC.Prim.bitReverse32#", "GHC.Internal.Prim.bitReverse32#"]
     kind: Declaration
     type: 'bitReverse32# ::
       Word# -> Word#'
@@ -1229,7 +1229,7 @@
       -- bitReverse32 end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.bitReverse64#
+    name: ["GHC.Prim.bitReverse64#", "GHC.Internal.Prim.bitReverse64#"]
     kind: Declaration
     type: 'bitReverse64# ::
       Word# -> Word#'
@@ -1242,7 +1242,7 @@
       -- bitReverse64 end
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.quotInt#
+    name: ["GHC.Prim.quotInt#", "GHC.Internal.Prim.quotInt#"]
     kind: Declaration
     type: 'quotInt# :: Int#
       -> Int# -> Int#'
@@ -1253,7 +1253,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotWord#
+    name: ["GHC.Prim.quotWord#", "GHC.Internal.Prim.quotWord#"]
     kind: Declaration
     type: 'quotWord# :: Word#
       -> Word# -> Word#'
@@ -1264,21 +1264,21 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.int8ToInt#
+    name: ["GHC.Prim.int8ToInt#", "GHC.Internal.Prim.int8ToInt#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.intToInt8#
+    name: ["GHC.Prim.intToInt8#", "GHC.Internal.Prim.intToInt8#"]
     kind: Expression
     template: ~VAR[i][0](7 downto 0)
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.negateInt8#
+    name: ["GHC.Prim.negateInt8#", "GHC.Internal.Prim.negateInt8#"]
     kind: Expression
     template: -~ARG[0]
 - BlackBox:
-    name: GHC.Prim.timesInt8#
+    name: ["GHC.Prim.timesInt8#", "GHC.Internal.Prim.timesInt8#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_mult][0] : block
@@ -1288,7 +1288,7 @@
         ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
       end block;
 - BlackBox:
-    name: GHC.Prim.quotInt8#
+    name: ["GHC.Prim.quotInt8#", "GHC.Internal.Prim.quotInt8#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -1297,7 +1297,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remInt8#
+    name: ["GHC.Prim.remInt8#", "GHC.Internal.Prim.remInt8#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -1306,7 +1306,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemInt8#
+    name: ["GHC.Prim.quotRemInt8#", "GHC.Internal.Prim.quotRemInt8#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -1315,7 +1315,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftLInt8#
+    name: ["GHC.Prim.uncheckedShiftLInt8#", "GHC.Internal.Prim.uncheckedShiftLInt8#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -1333,7 +1333,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRAInt8#
+    name: ["GHC.Prim.uncheckedShiftRAInt8#", "GHC.Internal.Prim.uncheckedShiftRAInt8#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftR][0] : block
@@ -1351,7 +1351,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRLInt8#
+    name: ["GHC.Prim.uncheckedShiftRLInt8#", "GHC.Internal.Prim.uncheckedShiftRLInt8#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -1369,50 +1369,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.int8ToWord8#
+    name: ["GHC.Prim.int8ToWord8#", "GHC.Internal.Prim.int8ToWord8#"]
     kind: Expression
     template: unsigned(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqInt8#
+    name: ["GHC.Prim.eqInt8#", "GHC.Internal.Prim.eqInt8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geInt8#
+    name: ["GHC.Prim.geInt8#", "GHC.Internal.Prim.geInt8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtInt8#
+    name: ["GHC.Prim.gtInt8#", "GHC.Internal.Prim.gtInt8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leInt8#
+    name: ["GHC.Prim.leInt8#", "GHC.Internal.Prim.leInt8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltInt8#
+    name: ["GHC.Prim.ltInt8#", "GHC.Internal.Prim.ltInt8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neInt8#
+    name: ["GHC.Prim.neInt8#", "GHC.Internal.Prim.neInt8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.word8ToWord#
+    name: ["GHC.Prim.word8ToWord#", "GHC.Internal.Prim.word8ToWord#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.wordToWord8#
+    name: ["GHC.Prim.wordToWord8#", "GHC.Internal.Prim.wordToWord8#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.timesWord8#
+    name: ["GHC.Prim.timesWord8#", "GHC.Internal.Prim.timesWord8#"]
     kind: Expression
     template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
 - BlackBox:
-    name: GHC.Prim.quotWord8#
+    name: ["GHC.Prim.quotWord8#", "GHC.Internal.Prim.quotWord8#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -1421,7 +1421,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remWord8#
+    name: ["GHC.Prim.remWord8#", "GHC.Internal.Prim.remWord8#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -1430,7 +1430,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemWord8#
+    name: ["GHC.Prim.quotRemWord8#", "GHC.Internal.Prim.quotRemWord8#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -1439,23 +1439,23 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.andWord8#
+    name: ["GHC.Prim.andWord8#", "GHC.Internal.Prim.andWord8#"]
     kind: Expression
     template: ~ARG[0] and ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.orWord8#
+    name: ["GHC.Prim.orWord8#", "GHC.Internal.Prim.orWord8#"]
     kind: Expression
     template: ~ARG[0] or ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.xorWord8#
+    name: ["GHC.Prim.xorWord8#", "GHC.Internal.Prim.xorWord8#"]
     kind: Expression
     template: ~ARG[0] xor ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.notWord8#
+    name: ["GHC.Prim.notWord8#", "GHC.Internal.Prim.notWord8#"]
     kind: Expression
     template: not ~ARG[0]
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftLWord8#
+    name: ["GHC.Prim.uncheckedShiftLWord8#", "GHC.Internal.Prim.uncheckedShiftLWord8#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -1473,7 +1473,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRLWord8#
+    name: ["GHC.Prim.uncheckedShiftRLWord8#", "GHC.Internal.Prim.uncheckedShiftRLWord8#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -1491,50 +1491,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.word8ToInt8#
+    name: ["GHC.Prim.word8ToInt8#", "GHC.Internal.Prim.word8ToInt8#"]
     kind: Expression
     template: signed(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqWord8#
+    name: ["GHC.Prim.eqWord8#", "GHC.Internal.Prim.eqWord8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geWord8#
+    name: ["GHC.Prim.geWord8#", "GHC.Internal.Prim.geWord8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtWord8#
+    name: ["GHC.Prim.gtWord8#", "GHC.Internal.Prim.gtWord8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leWord8#
+    name: ["GHC.Prim.leWord8#", "GHC.Internal.Prim.leWord8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltWord8#
+    name: ["GHC.Prim.ltWord8#", "GHC.Internal.Prim.ltWord8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neWord8#
+    name: ["GHC.Prim.neWord8#", "GHC.Internal.Prim.neWord8#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.int16ToInt#
+    name: ["GHC.Prim.int16ToInt#", "GHC.Internal.Prim.int16ToInt#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.intToInt16#
+    name: ["GHC.Prim.intToInt16#", "GHC.Internal.Prim.intToInt16#"]
     kind: Expression
     template: ~VAR[i][0](15 downto 0)
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.negateInt16#
+    name: ["GHC.Prim.negateInt16#", "GHC.Internal.Prim.negateInt16#"]
     kind: Expression
     template: -~ARG[0]
 - BlackBox:
-    name: GHC.Prim.timesInt16#
+    name: ["GHC.Prim.timesInt16#", "GHC.Internal.Prim.timesInt16#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_mult][0] : block
@@ -1544,7 +1544,7 @@
         ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
       end block;
 - BlackBox:
-    name: GHC.Prim.quotInt16#
+    name: ["GHC.Prim.quotInt16#", "GHC.Internal.Prim.quotInt16#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -1553,7 +1553,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remInt16#
+    name: ["GHC.Prim.remInt16#", "GHC.Internal.Prim.remInt16#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -1562,7 +1562,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemInt16#
+    name: ["GHC.Prim.quotRemInt16#", "GHC.Internal.Prim.quotRemInt16#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -1571,7 +1571,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftLInt16#
+    name: ["GHC.Prim.uncheckedShiftLInt16#", "GHC.Internal.Prim.uncheckedShiftLInt16#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -1589,7 +1589,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRAInt16#
+    name: ["GHC.Prim.uncheckedShiftRAInt16#", "GHC.Internal.Prim.uncheckedShiftRAInt16#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftR][0] : block
@@ -1607,7 +1607,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRLInt16#
+    name: ["GHC.Prim.uncheckedShiftRLInt16#", "GHC.Internal.Prim.uncheckedShiftRLInt16#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -1625,50 +1625,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.int16ToWord16#
+    name: ["GHC.Prim.int16ToWord16#", "GHC.Internal.Prim.int16ToWord16#"]
     kind: Expression
     template: unsigned(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqInt16#
+    name: ["GHC.Prim.eqInt16#", "GHC.Internal.Prim.eqInt16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geInt16#
+    name: ["GHC.Prim.geInt16#", "GHC.Internal.Prim.geInt16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtInt16#
+    name: ["GHC.Prim.gtInt16#", "GHC.Internal.Prim.gtInt16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leInt16#
+    name: ["GHC.Prim.leInt16#", "GHC.Internal.Prim.leInt16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltInt16#
+    name: ["GHC.Prim.ltInt16#", "GHC.Internal.Prim.ltInt16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neInt16#
+    name: ["GHC.Prim.neInt16#", "GHC.Internal.Prim.neInt16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.word16ToWord#
+    name: ["GHC.Prim.word16ToWord#", "GHC.Internal.Prim.word16ToWord#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.wordToWord16#
+    name: ["GHC.Prim.wordToWord16#", "GHC.Internal.Prim.wordToWord16#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.timesWord16#
+    name: ["GHC.Prim.timesWord16#", "GHC.Internal.Prim.timesWord16#"]
     kind: Expression
     template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
 - BlackBox:
-    name: GHC.Prim.quotWord16#
+    name: ["GHC.Prim.quotWord16#", "GHC.Internal.Prim.quotWord16#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -1677,7 +1677,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remWord16#
+    name: ["GHC.Prim.remWord16#", "GHC.Internal.Prim.remWord16#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -1686,7 +1686,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemWord16#
+    name: ["GHC.Prim.quotRemWord16#", "GHC.Internal.Prim.quotRemWord16#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -1695,23 +1695,23 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.andWord16#
+    name: ["GHC.Prim.andWord16#", "GHC.Internal.Prim.andWord16#"]
     kind: Expression
     template: ~ARG[0] and ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.orWord16#
+    name: ["GHC.Prim.orWord16#", "GHC.Internal.Prim.orWord16#"]
     kind: Expression
     template: ~ARG[0] or ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.xorWord16#
+    name: ["GHC.Prim.xorWord16#", "GHC.Internal.Prim.xorWord16#"]
     kind: Expression
     template: ~ARG[0] xor ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.notWord16#
+    name: ["GHC.Prim.notWord16#", "GHC.Internal.Prim.notWord16#"]
     kind: Expression
     template: not ~ARG[0]
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftLWord16#
+    name: ["GHC.Prim.uncheckedShiftLWord16#", "GHC.Internal.Prim.uncheckedShiftLWord16#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -1729,7 +1729,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRLWord16#
+    name: ["GHC.Prim.uncheckedShiftRLWord16#", "GHC.Internal.Prim.uncheckedShiftRLWord16#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -1747,50 +1747,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.word16ToInt16#
+    name: ["GHC.Prim.word16ToInt16#", "GHC.Internal.Prim.word16ToInt16#"]
     kind: Expression
     template: signed(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqWord16#
+    name: ["GHC.Prim.eqWord16#", "GHC.Internal.Prim.eqWord16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geWord16#
+    name: ["GHC.Prim.geWord16#", "GHC.Internal.Prim.geWord16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtWord16#
+    name: ["GHC.Prim.gtWord16#", "GHC.Internal.Prim.gtWord16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leWord16#
+    name: ["GHC.Prim.leWord16#", "GHC.Internal.Prim.leWord16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltWord16#
+    name: ["GHC.Prim.ltWord16#", "GHC.Internal.Prim.ltWord16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neWord16#
+    name: ["GHC.Prim.neWord16#", "GHC.Internal.Prim.neWord16#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.int32ToInt#
+    name: ["GHC.Prim.int32ToInt#", "GHC.Internal.Prim.int32ToInt#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.intToInt32#
+    name: ["GHC.Prim.intToInt32#", "GHC.Internal.Prim.intToInt32#"]
     kind: Expression
     template: ~VAR[i][0](31 downto 0)
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.negateInt32#
+    name: ["GHC.Prim.negateInt32#", "GHC.Internal.Prim.negateInt32#"]
     kind: Expression
     template: -~ARG[0]
 - BlackBox:
-    name: GHC.Prim.timesInt32#
+    name: ["GHC.Prim.timesInt32#", "GHC.Internal.Prim.timesInt32#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_mult][0] : block
@@ -1800,7 +1800,7 @@
         ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
       end block;
 - BlackBox:
-    name: GHC.Prim.quotInt32#
+    name: ["GHC.Prim.quotInt32#", "GHC.Internal.Prim.quotInt32#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -1809,7 +1809,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remInt32#
+    name: ["GHC.Prim.remInt32#", "GHC.Internal.Prim.remInt32#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -1818,7 +1818,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemInt32#
+    name: ["GHC.Prim.quotRemInt32#", "GHC.Internal.Prim.quotRemInt32#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -1827,7 +1827,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftLInt32#
+    name: ["GHC.Prim.uncheckedShiftLInt32#", "GHC.Internal.Prim.uncheckedShiftLInt32#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -1845,7 +1845,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRAInt32#
+    name: ["GHC.Prim.uncheckedShiftRAInt32#", "GHC.Internal.Prim.uncheckedShiftRAInt32#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftR][0] : block
@@ -1863,7 +1863,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRLInt32#
+    name: ["GHC.Prim.uncheckedShiftRLInt32#", "GHC.Internal.Prim.uncheckedShiftRLInt32#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -1881,50 +1881,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.int32ToWord32#
+    name: ["GHC.Prim.int32ToWord32#", "GHC.Internal.Prim.int32ToWord32#"]
     kind: Expression
     template: unsigned(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqInt32#
+    name: ["GHC.Prim.eqInt32#", "GHC.Internal.Prim.eqInt32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geInt32#
+    name: ["GHC.Prim.geInt32#", "GHC.Internal.Prim.geInt32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtInt32#
+    name: ["GHC.Prim.gtInt32#", "GHC.Internal.Prim.gtInt32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leInt32#
+    name: ["GHC.Prim.leInt32#", "GHC.Internal.Prim.leInt32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltInt32#
+    name: ["GHC.Prim.ltInt32#", "GHC.Internal.Prim.ltInt32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neInt32#
+    name: ["GHC.Prim.neInt32#", "GHC.Internal.Prim.neInt32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.word32ToWord#
+    name: ["GHC.Prim.word32ToWord#", "GHC.Internal.Prim.word32ToWord#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.wordToWord32#
+    name: ["GHC.Prim.wordToWord32#", "GHC.Internal.Prim.wordToWord32#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.timesWord32#
+    name: ["GHC.Prim.timesWord32#", "GHC.Internal.Prim.timesWord32#"]
     kind: Expression
     template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
 - BlackBox:
-    name: GHC.Prim.quotWord32#
+    name: ["GHC.Prim.quotWord32#", "GHC.Internal.Prim.quotWord32#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -1933,7 +1933,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remWord32#
+    name: ["GHC.Prim.remWord32#", "GHC.Internal.Prim.remWord32#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -1942,7 +1942,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemWord32#
+    name: ["GHC.Prim.quotRemWord32#", "GHC.Internal.Prim.quotRemWord32#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -1951,23 +1951,23 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.andWord32#
+    name: ["GHC.Prim.andWord32#", "GHC.Internal.Prim.andWord32#"]
     kind: Expression
     template: ~ARG[0] and ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.orWord32#
+    name: ["GHC.Prim.orWord32#", "GHC.Internal.Prim.orWord32#"]
     kind: Expression
     template: ~ARG[0] or ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.xorWord32#
+    name: ["GHC.Prim.xorWord32#", "GHC.Internal.Prim.xorWord32#"]
     kind: Expression
     template: ~ARG[0] xor ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.notWord32#
+    name: ["GHC.Prim.notWord32#", "GHC.Internal.Prim.notWord32#"]
     kind: Expression
     template: not ~ARG[0]
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftLWord32#
+    name: ["GHC.Prim.uncheckedShiftLWord32#", "GHC.Internal.Prim.uncheckedShiftLWord32#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -1985,7 +1985,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRLWord32#
+    name: ["GHC.Prim.uncheckedShiftRLWord32#", "GHC.Internal.Prim.uncheckedShiftRLWord32#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -2003,50 +2003,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.word32ToInt32#
+    name: ["GHC.Prim.word32ToInt32#", "GHC.Internal.Prim.word32ToInt32#"]
     kind: Expression
     template: signed(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqWord32#
+    name: ["GHC.Prim.eqWord32#", "GHC.Internal.Prim.eqWord32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geWord32#
+    name: ["GHC.Prim.geWord32#", "GHC.Internal.Prim.geWord32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtWord32#
+    name: ["GHC.Prim.gtWord32#", "GHC.Internal.Prim.gtWord32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leWord32#
+    name: ["GHC.Prim.leWord32#", "GHC.Internal.Prim.leWord32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltWord32#
+    name: ["GHC.Prim.ltWord32#", "GHC.Internal.Prim.ltWord32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neWord32#
+    name: ["GHC.Prim.neWord32#", "GHC.Internal.Prim.neWord32#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.int64ToInt#
+    name: ["GHC.Prim.int64ToInt#", "GHC.Internal.Prim.int64ToInt#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.intToInt64#
+    name: ["GHC.Prim.intToInt64#", "GHC.Internal.Prim.intToInt64#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.negateInt64#
+    name: ["GHC.Prim.negateInt64#", "GHC.Internal.Prim.negateInt64#"]
     kind: Expression
     template: -~ARG[0]
 - BlackBox:
-    name: GHC.Prim.timesInt64#
+    name: ["GHC.Prim.timesInt64#", "GHC.Internal.Prim.timesInt64#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_mult][0] : block
@@ -2056,7 +2056,7 @@
         ~RESULT <= ~SYM[1](~SIZE[~TYPO]-1 downto 0);
       end block;
 - BlackBox:
-    name: GHC.Prim.quotInt64#
+    name: ["GHC.Prim.quotInt64#", "GHC.Internal.Prim.quotInt64#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -2065,7 +2065,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remInt64#
+    name: ["GHC.Prim.remInt64#", "GHC.Internal.Prim.remInt64#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -2074,7 +2074,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemInt64#
+    name: ["GHC.Prim.quotRemInt64#", "GHC.Internal.Prim.quotRemInt64#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -2083,7 +2083,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.uncheckedIShiftL64#
+    name: ["GHC.Prim.uncheckedIShiftL64#", "GHC.Internal.Prim.uncheckedIShiftL64#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -2101,7 +2101,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedIShiftRA64#
+    name: ["GHC.Prim.uncheckedIShiftRA64#", "GHC.Internal.Prim.uncheckedIShiftRA64#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftR][0] : block
@@ -2119,7 +2119,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedIShiftRL64#
+    name: ["GHC.Prim.uncheckedIShiftRL64#", "GHC.Internal.Prim.uncheckedIShiftRL64#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -2137,50 +2137,50 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.int64ToWord64#
+    name: ["GHC.Prim.int64ToWord64#", "GHC.Internal.Prim.int64ToWord64#"]
     kind: Expression
     template: unsigned(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqInt64#
+    name: ["GHC.Prim.eqInt64#", "GHC.Internal.Prim.eqInt64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geInt64#
+    name: ["GHC.Prim.geInt64#", "GHC.Internal.Prim.geInt64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtInt64#
+    name: ["GHC.Prim.gtInt64#", "GHC.Internal.Prim.gtInt64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leInt64#
+    name: ["GHC.Prim.leInt64#", "GHC.Internal.Prim.leInt64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltInt64#
+    name: ["GHC.Prim.ltInt64#", "GHC.Internal.Prim.ltInt64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neInt64#
+    name: ["GHC.Prim.neInt64#", "GHC.Internal.Prim.neInt64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.word64ToWord#
+    name: ["GHC.Prim.word64ToWord#", "GHC.Internal.Prim.word64ToWord#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.wordToWord64#
+    name: ["GHC.Prim.wordToWord64#", "GHC.Internal.Prim.wordToWord64#"]
     kind: Expression
     template: resize(~ARG[0],~SIZE[~TYPO])
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.timesWord64#
+    name: ["GHC.Prim.timesWord64#", "GHC.Internal.Prim.timesWord64#"]
     kind: Expression
     template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
 - BlackBox:
-    name: GHC.Prim.quotWord64#
+    name: ["GHC.Prim.quotWord64#", "GHC.Internal.Prim.quotWord64#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] / ~ARG[1]
@@ -2189,7 +2189,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.remWord64#
+    name: ["GHC.Prim.remWord64#", "GHC.Internal.Prim.remWord64#"]
     kind: Declaration
     template: |-
       ~RESULT <= ~ARG[0] rem ~ARG[1]
@@ -2198,7 +2198,7 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.quotRemWord64#
+    name: ["GHC.Prim.quotRemWord64#", "GHC.Internal.Prim.quotRemWord64#"]
     kind: Declaration
     template: |-
       ~RESULT <= (~ARG[0] / ~ARG[1], ~ARG[0] rem ~ARG[1])
@@ -2207,23 +2207,23 @@
           -- pragma translate_on
           ;
 - BlackBox:
-    name: GHC.Prim.and64#
+    name: ["GHC.Prim.and64#", "GHC.Internal.Prim.and64#"]
     kind: Expression
     template: ~ARG[0] and ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.or64#
+    name: ["GHC.Prim.or64#", "GHC.Internal.Prim.or64#"]
     kind: Expression
     template: ~ARG[0] or ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.xor64#
+    name: ["GHC.Prim.xor64#", "GHC.Internal.Prim.xor64#"]
     kind: Expression
     template: ~ARG[0] xor ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.not64#
+    name: ["GHC.Prim.not64#", "GHC.Internal.Prim.not64#"]
     kind: Expression
     template: not ~ARG[0]
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftL64#
+    name: ["GHC.Prim.uncheckedShiftL64#", "GHC.Internal.Prim.uncheckedShiftL64#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftL][0] : block
@@ -2241,7 +2241,7 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.uncheckedShiftRL64#
+    name: ["GHC.Prim.uncheckedShiftRL64#", "GHC.Internal.Prim.uncheckedShiftRL64#"]
     kind: Declaration
     template: |-
       ~GENSYM[~RESULT_shiftRL][0] : block
@@ -2259,31 +2259,31 @@
             ;
       end block;
 - BlackBox:
-    name: GHC.Prim.word64ToInt64#
+    name: ["GHC.Prim.word64ToInt64#", "GHC.Internal.Prim.word64ToInt64#"]
     kind: Expression
     template: signed(std_logic_vector(~ARG[0]))
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.eqWord64#
+    name: ["GHC.Prim.eqWord64#", "GHC.Internal.Prim.eqWord64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.geWord64#
+    name: ["GHC.Prim.geWord64#", "GHC.Internal.Prim.geWord64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.gtWord64#
+    name: ["GHC.Prim.gtWord64#", "GHC.Internal.Prim.gtWord64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.leWord64#
+    name: ["GHC.Prim.leWord64#", "GHC.Internal.Prim.leWord64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.ltWord64#
+    name: ["GHC.Prim.ltWord64#", "GHC.Internal.Prim.ltWord64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
 - BlackBox:
-    name: GHC.Prim.neWord64#
+    name: ["GHC.Prim.neWord64#", "GHC.Internal.Prim.neWord64#"]
     kind: Declaration
     template: ~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);
