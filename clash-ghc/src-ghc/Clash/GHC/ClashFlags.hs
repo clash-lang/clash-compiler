@@ -87,6 +87,7 @@ flagsClash r = [
   , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
+  , defFlag "fclash-debug-manifest-hash"         $ NoArg (liftEwM (setDebugManifestHash r))
   ]
 
 -- | Print deprecated flag warning
@@ -341,3 +342,6 @@ setNoRenderEnums r = modifyIORef r (\c -> c { opt_renderEnums = False })
 
 setNoConcurrentTopEntities :: IORef ClashOpts -> IO ()
 setNoConcurrentTopEntities r = modifyIORef r (\c -> c { opt_concurrentTopEntities = False })
+
+setDebugManifestHash :: IORef ClashOpts -> IO ()
+setDebugManifestHash r = modifyIORef r (\c -> c { opt_debugManifestHash = True })

@@ -394,7 +394,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
   -- Get manifest file if cache is not stale and caching is enabled. This is used
   -- to prevent unnecessary recompilation.
   clashModDate <- getClashModificationDate
-  (userModifications, maybeManifest, topHash) <-
+  (userModifications, maybeManifest, topHashWithSubHashes) <-
     readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
 
   let topEntityNames = map topId (eltsVarEnv topEntityMap)
@@ -492,7 +492,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         manifest =
           mkManifest
             hdlState' domainConfs opts topComponent components depIds
-            filesAndDigests1 topHash
+            filesAndDigests1 topHashWithSubHashes
       writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime

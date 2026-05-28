@@ -62,10 +62,20 @@ genPort =
     <*> Q.elements [False, True]
     <*> coerce @(Q.Gen (Maybe ArbitraryText)) Q.arbitrary
 
+genDebugSubHashes :: Q.Gen DebugSubHashes
+genDebugSubHashes =
+  DebugSubHashes
+    <$> genDigest
+    <*> genDigest
+    <*> genDigest
+    <*> genDigest
+    <*> genDigest
+
 genManifest :: Q.Gen Manifest
 genManifest =
   Manifest
     <$> genDigest -- hash
+    <*> Q.oneof [pure Nothing, Just <$> genDebugSubHashes] -- __debug_hash
     <*> Q.arbitrary -- flags
     <*> Q.listOf genPort -- ports
     <*> coerce @(Q.Gen [ArbitraryText]) @(Q.Gen [Text]) Q.arbitrary -- comp names
