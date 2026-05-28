@@ -34,6 +34,9 @@ module Clash.Sized.BitVector
   , (.<<+)
     -- ** Pattern matching
   , bitPattern
+    -- * Type-level error messages
+  , BitPositiveLiteralError
+  , BitVectorPositiveLiteralError
   )
 where
 

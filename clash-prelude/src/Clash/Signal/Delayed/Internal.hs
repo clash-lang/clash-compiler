@@ -7,6 +7,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -38,6 +39,14 @@ import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import GHC.TypeLits               (Nat, type (+))
 import Language.Haskell.TH.Syntax (Lift)
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral
+  , CheckedPositiveRationalLiteral
+  )
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import Clash.Promoted.Nat         (SNat)
@@ -106,6 +115,22 @@ newtype DSignal (dom :: Domain) (delay :: Nat) a =
             }
   deriving ( Show, Default, Functor, Applicative, Num, Fractional
            , Foldable, Traversable, Arbitrary, CoArbitrary, Lift )
+
+instance
+  (CheckedPositiveIntegerLiteral lit a) =>
+  CheckedPositiveIntegerLiteral lit (DSignal dom delay a)
+
+instance
+  (CheckedNegativeIntegerLiteral lit a) =>
+  CheckedNegativeIntegerLiteral lit (DSignal dom delay a)
+
+instance
+  (CheckedPositiveRationalLiteral str num den a) =>
+  CheckedPositiveRationalLiteral str num den (DSignal dom delay a)
+
+instance
+  (CheckedNegativeRationalLiteral str num den a) =>
+  CheckedNegativeRationalLiteral str num den (DSignal dom delay a)
 
 -- | Create a 'DSignal' from a list
 --

@@ -6,6 +6,8 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -25,6 +27,14 @@ import Data.Function (on)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, type (+))
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral
+  , CheckedPositiveIntegerLiteral
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral
+  , CheckedPositiveRationalLiteral
+  )
 
 import Clash.Class.BitPack (BitPack(..))
 import Clash.Class.Num (SaturationMode(SatWrap, SatZero), SaturatingNum(..))
@@ -54,6 +64,22 @@ toOverflowing x = Overflowing x False
 -- | Reset the overflow status flag to False.
 clearOverflow :: Overflowing a -> Overflowing a
 clearOverflow x = x { hasOverflowed = False }
+
+instance
+  (CheckedPositiveIntegerLiteral lit a) =>
+  CheckedPositiveIntegerLiteral lit (Overflowing a)
+
+instance
+  (CheckedNegativeIntegerLiteral lit a) =>
+  CheckedNegativeIntegerLiteral lit (Overflowing a)
+
+instance
+  (CheckedPositiveRationalLiteral str num den a) =>
+  CheckedPositiveRationalLiteral str num den (Overflowing a)
+
+instance
+  (CheckedNegativeRationalLiteral str num den a) =>
+  CheckedNegativeRationalLiteral str num den (Overflowing a)
 
 instance (Eq a) => Eq (Overflowing a) where
   {-# INLINE (==) #-}
