@@ -281,15 +281,8 @@ let
     ];
 in
 {
-  # This patch can be removed once verilator 5.048 has reached nixpkgs.
-  verilator = prev.verilator.overrideAttrs (old: {
-    patches = prev.lib.unique ((old.patches or [ ]) ++ [
-      ./verilator-fix-side-effect-loss-when-slicing-astexprstmt-array-expressions.patch
-    ]);
-  });
-
-  # gnat13 which si the default as of 11.03.2026 does not support aarch64
-  # but ghdl-llvm works fine with gnat14 sos witch to it.
+  # gnat13 which is the default as of 11.03.2026 does not support aarch64
+  # but ghdl-llvm works fine with gnat14 which does support aarch64.
   ghdl-llvm = prev.ghdl-llvm.override { gnat = prev.gnat14; };
 
   "clashPackages-${compilerVersion}" =
