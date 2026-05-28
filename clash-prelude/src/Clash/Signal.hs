@@ -1739,14 +1739,12 @@ fromListWithReset = hideReset E.fromListWithReset
 
 -- | Build an 'Automaton' from a function over 'Signal's.
 --
--- __NB__: Consumption of continuation of the 'Automaton' must be affine; that
--- is, you can only apply the continuation associated with a particular element
--- at most once.
+-- __NB__: Each continuation function must be called at most once.
 signalAutomaton
   :: forall dom a b
    . KnownDomain dom
   => (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
-  -> Automaton (->) a b
+  -> IO (Automaton (->) a b)
 signalAutomaton f0 =
   let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
   E.signalAutomaton f1

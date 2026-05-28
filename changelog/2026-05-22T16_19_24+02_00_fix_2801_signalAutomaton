@@ -1,0 +1,1 @@
+FIXED: `signalAutomaton` now allocates fresh mutable simulation state in `IO`, preventing separate simulations from accidentally sharing continuations. See [#2801](https://github.com/clash-lang/clash-compiler/issues/2801).

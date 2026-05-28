@@ -405,6 +405,7 @@ test-suite unittests
       clash-prelude,
       checked-literals,
 
+      arrows,
       ghc-typelits-knownnat,
       ghc-typelits-natnormalise,
       ghc-typelits-extra,
