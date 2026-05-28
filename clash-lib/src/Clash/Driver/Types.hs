@@ -404,6 +404,14 @@ data ClashOpts = ClashOpts
   -- investigating bugs, because it will make log output deterministic.
   --
   -- Command line flag: -fclash-no-concurrent-topentity-compilation
+  , opt_debugManifestHash :: Bool
+  -- ^ Emit a @__debug_hash@ field in @clash-manifest.json@ containing the
+  -- SHA256 of each input that feeds into the top-level @hash@. This is a
+  -- debugging aid for diagnosing cache misses across builds that produce
+  -- identical HDL: diffing two manifests' @__debug_hash@ fields reveals
+  -- /which/ input changed.
+  --
+  -- Command line flag: -fclash-debug-manifest-hash
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
 
@@ -444,6 +452,7 @@ defClashOpts
   --      https://github.com/clash-lang/clash-compiler/issues/2762.
   , opt_ignoreBrokenGhcs    = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
   , opt_concurrentTopEntities = True
+  , opt_debugManifestHash   = False
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

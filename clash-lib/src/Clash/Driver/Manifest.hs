@@ -125,11 +125,35 @@ newtype FilesManifest = FilesManifest [(FilePath, ByteString)]
 instance FromJSON FilesManifest where
   parseJSON = Aeson.withObject "FilesManifest" $ fmap FilesManifest . parseFiles
 
+-- | Per-input subhashes of the @manifestHash@. Exposed as @__debug_hash@ in
+-- the JSON manifest purely as a debugging aid: when two manifests disagree on
+-- @hash@, comparing these fields tells you *which* input changed. The leading
+-- double underscore and @debug@ in the name signal that downstream tools
+-- should not rely on these — their existence, names, and contents may change
+-- between Clash versions.
+data DebugSubHashes = DebugSubHashes
+  { dshTops :: ByteString
+    -- ^ Hash of the full @[TopEntityT]@ list discovered in the design.
+  , dshPrimMap :: ByteString
+    -- ^ Hash of the compiled primitive map.
+  , dshClashModDate :: ByteString
+    -- ^ Hash of the @clash@ executable's modification time.
+  , dshCallGraph :: ByteString
+    -- ^ Hash of the call-graph closure of the top entity (i.e., the bindings
+    -- that actually contribute to the generated HDL).
+  , dshOpts :: ByteString
+    -- ^ Hash of the (HDL-affecting subset of the) 'ClashOpts'.
+  } deriving (Show, Read, Eq)
+
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
   = Manifest
   { manifestHash :: ByteString
     -- ^ Hash digest of the TopEntity and all its dependencies.
+  , manifestDebugSubHashes :: Maybe DebugSubHashes
+    -- ^ Per-input subhashes that feed into 'manifestHash'. Debug-only — see
+    -- 'DebugSubHashes'. 'Nothing' when reading an older manifest that
+    -- predates this field.
   , successFlags  :: (Int, Int)
     -- ^ Compiler flags used to achieve successful compilation:
     --
@@ -163,12 +187,36 @@ data Manifest
     -- on any component listed before it, but not after it.
   } deriving (Show,Read,Eq)
 
+-- | JSON shape for 'DebugSubHashes'. All values are hex-encoded SHA256 digests.
+instance ToJSON DebugSubHashes where
+  toJSON DebugSubHashes{..} = Aeson.object
+    [ "tops" .= toHexDigest dshTops
+    , "prim_map" .= toHexDigest dshPrimMap
+    , "clash_mod_date" .= toHexDigest dshClashModDate
+    , "call_graph" .= toHexDigest dshCallGraph
+    , "opts" .= toHexDigest dshOpts
+    ]
+
+instance FromJSON DebugSubHashes where
+  parseJSON = Aeson.withObject "DebugSubHashes" $ \v ->
+    DebugSubHashes
+      -- See Note [Failed hex digest decodes]
+      <$> (unsafeFromHexDigest <$> v .: "tops")
+      <*> (unsafeFromHexDigest <$> v .: "prim_map")
+      <*> (unsafeFromHexDigest <$> v .: "clash_mod_date")
+      <*> (unsafeFromHexDigest <$> v .: "call_graph")
+      <*> (unsafeFromHexDigest <$> v .: "opts")
+
 instance ToJSON Manifest where
   toJSON (Manifest{..}) =
-    Aeson.object
+    Aeson.object $
       [ "version" .= ("unstable" :: Text)
       , "hash" .= toHexDigest manifestHash
-      , "flags" .= successFlags
+      ] <>
+      (case manifestDebugSubHashes of
+        Just sh -> ["__debug_hash" .= sh]
+        Nothing -> []) <>
+      [ "flags" .= successFlags
         -- TODO: add nested ports (i.e., how Clash split/filtered arguments)
       , "components" .= componentNames
       , "top_component" .= Aeson.object
@@ -236,6 +284,7 @@ instance FromJSON Manifest where
       Manifest
             -- See Note [Failed hex digest decodes]
         <$> (unsafeFromHexDigest <$> v .: "hash")
+        <*> v .:? "__debug_hash"
         <*> v .: "flags"
         <*> (topComponent >>= (.: "ports_flat"))
         <*> v .: "components"
@@ -309,12 +358,13 @@ mkManifest ::
   [Id] ->
   -- | Files and  their hashes
   [(FilePath, ByteString)] ->
-  -- | Hash returned by 'readFreshManifest'
-  ByteString ->
+  -- | Hash and per-input subhashes returned by 'readFreshManifest'
+  (ByteString, DebugSubHashes) ->
   -- | New manifest
   Manifest
-mkManifest backend domains ClashOpts{..} Component{..} components deps files topHash = Manifest
+mkManifest backend domains ClashOpts{..} Component{..} components deps files (topHash, subHashes) = Manifest
   { manifestHash = topHash
+  , manifestDebugSubHashes = if opt_debugManifestHash then Just subHashes else Nothing
   , ports = inPorts <> inOutPorts <> outPorts
   , componentNames = map Id.toText compNames
   , topComponent = Id.toText componentName
@@ -378,8 +428,9 @@ readFreshManifest ::
   -- | Path to manifest file.
   FilePath ->
   -- | ( Nothing if no manifest file was found
-  --   , Nothing on stale cache, disabled cache, or not manifest file found )
-  IO (Maybe [UnexpectedModification], Maybe Manifest, ByteString)
+  --   , Nothing on stale cache, disabled cache, or not manifest file found
+  --   , Top-level hash plus per-input subhashes used to derive it )
+  IO (Maybe [UnexpectedModification], Maybe Manifest, (ByteString, DebugSubHashes))
 readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashModDate path = do
   modificationsM <- traverse (isUserModified path) =<< readManifest path
 
@@ -387,7 +438,7 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
   pure
     ( modificationsM
     , checkManifest =<< if opt_cachehdl then manifestM else Nothing
-    , topHash
+    , (topHash, subHashes)
     )
 
  where
@@ -433,12 +484,25 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
 
   -- TODO: Binary encoding does not account for alpha equivalence (nor should
   --       it?), so the cache behaves more pessimisticly than it could.
+  --
+  -- Compute each input's digest independently so that they can be surfaced
+  -- via 'manifestDebugSubHashes'. The top-level hash is then a digest of the
+  -- subhashes — keeping it a deterministic function of the same inputs while
+  -- making it mechanically obvious which input changed between two runs.
+  subHashes = DebugSubHashes
+    { dshTops = Sha256.hashlazy (Binary.encode tops)
+    , dshPrimMap = Sha256.hashlazy (Binary.encode (hashCompiledPrimMap primMap))
+    , dshClashModDate = Sha256.hashlazy (Binary.encode (show clashModDate))
+    , dshCallGraph = Sha256.hashlazy (Binary.encode (callGraphBindings bindingsMap topId))
+    , dshOpts = Sha256.hashlazy (Binary.encode optsHash)
+    }
+
   topHash = Sha256.hashlazy $ Binary.encode
-    ( tops
-    , hashCompiledPrimMap primMap
-    , show clashModDate
-    , callGraphBindings bindingsMap topId
-    , optsHash
+    ( dshTops subHashes
+    , dshPrimMap subHashes
+    , dshClashModDate subHashes
+    , dshCallGraph subHashes
+    , dshOpts subHashes
     )
 
   checkManifest manifest@Manifest{manifestHash,successFlags}
