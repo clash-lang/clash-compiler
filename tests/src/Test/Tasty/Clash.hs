@@ -212,6 +212,8 @@ commonArgs =
   [ "-fclash-debug", "DebugSilent"
   , "-fclash-ignore-broken-ghcs"
   , "-Werror=unrecognised-pragmas"
+  -- Limit memory use to 2G. Prevents OOM when debugging things like infinite loops.
+  , "+RTS", "-M2G", "-RTS"
   ]
 
 instance IsTest ClashGenTest where
