@@ -1,0 +1,1 @@
+ADDED: `-fclash-debug-manifest-hash`. When enabled, Clash emits a `__debug_hash` object in `clash-manifest.json` listing the SHA256 of each input that feeds into the top-level `hash` (`tops`, `prim_map`, `clash_mod_date`, `call_graph`, `opts`). As the name implies, this should only be used to debug and should not be relied upon by tooling.
