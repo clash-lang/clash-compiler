@@ -184,6 +184,10 @@ loadExternalModule
   -> String
   -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
   -- qualified module name (example: "Data.List").
+  -> Maybe String
+  -- ^ Name passed with @-main-is@, if any. When set, only the transitive
+  -- closure of this binder is loaded (instead of the closure of all exports of
+  -- the module). See 'loadSeed'.
   -> m (Either
           SomeException
           ( [CoreSyn.CoreBndr]                     -- Root binders
@@ -192,16 +196,36 @@ loadExternalModule
           , LoadedBinders
           , [CoreSyn.CoreBind]                     -- All bindings
           ) )
-loadExternalModule hdl modName0 = MC.try $ do
+loadExternalModule hdl modName0 mainIsM = MC.try $ do
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
   let errMsg = "Internal error: found  module, but could not load it"
   modInfo <- fromMaybe (error errMsg) <$> (GHC.getModuleInfo foundMod)
   tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
   let rootIds = [id_ | GHC.AnId id_ <- tyThings]
-  loaded <- loadExternalBinders hdl rootIds
+  -- Only load (the transitive closure of) the binders we will actually compile.
+  -- With @-main-is@ that is just the requested binder; without it, all exports.
+  loaded <- loadExternalBinders hdl (loadSeed mainIsM rootIds)
   let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded))
+  -- NB: we return the /full/ export list as the root binders, so resolution of
+  -- the @-main-is@ name and of (testbench/synthesize) annotations in
+  -- 'loadModules' is unaffected by the pruning above.
   return (rootIds, FamInstEnv.emptyFamInstEnv, modName1, loaded, allBinders)
+
+-- | Restrict the set of binders we load the transitive closure of. When a
+-- @-main-is@ name is given we only need that binder (and what it uses): any
+-- other export, and its closure, would be loaded, converted to Clash Core, and
+-- then discarded by 'Clash.GHCi.Common.getMainTopEntity'. When no name is
+-- given we keep all exports.
+--
+-- If the name cannot be found among the exports we fall back to all exports and
+-- let 'loadModules' produce the usual \"no top-level function called ...\" error.
+loadSeed :: Maybe String -> [CoreSyn.CoreBndr] -> [CoreSyn.CoreBndr]
+loadSeed Nothing rootIds = rootIds
+loadSeed (Just nm) rootIds =
+  case filter ((== nm) . varNameString) rootIds of
+    [] -> rootIds
+    seed -> seed
 
 setupGhc
   :: GHC.GhcMonad m
@@ -455,15 +479,11 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     let setupStartDiff = reportTimeDiff setupTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
 
-    -- TODO: We currently load the transitive closure of _all_ bindings found
-    -- TODO: in the top module. This is wasteful if one or more binders don't
-    -- TODO: contribute to any top entities. This effect is worsened when using
-    -- TODO: -main-is, which only synthesizes a single top entity (and all its
-    -- TODO: dependencies).
+    let mainIsM = GHC.mainFunIs =<< dflagsM
     (rootIds, modFamInstEnvs, _rootModule, LoadedBinders{..}, allBinders) <-
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
-      loadExternalModule hdl modName >>= \case
+      loadExternalModule hdl modName mainIsM >>= \case
         Left loadExternalErr -> do
           catch @_ @SomeException
             (loadLocalModule hdl modName)
