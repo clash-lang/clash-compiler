@@ -50,15 +50,6 @@ in
   hls-test-utils = disableLibProfiling prev.hls-test-utils;
   haskell-language-server = disableLibProfiling prev.haskell-language-server;
 
-  # Upstream nixpkgs has this fix but they have not landed in a release yet
-  fourmolu = appendPatches prev.fourmolu [
-    (pkgs.fetchpatch {
-      name = "fourmolu-absolute-build-tool-paths.patch";
-      url = "https://github.com/fourmolu/fourmolu/commit/9217bc926ab80d20b815f0486be2184db07df4fc.patch";
-      hash = "sha256-ANzuKy5WfWCGZ7HFVBpTtuyUqzFfef/xR/v1KiyJEX4=";
-    })
-  ];
-
   # Randomly GHC panics with heap overflows during testing
   row-types = dontCheck prev.row-types;
 
