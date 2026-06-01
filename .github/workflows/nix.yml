@@ -1,9 +1,6 @@
 name: Nix Packaging
 
-on:
-  push:
-    branches:
-      - '*'
+on: push
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
