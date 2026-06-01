@@ -1,0 +1,1 @@
+ADDED: Clash now converts GHC Core to its own Clash Core in parallel. For larger projects, this can shave off ~40% of load times. See [#3299](https://github.com/clash-lang/clash-compiler/issues/3299).
