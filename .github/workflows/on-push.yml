@@ -40,7 +40,7 @@ jobs:
           # The cabal.project file contains the index state & hashes
           # Since we only cache the dependencies, and this is what determines what dependencies are grabbed
           # hashing the cabal.project file should suffice in determining if the dependencies changed
-          key: ${{ runner.os }}-${ matrix.ghc }-cabal-${ hashFiles("cabal.project") }
+          key: ${{ runner.os }}-${ matrix.ghc }-cabal-${ hashFiles("cabal.project", "*/*.cabal") }
           restore-keys: ${{ runner.os }}-${ matrix.ghc }-cabal-
           path: ~/.cabal
 
@@ -293,7 +293,6 @@ jobs:
     name: Running clash-testsuite (${{matrix.ghc}}, ${{matrix.hdl}})
     runs-on: self-hosted
     strategy:
-      # If caching fails for one package, then we are still interested in caching other packages
       fail-fast: false
       matrix:
         hdl: [
