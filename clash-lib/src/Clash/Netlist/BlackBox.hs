@@ -283,6 +283,7 @@ mkArgument bbName bndr declType nArg e = do
     tcm   <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm e
     iw    <- Lens.view intWidth
+    translBigNums <- Lens.view translateBigNums
     hwTyM <- fmap stripFiltered <$> N.termHWTypeM e
     let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
@@ -296,7 +297,7 @@ mkArgument bbName bndr declType nArg e = do
         (C.Var v,[],_) -> do
           return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
         (C.Literal l,[],_) ->
-          return ((mkLiteral iw True l,hwTy,True),[])
+          return ((mkLiteral iw translBigNums l,hwTy,True),[])
 
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False declType (NetlistId bndr ty) pinfo args tickDecls
