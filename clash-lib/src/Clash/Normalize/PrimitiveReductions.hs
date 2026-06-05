@@ -537,10 +537,14 @@ reduceTraverse n aTy fTy bTy dict fun arg (TransformContext is0 ctx) = do
               fmapTm = Case (Var functorDictId) fmapTy
                             [(fnPat, Var fmapId)]
 
-              (uniqs3,(vars,elems)) = second (second sconcat . NE.unzip)
-                                    $ uncurry extractElems uniqs2 consCon aTy 'T' n arg
+              (uniqs3,vars,elemBinds)
+                | n == 0    = (fst uniqs2,[],[])
+                | otherwise =
+                    let (us,(vs,es)) = second (second sconcat . NE.unzip)
+                                     $ uncurry extractElems uniqs2 consCon aTy 'T' n arg
+                    in  (us,NE.toList vs,NE.init es)
 
-              funApps = map (fun1 `App`) (NE.toList vars)
+              funApps = map (fun1 `App`) vars
 
               lbody   = mkTravVec vecTcNm nilCon consCon (Var (apDictIds!!1))
                                                         (Var (apDictIds!!2))
@@ -551,7 +555,7 @@ reduceTraverse n aTy fTy bTy dict fun arg (TransformContext is0 ctx) = do
                                 ,((apDictIds!!1), pureTm)
                                 ,((apDictIds!!2), apTm)
                                 ,((funcDicIds!!0), fmapTm)
-                                ] ++ NE.init elems) lbody
+                                ] ++ elemBinds) lbody
           uniqSupply Lens..= uniqs3
           lift (changed lb)
     go _ _ ty = error $ $(curLoc) ++ "reduceTraverse: argument does not have a vector type: " ++ showPpr ty

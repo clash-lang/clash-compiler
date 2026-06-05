@@ -167,7 +167,7 @@ extractElems supply inScope consCon resTy s maxN vec =
   if maxN >= 1 then
     first fst (go maxN (supply,inScope) vec)
   else
-    error "extractElems must be called with positive number"
+    error "extractElems must be called with maxN >= 1"
  where
   go :: Integer -> (Supply,InScopeSet) -> Term
      -> ((Supply,InScopeSet),NonEmpty (Term, NonEmpty (Id, Term)))
