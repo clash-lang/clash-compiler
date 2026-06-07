@@ -1,0 +1,1 @@
+FIXED: Clash no longer crashes with `mkVecNil: failed to instantiate Nil DC` when unfolding `traverse#` in very specific circumstances. See [#3291](https://github.com/clash-lang/clash-compiler/issues/3291).
