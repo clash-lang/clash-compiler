@@ -4716,7 +4716,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
     reduceWHNF' mach1 e =
       let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-          mach2@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e mach1)
+          mach2@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e $ stackClear mach1)
        in Just $ mach2 { mStack = mStack mach }
 
     makeUndefinedIf :: Exception e => (e -> Bool) -> Term -> Term
