@@ -697,6 +697,7 @@ runClashTest = defaultMain
             , hdlLoad=[IVerilog]
             , hdlSim=[IVerilog]
             }
+        , runTest "T3290" def{hdlSim=[], hdlLoad=[]}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
