@@ -86,6 +86,7 @@ library
     -- https://github.com/clash-lang/clash-compiler/issues/1796 for an example.
     shouldwork/LoadModules/precompiled
     shouldwork/Basic/precompiled
+    shouldwork/Issues/T3291-precompiled
 
   exposed-modules:
     Test.Tasty.Clash
@@ -107,6 +108,9 @@ library
     -- From tests/shouldwork/Basic/precompiled
     SimulationMagic2736a
 
+    -- From tests/shouldwork/Issues/T3291-precompiled
+    T3291.BitPackC
+
   other-modules:
     Paths_clash_testsuite
 
@@ -125,6 +129,9 @@ library
     singletons,
     template-haskell,
     unordered-containers,
+    ghc-typelits-extra,
+    ghc-typelits-knownnat,
+    ghc-typelits-natnormalise,
 
 
 executable clash-testsuite
