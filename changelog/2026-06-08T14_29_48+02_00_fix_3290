@@ -1,0 +1,1 @@
+FIXED: Clash no longer crashes upon calling `sequenceA`/`traverse#` on a zero-sized `Vec`. See [#3290](https://github.com/clash-lang/clash-compiler/issues/3290).
