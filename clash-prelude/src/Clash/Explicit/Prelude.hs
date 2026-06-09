@@ -91,6 +91,8 @@ module Clash.Explicit.Prelude
   , traceVecSignal
     -- ** VCD dump functions
   , dumpVCD
+    -- * Utility
+  , assertRight
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Explicit.Reset
@@ -287,3 +289,22 @@ windowD clk rst en x =
       next = x +>> prev
   in  prev
 {-# INLINABLE windowD #-}
+
+
+-- This function also exists in other packages on Hackage, but it'd be a pretty
+-- hefty dependency for a trivial implementation.
+--
+-- We just use it to be able to write, e.g.,
+-- `Trace.writeVcd "sim.vcd" =<< assertRight =<< Trace.simulate ...`
+-- and get an error if it's a `Left`.
+
+-- | Assert that an 'Either' value is of the 'Right' variant.
+assertRight ::
+  forall a b.
+  HasCallStack =>
+  Show a =>
+  Either a b ->
+  IO b
+assertRight = either err pure
+ where
+  err a = withFrozenCallStack $ errorIO $ "assertRight: expected a Right value, given " <> show (Left a :: Either a a)

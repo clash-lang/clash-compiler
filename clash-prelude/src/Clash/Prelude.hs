@@ -109,6 +109,8 @@ module Clash.Prelude
   , traceVecSignal
     -- ** VCD dump functions
   , dumpVCD
+    -- * Utility
+  , E.assertRight
     -- * Exported modules
     -- ** Synchronous signals
   , module Clash.Signal
