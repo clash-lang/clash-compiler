@@ -5,6 +5,7 @@ module Clash.Time (
   timeInFS, timeInPs, timeInNS, timeInUS, timeInMS, timeInS,
   clockCycles, clockPeriod,
   timeUntil,
+  mulTime,
   AtOrForTime(..),
 ) where
 
@@ -44,6 +45,24 @@ instance Show Time where
     split (TimeFS t) = ("TimeFS ",t)
     app_prec = 10
 
+instance Num Time where
+  (+) (TimeFS a) (TimeFS b) = TimeFS (a+b)
+  negate (TimeFS a) = TimeFS (-a)
+  abs (TimeFS a) = TimeFS (abs a)
+  (*) _ _ = error "Time values cannot be multiplied"
+  signum _ = error "signum is undefined for Time, because it must be a dimensionless quantity"
+  fromInteger _ = error "Time values must always be created with a unit"
+
+-- | Class for multiplying time and integers
+class MulTime a b where
+  mulTime :: a -> b -> Time
+infixl 7 `mulTime` -- same as (*)
+
+instance MulTime Time Integer
+  mulTime (TimeFS t) m = TimeFS (t*m)
+instance MulTime Integer Time
+  mulTime = flip mulTime
+
 -- | Time in femtoseconds.
 timeInFS :: Time -> Integer
 timeInFS (TimeFS t) = t
@@ -74,9 +93,7 @@ clockCycles ::
   KnownDomain dom =>
   Integer ->
   Time
-clockCycles i = TimeFS $ i * t
- where
-  TimeFS t = domainPeriod @dom
+clockCycles i = i `mulTime` domainPeriod @dom
 
 -- | The period of a clock domain.
 clockPeriod ::
@@ -90,8 +107,9 @@ clockPeriod =
 -- | Used to indicate a specific moment or a duration
 data AtOrForTime = At Time | For Time
 
--- | Compute the 'Time' from the first clock edge at which a signal satisfies a predicate.
--- Note that the first value of a signal is the reset value before the first clock edge,
+-- | Compute the 'Time' that elapses from the first clock edge of the simulation
+-- to the edge at which the signal satisfies the predicate.
+-- Note that the first value of a signal is the initial value before the first clock edge,
 -- and is ignored by this function.
 timeUntil ::
   forall dom a.
