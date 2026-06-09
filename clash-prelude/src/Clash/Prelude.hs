@@ -128,6 +128,8 @@ module Clash.Prelude
   , module Clash.Sized.RTree
     -- ** Annotations
   , module Clash.Annotations.TopEntity
+    -- ** Time
+  , module Clash.Time
     -- ** Generics type-classes
   , Generic
   , Generic1
