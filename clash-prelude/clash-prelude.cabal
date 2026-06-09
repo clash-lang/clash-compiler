@@ -283,6 +283,8 @@ Library
                       Clash.Sized.Internal.Signed
                       Clash.Sized.Internal.Unsigned
 
+                      Clash.Time
+
                       Clash.Verification
                       Clash.Verification.DSL
                       Clash.Verification.Internal
