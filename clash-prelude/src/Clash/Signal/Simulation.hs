@@ -6,24 +6,14 @@ type TypeRepBS = String
 type Period = Time
 type Width = Natural
 type Value = [(Natural, Natural)]
+type Trace = (TypeRepBS,Period,Width,[Value])
+type TraceMap = Map String Trace
 
 type Traceable a = (NFDataX a, BitPack a, Typeable a)
-
-type Trace = (TypeRepBS,Period,Width,[Value])
-
-type TraceMap = Map String Trace
 
 -- | (/name/, /period/): Name of the clock wave in the VCD output, and period of
 -- the clock wave. The clock will have 50% duty cycle.
 type ClockWave = (String, Time)
-
--- | TODO
-clockWave ::
-  forall dom.
-  KnownDomain dom =>
-  String ->
-  ClockWave
-clockWave name = (name, clockPeriod @dom)
 
 -- | Object containing the simulation configuration and the traces captured during simulation.
 data Simulation = Simulation
@@ -58,7 +48,7 @@ data Config
 
 instance Default Config where
   def =
-    VcdConfig
+    Config
       { start = TimeFS 0
       , clockStart = TimeNS 100
       , shiftToZero = True
@@ -74,6 +64,15 @@ instance Default GlobalData where
       , messages = []
       , firstRun = True
       }
+
+
+{----------------------------------------
+SIMULATION
+----------------------------------------}
+
+globalDataRef :: IORef globalDataRef
+globalDataRef = unsafePerformIO (newIORef def)
+{-# OPAQUE globalDataRef #-}
 
 -- | Simulate a design by forcefully evaluating an output signal.
 simulate ::
@@ -103,9 +102,21 @@ simulateWith ::
   -- | (One of) the outputs of the circuit containing the traces
   Signal dom a ->
   IO (Either String Simulation)
-simulateWith = ...
+simulateWith = simulate0 globalData
 
--- Change when sim starts and stops
+-- | Internal simulation function that takes the global reference as a parameter.
+simulate0 ::
+  forall a.
+  NFData a =>
+  IORef GlobalData ->
+  Config ->
+  [ClockWave] ->
+  [String] ->
+  Signal dom a ->
+  IO (Either String Simulation)
+simulate0 = ...
+
+-- Change when the 'Simulation' starts and stops.
 setStartStop ::
   Time ->
   AtOrForTime ->
@@ -113,84 +124,36 @@ setStartStop ::
   Simulation
 setStartStop start stop sim@Simulation{config} = sim{config=config{start,stop}}
 
--- Change when clock starts in sim
+-- | Change when the clocks start in a 'Simulation'.
 setClockStart ::
   Time ->
   Simulation ->
   Simulation
 setClockStart clockStart sim@Simulation{config} = sim{config=config{clockStart}}
 
-
-
-
-
--- Zero-width signals are dropped from the VCD
-
--- | Create a VCD file for the given traces and simulation configuration.
-vcdText ::
-  Simulation ->
-  Either String Text
-vcdText = ...
-
--- | Create a VCD file for the given traces and simulation configuration,
--- and write it to a file.
--- Errors if the VCD generation fails
-writeVcd ::
-  FilePath ->
-  Simulation ->
-  IO ()
-writeVcd file sim = do
-  text <- assertRight $ vcdText sim
-  writeFile file text
-
--- | Store a trace in binary form.
-store ::
-  -- | Name of trace to dump
-  String ->
-  -- | Number of samples
-  Int ->
-  Simulation ->
-  IO ByteString
-store = ...
-
--- | Store a 'Signal' in binary form.
-storeSignal ::
-  forall dom a.
+-- | Create a 'ClockWave' for a given domain.
+clockWave ::
+  forall dom.
   KnownDomain dom =>
-  Traceable a =>
-  Signal dom a ->
-  ByteSting
-storeSignal = ...
+  String ->
+  ClockWave
+clockWave name = (name, clockPeriod @dom)
 
--- | Load a trace from binary form.
-load ::
-  forall a dom.
-  Traceable a =>
-  ByteString ->
-  Simulation ->
-  Either String (Simulation)
-load = ...
+{----------------------------------------
+TRACING
+----------------------------------------}
 
--- This is replay
--- | Load a 'Signal' from binary form.
-loadSignal ::
-  forall a dom.
-  Traceable a =>
-  ByteString ->
-  Either String (Signal dom a)
-loadSignal bin = fromTrace <$> loadTrace bin
+-- | Put a trace in the global data.
+registerTrace :: String -> Trace -> GlobalData -> Either String GlobalData
+registerTrace name trace glob@GlobalData{traces,found} =
+  if M.member name traces then
+    Left ("Trace " <> name <> " already exists")
+  else
+    Right glob{traces = M.insert name trace}
 
--- | Convert binary data into a trace for the type specified.
-loadTrace ::
-  forall a.
-  Traceable a =>
-  ByteString ->
-  Either String Trace
-loadTrace = ...
-
--- | Convert a trace into binary form.
-storeTrace :: Trace -> ByteString
-storeTrace = ...
+-- | Mark a signal/signals as found.
+registerFound :: [String] -> GlobalData -> GloblaData
+registerFound new glob@GlobalData{found} = glob{found = new <> found}
 
 -- | Trace a 'Signal'.
 -- This converts the signal to a trace, and stores it in global storage.
@@ -201,7 +164,8 @@ trace ::
   String ->
   Signal dom a ->
   Signal dom a
-trace name sig = unsafePerformIO (atomicModifyIORef globalData (trace0 name sig)) `seq` sig
+trace name sig = unsafePerformIO (atomicModifyIORef globalDataRef (trace0 name sig)) `seq` sig
+{-# OPAQUE trace #-}
 
 trace0 ::
   forall dom a.
@@ -218,17 +182,7 @@ trace0 name sig = right . registerTrace fullName trace . registerFound found
   found = if fullName == name then [name] else [name, fullName]
   right (Right x) = x
   right (Left e) = error e
-
--- put a trace in the global data
-registerTrace :: String -> Trace -> GlobalData -> Either String GlobalData
-registerTrace name trace glob@GlobalData{traces,found} =
-  if M.member name traces then
-    Left ("Trace " <> name <> " already exists")
-  else
-    Right glob{traces = M.insert name trace}
-
-registerFound :: [String] -> GlobalData -> GloblaData
-registerFound new glob@GlobalData{found} = glob{found = new <> found}
+{-# OPAQUE trace0 #-}
 
 -- | Trace all values in a vector signal individually.
 traceVec ::
@@ -239,7 +193,8 @@ traceVec ::
   String ->
   Signal dom (Vec n a) ->
   Signal dom (Vec n a)
-traceVec name sig = unsafePerformIO (atomicModifyIORef globalData (traceVec0 name sig)) `seq` sig
+traceVec name sig = unsafePerformIO (atomicModifyIORef globalDataRef (traceVec0 name sig)) `seq` sig
+{-# OPAQUE traceVec #-}
 
 traceVec0 ::
   forall dom a n.
@@ -250,36 +205,41 @@ traceVec0 ::
   Signal dom (Vec n a) ->
   GlobalData ->
   GlobalData
-traceVec0 = ...
+traceVec0 name sig = registerTraces . registerFound found
+ where
+  traces = toList $ toTrace <$> unbundle sig
+  fullName = replace "$" (domainName @dom) name
+  names = map (\i -> name <> "." <> show i) [0..length traces-1]
+  fullNames = map (\i -> fullName <> "." <> show i) [0..length traces-1]
+  found = if fullName == name then name:names else [name, fullName]<>names<>fullNames
+  registerTraces = foldr (.) id $ zipWith registerTrace fullNames traces
+{-# OPAQUE traceVec0 #-}
 
--- | Retrieve a 'Signal' from the captured traces.
-fetch ::
-  forall dom a.
-  Traceable a ->
+-- | Like 'trace', but operates on a 'Reset'
+traceReset ::
+  forall dom.
+  KnownDomain dom =>
+  -- | Name of signal in the simulation output
   String ->
-  Simulation ->
-  Either String (Signal dom a)
-fetch name sim = fromTrace <$> fetchTrace name sim
+  -- | Reset to trace
+  Reset dom ->
+  Reset dom
+traceReset name rst = trace name (unsafeFromReset rst) `seq` rst
+{-# OPAQUE traceReset #-}
 
--- | Retrieve a captured 'Trace'.
-fetchTrace ::
+-- Like traceReset for enables
+traceEnable ::
+  forall dom.
+  KnownDomain dom =>
   String ->
-  Simulation ->
-  Either String Trace
-fetchTrace name sim@Simulation{traces} =
-  maybeToEither ("Trace " <> name <> " not found") $ M.lookup name traces
+  Enable dom ->
+  Enable dom
+traceEnable name en = trace name (fromEnable en) `seq` en
+{-# OPAQUE traceEnable #-}
 
--- | Add a 'Trace' to a 'Simulation'
-addTrace ::
-  String ->
-  Trace ->
-  Simulation ->
-  Either String Simulation
-addTrace name trace sim@Simulation{traces} =
-  if M.member name traces then
-    Left ("Trace " <> name <> " already registered")
-  else
-    Right sim{traces = M.insert name trace traces}
+{----------------------------------------
+TRACES
+----------------------------------------}
 
 -- | Create a 'Trace' from a 'Signal'.
 toTrace ::
@@ -306,27 +266,92 @@ fromTrace ::
   Either String (Signal dom a)
 fromTrace (ty,_period,_width,values)
   | ty == encode (typeRep @a) = ...
-  | otherwise = "Trace did not match target type"
+  | otherwise = Left "Trace did not match target type"
 
-
-
-
--- | Like 'trace', but operates on a 'Reset'
-traceReset ::
-  forall dom.
-  KnownDomain dom =>
-  -- | Name of signal in the simulation output
+-- | Add a 'Trace' to a 'Simulation'
+addTrace ::
   String ->
-  -- | Reset to trace
-  Reset dom ->
-  Reset dom
-traceReset name rst = trace name (unsafeFromReset rst) `seq` rst
+  Trace ->
+  Simulation ->
+  Either String Simulation
+addTrace name trace sim@Simulation{traces} =
+  if M.member name traces then
+    Left ("Trace " <> name <> " already exists")
+  else
+    Right sim{traces = M.insert name trace traces}
 
--- Like traceReset for enables
-traceEnable ::
-  forall dom.
-  KnownDomain dom =>
+-- | Retrieve a captured 'Trace'.
+fetchTrace ::
   String ->
-  Enable dom ->
-  Enable dom
-traceEnable name en = trace name (fromEnable en) `seq` en
+  Simulation ->
+  Either String Trace
+fetchTrace name sim@Simulation{traces} =
+  maybeToEither ("Trace " <> name <> " not found") $ M.lookup name traces
+
+-- | Retrieve a 'Signal' from the captured traces.
+fetch ::
+  forall dom a.
+  Traceable a ->
+  String ->
+  Simulation ->
+  Either String (Signal dom a)
+fetch name sim = fetchTrace name sim >>= fromTrace
+
+{----------------------------------------
+STORING SIGNALS
+----------------------------------------}
+
+-- | Store a trace in binary form.
+store ::
+  -- | Name of trace to dump
+  String ->
+  -- | Number of samples
+  Int ->
+  Simulation ->
+  Either String ByteString
+store name samples = storeTrace samples <$> fetchTrace name
+
+-- | Store a 'Signal' in binary form.
+storeSignal ::
+  forall dom a.
+  KnownDomain dom =>
+  Traceable a =>
+  -- | Name of trace to dump
+  Signal dom a ->
+  -- | Number of samples
+  Int ->
+  ByteSting
+storeSignal signal samples = storeTrace samples $ toTrace signal
+
+-- | Convert a trace into binary form.
+storeTrace :: Trace -> ByteString
+storeTrace = ...
+
+-- | Load a trace from binary form.
+load ::
+  forall a dom.
+  Traceable a =>
+  -- | The name to use for the signal
+  String ->
+  -- | The binary data
+  ByteString ->
+  -- | The 'Simulation' to add the signal to
+  Simulation ->
+  Either String Simulation
+load name bin sim = loadTrace @a bin >>= (\trace -> registerTrace name trace sim)
+
+-- | Load a 'Signal' from binary form.
+loadSignal ::
+  forall a dom.
+  Traceable a =>
+  ByteString ->
+  Either String (Signal dom a)
+loadSignal bin = fromTrace <$> loadTrace bin
+
+-- | Convert binary data into a trace for the type specified.
+loadTrace ::
+  forall a.
+  Traceable a =>
+  ByteString ->
+  Either String Trace
+loadTrace = ...
