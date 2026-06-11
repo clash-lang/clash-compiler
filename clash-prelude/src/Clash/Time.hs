@@ -63,6 +63,9 @@ instance MulTime Time Integer
 instance MulTime Integer Time
   mulTime = flip mulTime
 
+instance Ord (Time dom) where
+  (<=) (TimeFS a) (TimeFS b) = a<=b
+
 -- | Time in femtoseconds.
 timeInFS :: Time -> Integer
 timeInFS (TimeFS t) = t
