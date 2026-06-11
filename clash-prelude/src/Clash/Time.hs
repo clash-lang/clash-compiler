@@ -27,23 +27,53 @@ pattern TimeS t <- (getTimePat 15 -> Just t) where
 getTimePat k t = if t % (10^k) == 0 then Just (t `div` (10^k)) else Nothing
 
 instance Show Time where
-  -- show (TimeS  t) = show t <> "s"
-  -- show (TimeMS t) = show t <> "ms"
-  -- show (TimeUS t) = show t <> "us"
-  -- show (TimeNS t) = show t <> "ns"
-  -- show (TimePS t) = show t <> "ps"
-  -- show (TimeFS t) = show t <> "fs"
+  show (TimeS  t) = show t <> "s"
+  show (TimeMS t) = show t <> "ms"
+  show (TimeUS t) = show t <> "us"
+  show (TimeNS t) = show t <> "ns"
+  show (TimePS t) = show t <> "ps"
+  show (TimeFS t) = show t <> "fs"
 
-  showsPrec d t = showParen (d > app_prec) $ showString (unit <> show value)
+  -- showsPrec d t = showParen (d > app_prec) $ showString (unit <> show value)
+  --  where
+  --   (unit,value) = split t
+  --   split (TimeS  t) = ("TimeS " ,t)
+  --   split (TimeMS t) = ("TimeMS ",t)
+  --   split (TimeUS t) = ("TimeUS ",t)
+  --   split (TimeNS t) = ("TimeNS ",t)
+  --   split (TimePS t) = ("TimePS ",t)
+  --   split (TimeFS t) = ("TimeFS ",t)
+  --   app_prec = 10
+
+instance Read Time where
+  readPrec =
+    parens
+      $   (prec app_prec $ do
+              Ident unitCons <- lexP
+              t <- step readPrec
+              case unitCons of
+                "TimeFS" -> return (TimeFS t)
+                "TimePS" -> return (TimePS t)
+                "TimeNS" -> return (TimeNS t)
+                "TimeUS" -> return (TimeUS t)
+                "TimeMS" -> return (TimeMS t)
+                "TimeS"  -> return (TimeS  t)
+                _        -> pfail )
+
+      +++ (prec pfix_prec $ do
+              t <- step readPrec
+              Ident unit <- lexP
+              case unit of
+                "fs" -> return (TimeFS t)
+                "ps" -> return (TimePS t)
+                "ns" -> return (TimeNS t)
+                "us" -> return (TimeUS t)
+                "ms" -> return (TimeMS t)
+                "s"  -> return (TimeS  t)
+                _    -> pfail )
    where
-    (unit,value) = split t
-    split (TimeS  t) = ("TimeS " ,t)
-    split (TimeMS t) = ("TimeMS ",t)
-    split (TimeUS t) = ("TimeUS ",t)
-    split (TimeNS t) = ("TimeNS ",t)
-    split (TimePS t) = ("TimePS ",t)
-    split (TimeFS t) = ("TimeFS ",t)
     app_prec = 10
+    pfix_prec = 11
 
 instance Num Time where
   (+) (TimeFS a) (TimeFS b) = TimeFS (a+b)
@@ -51,7 +81,8 @@ instance Num Time where
   abs (TimeFS a) = TimeFS (abs a)
   (*) _ _ = error "Time values cannot be multiplied"
   signum _ = error "signum is undefined for Time, because it must be a dimensionless quantity"
-  fromInteger _ = error "Time values must always be created with a unit"
+  fromInteger 0 = TimeFS 0
+  fromInteger _ = error "Non-zero Time values must always be created with a unit"
 
 -- | Class for multiplying time and integers
 class MulTime a b where
