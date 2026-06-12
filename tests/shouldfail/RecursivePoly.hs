@@ -3,7 +3,7 @@ module RecursivePoly where
 
 import Clash.Prelude
 
-topEntity :: Integer
+topEntity :: Int
 topEntity = f 0
 
 f :: (Integral b, Num b) => b -> b

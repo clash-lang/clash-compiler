@@ -3,7 +3,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -149,7 +149,7 @@ mkBlackBoxContext bbName declType resIds args@(lefts -> termArgs) = do
       resNms = fmap Id.unsafeFromCoreId resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
     resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) . coreTypeOf) resIds
-    (imps,impDecls) <- unzip <$> zipWithM (mkArgument bbName resNm declType) [0..] termArgs
+    (inps,inpDecls) <- unzip <$> zipWithM (mkArgument bbName resNm declType) [0..] termArgs
     (funs,funDecls) <-
       mapAccumLM
         (addFunction (map coreTypeOf resIds))
@@ -169,8 +169,8 @@ mkBlackBoxContext bbName declType resIds args@(lefts -> termArgs) = do
     -- `Clash.Magic.prefixName` and `Clash.Magic.suffixName`
     ctxName2 <- mapM affixName ctxName1
 
-    return ( Context bbName (zip ress resTys) imps funs [] lvl nm (listToMaybe ctxName2)
-           , concat impDecls ++ concat funDecls
+    return ( Context bbName (zip ress resTys) inps funs [] lvl nm (listToMaybe ctxName2)
+           , concat inpDecls ++ concat funDecls
            )
   where
     addFunction resTys im (arg,i) = do
@@ -283,6 +283,7 @@ mkArgument bbName bndr declType nArg e = do
     tcm   <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm e
     iw    <- Lens.view intWidth
+    translBigNums <- Lens.view translateBigNums
     hwTyM <- fmap stripFiltered <$> N.termHWTypeM e
     let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
@@ -296,7 +297,7 @@ mkArgument bbName bndr declType nArg e = do
         (C.Var v,[],_) -> do
           return ((Identifier (Id.unsafeFromCoreId v) Nothing,hwTy,False),[])
         (C.Literal l,[],_) ->
-          return ((mkLiteral iw l,hwTy,True),[])
+          return ((mkLiteral iw translBigNums l,hwTy,True),[])
 
         (Prim pinfo,args,ticks) -> withTicks ticks $ \tickDecls -> do
           (e',d) <- mkPrimitive True False declType (NetlistId bndr ty) pinfo args tickDecls

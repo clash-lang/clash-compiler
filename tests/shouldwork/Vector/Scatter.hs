@@ -8,7 +8,9 @@ import Clash.Explicit.Testbench
 topEntity :: Vec 5 (Unsigned 10) -> Vec 5 (Unsigned 10)
 topEntity = scatter defvec to
   where
+    defvec :: Vec 5 (Unsigned 10)
     defvec = replicate d5 99
+    to :: Vec 5 Int
     to = 0 :> 4 :> 2 :> 3 :> 1 :> Nil
 {-# OPAQUE topEntity #-}
 

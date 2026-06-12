@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -200,6 +200,7 @@ instance Backend VHDLState where
     Signed {} -> pure PrimitiveType
     String -> pure PrimitiveType
     Integer -> pure PrimitiveType
+    Natural -> pure PrimitiveType  -- TODO natural is a primitive type, but we don't ever want to generate it
     FileType -> pure PrimitiveType
 
     -- Transparent types:
@@ -619,6 +620,7 @@ tyDec hwty = do
     Signed _    -> emptyDoc
     String      -> emptyDoc
     Integer     -> emptyDoc
+    Natural     -> emptyDoc
     FileType    -> emptyDoc
 
     -- Transparent types:
@@ -1211,6 +1213,7 @@ tyName' rec0 (filterTransparent -> t) = do
       return $ TextS.concat $ "std_logic_vector" : app
     String        -> return "string"
     Integer       -> return "integer"
+    -- Natural       -> return "natural" -- TODO natural is a primitive type, but we don't ever want to generate it
     Bit           -> return "std_logic"
     Vector n elTy -> do
       elTy' <- tyName' True elTy
@@ -1273,6 +1276,7 @@ normaliseType enums@(RenderEnums e) hwty = case hwty of
   BitVector _   -> hwty
   String        -> hwty
   Integer       -> hwty
+  Natural       -> hwty
   Bit           -> hwty
   FileType      -> hwty
 
@@ -1307,6 +1311,7 @@ filterTransparent hwty = case hwty of
   BitVector _       -> hwty
   String            -> hwty
   Integer           -> hwty
+  Natural           -> hwty
   Bit               -> hwty
   Clock _           -> hwty
   ClockN _          -> hwty
@@ -1900,6 +1905,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
     | otherwise -> "signed'" <> parens lit
   BitVector _ -> "std_logic_vector'" <> parens lit
   Bit         -> squotes (int (fromInteger i `mod` 2))
+  Natural     -> integer i  -- used for SNat when -fclash-no-tranlate-integer-natural
   _           -> blit
 
   where

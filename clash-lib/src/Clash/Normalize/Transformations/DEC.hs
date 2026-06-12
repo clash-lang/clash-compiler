@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022,      LumiGuide Fietsdetectie B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -56,7 +56,6 @@ import Data.Monoid (All(..))
 import qualified Data.Text as Text
 import Data.Text.Extra (showt)
 import GHC.Stack (HasCallStack)
-import qualified Language.Haskell.TH as TH
 
 import GHC.Core.Make (chunkify, mkChunkified)
 
@@ -89,7 +88,7 @@ import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isFromInt, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
-import Clash.Util (MonadUnique, curLoc)
+import Clash.Util (MonadUnique, curLoc, fromTHName)
 import Clash.Util.Supply (splitSupply)
 
 -- primitives
@@ -784,6 +783,3 @@ interestingToLift inScope eval e@(Prim pInfo) args ticks
       (args',_) -> any isPolyFunTy (Either.rights args')
 
 interestingToLift _ _ _ _ _ = Nothing
-
-fromTHName :: TH.Name -> Text.Text
-fromTHName = Text.pack . show

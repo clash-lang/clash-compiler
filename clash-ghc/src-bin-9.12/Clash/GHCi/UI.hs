@@ -2441,8 +2441,7 @@ makeHDL Proxy startAction optsRef srcs = do
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0  <- readIORef optsRef
               let opts1  = opts0 { opt_color = fromGhcOverridingBool (useColor dflags) }
-              let iw     = opt_intWidth opts1
-                  hdl    = hdlKind backend
+              let hdl    = hdlKind backend
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
                                  hidir <- hiDir dflags
@@ -2477,7 +2476,7 @@ makeHDL Proxy startAction optsRef srcs = do
                   clashEnv
                   clashDesign
                   (Just backend)
-                  (ghcTypeToHWType iw)
+                  (ghcTypeToHWType opts2)
                   ghcEvaluator
                   evaluator
                   mainTopEntity

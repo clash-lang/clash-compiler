@@ -4,7 +4,7 @@ module DivMod where
 
 import Clash.Prelude
 
-topEntity :: (Integer,Integer)
+topEntity :: (Int,Int)
 topEntity = topEntity1 height depthInput filterHeight stride cycles
   where
     height = SNat @5
@@ -15,12 +15,12 @@ topEntity = topEntity1 height depthInput filterHeight stride cycles
 
 topEntity1 height depthInput filterHeight stride cycles = snatToNum cycles `divMod` pools
   where
-    pools :: Integer
+    pools :: Int
     pools =
       rows *
       (((snatToNum height - snatToNum filterHeight) `div` snatToNum stride) + 1) *
       snatToNum depthInput
 
-    rows :: Integer
+    rows :: Int
     rows = ((snatToNum height - snatToNum filterHeight) `div` snatToNum stride) + 1
 {-# OPAQUE topEntity1 #-}

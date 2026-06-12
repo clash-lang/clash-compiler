@@ -412,6 +412,10 @@ data ClashOpts = ClashOpts
   -- /which/ input changed.
   --
   -- Command line flag: -fclash-debug-manifest-hash
+  , opt_translateBigNums :: Bool
+  -- ^ Translate bignums (Integer and Natural) to HDL
+  -- Defaults to on.
+  -- Command line flag: @-fclash-translate-bignums@ or @-fclash-no-translate-bignums@
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
 
@@ -453,6 +457,7 @@ defClashOpts
   , opt_ignoreBrokenGhcs    = unsafeLookupEnvBool "CLASH_IGNORE_BROKEN_GHCS" False
   , opt_concurrentTopEntities = True
   , opt_debugManifestHash   = False
+  , opt_translateBigNums    = True
   }
 
 -- | Synopsys Design Constraint (SDC) information for a component.

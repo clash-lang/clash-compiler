@@ -146,6 +146,9 @@ workaroundMmapCrash = flakyTestWithRetryAction retryAction retryPolicy
   retryPolicy :: RetryPolicyM IO
   retryPolicy = limitRetries 5
 
+needBigNums :: TestOptions -> TestOptions
+needBigNums opts = opts { clashFlags = clashFlags opts <> ["-fclash-translate-bignums"]}
+
 runClashTest :: IO ()
 runClashTest = defaultMain
   $ workaroundMmapCrash
@@ -349,11 +352,10 @@ runClashTest = defaultMain
           hdlTargets=[VHDL]
         , expectClashFail=Just (def, "This bndr has a non-representable return type and can't be normalized:")
         }
---        Disabled, due to it eating gigabytes of memory:
---      , runTest "RecursivePoly" def{
---          hdlTargets=[VHDL]
---        , expectClashFail=Just (def, "??")
---        }
+     , runTest "RecursivePoly" def{
+         hdlTargets=[VHDL]
+       , expectClashFail=Just (def, "Callgraph after normalization contains following recursive components")
+       }
       ]
     , clashTestGroup "shouldwork"
       [ clashTestGroup "AutoReg"
@@ -369,7 +371,7 @@ runClashTest = defaultMain
         , runTest "CaseOfErr" def{hdlTargets=[VHDL],hdlSim=[]}
         , runTest "Trace" def{hdlSim=[]}
         , runTest "DivMod" def{hdlSim=[]}
-        , runTest "DivZero" def
+        , runTest "DivZero" $ needBigNums def
         , runTest "LambdaDrop" def{hdlSim=[]}
         , runTest "IrrefError" def{hdlSim=[]}
         , outputTest "NameInlining" def
@@ -429,7 +431,7 @@ runClashTest = defaultMain
         , let _opts = def { hdlTargets = [VHDL], hdlSim = []}
            in runTest "T1354B" _opts
         , runTest "T1402" def{clashFlags=["-O"]}
-        , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=[]}
+        , runTest "T1402b" $ needBigNums def{hdlTargets=[VHDL], hdlSim=[]}
         , runTest "T1556" def
         , runTest "T1591" def{hdlTargets=[VHDL], hdlSim=[]}
         , runTest "TagToEnum" def{hdlSim=[]}
@@ -674,7 +676,7 @@ runClashTest = defaultMain
         , runTest "T2966" def{hdlSim=[],hdlTargets=[Verilog]}
         , runTest "T2988" def{hdlSim=[]}
         , outputTest "T3008" def{hdlSim=[]}
-        , outputTest "T3011" def{hdlSim=[]}
+        , outputTest "T3011" $ needBigNums def{hdlSim=[]}
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
            in runTest "T3021" _opts
         , runTest "T3041" def{hdlSim=[], hdlLoad=[]}
@@ -727,9 +729,9 @@ runClashTest = defaultMain
           , outputTest "HDLNotContainsLoc" def{hdlSim=[]}
           ]
       , clashTestGroup "Numbers"
-        [ runTest "BitInteger" def
+        [ runTest "BitInteger" $ needBigNums def
         , runTest "BitReverse" def
-        , runTest "BitsTB" def { buildTargets = BuildSpecific [ "bitsTB1"
+        , runTest "BitsTB" (needBigNums def) { buildTargets = BuildSpecific [ "bitsTB1"
                                                               , "bitsTB2"
                                                               , "bitsTB3"
                                                               ]}
@@ -737,52 +739,52 @@ runClashTest = defaultMain
           -- vivado segfaults
           runTest "Bounds" def { hdlSim=hdlSim def \\ [Vivado] }
 
-        , runTest "DivideByZero" def
-        , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
+        , runTest "DivideByZero" (needBigNums def)
+        , let _opts = needBigNums def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in runTest "ExpWithGhcCF" _opts
-        , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
+        , let _opts = needBigNums def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in runTest "ExpWithClashCF" _opts
-        , outputTest "ExpWithClashCF" def{ghcFlags=["-itests/shouldwork/Numbers"]}
+        , outputTest "ExpWithClashCF" $ needBigNums def{ghcFlags=["-itests/shouldwork/Numbers"]}
         , let _opts = def { hdlTargets = [VHDL], hdlSim = [] }
            in runTest "HalfAsBlackboxArg" _opts
         ,
           -- see https://github.com/clash-lang/clash-compiler/issues/2262,
           -- Vivado's mod misbehaves on negative dividend
-          runTest "IntegralTB" def{hdlSim=hdlSim def \\ [Vivado]}
+          runTest "IntegralTB" $ needBigNums def{hdlSim=hdlSim def \\ [Vivado]}
 
-        , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
-        , outputTest "NumConstantFolding_1" def
+        , runTest "NumConstantFoldingTB_1" $ needBigNums def{clashFlags=["-itests/shouldwork/Numbers"]}
+        , outputTest "NumConstantFolding_1" $ needBigNums def
             { clashFlags=["-fconstraint-solver-iterations=15"]
             , ghcFlags=["-itests/shouldwork/Numbers"]
             }
-        , let _opts = def { clashFlags=["-itests/shouldwork/Numbers"]
+        , let _opts = needBigNums def { clashFlags=["-itests/shouldwork/Numbers"]
                           , hdlLoad = hdlLoad def \\ [Verilator]
                           , hdlSim = hdlSim def \\ [Verilator]
                           }
           in runTest "NumConstantFoldingTB_2" _opts
-        , outputTest "NumConstantFolding_2" def
+        , outputTest "NumConstantFolding_2" $ needBigNums def
             { clashFlags=["-fconstraint-solver-iterations=15"]
             , ghcFlags=["-itests/shouldwork/Numbers"]
             }
-        , runTest "Naturals" def
-        , runTest "NaturalToInteger" def{hdlSim=[]}
+        , runTest "Naturals" $ needBigNums def
+        , runTest "NaturalToInteger" $ needBigNums def{hdlSim=[]}
         , runTest "NegativeLits" def
         , runTest "Resize" def
         , runTest "Resize2" def
         , runTest "Resize3" def
         , runTest "SatMult" def{hdlSim=[]}
         , runTest "ShiftRotate" def
-        , runTest "ShiftRotateNegative" def{hdlTargets=[VHDL]}
+        , runTest "ShiftRotateNegative" $ needBigNums def{hdlTargets=[VHDL]}
         , runTest "SignedProjectionTB" def
         , runTest "SignedZero" def
-        , runTest "Signum" def
+        , runTest "Signum" $ needBigNums def
         ,
           -- vivado segfaults
           runTest "Strict" def{hdlSim=hdlSim def \\ [Vivado]}
 
-        , runTest "T1019" def{hdlSim=[]}
+        , runTest "T1019" $ needBigNums def{hdlSim=[]}
         , runTest "T1351" def
-        , runTest "T2149" def
+        , runTest "T2149" $ needBigNums def
         , outputTest "UndefinedConstantFolding" def{ghcFlags=["-itests/shouldwork/Numbers"]}
         , runTest "UnsignedZero" def
         ]
@@ -824,8 +826,8 @@ runClashTest = defaultMain
           -- see: https://github.com/clash-lang/clash-compiler/issues/2269
           runTest "BlockRamFile" def{hdlSim=hdlSim def \\ [Vivado]}
 
-        , runTest "BlockRam0" def
-        , runTest "BlockRam1" def
+        , runTest "BlockRam0" $ needBigNums def -- TODO shouldn't needBigNums, remove after we fixed blockRam1/U to not use Integer internally
+        , runTest "BlockRam1" $ needBigNums def -- TODO shouldn't needBigNums, remove after we fixed blockRam1/U to not use Integer internally
         , clashTestGroup "BlockRam"
           [ runTest "Blob" def
           ]
@@ -997,7 +999,7 @@ runClashTest = defaultMain
         , outputTest "PortNamesWithRTree" def{hdlTargets=[Verilog]}
         , clashLibTest "T1182A" def
         , clashLibTest "T1182B" def
-        , runTest "T3129" def{hdlSim=[], clashFlags=["-fclash-spec-limit=400"]}
+        , runTest "T3129" $ needBigNums (def{hdlSim=[], clashFlags=["-fclash-spec-limit=400"]})
         ]
       , clashTestGroup "Unit"
         [ runTest "Imap" def

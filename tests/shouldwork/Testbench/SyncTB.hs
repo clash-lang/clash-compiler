@@ -27,8 +27,8 @@ topEntity
   :: Clock Dom2
   -> Clock Dom7
   -> Clock Dom9
-  -> Signal Dom7 Integer
-  -> Signal Dom9 Integer
+  -> Signal Dom7 Int
+  -> Signal Dom9 Int
 topEntity clk2 clk7 clk9 i =
   delay
     clk9
@@ -51,9 +51,9 @@ testBench
   :: Signal Dom9 Bool
 testBench = done
   where
-    testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Integer)..20])
+    testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Int)..20])
     expectedOutput = outputVerifier'   clk9 rst9
-                        (0 :> 1 :>  $(listToVecTH ([2,3,4,6,7,8,9,11,12,13,15,16]::[Integer])))
+                        (0 :> 1 :>  $(listToVecTH ([2,3,4,6,7,8,9,11,12,13,15,16]::[Int])))
     done           = expectedOutput (zeroAt0 clk9 rst9 (topEntity clk2 clk7 clk9 testInput))
     notDone        = not <$> done
     clk2           = tbClockGen @Dom2 (unsafeSynchronizer clk9 clk2 notDone)

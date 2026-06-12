@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2021,      QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022,      Google Inc.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -88,6 +88,8 @@ flagsClash r = [
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
   , defFlag "fclash-debug-manifest-hash"         $ NoArg (liftEwM (setDebugManifestHash r))
+  , defFlag "fclash-translate-bignums" $ NoArg (liftEwM (setTranslateBigNums r True))
+  , defFlag "fclash-no-translate-bignums" $ NoArg (liftEwM (setTranslateBigNums r False))
   ]
 
 -- | Print deprecated flag warning
@@ -249,6 +251,9 @@ setIntWidth r n =
   if n == 32 || n == 64
      then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
+
+setTranslateBigNums :: IORef ClashOpts -> Bool -> IO ()
+setTranslateBigNums r b = modifyIORef r (\c -> c {opt_translateBigNums = b})
 
 setHdlDir :: IORef ClashOpts
           -> String

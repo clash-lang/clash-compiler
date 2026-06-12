@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
                     2017-2018, Google Inc.
-                    2020-2023, QBayLogic B.V.
+                    2020-2026, QBayLogic B.V.
                     2022-2023, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -432,7 +432,9 @@ data HWType
   | String
   -- ^ String type
   | Integer
-  -- ^ Integer type (for parameters only)
+  -- ^ Integer type (for parameters and for reporting untranslated Integers)
+  | Natural
+  -- ^ Natural type (for reporting untranslated Naturals only)
   | Bool
   -- ^ Boolean type
   | Bit
@@ -990,6 +992,9 @@ Lens.makeLenses ''NetlistState
 
 intWidth :: Lens.Getter NetlistEnv Int
 intWidth = clashEnv . Lens.to (opt_intWidth . envOpts)
+
+translateBigNums :: Lens.Getter NetlistEnv Bool
+translateBigNums = clashEnv . Lens.to (opt_translateBigNums . envOpts)
 
 customReprs :: Lens.Getter NetlistEnv CustomReprs
 customReprs = clashEnv . Lens.to envCustomReprs

@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
-                     2020-2024, QBayLogic,
+                     2020-2026, QBayLogic B.V.,
                      2022     , Google Inc.
 
   License     :  BSD2 (see the file LICENSE)
@@ -21,7 +21,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Driver where
-
 import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
 import           Control.Concurrent.Async         (mapConcurrently_)
 import           Control.DeepSeq
@@ -42,6 +41,7 @@ import qualified Data.ByteString.Lazy             as ByteStringLazy
 import qualified Data.ByteString.Lazy.Char8       as ByteStringLazyChar8
 import           Data.Char                        (isAscii, isAlphaNum)
 import           Data.Default
+import           Data.Foldable                    (toList)
 import           Data.Hashable                    (hash)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
@@ -113,7 +113,7 @@ import           Clash.Driver.Manifest
   (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
    mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
-import           Clash.Netlist                    (genNetlist, genTopNames)
+import           Clash.Netlist                    (checkComponent, genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import qualified Clash.Netlist.Id                 as Id
@@ -459,6 +459,14 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       withMVar ioLockV . const $
         putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
+
+      let netlistComps = snd <$> toList netlist
+          netlistErrors = concatMap checkComponent netlistComps
+          translBigNums = opt_translateBigNums opts
+      -- 3b. Check the netlist for bignums that shouldn't be there
+      Monad.when (not translBigNums && not (null netlistErrors)) $ do
+        IO.hPutStrLn IO.stderr $ unlines netlistErrors
+        error "got netlist errors"
 
       -- 4. Generate topEntity wrapper
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
