@@ -27,18 +27,27 @@ deriveBitPackTuples
   -- ^ pack
   -> Name
   -- ^ unpack
+  -> Name
+  -- ^ maybeUnpack
   -> DecsQ
-deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
-  let bitPack  = ConT bitPackName
-      bitSize  = ConT bitSizeName
-      knownNat = ConT ''KnownNat
-      plus     = ConT $ mkName "+"
+deriveBitPackTuples bitPackName bitSizeName packName unpackName maybeUnpackName = do
+  let bitPack   = ConT bitPackName
+      bitSize   = ConT bitSizeName
+      knownNat  = ConT ''KnownNat
+      plus      = ConT $ mkName "+"
+      bitVector = ConT $ mkName "BitVector"
+      justP     = ConP $ mkName "Just"
+      justE     = ConE $ mkName "Just"
+      nothing   = ConE $ mkName "Nothing"
+      bvSplit   = VarE $ mkName "split#"
 
   allNames <- replicateM maxTupleSize (newName "a")
   retupName <- newName "retup"
   x <- newName "x"
   y <- newName "y"
   tup <- newName "tup"
+  bvL <- newName "bvL"
+  bvR <- newName "bvR"
 
   pure $ flip map [3..maxTupleSize] $ \tupleNum ->
     let names  = take tupleNum allNames
@@ -107,4 +116,39 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName = do
                 []
             ]
 
-    in InstanceD Nothing context instTy [bitSizeType, pack, unpack]
+        maybeUnpack =
+            FunD
+                maybeUnpackName
+                [ Clause
+                    [ VarP x ]
+                    ( NormalB $
+                        let (p,ps) = case map VarP names of
+                                        (z:zs) -> (z,zs)
+                                        _ -> error "maxTupleSize <= 3"
+                        in
+                        LetE
+                            [ SigD bvL ( AppT bitVector ( AppT bitSize v ) )
+                            , SigD
+                                bvR
+                                ( AppT
+                                    bitVector
+                                    ( AppT bitSize ( foldl AppT ( TupleT $ tupleNum - 1 ) vs ) )
+                                )
+                            , ValD
+                                ( TupP [ VarP bvL, VarP bvR ] )
+                                ( NormalB $ AppE bvSplit ( VarE x ) )
+                                []
+                            ]
+                            ( CaseE
+                                ( mkTupE $ map ( AppE ( VarE maybeUnpackName ) . VarE ) [bvL, bvR] )
+                                [ Match
+                                    ( TupP [ justP [] [p], justP [] [TupP ps] ] )
+                                    ( NormalB $ AppE justE ( mkTupE $ map VarE names ) )
+                                    []
+                                , Match WildP ( NormalB $ nothing ) []
+                                ]
+                            )
+                    )
+                    []
+                ]
+    in InstanceD Nothing context instTy [bitSizeType, pack, unpack, maybeUnpack]
