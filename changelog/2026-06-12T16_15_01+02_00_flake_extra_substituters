@@ -1,0 +1,1 @@
+CHANGED: `flake.nix` now advertises the [clash-lang Cachix binary cache](https://clash-lang.cachix.org) via `nixConfig.extra-substituters`. Running `nix develop` will prompt you to trust the cache, avoiding having to build Clash from source. See [#3213](https://github.com/clash-lang/clash-compiler/issues/3213).

@@ -130,6 +130,10 @@ experimental-features = nix-command flakes
 
 in your `nix.conf`.
 
+The flake is configured to use the [clash-lang Cachix binary cache](https://clash-lang.cachix.org).
+When you first run `nix develop`, Nix will ask whether to allow and trust the
+cache. Accepting avoids having to build Clash from source.
+
 To automatically enter and exit the `nix` environment on directory change, you
 can install [`direnv`](https://direnv.net/) and
 [`nix-direnv`](https://github.com/nix-community/nix-direnv) and write the
