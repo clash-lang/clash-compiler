@@ -175,9 +175,15 @@ trace0 ::
   Signal dom a ->
   GlobalData ->
   GlobalData
-trace0 name sig = right . registerTrace fullName trace . registerFound found
+trace0 name sig = trace1 name (toTrace sig)
+
+trace1 ::
+  String ->
+  Trace ->
+  GlobalData ->
+  GlobalData
+trace1 name trace = right . registerTrace fullName trace . registerFound found
  where
-  trace = toTrace sig
   fullName = replace "$" (domainName @dom) name
   found = if fullName == name then [name] else [name, fullName]
   right (Right x) = x
@@ -236,6 +242,27 @@ traceEnable ::
   Enable dom
 traceEnable name en = trace name (fromEnable en) `seq` en
 {-# OPAQUE traceEnable #-}
+
+-- Like traceReset for enables
+traceClock ::
+  forall dom.
+  KnownDomain dom =>
+  String ->
+  Clock dom ->
+  Clock dom
+traceClock name clk = unsafePerformIO (atomicModifyIORef globalDataRef (trace1 name trace)) `seq` clk
+ where
+  trace = clockTrace (clockPeriod @dom)
+{-# OPAQUE traceEnable #-}
+
+-- Create a trace from a clock period. The period *must* be an even number of fs.
+clockTrace t | fs <- timeInFS t, fs & 1 == 0 =
+  ( encode (typeRep @Bool)
+  , TimeFS (fs `div` 2)
+  , 1
+  , L.cycle $ L.map (unsafeToTup . pack) [False,True] )
+             | otherwise = error "Cannot create clock trace for odd periods (in fs)"
+
 
 {----------------------------------------
 TRACES

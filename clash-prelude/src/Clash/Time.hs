@@ -6,7 +6,7 @@ module Clash.Time (
   clockCycles, clockPeriod,
   timeUntil,
   mulTime,
-  AtOrForTime(..),
+  AtOrForTime(..), absTime
 ) where
 
 newtype Time = TimeFS Integer
@@ -157,3 +157,11 @@ timeUntil cond sig = clockCycles
   $ findIndex cond
   $ tail -- drop reset value
   $ toList sig
+
+-- | Go from an absolute or relative time and starting point to an absolute time.
+absTime ::
+  Time ->
+  AtOrForTime ->
+  Time
+absTime _ (At t) = t
+absTime t (For d) = t + d
