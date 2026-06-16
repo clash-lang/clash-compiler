@@ -357,6 +357,51 @@ runClashTest t3105Env = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Saw a PortProduct in a Synthesize annotation")
           }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "argTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "resTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "splitTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "nestedTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "vecTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "hiddenTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "voidOutTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "voidFieldTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "callStackTop"]
+          , expectClashFail=Just (def, "but the top entity has only 1 argument(s)")
+          }
         ]
       , clashTestGroup "Verification"
         [ let n = 9 -- GHDL only has VERY basic PSL support
@@ -1122,6 +1167,7 @@ runClashTest t3105Env = defaultMain
             }
         , runTest "T1139" def{hdlSim=[]}
         , runTest "ZeroWidthPorts" def{hdlSim=[]}
+        , outputTest "T2243" def{hdlTargets=[VHDL]}
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNames_testBench"]
                           }
