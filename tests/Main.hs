@@ -278,6 +278,16 @@ runClashTest = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Saw a PortProduct in a Synthesize annotation")
           }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "argTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "resTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
         ]
       , clashTestGroup "Verification"
         [ let n = 9 -- GHDL only has VERY basic PSL support
