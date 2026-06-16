@@ -10,11 +10,13 @@ type CacheLine m tag addr                    -- 2^m tags per line, 2^n lines
 
 {-# ANN tacache_server_step32
   (Synthesize { t_name   = "TACacheServerStep"
-              , t_inputs = [ PortName "dx"        -- user B
-                           , PortName "d_x"       -- tlb C
-                           , PortName "dw"        -- tlb D
-                           , PortName "out2"     -- cache B
-                           , PortName "out3"     -- cache C
+              , t_inputs = [ PortProduct ""
+                             [ PortName "dx"        -- user B
+                             , PortName "d_x"       -- tlb C
+                             , PortName "dw"        -- tlb D
+                             , PortName "out2"     -- cache B
+                             , PortName "out3"     -- cache C
+                             ]
                            ]
               , t_output = PortProduct ""
                              [ PortName "win1"   -- cache A1
