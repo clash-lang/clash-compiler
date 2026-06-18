@@ -1,13 +1,43 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
 module Clash.Signal.Simulation where
 
-type TypeRepBS = String
+import           Control.Monad         (foldM)
+import           Data.Binary           (encode)
+import           Data.ByteString.Lazy  (ByteString)
+import           Data.Default          (Default(..))
+import           Data.Either.Extra     (maybeToEither)
+import           Data.IORef
+  (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
+import qualified Data.List as L
+import qualified Data.Map as M
+import           Data.Typeable         (Typeable, typeRep, Proxy(..))
+import           GHC.Natural           (Natural)
+import           GHC.TypeLits          (KnownNat, natVal, symbolVal)
+import           System.IO.Unsafe      (unsafePerformIO)
+
+import           Clash.Class.BitPack   (BitPack(..), BitSize)
+import           Clash.XException      (deepseqX, NFDataX)
+import           Clash.Signal          (KnownDomain, knownDomain, Signal, Clock, Reset, Enable, fromEnable, unsafeFromReset, sample, SDomainConfiguration(..), unbundle)
+import           Clash.Sized.Internal.BitVector
+  (BitVector(BV))
+import           Clash.Sized.Vector    (Vec, toList)
+import           Clash.Time            (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
+
+
+type TypeRepBS = ByteString
 type Period = Time
-type Width = Natural
-type Value = [(Natural, Natural)]
+type Width = Int
+type Value = (Natural, Natural)
 type Trace = (TypeRepBS,Period,Width,[Value])
-type TraceMap = Map String Trace
+type TraceMap = M.Map String Trace
 
 type Traceable a = (NFDataX a, BitPack a, Typeable a)
 
@@ -23,7 +53,7 @@ data Simulation = Simulation
 
 -- | Object containing all data that must be globally accessible.
 data GlobalData = GlobalData
-  { traces :: TraceMap
+  { globTraces :: TraceMap
   , found :: [String]
   , messages :: [String]
   , firstRun :: Bool
@@ -50,6 +80,7 @@ instance Default Config where
   def =
     Config
       { start = TimeFS 0
+      , stop = For $ TimeNS 500
       , clockStart = TimeNS 100
       , shiftToZero = True
       , statusMsgs = True
@@ -59,7 +90,7 @@ instance Default Config where
 instance Default GlobalData where
   def =
     GlobalData
-      { traces = []
+      { globTraces = M.empty
       , found = []
       , messages = []
       , firstRun = True
@@ -70,13 +101,13 @@ instance Default GlobalData where
 SIMULATION
 ----------------------------------------}
 
-globalDataRef :: IORef globalDataRef
+globalDataRef :: IORef GlobalData
 globalDataRef = unsafePerformIO (newIORef def)
 {-# OPAQUE globalDataRef #-}
 
 -- | Simulate a design by forcefully evaluating an output signal.
 simulate ::
-  forall a.
+  forall dom a.
   NFDataX a =>
   -- | Duration
   Time ->
@@ -92,7 +123,7 @@ simulate d = simulateWith def{stop = For $ d + clockStart def}
 -- | Simulate a design by forcefully evaluating an output signal.
 -- Like 'simulate', but with more options.
 simulateWith ::
-  forall a.
+  forall dom a.
   NFDataX a =>
   Config ->
   -- | Clock waves to render
@@ -102,19 +133,20 @@ simulateWith ::
   -- | (One of) the outputs of the circuit containing the traces
   Signal dom a ->
   IO (Either String Simulation)
-simulateWith = simulate0 globalData
+simulateWith = simulate0 globalDataRef
 
 -- | Internal simulation function that takes the global reference as a parameter.
 simulate0 ::
-  forall a.
-  NFData a =>
+  forall dom a.
+  NFDataX a =>
   IORef GlobalData ->
   Config ->
   [ClockWave] ->
   [String] ->
   Signal dom a ->
   IO (Either String Simulation)
-simulate0 = ...
+simulate0 ref conf clockWaves signals sig = do undefined -- ...
+-- union (M.fromList $ L.map (second clockTrace) clockWaves) globTraces
 
 -- Change when the 'Simulation' starts and stops.
 setStartStop ::
@@ -137,7 +169,7 @@ clockWave ::
   KnownDomain dom =>
   String ->
   ClockWave
-clockWave name = (name, clockPeriod @dom)
+clockWave name = (name, clockPeriodTime @dom)
 
 {----------------------------------------
 TRACING
@@ -145,14 +177,14 @@ TRACING
 
 -- | Put a trace in the global data.
 registerTrace :: String -> Trace -> GlobalData -> Either String GlobalData
-registerTrace name trace glob@GlobalData{traces,found} =
-  if M.member name traces then
+registerTrace name trace glob@GlobalData{globTraces} =
+  if M.member name globTraces then
     Left ("Trace " <> name <> " already exists")
   else
-    Right glob{traces = M.insert name trace}
+    Right glob{globTraces = M.insert name trace globTraces}
 
 -- | Mark a signal/signals as found.
-registerFound :: [String] -> GlobalData -> GloblaData
+registerFound :: [String] -> GlobalData -> GlobalData
 registerFound new glob@GlobalData{found} = glob{found = new <> found}
 
 -- | Trace a 'Signal'.
@@ -164,27 +196,19 @@ trace ::
   String ->
   Signal dom a ->
   Signal dom a
-trace name sig = unsafePerformIO (atomicModifyIORef globalDataRef (trace0 name sig)) `seq` sig
+trace name sig = unsafePerformIO $ atomicModifyIORef' globalDataRef $ \g -> (trace0 @dom name (toTrace sig) g, sig)
 {-# OPAQUE trace #-}
 
 trace0 ::
-  forall dom a.
+  forall dom.
   KnownDomain dom =>
-  Traceable a =>
-  String ->
-  Signal dom a ->
-  GlobalData ->
-  GlobalData
-trace0 name sig = trace1 name (toTrace sig)
-
-trace1 ::
   String ->
   Trace ->
   GlobalData ->
   GlobalData
-trace1 name trace = right . registerTrace fullName trace . registerFound found
+trace0 name trace = right . registerTrace fullName trace . registerFound found
  where
-  fullName = replace "$" (domainName @dom) name
+  fullName = replaceDollar (domainName @dom) name
   found = if fullName == name then [name] else [name, fullName]
   right (Right x) = x
   right (Left e) = error e
@@ -199,7 +223,7 @@ traceVec ::
   String ->
   Signal dom (Vec n a) ->
   Signal dom (Vec n a)
-traceVec name sig = unsafePerformIO (atomicModifyIORef globalDataRef (traceVec0 name sig)) `seq` sig
+traceVec name sig = unsafePerformIO $ atomicModifyIORef' globalDataRef $ \g -> (traceVec0 name sig g,sig)
 {-# OPAQUE traceVec #-}
 
 traceVec0 ::
@@ -214,11 +238,13 @@ traceVec0 ::
 traceVec0 name sig = registerTraces . registerFound found
  where
   traces = toList $ toTrace <$> unbundle sig
-  fullName = replace "$" (domainName @dom) name
+  fullName = replaceDollar (domainName @dom) name
   names = map (\i -> name <> "." <> show i) [0..length traces-1]
   fullNames = map (\i -> fullName <> "." <> show i) [0..length traces-1]
   found = if fullName == name then name:names else [name, fullName]<>names<>fullNames
-  registerTraces = foldr (.) id $ zipWith registerTrace fullNames traces
+  registerTraces g = right $ foldM (flip ($)) g $ zipWith registerTrace fullNames traces
+  right (Right x) = x
+  right (Left e) = error e
 {-# OPAQUE traceVec0 #-}
 
 -- | Like 'trace', but operates on a 'Reset'
@@ -250,18 +276,22 @@ traceClock ::
   String ->
   Clock dom ->
   Clock dom
-traceClock name clk = unsafePerformIO (atomicModifyIORef globalDataRef (trace1 name trace)) `seq` clk
+traceClock name clk = unsafePerformIO (atomicModifyIORef' globalDataRef ((,clk) . trace0 @dom name trc))
  where
-  trace = clockTrace (clockPeriod @dom)
-{-# OPAQUE traceEnable #-}
+  trc = clockTrace (clockPeriodTime @dom)
+{-# OPAQUE traceClock #-}
 
 -- Create a trace from a clock period. The period *must* be an even number of fs.
-clockTrace t | fs <- timeInFS t, fs & 1 == 0 =
-  ( encode (typeRep @Bool)
-  , TimeFS (fs `div` 2)
-  , 1
-  , L.cycle $ L.map (unsafeToTup . pack) [False,True] )
-             | otherwise = error "Cannot create clock trace for odd periods (in fs)"
+clockTrace :: Time -> Trace
+clockTrace t
+  | fs <- timeInFS t, even fs =
+    ( encode (typeRep $ Proxy @Bool)
+    , TimeFS (fs `div` 2)
+    , 1
+    , L.cycle $ L.map (unsafeToTup . pack) [False,True] )
+  | otherwise = error "Cannot create clock trace for odd periods (in fs)"
+ where
+  unsafeToTup (BV mask value) = (mask, value)
 
 
 {----------------------------------------
@@ -272,14 +302,14 @@ TRACES
 toTrace ::
   forall dom a.
   KnownDomain dom =>
-  Traceable a ->
+  Traceable a =>
   Signal dom a ->
   Trace
 toTrace sig =
-  ( encode (typeRep @a)
-  , clockPeriod @dom
-  , natVal (Proxy @(BitSize a))
-  , sample (unsafeToTup . pack <$> signal) )
+  ( encode (typeRep $ Proxy @a)
+  , clockPeriodTime @dom
+  , fromInteger $ natVal (Proxy @(BitSize a))
+  , sample (unsafeToTup . pack <$> sig) )
  where
   unsafeToTup (BV mask value) = (mask, value)
 
@@ -287,12 +317,11 @@ toTrace sig =
 -- This only checks whether the type is correct.
 fromTrace ::
   forall dom a.
-  KnownDomain dom ->
-  Traceable a ->
+  Traceable a =>
   Trace ->
   Either String (Signal dom a)
 fromTrace (ty,_period,_width,values)
-  | ty == encode (typeRep @a) = ...
+  | ty == encode (typeRep $ Proxy @a) = undefined -- TODO ...
   | otherwise = Left "Trace did not match target type"
 
 -- | Add a 'Trace' to a 'Simulation'
@@ -301,11 +330,11 @@ addTrace ::
   Trace ->
   Simulation ->
   Either String Simulation
-addTrace name trace sim@Simulation{traces} =
+addTrace name trc sim@Simulation{traces} =
   if M.member name traces then
     Left ("Trace " <> name <> " already exists")
   else
-    Right sim{traces = M.insert name trace traces}
+    Right sim{traces = M.insert name trc traces}
 
 -- | Retrieve a captured 'Trace'.
 fetchTrace ::
@@ -318,7 +347,8 @@ fetchTrace name sim@Simulation{traces} =
 -- | Retrieve a 'Signal' from the captured traces.
 fetch ::
   forall dom a.
-  Traceable a ->
+  KnownDomain dom =>
+  Traceable a =>
   String ->
   Simulation ->
   Either String (Signal dom a)
@@ -336,7 +366,7 @@ store ::
   Int ->
   Simulation ->
   Either String ByteString
-store name samples = storeTrace samples <$> fetchTrace name
+store name samples sim = storeTrace samples <$> fetchTrace name sim
 
 -- | Store a 'Signal' in binary form.
 storeSignal ::
@@ -347,16 +377,16 @@ storeSignal ::
   Signal dom a ->
   -- | Number of samples
   Int ->
-  ByteSting
+  ByteString
 storeSignal signal samples = storeTrace samples $ toTrace signal
 
 -- | Convert a trace into binary form.
-storeTrace :: Trace -> ByteString
-storeTrace = ...
+storeTrace :: Int -> Trace -> ByteString
+storeTrace samples trc = undefined -- TODO ...
 
 -- | Load a trace from binary form.
 load ::
-  forall a dom.
+  forall a.
   Traceable a =>
   -- | The name to use for the signal
   String ->
@@ -365,7 +395,7 @@ load ::
   -- | The 'Simulation' to add the signal to
   Simulation ->
   Either String Simulation
-load name bin sim = loadTrace @a bin >>= (\trace -> registerTrace name trace sim)
+load name bin sim = loadTrace @a bin >>= (\trc -> addTrace name trc sim)
 
 -- | Load a 'Signal' from binary form.
 loadSignal ::
@@ -373,7 +403,7 @@ loadSignal ::
   Traceable a =>
   ByteString ->
   Either String (Signal dom a)
-loadSignal bin = fromTrace <$> loadTrace bin
+loadSignal bin = loadTrace @a bin >>= fromTrace
 
 -- | Convert binary data into a trace for the type specified.
 loadTrace ::
@@ -381,4 +411,19 @@ loadTrace ::
   Traceable a =>
   ByteString ->
   Either String Trace
-loadTrace = ...
+loadTrace = undefined -- TODO ...
+
+
+{---REST--}
+domainName ::
+  forall dom.
+  KnownDomain dom =>
+  String
+domainName =
+  case knownDomain @dom of
+    SDomainConfiguration{sName} -> symbolVal sName
+
+replaceDollar :: String -> String -> String
+replaceDollar _ "" = ""
+replaceDollar n ('$':rest) = n <> replaceDollar n rest
+replaceDollar n (c:rest) = c : replaceDollar n rest

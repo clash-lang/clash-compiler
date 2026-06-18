@@ -265,6 +265,8 @@ Library
                       Clash.Signal.Internal
                       Clash.Signal.Internal.Ambiguous
                       Clash.Signal.Trace
+                      Clash.Signal.Simulation
+                      Clash.Signal.Simulation.Vcd
 
                       Clash.Sized.BitVector
                       Clash.Sized.Fixed
@@ -349,6 +351,7 @@ Library
                       reflection                >= 2       && < 2.2,
                       checked-literals          >= 0.1.1   && < 0.2,
                       singletons                >= 2.0     && < 3.1,
+                      split                     >= 0.2     && < 0.3,
                       string-interpolate        ^>= 0.3,
                       tagged                    >= 0.8     && < 0.9,
                       template-haskell          >= 2.20.0.0 && < 2.24,

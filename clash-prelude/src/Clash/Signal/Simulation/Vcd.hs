@@ -1,18 +1,43 @@
 
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module Clash.Simulation.Vcd (vcdText, writeVcd) where
+module Clash.Signal.Simulation.Vcd (vcdText, writeVcd) where
 
-import Clash.Simulation
+import           Data.Char             (chr, ord)
+import           Control.Exception.Extra
+  (errorIO)
+import           Data.Bifunctor        (second)
+import           Data.Bits             (testBit)
+import qualified Data.List             as L
+import           Data.List.Extra       (snoc)
+import           Data.List.Split       (splitOn)
+import qualified Data.Map              as M
+import           Data.Maybe            (fromMaybe)
+import           Data.Text             (Text)
+import qualified Data.Text             as Text
+import qualified Data.Text.IO
+import qualified Data.Version
+import           Data.Time.Clock       (UTCTime, getCurrentTime)
+import           Data.Time.Format      (formatTime, defaultTimeLocale)
+import           GHC.Exts              (groupWith)
+import           GHC.Stack             (HasCallStack, withFrozenCallStack)
+import           System.IO.Unsafe      (unsafePerformIO)
 
+import           Clash.Signal.Simulation
+import           Clash.Time            (timeInFS, absTime)
 
+import qualified Paths_clash_prelude
 
 data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand]
   deriving (Show)
 
 data DeclarationCommand
   = Version String
-  | Date-- UTCTime -- date is only created when turning into text? or
-  | TimeScale (Int,TimeUnit)
+  | Date UTCTime -- date is only created when turning into text? or
+  | TimeScale (Integer,TimeUnit)
   | VarDec Var
   | Scope Scope [DeclarationCommand]
   | Comment String
@@ -42,7 +67,7 @@ data ValueChange
 
 type Scope = String
 type IDCode = String
-type VcdTime = Int
+type VcdTime = Integer --TODO: check if Int is faster
 type TimeUnit = String
 
 -- | Create a 'Vcd' object from a 'Simulation'.
@@ -58,8 +83,8 @@ vcd Simulation
                   }
       , traces = traceMap
       }
-  | stop < start =
-      Left $ "VCD: stop was " <> show start <> ", which is earlier than start (" <> show startPs <> ")."
+  | absTime start stop < start =
+      Left $ "VCD: stop was " <> show stop <> ", which is earlier than start (" <> show start <> ")."
   | start < 0 && shiftToZero == False =
       Left $ "VCD: Start time was " <> show start <> ", but cannot be negative without shifting the start to 0."
   | null names =
@@ -73,12 +98,12 @@ vcd Simulation
                      , "empty scope names, which is not"
                      , "supported by VCD." ]
   | otherwise =
-      Right $ VCDFile
+      Right $ VcdFile
         ( headers ++ variables )
         simulation
  where
-  offensiveNames = filter (any (not . printable)) allTraceNames
-  emptyScopes = filter (\nm -> ".." `isInfixOf` ('.' : nm <> ".")) allTraceNames
+  offensiveNames = filter (any (not . printable)) allNames
+  emptyScopes = filter (\nm -> ".." `L.isInfixOf` ('.' : nm <> ".")) allNames
 
   {--------------------------
     SPLIT TRACES INTO PARTS
@@ -88,15 +113,15 @@ vcd Simulation
   allLabels = concatMap (\s -> map (snoc s) alphabet) ("": labels)
     where alphabet = map chr [33..126]
 
-  allTraces = L.map second clockTrace <> L.toList traceMap
-  (allNames, allTraces) = L.unzip allTraces
+  allTraces = M.toList traceMap
+  (allNames, _) = L.unzip allTraces
 
-  nonUnitTraces = filter (\(_,(_,_,w,_)) = w>0) allTraces
+  nonUnitTraces = filter (\(_,(_,_,w,_)) -> w>0) allTraces
 
   (labels,names,periods,widths,valuess) = L.unzip5
     $ L.map (\(l,(n,(_t,p,w,vs))) -> (l,n,p,w,vs))
-    $ filter (\(_,(_,(_,_,w,_))) = w>0)
-    $ L.zip allLabels allTraces
+    $ filter (\(_,(_,(_,_,w,_))) -> w>0)
+    $ L.zip allLabels nonUnitTraces
 
   {--------------------------
     VCD FILE CONSTRUCTION
@@ -112,7 +137,7 @@ vcd Simulation
     [ SimulationTime vStart
     , DumpVars initialValues
     ] -- use dumpvars only for reset values? the values at the start?
-    <> blocks
+    <> changes
     <> [SimulationTime vStop]
 
   {--------------------------
@@ -121,7 +146,7 @@ vcd Simulation
 
   variables = mergeScopes varScopes []
    where
-    varScopes = L.map (\(n,w,l) -> mkScope ("logic" : split "." n) w l)
+    varScopes = L.map (\(n,w,l) -> mkScope ("logic" : splitOn "." n) w l)
       $ L.sort
       $ L.zip3 names widths labels
 
@@ -131,13 +156,13 @@ vcd Simulation
   addScope s l = s:l
 
   -- essentially xs <> ys
-  mergeScopes :: [DeclartionCommand] -> [DeclarationCommand]
+  mergeScopes :: [DeclarationCommand] -> [DeclarationCommand] -> [DeclarationCommand]
   mergeScopes [] ys = ys
   mergeScopes (x:xs) ys = addScope x $ mergeScopes xs ys
 
   mkScope :: [String] -> Width -> IDCode -> DeclarationCommand
   mkScope [] _ _ = error "empty signal name"
-  mkScope [varReference] varSize varIDCode = VarDef $ Var{varSize, varIDCode, varReference}
+  mkScope [varReference] varSize varIDCode = VarDec $ Var{varSize, varIDCode, varReference}
   mkScope (n:ns) w l = Scope n [mkScope ns w l]
 
   {--------------------------
@@ -156,15 +181,15 @@ vcd Simulation
 
   -}
 
-  simTimeScaleFS = foldl1 gcd L.map timeInFS periods
+  simTimeScaleFS = foldl1 gcd $ L.map timeInFS periods
 
   vcdTimeScaleFS = largestPow10 1
     $ foldl1 gcd
-    $ simTimeFS : L.map timeInFS [ start
-                                 , absTime start stop
-                                 , absTime start clockStart ]
+    $ simTimeScaleFS : L.map timeInFS [ start
+                                      , absTime start stop
+                                      , clockStart ]
    where
-    largestPow10 p x | x>=10*p = largestPos10 (p*10) x
+    largestPow10 p x | x>=10*p = largestPow10 (p*10) x
                      | otherwise = p
 
   timeScale = timeScale' vcdTimeScaleFS "fs" ["ps","ns","us","ms","s"]
@@ -177,7 +202,7 @@ vcd Simulation
 
   vClockStart = timeInFS clockStart `div` vcdTimeScaleFS :: VcdTime
   vStart = timeInFS start `div` vcdTimeScaleFS + timeOffset :: VcdTime
-  vStop = timeInFS stop `div` vcdTimeScaleFS + timeOffset :: VcdTime
+  vStop = timeInFS (absTime start stop) `div` vcdTimeScaleFS + timeOffset :: VcdTime
 
   simTimeToVcd x = x*timeMult + timeOffset + vClockStart
 
@@ -193,18 +218,79 @@ vcd Simulation
     - compare samples to only get changes
   -}
 
-  domains :: [(VCDTime,([Width],[String],[[Value]]))]
+  -- [(period in VCDTime,([widths))]
+  domains :: [(Period,([Width],[IDCode],[[Value]]))]
   domains = map (\traces -> (fst $ head traces, unzip3 $ map (snd) traces)) $ groupWith fst $ zip periods $ zip3 widths labels valuess
-  changesPerDomain = map mkDomain domains
-  initials = concatMap fst changesPerDomain
-  bodyParts = concatMap (\(t,v) -> [SimulationTime t, ValueChanges v]) $
-              foldl1 zipTimed $
-              map snd changesPerDomain
 
+  changesPerDomain :: [([ValueChange],[(VcdTime,[ValueChange])])]
+  changesPerDomain = L.map findChanges domains
 
-  ...
+  initialValues :: [ValueChange]
+  initialValues = L.concatMap fst changesPerDomain
 
+  -- essentially merge sort with nested merging on equal values
+  blocks :: [(VcdTime, [ValueChange])]
+  blocks = treeFold zipTimed $ (L.map snd changesPerDomain :: [[(VcdTime,[ValueChange])]])
+             
+  changes :: [SimulationCommand]
+  changes = concatMap (\(t,cs) -> [SimulationTime t, ValueChanges cs]) blocks
+  
+  -- TODO: small to large merging is better, but this is likely sufficient
 
+  -- | Merge items with the given function using a binary tree.
+  -- A linear fold would incur quadratic runtime.
+  treeFold :: (a -> a -> a) -> [a] -> a
+  treeFold ff xx = treeFold' (length xx) ff xx
+   where
+    treeFold' l _ [] = error "treeFold used on empty sequence"
+    treeFold' l _ [x] = x
+    treeFold  l f xs = treeFold l' f as `f` treeFold (l - l') f bs
+     where
+      l' = l `div` 2
+      (as, bs) = L.splitAt l' xs
+
+  -- | Zip two lists of timestamped lists of changes.
+  -- A single merge in the merge sort
+  zipTimed :: [(VcdTime,[a])] -> [(VcdTime,[a])] -> [(VcdTime,[a])]
+  zipTimed aa [] = aa
+  zipTimed [] bb = bb
+  zipTimed aa@((ta,va):as) bb@((tb,vb):bs) =
+    case compare ta tb of
+      LT -> (ta,    va) : zipTimed as bb
+      EQ -> (ta,va<>vb) : zipTimed as bs
+      GT -> (tb,    vb) : zipTimed aa bs
+
+  -- Find changes in a list of signals with equal period
+  findChanges :: (Period,([Width],[String],[[Value]])) -> ([ValueChange],[(VcdTime,[ValueChange])])
+  findChanges (period,(widths',labels',valuess')) = (initial', samples')
+    where
+      clkEdges :: [VcdTime]
+      clkEdges = [vClockStart, vClockStart + period' ..]
+       where
+        period' = timeInFS period `div` vcdTimeScaleFS
+
+      -- group by clock cycle and add timestamps (the initial value starts at -inf)
+      valuessFrom :: [(VcdTime,[Value])]
+      valuessFrom = zip (-1000000000000:clkEdges) $ L.transpose valuess' --TODO: minBound, but we're using integers :/
+
+      skipStart :: [(VcdTime,[Value])]
+      skipStart = map fst $ dropWhile ((<= vStart) . snd) $ zip valuessFrom clkEdges
+
+      ((_,initial) , rest) = fromMaybe (error "Finite signal") $ L.uncons skipStart
+
+      samples :: [(VcdTime,[Value])]
+      samples = takeWhile ((< vStop) . fst) rest
+
+      filterChanges (_ta,va) (tb,vb) =
+        (tb
+        , [ValueChange w l b | (a,b,w,l) <- L.zip4 va vb widths' labels', a /= b]
+        )
+
+      initial' :: [ValueChange]
+      initial' = zipWith3 ValueChange widths' labels' initial
+
+      samples' :: [(VcdTime,[ValueChange])]
+      samples' = filter (not . null . snd) $ zipWith filterChanges skipStart samples
 
 
 -- | Create a VCD file for the given traces and simulation configuration.
@@ -223,13 +309,23 @@ writeVcd ::
   IO ()
 writeVcd file sim = do
   text <- assertRight $ vcdText sim
-  writeFile file text
-
+  Data.Text.IO.writeFile file text
+ where
+  assertRight :: -- TODO; duplicate of the one in Prelude :(
+    forall a b.
+    HasCallStack =>
+    Show a =>
+    Either a b ->
+    IO b
+  assertRight = either err pure
+   where
+    err a = withFrozenCallStack $ errorIO $ "assertRight: expected a Right value, given " <> show (Left a :: Either a a)
+    
 -- | Render a 'Vcd' object as 'Text'.
 renderVcd ::
-  VcdFile decl sim ->
+  VcdFile ->
   Text
-renderVcd = Text.unlines $ L.map renderDecl decl <> L.map renderSim sim
+renderVcd (VcdFile decl sim) = Text.unlines $ L.map renderDecl decl <> L.map renderSim sim
 
 -- | Render a VCD 'DeclarationCommand' as 'Text'.
 renderDecl ::
@@ -237,14 +333,14 @@ renderDecl ::
   Text
 renderDecl = \case
   Version v ->
-    vcdCommand "version" [v]
+    vcdCommand "version" [Text.pack v]
   Date t ->
     vcdCommand "date" [Text.pack $ iso8601Format t]
   TimeScale (x,unit) ->
     vcdCommand "timescale" [Text.show x, Text.pack unit]
   VarDec Var{varSize, varIDCode, varReference} ->
     vcdCommand "var" ["wire", Text.show varSize, Text.pack varIDCode, Text.pack varReference]
-  Scope name subs -> Text.unlines
+  Scope name subs -> Text.unlines $
     vcdCommand "scope" ["module", Text.pack name]
     : L.map renderDecl subs
     <> [vcdCommand "upscope" [] ]
@@ -286,15 +382,15 @@ renderChange (ValueChange 1 idCode (mask, val)) =
       ++ show mask
 renderChange ValueChange{..} =
   Text.pack $
-        'b'
-    :  shorten (L.map digit (reverse [0 .. changeSize - 1]))
-    <> ' ':changeIDCode
+       ('b' : shorten (L.map digit $ reverse [0 .. changeSize - 1]))
+    <> (' ' : changeIDCode)
  where
   (mask, val) = changeValue
   digit d = case (testBit mask d, testBit val d) of
     (False,False) -> '0'
     (False,True)  -> '1'
     (True,_)      -> 'x'
+  shorten :: String -> String
   shorten (a:rest@(b:c)) | a == b = shorten rest
   shorten a = a
 
@@ -303,10 +399,14 @@ vcdCommand ::
   Text ->
   [Text] ->
   Text
-vcdCommand tag contents = Text.unwords ("$"<>tag):(contents<>["$end"])
+vcdCommand tag contents = Text.unwords $ ("$"<>tag):(contents<>["$end"])
 
 -- | Format the time according to iso8601: @<yyyy>-<mm>-<dd>T<hh>:<mm>:<ss>@.
 iso8601Format ::
   UTCTime ->
   String
 iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"
+
+-- | TODO
+printable :: Char -> Bool
+printable (ord -> c) = 33 <= c && c <= 126

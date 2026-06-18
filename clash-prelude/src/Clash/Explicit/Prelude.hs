@@ -157,6 +157,8 @@ where
 import Control.Applicative
 import Data.Bits
 import Data.Default
+import Control.Exception.Extra (errorIO)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits
   hiding (SNat, SSymbol, fromSNat)
 import GHC.TypeLits.Extra
