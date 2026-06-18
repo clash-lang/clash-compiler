@@ -1,30 +1,48 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Clash.Time (
-  Time(TimeFS),
-  TimePS, TimeNS, TimeUS, TimeMS, TimeS,
-  timeInFS, timeInPs, timeInNS, timeInUS, timeInMS, timeInS,
-  clockCycles, clockPeriod,
+  Time(TimeFS, TimePS, TimeNS, TimeUS, TimeMS, TimeS),
+  timeInFS, timeInPS, timeInNS, timeInUS, timeInMS, timeInS,
+  clockCycles, clockPeriodTime,
   timeUntil,
   mulTime,
   AtOrForTime(..), absTime
 ) where
 
+import qualified Data.Foldable
+import Data.List (findIndex)
+import Data.Maybe (fromMaybe)
+import Text.Read
+
+import Clash.Promoted.Nat (snatToNum)
+import Clash.Signal (KnownDomain(..), Signal, SDomainConfiguration(..))
+
+
 newtype Time = TimeFS Integer
   deriving (Eq, Ord)
 
+pattern TimePS :: Integer -> Time
 pattern TimePS t <- (getTimePat 3 -> Just t) where
-  TimePS t = TimeFS (t * 10^3)
+  TimePS t = TimeFS (t * 10^(3::Integer))
+pattern TimeNS :: Integer -> Time
 pattern TimeNS t <- (getTimePat 6 -> Just t) where
-  TimeNS t = TimeFS (t * 10^6)
+  TimeNS t = TimeFS (t * 10^(6::Integer))
+pattern TimeUS :: Integer -> Time
 pattern TimeUS t <- (getTimePat 9 -> Just t) where
-  TimeUS t = TimeFS (t * 10^9)
+  TimeUS t = TimeFS (t * 10^(9::Integer))
+pattern TimeMS :: Integer -> Time
 pattern TimeMS t <- (getTimePat 12 -> Just t) where
-  TimeMS t = TimeFS (t * 10^12)
+  TimeMS t = TimeFS (t * 10^(12::Integer))
+pattern TimeS :: Integer -> Time
 pattern TimeS t <- (getTimePat 15 -> Just t) where
-  TimeS  t = TimeFS (t * 10^15)
+  TimeS  t = TimeFS (t * 10^(15::Integer))
 
--- | This is an internal function
-getTimePat k t = if t % (10^k) == 0 then Just (t `div` (10^k)) else Nothing
+-- | This is an internal function.
+getTimePat :: Int -> Time -> Maybe Integer
+getTimePat k (TimeFS t) = if t `rem` (10^k) == 0 then Just (t `div` (10^k)) else Nothing
 
 instance Show Time where
   show (TimeS  t) = show t <> "s"
@@ -89,13 +107,10 @@ class MulTime a b where
   mulTime :: a -> b -> Time
 infixl 7 `mulTime` -- same as (*)
 
-instance MulTime Time Integer
+instance MulTime Time Integer where
   mulTime (TimeFS t) m = TimeFS (t*m)
-instance MulTime Integer Time
+instance MulTime Integer Time where
   mulTime = flip mulTime
-
-instance Ord (Time dom) where
-  (<=) (TimeFS a) (TimeFS b) = a<=b
 
 -- | Time in femtoseconds.
 timeInFS :: Time -> Integer
@@ -127,19 +142,20 @@ clockCycles ::
   KnownDomain dom =>
   Integer ->
   Time
-clockCycles i = i `mulTime` domainPeriod @dom
+clockCycles i = i `mulTime` clockPeriodTime @dom
 
 -- | The period of a clock domain.
-clockPeriod ::
+clockPeriodTime ::
   forall dom.
   KnownDomain dom =>
   Time
-clockPeriod =
+clockPeriodTime =
   case knownDomain @dom of
     SDomainConfiguration{sPeriod} -> TimePS $ snatToNum sPeriod
 
 -- | Used to indicate a specific moment or a duration
 data AtOrForTime = At Time | For Time
+  deriving (Show)
 
 -- | Compute the 'Time' that elapses from the first clock edge of the simulation
 -- to the edge at which the signal satisfies the predicate.
@@ -151,12 +167,15 @@ timeUntil ::
   (a -> Bool) ->
   Signal dom a ->
   Time
-timeUntil cond sig = clockCycles
+timeUntil cond sig = clockCycles @dom
   $ toInteger
   $ fromMaybe undefined
   $ findIndex cond
-  $ tail -- drop reset value
-  $ toList sig
+  $ unsafeTail -- drop reset value
+  $ Data.Foldable.foldr (:) [] sig
+ where
+  unsafeTail (_:t) = t
+  unsafeTail [] = error "Empty signal"
 
 -- | Go from an absolute or relative time and starting point to an absolute time.
 absTime ::

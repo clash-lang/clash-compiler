@@ -221,6 +221,7 @@ import           Clash.Signal hiding
   (HiddenClockName, HiddenResetName, HiddenEnableName)
 import           Clash.Signal.Delayed
 import           Clash.Signal.Trace
+import           Clash.Time
 import           Clash.XException
 
 {- $setup
