@@ -200,6 +200,11 @@ let
           '';
         });
 
+      clash-term =
+        hprev.callCabal2nix "clash-term" ../clash-term {
+          inherit (hfinal) clash-lib;
+        };
+
       clash-testsuite =
         let
           unmodified =

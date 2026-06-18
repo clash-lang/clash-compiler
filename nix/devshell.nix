@@ -20,6 +20,7 @@ pkgs.mkShell {
     clashPkgs.clash-prelude-hedgehog.env
     clashPkgs.clash-profiling.env
     clashPkgs.clash-profiling-prepare.env
+    clashPkgs.clash-term.env
     clashPkgs.clash-testsuite.env
   ];
 

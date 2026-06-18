@@ -76,6 +76,7 @@ jobs:
             "clash-prelude-hedgehog",
             "clash-profiling",
             "clash-profiling-prepare",
+            "clash-term",
             "clash-testsuite"
         ]
         exclude:

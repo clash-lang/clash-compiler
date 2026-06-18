@@ -171,7 +171,8 @@ data DebugOpts = DebugOpts
   --
   -- Command line flag: -fclash-debug-transformations-limit=N
   , dbg_historyFile :: Maybe FilePath
-  -- ^ Save information about all applied transformations to a history file.
+  -- ^ Save information about all applied transformations to a history file
+  -- for use with @clash-term@.
   --
   -- Command line flag: -fclash-debug-history[=FILE]
   } deriving (Generic, NFData, Show, Eq)
