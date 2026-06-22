@@ -22,6 +22,7 @@ import qualified Data.List             as L
 import qualified Data.Map              as M
 import           Data.Time.Clock       (UTCTime, getCurrentTime)
 import           Data.Typeable         (Typeable, typeRep, Proxy(..))
+import qualified Debug.Trace
 import           GHC.Natural           (Natural)
 import           GHC.TypeLits          (KnownNat, natVal, symbolVal)
 import           System.IO.Unsafe      (unsafePerformIO)
@@ -38,12 +39,12 @@ import           Clash.Sized.Internal.BitVector
 import           Clash.Sized.Vector    (Vec, toList)
 import           Clash.Time            (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
 
+data DataType = DT String [DataType] deriving (Show)
 
-type TypeRepBS = ByteString
 type Period = Time
 type Width = Int
 type Value = (Natural, Natural)
-type Trace = (TypeRepBS,Period,Width,[Value])
+type Trace = (DataType,Period,Width,[Value])
 type TraceMap = M.Map String Trace
 
 type Traceable a = (NFDataX a, BitPack a, Typeable a)
@@ -191,16 +192,40 @@ forceEvaluateSignal ::
   (Integer,Integer) ->
   Bool ->
   IO (Either String ())
-forceEvaluateSignal _ref sig waitFor (_start,_stop) _statusMsgs = --undefined -- TODO ...
-  if null waitFor then
-    -- forcefully evaluate all values in the given range
-    undefined
-    do seepSeqX $ drop start $ take stop $ foldr (:) [] sig -- but with progress bar
-  else
-    -- forcefully evaluate values in the given range until all signals have been found
-    -- exit early if all have been found
-    -- error if not all were found
-    undefined
+forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs = --undefined -- TODO ...
+  case (waitFor, statusMsgs) of
+    ([],False) ->
+      -- just evaluate everything
+      do x <- deepseqX values'
+         return $ Right x
+    ([],True) ->
+      -- keep monitoring found signals and report them
+      do x <- foldM printFound () values'
+         return $ Right $ x
+    (_,False) ->
+      do ... -- TODO: for every signal we need to find, _continue_ the search
+    (_,True) -> 
+      do ... -- TODO: needs some sort of linear search that checks all the signals all the time?
+ where
+  values = drop start $ take stop $ foldr (:) [] sig
+  values' =
+    if statusMsgs then
+      zipWith $ (progress $ stop - start) values
+    else
+      values
+
+  progress n = map go [0..n-1]
+   where 
+    go k =
+      if (20*k `div` n) /= (20*(k-1) `div` n) then 
+        Debug.Trace.trace $ show ((20*k) `div` n * 5) ++ "%"
+      else id
+  
+  printFound :: () -> a -> IO ()
+  printFound u x = deepseqX x
+                   glob@GlobalData{globFound} <- readIORef ref
+                   ... -- print any signals found TODO
+                   return u
 
 -- Change when the 'Simulation' starts and stops.
 setStartStop ::
@@ -407,65 +432,6 @@ fetch ::
   Simulation ->
   Either String (Signal dom a)
 fetch name sim = fetchTrace name sim >>= fromTrace
-
-{----------------------------------------
-STORING SIGNALS
-----------------------------------------}
-
--- | Store a trace in binary form.
-store ::
-  -- | Name of trace to dump
-  String ->
-  -- | Number of samples
-  Int ->
-  Simulation ->
-  Either String ByteString
-store name samples sim = storeTrace samples <$> fetchTrace name sim
-
--- | Store a 'Signal' in binary form.
-storeSignal ::
-  forall dom a.
-  KnownDomain dom =>
-  Traceable a =>
-  -- | Name of trace to dump
-  Signal dom a ->
-  -- | Number of samples
-  Int ->
-  ByteString
-storeSignal signal samples = storeTrace samples $ toTrace signal
-
--- | Convert a trace into binary form.
-storeTrace :: Int -> Trace -> ByteString
-storeTrace _samples _trc = undefined -- TODO ...
-
--- | Load a trace from binary form.
-load ::
-  forall a.
-  Traceable a =>
-  -- | The name to use for the signal
-  String ->
-  -- | The binary data
-  ByteString ->
-  -- | The 'Simulation' to add the signal to
-  Simulation ->
-  Either String Simulation
-load name bin sim = loadTrace @a bin >>= (\trc -> addTrace name trc sim)
-
--- | Load a 'Signal' from binary form.
-loadSignal ::
-  forall a dom.
-  Traceable a =>
-  ByteString ->
-  Either String (Signal dom a)
-loadSignal bin = loadTrace @a bin >>= fromTrace
-
--- | Convert binary data into a trace for the type specified.
-loadTrace ::
-  forall a.
-  Traceable a =>
-  ByteString ->
-  Either String Trace
-loadTrace _bin = undefined -- TODO ...
 
 
 {---REST--}
