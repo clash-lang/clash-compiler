@@ -199,8 +199,8 @@ instance Backend VHDLState where
     Unsigned {} -> pure PrimitiveType
     Signed {} -> pure PrimitiveType
     String -> pure PrimitiveType
-    Integer -> pure PrimitiveType
-    Natural -> pure PrimitiveType  -- TODO natural is a primitive type, but we don't ever want to generate it
+    Integer -> integerTyError
+    Natural -> naturalTyError
     FileType -> pure PrimitiveType
 
     -- Transparent types:
@@ -619,8 +619,8 @@ tyDec hwty = do
     Unsigned _  -> emptyDoc
     Signed _    -> emptyDoc
     String      -> emptyDoc
-    Integer     -> emptyDoc
-    Natural     -> emptyDoc
+    Integer     -> integerTyError
+    Natural     -> naturalTyError
     FileType    -> emptyDoc
 
     -- Transparent types:
@@ -635,7 +635,9 @@ tyDec hwty = do
       Unexpected Product with fewer than 2 fields: #{hwty}
     |]
 
-
+integerTyError, naturalTyError :: HasCallStack => a
+integerTyError = error "VHDL backend processing a Integer, this shouldn't have happened :'("
+naturalTyError = error "VHDL backend processing a Natural, this shouldn't have happened :'("
 
 
 funDec :: RenderEnums -> HdlSyn -> HWType -> Maybe (VHDLM Doc,VHDLM Doc)
@@ -1212,8 +1214,8 @@ tyName' rec0 (filterTransparent -> t) = do
       let app = if rec0 then ["_", showt n] else [] in
       return $ TextS.concat $ "std_logic_vector" : app
     String        -> return "string"
-    Integer       -> return "integer"
-    -- Natural       -> return "natural" -- TODO natural is a primitive type, but we don't ever want to generate it
+    Integer       -> integerTyError
+    Natural       -> naturalTyError
     Bit           -> return "std_logic"
     Vector n elTy -> do
       elTy' <- tyName' True elTy
@@ -1275,8 +1277,8 @@ normaliseType enums@(RenderEnums e) hwty = case hwty of
   Unsigned _    -> hwty
   BitVector _   -> hwty
   String        -> hwty
-  Integer       -> hwty
-  Natural       -> hwty
+  Integer       -> integerTyError
+  Natural       -> naturalTyError
   Bit           -> hwty
   FileType      -> hwty
 
@@ -1310,8 +1312,8 @@ filterTransparent hwty = case hwty of
   Unsigned _        -> hwty
   BitVector _       -> hwty
   String            -> hwty
-  Integer           -> hwty
-  Natural           -> hwty
+  Integer           -> integerTyError
+  Natural           -> naturalTyError
   Bit               -> hwty
   Clock _           -> hwty
   ClockN _          -> hwty

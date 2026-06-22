@@ -43,6 +43,7 @@ import qualified Data.Text                            as TextS
 import           Data.Text.Prettyprint.Doc.Extra
 import qualified Data.Text.Prettyprint.Doc.Extra      as PP
 import           Data.Tuple                           (swap)
+import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath
 
 import           Clash.Annotations.Primitive          (HDL (..))
@@ -618,7 +619,14 @@ verilogType t_ = do
     Bool          -> "logic"
     String        -> "string"
     FileType      -> "integer"
+    Integer       -> integerTyError
+    Natural       -> naturalTyError
     _ -> logicOrWire <+> brackets (int (typeSize t -1) <> colon <> int 0)
+
+integerTyError, naturalTyError :: HasCallStack => a
+integerTyError = error "Verilog backend processing a Integer, this shouldn't have happened :'("
+naturalTyError = error "Verilog backend processing a Natural, this shouldn't have happened :'("
+
 
 sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
 sigDecl d t = verilogType t <+> d

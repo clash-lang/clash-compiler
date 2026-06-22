@@ -392,7 +392,13 @@ verilogType t = case t of
   FileType -> emptyDoc
   Annotated _ ty -> verilogType ty
   BiDirectional _ ty -> verilogType ty
+  Integer -> integerTyError
+  Natural -> naturalTyError
   _        -> brackets (int (typeSize t -1) <> colon <> int 0)
+
+integerTyError, naturalTyError :: HasCallStack => a
+integerTyError = error "Verilog backend processing a Integer, this shouldn't have happened :'("
+naturalTyError = error "Verilog backend processing a Natural, this shouldn't have happened :'("
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
 sigDecl d t = verilogType t <+> d
