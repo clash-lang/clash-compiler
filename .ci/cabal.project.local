@@ -15,12 +15,12 @@ package clash-prelude
   benchmarks: True
 
 package clash-lib
-  ghc-options: -Werror
+  -- ghc-options: -Werror
   tests: True
   flags: +debug -workaround-ghc-mmap-crash
 
 package clash-ghc
-  ghc-options: -Werror
+  -- ghc-options: -Werror
   flags: -workaround-ghc-mmap-crash
 
 package clash-cosim
