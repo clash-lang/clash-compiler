@@ -122,12 +122,15 @@ ghcTypeToHWType opts = go
                       _  -> throwE $ $(curLoc) ++ "Word64 DC has unexpected amount of arguments"
                     _    -> throwE $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
              else returnN (Unsigned 64)
-        $(namePat ''Integer)
-          | opt_translateBigNums opts -> returnN (Signed iw)
-          | otherwise -> returnN Integer
-        $(namePat ''Natural)
-          | opt_translateBigNums opts -> returnN (Unsigned iw)
-          | otherwise -> returnN Natural
+
+        -- NOTE that we keep Integer and Natural here as a tag
+        -- Later we'll do a pass over the whole netlist with 'Clash.Netlist.filterBigNums',
+        -- that finds all of them and transforms them to Signed/Unsigned
+        -- and optionally reports them as warnings or errors.
+        $(namePat ''Integer) -> returnN Integer
+        $(namePat ''Natural) -> returnN Natural
+
+
         $(namePat ''GHC.Prim.Char#)                -> returnN (Unsigned 21)
         $(namePat ''GHC.Prim.Int#)                 -> returnN (Signed iw)
         $(namePat ''GHC.Prim.Word#)                -> returnN (Unsigned iw)

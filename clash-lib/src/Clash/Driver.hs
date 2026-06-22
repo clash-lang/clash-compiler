@@ -33,6 +33,7 @@ import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
+import           Control.Monad.Trans.RWS.CPS      (runRWS)
 import qualified Crypto.Hash.SHA256               as Sha256
 import           Data.Bifunctor                   (first, second)
 import           Data.ByteString                  (ByteString)
@@ -113,7 +114,7 @@ import           Clash.Driver.Manifest
   (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
    mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
-import           Clash.Netlist                    (checkComponent, genNetlist, genTopNames)
+import           Clash.Netlist                    (checkComponent, filterBigNums, genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import qualified Clash.Netlist.Id                 as Id
@@ -446,7 +447,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
       -- 3. Generate netlist for topEntity
-      (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
+      (topComponent, netlist0) <- modifyMVar seenV $ \seen -> do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
           genNetlist env peEval isTb transformedBindings topEntityMap compNames
@@ -454,15 +455,17 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
         pure (seen', (topComponent, netlist))
 
-      netlistTime <- netlist `deepseq` Clock.getCurrentTime
+      netlistTime <- netlist0 `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
 
       withMVar ioLockV . const $
         putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
 
-      let netlistComps = snd <$> toList netlist
-          netlistErrors = concatMap checkComponent netlistComps
+      let -- netlistComps = snd <$> toList netlist0
+          -- netlistErrors = concatMap checkComponent netlistComps
           translBigNums = opt_translateBigNums opts
+          iw = opt_intWidth opts
+      let (netlist, _, netlistErrors) = runRWS (filterBigNums [] netlist0) iw ()
       -- 3b. Check the netlist for bignums that shouldn't be there
       Monad.when (not translBigNums && not (null netlistErrors)) $ do
         IO.hPutStrLn IO.stderr $ unlines netlistErrors

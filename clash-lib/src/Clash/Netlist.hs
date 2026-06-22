@@ -11,6 +11,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -19,6 +20,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 module Clash.Netlist where
 
@@ -29,7 +31,9 @@ import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT, runState)
+import           Control.Monad.Trans.RWS.CPS      (RWS, ask, tell)
 import           Data.Bifunctor                   (first, second)
+import           Data.Bitraversable               (bitraverse)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
 import           Data.Foldable                    (foldlM)
@@ -75,7 +79,7 @@ import           Clash.Core.VarEnv
    lookupVarEnv')
 import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
-import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
+import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate,Element)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
@@ -1172,6 +1176,171 @@ showNetlistContexts = concatMap go
 
 showIdentifier :: Identifier -> String
 showIdentifier = StrictText.unpack . Id.toText
+
+type IntWidth = Int
+
+class FilterBigNums a where
+  filterBigNums :: [NetlistContext] -> a -> RWS IntWidth [ErrorMsg] () a
+
+instance FilterBigNums Component where
+  filterBigNums ctx0 (Component compNm0 ins0 outs0 decls0) = do
+    let ctx = CtxComponent compNm0 : ctx0
+    ins <- fmap (map snd) $ filterBigNums ctx $ map (\x -> (In,x)) ins0
+    outs <- fmap (map snd) $ filterBigNums ctx $ map (\x -> (Out,x)) outs0
+    decls <- filterBigNums ctx decls0
+    return $ Component compNm0 ins outs decls
+
+instance FilterBigNums a => FilterBigNums [a] where
+  filterBigNums ctx = mapM (filterBigNums ctx)
+
+instance FilterBigNums a => FilterBigNums (Maybe a) where
+  filterBigNums ctx = mapM (filterBigNums ctx)
+
+instance (FilterBigNums t1, FilterBigNums t2) => FilterBigNums (t1,t2) where
+  filterBigNums ctx (x1,x2) = (,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3) => FilterBigNums (t1,t2,t3) where
+  filterBigNums ctx (x1,x2,x3) = (,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3, FilterBigNums t4) => FilterBigNums (t1,t2,t3,t4) where
+  filterBigNums ctx (x1,x2,x3,x4) = (,,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3 <*> filterBigNums ctx x4
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3, FilterBigNums t4, FilterBigNums t5) => FilterBigNums (t1,t2,t3,t4,t5) where
+  filterBigNums ctx (x1,x2,x3,x4,x5) = (,,,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3 <*> filterBigNums ctx x4 <*> filterBigNums ctx x5
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3, FilterBigNums t4, FilterBigNums t5, FilterBigNums t6) => FilterBigNums (t1,t2,t3,t4,t5,t6) where
+  filterBigNums ctx (x1,x2,x3,x4,x5,x6) = (,,,,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3 <*> filterBigNums ctx x4 <*> filterBigNums ctx x5 <*> filterBigNums ctx x6
+
+instance (FilterBigNums a,FilterBigNums b) => FilterBigNums (Either a b) where
+  filterBigNums ctx = bitraverse (filterBigNums ctx) (filterBigNums ctx)
+
+instance (Ord k, FilterBigNums v) => FilterBigNums (OMap.OMap k v) where
+  filterBigNums ctx = traverse (filterBigNums ctx)
+
+
+instance FilterBigNums BlackBox where
+  filterBigNums ctx = pure
+instance FilterBigNums Element where
+  filterBigNums ctx = pure
+instance FilterBigNums ComponentMeta where
+  filterBigNums ctx = pure
+
+instance FilterBigNums Declaration where
+  filterBigNums ctx d0 = case d0 of
+    Assignment nm usage expr -> Assignment nm usage <$> filterBigNums (CtxSignal nm : ctx) expr
+    CondAssignment nm ty scrut scrutTy alts -> let ctx' = CtxSignal nm : ctx in
+        CondAssignment nm <$> filterBigNums ctx' ty <*> filterBigNums ctx' scrut <*> filterBigNums ctx' scrutTy <*> filterBigNums ctx' alts
+    InstDecl eOrC mLib attrs nm lbl params portmap -> InstDecl eOrC mLib attrs nm lbl <$> filterBigNums ctx params <*> filterBigNums ctx portmap
+    CompDecl nm ports -> CompDecl nm <$> filterBigNums ctx ports
+    BlackBoxD nm libs use qsys bb bbCtx -> let ctx' = CtxBlackBox nm : ctx in
+      BlackBoxD nm libs use qsys bb <$> filterBigNums ctx bbCtx
+    NetDecl' comment nm ty e -> let ctx' = CtxSignal nm : ctx in
+      NetDecl' comment nm <$> filterBigNums ctx' ty <*> filterBigNums ctx' e
+    TickDecl {} -> pure d0
+    Seq xs -> Seq <$> filterBigNums ctx xs
+    ConditionalDecl condText xs -> ConditionalDecl condText <$> filterBigNums ctx xs
+
+instance FilterBigNums PortMap where
+  filterBigNums ctx portmap = case portmap of
+    IndexedPortMap xs -> IndexedPortMap <$> filterBigNums ctx xs
+    NamedPortMap xs   -> NamedPortMap   <$> filterBigNums ctx xs
+
+instance FilterBigNums Seq where
+  filterBigNums ctx x = case x of
+    AlwaysClocked edge clkExpr xs -> AlwaysClocked edge <$> filterBigNums ctx clkExpr <*> filterBigNums ctx xs
+    Initial xs -> Initial <$> filterBigNums ctx xs
+    AlwaysComb xs -> AlwaysComb <$> filterBigNums ctx xs
+    SeqDecl s -> SeqDecl <$> filterBigNums ctx s
+    Branch scrut scrutTy alts -> Branch <$> filterBigNums ctx scrut <*> filterBigNums ctx scrutTy <*> filterBigNums ctx alts
+
+instance FilterBigNums PortDirection where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums Identifier where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums HW.Literal where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums Usage where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums Bool where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums StrictText.Text where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums HWType where
+  filterBigNums ctx ty0 = case ty0 of
+     Natural -> do
+       tell $ ["Found Natural" <> showNetlistContexts ctx]
+       iw <- ask
+       return (Unsigned iw)
+     Integer -> do
+       tell $ ["Found Integer" <> showNetlistContexts ctx]
+       iw <- ask
+       return (Signed iw)
+
+     Vector sz elemTy -> let ctx' = CtxType "Vector" : ctx in
+       Vector sz <$> filterBigNums ctx' elemTy
+
+     RTree sz elemTy -> let ctx' = CtxType "RTree" : ctx in
+       RTree sz <$> filterBigNums ctx' elemTy
+
+     BiDirectional dir ty' -> let ctx' = CtxType "BiDirectional" : ctx in
+       BiDirectional dir <$> filterBigNums ctx' ty'
+
+     Product nm fieldNms tys -> let ctx' = CtxType ("Product " <> show nm) : ctx in
+       Product nm fieldNms <$> filterBigNums ctx' tys
+
+     CustomProduct nm repr sz fieldNms xs -> let ctx' = CtxType ("CustomProduct " <> show nm) : ctx in
+       CustomProduct nm repr sz fieldNms <$> mapM (\(fAnn,ty) -> (fAnn,) <$> filterBigNums ctx' ty) xs
+
+     SP nm xs -> let ctx' = CtxType ("SP" <> show nm) : ctx in
+       SP nm <$> mapM (\(nm',tys) -> (nm',) <$> filterBigNums ctx' tys) xs
+
+     CustomSP nm repr sz xs -> let ctx' = CtxType ("CustomSP " <> show nm) : ctx in
+       CustomSP nm repr sz <$> mapM (\(cRepr,nm',tys) -> (cRepr,nm',) <$> filterBigNums ctx' tys) xs
+
+     Annotated attrs ty' -> let ctx' = CtxType "Annotated" : ctx in
+      Annotated attrs <$> filterBigNums ctx' ty'
+
+     Void mTy -> let ctx' = CtxType "Void" : ctx in Void <$> mapM (filterBigNums ctx') mTy
+
+     String -> return ty0
+     Bool -> return ty0
+     Bit -> return ty0
+     BitVector _ -> return ty0
+     Index _ -> return ty0
+     Signed _ -> return ty0
+     Unsigned _ -> return ty0
+     MemBlob _ _ -> return ty0
+     Sum _ _ -> return ty0
+     Clock _ -> return ty0
+     ClockN _ -> return ty0
+     Reset _ -> return ty0
+     Enable _ -> return ty0
+     CustomSum {} -> return ty0
+     KnownDomain {} -> return ty0
+     FileType -> return ty0
+
+instance FilterBigNums Expr where
+  filterBigNums ctx e0 = case e0 of
+     HW.Literal mTy0 lit -> do
+       mTy <- filterBigNums ctx mTy0
+       return $ HW.Literal mTy lit
+
+     DataCon ty modifier exprs -> DataCon <$> filterBigNums ctx ty <*> pure modifier <*> filterBigNums ctx exprs
+     Identifier{} -> pure e0
+     DataTag ty x -> DataTag <$> filterBigNums ctx ty <*> pure x
+     BlackBoxE nm libs use qsys bb bbCtx wrap -> let ctx' = CtxBlackBox nm : ctx in
+       BlackBoxE nm libs use qsys bb <$> filterBigNums ctx' bbCtx <*> pure wrap
+     ToBv   mNm ty e -> ToBv   mNm <$> filterBigNums ctx ty <*> filterBigNums ctx e
+     FromBv mNm ty e -> FromBv mNm <$> filterBigNums ctx ty <*> filterBigNums ctx e
+     IfThenElse eCond eThen eElse -> IfThenElse <$> filterBigNums ctx eCond <*> filterBigNums ctx eThen <*> filterBigNums ctx eElse
+     Noop -> pure e0
+
+instance FilterBigNums BlackBoxContext where
+  filterBigNums ctx (Context {..}) =
+    Context bbName <$> filterBigNums ctx bbResults <*> filterBigNums ctx bbInputs <*> mapM (filterBigNums ctx) bbFunctions <*> pure bbQsysIncName <*> pure bbLevel <*> pure bbCompName <*> pure bbCtxName
+
 
 -- Checks the netlist for Integer/Natural usage
 checkComponent :: Component -> [ErrorMsg]
