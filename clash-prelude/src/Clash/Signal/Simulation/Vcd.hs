@@ -9,7 +9,6 @@ module Clash.Signal.Simulation.Vcd (vcdText, writeVcd) where
 import           Data.Char             (chr, ord)
 import           Control.Exception.Extra
   (errorIO)
-import           Data.Bifunctor        (second)
 import           Data.Bits             (testBit)
 import qualified Data.List             as L
 import           Data.List.Extra       (snoc)
@@ -20,11 +19,10 @@ import           Data.Text             (Text)
 import qualified Data.Text             as Text
 import qualified Data.Text.IO
 import qualified Data.Version
-import           Data.Time.Clock       (UTCTime, getCurrentTime)
+import           Data.Time.Clock       (UTCTime)
 import           Data.Time.Format      (formatTime, defaultTimeLocale)
 import           GHC.Exts              (groupWith)
 import           GHC.Stack             (HasCallStack, withFrozenCallStack)
-import           System.IO.Unsafe      (unsafePerformIO)
 
 import           Clash.Signal.Simulation
 import           Clash.Time            (timeInFS, absTime)
@@ -75,13 +73,14 @@ vcd ::
   Simulation ->
   Either String VcdFile
 vcd Simulation
-      { config = Config
+      { simConfig = Config
                   { start, stop, clockStart
                   , shiftToZero
                   , statusMsgs
                   , warnZeroWidth
                   }
-      , traces = traceMap
+      , simTraces = traceMap
+      , simTimestamp
       }
   | absTime start stop < start =
       Left $ "VCD: stop was " <> show stop <> ", which is earlier than start (" <> show start <> ")."
@@ -116,19 +115,17 @@ vcd Simulation
   allTraces = M.toList traceMap
   (allNames, _) = L.unzip allTraces
 
-  nonUnitTraces = filter (\(_,(_,_,w,_)) -> w>0) allTraces
+  nonUnitTraces = filter (\(l,(_,(_,_,w,_))) -> w>0) $ zip allLabels allTraces -- TODO: Use warnZeroWidth here?
 
   (labels,names,periods,widths,valuess) = L.unzip5
-    $ L.map (\(l,(n,(_t,p,w,vs))) -> (l,n,p,w,vs))
-    $ filter (\(_,(_,(_,_,w,_))) -> w>0)
-    $ L.zip allLabels nonUnitTraces
+    $ L.map (\(l,(n,(_t,p,w,vs))) -> (l,n,p,w,vs)) nonUnitTraces
 
   {--------------------------
     VCD FILE CONSTRUCTION
   --------------------------}
 
   headers =
-    [ Date $ unsafePerformIO getCurrentTime
+    [ Date simTimestamp
     , Version $ Data.Version.showVersion Paths_clash_prelude.version
     , TimeScale timeScale
     ]
@@ -220,7 +217,10 @@ vcd Simulation
 
   -- [(period in VCDTime,([widths))]
   domains :: [(Period,([Width],[IDCode],[[Value]]))]
-  domains = map (\traces -> (fst $ head traces, unzip3 $ map (snd) traces)) $ groupWith fst $ zip periods $ zip3 widths labels valuess
+  domains = map (\traces -> (fst $ unsafeHead traces, unzip3 $ map (snd) traces)) $ groupWith fst $ zip periods $ zip3 widths labels valuess
+
+  unsafeHead (x:_) = x
+  unsafeHead [] = error "Cannot take head of empty list"
 
   changesPerDomain :: [([ValueChange],[(VcdTime,[ValueChange])])]
   changesPerDomain = L.map findChanges domains
@@ -242,9 +242,9 @@ vcd Simulation
   treeFold :: (a -> a -> a) -> [a] -> a
   treeFold ff xx = treeFold' (length xx) ff xx
    where
-    treeFold' l _ [] = error "treeFold used on empty sequence"
-    treeFold' l _ [x] = x
-    treeFold  l f xs = treeFold l' f as `f` treeFold (l - l') f bs
+    treeFold' _ _ [] = error "treeFold used on empty sequence"
+    treeFold' _ _ [x] = x
+    treeFold' l f xs = treeFold' l' f as `f` treeFold' (l - l') f bs
      where
       l' = l `div` 2
       (as, bs) = L.splitAt l' xs
@@ -407,6 +407,6 @@ iso8601Format ::
   String
 iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"
 
--- | TODO
+-- | Check whether a character is a simple printable (visible) ASCII character.
 printable :: Char -> Bool
 printable (ord -> c) = 33 <= c && c <= 126
