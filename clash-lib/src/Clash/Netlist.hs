@@ -1339,8 +1339,16 @@ instance FilterBigNums Expr where
 
 instance FilterBigNums BlackBoxContext where
   filterBigNums ctx (Context {..}) =
-    Context bbName <$> filterBigNums ctx bbResults <*> filterBigNums ctx bbInputs <*> mapM (filterBigNums ctx) bbFunctions <*> pure bbQsysIncName <*> pure bbLevel <*> pure bbCompName <*> pure bbCtxName
-
+    Context bbName <$> filterBigNums ctx bbResults <*> filterInputs bbInputs <*> mapM (filterBigNums ctx) bbFunctions <*> pure bbQsysIncName <*> pure bbLevel <*> pure bbCompName <*> pure bbCtxName
+   where
+     -- filterInputs :: [(Expr, HWType, Bool)] -> _
+     filterInputs = zipWithM filterInput [0..]
+     filterInput n (e, ty, isConst) = (,,) <$> e' <*> filterBigNums ctx' ty <*> pure isConst
+      where
+        ctx' = CtxBbInput n : ctx
+        e' = case ty of
+          Void _ -> pure e
+          _ -> filterBigNums ctx' e
 
 -- Checks the netlist for Integer/Natural usage
 checkComponent :: Component -> [ErrorMsg]
