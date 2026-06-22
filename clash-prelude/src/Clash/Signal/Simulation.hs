@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
@@ -10,22 +11,28 @@
 module Clash.Signal.Simulation where
 
 import           Control.Monad         (foldM)
+import           Data.Bifunctor        (second)
 import           Data.Binary           (encode)
 import           Data.ByteString.Lazy  (ByteString)
 import           Data.Default          (Default(..))
 import           Data.Either.Extra     (maybeToEither)
 import           Data.IORef
-  (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
-import qualified Data.List as L
-import qualified Data.Map as M
+  (IORef, atomicModifyIORef', newIORef, readIORef)
+import qualified Data.List             as L
+import qualified Data.Map              as M
+import           Data.Time.Clock       (UTCTime, getCurrentTime)
 import           Data.Typeable         (Typeable, typeRep, Proxy(..))
 import           GHC.Natural           (Natural)
 import           GHC.TypeLits          (KnownNat, natVal, symbolVal)
 import           System.IO.Unsafe      (unsafePerformIO)
 
 import           Clash.Class.BitPack   (BitPack(..), BitSize)
-import           Clash.XException      (deepseqX, NFDataX)
-import           Clash.Signal          (KnownDomain, knownDomain, Signal, Clock, Reset, Enable, fromEnable, unsafeFromReset, sample, SDomainConfiguration(..), unbundle)
+import           Clash.XException      (NFDataX)
+import           Clash.Signal
+  (KnownDomain, SDomainConfiguration(..), knownDomain,
+  Signal, sample, fromList,
+  Clock, Reset, Enable, fromEnable, unsafeFromReset,
+  unbundle)
 import           Clash.Sized.Internal.BitVector
   (BitVector(BV))
 import           Clash.Sized.Vector    (Vec, toList)
@@ -47,16 +54,17 @@ type ClockWave = (String, Time)
 
 -- | Object containing the simulation configuration and the traces captured during simulation.
 data Simulation = Simulation
-  { config :: Config
-  , traces :: TraceMap
+  { simConfig :: Config
+  , simTraces :: TraceMap
+  , simTimestamp :: UTCTime
   }
 
 -- | Object containing all data that must be globally accessible.
 data GlobalData = GlobalData
   { globTraces :: TraceMap
-  , found :: [String]
-  , messages :: [String]
-  , firstRun :: Bool
+  , globFound :: [String]
+  , globMessages :: [String]
+  , globFirstRun :: Bool
   }
 
 data Config
@@ -91,9 +99,9 @@ instance Default GlobalData where
   def =
     GlobalData
       { globTraces = M.empty
-      , found = []
-      , messages = []
-      , firstRun = True
+      , globFound = []
+      , globMessages = []
+      , globFirstRun = True
       }
 
 
@@ -108,6 +116,7 @@ globalDataRef = unsafePerformIO (newIORef def)
 -- | Simulate a design by forcefully evaluating an output signal.
 simulate ::
   forall dom a.
+  KnownDomain dom =>
   NFDataX a =>
   -- | Duration
   Time ->
@@ -124,6 +133,7 @@ simulate d = simulateWith def{stop = For $ d + clockStart def}
 -- Like 'simulate', but with more options.
 simulateWith ::
   forall dom a.
+  KnownDomain dom =>
   NFDataX a =>
   Config ->
   -- | Clock waves to render
@@ -138,6 +148,7 @@ simulateWith = simulate0 globalDataRef
 -- | Internal simulation function that takes the global reference as a parameter.
 simulate0 ::
   forall dom a.
+  KnownDomain dom =>
   NFDataX a =>
   IORef GlobalData ->
   Config ->
@@ -145,8 +156,51 @@ simulate0 ::
   [String] ->
   Signal dom a ->
   IO (Either String Simulation)
-simulate0 ref conf clockWaves signals sig = do undefined -- ...
--- union (M.fromList $ L.map (second clockTrace) clockWaves) globTraces
+simulate0 ref simConfig@Config{start,stop,clockStart,statusMsgs, warnZeroWidth} clockWaves signals sig = do
+  simTimestamp <- getCurrentTime
+
+  GlobalData{globFirstRun} <- readIORef ref
+  if globFirstRun then do
+    -- register firstRun
+    atomicModifyIORef' ref (\glob -> (glob{globFirstRun=False},()))
+
+    -- evaluate signal
+    let cStart = max 0
+          $ (timeInFS (start - clockStart))
+          `div` (timeInFS $ clockPeriodTime @dom)
+          + 1 -- t=0 for sample 1
+        cStop = max 0
+          $ (timeInFS $ absTime start stop - clockStart)
+          `div` (timeInFS $ clockPeriodTime @dom)
+          + 2 -- add 1 for exclusive range
+    evalResult <- forceEvaluateSignal ref sig signals (cStart, cStop) statusMsgs
+
+    -- create Simulation
+    GlobalData{globTraces} <- readIORef ref
+    let simTraces = M.union (M.fromList $ L.map (second clockTrace) clockWaves) globTraces
+    return $ evalResult >>= Right Simulation{simConfig, simTraces, simTimestamp}
+  else
+    return $ Left "simulate can only be safely called once"
+
+forceEvaluateSignal ::
+  forall dom a.
+  NFDataX a =>
+  IORef GlobalData ->
+  Signal dom a ->
+  [String] ->
+  (Integer,Integer) ->
+  Bool ->
+  IO (Either String ())
+forceEvaluateSignal _ref sig waitFor (_start,_stop) _statusMsgs = --undefined -- TODO ...
+  if null waitFor then
+    -- forcefully evaluate all values in the given range
+    undefined
+    do seepSeqX $ drop start $ take stop $ foldr (:) [] sig -- but with progress bar
+  else
+    -- forcefully evaluate values in the given range until all signals have been found
+    -- exit early if all have been found
+    -- error if not all were found
+    undefined
 
 -- Change when the 'Simulation' starts and stops.
 setStartStop ::
@@ -154,14 +208,14 @@ setStartStop ::
   AtOrForTime ->
   Simulation ->
   Simulation
-setStartStop start stop sim@Simulation{config} = sim{config=config{start,stop}}
+setStartStop start stop sim@Simulation{simConfig} = sim{simConfig=simConfig{start,stop}}
 
 -- | Change when the clocks start in a 'Simulation'.
 setClockStart ::
   Time ->
   Simulation ->
   Simulation
-setClockStart clockStart sim@Simulation{config} = sim{config=config{clockStart}}
+setClockStart clockStart sim@Simulation{simConfig} = sim{simConfig=simConfig{clockStart}}
 
 -- | Create a 'ClockWave' for a given domain.
 clockWave ::
@@ -177,15 +231,15 @@ TRACING
 
 -- | Put a trace in the global data.
 registerTrace :: String -> Trace -> GlobalData -> Either String GlobalData
-registerTrace name trace glob@GlobalData{globTraces} =
+registerTrace name trc glob@GlobalData{globTraces} =
   if M.member name globTraces then
     Left ("Trace " <> name <> " already exists")
   else
-    Right glob{globTraces = M.insert name trace globTraces}
+    Right glob{globTraces = M.insert name trc globTraces}
 
 -- | Mark a signal/signals as found.
 registerFound :: [String] -> GlobalData -> GlobalData
-registerFound new glob@GlobalData{found} = glob{found = new <> found}
+registerFound new glob@GlobalData{globFound} = glob{globFound = new <> globFound}
 
 -- | Trace a 'Signal'.
 -- This converts the signal to a trace, and stores it in global storage.
@@ -206,7 +260,7 @@ trace0 ::
   Trace ->
   GlobalData ->
   GlobalData
-trace0 name trace = right . registerTrace fullName trace . registerFound found
+trace0 name trc = right . registerTrace fullName trc . registerFound found
  where
   fullName = replaceDollar (domainName @dom) name
   found = if fullName == name then [name] else [name, fullName]
@@ -321,7 +375,7 @@ fromTrace ::
   Trace ->
   Either String (Signal dom a)
 fromTrace (ty,_period,_width,values)
-  | ty == encode (typeRep $ Proxy @a) = undefined -- TODO ...
+  | ty == encode (typeRep $ Proxy @a) = Right $ fromList $ L.map (unpack . uncurry BV) values
   | otherwise = Left "Trace did not match target type"
 
 -- | Add a 'Trace' to a 'Simulation'
@@ -330,19 +384,19 @@ addTrace ::
   Trace ->
   Simulation ->
   Either String Simulation
-addTrace name trc sim@Simulation{traces} =
-  if M.member name traces then
+addTrace name trc sim@Simulation{simTraces} =
+  if M.member name simTraces then
     Left ("Trace " <> name <> " already exists")
   else
-    Right sim{traces = M.insert name trc traces}
+    Right sim{simTraces = M.insert name trc simTraces}
 
 -- | Retrieve a captured 'Trace'.
 fetchTrace ::
   String ->
   Simulation ->
   Either String Trace
-fetchTrace name sim@Simulation{traces} =
-  maybeToEither ("Trace " <> name <> " not found") $ M.lookup name traces
+fetchTrace name Simulation{simTraces} =
+  maybeToEither ("Trace " <> name <> " not found") $ M.lookup name simTraces
 
 -- | Retrieve a 'Signal' from the captured traces.
 fetch ::
@@ -382,7 +436,7 @@ storeSignal signal samples = storeTrace samples $ toTrace signal
 
 -- | Convert a trace into binary form.
 storeTrace :: Int -> Trace -> ByteString
-storeTrace samples trc = undefined -- TODO ...
+storeTrace _samples _trc = undefined -- TODO ...
 
 -- | Load a trace from binary form.
 load ::
@@ -411,7 +465,7 @@ loadTrace ::
   Traceable a =>
   ByteString ->
   Either String Trace
-loadTrace = undefined -- TODO ...
+loadTrace _bin = undefined -- TODO ...
 
 
 {---REST--}
