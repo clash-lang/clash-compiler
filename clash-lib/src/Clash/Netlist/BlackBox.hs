@@ -3,7 +3,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -552,7 +552,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
           | pNm == "GHC.Prim.dataToTag#" -> case args of
               [Right _,Left (Data dc)] -> do
                 iw <- Lens.view intWidth
-                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
+                return (N.Literal (Just (Signed iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _,Left scrut] -> mkDataToTag declType assignTy scrut
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
@@ -560,7 +560,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
             ["GHC.Prim.dataToTagSmall#", "GHC.Prim.dataToTagLarge#"] -> case args of
               [Right _, Right _,Left (Data dc)] -> do
                 iw <- Lens.view intWidth
-                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
+                return (N.Literal (Just (Signed iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _, Right _,Left scrut] -> mkDataToTag declType assignTy scrut
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
@@ -804,12 +804,12 @@ mkDataToTag declType assignTy scrut = do
       iw <- Lens.view intWidth
       let sIw = Signed iw
       if k <= 1
-        then pure ( N.Literal (Just (sIw, iw)) (NumLit 0)
+        then pure ( N.Literal (Just sIw) (NumLit 0)
                   , scrutDecls' )
         else do
           tag <- Id.make "c$dtt_tag"
           let alts = [ ( Just (NumLit (toInteger i))
-                       , N.Literal (Just (sIw, iw)) (NumLit (toInteger i)))
+                       , N.Literal (Just sIw) (NumLit (toInteger i)))
                      | i <- [0 .. k - 1] ]
               tagDecl = NetDecl' Nothing tag sIw Nothing
           assn <- N.condAssign tag sIw (Identifier scrutId Nothing) scrutHTy alts

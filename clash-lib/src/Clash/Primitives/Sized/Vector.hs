@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2020-2022 QBayLogic B.V.
+  Copyright   :  (C) 2020-2026 QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -297,7 +297,7 @@ indexIntVerilogTemplate bbCtx
         ixI ix0 = case ix0 of
           Literal _ (NumLit j) ->
             fromInteger j
-          DataCon (Signed _) (DC (Void{},_)) [Literal (Just (Signed _,_)) (NumLit j)] ->
+          DataCon (Signed _) (DC (Void{},_)) [Literal (Just (Signed _)) (NumLit j)] ->
             fromInteger j
           BlackBoxE "GHC.Types.I#" _lib _use _incl _templ Context{bbInputs=[(Literal _ (NumLit j),_,_)]} _paren ->
             fromInteger j
