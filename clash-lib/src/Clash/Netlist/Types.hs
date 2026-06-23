@@ -76,7 +76,7 @@ import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types
-  (BindingMap, ClashEnv(..), ClashOpts(..))
+  (BindingMap, ClashEnv(..), ClashOpts(..),TranslateBigNums)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
@@ -993,7 +993,7 @@ Lens.makeLenses ''NetlistState
 intWidth :: Lens.Getter NetlistEnv Int
 intWidth = clashEnv . Lens.to (opt_intWidth . envOpts)
 
-translateBigNums :: Lens.Getter NetlistEnv Bool
+translateBigNums :: Lens.Getter NetlistEnv TranslateBigNums
 translateBigNums = clashEnv . Lens.to (opt_translateBigNums . envOpts)
 
 customReprs :: Lens.Getter NetlistEnv CustomReprs

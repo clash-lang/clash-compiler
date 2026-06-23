@@ -18,7 +18,7 @@ import           GHC.Utils.Panic
 import           GHC.Types.SrcLoc
 
 import           Control.Monad
-import           Data.Char                      (isSpace)
+import           Data.Char                      (isSpace,toLower)
 import           Data.IORef
 import           Data.List                      (dropWhileEnd)
 import           Data.List.Split                (splitOn)
@@ -88,8 +88,7 @@ flagsClash r = [
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
   , defFlag "fclash-debug-manifest-hash"         $ NoArg (liftEwM (setDebugManifestHash r))
-  , defFlag "fclash-translate-bignums" $ NoArg (liftEwM (setTranslateBigNums r True))
-  , defFlag "fclash-no-translate-bignums" $ NoArg (liftEwM (setTranslateBigNums r False))
+  , defFlag "fclash-translate-bignums" $ OptPrefix (liftEwM . (setTranslateBigNums r))
   ]
 
 -- | Print deprecated flag warning
@@ -252,8 +251,17 @@ setIntWidth r n =
      then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
 
-setTranslateBigNums :: IORef ClashOpts -> Bool -> IO ()
-setTranslateBigNums r b = modifyIORef r (\c -> c {opt_translateBigNums = b})
+setTranslateBigNums :: IORef ClashOpts -> String -> IO ()
+setTranslateBigNums r arg = modifyIORef r (\c -> c {opt_translateBigNums = val})
+ where
+  val = case map toLower arg of
+      ""       -> BigNumWarn  -- or Silent?
+      "yes"    -> BigNumWarn  -- or Silent?
+      "no"     -> BigNumError
+      "error"  -> BigNumError
+      "warn"   -> BigNumWarn
+      "silent" -> BigNumSilent
+      _ -> error ("invalid flag: -fclash-translate-bignums=" <> arg)
 
 setHdlDir :: IORef ClashOpts
           -> String

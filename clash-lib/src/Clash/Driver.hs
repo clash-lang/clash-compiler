@@ -467,9 +467,10 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
           iw = opt_intWidth opts
       let (netlist, _, netlistErrors) = runRWS (filterBigNums [] netlist0) iw ()
       -- 3b. Check the netlist for bignums that shouldn't be there
-      Monad.when (not translBigNums && not (null netlistErrors)) $ do
+      Monad.when (translBigNums /= BigNumSilent && not (null netlistErrors)) $ do
         IO.hPutStrLn IO.stderr $ unlines netlistErrors
-        error "got netlist errors"
+        Monad.when (translBigNums == BigNumError) $
+          error "got netlist errors"
 
       -- 4. Generate topEntity wrapper
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->

@@ -147,7 +147,7 @@ workaroundMmapCrash = flakyTestWithRetryAction retryAction retryPolicy
   retryPolicy = limitRetries 5
 
 needBigNums :: TestOptions -> TestOptions
-needBigNums opts = opts { clashFlags = clashFlags opts <> ["-fclash-translate-bignums"]}
+needBigNums opts = opts { clashFlags = clashFlags opts <> ["-fclash-translate-bignums=silent"]}
 
 runClashTest :: IO ()
 runClashTest = defaultMain

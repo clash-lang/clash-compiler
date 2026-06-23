@@ -843,8 +843,7 @@ mkExpr :: HasCallStack
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
   iw <- Lens.view intWidth
-  translBigNums <- Lens.view translateBigNums
-  return (mkLiteral iw translBigNums l, [])
+  return (mkLiteral iw False l, [])
 
 mkExpr bbEasD declType bndr app =
  let (appF,args,ticks) = collectArgsTicks app
