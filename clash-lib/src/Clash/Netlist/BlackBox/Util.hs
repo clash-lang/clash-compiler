@@ -849,11 +849,11 @@ renderTag b (Lit n) =
  where
   (e,_,_) = bbInputs b !! n
 
-  mkLit (Literal (Just (Signed _,_)) i)                                 = Literal Nothing i  -- Integer, Int#
-  mkLit (Literal (Just (Unsigned _,_)) i)                               = Literal Nothing i  -- KnownNat, Natural, Word#
+  mkLit (Literal (Just (Signed _)) i)                                 = Literal Nothing i  -- Integer, Int#
+  mkLit (Literal (Just (Unsigned _)) i)                               = Literal Nothing i  -- KnownNat, Natural, Word#
 
-  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _,_)) i])   = Literal Nothing i  -- Int
-  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i  -- SNat, Word
+  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Signed _)) i])   = Literal Nothing i  -- Int
+  mkLit (DataCon _ (DC (Void {}, _)) [Literal (Just (Unsigned _)) i]) = Literal Nothing i  -- SNat, Word
 
   mkLit (BlackBoxE pNm _ _ _ _ bbCtx _) | pNm `elem` ["GHC.Int.I8#", "GHC.Int.I16#", "GHC.Int.I32#", "GHC.Int.I64#"
                                                      ,"GHC.Word.W8#","GHC.Word.W16#","GHC.Word.W32#","GHC.Word.W64#"

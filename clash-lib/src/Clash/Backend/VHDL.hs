@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -1679,7 +1679,7 @@ expr_
   -> Expr
   -- ^ Expr to convert
   -> VHDLM Doc
-expr_ _ (Literal sizeM lit) = exprLit sizeM lit
+expr_ _ (Literal tyM lit) = exprLit tyM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 
 expr_ _ (Identifier id_ (Just m)) = do
@@ -1714,7 +1714,7 @@ expr_ _ (DataCon ty@(MemBlob n m) _ [n0, m0, _, runs, _, ends])
   , Literal Nothing (StringLit runs0) <- runs
   , Literal Nothing (StringLit ends0) <- ends
   , es <- unpackNats n m (B8.pack runs0) (B8.pack ends0) =
-    let el val = exprLit (Just (BitVector m, m)) (BitVecLit 0 $ toInteger val)
+    let el val = exprLit (Just (BitVector m)) (BitVecLit 0 $ toInteger val)
     in qualTyName ty <> "'" <> (align $ tupled $ mapM el es)
 
 expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
@@ -1768,41 +1768,37 @@ expr_ _ (DataCon (Enable _) _ [e]) =
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
+  = exprLit (Just (Signed (fromInteger n))) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
+  = exprLit (Just (Unsigned (fromInteger n))) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ m, Literal _ i] <- extractLiterals bbCtx
   , NumLit m' <- m
   , NumLit i' <- i
-  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
+  = exprLit (Just (BitVector (fromInteger n))) (BitVecLit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
   , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
   , NumLit m' <- m
   , NumLit i' <- i
-  = exprLit (Just (Bit,1)) (BitLit $ toBit m' i')
+  = exprLit (Just Bit) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  , Just k <- clogBase 2 n
-  , let k' = max 1 k
-  = exprLit (Just (Index n,k')) i
+  = exprLit (Just (Index n)) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.maxBound#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   , n > 0
-  , Just k <- clogBase 2 n
-  , let k' = max 1 k
-  = exprLit (Just (Unsigned k',k')) (NumLit (n-1))
+  = exprLit (Just (Index n)) (NumLit (n-1))
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
   parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
@@ -1883,17 +1879,17 @@ rtreeChain (DataCon (RTree 1 _) _ [e])     = Just [e]
 rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = liftA2 (++) (rtreeChain e1) (rtreeChain e2)
 rtreeChain _ = Nothing
 
-exprLit :: Maybe (HWType,Size) -> Literal -> VHDLM Doc
+exprLit :: Maybe HWType -> Literal -> VHDLM Doc
 exprLit Nothing (NumLit i) = integer i
 
-exprLit (Just (hty,sz)) (NumLit i) = case hty of
+exprLit (Just hty) (NumLit i) = case hty of
   Unsigned n
     | i <= (-2^(31 :: Integer))-> "unsigned" <> parens ("std_logic_vector" <> parens ("signed'" <> parens lit))
     | i < 0                    -> "unsigned" <> parens ("std_logic_vector" <> parens ("to_signed" <> parens(integer i <> "," <> int n)))
     | i < 2^(31 :: Integer) -> "to_unsigned" <> parens (integer i <> "," <> int n)
     | otherwise -> "unsigned'" <> parens lit
   Index n
-   | 0 <= i && i < n -> exprLit (Just (Unsigned sz, sz)) (NumLit i)  -- reuse Unsigned implementation above
+   | 0 <= i && i < n -> exprLit (Just (Unsigned sz)) (NumLit i)  -- reuse Unsigned implementation above
    | otherwise       -> hdlTypeErrValue hty
   Signed n
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
@@ -1903,6 +1899,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
   _           -> blit
 
   where
+    sz = typeSize hty
     validHexLit = sz `mod` 4 == 0 && sz /= 0
     lit = if validHexLit then hlit else blit
     blit = bits (toBits sz i)
@@ -1913,10 +1910,11 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
              _ -> i `mod` 2^sz
     hlit = (if i' < 0 then "-" else emptyDoc) <> hex (toHex sz i')
 
-exprLit (Just (hty,sz)) (BitVecLit m i) = case m of
-  0 -> exprLit (Just (hty,sz)) (NumLit i)
+exprLit (Just hty) (BitVecLit m i) = case m of
+  0 -> exprLit (Just hty) (NumLit i)
   _ -> "std_logic_vector'" <> parens bvlit
   where
+    sz = typeSize hty
     bvlit = bits (toBits' sz m i)
 
 
@@ -2065,7 +2063,15 @@ toSLV (RTree _ _) e = do
 toSLV hty e = error $ $(curLoc) ++  "toSLV:\n\nType: " ++ show hty ++ "\n\nExpression: " ++ show e
 
 dcToExpr :: HWType -> Int -> Expr
-dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
+dcToExpr ty i = Literal (Just (altTy ty)) (NumLit (toInteger i))
+
+-- | Calculate the type of an (case) alternative pattern in HDL
+--
+-- For 'SP' this equal to  @BitVector conSize@,
+-- otherwise it's just equal to the type itself.
+altTy :: HWType -> HWType
+altTy scrutTy | typeSize scrutTy /= conSize scrutTy = BitVector (conSize scrutTy)
+              | otherwise = scrutTy
 
 larrow :: VHDLM Doc
 larrow = "<="

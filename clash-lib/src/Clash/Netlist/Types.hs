@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
                     2017-2018, Google Inc.
-                    2020-2023, QBayLogic B.V.
+                    2020-2026, QBayLogic B.V.
                     2022-2023, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -761,7 +761,7 @@ data Modifier
 
 -- | Expression used in RHS of a declaration
 data Expr
-  = Literal    !(Maybe (HWType,Size)) !Literal -- ^ Literal expression
+  = Literal    !(Maybe HWType) !Literal -- ^ Literal expression
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum\#, @Right e@: dataToTag\#
