@@ -4194,13 +4194,19 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     , Right n <- runExcept (tyNatSize tcm nTy)
     -> case n of
          0  -> reduce (mkVecNil dc cTy)
-         n' -> reduce $ mkVecCons dc cTy n'
-                 (mkApps (valToTerm f)
+         -- We share the function 'f' and the second vector 'ys' via heap
+         -- let-bindings instead of inlining 'valToTerm f' / 'valToTerm ys'
+         -- twice. See #3308.
+         n' ->
+           let (mach1, fId)  = newLetBinding tcm mach  (valToTerm f)
+               (mach2, ysId) = newLetBinding tcm mach1 (valToTerm ys)
+           in reduceWith mach2 $ mkVecCons dc cTy n'
+                 (mkApps (Var fId)
                             [Left (Either.lefts vArgs !! 1)
                             ,Left (mkApps (vecHeadPrim vecTcNm)
                                     [Right (LitTy (NumTy (n'-1)))
                                     ,Right bTy
-                                    ,Left  (valToTerm ys)
+                                    ,Left  (Var ysId)
                                     ])
                             ])
                  (mkApps (Prim pInfo)
@@ -4208,12 +4214,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                       ,Right bTy
                                       ,Right cTy
                                       ,Right (LitTy (NumTy (n' - 1)))
-                                      ,Left (valToTerm f)
+                                      ,Left (Var fId)
                                       ,Left (Either.lefts vArgs !! 2)
                                       ,Left (mkApps (vecTailPrim vecTcNm)
                                                     [Right (LitTy (NumTy (n'-1)))
                                                     ,Right bTy
-                                                    ,Left (valToTerm ys)
+                                                    ,Left (Var ysId)
                                                     ])])
 
 -- Folding
@@ -4699,15 +4705,21 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
         f (map fromInteger natsAsInts)
 
     reduce :: Term -> Maybe Machine
-    reduce e = case isX e of
+    reduce = reduceWith mach
+
+    -- Like 'reduceWith, but reduces in (the heap of) an explicitly given machine
+    -- rather than the captured 'mach'. Use this when the reduced term refers to
+    -- bindings freshly allocated with 'newLetBinding'.
+    reduceWith :: Machine -> Term -> Maybe Machine
+    reduceWith mach0 e = case isX e of
       Left msg ->
         let resTy = getResultTy tcm ty tys
             warning = unlines
               [ "Warning: caught XException: \"" ++ msg ++ "\" while trying to evaluate: "
               , showPpr (mkApps (Prim pInfo) (map (Left . valToTerm) args))
               ]
-        in trace warning (Just (setTerm (TyApp (Prim NP.undefined) resTy) mach))
-      Right e' -> Just (setTerm e' mach)
+        in trace warning (Just (setTerm (TyApp (Prim NP.undefined) resTy) mach0))
+      Right e' -> Just (setTerm e' mach0)
 
     reduceWHNF e =
       let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
