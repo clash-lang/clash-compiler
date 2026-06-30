@@ -30,7 +30,6 @@ module Clash.Normalize.Transformations.Case
 import Control.Exception.Base (patError)
 import GHC.Prim.Panic (absentError)
 import qualified Control.Lens as Lens
-
 import Data.Bifunctor (second)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
@@ -87,11 +86,11 @@ import Clash.XException (errorX)
 -- alternatives
 caseCase :: HasCallStack => NormRewrite
 caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2) = do
-  ty1Rep <- not <$> isUntranslatableType False alts1Ty
+  ty1NonRep <- isUntranslatableType False alts1Ty
 
   -- This is only worth doing if the inner case-expression has a
   -- non-representable alternative type.
-  if ty1Rep then return e else
+  if ty1NonRep then
     -- Deshadow to prevent accidental capture of free variables of inner
     -- case. Imagine:
     --
@@ -115,6 +114,8 @@ caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts
     let newAlts = fmap (second (\altE -> Case altE alts2Ty alts2))
                       (fmap (deShadowAlt is0) alts1)
      in changed $ Case scrut alts2Ty newAlts
+  else
+    return e
 
 caseCase _ e = return e
 {-# SCC caseCase #-}

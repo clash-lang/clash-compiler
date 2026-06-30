@@ -119,7 +119,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
    , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
    , primGuards
-   , domainConfs ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
+   , domainTCUs ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
@@ -170,7 +170,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
         , envTupleTyCons = tupTcCache
         , envPrimitives = primMapC
         , envCustomReprs = buildCustomReprs customBitRepresentations
-        , envDomains = domainConfs
+        , envDomainTCUs = domainTCUs
         }
     , ClashDesign
         { designEntities = topEntities''

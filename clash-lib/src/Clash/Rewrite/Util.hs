@@ -79,7 +79,7 @@ import           Clash.Debug
 import           Clash.Driver.Types
   (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
   ClashEnv(..), ClashOpts(..), hasDebugInfo, isDebugging)
-import           Clash.Netlist.Types         (HWMap)
+import           Clash.Netlist.Types         (TTState)
 import           Clash.Netlist.Util          (representableTypeState)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
@@ -712,11 +712,13 @@ cloneNameWithBindingMap binders nm = do
 {-# INLINE isUntranslatable #-}
 -- | Run a Core-type to HWType translation action against the session-wide
 -- translation cache ('hwTypeCache').
-runWithHWTypeCache :: State.State HWMap a -> RewriteMonad extra a
+runWithHWTypeCache :: State.State TTState a -> RewriteMonad extra a
 runWithHWTypeCache m = do
   cache0 <- Lens.use hwTypeCache
-  let (a, !cache1) = State.runState m cache0
+  doms0 <- Lens.use domains
+  let (a, (!cache1, !doms1)) = State.runState m (cache0, doms0)
   hwTypeCache Lens..= cache1
+  domains Lens..= doms1
   pure a
 
 -- | Determine if a term cannot be represented in hardware
@@ -740,7 +742,11 @@ isUntranslatableType stringRepresentable ty = do
   tt <- Lens.view typeTranslator
   reprs <- Lens.view customReprs
   tcm <- Lens.view tcCache
-  not <$> runWithHWTypeCache (representableTypeState tt reprs stringRepresentable tcm ty)
+--  doms0 <- State.gets _domains
+  (representable, doms1) <-
+    runWithHWTypeCache (representableTypeState tt reprs stringRepresentable tcm ty)
+  State.modify $ Lens.set domains doms1
+  return $ not representable
 
 normalizeTermTypes :: TyConMap -> Term -> Term
 normalizeTermTypes tcm e = case e of

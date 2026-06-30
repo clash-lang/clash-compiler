@@ -67,7 +67,7 @@ import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
 import           Clash.Netlist.Types
-  (HWMap, FilteredHWType(..))
+  (TTState, FilteredHWType(..))
 import           Clash.Netlist.Util
   (splitNormalized)
 import           Clash.Normalize.Strategy
@@ -100,7 +100,7 @@ runNormalization
   -> BindingMap
   -- ^ Global Binders
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
@@ -128,6 +128,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   0
                   mempty       -- transformAppliedCounters Map
                   mempty       -- transformTriedCounters Map
+                  mempty       -- known domains Map
                   globals
                   supply
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)

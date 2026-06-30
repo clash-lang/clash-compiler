@@ -58,7 +58,7 @@ import           Clash.Backend
 import           Clash.Backend.Verilog
   (bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
 import           Clash.Backend.Verilog.Time           (periodToString)
-import           Clash.Driver.Types                   (ClashOpts(..))
+import           Clash.Driver.Types                   (ClashOpts(..), DomainMap)
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
@@ -135,7 +135,7 @@ instance Backend SystemVerilogState where
     , _undefValue=opt_forceUndefined opts
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     , _renderEnums_=coerce (opt_renderEnums opts)
-    , _domainConfigurations_=emptyDomainMap
+    , _domainConfigurations_=mempty
     , _usages=mempty
     }
   hdlKind         = const SystemVerilog

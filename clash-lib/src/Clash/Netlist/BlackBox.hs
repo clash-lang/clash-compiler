@@ -101,7 +101,8 @@ import           Clash.Netlist.Util            as N
 import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
-import           Clash.Signal.Internal         (ActiveEdge (..))
+import           Clash.Signal.Internal
+  ( ActiveEdge(..), VDomainConfiguration(..) )
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
 
@@ -958,8 +959,9 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- ensures that the "opposite" edge always comes first.
       kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (inferCoreTypeOf tcm kd)
       let edge = case stripVoid (stripFiltered kdTy) of
-                   KnownDomain _ _ Rising _ _ _  -> Falling
-                   KnownDomain _ _ Falling _ _ _ -> Rising
+                   KnownDomain dom -> case vActiveEdge dom of
+                     Rising -> Falling
+                     Falling -> Rising
                    _ -> error "internal error"
       (clkExpr,clkDecls) <-
         mkExpr False Concurrent (NetlistId (Id.unsafeMake "__MEALY_CLK__") (inferCoreTypeOf tcm clk)) clk

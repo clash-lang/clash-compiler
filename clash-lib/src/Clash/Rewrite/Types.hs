@@ -47,8 +47,9 @@ import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
-import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts)
-import Clash.Netlist.Types       (FilteredHWType, HWMap)
+import Clash.Driver.Types
+  (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts, DomainMap)
+import Clash.Netlist.Types       (FilteredHWType, HWMap, TTState)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
 import Clash.Util
@@ -82,6 +83,8 @@ data RewriteState extra
   -- ^ Map that tracks how many times each transformation is applied
   , _transformTriedCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation has been tried
+  , _domains          :: DomainMap
+  -- ^ Domain information
   , _bindings         :: !BindingMap
   -- ^ Global binders
   , _uniqSupply       :: !Supply
@@ -113,7 +116,7 @@ data RewriteEnv
   , _typeTranslator :: CustomReprs
                     -> TyConMap
                     -> Type
-                    -> State HWMap (Maybe (Either String FilteredHWType))
+                    -> State TTState (Maybe (Either String FilteredHWType))
   -- ^ Hardcode Type -> FilteredHWType translator
   , _peEvaluator    :: PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation

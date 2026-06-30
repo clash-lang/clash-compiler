@@ -12,7 +12,6 @@
 
 module Clash.Backend where
 
-import Data.HashMap.Strict                  (HashMap, empty)
 import Data.HashSet                         (HashSet)
 import Control.Lens                         (Lens')
 import Data.Monoid                          (Ap)
@@ -23,12 +22,11 @@ import Data.Text.Prettyprint.Doc.Extra      (Doc)
 
 import GHC.Types.SrcLoc (SrcSpan)
 
-import Clash.Driver.Types (ClashOpts)
+import Clash.Driver.Types                   (ClashOpts, DomainMap)
 import {-# SOURCE #-} Clash.Netlist.Types
   (Component, Declaration, Expr, HWType, Identifier, IdentifierSet, HasIdentifierSet, UsageMap)
 import Clash.Netlist.BlackBox.Types
 
-import Clash.Signal.Internal                (VDomainConfiguration)
 import Clash.Annotations.Primitive          (HDL)
 
 #ifdef CABAL
@@ -79,11 +77,6 @@ data HWKind
   | UserType
   -- ^ User defined type that's not interchangeable with any others, even if
   -- the underlying structures are the same. Similar to an ADT in Haskell.
-
-type DomainMap = HashMap Text VDomainConfiguration
-
-emptyDomainMap :: DomainMap
-emptyDomainMap = empty
 
 class HasUsageMap s where
   usageMap :: Lens' s UsageMap

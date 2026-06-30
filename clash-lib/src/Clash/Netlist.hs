@@ -72,7 +72,8 @@ import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv')
-import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
+import           Clash.Driver.Types
+  (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
@@ -96,7 +97,7 @@ genNetlist
   -> VarEnv Identifier
   -- ^ Top entity names
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
@@ -131,7 +132,7 @@ runNetlistMonad
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcode Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions

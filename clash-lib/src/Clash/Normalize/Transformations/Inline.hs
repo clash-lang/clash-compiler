@@ -535,7 +535,6 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
       notClassTy = not (isClassTy tcm scrutTy)
       overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
 
-
     bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
     nonRepScrut <- isUntranslatableType False scrutTy
     case (nonRepScrut, bodyMaybe) of

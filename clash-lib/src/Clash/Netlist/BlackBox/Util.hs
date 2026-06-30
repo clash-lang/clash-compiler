@@ -15,6 +15,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
@@ -82,12 +83,12 @@ import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend
-  (Backend (..), DomainMap, Usage (..), AggressiveXOptBB(..), RenderEnums(..))
+  (Backend (..), Usage (..), AggressiveXOptBB(..), RenderEnums(..))
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Types
   (BlackBoxContext (..), Expr (..), HWType (..), Literal (..), Modifier (..),
-   Declaration(BlackBoxD))
+   Declaration(BlackBoxD), hwTypeDomain)
 import qualified Clash.Netlist.Id                as Id
 import qualified Clash.Netlist.Types             as N
 import           Clash.Netlist.Util              (typeSize, isVoid, stripAttributes, stripVoid)
@@ -588,8 +589,12 @@ renderElem b (SigD e m) = do
 renderElem b (Period n) = do
   let (_, ty, _) = bbInputs b !! n
   case stripVoid ty of
-    KnownDomain _ period _ _ _ _ ->
-      return $ const $ Text.pack $ show period
+    KnownDomain dom ->
+      -- TODO: better utilize the fact that periods are of type
+      -- rational now. We should not rely on blindly appending `0`s in
+      -- the primitive files for creating a multiple of the period any
+      -- more, but use more precise numbers instead.
+      return $ const $ Text.pack $ show $ toInteger $ vPeriod dom
     _ ->
       error $ $(curLoc) ++ "Period: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
@@ -597,25 +602,16 @@ renderElem _ LongestPeriod = do
   doms <- domainConfigurations
   -- Longest period with a minimum of 100 ns, see:
   -- https://github.com/clash-lang/clash-compiler/issues/2455
-  let longestPeriod = maximum (100_000 : [vPeriod v | v <- HashMap.elems doms])
-  return (const (Text.pack (show longestPeriod)))
+  let longestPeriod = maximum (100_000 : fmap (ceiling . vPeriod) (Map.elems doms))
+  return (const (Text.pack (show @Integer longestPeriod)))
 
 renderElem b (Tag n) = do
   let (_, ty, _) = bbInputs b !! n
-  case stripVoid ty of
-    KnownDomain dom _ _ _ _ _ ->
-      return (const (Text.pack (Data.Text.unpack dom)))
-    Clock dom ->
-      return (const (Text.pack (Data.Text.unpack dom)))
-    ClockN dom ->
-      return (const (Text.pack (Data.Text.unpack dom)))
-    Reset dom ->
-      return (const (Text.pack (Data.Text.unpack dom)))
-    Enable dom ->
-      return (const (Text.pack (Data.Text.unpack dom)))
-    _ ->
-      error $ $(curLoc) ++ "Tag: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
-
+  case hwTypeDomain $ stripVoid ty of
+    Just dom -> return $ const $ Text.pack $ vName dom
+    Nothing -> error $ $(curLoc)
+            <> "Tag: Expected `KnownDomain` or `KnownConfiguration`, not: "
+            <> show ty
 
 renderElem b (IF c t f) = do
   iw <- iwWidth
@@ -717,31 +713,29 @@ renderElem b (IF c t f) = do
 
       (ActiveEdge edgeRequested n) -> do
         let (_, ty, _) = bbInputs b !! n
-        domConf <- getDomainConf ty
-        case domConf of
-          VDomainConfiguration _ _ edgeActual _ _ _ -> pure $
-            if edgeRequested == edgeActual then 1 else 0
+            domConf = getDomainConf ty
+        pure $ if edgeRequested == domConf.vActiveEdge then 1 else 0
 
       (IsSync n) -> do
         let (_, ty, _) = bbInputs b !! n
-        domConf <- getDomainConf ty
-        case domConf of
-          VDomainConfiguration _ _ _ Synchronous _ _ -> pure 1
-          VDomainConfiguration _ _ _ Asynchronous _ _ -> pure 0
+            domConf = getDomainConf ty
+        pure $ case domConf.vResetKind of
+          Synchronous -> 1
+          Asynchronous -> 0
 
       (IsInitDefined n) -> do
         let (_, ty, _) = bbInputs b !! n
-        domConf <- getDomainConf ty
-        case domConf of
-          VDomainConfiguration _ _ _ _ Defined _ -> pure 1
-          VDomainConfiguration _ _ _ _ Unknown _ -> pure 0
+            domConf = getDomainConf ty
+        pure $ case domConf.vInitBehavior of
+          Defined -> 1
+          Unknown -> 0
 
       (IsActiveHigh n) -> do
         let (_, ty, _) = bbInputs b !! n
-        domConf <- getDomainConf ty
-        case domConf of
-          VDomainConfiguration _ _ _ _ _ ActiveHigh -> pure 1
-          VDomainConfiguration _ _ _ _ _ ActiveLow  -> pure 0
+            domConf = getDomainConf ty
+        pure $ case domConf.vResetPolarity of
+          ActiveHigh -> 1
+          ActiveLow  -> 0
 
       (StrCmp [Text t1] n) -> pure $
         let (e,_,_) = bbInputs b !! n
@@ -765,30 +759,15 @@ renderElem b (IF c t f) = do
                              ++ "\nGot: " ++ show c'
 renderElem b e = fmap const (renderTag b e)
 
-getDomainConf :: (Backend backend, HasCallStack) => HWType -> State backend VDomainConfiguration
-getDomainConf = generalGetDomainConf domainConfigurations
-
-generalGetDomainConf
-  :: forall m. (Monad m, HasCallStack)
-  => (m DomainMap) -- ^ a way to get the `DomainMap`
-  -> HWType -> m VDomainConfiguration
-generalGetDomainConf getDomainMap ty = case (snd . stripAttributes . stripVoid) ty of
-  KnownDomain dom period activeEdge resetKind initBehavior resetPolarity ->
-    pure $ VDomainConfiguration (Data.Text.unpack dom) (fromIntegral period) activeEdge resetKind initBehavior resetPolarity
-
-  Clock dom -> go dom
-  ClockN dom -> go dom
-  Reset dom  -> go dom
-  Enable dom -> go dom
-  Product _DiffClock _ [Clock dom,_clkN] -> go dom
+getDomainConf :: HasCallStack => HWType -> VDomainConfiguration
+getDomainConf ty = case snd $ stripAttributes $ stripVoid ty of
+  KnownDomain dom -> dom
+  Clock dom -> dom
+  ClockN dom -> dom
+  Reset dom -> dom
+  Enable dom -> dom
+  Product _DiffClock _ [Clock dom,_clkN] -> dom
   t -> error $ "Don't know how to get a Domain out of HWType: " <> show t
- where
-  go :: HasCallStack => N.DomainName -> m VDomainConfiguration
-  go dom = do
-    doms <- getDomainMap
-    case HashMap.lookup dom doms of
-      Nothing -> error $ "Can't find domain " <> show dom <> ". Please report an issue at https://github.com/clash-lang/clash-compiler/issues."
-      Just conf -> pure conf
 
 parseFail :: BlackBoxContext -> Text -> BlackBoxTemplate
 parseFail b t = case runParse t of
