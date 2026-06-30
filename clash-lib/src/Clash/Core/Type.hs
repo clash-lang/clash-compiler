@@ -69,7 +69,7 @@ import           Data.List              (foldl')
 #endif
 import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
-import           Data.Text              (Text)
+import           Data.Text              (Text, pack)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
@@ -87,8 +87,10 @@ import           GHC.Builtin.Names
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,
+   ordLTDataConName, ordEQDataConName, ordGTDataConName,
    typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
    typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
+import           GHC.Types.Name         (nameStableString)
 import           GHC.Types.SrcLoc       (wiredInSrcSpan)
 
 -- Local imports
@@ -549,10 +551,13 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
           case compare i1 i2 of
             LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordLTDataConName)
             EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordEQDataConName)
             GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordGTDataConName)
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeSymbolCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
@@ -562,10 +567,13 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
           case compare s1 s2 of
             LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordLTDataConName)
             EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordEQDataConName)
             GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordGTDataConName)
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeCharCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
@@ -575,10 +583,13 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
           case compare s1 s2 of
             LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordLTDataConName)
             EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordEQDataConName)
             GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordGTDataConName)
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeConsSymbolTyFamNameKey -- ConsSymbol

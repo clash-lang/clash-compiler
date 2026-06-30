@@ -40,6 +40,7 @@ import           Clash.Netlist.Types
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
+import           Clash.Signal.Internal           (VDomainConfiguration(..))
 
 import           Clash.Verification.Internal
 import           Clash.Verification.Pretty
@@ -129,7 +130,7 @@ checkTF' decls (clkId, clkDecls) propName renderAs prop bbCtx = do
 
   edge =
     case bbInputs bbCtx of
-      (_, stripVoid -> KnownDomain _nm _period e _rst _init _polarity, _):_ -> e
+      (_, stripVoid -> KnownDomain dom, _):_ -> vActiveEdge dom
       _ -> error $ "Unexpected first argument: " ++ show (listToMaybe (bbInputs bbCtx))
 
   renderedPslProperty = case renderAs of

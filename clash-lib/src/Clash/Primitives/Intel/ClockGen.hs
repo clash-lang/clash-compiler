@@ -26,7 +26,7 @@ import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
 import Clash.Netlist.Util
 import qualified Clash.Primitives.DSL as DSL
-import Clash.Signal (periodToHz)
+import Clash.Signal (periodToHz, vPeriod)
 import Data.Text.Extra (showt)
 
 import qualified Data.String.Interpolate as I
@@ -142,12 +142,12 @@ altpllQsysTemplate
   => BlackBoxContext
   -> State s Doc
 altpllQsysTemplate bbCtx
-  |   (_,stripVoid -> (KnownDomain _ clkInPeriod _ _ _ _),_)
+  |   (_,stripVoid -> KnownDomain (vPeriod -> clkInPeriod),_)
     : _clocksClass
     : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
     : _ <- bbInputs bbCtx
   = let
-    clkPeriod (KnownDomain _ p _ _ _ _) = p
+    clkPeriod (KnownDomain (vPeriod -> p)) = p
     clkPeriod _ =
       error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 
@@ -280,7 +280,7 @@ alteraPllQsysTemplate bbCtx
     : (_,stripVoid -> Product _ _ (init -> kdOuts),_)
     : _ <- bbInputs bbCtx
   = let
-    clkFreq (KnownDomain _ p _ _ _ _) = periodToHz p / 1e6 :: Double
+    clkFreq (KnownDomain (vPeriod -> p)) = periodToHz p / 1e6 :: Double
     clkFreq _ =
       error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 
