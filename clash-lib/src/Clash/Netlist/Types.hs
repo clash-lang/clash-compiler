@@ -76,12 +76,11 @@ import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types
-  (BindingMap, ClashEnv(..), ClashOpts(..), HasClashOpts(..))
+  (BindingMap, ClashEnv(..), ClashOpts(..), DomainMap, HasClashOpts(..))
 import Clash.Driver.Warning                 (CanWarn)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
-import Clash.Signal.Internal
-  (ResetPolarity, ActiveEdge, ResetKind, InitBehavior)
+import Clash.Signal.Internal                (ActiveEdge, VDomainConfiguration(..))
 import Clash.Unique                         (Unique)
 
 import Clash.Annotations.BitRepresentation.Internal
@@ -131,6 +130,7 @@ newtype NetlistMonad a =
                     Strict.MonadState NetlistState, Strict.MonadIO, MonadFail)
 
 type HWMap = Map Type (Either String FilteredHWType)
+type TTState = (HWMap, DomainMap)
 
 -- | See 'is_freshCache'
 type FreshCache = HashMap Text (IntMap Word)
@@ -305,7 +305,7 @@ data NetlistState
   -- ^ Cached components. Is an insertion ordered map to preserve a topologically
   -- sorted component list for the manifest file.
   , _typeTranslator :: CustomReprs -> TyConMap -> Type
-                    -> Strict.State HWMap (Maybe (Either String FilteredHWType))
+                    -> Strict.State TTState (Maybe (Either String FilteredHWType))
   -- ^ Hardcoded Type -> HWType translator
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _seenIds        :: IdentifierSet
@@ -402,7 +402,7 @@ isBiDirectional = go . snd
 --
 -- This will not consider @ClockN@ to be a clock argument, which means only the
 -- positive phase of a differential pair will be added to @sdcClock@.
-findClocks :: Component -> [(Text, Text)]
+findClocks :: Component -> [(Text, VDomainConfiguration)]
 findClocks (Component _ is _ _) =
   mapMaybe isClock is
  where
@@ -421,8 +421,6 @@ type IsVoid = Bool
 data FilteredHWType =
   FilteredHWType HWType [[(IsVoid, FilteredHWType)]]
     deriving (Eq, Show)
-
-type DomainName = Text
 
 -- | Representable hardware types
 data HWType
@@ -459,14 +457,14 @@ data HWType
   -- populated when using records.
   | SP !Text [(Text, [HWType])]
   -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock !DomainName
-  -- ^ Clock type corresponding to domain /DomainName/
-  | ClockN !DomainName
-  -- ^ ClockN type corresponding to domain /DomainName/
-  | Reset !DomainName
-  -- ^ Reset type corresponding to domain /DomainName/
-  | Enable !DomainName
-  -- ^ Enable type corresponding to domain /DomainName/
+  | Clock !VDomainConfiguration
+  -- ^ Clock type corresponding to the attached domain configuration
+  | ClockN !VDomainConfiguration
+  -- ^ ClockN type corresponding to the attached domain configuration
+  | Reset !VDomainConfiguration
+  -- ^ Reset type corresponding to the attached domain configuration
+  | Enable !VDomainConfiguration
+  -- ^ Enable type corresponding to the attached domain configuration
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
   | CustomSP !Text !DataRepr' !Size [(ConstrRepr', Text, [HWType])]
@@ -480,8 +478,8 @@ data HWType
   -- info, see: Clash.Annotations.BitRepresentations.
   | Annotated [Attr Text] !HWType
   -- ^ Annotated with HDL attributes
-  | KnownDomain !DomainName !Integer !ActiveEdge !ResetKind !InitBehavior !ResetPolarity
-  -- ^ Domain name, period, active edge, reset kind, initial value behavior
+  | KnownDomain !VDomainConfiguration
+  -- ^ Known Domain Configuration
   | FileType
   -- ^ File type for simulation-level I/O
   deriving (Eq, Ord, Show, Generic, NFData, Hashable)
@@ -493,13 +491,13 @@ annotated :: [Attr Text] -> HWType -> HWType
 annotated [] t = t
 annotated attrs t = Annotated attrs t
 
-hwTypeDomain :: HWType -> Maybe DomainName
+hwTypeDomain :: HWType -> Maybe VDomainConfiguration
 hwTypeDomain = \case
   Clock dom -> Just dom
   ClockN dom -> Just dom
   Reset dom -> Just dom
   Enable dom -> Just dom
-  KnownDomain dom _ _ _ _ _ -> Just dom
+  KnownDomain dom -> Just dom
   _ -> Nothing
 
 -- | Extract hardware attributes from Annotated. Returns an empty list if
