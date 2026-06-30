@@ -1228,7 +1228,7 @@ instance FilterBigNums Declaration where
     InstDecl eOrC mLib attrs nm lbl params portmap -> InstDecl eOrC mLib attrs nm lbl <$> filterBigNums ctx params <*> filterBigNums ctx portmap
     CompDecl nm ports -> CompDecl nm <$> filterBigNums ctx ports
     BlackBoxD nm libs use qsys bb bbCtx -> let ctx' = CtxBlackBox nm : ctx in
-      BlackBoxD nm libs use qsys bb <$> filterBigNums ctx bbCtx
+      BlackBoxD nm libs use qsys bb <$> filterBigNums ctx' bbCtx
     NetDecl' comment nm ty e -> let ctx' = CtxSignal nm : ctx in
       NetDecl' comment nm <$> filterBigNums ctx' ty <*> filterBigNums ctx' e
     TickDecl {} -> pure d0
