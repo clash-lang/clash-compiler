@@ -32,8 +32,7 @@ import           Data.Char (toLower)
 import           Data.Either (fromRight)
 #endif
 import           Data.Hashable (hash)
-import           Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map.Strict as Map
 import           Data.Maybe (catMaybes)
 import           Data.Monoid (Ap(getAp))
 import qualified Data.Text as Text
@@ -52,7 +51,7 @@ import           System.Directory (listDirectory, doesFileExist)
 import           Text.Read (readMaybe)
 
 import           Clash.Annotations.TopEntity.Extra ()
-import           Clash.Backend (Backend (hdlType), Usage (External))
+import           Clash.Backend (Backend(..), Usage (External))
 import           Clash.Core.Name (nameOcc)
 import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
@@ -178,7 +177,7 @@ data Manifest
     --
     -- This list is reverse topologically sorted. I.e., a component might depend
     -- on any component listed before it, but not after it.
-  , domains :: HashMap Text VDomainConfiguration
+  , domains :: [VDomainConfiguration]
     -- ^ Domains encountered in design
   , transitiveDependencies :: [Text]
     -- ^ Dependencies of this design (fully qualified binder names). Is a
@@ -231,8 +230,8 @@ instance ToJSON Manifest where
             -- TODO: Add Edam like fields
           ]
         | (fName, fHash) <- fileNames]
-      , "domains" .= HashMap.fromList
-        [ ( domNm
+      , "domains" .= Map.fromList
+        [ ( vName
           , Aeson.object
             [ "period" .= ((\(Period p) -> p) vPeriod)
             , "active_edge" .= show vActiveEdge
@@ -241,7 +240,7 @@ instance ToJSON Manifest where
             , "reset_polarity" .= show vResetPolarity
             ]
           )
-        | (domNm, VDomainConfiguration{..}) <- HashMap.toList domains ]
+        | VDomainConfiguration{..} <- domains ]
       , "dependencies" .= Aeson.object
         [ "transitive" .= transitiveDependencies ]
       ]
@@ -291,7 +290,7 @@ instance FromJSON Manifest where
         <*> v .: "components"
         <*> (topComponent >>= (.: "name"))
         <*> parseFiles v
-        <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
+        <*> (Map.elems <$> (v .: "domains" >>= Map.traverseWithKey parseDomain))
         <*> (v .: "dependencies" >>= (.: "transitive"))
    where
     parseDomain :: Text -> Aeson.Object -> Parser VDomainConfiguration
@@ -335,7 +334,7 @@ mkManifestPort backend portId portType portDir = ManifestPort{..}
   mpWidth = typeSize portType
   mpDirection = portDir
   mpIsClock = case portType of {Clock _ -> True; ClockN _ -> True; _ -> False}
-  mpDomain = hwTypeDomain portType
+  mpDomain = Text.pack . vName <$> hwTypeDomain portType
   mpTypeName = flip evalState backend $ getAp $ do
      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
 
@@ -347,8 +346,6 @@ mkManifest ::
   Backend backend =>
   -- | Backend used to lookup port type names
   backend ->
-  -- | Domains encountered in design
-  HashMap Text VDomainConfiguration ->
   -- | Options Clash was run with
   ClashOpts ->
   -- | Component of top entity
@@ -363,7 +360,7 @@ mkManifest ::
   (ByteString, DebugSubHashes) ->
   -- | New manifest
   Manifest
-mkManifest backend domains ClashOpts{..} Component{..} components deps files (topHash, subHashes) = Manifest
+mkManifest backend ClashOpts{..} Component{..} components deps files (topHash, subHashes) = Manifest
   { manifestHash = topHash
   , manifestDebugSubHashes = if opt_debugManifestHash then Just subHashes else Nothing
   , ports = inPorts <> inOutPorts <> outPorts
@@ -371,7 +368,7 @@ mkManifest backend domains ClashOpts{..} Component{..} components deps files (to
   , topComponent = Id.toText componentName
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit)
-  , domains = domains
+  , domains = Map.elems $ evalState domainConfigurations backend
   , transitiveDependencies = map (nameOcc . varName) deps
   }
  where

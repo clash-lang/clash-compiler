@@ -120,7 +120,7 @@ import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
-  (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
+  (IdentifierText, BlackBox (..), Component (..), FilteredHWType, TTState, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
@@ -136,7 +136,7 @@ import qualified Clash.Primitives.Magic           as P
 import qualified Clash.Primitives.Verification    as P
 import qualified Clash.Primitives.Xilinx.ClockGen as P
 import           Clash.Primitives.Types
-import           Clash.Signal.Internal
+import           Clash.Rewrite.Types              (RewriteState(..))
 import           Clash.Unique                     (Unique, getUnique, fromGhcUnique)
 import           Clash.Util
   (ClashException(..), reportTimeDiff,
@@ -188,7 +188,7 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
               to a malformed Synthesize annotation. All clocks, resets, and
               enables should be given a unique port name. Type to be split:
 
-                #{showPpr' (PrettyOptions False True False False) a}
+                #{showPpr' minBound{displayTypes=True\} a}
 
               Given port annotation: #{p}. You might want to use the
               following instead: PortProduct #{show nm} []. This allows Clash to
@@ -305,7 +305,7 @@ generateHDL
   -> ClashDesign
   -> Maybe backend
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
@@ -368,7 +368,6 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     -> TopEntityT
     -> IO ()
   go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
-  let domainConfs = envDomains env
   let bindingsMap = designBindings design
   let primMap = envPrimitives env
   let topEntities0 = designEntities design
@@ -387,13 +386,12 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
   let topNm = lookupVarEnv' compNames topEntity
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
-      hdlState' = setDomainConfigurations domainConfs
-                $ setModName modNameT
+      hdlState0 = setModName modNameT
                 $ setTopName topNm
                 $ fromMaybe (initBackend @backend opts) hdlState
-      hdlDir    = fromMaybe (Clash.Backend.name hdlState') (opt_hdlDir opts) </> topEntityS
+      hdlDir    = fromMaybe (Clash.Backend.name hdlState0) (opt_hdlDir opts) </> topEntityS
       manPath   = hdlDir </> manifestFilename
-      ite       = ifThenElseExpr hdlState'
+      ite       = ifThenElseExpr hdlState0
       topNmT    = Id.toText topNm
 
   -- Get manifest file if cache is not stale and caching is enabled. This is used
@@ -456,8 +454,9 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       -- 3. Normalize topEntity
       supplyN <- Supply.newSupply
-      transformedBindings <- normalizeEntity env bindingsMap typeTrans peEval
-                               eval topEntityNames supplyN topEntity
+      (transformedBindings, domains) <-
+        normalizeEntity env bindingsMap typeTrans peEval
+                        eval topEntityNames supplyN topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
@@ -465,12 +464,14 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
+      let hdlState1 = setDomainConfigurations domains hdlState0
+
       -- 4. Generate netlist for topEntity
       (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
           genNetlist env peEval isTb transformedBindings topEntityMap compNames
-            typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+            typeTrans ite (SomeBackend hdlState1) seen hdlDir prefixM topEntity
 
         pure (seen', (topComponent, netlist))
 
@@ -482,7 +483,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       -- 5. Generate topEntity wrapper
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
-        pure $! createHDL hdlState' opts modNameT seen netlist domainConfs topComponent topNmT
+        pure $! createHDL hdlState1 opts modNameT seen netlist topComponent topNmT
 
       -- TODO: Data files should go into their own directory
       -- FIXME: Files can silently overwrite each other
@@ -509,10 +510,8 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
         depIds = map bindingId depBindings
 
-        manifest =
-          mkManifest
-            hdlState' domainConfs opts topComponent components depIds
-            filesAndDigests1 topHashWithSubHashes
+        manifest = mkManifest hdlState1 opts topComponent components depIds
+                              filesAndDigests1 topHashWithSubHashes
       writeManifest manPath manifest
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
@@ -920,8 +919,6 @@ createHDL
   -- ^ Component names
   -> ComponentMap
   -- ^ List of components
-  -> HashMap Data.Text.Text VDomainConfiguration
-  -- ^ Known domains to configurations
   -> Component
   -- ^ Top component
   -> IdentifierText
@@ -929,7 +926,7 @@ createHDL
   -> ([(String,Doc)],[(String,FilePath)],[(String,String)])
   -- ^ The pretty-printed HDL documents
   -- + The data files that need to be copied
-createHDL backend opts modName seen components domainConfs top topName = flip evalState backend $ getAp $ do
+createHDL backend opts modName seen components top topName = flip evalState backend $ getAp $ do
   let componentsL = map snd (OMap.assocs components)
   (hdlNmDocs0,incs) <-
     fmap unzip $
@@ -945,19 +942,12 @@ createHDL backend opts modName seen components domainConfs top topName = flip ev
     hdlNmDocs1 = map (first (<.> Clash.Backend.extension backend)) hdlNmDocs0
     topFiles = concat incs ++ typesPkg1 ++ hdlNmDocs1
 
-    topClks = findClocks top
-    sdcInfo = fmap findDomainConfig <$> topClks
+    sdcInfo = findClocks top
     sdcFile = Data.Text.unpack topName <.> "sdc"
     sdcDoc  = (sdcFile, pprSDC (SdcInfo sdcInfo))
     sdc = if null sdcInfo then Nothing else Just sdcDoc
 
   return (maybeToList sdc <> topFiles, dataFiles, memFiles)
- where
-  findDomainConfig dom =
-    HashMap.lookupDefault
-      (error $ $(curLoc) ++ "Unknown synthesis domain: " ++ show dom)
-      dom
-      domainConfs
 
 writeEdam ::
   FilePath ->
@@ -1160,7 +1150,7 @@ normalizeEntity
   -> BindingMap
   -- ^ All bindings
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PE.Evaluator
   -- ^ Hardcoded evaluator for partial evaluation
@@ -1172,13 +1162,14 @@ normalizeEntity
   -- ^ Unique supply
   -> Id
   -- ^ root of the hierarchy
-  -> IO BindingMap
+  -> IO (BindingMap, DomainMap)
 normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
                 cleaned <- cleanupGraph tm normChecked
-                return cleaned
+                doms <- State.gets _domains
+                return (cleaned, doms)
     transformedBindings = runNormalization env supply bindingsMap
                             typeTrans peEval eval emptyVarEnv
                             topEntities doNorm

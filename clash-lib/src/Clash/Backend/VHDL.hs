@@ -68,7 +68,7 @@ import           Clash.Annotations.BitRepresentation.Util
 import           Clash.Annotations.SynthesisAttributes (Attr(..))
 import           Clash.Backend
 import           Clash.Debug                          (traceIf)
-import           Clash.Driver.Types                   (ClashOpts(..))
+import           Clash.Driver.Types                   (ClashOpts(..), DomainMap)
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
@@ -76,6 +76,7 @@ import           Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
+import           Clash.Signal.Internal                (VDomainConfiguration(..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, makeCached, indexNote)
 import qualified Clash.Util.Interpolate               as I
@@ -155,7 +156,7 @@ instance Backend VHDLState where
     , _enumNameCache=mempty
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
     , _renderEnums_=coerce (opt_renderEnums opts)
-    , _domainConfigurations_=emptyDomainMap
+    , _domainConfigurations_=mempty
     , _usages=mempty
     }
   hdlKind         = const VHDL
@@ -1227,18 +1228,18 @@ tyName' rec0 (filterTransparent -> t) = do
     -- TODO: nice formatting for Index. I.e., 2000 = 2e3, 1024 = 2pow10
     Index n ->
       return ("index_" `TextS.append` showt n)
-    Clock nm0 ->
-      let nm1 = "clk_" `TextS.append` nm0 in
-      Ap $ makeCached (t, False) nameCache (userTyName "clk" nm1 t)
-    ClockN nm0 ->
-      let nm1 = "clk_n_" `TextS.append` nm0 in
-      Ap $ makeCached (t, False) nameCache (userTyName "clk" nm1 t)
-    Reset nm0 ->
-      let nm1 = "rst_" `TextS.append` nm0 in
-      Ap $ makeCached (t, False) nameCache (userTyName "rst" nm1 t)
-    Enable nm0 ->
-      let nm1 = "en_" `TextS.append` nm0 in
-      Ap $ makeCached (t, False) nameCache (userTyName "en" nm1 t)
+    Clock dom ->
+      let nm = "clk_" `withDomSuffix` dom
+       in Ap $ makeCached (t, False) nameCache (userTyName "clk" nm t)
+    ClockN dom ->
+      let nm = "clk_n_" `withDomSuffix` dom
+       in Ap $ makeCached (t, False) nameCache (userTyName "clk" nm t)
+    Reset dom ->
+      let nm = "rst_" `withDomSuffix` dom
+       in Ap $ makeCached (t, False) nameCache (userTyName "rst" nm t)
+    Enable dom ->
+      let nm = "en_" `withDomSuffix` dom
+       in Ap $ makeCached (t, False) nameCache (userTyName "en" nm t)
     Sum nm _  ->
       Ap $ makeCached (t, False) nameCache (userTyName "sum" nm t)
     CustomSum nm _ _ _ ->
@@ -1258,6 +1259,10 @@ tyName' rec0 (filterTransparent -> t) = do
     FileType -> return "file"
     ty -> return (error ($(curLoc) ++  show ty ++
                          " not filtered by filterTransparent"))
+ where
+  withDomSuffix nm = TextS.pack . (nm <>) . concatMap suffix . words . vName
+   where
+    suffix = reverse . takeWhile (/= '$') . reverse
 
 -- | Returns underlying type of given HWType. That is, the type by which it
 -- eventually will be represented in VHDL.
