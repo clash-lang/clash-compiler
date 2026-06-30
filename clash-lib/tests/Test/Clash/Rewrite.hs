@@ -93,7 +93,7 @@ instance Default RewriteEnv where
         , envTupleTyCons = IntMap.empty
         , envPrimitives = HashMap.empty
         , envCustomReprs = buildCustomReprs []
-        , envDomains = HashMap.empty
+        , envDomainTCUs = Nothing
         }
     , _typeTranslator=testTypeTranslator
     , _peEvaluator=error "_peEvaluator: NYI"
@@ -120,6 +120,7 @@ instance Default extra => Default (RewriteState extra) where
     { _transformCounter=0
     , _transformAppliedCounters=mempty
     , _transformTriedCounters=mempty
+    , _domains=mempty
     , _bindings=emptyVarEnv
     , _uniqSupply=unsafePerformIO newSupply
     , _curFun=error "_curFun: NYI"
@@ -336,7 +337,7 @@ parseId typs nm0 = C.Id nm1 uniq (lookupTM uniq typs) scope
 -- declared, see 'parsePats'.
 freeVarType :: C.Type
 freeVarType =
-  C.ConstTy (C.TyCon (C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan))
+  C.ConstTy (C.TyCon (C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan (Text.pack "FreeVar")))
 
 -- | Parse a reference to a variable, looking its type up in the given 'TypeMap'.
 -- References that aren't in it are free variables, and get 'freeVarType'.
@@ -591,7 +592,7 @@ parseToTermQQ = TH.QuasiQuoter{
 -- | The name 'parseType' produces for a type constructor whose name it
 -- derives a unique from, e.g. @Int@
 parseTyConName :: HasCallStack => String -> C.TyConName
-parseTyConName nm = C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan
+parseTyConName nm = C.mkUnsafeName C.User (Text.pack nm) (nameToUnique nm)
 
 -- | The type 'parseType' produces for a type constructor whose name it derives
 -- a unique from, e.g. @Int@
@@ -963,7 +964,7 @@ tests = testGroup "Test.Clash.Rewrite"
                 C.AppTy
                   (C.ConstTy
                     (C.TyCon
-                      (C.Name C.User (Text.pack "Maybe") 9 C.noSrcSpan)))
+                      (C.Name C.User (Text.pack "Maybe") 9 C.noSrcSpan (Text.pack "Maybe"))))
                   intTy
           in assertStructurallyEqual
                (C.Lam

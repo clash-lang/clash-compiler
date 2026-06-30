@@ -26,6 +26,7 @@ fakeName =
     , nameOcc="fake"
     , nameUniq=0
     , nameLoc=noSrcSpan
+    , nameStable="fake"
     }
 
 f :: IdScope -> Var Term
@@ -34,7 +35,8 @@ f scope =
   Id { varName = Name { nameSort=User
                       , nameOcc="f"
                       , nameUniq=unique
-                      , nameLoc=noSrcSpan }
+                      , nameLoc=noSrcSpan
+                      , nameStable="f" }
      , varUniq = unique
      , varType = ConstTy (TyCon fakeName)
      , idScope = scope }
