@@ -1292,7 +1292,7 @@ instance FilterBigNums HWType where
      CustomProduct nm repr sz fieldNms xs -> let ctx' = CtxType ("CustomProduct " <> show nm) : ctx in
        CustomProduct nm repr sz fieldNms <$> mapM (\(fAnn,ty) -> (fAnn,) <$> filterBigNums ctx' ty) xs
 
-     SP nm xs -> let ctx' = CtxType ("SP" <> show nm) : ctx in
+     SP nm xs -> let ctx' = CtxType ("SP " <> show nm) : ctx in
        SP nm <$> mapM (\(nm',tys) -> (nm',) <$> filterBigNums ctx' tys) xs
 
      CustomSP nm repr sz xs -> let ctx' = CtxType ("CustomSP " <> show nm) : ctx in
