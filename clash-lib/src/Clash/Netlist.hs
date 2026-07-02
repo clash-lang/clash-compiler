@@ -47,6 +47,7 @@ import           Data.Maybe
 import qualified Data.Map.Ordered                 as OMap
 import qualified Data.Set                         as Set
 import qualified Data.Text                        as StrictText
+import           Data.Text.Extra                  (showt)
 import           GHC.Stack                        (HasCallStack)
 
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
@@ -83,10 +84,12 @@ import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate,Element)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
+import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 import Clash.Core.PartialEval (Evaluator)
+import Clash.Annotations.SynthesisAttributes (annotate)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
@@ -1329,8 +1332,10 @@ instance FilterBigNums Expr where
      DataCon ty modifier exprs -> DataCon <$> filterBigNums ctx ty <*> pure modifier <*> filterBigNums ctx exprs
      Identifier{} -> pure e0
      DataTag ty x -> DataTag <$> filterBigNums ctx ty <*> pure x
-     BlackBoxE nm libs use qsys bb bbCtx wrap -> let ctx' = CtxBlackBox nm : ctx in
-       BlackBoxE nm libs use qsys bb <$> filterBigNums ctx' bbCtx <*> pure wrap
+     BlackBoxE nm libs use qsys bb bbCtx wrap
+       | nm == showt 'removedArg -> pure e0 -- error ("got removedArg") --
+       | otherwise -> let ctx' = CtxBlackBox nm : ctx in
+         BlackBoxE nm libs use qsys bb <$> filterBigNums ctx' bbCtx <*> pure wrap
      ToBv   mNm ty e -> ToBv   mNm <$> filterBigNums ctx ty <*> filterBigNums ctx e
      FromBv mNm ty e -> FromBv mNm <$> filterBigNums ctx ty <*> filterBigNums ctx e
      IfThenElse eCond eThen eElse -> IfThenElse <$> filterBigNums ctx eCond <*> filterBigNums ctx eThen <*> filterBigNums ctx eElse
@@ -1341,13 +1346,26 @@ instance FilterBigNums BlackBoxContext where
     Context bbName <$> filterBigNums ctx bbResults <*> filterInputs bbInputs <*> mapM (filterBigNums ctx) bbFunctions <*> pure bbQsysIncName <*> pure bbLevel <*> pure bbCompName <*> pure bbCtxName
    where
      -- filterInputs :: [(Expr, HWType, Bool)] -> _
-     filterInputs = zipWithM filterInput [0..]
-     filterInput n (e, ty, isConst) = (,,) <$> e' <*> filterBigNums ctx' ty <*> pure isConst
+     filterInputs
+       | bbName == showt 'annotate = \(attrs : args) -> (attrs :) <$> zipWithM filterInput [1..] args
+       | otherwise = zipWithM filterInput [0..]
+     filterInput n inp@(e, ty, isConst) = case (ty,e) of
+          (Void {},_)       -> pure inp
+          _ | isConst && isLiteralExpr e -> pure inp -- allow all literals as inputs to blackboxes
+          _ | isRemovedArg e -> pure inp -- ignore removedArg
+
+          _ -> (,,) <$> filterBigNums ctx' e <*> filterBigNums ctx' ty <*> pure isConst
       where
         ctx' = CtxBbInput n : ctx
-        e' = case ty of
-          Void _ -> pure e
-          _ -> filterBigNums ctx' e
+
+isLiteralExpr e = case e of
+  HW.Literal{} -> True
+  DataCon _ (DC (Void Nothing,-1)) args -> all isLiteralExpr args -- look through newtype wrapper (mostly SNat)
+  _ -> False
+
+isRemovedArg e = case e of
+  BlackBoxE nm _ _ _ _ _ _ -> nm == showt 'removedArg
+  _ -> False
 
 -- Checks the netlist for Integer/Natural usage
 checkComponent :: Component -> [ErrorMsg]
