@@ -88,7 +88,7 @@ flagsClash r = [
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
   , defFlag "fclash-debug-manifest-hash"         $ NoArg (liftEwM (setDebugManifestHash r))
-  , defFlag "fclash-translate-bignums" $ OptPrefix (liftEwM . (setTranslateBigNums r))
+  , defFlag "fclash-translate-bignums" $ OptPrefix (setTranslateBigNums r)
   ]
 
 -- | Print deprecated flag warning
@@ -251,17 +251,19 @@ setIntWidth r n =
      then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
 
-setTranslateBigNums :: IORef ClashOpts -> String -> IO ()
-setTranslateBigNums r arg = modifyIORef r (\c -> c {opt_translateBigNums = val})
+setTranslateBigNums :: IORef ClashOpts -> String -> EwM IO ()
+setTranslateBigNums r arg = case valM of
+  Just val -> liftEwM $ modifyIORef r (\c -> c {opt_translateBigNums = val})
+  Nothing -> addWarn ("invalid flag: -fclash-translate-bignums=" <> arg)
  where
-  val = case map toLower arg of
-      ""       -> BigNumWarn  -- or Silent?
-      "yes"    -> BigNumWarn  -- or Silent?
-      "no"     -> BigNumError
-      "error"  -> BigNumError
-      "warn"   -> BigNumWarn
-      "silent" -> BigNumSilent
-      _ -> error ("invalid flag: -fclash-translate-bignums=" <> arg)
+  valM = case map toLower arg of
+      ""       -> Just BigNumWarn  -- or Silent?
+      "yes"    -> Just BigNumWarn  -- or Silent?
+      "no"     -> Just BigNumError
+      "error"  -> Just BigNumError
+      "warn"   -> Just BigNumWarn
+      "silent" -> Just BigNumSilent
+      _ -> Nothing
 
 setHdlDir :: IORef ClashOpts
           -> String
