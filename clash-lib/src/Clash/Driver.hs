@@ -447,7 +447,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
       -- 3. Generate netlist for topEntity
-      (topComponent, netlist0) <- modifyMVar seenV $ \seen -> do
+      (topComponent0, netlist0) <- modifyMVar seenV $ \seen -> do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
           genNetlist env peEval isTb transformedBindings topEntityMap compNames
@@ -465,7 +465,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
           -- netlistErrors = concatMap checkComponent netlistComps
           translBigNums = opt_translateBigNums opts
           iw = opt_intWidth opts
-      let (netlist, _, netlistErrors) = runRWS (filterBigNums [] netlist0) iw ()
+      let ((topComponent,netlist), _, netlistErrors) = runRWS (filterBigNums [] (topComponent0,netlist0)) iw ()
       -- 3b. Check the netlist for bignums that shouldn't be there
       Monad.when (translBigNums /= BigNumSilent && not (null netlistErrors)) $ do
         IO.hPutStrLn IO.stderr $ unlines netlistErrors
@@ -787,7 +787,10 @@ createHDL backend opts modName seen components domainConfs top topName = flip ev
       forM componentsL $ \(ComponentMeta{cmLoc, cmScope,cmUsage}, comp) ->
          genHDL opts modName cmLoc (Id.union seen cmScope) cmUsage comp
 
-  hwtys <- HashSet.toList <$> extractTypes <$> Ap get
+  hwtys0 <- HashSet.toList <$> extractTypes <$> Ap get
+  let (hwtys,_,_) = runRWS (filterBigNums [] hwtys0) iw ()
+      iw = opt_intWidth opts
+
   typesPkg0 <- mkTyPackage modName hwtys
   dataFiles <- Ap getDataFiles
   memFiles  <- Ap getMemoryDataFiles
