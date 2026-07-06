@@ -14,7 +14,7 @@
       :: Integer -> Natural'
     template: |-
       -- integerToNaturalThrow begin
-      ~RESULT <= ~ERRORO when ~ARG[0] < ~SIZE[~TYP[0]]'d0 else
+      ~RESULT <= ~ERRORO when ~ARG[0] < to_signed(0,~SIZE[~TYP[0]]) else
                  resize(unsigned(std_logic_vector(~ARG[0])),~SIZE[~TYPO]);
       -- integerToNaturalThrow end
     warning: 'GHC.Num.Integer.integerToNaturalThrow: Naturals are dynamically sized
@@ -27,7 +27,7 @@
       :: Integer -> Natural'
     template: |-
       -- integerToNaturalClamp begin
-      ~RESULT <= to_unsigned(0,~SIZE[~TYPO]]) when ~ARG[0] < ~SIZE[~TYP[0]]'d0 else
+      ~RESULT <= to_unsigned(0,~SIZE[~TYPO]) when ~ARG[0] < to_signed(0,~SIZE[~TYP[0]]) else
                  resize(unsigned(std_logic_vector(~ARG[0])),~SIZE[~TYPO]);
       -- integerToNaturalClamp end
     warning: 'GHC.Num.Integer.integerToNaturalClamp: Naturals are dynamically sized
