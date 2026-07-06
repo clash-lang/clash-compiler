@@ -76,8 +76,8 @@ vcd Simulation
       { simConfig = Config
                   { start, stop, clockStart
                   , shiftToZero
-                  , statusMsgs
-                  , warnZeroWidth
+                  --, statusMsgs
+                  --, warnZeroWidth
                   }
       , simTraces = traceMap
       , simTimestamp
@@ -115,7 +115,7 @@ vcd Simulation
   allTraces = M.toList traceMap
   (allNames, _) = L.unzip allTraces
 
-  nonUnitTraces = filter (\(l,(_,(_,_,w,_))) -> w>0) $ zip allLabels allTraces -- TODO: Use warnZeroWidth here?
+  nonUnitTraces = filter (\(_,(_,(_,_,w,_))) -> w>0) $ zip allLabels allTraces -- TODO: Use warnZeroWidth here?
 
   (labels,names,periods,widths,valuess) = L.unzip5
     $ L.map (\(l,(n,(_t,p,w,vs))) -> (l,n,p,w,vs)) nonUnitTraces
@@ -191,17 +191,18 @@ vcd Simulation
 
   timeScale = timeScale' vcdTimeScaleFS "fs" ["ps","ns","us","ms","s"]
    where
+    timeScale' t u [] = (t,u)
     timeScale' t u (u':r) | t>=1000 = timeScale' (t `div` 1000) u' r
                           | otherwise = (t,u)
 
   timeOffset = if shiftToZero then timeInFS (-start) `div` vcdTimeScaleFS else 0 :: VcdTime
-  timeMult = simTimeScaleFS `div` vcdTimeScaleFS :: VcdTime
+  -- timeMult = simTimeScaleFS `div` vcdTimeScaleFS :: VcdTime
 
   vClockStart = timeInFS clockStart `div` vcdTimeScaleFS :: VcdTime
   vStart = timeInFS start `div` vcdTimeScaleFS + timeOffset :: VcdTime
   vStop = timeInFS (absTime start stop) `div` vcdTimeScaleFS + timeOffset :: VcdTime
 
-  simTimeToVcd x = x*timeMult + timeOffset + vClockStart
+  -- simTimeToVcd x = x*timeMult + timeOffset + vClockStart
 
   {--------------------------
     SIGNAL VALUES
@@ -390,8 +391,9 @@ renderChange ValueChange{..} =
     (False,False) -> '0'
     (False,True)  -> '1'
     (True,_)      -> 'x'
+
   shorten :: String -> String
-  shorten (a:rest@(b:c)) | a == b = shorten rest
+  shorten (a:rest@(b:_)) | a == b = shorten rest
   shorten a = a
 
 -- | Create a VCD command of the form @$<tag> <contents> $end@.

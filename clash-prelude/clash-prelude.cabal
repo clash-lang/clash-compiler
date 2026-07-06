@@ -267,6 +267,8 @@ Library
                       Clash.Signal.Trace
                       Clash.Signal.Simulation
                       Clash.Signal.Simulation.Vcd
+                      Clash.Signal.Simulation.DataType
+                      Data.AnonRecords
 
                       Clash.Sized.BitVector
                       Clash.Sized.Fixed
