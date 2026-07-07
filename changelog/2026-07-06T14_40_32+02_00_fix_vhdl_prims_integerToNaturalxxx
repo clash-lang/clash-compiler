@@ -1,0 +1,1 @@
+FIXED: The VHDL primitives for `integerToNaturalThrow` and `integerToNaturalClamp` no longer contain syntax errors. See [#3315](https://github.com/clash-lang/clash-compiler/pull/3315).
