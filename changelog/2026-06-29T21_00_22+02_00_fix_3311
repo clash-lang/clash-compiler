@@ -1,0 +1,1 @@
+FIXED: Clash no longer crashes for self-recursive global binders in very specific circumstances. See [#3311](https://github.com/clash-lang/clash-compiler/issues/3311).
