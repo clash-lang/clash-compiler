@@ -54,9 +54,9 @@ import Clash.Core.Term
   , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks, Bind(..)
   , partitionTicks, stripAllTicks)
 import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
-import Clash.Core.TyCon (tyConDataCons)
+import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (Type(..), TypeView(..), normalizeType
+  (Type(..), TypeView(..), isClassTy, normalizeType
   , splitFunForallTy, tyView)
 import Clash.Core.Util (inverseTopSortLetBindings, mkVec, tyNatSize)
 import Clash.Core.Var (isGlobalId)
@@ -329,13 +329,18 @@ recToLetRec (TransformContext is0 []) e = do
         else
           -- Check whether all arguments to the data constructor are projections
           --
-          and (zipWith (eqDat v1) (map pure [0..]) (Either.lefts args'))
+          and (zipWith (eqDat tcm v1) (map pure [0..]) (Either.lefts args'))
     eqArg _ _ _
       = False
 
     -- Recursively check whether a term /e/ is semantically equal to some variable /v/.
-    -- Currently it can only assert equality when /e/ is  syntactically equal
-    -- to /v/, or is constructed out of projections of /v/, importantly:
+    -- Currently it can only assert equality when /e/:
+    --
+    --   * is syntactically equal to /v/; or
+    --   * is constructed out of projections of /v/; or
+    --   * is constructed out of type-equal class dictionaries
+    --
+    -- or a mix of these.
     --
     -- [Note: Breaks on constants and predetermined equality]
     -- This function currently breaks if:
@@ -350,13 +355,18 @@ recToLetRec (TransformContext is0 []) e = do
     --     always be the same, it might replace the (semantically equal to 'x')
     --     construction of `y` with `(fst x, fst x)`.
     --
-    eqDat :: Term -> [Int] -> Term -> Bool
-    eqDat v fTrace (collectArgs -> (Data _, args)) =
-      and (zipWith (eqDat v) (map (:fTrace) [0..]) (Either.lefts args))
-    eqDat v1 fTrace v2 =
+    eqDat :: TyConMap -> Term -> [Int] -> Term -> Bool
+    eqDat tcm v fTrace (collectArgs -> (Data _, args)) =
+      and (zipWith (eqDat tcm v) (map (:fTrace) [0..]) (Either.lefts args))
+    eqDat tcm v1 fTrace v2 =
       case stripProjection (reverse fTrace) v1 v2 of
         Just [] -> True
-        _ -> False
+        -- A class dictionary subfield is uniquely determined by its type, so we
+        -- don't require it to be projected from the exact corresponding field.
+        -- GHC routinely shares such dictionaries (e.g. the @KnownDomain@ inside
+        -- a @HiddenClockResetEnable@) via CSE, projecting them from a different
+        -- but type-equal field of the target than the one being reconstructed.
+        _ -> isClassTy tcm (inferCoreTypeOf tcm v2)
 
     stripProjection :: [Int] -> Term -> Term -> Maybe [Int]
     stripProjection fTrace0 vTarget0 (Case v _ [(DataPat _ _ xs, r)]) = do
