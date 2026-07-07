@@ -25,7 +25,7 @@ module Clash.Driver where
 import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
 import           Control.Concurrent.Async         (mapConcurrently_)
 import           Control.DeepSeq
-import           Control.Exception                (throw, Exception)
+import           Control.Exception                (evaluate, throw, Exception)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM)
 import           Control.Monad.Catch              (MonadMask, MonadThrow (throwM))
@@ -120,6 +120,7 @@ import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
+import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -434,7 +435,22 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       -- files belonging to other top entities. Failing to do so leads to #463
       prepareDir hdlDir opts userModifications
 
-      -- 2. Normalize topEntity
+      -- 2. Validate the top entity's 'Synthesize' port annotation. This is done
+      -- before normalization so that "trivial" port errors are reported quickly,
+      -- instead of only after a (potentially long) normalization (#3305).
+      --
+      -- 'annM' is already split (by 'splitTopEntityT') and 'topEntity' has been
+      -- through 'removeForAll', so the types and ports line up; see
+      -- 'checkTopEntityPorts' for how the check is kept equivalent to the one in
+      -- 'mkUniqueNormalized'.
+      --
+      -- XXX: Because the types are split to match, reported errors may refer to
+      --      ports the user didn't directly write.
+      evaluate
+        (checkTopEntityPorts typeTrans (envCustomReprs env) (envTyConMap env)
+           topEntity annM)
+
+      -- 3. Normalize topEntity
       supplyN <- Supply.newSupply
       transformedBindings <- normalizeEntity env bindingsMap typeTrans peEval
                                eval topEntityNames supplyN topEntity
@@ -445,7 +461,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
-      -- 3. Generate netlist for topEntity
+      -- 4. Generate netlist for topEntity
       (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
@@ -460,7 +476,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
 
-      -- 4. Generate topEntity wrapper
+      -- 5. Generate topEntity wrapper
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
         pure $! createHDL hdlState' opts modNameT seen netlist domainConfs topComponent topNmT
 
