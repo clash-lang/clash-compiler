@@ -1,12 +1,25 @@
-
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Clash.Signal.Simulation.Store where
 
-
+import           Data.Aeson
 import           Data.ByteString.Lazy  (ByteString)
-import           Data.ByteString.Lazy  as B
+import qualified Data.ByteString.Lazy  as B
+import           Data.Maybe            (fromMaybe)
+import           Data.Word             (Word8)
+import           GHC.Generics          (Generic)
+import           GHC.Natural           (Natural)
+
+import           Clash.Signal          (KnownDomain, Signal)
+import           Clash.Sized.Internal.BitVector
+  (BitVector(BV))
+import           Clash.Time            (clockPeriodTime)
 
 import           Clash.Signal.Simulation
+import           Clash.Signal.Simulation.DataType
 
 
 {-
@@ -41,19 +54,19 @@ The header looking something like:
 
 data FileHeader = FileHeader
   { samples :: Int
-  , offset :: Maybe Int
+  , offset :: Int
   , width :: Int
   , undefined :: Bool
   , values :: [ValueDescr]
   }
+ deriving (Show,Generic,ToJSON,FromJSON)
 
 data ValueDescr = ValueDescr
   { name :: String
   , width :: Int
   , datatype :: DataType
   }
-
-type DataType = (String,[DataType])
+ deriving (Show,Generic,ToJSON,FromJSON)
 
 -- | Store a trace in binary form.
 store ::
@@ -71,15 +84,38 @@ storeSignal ::
   KnownDomain dom =>
   Traceable a =>
   -- | Name of trace to dump
+  String ->
+  -- | Range of samples to dump
+  (Int,Int) ->
+  -- | The signal to dump
   Signal dom a ->
-  -- | Number of samples
-  Int ->
   ByteString
-storeSignal signal samples = storeTrace (0,samples) $ toTrace signal
+storeSignal name samples signal = storeTrace name samples $ toTrace signal
 
 -- | Convert a trace into binary form.
-storeTrace :: (Int,Int) -> Trace -> ByteString
-storeTrace _samples _trc = undefined -- TODO ...
+storeTrace :: String -> (Int,Int) -> Trace -> ByteString
+storeTrace name (start,stop) (ty,period,width,values) = header' <> "\0" <> rawValues
+ where
+  header = FileHeader
+    { samples = stop-start
+    , offset = start
+    , width
+    , undefined = True
+    , values =
+        [ ValueDescr
+            { name
+            , width
+            , datatype = ty
+            }
+        ]
+    }
+  k = (width+7) `div` 9
+  header' = encode header
+  values' = drop start $ take stop $ values
+  rawValues = B.pack $ concatMap valToBytes values
+  valToBytes (m,v) = concatMap natToBytes [v,m]
+  natToBytes :: Natural -> [Word8]
+  natToBytes i = map (\x -> fromIntegral (i >> (8*x))) [0..k-1] -- TODO: more efficient implementation, and check endianness
 
 -- | Load a trace from binary form.
 load ::
@@ -100,59 +136,64 @@ loadSignal ::
   Traceable a =>
   ByteString ->
   Either String (Signal dom a)
-loadSignal bin = loadTrace @a bin >>= fromTrace
+loadSignal bin = loadTrace (clockPeriodTime @dom) bin >>= fromTrace
 
 -- | Convert binary data into a trace with the given clock period.
 loadTrace ::
   Period ->
   ByteString ->
   Either String Trace
-loadTrace bin 
-  | n /= header.width = Left "Data type width does not match"
+loadTrace period bin
   = Right
-  ( encode (typeRep $ Proxy @a)
-  , clockPeriodTime @dom
-  , fromInteger $ natVal (Proxy @(BitSize a))
-  , values )
+  ( ty
+  , period
+  , width
+  , (replicate offset ((1<<width)-1,0)) <> values )
  where
-  (header,rest) = B.span (/=0) bin
+  (header',rest) = B.span (/=0) bin
   rawValues' = B.drop 1 rest'
 
-  n = natVal (Proxy @(BitSize a))
-  k = (n+7) `div` 8
+  Right header@FileHeader{width,undefined=storesUndefined,offset,values=subsignals} = eitherDecode header'
+
+  k = (width+7) `div` 8
+
+  ty = ... subsignals
 
   values =
-    if header.undefined then
+    if storesUndefined then
       undefinedValues
     else
       definedValues
 
-  offset = fromMaybe 0 header.offset
-
   undefinedValues = f rawValues
    where
     f (v:m:r) = BV m v : f r
-  definedValues = L.map (BV 0) rawValues
+    f _ = []
+  definedValues = map (BV 0) rawValues
 
-  rawValues = L.toInteger $ cut rawValues'
+  rawValues = map toInteger $ cut rawValues'
    where
-    cut B.null = []
-    cut b = v : cut r
-     where (v,r) = B.splitAt k b
-
+    cut b | B.null b = []
+          | otherwise = v : cut r
+     where (v,r) = B.splitAt (fromIntegral k) b
 
 
 
 -- | Load multiple traces from a single binary.
-loadTraces :: Period ...
+loadTraces :: Period -> ByteString -> Either String [(String,Trace)]
+loadTraces  = Prelude.undefined -- TODO
 
 -- | Load multiple traces from a single binary.
 -- The traces will be loaded into a single domain.
-loads :: forall dom. KnownDomain dom => ...
+loads :: forall dom. KnownDomain dom => Period -> ByteString -> Simulation -> Either String Simulation
+loads = Prelude.undefined -- TODO
 
 -- | Store multiple traces in a single binary file.
-storeTraces :: ... [(String,Trace)]
+-- All traces must have the same clock period.
+storeTraces :: (Int,Int) -> [(String,Trace)] -> Either String ByteString
+storeTraces = Prelude.undefined -- TODO
 
 -- | Store multiple traces into a single binary.
 -- All traces must have the same clock period.
-stores :: ... [String]
+stores :: [String] -> Simulation -> Either String ByteString
+stores = Prelude.undefined -- TODO
