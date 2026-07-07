@@ -6,6 +6,7 @@ import Clash.Prelude
 import Clash.Explicit.Testbench
 
 import GHC.Natural
+import GHC.Num.Integer (integerToNaturalClamp)
 
 -- Mark NOINLINE to prevent GHC constant folding
 plusNatural' :: Natural -> Natural -> Natural
@@ -29,10 +30,13 @@ naturalFromInteger' = naturalFromInteger
 {-# OPAQUE naturalFromInteger' #-}
 
 calc :: Integer -> Natural
-calc (naturalFromInteger -> n) = c + h
+calc i = c + h
   where
-    a = n + n
-    b = a * n
+    n = naturalFromInteger i
+    n2 = fromInteger i -- uses the integerToNaturalThrow prim,  see #3315
+    n3 = integerToNaturalClamp i -- yet a 3rd primitive we should test
+    a = n + n2
+    b = a * n3
     c = b - n
 
     -- TODO: Should get constant folded. Test using blackbox forcing an
