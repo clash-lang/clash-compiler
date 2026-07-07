@@ -429,22 +429,22 @@ untuple = deconstructProduct
 -- | The high literal bit.
 pattern High :: TExpr
 pattern High <- TExpr Bit (Literal _ (BitLit H))
-  where High = TExpr Bit (Literal (Just (Bit,1)) (BitLit H))
+  where High = TExpr Bit (Literal (Just Bit) (BitLit H))
 
 -- | The low literal bit.
 pattern Low :: TExpr
 pattern Low <- TExpr Bit (Literal _ (BitLit L))
-  where Low = TExpr Bit (Literal (Just (Bit,1)) (BitLit L))
+  where Low = TExpr Bit (Literal (Just Bit) (BitLit L))
 
 -- | The true literal bool.
 pattern T :: TExpr
 pattern T <- TExpr Bool (Literal _ (BoolLit True))
-  where T = TExpr Bool (Literal (Just (Bool,1)) (BoolLit True))
+  where T = TExpr Bool (Literal (Just Bool) (BoolLit True))
 
 -- | The false literal bool.
 pattern F :: TExpr
 pattern F <- TExpr Bool (Literal _ (BoolLit False))
-  where F = TExpr Bool (Literal (Just (Bool,1)) (BoolLit False))
+  where F = TExpr Bool (Literal (Just Bool) (BoolLit False))
 
 -- | Construct a fully defined BitVector literal
 bvLit
@@ -456,7 +456,7 @@ bvLit
 bvLit sz n =
   TExpr
     (BitVector sz)
-    (Literal (Just (BitVector sz, sz)) (BitVecLit 0 n))
+    (Literal (Just (BitVector sz)) (BitVecLit 0 n))
 
 -- | Convert a bool to a bit.
 boolToBit

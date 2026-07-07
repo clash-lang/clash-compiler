@@ -142,7 +142,7 @@ instance Default TestOptions where
       , verificationTool=Nothing
       , hdlTargets=allTargets
       , ghcFlags=[]
-      , clashFlags=[]
+      , clashFlags=["-fclash-translate-bignums=error"]
       , buildTargets=BuildAuto
       , vvpStdoutNonEmptyFail=True
       }

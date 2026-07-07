@@ -10,7 +10,7 @@ import System.Environment (getArgs, withArgs)
 import Clash.Backend
 import Clash.Backend.VHDL (VHDLState)
 import Clash.Driver
-import Clash.Driver.Types (ClashEnv(..), ClashOpts(..))
+import Clash.Driver.Types (ClashEnv(..))
 
 import Clash.GHC.PartialEval
 import Clash.GHC.Evaluator
@@ -41,5 +41,5 @@ benchFile idirs src =
       bench ("Generating HDL: " ++ src)
             (nfIO (generateHDL clashEnv clashDesign
                      (Just (initBackend @VHDLState (envOpts clashEnv)))
-                     (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                     (ghcTypeToHWType (envOpts clashEnv))
                      ghcEvaluator evaluator Nothing startTime))

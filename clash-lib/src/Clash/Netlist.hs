@@ -11,6 +11,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -19,6 +20,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 module Clash.Netlist where
 
@@ -29,19 +31,23 @@ import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.Reader             (runReaderT)
 import           Control.Monad.State.Strict       (State, runStateT, runState)
+import           Control.Monad.Trans.RWS.CPS      (RWS, ask, tell)
 import           Data.Bifunctor                   (first, second)
+import           Data.Bitraversable               (bitraverse)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
 import           Data.Foldable                    (foldlM)
+import qualified Data.IntMap.Strict               as IntMap
 import           Data.List                        (elemIndex, partition)
 import           Data.List.Extra                  (zipEqual)
 import           Data.List.NonEmpty               (NonEmpty (..))
 import qualified Data.List.NonEmpty.Extra         as NE
 import           Data.Maybe
-  (listToMaybe, fromMaybe)
+  (catMaybes, listToMaybe, fromMaybe, mapMaybe, maybeToList)
 import qualified Data.Map.Ordered                 as OMap
 import qualified Data.Set                         as Set
 import qualified Data.Text                        as StrictText
+import           Data.Text.Extra                  (showt)
 import           GHC.Stack                        (HasCallStack)
 
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
@@ -74,13 +80,16 @@ import           Clash.Core.VarEnv
    lookupVarEnv')
 import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
+import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate,Element)
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
+import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 import Clash.Core.PartialEval (Evaluator)
+import Clash.Annotations.SynthesisAttributes (annotate)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
@@ -837,7 +846,7 @@ mkExpr :: HasCallStack
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ _ (stripTicks -> Core.Literal l) = do
   iw <- Lens.view intWidth
-  return (mkLiteral iw l, [])
+  return (mkLiteral iw False l, [])
 
 mkExpr bbEasD declType bndr app =
  let (appF,args,ticks) = collectArgsTicks app
@@ -1148,3 +1157,324 @@ mkDcApplication declType dstHTypes (MultiId argNms) _ args = do
     error "internal error"
 
 mkDcApplication _ _ _ _ _ = error "internal error"
+
+type ErrorMsg = String
+
+data NetlistContext =
+  CtxComponent Identifier | CtxPort PortDirection Identifier | CtxSignal Identifier | CtxBlackBox StrictText.Text | CtxBbInput Int | CtxBbResult Int | CtxType String
+
+showNetlistContexts :: [NetlistContext] -> String
+showNetlistContexts = concatMap go
+ where
+  go = \case
+    CtxComponent nm -> " in component " <> showIdentifier nm
+    CtxPort dir nm -> let dirStr = case dir of In -> "input"; Out -> "output"
+                      in " in " <> dirStr <> " port " <> showIdentifier nm
+    CtxSignal nm -> " in signal " <> showIdentifier nm
+    CtxBlackBox nm -> " blackbox " <> StrictText.unpack nm
+    CtxBbInput n -> " in input " <> show n <> " to"
+    CtxBbResult n -> " in result " <> show n <> " of"
+    CtxType str -> " in " <> str
+
+showIdentifier :: Identifier -> String
+showIdentifier = StrictText.unpack . Id.toText
+
+type IntWidth = Int
+
+class FilterBigNums a where
+  filterBigNums :: [NetlistContext] -> a -> RWS IntWidth [ErrorMsg] () a
+
+instance FilterBigNums Component where
+  filterBigNums ctx0 (Component compNm0 ins0 outs0 decls0) = do
+    let ctx = CtxComponent compNm0 : ctx0
+    ins <- fmap (map snd) $ filterBigNums ctx $ map (\x -> (In,x)) ins0
+    outs <- fmap (map snd) $ filterBigNums ctx $ map (\x -> (Out,x)) outs0
+    decls <- filterBigNums ctx decls0
+    return $ Component compNm0 ins outs decls
+
+instance FilterBigNums a => FilterBigNums [a] where
+  filterBigNums ctx = mapM (filterBigNums ctx)
+
+instance FilterBigNums a => FilterBigNums (Maybe a) where
+  filterBigNums ctx = mapM (filterBigNums ctx)
+
+instance (FilterBigNums t1, FilterBigNums t2) => FilterBigNums (t1,t2) where
+  filterBigNums ctx (x1,x2) = (,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3) => FilterBigNums (t1,t2,t3) where
+  filterBigNums ctx (x1,x2,x3) = (,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3, FilterBigNums t4) => FilterBigNums (t1,t2,t3,t4) where
+  filterBigNums ctx (x1,x2,x3,x4) = (,,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3 <*> filterBigNums ctx x4
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3, FilterBigNums t4, FilterBigNums t5) => FilterBigNums (t1,t2,t3,t4,t5) where
+  filterBigNums ctx (x1,x2,x3,x4,x5) = (,,,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3 <*> filterBigNums ctx x4 <*> filterBigNums ctx x5
+instance (FilterBigNums t1, FilterBigNums t2, FilterBigNums t3, FilterBigNums t4, FilterBigNums t5, FilterBigNums t6) => FilterBigNums (t1,t2,t3,t4,t5,t6) where
+  filterBigNums ctx (x1,x2,x3,x4,x5,x6) = (,,,,,) <$> filterBigNums ctx x1 <*> filterBigNums ctx x2 <*> filterBigNums ctx x3 <*> filterBigNums ctx x4 <*> filterBigNums ctx x5 <*> filterBigNums ctx x6
+
+instance (FilterBigNums a,FilterBigNums b) => FilterBigNums (Either a b) where
+  filterBigNums ctx = bitraverse (filterBigNums ctx) (filterBigNums ctx)
+
+instance (Ord k, FilterBigNums v) => FilterBigNums (OMap.OMap k v) where
+  filterBigNums ctx = traverse (filterBigNums ctx)
+
+
+instance FilterBigNums BlackBox where
+  filterBigNums ctx = pure
+instance FilterBigNums Element where
+  filterBigNums ctx = pure
+instance FilterBigNums ComponentMeta where
+  filterBigNums ctx = pure
+
+instance FilterBigNums Declaration where
+  filterBigNums ctx d0 = case d0 of
+    Assignment nm usage expr -> Assignment nm usage <$> filterBigNums (CtxSignal nm : ctx) expr
+    CondAssignment nm ty scrut scrutTy alts -> let ctx' = CtxSignal nm : ctx in
+        CondAssignment nm <$> filterBigNums ctx' ty <*> filterBigNums ctx' scrut <*> filterBigNums ctx' scrutTy <*> filterBigNums ctx' alts
+    InstDecl eOrC mLib attrs nm lbl params portmap -> InstDecl eOrC mLib attrs nm lbl <$> filterBigNums ctx params <*> filterBigNums ctx portmap
+    CompDecl nm ports -> CompDecl nm <$> filterBigNums ctx ports
+    BlackBoxD nm libs use qsys bb bbCtx -> let ctx' = CtxBlackBox nm : ctx in
+      BlackBoxD nm libs use qsys bb <$> filterBigNums ctx' bbCtx
+    NetDecl' comment nm ty e -> let ctx' = CtxSignal nm : ctx in
+      NetDecl' comment nm <$> filterBigNums ctx' ty <*> filterBigNums ctx' e
+    TickDecl {} -> pure d0
+    Seq xs -> Seq <$> filterBigNums ctx xs
+    ConditionalDecl condText xs -> ConditionalDecl condText <$> filterBigNums ctx xs
+
+instance FilterBigNums PortMap where
+  filterBigNums ctx portmap = case portmap of
+    IndexedPortMap xs -> IndexedPortMap <$> filterBigNums ctx xs
+    NamedPortMap xs   -> NamedPortMap   <$> filterBigNums ctx xs
+
+instance FilterBigNums Seq where
+  filterBigNums ctx x = case x of
+    AlwaysClocked edge clkExpr xs -> AlwaysClocked edge <$> filterBigNums ctx clkExpr <*> filterBigNums ctx xs
+    Initial xs -> Initial <$> filterBigNums ctx xs
+    AlwaysComb xs -> AlwaysComb <$> filterBigNums ctx xs
+    SeqDecl s -> SeqDecl <$> filterBigNums ctx s
+    Branch scrut scrutTy alts -> Branch <$> filterBigNums ctx scrut <*> filterBigNums ctx scrutTy <*> filterBigNums ctx alts
+
+instance FilterBigNums PortDirection where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums Identifier where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums HW.Literal where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums Usage where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums Bool where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums StrictText.Text where
+  filterBigNums _ctx = pure
+
+instance FilterBigNums HWType where
+  filterBigNums ctx ty0 = case ty0 of
+     Natural -> do
+       tell $ ["Found Natural" <> showNetlistContexts ctx]
+       iw <- ask
+       return (Unsigned iw)
+     Integer -> do
+       tell $ ["Found Integer" <> showNetlistContexts ctx]
+       iw <- ask
+       return (Signed iw)
+
+     Vector sz elemTy -> let ctx' = CtxType "Vector" : ctx in
+       Vector sz <$> filterBigNums ctx' elemTy
+
+     RTree sz elemTy -> let ctx' = CtxType "RTree" : ctx in
+       RTree sz <$> filterBigNums ctx' elemTy
+
+     BiDirectional dir ty' -> let ctx' = CtxType "BiDirectional" : ctx in
+       BiDirectional dir <$> filterBigNums ctx' ty'
+
+     Product nm fieldNms tys -> let ctx' = CtxType ("Product " <> show nm) : ctx in
+       Product nm fieldNms <$> filterBigNums ctx' tys
+
+     CustomProduct nm repr sz fieldNms xs -> let ctx' = CtxType ("CustomProduct " <> show nm) : ctx in
+       CustomProduct nm repr sz fieldNms <$> mapM (\(fAnn,ty) -> (fAnn,) <$> filterBigNums ctx' ty) xs
+
+     SP nm xs -> let ctx' = CtxType ("SP " <> show nm) : ctx in
+       SP nm <$> mapM (\(nm',tys) -> (nm',) <$> filterBigNums ctx' tys) xs
+
+     CustomSP nm repr sz xs -> let ctx' = CtxType ("CustomSP " <> show nm) : ctx in
+       CustomSP nm repr sz <$> mapM (\(cRepr,nm',tys) -> (cRepr,nm',) <$> filterBigNums ctx' tys) xs
+
+     Annotated attrs ty' -> let ctx' = CtxType "Annotated" : ctx in
+      Annotated attrs <$> filterBigNums ctx' ty'
+
+     Void mTy -> let ctx' = CtxType "Void" : ctx in Void <$> mapM (filterBigNums ctx') mTy
+
+     String -> return ty0
+     Bool -> return ty0
+     Bit -> return ty0
+     BitVector _ -> return ty0
+     Index _ -> return ty0
+     Signed _ -> return ty0
+     Unsigned _ -> return ty0
+     MemBlob _ _ -> return ty0
+     Sum _ _ -> return ty0
+     Clock _ -> return ty0
+     ClockN _ -> return ty0
+     Reset _ -> return ty0
+     Enable _ -> return ty0
+     CustomSum {} -> return ty0
+     KnownDomain {} -> return ty0
+     FileType -> return ty0
+
+instance FilterBigNums Expr where
+  filterBigNums ctx e0 = case e0 of
+     HW.Literal mTy0 lit -> do
+       mTy <- filterBigNums ctx mTy0
+       return $ HW.Literal mTy lit
+
+     DataCon ty modifier exprs -> DataCon <$> filterBigNums ctx ty <*> pure modifier <*> filterBigNums ctx exprs
+     Identifier{} -> pure e0
+     DataTag ty x -> DataTag <$> filterBigNums ctx ty <*> pure x
+     BlackBoxE nm libs use qsys bb bbCtx wrap
+       | nm == showt 'removedArg -> pure e0 -- error ("got removedArg") --
+       | otherwise -> let ctx' = CtxBlackBox nm : ctx in
+         BlackBoxE nm libs use qsys bb <$> filterBigNums ctx' bbCtx <*> pure wrap
+     ToBv   mNm ty e -> ToBv   mNm <$> filterBigNums ctx ty <*> filterBigNums ctx e
+     FromBv mNm ty e -> FromBv mNm <$> filterBigNums ctx ty <*> filterBigNums ctx e
+     IfThenElse eCond eThen eElse -> IfThenElse <$> filterBigNums ctx eCond <*> filterBigNums ctx eThen <*> filterBigNums ctx eElse
+     Noop -> pure e0
+
+instance FilterBigNums BlackBoxContext where
+  filterBigNums ctx (Context {..}) =
+    Context bbName <$> filterBigNums ctx bbResults <*> filterInputs bbInputs <*> mapM (filterBigNums ctx) bbFunctions <*> pure bbQsysIncName <*> pure bbLevel <*> pure bbCompName <*> pure bbCtxName
+   where
+     -- filterInputs :: [(Expr, HWType, Bool)] -> _
+     filterInputs
+       | bbName == showt 'annotate = \(attrs : args) -> (attrs :) <$> zipWithM filterInput [1..] args
+       | otherwise = zipWithM filterInput [0..]
+     filterInput n inp@(e, ty, isConst) = case (ty,e) of
+          (Void {},_)       -> pure inp
+          _ | isConst && isLiteralExpr e -> pure inp -- allow all literals as inputs to blackboxes
+          _ | isRemovedArg e -> pure inp -- ignore removedArg
+
+          _ -> (,,) <$> filterBigNums ctx' e <*> filterBigNums ctx' ty <*> pure isConst
+      where
+        ctx' = CtxBbInput n : ctx
+
+isLiteralExpr e = case e of
+  HW.Literal{} -> True
+  DataCon _ (DC (Void Nothing,-1)) args -> all isLiteralExpr args -- look through newtype wrapper (mostly SNat)
+  _ -> False
+
+isRemovedArg e = case e of
+  BlackBoxE nm _ _ _ _ _ _ -> nm == showt 'removedArg
+  _ -> False
+
+-- Checks the netlist for Integer/Natural usage
+checkComponent :: Component -> [ErrorMsg]
+checkComponent (Component compNm ins outs decls) = inErrs <> outErrs <> declErrs
+ where
+   compCtx = [CtxComponent compNm]
+   inErrs = mapMaybe (checkPort compCtx In) ins
+   outErrs = mapMaybe ((checkPort compCtx Out) . (\(_,x,_) -> x)) outs
+   declErrs = concatMap (checkDecl compCtx) decls
+   checkHWType :: [NetlistContext] -> HWType -> Maybe ErrorMsg
+   checkHWType ctx ty = case ty of
+     Natural -> Just $ "Found Natural" <> showNetlistContexts ctx
+     Integer -> Just $ "Found Integer" <> showNetlistContexts ctx
+     Vector _sz elemTy -> let ctx' = CtxType "Vector" : ctx in checkHWType ctx' elemTy
+     RTree _ elemTy -> let ctx' = CtxType "RTree" : ctx in checkHWType ctx' elemTy
+     Product _ _ tys -> let ctx' = CtxType "Product" : ctx in listToMaybe $ concatMap maybeToList $ map (checkHWType ctx') tys
+     SP _ xs -> let ctx' = CtxType "SP" : ctx in listToMaybe $ concatMap maybeToList $ map (checkHWType ctx') $ concatMap snd xs
+     BiDirectional _ ty' -> let ctx' = CtxType "BiDirectional" : ctx in checkHWType ctx' ty'
+     CustomSP _ _ _ xs -> let ctx' = CtxType "CustomSP" : ctx in listToMaybe $ concatMap maybeToList $ map (checkHWType ctx') $ concatMap (\(_,_,x) -> x) xs
+     CustomProduct _ _ _ _ xs -> let ctx' = CtxType "CustomProduct" : ctx in  listToMaybe $ concatMap maybeToList $ map (checkHWType ctx' . snd) xs
+     Annotated _ ty' -> let ctx' = CtxType "Annotated" : ctx in  checkHWType ctx' ty'
+
+     Void _ -> Nothing
+     String -> Nothing
+     Bool -> Nothing
+     Bit -> Nothing
+     BitVector _ -> Nothing
+     Index _ -> Nothing
+     Signed _ -> Nothing
+     Unsigned _ -> Nothing
+     MemBlob _ _ -> Nothing
+     Sum _ _ -> Nothing
+     Clock _ -> Nothing
+     ClockN _ -> Nothing
+     Reset _ -> Nothing
+     Enable _ -> Nothing
+     CustomSum {} -> Nothing
+     KnownDomain {} -> Nothing
+     FileType -> Nothing
+
+   checkTypedExpr1 :: [NetlistContext] -> HWType -> Expr -> Maybe ErrorMsg
+   checkTypedExpr1 ctx ty e = listToMaybe $ checkTypedExpr ctx ty e
+
+   -- Function arguments to HO blackboxes get the type "Void Nothing"
+   -- and a Expr containing an exception, so don't look inside
+   checkTypedExpr1IgnoreVoid :: [NetlistContext] -> HWType -> Expr -> Maybe ErrorMsg
+   checkTypedExpr1IgnoreVoid ctx ty e = case ty of
+     Void Nothing -> Nothing
+     _ -> checkTypedExpr1 ctx ty e
+
+
+   checkTypedExpr :: [NetlistContext] -> HWType -> Expr -> [ErrorMsg]
+   checkTypedExpr ctx ty e = case checkHWType ctx ty of
+     Just err -> [err]
+     Nothing -> checkExpr ctx e
+   checkPort :: [NetlistContext] -> PortDirection -> (Identifier,HWType) -> Maybe ErrorMsg
+   checkPort ctx portDirection (portNm,ty) = checkHWType (CtxPort portDirection portNm:ctx) ty
+   checkDecl :: [NetlistContext] -> Declaration -> [ErrorMsg]
+   checkDecl ctx x = case x of
+     Assignment nm _ expr -> checkExpr (CtxSignal nm : ctx) expr
+     CondAssignment nm ty scrut scrutTy alts ->
+       let ctx' = CtxSignal nm : ctx
+       in catMaybes [checkHWType ctx' ty, checkHWType ctx' scrutTy] <> checkExpr ctx' scrut <> concatMap (checkExpr ctx' . snd) alts
+     InstDecl {} -> [] -- will be checked when we check that components netlist
+     CompDecl{} -> [] -- will be checked when we check that components netlist
+     BlackBoxD nm _libs _use _qsys _bb bbCtx ->
+       let ctx' = CtxBlackBox nm : ctx
+       in checkBbCtx ctx' bbCtx
+     NetDecl' _ nm ty e -> let ctx' = CtxSignal nm : ctx in catMaybes [checkHWType ctx' ty, checkExpr1 ctx' =<< e]
+     TickDecl {} -> []
+     Seq xs -> concatMap (checkSeq ctx) xs
+     ConditionalDecl _ xs -> concatMap (checkDecl ctx) xs
+   checkExpr1 :: [NetlistContext] -> Expr -> Maybe ErrorMsg
+   checkExpr1 ctx e = listToMaybe $ checkExpr ctx e
+   checkExpr :: [NetlistContext] -> Expr -> [ErrorMsg]
+   checkExpr ctx = \case
+     HW.Literal mTy _ -> maybeToList $ checkHWType ctx =<< mTy
+     DataCon _ _ exprs -> concatMap (checkExpr ctx) exprs
+     Identifier{} -> mempty
+     DataTag ty _ -> maybeToList $ checkHWType ctx ty
+     BlackBoxE nm _libs _use _qsys _bb bbCtx _ ->
+       let ctx' = CtxBlackBox nm : ctx
+       in checkBbCtx ctx' bbCtx
+     ToBv _ ty e -> maybeToList (checkHWType ctx ty) <> checkExpr ctx e
+     FromBv _ ty e -> maybeToList (checkHWType ctx ty) <> checkExpr ctx e
+     IfThenElse eCond eThen eElse -> concatMap (checkExpr ctx) [eCond,eThen,eElse]
+     Noop -> mempty
+   checkSeq :: [NetlistContext] -> Seq -> [ErrorMsg]
+   checkSeq ctx = \case
+     AlwaysClocked _edge _clock seqs -> concatMap (checkSeq ctx) seqs
+     Initial seqs -> concatMap (checkSeq ctx) seqs
+     AlwaysComb seqs -> concatMap (checkSeq ctx) seqs
+     SeqDecl decl -> checkDecl ctx decl
+     Branch scrut scrutTy alts -> checkTypedExpr ctx scrutTy scrut <> concatMap (concatMap (checkSeq ctx) . snd) alts
+
+   checkBbCtx :: [NetlistContext] -> BlackBoxContext -> [ErrorMsg]
+   checkBbCtx ctx bbCtx =
+     let
+        bbInpErrs = mapMaybe (\(n,(e,ty,isConst)) -> if isConst then mempty else let ctx' = CtxBbInput n : ctx in checkTypedExpr1IgnoreVoid ctx' ty e) (zip [0..] $ bbInputs bbCtx)
+        bbResErrs = mapMaybe (\(n,(e,ty)) ->        let ctx' = CtxBbResult n : ctx in checkTypedExpr1 ctx' ty e) (zip [0..] $ bbResults bbCtx)
+        bbFunErrs = concatMap (\(n,xs) -> concatMap (checkBbFun (CtxBbInput n : ctx)) xs) $ IntMap.toList $ bbFunctions bbCtx
+     in bbInpErrs <> bbResErrs <> bbFunErrs
+
+   checkBbFun :: [NetlistContext]
+              -> (Either BlackBox (Identifier, [Declaration]), Usage,
+                  [BlackBoxTemplate],[BlackBoxTemplate],
+                  [((StrictText.Text, StrictText.Text), BlackBox)], BlackBoxContext
+                 )
+              -> [ErrorMsg]
+   checkBbFun ctx (eTempl, _usage, _lib, _imps, _incs, bbCtx) = case eTempl of
+     Left _bb -> checkBbCtx ctx bbCtx
+     Right (_nm,decls') -> concatMap (checkDecl ctx) decls' <> checkBbCtx ctx bbCtx

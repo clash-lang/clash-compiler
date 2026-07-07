@@ -52,7 +52,7 @@ benchFile idirs src =
               (normalizeEntity
                 clashEnv
                 (designBindings clashDesign)
-                (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                (ghcTypeToHWType (envOpts clashEnv))
                 ghcEvaluator
                 evaluator
                 topEntities

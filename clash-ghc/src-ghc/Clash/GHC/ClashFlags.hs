@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2021,      QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022,      Google Inc.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -18,7 +18,7 @@ import           GHC.Utils.Panic
 import           GHC.Types.SrcLoc
 
 import           Control.Monad
-import           Data.Char                      (isSpace)
+import           Data.Char                      (isSpace,toLower)
 import           Data.IORef
 import           Data.List                      (dropWhileEnd)
 import           Data.List.Split                (splitOn)
@@ -88,6 +88,7 @@ flagsClash r = [
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
   , defFlag "fclash-debug-manifest-hash"         $ NoArg (liftEwM (setDebugManifestHash r))
+  , defFlag "fclash-translate-bignums" $ OptPrefix (setTranslateBigNums r)
   ]
 
 -- | Print deprecated flag warning
@@ -249,6 +250,20 @@ setIntWidth r n =
   if n == 32 || n == 64
      then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
+
+setTranslateBigNums :: IORef ClashOpts -> String -> EwM IO ()
+setTranslateBigNums r arg = case valM of
+  Just val -> liftEwM $ modifyIORef r (\c -> c {opt_translateBigNums = val})
+  Nothing -> addWarn ("invalid flag: -fclash-translate-bignums=" <> arg)
+ where
+  valM = case map toLower arg of
+      ""       -> Just BigNumWarn  -- or Silent?
+      "yes"    -> Just BigNumWarn  -- or Silent?
+      "no"     -> Just BigNumError
+      "error"  -> Just BigNumError
+      "warn"   -> Just BigNumWarn
+      "silent" -> Just BigNumSilent
+      _ -> Nothing
 
 setHdlDir :: IORef ClashOpts
           -> String

@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -43,6 +43,7 @@ import qualified Data.Text                            as TextS
 import           Data.Text.Prettyprint.Doc.Extra
 import qualified Data.Text.Prettyprint.Doc.Extra      as PP
 import           Data.Tuple                           (swap)
+import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath
 
 import           Clash.Annotations.Primitive          (HDL (..))
@@ -56,7 +57,7 @@ import           Clash.Annotations.SynthesisAttributes (Attr(..))
 import           Clash.Debug                          (traceIf)
 import           Clash.Backend
 import           Clash.Backend.Verilog
-  (bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
+  (altTy, bits, bit_char, encodingNote, exprLit, include, noEmptyInit, uselibs)
 import           Clash.Backend.Verilog.Time           (periodToString)
 import           Clash.Driver.Types                   (ClashOpts(..))
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
@@ -68,7 +69,7 @@ import           Clash.Netlist.Types                  hiding (intWidth, usages, 
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, clogBase, noSrcSpan, curLoc, makeCached, indexNote)
+  (SrcSpan, noSrcSpan, curLoc, makeCached, indexNote)
 import           Clash.Util.Graph                     (reverseTopSort)
 
 -- | State for the 'Clash.Backend.SystemVerilog.SystemVerilogM' monad:
@@ -618,7 +619,14 @@ verilogType t_ = do
     Bool          -> "logic"
     String        -> "string"
     FileType      -> "integer"
+    Integer       -> integerTyError
+    Natural       -> naturalTyError
     _ -> logicOrWire <+> brackets (int (typeSize t -1) <> colon <> int 0)
+
+integerTyError, naturalTyError :: HasCallStack => a
+integerTyError = error "Verilog backend processing a Integer, this shouldn't have happened :'("
+naturalTyError = error "Verilog backend processing a Natural, this shouldn't have happened :'("
+
 
 sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
 sigDecl d t = verilogType t <+> d
@@ -879,7 +887,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     conds _ []                = return []
     conds i [(_,e)]           = ("default" <+> colon <+> pretty i <+> equals <+> expr_ False e) <:> return []
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> pretty i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Just c ,e):es') = (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> pretty i <+> equals <+> expr_ False e) <:> conds i es'
+    conds i ((Just c ,e):es') = (exprLitSV (Just (altTy scrutTy)) c <+> colon <+> pretty i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl _ _ attrs nm lbl ps pms0) = fmap Just $
     attrs' <> nest 2 (pretty nm <> params <> pretty lbl <> line <> pms2 <> semi)
@@ -990,7 +998,7 @@ seq_ (Branch scrut scrutTy es) =
             indent 2 (seqs sq) <> line <>
           "end") <:> return []
         conds ((Just c ,sq):es') =
-          (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> "begin" <> line <>
+          (exprLitSV (Just (altTy scrutTy)) c <+> colon <+> "begin" <> line <>
             indent 2 (seqs sq) <> line <>
           "end") <:> conds es'
 
@@ -1017,7 +1025,7 @@ seqs (d:ds) = seq_ d <> line <> line <> seqs ds
 expr_ :: Bool -- ^ Enclose in parentheses?
       -> Expr -- ^ Expr to convert
       -> SystemVerilogM Doc
-expr_ _ (Literal sizeM lit) = exprLitSV sizeM lit
+expr_ _ (Literal htyM lit) = exprLitSV htyM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id dataRepr _size args,dcI,fI)))) =
   case fieldTy of
@@ -1174,7 +1182,7 @@ expr_ _ (DataCon (MemBlob n m) _ [n0, m0, _, runs, _, ends])
   , Literal Nothing (StringLit runs0) <- runs
   , Literal Nothing (StringLit ends0) <- ends
   , es <- unpackNats n m (B8.pack runs0) (B8.pack ends0) =
-    let el val = exprLitSV (Just (BitVector m, m))
+    let el val = exprLitSV (Just (BitVector m))
                            (BitVecLit 0 $ toInteger val)
     in "'" <> listBraces (mapM el es)
 
@@ -1219,31 +1227,29 @@ expr_ _ (DataCon (Enable _) _ [e]) =
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLitSV (Just (Signed (fromInteger n),fromInteger n)) i
+  = exprLitSV (Just (Signed (fromInteger n))) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLitSV (Just (Unsigned (fromInteger n),fromInteger n)) i
+  = exprLitSV (Just (Unsigned (fromInteger n))) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ (NumLit m), Literal _ (NumLit i)] <- extractLiterals bbCtx
-  = exprLitSV (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m i)
+  = exprLitSV (Just (BitVector (fromInteger n))) (BitVecLit m i)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
   , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
   , NumLit m' <- m
   , NumLit i' <- i
-  = exprLitSV (Just (Bit,1)) (BitLit $ toBit m' i')
+  = exprLitSV (Just Bit) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  , Just k <- clogBase 2 n
-  , let k' = max 1 k
-  = exprLitSV (Just (Index (fromInteger n),k')) i
+  = exprLitSV (Just (Index (fromInteger n))) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') =
   parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
@@ -1316,7 +1322,7 @@ expr_ b (IfThenElse c t e) =
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
-exprLitSV :: Maybe (HWType,Size) -> Literal -> SystemVerilogM Doc
+exprLitSV :: Maybe HWType -> Literal -> SystemVerilogM Doc
 exprLitSV = exprLit undefValue
 
 otherSize :: [HWType] -> Int -> Int
@@ -1364,7 +1370,7 @@ expFromSLV (Signed _) exp_ = "$signed" <> parens exp_
 expFromSLV _ exp_ = exp_
 
 dcToExpr :: HWType -> Int -> Expr
-dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
+dcToExpr ty i = Literal (Just (altTy ty)) (NumLit (toInteger i))
 
 listBraces :: Monad m => m [Doc] -> m Doc
 listBraces = align . encloseSep lbrace rbrace comma

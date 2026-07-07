@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                     2026,      QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -43,6 +44,7 @@ import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
 #endif
 
+import qualified Data.Text            as Text
 import Data.Time.Clock                (UTCTime)
 import qualified Data.Time.Clock      as Clock
 import qualified Data.Time.Format     as Clock
@@ -81,6 +83,9 @@ instance Exception.Exception ClashException
 -- | Construct a string pattern match out of the given @TemplateHaskell@ name
 namePat :: TH.Name -> TH.Q TH.Pat
 namePat = return . TH.LitP . TH.StringL . show
+
+fromTHName :: TH.Name -> Text.Text
+fromTHName = Text.pack . show
 
 assertPanic
   :: String -> Int -> a

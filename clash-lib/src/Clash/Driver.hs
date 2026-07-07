@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017     , QBayLogic, Google Inc.
-                     2020-2024, QBayLogic,
+                     2020-2026, QBayLogic B.V.,
                      2022     , Google Inc.
 
   License     :  BSD2 (see the file LICENSE)
@@ -21,7 +21,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Driver where
-
 import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
 import           Control.Concurrent.Async         (mapConcurrently_)
 import           Control.DeepSeq
@@ -34,6 +33,7 @@ import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
+import           Control.Monad.Trans.RWS.CPS      (runRWS)
 import qualified Crypto.Hash.SHA256               as Sha256
 import           Data.Bifunctor                   (first, second)
 import           Data.ByteString                  (ByteString)
@@ -42,6 +42,7 @@ import qualified Data.ByteString.Lazy             as ByteStringLazy
 import qualified Data.ByteString.Lazy.Char8       as ByteStringLazyChar8
 import           Data.Char                        (isAscii, isAlphaNum)
 import           Data.Default
+import           Data.Foldable                    (toList)
 import           Data.Hashable                    (hash)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
@@ -113,7 +114,7 @@ import           Clash.Driver.Manifest
   (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
    mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
-import           Clash.Netlist                    (genNetlist, genTopNames)
+import           Clash.Netlist                    (checkComponent, filterBigNums, genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
 import qualified Clash.Netlist.Id                 as Id
@@ -446,7 +447,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
       -- 3. Generate netlist for topEntity
-      (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
+      (topComponent0, netlist0) <- modifyMVar seenV $ \seen -> do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
           genNetlist env peEval isTb transformedBindings topEntityMap compNames
@@ -454,11 +455,22 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
         pure (seen', (topComponent, netlist))
 
-      netlistTime <- netlist `deepseq` Clock.getCurrentTime
+      netlistTime <- netlist0 `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
 
       withMVar ioLockV . const $
         putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
+
+      let -- netlistComps = snd <$> toList netlist0
+          -- netlistErrors = concatMap checkComponent netlistComps
+          translBigNums = opt_translateBigNums opts
+          iw = opt_intWidth opts
+      let ((topComponent,netlist), _, netlistErrors) = runRWS (filterBigNums [] (topComponent0,netlist0)) iw ()
+      -- 3b. Check the netlist for bignums that shouldn't be there
+      Monad.when (translBigNums /= BigNumSilent && not (null netlistErrors)) $ do
+        IO.hPutStrLn IO.stderr $ unlines netlistErrors
+        Monad.when (translBigNums == BigNumError) $
+          error "got netlist errors"
 
       -- 4. Generate topEntity wrapper
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
@@ -775,7 +787,10 @@ createHDL backend opts modName seen components domainConfs top topName = flip ev
       forM componentsL $ \(ComponentMeta{cmLoc, cmScope,cmUsage}, comp) ->
          genHDL opts modName cmLoc (Id.union seen cmScope) cmUsage comp
 
-  hwtys <- HashSet.toList <$> extractTypes <$> Ap get
+  hwtys0 <- HashSet.toList <$> extractTypes <$> Ap get
+  let (hwtys,_,_) = runRWS (filterBigNums [] hwtys0) iw ()
+      iw = opt_intWidth opts
+
   typesPkg0 <- mkTyPackage modName hwtys
   dataFiles <- Ap getDataFiles
   memFiles  <- Ap getMemoryDataFiles

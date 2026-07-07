@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -26,6 +26,7 @@ module Clash.Backend.Verilog
   , bits
   , bit_char
   , noEmptyInit
+  , altTy
   -- * split ranges
   , Range (..)
   , continueWithRange
@@ -85,7 +86,7 @@ import           Clash.Netlist.Types as N             hiding (intWidth, usages, 
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
 import           Clash.Util
-  (SrcSpan, clogBase, noSrcSpan, curLoc, indexNote, makeCached)
+  (SrcSpan, noSrcSpan, curLoc, indexNote, makeCached)
 
 -- | State for the 'Clash.Backend.Verilog.VerilogM' monad:
 data VerilogState =
@@ -391,7 +392,13 @@ verilogType t = case t of
   FileType -> emptyDoc
   Annotated _ ty -> verilogType ty
   BiDirectional _ ty -> verilogType ty
+  Integer -> integerTyError
+  Natural -> naturalTyError
   _        -> brackets (int (typeSize t -1) <> colon <> int 0)
+
+integerTyError, naturalTyError :: HasCallStack => a
+integerTyError = error "Verilog backend processing a Integer, this shouldn't have happened :'("
+naturalTyError = error "Verilog backend processing a Natural, this shouldn't have happened :'("
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
 sigDecl d t = verilogType t <+> d
@@ -591,7 +598,7 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     conds _ []                = return []
     conds i [(_,e)]           = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Just c ,e):es') = (exprLitV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
+    conds i ((Just c ,e):es') = (exprLitV (Just $ altTy scrutTy) c <+> colon <+> stringS i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl _ _ attrs nm lbl ps pms0) = fmap Just $
     attrs' <> nest 2 (pretty nm <> params <> pretty lbl <> line <> pms2 <> semi)
@@ -624,6 +631,14 @@ inst_ (ConditionalDecl cond ds) = Just <$>
 
 inst_ d =
   error ("inst_: " ++ show d)
+
+-- | Calculate the type of an (case) alternative pattern in HDL
+--
+-- For 'SP' this equal to  @BitVector conSize@,
+-- otherwise it's just equal to the type itself.
+altTy :: HWType -> HWType
+altTy scrutTy | typeSize scrutTy /= conSize scrutTy = BitVector (conSize scrutTy)
+              | otherwise = scrutTy
 
 seq_ :: Seq -> VerilogM Doc
 seq_ (AlwaysClocked edge clk ds) =
@@ -660,7 +675,7 @@ seq_ (Branch scrut scrutTy es) =
         indent 2 (seqs sq) <> line <>
       "end") <:> return []
     conds ((Just c ,sq):es') =
-      (exprLitV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> "begin" <> line <>
+      (exprLitV (Just (altTy scrutTy)) c <+> colon <+> "begin" <> line <>
         indent 2 (seqs sq) <> line <>
       "end") <:> conds es'
 
@@ -1099,7 +1114,7 @@ expr_ _ (DataCon (MemBlob n m) _ [n0, m0, _, runs, _, ends])
   , Literal Nothing (StringLit runs0) <- runs
   , Literal Nothing (StringLit ends0) <- ends
   , es <- unpackNats n m (B8.pack runs0) (B8.pack ends0) =
-    let el val = exprLitV (Just (BitVector m, m)) (BitVecLit 0 $ toInteger val)
+    let el val = exprLitV (Just (BitVector m)) (BitVecLit 0 $ toInteger val)
     in listBraces $ mapM el es
 
 expr_ _ (DataCon (RTree 0 _) _ [e]) = expr_ False e
@@ -1141,33 +1156,31 @@ expr_ _ (DataCon (Enable _) _ [e]) =
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLitV (Just (Signed (fromInteger n),fromInteger n)) i
+  = exprLitV (Just (Signed (fromInteger n))) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  = exprLitV (Just (Unsigned (fromInteger n),fromInteger n)) i
+  = exprLitV (Just (Unsigned (fromInteger n))) i
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ m, Literal _ i] <- extractLiterals bbCtx
   , NumLit m' <- m
   , NumLit i' <- i
-  = exprLitV (Just (BitVector (fromInteger n),fromInteger n)) (BitVecLit m' i')
+  = exprLitV (Just (BitVector (fromInteger n))) (BitVecLit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.BitVector.fromInteger##"
   , [Literal _ m, Literal _ i] <- extractLiterals bbCtx
   , NumLit m' <- m
   , NumLit i' <- i
-  = exprLitV (Just (Bit,1)) (BitLit $ toBit m' i')
+  = exprLitV (Just Bit) (BitLit $ toBit m' i')
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  , Just k <- clogBase 2 n
-  , let k' = max 1 k
-  = exprLitV (Just (Index (fromInteger n),k')) i
+  = exprLitV (Just (Index (fromInteger n))) i
 
 expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
   parenIf (b || b') (Ap (renderBlackBox libs imps inc bs bbCtx <*> pure 0))
@@ -1229,13 +1242,13 @@ rtreeChain (DataCon (RTree 0 _) _ [e])     = Just [e]
 rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = Just e1 <:> rtreeChain e2
 rtreeChain _                               = Nothing
 
-exprLitV :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
+exprLitV :: Maybe HWType -> Literal -> VerilogM Doc
 exprLitV = exprLit undefValue
 
-exprLit :: Backend s => Lens' s (Maybe (Maybe Int)) -> Maybe (HWType,Size) -> Literal -> Ap (State s) Doc
+exprLit :: Backend s => Lens' s (Maybe (Maybe Int)) -> Maybe HWType -> Literal -> Ap (State s) Doc
 exprLit _ Nothing (NumLit i) = integer i
 
-exprLit k (Just (hty,sz)) (NumLit i0) = case hty of
+exprLit k (Just hty) (NumLit i0) = case hty of
   Unsigned _
    | i < 0     -> string "-" <> int sz <> string "'d" <> integer (abs i)
    | otherwise -> int sz <> string "'d" <> integer i
@@ -1245,16 +1258,19 @@ exprLit k (Just (hty,sz)) (NumLit i0) = case hty of
   Signed _
    | i < 0     -> string "-" <> int sz <> string "'sd" <> integer (abs i)
    | otherwise -> int sz <> string "'sd" <> integer i
+  Natural -> integer i0 -- used for SNat when -fclash-no-tranlate-integer-natural
   _ -> int sz <> string "'b" <> blit
   where
+    sz = typeSize hty
     blit = bits k (toBits sz i)
     i = case hty of
              Signed _ -> let mask = 2^(sz-1) in case divMod i0 mask of
                 (s,i'') | even s    -> i''
                         | otherwise -> i'' - mask
              _ -> i0 `mod` 2^sz
-exprLit k (Just (_,sz)) (BitVecLit m i) = int sz <> string "'b" <> bvlit
+exprLit k (Just hty) (BitVecLit m i) = int sz <> string "'b" <> bvlit
   where
+    sz = typeSize hty
     bvlit = bits k (toBits' sz m i)
 
 exprLit _ _             (BoolLit t)   = string $ if t then "1'b1" else "1'b0"
@@ -1296,7 +1312,7 @@ bit_char k b = do
     _                 -> char (bit_char' b)
 
 dcToExpr :: HWType -> Int -> Expr
-dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
+dcToExpr ty i = Literal (Just (altTy ty)) (NumLit (toInteger i))
 
 listBraces :: Monad m => m [Doc] -> m Doc
 listBraces = align . enclose lbrace rbrace . hsep . punctuate (comma <+> softline)

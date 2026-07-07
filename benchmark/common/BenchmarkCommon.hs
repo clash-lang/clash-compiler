@@ -62,7 +62,7 @@ runNormalisationStage idirs src = do
     topEntity:_ -> do
       transformedBindings <-
             normalizeEntity env (designBindings design)
-              (ghcTypeToHWType (opt_intWidth (opts idirs)))
+              (ghcTypeToHWType (opts idirs))
               ghcEvaluator
               evaluator
               topEntityNames supplyN topEntity

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 import           Clash.Driver
-import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWidth))
+import           Clash.Driver.Types           (ClashEnv(..))
 import qualified Clash.Util.Supply            as Supply
 
 import           Clash.GHC.PartialEval
@@ -45,7 +45,7 @@ benchFile idirs src = do
                    }
 
   res <- normalizeEntity clashEnv bindingsMap
-                   (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                   (ghcTypeToHWType (envOpts clashEnv))
                    ghcEvaluator
                    evaluator
                    topEntityNames supplyN topEntity

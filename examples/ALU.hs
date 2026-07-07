@@ -4,7 +4,7 @@ import Clash.Prelude
 
 data OPC = ADD | MUL | SUB
 
-topEntity :: OPC -> Integer -> Integer -> Integer
+topEntity :: OPC -> Int -> Int -> Int
 topEntity SUB = (-)
 topEntity ADD = (+)
 topEntity MUL = (*)
