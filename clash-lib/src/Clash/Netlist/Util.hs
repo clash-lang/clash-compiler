@@ -101,9 +101,9 @@ import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
   (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, normalizeType,
-   splitTyConAppM, stripAnnTypes, tyView)
+   splitCoreFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
-  (substArgTys, tyLitShow)
+  (splitShouldSplit, substArgTys, tyLitShow)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
@@ -1963,6 +1963,84 @@ data ExpandError
   -- | Something was annotated as being a PortProduct, but wasn't one
   | PortProductError PortName HWType
 
+-- | Render an 'ExpandError' as a human readable error message.
+expandErrorMessage :: ExpandError -> String
+expandErrorMessage (AttrError attrs) = [I.i|
+  Cannot use attribute annotations on product types of top entities. Saw
+  annotation:
+
+    #{attrs}
+|]
+expandErrorMessage (PortProductError pn hwty) = [I.i|
+  Saw a PortProduct in a Synthesize annotation:
+
+    #{pn}
+
+  but the port type:
+
+    #{hwty}
+
+  is not a product!
+|]
+
+-- | Like 'expandTopEntityOrErrM', but pure: expands the top entity and throws a
+-- formatted error (via 'expandErrorMessage') if the annotation is invalid.
+expandTopEntityOrErr
+  :: HasCallStack
+  => [(Maybe Id, FilteredHWType)]
+  -- ^ Arguments. Ids are used as name hints.
+  -> (Maybe Id, FilteredHWType)
+  -- ^ Result. Id is used as name hint.
+  -> Maybe TopEntity
+  -- ^ If /Nothing/, an expanded top entity will be generated as if /defSyn/
+  -- was passed.
+  -> ExpandedTopEntity (Either Text Text)
+expandTopEntityOrErr ihwtys ohwty topM =
+  case expandTopEntity ihwtys ohwty topM of
+    Left err -> error (expandErrorMessage err)
+    Right eTop -> eTop
+
+-- | Check the 'Synthesize' port annotation of a top entity against the types
+-- of its arguments and result, throwing an error if the annotation is invalid.
+--
+-- The annotation is expected to already be split (see
+-- 'Clash.Driver.splitTopEntityT'); the argument types are split to match before
+-- checking.
+checkTopEntityPorts
+  :: HasCallStack
+  => (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
+  -- ^ Hardcoded 'Type' -> 'HWType' translator
+  -> CustomReprs
+  -> TyConMap
+  -> Id
+  -- ^ Top entity binder
+  -> Maybe TopEntity
+  -- ^ Top entity annotation, if any. Expected to be already split, see above.
+  -> ()
+checkTopEntityPorts typeTrans reprs tcm topId topM =
+  let
+    (argTys, resTy) = splitCoreFunForallTy tcm (coreTypeOf topId)
+    -- Only value arguments carry ports; type/dictionary arguments are skipped.
+    -- 'splitShouldSplit' mirrors 'separateArguments', so the resulting types
+    -- align with the (already split) ports in the annotation.
+    valArgTys = splitShouldSplit tcm [ty | Right ty <- argTys]
+    convert = coreTypeToHWType typeTrans reprs tcm
+    hwtysE =
+      flip evalState mempty $
+        sequence <$> mapM convert (valArgTys ++ [resTy])
+  in
+    case hwtysE of
+      -- A port type is polymorphic or otherwise untranslatable. Skip the check
+      -- and let normalization produce its (clearer) diagnostic (e.g. "can only
+      -- normalize monomorphic functions" or "non-representable return type").
+      Left _ -> ()
+      Right hwtys ->
+        let (argHwtys, resHwty) = (init hwtys, last hwtys)
+        -- Force the expansion, which throws on an invalid annotation.
+        in expandTopEntityOrErr (map (Nothing,) argHwtys) (Nothing, resHwty) topM
+             `seq` ()
+
 -- | Same as 'expandTopEntity', but also adds identifiers to the identifier
 -- set of the monad.
 expandTopEntityOrErrM
@@ -1980,31 +2058,10 @@ expandTopEntityOrErrM
   -- IdentifierSet.
 expandTopEntityOrErrM ihwtys ohwty topM = do
   is <- identifierSetM id
-
-  case expandTopEntity ihwtys ohwty topM of
-    Left (AttrError attrs) ->
-      (error [I.i|
-        Cannot use attribute annotations on product types of top entities. Saw
-        annotation:
-
-          #{attrs}
-      |])
-    Left (PortProductError pn hwty) ->
-      (error [I.i|
-        Saw a PortProduct in a Synthesize annotation:
-
-          #{pn}
-
-        but the port type:
-
-          #{hwty}
-
-        is not a product!
-      |])
-    Right eTop -> do
-      let ete = evalState (traverse (either Id.addRaw Id.makeBasic) eTop) (Id.clearSet is)
-      Id.addMultiple (toList ete)
-      pure ete
+  let eTop = expandTopEntityOrErr ihwtys ohwty topM
+  let ete = evalState (traverse (either Id.addRaw Id.makeBasic) eTop) (Id.clearSet is)
+  Id.addMultiple (toList ete)
+  pure ete
 
 -- | Take a top entity and /expand/ its port names. I.e., make sure that every
 -- port that should be generated in the HDL is part of the data structure. It
