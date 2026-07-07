@@ -1,0 +1,6 @@
+---
+issues: [2978]
+---
+
+# FIXED
+`deepErrorX` and `ensureSpine` on a `Bit` no longer throws an `XException`; it now produces an undefined `Bit` (`.`), matching the behavior of `deepErrorX` on `BitVector n`.

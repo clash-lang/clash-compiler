@@ -1,0 +1,6 @@
+---
+issues: [2753]
+---
+
+# FIXED
+`Clash.Util.Interpolate.i` no longer inserts an extra blank line after a paragraph that gets reflowed onto multiple lines.

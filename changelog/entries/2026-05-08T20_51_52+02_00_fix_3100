@@ -1,0 +1,6 @@
+---
+issues: [3100]
+---
+
+# FIXED
+`deriveAutoReg` no longer fails on GHC versions where `KnownNat` lives in `GHC.Internal.TypeNats` rather than `GHC.TypeNats`.

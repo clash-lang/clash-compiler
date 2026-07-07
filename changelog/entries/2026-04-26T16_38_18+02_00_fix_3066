@@ -1,0 +1,6 @@
+---
+issues: [3066]
+---
+
+# FIXED
+`makeTopEntity` now accounts for unary product types.

@@ -1,0 +1,6 @@
+---
+issues: [3174]
+---
+
+# CHANGED
+Replaced the deprecated `data-binary-ieee754` dependency with `castDoubleToWord64`, `castFloatToWord32`, `castWord32ToFloat`, and `castWord64ToDouble` from `GHC.Float`.

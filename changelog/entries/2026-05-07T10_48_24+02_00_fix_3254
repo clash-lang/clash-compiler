@@ -1,0 +1,6 @@
+---
+issues: [3254]
+---
+
+# FIXED
+The compiler's evaluator reduces `XException`s thrown by evaluated constructs to an `undefined`.

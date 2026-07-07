@@ -1,0 +1,6 @@
+---
+issues: [2724]
+---
+
+# FIXED
+Clash no longer produces an error when using `dataToTag` in combination with custom bit representations.

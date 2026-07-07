@@ -1,0 +1,6 @@
+---
+issues: [2926]
+---
+
+# FIXED
+`termToData` now strips ticks (recursively) from its input before delegating to instances, so `TermLiteral` lookups no longer spuriously fail on tick-wrapped subterms. The class method has been renamed to `termToData#`.

@@ -1,0 +1,6 @@
+---
+issues: [3311]
+---
+
+# FIXED
+Clash no longer crashes for self-recursive global binders in very specific circumstances.

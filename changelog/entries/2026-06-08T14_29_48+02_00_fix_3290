@@ -1,0 +1,6 @@
+---
+issues: [3290]
+---
+
+# FIXED
+Clash no longer crashes upon calling `sequenceA`/`traverse#` on a zero-sized `Vec`.

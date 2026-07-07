@@ -1,0 +1,6 @@
+---
+issues: [2801]
+---
+
+# FIXED
+`signalAutomaton` now allocates fresh mutable simulation state in `IO`, preventing separate simulations from accidentally sharing continuations.
