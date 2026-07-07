@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: tespkg/actions-cache/restore@v1
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
           endpoint: "192.168.102.136"
           port: 9000
@@ -67,7 +67,7 @@ jobs:
         run: |
           cabal v2-build all --dependencies-only
 
-      - uses: tespkg/actions-cache/save@v1
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
           endpoint: "192.168.102.136"
           port: 9000
