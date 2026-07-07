@@ -26,6 +26,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Perhaps we should preinstall these on the container?
+      # This step always takes a minute...
+      # We'd lose the ability to select the version of cabal inside of the runner though
+      - name: Install GHC
+        id: ghc-install
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: latest
+
       - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
           endpoint: "192.168.102.136"
@@ -37,21 +47,9 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          # The cabal.project file contains the index state & hashes
-          # Since we only cache the dependencies, and this is what determines what dependencies are grabbed
-          # hashing the cabal.project file should suffice in determining if the dependencies changed
-          key: ${{ runner.os }}-${ matrix.ghc }-cabal-${ hashFiles("cabal.project", "*/*.cabal") }
+          key: ${{ runner.os }}-${ matrix.ghc }-cabal-${ hashFiles( ${{ steps.ghc-install.outputs.cabal-store }}, "~/.cache/cabal" ) }
           restore-keys: ${{ runner.os }}-${ matrix.ghc }-cabal-
-          path: ~/.cabal
-
-      # Perhaps we should preinstall these on the container?
-      # This step always takes a minute...
-      # We'd lose the ability to select the version of cabal inside of the runner though
-      - name: Install GHC
-        uses: haskell-actions/setup@v2
-        with:
-          ghc-version: ${{ matrix.ghc }}
-          cabal-version: latest
+          path: ${{ steps.ghc-install.outputs.cabal-store }}
 
       - name: Version information
         run:
@@ -75,8 +73,8 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${ matrix.ghc }-cabal-${ hashFiles("cabal.project") }
-          path: ~/.cabal
+          key: ${{ runner.os }}-${ matrix.ghc }-cabal-${ hashFiles( ${{ steps.ghc-install.outputs.cabal-store }}, "~/.cache/cabal" ) }
+          path: ${{ steps.ghc-install.outputs.cabal-store }}
 
       - name: Build
         run: |
@@ -109,6 +107,20 @@ jobs:
           enable-stack: true
           stack-version: latest
 
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${ matrix.ghc }-stack-${ hashFiles( ${{ steps.ghc-install.outputs.stack-root }} ) }
+          restore-keys: ${{ runner.os }}-${ matrix.ghc }-stack-
+          path: ${{ steps.ghc-install.outputs.stack-root }}
 
       - name: Version information
         run:
@@ -117,8 +129,24 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get install libtinfo-dev -y
 
-      # From what I read online, stack is difficult to cache and also generates huge build artifacts
-      # So maybe it's better not to cache the stack builds? The current Gitlab runners don't either
+      - name: Build Dependencies
+        run:
+          stack build -j$(nproc) --pedantic --dependencies-only
+
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${ matrix.ghc }-stack-${ hashFiles( ${{ steps.ghc-install.outputs.stack-root }} ) }
+          path: ${{ steps.ghc-install.outputs.stack-root }}
+
       - name: Build
         run:
           stack build -j$(nproc) --pedantic
