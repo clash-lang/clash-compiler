@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedLabels #-}
+-- {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -18,10 +18,10 @@ module Data.AnonRecords where
 
 import GHC.TypeLits
 import Data.Proxy
-import Data.Type.Bool (If, type (||))
+import Data.Type.Bool (type (||))
 
 import Clash.Signal
-import Clash.Signal.Bundle
+-- import Clash.Signal.Bundle
 
 infixr 3 :=
 -- data (:=) x a where

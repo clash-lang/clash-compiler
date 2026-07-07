@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Clash.Signal.Simulation.DataType where
 
@@ -42,13 +43,17 @@ This cannot be done through a coercible class, as the values exist in runtime on
 
 -}
 import Type.Reflection
+import GHC.Generics
+import Data.Aeson
 import Data.Typeable
 import Data.List (stripPrefix)
 
 
-data DataType = DT String [DataType]
+data DataType = DT String [DataType] deriving (Show,Generic,ToJSON,FromJSON)
 
-
+-- | Get a @DataType@ representation of a type.
+-- This amounts to the toplevel type, and a list of all its type arguments.
+-- Note that this does not directly specify anything about the data type.
 typeRep :: forall a. Typeable a => DataType
 typeRep = pretty $ Data.Typeable.typeRep $ Proxy @a
  where
@@ -71,15 +76,18 @@ pattern JOIN = "Clash.Data.AnonRecord$(:&:)"
 pattern UNIT = "GHC.Tuple$Unit"
 pattern TUP2 = "GHC.Tuple$Tuple2"
 pattern TUP_BASE = "GHC.Tuple$Tuple"
+pattern SYMBOL_BASE = "GHC.DataKind$"
 
-
-
+-- | Check whether two data types are compatible.
+-- This occurs when both types are the same,
+-- or when they have a compatible tuple/anonymous record structure.
+-- For example, @(a,(b,c)) ~ (a,b,c) ~ (a,(b,(c,()))) ~ (L a :&: L b :&: L c)@.
 compatible :: DataType -> DataType -> Bool
 compatible (DT a     ra   ) (DT b     rb    ) | a == b
                                               = and $ zipWith compatible ra rb
 compatible (DT LABEL _    ) (DT LABEL _     ) = False -- cut off before removing labels
 compatible (DT TUP2 [a,b] ) (DT TUP2 [c,d]  ) = compatible a c && compatible b d
-compatible x                y                 = compatible' x y || compatible' y x -- asymmetric reductions
+compatible x'               y'                = compatible' x' y' || compatible' y' x' -- asymmetric reductions
  where
   -- a:&:b ~ (a,b)
   compatible' (DT JOIN [a,b] ) y = compatible (DT TUP2 [a,b]) y
@@ -94,3 +102,17 @@ compatible x                y                 = compatible' x y || compatible' y
   compatible' (DT LABEL [_,a]) b = compatible a b
 
   compatible' _ _ = False
+
+
+-- | Turn a list of fields and their types into an anonymous record.
+-- @
+-- [("a",DT "Bool" []),("b",DT "Int" [])] ~ (a := Bool :&: b := Int)
+-- @
+constructRecord :: [(String,DataType)] -> DataType
+constructRecord [] = DT UNIT []
+constructRecord [(field,ty)] = constructLabel field ty
+constructRecord ((field,ty):rest) = DT JOIN [constructLabel field ty, constructRecord rest]
+
+-- | Create an anonymous record label from the type.
+constructLabel :: String -> DataType -> DataType
+constructLabel l t = DT LABEL [DT (SYMBOL_BASE<>show l) [],t]
