@@ -114,6 +114,14 @@ instance Default GlobalData where
 SIMULATION
 ----------------------------------------}
 
+-- | Create an empty simulation from a configuration.
+emptySim :: Config -> IO Simulation
+emptySim config = Simulation
+  { simConfig = config
+  , simTraces = M.empty
+  , simTimestamp = now
+  }
+
 globalDataRef :: IORef GlobalData
 globalDataRef = unsafePerformIO (newIORef def)
 {-# OPAQUE globalDataRef #-}
@@ -171,20 +179,27 @@ simulate0 ref simConfig@Config{start,stop,clockStart,statusMsgs,warnZeroWidth} c
   else pure ()
 
   -- evaluate signal
-  let cStart = max 0
-        $ (timeInFS (start - clockStart))
-        `div` (timeInFS $ clockPeriodTime @dom)
-        + 1 -- t=0 for sample 1
-      cStop = max 0
-        $ (timeInFS $ absTime start stop - clockStart)
-        `div` (timeInFS $ clockPeriodTime @dom)
-        + 2 -- add 1 for exclusive range
+  let (cStart,cStop) = simulationTimeRangeToCycles simConfig (clockPeriodTime @dom)
   evalResult <- forceEvaluateSignal ref sig signals (cStart, cStop) statusMsgs
 
   -- create Simulation
   GlobalData{globTraces} <- readIORef ref
   let simTraces = M.union (M.fromList $ L.map (second clockTrace) clockWaves) globTraces
   return $ evalResult >>= const (Right Simulation{simConfig, simTraces, simTimestamp})
+
+simulationTimeRangeToCycles :: Config -> Time -> (Int,Int)
+simulationTimeRangeToCycles Config{start,stop,clockStart} period = (fromInteger cStart,fromInteger cStop)
+ where
+    cStart = max 0
+      $ timeInFS (start - clockStart)
+      `div` timeInFS period
+      + 1 -- t=0 for sample 1
+    cStop = max 0
+      $ ((timeInFS $ absTime start stop - clockStart) - 1) -- -1 to not include a cycle that starts at <stop>
+      `div` timeInFS period
+      + 2 -- add 1 for exclusive range
+
+
 
 -- | The magic that makes the tracing simulation work.
 -- A signal is evaluated within some range, which may be cut short if all wanted
@@ -195,10 +210,10 @@ forceEvaluateSignal ::
   IORef GlobalData ->
   Signal dom a ->
   [String] ->
-  (Integer,Integer) ->
+  (Int,Int) ->
   Bool ->
   IO (Either String ())
-forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs = --undefined -- TODO ...
+forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   case (waitFor, statusMsgs) of
     ([],False) -> return $ Right $ deepseqX values' ()
     ([],True)  -> do
