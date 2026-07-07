@@ -56,7 +56,9 @@ jobs:
           cabal --version
 
       - name: Install system dependencies
-        run: sudo apt-get install libtinfo-dev tree iverilog -y
+        run: |
+          sudo apt-get update
+          sudo apt-get install libtinfo-dev tree iverilog -y
 
       - name: Build dependencies
         run: |
@@ -127,7 +129,9 @@ jobs:
           stack --version
 
       - name: Install system dependencies
-        run: sudo apt-get install libtinfo-dev -y
+        run: |
+          sudo apt-get update
+          sudo apt-get install libtinfo-dev -y
 
       - name: Build Dependencies
         run:
