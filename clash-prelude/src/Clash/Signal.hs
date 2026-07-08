@@ -91,6 +91,10 @@ module Clash.Signal
     -- * Domain
   , Domain
   , sameDomain
+  , switchDomain
+  , switchClockDomain
+  , switchResetDomain
+  , switchEnableDomain
   , KnownDomain(..)
   , KnownConfiguration
   , ActiveEdge(..)
@@ -103,6 +107,8 @@ module Clash.Signal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
+  , SupportsSwitchingTo
+  , EligibleDomainSwitch
     -- *** Convenience types
     -- $conveniencetypes
 
@@ -174,23 +180,27 @@ module Clash.Signal
   , exposeClock
   , withClock
   , hasClock
+  , switchHiddenClockDomain
     -- ** Hidden reset
   , HiddenReset
   , hideReset
   , exposeReset
   , withReset
   , hasReset
+  , switchHiddenResetDomain
     -- ** Hidden enable
   , HiddenEnable
   , hideEnable
   , exposeEnable
   , withEnable
   , hasEnable
+  , switchHiddenEnableDomain
     -- ** Hidden clock, reset, and enable
   , HiddenClockResetEnable
   , hideClockResetEnable
   , exposeClockResetEnable
   , withClockResetEnable
+  , switchHiddenClockResetEnableDomain
   , SystemClockResetEnable
     -- * Basic circuit functions
   , andEnable
@@ -698,6 +708,14 @@ hasClock
 hasClock = fromLabel @(HiddenClockName dom)
 {-# INLINE hasClock #-}
 
+-- | Switches the domain of a hidden clock. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchHiddenClockDomain ::
+  (EligibleDomainSwitch domA domB, HiddenClock domA) =>
+  (HiddenClock domB => r) -> r
+switchHiddenClockDomain = withClock $ switchClockDomain hasClock
+{-# INLINE switchHiddenClockDomain #-}
+
 {- | Expose a hidden 'Reset' argument of a component, so it can be applied
 explicitly.
 
@@ -778,6 +796,14 @@ hasReset
   => Reset dom
 hasReset = fromLabel @(HiddenResetName dom)
 {-# INLINE hasReset #-}
+
+-- | Switches the domain of a hidden reset. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchHiddenResetDomain ::
+  (EligibleDomainSwitch domA domB, HiddenReset domA) =>
+  (HiddenReset domB => r) -> r
+switchHiddenResetDomain = withReset $ switchResetDomain hasReset
+{-# INLINE switchHiddenResetDomain #-}
 
 {- | Expose a hidden 'Enable' argument of a component, so it can be applied
 explicitly.
@@ -862,6 +888,14 @@ hasEnable
   => Enable dom
 hasEnable = fromLabel @(HiddenEnableName dom)
 {-# INLINE hasEnable #-}
+
+-- | Switches the domain of a hidden enable. See 'switchDomain' for
+-- further details on domain switching in particular.
+switchHiddenEnableDomain ::
+  (EligibleDomainSwitch domA domB, HiddenEnable domA) =>
+  (HiddenEnable domB => r) -> r
+switchHiddenEnableDomain = withEnable $ switchEnableDomain hasEnable
+{-# INLINE switchHiddenEnableDomain #-}
 
 {- | Merge enable signal with signal of bools by applying the boolean AND
 operation.
@@ -1015,6 +1049,18 @@ withClockResetEnable
 withClockResetEnable =
   \clk rst en f -> withClock clk (withReset rst (withEnable en f))
 {-# INLINE withClockResetEnable #-}
+
+-- | Switches the domain of a hidden clock, reset, and enable. See
+-- 'switchDomain' for further details on domain switching in
+-- particular.
+switchHiddenClockResetEnableDomain ::
+  (EligibleDomainSwitch domA domB, HiddenClockResetEnable domA) =>
+  (HiddenClockResetEnable domB => r) -> r
+switchHiddenClockResetEnableDomain =
+  withClockResetEnable (switchClockDomain hasClock)
+                       (switchResetDomain hasReset)
+                       (switchEnableDomain hasEnable)
+{-# INLINE switchHiddenClockResetEnableDomain #-}
 
 -- * Basic circuit functions
 

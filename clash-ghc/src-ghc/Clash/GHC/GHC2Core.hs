@@ -472,19 +472,22 @@ coreToTerm primMap unlocs = term
       = term' e
       where
         -- Remove most Signal transformers
-        go "Clash.Signal.Internal.mapSignal#"  args
+        go "Clash.Signal.Internal.mapSignal#" args
           | length args == 5
           = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.signal#"     args
+        go "Clash.Signal.Internal.signal#" args
           | length args == 3
           = term (args!!2)
-        go "Clash.Signal.Internal.appSignal#"  args
+        go "Clash.Signal.Internal.appSignal#" args
           | length args == 5
           = term (App (args!!3) (args!!4))
         go "Clash.Signal.Internal.joinSignal#" args
           | length args == 3
           = term (args!!2)
-        go "Clash.Signal.Bundle.vecBundle#"    args
+        go "Clash.Signal.Internal.switchDomain" args
+          | length args == 13
+          = term (last args)
+        go "Clash.Signal.Bundle.vecBundle#" args
           | length args == 4
           = term (args!!3)
         --- Remove `$`
