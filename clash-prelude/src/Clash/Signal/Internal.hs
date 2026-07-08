@@ -46,6 +46,10 @@ module Clash.Signal.Internal
     -- * Domains
   , Domain
   , sameDomain
+  , switchDomain
+  , switchClockDomain
+  , switchResetDomain
+  , switchEnableDomain
   , KnownDomain(..)
   , KnownConf
   , KnownConfiguration
@@ -60,6 +64,8 @@ module Clash.Signal.Internal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
+  , SupportsSwitchingTo
+  , EligibleDomainSwitch
   -- ** Configuration type families
   , DomainConfigurationPeriod
   , DomainConfigurationPeriodFraction
@@ -200,6 +206,7 @@ import Data.Type.Equality         ((:~:), testEquality)
 import GHC.Generics               (Generic)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.Types                  (Type)
+import GHC.TypeError              (Assert, TypeError, ErrorMessage(..))
 import GHC.TypeLits               (Div, KnownNat, Nat, type (<=), type (*), type (-))
 import GHC.TypeLits.Extra         (DivRU)
 import GHC.Real                   (Ratio(..), (%))
@@ -925,6 +932,67 @@ sameDomain
    . (KnownDomain domA, KnownDomain domB)
   => Maybe (domA :~: domB)
 sameDomain = testEquality (typeRep @domA) (typeRep @domB)
+
+-- | An open type family for keeping track of the supported domain
+-- switches. Instantiating this type family with a 'True' value is a
+-- strict requirement for enabling domain switching via
+-- 'switchDomain'. Setting the value to 'False' instead actively
+-- forbids such switching behavior. The direction of domain switching
+-- is unidirectional.
+type family (domA :: Domain) `SupportsSwitchingTo` (domB :: Domain) :: Bool
+
+-- | The constraints to be satisfied for switching from @domA@ to @domB@.
+type EligibleDomainSwitch domA domB =
+  ( KnownDomain domA          , KnownDomain domB
+  , DomainPeriod domA         ~ DomainPeriod domB
+  , DomainActiveEdge domA     ~ DomainActiveEdge domB
+  , DomainResetKind domA      ~ DomainResetKind domB
+  , DomainInitBehavior domA   ~ DomainInitBehavior domB
+  , DomainResetPolarity domA  ~ DomainResetPolarity domB
+  , DomainPeriodFraction domA ~ DomainPeriodFraction domB
+  , Assert (domA `SupportsSwitchingTo` domB)
+      (TypeError (    Text "Forbidden domain switch:" :$$: Text "  "
+                 :<>: ShowType domA :<>: Text "  ⟶  " :<>: ShowType domB
+                 )
+      )
+  )
+
+-- | Switches the domain of a signal, given that the corresponding two
+-- domains are hardware compatible. Furthermore, switching needs to be
+-- enabled through the open 'SupportsSwitchingTo' type family for the
+-- selected domain pair .
+--
+-- This function is intended to be used for domain switching inside
+-- physical clock domains, which enjoy some further virtual
+-- partitioning according to some additionally given context. It will
+-- not introduce any additional logic in hardware.
+switchDomain ::
+  EligibleDomainSwitch domA domB =>
+  Signal domA a -> Signal domB a
+switchDomain ~(x :- xr) = x :- switchDomain xr
+{-# OPAQUE switchDomain #-}
+{-# ANN switchDomain hasBlackBox #-}
+
+-- | Switches the domain of a clock. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchClockDomain ::
+  EligibleDomainSwitch domA domB =>
+  Clock domA -> Clock domB
+switchClockDomain (Clock c) = Clock $ fmap switchDomain c
+
+-- | Switches the domain of a reset. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchResetDomain ::
+  EligibleDomainSwitch domA domB =>
+  Reset domA -> Reset domB
+switchResetDomain (Reset r) = Reset $ switchDomain r
+
+-- | Switches the domain of an enable. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchEnableDomain ::
+  EligibleDomainSwitch domA domB =>
+  Enable domA -> Enable domB
+switchEnableDomain (Enable e) = Enable $ switchDomain e
 
 infixr 5 :-
 {- | Clash has synchronous 'Signal's in the form of:
