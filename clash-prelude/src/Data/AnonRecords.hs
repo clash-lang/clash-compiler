@@ -10,27 +10,37 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures -Wterm-variable-capture #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
+
 module Data.AnonRecords where
 
-
-import GHC.TypeLits
+import GHC.Generics (Generic)
+import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Data.Proxy
 import Data.Type.Bool (type (||))
+import Data.Typeable (Typeable)
 
 import Clash.Signal
--- import Clash.Signal.Bundle
+import Clash.Class.BitPack (BitPack)
+import Clash.XException (NFDataX)
 
 infixr 3 :=
 -- data (:=) x a where
 --   (:=) :: forall (x :: Symbol) -> a -> x := a
 -- -- GADT problematic!
-data (:=) (x::Symbol) a = L{unLabel::a}
+newtype (:=) (x::Symbol) a = L{unLabel::a}
+  deriving (Generic, BitPack, NFDataX, Typeable)
 
 infixr 2 :&:
-data (:&:) a b = a :&: b deriving Show
+data (:&:) a b = a :&: b
+  deriving (Show, Generic, BitPack, NFDataX, Typeable)
+
+-- deriving instance (KnownNat (BitSize a + BitSize b), BitPack a, BitPack b) => BitPack (a :&: b)
 
 -- -- extra pattern for when you do not want to add the labels explicitly
 -- pattern L a <- x := a where
@@ -63,6 +73,7 @@ instance Bundle (x := a) where
 
 
 -- TUPLES
+-- from/to records up to size 3, presently
 
 class AsTuple a where
   type Tupled a
