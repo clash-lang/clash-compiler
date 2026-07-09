@@ -1,23 +1,31 @@
--- {-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE RequiredTypeArguments #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TypeAbstractions #-}
+{-|
+Copyright  :  (C) 2026     , QBayLogic B.V.,
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+The module includes a way to construct anonymous records.
+-}
+
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveAnyClass #-}
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures -Wterm-variable-capture #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
-module Data.AnonRecords where
+module Data.AnonRecords (
+  (:&:)(..),
+  (:=)(..),
+  HasField,
+  WithField(..),
+  AsTuple(..),
+) where
 
 import GHC.Generics (Generic)
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
@@ -30,9 +38,6 @@ import Clash.Class.BitPack (BitPack)
 import Clash.XException (NFDataX)
 
 infixr 3 :=
--- data (:=) x a where
---   (:=) :: forall (x :: Symbol) -> a -> x := a
--- -- GADT problematic!
 newtype (:=) (x::Symbol) a = L{unLabel::a}
   deriving (Generic, BitPack, NFDataX, Typeable)
 
@@ -40,20 +45,11 @@ infixr 2 :&:
 data (:&:) a b = a :&: b
   deriving (Show, Generic, BitPack, NFDataX, Typeable)
 
--- deriving instance (KnownNat (BitSize a + BitSize b), BitPack a, BitPack b) => BitPack (a :&: b)
-
--- -- extra pattern for when you do not want to add the labels explicitly
--- pattern L a <- x := a where
---   L a = fillX a
---    where
---     fillX :: forall x' a. a -> x' := a
---     fillX a = x' := a
-
 -- SHOW
 
 instance (KnownSymbol x, Show a) => Show (x := a) where
-  show (L a) = symbolVal (Proxy @x) <> " := " <> show a
-
+  -- show (L a) = show (symbolVal $ Proxy @x) <> " := " <> show a
+  show (L a) = "L @" <> show (symbolVal $ Proxy @x) <> " " <> show a
 
  -- BUNDLE
 
@@ -98,38 +94,37 @@ instance AsTuple (x:=a :&: y:=b :&: z:=c) where
 
 -- FIELD ACCESS
 
-type family HasField a f where
-  HasField (x:=_) x = True
-  HasField (_:=_) _ = False
-  HasField (a:&:b) x = HasField a x || HasField b x
+type family HasField f a where
+  HasField x (x:=_) = True
+  HasField x (a:&:b) = HasField x a || HasField x b
   HasField _ _ = False
 
-class WithField a (f::Symbol) where
-  type FieldType a f
-  getField :: forall f' -> (f~f') => a -> FieldType a f
-  setField :: forall f' -> (f~f') => FieldType a f -> a -> a
+class WithField (f::Symbol) a where
+  type FieldType f a
+  getField :: a -> FieldType f a
+  setField :: FieldType f a -> a -> a
 
-instance WithField (f := a) f where
-  type FieldType (f:=a) f = a
-  getField _ (L x) = x
-  setField _ x _ = L x
+instance WithField f (f := a) where
+  type FieldType f (f:=a) = a
+  getField (L x) = x
+  setField x _ = L x
 
-class WithField' a f b where
-  type FieldType' a f b
-  getField' :: a -> FieldType' a f b
-  setField' :: FieldType' a f b -> a -> a
+class WithField' f a left where
+  type FieldType' f a left
+  getField' :: a -> FieldType' f a left
+  setField' :: FieldType' f a left -> a -> a
 
-instance (WithField' (a:&:b) f (HasField a f)) => WithField (a:&:b) f where
-  type FieldType (a:&:b) f = FieldType' (a:&:b) f (HasField a f)
-  getField _ ab = getField' @(a:&:b) @f @(HasField a f) ab
-  setField _ x ab = setField' @(a:&:b) @f @(HasField a f) x ab
+instance (WithField' f (a:&:b) (HasField f a)) => WithField f (a:&:b) where
+  type FieldType f (a:&:b) = FieldType' f (a:&:b) (HasField f a)
+  getField   ab = getField' @f @(a:&:b) @(HasField f a)   ab
+  setField x ab = setField' @f @(a:&:b) @(HasField f a) x ab
 
-instance (WithField a f, HasField a f ~ True) => WithField' (a:&:b) f True where
-  type FieldType' (a:&:b) f True = FieldType a f
-  getField' (x:&:_) = getField f x
-  setField' x (a:&:b) = setField f x a :&: b
+instance (WithField f a, HasField f a ~ True) => WithField' f (a:&:b) True where
+  type FieldType' f (a:&:b) True = FieldType f a
+  getField'   (a:&:_) = getField @f a
+  setField' x (a:&:b) = setField @f x a :&: b
 
-instance (WithField b f, HasField b f ~ True) => WithField' (a:&:b) f False where
-  type FieldType' (a:&:b) f False = FieldType b f
-  getField' (_:&:y) = getField f y
-  setField' y (a:&:b) = a :&: setField f y b
+instance (WithField f b, HasField f a ~ False) => WithField' f (a:&:b) False where
+  type FieldType' f (a:&:b) False = FieldType f b
+  getField'   (_:&:b) = getField @f b
+  setField' y (a:&:b) = a :&: setField @f y b
