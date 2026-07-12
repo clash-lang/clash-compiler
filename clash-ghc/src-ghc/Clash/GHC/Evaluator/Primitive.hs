@@ -4565,6 +4565,38 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                 ])
                  ]
          _ -> Nothing
+  -- Fast path: unconcatting a literal BitVector peels off the head and tail
+  -- as literals directly. The general case below leaves residual split#
+  -- calls in both the head and the tail, which later rewrite passes have to
+  -- evaluate separately (and repeatedly).
+  $(namePat 'Clash.Sized.Vector.unconcatBitVector#)
+    | isSubj
+    , nTy : mTy : _  <- tys
+    , _ : km : bv : _ <- args
+    , Just (mski, i) <- bitVectorLiteral bv
+    , (_,tyView -> TyConApp vecTcNm [_,bvMTy]) <- splitFunForallTy ty
+    , TyConApp bvTcNm _ <- tyView bvMTy
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    , n >= 1
+    -> let Just vecTc = UniqMap.lookup vecTcNm tcm
+           [_,consCon] = tyConDataCons vecTc
+           mBVTy   = mkTyConApp bvTcNm [mTy]
+           n1MTy   = mkTyConApp typeNatMul [LitTy (NumTy (n-1)),mTy]
+           n1BVTy  = mkTyConApp bvTcNm [n1MTy]
+           sh      = fromInteger ((n-1) * m)
+           loMask  = bit sh - 1
+           hd      = mkBitVectorLit mBVTy mTy m (mski `shiftR` sh) (i `shiftR` sh)
+           tl      = mkBitVectorLit n1BVTy n1MTy ((n-1)*m)
+                       (mski .&. loMask) (i .&. loMask)
+       in reduce $ mkVecCons consCon mBVTy n hd
+            (mkApps (Prim pInfo)
+                    [ Right (LitTy (NumTy (n-1)))
+                    , Right mTy
+                    , Left (Literal (NaturalLiteral (n-1)))
+                    , Left (valToTerm km)
+                    , Left tl
+                    ])
   $(namePat 'Clash.Sized.Vector.unconcatBitVector#)
     | isSubj
     , nTy : mTy : _  <- tys
