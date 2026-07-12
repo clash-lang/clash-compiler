@@ -1,0 +1,1 @@
+CHANGED: The compile-time evaluator no longer projects the entire global binding map into a fresh heap on every invocation; updates to the global heap during evaluation now go through a small overlay instead of a full-size map. On designs that trigger the evaluator often (e.g. large designs with many vector primitives) this can cut normalization time by 25% or more.
