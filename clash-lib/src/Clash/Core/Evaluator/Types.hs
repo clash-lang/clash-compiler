@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
-  Copyright     : (C) 2020-2024, QBayLogic B.V.
+  Copyright     : (C) 2020-2026, QBayLogic B.V.
   License       : BSD2 (see the file LICENSE)
   Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -35,6 +35,7 @@ import Clash.Core.Var (Id, IdScope(..), TyVar)
 import Clash.Core.VarEnv
 import Clash.Driver.Types (BindingMap, bindingTerm)
 import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
+import Clash.Unique (getUnique)
 import Clash.Util.Supply (Supply)
 
 whnf'
@@ -53,8 +54,7 @@ whnf' eval bm lh tcm ph ids is isSubj e =
  where
   toResult x = (mHeapPrim x, mHeapLocal x, mTerm x)
 
-  m  = Machine ph gh lh [] ids is e
-  gh = mapVarEnv bindingTerm bm
+  m  = Machine ph bm emptyVarEnv emptyVarSet lh [] ids is e
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf
@@ -189,7 +189,16 @@ type PrimUnwind
 --
 data Machine = Machine
   { mHeapPrim   :: PrimHeap
-  , mHeapGlobal :: PureHeap
+  , mHeapGlobalBase :: BindingMap
+  -- ^ Immutable global bindings, projected to terms on demand in
+  -- 'heapLookup'. Kept as 'BindingMap' so 'whnf'' doesn't have to copy the
+  -- entire map on every invocation.
+  , mHeapGlobalOverlay :: PureHeap
+  -- ^ Global-heap entries added or updated during evaluation; shadows
+  -- 'mHeapGlobalBase'
+  , mHeapGlobalDeleted :: VarSet
+  -- ^ Global-heap entries deleted during evaluation (blackholing); shadows
+  -- both maps above
   , mHeapLocal  :: PureHeap
   , mStack      :: Stack
   , mSupply     :: Supply
@@ -198,7 +207,7 @@ data Machine = Machine
   }
 
 instance Show Machine where
-  show (Machine ph gh lh s _ _ x) =
+  show (Machine ph _ gh _ lh s _ _ x) =
     unlines
       [ "Machine:"
       , ""
@@ -349,8 +358,10 @@ primUpdate i x m =
    in m { mHeapPrim = (IntMap.insert i x gh, c) }
 
 heapLookup :: IdScope -> Id -> Machine -> Maybe Term
-heapLookup GlobalId i m =
-  lookupVarEnv i $ mHeapGlobal m
+heapLookup GlobalId i m
+  | elemVarSet i (mHeapGlobalDeleted m) = Nothing
+  | Just x <- lookupVarEnv i (mHeapGlobalOverlay m) = Just x
+  | otherwise = bindingTerm <$> lookupVarEnv i (mHeapGlobalBase m)
 heapLookup LocalId i m =
   lookupVarEnv i $ mHeapLocal m
 
@@ -359,13 +370,17 @@ heapContains scope i = isJust . heapLookup scope i
 
 heapInsert :: IdScope -> Id -> Term -> Machine -> Machine
 heapInsert GlobalId i x m =
-  m { mHeapGlobal = extendVarEnv i x (mHeapGlobal m) }
+  m { mHeapGlobalOverlay = extendVarEnv i x (mHeapGlobalOverlay m)
+    , mHeapGlobalDeleted = delVarSetByKey (getUnique i) (mHeapGlobalDeleted m)
+    }
 heapInsert LocalId i x m =
   m { mHeapLocal = extendVarEnv i x (mHeapLocal m) }
 
 heapDelete :: IdScope -> Id -> Machine -> Machine
 heapDelete GlobalId i m =
-  m { mHeapGlobal = delVarEnv (mHeapGlobal m) i }
+  m { mHeapGlobalOverlay = delVarEnv (mHeapGlobalOverlay m) i
+    , mHeapGlobalDeleted = extendVarSet (mHeapGlobalDeleted m) i
+    }
 heapDelete LocalId i m =
   m { mHeapLocal = delVarEnv (mHeapLocal m) i }
 
