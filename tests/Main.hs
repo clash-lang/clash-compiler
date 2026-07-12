@@ -1066,6 +1066,7 @@ runClashTest = defaultMain
         , runTest "Split" def{hdlSim=[]}
         , runTest "ToList" def
         , runTest "Unconcat" def
+        , clashLibTest "UnconcatBitVectorLiteral" def{hdlTargets=[Verilog]}
         , runTest "VACC" def{hdlSim=[]}
         , runTest "VEmpty" def
         , runTest "VIndex" def{hdlSim=[]}

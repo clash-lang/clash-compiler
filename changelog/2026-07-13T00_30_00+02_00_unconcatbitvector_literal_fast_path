@@ -1,0 +1,1 @@
+CHANGED: The compile-time evaluator peels elements off `unconcatBitVector#` of a literal BitVector as literals directly, instead of leaving residual `split#` calls that later rewrite passes evaluate separately. This speeds up normalization of designs that convert large BitVector constants to vectors.
