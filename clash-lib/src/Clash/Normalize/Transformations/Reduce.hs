@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2022,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -77,6 +77,12 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
 {-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite
+-- An 'App' in an 'AppFun' context is an inner node of an application spine.
+-- The attempt at the root of the spine evaluates the same application with
+-- strictly more arguments and thereby subsumes any reduction possible here,
+-- while an under-applied primitive cannot reduce at all. Skip the evaluator
+-- call for such nodes.
+reduceConst (TransformContext _ (AppFun:_)) e = return e
 reduceConst ctx e@(App _ _)
   | (Prim p0, _) <- collectArgs e
   = whnfRW False ctx e $ \_ctx1 e1 -> case e1 of
