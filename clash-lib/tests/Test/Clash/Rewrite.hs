@@ -1,5 +1,5 @@
 {-|
-  Copyright  :  (C) 2020,2022 QBayLogic B.V.
+  Copyright  :  (C) 2020,2022,2026 QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -83,6 +83,7 @@ instance Default extra => Default (RewriteState extra) where
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
     , _workFreeBinders=emptyVarEnv
+    , _hwTypeCache=mempty
     , _globalHeap=error "_globalHeap: NYI"
     , _extra=def
     }

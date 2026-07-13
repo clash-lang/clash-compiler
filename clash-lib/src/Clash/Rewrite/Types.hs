@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2022,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -92,6 +92,11 @@ data RewriteState extra
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
   , _workFreeBinders  :: VarEnv Bool
   -- ^ Map telling whether a binder's definition is work-free
+  , _hwTypeCache      :: HWMap
+  -- ^ Cache for the Core-type to HWType translation. The translation only
+  -- depends on environment that is constant for the whole rewrite session
+  -- (the type translator, custom representations, and the TyConMap), so the
+  -- cache never has to be invalidated.
   , _extra            :: !extra
   -- ^ Additional state
   }
