@@ -47,6 +47,9 @@ import Clash.XException       (deepErrorX, seqX, NFDataX)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
+-- This primitive is particularly designed to enable mapping to a block RAM by
+-- downstream synthesis tools.
+--
 -- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
@@ -77,6 +80,9 @@ romPow2 = rom
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
+--
+-- This primitive is particularly designed to enable mapping to a block RAM by
+-- downstream synthesis tools.
 --
 -- === See also:
 --

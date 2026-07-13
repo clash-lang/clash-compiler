@@ -1,0 +1,1 @@
+CHANGED: The interface of `Clash.Prelude.ROM.rom` has been aligned with the one of `Clash.Explicit.ROM.rom`. Arguments are no longer `Unsigned`, but `Enum` based.
