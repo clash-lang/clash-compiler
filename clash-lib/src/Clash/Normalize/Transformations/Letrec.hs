@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2022,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -50,7 +50,7 @@ import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
+  ( CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
   , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks, Bind(..)
   , partitionTicks, stripAllTicks)
 import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
@@ -93,6 +93,27 @@ deadCode _ e = return e
 {-# SCC deadCode #-}
 
 removeUnusedExpr :: HasCallStack => NormRewrite
+-- Skip inner nodes of an application spine: the attempt at the root of the
+-- spine collects a superset of this node's arguments (also looking through
+-- ticks), with identical term-argument indices, and thereby subsumes any
+-- change possible here. The single-alternative-Case equation is unaffected:
+-- a Case node is never an inner node of a spine.
+removeUnusedExpr (TransformContext _ (cc:_)) e
+  | isSpineCtx cc
+  , isSpineNode e
+  = return e
+ where
+  isSpineCtx AppFun = True
+  isSpineCtx TyAppC = True
+  isSpineCtx (TickC _) = True
+  isSpineCtx _ = False
+
+  isSpineNode App {} = True
+  isSpineNode TyApp {} = True
+  isSpineNode Prim {} = True
+  isSpineNode Tick {} = True
+  isSpineNode _ = False
+
 removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
   bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
   let
