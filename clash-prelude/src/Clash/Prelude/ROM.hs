@@ -2,7 +2,7 @@
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021-2022, QBayLogic B.V.
+                  2021-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -131,6 +131,9 @@ asyncRom# content = safeAt
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
+-- This primitive is particularly designed to enable mapping to a block RAM by
+-- downstream synthesis tools.
+--
 -- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
@@ -139,17 +142,17 @@ asyncRom# content = safeAt
 -- is constructed. See 'Clash.Prelude.ROM.File.romFile' and
 -- 'Clash.Prelude.ROM.Blob.romBlob' for different approaches that scale well.
 rom
-  :: forall dom n m a
-   . ( NFDataX a
+  :: forall dom n addr a
+   . ( Enum addr
+     , NFDataX a
      , KnownNat n
-     , KnownNat m
      , HiddenClock dom
      , HiddenEnable dom  )
   => Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom (Unsigned m)
+  -> Signal dom addr
   -- ^ Read address @r@
   -> Signal dom a
   -- ^ The value of the ROM at address @r@ from the previous clock cycle
@@ -161,6 +164,9 @@ rom = hideEnable (hideClock E.rom)
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
+--
+-- This primitive is particularly designed to enable mapping to a block RAM by
+-- downstream synthesis tools.
 --
 -- === See also:
 --
