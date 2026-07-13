@@ -1,8 +1,8 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017-2022, Google Inc.
-                     2021-2025, QBayLogic B.V.,
+                     2017-2022, Google Inc.,
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -79,7 +79,7 @@ import GHC.Core.FamInstEnv
   ( FamInst (..), FamInstEnvs
   , familyInstances, normaliseType, emptyFamInstEnvs, topReduceTyFamApp_maybe
   )
-import GHC.Data.FastString (unpackFS, bytesFS)
+import GHC.Data.FastString (FastString, mkFastString, unpackFS, bytesFS)
 import GHC.Types.Id (isDataConId_maybe)
 import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
 import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
@@ -87,7 +87,7 @@ import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
 import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
-import GHC.Types.Name.Occurrence (occNameString)
+import GHC.Types.Name.Occurrence (occNameFS, occNameString)
 import GHC.Data.Pair (Pair (..))
 import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
 import GHC.Core.TyCon
@@ -131,6 +131,9 @@ data GHC2CoreState
   = GHC2CoreState
   { _tyConMap :: C.UniqMap TyCon
   , _nameMap  :: HashMap Name Text
+  , _varTypeMap :: HashMap Name C.Type
+  -- ^ Cache for converted types of global variables ('varType'). See
+  -- 'coreToVarType'.
   }
 
 makeLenses ''GHC2CoreState
@@ -144,7 +147,7 @@ data GHC2CoreEnv
 makeLenses ''GHC2CoreEnv
 
 emptyGHC2CoreState :: GHC2CoreState
-emptyGHC2CoreState = GHC2CoreState mempty HashMap.empty
+emptyGHC2CoreState = GHC2CoreState mempty HashMap.empty HashMap.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -505,7 +508,7 @@ coreToTerm primMap unlocs = term
     var x = do
         xPrim <- if isGlobalId x then coreToPrimVar x else coreToVar x
         let xNameS = C.nameOcc xPrim
-        xType  <- coreToType (varType x)
+        xType  <- coreToVarType x
         case isDataConId_maybe x of
           Just dc -> case lookupPrim xNameS of
             Just p  ->
@@ -867,14 +870,21 @@ coreToAttrs' [k, a, attrs] = do
 coreToAttrs' illegal =
   error $ "Unexpected type args to Annotate: " ++ show (map (showPprUnsafe) illegal)
 
+annotateOccFS :: FastString
+annotateOccFS = mkFastString "Annotate"
+{-# NOINLINE annotateOccFS #-}
+
 -- | If this type has an annotate type synonym, return list of attributes.
 coreToAttrs :: Type -> C2C [Attr Text]
-coreToAttrs (TyConApp tycon kindsOrTypes) = do
-  name' <- typeConstructorToString tycon
+coreToAttrs (TyConApp tycon kindsOrTypes)
+  -- Cheap pre-check on the interned occurrence name; only build the qualified
+  -- name when it can possibly be Clash.Annotations.SynthesisAttributes.Annotate.
+  | occNameFS (nameOccName (tyConName tycon)) == annotateOccFS = do
+      name' <- typeConstructorToString tycon
 
-  if name' == show ''Annotate
-  then coreToAttrs' kindsOrTypes
-  else return []
+      if name' == show ''Annotate
+      then coreToAttrs' kindsOrTypes
+      else return []
 
 coreToAttrs _ =
     return []
@@ -919,7 +929,7 @@ coreToType' (TyConApp tc args)
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
                       _ -> do
                         tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-                        tyConMap %= (C.insert tcName tc)
+                        tyConMap %= (\m -> if tcName `C.elem` m then m else C.insert tcName tc m)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
 -- TODO: save the distinction between => and ->
@@ -944,13 +954,25 @@ coreToTyVar tv =
 coreToId :: Id
          -> C2C C.Id
 coreToId i = do
-  C.mkId <$> coreToType (varType i) <*> pure scope <*> coreToVar i
+  C.mkId <$> coreToVarType i <*> pure scope <*> coreToVar i
  where
   scope = if isGlobalId i then C.GlobalId else C.LocalId
 
 coreToVar :: Var
           -> C2C (C.Name a)
 coreToVar = coreToName varName varUnique qualifiedNameStringM
+
+-- | Convert the type of a variable, memoized on the variable's name.
+--
+-- Only global variables are memoized: their names come from GHC's name cache
+-- and are globally unique, so the same name always refers to the same
+-- variable, whose type is intrinsic. Names of local variables (e.g. binders
+-- instantiated when loading unfoldings from interface files) can collide
+-- between declarations and must not share cache entries.
+coreToVarType :: Var -> C2C C.Type
+coreToVarType v
+  | isGlobalId v = makeCached (varName v) varTypeMap (coreToType (varType v))
+  | otherwise = coreToType (varType v)
 
 coreToPrimVar :: Var
               -> C2C (C.Name C.Term)
