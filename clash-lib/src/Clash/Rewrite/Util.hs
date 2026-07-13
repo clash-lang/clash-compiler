@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016     , Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2023, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -78,7 +78,8 @@ import           Clash.Debug
 import           Clash.Driver.Types
   (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
   ClashEnv(..), ClashOpts(..), hasDebugInfo, isDebugging)
-import           Clash.Netlist.Util          (representableType)
+import           Clash.Netlist.Types         (HWMap)
+import           Clash.Netlist.Util          (representableTypeState)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.WorkFree
@@ -685,6 +686,15 @@ cloneNameWithBindingMap binders nm = do
   return (uniqAway' (`UniqMap.elem` binders) i (setUnique nm i))
 
 {-# INLINE isUntranslatable #-}
+-- | Run a Core-type to HWType translation action against the session-wide
+-- translation cache ('hwTypeCache').
+runWithHWTypeCache :: State.State HWMap a -> RewriteMonad extra a
+runWithHWTypeCache m = do
+  cache0 <- Lens.use hwTypeCache
+  let (a, !cache1) = State.runState m cache0
+  hwTypeCache Lens..= cache1
+  pure a
+
 -- | Determine if a term cannot be represented in hardware
 isUntranslatable
   :: Bool
@@ -693,11 +703,7 @@ isUntranslatable
   -> RewriteMonad extra Bool
 isUntranslatable stringRepresentable tm = do
   tcm <- Lens.view tcCache
-  not <$> (representableType <$> Lens.view typeTranslator
-                             <*> Lens.view customReprs
-                             <*> pure stringRepresentable
-                             <*> pure tcm
-                             <*> pure (inferCoreTypeOf tcm tm))
+  isUntranslatableType stringRepresentable (inferCoreTypeOf tcm tm)
 
 {-# INLINE isUntranslatableType #-}
 -- | Determine if a type cannot be represented in hardware
@@ -706,12 +712,11 @@ isUntranslatableType
   -- ^ String representable
   -> Type
   -> RewriteMonad extra Bool
-isUntranslatableType stringRepresentable ty =
-  not <$> (representableType <$> Lens.view typeTranslator
-                             <*> Lens.view customReprs
-                             <*> pure stringRepresentable
-                             <*> Lens.view tcCache
-                             <*> pure ty)
+isUntranslatableType stringRepresentable ty = do
+  tt <- Lens.view typeTranslator
+  reprs <- Lens.view customReprs
+  tcm <- Lens.view tcCache
+  not <$> runWithHWTypeCache (representableTypeState tt reprs stringRepresentable tcm ty)
 
 normalizeTermTypes :: TyConMap -> Term -> Term
 normalizeTermTypes tcm e = case e of

@@ -80,14 +80,13 @@ import Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
-import Clash.Netlist.Util (representableType)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, censor, curFun, customReprs, extra, tcCache
-  , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit)
+  ( TransformContext(..), bindings, censor, curFun, extra, tcCache
+  , workFreeBinders, debugOpts, topEntities, specializationLimit)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
-  , normalizeTermTypes, normalizeId, whnfRW)
+  , isUntranslatableType, normalizeTermTypes, normalizeId, whnfRW)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
@@ -608,11 +607,7 @@ nonRepSpec ctx e@(App e1 e2)
   = do tcm <- Lens.view tcCache
        let e2Ty = inferCoreTypeOf tcm e2
        let localVar = isLocalVar e2
-       nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
-                                              <*> Lens.view customReprs
-                                              <*> pure False
-                                              <*> Lens.view tcCache
-                                              <*> pure e2Ty)
+       nonRepE2 <- isUntranslatableType False e2Ty
        if nonRepE2 && not localVar
          then do
            e2' <- inlineInternalSpecialisationArgument e2
