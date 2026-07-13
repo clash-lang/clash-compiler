@@ -8,6 +8,7 @@
   Capture-free substitution function for CoreHW
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -56,6 +57,7 @@ module Clash.Core.Subst
     -- * Alpha equivalence
   , aeqType
   , aeqTerm
+  , aeqTermFingerprint
   , acmpTerm
     -- * Structural equivalence
   , eqTerm
@@ -80,6 +82,10 @@ import           GHC.SrcLoc.Extra          ()
 import           GHC.TypeLits
   (TypeError, ErrorMessage (Text, (:<>:)))
 
+import           Data.Bits                 (xor)
+import           Data.Hashable             (hash)
+
+import           Clash.Core.DataCon        (DataCon (dcUniq))
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
@@ -969,6 +975,55 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     Let Rec{} _ -> 10
     Case {}    -> 11
     Tick {}    -> 12
+
+-- | A cheap, alpha-invariant fingerprint of a term: alpha-equivalent terms
+-- (in the sense of 'aeqTerm') have equal fingerprints. The converse does not
+-- hold, so use the fingerprint as a pre-filter and verify candidates with
+-- 'aeqTerm'. Types and ticks do not contribute to the fingerprint.
+aeqTermFingerprint :: Term -> Int
+aeqTermFingerprint = go 0 emptyVarEnv 17
+ where
+  hc :: Int -> Int -> Int
+  hc s x = (s * 1099511628211) `xor` x
+
+  go :: Int -> VarEnv Int -> Int -> Term -> Int
+  go !d env !s = \case
+    Var i -> case lookupVarEnv i env of
+      -- Bound variables fingerprint by their binding position, free
+      -- variables by their unique; matches the renaming in 'acmpTerm''.
+      Just lvl -> hc (hc s 1) lvl
+      Nothing  -> hc (hc s 2) (fromIntegral (varUniq i))
+    Data dc -> hc (hc s 3) (fromIntegral (dcUniq dc))
+    Literal l -> hc (hc s 4) (hash l)
+    Prim p -> hc (hc s 5) (hash (primName p))
+    Lam b e -> go (d+1) (extendVarEnv b d env) (hc s 6) e
+    -- Type variables only occur in types, which are ignored.
+    TyLam _ e -> go d env (hc s 7) e
+    App l r -> go d env (go d env (hc s 8) l) r
+    TyApp e _ -> go d env (hc s 9) e
+    Let (NonRec i x) e ->
+      go (d+1) (extendVarEnv i d env) (go d env (hc s 10) x) e
+    Let (Rec bs) e ->
+      let (ids,rhss) = unzip bs
+          d1 = d + length ids
+          env1 = foldr2 (\i lvl acc -> extendVarEnv i lvl acc) env ids [d..]
+          s1 = List.foldl' (go d1 env1) (hc (hc s 11) (length bs)) rhss
+      in go d1 env1 s1 e
+    Case subj _ alts ->
+      let s1 = go d env (hc (hc s 12) (length alts)) subj
+      in List.foldl' (goAlt d env) s1 alts
+    Cast e _ _ -> go d env (hc s 13) e
+    Tick _ e -> go d env s e
+
+  goAlt d env s (pat,e) = case pat of
+    DataPat dc _tvs ids ->
+      let d1 = d + length ids
+          env1 = foldr2 (\i lvl acc -> extendVarEnv i lvl acc) env ids [d..]
+      in go d1 env1 (hc (hc s 14) (fromIntegral (dcUniq dc))) e
+    LitPat l -> go d env (hc (hc s 15) (hash l)) e
+    DefaultPat -> go d env (hc s 16) e
+
+  foldr2 f z xs ys = List.foldl' (\acc (x,y) -> f x y acc) z (zip xs ys)
 
 -- | Structural equality on 'Term'
 eqTerm :: Term -> Term -> Bool

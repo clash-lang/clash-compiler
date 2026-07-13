@@ -84,6 +84,7 @@ instance Default extra => Default (RewriteState extra) where
     , _nameCounter=2
     , _workFreeBinders=emptyVarEnv
     , _hwTypeCache=mempty
+    , _liftedBodyIndex=mempty
     , _globalHeap=error "_globalHeap: NYI"
     , _extra=def
     }

@@ -97,6 +97,12 @@ data RewriteState extra
   -- depends on environment that is constant for the whole rewrite session
   -- (the type translator, custom representations, and the TyConMap), so the
   -- cache never has to be invalidated.
+  , _liftedBodyIndex  :: HashMap Int [Id]
+  -- ^ Index of global binders created by 'Clash.Rewrite.Util.liftBinding',
+  -- keyed by the alpha-invariant fingerprint of the body they were created
+  -- with ('Clash.Core.Subst.aeqTermFingerprint'). Used to find an existing
+  -- alpha-equivalent binder without scanning the whole binding map;
+  -- candidates must be verified against their current binding.
   , _extra            :: !extra
   -- ^ Additional state
   }

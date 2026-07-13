@@ -134,6 +134,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   (IntMap.empty, 0)
                   emptyVarEnv
                   Map.empty    -- hwTypeCache
+                  mempty       -- liftedBodyIndex
                   normState
 
     normState = NormalizeState

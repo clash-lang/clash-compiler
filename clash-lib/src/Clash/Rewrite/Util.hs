@@ -61,7 +61,7 @@ import           Clash.Core.HasType
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
+  (substTmEnv, aeqTerm, aeqTermFingerprint, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
 import           Clash.Core.Term
 import           Clash.Core.TyCon            (TyConMap)
 import           Clash.Core.Type             (Type (..), normalizeType)
@@ -604,11 +604,24 @@ liftBinding (var@Id {varName = idName} ,e) = do
       -- Create a new body that abstracts over the free variables
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
-  -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (UniqMap.elems . UniqMap.filter ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
+  -- Check if an alpha-equivalent lifted binder already exists. Instead of
+  -- scanning the whole binding map with aeqTerm, look up candidates by the
+  -- alpha-invariant fingerprint of the body in 'liftedBodyIndex' and verify
+  -- them against their current binding (index entries can go stale when a
+  -- binding is later rewritten; verification filters those). Note that only
+  -- binders created here are indexed: an alpha-equivalent global that was
+  -- never lifted is not found, whereas the old full scan would find it.
+  let !fp = aeqTermFingerprint newBody
+  cands <- HashMap.lookupDefault [] fp <$> Lens.use liftedBodyIndex
+  bnds <- Lens.use bindings
+  let aeqExisting =
+        [ b | i <- cands, Just b <- [UniqMap.lookup i bnds]
+        , bindingTerm b `aeqTerm` newBody ]
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
+             -- (oldest first, so multiple matches resolve like the old scan)
+             liftedBodyIndex %= HashMap.insertWith (flip (<>)) fp [newBodyId]
              let r = newBodyId `globalIdOccursIn` newBody
              bindings %= UniqMap.insert newBodyNm
                                     -- We mark this function as internal so that
