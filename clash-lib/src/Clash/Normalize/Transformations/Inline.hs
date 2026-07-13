@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2022, Google Inc.,
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -76,13 +76,12 @@ import Clash.Core.VarEnv
   , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding(..))
-import Clash.Netlist.Util (representableType)
 import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, customReprs, tcCache, topEntities
-  , typeTranslator, inlineConstantLimit, inlineFunctionLimit, inlineLimit
+  ( TransformContext(..), bindings, curFun, tcCache, topEntities
+  , inlineConstantLimit, inlineFunctionLimit, inlineLimit
   , inlineWFCacheLimit, primitives)
 import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
@@ -536,11 +535,7 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
 
 
     bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
-    nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
-                                              <*> Lens.view customReprs
-                                              <*> pure False
-                                              <*> Lens.view tcCache
-                                              <*> pure scrutTy)
+    nonRepScrut <- isUntranslatableType False scrutTy
     case (nonRepScrut, bodyMaybe) of
       (True, Just b) -> do
         if overLimit then
@@ -576,12 +571,7 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
     bodyFreeOccs = countFreeOccurances body
 
     nonRepTest :: (Id, Term) -> NormalizeSession Bool
-    nonRepTest (Id {varType = ty}, _)
-      = not <$> (representableType <$> Lens.view typeTranslator
-                                   <*> Lens.view customReprs
-                                   <*> pure False
-                                   <*> Lens.view tcCache
-                                   <*> pure ty)
+    nonRepTest (Id {varType = ty}, _) = isUntranslatableType False ty
     nonRepTest _ = return False
 
     inlineTest :: Term -> (Id, Term) -> Bool

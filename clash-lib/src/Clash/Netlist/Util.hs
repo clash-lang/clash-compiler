@@ -653,8 +653,22 @@ representableType
   -> Type
   -> Bool
 representableType builtInTranslation reprs stringRepresentable m =
-    either (const False) isRepresentable .
     flip evalState mempty .
+    representableTypeState builtInTranslation reprs stringRepresentable m
+
+-- | Like 'representableType', but memoizes the Core-type to HWType
+-- translation in the given state.
+representableTypeState
+  :: (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
+  -> CustomReprs
+  -> Bool
+  -- ^ String considered representable
+  -> TyConMap
+  -> Type
+  -> State HWMap Bool
+representableTypeState builtInTranslation reprs stringRepresentable m =
+    fmap (either (const False) isRepresentable) .
     coreTypeToHWType' builtInTranslation reprs m
   where
     isRepresentable hty = case hty of
