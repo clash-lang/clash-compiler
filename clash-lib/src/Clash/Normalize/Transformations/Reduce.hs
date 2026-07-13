@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -77,6 +77,12 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
 {-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite
+-- An 'App' in an 'AppFun' context is an inner node of an application spine,
+-- e.g. the @f a@ inside @f a b c@. Only evaluate at the root (@f a b c@):
+-- an under-applied primitive cannot fold, and if @f@ is itself an application
+-- (@(g x) a b c@) the evaluator reduces the whole thing to WHNF anyway, so it
+-- folds @g x@ as part of folding the root. Skip the evaluator call here.
+reduceConst (TransformContext _ (AppFun:_)) e = return e
 reduceConst ctx e@(App _ _)
   | (Prim p0, _) <- collectArgs e
   = whnfRW False ctx e $ \_ctx1 e1 -> case e1 of
