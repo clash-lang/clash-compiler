@@ -3778,9 +3778,6 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
                                  , Left  (Literal (NaturalLiteral (m-1)))])
                    ,Left v
                    ]
-           -- Projection either the first or second field of the recursive
-           -- call to @splitAt@
-           splitAtSelR v = Case (splitAtRec v)
            m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
            nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
            -- Guaranteed no capture, so okay to use unsafe name generation
@@ -3804,11 +3801,12 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
             -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
             -> case Either.lefts vArgs of
                 (_ : x : xs : _) ->
-                  reduce $
+                  let (mach1, recId) = newLetBinding tcm mach (splitAtRec xs)
+                  in reduceWith mach1 $
                     mkApps (Data tupDc) $ (map Right tyArgs) ++
                       [ Left (mkVecCons consCon aTy m' x
-                                (splitAtSelR xs m1VecTy [lAlt]))
-                      , Left (splitAtSelR xs nVecTy [rAlt])
+                                (Case (Var recId) m1VecTy [lAlt]))
+                      , Left (Case (Var recId) nVecTy [rAlt])
                       ]
                 _ ->
                   -- v actually reduces to Nil and not Cons, this only happens
