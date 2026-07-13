@@ -19,6 +19,7 @@ module Clash.Data.UniqMap
   , insertUnique
   , insertWith
   , insertMany
+  , insertIfAbsent
   , lookup
   , find
   , elem
@@ -144,6 +145,13 @@ insertWith f k v =
 insertMany :: Uniquable a => [(a, b)] -> UniqMap b -> UniqMap b
 insertMany kvs xs =
   List.foldl' (\acc (k, v) -> insert k v acc) xs kvs
+
+{-# SPECIALIZE insertIfAbsent :: Unique -> b -> UniqMap b -> UniqMap b #-}
+-- | Insert a key-value pair into the map if the key is not already present. Note
+-- that this will first do a lookup and only then use insert (when applicable).
+-- Use this when you can reasonably expect the key to already exist.
+insertIfAbsent :: Uniquable a => a -> b -> UniqMap b -> UniqMap b
+insertIfAbsent k v m = if elem k m then m else insert k v m
 
 {-# SPECIALIZE lookup :: Unique -> UniqMap b -> Maybe b #-}
 -- | Lookup an item in the map, using the unique of the given key.
