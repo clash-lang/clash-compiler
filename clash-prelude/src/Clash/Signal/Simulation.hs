@@ -116,11 +116,13 @@ SIMULATION
 
 -- | Create an empty simulation from a configuration.
 emptySim :: Config -> IO Simulation
-emptySim config = Simulation
-  { simConfig = config
-  , simTraces = M.empty
-  , simTimestamp = now
-  }
+emptySim config = do
+  simTimestamp <- getCurrentTime
+  return Simulation
+    { simConfig = config
+    , simTraces = M.empty
+    , simTimestamp
+    }
 
 globalDataRef :: IORef GlobalData
 globalDataRef = unsafePerformIO (newIORef def)

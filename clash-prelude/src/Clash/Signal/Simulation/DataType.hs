@@ -71,12 +71,12 @@ typeRep = pretty $ Data.Typeable.typeRep $ Proxy @a
 -- #define TUP2 "GHC.Tuple$Tuple2"
 -- #define TUP_BASE "GHC.Tuple$Tuple"
 
-pattern LABEL = "Clash.Data.AnonRecords$(:=)"
-pattern JOIN = "Clash.Data.AnonRecord$(:&:)"
+pattern LABEL = "Clash.Data.AnonRecords$:="
+pattern JOIN = "Clash.Data.AnonRecord$:&:"
 pattern UNIT = "GHC.Tuple$Unit"
 pattern TUP2 = "GHC.Tuple$Tuple2"
 pattern TUP_BASE = "GHC.Tuple$Tuple"
-pattern SYMBOL_BASE = "GHC.DataKind$"
+pattern SYMBOL_BASE = "GHC.TypeLits$"
 
 -- | Check whether two data types are compatible.
 -- This occurs when both types are the same,
