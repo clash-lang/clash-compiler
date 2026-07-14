@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
-                    2021-2022, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , LUMI GUIDE FIETSDETECTIE B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
@@ -126,8 +126,6 @@ data Element
   | ToVar [Element] !Int
   -- ^ Like Arg but only insert variable reference (creating an assignment
   -- elsewhere if necessary).
-  | Sym !Text !Int
-  -- ^ Symbol hole
   | Typ !(Maybe Int)
   -- ^ Type declaration hole
   | TypM !(Maybe Int)
@@ -204,6 +202,9 @@ data Element
   | OutputUsage !Int
   | Vars !Int
   | GenSym [Element] !Int
+  -- ^ Define a name for a numbered symbol, and render that name too
+  | Sym !Text !(Either Int [Element])
+  -- ^ Symbol hole (indexed by either a number or a name)
   | Repeat [Element] [Element]
   -- ^ Repeat <hole> n times
   | DevNull [Element]

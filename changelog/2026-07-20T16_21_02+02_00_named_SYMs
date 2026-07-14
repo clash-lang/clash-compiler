@@ -1,0 +1,21 @@
+ADDED: In blackboxes `~SYM`s can now be referenced by name
+
+Instead of doing:
+```
+	signal ~GENSYM[foo][3] : ..;
+	signal ~GENSYM[bar][4] : ..;
+
+	.. <= ~SYM[3] - ~SYM[4];
+```
+
+You can now refer to SYMbols by name:
+```
+	signal ~SYM[foo] : ..;
+	signal ~SYM[bar] : ..;
+
+	.. <= ~SYM[foo] - ~SYM[bar];
+```
+
+The old behaviour with GENSYM and the numeric references is still fully supported.
+
+See [#3325](https://github.com/clash-lang/clash-compiler/issues/3325).
