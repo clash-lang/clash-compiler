@@ -118,32 +118,32 @@
     type: 'reduceAnd# :: KnownNat
       n => BitVector n -> Bit'
     template: |-
-      -- reduceAnd begin,
+      -- reduceAnd begin
       ~IF~SIZE[~TYP[1]]~THEN
-      ~GENSYM[reduceAnd][0] : block
-        function and_reduce (arg : std_logic_vector) return std_logic is
-          variable upper, lower : std_logic;
-          variable half         : integer;
-          variable argi         : std_logic_vector (arg'length - 1 downto 0);
-          variable result       : std_logic;
+      ~SYM[reduceAnd] : block
+        function ~SYM[and_reduce] (~SYM[arg] : std_logic_vector) return std_logic is
+          variable ~SYM[upper], ~SYM[lower] : std_logic;
+          variable ~SYM[half]         : integer;
+          variable ~SYM[argi]         : std_logic_vector (~SYM[arg]'length - 1 downto 0);
+          variable ~SYM[result]       : std_logic;
         begin
-          if (arg'length < 1) then
-            result := '1';
+          if (~SYM[arg]'length < 1) then
+            ~SYM[result] := '1';
           else
-            argi := arg;
-            if (argi'length = 1) then
-              result := argi(argi'left);
+            ~SYM[argi] := ~SYM[arg];
+            if (~SYM[argi]'length = 1) then
+              ~SYM[result] := ~SYM[argi](~SYM[argi]'left);
             else
-              half   := (argi'length + 1) / 2; -- lsb-biased tree
-              upper  := and_reduce (argi (argi'left downto half));
-              lower  := and_reduce (argi (half - 1 downto argi'right));
-              result := upper and lower;
+              ~SYM[half]   := (~SYM[argi]'length + 1) / 2; -- lsb-biased tree
+              ~SYM[upper]  := ~SYM[and_reduce] (~SYM[argi] (~SYM[argi]'left downto ~SYM[half]));
+              ~SYM[lower]  := ~SYM[and_reduce] (~SYM[argi] (~SYM[half] - 1 downto ~SYM[argi]'right));
+              ~SYM[result] := ~SYM[upper] and ~SYM[lower];
             end if;
           end if;
-          return result;
+          return ~SYM[result];
         end;
       begin
-        ~RESULT <= and_reduce(~ARG[1]);
+        ~RESULT <= ~SYM[and_reduce](~ARG[1]);
       end block;~ELSE
       ~RESULT <= '1';~FI
       -- reduceAnd end
@@ -155,29 +155,29 @@
     template: |-
       -- reduceOr begin ~IF~SIZE[~TYP[1]]~THEN
       ~GENSYM[reduceOr][0] : block
-        function or_reduce (arg : std_logic_vector) return std_logic is
-          variable upper, lower : std_logic;
-          variable half         : integer;
-          variable argi         : std_logic_vector (arg'length - 1 downto 0);
-          variable result       : std_logic;
+        function ~SYM[or_reduce] (~SYM[arg] : std_logic_vector) return std_logic is
+          variable ~SYM[upper], ~SYM[lower] : std_logic;
+          variable ~SYM[half]         : integer;
+          variable ~SYM[argi]         : std_logic_vector (~SYM[arg]'length - 1 downto 0);
+          variable ~SYM[result]       : std_logic;
         begin
-          if (arg'length < 1) then
-            result := '0';
+          if (~SYM[arg]'length < 1) then
+            ~SYM[result] := '0';
           else
-            argi := arg;
-            if (argi'length = 1) then
-              result := argi(argi'left);
+            ~SYM[argi] := ~SYM[arg];
+            if (~SYM[argi]'length = 1) then
+              ~SYM[result] := ~SYM[argi](~SYM[argi]'left);
             else
-              half   := (argi'length + 1) / 2; -- lsb-biased tree
-              upper  := or_reduce (argi (argi'left downto half));
-              lower  := or_reduce (argi (half - 1 downto argi'right));
-              result := upper or lower;
+              ~SYM[half]   := (~SYM[argi]'length + 1) / 2; -- lsb-biased tree
+              ~SYM[upper]  := ~SYM[or_reduce] (~SYM[argi] (~SYM[argi]'left downto ~SYM[half]));
+              ~SYM[lower]  := ~SYM[or_reduce] (~SYM[argi] (~SYM[half] - 1 downto ~SYM[argi]'right));
+              ~SYM[result] := ~SYM[upper] or ~SYM[lower];
             end if;
           end if;
-          return result;
+          return ~SYM[result];
         end;
       begin
-        ~RESULT <= or_reduce(~ARG[1]);
+        ~RESULT <= ~SYM[or_reduce](~ARG[1]);
       end block;~ELSE
       ~RESULT <= '0'; ~FI
       -- reduceOr end
@@ -189,29 +189,29 @@
     template: |-
       -- reduceXor begin ~IF~SIZE[~TYP[1]]~THEN
       ~GENSYM[reduceXor][0] : block
-        function xor_reduce (arg : std_logic_vector) return std_logic is
-          variable upper, lower : std_logic;
-          variable half         : integer;
-          variable argi         : std_logic_vector (arg'length - 1 downto 0);
-          variable result       : std_logic;
+        function ~SYM[xor_reduce] (~SYM[arg] : std_logic_vector) return std_logic is
+          variable ~SYM[upper], ~SYM[lower] : std_logic;
+          variable ~SYM[half]         : integer;
+          variable ~SYM[argi]         : std_logic_vector (~SYM[arg]'length - 1 downto 0);
+          variable ~SYM[result]       : std_logic;
         begin
-          if (arg'length < 1) then
-            result := '0';
+          if (~SYM[arg]'length < 1) then
+            ~SYM[result] := '0';
           else
-            argi := arg;
-            if (argi'length = 1) then
-              result := argi(argi'left);
+            ~SYM[argi] := ~SYM[arg];
+            if (~SYM[argi]'length = 1) then
+              ~SYM[result] := ~SYM[argi](~SYM[argi]'left);
             else
-              half   := (argi'length + 1) / 2; -- lsb-biased tree
-              upper  := xor_reduce (argi (argi'left downto half));
-              lower  := xor_reduce (argi (half - 1 downto argi'right));
-              result := upper xor lower;
+              ~SYM[half]   := (~SYM[argi]'length + 1) / 2; -- lsb-biased tree
+              ~SYM[upper]  := ~SYM[xor_reduce] (~SYM[argi] (~SYM[argi]'left downto ~SYM[half]));
+              ~SYM[lower]  := ~SYM[xor_reduce] (~SYM[argi] (~SYM[half] - 1 downto ~SYM[argi]'right));
+              ~SYM[result] := ~SYM[upper] xor ~SYM[lower];
             end if;
           end if;
-          return result;
+          return ~SYM[result];
         end;
       begin
-        ~RESULT <= xor_reduce(~ARG[1]);
+        ~RESULT <= ~SYM[xor_reduce](~ARG[1]);
       end block;~ELSE
       ~RESULT <= '0';~FI
       -- reduceXor end

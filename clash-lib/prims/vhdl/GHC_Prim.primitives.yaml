@@ -361,9 +361,9 @@
       ~GENSYM[popCnt8][0] : block
         -- given a level and a depth, calculate the corresponding index into the
         -- intermediate array
-        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        function ~GENSYM[depth2Index][1] (~SYM[levelsIn],~SYM[depthIn] : in natural) return natural is
         begin
-          return (2 ** levels - 2 ** depth);
+          return (2 ** ~SYM[levelsIn] - 2 ** ~SYM[depthIn]);
         end function;
 
         constant ~GENSYM[width][2] : natural := 8;
@@ -401,9 +401,9 @@
       ~GENSYM[popCnt16][0] : block
         -- given a level and a depth, calculate the corresponding index into the
         -- intermediate array
-        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        function ~GENSYM[depth2Index][1] (~SYM[levelsIn],~SYM[depthIn] : in natural) return natural is
         begin
-          return (2 ** levels - 2 ** depth);
+          return (2 ** ~SYM[levelsIn] - 2 ** ~SYM[depthIn]);
         end function;
 
         constant ~GENSYM[width][2] : natural := 16;
@@ -441,9 +441,9 @@
       ~GENSYM[popCnt32][0] : block
         -- given a level and a depth, calculate the corresponding index into the
         -- intermediate array
-        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        function ~GENSYM[depth2Index][1] (~SYM[levelsIn],~SYM[depthIn] : in natural) return natural is
         begin
-          return (2 ** levels - 2 ** depth);
+          return (2 ** ~SYM[levelsIn] - 2 ** ~SYM[depthIn]);
         end function;
 
         constant ~GENSYM[width][2] : natural := 32;
@@ -481,9 +481,9 @@
       ~GENSYM[popCnt64][0] : block
         -- given a level and a depth, calculate the corresponding index into the
         -- intermediate array
-        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        function ~GENSYM[f][1] (~SYM[levelsIn],~SYM[depthIn] : in natural) return natural is
         begin
-          return (2 ** levels - 2 ** depth);
+          return (2 ** ~SYM[levelsIn] - 2 ** ~SYM[depthIn]);
         end function;
 
         constant ~GENSYM[width][2] : natural := 64;
@@ -521,9 +521,9 @@
       ~GENSYM[popCnt][0] : block
         -- given a level and a depth, calculate the corresponding index into the
         -- intermediate array
-        function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
+        function ~GENSYM[depth2Index][1] (~SYM[levelsIn],~SYM[depthIn] : in natural) return natural is
         begin
-          return (2 ** levels - 2 ** depth);
+          return (2 ** ~SYM[levelsIn] - 2 ** ~SYM[depthIn]);
         end function;
 
         constant ~GENSYM[width][2] : natural := ~SIZE[~TYPO];

@@ -12,16 +12,16 @@
       ~GENSYM[asyncROMFile][0] : block
         type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
 
-        impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return ~SYM[4] is
-          FILE RomFile : text open read_mode is RomFileName;
-          variable RomFileLine : line;
-          variable ROM : ~SYM[4](0 to ~LIT[1]-1);
+        impure function ~GENSYM[InitRomFromFile][1] (~SYM[RomFileName] : in string) return ~SYM[4] is
+          FILE ~SYM[RomFile] : text open read_mode is ~SYM[RomFileName];
+          variable ~SYM[RomFileLine] : line;
+          variable ~SYM[ROM_contents] : ~SYM[4](0 to ~LIT[1]-1);
         begin
-          for i in ROM'range loop
-            readline(RomFile,RomFileLine);
-            read(RomFileLine,ROM(i));
+          for i in ~SYM[ROM_contents]'range loop
+            readline(~SYM[RomFile],~SYM[RomFileLine]);
+            read(~SYM[RomFileLine],~SYM[ROM_contents](i));
           end loop;
-          return ROM;
+          return ~SYM[ROM_contents];
         end function;
 
         signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[1]-1) := ~SYM[1](~FILE[~LIT[2]]);
