@@ -79,6 +79,8 @@ import           Clash.Rewrite.Combinators
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities, newInlineStrategy)
+import           Clash.Rewrite.Shape
+  (runShapedTransformation, withTransformationName)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
@@ -410,22 +412,23 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     -- topdownFixR reaches a fixpoint for the top-down propagation bundle.
     -- Keep flattenLet in the outer fixed-point loop: flattening can expose
     -- fresh propagation redexes for the next top-down pass.
-    repeatR (topdownFixR (apply "appProp" appProp >->
-               apply "bindConstantVar" bindConstantVar >->
-               apply "caseCon" caseCon >->
-               (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
-               apply "reduceNonRepPrim" reduceNonRepPrim >->
-               apply "removeUnusedExpr" removeUnusedExpr) >->
-             bottomupR (apply "flattenLet" flattenLet)) !->
+    repeatR (topdownFixR (runShapedTransformation (withTransformationName "appProp" appProp) >->
+               runShapedTransformation bindConstantVar >->
+               runShapedTransformation caseCon >->
+               (runShapedTransformation reduceConst !->
+                runShapedTransformation (withTransformationName "deadcode" deadCode)) >->
+               runShapedTransformation reduceNonRepPrim >->
+               runShapedTransformation removeUnusedExpr) >->
+             bottomupR (runShapedTransformation flattenLet)) !->
     topdownSucR (apply "topLet" topLet) >->
     -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
     -- Note that we do this as the very last step, after all constant propagation
     -- has been done to avoid #3036.
-    topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
-    topdownSucR (apply "inlineCleanup" inlineCleanup) >->
-    bottomupR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
-    bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
-    bottomupR (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
+    topdownSucR (runShapedTransformation collapseRHSNoops) >->
+    topdownSucR (runShapedTransformation inlineCleanup) >->
+    bottomupR (runShapedTransformation caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
+    bottomupR (runShapedTransformation flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+    bottomupR (runShapedTransformation bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
     topdownSucR (apply "topLet" topLet)
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))

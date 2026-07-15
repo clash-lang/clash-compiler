@@ -30,7 +30,8 @@ module Clash.Normalize.Transformations.Case
 import Control.Exception.Base (patError)
 import GHC.Prim.Panic (absentError)
 import qualified Control.Lens as Lens
-
+import qualified Control.Monad.Writer as Writer
+import qualified Data.Monoid as Monoid
 import Data.Bifunctor (second)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
@@ -71,8 +72,8 @@ import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
-import Clash.Rewrite.Combinators ((>-!))
+import Clash.Normalize.Types (NormShapedTransformation, NormalizeSession)
+import Clash.Rewrite.Shape (applyCase)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
   , typeTranslator, workFreeBinders)
@@ -85,8 +86,14 @@ import Clash.XException (errorX)
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the
 -- alternatives
-caseCase :: HasCallStack => NormRewrite
-caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2) = do
+caseCase :: HasCallStack => NormShapedTransformation
+caseCase = applyCase "caseCase" caseCaseWorker
+
+-- | The 'Case' handler of 'caseCase'.
+caseCaseWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+caseCaseWorker (TransformContext is0 _) e (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2 = do
   ty1Rep <- not <$> isUntranslatableType False alts1Ty
 
   -- This is only worth doing if the inner case-expression has a
@@ -116,8 +123,8 @@ caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts
                       (fmap (deShadowAlt is0) alts1)
      in changed $ Case scrut alts2Ty newAlts
 
-caseCase _ e = return e
-{-# SCC caseCase #-}
+caseCaseWorker _ e _ _ _ = return e
+{-# SCC caseCaseWorker #-}
 
 {-
 NOTE: caseOneAlt before caseCon'
@@ -140,8 +147,24 @@ Because no pattern matches caseCon transforms this into
 By trying caseOneAlt first clash can instead drop the case
 and use the body of the single alternative.
 -}
-caseCon :: HasCallStack => NormRewrite
-caseCon = const caseOneAlt >-! caseCon'
+caseCon :: HasCallStack => NormShapedTransformation
+caseCon = applyCase "caseCon" caseConWorker
+
+-- | The 'Case' handler of 'caseCon': tries 'caseOneAlt' first and only when
+-- that did not fire, 'caseCon''. See NOTE: caseOneAlt before caseCon'.
+caseConWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+caseConWorker ctx node subj ty alts = do
+  (node1, oneAltChanged) <- Writer.listen (caseOneAlt node)
+  if Monoid.getAny oneAltChanged
+    then return node1
+    else caseCon' ctx node subj ty alts
+
+-- | Apply 'caseCon' to a freshly constructed case-expression; used by the
+-- recursive calls inside 'caseCon''.
+caseConOn :: TransformContext -> Term -> Type -> [Alt] -> NormalizeSession Term
+caseConOn ctx subj ty alts = caseConWorker ctx (Case subj ty alts) subj ty alts
 
 -- | Specialize a Case-decomposition (replace by the RHS of an alternative) if
 -- the subject is (an application of) a DataCon; or if there is only a single
@@ -172,8 +195,10 @@ caseCon = const caseOneAlt >-! caseCon'
 -- let a1 = f a b
 -- in  h a1
 -- @
-caseCon' :: HasCallStack => NormRewrite
-caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
+caseCon'
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+caseCon' ctx@(TransformContext is0 _) e subj ty alts = do
  tcm <- Lens.view tcCache
  case collectArgsTicks subj of
   -- The subject is an applied data constructor
@@ -258,9 +283,9 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
     -- We try to reduce the applied primitive to WHNF
     whnfRW True ctx subj $ \ctx1 subj1 -> case collectArgsTicks subj1 of
       -- WHNF of subject is a literal, try `caseCon` with that
-      (Literal l,_,_) -> caseCon ctx1 (Case (Literal l) ty alts)
+      (Literal l,_,_) -> caseConOn ctx1 (Literal l) ty alts
       -- WHNF of subject is a data-constructor, try `caseCon` with that
-      (Data _,_,_) -> caseCon ctx1 (Case subj1 ty alts)
+      (Data _,_,_) -> caseConOn ctx1 subj1 ty alts
       -- WHNF of subject is _|_, in the form of `error`: that means that the
       -- entire case-expression is evaluates to _|_
       (Prim pInfo,repTy:_:callStack:msg:_,ticks)
@@ -312,7 +337,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             -- one of the Clash number types. Then the only valid alternative is
             -- the one that can match on the literal "0", so try 'caseCon' with
             -- that.
-            -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
+            -> caseConOn ctx1 (Literal (IntegerLiteral 0)) ty alts
           _ -> do
             opts <- Lens.view debugOpts
             -- When invariants are being checked, report missing evaluation
@@ -330,7 +355,7 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
     -- one of the Clash number types. Then the only valid alternative is
     -- the one that can match on the literal "0", so try 'caseCon' with
     -- that.
-    caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
+    caseConOn ctx (Literal (IntegerLiteral 0)) ty alts
    where
     isNum0 (tyView -> TyConApp (nameOcc -> tcNm) [arg])
       | tcNm `elem`
@@ -351,8 +376,6 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
   -- Otherwise check whether the entire case-expression has a single
   -- alternative, and pick that one.
   _ -> caseOneAlt e
-
-caseCon' _ e = return e
 {-# SCC caseCon' #-}
 
 {- [Note: Name re-creation]
@@ -458,16 +481,16 @@ matchLiteralContructor c _ _ =
 -- @f@ is always specialized on @STy Int@. The SBool alternatives are therefore
 -- unreachable. Additional information can be found at:
 -- https://github.com/clash-lang/clash-compiler/pull/465
-caseEliminateNonReachable :: HasCallStack => NormRewrite
-caseEliminateNonReachable _ case0@(Case scrut altsTy alts0) = do
-  tcm <- Lens.view tcCache
+caseEliminateNonReachable :: HasCallStack => NormShapedTransformation
+caseEliminateNonReachable = applyCase "caseEliminateNonReachable" go
+ where
+  go _ case0 scrut altsTy alts0 = do
+    tcm <- Lens.view tcCache
 
-  let (altsAbsurd, altsOther) = List.partition (isAbsurdPat tcm . fst) alts0
-  case altsAbsurd of
-    [] -> return case0
-    _  -> changed =<< caseOneAlt (Case scrut altsTy altsOther)
-
-caseEliminateNonReachable _ e = return e
+    let (altsAbsurd, altsOther) = List.partition (isAbsurdPat tcm . fst) alts0
+    case altsAbsurd of
+      [] -> return case0
+      _  -> changed =<< caseOneAlt (Case scrut altsTy altsOther)
 {-# SCC caseEliminateNonReachable #-}
 
 -- | Flatten ridiculous case-statements generated by GHC
@@ -510,24 +533,26 @@ caseEliminateNonReachable _ e = return e
 --        2 -> fromInteger 1
 --        3 -> fromInteger 0
 -- @
-caseFlat :: HasCallStack => NormRewrite
-caseFlat (TransformContext is0 _) e@(Case (collectEqArgs -> Just (scrut',val)) ty _) =
-  case collectFlat scrut' e of
-    Just alts' -> case collectArgs val of
-      -- When we're pattern matching on `Int`, extract the `Int#` first before
-      -- we do the Literal matching branches.
-      (Data dc,_)
-        | nameOcc (dcName dc) == "GHC.Types.I#"
-        , [argTy] <- dcArgTys dc
-        -> do
-          wild <- mkInternalVar is0 "wild" argTy
-          changed (Case scrut' ty
-                    [(DataPat dc [] [wild]
-                     ,Case (Var wild) ty (last alts' : init alts'))])
-      _ -> changed (Case scrut' ty (last alts' : init alts'))
-    Nothing -> return e
+caseFlat :: HasCallStack => NormShapedTransformation
+caseFlat = applyCase "caseFlat" go
+ where
+  go (TransformContext is0 _) e (collectEqArgs -> Just (scrut',val)) ty _ =
+    case collectFlat scrut' e of
+      Just alts' -> case collectArgs val of
+        -- When we're pattern matching on `Int`, extract the `Int#` first before
+        -- we do the Literal matching branches.
+        (Data dc,_)
+          | nameOcc (dcName dc) == "GHC.Types.I#"
+          , [argTy] <- dcArgTys dc
+          -> do
+            wild <- mkInternalVar is0 "wild" argTy
+            changed (Case scrut' ty
+                      [(DataPat dc [] [wild]
+                       ,Case (Var wild) ty (last alts' : init alts'))])
+        _ -> changed (Case scrut' ty (last alts' : init alts'))
+      Nothing -> return e
 
-caseFlat _ e = return e
+  go _ e _ _ _ = return e
 {-# SCC caseFlat #-}
 
 collectFlat :: Term -> Term -> Maybe [Alt]
@@ -589,8 +614,14 @@ collectEqArgs f@(collectArgsTicks -> (Prim p, args, ticks))
 collectEqArgs _ = Nothing
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
-caseLet :: HasCallStack => NormRewrite
-caseLet (TransformContext is0 _) (Case (collectTicks -> (Let xes e,ticks)) ty alts) = do
+caseLet :: HasCallStack => NormShapedTransformation
+caseLet = applyCase "caseLet" caseLetWorker
+
+-- | The 'Case' handler of 'caseLet'.
+caseLetWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+caseLetWorker (TransformContext is0 _) _node (collectTicks -> (Let xes e,ticks)) ty alts = do
   -- Note [CaseLet deshadow]
   -- Imagine
   --
@@ -622,8 +653,8 @@ caseLet (TransformContext is0 _) (Case (collectTicks -> (Let xes e,ticks)) ty al
   changed (Let (fmap (`mkTicks` ticks) xes1)
                   (Case (mkTicks e1 ticks) ty alts))
 
-caseLet _ e = return e
-{-# SCC caseLet #-}
+caseLetWorker _ e _ _ _ = return e
+{-# SCC caseLetWorker #-}
 
 caseOneAlt :: Term -> NormalizeSession Term
 caseOneAlt e@(Case _ _ [(pat,altE)]) =
@@ -671,35 +702,35 @@ caseOneAlt e = return e
 -- This function solves 'n1' and replaces every occurrence with its solution. A
 -- very limited number of solutions are currently recognized: only adds (such
 -- as in the example) will be solved.
-elimExistentials :: HasCallStack => NormRewrite
-elimExistentials (TransformContext is0 _) (Case scrut altsTy alts0) = do
-  tcm <- Lens.view tcCache
-  alts1 <- traverse (go is0 tcm) alts0
-  caseOneAlt (Case scrut altsTy alts1)
+elimExistentials :: HasCallStack => NormShapedTransformation
+elimExistentials = applyCase "elimExistentials" eliminate
  where
-    -- Eliminate free type variables if possible
-    go :: InScopeSet -> TyConMap -> Alt -> NormalizeSession Alt
-    go is2 tcm alt@(pat@(DataPat dc exts0 xs0), term0) =
-      case solveNonAbsurds tcm (mkVarSet exts0) (patEqs tcm pat) of
-        -- No equations solved:
-        [] -> return alt
-        -- One or more equations solved:
-        sols ->
-          changed =<< go is2 tcm (DataPat dc exts1 xs1, term1)
-          where
-            -- Substitute solution in existentials and applied types
-            is3 = extendInScopeSetList is2 exts0
-            xs1 = fmap (substTyInVar (extendTvSubstList (mkSubst is3) sols)) xs0
-            exts1 = substInExistentialsList is2 exts0 sols
+  eliminate (TransformContext is0 _) _node scrut altsTy alts0 = do
+    tcm <- Lens.view tcCache
+    alts1 <- traverse (go is0 tcm) alts0
+    caseOneAlt (Case scrut altsTy alts1)
 
-            -- Substitute solution in term.
-            is4 = extendInScopeSetList is3 xs1
-            subst = extendTvSubstList (mkSubst is4) sols
-            term1 = substTm "Replacing tyVar due to solved eq" subst term0
+  -- Eliminate free type variables if possible
+  go :: InScopeSet -> TyConMap -> Alt -> NormalizeSession Alt
+  go is2 tcm alt@(pat@(DataPat dc exts0 xs0), term0) =
+    case solveNonAbsurds tcm (mkVarSet exts0) (patEqs tcm pat) of
+      -- No equations solved:
+      [] -> return alt
+      -- One or more equations solved:
+      sols ->
+        changed =<< go is2 tcm (DataPat dc exts1 xs1, term1)
+        where
+          -- Substitute solution in existentials and applied types
+          is3 = extendInScopeSetList is2 exts0
+          xs1 = fmap (substTyInVar (extendTvSubstList (mkSubst is3) sols)) xs0
+          exts1 = substInExistentialsList is2 exts0 sols
 
-    go _ _ alt = return alt
+          -- Substitute solution in term.
+          is4 = extendInScopeSetList is3 xs1
+          subst = extendTvSubstList (mkSubst is4) sols
+          term1 = substTm "Replacing tyVar due to solved eq" subst term0
 
-elimExistentials _ e = return e
+  go _ _ alt = return alt
 {-# SCC elimExistentials #-}
 
 -- | This finds cases on Integers and Naturals and rewrites them
@@ -720,22 +751,24 @@ elimExistentials _ e = return e
 --
 -- This is as "safe" as the rest of the Natural/Integer handling that clash does in HDL,
 -- because numbers bigger then Word/Int can't exist there anyway.
-elimCaseBigNumInternals :: HasCallStack => NormRewrite
-elimCaseBigNumInternals _ e@(Case scrut altsTy alts0@(_:_:_)) =
-  go alts0
+elimCaseBigNumInternals :: HasCallStack => NormShapedTransformation
+elimCaseBigNumInternals = applyCase "elimCaseBigNum" transform
  where
-  go [] = return e
-  go ((pat,altE):alts) = case pat of
-    DataPat dc [] [x] | (dc == integerIsDc || dc == naturalNsDc) ->
-      if elemVarSet x fvs then
-        -- field used, turn the case into a projection
-        -- It seems this pattern never happens after ANF.
-        changed (Case scrut altsTy [(DataPat dc [] [x],altE)])
-      else
-        -- field not used, eliminate the case completely
-        changed altE
-    _ -> go alts
+  transform _ e scrut altsTy alts0@(_:_:_) =
+    go alts0
    where
-    fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
+    go [] = return e
+    go ((pat,altE):alts) = case pat of
+      DataPat dc [] [x] | (dc == integerIsDc || dc == naturalNsDc) ->
+        if elemVarSet x fvs then
+          -- field used, turn the case into a projection
+          -- It seems this pattern never happens after ANF.
+          changed (Case scrut altsTy [(DataPat dc [] [x],altE)])
+        else
+          -- field not used, eliminate the case completely
+          changed altE
+      _ -> go alts
+     where
+      fvs = Lens.foldMapOf freeLocalIds unitVarSet altE
 
-elimCaseBigNumInternals _ e = return e
+  transform _ e _ _ _ = return e

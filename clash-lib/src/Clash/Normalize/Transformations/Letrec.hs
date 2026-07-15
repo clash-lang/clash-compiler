@@ -50,9 +50,10 @@ import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
-  , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks, Bind(..)
-  , partitionTicks, stripAllTicks)
+  ( Alt, CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
+  , bindToList, collectArgs, collectArgsTicks, collectTicks, isLambdaBodyCtx
+  , isTickCtx, mkApps, mkLams, mkTicks, Bind(..), partitionTicks
+  , stripAllTicks)
 import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
@@ -69,8 +70,12 @@ import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types
+  (NormRewrite, NormShapedTransformation, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
+import Clash.Rewrite.Shape
+  ( applyLet, applyShapes, onAppNode, onCase, onLetNode, onPrimNode
+  , onTickNode, onTyAppNode)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
@@ -84,17 +89,36 @@ not the complete names. So we use mkUnsafeSystemName to recreate the same Name.
 -}
 
 -- | Remove unused let-bindings
-deadCode :: HasCallStack => NormRewrite
-deadCode _ e@(Let binds body) =
-  case removeUnusedBinders binds body of
-    Just t -> changed t
-    Nothing -> return e
-deadCode _ e = return e
+deadCode :: HasCallStack => NormShapedTransformation
+deadCode = applyLet "deadCode" go
+ where
+  go _ e binds body =
+    case removeUnusedBinders binds body of
+      Just t -> changed t
+      Nothing -> return e
 {-# SCC deadCode #-}
 
-removeUnusedExpr :: HasCallStack => NormRewrite
--- The primitive and data-constructor equations below collect the whole
--- application spine with 'collectArgsTicks'. Say we have an application:
+removeUnusedExpr :: HasCallStack => NormShapedTransformation
+removeUnusedExpr = applyShapes "removeUnusedExpr"
+  (onPrimNode removeUnusedExprSpine <> onAppNode removeUnusedExprSpine <>
+   onTyAppNode removeUnusedExprSpine <> onTickNode removeUnusedExprSpine <>
+   onCase removeUnusedExprCase)
+
+-- | The 'Case' handler of 'removeUnusedExpr': a single-alternative case whose
+-- pattern binds no used variables is replaced by the alternative.
+removeUnusedExprCase
+  :: TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+removeUnusedExprCase _ e _subj _ty [(DataPat _ [] xs,altExpr)] =
+  if mkVarSet xs `disjointFreeVars` altExpr
+     then changed altExpr
+     else return e
+removeUnusedExprCase _ e _subj _ty _alts = return e
+
+-- | The application-spine handlers of 'removeUnusedExpr': replace unused
+-- arguments of primitives (and 'Vec's 'Vec.Cons') with 'removedArg'.
+removeUnusedExprSpine :: HasCallStack => NormRewrite
+-- The equations below collect the whole application spine with
+-- 'collectArgsTicks'. Say we have an application:
 --
 --     f a b c
 --
@@ -104,16 +128,15 @@ removeUnusedExpr :: HasCallStack => NormRewrite
 -- @[a, b]@) at the same argument indices. So any argument an inner node could
 -- remove, the root removes too, which makes the inner attempts wasted work.
 -- This holds through ticks and type applications as well, since
--- 'collectArgsTicks' looks through both.
---
--- We therefore skip a node that is itself a spine node (@App@, @TyApp@, @Prim@,
--- or @Tick@) sitting under a parent that continues the spine (@AppFun@,
--- @TyAppC@, or @TickC@). The single-alternative-Case equation is unaffected:
--- the spine only threads through applications, type applications, and ticks, so
--- a Case is never an inner node of a spine.
-removeUnusedExpr (TransformContext _ (cc:_)) e
+-- 'collectArgsTicks' looks through both. We therefore skip any node whose parent
+-- continues the spine (an @AppFun@, @TyAppC@, or @TickC@ context); the shape
+-- dispatch only routes spine nodes (@App@, @TyApp@, @Prim@, @Tick@) here, so no
+-- explicit node-shape check is needed. The single-alternative-Case handling
+-- lives in 'removeUnusedExprCase' and is unaffected: the spine only threads
+-- through applications, type applications, and ticks, so a Case is never an
+-- inner node of a spine.
+removeUnusedExprSpine (TransformContext _ (cc:_)) e
   | isSpineCtx cc
-  , isSpineNode e
   = return e
  where
   isSpineCtx AppFun = True
@@ -121,13 +144,7 @@ removeUnusedExpr (TransformContext _ (cc:_)) e
   isSpineCtx (TickC _) = True
   isSpineCtx _ = False
 
-  isSpineNode App {} = True
-  isSpineNode TyApp {} = True
-  isSpineNode Prim {} = True
-  isSpineNode Tick {} = True
-  isSpineNode _ = False
-
-removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
+removeUnusedExprSpine _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
   bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
   let
     usedArgs0 =
@@ -179,14 +196,9 @@ removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
              then changed (Left p' : args'')
              else return  (Left tm : args'')
 
-removeUnusedExpr _ e@(Case _ _ [(DataPat _ [] xs,altExpr)]) =
-  if mkVarSet xs `disjointFreeVars` altExpr
-     then changed altExpr
-     else return e
-
 -- Replace any expression that creates a Vector of size 0 within the application
 -- of the Cons constructor, by the Nil constructor.
-removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Left a,Left nil],ticks))
+removeUnusedExprSpine _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Left a,Left nil],ticks))
   | nameOcc (dcName dc) == Text.showt 'Vec.Cons
   = do
     tcm <- Lens.view tcCache
@@ -203,8 +215,8 @@ removeUnusedExpr _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,_,Lef
            in  changed v
       _ -> return e
 
-removeUnusedExpr _ e = return e
-{-# SCC removeUnusedExpr #-}
+removeUnusedExprSpine _ e = return e
+{-# SCC removeUnusedExprSpine #-}
 
 -- | Flatten's letrecs after `inlineCleanup`
 --
@@ -213,17 +225,22 @@ removeUnusedExpr _ e = return e
 -- flattens those nested let-bindings again.
 --
 -- NB: must only be called in the cleaning up phase.
-flattenLet :: HasCallStack => NormRewrite
-flattenLet ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
+flattenLet :: HasCallStack => NormShapedTransformation
+flattenLet = applyShapes "flattenLet" (onLetNode flattenLetWorker)
+
+-- | The 'Let' handler of 'flattenLet'; recurses on the rebuilt let-expression
+-- after merging nested bindings.
+flattenLetWorker :: HasCallStack => NormRewrite
+flattenLetWorker ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
   -- deshadow binds1, so binds0 and binds1 don't conflict when merged
   let is1 = extendInScopeSetList is0 (fmap fst binds0)
   case deShadowTerm is1 body0 of
     Letrec binds1 body1 -> do
       setChanged
-      flattenLet ctx{tfInScope=is1} (Letrec (binds0 <> binds1) body1)
+      flattenLetWorker ctx{tfInScope=is1} (Letrec (binds0 <> binds1) body1)
     _ -> error "internal error"
 
-flattenLet (TransformContext is0 _) (Letrec binds body) = do
+flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
   let is1 = extendInScopeSetList is0 (map fst binds)
       bodyOccs = Lens.foldMapByOf
                    freeLocalIds (unionVarEnvWith (+))
@@ -294,8 +311,8 @@ flattenLet (TransformContext is0 _) (Letrec binds body) = do
                               ,mkTicks body2 srcTicks)])
     go isN b = return (isN,[b])
 
-flattenLet _ e = return e
-{-# SCC flattenLet #-}
+flattenLetWorker _ e = return e
+{-# SCC flattenLetWorker #-}
 
 -- | Turn a  normalized recursive function, where the recursive calls only pass
 -- along the unchanged original arguments, into let-recursive function. This
@@ -446,29 +463,29 @@ isClassConstraint _ = False
 -- be really helpful if we tracked circuit size in the regression/test suite.
 -- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
 -- version of CSE removed the same amount of let-binders.
-simpleCSE :: HasCallStack => NormRewrite
-simpleCSE (TransformContext is0 _) term@(Letrec bndrsX body) = do
-  let bndrs = inverseTopSortLetBindings bndrsX
-  let is1 = extendInScopeSetList is0 (map fst bndrs)
-  ((subst,bndrs1), change) <- listen $ reduceBinders (mkSubst is1) [] bndrs
-  -- TODO: check whether a substitution over the body is enough, the reason I'm
-  -- doing a substitution over the the binders as well is that I don't know in
-  -- what order a recursive group shows up in a inverse topological sort.
-  -- Depending on the order and forgetting to apply the substitution over the
-  -- let-bindings might lead to the introduction of free variables.
-  --
-  -- NB: don't apply the substitution to the entire let-expression, and that
-  -- would rename the let-bindings because they've been added to the InScopeSet
-  -- of the substitution.
-  if Monoid.getAny change
-     then
-       let bndrs2 = map (second (substTm "simpleCSE.bndrs" subst)) bndrs1
-           body1 = substTm "simpleCSE.body" subst body
-        in changed (Letrec bndrs2 body1)
-     else
-       return term
-
-simpleCSE _ e = return e
+simpleCSE :: HasCallStack => NormShapedTransformation
+simpleCSE = applyLet "CSE" go
+ where
+  go (TransformContext is0 _) term (bindToList -> bndrsX) body = do
+    let bndrs = inverseTopSortLetBindings bndrsX
+    let is1 = extendInScopeSetList is0 (map fst bndrs)
+    ((subst,bndrs1), change) <- listen $ reduceBinders (mkSubst is1) [] bndrs
+    -- TODO: check whether a substitution over the body is enough, the reason I'm
+    -- doing a substitution over the the binders as well is that I don't know in
+    -- what order a recursive group shows up in a inverse topological sort.
+    -- Depending on the order and forgetting to apply the substitution over the
+    -- let-bindings might lead to the introduction of free variables.
+    --
+    -- NB: don't apply the substitution to the entire let-expression, and that
+    -- would rename the let-bindings because they've been added to the InScopeSet
+    -- of the substitution.
+    if Monoid.getAny change
+       then
+         let bndrs2 = map (second (substTm "simpleCSE.bndrs" subst)) bndrs1
+             body1 = substTm "simpleCSE.body" subst body
+          in changed (Letrec bndrs2 body1)
+       else
+         return term
 {-# SCC simpleCSE #-}
 
 -- | Ensure that top-level lambda's eventually bind a let-expression of which

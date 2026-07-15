@@ -23,6 +23,7 @@ import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
 import Clash.Driver.Types     (BindingMap)
+import Clash.Rewrite.Shape    (ShapedTransformation)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
 -- | State of the 'NormalizeMonad'
@@ -63,6 +64,9 @@ type NormalizeSession = RewriteMonad NormalizeState
 
 -- | A 'Transform' action in the context of the 'RewriteMonad' and 'NormalizeMonad'
 type NormRewrite = Rewrite NormalizeState
+
+-- | A 'ShapedTransformation' in the context of the 'RewriteMonad' and 'NormalizeMonad'
+type NormShapedTransformation = ShapedTransformation NormalizeState
 
 -- | Description of a @Term@ in terms of the type "components" the @Term@ has.
 --

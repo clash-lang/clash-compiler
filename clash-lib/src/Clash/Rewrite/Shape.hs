@@ -39,11 +39,13 @@ module Clash.Rewrite.Shape
   , onCase
   , onCast
   , onTick
-    -- ** Node-receiving handlers, for application-spine transformations
+    -- ** Node-receiving handlers, for transformations that operate on the
+    -- node itself (application spines, self-recursion on rebuilt terms)
   , onVarNode
   , onPrimNode
   , onAppNode
   , onTyAppNode
+  , onLetNode
   , onTickNode
     -- ** Renaming
   , withTransformationName
@@ -70,8 +72,8 @@ import qualified Data.Monoid as Monoid
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
 import Clash.Core.Term
-  (Alt, Bind (..), CoreContext (..), PrimInfo, Term (..), TickInfo, patIds,
-   primArg)
+  (Alt, Bind (..), CoreContext (..), PrimInfo, Term (..), TickInfo,
+   bindToList, patIds, primArg)
 import Clash.Core.Type (Type)
 import Clash.Core.Var (Id, TyVar)
 import Clash.Core.VarEnv (extendInScopeSet, extendInScopeSetList)
@@ -281,6 +283,9 @@ onAppNode transform = mempty { handleApp = Just (\ctx node _ _ -> transform ctx 
 
 onTyAppNode :: Rewrite extra -> ShapeHandlers extra
 onTyAppNode transform = mempty { handleTyApp = Just (\ctx node _ _ -> transform ctx node) }
+
+onLetNode :: Rewrite extra -> ShapeHandlers extra
+onLetNode transform = mempty { handleLet = Just (\ctx node _ _ -> transform ctx node) }
 
 onTickNode :: Rewrite extra -> ShapeHandlers extra
 onTickNode transform = mempty { handleTick = Just (\ctx node _ _ -> transform ctx node) }
@@ -563,7 +568,7 @@ nodeStep bundle = step
         runBucket instrumentation (\h ctx' node' -> h ctx' node' bind body) (bundleLet bundle) ctx node
     , nodeStepDescend = \go (TransformContext is c) -> do
         -- See Note [NonRec erasure during descent]
-        let bindings = bindingsOf bind
+        let bindings = bindToList bind
             binders = map fst bindings
             is' = extendInScopeSetList is binders
             rewriteBinding (b, rhs) =
@@ -616,10 +621,6 @@ real behavior change (downstream code branches on 'Rec'/'NonRec', and netlist
 rendering order can shift) that must be validated on its own, separately from
 this dispatch machinery.
 -}
-
-bindingsOf :: Bind a -> [(Id, a)]
-bindingsOf (NonRec i x) = [(i, x)]
-bindingsOf (Rec bindings) = bindings
 
 listenChanged :: RewriteMonad extra a -> RewriteMonad extra (a, Bool)
 listenChanged action = do

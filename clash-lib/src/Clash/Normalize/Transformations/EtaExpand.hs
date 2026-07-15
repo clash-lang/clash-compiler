@@ -29,31 +29,36 @@ import Clash.Core.Type (splitFunTy)
 import Clash.Core.Util (mkInternalVar)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (elemVarSet, extendInScopeSet, extendInScopeSetList)
-import Clash.Normalize.Types (NormRewrite)
+import Clash.Normalize.Types (NormRewrite, NormShapedTransformation)
+import Clash.Rewrite.Shape
+  (applyShapes, onAppNode, onTickNode, onTyAppNode, onVarNode)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, topEntities)
 import Clash.Rewrite.Util (changed)
 import Clash.Util (curLoc)
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
 -- functions to appear as arguments to higher-order primitives.
-etaExpandSyn :: HasCallStack => NormRewrite
-etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
-  topEnts <- Lens.view topEntities
-  tcm <- Lens.view tcCache
-  let isTopEnt = f `elemVarSet` topEnts
-      isAppFunCtx =
-        \case
-          AppFun:_ -> True
-          TickC _:c -> isAppFunCtx c
-          _ -> False
-      argTyM = fmap fst (splitFunTy tcm (inferCoreTypeOf tcm e))
-  case argTyM of
-    Just argTy | isTopEnt && not (isAppFunCtx ctx) -> do
-      newId <- mkInternalVar is0 "arg" argTy
-      changed (Lam newId (App e (Var newId)))
-    _ -> return e
+etaExpandSyn :: HasCallStack => NormShapedTransformation
+etaExpandSyn = applyShapes "etaExpandSyn"
+  (onVarNode go <> onAppNode go <> onTyAppNode go <> onTickNode go)
+ where
+  go (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
+    topEnts <- Lens.view topEntities
+    tcm <- Lens.view tcCache
+    let isTopEnt = f `elemVarSet` topEnts
+        isAppFunCtx =
+          \case
+            AppFun:_ -> True
+            TickC _:c -> isAppFunCtx c
+            _ -> False
+        argTyM = fmap fst (splitFunTy tcm (inferCoreTypeOf tcm e))
+    case argTyM of
+      Just argTy | isTopEnt && not (isAppFunCtx ctx) -> do
+        newId <- mkInternalVar is0 "arg" argTy
+        changed (Lam newId (App e (Var newId)))
+      _ -> return e
 
-etaExpandSyn _ e = return e
+  go _ e = return e
 {-# SCC etaExpandSyn #-}
 
 stripLambda :: Term -> ([Id], Term)
