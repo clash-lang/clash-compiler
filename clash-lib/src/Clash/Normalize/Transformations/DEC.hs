@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2021-2024, QBayLogic B.V.
+                    2021-2024,2026, QBayLogic B.V.
                     2022,      LumiGuide Fietsdetectie B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
