@@ -47,7 +47,9 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList, mkVarSet)
 import Clash.Netlist.Util (bindsExistentials)
 import Clash.Normalize.Transformations.Specialize (specialize)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types
+  (NormRewrite, NormShapedTransformation, NormalizeSession)
+import Clash.Rewrite.Shape (applyApp)
 import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
@@ -394,21 +396,23 @@ collectANF _ e = return e
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
-nonRepANF :: HasCallStack => NormRewrite
-nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
-  | (conPrim, _) <- collectArgs e
-  , isCon conPrim || isPrim conPrim
-  = do
-    untranslatable <- isUntranslatable False arg
-    case (untranslatable,stripTicks arg) of
-      (True,Let binds body) ->
-        -- This is a situation similar to Note [CaseLet deshadow]
-        let (binds1,body1) = deshadowLetExpr is0 binds body
-        in  changed (Let binds1 (App appConPrim body1))
-      (True,Case {})  -> specialize ctx e
-      (True,Lam {})   -> specialize ctx e
-      (True,TyLam {}) -> specialize ctx e
-      _               -> return e
+nonRepANF :: HasCallStack => NormShapedTransformation
+nonRepANF = applyApp "nonRepANF" go
+ where
+  go ctx@(TransformContext is0 _) e appConPrim arg
+    | (conPrim, _) <- collectArgs e
+    , isCon conPrim || isPrim conPrim
+    = do
+      untranslatable <- isUntranslatable False arg
+      case (untranslatable,stripTicks arg) of
+        (True,Let binds body) ->
+          -- This is a situation similar to Note [CaseLet deshadow]
+          let (binds1,body1) = deshadowLetExpr is0 binds body
+          in  changed (Let binds1 (App appConPrim body1))
+        (True,Case {})  -> specialize ctx e
+        (True,Lam {})   -> specialize ctx e
+        (True,TyLam {}) -> specialize ctx e
+        _               -> return e
 
-nonRepANF _ e = return e
+  go _ e _ _ = return e
 {-# SCC nonRepANF #-}

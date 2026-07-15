@@ -82,6 +82,9 @@ import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Netlist.Util (representableType)
 import Clash.Rewrite.Combinators (topdownR)
+import Clash.Rewrite.Shape
+  ( applyApp, applyLam, applyShapes, applyTyApp, onAppNode, onTyAppNode
+  , runShapedTransformationQuiet)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, curFun, customReprs, extra, tcCache
   , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit)
@@ -90,7 +93,8 @@ import Clash.Rewrite.Util
   , normalizeTermTypes, normalizeId, whnfRW)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
-  ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
+  ( NormRewrite, NormShapedTransformation, NormalizeSession
+  , specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
   (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
 import Clash.Unique (Unique)
@@ -179,21 +183,18 @@ import Clash.Util (ClashException(..))
 -- of the application w.r.t. the free variables in the argument part of the
 -- application. It is okay to over-approximate in this case and deshadow w.r.t
 -- the current InScopeSet.
-appProp :: HasCallStack => NormRewrite
-appProp ctx@(TransformContext is _) = \case
-  e@App {}
-    | let (fun,args,ticks) = collectArgsTicks e
-    -> do (eN,hasChanged) <- Writer.listen (go is (deShadowTerm is fun) args ticks)
-          if Monoid.getAny hasChanged
-            then return eN
-            else return e
-  e@TyApp {}
-    | let (fun,args,ticks) = collectArgsTicks e
-    -> do (eN,hasChanged) <- Writer.listen (go is (deShadowTerm is fun) args ticks)
-          if Monoid.getAny hasChanged
-            then return eN
-            else return e
-  e          -> return e
+appProp :: HasCallStack => NormShapedTransformation
+appProp = applyShapes "applicationPropagation"
+  (onAppNode appPropWorker <> onTyAppNode appPropWorker)
+
+-- | The application-spine handler of 'appProp'.
+appPropWorker :: HasCallStack => NormRewrite
+appPropWorker ctx@(TransformContext is _) e = do
+  let (fun,args,ticks) = collectArgsTicks e
+  (eN,hasChanged) <- Writer.listen (go is (deShadowTerm is fun) args ticks)
+  if Monoid.getAny hasChanged
+    then return eN
+    else return e
  where
   go :: InScopeSet -> Term -> [Either Term Type] -> [TickInfo] -> NormalizeSession Term
   go is0 (collectArgsTicks -> (fun,args0@(_:_),ticks0)) args1 ticks1 =
@@ -278,12 +279,18 @@ appProp ctx@(TransformContext is _) = \case
         return (ty2,(boundArg,arg):ls1,Left (Var boundArg):args1)
 
   goCaseArg _ ty ls [] = return (ty,ls,[])
-{-# SCC appProp #-}
+{-# SCC appPropWorker #-}
 
 -- | Specialize functions on arguments which are constant, except when they
 -- are clock, reset generators.
-constantSpec :: HasCallStack => NormRewrite
-constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
+constantSpec :: HasCallStack => NormShapedTransformation
+constantSpec = applyApp "constantSpec" constantSpecWorker
+
+-- | The 'App' handler of 'constantSpec'.
+constantSpecWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
+constantSpecWorker ctx@(TransformContext is0 tfCtx) e e1 e2
   | (Var {}, args) <- collectArgs e1
   , (_, []) <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
@@ -314,8 +321,8 @@ constantSpec ctx@(TransformContext is0 tfCtx) e@(App e1 e2)
        else
         -- e2 has no constant parts
         return e
-constantSpec _ e = return e
-{-# SCC constantSpec #-}
+constantSpecWorker _ e _ _ = return e
+{-# SCC constantSpecWorker #-}
 
 -- | Specialize an application on its argument
 specialize :: NormRewrite
@@ -600,8 +607,14 @@ specArgBndrsAndVars specArg =
   in  (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
 
 -- | Specialize functions on their non-representable argument
-nonRepSpec :: HasCallStack => NormRewrite
-nonRepSpec ctx e@(App e1 e2)
+nonRepSpec :: HasCallStack => NormShapedTransformation
+nonRepSpec = applyApp "nonRepSpec" nonRepSpecWorker
+
+-- | The 'App' handler of 'nonRepSpec'.
+nonRepSpecWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
+nonRepSpecWorker ctx e e1 e2
   | (Var {}, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
@@ -637,23 +650,25 @@ nonRepSpec ctx e@(App e1 e2)
           Just b
             | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
-                      (topdownR appProp ctx
+                      (topdownR (runShapedTransformationQuiet appProp) ctx
                         (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
           _ -> return app
       | otherwise = return app
 
-nonRepSpec _ e = return e
-{-# SCC nonRepSpec #-}
+nonRepSpecWorker _ e _ _ = return e
+{-# SCC nonRepSpecWorker #-}
 
 -- | Specialize functions on their type
-typeSpec :: HasCallStack => NormRewrite
-typeSpec ctx e@(TyApp e1 ty)
-  | (Var {},  args) <- collectArgs e1
-  , null $ Lens.toListOf typeFreeVars ty
-  , (_, []) <- Either.partitionEithers args
-  = specialize ctx e
+typeSpec :: HasCallStack => NormShapedTransformation
+typeSpec = applyTyApp "typeSpec" go
+ where
+  go ctx e e1 ty
+    | (Var {},  args) <- collectArgs e1
+    , null $ Lens.toListOf typeFreeVars ty
+    , (_, []) <- Either.partitionEithers args
+    = specialize ctx e
 
-typeSpec _ e = return e
+  go _ e _ _ = return e
 {-# SCC typeSpec #-}
 
 -- | Specialize functions on arguments which are zero-width. These arguments
@@ -664,21 +679,21 @@ typeSpec _ e = return e
 -- the type of a term), we instead substitute all occurances of a lambda-bound
 -- variable with a zero-width type with the only value of that type.
 --
-zeroWidthSpec :: HasCallStack => NormRewrite
-zeroWidthSpec (TransformContext is _) e@(Lam i x0) = do
-  tcm <- Lens.view tcCache
-  let bndrTy = normalizeType tcm (coreTypeOf i)
+zeroWidthSpec :: HasCallStack => NormShapedTransformation
+zeroWidthSpec = applyLam "zeroWidthSpec" go
+ where
+  go (TransformContext is _) e i x0 = do
+    tcm <- Lens.view tcCache
+    let bndrTy = normalizeType tcm (coreTypeOf i)
 
-  case zeroWidthTypeElem tcm bndrTy of
-    Just tm ->
-      let subst = extendIdSubst (mkSubst is) i tm
-          x1 = substTm "zeroWidthSpec" subst x0
-       in changed (Lam i x1)
+    case zeroWidthTypeElem tcm bndrTy of
+      Just tm ->
+        let subst = extendIdSubst (mkSubst is) i tm
+            x1 = substTm "zeroWidthSpec" subst x0
+         in changed (Lam i x1)
 
-    Nothing ->
-      return e
-
-zeroWidthSpec _ e = return e
+      Nothing ->
+        return e
 {-# SCC zeroWidthSpec #-}
 
 -- Get the only element of a type, if it is zero-width.

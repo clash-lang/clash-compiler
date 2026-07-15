@@ -84,8 +84,9 @@ import Clash.Core.VarEnv
   , notElemInScopeSet, unionInScope)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.Transformations.Letrec (deadCode)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormShapedTransformation, NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.Shape (applyCase, runShapedTransformationQuiet)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isFromInt, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
@@ -143,8 +144,14 @@ import qualified GHC.Prim
 -- and to share the /decoder/ circuit that logic synthesis will create to map the
 -- bits of the subject expression to the bits needed to make the selection in the
 -- multiplexer.
-disjointExpressionConsolidation :: HasCallStack => NormRewrite
-disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _ty _alts@(_:_:_)) = do
+disjointExpressionConsolidation :: HasCallStack => NormShapedTransformation
+disjointExpressionConsolidation = applyCase "DEC" disjointExpressionConsolidationWorker
+
+-- | The 'Case' handler of 'disjointExpressionConsolidation'.
+disjointExpressionConsolidationWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+disjointExpressionConsolidationWorker ctx@(TransformContext isCtx _) e _scrut _ty _alts@(_:_:_) = do
     -- Collect all (the applications of) global binders (and certain primitives)
     -- that would be interesting to share out of the case-alternatives.
     (_,isCollected,collected) <- collectGlobals isCtx [] [] e
@@ -191,7 +198,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
          let lb = Letrec (zip funOutIds lifted1) e1
          -- Do an initial dead-code elimination pass, as `mkDisJoint` doesn't
          -- clean-up unused let-binders.
-         lb1 <- bottomupR deadCode ctx lb
+         lb1 <- bottomupR (runShapedTransformationQuiet deadCode) ctx lb
          changed lb1
   where
     -- Make the let-binder for the lifted expressions
@@ -250,7 +257,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
       go _  []     = []
       go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
 
-disjointExpressionConsolidation _ e = return e
+disjointExpressionConsolidationWorker _ e _ _ _ = return e
 {-# SCC disjointExpressionConsolidation #-}
 
 decFunName :: Term -> OccName

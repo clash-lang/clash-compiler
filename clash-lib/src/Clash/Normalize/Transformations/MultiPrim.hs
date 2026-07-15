@@ -31,8 +31,9 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type(..), mkPolyFunTy, splitFunForallTy)
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (mkLocalId)
-import Clash.Normalize.Types (NormRewrite)
+import Clash.Normalize.Types (NormShapedTransformation)
 import Clash.Primitives.Types (Primitive(..))
+import Clash.Rewrite.Shape (applyPrim)
 import Clash.Rewrite.Types (tcCache, primitives)
 import Clash.Rewrite.Util (changed)
 
@@ -74,20 +75,21 @@ import Clash.Rewrite.Util (changed)
 -- types, not any product type. It will error if it sees a multi result primitive
 -- with a non-tuple return type.
 --
-setupMultiResultPrim :: HasCallStack => NormRewrite
-setupMultiResultPrim _ctx e@(Prim pInfo@PrimInfo{primMultiResult=SingleResult}) = do
-  tcm <- Lens.view tcCache
-  prim <- Lens.view (primitives . Lens.at (primName pInfo))
+setupMultiResultPrim :: HasCallStack => NormShapedTransformation
+setupMultiResultPrim = applyPrim "setupMultiResultPrim" go
+ where
+  go _ctx node pInfo@PrimInfo{primMultiResult=SingleResult} = do
+    tcm <- Lens.view tcCache
+    prim <- Lens.view (primitives . Lens.at (primName pInfo))
 
-  case prim >>= extractPrim of
-    Just (BlackBoxHaskell{multiResult=True}) ->
-      changed (setupMultiResultPrim' tcm pInfo)
-    Just (BlackBox{multiResult=True}) ->
-      changed (setupMultiResultPrim' tcm pInfo)
-    _ ->
-      return e
-
-setupMultiResultPrim _ e = return e
+    case prim >>= extractPrim of
+      Just (BlackBoxHaskell{multiResult=True}) ->
+        changed (setupMultiResultPrim' tcm pInfo)
+      Just (BlackBox{multiResult=True}) ->
+        changed (setupMultiResultPrim' tcm pInfo)
+      _ ->
+        return node
+  go _ctx node _primInfo = return node
 
 setupMultiResultPrim' :: HasCallStack => TyConMap -> PrimInfo -> Term
 setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =

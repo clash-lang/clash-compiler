@@ -36,8 +36,9 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Netlist.BlackBox.Types (Element(Err))
 import Clash.Netlist.Types (BlackBox(..))
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormShapedTransformation, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
+import Clash.Rewrite.Shape (applyCase)
 import Clash.Rewrite.Types
   (TransformContext(..), aggressiveXOpt, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
@@ -66,22 +67,22 @@ import Clash.Util (MonadUnique, curLoc)
 -- where fieldN is an internal variable referring to the nth argument of a
 -- data constructor.
 --
-xOptimize :: HasCallStack => NormRewrite
-xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
-  runXOpt <- Lens.view aggressiveXOpt
+xOptimize :: HasCallStack => NormShapedTransformation
+xOptimize = applyCase "xOptimize" go
+ where
+  go (TransformContext is0 _) node subj ty alts = do
+    runXOpt <- Lens.view aggressiveXOpt
 
-  if runXOpt then do
-    defPart <- List.partitionM (isPrimError . snd) alts
+    if runXOpt then do
+      defPart <- List.partitionM (isPrimError . snd) alts
 
-    case defPart of
-      ([], _)    -> return e
-      (_, [])    -> changed (Prim (PrimInfo (Text.showt 'errorX) ty WorkConstant SingleResult NoUnfolding))
-      (_, [alt]) -> xOptimizeSingle is0 subj alt
-      (_, defs)  -> xOptimizeMany is0 subj ty defs
-  else
-    return e
-
-xOptimize _ e = return e
+      case defPart of
+        ([], _)    -> return node
+        (_, [])    -> changed (Prim (PrimInfo (Text.showt 'errorX) ty WorkConstant SingleResult NoUnfolding))
+        (_, [alt]) -> xOptimizeSingle is0 subj alt
+        (_, defs)  -> xOptimizeMany is0 subj ty defs
+    else
+      return node
 {-# SCC xOptimize #-}
 
 -- Return an expression equivalent to the alternative given. When only one

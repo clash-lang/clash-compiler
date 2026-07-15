@@ -14,6 +14,7 @@ module Clash.Normalize.Strategy where
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types
 import Clash.Rewrite.Combinators
+import Clash.Rewrite.Shape (runShapedTransformation, withTransformationName)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util
 
@@ -40,27 +41,27 @@ normalization =
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
-    multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
-    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
+    multPrim   = topdownR (runShapedTransformation setupMultiResultPrim)
+    anf        = topdownR (runShapedTransformation nonRepANF) >-> apply "ANF" makeANF >-> topdownR (runShapedTransformation caseCon)
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
-    rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
-    rmDeadcode = bottomupR (apply "deadcode" deadCode)
-    bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
+    rmUnusedExpr = bottomupR (runShapedTransformation removeUnusedExpr)
+    rmDeadcode = bottomupR (runShapedTransformation (withTransformationName "deadcode" deadCode))
+    bindConst  = topdownR (runShapedTransformation bindConstantVar)
     -- See [Note] bottomup traversal reduceConst:
-    evalConst  = bottomupR (apply "reduceConst" reduceConst)
-    cse        = topdownR (apply "CSE" simpleCSE)
-    elimCaseBigNum = topdownR (apply "elimCaseBigNum" elimCaseBigNumInternals)
-    xOptim     = bottomupR (apply "xOptimize" xOptimize)
-    cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
-                 topdownSucR (apply "inlineCleanup" inlineCleanup) !->
-                 innerMost (applyMany [("caseCon"        , caseCon)
-                                      ,("bindConstantVar", bindConstantVar)
-                                      ,("letFlat"        , flattenLet)])
+    evalConst  = bottomupR (runShapedTransformation reduceConst)
+    cse        = topdownR (runShapedTransformation simpleCSE)
+    elimCaseBigNum = topdownR (runShapedTransformation elimCaseBigNumInternals)
+    xOptim     = bottomupR (runShapedTransformation xOptimize)
+    cleanup    = topdownR (runShapedTransformation etaExpandSyn) >->
+                 topdownSucR (runShapedTransformation inlineCleanup) !->
+                 innerMost (runShapedTransformation caseCon >->
+                            runShapedTransformation bindConstantVar >->
+                            runShapedTransformation (withTransformationName "letFlat" flattenLet))
                  >-> rmDeadcode >-> letTL
-    splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
-                 bottomupR (apply "caseCon" caseCon)
-    bindSimIO  = topdownR (apply "bindSimIO" inlineSimIO)
+    splitArgs  = topdownR (runShapedTransformation separateArguments) !->
+                 bottomupR (runShapedTransformation caseCon)
+    bindSimIO  = topdownR (runShapedTransformation inlineSimIO)
 
 
 constantPropagation :: NormRewrite
@@ -73,44 +74,42 @@ constantPropagation =
   dec >->
   conSpec
   where
-    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
+    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (runShapedTransformation appProp)
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down bundle from the
     -- new root.
-    inlineAndPropagate = repeatR (topdownFixR (applyMany transPropagateAndInline) >-> inlineNR)
-    spec               = bottomupR (applyMany specTransformations)
-    caseFlattening     = topdownFixR (apply "caseFlat" caseFlat)
-    dec                = topdownFixR (apply "DEC" disjointExpressionConsolidation)
-    conSpec            = bottomupR  ((apply "appPropCS" appProp !->
-                                     bottomupR (apply "constantSpec" constantSpec)) >-!
-                                     apply "constantSpec" constantSpec)
+    inlineAndPropagate = repeatR (topdownFixR transPropagateAndInline >-> inlineNR)
+    spec               = bottomupR specTransformations
+    caseFlattening     = topdownFixR (runShapedTransformation caseFlat)
+    dec                = topdownFixR (runShapedTransformation disjointExpressionConsolidation)
+    conSpec            = bottomupR  ((runShapedTransformation (withTransformationName "appPropCS" appProp) !->
+                                     bottomupR (runShapedTransformation constantSpec)) >-!
+                                     runShapedTransformation constantSpec)
 
-    transPropagateAndInline :: [(String,NormRewrite)]
+    transPropagateAndInline :: NormRewrite
     transPropagateAndInline =
-      [ ("applicationPropagation", appProp              )
-      , ("bindConstantVar"       , bindConstantVar      )
-      , ("caseLet"               , caseLet              )
-      , ("caseCase"              , caseCase             )
-      , ("caseCon"               , caseCon              )
-      , ("elimExistentials"      , elimExistentials     )
-      , ("caseEliminateNonReachable"  , caseEliminateNonReachable )
-      , ("removeUnusedExpr"      , removeUnusedExpr     )
+      runShapedTransformation appProp >->
+      runShapedTransformation bindConstantVar >->
+      runShapedTransformation caseLet >->
+      runShapedTransformation caseCase >->
+      runShapedTransformation caseCon >->
+      runShapedTransformation elimExistentials >->
+      runShapedTransformation caseEliminateNonReachable >->
+      runShapedTransformation removeUnusedExpr >->
       -- These transformations can safely be applied in a top-down traversal as
       -- they themselves check whether the to-be-inlined binder is recursive or not.
-      , ("inlineWorkFree"  , inlineWorkFree)
-      , ("inlineSmall"     , inlineSmall)
-      , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
-                                                 -- See: [Note] bottom-up traversal for liftNonRep
-      , ("reduceNonRepPrim", reduceNonRepPrim)
+      runShapedTransformation inlineWorkFree >->
+      runShapedTransformation inlineSmall >->
+      runShapedTransformation inlineOrLiftNonRep >-> -- See: [Note] bindNonRep before liftNonRep
+                                                     -- See: [Note] bottom-up traversal for liftNonRep
+      runShapedTransformation reduceNonRepPrim >->
 
-
-      , ("caseCast"        , caseCast)
-      , ("letCast"         , letCast)
-      , ("splitCastWork"   , splitCastWork)
-      , ("argCastSpec"     , argCastSpec)
-      , ("inlineCast"      , inlineCast)
-      , ("elimCastCast"    , elimCastCast)
-      ]
+      runShapedTransformation caseCast >->
+      runShapedTransformation letCast >->
+      runShapedTransformation splitCastWork >->
+      runShapedTransformation argCastSpec >->
+      runShapedTransformation inlineCast >->
+      runShapedTransformation elimCastCast
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
     -- binder might be recursive. The idea is, is that if the recursive
@@ -130,16 +129,15 @@ constantPropagation =
     --
     inlineNR :: NormRewrite
     inlineNR =
-          bottomupR (apply "deadCode" deadCode)
+          bottomupR (runShapedTransformation deadCode)
       >-! apply "inlineNonRep" inlineNonRep
 
-    specTransformations :: [(String,NormRewrite)]
+    specTransformations :: NormRewrite
     specTransformations =
-      [ ("typeSpec"    , typeSpec)
-      , ("nonRepSpec"  , nonRepSpec)
-      , ("zeroWidthSpec", zeroWidthSpec)
+      runShapedTransformation typeSpec >->
+      runShapedTransformation nonRepSpec >->
+      runShapedTransformation zeroWidthSpec
         -- See Note [zeroWidthSpec enabling transformations]
-      ]
 
 {-
 [Note] late elimCaseBigNum
@@ -334,7 +332,3 @@ topdownSucR r = r >-! (allR (topdownSucR r))
 innerMost :: Rewrite extra -> Rewrite extra
 innerMost = let go r = bottomupR (r !-> innerMost r) in go
 {-# INLINE innerMost #-}
-
-applyMany :: [(String,Rewrite extra)] -> Rewrite extra
-applyMany = foldr1 (>->) . map (uncurry apply)
-{-# INLINE applyMany #-}

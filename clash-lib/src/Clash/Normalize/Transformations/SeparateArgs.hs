@@ -29,7 +29,9 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Util (Projections (..), shouldSplit)
 import Clash.Core.Var (Id, TyVar, Var (..), isGlobalId, mkLocalId)
 import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormShapedTransformation, NormalizeSession)
+import Clash.Rewrite.Shape
+  (applyShapes, onAppNode, onLam, onTickNode, onTyAppNode, onVarNode)
 import Clash.Rewrite.Types (TransformContext(..), tcCache)
 import Clash.Rewrite.Util (changed, mkDerivedName)
 
@@ -43,48 +45,53 @@ import Clash.Rewrite.Util (changed, mkDerivedName)
 -- into
 --
 -- > f :: Clock System -> Reset System -> Signal System Int
-separateArguments :: HasCallStack => NormRewrite
-separateArguments ctx e0@(Lam b eb) = do
-  tcm <- Lens.view tcCache
-  case separateLambda tcm ctx b eb of
-    Just e1 -> changed e1
-    Nothing -> return e0
-
-separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
-  | isGlobalId g = do
-  -- We ensure that both the type of the global variable reference is updated
-  -- to take into account the changed arguments, and that we apply the global
-  -- function with the split apart arguments.
-  let (argTys0,resTy) = splitFunForallTy (coreTypeOf g)
-  (concat -> args1, Monoid.getAny -> hasChanged)
-    <- listen (mapM (uncurry splitArg) (zip argTys0 args))
-  if hasChanged then
-    let (argTys1,args2) = unzip args1
-        gTy = mkPolyFunTy resTy argTys1
-    in  return (mkApps (mkTicks (Var g {varType = gTy}) ticks) args2)
-  else
-    return e
-
+separateArguments :: HasCallStack => NormShapedTransformation
+separateArguments = applyShapes "separateArguments"
+  (onLam goLambda <>
+   onVarNode goSpine <> onAppNode goSpine <> onTyAppNode goSpine <>
+   onTickNode goSpine)
  where
-  -- Split a single argument
-  splitArg
-    :: Either TyVar Type
-    -- The quantifier/function argument type of the global variable
-    -> Either Term Type
-    -- The applied type argument or term argument
-    -> NormalizeSession [(Either TyVar Type,Either Term Type)]
-  splitArg tv arg@(Right _)    = return [(tv,arg)]
-  splitArg ty arg@(Left tmArg) = do
+  goLambda ctx node b eb = do
     tcm <- Lens.view tcCache
-    let argTy = inferCoreTypeOf tcm tmArg
-    case shouldSplit tcm argTy of
-      Just (_,Projections projections,_) -> do
-        tmArgs <- projections is0 tmArg
-        changed (map ((ty,) . Left) tmArgs)
-      _ ->
-        return [(ty,arg)]
+    case separateLambda tcm ctx b eb of
+      Just e1 -> changed e1
+      Nothing -> return node
 
-separateArguments _ e = return e
+  goSpine (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
+    | isGlobalId g = do
+    -- We ensure that both the type of the global variable reference is updated
+    -- to take into account the changed arguments, and that we apply the global
+    -- function with the split apart arguments.
+    let (argTys0,resTy) = splitFunForallTy (coreTypeOf g)
+    (concat -> args1, Monoid.getAny -> hasChanged)
+      <- listen (mapM (uncurry splitArg) (zip argTys0 args))
+    if hasChanged then
+      let (argTys1,args2) = unzip args1
+          gTy = mkPolyFunTy resTy argTys1
+      in  return (mkApps (mkTicks (Var g {varType = gTy}) ticks) args2)
+    else
+      return e
+
+   where
+    -- Split a single argument
+    splitArg
+      :: Either TyVar Type
+      -- The quantifier/function argument type of the global variable
+      -> Either Term Type
+      -- The applied type argument or term argument
+      -> NormalizeSession [(Either TyVar Type,Either Term Type)]
+    splitArg tv arg@(Right _)    = return [(tv,arg)]
+    splitArg ty arg@(Left tmArg) = do
+      tcm <- Lens.view tcCache
+      let argTy = inferCoreTypeOf tcm tmArg
+      case shouldSplit tcm argTy of
+        Just (_,Projections projections,_) -> do
+          tmArgs <- projections is0 tmArg
+          changed (map ((ty,) . Left) tmArgs)
+        _ ->
+          return [(ty,arg)]
+
+  goSpine _ e = return e
 {-# SCC separateArguments #-}
 
 -- | Worker function of 'separateArguments'.
