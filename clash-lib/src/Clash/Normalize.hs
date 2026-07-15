@@ -409,13 +409,16 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     -- topdownFixR reaches a fixpoint for the top-down propagation bundle.
     -- Keep flattenLet in the outer fixed-point loop: flattening can expose
     -- fresh propagation redexes for the next top-down pass.
-    repeatR (topdownFixR (apply "appProp" appProp >->
-               apply "bindConstantVar" bindConstantVar >->
-               apply "caseCon" caseCon >->
-               (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
-               apply "reduceNonRepPrim" reduceNonRepPrim >->
-               apply "removeUnusedExpr" removeUnusedExpr) >->
-             bottomupR (apply "flattenLet" flattenLet)) !->
+    --
+    -- The bundle dispatches on the node constructor so only transformations
+    -- that can fire on that constructor are attempted; the skipped ones are
+    -- guaranteed no-ops there (checked against each transformation's entry
+    -- patterns). A node whose constructor changes is re-attempted by
+    -- topdownFixR's repeatR and then re-dispatched on its new shape.
+    repeatR (topdownFixR flattenStep >->
+             bottomupR (\ctx e -> case e of
+               Let {} -> apply "flattenLet" flattenLet ctx e
+               _ -> pure e)) !->
     topdownSucR (apply "topLet" topLet) >->
     -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
     -- Note that we do this as the very last step, after all constant propagation
@@ -426,6 +429,38 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
     bottomupR (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
     topdownSucR (apply "topLet" topLet)
+
+  -- Entry shapes: appProp: App/TyApp; bindConstantVar: Let; caseCon: Case;
+  -- reduceConst: App; reduceNonRepPrim: App; removeUnusedExpr: single-alt
+  -- Case, and anything whose spine head is a Prim or Data (Prim, App, TyApp,
+  -- Tick). deadCode (Let) only runs after a successful reduceConst, whose
+  -- reductions are what expose the dead bindings it cleans up.
+  flattenStep ctx e = case e of
+    App {} -> bundleApp ctx e
+    TyApp {} -> bundleTyApp ctx e
+    Case {} -> bundleCase ctx e
+    Let {} -> bundleLet ctx e
+    Prim {} -> bundlePrim ctx e
+    Tick {} -> bundlePrim ctx e
+    _ -> pure e
+
+  bundleApp =
+    apply "appProp" appProp >->
+    (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
+    apply "reduceNonRepPrim" reduceNonRepPrim >->
+    apply "removeUnusedExpr" removeUnusedExpr
+
+  bundleTyApp =
+    apply "appProp" appProp >->
+    apply "removeUnusedExpr" removeUnusedExpr
+
+  bundleCase =
+    apply "caseCon" caseCon >->
+    apply "removeUnusedExpr" removeUnusedExpr
+
+  bundleLet = apply "bindConstantVar" bindConstantVar
+
+  bundlePrim = apply "removeUnusedExpr" removeUnusedExpr
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
     | isNoInline inl2  = (Nothing     ,[c])

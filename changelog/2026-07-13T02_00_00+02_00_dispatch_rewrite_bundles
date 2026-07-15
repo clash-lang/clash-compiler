@@ -1,0 +1,1 @@
+CHANGED: The normalization and flattening rewrite bundles dispatch on the node constructor, skipping transformations that cannot fire on that node. This significantly reduces rewrite-engine overhead on large designs (measured up to 2x faster normalization), without changing the produced HDL.

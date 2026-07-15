@@ -17,6 +17,14 @@ module Clash.Rewrite.Combinators
   , repeatR
   , topdownR
   , topdownFixR
+  -- * Shape gates
+  , onApp
+  , onCase
+  , onLam
+  , onLet
+  , onPrim
+  , onPrimSpine
+  , onVarSpine
   ) where
 
 import           Control.DeepSeq             (deepseq)
@@ -210,3 +218,41 @@ infixr 5 >-!
 repeatR :: Rewrite m -> Rewrite m
 repeatR = let go r = r !-> repeatR r in go
 {-# INLINE repeatR #-}
+
+-- | Attempt a transformation only on nodes with the given constructor;
+-- other nodes are returned unchanged without invoking the transformation.
+-- Useful to skip transformations whose entry patterns cannot match a node,
+-- avoiding the (per-attempt) rewrite-engine overhead.
+onApp, onCase, onLam, onLet, onPrim
+  :: Monad m => Transform m -> Transform m
+onApp r ctx e = case e of { App {} -> r ctx e; _ -> pure e }
+{-# INLINE onApp #-}
+onCase r ctx e = case e of { Case {} -> r ctx e; _ -> pure e }
+{-# INLINE onCase #-}
+onLam r ctx e = case e of { Lam {} -> r ctx e; _ -> pure e }
+{-# INLINE onLam #-}
+onLet r ctx e = case e of { Let {} -> r ctx e; _ -> pure e }
+{-# INLINE onLet #-}
+onPrim r ctx e = case e of { Prim {} -> r ctx e; _ -> pure e }
+{-# INLINE onPrim #-}
+
+-- | Attempt a transformation only on nodes that can have a 'Prim'-headed
+-- application spine ('Prim', 'App', 'TyApp', 'Tick').
+onPrimSpine :: Monad m => Transform m -> Transform m
+onPrimSpine r ctx e = case e of
+  Prim {} -> r ctx e
+  App {} -> r ctx e
+  TyApp {} -> r ctx e
+  Tick {} -> r ctx e
+  _ -> pure e
+{-# INLINE onPrimSpine #-}
+
+-- | Attempt a transformation only on nodes that can have a 'Var'-headed
+-- application spine ('Var', 'App', 'TyApp').
+onVarSpine :: Monad m => Transform m -> Transform m
+onVarSpine r ctx e = case e of
+  Var {} -> r ctx e
+  App {} -> r ctx e
+  TyApp {} -> r ctx e
+  _ -> pure e
+{-# INLINE onVarSpine #-}

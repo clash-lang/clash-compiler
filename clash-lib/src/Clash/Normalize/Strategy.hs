@@ -11,6 +11,7 @@
 
 module Clash.Normalize.Strategy where
 
+import Clash.Core.Term (Term(..))
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types
 import Clash.Rewrite.Combinators
@@ -40,27 +41,55 @@ normalization =
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
-    multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
-    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
+    -- The shape gates (onApp, onCase, ...) skip transformations on nodes
+    -- their entry patterns cannot match; see each transformation's entry
+    -- clauses.
+    multPrim   = topdownR (onPrim (apply "setupMultiResultPrim" setupMultiResultPrim))
+    anf        = topdownR (onApp (apply "nonRepANF" nonRepANF)) >-> apply "ANF" makeANF >-> topdownR (onCase (apply "caseCon" caseCon))
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
-    rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
-    rmDeadcode = bottomupR (apply "deadcode" deadCode)
-    bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
+    -- removeUnusedExpr fires on Prim- and Data-headed spines and on
+    -- single-alternative case expressions
+    rmUnusedExpr = bottomupR rmUnusedExprStep
+    rmUnusedExprStep ctx e =
+      let go = apply "removeUnusedExpr" removeUnusedExpr ctx e
+      in case e of
+           Prim {} -> go
+           App {} -> go
+           TyApp {} -> go
+           Tick {} -> go
+           Case {} -> go
+           _ -> pure e
+    rmDeadcode = bottomupR (onLet (apply "deadcode" deadCode))
+    bindConst  = topdownR (onLet (apply "bindConstantVar" bindConstantVar))
     -- See [Note] bottomup traversal reduceConst:
-    evalConst  = bottomupR (apply "reduceConst" reduceConst)
-    cse        = topdownR (apply "CSE" simpleCSE)
-    elimCaseBigNum = topdownR (apply "elimCaseBigNum" elimCaseBigNumInternals)
-    xOptim     = bottomupR (apply "xOptimize" xOptimize)
-    cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
-                 topdownSucR (apply "inlineCleanup" inlineCleanup) !->
-                 innerMost (applyMany [("caseCon"        , caseCon)
-                                      ,("bindConstantVar", bindConstantVar)
-                                      ,("letFlat"        , flattenLet)])
+    evalConst  = bottomupR (onApp (apply "reduceConst" reduceConst))
+    cse        = topdownR (onLet (apply "CSE" simpleCSE))
+    elimCaseBigNum = topdownR (onCase (apply "elimCaseBigNum" elimCaseBigNumInternals))
+    xOptim     = bottomupR (onCase (apply "xOptimize" xOptimize))
+    cleanup    = topdownR (onVarSpine (apply "etaExpandSyn" etaExpandSyn)) >->
+                 topdownSucR (onLet (apply "inlineCleanup" inlineCleanup)) !->
+                 innerMost cleanupStep
                  >-> rmDeadcode >-> letTL
-    splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
-                 bottomupR (apply "caseCon" caseCon)
-    bindSimIO  = topdownR (apply "bindSimIO" inlineSimIO)
+    -- Entry shapes: caseCon: Case; bindConstantVar, letFlat: Let.
+    cleanupStep ctx e = case e of
+      Case {} -> apply "caseCon" caseCon ctx e
+      Let {} -> (apply "bindConstantVar" bindConstantVar >->
+                 apply "letFlat" flattenLet) ctx e
+      _ -> pure e
+    -- separateArguments fires on lambdas and on Var-headed spines
+    splitArgs  = topdownR separateArgsStep !->
+                 bottomupR (onCase (apply "caseCon" caseCon))
+    separateArgsStep ctx e =
+      let go = apply "separateArguments" separateArguments ctx e
+      in case e of
+           Lam {} -> go
+           Var {} -> go
+           App {} -> go
+           TyApp {} -> go
+           Tick {} -> go
+           _ -> pure e
+    bindSimIO  = topdownR (onLet (apply "bindSimIO" inlineSimIO))
 
 
 constantPropagation :: NormRewrite
@@ -77,40 +106,95 @@ constantPropagation =
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down bundle from the
     -- new root.
-    inlineAndPropagate = repeatR (topdownFixR (applyMany transPropagateAndInline) >-> inlineNR)
-    spec               = bottomupR (applyMany specTransformations)
-    caseFlattening     = topdownFixR (apply "caseFlat" caseFlat)
-    dec                = topdownFixR (apply "DEC" disjointExpressionConsolidation)
+    inlineAndPropagate = repeatR (topdownFixR propInlineStep >-> inlineNR)
+    -- Entry shapes: typeSpec: TyApp; nonRepSpec: App; zeroWidthSpec: Lam.
+    -- See Note [zeroWidthSpec enabling transformations]
+    spec               = bottomupR specStep
+    specStep :: NormRewrite
+    specStep ctx e = case e of
+      TyApp {} -> apply "typeSpec" typeSpec ctx e
+      App {} -> apply "nonRepSpec" nonRepSpec ctx e
+      Lam {} -> apply "zeroWidthSpec" zeroWidthSpec ctx e
+      _ -> pure e
+    caseFlattening     = topdownFixR (onCase (apply "caseFlat" caseFlat))
+    dec                = topdownFixR (onCase (apply "DEC" disjointExpressionConsolidation))
     conSpec            = bottomupR  ((apply "appPropCS" appProp !->
                                      bottomupR (apply "constantSpec" constantSpec)) >-!
                                      apply "constantSpec" constantSpec)
 
-    transPropagateAndInline :: [(String,NormRewrite)]
-    transPropagateAndInline =
-      [ ("applicationPropagation", appProp              )
-      , ("bindConstantVar"       , bindConstantVar      )
-      , ("caseLet"               , caseLet              )
-      , ("caseCase"              , caseCase             )
-      , ("caseCon"               , caseCon              )
-      , ("elimExistentials"      , elimExistentials     )
-      , ("caseEliminateNonReachable"  , caseEliminateNonReachable )
-      , ("removeUnusedExpr"      , removeUnusedExpr     )
-      -- These transformations can safely be applied in a top-down traversal as
-      -- they themselves check whether the to-be-inlined binder is recursive or not.
-      , ("inlineWorkFree"  , inlineWorkFree)
-      , ("inlineSmall"     , inlineSmall)
-      , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
-                                                 -- See: [Note] bottom-up traversal for liftNonRep
-      , ("reduceNonRepPrim", reduceNonRepPrim)
+    -- The propagate-and-inline bundle, dispatched on the node constructor so
+    -- only transformations whose entry patterns can match the node are
+    -- attempted. The relative order of transformations within each group is
+    -- significant. A rewrite that changes a node's constructor is
+    -- re-attempted by topdownFixR's repeatR and then dispatched on its new
+    -- shape.
+    --
+    -- Entry shapes: applicationPropagation: App/TyApp; bindConstantVar,
+    -- bindOrLiftNonRep, splitCastWork, inlineCast: Let; caseLet, caseCase,
+    -- caseCon, elimExistentials, caseEliminateNonReachable: Case;
+    -- removeUnusedExpr: Prim/Data-headed spines (Prim/App/TyApp/Tick) and
+    -- single-alternative Case;
+    -- inlineWorkFree, inlineSmall: Var-headed spines (Var/App/TyApp/Tick);
+    -- reduceNonRepPrim, argCastSpec: App; caseCast, letCast, elimCastCast:
+    -- Cast.
+    propInlineStep :: NormRewrite
+    propInlineStep ctx e = case e of
+      App {} -> piApp ctx e
+      TyApp {} -> piTyApp ctx e
+      Case {} -> piCase ctx e
+      Let {} -> piLet ctx e
+      Var {} -> piVar ctx e
+      Cast {} -> piCast ctx e
+      Prim {} -> apply "removeUnusedExpr" removeUnusedExpr ctx e
+      Tick {} -> piTick ctx e
+      _ -> pure e
 
+    piApp =
+      apply "applicationPropagation" appProp >->
+      apply "removeUnusedExpr" removeUnusedExpr >->
+      -- inlineWorkFree and inlineSmall can safely be applied in a top-down
+      -- traversal as they themselves check whether the to-be-inlined binder
+      -- is recursive or not.
+      apply "inlineWorkFree" inlineWorkFree >->
+      apply "inlineSmall" inlineSmall >->
+      apply "reduceNonRepPrim" reduceNonRepPrim >->
+      apply "argCastSpec" argCastSpec
 
-      , ("caseCast"        , caseCast)
-      , ("letCast"         , letCast)
-      , ("splitCastWork"   , splitCastWork)
-      , ("argCastSpec"     , argCastSpec)
-      , ("inlineCast"      , inlineCast)
-      , ("elimCastCast"    , elimCastCast)
-      ]
+    piTyApp =
+      apply "applicationPropagation" appProp >->
+      apply "removeUnusedExpr" removeUnusedExpr >->
+      apply "inlineWorkFree" inlineWorkFree >->
+      apply "inlineSmall" inlineSmall
+
+    piCase =
+      apply "caseLet" caseLet >->
+      apply "caseCase" caseCase >->
+      apply "caseCon" caseCon >->
+      apply "elimExistentials" elimExistentials >->
+      apply "caseEliminateNonReachable" caseEliminateNonReachable >->
+      -- removeUnusedExpr also fires on single-alternative case expressions
+      apply "removeUnusedExpr" removeUnusedExpr
+
+    piLet =
+      apply "bindConstantVar" bindConstantVar >->
+      apply "bindOrLiftNonRep" inlineOrLiftNonRep >-> -- See: [Note] bindNonRep before liftNonRep
+                                                      -- See: [Note] bottom-up traversal for liftNonRep
+      apply "splitCastWork" splitCastWork >->
+      apply "inlineCast" inlineCast
+
+    piVar =
+      apply "inlineWorkFree" inlineWorkFree >->
+      apply "inlineSmall" inlineSmall
+
+    piCast =
+      apply "caseCast" caseCast >->
+      apply "letCast" letCast >->
+      apply "elimCastCast" elimCastCast
+
+    piTick =
+      apply "removeUnusedExpr" removeUnusedExpr >->
+      apply "inlineWorkFree" inlineWorkFree >->
+      apply "inlineSmall" inlineSmall
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
     -- binder might be recursive. The idea is, is that if the recursive
@@ -132,14 +216,6 @@ constantPropagation =
     inlineNR =
           bottomupR (apply "deadCode" deadCode)
       >-! apply "inlineNonRep" inlineNonRep
-
-    specTransformations :: [(String,NormRewrite)]
-    specTransformations =
-      [ ("typeSpec"    , typeSpec)
-      , ("nonRepSpec"  , nonRepSpec)
-      , ("zeroWidthSpec", zeroWidthSpec)
-        -- See Note [zeroWidthSpec enabling transformations]
-      ]
 
 {-
 [Note] late elimCaseBigNum
