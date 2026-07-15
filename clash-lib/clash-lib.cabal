@@ -296,6 +296,7 @@ Library
                       Clash.Primitives.Xilinx.ClockGen
 
                       Clash.Rewrite.Combinators
+                      Clash.Rewrite.Shape
                       Clash.Rewrite.Types
                       Clash.Rewrite.Util
                       Clash.Rewrite.WorkFree
@@ -432,6 +433,7 @@ test-suite unittests
                  Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist.Id
+                 Clash.Tests.Rewrite.Shape
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize.Transformations
 
