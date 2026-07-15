@@ -14,7 +14,10 @@ module Clash.Normalize.Strategy where
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types
 import Clash.Rewrite.Combinators
-import Clash.Rewrite.Shape (runShapedTransformation, withTransformationName)
+import Clash.Rewrite.Shape
+  ( TransformationBundle, applyAnyShape, bottomupBundle, compileBundle
+  , innerMostBundle, runShapedTransformation, topdownBundle, topdownFixBundle
+  , topdownSucBundle, withTransformationName)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util
 
@@ -41,27 +44,29 @@ normalization =
   xOptim >-> rmDeadcode >->
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
-    multPrim   = topdownR (runShapedTransformation setupMultiResultPrim)
-    anf        = topdownR (runShapedTransformation nonRepANF) >-> apply "ANF" makeANF >-> topdownR (runShapedTransformation caseCon)
-    letTL      = topdownSucR (apply "topLet" topLet)
+    multPrim   = topdownBundle (compileBundle [setupMultiResultPrim])
+    anf        = topdownBundle (compileBundle [nonRepANF]) >-> apply "ANF" makeANF >-> topdownBundle (compileBundle [caseCon])
+    letTL      = topdownSucBundle (compileBundle [applyAnyShape "topLet" topLet])
     recLetRec  = apply "recToLetRec" recToLetRec
-    rmUnusedExpr = bottomupR (runShapedTransformation removeUnusedExpr)
-    rmDeadcode = bottomupR (runShapedTransformation (withTransformationName "deadcode" deadCode))
-    bindConst  = topdownR (runShapedTransformation bindConstantVar)
+    rmUnusedExpr = bottomupBundle (compileBundle [removeUnusedExpr])
+    rmDeadcode = bottomupBundle (compileBundle [withTransformationName "deadcode" deadCode])
+    bindConst  = topdownBundle (compileBundle [bindConstantVar])
     -- See [Note] bottomup traversal reduceConst:
-    evalConst  = bottomupR (runShapedTransformation reduceConst)
-    cse        = topdownR (runShapedTransformation simpleCSE)
-    elimCaseBigNum = topdownR (runShapedTransformation elimCaseBigNumInternals)
-    xOptim     = bottomupR (runShapedTransformation xOptimize)
-    cleanup    = topdownR (runShapedTransformation etaExpandSyn) >->
-                 topdownSucR (runShapedTransformation inlineCleanup) !->
-                 innerMost (runShapedTransformation caseCon >->
-                            runShapedTransformation bindConstantVar >->
-                            runShapedTransformation (withTransformationName "letFlat" flattenLet))
+    evalConst  = bottomupBundle (compileBundle [reduceConst])
+    cse        = topdownBundle (compileBundle [simpleCSE])
+    elimCaseBigNum = topdownBundle (compileBundle [elimCaseBigNumInternals])
+    xOptim     = bottomupBundle (compileBundle [xOptimize])
+    cleanup    = topdownBundle (compileBundle [etaExpandSyn]) >->
+                 topdownSucBundle (compileBundle [inlineCleanup]) !->
+                 innerMostBundle (compileBundle
+                   [ caseCon
+                   , bindConstantVar
+                   , withTransformationName "letFlat" flattenLet
+                   ])
                  >-> rmDeadcode >-> letTL
-    splitArgs  = topdownR (runShapedTransformation separateArguments) !->
-                 bottomupR (runShapedTransformation caseCon)
-    bindSimIO  = topdownR (runShapedTransformation inlineSimIO)
+    splitArgs  = topdownBundle (compileBundle [separateArguments]) !->
+                 bottomupBundle (compileBundle [caseCon])
+    bindSimIO  = topdownBundle (compileBundle [inlineSimIO])
 
 
 constantPropagation :: NormRewrite
@@ -74,42 +79,45 @@ constantPropagation =
   dec >->
   conSpec
   where
-    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (runShapedTransformation appProp)
+    etaTL              = apply "etaTL" etaExpansionTL !-> topdownBundle (compileBundle [appProp])
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down bundle from the
     -- new root.
-    inlineAndPropagate = repeatR (topdownFixR transPropagateAndInline >-> inlineNR)
-    spec               = bottomupR specTransformations
-    caseFlattening     = topdownFixR (runShapedTransformation caseFlat)
-    dec                = topdownFixR (runShapedTransformation disjointExpressionConsolidation)
+    inlineAndPropagate = repeatR (topdownFixBundle transPropagateAndInline >-> inlineNR)
+    spec               = bottomupBundle specTransformations
+    caseFlattening     = topdownFixBundle (compileBundle [caseFlat])
+    dec                = topdownFixBundle (compileBundle [disjointExpressionConsolidation])
     conSpec            = bottomupR  ((runShapedTransformation (withTransformationName "appPropCS" appProp) !->
-                                     bottomupR (runShapedTransformation constantSpec)) >-!
+                                     bottomupBundle (compileBundle [constantSpec])) >-!
                                      runShapedTransformation constantSpec)
 
-    transPropagateAndInline :: NormRewrite
-    transPropagateAndInline =
-      runShapedTransformation appProp >->
-      runShapedTransformation bindConstantVar >->
-      runShapedTransformation caseLet >->
-      runShapedTransformation caseCase >->
-      runShapedTransformation caseCon >->
-      runShapedTransformation elimExistentials >->
-      runShapedTransformation caseEliminateNonReachable >->
-      runShapedTransformation removeUnusedExpr >->
+    -- The propagate-and-inline bundle: one flat, ordered list;
+    -- 'compileBundle' derives the dispatch groups from it.
+    transPropagateAndInline :: TransformationBundle NormalizeState
+    transPropagateAndInline = compileBundle
+      [ appProp
+      , bindConstantVar
+      , caseLet
+      , caseCase
+      , caseCon
+      , elimExistentials
+      , caseEliminateNonReachable
+      , removeUnusedExpr
       -- These transformations can safely be applied in a top-down traversal as
       -- they themselves check whether the to-be-inlined binder is recursive or not.
-      runShapedTransformation inlineWorkFree >->
-      runShapedTransformation inlineSmall >->
-      runShapedTransformation inlineOrLiftNonRep >-> -- See: [Note] bindNonRep before liftNonRep
-                                                     -- See: [Note] bottom-up traversal for liftNonRep
-      runShapedTransformation reduceNonRepPrim >->
+      , inlineWorkFree
+      , inlineSmall
+      , inlineOrLiftNonRep -- See: [Note] bindNonRep before liftNonRep
+                           -- See: [Note] bottom-up traversal for liftNonRep
+      , reduceNonRepPrim
 
-      runShapedTransformation caseCast >->
-      runShapedTransformation letCast >->
-      runShapedTransformation splitCastWork >->
-      runShapedTransformation argCastSpec >->
-      runShapedTransformation inlineCast >->
-      runShapedTransformation elimCastCast
+      , caseCast
+      , letCast
+      , splitCastWork
+      , argCastSpec
+      , inlineCast
+      , elimCastCast
+      ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
     -- binder might be recursive. The idea is, is that if the recursive
@@ -129,15 +137,16 @@ constantPropagation =
     --
     inlineNR :: NormRewrite
     inlineNR =
-          bottomupR (runShapedTransformation deadCode)
+          bottomupBundle (compileBundle [deadCode])
       >-! apply "inlineNonRep" inlineNonRep
 
-    specTransformations :: NormRewrite
-    specTransformations =
-      runShapedTransformation typeSpec >->
-      runShapedTransformation nonRepSpec >->
-      runShapedTransformation zeroWidthSpec
+    specTransformations :: TransformationBundle NormalizeState
+    specTransformations = compileBundle
+      [ typeSpec
+      , nonRepSpec
+      , zeroWidthSpec
         -- See Note [zeroWidthSpec enabling transformations]
+      ]
 
 {-
 [Note] late elimCaseBigNum

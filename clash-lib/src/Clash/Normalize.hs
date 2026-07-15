@@ -70,19 +70,19 @@ import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
   (splitNormalized)
-import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
-  ((>->), (!->), bottomupR, repeatR, topdownFixR)
+  ((>->), (!->), repeatR, topdownFixR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities, newInlineStrategy)
 import           Clash.Rewrite.Shape
-  (runShapedTransformation, withTransformationName)
+  (applyAnyShape, bottomupBundle, compileBundle, dispatchBundle,
+   runShapedTransformation, topdownSucBundle, withTransformationName)
 import           Clash.Rewrite.Util
-  (apply, isUntranslatableType, runRewriteSession)
+  (isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)
@@ -411,25 +411,34 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   flatten =
     -- topdownFixR reaches a fixpoint for the top-down propagation bundle.
     -- Keep flattenLet in the outer fixed-point loop: flattening can expose
-    -- fresh propagation redexes for the next top-down pass.
-    repeatR (topdownFixR (runShapedTransformation (withTransformationName "appProp" appProp) >->
-               runShapedTransformation bindConstantVar >->
-               runShapedTransformation caseCon >->
+    -- fresh propagation redexes for the next top-down pass. The conditional
+    -- (reduceConst !-> deadCode) is a cross-shape sequence — deadCode runs on
+    -- reduceConst's result — so it stays a combinator between the two bundles,
+    -- preserving the flat order.
+    repeatR (topdownFixR (dispatchBundle (compileBundle
+               [ withTransformationName "appProp" appProp
+               , bindConstantVar
+               , caseCon
+               ]) >->
                (runShapedTransformation reduceConst !->
                 runShapedTransformation (withTransformationName "deadcode" deadCode)) >->
-               runShapedTransformation reduceNonRepPrim >->
-               runShapedTransformation removeUnusedExpr) >->
-             bottomupR (runShapedTransformation flattenLet)) !->
-    topdownSucR (apply "topLet" topLet) >->
+               dispatchBundle (compileBundle
+               [ reduceNonRepPrim
+               , removeUnusedExpr
+               ])) >->
+             bottomupBundle (compileBundle [flattenLet])) !->
+    letTL >->
     -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
     -- Note that we do this as the very last step, after all constant propagation
     -- has been done to avoid #3036.
-    topdownSucR (runShapedTransformation collapseRHSNoops) >->
-    topdownSucR (runShapedTransformation inlineCleanup) >->
-    bottomupR (runShapedTransformation caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
-    bottomupR (runShapedTransformation flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
-    bottomupR (runShapedTransformation bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
-    topdownSucR (apply "topLet" topLet)
+    topdownSucBundle (compileBundle [collapseRHSNoops]) >->
+    topdownSucBundle (compileBundle [inlineCleanup]) >->
+    bottomupBundle (compileBundle [caseCon]) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
+    bottomupBundle (compileBundle [flattenLet]) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+    bottomupBundle (compileBundle [bindConstantVar]) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
+    letTL
+
+  letTL = topdownSucBundle (compileBundle [applyAnyShape "topLet" topLet])
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
     | isNoInline inl2  = (Nothing     ,[c])
