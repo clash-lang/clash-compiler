@@ -184,6 +184,10 @@ loadExternalModule
   -> String
   -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
   -- qualified module name (example: "Data.List").
+  -> Maybe String
+  -- ^ Name passed with @-main-is@, if any. When set, only the transitive
+  -- closure of this binder is loaded (instead of the closure of all exports of
+  -- the module). See 'loadSeed'.
   -> m (Either
           SomeException
           ( [CoreSyn.CoreBndr]                     -- Root binders
@@ -192,16 +196,67 @@ loadExternalModule
           , LoadedBinders
           , [CoreSyn.CoreBind]                     -- All bindings
           ) )
-loadExternalModule hdl modName0 = MC.try $ do
+loadExternalModule hdl modName0 mainIsM = MC.try $ do
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
   let errMsg = "Internal error: found  module, but could not load it"
   modInfo <- fromMaybe (error errMsg) <$> (GHC.getModuleInfo foundMod)
   tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
   let rootIds = [id_ | GHC.AnId id_ <- tyThings]
-  loaded <- loadExternalBinders hdl rootIds
+  -- Only load (the transitive closure of) the binders we will actually compile.
+  -- With @-main-is@ that is the requested binder plus any other binder that
+  -- 'loadModules' can still select as a top entity (see 'loadSeed'); without it,
+  -- all exports.
+  seed <- loadSeed mainIsM rootIds
+  loaded <- loadExternalBinders hdl seed
   let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded))
+  -- NB: we return the /full/ export list as the root binders, so resolution of
+  -- the @-main-is@ name and of (testbench/synthesize) annotations in
+  -- 'loadModules' is unaffected by the pruning above.
   return (rootIds, FamInstEnv.emptyFamInstEnv, modName1, loaded, allBinders)
+
+-- | Restrict the set of binders we load the transitive closure of. When a
+-- @-main-is@ name is given we do not need every export: any binder (and its
+-- closure) that is not selected as a top entity would be loaded, converted to
+-- Clash Core, and then discarded by 'Clash.GHCi.Common.getMainTopEntity'. When
+-- no name is given we keep all exports.
+--
+-- The seed must cover /every/ binder that 'loadModules' can select as a top
+-- entity, otherwise that binder is chosen but its binding is never loaded,
+-- leading to a spurious \"No top entity called ...\" error (see #3297). Besides
+-- the @-main-is@ binder itself, this is:
+--
+--   * magically named exports @topEntity@ and @testBench@;
+--   * @Synthesize@- and @TestBench@-annotated exports, and the designs under
+--     test the latter point at.
+--
+-- These match the implicit top entities computed in 'loadModules'. We do not
+-- prune them further based on @-main-is@ here, as 'getMainTopEntity' does that
+-- downstream; loading their (small) closures is cheap and keeps this in step
+-- with the selection logic.
+--
+-- If the @-main-is@ name cannot be found among the exports we fall back to all
+-- exports and let 'loadModules' produce the usual \"no top-level function
+-- called ...\" error.
+loadSeed
+  :: GHC.GhcMonad m
+  => Maybe String
+  -> [CoreSyn.CoreBndr]
+  -> m [CoreSyn.CoreBndr]
+loadSeed Nothing rootIds = pure rootIds
+loadSeed (Just nm) rootIds =
+  case filter ((== nm) . varNameString) rootIds of
+    [] -> pure rootIds
+    mainIs -> do
+      synAnns <- findSynthesizeAnnotations rootIds
+      benchAnns <- findTestBenches rootIds
+      let
+        implicit =
+             map fst synAnns
+          <> Map.keys benchAnns
+          <> concat (Map.elems benchAnns)
+          <> filter isMagicName rootIds
+      pure (nubSort (mainIs <> implicit))
 
 setupGhc
   :: GHC.GhcMonad m
@@ -398,6 +453,22 @@ nameString = OccName.occNameString . Name.nameOccName
 varNameString :: Var.Var -> String
 varNameString = nameString . Var.varName
 
+-- | Is the binder magically named @topEntity@? Such binders are implicitly
+-- treated as top entities (see 'isMagicName').
+isTopEntityName :: Var.Var -> Bool
+isTopEntityName = (== "topEntity") . varNameString
+
+-- | Is the binder magically named @testBench@? Such binders are implicitly
+-- treated as top entities (see 'isMagicName').
+isTestBenchName :: Var.Var -> Bool
+isTestBenchName = (== "testBench") . varNameString
+
+-- | Is the binder magically named, i.e. called @topEntity@ or @testBench@?
+-- These are picked up as top entities even without a @Synthesize@/@TestBench@
+-- annotation.
+isMagicName :: Var.Var -> Bool
+isMagicName v = isTopEntityName v || isTestBenchName v
+
 data LoadModulesException = LoadModulesException
   { moduleName :: String
   , externalError :: String
@@ -455,15 +526,11 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     let setupStartDiff = reportTimeDiff setupTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
 
-    -- TODO: We currently load the transitive closure of _all_ bindings found
-    -- TODO: in the top module. This is wasteful if one or more binders don't
-    -- TODO: contribute to any top entities. This effect is worsened when using
-    -- TODO: -main-is, which only synthesizes a single top entity (and all its
-    -- TODO: dependencies).
+    let mainIsM = GHC.mainFunIs =<< dflagsM
     (rootIds, modFamInstEnvs, _rootModule, LoadedBinders{..}, allBinders) <-
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
-      loadExternalModule hdl modName >>= \case
+      loadExternalModule hdl modName mainIsM >>= \case
         Left loadExternalErr -> do
           catch @_ @SomeException
             (loadLocalModule hdl modName)
@@ -503,12 +570,11 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
       -- TestBench and the binders they're pointing to, plus magically named
       -- functions called "topEntity" or "testBench". Synthesized in case user
       -- didn't specify a particular target.
-      isMagicName = (`elem` ["topEntity", "testBench"])
       allImplicit = nubSort $
            Map.keys benchAnn
         <> Map.keys allSyn
         <> concat (Map.elems benchAnn)
-        <> filter (isMagicName . varNameString) rootIds
+        <> filter isMagicName rootIds
         <> topSyn
 
       -- Top entities we wish to synthesize. Users can filter these with -main-is.
@@ -797,8 +863,8 @@ findTestBenches bndrs0 = do
   -- Special case magic name 'testBench'. See function documentation.
   specialCaseMagicName m =
     let
-      topEntM = find ((=="topEntity") . varNameString) bndrs0
-      tbM = find ((=="testBench") . varNameString) bndrs0
+      topEntM = find isTopEntityName bndrs0
+      tbM = find isTestBenchName bndrs0
     in
       case (topEntM, tbM) of
         (Just dut, Just tb) -> insertTb m (dut, tb)

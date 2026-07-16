@@ -1,0 +1,1 @@
+ADDED: Clash now prunes the binders it collects from top modules when loading from precompiled core. For larger projects, this can shave off 15% of package loading times. See [#3298](https://github.com/clash-lang/clash-compiler/issues/3298).

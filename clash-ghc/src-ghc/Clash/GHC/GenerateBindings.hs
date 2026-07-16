@@ -6,6 +6,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,9 +17,9 @@ module Clash.GHC.GenerateBindings
 where
 
 import           Control.Arrow           ((***))
-import           Control.DeepSeq         (deepseq)
-import           Control.Lens            ((%~),(&),(.~))
-import           Control.Monad           (unless)
+import           Control.DeepSeq         (NFData, deepseq)
+import           Control.Lens            ((%~),(&),(.~),(^.))
+import           Control.Monad           (forM, unless)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Strict as RWS
 import           Data.Coerce             (coerce)
@@ -26,10 +27,15 @@ import           Data.Either             (partitionEithers, lefts ,rights)
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
 import qualified Data.HashMap.Strict     as HashMap
+#if !MIN_VERSION_base(4,20,0)
+import           Data.List               (foldl')
+#endif
 import           Data.List               (isPrefixOf)
+import           Data.List.Split         (chunksOf)
 import           Data.Maybe              (listToMaybe)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
+import           GHC.Conc                (numCapabilities, par, pseq)
 
 import qualified GHC                     as GHC (Ghc)
 import qualified GHC.Types.SourceText    as GHC
@@ -206,45 +212,105 @@ mkBindings
          , VarEnv (Id,Int)
          )
 mkBindings primMap bindings clsOps unlocatable = do
-  bindingsList <- mapM (\case
-    GHC.NonRec v e -> do
-      let sp = GHC.getSrcSpan v
+  -- Converting each binder is independent: 'GHC2CoreState' only accumulates a
+  -- 'TyCon' map and a name cache, both of which are pure (deterministic per
+  -- key) memo tables. We therefore convert every binder from a fresh state in
+  -- parallel and merge the resulting 'TyCon' maps afterwards. See 'parRunC2C'.
+  env <- RWS.ask
+  let
+    bindingsList = parRunC2C env (map (processBind primMap unlocatable) bindings)
+    clsOpList    = parRunC2C env (map processClsOp clsOps)
+  -- Merge the 'TyCon' maps discovered while converting; the name caches are
+  -- not used after this point, so they are dropped. 'makeAllTyCons' later
+  -- recomputes over the merged map, so a plain union suffices.
+  RWS.modify (tyConMap %~ \tcm0 ->
+    foldl' (\acc st -> acc <> (st ^. tyConMap)) tcm0
+      (map snd bindingsList ++ map snd clsOpList))
+
+  return ( mkVarEnv (concatMap fst bindingsList)
+         , mkVarEnv (map fst clsOpList) )
+
+-- | Convert a single (possibly recursive) binder group to Clash Core bindings.
+-- See 'mkBindings' for how these conversions are run in parallel.
+processBind
+  :: CompiledPrimMap
+  -> [GHC.CoreBndr]
+  -> GHC.CoreBind
+  -> C2C [(Id, Binding Term)]
+processBind primMap unlocatable = \case
+  GHC.NonRec v e -> do
+    let sp = GHC.getSrcSpan v
+        inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
+    tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
+    v' <- coreToId v
+    nm <- qualifiedNameString (GHC.varName v)
+    let pr = if HashMap.member nm primMap then IsPrim else IsFun
+    checkPrimitive primMap v
+    return [(v', (Binding v' sp inl pr tm False))]
+  GHC.Rec bs -> do
+    tms <- forM bs $ \(v,e) -> do
+      let sp  = GHC.getSrcSpan v
           inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
       tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
       v' <- coreToId v
       nm <- qualifiedNameString (GHC.varName v)
       let pr = if HashMap.member nm primMap then IsPrim else IsFun
       checkPrimitive primMap v
-      return [(v', (Binding v' sp inl pr tm False))]
-    GHC.Rec bs -> do
-      tms <- mapM (\(v,e) -> do
-                    let sp  = GHC.getSrcSpan v
-                        inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                    tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
-                    v' <- coreToId v
-                    nm <- qualifiedNameString (GHC.varName v)
-                    let pr = if HashMap.member nm primMap then IsPrim else IsFun
-                    checkPrimitive primMap v
-                    return (Binding v' sp inl pr tm True)
-                  ) bs
-      case tms of
-        [Binding v sp inl pr tm r] -> return [(v, Binding v sp inl pr tm r)]
+      return (Binding v' sp inl pr tm True)
+    case tms of
+      [Binding v sp inl pr tm r] -> return [(v, Binding v sp inl pr tm r)]
 
-        -- Rewrite the bindings to avoid triggering the recursion check.
-        -- See NOTE [bindings in recursive groups]
-        _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
-                 vsV   = map Var vsL
-                 subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
-                 lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-                 tms1  = zipWith (\b (i, _) -> (bindingId b, b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
-             in  return tms1
-    ) bindings
-  clsOpList    <- mapM (\(v,i) -> do
-                          v' <- coreToId v
-                          return (v', (v',i))
-                       ) clsOps
+      -- Rewrite the bindings to avoid triggering the recursion check.
+      -- See NOTE [bindings in recursive groups]
+      _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
+               vsV   = map Var vsL
+               subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
+               lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
+               tms1  = zipWith (\b (i, _) -> (bindingId b, b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
+           in  return tms1
 
-  return (mkVarEnv (concat bindingsList), mkVarEnv clsOpList)
+-- | Convert a single class operation. See 'processBind'.
+processClsOp :: (GHC.CoreBndr, Int) -> C2C (Id, (Id, Int))
+processClsOp (v,i) = do
+  v' <- coreToId v
+  return (v', (v',i))
+
+-- | Run a list of independent 'C2C' computations, each starting from an empty
+-- 'GHC2CoreState', forcing their results to normal form in parallel across the
+-- available capabilities. Returns each computation's result paired with the
+-- state it produced (so the caller can merge the accumulated 'TyCon' maps).
+--
+-- This only runs in parallel when the RTS has more than one capability, i.e.,
+-- when the executable is run with @+RTS -N@ or built with @-with-rtsopts=-N@.
+-- With a single capability it degrades to sequential evaluation.
+parRunC2C :: NFData a => GHC2CoreEnv -> [C2C a] -> [(a, GHC2CoreState)]
+parRunC2C env ms = parListChunk chunkSize forceResult (map runC2C ms)
+ where
+  runC2C m = case RWS.runRWS m env emptyGHC2CoreState of
+    (a, s, _w) -> (a, s)
+  -- Force the converted result to normal form (this is the expensive
+  -- 'coreToTerm' work we want to parallelize). The state is left to be forced
+  -- lazily when its 'TyCon' map is merged; its entries are cheap GHC 'TyCon'
+  -- references (the heavy 'makeAllTyCons' conversion happens later).
+  forceResult p@(a, _s) = a `deepseq` p
+  -- Keep chunks small so the work stays balanced even when a few binders are
+  -- far larger than the rest; ~16 measured as a good size on large downstream
+  -- designs. For small designs we make chunks finer still, scaling with the
+  -- number of capabilities, but never below 1.
+  chunkSize = min 16 (max 1 (length ms `div` (numCapabilities * 4)))
+
+-- | Evaluate a list in parallel, in chunks, using only @base@ (@par@/@pseq@).
+-- Equivalent in spirit to @Control.Parallel.Strategies@' @parListChunk n@ with
+-- a caller-supplied forcing function, but avoids adding a dependency.
+parListChunk :: Int -> (a -> a) -> [a] -> [a]
+parListChunk n forceElem = concat . go . chunksOf n
+ where
+  forceChunk c = foldr (\x xs -> forceElem x `pseq` xs) () c `pseq` c
+  go []     = []
+  go (c:cs) =
+    let c'  = forceChunk c
+        cs' = go cs
+    in  c' `par` (cs' `pseq` (c' : cs'))
 
 {-
 NOTE [bindings in recursive groups]
