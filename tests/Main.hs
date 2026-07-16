@@ -967,6 +967,17 @@ runClashTest = defaultMain
             { hdlTargets = [VHDL]
             , clashFlags = ["-main-is", "topEntity3"]
             }
+        , -- Regression test for #3297: with -main-is, a magically named
+          -- 'testBench' living outside 'topEntity's closure must not be pruned
+          -- before it is loaded. 'T3297a' is compiled into the clash-testsuite
+          -- library, so (with no source on the search path) Clash loads it from
+          -- its external interface file, exercising the pruning in
+          -- 'loadExternalModule'. Gen-only: we only need loading to succeed.
+          runTest "T3297a" def
+            { hdlSim = []
+            , hdlLoad = []
+            , clashFlags = ["-package", "clash-testsuite", "-main-is", "topEntity"]
+            }
         , runTest "T1139" def{hdlSim=[]}
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNames_testBench"]
