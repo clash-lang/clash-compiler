@@ -328,7 +328,7 @@ Library
                       TypeFamilies
                       UndecidableInstances
 
-  Build-depends:      aeson                     >= 2.2.3   && <2.2.4,
+  Build-depends:      aeson                     >= 2.2.3   && <2.2.5,
                       adjunctions               >= 4.0     && < 5.0,
                       array                     >= 0.5.1.0 && < 0.6,
                       arrows                    >= 0.4     && < 0.5,

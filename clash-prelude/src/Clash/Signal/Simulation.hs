@@ -25,6 +25,7 @@ import           Data.Typeable         (Typeable, Proxy(..))
 import qualified Debug.Trace
 import           GHC.Natural           (Natural)
 import           GHC.TypeLits          (KnownNat, natVal, symbolVal)
+import           System.IO             (hPutStrLn, stderr)
 import           System.IO.Unsafe      (unsafePerformIO)
 
 import           Clash.Class.BitPack   (BitPack(..), BitSize)
@@ -47,7 +48,7 @@ import           Clash.Signal.Simulation.DataType (DataType, compatible, typeRep
 
 type Period = Time
 type Width = Int
-type Value = (Natural, Natural)
+type Value = (Natural, Natural) -- (mask, value)
 type Trace = (DataType,Period,Width,[Value])
 type TraceMap = M.Map String Trace
 
@@ -177,7 +178,7 @@ simulate0 ref simConfig@Config{start,stop,clockStart,statusMsgs,warnZeroWidth} c
   firstRun <- atomicModifyIORef' ref (\glob@GlobalData{globFirstRun} -> (glob{globFirstRun=False},globFirstRun))
 
   if not firstRun && statusMsgs then
-    putStrLn "Warning: `simulate` can only be safely called once"
+    hPutStrLn stderr "Warning: `simulate` can only be safely called once"
   else pure ()
 
   -- evaluate signal
@@ -235,9 +236,9 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
       values
 
   progress n = map go [0..n-1]
-   where 
+   where
     go k =
-      if (20*k `div` n) /= (20*(k-1) `div` n) then 
+      if (20*k `div` n) /= (20*(k-1) `div` n) then
         Debug.Trace.trace $ show ((20*k) `div` n * 5) ++ "%"
       else id
 
@@ -251,7 +252,7 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   printFound x = do
     evaluate $ rnfX x
     (_,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
-    mapM_ putStrLn newMsgs
+    mapM_ (hPutStrLn stderr) newMsgs
     return ()
 
   -- Evaluate a list of values, looking for certain signals.
@@ -267,7 +268,7 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
       (newFound,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
 
       if statusMsgs then
-        mapM_ putStrLn newMsgs
+        mapM_ (hPutStrLn stderr) newMsgs
       else
         pure ()
 

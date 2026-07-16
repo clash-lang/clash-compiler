@@ -232,10 +232,10 @@ vcd Simulation
   -- essentially merge sort with nested merging on equal values
   blocks :: [(VcdTime, [ValueChange])]
   blocks = treeFold zipTimed $ (L.map snd changesPerDomain :: [[(VcdTime,[ValueChange])]])
-             
+
   changes :: [SimulationCommand]
   changes = concatMap (\(t,cs) -> [SimulationTime t, ValueChanges cs]) blocks
-  
+
   -- TODO: small to large merging is better, but this is likely sufficient
 
   -- | Merge items with the given function using a binary tree.
@@ -321,12 +321,15 @@ writeVcd file sim = do
   assertRight = either err pure
    where
     err a = withFrozenCallStack $ errorIO $ "assertRight: expected a Right value, given " <> show (Left a :: Either a a)
-    
+
 -- | Render a 'Vcd' object as 'Text'.
 renderVcd ::
   VcdFile ->
   Text
-renderVcd (VcdFile decl sim) = Text.unlines $ L.map renderDecl decl <> L.map renderSim sim
+renderVcd (VcdFile decl sim) = Text.unlines
+  $  L.map renderDecl decl
+  <> ["$enddefinitions $end\n"]
+  <> L.map renderSim sim
 
 -- | Render a VCD 'DeclarationCommand' as 'Text'.
 renderDecl ::
@@ -341,7 +344,7 @@ renderDecl = \case
     vcdCommand "timescale" [Text.show x, Text.pack unit]
   VarDec Var{varSize, varIDCode, varReference} ->
     vcdCommand "var" ["wire", Text.show varSize, Text.pack varIDCode, Text.pack varReference]
-  Scope name subs -> Text.unlines $
+  Scope name subs -> Text.unlines $ -- unlines introduces a trailing newline, but oh well
     vcdCommand "scope" ["module", Text.pack name]
     : L.map renderDecl subs
     <> [vcdCommand "upscope" [] ]
