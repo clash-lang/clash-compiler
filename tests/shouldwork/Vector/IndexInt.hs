@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 module IndexInt where
 
@@ -12,7 +13,7 @@ index_ints
   -> (Vec n Int, Int)
   -> (Int, Int)
 index_ints (mv, mi) (nv, ni) =
-  (mv !! mi, nv !! ni)
+  (indexEnum mv mi, indexEnum nv ni)
 {-# OPAQUE index_ints #-}
 
 fst' ab = fst ab

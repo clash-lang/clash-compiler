@@ -560,7 +560,7 @@ let cpu :: Vec 7 Value          -- ^ Register bank
     cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,bitCoerce ipntr))
       where
         -- Current instruction pointer
-        ipntr = regbank C.!! PC
+        ipntr = regbank C.!! tagToIndex PC
         -- Decoder
         (MachCode {..}) = case instr of
           Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
@@ -570,18 +570,18 @@ let cpu :: Vec 7 Value          -- ^ Register bank
           Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
           Nop                  -> nullCode
         -- ALU
-        regX   = regbank C.!! inputX
-        regY   = regbank C.!! inputY
+        regX   = regbank C.!! tagToIndex inputX
+        regY   = regbank C.!! tagToIndex inputY
         aluOut = alu aluCode regX regY
         -- next instruction
         nextPC = case jmpM of
                    Just a | aluOut /= 0 -> ipntr + a
                    _                    -> ipntr + 1
         -- update registers
-        regbank' = replace Zero   0
-                 $ replace PC     nextPC
-                 $ replace result aluOut
-                 $ replace ldReg  memOut
+        regbank' = replace (tagToIndex Zero)   0
+                 $ replace (tagToIndex PC)     nextPC
+                 $ replace (tagToIndex result) aluOut
+                 $ replace (tagToIndex ldReg)  memOut
                  $ regbank
 :}
 
@@ -596,11 +596,15 @@ let dataMem
       -> Signal dom Value
     dataMem clk rst en rd wrM = mealy clk rst en dataMemT (C.replicate d32 0) (bundle (rd,wrM))
       where
+        dataMemT
+          :: Vec 32 Value
+          -> (MemAddr, Maybe (MemAddr,Value))
+          -> (Vec 32 Value, Value)
         dataMemT mem (rd,wrM) = (mem',dout)
           where
-            dout = mem C.!! rd
+            dout = mem C.!! numConvert rd
             mem' = case wrM of
-                     Just (wr,din) -> replace wr din mem
+                     Just (wr,din) -> replace (numConvert wr) din mem
                      Nothing       -> mem
 :}
 
@@ -677,7 +681,7 @@ let cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
     cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) <$> wrAddrM,bitCoerce ipntr))
       where
         -- Current instruction pointer
-        ipntr = regbank C.!! PC
+        ipntr = regbank C.!! tagToIndex PC
         -- Decoder
         (MachCode {..}) = case instr of
           Compute op rx ry res -> nullCode {inputX=rx,inputY=ry,result=res,aluCode=op}
@@ -687,8 +691,8 @@ let cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
           Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
           Nop                  -> nullCode
         -- ALU
-        regX   = regbank C.!! inputX
-        regY   = regbank C.!! inputY
+        regX   = regbank C.!! tagToIndex inputX
+        regY   = regbank C.!! tagToIndex inputY
         aluOut = alu aluCode regX regY
         -- next instruction
         nextPC = case jmpM of
@@ -696,10 +700,10 @@ let cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
                    _                    -> ipntr + 1
         -- update registers
         ldRegD'  = ldReg -- Delay the ldReg by 1 cycle
-        regbank' = replace Zero   0
-                 $ replace PC     nextPC
-                 $ replace result aluOut
-                 $ replace ldRegD memOut
+        regbank' = replace (tagToIndex Zero)   0
+                 $ replace (tagToIndex PC)     nextPC
+                 $ replace (tagToIndex result) aluOut
+                 $ replace (tagToIndex ldRegD) memOut
                  $ regbank
 :}
 

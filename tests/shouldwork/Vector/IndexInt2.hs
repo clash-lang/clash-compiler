@@ -1,6 +1,7 @@
 -- This tests the special, verlog only, code-path for index_int,
 -- which generates special verilog when the index is constant.
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 module IndexInt2 where
 
@@ -17,9 +18,9 @@ import Clash.Netlist.Types
 
 topEntity :: Vec 4 (Unsigned 4) -> Signed 8 -> (Unsigned 4,Unsigned 4,Unsigned 4)
 topEntity xs ix0 =
-  ( xs !! ix0    -- non-constant index
-  , xs !! ix1    -- constant index, vec is a Var
-  , (tail xs :< 0xe) !! ix1 -- constant index, vec is an expression
+  ( indexEnum xs ix0    -- non-constant index
+  , indexEnum xs ix1    -- constant index, vec is a Var
+  , indexEnum (tail xs :< 0xe) ix1 -- constant index, vec is an expression
   )
   where
     ix1 :: Signed 8

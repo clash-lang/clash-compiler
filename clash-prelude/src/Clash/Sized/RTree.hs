@@ -27,10 +27,10 @@ module Clash.Sized.RTree
   , thead
   , tlast
     -- ** Indexing
-  , indexTree
+  , indexTree, indexTreeEnum
   , tindices
     -- * Modifying trees
-  , replaceTree
+  , replaceTree, replaceTreeEnum
     -- * Element-wise operations
     -- ** Mapping
   , tmap
@@ -81,7 +81,8 @@ import Clash.Promoted.Nat          (SNat (..), UNat (..),
                                     pow2SNat, snatToNum, subSNat, toUNat)
 import Clash.Promoted.Nat.Literals (d1)
 import Clash.Sized.Index           (Index)
-import Clash.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
+import Clash.Sized.Vector
+  (Vec (..), (!!), (++), dtfold, replace, index_int, replace_int)
 import Clash.XException
   (ShowX (..), NFDataX (..), isX, showsX, showsPrecXWith)
 
@@ -94,6 +95,7 @@ import Clash.XException
 >>> :set -XTypeApplications
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> :set -XUndecidableInstances
+>>> :set -Wno-deprecations
 >>> import Clash.Prelude
 >>> import Data.Kind
 >>> import Data.Singletons (Apply, TyFun)
@@ -219,7 +221,7 @@ instance (KnownNat d, BitPack a) =>
   pack   = pack . t2v . lazyT
   unpack = v2t . unpack
 
-type instance Lens.Index   (RTree d a) = Int
+type instance Lens.Index   (RTree d a) = Index (2^d)
 type instance Lens.IxValue (RTree d a) = a
 instance KnownNat d => Lens.Ixed (RTree d a) where
   ix i f t = replaceTree i <$> f (indexTree t i) <*> pure t
@@ -478,11 +480,23 @@ t2v = tdfold (Proxy @(T2VTree a)) (:> Nil) (\_ l r -> l ++ r)
 -- 1
 -- >>> indexTree (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))) 2
 -- 3
--- >>> indexTree (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))) 14
+--
+-- The index is an 'Index', so it is guaranteed to be in bounds. If you want the
+-- old behavior, where any 'Enum' is accepted (at the cost of possible
+-- out-of-bounds runtime errors), use 'indexTreeEnum'.
+indexTree :: KnownNat d => RTree d a -> Index (2^d) -> a
+indexTree t i = (t2v t) !! i
+
+-- | Like 'indexTree', but accepts any 'Enum'-typed index. Because the index
+-- type is not bounded by the size of the tree, this function is __partial__: it
+-- errors at runtime when the index is out of bounds.
+--
+-- >>> indexTreeEnum (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))) (14 :: Int)
 -- *** Exception: Clash.Sized.Vector.(!!): index 14 is larger than maximum index 3
 -- ...
-indexTree :: (KnownNat d, Enum i) => RTree d a -> i -> a
-indexTree t i = (t2v t) !! i
+indexTreeEnum :: (KnownNat d, Enum i) => RTree d a -> i -> a
+indexTreeEnum t i = index_int (t2v t) (fromEnum i)
+{-# DEPRECATED indexTreeEnum "Prefer the total 'indexTree' with an 'Index'; convert the index explicitly instead of relying on 'Enum'. 'indexTreeEnum' will be removed in a future release." #-}
 
 -- | \"'replaceTree' @n a t@\" returns the tree /t/ where the /n/'th element is
 -- replaced by /a/.
@@ -494,11 +508,23 @@ indexTree t i = (t2v t) !! i
 -- <<5,2>,<3,4>>
 -- >>> replaceTree 2 7 (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
 -- <<1,2>,<7,4>>
--- >>> replaceTree 9 6 (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
+--
+-- The index is an 'Index', so it is guaranteed to be in bounds. If you want the
+-- old behavior, where any 'Enum' is accepted (at the cost of possible
+-- out-of-bounds runtime errors), use 'replaceTreeEnum'.
+replaceTree :: KnownNat d => Index (2^d) -> a -> RTree d a -> RTree d a
+replaceTree i a = v2t . replace i a . t2v
+
+-- | Like 'replaceTree', but accepts any 'Enum'-typed index. Because the index
+-- type is not bounded by the size of the tree, this function is __partial__: it
+-- errors at runtime when the index is out of bounds.
+--
+-- >>> replaceTreeEnum (9 :: Int) 6 (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
 -- <<1,2>,<3,*** Exception: Clash.Sized.Vector.replace: index 9 is out of bounds: [0..3]
 -- ...
-replaceTree :: (KnownNat d, Enum i) => i -> a -> RTree d a -> RTree d a
-replaceTree i a = v2t . replace i a . t2v
+replaceTreeEnum :: (KnownNat d, Enum i) => i -> a -> RTree d a -> RTree d a
+replaceTreeEnum i a = v2t . (\xs -> replace_int xs (fromEnum i) a) . t2v
+{-# DEPRECATED replaceTreeEnum "Prefer the total 'replaceTree' with an 'Index'; convert the index explicitly instead of relying on 'Enum'. 'replaceTreeEnum' will be removed in a future release." #-}
 
 data ZipWithTree (b :: Type) (c :: Type) (f :: TyFun Nat Type) :: Type
 type instance Apply (ZipWithTree b c) d = RTree d b -> RTree d c

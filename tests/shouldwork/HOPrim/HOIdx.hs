@@ -1,9 +1,11 @@
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module HOIdx where
 
 import Clash.Prelude
 import Clash.Explicit.Testbench
 
-hoIdx ks i a = (ks !! i) a
+hoIdx ks i a = (indexEnum ks i) a
 
 f g h = hoIdx (g :> h :> Nil)
 

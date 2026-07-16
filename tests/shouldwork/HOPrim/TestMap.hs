@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 module TestMap where
 
@@ -24,7 +25,7 @@ mf
   -> (Vec n RomFunction, SNat n1, SNat n2)
   -> (Signal System50 Word1, Signal System50 Bool)
   -> Signal System50 Word1
-mf clk rst en (romFunctions, nI, coefN) (bk, dPulse) = (!!) <$> (bundle results) <*> curCore
+mf clk rst en (romFunctions, nI, coefN) (bk, dPulse) = indexEnum <$> (bundle results) <*> curCore
   where
 
     g (mem, coreIndex) = initCore (mem, curCore .==. coreIndex)

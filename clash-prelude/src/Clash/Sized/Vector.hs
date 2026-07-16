@@ -9,6 +9,7 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -33,7 +34,8 @@ module Clash.Sized.Vector
     -- ** Length information
   , length, lengthS
     -- ** Indexing
-  , (!!), head, last, at
+  , (!!), indexEnum, head, last, at
+  , tagToIndex
   , indices, indicesI
   , findIndex, elemIndex
     -- ** Extracting sub-vectors (slicing)
@@ -56,9 +58,10 @@ module Clash.Sized.Vector
   , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
   , merge
     -- * Modifying vectors
-  , replace
+  , replace, replaceEnum
     -- ** Permutations
   , permute, backpermute, scatter, gather
+  , permuteEnum, backpermuteEnum, scatterEnum, gatherEnum
     -- *** Specialized permutations
   , reverse, transpose, interleave
   , rotateLeft, rotateRight, rotateLeftS, rotateRightS
@@ -96,6 +99,11 @@ module Clash.Sized.Vector
     -- ** 'BitPack' instance
   , concatBitVector#
   , unconcatBitVector#
+    -- ** Internal, partial indexing primitives
+    -- | Exported for use by other @clash-prelude@ modules (e.g.
+    -- "Clash.Sized.RTree"); not intended for direct use.
+  , index_int
+  , replace_int
   )
 where
 
@@ -119,6 +127,7 @@ import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), type (<=), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Generics               hiding (Fixity (..))
+import qualified GHC.Generics     as GHC (Rep)
 import qualified GHC.Magic
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
@@ -148,6 +157,7 @@ import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
 import Clash.Sized.Index          (Index)
 
 import Clash.Class.BitPack        (BitPack (..))
+import Clash.Class.BitPack.Internal (GConstructorCount)
 import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 
 {- $setup
@@ -158,6 +168,7 @@ import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> :set -fplugin GHC.TypeLits.KnownNat.Solver
 >>> :set -fplugin GHC.TypeLits.Extra.Solver
+>>> :set -Wno-deprecations
 >>> :m -Prelude
 >>> import Clash.Prelude
 >>> import qualified Clash.Sized.Vector as Vec
@@ -1493,16 +1504,59 @@ index_int xs i@(I# n0)
 --
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 4
 -- 5
--- >>> (1:>2:>3:>4:>5:>Nil) !! (length (1:>2:>3:>4:>5:>Nil) - 1)
+-- >>> (1:>2:>3:>4:>5:>Nil) !! (maxBound :: Index 5)
 -- 5
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 1
 -- 2
--- >>> (1:>2:>3:>4:>5:>Nil) !! 14
--- *** Exception: Clash.Sized.Vector.(!!): index 14 is larger than maximum index 4
--- ...
-(!!) :: (KnownNat n, Enum i) => Vec n a -> i -> a
+--
+-- The index is an 'Index', so it is guaranteed to be in bounds: there is no
+-- index of type @'Index' n@ that lies outside @[0 .. n-1]@. If you need to
+-- index with a wider or differently-typed value, convert it explicitly first
+-- (e.g. with 'Clash.Class.NumConvert.numConvert' or, for enumerations, with
+-- 'tagToIndex').
+--
+-- If you want the old behavior, where any 'Enum' is accepted (at the cost of
+-- possible out-of-bounds runtime errors), use 'indexEnum'.
+(!!) :: KnownNat n => Vec n a -> Index n -> a
 xs !! i = index_int xs (fromEnum i)
 {-# INLINE (!!) #-}
+
+-- | Like '(!!)', but accepts any 'Enum'-typed index. Because the index type is
+-- not bounded by the length of the vector, this function is __partial__: it
+-- errors at runtime when the index is out of bounds.
+--
+-- >>> indexEnum (1:>2:>3:>4:>5:>Nil) (4 :: Int)
+-- 5
+-- >>> indexEnum (1:>2:>3:>4:>5:>Nil) (14 :: Int)
+-- *** Exception: Clash.Sized.Vector.(!!): index 14 is larger than maximum index 4
+-- ...
+indexEnum :: (KnownNat n, Enum i) => Vec n a -> i -> a
+indexEnum xs i = index_int xs (fromEnum i)
+{-# INLINE indexEnum #-}
+{-# DEPRECATED indexEnum "Prefer the total '(!!)' with an 'Index'; convert the index explicitly (e.g. with 'numConvert' or 'tagToIndex') instead of relying on 'Enum'. 'indexEnum' will be removed in a future release." #-}
+
+-- | Convert the /tag/ (constructor) of an enumeration into an 'Index'. This is
+-- the safe, total counterpart to indexing a vector directly with an ADT: the
+-- resulting 'Index' has exactly as many inhabitants as the type has
+-- constructors, so it can be used with '(!!)', 'replace', and friends without
+-- risk of an out-of-bounds error.
+--
+-- >>> data RGB = Red | Green | Blue deriving (Generic, Show, Enum, Bounded)
+-- >>> tagToIndex Green
+-- 1
+-- >>> (5 :> 6 :> 7 :> Nil) !! tagToIndex Blue
+-- 7
+--
+-- If the enumeration has more constructors than the vector has elements, resize
+-- the resulting 'Index' explicitly (e.g. with
+-- 'Clash.Class.NumConvert.numConvert').
+tagToIndex
+  :: forall a
+   . (Generic a, Enum a, KnownNat (GConstructorCount (GHC.Rep a)))
+  => a
+  -> Index (GConstructorCount (GHC.Rep a))
+tagToIndex = toEnum . fromEnum
+{-# INLINE tagToIndex #-}
 
 -- | The length of a 'Vec'tor as an 'Int' value.
 --
@@ -1538,16 +1592,34 @@ replace_int xs i@(I# n0) a
 -- __NB__: Vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at @'length' - 1@.
 --
+--
+-- The index is an 'Index', so it is guaranteed to be in bounds. If you need to
+-- index with a wider or differently-typed value, convert it explicitly first
+-- (e.g. with 'Clash.Class.NumConvert.numConvert' or, for enumerations, with
+-- 'tagToIndex').
+--
 -- >>> replace 3 7 (1:>2:>3:>4:>5:>Nil)
 -- 1 :> 2 :> 3 :> 7 :> 5 :> Nil
 -- >>> replace 0 7 (1:>2:>3:>4:>5:>Nil)
 -- 7 :> 2 :> 3 :> 4 :> 5 :> Nil
--- >>> replace 9 7 (1:>2:>3:>4:>5:>Nil)
--- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.replace: index 9 is out of bounds: [0..4]
--- ...
-replace :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
+--
+-- If you want the old behavior, where any 'Enum' is accepted (at the cost of
+-- possible out-of-bounds runtime errors), use 'replaceEnum'.
+replace :: KnownNat n => Index n -> a -> Vec n a -> Vec n a
 replace i y xs = replace_int xs (fromEnum i) y
 {-# INLINE replace #-}
+
+-- | Like 'replace', but accepts any 'Enum'-typed index. Because the index type
+-- is not bounded by the length of the vector, this function is __partial__: it
+-- errors at runtime when the index is out of bounds.
+--
+-- >>> replaceEnum (9 :: Int) 7 (1:>2:>3:>4:>5:>Nil)
+-- 1 :> 2 :> 3 :> 4 :> 5 :> *** Exception: Clash.Sized.Vector.replace: index 9 is out of bounds: [0..4]
+-- ...
+replaceEnum :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
+replaceEnum i y xs = replace_int xs (fromEnum i) y
+{-# INLINE replaceEnum #-}
+{-# DEPRECATED replaceEnum "Prefer the total 'replace' with an 'Index'; convert the index explicitly (e.g. with 'numConvert' or 'tagToIndex') instead of relying on 'Enum'. 'replaceEnum' will be removed in a future release." #-}
 
 {- | \"'take' @n xs@\" returns the /n/-length prefix of /xs/.
 
@@ -1942,17 +2014,42 @@ windows2d stY stX xss = map (transpose . (map (windows1d stX))) (windows1d stY x
 -- combination function, /f/.
 --
 -- The combination function must be /associative/ and /commutative/.
-permute :: (Enum i, KnownNat n, KnownNat m)
-        => (a -> a -> a)  -- ^ Combination function, /f/
-        -> Vec n a        -- ^ Default values, /def/
-        -> Vec m i        -- ^ Index mapping, /is/
-        -> Vec (m + k) a  -- ^ Vector to be permuted, /xs/
+--
+-- The index mapping is a vector of 'Index'es, so every index is guaranteed to
+-- be in bounds. If you need to permute using a wider or differently-typed
+-- index, convert the mapping explicitly first (e.g. with
+-- @'map' 'Clash.Class.NumConvert.numConvert'@). If you want the old behavior,
+-- where any 'Enum' is accepted, use 'permuteEnum'.
+permute :: (KnownNat n, KnownNat m)
+        => (a -> a -> a)       -- ^ Combination function, /f/
+        -> Vec n a             -- ^ Default values, /def/
+        -> Vec m (Index n)     -- ^ Index mapping, /is/
+        -> Vec (m + k) a       -- ^ Vector to be permuted, /xs/
         -> Vec n a
 permute f defs is xs = ys
   where
     ixs = zip is (takeI xs)
     ys  = foldl (\ks (i,x) -> let ki = ks!!i in replace i (f x ki) ks) defs ixs
 {-# INLINE permute #-}
+
+-- | Like 'permute', but accepts any 'Enum'-typed index mapping. Because the
+-- index type is not bounded by the length of the default vector, this function
+-- is __partial__: it errors at runtime when an index is out of bounds.
+permuteEnum :: (Enum i, KnownNat n, KnownNat m)
+            => (a -> a -> a)  -- ^ Combination function, /f/
+            -> Vec n a        -- ^ Default values, /def/
+            -> Vec m i        -- ^ Index mapping, /is/
+            -> Vec (m + k) a  -- ^ Vector to be permuted, /xs/
+            -> Vec n a
+permuteEnum f defs is xs = ys
+  where
+    ixs = zip is (takeI xs)
+    ys  = foldl (\ks (i,x) ->
+                   let i' = fromEnum i
+                       ki = index_int ks i'
+                   in  replace_int ks i' (f x ki)) defs ixs
+{-# INLINE permuteEnum #-}
+{-# DEPRECATED permuteEnum "Prefer the total 'permute' with an 'Index' mapping; convert indices explicitly instead of relying on 'Enum'. 'permuteEnum' will be removed in a future release." #-}
 
 -- | Backwards permutation specified by an index mapping, /is/, from the
 -- destination vector specifying which element of the source vector /xs/ to
@@ -1966,12 +2063,27 @@ permute f defs is xs = ys
 -- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
 -- >>> backpermute input from
 -- 9 :> 4 :> 1 :> 6 :> 2 :> 4 :> Nil
-backpermute :: (Enum i, KnownNat n)
-            => Vec n a  -- ^ Source vector, /xs/
-            -> Vec m i  -- ^ Index mapping, /is/
+--
+-- The index mapping is a vector of 'Index'es, so every index is guaranteed to
+-- be in bounds. If you want the old behavior, where any 'Enum' is accepted,
+-- use 'backpermuteEnum'.
+backpermute :: KnownNat n
+            => Vec n a          -- ^ Source vector, /xs/
+            -> Vec m (Index n)  -- ^ Index mapping, /is/
             -> Vec m a
 backpermute xs = map (xs!!)
 {-# INLINE backpermute #-}
+
+-- | Like 'backpermute', but accepts any 'Enum'-typed index mapping. Because the
+-- index type is not bounded by the length of the source vector, this function
+-- is __partial__: it errors at runtime when an index is out of bounds.
+backpermuteEnum :: (Enum i, KnownNat n)
+                => Vec n a  -- ^ Source vector, /xs/
+                -> Vec m i  -- ^ Index mapping, /is/
+                -> Vec m a
+backpermuteEnum xs = map (index_int xs . fromEnum)
+{-# INLINE backpermuteEnum #-}
+{-# DEPRECATED backpermuteEnum "Prefer the total 'backpermute' with an 'Index' mapping; convert indices explicitly instead of relying on 'Enum'. 'backpermuteEnum' will be removed in a future release." #-}
 
 -- | Copy elements from the source vector, /xs/, to the destination vector
 -- according to an index mapping /is/. This is a forward permute operation where
@@ -1988,13 +2100,32 @@ backpermute xs = map (xs!!)
 --
 -- __NB__: If the same index appears in the index mapping more than once, the
 -- latest mapping is chosen.
-scatter :: (Enum i, KnownNat n, KnownNat m)
-        => Vec n a       -- ^ Default values, /def/
-        -> Vec m i       -- ^ Index mapping, /is/
-        -> Vec (m + k) a -- ^ Vector to be scattered, /xs/
+--
+-- The index mapping is a vector of 'Index'es, so every index is guaranteed to
+-- be in bounds. If you want the old behavior, where any 'Enum' is accepted,
+-- use 'scatterEnum'.
+scatter :: (KnownNat n, KnownNat m)
+        => Vec n a          -- ^ Default values, /def/
+        -> Vec m (Index n)  -- ^ Index mapping, /is/
+        -> Vec (m + k) a    -- ^ Vector to be scattered, /xs/
         -> Vec n a
 scatter = permute const
 {-# INLINE scatter #-}
+
+-- | Like 'scatter', but accepts any 'Enum'-typed index mapping. Because the
+-- index type is not bounded by the length of the default vector, this function
+-- is __partial__: it errors at runtime when an index is out of bounds.
+scatterEnum :: (Enum i, KnownNat n, KnownNat m)
+            => Vec n a       -- ^ Default values, /def/
+            -> Vec m i       -- ^ Index mapping, /is/
+            -> Vec (m + k) a -- ^ Vector to be scattered, /xs/
+            -> Vec n a
+scatterEnum defs is xs = ys
+  where
+    ixs = zip is (takeI xs)
+    ys  = foldl (\ks (i,x) -> replace_int ks (fromEnum i) x) defs ixs
+{-# INLINE scatterEnum #-}
+{-# DEPRECATED scatterEnum "Prefer the total 'scatter' with an 'Index' mapping; convert indices explicitly instead of relying on 'Enum'. 'scatterEnum' will be removed in a future release." #-}
 
 -- | Backwards permutation specified by an index mapping, /is/, from the
 -- destination vector specifying which element of the source vector /xs/ to
@@ -2008,12 +2139,27 @@ scatter = permute const
 -- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
 -- >>> gather input from
 -- 9 :> 4 :> 1 :> 6 :> 2 :> 4 :> Nil
-gather :: (Enum i, KnownNat n)
-       => Vec n a  -- ^ Source vector, /xs/
-       -> Vec m i  -- ^ Index mapping, /is/
+--
+-- The index mapping is a vector of 'Index'es, so every index is guaranteed to
+-- be in bounds. If you want the old behavior, where any 'Enum' is accepted,
+-- use 'gatherEnum'.
+gather :: KnownNat n
+       => Vec n a          -- ^ Source vector, /xs/
+       -> Vec m (Index n)  -- ^ Index mapping, /is/
        -> Vec m a
 gather xs = map (xs!!)
 {-# INLINE gather #-}
+
+-- | Like 'gather', but accepts any 'Enum'-typed index mapping. Because the
+-- index type is not bounded by the length of the source vector, this function
+-- is __partial__: it errors at runtime when an index is out of bounds.
+gatherEnum :: (Enum i, KnownNat n)
+           => Vec n a  -- ^ Source vector, /xs/
+           -> Vec m i  -- ^ Index mapping, /is/
+           -> Vec m a
+gatherEnum xs = map (index_int xs . fromEnum)
+{-# INLINE gatherEnum #-}
+{-# DEPRECATED gatherEnum "Prefer the total 'gather' with an 'Index' mapping; convert indices explicitly instead of relying on 'Enum'. 'gatherEnum' will be removed in a future release." #-}
 
 -- | \"'interleave' @d xs@\" creates a vector:
 --
@@ -2044,7 +2190,7 @@ rotateLeft :: (Enum i, KnownNat n)
            => Vec n a
            -> i
            -> Vec n a
-rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
+rotateLeft xs i = map (index_int xs . (`mod` len)) (iterateI (+1) i')
   where
     i'  = fromEnum i
     len = length xs
@@ -2065,7 +2211,7 @@ rotateRight :: (Enum i, KnownNat n)
             => Vec n a
             -> i
             -> Vec n a
-rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
+rotateRight xs i = map (index_int xs . (`mod` len)) (iterateI (+1) i')
   where
     i'  = negate (fromEnum i)
     len = length xs

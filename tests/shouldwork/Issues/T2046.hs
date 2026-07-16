@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 module T2046 where
 
@@ -14,7 +15,7 @@ topGeneric
   -> Int
   -> Int
 topGeneric Proxy x i =
-  x !! toEnum @ix i
+  indexEnum x (toEnum @ix i)
 
 topBit
   :: Vec 2 Int

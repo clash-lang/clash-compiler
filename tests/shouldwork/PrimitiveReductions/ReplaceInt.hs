@@ -1,9 +1,10 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 module ReplaceInt where
 
 import Clash.Prelude
-import Clash.Sized.Vector (replace)
+import Clash.Sized.Vector (replaceEnum)
 import Clash.Explicit.Testbench
 
 replace_int
@@ -12,7 +13,7 @@ replace_int
   -> Int
   -> a
   -> Vec n a
-replace_int v i a = replace i a v
+replace_int v i a = replaceEnum i a v
 {-# OPAQUE replace_int #-}
 
 

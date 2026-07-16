@@ -196,7 +196,7 @@ import Clash.Sized.Index
 import Clash.Sized.RTree
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
-import Clash.Sized.Vector hiding (fromList, unsafeFromList)
+import Clash.Sized.Vector hiding (fromList, unsafeFromList, index_int, replace_int)
 import Clash.XException
 
 {- $setup
