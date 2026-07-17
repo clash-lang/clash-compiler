@@ -400,8 +400,8 @@ renderChange ValueChange{..} =
   -- xx_ -> x_ ->
   -- _ -> _
   shorten :: String -> String
-  shorten a@('1':_) = a -- 1_
-  shorten (a:rest@(b:_)) | a == b = shorten rest -- 00_/xx_
+  shorten ('0':rest@('1':_)) = rest
+  shorten (a:rest@(b:_)) | a==b && (a=='0' || a=='x') = shorten rest
   shorten a = a
 
 -- | Create a VCD command of the form @$<tag> <contents> $end@.
