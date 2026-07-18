@@ -356,12 +356,19 @@ mkBinderFor is tcm name (Right ty) = do
   let ki = inferCoreKindOf tcm ty
   return (Right (mkTyVar ki (coerce name')))
 
--- | Inline the binders in a let-binding that have a certain property
+-- | Inline the binders in a let-binding that have a certain property. This is
+-- a 'Clash.Rewrite.StrategyDSL.onLet' handler: it receives the let-expression
+-- itself, its bindings, and its body.
 inlineBinders
   :: (Term -> LetBinding -> RewriteMonad extra Bool)
   -- ^ Property test
-  -> Rewrite extra
-inlineBinders condition (TransformContext inScope0 _) expr@(Let (NonRec i x) res) = do
+  -> TransformContext
+  -> Term
+  -- ^ The let-expression
+  -> Bind Term
+  -> Term
+  -> RewriteMonad extra Term
+inlineBinders condition (TransformContext inScope0 _) expr (NonRec i x) res = do
   inline <- condition expr (i, x)
 
   if inline && elemFreeVars i res then
@@ -371,7 +378,7 @@ inlineBinders condition (TransformContext inScope0 _) expr@(Let (NonRec i x) res
   else
     return expr
 
-inlineBinders condition (TransformContext inScope0 _) expr@(Let (Rec xes) res) = do
+inlineBinders condition (TransformContext inScope0 _) expr (Rec xes) res = do
   (toInline,toKeep) <- partitionM (condition expr) xes
   case toInline of
     [] -> return expr
@@ -382,8 +389,6 @@ inlineBinders condition (TransformContext inScope0 _) expr@(Let (Rec xes) res) =
       case toInlRec ++ toKeep1 of
         []   -> changed res1
         xes1 -> changed (Letrec xes1 res1)
-
-inlineBinders _ _ e = return e
 
 -- | Determine whether a binder is a join-point created for a complex case
 -- expression.
@@ -527,6 +532,9 @@ isFromInt nm = nm == "Clash.Sized.Internal.BitVector.fromInteger##" ||
                nm == "Clash.Sized.Internal.Signed.fromInteger#" ||
                nm == "Clash.Sized.Internal.Unsigned.fromInteger#"
 
+-- | Inline or lift the binders in a let-binding that have a certain property.
+-- This is a 'Clash.Rewrite.StrategyDSL.onLet' handler: it receives the
+-- let-expression itself, its bindings, and its body.
 inlineOrLiftBinders
   :: (LetBinding -> RewriteMonad extra Bool)
   -- ^ Property test
@@ -535,8 +543,13 @@ inlineOrLiftBinders
   --
   -- * True: inline
   -- * False: lift
-  -> Rewrite extra
-inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) e@(Letrec bndrs body) = do
+  -> TransformContext
+  -> Term
+  -- ^ The let-expression
+  -> Bind Term
+  -> Term
+  -> RewriteMonad extra Term
+inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) e (bindToList -> bndrs) body = do
   (toReplace,toKeep) <- partitionM condition bndrs
   case toReplace of
     [] -> return e
@@ -555,8 +568,6 @@ inlineOrLiftBinders condition inlineOrLift (TransformContext inScope0 _) e@(Letr
       case toKeep2 of
         [] -> changed body2
         _  -> changed (Letrec toKeep2 body2)
-
-inlineOrLiftBinders _ _ _ e = return e
 
 -- | Create a global function for a Let-binding and return a Let-binding where
 -- the RHS is a reference to the new global function applied to the free
@@ -797,7 +808,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     -- † https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374
     -- ‡ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf
     bs <- Lens.use bindings
-    inlineBinders (inlineTest bs) ctx0 (Letrec bndrs e1) >>= \case
+    inlineBinders (inlineTest bs) ctx0 (Letrec bndrs e1) (Rec bndrs) e1 >>= \case
       e2@(Let bnders1 e3) ->
         pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
       e2 ->
