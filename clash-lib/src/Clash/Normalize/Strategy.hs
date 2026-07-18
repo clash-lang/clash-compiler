@@ -326,15 +326,6 @@ That is why bindNonRep must always be exhaustively applied before we apply
 liftNonRep.
 -}
 
--- | Topdown traversal, stops upon first success
-topdownSucR :: Rewrite extra -> Rewrite extra
-topdownSucR r = r >-! (allR (topdownSucR r))
-{-# INLINE topdownSucR #-}
-
-innerMost :: Rewrite extra -> Rewrite extra
-innerMost = let go r = bottomupR (r !-> innerMost r) in go
-{-# INLINE innerMost #-}
-
 applyMany :: [(String,Rewrite extra)] -> Rewrite extra
 applyMany = foldr1 (>->) . map (uncurry apply)
 {-# INLINE applyMany #-}

@@ -70,12 +70,11 @@ import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
   (splitNormalized)
-import           Clash.Normalize.Strategy
 import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
-  ((>->), (!->), bottomupR, repeatR, topdownFixR)
+  ((>->), (!->), bottomupR, repeatR, topdownFixR, topdownSucR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities, newInlineStrategy)
