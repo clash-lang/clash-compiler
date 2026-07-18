@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
   The separating arguments transformation
@@ -12,6 +12,8 @@
 
 module Clash.Normalize.Transformations.SeparateArgs
   ( separateArguments
+  , separateArgumentsLambdaWorker
+  , separateArgumentsSpineWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -44,13 +46,28 @@ import Clash.Rewrite.Util (changed, mkDerivedName)
 --
 -- > f :: Clock System -> Reset System -> Signal System Int
 separateArguments :: HasCallStack => NormRewrite
-separateArguments ctx e0@(Lam b eb) = do
+separateArguments ctx e@(Lam v body) = separateArgumentsLambdaWorker ctx e v body
+separateArguments ctx e@Var{} = separateArgumentsSpineWorker ctx e
+separateArguments ctx e@App{} = separateArgumentsSpineWorker ctx e
+separateArguments ctx e@TyApp{} = separateArgumentsSpineWorker ctx e
+separateArguments ctx e@Tick{} = separateArgumentsSpineWorker ctx e
+separateArguments _ e = return e
+
+-- | The 'Lam' handler of 'separateArguments'.
+separateArgumentsLambdaWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Id -> Term -> NormalizeSession Term
+separateArgumentsLambdaWorker ctx node b eb = do
   tcm <- Lens.view tcCache
   case separateLambda tcm ctx b eb of
     Just e1 -> changed e1
-    Nothing -> return e0
+    Nothing -> return node
+{-# SCC separateArgumentsLambdaWorker #-}
 
-separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
+-- | The application spine ('Var', 'App', 'TyApp', 'Tick') handler of
+-- 'separateArguments'.
+separateArgumentsSpineWorker :: HasCallStack => NormRewrite
+separateArgumentsSpineWorker (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
   | isGlobalId g = do
   -- We ensure that both the type of the global variable reference is updated
   -- to take into account the changed arguments, and that we apply the global
@@ -84,8 +101,8 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
       _ ->
         return [(ty,arg)]
 
-separateArguments _ e = return e
-{-# SCC separateArguments #-}
+separateArgumentsSpineWorker _ e = return e
+{-# SCC separateArgumentsSpineWorker #-}
 
 -- | Worker function of 'separateArguments'.
 separateLambda
