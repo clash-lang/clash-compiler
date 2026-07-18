@@ -1,0 +1,32 @@
+#!/bin/sh
+# Wrapper around `iverilog-vpi` that works around a packaging bug in some
+# distributions of Icarus Verilog (observed with the Debian/Ubuntu `iverilog`
+# 12.0 package). There, the compiled-in CFLAGS/CXXFLAGS of `/usr/bin/iverilog-vpi`
+# contain a stray, corrupt token `0-3` (a mangled hardening flag). `iverilog-vpi`
+# passes it straight to `cc`, which interprets the bare `0-3` as an input file and
+# fails with "linker input file not found: No such file or directory", breaking
+# the cosim VPI build even though the C source is fine.
+#
+# This wrapper runs a copy of the real `iverilog-vpi` with the ` 0-3 ` token
+# stripped out. The Makefile only routes through this wrapper when it detects the
+# broken token, so healthy toolchains call `iverilog-vpi` directly and are
+# unaffected.
+#
+# Usage: iverilog-vpi-sanitize <the-real-iverilog-vpi> [args...]
+set -e
+
+real=$1
+shift
+
+case "$real" in
+  */*) : ;;                       # already a path
+  *) real=$(command -v "$real") ;; # resolve from PATH
+esac
+
+patched=$(mktemp "${TMPDIR:-/tmp}/iverilog-vpi.XXXXXX")
+trap 'rm -f "$patched"' EXIT INT TERM
+# Remove the corrupt standalone token. Match it with surrounding spaces so we
+# never touch a legitimate flag that merely contains the characters "0-3".
+sed 's/ 0-3 / /g' "$real" > "$patched"
+chmod +x "$patched"
+"$patched" "$@"
