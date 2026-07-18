@@ -18,7 +18,9 @@
 module Clash.Normalize.Transformations.Reduce
   ( reduceBinders
   , reduceConst
+  , reduceConstWorker
   , reducePrim
+  , reducePrimWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -85,20 +87,27 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
 {-# SCC reduceBinders #-}
 
 reduceConst :: HasCallStack => NormRewrite
+reduceConst ctx e@(App fun arg) = reduceConstWorker ctx e fun arg
+reduceConst _ e = return e
+
+-- | The 'App' handler of 'reduceConst'.
+reduceConstWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
 -- An 'App' in an 'AppFun' context is an inner node of an application spine,
 -- e.g. the @f a@ inside @f a b c@. Only evaluate at the root (@f a b c@):
 -- an under-applied primitive cannot fold, and if @f@ is itself an application
 -- (@(g x) a b c@) the evaluator reduces the whole thing to WHNF anyway, so it
 -- folds @g x@ as part of folding the root. Skip the evaluator call here.
-reduceConst (TransformContext _ (AppFun:_)) e = return e
-reduceConst ctx e@(App _ _)
+reduceConstWorker (TransformContext _ (AppFun:_)) e _appFunction _appArgument = return e
+reduceConstWorker ctx e _appFunction _appArgument
   | (Prim p0, _) <- collectArgs e
   = whnfRW False ctx e $ \_ctx1 e1 -> case e1 of
       (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
       _ -> changed e1
 
-reduceConst _ e = return e
-{-# SCC reduceConst #-}
+reduceConstWorker _ e _ _ = return e
+{-# SCC reduceConstWorker #-}
 
 -- | Replace primitives by their "definition" if they would lead to let-bindings
 -- with a non-representable type when a function is in ANF. This happens for
@@ -148,11 +157,18 @@ reduceConst _ e = return e
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
 reducePrim :: HasCallStack => NormRewrite
+reducePrim ctx e@(App fun arg) = reducePrimWorker ctx e fun arg
+reducePrim _ e = return e
+
+-- | The 'Clash.Core.Term.App' handler of 'reducePrim'.
+reducePrimWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
 -- Only consider the root of an application spine (see 'reduceConst'): the root
 -- sees all arguments, and the @Vec 0@-to-@Nil@ rewrite below is only
 -- type-correct at the root, where no more arguments follow.
-reducePrim (TransformContext _ (AppFun:_)) e = return e
-reducePrim c e@(App _ _)
+reducePrimWorker (TransformContext _ (AppFun:_)) e _appFunction _appArgument = return e
+reducePrimWorker c e _appFunction _appArgument
   | (Prim p, args, ticks) <- collectArgsTicks e
   = do
     tcm <- Lens.view tcCache
@@ -196,8 +212,8 @@ reducePrim c e@(App _ _)
               , resultTypeView = tv
               }
 
-reducePrim _ e = return e
-{-# SCC reducePrim #-}
+reducePrimWorker _ e _ _ = return e
+{-# SCC reducePrimWorker #-}
 
 -- | The name of the 'Clash.Sized.Vector.Vec' type constructor.
 vecTcName :: Text
