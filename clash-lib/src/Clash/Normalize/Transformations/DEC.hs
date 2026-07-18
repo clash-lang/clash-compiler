@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
-                    2021-2024, QBayLogic B.V.
+                    2021-2024,2026, QBayLogic B.V.
                     2022,      LumiGuide Fietsdetectie B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -35,6 +35,7 @@
 
 module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
+  , disjointExpressionConsolidationWorker
   ) where
 
 import Control.Lens ((^.), _1)
@@ -147,7 +148,16 @@ import qualified GHC.Prim
 -- bits of the subject expression to the bits needed to make the selection in the
 -- multiplexer.
 disjointExpressionConsolidation :: HasCallStack => NormRewrite
-disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _ty _alts@(_:_:_)) = do
+disjointExpressionConsolidation ctx e@(Case subj ty alts) =
+  disjointExpressionConsolidationWorker ctx e subj ty alts
+disjointExpressionConsolidation _ e = return e
+{-# SCC disjointExpressionConsolidation #-}
+
+-- | The 'Case' handler of 'disjointExpressionConsolidation'.
+disjointExpressionConsolidationWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+disjointExpressionConsolidationWorker ctx@(TransformContext isCtx _) e _scrut _ty _alts@(_:_:_) = do
     -- Collect all (the applications of) global binders (and certain primitives)
     -- that would be interesting to share out of the case-alternatives.
     (_,isCollected,collected) <- collectGlobals isCtx [] [] e
@@ -253,8 +263,7 @@ disjointExpressionConsolidation ctx@(TransformContext isCtx _) e@(Case _scrut _t
       go _  []     = []
       go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
 
-disjointExpressionConsolidation _ e = return e
-{-# SCC disjointExpressionConsolidation #-}
+disjointExpressionConsolidationWorker _ e _ _ _ = return e
 
 decFunName :: Term -> OccName
 decFunName fun = last . Text.splitOn "." $ case collectArgs fun of

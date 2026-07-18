@@ -29,6 +29,7 @@ module Clash.Core.Term
   , TmName
   , varToId
   , Bind(..)
+  , bindToList
   , LetBinding
   , Pat (..)
   , patIds

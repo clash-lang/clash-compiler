@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -15,6 +15,7 @@
 
 module Clash.Normalize.Transformations.EtaExpand
   ( etaExpandSyn
+  , etaExpandSynWorker
   , etaExpansionTL
   ) where
 
@@ -37,7 +38,15 @@ import Clash.Util (curLoc)
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
 -- functions to appear as arguments to higher-order primitives.
 etaExpandSyn :: HasCallStack => NormRewrite
-etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
+etaExpandSyn ctx e@Var{} = etaExpandSynWorker ctx e
+etaExpandSyn ctx e@App{} = etaExpandSynWorker ctx e
+etaExpandSyn ctx e@TyApp{} = etaExpandSynWorker ctx e
+etaExpandSyn ctx e@Tick{} = etaExpandSynWorker ctx e
+etaExpandSyn _ e = return e
+
+-- | The application-spine handler of 'etaExpandSyn'.
+etaExpandSynWorker :: HasCallStack => NormRewrite
+etaExpandSynWorker (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
   topEnts <- Lens.view topEntities
   tcm <- Lens.view tcCache
   let isTopEnt = f `elemVarSet` topEnts
@@ -53,8 +62,8 @@ etaExpandSyn (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
       changed (Lam newId (App e (Var newId)))
     _ -> return e
 
-etaExpandSyn _ e = return e
-{-# SCC etaExpandSyn #-}
+etaExpandSynWorker _ e = return e
+{-# SCC etaExpandSynWorker #-}
 
 stripLambda :: Term -> ([Id], Term)
 stripLambda (Lam bndr e) =
