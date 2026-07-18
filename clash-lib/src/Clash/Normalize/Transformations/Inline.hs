@@ -18,6 +18,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.Inline
   ( bindConstantVar
@@ -87,6 +88,9 @@ import Clash.Driver.Types (Binding(..))
 import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
+import Clash.Rewrite.StrategyDSL
+  ( TransformSpec, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
+  , transform)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, curFun, tcCache, topEntities
   , inlineConstantLimit, inlineFunctionLimit, inlineLimit
@@ -120,9 +124,8 @@ as they'd need to be.
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
-bindConstantVar :: HasCallStack => NormRewrite
-bindConstantVar ctx e@(Let bnd body) = bindConstantVarWorker ctx e bnd body
-bindConstantVar _ e = return e
+bindConstantVar :: TransformSpec
+bindConstantVar = transform "bindConstantVar" (onLet 'bindConstantVarWorker)
 
 -- | The 'Let' handler of 'bindConstantVar'.
 bindConstantVarWorker
@@ -292,9 +295,8 @@ inlineBndrsCleanup isN origInl = go
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
-inlineCast :: HasCallStack => NormRewrite
-inlineCast ctx e@(Let bnd body) = inlineCastWorker ctx e bnd body
-inlineCast _ e = return e
+inlineCast :: TransformSpec
+inlineCast = transform "inlineCast" (onLet 'inlineCastWorker)
 
 -- | The 'Let' handler of 'inlineCast'.
 inlineCastWorker
@@ -315,9 +317,8 @@ inlineCastWorker = inlineBinders test
 --   * a projection case-expression (1 alternative)
 --   * a data constructor
 --   * I/O actions
-inlineCleanup :: HasCallStack => NormRewrite
-inlineCleanup ctx e@(Let bnd body) = inlineCleanupWorker ctx e bnd body
-inlineCleanup _ e = return e
+inlineCleanup :: TransformSpec
+inlineCleanup = transform "inlineCleanup" (onLet 'inlineCleanupWorker)
 
 -- | The 'Let' handler of 'inlineCleanup'.
 inlineCleanupWorker
@@ -423,9 +424,8 @@ simply a variable reference. See issue #779 -}
 -- | Takes a binding and collapses its term if it is a noop. Only runs at
 -- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
 -- on functions that might be inlined later. See #3036.
-collapseRHSNoops :: HasCallStack => NormRewrite
-collapseRHSNoops ctx e@(Let bnd body) = collapseRHSNoopsWorker ctx e bnd body
-collapseRHSNoops _ e = return e
+collapseRHSNoops :: TransformSpec
+collapseRHSNoops = transform "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
 
 -- | The 'Let' handler of 'collapseRHSNoops'.
 collapseRHSNoopsWorker
@@ -596,9 +596,9 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
 inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
 
-inlineOrLiftNonRep :: HasCallStack => NormRewrite
-inlineOrLiftNonRep ctx e@(Let bnd body) = inlineOrLiftNonRepWorker ctx e bnd body
-inlineOrLiftNonRep _ e = return e
+inlineOrLiftNonRep :: TransformSpec
+inlineOrLiftNonRep =
+  transform "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepWorker)
 
 -- | The 'Let' handler of 'inlineOrLiftNonRep'.
 inlineOrLiftNonRepWorker
@@ -630,9 +630,8 @@ inlineOrLiftNonRepWorker ctx eLet bind body =
 {-# SCC inlineOrLiftNonRepWorker #-}
 
 -- | Inline anything of type `SimIO`: IO actions cannot be shared
-inlineSimIO :: HasCallStack => NormRewrite
-inlineSimIO ctx e@(Let bnd body) = inlineSimIOWorker ctx e bnd body
-inlineSimIO _ e = return e
+inlineSimIO :: TransformSpec
+inlineSimIO = transform "bindSimIO" (onLet 'inlineSimIOWorker)
 
 -- | The 'Let' handler of 'inlineSimIO'.
 inlineSimIOWorker
@@ -646,12 +645,11 @@ inlineSimIOWorker = inlineBinders test
 {-# SCC inlineSimIOWorker #-}
 
 -- | Inline small functions
-inlineSmall :: HasCallStack => NormRewrite
-inlineSmall ctx e@Var{} = inlineSmallWorker ctx e
-inlineSmall ctx e@App{} = inlineSmallWorker ctx e
-inlineSmall ctx e@TyApp{} = inlineSmallWorker ctx e
-inlineSmall ctx e@Tick{} = inlineSmallWorker ctx e
-inlineSmall _ e = return e
+inlineSmall :: TransformSpec
+inlineSmall =
+  transform "inlineSmall"
+    (onVarNode 'inlineSmallWorker <> onAppNode 'inlineSmallWorker
+      <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)
 
 -- | The application-spine handler of 'inlineSmall'.
 inlineSmallWorker :: HasCallStack => NormRewrite
@@ -681,12 +679,11 @@ inlineSmallWorker _ e = return e
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
-inlineWorkFree :: HasCallStack => NormRewrite
-inlineWorkFree ctx e@Var{} = inlineWorkFreeWorker ctx e
-inlineWorkFree ctx e@App{} = inlineWorkFreeWorker ctx e
-inlineWorkFree ctx e@TyApp{} = inlineWorkFreeWorker ctx e
-inlineWorkFree ctx e@Tick{} = inlineWorkFreeWorker ctx e
-inlineWorkFree _ e = return e
+inlineWorkFree :: TransformSpec
+inlineWorkFree =
+  transform "inlineWorkFree"
+    (onVarNode 'inlineWorkFreeWorker <> onAppNode 'inlineWorkFreeWorker
+      <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)
 
 -- | The application-spine handler of 'inlineWorkFree'.
 inlineWorkFreeWorker :: HasCallStack => NormRewrite

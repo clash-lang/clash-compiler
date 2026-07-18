@@ -11,6 +11,7 @@
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.Reduce
   ( reduceBinders
@@ -44,8 +45,9 @@ import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
+import Clash.Rewrite.StrategyDSL (TransformSpec, onApp, transform)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, normalizeUltra)
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
 
@@ -78,9 +80,8 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
   = reduceBinders subst ((i,e):processed) rest
 {-# SCC reduceBinders #-}
 
-reduceConst :: HasCallStack => NormRewrite
-reduceConst ctx e@(App fun arg) = reduceConstWorker ctx e fun arg
-reduceConst _ e = return e
+reduceConst :: TransformSpec
+reduceConst = transform "reduceConst" (onApp 'reduceConstWorker)
 
 -- | The 'App' handler of 'reduceConst'.
 reduceConstWorker
@@ -164,9 +165,8 @@ reduceConstWorker _ e _ _ = return e
 -- It's easier to just unroll the recursive definitions.
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
-reduceNonRepPrim :: HasCallStack => NormRewrite
-reduceNonRepPrim ctx e@(App fun arg) = reduceNonRepPrimWorker ctx e fun arg
-reduceNonRepPrim _ e = return e
+reduceNonRepPrim :: TransformSpec
+reduceNonRepPrim = transform "reduceNonRepPrim" (onApp 'reduceNonRepPrimWorker)
 
 -- | The 'Clash.Core.Term.App' handler of 'reduceNonRepPrim'.
 reduceNonRepPrimWorker

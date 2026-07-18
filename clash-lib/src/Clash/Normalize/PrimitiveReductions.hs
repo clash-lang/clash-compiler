@@ -91,7 +91,6 @@ import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP (undefined)
 import           Clash.Sized.RTree                (RTree)
 import           Clash.Sized.Vector               (Vec)
-import {-# SOURCE #-} Clash.Normalize.Strategy
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
@@ -110,6 +109,14 @@ typeNatMul =
 typeNatSub :: TyConName
 typeNatSub =
   Name User "GHC.TypeNats.-" (fromGhcUnique typeNatSubTyFamNameKey) wiredInSrcSpan
+
+-- | The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
+-- taken from the normalization state. See the documentation of
+-- '_constantPropagationStrategy' for why it is not simply imported.
+constantPropagation :: NormRewrite
+constantPropagation ctx tm = do
+  strategy <- Lens.use (extra . constantPropagationStrategy)
+  strategy ctx tm
 
 vecHeadPrim
   :: TyConName

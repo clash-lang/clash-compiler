@@ -12,6 +12,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.EtaExpand
   ( etaExpandSyn
@@ -31,18 +32,19 @@ import Clash.Core.Util (mkInternalVar)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (elemVarSet, extendInScopeSet, extendInScopeSetList)
 import Clash.Normalize.Types (NormRewrite)
+import Clash.Rewrite.StrategyDSL
+  (TransformSpec, onAppNode, onTickNode, onTyAppNode, onVarNode, transform)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, topEntities)
 import Clash.Rewrite.Util (changed)
 import Clash.Util (curLoc)
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
 -- functions to appear as arguments to higher-order primitives.
-etaExpandSyn :: HasCallStack => NormRewrite
-etaExpandSyn ctx e@Var{} = etaExpandSynWorker ctx e
-etaExpandSyn ctx e@App{} = etaExpandSynWorker ctx e
-etaExpandSyn ctx e@TyApp{} = etaExpandSynWorker ctx e
-etaExpandSyn ctx e@Tick{} = etaExpandSynWorker ctx e
-etaExpandSyn _ e = return e
+etaExpandSyn :: TransformSpec
+etaExpandSyn =
+  transform "etaExpandSyn"
+    (onVarNode 'etaExpandSynWorker <> onAppNode 'etaExpandSynWorker
+      <> onTyAppNode 'etaExpandSynWorker <> onTickNode 'etaExpandSynWorker)
 
 -- | The application-spine handler of 'etaExpandSyn'.
 etaExpandSynWorker :: HasCallStack => NormRewrite
