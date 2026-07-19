@@ -1,0 +1,1 @@
+CHANGED: Clash the compiler no longer traverses types when it doesn't need to, yielding a ~2% performance benefit.
