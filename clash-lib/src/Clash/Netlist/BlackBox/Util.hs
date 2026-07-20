@@ -42,6 +42,7 @@ import           Control.Exception               (throw)
 import           Control.Lens
   (use, (%=), _1, _2, _3, element, (^?))
 import           Control.Monad                   (forM, (<=<), filterM)
+import           Control.Monad.Identity          (runIdentity)
 import           Control.Monad.Extra             (ifM)
 import           Control.Monad.State             (State, StateT (..), lift, gets)
 import           Data.Bitraversable              (bitraverse)
@@ -267,7 +268,7 @@ setSym bbCtx l = do
     setSym'
       :: Element
       -> StateT ( IntMap.IntMap N.IdentifierText  -- ~SYM[number] mapping
-                , HashMap.HashMap Text N.IdentifierText   -- ~SYM[string] mapping
+                , HashMap.HashMap Text (Maybe N.IdentifierText)   -- ~SYM[string] mapping, Nothing when a name is used by GENSYM
                 , IntMap.IntMap (N.IdentifierText, [N.Declaration]))  -- ~VAR[nm][n] mapping
                 m
                 Element
@@ -303,20 +304,32 @@ setSym bbCtx l = do
         case symM of
           Nothing -> do
             t <- Id.toText <$> lift (Id.make $ Text.toStrict nm)
-            _2 %= (HashMap.insert nm t)
+            _2 %= (HashMap.insert nm (Just t))
             return (Sym (Text.fromStrict t) x)
-          Just t -> return (Sym (Text.fromStrict t) x)
-      GenSym t i -> do
-        symM <- IntMap.lookup i <$> use _1
-        case symM of
-          Nothing -> do
-            t' <- Id.toText <$> lift (Id.makeBasic (Text.toStrict (concatT t)))
-            _1 %= (IntMap.insert i t')
-            return (GenSym [Text (Text.fromStrict t')] i)
-          Just _ ->
-            error ("Symbol #" ++ show (t,i)
-                ++ " is already defined in BlackBox for: "
-                ++ bbnm)
+          Just (Just t) -> return (Sym (Text.fromStrict t) x)
+          Just Nothing ->
+            error ("In BlackBox " ++ bbnm ++ ": "
+                ++ " ~SYM[" ++ Text.unpack nm ++ "] uses the same name as previously used in ~GENSYM.\n"
+                ++ "You can't mix numbered and named symbols.")
+      GenSym t@(concatT -> nm) i -> do
+        symNmM <- HashMap.lookup nm <$> use _2
+        case symNmM of
+          Just (Just _) ->
+            error ("In BlackBox " ++ bbnm ++ ": "
+                ++ "the name of ~GENSYM[" ++ prettyBlackBoxStr t ++ "][" ++ show i ++ "]"
+                ++ " would overwrite an earlier ~SYM[" ++ Text.unpack nm ++ "].\n"
+                ++ "You can't mix numbered and named symbols.")
+          _ -> do
+            symM <- IntMap.lookup i <$> use _1
+            case symM of
+              Nothing -> do
+                t' <- Id.toText <$> lift (Id.makeBasic (Text.toStrict nm))
+                _1 %= (IntMap.insert i t')
+                _2 %= (HashMap.insert nm Nothing) -- mark name as taken by GENSYM
+                return (GenSym [Text (Text.fromStrict t')] i)
+              Just _ ->
+                error ("In BlackBox " ++ bbnm ++ ": ~GENSYM[" ++ show t ++ "][" ++ show i ++ "]"
+                    ++ " is redefining symbol #" ++ show i ++ ".\n")
       Component (Decl n subN l') ->
         Component <$> (Decl n subN <$> mapM (bitraverse (mapM setSym') (mapM setSym')) l')
       IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
@@ -1091,6 +1104,9 @@ prettyBlackBox :: Monad m
                => BlackBoxTemplate
                -> Ap m Text
 prettyBlackBox bbT = Text.concat <$> mapM prettyElem bbT
+
+prettyBlackBoxStr :: BlackBoxTemplate -> String
+prettyBlackBoxStr = Text.unpack . runIdentity . getAp . prettyBlackBox
 
 prettyElem
   :: (HasCallStack, Monad m)
