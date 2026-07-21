@@ -96,15 +96,15 @@ type BlackBoxTemplate = [Element]
 -- | Elements of a blackbox context. If you extend this list, make sure to
 -- update the following functions:
 --
---  - Clash.Netlist.BlackBox.Types.prettyElem
---  - Clash.Netlist.BlackBox.Types.renderElem
---  - Clash.Netlist.BlackBox.Types.renderTag
---  - Clash.Netlist.BlackBox.Types.setSym
+--  - Clash.Netlist.BlackBox.Util.prettyElem
+--  - Clash.Netlist.BlackBox.Util.renderElem
+--  - Clash.Netlist.BlackBox.Util.renderTag
+--  - Clash.Netlist.BlackBox.Util.setSym
 --  - Clash.Netlist.BlackBox.Util.inputHole
---  - Clash.Netlist.BlackBox.Types.getUsedArguments
---  - Clash.Netlist.BlackBox.Types.usedVariables
---  - Clash.Netlist.BlackBox.Types.verifyBlackBoxContext
---  - Clash.Netlist.BlackBox.Types.walkElement
+--  - Clash.Netlist.BlackBox.Util.getUsedArguments
+--  - Clash.Netlist.BlackBox.Util.usedVariables
+--  - Clash.Netlist.BlackBox.Util.verifyBlackBoxContext
+--  - Clash.Netlist.BlackBox.Util.walkElement
 data Element
   = Text !Text
   -- ^ Dumps given text without processing in HDL
