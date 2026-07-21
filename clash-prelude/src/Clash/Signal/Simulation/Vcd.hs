@@ -399,10 +399,13 @@ renderChange ValueChange{..} =
   -- 00_ -> 0_ ->
   -- xx_ -> x_ ->
   -- _ -> _
-  shorten :: String -> String
-  shorten ('0':rest@('1':_)) = rest
-  shorten (a:rest@(b:_)) | a==b && (a=='0' || a=='x') = shorten rest
-  shorten a = a
+  shorten xs = go xs
+   where
+    go (x0:xs0@(x1:_)) | extends x0 x1 = go xs0
+    go xs0 = xs0
+
+    extends e 'x' = e == 'x'
+    extends e _   = e == '0'
 
 -- | Create a VCD command of the form @$<tag> <contents> $end@.
 vcdCommand ::
