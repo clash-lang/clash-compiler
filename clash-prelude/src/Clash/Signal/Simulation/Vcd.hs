@@ -143,7 +143,7 @@ vcd Simulation
 
   variables = mergeScopes varScopes []
    where
-    varScopes = L.map (\(n,w,l) -> mkScope ("logic" : splitOn "." n) w l)
+    varScopes = L.map (\(n,w,l) -> mkScope (splitOn "." n) w l)
       $ L.sort
       $ L.zip3 names widths labels
 
