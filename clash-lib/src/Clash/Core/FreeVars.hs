@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente
-                     2021,      QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -26,6 +26,7 @@ module Clash.Core.FreeVars
   -- * Internal
   , typeFreeVars'
   , termFreeVars'
+  , termFreeIds'
   )
 where
 
@@ -147,19 +148,19 @@ freeLocalVars = termFreeVars' isLocalVar where
 
 -- | Gives the free identifiers of a Term, implemented as a 'Fold'
 freeIds :: Fold Term Id
-freeIds = termFreeVars' isId where
+freeIds = termFreeIds' isId where
   isId (Id {}) = True
   isId _       = False
 
 -- | Calculate the /local/ free identifiers of an expression: the free
 -- identifiers that are not bound in the global environment.
 freeLocalIds :: Fold Term Id
-freeLocalIds = termFreeVars' isLocalId
+freeLocalIds = termFreeIds' isLocalId
 
 -- | Calculate the /global/ free identifiers of an expression: the free
 -- identifiers that are bound in the global environment.
 globalIds :: Fold Term Id
-globalIds = termFreeVars' isGlobalId where
+globalIds = termFreeIds' isGlobalId where
   isGlobalId (Id {idScope = GlobalId}) = True
   isGlobalId _ = False
 
@@ -207,9 +208,42 @@ termFreeVars'
   -> (Var a -> f (Var a))
   -> Term
   -> f Term
-termFreeVars' interesting f = go IntSet.empty where
+termFreeVars' = termFreeVarsWorker True
+
+-- | Gives the "interesting" free identifiers in a Term, implemented as a
+-- 'Fold'. Like 'termFreeVars'', but fold does not descend into the types of
+-- variables and binders.
+termFreeIds'
+  :: (Contravariant f, Applicative f)
+  => (forall b . Var b -> Bool)
+  -- ^ Predicate telling whether an identifier is interesting
+  -> (Var a -> f (Var a))
+  -> Term
+  -> f Term
+termFreeIds' = termFreeVarsWorker False
+
+-- | Worker for 'termFreeVars'' and 'termFreeIds''. Has option that selects
+-- whether to descend into types or not.
+termFreeVarsWorker
+  :: forall a f
+   . (Contravariant f, Applicative f)
+  => Bool
+  -- ^ Descend into the types of variables and binders?
+  -> (forall b . Var b -> Bool)
+  -- ^ Predicate telling whether a variable is interesting
+  -> (Var a -> f (Var a))
+  -> Term
+  -> f Term
+termFreeVarsWorker descendIntoTypes interesting f = go IntSet.empty where
+  -- Fold over a type only when descending into types; otherwise leave it as-is.
+  onType inScope ty
+    | descendIntoTypes = typeFreeVars' interesting inScope f ty
+    | otherwise        = pure ty
+
   go inLocalScope = \case
-    Var v -> v1 <* typeFreeVars' interesting inLocalScope1 f (varType v)
+    Var v
+      | descendIntoTypes -> v1 <* typeFreeVars' interesting inLocalScope1 f (varType v)
+      | otherwise        -> v1
       where
         isInteresting = interesting v
         vInScope      = isLocalId v && varUniq v `IntSet.member` inLocalScope
@@ -235,7 +269,7 @@ termFreeVars' interesting f = go IntSet.empty where
 
     TyApp l r ->
       TyApp <$> go inLocalScope l
-            <*> typeFreeVars' interesting inLocalScope f r
+            <*> onType inLocalScope r
 
     Let (NonRec i x) e ->
       Let <$> (NonRec <$> goBndr inLocalScope i <*> go inLocalScope x)
@@ -249,13 +283,13 @@ termFreeVars' interesting f = go IntSet.empty where
 
     Case subj ty alts ->
       Case <$> go inLocalScope subj
-           <*> typeFreeVars' interesting inLocalScope f ty
+           <*> onType inLocalScope ty
            <*> traverse (goAlt inLocalScope) alts
 
     Cast tm t1 t2 ->
       Cast <$> go inLocalScope tm
-           <*> typeFreeVars' interesting inLocalScope f t1
-           <*> typeFreeVars' interesting inLocalScope f t2
+           <*> onType inLocalScope t1
+           <*> onType inLocalScope t2
 
     Tick tick tm ->
       Tick <$> goTick inLocalScope tick
@@ -263,27 +297,30 @@ termFreeVars' interesting f = go IntSet.empty where
 
     tm -> pure tm
 
-  goBndr inLocalScope v =
-    (\t -> v  {varType = t}) <$> typeFreeVars' interesting inLocalScope f (varType v)
+  -- Fold over a binder's type only when descending; otherwise leave it as-is.
+  goBndr inLocalScope v
+    | descendIntoTypes = (\t -> v {varType = t}) <$> onType inLocalScope (varType v)
+    | otherwise        = pure v
 
   goBind inLocalScope (l,r) = (,) <$> goBndr inLocalScope l <*> go inLocalScope r
 
   goAlt inLocalScope (pat,alt) = case pat of
-    DataPat dc tvs ids -> (,) <$> (DataPat <$> pure dc
-                                           <*> traverse (goBndr inLocalScope') tvs
-                                           <*> traverse (goBndr inLocalScope') ids)
+    DataPat dc tvs ids -> (,) <$> (DataPat dc
+                                     <$> traverse (goBndr inLocalScope') tvs
+                                     <*> traverse (goBndr inLocalScope') ids)
                               <*> go inLocalScope' alt
       where
         inLocalScope' = foldr IntSet.insert
                          (foldr IntSet.insert inLocalScope (map varUniq tvs))
                          (map varUniq ids)
-    _ -> (,) <$> pure pat <*> go inLocalScope alt
+    _ -> (,) pat <$> go inLocalScope alt
 
   goTick inLocalScope = \case
-    NameMod m ty -> NameMod m <$> typeFreeVars' interesting inLocalScope f ty
-    Attributes ty tm -> Attributes <$> typeFreeVars' interesting inLocalScope f ty
+    NameMod m ty -> NameMod m <$> onType inLocalScope ty
+    Attributes ty tm -> Attributes <$> onType inLocalScope ty
                                    <*> go inLocalScope tm
     tick         -> pure tick
+{-# INLINE termFreeVarsWorker #-}
 
 -- | Get the free variables of an expression and count the number of occurrences
 countFreeOccurances
