@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -50,7 +50,7 @@ import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
+  ( CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
   , collectTicks, isLambdaBodyCtx, isTickCtx, mkApps, mkLams, mkTicks, Bind(..)
   , partitionTicks, stripAllTicks)
 import Clash.Core.TermInfo (isCon, isLet, isLocalVar, isTick)
@@ -93,6 +93,40 @@ deadCode _ e = return e
 {-# SCC deadCode #-}
 
 removeUnusedExpr :: HasCallStack => NormRewrite
+-- The primitive and data-constructor equations below collect the whole
+-- application spine with 'collectArgsTicks'. Say we have an application:
+--
+--     f a b c
+--
+-- Then we're only interested in the root (@f a b c@), not in the inner nodes
+-- (@f a@, @f a b@). At the root, 'collectArgsTicks' collects the full argument
+-- list @[a, b, c]@; an inner node would only ever see a prefix of that (@[a]@,
+-- @[a, b]@) at the same argument indices. So any argument an inner node could
+-- remove, the root removes too, which makes the inner attempts wasted work.
+-- This holds through ticks and type applications as well, since
+-- 'collectArgsTicks' looks through both.
+--
+-- We therefore skip a node that is itself a spine node (@App@, @TyApp@, @Prim@,
+-- or @Tick@) sitting under a parent that continues the spine (@AppFun@,
+-- @TyAppC@, or @TickC@). The single-alternative-Case equation is unaffected:
+-- the spine only threads through applications, type applications, and ticks, so
+-- a Case is never an inner node of a spine.
+removeUnusedExpr (TransformContext _ (cc:_)) e
+  | isSpineCtx cc
+  , isSpineNode e
+  = return e
+ where
+  isSpineCtx AppFun = True
+  isSpineCtx TyAppC = True
+  isSpineCtx (TickC _) = True
+  isSpineCtx _ = False
+
+  isSpineNode App {} = True
+  isSpineNode TyApp {} = True
+  isSpineNode Prim {} = True
+  isSpineNode Tick {} = True
+  isSpineNode _ = False
+
 removeUnusedExpr _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
   bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
   let

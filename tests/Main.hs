@@ -1077,6 +1077,9 @@ runClashTest = defaultMain
         , runTest "Split" def{hdlSim=[]}
         , runTest "ToList" def
         , runTest "Unconcat" def
+#if !defined(darwin_HOST_OS)
+        , clashLibTest "UnconcatBitVectorLiteral" def{hdlTargets=[Verilog]}
+#endif
         , runTest "VACC" def{hdlSim=[]}
         , runTest "VEmpty" def
         , runTest "VIndex" def{hdlSim=[]}

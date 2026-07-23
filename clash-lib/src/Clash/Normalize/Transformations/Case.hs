@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2022, Google Inc.,
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
   Transformations on case-expressions
@@ -30,7 +30,7 @@ module Clash.Normalize.Transformations.Case
 import Control.Exception.Base (patError)
 import GHC.Prim.Panic (absentError)
 import qualified Control.Lens as Lens
-import Control.Monad.State.Strict (evalState)
+
 import Data.Bifunctor (second)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
@@ -69,14 +69,15 @@ import Clash.Core.VarEnv
 import Clash.Debug (traceIf)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
-import Clash.Netlist.Util (coreTypeToHWType, representableType)
+import Clash.Netlist.Util (coreTypeToHWType)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
   , typeTranslator, workFreeBinders)
-import Clash.Rewrite.Util (changed, isFromInt, whnfRW)
+import Clash.Rewrite.Util
+  (changed, isFromInt, isUntranslatableType, runWithHWTypeCache, whnfRW)
 import Clash.Rewrite.WorkFree
 import Clash.Util (curLoc)
 
@@ -86,12 +87,7 @@ import Clash.XException (errorX)
 -- alternatives
 caseCase :: HasCallStack => NormRewrite
 caseCase (TransformContext is0 _) e@(Case (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2) = do
-  ty1Rep <- representableType
-    <$> Lens.view typeTranslator
-    <*> Lens.view customReprs
-    <*> pure False
-    <*> Lens.view tcCache
-    <*> pure alts1Ty
+  ty1Rep <- not <$> isUntranslatableType False alts1Ty
 
   -- This is only worth doing if the inner case-expression has a
   -- non-representable alternative type.
@@ -308,7 +304,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
         let subjTy = inferCoreTypeOf tcm subj
         tran <- Lens.view typeTranslator
         reprs <- Lens.view customReprs
-        case (`evalState` mempty) (coreTypeToHWType tran reprs tcm subjTy) of
+        subjHwty <- runWithHWTypeCache (coreTypeToHWType tran reprs tcm subjTy)
+        case subjHwty of
           Right (FilteredHWType (Void (Just hty)) _areVoids)
             | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
             -- If we know that the type of the subject is zero-bits wide and
