@@ -17,7 +17,7 @@ import           Data.List             (foldl')
 import           GHC.TypeLits          (KnownNat)
 import           Language.Haskell.TH
 
--- | Contruct all the tuple (starting at size 3) instances for BitPack.
+-- | Construct all the tuple (starting at size 3) instances for BitPack.
 deriveBitPackTuples
   :: Name
   -- ^ BitPack
@@ -35,41 +35,59 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName maybeUnpackName 
       bitSize   = ConT bitSizeName
       knownNat  = ConT ''KnownNat
       plus      = ConT $ mkName "+"
-      bitVector = ConT $ mkName "BitVector"
-      justP     = ConP $ mkName "Just"
-      justE     = ConE $ mkName "Just"
-      nothing   = ConE $ mkName "Nothing"
-      bvSplit   = VarE $ mkName "split#"
 
   allNames <- replicateM maxTupleSize (newName "a")
   retupName <- newName "retup"
   x <- newName "x"
-  y <- newName "y"
   tup <- newName "tup"
-  bvL <- newName "bvL"
-  bvR <- newName "bvR"
 
   pure $ flip map [3..maxTupleSize] $ \tupleNum ->
     let names  = take tupleNum allNames
-        (v,vs) = case map VarT names of
-                    (z:zs) -> (z,zs)
-                    _ -> error "maxTupleSize <= 3"
         tuple xs = foldl' AppT (TupleT $ length xs) xs
+        types = map VarT names
+
+        -- Use a balanced pair tree so validation logic grows logarithmically
+        -- in depth. Regrouping does not change the left-to-right bit layout.
+        splitAtField = tupleNum `div` 2
+        (leftNames, rightNames) = splitAt splitAtField names
+        (leftTypes, rightTypes) = splitAt splitAtField types
+
+        groupType [ty] = ty
+        groupType tys = tuple tys
+
+        groupPattern [name] = VarP name
+        groupPattern groupNames = TupP (map VarP groupNames)
+
+        groupExpression [name] = VarE name
+        groupExpression groupNames = mkTupE (map VarE groupNames)
+
+        leftType = groupType leftTypes
+        rightType = groupType rightTypes
+        nestedType = tuple [leftType, rightType]
+        nestedPattern =
+          TupP [groupPattern leftNames, groupPattern rightNames]
+        nestedExpression =
+          mkTupE
+            [ groupExpression leftNames
+            , groupExpression rightNames
+            ]
+        flatExpression = mkTupE (map VarE names)
+
+        bitSizeOf ty = bitSize `AppT` ty
 
         -- Instance declaration
         context =
-          [ bitPack `AppT` v
-          , knownNat `AppT` (bitSize `AppT` v)
-          , bitPack `AppT` tuple vs
-          , knownNat `AppT` (bitSize `AppT` tuple vs)
+          [ bitPack `AppT` leftType
+          , knownNat `AppT` bitSizeOf leftType
+          , bitPack `AppT` rightType
+          , knownNat `AppT` bitSizeOf rightType
           ]
-        instTy = AppT bitPack $ tuple (v:vs)
+        instTy = AppT bitPack (tuple types)
 
         -- Associated type BitSize
         bitSizeType =
-          mkTySynInstD bitSizeName [tuple (v:vs)]
-            $ plus `AppT` (bitSize `AppT` v) `AppT`
-              (bitSize `AppT` foldl AppT (TupleT $ tupleNum - 1) vs)
+          mkTySynInstD bitSizeName [tuple types]
+            $ plus `AppT` bitSizeOf leftType `AppT` bitSizeOf rightType
 
         pack =
           FunD
@@ -80,12 +98,8 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName maybeUnpackName 
                 [FunD
                     retupName
                     [ Clause
-                        [ TupP $ map VarP names ]
-                        ( let (e,es) = case map VarE names of
-                                          (z:zs) -> (z,zs)
-                                          _ -> error "maxTupleSize <= 3"
-                          in NormalB (mkTupE [e,mkTupE es])
-                        )
+                        [TupP (map VarP names)]
+                        (NormalB nestedExpression)
                         []
                     ]
                 ]
@@ -95,60 +109,33 @@ deriveBitPackTuples bitPackName bitSizeName packName unpackName maybeUnpackName 
           FunD
             unpackName
             [ Clause
-                [ VarP x ]
-                ( NormalB $
-                    let (p,ps) = case map VarP names of
-                                   (z:zs) -> (z,zs)
-                                   _ -> error "maxTupleSize <= 3"
-                    in
-                    LetE
-                      [ ValD
-                          ( TupP [ p, VarP y ] )
-                          ( NormalB $ VarE unpackName `AppE` VarE x )
-                          []
-                      , ValD
-                          ( TupP ps )
-                          ( NormalB $ VarE unpackName `AppE` VarE y )
-                          []
-                      ]
-                      ( mkTupE $ map VarE names )
-                )
+                [VarP x]
+                (NormalB
+                  (CaseE
+                    (SigE
+                      (AppE (VarE unpackName) (VarE x))
+                      nestedType)
+                    [ Match
+                        nestedPattern
+                        (NormalB flatExpression)
+                        []
+                    ]))
                 []
             ]
 
         maybeUnpack =
-            FunD
-                maybeUnpackName
-                [ Clause
-                    [ VarP x ]
-                    ( NormalB $
-                        let (p,ps) = case map VarP names of
-                                        (z:zs) -> (z,zs)
-                                        _ -> error "maxTupleSize <= 3"
-                        in
-                        LetE
-                            [ SigD bvL ( AppT bitVector ( AppT bitSize v ) )
-                            , SigD
-                                bvR
-                                ( AppT
-                                    bitVector
-                                    ( AppT bitSize ( foldl AppT ( TupleT $ tupleNum - 1 ) vs ) )
-                                )
-                            , ValD
-                                ( TupP [ VarP bvL, VarP bvR ] )
-                                ( NormalB $ AppE bvSplit ( VarE x ) )
-                                []
-                            ]
-                            ( CaseE
-                                ( mkTupE $ map ( AppE ( VarE maybeUnpackName ) . VarE ) [bvL, bvR] )
-                                [ Match
-                                    ( TupP [ justP [] [p], justP [] [TupP ps] ] )
-                                    ( NormalB $ AppE justE ( mkTupE $ map VarE names ) )
-                                    []
-                                , Match WildP ( NormalB $ nothing ) []
-                                ]
-                            )
-                    )
-                    []
-                ]
+          FunD
+            maybeUnpackName
+            [ Clause
+                [VarP x]
+                (NormalB
+                  (AppE
+                    (AppE
+                      (VarE 'fmap)
+                      (LamE [nestedPattern] flatExpression))
+                    (SigE
+                      (AppE (VarE maybeUnpackName) (VarE x))
+                      (ConT ''Maybe `AppT` nestedType))))
+                []
+            ]
     in InstanceD Nothing context instTy [bitSizeType, pack, unpack, maybeUnpack]
