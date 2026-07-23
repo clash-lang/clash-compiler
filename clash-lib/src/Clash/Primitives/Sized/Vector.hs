@@ -7,6 +7,7 @@
   Blackbox implementations for functions in "Clash.Sized.Vector".
 -}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -24,6 +25,7 @@ import           Data.Text.Extra                    (showt)
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, string, renderLazy, layoutPretty, LayoutOptions(..),
    PageWidth(AvailablePerLine))
+import           GHC.Exts                           (Int(..))
 import           Text.Trifecta.Result               (Result(Success))
 import qualified Data.String.Interpolate            as I
 import           GHC.Stack                          (HasCallStack)
@@ -299,7 +301,8 @@ indexIntVerilogTemplate bbCtx
             fromInteger j
           DataCon (Signed _) (DC (Void{},_)) [Literal (Just (Signed _,_)) (NumLit j)] ->
             fromInteger j
-          BlackBoxE "GHC.Types.I#" _lib _use _incl _templ Context{bbInputs=[(Literal _ (NumLit j),_,_)]} _paren ->
+          BlackBoxE nm _lib _use _incl _templ Context{bbInputs=[(Literal _ (NumLit j),_,_)]} _paren
+            | nm == showt 'I# ->
             fromInteger j
           _ ->
             error ($(curLoc) ++ "Unexpected literal: " ++ show ix)

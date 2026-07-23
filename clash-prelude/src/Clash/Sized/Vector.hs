@@ -100,7 +100,11 @@ module Clash.Sized.Vector
 where
 
 import Control.DeepSeq            (NFData (..))
+#if __GLASGOW_HASKELL__ >= 914
+import qualified Control.Lens     as Lens hiding (data (:>), data (:<))
+#else
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
+#endif
 import Data.Bits                  ((.|.), shiftL)
 import Data.Constraint            ((:-)(Sub), Dict (..))
 import Data.Constraint.Nat        (leZero)
