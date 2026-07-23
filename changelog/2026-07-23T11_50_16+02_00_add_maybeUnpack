@@ -1,0 +1,5 @@
+ADDED: `maybeUnpack` to `BitPack`, providing a synthesizable way to reject bit
+patterns that do not represent a value. This is a source-breaking addition for
+manually written `BitPack` instances: they must either define `maybeUnpack` or
+satisfy its generic default implementation. See
+[#3177](https://github.com/clash-lang/clash-compiler/pull/3177).
