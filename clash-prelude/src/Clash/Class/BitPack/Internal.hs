@@ -209,7 +209,7 @@ class KnownNat (BitSize a) => BitPack a where
        , (constrSize + fieldSize) ~ BitSize a
        )
     => BitVector (BitSize a) -> Maybe a
-  maybeUnpack b = to <$> gMaybeUnpack sc 0 bFields
+  maybeUnpack b = to <$> gMaybeUnpack True sc 0 bFields
    where
     (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
 
@@ -574,7 +574,10 @@ class GBitPack f where
 
   -- | Attempt to unpack whole type.
   gMaybeUnpack
-    :: Int
+    :: Bool
+    -- ^ Check whether the constructor is in range. This should only be 'True'
+    -- for the root of a generic representation.
+    -> Int
     -- ^ Construct with constructor /n/
     -> Int
     -- ^ Current constructor
@@ -589,7 +592,8 @@ instance GBitPack a => GBitPack (M1 m d a) where
 
   gPackFields cc (M1 m1) = gPackFields cc m1
   gUnpack c cc b = M1 (gUnpack c cc b)
-  gMaybeUnpack c cc b = M1 <$> (gMaybeUnpack c cc b)
+  gMaybeUnpack checkBounds c cc b =
+    M1 <$> gMaybeUnpack checkBounds c cc b
 
 instance ( KnownNat (GFieldSize g)
          , KnownNat (GFieldSize f)
@@ -623,15 +627,15 @@ instance ( KnownNat (GFieldSize g)
     (f, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f)) = split# b
     (g, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g)) = split# b
 
-  gMaybeUnpack c cc b =
+  gMaybeUnpack checkBounds c cc b =
     let
       cLeft = snatToNum (SNat @(GConstructorCount f))
       cTotal = snatToNum (SNat @(GConstructorCount (f :+: g)))
     in
-    if c < cc + cTotal
+    if not checkBounds || c < cc + cTotal
       then if c < cc + cLeft
-        then L1 <$> gMaybeUnpack c cc f
-        else R1 <$> gMaybeUnpack c (cc + cLeft) g
+        then L1 <$> gMaybeUnpack False c cc f
+        else R1 <$> gMaybeUnpack False c (cc + cLeft) g
       else Nothing
    where
     (f, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f)) = split# b
@@ -654,8 +658,10 @@ instance (KnownNat (GFieldSize g), KnownNat (GFieldSize f), GBitPack f, GBitPack
    where
     (front, back) = split# b
 
-  gMaybeUnpack c cc b =
-    (:*:) <$> gMaybeUnpack c cc front <*> gMaybeUnpack c cc back
+  gMaybeUnpack checkBounds c cc b =
+    (:*:)
+      <$> gMaybeUnpack checkBounds c cc front
+      <*> gMaybeUnpack checkBounds c cc back
    where
     (front, back) = split# b
 
@@ -665,7 +671,7 @@ instance BitPack c => GBitPack (K1 i c) where
 
   gPackFields cc (K1 i) = (cc, pack i)
   gUnpack _c _cc b      = K1 (unpack b)
-  gMaybeUnpack _c _cc b = K1 <$> maybeUnpack b
+  gMaybeUnpack _checkBounds _c _cc b = K1 <$> maybeUnpack b
 
 instance GBitPack U1 where
   type GFieldSize U1 = 0
@@ -673,7 +679,7 @@ instance GBitPack U1 where
 
   gPackFields cc U1 = (cc, 0)
   gUnpack _c _cc _b = U1
-  gMaybeUnpack _c _cc _b = Just U1
+  gMaybeUnpack _checkBounds _c _cc _b = Just U1
 
 -- Instances derived using Generic
 instance BitPack Ordering
