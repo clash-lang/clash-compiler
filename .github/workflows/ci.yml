@@ -216,7 +216,6 @@ jobs:
           cabal v2-run clash-prelude:unittests -- --hide-successes
           cabal v2-run clash-lib:doctests
           cabal v2-run clash-lib:unittests -- --hide-successes
-          cabal v2-run clash-cosim:test -- --hide-successes
 
       - name: Testsuite (VHDL)
         if: github.ref != 'refs/heads/master'

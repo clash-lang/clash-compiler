@@ -28,7 +28,6 @@ stages:
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export CABAL_DIR=$HOME/.cabal
     - export clash_lib_datadir=$(pwd)/clash-lib/
-    - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export
     - tar -xf dist.tar.zst -C /
 
@@ -56,7 +55,6 @@ stages:
     - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
     - export CABAL_DIR=$HOME/.cabal
     - export clash_lib_datadir=$(pwd)/clash-lib/
-    - export clash_cosim_datadir=$(pwd)/clash-cosim/
     - export
     - tar -xf cache.tar.zst -C / || true
     - tar -xf dist.tar.zst -C /
@@ -89,11 +87,6 @@ build:
     # Archive all build files (from .cabal and dist-newstyle)
     - tar -cf - $(.ci/get_build_dist.sh) | zstd -T${THREADS} -15 > dist.tar.zst
 
-cosim:unittests:
-  extends: .test-nocache
-  script:
-    - bin/clash-cosim:test
-
 prelude:doctests:
   extends: .test-nocache
   script:
@@ -113,14 +106,6 @@ lib:unittests:
   extends: .test-nocache
   script:
     - bin/clash-lib:unittests --hide-successes
-
-ffi:interface-tests:
-  extends: .test-nocache
-  # GHC 9.8.3, 9.8.4 and 9.10.2 have issues, see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-  rules:
-    - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
-  script:
-    - bin/clash-ffi:ffi-interface-tests --smallcheck-max-count 2000
 
 # Normally, this job is small. But it was flaky on GHC 9.2; it sometimes fails
 # and we don't know yet why. When it fails, it recompiles things it should have
@@ -144,40 +129,6 @@ suite:systemverilog:
   extends: .test-cache
   script:
     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
-
-ffi:example:
-  extends:
-    - .common
-    - .nightly-rules
-  # GHC 9.8.3, 9.8.4 and 9.10.2 have issues, see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-  rules:
-    - if: $SKIP_CLASH_FFI_EXAMPLE != "yes"
-  stage: test
-  needs: []
-  before_script:
-    - unset SNAPCRAFT_LOGIN_FILE
-    - unset HACKAGE_PASSWORD
-    - export THREADS=$(./.ci/effective_cpus.sh)
-    - export CABAL_JOBS=$(./.ci/effective_cpus.sh)
-    - export CABAL_DIR=$HOME/.cabal
-    - export clash_lib_datadir=$(pwd)/clash-lib/
-    - export clash_cosim_datadir=$(pwd)/clash-cosim/
-    - export MASKBINS="$(mktemp -d)"
-    - PATH="$MASKBINS:$PATH"
-    - export
-    - tar -xf cache.tar.zst -C / || true
-      # The iverilog on CI cannot run the example, we only test it builds
-    - ln -s /bin/true "$MASKBINS/iverilog"
-    - ln -s /bin/true "$MASKBINS/vvp"
-    - ls -al "$MASKBINS"
-    - .ci/setup.sh
-      # Make sure we get custom cabals setting in the clash-example project too
-    - cp cabal.project.local clash-ffi/example
-  script:
-     - cd clash-ffi/example && ./run-iverilog.sh
-  after_script:
-    - export THREADS=$(./.ci/effective_cpus.sh)
-    - tar -cf - /root/.cabal | zstd -T${THREADS} -3 > cache.tar.zst
 
 # Tests run on local fast machines with Vivado installed. We only run these at night
 # to save resources - as Vivado is quite slow to execute.

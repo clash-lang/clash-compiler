@@ -15,8 +15,6 @@ in
   # than the defaults in nixpkgs.
   rewrite-inspector = doJailbreak (markUnbroken prev.rewrite-inspector);
 
-  derive-storable-plugin = markUnbroken prev.derive-storable-plugin;
-
   # singletons-base/th 3.2 is the last version working on GHC 9.6
   singletons-th = prev.callHackage "singletons-th" "3.2" { };
   # Some tests fail, seems to be golden tests which might fail when output

@@ -95,8 +95,6 @@
         packages = {
           inherit (pkgs."clashPackages-${defaultGhcVersion}")
             clash-benchmark
-            clash-cosim
-            clash-ffi
             clash-ghc
             clash-lib
             clash-lib-hedgehog
@@ -115,8 +113,6 @@
             value = {
               inherit (pkgs."clashPackages-${version}")
                 clash-benchmark
-                clash-cosim
-                clash-ffi
                 clash-ghc
                 clash-lib
                 clash-lib-hedgehog

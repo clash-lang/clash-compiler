@@ -16,12 +16,6 @@ build-type:          Simple
 data-files:
   data-files/tcl/clash_namespace.tcl
 
-flag cosim
-   description:
-     Run the co-simulation tests
-   default: False
-   manual: True
-
 flag workaround-ghc-mmap-crash
   description:
     Only use this flag when hit by GHC bug #19421. See clash-compiler PR #2444.
@@ -67,12 +61,6 @@ common basic-config
     clash-ghc,
     clash-lib,
     clash-prelude
-
-  if flag(cosim)
-    build-depends:     clash-cosim
-
-  if flag(cosim)
-    cpp-options:       -DCOSIM
 
   if arch(x86_64) && flag(workaround-ghc-mmap-crash)
     cpp-options:       -DCLASH_WORKAROUND_GHC_MMAP_CRASH

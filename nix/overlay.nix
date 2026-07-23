@@ -98,26 +98,6 @@ let
           '';
         });
 
-      clash-cosim =
-        let
-          unmodified =
-            hprev.callCabal2nix "clash-cosim" ../clash-cosim {
-              inherit (hfinal) clash-prelude;
-            };
-        in
-        unmodified.overrideAttrs (old: {
-          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-            prev.iverilog
-          ];
-        });
-
-      # Broken on GHC 9.8.4
-      clash-ffi =
-        prev.haskell.lib.overrideCabal (hprev.callCabal2nix "clash-ffi" ../clash-ffi {})
-          (drv: {
-            testFlags = [ "--smallcheck-max-count" "2000" ];
-          });
-
       clash-ghc =
         let
           unmodified =
