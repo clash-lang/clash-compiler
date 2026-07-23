@@ -50,7 +50,7 @@ import qualified Data.HashMap.Strict         as HashMap
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
-import           Data.Text.Encoding          (decodeUtf8)
+import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import qualified Data.Traversable            as T
 import           Data.String.Interpolate     (__i)
 import qualified Text.Read                   as Text
@@ -79,7 +79,7 @@ import GHC.Core.FamInstEnv
   ( FamInst (..), FamInstEnvs
   , familyInstances, normaliseType, emptyFamInstEnvs, topReduceTyFamApp_maybe
   )
-import GHC.Data.FastString (unpackFS, bytesFS)
+import GHC.Data.FastString (unpackFS, bytesFS, fsLit, mkFastStringByteString)
 import GHC.Types.Id (isDataConId_maybe)
 import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
 import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
@@ -293,6 +293,136 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   AbstractTyCon {} -> return Nothing
   TupleTyCon {}    -> error "Cannot handle tuple tycons"
 
+-- | Handler for a single named application in 'goDispatchTable'. Takes the
+-- (recursive) 'term' translator and the application's arguments; 'Nothing'
+-- means the argument shape didn't match (e.g. a guard on @length args@
+-- failed), so the caller should fall back to the general translation.
+type GoHandler = (CoreExpr -> C2C C.Term) -> [CoreExpr] -> Maybe (C2C C.Term)
+
+-- | Dispatch table for the small set of known-named applications
+-- 'coreToTerm' special-cases (Signal transformers, @$@, 'Clash.Magic'
+-- name/dedup annotations, etc.), keyed by 'FastString' for O(1) lookup
+-- instead of a sequential chain of 'Text' equality checks. Built once (a
+-- CAF) for the process; see the analogous table + note in
+-- "Clash.Normalize.Transformations.Reduce".
+goDispatchTable :: C.UniqMap GoHandler
+goDispatchTable = C.fromList
+  -- Remove most Signal transformers
+  [ ( fsLit "Clash.Signal.Internal.mapSignal#"
+    , \term args -> case () of
+        _ | length args == 5 -> Just (term (App (args!!3) (args!!4)))
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Signal.Internal.signal#"
+    , \term args -> case () of
+        _ | length args == 3 -> Just (term (args!!2))
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Signal.Internal.appSignal#"
+    , \term args -> case () of
+        _ | length args == 5 -> Just (term (App (args!!3) (args!!4)))
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Signal.Internal.joinSignal#"
+    , \term args -> case () of
+        _ | length args == 3 -> Just (term (args!!2))
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Signal.Bundle.vecBundle#"
+    , \term args -> case () of
+        _ | length args == 4 -> Just (term (args!!3))
+          | otherwise -> Nothing
+    )
+  --- Remove `$`
+  , ( fsLit "GHC.Base.$"
+    , \term args -> case () of
+        _ | length args == 5 -> Just (term (App (args!!3) (args!!4)))
+          | otherwise -> Nothing
+    )
+  , ( fsLit "GHC.Magic.noinline" -- noinline :: forall a. a -> a
+    , \term args -> case () of
+        _ | [_ty, x] <- args -> Just (term x)
+          | otherwise -> Nothing
+    )
+  -- Remove most CallStack logic
+  , ( fsLit "GHC.Stack.Types.PushCallStack"
+    , \term args -> Just (term (last args))
+    )
+  , ( fsLit "GHC.Stack.Types.FreezeCallStack"
+    , \term args -> Just (term (last args))
+    )
+  , ( fsLit "GHC.Stack.withFrozenCallStack"
+    , \term args -> case () of
+        _ | length args == 3 -> Just (term (App (args!!2) (args!!1)))
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Sized.BitVector.Internal.checkUnpackUndef"
+    , \term args -> case () of
+        _ | [_nTy,_aTy,_kn,_typ,f] <- args -> Just (term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.prefixName"
+    , \term args -> case () of
+        _ | [Type nmTy,_aTy,f] <- args
+          -> Just (C.Tick <$> (C.NameMod C.PrefixName <$> coreToType nmTy) <*> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.suffixName"
+    , \term args -> case () of
+        _ | [Type nmTy,_aTy,f] <- args
+          -> Just (C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.suffixNameFromNat"
+    , \term args -> case () of
+        _ | [Type nmTy,_aTy,f] <- args
+          -> Just (C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.suffixNameP"
+    , \term args -> case () of
+        _ | [Type nmTy,_aTy,f] <- args
+          -> Just (C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.suffixNameFromNatP"
+    , \term args -> case () of
+        _ | [Type nmTy,_aTy,f] <- args
+          -> Just (C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.setName"
+    , \term args -> case () of
+        _ | [Type nmTy,_aTy,f] <- args
+          -> Just (C.Tick <$> (C.NameMod C.SetName <$> coreToType nmTy) <*> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.deDup"
+    , \term args -> case () of
+        _ | [_aTy,f] <- args -> Just (C.Tick C.DeDup <$> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.noDeDup"
+    , \term args -> case () of
+        _ | [_aTy,f] <- args -> Just (C.Tick C.NoDeDup <$> term f)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Magic.clashSimulation"
+    , \_term _args -> Just (C.Data <$> coreToDataCon falseDataCon)
+    )
+  , ( fsLit "Clash.XException.xToErrorCtx" -- xToErrorCtx :: forall a. String -> a -> a
+    , \term args -> case () of
+        _ | [_ty, _msg, x] <- args -> Just (term x)
+          | otherwise -> Nothing
+    )
+  , ( fsLit "Clash.Annotations.SynthesisAttributes.annotateReg"
+    , \term args -> case () of
+        _ | [ Type nTy, _domTy, _aTy, attrs, x] <- args
+          -> Just (C.Tick <$> (C.Attributes <$> coreToType nTy <*> term attrs) <*> term x)
+          | otherwise -> Nothing
+    )
+  ]
+
 coreToTerm
   :: CompiledPrimMap
   -> [Var]
@@ -310,82 +440,20 @@ coreToTerm primMap unlocs = term
       | otherwise
       = term' e
       where
-        -- Remove most Signal transformers
-        go "Clash.Signal.Internal.mapSignal#"  args
-          | length args == 5
-          = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.signal#"     args
-          | length args == 3
-          = term (args!!2)
-        go "Clash.Signal.Internal.appSignal#"  args
-          | length args == 5
-          = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.joinSignal#" args
-          | length args == 3
-          = term (args!!2)
-        go "Clash.Signal.Bundle.vecBundle#"    args
-          | length args == 4
-          = term (args!!3)
-        --- Remove `$`
-        go "GHC.Base.$"                        args
-          | length args == 5
-          = term (App (args!!3) (args!!4))
-        go "GHC.Magic.noinline"                args   -- noinline :: forall a. a -> a
-          | [_ty, x] <- args
-          = term x
-        -- Remove most CallStack logic
-        go "GHC.Stack.Types.PushCallStack"     args = term (last args)
-        go "GHC.Stack.Types.FreezeCallStack"   args = term (last args)
-        go "GHC.Stack.withFrozenCallStack"     args
-          | length args == 3
-          = term (App (args!!2) (args!!1))
-        go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
-          | [_nTy,_aTy,_kn,_typ,f] <- args
-          = term f
-        go "Clash.Magic.prefixName" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.PrefixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixName" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameFromNat" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameP" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameFromNatP" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.setName" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SetName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.deDup" args
-          | [_aTy,f] <- args
-          = C.Tick C.DeDup <$> term f
-        go "Clash.Magic.noDeDup" args
-          | [_aTy,f] <- args
-          = C.Tick C.NoDeDup <$> term f
-        go "Clash.Magic.clashSimulation" _
-          = C.Data <$> coreToDataCon falseDataCon
-        go "Clash.XException.xToErrorCtx" args
-          -- xToErrorCtx :: forall a. String -> a -> a
-          | [_ty, _msg, x] <- args
-          = term x
-        go "Clash.Annotations.SynthesisAttributes.annotateReg" args
-          | [ Type nTy, _domTy, _aTy, attrs, x] <- args
-          = C.Tick <$> (C.Attributes <$> coreToType nTy <*> term attrs) <*> term x
         go nm args
+          | Just h <- C.lookup (mkFastStringByteString (encodeUtf8 nm)) goDispatchTable
+          , Just result <- h term args
+          = result
           | Just n <- parseBundle "bundle" nm
             -- length args = domain tyvar + signal arg + number of type vars
           , length args == 2 + n
           = term (last args)
-        go nm args
           | Just n <- parseBundle "unbundle" nm
             -- length args = domain tyvar + signal arg + number of type vars
           , length args == 2 + n
           = term (last args)
-        go _ _ = term' e
+          | otherwise
+          = term' e
 
     parseBundle :: Text -> Text -> Maybe Int
     parseBundle fNm nm0 = do

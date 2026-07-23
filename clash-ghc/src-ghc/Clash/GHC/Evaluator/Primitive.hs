@@ -13,6 +13,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 
@@ -49,6 +50,7 @@ import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
 import qualified Data.Text           as Text
+import qualified Data.Text.Encoding  as Text
 import           Data.Text.Extra     (showt)
 import           GHC.Exts (IsList(..))
 import           GHC.Float
@@ -71,6 +73,7 @@ import           Data.Bifunctor      (first)
 import qualified Data.Text.Array     as Text
 import qualified Data.Text.Internal  as Text
 
+import           GHC.Data.FastString (fsLit, mkFastStringByteString)
 import           GHC.Types.Basic     (Boxity (..))
 import           GHC.Types.Name      (getSrcSpan, nameOccName, occNameString)
 import           GHC.Builtin.Names   (trueDataConKey, falseDataConKey)
@@ -105,7 +108,7 @@ import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Unique        (fromGhcUnique)
 import           Clash.Util
-  (MonadUnique (..), clogBase, flogBase, curLoc, namePat)
+  (MonadUnique (..), clogBase, flogBase, curLoc, nameFS)
 import           Clash.Util.Supply   (Supply,freshId)
 import           Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
@@ -248,4503 +251,7077 @@ instance MonadUnique PrimEvalMonad where
 runPEM :: PrimEvalMonad a -> Supply -> (a, Supply)
 runPEM (PEM m) = State.runState m
 
+-- | The environment 'ghcPrimStep' dispatch-table handlers run in. Carries
+-- every value the original case-arm bodies closed over from 'ghcPrimStep's
+-- arguments and @where@-bound helpers, so a handler taken out of the
+-- top-level 'ghcPrimDispatchTable' can be applied to it directly.
+data PrimEnv = PrimEnv
+  { tcm :: TyConMap
+  , isSubj :: Bool
+  , pInfo :: PrimInfo
+  , tys :: [Type]
+  , args :: [Value]
+  , mach :: Machine
+  , ty :: Type
+  , reduce :: Term -> Maybe Machine
+  , reduceWith :: Machine -> Term -> Maybe Machine
+  , reduceWHNF :: Term -> Maybe Machine
+  , reduceWHNF' :: Machine -> Term -> Maybe Machine
+  , makeUndefinedIf :: forall e. Exception e => (e -> Bool) -> Term -> Term
+  , catchDivByZero :: Term -> Term
+  , catchErrorCall :: Term -> Term
+  , checkNaturalRange :: Type -> [Integer] -> ([Natural] -> Term) -> Term
+  , checkNaturalRange1 :: Type -> Integer -> (Natural -> Natural) -> Term
+  , checkNaturalRange2 :: Type -> Integer -> Integer -> (Natural -> Natural -> Natural) -> Term
+  }
+
+type PrimHandler = PrimEnv -> Maybe Machine
+
+mkPrimEnv :: TyConMap -> Bool -> PrimInfo -> [Type] -> [Value] -> Machine -> PrimEnv
+mkPrimEnv tcm isSubj pInfo tys args mach = env
+ where
+  env = PrimEnv
+    { tcm = tcm, isSubj = isSubj, pInfo = pInfo, tys = tys, args = args, mach = mach
+    , ty = ty_
+    , reduce = reduce_
+    , reduceWith = reduceWith_
+    , reduceWHNF = reduceWHNF_
+    , reduceWHNF' = reduceWHNF'_
+    , makeUndefinedIf = makeUndefinedIf_
+    , catchDivByZero = makeUndefinedIf_ (==DivideByZero)
+    , catchErrorCall = makeUndefinedIf_ (const True :: ErrorCall -> Bool)
+    , checkNaturalRange = checkNaturalRange_
+    , checkNaturalRange1 = checkNaturalRange1_
+    , checkNaturalRange2 = checkNaturalRange2_
+    }
+
+  ty_ = primType pInfo
+
+  checkNaturalRange1_ nTy i f =
+    checkNaturalRange_ nTy [i]
+      (\[i'] -> naturalToNaturalLiteral (f i'))
+
+  checkNaturalRange2_ nTy i j f =
+    checkNaturalRange_ nTy [i, j]
+      (\[i', j'] -> naturalToNaturalLiteral (f i' j'))
+
+  -- Check given integer's range. If any of them are less than zero, give up
+  -- and return an undefined type.
+  checkNaturalRange_
+    :: Type
+    -- Type of GHC.Natural.Natural ^
+    -> [Integer]
+    -> ([Natural] -> Term)
+    -> Term
+  checkNaturalRange_ nTy natsAsInts f =
+    if any (<0) natsAsInts then
+      TyApp (Prim NP.undefined) nTy
+    else
+      f (map fromInteger natsAsInts)
+
+  reduce_ :: Term -> Maybe Machine
+  reduce_ = reduceWith_ mach
+
+  -- Like 'reduceWith, but reduces in (the heap of) an explicitly given machine
+  -- rather than the captured 'mach'. Use this when the reduced term refers to
+  -- bindings freshly allocated with 'newLetBinding'.
+  reduceWith_ :: Machine -> Term -> Maybe Machine
+  reduceWith_ mach0 e = case isX e of
+    Left msg ->
+      let resTy = getResultTy tcm ty_ tys
+          warning = unlines
+            [ "Warning: caught XException: \"" ++ msg ++ "\" while trying to evaluate: "
+            , showPpr (mkApps (Prim pInfo) (map (Left . valToTerm) args))
+            ]
+      in trace warning (Just (setTerm (TyApp (Prim NP.undefined) resTy) mach0))
+    Right e' -> Just (setTerm e' mach0)
+
+  reduceWHNF_ e =
+    let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+        mach1@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e $ stackClear mach)
+    in Just $ mach1 { mStack = mStack mach }
+
+  reduceWHNF'_ mach1 e =
+    let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+        mach2@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e $ stackClear mach1)
+     in Just $ mach2 { mStack = mStack mach }
+
+  makeUndefinedIf_ :: Exception e => (e -> Bool) -> Term -> Term
+  makeUndefinedIf_ wantToHandle tm =
+    case unsafeDupablePerformIO $ tryJust selectException (evaluate $ force tm) of
+      Right b -> b
+      Left e -> trace (msg e) (TyApp (Prim NP.undefined) resTy)
+    where
+      resTy = getResultTy tcm ty_ tys
+      selectException e | wantToHandle e = Just e
+                        | otherwise = Nothing
+      msg e = unlines ["Warning: caught exception: \"" ++ show e ++ "\" while trying to evaluate: "
+                      , showPpr (mkApps (Prim pInfo) (map (Left . valToTerm) args))
+                      ]
+
 ghcPrimStep :: PrimStep
-ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
+ghcPrimStep tcm isSubj pInfo tys args mach =
+  maybe Nothing ($ env) (UniqMap.lookup key ghcPrimDispatchTable)
+ where
+  env = mkPrimEnv tcm isSubj pInfo tys args mach
+  key = mkFastStringByteString (Text.encodeUtf8 (primName pInfo))
+
+ghcPrimDispatchTable :: UniqMap.UniqMap PrimHandler
+ghcPrimDispatchTable = UniqMap.fromList
 -----------------
 -- GHC.Prim.Char#
 -----------------
-  $(namePat 'GHC.Prim.gtChar#) | Just (i,j) <- charLiterals args
-    -> reduce (boolToIntLiteral (i > j))
-  $(namePat 'GHC.Prim.geChar#) | Just (i,j) <- charLiterals args
-    -> reduce (boolToIntLiteral (i >= j))
-  $(namePat 'GHC.Prim.eqChar#) | Just (i,j) <- charLiterals args
-    -> reduce (boolToIntLiteral (i == j))
-  $(namePat 'GHC.Prim.neChar#) | Just (i,j) <- charLiterals args
-    -> reduce (boolToIntLiteral (i /= j))
-  $(namePat 'GHC.Prim.ltChar#) | Just (i,j) <- charLiterals args
-    -> reduce (boolToIntLiteral (i < j))
-  $(namePat 'GHC.Prim.leChar#) | Just (i,j) <- charLiterals args
-    -> reduce (boolToIntLiteral (i <= j))
-  $(namePat 'GHC.Prim.ord#) | [i] <- charLiterals' args
-    -> reduce (integerToIntLiteral (toInteger $ ord i))
-
-----------------
--- GHC.Prim.Int#
-----------------
-  $(namePat '(GHC.Prim.+#)) | Just (i,j) <- intLiterals args
-    -> reduce (integerToIntLiteral (i+j))
-  $(namePat '(GHC.Prim.-#)) | Just (i,j) <- intLiterals args
-    -> reduce (integerToIntLiteral (i-j))
-  $(namePat '(GHC.Prim.*#)) | Just (i,j) <- intLiterals args
-    -> reduce (integerToIntLiteral (i*j))
-
-  $(namePat 'GHC.Prim.mulIntMayOflo#) | Just (i,j) <- intLiterals  args
-    -> let !(I# a)  = fromInteger i
-           !(I# b)  = fromInteger j
-           c :: Int#
-           c = mulIntMayOflo# a b
-       in  reduce (integerToIntLiteral (toInteger $ I# c))
-
-  $(namePat 'GHC.Prim.quotInt#) | Just (i,j) <- intLiterals args
-    -> reduce $ catchDivByZero (integerToIntLiteral (i `quot` j))
-  $(namePat 'GHC.Prim.remInt#) | Just (i,j) <- intLiterals args
-    -> reduce $ catchDivByZero (integerToIntLiteral (i `rem` j))
-  $(namePat 'GHC.Prim.quotRemInt#) | Just (i,j) <- intLiterals args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           (q,r)   = quotRem i j
-           ret     = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left $ catchDivByZero (integerToIntLiteral q)
-                    ,Left $ catchDivByZero (integerToIntLiteral r)])
-       in  reduce ret
-
-  $(namePat 'GHC.Prim.andI#) | Just (i,j) <- intLiterals args
-    -> reduce (integerToIntLiteral (i .&. j))
-  $(namePat 'GHC.Prim.orI#) | Just (i,j) <- intLiterals args
-    -> reduce (integerToIntLiteral (i .|. j))
-  $(namePat 'GHC.Prim.xorI#) | Just (i,j) <- intLiterals args
-    -> reduce (integerToIntLiteral (i `xor` j))
-  $(namePat 'GHC.Prim.notI#) | [i] <- intLiterals' args
-    -> reduce (integerToIntLiteral (complement i))
-
-  $(namePat 'GHC.Prim.negateInt#)
-    | [Lit (IntLiteral i)] <- args
-    -> reduce (integerToIntLiteral (negate i))
-
-  $(namePat 'GHC.Prim.addIntC#) | Just (i,j) <- intLiterals args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(I# a)  = fromInteger i
-           !(I# b)  = fromInteger j
-           !(# d, c #) = addIntC# a b
-       in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral . toInteger $ I# d)
-                   , Left (Literal . IntLiteral . toInteger $ I# c)])
-  $(namePat 'GHC.Prim.subIntC#) | Just (i,j) <- intLiterals args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(I# a)  = fromInteger i
-           !(I# b)  = fromInteger j
-           !(# d, c #) = subIntC# a b
-       in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral . toInteger $ I# d)
-                   , Left (Literal . IntLiteral . toInteger $ I# c)])
-
-  $(namePat '(GHC.Prim.>#)) | Just (i,j) <- intLiterals args
-    -> reduce (boolToIntLiteral (i > j))
-  $(namePat '(GHC.Prim.>=#)) | Just (i,j) <- intLiterals args
-    -> reduce (boolToIntLiteral (i >= j))
-  $(namePat '(GHC.Prim.==#)) | Just (i,j) <- intLiterals args
-    -> reduce (boolToIntLiteral (i == j))
-  $(namePat '(GHC.Prim./=#)) | Just (i,j) <- intLiterals args
-    -> reduce (boolToIntLiteral (i /= j))
-  $(namePat '(GHC.Prim.<#))| Just (i,j) <- intLiterals args
-    -> reduce (boolToIntLiteral (i < j))
-  $(namePat '(GHC.Prim.<=#)) | Just (i,j) <- intLiterals args
-    -> reduce (boolToIntLiteral (i <= j))
-
-  $(namePat 'GHC.Prim.chr#) | [i] <- intLiterals' args
-    -> reduce (catchErrorCall (charToCharLiteral (chr $ fromInteger i)))
-
-  $(namePat 'GHC.Prim.int2Word#)
-    | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behavior
-
-  $(namePat 'GHC.Prim.int2Float#)
-    | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . FloatLiteral  . castFloatToWord32 $ fromInteger i
-  $(namePat 'GHC.Prim.int2Double#)
-    | [Lit (IntLiteral i)] <- args
-    -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ fromInteger i
-
-  $(namePat 'GHC.Prim.word2Float#)
-    | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . FloatLiteral  . castFloatToWord32 $ fromInteger i
-  $(namePat 'GHC.Prim.word2Double#)
-    | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ fromInteger i
-
-  $(namePat 'GHC.Prim.uncheckedIShiftL#)
-    | [ Lit (IntLiteral i)
-      , Lit (IntLiteral s)
-      ] <- args
-    -> reduce (integerToIntLiteral (i `shiftL` fromInteger s))
-  $(namePat 'GHC.Prim.uncheckedIShiftRA#)
-    | [ Lit (IntLiteral i)
-      , Lit (IntLiteral s)
-      ] <- args
-    -> reduce (integerToIntLiteral (i `shiftR` fromInteger s))
-  $(namePat 'GHC.Prim.uncheckedIShiftRL#) | Just (i,j) <- intLiterals args
-    -> let !(I# a)  = fromInteger i
-           !(I# b)  = fromInteger j
-           c :: Int#
-           c = uncheckedIShiftRL# a b
-       in  reduce (integerToIntLiteral (toInteger $ I# c))
-
------------------
--- GHC.Prim.Word#
------------------
-  $(namePat 'GHC.Prim.plusWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (integerToWordLiteral (i+j))
-
-  $(namePat 'GHC.Prim.subWordC#) | Just (i,j) <- wordLiterals args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(W# a)  = fromInteger i
-           !(W# b)  = fromInteger j
-           !(# d, c #) = subWordC# a b
-       in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . WordLiteral . toInteger $ W# d)
-                   , Left (Literal . IntLiteral . toInteger $ I# c)])
-
-  $(namePat 'GHC.Prim.plusWord2#) | Just (i,j) <- wordLiterals args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(W# a)  = fromInteger i
-           !(W# b)  = fromInteger j
-           !(# h', l #) = plusWord2# a b
-       in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . WordLiteral . toInteger $ W# h')
-                   , Left (Literal . WordLiteral . toInteger $ W# l)])
-
-  $(namePat 'GHC.Prim.minusWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (integerToWordLiteral (i-j))
-  $(namePat 'GHC.Prim.timesWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (integerToWordLiteral (i*j))
-
-  $(namePat 'GHC.Prim.timesWord2#) | Just (i,j) <- wordLiterals args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(W# a)  = fromInteger i
-           !(W# b)  = fromInteger j
-           !(# h', l #) = timesWord2# a b
-       in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . WordLiteral . toInteger $ W# h')
-                   , Left (Literal . WordLiteral . toInteger $ W# l)])
-
-  $(namePat 'GHC.Prim.quotWord#) | Just (i,j) <- wordLiterals args
-    -> reduce $ catchDivByZero (integerToWordLiteral (i `quot` j))
-  $(namePat 'GHC.Prim.remWord#) | Just (i,j) <- wordLiterals args
-    -> reduce $ catchDivByZero (integerToWordLiteral (i `rem` j))
-  $(namePat 'GHC.Prim.quotRemWord#) | Just (i,j) <- wordLiterals args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           (q,r)   = quotRem i j
-           ret     = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left $ catchDivByZero (integerToWordLiteral q)
-                    ,Left $ catchDivByZero (integerToWordLiteral r)])
-       in  reduce ret
-  $(namePat 'GHC.Prim.quotRemWord2#) | [i,j,k'] <- wordLiterals' args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(W# a)  = fromInteger i
-           !(W# b)  = fromInteger j
-           !(W# c)  = fromInteger k'
-           !(# x, y #) = quotRemWord2# a b c
-       in  reduce $
-           mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left $ catchDivByZero (Literal . WordLiteral . toInteger $ W# x)
-                   , Left $ catchDivByZero (Literal . WordLiteral . toInteger $ W# y)])
-
-  $(namePat 'GHC.Prim.and#) | Just (i,j) <- wordLiterals args
-    -> reduce (integerToWordLiteral (i .&. j))
-  $(namePat 'GHC.Prim.or#) | Just (i,j) <- wordLiterals args
-    -> reduce (integerToWordLiteral (i .|. j))
-  $(namePat 'GHC.Prim.xor#) | Just (i,j) <- wordLiterals args
-    -> reduce (integerToWordLiteral (i `xor` j))
-  $(namePat 'GHC.Prim.not#) | [i] <- wordLiterals' args
-    -> reduce (integerToWordLiteral (complement i))
-
-  $(namePat 'GHC.Prim.uncheckedShiftL#)
-    | [ Lit (WordLiteral w)
-      , Lit (IntLiteral  i)
-      ] <- args
-    -> reduce (Literal (WordLiteral (w `shiftL` fromInteger i)))
-  $(namePat 'GHC.Prim.uncheckedShiftRL#)
-    | [ Lit (WordLiteral w)
-      , Lit (IntLiteral  i)
-      ] <- args
-    -> reduce (Literal (WordLiteral (w `shiftR` fromInteger i)))
-
-  $(namePat 'GHC.Prim.word2Int#)
-    | [Lit (WordLiteral i)] <- args
-    -> reduce . Literal . IntLiteral . toInteger $ (fromInteger :: Integer -> Int) i -- for overflow behavior
-
-  $(namePat 'GHC.Prim.gtWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (boolToIntLiteral (i > j))
-  $(namePat 'GHC.Prim.geWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (boolToIntLiteral (i >= j))
-  $(namePat 'GHC.Prim.eqWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (boolToIntLiteral (i == j))
-  $(namePat 'GHC.Prim.neWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (boolToIntLiteral (i /= j))
-  $(namePat 'GHC.Prim.ltWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (boolToIntLiteral (i < j))
-  $(namePat 'GHC.Prim.leWord#) | Just (i,j) <- wordLiterals args
-    -> reduce (boolToIntLiteral (i <= j))
-
-  $(namePat 'GHC.Prim.popCnt8#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word8) $ i
-  $(namePat 'GHC.Prim.popCnt16#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word16) $ i
-  $(namePat 'GHC.Prim.popCnt32#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word32) $ i
-  $(namePat 'GHC.Prim.popCnt64#) | [i] <- word64Literals' args
-    -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word64) $ i
-  $(namePat 'GHC.Prim.popCnt#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word) $ i
-
-  $(namePat 'GHC.Prim.clz8#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word8) $ i
-  $(namePat 'GHC.Prim.clz16#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word16) $ i
-  $(namePat 'GHC.Prim.clz32#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word32) $ i
-  $(namePat 'GHC.Prim.clz64#) | [i] <- word64Literals' args
-    -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word64) $ i
-  $(namePat 'GHC.Prim.clz#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word) $ i
-
-  $(namePat 'GHC.Prim.ctz8#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 8 - 1)
-  $(namePat 'GHC.Prim.ctz16#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 16 - 1)
-  $(namePat 'GHC.Prim.ctz32#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 32 - 1)
-  $(namePat 'GHC.Prim.ctz64#) | [i] <- word64Literals' args
-    -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word64) $ i .&. (bit 64 - 1)
-  $(namePat 'GHC.Prim.ctz#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i
-
-  $(namePat 'GHC.Prim.byteSwap16#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . byteSwap16 . (fromInteger :: Integer -> Word16) $ i
-  $(namePat 'GHC.Prim.byteSwap32#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . byteSwap32 . (fromInteger :: Integer -> Word32) $ i
-  $(namePat 'GHC.Prim.byteSwap64#) | [i] <- word64Literals' args
-    -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
-  $(namePat 'GHC.Prim.byteSwap#) | [i] <- wordLiterals' args -- assume 64bits
-    -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
-
-  $(namePat 'GHC.Prim.bitReverse#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i -- assume 64bits
-  $(namePat 'GHC.Prim.bitReverse8#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . bitReverse8 . fromInteger $ i
-  $(namePat 'GHC.Prim.bitReverse16#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . bitReverse16 . fromInteger $ i
-  $(namePat 'GHC.Prim.bitReverse32#) | [i] <- wordLiterals' args
-    -> reduce . integerToWordLiteral . toInteger . bitReverse32 . fromInteger $ i
-  $(namePat 'GHC.Prim.bitReverse64#) | [i] <- word64Literals' args
-    -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i
-------------
--- Narrowing
-------------
-  $(namePat 'GHC.Prim.narrow8Int#) | [i] <- intLiterals' args
-    -> let !(I# a)  = fromInteger i
-           b = narrow8Int# a
-       in  reduce . Literal . IntLiteral . toInteger $ I# b
-  $(namePat 'GHC.Prim.narrow16Int#) | [i] <- intLiterals' args
-    -> let !(I# a)  = fromInteger i
-           b = narrow16Int# a
-       in  reduce . Literal . IntLiteral . toInteger $ I# b
-  $(namePat 'GHC.Prim.narrow32Int#) | [i] <- intLiterals' args
-    -> let !(I# a)  = fromInteger i
-           b = narrow32Int# a
-       in  reduce . Literal . IntLiteral . toInteger $ I# b
-  $(namePat 'GHC.Prim.narrow8Word#) | [i] <- wordLiterals' args
-    -> let !(W# a)  = fromInteger i
-           b = narrow8Word# a
-       in  reduce . Literal . WordLiteral . toInteger $ W# b
-  $(namePat 'GHC.Prim.narrow16Word#) | [i] <- wordLiterals' args
-    -> let !(W# a)  = fromInteger i
-           b = narrow16Word# a
-       in  reduce . Literal . WordLiteral . toInteger $ W# b
-  $(namePat 'GHC.Prim.narrow32Word#) | [i] <- wordLiterals' args
-    -> let !(W# a)  = fromInteger i
-           b = narrow32Word# a
-       in  reduce . Literal . WordLiteral . toInteger $ W# b
-
---------
--- Int8#
---------
-  $(namePat 'GHC.Prim.intToInt8#) | [i] <- intLiterals' args
-    -> let !(I# a)  = fromInteger i
-           b = narrow8Int# a
-       in  reduce . Literal . Int8Literal . toInteger $ I# b
-  $(namePat 'GHC.Prim.int8ToInt#) | [i] <- int8Literals' args
-    -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt8" | [i] <- int8Literals' args
-    -> let !(I8# a) = fromInteger i
-        in reduce (Literal (Int8Literal (toInteger (I8# (negateInt8# a)))))
-  $(namePat 'GHC.Prim.plusInt8#) | Just r <- liftI8 plusInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subInt8#) | Just r <- liftI8 subInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesInt8#) | Just r <- liftI8 timesInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotInt8#) | [i, j] <- int8Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int8Literal (toInteger (fromInteger i `quot` fromInteger j :: Int8))))
-  $(namePat 'GHC.Prim.remInt8#) | [i, j] <- int8Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int8Literal (toInteger (fromInteger i `rem` fromInteger j :: Int8))))
-  $(namePat 'GHC.Prim.quotRemInt8#)
-    | [i, j] <- int8Literals' args
-    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (q,r) = quotRem (fromInteger i :: Int8) (fromInteger j)
-       in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left $ catchDivByZero (Literal (Int8Literal (toInteger q)))
-                  , Left $ catchDivByZero (Literal (Int8Literal (toInteger r)))])
-  $(namePat 'GHC.Prim.uncheckedShiftLInt8#) | Just r <- liftI8I uncheckedShiftLInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRAInt8#) | Just r <- liftI8I uncheckedShiftRAInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRLInt8#) | Just r <- liftI8I uncheckedShiftRLInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.int8ToWord8#) | [i] <- int8Literals' args
-    -> let !(I8# a) = fromInteger i
-        in reduce (Literal (Word8Literal (toInteger (W8# (int8ToWord8# a)))))
-  $(namePat 'GHC.Prim.eqInt8#) | Just r <- liftI8RI eqInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geInt8#) | Just r <- liftI8RI geInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtInt8#) | Just r <- liftI8RI gtInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leInt8#) | Just r <- liftI8RI leInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltInt8#) | Just r <- liftI8RI ltInt8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neInt8#) | Just r <- liftI8RI neInt8# args
-    -> reduce r
-
----------
--- Int16#
----------
-  $(namePat 'GHC.Prim.intToInt16#) | [i] <- intLiterals' args
-    -> let !(I# a)  = fromInteger i
-           b = narrow16Int# a
-       in  reduce . Literal . Int16Literal . toInteger $ I# b
-  $(namePat 'GHC.Prim.int16ToInt#) | [i] <- int16Literals' args
-    -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt16" | [i] <- int16Literals' args
-    -> let !(I16# a) = fromInteger i
-        in reduce (Literal (Int16Literal (toInteger (I16# (negateInt16# a)))))
-  $(namePat 'GHC.Prim.plusInt16#) | Just r <- liftI16 plusInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subInt16#) | Just r <- liftI16 subInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesInt16#) | Just r <- liftI16 timesInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotInt16#) | [i, j] <- int16Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int16Literal (toInteger (fromInteger i `quot` fromInteger j :: Int16))))
-  $(namePat 'GHC.Prim.remInt16#) | [i, j] <- int16Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int16Literal (toInteger (fromInteger i `rem` fromInteger j :: Int16))))
-  $(namePat 'GHC.Prim.quotRemInt16#)
-    | [i, j] <- int16Literals' args
-    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (q,r) = quotRem (fromInteger i :: Int16) (fromInteger j)
-       in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left $ catchDivByZero (Literal (Int16Literal (toInteger q)))
-                  , Left $ catchDivByZero (Literal (Int16Literal (toInteger r)))])
-  $(namePat 'GHC.Prim.uncheckedShiftLInt16#) | Just r <- liftI16I uncheckedShiftLInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRAInt16#) | Just r <- liftI16I uncheckedShiftRAInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRLInt16#) | Just r <- liftI16I uncheckedShiftRLInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.int16ToWord16#) | [i] <- int16Literals' args
-    -> let !(I16# a) = fromInteger i
-        in reduce (Literal (Word16Literal (toInteger (W16# (int16ToWord16# a)))))
-  $(namePat 'GHC.Prim.eqInt16#) | Just r <- liftI16RI eqInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geInt16#) | Just r <- liftI16RI geInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtInt16#) | Just r <- liftI16RI gtInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leInt16#) | Just r <- liftI16RI leInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltInt16#) | Just r <- liftI16RI ltInt16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neInt16#) | Just r <- liftI16RI neInt16# args
-    -> reduce r
-
----------
--- Int32#
----------
-  $(namePat 'GHC.Prim.intToInt32#) | [i] <- intLiterals' args
-    -> let !(I# a)  = fromInteger i
-           b = narrow32Int# a
-       in  reduce . Literal . Int32Literal . toInteger $ I# b
-  $(namePat 'GHC.Prim.int32ToInt#) | [i] <- int32Literals' args
-    -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt32" | [i] <- int32Literals' args
-    -> let !(I32# a) = fromInteger i
-        in reduce (Literal (Int32Literal (toInteger (I32# (negateInt32# a)))))
-  $(namePat 'GHC.Prim.plusInt32#) | Just r <- liftI32 plusInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subInt32#) | Just r <- liftI32 subInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesInt32#) | Just r <- liftI32 timesInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotInt32#) | [i, j] <- int32Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int32Literal (toInteger (fromInteger i `quot` fromInteger j :: Int32))))
-  $(namePat 'GHC.Prim.remInt32#) | [i, j] <- int32Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int32Literal (toInteger (fromInteger i `rem` fromInteger j :: Int32))))
-  $(namePat 'GHC.Prim.quotRemInt32#)
-    | [i, j] <- int32Literals' args
-    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (q,r) = quotRem (fromInteger i :: Int32) (fromInteger j)
-       in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left $ catchDivByZero (Literal (Int32Literal (toInteger q)))
-                  , Left $ catchDivByZero (Literal (Int32Literal (toInteger r)))])
-  $(namePat 'GHC.Prim.uncheckedShiftLInt32#) | Just r <- liftI32I uncheckedShiftLInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRAInt32#) | Just r <- liftI32I uncheckedShiftRAInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRLInt32#) | Just r <- liftI32I uncheckedShiftRLInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.int32ToWord32#) | [i] <- int32Literals' args
-    -> let !(I32# a) = fromInteger i
-        in reduce (Literal (Word32Literal (toInteger (W32# (int32ToWord32# a)))))
-  $(namePat 'GHC.Prim.eqInt32#) | Just r <- liftI32RI eqInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geInt32#) | Just r <- liftI32RI geInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtInt32#) | Just r <- liftI32RI gtInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leInt32#) | Just r <- liftI32RI leInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltInt32#) | Just r <- liftI32RI ltInt32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neInt32#) | Just r <- liftI32RI neInt32# args
-    -> reduce r
-
----------
--- Int64#
----------
-  $(namePat 'GHC.Prim.intToInt64#) | [i] <- intLiterals' args
-    -> reduce (Literal (Int64Literal i))
-  $(namePat 'GHC.Prim.int64ToInt#) | [i] <- int64Literals' args
-    -> reduce . Literal $ IntLiteral i
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.negateInt64" | [i] <- int64Literals' args
-    -> let !(I64# a) = fromInteger i
-        in reduce (Literal (Int64Literal (toInteger (I64# (negateInt64# a)))))
-  $(namePat 'GHC.Prim.plusInt64#) | Just r <- liftI64 plusInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subInt64#) | Just r <- liftI64 subInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesInt64#) | Just r <- liftI64 timesInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotInt64#) | [i, j] <- int64Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int64Literal (toInteger (fromInteger i `quot` fromInteger j :: Int64))))
-  $(namePat 'GHC.Prim.remInt64#) | [i, j] <- int64Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Int64Literal (toInteger (fromInteger i `rem` fromInteger j :: Int64))))
-  $(namePat 'GHC.Prim.uncheckedIShiftL64#) | Just r <- liftI64I uncheckedIShiftL64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedIShiftRA64#) | Just r <- liftI64I uncheckedIShiftRA64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedIShiftRL64#) | Just r <- liftI64I uncheckedIShiftRL64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.int64ToWord64#) | [i] <- int64Literals' args
-    -> let !(I64# a) = fromInteger i
-        in reduce (Literal (Word64Literal (toInteger (W64# (int64ToWord64# a)))))
-  $(namePat 'GHC.Prim.eqInt64#) | Just r <- liftI64RI eqInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geInt64#) | Just r <- liftI64RI geInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtInt64#) | Just r <- liftI64RI gtInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leInt64#) | Just r <- liftI64RI leInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltInt64#) | Just r <- liftI64RI ltInt64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neInt64#) | Just r <- liftI64RI neInt64# args
-    -> reduce r
-
----------
--- Word8#
----------
-  $(namePat 'GHC.Prim.wordToWord8#) | [i] <- wordLiterals' args
-    -> let !(W# a)  = fromInteger i
-           b = narrow8Word# a
-       in  reduce . Literal . Word8Literal . toInteger $ W# b
-  $(namePat 'GHC.Prim.word8ToWord#) | [i] <- word8Literals' args
-    -> reduce . Literal $ WordLiteral i
-  $(namePat 'GHC.Prim.plusWord8#) | Just r <- liftW8 plusWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subWord8#) | Just r <- liftW8 subWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesWord8#) | Just r <- liftW8 timesWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotWord8#) | [i, j] <- word8Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word8Literal (toInteger (fromInteger i `quot` fromInteger j :: Word8))))
-  $(namePat 'GHC.Prim.remWord8#) | [i, j] <- word8Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word8Literal (toInteger (fromInteger i `rem` fromInteger j :: Word8))))
-  $(namePat 'GHC.Prim.quotRemWord8#)
-    | [i, j] <- word8Literals' args
-    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (q,r) = quotRem (fromInteger i :: Word8) (fromInteger j)
-       in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left $ catchDivByZero (Literal (Word8Literal (toInteger q)))
-                  , Left $ catchDivByZero (Literal (Word8Literal (toInteger r)))])
-  $(namePat 'GHC.Prim.andWord8#) | Just r <- liftW8 andWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.orWord8#) | Just r <- liftW8 orWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.xorWord8#) | Just r <- liftW8 xorWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.notWord8#) | [i] <- word8Literals' args
-    -> let !(W8# a) = fromInteger i
-        in reduce (Literal (Word8Literal (toInteger (W8# (notWord8# a)))))
-  $(namePat 'GHC.Prim.uncheckedShiftLWord8#) | Just r <- liftW8I uncheckedShiftLWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRLWord8#) | Just r <- liftW8I uncheckedShiftRLWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.word8ToInt8#) | [i] <- word8Literals' args
-    -> let !(W8# a) = fromInteger i
-        in reduce (Literal (Int8Literal (toInteger (I8# (word8ToInt8# a)))))
-  $(namePat 'GHC.Prim.eqWord8#) | Just r <- liftW8RI eqWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geWord8#) | Just r <- liftW8RI geWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtWord8#) | Just r <- liftW8RI gtWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leWord8#) | Just r <- liftW8RI leWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltWord8#) | Just r <- liftW8RI ltWord8# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neWord8#) | Just r <- liftW8RI neWord8# args
-    -> reduce r
-
-----------
--- Word16#
-----------
-  $(namePat 'GHC.Prim.wordToWord16#) | [i] <- wordLiterals' args
-    -> let !(W# a)  = fromInteger i
-           b = narrow16Word# a
-       in  reduce . Literal . Word16Literal . toInteger $ W# b
-  $(namePat 'GHC.Prim.word16ToWord#) | [i] <- word16Literals' args
-    -> reduce . Literal $ WordLiteral i
-  $(namePat 'GHC.Prim.plusWord16#) | Just r <- liftW16 plusWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subWord16#) | Just r <- liftW16 subWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesWord16#) | Just r <- liftW16 timesWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotWord16#) | [i, j] <- word16Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word16Literal (toInteger (fromInteger i `quot` fromInteger j :: Word16))))
-  $(namePat 'GHC.Prim.remWord16#) | [i, j] <- word16Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word16Literal (toInteger (fromInteger i `rem` fromInteger j :: Word16))))
-  $(namePat 'GHC.Prim.quotRemWord16#)
-    | [i, j] <- word16Literals' args
-    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (q,r) = quotRem (fromInteger i :: Word16) (fromInteger j)
-       in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left $ catchDivByZero (Literal (Word16Literal (toInteger q)))
-                  , Left $ catchDivByZero (Literal (Word16Literal (toInteger r)))])
-  $(namePat 'GHC.Prim.andWord16#) | Just r <- liftW16 andWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.orWord16#) | Just r <- liftW16 orWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.xorWord16#) | Just r <- liftW16 xorWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.notWord16#) | [i] <- word16Literals' args
-    -> let !(W16# a) = fromInteger i
-        in reduce (Literal (Word16Literal (toInteger (W16# (notWord16# a)))))
-  $(namePat 'GHC.Prim.uncheckedShiftLWord16#) | Just r <- liftW16I uncheckedShiftLWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRLWord16#) | Just r <- liftW16I uncheckedShiftRLWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.word16ToInt16#) | [i] <- word16Literals' args
-    -> let !(W16# a) = fromInteger i
-        in reduce (Literal (Int16Literal (toInteger (I16# (word16ToInt16# a)))))
-  $(namePat 'GHC.Prim.eqWord16#) | Just r <- liftW16RI eqWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geWord16#) | Just r <- liftW16RI geWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtWord16#) | Just r <- liftW16RI gtWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leWord16#) | Just r <- liftW16RI leWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltWord16#) | Just r <- liftW16RI ltWord16# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neWord16#) | Just r <- liftW16RI neWord16# args
-    -> reduce r
-
-----------
--- Word32#
-----------
-  $(namePat 'GHC.Prim.wordToWord32#) | [i] <- wordLiterals' args
-    -> let !(W# a)  = fromInteger i
-           b = narrow32Word# a
-       in  reduce . Literal . Word32Literal . toInteger $ W# b
-  $(namePat 'GHC.Prim.word32ToWord#) | [i] <- word32Literals' args
-    -> reduce . Literal $ WordLiteral i
-  $(namePat 'GHC.Prim.plusWord32#) | Just r <- liftW32 plusWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subWord32#) | Just r <- liftW32 subWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesWord32#) | Just r <- liftW32 timesWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotWord32#) | [i, j] <- word32Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word32Literal (toInteger (fromInteger i `quot` fromInteger j :: Word32))))
-  $(namePat 'GHC.Prim.remWord32#) | [i, j] <- word32Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word32Literal (toInteger (fromInteger i `rem` fromInteger j :: Word32))))
-  $(namePat 'GHC.Prim.quotRemWord32#)
-    | [i, j] <- word32Literals' args
-    , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (q,r) = quotRem (fromInteger i :: Word32) (fromInteger j)
-       in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left $ catchDivByZero (Literal (Word32Literal (toInteger q)))
-                  , Left $ catchDivByZero (Literal (Word32Literal (toInteger r)))])
-  $(namePat 'GHC.Prim.andWord32#) | Just r <- liftW32 andWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.orWord32#) | Just r <- liftW32 orWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.xorWord32#) | Just r <- liftW32 xorWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.notWord32#) | [i] <- word32Literals' args
-    -> let !(W32# a) = fromInteger i
-        in reduce (Literal (Word32Literal (toInteger (W32# (notWord32# a)))))
-  $(namePat 'GHC.Prim.uncheckedShiftLWord32#) | Just r <- liftW32I uncheckedShiftLWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRLWord32#) | Just r <- liftW32I uncheckedShiftRLWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.word32ToInt32#) | [i] <- word32Literals' args
-    -> let !(W32# a) = fromInteger i
-        in reduce (Literal (Int32Literal (toInteger (I32# (word32ToInt32# a)))))
-  $(namePat 'GHC.Prim.eqWord32#) | Just r <- liftW32RI eqWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geWord32#) | Just r <- liftW32RI geWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtWord32#) | Just r <- liftW32RI gtWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leWord32#) | Just r <- liftW32RI leWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltWord32#) | Just r <- liftW32RI ltWord32# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neWord32#) | Just r <- liftW32RI neWord32# args
-    -> reduce r
-
-----------
--- Word64#
-----------
-  $(namePat 'GHC.Prim.wordToWord64#) | [i] <- wordLiterals' args
-    -> reduce (Literal (Word64Literal i))
-  $(namePat 'GHC.Prim.word64ToWord#) | [i] <- word64Literals' args
-    -> reduce . Literal $ WordLiteral i
-  $(namePat 'GHC.Prim.plusWord64#) | Just r <- liftW64 plusWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.subWord64#) | Just r <- liftW64 subWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesWord64#) | Just r <- liftW64 timesWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.quotWord64#) | [i, j] <- word64Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word64Literal (toInteger (fromInteger i `quot` fromInteger j :: Word64))))
-  $(namePat 'GHC.Prim.remWord64#) | [i, j] <- word64Literals' args
-    -> reduce $ catchDivByZero
-         (Literal (Word64Literal (toInteger (fromInteger i `rem` fromInteger j :: Word64))))
-  $(namePat 'GHC.Prim.and64#) | Just r <- liftW64 and64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.or64#) | Just r <- liftW64 or64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.xor64#) | Just r <- liftW64 xor64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.not64#) | [i] <- word64Literals' args
-    -> let !(W64# a) = fromInteger i
-        in reduce (Literal (Word64Literal (toInteger (W64# (not64# a)))))
-  $(namePat 'GHC.Prim.uncheckedShiftL64#) | Just r <- liftW64I uncheckedShiftL64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.uncheckedShiftRL64#) | Just r <- liftW64I uncheckedShiftRL64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.word64ToInt64#) | [i] <- word64Literals' args
-    -> let !(W64# a) = fromInteger i
-        in reduce (Literal (Int64Literal (toInteger (I64# (word64ToInt64# a)))))
-  $(namePat 'GHC.Prim.eqWord64#) | Just r <- liftW64RI eqWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geWord64#) | Just r <- liftW64RI geWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.gtWord64#) | Just r <- liftW64RI gtWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leWord64#) | Just r <- liftW64RI leWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltWord64#) | Just r <- liftW64RI ltWord64# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neWord64#) | Just r <- liftW64RI neWord64# args
-    -> reduce r
-
-----------
--- Double#
-----------
-  $(namePat '(GHC.Prim.>##))  | Just r <- liftDDI (>##)  args
-    -> reduce r
-  $(namePat '(GHC.Prim.>=##)) | Just r <- liftDDI (>=##) args
-    -> reduce r
-  $(namePat '(GHC.Prim.==##)) | Just r <- liftDDI (==##) args
-    -> reduce r
-  $(namePat '(GHC.Prim./=##)) | Just r <- liftDDI (/=##) args
-    -> reduce r
-  $(namePat '(GHC.Prim.<##))  | Just r <- liftDDI (<##)  args
-    -> reduce r
-  $(namePat '(GHC.Prim.<=##)) | Just r <- liftDDI (<=##) args
-    -> reduce r
-  $(namePat '(GHC.Prim.+##))  | Just r <- liftDDD (+##)  args
-    -> reduce r
-  $(namePat '(GHC.Prim.-##))  | Just r <- liftDDD (-##)  args
-    -> reduce r
-  $(namePat '(GHC.Prim.*##))  | Just r <- liftDDD (*##)  args
-    -> reduce r
-  $(namePat '(GHC.Prim./##))  | Just r <- liftDDD (/##)  args
-    -> reduce r
-
-  $(namePat 'GHC.Prim.negateDouble#) | Just r <- liftDD negateDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.fabsDouble#) | Just r <- liftDD fabsDouble# args
-    -> reduce r
-
-  $(namePat 'GHC.Prim.double2Int#) | [i] <- doubleLiterals' args
-    -> let !(D# a) = castWord64ToDouble i
-           r = double2Int# a
-       in  reduce . Literal . IntLiteral . toInteger $ I# r
-  $(namePat 'GHC.Prim.double2Float#)
-    | [Lit (DoubleLiteral d)] <- args
-    -> let !(D# a) = castWord64ToDouble d
-           r = double2Float# a
-       in reduce . Literal . FloatLiteral . castFloatToWord32 $ F# r
-
-  $(namePat 'GHC.Prim.expDouble#) | Just r <- liftDD expDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.logDouble#) | Just r <- liftDD logDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.sqrtDouble#) | Just r <- liftDD sqrtDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.sinDouble#) | Just r <- liftDD sinDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.cosDouble#) | Just r <- liftDD cosDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.tanDouble#) | Just r <- liftDD tanDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.asinDouble#) | Just r <- liftDD asinDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.acosDouble#) | Just r <- liftDD acosDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.atanDouble#) | Just r <- liftDD atanDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.sinhDouble#) | Just r <- liftDD sinhDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.coshDouble#) | Just r <- liftDD coshDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.tanhDouble#) | Just r <- liftDD tanhDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.asinhDouble#)  | Just r <- liftDD asinhDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.acoshDouble#)  | Just r <- liftDD acoshDouble# args
-    -> reduce r
-  $(namePat 'GHC.Prim.atanhDouble#)  | Just r <- liftDD atanhDouble# args
-    -> reduce r
-
-  $(namePat '(GHC.Prim.**##)) | Just r <- liftDDD (**##) args
-    -> reduce r
--- decodeDouble_2Int# :: Double# -> (#Int#, Word#, Word#, Int##)
-  $(namePat 'GHC.Prim.decodeDouble_2Int#) | [i] <- doubleLiterals' args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(D# a) = castWord64ToDouble i
-           !(# p, q, r, s #) = decodeDouble_2Int# a
-       in reduce $
-          mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
-                   , Left (Literal . WordLiteral . toInteger $ W# q)
-                   , Left (Literal . WordLiteral . toInteger $ W# r)
-                   , Left (Literal . IntLiteral  . toInteger $ I# s)])
--- decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
-  $(namePat 'GHC.Prim.decodeDouble_Int64#) | [i] <- doubleLiterals' args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(D# a) = castWord64ToDouble i
-           !(# p, q #) = decodeDouble_Int64# a
-       in reduce $
-          mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . Int64Literal  . toInteger $ I64# p)
-                   , Left (Literal . IntLiteral  . toInteger $ I# q)])
-
---------
--- Float
---------
-  $(namePat 'GHC.Prim.gtFloat#)  | Just r <- liftFFI gtFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.geFloat#)  | Just r <- liftFFI geFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.eqFloat#)  | Just r <- liftFFI eqFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.neFloat#)  | Just r <- liftFFI neFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.ltFloat#)  | Just r <- liftFFI ltFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.leFloat#)  | Just r <- liftFFI leFloat# args
-    -> reduce r
-
-  $(namePat 'GHC.Prim.plusFloat#)  | Just r <- liftFFF plusFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.minusFloat#)  | Just r <- liftFFF minusFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.timesFloat#)  | Just r <- liftFFF timesFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.divideFloat#)  | Just r <- liftFFF divideFloat# args
-    -> reduce r
-
-  $(namePat 'GHC.Prim.negateFloat#)  | Just r <- liftFF negateFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.fabsFloat#)  | Just r <- liftFF fabsFloat# args
-    -> reduce r
-
-  $(namePat 'GHC.Prim.float2Int#) | [i] <- floatLiterals' args
-    -> let !(F# a) = castWord32ToFloat i
-           r = float2Int# a
-       in  reduce . Literal . IntLiteral . toInteger $ I# r
-
-  $(namePat 'GHC.Prim.expFloat#)  | Just r <- liftFF expFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.logFloat#)  | Just r <- liftFF logFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.sqrtFloat#)  | Just r <- liftFF sqrtFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.sinFloat#)  | Just r <- liftFF sinFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.cosFloat#)  | Just r <- liftFF cosFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.tanFloat#)  | Just r <- liftFF tanFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.asinFloat#)  | Just r <- liftFF asinFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.acosFloat#)  | Just r <- liftFF acosFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.atanFloat#)  | Just r <- liftFF atanFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.sinhFloat#)  | Just r <- liftFF sinhFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.coshFloat#)  | Just r <- liftFF coshFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.tanhFloat#)  | Just r <- liftFF tanhFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.powerFloat#)  | Just r <- liftFFF powerFloat# args
-    -> reduce r
-
-  -- GHC.Float.asinh  -- XXX: Very fragile
-  --  $w$casinh is the Double specialisation of asinh
-  --  $w$casinh1 is the Float specialisation of asinh
-  "GHC.Float.$w$casinh" | Just r <- liftDD go args
-    -> reduce r
-    where go f = case asinh (D# f) of
-                   D# f' -> f'
-  "GHC.Float.$w$casinh1" | Just r <- liftFF go args
-    -> reduce r
-    where go f = case asinh (F# f) of
-                   F# f' -> f'
-
-  $(namePat 'GHC.Prim.asinhFloat#)  | Just r <- liftFF asinhFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.acoshFloat#)  | Just r <- liftFF acoshFloat# args
-    -> reduce r
-  $(namePat 'GHC.Prim.atanhFloat#)  | Just r <- liftFF atanhFloat# args
-    -> reduce r
-
-  $(namePat 'GHC.Prim.float2Double#) | [i] <- floatLiterals' args
-    -> let !(F# a) = castWord32ToFloat i
-           r = float2Double# a
-       in  reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# r
-
-
-  $(namePat 'GHC.Prim.newByteArray#)
-    | [iV,PrimVal rwTy _ _] <- args
-    , [i] <- intLiterals' [iV]
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           p = primCount mach
-           lit = Literal (ByteArrayLiteral (fromList (List.genericReplicate i 0)))
-           mbaTy = mkFunTy intPrimTy (last tyArgs)
-           newE = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left (Prim rwTy)
-                    ,Left (mkApps (Prim (PrimInfo (showt ''MutableByteArray#) mbaTy WorkNever SingleResult NoUnfolding))
-                                  [Left (Literal . IntLiteral $ toInteger p)])
-                    ])
-       in Just . setTerm newE $ primInsert p lit mach
-
-  $(namePat 'GHC.Prim.setByteArray#)
-    | [PrimVal _mbaTy _ [baV]
-      ,offV,lenV,cV
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [ba,off,len,c] <- intLiterals' [baV,offV,lenV,cV]
-    -> let Just (Literal (ByteArrayLiteral ba1)) =
-              primLookup (fromInteger ba) mach
-           !(I# off') = fromInteger off
-           !(I# len') = fromInteger len
-           !(I# c')   = fromInteger c
-           ba2 = unsafeDupablePerformIO $ do
-                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
-                  svoid (setByteArray# mba off' len' c')
-                  BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
-           ba3 = Literal (ByteArrayLiteral ba2)
-       in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
-
-  $(namePat 'GHC.Prim.writeWordArray#)
-    | [PrimVal _mbaTy _  [baV]
-      ,iV,wV
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [ba,i] <- intLiterals' [baV,iV]
-    , [w] <- wordLiterals' [wV]
-    -> let Just (Literal (ByteArrayLiteral ba1)) =
-              primLookup (fromInteger ba) mach
-           !(I# i') = fromInteger i
-           !(W# w') = fromIntegral w
-           ba2 = unsafeDupablePerformIO $ do
-                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
-                  svoid (writeWordArray# mba i' w')
-                  BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
-           ba3 = Literal (ByteArrayLiteral ba2)
-       in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
-
-  $(namePat 'GHC.Prim.unsafeFreezeByteArray#)
-    | [PrimVal _mbaTy _ [baV]
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [ba] <-  intLiterals' [baV]
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           Just ba' = primLookup (fromInteger ba) mach
-       in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+  [ ( $(nameFS 'GHC.Prim.gtChar#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- charLiterals args
+      -> reduce (boolToIntLiteral (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geChar#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- charLiterals args
+      -> reduce (boolToIntLiteral (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqChar#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- charLiterals args
+      -> reduce (boolToIntLiteral (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neChar#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- charLiterals args
+      -> reduce (boolToIntLiteral (i /= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltChar#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- charLiterals args
+      -> reduce (boolToIntLiteral (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leChar#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- charLiterals args
+      -> reduce (boolToIntLiteral (i <= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ord#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- charLiterals' args
+      -> reduce (integerToIntLiteral (toInteger $ ord i))
+  
+  ----------------
+  -- GHC.Prim.Int#
+  ----------------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.+#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (integerToIntLiteral (i+j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.-#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (integerToIntLiteral (i-j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.*#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (integerToIntLiteral (i*j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.mulIntMayOflo#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals  args
+      -> let !(I# a)  = fromInteger i
+             !(I# b)  = fromInteger j
+             c :: Int#
+             c = mulIntMayOflo# a b
+         in  reduce (integerToIntLiteral (toInteger $ I# c))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotInt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce $ catchDivByZero (integerToIntLiteral (i `quot` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remInt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce $ catchDivByZero (integerToIntLiteral (i `rem` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemInt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             (q,r)   = quotRem i j
+             ret     = mkApps (Data tupDc) (map Right tyArgs ++
+                      [Left $ catchDivByZero (integerToIntLiteral q)
+                      ,Left $ catchDivByZero (integerToIntLiteral r)])
+         in  reduce ret
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.andI#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (integerToIntLiteral (i .&. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.orI#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (integerToIntLiteral (i .|. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.xorI#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (integerToIntLiteral (i `xor` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.notI#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> reduce (integerToIntLiteral (complement i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.negateInt#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral i)] <- args
+      -> reduce (integerToIntLiteral (negate i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.addIntC#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(I# a)  = fromInteger i
+             !(I# b)  = fromInteger j
+             !(# d, c #) = addIntC# a b
+         in  reduce $
+             mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . IntLiteral . toInteger $ I# d)
+                     , Left (Literal . IntLiteral . toInteger $ I# c)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subIntC#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(I# a)  = fromInteger i
+             !(I# b)  = fromInteger j
+             !(# d, c #) = subIntC# a b
+         in  reduce $
+             mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . IntLiteral . toInteger $ I# d)
+                     , Left (Literal . IntLiteral . toInteger $ I# c)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.>#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (boolToIntLiteral (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.>=#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (boolToIntLiteral (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.==#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (boolToIntLiteral (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim./=#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (boolToIntLiteral (i /= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.<#))
+  , \PrimEnv{..} -> case () of { _| Just (i,j) <- intLiterals args
+      -> reduce (boolToIntLiteral (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.<=#))
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (boolToIntLiteral (i <= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.chr#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> reduce (catchErrorCall (charToCharLiteral (chr $ fromInteger i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int2Word#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral i)] <- args
+      -> reduce . Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behavior
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int2Float#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral i)] <- args
+      -> reduce . Literal . FloatLiteral  . castFloatToWord32 $ fromInteger i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int2Double#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral i)] <- args
+      -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ fromInteger i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word2Float#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (WordLiteral i)] <- args
+      -> reduce . Literal . FloatLiteral  . castFloatToWord32 $ fromInteger i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word2Double#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (WordLiteral i)] <- args
+      -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ fromInteger i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedIShiftL#)
+  , \PrimEnv{..} -> case () of { _
+      | [ Lit (IntLiteral i)
+        , Lit (IntLiteral s)
+        ] <- args
+      -> reduce (integerToIntLiteral (i `shiftL` fromInteger s))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedIShiftRA#)
+  , \PrimEnv{..} -> case () of { _
+      | [ Lit (IntLiteral i)
+        , Lit (IntLiteral s)
+        ] <- args
+      -> reduce (integerToIntLiteral (i `shiftR` fromInteger s))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedIShiftRL#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> let !(I# a)  = fromInteger i
+             !(I# b)  = fromInteger j
+             c :: Int#
+             c = uncheckedIShiftRL# a b
+         in  reduce (integerToIntLiteral (toInteger $ I# c))
+  
+  -----------------
+  -- GHC.Prim.Word#
+  -----------------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (integerToWordLiteral (i+j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subWordC#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(W# a)  = fromInteger i
+             !(W# b)  = fromInteger j
+             !(# d, c #) = subWordC# a b
+         in  reduce $
+             mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . WordLiteral . toInteger $ W# d)
+                     , Left (Literal . IntLiteral . toInteger $ I# c)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusWord2#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(W# a)  = fromInteger i
+             !(W# b)  = fromInteger j
+             !(# h', l #) = plusWord2# a b
+         in  reduce $
+             mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . WordLiteral . toInteger $ W# h')
+                     , Left (Literal . WordLiteral . toInteger $ W# l)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.minusWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (integerToWordLiteral (i-j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (integerToWordLiteral (i*j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesWord2#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(W# a)  = fromInteger i
+             !(W# b)  = fromInteger j
+             !(# h', l #) = timesWord2# a b
+         in  reduce $
+             mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . WordLiteral . toInteger $ W# h')
+                     , Left (Literal . WordLiteral . toInteger $ W# l)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce $ catchDivByZero (integerToWordLiteral (i `quot` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce $ catchDivByZero (integerToWordLiteral (i `rem` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             (q,r)   = quotRem i j
+             ret     = mkApps (Data tupDc) (map Right tyArgs ++
+                      [Left $ catchDivByZero (integerToWordLiteral q)
+                      ,Left $ catchDivByZero (integerToWordLiteral r)])
+         in  reduce ret
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemWord2#)
+  , \PrimEnv{..} -> case () of { _ | [i,j,k'] <- wordLiterals' args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(W# a)  = fromInteger i
+             !(W# b)  = fromInteger j
+             !(W# c)  = fromInteger k'
+             !(# x, y #) = quotRemWord2# a b c
+         in  reduce $
+             mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left $ catchDivByZero (Literal . WordLiteral . toInteger $ W# x)
+                     , Left $ catchDivByZero (Literal . WordLiteral . toInteger $ W# y)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.and#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (integerToWordLiteral (i .&. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.or#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (integerToWordLiteral (i .|. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.xor#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (integerToWordLiteral (i `xor` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.not#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce (integerToWordLiteral (complement i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftL#)
+  , \PrimEnv{..} -> case () of { _
+      | [ Lit (WordLiteral w)
+        , Lit (IntLiteral  i)
+        ] <- args
+      -> reduce (Literal (WordLiteral (w `shiftL` fromInteger i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRL#)
+  , \PrimEnv{..} -> case () of { _
+      | [ Lit (WordLiteral w)
+        , Lit (IntLiteral  i)
+        ] <- args
+      -> reduce (Literal (WordLiteral (w `shiftR` fromInteger i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word2Int#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (WordLiteral i)] <- args
+      -> reduce . Literal . IntLiteral . toInteger $ (fromInteger :: Integer -> Int) i -- for overflow behavior
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (boolToIntLiteral (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (boolToIntLiteral (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (boolToIntLiteral (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (boolToIntLiteral (i /= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (boolToIntLiteral (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leWord#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- wordLiterals args
+      -> reduce (boolToIntLiteral (i <= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.popCnt8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word8) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.popCnt16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word16) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.popCnt32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word32) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.popCnt64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word64) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.popCnt#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.clz8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word8) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.clz16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word16) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.clz32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word32) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.clz64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word64) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.clz#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ctz8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 8 - 1)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ctz16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 16 - 1)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ctz32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 32 - 1)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ctz64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word64) $ i .&. (bit 64 - 1)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ctz#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.byteSwap16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . byteSwap16 . (fromInteger :: Integer -> Word16) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.byteSwap32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . byteSwap32 . (fromInteger :: Integer -> Word32) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.byteSwap64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.byteSwap#) -- assume 64bits
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.bitReverse#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i -- assume 64bits
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.bitReverse8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . bitReverse8 . fromInteger $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.bitReverse16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . bitReverse16 . fromInteger $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.bitReverse32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce . integerToWordLiteral . toInteger . bitReverse32 . fromInteger $ i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.bitReverse64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> reduce . integerToWordLiteral . toInteger . bitReverse64 . fromInteger $ i
+  ------------
+  -- Narrowing
+  ------------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.narrow8Int#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> let !(I# a)  = fromInteger i
+             b = narrow8Int# a
+         in  reduce . Literal . IntLiteral . toInteger $ I# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.narrow16Int#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> let !(I# a)  = fromInteger i
+             b = narrow16Int# a
+         in  reduce . Literal . IntLiteral . toInteger $ I# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.narrow32Int#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> let !(I# a)  = fromInteger i
+             b = narrow32Int# a
+         in  reduce . Literal . IntLiteral . toInteger $ I# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.narrow8Word#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> let !(W# a)  = fromInteger i
+             b = narrow8Word# a
+         in  reduce . Literal . WordLiteral . toInteger $ W# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.narrow16Word#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> let !(W# a)  = fromInteger i
+             b = narrow16Word# a
+         in  reduce . Literal . WordLiteral . toInteger $ W# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.narrow32Word#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> let !(W# a)  = fromInteger i
+             b = narrow32Word# a
+         in  reduce . Literal . WordLiteral . toInteger $ W# b
+  
+  --------
+  -- Int8#
+  --------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.intToInt8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> let !(I# a)  = fromInteger i
+             b = narrow8Int# a
+         in  reduce . Literal . Int8Literal . toInteger $ I# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int8ToInt#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int8Literals' args
+      -> reduce . Literal $ IntLiteral i
+    -- XXX: Primitive does not exist?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Prim.negateInt8"
+  , \PrimEnv{..} -> case () of { _ | [i] <- int8Literals' args
+      -> let !(I8# a) = fromInteger i
+          in reduce (Literal (Int8Literal (toInteger (I8# (negateInt8# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8 plusInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8 subInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8 timesInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotInt8#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int8Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int8Literal (toInteger (fromInteger i `quot` fromInteger j :: Int8))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remInt8#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int8Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int8Literal (toInteger (fromInteger i `rem` fromInteger j :: Int8))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemInt8#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- int8Literals' args
+      , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (q,r) = quotRem (fromInteger i :: Int8) (fromInteger j)
+         in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left $ catchDivByZero (Literal (Int8Literal (toInteger q)))
+                    , Left $ catchDivByZero (Literal (Int8Literal (toInteger r)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftLInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8I uncheckedShiftLInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRAInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8I uncheckedShiftRAInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRLInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8I uncheckedShiftRLInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int8ToWord8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int8Literals' args
+      -> let !(I8# a) = fromInteger i
+          in reduce (Literal (Word8Literal (toInteger (W8# (int8ToWord8# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8RI eqInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8RI geInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8RI gtInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8RI leInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8RI ltInt8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neInt8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI8RI neInt8# args
+      -> reduce r
+  
+  ---------
+  -- Int16#
+  ---------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.intToInt16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> let !(I# a)  = fromInteger i
+             b = narrow16Int# a
+         in  reduce . Literal . Int16Literal . toInteger $ I# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int16ToInt#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int16Literals' args
+      -> reduce . Literal $ IntLiteral i
+    -- XXX: Primitive does not exist?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Prim.negateInt16"
+  , \PrimEnv{..} -> case () of { _ | [i] <- int16Literals' args
+      -> let !(I16# a) = fromInteger i
+          in reduce (Literal (Int16Literal (toInteger (I16# (negateInt16# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16 plusInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16 subInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16 timesInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotInt16#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int16Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int16Literal (toInteger (fromInteger i `quot` fromInteger j :: Int16))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remInt16#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int16Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int16Literal (toInteger (fromInteger i `rem` fromInteger j :: Int16))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemInt16#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- int16Literals' args
+      , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (q,r) = quotRem (fromInteger i :: Int16) (fromInteger j)
+         in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left $ catchDivByZero (Literal (Int16Literal (toInteger q)))
+                    , Left $ catchDivByZero (Literal (Int16Literal (toInteger r)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftLInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16I uncheckedShiftLInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRAInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16I uncheckedShiftRAInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRLInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16I uncheckedShiftRLInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int16ToWord16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int16Literals' args
+      -> let !(I16# a) = fromInteger i
+          in reduce (Literal (Word16Literal (toInteger (W16# (int16ToWord16# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16RI eqInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16RI geInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16RI gtInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16RI leInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16RI ltInt16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neInt16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI16RI neInt16# args
+      -> reduce r
+  
+  ---------
+  -- Int32#
+  ---------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.intToInt32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> let !(I# a)  = fromInteger i
+             b = narrow32Int# a
+         in  reduce . Literal . Int32Literal . toInteger $ I# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int32ToInt#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int32Literals' args
+      -> reduce . Literal $ IntLiteral i
+    -- XXX: Primitive does not exist?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Prim.negateInt32"
+  , \PrimEnv{..} -> case () of { _ | [i] <- int32Literals' args
+      -> let !(I32# a) = fromInteger i
+          in reduce (Literal (Int32Literal (toInteger (I32# (negateInt32# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32 plusInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32 subInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32 timesInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotInt32#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int32Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int32Literal (toInteger (fromInteger i `quot` fromInteger j :: Int32))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remInt32#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int32Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int32Literal (toInteger (fromInteger i `rem` fromInteger j :: Int32))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemInt32#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- int32Literals' args
+      , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (q,r) = quotRem (fromInteger i :: Int32) (fromInteger j)
+         in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left $ catchDivByZero (Literal (Int32Literal (toInteger q)))
+                    , Left $ catchDivByZero (Literal (Int32Literal (toInteger r)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftLInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32I uncheckedShiftLInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRAInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32I uncheckedShiftRAInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRLInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32I uncheckedShiftRLInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int32ToWord32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int32Literals' args
+      -> let !(I32# a) = fromInteger i
+          in reduce (Literal (Word32Literal (toInteger (W32# (int32ToWord32# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32RI eqInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32RI geInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32RI gtInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32RI leInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32RI ltInt32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neInt32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI32RI neInt32# args
+      -> reduce r
+  
+  ---------
+  -- Int64#
+  ---------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.intToInt64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- intLiterals' args
+      -> reduce (Literal (Int64Literal i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int64ToInt#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int64Literals' args
+      -> reduce . Literal $ IntLiteral i
+    -- XXX: Primitive does not exist?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Prim.negateInt64"
+  , \PrimEnv{..} -> case () of { _ | [i] <- int64Literals' args
+      -> let !(I64# a) = fromInteger i
+          in reduce (Literal (Int64Literal (toInteger (I64# (negateInt64# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64 plusInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64 subInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64 timesInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotInt64#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int64Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int64Literal (toInteger (fromInteger i `quot` fromInteger j :: Int64))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remInt64#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- int64Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Int64Literal (toInteger (fromInteger i `rem` fromInteger j :: Int64))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedIShiftL64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64I uncheckedIShiftL64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedIShiftRA64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64I uncheckedIShiftRA64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedIShiftRL64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64I uncheckedIShiftRL64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.int64ToWord64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- int64Literals' args
+      -> let !(I64# a) = fromInteger i
+          in reduce (Literal (Word64Literal (toInteger (W64# (int64ToWord64# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64RI eqInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64RI geInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64RI gtInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64RI leInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64RI ltInt64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neInt64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftI64RI neInt64# args
+      -> reduce r
+  
+  ---------
+  -- Word8#
+  ---------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.wordToWord8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> let !(W# a)  = fromInteger i
+             b = narrow8Word# a
+         in  reduce . Literal . Word8Literal . toInteger $ W# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word8ToWord#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word8Literals' args
+      -> reduce . Literal $ WordLiteral i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8 plusWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8 subWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8 timesWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotWord8#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word8Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word8Literal (toInteger (fromInteger i `quot` fromInteger j :: Word8))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remWord8#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word8Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word8Literal (toInteger (fromInteger i `rem` fromInteger j :: Word8))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemWord8#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- word8Literals' args
+      , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (q,r) = quotRem (fromInteger i :: Word8) (fromInteger j)
+         in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left $ catchDivByZero (Literal (Word8Literal (toInteger q)))
+                    , Left $ catchDivByZero (Literal (Word8Literal (toInteger r)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.andWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8 andWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.orWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8 orWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.xorWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8 xorWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.notWord8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word8Literals' args
+      -> let !(W8# a) = fromInteger i
+          in reduce (Literal (Word8Literal (toInteger (W8# (notWord8# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftLWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8I uncheckedShiftLWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRLWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8I uncheckedShiftRLWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word8ToInt8#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word8Literals' args
+      -> let !(W8# a) = fromInteger i
+          in reduce (Literal (Int8Literal (toInteger (I8# (word8ToInt8# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8RI eqWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8RI geWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8RI gtWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8RI leWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8RI ltWord8# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neWord8#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW8RI neWord8# args
+      -> reduce r
+  
+  ----------
+  -- Word16#
+  ----------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.wordToWord16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> let !(W# a)  = fromInteger i
+             b = narrow16Word# a
+         in  reduce . Literal . Word16Literal . toInteger $ W# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word16ToWord#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word16Literals' args
+      -> reduce . Literal $ WordLiteral i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16 plusWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16 subWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16 timesWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotWord16#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word16Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word16Literal (toInteger (fromInteger i `quot` fromInteger j :: Word16))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remWord16#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word16Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word16Literal (toInteger (fromInteger i `rem` fromInteger j :: Word16))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemWord16#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- word16Literals' args
+      , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (q,r) = quotRem (fromInteger i :: Word16) (fromInteger j)
+         in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left $ catchDivByZero (Literal (Word16Literal (toInteger q)))
+                    , Left $ catchDivByZero (Literal (Word16Literal (toInteger r)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.andWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16 andWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.orWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16 orWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.xorWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16 xorWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.notWord16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word16Literals' args
+      -> let !(W16# a) = fromInteger i
+          in reduce (Literal (Word16Literal (toInteger (W16# (notWord16# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftLWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16I uncheckedShiftLWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRLWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16I uncheckedShiftRLWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word16ToInt16#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word16Literals' args
+      -> let !(W16# a) = fromInteger i
+          in reduce (Literal (Int16Literal (toInteger (I16# (word16ToInt16# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16RI eqWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16RI geWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16RI gtWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16RI leWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16RI ltWord16# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neWord16#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW16RI neWord16# args
+      -> reduce r
+  
+  ----------
+  -- Word32#
+  ----------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.wordToWord32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> let !(W# a)  = fromInteger i
+             b = narrow32Word# a
+         in  reduce . Literal . Word32Literal . toInteger $ W# b
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word32ToWord#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word32Literals' args
+      -> reduce . Literal $ WordLiteral i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32 plusWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32 subWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32 timesWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotWord32#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word32Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word32Literal (toInteger (fromInteger i `quot` fromInteger j :: Word32))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remWord32#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word32Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word32Literal (toInteger (fromInteger i `rem` fromInteger j :: Word32))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotRemWord32#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- word32Literals' args
+      , (_,tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , (Just tupTc) <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (q,r) = quotRem (fromInteger i :: Word32) (fromInteger j)
+         in reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left $ catchDivByZero (Literal (Word32Literal (toInteger q)))
+                    , Left $ catchDivByZero (Literal (Word32Literal (toInteger r)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.andWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32 andWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.orWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32 orWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.xorWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32 xorWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.notWord32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word32Literals' args
+      -> let !(W32# a) = fromInteger i
+          in reduce (Literal (Word32Literal (toInteger (W32# (notWord32# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftLWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32I uncheckedShiftLWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRLWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32I uncheckedShiftRLWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word32ToInt32#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word32Literals' args
+      -> let !(W32# a) = fromInteger i
+          in reduce (Literal (Int32Literal (toInteger (I32# (word32ToInt32# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32RI eqWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32RI geWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32RI gtWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32RI leWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32RI ltWord32# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neWord32#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW32RI neWord32# args
+      -> reduce r
+  
+  ----------
+  -- Word64#
+  ----------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.wordToWord64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- wordLiterals' args
+      -> reduce (Literal (Word64Literal i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word64ToWord#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> reduce . Literal $ WordLiteral i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64 plusWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.subWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64 subWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64 timesWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.quotWord64#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word64Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word64Literal (toInteger (fromInteger i `quot` fromInteger j :: Word64))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.remWord64#)
+  , \PrimEnv{..} -> case () of { _ | [i, j] <- word64Literals' args
+      -> reduce $ catchDivByZero
+           (Literal (Word64Literal (toInteger (fromInteger i `rem` fromInteger j :: Word64))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.and64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64 and64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.or64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64 or64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.xor64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64 xor64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.not64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> let !(W64# a) = fromInteger i
+          in reduce (Literal (Word64Literal (toInteger (W64# (not64# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftL64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64I uncheckedShiftL64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.uncheckedShiftRL64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64I uncheckedShiftRL64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.word64ToInt64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- word64Literals' args
+      -> let !(W64# a) = fromInteger i
+          in reduce (Literal (Int64Literal (toInteger (I64# (word64ToInt64# a)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64RI eqWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64RI geWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64RI gtWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64RI leWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64RI ltWord64# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neWord64#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftW64RI neWord64# args
+      -> reduce r
+  
+  ----------
+  -- Double#
+  ----------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.>##))
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDDI (>##)  args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.>=##))
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDDI (>=##) args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.==##))
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDDI (==##) args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim./=##))
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDDI (/=##) args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.<##))
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDDI (<##)  args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.<=##))
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDDI (<=##) args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.+##))
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDDD (+##)  args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.-##))
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDDD (-##)  args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.*##))
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDDD (*##)  args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim./##))
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDDD (/##)  args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.negateDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD negateDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.fabsDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD fabsDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.double2Int#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- doubleLiterals' args
+      -> let !(D# a) = castWord64ToDouble i
+             r = double2Int# a
+         in  reduce . Literal . IntLiteral . toInteger $ I# r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.double2Float#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (DoubleLiteral d)] <- args
+      -> let !(D# a) = castWord64ToDouble d
+             r = double2Float# a
+         in reduce . Literal . FloatLiteral . castFloatToWord32 $ F# r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.expDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD expDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.logDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD logDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.sqrtDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD sqrtDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.sinDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD sinDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.cosDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD cosDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.tanDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD tanDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.asinDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD asinDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.acosDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD acosDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.atanDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD atanDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.sinhDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD sinhDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.coshDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD coshDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.tanhDouble#)
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD tanhDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.asinhDouble#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDD asinhDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.acoshDouble#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDD acoshDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.atanhDouble#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftDD atanhDouble# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Prim.**##))
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDDD (**##) args
+      -> reduce r
+  -- decodeDouble_2Int# :: Double# -> (#Int#, Word#, Word#, Int##)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.decodeDouble_2Int#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- doubleLiterals' args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(D# a) = castWord64ToDouble i
+             !(# p, q, r, s #) = decodeDouble_2Int# a
+         in reduce $
+            mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . IntLiteral  . toInteger $ I# p)
+                     , Left (Literal . WordLiteral . toInteger $ W# q)
+                     , Left (Literal . WordLiteral . toInteger $ W# r)
+                     , Left (Literal . IntLiteral  . toInteger $ I# s)])
+  -- decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.decodeDouble_Int64#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- doubleLiterals' args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(D# a) = castWord64ToDouble i
+             !(# p, q #) = decodeDouble_Int64# a
+         in reduce $
+            mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . Int64Literal  . toInteger $ I64# p)
+                     , Left (Literal . IntLiteral  . toInteger $ I# q)])
+  
+  --------
+  -- Float
+  --------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.gtFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFI gtFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.geFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFI geFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.eqFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFI eqFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.neFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFI neFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.ltFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFI ltFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.leFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFI leFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.plusFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFF plusFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.minusFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFF minusFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.timesFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFF timesFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.divideFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFF divideFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.negateFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF negateFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.fabsFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF fabsFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.float2Int#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- floatLiterals' args
+      -> let !(F# a) = castWord32ToFloat i
+             r = float2Int# a
+         in  reduce . Literal . IntLiteral . toInteger $ I# r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.expFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF expFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.logFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF logFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.sqrtFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF sqrtFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.sinFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF sinFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.cosFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF cosFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.tanFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF tanFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.asinFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF asinFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.acosFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF acosFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.atanFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF atanFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.sinhFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF sinhFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.coshFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF coshFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.tanhFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF tanhFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.powerFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFFF powerFloat# args
+      -> reduce r
+  
+    -- GHC.Float.asinh  -- XXX: Very fragile
+    --  $w$casinh is the Double specialisation of asinh
+    --  $w$casinh1 is the Float specialisation of asinh
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Float.$w$casinh"
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftDD go args
+      -> reduce r
+      | otherwise -> Nothing
+      where go f = case asinh (D# f) of
+                     D# f' -> f'
+  }
+  )
+  , ( fsLit "GHC.Float.$w$casinh1"
+  , \PrimEnv{..} -> case () of { _ | Just r <- liftFF go args
+      -> reduce r
+      | otherwise -> Nothing
+      where go f = case asinh (F# f) of
+                     F# f' -> f'
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.asinhFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF asinhFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.acoshFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF acoshFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.atanhFloat#)
+  , \PrimEnv{..} -> case () of { _  | Just r <- liftFF atanhFloat# args
+      -> reduce r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.float2Double#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- floatLiterals' args
+      -> let !(F# a) = castWord32ToFloat i
+             r = float2Double# a
+         in  reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.newByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [iV,PrimVal rwTy _ _] <- args
+      , [i] <- intLiterals' [iV]
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             p = primCount mach
+             lit = Literal (ByteArrayLiteral (fromList (List.genericReplicate i 0)))
+             mbaTy = mkFunTy intPrimTy (last tyArgs)
+             newE = mkApps (Data tupDc) (map Right tyArgs ++
                       [Left (Prim rwTy)
-                      ,Left ba'])
-
-  $(namePat 'GHC.Prim.sizeofByteArray#)
-    | [Lit (ByteArrayLiteral ba)] <- args
-    -> reduce (Literal (IntLiteral (toInteger (BA.sizeofByteArray ba))))
-
-  $(namePat 'GHC.Prim.indexWordArray#)
-    | [Lit (ByteArrayLiteral (BA.ByteArray ba)),iV] <- args
-    , [i] <- intLiterals' [iV]
-    -> let !(I# i') = fromInteger i
-           !w       = indexWordArray# ba i'
-       in  reduce (Literal (WordLiteral (toInteger (W# w))))
-
-  -- XXX: Primitive does not exist?
-  "GHC.Prim.getSizeofMutBigNat#"
-    | [PrimVal _mbaTy _ [baV]
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [ba] <- intLiterals' [baV]
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           Just (Literal (ByteArrayLiteral ba')) = primLookup (fromInteger ba) mach
-           lit = Literal (IntLiteral (toInteger (BA.sizeofByteArray ba')))
-       in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                      ,Left (mkApps (Prim (PrimInfo (showt ''MutableByteArray#) mbaTy WorkNever SingleResult NoUnfolding))
+                                    [Left (Literal . IntLiteral $ toInteger p)])
+                      ])
+         in Just . setTerm newE $ primInsert p lit mach
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.setByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal _mbaTy _ [baV]
+        ,offV,lenV,cV
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [ba,off,len,c] <- intLiterals' [baV,offV,lenV,cV]
+      -> let Just (Literal (ByteArrayLiteral ba1)) =
+                primLookup (fromInteger ba) mach
+             !(I# off') = fromInteger off
+             !(I# len') = fromInteger len
+             !(I# c')   = fromInteger c
+             ba2 = unsafeDupablePerformIO $ do
+                    BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                    svoid (setByteArray# mba off' len' c')
+                    BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+             ba3 = Literal (ByteArrayLiteral ba2)
+         in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.writeWordArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal _mbaTy _  [baV]
+        ,iV,wV
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [ba,i] <- intLiterals' [baV,iV]
+      , [w] <- wordLiterals' [wV]
+      -> let Just (Literal (ByteArrayLiteral ba1)) =
+                primLookup (fromInteger ba) mach
+             !(I# i') = fromInteger i
+             !(W# w') = fromIntegral w
+             ba2 = unsafeDupablePerformIO $ do
+                    BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                    svoid (writeWordArray# mba i' w')
+                    BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+             ba3 = Literal (ByteArrayLiteral ba2)
+         in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.unsafeFreezeByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal _mbaTy _ [baV]
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [ba] <-  intLiterals' [baV]
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             Just ba' = primLookup (fromInteger ba) mach
+         in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                        [Left (Prim rwTy)
+                        ,Left ba'])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.sizeofByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (ByteArrayLiteral ba)] <- args
+      -> reduce (Literal (IntLiteral (toInteger (BA.sizeofByteArray ba))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.indexWordArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (ByteArrayLiteral (BA.ByteArray ba)),iV] <- args
+      , [i] <- intLiterals' [iV]
+      -> let !(I# i') = fromInteger i
+             !w       = indexWordArray# ba i'
+         in  reduce (Literal (WordLiteral (toInteger (W# w))))
+  
+    -- XXX: Primitive does not exist?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Prim.getSizeofMutBigNat#"
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal _mbaTy _ [baV]
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [ba] <- intLiterals' [baV]
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             Just (Literal (ByteArrayLiteral ba')) = primLookup (fromInteger ba) mach
+             lit = Literal (IntLiteral (toInteger (BA.sizeofByteArray ba')))
+         in  reduce $ mkApps (Data tupDc) (map Right tyArgs ++
+                        [Left (Prim rwTy)
+                        ,Left lit])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.resizeMutableByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal mbaTy _ [baV]
+        ,iV
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [ba,i] <- intLiterals' [baV,iV]
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             p = primCount mach
+             Just (Literal (ByteArrayLiteral ba1))
+              = primLookup (fromInteger ba) mach
+             !(I# i') = fromInteger i
+             ba2 = unsafeDupablePerformIO $ do
+                     BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                     mba' <- IO (\s -> case resizeMutableByteArray# mba i' s of
+                                   (# s', mba' #) -> (# s', BA.MutableByteArray mba' #))
+                     BA.unsafeFreezeByteArray mba'
+             ba3 = Literal (ByteArrayLiteral ba2)
+             newE = mkApps (Data tupDc) (map Right tyArgs ++
                       [Left (Prim rwTy)
-                      ,Left lit])
-
-  $(namePat 'GHC.Prim.resizeMutableByteArray#)
-    | [PrimVal mbaTy _ [baV]
-      ,iV
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [ba,i] <- intLiterals' [baV,iV]
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           p = primCount mach
-           Just (Literal (ByteArrayLiteral ba1))
-            = primLookup (fromInteger ba) mach
-           !(I# i') = fromInteger i
-           ba2 = unsafeDupablePerformIO $ do
-                   BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
-                   mba' <- IO (\s -> case resizeMutableByteArray# mba i' s of
-                                 (# s', mba' #) -> (# s', BA.MutableByteArray mba' #))
-                   BA.unsafeFreezeByteArray mba'
-           ba3 = Literal (ByteArrayLiteral ba2)
-           newE = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left (Prim rwTy)
-                    ,Left (mkApps (Prim mbaTy)
-                                  [Left (Literal . IntLiteral $ toInteger p)])
-                    ])
-       in Just . setTerm newE $ primInsert p ba3 mach
-
-  $(namePat 'GHC.Prim.shrinkMutableByteArray#)
-    | [PrimVal _mbaTy _ [baV]
-      ,lenV
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [ba,len] <- intLiterals' [baV,lenV]
-    -> let Just (Literal (ByteArrayLiteral ba1)) =
-              primLookup (fromInteger ba) mach
-           !(I# len') = fromInteger len
-           ba2 = unsafeDupablePerformIO $ do
-                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
-                  svoid (shrinkMutableByteArray# mba len')
-                  BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
-           ba3 = Literal (ByteArrayLiteral ba2)
-       in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
-
-  $(namePat 'GHC.Prim.copyByteArray#)
-    | [Lit (ByteArrayLiteral (BA.ByteArray src_ba))
-      ,src_offV
-      ,PrimVal _mbaTy _ [dst_mbaV]
-      ,dst_offV, nV
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [src_off,dst_mba,dst_off,n] <- intLiterals' [src_offV,dst_mbaV,dst_offV,nV]
-    -> let Just (Literal (ByteArrayLiteral dst_ba)) =
-              primLookup (fromInteger dst_mba) mach
-           !(I# src_off') = fromInteger src_off
-           !(I# dst_off') = fromInteger dst_off
-           !(I# n')       = fromInteger n
-           ba2 = unsafeDupablePerformIO $ do
-                  BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
-                  svoid (copyByteArray# src_ba src_off' dst_mba1 dst_off' n')
-                  BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
-           ba3 = Literal (ByteArrayLiteral ba2)
-       in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
-
-  $(namePat 'GHC.Prim.readWordArray#)
-    | [PrimVal _mbaTy _  [baV]
-      ,offV
-      ,PrimVal rwTy _ _
-      ] <- args
-    , [ba,off] <- intLiterals' [baV,offV]
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           Just (Literal (ByteArrayLiteral ba1)) =
-              primLookup (fromInteger ba) mach
-           !(I# off') = fromInteger off
-           w = unsafeDupablePerformIO $ do
-                  BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
-                  IO (\s -> case readWordArray# mba off' s of
-                        (# s', w' #) -> (# s',  W# w' #))
-           newE = mkApps (Data tupDc) (map Right tyArgs ++
-                    [Left (Prim rwTy)
-                    ,Left (Literal (WordLiteral (toInteger w)))
-                    ])
-       in reduce newE
-
-  $(namePat 'GHC.Prim.copyAddrToByteArray#)
-    | [ Lit (StringLiteral addr)
-      , PrimVal _mbaTy _ [dst_mbaV]
-      , offV, lenV
-      , PrimVal rwTy _ _
-      ] <- args
-    , [off,len,dst_mba] <- intLiterals' [offV, lenV, dst_mbaV]
-    -> let Just (Literal (ByteArrayLiteral dst_ba)) =
-              primLookup (fromInteger dst_mba) mach
-           !(I# off') = fromInteger off
-           !(I# len') = fromInteger len
-           !(BS.PS (ForeignPtr addr' _) _ _) = BS.packChars addr
-           ba2 = unsafeDupablePerformIO $ do
+                      ,Left (mkApps (Prim mbaTy)
+                                    [Left (Literal . IntLiteral $ toInteger p)])
+                      ])
+         in Just . setTerm newE $ primInsert p ba3 mach
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.shrinkMutableByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal _mbaTy _ [baV]
+        ,lenV
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [ba,len] <- intLiterals' [baV,lenV]
+      -> let Just (Literal (ByteArrayLiteral ba1)) =
+                primLookup (fromInteger ba) mach
+             !(I# len') = fromInteger len
+             ba2 = unsafeDupablePerformIO $ do
+                    BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                    svoid (shrinkMutableByteArray# mba len')
+                    BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+             ba3 = Literal (ByteArrayLiteral ba2)
+         in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.copyByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (ByteArrayLiteral (BA.ByteArray src_ba))
+        ,src_offV
+        ,PrimVal _mbaTy _ [dst_mbaV]
+        ,dst_offV, nV
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [src_off,dst_mba,dst_off,n] <- intLiterals' [src_offV,dst_mbaV,dst_offV,nV]
+      -> let Just (Literal (ByteArrayLiteral dst_ba)) =
+                primLookup (fromInteger dst_mba) mach
+             !(I# src_off') = fromInteger src_off
+             !(I# dst_off') = fromInteger dst_off
+             !(I# n')       = fromInteger n
+             ba2 = unsafeDupablePerformIO $ do
                     BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
-                    svoid (copyAddrToByteArray# addr' dst_mba1 off' len')
+                    svoid (copyByteArray# src_ba src_off' dst_mba1 dst_off' n')
                     BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
-           ba3 = Literal (ByteArrayLiteral ba2)
-        in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
-
--- decodeFloat_Int# :: Float# -> (#Int#, Int##)
-  $(namePat 'GHC.Prim.decodeFloat_Int#) | [i] <- floatLiterals' args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(F# a) = castWord32ToFloat i
-           !(# p, q #) = decodeFloat_Int# a
-       in reduce $
-          mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
-                   , Left (Literal . IntLiteral  . toInteger $ I# q)])
-
-  $(namePat 'GHC.Prim.tagToEnum#)
-    | [ConstTy (TyCon tcN)] <- tys
-    , [Lit (IntLiteral i)]  <- args
-    -> let dc = do { tc <- UniqMap.lookup tcN tcm
-                   ; let dcs = tyConDataCons tc
-                   ; List.find ((== (i+1)) . toInteger . dcTag) dcs
-                   }
-       in (\e -> setTerm (Data e) mach) <$> dc
-
+             ba3 = Literal (ByteArrayLiteral ba2)
+         in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.readWordArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal _mbaTy _  [baV]
+        ,offV
+        ,PrimVal rwTy _ _
+        ] <- args
+      , [ba,off] <- intLiterals' [baV,offV]
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             Just (Literal (ByteArrayLiteral ba1)) =
+                primLookup (fromInteger ba) mach
+             !(I# off') = fromInteger off
+             w = unsafeDupablePerformIO $ do
+                    BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                    IO (\s -> case readWordArray# mba off' s of
+                          (# s', w' #) -> (# s',  W# w' #))
+             newE = mkApps (Data tupDc) (map Right tyArgs ++
+                      [Left (Prim rwTy)
+                      ,Left (Literal (WordLiteral (toInteger w)))
+                      ])
+         in reduce newE
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.copyAddrToByteArray#)
+  , \PrimEnv{..} -> case () of { _
+      | [ Lit (StringLiteral addr)
+        , PrimVal _mbaTy _ [dst_mbaV]
+        , offV, lenV
+        , PrimVal rwTy _ _
+        ] <- args
+      , [off,len,dst_mba] <- intLiterals' [offV, lenV, dst_mbaV]
+      -> let Just (Literal (ByteArrayLiteral dst_ba)) =
+                primLookup (fromInteger dst_mba) mach
+             !(I# off') = fromInteger off
+             !(I# len') = fromInteger len
+             !(BS.PS (ForeignPtr addr' _) _ _) = BS.packChars addr
+             ba2 = unsafeDupablePerformIO $ do
+                      BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
+                      svoid (copyAddrToByteArray# addr' dst_mba1 off' len')
+                      BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
+             ba3 = Literal (ByteArrayLiteral ba2)
+          in Just . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
+  
+  -- decodeFloat_Int# :: Float# -> (#Int#, Int##)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.decodeFloat_Int#)
+  , \PrimEnv{..} -> case () of { _ | [i] <- floatLiterals' args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(F# a) = castWord32ToFloat i
+             !(# p, q #) = decodeFloat_Int# a
+         in reduce $
+            mkApps (Data tupDc) (map Right tyArgs ++
+                     [ Left (Literal . IntLiteral  . toInteger $ I# p)
+                     , Left (Literal . IntLiteral  . toInteger $ I# q)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.tagToEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | [ConstTy (TyCon tcN)] <- tys
+      , [Lit (IntLiteral i)]  <- args
+      -> let dc = do { tc <- UniqMap.lookup tcN tcm
+                     ; let dcs = tyConDataCons tc
+                     ; List.find ((== (i+1)) . toInteger . dcTag) dcs
+                     }
+         in (\e -> setTerm (Data e) mach) <$> dc
+  
+      | otherwise -> Nothing
+  }
+  )
 #if MIN_VERSION_ghc_prim(0,12,0)
-  $(namePat 'GHC.PrimopWrappers.dataToTagSmall#)
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-
-  $(namePat 'GHC.PrimopWrappers.dataToTagLarge#)
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+  , ( $(nameFS 'GHC.PrimopWrappers.dataToTagSmall#)
+  , \PrimEnv{..} -> case () of { _
+      | [DC dc _] <- args
+      -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.PrimopWrappers.dataToTagLarge#)
+  , \PrimEnv{..} -> case () of { _
+      | [DC dc _] <- args
+      -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      | otherwise -> Nothing
+  }
+  )
 #endif
 #if MIN_VERSION_ghc(9,12,0)
-  $(namePat 'GHC.Magic.dataToTag#)
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+  , ( $(nameFS 'GHC.Magic.dataToTag#)
+  , \PrimEnv{..} -> case () of { _
+      | [DC dc _] <- args
+      -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      | otherwise -> Nothing
+  }
+  )
 #endif
 #if MIN_VERSION_ghc(9,10,0)
-  $(namePat 'GHC.Prim.dataToTagSmall#)
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-  $(namePat 'GHC.Prim.dataToTagLarge#)
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-  $(namePat 'GHC.Base.dataToTag#)
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+  , ( $(nameFS 'GHC.Prim.dataToTagSmall#)
+  , \PrimEnv{..} -> case () of { _
+      | [DC dc _] <- args
+      -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Prim.dataToTagLarge#)
+  , \PrimEnv{..} -> case () of { _
+      | [DC dc _] <- args
+      -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Base.dataToTag#)
+  , \PrimEnv{..} -> case () of { _
+      | [DC dc _] <- args
+      -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      | otherwise -> Nothing
+  }
+  )
 #else
-  $(namePat 'GHC.Prim.dataToTag#)
-    | [DC dc _] <- args
-    -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+  , ( $(nameFS 'GHC.Prim.dataToTag#)
+  , \PrimEnv{..} -> case () of { _
+      | [DC dc _] <- args
+      -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      | otherwise -> Nothing
+  }
+  )
 #endif
-
-  $(namePat 'GHC.Classes.eqInt) | Just (i,j) <- intCLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i == j))
-
-  $(namePat 'GHC.Classes.neInt) | Just (i,j) <- intCLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i /= j))
-
-  $(namePat 'GHC.Classes.leInt) | Just (i,j) <- intCLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <= j))
-
-  $(namePat 'GHC.Classes.ltInt) | Just (i,j) <- intCLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i < j))
-
-  $(namePat 'GHC.Classes.geInt) | Just (i,j) <- intCLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >= j))
-
-  $(namePat 'GHC.Classes.gtInt) | Just (i,j) <- intCLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i > j))
-
-  $(namePat '(GHC.Classes.&&))
-    | [ lArg , rArg ] <- args
-    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    -- evaluation of the arguments is deferred until the evaluation of the ghcPrimUnwindWith
-    -- to make `&&` lazy in both arguments
-    , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
-    , mach2@Machine{mStack=[],mTerm=rArgWHNF} <- whnf eval tcm True (setTerm (valToTerm rArg) $ stackClear mach1)
-    -> case [ lArgWHNF, rArgWHNF ] of
-         [ Data lCon, Data rCon ] ->
-           Just $ mach2
-             { mStack = mStack mach
-             , mTerm = boolToBoolLiteral tcm ty (isTrueDC lCon && isTrueDC rCon)
-             }
-
-         [ Data lCon, _ ]
-           | isTrueDC lCon -> reduce rArgWHNF
-           | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
-
-         [ _, Data rCon ]
-           | isTrueDC rCon -> reduce lArgWHNF
-           | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
-
-         _ -> Nothing
-
-  $(namePat '(GHC.Classes.||))
-    | [ lArg , rArg ] <- args
-    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    -- evaluation of the arguments is deferred until the evaluation of the ghcPrimUnwindWith
-    -- to make `||` lazy in both arguments
-    , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
-    , mach2@Machine{mStack=[],mTerm=rArgWHNF} <- whnf eval tcm True (setTerm (valToTerm rArg) $ stackClear mach1)
-    -> case [ lArgWHNF, rArgWHNF ] of
-         [ Data lCon, Data rCon ] ->
-           Just $ mach2
-             { mStack = mStack mach
-             , mTerm = boolToBoolLiteral tcm ty (isTrueDC lCon || isTrueDC rCon)
-             }
-
-         [ Data lCon, _ ]
-           | isFalseDC lCon -> reduce rArgWHNF
-           | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
-
-         [ _, Data rCon ]
-           | isFalseDC rCon -> reduce lArgWHNF
-           | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
-
-         _ -> Nothing
-
-  $(namePat 'GHC.Classes.divInt#) | Just (i,j) <- intLiterals args
-    -> reduce (catchDivByZero (integerToIntLiteral (i `div` j)))
-
-  -- modInt# :: Int# -> Int# -> Int#
-  $(namePat 'GHC.Classes.modInt#)
-    | [dividend, divisor] <- intLiterals' args
-    ->
-      if divisor == 0 then
-        let iTy = snd (splitFunForallTy ty) in
-        reduce (TyApp (Prim NP.undefined) iTy)
-      else
-        reduce (Literal (IntLiteral (dividend `mod` divisor)))
-
-  $(namePat 'GHC.Classes.not)
-    | [DC bCon _] <- args
-    -> reduce (boolToBoolLiteral tcm ty (nameOcc (dcName bCon) == showt 'False))
-
-  $(namePat 'GHC.Num.Integer.integerLogBase#)
-    | Just (a,b) <- integerLiterals args
-    , Just c <- flogBase a b
-    -> (reduce . Literal . WordLiteral . toInteger) c
-
-  $(namePat 'GHC.Float.integerToFloat#)
-    | [v] <- args
-    , Just i <- integerLiteral v
-    -> reduce . Literal . FloatLiteral . castFloatToWord32 $ F# (integerToFloat# i)
-
-  $(namePat 'GHC.Float.integerToDouble#)
-    | [v] <- args
-    , Just i <- integerLiteral v
-    -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# (integerToDouble# i)
-
-  $(namePat 'GHC.Num.naturalLogBase#)
-    | Just (a,b) <- naturalLiterals args
-    , Just c <- flogBase a b
-    -> (reduce . Literal . WordLiteral . toInteger) c
-
-
-  $(namePat 'GHC.Num.Integer.integerToInt#)
-    | [i] <- integerLiterals' args
-    -> reduce (integerToIntLiteral i)
-
-  $(namePat 'GHC.Num.Integer.integerDecodeDouble#) -- :: Double# -> (#Integer, Int##)
-    | [Lit (DoubleLiteral i)] <- args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           !(D# a)  = castWord64ToDouble i
-           !(# b, c #) = decodeDoubleInteger a
-    in reduce $
-       mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left (integerToIntegerLiteral b)
-                , Left (integerToIntLiteral . toInteger $ I# c)])
-
-  $(namePat 'GHC.Num.Integer.integerEncodeDouble#) -- :: Integer -> Int# -> Double
-    | [iV, Lit (IntLiteral j)] <- args
-    , [i] <- integerLiterals' [iV]
-    -> let !(I# k') = fromInteger j
-           r = encodeDoubleInteger i k'
-    in  reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# r
-
-  $(namePat 'GHC.Num.Integer.integerEncodeFloat#)
-    | [iV, Lit (IntLiteral j)] <- args
-    , [i] <- integerLiterals' [iV]
-    -> let !(I# k') = fromInteger j
-           r = integerEncodeFloat# i k'
-        in reduce . Literal . FloatLiteral . castFloatToWord32 $ F# r
-
-  $(namePat 'GHC.Num.Integer.integerQuotRem#) -- :: Integer -> Integer -> (#Integer, Integer#)
-    | [i, j] <- integerLiterals' args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           (q,r) = quotRem i j
-    in reduce $
+  , ( $(nameFS 'GHC.Classes.eqInt)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intCLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.neInt)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intCLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i /= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.leInt)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intCLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.ltInt)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intCLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.geInt)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intCLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.gtInt)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intCLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Classes.&&))
+  , \PrimEnv{..} -> case () of { _
+      | [ lArg , rArg ] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      -- evaluation of the arguments is deferred until the evaluation of the ghcPrimUnwindWith
+      -- to make `&&` lazy in both arguments
+      , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
+      , mach2@Machine{mStack=[],mTerm=rArgWHNF} <- whnf eval tcm True (setTerm (valToTerm rArg) $ stackClear mach1)
+      -> case [ lArgWHNF, rArgWHNF ] of
+           [ Data lCon, Data rCon ] ->
+             Just $ mach2
+               { mStack = mStack mach
+               , mTerm = boolToBoolLiteral tcm ty (isTrueDC lCon && isTrueDC rCon)
+               }
+  
+           [ Data lCon, _ ]
+             | isTrueDC lCon -> reduce rArgWHNF
+             | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
+  
+           [ _, Data rCon ]
+             | isTrueDC rCon -> reduce lArgWHNF
+             | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
+  
+           _ -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(GHC.Classes.||))
+  , \PrimEnv{..} -> case () of { _
+      | [ lArg , rArg ] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      -- evaluation of the arguments is deferred until the evaluation of the ghcPrimUnwindWith
+      -- to make `||` lazy in both arguments
+      , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
+      , mach2@Machine{mStack=[],mTerm=rArgWHNF} <- whnf eval tcm True (setTerm (valToTerm rArg) $ stackClear mach1)
+      -> case [ lArgWHNF, rArgWHNF ] of
+           [ Data lCon, Data rCon ] ->
+             Just $ mach2
+               { mStack = mStack mach
+               , mTerm = boolToBoolLiteral tcm ty (isTrueDC lCon || isTrueDC rCon)
+               }
+  
+           [ Data lCon, _ ]
+             | isFalseDC lCon -> reduce rArgWHNF
+             | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
+  
+           [ _, Data rCon ]
+             | isFalseDC rCon -> reduce lArgWHNF
+             | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
+  
+           _ -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.divInt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- intLiterals args
+      -> reduce (catchDivByZero (integerToIntLiteral (i `div` j)))
+  
+    -- modInt# :: Int# -> Int# -> Int#
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.modInt#)
+  , \PrimEnv{..} -> case () of { _
+      | [dividend, divisor] <- intLiterals' args
+      ->
+        if divisor == 0 then
+          let iTy = snd (splitFunForallTy ty) in
+          reduce (TyApp (Prim NP.undefined) iTy)
+        else
+          reduce (Literal (IntLiteral (dividend `mod` divisor)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Classes.not)
+  , \PrimEnv{..} -> case () of { _
+      | [DC bCon _] <- args
+      -> reduce (boolToBoolLiteral tcm ty (nameOcc (dcName bCon) == showt 'False))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerLogBase#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (a,b) <- integerLiterals args
+      , Just c <- flogBase a b
+      -> (reduce . Literal . WordLiteral . toInteger) c
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Float.integerToFloat#)
+  , \PrimEnv{..} -> case () of { _
+      | [v] <- args
+      , Just i <- integerLiteral v
+      -> reduce . Literal . FloatLiteral . castFloatToWord32 $ F# (integerToFloat# i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Float.integerToDouble#)
+  , \PrimEnv{..} -> case () of { _
+      | [v] <- args
+      , Just i <- integerLiteral v
+      -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# (integerToDouble# i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalLogBase#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (a,b) <- naturalLiterals args
+      , Just c <- flogBase a b
+      -> (reduce . Literal . WordLiteral . toInteger) c
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerToInt#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (integerToIntLiteral i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerDecodeDouble#) -- :: Double# -> (#Integer, Int##)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (DoubleLiteral i)] <- args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             !(D# a)  = castWord64ToDouble i
+             !(# b, c #) = decodeDoubleInteger a
+      in reduce $
          mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left $ catchDivByZero (integerToIntegerLiteral q)
-                , Left $ catchDivByZero (integerToIntegerLiteral r)])
-
-  $(namePat 'GHC.Num.Integer.integerAdd)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (integerToIntegerLiteral (i+j))
-
-  $(namePat 'GHC.Num.Integer.integerSub)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (integerToIntegerLiteral (i-j))
-
-  $(namePat 'GHC.Num.Integer.integerMul)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (integerToIntegerLiteral (i*j))
-
-  $(namePat 'GHC.Num.Integer.integerNegate)
-    | [i] <- integerLiterals' args
-    -> reduce (integerToIntegerLiteral (negate i))
-
-  $(namePat 'GHC.Num.Integer.integerDiv)
-    | Just (i,j) <- integerLiterals args
-    -> reduce $ catchDivByZero (integerToIntegerLiteral (i `div` j))
-
-  $(namePat 'GHC.Num.Integer.integerMod)
-    | Just (i,j) <- integerLiterals args
-    -> reduce $ catchDivByZero (integerToIntegerLiteral (i `mod` j))
-
-  $(namePat 'GHC.Num.Integer.integerQuot)
-    | Just (i,j) <- integerLiterals args
-    -> reduce $ catchDivByZero (integerToIntegerLiteral (i `quot` j))
-
-  $(namePat 'GHC.Num.Integer.integerRem)
-    | Just (i,j) <- integerLiterals args
-    -> reduce $ catchDivByZero (integerToIntegerLiteral (i `rem` j))
-
-  $(namePat 'GHC.Num.Integer.integerDivMod#)
-    | Just (i,j) <- integerLiterals args
-    -> let (_,tyView -> TyConApp ubTupTcNm [liftedKi,_,intTy,_]) = splitFunForallTy ty
-           (Just ubTupTc) = UniqMap.lookup ubTupTcNm tcm
-           [ubTupDc] = tyConDataCons ubTupTc
-           (d,m) = divMod i j
-       in  reduce $
-           mkApps (Data ubTupDc) [ Right liftedKi, Right liftedKi
-                                 , Right intTy,    Right intTy
-                                 , Left $ catchDivByZero (Literal (IntegerLiteral d))
-                                 , Left $ catchDivByZero (Literal (IntegerLiteral m))
-                                 ]
-
-  $(namePat 'GHC.Num.Integer.integerGt)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i > j))
-
-  $(namePat 'GHC.Num.Integer.integerGe)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >= j))
-
-  $(namePat 'GHC.Num.Integer.integerEq)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i == j))
-
-  $(namePat 'GHC.Num.Integer.integerNe)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i /= j))
-
-  $(namePat 'GHC.Num.Integer.integerLt)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i < j))
-
-  $(namePat 'GHC.Num.Integer.integerLe)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <= j))
-
-  $(namePat 'GHC.Num.Integer.integerGt#)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToIntLiteral (i > j))
-
-  $(namePat 'GHC.Num.Integer.integerGe#)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToIntLiteral (i >= j))
-
-  $(namePat 'GHC.Num.Integer.integerEq#)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToIntLiteral (i == j))
-
-  $(namePat 'GHC.Num.Integer.integerNe#)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToIntLiteral (i /= j))
-
-  $(namePat 'GHC.Num.Integer.integerLt#)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToIntLiteral (i < j))
-
-  $(namePat 'GHC.Num.Integer.integerLe#)
-    | Just (i,j) <- integerLiterals args
-    -> reduce (boolToIntLiteral (i <= j))
-
-  $(namePat 'GHC.Num.Integer.integerCompare)
-    | [i, j] <- integerLiterals' args
-    -> let -- Get the required result type (viewed as an applied type constructor name)
-           (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
-           -- Find the type constructor from the name
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           -- Get the data constructors of that type
-           -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
-           [ltDc, eqDc, gtDc] = tyConDataCons tupTc
-           -- Do the actual compile-time evaluation
-           ordVal = compareInteger i j
-        in reduce $ case ordVal of
-            LT -> Data ltDc
-            EQ -> Data eqDc
-            GT -> Data gtDc
-
-  $(namePat 'GHC.Num.Integer.integerShiftR#)
-    | [iV, Lit (WordLiteral j)] <- args
-    , [i] <- integerLiterals' [iV]
-    -> reduce (integerToIntegerLiteral (i `shiftR` fromInteger j))
-
-  $(namePat 'GHC.Num.Integer.integerShiftL#)
-    | [iV, Lit (WordLiteral j)] <- args
-    , [i] <- integerLiterals' [iV]
-    -> reduce (integerToIntegerLiteral (i `shiftL` fromInteger j))
-
-  $(namePat 'GHC.Num.Integer.integerFromWord#)
-    | [Lit (WordLiteral w)] <- args
-    -> reduce (Literal (IntegerLiteral w))
-
-  $(namePat 'GHC.Num.Integer.integerToWord#)
-    | [i] <- integerLiterals' args
-    -> reduce (integerToWordLiteral i)
-
-  $(namePat 'GHC.Num.Integer.integerTestBit#) -- :: Integer -> Int# -> Int#
-    | [Lit (IntegerLiteral i), Lit (WordLiteral j)] <- args
-    -> reduce (boolToIntLiteral (testBit i (fromInteger j)))
-
-  $(namePat 'GHC.Num.NS)
-    | [Lit (WordLiteral w)] <- args
-    -> reduce (Literal (NaturalLiteral w))
-  $(namePat 'GHC.Num.NB)
-    | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
-    -> reduce (Literal (NaturalLiteral (IP ba)))
-    | [Lit l] <- args
-    -> error ("NB: " <> show l)
-  $(namePat 'GHC.Num.Integer.IS)
-    | [Lit (IntLiteral i)] <- args
-    -> reduce (Literal (IntegerLiteral i))
-  $(namePat 'GHC.Num.Integer.IP)
-    | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
-    -> reduce (Literal (IntegerLiteral (IP ba)))
-    | [Lit l] <- args
-    -> error ("IP: " <> show l)
-  $(namePat 'GHC.Num.Integer.IN)
-    | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
-    -> reduce (Literal (IntegerLiteral (IN ba)))
-    | [Lit l] <- args
-    -> error ("IN: " <> show l)
-
-  $(namePat 'GHC.Num.Integer.integerFromNatural)
-    | [i] <- naturalLiterals' args
-    -> reduce (Literal (IntegerLiteral (toInteger i)))
-
-  $(namePat 'GHC.Num.Integer.integerToNatural)
-    | [i] <- integerLiterals' args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange1 nTy i id)
-
-  $(namePat 'GHC.Num.Integer.integerToNaturalClamp)
-    | [i] <- integerLiterals' args
-    -> if i < 0 then
-         reduce (naturalToNaturalLiteral 0)
-       else
-         reduce (naturalToNaturalLiteral (fromInteger i))
-
-  $(namePat 'GHC.Num.Integer.integerToNaturalThrow)
-    | [i] <- integerLiterals' args
-    -> let nTy = snd (splitFunForallTy ty) in
+                  [ Left (integerToIntegerLiteral b)
+                  , Left (integerToIntLiteral . toInteger $ I# c)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerEncodeDouble#) -- :: Integer -> Int# -> Double
+  , \PrimEnv{..} -> case () of { _
+      | [iV, Lit (IntLiteral j)] <- args
+      , [i] <- integerLiterals' [iV]
+      -> let !(I# k') = fromInteger j
+             r = encodeDoubleInteger i k'
+      in  reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerEncodeFloat#)
+  , \PrimEnv{..} -> case () of { _
+      | [iV, Lit (IntLiteral j)] <- args
+      , [i] <- integerLiterals' [iV]
+      -> let !(I# k') = fromInteger j
+             r = integerEncodeFloat# i k'
+          in reduce . Literal . FloatLiteral . castFloatToWord32 $ F# r
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerQuotRem#) -- :: Integer -> Integer -> (#Integer, Integer#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- integerLiterals' args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             (q,r) = quotRem i j
+      in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left $ catchDivByZero (integerToIntegerLiteral q)
+                  , Left $ catchDivByZero (integerToIntegerLiteral r)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerAdd)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (integerToIntegerLiteral (i+j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerSub)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (integerToIntegerLiteral (i-j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerMul)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (integerToIntegerLiteral (i*j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerNegate)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (integerToIntegerLiteral (negate i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerDiv)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce $ catchDivByZero (integerToIntegerLiteral (i `div` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerMod)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce $ catchDivByZero (integerToIntegerLiteral (i `mod` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerQuot)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce $ catchDivByZero (integerToIntegerLiteral (i `quot` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerRem)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce $ catchDivByZero (integerToIntegerLiteral (i `rem` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerDivMod#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> let (_,tyView -> TyConApp ubTupTcNm [liftedKi,_,intTy,_]) = splitFunForallTy ty
+             (Just ubTupTc) = UniqMap.lookup ubTupTcNm tcm
+             [ubTupDc] = tyConDataCons ubTupTc
+             (d,m) = divMod i j
+         in  reduce $
+             mkApps (Data ubTupDc) [ Right liftedKi, Right liftedKi
+                                   , Right intTy,    Right intTy
+                                   , Left $ catchDivByZero (Literal (IntegerLiteral d))
+                                   , Left $ catchDivByZero (Literal (IntegerLiteral m))
+                                   ]
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerGt)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerGe)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerEq)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerNe)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i /= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerLt)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerLe)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerGt#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToIntLiteral (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerGe#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToIntLiteral (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerEq#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToIntLiteral (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerNe#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToIntLiteral (i /= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerLt#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToIntLiteral (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerLe#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- integerLiterals args
+      -> reduce (boolToIntLiteral (i <= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerCompare)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- integerLiterals' args
+      -> let -- Get the required result type (viewed as an applied type constructor name)
+             (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
+             -- Find the type constructor from the name
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             -- Get the data constructors of that type
+             -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
+             [ltDc, eqDc, gtDc] = tyConDataCons tupTc
+             -- Do the actual compile-time evaluation
+             ordVal = compareInteger i j
+          in reduce $ case ordVal of
+              LT -> Data ltDc
+              EQ -> Data eqDc
+              GT -> Data gtDc
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerShiftR#)
+  , \PrimEnv{..} -> case () of { _
+      | [iV, Lit (WordLiteral j)] <- args
+      , [i] <- integerLiterals' [iV]
+      -> reduce (integerToIntegerLiteral (i `shiftR` fromInteger j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerShiftL#)
+  , \PrimEnv{..} -> case () of { _
+      | [iV, Lit (WordLiteral j)] <- args
+      , [i] <- integerLiterals' [iV]
+      -> reduce (integerToIntegerLiteral (i `shiftL` fromInteger j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerFromWord#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (WordLiteral w)] <- args
+      -> reduce (Literal (IntegerLiteral w))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerToWord#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (integerToWordLiteral i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerTestBit#) -- :: Integer -> Int# -> Int#
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntegerLiteral i), Lit (WordLiteral j)] <- args
+      -> reduce (boolToIntLiteral (testBit i (fromInteger j)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.NS)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (WordLiteral w)] <- args
+      -> reduce (Literal (NaturalLiteral w))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.NB)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
+      -> reduce (Literal (NaturalLiteral (IP ba)))
+      | [Lit l] <- args
+      -> error ("NB: " <> show l)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.IS)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral i)] <- args
+      -> reduce (Literal (IntegerLiteral i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.IP)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
+      -> reduce (Literal (IntegerLiteral (IP ba)))
+      | [Lit l] <- args
+      -> error ("IP: " <> show l)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.IN)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (ByteArrayLiteral (BA.ByteArray ba))] <- args
+      -> reduce (Literal (IntegerLiteral (IN ba)))
+      | [Lit l] <- args
+      -> error ("IN: " <> show l)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerFromNatural)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- naturalLiterals' args
+      -> reduce (Literal (IntegerLiteral (toInteger i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerToNatural)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
        reduce (checkNaturalRange1 nTy i id)
-
-  $(namePat 'GHC.Num.Integer.integerToInt64#)
-    | [i] <- integerLiterals' args
-    -> reduce (integerToInt64Literal i)
-
-  $(namePat 'GHC.Num.Integer.integerToWord64#)
-    | [i] <- integerLiterals' args
-    -> reduce (integerToWord64Literal i)
-
-  $(namePat 'GHC.Num.Integer.integerFromWord64#)
-    | [w] <- word64Literals' args
-    -> reduce (Literal (IntegerLiteral w))
-
-  $(namePat 'GHC.Num.naturalAdd)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j (+))
-
-  $(namePat 'GHC.Num.naturalMul)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j (*))
-
-  $(namePat 'GHC.Num.Natural.naturalSubUnsafe)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
-      naturalToNaturalLiteral (naturalSubUnsafe i' j')))
-
-  $(namePat 'GHC.Num.naturalSubThrow)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
-                case minusNaturalMaybe i' j' of
-                  Nothing -> checkNaturalRange1 nTy (-1) id
-                  Just n -> naturalToNaturalLiteral n))
-
-  $(namePat 'GHC.Num.naturalFromWord#)
-    | [Lit (WordLiteral w)] <- args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange1 nTy w id)
-
-  $(namePat 'GHC.Num.naturalToWord#)
-    | [i] <- naturalLiterals' args
-    -> reduce (integerToWordLiteral i)
-
-  $(namePat 'GHC.Num.naturalQuot)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j quot)
-
-  $(namePat 'GHC.Num.naturalRem)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j rem)
-
-  $(namePat 'GHC.Num.naturalQuotRem#) -- :: Natural -> Natural -> (#Natural, Natural#)
-    | [i, j] <- naturalLiterals' args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           (q,r) = quotRem (fromInteger i) (fromInteger j)
-    in reduce $
-         mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left $ catchDivByZero (naturalToNaturalLiteral q)
-                , Left $ catchDivByZero (naturalToNaturalLiteral r)])
-
-  $(namePat 'GHC.Num.naturalGcd)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j gcd)
-
-  $(namePat 'GHC.Num.naturalLcm)
-    | Just (i,j) <- naturalLiterals args
-    ->
-     let nTy = snd (splitFunForallTy ty) in
-     reduce (checkNaturalRange2 nTy i j lcm)
-
-  $(namePat 'GHC.Num.naturalGt#)
-    | Just (i,j) <- naturalLiterals args
-    -> reduce (boolToIntLiteral (i > j))
-
-  $(namePat 'GHC.Num.naturalGe#)
-    | Just (i,j) <- naturalLiterals args
-    -> reduce (boolToIntLiteral (i >= j))
-
-  $(namePat 'GHC.Num.naturalEq#)
-    | Just (i,j) <- naturalLiterals args
-    -> reduce (boolToIntLiteral (i == j))
-
-  $(namePat 'GHC.Num.naturalNe#)
-    | Just (i,j) <- naturalLiterals args
-    -> reduce (boolToIntLiteral (i /= j))
-
-  $(namePat 'GHC.Num.naturalLt#)
-    | Just (i,j) <- naturalLiterals args
-    -> reduce (boolToIntLiteral (i < j))
-
-  $(namePat 'GHC.Num.naturalLe#)
-    | Just (i,j) <- naturalLiterals args
-    -> reduce (boolToIntLiteral (i <= j))
-
-  $(namePat 'GHC.Num.naturalShiftL#)
-    | [iV, Lit (WordLiteral j)] <- args
-    , [i] <- naturalLiterals' [iV]
-    -> reduce (naturalToNaturalLiteral (fromInteger (i `shiftL` fromInteger j)))
-
-  $(namePat 'GHC.Num.naturalShiftR#)
-    | [iV, Lit (WordLiteral j)] <- args
-    , [i] <- naturalLiterals' [iV]
-    -> reduce (naturalToNaturalLiteral (fromInteger (i `shiftR` fromInteger j)))
-
-  $(namePat 'GHC.Num.naturalCompare)
-    | [i, j] <- naturalLiterals' args
-    -> let -- Get the required result type (viewed as an applied type constructor name)
-           (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
-           -- Find the type constructor from the name
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           -- Get the data constructors of that type
-           -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
-           [ltDc, eqDc, gtDc] = tyConDataCons tupTc
-           -- Do the actual compile-time evaluation
-           ordVal = compareInteger i j
-        in reduce $ case ordVal of
-            LT -> Data ltDc
-            EQ -> Data eqDc
-            GT -> Data gtDc
-
-  $(namePat 'GHC.Num.naturalSignum)
-    | [i] <- naturalLiterals' args
-    -> reduce (Literal (NaturalLiteral (signum i)))
-
-  "GHC.Num.Natural.$wnaturalSignum"
-    | [i] <- naturalLiterals' args
-    -> reduce (Literal (WordLiteral (signum i)))
-
-  $(namePat 'GHC.Num.BigNat.bigNatEq#)
-    | [ Lit (ByteArrayLiteral (BA.ByteArray i))
-      , Lit (ByteArrayLiteral (BA.ByteArray j))] <- args
-    -> reduce (Literal (IntLiteral (IS (bigNatEq# i j))))
-
-  -- GHC.Real.^  -- XXX: Very fragile
-  --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
-  "GHC.Real.^_f"  -- :: Integer -> Integer -> Integer
-    | [i,j] <- integerLiterals' args
-    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
-  "GHC.Real.$wf"  -- :: Integer -> Int# -> Integer
-    | [iV, Lit (IntLiteral j)] <- args
-    , [i] <- integerLiterals' [iV]
-    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
-  "GHC.Real.$wf1" -- :: Int# -> Int# -> Int#
-    | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.^_$s$spowImpl" -- :: Int -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
-    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Internal.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
-    | [intLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
-    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
-    | [intLiteral -> Just i, intLiteral -> Just j] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-  "GHC.Real.^_$sf2" -- :: Int# -> Integer -> Integer
-    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-
-  -- Type level ^    -- XXX: Very fragile
-  -- These is are specialized versions of ^_f, named by some combination of ghc and singletons.
-  "Data.Singletons.TypeLits.Internal.$fSingI->^@#@$_f" -- ghc-8.6.5, singletons-2.5.1
-    | [i,j] <- naturalLiterals' args
-    -> reduce (Literal (NaturalLiteral (i ^ j)))
-  "Data.Singletons.TypeLits.Internal.%^_f"             -- ghc-8.8.1, singletons-2.6
-    | [i,j] <- naturalLiterals' args
-    -> reduce (Literal (NaturalLiteral (i ^ j)))
-
-  -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
-  $(namePat 'GHC.TypeLits.natVal)
-    | [Lit (NaturalLiteral n), _] <- args
-    -> reduce (integerToIntegerLiteral n)
-
-  $(namePat 'GHC.TypeNats.natVal)
-    | [Lit (NaturalLiteral n), _] <- args
-    -> reduce (Literal (NaturalLiteral n))
-
-  $(namePat 'GHC.TypeNats.someNatVal)
-    | [Lit (NaturalLiteral n)] <- args
-    -> let resTy = getResultTy tcm ty tys
-        in reduce (mkSomeNat tcm n resTy)
-
-  -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
-  $(namePat 'GHC.TypeLits.someNatVal)
-    | [Lit (NaturalLiteral n)] <- args
-    -> let resTy = getResultTy tcm ty tys
-        in reduce (mkSomeNat tcm n resTy)
-
-  $(namePat 'GHC.Types.I#)
-    | isSubj
-    , [Lit (IntLiteral i)] <- args
-    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = UniqMap.lookup intTcNm tcm
-            [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
-
-  $(namePat 'GHC.Int.I8#)
-    | isSubj
-    , [Lit (Int8Literal i)] <- args
-    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = UniqMap.lookup intTcNm tcm
-            [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (Int8Literal i))])
-  $(namePat 'GHC.Int.I16#)
-    | isSubj
-    , [Lit (Int16Literal i)] <- args
-    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = UniqMap.lookup intTcNm tcm
-            [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (Int16Literal i))])
-  $(namePat 'GHC.Int.I32#)
-    | isSubj
-    , [Lit (Int32Literal i)] <- args
-    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = UniqMap.lookup intTcNm tcm
-            [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (Int32Literal i))])
-  $(namePat 'GHC.Int.I64#)
-    | isSubj
-    , [Lit (Int64Literal i)] <- args
-    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = UniqMap.lookup intTcNm tcm
-            [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (Int64Literal i))])
-
-  $(namePat 'GHC.Word.W8#)
-    | isSubj
-    , [Lit (Word8Literal c)] <- args
-    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = UniqMap.lookup wordTcNm tcm
-            [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (Word8Literal c))])
-  $(namePat 'GHC.Word.W16#)
-    | isSubj
-    , [Lit (Word16Literal c)] <- args
-    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = UniqMap.lookup wordTcNm tcm
-            [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (Word16Literal c))])
-  $(namePat 'GHC.Word.W32#)
-    | isSubj
-    , [Lit (Word32Literal c)] <- args
-    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = UniqMap.lookup wordTcNm tcm
-            [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (Word32Literal c))])
-  $(namePat 'GHC.Word.W64#)
-    | isSubj
-    , [Lit (Word64Literal c)] <- args
-    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-            (Just wordTc) = UniqMap.lookup wordTcNm tcm
-            [wordDc] = tyConDataCons wordTc
-        in  reduce (mkApps (Data wordDc) [Left (Literal (Word64Literal c))])
-
-  $(namePat 'GHC.Types.W#)
-    | isSubj
-    , [Lit (WordLiteral i)] <- args
-    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = UniqMap.lookup intTcNm tcm
-            [intDc] = tyConDataCons intTc
-        in  reduce (mkApps (Data intDc) [Left (Literal (WordLiteral i))])
-
-  "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
-    | [Lit (IntLiteral _minEx)
-      ,Lit (IntLiteral matDigs)
-      ,nV
-      ,dV] <- args
-    , [n,d] <- integerLiterals' [nV,dV]
-    -> case fromInteger matDigs of
-          matDigs'
-            | matDigs' == floatDigits (undefined :: Float)
-            -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
-            | matDigs' == floatDigits (undefined :: Double)
-            -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
-          _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
-
-  "GHC.Float.$w$sfromRat''1" -- XXX: Very fragile
-    | [Lit (IntLiteral _minEx)
-      ,Lit (IntLiteral matDigs)
-      ,nV
-      ,dV] <- args
-    , [n,d] <- integerLiterals' [nV,dV]
-    -> case fromInteger matDigs of
-          matDigs'
-            | matDigs' == floatDigits (undefined :: Float)
-            -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
-            | matDigs' == floatDigits (undefined :: Double)
-            -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
-          _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
-
-  $(namePat 'GHC.Num.Integer.integerSignum#)
-    | [i] <- integerLiterals' args
-    -> reduce (Literal (IntLiteral (signum i)))
-
-  $(namePat 'GHC.Num.Integer.integerSignum)
-    | [i] <- integerLiterals' args
-    -> reduce (Literal (IntegerLiteral (signumInteger i)))
-
-  "GHC.Num.Integer.$wintegerSignum"
-    | [i] <- integerLiterals' args
-    -> reduce (Literal (IntLiteral (signum i)))
-
-  $(namePat 'GHC.Num.Integer.integerAbs)
-    | [i] <- integerLiterals' args
-    -> reduce (Literal (IntegerLiteral (absInteger i)))
-
-  $(namePat 'GHC.Num.Integer.integerBit#)
-    | [i] <- wordLiterals' args
-    -> reduce (Literal (IntegerLiteral (bit (fromInteger i))))
-
-  $(namePat 'GHC.Num.Integer.integerComplement)
-    | [i] <- integerLiterals' args
-    -> reduce (Literal (IntegerLiteral (complementInteger i)))
-
-  $(namePat 'GHC.Num.Integer.integerOr)
-    | [i, j] <- integerLiterals' args
-    -> reduce (Literal (IntegerLiteral (orInteger i j)))
-
-  $(namePat 'GHC.Num.Integer.integerXor)
-    | [i, j] <- integerLiterals' args
-    -> reduce (Literal (IntegerLiteral (xorInteger i j)))
-
-  $(namePat 'GHC.Num.Integer.integerAnd)
-    | [i, j] <- integerLiterals' args
-    -> reduce (Literal (IntegerLiteral (andInteger i j)))
-
-  "GHC.Num.Integer.$wintegerFromInt64#"
-    | [i] <- int64Literals' args
-    -> reduce . Literal $ IntLiteral i
-
-  $(namePat 'GHC.Base.eqString)
-    | [PrimVal _ _ [Lit (StringLiteral s1)]
-      ,PrimVal _ _ [Lit (StringLiteral s2)]
-      ] <- args
-    -> reduce (boolToBoolLiteral tcm ty (s1 == s2))
-    | otherwise -> error (show args)
-
-  $(namePat 'GHC.Base.quotInt)
-    | [ DC intDc [Left (Literal (IntLiteral i))]
-      , DC _     [Left (Literal (IntLiteral j))]
-      ] <- args
-    -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `quot` j)))))
-  $(namePat 'Clash.Class.BitPack.Internal.packInt8#) -- :: Int8 -> BitVector 8
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Int8Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packInt16#) -- :: Int16 -> BitVector 16
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Int16Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packInt32#) -- :: Int32 -> BitVector 32
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Int32Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packInt64#) -- :: Int64 -> BitVector 64
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Int64Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packWord#) -- :: Word -> BitVector WORD_SIZE_IN_BITS
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packWord8#) -- :: Word8 -> BitVector 8
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Word8Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packWord16#) -- :: Word16 -> BitVector 16
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packWord32#) -- :: Word32 -> BitVector 32
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Word32Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packWord64#) -- :: Word64 -> BitVector 64
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Word64Literal i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
-          whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'GHC.Base.remInt)
-    | [ DC intDc [Left (Literal (IntLiteral i))]
-      , DC _     [Left (Literal (IntLiteral j))]
-      ] <- args
-    -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `rem` j)))))
-
-  $(namePat 'GHC.Base.divInt)
-    | [ DC intDc [Left (Literal (IntLiteral i))]
-      , DC _     [Left (Literal (IntLiteral j))]
-      ] <- args
-    -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `div` j)))))
-
-
-  $(namePat 'GHC.Base.modInt)
-    | [ DC intDc [Left (Literal (IntLiteral i))]
-      , DC _     [Left (Literal (IntLiteral j))]
-      ] <- args
-    -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `mod` j)))))
-
-  $(namePat 'Clash.Class.BitPack.Internal.packDouble#) -- :: Double -> BitVector 64
-    | [DC _ [Left arg]] <- args
-    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-        in Just $ mach2
-             { mStack = mStack mach
-             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Word64 -> BitVector 64) i)
-             }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packFloat#) -- :: Float -> BitVector 32
-    | [DC _ [Left arg]] <- args
-    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-        in Just $ mach2
-             { mStack = mStack mach
-             , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Word32 -> BitVector 32) i)
-             }
-
-  $(namePat 'Clash.Class.BitPack.Internal.packCUShort#) -- :: CUShort -> BitVector 16
-    | [DC _ [Left arg]] <- args
-      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-#if MIN_VERSION_base(4,16,0)
-      , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)}
-          <- whnf eval tcm True (setTerm arg $ stackClear mach)
-#else
-      , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)}
-          <- whnf eval tcm True (setTerm arg $ stackClear mach)
-#endif
-      -> let resTyInfo = extractTySizeInfo tcm ty tys
-          in Just $ mach2
-              { mStack = mStack mach
-              , mTerm = mkBitVectorLit' resTyInfo 0 i
-              }
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackInt8#) -- BitVector 8 -> Int8
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Signed 8)
-#if MIN_VERSION_base(4,16,0)
-           proj = Int8Literal
-#else
-           proj = IntLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackInt16#) -- BitVector 16 -> Int16
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Signed 16)
-#if MIN_VERSION_base(4,16,0)
-           proj = Int16Literal
-#else
-           proj = IntLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackInt32#) -- BitVector 32 -> Int32
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Signed 32)
-#if MIN_VERSION_base(4,16,0)
-           proj = Int32Literal
-#else
-           proj = IntLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackInt64#) -- BitVector 64 -> Int64
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Signed 64)
-#if MIN_VERSION_base(4,16,0)
-           proj = Int64Literal
-#else
-           proj = IntLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackWord#) -- BitVector WORD_SIZE_IN_BITS -> Word
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Unsigned 64)
-        in reduce (mkIntCLit tcm WordLiteral val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackWord8#) -- BitVector 8 -> Word8
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Unsigned 8)
-#if MIN_VERSION_base(4,16,0)
-           proj = Word8Literal
-#else
-           proj = WordLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackWord16#) -- BitVector 16 -> Word16
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Unsigned 16)
-#if MIN_VERSION_base(4,16,0)
-           proj = Word16Literal
-#else
-           proj = WordLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackWord32#) -- BitVector 32 -> Word32
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Unsigned 32)
-#if MIN_VERSION_base(4,16,0)
-           proj = Word32Literal
-#else
-           proj = WordLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackWord64#) -- BitVector 64 -> Word64
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Unsigned 64)
-#if MIN_VERSION_base(4,16,0)
-           proj = Word64Literal
-#else
-           proj = WordLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackFloat#)
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = unpack (toBV i :: BitVector 32)
-        in reduce (mkFloatCLit tcm val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackDouble#)
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = unpack (toBV i :: BitVector 64)
-        in reduce (mkDoubleCLit tcm val resTy)
-
-  $(namePat 'Clash.Class.BitPack.Internal.unpackCUShort#)
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           val = toInteger (unpack (toBV i) :: Unsigned 16)
-#if MIN_VERSION_base(4,16,0)
-           proj = Word16Literal
-#else
-           proj = WordLiteral
-#endif
-        in reduce (mkIntCLit tcm proj val resTy)
-
-  $(namePat 'Clash.Sized.Internal.BitVector.xToBV)
-    | isSubj
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -- The second argument to `xToBV` is always going to be suspended.
-    -- See Note [Lazy primitives]
-    , [ _, (Suspend arg) ] <- args
-    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-    , mach1@Machine{mStack=[],mTerm=argWHNF} <-
-        whnf eval tcm True (setTerm arg (stackClear mach))
-    , let undefBitVector =
-            Just $ mach1
-                 { mStack = mStack mach
-                 , mTerm  = mkBitVectorLit ty nTy kn (bit (fromInteger kn)-1) 0
-                 }
-    -> case isX argWHNF of
-         Left _ -> undefBitVector
-         _ -> case collectArgs argWHNF of
-           (Prim p,_) | primName p `elem` undefinedXPrims -> undefBitVector
-           _ -> Just $ mach1
-                     { mStack = mStack mach
-                     , mTerm  = argWHNF
-                     }
-
-  -- expIndex#
-  --   :: KnownNat m
-  --   => Index m
-  --   -> SNat n
-  --   -> Index (n^m)
-  $(namePat 'Clash.Class.Exp.expIndex#)
-    | [b] <- indexLiterals' args
-    , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
-    -> reduce (mkIndexLit ty (LitTy (NumTy (km^e))) (km^e) (b^e))
-
-  -- expSigned#
-  --   :: KnownNat m
-  --   => Signed m
-  --   -> SNat n
-  --   -> Signed (n*m)
-  $(namePat 'Clash.Class.Exp.expSigned#)
-    | [b] <- signedLiterals' args
-    , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
-    -> reduce (mkSignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
-
-  -- expUnsigned#
-  --   :: KnownNat m
-  --   => Unsigned m
-  --   -> SNat n
-  --   -> Unsigned m
-  $(namePat 'Clash.Class.Exp.expUnsigned#)
-    | [b] <- unsignedLiterals' args
-    , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
-    -> reduce (mkUnsignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
-
-  $(namePat 'Clash.Promoted.Nat.powSNat)
-    | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-    -> let c = case a of
-                 2 -> 1 `shiftL` (fromInteger b)
-                 _ -> a ^ b
-           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = UniqMap.lookup snatTcNm tcm
-           [snatDc] = tyConDataCons snatTc
-       in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c))
-                                , Left (Literal (NaturalLiteral c))]
-
-  $(namePat 'Clash.Promoted.Nat.flogBaseSNat)
-    | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-    , Just c <- flogBase a b
-    , let c' = toInteger c
-    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = UniqMap.lookup snatTcNm tcm
-           [snatDc] = tyConDataCons snatTc
-       in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                , Left (Literal (NaturalLiteral c'))]
-
-  $(namePat 'Clash.Promoted.Nat.clogBaseSNat)
-    | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-    , Just c <- clogBase a b
-    , let c' = toInteger c
-    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = UniqMap.lookup snatTcNm tcm
-           [snatDc] = tyConDataCons snatTc
-       in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                , Left (Literal (NaturalLiteral c'))]
-    | otherwise
-    -> error ("clogBaseSNat: args = " <> show args <> ", tys = " <> show tys)
-
-  $(namePat 'Clash.Promoted.Nat.logBaseSNat)
-    | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-    , Just c <- flogBase a b
-    , let c' = toInteger c
-    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = UniqMap.lookup snatTcNm tcm
-           [snatDc] = tyConDataCons snatTc
-       in  reduce $
-           mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                , Left (Literal (NaturalLiteral c'))]
-
-------------
--- BitVector
-------------
--- Constructor
-  $(namePat 'Clash.Sized.Internal.BitVector.BV)
-    | [Right _] <- map (runExcept . tyNatSize tcm) tys
-    , Just (m,i) <- integerLiterals args
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkBitVectorLit' resTyInfo m i)
-
-  $(namePat 'Clash.Sized.Internal.BitVector.Bit)
-    | Just (m,i) <- integerLiterals args
-    -> reduce (mkBitLit ty m i)
-
--- Initialization
-  $(namePat 'Clash.Sized.Internal.BitVector.size#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = UniqMap.lookup intTcNm tcm
-           [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
-  $(namePat 'Clash.Sized.Internal.BitVector.maxIndex#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = UniqMap.lookup intTcNm tcm
-           [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (kn-1)))])
-
--- Construction
-  $(namePat 'Clash.Sized.Internal.BitVector.high)
-    -> reduce (mkBitLit ty 0 1)
-  $(namePat 'Clash.Sized.Internal.BitVector.low)
-    -> reduce (mkBitLit ty 0 0)
-  $(namePat 'Clash.Sized.Internal.BitVector.undefined##)
-    -> reduce (mkBitLit ty 1 0)
-
-  $(namePat 'Clash.Sized.Internal.BitVector.undefined#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-           mask = bit (fromInteger kn) - 1
-       in reduce (mkBitVectorLit' resTyInfo mask 0)
-
--- Eq
-  $(namePat 'Clash.Sized.Internal.BitVector.eq##) | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i == j))
-  $(namePat 'Clash.Sized.Internal.BitVector.neq##) | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i /= j))
-
--- Ord
-  $(namePat 'Clash.Sized.Internal.BitVector.lt##) | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <  j))
-  $(namePat 'Clash.Sized.Internal.BitVector.ge##) | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  $(namePat 'Clash.Sized.Internal.BitVector.gt##) | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >  j))
-  $(namePat 'Clash.Sized.Internal.BitVector.le##) | [(0,i),(0,j)] <- bitLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <= j))
-
--- Enum
-  $(namePat 'Clash.Sized.Internal.BitVector.toEnum##)
-    | [i] <- intCLiterals' args
-    -> let Bit msk val = BitVector.toEnum## (fromInteger i)
-       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
-
--- Bits
-  $(namePat 'Clash.Sized.Internal.BitVector.and##)
-    | [i,j] <- bitLiterals args
-    -> let Bit msk val = BitVector.and## (toBit i) (toBit j)
-       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
-  $(namePat 'Clash.Sized.Internal.BitVector.or##)
-    | [i,j] <- bitLiterals args
-    -> let Bit msk val = BitVector.or## (toBit i) (toBit j)
-       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
-  $(namePat 'Clash.Sized.Internal.BitVector.xor##)
-    | [i,j] <- bitLiterals args
-    -> let Bit msk val = BitVector.xor## (toBit i) (toBit j)
-       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
-
-  $(namePat 'Clash.Sized.Internal.BitVector.complement##)
-    | [i] <- bitLiterals args
-    -> let Bit msk val = BitVector.complement## (toBit i)
-       in reduce (mkBitLit ty (toInteger msk) (toInteger val))
-
--- Pack
-  $(namePat 'Clash.Sized.Internal.BitVector.pack#)
-    | [(msk,i)] <- bitLiterals args
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkBitVectorLit' resTyInfo msk i)
-
-  $(namePat 'Clash.Sized.Internal.BitVector.unpack#)
-    | [(msk,i)] <- bitVectorLiterals' args
-    -> reduce (mkBitLit ty msk i)
-
--- Concatenation
-  $(namePat '(Clash.Sized.Internal.BitVector.++#)) -- :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
-    | Just (_,m) <- extractKnownNat tcm tys
-    , [(mski,i),(mskj,j)] <- bitVectorLiterals' args
-    -> let val = i `shiftL` fromInteger m .|. j
-           msk = mski `shiftL` fromInteger m .|. mskj
-           resTyInfo = extractTySizeInfo tcm ty tys
-       in reduce (mkBitVectorLit' resTyInfo msk val)
-
--- Reduction
-  $(namePat 'Clash.Sized.Internal.BitVector.reduceAnd#) -- :: KnownNat n => BitVector n -> Bit
-    | [i] <- bitVectorLiterals' args
-    , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
-           val = reifyNat kn (op (toBV i))
-       in reduce (mkBitLit resTy 0 val)
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> Integer
-      op u _ = toInteger (BitVector.reduceAnd# u)
-  $(namePat 'Clash.Sized.Internal.BitVector.reduceOr#) -- :: KnownNat n => BitVector n -> Bit
-    | [i] <- bitVectorLiterals' args
-    , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
-           val = reifyNat kn (op (toBV i))
-       in reduce (mkBitLit resTy 0 val)
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> Integer
-      op u _ = toInteger (BitVector.reduceOr# u)
-  $(namePat 'Clash.Sized.Internal.BitVector.reduceXor#) -- :: KnownNat n => BitVector n -> Bit
-    | [i] <- bitVectorLiterals' args
-    , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
-           val = reifyNat kn (op (toBV i))
-       in reduce (mkBitLit resTy 0 val)
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> Integer
-      op u _ = toInteger (BitVector.reduceXor# u)
-
-
--- Indexing
-  $(namePat 'Clash.Sized.Internal.BitVector.index#) -- :: KnownNat n => BitVector n -> Int -> Bit
-    | Just (_,kn,i,j) <- bitVectorLitIntLit tcm tys args
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerToNaturalClamp)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> if i < 0 then
+           reduce (naturalToNaturalLiteral 0)
+         else
+           reduce (naturalToNaturalLiteral (fromInteger i))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerToNaturalThrow)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> let nTy = snd (splitFunForallTy ty) in
+         reduce (checkNaturalRange1 nTy i id)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerToInt64#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (integerToInt64Literal i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerToWord64#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (integerToWord64Literal i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerFromWord64#)
+  , \PrimEnv{..} -> case () of { _
+      | [w] <- word64Literals' args
+      -> reduce (Literal (IntegerLiteral w))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalAdd)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange2 nTy i j (+))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalMul)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange2 nTy i j (*))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Natural.naturalSubUnsafe)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
+        naturalToNaturalLiteral (naturalSubUnsafe i' j')))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalSubThrow)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
+                  case minusNaturalMaybe i' j' of
+                    Nothing -> checkNaturalRange1 nTy (-1) id
+                    Just n -> naturalToNaturalLiteral n))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalFromWord#)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (WordLiteral w)] <- args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange1 nTy w id)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalToWord#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- naturalLiterals' args
+      -> reduce (integerToWordLiteral i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalQuot)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange2 nTy i j quot)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalRem)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange2 nTy i j rem)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalQuotRem#) -- :: Natural -> Natural -> (#Natural, Natural#)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- naturalLiterals' args
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             (q,r) = quotRem (fromInteger i) (fromInteger j)
+      in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left $ catchDivByZero (naturalToNaturalLiteral q)
+                  , Left $ catchDivByZero (naturalToNaturalLiteral r)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalGcd)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange2 nTy i j gcd)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalLcm)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      ->
+       let nTy = snd (splitFunForallTy ty) in
+       reduce (checkNaturalRange2 nTy i j lcm)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalGt#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      -> reduce (boolToIntLiteral (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalGe#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      -> reduce (boolToIntLiteral (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalEq#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      -> reduce (boolToIntLiteral (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalNe#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      -> reduce (boolToIntLiteral (i /= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalLt#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      -> reduce (boolToIntLiteral (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalLe#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- naturalLiterals args
+      -> reduce (boolToIntLiteral (i <= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalShiftL#)
+  , \PrimEnv{..} -> case () of { _
+      | [iV, Lit (WordLiteral j)] <- args
+      , [i] <- naturalLiterals' [iV]
+      -> reduce (naturalToNaturalLiteral (fromInteger (i `shiftL` fromInteger j)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalShiftR#)
+  , \PrimEnv{..} -> case () of { _
+      | [iV, Lit (WordLiteral j)] <- args
+      , [i] <- naturalLiterals' [iV]
+      -> reduce (naturalToNaturalLiteral (fromInteger (i `shiftR` fromInteger j)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalCompare)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- naturalLiterals' args
+      -> let -- Get the required result type (viewed as an applied type constructor name)
+             (_,tyView -> TyConApp tupTcNm []) = splitFunForallTy ty
+             -- Find the type constructor from the name
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             -- Get the data constructors of that type
+             -- The type is 'Ordering', so they are: 'LT', 'EQ', 'GT'
+             [ltDc, eqDc, gtDc] = tyConDataCons tupTc
+             -- Do the actual compile-time evaluation
+             ordVal = compareInteger i j
+          in reduce $ case ordVal of
+              LT -> Data ltDc
+              EQ -> Data eqDc
+              GT -> Data gtDc
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.naturalSignum)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- naturalLiterals' args
+      -> reduce (Literal (NaturalLiteral (signum i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Num.Natural.$wnaturalSignum"
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- naturalLiterals' args
+      -> reduce (Literal (WordLiteral (signum i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.BigNat.bigNatEq#)
+  , \PrimEnv{..} -> case () of { _
+      | [ Lit (ByteArrayLiteral (BA.ByteArray i))
+        , Lit (ByteArrayLiteral (BA.ByteArray j))] <- args
+      -> reduce (Literal (IntLiteral (IS (bigNatEq# i j))))
+  
+    -- GHC.Real.^  -- XXX: Very fragile
+    --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Real.^_f" -- :: Integer -> Integer -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- integerLiterals' args
+      -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Real.$wf" -- :: Integer -> Int# -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [iV, Lit (IntLiteral j)] <- args
+      , [i] <- integerLiterals' [iV]
+      -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Real.$wf1" -- :: Int# -> Int# -> Int#
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Internal.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Internal.Real.^_$s$spowImpl" -- :: Int -> Integer -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Internal.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [integerLiteral -> Just i, intLiteral -> Just j] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Internal.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [intLiteral -> Just i, intLiteral -> Just j] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Real.^_$s$spowImpl2" -- :: Int# -> Integer -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Real.$w$spowImpl" -- :: Integer -> Int# -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [integerLiteral -> Just i, intLiteral -> Just j] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Real.$w$spowImpl1" -- :: Int# -> Int# -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [intLiteral -> Just i, intLiteral -> Just j] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Real.^_$sf2" -- :: Int# -> Integer -> Integer
+  , \PrimEnv{..} -> case () of { _
+      | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+      -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+  
+    -- Type level ^    -- XXX: Very fragile
+    -- These is are specialized versions of ^_f, named by some combination of ghc and singletons.
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Data.Singletons.TypeLits.Internal.$fSingI->^@#@$_f" -- ghc-8.6.5, singletons-2.5.1
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- naturalLiterals' args
+      -> reduce (Literal (NaturalLiteral (i ^ j)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Data.Singletons.TypeLits.Internal.%^_f" -- ghc-8.8.1, singletons-2.6
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- naturalLiterals' args
+      -> reduce (Literal (NaturalLiteral (i ^ j)))
+  
+    -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.TypeLits.natVal)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (NaturalLiteral n), _] <- args
+      -> reduce (integerToIntegerLiteral n)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.TypeNats.natVal)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (NaturalLiteral n), _] <- args
+      -> reduce (Literal (NaturalLiteral n))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.TypeNats.someNatVal)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (NaturalLiteral n)] <- args
       -> let resTy = getResultTy tcm ty tys
-             (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-         in reduce (mkBitLit resTy msk val)
-      where
-        op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
-        op u i _ = (toInteger m, toInteger v)
-          where Bit m v = (BitVector.index# u i)
-  $(namePat 'Clash.Sized.Internal.BitVector.replaceBit#) -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
-    | Just (_, n) <- extractKnownNat tcm tys
-    , [ _
-      , PrimVal bvP _ [_, Lit (NaturalLiteral mskBv), Lit (IntegerLiteral bv)]
-      , valArgs -> Just [Literal (IntLiteral i)]
-      , PrimVal bP _ [Lit (WordLiteral mskB), Lit (IntegerLiteral b)]
-      ] <- args
-    , primName bvP == showt 'Clash.Sized.Internal.BitVector.fromInteger#
-    , primName bP  == showt 'Clash.Sized.Internal.BitVector.fromInteger##
+          in reduce (mkSomeNat tcm n resTy)
+  
+    -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.TypeLits.someNatVal)
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (NaturalLiteral n)] <- args
+      -> let resTy = getResultTy tcm ty tys
+          in reduce (mkSomeNat tcm n resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Types.I#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (IntLiteral i)] <- args
+      ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+              (Just intTc) = UniqMap.lookup intTcNm tcm
+              [intDc] = tyConDataCons intTc
+          in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Int.I8#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Int8Literal i)] <- args
+      ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+              (Just intTc) = UniqMap.lookup intTcNm tcm
+              [intDc] = tyConDataCons intTc
+          in  reduce (mkApps (Data intDc) [Left (Literal (Int8Literal i))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Int.I16#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Int16Literal i)] <- args
+      ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+              (Just intTc) = UniqMap.lookup intTcNm tcm
+              [intDc] = tyConDataCons intTc
+          in  reduce (mkApps (Data intDc) [Left (Literal (Int16Literal i))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Int.I32#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Int32Literal i)] <- args
+      ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+              (Just intTc) = UniqMap.lookup intTcNm tcm
+              [intDc] = tyConDataCons intTc
+          in  reduce (mkApps (Data intDc) [Left (Literal (Int32Literal i))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Int.I64#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Int64Literal i)] <- args
+      ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+              (Just intTc) = UniqMap.lookup intTcNm tcm
+              [intDc] = tyConDataCons intTc
+          in  reduce (mkApps (Data intDc) [Left (Literal (Int64Literal i))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Word.W8#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Word8Literal c)] <- args
+      ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+              (Just wordTc) = UniqMap.lookup wordTcNm tcm
+              [wordDc] = tyConDataCons wordTc
+          in  reduce (mkApps (Data wordDc) [Left (Literal (Word8Literal c))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Word.W16#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Word16Literal c)] <- args
+      ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+              (Just wordTc) = UniqMap.lookup wordTcNm tcm
+              [wordDc] = tyConDataCons wordTc
+          in  reduce (mkApps (Data wordDc) [Left (Literal (Word16Literal c))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Word.W32#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Word32Literal c)] <- args
+      ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+              (Just wordTc) = UniqMap.lookup wordTcNm tcm
+              [wordDc] = tyConDataCons wordTc
+          in  reduce (mkApps (Data wordDc) [Left (Literal (Word32Literal c))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Word.W64#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (Word64Literal c)] <- args
+      ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+              (Just wordTc) = UniqMap.lookup wordTcNm tcm
+              [wordDc] = tyConDataCons wordTc
+          in  reduce (mkApps (Data wordDc) [Left (Literal (Word64Literal c))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Types.W#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [Lit (WordLiteral i)] <- args
+      ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+              (Just intTc) = UniqMap.lookup intTcNm tcm
+              [intDc] = tyConDataCons intTc
+          in  reduce (mkApps (Data intDc) [Left (Literal (WordLiteral i))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral _minEx)
+        ,Lit (IntLiteral matDigs)
+        ,nV
+        ,dV] <- args
+      , [n,d] <- integerLiterals' [nV,dV]
+      -> case fromInteger matDigs of
+            matDigs'
+              | matDigs' == floatDigits (undefined :: Float)
+              -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
+              | matDigs' == floatDigits (undefined :: Double)
+              -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
+            _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Float.$w$sfromRat''1" -- XXX: Very fragile
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (IntLiteral _minEx)
+        ,Lit (IntLiteral matDigs)
+        ,nV
+        ,dV] <- args
+      , [n,d] <- integerLiterals' [nV,dV]
+      -> case fromInteger matDigs of
+            matDigs'
+              | matDigs' == floatDigits (undefined :: Float)
+              -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
+              | matDigs' == floatDigits (undefined :: Double)
+              -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
+            _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerSignum#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (Literal (IntLiteral (signum i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerSignum)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (Literal (IntegerLiteral (signumInteger i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Num.Integer.$wintegerSignum"
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (Literal (IntLiteral (signum i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerAbs)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (Literal (IntegerLiteral (absInteger i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerBit#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- wordLiterals' args
+      -> reduce (Literal (IntegerLiteral (bit (fromInteger i))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerComplement)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- integerLiterals' args
+      -> reduce (Literal (IntegerLiteral (complementInteger i)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerOr)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- integerLiterals' args
+      -> reduce (Literal (IntegerLiteral (orInteger i j)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerXor)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- integerLiterals' args
+      -> reduce (Literal (IntegerLiteral (xorInteger i j)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Num.Integer.integerAnd)
+  , \PrimEnv{..} -> case () of { _
+      | [i, j] <- integerLiterals' args
+      -> reduce (Literal (IntegerLiteral (andInteger i j)))
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Num.Integer.$wintegerFromInt64#"
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- int64Literals' args
+      -> reduce . Literal $ IntLiteral i
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Base.eqString)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal _ _ [Lit (StringLiteral s1)]
+        ,PrimVal _ _ [Lit (StringLiteral s2)]
+        ] <- args
+      -> reduce (boolToBoolLiteral tcm ty (s1 == s2))
+      | otherwise -> error (show args)
+  }
+  )
+  , ( $(nameFS 'GHC.Base.quotInt)
+  , \PrimEnv{..} -> case () of { _
+      | [ DC intDc [Left (Literal (IntLiteral i))]
+        , DC _     [Left (Literal (IntLiteral j))]
+        ] <- args
+      -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `quot` j)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packInt8#) -- :: Int8 -> BitVector 8
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Int8Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packInt16#) -- :: Int16 -> BitVector 16
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Int16Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packInt32#) -- :: Int32 -> BitVector 32
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Int32Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packInt64#) -- :: Int64 -> BitVector 64
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Int64Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (IntLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packWord#) -- :: Word -> BitVector WORD_SIZE_IN_BITS
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+        , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packWord8#) -- :: Word8 -> BitVector 8
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Word8Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packWord16#) -- :: Word16 -> BitVector 16
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packWord32#) -- :: Word32 -> BitVector 32
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Word32Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packWord64#) -- :: Word64 -> BitVector 64
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Word64Literal i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
+            whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Base.remInt)
+  , \PrimEnv{..} -> case () of { _
+      | [ DC intDc [Left (Literal (IntLiteral i))]
+        , DC _     [Left (Literal (IntLiteral j))]
+        ] <- args
+      -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `rem` j)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Base.divInt)
+  , \PrimEnv{..} -> case () of { _
+      | [ DC intDc [Left (Literal (IntLiteral i))]
+        , DC _     [Left (Literal (IntLiteral j))]
+        ] <- args
+      -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `div` j)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.Base.modInt)
+  , \PrimEnv{..} -> case () of { _
+      | [ DC intDc [Left (Literal (IntLiteral i))]
+        , DC _     [Left (Literal (IntLiteral j))]
+        ] <- args
+      -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `mod` j)))))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packDouble#) -- :: Double -> BitVector 64
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
       -> let resTyInfo = extractTySizeInfo tcm ty tys
-             (mskVal,val) = reifyNat n (op (BV (fromInteger mskBv) (fromInteger bv))
-                                           (fromInteger i)
-                                           (Bit (fromInteger mskB) (fromInteger b)))
-      in reduce (mkBitVectorLit' resTyInfo mskVal val)
+          in Just $ mach2
+               { mStack = mStack mach
+               , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Word64 -> BitVector 64) i)
+               }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packFloat#) -- :: Float -> BitVector 32
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+          in Just $ mach2
+               { mStack = mStack mach
+               , mTerm = mkBitVectorLit' resTyInfo 0 (toInteger $ (pack :: Word32 -> BitVector 32) i)
+               }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.packCUShort#) -- :: CUShort -> BitVector 16
+  , \PrimEnv{..} -> case () of { _
+      | [DC _ [Left arg]] <- args
+        , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+#if MIN_VERSION_base(4,16,0)
+        , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)}
+            <- whnf eval tcm True (setTerm arg $ stackClear mach)
+#else
+        , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)}
+            <- whnf eval tcm True (setTerm arg $ stackClear mach)
+#endif
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+            in Just $ mach2
+                { mStack = mStack mach
+                , mTerm = mkBitVectorLit' resTyInfo 0 i
+                }
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackInt8#) -- BitVector 8 -> Int8
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Signed 8)
+#if MIN_VERSION_base(4,16,0)
+             proj = Int8Literal
+#else
+             proj = IntLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackInt16#) -- BitVector 16 -> Int16
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Signed 16)
+#if MIN_VERSION_base(4,16,0)
+             proj = Int16Literal
+#else
+             proj = IntLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackInt32#) -- BitVector 32 -> Int32
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Signed 32)
+#if MIN_VERSION_base(4,16,0)
+             proj = Int32Literal
+#else
+             proj = IntLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackInt64#) -- BitVector 64 -> Int64
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Signed 64)
+#if MIN_VERSION_base(4,16,0)
+             proj = Int64Literal
+#else
+             proj = IntLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackWord#) -- BitVector WORD_SIZE_IN_BITS -> Word
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Unsigned 64)
+          in reduce (mkIntCLit tcm WordLiteral val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackWord8#) -- BitVector 8 -> Word8
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Unsigned 8)
+#if MIN_VERSION_base(4,16,0)
+             proj = Word8Literal
+#else
+             proj = WordLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackWord16#) -- BitVector 16 -> Word16
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Unsigned 16)
+#if MIN_VERSION_base(4,16,0)
+             proj = Word16Literal
+#else
+             proj = WordLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackWord32#) -- BitVector 32 -> Word32
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Unsigned 32)
+#if MIN_VERSION_base(4,16,0)
+             proj = Word32Literal
+#else
+             proj = WordLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackWord64#) -- BitVector 64 -> Word64
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Unsigned 64)
+#if MIN_VERSION_base(4,16,0)
+             proj = Word64Literal
+#else
+             proj = WordLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackFloat#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = unpack (toBV i :: BitVector 32)
+          in reduce (mkFloatCLit tcm val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackDouble#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = unpack (toBV i :: BitVector 64)
+          in reduce (mkDoubleCLit tcm val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.BitPack.Internal.unpackCUShort#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             val = toInteger (unpack (toBV i) :: Unsigned 16)
+#if MIN_VERSION_base(4,16,0)
+             proj = Word16Literal
+#else
+             proj = WordLiteral
+#endif
+          in reduce (mkIntCLit tcm proj val resTy)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.xToBV)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -- The second argument to `xToBV` is always going to be suspended.
+      -- See Note [Lazy primitives]
+      , [ _, (Suspend arg) ] <- args
+      , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      , mach1@Machine{mStack=[],mTerm=argWHNF} <-
+          whnf eval tcm True (setTerm arg (stackClear mach))
+      , let undefBitVector =
+              Just $ mach1
+                   { mStack = mStack mach
+                   , mTerm  = mkBitVectorLit ty nTy kn (bit (fromInteger kn)-1) 0
+                   }
+      -> case isX argWHNF of
+           Left _ -> undefBitVector
+           _ -> case collectArgs argWHNF of
+             (Prim p,_) | primName p `elem` undefinedXPrims -> undefBitVector
+             _ -> Just $ mach1
+                       { mStack = mStack mach
+                       , mTerm  = argWHNF
+                       }
+  
+    -- expIndex#
+    --   :: KnownNat m
+    --   => Index m
+    --   -> SNat n
+    --   -> Index (n^m)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.Exp.expIndex#)
+  , \PrimEnv{..} -> case () of { _
+      | [b] <- indexLiterals' args
+      , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+      -> reduce (mkIndexLit ty (LitTy (NumTy (km^e))) (km^e) (b^e))
+  
+    -- expSigned#
+    --   :: KnownNat m
+    --   => Signed m
+    --   -> SNat n
+    --   -> Signed (n*m)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.Exp.expSigned#)
+  , \PrimEnv{..} -> case () of { _
+      | [b] <- signedLiterals' args
+      , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+      -> reduce (mkSignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
+  
+    -- expUnsigned#
+    --   :: KnownNat m
+    --   => Unsigned m
+    --   -> SNat n
+    --   -> Unsigned m
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Class.Exp.expUnsigned#)
+  , \PrimEnv{..} -> case () of { _
+      | [b] <- unsignedLiterals' args
+      , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+      -> reduce (mkUnsignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Promoted.Nat.powSNat)
+  , \PrimEnv{..} -> case () of { _
+      | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+      -> let c = case a of
+                   2 -> 1 `shiftL` (fromInteger b)
+                   _ -> a ^ b
+             (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+             (Just snatTc) = UniqMap.lookup snatTcNm tcm
+             [snatDc] = tyConDataCons snatTc
+         in  reduce $
+             mkApps (Data snatDc) [ Right (LitTy (NumTy c))
+                                  , Left (Literal (NaturalLiteral c))]
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Promoted.Nat.flogBaseSNat)
+  , \PrimEnv{..} -> case () of { _
+      | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+      , Just c <- flogBase a b
+      , let c' = toInteger c
+      -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+             (Just snatTc) = UniqMap.lookup snatTcNm tcm
+             [snatDc] = tyConDataCons snatTc
+         in  reduce $
+             mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+                                  , Left (Literal (NaturalLiteral c'))]
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Promoted.Nat.clogBaseSNat)
+  , \PrimEnv{..} -> case () of { _
+      | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+      , Just c <- clogBase a b
+      , let c' = toInteger c
+      -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+             (Just snatTc) = UniqMap.lookup snatTcNm tcm
+             [snatDc] = tyConDataCons snatTc
+         in  reduce $
+             mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+                                  , Left (Literal (NaturalLiteral c'))]
+      | otherwise
+      -> error ("clogBaseSNat: args = " <> show args <> ", tys = " <> show tys)
+  }
+  )
+  , ( $(nameFS 'Clash.Promoted.Nat.logBaseSNat)
+  , \PrimEnv{..} -> case () of { _
+      | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+      , Just c <- flogBase a b
+      , let c' = toInteger c
+      -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+             (Just snatTc) = UniqMap.lookup snatTcNm tcm
+             [snatDc] = tyConDataCons snatTc
+         in  reduce $
+             mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+                                  , Left (Literal (NaturalLiteral c'))]
+  
+  ------------
+  -- BitVector
+  ------------
+  -- Constructor
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.BV)
+  , \PrimEnv{..} -> case () of { _
+      | [Right _] <- map (runExcept . tyNatSize tcm) tys
+      , Just (m,i) <- integerLiterals args
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkBitVectorLit' resTyInfo m i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.Bit)
+  , \PrimEnv{..} -> case () of { _
+      | Just (m,i) <- integerLiterals args
+      -> reduce (mkBitLit ty m i)
+  
+  -- Initialization
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.size#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
+             (Just intTc) = UniqMap.lookup intTcNm tcm
+             [intCon] = tyConDataCons intTc
+         in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.maxIndex#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
+             (Just intTc) = UniqMap.lookup intTcNm tcm
+             [intCon] = tyConDataCons intTc
+         in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (kn-1)))])
+  
+  -- Construction
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.high)
+  , \PrimEnv{..} -> case () of { _
+      -> reduce (mkBitLit ty 0 1)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.low)
+  , \PrimEnv{..} -> case () of { _
+      -> reduce (mkBitLit ty 0 0)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.undefined##)
+  , \PrimEnv{..} -> case () of { _
+      -> reduce (mkBitLit ty 1 0)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.undefined#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+             mask = bit (fromInteger kn) - 1
+         in reduce (mkBitVectorLit' resTyInfo mask 0)
+  
+  -- Eq
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.eq##)
+  , \PrimEnv{..} -> case () of { _ | [(0,i),(0,j)] <- bitLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.neq##)
+  , \PrimEnv{..} -> case () of { _ | [(0,i),(0,j)] <- bitLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i /= j))
+  
+  -- Ord
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.lt##)
+  , \PrimEnv{..} -> case () of { _ | [(0,i),(0,j)] <- bitLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <  j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.ge##)
+  , \PrimEnv{..} -> case () of { _ | [(0,i),(0,j)] <- bitLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.gt##)
+  , \PrimEnv{..} -> case () of { _ | [(0,i),(0,j)] <- bitLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >  j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.le##)
+  , \PrimEnv{..} -> case () of { _ | [(0,i),(0,j)] <- bitLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <= j))
+  
+  -- Enum
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.toEnum##)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- intCLiterals' args
+      -> let Bit msk val = BitVector.toEnum## (fromInteger i)
+         in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+  
+  -- Bits
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.and##)
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- bitLiterals args
+      -> let Bit msk val = BitVector.and## (toBit i) (toBit j)
+         in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.or##)
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- bitLiterals args
+      -> let Bit msk val = BitVector.or## (toBit i) (toBit j)
+         in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.xor##)
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- bitLiterals args
+      -> let Bit msk val = BitVector.xor## (toBit i) (toBit j)
+         in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.complement##)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitLiterals args
+      -> let Bit msk val = BitVector.complement## (toBit i)
+         in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+  
+  -- Pack
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.pack#)
+  , \PrimEnv{..} -> case () of { _
+      | [(msk,i)] <- bitLiterals args
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkBitVectorLit' resTyInfo msk i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.unpack#)
+  , \PrimEnv{..} -> case () of { _
+      | [(msk,i)] <- bitVectorLiterals' args
+      -> reduce (mkBitLit ty msk i)
+  
+  -- Concatenation
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.BitVector.++#)) -- :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_,m) <- extractKnownNat tcm tys
+      , [(mski,i),(mskj,j)] <- bitVectorLiterals' args
+      -> let val = i `shiftL` fromInteger m .|. j
+             msk = mski `shiftL` fromInteger m .|. mskj
+             resTyInfo = extractTySizeInfo tcm ty tys
+         in reduce (mkBitVectorLit' resTyInfo msk val)
+  
+  -- Reduction
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.reduceAnd#) -- :: KnownNat n => BitVector n -> Bit
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      , Just (_, kn) <- extractKnownNat tcm tys
+      -> let resTy = getResultTy tcm ty tys
+             val = reifyNat kn (op (toBV i))
+         in reduce (mkBitLit resTy 0 val)
+      | otherwise -> Nothing
       where
-        op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> (Integer,Integer)
-        -- op bv i b _ = (BitVector.unsafeMask res, BitVector.unsafeToInteger res)
-        op bv i b _ = splitBV (BitVector.replaceBit# bv i b)
-  $(namePat 'Clash.Sized.Internal.BitVector.setSlice#)
-  -- :: SNat (m+1+i) -> BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n) -> BitVector (m + 1 + i)
-    | mTy : iTy : nTy : _ <- tys
-    , Right m <- runExcept (tyNatSize tcm mTy)
-    , Right iN <- runExcept (tyNatSize tcm iTy)
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    , [i,j] <- bitVectorLiterals' args
-    -> let BV msk val = BitVector.setSlice# (unsafeSNat (m+1+iN)) (toBV i) (unsafeSNat m) (unsafeSNat n) (toBV j)
-           resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
-  $(namePat 'Clash.Sized.Internal.BitVector.slice#)
-  -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
-    | mTy : _ : nTy : _ <- tys
-    , Right m <- runExcept (tyNatSize tcm mTy)
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    , [i] <- bitVectorLiterals' args
-    -> let BV msk val = BitVector.slice# (toBV i) (unsafeSNat m) (unsafeSNat n)
-           resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
-  $(namePat 'Clash.Sized.Internal.BitVector.split#) -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
-    | nTy : mTy : _ <- tys
-    , Right n <-  runExcept (tyNatSize tcm nTy)
-    , Right m <-  runExcept (tyNatSize tcm mTy)
-    , [(mski,i)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
-           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty'
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           bvTy : _ = tyArgs
-           valM = i `shiftR` fromInteger n
-           mskM = mski `shiftR` fromInteger n
-           valN = i .&. mask
-           mskN = mski .&. mask
-           mask = bit (fromInteger n) - 1
-    in reduce $
-       mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left (mkBitVectorLit bvTy mTy m mskM valM)
-                , Left (mkBitVectorLit bvTy nTy n mskN valN)])
-
-  $(namePat 'Clash.Sized.Internal.BitVector.msb#) -- :: forall n. KnownNat n => BitVector n -> Bit
-    | [i] <- bitVectorLiterals' args
-    , Just (_, kn) <- extractKnownNat tcm tys
-    -> let resTy = getResultTy tcm ty tys
-           (msk,val) = reifyNat kn (op (toBV i))
-       in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> (Word,Word)
-      op u _ = (unsafeMask# res, BitVector.unsafeToInteger# res)
-        where
-          res = BitVector.msb# u
-  $(namePat 'Clash.Sized.Internal.BitVector.lsb#) -- :: BitVector n -> Bit
-    | [i] <- bitVectorLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-           Bit msk val = BitVector.lsb# (toBV i)
-    in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
-
-
--- Eq
-  -- eq#, neq# :: KnownNat n => BitVector n -> BitVector n -> Bool
-  $(namePat 'Clash.Sized.Internal.BitVector.eq#)
-    | nTy : _ <- tys
-    , Right 0 <- runExcept (tyNatSize tcm nTy)
-    -> reduce (boolToBoolLiteral tcm ty True)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2Bool BitVector.eq# ty tcm args)
-    -> reduce val
-
-  $(namePat 'Clash.Sized.Internal.BitVector.neq#)
-    | nTy : _ <- tys
-    , Right 0 <- runExcept (tyNatSize tcm nTy)
-    -> reduce (boolToBoolLiteral tcm ty False)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2Bool BitVector.neq# ty tcm args)
-    -> reduce val
-
--- Ord
-  -- lt#,ge#,gt#,le# :: KnownNat n => BitVector n -> BitVector n -> Bool
-  $(namePat 'Clash.Sized.Internal.BitVector.lt#)
-    | nTy : _ <- tys
-    , Right 0 <- runExcept (tyNatSize tcm nTy)
-    -> reduce (boolToBoolLiteral tcm ty False)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2Bool BitVector.lt# ty tcm args)
-    -> reduce val
-  $(namePat 'Clash.Sized.Internal.BitVector.ge#)
-    | nTy : _ <- tys
-    , Right 0 <- runExcept (tyNatSize tcm nTy)
-    -> reduce (boolToBoolLiteral tcm ty True)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2Bool BitVector.ge# ty tcm args)
-    -> reduce val
-  $(namePat 'Clash.Sized.Internal.BitVector.gt#)
-    | nTy : _ <- tys
-    , Right 0 <- runExcept (tyNatSize tcm nTy)
-    -> reduce (boolToBoolLiteral tcm ty False)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2Bool BitVector.gt# ty tcm args)
-    -> reduce val
-  $(namePat 'Clash.Sized.Internal.BitVector.le#)
-    | nTy : _ <- tys
-    , Right 0 <- runExcept (tyNatSize tcm nTy)
-    -> reduce (boolToBoolLiteral tcm ty True)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2Bool BitVector.le# ty tcm args)
-    -> reduce val
-
--- Enum
-
-  $(namePat 'Clash.Sized.Internal.BitVector.toEnum#)
-    | let resTyInfo@(_,_,kn) = extractTySizeInfo tcm ty tys
-    , Just val <- reifyNat kn (liftInteger2BitVector (BitVector.toEnum# . fromInteger) resTyInfo args)
-    -> reduce val
-
-  $(namePat 'Clash.Sized.Internal.BitVector.fromEnum#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , let resTy = getResultTy tcm ty tys
-    , Just val <- reifyNat kn (liftBitVector2CInt tcm resTy (toInteger . BitVector.fromEnum#) args)
-    -> reduce val
-
--- Bounded
-  $(namePat 'Clash.Sized.Internal.BitVector.minBound#)
-    | Just (nTy,len) <- extractKnownNat tcm tys
-    -> reduce (mkBitVectorLit ty nTy len 0 0)
-  $(namePat 'Clash.Sized.Internal.BitVector.maxBound#)
-    | Just (litTy,mb) <- extractKnownNat tcm tys
-    -> let maxB = (2 ^ mb) - 1
-       in  reduce (mkBitVectorLit ty litTy mb 0 maxB)
-
--- Num
-  $(namePat '(Clash.Sized.Internal.BitVector.+#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.+#) ty tcm tys args)
-    -> reduce val
-  $(namePat '(Clash.Sized.Internal.BitVector.-#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.-#) ty tcm tys args)
-    -> reduce val
-  $(namePat '(Clash.Sized.Internal.BitVector.*#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.*#) ty tcm tys args)
-    -> reduce val
-  $(namePat 'Clash.Sized.Internal.BitVector.negate#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [i] <- bitVectorLiterals' args
-    -> let (msk,val) = reifyNat kn (op (toBV i))
-    in reduce (mkBitVectorLit ty nTy kn msk val)
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> (Integer,Integer)
-      op u _ = splitBV (BitVector.negate# u)
-
--- ExtendingNum
-  $(namePat 'Clash.Sized.Internal.BitVector.plus#) -- :: (KnownNat n, KnownNat m) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
-    | [(0,i),(0,j)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-       in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 (i+j))
-
-  $(namePat 'Clash.Sized.Internal.BitVector.minus#)
-    | [(0,i),(0,j)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-           val = reifyNat resSizeInt (runSizedF (BitVector.-#) i j)
-      in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 val)
-
-  $(namePat 'Clash.Sized.Internal.BitVector.times#)
-    | [(0,i),(0,j)] <- bitVectorLiterals' args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-       in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 (i*j))
-
--- Integral
-  $(namePat 'Clash.Sized.Internal.BitVector.quot#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.quot#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.BitVector.rem#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.rem#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.BitVector.toInteger#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , [i] <- bitVectorLiterals' args
-    -> let val = reifyNat kn (op (toBV i))
-    in reduce (integerToIntegerLiteral val)
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> Integer
-      op u _ = BitVector.toInteger# u
-
--- Bits
-  $(namePat 'Clash.Sized.Internal.BitVector.and#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.and#) ty tcm tys args)
-    -> reduce val
-  $(namePat 'Clash.Sized.Internal.BitVector.or#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.or#) ty tcm tys args)
-    -> reduce val
-  $(namePat 'Clash.Sized.Internal.BitVector.xor#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftBitVector2 (BitVector.xor#) ty tcm tys args)
-    -> reduce val
-
-  $(namePat 'Clash.Sized.Internal.BitVector.complement#)
-    | [i] <- bitVectorLiterals' args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> let (msk,val) = reifyNat kn (op (toBV i))
-    in reduce (mkBitVectorLit ty nTy kn msk val)
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> (Integer,Integer)
-      op u _ = splitBV $ BitVector.complement# u
-
-  $(namePat 'Clash.Sized.Internal.BitVector.shiftL#)
-    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
-      -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (mkBitVectorLit ty nTy kn msk val)
-      where
-        op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
-        op u i _ = splitBV (BitVector.shiftL# u i)
-  $(namePat 'Clash.Sized.Internal.BitVector.shiftR#)
-    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
-      -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (mkBitVectorLit ty nTy kn msk val)
-      where
-        op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
-        op u i _ = splitBV (BitVector.shiftR# u i)
-  $(namePat 'Clash.Sized.Internal.BitVector.rotateL#)
-    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
-      -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (mkBitVectorLit ty nTy kn msk val)
-      where
-        op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
-        op u i _ = splitBV (BitVector.rotateL# u i)
-  $(namePat 'Clash.Sized.Internal.BitVector.rotateR#)
-    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
-      -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
-      in reduce (mkBitVectorLit ty nTy kn msk val)
-      where
-        op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
-        op u i _ = splitBV (BitVector.rotateR# u i)
-
--- truncateB
-  $(namePat 'Clash.Sized.Internal.BitVector.truncateB#) -- forall a b . KnownNat a => BitVector (a + b) -> BitVector a
-    | aTy  : _ <- tys
-    , Right ka <- runExcept (tyNatSize tcm aTy)
-    , [(mski,i)] <- bitVectorLiterals' args
-    -> let bitsKeep = (bit (fromInteger ka)) - 1
-           val = i .&. bitsKeep
-           msk = mski .&. bitsKeep
-    in reduce (mkBitVectorLit ty aTy ka msk val)
-
---------
--- Index
---------
--- BitPack
-  $(namePat 'Clash.Sized.Internal.Index.pack#)
-    | nTy : _ <- tys
-    , Right _ <- runExcept (tyNatSize tcm nTy)
-    , [i] <- indexLiterals' args
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkBitVectorLit' resTyInfo 0 i)
-  $(namePat 'Clash.Sized.Internal.Index.unpack#)
-    | Just (nTy,kn) <- extractKnownNat tcm tys
-    , [(0,i)] <- bitVectorLiterals' args
-    -> reduce (mkIndexLit ty nTy kn i)
-
--- Eq
-  $(namePat 'Clash.Sized.Internal.Index.eq#) | Just (i,j) <- indexLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i == j))
-  $(namePat 'Clash.Sized.Internal.Index.neq#) | Just (i,j) <- indexLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i /= j))
-
--- Ord
-  $(namePat 'Clash.Sized.Internal.Index.lt#)
-    | Just (i,j) <- indexLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i < j))
-  $(namePat 'Clash.Sized.Internal.Index.ge#)
-    | Just (i,j) <- indexLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  $(namePat 'Clash.Sized.Internal.Index.gt#)
-    | Just (i,j) <- indexLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i > j))
-  $(namePat 'Clash.Sized.Internal.Index.le#)
-    | Just (i,j) <- indexLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <= j))
-
--- Enum
-  $(namePat 'Clash.Sized.Internal.Index.toEnum#)
-    | [i] <- intCLiterals' args
-    , Just (nTy, mb) <- extractKnownNat tcm tys
-    -> reduce (mkIndexLit ty nTy mb i)
-
-  $(namePat 'Clash.Sized.Internal.Index.fromEnum#)
-    | [i] <- indexLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-        in reduce (mkIntCLit tcm IntLiteral i resTy)
-
--- Bounded
-  $(namePat 'Clash.Sized.Internal.Index.maxBound#)
-    | Just (nTy,mb) <- extractKnownNat tcm tys
-    -> reduce (mkIndexLit ty nTy mb (mb - 1))
-
--- Num
-  $(namePat '(Clash.Sized.Internal.Index.+#))
-    | Just (nTy,kn) <- extractKnownNat tcm tys
-    , [i,j] <- indexLiterals' args
-    -> reduce (mkIndexLit ty nTy kn (i + j))
-  $(namePat '(Clash.Sized.Internal.Index.-#))
-    | Just (nTy,kn) <- extractKnownNat tcm tys
-    , [i,j] <- indexLiterals' args
-    -> reduce (mkIndexLit ty nTy kn (i - j))
-  $(namePat '(Clash.Sized.Internal.Index.*#))
-    | Just (nTy,kn) <- extractKnownNat tcm tys
-    , [i,j] <- indexLiterals' args
-    -> reduce (mkIndexLit ty nTy kn (i * j))
-
--- ExtendingNum
-  $(namePat 'Clash.Sized.Internal.Index.plus#)
-    | mTy : nTy : _ <- tys
-    , Right _ <- runExcept (tyNatSize tcm mTy)
-    , Right _ <- runExcept (tyNatSize tcm nTy)
-    , Just (i,j) <- indexLiterals args
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkIndexLit' resTyInfo (i + j))
-  $(namePat 'Clash.Sized.Internal.Index.minus#)
-    | mTy : nTy : _ <- tys
-    , Right _ <- runExcept (tyNatSize tcm mTy)
-    , Right _ <- runExcept (tyNatSize tcm nTy)
-    , Just (i,j) <- indexLiterals args
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkIndexLit' resTyInfo (i - j))
-  $(namePat 'Clash.Sized.Internal.Index.times#)
-    | mTy : nTy : _ <- tys
-    , Right _ <- runExcept (tyNatSize tcm mTy)
-    , Right _ <- runExcept (tyNatSize tcm nTy)
-    , Just (i,j) <- indexLiterals args
-    -> let resTyInfo = extractTySizeInfo tcm ty tys
-       in  reduce (mkIndexLit' resTyInfo (i * j))
-
--- Integral
-  $(namePat 'Clash.Sized.Internal.Index.quot#)
-    | Just (nTy,kn) <- extractKnownNat tcm tys
-    , Just (i,j) <- indexLiterals args
-    -> reduce $ catchDivByZero (mkIndexLit ty nTy kn (i `quot` j))
-  $(namePat 'Clash.Sized.Internal.Index.rem#)
-    | Just (nTy,kn) <- extractKnownNat tcm tys
-    , Just (i,j) <- indexLiterals args
-    -> reduce $ catchDivByZero (mkIndexLit ty nTy kn (i `rem` j))
-  $(namePat 'Clash.Sized.Internal.Index.toInteger#)
-    | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
-    , primName p == showt 'Clash.Sized.Internal.Index.fromInteger#
-    -> reduce (integerToIntegerLiteral i)
-
--- Resize
-  $(namePat 'Clash.Sized.Internal.Index.resize#)
-    | Just (mTy,m) <- extractKnownNat tcm tys
-    , [i] <- indexLiterals' args
-    -> reduce (mkIndexLit ty mTy m i)
-
----------
--- Signed
----------
-  $(namePat 'Clash.Sized.Internal.Signed.size#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = UniqMap.lookup intTcNm tcm
-           [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
-
--- BitPack
-  $(namePat 'Clash.Sized.Internal.Signed.pack#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [i] <- signedLiterals' args
-    -> let val = reifyNat kn (op (fromInteger i))
-       in reduce (mkBitVectorLit ty nTy kn 0 val)
-    where
-        op :: KnownNat n => Signed n -> Proxy n -> Integer
-        op s _ = toInteger (Signed.pack# s)
-  $(namePat 'Clash.Sized.Internal.Signed.unpack#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [(0,i)] <- bitVectorLiterals' args
-    -> let val = reifyNat kn (op (fromInteger i))
-       in reduce (mkSignedLit ty nTy kn val)
-    where
         op :: KnownNat n => BitVector n -> Proxy n -> Integer
-        op s _ = toInteger (Signed.unpack# s)
-
--- Eq
-  $(namePat 'Clash.Sized.Internal.Signed.eq#) | Just (i,j) <- signedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i == j))
-  $(namePat 'Clash.Sized.Internal.Signed.neq#) | Just (i,j) <- signedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i /= j))
-
--- Ord
-  $(namePat 'Clash.Sized.Internal.Signed.lt#) | Just (i,j) <- signedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <  j))
-  $(namePat 'Clash.Sized.Internal.Signed.ge#) | Just (i,j) <- signedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  $(namePat 'Clash.Sized.Internal.Signed.gt#) | Just (i,j) <- signedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >  j))
-  $(namePat 'Clash.Sized.Internal.Signed.le#) | Just (i,j) <- signedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <= j))
-
--- Enum
-  $(namePat 'Clash.Sized.Internal.Signed.toEnum#)
-    | [i] <- intCLiterals' args
-    , Just (litTy, mb) <- extractKnownNat tcm tys
-    -> reduce (mkSignedLit ty litTy mb i)
-
-  $(namePat 'Clash.Sized.Internal.Signed.fromEnum#)
-    | [i] <- signedLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-        in reduce (mkIntCLit tcm IntLiteral i resTy)
-
--- Bounded
-  $(namePat 'Clash.Sized.Internal.Signed.minBound#)
-    | Just (litTy,mb) <- extractKnownNat tcm tys
-    -> let minB = negate (2 ^ (mb - 1))
-       in  reduce (mkSignedLit ty litTy mb minB)
-  $(namePat 'Clash.Sized.Internal.Signed.maxBound#)
-    | Just (litTy,mb) <- extractKnownNat tcm tys
-    -> let maxB = (2 ^ (mb - 1)) - 1
-       in reduce (mkSignedLit ty litTy mb maxB)
-
--- Num
-  $(namePat '(Clash.Sized.Internal.Signed.+#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftSigned2 (Signed.+#) ty tcm tys args)
-    -> reduce (val)
-  $(namePat '(Clash.Sized.Internal.Signed.-#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftSigned2 (Signed.-#) ty tcm tys args)
-    -> reduce (val)
-  $(namePat '(Clash.Sized.Internal.Signed.*#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftSigned2 (Signed.*#) ty tcm tys args)
-    -> reduce (val)
-  $(namePat 'Clash.Sized.Internal.Signed.negate#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [i] <- signedLiterals' args
-    -> let val = reifyNat kn (op (fromInteger i))
-    in reduce (mkSignedLit ty nTy kn val)
-    where
-      op :: KnownNat n => Signed n -> Proxy n -> Integer
-      op s _ = toInteger (Signed.negate# s)
-  $(namePat 'Clash.Sized.Internal.Signed.abs#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [i] <- signedLiterals' args
-    -> let val = reifyNat kn (op (fromInteger i))
-    in reduce (mkSignedLit ty nTy kn val)
-    where
-      op :: KnownNat n => Signed n -> Proxy n -> Integer
-      op s _ = toInteger (Signed.abs# s)
-
--- ExtendingNum
-  $(namePat 'Clash.Sized.Internal.Signed.plus#)
-    | Just (i,j) <- signedLiterals args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-       in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i+j))
-
-  $(namePat 'Clash.Sized.Internal.Signed.minus#)
-    | Just (i,j) <- signedLiterals args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-       in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i-j))
-
-  $(namePat 'Clash.Sized.Internal.Signed.times#)
-    | Just (i,j) <- signedLiterals args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-       in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i*j))
-
--- Integral
-  $(namePat 'Clash.Sized.Internal.Signed.quot#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftSigned2 (Signed.quot#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.Signed.rem#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftSigned2 (Signed.rem#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.Signed.div#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftSigned2 (Signed.div#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.Signed.mod#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftSigned2 (Signed.mod#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.Signed.toInteger#)
-    | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
-    , primName p == showt 'Clash.Sized.Internal.Signed.fromInteger#
-    -> reduce (integerToIntegerLiteral i)
-
--- Bits
-  $(namePat 'Clash.Sized.Internal.Signed.and#)
-    | [i,j] <- signedLiterals' args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> reduce (mkSignedLit ty nTy kn (i .&. j))
-  $(namePat 'Clash.Sized.Internal.Signed.or#)
-    | [i,j] <- signedLiterals' args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> reduce (mkSignedLit ty nTy kn (i .|. j))
-  $(namePat 'Clash.Sized.Internal.Signed.xor#)
-    | [i,j] <- signedLiterals' args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> reduce (mkSignedLit ty nTy kn (i `xor` j))
-
-  $(namePat 'Clash.Sized.Internal.Signed.complement#)
-    | [i] <- signedLiterals' args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> let val = reifyNat kn (op (fromInteger i))
-    in reduce (mkSignedLit ty nTy kn val)
-    where
-      op :: KnownNat n => Signed n -> Proxy n -> Integer
-      op u _ = toInteger (Signed.complement# u)
-
-  $(namePat 'Clash.Sized.Internal.Signed.shiftL#)
-    | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        op u _ = toInteger (BitVector.reduceAnd# u)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.reduceOr#) -- :: KnownNat n => BitVector n -> Bit
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      , Just (_, kn) <- extractKnownNat tcm tys
+      -> let resTy = getResultTy tcm ty tys
+             val = reifyNat kn (op (toBV i))
+         in reduce (mkBitLit resTy 0 val)
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => BitVector n -> Proxy n -> Integer
+        op u _ = toInteger (BitVector.reduceOr# u)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.reduceXor#) -- :: KnownNat n => BitVector n -> Bit
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      , Just (_, kn) <- extractKnownNat tcm tys
+      -> let resTy = getResultTy tcm ty tys
+             val = reifyNat kn (op (toBV i))
+         in reduce (mkBitLit resTy 0 val)
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => BitVector n -> Proxy n -> Integer
+        op u _ = toInteger (BitVector.reduceXor# u)
+  
+  
+  -- Indexing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.index#) -- :: KnownNat n => BitVector n -> Int -> Bit
+  , \PrimEnv{..} -> case () of { _
+      | Just (_,kn,i,j) <- bitVectorLitIntLit tcm tys args
+        -> let resTy = getResultTy tcm ty tys
+               (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
+           in reduce (mkBitLit resTy msk val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
+          op u i _ = (toInteger m, toInteger v)
+            where Bit m v = (BitVector.index# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.replaceBit#) -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, n) <- extractKnownNat tcm tys
+      , [ _
+        , PrimVal bvP _ [_, Lit (NaturalLiteral mskBv), Lit (IntegerLiteral bv)]
+        , valArgs -> Just [Literal (IntLiteral i)]
+        , PrimVal bP _ [Lit (WordLiteral mskB), Lit (IntegerLiteral b)]
+        ] <- args
+      , primName bvP == showt 'Clash.Sized.Internal.BitVector.fromInteger#
+      , primName bP  == showt 'Clash.Sized.Internal.BitVector.fromInteger##
+        -> let resTyInfo = extractTySizeInfo tcm ty tys
+               (mskVal,val) = reifyNat n (op (BV (fromInteger mskBv) (fromInteger bv))
+                                             (fromInteger i)
+                                             (Bit (fromInteger mskB) (fromInteger b)))
+        in reduce (mkBitVectorLit' resTyInfo mskVal val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> (Integer,Integer)
+          -- op bv i b _ = (BitVector.unsafeMask res, BitVector.unsafeToInteger res)
+          op bv i b _ = splitBV (BitVector.replaceBit# bv i b)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.setSlice#)
+  , \PrimEnv{..} -> case () of { _
+    -- :: SNat (m+1+i) -> BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n) -> BitVector (m + 1 + i)
+      | mTy : iTy : nTy : _ <- tys
+      , Right m <- runExcept (tyNatSize tcm mTy)
+      , Right iN <- runExcept (tyNatSize tcm iTy)
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      , [i,j] <- bitVectorLiterals' args
+      -> let BV msk val = BitVector.setSlice# (unsafeSNat (m+1+iN)) (toBV i) (unsafeSNat m) (unsafeSNat n) (toBV j)
+             resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.slice#)
+  , \PrimEnv{..} -> case () of { _
+    -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
+      | mTy : _ : nTy : _ <- tys
+      , Right m <- runExcept (tyNatSize tcm mTy)
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      , [i] <- bitVectorLiterals' args
+      -> let BV msk val = BitVector.slice# (toBV i) (unsafeSNat m) (unsafeSNat n)
+             resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.split#) -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : mTy : _ <- tys
+      , Right n <-  runExcept (tyNatSize tcm nTy)
+      , Right m <-  runExcept (tyNatSize tcm mTy)
+      , [(mski,i)] <- bitVectorLiterals' args
+      -> let ty' = piResultTys tcm ty tys
+             (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty'
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             bvTy : _ = tyArgs
+             valM = i `shiftR` fromInteger n
+             mskM = mski `shiftR` fromInteger n
+             valN = i .&. mask
+             mskN = mski .&. mask
+             mask = bit (fromInteger n) - 1
+      in reduce $
+         mkApps (Data tupDc) (map Right tyArgs ++
+                  [ Left (mkBitVectorLit bvTy mTy m mskM valM)
+                  , Left (mkBitVectorLit bvTy nTy n mskN valN)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.msb#) -- :: forall n. KnownNat n => BitVector n -> Bit
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      , Just (_, kn) <- extractKnownNat tcm tys
+      -> let resTy = getResultTy tcm ty tys
+             (msk,val) = reifyNat kn (op (toBV i))
+         in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => BitVector n -> Proxy n -> (Word,Word)
+        op u _ = (unsafeMask# res, BitVector.unsafeToInteger# res)
+          where
+            res = BitVector.msb# u
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.lsb#) -- :: BitVector n -> Bit
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+             Bit msk val = BitVector.lsb# (toBV i)
+      in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
+  
+  
+  -- Eq
+    -- eq#, neq# :: KnownNat n => BitVector n -> BitVector n -> Bool
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.eq#)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : _ <- tys
+      , Right 0 <- runExcept (tyNatSize tcm nTy)
+      -> reduce (boolToBoolLiteral tcm ty True)
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2Bool BitVector.eq# ty tcm args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.neq#)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : _ <- tys
+      , Right 0 <- runExcept (tyNatSize tcm nTy)
+      -> reduce (boolToBoolLiteral tcm ty False)
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2Bool BitVector.neq# ty tcm args)
+      -> reduce val
+  
+  -- Ord
+    -- lt#,ge#,gt#,le# :: KnownNat n => BitVector n -> BitVector n -> Bool
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.lt#)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : _ <- tys
+      , Right 0 <- runExcept (tyNatSize tcm nTy)
+      -> reduce (boolToBoolLiteral tcm ty False)
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2Bool BitVector.lt# ty tcm args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.ge#)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : _ <- tys
+      , Right 0 <- runExcept (tyNatSize tcm nTy)
+      -> reduce (boolToBoolLiteral tcm ty True)
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2Bool BitVector.ge# ty tcm args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.gt#)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : _ <- tys
+      , Right 0 <- runExcept (tyNatSize tcm nTy)
+      -> reduce (boolToBoolLiteral tcm ty False)
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2Bool BitVector.gt# ty tcm args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.le#)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : _ <- tys
+      , Right 0 <- runExcept (tyNatSize tcm nTy)
+      -> reduce (boolToBoolLiteral tcm ty True)
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2Bool BitVector.le# ty tcm args)
+      -> reduce val
+  
+  -- Enum
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.toEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | let resTyInfo@(_,_,kn) = extractTySizeInfo tcm ty tys
+      , Just val <- reifyNat kn (liftInteger2BitVector (BitVector.toEnum# . fromInteger) resTyInfo args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.fromEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , let resTy = getResultTy tcm ty tys
+      , Just val <- reifyNat kn (liftBitVector2CInt tcm resTy (toInteger . BitVector.fromEnum#) args)
+      -> reduce val
+  
+  -- Bounded
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.minBound#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,len) <- extractKnownNat tcm tys
+      -> reduce (mkBitVectorLit ty nTy len 0 0)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.maxBound#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (litTy,mb) <- extractKnownNat tcm tys
+      -> let maxB = (2 ^ mb) - 1
+         in  reduce (mkBitVectorLit ty litTy mb 0 maxB)
+  
+  -- Num
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.BitVector.+#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.+#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.BitVector.-#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.-#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.BitVector.*#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.*#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.negate#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [i] <- bitVectorLiterals' args
+      -> let (msk,val) = reifyNat kn (op (toBV i))
+      in reduce (mkBitVectorLit ty nTy kn msk val)
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => BitVector n -> Proxy n -> (Integer,Integer)
+        op u _ = splitBV (BitVector.negate# u)
+  
+  -- ExtendingNum
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.plus#) -- :: (KnownNat n, KnownNat m) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
+  , \PrimEnv{..} -> case () of { _
+      | [(0,i),(0,j)] <- bitVectorLiterals' args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+         in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 (i+j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.minus#)
+  , \PrimEnv{..} -> case () of { _
+      | [(0,i),(0,j)] <- bitVectorLiterals' args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+             val = reifyNat resSizeInt (runSizedF (BitVector.-#) i j)
+        in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 val)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.times#)
+  , \PrimEnv{..} -> case () of { _
+      | [(0,i),(0,j)] <- bitVectorLiterals' args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+         in  reduce (mkBitVectorLit resTy resSizeTy resSizeInt 0 (i*j))
+  
+  -- Integral
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.quot#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.quot#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.rem#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.rem#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.toInteger#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , [i] <- bitVectorLiterals' args
+      -> let val = reifyNat kn (op (toBV i))
+      in reduce (integerToIntegerLiteral val)
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => BitVector n -> Proxy n -> Integer
+        op u _ = BitVector.toInteger# u
+  
+  -- Bits
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.and#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.and#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.or#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.or#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.xor#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftBitVector2 (BitVector.xor#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.complement#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- bitVectorLiterals' args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> let (msk,val) = reifyNat kn (op (toBV i))
+      in reduce (mkBitVectorLit ty nTy kn msk val)
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => BitVector n -> Proxy n -> (Integer,Integer)
+        op u _ = splitBV $ BitVector.complement# u
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.shiftL#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
+        -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
+        in reduce (mkBitVectorLit ty nTy kn msk val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
+          op u i _ = splitBV (BitVector.shiftL# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.shiftR#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
+        -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
+        in reduce (mkBitVectorLit ty nTy kn msk val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
+          op u i _ = splitBV (BitVector.shiftR# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.rotateL#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
+        -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
+        in reduce (mkBitVectorLit ty nTy kn msk val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
+          op u i _ = splitBV (BitVector.rotateL# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.rotateR#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm tys args
+        -> let (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
+        in reduce (mkBitVectorLit ty nTy kn msk val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
+          op u i _ = splitBV (BitVector.rotateR# u i)
+  
+  -- truncateB
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.BitVector.truncateB#) -- forall a b . KnownNat a => BitVector (a + b) -> BitVector a
+  , \PrimEnv{..} -> case () of { _
+      | aTy  : _ <- tys
+      , Right ka <- runExcept (tyNatSize tcm aTy)
+      , [(mski,i)] <- bitVectorLiterals' args
+      -> let bitsKeep = (bit (fromInteger ka)) - 1
+             val = i .&. bitsKeep
+             msk = mski .&. bitsKeep
+      in reduce (mkBitVectorLit ty aTy ka msk val)
+  
+  --------
+  -- Index
+  --------
+  -- BitPack
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.pack#)
+  , \PrimEnv{..} -> case () of { _
+      | nTy : _ <- tys
+      , Right _ <- runExcept (tyNatSize tcm nTy)
+      , [i] <- indexLiterals' args
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkBitVectorLit' resTyInfo 0 i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.unpack#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn) <- extractKnownNat tcm tys
+      , [(0,i)] <- bitVectorLiterals' args
+      -> reduce (mkIndexLit ty nTy kn i)
+  
+  -- Eq
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.eq#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- indexLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.neq#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- indexLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i /= j))
+  
+  -- Ord
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.lt#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- indexLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i < j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.ge#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- indexLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.gt#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- indexLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i > j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.le#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- indexLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <= j))
+  
+  -- Enum
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.toEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- intCLiterals' args
+      , Just (nTy, mb) <- extractKnownNat tcm tys
+      -> reduce (mkIndexLit ty nTy mb i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.fromEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- indexLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+          in reduce (mkIntCLit tcm IntLiteral i resTy)
+  
+  -- Bounded
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.maxBound#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,mb) <- extractKnownNat tcm tys
+      -> reduce (mkIndexLit ty nTy mb (mb - 1))
+  
+  -- Num
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Index.+#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn) <- extractKnownNat tcm tys
+      , [i,j] <- indexLiterals' args
+      -> reduce (mkIndexLit ty nTy kn (i + j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Index.-#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn) <- extractKnownNat tcm tys
+      , [i,j] <- indexLiterals' args
+      -> reduce (mkIndexLit ty nTy kn (i - j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Index.*#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn) <- extractKnownNat tcm tys
+      , [i,j] <- indexLiterals' args
+      -> reduce (mkIndexLit ty nTy kn (i * j))
+  
+  -- ExtendingNum
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.plus#)
+  , \PrimEnv{..} -> case () of { _
+      | mTy : nTy : _ <- tys
+      , Right _ <- runExcept (tyNatSize tcm mTy)
+      , Right _ <- runExcept (tyNatSize tcm nTy)
+      , Just (i,j) <- indexLiterals args
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkIndexLit' resTyInfo (i + j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.minus#)
+  , \PrimEnv{..} -> case () of { _
+      | mTy : nTy : _ <- tys
+      , Right _ <- runExcept (tyNatSize tcm mTy)
+      , Right _ <- runExcept (tyNatSize tcm nTy)
+      , Just (i,j) <- indexLiterals args
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkIndexLit' resTyInfo (i - j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.times#)
+  , \PrimEnv{..} -> case () of { _
+      | mTy : nTy : _ <- tys
+      , Right _ <- runExcept (tyNatSize tcm mTy)
+      , Right _ <- runExcept (tyNatSize tcm nTy)
+      , Just (i,j) <- indexLiterals args
+      -> let resTyInfo = extractTySizeInfo tcm ty tys
+         in  reduce (mkIndexLit' resTyInfo (i * j))
+  
+  -- Integral
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.quot#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn) <- extractKnownNat tcm tys
+      , Just (i,j) <- indexLiterals args
+      -> reduce $ catchDivByZero (mkIndexLit ty nTy kn (i `quot` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.rem#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn) <- extractKnownNat tcm tys
+      , Just (i,j) <- indexLiterals args
+      -> reduce $ catchDivByZero (mkIndexLit ty nTy kn (i `rem` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.toInteger#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
+      , primName p == showt 'Clash.Sized.Internal.Index.fromInteger#
+      -> reduce (integerToIntegerLiteral i)
+  
+  -- Resize
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Index.resize#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (mTy,m) <- extractKnownNat tcm tys
+      , [i] <- indexLiterals' args
+      -> reduce (mkIndexLit ty mTy m i)
+  
+  ---------
+  -- Signed
+  ---------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.size#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      -> let (_,tyView -> TyConApp intTcNm _) = splitFunForallTy ty
+             (Just intTc) = UniqMap.lookup intTcNm tcm
+             [intCon] = tyConDataCons intTc
+         in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
+  
+  -- BitPack
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.pack#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [i] <- signedLiterals' args
+      -> let val = reifyNat kn (op (fromInteger i))
+         in reduce (mkBitVectorLit ty nTy kn 0 val)
+      | otherwise -> Nothing
+      where
+          op :: KnownNat n => Signed n -> Proxy n -> Integer
+          op s _ = toInteger (Signed.pack# s)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.unpack#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [(0,i)] <- bitVectorLiterals' args
+      -> let val = reifyNat kn (op (fromInteger i))
+         in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
+      where
+          op :: KnownNat n => BitVector n -> Proxy n -> Integer
+          op s _ = toInteger (Signed.unpack# s)
+  
+  -- Eq
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.eq#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- signedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.neq#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- signedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i /= j))
+  
+  -- Ord
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.lt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- signedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <  j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.ge#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- signedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.gt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- signedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >  j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.le#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- signedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <= j))
+  
+  -- Enum
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.toEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- intCLiterals' args
+      , Just (litTy, mb) <- extractKnownNat tcm tys
+      -> reduce (mkSignedLit ty litTy mb i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.fromEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- signedLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+          in reduce (mkIntCLit tcm IntLiteral i resTy)
+  
+  -- Bounded
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.minBound#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (litTy,mb) <- extractKnownNat tcm tys
+      -> let minB = negate (2 ^ (mb - 1))
+         in  reduce (mkSignedLit ty litTy mb minB)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.maxBound#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (litTy,mb) <- extractKnownNat tcm tys
+      -> let maxB = (2 ^ (mb - 1)) - 1
+         in reduce (mkSignedLit ty litTy mb maxB)
+  
+  -- Num
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Signed.+#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftSigned2 (Signed.+#) ty tcm tys args)
+      -> reduce (val)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Signed.-#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftSigned2 (Signed.-#) ty tcm tys args)
+      -> reduce (val)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Signed.*#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftSigned2 (Signed.*#) ty tcm tys args)
+      -> reduce (val)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.negate#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [i] <- signedLiterals' args
+      -> let val = reifyNat kn (op (fromInteger i))
       in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
       where
-        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Signed.shiftL# u i)
-  $(namePat 'Clash.Sized.Internal.Signed.shiftR#)
-    | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        op :: KnownNat n => Signed n -> Proxy n -> Integer
+        op s _ = toInteger (Signed.negate# s)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.abs#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [i] <- signedLiterals' args
+      -> let val = reifyNat kn (op (fromInteger i))
       in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
       where
-        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Signed.shiftR# u i)
-  $(namePat 'Clash.Sized.Internal.Signed.rotateL#)
-    | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        op :: KnownNat n => Signed n -> Proxy n -> Integer
+        op s _ = toInteger (Signed.abs# s)
+  
+  -- ExtendingNum
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.plus#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- signedLiterals args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+         in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i+j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.minus#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- signedLiterals args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+         in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i-j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.times#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- signedLiterals args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+         in  reduce (mkSignedLit resTy resSizeTy resSizeInt (i*j))
+  
+  -- Integral
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.quot#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftSigned2 (Signed.quot#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.rem#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftSigned2 (Signed.rem#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.div#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftSigned2 (Signed.div#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.mod#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftSigned2 (Signed.mod#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.toInteger#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
+      , primName p == showt 'Clash.Sized.Internal.Signed.fromInteger#
+      -> reduce (integerToIntegerLiteral i)
+  
+  -- Bits
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.and#)
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- signedLiterals' args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> reduce (mkSignedLit ty nTy kn (i .&. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.or#)
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- signedLiterals' args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> reduce (mkSignedLit ty nTy kn (i .|. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.xor#)
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- signedLiterals' args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> reduce (mkSignedLit ty nTy kn (i `xor` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.complement#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- signedLiterals' args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> let val = reifyNat kn (op (fromInteger i))
       in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
       where
-        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Signed.rotateL# u i)
-  $(namePat 'Clash.Sized.Internal.Signed.rotateR#)
-    | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (mkSignedLit ty nTy kn val)
-      where
-        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Signed.rotateR# u i)
-
--- Resize
-  $(namePat 'Clash.Sized.Internal.Signed.resize#) -- forall m n. (KnownNat n, KnownNat m) => Signed n -> Signed m
-    | mTy : nTy : _ <- tys
-    , Right mInt <- runExcept (tyNatSize tcm mTy)
-    , Right nInt <- runExcept (tyNatSize tcm nTy)
-    , [i] <- signedLiterals' args
-    -> let val | nInt <= mInt = extended
-               | otherwise    = truncated
-           extended  = i
-           mask      = 1 `shiftL` fromInteger (mInt - 1)
-           i'        = i `mod` mask
-           truncated = if testBit i (fromInteger nInt - 1)
-                          then (i' - mask)
-                          else i'
-       in reduce (mkSignedLit ty mTy mInt val)
-  $(namePat 'Clash.Sized.Internal.Signed.truncateB#) -- KnownNat m => Signed (m + n) -> Signed m
-    | Just (mTy, km) <- extractKnownNat tcm tys
-    , [i] <- signedLiterals' args
-    -> let bitsKeep = (bit (fromInteger km)) - 1
-           val = i .&. bitsKeep
-    in reduce (mkSignedLit ty mTy km val)
-
--- SaturatingNum
--- No need to manually evaluate Clash.Sized.Internal.Signed.minBoundSym#
--- It is just implemented in terms of other primitives.
-
-
------------
--- Unsigned
------------
-  $(namePat 'Clash.Sized.Internal.Unsigned.size#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    -> let (_,ty') = splitFunForallTy ty
-           (TyConApp intTcNm _) = tyView ty'
-           (Just intTc) = UniqMap.lookup intTcNm tcm
-           [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
-
--- BitPack
-  $(namePat 'Clash.Sized.Internal.Unsigned.pack#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [i] <- unsignedLiterals' args
-    -> reduce (mkBitVectorLit ty nTy kn 0 i)
-  $(namePat 'Clash.Sized.Internal.Unsigned.unpack#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [i] <- bitVectorLiterals' args
-    -> let val = reifyNat kn (op (toBV i))
-    in reduce (mkUnsignedLit ty nTy kn val)
-    where
-      op :: KnownNat n => BitVector n -> Proxy n -> Integer
-      op u _ = toInteger (Unsigned.unpack# u)
-
--- Eq
-  $(namePat 'Clash.Sized.Internal.Unsigned.eq#) | Just (i,j) <- unsignedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i == j))
-  $(namePat 'Clash.Sized.Internal.Unsigned.neq#) | Just (i,j) <- unsignedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i /= j))
-
--- Ord
-  $(namePat 'Clash.Sized.Internal.Unsigned.lt#) | Just (i,j) <- unsignedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <  j))
-  $(namePat 'Clash.Sized.Internal.Unsigned.ge#) | Just (i,j) <- unsignedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >= j))
-  $(namePat 'Clash.Sized.Internal.Unsigned.gt#) | Just (i,j) <- unsignedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i >  j))
-  $(namePat 'Clash.Sized.Internal.Unsigned.le#) | Just (i,j) <- unsignedLiterals args
-    -> reduce (boolToBoolLiteral tcm ty (i <= j))
-
--- Enum
-  $(namePat 'Clash.Sized.Internal.Unsigned.toEnum#)
-    | [i] <- intCLiterals' args
-    , Just (litTy, mb) <- extractKnownNat tcm tys
-    -> reduce (mkUnsignedLit ty litTy mb i)
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.fromEnum#)
-    | [i] <- unsignedLiterals' args
-    -> let resTy = getResultTy tcm ty tys
-        in reduce (mkIntCLit tcm IntLiteral i resTy)
-
--- Bounded
-  $(namePat 'Clash.Sized.Internal.Unsigned.minBound#)
-    | Just (nTy,len) <- extractKnownNat tcm tys
-    -> reduce (mkUnsignedLit ty nTy len 0)
-  $(namePat 'Clash.Sized.Internal.Unsigned.maxBound#)
-    | Just (litTy,mb) <- extractKnownNat tcm tys
-    -> let maxB = (2 ^ mb) - 1
-       in  reduce (mkUnsignedLit ty litTy mb maxB)
-
--- Num
-  $(namePat '(Clash.Sized.Internal.Unsigned.+#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.+#) ty tcm tys args)
-    -> reduce val
-  $(namePat '(Clash.Sized.Internal.Unsigned.-#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.-#) ty tcm tys args)
-    -> reduce val
-  $(namePat '(Clash.Sized.Internal.Unsigned.*#))
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.*#) ty tcm tys args)
-    -> reduce val
-  $(namePat 'Clash.Sized.Internal.Unsigned.negate#)
-    | Just (nTy, kn) <- extractKnownNat tcm tys
-    , [i] <- unsignedLiterals' args
-    -> let val = reifyNat kn (op (fromInteger i))
-    in reduce (mkUnsignedLit ty nTy kn val)
-    where
-      op :: KnownNat n => Unsigned n -> Proxy n -> Integer
-      op u _ = toInteger (Unsigned.negate# u)
-
--- ExtendingNum
-  $(namePat 'Clash.Sized.Internal.Unsigned.plus#) -- :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
-    | Just (i,j) <- unsignedLiterals args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-       in  reduce (mkUnsignedLit resTy resSizeTy resSizeInt (i+j))
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.minus#)
-    | [i,j] <- unsignedLiterals' args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-           val = reifyNat resSizeInt (runSizedF (Unsigned.-#) i j)
-      in   reduce (mkUnsignedLit resTy resSizeTy resSizeInt val)
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.times#)
-    | Just (i,j) <- unsignedLiterals args
-    -> let ty' = piResultTys tcm ty tys
-           (_,resTy) = splitFunForallTy ty'
-           (TyConApp _ [resSizeTy]) = tyView resTy
-           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
-       in  reduce (mkUnsignedLit resTy resSizeTy resSizeInt (i*j))
-
--- Integral
-  $(namePat 'Clash.Sized.Internal.Unsigned.quot#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.quot#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.Unsigned.rem#)
-    | Just (_, kn) <- extractKnownNat tcm tys
-    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm tys args)
-    -> reduce $ catchDivByZero val
-  $(namePat 'Clash.Sized.Internal.Unsigned.toInteger#)
-    | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
-    , primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
-    -> reduce (integerToIntegerLiteral i)
-
--- Bits
-  $(namePat 'Clash.Sized.Internal.Unsigned.and#)
-    | Just (i,j) <- unsignedLiterals args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> reduce (mkUnsignedLit ty nTy kn (i .&. j))
-  $(namePat 'Clash.Sized.Internal.Unsigned.or#)
-    | Just (i,j) <- unsignedLiterals args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> reduce (mkUnsignedLit ty nTy kn (i .|. j))
-  $(namePat 'Clash.Sized.Internal.Unsigned.xor#)
-    | Just (i,j) <- unsignedLiterals args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> reduce (mkUnsignedLit ty nTy kn (i `xor` j))
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.complement#)
-    | [i] <- unsignedLiterals' args
-    , Just (nTy, kn) <- extractKnownNat tcm tys
-    -> let val = reifyNat kn (op (fromInteger i))
-    in reduce (mkUnsignedLit ty nTy kn val)
-    where
-      op :: KnownNat n => Unsigned n -> Proxy n -> Integer
-      op u _ = toInteger (Unsigned.complement# u)
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.shiftL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
-    | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        op :: KnownNat n => Signed n -> Proxy n -> Integer
+        op u _ = toInteger (Signed.complement# u)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.shiftL#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Signed.shiftL# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.shiftR#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Signed.shiftR# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.rotateL#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Signed.rotateL# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.rotateR#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- signedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkSignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Signed.rotateR# u i)
+  
+  -- Resize
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.resize#) -- forall m n. (KnownNat n, KnownNat m) => Signed n -> Signed m
+  , \PrimEnv{..} -> case () of { _
+      | mTy : nTy : _ <- tys
+      , Right mInt <- runExcept (tyNatSize tcm mTy)
+      , Right nInt <- runExcept (tyNatSize tcm nTy)
+      , [i] <- signedLiterals' args
+      -> let val | nInt <= mInt = extended
+                 | otherwise    = truncated
+             extended  = i
+             mask      = 1 `shiftL` fromInteger (mInt - 1)
+             i'        = i `mod` mask
+             truncated = if testBit i (fromInteger nInt - 1)
+                            then (i' - mask)
+                            else i'
+         in reduce (mkSignedLit ty mTy mInt val)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Signed.truncateB#) -- KnownNat m => Signed (m + n) -> Signed m
+  , \PrimEnv{..} -> case () of { _
+      | Just (mTy, km) <- extractKnownNat tcm tys
+      , [i] <- signedLiterals' args
+      -> let bitsKeep = (bit (fromInteger km)) - 1
+             val = i .&. bitsKeep
+      in reduce (mkSignedLit ty mTy km val)
+  
+  -- SaturatingNum
+  -- No need to manually evaluate Clash.Sized.Internal.Signed.minBoundSym#
+  -- It is just implemented in terms of other primitives.
+  
+  
+  -----------
+  -- Unsigned
+  -----------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.size#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      -> let (_,ty') = splitFunForallTy ty
+             (TyConApp intTcNm _) = tyView ty'
+             (Just intTc) = UniqMap.lookup intTcNm tcm
+             [intCon] = tyConDataCons intTc
+         in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral kn))])
+  
+  -- BitPack
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.pack#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [i] <- unsignedLiterals' args
+      -> reduce (mkBitVectorLit ty nTy kn 0 i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.unpack#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [i] <- bitVectorLiterals' args
+      -> let val = reifyNat kn (op (toBV i))
       in reduce (mkUnsignedLit ty nTy kn val)
+      | otherwise -> Nothing
       where
-        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Unsigned.shiftL# u i)
-  $(namePat 'Clash.Sized.Internal.Unsigned.shiftR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
-    | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        op :: KnownNat n => BitVector n -> Proxy n -> Integer
+        op u _ = toInteger (Unsigned.unpack# u)
+  
+  -- Eq
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.eq#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- unsignedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i == j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.neq#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- unsignedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i /= j))
+  
+  -- Ord
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.lt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- unsignedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <  j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.ge#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- unsignedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >= j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.gt#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- unsignedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i >  j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.le#)
+  , \PrimEnv{..} -> case () of { _ | Just (i,j) <- unsignedLiterals args
+      -> reduce (boolToBoolLiteral tcm ty (i <= j))
+  
+  -- Enum
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.toEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- intCLiterals' args
+      , Just (litTy, mb) <- extractKnownNat tcm tys
+      -> reduce (mkUnsignedLit ty litTy mb i)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.fromEnum#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- unsignedLiterals' args
+      -> let resTy = getResultTy tcm ty tys
+          in reduce (mkIntCLit tcm IntLiteral i resTy)
+  
+  -- Bounded
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.minBound#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,len) <- extractKnownNat tcm tys
+      -> reduce (mkUnsignedLit ty nTy len 0)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.maxBound#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (litTy,mb) <- extractKnownNat tcm tys
+      -> let maxB = (2 ^ mb) - 1
+         in  reduce (mkUnsignedLit ty litTy mb maxB)
+  
+  -- Num
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Unsigned.+#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.+#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Unsigned.-#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.-#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Internal.Unsigned.*#))
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.*#) ty tcm tys args)
+      -> reduce val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.negate#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy, kn) <- extractKnownNat tcm tys
+      , [i] <- unsignedLiterals' args
+      -> let val = reifyNat kn (op (fromInteger i))
       in reduce (mkUnsignedLit ty nTy kn val)
+      | otherwise -> Nothing
       where
-        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Unsigned.shiftR# u i)
-  $(namePat 'Clash.Sized.Internal.Unsigned.rotateL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
-    | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        op :: KnownNat n => Unsigned n -> Proxy n -> Integer
+        op u _ = toInteger (Unsigned.negate# u)
+  
+  -- ExtendingNum
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.plus#) -- :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- unsignedLiterals args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+         in  reduce (mkUnsignedLit resTy resSizeTy resSizeInt (i+j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.minus#)
+  , \PrimEnv{..} -> case () of { _
+      | [i,j] <- unsignedLiterals' args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+             val = reifyNat resSizeInt (runSizedF (Unsigned.-#) i j)
+        in   reduce (mkUnsignedLit resTy resSizeTy resSizeInt val)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.times#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- unsignedLiterals args
+      -> let ty' = piResultTys tcm ty tys
+             (_,resTy) = splitFunForallTy ty'
+             (TyConApp _ [resSizeTy]) = tyView resTy
+             Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+         in  reduce (mkUnsignedLit resTy resSizeTy resSizeInt (i*j))
+  
+  -- Integral
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.quot#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.quot#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.rem#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (_, kn) <- extractKnownNat tcm tys
+      , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm tys args)
+      -> reduce $ catchDivByZero val
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.toInteger#)
+  , \PrimEnv{..} -> case () of { _
+      | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
+      , primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
+      -> reduce (integerToIntegerLiteral i)
+  
+  -- Bits
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.and#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- unsignedLiterals args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> reduce (mkUnsignedLit ty nTy kn (i .&. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.or#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- unsignedLiterals args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> reduce (mkUnsignedLit ty nTy kn (i .|. j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.xor#)
+  , \PrimEnv{..} -> case () of { _
+      | Just (i,j) <- unsignedLiterals args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> reduce (mkUnsignedLit ty nTy kn (i `xor` j))
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.complement#)
+  , \PrimEnv{..} -> case () of { _
+      | [i] <- unsignedLiterals' args
+      , Just (nTy, kn) <- extractKnownNat tcm tys
+      -> let val = reifyNat kn (op (fromInteger i))
       in reduce (mkUnsignedLit ty nTy kn val)
+      | otherwise -> Nothing
       where
-        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Unsigned.rotateL# u i)
-  $(namePat 'Clash.Sized.Internal.Unsigned.rotateR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
-    | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
-      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in reduce (mkUnsignedLit ty nTy kn val)
-      where
-        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
-        op u i _ = toInteger (Unsigned.rotateR# u i)
-
--- Resize
-  $(namePat 'Clash.Sized.Internal.Unsigned.resize#) -- forall n m . KnownNat m => Unsigned n -> Unsigned m
-    | _ : mTy : _ <- tys
-    , Right km <- runExcept (tyNatSize tcm mTy)
-    , [i] <- unsignedLiterals' args
-    -> let bitsKeep = (bit (fromInteger km)) - 1
-           val = i .&. bitsKeep
-    in reduce (mkUnsignedLit ty mTy km val)
-
--- Conversions
-  $(namePat 'Clash.Sized.Internal.Unsigned.unsignedToWord)
-    | isSubj
-    , [a] <- unsignedLiterals' args
-    -> let b = Unsigned.unsignedToWord (U (fromInteger a))
-           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = UniqMap.lookup wordTcNm tcm
-           [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.unsigned8toWord8)
-    | isSubj
-    , [a] <- unsignedLiterals' args
-    -> let b = Unsigned.unsigned8toWord8 (U (fromInteger a))
-           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = UniqMap.lookup wordTcNm tcm
-           [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.unsigned16toWord16)
-    | isSubj
-    , [a] <- unsignedLiterals' args
-    -> let b = Unsigned.unsigned16toWord16 (U (fromInteger a))
-           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = UniqMap.lookup wordTcNm tcm
-           [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
-
-  $(namePat 'Clash.Sized.Internal.Unsigned.unsigned32toWord32)
-    | isSubj
-    , [a] <- unsignedLiterals' args
-    -> let b = Unsigned.unsigned32toWord32 (U (fromInteger a))
-           (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-           (Just wordTc) = UniqMap.lookup wordTcNm tcm
-           [wordDc] = tyConDataCons wordTc
-       in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
-
-  $(namePat 'Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL)
-    | isSubj
-    , f : a : _ <- args
-    -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])
-
---------
--- RTree
---------
-  $(namePat 'Clash.Sized.RTree.textract)
-    | isSubj
-    , [DC _ tArgs] <- args
-    -> reduceWHNF (Either.lefts tArgs !! 1)
-
-  $(namePat 'Clash.Sized.RTree.tsplit)
-    | isSubj
-    , dTy : aTy : _ <- tys
-    , [DC _ tArgs] <- args
-    , (tyArgs,tyView -> TyConApp tupTcNm _) <- splitFunForallTy ty
-    , TyConApp treeTcNm _ <- tyView (Either.rights tyArgs !! 0)
-    -> let (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc]      = tyConDataCons tupTc
-       in  reduce $
-           mkApps (Data tupDc)
-                  [Right (mkTyConApp treeTcNm [dTy,aTy])
-                  ,Right (mkTyConApp treeTcNm [dTy,aTy])
-                  ,Left (Either.lefts tArgs !! 1)
-                  ,Left (Either.lefts tArgs !! 2)
-                  ]
-
-  $(namePat 'Clash.Sized.RTree.tdfold)
-    | isSubj
-    , pTy : kTy : aTy : _ <- tys
-    , _ : p : f : g : ts : _ <- args
-    , DC _ tArgs <- ts
-    , Right k' <- runExcept (tyNatSize tcm kTy)
-    -> case k' of
-         0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts tArgs !! 1)])
-         _ -> let k'ty = LitTy (NumTy (k'-1))
-                  (tyArgs,_)  = splitFunForallTy ty
-                  (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
-                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
-                  Just snatTc = UniqMap.lookup snatTcNm tcm
-                  [snatDc]    = tyConDataCons snatTc
-              in  reduceWHNF $
-                  mkApps (valToTerm g)
-                         [Right k'ty
-                         ,Left (mkApps (Data snatDc)
-                                       [Right k'ty
-                                       ,Left (Literal (NaturalLiteral (k'-1)))])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
+        op :: KnownNat n => Unsigned n -> Proxy n -> Integer
+        op u _ = toInteger (Unsigned.complement# u)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.shiftL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkUnsignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Unsigned.shiftL# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.shiftR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkUnsignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Unsigned.shiftR# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.rotateL#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkUnsignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Unsigned.rotateL# u i)
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.rotateR#) -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+  , \PrimEnv{..} -> case () of { _
+      | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm tys args
+        -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
+        in reduce (mkUnsignedLit ty nTy kn val)
+      | otherwise -> Nothing
+        where
+          op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+          op u i _ = toInteger (Unsigned.rotateR# u i)
+  
+  -- Resize
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.resize#) -- forall n m . KnownNat m => Unsigned n -> Unsigned m
+  , \PrimEnv{..} -> case () of { _
+      | _ : mTy : _ <- tys
+      , Right km <- runExcept (tyNatSize tcm mTy)
+      , [i] <- unsignedLiterals' args
+      -> let bitsKeep = (bit (fromInteger km)) - 1
+             val = i .&. bitsKeep
+      in reduce (mkUnsignedLit ty mTy km val)
+  
+  -- Conversions
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.unsignedToWord)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [a] <- unsignedLiterals' args
+      -> let b = Unsigned.unsignedToWord (U (fromInteger a))
+             (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+             (Just wordTc) = UniqMap.lookup wordTcNm tcm
+             [wordDc] = tyConDataCons wordTc
+         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.unsigned8toWord8)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [a] <- unsignedLiterals' args
+      -> let b = Unsigned.unsigned8toWord8 (U (fromInteger a))
+             (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+             (Just wordTc) = UniqMap.lookup wordTcNm tcm
+             [wordDc] = tyConDataCons wordTc
+         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.unsigned16toWord16)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [a] <- unsignedLiterals' args
+      -> let b = Unsigned.unsigned16toWord16 (U (fromInteger a))
+             (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+             (Just wordTc) = UniqMap.lookup wordTcNm tcm
+             [wordDc] = tyConDataCons wordTc
+         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Internal.Unsigned.unsigned32toWord32)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [a] <- unsignedLiterals' args
+      -> let b = Unsigned.unsigned32toWord32 (U (fromInteger a))
+             (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+             (Just wordTc) = UniqMap.lookup wordTcNm tcm
+             [wordDc] = tyConDataCons wordTc
+         in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , f : a : _ <- args
+      -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])
+  
+  --------
+  -- RTree
+  --------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.RTree.textract)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [DC _ tArgs] <- args
+      -> reduceWHNF (Either.lefts tArgs !! 1)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.RTree.tsplit)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , dTy : aTy : _ <- tys
+      , [DC _ tArgs] <- args
+      , (tyArgs,tyView -> TyConApp tupTcNm _) <- splitFunForallTy ty
+      , TyConApp treeTcNm _ <- tyView (Either.rights tyArgs !! 0)
+      -> let (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc]      = tyConDataCons tupTc
+         in  reduce $
+             mkApps (Data tupDc)
+                    [Right (mkTyConApp treeTcNm [dTy,aTy])
+                    ,Right (mkTyConApp treeTcNm [dTy,aTy])
+                    ,Left (Either.lefts tArgs !! 1)
+                    ,Left (Either.lefts tArgs !! 2)
+                    ]
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.RTree.tdfold)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , pTy : kTy : aTy : _ <- tys
+      , _ : p : f : g : ts : _ <- args
+      , DC _ tArgs <- ts
+      , Right k' <- runExcept (tyNatSize tcm kTy)
+      -> case k' of
+           0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts tArgs !! 1)])
+           _ -> let k'ty = LitTy (NumTy (k'-1))
+                    (tyArgs,_)  = splitFunForallTy ty
+                    (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
+                    TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
+                    Just snatTc = UniqMap.lookup snatTcNm tcm
+                    [snatDc]    = tyConDataCons snatTc
+                in  reduceWHNF $
+                    mkApps (valToTerm g)
+                           [Right k'ty
+                           ,Left (mkApps (Data snatDc)
+                                         [Right k'ty
+                                         ,Left (Literal (NaturalLiteral (k'-1)))])
+                           ,Left (mkApps (Prim pInfo)
+                                         [Right pTy
+                                         ,Right k'ty
+                                         ,Right aTy
+                                         ,Left (Literal (NaturalLiteral (k'-1)))
+                                         ,Left (valToTerm p)
+                                         ,Left (valToTerm f)
+                                         ,Left (valToTerm g)
+                                         ,Left (Either.lefts tArgs !! 1)
+                                         ])
+                           ,Left (mkApps (Prim pInfo)
+                                         [Right pTy
+                                         ,Right k'ty
+                                         ,Right aTy
+                                         ,Left (Literal (NaturalLiteral (k'-1)))
+                                         ,Left (valToTerm p)
+                                         ,Left (valToTerm f)
+                                         ,Left (valToTerm g)
+                                         ,Left (Either.lefts tArgs !! 2)
+                                         ])
+                           ]
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.RTree.treplicate)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , let ty' = piResultTys tcm ty tys
+      , (_,tyView -> TyConApp treeTcNm [lenTy,argTy]) <- splitFunForallTy ty'
+      , Right len <- runExcept (tyNatSize tcm lenTy)
+      -> let (Just treeTc) = UniqMap.lookup treeTcNm tcm
+             [lrCon,brCon] = tyConDataCons treeTc
+         in  reduce (mkRTree lrCon brCon argTy len (replicate (2^len) (valToTerm (last args))))
+  
+  ---------
+  -- Vector
+  ---------
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.length) -- :: KnownNat n => Vec n a -> Int
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [nTy, _] <- tys
+      , Right n <-runExcept (tyNatSize tcm nTy)
+      -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
+             (Just intTc) = UniqMap.lookup intTcNm tcm
+             [intCon] = tyConDataCons intTc
+         in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))])
+  
+    -- XXX: Not a thing anymore?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Clash.Sized.Vector.maxIndex"
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [nTy, _] <- tys
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
+             (Just intTc) = UniqMap.lookup intTcNm tcm
+             [intCon] = tyConDataCons intTc
+         in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))])
+  
+  -- Indexing
+    -- XXX: Not exported
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Clash.Sized.Vector.index_int" -- :: KnownNat n => Vec n a -> Int
+  , \PrimEnv{..} -> case () of { _
+      | nTy : aTy : _  <- tys
+      , _ : xs : i : _ <- args
+      , DC intDc [Left (Literal (IntLiteral i'))] <- i
+      -> if i' < 0
+            then Nothing
+            else case xs of
+                   DC _ vArgs  -> case runExcept (tyNatSize tcm nTy) of
+                      Right 0  -> Nothing
+                      Right n' ->
+                        if i' == 0
+                           then reduceWHNF (Either.lefts vArgs !! 1)
+                           else reduceWHNF $
+                                mkApps (Prim pInfo)
+                                       [Right (LitTy (NumTy (n'-1)))
                                        ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Either.lefts tArgs !! 1)
-                                       ])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Either.lefts tArgs !! 2)
-                                       ])
-                         ]
-
-  $(namePat 'Clash.Sized.RTree.treplicate)
-    | isSubj
-    , let ty' = piResultTys tcm ty tys
-    , (_,tyView -> TyConApp treeTcNm [lenTy,argTy]) <- splitFunForallTy ty'
-    , Right len <- runExcept (tyNatSize tcm lenTy)
-    -> let (Just treeTc) = UniqMap.lookup treeTcNm tcm
-           [lrCon,brCon] = tyConDataCons treeTc
-       in  reduce (mkRTree lrCon brCon argTy len (replicate (2^len) (valToTerm (last args))))
-
----------
--- Vector
----------
-  $(namePat 'Clash.Sized.Vector.length) -- :: KnownNat n => Vec n a -> Int
-    | isSubj
-    , [nTy, _] <- tys
-    , Right n <-runExcept (tyNatSize tcm nTy)
-    -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = UniqMap.lookup intTcNm tcm
-           [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))])
-
-  -- XXX: Not a thing anymore?
-  "Clash.Sized.Vector.maxIndex"
-    | isSubj
-    , [nTy, _] <- tys
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> let (_, tyView -> TyConApp intTcNm _) = splitFunForallTy ty
-           (Just intTc) = UniqMap.lookup intTcNm tcm
-           [intCon] = tyConDataCons intTc
-       in  reduce (mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))])
-
--- Indexing
-  -- XXX: Not exported
-  "Clash.Sized.Vector.index_int" -- :: KnownNat n => Vec n a -> Int
-    | nTy : aTy : _  <- tys
-    , _ : xs : i : _ <- args
-    , DC intDc [Left (Literal (IntLiteral i'))] <- i
-    -> if i' < 0
-          then Nothing
-          else case xs of
-                 DC _ vArgs  -> case runExcept (tyNatSize tcm nTy) of
-                    Right 0  -> Nothing
-                    Right n' ->
-                      if i' == 0
-                         then reduceWHNF (Either.lefts vArgs !! 1)
-                         else reduceWHNF $
-                              mkApps (Prim pInfo)
-                                     [Right (LitTy (NumTy (n'-1)))
-                                     ,Right aTy
-                                     ,Left (Literal (NaturalLiteral (n'-1)))
-                                     ,Left (Either.lefts vArgs !! 2)
-                                     ,Left (mkApps (Data intDc)
-                                                   [Left (Literal (IntLiteral (i'-1)))])
-                                     ]
-                    _ -> Nothing
-                 _ -> Nothing
-  $(namePat 'Clash.Sized.Vector.head) -- :: Vec (n+1) a -> a
-    | isSubj
-    , [DC _ vArgs] <- args
-    -> reduceWHNF (Either.lefts vArgs !! 1)
-  $(namePat 'Clash.Sized.Vector.last) -- :: Vec (n+1) a -> a
-    | isSubj
-    , [DC _ vArgs] <- args
-    , (Right _ : Right aTy : Right nTy : _) <- vArgs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> if n == 0
-          then reduceWHNF (Either.lefts vArgs !! 1)
-          else reduceWHNF
-                (mkApps (Prim pInfo)
-                                     [Right (LitTy (NumTy (n-1)))
-                                     ,Right aTy
-                                     ,Left (Either.lefts vArgs !! 2)
-                                     ])
--- - Sub-vectors
-  $(namePat 'Clash.Sized.Vector.tail) -- :: Vec (n+1) a -> Vec n a
-    | isSubj
-    , [DC _ vArgs] <- args
-    -> reduceWHNF (Either.lefts vArgs !! 2)
-  $(namePat 'Clash.Sized.Vector.init) -- :: Vec (n+1) a -> Vec n a
-    | isSubj
-    , [DC consCon vArgs] <- args
-    , (Right _ : Right aTy : Right nTy : _) <- vArgs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> if n == 0
-          then reduceWHNF (Either.lefts vArgs !! 2)
-          else reduce $
-               mkVecCons consCon aTy n
-                  (Either.lefts vArgs !! 1)
+                                       ,Left (Literal (NaturalLiteral (n'-1)))
+                                       ,Left (Either.lefts vArgs !! 2)
+                                       ,Left (mkApps (Data intDc)
+                                                     [Left (Literal (IntLiteral (i'-1)))])
+                                       ]
+                      _ -> Nothing
+                   _ -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.head) -- :: Vec (n+1) a -> a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [DC _ vArgs] <- args
+      -> reduceWHNF (Either.lefts vArgs !! 1)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.last) -- :: Vec (n+1) a -> a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [DC _ vArgs] <- args
+      , (Right _ : Right aTy : Right nTy : _) <- vArgs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> if n == 0
+            then reduceWHNF (Either.lefts vArgs !! 1)
+            else reduceWHNF
                   (mkApps (Prim pInfo)
                                        [Right (LitTy (NumTy (n-1)))
                                        ,Right aTy
-                                       ,Left (Either.lefts vArgs !! 2)])
-  $(namePat 'Clash.Sized.Vector.select) -- :: (CmpNat (i+s) (s*n) ~ GT) => SNat f -> SNat s -> SNat n -> Vec (f + i) a -> Vec n a
-    | isSubj
-    , iTy : sTy : nTy : fTy : aTy : _ <- tys
-    , eq : f : s : n : xs : _ <- args
-    , Right n' <- runExcept (tyNatSize tcm nTy)
-    , Right f' <- runExcept (tyNatSize tcm fTy)
-    , Right i' <- runExcept (tyNatSize tcm iTy)
-    , Right s' <- runExcept (tyNatSize tcm sTy)
-    , DC _ vArgs <- xs
-    -> case n' of
-         0 -> reduce (mkVecNil nilCon aTy)
-         _ -> case f' of
-          0 -> let splitAtCall =
-                    mkApps (splitAtPrim snatTcNm vecTcNm)
-                           [Right sTy
-                           ,Right (LitTy (NumTy (i'-s')))
-                           ,Right aTy
-                           ,Left (valToTerm s)
-                           ,Left (valToTerm xs)
-                           ]
-                   fVecTy = mkTyConApp vecTcNm [sTy,aTy]
-                   iVecTy = mkTyConApp vecTcNm [LitTy (NumTy (i'-s')),aTy]
-                   -- Guaranteed no capture, so okay to use unsafe name generation
-                   fNm    = mkUnsafeSystemName "fxs" 0
-                   iNm    = mkUnsafeSystemName "ixs" 1
-                   fId    = mkLocalId fVecTy fNm
-                   iId    = mkLocalId iVecTy iNm
-                   tupPat = DataPat tupDc [] [fId,iId]
-                   iAlt   = (tupPat, (Var iId))
-               in  reduce $
-                   mkVecCons consCon aTy n' (Either.lefts vArgs !! 1) $
-                   mkApps (Prim pInfo)
-                          [Right (LitTy (NumTy (i'-s')))
-                          ,Right sTy
-                          ,Right (LitTy (NumTy (n'-1)))
-                          ,Right (LitTy (NumTy 0))
-                          ,Right aTy
-                          ,Left (valToTerm eq)
-                          ,Left (Literal (NaturalLiteral 0))
-                          ,Left (valToTerm s)
-                          ,Left (Literal (NaturalLiteral (n'-1)))
-                          ,Left (Case splitAtCall iVecTy [iAlt])
-                          ]
-          _ -> let splitAtCall =
-                    mkApps (splitAtPrim snatTcNm vecTcNm)
-                           [Right fTy
-                           ,Right iTy
-                           ,Right aTy
-                           ,Left (valToTerm f)
-                           ,Left (valToTerm xs)
-                           ]
-                   fVecTy = mkTyConApp vecTcNm [fTy,aTy]
-                   iVecTy = mkTyConApp vecTcNm [iTy,aTy]
-                   -- Guaranteed no capture, so okay to use unsafe name generation
-                   fNm    = mkUnsafeSystemName "fxs" 0
-                   iNm    = mkUnsafeSystemName "ixs" 1
-                   fId    = mkLocalId fVecTy fNm
-                   iId    = mkLocalId iVecTy iNm
-                   tupPat = DataPat tupDc [] [fId,iId]
-                   iAlt   = (tupPat, (Var iId))
-               in  reduceWHNF $
-                   mkApps (Prim pInfo)
-                     [Right iTy
-                     ,Right sTy
+                                       ,Left (Either.lefts vArgs !! 2)
+                                       ])
+  -- - Sub-vectors
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.tail) -- :: Vec (n+1) a -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [DC _ vArgs] <- args
+      -> reduceWHNF (Either.lefts vArgs !! 2)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.init) -- :: Vec (n+1) a -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [DC consCon vArgs] <- args
+      , (Right _ : Right aTy : Right nTy : _) <- vArgs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> if n == 0
+            then reduceWHNF (Either.lefts vArgs !! 2)
+            else reduce $
+                 mkVecCons consCon aTy n
+                    (Either.lefts vArgs !! 1)
+                    (mkApps (Prim pInfo)
+                                         [Right (LitTy (NumTy (n-1)))
+                                         ,Right aTy
+                                         ,Left (Either.lefts vArgs !! 2)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.select) -- :: (CmpNat (i+s) (s*n) ~ GT) => SNat f -> SNat s -> SNat n -> Vec (f + i) a -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , iTy : sTy : nTy : fTy : aTy : _ <- tys
+      , eq : f : s : n : xs : _ <- args
+      , Right n' <- runExcept (tyNatSize tcm nTy)
+      , Right f' <- runExcept (tyNatSize tcm fTy)
+      , Right i' <- runExcept (tyNatSize tcm iTy)
+      , Right s' <- runExcept (tyNatSize tcm sTy)
+      , DC _ vArgs <- xs
+      -> case n' of
+           0 -> reduce (mkVecNil nilCon aTy)
+           _ -> case f' of
+            0 -> let splitAtCall =
+                      mkApps (splitAtPrim snatTcNm vecTcNm)
+                             [Right sTy
+                             ,Right (LitTy (NumTy (i'-s')))
+                             ,Right aTy
+                             ,Left (valToTerm s)
+                             ,Left (valToTerm xs)
+                             ]
+                     fVecTy = mkTyConApp vecTcNm [sTy,aTy]
+                     iVecTy = mkTyConApp vecTcNm [LitTy (NumTy (i'-s')),aTy]
+                     -- Guaranteed no capture, so okay to use unsafe name generation
+                     fNm    = mkUnsafeSystemName "fxs" 0
+                     iNm    = mkUnsafeSystemName "ixs" 1
+                     fId    = mkLocalId fVecTy fNm
+                     iId    = mkLocalId iVecTy iNm
+                     tupPat = DataPat tupDc [] [fId,iId]
+                     iAlt   = (tupPat, (Var iId))
+                 in  reduce $
+                     mkVecCons consCon aTy n' (Either.lefts vArgs !! 1) $
+                     mkApps (Prim pInfo)
+                            [Right (LitTy (NumTy (i'-s')))
+                            ,Right sTy
+                            ,Right (LitTy (NumTy (n'-1)))
+                            ,Right (LitTy (NumTy 0))
+                            ,Right aTy
+                            ,Left (valToTerm eq)
+                            ,Left (Literal (NaturalLiteral 0))
+                            ,Left (valToTerm s)
+                            ,Left (Literal (NaturalLiteral (n'-1)))
+                            ,Left (Case splitAtCall iVecTy [iAlt])
+                            ]
+            _ -> let splitAtCall =
+                      mkApps (splitAtPrim snatTcNm vecTcNm)
+                             [Right fTy
+                             ,Right iTy
+                             ,Right aTy
+                             ,Left (valToTerm f)
+                             ,Left (valToTerm xs)
+                             ]
+                     fVecTy = mkTyConApp vecTcNm [fTy,aTy]
+                     iVecTy = mkTyConApp vecTcNm [iTy,aTy]
+                     -- Guaranteed no capture, so okay to use unsafe name generation
+                     fNm    = mkUnsafeSystemName "fxs" 0
+                     iNm    = mkUnsafeSystemName "ixs" 1
+                     fId    = mkLocalId fVecTy fNm
+                     iId    = mkLocalId iVecTy iNm
+                     tupPat = DataPat tupDc [] [fId,iId]
+                     iAlt   = (tupPat, (Var iId))
+                 in  reduceWHNF $
+                     mkApps (Prim pInfo)
+                       [Right iTy
+                       ,Right sTy
+                       ,Right nTy
+                       ,Right (LitTy (NumTy 0))
+                       ,Right aTy
+                       ,Left (valToTerm eq)
+                       ,Left (Literal (NaturalLiteral 0))
+                       ,Left (valToTerm s)
+                       ,Left (valToTerm n)
+                       ,Left (Case splitAtCall iVecTy [iAlt])
+                       ]
+      | otherwise -> Nothing
+      where
+        (tyArgs,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
+        Just vecTc          = UniqMap.lookup vecTcNm tcm
+        [nilCon,consCon]    = tyConDataCons vecTc
+        TyConApp snatTcNm _ = tyView (Either.rights tyArgs !! 1)
+        tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
+        (Just tupTc)       = UniqMap.lookup tupTcNm tcm
+        [tupDc]            = tyConDataCons tupTc
+  -- - Splitting
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.splitAt) -- :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , (DC snatDc (Right mTy:_)):_ <- args
+      , Right m <- runExcept (tyNatSize tcm mTy)
+      -> let _:nTy:aTy:_ = tys
+             -- Get the tuple data-constructor
+             ty1 = piResultTys tcm ty tys
+             (_,tyView -> TyConApp tupTcNm tyArgs@(tyArg:_)) = splitFunForallTy ty1
+             (Just tupTc)       = UniqMap.lookup tupTcNm tcm
+             [tupDc]            = tyConDataCons tupTc
+             -- Get the vector data-constructors
+             TyConApp vecTcNm _ = tyView tyArg
+             Just vecTc         = UniqMap.lookup vecTcNm tcm
+             [nilCon,consCon]   = tyConDataCons vecTc
+             -- Recursive call to @splitAt@
+             splitAtRec v =
+              mkApps (Prim pInfo)
+                     [Right (LitTy (NumTy (m-1)))
                      ,Right nTy
-                     ,Right (LitTy (NumTy 0))
                      ,Right aTy
-                     ,Left (valToTerm eq)
-                     ,Left (Literal (NaturalLiteral 0))
-                     ,Left (valToTerm s)
-                     ,Left (valToTerm n)
-                     ,Left (Case splitAtCall iVecTy [iAlt])
+                     ,Left (mkApps (Data snatDc)
+                                   [ Right (LitTy (NumTy (m-1)))
+                                   , Left  (Literal (NaturalLiteral (m-1)))])
+                     ,Left v
                      ]
-    where
-      (tyArgs,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
-      Just vecTc          = UniqMap.lookup vecTcNm tcm
-      [nilCon,consCon]    = tyConDataCons vecTc
-      TyConApp snatTcNm _ = tyView (Either.rights tyArgs !! 1)
-      tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
-      (Just tupTc)       = UniqMap.lookup tupTcNm tcm
-      [tupDc]            = tyConDataCons tupTc
--- - Splitting
-  $(namePat 'Clash.Sized.Vector.splitAt) -- :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
-    | isSubj
-    , (DC snatDc (Right mTy:_)):_ <- args
-    , Right m <- runExcept (tyNatSize tcm mTy)
-    -> let _:nTy:aTy:_ = tys
-           -- Get the tuple data-constructor
-           ty1 = piResultTys tcm ty tys
-           (_,tyView -> TyConApp tupTcNm tyArgs@(tyArg:_)) = splitFunForallTy ty1
-           (Just tupTc)       = UniqMap.lookup tupTcNm tcm
-           [tupDc]            = tyConDataCons tupTc
-           -- Get the vector data-constructors
-           TyConApp vecTcNm _ = tyView tyArg
-           Just vecTc         = UniqMap.lookup vecTcNm tcm
-           [nilCon,consCon]   = tyConDataCons vecTc
-           -- Recursive call to @splitAt@
-           splitAtRec v =
-            mkApps (Prim pInfo)
-                   [Right (LitTy (NumTy (m-1)))
-                   ,Right nTy
-                   ,Right aTy
-                   ,Left (mkApps (Data snatDc)
-                                 [ Right (LitTy (NumTy (m-1)))
-                                 , Left  (Literal (NaturalLiteral (m-1)))])
-                   ,Left v
-                   ]
-           m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
-           nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
-           -- Guaranteed no capture, so okay to use unsafe name generation
-           lNm     = mkUnsafeSystemName "l" 0
-           rNm     = mkUnsafeSystemName "r" 1
-           lId     = mkLocalId m1VecTy lNm
-           rId     = mkLocalId nVecTy rNm
-           tupPat  = DataPat tupDc [] [lId,rId]
-           lAlt    = (tupPat, (Var lId))
-           rAlt    = (tupPat, (Var rId))
-
-       in case m of
-         -- (Nil,v)
-         0 -> reduce $
-              mkApps (Data tupDc) $ (map Right tyArgs) ++
-                [ Left (mkVecNil nilCon aTy)
-                , Left (valToTerm (last args))
-                ]
-         -- (x:xs) <- v
-         m' | DC _ vArgs <- last args
-            -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
-            -> case Either.lefts vArgs of
-                (_ : x : xs : _) ->
-                  let (mach1, recId) = newLetBinding tcm mach (splitAtRec xs)
-                  in reduceWith mach1 $
-                    mkApps (Data tupDc) $ (map Right tyArgs) ++
-                      [ Left (mkVecCons consCon aTy m' x
-                                (Case (Var recId) m1VecTy [lAlt]))
-                      , Left (Case (Var recId) nVecTy [rAlt])
-                      ]
-                _ ->
-                  -- v actually reduces to Nil and not Cons, this only happens
-                  -- when 'n' would reduce to a negative number; the complement
-                  -- of 'm'.
-                  --
-                  -- See Clash issue: https://github.com/clash-lang/clash-compiler/issues/2831
-                  let resTy = getResultTy tcm ty tys
-                   in reduce (TyApp (Prim NP.undefined) resTy)
-
-         -- v doesn't reduce to a data-constructor
-         _  -> Nothing
-
-  $(namePat 'Clash.Sized.Vector.unconcat) -- :: KnownNat n => SNamt m -> Vec (n * m) a -> Vec n (Vec m a)
-    | isSubj
-    , kn : snat : v : _  <- args
-    , nTy : mTy : aTy :_ <- tys
-    , Lit (NaturalLiteral n) <- kn
-    -> let ( Either.rights -> argTys, tyView -> TyConApp vecTcNm _) =
-              splitFunForallTy ty
-           Just vecTc = UniqMap.lookup vecTcNm tcm
-           [nilCon,consCon]   = tyConDataCons vecTc
-           tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
-           (Just tupTc)       = UniqMap.lookup tupTcNm tcm
-           [tupDc]            = tyConDataCons tupTc
-           TyConApp snatTcNm _ = tyView (argTys !! 1)
-           n1mTy  = mkTyConApp typeNatMul
-                        [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)]
-                        ,mTy]
-           splitAtCall =
-            mkApps (splitAtPrim snatTcNm vecTcNm)
-                   [Right mTy
-                   ,Right n1mTy
-                   ,Right aTy
-                   ,Left (valToTerm snat)
-                   ,Left (valToTerm v)
-                   ]
-           mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
-           n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
-           -- Guaranteed no capture, so okay to use unsafe name generation
-           asNm     = mkUnsafeSystemName "as" 0
-           bsNm     = mkUnsafeSystemName "bs" 1
-           asId     = mkLocalId mVecTy asNm
-           bsId     = mkLocalId n1mVecTy bsNm
-           tupPat   = DataPat tupDc [] [asId,bsId]
-           asAlt    = (tupPat, (Var asId))
-           bsAlt    = (tupPat, (Var bsId))
-
-       in  case n of
-         0 -> reduce (mkVecNil nilCon mVecTy)
-         _ -> reduce $
-              mkVecCons consCon mVecTy n
-                (Case splitAtCall mVecTy [asAlt])
-                (mkApps (Prim pInfo)
-                    [Right (LitTy (NumTy (n-1)))
-                    ,Right mTy
-                    ,Right aTy
-                    ,Left (Literal (NaturalLiteral (n-1)))
-                    ,Left (valToTerm snat)
-                    ,Left (Case splitAtCall n1mVecTy [bsAlt])])
--- Construction
--- - initialisation
-  $(namePat 'Clash.Sized.Vector.replicate) -- :: SNat n -> a -> Vec n a
-    | isSubj
-    , let ty' = piResultTys tcm ty tys
-    , let (_,resTy) = splitFunForallTy ty'
-    , (TyConApp vecTcNm [lenTy,argTy]) <- tyView resTy
-    , Right len <- runExcept (tyNatSize tcm lenTy)
-    -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
-           [nilCon,consCon] = tyConDataCons vecTc
-       in  reduce $
-           mkVec nilCon consCon argTy len
-                 (replicate (fromInteger len) (valToTerm (last args)))
--- - Concatenation
-  $(namePat '(Clash.Sized.Vector.++)) -- :: Vec n a -> Vec m a -> Vec (n + m) a
-    | isSubj
-    , (DC dc vArgs):_ <- args
-    , Right nTy : Right aTy : _ <- vArgs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0  -> reduce (valToTerm (last args))
-         n' | (_ : _ : mTy : _) <- tys
-            , Right m <- runExcept (tyNatSize tcm mTy)
-            -> -- x : (xs ++ ys)
-               reduce $
-               mkVecCons dc aTy (n' + m) (Either.lefts vArgs !! 1)
-                 (mkApps (Prim pInfo)
-                                      [Right (LitTy (NumTy (n'-1)))
-                                      ,Right aTy
-                                      ,Right mTy
-                                      ,Left (Either.lefts vArgs !! 2)
-                                      ,Left (valToTerm (last args))
-                                      ])
-         _ -> Nothing
-  $(namePat 'Clash.Sized.Vector.concat) -- :: Vec n (Vec m a) -> Vec (n * m) a
-    | isSubj
-    , (nTy : mTy : aTy : _)  <- tys
-    , (xs : _)               <- args
-    , DC dc vArgs <- xs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-        0 -> reduce (mkVecNil dc aTy)
-        _ | _ : h' : t : _ <- Either.lefts  vArgs
-          , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
-          -> reduceWHNF $
-             mkApps (vecAppendPrim vecTcNm)
-                    [Right mTy
-                    ,Right aTy
-                    ,Right $ mkTyConApp typeNatMul
-                      [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)], mTy]
-                    ,Left h'
-                    ,Left $ mkApps (Prim pInfo)
-                      [ Right (LitTy (NumTy (n-1)))
-                      , Right mTy
-                      , Right aTy
-                      , Left t
-                      ]
-                    ]
-        _ -> Nothing
-
--- Modifying vectors
-  "Clash.Sized.Vector.replace_int" -- :: KnownNat n => Vec n a -> Int -> a -> Vec n a
-    | nTy : aTy : _  <- tys
-    , _ : xs : i : a : _ <- args
-    , DC intDc [Left (Literal (IntLiteral i'))] <- i
-    -> if i' < 0
-          then Nothing
-          else case xs of
-                 DC vecTcNm vArgs -> case runExcept (tyNatSize tcm nTy) of
-                    Right 0  -> Nothing
-                    Right n' ->
-                      if i' == 0
-                         then reduce (mkVecCons vecTcNm aTy n' (valToTerm a) (Either.lefts vArgs !! 2))
-                         else reduce $
-                              mkVecCons vecTcNm aTy n' (Either.lefts vArgs !! 1)
-                                (mkApps (Prim pInfo)
+             m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
+             nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
+             -- Guaranteed no capture, so okay to use unsafe name generation
+             lNm     = mkUnsafeSystemName "l" 0
+             rNm     = mkUnsafeSystemName "r" 1
+             lId     = mkLocalId m1VecTy lNm
+             rId     = mkLocalId nVecTy rNm
+             tupPat  = DataPat tupDc [] [lId,rId]
+             lAlt    = (tupPat, (Var lId))
+             rAlt    = (tupPat, (Var rId))
+  
+         in case m of
+           -- (Nil,v)
+           0 -> reduce $
+                mkApps (Data tupDc) $ (map Right tyArgs) ++
+                  [ Left (mkVecNil nilCon aTy)
+                  , Left (valToTerm (last args))
+                  ]
+           -- (x:xs) <- v
+           m' | DC _ vArgs <- last args
+              -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
+              -> case Either.lefts vArgs of
+                  (_ : x : xs : _) ->
+                    let (mach1, recId) = newLetBinding tcm mach (splitAtRec xs)
+                    in reduceWith mach1 $
+                      mkApps (Data tupDc) $ (map Right tyArgs) ++
+                        [ Left (mkVecCons consCon aTy m' x
+                                  (Case (Var recId) m1VecTy [lAlt]))
+                        , Left (Case (Var recId) nVecTy [rAlt])
+                        ]
+                  _ ->
+                    -- v actually reduces to Nil and not Cons, this only happens
+                    -- when 'n' would reduce to a negative number; the complement
+                    -- of 'm'.
+                    --
+                    -- See Clash issue: https://github.com/clash-lang/clash-compiler/issues/2831
+                    let resTy = getResultTy tcm ty tys
+                     in reduce (TyApp (Prim NP.undefined) resTy)
+  
+           -- v doesn't reduce to a data-constructor
+           _  -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.unconcat) -- :: KnownNat n => SNamt m -> Vec (n * m) a -> Vec n (Vec m a)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , kn : snat : v : _  <- args
+      , nTy : mTy : aTy :_ <- tys
+      , Lit (NaturalLiteral n) <- kn
+      -> let ( Either.rights -> argTys, tyView -> TyConApp vecTcNm _) =
+                splitFunForallTy ty
+             Just vecTc = UniqMap.lookup vecTcNm tcm
+             [nilCon,consCon]   = tyConDataCons vecTc
+             tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
+             (Just tupTc)       = UniqMap.lookup tupTcNm tcm
+             [tupDc]            = tyConDataCons tupTc
+             TyConApp snatTcNm _ = tyView (argTys !! 1)
+             n1mTy  = mkTyConApp typeNatMul
+                          [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)]
+                          ,mTy]
+             splitAtCall =
+              mkApps (splitAtPrim snatTcNm vecTcNm)
+                     [Right mTy
+                     ,Right n1mTy
+                     ,Right aTy
+                     ,Left (valToTerm snat)
+                     ,Left (valToTerm v)
+                     ]
+             mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
+             n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
+             -- Guaranteed no capture, so okay to use unsafe name generation
+             asNm     = mkUnsafeSystemName "as" 0
+             bsNm     = mkUnsafeSystemName "bs" 1
+             asId     = mkLocalId mVecTy asNm
+             bsId     = mkLocalId n1mVecTy bsNm
+             tupPat   = DataPat tupDc [] [asId,bsId]
+             asAlt    = (tupPat, (Var asId))
+             bsAlt    = (tupPat, (Var bsId))
+  
+         in  case n of
+           0 -> reduce (mkVecNil nilCon mVecTy)
+           _ -> reduce $
+                mkVecCons consCon mVecTy n
+                  (Case splitAtCall mVecTy [asAlt])
+                  (mkApps (Prim pInfo)
+                      [Right (LitTy (NumTy (n-1)))
+                      ,Right mTy
+                      ,Right aTy
+                      ,Left (Literal (NaturalLiteral (n-1)))
+                      ,Left (valToTerm snat)
+                      ,Left (Case splitAtCall n1mVecTy [bsAlt])])
+  -- Construction
+  -- - initialisation
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.replicate) -- :: SNat n -> a -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , let ty' = piResultTys tcm ty tys
+      , let (_,resTy) = splitFunForallTy ty'
+      , (TyConApp vecTcNm [lenTy,argTy]) <- tyView resTy
+      , Right len <- runExcept (tyNatSize tcm lenTy)
+      -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
+             [nilCon,consCon] = tyConDataCons vecTc
+         in  reduce $
+             mkVec nilCon consCon argTy len
+                   (replicate (fromInteger len) (valToTerm (last args)))
+  -- - Concatenation
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS '(Clash.Sized.Vector.++)) -- :: Vec n a -> Vec m a -> Vec (n + m) a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , (DC dc vArgs):_ <- args
+      , Right nTy : Right aTy : _ <- vArgs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0  -> reduce (valToTerm (last args))
+           n' | (_ : _ : mTy : _) <- tys
+              , Right m <- runExcept (tyNatSize tcm mTy)
+              -> -- x : (xs ++ ys)
+                 reduce $
+                 mkVecCons dc aTy (n' + m) (Either.lefts vArgs !! 1)
+                   (mkApps (Prim pInfo)
                                         [Right (LitTy (NumTy (n'-1)))
                                         ,Right aTy
-                                        ,Left (Literal (NaturalLiteral (n'-1)))
+                                        ,Right mTy
                                         ,Left (Either.lefts vArgs !! 2)
-                                        ,Left (mkApps (Data intDc)
-                                                      [Left (Literal (IntLiteral (i'-1)))])
-                                        ,Left (valToTerm a)
+                                        ,Left (valToTerm (last args))
                                         ])
-                    _ -> Nothing
-                 _ -> Nothing
-
--- - specialized permutations
-  $(namePat 'Clash.Sized.Vector.reverse) -- :: Vec n a -> Vec n a
-    | isSubj
-    , nTy : aTy : _  <- tys
-    , [DC vecDc vArgs] <- args
-    -> case runExcept (tyNatSize tcm nTy) of
-         Right 0 -> reduce (mkVecNil vecDc aTy)
-         Right n
-           | (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
-           , let (Just vecTc) = UniqMap.lookup vecTcNm tcm
-           , let [nilCon,consCon] = tyConDataCons vecTc
-           -> reduceWHNF $
-              mkApps (vecAppendPrim vecTcNm)
-                [Right (LitTy (NumTy (n-1)))
-                ,Right aTy
-                ,Right (LitTy (NumTy 1))
-                ,Left (mkApps (Prim pInfo)
-                              [Right (LitTy (NumTy (n-1)))
-                              ,Right aTy
-                              ,Left (Either.lefts vArgs !! 2)
-                              ])
-                ,Left (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])
-                ]
-         _ -> Nothing
-  $(namePat 'Clash.Sized.Vector.transpose) -- :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
-    | isSubj
-    , nTy : mTy : aTy : _ <- tys
-    , kn : xss : _ <- args
-    , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
-    , DC _ vArgs <- xss
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    , Right m <- runExcept (tyNatSize tcm mTy)
-    -> case m of
-      0 -> let (Just vecTc)     = UniqMap.lookup vecTcNm tcm
-               [nilCon,consCon] = tyConDataCons vecTc
-           in  reduce $
-               mkVec nilCon consCon (mkTyConApp vecTcNm [mTy,aTy]) n
-                (replicate (fromInteger n) (mkVec nilCon consCon aTy 0 []))
-      m' -> let (Just vecTc)     = UniqMap.lookup vecTcNm tcm
-                [_,consCon] = tyConDataCons vecTc
-                Just (consCoTy : _) = dataConInstArgTys consCon
-                                        [mTy,aTy,LitTy (NumTy (m'-1))]
-            in  reduceWHNF $
-                mkApps (vecZipWithPrim vecTcNm)
-                       [ Right aTy
-                       , Right (mkTyConApp vecTcNm [LitTy (NumTy (m'-1)),aTy])
-                       , Right (mkTyConApp vecTcNm [mTy,aTy])
-                       , Right nTy
-                       , Left  (mkApps (Data consCon)
-                                       [Right mTy
-                                       ,Right aTy
-                                       ,Right (LitTy (NumTy (m'-1)))
-                                       ,Left (primCo consCoTy)
-                                       ])
-                       , Left  (Either.lefts vArgs !! 1)
-                       , Left  (mkApps (Prim pInfo)
-                                       [ Right nTy
-                                       , Right (LitTy (NumTy (m'-1)))
-                                       , Right aTy
-                                       , Left  (valToTerm kn)
-                                       , Left  (Either.lefts vArgs !! 2)
-                                       ])
-                       ]
-
-  $(namePat 'Clash.Sized.Vector.rotateLeftS) -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
-    | nTy : aTy : _ : _ <- tys
-    , kn : xs : d : _ <- args
-    , DC dc vArgs <- xs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0  -> reduce (mkVecNil dc aTy)
-         n' | DC snatDc [_,Left d'] <- d
-            , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-            , mach2@Machine{mStack=[],mTerm=Literal (NaturalLiteral d2)} <- whnf eval tcm isSubj (setTerm d' $ stackClear mach)
-            -> case (d2 `mod` n) of
-                 0  -> reduce (valToTerm xs)
-                 d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
-                           (Just vecTc)     = UniqMap.lookup vecTcNm tcm
-                           [nilCon,consCon] = tyConDataCons vecTc
-                       in  reduceWHNF' mach2 $
-                           mkApps (Prim pInfo)
-                                  [Right nTy
-                                  ,Right aTy
-                                  ,Right (LitTy (NumTy (d3-1)))
-                                  ,Left (valToTerm kn)
-                                  ,Left (mkApps (vecAppendPrim vecTcNm)
-                                                [Right (LitTy (NumTy (n'-1)))
-                                                ,Right aTy
-                                                ,Right (LitTy (NumTy 1))
-                                                ,Left  (Either.lefts vArgs !! 2)
-                                                ,Left  (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])])
-                                  ,Left (mkApps (Data snatDc)
-                                                [Right (LitTy (NumTy (d3-1)))
-                                                ,Left  (Literal (NaturalLiteral (d3-1)))])
-                                  ]
-         _  -> Nothing
-
-  $(namePat 'Clash.Sized.Vector.rotateRightS) -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
-    | isSubj
-    , nTy : aTy : _ : _ <- tys
-    , kn : xs : d : _ <- args
-    , DC dc _ <- xs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0  -> reduce (mkVecNil dc aTy)
-         n' | DC snatDc [_,Left d'] <- d
-            , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-            , mach2@Machine{mStack=[],mTerm=Literal (NaturalLiteral d2)} <- whnf eval tcm isSubj (setTerm d' $ stackClear mach)
-            -> case (d2 `mod` n) of
-                 0  -> reduce (valToTerm xs)
-                 d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
-                       in  reduceWHNF' mach2 $
-                           mkApps (Prim pInfo)
-                                  [Right nTy
-                                  ,Right aTy
-                                  ,Right (LitTy (NumTy (d3-1)))
-                                  ,Left (valToTerm kn)
-                                  ,Left (mkVecCons dc aTy n
-                                          (mkApps (vecLastPrim vecTcNm)
-                                                  [Right (LitTy (NumTy (n'-1)))
-                                                  ,Right aTy
-                                                  ,Left  (valToTerm xs)])
-                                          (mkApps (vecInitPrim vecTcNm)
-                                                  [Right (LitTy (NumTy (n'-1)))
-                                                  ,Right aTy
-                                                  ,Left (valToTerm xs)]))
-                                  ,Left (mkApps (Data snatDc)
-                                                [Right (LitTy (NumTy (d3-1)))
-                                                ,Left  (Literal (NaturalLiteral (d3-1)))])
-                                  ]
-         _  -> Nothing
--- Element-wise operations
--- - mapping
-  $(namePat 'Clash.Sized.Vector.map) -- :: (a -> b) -> Vec n a -> Vec n b
-    | isSubj
-    , DC dc vArgs <- args !! 1
-    , aTy : bTy : nTy : _ <- tys
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0  -> reduce (mkVecNil dc bTy)
-         n' -> reduce $
-               mkVecCons dc bTy n'
-                 (mkApps (valToTerm (args !! 0)) [Left (Either.lefts vArgs !! 1)])
-                 (mkApps (Prim pInfo)
-                                      [Right aTy
-                                      ,Right bTy
-                                      ,Right (LitTy (NumTy (n' - 1)))
-                                      ,Left (valToTerm (args !! 0))
-                                      ,Left (Either.lefts vArgs !! 2)])
-  $(namePat 'Clash.Sized.Vector.imap) -- :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
-    | isSubj
-    , nTy : aTy : bTy : _ <- tys
-    , (tyArgs,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
-    , let (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 1)
-    , TyConApp indexTcNm _ <- tyView (Either.rights tyArgs' !! 0)
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    , let iLit = mkIndexLit (Either.rights tyArgs' !! 0) nTy n 0
-    -> reduceWHNF $
-       mkApps (Prim (PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm) WorkNever SingleResult NoUnfolding))
-              [Right nTy
-              ,Right nTy
-              ,Right aTy
-              ,Right bTy
-              ,Left (valToTerm (args !! 1))
-              ,Left (valToTerm (args !! 2))
-              ,Left iLit
-              ]
-
-  "Clash.Sized.Vector.imap_go"
-    | isSubj
-    , nTy : mTy : aTy : bTy : _ <- tys
-    , f : xs : (Suspend nArg) : _ <- args
-    , DC dc vArgs <- xs
-    , Right n' <- runExcept (tyNatSize tcm nTy)
-    , Right m <- runExcept (tyNatSize tcm mTy)
-    -> case m of
-         0  -> reduce (mkVecNil dc bTy)
-         m'
-          | eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-          , mach1@Machine{mStack=[],mTerm=n} <-
-              whnf eval tcm True (setTerm nArg (stackClear mach))
-          ->  let (tyArgs,_) = splitFunForallTy ty
-                  TyConApp indexTcNm _ = tyView (Either.rights tyArgs !! 2)
-                  iLit = mkIndexLit (Either.rights tyArgs !! 2) nTy n' 1
-               in Just $ flip setTerm (mach1 {mStack = mStack mach}) $ mkVecCons dc bTy m'
-                 (mkApps (valToTerm f) [Left n,Left (Either.lefts vArgs !! 1)])
-                 (mkApps (Prim pInfo)
-                         [Right nTy
-                         ,Right (LitTy (NumTy (m'-1)))
-                         ,Right aTy
-                         ,Right bTy
-                         ,Left (valToTerm f)
-                         ,Left (Either.lefts vArgs !! 2)
-                         ,Left (mkApps (Prim (PrimInfo (showt '(Clash.Sized.Internal.Index.+#)) (indexAddTy indexTcNm) WorkVariable SingleResult NoUnfolding))
-                                       [Right nTy
-                                       ,Left (Literal (NaturalLiteral n'))
-                                       ,Left n
-                                       ,Left iLit
-                                       ])
-                         ])
-          | otherwise
-          -> Nothing
-
-  -- :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
-  $(namePat 'Clash.Sized.Vector.iterateI)
-    | isSubj
-    , [nTy, aTy] <- tys
-    , [_n, f, a] <- args
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    ->
-      let
-        TyConApp vecTcNm _ = tyView (getResultTy tcm ty tys)
-        Just vecTc = UniqMap.lookup vecTcNm tcm
-        [nilCon, consCon] = tyConDataCons vecTc
-      in case n of
-         0 -> reduce (mkVecNil nilCon aTy)
-         _ -> reduce $
-          mkVecCons consCon aTy n
-            (valToTerm a)
-            (mkApps
-              (Prim pInfo)
-              [ Right (LitTy (NumTy (n - 1)))
-              , Right aTy
-              , Left (valToTerm (Lit (NaturalLiteral (n - 1))))
-              , Left (valToTerm f)
-              , Left (mkApps (valToTerm f) [Left (valToTerm a)])
-              ])
-
--- - Zipping
-  $(namePat 'Clash.Sized.Vector.zipWith) -- :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
-    | isSubj
-    , aTy : bTy : cTy : nTy : _ <- tys
-    , f : xs : ys : _   <- args
-    , DC dc vArgs <- xs
-    , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0  -> reduce (mkVecNil dc cTy)
-         -- We share the function 'f' and the second vector 'ys' via heap
-         -- let-bindings instead of inlining 'valToTerm f' / 'valToTerm ys'
-         -- twice. See #3308.
-         n' ->
-           let (mach1, fId)  = newLetBinding tcm mach  (valToTerm f)
-               (mach2, ysId) = newLetBinding tcm mach1 (valToTerm ys)
-           in reduceWith mach2 $ mkVecCons dc cTy n'
-                 (mkApps (Var fId)
-                            [Left (Either.lefts vArgs !! 1)
-                            ,Left (mkApps (vecHeadPrim vecTcNm)
-                                    [Right (LitTy (NumTy (n'-1)))
-                                    ,Right bTy
-                                    ,Left  (Var ysId)
-                                    ])
-                            ])
-                 (mkApps (Prim pInfo)
-                                      [Right aTy
-                                      ,Right bTy
-                                      ,Right cTy
-                                      ,Right (LitTy (NumTy (n' - 1)))
-                                      ,Left (Var fId)
-                                      ,Left (Either.lefts vArgs !! 2)
-                                      ,Left (mkApps (vecTailPrim vecTcNm)
-                                                    [Right (LitTy (NumTy (n'-1)))
-                                                    ,Right bTy
-                                                    ,Left (Var ysId)
-                                                    ])])
-
--- Folding
-  $(namePat 'Clash.Sized.Vector.foldr) -- :: (a -> b -> b) -> b -> Vec n a -> b
-    | isSubj
-    , aTy : bTy : nTy : _ <- tys
-    , f : z : xs : _ <- args
-    , DC _ vArgs <- xs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0 -> reduce (valToTerm z)
-         _ -> reduceWHNF $
-              mkApps (valToTerm f)
-                     [Left (Either.lefts vArgs !! 1)
-                     ,Left (mkApps (Prim pInfo)
-                                   [Right aTy
-                                   ,Right bTy
-                                   ,Right (LitTy (NumTy (n-1)))
-                                   ,Left  (valToTerm f)
-                                   ,Left  (valToTerm z)
-                                   ,Left  (Either.lefts vArgs !! 2)
-                                   ])
-                     ]
-  $(namePat 'Clash.Sized.Vector.fold) -- :: (a -> a -> a) -> Vec (n + 1) a -> a
-    | isSubj
-    , nTy : aTy :  _ <- tys
-    , f : vs : _ <- args
-    , DC _ vArgs <- vs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0 -> reduceWHNF (Either.lefts vArgs !! 1)
-         _ -> let (tyArgs,_)         = splitFunForallTy ty
-                  TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 1)
-                  tupTcNm      = ghcTyconToTyConName (tupleTyCon Boxed 2)
-                  (Just tupTc) = UniqMap.lookup tupTcNm tcm
-                  [tupDc]      = tyConDataCons tupTc
-                  n'     = n+1
-                  m      = n' `div` 2
-                  n1     = n' - m
-                  mTy    = LitTy (NumTy m)
-                  m'ty   = LitTy (NumTy (m-1))
-                  n1mTy  = LitTy (NumTy n1)
-                  n1m'ty = LitTy (NumTy (n1-1))
-                  splitAtCall =
-                   mkApps (Prim (PrimInfo "Clash.Sized.Vector.fold_split" (foldSplitAtTy vecTcNm) WorkNever SingleResult NoUnfolding))
-                          [Right mTy
-                          ,Right n1mTy
-                          ,Right aTy
-                          ,Left (Literal (NaturalLiteral m))
-                          ,Left (valToTerm vs)
-                          ]
-                  mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
-                  n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
-                  -- Guaranteed no capture, so okay to use unsafe name generation
-                  asNm     = mkUnsafeSystemName "as" 0
-                  bsNm     = mkUnsafeSystemName "bs" 1
-                  asId     = mkLocalId mVecTy asNm
-                  bsId     = mkLocalId n1mVecTy bsNm
-                  tupPat   = DataPat tupDc [] [asId,bsId]
-                  asAlt    = (tupPat, (Var asId))
-                  bsAlt    = (tupPat, (Var bsId))
-              in  reduceWHNF $
-                  mkApps (valToTerm f)
-                         [Left (mkApps (Prim pInfo)
-                                       [Right m'ty
-                                       ,Right aTy
-                                       ,Left (valToTerm f)
-                                       ,Left (Case splitAtCall mVecTy [asAlt])
-                                       ])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right n1m'ty
-                                       ,Right aTy
-                                       ,Left  (valToTerm f)
-                                       ,Left  (Case splitAtCall n1mVecTy [bsAlt])
-                                       ])
-                         ]
-
-
-  "Clash.Sized.Vector.fold_split" -- :: Natural -> Vec (m + n) a -> (Vec m a, Vec n a)
-    | isSubj
-    , mTy : nTy : aTy : _ <- tys
-    , Right m <- runExcept (tyNatSize tcm mTy)
-    -> let -- Get the tuple data-constructor
-           ty1 = piResultTys tcm ty tys
-           (_,tyView -> TyConApp tupTcNm tyArgs@(tyArg:_)) = splitFunForallTy ty1
-           (Just tupTc)       = UniqMap.lookup tupTcNm tcm
-           [tupDc]            = tyConDataCons tupTc
-           -- Get the vector data-constructors
-           TyConApp vecTcNm _ = tyView tyArg
-           Just vecTc         = UniqMap.lookup vecTcNm tcm
-           [nilCon,consCon]   = tyConDataCons vecTc
-           -- Recursive call to @splitAt@
-           splitAtRec v =
-            mkApps (Prim pInfo)
-                   [Right (LitTy (NumTy (m-1)))
-                   ,Right nTy
-                   ,Right aTy
-                   ,Left (Literal (NaturalLiteral (m-1)))
-                   ,Left v
-                   ]
-           -- Projection either the first or second field of the recursive
-           -- call to @splitAt@
-           splitAtSelR v = Case (splitAtRec v)
-           m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
-           nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
-           -- Guaranteed no capture, so okay to use unsafe name generation
-           lNm     = mkUnsafeSystemName "l" 0
-           rNm     = mkUnsafeSystemName "r" 1
-           lId     = mkLocalId m1VecTy lNm
-           rId     = mkLocalId nVecTy rNm
-           tupPat  = DataPat tupDc [] [lId,rId]
-           lAlt    = (tupPat, (Var lId))
-           rAlt    = (tupPat, (Var rId))
-       in case m of
-         -- (Nil,v)
-         0 -> reduce $
-              mkApps (Data tupDc) $ (map Right tyArgs) ++
-                [ Left (mkVecNil nilCon aTy)
-                , Left (valToTerm (last args))
-                ]
-         -- (x:xs) <- v
-         m' | DC _ vArgs <- last args
-            -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
-            -> reduce $
-               mkApps (Data tupDc) $ (map Right tyArgs) ++
-                 [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
-                           (splitAtSelR (Either.lefts vArgs !! 2) m1VecTy [lAlt]))
-                 , Left (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
-                 ]
-         -- v doesn't reduce to a data-constructor
-         _  -> Nothing
--- - Specialised folds
-  $(namePat 'Clash.Sized.Vector.dfold)
-    | isSubj
-    , pTy : kTy : aTy : _ <- tys
-    , _ : p : f : z : xs : _ <- args
-    , DC _ vArgs <- xs
-    , Right k' <- runExcept (tyNatSize tcm kTy)
-    -> case k'  of
-         0 -> reduce (valToTerm z)
-         _ -> let (tyArgs,_)  = splitFunForallTy ty
-                  (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 2)
-                  Just (tvN, _) = List.uncons $ Either.lefts tyArgs'
-                  ubpT = Either.rights tyArgs' !! 0
-                  fTVs = Lens.toListOf typeFreeVars ubpT
-                  Just tvK = List.find (/= tvN) fTVs
-                  subst0 = extendTvSubst (mkSubst is0) tvN k'ty
-                  subst1 = extendTvSubst subst0 tvK (LitTy (NumTy k'))
-                  witness = normalizeType tcm (substTy subst1 ubpT)
-                  TyConApp tupTcNm _ = tyView witness
-                  Just witnessTc = UniqMap.lookup tupTcNm tcm
-                  ubp : _ = tyConDataCons witnessTc
-                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 1)
-                  Just snatTc = UniqMap.lookup snatTcNm tcm
-                  [snatDc]    = tyConDataCons snatTc
-                  k'ty        = LitTy (NumTy (k'-1))
-              in  reduceWHNF $
-                  mkApps (valToTerm f)
-                         [Right k'ty
-                         ,Left (Data ubp)
-                         ,Left (mkApps (Data snatDc)
-                                       [Right k'ty
-                                       ,Left (Literal (NaturalLiteral (k'-1)))])
-                         ,Left (Either.lefts vArgs !! 1)
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm z)
-                                       ,Left (Either.lefts vArgs !! 2)
-                                       ])
-                         ]
-    where
-      is0 = mScopeNames mach
-  $(namePat 'Clash.Sized.Vector.dtfold)
-    | isSubj
-    , pTy : kTy : aTy : _ <- tys
-    , _ : p : f : g : xs : _ <- args
-    , DC _ vArgs <- xs
-    , Right k' <- runExcept (tyNatSize tcm kTy)
-    -> case k' of
-         0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts vArgs !! 1)])
-         _ -> let (tyArgs,_)  = splitFunForallTy ty
-                  TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 4)
-                  (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
-                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
-                  Just snatTc = UniqMap.lookup snatTcNm tcm
-                  [snatDc]    = tyConDataCons snatTc
-                  tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
-                  (Just tupTc) = UniqMap.lookup tupTcNm tcm
-                  [tupDc]     = tyConDataCons tupTc
-                  k'ty        = LitTy (NumTy (k'-1))
-                  k2ty        = LitTy (NumTy (2^(k'-1)))
-                  splitAtCall =
-                   mkApps (splitAtPrim snatTcNm vecTcNm)
-                          [Right k2ty
-                          ,Right k2ty
-                          ,Right aTy
-                          ,Left (mkApps (Data snatDc)
-                                        [Right k2ty
-                                        ,Left (Literal (NaturalLiteral (2^(k'-1))))])
-                          ,Left (valToTerm xs)
-                          ]
-                  xsSVecTy = mkTyConApp vecTcNm [k2ty,aTy]
-                  -- Guaranteed no capture, so okay to use unsafe name generation
-                  xsLNm    = mkUnsafeSystemName "xsL" 0
-                  xsRNm    = mkUnsafeSystemName "xsR" 1
-                  xsLId    = mkLocalId k2ty xsLNm
-                  xsRId    = mkLocalId k2ty xsRNm
-                  tupPat   = DataPat tupDc [] [xsLId,xsRId]
-                  asAlt    = (tupPat, (Var xsLId))
-                  bsAlt    = (tupPat, (Var xsRId))
-              in  reduceWHNF $
-                  mkApps (valToTerm g)
-                         [Right k'ty
-                         ,Left (mkApps (Data snatDc)
-                                       [Right k'ty
-                                       ,Left (Literal (NaturalLiteral (k'-1)))])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Case splitAtCall xsSVecTy [asAlt])])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right pTy
-                                       ,Right k'ty
-                                       ,Right aTy
-                                       ,Left (Literal (NaturalLiteral (k'-1)))
-                                       ,Left (valToTerm p)
-                                       ,Left (valToTerm f)
-                                       ,Left (valToTerm g)
-                                       ,Left (Case splitAtCall xsSVecTy [bsAlt])])
-                         ]
--- Misc
-  $(namePat 'Clash.Sized.Vector.lazyV)
-    | isSubj
-    , nTy : aTy : _ <- tys
-    , _ : xs : _ <- args
-    , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0  -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
-                   [nilCon,_]   = tyConDataCons vecTc
-               in  reduce (mkVecNil nilCon aTy)
-         n' -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
-                   [_,consCon]  = tyConDataCons vecTc
-               in  reduce $ mkVecCons consCon aTy n'
-                     (mkApps (vecHeadPrim vecTcNm)
-                             [ Right (LitTy (NumTy (n' - 1)))
-                             , Right aTy
-                             , Left  (valToTerm xs)
-                             ])
-                     (mkApps (Prim pInfo)
-                             [ Right (LitTy (NumTy (n' - 1)))
-                             , Right aTy
-                             , Left  (Literal (NaturalLiteral (n'-1)))
-                             , Left  (mkApps (vecTailPrim vecTcNm)
-                                             [ Right (LitTy (NumTy (n'-1)))
-                                             , Right aTy
-                                             , Left  (valToTerm xs)
-                                             ])
-                             ])
--- Traversable
-  $(namePat 'Clash.Sized.Vector.traverse#)
-    | isSubj
-    , aTy : fTy : bTy : nTy : _ <- tys
-    , apDict : f : xs : _ <- args
-    , DC dc vArgs <- xs
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0 -> let (pureF,ids') = runPEM (mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 1) ids
-              in  reduceWHNF' (mach { mSupply = ids' }) $
-                  mkApps pureF
-                         [Right (mkTyConApp (vecTcNm) [nTy,bTy])
-                         ,Left  (mkVecNil dc bTy)]
-         _ -> let ((fmapF,apF),ids') = flip runPEM ids $ do
-                    fDict  <- mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 0
-                    fmapF' <- mkSelectorCase $(curLoc) is0 tcm fDict 1 0
-                    apF'   <- mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 2
-                    return (fmapF',apF')
-                  n'ty = LitTy (NumTy (n-1))
-                  Just (consCoTy : _) = dataConInstArgTys dc [nTy,bTy,n'ty]
-              in  reduceWHNF' (mach { mSupply = ids' }) $
-                  mkApps apF
-                         [Right (mkTyConApp vecTcNm [n'ty,bTy])
-                         ,Right (mkTyConApp vecTcNm [nTy,bTy])
-                         ,Left (mkApps fmapF
-                                       [Right bTy
-                                       ,Right (mkFunTy (mkTyConApp vecTcNm [n'ty,bTy])
-                                                       (mkTyConApp vecTcNm [nTy,bTy]))
-                                       ,Left (mkApps (Data dc)
-                                                     [Right nTy
-                                                     ,Right bTy
-                                                     ,Right n'ty
-                                                     ,Left (primCo consCoTy)])
-                                       ,Left (mkApps (valToTerm f)
-                                                     [Left (Either.lefts vArgs !! 1)])
-                                       ])
-                         ,Left (mkApps (Prim pInfo)
-                                       [Right aTy
-                                       ,Right fTy
-                                       ,Right bTy
-                                       ,Right n'ty
-                                       ,Left (valToTerm apDict)
-                                       ,Left (valToTerm f)
-                                       ,Left (Either.lefts vArgs !! 2)
-                                       ])
-                         ]
-    where
-      (tyArgs,_)         = splitFunForallTy ty
-      TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 2)
-      (ids, is0) = (mSupply mach, mScopeNames mach)
-
--- BitPack
-  $(namePat 'Clash.Sized.Vector.concatBitVector#)
-    | isSubj
-    , nTy : mTy : _ <- tys
-    , _  : km  : v : _ <- args
-    , DC _ vArgs <- v
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0  -> let resTyInfo = extractTySizeInfo tcm ty tys
-               in  reduce (mkBitVectorLit' resTyInfo 0 0)
-         n' | Right m <- runExcept (tyNatSize tcm mTy)
-            , (_,tyView -> TyConApp bvTcNm _) <- splitFunForallTy ty
+           _ -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.concat) -- :: Vec n (Vec m a) -> Vec (n * m) a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , (nTy : mTy : aTy : _)  <- tys
+      , (xs : _)               <- args
+      , DC dc vArgs <- xs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+          0 -> reduce (mkVecNil dc aTy)
+          _ | _ : h' : t : _ <- Either.lefts  vArgs
+            , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
             -> reduceWHNF $
-               mkApps (bvAppendPrim bvTcNm)
-                 [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
-                 , Right mTy
-                 , Left (Literal (NaturalLiteral ((n'-1)*m)))
-                 , Left (Either.lefts vArgs !! 1)
-                 , Left (mkApps (Prim pInfo)
-                                [ Right (LitTy (NumTy (n'-1)))
-                                , Right mTy
-                                , Left (Literal (NaturalLiteral (n'-1)))
-                                , Left (valToTerm km)
-                                , Left (Either.lefts vArgs !! 2)
-                                ])
-                 ]
-         _ -> Nothing
-  $(namePat 'Clash.Sized.Vector.unconcatBitVector#)
-    | isSubj
-    , nTy : mTy : _  <- tys
-    , _  : km  : bv : _ <- args
-    , (_,tyView -> TyConApp vecTcNm [_,bvMTy]) <- splitFunForallTy ty
-    , TyConApp bvTcNm _ <- tyView bvMTy
-    , Right n <- runExcept (tyNatSize tcm nTy)
-    -> case n of
-         0 ->
-          let (Just vecTc) = UniqMap.lookup vecTcNm tcm
-              [nilCon,_] = tyConDataCons vecTc
-          in  reduce (mkVecNil nilCon (mkTyConApp bvTcNm [mTy]))
-         n' | Right m <- runExcept (tyNatSize tcm mTy) ->
-          let Just vecTc  = UniqMap.lookup vecTcNm tcm
-              [_,consCon] = tyConDataCons vecTc
-              tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
-              Just tupTc  = UniqMap.lookup tupTcNm tcm
-              [tupDc]     = tyConDataCons tupTc
-              splitCall   =
-                mkApps (bvSplitPrim bvTcNm)
-                       [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
-                       , Right mTy
-                       , Left (Literal (NaturalLiteral ((n'-1)*m)))
-                       , Left (valToTerm bv)
-                       ]
-              mBVTy       = mkTyConApp bvTcNm [mTy]
-              n1BVTy      = mkTyConApp bvTcNm
-                              [mkTyConApp typeNatMul
-                                [LitTy (NumTy (n'-1))
-                                ,mTy]]
-              -- Guaranteed no capture, so okay to use unsafe name generation
-              xNm         = mkUnsafeSystemName "x" 0
-              bvNm        = mkUnsafeSystemName "bv'" 1
-              xId         = mkLocalId mBVTy xNm
-              bvId        = mkLocalId n1BVTy bvNm
-              tupPat      = DataPat tupDc [] [xId,bvId]
-              xAlt        = (tupPat, (Var xId))
-              bvAlt       = (tupPat, (Var bvId))
-
-          in  reduce $ mkVecCons consCon (mkTyConApp bvTcNm [mTy]) n'
-                (Case splitCall mBVTy [xAlt])
-                (mkApps (Prim pInfo)
-                        [ Right (LitTy (NumTy (n'-1)))
+               mkApps (vecAppendPrim vecTcNm)
+                      [Right mTy
+                      ,Right aTy
+                      ,Right $ mkTyConApp typeNatMul
+                        [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)], mTy]
+                      ,Left h'
+                      ,Left $ mkApps (Prim pInfo)
+                        [ Right (LitTy (NumTy (n-1)))
                         , Right mTy
-                        , Left (Literal (NaturalLiteral (n'-1)))
-                        , Left (valToTerm km)
-                        , Left (Case splitCall n1BVTy [bvAlt])
-                        ])
-         _ -> Nothing
-  "Data.Text.Show.$wunpackCStringAscii#"
-    | [Lit (StringLiteral addr)] <- args
-    , Text.Text (Text.ByteArray ba) _off len <- Text.pack addr
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = UniqMap.lookup tupTcNm tcm
-           [tupDc] = tyConDataCons tupTc
-           ret     = mkApps (Data tupDc) (map Right tyArgs ++
-                    [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
-                    , Left (Literal (IntLiteral 0))
-                    , Left (Literal (IntLiteral (toInteger len)))])
-        in reduce ret
-  -- XXX: Does not seem to exist?
-  "GHC.Magic.noinlineConstraint"
-    | [arg] <- args
-    -> reduce (valToTerm arg)
-  $(namePat 'GHC.TypeNats.withSomeSNat)
-    | Lit (NaturalLiteral n) : fun : _ <- args
-    , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
-    , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
-    , Just snatTc <- UniqMap.lookup snatTcNm tcm
-    , [snatDc] <- tyConDataCons snatTc
-    -> let nTy = LitTy (NumTy n)
-           snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
-           ret = mkApps (valToTerm fun) [Right nTy, Left snat]
-        in reduce ret
-  -- XXX: Does not seem to exist?
-  "GHC.Magic.nospec"
-    | [arg] <- args
-    -> reduce (valToTerm arg)
-  "GHC.Float.$wproperFractionDouble"
-    | _ : Lit (DoubleLiteral d) : _ <- args
-    , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
-    , nameOcc signedTcNm == showt ''Signed
-    , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , Just tupTc <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
-           ret = mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left (mkSignedLit sty nTy kn sn)
-                  , Left (mkDoubleCLit tcm (castDoubleToWord64 d1) (last tyArgs))
-                  ])
-        in reduce ret
-    where
-      op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
-      op _ = properFraction
-  "GHC.Internal.Float.$wproperFractionDouble"
-    | _ : Lit (DoubleLiteral d) : _ <- args
-    , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
-    , nameOcc signedTcNm == showt ''Clash.Sized.Internal.Signed.Signed
-    , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
-    , Just tupTc <- UniqMap.lookup tupTcNm tcm
-    , [tupDc] <- tyConDataCons tupTc
-    -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
-           ret = mkApps (Data tupDc) (map Right tyArgs ++
-                  [ Left (mkSignedLit sty nTy kn sn)
-                  , Left (mkDoubleCLit tcm (castDoubleToWord64 d1) (last tyArgs))
-                  ])
-        in reduce ret
-    where
-      op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
-      op _ = properFraction
-
-  _ -> Nothing
-  where
-    ty = primType pInfo
-
-    checkNaturalRange1 nTy i f =
-      checkNaturalRange nTy [i]
-        (\[i'] -> naturalToNaturalLiteral (f i'))
-
-    checkNaturalRange2 nTy i j f =
-      checkNaturalRange nTy [i, j]
-        (\[i', j'] -> naturalToNaturalLiteral (f i' j'))
-
-    -- Check given integer's range. If any of them are less than zero, give up
-    -- and return an undefined type.
-    checkNaturalRange
-      :: Type
-      -- Type of GHC.Natural.Natural ^
-      -> [Integer]
-      -> ([Natural] -> Term)
-      -> Term
-    checkNaturalRange nTy natsAsInts f =
-      if any (<0) natsAsInts then
-        TyApp (Prim NP.undefined) nTy
-      else
-        f (map fromInteger natsAsInts)
-
-    reduce :: Term -> Maybe Machine
-    reduce = reduceWith mach
-
-    -- Like 'reduceWith, but reduces in (the heap of) an explicitly given machine
-    -- rather than the captured 'mach'. Use this when the reduced term refers to
-    -- bindings freshly allocated with 'newLetBinding'.
-    reduceWith :: Machine -> Term -> Maybe Machine
-    reduceWith mach0 e = case isX e of
-      Left msg ->
-        let resTy = getResultTy tcm ty tys
-            warning = unlines
-              [ "Warning: caught XException: \"" ++ msg ++ "\" while trying to evaluate: "
-              , showPpr (mkApps (Prim pInfo) (map (Left . valToTerm) args))
-              ]
-        in trace warning (Just (setTerm (TyApp (Prim NP.undefined) resTy) mach0))
-      Right e' -> Just (setTerm e' mach0)
-
-    reduceWHNF e =
-      let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-          mach1@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e $ stackClear mach)
-      in Just $ mach1 { mStack = mStack mach }
-
-    reduceWHNF' mach1 e =
-      let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
-          mach2@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e $ stackClear mach1)
-       in Just $ mach2 { mStack = mStack mach }
-
-    makeUndefinedIf :: Exception e => (e -> Bool) -> Term -> Term
-    makeUndefinedIf wantToHandle tm =
-      case unsafeDupablePerformIO $ tryJust selectException (evaluate $ force tm) of
-        Right b -> b
-        Left e -> trace (msg e) (TyApp (Prim NP.undefined) resTy)
-      where
-        resTy = getResultTy tcm ty tys
-        selectException e | wantToHandle e = Just e
-                          | otherwise = Nothing
-        msg e = unlines ["Warning: caught exception: \"" ++ show e ++ "\" while trying to evaluate: "
-                        , showPpr (mkApps (Prim pInfo) (map (Left . valToTerm) args))
+                        , Right aTy
+                        , Left t
                         ]
-
-    catchDivByZero = makeUndefinedIf (==DivideByZero)
-
-    catchErrorCall = makeUndefinedIf (const True :: ErrorCall -> Bool)
+                      ]
+          _ -> Nothing
+  
+  -- Modifying vectors
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Clash.Sized.Vector.replace_int" -- :: KnownNat n => Vec n a -> Int -> a -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | nTy : aTy : _  <- tys
+      , _ : xs : i : a : _ <- args
+      , DC intDc [Left (Literal (IntLiteral i'))] <- i
+      -> if i' < 0
+            then Nothing
+            else case xs of
+                   DC vecTcNm vArgs -> case runExcept (tyNatSize tcm nTy) of
+                      Right 0  -> Nothing
+                      Right n' ->
+                        if i' == 0
+                           then reduce (mkVecCons vecTcNm aTy n' (valToTerm a) (Either.lefts vArgs !! 2))
+                           else reduce $
+                                mkVecCons vecTcNm aTy n' (Either.lefts vArgs !! 1)
+                                  (mkApps (Prim pInfo)
+                                          [Right (LitTy (NumTy (n'-1)))
+                                          ,Right aTy
+                                          ,Left (Literal (NaturalLiteral (n'-1)))
+                                          ,Left (Either.lefts vArgs !! 2)
+                                          ,Left (mkApps (Data intDc)
+                                                        [Left (Literal (IntLiteral (i'-1)))])
+                                          ,Left (valToTerm a)
+                                          ])
+                      _ -> Nothing
+                   _ -> Nothing
+  
+  -- - specialized permutations
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.reverse) -- :: Vec n a -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : aTy : _  <- tys
+      , [DC vecDc vArgs] <- args
+      -> case runExcept (tyNatSize tcm nTy) of
+           Right 0 -> reduce (mkVecNil vecDc aTy)
+           Right n
+             | (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+             , let (Just vecTc) = UniqMap.lookup vecTcNm tcm
+             , let [nilCon,consCon] = tyConDataCons vecTc
+             -> reduceWHNF $
+                mkApps (vecAppendPrim vecTcNm)
+                  [Right (LitTy (NumTy (n-1)))
+                  ,Right aTy
+                  ,Right (LitTy (NumTy 1))
+                  ,Left (mkApps (Prim pInfo)
+                                [Right (LitTy (NumTy (n-1)))
+                                ,Right aTy
+                                ,Left (Either.lefts vArgs !! 2)
+                                ])
+                  ,Left (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])
+                  ]
+           _ -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.transpose) -- :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : mTy : aTy : _ <- tys
+      , kn : xss : _ <- args
+      , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+      , DC _ vArgs <- xss
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      , Right m <- runExcept (tyNatSize tcm mTy)
+      -> case m of
+        0 -> let (Just vecTc)     = UniqMap.lookup vecTcNm tcm
+                 [nilCon,consCon] = tyConDataCons vecTc
+             in  reduce $
+                 mkVec nilCon consCon (mkTyConApp vecTcNm [mTy,aTy]) n
+                  (replicate (fromInteger n) (mkVec nilCon consCon aTy 0 []))
+        m' -> let (Just vecTc)     = UniqMap.lookup vecTcNm tcm
+                  [_,consCon] = tyConDataCons vecTc
+                  Just (consCoTy : _) = dataConInstArgTys consCon
+                                          [mTy,aTy,LitTy (NumTy (m'-1))]
+              in  reduceWHNF $
+                  mkApps (vecZipWithPrim vecTcNm)
+                         [ Right aTy
+                         , Right (mkTyConApp vecTcNm [LitTy (NumTy (m'-1)),aTy])
+                         , Right (mkTyConApp vecTcNm [mTy,aTy])
+                         , Right nTy
+                         , Left  (mkApps (Data consCon)
+                                         [Right mTy
+                                         ,Right aTy
+                                         ,Right (LitTy (NumTy (m'-1)))
+                                         ,Left (primCo consCoTy)
+                                         ])
+                         , Left  (Either.lefts vArgs !! 1)
+                         , Left  (mkApps (Prim pInfo)
+                                         [ Right nTy
+                                         , Right (LitTy (NumTy (m'-1)))
+                                         , Right aTy
+                                         , Left  (valToTerm kn)
+                                         , Left  (Either.lefts vArgs !! 2)
+                                         ])
+                         ]
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.rotateLeftS) -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | nTy : aTy : _ : _ <- tys
+      , kn : xs : d : _ <- args
+      , DC dc vArgs <- xs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0  -> reduce (mkVecNil dc aTy)
+           n' | DC snatDc [_,Left d'] <- d
+              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , mach2@Machine{mStack=[],mTerm=Literal (NaturalLiteral d2)} <- whnf eval tcm isSubj (setTerm d' $ stackClear mach)
+              -> case (d2 `mod` n) of
+                   0  -> reduce (valToTerm xs)
+                   d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
+                             (Just vecTc)     = UniqMap.lookup vecTcNm tcm
+                             [nilCon,consCon] = tyConDataCons vecTc
+                         in  reduceWHNF' mach2 $
+                             mkApps (Prim pInfo)
+                                    [Right nTy
+                                    ,Right aTy
+                                    ,Right (LitTy (NumTy (d3-1)))
+                                    ,Left (valToTerm kn)
+                                    ,Left (mkApps (vecAppendPrim vecTcNm)
+                                                  [Right (LitTy (NumTy (n'-1)))
+                                                  ,Right aTy
+                                                  ,Right (LitTy (NumTy 1))
+                                                  ,Left  (Either.lefts vArgs !! 2)
+                                                  ,Left  (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])])
+                                    ,Left (mkApps (Data snatDc)
+                                                  [Right (LitTy (NumTy (d3-1)))
+                                                  ,Left  (Literal (NaturalLiteral (d3-1)))])
+                                    ]
+           _  -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.rotateRightS) -- :: KnownNat n => Vec n a -> SNat d -> Vec n a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : aTy : _ : _ <- tys
+      , kn : xs : d : _ <- args
+      , DC dc _ <- xs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0  -> reduce (mkVecNil dc aTy)
+           n' | DC snatDc [_,Left d'] <- d
+              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , mach2@Machine{mStack=[],mTerm=Literal (NaturalLiteral d2)} <- whnf eval tcm isSubj (setTerm d' $ stackClear mach)
+              -> case (d2 `mod` n) of
+                   0  -> reduce (valToTerm xs)
+                   d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
+                         in  reduceWHNF' mach2 $
+                             mkApps (Prim pInfo)
+                                    [Right nTy
+                                    ,Right aTy
+                                    ,Right (LitTy (NumTy (d3-1)))
+                                    ,Left (valToTerm kn)
+                                    ,Left (mkVecCons dc aTy n
+                                            (mkApps (vecLastPrim vecTcNm)
+                                                    [Right (LitTy (NumTy (n'-1)))
+                                                    ,Right aTy
+                                                    ,Left  (valToTerm xs)])
+                                            (mkApps (vecInitPrim vecTcNm)
+                                                    [Right (LitTy (NumTy (n'-1)))
+                                                    ,Right aTy
+                                                    ,Left (valToTerm xs)]))
+                                    ,Left (mkApps (Data snatDc)
+                                                  [Right (LitTy (NumTy (d3-1)))
+                                                  ,Left  (Literal (NaturalLiteral (d3-1)))])
+                                    ]
+           _  -> Nothing
+  -- Element-wise operations
+  -- - mapping
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.map) -- :: (a -> b) -> Vec n a -> Vec n b
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , DC dc vArgs <- args !! 1
+      , aTy : bTy : nTy : _ <- tys
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0  -> reduce (mkVecNil dc bTy)
+           n' -> reduce $
+                 mkVecCons dc bTy n'
+                   (mkApps (valToTerm (args !! 0)) [Left (Either.lefts vArgs !! 1)])
+                   (mkApps (Prim pInfo)
+                                        [Right aTy
+                                        ,Right bTy
+                                        ,Right (LitTy (NumTy (n' - 1)))
+                                        ,Left (valToTerm (args !! 0))
+                                        ,Left (Either.lefts vArgs !! 2)])
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.imap) -- :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : aTy : bTy : _ <- tys
+      , (tyArgs,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+      , let (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 1)
+      , TyConApp indexTcNm _ <- tyView (Either.rights tyArgs' !! 0)
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      , let iLit = mkIndexLit (Either.rights tyArgs' !! 0) nTy n 0
+      -> reduceWHNF $
+         mkApps (Prim (PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm) WorkNever SingleResult NoUnfolding))
+                [Right nTy
+                ,Right nTy
+                ,Right aTy
+                ,Right bTy
+                ,Left (valToTerm (args !! 1))
+                ,Left (valToTerm (args !! 2))
+                ,Left iLit
+                ]
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Clash.Sized.Vector.imap_go"
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : mTy : aTy : bTy : _ <- tys
+      , f : xs : (Suspend nArg) : _ <- args
+      , DC dc vArgs <- xs
+      , Right n' <- runExcept (tyNatSize tcm nTy)
+      , Right m <- runExcept (tyNatSize tcm mTy)
+      -> case m of
+           0  -> reduce (mkVecNil dc bTy)
+           m'
+            | eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+            , mach1@Machine{mStack=[],mTerm=n} <-
+                whnf eval tcm True (setTerm nArg (stackClear mach))
+            ->  let (tyArgs,_) = splitFunForallTy ty
+                    TyConApp indexTcNm _ = tyView (Either.rights tyArgs !! 2)
+                    iLit = mkIndexLit (Either.rights tyArgs !! 2) nTy n' 1
+                 in Just $ flip setTerm (mach1 {mStack = mStack mach}) $ mkVecCons dc bTy m'
+                   (mkApps (valToTerm f) [Left n,Left (Either.lefts vArgs !! 1)])
+                   (mkApps (Prim pInfo)
+                           [Right nTy
+                           ,Right (LitTy (NumTy (m'-1)))
+                           ,Right aTy
+                           ,Right bTy
+                           ,Left (valToTerm f)
+                           ,Left (Either.lefts vArgs !! 2)
+                           ,Left (mkApps (Prim (PrimInfo (showt '(Clash.Sized.Internal.Index.+#)) (indexAddTy indexTcNm) WorkVariable SingleResult NoUnfolding))
+                                         [Right nTy
+                                         ,Left (Literal (NaturalLiteral n'))
+                                         ,Left n
+                                         ,Left iLit
+                                         ])
+                           ])
+            | otherwise
+            -> Nothing
+  
+    -- :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.iterateI)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , [nTy, aTy] <- tys
+      , [_n, f, a] <- args
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      ->
+        let
+          TyConApp vecTcNm _ = tyView (getResultTy tcm ty tys)
+          Just vecTc = UniqMap.lookup vecTcNm tcm
+          [nilCon, consCon] = tyConDataCons vecTc
+        in case n of
+           0 -> reduce (mkVecNil nilCon aTy)
+           _ -> reduce $
+            mkVecCons consCon aTy n
+              (valToTerm a)
+              (mkApps
+                (Prim pInfo)
+                [ Right (LitTy (NumTy (n - 1)))
+                , Right aTy
+                , Left (valToTerm (Lit (NaturalLiteral (n - 1))))
+                , Left (valToTerm f)
+                , Left (mkApps (valToTerm f) [Left (valToTerm a)])
+                ])
+  
+  -- - Zipping
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.zipWith) -- :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , aTy : bTy : cTy : nTy : _ <- tys
+      , f : xs : ys : _   <- args
+      , DC dc vArgs <- xs
+      , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0  -> reduce (mkVecNil dc cTy)
+           -- We share the function 'f' and the second vector 'ys' via heap
+           -- let-bindings instead of inlining 'valToTerm f' / 'valToTerm ys'
+           -- twice. See #3308.
+           n' ->
+             let (mach1, fId)  = newLetBinding tcm mach  (valToTerm f)
+                 (mach2, ysId) = newLetBinding tcm mach1 (valToTerm ys)
+             in reduceWith mach2 $ mkVecCons dc cTy n'
+                   (mkApps (Var fId)
+                              [Left (Either.lefts vArgs !! 1)
+                              ,Left (mkApps (vecHeadPrim vecTcNm)
+                                      [Right (LitTy (NumTy (n'-1)))
+                                      ,Right bTy
+                                      ,Left  (Var ysId)
+                                      ])
+                              ])
+                   (mkApps (Prim pInfo)
+                                        [Right aTy
+                                        ,Right bTy
+                                        ,Right cTy
+                                        ,Right (LitTy (NumTy (n' - 1)))
+                                        ,Left (Var fId)
+                                        ,Left (Either.lefts vArgs !! 2)
+                                        ,Left (mkApps (vecTailPrim vecTcNm)
+                                                      [Right (LitTy (NumTy (n'-1)))
+                                                      ,Right bTy
+                                                      ,Left (Var ysId)
+                                                      ])])
+  
+  -- Folding
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.foldr) -- :: (a -> b -> b) -> b -> Vec n a -> b
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , aTy : bTy : nTy : _ <- tys
+      , f : z : xs : _ <- args
+      , DC _ vArgs <- xs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0 -> reduce (valToTerm z)
+           _ -> reduceWHNF $
+                mkApps (valToTerm f)
+                       [Left (Either.lefts vArgs !! 1)
+                       ,Left (mkApps (Prim pInfo)
+                                     [Right aTy
+                                     ,Right bTy
+                                     ,Right (LitTy (NumTy (n-1)))
+                                     ,Left  (valToTerm f)
+                                     ,Left  (valToTerm z)
+                                     ,Left  (Either.lefts vArgs !! 2)
+                                     ])
+                       ]
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.fold) -- :: (a -> a -> a) -> Vec (n + 1) a -> a
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : aTy :  _ <- tys
+      , f : vs : _ <- args
+      , DC _ vArgs <- vs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0 -> reduceWHNF (Either.lefts vArgs !! 1)
+           _ -> let (tyArgs,_)         = splitFunForallTy ty
+                    TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 1)
+                    tupTcNm      = ghcTyconToTyConName (tupleTyCon Boxed 2)
+                    (Just tupTc) = UniqMap.lookup tupTcNm tcm
+                    [tupDc]      = tyConDataCons tupTc
+                    n'     = n+1
+                    m      = n' `div` 2
+                    n1     = n' - m
+                    mTy    = LitTy (NumTy m)
+                    m'ty   = LitTy (NumTy (m-1))
+                    n1mTy  = LitTy (NumTy n1)
+                    n1m'ty = LitTy (NumTy (n1-1))
+                    splitAtCall =
+                     mkApps (Prim (PrimInfo "Clash.Sized.Vector.fold_split" (foldSplitAtTy vecTcNm) WorkNever SingleResult NoUnfolding))
+                            [Right mTy
+                            ,Right n1mTy
+                            ,Right aTy
+                            ,Left (Literal (NaturalLiteral m))
+                            ,Left (valToTerm vs)
+                            ]
+                    mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
+                    n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
+                    -- Guaranteed no capture, so okay to use unsafe name generation
+                    asNm     = mkUnsafeSystemName "as" 0
+                    bsNm     = mkUnsafeSystemName "bs" 1
+                    asId     = mkLocalId mVecTy asNm
+                    bsId     = mkLocalId n1mVecTy bsNm
+                    tupPat   = DataPat tupDc [] [asId,bsId]
+                    asAlt    = (tupPat, (Var asId))
+                    bsAlt    = (tupPat, (Var bsId))
+                in  reduceWHNF $
+                    mkApps (valToTerm f)
+                           [Left (mkApps (Prim pInfo)
+                                         [Right m'ty
+                                         ,Right aTy
+                                         ,Left (valToTerm f)
+                                         ,Left (Case splitAtCall mVecTy [asAlt])
+                                         ])
+                           ,Left (mkApps (Prim pInfo)
+                                         [Right n1m'ty
+                                         ,Right aTy
+                                         ,Left  (valToTerm f)
+                                         ,Left  (Case splitAtCall n1mVecTy [bsAlt])
+                                         ])
+                           ]
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Clash.Sized.Vector.fold_split" -- :: Natural -> Vec (m + n) a -> (Vec m a, Vec n a)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , mTy : nTy : aTy : _ <- tys
+      , Right m <- runExcept (tyNatSize tcm mTy)
+      -> let -- Get the tuple data-constructor
+             ty1 = piResultTys tcm ty tys
+             (_,tyView -> TyConApp tupTcNm tyArgs@(tyArg:_)) = splitFunForallTy ty1
+             (Just tupTc)       = UniqMap.lookup tupTcNm tcm
+             [tupDc]            = tyConDataCons tupTc
+             -- Get the vector data-constructors
+             TyConApp vecTcNm _ = tyView tyArg
+             Just vecTc         = UniqMap.lookup vecTcNm tcm
+             [nilCon,consCon]   = tyConDataCons vecTc
+             -- Recursive call to @splitAt@
+             splitAtRec v =
+              mkApps (Prim pInfo)
+                     [Right (LitTy (NumTy (m-1)))
+                     ,Right nTy
+                     ,Right aTy
+                     ,Left (Literal (NaturalLiteral (m-1)))
+                     ,Left v
+                     ]
+             -- Projection either the first or second field of the recursive
+             -- call to @splitAt@
+             splitAtSelR v = Case (splitAtRec v)
+             m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
+             nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
+             -- Guaranteed no capture, so okay to use unsafe name generation
+             lNm     = mkUnsafeSystemName "l" 0
+             rNm     = mkUnsafeSystemName "r" 1
+             lId     = mkLocalId m1VecTy lNm
+             rId     = mkLocalId nVecTy rNm
+             tupPat  = DataPat tupDc [] [lId,rId]
+             lAlt    = (tupPat, (Var lId))
+             rAlt    = (tupPat, (Var rId))
+         in case m of
+           -- (Nil,v)
+           0 -> reduce $
+                mkApps (Data tupDc) $ (map Right tyArgs) ++
+                  [ Left (mkVecNil nilCon aTy)
+                  , Left (valToTerm (last args))
+                  ]
+           -- (x:xs) <- v
+           m' | DC _ vArgs <- last args
+              -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
+              -> reduce $
+                 mkApps (Data tupDc) $ (map Right tyArgs) ++
+                   [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
+                             (splitAtSelR (Either.lefts vArgs !! 2) m1VecTy [lAlt]))
+                   , Left (splitAtSelR (Either.lefts vArgs !! 2) nVecTy [rAlt])
+                   ]
+           -- v doesn't reduce to a data-constructor
+           _  -> Nothing
+  -- - Specialised folds
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.dfold)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , pTy : kTy : aTy : _ <- tys
+      , _ : p : f : z : xs : _ <- args
+      , DC _ vArgs <- xs
+      , Right k' <- runExcept (tyNatSize tcm kTy)
+      -> case k'  of
+           0 -> reduce (valToTerm z)
+           _ -> let (tyArgs,_)  = splitFunForallTy ty
+                    (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 2)
+                    Just (tvN, _) = List.uncons $ Either.lefts tyArgs'
+                    ubpT = Either.rights tyArgs' !! 0
+                    fTVs = Lens.toListOf typeFreeVars ubpT
+                    Just tvK = List.find (/= tvN) fTVs
+                    subst0 = extendTvSubst (mkSubst is0) tvN k'ty
+                    subst1 = extendTvSubst subst0 tvK (LitTy (NumTy k'))
+                    witness = normalizeType tcm (substTy subst1 ubpT)
+                    TyConApp tupTcNm _ = tyView witness
+                    Just witnessTc = UniqMap.lookup tupTcNm tcm
+                    ubp : _ = tyConDataCons witnessTc
+                    TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 1)
+                    Just snatTc = UniqMap.lookup snatTcNm tcm
+                    [snatDc]    = tyConDataCons snatTc
+                    k'ty        = LitTy (NumTy (k'-1))
+                in  reduceWHNF $
+                    mkApps (valToTerm f)
+                           [Right k'ty
+                           ,Left (Data ubp)
+                           ,Left (mkApps (Data snatDc)
+                                         [Right k'ty
+                                         ,Left (Literal (NaturalLiteral (k'-1)))])
+                           ,Left (Either.lefts vArgs !! 1)
+                           ,Left (mkApps (Prim pInfo)
+                                         [Right pTy
+                                         ,Right k'ty
+                                         ,Right aTy
+                                         ,Left (Literal (NaturalLiteral (k'-1)))
+                                         ,Left (valToTerm p)
+                                         ,Left (valToTerm f)
+                                         ,Left (valToTerm z)
+                                         ,Left (Either.lefts vArgs !! 2)
+                                         ])
+                           ]
+      | otherwise -> Nothing
+      where
+        is0 = mScopeNames mach
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.dtfold)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , pTy : kTy : aTy : _ <- tys
+      , _ : p : f : g : xs : _ <- args
+      , DC _ vArgs <- xs
+      , Right k' <- runExcept (tyNatSize tcm kTy)
+      -> case k' of
+           0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts vArgs !! 1)])
+           _ -> let (tyArgs,_)  = splitFunForallTy ty
+                    TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 4)
+                    (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
+                    TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
+                    Just snatTc = UniqMap.lookup snatTcNm tcm
+                    [snatDc]    = tyConDataCons snatTc
+                    tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
+                    (Just tupTc) = UniqMap.lookup tupTcNm tcm
+                    [tupDc]     = tyConDataCons tupTc
+                    k'ty        = LitTy (NumTy (k'-1))
+                    k2ty        = LitTy (NumTy (2^(k'-1)))
+                    splitAtCall =
+                     mkApps (splitAtPrim snatTcNm vecTcNm)
+                            [Right k2ty
+                            ,Right k2ty
+                            ,Right aTy
+                            ,Left (mkApps (Data snatDc)
+                                          [Right k2ty
+                                          ,Left (Literal (NaturalLiteral (2^(k'-1))))])
+                            ,Left (valToTerm xs)
+                            ]
+                    xsSVecTy = mkTyConApp vecTcNm [k2ty,aTy]
+                    -- Guaranteed no capture, so okay to use unsafe name generation
+                    xsLNm    = mkUnsafeSystemName "xsL" 0
+                    xsRNm    = mkUnsafeSystemName "xsR" 1
+                    xsLId    = mkLocalId k2ty xsLNm
+                    xsRId    = mkLocalId k2ty xsRNm
+                    tupPat   = DataPat tupDc [] [xsLId,xsRId]
+                    asAlt    = (tupPat, (Var xsLId))
+                    bsAlt    = (tupPat, (Var xsRId))
+                in  reduceWHNF $
+                    mkApps (valToTerm g)
+                           [Right k'ty
+                           ,Left (mkApps (Data snatDc)
+                                         [Right k'ty
+                                         ,Left (Literal (NaturalLiteral (k'-1)))])
+                           ,Left (mkApps (Prim pInfo)
+                                         [Right pTy
+                                         ,Right k'ty
+                                         ,Right aTy
+                                         ,Left (Literal (NaturalLiteral (k'-1)))
+                                         ,Left (valToTerm p)
+                                         ,Left (valToTerm f)
+                                         ,Left (valToTerm g)
+                                         ,Left (Case splitAtCall xsSVecTy [asAlt])])
+                           ,Left (mkApps (Prim pInfo)
+                                         [Right pTy
+                                         ,Right k'ty
+                                         ,Right aTy
+                                         ,Left (Literal (NaturalLiteral (k'-1)))
+                                         ,Left (valToTerm p)
+                                         ,Left (valToTerm f)
+                                         ,Left (valToTerm g)
+                                         ,Left (Case splitAtCall xsSVecTy [bsAlt])])
+                           ]
+  -- Misc
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.lazyV)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : aTy : _ <- tys
+      , _ : xs : _ <- args
+      , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0  -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
+                     [nilCon,_]   = tyConDataCons vecTc
+                 in  reduce (mkVecNil nilCon aTy)
+           n' -> let (Just vecTc) = UniqMap.lookup vecTcNm tcm
+                     [_,consCon]  = tyConDataCons vecTc
+                 in  reduce $ mkVecCons consCon aTy n'
+                       (mkApps (vecHeadPrim vecTcNm)
+                               [ Right (LitTy (NumTy (n' - 1)))
+                               , Right aTy
+                               , Left  (valToTerm xs)
+                               ])
+                       (mkApps (Prim pInfo)
+                               [ Right (LitTy (NumTy (n' - 1)))
+                               , Right aTy
+                               , Left  (Literal (NaturalLiteral (n'-1)))
+                               , Left  (mkApps (vecTailPrim vecTcNm)
+                                               [ Right (LitTy (NumTy (n'-1)))
+                                               , Right aTy
+                                               , Left  (valToTerm xs)
+                                               ])
+                               ])
+  -- Traversable
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.traverse#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , aTy : fTy : bTy : nTy : _ <- tys
+      , apDict : f : xs : _ <- args
+      , DC dc vArgs <- xs
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0 -> let (pureF,ids') = runPEM (mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 1) ids
+                in  reduceWHNF' (mach { mSupply = ids' }) $
+                    mkApps pureF
+                           [Right (mkTyConApp (vecTcNm) [nTy,bTy])
+                           ,Left  (mkVecNil dc bTy)]
+           _ -> let ((fmapF,apF),ids') = flip runPEM ids $ do
+                      fDict  <- mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 0
+                      fmapF' <- mkSelectorCase $(curLoc) is0 tcm fDict 1 0
+                      apF'   <- mkSelectorCase $(curLoc) is0 tcm (valToTerm apDict) 1 2
+                      return (fmapF',apF')
+                    n'ty = LitTy (NumTy (n-1))
+                    Just (consCoTy : _) = dataConInstArgTys dc [nTy,bTy,n'ty]
+                in  reduceWHNF' (mach { mSupply = ids' }) $
+                    mkApps apF
+                           [Right (mkTyConApp vecTcNm [n'ty,bTy])
+                           ,Right (mkTyConApp vecTcNm [nTy,bTy])
+                           ,Left (mkApps fmapF
+                                         [Right bTy
+                                         ,Right (mkFunTy (mkTyConApp vecTcNm [n'ty,bTy])
+                                                         (mkTyConApp vecTcNm [nTy,bTy]))
+                                         ,Left (mkApps (Data dc)
+                                                       [Right nTy
+                                                       ,Right bTy
+                                                       ,Right n'ty
+                                                       ,Left (primCo consCoTy)])
+                                         ,Left (mkApps (valToTerm f)
+                                                       [Left (Either.lefts vArgs !! 1)])
+                                         ])
+                           ,Left (mkApps (Prim pInfo)
+                                         [Right aTy
+                                         ,Right fTy
+                                         ,Right bTy
+                                         ,Right n'ty
+                                         ,Left (valToTerm apDict)
+                                         ,Left (valToTerm f)
+                                         ,Left (Either.lefts vArgs !! 2)
+                                         ])
+                           ]
+      | otherwise -> Nothing
+      where
+        (tyArgs,_)         = splitFunForallTy ty
+        TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 2)
+        (ids, is0) = (mSupply mach, mScopeNames mach)
+  
+  -- BitPack
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.concatBitVector#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : mTy : _ <- tys
+      , _  : km  : v : _ <- args
+      , DC _ vArgs <- v
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0  -> let resTyInfo = extractTySizeInfo tcm ty tys
+                 in  reduce (mkBitVectorLit' resTyInfo 0 0)
+           n' | Right m <- runExcept (tyNatSize tcm mTy)
+              , (_,tyView -> TyConApp bvTcNm _) <- splitFunForallTy ty
+              -> reduceWHNF $
+                 mkApps (bvAppendPrim bvTcNm)
+                   [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
+                   , Right mTy
+                   , Left (Literal (NaturalLiteral ((n'-1)*m)))
+                   , Left (Either.lefts vArgs !! 1)
+                   , Left (mkApps (Prim pInfo)
+                                  [ Right (LitTy (NumTy (n'-1)))
+                                  , Right mTy
+                                  , Left (Literal (NaturalLiteral (n'-1)))
+                                  , Left (valToTerm km)
+                                  , Left (Either.lefts vArgs !! 2)
+                                  ])
+                   ]
+           _ -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'Clash.Sized.Vector.unconcatBitVector#)
+  , \PrimEnv{..} -> case () of { _
+      | isSubj
+      , nTy : mTy : _  <- tys
+      , _  : km  : bv : _ <- args
+      , (_,tyView -> TyConApp vecTcNm [_,bvMTy]) <- splitFunForallTy ty
+      , TyConApp bvTcNm _ <- tyView bvMTy
+      , Right n <- runExcept (tyNatSize tcm nTy)
+      -> case n of
+           0 ->
+            let (Just vecTc) = UniqMap.lookup vecTcNm tcm
+                [nilCon,_] = tyConDataCons vecTc
+            in  reduce (mkVecNil nilCon (mkTyConApp bvTcNm [mTy]))
+           n' | Right m <- runExcept (tyNatSize tcm mTy) ->
+            let Just vecTc  = UniqMap.lookup vecTcNm tcm
+                [_,consCon] = tyConDataCons vecTc
+                tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
+                Just tupTc  = UniqMap.lookup tupTcNm tcm
+                [tupDc]     = tyConDataCons tupTc
+                splitCall   =
+                  mkApps (bvSplitPrim bvTcNm)
+                         [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
+                         , Right mTy
+                         , Left (Literal (NaturalLiteral ((n'-1)*m)))
+                         , Left (valToTerm bv)
+                         ]
+                mBVTy       = mkTyConApp bvTcNm [mTy]
+                n1BVTy      = mkTyConApp bvTcNm
+                                [mkTyConApp typeNatMul
+                                  [LitTy (NumTy (n'-1))
+                                  ,mTy]]
+                -- Guaranteed no capture, so okay to use unsafe name generation
+                xNm         = mkUnsafeSystemName "x" 0
+                bvNm        = mkUnsafeSystemName "bv'" 1
+                xId         = mkLocalId mBVTy xNm
+                bvId        = mkLocalId n1BVTy bvNm
+                tupPat      = DataPat tupDc [] [xId,bvId]
+                xAlt        = (tupPat, (Var xId))
+                bvAlt       = (tupPat, (Var bvId))
+  
+            in  reduce $ mkVecCons consCon (mkTyConApp bvTcNm [mTy]) n'
+                  (Case splitCall mBVTy [xAlt])
+                  (mkApps (Prim pInfo)
+                          [ Right (LitTy (NumTy (n'-1)))
+                          , Right mTy
+                          , Left (Literal (NaturalLiteral (n'-1)))
+                          , Left (valToTerm km)
+                          , Left (Case splitCall n1BVTy [bvAlt])
+                          ])
+           _ -> Nothing
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "Data.Text.Show.$wunpackCStringAscii#"
+  , \PrimEnv{..} -> case () of { _
+      | [Lit (StringLiteral addr)] <- args
+      , Text.Text (Text.ByteArray ba) _off len <- Text.pack addr
+      -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+             (Just tupTc) = UniqMap.lookup tupTcNm tcm
+             [tupDc] = tyConDataCons tupTc
+             ret     = mkApps (Data tupDc) (map Right tyArgs ++
+                      [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
+                      , Left (Literal (IntLiteral 0))
+                      , Left (Literal (IntLiteral (toInteger len)))])
+          in reduce ret
+    -- XXX: Does not seem to exist?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Magic.noinlineConstraint"
+  , \PrimEnv{..} -> case () of { _
+      | [arg] <- args
+      -> reduce (valToTerm arg)
+      | otherwise -> Nothing
+  }
+  )
+  , ( $(nameFS 'GHC.TypeNats.withSomeSNat)
+  , \PrimEnv{..} -> case () of { _
+      | Lit (NaturalLiteral n) : fun : _ <- args
+      , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
+      , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
+      , Just snatTc <- UniqMap.lookup snatTcNm tcm
+      , [snatDc] <- tyConDataCons snatTc
+      -> let nTy = LitTy (NumTy n)
+             snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+             ret = mkApps (valToTerm fun) [Right nTy, Left snat]
+          in reduce ret
+    -- XXX: Does not seem to exist?
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Magic.nospec"
+  , \PrimEnv{..} -> case () of { _
+      | [arg] <- args
+      -> reduce (valToTerm arg)
+      | otherwise -> Nothing
+  }
+  )
+  , ( fsLit "GHC.Float.$wproperFractionDouble"
+  , \PrimEnv{..} -> case () of { _
+      | _ : Lit (DoubleLiteral d) : _ <- args
+      , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
+      , nameOcc signedTcNm == showt ''Signed
+      , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , Just tupTc <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
+             ret = mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left (mkSignedLit sty nTy kn sn)
+                    , Left (mkDoubleCLit tcm (castDoubleToWord64 d1) (last tyArgs))
+                    ])
+          in reduce ret
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
+        op _ = properFraction
+  }
+  )
+  , ( fsLit "GHC.Internal.Float.$wproperFractionDouble"
+  , \PrimEnv{..} -> case () of { _
+      | _ : Lit (DoubleLiteral d) : _ <- args
+      , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
+      , nameOcc signedTcNm == showt ''Clash.Sized.Internal.Signed.Signed
+      , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+      , Just tupTc <- UniqMap.lookup tupTcNm tcm
+      , [tupDc] <- tyConDataCons tupTc
+      -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
+             ret = mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left (mkSignedLit sty nTy kn sn)
+                    , Left (mkDoubleCLit tcm (castDoubleToWord64 d1) (last tyArgs))
+                    ])
+          in reduce ret
+      | otherwise -> Nothing
+      where
+        op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
+        op _ = properFraction
+  }
+  )
+  ]
 
 -- Helper functions for literals
 

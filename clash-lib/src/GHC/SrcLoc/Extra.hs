@@ -12,6 +12,7 @@ module GHC.SrcLoc.Extra where
 
 import Data.Binary
 import Data.Hashable                        (Hashable (..))
+import GHC.BasicTypes.Extra                 ()
 import GHC.Generics
 import GHC.Types.SrcLoc
   (SrcSpan (..), RealSrcLoc, RealSrcSpan, BufSpan (..), BufPos (..), UnhelpfulSpanReason (..),
@@ -19,7 +20,11 @@ import GHC.Types.SrcLoc
    realSrcSpanStart, realSrcSpanEnd,
    srcLocFile, srcLocLine, srcLocCol,
    srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
+#if MIN_VERSION_ghc(9,8,0)
+import GHC.Data.FastString (FastString (..))
+#else
 import GHC.Data.FastString (FastString (..), bytesFS, mkFastStringByteList)
+#endif
 import qualified GHC.Data.Strict
 
 deriving instance Generic (GHC.Data.Strict.Maybe a)
@@ -46,9 +51,12 @@ instance Binary RealSrcLoc where
   put r = put (srcLocFile r, srcLocLine r, srcLocCol r)
   get = (\(file,line,col) -> mkRealSrcLoc file line col) <$> get
 
+-- GHC >=9.8 derives this from 'GHC.Data.FastString' via 'GHC.BasicTypes.Extra'.
+#if !MIN_VERSION_ghc(9,8,0)
 instance Binary FastString where
-  put str = put $ bytesFS str
+  put str = put (bytesFS str)
   get = mkFastStringByteList <$> get
+#endif
 
 deriving instance Generic BufPos
 instance Binary BufPos
