@@ -117,6 +117,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Class.BitPack.BitIndex (replaceBit)
+import Clash.Magic                 (clashSimulation)
 import Clash.Sized.Internal       (formatRange)
 import Clash.Sized.Internal.CheckedLiterals
   ( PotentiallyOutOfBounds
@@ -219,6 +220,9 @@ unpack# bv = undefError "Index.unpack" [bv]
 maybeUnpack# :: forall n. KnownNat n => BitVector (CLogWZ 2 n 0) -> Maybe (Index n)
 maybeUnpack# bv
   | bound == 0 = Nothing
+  | clashSimulation
+  , BV mask _ <- bv
+  , mask > 0 = undefError "Index.maybeUnpack" [bv]
   | bv <= maxBoundBV = Just (unpack# bv)
   | otherwise = Nothing
  where
