@@ -11,6 +11,7 @@
 
 module MaybeUnpackDerivation where
 
+import           Data.Maybe                             (isNothing)
 import           GHC.Generics                           (Generic)
 
 import           Clash.Annotations.BitRepresentation    (ConstrRepr(..), DataReprAnn(..), liftQ)
@@ -48,15 +49,15 @@ data Wrapped = Wrapped Bool Color
   #-}
 deriveBitPack [t| Wrapped |]
 
-wasNothing :: Maybe a -> Bool
-wasNothing Nothing = True
-wasNothing (Just _) = False
-
 topEntity
   :: SystemClockResetEnable
   => Signal System (BitVector 3)
-  -> Signal System Bool
-topEntity = fmap (wasNothing . maybeUnpack @Wrapped)
+  -> Signal System (Bool, Maybe Wrapped)
+topEntity = fmap decode
+ where
+  decode bv = (isNothing decoded, decoded)
+   where
+    decoded = maybeUnpack @Wrapped bv
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool
@@ -67,17 +68,20 @@ testBench = done'
     stimuliGenerator $
       0 :> 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil
 
-  expectedOutput :: SystemClockResetEnable => Signal System Bool -> Signal System Bool
+  expectedOutput
+    :: SystemClockResetEnable
+    => Signal System (Bool, Maybe Wrapped)
+    -> Signal System Bool
   expectedOutput =
     outputVerifier' $
-      False
-      :> False
-      :> False
-      :> True
-      :> False
-      :> False
-      :> False
-      :> True
+      (False, Just (Wrapped False Red))
+      :> (False, Just (Wrapped False Green))
+      :> (False, Just (Wrapped False Blue))
+      :> (True, Nothing)
+      :> (False, Just (Wrapped True Red))
+      :> (False, Just (Wrapped True Green))
+      :> (False, Just (Wrapped True Blue))
+      :> (True, Nothing)
       :> Nil
 
   done :: SystemClockResetEnable => Signal System Bool

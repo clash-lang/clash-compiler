@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
@@ -78,6 +79,29 @@ maybeUnpackIndex4 :: Assertion
 maybeUnpackIndex4 =
   maybeUnpack @(Index 4) (maxBound :: BitVector (BitSize (Index 4))) @?= Just 3
 
+maybeUnpackCharMaxBound :: Assertion
+maybeUnpackCharMaxBound =
+  maybeUnpack @Char (0x10ffff :: BitVector (BitSize Char)) @?= Just maxBound
+
+maybeUnpackCharOutOfRange :: Assertion
+maybeUnpackCharOutOfRange =
+  maybeUnpack @Char (0x110000 :: BitVector (BitSize Char)) @?= Nothing
+
+maybeUnpackVec0 :: Assertion
+maybeUnpackVec0 =
+  maybeUnpack @(Vec 0 (Index 3)) 0 @?= Just Nil
+
+maybeUnpackVec2 :: Assertion
+maybeUnpackVec2 = do
+  maybeUnpack @(Vec 2 (Index 3)) 0b00_10 @?= Just (0 :> 2 :> Nil)
+  maybeUnpack @(Vec 2 (Index 3)) 0b11_00 @?= Nothing
+
+maybeUnpackPair :: Assertion
+maybeUnpackPair = do
+  let pair = (1 :: Index 3, 2 :: Unsigned 2)
+  maybeUnpack (pack pair) @?= Just pair
+  maybeUnpack @(Index 3, Unsigned 2) 0b11_01 @?= Nothing
+
 maybeUnpackIndex4All :: Assertion
 maybeUnpackIndex4All =
   assertMaybeUnpackTable @(Index 4)
@@ -154,6 +178,29 @@ maybeUnpackWrappedIndexAll =
     :> Nothing
     :> Nil )
 
+maybeUnpackTuple4All :: Assertion
+maybeUnpackTuple4All =
+  assertMaybeUnpackTable @(Index 3, Index 3, Index 3, Index 3)
+    ( 0b00_01_10_00
+    :> 0b11_01_10_00
+    :> 0b00_11_10_00
+    :> 0b00_01_11_00
+    :> 0b00_01_10_11
+    :> Nil )
+    ( Just (0, 1, 2, 0)
+    :> Nothing
+    :> Nothing
+    :> Nothing
+    :> Nothing
+    :> Nil )
+
+packTuple4Layout :: Assertion
+packTuple4Layout =
+  pack ((0, 1, 2, 0) :: (Index 3, Index 3, Index 3, Index 3))
+    @?= ( 0b00_01_10_00
+          :: BitVector (BitSize (Index 3, Index 3, Index 3, Index 3))
+        )
+
 tests :: TestTree
 tests =
   testGroup
@@ -182,11 +229,18 @@ tests =
         , testCase "Index 1 accepts its only bit pattern" maybeUnpackIndex1
         , testCase "Index 3 rejects out-of-range bit patterns" maybeUnpackIndex3
         , testCase "Index 4 accepts its full state space" maybeUnpackIndex4
+        , testCase "Char accepts its maximum code point" maybeUnpackCharMaxBound
+        , testCase "Char rejects out-of-range code points" maybeUnpackCharOutOfRange
+        , testCase "Empty Vec accepts its only bit pattern" maybeUnpackVec0
+        , testCase "Vec propagates element validity and payloads" maybeUnpackVec2
+        , testCase "Pairs propagate field validity and payloads" maybeUnpackPair
         , testCase "Index 4 accepts every bit pattern in its state space" maybeUnpackIndex4All
         , testCase "Index 5 only accepts in-range bit patterns" maybeUnpackIndex5All
         , testCase "Generic sums reject unused constructor tags" maybeUnpackBigSumAll
         , testCase "Generic propagation returns Nothing for invalid Index fields" maybeUnpackWrappedIndex
         , testCase "Generic propagation only rejects wrapped invalid Index fields" maybeUnpackWrappedIndexAll
+        , testCase "Tuples reject an invalid field at every position" maybeUnpackTuple4All
+        , testCase "Balanced tuple packing preserves field order" packTuple4Layout
         ]
     , testCase "undefSpineVec" undefSpineVec
     , testCase "undefSpineRTree" undefSpineRTree
