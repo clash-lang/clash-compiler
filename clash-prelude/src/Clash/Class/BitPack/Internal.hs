@@ -521,7 +521,11 @@ instance BitPack Char where
   type BitSize Char = 21
   pack        = packXWith packChar#
   unpack      = checkUnpackUndef unpackChar#
-  maybeUnpack = Just . unpack
+  maybeUnpack bv
+    | bv <= maxCharBV = Just (unpack bv)
+    | otherwise = Nothing
+   where
+    maxCharBV = packChar# maxBound
 
 packChar# :: Char -> BitVector 21
 packChar# = fromIntegral . ord
