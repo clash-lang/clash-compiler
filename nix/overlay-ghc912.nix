@@ -21,9 +21,6 @@ in
   # An ipv6 test fails on CI. Most likely due to missing kernel support?
   network = dontCheck prev.network;
 
-  # Marked broken and bounds exclude newer GHC. But seems to work fine.
-  derive-storable-plugin = doJailbreak (markUnbroken prev.derive-storable-plugin);
-
   # The nixpkgs singletons stack for this package set still pulls a th-desugar
   # release with pre-9.12 template-haskell bounds.
   singletons-base = dontCheck (prev.callHackage "singletons-base" "3.5" { });

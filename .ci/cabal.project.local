@@ -23,15 +23,6 @@ package clash-ghc
   ghc-options: -Werror
   flags: -workaround-ghc-mmap-crash
 
-package clash-cosim
-  ghc-options: -Werror
-  tests: True
-
-  -- clash-cosim unittests fail with dynamic executables because of a bug in
-  -- Cabal-the-library in combination with custom setup where the library path
-  -- is not added to the RPATH
-  executable-dynamic: False
-
 package clash-prelude-hedgehog
   ghc-options: -Werror
   tests: True
@@ -42,8 +33,7 @@ package clash-lib-hedgehog
 
 package clash-testsuite
   ghc-options: -Werror
-  -- enable cosim
-  flags: +cosim -workaround-ghc-mmap-crash
+  flags: -workaround-ghc-mmap-crash
 
 package clash-benchmark
   ghc-options: -Werror

@@ -495,12 +495,6 @@ runClashTest = defaultMain
         [ runTest "MAC" def{hdlSim=[]}
         , runTest "CBlockRamTest" def{hdlSim=[]}
         ]
-#ifdef COSIM
-      , clashTestGroup "CoSim"
-        [ runTest "Multiply" def{hdlTargets=[Verilog]}
-        , runTest "Register" def{hdlTargets=[Verilog]}
-        ]
-#endif
       , clashTestGroup "CustomReprs"
         [ clashTestGroup "RotateC"
           [ runTest "RotateC" def
