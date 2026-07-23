@@ -113,6 +113,7 @@ import qualified Data.Foldable1   as F1
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Kind                  (Type)
+import Data.Maybe                 (isJust, fromJust)
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons            (TyFun,Apply,type (@@))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
@@ -2642,7 +2643,17 @@ instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
   pack        = concatBitVector# . map pack . lazyV
   unpack      = map unpack . unconcatBitVector#
-  maybeUnpack = sequenceA . map maybeUnpack . unconcatBitVector#
+  maybeUnpack bv =
+    case compareSNat (SNat @n) (SNat @0) of
+      SNatLE -> Just unpacked
+      SNatGT -> leToPlus @1 @n $
+        if fold (&&) (map isJust decoded)
+          then Just unpacked
+          else Nothing
+   where
+    decoded :: Vec n (Maybe a)
+    decoded = map maybeUnpack (unconcatBitVector# bv)
+    unpacked = map fromJust decoded
 
 concatBitVector#
   :: forall n m
