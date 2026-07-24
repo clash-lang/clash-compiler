@@ -319,6 +319,7 @@ Library
 
                       -- Used in clash-ghc
                       GHC.BasicTypes.Extra
+                      GHC.Data.FastString.Extra
 
   Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.List.Extra
