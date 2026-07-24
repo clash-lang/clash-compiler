@@ -378,20 +378,19 @@ coreTypeToHWType
   -- ^ Type to convert to HWType
   -> State HWMap (Either String FilteredHWType)
 coreTypeToHWType builtInTranslation reprs m ty = do
-  htyM <- Map.lookup ty <$> get
+  htyM <- HashMap.lookup (StructuralType ty) <$> get
   case htyM of
     Just hty -> return hty
     _ -> do
       hty0M <- builtInTranslation reprs m ty
       hty1  <- go hty0M ty
-      modify (Map.insert ty hty1)
+      modify (HashMap.insert (StructuralType ty) hty1)
       return hty1
  where
   -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
   go :: Maybe (Either String FilteredHWType)
      -> Type
-     -> State (Map Type (Either String FilteredHWType))
-              (Either String FilteredHWType)
+     -> State HWMap (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
   -- Strip transparant types:
   go _ (coreView1 m -> Just ty') =

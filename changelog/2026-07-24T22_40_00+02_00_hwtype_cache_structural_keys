@@ -1,0 +1,1 @@
+CHANGED: The Core-type to HWType translation cache is now keyed on structural type equality instead of alpha-equivalence, whose comparisons computed the free variables of both types on every cache lookup. On large designs this removes a significant share of normalization time.

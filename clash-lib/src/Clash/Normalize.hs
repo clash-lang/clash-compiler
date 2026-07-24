@@ -133,7 +133,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   0
                   (IntMap.empty, 0)
                   emptyVarEnv
-                  Map.empty    -- hwTypeCache
+                  mempty       -- hwTypeCache
                   normState
 
     normState = NormalizeState

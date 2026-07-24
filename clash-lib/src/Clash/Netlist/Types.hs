@@ -71,8 +71,9 @@ import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
 import Clash.Core.PartialEval               (Evaluator)
-import Clash.Core.Type                      (Type)
-import Clash.Core.Var                       (Id)
+import Clash.Core.Subst                     (eqType)
+import Clash.Core.Type                      (Type (..))
+import Clash.Core.Var                       (Id, varUniq)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types
@@ -129,7 +130,34 @@ newtype NetlistMonad a =
   deriving newtype (Functor, Monad, Applicative, MonadReader NetlistEnv,
                     Strict.MonadState NetlistState, Strict.MonadIO, MonadFail)
 
-type HWMap = Map Type (Either String FilteredHWType)
+-- | Cache for Core-type to 'HWType' translation, keyed structurally. See
+-- 'StructuralType'.
+type HWMap = HashMap StructuralType (Either String FilteredHWType)
+
+-- | A 'Type' keyed for cache lookups: 'Eq' and 'Hashable' compare types
+-- structurally instead of up to alpha-equivalence. Alpha-comparison computes
+-- the free variables of both types on every comparison, which dominated the
+-- cost of 'HWMap' lookups. Types that differ only in the names of bound
+-- variables get separate — but semantically identical — cache entries, which
+-- is harmless for a cache.
+newtype StructuralType = StructuralType Type
+
+instance Eq StructuralType where
+  StructuralType t1 == StructuralType t2 = eqType t1 t2
+
+instance Hashable StructuralType where
+  hashWithSalt salt0 (StructuralType ty0) = go salt0 ty0
+   where
+    go s ty = case ty of
+      VarTy v -> s `hashWithSalt` (0 :: Int) `hashWithSalt` varUniq v
+      ConstTy c -> s `hashWithSalt` (1 :: Int) `hashWithSalt` c
+      ForAllTy v t -> go (s `hashWithSalt` (2 :: Int) `hashWithSalt` varUniq v) t
+      AppTy t1 t2 -> go (go (s `hashWithSalt` (3 :: Int)) t1) t2
+      LitTy l -> s `hashWithSalt` (4 :: Int) `hashWithSalt` l
+      -- Attributes take part in 'eqType' but are left out of the hash: equal
+      -- types must hash equally, and the rare collision between types that
+      -- differ only in their attributes is resolved through 'Eq'.
+      AnnType _ t -> go (s `hashWithSalt` (5 :: Int)) t
 
 -- | See 'is_freshCache'
 type FreshCache = HashMap Text (IntMap Word)
