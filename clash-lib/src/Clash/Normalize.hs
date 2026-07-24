@@ -403,11 +403,15 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
    if not (isNoInline inl) && isCheapFunction newExpr
       then do
          let (toInline',allUsed') = unzip (map goCheap allUsed)
-             subst' = extendGblSubstList (mkSubst emptyInScopeSet)
-                                         (Maybe.catMaybes toInline')
-         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
-         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
-         return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
+         case Maybe.catMaybes toInline' of
+           -- Nothing to inline: substituting and re-running the flatten
+           -- strategy would be working on an unchanged expression.
+           [] -> return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
+           toInline1 -> do
+             let subst' = extendGblSubstList (mkSubst emptyInScopeSet) toInline1
+             let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
+             newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
+             return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   -- The flattening strategy is described in Clash.Normalize.Strategy.Spec.
