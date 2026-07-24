@@ -11,6 +11,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -55,6 +56,7 @@ import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
 import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 
+import GHC.Data.FastString            (fsLit)
 import GHC.Types.SrcLoc               (SrcSpan, noSrcSpan)
 
 import Clash.Data.UniqMap (UniqMap)
@@ -81,6 +83,12 @@ instance Exception.Exception ClashException
 -- | Construct a string pattern match out of the given @TemplateHaskell@ name
 namePat :: TH.Name -> TH.Q TH.Pat
 namePat = return . TH.LitP . TH.StringL . show
+
+-- | Like 'fsLit', but used with a TemplateHaskell name. As a TemplateHaskell
+-- expression itself to make sure GHC can optimize the call.
+fsNameLit :: TH.Name -> TH.Q TH.Exp
+fsNameLit nm =
+  TH.appE (TH.varE 'fsLit) (TH.litE (TH.stringL (show nm)))
 
 assertPanic
   :: String -> Int -> a
