@@ -26,6 +26,7 @@ import Control.Monad.Trans.Except (runExcept)
 import qualified Data.Either as Either
 import qualified Data.List as List
 import qualified Data.List.Extra as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Maybe (fromMaybe, listToMaybe)
 import GHC.Stack (HasCallStack)
@@ -56,28 +57,33 @@ import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
 --
 -- TODO: check further speed improvements:
 --
--- 1. Store the processed binders in a `Map Expr LetBinding`:
---    * Trades O(1) `cons` and O(n)*aeqTerm `find` for:
---    * O(log n)*aeqTerm `insert` and O(log n)*aeqTerm `lookup`
--- 2. Store the processed binders in a `AEQTrie Expr LetBinding`
---    * Trades O(1) `cons` and O(n)*aeqTerm `find` for:
+-- 1. Store the processed binders in a `AEQTrie Expr LetBinding`
+--    * Trades O(log n)*acmpTerm `insert` and `lookup` for:
 --    * O(e) `insert` and O(e) `lookup`
 reduceBinders
   :: Subst
   -> [LetBinding]
   -> [LetBinding]
   -> NormalizeSession (Subst, [LetBinding])
-reduceBinders !subst processed [] = return (subst,processed)
-reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
-  | (_,_,ticks) <- collectArgsTicks e
-  , NoDeDup `notElem` ticks
-  , Just (i1,_) <- List.find ((== e) . snd) processed
-  = do
-    let subst1 = extendIdSubst subst i (Var i1)
-    setChanged
-    reduceBinders subst1 processed rest
-  | otherwise
-  = reduceBinders subst ((i,e):processed) rest
+reduceBinders subst0 processed0 =
+  go subst0 (Map.fromList [(e, i) | (i, e) <- reverse processed0]) processed0
+ where
+  -- The index maps a processed binding's RHS to its binder, keyed on
+  -- alpha-equivalence ('Ord' on 'Term'). It replaces a linear scan over the
+  -- processed bindings that did an alpha-equivalence comparison per entry.
+  -- Later insertions shadow earlier ones, like the head-first linear scan
+  -- they replace did.
+  go !subst _index processed [] = return (subst,processed)
+  go !subst index processed ((i,substTm "reduceBinders" subst -> e):rest)
+    | (_,_,ticks) <- collectArgsTicks e
+    , NoDeDup `notElem` ticks
+    , Just i1 <- Map.lookup e index
+    = do
+      let subst1 = extendIdSubst subst i (Var i1)
+      setChanged
+      go subst1 index processed rest
+    | otherwise
+    = go subst (Map.insert e i index) ((i,e):processed) rest
 {-# SCC reduceBinders #-}
 
 reduceConst :: TransformSpec
