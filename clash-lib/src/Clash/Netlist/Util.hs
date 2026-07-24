@@ -49,7 +49,6 @@ import           Data.List               (unzip4, partition)
 import qualified Data.List               as List
 import           Data.List.NonEmpty      (NonEmpty((:|)))
 import qualified Data.Map                as Map
-import           Data.Map                (Map)
 import           Data.Maybe
   (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
 import           Text.Printf             (printf)
