@@ -57,6 +57,7 @@ import GHC.Stack                      (HasCallStack, callStack, prettyCallStack)
 import Type.Reflection                (tyConPackage, typeRepTyCon, typeOf)
 import qualified Language.Haskell.TH  as TH
 
+import GHC.Data.FastString            (fsLit)
 import GHC.Types.SrcLoc               (SrcSpan, noSrcSpan)
 
 import Clash.Data.UniqMap (UniqMap)
@@ -89,6 +90,12 @@ namePat = return . TH.LitP . TH.StringL . show
 textNameLit :: TH.Name -> TH.Q TH.Exp
 textNameLit nm =
   TH.appE (TH.varE 'Text.pack) (TH.litE (TH.stringL (show nm)))
+
+-- | Like 'fsLit', but used with a TemplateHaskell name. As a TemplateHaskell
+-- expression itself to make sure GHC can optimize the call.
+fsNameLit :: TH.Name -> TH.Q TH.Exp
+fsNameLit nm =
+  TH.appE (TH.varE 'fsLit) (TH.litE (TH.stringL (show nm)))
 
 assertPanic
   :: String -> Int -> a
