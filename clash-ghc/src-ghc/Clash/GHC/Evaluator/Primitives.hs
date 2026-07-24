@@ -26,11 +26,8 @@
 
 #include "MachDeps.h"
 
-module Clash.GHC.Evaluator.Primitive
-  ( ghcPrimStep
-  , ghcPrimUnwind
-  , isUndefinedPrimVal
-  , isUndefinedXPrimVal
+module Clash.GHC.Evaluator.Primitives
+  ( ghcPrimStepImpls
   ) where
 
 import           Control.DeepSeq            (force)
@@ -151,101 +148,67 @@ import qualified GHC.Num.Integer
 import qualified GHC.PrimopWrappers
 #endif
 
-import Clash.GHC.Evaluator.Primitive.Util
-import Clash.GHC.Evaluator.Primitives (ghcPrimStepImpls)
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving as Clash.Annotations.BitRepresentation.Deriving
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Class.BitPack.Internal as Clash.Class.BitPack.Internal
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Class.Exp as Clash.Class.Exp
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Promoted.Nat as Clash.Promoted.Nat
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.BitVector as Clash.Sized.Internal.BitVector
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Index as Clash.Sized.Internal.Index
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Signed as Clash.Sized.Internal.Signed
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Unsigned as Clash.Sized.Internal.Unsigned
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.RTree as Clash.Sized.RTree
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Vector as Clash.Sized.Vector
+import qualified Clash.GHC.Evaluator.Primitives.Data.Singletons.TypeLits.Internal as Data.Singletons.TypeLits.Internal
+import qualified Clash.GHC.Evaluator.Primitives.Data.Text.Show as Data.Text.Show
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Base as GHC.Base
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Classes as GHC.Classes
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Float as GHC.Float
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Int as GHC.Int
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Internal.Float as GHC.Internal.Float
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Internal.Real as GHC.Internal.Real
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Magic as GHC.Magic
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Num as GHC.Num
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Num.BigNat as GHC.Num.BigNat
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Num.Integer as GHC.Num.Integer
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Num.Natural as GHC.Num.Natural
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Prim as GHC.Prim
+import qualified Clash.GHC.Evaluator.Primitives.GHC.PrimopWrappers as GHC.PrimopWrappers
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Real as GHC.Real
+import qualified Clash.GHC.Evaluator.Primitives.GHC.TypeLits as GHC.TypeLits
+import qualified Clash.GHC.Evaluator.Primitives.GHC.TypeNats as GHC.TypeNats
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Types as GHC.Types
+import qualified Clash.GHC.Evaluator.Primitives.GHC.Word as GHC.Word
 
-isUndefinedPrimVal :: Value -> Bool
-isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` undefinedPrims
-isUndefinedPrimVal _ = False
-
-isUndefinedXPrimVal :: Value -> Bool
-isUndefinedXPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` undefinedXPrims
-isUndefinedXPrimVal _ = False
-
--- | Evaluation of primitive operations.
-ghcPrimUnwind :: PrimUnwind
-ghcPrimUnwind tcm p tys vs v [] m
-  | primName p `elem` [ showt 'Clash.Sized.Internal.Index.fromInteger#
-                       , showt 'GHC.CString.unpackCString#
-                       , showt 'NP.removedArg
-                       , showt ''MutableByteArray#
-                       , showt 'NP.undefined
-                       , showt 'NP.undefinedX
-                       ]
-              -- The above primitives are actually values, and not operations.
-  = ghcUnwind (PrimVal p tys (vs ++ [v])) m tcm
-  | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n,mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), mask, Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger##
-  = case (vs,v) of
-    ([mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [mask, Lit (IntegerLiteral (wrapUnsigned 1 i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.Signed.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapSigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | isUndefinedPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v])
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | isUndefinedXPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v])
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefinedX) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | otherwise
-  = ghcPrimStep tcm (forcePrims m) p tys (vs ++ [v]) m
-
-ghcPrimUnwind tcm p tys vs v [e] m0
-  -- Note [Lazy primitives]
-  -- ~~~~~~~~~~~~~~~~~~~~~~
-  --
-  -- Primitives are usually considered undefined when one of their arguments is
-  -- (unless they're unused). _Some_ primitives can still yield a result even
-  -- though one of their arguments is undefined. It turns out that all primitives
-  -- exhibiting this property happen to be "lazy" in their last argument. Thus,
-  -- all the cases can be covered by a match on [e] and their names:
-  | primName p `elem` [  showt 'Clash.Sized.Vector.lazyV
-                       , showt 'Clash.Sized.Vector.replicate
-                       , "Clash.Sized.Vector.replace_int"
-                       , showt '(GHC.Classes.&&)
-                       , showt '(GHC.Classes.||)
-                       , showt 'BitVector.xToBV
-                       , "Clash.Sized.Vector.imap_go"
-                       ]
-  = if isUndefinedPrimVal v then
-      let tyArgs = map Right tys
-          tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ [Left e]
-      in  Just $ flip setTerm m0 $ TyApp (Prim NP.undefined) $
-            applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-    else
-      let (m1,i) = newLetBinding tcm m0 e
-      in  ghcPrimStep tcm (forcePrims m0) p tys (vs ++ [v,Suspend (Var i)]) m1
-
-ghcPrimUnwind tcm p tys vs (collectValueTicks -> (v, ts)) (e:es) m
-  | isUndefinedPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ map Left (e:es)
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | otherwise
-  = Just . setTerm e $ stackPush (PrimApply p tys (vs ++ [foldr TickValue v ts]) es) m
-
-ghcPrimStep :: PrimStep
-ghcPrimStep tcm isSubj pInfo tys args mach =
-  case HashMap.lookup (primName pInfo) ghcPrimStepImpls of
-    Just impl -> impl tcm isSubj pInfo tys args mach
-    Nothing -> Nothing
+ghcPrimStepImpls :: HashMap.HashMap Text PrimStep
+ghcPrimStepImpls = HashMap.fromList $ concat
+  [ Clash.Annotations.BitRepresentation.Deriving.primitives
+  , Clash.Class.BitPack.Internal.primitives
+  , Clash.Class.Exp.primitives
+  , Clash.Promoted.Nat.primitives
+  , Clash.Sized.Internal.BitVector.primitives
+  , Clash.Sized.Internal.Index.primitives
+  , Clash.Sized.Internal.Signed.primitives
+  , Clash.Sized.Internal.Unsigned.primitives
+  , Clash.Sized.RTree.primitives
+  , Clash.Sized.Vector.primitives
+  , Data.Singletons.TypeLits.Internal.primitives
+  , Data.Text.Show.primitives
+  , GHC.Base.primitives
+  , GHC.Classes.primitives
+  , GHC.Float.primitives
+  , GHC.Int.primitives
+  , GHC.Internal.Float.primitives
+  , GHC.Internal.Real.primitives
+  , GHC.Magic.primitives
+  , GHC.Num.primitives
+  , GHC.Num.BigNat.primitives
+  , GHC.Num.Integer.primitives
+  , GHC.Num.Natural.primitives
+  , GHC.Prim.primitives
+  , GHC.PrimopWrappers.primitives
+  , GHC.Real.primitives
+  , GHC.TypeLits.primitives
+  , GHC.TypeNats.primitives
+  , GHC.Types.primitives
+  , GHC.Word.primitives
+  ]
