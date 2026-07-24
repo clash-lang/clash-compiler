@@ -26,11 +26,8 @@
 
 #include "MachDeps.h"
 
-module Clash.GHC.Evaluator.Primitive
-  ( ghcPrimStep
-  , ghcPrimUnwind
-  , isUndefinedPrimVal
-  , isUndefinedXPrimVal
+module Clash.GHC.Evaluator.Primitives.GHC.Float
+  ( primitives
   ) where
 
 import           Control.DeepSeq            (force)
@@ -151,101 +148,109 @@ import qualified GHC.Num.Integer
 import qualified GHC.PrimopWrappers
 #endif
 
+import {-# SOURCE #-} Clash.GHC.Evaluator.Primitive
 import Clash.GHC.Evaluator.Primitive.Util
-import Clash.GHC.Evaluator.Primitives (ghcPrimStepImpls)
 
-isUndefinedPrimVal :: Value -> Bool
-isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` undefinedPrims
-isUndefinedPrimVal _ = False
+primitives :: [(Text, PrimStep)]
+primitives =
+  -- GHC.Float.asinh  -- XXX: Very fragile
+  --  $w$casinh is the Double specialisation of asinh
+  --  $w$casinh1 is the Float specialisation of asinh
+  [ ( "GHC.Float.$w$casinh"
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..} | Just r <- liftDD go args
+            -> reduce r
+            where go f = case asinh (D# f) of
+                           D# f' -> f'
+          _ -> Nothing
+    )
+  , ( "GHC.Float.$w$casinh1"
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..} | Just r <- liftFF go args
+            -> reduce r
+            where go f = case asinh (F# f) of
+                           F# f' -> f'
+          _ -> Nothing
+    )
 
-isUndefinedXPrimVal :: Value -> Bool
-isUndefinedXPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` undefinedXPrims
-isUndefinedXPrimVal _ = False
+  , ( $(textNameLit 'GHC.Float.integerToFloat#)
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..}
+            | [v] <- args
+            , Just i <- integerLiteral v
+            -> reduce . Literal . FloatLiteral . castFloatToWord32 $ F# (integerToFloat# i)
+          _ -> Nothing
+    )
 
--- | Evaluation of primitive operations.
-ghcPrimUnwind :: PrimUnwind
-ghcPrimUnwind tcm p tys vs v [] m
-  | primName p `elem` [ showt 'Clash.Sized.Internal.Index.fromInteger#
-                       , showt 'GHC.CString.unpackCString#
-                       , showt 'NP.removedArg
-                       , showt ''MutableByteArray#
-                       , showt 'NP.undefined
-                       , showt 'NP.undefinedX
-                       ]
-              -- The above primitives are actually values, and not operations.
-  = ghcUnwind (PrimVal p tys (vs ++ [v])) m tcm
-  | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n,mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), mask, Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger##
-  = case (vs,v) of
-    ([mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [mask, Lit (IntegerLiteral (wrapUnsigned 1 i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.Signed.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapSigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | isUndefinedPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v])
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | isUndefinedXPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v])
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefinedX) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | otherwise
-  = ghcPrimStep tcm (forcePrims m) p tys (vs ++ [v]) m
+  , ( $(textNameLit 'GHC.Float.integerToDouble#)
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..}
+            | [v] <- args
+            , Just i <- integerLiteral v
+            -> reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# (integerToDouble# i)
+          _ -> Nothing
+    )
 
-ghcPrimUnwind tcm p tys vs v [e] m0
-  -- Note [Lazy primitives]
-  -- ~~~~~~~~~~~~~~~~~~~~~~
-  --
-  -- Primitives are usually considered undefined when one of their arguments is
-  -- (unless they're unused). _Some_ primitives can still yield a result even
-  -- though one of their arguments is undefined. It turns out that all primitives
-  -- exhibiting this property happen to be "lazy" in their last argument. Thus,
-  -- all the cases can be covered by a match on [e] and their names:
-  | primName p `elem` [  showt 'Clash.Sized.Vector.lazyV
-                       , showt 'Clash.Sized.Vector.replicate
-                       , "Clash.Sized.Vector.replace_int"
-                       , showt '(GHC.Classes.&&)
-                       , showt '(GHC.Classes.||)
-                       , showt 'BitVector.xToBV
-                       , "Clash.Sized.Vector.imap_go"
-                       ]
-  = if isUndefinedPrimVal v then
-      let tyArgs = map Right tys
-          tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ [Left e]
-      in  Just $ flip setTerm m0 $ TyApp (Prim NP.undefined) $
-            applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-    else
-      let (m1,i) = newLetBinding tcm m0 e
-      in  ghcPrimStep tcm (forcePrims m0) p tys (vs ++ [v,Suspend (Var i)]) m1
+  , ( "GHC.Float.$w$sfromRat''"
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..} -- XXX: Very fragile
+            | [Lit (IntLiteral _minEx)
+              ,Lit (IntLiteral matDigs)
+              ,nV
+              ,dV] <- args
+            , [n,d] <- integerLiterals' [nV,dV]
+            -> case fromInteger matDigs of
+                  matDigs'
+                    | matDigs' == floatDigits (undefined :: Float)
+                    -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
+                    | matDigs' == floatDigits (undefined :: Double)
+                    -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
+                  _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
+          _ -> Nothing
+    )
 
-ghcPrimUnwind tcm p tys vs (collectValueTicks -> (v, ts)) (e:es) m
-  | isUndefinedPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ map Left (e:es)
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | otherwise
-  = Just . setTerm e $ stackPush (PrimApply p tys (vs ++ [foldr TickValue v ts]) es) m
-
-ghcPrimStep :: PrimStep
-ghcPrimStep tcm isSubj pInfo tys args mach =
-  case HashMap.lookup (primName pInfo) ghcPrimStepImpls of
-    Just impl -> impl tcm isSubj pInfo tys args mach
-    Nothing -> Nothing
+  , ( "GHC.Float.$w$sfromRat''1"
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..} -- XXX: Very fragile
+            | [Lit (IntLiteral _minEx)
+              ,Lit (IntLiteral matDigs)
+              ,nV
+              ,dV] <- args
+            , [n,d] <- integerLiterals' [nV,dV]
+            -> case fromInteger matDigs of
+                  matDigs'
+                    | matDigs' == floatDigits (undefined :: Float)
+                    -> reduce (Literal (FloatLiteral (castFloatToWord32 (fromRational (n :% d)))))
+                    | matDigs' == floatDigits (undefined :: Double)
+                    -> reduce (Literal (DoubleLiteral (castDoubleToWord64 (fromRational (n :% d)))))
+                  _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double"
+          _ -> Nothing
+    )
+  , ( "GHC.Float.$wproperFractionDouble"
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..}
+            | _ : Lit (DoubleLiteral d) : _ <- args
+            , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
+            , nameOcc signedTcNm == showt ''Signed
+            , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+            , Just tupTc <- UniqMap.lookup tupTcNm tcm
+            , [tupDc] <- tyConDataCons tupTc
+            -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
+                   ret = mkApps (Data tupDc) (map Right tyArgs ++
+                          [ Left (mkSignedLit sty nTy kn sn)
+                          , Left (mkDoubleCLit tcm (castDoubleToWord64 d1) (last tyArgs))
+                          ])
+                in reduce ret
+            where
+              op :: KnownNat n => Proxy n -> Double -> (Signed n, Double)
+              op _ = properFraction
+          _ -> Nothing
+    )
+  ]
