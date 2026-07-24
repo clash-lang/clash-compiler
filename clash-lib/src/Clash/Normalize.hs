@@ -60,9 +60,10 @@ import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+  (VarEnv, VarSet, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
+   emptyVarSet, extendVarEnv, extendVarSet, lookupVarEnv, mapVarEnv,
+   mapMaybeVarEnv, mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet,
+   nullVarEnv, unionVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
@@ -262,10 +263,10 @@ cleanupGraph
   -> BindingMap
   -> NormalizeSession BindingMap
 cleanupGraph topEntity norm
-  | Just ct <- mkCallTree [] norm topEntity
+  | Just ct <- mkCallTree emptyVarSet norm topEntity
   = do cache <- liftIO (IORef.newIORef UniqMap.empty)
        ctFlat <- flattenCallTree cache ct
-       return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
+       return (mkVarEnv $ snd $ callTreeToList emptyVarSet ctFlat)
 cleanupGraph _ norm = return norm
 
 -- | A tree of identifiers and their bindings, with branches containing
@@ -276,7 +277,7 @@ data CallTree
   | CBranch (Id, Binding Term) [CallTree]
 
 mkCallTree
-  :: [Id]
+  :: VarSet
   -- ^ Visited
   -> BindingMap
   -- ^ Global binders
@@ -286,7 +287,8 @@ mkCallTree
 mkCallTree visited bindingMap root
   | Just rootTm <- lookupVarEnv root bindingMap
   = let used   = Set.toList $ Lens.setOf globalIds $ (bindingTerm rootTm)
-        other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
+        other  = Maybe.mapMaybe (mkCallTree (extendVarSet visited root) bindingMap)
+                                (filter (`notElemVarSet` visited) used)
     in  case used of
           [] -> Just (CLeaf   (root,rootTm))
           _  -> Just (CBranch (root,rootTm) other)
@@ -417,12 +419,12 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     | isNoInline inl2  = (Nothing, [c])
     | otherwise        = (Just (nm2,e),us)
 
-callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding Term)])
+callTreeToList :: VarSet -> CallTree -> (VarSet, [(Id, Binding Term)])
 callTreeToList visited (CLeaf (nm,bndr))
-  | nm `elem` visited = (visited,[])
-  | otherwise         = (nm:visited,[(nm,bndr)])
+  | nm `elemVarSet` visited = (visited,[])
+  | otherwise               = (extendVarSet visited nm,[(nm,bndr)])
 callTreeToList visited (CBranch (nm,bndr) used)
-  | nm `elem` visited = (visited,[])
-  | otherwise         = (visited',(nm,bndr):(concat others))
+  | nm `elemVarSet` visited = (visited,[])
+  | otherwise               = (visited',(nm,bndr):(concat others))
   where
-    (visited',others) = mapAccumL callTreeToList (nm:visited) used
+    (visited',others) = mapAccumL callTreeToList (extendVarSet visited nm) used

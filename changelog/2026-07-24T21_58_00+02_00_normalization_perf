@@ -1,0 +1,1 @@
+CHANGED: Normalization got faster: common subexpression elimination now looks up processed binders in a map instead of scanning a list with an alpha-equivalence check per entry, inlining heuristics stop measuring a term's size once it exceeds the inline limit, and the call-graph flattening in the cleanup phase tracks visited binders in a set instead of a list.
