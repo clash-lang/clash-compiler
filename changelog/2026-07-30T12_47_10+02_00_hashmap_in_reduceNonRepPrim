@@ -1,0 +1,1 @@
+CHANGED: `reduceNonRepPrim` dispatches on the primitive's name through a `HashMap` of handlers, instead of walking a chain of string comparisons. On larger designs we've tested this yielded a ~6% performance bump end-to-end.
