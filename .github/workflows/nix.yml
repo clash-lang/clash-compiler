@@ -70,8 +70,6 @@ jobs:
         ]
         package: [
             "clash-benchmark",
-            "clash-cosim",
-            "clash-ffi",
             "clash-lib-hedgehog",
             "clash-prelude-hedgehog",
             "clash-profiling",
@@ -79,10 +77,6 @@ jobs:
             "clash-term",
             "clash-testsuite"
         ]
-        exclude:
-          - ghc: ghc984
-            package: clash-ffi
-
     needs: packages_common
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2

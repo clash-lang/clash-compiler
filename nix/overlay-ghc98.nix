@@ -1,7 +1,7 @@
 { pkgs }:
 final: prev:
 let
-  inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken overrideCabal;
+  inherit (pkgs.haskell.lib) doJailbreak dontCheck markUnbroken;
 in
 {
   # Use an older version than the default in nixpkgs. Since rewrite-inspector
@@ -31,11 +31,6 @@ in
 
   # Criterion test fails with tasty 1.5.4
   criterion = dontCheck prev.criterion;
-
-  # Broken on GHC 9.8.4 see clash-ffi cabal file for details
-  clash-ffi = overrideCabal prev.clash-ffi (drv: {
-    broken = true;
-  });
 
   # Randomly GHC panics with heap overflows during testing
   row-types = dontCheck prev.row-types;

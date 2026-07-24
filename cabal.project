@@ -2,7 +2,6 @@
 -- root directory (i.e. patched copies, or forks) and will automatically be
 -- preferred by the solver over other versions.
 packages:
-  ./clash-ffi
   ./clash-ghc
   ./clash-lib
   ./clash-lib-hedgehog
@@ -39,9 +38,6 @@ package clash-prelude
   -- so we're able to import its css file from the custom theme.
   haddock-options: --theme=doc/linuwial-wrap-types.css --theme=Linuwial
 
-package clash-testsuite
-  flags: +cosim
-
 package clash-lib
   ghc-options: +RTS -qn4 -A128M -RTS -j4
   flags: +debug
@@ -53,7 +49,6 @@ optional-packages:
   ./benchmark
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
-  ./clash-cosim
   ./clash-term
 
 allow-newer:
@@ -64,8 +59,6 @@ allow-newer:
   rewrite-inspector:binary,
   rewrite-inspector:containers,
   vty:deepseq,
-  derive-storable-plugin:ghc,
-  derive-storable-plugin:ghci,
   string-random:text,
   string-random:containers,
   string-interpolate:template-haskell,

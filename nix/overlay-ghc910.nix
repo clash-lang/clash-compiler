@@ -18,9 +18,6 @@ in
   # An ipv6 test fails on CI. Most likely due to missing kernel support?
   network  = dontCheck prev.network;
 
-  # Marked broken and bounds exclude newer GHC. But seems to work fine.
-  derive-storable-plugin = doJailbreak (markUnbroken prev.derive-storable-plugin);
-
   # This version of tasty isn't available in the nix ghc910 package set
   tasty = prev.callHackageDirect {
     pkg = "tasty";
