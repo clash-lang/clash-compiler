@@ -44,6 +44,7 @@ import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
 #endif
 
+import qualified Data.Text            as Text
 import Data.Time.Clock                (UTCTime)
 import qualified Data.Time.Clock      as Clock
 import qualified Data.Time.Format     as Clock
@@ -89,6 +90,12 @@ namePat = return . TH.LitP . TH.StringL . show
 fsNameLit :: TH.Name -> TH.Q TH.Exp
 fsNameLit nm =
   TH.appE (TH.varE 'fsLit) (TH.litE (TH.stringL (show nm)))
+
+-- | Like 'Data.Text.pack', but used with a TemplateHaskell name. As a
+-- TemplateHaskell expression itself to make sure GHC can optimize the call.
+textNameLit :: TH.Name -> TH.Q TH.Exp
+textNameLit nm =
+  TH.appE (TH.varE 'Text.pack) (TH.litE (TH.stringL (show nm)))
 
 assertPanic
   :: String -> Int -> a
