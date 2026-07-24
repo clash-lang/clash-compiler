@@ -73,7 +73,7 @@ import qualified Clash.Core.Term as Term
 import Clash.Core.Term
   ( Bind, CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..)
   , bindToList, collectArgs, collectArgsTicks, mkApps , mkTicks, stripTicks)
-import Clash.Core.TermInfo (isLocalVar, termSize)
+import Clash.Core.TermInfo (isLocalVar, termSizeSmallerThan)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
 import Clash.Core.Util (isSignalType, primUCo)
@@ -148,7 +148,7 @@ bindConstantVarWorker = inlineBinders test
         case isWorkFreeIsh tcm e && not (e == Var fn) of
           True -> Lens.view inlineConstantLimit >>= \case
             0 -> return True
-            n -> return (termSize e <= n)
+            n -> return (termSizeSmallerThan (n + 1) e)
           _ -> return False
 {-# SCC bindConstantVarWorker #-}
 
@@ -666,7 +666,7 @@ inlineSmallWorker _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
         -- Don't inline recursive expressions
         Just b -> do
           isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && not (isNoInline (bindingSpec b)) && termSize (bindingTerm b) < sizeLimit
+          if not isRecBndr && not (isNoInline (bindingSpec b)) && termSizeSmallerThan sizeLimit (bindingTerm b)
              then do
                let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
                changed $ mkApps tm args
@@ -747,7 +747,7 @@ inlineWorkFreeWorker _ e@(Var f) = do
               sizeLimit <- Lens.view inlineWFCacheLimit
               -- caching only worth it from a certain size onwards, otherwise
               -- the caching mechanism itself brings more of an overhead.
-              if termSize topB < sizeLimit then
+              if termSizeSmallerThan sizeLimit topB then
                 changed topB
               else do
                 b <- normalizeTopLvlBndr False f top
