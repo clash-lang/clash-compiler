@@ -21,6 +21,7 @@ module Clash.Core.FreeVars
   , termFreeTyVars
   -- * occurrence check
   , globalIdOccursIn
+  , localIdOccursIn
   , localVarsDoNotOccurIn
   , countFreeOccurances
   -- * Internal
@@ -131,12 +132,21 @@ localVarsDoNotOccurIn
 localVarsDoNotOccurIn vs e =
   getAll (Lens.foldMapOf freeLocalVars (All . (`notElem` vs)) e)
 
--- | Check whether a local identifier occurs free in a term
+-- | Check whether a global identifier occurs free in a term
 globalIdOccursIn
   :: Id
   -> Term
   -> Bool
 globalIdOccursIn v e = getAny (Lens.foldMapOf globalIds (Any . (== v)) e)
+
+-- | Check whether a local identifier occurs free in a term. Unlike checking
+-- membership of 'freeLocalVars', this does not descend into types: a term
+-- variable cannot occur free in a type.
+localIdOccursIn
+  :: Id
+  -> Term
+  -> Bool
+localIdOccursIn v e = getAny (Lens.foldMapOf freeLocalIds (Any . (== v)) e)
 
 -- | Calculate the /local/ free variable of an expression: the free type
 -- variables and the free identifiers that are not bound in the global

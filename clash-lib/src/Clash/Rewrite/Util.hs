@@ -55,7 +55,8 @@ import           GHC.Types.Basic             (InlineSpec (..))
 
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
-  (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn)
+  ( freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn
+  , localIdOccursIn)
 import           Clash.Core.HasFreeVars      (elemFreeVars, notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.Name
@@ -492,7 +493,7 @@ substituteBinders inScope toInline toKeep body =
         subst1  = subst { substTmEnv = mapVarEnv (substTm "substSubst" substE)
                                                  (substTmEnv subst)}
         subst2  = extendIdSubst subst1 x e1
-    in  if x `elemFreeVars` e1 then
+    in  if x `localIdOccursIn` e1 then
           go subst ((x,e1):inlRec) toInl
         else
           go subst2 inlRec toInl
@@ -523,7 +524,7 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
         subst1 = subst { substTmEnv = mapVarEnv (substTm "liftSubst" substE)
                                                 (substTmEnv subst) }
         subst2 = extendIdSubst subst1 x e2
-    if x `elemFreeVars` e2 then do
+    if x `localIdOccursIn` e2 then do
       (_,sp) <- Lens.use curFun
       throw (ClashException sp [I.i|
         Internal error: inlineOrLiftBInders failed on:
@@ -631,11 +632,18 @@ liftBinding (var@Id {varName = idName} ,e) = do
       -- Create a new body that abstracts over the free variables
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
-  -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (UniqMap.elems . UniqMap.filter ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
+  -- Check if an alpha-equivalent global binder already exists. Terms can
+  -- only be alpha-equivalent if their types are, so candidates are
+  -- prefiltered on alpha-equality of their (much smaller) types. The scan
+  -- also stops at the first match, where it used to filter the whole binding
+  -- map with a term alpha-equality check per entry.
+  let aeqExisting = List.find
+        (\b -> varType (bindingId b) `aeqType` newBodyTy
+                 && bindingTerm b `aeqTerm` newBody)
+        (UniqMap.elems binders)
   case aeqExisting of
     -- If it doesn't, create a new binder
-    [] -> do -- Add the created function to the list of global bindings
+    Nothing -> do -- Add the created function to the list of global bindings
              let r = newBodyId `globalIdOccursIn` newBody
              bindings %= UniqMap.insert newBodyNm
                                     -- We mark this function as internal so that
@@ -650,7 +658,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder
-    (b:_) ->
+    Just b ->
       let newExpr' = mkTmApps
                       (mkTyApps (Var $ bindingId b)
                                 (map VarTy boundFTVs))
