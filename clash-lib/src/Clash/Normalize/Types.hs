@@ -14,6 +14,7 @@ module Clash.Normalize.Types where
 
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (State)
+import Data.HashMap.Strict        (HashMap)
 import Data.Map                   (Map)
 import Data.Set                   (Set)
 import Data.Text                  (Text)
@@ -23,6 +24,7 @@ import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
 import Clash.Driver.Types     (BindingMap)
+import Clash.Primitives.Types (UsedArguments)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
 -- | State of the 'NormalizeMonad'
@@ -46,6 +48,11 @@ data NormalizeState
   -- * Elem: (functions which were inlined, number of times inlined)
   , _primitiveArgs :: Map Text (Set Int)
   -- ^ Cache for looking up constantness of blackbox arguments
+  , _usedArgumentsCache :: HashMap Text (Maybe UsedArguments)
+  -- ^ Cache for looking up which arguments a primitive's blackbox uses. The
+  -- specification is a pure function of the (immutable) primitive
+  -- environment, while computing it walks the blackbox template. 'Nothing'
+  -- means the primitive has no extractable blackbox.
   , _recursiveComponents :: VarEnv Bool
   -- ^ Map telling whether a components is recursively defined.
   --

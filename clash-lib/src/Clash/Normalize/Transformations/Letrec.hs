@@ -30,13 +30,11 @@ module Clash.Normalize.Transformations.Letrec
   ) where
 
 import qualified Control.Lens as Lens
-import qualified Control.Monad as Monad
 import Control.Monad.Trans.Except (runExcept)
 import Control.Monad.Writer (listen)
 import Data.Bifunctor (second)
 import qualified Data.Either as Either
 import qualified Data.HashMap.Lazy as HashMap
-import Data.List ((\\))
 import qualified Data.List as List
 import qualified Data.List.Extra as List
 import Data.Maybe (fromMaybe)
@@ -76,13 +74,14 @@ import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession, usedArgumentsCache)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.StrategyDSL
   ( TransformSpec, anyShape, onAppNode, onCase, onLet, onLetNode, onPrimNode
   , onTickNode, onTyAppNode, transform)
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
+  ( TransformContext(..), bindings, curFun, extra, tcCache, workFreeBinders
+  , primitives)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders, setChanged)
 import Clash.Rewrite.WorkFree
@@ -156,32 +155,13 @@ removeUnusedExprSpine (TransformContext _ (cc:_)) e
   isSpineCtx _ = False
 
 removeUnusedExprSpine _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
-  bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
-  let
-    usedArgs0 =
-      case Monad.join (extractPrim <$> bbM) of
-        Just (BlackBoxHaskell{usedArguments}) ->
-          case usedArguments of
-            UsedArguments used -> Just used
-            IgnoredArguments ignored -> Just ([0..length args - 1] \\ ignored)
-        Just (BlackBox pNm _ _ _ _ _ _ _ _ _ inc r ri templ) -> Just $
-          if | isFromInt pNm -> [0,1,2]
-             | primName pInfo `elem` [ Text.showt 'dontApplyInHDL
-                                     , Text.showt 'Vec.splitAt
-                                     ] -> [0,1]
-             | otherwise -> concat [ concatMap getUsedArguments r
-                                   , concatMap getUsedArguments ri
-                                   , getUsedArguments templ
-                                   , concatMap (getUsedArguments . snd) inc ]
-        _ ->
-          Nothing
-
-  case usedArgs0 of
+  usedArgsM <- lookupUsedArguments pInfo
+  case usedArgsM of
     Nothing ->
       return e
-    Just usedArgs1 -> do
+    Just usedArgs -> do
       tcm <- Lens.view tcCache
-      (args1, Monoid.getAny -> hasChanged) <- listen (go tcm 0 usedArgs1 args)
+      (args1, Monoid.getAny -> hasChanged) <- listen (go tcm 0 usedArgs args)
       if hasChanged then
         return (mkApps (mkTicks p ticks) args1)
       else
@@ -203,7 +183,7 @@ removeUnusedExprSpine _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
         _ -> do
           let ty = inferCoreTypeOf tcm tm
               p' = TyApp (Prim removedArg) ty
-          if n < arity && n `notElem` used
+          if n < arity && not (argumentUsed used n)
              then changed (Left p' : args'')
              else return  (Left tm : args'')
 
@@ -228,6 +208,42 @@ removeUnusedExprSpine _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,
 
 removeUnusedExprSpine _ e = return e
 {-# SCC removeUnusedExprSpine #-}
+
+-- | The 'UsedArguments' of the primitive's blackbox, cached per primitive
+-- name: the specification is a pure function of the (immutable) primitive
+-- environment, while computing it walks the blackbox template. 'Nothing'
+-- means the primitive has no extractable blackbox.
+lookupUsedArguments :: PrimInfo -> NormalizeSession (Maybe UsedArguments)
+lookupUsedArguments pInfo = do
+  cache <- Lens.use (extra.usedArgumentsCache)
+  case HashMap.lookup name cache of
+    Just result -> return result
+    Nothing -> do
+      bbM <- HashMap.lookup name <$> Lens.view primitives
+      let result = computeUsedArguments (extractPrim =<< bbM)
+      (extra.usedArgumentsCache) Lens.%= HashMap.insert name result
+      return result
+ where
+  name = primName pInfo
+
+  computeUsedArguments bbM = case bbM of
+    Just (BlackBoxHaskell{usedArguments}) -> Just usedArguments
+    Just (BlackBox pNm _ _ _ _ _ _ _ _ _ inc r ri templ) -> Just $ UsedArguments $
+      if | isFromInt pNm -> [0,1,2]
+         | name `elem` [ Text.showt 'dontApplyInHDL
+                       , Text.showt 'Vec.splitAt
+                       ] -> [0,1]
+         | otherwise -> concat [ concatMap getUsedArguments r
+                               , concatMap getUsedArguments ri
+                               , getUsedArguments templ
+                               , concatMap (getUsedArguments . snd) inc ]
+    _ ->
+      Nothing
+
+-- | Whether the blackbox uses the term argument at the given index.
+argumentUsed :: UsedArguments -> Int -> Bool
+argumentUsed (UsedArguments used) n = n `elem` used
+argumentUsed (IgnoredArguments ignored) n = n `notElem` ignored
 
 -- | Flatten's letrecs after `inlineCleanup`
 --

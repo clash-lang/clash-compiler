@@ -95,6 +95,7 @@ instance Default NormalizeState where
     , _specialisationHistory=emptyVarEnv
     , _inlineHistory=emptyVarEnv
     , _primitiveArgs=Map.empty
+    , _usedArgumentsCache=mempty
     , _recursiveComponents=emptyVarEnv
     , _normalizationStrategy=error "_normalizationStrategy: NYI"
     , _constantPropagationStrategy=error "_constantPropagationStrategy: NYI"

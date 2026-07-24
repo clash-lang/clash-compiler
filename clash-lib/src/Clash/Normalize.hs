@@ -142,6 +142,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   emptyVarEnv
                   emptyVarEnv
                   Map.empty
+                  mempty       -- usedArgumentsCache
                   rcsMap
                   normalization
                   constantPropagation
