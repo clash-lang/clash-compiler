@@ -26,11 +26,8 @@
 
 #include "MachDeps.h"
 
-module Clash.GHC.Evaluator.Primitive
-  ( ghcPrimStep
-  , ghcPrimUnwind
-  , isUndefinedPrimVal
-  , isUndefinedXPrimVal
+module Clash.GHC.Evaluator.Primitives.Clash.Sized.RTree
+  ( primitives
   ) where
 
 import           Control.DeepSeq            (force)
@@ -151,101 +148,103 @@ import qualified GHC.Num.Integer
 import qualified GHC.PrimopWrappers
 #endif
 
+import {-# SOURCE #-} Clash.GHC.Evaluator.Primitive
 import Clash.GHC.Evaluator.Primitive.Util
-import Clash.GHC.Evaluator.Primitives (ghcPrimStepImpls)
 
-isUndefinedPrimVal :: Value -> Bool
-isUndefinedPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` undefinedPrims
-isUndefinedPrimVal _ = False
+primitives :: [(Text, PrimStep)]
+primitives =
+--------
+-- RTree
+--------
+  [ ( $(textNameLit 'Clash.Sized.RTree.textract)
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..}
+            | isSubj
+            , [DC _ tArgs] <- args
+            -> reduceWHNF (Either.lefts tArgs !! 1)
+          _ -> Nothing
+    )
 
-isUndefinedXPrimVal :: Value -> Bool
-isUndefinedXPrimVal (PrimVal (PrimInfo{primName}) _ _) =
-  primName `elem` undefinedXPrims
-isUndefinedXPrimVal _ = False
+  , ( $(textNameLit 'Clash.Sized.RTree.tsplit)
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..}
+            | isSubj
+            , dTy : aTy : _ <- tys
+            , [DC _ tArgs] <- args
+            , (tyArgs,tyView -> TyConApp tupTcNm _) <- splitFunForallTy ty
+            , TyConApp treeTcNm _ <- tyView (Either.rights tyArgs !! 0)
+            -> let (Just tupTc) = UniqMap.lookup tupTcNm tcm
+                   [tupDc]      = tyConDataCons tupTc
+               in  reduce $
+                   mkApps (Data tupDc)
+                          [Right (mkTyConApp treeTcNm [dTy,aTy])
+                          ,Right (mkTyConApp treeTcNm [dTy,aTy])
+                          ,Left (Either.lefts tArgs !! 1)
+                          ,Left (Either.lefts tArgs !! 2)
+                          ]
+          _ -> Nothing
+    )
 
--- | Evaluation of primitive operations.
-ghcPrimUnwind :: PrimUnwind
-ghcPrimUnwind tcm p tys vs v [] m
-  | primName p `elem` [ showt 'Clash.Sized.Internal.Index.fromInteger#
-                       , showt 'GHC.CString.unpackCString#
-                       , showt 'NP.removedArg
-                       , showt ''MutableByteArray#
-                       , showt 'NP.undefined
-                       , showt 'NP.undefinedX
-                       ]
-              -- The above primitives are actually values, and not operations.
-  = ghcUnwind (PrimVal p tys (vs ++ [v])) m tcm
-  | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n,mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), mask, Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger##
-  = case (vs,v) of
-    ([mask], integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [mask, Lit (IntegerLiteral (wrapUnsigned 1 i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.Signed.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapSigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
-  = case (vs,v) of
-    ([naturalLiteral -> Just n],integerLiteral -> Just i) ->
-      ghcUnwind (PrimVal p tys [Lit (NaturalLiteral n), Lit (IntegerLiteral (wrapUnsigned n i))]) m tcm
-    _ -> error ($(curLoc) ++ "Internal error"  ++ show (vs,v))
-  | isUndefinedPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v])
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | isUndefinedXPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v])
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefinedX) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | otherwise
-  = ghcPrimStep tcm (forcePrims m) p tys (vs ++ [v]) m
+  , ( $(textNameLit 'Clash.Sized.RTree.tdfold)
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..}
+            | isSubj
+            , pTy : kTy : aTy : _ <- tys
+            , _ : p : f : g : ts : _ <- args
+            , DC _ tArgs <- ts
+            , Right k' <- runExcept (tyNatSize tcm kTy)
+            -> case k' of
+                 0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts tArgs !! 1)])
+                 _ -> let k'ty = LitTy (NumTy (k'-1))
+                          (tyArgs,_)  = splitFunForallTy ty
+                          (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
+                          TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
+                          Just snatTc = UniqMap.lookup snatTcNm tcm
+                          [snatDc]    = tyConDataCons snatTc
+                      in  reduceWHNF $
+                          mkApps (valToTerm g)
+                                 [Right k'ty
+                                 ,Left (mkApps (Data snatDc)
+                                               [Right k'ty
+                                               ,Left (Literal (NaturalLiteral (k'-1)))])
+                                 ,Left (mkApps (Prim pInfo)
+                                               [Right pTy
+                                               ,Right k'ty
+                                               ,Right aTy
+                                               ,Left (Literal (NaturalLiteral (k'-1)))
+                                               ,Left (valToTerm p)
+                                               ,Left (valToTerm f)
+                                               ,Left (valToTerm g)
+                                               ,Left (Either.lefts tArgs !! 1)
+                                               ])
+                                 ,Left (mkApps (Prim pInfo)
+                                               [Right pTy
+                                               ,Right k'ty
+                                               ,Right aTy
+                                               ,Left (Literal (NaturalLiteral (k'-1)))
+                                               ,Left (valToTerm p)
+                                               ,Left (valToTerm f)
+                                               ,Left (valToTerm g)
+                                               ,Left (Either.lefts tArgs !! 2)
+                                               ])
+                                 ]
+          _ -> Nothing
+    )
 
-ghcPrimUnwind tcm p tys vs v [e] m0
-  -- Note [Lazy primitives]
-  -- ~~~~~~~~~~~~~~~~~~~~~~
-  --
-  -- Primitives are usually considered undefined when one of their arguments is
-  -- (unless they're unused). _Some_ primitives can still yield a result even
-  -- though one of their arguments is undefined. It turns out that all primitives
-  -- exhibiting this property happen to be "lazy" in their last argument. Thus,
-  -- all the cases can be covered by a match on [e] and their names:
-  | primName p `elem` [  showt 'Clash.Sized.Vector.lazyV
-                       , showt 'Clash.Sized.Vector.replicate
-                       , "Clash.Sized.Vector.replace_int"
-                       , showt '(GHC.Classes.&&)
-                       , showt '(GHC.Classes.||)
-                       , showt 'BitVector.xToBV
-                       , "Clash.Sized.Vector.imap_go"
-                       ]
-  = if isUndefinedPrimVal v then
-      let tyArgs = map Right tys
-          tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ [Left e]
-      in  Just $ flip setTerm m0 $ TyApp (Prim NP.undefined) $
-            applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-    else
-      let (m1,i) = newLetBinding tcm m0 e
-      in  ghcPrimStep tcm (forcePrims m0) p tys (vs ++ [v,Suspend (Var i)]) m1
-
-ghcPrimUnwind tcm p tys vs (collectValueTicks -> (v, ts)) (e:es) m
-  | isUndefinedPrimVal v
-  = let tyArgs = map Right tys
-        tmArgs = map (Left . valToTerm) (vs ++ [v]) ++ map Left (e:es)
-    in  Just $ flip setTerm m $ TyApp (Prim NP.undefined) $
-          applyTypeToArgs (Prim p) tcm (primType p) (tyArgs ++ tmArgs)
-  | otherwise
-  = Just . setTerm e $ stackPush (PrimApply p tys (vs ++ [foldr TickValue v ts]) es) m
-
-ghcPrimStep :: PrimStep
-ghcPrimStep tcm isSubj pInfo tys args mach =
-  case HashMap.lookup (primName pInfo) ghcPrimStepImpls of
-    Just impl -> impl tcm isSubj pInfo tys args mach
-    Nothing -> Nothing
+  , ( $(textNameLit 'Clash.Sized.RTree.treplicate)
+    , \tcm isSubj pInfo tys args mach ->
+        case mkPrimStepContext tcm isSubj pInfo tys args mach of
+          PrimStepContext{..}
+            | isSubj
+            , let ty' = piResultTys tcm ty tys
+            , (_,tyView -> TyConApp treeTcNm [lenTy,argTy]) <- splitFunForallTy ty'
+            , Right len <- runExcept (tyNatSize tcm lenTy)
+            -> let (Just treeTc) = UniqMap.lookup treeTcNm tcm
+                   [lrCon,brCon] = tyConDataCons treeTc
+               in  reduce (mkRTree lrCon brCon argTy len (replicate (2^len) (valToTerm (last args))))
+          _ -> Nothing
+    )
+  ]

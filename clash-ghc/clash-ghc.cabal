@@ -227,6 +227,38 @@ library
                       Clash.GHCi.UI.Monad
 
                       Clash.GHC.ClashFlags
+                      Clash.GHC.Evaluator.Primitive.Util
+                      Clash.GHC.Evaluator.Primitives
+                      Clash.GHC.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving
+                      Clash.GHC.Evaluator.Primitives.Clash.Class.BitPack.Internal
+                      Clash.GHC.Evaluator.Primitives.Clash.Class.Exp
+                      Clash.GHC.Evaluator.Primitives.Clash.Promoted.Nat
+                      Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.BitVector
+                      Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Index
+                      Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Signed
+                      Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Unsigned
+                      Clash.GHC.Evaluator.Primitives.Clash.Sized.RTree
+                      Clash.GHC.Evaluator.Primitives.Clash.Sized.Vector
+                      Clash.GHC.Evaluator.Primitives.Data.Singletons.TypeLits.Internal
+                      Clash.GHC.Evaluator.Primitives.Data.Text.Show
+                      Clash.GHC.Evaluator.Primitives.GHC.Base
+                      Clash.GHC.Evaluator.Primitives.GHC.Classes
+                      Clash.GHC.Evaluator.Primitives.GHC.Float
+                      Clash.GHC.Evaluator.Primitives.GHC.Int
+                      Clash.GHC.Evaluator.Primitives.GHC.Internal.Float
+                      Clash.GHC.Evaluator.Primitives.GHC.Internal.Real
+                      Clash.GHC.Evaluator.Primitives.GHC.Magic
+                      Clash.GHC.Evaluator.Primitives.GHC.Num
+                      Clash.GHC.Evaluator.Primitives.GHC.Num.BigNat
+                      Clash.GHC.Evaluator.Primitives.GHC.Num.Integer
+                      Clash.GHC.Evaluator.Primitives.GHC.Num.Natural
+                      Clash.GHC.Evaluator.Primitives.GHC.Prim
+                      Clash.GHC.Evaluator.Primitives.GHC.PrimopWrappers
+                      Clash.GHC.Evaluator.Primitives.GHC.Real
+                      Clash.GHC.Evaluator.Primitives.GHC.TypeLits
+                      Clash.GHC.Evaluator.Primitives.GHC.TypeNats
+                      Clash.GHC.Evaluator.Primitives.GHC.Types
+                      Clash.GHC.Evaluator.Primitives.GHC.Word
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
                       Clash.GHC.Util
