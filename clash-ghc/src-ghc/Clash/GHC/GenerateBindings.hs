@@ -71,7 +71,7 @@ import           Clash.Core.VarEnv
   ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
-import           Clash.Driver            (compilePrimitive)
+import           Clash.Driver            (compilePrimitives)
 import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.GHC.GHC2Core
@@ -123,10 +123,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
-  primMapC <-
-    sequence $ HashMap.map
-                 (sequence . fmap (compilePrimitive importDirs dbs tdir))
-                 primMapR
+  primMapC <- compilePrimitives importDirs dbs tdir primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
                    (GHC2CoreEnv GHC.noSrcSpan fiEnvs)

@@ -4,6 +4,7 @@
                      2017     , QBayLogic, Google Inc.
                      2020-2024, QBayLogic,
                      2022     , Google Inc.
+                     2026     , Martijn Bastiaan
 
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -28,9 +29,8 @@ import           Control.DeepSeq
 import           Control.Exception                (evaluate, throw, Exception)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM)
-import           Control.Monad.Catch              (MonadMask, MonadThrow (throwM))
+import           Control.Monad.Catch              (MonadThrow (throwM), try)
 import           Control.Monad.Extra              (whenM, ifM, unlessM)
-import           Control.Monad.IO.Class           (MonadIO)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
@@ -42,13 +42,14 @@ import qualified Data.ByteString.Lazy             as ByteStringLazy
 import qualified Data.ByteString.Lazy.Char8       as ByteStringLazyChar8
 import           Data.Char                        (isAscii, isAlphaNum)
 import           Data.Default
-import           Data.Hashable                    (hash)
+import           Data.Hashable                    (Hashable, hash)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
 import           Data.List                        (intercalate)
 import qualified Data.List                        as List
+import qualified Data.List.Extra                  as List
 import           Data.List.NonEmpty               (NonEmpty((:|)))
 import qualified Data.List.NonEmpty               as NonEmpty
 import           Data.Maybe                       (fromMaybe, maybeToList, mapMaybe)
@@ -63,6 +64,7 @@ import qualified Data.Text.Lazy.IO                as Text
 import           Data.Text.Prettyprint.Doc.Extra
   (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified Data.Time.Clock                  as Clock
+import           GHC.Generics                     (Generic)
 import           GHC.Stack                        (HasCallStack)
 import qualified Language.Haskell.Interpreter     as Hint
 import qualified Language.Haskell.Interpreter.Extension as Hint
@@ -86,7 +88,7 @@ import           GHC.Types.SrcLoc                  (SrcSpan)
 import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive
-  (HDL (..))
+  (HDL (..), extractPrim)
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Annotations.TopEntity
@@ -517,66 +519,175 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Compiling " ++ topEntityS ++ " took " ++ topDiff)
 
--- | Interpret a specific function from a specific module. This action tries
--- two things:
+-- | Whether a function should be interpreted as a 'BlackBoxFunction' or a
+-- 'TemplateFunction'.
+data InterpretFunctionType
+  = InterpretBlackBoxFunction
+  | InterpretTemplateFunction
+  deriving (Eq, Ord, Show, Generic, Hashable)
+
+-- | A single function that needs to be interpreted with Hint in order to
+-- compile a primitive. Multiple primitives referencing the same function map
+-- to the same request, so interpreting the distinct requests of a primitive
+-- map compiles each function exactly once.
+data InterpretFunctionRequest = InterpretFunctionRequest
+  { ifrModNames :: [String]
+    -- ^ Module the function lives in, one entry per module name component
+  , ifrFuncName :: String
+    -- ^ Function name
+  , ifrType :: InterpretFunctionType
+    -- ^ Type to interpret the function at
+  , ifrSource :: Maybe Text
+    -- ^ Inline Haskell source of the module, if the primitive provided one
+  } deriving (Eq, Ord, Show, Generic, Hashable)
+
+-- | Module the function of an 'InterpretFunctionRequest' lives in, as a
+-- qualified module name
+interpretFunctionRequestToModuleName :: InterpretFunctionRequest -> Hint.ModuleName
+interpretFunctionRequestToModuleName = intercalate "." . ifrModNames
+
+-- | The result of interpreting an 'InterpretFunctionRequest'
+data InterpretFunctionResult
+  = InterpretBBF BlackBoxFunction
+  | InterpretTF TemplateFunction
+
+type InterpretResults =
+  HashMap InterpretFunctionRequest
+          (Either (NonEmpty Hint.InterpreterError) InterpretFunctionResult)
+
+-- | Language extensions in effect when interpreting inline primitive sources
+hintLanguageExtensions :: [Hint.Extension]
+hintLanguageExtensions =
+  map Hint.asExtension $
+    map show wantedLanguageExtensions ++
+    map ("No" ++ ) (map show unwantedLanguageExtensions)
+
+-- | The functions a primitive needs interpreted before it can be compiled by
+-- 'compilePrimitiveWith'. Functions in 'knownBlackBoxFunctions' or
+-- 'knownTemplateFunctions' need no interpretation and yield no request.
+neededInterpRequests :: ResolvedPrimitive -> [InterpretFunctionRequest]
+neededInterpRequests (BlackBoxHaskell _ _ _ _ bbGenName source)
+  | HashMap.member fullName knownBlackBoxFunctions = []
+  | otherwise =
+      [InterpretFunctionRequest modNames funcName InterpretBlackBoxFunction source]
+ where
+  fullName = intercalate "." modNames ++ "." ++ funcName
+  BlackBoxFunctionName modNames funcName = bbGenName
+neededInterpRequests (BlackBox _ _ _ _ _ _ _ _ _ _ incs rM riM templ) =
+  concatMap go (templ : rM ++ riM ++ map snd incs)
+ where
+  go ((TTemplate, _), _) = []
+  go ((THaskell, BlackBoxFunctionName modNames funcName), source@(Just _)) =
+    [InterpretFunctionRequest modNames funcName InterpretTemplateFunction source]
+  go ((THaskell, BlackBoxFunctionName modNames funcName), Nothing)
+    | HashMap.member fullName knownTemplateFunctions = []
+    | otherwise =
+        [InterpretFunctionRequest modNames funcName InterpretTemplateFunction Nothing]
+   where
+    fullName = intercalate "." modNames ++ "." ++ funcName
+neededInterpRequests (Primitive {}) = []
+
+-- | Interpret the given functions in a single shared Hint session. Starting a
+-- session is expensive (it initializes a full GHC session, including reading
+-- all package databases), so sharing one session over all requests is much
+-- faster than a session per function. For each request this action tries two
+-- things:
 --
 --   1. Interpret without explicitly loading the module. This will succeed if
---      the module was already loaded through a package database (set using
---      'interpreterArgs').
+--      the module can be found in the package databases (passed in as
+--      @-package-db@ interpreter arguments).
 --
---   2. If (1) fails, it does try to load it explicitly. If this also fails,
---      an error is returned.
+--   2. If (1) fails, try to load the module explicitly: either from the
+--      inline source a primitive provided, or from the import directories.
+--      If this also fails, an error is recorded for the request.
 --
-loadImportAndInterpret
-  :: (MonadIO m, MonadMask m)
-  => [String]
-  -- ^ Extra search path (usually passed as -i)
-  -> [String]
-  -- ^ Interpreter args
-  -> String
+-- All (1) attempts run before the first (2) attempt, so that interpreting
+-- against the package databases is never influenced by locally loaded
+-- modules. Note that 'Hint.loadModules' resets previously loaded modules, so
+-- (2) attempts cannot see each other's modules either.
+interpretFunctions
+  :: [FilePath]
+  -- ^ Import directories (-i flag)
+  -> [FilePath]
+  -- ^ Package databases
+  -> FilePath
   -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
   -- can be found
-  -> Hint.ModuleName
-  -- ^ Module function lives in
-  -> String
-  -- ^ Function name
-  -> String
-  -- ^ Type name ('BlackBoxFunction' or 'TemplateFunction')
-  -> m (Either (NonEmpty Hint.InterpreterError) a)
-loadImportAndInterpret iPaths0 interpreterArgs topDir qualMod funcName typ = do
-  Hint.liftIO $ Monad.when debugIsOn $
-    putStr "Hint: Interpreting " >> putStrLn (qualMod ++ "." ++ funcName)
-  -- Try to interpret function *without* loading module explicitly. If this
-  -- succeeds, the module was already in the global package database(s).
-  bbfE <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
-    iPaths1 <- (++iPaths0) <$> Hint.get Hint.searchPath
-    Hint.set [Hint.searchPath Hint.:= iPaths1]
-    Hint.setImports [ "Clash.Netlist.Types", "Clash.Netlist.BlackBox.Types", qualMod]
-    Hint.unsafeInterpret funcName typ
+  -> [InterpretFunctionRequest]
+  -- ^ Functions to interpret
+  -> IO InterpretResults
+interpretFunctions _ _ _ [] = pure HashMap.empty
+interpretFunctions idirs pkgDbs topDir reqs = do
+  sessionRes <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
+    -- NB: capture the pristine search path once; 'Hint.get' returns the
+    -- current (possibly already extended) value in a shared session.
+    defaultPath <- Hint.get Hint.searchPath
+    Hint.set [Hint.searchPath Hint.:= (defaultPath ++ idirs)]
 
-  case bbfE of
-    Left globalException -> do
-      -- Try to interpret module as a local module, not yet present in the
-      -- global package database(s).
-      localRes <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
-        Hint.reset
-        iPaths1 <- (iPaths0++) <$> Hint.get Hint.searchPath
-        Hint.set [ Hint.searchPath Hint.:= iPaths1
-                 , Hint.languageExtensions Hint.:= langExts]
-        Hint.loadModules [qualMod]
-        Hint.setImports [ "Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", qualMod]
-        Hint.unsafeInterpret funcName typ
+    -- Phase 1: try to interpret all functions from the package databases
+    globalResults <- forM reqs $ \req -> do
+      Hint.liftIO $ Monad.when debugIsOn $
+        putStr "Hint: Interpreting " >> putStrLn (interpretFunctionRequestToModuleName req ++ "." ++ ifrFuncName req)
+      res <- tryInterp (interpretGlobal req)
+      pure (req, res)
 
-      case localRes of
-        Left localException -> pure (Left (globalException :| [localException]))
-        Right res -> pure (Right res)
+    -- Phase 2: functions that failed phase 1 are interpreted as local
+    -- modules, compiled from inline source or the import directories
+    Monad.unless (null [() | (_, Left _) <- globalResults]) $
+      Hint.set [Hint.languageExtensions Hint.:= hintLanguageExtensions]
+    forM globalResults $ \(req, globalRes) ->
+      case globalRes of
+        Right res -> pure (req, Right res)
+        Left globalException -> do
+          localRes <- tryInterp (interpretLocal defaultPath req)
+          case localRes of
+            Left localException ->
+              pure (req, Left (globalException :| [localException]))
+            Right res -> pure (req, Right res)
 
-    Right res -> do
-      return (Right res)
+  case sessionRes of
+    -- The session itself failed to initialize; attribute the error to every
+    -- request.
+    Left e -> pure (HashMap.fromList [(req, Left (e :| [])) | req <- reqs])
+    Right results -> pure (HashMap.fromList results)
  where
-   langExts = map Hint.asExtension $
-                map show wantedLanguageExtensions ++
-                map ("No" ++ ) (map show unwantedLanguageExtensions)
+  interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
+
+  tryInterp
+    :: Hint.InterpreterT IO InterpretFunctionResult
+    -> Hint.InterpreterT IO (Either Hint.InterpreterError InterpretFunctionResult)
+  tryInterp = try
+
+  interpret req = case ifrType req of
+    InterpretBlackBoxFunction ->
+      InterpretBBF <$> Hint.unsafeInterpret (ifrFuncName req) "BlackBoxFunction"
+    InterpretTemplateFunction ->
+      InterpretTF <$> Hint.unsafeInterpret (ifrFuncName req) "TemplateFunction"
+
+  interpretGlobal req = do
+    Hint.setImports
+      ["Clash.Netlist.Types", "Clash.Netlist.BlackBox.Types", interpretFunctionRequestToModuleName req]
+    interpret req
+
+  interpretLocal defaultPath req = withSourceDir $ \extraDirs -> do
+    Hint.set [Hint.searchPath Hint.:= (extraDirs ++ idirs ++ defaultPath)]
+    Hint.loadModules [interpretFunctionRequestToModuleName req]
+    Hint.setImports
+      ["Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", interpretFunctionRequestToModuleName req]
+    interpret req
+   where
+    -- Write the inline source (if any) of a request to a temporary
+    -- directory, and pass that directory as an extra search path
+    withSourceDir act = case ifrSource req of
+      Nothing -> act []
+      Just source -> do
+        tmpDir0 <- Hint.liftIO getCanonicalTemporaryDirectory
+        withTempDirectory tmpDir0 "clash-prim-compile" $ \tmpDir1 -> do
+          let modDir = foldl (</>) tmpDir1 (init (ifrModNames req))
+          Hint.liftIO $ do
+            Directory.createDirectoryIfMissing True modDir
+            Text.writeFile (modDir </> last (ifrModNames req) <.> "hs") source
+          act [tmpDir1]
 
 -- | List of known BlackBoxFunctions used to prevent Hint from firing. This
 --  improves Clash startup times.
@@ -616,7 +727,33 @@ knownTemplateFunctions =
     , ('P.clockWizardDifferentialTclTF, P.clockWizardDifferentialTclTF)
     ]
 
--- | Compiles blackbox functions and parses blackbox templates.
+-- | Compiles the blackbox functions of and parses the blackbox templates in
+-- a primitive map. All blackbox functions are interpreted in a single shared
+-- Hint session (see 'interpretFunctions'), and every distinct function is
+-- interpreted exactly once, no matter how many primitives reference it.
+compilePrimitives
+  :: [FilePath]
+  -- ^ Import directories (-i flag)
+  -> [FilePath]
+  -- ^ Package databases
+  -> FilePath
+  -- ^ The folder in which the GHC bootstrap libraries (base, containers, etc.)
+  -- can be found
+  -> ResolvedPrimMap
+  -- ^ Primitives to compile
+  -> IO CompiledPrimMap
+compilePrimitives idirs pkgDbs topDir primMapR = do
+  let reqs =
+        List.nubOrd $
+        concatMap
+          neededInterpRequests
+          (mapMaybe extractPrim (HashMap.elems primMapR))
+  results <- interpretFunctions idirs pkgDbs topDir reqs
+  traverse (traverse (compilePrimitiveWith (lookupInterpResult results))) primMapR
+
+-- | Compiles a single primitive. Provided for backwards compatibility; when
+-- compiling multiple primitives, 'compilePrimitives' only pays the cost of
+-- starting a Hint session once.
 compilePrimitive
   :: [FilePath]
   -- ^ Import directories (-i flag)
@@ -628,18 +765,41 @@ compilePrimitive
   -> ResolvedPrimitive
   -- ^ Primitive to compile
   -> IO CompiledPrimitive
-compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName source) = do
+compilePrimitive idirs pkgDbs topDir prim = do
+  let reqs = HashSet.toList (HashSet.fromList (neededInterpRequests prim))
+  results <- interpretFunctions idirs pkgDbs topDir reqs
+  compilePrimitiveWith (lookupInterpResult results) prim
+
+-- | Look up the interpreter result of a request. All requests are
+-- interpreted before primitives are compiled, so a missing result is an
+-- internal error: 'neededInterpRequests' diverged from the requests
+-- 'compilePrimitiveWith' consumes.
+lookupInterpResult
+  :: InterpretResults
+  -> InterpretFunctionRequest
+  -> IO (Either (NonEmpty Hint.InterpreterError) InterpretFunctionResult)
+lookupInterpResult results req =
+  case HashMap.lookup req results of
+    Just res -> pure res
+    Nothing -> error ($(curLoc) ++ "Internal error: no interpreter result for "
+                             ++ show req)
+
+-- | Compiles the blackbox functions of and parses the blackbox templates in
+-- a primitive, given an action that produces the interpreted functions the
+-- primitive needs (see 'neededInterpRequests').
+compilePrimitiveWith
+  :: (InterpretFunctionRequest -> IO (Either (NonEmpty Hint.InterpreterError) InterpretFunctionResult))
+  -- ^ Look up the interpreter result for a request
+  -> ResolvedPrimitive
+  -- ^ Primitive to compile
+  -> IO CompiledPrimitive
+compilePrimitiveWith lookupInterp (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName source) = do
   bbFunc <-
-    -- TODO: Use cache for hint targets. Right now Hint will fire multiple times
-    -- TODO: if multiple functions use the same blackbox haskell function.
     case HashMap.lookup fullName knownBlackBoxFunctions of
       Just f -> pure f
       Nothing -> do
-        Monad.when debugIsOn (putStr "Hint: interpreting " >> putStrLn (show fullName))
-        let interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
-        -- Compile a blackbox template function or fetch it from an already compiled file.
-        r <- go interpreterArgs source
-        processHintErrors (show bbGenName) bbName r
+        r <- lookupInterp (InterpretFunctionRequest modNames funcName InterpretBlackBoxFunction source)
+        expectBBF =<< processHintErrors (show bbGenName) bbName r
 
   pure (BlackBoxHaskell bbName wf usedArgs multiRes bbGenName (hash source, bbFunc))
  where
@@ -647,34 +807,12 @@ compilePrimitive idirs pkgDbs topDir (BlackBoxHaskell bbName wf usedArgs multiRe
     qualMod = intercalate "." modNames
     BlackBoxFunctionName modNames funcName = bbGenName
 
-    -- | Create directory based on base name and directory. Return path
-    -- of directory just created.
-    createDirectory'
-      :: FilePath
-      -> FilePath
-      -> IO FilePath
-    createDirectory' base sub =
-      let new = base </> sub in
-      Directory.createDirectory new >> return new
+    expectBBF :: InterpretFunctionResult -> IO BlackBoxFunction
+    expectBBF (InterpretBBF f) = pure f
+    expectBBF _ = error ($(curLoc) ++ "Internal error: expected a BlackBoxFunction for "
+                                ++ fullName)
 
-    go
-      :: [String]
-      -> Maybe Text
-      -> IO (Either (NonEmpty Hint.InterpreterError) BlackBoxFunction)
-    go args (Just source') = do
-      -- Create a temporary directory with user module in it, add it to the
-      -- list of import direcotries, and run as if it were a "normal" compiled
-      -- module.
-      tmpDir0 <- getCanonicalTemporaryDirectory
-      withTempDirectory tmpDir0 "clash-prim-compile" $ \tmpDir1 -> do
-        modDir <- foldM createDirectory' tmpDir1 (init modNames)
-        Text.writeFile (modDir </> (last modNames ++ ".hs")) source'
-        loadImportAndInterpret (tmpDir1:idirs) args topDir qualMod funcName "BlackBoxFunction"
-
-    go args Nothing = do
-      loadImportAndInterpret idirs args topDir qualMod funcName "BlackBoxFunction"
-
-compilePrimitive idirs pkgDbs topDir
+compilePrimitiveWith lookupInterp
   (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM imps fPlural incs rM riM templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
@@ -684,8 +822,6 @@ compilePrimitive idirs pkgDbs topDir
   riM'   <- traverse parseBB riM
   return (BlackBox pNm wf rVoid multiRes tkind () outputUsage libM' imps' fPlural incs' rM' riM' templ')
  where
-  iArgs = concatMap (("-package-db":) . (:[])) pkgDbs
-
   parseTempl
     :: Applicative m
     => Text
@@ -697,24 +833,27 @@ compilePrimitive idirs pkgDbs topDir
     Success t'
       -> pure t'
 
+  interpretTF :: InterpretFunctionRequest -> IO TemplateFunction
+  interpretTF req = do
+    r <- lookupInterp req
+    res <- processHintErrors (show (BlackBoxFunctionName (ifrModNames req) (ifrFuncName req))) pNm r
+    case res of
+      InterpretTF f -> pure f
+      _ -> error ($(curLoc) ++ "Internal error: expected a TemplateFunction for "
+                         ++ interpretFunctionRequestToModuleName req ++ "." ++ ifrFuncName req)
+
   parseBB
     :: ((TemplateFormat,BlackBoxFunctionName), Maybe Text)
     -> IO BlackBox
   parseBB ((TTemplate,_),Just t)     = BBTemplate <$> parseTempl t
   parseBB ((TTemplate,_),Nothing)    =
     error ("No template specified for blackbox: " ++ show pNm)
-  parseBB ((THaskell,bbGenName),Just source) = do
+  parseBB ((THaskell,bbGenName),source@(Just source')) = do
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
-    tmpDir <- getCanonicalTemporaryDirectory
-    r <- withTempDirectory tmpDir "clash-prim-compile" $ \tmpDir' -> do
-      let modDir = foldl (</>) tmpDir' (init modNames)
-      Directory.createDirectoryIfMissing True modDir
-      Text.writeFile (modDir </> last modNames <.>  "hs") source
-      loadImportAndInterpret (tmpDir':idirs) iArgs topDir qualMod funcName "TemplateFunction"
-    let hsh = hash (qualMod, source)
+        hsh = hash (qualMod, source')
     BBFunction (Data.Text.unpack pNm) hsh <$>
-      processHintErrors (show bbGenName) pNm  r
+      interpretTF (InterpretFunctionRequest modNames funcName InterpretTemplateFunction source)
   parseBB ((THaskell,bbGenName),Nothing) = do
     let BlackBoxFunctionName modNames funcName = bbGenName
         qualMod = intercalate "." modNames
@@ -723,14 +862,13 @@ compilePrimitive idirs pkgDbs topDir
     tf <-
       case HashMap.lookup fullName knownTemplateFunctions of
         Just f -> pure f
-        Nothing -> do
-          r <- loadImportAndInterpret idirs iArgs topDir qualMod funcName "TemplateFunction"
-          processHintErrors (show bbGenName) pNm r
+        Nothing ->
+          interpretTF (InterpretFunctionRequest modNames funcName InterpretTemplateFunction Nothing)
     pure (BBFunction (Data.Text.unpack pNm) hsh tf)
 
-compilePrimitive _ _ _ (Primitive pNm wf typ) =
+compilePrimitiveWith _ (Primitive pNm wf typ) =
   return (Primitive pNm wf typ)
-{-# SCC compilePrimitive #-}
+{-# SCC compilePrimitiveWith #-}
 
 newtype HintError = HintError String deriving (Exception)
 
