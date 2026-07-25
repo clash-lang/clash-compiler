@@ -73,7 +73,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet,
-   differenceVarEnv)
+   differenceVarEnv, emptyVarSet, extendVarSet)
 import           Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
@@ -850,12 +850,15 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     --
     -- † https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374
     -- ‡ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf
-    bs <- Lens.use bindings
-    inlineBinders (inlineTest bs) ctx0 (Letrec bndrs e1) (Rec bndrs) e1 >>= \case
-      e2@(Let bnders1 e3) ->
-        pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
-      e2 ->
-        pure e2
+    case prune e1 of
+      [] -> return e1
+      bndrs1 -> do
+        bs <- Lens.use bindings
+        inlineBinders (inlineTest bs) ctx0 (Letrec bndrs1 e1) (Rec bndrs1) e1 >>= \case
+          e2@(Let bnders1 e3) ->
+            pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
+          e2 ->
+            pure e2
   else
     return e1
   where
@@ -864,6 +867,23 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
     ctx = TransformContext is1 (LetBody bndrs : hist)
 
     bndrs = map toLetBinding $ UniqMap.toList heap
+
+    -- Only the heap entries that the rewritten expression (transitively)
+    -- references need to be let-bound. The heap also contains entries whose
+    -- references were eliminated by evaluation; letting those means paying
+    -- for them in every pass over the letrec, only for
+    -- 'removeUnusedBinders' to remove them again. Removal there is also
+    -- transitive, so pruning keeps exactly the bindings that would survive.
+    prune e1 = filter (\(i, _) -> i `elemVarSet` reachable) bndrs
+      where
+        reachable = go emptyVarSet (Lens.toListOf freeLocalIds e1)
+
+        go seen [] = seen
+        go seen (i:is)
+          | i `elemVarSet` seen = go seen is
+          | otherwise = case UniqMap.lookup i heap of
+              Just t -> go (extendVarSet seen i) (Lens.toListOf freeLocalIds t ++ is)
+              Nothing -> go (extendVarSet seen i) is
 
     toLetBinding :: (Unique,Term) -> LetBinding
     toLetBinding (uniq,term) = (nm, term)
