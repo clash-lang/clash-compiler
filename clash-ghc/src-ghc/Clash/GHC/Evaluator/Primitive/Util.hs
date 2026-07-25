@@ -97,7 +97,6 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified Clash.Sized.Vector
 
-import {-# SOURCE #-} Clash.GHC.Evaluator.Primitive
 
 newtype PrimEvalMonad a = PEM (State Supply a)
   deriving (Functor, Applicative, Monad, MonadState Supply)
@@ -172,12 +171,12 @@ mkPrimStepContext tcm isSubj pInfo tys args mach = PrimStepContext{..}
       Right e' -> Just (setTerm e' mach0)
 
     reduceWHNF e =
-      let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      let eval = evaluator
           mach1@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e $ stackClear mach)
       in Just $ mach1 { mStack = mStack mach }
 
     reduceWHNF' mach1 e =
-      let eval = Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+      let eval = evaluator
           mach2@Machine{mStack=[]} = whnf eval tcm isSubj (setTerm e $ stackClear mach1)
        in Just $ mach2 { mStack = mStack mach }
 

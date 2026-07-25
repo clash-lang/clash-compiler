@@ -36,7 +36,6 @@ import {-# SOURCE #-} Clash.GHC.Evaluator
 
 import qualified Clash.Class.BitPack.Internal
 
-import {-# SOURCE #-} Clash.GHC.Evaluator.Primitive
 import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
@@ -46,7 +45,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Int8 -> BitVector 8
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Int8Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -67,7 +66,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Int16 -> BitVector 16
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Int16Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -88,7 +87,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Int32 -> BitVector 32
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Int32Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -109,7 +108,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Int64 -> BitVector 64
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Int64Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -130,7 +129,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Word -> BitVector WORD_SIZE_IN_BITS
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
               , mach2@Machine{mStack=[],mTerm=Literal (WordLiteral i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
               -> let resTyInfo = extractTySizeInfo tcm ty tys
@@ -146,7 +145,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Word8 -> BitVector 8
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Word8Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -167,7 +166,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Word16 -> BitVector 16
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -188,7 +187,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Word32 -> BitVector 32
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Word32Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -209,7 +208,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Word64 -> BitVector 64
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Word64Literal i)} <-
                   whnf eval tcm True (setTerm arg $ stackClear mach)
@@ -230,7 +229,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Double -> BitVector 64
             | [DC _ [Left arg]] <- args
-            , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+            , eval <- evaluator
             , mach2@Machine{mStack=[],mTerm=Literal (DoubleLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
             -> let resTyInfo = extractTySizeInfo tcm ty tys
                 in Just $ mach2
@@ -245,7 +244,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: Float -> BitVector 32
             | [DC _ [Left arg]] <- args
-            , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+            , eval <- evaluator
             , mach2@Machine{mStack=[],mTerm=Literal (FloatLiteral i)} <- whnf eval tcm True (setTerm arg $ stackClear mach)
             -> let resTyInfo = extractTySizeInfo tcm ty tys
                 in Just $ mach2
@@ -260,7 +259,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..} -- :: CUShort -> BitVector 16
             | [DC _ [Left arg]] <- args
-              , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+              , eval <- evaluator
 #if MIN_VERSION_base(4,16,0)
               , mach2@Machine{mStack=[],mTerm=Literal (Word16Literal i)}
                   <- whnf eval tcm True (setTerm arg $ stackClear mach)

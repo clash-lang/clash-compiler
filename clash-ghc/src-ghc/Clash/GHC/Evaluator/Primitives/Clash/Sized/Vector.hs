@@ -76,7 +76,6 @@ import {-# SOURCE #-} Clash.GHC.Evaluator
 import qualified Clash.Sized.Internal.Index
 import qualified Clash.Sized.Vector
 
-import {-# SOURCE #-} Clash.GHC.Evaluator.Primitive
 import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
@@ -602,7 +601,7 @@ primitives =
             -> case n of
                  0  -> reduce (mkVecNil dc aTy)
                  n' | DC snatDc [_,Left d'] <- d
-                    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+                    , eval <- evaluator
                     , mach2@Machine{mStack=[],mTerm=Literal (NaturalLiteral d2)} <- whnf eval tcm isSubj (setTerm d' $ stackClear mach)
                     -> case (d2 `mod` n) of
                          0  -> reduce (valToTerm xs)
@@ -641,7 +640,7 @@ primitives =
             -> case n of
                  0  -> reduce (mkVecNil dc aTy)
                  n' | DC snatDc [_,Left d'] <- d
-                    , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+                    , eval <- evaluator
                     , mach2@Machine{mStack=[],mTerm=Literal (NaturalLiteral d2)} <- whnf eval tcm isSubj (setTerm d' $ stackClear mach)
                     -> case (d2 `mod` n) of
                          0  -> reduce (valToTerm xs)
@@ -728,7 +727,7 @@ primitives =
             -> case m of
                  0  -> reduce (mkVecNil dc bTy)
                  m'
-                  | eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+                  | eval <- evaluator
                   , mach1@Machine{mStack=[],mTerm=n} <-
                       whnf eval tcm True (setTerm nArg (stackClear mach))
                   ->  let (tyArgs,_) = splitFunForallTy ty

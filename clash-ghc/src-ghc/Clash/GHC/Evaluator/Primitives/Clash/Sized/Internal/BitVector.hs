@@ -46,7 +46,6 @@ import {-# SOURCE #-} Clash.GHC.Evaluator
 
 import qualified Clash.Sized.Internal.BitVector
 
-import {-# SOURCE #-} Clash.GHC.Evaluator.Primitive
 import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
@@ -60,7 +59,7 @@ primitives =
             -- The second argument to `xToBV` is always going to be suspended.
             -- See Note [Lazy primitives]
             , [ _, (Suspend arg) ] <- args
-            , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+            , eval <- evaluator
             , mach1@Machine{mStack=[],mTerm=argWHNF} <-
                 whnf eval tcm True (setTerm arg (stackClear mach))
             , let undefBitVector =

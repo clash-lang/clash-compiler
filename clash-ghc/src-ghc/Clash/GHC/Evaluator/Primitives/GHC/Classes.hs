@@ -33,7 +33,6 @@ import {-# SOURCE #-} Clash.GHC.Evaluator
 
 import qualified GHC.Classes
 
-import {-# SOURCE #-} Clash.GHC.Evaluator.Primitive
 import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
@@ -91,7 +90,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..}
             | [ lArg , rArg ] <- args
-            , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+            , eval <- evaluator
             -- evaluation of the arguments is deferred until the evaluation of the ghcPrimUnwindWith
             -- to make `&&` lazy in both arguments
             , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
@@ -120,7 +119,7 @@ primitives =
         case mkPrimStepContext tcm isSubj pInfo tys args mach of
           PrimStepContext{..}
             | [ lArg , rArg ] <- args
-            , eval <- Evaluator ghcStep ghcUnwind ghcPrimStep ghcPrimUnwind
+            , eval <- evaluator
             -- evaluation of the arguments is deferred until the evaluation of the ghcPrimUnwindWith
             -- to make `||` lazy in both arguments
             , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
