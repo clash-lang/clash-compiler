@@ -638,28 +638,31 @@ liftBinding (var@Id {varName = idName} ,e) = do
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists. Terms can
-  -- only be alpha-equivalent if their types are, so candidates are
-  -- prefiltered on a cached fingerprint of their type: alpha-equivalent
-  -- types have equal fingerprints, and a binder's type never changes, so
-  -- the cached fingerprints stay valid across calls. The scan stops at the
-  -- first match.
-  let newBodyFingerprint = typeAlphaFingerprint newBodyTy
-  fingerprints0 <- Lens.use bindingTypeFingerprints
-  let scan cache [] = (Nothing, cache)
-      scan cache (b:bs) =
+  -- only be alpha-equivalent if their types are, so candidates come from a
+  -- reverse index on the fingerprint of binder types: alpha-equivalent types
+  -- have equal fingerprints, and a binder's type never changes. The index is
+  -- extended with the binders added to the binding map since the previous
+  -- call; binders are never removed during normalization, so entries never
+  -- have to be invalidated. Candidates are checked in ascending unique order
+  -- (the order the old whole-map scan visited them in) against the current
+  -- binding map, because terms do get updated in place. The scan stops at
+  -- the first match.
+  indexed <- Lens.use liftBindingIndexed
+  index0 <- Lens.use liftBindingIndex
+  let insertFingerprint acc b =
         let i = bindingId b
-            (fingerprint, cache1) = case lookupVarEnv i cache of
-              Just known -> (known, cache)
-              Nothing ->
-                let fresh = typeAlphaFingerprint (varType i)
-                 in (fresh, extendVarEnv i fresh cache)
-         in if fingerprint == newBodyFingerprint
-               && varType i `aeqType` newBodyTy
-               && bindingTerm b `aeqTerm` newBody
-              then (Just b, cache1)
-              else scan cache1 bs
-      (aeqExisting, fingerprints1) = scan fingerprints0 (UniqMap.elems binders)
-  bindingTypeFingerprints Lens..= fingerprints1
+         in HashMap.insertWith (<>) (typeAlphaFingerprint (varType i)) [i] acc
+      index1 = List.foldl' insertFingerprint index0
+                 (UniqMap.elems (UniqMap.difference binders indexed))
+  liftBindingIndex Lens..= index1
+  liftBindingIndexed Lens..= binders
+  let newBodyFingerprint = typeAlphaFingerprint newBodyTy
+      candidates = sortOn varUniq
+        (HashMap.findWithDefault [] newBodyFingerprint index1)
+      aeqExisting = List.find
+        (\b -> varType (bindingId b) `aeqType` newBodyTy
+            && bindingTerm b `aeqTerm` newBody)
+        (mapMaybe (`UniqMap.lookup` binders) candidates)
   case aeqExisting of
     -- If it doesn't, create a new binder
     Nothing -> do -- Add the created function to the list of global bindings

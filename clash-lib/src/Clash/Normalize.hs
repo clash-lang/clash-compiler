@@ -132,7 +132,8 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   0
                   (IntMap.empty, 0)
                   emptyVarEnv
-                  emptyVarEnv  -- bindingTypeFingerprints
+                  mempty       -- liftBindingIndex
+                  emptyVarEnv  -- liftBindingIndexed
                   mempty       -- hwTypeCache
                   normState
 
