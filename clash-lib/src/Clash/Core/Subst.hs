@@ -47,6 +47,7 @@ module Clash.Core.Subst
   , substTm
   , maybeSubstTm
   , substGlobalsInTerm
+  , substLocalIdInTerm
   , substAlt
   , substId
     -- * Variable renaming
@@ -646,6 +647,88 @@ substGlobalsInTerm globals = \term -> fromMaybe term (go term)
   -- 'Attributes' — which carries a term — needs a traversal.
   goTickInfo (Attributes ty e) = Attributes ty <$> go e
   goTickInfo _ = Nothing
+
+  goList :: (a -> Maybe a) -> [a] -> Maybe [a]
+  goList f = goElements
+   where
+    goElements [] = Nothing
+    goElements (x:xs) = case (f x, goElements xs) of
+      (Nothing, Nothing) -> Nothing
+      (x1, xs1) -> Just (fromMaybe x x1 : fromMaybe xs xs1)
+
+-- | Substitute a single local variable by a term, without any capture
+-- avoidance. Only valid when the term substituted into is deshadowed with
+-- respect to an in-scope set that contains the free variables of the
+-- replacement term: no binder in the traversed term can then capture a
+-- variable of the replacement term, so binders never have to be renamed —
+-- where they would, 'substTm' must be used instead.
+--
+-- Sharing-preserving: a subterm in which no substitution takes place is
+-- returned as the original subterm instead of being reallocated, and types
+-- are never touched, unlike 'substTm', which rebuilds every node it visits.
+-- Binders shadowing the substituted variable end the substitution in their
+-- scope.
+substLocalIdInTerm
+  :: Id
+  -- ^ The local variable to substitute
+  -> Term
+  -- ^ The term to replace it with
+  -> Term
+  -- ^ The term to substitute in
+  -> Term
+substLocalIdInTerm target payload = \term -> fromMaybe term (go term)
+ where
+  go :: Term -> Maybe Term
+  go = \case
+    Var v
+      | v == target -> Just payload
+      | otherwise -> Nothing
+    Lam v e
+      | v `shadows` target -> Nothing
+      | otherwise -> Lam v <$> go e
+    TyLam tv e -> TyLam tv <$> go e
+    App l r -> case (go l, go r) of
+      (Nothing, Nothing) -> Nothing
+      (l1, r1) -> Just (App (fromMaybe l l1) (fromMaybe r r1))
+    TyApp e ty -> (`TyApp` ty) <$> go e
+    -- A non-recursive let binder does not scope over its own right-hand side
+    Let (NonRec v rhs) body ->
+      case (go rhs, if v `shadows` target then Nothing else go body) of
+        (Nothing, Nothing) -> Nothing
+        (rhs1, body1) ->
+          Just (Let (NonRec v (fromMaybe rhs rhs1)) (fromMaybe body body1))
+    Let (Rec bindings) body
+      | any ((`shadows` target) . fst) bindings -> Nothing
+      | otherwise -> case (goList goBinding bindings, go body) of
+          (Nothing, Nothing) -> Nothing
+          (bindings1, body1) ->
+            Just (Let (Rec (fromMaybe bindings bindings1))
+                      (fromMaybe body body1))
+    Case subject ty alternatives ->
+      case (go subject, goList goAlternative alternatives) of
+        (Nothing, Nothing) -> Nothing
+        (subject1, alternatives1) ->
+          Just (Case (fromMaybe subject subject1) ty
+                     (fromMaybe alternatives alternatives1))
+    Cast e t1 t2 -> (\e1 -> Cast e1 t1 t2) <$> go e
+    Tick tickInfo e -> case (goTickInfo tickInfo, go e) of
+      (Nothing, Nothing) -> Nothing
+      (tick1, e1) -> Just (Tick (fromMaybe tickInfo tick1) (fromMaybe e e1))
+    -- Data, Literal, Prim
+    _ -> Nothing
+
+  goBinding (v, rhs) = (,) v <$> go rhs
+
+  goAlternative (pat, alternative) = case pat of
+    DataPat _ _ ids | any (`shadows` target) ids -> Nothing
+    _ -> (,) pat <$> go alternative
+
+  -- Types contain no term variables, so of the tick constructors only
+  -- 'Attributes' — which carries a term — needs a traversal.
+  goTickInfo (Attributes ty e) = Attributes ty <$> go e
+  goTickInfo _ = Nothing
+
+  shadows v i = varUniq v == varUniq i
 
   goList :: (a -> Maybe a) -> [a] -> Maybe [a]
   goList f = goElements

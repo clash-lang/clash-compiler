@@ -216,8 +216,11 @@ appPropWorker ctx@(TransformContext is _) node = do
     bndrs <- Lens.use bindings
     orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
       True ->
-        let subst = extendIdSubst (mkSubst is0) v arg in
-        (`mkTicks` ticks) <$> go is0 (substTm "appProp.AppLam" subst e) args []
+        -- 'e' is deshadowed w.r.t. 'is0' (the top-level 'deShadowTerm', with
+        -- 'go' re-deshadowing whenever it extends the in-scope set) and the
+        -- free variables of 'arg' are in 'is0', which is exactly the
+        -- precondition of the sharing-preserving 'substLocalIdInTerm'.
+        (`mkTicks` ticks) <$> go is0 (substLocalIdInTerm v arg e) args []
       False ->
         let is1 = extendInScopeSet is0 v in
         Let (NonRec v arg) <$> go is1 (deShadowTerm is1 e) args ticks
