@@ -44,6 +44,7 @@ module Clash.Normalize.Transformations.Inline
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad ((>=>))
+import Control.Monad.Extra (anyM)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Writer (lift,listen)
 import Data.Default (Default(..))
@@ -137,19 +138,20 @@ bindConstantVarWorker = inlineBinders test
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
       True -> return (i `notElemFreeVars` e)
       _    -> do
-        tcm <- Lens.view tcCache
         (fn,_) <- Lens.use curFun
-        -- Don't inline things that perform work, it increases the circuit size.
-        --
-        -- Also don't inline globally recursive calls, it prevents the
+        -- Don't inline globally recursive calls, it prevents the
         -- recToLetRec transformation from transforming global recursion to
         -- local recursion.
         -- See https://github.com/clash-lang/clash-compiler/issues/2839
-        case isWorkFreeIsh tcm e && not (e == Var fn) of
-          True -> Lens.view inlineConstantLimit >>= \case
-            0 -> return True
-            n -> return (termSizeSmallerThan (n + 1) e)
-          _ -> return False
+        if e == Var fn then return False else do
+          tcm <- Lens.view tcCache
+          -- Don't inline things that perform work, it increases the circuit
+          -- size.
+          case isWorkFreeIsh tcm e of
+            True -> Lens.view inlineConstantLimit >>= \case
+              0 -> return True
+              n -> return (termSizeSmallerThan (n + 1) e)
+            _ -> return False
 {-# SCC bindConstantVarWorker #-}
 
 -- | Mark to track progress of 'reduceBindersCleanup'
@@ -652,27 +654,37 @@ inlineSmall =
       <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)
 
 -- | The application-spine handler of 'inlineSmall'.
+--
+-- The guards run cheapest-first: the binder-only checks disqualify the vast
+-- majority of attempts without computing any type information.
 inlineSmallWorker :: HasCallStack => NormRewrite
-inlineSmallWorker _ e@(collectArgsTicks -> (Var f,args,ticks)) = do
-  untranslatable <- isUntranslatable True e
-  topEnts <- Lens.view topEntities
-  let lv = isLocalId f
-  if untranslatable || f `elemVarSet` topEnts || lv
-    then return e
-    else do
-      bndrs <- Lens.use bindings
-      sizeLimit <- Lens.view inlineFunctionLimit
-      case lookupVarEnv f bndrs of
-        -- Don't inline recursive expressions
-        Just b -> do
-          isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && not (isNoInline (bindingSpec b)) && termSizeSmallerThan sizeLimit (bindingTerm b)
-             then do
-               let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-               changed $ mkApps tm args
-             else return e
+inlineSmallWorker _ e@(collectArgsTicks -> (Var f,args,ticks))
+  | isLocalId f = return e
+  | otherwise = do
+      topEnts <- Lens.view topEntities
+      if f `elemVarSet` topEnts
+        then return e
+        else do
+          bndrs <- Lens.use bindings
+          sizeLimit <- Lens.view inlineFunctionLimit
+          case lookupVarEnv f bndrs of
+            Just b
+              | not (isNoInline (bindingSpec b))
+              , termSizeSmallerThan sizeLimit (bindingTerm b)
+              -> do
+                -- Don't inline recursive expressions
+                isRecBndr <- isRecursiveBndr f
+                if isRecBndr
+                   then return e
+                   else do
+                     untranslatable <- isUntranslatable True e
+                     if untranslatable
+                        then return e
+                        else do
+                          let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+                          changed $ mkApps tm args
 
-        _ -> return e
+            _ -> return e
 
 inlineSmallWorker _ e = return e
 {-# SCC inlineSmallWorker #-}
@@ -686,74 +698,88 @@ inlineWorkFree =
       <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)
 
 -- | The application-spine handler of 'inlineWorkFree'.
+--
+-- The guards run cheapest-first: the binder-only checks (local variable, top
+-- entity, unknown binder) disqualify the vast majority of attempts without
+-- computing any type information.
 inlineWorkFreeWorker :: HasCallStack => NormRewrite
 inlineWorkFreeWorker _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
+  | isLocalId f = return e
+  | otherwise
   = do
-    tcm <- Lens.view tcCache
-    let eTy = inferCoreTypeOf tcm e
-    argsHaveWork <- or <$> mapM (either expressionHasWork
-                                        (const (pure False)))
-                                args
-    untranslatable <- isUntranslatableType True eTy
     topEnts <- Lens.view topEntities
-    let isSignal = isSignalType tcm eTy
-    let lv = isLocalId f
-    let isTopEnt = elemVarSet f topEnts
-    if untranslatable || isSignal || argsHaveWork || lv || isTopEnt
+    if f `elemVarSet` topEnts
       then return e
       else do
         bndrs <- Lens.use bindings
         case lookupVarEnv f bndrs of
-          -- Don't inline recursive expressions
           Just b -> do
-            isRecBndr <- isRecursiveBndr f
-            if isRecBndr
-               then return e
-               else do
-                 let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-                 changed $ mkApps tm args
+            tcm <- Lens.view tcCache
+            let eTy = inferCoreTypeOf tcm e
+            if isSignalType tcm eTy
+              then return e
+              else do
+                untranslatable <- isUntranslatableType True eTy
+                argsHaveWork <- anyM (either expressionHasWork
+                                             (const (pure False)))
+                                     args
+                if untranslatable || argsHaveWork
+                  then return e
+                  else do
+                    -- Don't inline recursive expressions
+                    isRecBndr <- isRecursiveBndr f
+                    if isRecBndr
+                       then return e
+                       else do
+                         let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+                         changed $ mkApps tm args
 
           _ -> return e
   where
-    -- an expression is has work when it contains free local variables,
+    -- an expression has work when it contains free local variables,
     -- or has a Signal type, i.e. it does not evaluate to a work-free
-    -- constant.
-    expressionHasWork e' = do
-      let fvIds = Lens.toListOf freeLocalIds e'
-      tcm   <- Lens.view tcCache
-      let e'Ty     = inferCoreTypeOf tcm e'
-          isSignal = isSignalType tcm e'Ty
-      return (not (null fvIds) || isSignal)
+    -- constant. The free-variable check runs first: it is cheaper than
+    -- inferring the expression's type.
+    expressionHasWork e' =
+      if not (isClosed e')
+        then return True
+        else do
+          tcm <- Lens.view tcCache
+          let e'Ty = inferCoreTypeOf tcm e'
+          return (isSignalType tcm e'Ty)
 
-inlineWorkFreeWorker _ e@(Var f) = do
-  tcm <- Lens.view tcCache
-  let fTy      = coreTypeOf f
-      closed   = not (isPolyFunCoreTy tcm fTy)
-      isSignal = isSignalType tcm fTy
-  untranslatable <- isUntranslatableType True fTy
-  topEnts <- Lens.view topEntities
-  let gv = isGlobalId f
-  if closed && f `notElemVarSet` topEnts && not untranslatable && not isSignal && gv
-    then do
-      bndrs <- Lens.use bindings
-      case lookupVarEnv f bndrs of
-        -- Don't inline recursive expressions
-        Just top -> do
-          isRecBndr <- isRecursiveBndr f
-          if isRecBndr
-             then return e
-             else do
-              let topB = bindingTerm top
-              sizeLimit <- Lens.view inlineWFCacheLimit
-              -- caching only worth it from a certain size onwards, otherwise
-              -- the caching mechanism itself brings more of an overhead.
-              if termSizeSmallerThan sizeLimit topB then
-                changed topB
-              else do
-                b <- normalizeTopLvlBndr False f top
-                changed (bindingTerm b)
-        _ -> return e
-    else return e
+inlineWorkFreeWorker _ e@(Var f)
+  | isLocalId f = return e
+  | otherwise = do
+      topEnts <- Lens.view topEntities
+      tcm <- Lens.view tcCache
+      let fTy    = coreTypeOf f
+          closed = not (isPolyFunCoreTy tcm fTy)
+      if f `elemVarSet` topEnts || not closed || isSignalType tcm fTy
+        then return e
+        else do
+          untranslatable <- isUntranslatableType True fTy
+          if untranslatable
+            then return e
+            else do
+              bndrs <- Lens.use bindings
+              case lookupVarEnv f bndrs of
+                -- Don't inline recursive expressions
+                Just top -> do
+                  isRecBndr <- isRecursiveBndr f
+                  if isRecBndr
+                     then return e
+                     else do
+                      let topB = bindingTerm top
+                      sizeLimit <- Lens.view inlineWFCacheLimit
+                      -- caching only worth it from a certain size onwards, otherwise
+                      -- the caching mechanism itself brings more of an overhead.
+                      if termSizeSmallerThan sizeLimit topB then
+                        changed topB
+                      else do
+                        b <- normalizeTopLvlBndr False f top
+                        changed (bindingTerm b)
+                _ -> return e
 
 inlineWorkFreeWorker _ e = return e
 {-# SCC inlineWorkFreeWorker #-}
