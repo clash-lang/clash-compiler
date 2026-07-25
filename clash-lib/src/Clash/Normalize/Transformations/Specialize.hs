@@ -77,7 +77,7 @@ import Clash.Core.Type
   (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
   , mkPolyFunTy, mkTyConApp)
 import Clash.Core.TysPrim
-import Clash.Core.Util (listToLets)
+import Clash.Core.Util (listToLets, mkNonRecLets)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv
@@ -252,10 +252,10 @@ appPropWorker ctx@(TransformContext is _) node = do
         let vbs   = map fst vs
             is1   = extendInScopeSetList is0 vbs
             alts1 = map (deShadowAlt is1) alts
-        -- TODO I should have a mkNonRecLets :: [LetBinding] -> Term -> Term
-        -- function which makes a chain of non-recursive let expressions without
-        -- needing to first take the SCCs of all the binders.
-        listToLets vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts1
+        -- These binders are the freshly created argument binders of one
+        -- application and cannot refer to each other, so they become a chain
+        -- of non-recursive lets without computing their dependency graph.
+        mkNonRecLets vs . (`mkTicks` ticks) . Case scrut ty1 <$> mapM (goAlt is1 args1) alts1
 
   go is0 (Tick sp e) args ticks = do
     setChanged

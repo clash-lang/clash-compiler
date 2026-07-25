@@ -72,6 +72,13 @@ listToLets xs body = foldr go body (sccLetBindings xs)
   go (Graph.AcyclicSCC (i, x)) acc = Let (NonRec i x) acc
   go (Graph.CyclicSCC binds) acc = Let (Rec binds) acc
 
+-- | Rebuild a let expression as a chain of non-recursive lets, in the given
+-- order. Only valid when the bindings do not refer to each other: unlike
+-- 'listToLets' this does not compute their dependency graph, which requires
+-- a free-variable traversal of every bound term.
+mkNonRecLets :: [LetBinding] -> Term -> Term
+mkNonRecLets xs body = foldr (\(i, x) acc -> Let (NonRec i x) acc) body xs
+
 -- | The type @forall a . a@
 undefinedTy ::Type
 undefinedTy =

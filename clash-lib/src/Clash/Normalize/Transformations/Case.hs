@@ -71,7 +71,7 @@ import Clash.Core.Term
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
 import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
-import Clash.Core.Util (listToLets, mkInternalVar)
+import Clash.Core.Util (mkInternalVar, mkNonRecLets)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
@@ -248,9 +248,10 @@ caseCon' ctx@(TransformContext is0 _) e subj ty alts = do
             body  = substTm "caseCon'" subst altE
           case Maybe.catMaybes binds2 of
             []     -> pure body
-            -- Use listToLets to create a series of non-recursive lets instead
-            -- of a recursive group. We know these binders will not form a group.
-            binds3 -> pure (listToLets binds3 body)
+            -- These binders are arguments of a single constructor application
+            -- and cannot refer to each other, so they become a series of
+            -- non-recursive lets without computing their dependency graph.
+            binds3 -> pure (mkNonRecLets binds3 body)
      changed altE1
     _ -> case alts of
            -- In Core, default patterns always come first, so we match against
