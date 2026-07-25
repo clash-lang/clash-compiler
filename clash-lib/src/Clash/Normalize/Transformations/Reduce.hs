@@ -164,6 +164,10 @@ reduceNonRepPrim = transform "reduceNonRepPrim" (onApp 'reduceNonRepPrimWorker)
 reduceNonRepPrimWorker
   :: HasCallStack
   => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
+-- Only consider the root of an application spine (see 'reduceConstWorker'):
+-- the root sees all arguments, and the @Vec 0@-to-@Nil@ rewrite below is only
+-- type-correct at the root, where no more arguments follow.
+reduceNonRepPrimWorker (TransformContext _ (AppFun:_)) e _appFunction _appArgument = return e
 reduceNonRepPrimWorker c e _appFunction _appArgument
   | (Prim p, args, ticks) <- collectArgsTicks e
   = do
