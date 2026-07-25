@@ -159,15 +159,27 @@ flattenSpec =
   -- topdownFix reaches a fixpoint for the top-down propagation chain.
   -- Keep flattenLet in the outer fixed-point loop: flattening can expose
   -- fresh propagation redexes for the next top-down pass.
+  --
+  -- The evaluator-backed transformations (reduceConst, reduceNonRepPrim) and
+  -- the transformations that piggyback on their output (deadCode,
+  -- removeUnusedExpr) run once per outer iteration, in a single bottom-up
+  -- pass, instead of in every settle round of the inner fixpoint: attempting
+  -- them evaluates the node whether or not anything folds, which dominated
+  -- the cost of this strategy. See [Note: bottomup traversal reduceConst] for
+  -- why the pass is bottom-up. The per-node program of the pass is the same
+  -- segment these transformations formed in the inner chain, preserving the
+  -- pairing between reduceConst output (which can be a let-expression) and
+  -- deadCode. Redexes the pass exposes are picked up by the next iteration of
+  -- the outer fixed-point loop.
   repeatR (topdownFix (chain [ named "appProp" appProp
                              , bindConstantVar
                              , caseCon
-                             ] >->
-                       (one reduceConst !-> one (named "deadcode" deadCode)) >->
-                       chain [ reduceNonRepPrim
-                             , removeUnusedExpr
                              ]) >->
-           bottomup flattenLet) !->
+           bottomup flattenLet >->
+           bottomup ((one reduceConst !-> one (named "deadcode" deadCode)) >->
+                     chain [ reduceNonRepPrim
+                           , removeUnusedExpr
+                           ])) !->
   letTL >->
   -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
   -- Note that we do this as the very last step, after all constant propagation
