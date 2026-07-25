@@ -35,7 +35,7 @@ module Clash.GHC.GHC2Core
 where
 
 -- External Modules
-import           Control.Lens                ((^.), (%~), (&), (%=), (.~), view, makeLenses)
+import           Control.Lens                ((^.), (%~), (&), (%=), (.~), use, view, makeLenses)
 import           Control.Applicative         ((<|>))
 import           Control.Monad.Extra         (ifM, andM)
 import           Control.Monad.RWS.Strict    (RWS)
@@ -127,6 +127,54 @@ import           Clash.GHC.Util
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
 
+-- | A GHC type compared and hashed on its raw structure: type synonyms stay
+-- unexpanded and alpha-equivalent types are distinct. GHC's
+-- 'GHC.Core.Map.Type.TypeMap' is unusable as a conversion-cache key because
+-- it looks through type synonyms, collapsing an
+-- 'Clash.Annotations.SynthesisAttributes.Annotate' synonym (whose conversion
+-- carries annotations) with the bare type it annotates.
+--
+-- Types containing casts or coercions never compare equal, so they never
+-- produce a (potentially wrong) cache hit.
+newtype RawType = RawType Type
+
+instance Eq RawType where
+  RawType l0 == RawType r0 = go l0 r0
+   where
+    go (TyVarTy v1) (TyVarTy v2) = v1 == v2
+    go (AppTy l1 r1) (AppTy l2 r2) = go l1 l2 && go r1 r2
+    go (TyConApp tc1 args1) (TyConApp tc2 args2) =
+      tc1 == tc2 && goList args1 args2
+    go (ForAllTy (Bndr v1 f1) t1) (ForAllTy (Bndr v2 f2) t2) =
+      v1 == v2 && f1 == f2 && go t1 t2
+    go (FunTy f1 m1 a1 r1) (FunTy f2 m2 a2 r2) =
+      f1 == f2 && go m1 m2 && go a1 a2 && go r1 r2
+    go (LitTy l1) (LitTy l2) = l1 == l2
+    go _ _ = False
+
+    goList (t1:ts1) (t2:ts2) = go t1 t2 && goList ts1 ts2
+    goList [] [] = True
+    goList _ _ = False
+
+instance Hashable RawType where
+  hashWithSalt salt0 (RawType ty0) = go salt0 ty0
+   where
+    go s ty = case ty of
+      TyVarTy v -> hashWithSalt (tag s 0) (getKey (varUnique v))
+      AppTy l r -> go (go (tag s 1) l) r
+      TyConApp tc args -> foldl go (hashWithSalt (tag s 2) (getKey (tyConUnique tc))) args
+      ForAllTy (Bndr v _) t -> go (hashWithSalt (tag s 3) (getKey (varUnique v))) t
+      FunTy _ m a r -> go (go (go (tag s 4) m) a) r
+      LitTy l -> case l of
+        NumTyLit i -> hashWithSalt (tag s 5) i
+        StrTyLit str -> hashWithSalt (tag s 6) (unpackFS str)
+        CharTyLit c -> hashWithSalt (tag s 7) c
+      CastTy t _ -> go (tag s 8) t
+      CoercionTy _ -> tag s 9
+
+    tag :: Int -> Int -> Int
+    tag = hashWithSalt
+
 data GHC2CoreState
   = GHC2CoreState
   { _tyConMap :: C.UniqMap TyCon
@@ -134,6 +182,8 @@ data GHC2CoreState
   , _varTypeMap :: HashMap Name C.Type
   -- ^ Cache for converted types of global variables ('varType'). See
   -- 'coreToVarType'.
+  , _convertedTypeCache :: HashMap RawType C.Type
+  -- ^ Cache for converted types, keyed on the GHC type. See 'coreToType'.
   }
 
 makeLenses ''GHC2CoreState
@@ -147,7 +197,8 @@ data GHC2CoreEnv
 makeLenses ''GHC2CoreEnv
 
 emptyGHC2CoreState :: GHC2CoreState
-emptyGHC2CoreState = GHC2CoreState mempty HashMap.empty HashMap.empty
+emptyGHC2CoreState =
+  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -903,10 +954,24 @@ annotateType ty cty = do
 
 -- | Converts GHC Type to a Clash Type. Strips newtypes and signals, with the
 -- exception of newtypes used as annotations (see: SynthesisAttributes).
+--
+-- Conversions are memoized on the GHC type: types repeat massively across
+-- binders, and converting one evaluates family-instance reductions and name
+-- conversions per node. The cache also shares the converted types. Cached
+-- conversions bake in the 'srcSpan' of their first encounter in the location
+-- of names that have no source span of their own, which only affects
+-- diagnostics (the same trade-off 'coreToVarType' already makes).
 coreToType
   :: Type
   -> C2C C.Type
-coreToType ty = ty'' >>= annotateType ty
+coreToType ty = do
+  cache <- use convertedTypeCache
+  case HashMap.lookup (RawType ty) cache of
+    Just ty1 -> pure ty1
+    Nothing -> do
+      ty1 <- ty'' >>= annotateType ty
+      convertedTypeCache %= HashMap.insert (RawType ty) ty1
+      pure ty1
   where
     ty'' | Just ty' <- coreView ty = coreToType ty'
          | TyConApp tc xs <- ty = do
