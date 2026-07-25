@@ -46,6 +46,7 @@ module Clash.Core.Subst
     -- ** Applying substitutions
   , substTm
   , maybeSubstTm
+  , substGlobalsInTerm
   , substAlt
   , substId
     -- * Variable renaming
@@ -74,6 +75,7 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Hashable             (Hashable (hashWithSalt))
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
+import           Data.Maybe                (fromMaybe)
 import           Data.Ord                  (comparing)
 import           GHC.Stack                 (HasCallStack)
 import           GHC.SrcLoc.Extra          ()
@@ -586,6 +588,70 @@ substTm doc subst = go where
   goTick t@DeDup        = t
   goTick t@NoDeDup      = t
   goTick (Attributes ty tm) = Attributes (substTy subst ty) (go tm)
+
+-- | Substitute global variables by the given terms, without any capture
+-- avoidance. Only valid when the replacement terms are closed up to global
+-- variables — as the bodies of global binders are — so no binder in the
+-- traversed term can capture a variable of a replacement term.
+--
+-- Sharing-preserving: a subterm in which no substitution takes place is
+-- returned as the original subterm instead of being reallocated, unlike
+-- 'substTm', which rebuilds every node it visits. The substitution is
+-- simultaneous: replacement terms are not traversed again, matching what
+-- 'substTm' does with a substitution built by 'extendGblSubstList'.
+substGlobalsInTerm
+  :: VarEnv Term
+  -- ^ Substitution: global variable to replacement term
+  -> Term
+  -> Term
+substGlobalsInTerm globals = \term -> fromMaybe term (go term)
+ where
+  go :: Term -> Maybe Term
+  go = \case
+    Var v
+      | isGlobalId v -> lookupVarEnv v globals
+      | otherwise -> Nothing
+    Lam v e -> Lam v <$> go e
+    TyLam tv e -> TyLam tv <$> go e
+    App l r -> case (go l, go r) of
+      (Nothing, Nothing) -> Nothing
+      (l1, r1) -> Just (App (fromMaybe l l1) (fromMaybe r r1))
+    TyApp e ty -> (`TyApp` ty) <$> go e
+    Let bs body -> case (goBind bs, go body) of
+      (Nothing, Nothing) -> Nothing
+      (bs1, body1) -> Just (Let (fromMaybe bs bs1) (fromMaybe body body1))
+    Case subject ty alternatives ->
+      case (go subject, goList goAlternative alternatives) of
+        (Nothing, Nothing) -> Nothing
+        (subject1, alternatives1) ->
+          Just (Case (fromMaybe subject subject1) ty
+                     (fromMaybe alternatives alternatives1))
+    Cast e t1 t2 -> (\e1 -> Cast e1 t1 t2) <$> go e
+    Tick tickInfo e -> case (goTickInfo tickInfo, go e) of
+      (Nothing, Nothing) -> Nothing
+      (tick1, e1) -> Just (Tick (fromMaybe tickInfo tick1) (fromMaybe e e1))
+    -- Data, Literal, Prim
+    _ -> Nothing
+
+  goBind (NonRec v rhs) = NonRec v <$> go rhs
+  goBind (Rec bindings) = Rec <$> goList goBinding bindings
+
+  goBinding (v, rhs) = (,) v <$> go rhs
+
+  goAlternative (pat, alternative) = (,) pat <$> go alternative
+
+  -- Types contain no term variables, so of the tick constructors only
+  -- 'Attributes' — which carries a term — needs a traversal.
+  goTickInfo (Attributes ty e) = Attributes ty <$> go e
+  goTickInfo _ = Nothing
+
+  goList :: (a -> Maybe a) -> [a] -> Maybe [a]
+  goList f = goElements
+   where
+    goElements [] = Nothing
+    goElements (x:xs) = case (f x, goElements xs) of
+      (Nothing, Nothing) -> Nothing
+      (x1, xs1) -> Just (fromMaybe x x1 : fromMaybe xs xs1)
 
 -- | Substitute within a case-alternative
 substAlt

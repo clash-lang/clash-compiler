@@ -51,8 +51,7 @@ import           Clash.Core.HasFreeVars           (notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
-import           Clash.Core.Subst
-  (extendGblSubstList, mkSubst, substTm)
+import           Clash.Core.Subst                 (substGlobalsInTerm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
@@ -60,7 +59,7 @@ import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, VarSet, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
+  (VarEnv, VarSet, elemVarSet, eltsVarEnv, emptyVarEnv,
    emptyVarSet, extendVarEnv, extendVarSet, lookupVarEnv, mapVarEnv,
    mapMaybeVarEnv, mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet,
    nullVarEnv, unionVarEnv)
@@ -375,11 +374,10 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
    flattenedUsed   <- mapM (flattenCallTree cache) used
    (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
    let (toInline,il_used) = unzip il_ct
-       subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
    newExpr <- case toInline of
      [] -> return tm
      _  -> do
-       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
+       let tm1 = substGlobalsInTerm (mkVarEnv toInline) tm
 
        -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
        opts <- Lens.view debugOpts
@@ -408,8 +406,7 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
            -- strategy would be working on an unchanged expression.
            [] -> return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
            toInline1 -> do
-             let subst' = extendGblSubstList (mkSubst emptyInScopeSet) toInline1
-             let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
+             let tm1 = substGlobalsInTerm (mkVarEnv toInline1) newExpr
              newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
              return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
