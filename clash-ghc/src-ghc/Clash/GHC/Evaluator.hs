@@ -33,7 +33,6 @@ import           GHC.Num.Integer                         (Integer (..))
 
 import           Clash.Core.DataCon
 import           Clash.Core.Evaluator.Types
-import           Clash.Core.HasFreeVars
 import           Clash.Core.HasType
 import           Clash.Core.Literal
 import           Clash.Core.Name
@@ -337,9 +336,11 @@ instantiate :: TyConMap -> Value -> Type -> Machine -> Machine
 instantiate _tcm (TyLambda x e) ty m =
   setTerm (substTm "Evaluator.instantiate1" subst e) m
  where
+  -- The machine's in-scope set covers everything live in the machine, so
+  -- recomputing the free variables of the body (a full traversal per
+  -- instantiation) is not needed. See 'apply', which does the same.
   subst  = extendTvSubst subst0 x ty
-  subst0 = mkSubst iss0
-  iss0   = mkInScopeSet (freeVarsOf e <> freeVarsOf ty)
+  subst0 = mkSubst (mScopeNames m)
 -- The evaluator is setup in such a way that under normal conditions anything
 -- of type 'forall a . ty' must be a ty-lambda.
 --
@@ -399,8 +400,7 @@ scrutinise (Lit l) _altTy alts m = case alts of
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
-    = let inScope = freeVarsOf altE
-          subst0  = mkSubst (mkInScopeSet inScope)
+    = let subst0  = mkSubst (mScopeNames m)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
     | NaturalLiteral l1  <- l
@@ -412,14 +412,13 @@ scrutinise (Lit l) _altTy alts m = case alts of
               ba1 = BA.ByteArray ba0
           in  Just (ByteArrayLiteral ba1)
        _ -> Nothing
-    = let inScope = freeVarsOf altE
-          subst0  = mkSubst (mkInScopeSet inScope)
+    = let subst0  = mkSubst (mScopeNames m)
           subst1  = extendIdSubst subst0 x (Literal patE)
       in  substTm "Evaluator.scrutinise" subst1 altE
   go def (_:alts1) = go def alts1
 
 scrutinise (DC dc xs) _altTy alts m
-  | altE:_ <- [substInAlt altDc tvs pxs xs altE
+  | altE:_ <- [substInAlt (mScopeNames m) altDc tvs pxs xs altE
               | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
               [altE | (DefaultPat,altE) <- alts ]
   = setTerm altE m
@@ -457,16 +456,15 @@ scrutinise v@(PrimVal p _ vs) altTy alts m
 scrutinise v _altTy alts _ =
   error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-substInAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
-substInAlt dc tvs xs args e = substTm "Evaluator.substInAlt" subst e
+substInAlt :: InScopeSet -> DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
+substInAlt is dc tvs xs args e = substTm "Evaluator.substInAlt" subst e
  where
   tys        = rights args
   tms        = lefts args
   substTyMap = zip tvs (drop (length (dcUnivTyVars dc)) tys)
   substTmMap = zip xs tms
-  inScope    = freeVarsOf tys `unionVarSet` freeVarsOf (e:tms)
   subst      = extendTvSubstList (extendIdSubstList subst0 substTmMap) substTyMap
-  subst0     = mkSubst (mkInScopeSet inScope)
+  subst0     = mkSubst is
 
 -- | Allocate let-bindings on the heap
 allocate :: [LetBinding] -> Term -> Machine -> Machine
