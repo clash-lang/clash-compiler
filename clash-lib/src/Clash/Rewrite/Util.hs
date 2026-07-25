@@ -62,7 +62,8 @@ import           Clash.Core.HasType
 import           Clash.Core.Name
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst
-  (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
+  ( substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm
+  , typeAlphaFingerprint )
 import           Clash.Core.Term
 import           Clash.Core.TyCon            (TyConMap)
 import           Clash.Core.Type             (Type (..), normalizeType)
@@ -638,13 +639,27 @@ liftBinding (var@Id {varName = idName} ,e) = do
 
   -- Check if an alpha-equivalent global binder already exists. Terms can
   -- only be alpha-equivalent if their types are, so candidates are
-  -- prefiltered on alpha-equality of their (much smaller) types. The scan
-  -- also stops at the first match, where it used to filter the whole binding
-  -- map with a term alpha-equality check per entry.
-  let aeqExisting = List.find
-        (\b -> varType (bindingId b) `aeqType` newBodyTy
-                 && bindingTerm b `aeqTerm` newBody)
-        (UniqMap.elems binders)
+  -- prefiltered on a cached fingerprint of their type: alpha-equivalent
+  -- types have equal fingerprints, and a binder's type never changes, so
+  -- the cached fingerprints stay valid across calls. The scan stops at the
+  -- first match.
+  let newBodyFingerprint = typeAlphaFingerprint newBodyTy
+  fingerprints0 <- Lens.use bindingTypeFingerprints
+  let scan cache [] = (Nothing, cache)
+      scan cache (b:bs) =
+        let i = bindingId b
+            (fingerprint, cache1) = case lookupVarEnv i cache of
+              Just known -> (known, cache)
+              Nothing ->
+                let fresh = typeAlphaFingerprint (varType i)
+                 in (fresh, extendVarEnv i fresh cache)
+         in if fingerprint == newBodyFingerprint
+               && varType i `aeqType` newBodyTy
+               && bindingTerm b `aeqTerm` newBody
+              then (Just b, cache1)
+              else scan cache1 bs
+      (aeqExisting, fingerprints1) = scan fingerprints0 (UniqMap.elems binders)
+  bindingTypeFingerprints Lens..= fingerprints1
   case aeqExisting of
     -- If it doesn't, create a new binder
     Nothing -> do -- Add the created function to the list of global bindings

@@ -83,6 +83,7 @@ instance Default extra => Default (RewriteState extra) where
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
     , _workFreeBinders=emptyVarEnv
+    , _bindingTypeFingerprints=emptyVarEnv
     , _hwTypeCache=mempty
     , _globalHeap=error "_globalHeap: NYI"
     , _extra=def

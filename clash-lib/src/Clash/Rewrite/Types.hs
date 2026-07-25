@@ -92,6 +92,11 @@ data RewriteState extra
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
   , _workFreeBinders  :: VarEnv Bool
   -- ^ Map telling whether a binder's definition is work-free
+  , _bindingTypeFingerprints :: VarEnv Int
+  -- ^ 'Clash.Core.Subst.typeAlphaFingerprint' of the type of global binders.
+  -- A binder's type never changes, so the cache never has to be invalidated.
+  -- Used by 'Clash.Rewrite.Util.liftBinding' to prefilter candidates for its
+  -- alpha-equivalence scan over the binding map.
   , _hwTypeCache      :: HWMap
   -- ^ Cache for the Core-type to HWType translation. The translation only
   -- depends on environment that is constant for the whole rewrite session

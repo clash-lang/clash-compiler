@@ -56,6 +56,7 @@ module Clash.Core.Subst
   , deshadowLetExpr
     -- * Alpha equivalence
   , aeqType
+  , typeAlphaFingerprint
   , aeqTerm
   , acmpTerm
     -- * Structural equivalence
@@ -83,10 +84,11 @@ import           GHC.TypeLits
   (TypeError, ErrorMessage (Text, (:<>:)))
 
 import           Clash.Core.HasFreeVars
+import           Clash.Core.Name           (nameUniq)
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
   (Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
-import           Clash.Core.Type           (Type (..))
+import           Clash.Core.Type           (ConstTy (..), LitTy (..), Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -882,6 +884,27 @@ aeqType
 aeqType t1 t2 = acmpType' rnEnv t1 t2 == EQ
  where
   rnEnv = mkRnEnv (mkInScopeSet (freeVarsOf [t1,t2]))
+
+-- | A fingerprint of a 'Type' modulo alpha-equivalence: alpha-equivalent
+-- types have equal fingerprints. The converse does not hold, so the
+-- fingerprint is only usable to prefilter candidates for the more expensive
+-- 'aeqType'. All type variables hash alike, and annotation attributes are
+-- ignored; both make the fingerprint coarser, never unsound.
+typeAlphaFingerprint :: Type -> Int
+typeAlphaFingerprint = go (0x2f9be6cc :: Int)
+ where
+  go s ty = case ty of
+    VarTy _ -> hashWithSalt s (0 :: Int)
+    LitTy l -> case l of
+      NumTy i -> hashWithSalt (hashWithSalt s (1 :: Int)) i
+      SymTy str -> hashWithSalt (hashWithSalt s (2 :: Int)) str
+      CharTy c -> hashWithSalt (hashWithSalt s (3 :: Int)) c
+    ConstTy c -> case c of
+      TyCon tcNm -> hashWithSalt (hashWithSalt s (4 :: Int)) (nameUniq tcNm)
+      Arrow -> hashWithSalt s (5 :: Int)
+    AnnType _attrs t -> go (hashWithSalt s (6 :: Int)) t
+    AppTy l r -> go (go (hashWithSalt s (7 :: Int)) l) r
+    ForAllTy tv t -> go (go (hashWithSalt s (8 :: Int)) (varType tv)) t
 
 -- | Alpha comparison for types
 acmpType
