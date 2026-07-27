@@ -80,8 +80,6 @@ jobs:
 
       - name: Build
         run: |
-          # clash-cosim really wants to be built first
-          cabal v2-build clash-cosim
           cabal v2-build all
 
   stack:
