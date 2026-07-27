@@ -25,3 +25,8 @@ pull_request_rules:
         merge_conflict_style: diff3
         branches:
           - "1.10"
+
+merge_queue:
+  # Stop Mergify's from commenting "Tick the box to add this pull request to the
+  # merge queue" on every pull request.
+  queue_controls_comment: false
