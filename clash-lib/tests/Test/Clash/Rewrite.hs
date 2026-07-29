@@ -140,12 +140,12 @@ runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> IO C.T
 runSingleTransformationDef = runSingleTransformation def def def
 
 
-parseType :: Show l => Type l -> C.Type
+parseType :: (HasCallStack, Show l) => Type l -> C.Type
 parseType = \case
   -- Type constructor: T
-  TyCon _ (UnQual _ (Ident _ typNm)) ->
+  TyCon _ (UnQual _ nm) ->
     -- TODO: We could/should build a TyConMap here
-    C.ConstTy (C.TyCon (C.Name C.User (Text.pack typNm) 0 C.noSrcSpan))
+    C.ConstTy (C.TyCon (parseName nm))
 
   -- Unsupported type:
   t ->
@@ -463,7 +463,9 @@ parseToTermQQ = TH.QuasiQuoter{
 
 -- | The type 'parseType' produces for the type constructor @Int@
 intTy :: C.Type
-intTy = C.ConstTy (C.TyCon (C.Name C.User (Text.pack "Int") 0 C.noSrcSpan))
+intTy =
+  C.ConstTy
+    (C.TyCon (C.Name C.User (Text.pack "Int") (nameToUnique "Int") C.noSrcSpan))
 
 -- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
