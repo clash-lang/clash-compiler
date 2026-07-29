@@ -71,16 +71,16 @@ import Data.Maybe                              (catMaybes)
 import Data.List                               (nub, partition)
 import Data.Text                               (Text)
 import GHC.Generics
-import GHC.Types.SrcLoc                        (SrcSpan, leftmost_smallest)
+import GHC.Types.SrcLoc                        (SrcSpan)
 
 -- Internal Modules
 import Clash.Core.DataCon                      (DataCon)
 import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
-import {-# SOURCE #-} Clash.Core.Subst         (acmpTerm) -- instance Eq/Ord Type, Eq Term
+import {-# SOURCE #-} Clash.Core.Subst         (acmpTickInfo) -- instance Eq/Ord Type, Eq Term
 import {-# SOURCE #-} Clash.Core.Type          (Type)
 import Clash.Core.Var                          (Var, Id, TyVar)
-import Clash.Util                              (curLoc, thenCompare)
+import Clash.Util                              (curLoc)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -126,19 +126,7 @@ data TickInfo
   deriving (Eq, Show, Generic, NFData, Binary)
 
 instance Ord TickInfo where
-  compare (SrcSpan s1) (SrcSpan s2) = leftmost_smallest s1 s2
-  compare (NameMod m1 t1) (NameMod m2 t2) =
-    compare m1 m2 `thenCompare` compare t1 t2
-  compare (Attributes t1 a1) (Attributes t2 a2) =
-    compare t1 t2 `thenCompare` acmpTerm a1 a2
-  compare t1 t2 = compare (getRank t1) (getRank t2)
-    where
-      getRank :: TickInfo -> Word
-      getRank SrcSpan{}     = 0
-      getRank NameMod{}     = 1
-      getRank DeDup         = 2
-      getRank NoDeDup       = 3
-      getRank Attributes {} = 4
+  compare = acmpTickInfo
 
 -- | Tag to indicate which instance/register name modifier was used
 data NameMod

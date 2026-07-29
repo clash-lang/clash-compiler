@@ -2,12 +2,14 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                           2017, Google Inc.
                           2021, QBayLogic B.V.
+                          2026, Martijn Bastiaan
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Capture-free substitution function for CoreHW
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -57,6 +59,10 @@ module Clash.Core.Subst
   , aeqType
   , aeqTerm
   , acmpTerm
+  , aeqTickInfo
+  , acmpTickInfo
+  , aeqTickInfoLevels
+  , acmpTickInfoLevels
     -- * Structural equivalence
   , eqTerm
   , eqType
@@ -84,14 +90,15 @@ import           GHC.TypeLits
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
-  (Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
+  (Alt, Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
-import           Clash.Core.Var            (Id, Var (..), TyVar, isGlobalId)
+import           Clash.Core.Var
+  (Id, Var (..), TyVar, isGlobalId, varKey)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug               (debugIsOn)
-import           Clash.Util
 import           Clash.Pretty
+import           Clash.Util
 
 -- * Subst
 
@@ -820,46 +827,15 @@ aeqType
   :: Type
   -> Type
   -> Bool
-aeqType t1 t2 = acmpType' rnEnv t1 t2 == EQ
- where
-  rnEnv = mkRnEnv (mkInScopeSet (freeVarsOf [t1,t2]))
+aeqType t1 t2 = acmpType t1 t2 == EQ
+{-# INLINE aeqType #-}
 
 -- | Alpha comparison for types
 acmpType
   :: Type
   -> Type
   -> Ordering
-acmpType t1 t2 = acmpType' (mkRnEnv inScope) t1 t2
- where
-  inScope = mkInScopeSet (freeVarsOf [t1,t2])
-
--- | Alpha comparison for types. Faster than 'acmpType' as it doesn't need to
--- calculate the free variables to create the 'InScopeSet'
-acmpType'
-  :: RnEnv
-  -> Type
-  -> Type
-  -> Ordering
-acmpType' = go
- where
-  go env (VarTy tv1) (VarTy tv2) = compare (rnOccLTy env tv1) (rnOccRTy env tv2)
-  go _   (ConstTy c1) (ConstTy c2) = compare c1 c2
-  go env (ForAllTy tv1 t1) (ForAllTy tv2 t2) =
-    go env (varType tv1) (varType tv2) `thenCompare` go (rnTyBndr env tv1 tv2) t1 t2
-  go env (AppTy s1 t1) (AppTy s2 t2) =
-    go env s1 s2 `thenCompare` go env t1 t2
-  go _ (LitTy l1) (LitTy l2) = compare l1 l2
-  go env (AnnType a1 t1) (AnnType a2 t2) =
-    compare a1 a2 `thenCompare` go env t1 t2
-  go _ t1 t2 = compare (getRank t1) (getRank t2)
-
-  getRank :: Type -> Word
-  getRank (VarTy {})    = 0
-  getRank (LitTy {})    = 1
-  getRank (ConstTy {})  = 2
-  getRank (AnnType {})  = 3
-  getRank (AppTy {})    = 4
-  getRank (ForAllTy {}) = 5
+acmpType = acmpTypeLevels 0 emptyVarEnv emptyVarEnv
 
 -- | Structural equality on 'Type'
 eqType
@@ -882,133 +858,32 @@ aeqTerm
   :: Term
   -> Term
   -> Bool
-aeqTerm t1 t2 = aeqTerm' inScope t1 t2
- where
-  inScope = mkInScopeSet (freeVarsOf [t1,t2])
+aeqTerm t1 t2 = acmpTerm t1 t2 == EQ
+{-# INLINE aeqTerm #-}
 
--- | Alpha equality for terms. Faster than 'aeqTerm' as it doesn't need to
--- calculate the free variables to create the 'InScopeSet'
-aeqTerm'
-  :: InScopeSet
-  -- ^ Superset of variables in scope of the left and right term
-  -> Term
-  -> Term
-  -> Bool
-aeqTerm' inScope t1 t2 = acmpTerm' inScope t1 t2 == EQ
-
--- | Alpha comparison for types
+-- | Alpha comparison for terms
 acmpTerm
   :: Term
   -> Term
   -> Ordering
-acmpTerm t1 t2 = acmpTerm' inScope t1 t2
- where
-  inScope = mkInScopeSet (freeVarsOf [t1,t2])
+acmpTerm =
+  acmpTermLevels 0 emptyVarEnv emptyVarEnv emptyVarEnv emptyVarEnv
 
--- | Alpha comparison for types. Faster than 'acmpTerm' as it doesn't need to
--- calculate the free variables to create the 'InScopeSet'
-acmpTerm'
-  :: InScopeSet
-  -- ^ Superset of variables in scope of the left and right term
-  -> Term
-  -> Term
+-- | Alpha equality for ticks
+aeqTickInfo
+  :: TickInfo
+  -> TickInfo
+  -> Bool
+aeqTickInfo t1 t2 = acmpTickInfo t1 t2 == EQ
+{-# INLINE aeqTickInfo #-}
+
+-- | Alpha comparison for ticks
+acmpTickInfo
+  :: TickInfo
+  -> TickInfo
   -> Ordering
-acmpTerm' inScope = go (mkRnEnv inScope)
- where
-  thenCmpTm EQ  rel = rel
-  thenCmpTm rel _   = rel
-
-  go env (Var id1) (Var id2)   = compare (rnOccLId env id1) (rnOccRId env id2)
-  go _   (Data dc1) (Data dc2) = compare dc1 dc2
-  go _   (Literal l1) (Literal l2) = compare l1 l2
-  go _   (Prim p1) (Prim p2) = comparing primName p1 p2
-  go env (Lam b1 e1) (Lam b2 e2) =
-    acmpType' env (varType b1) (varType b2) `thenCompare`
-    go (rnTmBndr env b1 b2) e1 e2
-  go env (TyLam b1 e1) (TyLam b2 e2) =
-    acmpType' env (varType b1) (varType b2) `thenCompare`
-    go (rnTyBndr env b1 b2) e1 e2
-  go env (App l1 r1) (App l2 r2) =
-    go env l1 l2 `thenCompare` go env r1 r2
-  go env (TyApp l1 r1) (TyApp l2 r2) =
-    go env l1 l2 `thenCompare` acmpType' env r1 r2
-  go env (Let (NonRec i1 x1) e1) (Let (NonRec i2 x2) e2) =
-    go env x1 x2 `thenCompare` go (rnTmBndr env i1 i2) e1 e2
-  go env (Let (Rec bs1) e1) (Let (Rec bs2) e2) =
-    compare (length bs1) (length bs2) `thenCompare`
-    -- Note that we compare types, because:
-    --
-    --   let (x :: Int) = x in x
-    --
-    -- is not alpha equivalent to:
-    --
-    --   let (x :: Word) = x in x
-    --
-    foldr thenCmpTm EQ
-      (zipWith (acmpType' env) (map varType ids1) (map varType ids2))
-      `thenCompare`
-    foldr thenCmpTm EQ (zipWith (go env') rhs1 rhs2) `thenCompare`
-    go env' e1 e2
-   where
-    (ids1,rhs1) = unzip bs1
-    (ids2,rhs2) = unzip bs2
-    env' = rnTmBndrs env ids1 ids2
-  go env (Case e1 _ a1) (Case e2 _ a2) =
-    compare (length a1) (length a2) `thenCompare`
-    go env e1 e2 `thenCompare`
-    foldr thenCmpTm EQ (zipWith (goAlt env) a1 a2)
-  go env (Cast e1 l1 r1) (Cast e2 l2 r2) =
-    go env e1 e2 `thenCompare`
-    acmpType' env l1 l2 `thenCompare`
-    acmpType' env r1 r2
-  go env (Tick t1 e1) (Tick t2 e2) =
-    goTick env t1 t2 `thenCompare` go env e1 e2
-  go _ e1 e2 = compare (getRank e1) (getRank e2)
-
-  goAlt env (DataPat c1 tvs1 ids1,e1) (DataPat c2 tvs2 ids2,e2) =
-    compare c1 c2 `thenCompare` go env' e1 e2
-   where
-    env' = rnTmBndrs (rnTyBndrs env tvs1 tvs2) ids1 ids2
-  goAlt env (c1,e1) (c2,e2) =
-    compare c1 c2 `thenCompare` go env e1 e2
-
-  -- The Core in 'NameMod' and 'Attributes' lives in the scope enclosing the
-  -- tick -- 'substTm' substitutes into it and 'Clash.Core.FreeVars' traverses
-  -- it -- so it is compared under the renaming environment we have here.
-  -- Comparing it in isolation would judge a mention of a bound variable by that
-  -- variable's raw unique, making alpha-equivalent terms compare unequal.
-  -- @Clash.GHC.GHC2Core.nameModTerm@ builds exactly such a term:
-  -- @/\nm. /\a. \x. Tick (NameMod sa (VarTy nm)) x@.
-  goTick _ (SrcSpan s1) (SrcSpan s2) = leftmost_smallest s1 s2
-  goTick env (NameMod m1 t1) (NameMod m2 t2) =
-    compare m1 m2 `thenCompare` acmpType' env t1 t2
-  goTick env (Attributes t1 a1) (Attributes t2 a2) =
-    acmpType' env t1 t2 `thenCompare` go env a1 a2
-  goTick _ t1 t2 = compare (getRankTick t1) (getRankTick t2)
-
-  getRankTick :: TickInfo -> Word
-  getRankTick = \case
-    SrcSpan {}    -> 0
-    NameMod {}    -> 1
-    DeDup         -> 2
-    NoDeDup       -> 3
-    Attributes {} -> 4
-
-  getRank :: Term -> Word
-  getRank = \case
-    Var {}     -> 0
-    Data {}    -> 1
-    Literal {} -> 2
-    Prim {}    -> 3
-    Cast {}    -> 4
-    App {}     -> 5
-    TyApp {}   -> 6
-    Lam {}     -> 7
-    TyLam {}   -> 8
-    Let NonRec{} _ -> 9
-    Let Rec{} _ -> 10
-    Case {}    -> 11
-    Tick {}    -> 12
+acmpTickInfo =
+  acmpTickInfoLevels 0 emptyVarEnv emptyVarEnv emptyVarEnv emptyVarEnv
 
 -- | Structural equality on 'Term'
 eqTerm :: Term -> Term -> Bool
@@ -1047,6 +922,7 @@ eqTerm = go
           go r1 r2)
         brs1 brs2
     goBind _ _ = False
+  -- Note [Case result types and alpha-equivalence]
   go (Case e1 _ a1) (Case e2 _ a2) =
     go e1 e2 &&
     List.all2 goAlt a1 a2
@@ -1068,6 +944,22 @@ eqTerm = go
   goTick (Attributes t1 a1) (Attributes t2 a2) = eqType t1 t2 && go a1 a2
   goTick _ _ = False
 
+{- Note [Case result types and alpha-equivalence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'acmpTermLevels' (and hence 'aeqTerm', 'acmpTerm', @Eq Term@ and @Ord Term@)
+does not compare the result type stored in a 'Case' constructor, and 'eqTerm'
+follows it. This is OK for case expressions with at least one alternative: the
+result type is determined by the alternatives. Every alternative's right-hand
+side has exactly the result type, and (alpha-)equal right-hand sides have
+(alpha-)equal types, so comparing the result type as well would be redundant
+work.
+
+For a case expression with no alternatives the result type is /not/ determined
+by the subterms, so @(case x of {}) :: A@ and @(case x of {}) :: B@ compare
+equal even though their types differ. Such case expressions don't occur in
+CoreHW: @Clash.GHC.GHC2Core@ turns them into an @undefined@ or @undefinedX@.
+-}
+
 instance Eq Type where
   (==) = aeqType
 
@@ -1084,6 +976,258 @@ instance TypeError (
   ) => Hashable Term where
     hashWithSalt = error "Term.hashWithSalt: unreachable"
 
+{- Note [Numbering binders by De Bruijn level]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Alpha comparison compares two variable occurrences by their De Bruijn level:
+how many binders enclose the binder an occurrence resolves to. Both sides are
+walked in lockstep, so at any point they are under equally many binders, and a
+level therefore identifies a binder position rather than a name. Two
+occurrences are alpha-equal exactly when they resolve to the same level.
+
+Binders that come into scope together, such as those of a 'Rec' or a 'DataPat',
+get consecutive levels: they are numbered as if they were nested.
+-}
+
+-- | Compare a pair of variable occurrences, under the levels of the binders
+-- enclosing them. See Note [Numbering binders by De Bruijn level].
+acmpOccLevels ::
+  -- | Levels of the binders enclosing the left occurrence
+  VarEnv Int ->
+  -- | Levels of the binders enclosing the right occurrence
+  VarEnv Int ->
+  Var a ->
+  Var a ->
+  Ordering
+acmpOccLevels envL envR v1 v2 =
+  case (lookupVarEnv v1 envL, lookupVarEnv v2 envR) of
+    -- Both bound: equal exactly when bound at the same level
+    (Just lvlL, Just lvlR) -> compare lvlL lvlR
+    -- Neither bound: compare the variables themselves
+    (Nothing, Nothing) -> compare (varKey v1) (varKey v2)
+    -- A bound variable is never equal to a free one. Which way round is
+    -- arbitrary, it only has to be consistent to keep the order total.
+    (Just _, Nothing) -> LT
+    (Nothing, Just _) -> GT
+
+-- | Give a group of binders that come into scope together, such as a 'Rec' or
+-- a 'DataPat', consecutive levels, and return the level following the group.
+extendLevels ::
+  Int ->
+  [Var a] ->
+  [Var a] ->
+  VarEnv Int ->
+  VarEnv Int ->
+  (Int, VarEnv Int, VarEnv Int)
+extendLevels lvl vs1 vs2 envL envR =
+  List.foldl' one (lvl, envL, envR) (List.zipEqual vs1 vs2)
+ where
+  one (!l, eL, eR) (v1, v2) =
+    (l + 1, extendVarEnv v1 l eL, extendVarEnv v2 l eR)
+
+-- | Alpha comparison for 'Type's, under the binders enclosing them.
+-- See Note [Numbering binders by De Bruijn level].
+acmpTypeLevels ::
+  -- | Number of enclosing binders
+  Int ->
+  -- | Levels of the type binders enclosing the left type
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the right type
+  VarEnv Int ->
+  Type ->
+  Type ->
+  Ordering
+acmpTypeLevels !lvl tyL tyR = go
+ where
+  go :: Type -> Type -> Ordering
+  go (VarTy tv1) (VarTy tv2) = acmpOccLevels tyL tyR tv1 tv2
+  go (ConstTy c1) (ConstTy c2) = compare c1 c2
+  go (ForAllTy tv1 t1) (ForAllTy tv2 t2) =
+    go (varType tv1) (varType tv2) `thenCompare`
+      acmpTypeLevels
+        (lvl + 1) (extendVarEnv tv1 lvl tyL) (extendVarEnv tv2 lvl tyR) t1 t2
+  go (AppTy s1 t1) (AppTy s2 t2) = go s1 s2 `thenCompare` go t1 t2
+  go (LitTy l1) (LitTy l2) = compare l1 l2
+  go (AnnType a1 t1) (AnnType a2 t2) = compare a1 a2 `thenCompare` go t1 t2
+  go t1 t2 = compare (getRank t1) (getRank t2)
+
+  getRank :: Type -> Word
+  getRank (VarTy {})    = 0
+  getRank (LitTy {})    = 1
+  getRank (ConstTy {})  = 2
+  getRank (AnnType {})  = 3
+  getRank (AppTy {})    = 4
+  getRank (ForAllTy {}) = 5
+
+-- | Alpha comparison for 'Term's. See 'acmpTypeLevels'.
+acmpTermLevels ::
+  -- | Number of enclosing binders
+  Int ->
+  -- | Levels of the term binders enclosing the left term
+  VarEnv Int ->
+  -- | Levels of the term binders enclosing the right term
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the left term
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the right term
+  VarEnv Int ->
+  Term ->
+  Term ->
+  Ordering
+acmpTermLevels !lvl tmL tmR tyL tyR = go
+ where
+  goType = acmpTypeLevels lvl tyL tyR
+  goTick = acmpTickInfoLevels lvl tmL tmR tyL tyR
+
+  -- Compare underneath one more term or type binder
+  underTmBndr b1 b2 =
+    acmpTermLevels
+      (lvl + 1) (extendVarEnv b1 lvl tmL) (extendVarEnv b2 lvl tmR) tyL tyR
+  underTyBndr b1 b2 =
+    acmpTermLevels
+      (lvl + 1) tmL tmR (extendVarEnv b1 lvl tyL) (extendVarEnv b2 lvl tyR)
+
+  go :: Term -> Term -> Ordering
+  go (Var id1) (Var id2) = goVar id1 id2
+  go (Data dc1) (Data dc2) = compare dc1 dc2
+  go (Literal l1) (Literal l2) = compare l1 l2
+  go (Prim p1) (Prim p2) = comparing primName p1 p2
+  go (Lam b1 e1) (Lam b2 e2) =
+    goType (varType b1) (varType b2) `thenCompare` underTmBndr b1 b2 e1 e2
+  go (TyLam b1 e1) (TyLam b2 e2) =
+    goType (varType b1) (varType b2) `thenCompare` underTyBndr b1 b2 e1 e2
+  go (App l1 r1) (App l2 r2) = go l1 l2 `thenCompare` go r1 r2
+  go (TyApp l1 r1) (TyApp l2 r2) = go l1 l2 `thenCompare` goType r1 r2
+  go (Let (NonRec i1 x1) e1) (Let (NonRec i2 x2) e2) =
+    go x1 x2 `thenCompare` underTmBndr i1 i2 e1 e2
+  go (Let (Rec bs1) e1) (Let (Rec bs2) e2) =
+    -- The lengths are compared first: the binder lists are only numbered
+    -- against each other when they match
+    compare (length bs1) (length bs2) `thenCompare`
+      let (ids1, rhs1) = unzip bs1
+          (ids2, rhs2) = unzip bs2
+          (lvl', tmL', tmR') = extendLevels lvl ids1 ids2 tmL tmR
+          under = acmpTermLevels lvl' tmL' tmR' tyL tyR
+      -- Note that we compare types, because:
+      --
+      --   let (x :: Int) = x in x
+      --
+      -- is not alpha equivalent to:
+      --
+      --   let (x :: Word) = x in x
+      --
+      in goList goType (map varType ids1) (map varType ids2) `thenCompare`
+           (goList under rhs1 rhs2 `thenCompare` under e1 e2)
+  -- Note [Case result types and alpha-equivalence]
+  go (Case e1 _ a1) (Case e2 _ a2) =
+    compare (length a1) (length a2) `thenCompare`
+      (go e1 e2 `thenCompare` goAlts a1 a2)
+  go (Cast e1 l1 r1) (Cast e2 l2 r2) =
+    go e1 e2 `thenCompare` (goType l1 l2 `thenCompare` goType r1 r2)
+  go (Tick t1 e1) (Tick t2 e2) = goTick t1 t2 `thenCompare` go e1 e2
+  go e1 e2 = compare (getRank e1) (getRank e2)
+
+  goList :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
+  goList cmp (x : xs) (y : ys) = cmp x y `thenCompare` goList cmp xs ys
+  goList _ _ _ = EQ
+
+  goAlts :: [Alt] -> [Alt] -> Ordering
+  goAlts (x : xs) (y : ys) = goAlt x y `thenCompare` goAlts xs ys
+  goAlts _ _ = EQ
+
+  goAlt :: Alt -> Alt -> Ordering
+  goAlt (DataPat c1 tvs1 ids1, e1) (DataPat c2 tvs2 ids2, e2) =
+    -- Two 'DataPat's for the same 'DataCon' necessarily bind equally many
+    -- variables, so 'extendLevels' erroring on lists of unequal length is the
+    -- right response to Core that is already ill-formed
+    compare c1 c2 `thenCompare`
+      let (lvlTy, tyL', tyR') = extendLevels lvl tvs1 tvs2 tyL tyR
+          (lvl', tmL', tmR') = extendLevels lvlTy ids1 ids2 tmL tmR
+      in acmpTermLevels lvl' tmL' tmR' tyL' tyR' e1 e2
+  goAlt (c1, e1) (c2, e2) = compare c1 c2 `thenCompare` go e1 e2
+
+  goVar :: Id -> Id -> Ordering
+  goVar id1 id2
+    -- A global is never bound by an enclosing binder, so it never resolves to
+    -- a level. Checked before the environments, because those are keyed on
+    -- unique alone and a global may share a unique with a bound local.
+    | isGlobalId id1 || isGlobalId id2 = compare (varKey id1) (varKey id2)
+    | otherwise = acmpOccLevels tmL tmR id1 id2
+
+  getRank :: Term -> Word
+  getRank = \case
+    Var {}     -> 0
+    Data {}    -> 1
+    Literal {} -> 2
+    Prim {}    -> 3
+    Cast {}    -> 4
+    App {}     -> 5
+    TyApp {}   -> 6
+    Lam {}     -> 7
+    TyLam {}   -> 8
+    Let NonRec{} _ -> 9
+    Let Rec{} _ -> 10
+    Case {}    -> 11
+    Tick {}    -> 12
+
+-- | Alpha equality for ticks, under the binders enclosing them.
+-- See 'acmpTickInfoLevels'.
+aeqTickInfoLevels ::
+  -- | Number of enclosing binders
+  Int ->
+  -- | Levels of the term binders enclosing the left tick
+  VarEnv Int ->
+  -- | Levels of the term binders enclosing the right tick
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the left tick
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the right tick
+  VarEnv Int ->
+  TickInfo ->
+  TickInfo ->
+  Bool
+aeqTickInfoLevels lvl tmL tmR tyL tyR t1 t2 =
+  acmpTickInfoLevels lvl tmL tmR tyL tyR t1 t2 == EQ
+{-# INLINE aeqTickInfoLevels #-}
+
+-- | Alpha comparison for ticks, under the binders enclosing them.
+--
+-- The 'Type' in 'NameMod' and the 'Term' in 'Attributes' live in the scope
+-- enclosing the tick, so they are compared under the same binders as the term
+-- the tick is attached to. 'SrcSpan's are compared with 'leftmost_smallest',
+-- which treats all unhelpful spans alike, so it is coarser than @Eq TickInfo@.
+acmpTickInfoLevels ::
+  -- | Number of enclosing binders
+  Int ->
+  -- | Levels of the term binders enclosing the left tick
+  VarEnv Int ->
+  -- | Levels of the term binders enclosing the right tick
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the left tick
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the right tick
+  VarEnv Int ->
+  TickInfo ->
+  TickInfo ->
+  Ordering
+acmpTickInfoLevels !lvl tmL tmR tyL tyR = go
+ where
+  goType = acmpTypeLevels lvl tyL tyR
+  goTerm = acmpTermLevels lvl tmL tmR tyL tyR
+
+  go :: TickInfo -> TickInfo -> Ordering
+  go (SrcSpan s1) (SrcSpan s2) = leftmost_smallest s1 s2
+  go (NameMod m1 t1) (NameMod m2 t2) = compare m1 m2 `thenCompare` goType t1 t2
+  go (Attributes t1 a1) (Attributes t2 a2) =
+    goType t1 t2 `thenCompare` goTerm a1 a2
+  go t1 t2 = compare (getRank t1) (getRank t2)
+
+  getRank :: TickInfo -> Word
+  getRank = \case
+    SrcSpan {}    -> 0
+    NameMod {}    -> 1
+    DeDup         -> 2
+    NoDeDup       -> 3
+    Attributes {} -> 4
 
 instance Ord Term where
   compare = acmpTerm

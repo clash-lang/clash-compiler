@@ -20,6 +20,7 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
 import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
@@ -142,14 +143,47 @@ runSingleTransformationDef = runSingleTransformation def def def
 
 parseType :: (HasCallStack, Show l) => Type l -> C.Type
 parseType = \case
+  -- Parentheses: (..)
+  TyParen _ t ->
+    parseType t
+
   -- Type constructor: T
   TyCon _ (UnQual _ nm) ->
     -- TODO: We could/should build a TyConMap here
     C.ConstTy (C.TyCon (parseName nm))
 
+  -- Type variable: a
+  TyVar _ nm ->
+    C.VarTy (parseTyVar nm)
+
+  -- Universal quantification: forall a b. t
+  TyForall _ (Just tvs) Nothing t ->
+    foldr (C.ForAllTy . parseTyVarBind) (parseType t) tvs
+
+  -- Type application: f a
+  TyApp _ t1 t2 ->
+    C.AppTy (parseType t1) (parseType t2)
+
   -- Unsupported type:
   t ->
     error ("parseType: " <> show t)
+
+-- | Parse an identifier into a 'C.TyVar'. Type variables are always of kind
+-- 'liftedTypeKind': there is no way to spell out anything else, and nothing in
+-- these tests needs one. See 'parseNameScope' for the format of identifiers.
+parseTyVar :: (HasCallStack, Show l) => Name l -> C.TyVar
+parseTyVar nm0 = C.TyVar nm1 (C.nameUniq nm1) C.liftedTypeKind
+ where
+  nm1 = parseName nm0
+
+-- | Parse the binder of a @forall@ into a 'C.TyVar'. See 'parseTyVar'.
+parseTyVarBind :: (HasCallStack, Show l) => TyVarBind l -> C.TyVar
+parseTyVarBind = \case
+  UnkindedVar _ nm -> parseTyVar nm
+
+  -- A kind annotation would have to name a kind, and 'parseTyVar' only produces
+  -- 'liftedTypeKind' anyway
+  b -> error ("parseTyVarBind: " <> show b)
 
 -- | Derive a 'Unique' from a human readable name, by interpreting each of its
 -- characters as a byte and concatenating those bytes. Used for identifiers that
@@ -332,6 +366,42 @@ parsePats = List.mapAccumL parsePat
     p ->
       error ("parsePat: " <> show p)
 
+-- | Parse lambda binders. Like 'parsePats', except that a binder annotated with
+-- the kind @Type@ binds a /type/ variable rather than a term variable:
+--
+--    \\(a :: Type) (x :: a) -> x
+--
+-- is @/\\a. \\x. x@, a 'C.TyLam' around a 'C.Lam'. Haskell has no syntax for a
+-- type lambda, and @\\ \@a -> e@ is not something @haskell-src-exts@ parses, so
+-- the kind annotation is what marks one here.
+--
+-- Type binders are not added to the type map: it maps a term variable to its
+-- type, and a reference to a type variable is parsed by 'parseType', which needs
+-- no context. See 'parseTyVar'.
+parseLamPats
+  :: forall l
+   . (HasCallStack, Show l)
+  => TypeMap
+  -> [Pat l]
+  -> (TypeMap, [Either C.TyVar C.Id])
+parseLamPats = List.mapAccumL parseLamPat
+ where
+  parseLamPat
+    :: HasCallStack => TypeMap -> Pat l -> (TypeMap, Either C.TyVar C.Id)
+  parseLamPat typs pat
+    | Just nm <- typeBinder pat = (typs, Left (parseTyVar nm))
+    | otherwise = fmap Right (head' (parsePats typs [pat]))
+   where
+    head' (typs1, [i]) = (typs1, i)
+    head' _ = error "parseLamPats: impossible"
+
+  -- A binder annotated with the kind 'Type', modulo parentheses
+  typeBinder :: Pat l -> Maybe (Name l)
+  typeBinder = \case
+    PParen _ p -> typeBinder p
+    PatTypeSig _ (PVar _ nm) (TyCon _ (UnQual _ (Ident _ "Type"))) -> Just nm
+    _ -> Nothing
+
 -- | Parse declarations (as, amongst others, used in let expressions). See
 -- 'parsePats' for how binders get their type.
 --
@@ -387,6 +457,10 @@ expToTerm typs0 = \case
   ExpTypeSig _ (Var _ (UnQual _ nm)) (parseType -> t) ->
     C.Var (parseIdWithType t nm)
 
+  -- Type application: e @t
+  App _ e1 (TypeApp _ t) ->
+    C.TyApp (expToTerm typs0 e1) (parseType t)
+
   -- Term application: e1 e2
   App _ e1 e2 ->
     C.App (expToTerm typs0 e1) (expToTerm typs0 e2)
@@ -395,13 +469,14 @@ expToTerm typs0 = \case
   InfixApp _ e1 op e2 ->
     C.App (C.App (parseOp typs0 op) (expToTerm typs0 e1)) (expToTerm typs0 e2)
 
-  -- Lambda: \x y -> e
+  -- Lambda: \x y -> e. A binder annotated @:: Type@ binds a type variable, so
+  -- it becomes a 'C.TyLam': @\\(a :: Type) (x :: a) -> x@ is @/\\a. \\x. x@.
   Lambda _ pats body0 ->
     let
-      (typs1, ids) = parsePats typs0 pats
+      (typs1, binders) = parseLamPats typs0 pats
       body1 = expToTerm typs1 body0
     in
-      foldr C.Lam body1 ids
+      foldr (either C.TyLam C.Lam) body1 binders
 
   -- Variable reference: e
   Var _ (UnQual _ nm) ->
@@ -421,12 +496,18 @@ expToTerm typs0 = \case
  -- Unsupported expression
   e -> error ("expToTerm: " <> show e)
 
--- | Parse mode used by 'parseToTerm'. Enables @ScopedTypeVariables@, so lambda
--- binders can spell out their type: @\\(x_0 :: Int) -> x_0@.
+-- | Parse mode used by 'parseToTerm'. Enables:
+--
+--   * @ScopedTypeVariables@, so lambda binders can spell out their type:
+--     @\\(x_0 :: Int) -> x_0@, and so a type binder can spell out its kind:
+--     @\\(a :: Type) -> ..@, see 'parseLamPats'.
+--   * @RankNTypes@, for @forall@ in a type: @(x :: forall a. a)@.
+--   * @TypeApplications@, for type application: @f \@Int@.
 termParseMode :: ParseMode
 termParseMode = defaultParseMode
   { extensions =
-      EnableExtension ScopedTypeVariables : extensions defaultParseMode
+      map EnableExtension [ScopedTypeVariables, RankNTypes, TypeApplications]
+        <> extensions defaultParseMode
   }
 
 -- | Parse a string representing a Haskell expression into Clash Core. This can
@@ -461,11 +542,16 @@ parseToTermQQ = TH.QuasiQuoter{
   , TH.quoteDec = error "parseToTerm.quoteDec: NYI"
   }
 
+-- | The type 'parseType' produces for a type constructor whose name it derives
+-- a unique from, e.g. @Int@
+parseTyConTy :: HasCallStack => String -> C.Type
+parseTyConTy nm =
+  C.ConstTy
+    (C.TyCon (C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan))
+
 -- | The type 'parseType' produces for the type constructor @Int@
 intTy :: C.Type
-intTy =
-  C.ConstTy
-    (C.TyCon (C.Name C.User (Text.pack "Int") (nameToUnique "Int") C.noSrcSpan))
+intTy = parseTyConTy "Int"
 
 -- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
@@ -476,6 +562,12 @@ mkId scope nmSort nm uniq typ =
 -- | A local 'C.Id'. See 'mkId'.
 localId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
 localId = mkId C.LocalId
+
+-- | A 'C.TyVar' with the given name sort, human readable name, and unique. Its
+-- kind is 'C.liftedTypeKind', see 'parseTyVar'.
+tyVar :: C.NameSort -> String -> Unique -> C.TyVar
+tyVar nmSort nm uniq =
+  C.TyVar (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq C.liftedTypeKind
 
 -- | A reference to a local variable of type @Int@. See 'localId'.
 intVar :: C.NameSort -> String -> Unique -> C.Term
@@ -622,6 +714,45 @@ tests = testGroup "Test.Clash.Rewrite"
       , testCase "lambda without a type annotation" $
           assertErrorContains "forgot to (explicitely) declare"
             (parseToTerm "\\x_0 -> x_0")
+
+      , testCase "type lambda" $
+          assertStructurallyEqual
+            (C.TyLam (tyVar C.User "a" 0)
+              (C.Lam (localId C.User "x" 1 (C.VarTy (tyVar C.User "a" 0)))
+                (C.Var (localId C.User "x" 1 (C.VarTy (tyVar C.User "a" 0))))))
+            (parseToTerm "\\(a_0 :: Type) (x_1 :: a_0) -> x_1")
+
+      , testCase "type application" $
+          assertStructurallyEqual
+            (C.TyApp (freeVar C.User "f" 0) intTy)
+            (parseToTerm "f_0 @Int")
+
+      , testCase "forall" $
+          assertStructurallyEqual
+            (C.Lam
+              (localId C.User "v" 0
+                (C.ForAllTy (tyVar C.User "a" 1)
+                  (C.ForAllTy (tyVar C.User "b" 2)
+                    (C.VarTy (tyVar C.User "b" 2)))))
+              (C.Var
+                (localId C.User "v" 0
+                  (C.ForAllTy (tyVar C.User "a" 1)
+                    (C.ForAllTy (tyVar C.User "b" 2)
+                      (C.VarTy (tyVar C.User "b" 2)))))))
+            (parseToTerm "\\(v_0 :: forall a_1 b_2. b_2) -> v_0")
+
+      , testCase "type application of a type constructor" $
+          let maybeInt =
+                C.AppTy
+                  (C.ConstTy
+                    (C.TyCon
+                      (C.Name C.User (Text.pack "Maybe") 9 C.noSrcSpan)))
+                  intTy
+          in assertStructurallyEqual
+               (C.Lam
+                 (localId C.User "v" 0 maybeInt)
+                 (C.Var (localId C.User "v" 0 maybeInt)))
+               (parseToTerm "\\(v_0 :: Maybe_9 Int) -> v_0")
       ]
 
   , testGroup "parseNameScope"

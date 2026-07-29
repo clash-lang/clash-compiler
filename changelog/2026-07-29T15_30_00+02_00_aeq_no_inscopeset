@@ -1,0 +1,1 @@
+CHANGED: Alpha equality on `Term` and `Type` no longer computes the free variables of its arguments. Microbenchmarks show a 6-24x speedup, with end-to-end tests on larger designs showing a modest 2.5% improvement in normalization runtime.
