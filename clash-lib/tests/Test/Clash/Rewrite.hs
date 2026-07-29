@@ -37,7 +37,9 @@ import Data.Char (isAscii, ord)
 import Data.Default
 import Data.Maybe (fromMaybe)
 import Language.Haskell.Exts.Syntax
-import Language.Haskell.Exts.Parser (parseExp, fromParseResult)
+import Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
+import Language.Haskell.Exts.Parser
+  (ParseMode (..), defaultParseMode, fromParseResult, parseExpWithMode)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase)
@@ -295,6 +297,47 @@ parseDecls typs0 decls = (typs1, map parseOtherDecl otherDecls)
   isTypeDecl (TypeSig {}) = True
   isTypeDecl _ = False
 
+-- | Parse the patterns of a lambda into its binders. Like let bindings, binders
+-- need an explicit type, either spelled out in the pattern or declared in an
+-- enclosing let. I.e., both of these are OK:
+--
+--    \(x_0 :: Int) -> x_0
+--
+--    let
+--      x_0 :: Int
+--      x_0 = 5
+--    in
+--      \x_0 -> x_0
+--
+-- Binders are added to the type map, so a lambda's body can refer to them
+-- without repeating their type.
+parsePats
+  :: forall l
+   . (HasCallStack, Show l)
+  => TypeMap
+  -> [Pat l]
+  -> (TypeMap, [C.Id])
+parsePats = List.mapAccumL parsePat
+ where
+  parsePat :: HasCallStack => TypeMap -> Pat l -> (TypeMap, C.Id)
+  parsePat typs = \case
+    -- Parentheses: (...)
+    PParen _ p ->
+      parsePat typs p
+
+    -- Binder with type signature: x :: t
+    PatTypeSig _ (PVar _ nm) (parseType -> t) ->
+      let i = parseIdWithType t nm
+      in (HashMap.insert (C.varUniq i) t typs, i)
+
+    -- Binder: x
+    PVar _ nm ->
+      (typs, parseId typs nm)
+
+    -- Unsupported pattern
+    p ->
+      error ("parsePat: " <> show p)
+
 -- | Parse a haskell-src-exts expression into Clash Core.
 expToTerm
   :: forall l
@@ -315,6 +358,14 @@ expToTerm typs0 = \case
   App _ e1 e2 ->
     C.App (expToTerm typs0 e1) (expToTerm typs0 e2)
 
+  -- Lambda: \x y -> e
+  Lambda _ pats body0 ->
+    let
+      (typs1, ids) = parsePats typs0 pats
+      body1 = expToTerm typs1 body0
+    in
+      foldr C.Lam body1 ids
+
   -- Variable reference: e
   Var _ (UnQual _ nm) ->
     C.Var (parseId typs0 nm)
@@ -333,12 +384,21 @@ expToTerm typs0 = \case
  -- Unsupported expression
   e -> error ("expToTerm: " <> show e)
 
+-- | Parse mode used by 'parseToTerm'. Enables @ScopedTypeVariables@, so lambda
+-- binders can spell out their type: @\\(x_0 :: Int) -> x_0@.
+termParseMode :: ParseMode
+termParseMode = defaultParseMode
+  { extensions =
+      EnableExtension ScopedTypeVariables : extensions defaultParseMode
+  }
+
 -- | Parse a string representing a Haskell expression into Clash Core. This can
 -- only parse very simple expressions. In the future we should make an effort to
 -- build a proper TyConMap (using LoadModules) to faithfully reproduce more
 -- complex expressions.
 parseToTerm :: String -> C.Term
-parseToTerm = expToTerm HashMap.empty . fromParseResult . parseExp
+parseToTerm =
+  expToTerm HashMap.empty . fromParseResult . parseExpWithMode termParseMode
 
 -- | See documentation of 'parseToTerm'. Example usage:
 --
@@ -447,6 +507,40 @@ tests = testGroup "Test.Clash.Rewrite"
       , testCase "let without a type annotation" $
           assertErrorContains "forgot to (explicitely) declare"
             (parseToTerm "let { x_0 = 5 } in x_0")
+
+      , testCase "lambda" $
+          assertStructurallyEqual
+            (C.Lam (localId C.User "x" 0 intTy) (intVar C.User "x" 0))
+            (parseToTerm "\\(x_0 :: Int) -> x_0")
+
+      , testCase "lambda with multiple binders" $
+          assertStructurallyEqual
+            (C.Lam (localId C.User "x" 0 intTy)
+              (C.Lam (localId C.User "y" 1 intTy) (intVar C.User "y" 1)))
+            (parseToTerm "\\(x_0 :: Int) (y_1 :: Int) -> y_1")
+
+      , testCase "lambda with a modified binder" $
+          assertStructurallyEqual
+            (C.Lam (localId C.System "x" 0 intTy) (intVar C.System "x" 0))
+            (parseToTerm "\\(x_S0 :: Int) -> x_S0")
+
+      , testCase "lambda application" $
+          assertStructurallyEqual
+            (C.App
+              (C.Lam (localId C.User "x" 0 intTy) (intVar C.User "x" 0))
+              (intVar C.User "y" 1))
+            (parseToTerm "(\\(x_0 :: Int) -> x_0) (y_1 :: Int)")
+
+      , testCase "lambda binder typed by an enclosing let" $
+          assertStructurallyEqual
+            (C.Letrec
+              [(localId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))]
+              (C.Lam (localId C.User "y" 1 intTy) (intVar C.User "x" 0)))
+            (parseToTerm "let { x_0, y_1 :: Int; x_0 = 5 } in \\y_1 -> x_0")
+
+      , testCase "lambda without a type annotation" $
+          assertErrorContains "forgot to (explicitely) declare"
+            (parseToTerm "\\x_0 -> x_0")
       ]
 
   , testGroup "parseNameScope"
