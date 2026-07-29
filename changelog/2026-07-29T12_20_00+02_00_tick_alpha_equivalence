@@ -1,0 +1,1 @@
+FIXED: Alpha-equivalence on terms now compares the `NameMod` and `Attributes` of a tick under the enclosing renaming environment, instead of in isolation.
