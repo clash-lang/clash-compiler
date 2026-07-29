@@ -936,6 +936,17 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     go env x1 x2 `thenCompare` go (rnTmBndr env i1 i2) e1 e2
   go env (Let (Rec bs1) e1) (Let (Rec bs2) e2) =
     compare (length bs1) (length bs2) `thenCompare`
+    -- Note that we compare types, because:
+    --
+    --   let (x :: Int) = x in x
+    --
+    -- is not alpha equivalent to:
+    --
+    --   let (x :: Word) = x in x
+    --
+    foldr thenCmpTm EQ
+      (zipWith (acmpType' env) (map varType ids1) (map varType ids2))
+      `thenCompare`
     foldr thenCmpTm EQ (zipWith (go env') rhs1 rhs2) `thenCompare`
     go env' e1 e2
    where
