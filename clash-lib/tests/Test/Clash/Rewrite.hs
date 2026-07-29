@@ -31,12 +31,20 @@ import Clash.Util.Supply (newSupply)
 import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
+import Control.DeepSeq (NFData, force)
+import Control.Exception (ErrorCall (..), evaluate, try)
+import Data.Char (isAscii, ord)
 import Data.Default
+import Data.Maybe (fromMaybe)
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Parser (parseExp, fromParseResult)
 import System.IO.Unsafe (unsafePerformIO)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase)
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
+
+import qualified Text.Show.Pretty as Pretty
 
 import qualified Language.Haskell.TH.Syntax as TH
 import qualified Language.Haskell.TH.Quote as TH
@@ -141,36 +149,67 @@ parseType = \case
   t ->
     error ("parseType: " <> show t)
 
--- | Parse an identifier into a Clash Name. Identifiers must include a unique
--- and might include a modifier indicating whether its NameSort. Examples:
+-- | Derive a 'Unique' from a human readable name, by interpreting each of its
+-- characters as a byte and concatenating those bytes. Used for identifiers that
+-- don't spell out their unique, see 'parseName'.
+--
+-- Only ASCII names of at most four characters are supported, as a 'Unique' is
+-- only guaranteed to hold 32 bits.
+nameToUnique :: HasCallStack => String -> Unique
+nameToUnique nm
+  | null nm = error
+      "nameToUnique: can't derive a unique from an empty name"
+  | length nm > 4 = error [I.i|
+      Can't derive a unique from '#{nm}': a 'Unique' is only guaranteed to hold
+      32 bits, so names of more than four characters don't fit. Spell out the
+      unique instead, e.g. '#{nm}_123'.
+    |]
+  | any (not . isAscii) nm = error [I.i|
+      Can't derive a unique from '#{nm}': it contains non-ASCII characters.
+      Spell out the unique instead, e.g. 'foobar_123'.
+    |]
+  | otherwise = List.foldl' (\acc c -> acc * 256 + fromIntegral (ord c)) 0 nm
+
+-- | Parse an identifier into a Clash Name. Identifiers might include a unique,
+-- and might include a modifier indicating their NameSort. Examples:
 --
 --   * x_3:  User identifier with human readable name "x", unique "3"
 --   * x_I3: Internal identifier with human readable name "x", unique "3"
 --   * x_S3: System identifier with human readable name "x", unique "3"
+
+--   * x:    User identifier with human readable name "x", unique derived from "x"
+--   * x_U:  User identifier with human readable name "x", unique derived from "x"
+--   * x_S:  System identifier with human readable name "x", unique derived from "x"
 --
-parseName :: Show l => Name l -> C.Name a
+-- Identifiers that don't spell out their unique derive it from their human
+-- readable name, see 'nameToUnique'.
+--
+parseName :: (HasCallStack, Show l) => Name l -> C.Name a
 parseName = \case
-  Ident _ s -> failOnNothing s (go "" s)
-  Symbol _ s -> failOnNothing s (go "" s)
+  Ident _ s -> mkName s
+  Symbol _ s -> mkName s
  where
-  failOnNothing _ (Just (nmSort, nm, uniq)) =
-    C.mkUnsafeName nmSort (Text.pack nm) uniq
-  failOnNothing s Nothing = error [I.i|
-    Not a valid id: #{s}. Identifiers must be of form 'foobar_123', where
-    'foobar' is a human-readable (but ultimately unused) name and '123' is the
-    unique. Additionally, 'I', 'U', or 'S' might be prefixed to create an
-    Internal, User, or System name respectively. For example, 'foobar_S123'.
-  |]
+  mkName s = case go "" s of
+    Just (nmSort, nm, uniq) ->
+      C.mkUnsafeName nmSort (Text.pack nm) (fromMaybe (nameToUnique nm) uniq)
+    -- No '_'-delimited suffix at all: the whole identifier is the name
+    Nothing ->
+      C.mkUnsafeName C.User (Text.pack s) (nameToUnique s)
 
   go _seen "" = Nothing
   go seen0 ('_':s:ss)
-    | 'U' <- s = fmap (C.User,seen1,) (readMaybe ss) <|> cont
-    | 'S' <- s = fmap (C.System,seen1,) (readMaybe ss) <|> cont
-    | 'I' <- s = fmap (C.Internal,seen1,) (readMaybe ss) <|> cont
-    | otherwise = fmap (C.User,seen1,) (readMaybe (s:ss)) <|> cont
+    | 'U' <- s = withSort C.User
+    | 'S' <- s = withSort C.System
+    | 'I' <- s = withSort C.Internal
+    | otherwise = fmap ((C.User,seen1,) . Just) (readMaybe (s:ss)) <|> cont
    where
     seen1 = reverse seen0
     cont = go ('_':seen0) (s:ss)
+
+    -- A sort modifier is either followed by a unique, or ends the identifier
+    withSort nmSort
+      | null ss = Just (nmSort, seen1, Nothing)
+      | otherwise = fmap ((nmSort,seen1,) . Just) (readMaybe ss) <|> cont
   go seen (s:ss) = go (s:seen) ss
 
 -- | Parse declarations (as, amongst others, used in let expressions). Note that
@@ -300,3 +339,147 @@ parseToTermQQ = TH.QuasiQuoter{
   , TH.quoteType = error "parseToTerm.quoteType: NYI"
   , TH.quoteDec = error "parseToTerm.quoteDec: NYI"
   }
+
+-- | The type 'parseType' produces for the type constructor @Int@
+intTy :: C.Type
+intTy = C.ConstTy (C.TyCon (C.Name C.User (Text.pack "Int") 0 C.noSrcSpan))
+
+-- | A local 'C.Id' with the given name sort, human readable name, unique, and
+-- type
+localId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
+localId nmSort nm uniq typ =
+  C.Id (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq typ C.LocalId
+
+-- | A reference to a local variable of type @Int@. See 'localId'.
+intVar :: C.NameSort -> String -> Unique -> C.Term
+intVar nmSort nm uniq = C.Var (localId nmSort nm uniq intTy)
+
+-- | Assert that two terms are structurally equal, by comparing their 'Show'
+-- output.
+--
+-- Note that we deliberately use neither '==' nor 'Clash.Core.Subst.eqTerm':
+-- 'Eq' on 'C.Term' is alpha equivalence, and both compare names by their unique
+-- alone, so they'd ignore a name's sort ('C.User', 'C.System', 'C.Internal')
+-- and human readable name. 'Show' is derived everywhere, so it shows all of it.
+assertStructurallyEqual :: (HasCallStack, Show a) => a -> a -> Assertion
+assertStructurallyEqual expected actual =
+  assertEqual "" (Pretty.ppShow expected) (Pretty.ppShow actual)
+
+-- | Assert that forcing a value throws an 'ErrorCall' mentioning the given
+-- substring
+assertErrorContains
+  :: (HasCallStack, NFData a, Show a) => String -> a -> Assertion
+assertErrorContains needle a = do
+  parsed <- try (evaluate (force a))
+  case parsed of
+    Left (ErrorCall msg)
+      | needle `List.isInfixOf` msg -> pure ()
+      | otherwise -> assertFailure
+          ("Expected an error mentioning '" <> needle <> "', but got:\n" <> msg)
+    Right parsed1 -> assertFailure
+      ("Expected an error mentioning '" <> needle
+        <> "', but parsing succeeded:\n" <> Pretty.ppShow parsed1)
+
+tests :: TestTree
+tests = testGroup "Test.Clash.Rewrite"
+  [ testGroup "parseToTerm"
+      [ testCase "literal" $
+          assertStructurallyEqual
+            (C.Literal (C.IntLiteral 3))
+            (parseToTerm "3")
+
+      , testCase "variable" $
+          assertStructurallyEqual
+            (intVar C.User "x" 3)
+            (parseToTerm "x_3 :: Int")
+
+      , testCase "parentheses" $
+          assertStructurallyEqual
+            (intVar C.User "x" 3)
+            (parseToTerm "((x_3 :: Int))")
+
+      , testCase "application" $
+          assertStructurallyEqual
+            (C.App (intVar C.User "f" 0) (intVar C.User "x" 1))
+            (parseToTerm "(f_0 :: Int) (x_1 :: Int)")
+
+      , testCase "let" $
+          assertStructurallyEqual
+            (C.Letrec
+              [ (localId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))
+              , (localId C.User "x" 1 intTy, intVar C.User "x" 0)
+              ]
+              (intVar C.User "x" 1))
+            (parseToTerm "let { x_0, x_1 :: Int; x_0 = 5; x_1 = x_0 } in x_1")
+
+      , testCase "let without a type annotation" $
+          assertErrorContains "forgot to (explicitely) declare"
+            (parseToTerm "let { x_0 = 5 } in x_0")
+      ]
+
+  , testGroup "parseName"
+      [ testCase "explicit unique" $
+          assertStructurallyEqual
+            (intVar C.User "x" 3)
+            (parseToTerm "x_3 :: Int")
+
+      , testCase "explicit unique, user" $
+          assertStructurallyEqual
+            (intVar C.User "x" 3)
+            (parseToTerm "x_U3 :: Int")
+
+      , testCase "explicit unique, system" $
+          assertStructurallyEqual
+            (intVar C.System "x" 3)
+            (parseToTerm "x_S3 :: Int")
+
+      , testCase "explicit unique, internal" $
+          assertStructurallyEqual
+            (intVar C.Internal "x" 3)
+            (parseToTerm "x_I3 :: Int")
+
+      -- 0x78 == ord 'x'
+      , testCase "derived unique" $
+          assertStructurallyEqual
+            (intVar C.User "x" 0x78)
+            (parseToTerm "x :: Int")
+
+      , testCase "derived unique, user" $
+          assertStructurallyEqual
+            (intVar C.User "x" 0x78)
+            (parseToTerm "x_U :: Int")
+
+      , testCase "derived unique, system" $
+          assertStructurallyEqual
+            (intVar C.System "x" 0x78)
+            (parseToTerm "x_S :: Int")
+
+      , testCase "derived unique, internal" $
+          assertStructurallyEqual
+            (intVar C.Internal "x" 0x78)
+            (parseToTerm "x_I :: Int")
+
+      , testCase "derived unique, four characters" $
+          assertStructurallyEqual
+            (intVar C.User "abcd" 0x61626364)
+            (parseToTerm "abcd :: Int")
+
+      , testCase "derived unique, four characters and a modifier" $
+          assertStructurallyEqual
+            (intVar C.System "abcd" 0x61626364)
+            (parseToTerm "abcd_S :: Int")
+
+      , testCase "name containing an underscore" $
+          assertStructurallyEqual
+            (intVar C.User "foo_bar" 3)
+            (parseToTerm "foo_bar_3 :: Int")
+
+      , testCase "name too long to derive a unique from" $
+          assertErrorContains "names of more than four characters don't fit"
+            (parseToTerm "abcde :: Int")
+
+      , testCase "name too long to derive a unique from, with a modifier" $
+          assertErrorContains "names of more than four characters don't fit"
+            (parseToTerm "abcde_S :: Int")
+      ]
+  ]
