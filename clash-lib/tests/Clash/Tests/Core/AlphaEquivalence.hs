@@ -6,6 +6,7 @@
   Tests for alpha equivalence and alpha comparison of 'Term' and 'Type'
 -}
 
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -16,40 +17,30 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH (testGroupGenerator)
 
-import Data.Text (Text)
-
 import Clash.Core.HasFreeVars (freeVarsOf)
-import Clash.Core.Name (NameSort (..), mkUnsafeName)
+import Clash.Core.Name (NameSort (..))
 import Clash.Core.Subst (freshenTm)
 import Clash.Core.Term (Term (..), NameMod (..), TickInfo (..))
-import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Type (Type (..))
-import Clash.Core.Var (TyVar, Var (..))
+import Clash.Core.Var (Var (..))
 import Clash.Core.VarEnv (eltsVarSet, mkInScopeSet, mkVarSet)
-import Clash.Unique (Unique)
 
-import Test.Clash.Rewrite (intTy, localId, parseToTermQQ)
-
-
--- | A 'TyVar' with the given human readable name and unique. 'Test.Clash.Rewrite'
--- has no equivalent of 'localId' for type variables, and 'parseToTermQQ' cannot
--- express the terms the tick tests below need.
-mkTyVar :: Text -> Unique -> TyVar
-mkTyVar occ uniq = TyVar (mkUnsafeName User occ uniq) uniq liftedTypeKind
+import Test.Clash.Rewrite (intTy, localId, parseToTermQQ, tyVar)
 
 
--- | Assert that two terms are alpha-equivalent, and that 'Ord' agrees, in both
--- directions
-assertAlphaEqual :: Term -> Term -> Assertion
+-- | Assert that two terms (or types) are alpha-equivalent, and that 'Ord'
+-- agrees, in both directions
+assertAlphaEqual :: (Ord a, Show a) => a -> a -> Assertion
 assertAlphaEqual t1 t2 = do
   t1 @=? t2
   t2 @=? t1
   EQ @=? compare t1 t2
   EQ @=? compare t2 t1
 
--- | Assert that two terms are not alpha-equivalent, and that 'Ord' agrees. Also
--- checks that comparison in the opposite direction yields the opposite result.
-assertAlphaNotEqual :: Term -> Term -> Assertion
+-- | Assert that two terms (or types) are not alpha-equivalent, and that 'Ord'
+-- agrees. Also checks that comparison in the opposite direction yields the
+-- opposite result, i.e. that the order is antisymmetric on this pair.
+assertAlphaNotEqual :: (Ord a, Show a) => a -> a -> Assertion
 assertAlphaNotEqual t1 t2 = do
   assertBool "t1 /= t2" (t1 /= t2)
   assertBool "t2 /= t1" (t2 /= t1)
@@ -305,8 +296,8 @@ case_tickAttributesDistinguishesFreeVars = assertAlphaNotEqual a b
 case_tickNameModSeesEnclosingBinders :: Assertion
 case_tickNameModSeesEnclosingBinders = assertAlphaEqual a b
  where
-  a = nameModTerm (mkTyVar "nm" 300)
-  b = nameModTerm (mkTyVar "nm" 400)
+  a = nameModTerm (tyVar User "nm" 300)
+  b = nameModTerm (tyVar User "nm" 400)
   x = localId User "x" 100 intTy
   nameModTerm tv =
     TyLam tv (Lam x (Tick (NameMod PrefixName (VarTy tv)) (Var x)))
@@ -328,6 +319,31 @@ case_freshenTmRenamesInsideAttributes =
   term = Lam x (Tick (Attributes intTy (Var x)) (Var x))
   -- 'x' is already in scope, so 'freshenTm' has to rename the binder
   (_, freshened) = freshenTm (mkInScopeSet (mkVarSet [x])) term
+
+-- | The type of the outermost lambda binder of a term. 'parseToTermQQ' parses a
+-- 'Term', so this is how a test gets its hands on a 'Type'.
+binderType :: Term -> Type
+binderType = \case
+  Lam i _ -> varType i
+  t -> error ("binderType: not a lambda: " <> show t)
+
+-- | Regression test: comparison of 'ForAllTy' binders is antisymmetric, i.e.
+-- swapping the arguments flips the 'Ordering' rather than yielding 'LT' both
+-- ways. 'assertAlphaNotEqual' checks both directions.
+case_forAllTyAntisymmetric :: Assertion
+case_forAllTyAntisymmetric = assertAlphaNotEqual t1 t2
+ where
+  t1 = binderType [parseToTermQQ|\(v :: forall a_3 b_2. b_2) -> v|]
+  t2 = binderType [parseToTermQQ|\(v :: forall c_1 d_4. c_1) -> v|]
+
+-- | Regression test: comparison of 'Lam' binders is antisymmetric, i.e.
+-- swapping the arguments flips the 'Ordering' rather than yielding 'LT' both
+-- ways. 'assertAlphaNotEqual' checks both directions.
+case_lamAntisymmetric :: Assertion
+case_lamAntisymmetric = assertAlphaNotEqual a b
+ where
+  a = [parseToTermQQ|\(x_3 :: Int) -> \(y_2 :: Int) -> y_2|]
+  b = [parseToTermQQ|\(p_1 :: Int) -> \(q_4 :: Int) -> p_1|]
 
 tests :: TestTree
 tests = $(testGroupGenerator)
