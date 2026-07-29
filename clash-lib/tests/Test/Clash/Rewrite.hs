@@ -239,77 +239,71 @@ parseIdWithType typ nm0 = C.Id nm1 (C.nameUniq nm1) typ scope
   (nm1, scope) = parseNameScope nm0
 
 -- | Parse an identifier into an 'C.Id', looking its type up in the given
--- 'TypeMap'. See 'parseIdWithType'.
+-- 'TypeMap'. Fails if the identifier's type wasn't declared. See
+-- 'parseIdWithType'.
 parseId :: (HasCallStack, Show l) => TypeMap -> Name l -> C.Id
 parseId typs nm0 = C.Id nm1 uniq (lookupTM uniq typs) scope
  where
   (nm1, scope) = parseNameScope nm0
   uniq = C.nameUniq nm1
 
--- | Parse declarations (as, amongst others, used in let expressions). Note that
--- every binder needs an explicit type annotation, as we don't do any type
--- inference. Type annotations may occur anywhere though. Example, this is OK:
+-- | Type given to free variables, i.e. to variables that aren't bound anywhere
+-- in the term and don't spell out their type. There's nothing to infer such a
+-- type from, and it is irrelevant to most tests - notably, alpha equivalence
+-- compares free variables by unique alone.
 --
---    let
---      x_0 :: Int
---      x_0 = 2
---
---      x_1 :: Int
---      x_1 = x_0
---    in
---      x_1
---
--- But this is not:
---
---    let
---      x_0 :: Int
---      x_0 = 2
---
---      x_1 = x_0
---    in
---      x_1
---
-parseDecls
-  :: forall l
-   . (HasCallStack, Show l)
-  => TypeMap
-  -> [Decl l]
-  -> (TypeMap, [C.LetBinding])
-parseDecls typs0 decls = (typs1, map parseOtherDecl otherDecls)
+-- Note that this only applies to /references/: binders always need their type
+-- declared, see 'parsePats'.
+freeVarType :: C.Type
+freeVarType =
+  C.ConstTy (C.TyCon (C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan))
+
+-- | Parse a reference to a variable, looking its type up in the given 'TypeMap'.
+-- References that aren't in it are free variables, and get 'freeVarType'.
+parseVarRef :: (HasCallStack, Show l) => TypeMap -> Name l -> C.Id
+parseVarRef typs nm0 = C.Id nm1 uniq typ scope
  where
-  (typDecls, otherDecls) = List.partition isTypeDecl decls
-  insertTyp (nm, t) = HashMap.insert nm t
-  typs1 = foldr insertTyp typs0 (concatMap parseTypeDecl typDecls)
+  (nm1, scope) = parseNameScope nm0
+  uniq = C.nameUniq nm1
+  typ = fromMaybe freeVarType (HashMap.lookup uniq typs)
 
-  parseOtherDecl :: HasCallStack => Decl l -> C.LetBinding
-  parseOtherDecl = \case
-    PatBind _ (PVar _ nm) (UnGuardedRhs _ e) Nothing ->
-      (parseId typs1 nm, expToTerm typs1 e)
-    e ->
-      error ("parseOtherDecl: " <> show e)
+-- | Parse the operator of an infix application into a variable reference
+parseOp :: (HasCallStack, Show l) => TypeMap -> QOp l -> C.Term
+parseOp typs = \case
+  -- Operator: `f` or +
+  QVarOp _ (UnQual _ nm) ->
+    C.Var (parseVarRef typs nm)
 
-  parseTypeDecl :: Decl l -> [(Unique, C.Type)]
-  parseTypeDecl (TypeSig _ nms t) =
-    map (\nm -> (C.nameUniq (parseName nm), parseType t)) nms
-  parseTypeDecl _ = error "impossible"
+  -- Unsupported operator:
+  o ->
+    error ("parseOp: " <> show o)
 
-  isTypeDecl :: Decl l -> Bool
-  isTypeDecl (TypeSig {}) = True
-  isTypeDecl _ = False
-
--- | Parse the patterns of a lambda into its binders. Like let bindings, binders
--- need an explicit type, either spelled out in the pattern or declared in an
--- enclosing let. I.e., both of these are OK:
+-- | Parse binder patterns, as used by let bindings and lambdas. Note that every
+-- binder needs an explicit type annotation, as we don't do any type inference.
+-- The annotation may be spelled out in the pattern itself, or declared in an
+-- enclosing let. I.e., all of these are OK:
 --
 --    \(x_0 :: Int) -> x_0
 --
 --    let
+--      (x_0 :: Int) = 2
+--    in
+--      x_0
+--
+--    let
 --      x_0 :: Int
---      x_0 = 5
+--      x_0 = 2
 --    in
 --      \x_0 -> x_0
 --
--- Binders are added to the type map, so a lambda's body can refer to them
+-- But this is not:
+--
+--    let
+--      x_0 = 2
+--    in
+--      x_0
+--
+-- Binders are added to the type map, so the scope they bind can refer to them
 -- without repeating their type.
 parsePats
   :: forall l
@@ -338,6 +332,45 @@ parsePats = List.mapAccumL parsePat
     p ->
       error ("parsePat: " <> show p)
 
+-- | Parse declarations (as, amongst others, used in let expressions). See
+-- 'parsePats' for how binders get their type.
+--
+-- The type map returned includes the types of all binders declared here, so it
+-- can be used to parse the body of the let these declarations belong to.
+parseDecls
+  :: forall l
+   . (HasCallStack, Show l)
+  => TypeMap
+  -> [Decl l]
+  -> (TypeMap, [C.LetBinding])
+parseDecls typs0 decls = (typs2, zip ids (map (expToTerm typs2) rhss))
+ where
+  (typDecls, otherDecls) = List.partition isTypeDecl decls
+
+  -- Types declared by separate type signatures
+  insertTyp (nm, t) = HashMap.insert nm t
+  typs1 = foldr insertTyp typs0 (concatMap parseTypeDecl typDecls)
+
+  -- Binders, plus the types they declare in their patterns. Note that all
+  -- right-hand sides are parsed with the /final/ type map, so bindings may refer
+  -- to each other irrespective of the order they're declared in.
+  (typs2, ids) = parsePats typs1 pats
+  (pats, rhss) = unzip (map splitOtherDecl otherDecls)
+
+  splitOtherDecl :: HasCallStack => Decl l -> (Pat l, Exp l)
+  splitOtherDecl = \case
+    PatBind _ p (UnGuardedRhs _ e) Nothing -> (p, e)
+    d -> error ("splitOtherDecl: " <> show d)
+
+  parseTypeDecl :: Decl l -> [(Unique, C.Type)]
+  parseTypeDecl (TypeSig _ nms t) =
+    map (\nm -> (C.nameUniq (parseName nm), parseType t)) nms
+  parseTypeDecl _ = error "impossible"
+
+  isTypeDecl :: Decl l -> Bool
+  isTypeDecl (TypeSig {}) = True
+  isTypeDecl _ = False
+
 -- | Parse a haskell-src-exts expression into Clash Core.
 expToTerm
   :: forall l
@@ -358,6 +391,10 @@ expToTerm typs0 = \case
   App _ e1 e2 ->
     C.App (expToTerm typs0 e1) (expToTerm typs0 e2)
 
+  -- Infix application: e1 + e2
+  InfixApp _ e1 op e2 ->
+    C.App (C.App (parseOp typs0 op) (expToTerm typs0 e1)) (expToTerm typs0 e2)
+
   -- Lambda: \x y -> e
   Lambda _ pats body0 ->
     let
@@ -368,7 +405,7 @@ expToTerm typs0 = \case
 
   -- Variable reference: e
   Var _ (UnQual _ nm) ->
-    C.Var (parseId typs0 nm)
+    C.Var (parseVarRef typs0 nm)
 
   -- Literal: 3
   Lit _ (Int _ i _) -> C.Literal (C.IntLiteral i)
@@ -396,7 +433,7 @@ termParseMode = defaultParseMode
 -- only parse very simple expressions. In the future we should make an effort to
 -- build a proper TyConMap (using LoadModules) to faithfully reproduce more
 -- complex expressions.
-parseToTerm :: String -> C.Term
+parseToTerm :: HasCallStack => String -> C.Term
 parseToTerm =
   expToTerm HashMap.empty . fromParseResult . parseExpWithMode termParseMode
 
@@ -445,6 +482,10 @@ intVar nmSort nm uniq = C.Var (localId nmSort nm uniq intTy)
 -- | A reference to a global variable of type @Int@. See 'mkId'.
 globalIntVar :: C.NameSort -> String -> Unique -> C.Term
 globalIntVar nmSort nm uniq = C.Var (mkId C.GlobalId nmSort nm uniq intTy)
+
+-- | A reference to a variable without a declared type. See 'freeVarType'.
+freeVar :: C.NameSort -> String -> Unique -> C.Term
+freeVar nmSort nm uniq = C.Var (localId nmSort nm uniq freeVarType)
 
 -- | Assert that two terms are structurally equal, by comparing their 'Show'
 -- output.
@@ -504,9 +545,47 @@ tests = testGroup "Test.Clash.Rewrite"
               (intVar C.User "x" 1))
             (parseToTerm "let { x_0, x_1 :: Int; x_0 = 5; x_1 = x_0 } in x_1")
 
+      , testCase "let with an inline type annotation" $
+          assertStructurallyEqual
+            (C.Letrec
+              [(localId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))]
+              (intVar C.User "x" 0))
+            (parseToTerm "let { (x_0 :: Int) = 5 } in x_0")
+
+      -- Bindings may refer to each other regardless of the order they're
+      -- declared in, so their types have to be collected up front
+      , testCase "let with a forward reference" $
+          assertStructurallyEqual
+            (C.Letrec
+              [ (localId C.User "x" 0 intTy, intVar C.User "y" 1)
+              , (localId C.User "y" 1 intTy, C.Literal (C.IntLiteral 5))
+              ]
+              (intVar C.User "x" 0))
+            (parseToTerm "let { (x_0 :: Int) = y_1; (y_1 :: Int) = 5 } in x_0")
+
       , testCase "let without a type annotation" $
           assertErrorContains "forgot to (explicitely) declare"
             (parseToTerm "let { x_0 = 5 } in x_0")
+
+      -- 0x2b == ord '+'
+      , testCase "infix application" $
+          assertStructurallyEqual
+            (C.App
+              (C.App (freeVar C.User "+" 0x2b) (intVar C.User "x" 0))
+              (intVar C.User "y" 1))
+            (parseToTerm "(x_0 :: Int) + (y_1 :: Int)")
+
+      , testCase "infix application of a named function" $
+          assertStructurallyEqual
+            (C.App
+              (C.App (freeVar C.User "add" 2) (intVar C.User "x" 0))
+              (intVar C.User "y" 1))
+            (parseToTerm "(x_0 :: Int) `add_2` (y_1 :: Int)")
+
+      , testCase "free variable" $
+          assertStructurallyEqual
+            (C.App (freeVar C.User "f" 0) (intVar C.User "x" 1))
+            (parseToTerm "f_0 (x_1 :: Int)")
 
       , testCase "lambda" $
           assertStructurallyEqual
