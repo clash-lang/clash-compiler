@@ -251,6 +251,16 @@ case_letrecBindingCountSignificant = assertAlphaNotEqual a b
   a = [parseToTermQQ|let { (x :: Int) = 1 } in x|]
   b = [parseToTermQQ|let { (x :: Int) = 1; (y :: Int) = 1 } in x|]
 
+-- | A letrec binder's type is significant, even when the right-hand sides
+-- agree. Unlike a @NonRec@ binder, whose type its right-hand side pins down, a
+-- letrec binder may occur in its own right-hand side, and then it does not:
+-- @let x = x@ is the same term whether @x@ is an @Int@ or a @Bool@.
+case_letrecBinderTypeSignificant :: Assertion
+case_letrecBinderTypeSignificant = assertAlphaNotEqual a b
+ where
+  a = [parseToTermQQ|let (x :: Int) = 5 in x|]
+  b = [parseToTermQQ|let (x :: Bool) = 5 in x|]
+
 -- | Self-referencing letrec bindings can be renamed like any other binding.
 case_letrecSelfReference :: Assertion
 case_letrecSelfReference = assertAlphaEqual a b
