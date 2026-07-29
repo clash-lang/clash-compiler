@@ -779,8 +779,9 @@ freshenTm is0 = go (mkSubst is0) where
         (is2,alts') -> (is2, Case subj' (substTy subst0 ty) alts')
     Cast e t1 t2 -> case go subst0 e of
       (is1, e') -> (is1, Cast e' (substTy subst0 t1) (substTy subst0 t2))
-    Tick tick e -> case go subst0 e of
-       (is1, e') -> (is1, Tick (goTick subst0 tick) e')
+    Tick tick e -> case goTick subst0 tick of
+      (is1, tick') -> case go subst0 {substInScope = is1} e of
+        (is2, e') -> (is2, Tick tick' e')
     tm -> (substInScope subst0, tm)
 
   goBind subst0 (NonRec i x) =
@@ -804,8 +805,13 @@ freshenTm is0 = go (mkSubst is0) where
     _ -> case go subst0 alt of
       (is1,alt') -> (is1,(pat,alt'))
 
-  goTick subst0 (NameMod m ty) = NameMod m (substTy subst0 ty)
-  goTick _      tick           = tick
+  goTick subst0 t@(SrcSpan _) = (substInScope subst0, t)
+  goTick subst0 (NameMod m ty) =
+    (substInScope subst0, NameMod m (substTy subst0 ty))
+  goTick subst0 t@DeDup = (substInScope subst0, t)
+  goTick subst0 t@NoDeDup = (substInScope subst0, t)
+  goTick subst0 (Attributes ty tm) = case go subst0 tm of
+    (is1, tm') -> (is1, Attributes (substTy subst0 ty) tm')
 
 -- * AEQ
 
