@@ -170,47 +170,79 @@ nameToUnique nm
     |]
   | otherwise = List.foldl' (\acc c -> acc * 256 + fromIntegral (ord c)) 0 nm
 
--- | Parse an identifier into a Clash Name. Identifiers might include a unique,
--- and might include a modifier indicating their NameSort. Examples:
+-- | Parse an identifier into a Clash Name and an 'C.IdScope'. Identifiers might
+-- include a unique, and might include modifiers indicating their 'C.NameSort'
+-- and 'C.IdScope'. Examples:
 --
---   * x_3:  User identifier with human readable name "x", unique "3"
---   * x_I3: Internal identifier with human readable name "x", unique "3"
---   * x_S3: System identifier with human readable name "x", unique "3"
-
---   * x:    User identifier with human readable name "x", unique derived from "x"
---   * x_U:  User identifier with human readable name "x", unique derived from "x"
---   * x_S:  System identifier with human readable name "x", unique derived from "x"
+--   * x_3:  User, local identifier with human readable name "x", unique "3"
+--   * x_I3: Internal, local identifier with human readable name "x", unique "3"
+--   * x_S3: System, local identifier with human readable name "x", unique "3"
+--   * x_G3: User, global identifier with human readable name "x", unique "3"
 --
--- Identifiers that don't spell out their unique derive it from their human
--- readable name, see 'nameToUnique'.
+--   * x:    User, local identifier with human readable name "x", unique derived from "x"
+--   * x_U:  User, local identifier with human readable name "x", unique derived from "x"
+--   * x_S:  System, local identifier with human readable name "x", unique derived from "x"
+--   * x_G:  User, global identifier with human readable name "x", unique derived from "x"
 --
-parseName :: (HasCallStack, Show l) => Name l -> C.Name a
-parseName = \case
+-- Modifiers may be combined, in any order: 'x_SG3' and 'x_GS3' both denote a
+-- System, global identifier with unique "3". Identifiers that don't spell out
+-- their unique derive it from their human readable name, see 'nameToUnique'.
+--
+-- Identifiers default to 'C.User' and 'C.LocalId'.
+--
+parseNameScope :: (HasCallStack, Show l) => Name l -> (C.Name a, C.IdScope)
+parseNameScope = \case
   Ident _ s -> mkName s
   Symbol _ s -> mkName s
  where
   mkName s = case go "" s of
-    Just (nmSort, nm, uniq) ->
-      C.mkUnsafeName nmSort (Text.pack nm) (fromMaybe (nameToUnique nm) uniq)
+    Just (nmSort, scope, nm, uniq) ->
+      ( C.mkUnsafeName nmSort (Text.pack nm) (fromMaybe (nameToUnique nm) uniq)
+      , scope )
     -- No '_'-delimited suffix at all: the whole identifier is the name
     Nothing ->
-      C.mkUnsafeName C.User (Text.pack s) (nameToUnique s)
+      (C.mkUnsafeName C.User (Text.pack s) (nameToUnique s), C.LocalId)
 
   go _seen "" = Nothing
-  go seen0 ('_':s:ss)
-    | 'U' <- s = withSort C.User
-    | 'S' <- s = withSort C.System
-    | 'I' <- s = withSort C.Internal
-    | otherwise = fmap ((C.User,seen1,) . Just) (readMaybe (s:ss)) <|> cont
+  go seen0 ('_':s:ss) = fmap withName (parseSuffix (s:ss)) <|> cont
    where
-    seen1 = reverse seen0
+    withName (nmSort, scope, uniq) = (nmSort, scope, reverse seen0, uniq)
     cont = go ('_':seen0) (s:ss)
-
-    -- A sort modifier is either followed by a unique, or ends the identifier
-    withSort nmSort
-      | null ss = Just (nmSort, seen1, Nothing)
-      | otherwise = fmap ((nmSort,seen1,) . Just) (readMaybe ss) <|> cont
   go seen (s:ss) = go (s:seen) ss
+
+  -- Parse a suffix such as "3", "S", or "SG3": zero or more modifiers followed
+  -- by an optional unique. Yields 'Nothing' if the suffix is malformed, in which
+  -- case it is considered part of the human readable name.
+  parseSuffix = goSuffix C.User C.LocalId
+   where
+    goSuffix nmSort scope = \case
+      'U':ss -> goSuffix C.User scope ss
+      'S':ss -> goSuffix C.System scope ss
+      'I':ss -> goSuffix C.Internal scope ss
+      'G':ss -> goSuffix nmSort C.GlobalId ss
+      'L':ss -> goSuffix nmSort C.LocalId ss
+      -- Modifiers are either followed by a unique, or end the identifier
+      "" -> Just (nmSort, scope, Nothing)
+      ss -> fmap ((nmSort,scope,) . Just) (readMaybe ss)
+
+-- | Parse an identifier into a Clash Name, ignoring any scope modifier. See
+-- 'parseNameScope'.
+parseName :: (HasCallStack, Show l) => Name l -> C.Name a
+parseName = fst . parseNameScope
+
+-- | Parse an identifier into an 'C.Id' of the given type. See 'parseNameScope'.
+parseIdWithType :: (HasCallStack, Show l) => C.Type -> Name l -> C.Id
+parseIdWithType typ nm0 = C.Id nm1 (C.nameUniq nm1) typ scope
+ where
+  (nm1, scope) = parseNameScope nm0
+
+-- | Parse an identifier into an 'C.Id', looking its type up in the given
+-- 'TypeMap'. See 'parseIdWithType'.
+parseId :: (HasCallStack, Show l) => TypeMap -> Name l -> C.Id
+parseId typs nm0 = C.Id nm1 uniq (lookupTM uniq typs) scope
+ where
+  (nm1, scope) = parseNameScope nm0
+  uniq = C.nameUniq nm1
 
 -- | Parse declarations (as, amongst others, used in let expressions). Note that
 -- every binder needs an explicit type annotation, as we don't do any type
@@ -249,12 +281,8 @@ parseDecls typs0 decls = (typs1, map parseOtherDecl otherDecls)
 
   parseOtherDecl :: HasCallStack => Decl l -> C.LetBinding
   parseOtherDecl = \case
-    PatBind _ (PVar _ (parseName -> nm)) (UnGuardedRhs _ e) Nothing ->
-      let
-        uniq = C.nameUniq nm
-        typ = lookupTM (C.nameUniq nm) typs1
-      in
-        (C.Id nm uniq typ C.LocalId, expToTerm typs1 e)
+    PatBind _ (PVar _ nm) (UnGuardedRhs _ e) Nothing ->
+      (parseId typs1 nm, expToTerm typs1 e)
     e ->
       error ("parseOtherDecl: " <> show e)
 
@@ -279,21 +307,17 @@ expToTerm typs0 = \case
   Paren _ e ->
     expToTerm typs0 e
 
-  -- Local variable reference with type signature: x :: t
-  ExpTypeSig _ (Var _ (UnQual _ (parseName -> nm))) (parseType -> t) ->
-    C.Var (C.Id nm (C.nameUniq nm) t C.LocalId)
+  -- Variable reference with type signature: x :: t
+  ExpTypeSig _ (Var _ (UnQual _ nm)) (parseType -> t) ->
+    C.Var (parseIdWithType t nm)
 
   -- Term application: e1 e2
   App _ e1 e2 ->
     C.App (expToTerm typs0 e1) (expToTerm typs0 e2)
 
   -- Variable reference: e
-  Var _ (UnQual _ (parseName -> nm)) ->
-    let
-     uniq = C.nameUniq nm
-     typ = lookupTM (C.nameUniq nm) typs0
-    in
-      C.Var (C.Id nm uniq typ C.LocalId)
+  Var _ (UnQual _ nm) ->
+    C.Var (parseId typs0 nm)
 
   -- Literal: 3
   Lit _ (Int _ i _) -> C.Literal (C.IntLiteral i)
@@ -344,15 +368,23 @@ parseToTermQQ = TH.QuasiQuoter{
 intTy :: C.Type
 intTy = C.ConstTy (C.TyCon (C.Name C.User (Text.pack "Int") 0 C.noSrcSpan))
 
--- | A local 'C.Id' with the given name sort, human readable name, unique, and
+-- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
+mkId :: C.IdScope -> C.NameSort -> String -> Unique -> C.Type -> C.Id
+mkId scope nmSort nm uniq typ =
+  C.Id (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq typ scope
+
+-- | A local 'C.Id'. See 'mkId'.
 localId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
-localId nmSort nm uniq typ =
-  C.Id (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq typ C.LocalId
+localId = mkId C.LocalId
 
 -- | A reference to a local variable of type @Int@. See 'localId'.
 intVar :: C.NameSort -> String -> Unique -> C.Term
 intVar nmSort nm uniq = C.Var (localId nmSort nm uniq intTy)
+
+-- | A reference to a global variable of type @Int@. See 'mkId'.
+globalIntVar :: C.NameSort -> String -> Unique -> C.Term
+globalIntVar nmSort nm uniq = C.Var (mkId C.GlobalId nmSort nm uniq intTy)
 
 -- | Assert that two terms are structurally equal, by comparing their 'Show'
 -- output.
@@ -417,7 +449,7 @@ tests = testGroup "Test.Clash.Rewrite"
             (parseToTerm "let { x_0 = 5 } in x_0")
       ]
 
-  , testGroup "parseName"
+  , testGroup "parseNameScope"
       [ testCase "explicit unique" $
           assertStructurallyEqual
             (intVar C.User "x" 3)
@@ -473,6 +505,43 @@ tests = testGroup "Test.Clash.Rewrite"
           assertStructurallyEqual
             (intVar C.User "foo_bar" 3)
             (parseToTerm "foo_bar_3 :: Int")
+
+      , testCase "explicit scope, local" $
+          assertStructurallyEqual
+            (intVar C.User "x" 3)
+            (parseToTerm "x_L3 :: Int")
+
+      , testCase "explicit scope, global" $
+          assertStructurallyEqual
+            (globalIntVar C.User "x" 3)
+            (parseToTerm "x_G3 :: Int")
+
+      , testCase "explicit scope, derived unique" $
+          assertStructurallyEqual
+            (globalIntVar C.User "x" 0x78)
+            (parseToTerm "x_G :: Int")
+
+      , testCase "explicit scope and name sort" $
+          assertStructurallyEqual
+            (globalIntVar C.System "x" 3)
+            (parseToTerm "x_SG3 :: Int")
+
+      , testCase "explicit scope and name sort, reversed" $
+          assertStructurallyEqual
+            (globalIntVar C.System "x" 3)
+            (parseToTerm "x_GS3 :: Int")
+
+      , testCase "explicit scope and name sort, derived unique" $
+          assertStructurallyEqual
+            (globalIntVar C.Internal "x" 0x78)
+            (parseToTerm "x_IG :: Int")
+
+      , testCase "explicit scope on a let binder" $
+          assertStructurallyEqual
+            (C.Letrec
+              [(mkId C.GlobalId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))]
+              (globalIntVar C.User "x" 0))
+            (parseToTerm "let { x_G0 :: Int; x_G0 = 5 } in x_G0")
 
       , testCase "name too long to derive a unique from" $
           assertErrorContains "names of more than four characters don't fit"
