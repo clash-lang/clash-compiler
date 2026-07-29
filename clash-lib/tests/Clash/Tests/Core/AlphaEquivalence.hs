@@ -18,11 +18,14 @@ import Test.Tasty.TH (testGroupGenerator)
 
 import Data.Text (Text)
 
+import Clash.Core.HasFreeVars (freeVarsOf)
 import Clash.Core.Name (NameSort (..), mkUnsafeName)
+import Clash.Core.Subst (freshenTm)
 import Clash.Core.Term (Term (..), NameMod (..), TickInfo (..))
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Type (Type (..))
 import Clash.Core.Var (TyVar, Var (..))
+import Clash.Core.VarEnv (eltsVarSet, mkInScopeSet, mkVarSet)
 import Clash.Unique (Unique)
 
 import Test.Clash.Rewrite (intTy, localId, parseToTermQQ)
@@ -297,6 +300,24 @@ case_tickNameModSeesEnclosingBinders = assertAlphaEqual a b
   x = localId User "x" 100 intTy
   nameModTerm tv =
     TyLam tv (Lam x (Tick (NameMod PrefixName (VarTy tv)) (Var x)))
+
+-- | 'freshenTm' gives every binder a fresh unique. The Core in 'Attributes'
+-- lives in the scope enclosing the tick, so an occurrence of the binder inside
+-- it has to be renamed along with the body; leaving it alone turns it into a
+-- free variable pointing at the old unique.
+case_freshenTmRenamesInsideAttributes :: Assertion
+case_freshenTmRenamesInsideAttributes =
+  case freshened of
+    Lam x' (Tick (Attributes _ (Var attributed)) _) -> do
+      assertBool "binder was freshened" (varUniq x' /= varUniq x)
+      varUniq x' @=? varUniq attributed
+      [] @=? eltsVarSet (freeVarsOf freshened)
+    other -> assertFailure ("unexpected shape: " <> show other)
+ where
+  x = localId User "x" 100 intTy
+  term = Lam x (Tick (Attributes intTy (Var x)) (Var x))
+  -- 'x' is already in scope, so 'freshenTm' has to rename the binder
+  (_, freshened) = freshenTm (mkInScopeSet (mkVarSet [x])) term
 
 tests :: TestTree
 tests = $(testGroupGenerator)
