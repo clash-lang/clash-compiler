@@ -16,9 +16,23 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH (testGroupGenerator)
 
-import Clash.Core.Term (Term (..))
+import Data.Text (Text)
 
-import Test.Clash.Rewrite (parseToTermQQ)
+import Clash.Core.Name (NameSort (..), mkUnsafeName)
+import Clash.Core.Term (Term (..), NameMod (..), TickInfo (..))
+import Clash.Core.TysPrim (liftedTypeKind)
+import Clash.Core.Type (Type (..))
+import Clash.Core.Var (TyVar, Var (..))
+import Clash.Unique (Unique)
+
+import Test.Clash.Rewrite (intTy, localId, parseToTermQQ)
+
+
+-- | A 'TyVar' with the given human readable name and unique. 'Test.Clash.Rewrite'
+-- has no equivalent of 'localId' for type variables, and 'parseToTermQQ' cannot
+-- express the terms the tick tests below need.
+mkTyVar :: Text -> Unique -> TyVar
+mkTyVar occ uniq = TyVar (mkUnsafeName User occ uniq) uniq liftedTypeKind
 
 
 -- | Assert that two terms are alpha-equivalent, and that 'Ord' agrees, in both
@@ -248,6 +262,41 @@ case_differentConstructors = assertAlphaNotEqual a b
  where
   a = [parseToTermQQ|\(x :: Int) -> x|]
   b = [parseToTermQQ|let (x :: Int) = x in x|]
+
+-- | The Core in 'Attributes' lives in the scope enclosing the tick, so it is
+-- compared under the enclosing renaming environment. Judging it in an empty
+-- environment would compare an occurrence of a bound variable by its raw
+-- unique, making these two unequal.
+case_tickAttributesSeesEnclosingBinders :: Assertion
+case_tickAttributesSeesEnclosingBinders = assertAlphaEqual a b
+ where
+  a = attributed (localId User "x" 100 intTy)
+  b = attributed (localId User "y" 200 intTy)
+  attributed v = Lam v (Tick (Attributes intTy (Var v)) (Var v))
+
+-- | Free variables in 'Attributes' are still significant: only binders are
+-- renamed away.
+case_tickAttributesDistinguishesFreeVars :: Assertion
+case_tickAttributesDistinguishesFreeVars = assertAlphaNotEqual a b
+ where
+  x = localId User "x" 100 intTy
+  a = attributed x
+  b = attributed (localId User "y" 200 intTy)
+  attributed v = Lam x (Tick (Attributes intTy (Var v)) (Var x))
+
+-- | The 'Type' in 'NameMod' lives in the scope enclosing the tick, so it is
+-- compared under the enclosing renaming environment, just like the 'Term' in
+-- 'Attributes'. This is the shape @Clash.GHC.GHC2Core.nameModTerm@ builds for
+-- @prefixName@ and friends:
+-- @/\\nm. \\x -> Tick (NameMod PrefixName (VarTy nm)) x@.
+case_tickNameModSeesEnclosingBinders :: Assertion
+case_tickNameModSeesEnclosingBinders = assertAlphaEqual a b
+ where
+  a = nameModTerm (mkTyVar "nm" 300)
+  b = nameModTerm (mkTyVar "nm" 400)
+  x = localId User "x" 100 intTy
+  nameModTerm tv =
+    TyLam tv (Lam x (Tick (NameMod PrefixName (VarTy tv)) (Var x)))
 
 tests :: TestTree
 tests = $(testGroupGenerator)

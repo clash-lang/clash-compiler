@@ -77,6 +77,7 @@ import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
 import           GHC.Stack                 (HasCallStack)
 import           GHC.SrcLoc.Extra          ()
+import           GHC.Types.SrcLoc          (leftmost_smallest)
 import           GHC.TypeLits
   (TypeError, ErrorMessage (Text, (:<>:)))
 
@@ -944,7 +945,7 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     acmpType' env l1 l2 `thenCompare`
     acmpType' env r1 r2
   go env (Tick t1 e1) (Tick t2 e2) =
-    compare t1 t2 `thenCompare` go env e1 e2
+    goTick env t1 t2 `thenCompare` go env e1 e2
   go _ e1 e2 = compare (getRank e1) (getRank e2)
 
   goAlt env (DataPat c1 tvs1 ids1,e1) (DataPat c2 tvs2 ids2,e2) =
@@ -953,6 +954,28 @@ acmpTerm' inScope = go (mkRnEnv inScope)
     env' = rnTmBndrs (rnTyBndrs env tvs1 tvs2) ids1 ids2
   goAlt env (c1,e1) (c2,e2) =
     compare c1 c2 `thenCompare` go env e1 e2
+
+  -- The Core in 'NameMod' and 'Attributes' lives in the scope enclosing the
+  -- tick -- 'substTm' substitutes into it and 'Clash.Core.FreeVars' traverses
+  -- it -- so it is compared under the renaming environment we have here.
+  -- Comparing it in isolation would judge a mention of a bound variable by that
+  -- variable's raw unique, making alpha-equivalent terms compare unequal.
+  -- @Clash.GHC.GHC2Core.nameModTerm@ builds exactly such a term:
+  -- @/\nm. /\a. \x. Tick (NameMod sa (VarTy nm)) x@.
+  goTick _ (SrcSpan s1) (SrcSpan s2) = leftmost_smallest s1 s2
+  goTick env (NameMod m1 t1) (NameMod m2 t2) =
+    compare m1 m2 `thenCompare` acmpType' env t1 t2
+  goTick env (Attributes t1 a1) (Attributes t2 a2) =
+    acmpType' env t1 t2 `thenCompare` go env a1 a2
+  goTick _ t1 t2 = compare (getRankTick t1) (getRankTick t2)
+
+  getRankTick :: TickInfo -> Word
+  getRankTick = \case
+    SrcSpan {}    -> 0
+    NameMod {}    -> 1
+    DeDup         -> 2
+    NoDeDup       -> 3
+    Attributes {} -> 4
 
   getRank :: Term -> Word
   getRank = \case
@@ -1016,8 +1039,17 @@ eqTerm = go
     go e1 e2 &&
     eqType l1 l2 &&
     eqType r1 r2
-  go (Tick t1 e1) (Tick t2 e2) = t1 == t2 && go e1 e2
+  go (Tick t1 e1) (Tick t2 e2) = goTick t1 t2 && go e1 e2
   go _ _ = False
+
+  -- @Eq TickInfo@ compares 'NameMod' and 'Attributes' with alpha-equivalence,
+  -- which is too coarse here: this is structural equality.
+  goTick (SrcSpan s1) (SrcSpan s2) = s1 == s2
+  goTick (NameMod m1 t1) (NameMod m2 t2) = m1 == m2 && eqType t1 t2
+  goTick DeDup DeDup = True
+  goTick NoDeDup NoDeDup = True
+  goTick (Attributes t1 a1) (Attributes t2 a2) = eqType t1 t2 && go a1 a2
+  goTick _ _ = False
 
 instance Eq Type where
   (==) = aeqType
