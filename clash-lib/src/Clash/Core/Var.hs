@@ -18,6 +18,7 @@ module Clash.Core.Var
   , IdScope (..)
   , Id
   , TyVar
+  , varKey
   , mkId
   , mkLocalId
   , mkGlobalId
