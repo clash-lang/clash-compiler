@@ -142,6 +142,10 @@ class KnownNat (BitSize a) => BitPack a where
 
   -- | Convert a 'BitVector' to an element of type @a@
   --
+  -- When the bit pattern is not the representation of any value of type @a@,
+  -- @unpack@ can return an invalid value, or some value @y@ where @'pack' y@
+  -- is not equal to the input. Use 'maybeUnpack' to detect such bit patterns.
+  --
   -- >>> pack (-5 :: Signed 6)
   -- 0b11_1011
   -- >>> let x = pack (-5 :: Signed 6)
@@ -167,6 +171,11 @@ class KnownNat (BitSize a) => BitPack a where
 
   -- | Attempt to convert a 'BitVector' to an element of type @a@. If the unpacking
   -- is successful, outputs @Just a@, otherwise outputs @Nothing@.
+  --
+  -- Not every bit pattern is necessarily the representation of a value of type
+  -- @a@. If there is no @x@ such that @bv == 'pack' x@, then @maybeUnpack bv@
+  -- returns @Nothing@. Conversely, 'unpack' @bv@ would return an invalid value,
+  -- or some value @y@ where @'pack' y@ is not equal to @bv@.
   --
   -- >>> pack (maxBound :: Index 13)
   -- 0b1100

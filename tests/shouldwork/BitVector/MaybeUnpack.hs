@@ -8,10 +8,10 @@
 
 module MaybeUnpack where
 
-import           GHC.Generics           (Generic)
+import GHC.Generics (Generic)
 
-import           Clash.Explicit.Testbench
-import           Clash.Prelude
+import Clash.Explicit.Testbench
+import Clash.Prelude
 
 data Wrapped = Wrapped (Index 3)
   deriving (Generic, NFDataX, BitPack, Eq, Show, ShowX)
@@ -71,5 +71,5 @@ testBench = done
       :> Nil
       )
   done = expectedOutput (topEntity <$> testInput)
-  clk = tbSystemClockGen (Clash.Prelude.not <$> done)
+  clk = tbSystemClockGen (not <$> done)
   rst = systemResetGen

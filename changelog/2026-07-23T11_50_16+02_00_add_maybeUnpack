@@ -1,4 +1,4 @@
-ADDED: `maybeUnpack` to `BitPack`, providing a synthesizable way to reject bit
+ADDED: Added `maybeUnpack` to `BitPack`, providing a synthesizable way to reject bit
 patterns that do not represent a value. This is a source-breaking addition for
 manually written `BitPack` instances: they must either define `maybeUnpack` or
 satisfy its generic default implementation. See

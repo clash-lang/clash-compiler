@@ -11,14 +11,13 @@
 
 module MaybeUnpackDerivation where
 
-import           Data.Maybe                             (isNothing)
-import           GHC.Generics                           (Generic)
+import Data.Maybe (isNothing)
+import GHC.Generics (Generic)
 
-import           Clash.Annotations.BitRepresentation    (ConstrRepr(..), DataReprAnn(..), liftQ)
-import           Clash.Annotations.BitRepresentation.Deriving
-  ( deriveBitPack )
-import           Clash.Prelude
-import           Clash.Prelude.Testbench
+import Clash.Annotations.BitRepresentation (ConstrRepr(..), DataReprAnn(..), liftQ)
+import Clash.Annotations.BitRepresentation.Deriving (deriveBitPack)
+import Clash.Prelude
+import Clash.Prelude.Testbench
 
 data Color
   = Red
@@ -89,7 +88,7 @@ testBench = done'
 
   done' =
     withClockResetEnable
-      (tbSystemClockGen (Clash.Prelude.not <$> done'))
+      (tbSystemClockGen (not <$> done'))
       systemResetGen
       enableGen
       done
