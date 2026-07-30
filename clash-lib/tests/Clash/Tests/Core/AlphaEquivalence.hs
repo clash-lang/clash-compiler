@@ -3,7 +3,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for alpha equivalence and alpha comparison of 'Term' and 'Type'
+  Tests for alpha equivalence, alpha comparison and alpha hashing of 'Term' and
+  'Type'
 -}
 
 {-# LANGUAGE LambdaCase #-}
@@ -12,6 +13,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Core.AlphaEquivalence (tests) where
+
+import Data.Hashable (Hashable, hash)
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -29,18 +32,20 @@ import Test.Clash.Rewrite (intTy, localId, parseToTermQQ, tyVar)
 
 
 -- | Assert that two terms (or types) are alpha-equivalent, and that 'Ord'
--- agrees, in both directions
-assertAlphaEqual :: (Ord a, Show a) => a -> a -> Assertion
+-- agrees, in both directions. Their hashes have to agree as well: hashing
+-- alpha-equivalent terms alike is the direction of the hash law that holds.
+assertAlphaEqual :: (Ord a, Show a, Hashable a) => a -> a -> Assertion
 assertAlphaEqual t1 t2 = do
   t1 @=? t2
   t2 @=? t1
   EQ @=? compare t1 t2
   EQ @=? compare t2 t1
+  hash t1 @=? hash t2
 
 -- | Assert that two terms (or types) are not alpha-equivalent, and that 'Ord'
 -- agrees. Also checks that comparison in the opposite direction yields the
 -- opposite result, i.e. that the order is antisymmetric on this pair.
-assertAlphaNotEqual :: (Ord a, Show a) => a -> a -> Assertion
+assertAlphaNotEqual :: (Ord a, Show a, Hashable a) => a -> a -> Assertion
 assertAlphaNotEqual t1 t2 = do
   assertBool "t1 /= t2" (t1 /= t2)
   assertBool "t2 /= t1" (t2 /= t1)
@@ -48,6 +53,18 @@ assertAlphaNotEqual t1 t2 = do
     EQ -> assertFailure "compare == EQ"
     LT -> GT @=? compare t2 t1
     GT -> LT @=? compare t2 t1
+
+  -- XXX: (a == b) `implies` (hash a == hash b), but not necessarily the other
+  --      way around. Still, chances of hitting a hash collision should be pretty
+  --      small. This test therefore serves as a sanity check to see whether the
+  --      generated hashes are chaotic enough.
+  --
+  --      IF you ever encounter a hash collision here, you can safely remove it.
+  --      Still, it would then be a good idea to think about how we want to test
+  --      the "chaoticness" of the function.
+  assertBool
+    "If you see this read the TODO comment ^: hash t1 /= hash t2"
+    (hash t1 /= hash t2)
 
 case_arxiv_2105_02856_eq1 :: Assertion
 case_arxiv_2105_02856_eq1 = assertAlphaEqual a b
