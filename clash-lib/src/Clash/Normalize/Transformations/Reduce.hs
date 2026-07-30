@@ -143,6 +143,10 @@ reduceConst _ e = return e
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
 reduceNonRepPrim :: HasCallStack => NormRewrite
+-- Only consider the root of an application spine (see 'reduceConst'): the root
+-- sees all arguments, and the @Vec 0@-to-@Nil@ rewrite below is only
+-- type-correct at the root, where no more arguments follow.
+reduceNonRepPrim (TransformContext _ (AppFun:_)) e = return e
 reduceNonRepPrim c e@(App _ _)
   | (Prim p, args, ticks) <- collectArgsTicks e
   = do
