@@ -1,0 +1,1 @@
+FIXED: `freshenTm` now renames inside of an `Attributes` tick, added by `Clash.Annotations.SynthesisAttributes.annotateReg`.

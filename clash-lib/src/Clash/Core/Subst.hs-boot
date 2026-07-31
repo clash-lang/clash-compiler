@@ -3,7 +3,7 @@
 module Clash.Core.Subst where
 
 import GHC.Stack (HasCallStack)
-import {-# SOURCE #-} Clash.Core.Term (Term)
+import {-# SOURCE #-} Clash.Core.Term (Term, TickInfo)
 import {-# SOURCE #-} Clash.Core.Type (Type)
 import Clash.Core.Var (TyVar)
 
@@ -22,6 +22,6 @@ aeqType
 instance Eq Type
 instance Ord Type
 
-acmpTerm :: Term -> Term -> Ordering
+acmpTickInfo :: TickInfo -> TickInfo -> Ordering
 
 instance Eq Term

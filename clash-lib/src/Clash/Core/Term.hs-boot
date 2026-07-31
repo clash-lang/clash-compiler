@@ -13,6 +13,8 @@ import Clash.Core.Name (Name)
 
 data Term
 
+data TickInfo
+
 type TmName = Name Term
 
 instance Generic Term
