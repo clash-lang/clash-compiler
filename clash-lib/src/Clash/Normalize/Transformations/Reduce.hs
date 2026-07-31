@@ -41,7 +41,7 @@ import Clash.Core.Term
   ( CoreContext(..), LetBinding, PrimInfo(..), Term(..), TickInfo(..), collectArgs
   , collectArgsTicks, mkApps, mkTicks, mkTmApps)
 import Clash.Core.TyCon (TyCon(..), TyConMap, tyConDataCons)
-import Clash.Core.Type (Type, TypeView(..), mkTyConApp, splitFunForallTy, tyView)
+import Clash.Core.Type (Type, TypeView(..), mkTyConApp, splitFunForallTy, tyView, coreView)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize, mkInternalVar)
 import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -159,7 +159,7 @@ reduceNonRepPrim c e@(App _ _)
     else do
       let eTy = inferCoreTypeOf tcm e
       let resTy = snd (splitFunForallTy eTy)
-      let tv = tyView resTy
+      let tv = tyView (coreView tcm resTy)
       case zeroLengthVecTerm tcm tv of
         Just nilE -> changed (mkTicks nilE ticks)
         Nothing -> case handlerM of
