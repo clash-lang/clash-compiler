@@ -1,0 +1,4 @@
+CHANGED: The `Generic` default implementation of `unpack` now returns an
+undefined value for bit patterns that do not encode a value of the target
+type, instead of silently decoding them to one of the constructors. See
+[#3146](https://github.com/clash-lang/clash-compiler/issues/3146).
