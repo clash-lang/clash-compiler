@@ -1,0 +1,1 @@
+ADDED: `Hashable Term` and `Hashable Type` instances. These were removed in Clash 1.4.7 due to a faulty implementation, but are now back. They hash modulo alpha equivalence, and so agree with `Eq Term` and `Eq Type`: alpha-equivalent terms hash alike.

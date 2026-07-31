@@ -24,7 +24,7 @@ where
 import Control.DeepSeq                        (NFData(..))
 import Data.Binary                            (Binary)
 import Data.Function                          (on)
-import Data.Hashable                          (Hashable)
+import Data.Hashable                          (Hashable (hashWithSalt))
 import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
@@ -67,6 +67,9 @@ instance Eq DataCon where
 
 instance Ord DataCon where
   compare = compare `on` dcUniq
+
+instance Hashable DataCon where
+  hashWithSalt salt = hashWithSalt salt . dcUniq
 
 instance Uniquable DataCon where
   getUnique = dcUniq
