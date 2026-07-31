@@ -14,7 +14,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -82,10 +81,9 @@ import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
 import           Data.Ord                  (comparing)
 import           GHC.Stack                 (HasCallStack)
-import           GHC.SrcLoc.Extra          ()
-import           GHC.Types.SrcLoc          (leftmost_smallest)
-import           GHC.TypeLits
-  (TypeError, ErrorMessage (Text, (:<>:)))
+import           GHC.SrcLoc.Extra          () -- Hashable RealSrcSpan
+import           GHC.Types.SrcLoc
+  (SrcSpan (RealSrcSpan, UnhelpfulSpan), leftmost_smallest)
 
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)
@@ -969,13 +967,6 @@ instance Ord Type where
 instance Eq Term where
   (==) = aeqTerm
 
-instance TypeError (
-        'Text "A broken implementation of Hashable Term has been "
-  ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
-  ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
-  ) => Hashable Term where
-    hashWithSalt = error "Term.hashWithSalt: unreachable"
-
 {- Note [Numbering binders by De Bruijn level]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Alpha comparison compares two variable occurrences by their De Bruijn level:
@@ -1231,3 +1222,167 @@ acmpTickInfoLevels !lvl tmL tmR tyL tyR = go
 
 instance Ord Term where
   compare = acmpTerm
+
+-- * Alpha hashing
+--
+-- Hashing is modulo alpha equivalence, so that it agrees with @Eq Term@ and
+-- @Eq Type@: alpha-equivalent terms hash alike. Only that direction holds,
+-- terms that are not alpha-equivalent may collide as with any hash. A bound
+-- variable is hashed by its De Bruijn level, see
+-- Note [Numbering binders by De Bruijn level].
+
+-- | Mix the tag of a constructor into a salt, so that terms differing only in
+-- which constructor they use do not hash alike.
+hashTag :: Int -> Int -> Int
+hashTag = hashWithSalt
+
+-- | Give a group of binders that come into scope together, such as a 'Rec' or a
+-- 'DataPat', consecutive levels, and return the level following the group.
+extendLevelsOf :: Int -> [Var a] -> VarEnv Int -> (Int, VarEnv Int)
+extendLevelsOf lvl vs env = List.foldl' one (lvl, env) vs
+ where
+  one (!l, e) v = (l + 1, extendVarEnv v l e)
+
+-- | Hash a 'SrcSpan' only as finely as @Eq Term@ tells one apart: all
+-- 'UnhelpfulSpan's alike, and a 'RealSrcSpan' by its file name and its start
+-- and end positions. The structural @Hashable SrcSpan@ orphan from
+-- "GHC.SrcLoc.Extra" is finer than that, as it takes in the buffer span and the
+-- reason of an unhelpful span as well, and would tell alpha-equivalent terms
+-- apart.
+hashSrcSpan :: Int -> SrcSpan -> Int
+hashSrcSpan salt = \case
+  RealSrcSpan realSrcSpan _bufSpan -> hashWithSalt salt (0 :: Int, realSrcSpan)
+  UnhelpfulSpan _reason -> hashWithSalt salt (1 :: Int)
+
+-- | Hash a 'Type' modulo alpha, under the binders enclosing it.
+-- See Note [Numbering binders by De Bruijn level].
+aTypeHashLevels ::
+  -- | Number of enclosing binders
+  Int ->
+  -- | Levels of the type binders enclosing the type
+  VarEnv Int ->
+  -- | Salt
+  Int ->
+  Type ->
+  Int
+aTypeHashLevels !lvl tyEnv = go
+ where
+  go :: Int -> Type -> Int
+  go salt = \case
+    VarTy tv ->
+      -- N.B.: Variables are hashed with a "tag" to differentiate between, e.g.,
+      --       a bound local variable bound at level "2" and a free local variable
+      --       with unique "2".
+      case lookupVarEnv tv tyEnv of
+        Just boundLvl -> hashWithSalt salt (0 :: Int, boundLvl)
+        Nothing -> hashWithSalt salt (1 :: Int, varUniq tv)
+    LitTy l -> hashWithSalt (hashTag salt 1) l
+    ConstTy c -> hashWithSalt (hashTag salt 2) c
+    AnnType attrs t -> go (hashWithSalt (hashTag salt 3) attrs) t
+    AppTy t1 t2 -> go (go (hashTag salt 4) t1) t2
+    ForAllTy tv t ->
+      aTypeHashLevels (lvl + 1) (extendVarEnv tv lvl tyEnv)
+        (go (hashTag salt 5) (varType tv)) t
+
+-- | Hash a 'Term' modulo alpha, under the binders enclosing it.
+-- See Note [Numbering binders by De Bruijn level].
+aTermHashLevels ::
+  -- | Number of enclosing binders
+  Int ->
+  -- | Levels of the term binders enclosing the term
+  VarEnv Int ->
+  -- | Levels of the type binders enclosing the term
+  VarEnv Int ->
+  -- | Salt
+  Int ->
+  Term ->
+  Int
+aTermHashLevels !lvl tmEnv tyEnv = go
+ where
+  goType = aTypeHashLevels lvl tyEnv
+
+  underTmBndr b = aTermHashLevels (lvl + 1) (extendVarEnv b lvl tmEnv) tyEnv
+  underTyBndr b = aTermHashLevels (lvl + 1) tmEnv (extendVarEnv b lvl tyEnv)
+
+  go :: Int -> Term -> Int
+  go salt = \case
+    Var i -> goVar (hashTag salt 0) i
+    Data dc -> hashWithSalt (hashTag salt 1) dc
+    Literal l -> hashWithSalt (hashTag salt 2) l
+    -- A primitive is identified by its name
+    Prim p -> hashWithSalt (hashTag salt 3) (primName p)
+    Cast e t1 t2 -> goType (goType (go (hashTag salt 4) e) t1) t2
+    App e1 e2 -> go (go (hashTag salt 5) e1) e2
+    TyApp e t -> goType (go (hashTag salt 6) e) t
+    Lam b e -> underTmBndr b (goType (hashTag salt 7) (varType b)) e
+    TyLam b e -> underTyBndr b (goType (hashTag salt 8) (varType b)) e
+    -- A 'NonRec' binder's type is pinned down by its right-hand side, so it is
+    -- left out. A 'Rec' binder may occur in its own right-hand side, and then
+    -- it is not: @let x = x in x@ is the same term whether @x@ is an Int or a
+    -- Bool.
+    Let (NonRec i x) e -> underTmBndr i (go (hashTag salt 9) x) e
+    Let (Rec bs) e ->
+      let (ids, rhss) = unzip bs
+          (lvl', tmEnv') = extendLevelsOf lvl ids tmEnv
+          under = aTermHashLevels lvl' tmEnv' tyEnv
+          types = goList goType (hashTag salt 10) (map varType ids)
+      in under (goList under types rhss) e
+    -- Note [Case result types and alpha-equivalence]
+    Case subj _ty alts -> goList goAlt (go (hashTag salt 11) subj) alts
+    Tick tick e -> go (goTick (hashTag salt 12) tick) e
+
+  -- Hash a list, mixing in its length, so that a list does not hash like one of
+  -- its prefixes
+  goList :: (Int -> a -> Int) -> Int -> [a] -> Int
+  goList hashElement salt xs =
+    hashWithSalt (List.foldl' hashElement salt xs) (length xs)
+
+  goAlt :: Int -> Alt -> Int
+  goAlt salt = \case
+    -- A 'DataCon' fixes how many variables its 'DataPat' binds, so the binder
+    -- counts need no hashing of their own
+    (DataPat dc tvs ids, e) ->
+      let (lvlTy, tyEnv') = extendLevelsOf lvl tvs tyEnv
+          (lvl', tmEnv') = extendLevelsOf lvlTy ids tmEnv
+      in aTermHashLevels lvl' tmEnv' tyEnv'
+           (hashWithSalt (hashTag salt 0) dc) e
+    (LitPat l, e) -> go (hashWithSalt (hashTag salt 1) l) e
+    (DefaultPat, e) -> go (hashTag salt 2) e
+
+  -- N.B.: Variables are hashed with a "tag" to differentiate between, e.g., a
+  --       local free variable with unique "2" and a bound free variable which
+  --       happens to be bound at level 2.
+  goVar :: Int -> Id -> Int
+  goVar salt i
+    -- Global, never bound with respect to 'tmEnv'
+    | isGlobalId i = hashWithSalt salt (0 :: Int, varUniq i)
+    -- Local, bound variable
+    | Just boundLvl <- lookupVarEnv i tmEnv = hashWithSalt salt (1 :: Int, boundLvl)
+    -- Free, local variable
+    | otherwise = hashWithSalt salt (2 :: Int, varUniq i)
+
+  -- A tick's payload lives in the scope enclosing the tick, so it is hashed
+  -- under the enclosing binders rather than in isolation
+  goTick :: Int -> TickInfo -> Int
+  goTick salt = \case
+    SrcSpan s -> hashSrcSpan (hashTag salt 0) s
+    NameMod m t -> goType (hashWithSalt (hashTag salt 1) m) t
+    DeDup -> hashTag salt 2
+    NoDeDup -> hashTag salt 3
+    Attributes t e -> go (goType (hashTag salt 4) t) e
+
+-- | Hash a 'Type' modulo alpha.
+-- See Note [Numbering binders by De Bruijn level].
+aTypeHashWithSalt :: Int -> Type -> Int
+aTypeHashWithSalt = aTypeHashLevels 0 emptyVarEnv
+
+-- | Hash a 'Term' modulo alpha.
+-- See Note [Numbering binders by De Bruijn level].
+aTermHashWithSalt :: Int -> Term -> Int
+aTermHashWithSalt = aTermHashLevels 0 emptyVarEnv emptyVarEnv
+
+instance Hashable Type where
+  hashWithSalt = aTypeHashWithSalt
+
+instance Hashable Term where
+  hashWithSalt = aTermHashWithSalt
