@@ -412,6 +412,7 @@ test-suite unittests
       containers,
       data-default,
       deepseq,
+      hashable,
       haskell-src-exts,
       ghc,
       lens,

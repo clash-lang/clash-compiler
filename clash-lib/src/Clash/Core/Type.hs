@@ -62,7 +62,7 @@ where
 import           Control.DeepSeq        as DS
 import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
-import           Data.Hashable          (Hashable (hashWithSalt))
+import           Data.Hashable          (Hashable)
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List              (foldl')
 #endif
@@ -73,7 +73,6 @@ import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
 import           GHC.Integer.Logarithms (integerLogBase#)
-import           GHC.TypeLits           (type TypeError, ErrorMessage(Text, (:<>:)))
 import           GHC.Base               (ord)
 import           Data.Char              (chr)
 import           Data.Maybe             (fromMaybe)
@@ -121,13 +120,6 @@ data Type
   | LitTy    !LitTy             -- ^ Type literal
   | AnnType  [Attr Text] !Type  -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
   deriving (Show, Generic, NFData, Binary)
-
-instance TypeError (
-        'Text "A broken implementation of Hashable Type has been "
-  ':<>: 'Text "removed in Clash 1.4.7. If this is an issue for you, please submit "
-  ':<>: 'Text "an issue report at https://github.com/clash-lang/clash-compiler/issues."
-  ) => Hashable Type where
-    hashWithSalt = error "Type.hashWithSalt: unreachable"
 
 -- | An easier view on types
 data TypeView
