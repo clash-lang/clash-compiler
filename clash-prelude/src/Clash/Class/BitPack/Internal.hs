@@ -50,7 +50,7 @@ import Numeric.Half                   (Half (..))
 import Clash.Annotations.Primitive    (hasBlackBox)
 import Clash.Class.BitPack.Internal.TH (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend, resize)
-import Clash.Promoted.Nat             (SNat(..), snatToNum)
+import Clash.Promoted.Nat             (SNat(..), SNatLE(..), compareSNat, snatToNum)
 import Clash.Sized.Internal.BitVector
   (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural, isLike#,
    BitVector, Bit, (++#), xToBV)
@@ -135,7 +135,11 @@ class KnownNat (BitSize a) => BitPack a where
        , (constrSize + fieldSize) ~ BitSize a
        )
     => a -> BitVector (BitSize a)
-  pack = packXWith go
+  pack v = case compareSNat (SNat @(BitSize a)) (SNat @0) of
+    -- Zero-width primitives cannot be rendered; there is nothing to convert
+    -- anyway. The case is resolved at compile time.
+    SNatLE -> packXWith go v
+    SNatGT -> dontApplyInHDL (packXWith go) v
    where
     go a = resize (pack sc) ++# packedFields
      where
@@ -167,10 +171,13 @@ class KnownNat (BitSize a) => BitPack a where
        , (constrSize + fieldSize) ~ BitSize a
        )
     => BitVector (BitSize a) -> a
-  unpack b =
-    to (snd (gUnpack True sc 0 bFields))
+  unpack b = case compareSNat (SNat @(BitSize a)) (SNat @0) of
+    -- Zero-width primitives cannot be rendered; there is nothing to convert
+    -- anyway. The case is resolved at compile time.
+    SNatLE -> x
+    SNatGT -> dontApplyInHDL (const x) b
    where
-    (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
+    (_, x) = unpackGeneric b :: (Bool, a)
 
   -- | Attempt to convert a 'BitVector' to an element of type @a@. If the unpacking
   -- is successful, outputs @Just a@, otherwise outputs @Nothing@.
@@ -222,10 +229,14 @@ class KnownNat (BitSize a) => BitPack a where
        )
     => BitVector (BitSize a) -> Maybe a
   maybeUnpack b =
-    let (valid, x) = gUnpack True sc 0 bFields in
-    if valid then Just (to x) else Nothing
+    if valid then Just payload else Nothing
    where
-    (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
+    (valid, x) = unpackGeneric b :: (Bool, a)
+    -- Zero-width primitives cannot be rendered; there is nothing to convert
+    -- anyway. The case is resolved at compile time.
+    payload = case compareSNat (SNat @(BitSize a)) (SNat @0) of
+      SNatLE -> x
+      SNatGT -> dontApplyInHDL (const x) b
 
 packXWith
   :: KnownNat n
@@ -234,6 +245,42 @@ packXWith
   -> BitVector n
 packXWith f = xToBV . f
 {-# INLINE packXWith #-}
+
+-- | In Haskell, apply the first argument to the second argument. In HDL,
+-- convert the second argument to the result type directly instead -- a no-op
+-- in hardware. This is sound because a lawful 'BitPack' instance accurately
+-- reflects the bit representation of the data in HDL, and converting a bit
+-- pattern that does not encode a value is undefined, which the
+-- passed-through bits refine.
+--
+-- This is used by the generated pack/unpack of custom bit representations,
+-- and by the 'Generic' default implementations of 'pack', 'unpack', and
+-- 'maybeUnpack', to not instantiate any conversion logic in HDL.
+dontApplyInHDL :: (a -> b) -> a -> b
+dontApplyInHDL f a = f a
+{-# OPAQUE dontApplyInHDL #-}
+{-# ANN dontApplyInHDL hasBlackBox #-}
+
+-- | Generic implementation of 'unpack': reports whether the bit pattern
+-- encodes a value of the type, alongside the unpacked value. Wherever the
+-- bit pattern does not encode a value, the returned value is undefined in
+-- the affected parts.
+unpackGeneric
+  :: ( Generic a
+     , GBitPack (Rep a)
+     , KnownNat (BitSize a)
+     , KnownNat constrSize
+     , KnownNat fieldSize
+     , constrSize ~ CLog 2 (GConstructorCount (Rep a))
+     , fieldSize ~ GFieldSize (Rep a)
+     , (constrSize + fieldSize) ~ BitSize a
+     )
+  => BitVector (BitSize a)
+  -> (Bool, a)
+unpackGeneric b =
+  let (valid, x) = gUnpack True sc 0 bFields in (valid, to x)
+ where
+  (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
 
 -- | Pack both arguments to a 'BitVector' and use
 -- 'Clash.Sized.Internal.BitVector.isLike#' to compare them. This is a more

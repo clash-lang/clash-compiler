@@ -1,0 +1,4 @@
+CHANGED: The `Generic` default implementations of `pack`, `unpack`, and
+`maybeUnpack` no longer instantiate conversion logic in HDL: they are now
+rendered as the identity on the bit representation. Only the validity bit of
+`maybeUnpack` is still instantiated. See [#3146](https://github.com/clash-lang/clash-compiler/issues/3146).
