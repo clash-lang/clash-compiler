@@ -1,0 +1,1 @@
+CHANGED: Blackbox functions and Haskell template functions are now compiled in a single shared Hint (GHC) session, and every distinct function is compiled exactly once no matter how many primitives reference it. In larger designs we've tested this yields about ~20% quicker load times, for a 2% end-to-end improvement.
