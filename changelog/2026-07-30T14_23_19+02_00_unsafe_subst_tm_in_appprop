@@ -1,0 +1,1 @@
+CHANGED: The beta-reduction step of the `appProp` transformation substitutes with a sharing-preserving substitution that leaves untouched subterms alone, instead of one that rebuilds every node it visits. Output is unchanged.
