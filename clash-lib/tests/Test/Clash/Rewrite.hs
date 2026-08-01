@@ -107,6 +107,8 @@ instance Default NormalizeState where
     , _inlineHistory=emptyVarEnv
     , _primitiveArgs=Map.empty
     , _recursiveComponents=emptyVarEnv
+    , _normalizationStrategy=error "_normalizationStrategy: NYI"
+    , _constantPropagationStrategy=error "_constantPropagationStrategy: NYI"
     }
 
 instance Default InScopeSet where

@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2022,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -11,9 +11,11 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.XOptimize
   ( xOptimize
+  , xOptimizeWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -36,8 +38,9 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Netlist.BlackBox.Types (Element(Err))
 import Clash.Netlist.Types (BlackBox(..))
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
+import Clash.Rewrite.StrategyDSL (TransformSpec, onCase, transform)
 import Clash.Rewrite.Types
   (TransformContext(..), aggressiveXOpt, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
@@ -66,23 +69,27 @@ import Clash.Util (MonadUnique, curLoc)
 -- where fieldN is an internal variable referring to the nth argument of a
 -- data constructor.
 --
-xOptimize :: HasCallStack => NormRewrite
-xOptimize (TransformContext is0 _) e@(Case subj ty alts) = do
+xOptimize :: TransformSpec
+xOptimize = transform "xOptimize" (onCase 'xOptimizeWorker)
+
+-- | The 'Case' handler of 'xOptimize'.
+xOptimizeWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
+xOptimizeWorker (TransformContext is0 _) node subj ty alts = do
   runXOpt <- Lens.view aggressiveXOpt
 
   if runXOpt then do
     defPart <- List.partitionM (isPrimError . snd) alts
 
     case defPart of
-      ([], _)    -> return e
+      ([], _)    -> return node
       (_, [])    -> changed (Prim (PrimInfo (Text.showt 'errorX) ty WorkConstant SingleResult NoUnfolding))
       (_, [alt]) -> xOptimizeSingle is0 subj alt
       (_, defs)  -> xOptimizeMany is0 subj ty defs
   else
-    return e
-
-xOptimize _ e = return e
-{-# SCC xOptimize #-}
+    return node
+{-# SCC xOptimizeWorker #-}
 
 -- Return an expression equivalent to the alternative given. When only one
 -- alternative is defined the result of this function is used to replace the

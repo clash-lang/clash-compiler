@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.
-                    2022     , QBayLogic B.V.
+                    2022,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -11,9 +11,11 @@
 
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.MultiPrim
   ( setupMultiResultPrim
+  , setupMultiResultPrimWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -31,9 +33,10 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type(..), mkPolyFunTy, splitFunForallTy)
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (mkLocalId)
-import Clash.Normalize.Types (NormRewrite)
+import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
-import Clash.Rewrite.Types (tcCache, primitives)
+import Clash.Rewrite.StrategyDSL (TransformSpec, onPrim, transform)
+import Clash.Rewrite.Types (TransformContext, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
 
 -- Note [MultiResult type]
@@ -74,8 +77,15 @@ import Clash.Rewrite.Util (changed)
 -- types, not any product type. It will error if it sees a multi result primitive
 -- with a non-tuple return type.
 --
-setupMultiResultPrim :: HasCallStack => NormRewrite
-setupMultiResultPrim _ctx e@(Prim pInfo@PrimInfo{primMultiResult=SingleResult}) = do
+setupMultiResultPrim :: TransformSpec
+setupMultiResultPrim =
+  transform "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)
+
+-- | The 'Prim' handler of 'setupMultiResultPrim'.
+setupMultiResultPrimWorker
+  :: HasCallStack
+  => TransformContext -> Term -> PrimInfo -> NormalizeSession Term
+setupMultiResultPrimWorker _ctx node pInfo@PrimInfo{primMultiResult=SingleResult} = do
   tcm <- Lens.view tcCache
   prim <- Lens.view (primitives . Lens.at (primName pInfo))
 
@@ -85,9 +95,8 @@ setupMultiResultPrim _ctx e@(Prim pInfo@PrimInfo{primMultiResult=SingleResult}) 
     Just (BlackBox{multiResult=True}) ->
       changed (setupMultiResultPrim' tcm pInfo)
     _ ->
-      return e
-
-setupMultiResultPrim _ e = return e
+      return node
+setupMultiResultPrimWorker _ctx node _primInfo = return node
 
 setupMultiResultPrim' :: HasCallStack => TyConMap -> PrimInfo -> Term
 setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =

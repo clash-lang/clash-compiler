@@ -14,9 +14,11 @@ module Clash.Rewrite.Combinators
   , (>-!->)
   , (>->)
   , bottomupR
+  , innerMost
   , repeatR
   , topdownR
   , topdownFixR
+  , topdownSucR
   ) where
 
 import           Control.DeepSeq             (deepseq)
@@ -210,3 +212,14 @@ infixr 5 >-!
 repeatR :: Rewrite m -> Rewrite m
 repeatR = let go r = r !-> repeatR r in go
 {-# INLINE repeatR #-}
+
+-- | Topdown traversal, stops upon first success
+topdownSucR :: Rewrite extra -> Rewrite extra
+topdownSucR r = r >-! (allR (topdownSucR r))
+{-# INLINE topdownSucR #-}
+
+-- | Bottomup traversal; when the transformation succeeds, re-traverse the
+-- result until the innermost fixpoint is reached.
+innerMost :: Rewrite extra -> Rewrite extra
+innerMost = let go r = bottomupR (r !-> innerMost r) in go
+{-# INLINE innerMost #-}

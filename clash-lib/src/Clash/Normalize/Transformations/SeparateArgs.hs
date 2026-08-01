@@ -2,16 +2,19 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
   The separating arguments transformation
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.SeparateArgs
   ( separateArguments
+  , separateArgumentsLambdaWorker
+  , separateArgumentsSpineWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -30,6 +33,9 @@ import Clash.Core.Util (Projections (..), shouldSplit)
 import Clash.Core.Var (Id, TyVar, Var (..), isGlobalId, mkLocalId)
 import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Rewrite.StrategyDSL
+  ( TransformSpec, onAppNode, onLam, onTickNode, onTyAppNode, onVarNode
+  , transform)
 import Clash.Rewrite.Types (TransformContext(..), tcCache)
 import Clash.Rewrite.Util (changed, mkDerivedName)
 
@@ -43,14 +49,29 @@ import Clash.Rewrite.Util (changed, mkDerivedName)
 -- into
 --
 -- > f :: Clock System -> Reset System -> Signal System Int
-separateArguments :: HasCallStack => NormRewrite
-separateArguments ctx e0@(Lam b eb) = do
+separateArguments :: TransformSpec
+separateArguments = transform "separateArguments"
+  (  onLam 'separateArgumentsLambdaWorker
+  <> onVarNode 'separateArgumentsSpineWorker
+  <> onAppNode 'separateArgumentsSpineWorker
+  <> onTyAppNode 'separateArgumentsSpineWorker
+  <> onTickNode 'separateArgumentsSpineWorker)
+
+-- | The 'Lam' handler of 'separateArguments'.
+separateArgumentsLambdaWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Id -> Term -> NormalizeSession Term
+separateArgumentsLambdaWorker ctx node b eb = do
   tcm <- Lens.view tcCache
   case separateLambda tcm ctx b eb of
     Just e1 -> changed e1
-    Nothing -> return e0
+    Nothing -> return node
+{-# SCC separateArgumentsLambdaWorker #-}
 
-separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
+-- | The application spine ('Var', 'App', 'TyApp', 'Tick') handler of
+-- 'separateArguments'.
+separateArgumentsSpineWorker :: HasCallStack => NormRewrite
+separateArgumentsSpineWorker (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, ticks))
   | isGlobalId g = do
   -- We ensure that both the type of the global variable reference is updated
   -- to take into account the changed arguments, and that we apply the global
@@ -84,8 +105,8 @@ separateArguments (TransformContext is0 _) e@(collectArgsTicks -> (Var g, args, 
       _ ->
         return [(ty,arg)]
 
-separateArguments _ e = return e
-{-# SCC separateArguments #-}
+separateArgumentsSpineWorker _ e = return e
+{-# SCC separateArgumentsSpineWorker #-}
 
 -- | Worker function of 'separateArguments'.
 separateLambda
