@@ -47,6 +47,7 @@ module Clash.Core.Subst
     -- ** Applying substitutions
   , substTm
   , maybeSubstTm
+  , unsafeSubstTm
   , substAlt
   , substId
     -- * Variable renaming
@@ -79,6 +80,7 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Hashable             (Hashable (hashWithSalt))
 import qualified Data.List                 as List
 import qualified Data.List.Extra           as List
+import           Data.Maybe                (fromMaybe)
 import           Data.Ord                  (comparing)
 import           GHC.Stack                 (HasCallStack)
 import           GHC.SrcLoc.Extra          () -- Hashable RealSrcSpan
@@ -592,6 +594,92 @@ substTm doc subst = go where
   goTick t@DeDup        = t
   goTick t@NoDeDup      = t
   goTick (Attributes ty tm) = Attributes (substTy subst ty) (go tm)
+
+-- | Like 'substTm', but doesn't account for shadowing or free variable capture.
+--
+-- An example of shadowing: in @(x, \x -> x)@ with a substitution @x |-> 5@
+-- 'unsafeSubstTm' will yield @(5, \x -> 5)@, whereas a safe substitution would
+-- yield @(5, \x -> x)@.
+--
+-- An example of free variable capture: in @\x -> y@ and a substitution
+-- @y |-> f x@, 'unsafeSubstTm' will yield @\x -> f x@, whereas a safe substitution
+-- would yield @\x' -> f x@.
+--
+-- You should therefore only use this function if:
+--
+--   1. No binder in the term binds variables in the domain of the local
+--      substitution.
+--
+--   2. No binder in the term has the same unique as a local, free variable of any
+--      replacement term in the range of either substitution.
+--
+-- Both conditions hold if the term is deshadowed (see 'deShadowTerm') with
+-- respect to an in-scope set that contains the domains of the substitutions
+-- and the free variables of the replacement terms.
+--
+-- Note that global substituations are always safe. They never have local free
+-- variables and cannot be introduced through a binder. I.e., neither rule 1
+-- nor 2 applies.
+unsafeSubstTm
+  :: VarEnv Term
+  -- ^ Substitution: global variable to replacement term
+  -> VarEnv Term
+  -- ^ Substitution: local variable to replacement term
+  -> Term
+  -- ^ Term to substitute in
+  -> Term
+unsafeSubstTm globals locals = \term -> fromMaybe term (go term)
+ where
+  go :: Term -> Maybe Term
+  go = \case
+    Var v
+      | isGlobalId v -> lookupVarEnv v globals
+      | otherwise -> lookupVarEnv v locals
+    Lam v e -> Lam v <$> go e
+    TyLam tv e -> TyLam tv <$> go e
+    App l r -> case (go l, go r) of
+      (Nothing, Nothing) -> Nothing
+      (l1, r1) -> Just (App (fromMaybe l l1) (fromMaybe r r1))
+    TyApp e ty -> (`TyApp` ty) <$> go e
+    Let bs body -> case (goBind bs, go body) of
+      (Nothing, Nothing) -> Nothing
+      (bs1, body1) -> Just (Let (fromMaybe bs bs1) (fromMaybe body body1))
+    Case subject ty alternatives ->
+      case (go subject, goList goAlternative alternatives) of
+        (Nothing, Nothing) -> Nothing
+        (subject1, alternatives1) ->
+          Just (Case (fromMaybe subject subject1) ty
+                     (fromMaybe alternatives alternatives1))
+    Cast e t1 t2 -> (\e1 -> Cast e1 t1 t2) <$> go e
+    Tick tickInfo e -> case (goTickInfo tickInfo, go e) of
+      (Nothing, Nothing) -> Nothing
+      (tick1, e1) -> Just (Tick (fromMaybe tickInfo tick1) (fromMaybe e e1))
+    Data{} -> Nothing
+    Literal{} -> Nothing
+    Prim{} -> Nothing
+
+  goBind (NonRec v rhs) = NonRec v <$> go rhs
+  goBind (Rec bindings0) = Rec <$> goList goBinding bindings0
+
+  goBinding (v, rhs) = (,) v <$> go rhs
+
+  goAlternative (pat, alternative) = (,) pat <$> go alternative
+
+  -- Types contain no term variables, so of the tick constructors only
+  -- 'Attributes', which carries a term, needs a traversal.
+  goTickInfo (Attributes ty e) = Attributes ty <$> go e
+  goTickInfo SrcSpan{} = Nothing
+  goTickInfo NameMod{} = Nothing
+  goTickInfo DeDup = Nothing
+  goTickInfo NoDeDup = Nothing
+
+  goList :: (a -> Maybe a) -> [a] -> Maybe [a]
+  goList f = goElements
+   where
+    goElements [] = Nothing
+    goElements (x:xs) = case (f x, goElements xs) of
+      (Nothing, Nothing) -> Nothing
+      (x1, xs1) -> Just (fromMaybe x x1 : fromMaybe xs xs1)
 
 -- | Substitute within a case-alternative
 substAlt
