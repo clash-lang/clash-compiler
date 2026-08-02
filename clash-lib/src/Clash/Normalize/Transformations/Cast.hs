@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.Cast
   ( argCastSpec
@@ -30,7 +31,9 @@ import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Normalize.Transformations.Specialize (specialize)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormalizeSession)
+import Clash.Rewrite.StrategyDSL
+  (Transformation, onApp, onCast, onLet, toTransformation)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
@@ -55,9 +58,8 @@ import Clash.Warning (ClashWarning(WarnCastSpecialization))
 -- The reason d'etre for this transformation is that we hope to end up with
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'elimCastCast'.
-argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App fun arg) = argCastSpecWorker ctx e fun arg
-argCastSpec _ e = return e
+argCastSpec :: Transformation
+argCastSpec = toTransformation "argCastSpec" (onApp 'argCastSpecWorker)
 
 -- | The 'App' handler of 'argCastSpec'.
 argCastSpecWorker
@@ -90,9 +92,8 @@ argCastSpecWorker _ctx node _function _argument = return node
 {-# SCC argCastSpecWorker #-}
 
 -- | Push a cast over a case into it's alternatives.
-caseCast :: HasCallStack => NormRewrite
-caseCast ctx e@(Cast body ty1 ty2) = caseCastWorker ctx e body ty1 ty2
-caseCast _ e = return e
+caseCast :: Transformation
+caseCast = toTransformation "caseCast" (onCast 'caseCastWorker)
 
 -- | The 'Cast' handler of 'caseCast'.
 caseCastWorker
@@ -109,9 +110,8 @@ caseCastWorker _ctx node _body _fromType _toType = return node
 -- @
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
-elimCastCast :: HasCallStack => NormRewrite
-elimCastCast ctx e@(Cast body ty1 ty2) = elimCastCastWorker ctx e body ty1 ty2
-elimCastCast _ e = return e
+elimCastCast :: Transformation
+elimCastCast = toTransformation "elimCastCast" (onCast 'elimCastCastWorker)
 
 -- | The 'Cast' handler of 'elimCastCast'.
 elimCastCastWorker
@@ -136,9 +136,8 @@ elimCastCastWorker _ctx node _body _fromType _toType = return node
 {-# SCC elimCastCastWorker #-}
 
 -- | Push a cast over a Let into it's body
-letCast :: HasCallStack => NormRewrite
-letCast ctx e@(Cast body ty1 ty2) = letCastWorker ctx e body ty1 ty2
-letCast _ e = return e
+letCast :: Transformation
+letCast = toTransformation "letCast" (onCast 'letCastWorker)
 
 -- | The 'Cast' handler of 'letCast'.
 letCastWorker
@@ -157,9 +156,8 @@ letCastWorker _ctx node _body _fromType _toType = return node
 -- let x  = cast x'
 --     x' = f a b
 -- @
-splitCastWork :: HasCallStack => NormRewrite
-splitCastWork ctx e@(Let bind body) = splitCastWorkWorker ctx e bind body
-splitCastWork _ e = return e
+splitCastWork :: Transformation
+splitCastWork = toTransformation "splitCastWork" (onLet 'splitCastWorkWorker)
 
 -- | The 'Let' handler of 'splitCastWork'.
 splitCastWorkWorker
