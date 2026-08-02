@@ -26,6 +26,7 @@ module Clash.Normalize.Transformations.Letrec
   , simpleCSE
   , simpleCSEWorker
   , topLet
+  , topLetWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -77,6 +78,10 @@ import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
+import Clash.Rewrite.StrategyDSL
+  ( Transformation, anyConstructor, onAppNode, onCase, onLet, onLetNode
+  , onPrimNode, onTickNode, onTyAppNode, toTransformation
+  )
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
@@ -90,9 +95,8 @@ not the complete names. So we use mkUnsafeSystemName to recreate the same Name.
 -}
 
 -- | Remove unused let-bindings
-deadCode :: HasCallStack => NormRewrite
-deadCode ctx e@(Let binds body) = deadCodeWorker ctx e binds body
-deadCode _ e = return e
+deadCode :: Transformation
+deadCode = toTransformation "deadCode" (onLet 'deadCodeWorker)
 
 -- | The 'Let' handler of 'deadCode'.
 deadCodeWorker
@@ -104,14 +108,13 @@ deadCodeWorker _ e binds body =
     Nothing -> return e
 {-# SCC deadCodeWorker #-}
 
-removeUnusedExpr :: HasCallStack => NormRewrite
-removeUnusedExpr ctx e@Prim {} = removeUnusedExprSpine ctx e
-removeUnusedExpr ctx e@App {} = removeUnusedExprSpine ctx e
-removeUnusedExpr ctx e@TyApp {} = removeUnusedExprSpine ctx e
-removeUnusedExpr ctx e@Tick {} = removeUnusedExprSpine ctx e
-removeUnusedExpr ctx e@(Case subj ty alts) =
-  removeUnusedExprCase ctx e subj ty alts
-removeUnusedExpr _ e = return e
+removeUnusedExpr :: Transformation
+removeUnusedExpr = toTransformation "removeUnusedExpr"
+  (  onPrimNode 'removeUnusedExprSpine
+  <> onAppNode 'removeUnusedExprSpine
+  <> onTyAppNode 'removeUnusedExprSpine
+  <> onTickNode 'removeUnusedExprSpine
+  <> onCase 'removeUnusedExprCase)
 
 -- | The 'Case' handler of 'removeUnusedExpr': a single-alternative case whose
 -- pattern binds no used variables is replaced by the alternative.
@@ -140,7 +143,7 @@ removeUnusedExprSpine :: HasCallStack => NormRewrite
 -- 'collectArgsTicks' looks through both. We therefore skip any node whose parent
 -- continues the spine (an @AppFun@, @TyAppC@, or @TickC@ context);
 -- 'removeUnusedExpr' only routes spine nodes (@App@, @TyApp@, @Prim@, @Tick@)
--- here, so no explicit node-shape check is needed. The
+-- here, so no explicit node-constructor check is needed. The
 -- single-alternative-Case handling lives in 'removeUnusedExprCase' and is
 -- unaffected: the spine only threads through applications, type applications,
 -- and ticks, so a Case is never an inner node of a spine.
@@ -234,9 +237,8 @@ removeUnusedExprSpine _ e = return e
 -- flattens those nested let-bindings again.
 --
 -- NB: must only be called in the cleaning up phase.
-flattenLet :: HasCallStack => NormRewrite
-flattenLet ctx e@Let {} = flattenLetWorker ctx e
-flattenLet _ e = return e
+flattenLet :: Transformation
+flattenLet = toTransformation "flattenLet" (onLetNode 'flattenLetWorker)
 
 -- | The 'Let' handler of 'flattenLet'; recurses on the rebuilt let-expression
 -- after merging nested bindings.
@@ -473,9 +475,8 @@ isClassConstraint _ = False
 -- be really helpful if we tracked circuit size in the regression/test suite.
 -- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
 -- version of CSE removed the same amount of let-binders.
-simpleCSE :: HasCallStack => NormRewrite
-simpleCSE ctx e@(Let binds body) = simpleCSEWorker ctx e binds body
-simpleCSE _ e = return e
+simpleCSE :: Transformation
+simpleCSE = toTransformation "CSE" (onLet 'simpleCSEWorker)
 
 -- | The 'Let' handler of 'simpleCSE'.
 simpleCSEWorker
@@ -505,8 +506,12 @@ simpleCSEWorker (TransformContext is0 _) term (bindToList -> bndrsX) body = do
 
 -- | Ensure that top-level lambda's eventually bind a let-expression of which
 -- the body is a variable-reference.
-topLet :: HasCallStack => NormRewrite
-topLet (TransformContext is0 ctx) e
+topLet :: Transformation
+topLet = anyConstructor "topLet" 'topLetWorker
+
+-- | The worker of 'topLet': a plain rewrite, offered at every node.
+topLetWorker :: HasCallStack => NormRewrite
+topLetWorker (TransformContext is0 ctx) e
   | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx && not (isLet e) && not (isTick e)
   = do
   untranslatable <- isUntranslatable False e
@@ -516,7 +521,7 @@ topLet (TransformContext is0 ctx) e
             argId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "result" 0) e
             changed (Let (NonRec argId e) (Var argId))
 
-topLet (TransformContext is0 ctx) e@(Letrec binds body)
+topLetWorker (TransformContext is0 ctx) e@(Letrec binds body)
   | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx
   = do
     let localVar = isLocalVar body
@@ -535,5 +540,5 @@ topLet (TransformContext is0 ctx) e@(Letrec binds body)
         -- but this makes tests/shouldwork/SimIO/Test00.hs fail.
         changed (Letrec (binds ++ [(argId, body)]) (Var argId))
 
-topLet _ e = return e
-{-# SCC topLet #-}
+topLetWorker _ e = return e
+{-# SCC topLetWorker #-}

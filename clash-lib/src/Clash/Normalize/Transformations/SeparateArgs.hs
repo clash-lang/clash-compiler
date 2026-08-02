@@ -9,6 +9,7 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.SeparateArgs
   ( separateArguments
@@ -32,6 +33,9 @@ import Clash.Core.Util (Projections (..), shouldSplit)
 import Clash.Core.Var (Id, TyVar, Var (..), isGlobalId, mkLocalId)
 import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Rewrite.StrategyDSL
+  ( Transformation, onAppNode, onLam, onTickNode, onTyAppNode, onVarNode
+  , toTransformation)
 import Clash.Rewrite.Types (TransformContext(..), tcCache)
 import Clash.Rewrite.Util (changed, mkDerivedName)
 
@@ -45,13 +49,13 @@ import Clash.Rewrite.Util (changed, mkDerivedName)
 -- into
 --
 -- > f :: Clock System -> Reset System -> Signal System Int
-separateArguments :: HasCallStack => NormRewrite
-separateArguments ctx e@(Lam v body) = separateArgumentsLambdaWorker ctx e v body
-separateArguments ctx e@Var{} = separateArgumentsSpineWorker ctx e
-separateArguments ctx e@App{} = separateArgumentsSpineWorker ctx e
-separateArguments ctx e@TyApp{} = separateArgumentsSpineWorker ctx e
-separateArguments ctx e@Tick{} = separateArgumentsSpineWorker ctx e
-separateArguments _ e = return e
+separateArguments :: Transformation
+separateArguments = toTransformation "separateArguments"
+  (  onLam 'separateArgumentsLambdaWorker
+  <> onVarNode 'separateArgumentsSpineWorker
+  <> onAppNode 'separateArgumentsSpineWorker
+  <> onTyAppNode 'separateArgumentsSpineWorker
+  <> onTickNode 'separateArgumentsSpineWorker)
 
 -- | The 'Lam' handler of 'separateArguments'.
 separateArgumentsLambdaWorker
