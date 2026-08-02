@@ -63,7 +63,8 @@ import GHC.Core.Make (chunkify, mkChunkified)
 import GHC.Settings.Constants (mAX_TUPLE_SIZE)
 
 -- internal
-import Clash.Core.DataCon (DataCon)
+import Clash.Core.DataCon (DataCon, dcArgTys, dcExtTyVars)
+import Clash.Core.EqSolver (typeEq)
 import Clash.Core.Evaluator.Types  (whnf')
 import Clash.Core.FreeVars
   (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
@@ -76,13 +77,15 @@ import Clash.Core.Term
   , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds, stripTicks)
 import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type
-  (Type, TypeView (..), isPolyFunTy, mkTyConApp, splitFunForallTy, tyView)
+  ( Type, TypeView (..), coreView, isPolyFunTy, mkTyConApp, splitFunForallTy
+  , tyView)
 import Clash.Core.Util (mkInternalVar, mkSelectorCase, sccLetBindings)
 import Clash.Core.Var (Id, isGlobalId, isLocalId, varName)
 import Clash.Core.VarEnv
   ( InScopeSet, elemInScopeSet, extendInScopeSet, extendInScopeSetList
   , notElemInScopeSet, unionInScope)
 import qualified Clash.Data.UniqMap as UniqMap
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Normalize.Transformations.Letrec (deadCode)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
@@ -610,10 +613,75 @@ genCase tcm tupTcm ty argTys = go
           (ptvs,pids) = patIds p
       in  if (coerce ptvs ++ coerce pids) `localVarsDoNotOccurIn` ct'
              then ct'
-             else Case scrut ty [(p,ct')]
+             else Case scrut ty (addDefault scrut [(p,ct')])
 
     go (Branch scrut pats) =
-      Case scrut ty (map (second go) pats)
+      Case scrut ty (addDefault scrut (map (second go) pats))
+
+    -- A 'CaseTree' only contains alternatives for the branches in which the
+    -- lifted function is applied, so the case-expressions generated from it
+    -- are not necessarily exhaustive (#2770). e.g. for
+    --
+    -- @
+    -- case x of
+    --   Left y  -> f y
+    --   Right z -> case z of
+    --     Left a  -> h a
+    --     Right w -> f w
+    -- @
+    --
+    -- the transformation will (naively) rewrite it to:
+    --
+    -- @
+    -- case x of
+    --   Left y  -> f_shared
+    --   Right z -> case z of
+    --     Left a  -> h a
+    --     Right w -> f_shared
+    --  where
+    --   f_shared = f f_arg
+    --   f_arg = case x of
+    --     Left y -> y
+    --     Right z -> case z of
+    --       Right w -> w
+    -- @
+    --
+    -- Note that the case on @z@ doesn't have a 'Left' branch. It doesn't need
+    -- to, because it only gets called in cases where it has already been proven
+    -- that z ~ Right. Still, this is malformed Core and the evaluator will
+    -- crash on it if it ever sees it. We therefore add a 'DefaultPat'.
+    --
+    -- XXX: For GADT-like constructors (e.g. Vec) counting alternatives cannot
+    --      tell whether missing constructors can match. We therefore leave those
+    --      alone. Handle smarter in the future?
+    addDefault :: Term -> [(Pat,Term)] -> [(Pat,Term)]
+    addDefault scrut alts
+      | any (isDefaultPat . fst) alts
+      = alts
+      -- Literal patterns can never cover all values
+      | any (isLitPat . fst) alts
+      = defaultAlt : alts
+      | TyConApp tcNm _ <- tyView (coreView tcm (inferCoreTypeOf tcm scrut))
+      , Just tc <- UniqMap.lookup tcNm tcm
+      , let dcs = tyConDataCons tc
+      , all isVanillaDc dcs
+      , length dcs > length alts
+      = -- In Core, default patterns always come first
+        defaultAlt : alts
+      | otherwise
+      = alts
+
+    defaultAlt = (DefaultPat, TyApp (Prim NP.undefined) ty)
+
+    isDefaultPat DefaultPat = True
+    isDefaultPat _ = False
+
+    isLitPat LitPat{} = True
+    isLitPat _ = False
+
+    isVanillaDc dc =
+      null (dcExtTyVars dc) &&
+      all (Maybe.isNothing . typeEq tcm) (dcArgTys dc)
 
 -- | Lookup the TyConName and DataCon for a tuple of size n
 findTup :: TyConMap -> IntMap TyConName -> Int -> (TyConName,DataCon)

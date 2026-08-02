@@ -661,6 +661,7 @@ runClashTest = defaultMain
         , runTest "T2724" def
         , runTest "T2724B" def
         , runTest "T2729" def
+        , runTest "T2770" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2831" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2839" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2845" def{hdlSim=[],hdlTargets=[Verilog]}
