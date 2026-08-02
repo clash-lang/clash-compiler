@@ -21,6 +21,9 @@ import Data.Default (def)
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Term (Bind (..), Term (..))
 import Clash.Core.VarEnv (emptyInScopeSet)
+import Clash.Normalize.Strategy (constantPropagation)
+import Clash.Normalize.Strategy.Spec
+  (constantPropagationSpec, flattenSpec, normalizationSpec)
 import qualified Clash.Rewrite.Combinators as Comb
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.Compile
@@ -269,6 +272,18 @@ tests = testGroup "Clash.Tests.Rewrite.StrategyDSL"
               assertBool ("recorded context mentions somePrim: " <> recordedContext)
                 ("somePrim" `List.isInfixOf` recordedContext)
             _ -> assertFailure ("expected a probed argument, got: " <> show result)
+      ]
+
+    -- Strategy compilation happens at runtime, so an invalid spec no longer
+    -- fails the clash-lib build the way a failing splice did; this group
+    -- restores that coverage at unit-test time.
+  , testGroup "normalization strategy specs validate"
+      [ testCase "constantPropagationSpec" $
+          validateStrat constantPropagationSpec @?= Right ()
+      , testCase "normalizationSpec" $
+          validateStrat (normalizationSpec constantPropagation) @?= Right ()
+      , testCase "flattenSpec" $
+          validateStrat flattenSpec @?= Right ()
       ]
 
   , testGroup "asRewrite"

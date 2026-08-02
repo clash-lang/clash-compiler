@@ -37,8 +37,9 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Netlist.BlackBox.Types (Element(Err))
 import Clash.Netlist.Types (BlackBox(..))
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormTransformSpec, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
+import Clash.Rewrite.StrategyDSL (onCase, transform)
 import Clash.Rewrite.Types
   (TransformContext(..), aggressiveXOpt, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
@@ -67,9 +68,8 @@ import Clash.Util (MonadUnique, curLoc)
 -- where fieldN is an internal variable referring to the nth argument of a
 -- data constructor.
 --
-xOptimize :: HasCallStack => NormRewrite
-xOptimize ctx e@(Case subj ty alts) = xOptimizeWorker ctx e subj ty alts
-xOptimize _ e = return e
+xOptimize :: NormTransformSpec
+xOptimize = transform "xOptimize" (onCase xOptimizeWorker)
 
 -- | The 'Case' handler of 'xOptimize'.
 xOptimizeWorker

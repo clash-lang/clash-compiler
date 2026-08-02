@@ -48,8 +48,9 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList, mkVarSet)
 import Clash.Netlist.Util (bindsExistentials)
 import Clash.Normalize.Transformations.Specialize (specialize)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormTransformSpec, NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.StrategyDSL (onApp, transform)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
 import Clash.Rewrite.Util
@@ -395,9 +396,8 @@ collectANF _ e = return e
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
-nonRepANF :: HasCallStack => NormRewrite
-nonRepANF ctx e@(App appConPrim arg) = nonRepANFWorker ctx e appConPrim arg
-nonRepANF _ e = return e
+nonRepANF :: NormTransformSpec
+nonRepANF = transform "nonRepANF" (onApp nonRepANFWorker)
 
 -- | The 'App' handler of 'nonRepANF'.
 nonRepANFWorker

@@ -23,6 +23,7 @@ import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
 import Clash.Driver.Types     (BindingMap)
+import Clash.Rewrite.StrategyDSL (Step, Strat, TransformSpec)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
 -- | State of the 'NormalizeMonad'
@@ -51,6 +52,15 @@ data NormalizeState
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
+  , _normalizationStrategy :: Rewrite NormalizeState
+  -- ^ The compiled 'Clash.Normalize.Strategy.normalization' strategy. Carried
+  -- in the state so transformations can normalize other binders
+  -- ('Clash.Normalize.Util.normalizeTopLvlBndr') without importing the
+  -- strategy module: that import cycle would need an hs-boot module, inside
+  -- which Template Haskell — which compiles the strategies — cannot link.
+  , _constantPropagationStrategy :: Rewrite NormalizeState
+  -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
+  -- for "Clash.Normalize.PrimitiveReductions". See '_normalizationStrategy'.
   }
 
 Lens.makeLenses ''NormalizeState
@@ -63,6 +73,16 @@ type NormalizeSession = RewriteMonad NormalizeState
 
 -- | A 'Transform' action in the context of the 'RewriteMonad' and 'NormalizeMonad'
 type NormRewrite = Rewrite NormalizeState
+
+-- | A strategy-DSL transformation declaration in the context of the
+-- 'NormalizeMonad'
+type NormTransformSpec = TransformSpec NormalizeState
+
+-- | A strategy-DSL node program in the context of the 'NormalizeMonad'
+type NormStep = Step NormalizeState
+
+-- | A strategy-DSL strategy in the context of the 'NormalizeMonad'
+type NormStrat = Strat NormalizeState
 
 -- | Description of a @Term@ in terms of the type "components" the @Term@ has.
 --
