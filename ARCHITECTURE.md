@@ -136,7 +136,7 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
   * `Clash.Normalize.Strategy.normalization`
 
-    Normalization uses a rewrite system which applies transformations in the order defined here. The individual transformations are defined in the submodules of `Clash.Normalize.Transformations`. When a binding is normalized, the free variables of the binding are then recursively normalized if they appear in the bindings map.
+    Normalization uses a rewrite system which applies transformations in the order defined by `Clash.Normalize.Strategy.Spec`. The individual transformations are defined in the submodules of `Clash.Normalize.Transformations`. When a binding is normalized, the free variables of the binding are then recursively normalized if they appear in the bindings map.
 
   * `Clash.Normalize.cleanupGraph`
 

@@ -86,6 +86,10 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Rewrite.Combinators (topdownR)
+import Clash.Rewrite.StrategyDSL
+  ( Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode
+  , toTransformation
+  )
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, curFun, extra, tcCache
   , workFreeBinders, debugOpts, topEntities, specializationLimit)
@@ -183,20 +187,26 @@ import Clash.Util (ClashException(..))
 -- of the application w.r.t. the free variables in the argument part of the
 -- application. It is okay to over-approximate in this case and deshadow w.r.t
 -- the current InScopeSet.
-appProp :: HasCallStack => NormRewrite
-appProp ctx e@App {} = appPropWorker ctx e
-appProp ctx e@TyApp {} = appPropWorker ctx e
-appProp _ e = return e
+appProp :: Transformation
+appProp = toTransformation "applicationPropagation"
+  (onAppNode 'appPropWorker <> onTyAppNode 'appPropWorker)
 
--- | The application-spine handler of 'appProp'.
+-- | The application-spine handler of 'appProp'. Matches the constructors it
+-- is registered for itself, so it can also be used as a plain uninstrumented
+-- rewrite in the traversal inside 'inlineInternalSpecialisationArgument'.
 appPropWorker :: HasCallStack => NormRewrite
-appPropWorker ctx@(TransformContext is _) node = do
-  let (fun,args,ticks) = collectArgsTicks node
-  (eN,hasChanged) <- Writer.listen (go is (deShadowTerm is fun) args ticks)
-  if Monoid.getAny hasChanged
-    then return eN
-    else return node
+appPropWorker ctx@(TransformContext is _) node = case node of
+  App{} -> propagate
+  TyApp{} -> propagate
+  _ -> return node
  where
+  propagate = do
+    let (fun,args,ticks) = collectArgsTicks node
+    (eN,hasChanged) <- Writer.listen (go is (deShadowTerm is fun) args ticks)
+    if Monoid.getAny hasChanged
+      then return eN
+      else return node
+
   go :: InScopeSet -> Term -> [Either Term Type] -> [TickInfo] -> NormalizeSession Term
   go is0 (collectArgsTicks -> (fun,args0@(_:_),ticks0)) args1 ticks1 =
     go is0 fun (args0 ++ args1) (ticks0 ++ ticks1)
@@ -290,9 +300,8 @@ appPropWorker ctx@(TransformContext is _) node = do
 
 -- | Specialize functions on arguments which are constant, except when they
 -- are clock, reset generators.
-constantSpec :: HasCallStack => NormRewrite
-constantSpec ctx e@(App e1 e2) = constantSpecWorker ctx e e1 e2
-constantSpec _ e = return e
+constantSpec :: Transformation
+constantSpec = toTransformation "constantSpec" (onApp 'constantSpecWorker)
 
 -- | The 'App' handler of 'constantSpec'.
 constantSpecWorker
@@ -615,9 +624,8 @@ specArgBndrsAndVars specArg =
   in  (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
 
 -- | Specialize functions on their non-representable argument
-nonRepSpec :: HasCallStack => NormRewrite
-nonRepSpec ctx e@(App e1 e2) = nonRepSpecWorker ctx e e1 e2
-nonRepSpec _ e = return e
+nonRepSpec :: Transformation
+nonRepSpec = toTransformation "nonRepSpec" (onApp 'nonRepSpecWorker)
 
 -- | The 'App' handler of 'nonRepSpec'.
 nonRepSpecWorker
@@ -655,7 +663,7 @@ nonRepSpecWorker ctx e e1 e2
           Just b
             | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
-                      (topdownR appProp ctx
+                      (topdownR appPropWorker ctx
                         (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
           _ -> return app
       | otherwise = return app
@@ -664,9 +672,8 @@ nonRepSpecWorker _ e _ _ = return e
 {-# SCC nonRepSpecWorker #-}
 
 -- | Specialize functions on their type
-typeSpec :: HasCallStack => NormRewrite
-typeSpec ctx e@(TyApp e1 ty) = typeSpecWorker ctx e e1 ty
-typeSpec _ e = return e
+typeSpec :: Transformation
+typeSpec = toTransformation "typeSpec" (onTyApp 'typeSpecWorker)
 
 -- | The 'TyApp' handler of 'typeSpec'.
 typeSpecWorker
@@ -689,9 +696,8 @@ typeSpecWorker _ e _ _ = return e
 -- the type of a term), we instead substitute all occurances of a lambda-bound
 -- variable with a zero-width type with the only value of that type.
 --
-zeroWidthSpec :: HasCallStack => NormRewrite
-zeroWidthSpec ctx e@(Lam i x0) = zeroWidthSpecWorker ctx e i x0
-zeroWidthSpec _ e = return e
+zeroWidthSpec :: Transformation
+zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecWorker)
 
 -- | The 'Lam' handler of 'zeroWidthSpec'.
 zeroWidthSpecWorker
