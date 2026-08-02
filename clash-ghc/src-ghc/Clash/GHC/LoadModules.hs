@@ -113,6 +113,7 @@ import qualified GHC.Driver.Session as DynFlags
 import qualified GHC.Data.FastString as FastString
 import qualified GHC
 import qualified GHC.Driver.Main as HscMain
+import qualified GHC.Iface.Load as IfaceLoad
 import qualified GHC.Utils.Monad as MonadUtils
 import qualified GHC.Utils.Panic as Panic
 import qualified GHC.Serialized as Serialized (deserializeWithData)
@@ -199,6 +200,7 @@ loadExternalModule
 loadExternalModule hdl modName0 mainIsM = MC.try $ do
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
+  loadFamilyInstanceModules foundMod
   let errMsg = "Internal error: found  module, but could not load it"
   modInfo <- fromMaybe (error errMsg) <$> (GHC.getModuleInfo foundMod)
   tyThings <- catMaybes <$> mapM GHC.lookupGlobalName (GHC.modInfoExports modInfo)
@@ -214,6 +216,26 @@ loadExternalModule hdl modName0 mainIsM = MC.try $ do
   -- the @-main-is@ name and of (testbench/synthesize) annotations in
   -- 'loadModules' is unaffected by the pruning above.
   return (rootIds, FamInstEnv.emptyFamInstEnv, modName1, loaded, allBinders)
+
+-- | Read the interfaces of all modules that (transitively) contain type family
+-- instances, so that those instances are visible in the external package state.
+-- Also see https://github.com/clash-lang/clash-compiler/issues/1534.
+loadFamilyInstanceModules :: GHC.GhcMonad m => GHC.Module -> m ()
+loadFamilyInstanceModules rootModule = runTcInteractive $ do
+  iface <- IfaceLoad.loadModuleInterface doc rootModule
+  IfaceLoad.loadModuleInterfaces doc (HscTypes.dep_finsts (GHC.mi_deps iface))
+ where
+  doc = Outputable.text "Clash: reading type family instances"
+
+-- | Run a type checker action in the interactive context of the current session,
+-- turning a failure into a source error.
+runTcInteractive :: GHC.GhcMonad m => TcRnTypes.TcM a -> m a
+runTcInteractive action = do
+  hscEnv <- GHC.getSession
+  (msgs, res) <- liftIO (TcRnMonad.initTcInteractive hscEnv action)
+  case res of
+    Nothing -> liftIO (throwIO (HscTypes.mkSrcErr (fmap GhcTcRnMessage msgs)))
+    Just a -> pure a
 
 -- | Restrict the set of binders we load the transitive closure of. When a
 -- @-main-is@ name is given we do not need every export: any binder (and its
@@ -550,15 +572,9 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     MonadUtils.liftIO $ putStrLn $ "GHC: Compiling and loading modules took: " ++ modStartDiff
 
     -- Get type family instances: accumulated by GhcMonad during
-    -- 'loadExternalBinders' / 'loadExternalExprs'
-    hscEnv <- GHC.getSession
-    famInstEnvs <- do
-      (msgs, m) <- TcRnMonad.liftIO $ TcRnMonad.initTcInteractive hscEnv FamInst.tcGetFamInstEnvs
-      case m of
-        Nothing -> TcRnMonad.liftIO $ throwIO
-                                    $ HscTypes.mkSrcErr
-                                    $ fmap GhcTcRnMessage msgs
-        Just x  -> return x
+    -- 'loadExternalBinders' / 'loadExternalExprs', and by
+    -- 'loadFamilyInstanceModules' for modules loaded from interface files.
+    famInstEnvs <- runTcInteractive FamInst.tcGetFamInstEnvs
 
     allSyn     <- Map.fromList <$> findSynthesizeAnnotations allBinderIds
     topSyn     <- map fst <$> findSynthesizeAnnotations rootIds
