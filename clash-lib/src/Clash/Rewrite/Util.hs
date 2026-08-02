@@ -141,11 +141,27 @@ apply
   -> Rewrite extra
   -- ^ Transformation to be applied
   -> Rewrite extra
-apply = \s rewrite ctx expr0 -> do
+apply = \s rewrite ctx expr0 -> fst <$> applyWith s ctx expr0 (rewrite ctx expr0)
+{-# INLINE apply #-}
+
+-- | The instrumentation core of 'apply' (debug tracing, transformation
+-- counter, rewrite history, invariant checks) around an already-applied
+-- transformation action. Also returns whether the action signaled change.
+-- Used by the dispatch code built by "Clash.Rewrite.StrategyDSL.Compile".
+applyWith
+  :: String
+  -- ^ Name of the transformation
+  -> TransformContext
+  -> Term
+  -- ^ The node the transformation was offered
+  -> RewriteMonad extra Term
+  -- ^ The transformation, applied to that node
+  -> RewriteMonad extra (Term, Bool)
+applyWith = \s ctx expr0 action -> do
   opts <- Lens.view debugOpts
   traceIf (hasDebugInfo TryName s opts) ("Trying: " <> s) (pure ())
 
-  (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
+  (!expr1,anyChanged) <- Writer.listen action
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged (transformCounter += 1)
 
@@ -165,9 +181,9 @@ apply = \s rewrite ctx expr0 -> do
           }
 
   if isDebugging opts
-    then applyDebug ctx s expr0 hasChanged expr1
-    else return expr1
-{-# INLINE apply #-}
+    then (, hasChanged) <$> applyDebug ctx s expr0 hasChanged expr1
+    else return (expr1, hasChanged)
+{-# INLINE applyWith #-}
 
 applyDebug
   :: TransformContext
