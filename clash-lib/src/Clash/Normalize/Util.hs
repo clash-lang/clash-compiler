@@ -74,7 +74,6 @@ import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
 import           Clash.Normalize.Primitives (removedArg)
-import {-# SOURCE #-} Clash.Normalize.Strategy (normalization)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
@@ -415,6 +414,9 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extr
   let tm1 = deShadowTerm emptyInScopeSet tm
       tm2 = if isTop then substWithTyEq tm1 else tm1
   old <- Lens.use curFun
+  -- See the documentation of '_normalizationStrategy' for why the strategy
+  -- comes out of the state instead of an import.
+  normalization <- Lens.use (extra . normalizationStrategy)
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
   curFun .= old
   let ty' = inferCoreTypeOf tcm tm3
@@ -491,6 +493,7 @@ normalizeWorkFreeApp f b args = do
           -- 'normalizeTopLvlBndr' does.
           redex = deShadowTerm emptyInScopeSet (mkApps (bindingTerm b) args)
       old <- Lens.use curFun
+      normalization <- Lens.use (extra . normalizationStrategy)
       tm <- rewriteExpr ("normalization",normalization)
                         (showPpr (varName f),redex) (g,bindingLoc b)
       curFun .= old

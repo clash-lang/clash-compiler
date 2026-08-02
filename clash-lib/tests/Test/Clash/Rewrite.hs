@@ -26,6 +26,7 @@ import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
 import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
+import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
 import Clash.Util.Supply (newSupply)
@@ -109,6 +110,8 @@ instance Default NormalizeState where
     , _primitiveArgs=Map.empty
     , _recursiveComponents=emptyVarEnv
     , _workFreeAppCache=Map.empty
+    , _normalizationStrategy=normalization
+    , _constantPropagationStrategy=constantPropagation
     }
 
 instance Default InScopeSet where

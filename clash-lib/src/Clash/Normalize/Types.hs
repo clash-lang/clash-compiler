@@ -60,6 +60,15 @@ data NormalizeState
   -- * Elem: the normalized body of @f@ applied to the arguments
   --
   -- See Note [Caching work-free applications] in "Clash.Normalize.Util".
+  , _normalizationStrategy :: Rewrite NormalizeState
+  -- ^ The compiled 'Clash.Normalize.Strategy.normalization' strategy. Carried
+  -- in the state so transformations can normalize other binders
+  -- ('Clash.Normalize.Util.normalizeTopLvlBndr') without importing the
+  -- strategy module. Breaking that import cycle would need an hs-boot file,
+  -- and GHC rejects Template Haskell splices in a module cycle.
+  , _constantPropagationStrategy :: Rewrite NormalizeState
+  -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
+  -- for "Clash.Normalize.PrimitiveReductions". See '_normalizationStrategy'.
   }
 
 Lens.makeLenses ''NormalizeState

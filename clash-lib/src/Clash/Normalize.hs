@@ -15,6 +15,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
+--{-# OPTIONS_GHC -ddump-splices #-}
+
 module Clash.Normalize where
 
 import           Control.Exception                (throw)
@@ -74,17 +76,19 @@ import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
   (splitNormalized)
-import           Clash.Normalize.Strategy
+import           Clash.Normalize.Strategy         (constantPropagation, normalization)
 import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
-  ((>->), (>-!), (!->), allR, bottomupWithR, repeatR, topdownFixWithR, topdownSucR)
+  ((>->), (>-!), (!->), allR, bottomupWithR, repeatR, topdownFixWithR)
+import qualified Clash.Rewrite.StrategyDSL       as DSL
+import           Clash.Rewrite.StrategyDSL.TH     (compileStrategy, dispatchQ)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..), bindings,
    curFun, debugOpts, extra, tcCache, topEntities, newInlineStrategy)
 import           Clash.Rewrite.Util
-  (apply, isUntranslatableType, runRewriteSession)
+  (isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Eq                    (fastEqBy)
 import           Clash.Util.Interpolate           (i)
@@ -150,6 +154,8 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   Map.empty
                   rcsMap
                   Map.empty    -- workFreeAppCache
+                  normalization
+                  constantPropagation
 
 normalize
   :: [Id]
@@ -516,7 +522,7 @@ allCleanR _ _ trans ctx e = allR trans ctx e
 -- | 'topdownSucR' for 'topLet': it only fires along the spine of lambdas (and
 -- ticks) of a function, so there is no need to look further.
 topLetR :: NormRewrite
-topLetR = apply "topLet" topLet >-! spine
+topLetR = $(dispatchQ (DSL.one topLet)) >-! spine
  where
   spine ctx e@Lam{} = allR topLetR ctx e
   spine ctx e@Tick{} = allR topLetR ctx e
@@ -583,33 +589,33 @@ flattenCallTree memo (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   flatten =
-    -- See Note [flatten pass structure] and Note [flatten memo].
+    -- See Note [flatten pass structure] and Note [flatten memo]. The traversals
+    -- skip unchanged let-bindings; the node programs are compiled by
+    -- 'dispatchQ' from the same chains as 'Clash.Normalize.Strategy.Spec.flattenSpec'.
     repeatR (bottomupWithR (allCleanR (fmBottomUp memo) True)
-                       (apply "flattenLet" flattenLet >->
-                        (apply "reduceConst" reduceConst !->
-                           apply "deadCode" deadCode) >->
-                        apply "reducePrim" reducePrim >->
-                        apply "removeUnusedExpr" removeUnusedExpr) >->
+              $(dispatchQ (DSL.one flattenLet DSL.>->
+                           (DSL.one reduceConst DSL.!-> DSL.one deadCode) DSL.>->
+                           DSL.chain [reducePrim, removeUnusedExpr])) >->
              topdownFixWithR (allCleanR (fmTopDown memo) True)
-              (apply "appProp" appProp >->
-               apply "bindConstantVar" bindConstantVar >->
-               apply "caseCon" caseCon)) !->
+              $(dispatchQ (DSL.chain [ DSL.named "appProp" appProp
+                                     , bindConstantVar
+                                     , caseCon ]))) !->
     bottomupWithR (allCleanR (fmDeadCode memo) True)
-      (apply "deadCode" deadCode) >-> -- See #3407
+      $(dispatchQ (DSL.one deadCode)) >-> -- See #3407
     topLetR >->
     -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
     -- Note that we do this as the very last step, after all constant propagation
     -- has been done to avoid #3036.
-    onlyNoInline (topdownSucR (apply "collapseRHSNoops" collapseRHSNoops)) >->
-    topdownSucR (apply "inlineCleanup" inlineCleanup) >->
+    onlyNoInline $(compileStrategy (DSL.topdownSuc collapseRHSNoops)) >->
+    $(compileStrategy (DSL.topdownSuc inlineCleanup)) >->
     -- The next three passes only revisit let-bindings that changed since the
     -- loop above, see Note [flatten memo].
     bottomupWithR (allCleanR (fmTopDown memo) False)
-      (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
+      $(dispatchQ (DSL.one caseCon)) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
     bottomupWithR (allCleanR (fmBottomUp memo) False)
-      (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+      $(dispatchQ (DSL.one flattenLet)) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
     bottomupWithR (allCleanR (fmTopDown memo) False)
-      (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
+      $(dispatchQ (DSL.one bindConstantVar)) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
     topLetR
 
   -- 'collapseRHSNoops' only fires in synthesis boundaries, don't traverse the
