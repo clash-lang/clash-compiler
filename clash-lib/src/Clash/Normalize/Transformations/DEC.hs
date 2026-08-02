@@ -33,6 +33,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MagicHash #-}
 
+--{-# OPTIONS_GHC -ddump-splices #-}
+
 module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
   , disjointExpressionConsolidationWorker
@@ -88,8 +90,10 @@ import Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP
 import Clash.Normalize.Transformations.Letrec (deadCode)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isFromInt, isUntranslatableType)
 import Clash.Rewrite.WorkFree (isConstant)
@@ -147,11 +151,9 @@ import qualified GHC.Prim
 -- and to share the /decoder/ circuit that logic synthesis will create to map the
 -- bits of the subject expression to the bits needed to make the selection in the
 -- multiplexer.
-disjointExpressionConsolidation :: HasCallStack => NormRewrite
-disjointExpressionConsolidation ctx e@(Case subj ty alts) =
-  disjointExpressionConsolidationWorker ctx e subj ty alts
-disjointExpressionConsolidation _ e = return e
-{-# SCC disjointExpressionConsolidation #-}
+disjointExpressionConsolidation :: Transformation
+disjointExpressionConsolidation =
+  toTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)
 
 -- | The 'Case' handler of 'disjointExpressionConsolidation'.
 disjointExpressionConsolidationWorker
@@ -204,7 +206,7 @@ disjointExpressionConsolidationWorker ctx@(TransformContext isCtx _) e _scrut _t
          let lb = Letrec (zip funOutIds lifted1) e1
          -- Do an initial dead-code elimination pass, as `mkDisJoint` doesn't
          -- clean-up unused let-binders.
-         lb1 <- bottomupR deadCode ctx lb
+         lb1 <- bottomupR $(asRewriteQ deadCode) ctx lb
          changed lb1
   where
     -- Make the let-binder for the lifted expressions

@@ -264,6 +264,7 @@ Library
                       Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Primitives
                       Clash.Normalize.Strategy
+                      Clash.Normalize.Strategy.Spec
                       Clash.Normalize.Transformations
                       Clash.Normalize.Transformations.ANF
                       Clash.Normalize.Transformations.Case
@@ -297,6 +298,8 @@ Library
                       Clash.Primitives.Xilinx.ClockGen
 
                       Clash.Rewrite.Combinators
+                      Clash.Rewrite.StrategyDSL
+                      Clash.Rewrite.StrategyDSL.TH
                       Clash.Rewrite.Types
                       Clash.Rewrite.Util
                       Clash.Rewrite.WorkFree
@@ -439,5 +442,7 @@ test-suite unittests
                  Clash.Tests.Netlist.Id
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize.Transformations
+                 Clash.Tests.Rewrite.StrategyDSL
+                 Clash.Tests.Rewrite.StrategyDSL.Stubs
 
                  Test.Clash.Rewrite

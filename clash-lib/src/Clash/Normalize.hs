@@ -14,6 +14,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+--{-# OPTIONS_GHC -ddump-splices #-}
+
 module Clash.Normalize where
 
 import           Control.Exception                (throw)
@@ -70,17 +72,16 @@ import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Netlist.Util
   (splitNormalized)
-import           Clash.Normalize.Strategy
-import           Clash.Normalize.Transformations
+import           Clash.Normalize.Strategy         (constantPropagation, normalization)
+import           Clash.Normalize.Strategy.Spec    (flattenSpec)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
-import           Clash.Rewrite.Combinators
-  ((>->), (!->), bottomupR, repeatR, topdownFixR, topdownSucR)
+import           Clash.Rewrite.StrategyDSL.TH     (compileStrategy)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities, newInlineStrategy)
 import           Clash.Rewrite.Util
-  (apply, isUntranslatableType, runRewriteSession)
+  (isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)
@@ -144,6 +145,8 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   emptyVarEnv
                   Map.empty
                   rcsMap
+                  normalization
+                  constantPropagation
 
 normalize
   :: [Id]
@@ -348,37 +351,6 @@ flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
            then return (Right ((nm,e),us))
            else return (Left b)
 
-{-
-Note [flatten pass structure]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Through experimentation we've learned the following:
-
-1. The evaluator-backed rewrites ('reduceConst', 'reduceNonRepPrim') must not
-   sit inside the top-down propagation bundle. 'topdownFixR' settles that bundle
-   at each node with 'repeatR', so a bundled 'reduceConst' is re-attempted -
-   evaluator call and all - for every 'appProp' or 'caseCon' that fires there.
-   On large designs we've measured that dominates; hoisting them out was worth
-   ~30%. See #3338.
-
-2. There should be exactly two traversals per round, and the bottom-up one has
-   to come first.
-
-   'allR' rebuilds every node it walks, so each extra traversal costs a full
-   term rebuild per round even when nothing fires. Running 'flattenLet' and the
-   evaluator-backed rewrites as one fused bottom-up pass instead of two
-   consecutive ones is therefore free of charge (it does not change which
-   rewrites fire, or in which order they fire relative to each other).
-
-   Running that bottom-up pass _before_ the top-down one lets the constants it
-   folds be consumed by 'caseCon' in the same round. With the passes the other
-   way round the folded constants sit unused until the next round, so
-   constant-heavy designs pay for an extra iteration of the whole loop:
-   @tests/shouldwork/Basic/AES.hs@ did ~36k extra node visits per transformation
-   that way.
-
-If you touch code related to this, please make sure to run benchmarks.
--}
-
 -- | Flatten a 'CallTree', memoizing results by binder Id within one cleanup
 -- pass. Without the cache, every binder reachable from the root is flattened
 -- as many times as it appears in the (un-deduplicated) call tree.
@@ -438,26 +410,8 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
          return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
-  flatten =
-    -- See Note [flatten pass structure].
-    repeatR (bottomupR (apply "flattenLet" flattenLet >->
-                        (apply "reduceConst" reduceConst !->
-                           apply "deadcode" deadCode) >->
-                        apply "reduceNonRepPrim" reduceNonRepPrim >->
-                        apply "removeUnusedExpr" removeUnusedExpr) >->
-             topdownFixR (apply "appProp" appProp >->
-               apply "bindConstantVar" bindConstantVar >->
-               apply "caseCon" caseCon)) !->
-    topdownSucR (apply "topLet" topLet) >->
-    -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
-    -- Note that we do this as the very last step, after all constant propagation
-    -- has been done to avoid #3036.
-    topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
-    topdownSucR (apply "inlineCleanup" inlineCleanup) >->
-    bottomupR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
-    bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
-    bottomupR (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
-    topdownSucR (apply "topLet" topLet)
+  -- The flattening strategy is described in Clash.Normalize.Strategy.Spec.
+  flatten = $(compileStrategy flattenSpec)
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
     | isNoInline inl2  = (Nothing     ,[c])
