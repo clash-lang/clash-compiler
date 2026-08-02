@@ -79,7 +79,8 @@ import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormTransformSpec, NormalizeSession)
+import Clash.Rewrite.StrategyDSL (onCase, transform)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
   , typeTranslator, workFreeBinders)
@@ -92,9 +93,8 @@ import Clash.XException (errorX)
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the
 -- alternatives
-caseCase :: HasCallStack => NormRewrite
-caseCase ctx e@(Case subj ty alts) = caseCaseWorker ctx e subj ty alts
-caseCase _ e = return e
+caseCase :: NormTransformSpec
+caseCase = transform "caseCase" (onCase caseCaseWorker)
 
 -- | The 'Case' handler of 'caseCase'.
 caseCaseWorker
@@ -154,9 +154,8 @@ Because no pattern matches caseCon transforms this into
 By trying caseOneAlt first clash can instead drop the case
 and use the body of the single alternative.
 -}
-caseCon :: HasCallStack => NormRewrite
-caseCon ctx e@(Case subj ty alts) = caseConWorker ctx e subj ty alts
-caseCon _ e = return e
+caseCon :: NormTransformSpec
+caseCon = transform "caseCon" (onCase caseConWorker)
 
 -- | The 'Case' handler of 'caseCon': tries 'caseOneAlt' first and only when
 -- that did not fire, 'caseCon''. See NOTE: caseOneAlt before caseCon'.
@@ -489,10 +488,9 @@ matchLiteralContructor c _ _ =
 -- @f@ is always specialized on @STy Int@. The SBool alternatives are therefore
 -- unreachable. Additional information can be found at:
 -- https://github.com/clash-lang/clash-compiler/pull/465
-caseEliminateNonReachable :: HasCallStack => NormRewrite
-caseEliminateNonReachable ctx e@(Case subj ty alts) =
-  caseEliminateNonReachableWorker ctx e subj ty alts
-caseEliminateNonReachable _ e = return e
+caseEliminateNonReachable :: NormTransformSpec
+caseEliminateNonReachable =
+  transform "caseEliminateNonReachable" (onCase caseEliminateNonReachableWorker)
 
 -- | The 'Case' handler of 'caseEliminateNonReachable'.
 caseEliminateNonReachableWorker
@@ -547,9 +545,8 @@ caseEliminateNonReachableWorker _ case0 scrut altsTy alts0 = do
 --        2 -> fromInteger 1
 --        3 -> fromInteger 0
 -- @
-caseFlat :: HasCallStack => NormRewrite
-caseFlat ctx e@(Case subj ty alts) = caseFlatWorker ctx e subj ty alts
-caseFlat _ e = return e
+caseFlat :: NormTransformSpec
+caseFlat = transform "caseFlat" (onCase caseFlatWorker)
 
 -- | The 'Case' handler of 'caseFlat'.
 caseFlatWorker
@@ -633,9 +630,8 @@ collectEqArgs f@(collectArgsTicks -> (Prim p, args, ticks))
 collectEqArgs _ = Nothing
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
-caseLet :: HasCallStack => NormRewrite
-caseLet ctx e@(Case subj ty alts) = caseLetWorker ctx e subj ty alts
-caseLet _ e = return e
+caseLet :: NormTransformSpec
+caseLet = transform "caseLet" (onCase caseLetWorker)
 
 -- | The 'Case' handler of 'caseLet'.
 caseLetWorker
@@ -722,9 +718,8 @@ caseOneAlt e = return e
 -- This function solves 'n1' and replaces every occurrence with its solution. A
 -- very limited number of solutions are currently recognized: only adds (such
 -- as in the example) will be solved.
-elimExistentials :: HasCallStack => NormRewrite
-elimExistentials ctx e@(Case subj ty alts) = elimExistentialsWorker ctx e subj ty alts
-elimExistentials _ e = return e
+elimExistentials :: NormTransformSpec
+elimExistentials = transform "elimExistentials" (onCase elimExistentialsWorker)
 
 -- | The 'Case' handler of 'elimExistentials'.
 elimExistentialsWorker
@@ -776,10 +771,9 @@ elimExistentialsWorker (TransformContext is0 _) _node scrut altsTy alts0 = do
 --
 -- This is as "safe" as the rest of the Natural/Integer handling that clash does in HDL,
 -- because numbers bigger then Word/Int can't exist there anyway.
-elimCaseBigNumInternals :: HasCallStack => NormRewrite
-elimCaseBigNumInternals ctx e@(Case subj ty alts) =
-  elimCaseBigNumInternalsWorker ctx e subj ty alts
-elimCaseBigNumInternals _ e = return e
+elimCaseBigNumInternals :: NormTransformSpec
+elimCaseBigNumInternals =
+  transform "elimCaseBigNum" (onCase elimCaseBigNumInternalsWorker)
 
 -- | The 'Case' handler of 'elimCaseBigNumInternals'.
 elimCaseBigNumInternalsWorker

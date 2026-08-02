@@ -32,8 +32,9 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type(..), mkPolyFunTy, splitFunForallTy)
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (mkLocalId)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormTransformSpec, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
+import Clash.Rewrite.StrategyDSL (onPrim, transform)
 import Clash.Rewrite.Types (TransformContext, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
 
@@ -75,9 +76,9 @@ import Clash.Rewrite.Util (changed)
 -- types, not any product type. It will error if it sees a multi result primitive
 -- with a non-tuple return type.
 --
-setupMultiResultPrim :: HasCallStack => NormRewrite
-setupMultiResultPrim ctx e@(Prim pInfo) = setupMultiResultPrimWorker ctx e pInfo
-setupMultiResultPrim _ e = return e
+setupMultiResultPrim :: NormTransformSpec
+setupMultiResultPrim =
+  transform "setupMultiResultPrim" (onPrim setupMultiResultPrimWorker)
 
 -- | The 'Prim' handler of 'setupMultiResultPrim'.
 setupMultiResultPrimWorker

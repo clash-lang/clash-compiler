@@ -86,6 +86,9 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Rewrite.Combinators (topdownR)
+import Clash.Rewrite.StrategyDSL
+  (onApp, onAppNode, onLam, onTyApp, onTyAppNode, transform)
+import Clash.Rewrite.StrategyDSL.Compile (asRewrite)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, curFun, extra, tcCache
   , workFreeBinders, debugOpts, topEntities, specializationLimit)
@@ -94,7 +97,8 @@ import Clash.Rewrite.Util
   , isUntranslatableType, normalizeTermTypes, normalizeId, whnfRW)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
-  ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
+  ( NormRewrite, NormTransformSpec, NormalizeSession, specialisationCache
+  , specialisationHistory)
 import Clash.Normalize.Util
   (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
 import Clash.Unique (Unique)
@@ -183,10 +187,14 @@ import Clash.Util (ClashException(..))
 -- of the application w.r.t. the free variables in the argument part of the
 -- application. It is okay to over-approximate in this case and deshadow w.r.t
 -- the current InScopeSet.
-appProp :: HasCallStack => NormRewrite
-appProp ctx e@App {} = appPropWorker ctx e
-appProp ctx e@TyApp {} = appPropWorker ctx e
-appProp _ e = return e
+appProp :: NormTransformSpec
+appProp = transform "applicationPropagation"
+  (onAppNode appPropWorker <> onTyAppNode appPropWorker)
+
+-- | 'appProp' as a plain uninstrumented rewrite, for the traversal inside
+-- 'inlineInternalSpecialisationArgument'.
+appPropQuiet :: NormRewrite
+appPropQuiet = asRewrite appProp
 
 -- | The application-spine handler of 'appProp'.
 appPropWorker :: HasCallStack => NormRewrite
@@ -290,9 +298,8 @@ appPropWorker ctx@(TransformContext is _) node = do
 
 -- | Specialize functions on arguments which are constant, except when they
 -- are clock, reset generators.
-constantSpec :: HasCallStack => NormRewrite
-constantSpec ctx e@(App e1 e2) = constantSpecWorker ctx e e1 e2
-constantSpec _ e = return e
+constantSpec :: NormTransformSpec
+constantSpec = transform "constantSpec" (onApp constantSpecWorker)
 
 -- | The 'App' handler of 'constantSpec'.
 constantSpecWorker
@@ -615,9 +622,8 @@ specArgBndrsAndVars specArg =
   in  (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
 
 -- | Specialize functions on their non-representable argument
-nonRepSpec :: HasCallStack => NormRewrite
-nonRepSpec ctx e@(App e1 e2) = nonRepSpecWorker ctx e e1 e2
-nonRepSpec _ e = return e
+nonRepSpec :: NormTransformSpec
+nonRepSpec = transform "nonRepSpec" (onApp nonRepSpecWorker)
 
 -- | The 'App' handler of 'nonRepSpec'.
 nonRepSpecWorker
@@ -655,7 +661,7 @@ nonRepSpecWorker ctx e e1 e2
           Just b
             | nameSort (varName (bindingId b)) == Internal
             -> censor (const mempty)
-                      (topdownR appProp ctx
+                      (topdownR appPropQuiet ctx
                         (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
           _ -> return app
       | otherwise = return app
@@ -664,9 +670,8 @@ nonRepSpecWorker _ e _ _ = return e
 {-# SCC nonRepSpecWorker #-}
 
 -- | Specialize functions on their type
-typeSpec :: HasCallStack => NormRewrite
-typeSpec ctx e@(TyApp e1 ty) = typeSpecWorker ctx e e1 ty
-typeSpec _ e = return e
+typeSpec :: NormTransformSpec
+typeSpec = transform "typeSpec" (onTyApp typeSpecWorker)
 
 -- | The 'TyApp' handler of 'typeSpec'.
 typeSpecWorker
@@ -689,9 +694,8 @@ typeSpecWorker _ e _ _ = return e
 -- the type of a term), we instead substitute all occurances of a lambda-bound
 -- variable with a zero-width type with the only value of that type.
 --
-zeroWidthSpec :: HasCallStack => NormRewrite
-zeroWidthSpec ctx e@(Lam i x0) = zeroWidthSpecWorker ctx e i x0
-zeroWidthSpec _ e = return e
+zeroWidthSpec :: NormTransformSpec
+zeroWidthSpec = transform "zeroWidthSpec" (onLam zeroWidthSpecWorker)
 
 -- | The 'Lam' handler of 'zeroWidthSpec'.
 zeroWidthSpecWorker
