@@ -86,6 +86,7 @@ library
     -- https://github.com/clash-lang/clash-compiler/issues/1796 for an example.
     shouldwork/LoadModules/precompiled
     shouldwork/Basic/precompiled
+    shouldwork/Issues/T1534-precompiled
     shouldwork/Issues/T3291-precompiled
     shouldwork/TopEntity/precompiled
 
@@ -108,6 +109,9 @@ library
 
     -- From tests/shouldwork/Basic/precompiled
     SimulationMagic2736a
+
+    -- From tests/shouldwork/Issues/T1534-precompiled
+    T1534
 
     -- From tests/shouldwork/Issues/T3291-precompiled
     T3291.BitPackC
