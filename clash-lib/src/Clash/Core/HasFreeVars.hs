@@ -61,6 +61,11 @@ instance HasFreeVars Term where
   freeVarsOf =
     Lens.foldMapOf freeLocalVars unitVarSet
 
+  -- Stops at the first free variable, instead of collecting the full set
+  -- only to test it for emptiness.
+  isClosed e =
+    getAll (Lens.foldMapOf freeLocalVars (const (All False)) e)
+
   elemFreeVars v e =
     getAny (Lens.foldMapOf freeLocalVars (Any . (== v)) e)
 
