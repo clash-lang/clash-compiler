@@ -602,6 +602,7 @@ runClashTest = defaultMain
         , outputTest "T1171" def
         , clashLibTest "T1439" def{hdlTargets=[VHDL]}
         , runTest "T1477" def{hdlSim=[]}
+        , runTest "T1534" def{hdlSim = [], hdlLoad = []}
         , runTest "T1506A" def{hdlSim=[], clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]}
         , outputTest "T1506B" def
             { clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
