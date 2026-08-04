@@ -361,15 +361,19 @@ inlineBinders
   :: (Term -> LetBinding -> RewriteMonad extra Bool)
   -- ^ Property test
   -> Rewrite extra
-inlineBinders condition (TransformContext inScope0 _) expr@(Let (NonRec i x) res) = do
-  inline <- condition expr (i, x)
+inlineBinders condition (TransformContext inScope0 _) expr@(Let (NonRec i x) res)
+  -- Substitution would be a no-op for a binder that does not occur in the
+  -- body, so the (potentially expensive) property test can be skipped.
+  | not (elemFreeVars i res) = return expr
+  | otherwise = do
+      inline <- condition expr (i, x)
 
-  if inline && elemFreeVars i res then
-    let inScope1 = extendInScopeSet inScope0 i
-        subst = extendIdSubst (mkSubst inScope1) i x
-     in changed (substTm "inlineBinders" subst res)
-  else
-    return expr
+      if inline then
+        let inScope1 = extendInScopeSet inScope0 i
+            subst = extendIdSubst (mkSubst inScope1) i x
+         in changed (substTm "inlineBinders" subst res)
+      else
+        return expr
 
 inlineBinders condition (TransformContext inScope0 _) expr@(Let (Rec xes) res) = do
   (toInline,toKeep) <- partitionM (condition expr) xes
