@@ -64,7 +64,7 @@ import           Clash.Core.Term
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Type
-  (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
+  (Type (..), coreView1, splitFunForallTy, splitRepFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
@@ -256,7 +256,7 @@ genComponentT compName0 componentExpr = do
 
   topEntityTM <- lookupVarEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
-      topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
+      topVarTypeM = snd . splitRepFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
   seenIds <~ Lens.use seenComps
   (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-

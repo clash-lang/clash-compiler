@@ -73,7 +73,11 @@ constantPropagation =
   dec >->
   conSpec
   where
-    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
+    etaTL              = apply "etaTL" etaExpansionTL !->
+                         topdownR (apply "applicationPropagation" appProp >->
+                                   -- Eta-expanding through a newtype of a
+                                   -- function type introduces casts
+                                   apply "elimCastCast" elimCastCast)
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down bundle from the
     -- new root.

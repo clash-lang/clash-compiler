@@ -25,8 +25,9 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.HasType
 import Clash.Core.Term (Bind(..), CoreContext(..), Term(..), collectArgs, mkLams)
 import Clash.Core.TermInfo (isFun)
-import Clash.Core.Type (splitFunTy)
-import Clash.Core.Util (mkInternalVar)
+import Clash.Core.Subst (aeqType)
+import Clash.Core.Type (TypeView(..), repView, splitFunTy, tyView)
+import Clash.Core.Util (mkCast, mkInternalVar)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (elemVarSet, extendInScopeSet, extendInScopeSetList)
 import Clash.Normalize.Types (NormRewrite)
@@ -89,19 +90,27 @@ etaExpansionTL (TransformContext is0 ctx) (Let (Rec xes) e) = do
       changed (mkLams e3 bs)
     _ -> return (Let (Rec xes) e')
 
-etaExpansionTL (TransformContext is0 ctx) e
+etaExpansionTL ctx0@(TransformContext is0 ctx) e
   = do
     tcm <- Lens.view tcCache
+    let ty = inferCoreTypeOf tcm e
     if isFun tcm e
       then do
         let argTy = ( fst
                     . Maybe.fromMaybe (error $ $(curLoc) ++ "etaExpansion splitFunTy")
                     . splitFunTy tcm
-                    . inferCoreTypeOf tcm
-                    ) e
+                    ) ty
         newId <- mkInternalVar is0 "arg" argTy
         let ctx' = TransformContext (extendInScopeSet is0 newId) (LamBody newId : ctx)
         e' <- etaExpansionTL ctx' (App e (Var newId))
         changed (Lam newId e')
-      else return e
+      else case tyView (repView tcm ty) of
+        -- A binder whose result is a newtype of a function type (e.g.
+        -- @newtype Circuit .. = Circuit (.. -> ..)@) is eta-expanded through
+        -- the newtype by casting; in HDL its interface is that of the
+        -- function it wraps.
+        FunTy {} | tyR <- repView tcm ty, not (ty `aeqType` tyR) -> do
+          e1 <- etaExpansionTL ctx0 (mkCast tcm e ty tyR)
+          changed e1
+        _ -> return e
 {-# SCC etaExpansionTL #-}
