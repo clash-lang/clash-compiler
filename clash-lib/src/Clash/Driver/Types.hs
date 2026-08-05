@@ -58,6 +58,7 @@ import           Clash.Driver.Bool              (OverridingBool(..))
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
 import           Clash.Primitives.Types         (CompiledPrimMap)
+import           Clash.Warning                  (WarningOpts, defWarningOpts)
 
 data ClashEnv = ClashEnv
   { envOpts        :: ClashOpts
@@ -332,10 +333,11 @@ data ClashOpts = ClashOpts
   -- in with @-fclash-hdldir@. Note that Clash will still use a cache if it can.
   --
   -- Command line flag: @-fclash-clear@
-  , opt_primWarn :: Bool
-  -- ^ Disable warnings for primitives
+  , opt_warnings :: WarningOpts
+  -- ^ Which warnings are enabled, and which of them are treated as errors.
   --
-  -- Command line flag: -fclash-no-prim-warn
+  -- Command line flags: -W\<name\>, -Wno-\<name\>, -Werror=\<name\>,
+  -- -Wwarn=\<name\>, -Wno-error=\<name\>. See "Clash.Warning".
   , opt_color :: OverridingBool
   -- ^ Show colors in debug output
   --
@@ -428,7 +430,7 @@ defClashOpts
   , opt_ghcDebugLevel       = 0
   , opt_cachehdl            = True
   , opt_clear               = False
-  , opt_primWarn            = True
+  , opt_warnings            = defWarningOpts
   , opt_color               = Auto
   , opt_intWidth            = WORD_SIZE_IN_BITS
   , opt_hdlDir              = Nothing

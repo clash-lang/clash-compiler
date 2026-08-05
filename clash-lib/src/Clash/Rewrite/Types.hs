@@ -123,6 +123,9 @@ data RewriteEnv
 
 Lens.makeLenses ''RewriteEnv
 
+clashOpts :: Lens.Getter RewriteEnv ClashOpts
+clashOpts = clashEnv . Lens.to envOpts
+
 debugOpts :: Lens.Getter RewriteEnv DebugOpts
 debugOpts = clashEnv . Lens.to (opt_debug . envOpts)
 

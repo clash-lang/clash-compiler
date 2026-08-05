@@ -314,6 +314,19 @@ runClashTest = defaultMain
           , expectVerificationFail=Just (def, "Unreached cover statement at topEntity: B")
           }
         ]
+      , clashTestGroup "Warnings"
+        [ runTest "PromotedWarning" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-Werror=clash-non-synthesizable"]
+          , expectClashFail=Just (def, "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!")
+          }
+        , runTest "DemotedWarning" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-Werror=clash-non-synthesizable", "-Wwarn=clash-non-synthesizable"]
+          , expectClashFail=Just ( TestSpecificExitCode 0
+                                 , "[-Wclash-non-synthesizable]")
+          }
+        ]
       , clashTestGroup "ZeroWidth"
         [ runTest "FailGracefully1" def{
             hdlTargets=[VHDL]
@@ -1101,6 +1114,14 @@ runClashTest = defaultMain
           , hdlLoad=[]
           , hdlSim=[]
           , verificationTool=Just SymbiYosys
+          }
+        ]
+      , clashTestGroup "Warnings"
+        [ runTest "SuppressedWarning" def{
+            hdlTargets=[VHDL]
+          , hdlLoad=[]
+          , hdlSim=[]
+          , clashFlags=["-Werror=clash-non-synthesizable", "-Wno-clash-non-synthesizable"]
           }
         ]
       , clashTestGroup "Xilinx"

@@ -45,7 +45,6 @@ import qualified GHC.Core                as GHC
 import qualified GHC.Types.Demand        as GHC
 import qualified GHC.Driver.Session      as GHC
 import qualified GHC.Types.Id.Info       as GHC
-import qualified GHC.Utils.Outputable    as GHC
 import qualified GHC.Types.Name          as GHC hiding (varName)
 import qualified GHC.Core.FamInstEnv     as GHC
 import qualified GHC.Core.TyCon          as GHC
@@ -70,10 +69,10 @@ import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
   ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitives)
 import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
+import           Clash.Driver.Warning    (warnAboutPure)
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, qualifiedNameString, emptyGHC2CoreState, srcSpan)
@@ -86,6 +85,7 @@ import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Unique            (Unique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
+import           Clash.Warning           (ClashWarning(WarnPrimitiveDefinition))
 
 -- | Safe indexing, returns a 'Nothing' if the index does not exist
 indexMaybe :: [a] -> Int -> Maybe a
@@ -125,7 +125,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
   primMapC <- compilePrimitives importDirs dbs tdir primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
-        RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
+        RWS.runRWS (mkBindings opts primMapC bindings clsOps unlocatable)
                    (GHC2CoreEnv GHC.noSrcSpan fiEnvs)
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
@@ -198,7 +198,8 @@ setNoInlineTopEntities bm tes =
 -- mkRecInfo for an explanation of these).
 --
 mkBindings
-  :: CompiledPrimMap
+  :: ClashOpts
+  -> CompiledPrimMap
   -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]
@@ -208,14 +209,14 @@ mkBindings
   -> C2C ( BindingMap
          , VarEnv (Id,Int)
          )
-mkBindings primMap bindings clsOps unlocatable = do
+mkBindings opts primMap bindings clsOps unlocatable = do
   -- Converting each binder is independent: 'GHC2CoreState' only accumulates a
   -- 'TyCon' map and a name cache, both of which are pure (deterministic per
   -- key) memo tables. We therefore convert every binder from a fresh state in
   -- parallel and merge the resulting 'TyCon' maps afterwards. See 'parRunC2C'.
   env <- RWS.ask
   let
-    bindingsList = parRunC2C env (map (processBind primMap unlocatable) bindings)
+    bindingsList = parRunC2C env (map (processBind opts primMap unlocatable) bindings)
     clsOpList    = parRunC2C env (map processClsOp clsOps)
   -- Merge the 'TyCon' maps discovered while converting; the name caches are
   -- not used after this point, so they are dropped. 'makeAllTyCons' later
@@ -230,11 +231,12 @@ mkBindings primMap bindings clsOps unlocatable = do
 -- | Convert a single (possibly recursive) binder group to Clash Core bindings.
 -- See 'mkBindings' for how these conversions are run in parallel.
 processBind
-  :: CompiledPrimMap
+  :: ClashOpts
+  -> CompiledPrimMap
   -> [GHC.CoreBndr]
   -> GHC.CoreBind
   -> C2C [(Id, Binding Term)]
-processBind primMap unlocatable = \case
+processBind opts primMap unlocatable = \case
   GHC.NonRec v e -> do
     let sp = GHC.getSrcSpan v
         inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
@@ -242,7 +244,7 @@ processBind primMap unlocatable = \case
     v' <- coreToId v
     nm <- qualifiedNameString (GHC.varName v)
     let pr = if HashMap.member nm primMap then IsPrim else IsFun
-    checkPrimitive primMap v
+    checkPrimitive opts primMap v
     return [(v', (Binding v' sp inl pr tm False))]
   GHC.Rec bs -> do
     tms <- forM bs $ \(v,e) -> do
@@ -252,7 +254,7 @@ processBind primMap unlocatable = \case
       v' <- coreToId v
       nm <- qualifiedNameString (GHC.varName v)
       let pr = if HashMap.member nm primMap then IsPrim else IsFun
-      checkPrimitive primMap v
+      checkPrimitive opts primMap v
       return (Binding v' sp inl pr tm True)
     case tms of
       [Binding v sp inl pr tm r] -> return [(v, Binding v sp inl pr tm r)]
@@ -343,8 +345,8 @@ global bindings when they appear in a term.
 --   * isn't marked NOINLINE
 --   * produces an error when evaluating its result to WHNF
 --   * isn't using all its arguments
-checkPrimitive :: CompiledPrimMap -> GHC.CoreBndr -> C2C ()
-checkPrimitive primMap v = do
+checkPrimitive :: ClashOpts -> CompiledPrimMap -> GHC.CoreBndr -> C2C ()
+checkPrimitive opts primMap v = do
   nm <- qualifiedNameString (GHC.varName v)
   case HashMap.lookup nm primMap >>= extractPrim of
     Just (BlackBox{resultNames, resultInits, template, includes}) -> do
@@ -356,10 +358,10 @@ checkPrimitive primMap v = do
         (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
         (dmdArgs,_dmdRes) = GHC.splitDmdSig strictness
         nrOfArgs = length argTys
-        loc = case GHC.getSrcLoc v of
-                GHC.UnhelpfulLoc _ -> ""
-                GHC.RealSrcLoc l _ -> showPpr l ++ ": "
-        warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
+        warnIf cond msg =
+          if cond
+          then warnAboutPure opts WarnPrimitiveDefinition (GHC.getSrcSpan v) msg (return ())
+          else return ()
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
       let usedArgs = concat [ concatMap getUsedArguments resultNames
@@ -388,9 +390,6 @@ checkPrimitive primMap v = do
           ++ "calls to this primitive by an undefined value.")
         warnArgs usedArgs
     _ -> return ()
-  where
-    showPpr :: GHC.Outputable a => a -> String
-    showPpr = GHC.showSDocUnsafe . GHC.ppr
 
 mkClassSelector
   :: InScopeSet
