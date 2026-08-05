@@ -465,6 +465,10 @@ mkDeclarations' declType bndr app = do
   let (appF,args0,ticks) = collectArgsTicks app
       (args,tyArgs) = partitionEithers args0
   case appF of
+    -- A cast in function position has no HDL significance; see the
+    -- corresponding case in 'mkExpr'.
+    Cast e _ _ | not (null args0) ->
+      mkDeclarations' declType bndr (mkApps (mkTicks e ticks) args0)
     Var f
       | null tyArgs ->
         withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) f args)
@@ -915,7 +919,13 @@ mkExpr bbEasD declType bndr app =
     Let _ _ -> invalid "application of let"
     TyApp _ _ -> invalid "application of type application"
     Tick _ _ -> invalid "application of tick"
-    Cast _ _ _ -> invalid "application of cast"
+    -- A cast in function position has no HDL significance: functions do not
+    -- exist as values in HDL. By this stage only casts that cannot be pushed
+    -- into the arguments remain, e.g. between a newtype of a function type
+    -- (like clash-protocols' @Circuit@) and its underlying function type. The
+    -- component instantiation is fully determined by the head variable and
+    -- the collected arguments.
+    Cast e0 _ _ -> mkExpr bbEasD declType bndr (mkApps (mkTicks e0 ticks) args)
     Lam _ _ -> invalid "application of lambda"
     TyLam _ _ -> invalid "application of type lambda"
     App _ _ -> invalid "application of application"
