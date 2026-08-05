@@ -35,7 +35,6 @@ import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad.Extra (orM)
 import qualified Control.Monad.Writer as Writer (listen)
-import Data.Bifunctor (bimap)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
@@ -86,7 +85,7 @@ import Clash.Rewrite.Types
   , workFreeBinders, debugOpts, topEntities, specializationLimit)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
-  , isUntranslatableType, normalizeTermTypes, normalizeId, whnfRW)
+  , isUntranslatableType, whnfRW)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
@@ -432,13 +431,16 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
 
-  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
+  -- NB: we do not normalize the types in the specialized-on argument: doing
+  -- so would rewrite one endpoint of the casts it contains (but not their
+  -- neighbors), making the casts in the specialized function misaligned.
+  let specArg = specArgIn
       -- Create binders and variable references for free variables in 'specArg'
       -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
       (specBndrsIn,specVars) = specArgBndrsAndVars specArg
       argLen  = length args
       specBndrs :: [Either Id TyVar]
-      specBndrs = map (Lens.over Lens._Left (normalizeId tcm)) specBndrsIn
+      specBndrs = specBndrsIn
 
       -- See Note [ticks and specialization]
       specAbs :: Either Term Type

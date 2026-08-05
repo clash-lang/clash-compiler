@@ -84,14 +84,13 @@ listToLets xs body = foldr go body (sccLetBindings xs)
 -- 'normalizeType', a later *syntactic* alignment check between @A ~ C@ and a
 -- neighboring cast may fail even though the term is perfectly fine.
 --
--- 'castEqType' is that single equality. It currently equates types up to
--- alpha-equivalence modulo 'normalizeType', i.e. newtypes are transparent and
--- type families are reduced, but 'Signal' is kept. Once newtypes become
--- opaque in Clash core this must simultaneously stop looking through
--- newtypes.
+-- 'castEqType' is that single equality. It equates types up to
+-- alpha-equivalence modulo 'normalizeFamilies', i.e. type families are
+-- reduced, but newtypes and 'Signal' are kept: those equalities are carried
+-- by casts at the term level.
 castEqType :: TyConMap -> Type -> Type -> Bool
 castEqType tcm ty1 ty2 =
-  ty1 == ty2 || normalizeType tcm ty1 == normalizeType tcm ty2
+  ty1 == ty2 || normalizeFamilies tcm ty1 == normalizeFamilies tcm ty2
 
 -- | Smart constructor for 'Cast'. Drops casts that are refl under
 -- 'castEqType' and merges back-to-back casts.
@@ -472,7 +471,7 @@ isEnable
   -> Bool
 isEnable m ty0
   | TyConApp (nameOcc -> "Clash.Signal.Internal.Enable") _ <- tyView ty0 = True
-  | Just ty1 <- coreView1 m ty0 = isEnable m ty1
+  | Just ty1 <- repView1 m ty0 = isEnable m ty1
 isEnable _ _ = False
 
 -- | Determines whether given type is an (alias of en) Clock or Reset line
@@ -480,7 +479,7 @@ isClockOrReset
   :: TyConMap
   -> Type
   -> Bool
-isClockOrReset m (coreView1 m -> Just ty)    = isClockOrReset m ty
+isClockOrReset m (repView1 m -> Just ty)    = isClockOrReset m ty
 isClockOrReset _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
   "Clash.Signal.Internal.Clock" -> True
   "Clash.Signal.Internal.ClockN" -> True
@@ -684,7 +683,7 @@ shouldSplit
 shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
   -- We also look through `SimIO` to find things like Files
   shouldSplit tcm tyArg
-shouldSplit tcm ty = shouldSplit0 UniqMap.empty tcm (tyView (coreView tcm ty))
+shouldSplit tcm ty = shouldSplit0 UniqMap.empty tcm (tyView (repView tcm ty))
 
 -- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
 --
@@ -706,7 +705,7 @@ shouldSplit0 seen tcm (TyConApp tcNm tyArgs)
   , let dcArgs = substArgTys dc tyArgs
   , let dcArgsLen = length dcArgs
   , dcArgsLen > 1
-  , let dcArgVs = map (tyView . coreView tcm) dcArgs
+  , let dcArgVs = map (tyView . repView tcm) dcArgs
   = if any shouldSplitTy dcArgVs && not (isHidden tcNm tyArgs) then
       Just ( mkApps (Data dc) . (map Right tyArgs ++) . map Left
            , Projections
@@ -723,7 +722,7 @@ shouldSplit0 seen tcm (TyConApp tcNm tyArgs)
   , n > 1
   , Just tc <- UniqMap.lookup tcNm tcm
   , [nil,cons] <- tyConDataCons tc
-  = if shouldSplitTy (tyView (coreView tcm argTy)) then
+  = if shouldSplitTy (tyView (repView tcm argTy)) then
       Just ( mkVec nil cons argTy n
            , Projections (\is0 subj -> mapM (mkVecSelector is0 subj) [0..n-1])
            , replicate (fromInteger n) argTy)
@@ -862,7 +861,7 @@ mkSelectorCase
   -> m Term
 mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scrut)
   where
-    go (coreView1 tcm -> Just ty') = go ty'
+    go (repView1 tcm -> Just ty') = go ty'
     go scrutTy@(tyView -> TyConApp tc args) =
       case tyConDataCons (UniqMap.find tc tcm) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showPpr tc) scrutTy

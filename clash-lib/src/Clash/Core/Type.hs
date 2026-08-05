@@ -32,6 +32,9 @@ module Clash.Core.Type
   , tyView
   , coreView
   , coreView1
+  , repView
+  , repView1
+  , normalizeFamilies
   , mkTyConTy
   , mkFunTy
   , mkPolyFunTy
@@ -217,8 +220,14 @@ tyView tOrig = case tOrig of
   go args (AppTy ty1 ty2) = go (ty2:args) ty1
   go args t1              = (t1,args)
 
--- | A view on types in which newtypes are transparent, the Signal type is
--- transparent, and type functions are evaluated to WHNF (when possible).
+-- | A view on types in which type functions are evaluated to WHNF (when
+-- possible).
+--
+-- Newtypes, 'Signal', and the BiSignal types are *not* transparent: the
+-- GHC-to-Clash translation keeps all casts, so the corresponding type
+-- equalities are carried by casts at the term level. See
+-- Note [Casting signals] in Clash.GHC.GHC2Core. Use 'repView' when you care
+-- about the *representation* of a type instead.
 --
 -- Strips away ALL layers. If no layers are found it returns the given type.
 coreView :: TyConMap -> Type -> Type
@@ -227,23 +236,58 @@ coreView tcm ty =
     Nothing  -> ty
     Just ty' -> coreView tcm ty'
 
--- | A view on types in which newtypes are transparent, the Signal type is
--- transparent, and type functions are evaluated to WHNF (when possible).
---
--- Only strips away one "layer".
+-- | Like 'coreView', but only strips away one "layer".
 coreView1 :: TyConMap -> Type -> Maybe Type
 coreView1 tcMap ty = case tyView ty of
   TyConApp tcNm args
-    -- N.B. 'Signal' (and 'BiSignalIn'/'BiSignalOut') are *not* transparent:
-    -- the GHC-to-Clash translation represents the Signal combinators as
-    -- casts between @Signal dom a@ and @a@. See Note [Casting signals] in
-    -- Clash.GHC.GHC2Core.
-    | otherwise
+    -> case UniqMap.find tcNm tcMap of
+         AlgTyCon {algTcRhs = (NewTyCon _ nt), isClassTc}
+           | isClassTc || isEvidenceNewTyCon tcNm
+           -> newTyConInstRhs nt args
+         _ -> reduceTypeFamily tcMap ty
+  OtherType (AnnType _ ty') -> coreView1 tcMap ty'
+  _ -> Nothing
+
+-- | Constraint-evidence newtypes that remain transparent, like class
+-- dictionaries. They never reach the HDL: they are eliminated at compile
+-- time. They remain transparent -- unlike other newtypes -- because GHC's
+-- constraint solver (and, in particular, the ghc-typelits-* plugins) does
+-- not always produce consistent casts for them.
+isEvidenceNewTyCon :: TyConName -> Bool
+isEvidenceNewTyCon tcNm =
+  nameOcc tcNm `elem`
+    [ "GHC.TypeNats.SNat"
+    , "GHC.TypeLits.SSymbol"
+    , "GHC.TypeLits.SChar"
+    , "GHC.Internal.TypeNats.SNat"
+    , "GHC.Internal.TypeLits.SSymbol"
+    , "GHC.Internal.TypeLits.SChar"
+    , "GHC.TypeLits.KnownNat.SNatKn"
+    , "GHC.TypeLits.KnownNat.SBool"
+    ]
+
+-- | A view on types in which newtypes are transparent and type functions are
+-- evaluated to WHNF (when possible).
+--
+-- Only use this view when you care about the *representation* of a type,
+-- e.g. when translating to HDL types; use 'coreView' in type-system context.
+--
+-- Strips away ALL layers. If no layers are found it returns the given type.
+repView :: TyConMap -> Type -> Type
+repView tcm ty =
+  case repView1 tcm ty of
+    Nothing  -> ty
+    Just ty' -> repView tcm ty'
+
+-- | Like 'repView', but only strips away one "layer".
+repView1 :: TyConMap -> Type -> Maybe Type
+repView1 tcMap ty = case tyView ty of
+  TyConApp tcNm args
     -> case UniqMap.find tcNm tcMap of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
            -> newTyConInstRhs nt args
          _ -> reduceTypeFamily tcMap ty
-  OtherType (AnnType _ ty') -> coreView1 tcMap ty'
+  OtherType (AnnType _ ty') -> repView1 tcMap ty'
   _ -> Nothing
 
 -- | Instantiate and Apply the RHS/Original of a NewType with the given
@@ -726,6 +770,35 @@ normalizeType tcMap = go
                -- it encounters in one traversal.
                Just ty'' -> go ty''
                Nothing  -> ty'
+    FunTy ty1 ty2 -> mkFunTy (go ty1) (go ty2)
+    OtherType (ForAllTy tyvar ty')
+      -> ForAllTy tyvar (go ty')
+    _ -> ty
+
+-- | Like 'normalizeType', but keeps newtypes: it only reduces the type
+-- families in a type, everywhere.
+--
+-- This is the type equality underlying the cast-equality oracle
+-- ('Clash.Core.Util.castEqType'): newtype equalities are carried by casts
+-- at the term level and must therefore not be equated at the type level.
+normalizeFamilies :: TyConMap -> Type -> Type
+normalizeFamilies tcMap = go
+  where
+  go ty = case tyView ty of
+    TyConApp tcNm args
+      -- Constraint-evidence newtypes remain transparent; see 'coreView1'.
+      | AlgTyCon {algTcRhs = (NewTyCon _ nt), isClassTc}
+          <- UniqMap.find tcNm tcMap
+      , isClassTc || isEvidenceNewTyCon tcNm
+      -> case newTyConInstRhs nt args of
+           Just ty' -> go ty'
+           Nothing  -> ty
+      | otherwise
+      -> let args' = map go args
+             ty' = mkTyConApp tcNm args'
+         in case reduceTypeFamily tcMap ty' of
+              Just ty'' -> go ty''
+              Nothing  -> ty'
     FunTy ty1 ty2 -> mkFunTy (go ty1) (go ty2)
     OtherType (ForAllTy tyvar ty')
       -> ForAllTy tyvar (go ty')

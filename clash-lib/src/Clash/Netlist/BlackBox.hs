@@ -74,7 +74,7 @@ import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
   (IsMultiPrim (..), PrimInfo (..), Term (..), WorkInfo (..), collectArgs,
-   collectArgsTicks, collectBndrs, mkApps, mkTicks, PrimUnfolding(..))
+   collectArgsTicks, collectBndrs, collectTicks, mkApps, mkTicks, PrimUnfolding(..))
 import           Clash.Core.TermInfo
 import           Clash.Core.Type               as C
   (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, tyView)
@@ -1097,6 +1097,15 @@ mkFunInput
        ,[((TextS.Text,TextS.Text),BlackBox)]
        ,BlackBoxContext)
       ,[Declaration])
+-- A cast can be dropped when both types have the same HDL representation;
+-- see 'N.castHasSameRepr'. Function types are never translatable, so a cast
+-- between two function types is always dropped here.
+mkFunInput parentName declType resId (collectTicks -> (Cast e from to, ticks0)) = do
+  sameRepr <- N.castHasSameRepr from to
+  if sameRepr
+    then mkFunInput parentName declType resId (mkTicks e ticks0)
+    else error ($(curLoc) ++ "Cannot make function input for cast between types with different HDL representations: " ++ showPpr (Cast e from to))
+
 mkFunInput parentName declType resId e =
  let (appE,args,ticks) = collectArgsTicks e
  in  withTicks ticks $ \tickDecls -> do
