@@ -63,7 +63,7 @@ import Clash.Core.Name
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
+  ( Term(..), TickInfo, collectArgs, collectArgsTicks, collectTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
   , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..), stripAllTicks)
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
@@ -71,7 +71,7 @@ import Clash.Core.Type
   (LitTy(NumTy), Type(ForAllTy,LitTy,VarTy), applyFunTy, coreView, splitFunTy
   , splitTyConAppM, normalizeType, mkPolyFunTy, mkTyConApp)
 import Clash.Core.TysPrim
-import Clash.Core.Util (listToLets, mkCast)
+import Clash.Core.Util (castEqType, listToLets, mkCast)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, emptyVarEnv, extendInScopeSet, extendInScopeSetList
@@ -252,6 +252,19 @@ appProp ctx@(TransformContext is _) = \case
   go is0 (Tick sp e) args ticks = do
     setChanged
     go is0 e args (sp:ticks)
+
+  -- Merge back-to-back casts on the function part of an application; the
+  -- push rules below can then push a single cast in one go, and inverse
+  -- casts (e.g. from eta-expanding through a newtype of a function type)
+  -- disappear.
+  go is0 (Cast (collectTicks -> (Cast e fromI toI, ticksI)) from to) args@(_:_) ticks = do
+    tcm <- Lens.view tcCache
+    if castEqType tcm toI from
+      then do
+        setChanged
+        go is0 (mkCast tcm (mkTicks e ticksI) fromI to) args ticks
+      else
+        return (mkApps (mkTicks (Cast (mkTicks (Cast e fromI toI) ticksI) from to) ticks) args)
 
   -- Push rule: move a cast between function types past a term argument
   --

@@ -55,7 +55,7 @@ import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
-import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
+import           Clash.Core.Type                  (Type, splitRepFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
@@ -192,7 +192,7 @@ normalize' nm = do
         in throw (ClashException sp msg msgExtra)
 
       -- check for unrepresentable result type
-      let (args,resTy) = splitCoreFunForallTy tcm ty1
+      let (args,resTy) = splitRepFunForallTy tcm ty1
           isTopEnt = nm `elemVarSet` topEnts
           isFunction = not $ null $ lefts args
       resTyRep <- not <$> isUntranslatableType False resTy

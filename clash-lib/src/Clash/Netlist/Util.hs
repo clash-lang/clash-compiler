@@ -101,7 +101,7 @@ import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
   (LitTy (..), Type (..), TyVar, TypeView (..), coreView, repView1, normalizeType,
-   splitCoreFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
+   splitRepFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
   (splitShouldSplit, substArgTys, tyLitShow)
 import           Clash.Core.Var
@@ -2054,7 +2054,7 @@ checkTopEntityPorts
   -> ()
 checkTopEntityPorts typeTrans reprs tcm topId topM =
   let
-    (argTys, resTy) = splitCoreFunForallTy tcm (coreTypeOf topId)
+    (argTys, resTy) = splitRepFunForallTy tcm (coreTypeOf topId)
     -- Only value arguments carry ports; type/dictionary arguments are skipped.
     -- 'splitShouldSplit' mirrors 'separateArguments', so the resulting types
     -- align with the (already split) ports in the annotation.

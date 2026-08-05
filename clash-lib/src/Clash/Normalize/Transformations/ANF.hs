@@ -356,6 +356,8 @@ collectANF ctx (Case subj ty alts) = do
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
       let altExprIsConstant = isConstant altExpr
       let usesXs (Var n) = any (== n) xs
+          usesXs (Cast e' _ _) = usesXs e'
+          usesXs (Tick _ e') = usesXs e'
           usesXs _       = False
       -- See [ANF no let-bind]
       if or [isSimIOAlt, lv && (not (usesXs altExpr) || length alts == 1), altExprIsConstant]

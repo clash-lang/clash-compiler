@@ -34,6 +34,7 @@ module Clash.Core.Type
   , coreView1
   , repView
   , repView1
+  , splitRepFunForallTy
   , normalizeFamilies
   , mkTyConTy
   , mkFunTy
@@ -278,6 +279,18 @@ repView tcm ty =
   case repView1 tcm ty of
     Nothing  -> ty
     Just ty' -> repView tcm ty'
+
+-- | Like 'splitFunForallTy', but looks through type functions and
+-- representation-transparent layers ('repView1'), e.g. newtypes of function
+-- types. Only use this in representation context, e.g. to determine what the
+-- interface of a binder looks like in HDL.
+splitRepFunForallTy :: TyConMap -> Type -> ([Either TyVar Type], Type)
+splitRepFunForallTy tcm ty = go [] ty ty
+  where
+    go args orig_ty (repView1 tcm -> Just ty') = go args orig_ty ty'
+    go args _       (ForAllTy tv res)          = go (Left tv:args) res res
+    go args _       (tyView -> FunTy arg res)  = go (Right arg:args) res res
+    go args orig_ty _                          = (reverse args,orig_ty)
 
 -- | Like 'repView', but only strips away one "layer".
 repView1 :: TyConMap -> Type -> Maybe Type
