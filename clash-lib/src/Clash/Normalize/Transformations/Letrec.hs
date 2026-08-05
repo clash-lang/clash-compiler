@@ -34,6 +34,7 @@ import Data.List ((\\))
 import qualified Data.List as List
 import qualified Data.List.Extra as List
 import Data.Maybe (fromMaybe)
+import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
@@ -307,18 +308,26 @@ recToLetRec (TransformContext is0 []) e = do
   tcm    <- Lens.view tcCache
   case splitNormalized tcm e of
     Right (args,bndrs,res) -> do
-      let args'             = map Var args
-          (toInline,others) = List.partition (eqApp tcm fn args' . snd) bndrs
-          resV              = Var res
-      case (toInline,others) of
-        (_:_,_:_) -> do
+      let args'              = map Var args
+          (toInline,others0) = List.partition (eqApp tcm fn args' . snd) bndrs
+          resV               = Var res
+          -- A self-call under an outer cast cannot be replaced by 'resV'
+          -- wholesale -- the types differ -- so replace just the call and
+          -- keep the cast.
+          replaceCastCall (i, x) = case collectTicks x of
+            (Cast x0 t1 t2, ticks) | eqApp tcm fn args' x0 ->
+              Just (i, mkTicks (Cast resV t1 t2) ticks)
+            _ -> Nothing
+          anyCast = any (Maybe.isJust . replaceCastCall) others0
+          others1 = map (\b -> fromMaybe b (replaceCastCall b)) others0
+      if (not (null toInline) || anyCast) && not (null others1) then do
           let is1          = extendInScopeSetList is0 (args ++ map fst bndrs)
           let substsInline = extendIdSubstList (mkSubst is1)
                            $ map (second (const resV)) toInline
               others'      = map (second (substTm "recToLetRec" substsInline))
-                                 others
+                                 others1
           changed $ mkLams (Letrec others' resV) args
-        _ -> return e
+      else return e
     _ -> return e
   where
     -- This checks whether things are semantically equal. For example, say we
