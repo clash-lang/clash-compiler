@@ -73,11 +73,20 @@ constantPropagation =
   dec >->
   conSpec
   where
+    -- Eta-expanding through a newtype of a function type introduces casts
+    -- and new application redexes. Run the propagation and cast
+    -- transformations to a fixpoint afterwards: a single
+    -- appProp/elimCastCast pass is not enough to dissolve e.g.
+    -- @(case .. of alt -> (letrec .. in λx.e) ▷ co) arg@, and leftovers
+    -- with inner lambdas trip up ANF. Note that this deliberately does not
+    -- include the inlining transformations: inlining at this point changes
+    -- normalization outcomes for terms untouched by 'etaExpansionTL'.
     etaTL              = apply "etaTL" etaExpansionTL !->
-                         topdownR (apply "applicationPropagation" appProp >->
-                                   -- Eta-expanding through a newtype of a
-                                   -- function type introduces casts
-                                   apply "elimCastCast" elimCastCast)
+                         topdownFixR (apply "applicationPropagation" appProp >->
+                                      apply "bindConstantVar" bindConstantVar >->
+                                      apply "caseCast" caseCast >->
+                                      apply "letCast" letCast >->
+                                      apply "elimCastCast" elimCastCast)
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down bundle from the
     -- new root.
