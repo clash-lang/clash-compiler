@@ -394,11 +394,16 @@ isPolyFunTy :: Type
             -> Bool
 isPolyFunTy = not . null . fst . splitFunForallTy
 
--- | Is a type a polymorphic or function type under 'coreView1'?
+-- | Is a type a polymorphic or function type under 'repView1'?
+--
+-- This is a question about the type's *representation*: a newtype of a
+-- function type (or a @Signal@ of a function type) eta-expands to a function
+-- in the generated HDL and must be treated as one, e.g. by the inlining
+-- transformations.
 isPolyFunCoreTy :: TyConMap
                 -> Type
                 -> Bool
-isPolyFunCoreTy m (coreView1 m -> Just ty) = isPolyFunCoreTy m ty
+isPolyFunCoreTy m (repView1 m -> Just ty) = isPolyFunCoreTy m ty
 isPolyFunCoreTy _ ty = case tyView ty of
   FunTy _ _ -> True
   OtherType (ForAllTy _ _) -> True
