@@ -1,0 +1,12 @@
+FIXED: Clash no longer drops casts when translating GHC Core to Clash Core.
+Dropped casts were the root cause of a family of bugs involving newtypes,
+type families over newtypes, `unsafeCoerce`d constraint evidence, and
+`ghc-typelits-knownnat` evidence: [#760](https://github.com/clash-lang/clash-compiler/issues/760),
+[#1927](https://github.com/clash-lang/clash-compiler/issues/1927),
+[#2376](https://github.com/clash-lang/clash-compiler/issues/2376),
+[#2812](https://github.com/clash-lang/clash-compiler/issues/2812),
+[#2882](https://github.com/clash-lang/clash-compiler/issues/2882), and
+[#2961](https://github.com/clash-lang/clash-compiler/issues/2961).
+The normalizer, compile-time evaluator, and netlist generator have learned to
+push casts around (and eliminate them) using the push rules from "System FC
+with Explicit Kind Equality" (Weirich et al., ICFP '13).

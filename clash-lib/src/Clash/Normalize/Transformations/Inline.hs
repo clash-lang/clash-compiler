@@ -294,7 +294,7 @@ inlineCast = inlineBinders test
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: HasCallStack => NormRewrite
-inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
+inlineCleanup (TransformContext is0 _) origE@(Letrec binds body) = do
   prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
@@ -309,7 +309,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
                 $ map snd keep
 
-  if | null il -> return  (Letrec binds body)
+  if | null il -> return origE
      | null keep' -> changed body
      | otherwise -> changed (Letrec keep' body)
   where
