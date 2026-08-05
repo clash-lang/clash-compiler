@@ -117,6 +117,7 @@ import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import Clash.Class.Parity         (Parity (..))
 import Clash.Class.Resize         (Resize (..))
 import Clash.Class.BitPack.BitIndex (replaceBit)
+import Clash.Magic                 (clashSimulation)
 import Clash.Sized.Internal       (formatRange)
 import Clash.Sized.Internal.CheckedLiterals
   ( PotentiallyOutOfBounds
@@ -196,8 +197,9 @@ instance NFData (Index n) where
 
 instance KnownNat n => BitPack (Index n) where
   type BitSize (Index n) = CLogWZ 2 n 0
-  pack   = packXWith pack#
-  unpack = unpack#
+  pack        = packXWith pack#
+  unpack      = unpack#
+  maybeUnpack = maybeUnpack#
 
 -- | Safely convert an `SNat` value to an `Index`
 fromSNat :: (KnownNat m, n + 1 <= m) => SNat n -> Index m
@@ -213,6 +215,19 @@ pack# (I i) = BV 0 (naturalFromInteger i)
 unpack# :: KnownNat n => BitVector (CLogWZ 2 n 0) -> Index n
 unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
 unpack# bv = undefError "Index.unpack" [bv]
+
+{-# INLINE maybeUnpack# #-}
+maybeUnpack# :: forall n. KnownNat n => BitVector (CLogWZ 2 n 0) -> Maybe (Index n)
+maybeUnpack# bv
+  | bound == 0 = Nothing
+  | clashSimulation
+  , BV mask _ <- bv
+  , mask > 0 = undefError "Index.maybeUnpack" [bv]
+  | bv <= maxBoundBV = Just (unpack# bv)
+  | otherwise = Nothing
+ where
+  bound = natToInteger @n
+  maxBoundBV = pack# (maxBound# @n)
 
 instance Eq (Index n) where
   (==) = eq#
