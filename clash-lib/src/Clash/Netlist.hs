@@ -437,8 +437,13 @@ mkDeclarations' declType bndr e0@(collectTicks -> (Cast e from to,ticks)) = do
       (_,sp) <- Lens.use curCompNm
       throw (ClashException sp ($(curLoc) ++ "Not in normal form: cast between types with different HDL representations:\n\n" ++ showPpr e0) Nothing)
 
-mkDeclarations' declType bndr (collectTicks -> (Var v,ticks)) =
-  withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) v [])
+mkDeclarations' declType bndr (collectTicks -> (Var v,ticks)) = do
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf bndr)
+  -- No signal is declared for zero-width results, so don't assign to it
+  -- either.
+  if isVoid hwTy
+    then return []
+    else withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) v [])
 
 mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
@@ -935,8 +940,16 @@ mkProjection declType mkDec bndr scrut altTy alt@(pat,v) = do
   let scrutTy = inferCoreTypeOf tcm scrut
       e = Case scrut scrutTy [alt]
   (_,sp) <- Lens.use curCompNm
-  varTm <- case v of
+  varTm <- case stripTicks v of
     (Var n) -> return n
+    -- A cast on the projected variable can be ignored when both sides have
+    -- the same HDL representation; see 'castHasSameRepr'.
+    (Cast (stripTicks -> Var n) from to) ->
+      castHasSameRepr from to >>= \case
+        True -> return n
+        False -> throw (ClashException sp ($(curLoc) ++
+                  "Not in normal form: RHS of case-projection is cast between types with different HDL representations:\n\n"
+                   ++ showPpr e) Nothing)
     _ -> throw (ClashException sp ($(curLoc) ++
                 "Not in normal form: RHS of case-projection is not a variable:\n\n"
                  ++ showPpr e) Nothing)
