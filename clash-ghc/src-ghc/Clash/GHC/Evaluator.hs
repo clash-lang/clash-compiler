@@ -32,6 +32,7 @@ import qualified Data.Text as Text
 import           GHC.Num.Integer                         (Integer (..))
 
 import           Clash.Core.DataCon
+import           Clash.Core.Evaluator.KPush              (kpush)
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.HasFreeVars
 import           Clash.Core.HasType
@@ -45,10 +46,10 @@ import           Clash.Core.Type
 import           Clash.Core.Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv
-import           Clash.Debug
+import           Clash.Debug ()
 import qualified Clash.Normalize.Primitives as NP (removedArg, undefined, undefinedX)
 import           Clash.Unique
-import           Clash.Util                              (curLoc)
+import           Clash.Util ()
 import           Clash.Util.Supply                (Supply, freshId)
 
 import           Clash.GHC.Evaluator.Primitive
@@ -229,14 +230,9 @@ stepCase :: Term -> Type -> [Alt] -> Step
 stepCase scrut ty alts m _ =
   Just . setTerm scrut $ stackPush (Scrutinise ty alts) m
 
--- TODO Support stepwise evaluation of casts.
---
 stepCast :: Term -> Type -> Type -> Step
-stepCast _ _ _ _ _ =
-  flip trace Nothing $ unlines
-    [ "WARNING: " <> $(curLoc) <> "Clash can't symbolically evaluate casts"
-    , "Please file an issue at https://github.com/clash-lang/clash-compiler/issues"
-    ]
+stepCast x from to m _ =
+  Just . setTerm x $ stackPush (Castish from to) m
 
 stepTick :: TickInfo -> Term -> Step
 stepTick tick x m _ =
@@ -307,8 +303,21 @@ ghcUnwind v m tcm = do
   go (Apply x)                = return . apply tcm v x
   go (Instantiate ty)         = return . instantiate tcm v ty
   go (PrimApply p tys vs tms) = ghcPrimUnwind tcm p tys vs v tms
-  go (Scrutinise altTy as)    = return . scrutinise v altTy as
+  go (Scrutinise altTy as)    = scrutinise tcm v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
+  go (Castish from to)        = \m1 -> ghcUnwind (mkCastValue tcm v from to) m1 tcm
+
+-- | Smart constructor for 'CastValue': drops casts that are refl under
+-- 'castEqType' and merges back-to-back casts.
+mkCastValue :: TyConMap -> Value -> Type -> Type -> Value
+mkCastValue tcm v from to
+  | castEqType tcm from to
+  = v
+mkCastValue tcm (TickValue t v) from to = TickValue t (mkCastValue tcm v from to)
+mkCastValue tcm (CastValue v from0 to0) from to
+  | castEqType tcm to0 from
+  = mkCastValue tcm v from0 to
+mkCastValue _ v from to = CastValue v from to
 
 -- | Update the Heap with the evaluated term
 update :: IdScope -> Id -> Value -> Machine -> Machine
@@ -329,6 +338,17 @@ apply tcm pVal@(PrimVal (PrimInfo{primType}) tys vs) x m
   = setTerm (TyApp (Prim NP.undefined) ty) m
  where
   ty = piResultTys tcm primType (tys ++ map (inferCoreTypeOf tcm . valToTerm) vs ++ [varType x])
+
+-- Value-level Push rule: apply a function cast between function types by
+-- casting the argument with the (inverted) argument coercion:
+--
+--   (f ▷ (a → b) ~ (a' → b')) x  ⇒  (f (x ▷ a' ~ a)) ▷ b ~ b'
+apply tcm (CastValue f from to) x m
+  | Just (argFrom, resFrom) <- splitFunTy tcm from
+  , Just (argTo, resTo) <- splitFunTy tcm to
+  = setTerm
+      (Cast (App (valToTerm f) (mkCast tcm (Var x) argTo argFrom)) resFrom resTo)
+      m
 
 apply _ v _ m = error $ "Evaluator.apply: Not a lambda: " ++ show v ++ "\n" ++ show m
 
@@ -366,18 +386,51 @@ instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys es) ty m
   -- This combines the above-mentioned step 1 and 2
   primType1 = piResultTys tcm primType (tys ++ esTys ++ [ty])
 
+-- Value-level TPush rule: instantiate a type abstraction cast between
+-- forall-types by instantiating both sides of the coercion:
+--
+--   (f ▷ (∀tv.σ) ~ (∀tv'.σ')) @t  ⇒  (f @t) ▷ σ[tv:=t] ~ σ'[tv':=t]
+instantiate tcm (CastValue f from to) ty m
+  | ForAllTy fromTv fromBody <- coreView tcm from
+  , ForAllTy toTv toBody <- coreView tcm to
+  , varType fromTv == varType toTv
+  = setTerm
+      (mkCast tcm (TyApp (valToTerm f) ty)
+              (substTyWith [fromTv] [ty] fromBody)
+              (substTyWith [toTv] [ty] toBody))
+      m
+
 instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
 -- | Evaluate a case-expression
-scrutinise :: Value -> Type -> [Alt] -> Machine -> Machine
-scrutinise v _altTy [] m = setTerm (valToTerm v) m
+scrutinise :: TyConMap -> Value -> Type -> [Alt] -> Machine -> Maybe Machine
+scrutinise tcm v0 altTy0 alts0 m0 = go v0 altTy0 alts0 m0
+ where
+  -- A cast on a data-constructor application is pushed into the arguments of
+  -- the data constructor (KPush), after which regular pattern matching works.
+  -- Casted literals and primitive values are matched through their casts;
+  -- the literal patterns of the target type match on representation.
+  go (CastValue (collectValueTicks -> (v, _ticks)) from to) altTy alts m =
+    case v of
+      DC dc xs
+        | Just xs1 <- kpush tcm dc xs (from, to)
+        -> go (DC dc xs1) altTy alts m
+      Lit {} -> go v altTy alts m
+      PrimVal {} -> go v altTy alts m
+      -- Leave the case-expression unevaluated when we cannot push the cast
+      -- into the value. 'whnf' then yields the original expression.
+      _ -> Nothing
+  go v altTy alts m = Just (scrutinise' v altTy alts m)
+
+scrutinise' :: Value -> Type -> [Alt] -> Machine -> Machine
+scrutinise' v _altTy [] m = setTerm (valToTerm v) m
 -- [Note: empty case expressions]
 --
 -- Clash does not have empty case-expressions; instead, empty case-expressions
 -- are used to indicate that the `whnf` function was called the context of a
 -- case-expression, which means certain special primitives must be forced.
 -- See also [Note: forcing special primitives]
-scrutinise (Lit l) _altTy alts m = case alts of
+scrutinise' (Lit l) _altTy alts m = case alts of
   (DefaultPat, altE):alts1 -> setTerm (go altE alts1) m
   _ -> let term = go (error $ "Evaluator.scrutinise: no match "
                     <> showPpr (Case (valToTerm (Lit l)) (ConstTy Arrow) alts)) alts
@@ -418,13 +471,13 @@ scrutinise (Lit l) _altTy alts m = case alts of
       in  substTm "Evaluator.scrutinise" subst1 altE
   go def (_:alts1) = go def alts1
 
-scrutinise (DC dc xs) _altTy alts m
+scrutinise' (DC dc xs) _altTy alts m
   | altE:_ <- [substInAlt altDc tvs pxs xs altE
               | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
               [altE | (DefaultPat,altE) <- alts ]
   = setTerm altE m
 
-scrutinise v@(PrimVal p _ vs) altTy alts m
+scrutinise' v@(PrimVal p _ vs) altTy alts m
   | isUndefinedXPrimVal v
   = setTerm (TyApp (Prim NP.undefinedX) altTy) m
   | isUndefinedPrimVal v
@@ -454,7 +507,7 @@ scrutinise v@(PrimVal p _ vs) altTy alts m
           | [_,Lit l0] <- vs -> l0
         _ -> error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-scrutinise v _altTy alts _ =
+scrutinise' v _altTy alts _ =
   error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
 substInAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
