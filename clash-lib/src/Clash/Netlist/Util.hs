@@ -100,7 +100,7 @@ import           Clash.Core.TermLiteral (termToDataError)
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, normalizeType,
+  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, repView1, normalizeType,
    splitCoreFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
   (splitShouldSplit, substArgTys, tyLitShow)
@@ -406,7 +406,7 @@ coreTypeToHWType builtInTranslation reprs m ty = do
               (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
   -- Strip transparant types:
-  go _ (coreView1 m -> Just ty') =
+  go _ (repView1 m -> Just ty') =
     coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
   go _ (tyView -> TyConApp tc args) = runExceptT $ do

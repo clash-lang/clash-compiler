@@ -33,6 +33,7 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.DataCon (DataCon(dcType))
 import Clash.Core.HasFreeVars
 import Clash.Core.Literal (Literal(..))
+import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term (Term(..), IsMultiPrim(..), PrimInfo(..), collectArgs)
@@ -240,7 +241,10 @@ piResultTys m ty origArgs@(arg:args)
   -- that case the argument's *kind* must match the expected type.
   = if debugIsOn
        && not (aeqType (coreView m a) (coreView m arg))
-       && not (aeqType (coreView m a) (coreView m (inferCoreKindOf m arg))) then error [I.i|
+       && not (aeqType (coreView m a) (coreView m (inferCoreKindOf m arg)))
+       -- 'Type' and 'TYPE (BoxedRep Lifted)' are represented by distinct
+       -- type constructors, but denote the same kind.
+       && not (isStarLike a && isStarLike (inferCoreKindOf m arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
@@ -257,6 +261,10 @@ piResultTys m ty origArgs@(arg:args)
   = pprPanic "piResultTys1" (ppr ty <> line <> ppr origArgs)
  where
   inScope = mkInScopeSet (freeVarsOf (ty:origArgs))
+
+  isStarLike (tyView . coreView m -> TyConApp nm _) =
+    nameOcc nm `elem` ["Type", "GHC.Prim.TYPE"]
+  isStarLike _ = False
 
   go env ty' [] = substTy (mkTvSubst inScope env) ty'
   go env ty' allArgs@(arg':args')
