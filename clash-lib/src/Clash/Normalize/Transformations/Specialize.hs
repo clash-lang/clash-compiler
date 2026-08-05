@@ -39,6 +39,7 @@ import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid (getAny)
 import qualified Data.Set.Ordered as OSet
 import qualified Data.Set.Ordered.Extra as OSet
@@ -497,6 +498,21 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                                        (mkBinderFor is0 tcm)
                                        (existingNames ++ newNames)
                                        args
+              -- Abstracting over the type arguments (replacing them with
+              -- fresh type variables) can produce an ill-typed body when a
+              -- term argument is consumed by an instantiated type variable,
+              -- e.g. @f :: forall a. Int -> a@ instantiated at a function
+              -- type and applied beyond its visible arity. Leave such terms
+              -- alone: after 'typeSpec' has specialized away the type
+              -- arguments, specializing on the term argument succeeds.
+              if Maybe.isNothing (applyTypeToArgsM tcm (coreTypeOf f) (argVars ++ [specArg]))
+              then do
+                traceIf (hasTransformationInfo AppliedTerm opts)
+                  ("Not specializing " ++ showPpr (varName f) ++
+                   ": a term argument is applied to a type variable") $
+                  return e
+              else do -- NondecreasingIndentation
+
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
               (newName, inl', specArg') <- case specArg of

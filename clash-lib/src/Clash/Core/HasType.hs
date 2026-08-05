@@ -18,6 +18,7 @@ module Clash.Core.HasType
   , InferType(..)
   , inferCoreKindOf
   , applyTypeToArgs
+  , applyTypeToArgsM
   , piResultTy
   , piResultTys
   ) where
@@ -185,6 +186,64 @@ applyTypeToArgs e m opTy args = go opTy args
 
   goTyArgs opTy' revTys (Right ty:args') = goTyArgs opTy' (ty:revTys) args'
   goTyArgs opTy' revTys args'            = go (piResultTys m opTy' (reverse revTys)) args'
+
+-- | Total variant of 'applyTypeToArgs': returns 'Nothing' when the arguments
+-- cannot be applied to the given (function) type. This happens for instance
+-- when a term argument would be consumed by an /uninstantiated/ type variable:
+--
+-- @
+--   f :: forall a. Int -> a
+--   f \@b 5 x   -- 'x' is applied to the type variable 'b'
+-- @
+--
+-- Such applications are only well-typed when the type variable is known to be
+-- a function type.
+applyTypeToArgsM
+  :: TyConMap
+  -> Type
+  -> [Either Term Type]
+  -> Maybe Type
+applyTypeToArgsM m opTy args = go opTy args
+ where
+  go opTy' []               = Just opTy'
+  go opTy' (Right ty:args') = goTyArgs opTy' [ty] args'
+  go opTy' (Left _:args')   = case splitFunTy m opTy' of
+    Just (_,resTy) -> go resTy args'
+    _ -> Nothing
+
+  goTyArgs opTy' revTys (Right ty:args') = goTyArgs opTy' (ty:revTys) args'
+  goTyArgs opTy' revTys args' =
+    piResultTysM m opTy' (reverse revTys) >>= \ty -> go ty args'
+
+-- | Total variant of 'piResultTys': returns 'Nothing' where 'piResultTys'
+-- would panic. Does not check that the applied types have the expected kinds.
+piResultTysM :: TyConMap -> Type -> [Type] -> Maybe Type
+piResultTysM _ ty [] = Just ty
+piResultTysM m ty origArgs@(arg:args)
+  | Just ty' <- coreView1 m ty
+  = piResultTysM m ty' origArgs
+  | FunTy _ res <- tyView ty
+  = piResultTysM m res args
+  | ForAllTy tv res <- ty
+  = go (extendVarEnv tv arg emptyVarEnv) res args
+  | otherwise
+  = Nothing
+ where
+  inScope = mkInScopeSet (freeVarsOf (ty:origArgs))
+
+  go env ty' [] = Just (substTy (mkTvSubst inScope env) ty')
+  go env ty' allArgs@(arg':args')
+    | Just ty'' <- coreView1 m ty'
+    = go env ty'' allArgs
+    | FunTy _ res <- tyView ty'
+    = go env res args'
+    | ForAllTy tv res <- ty'
+    = go (extendVarEnv tv arg' env) res args'
+    | VarTy tv <- ty'
+    , Just ty'' <- lookupVarEnv tv env
+    = piResultTysM m ty'' allArgs
+    | otherwise
+    = Nothing
 
 -- | Like 'piResultTys', but only applies a single type. If multiple types are
 -- being applied use 'piResultTys', as it is more efficient to only substitute
