@@ -19,10 +19,11 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term
-  (Bind(..), LetBinding, Term(..), collectArgs, collectTicks, mkTicks,
-   stripTicks)
+  (Bind(..), LetBinding, PrimInfo(..), Term(..), collectArgs,
+   collectArgsTicks, collectTicks, mkTicks, stripTicks)
 import Clash.Core.TermInfo (isCast)
-import Clash.Core.Util (castEqType)
+import Clash.Core.Util (castEqType, undefinedPrims, undefinedXPrims)
+import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet)
 import Clash.Normalize.Transformations.Specialize (specialize)
@@ -113,6 +114,13 @@ elimCastCast _ c@(Cast (collectTicks -> (Cast e tyA tyB, ticks)) tyB' tyC) = do
                   ++ ": Found 2 nested casts whose types don't line up:\n"
                   ++ showPpr c)
                 Nothing)
+
+-- A cast of an undefined value is an undefined value at the target type.
+elimCastCast _ (Cast (collectArgsTicks -> (Prim p, _, ticks)) _tyA tyB)
+  | primName p `elem` undefinedXPrims
+  = changed (mkTicks (TyApp (Prim NP.undefinedX) tyB) ticks)
+  | primName p `elem` undefinedPrims
+  = changed (mkTicks (TyApp (Prim NP.undefined) tyB) ticks)
 
 elimCastCast _ (Cast e tyA tyB) = do
   tcm <- Lens.view tcCache

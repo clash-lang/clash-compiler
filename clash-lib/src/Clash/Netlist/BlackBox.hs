@@ -262,6 +262,9 @@ isLiteral e = case collectArgs e of
   (Data _, args)   -> all (either isLiteral (const True)) args
   (Prim _, args) -> all (either isLiteral (const True)) args
   (C.Literal _,_)  -> True
+  -- N.B. this is only about being a *literal*; whether the cast is sound for
+  -- the generated HDL is checked where the term is rendered.
+  (Cast e0 _ _, args) -> all (either isLiteral (const True)) (Left e0:args)
   _                -> False
 
 

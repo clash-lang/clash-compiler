@@ -591,7 +591,9 @@ inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
     bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
     nonRepFrom <- isUntranslatableType False from
     case (nonRepFrom, bodyMaybe) of
-      (True, Just b) -> do
+      -- Don't inline OPAQUE/NOINLINE binders; their casts are handled at the
+      -- use site (e.g. 'mkFunInput' for higher-order primitive arguments).
+      (True, Just b) | not (isNoInline (bindingSpec b)) -> do
         if overLimit then
           trace ($(curLoc) ++ [I.i|
             InlineCastNonRep: #{showPpr (varName f)} already inlined
