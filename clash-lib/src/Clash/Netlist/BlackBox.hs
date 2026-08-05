@@ -74,7 +74,7 @@ import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Subst              (extendIdSubst, mkSubst, substTm)
 import           Clash.Core.Term               as C
   (IsMultiPrim (..), PrimInfo (..), Term (..), WorkInfo (..), collectArgs,
-   collectArgsTicks, collectBndrs, mkApps, PrimUnfolding(..))
+   collectArgsTicks, collectBndrs, mkApps, mkTicks, PrimUnfolding(..))
 import           Clash.Core.TermInfo
 import           Clash.Core.Type               as C
   (Type (..), ConstTy (..), TypeView (..), mkFunTy, splitFunTys, tyView)
@@ -309,6 +309,16 @@ mkArgument bbName bndr declType nArg e = do
         (Case scrut ty' [alt],[],_) -> do
           (projection,decls) <- mkProjection declType False (NetlistId bndr ty) scrut ty' alt
           return ((projection,hwTy,False),decls)
+        -- A cast can be dropped when both types have the same HDL
+        -- representation; see 'N.castHasSameRepr'.
+        (Cast e0 from to,[],ticks) -> do
+          sameRepr <- N.castHasSameRepr from to
+          if sameRepr
+            then mkArgument bbName bndr declType nArg (mkTicks e0 ticks)
+            else
+              let errMsg = $(curLoc) ++ "Forced to evaluate cast between types"
+                        ++ " with different HDL representations: " ++ eTyMsg
+              in  return ((Identifier (error errMsg) Nothing, hwTy, False), [])
         (Let _bnds _term, [], _ticks) -> do
           (exprN, letDecls) <- mkExpr False declType (NetlistId bndr ty) e
           return ((exprN,hwTy,False),letDecls)

@@ -430,6 +430,8 @@ tailCalls id_ = \case
     in  case scrutTl of
           Just 0 | all (/= Nothing) altsTl -> Just (sum (catMaybes altsTl))
           _ -> Nothing
+  Tick _ e -> tailCalls id_ e
+  Cast e _ _ -> tailCalls id_ e
   _ -> Just 0
 
 -- | Determines whether a function has the following shape:

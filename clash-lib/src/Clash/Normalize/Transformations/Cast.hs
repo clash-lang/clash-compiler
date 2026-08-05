@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.Transformations.Cast
@@ -17,12 +18,13 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (LetBinding, Term(..), collectArgs, stripTicks)
+import Clash.Core.Term
+  (Bind(..), LetBinding, Term(..), collectArgs, collectTicks, mkTicks,
+   stripTicks)
 import Clash.Core.TermInfo (isCast)
-import Clash.Core.Type (normalizeType)
+import Clash.Core.Util (castEqType)
 import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet)
-import Clash.Debug (trace)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Types
@@ -49,7 +51,7 @@ import Clash.Util (ClashException(..), curLoc)
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'elimCastCast'.
 argCastSpec :: HasCallStack => NormRewrite
-argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
+argCastSpec ctx@(TransformContext is0 _) e@(App f (collectTicks -> (Cast e' t1 t2, ticks)))
  -- Don't specialise when the arguments are casts-of-casts, these casts-of-casts
  -- will be eliminated by 'elimCastCast' during the normalization of the
  -- "current" function. We thus prevent the unnecessary introduction of a
@@ -60,41 +62,43 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  , isGlobalId g = do
   bndrs <- Lens.use bindings
   isWorkFree workFreeBinders bndrs e' >>= \case
-    True -> go
-    False -> warn go
- where
-  go = specialize ctx e
-  warn = trace (unwords
-    [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
-    , "cast. Generated HDL implementation might contain duplicate work."
-    , "Please report this as a bug.", "\n\nExpression where this occured:"
-    , "\n\n" ++ showPpr e
-    ])
+    True -> specialize ctx e
+    False -> do
+      -- Bind the work to a new binder, so we only specialize on a work-free
+      -- cast of a variable reference. A later pass then specializes on
+      -- @f (cast x)@ while the work is shared through the let-binding.
+      tcm <- Lens.view tcCache
+      x <- mkTmBinderFor is0 tcm (mkDerivedName ctx "argCastSpec") e'
+      changed (Let (NonRec x (mkTicks e' ticks)) (App f (Cast (Var x) t1 t2)))
 argCastSpec _ e = return e
 {-# SCC argCastSpec #-}
 
 -- | Push a cast over a case into it's alternatives.
 caseCast :: HasCallStack => NormRewrite
-caseCast _ (Cast (stripTicks -> Case subj ty alts) ty1 ty2) = do
+caseCast _ (Cast (collectTicks -> (Case subj _ty alts, ticks)) ty1 ty2) = do
   let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
-  changed (Case subj ty alts')
+  changed (mkTicks (Case subj ty2 alts') ticks)
 caseCast _ e = return e
 {-# SCC caseCast #-}
 
--- | Eliminate two back to back casts where the type going in and coming out are the same
+-- | Eliminate or merge two back to back casts, and eliminate casts between
+-- equal types:
 --
 -- @
---   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
+--   (e ▷ A ~ B) ▷ B ~ A  ==> e
+--   (e ▷ A ~ B) ▷ B ~ C  ==> e ▷ A ~ C
+--   e ▷ A ~ A            ==> e
 -- @
+--
+-- Type equality is 'castEqType', see Note [Cast-equality oracle].
 elimCastCast :: HasCallStack => NormRewrite
-elimCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
+elimCastCast _ c@(Cast (collectTicks -> (Cast e tyA tyB, ticks)) tyB' tyC) = do
   tcm <- Lens.view tcCache
-  let ntyA  = normalizeType tcm tyA
-      ntyB  = normalizeType tcm tyB
-      ntyB' = normalizeType tcm tyB'
-      ntyC  = normalizeType tcm tyC
-  if ntyB == ntyB' && ntyA == ntyC then changed e
-                                   else throwError
+  if castEqType tcm tyB tyB' then
+    if castEqType tcm tyA tyC
+      then changed (mkTicks e ticks)
+      else changed (Cast (mkTicks e ticks) tyA tyC)
+  else throwError
   where throwError = do
           (nm,sp) <- Lens.use curFun
           throw (ClashException sp ($(curLoc) ++ showPpr nm
@@ -102,13 +106,17 @@ elimCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
                   ++ showPpr c)
                 Nothing)
 
+elimCastCast _ (Cast e tyA tyB) = do
+  tcm <- Lens.view tcCache
+  if castEqType tcm tyA tyB then changed e else return (Cast e tyA tyB)
+
 elimCastCast _ e = return e
 {-# SCC elimCastCast #-}
 
 -- | Push a cast over a Let into it's body
 letCast :: HasCallStack => NormRewrite
-letCast _ (Cast (stripTicks -> Let binds body) ty1 ty2) =
-  changed $ Let binds (Cast body ty1 ty2)
+letCast _ (Cast (collectTicks -> (Let binds body, ticks)) ty1 ty2) =
+  changed $ mkTicks (Let binds (Cast body ty1 ty2)) ticks
 letCast _ e = return e
 {-# SCC letCast #-}
 

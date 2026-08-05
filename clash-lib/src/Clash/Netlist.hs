@@ -425,6 +425,18 @@ mkDeclarations'
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
+-- A cast can be dropped when both types have the same HDL representation.
+-- Note that this is not a given: custom bit representations and
+-- width-changing coercions (e.g. @Index 256 ~ Integer@) yield casts between
+-- types whose representations differ.
+mkDeclarations' declType bndr e0@(collectTicks -> (Cast e from to,ticks)) = do
+  sameRepr <- castHasSameRepr from to
+  if sameRepr
+    then mkDeclarations' declType bndr (mkTicks e ticks)
+    else do
+      (_,sp) <- Lens.use curCompNm
+      throw (ClashException sp ($(curLoc) ++ "Not in normal form: cast between types with different HDL representations:\n\n" ++ showPpr e0) Nothing)
+
 mkDeclarations' declType bndr (collectTicks -> (Var v,ticks)) =
   withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) v [])
 
@@ -885,6 +897,13 @@ mkExpr bbEasD declType bndr app =
       decls    <- concatMapM (uncurry (mkDeclarations' declType)) binders
       (bodyE,bodyDecls) <- mkExpr bbEasD declType bndr (mkApps (mkTicks body ticks) args)
       return (bodyE,netDecls ++ decls ++ bodyDecls)
+    -- A cast can be dropped when both types have the same HDL
+    -- representation; see 'castHasSameRepr'.
+    Cast e0 from to | null args -> do
+      sameRepr <- castHasSameRepr from to
+      if sameRepr
+        then mkExpr bbEasD declType bndr (mkTicks e0 ticks)
+        else invalid "cast between types with different HDL representations"
     Core.Literal _ -> invalid "application of literal"
     Let _ _ -> invalid "application of let"
     TyApp _ _ -> invalid "application of type application"
