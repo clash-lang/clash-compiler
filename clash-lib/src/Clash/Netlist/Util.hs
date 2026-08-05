@@ -238,6 +238,18 @@ coreTypeToHWTypeM'
 coreTypeToHWTypeM' ty =
   fmap stripFiltered <$> coreTypeToHWTypeM ty
 
+-- | Determine whether a cast between two core types is irrelevant to the
+-- generated HDL, i.e. whether both types translate to the same 'HWType'.
+-- Only such casts may be dropped during netlist generation. Casts between
+-- types with different representations -- e.g. when a custom bit
+-- representation is involved, or a width-changing coercion such as
+-- @Index 256 ~ Integer@ -- must not be silently dropped.
+castHasSameRepr :: Type -> Type -> NetlistMonad Bool
+castHasSameRepr from to = do
+  fromHwTyM <- coreTypeToHWTypeM' from
+  toHwTyM <- coreTypeToHWTypeM' to
+  pure (fromHwTyM == toHwTyM)
+
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
 coreTypeToHWTypeM

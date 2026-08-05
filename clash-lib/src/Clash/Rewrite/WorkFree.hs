@@ -170,6 +170,7 @@ isWorkFreeClockOrResetOrEnable tcm e =
       (Var v, []) -> Just (isLocalId v)
       (Data _, [_dom, Left (stripTicks -> Data _)]) -> Just True -- For Enable True/False
       (Literal _,_) -> Just True
+      (Cast e0 _ _,[]) -> isWorkFreeClockOrResetOrEnable tcm e0
       _ -> Just False
   else
     Nothing
@@ -204,6 +205,7 @@ isWorkFreeIsh tcm e =
 
         (Lam _ _, _)       -> isClosed e
         (Literal _,_)      -> True
+        (Cast e0 _ _,args) -> all isWorkFreeIshArg (Left e0:args)
         _                  -> False
  where
   isWorkFreeIshArg = either (isWorkFreeIsh tcm) (const True)

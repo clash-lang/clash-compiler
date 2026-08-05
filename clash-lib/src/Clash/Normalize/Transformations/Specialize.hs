@@ -69,10 +69,10 @@ import Clash.Core.Term
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
-  , mkPolyFunTy, mkTyConApp)
+  (LitTy(NumTy), Type(ForAllTy,LitTy,VarTy), applyFunTy, coreView, splitFunTy
+  , splitTyConAppM, normalizeType, mkPolyFunTy, mkTyConApp)
 import Clash.Core.TysPrim
-import Clash.Core.Util (listToLets)
+import Clash.Core.Util (listToLets, mkCast)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, emptyVarEnv, extendInScopeSet, extendInScopeSetList
@@ -253,6 +253,37 @@ appProp ctx@(TransformContext is _) = \case
   go is0 (Tick sp e) args ticks = do
     setChanged
     go is0 e args (sp:ticks)
+
+  -- Push rule: move a cast between function types past a term argument
+  --
+  --   (e ▷ (a → b) ~ (a' → b')) x  ⇒  (e (x ▷ a' ~ a)) ▷ b ~ b'
+  go is0 (Cast e from to) (Left arg:args) ticks = do
+    tcm <- Lens.view tcCache
+    case (splitFunTy tcm from, splitFunTy tcm to) of
+      (Just (argFrom, resFrom), Just (argTo, resTo)) -> do
+        setChanged
+        go is0
+           (mkCast tcm (App e (mkCast tcm arg argTo argFrom)) resFrom resTo)
+           args
+           ticks
+      _ -> return (mkApps (mkTicks (Cast e from to) ticks) (Left arg:args))
+
+  -- TPush rule: move a cast between forall-types past a type argument
+  --
+  --   (e ▷ (∀tv.σ) ~ (∀tv'.σ')) @t  ⇒  (e @t) ▷ σ[tv:=t] ~ σ'[tv':=t]
+  go is0 (Cast e from to) (Right ty:args) ticks = do
+    tcm <- Lens.view tcCache
+    case (coreView tcm from, coreView tcm to) of
+      (ForAllTy fromTv fromBody, ForAllTy toTv toBody)
+        | coreTypeOf fromTv == coreTypeOf toTv -> do
+        setChanged
+        go is0
+           (mkCast tcm (TyApp e ty)
+                   (substTyWith [fromTv] [ty] fromBody)
+                   (substTyWith [toTv] [ty] toBody))
+           args
+           ticks
+      _ -> return (mkApps (mkTicks (Cast e from to) ticks) (Right ty:args))
 
   go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
 
