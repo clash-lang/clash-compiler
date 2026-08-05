@@ -47,7 +47,7 @@ import           Data.Char                   (isDigit)
 import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
-import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
+import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
@@ -86,7 +86,6 @@ import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
 import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
-import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
 import GHC.Types.Name.Occurrence (occNameFS, occNameString)
 import GHC.Data.Pair (Pair (..))
 import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
@@ -99,7 +98,7 @@ import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type (tyConAppFunTy_maybe)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
 import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
-import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
+import GHC.Types.Unique (Uniquable (..), Unique, getKey)
 import GHC.Types.Var
   (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
    varUnique, idInfo, isGlobalId)
@@ -530,14 +529,19 @@ coreToTerm primMap unlocs = term
         return (C.Let (C.NonRec b' e') ct)
       else caseTerm e'
 
+    -- Keep all casts. Since Clash's core language does not have
+    -- evidence-carrying coercions, a cast is fully described by its source
+    -- and target type. Casts whose source and target convert to the same
+    -- Clash core type (e.g. multiplicity or levity coercions) are dropped:
+    -- they carry no information in Clash's type language.
     term' (Cast e co) = do
       let (Pair ty1 ty2) = coercionKind co
-      hasPrimCoM <- hasPrimCo co
-      sizedCast <- isSizedCast ty1 ty2
-      case hasPrimCoM of
-        Just _ | sizedCast
-          -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
-        _ -> term e
+      ty1C <- coreToType ty1
+      ty2C <- coreToType ty2
+      e1 <- term e
+      if ty1C == ty2C
+        then return e1
+        else return (C.Cast e1 ty1C ty2C)
     term' (Tick (SourceNote rsp _) e) =
       C.Tick (C.SrcSpan (RealSrcSpan rsp GHC.Nothing)) <$>
              addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
@@ -693,90 +697,6 @@ addUsefullR x m =
 -- conversion.
 withoutSrcSpan :: C2C a -> C2C a
 withoutSrcSpan = RWS.local (srcSpan .~ noSrcSpan)
-
-isSizedCast :: Type -> Type -> C2C Bool
-isSizedCast (TyConApp tc1 _) (TyConApp tc2 _) = do
-  tc1Nm <- qualifiedNameString (tyConName tc1)
-  tc2Nm <- qualifiedNameString (tyConName tc2)
-  return
-    (or [tc1 `hasKey` integerTyConKey &&
-          or [tc2Nm == "Clash.Sized.Internal.Signed.Signed"
-             ,tc2Nm == "Clash.Sized.Internal.Index.Index"]
-        ,tc2 `hasKey` integerTyConKey &&
-          or [tc1Nm == "Clash.Sized.Internal.Signed.Signed"
-             ,tc1Nm == "Clash.Sized.Internal.Index.Index"]
-        ,tc1 `hasKey` naturalTyConKey &&
-          tc2Nm == "Clash.Sized.Internal.Unsigned.Unsigned"
-        ,tc2 `hasKey` naturalTyConKey &&
-          tc1Nm == "Clash.Sized.Internal.Unsigned.Unsigned"
-        ])
-isSizedCast _ _ = return False
-
-hasPrimCo :: Coercion -> C2C (Maybe Type)
-hasPrimCo (TyConAppCo _ _ coers) = do
-  tcs <- catMaybes <$> mapM hasPrimCo coers
-  return (listToMaybe tcs)
-
-hasPrimCo (AppCo co1 co2) = do
-  tc1M <- hasPrimCo co1
-  case tc1M of
-    Just _ -> return tc1M
-    _ -> hasPrimCo co2
-#if MIN_VERSION_ghc(9,10,0)
-hasPrimCo (ForAllCo {fco_body = co}) = hasPrimCo co
-#else
-hasPrimCo (ForAllCo _ _ co) = hasPrimCo co
-#endif
-
-#if !MIN_VERSION_ghc(9,12,0)
-hasPrimCo co@(AxiomInstCo _ _ coers) = do
-    let (Pair ty1 _) = coercionKind co
-    ty1PM <- isPrimTc ty1
-    if ty1PM
-       then return (Just ty1)
-       else do
-         tcs <- catMaybes <$> mapM hasPrimCo coers
-         return (listToMaybe tcs)
-  where
-    isPrimTc (TyConApp tc _) = do
-      tcNm <- qualifiedNameString (tyConName tc)
-      return (tcNm `elem` ["Clash.Sized.Internal.BitVector.Bit"
-                          ,"Clash.Sized.Internal.BitVector.BitVector"
-                          ,"Clash.Sized.Internal.Index.Index"
-                          ,"Clash.Sized.Internal.Signed.Signed"
-                          ,"Clash.Sized.Internal.Unsigned.Unsigned"
-                          ])
-    isPrimTc _ = return False
-#endif
-
-hasPrimCo (SymCo co) = hasPrimCo co
-
-hasPrimCo (TransCo co1 co2) = do
-  tc1M <- hasPrimCo co1
-  case tc1M of
-    Just _ -> return tc1M
-    _ -> hasPrimCo co2
-
-#if MIN_VERSION_ghc(9,12,0)
-hasPrimCo (AxiomCo _ coers) = do
-#else
-hasPrimCo (AxiomRuleCo _ coers) = do
-#endif
-  tcs <- catMaybes <$> mapM hasPrimCo coers
-  return (listToMaybe tcs)
-
-hasPrimCo (SelCo _ co) = hasPrimCo co
-hasPrimCo (LRCo _ co)   = hasPrimCo co
-hasPrimCo (InstCo co _) = hasPrimCo co
-hasPrimCo (SubCo co)    = hasPrimCo co
-
-hasPrimCo (Refl {}) = return Nothing
-hasPrimCo (GRefl {}) = return Nothing
-hasPrimCo (FunCo {}) = return Nothing
-hasPrimCo (CoVarCo {}) = return Nothing
-hasPrimCo (UnivCo {}) = return Nothing
-hasPrimCo (KindCo {}) = return Nothing
-hasPrimCo (HoleCo {}) = return Nothing
 
 coreToDataCon :: DataCon
               -> C2C C.DataCon

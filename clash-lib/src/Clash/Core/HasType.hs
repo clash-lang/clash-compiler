@@ -234,7 +234,13 @@ piResultTys m ty origArgs@(arg:args)
   -- TODO coreView is used here because the partial evaluator will sometimes
   -- encounter / not encounter a Signal as an argument unexpectedly. When PR
   -- #1064 is merged the coreView calls should be removed again.
-  = if debugIsOn && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
+  --
+  -- N.B. this case is also used for kind applications, e.g. the kind of a
+  -- type family like @GHC.TypeNats.^@ applied to a type-level literal. In
+  -- that case the argument's *kind* must match the expected type.
+  = if debugIsOn
+       && not (aeqType (coreView m a) (coreView m arg))
+       && not (aeqType (coreView m a) (coreView m (inferCoreKindOf m arg))) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}

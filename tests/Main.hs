@@ -639,6 +639,7 @@ runClashTest = defaultMain
         , clashLibTest "T779" def{hdlTargets=[Verilog]}
         , outputTest "T1881" def{hdlSim=[]}
         , runTest "T1921" def{hdlTargets=[Verilog], hdlSim=[]}
+        , runTest "T1927" def{hdlSim=[]}
         , runTest "T1933" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (NoTestExitCode, "NOT:WARNING")
@@ -665,6 +666,7 @@ runClashTest = defaultMain
         , runTest "T2342A" def{hdlSim=[]}
         , runTest "T2342B" def{hdlSim=[]}
         , runTest "T2360" def{hdlSim=[],clashFlags=["-fclash-force-undefined=0"]}
+        , runTest "T2376" def{hdlSim=[]}
         , outputTest "T2502" def{hdlTargets=[VHDL]}
         , outputTest "T2508" def{hdlTargets=[VHDL]}
         , runTest "T2510" def{
@@ -681,10 +683,13 @@ runClashTest = defaultMain
         , runTest "T2724B" def
         , runTest "T2729" def
         , runTest "T2770" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
+        , runTest "T2812" def{hdlSim=[]}
         , runTest "T2831" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2839" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2845" def{hdlSim=[],hdlTargets=[Verilog]}
+        , runTest "T2882" def{hdlSim=[]}
         , runTest "T2904" def
+        , runTest "T2961" def{hdlSim=[]}
         , runTest "T2966" def{hdlSim=[],hdlTargets=[Verilog]}
         , runTest "T2988" def{hdlSim=[]}
         , outputTest "T3008" def{hdlSim=[]}
