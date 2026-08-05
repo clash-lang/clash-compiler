@@ -585,17 +585,11 @@ inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
     isInlined <- zoomExtra (alreadyInlined f cf)
     limit     <- Lens.view inlineLimit
     tcm       <- Lens.view tcCache
-    isRecBndr <- isRecursiveBndr f
     let
       -- Constraint dictionary inlining always terminates, so we ignore the
-      -- usual inline safeguards. The same goes for non-recursive binders:
-      -- inlining each of their (potentially many, e.g. once per element of
-      -- a Vec of circuits) use sites makes progress, and the inlined body
-      -- cannot re-expose an application of the same binder. Blocking those
-      -- inlines would leave casts of un-normalized bodies for later stages
-      -- that cannot deal with them.
+      -- usual inline safeguards.
       notClassTy = not (isClassTy tcm from)
-      overLimit = notClassTy && isRecBndr && (Maybe.fromMaybe 0 isInlined) > limit
+      overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
 
     bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
     nonRepFrom <- isUntranslatableType False from
