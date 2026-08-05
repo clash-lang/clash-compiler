@@ -10,6 +10,7 @@ import qualified Clash.Tests.Core.TermLiteral
 import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Normalize.Transformations
+import qualified Clash.Tests.Util
 import qualified Clash.Tests.Util.Interpolate
 import qualified Test.Clash.Rewrite
 
@@ -28,6 +29,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Driver.Manifest.tests
   , Clash.Tests.Netlist.Id.tests
   , Clash.Tests.Normalize.Transformations.tests
+  , Clash.Tests.Util.tests
   , Clash.Tests.Util.Interpolate.tests
   , Test.Clash.Rewrite.tests
   ]

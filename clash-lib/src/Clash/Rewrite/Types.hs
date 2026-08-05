@@ -123,6 +123,12 @@ data RewriteEnv
 
 Lens.makeLenses ''RewriteEnv
 
+-- | All options passed to Clash. Prefer one of the more specific getters below
+-- where one exists; this is meant for code that needs the whole record, such as
+-- 'Clash.Warning.warn'.
+clashOpts :: Lens.Getter RewriteEnv ClashOpts
+clashOpts = clashEnv . Lens.to envOpts
+
 debugOpts :: Lens.Getter RewriteEnv DebugOpts
 debugOpts = clashEnv . Lens.to (opt_debug . envOpts)
 

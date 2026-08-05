@@ -135,6 +135,33 @@ a big win. You need about 2GB of RAM for each thread.
 cabal run clash-testsuite -- --auto-detect-tools -j$(nproc)
 ```
 
+#### Turning Clash warnings into test failures: `-fclash-werror`
+
+Some compiler bugs only show up as a warning on stderr, which by itself does not
+fail a test. `-fclash-werror` makes Clash throw a `ClashException` instead of
+printing a warning, so a test that adds it to its `clashFlags` fails as soon as
+Clash starts warning:
+
+```haskell
+runTest "PopCountNoInteger" def{clashFlags=["-fclash-werror"]}
+```
+
+Unlike GHC's `-Werror`, `-fclash-werror` only affects Clash's own warnings
+(GHC's `-Werror` also sets it). Warnings this covers include:
+
+* `Dubious primitive instantiation ...` — e.g. an `Integer` reaching the
+  netlist. Useful for pinning down code that should be `Integer`-free.
+* `Unmatchable constant as case subject ...` — a constant the primitive
+  evaluator has no reduction rule for, so `caseCon` cannot fold the
+  case-expression. Only reported when invariants are checked, which
+  [`commonArgs`](tests/src/Test/Tasty/Clash.hs) already does for every test via
+  `-fclash-debug DebugSilent`.
+
+Note that this cannot be turned on testsuite-wide: a number of existing tests
+legitimately provoke these warnings (`Numbers/Bits` exercises `Bits Integer`,
+and `TopEntity/T1074` has a type-equality dictionary as a case subject, which is
+benign but irreducible). Enable it per test instead.
+
 #### `-p` (pattern filter)
 
 `-p PATTERN` is a [tasty pattern][tasty-patterns] that restricts which tests

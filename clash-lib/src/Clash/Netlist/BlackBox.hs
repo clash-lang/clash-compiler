@@ -52,12 +52,6 @@ import qualified Data.Text                     as TextS
 import           Data.Text.Extra
 import           GHC.Stack
   (HasCallStack, callStack, prettyCallStack)
-import qualified System.Console.ANSI           as ANSI
-import           System.Console.ANSI
-  ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta, Red)
-  , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
-import           System.IO
-  (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
 
 import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
@@ -82,7 +76,7 @@ import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (inverseTopSortLetBindings, splitShouldSplit)
 import           Clash.Core.Var                as V
-  (Id, mkLocalId, modifyVarName, varType)
+  (Id, mkLocalId, modifyVarName, varName, varType)
 import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
@@ -91,9 +85,7 @@ import {-# SOURCE #-} Clash.Netlist
 import qualified Clash.Backend                 as Backend
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug                   (debugIsOn)
-import           Clash.Driver.Bool             (OverridingBool(..))
-import           Clash.Driver.Types
-  (ClashOpts(opt_primWarn, opt_color, opt_werror))
+import           Clash.Driver.Types            (ClashOpts(opt_primWarn))
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Types           as N
@@ -104,32 +96,7 @@ import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
-
--- | Emits (colorized) warning to stderr
-warn
-  :: ClashOpts
-  -> String
-  -> IO ()
-warn opts msg = do
-  -- TODO: Put in appropriate module
-  useColor <-
-    case opt_color opts of
-      Always -> return True
-      Never  -> return False
-      Auto   -> hIsTerminalDevice stderr
-
-  hSetSGR stderr [SetConsoleIntensity BoldIntensity]
-
-  case opt_werror opts of
-    True -> do
-      when useColor $ hSetSGR stderr [SetColor Foreground Vivid Red]
-      throw (ClashException noSrcSpan msg Nothing)
-
-    False -> do
-      when useColor $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
-      hPutStrLn stderr $ "[WARNING] " ++ msg
-      hSetSGR stderr [ANSI.Reset]
-      hFlush stderr
+import           Clash.Warning                 (warn)
 
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext
@@ -329,10 +296,13 @@ mkArgument bbName bndr declType nArg e = do
 -- the guard wants to, or fail entirely.
 extractPrimWarnOrFail
   :: HasCallStack
-  => TextS.Text
+  => String
+  -- ^ Extra context to add to warnings, e.g. the id the primitive's result
+  -- is assigned to
+  -> TextS.Text
   -- ^ Name of primitive
   -> NetlistMonad CompiledPrimitive
-extractPrimWarnOrFail nm = do
+extractPrimWarnOrFail context nm = do
   prim <- HashMap.lookup nm <$> Lens.view primitives
   case prim of
     Just (HasBlackBox warnings compiledPrim) ->
@@ -361,15 +331,28 @@ extractPrimWarnOrFail nm = do
     -> CompiledPrimitive
     -> NetlistMonad CompiledPrimitive
 
+  -- The key a primitive is remembered under, see 'go [] cp' below. Note it
+  -- includes the current component: the warning mentions component specific
+  -- context, which would get lost if the primitive were only warned about once
+  -- per compilation. A single run therefore reveals all offending sites rather
+  -- than only the first.
+  seenKey = do
+    (curCompId,_) <- Lens.use curCompNm
+    pure (Id.toText curCompId <> ":" <> nm)
+
   go ((WarnAlways warning):ws) cp = do
     opts <- Lens.view clashOpts
     let primWarn = opt_primWarn opts
-    seen <- Set.member nm <$> Lens.use seenPrimitives
+    (curCompId,_) <- Lens.use curCompNm
+    seen <- Set.member <$> seenKey <*> Lens.use seenPrimitives
 
     when (primWarn && not seen)
       $ liftIO
       $ warn opts
-      $ "Dubious primitive instantiation for "
+      $ "Dubious primitive instantiation in "
+     ++ unpack (Id.toText curCompId)
+     ++ (if null context then "" else " (" ++ context ++ ")")
+     ++ " for "
      ++ unpack nm
      ++ ": "
      ++ warning
@@ -381,8 +364,12 @@ extractPrimWarnOrFail nm = do
     isTB <- Lens.use isTestBench
     if isTB then go ws cp else go ((WarnAlways warning):ws) cp
 
+  -- Only mark the primitive as seen once the whole list of warnings has been
+  -- emitted. A primitive can carry several 'WarnAlways' annotations, and all of
+  -- them should be reported, see 'tests/shouldwork/PrimitiveGuards/MultipleGuards'.
   go [] cp = do
-    seenPrimitives %= Set.insert nm
+    key <- seenKey
+    seenPrimitives %= Set.insert key
     return cp
 
 mkPrimitive
@@ -402,8 +389,14 @@ mkPrimitive
   -- ^ Tick declarations
   -> NetlistMonad (Expr,[Declaration])
 mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
-  go =<< extractPrimWarnOrFail (primName pInfo)
+  go =<< extractPrimWarnOrFail context (primName pInfo)
   where
+    context = N.primWarnContext [] dstName args
+    dstName =
+      case dst of
+        NetlistId i _ -> unpack (Id.toText i)
+        CoreId i -> showPpr (V.varName i)
+        MultiId is -> unwords (map (showPpr . V.varName) is)
     tys = netlistTypes dst
     ty = fromMaybe (error "mkPrimitive") (listToMaybe tys)
     assignTy = declTypeUsage declType
@@ -1095,7 +1088,10 @@ mkFunInput parentName declType resId e =
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
   templ <- case appE of
             Prim p -> do
-              bb  <- extractPrimWarnOrFail (primName p)
+              bb  <- extractPrimWarnOrFail
+                       (N.primWarnContext [] (showPpr (V.varName resId)) args
+                          <> ", as an argument of: " <> unpack parentName)
+                       (primName p)
               case bb of
                 P.BlackBox {..} ->
                   pure (Left (kind,outputUsage,libraries,imports,includes,primName p,template))

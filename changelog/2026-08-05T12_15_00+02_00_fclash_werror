@@ -1,0 +1,1 @@
+ADDED: `-fclash-werror` turns Clash's own warnings into errors. Unlike GHC's `-Werror` it does not make GHC's warnings fatal, which makes it usable in tests: a test that should not provoke any Clash warning can pass `-fclash-werror` and will fail as soon as it does.

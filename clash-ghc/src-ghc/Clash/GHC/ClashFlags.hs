@@ -65,6 +65,7 @@ flagsClash r = [
   , defFlag "fclash-no-clean"                    $ NoArg (setNoClean r)
   , defFlag "fclash-clear"                       $ NoArg (liftEwM (setClear r))
   , defFlag "fclash-no-prim-warn"                $ NoArg (liftEwM (setNoPrimWarn r))
+  , defFlag "fclash-werror"                      $ NoArg (liftEwM (setWError r))
   , defFlag "fclash-spec-limit"                  $ IntSuffix (liftEwM . setSpecLimit r)
   , defFlag "fclash-inline-limit"                $ IntSuffix (liftEwM . setInlineLimit r)
   , defFlag "fclash-inline-function-limit"       $ IntSuffix (liftEwM . setInlineFunctionLimit r)
@@ -241,6 +242,9 @@ setClear r = modifyIORef r (\c -> c {opt_clear = True})
 
 setNoPrimWarn :: IORef ClashOpts -> IO ()
 setNoPrimWarn r = modifyIORef r (\c -> c {opt_primWarn = False})
+
+setWError :: IORef ClashOpts -> IO ()
+setWError r = modifyIORef r (\c -> c {opt_werror = True})
 
 setIntWidth :: IORef ClashOpts
             -> Int
