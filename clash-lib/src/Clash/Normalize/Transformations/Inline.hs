@@ -67,7 +67,7 @@ import Clash.Core.Term
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
 import Clash.Core.TermInfo (isLocalVar, termSize)
 import Clash.Core.Type
-  (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
+  (TypeView(..), isClassTy, isPolyFunCoreTy, splitFunTy, tyView)
 import Clash.Core.Util (isSignalType, primUCo)
 import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
 import Clash.Core.VarEnv
@@ -590,10 +590,21 @@ inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
 
     bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
     nonRepFrom <- isUntranslatableType False from
-    case (nonRepFrom, bodyMaybe) of
-      -- Don't inline OPAQUE/NOINLINE binders; their casts are handled at the
-      -- use site (e.g. 'mkFunInput' for higher-order primitive arguments).
-      (True, Just b) | not (isNoInline (bindingSpec b)) -> do
+    let
+      -- A cast between two function types can be handled by the Push rule in
+      -- 'appProp' (and by 'mkFunInput' for arguments of higher-order
+      -- primitives); it does not require inlining. This keeps OPAQUE binders
+      -- with such casts intact.
+      pushable = Maybe.isJust (splitFunTy tcm from)
+              && Maybe.isJust (splitFunTy tcm to)
+      -- Signal casts are introduced in pairs (see Note [Casting signals] in
+      -- Clash.GHC.GHC2Core), so a cancelling partner always exists and we
+      -- can afford to respect OPAQUE. Other non-representable casts (e.g.
+      -- involving a newtype of a function type) must inline regardless.
+      signalCast = isSignalType tcm from || isSignalType tcm to
+      opaque = maybe False (isNoInline . bindingSpec) bodyMaybe
+    case (nonRepFrom && not pushable && not (opaque && signalCast), bodyMaybe) of
+      (True, Just b) -> do
         if overLimit then
           trace ($(curLoc) ++ [I.i|
             InlineCastNonRep: #{showPpr (varName f)} already inlined
