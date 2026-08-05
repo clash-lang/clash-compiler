@@ -146,8 +146,15 @@ workaroundMmapCrash = flakyTestWithRetryAction retryAction retryPolicy
   retryPolicy :: RetryPolicyM IO
   retryPolicy = limitRetries 5
 
+-- | Default timeout applied to each test, unless the user explicitly set one
+-- with @--timeout@ or @TASTY_TIMEOUT@.
+defaultTimeout :: Timeout -> Timeout
+defaultTimeout NoTimeout = mkTimeout (5 * 60 * 1000000) -- 5 minutes
+defaultTimeout userSet = userSet
+
 runClashTest :: IO ()
 runClashTest = defaultMain
+  $ adjustOption defaultTimeout
   $ workaroundMmapCrash
   $ clashTestRoot
   [ clashTestGroup "examples"
