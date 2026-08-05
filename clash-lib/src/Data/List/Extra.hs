@@ -9,6 +9,7 @@ module Data.List.Extra
   , (<:>)
   , indexMaybe
   , splitAtList
+  , dropList
   , equalLength
   , countEq
   , zipEqual
@@ -93,6 +94,13 @@ splitAtList _ xs@[]       = (xs, xs)
 splitAtList (_:xs) (y:ys) = (y:ys', ys'')
     where
       (ys', ys'') = splitAtList xs ys
+
+-- | Drop as many elements from the second list as there are elements in the
+-- first list.
+dropList :: [b] -> [a] -> [a]
+dropList [] xs = xs
+dropList _ [] = []
+dropList (_:xs) (_:ys) = dropList xs ys
 
 equalLength :: [a] -> [b] -> Bool
 equalLength [] [] = True

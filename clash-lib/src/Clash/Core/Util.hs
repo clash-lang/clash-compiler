@@ -72,6 +72,128 @@ listToLets xs body = foldr go body (sccLetBindings xs)
   go (Graph.AcyclicSCC (i, x)) acc = Let (NonRec i x) acc
   go (Graph.CyclicSCC binds) acc = Let (Rec binds) acc
 
+-- Note [Cast-equality oracle]
+--
+-- All code that merges, eliminates, or aligns casts must use one and the same
+-- type equality, otherwise a cast simplified under one equality can render
+-- the term ill-typed under another. For example, when two back-to-back casts
+--
+--   (e ▷ A ~ B) ▷ B' ~ C
+--
+-- are merged to @e ▷ A ~ C@ because @B@ and @B'@ are equal modulo
+-- 'normalizeType', a later *syntactic* alignment check between @A ~ C@ and a
+-- neighboring cast may fail even though the term is perfectly fine.
+--
+-- 'castEqType' is that single equality. It currently equates types up to
+-- alpha-equivalence modulo 'normalizeType', i.e. newtypes are transparent and
+-- type families are reduced, but 'Signal' is kept. Once newtypes become
+-- opaque in Clash core this must simultaneously stop looking through
+-- newtypes.
+castEqType :: TyConMap -> Type -> Type -> Bool
+castEqType tcm ty1 ty2 =
+  ty1 == ty2 || normalizeType tcm ty1 == normalizeType tcm ty2
+
+-- | Smart constructor for 'Cast'. Drops casts that are refl under
+-- 'castEqType' and merges back-to-back casts.
+mkCast :: TyConMap -> Term -> Type -> Type -> Term
+mkCast tcm x from to
+  | castEqType tcm from to
+  = x
+mkCast tcm (Tick i x) from to = Tick i (mkCast tcm x from to)
+mkCast tcm (Cast x from0 to0) from to
+  | castEqType tcm to0 from
+  = mkCast tcm x from0 to
+mkCast _ x from to = Cast x from to
+
+-- | Squash an 'AppArg' stack such that all casts are floated outward, using
+-- the push rules from \"System FC with Explicit Kind Equality\"
+-- (Weirich et al., ICFP '13):
+--
+-- * Two back-to-back casts merge into one (or disappear when they are each
+--   other's inverse under 'castEqType', see Note [Cast-equality oracle]).
+--
+-- * /Push/: a cast between function types moves past a term argument by
+--   casting the argument with the (inverted) argument coercion:
+--
+--   > (f ▷ (a → b) ~ (a' → b')) x  ⇒  (f (x ▷ a' ~ a)) ▷ b ~ b'
+--
+-- * /TPush/: a cast between forall-types moves past a type argument by
+--   instantiating both sides:
+--
+--   > (f ▷ (∀tv.σ) ~ (∀tv'.σ')) @t  ⇒  (f @t) ▷ σ[tv:=t] ~ σ'[tv':=t]
+--
+-- * Ticks float outward past casts.
+--
+-- Yields the term- and type-arguments, at most one remaining outermost cast,
+-- and the collected ticks. Returns 'Nothing' when a cast cannot be pushed
+-- (e.g. its endpoints do not decompose, or adjacent casts do not line up);
+-- callers must then leave the original term untouched.
+squashArgs
+  :: TyConMap
+  -> InScopeSet
+  -> [AppArg]
+  -> Maybe ([Either Term Type], Maybe (Type, Type), [TickInfo])
+squashArgs tcm _is0 = go [] [] Nothing
+ where
+  go acc ticks castM [] =
+    Just (reverse acc, castM, reverse ticks)
+
+  go acc ticks castM (TickCtx i : rest) =
+    go acc (i:ticks) castM rest
+
+  go acc ticks Nothing (TermArg x : rest) =
+    go (Left x:acc) ticks Nothing rest
+
+  go acc ticks Nothing (TypeArg t : rest) =
+    go (Right t:acc) ticks Nothing rest
+
+  go acc ticks Nothing (CastCtx from to : rest) =
+    go acc ticks (mkCastCtx from to) rest
+
+  -- Merge back-to-back casts
+  go acc ticks (Just (from0, to0)) (CastCtx from1 to1 : rest)
+    | castEqType tcm to0 from1
+    = go acc ticks (mkCastCtx from0 to1) rest
+    | otherwise
+    = Nothing
+
+  -- Push
+  go acc ticks (Just (from0, to0)) (TermArg x : rest)
+    | Just (argFrom, resFrom) <- splitFunTy tcm from0
+    , Just (argTo, resTo) <- splitFunTy tcm to0
+    = go (Left (mkCast tcm x argTo argFrom):acc) ticks
+         (mkCastCtx resFrom resTo) rest
+    | otherwise
+    = Nothing
+
+  -- TPush
+  go acc ticks (Just (from0, to0)) (TypeArg t : rest)
+    | ForAllTy fromTv fromBody <- coreView tcm from0
+    , ForAllTy toTv toBody <- coreView tcm to0
+    , varType fromTv == varType toTv
+    = let fromBody1 = substTyWith [fromTv] [t] fromBody
+          toBody1 = substTyWith [toTv] [t] toBody
+      in  go (Right t:acc) ticks (mkCastCtx fromBody1 toBody1) rest
+    | otherwise
+    = Nothing
+
+  mkCastCtx from to
+    | castEqType tcm from to = Nothing
+    | otherwise = Just (from, to)
+
+-- | 'collectAppArgs' followed by 'squashArgs'. Yields the applied function,
+-- its arguments, at most one outermost cast, and the collected ticks.
+-- Returns 'Nothing' when a cast could not be pushed outward.
+squashCollectApp
+  :: TyConMap
+  -> InScopeSet
+  -> Term
+  -> Maybe (Term, [Either Term Type], Maybe (Type, Type), [TickInfo])
+squashCollectApp tcm is0 e =
+  let (fun, args) = collectAppArgs e
+  in  (\(args1, castM, ticks) -> (fun, args1, castM, ticks))
+        <$> squashArgs tcm is0 args
+
 -- | The type @forall a . a@
 undefinedTy ::Type
 undefinedTy =
@@ -562,15 +684,20 @@ shouldSplit
 shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
   -- We also look through `SimIO` to find things like Files
   shouldSplit tcm tyArg
-shouldSplit tcm ty = shouldSplit0 tcm (tyView (coreView tcm ty))
+shouldSplit tcm ty = shouldSplit0 UniqMap.empty tcm (tyView (coreView tcm ty))
 
 -- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
+--
+-- The first argument tracks the type constructors we have already seen, so
+-- we don't loop on recursive (newtype) definitions.
 shouldSplit0
-  :: TyConMap
+  :: UniqMap.UniqMap ()
+  -> TyConMap
   -> TypeView
   -> Maybe ([Term] -> Term, Projections, [Type])
-shouldSplit0 tcm (TyConApp tcNm tyArgs)
-  | Just tc <- UniqMap.lookup tcNm tcm
+shouldSplit0 seen tcm (TyConApp tcNm tyArgs)
+  | tcNm `UniqMap.notElem` seen
+  , Just tc <- UniqMap.lookup tcNm tcm
   , [dc] <- tyConDataCons tc
   , let dcArgs = substArgTys dc tyArgs
   , let dcArgsLen = length dcArgs
@@ -586,6 +713,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
     else
       Nothing
   | "Clash.Sized.Vector.Vec" <- nameOcc tcNm
+  , tcNm `UniqMap.notElem` seen
   , [nTy,argTy] <- tyArgs
   , Right n <- runExcept (tyNatSize tcm nTy)
   , n > 1
@@ -598,6 +726,8 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
     else
       Nothing
  where
+  seen1 = UniqMap.insert tcNm () seen
+
   -- Project the n'th value out of a vector
   --
   -- >>> mkVecSelector subj 0
@@ -614,7 +744,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
     mkVecSelector is0 subj1 (n-1)
 
   shouldSplitTy :: TypeView -> Bool
-  shouldSplitTy ty = isJust (shouldSplit0 tcm ty) || splitTy ty
+  shouldSplitTy ty = isJust (shouldSplit0 seen1 tcm ty) || splitTy ty
 
   -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split
   -- because KnownDomain will be filtered anyway during netlist generation due
@@ -647,7 +777,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
                            ]
   splitTy _ = False
 
-shouldSplit0 _ _ = Nothing
+shouldSplit0 _ _ _ = Nothing
 
 -- | Potentially split apart a list of function argument types. e.g. given:
 --

@@ -132,6 +132,7 @@ isConstant e = case collectArgs e of
   (Prim _, args) -> all (either isConstant (const True)) args
   (Lam _ _, _)     -> isClosed e
   (Literal _,_)    -> True
+  (Cast e0 _ _, args) -> all (either isConstant (const True)) (Left e0:args)
   _                -> False
 
 isConstantNotClockReset :: TyConMap -> Term -> Bool
