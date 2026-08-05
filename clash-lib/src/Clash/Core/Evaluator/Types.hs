@@ -150,6 +150,10 @@ unwindStack m
           let term = Tick sp (getTerm m')
            in unwindStack (setTerm term m')
 
+        Castish from to ->
+          let term = Cast (getTerm m') from to
+           in unwindStack (setTerm term m')
+
 -- | A single step in the partial evaluator. The result is the new heap and
 -- stack, and the next expression to be reduced.
 --
@@ -239,6 +243,7 @@ data StackFrame
   | PrimApply  PrimInfo [Type] [Value] [Term]
   | Scrutinise Type [Alt]
   | Tickish TickInfo
+  | Castish Type Type
   deriving Show
 
 instance ClashPretty StackFrame where
@@ -256,6 +261,8 @@ instance ClashPretty StackFrame where
           fromPpr (Case (Literal (CharLiteral '_')) a b)]
   clashPretty (Tickish sp) =
     hsep ["Tick", fromPpr sp]
+  clashPretty (Castish from to) =
+    hsep ["Cast", fromPpr from, fromPpr to]
 
 -- Values
 data Value
@@ -333,8 +340,9 @@ forcePrims = go . mStack
   -- 2. When they are in the argument position of another primitive:
   --    primitives are assumed to be strict in their arguments
   go (PrimApply{}:_)  = True
-  -- We look through ticks
+  -- We look through ticks and casts
   go (Tickish{}:xs)   = go xs
+  go (Castish{}:xs)   = go xs
   -- We are in a context where we dereferenced a heap-binding, hence the
   -- update fram on the stack. So now we need to check whether that variable
   -- reference was in a position where the result must be evaluated to WHNF
