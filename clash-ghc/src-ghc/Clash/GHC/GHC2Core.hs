@@ -62,6 +62,7 @@ import           Language.Haskell.Syntax.Basic (FieldLabelString (..))
 -- GHC API
 import GHC.Core.Reduction (Reduction(Reduction), HetReduction(..))
 import GHC.Builtin.Types (falseDataCon)
+import GHC.Builtin.Types.Prim (fUNTyCon)
 import GHC.Core.Coercion.Axiom
   (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), fromBranches)
 import GHC.Core.Coercion (Role (Nominal), coercionType, coercionKind)
@@ -966,6 +967,13 @@ coreToType'
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToTyVar tv
 coreToType' (TyConApp tc args)
   | Just (FunTy _ _ ty1 ty2) <- tyConAppFunTy_maybe tc args = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+  -- A partially applied FUN, e.g. resulting from the eta-reduced right-hand
+  -- side of a newtype of a function type. Convert to Clash's Arrow, dropping
+  -- the multiplicity argument, such that 'tyView' recognizes the type as a
+  -- function type once it is fully applied.
+  -- See Note [Arrow arguments] in Clash.Core.Type.
+  | tc == fUNTyCon, (_mult:rest) <- args
+  = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType rest
   | otherwise     = case expandSynTyCon_maybe tc args of
                       ExpandsSyn substs synTy remArgs -> do
                         let substs' = mkTvSubstPrs substs
