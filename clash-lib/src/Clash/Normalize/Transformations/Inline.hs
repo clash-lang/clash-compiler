@@ -66,9 +66,12 @@ import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
 import Clash.Core.TermInfo (isLocalVar, termSize)
+import Clash.Core.TyCon (AlgTyConRhs(..), TyCon(..), TyConMap)
 import Clash.Core.Type
-  (TypeView(..), isClassTy, isPolyFunCoreTy, splitFunTy, tyView)
+  (Type, TypeView(..), isClassTy, isPolyFunCoreTy, normalizeType, splitFunTy
+  , tyView)
 import Clash.Core.Util (isSignalType, primUCo)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
 import Clash.Core.VarEnv
   ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarEnv, elemVarSet
@@ -603,7 +606,21 @@ inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
       -- involving a newtype of a function type) must inline regardless.
       signalCast = isSignalType tcm from || isSignalType tcm to
       opaque = maybe False (isNoInline . bindingSpec) bodyMaybe
-    case (nonRepFrom && not pushable && not (opaque && signalCast), bodyMaybe) of
+      -- A cast that merely unwraps a newtype of a *function* type -- e.g.
+      -- between clash-protocols' @Circuit a b@ and its underlying function
+      -- type -- has no HDL significance: a cast in function position does
+      -- not affect the component instantiation, and netlist generation
+      -- looks through such casts. Not inlining keeps binders with a
+      -- newtype-of-function result type, like Wishbone circuits, as
+      -- separate components.
+      --
+      -- Newtypes of *data* types (e.g. a newtype of a list) do not qualify:
+      -- when their representation is untranslatable the cast must still be
+      -- eliminated by inlining.
+      newtypeRefl = isNewtypeHeaded tcm from
+                 && isPolyFunCoreTy tcm from
+                 && aeqType (normalizeType tcm from) (normalizeType tcm to)
+    case (nonRepFrom && not pushable && not (opaque && signalCast) && not newtypeRefl, bodyMaybe) of
       (True, Just b) -> do
         if overLimit then
           trace ($(curLoc) ++ [I.i|
@@ -630,6 +647,14 @@ inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
 
 inlineCastNonRep _ e = return e
 {-# SCC inlineCastNonRep #-}
+
+-- | Is the type headed by a (user) newtype constructor?
+isNewtypeHeaded :: TyConMap -> Type -> Bool
+isNewtypeHeaded tcm (tyView -> TyConApp tcNm _) =
+  case UniqMap.lookup tcNm tcm of
+    Just (AlgTyCon {algTcRhs = NewTyCon {}}) -> True
+    _ -> False
+isNewtypeHeaded _ _ = False
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
 inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
