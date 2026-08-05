@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -62,11 +63,17 @@ argCastSpec ctx@(TransformContext is0 _) e@(App f (collectTicks -> (Cast e' t1 t
  -- We can only push casts into global binders
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
+  tcm <- Lens.view tcCache
+  -- A cast that is refl under the cast-equality oracle is not worth
+  -- specializing on: 'elimCastCast' simply drops it. Specializing on it
+  -- instead pollutes the specialization cache with (cast-decorated) variants
+  -- of otherwise identical arguments, which can hit the specialization limit
+  -- on dictionary-heavy code.
+  if castEqType tcm t1 t2 then return e else do
   bndrs <- Lens.use bindings
   isWorkFree workFreeBinders bndrs e' >>= \case
     True -> specialize ctx e
     False -> do
-      tcm <- Lens.view tcCache
       nonRep <- isUntranslatableType False t1
       if nonRep then
         -- A let-binding with a non-representable type would immediately be
