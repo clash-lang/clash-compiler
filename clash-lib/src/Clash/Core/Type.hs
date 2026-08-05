@@ -234,15 +234,10 @@ coreView tcm ty =
 coreView1 :: TyConMap -> Type -> Maybe Type
 coreView1 tcMap ty = case tyView ty of
   TyConApp tcNm args
-    | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalIn"
-    , [_,_,_,elTy] <- args
-    -> Just elTy
-    | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalOut"
-    , [_,_,_,elTy] <- args
-    -> Just elTy
-    -- N.B. 'Signal' is *not* transparent: the GHC-to-Clash translation
-    -- represents the Signal combinators as casts between @Signal dom a@ and
-    -- @a@. See Note [Casting signals] in Clash.GHC.GHC2Core.
+    -- N.B. 'Signal' (and 'BiSignalIn'/'BiSignalOut') are *not* transparent:
+    -- the GHC-to-Clash translation represents the Signal combinators as
+    -- casts between @Signal dom a@ and @a@. See Note [Casting signals] in
+    -- Clash.GHC.GHC2Core.
     | otherwise
     -> case UniqMap.find tcNm tcMap of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
