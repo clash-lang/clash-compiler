@@ -207,6 +207,7 @@ Library
 
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
+                      Clash.Core.Evaluator.KPush
                       Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
                       Clash.Core.HasType
@@ -429,6 +430,7 @@ test-suite unittests
       unordered-containers
 
   Other-Modules: Clash.Tests.Core.AlphaEquivalence
+                 Clash.Tests.Core.Cast
                  Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.Subst
                  Clash.Tests.Core.TermLiteral
