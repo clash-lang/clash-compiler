@@ -415,6 +415,12 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
                apply "caseCon" caseCon >->
                (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
                apply "reduceNonRepPrim" reduceNonRepPrim >->
+               -- Inlining a binder that was not normalized (due to a
+               -- non-representable result type) exposes casts; clean them up.
+               apply "caseCast" caseCast >->
+               apply "letCast" letCast >->
+               apply "inlineCastNonRep" inlineCastNonRep >->
+               apply "elimCastCast" elimCastCast >->
                apply "removeUnusedExpr" removeUnusedExpr) >->
              bottomupR (apply "flattenLet" flattenLet)) !->
     topdownSucR (apply "topLet" topLet) >->

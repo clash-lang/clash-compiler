@@ -696,6 +696,10 @@ shouldSplit0
   -> TypeView
   -> Maybe ([Term] -> Term, Projections, [Type])
 shouldSplit0 seen tcm (TyConApp tcNm tyArgs)
+  -- Signals may never be (de)constructed with their constructor; when the
+  -- element type must be split the argument should be unbundled instead.
+  | nameOcc tcNm == "Clash.Signal.Internal.Signal"
+  = Nothing
   | tcNm `UniqMap.notElem` seen
   , Just tc <- UniqMap.lookup tcNm tcm
   , [dc] <- tyConDataCons tc

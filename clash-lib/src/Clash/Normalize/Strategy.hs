@@ -109,6 +109,7 @@ constantPropagation =
       , ("splitCastWork"   , splitCastWork)
       , ("argCastSpec"     , argCastSpec)
       , ("inlineCast"      , inlineCast)
+      , ("inlineCastNonRep", inlineCastNonRep)
       , ("elimCastCast"    , elimCastCast)
       ]
 

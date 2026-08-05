@@ -29,7 +29,8 @@ import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
-import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
+import Clash.Rewrite.Util
+  (changed, isUntranslatableType, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Util (ClashException(..), curLoc)
 
@@ -64,12 +65,19 @@ argCastSpec ctx@(TransformContext is0 _) e@(App f (collectTicks -> (Cast e' t1 t
   isWorkFree workFreeBinders bndrs e' >>= \case
     True -> specialize ctx e
     False -> do
-      -- Bind the work to a new binder, so we only specialize on a work-free
-      -- cast of a variable reference. A later pass then specializes on
-      -- @f (cast x)@ while the work is shared through the let-binding.
       tcm <- Lens.view tcCache
-      x <- mkTmBinderFor is0 tcm (mkDerivedName ctx "argCastSpec") e'
-      changed (Let (NonRec x (mkTicks e' ticks)) (App f (Cast (Var x) t1 t2)))
+      nonRep <- isUntranslatableType False t1
+      if nonRep then
+        -- A let-binding with a non-representable type would immediately be
+        -- inlined again by 'inlineOrLiftNonRep'; specialize directly instead.
+        specialize ctx e
+      else do
+        -- Bind the work to a new binder, so we only specialize on a
+        -- work-free cast of a variable reference. A later pass then
+        -- specializes on @f (cast x)@ while the work is shared through the
+        -- let-binding.
+        x <- mkTmBinderFor is0 tcm (mkDerivedName ctx "argCastSpec") e'
+        changed (Let (NonRec x (mkTicks e' ticks)) (App f (Cast (Var x) t1 t2)))
 argCastSpec _ e = return e
 {-# SCC argCastSpec #-}
 

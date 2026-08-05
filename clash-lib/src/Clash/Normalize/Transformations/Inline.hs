@@ -23,6 +23,7 @@ module Clash.Normalize.Transformations.Inline
   ( bindConstantVar
   , inlineBndrsCleanup
   , inlineCast
+  , inlineCastNonRep
   , inlineCleanup
   , collapseRHSNoops
   , inlineNonRep
@@ -563,6 +564,59 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
 
 inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
+
+-- | Inline the global binder in a cast from a non-representable type:
+--
+-- @
+--   (f xs) ▷ Signal dom (a -> b) ~ (a -> b)
+-- @
+--
+-- Such casts can only be eliminated against their inverse, which lives
+-- inside the body of @f@, so @f@ must be inlined. See
+-- Note [Casting signals] in "Clash.GHC.GHC2Core".
+inlineCastNonRep :: HasCallStack => NormRewrite
+inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
+  | isGlobalId f
+  = do
+    (cf,_)    <- Lens.use curFun
+    isInlined <- zoomExtra (alreadyInlined f cf)
+    limit     <- Lens.view inlineLimit
+    tcm       <- Lens.view tcCache
+    let
+      -- Constraint dictionary inlining always terminates, so we ignore the
+      -- usual inline safeguards.
+      notClassTy = not (isClassTy tcm from)
+      overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
+
+    bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
+    nonRepFrom <- isUntranslatableType False from
+    case (nonRepFrom, bodyMaybe) of
+      (True, Just b) -> do
+        if overLimit then
+          trace ($(curLoc) ++ [I.i|
+            InlineCastNonRep: #{showPpr (varName f)} already inlined
+            #{limit} times in: #{showPpr (varName cf)}. The type of the cast
+            expression is:
+
+              #{showPpr' def{displayTypes=True\} from}
+
+            Function #{showPpr (varName cf)} will not reach a normal form and
+            compilation might fail.
+
+            Run with '-fclash-inline-limit=N' to increase the inline limit to N.
+          |]) (return e)
+        else do
+          Monad.when notClassTy (zoomExtra (addNewInline f cf))
+
+          let fBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+          let fBody1 = mkApps fBody0 args
+
+          changed (Cast fBody1 from to)
+      _ ->
+        return e
+
+inlineCastNonRep _ e = return e
+{-# SCC inlineCastNonRep #-}
 
 inlineOrLiftNonRep :: HasCallStack => NormRewrite
 inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
