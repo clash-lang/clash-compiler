@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
-                    2021-2022, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , LUMI GUIDE FIETSDETECTIE B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
@@ -96,15 +96,15 @@ type BlackBoxTemplate = [Element]
 -- | Elements of a blackbox context. If you extend this list, make sure to
 -- update the following functions:
 --
---  - Clash.Netlist.BlackBox.Types.prettyElem
---  - Clash.Netlist.BlackBox.Types.renderElem
---  - Clash.Netlist.BlackBox.Types.renderTag
---  - Clash.Netlist.BlackBox.Types.setSym
+--  - Clash.Netlist.BlackBox.Util.prettyElem
+--  - Clash.Netlist.BlackBox.Util.renderElem
+--  - Clash.Netlist.BlackBox.Util.renderTag
+--  - Clash.Netlist.BlackBox.Util.setSym
 --  - Clash.Netlist.BlackBox.Util.inputHole
---  - Clash.Netlist.BlackBox.Types.getUsedArguments
---  - Clash.Netlist.BlackBox.Types.usedVariables
---  - Clash.Netlist.BlackBox.Types.verifyBlackBoxContext
---  - Clash.Netlist.BlackBox.Types.walkElement
+--  - Clash.Netlist.BlackBox.Util.getUsedArguments
+--  - Clash.Netlist.BlackBox.Util.usedVariables
+--  - Clash.Netlist.BlackBox.Util.verifyBlackBoxContext
+--  - Clash.Netlist.BlackBox.Util.walkElement
 data Element
   = Text !Text
   -- ^ Dumps given text without processing in HDL
@@ -126,8 +126,6 @@ data Element
   | ToVar [Element] !Int
   -- ^ Like Arg but only insert variable reference (creating an assignment
   -- elsewhere if necessary).
-  | Sym !Text !Int
-  -- ^ Symbol hole
   | Typ !(Maybe Int)
   -- ^ Type declaration hole
   | TypM !(Maybe Int)
@@ -204,6 +202,9 @@ data Element
   | OutputUsage !Int
   | Vars !Int
   | GenSym [Element] !Int
+  -- ^ Define a name for a numbered symbol, and render that name too
+  | Sym !Text !(Either Int [Element])
+  -- ^ Symbol hole (indexed by either a number or a name)
   | Repeat [Element] [Element]
   -- ^ Repeat <hole> n times
   | DevNull [Element]

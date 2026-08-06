@@ -40,8 +40,9 @@ module Clash.Netlist.BlackBox.Util
 
 import           Control.Exception               (throw)
 import           Control.Lens
-  (use, (%=), _1, _2, element, (^?))
+  (use, (%=), _1, _2, _3, element, (^?))
 import           Control.Monad                   (forM, (<=<), filterM)
+import           Control.Monad.Identity          (runIdentity)
 import           Control.Monad.Extra             (ifM)
 import           Control.Monad.State             (State, StateT (..), lift, gets)
 import           Data.Bitraversable              (bitraverse)
@@ -259,15 +260,16 @@ setSym
   -> BlackBoxTemplate
   -> m (BlackBoxTemplate,[N.Declaration])
 setSym bbCtx l = do
-    (a,(_,decls)) <- runStateT (mapM setSym' l) (IntMap.empty,IntMap.empty)
+    (a,(_,_,decls)) <- runStateT (mapM setSym' l) (IntMap.empty,HashMap.empty,IntMap.empty)
     return (a,concatMap snd (IntMap.elems decls))
   where
     bbnm = Data.Text.unpack (bbName bbCtx)
 
     setSym'
       :: Element
-      -> StateT ( IntMap.IntMap N.IdentifierText
-                , IntMap.IntMap (N.IdentifierText, [N.Declaration]))
+      -> StateT ( IntMap.IntMap N.IdentifierText  -- ~SYM[number] mapping
+                , HashMap.HashMap Text (Maybe N.IdentifierText)   -- ~SYM[string] mapping, Nothing when a name is used by GENSYM
+                , IntMap.IntMap (N.IdentifierText, [N.Declaration]))  -- ~VAR[nm][n] mapping
                 m
                 Element
     setSym' e = case e of
@@ -276,7 +278,7 @@ setSym bbCtx l = do
           return (ToVar [Text (Id.toLazyText nm0)] i)
 
         (e',hwTy,_) -> do
-          varM <- IntMap.lookup i <$> use _2
+          varM <- IntMap.lookup i <$> use _3
           case varM of
             Nothing -> do
               nm' <- lift (Id.make (Text.toStrict (concatT (Text "c$":nm))))
@@ -285,29 +287,49 @@ setSym bbCtx l = do
                     _ -> [N.NetDecl Nothing nm' hwTy
                          ,N.Assignment nm' N.Cont e' -- TODO De-hardcode Cont
                          ]
-              _2 %= (IntMap.insert i (Id.toText nm',decls))
+              _3 %= (IntMap.insert i (Id.toText nm',decls))
               return (ToVar [Text (Id.toLazyText nm')] i)
             Just (nm',_) ->
               return (ToVar [Text (Text.fromStrict nm')] i)
-      Sym _ i -> do
+      Sym _ x@(Left i) -> do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
             t <- Id.toText <$> lift (Id.make "c$n")
             _1 %= (IntMap.insert i t)
-            return (Sym (Text.fromStrict t) i)
-          Just t -> return (Sym (Text.fromStrict t) i)
-      GenSym t i -> do
-        symM <- IntMap.lookup i <$> use _1
+            return (Sym (Text.fromStrict t) x)
+          Just t -> return (Sym (Text.fromStrict t) x)
+      Sym _ x@(Right (concatT -> nm)) -> do
+        symM <- HashMap.lookup nm <$> use _2
         case symM of
           Nothing -> do
-            t' <- Id.toText <$> lift (Id.makeBasic (Text.toStrict (concatT t)))
-            _1 %= (IntMap.insert i t')
-            return (GenSym [Text (Text.fromStrict t')] i)
-          Just _ ->
-            error ("Symbol #" ++ show (t,i)
-                ++ " is already defined in BlackBox for: "
-                ++ bbnm)
+            t <- Id.toText <$> lift (Id.make $ Text.toStrict nm)
+            _2 %= (HashMap.insert nm (Just t))
+            return (Sym (Text.fromStrict t) x)
+          Just (Just t) -> return (Sym (Text.fromStrict t) x)
+          Just Nothing ->
+            error ("In BlackBox " ++ bbnm ++ ": "
+                ++ " ~SYM[" ++ Text.unpack nm ++ "] uses the same name as previously used in ~GENSYM.\n"
+                ++ "You can't mix numbered and named symbols.")
+      GenSym t@(concatT -> nm) i -> do
+        symNmM <- HashMap.lookup nm <$> use _2
+        case symNmM of
+          Just (Just _) ->
+            error ("In BlackBox " ++ bbnm ++ ": "
+                ++ "the name of ~GENSYM[" ++ prettyBlackBoxStr t ++ "][" ++ show i ++ "]"
+                ++ " would overwrite an earlier ~SYM[" ++ Text.unpack nm ++ "].\n"
+                ++ "You can't mix numbered and named symbols.")
+          _ -> do
+            symM <- IntMap.lookup i <$> use _1
+            case symM of
+              Nothing -> do
+                t' <- Id.toText <$> lift (Id.makeBasic (Text.toStrict nm))
+                _1 %= (IntMap.insert i t')
+                _2 %= (HashMap.insert nm Nothing) -- mark name as taken by GENSYM
+                return (GenSym [Text (Text.fromStrict t')] i)
+              Just _ ->
+                error ("In BlackBox " ++ bbnm ++ ": ~GENSYM[" ++ show t ++ "][" ++ show i ++ "]"
+                    ++ " is redefining symbol #" ++ show i ++ ".\n")
       Component (Decl n subN l') ->
         Component <$> (Decl n subN <$> mapM (bitraverse (mapM setSym') (mapM setSym')) l')
       IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
@@ -341,8 +363,8 @@ setSym bbCtx l = do
             _ | [(Identifier t _, _)] <- bbResults bbCtx -> Id.toLazyText t
             _ -> error $ $(curLoc) ++ "Internal error when processing blackbox "
                       ++ "for " ++ bbnm
-        _ -> error $ $(curLoc) ++ "Unexpected element in GENSYM when processing "
-                  ++ "blackbox for " ++ bbnm
+        e -> error $ $(curLoc) ++ "Unexpected element in (GEN)SYM symbol name when processing "
+                  ++ "blackbox for " ++ bbnm ++ ": " ++ prettyBlackBoxStr [e]
         )
 
 type FileName = FilePath
@@ -1083,6 +1105,9 @@ prettyBlackBox :: Monad m
                -> Ap m Text
 prettyBlackBox bbT = Text.concat <$> mapM prettyElem bbT
 
+prettyBlackBoxStr :: BlackBoxTemplate -> String
+prettyBlackBoxStr = Text.unpack . runIdentity . getAp . prettyBlackBox
+
 prettyElem
   :: (HasCallStack, Monad m)
   => Element
@@ -1108,7 +1133,6 @@ prettyElem (Name i) = renderOneLine <$> (string "~NAME" <> brackets (int i))
 prettyElem (ToVar es i) = do
   es' <- prettyBlackBox es
   renderOneLine <$> (string "~VAR" <> brackets (string es') <> brackets (int i))
-prettyElem (Sym _ i) = renderOneLine <$> (string "~SYM" <> brackets (int i))
 prettyElem (Typ Nothing) = return "~TYPO"
 prettyElem (Typ (Just i)) = renderOneLine <$> (string "~TYP" <> brackets (int i))
 prettyElem (TypM Nothing) = return "~TYPMO"
@@ -1192,6 +1216,10 @@ prettyElem (StrCmp es i) = do
 prettyElem (GenSym es i) = do
   es' <- prettyBlackBox es
   renderOneLine <$> (string "~GENSYM" <> brackets (string es') <> brackets (int i))
+prettyElem (Sym _ (Left i)) = renderOneLine <$> (string "~SYM" <> brackets (int i))
+prettyElem (Sym _ (Right es)) = do
+    es' <- prettyBlackBox es
+    renderOneLine <$> (string "~SYM" <> brackets (string es'))
 prettyElem (Repeat [es] [i]) = do
   es' <- prettyElem es
   i'  <- prettyElem i
@@ -1255,6 +1283,8 @@ walkElement f el = maybeToList (f el) ++ walked
         SigD es _ -> concatMap go es
         BV _ es _ -> concatMap go es
         GenSym es _ -> concatMap go es
+        Sym _ (Left _) -> []
+        Sym _ (Right es) -> concatMap go es
         DevNull es -> concatMap go es
         Text _ -> []
         Result -> []
@@ -1264,7 +1294,6 @@ walkElement f el = maybeToList (f el) ++ walked
         Lit _ -> []
         Name _ -> []
         ToVar es _ -> concatMap go es
-        Sym _ _ -> []
         Typ _ -> []
         TypM _ -> []
         Err _ -> []
