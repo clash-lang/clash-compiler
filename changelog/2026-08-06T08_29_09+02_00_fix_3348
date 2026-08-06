@@ -1,0 +1,1 @@
+FIXED: `reduceNonRepPrim` now correctly accounts for non-work primitives returning a zero-length `Vec` and under-applied ones. See [#3348](https://github.com/clash-lang/clash-compiler/issues/3348).
