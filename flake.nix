@@ -34,6 +34,13 @@
       url = "github:clash-lang/ghc-typelits-natnormalise";
       flake = false;
     };
+
+    # Tool used to manage the changelog, see 'changelog/README.md'.
+    qlog = {
+      url = "github:QBayLogic/qlog";
+      inputs.flake-utils.follows = "flake-utils";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = args@{ self, nixpkgs, flake-utils, ... }:
@@ -187,6 +194,7 @@
           let
             makeDevShell = import ./nix/devshell.nix {
               inherit pkgs;
+              qlog = args.qlog.packages.${system}.default;
             };
 
             clashDevShells =
