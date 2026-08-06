@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                     2017     , Myrtle Software Ltd,
-                    2021-2022, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -79,7 +79,6 @@ pTagE =  Result            <$  string "~RESULT"
      <|> Lit               <$> (string "~LIT" *> brackets' natural')
      <|> Name              <$> (string "~NAME" *> brackets' natural')
      <|> ToVar             <$> try (string "~VAR" *> brackets' pSigDorEmpty) <*> brackets' natural'
-     <|> (Sym Text.empty)  <$> (string "~SYM" *> brackets' natural')
      <|> Typ Nothing       <$  string "~TYPO"
      <|> (Typ . Just)      <$> try (string "~TYP" *> brackets' natural')
      <|> TypM Nothing      <$  string "~TYPMO"
@@ -117,6 +116,7 @@ pTagE =  Result            <$  string "~RESULT"
      <|> OutputUsage       <$> (string "~OUTPUTWIREREG" *> brackets' natural')
      <|> OutputUsage       <$> (string "~OUTPUTUSAGE" *> brackets' natural')
      <|> GenSym            <$> (string "~GENSYM" *> brackets' pSigD) <*> brackets' natural'
+     <|> (Sym Text.empty)  <$> (string "~SYM" *> brackets' (Left <$> natural'  <|>  Right <$> pSigD))
      <|> Template          <$> (string "~TEMPLATE" *> brackets' pSigD) <*> brackets' pSigD
      <|> Repeat            <$> (string "~REPEAT" *> brackets' pSigD) <*> brackets' pSigD
      <|> DevNull           <$> (string "~DEVNULL" *> brackets' pSigD)
@@ -154,6 +154,7 @@ pSigD = some (pTagE <|> (EscapedSymbol SquareBracketOpen <$ string "[\\")
                     <|> (EscapedSymbol SquareBracketClose <$ string "\\]")
                     <|> (Text <$> (pack <$> some (satisfyRange '\000' '\90')))
                     <|> (Text <$> (pack <$> some (satisfyRange '\94' '\125'))))
+                        -- excludes '[', '\\', ']', `~`
 
 pSigDorEmpty :: Parser [Element]
 pSigDorEmpty = pSigD <|> mempty

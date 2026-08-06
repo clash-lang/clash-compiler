@@ -215,6 +215,14 @@ runClashTest = defaultMain
               primitive for WrongReference.myMultiplyX. These names should be
               the same. |])
           }
+        , runTest "NamedSymbolsAndNumberedSymbols" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "~SYM[mySymbol] uses the same name as previously used in ~GENSYM")
+          }
+        , runTest "NamedSymbolsAndNumberedSymbols2" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "~GENSYM[mySymbol][1] would overwrite an earlier ~SYM[mySymbol]")
+          }
         , runTest "T1945" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Template function for returned False")
