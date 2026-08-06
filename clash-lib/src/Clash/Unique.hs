@@ -22,6 +22,7 @@ module Clash.Unique
 #endif
 
 import Data.Word (Word64)
+import GHC.Data.FastString (FastString)
 
 #ifdef UNIQUE_IS_WORD64
 import GHC.Word (Word64(W64#))
@@ -63,6 +64,14 @@ class Uniquable a where
 instance Uniquable Unique where
   getUnique = id
   setUnique = flip const
+
+-- | Uses the 'GHC.Types.Unique.Unique' GHC already assigned the 'FastString'
+-- through its global intern table; no hashing or string comparison involved.
+-- There is no way to construct a 'FastString' from a 'Unique' alone, so
+-- 'setUnique' is not supported.
+instance Uniquable FastString where
+  getUnique = fromGhcUnique . GHC.getUnique
+  setUnique = error "setUnique: cannot change the Unique of a FastString"
 
 #ifndef UNIQUE_IS_WORD64
 instance Uniquable Word64 where

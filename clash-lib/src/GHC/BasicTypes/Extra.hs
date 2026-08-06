@@ -15,25 +15,12 @@ import Control.DeepSeq
 import Data.Binary
 import GHC.Generics
 
+import GHC.Data.FastString.Extra ()
 import GHC.Types.SourceText
-
-#if MIN_VERSION_ghc(9,8,0)
-import Data.ByteString
-import GHC.Data.FastString
-import Unsafe.Coerce
-#endif
 
 deriving instance Generic InlineSpec
 instance NFData InlineSpec
 instance Binary InlineSpec
-
-#if MIN_VERSION_ghc(9,8,0)
-deriving instance Generic FastString
-instance Binary FastString
-instance Binary FastZString where
-  put = put . fastZStringToByteString
-  get = unsafeCoerce (get :: Get ByteString)
-#endif
 
 deriving instance Generic SourceText
 #if !MIN_VERSION_ghc(9,8,0)
