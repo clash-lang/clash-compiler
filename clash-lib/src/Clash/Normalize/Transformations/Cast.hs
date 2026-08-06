@@ -26,7 +26,7 @@ import Clash.Core.TermInfo (isCast)
 import Clash.Core.Util (castEqType, undefinedPrims, undefinedXPrims)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Core.Var (isGlobalId, varName)
-import Clash.Core.VarEnv (InScopeSet)
+import Clash.Core.VarEnv (InScopeSet, extendInScopeSetList)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Types
@@ -153,7 +153,11 @@ letCast _ e = return e
 -- @
 splitCastWork :: HasCallStack => NormRewrite
 splitCastWork ctx@(TransformContext is0 _) unchanged@(Letrec vs e') = do
-  (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is0) vs)
+  -- The new binders derive their name (and, unless it collides with the
+  -- in-scope set, their unique!) from the closest let-binder, which is one
+  -- of the binders of this letrec: make sure they are all in scope.
+  let is1 = extendInScopeSetList is0 (map fst vs)
+  (vss', Monoid.getAny -> hasChanged) <- listen (mapM (splitCastLetBinding is1) vs)
   let vs' = concat vss'
   if hasChanged then changed (Letrec vs' e')
                 else return unchanged
