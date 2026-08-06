@@ -307,6 +307,7 @@ Library
                       Clash.Util.Interpolate
                       Clash.Util.Supply
                       Clash.Pretty
+                      Clash.Warning
 
                       Clash.Verification.Pretty
 
@@ -434,6 +435,7 @@ test-suite unittests
                  Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist.Id
+                 Clash.Tests.Util
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize.Transformations
 

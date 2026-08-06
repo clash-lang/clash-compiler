@@ -105,7 +105,7 @@ import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Unique        (fromGhcUnique)
 import           Clash.Util
-  (MonadUnique (..), clogBase, flogBase, curLoc, namePat)
+  (MonadUnique (..), clogBase, flogBase, logBaseOutOfDomain, curLoc, namePat)
 import           Clash.Util.Supply   (Supply,freshId)
 import           Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
@@ -1530,6 +1530,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- integerLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
+    -- The arguments are out of the domain of 'flogBase', but
+    -- 'integerLogBase#' is total: mirror the values GHC computes at runtime.
+    -- Such calls typically appear in (unused) 'KnownNat' evidence for
+    -- ill-defined applications of e.g. 'GHC.TypeLits.Extra.CLog'.
+    | Just (a,b) <- integerLiterals args
+    , a > 1
+    -> (reduce . Literal . WordLiteral) (logBaseOutOfDomain a b)
 
   $(namePat 'GHC.Float.integerToFloat#)
     | [v] <- args
@@ -1545,6 +1552,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- naturalLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
+    -- See the note at 'GHC.Num.Integer.integerLogBase#' above.
+    | Just (a,b) <- naturalLiterals args
+    , a > 1
+    -> (reduce . Literal . WordLiteral) (logBaseOutOfDomain a b)
 
 
   $(namePat 'GHC.Num.Integer.integerToInt#)
@@ -2643,6 +2654,21 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            msk = mski `shiftL` fromInteger m .|. mskj
            resTyInfo = extractTySizeInfo tcm ty tys
        in reduce (mkBitVectorLit' resTyInfo msk val)
+    -- A zero-width argument may have been replaced by 'removedArg' -- e.g. by
+    -- 'removeUnusedExpr' -- making it a non-literal. The result is then simply
+    -- the (only) remaining literal argument. Note that the type arguments are
+    -- ordered [m, n]: 'm' occurs first in the signature of '(++#)'.
+    | [_dict, bv1, bv2] <- args
+    , [mTy, nTy] <- tys
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    , let resTyInfo = extractTySizeInfo tcm ty tys
+    , Just (msk, val) <- case (n, bitVectorLiteral bv1, m, bitVectorLiteral bv2) of
+        (_, Just l1, 0, _) -> Just l1
+        (0, _, _, Just l2) -> Just l2
+        (0, Nothing, 0, Nothing) -> Just (0, 0)
+        _ -> Nothing
+    -> reduce (mkBitVectorLit' resTyInfo msk val)
 
 -- Reduction
   $(namePat 'Clash.Sized.Internal.BitVector.reduceAnd#) -- :: KnownNat n => BitVector n -> Bit

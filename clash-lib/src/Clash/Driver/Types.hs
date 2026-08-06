@@ -288,7 +288,12 @@ data ClashOpts = ClashOpts
   { opt_werror :: Bool
   -- ^ Are warnings treated as errors.
   --
-  -- Command line flag: -Werror
+  -- Command line flags: -Werror, -fclash-werror
+  --
+  -- @-Werror@ is GHC's flag and hence also makes GHC's own warnings fatal;
+  -- @-fclash-werror@ only affects Clash's warnings. The latter is useful in
+  -- tests: a test that should not provoke any Clash warning can pass
+  -- @-fclash-werror@ and will then fail as soon as it does.
   , opt_inlineLimit :: Int
   -- ^ Change the number of times a function f can undergo inlining inside
   -- some other function g. This prevents the size of g growing dramatically.

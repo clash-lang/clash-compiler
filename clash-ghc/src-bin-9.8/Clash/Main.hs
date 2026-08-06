@@ -269,7 +269,10 @@ main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
   -- Propagate some GHC flags to Clash
   liftIO . modifyIORef' clashOpts $ \opts ->
     opts
-      { opt_werror = EnumSet.member Opt_WarnIsError (generalFlags dflags3)
+      -- Note the '||': -fclash-werror has already been parsed at this point,
+      -- and GHC's -Werror should not undo it.
+      { opt_werror = opt_werror opts
+                       || EnumSet.member Opt_WarnIsError (generalFlags dflags3)
       , opt_ghcDebugLevel = debugLevel dflags3
       }
 

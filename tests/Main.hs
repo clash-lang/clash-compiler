@@ -453,6 +453,12 @@ runClashTest = defaultMain
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
         , runTest "AppendZero" def
+          -- -fclash-werror turns the "Unmatchable constant as case subject"
+          -- warning into an error, see the module header.
+        , runTest "AppendRemovedArg" def{clashFlags=["-fclash-werror"]}
+          -- -fclash-werror turns the "Dubious primitive instantiation" warning
+          -- for Integer primitives into an error, see the module header.
+        , runTest "PopCountNoInteger" def{clashFlags=["-fclash-werror"]}
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
