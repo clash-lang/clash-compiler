@@ -1,4 +1,6 @@
 The changelog is managed using [qlog](https://github.com/marijn-qbaylogic/qlog/).
+It is part of the Nix development shell, so `nix develop` provides it without
+any installation. See the `qlog` README for how to install it otherwise.
 
 Changelog entries are stored in files, and then aggregated into `CHANGELOG.md`.
 Simple entries can be created using `qlog entry`, but more is possible by editing
