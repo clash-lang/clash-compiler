@@ -614,6 +614,12 @@ runClashTest = defaultMain
       , clashTestGroup "Issues" $
         [ runTest "T359" def{hdlSim=[]}
         , clashLibTest "T508" def
+        -- Regression tests for the keep-all-casts reimplementation of PR #1064:
+        , runTest "T1064A" def{hdlSim=[]}
+        , outputTest "T1064B" def
+        , runTest "T1064C" def{hdlSim=[]}
+        , runTest "T1064D" def{hdlSim=[]}
+        , runTest "T1064E" def{hdlSim=[]}
         , let _opts = def { hdlSim = [], hdlTargets = [Verilog] }
            in runTest "T1187" _opts
         , clashLibTest "T1388" def{hdlTargets=[VHDL]}
