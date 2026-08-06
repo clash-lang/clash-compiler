@@ -38,8 +38,8 @@ import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst (Subst, extendIdSubst, substTm)
 import Clash.Core.Term
-  ( CoreContext(..), LetBinding, PrimInfo(..), Term(..), TickInfo(..), collectArgs
-  , collectArgsTicks, mkApps, mkTicks, mkTmApps)
+  ( CoreContext(..), LetBinding, PrimInfo(..), Term(..), TickInfo(..)
+  , WorkInfo(..), collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)
 import Clash.Core.TyCon (TyCon(..), TyConMap, tyConDataCons)
 import Clash.Core.Type (Type, TypeView(..), mkTyConApp, splitFunForallTy, tyView, coreView)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize, mkInternalVar)
@@ -158,11 +158,19 @@ reduceNonRepPrim c e@(App _ _)
     then return e
     else do
       let eTy = inferCoreTypeOf tcm e
-      let resTy = snd (splitFunForallTy eTy)
+      let (remainingArgTys, resTy) = splitFunForallTy eTy
       let tv = tyView (coreView tcm resTy)
       case zeroLengthVecTerm tcm tv of
-        Just nilE -> changed (mkTicks nilE ticks)
-        Nothing -> case handlerM of
+        -- Only replace the whole application by @Nil@ if the primitive is
+        -- fully applied (a partially applied primitive has a function type,
+        -- so replacing it by @Nil@ would change its arity) and if it does
+        -- not always perform work (e.g. blackboxes like an VIO must be
+        -- rendered even if their result is zero-width).
+        Just nilE
+          | null remainingArgTys
+          , primWorkInfo p /= WorkAlways
+          -> changed (mkTicks nilE ticks)
+        _ -> case handlerM of
           Nothing -> return e
           Just handler -> do
             ultraArg <- Lens.view normalizeUltra
