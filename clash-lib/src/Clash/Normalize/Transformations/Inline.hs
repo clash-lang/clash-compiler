@@ -610,17 +610,20 @@ inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
       -- between clash-protocols' @Circuit a b@ and its underlying function
       -- type -- has no HDL significance: a cast in function position does
       -- not affect the component instantiation, and netlist generation
-      -- looks through such casts. Not inlining keeps binders with a
-      -- newtype-of-function result type, like Wishbone circuits, as
-      -- separate components.
+      -- looks through such casts. Respecting OPAQUE for such casts keeps
+      -- binders with a newtype-of-function result type, like Wishbone
+      -- circuits, as separate components.
       --
       -- Newtypes of *data* types (e.g. a newtype of a list) do not qualify:
       -- when their representation is untranslatable the cast must still be
-      -- eliminated by inlining.
+      -- eliminated by inlining. Non-OPAQUE binders are still inlined
+      -- regardless: leaving their casts in place changes the normalization
+      -- dynamics and can prevent convergence (seen in bittide-hardware's
+      -- transceiver core).
       newtypeRefl = isNewtypeHeaded tcm from
                  && isPolyFunCoreTy tcm from
                  && aeqType (normalizeType tcm from) (normalizeType tcm to)
-    case (nonRepFrom && not pushable && not (opaque && signalCast) && not newtypeRefl, bodyMaybe) of
+    case (nonRepFrom && not pushable && not (opaque && (signalCast || newtypeRefl)), bodyMaybe) of
       (True, Just b) -> do
         if overLimit then
           trace ($(curLoc) ++ [I.i|
