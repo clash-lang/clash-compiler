@@ -11,6 +11,7 @@ module Clash.Normalize.Transformations.Cast
 
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Writer (listen)
 import qualified Data.Monoid as Monoid (Any(..))
 import GHC.Stack (HasCallStack)
@@ -22,14 +23,15 @@ import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (normalizeType)
 import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet)
-import Clash.Debug (trace)
+import Clash.Driver.Warning (warnAbout)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
+  (TransformContext(..), bindings, clashOpts, curFun, tcCache, workFreeBinders)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Util (ClashException(..), curLoc)
+import Clash.Warning (ClashWarning(WarnCastSpecialization))
 
 -- | Push cast over an argument to a function into that function
 --
@@ -61,15 +63,18 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
   bndrs <- Lens.use bindings
   isWorkFree workFreeBinders bndrs e' >>= \case
     True -> go
-    False -> warn go
+    False -> warn >> go
  where
   go = specialize ctx e
-  warn = trace (unwords
-    [ "WARNING:", $(curLoc), "specializing a function on a non work-free"
-    , "cast. Generated HDL implementation might contain duplicate work."
-    , "Please report this as a bug.", "\n\nExpression where this occured:"
-    , "\n\n" ++ showPpr e
-    ])
+  warn = do
+    opts <- Lens.view clashOpts
+    (_,sp) <- Lens.use curFun
+    liftIO $ warnAbout opts WarnCastSpecialization sp $ unwords
+      [ $(curLoc) ++ "specializing a function on a non work-free"
+      , "cast. Generated HDL implementation might contain duplicate work."
+      , "Please report this as a bug.", "\n\nExpression where this occured:"
+      , "\n\n" ++ showPpr e
+      ]
 argCastSpec _ e = return e
 {-# SCC argCastSpec #-}
 
