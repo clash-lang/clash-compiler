@@ -250,6 +250,15 @@ isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
 --
 -- 3. IO actions, the translation of IO actions to sequential HDL constructs
 --    depends on IO actions to be propagated down as far as possible.
+-- | Like 'isLocalVar', but looks through casts (and ticks): a cast of a
+-- local variable introduces no work and must not be let-bound by ANF. In
+-- particular, inside the lambda argument of a higher-order primitive,
+-- let-binding it would float the lambda-bound variable out of the lambda.
+isLocalVarCast :: Term -> Bool
+isLocalVarCast (Cast e _ _) = isLocalVarCast e
+isLocalVarCast (Tick _ e) = isLocalVarCast e
+isLocalVarCast e = isLocalVar e
+
 collectANF :: HasCallStack => NormRewriteW
 collectANF ctx e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
@@ -257,7 +266,7 @@ collectANF ctx e@(App appf arg)
   = do
     tcm <- Lens.view tcCache
     untranslatable <- lift (isUntranslatable False arg)
-    let localVar   = isLocalVar arg
+    let localVar   = isLocalVarCast arg
         constantNoCR = isConstantNotClockReset tcm arg
     -- See Note [ANF no let-bind]
     case (untranslatable,localVar || constantNoCR, isSimBind conVarPrim,arg) of
@@ -280,7 +289,7 @@ collectANF _ (Letrec binds body) = do
   tcm <- Lens.view tcCache
   let isSimIO = isSimIOTy tcm (inferCoreTypeOf tcm body)
   untranslatable <- lift (isUntranslatable False body)
-  let localVar = isLocalVar body
+  let localVar = isLocalVarCast body
   -- See Note [ANF no let-bind]
   if localVar || untranslatable || isSimIO
     then do
@@ -315,7 +324,7 @@ collectANF _ e@(Case _ _ [(DataPat dc _ _,_)])
   | nameOcc (dcName dc) == Text.showt '(:-) = return e
 
 collectANF ctx (Case subj ty alts) = do
-    let localVar = isLocalVar subj
+    let localVar = isLocalVarCast subj
     let isConstantSubj = isConstant subj
 
     (subj',subjBinders) <- if localVar || isConstantSubj
@@ -343,10 +352,12 @@ collectANF ctx (Case subj ty alts) = do
   where
     doAlt :: Bool -> Term -> Alt -> StateT ([LetBinding],InScopeSet) NormalizeSession Alt
     doAlt isSimIOAlt subj' alt@(DataPat dc exts xs,altExpr) | not (bindsExistentials exts xs) = do
-      let lv = isLocalVar altExpr
+      let lv = isLocalVarCast altExpr
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
       let altExprIsConstant = isConstant altExpr
       let usesXs (Var n) = any (== n) xs
+          usesXs (Cast e' _ _) = usesXs e'
+          usesXs (Tick _ e') = usesXs e'
           usesXs _       = False
       -- See [ANF no let-bind]
       if or [isSimIOAlt, lv && (not (usesXs altExpr) || length alts == 1), altExprIsConstant]
@@ -364,7 +375,7 @@ collectANF ctx (Case subj ty alts) = do
           return (DataPat dc exts xs,Var altId)
     doAlt _ _ alt@(DataPat {}, _) = return alt
     doAlt isSimIOAlt _ alt@(pat,altExpr) = do
-      let lv = isLocalVar altExpr
+      let lv = isLocalVarCast altExpr
       let altExprIsConstant = isConstant altExpr
       -- See [ANF no let-bind]
       if isSimIOAlt || lv || altExprIsConstant
@@ -400,7 +411,7 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
   , isCon conPrim || isPrim conPrim
   = do
     untranslatable <- isUntranslatable False arg
-    case (untranslatable,stripTicks arg) of
+    case (untranslatable,stripCasts (stripTicks arg)) of
       (True,Let binds body) ->
         -- This is a situation similar to Note [CaseLet deshadow]
         let (binds1,body1) = deshadowLetExpr is0 binds body
@@ -409,6 +420,11 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
       (True,Lam {})   -> specialize ctx e
       (True,TyLam {}) -> specialize ctx e
       _               -> return e
+ where
+  -- The shape checks must look through casts, e.g. a lambda argument to a
+  -- higher-order primitive may be cast between function types.
+  stripCasts (Cast e0 _ _) = stripCasts (stripTicks e0)
+  stripCasts e0 = e0
 
 nonRepANF _ e = return e
 {-# SCC nonRepANF #-}

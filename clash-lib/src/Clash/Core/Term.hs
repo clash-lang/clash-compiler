@@ -49,6 +49,9 @@ module Clash.Core.Term
   , isLambdaBodyCtx
   , isTickCtx
   , walkTerm
+  , AppArg (..)
+  , collectAppArgs
+  , mkArgApps
   , collectArgs
   , collectArgsTicks
   , collectTicks
@@ -334,6 +337,45 @@ stripAllTicks = go
 
   goBinds (NonRec i x) = NonRec i (go x)
   goBinds (Rec ixs) = Rec (fmap go <$> ixs)
+
+-- | A single layer of a nested application: a term or type argument, or a
+-- tick or cast wrapped around the function part of an application.
+--
+-- Where 'collectArgs' can only look through ticks, an @['AppArg']@ as
+-- collected by 'collectAppArgs' also records the casts encountered between a
+-- function and its arguments. Cast layers can subsequently be floated
+-- outwards with 'Clash.Core.Util.squashArgs', which implements the push rules
+-- from \"System FC with Explicit Kind Equality\" (Weirich et al., ICFP '13).
+data AppArg
+  = CastCtx Type Type
+  -- ^ The function part was cast from the first to the second type
+  | TickCtx TickInfo
+  -- ^ The function part was annotated with a tick
+  | TypeArg Type
+  -- ^ The function part was applied to a type
+  | TermArg Term
+  -- ^ The function part was applied to a term
+  deriving (Show, Generic, NFData, Binary)
+
+-- | Like 'collectArgsTicks', but also collects the casts between a function
+-- and its arguments. The returned list is ordered innermost-first.
+collectAppArgs :: Term -> (Term, [AppArg])
+collectAppArgs = go []
+ where
+  go args (App e1 e2)    = go (TermArg e2:args) e1
+  go args (TyApp e t)    = go (TypeArg t:args) e
+  go args (Tick s e)     = go (TickCtx s:args) e
+  go args (Cast e t1 t2) = go (CastCtx t1 t2:args) e
+  go args e              = (e, args)
+
+-- | Inverse of 'collectAppArgs': apply a stack of 'AppArg's to a term.
+mkArgApps :: Term -> [AppArg] -> Term
+mkArgApps = foldl' go
+ where
+  go e (TermArg tm)    = App e tm
+  go e (TypeArg ty)    = TyApp e ty
+  go e (TickCtx info)  = Tick info e
+  go e (CastCtx t1 t2) = Cast e t1 t2
 
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term -> (Term, [Either Term Type])

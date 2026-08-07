@@ -29,7 +29,7 @@ import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy (..), Type (..), TypeView (..), coreView, coreView1, tyView)
+  (LitTy (..), Type (..), TypeView (..), repView, repView1, tyView)
 import Clash.Core.Util                  (tyNatSize, substArgTys)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
@@ -177,7 +177,7 @@ ghcTypeToHWType iw = go
           -> case tyConDataCons (UniqMap.find tc m) of
                [dc] -> case substArgTys dc args of
                  [_knownSymbol, _knownNat, tyView -> TyConApp _ [_,dom]] ->
-                  case tyView (coreView m dom) of
+                  case tyView (repView m dom) of
                    TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
                      tag1      <- domTag m tag0
                      period1   <- domPeriod m period0
@@ -330,12 +330,12 @@ liftE
 liftE = mapExceptT (MaybeT . pure . Just . coerce)
 
 domTag :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) String
-domTag m (coreView1 m -> Just ty) = domTag m ty
+domTag m (repView1 m -> Just ty) = domTag m ty
 domTag _ (LitTy (SymTy tag)) = pure tag
 domTag _ ty = throwE $ "Internal error. Cannot translate domain tag:\n" ++ showPpr ty
 
 domPeriod :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) Integer
-domPeriod m (coreView1 m -> Just ty) = domPeriod m ty
+domPeriod m (repView1 m -> Just ty) = domPeriod m ty
 domPeriod _ (LitTy (NumTy period)) = pure period
 domPeriod _ ty = throwE $ "Internal error. Cannot translate domain period:\n" ++ showPpr ty
 
@@ -351,7 +351,7 @@ fromType
   -- ^ Type representing some constructor
   -> ExceptT String (MaybeT m) a
 fromType tyNm constrs m ty =
-  case tyView (coreView m ty) of
+  case tyView (repView m ty) of
     TyConApp tcNm [] ->
       go constrs (nameOcc tcNm)
     _ ->

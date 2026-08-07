@@ -55,7 +55,7 @@ import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
-import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
+import           Clash.Core.Type                  (Type, splitRepFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
@@ -143,6 +143,8 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   emptyVarEnv
                   Map.empty
                   rcsMap
+                  emptyVarEnv -- binderOrigin
+                  Map.empty   -- originReachable
 
 normalize
   :: [Id]
@@ -192,7 +194,7 @@ normalize' nm = do
         in throw (ClashException sp msg msgExtra)
 
       -- check for unrepresentable result type
-      let (args,resTy) = splitCoreFunForallTy tcm ty1
+      let (args,resTy) = splitRepFunForallTy tcm ty1
           isTopEnt = nm `elemVarSet` topEnts
           isFunction = not $ null $ lefts args
       resTyRep <- not <$> isUntranslatableType False resTy
@@ -415,6 +417,12 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
                apply "caseCon" caseCon >->
                (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
                apply "reduceNonRepPrim" reduceNonRepPrim >->
+               -- Inlining a binder that was not normalized (due to a
+               -- non-representable result type) exposes casts; clean them up.
+               apply "caseCast" caseCast >->
+               apply "letCast" letCast >->
+               apply "inlineCastNonRep" inlineCastNonRep >->
+               apply "elimCastCast" elimCastCast >->
                apply "removeUnusedExpr" removeUnusedExpr) >->
              bottomupR (apply "flattenLet" flattenLet)) !->
     topdownSucR (apply "topLet" topLet) >->

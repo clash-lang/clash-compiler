@@ -35,11 +35,11 @@ import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad.Extra (orM)
 import qualified Control.Monad.Writer as Writer (listen)
-import Data.Bifunctor (bimap)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid (getAny)
 import qualified Data.Set.Ordered as OSet
 import qualified Data.Set.Ordered.Extra as OSet
@@ -64,15 +64,15 @@ import Clash.Core.Name
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
+  ( Term(..), TickInfo, collectArgs, collectArgsTicks, collectTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
   , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..), stripAllTicks)
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
-  (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
-  , mkPolyFunTy, mkTyConApp)
+  (LitTy(NumTy), Type(ForAllTy,LitTy,VarTy), applyFunTy, coreView, splitFunTy
+  , splitTyConAppM, normalizeType, mkPolyFunTy, mkTyConApp)
 import Clash.Core.TysPrim
-import Clash.Core.Util (listToLets)
+import Clash.Core.Util (castEqType, listToLets, mkCast)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, emptyVarEnv, extendInScopeSet, extendInScopeSetList
@@ -86,12 +86,13 @@ import Clash.Rewrite.Types
   , workFreeBinders, debugOpts, topEntities, specializationLimit)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
-  , isUntranslatableType, normalizeTermTypes, normalizeId, whnfRW)
+  , isUntranslatableType, whnfRW)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
-  (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
+  ( constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm
+  , recordBinderOrigin)
 import Clash.Unique (Unique)
 import Clash.Util (ClashException(..))
 
@@ -254,6 +255,50 @@ appProp ctx@(TransformContext is _) = \case
     setChanged
     go is0 e args (sp:ticks)
 
+  -- Merge back-to-back casts on the function part of an application; the
+  -- push rules below can then push a single cast in one go, and inverse
+  -- casts (e.g. from eta-expanding through a newtype of a function type)
+  -- disappear.
+  go is0 (Cast (collectTicks -> (Cast e fromI toI, ticksI)) from to) args@(_:_) ticks = do
+    tcm <- Lens.view tcCache
+    if castEqType tcm toI from
+      then do
+        setChanged
+        go is0 (mkCast tcm (mkTicks e ticksI) fromI to) args ticks
+      else
+        return (mkApps (mkTicks (Cast (mkTicks (Cast e fromI toI) ticksI) from to) ticks) args)
+
+  -- Push rule: move a cast between function types past a term argument
+  --
+  --   (e ▷ (a → b) ~ (a' → b')) x  ⇒  (e (x ▷ a' ~ a)) ▷ b ~ b'
+  go is0 (Cast e from to) (Left arg:args) ticks = do
+    tcm <- Lens.view tcCache
+    case (splitFunTy tcm from, splitFunTy tcm to) of
+      (Just (argFrom, resFrom), Just (argTo, resTo)) -> do
+        setChanged
+        go is0
+           (mkCast tcm (App e (mkCast tcm arg argTo argFrom)) resFrom resTo)
+           args
+           ticks
+      _ -> return (mkApps (mkTicks (Cast e from to) ticks) (Left arg:args))
+
+  -- TPush rule: move a cast between forall-types past a type argument
+  --
+  --   (e ▷ (∀tv.σ) ~ (∀tv'.σ')) @t  ⇒  (e @t) ▷ σ[tv:=t] ~ σ'[tv':=t]
+  go is0 (Cast e from to) (Right ty:args) ticks = do
+    tcm <- Lens.view tcCache
+    case (coreView tcm from, coreView tcm to) of
+      (ForAllTy fromTv fromBody, ForAllTy toTv toBody)
+        | coreTypeOf fromTv == coreTypeOf toTv -> do
+        setChanged
+        go is0
+           (mkCast tcm (TyApp e ty)
+                   (substTyWith [fromTv] [ty] fromBody)
+                   (substTyWith [toTv] [ty] toBody))
+           args
+           ticks
+      _ -> return (mkApps (mkTicks (Cast e from to) ticks) (Right ty:args))
+
   go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
 
   goAlt is0 args0 (p,e) = do
@@ -401,13 +446,16 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
 
-  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
+  -- NB: we do not normalize the types in the specialized-on argument: doing
+  -- so would rewrite one endpoint of the casts it contains (but not their
+  -- neighbors), making the casts in the specialized function misaligned.
+  let specArg = specArgIn
       -- Create binders and variable references for free variables in 'specArg'
       -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
       (specBndrsIn,specVars) = specArgBndrsAndVars specArg
       argLen  = length args
       specBndrs :: [Either Id TyVar]
-      specBndrs = map (Lens.over Lens._Left (normalizeId tcm)) specBndrsIn
+      specBndrs = specBndrsIn
 
       -- See Note [ticks and specialization]
       specAbs :: Either Term Type
@@ -451,6 +499,21 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                                        (mkBinderFor is0 tcm)
                                        (existingNames ++ newNames)
                                        args
+              -- Abstracting over the type arguments (replacing them with
+              -- fresh type variables) can produce an ill-typed body when a
+              -- term argument is consumed by an instantiated type variable,
+              -- e.g. @f :: forall a. Int -> a@ instantiated at a function
+              -- type and applied beyond its visible arity. Leave such terms
+              -- alone: after 'typeSpec' has specialized away the type
+              -- arguments, specializing on the term argument succeeds.
+              if Maybe.isNothing (applyTypeToArgsM tcm (coreTypeOf f) (argVars ++ [specArg]))
+              then do
+                traceIf (hasTransformationInfo AppliedTerm opts)
+                  ("Not specializing " ++ showPpr (varName f) ++
+                   ": a term argument is applied to a type variable") $
+                  return e
+              else do -- NondecreasingIndentation
+
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
               (newName, inl', specArg') <- case specArg of
@@ -496,6 +559,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
               newf <- mkFunction newName sp inl' newBody
+              recordBinderOrigin newf f
               -- Remember specialization
               (extra.specialisationHistory) %= UniqMap.insertWith (+) f 1
               (extra.specialisationCache)  %= Map.insert (f,argLen,specAbs) newf

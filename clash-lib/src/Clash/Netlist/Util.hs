@@ -100,8 +100,8 @@ import           Clash.Core.TermLiteral (termToDataError)
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, normalizeType,
-   splitCoreFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
+  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, repView1, normalizeType,
+   splitRepFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
   (splitShouldSplit, substArgTys, tyLitShow)
 import           Clash.Core.Var
@@ -237,6 +237,18 @@ coreTypeToHWTypeM'
   -> NetlistMonad (Maybe HWType)
 coreTypeToHWTypeM' ty =
   fmap stripFiltered <$> coreTypeToHWTypeM ty
+
+-- | Determine whether a cast between two core types is irrelevant to the
+-- generated HDL, i.e. whether both types translate to the same 'HWType'.
+-- Only such casts may be dropped during netlist generation. Casts between
+-- types with different representations -- e.g. when a custom bit
+-- representation is involved, or a width-changing coercion such as
+-- @Index 256 ~ Integer@ -- must not be silently dropped.
+castHasSameRepr :: Type -> Type -> NetlistMonad Bool
+castHasSameRepr from to = do
+  fromHwTyM <- coreTypeToHWTypeM' from
+  toHwTyM <- coreTypeToHWTypeM' to
+  pure (fromHwTyM == toHwTyM)
 
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
@@ -394,7 +406,7 @@ coreTypeToHWType builtInTranslation reprs m ty = do
               (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
   -- Strip transparant types:
-  go _ (coreView1 m -> Just ty') =
+  go _ (repView1 m -> Just ty') =
     coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
   go _ (tyView -> TyConApp tc args) = runExceptT $ do
@@ -867,12 +879,20 @@ orNothing :: Bool -> a -> Maybe a
 orNothing True a = Just a
 orNothing False _ = Nothing
 
+-- | Strip the casts wrapped around a (potential) primitive application. The
+-- result of a primitive may be cast, e.g. from an element type to 'Signal';
+-- a requested result name ('renameBinder') applies through those casts.
+stripCastSpine :: Term -> Term
+stripCastSpine (Cast x _ _) = stripCastSpine x
+stripCastSpine (Tick t x) = Tick t (stripCastSpine x)
+stripCastSpine x = x
+
 -- | Set the name of the binder if the given term is a blackbox requesting
 -- a specific name for the result binder. It might return multiple names in
 -- case of a multi result primitive.
 --
 renameBinder :: (Id, Term) -> NetlistMonad [(Id, Id)]
-renameBinder (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ -> do
+renameBinder (i, collectArgsTicks . stripCastSpine -> (k, args, ticks)) = withTicks ticks $ \_ -> do
   case k of
     Prim p ->
       case primMultiResult p of
@@ -2034,7 +2054,7 @@ checkTopEntityPorts
   -> ()
 checkTopEntityPorts typeTrans reprs tcm topId topM =
   let
-    (argTys, resTy) = splitCoreFunForallTy tcm (coreTypeOf topId)
+    (argTys, resTy) = splitRepFunForallTy tcm (coreTypeOf topId)
     -- Only value arguments carry ports; type/dictionary arguments are skipped.
     -- 'splitShouldSplit' mirrors 'separateArguments', so the resulting types
     -- align with the (already split) ports in the annotation.

@@ -62,7 +62,8 @@ import Clash.Core.Term
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
 import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
-import Clash.Core.Util (listToLets, mkInternalVar)
+import Clash.Core.Evaluator.KPush (kpush)
+import Clash.Core.Util (listToLets, mkInternalVar, squashCollectApp)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
@@ -347,6 +348,25 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
     isLitX n (LitTy (NumTy m)) = n == m
     isLitX n (coreView1 tcm -> Just t) = isLitX n t
     isLitX _ _ = False
+
+  -- The subject is a cast. Push the cast into the arguments of the applied
+  -- data constructor (KPush), or drop it when it squashes to refl, and try
+  -- again. When a casted primitive application is scrutinised, we try to
+  -- reduce it to WHNF first; the evaluator pushes casts too.
+  (Cast {}, _, _)
+    | Just (fun, args1, castM, ticks1) <- squashCollectApp tcm is0 subj
+    -> case (fun, castM) of
+         (_, Nothing) ->
+           changed (Case (mkApps (mkTicks fun ticks1) args1) ty alts)
+         (Data dc, Just co)
+           | Just args2 <- kpush tcm dc args1 co
+           -> changed (Case (mkApps (mkTicks (Data dc) ticks1) args2) ty alts)
+         (Prim _, Just _) ->
+           whnfRW True ctx subj $ \ctx1 subj1 -> case collectArgsTicks subj1 of
+             (Literal l,_,_) -> caseCon ctx1 (Case (Literal l) ty alts)
+             (Data _,_,_)    -> caseCon ctx1 (Case subj1 ty alts)
+             _               -> caseOneAlt e
+         _ -> caseOneAlt e
 
   -- Otherwise check whether the entire case-expression has a single
   -- alternative, and pick that one.
