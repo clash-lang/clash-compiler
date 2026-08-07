@@ -543,7 +543,8 @@ boolFromBitVector
   -> TExpr
   -> State (BlockState VHDLState) TExpr
 boolFromBitVector n =
-  outputCoerce (BitVector n) Bool (\i -> "unsigned(" <> i <> ") > 0")
+  -- @>@ yields a boolean, but a 'Bool' is a std_logic
+  outputCoerce (BitVector n) Bool (\i -> "to_std_logic(unsigned(" <> i <> ") > 0)")
 
 -- | Used to create an output `Unsigned` from a `BitVector` of given
 -- size. Works in a similar way to `boolFromBit` above.
@@ -572,7 +573,10 @@ boolFromBits
   -> TExpr
   -> State (BlockState VHDLState) [TExpr]
 boolFromBits inNames = outputFn (map (const Bit) inNames) Bool
-  (foldl (<>) "" . intersperse " and " . map (\i -> "(" <> i <> " = '1')")) inNames
+  -- The conjunction yields a boolean, but a 'Bool' is a std_logic
+  (\is -> "to_std_logic("
+       <> foldl (<>) "" (intersperse " and " (map (\i -> "(" <> i <> " = '1')") is))
+       <> ")") inNames
 
 -- | Used to create an output value with an arbitrary VHDL coercion.
 -- The expression given should be the identifier of the output value

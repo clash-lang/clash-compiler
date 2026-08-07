@@ -1,0 +1,1 @@
+CHANGED: Sum types and `Bool` are now rendered as `std_logic_vector` and `std_logic` in VHDL instead of enums. A VHDL enum can't represent an undefined value and isn't allowed on ports of Vivado block designs. `-fclash-no-render-enums` is still accepted but does nothing. Fixes [#2193](https://github.com/clash-lang/clash-compiler/issues/2193).

@@ -20,7 +20,7 @@
       ~GENSYM[~RESULT_delay][4] : process(~ARG[2])
       begin
         if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-          if ~ARG[3] then
+          if ~ARG[3] = '1' then
             ~RESULT <= ~ARG[5];
           end if;
         end if;
@@ -59,7 +59,7 @@
           ~RESULT <= ~CONST[6];
         els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
           ~IF ~ISACTIVEENABLE[4] ~THEN
-          if ~ARG[4] then
+          if ~ARG[4] = '1' then
             ~RESULT <= ~ARG[7];
           end if;
           ~ELSE
@@ -94,7 +94,7 @@
         if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
           ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
             ~RESULT <= ~CONST[6];
-          els~FIif ~ARG[4] then
+          els~FIif ~ARG[4] = '1' then
             ~RESULT <= ~ARG[7];
           end if;
         end if;
@@ -104,7 +104,7 @@
         ~IF ~ISUNDEFINED[6] ~THEN ~ELSEif ~ARG[3] = ~IF ~ISACTIVEHIGH[0] ~THEN '1' ~ELSE '0' ~FI then
           ~RESULT <= ~CONST[6];
         els~FIif ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2]) then
-          if ~ARG[4] then
+          if ~ARG[4] = '1' then
             ~RESULT <= ~ARG[7];
           end if;
         end if;
@@ -149,7 +149,7 @@
       begin
         ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
         wait for ~LONGESTPERIOD ps;
-        ~IF~ISACTIVEENABLE[1]~THENwhile ~ARG[1] ~ELSE~FIloop
+        ~IF~ISACTIVEENABLE[1]~THENwhile ~ARG[1] = '1' ~ELSE~FIloop
           ~RESULT <= not ~RESULT;
           wait for ~SYM[1];
           ~RESULT <= not ~RESULT;
@@ -185,7 +185,7 @@
         ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
         wait for ~LONGESTPERIOD ps;
 
-        ~IF~ISACTIVEENABLE[2]~THENwhile ~ARG[2] ~ELSE~FIloop
+        ~IF~ISACTIVEENABLE[2]~THENwhile ~ARG[2] = '1' ~ELSE~FIloop
           ~SYM[1] := to_integer(~VAR[periods][1]) * 1 fs;
           ~SYM[2] := ~SYM[1] / 2;
           ~SYM[3] := ~SYM[1] - ~SYM[2];
@@ -224,12 +224,12 @@
     kind: Declaration
     type: 'unsafeFromReset
       :: Reset dom -> Signal dom Bool'
-    template: ~RESULT <= true when ~ARG[0] = '1' else false;
+    template: ~RESULT <= ~ARG[0];
     workInfo: Never
 - BlackBox:
     name: Clash.Signal.Internal.unsafeToReset
     kind: Declaration
     type: 'unsafeToReset ::
       KnownDomain dom => Signal dom Bool -> Reset dom'
-    template: ~RESULT <= '1' when ~ARG[1] = true else '0';
+    template: ~RESULT <= ~ARG[1];
     workInfo: Never

@@ -24,37 +24,37 @@
     kind: Expression
     type: 'eq# :: Signed n
       -> Signed n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Signed.neq#
     kind: Expression
     type: 'neq# :: Signed
       n -> Signed n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Signed.lt#
     kind: Expression
     type: 'lt# :: Signed n
       -> Signed n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Signed.ge#
     kind: Expression
     type: 'ge# :: Signed n
       -> Signed n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Signed.gt#
     kind: Expression
     type: 'gt# :: Signed n
       -> Signed n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Signed.le#
     kind: Expression
     type: 'le# :: Signed n
       -> Signed n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Signed.minBound#
     comment: the quantification with signed gives the array an ascending index
