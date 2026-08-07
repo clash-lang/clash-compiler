@@ -54,6 +54,7 @@ module Clash.Core.Type
   , applyFunTy
   , findFunSubst
   , reduceTypeFamily
+  , isEvidenceNewTyCon
   , isIntegerTy
   , normalizeType
   , varAttrs
