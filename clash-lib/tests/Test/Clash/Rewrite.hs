@@ -107,6 +107,8 @@ instance Default NormalizeState where
     , _inlineHistory=emptyVarEnv
     , _primitiveArgs=Map.empty
     , _recursiveComponents=emptyVarEnv
+    , _binderOrigin=emptyVarEnv
+    , _originReachable=Map.empty
     }
 
 instance Default InScopeSet where
