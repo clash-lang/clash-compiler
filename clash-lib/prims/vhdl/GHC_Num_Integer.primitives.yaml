@@ -175,7 +175,7 @@
     kind: Expression
     type: 'integerEq :: Integer
       -> Integer -> Bool'
-    template: to_std_logic(~ARG[0] = ~ARG[1])
+    template: eq_x(~ARG[0], ~ARG[1])
     warning: 'GHC.Num.Integer.integerEq: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
@@ -183,7 +183,7 @@
     kind: Expression
     type: 'integerNe :: Integer
       -> Integer -> Bool'
-    template: to_std_logic(~ARG[0] /= ~ARG[1])
+    template: neq_x(~ARG[0], ~ARG[1])
     warning: 'GHC.Num.Integer.integerNe: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:

@@ -3,13 +3,13 @@
     kind: Expression
     type: 'eqInt :: Int ->
       Int -> Bool'
-    template: to_std_logic(~ARG[0] = ~ARG[1])
+    template: eq_x(~ARG[0], ~ARG[1])
 - BlackBox:
     name: GHC.Classes.neInt
     kind: Expression
     type: 'neInt :: Int ->
       Int -> Bool'
-    template: to_std_logic(~ARG[0] /= ~ARG[1])
+    template: neq_x(~ARG[0], ~ARG[1])
 - BlackBox:
     name: GHC.Classes.&&
     kind: Expression

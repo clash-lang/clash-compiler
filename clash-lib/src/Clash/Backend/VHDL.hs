@@ -621,11 +621,62 @@ tyDec hwty = do
 
 
 
+-- | The comparisons the 'Eq' and 'Ord' black boxes need, with the VHDL operator
+-- each one wraps.
+xCompareEq, xCompareOrd :: [(VHDLM Doc, VHDLM Doc)]
+xCompareEq  = [("eq_x", "="), ("neq_x", "/=")]
+xCompareOrd = xCompareEq ++
+  [("lt_x", "<"), ("le_x", "<="), ("gt_x", ">"), ("ge_x", ">=")]
+
+-- | Comparison helpers that propagate metavalues in simulation.
+--
+-- VHDL relational operators answer definitely on a metavalue: @"000X" = "0001"@
+-- is @false@. Guarded by @translate_off@, so synthesis sees the plain operator.
+xCompare
+  :: [(VHDLM Doc, VHDLM Doc)]
+  -- ^ Helper names and the operators they wrap
+  -> VHDLM Doc
+  -- ^ Operand type
+  -> (VHDLM Doc -> VHDLM Doc)
+  -- ^ Coerce an operand to something @Is_X@ accepts. @unsigned@ and @signed@
+  -- are array types of their own, so they need a conversion.
+  -> (VHDLM Doc, VHDLM Doc)
+xCompare ops tyNm toSlv = (vcat (mapM dec ops), vcat (mapM body ops))
+ where
+  sig nm =
+    "function" <+> nm <+> parens ("l" <> comma <+> "r" <+> colon <+> "in" <+> tyNm)
+               <+> "return" <+> "std_logic"
+
+  dec (nm,_) = sig nm <> semi
+
+  body (nm,vhdlOp) =
+    sig nm <+> "is" <> line <>
+    "begin" <> line <>
+      indent 2
+        ( "-- pragma translate_off" <> line <>
+          "if" <+> isX "l" <+> "or" <+> isX "r" <+> "then" <> line <>
+            indent 2 ("return" <+> squotes (char 'X') <> semi) <> line <>
+          "end" <+> "if" <> semi <> line <>
+          "-- pragma translate_on" <> line <>
+          "return" <+> "to_std_logic" <> parens ("l" <+> vhdlOp <+> "r") <> semi
+        ) <> line <>
+    "end" <> semi
+
+  isX o = "is_x" <> parens (toSlv o)
+
+-- | Add the comparison helpers for an operand type to its other functions.
+withXCompare
+  :: (VHDLM Doc, VHDLM Doc)
+  -> (VHDLM Doc, VHDLM Doc)
+  -> Maybe (VHDLM Doc, VHDLM Doc)
+withXCompare (decs, bodies) (xDecs, xBodies) =
+  Just (decs <> line <> xDecs, bodies <> line <> xBodies)
+
 funDec :: HdlSyn -> HWType -> Maybe (VHDLM Doc,VHDLM Doc)
 -- 'Bool' is absent here: 'normaliseType' maps it onto 'Bit', so both share these
 -- @std_logic@ conversions. That is also why @tagToEnum@ and @dataToTag@ live
 -- here, they only ever apply to 'Bool'.
-funDec _ bit@Bit = Just
+funDec _ bit@Bit = withXCompare
   ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <> semi <> line <>
     "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> tyName bit <> semi <> line <>
@@ -660,8 +711,9 @@ funDec _ bit@Bit = Just
                                 ]) <> line <>
     "end" <> semi
   )
+  (xCompare xCompareEq (tyName bit) id)
 
-funDec _ (Signed _) = Just
+funDec _ (Signed _) = withXCompare
   ( "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "signed" <> semi
   , "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
@@ -674,8 +726,9 @@ funDec _ (Signed _) = Just
       indent 2 ("return" <+> "signed" <> parens ("islv") <> semi) <> line <>
     "end" <> semi
   )
+  (xCompare xCompareOrd "signed" (\o -> "std_logic_vector" <> parens o))
 
-funDec _ (Unsigned _) = Just
+funDec _ (Unsigned _) = withXCompare
   ( "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "unsigned" <> semi
   , "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <+> "is"  <> line <>
@@ -689,6 +742,7 @@ funDec _ (Unsigned _) = Just
     "end" <> semi
 
   )
+  (xCompare xCompareOrd "unsigned" (\o -> "std_logic_vector" <> parens o))
 
 funDec _ t@(Product _ labels elTys) = Just
   ( "function" <+> "toSLV" <+> parens ("p :" <+> sizedTyName t) <+> "return std_logic_vector" <> semi <> line <>
@@ -763,7 +817,7 @@ funDec syn t@(Vector _ elTy) = Just
     eSz     = int (typeSize elTy)
     getElem = "islv" <> parens ("i * " <> eSz <+> "to (i+1) * " <> eSz <+> "- 1")
 
-funDec _ (BitVector _) = Just
+funDec _ (BitVector _) = withXCompare
   ( "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <> semi
   , "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
@@ -775,6 +829,7 @@ funDec _ (BitVector _) = Just
       indent 2 ("return" <+> "slv" <> semi) <> line <>
     "end" <> semi
   )
+  (xCompare xCompareOrd "std_logic_vector" id)
 
 funDec syn t@(RTree _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
@@ -1477,16 +1532,22 @@ inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ Cont e) = fmap Just $
   pretty id_ <+> larrow <+> align (expr_ False e) <> semi
 
-inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
+inst_ (CondAssignment id_ sigTy scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   pretty id_ <+> larrow
-           <+> align (vsep (sequence [expr_ False t <+> "when" <+>
-                                      -- A 'Bool' is a std_logic, so it needs a
-                                      -- test to become a condition
-                                      parens (expr_ False scrut <+> "=" <+> squotes (int 1)) <+> "else"
+           <+> align (vsep (sequence [expr_ False t <+> "when" <+> cond (int 1) <+> "else"
+                                      -- Don't silently pick a branch when the
+                                      -- condition is undefined
+                                     ,"-- pragma translate_off"
+                                     ,sizedQualTyNameErrValue sigTy <+> "when"
+                                        <+> parens (expr_ False scrut <+> "/=" <+> squotes (int 0))
+                                        <+> "else"
+                                     ,"-- pragma translate_on"
                                      ,expr_ False f <> semi
                                      ]))
   where
     (t,f) = if b then (l,r) else (r,l)
+    -- 'Bool' is a std_logic, so it needs an explicit test to become a condition
+    cond v = parens (expr_ False scrut <+> "=" <+> squotes v)
 
 inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _ _) es) =
   inst_' id_ scrut scrutTy es

@@ -149,7 +149,7 @@
     kind: Expression
     type: 'eqInteger :: Integer
       -> Integer -> Bool'
-    template: to_std_logic(~ARG[0] = ~ARG[1])
+    template: eq_x(~ARG[0], ~ARG[1])
     warning: 'GHC.Integer.Type.eqInteger: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
@@ -157,7 +157,7 @@
     kind: Expression
     type: 'neqInteger :: Integer
       -> Integer -> Bool'
-    template: to_std_logic(~ARG[0] /= ~ARG[1])
+    template: neq_x(~ARG[0], ~ARG[1])
     warning: 'GHC.Integer.Type.neqInteger: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
@@ -257,7 +257,7 @@
     kind: Expression
     type: 'testBitInteger
       :: Integer -> Int# -> Bool'
-    template: to_std_logic(~VAR[input][0](to_integer(~ARG[1])) = '1')
+    template: eq_x(~VAR[input][0](to_integer(~ARG[1])), '1')
     warning: 'GHC.Integer.Type.testBitInteger: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:

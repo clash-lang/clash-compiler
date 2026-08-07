@@ -1,0 +1,1 @@
+FIXED: Comparisons and two-way selections in generated VHDL no longer hide undefined values in simulation. The generated types package provides `eq_x` and friends which return `'X'` on a metavalue, guarded by `translate_off` so synthesis is unaffected. Follows on from [#2193](https://github.com/clash-lang/clash-compiler/issues/2193).
