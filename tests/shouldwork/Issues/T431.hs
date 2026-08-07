@@ -47,4 +47,9 @@ mainVHDL = do
   assertIn "\"01\" when \"00\"" content
   assertIn "\"11\" when \"01\"" content
   assertIn "\"00\" when \"10\"" content
-  assertIn "\"10\" when others" content
+
+  assertIn "\"10\" when \"11\"" content
+
+  -- `when others` is only reached by a metavalue, so it must be undefined
+  assertNotIn "\"10\" when others" content
+  assertIn "=> '-') when others" content

@@ -1558,7 +1558,7 @@ inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _ _) es) =
 inst_ (CondAssignment id_ _ scrut scrutTy@(CustomProduct _ _ _ _ _) es) =
   inst_' id_ scrut scrutTy es
 
-inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
+inst_ (CondAssignment id_ sigTy scrut scrutTy es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <> line <>
       indent 2 (pretty id_ <+> larrow <+> align (vcat (punctuate comma (conds esNub)) <> semi))
   where
@@ -1567,6 +1567,14 @@ inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
 
     conds :: [(Maybe Literal,Expr)] -> VHDLM [Doc]
     conds []                = return []
+    -- Every constructor gets a choice of its own, so `others` is only reached by
+    -- a metavalue. Encodings without a constructor become a don't-care instead
+    -- of aliasing the last one.
+    conds [(Just c,e)]      =
+      expr_ False e <+> "when" <+> patLit scrutTy c <:>
+        (sizedQualTyNameErrValue sigTy <+> "when" <+> "others" <:> return [])
+    -- A real catch-all also covers unlisted encodings, which we can't tell apart
+    -- from metavalues here.
     conds [(_,e)]           = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'

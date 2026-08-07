@@ -1,0 +1,1 @@
+FIXED: A `case` on a sum type no longer selects its last alternative when the subject is undefined. Fixes [#2194](https://github.com/clash-lang/clash-compiler/issues/2194).
