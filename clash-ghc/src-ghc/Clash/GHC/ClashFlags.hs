@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2021,      QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022,      Google Inc.,
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -83,7 +83,7 @@ flagsClash r = [
   , defFlag "fclash-aggressive-x-optimization-blackboxes" $ NoArg (liftEwM (setAggressiveXOptBB r))
   , defFlag "fclash-inline-workfree-limit"       $ IntSuffix (liftEwM . setInlineWFLimit r)
   , defFlag "fclash-edalize"                     $ NoArg (liftEwM (setEdalize r))
-  , defFlag "fclash-no-render-enums"             $ NoArg (liftEwM (setNoRenderEnums r))
+  , defFlag "fclash-no-render-enums"             $ NoArg (deprecatedNoOp "no-render-enums" "sum types are always rendered as bitvectors")
   , defFlag "fclash-timescale-precision"         $ SepArg (setTimescalePrecision r)
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
@@ -105,6 +105,20 @@ deprecated wrong right f a = do
                              ++ right
                              ++ "' instead.")
   liftEwM (f a)
+
+-- | Print deprecation warning for a flag that no longer has any effect
+deprecatedNoOp
+  :: String
+  -- ^ Deprecated flag
+  -> String
+  -- ^ Why the flag is a no-op now
+  -> EwM IO ()
+deprecatedNoOp flag reason =
+  addWarn ("Using '-fclash-" ++ flag
+                             ++ "' is deprecated, it no longer has any effect: "
+                             ++ reason
+                             ++ ". It is accepted for backwards compatibility \
+                                \and will be removed in a future release.")
 
 setInlineLimit :: IORef ClashOpts
                -> Int
@@ -336,9 +350,6 @@ setRewriteHistoryFile r arg = do
  where
   setFile file opts =
     opts { opt_debug = (opt_debug opts) { dbg_historyFile = Just file } }
-
-setNoRenderEnums :: IORef ClashOpts -> IO ()
-setNoRenderEnums r = modifyIORef r (\c -> c { opt_renderEnums = False })
 
 setNoConcurrentTopEntities :: IORef ClashOpts -> IO ()
 setNoConcurrentTopEntities r = modifyIORef r (\c -> c { opt_concurrentTopEntities = False })

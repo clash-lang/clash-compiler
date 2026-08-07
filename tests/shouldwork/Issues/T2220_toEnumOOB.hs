@@ -12,9 +12,8 @@ topEntity x | x == 3    = Nothing
 
 {-
 Because of the concurrent nature of the VHDL generate by clash,
-in VHDL the toEnum will be called with on 3 too.
-This toEnum is implemented in VHDL by fromSLV,
-which used to throw an exception on out-of-bound values.
+in VHDL the toEnum will be called with on 3 too. Back when sum types were
+rendered as enums this went through fromSLV, which threw on out-of-bound values.
 -}
 
 testBench :: Signal System Bool

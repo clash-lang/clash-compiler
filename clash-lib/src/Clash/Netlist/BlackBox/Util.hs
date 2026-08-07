@@ -81,7 +81,7 @@ import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend
-  (Backend (..), DomainMap, Usage (..), AggressiveXOptBB(..), RenderEnums(..))
+  (Backend (..), DomainMap, Usage (..), AggressiveXOptBB(..))
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
 import           Clash.Netlist.Types
@@ -599,13 +599,12 @@ renderElem b (IF c t f) = do
   iw <- iwWidth
   hdl <- gets hdlKind
   syn <- hdlSyn
-  enums <- renderEnums
   xOpt <- aggressiveXOptBB
-  c' <- check (coerce xOpt) iw hdl syn enums c
+  c' <- check (coerce xOpt) iw hdl syn c
   if c' > 0 then renderTemplate b t else renderTemplate b f
   where
-    check :: Backend backend => Bool -> Int -> HDL -> HdlSyn -> RenderEnums -> Element -> State backend Int
-    check xOpt iw hdl syn enums c' = case c' of
+    check :: Backend backend => Bool -> Int -> HDL -> HdlSyn -> Element -> State backend Int
+    check xOpt iw hdl syn c' = case c' of
       (Size e)   -> pure $ typeSize (lineToType b [e])
       (Length e) -> pure $ case lineToType b [e] of
                        (Vector n _)              -> n
@@ -661,9 +660,6 @@ renderElem b (IF c t f) = do
                           isScalar _ Bit          = 1
                           isScalar _ Bool         = 1
                           isScalar VHDL Integer   = 1
-                          isScalar VHDL (Sum _ _) = case enums of
-                                                       RenderEnums True  -> 1
-                                                       RenderEnums False -> 0
                           isScalar _ _            = 0
                         in pure $ isScalar hdl ty
 
@@ -729,13 +725,13 @@ renderElem b (IF c t f) = do
                 | otherwise -> 0
               Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
       (And es)   -> do
-        es' <- mapM (check xOpt iw hdl syn enums) es
+        es' <- mapM (check xOpt iw hdl syn) es
         pure $ if all (/=0) es'
                        then 1
                        else 0
       CmpLE e1 e2 -> do
-        v1 <- check xOpt iw hdl syn enums e1
-        v2 <- check xOpt iw hdl syn enums e2
+        v1 <- check xOpt iw hdl syn e1
+        v2 <- check xOpt iw hdl syn e2
         if v1 <= v2
           then pure 1
           else pure 0
