@@ -49,7 +49,8 @@ import Clash.Core.Name
 import Clash.Core.Pretty                 (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-import Clash.Core.TyCon                  (TyConMap, tyConDataCons)
+import Clash.Core.TyCon
+  (AlgTyConRhs (..), TyCon (..), TyConMap, tyConDataCons)
 import Clash.Core.Type
 import Clash.Core.TysPrim                (liftedTypeKind, typeNatKind)
 import Clash.Core.Var                    (Id, Var(..), mkLocalId, mkTyVar)
@@ -89,8 +90,36 @@ listToLets xs body = foldr go body (sccLetBindings xs)
 -- reduced, but newtypes and 'Signal' are kept: those equalities are carried
 -- by casts at the term level.
 castEqType :: TyConMap -> Type -> Type -> Bool
-castEqType tcm ty1 ty2 =
-  ty1 == ty2 || normalizeFamilies tcm ty1 == normalizeFamilies tcm ty2
+castEqType tcm = go
+ where
+  -- Simultaneous descent that only falls back to a full 'normalizeFamilies'
+  -- for subtrees whose head may change under normalization. Heads that are
+  -- inert -- not a type family, not a transparent constraint-evidence
+  -- newtype -- survive 'normalizeFamilies' with their head intact, so two
+  -- unequal inert heads decide the comparison without normalizing (and
+  -- reconstructing) either type. This runs on every @Cast@ node visit in
+  -- the normalization fixpoint loops, where the common answer is a cheap
+  -- \"not equal\".
+  go ty1 ty2 = case (tyView ty1, tyView ty2) of
+    (TyConApp tc1 args1, TyConApp tc2 args2)
+      | inert tc1, inert tc2
+      -> tc1 == tc2
+      && length args1 == length args2
+      && and (zipWith go args1 args2)
+    (FunTy a1 r1, FunTy a2 r2) -> go a1 a2 && go r1 r2
+    (FunTy {}, TyConApp tc _) | inert tc -> False
+    (TyConApp tc _, FunTy {}) | inert tc -> False
+    _ -> normalizeFamilies tcm ty1 == normalizeFamilies tcm ty2
+
+  -- A head 'normalizeFamilies' cannot rewrite: not a type family
+  -- ('FunTyCon'), and not a class or constraint-evidence newtype. Keep in
+  -- sync with 'normalizeFamilies'.
+  inert tc = case UniqMap.lookup tc tcm of
+    Just (FunTyCon {}) -> False
+    Just (AlgTyCon {algTcRhs = NewTyCon {}, isClassTc}) ->
+      not (isClassTc || isEvidenceNewTyCon tc)
+    Just _ -> True
+    Nothing -> False
 
 -- | Smart constructor for 'Cast'. Drops casts that are refl under
 -- 'castEqType' and merges back-to-back casts.
