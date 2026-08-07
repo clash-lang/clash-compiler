@@ -91,7 +91,8 @@ import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
-  (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
+  ( constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm
+  , recordBinderOrigin)
 import Clash.Unique (Unique)
 import Clash.Util (ClashException(..))
 
@@ -558,6 +559,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
               newf <- mkFunction newName sp inl' newBody
+              recordBinderOrigin newf f
               -- Remember specialization
               (extra.specialisationHistory) %= UniqMap.insertWith (+) f 1
               (extra.specialisationCache)  %= Map.insert (f,argLen,specAbs) newf

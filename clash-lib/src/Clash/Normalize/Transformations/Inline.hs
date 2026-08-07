@@ -14,6 +14,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -33,6 +34,7 @@ module Clash.Normalize.Transformations.Inline
   , inlineWorkFree
   ) where
 
+import Control.Lens ((%=))
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad ((>=>))
@@ -42,12 +44,14 @@ import Data.Default (Default(..))
 import Data.Either  (lefts)
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 import GHC.BasicTypes.Extra (isNoInline)
+import GHC.Types.Basic (InlineSpec(..))
 
 import qualified Clash.Explicit.SimIO as SimIO
 import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV), xToBV)
@@ -55,20 +59,21 @@ import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV), 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.FreeVars
-  (countFreeOccurances, freeLocalIds)
+  (countFreeOccurances, freeLocalIds, typeFreeVars)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
-import Clash.Core.Name (Name(..), NameSort(..))
+import Clash.Core.Name
+  (Name(..), NameSort(..), appendToName, mkUnsafeInternalName)
 import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
 import Clash.Core.Subst
 import qualified Clash.Core.Term as Term
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
-  , collectArgsTicks, mkApps , mkTicks, stripTicks)
+  , collectArgsTicks, mkAbstraction, mkApps , mkTicks, stripTicks)
 import Clash.Core.TermInfo (isLocalVar, termSize)
 import Clash.Core.TyCon (AlgTyConRhs(..), TyCon(..), TyConMap)
 import Clash.Core.Type
-  (Type, TypeView(..), isClassTy, isPolyFunCoreTy, normalizeType, splitFunTy
+  (Type, TypeView(..), isClassTy, isPolyFunCoreTy, mkFunTy, normalizeType, splitFunTy
   , tyView)
 import Clash.Core.Util (isSignalType, primUCo)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -84,17 +89,19 @@ import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, tcCache, topEntities
+  ( TransformContext(..), bindings, curFun, extra, tcCache, topEntities
   , inlineConstantLimit, inlineFunctionLimit, inlineLimit
   , inlineWFCacheLimit, primitives)
 import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
-  , isUntranslatable, isUntranslatableType, isVoidWrapper, zoomExtra)
+  , isUntranslatable, isUntranslatableType, isVoidWrapper, mkFunction
+  , mkTmBinderFor, zoomExtra)
 import Clash.Rewrite.WorkFree (isWorkFreeIsh)
-import Clash.Normalize.Types ( NormRewrite, NormalizeSession)
+import Clash.Normalize.Types
+  ( NormRewrite, NormalizeSession, specialisationCache)
 import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
-  , normalizeTopLvlBndr)
+  , normalizeTopLvlBndr, originReachableFrom, recordBinderOrigin)
 import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
@@ -578,19 +585,10 @@ inlineNonRepWorker e = pure e
 -- inside the body of @f@, so @f@ must be inlined. See
 -- Note [Casting signals] in "Clash.GHC.GHC2Core".
 inlineCastNonRep :: HasCallStack => NormRewrite
-inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
+inlineCastNonRep (TransformContext is0 _) e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
   | isGlobalId f
   = do
-    (cf,_)    <- Lens.use curFun
-    isInlined <- zoomExtra (alreadyInlined f cf)
-    limit     <- Lens.view inlineLimit
-    tcm       <- Lens.view tcCache
-    let
-      -- Constraint dictionary inlining always terminates, so we ignore the
-      -- usual inline safeguards.
-      notClassTy = not (isClassTy tcm from)
-      overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
-
+    tcm <- Lens.view tcCache
     bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
     nonRepFrom <- isUntranslatableType False from
     let
@@ -624,29 +622,112 @@ inlineCastNonRep _ e@(Cast (collectArgsTicks -> (Var f, args, ticks)) from to)
                  && isPolyFunCoreTy tcm from
                  && aeqType (normalizeType tcm from) (normalizeType tcm to)
     case (nonRepFrom && not pushable && not (opaque && (signalCast || newtypeRefl)), bodyMaybe) of
-      (True, Just b) -> do
-        if overLimit then
-          trace ($(curLoc) ++ [I.i|
-            InlineCastNonRep: #{showPpr (varName f)} already inlined
-            #{limit} times in: #{showPpr (varName cf)}. The type of the cast
-            expression is:
-
-              #{showPpr' def{displayTypes=True\} from}
-
-            Function #{showPpr (varName cf)} will not reach a normal form and
-            compilation might fail.
-
-            Run with '-fclash-inline-limit=N' to increase the inline limit to N.
-          |]) (return e)
-        else do
-          Monad.when notClassTy (zoomExtra (addNewInline f cf))
-
-          let fBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-          let fBody1 = mkApps fBody0 args
-
-          changed (Cast fBody1 from to)
+      (True, Just b)
+        -- Worker/wrapper split: instead of inlining @f@'s body at every
+        -- call site (which duplicates the body once per site and trips the
+        -- inline limit on binders with many use sites), create a single
+        -- wrapper
+        --
+        -- > f_cast xs = (fBody @tys xs) |> from ~ to
+        --
+        -- per @(f, tys, from, to)@ and rewrite the call site to
+        -- @f_cast tmArgs@. The cast meets its inverse inside the wrapper
+        -- during the wrapper's own normalization, sharing is preserved,
+        -- and no cast remains at the call site. Wrappers are cached in the
+        -- specialization cache, with the type arguments and cast endpoints
+        -- encoded as a nested function type.
+        --
+        -- Restrictions (all fall back to plain inlining below):
+        --
+        -- * The type arguments must be closed.
+        --
+        -- * The cast target must be a non-dictionary function type: such
+        --   wrappers are left alone by the inlining transformations, while
+        --   e.g. a wrapper around a casted dictionary is itself work-free
+        --   and would be re-inlined by inlineWorkFree, ping-ponging with
+        --   this transformation.
+        --
+        -- * The wrapper must not close a cycle: when (the origin of) the
+        --   current function is reachable from @f@'s body, the wrapper
+        --   would create global *mutual* recursion -- e.g.
+        --   @fib -> fib_f_cast -> fib@ -- which violates Clash's invariant
+        --   that only direct self-recursion exists ('recToLetRec' and
+        --   flattening cannot handle it). Reachability is compared on
+        --   binder /origins/ ('originOf'): the back-reference may go
+        --   through a pre-specialization clone with a different unique.
+        | tyArgs <- [ty | Right ty <- args]
+        , all (null . Lens.toListOf typeFreeVars) tyArgs
+        , isPolyFunCoreTy tcm to
+        , not (isClassTy tcm to)
+        -> do
+          isRec <- isRecursiveBndr f
+          cyclic <- if isRec then pure True else do
+            (cf,_) <- Lens.use curFun
+            originReachableFrom f cf
+          if cyclic then inlinePath b else do
+          let tmArgs = [Left tm | Left tm <- args]
+              key = (f, length args, Right (foldr mkFunTy (mkFunTy from to) tyArgs))
+          wrapM <- Map.lookup key <$> Lens.use (extra.specialisationCache)
+          case wrapM of
+            Just w ->
+              changed (mkApps (mkTicks (Var w) ticks) tmArgs)
+            Nothing -> do
+              -- Fresh binders for the term arguments, in original order.
+              let mkArgId (n :: Unique) tm =
+                    mkTmBinderFor is0 tcm (mkUnsafeInternalName ("cwArg" `Text.append` Text.pack (show n)) n) tm
+              argIds <- Monad.zipWithM mkArgId [0..] [tm | Left tm <- args]
+              let rebuild [] _ = []
+                  rebuild (Right ty:rest) is' = Right ty : rebuild rest is'
+                  rebuild (Left _:rest) (i:is') = Left (Var i) : rebuild rest is'
+                  rebuild (Left _:_) [] = error "inlineCastNonRep: argument mismatch"
+                  fBody = mkTicks (bindingTerm b) [mkInlineTick f]
+                  newBody =
+                    mkAbstraction
+                      (Cast (mkApps fBody (rebuild args argIds)) from to)
+                      (map Left argIds)
+              w <- mkFunction
+                     (appendToName (varName f) "_cast")
+                     (bindingLoc b)
+                     NoUserInlinePrag
+                     newBody
+              recordBinderOrigin w f
+              (extra.specialisationCache) %= Map.insert key w
+              changed (mkApps (mkTicks (Var w) ticks) tmArgs)
+      (True, Just b) -> inlinePath b
       _ ->
         return e
+  where
+    inlinePath b = do
+      (cf,_)    <- Lens.use curFun
+      isInlined <- zoomExtra (alreadyInlined f cf)
+      limit     <- Lens.view inlineLimit
+      tcm       <- Lens.view tcCache
+      -- Constraint-dictionary inlining always terminates (dictionaries
+      -- resolve to constants), so it is exempt from the inline limit. The
+      -- class type can be on either side of the cast (e.g. evidence like
+      -- @unpackCString# .. |> List Char ~ KnownSymbol "System"@).
+      let notClassTy = not (isClassTy tcm from) && not (isClassTy tcm to)
+          overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
+      if overLimit then
+        trace ($(curLoc) ++ [I.i|
+          InlineCastNonRep: #{showPpr (varName f)} already inlined
+          #{limit} times in: #{showPpr (varName cf)}. The type of the cast
+          expression is:
+
+            #{showPpr' def{displayTypes=True\} from}
+
+          Function #{showPpr (varName cf)} will not reach a normal form and
+          compilation might fail.
+
+          Run with '-fclash-inline-limit=N' to increase the inline limit to N.
+        |]) (return e)
+      else do
+        Monad.when notClassTy (zoomExtra (addNewInline f cf))
+
+        let fBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+        let fBody1 = mkApps fBody0 args
+
+        changed (Cast fBody1 from to)
 
 inlineCastNonRep _ e = return e
 {-# SCC inlineCastNonRep #-}

@@ -612,6 +612,7 @@ runClashTest = defaultMain
         , runTest "T1064C" def{hdlSim=[]}
         , runTest "T1064D" def{hdlSim=[]}
         , runTest "T1064E" def{hdlSim=[]}
+        , runTest "T1064F" def{hdlSim=[]}
         , let _opts = def { hdlSim = [], hdlTargets = [Verilog] }
            in runTest "T1187" _opts
         , clashLibTest "T1388" def{hdlTargets=[VHDL]}
