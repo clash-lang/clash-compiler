@@ -408,7 +408,8 @@ mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     ; let normTys0    = nub (map mkVecZ (hwtys ++ usedTys))
     ; let sortedTys0  = topSortHWTys normTys0
           packageDec  = vcat $ mapM tyDec (nubBy eqTypM sortedTys0)
-          (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM (normaliseType <$> sortedTys0)
+          (funDecs0,funBodies0) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM (normaliseType <$> sortedTys0)
+          (funDecs,funBodies) = (toStdLogicDec:funDecs0, toStdLogicBody:funBodies0)
 
     ; pkg <- (:[]) <$> (TextS.unpack (modName `TextS.append` "_types"),) <$>
       "library IEEE;" <> line <>
@@ -438,6 +439,26 @@ mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     eqTypM (Unsigned _) (Unsigned _)     = True
     eqTypM (BitVector _) (BitVector _)   = True
     eqTypM ty1 ty2                       = ty1 == ty2
+
+-- | Convert the @boolean@ a VHDL relational operator yields to a Clash 'Bool'.
+-- Always emitted, black boxes can't know whether a design declares it.
+toStdLogicDec :: VHDLM Doc
+toStdLogicDec =
+  "function" <+> "to_std_logic" <+> parens ("b" <+> colon <+> "in" <+> "boolean")
+             <+> "return" <+> "std_logic" <> semi
+
+toStdLogicBody :: VHDLM Doc
+toStdLogicBody =
+  "function" <+> "to_std_logic" <+> parens ("b" <+> colon <+> "in" <+> "boolean")
+             <+> "return" <+> "std_logic" <+> "is" <> line <>
+  "begin" <> line <>
+    indent 2 (vcat $ sequence [ "if" <+> "b" <+> "then"
+                              ,   indent 2 ("return" <+> squotes (int 1) <> semi)
+                              , "else"
+                              ,   indent 2 ("return" <+> squotes (int 0) <> semi)
+                              , "end" <+> "if" <> semi
+                              ]) <> line <>
+  "end" <> semi
 
 mkUsedTys :: HWType -> [HWType]
 mkUsedTys hwty = hwty : case hwty of
@@ -601,52 +622,14 @@ tyDec hwty = do
 
 
 funDec :: HdlSyn -> HWType -> Maybe (VHDLM Doc,VHDLM Doc)
-funDec _ Bool = Just
-  ( "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <> semi <> line <>
-    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <> semi <> line <>
-    "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <> semi
-  , "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                                ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
-                                ,"else"
-                                ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> dquotes (int 1) <+> "then"
-                                ,   indent 2 ("return" <+> "true" <> semi)
-                                ,"else"
-                                ,   indent 2 ("return" <+> "false" <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi <> line <>
-    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <+> "then"
-                                ,   indent 2 ("return" <+> "false" <> semi)
-                                ,"else"
-                                ,   indent 2 ("return" <+> "true" <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi <> line <>
-    "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
-                                ,"else"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi
-  )
-
+-- 'Bool' is absent here: 'normaliseType' maps it onto 'Bit', so both share these
+-- @std_logic@ conversions. That is also why @tagToEnum@ and @dataToTag@ live
+-- here, they only ever apply to 'Bool'.
 funDec _ bit@Bit = Just
   ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <> semi
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <> semi <> line <>
+    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> tyName bit <> semi <> line <>
+    "function" <+> "dataToTag" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "signed" <> semi
   , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
     "begin" <> line <>
       indent 2 ("return" <+> "std_logic_vector'" <> parens (int 0 <+> rarrow <+> "sl") <> semi) <> line <>
@@ -657,6 +640,24 @@ funDec _ bit@Bit = Just
         ) <> line <>
     "begin" <> line <>
       indent 2 ("return" <+> "islv" <> parens (int 0) <> semi) <> line <>
+    "end" <> semi <> line <>
+    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> tyName bit <+> "is" <> line <>
+    "begin" <> line <>
+      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <+> "then"
+                                ,   indent 2 ("return" <+> squotes (int 0) <> semi)
+                                ,"else"
+                                ,   indent 2 ("return" <+> squotes (int 1) <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <> line <>
+    "end" <> semi <> line <>
+    "function" <+> "dataToTag" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "signed" <+> "is" <> line <>
+    "begin" <> line <>
+      indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> squotes (int 1) <+> "then"
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
+                                ,"else"
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <> line <>
     "end" <> semi
   )
 
@@ -1129,7 +1130,7 @@ tyName' rec0 (filterTransparent -> t) = do
       return (error ($(curLoc) ++ "Forced to print KnownDomain tyName"))
     Void _ ->
       return (error ($(curLoc) ++ "Forced to print Void tyName: " ++ show t))
-    Bool          -> return "boolean"
+    Bool          -> return "std_logic"
     Signed n      ->
       let app = if rec0 then ["_", showt n] else [] in
       return $ TextS.concat $ "signed" : app
@@ -1197,7 +1198,6 @@ normaliseType hwty = case hwty of
   KnownDomain {} -> hwty
 
   -- Base types:
-  Bool          -> hwty
   Signed _      -> hwty
   Unsigned _    -> hwty
   BitVector _   -> hwty
@@ -1213,10 +1213,11 @@ normaliseType hwty = case hwty of
   MemBlob n m   -> Vector n (BitVector m)
 
   -- Simple types, for which a subtype (without qualifiers) will be made in VHDL:
+  Bool              -> Bit
   Clock _           -> Bit
   ClockN _          -> Bit
   Reset _           -> Bit
-  Enable _          -> Bool
+  Enable _          -> Bit
   Index _           -> Unsigned (typeSize hwty)
   Sum _ _           -> BitVector (typeSize hwty)
   CustomSP _ _ _ _  -> BitVector (typeSize hwty)
@@ -1288,11 +1289,8 @@ userTyName dflt nm0 hwTy = do
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 sizedQualTyNameErrValue :: HWType -> VHDLM Doc
-sizedQualTyNameErrValue Bool                = do
-  udf <- Ap (use undefValue)
-  case udf of
-    Just (Just 0) -> "false"
-    _             -> "true"
+-- Unlike a VHDL @boolean@, @std_logic@ can carry a don't-care.
+sizedQualTyNameErrValue Bool                = singularErrValue
 sizedQualTyNameErrValue Bit                 = singularErrValue
 sizedQualTyNameErrValue t@(Vector n elTy)   = do
   syn <-Ap hdlSyn
@@ -1482,7 +1480,9 @@ inst_ (Assignment id_ Cont e) = fmap Just $
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   pretty id_ <+> larrow
            <+> align (vsep (sequence [expr_ False t <+> "when" <+>
-                                      expr_ False scrut <+> "else"
+                                      -- A 'Bool' is a std_logic, so it needs a
+                                      -- test to become a condition
+                                      parens (expr_ False scrut <+> "=" <+> squotes (int 1)) <+> "else"
                                      ,expr_ False f <> semi
                                      ]))
   where
@@ -1604,6 +1604,10 @@ expr_
   -> Expr
   -- ^ Expr to convert
   -> VHDLM Doc
+-- A bare @'0'@ is an overloaded character literal, so @'0' = '1'@ is ambiguous.
+-- Qualify where the context may embed us in a larger expression.
+expr_ True (Literal _ (BoolLit v)) =
+  "std_logic'" <> parens (squotes (if v then char '1' else char '0'))
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 
@@ -1682,8 +1686,10 @@ expr_ _ (DataCon (CustomProduct _ dataRepr _size _labels tys) _ es) |
 expr_ _ (DataCon ty@(Product _ labels tys) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> selectProductField labels tys i <+> rarrow <+> expr_ False e') [0..] es
 
-expr_ _ (DataCon (Enable _) _ [e]) =
-  expr_ False e
+-- 'Enable' is transparent, so pass @b@ on. Without this an 'andEnable' renders
+-- as a bare @a and b@, which reassociates if the consumer appends to it.
+expr_ b (DataCon (Enable _) _ [e]) =
+  expr_ b e
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
@@ -1832,13 +1838,14 @@ exprLit (Just (hty,sz)) (BitVecLit m i) = case m of
     bvlit = bits (toBits' sz m i)
 
 
-exprLit _             (BoolLit t)   = if t then "true" else "false"
+exprLit _             (BoolLit t)   = squotes (if t then char '1' else char '0')
 exprLit _             (BitLit b)    = squotes $ bit_char b
 exprLit _             (StringLit s) = pretty . T.pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 patLit :: HWType -> Literal -> VHDLM Doc
 patLit Bit (NumLit i) = if i == 0 then "'0'" else "'1'"
+patLit Bool (NumLit i) = if i == 0 then "'0'" else "'1'"
 patLit hwty (NumLit i) =
   let sz = conSize hwty
    in case sz `mod` 4 of
