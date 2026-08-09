@@ -72,7 +72,7 @@ import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
-import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
+import qualified Clash.Normalize.Primitives as NP (removedArg, undefined, undefinedX)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
@@ -290,7 +290,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of our internal _|_-values: that
       -- means the entire case-expression is _|_
       (Prim pInfo,[_],ticks)
-        | primName pInfo `elem` [ Text.showt 'NP.undefined
+        | primName pInfo `elem` [ Text.showt 'NP.removedArg
+                                , Text.showt 'NP.undefined
                                 , Text.showt 'NP.undefinedX ] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty]
         in changed e1
