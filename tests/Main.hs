@@ -134,6 +134,19 @@ clashTestGroup testName testTrees =
     testGroup testName $
       zipWith ($) testTrees (repeat (testName : parentNames))
 
+-- | Run the same test module more than once, e.g. with different Clash flags.
+-- Unlike 'clashTestGroup', the name given here is only a test name: it does not
+-- correspond to a directory, so the tests below it keep looking for their
+-- module in the directory of the enclosing 'clashTestGroup'.
+clashTestVariants
+  :: TestName
+  -> [[TestName] -> TestTree]
+  -> ([TestName] -> TestTree)
+clashTestVariants testName testTrees =
+  \parentNames ->
+    testGroup testName $
+      zipWith ($) testTrees (repeat parentNames)
+
 -- | Auto-retry failures caused by GHC bug #19421. See clash-compiler PR #2444.
 workaroundMmapCrash :: TestTree -> TestTree
 workaroundMmapCrash = flakyTestWithRetryAction retryAction retryPolicy
@@ -667,10 +680,13 @@ runClashTest = defaultMain
         , runTest "T2360" def{hdlSim=[],clashFlags=["-fclash-force-undefined=0"]}
         , outputTest "T2502" def{hdlTargets=[VHDL]}
         , outputTest "T2508" def{hdlTargets=[VHDL]}
+          -- Promotes the "primitive isn't marked OPAQUE" warning to an error,
+          -- so the test does not depend on how warnings are formatted.
         , runTest "T2510" def{
             hdlTargets=[VHDL]
           , hdlSim=[]
-          , expectClashFail=Just (TestSpecificExitCode 0, "Warning: primitive T2510.bb isn't marked OPAQUE.")
+          , clashFlags=["-Werror=clash-primitive-definition"]
+          , expectClashFail=Just (def, "primitive T2510.bb isn't marked OPAQUE.")
           }
         , outputTest "T2510" def{hdlTargets=[VHDL], clashFlags=["-DNOINLINE=OPAQUE"]}
         , outputTest "T2542" def{hdlTargets=[VHDL]}
@@ -1121,6 +1137,33 @@ runClashTest = defaultMain
           , hdlSim=[]
           , verificationTool=Just SymbiYosys
           }
+        ]
+      , clashTestGroup "Warnings"
+        -- One module instantiating a non-synthesizable primitive, compiled
+        -- with different combinations of warning flags.
+        [ clashTestVariants "Promoted"
+          [ runTest "NonSynthesizable" def{
+              hdlTargets=[VHDL]
+            , clashFlags=["-Werror=clash-non-synthesizable"]
+            , expectClashFail=Just (def, "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!")
+            }
+          ]
+        , clashTestVariants "Demoted"
+          [ runTest "NonSynthesizable" def{
+              hdlTargets=[VHDL]
+            , clashFlags=["-Werror=clash-non-synthesizable", "-Wwarn=clash-non-synthesizable"]
+            , expectClashFail=Just ( TestSpecificExitCode 0
+                                   , "[-Wclash-non-synthesizable]")
+            }
+          ]
+        , clashTestVariants "Suppressed"
+          [ runTest "NonSynthesizable" def{
+              hdlTargets=[VHDL]
+            , hdlLoad=[]
+            , hdlSim=[]
+            , clashFlags=["-Werror=clash-non-synthesizable", "-Wno-clash-non-synthesizable"]
+            }
+          ]
         ]
       , clashTestGroup "Xilinx"
         [ let _opts = def{ hdlLoad=[Vivado]

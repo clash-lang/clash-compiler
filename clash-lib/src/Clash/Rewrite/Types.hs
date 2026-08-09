@@ -47,7 +47,9 @@ import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
-import Clash.Driver.Types        (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts)
+import Clash.Driver.Types
+  (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts, HasClashOpts(..))
+import Clash.Driver.Warning      (CanWarn)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Rewrite.WorkFree    (isWorkFree)
@@ -123,6 +125,9 @@ data RewriteEnv
 
 Lens.makeLenses ''RewriteEnv
 
+clashOpts :: Lens.Getter RewriteEnv ClashOpts
+clashOpts = clashEnv . Lens.to envOpts
+
 debugOpts :: Lens.Getter RewriteEnv DebugOpts
 debugOpts = clashEnv . Lens.to (opt_debug . envOpts)
 
@@ -180,6 +185,11 @@ newtype RewriteMonad extra a = R
     , MonadWriter Any
     , MonadReader RewriteEnv
     )
+
+instance HasClashOpts (RewriteMonad extra) where
+  askClashOpts = Lens.view clashOpts
+
+instance CanWarn (RewriteMonad extra)
 
 -- | Run the computation in the RewriteMonad
 runR

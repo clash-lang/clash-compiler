@@ -11,6 +11,7 @@ import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Normalize.Transformations
 import qualified Clash.Tests.Util.Interpolate
+import qualified Clash.Tests.Warning
 import qualified Test.Clash.Rewrite
 
 -- AFAIK there's no good way to override the default, so we just detect the
@@ -29,6 +30,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Netlist.Id.tests
   , Clash.Tests.Normalize.Transformations.tests
   , Clash.Tests.Util.Interpolate.tests
+  , Clash.Tests.Warning.tests
   , Test.Clash.Rewrite.tests
   ]
 

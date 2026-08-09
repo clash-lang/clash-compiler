@@ -9,6 +9,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -31,11 +32,12 @@ module Clash.GHC.GHC2Core
   , qualifiedNameString'
   , makeAllTyCons
   , emptyGHC2CoreState
+  , pendingWarnings
   )
 where
 
 -- External Modules
-import           Control.Lens                ((^.), (%~), (&), (%=), (.~), use, view, makeLenses)
+import           Control.Lens                ((^.), (%~), (&), (%=), (.~), (<>=), use, view, makeLenses)
 import           Control.Applicative         ((<|>))
 import           Control.Monad.Extra         (ifM, andM)
 import           Control.Monad.RWS.Strict    (RWS)
@@ -48,6 +50,8 @@ import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
+import           Data.Sequence               (Seq, (|>))
+import qualified Data.Sequence               as Seq
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
@@ -118,6 +122,8 @@ import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
 import qualified Clash.Data.UniqMap          as C
+import           Clash.Driver.Types          (ClashOpts, HasClashOpts(..))
+import           Clash.Driver.Warning        (CanWarn(..), PendingWarning)
 import           Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types      hiding (name)
 import           Clash.Unique                (fromGhcUnique)
@@ -190,6 +196,10 @@ data GHC2CoreState
   -- 'coreToVarType'.
   , _convertedTypeCache :: HashMap StructuralType C.Type
   -- ^ Cache for converted types, keyed on the GHC type. See 'coreToType'.
+  , _pendingWarnings :: Seq PendingWarning
+  -- ^ Warnings collected while converting, in the order they were reported.
+  -- 'C2C' is pure, so it cannot print them itself; the driver reports these
+  -- once the conversion is done. See the 'HasClashOpts' instance below.
   }
 
 makeLenses ''GHC2CoreState
@@ -198,13 +208,22 @@ data GHC2CoreEnv
   = GHC2CoreEnv
   { _srcSpan :: SrcSpan
   , _famInstEnvs :: FamInstEnvs
+  , _clashOpts :: ClashOpts
   }
 
 makeLenses ''GHC2CoreEnv
 
+instance HasClashOpts C2C where
+  askClashOpts = view clashOpts
+
+-- | 'C2C' is a pure monad, so it cannot print warnings itself: it collects
+-- them in 'GHC2CoreState' for the driver to report.
+instance CanWarn C2C where
+  reportWarning pw = pendingWarnings %= (|> pw)
+
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState =
-  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty
+  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty Seq.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -220,17 +239,18 @@ instance Monoid SrcSpanRB where
 type C2C = RWS GHC2CoreEnv SrcSpanRB GHC2CoreState
 
 makeAllTyCons
-  :: GHC2CoreState
+  :: ClashOpts
+  -> GHC2CoreState
   -> FamInstEnvs
   -> C.UniqMap C.TyCon
-makeAllTyCons hm fiEnvs = go hm hm
+makeAllTyCons opts hm fiEnvs = go hm hm
   where
     go old new
         | C.null (new ^. tyConMap) = mempty
         | otherwise                = tcm <> tcm'
       where
         (tcm,old', _) = RWS.runRWS (T.mapM makeTyCon (new ^. tyConMap))
-                                   (GHC2CoreEnv noSrcSpan fiEnvs)
+                                   (GHC2CoreEnv noSrcSpan fiEnvs opts)
                                    old
         tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
 
@@ -363,10 +383,13 @@ coreToTerm primMap unlocs = term
     term :: CoreExpr -> C2C C.Term
     term e
       | (Var x,args) <- collectArgs e
-      , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
-                                  (GHC2CoreEnv noSrcSpan emptyFamInstEnvs)
-                                  emptyGHC2CoreState
-      = go nm args
+      = do
+        opts <- askClashOpts
+        let (nm, st, _) = RWS.runRWS (qualifiedNameString (varName x))
+                                     (GHC2CoreEnv noSrcSpan emptyFamInstEnvs opts)
+                                     emptyGHC2CoreState
+        pendingWarnings <>= st ^. pendingWarnings
+        go nm args
       | otherwise
       = term' e
       where
