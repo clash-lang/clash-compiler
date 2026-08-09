@@ -211,7 +211,10 @@ commonArgs :: [String]
 commonArgs =
   [ "-fclash-debug", "DebugSilent"
   , "-fclash-ignore-broken-ghcs"
-  , "-Werror=unrecognised-pragmas"
+  -- Warnings - from GHC and Clash alike - are not tolerated: a test that
+  -- warns on purpose should demote the specific warning with -Wwarn=<name>
+  -- (which wins over -Werror) or expect the failure.
+  , "-Werror"
   -- Limit memory use to 2G. Prevents OOM when debugging things like infinite loops.
   , "+RTS", "-M2G", "-RTS"
   ]
