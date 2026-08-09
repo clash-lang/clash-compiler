@@ -1,0 +1,1 @@
+FIXED: `caseCon` no longer reports `Unmatchable constant as case subject` when the case subject evaluates to `Clash.Normalize.Primitives.removedArg`. Such a subject stands for a value that was proven dead — eliminated evidence, for instance — and is unmatchable on purpose, so the report was a false positive rather than a missing evaluation rule.

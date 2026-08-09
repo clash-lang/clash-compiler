@@ -72,7 +72,7 @@ import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
-import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
+import qualified Clash.Normalize.Primitives as NP (removedArg, undefined, undefinedX)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
@@ -300,6 +300,14 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
         | primName pInfo == Text.showt 'errorX
         -> let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty,callStack,msg]
             in changed e1
+      -- WHNF of subject is a removed argument. It stands for a value that was
+      -- proven dead - e.g. eliminated evidence - and is deliberately
+      -- unmatchable, so this is not a missing evaluation rule: fall through to
+      -- 'caseOneAlt', which picks the only alternative (evidence has exactly
+      -- one).
+      (Prim pInfo,_,_)
+        | primName pInfo == Text.showt 'NP.removedArg
+        -> caseOneAlt e
       -- WHNF of subject is non of the above, so either a variable reference,
       -- or a primitive for which the evaluator doesn't have any evaluation
       -- rules.
