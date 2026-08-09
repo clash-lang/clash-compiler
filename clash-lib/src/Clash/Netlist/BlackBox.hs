@@ -74,7 +74,7 @@ import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (inverseTopSortLetBindings, splitShouldSplit)
 import           Clash.Core.Var                as V
-  (Id, mkLocalId, modifyVarName, varType)
+  (Id, mkLocalId, modifyVarName, varName, varType)
 import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
@@ -294,10 +294,13 @@ mkArgument bbName bndr declType nArg e = do
 -- the guard wants to, or fail entirely.
 extractPrimWarnOrFail
   :: HasCallStack
-  => TextS.Text
+  => String
+  -- ^ Extra context to add to warnings, e.g. the id the primitive's result
+  -- is assigned to
+  -> TextS.Text
   -- ^ Name of primitive
   -> NetlistMonad CompiledPrimitive
-extractPrimWarnOrFail nm = do
+extractPrimWarnOrFail context nm = do
   prim <- HashMap.lookup nm <$> Lens.view primitives
   case prim of
     Just (HasBlackBox warnings compiledPrim) ->
@@ -326,6 +329,15 @@ extractPrimWarnOrFail nm = do
     -> CompiledPrimitive
     -> NetlistMonad CompiledPrimitive
 
+  -- The key a primitive is remembered under, see 'go [] cp' below. Note it
+  -- includes the current component: the warning mentions component specific
+  -- context, which would get lost if the primitive were only warned about once
+  -- per compilation. A single run therefore reveals all offending sites rather
+  -- than only the first.
+  seenKey = do
+    (curCompId,_) <- Lens.use curCompNm
+    pure (Id.toText curCompId <> ":" <> nm)
+
   go ((WarnAlways warning):ws) cp = do
     warnPrimitive W.WarnDubiousPrimitive warning
     go ws cp
@@ -335,18 +347,25 @@ extractPrimWarnOrFail nm = do
     unless isTB (warnPrimitive W.WarnNonSynthesizable warning)
     go ws cp
 
+  -- Only mark the primitive as seen once the whole list of warnings has been
+  -- emitted. A primitive can carry several 'WarnAlways' annotations, and all of
+  -- them should be reported, see 'tests/shouldwork/PrimitiveGuards/MultipleGuards'.
   go [] cp = do
-    seenPrimitives %= Set.insert nm
+    key <- seenKey
+    seenPrimitives %= Set.insert key
     return cp
 
   warnPrimitive :: W.ClashWarning -> String -> NetlistMonad ()
   warnPrimitive w warning = do
-    seen <- Set.member nm <$> Lens.use seenPrimitives
-    (_,sp) <- Lens.use curCompNm
+    seen <- Set.member <$> seenKey <*> Lens.use seenPrimitives
+    (curCompId,sp) <- Lens.use curCompNm
 
     unless seen
       $ warnAboutM w sp
-      $ "Dubious primitive instantiation for "
+      $ "Dubious primitive instantiation in "
+     ++ unpack (Id.toText curCompId)
+     ++ (if null context then "" else " (" ++ context ++ ")")
+     ++ " for "
      ++ unpack nm
      ++ ": "
      ++ warning
@@ -368,8 +387,14 @@ mkPrimitive
   -- ^ Tick declarations
   -> NetlistMonad (Expr,[Declaration])
 mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
-  go =<< extractPrimWarnOrFail (primName pInfo)
+  go =<< extractPrimWarnOrFail context (primName pInfo)
   where
+    context = N.primWarnContext [] dstName args
+    dstName =
+      case dst of
+        NetlistId i _ -> unpack (Id.toText i)
+        CoreId i -> showPpr (V.varName i)
+        MultiId is -> unwords (map (showPpr . V.varName) is)
     tys = netlistTypes dst
     ty = fromMaybe (error "mkPrimitive") (listToMaybe tys)
     assignTy = declTypeUsage declType
@@ -1061,7 +1086,10 @@ mkFunInput parentName declType resId e =
   -- TODO: generates strings that are later parsed/interpreted again. Silly!
   templ <- case appE of
             Prim p -> do
-              bb  <- extractPrimWarnOrFail (primName p)
+              bb  <- extractPrimWarnOrFail
+                       (N.primWarnContext [] (showPpr (V.varName resId)) args
+                          <> ", as an argument of: " <> unpack parentName)
+                       (primName p)
               case bb of
                 P.BlackBox {..} ->
                   pure (Left (kind,outputUsage,libraries,imports,includes,primName p,template))
