@@ -28,7 +28,7 @@ import qualified Data.IORef                       as IORef
 import           Clash.Data.UniqMap               (UniqMap)
 import qualified Clash.Data.UniqMap               as UniqMap
 import           Data.List
-  (intersect, mapAccumL)
+  (intercalate, intersect, mapAccumL)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
@@ -227,11 +227,28 @@ normalize' nm = do
             -- (GHC-8.4 does this with tests/shouldwork/Numbers/Exp.hs)
             -- It will later be inlined by flattenCallTree.
             opts <- Lens.view debugOpts
+            -- Which already-normalized binders reference this one? Without that,
+            -- the trace below says nothing about where the offending binder came
+            -- from. Only computed when invariants are being checked, as it walks
+            -- every normalized binder.
+            referers <-
+              if dbg_invariants opts
+                 then do
+                   prevNorm <- Lens.use (extra.normalized)
+                   pure [ showPpr (varName (bindingId b))
+                        | b <- eltsVarEnv prevNorm
+                        , nm `elem` Lens.toListOf globalIds (bindingTerm b)
+                        ]
+                 else pure []
             traceIf (dbg_invariants opts)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
                             , showPpr (coreTypeOf nm')
                             , ") has a non-representable return type."
-                            , " Not normalising:\n", showPpr tm] )
+                            , " Referenced by: "
+                            , if null referers
+                                 then "nothing normalized so far"
+                                 else intercalate ", " referers
+                            , ". Not normalising:\n", showPpr tm] )
                     (return ([],(nm,(Binding nm' sp inl pr tm r))))
 
 
