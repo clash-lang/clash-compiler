@@ -474,6 +474,10 @@ runClashTest = defaultMain
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
         , runTest "AppendZero" def
+          -- Promotes the "Unmatchable constant as case subject" warning to an
+          -- error, see the module header.
+        , runTest "AppendRemovedArg"
+            def{clashFlags=["-Werror=clash-unmatchable-constant"]}
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
