@@ -31,9 +31,8 @@ module Clash.Netlist.BlackBox
 import           Control.Exception             (throw)
 import           Control.Lens                  ((%=))
 import qualified Control.Lens                  as Lens
-import           Control.Monad                 (when, replicateM, zipWithM)
+import           Control.Monad                 (unless, replicateM, zipWithM)
 import           Control.Monad.Extra           (concatMapM)
-import           Control.Monad.IO.Class        (liftIO)
 import           Data.Bifunctor                (first, second)
 import           Data.Either                   (lefts, partitionEithers)
 import           Data.Foldable                 (for_)
@@ -52,13 +51,6 @@ import qualified Data.Text                     as TextS
 import           Data.Text.Extra
 import           GHC.Stack
   (HasCallStack, callStack, prettyCallStack)
-import qualified System.Console.ANSI           as ANSI
-import           System.Console.ANSI
-  ( hSetSGR, SGR(SetConsoleIntensity, SetColor), Color(Magenta, Red)
-  , ConsoleIntensity(BoldIntensity), ConsoleLayer(Foreground), ColorIntensity(Vivid))
-import           System.IO
-  (hPutStrLn, stderr, hFlush, hIsTerminalDevice)
-
 import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
   , PrimitiveWarning(WarnNonSynthesizable, WarnAlways)
@@ -91,9 +83,7 @@ import {-# SOURCE #-} Clash.Netlist
 import qualified Clash.Backend                 as Backend
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug                   (debugIsOn)
-import           Clash.Driver.Bool             (OverridingBool(..))
-import           Clash.Driver.Types
-  (ClashOpts(opt_primWarn, opt_color, opt_werror))
+import           Clash.Driver.Warning          (warnAboutM)
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Types           as N
@@ -104,32 +94,7 @@ import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
-
--- | Emits (colorized) warning to stderr
-warn
-  :: ClashOpts
-  -> String
-  -> IO ()
-warn opts msg = do
-  -- TODO: Put in appropriate module
-  useColor <-
-    case opt_color opts of
-      Always -> return True
-      Never  -> return False
-      Auto   -> hIsTerminalDevice stderr
-
-  hSetSGR stderr [SetConsoleIntensity BoldIntensity]
-
-  case opt_werror opts of
-    True -> do
-      when useColor $ hSetSGR stderr [SetColor Foreground Vivid Red]
-      throw (ClashException noSrcSpan msg Nothing)
-
-    False -> do
-      when useColor $ hSetSGR stderr [SetColor Foreground Vivid Magenta]
-      hPutStrLn stderr $ "[WARNING] " ++ msg
-      hSetSGR stderr [ANSI.Reset]
-      hFlush stderr
+import qualified Clash.Warning                 as W
 
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext
@@ -362,28 +327,29 @@ extractPrimWarnOrFail nm = do
     -> NetlistMonad CompiledPrimitive
 
   go ((WarnAlways warning):ws) cp = do
-    opts <- Lens.view clashOpts
-    let primWarn = opt_primWarn opts
-    seen <- Set.member nm <$> Lens.use seenPrimitives
-
-    when (primWarn && not seen)
-      $ liftIO
-      $ warn opts
-      $ "Dubious primitive instantiation for "
-     ++ unpack nm
-     ++ ": "
-     ++ warning
-     ++ " (disable with -fclash-no-prim-warn)"
-
+    warnPrimitive W.WarnDubiousPrimitive warning
     go ws cp
 
   go ((WarnNonSynthesizable warning):ws) cp = do
     isTB <- Lens.use isTestBench
-    if isTB then go ws cp else go ((WarnAlways warning):ws) cp
+    unless isTB (warnPrimitive W.WarnNonSynthesizable warning)
+    go ws cp
 
   go [] cp = do
     seenPrimitives %= Set.insert nm
     return cp
+
+  warnPrimitive :: W.ClashWarning -> String -> NetlistMonad ()
+  warnPrimitive w warning = do
+    seen <- Set.member nm <$> Lens.use seenPrimitives
+    (_,sp) <- Lens.use curCompNm
+
+    unless seen
+      $ warnAboutM w sp
+      $ "Dubious primitive instantiation for "
+     ++ unpack nm
+     ++ ": "
+     ++ warning
 
 mkPrimitive
   :: Bool
