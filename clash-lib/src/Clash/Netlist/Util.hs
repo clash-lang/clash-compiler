@@ -88,7 +88,7 @@ import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, mkUnsafeSystemName, nameOcc)
 import           Clash.Core.PartialEval
-import           Clash.Core.Pretty       (showPpr)
+import           Clash.Core.Pretty       (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Subst
   (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
    extendInScopeIdList, mkSubst, substTm)
@@ -810,7 +810,7 @@ mkUniqueNormalized is0 topMM (args, binds, res) = do
     Just (oports, owrappers, res1, subst0) -> do
       -- Collect new names, see 'renameBinder' for more information
       (listToMaybe -> resRenameM0, HashMap.fromList -> renames0) <-
-        partition ((== res) . fst) <$> concatMapM renameBinder binds
+        partition ((== res) . fst) <$> concatMapM (renameBinder binds) binds
 
       let
         -- Is the result variable read by any of the other binders? In that case
@@ -867,19 +867,62 @@ orNothing :: Bool -> a -> Maybe a
 orNothing True a = Just a
 orNothing False _ = Nothing
 
+-- | Build the extra context 'extractPrimWarnOrFail' adds to a \"Dubious
+-- primitive instantiation\" warning: which binder the primitive's result is
+-- assigned to, and what the primitive is applied to. Without it a warning only
+-- names the primitive, which for a primitive as common as
+-- @GHC.Num.Integer.integerToInt#@ is not enough to find the offending code.
+--
+-- Arguments that reference one of the given sibling bindings are resolved (up
+-- to a fixed depth), because on its own a generated name like @c$app_arg@ says
+-- very little.
+primWarnContext
+  :: [(Id, Term)]
+  -- ^ Sibling bindings, used to resolve variable references. Pass @[]@ if they
+  -- are not available.
+  -> String
+  -- ^ Name of the binder the primitive's result is assigned to
+  -> [Either Term Type]
+  -- ^ Arguments the primitive is applied to
+  -> String
+primWarnContext binds dst args =
+  "result assigned to: " <> dst <> ", applied to: "
+    <> unwords (map (either (showArg maxResolveDepth) showDiag) args)
+ where
+  showArg :: Int -> Term -> String
+  showArg depth (stripTicks -> Var v)
+    | depth > 0
+    , Just rhs <- lookup v binds
+    , (h, rhsArgs, _) <- collectArgsTicks rhs
+    = "(" <> showPpr (varName v) <> " = "
+        <> unwords (showDiag h : map (either (showArg (depth - 1)) showDiag) rhsArgs)
+        <> ")"
+  showArg _ tm = showDiag tm
+
+  showDiag :: PrettyPrec p => p -> String
+  showDiag = showPprDiag maxArgLen
+
+  -- How deep to resolve variable references into sibling bindings
+  maxResolveDepth = 5
+
+  -- Longest rendering of a single argument
+  maxArgLen = 160
+
 -- | Set the name of the binder if the given term is a blackbox requesting
 -- a specific name for the result binder. It might return multiple names in
 -- case of a multi result primitive.
 --
-renameBinder :: (Id, Term) -> NetlistMonad [(Id, Id)]
-renameBinder (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ -> do
+renameBinder :: [(Id, Term)] -> (Id, Term) -> NetlistMonad [(Id, Id)]
+renameBinder binds (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ -> do
   case k of
     Prim p ->
       case primMultiResult p of
-        SingleResult -> extractPrimWarnOrFail (primName p) >>= goSingle p
-        MultiResult -> extractPrimWarnOrFail (primName p) >>= goMulti p
+        SingleResult -> extractPrimWarnOrFail context (primName p) >>= goSingle p
+        MultiResult -> extractPrimWarnOrFail context (primName p) >>= goMulti p
     _ -> pure []
  where
+  context = primWarnContext binds (showPpr (varName i)) args
+
   -- Routine for multi result primitives. For more info:
   -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
   goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
