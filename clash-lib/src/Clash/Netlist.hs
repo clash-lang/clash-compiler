@@ -369,7 +369,9 @@ mkNetDecl (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ withT
     -- Set the initialization value of a signal when a primitive wants to set it
     getResInits :: (Id, Term) -> NetlistMonad [Expr]
     getResInits (i,collectArgs -> (k,args0)) = case k of
-      Prim p -> extractPrimWarnOrFail (primName p) >>= go p
+      Prim p ->
+        let context = primWarnContext [] (showPpr (varName i)) args0
+         in extractPrimWarnOrFail context (primName p) >>= go p
       _ -> return []
      where
       go pInfo (BlackBox {resultInits=nmDs, multiResult=True}) = do
