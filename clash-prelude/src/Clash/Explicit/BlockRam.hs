@@ -901,7 +901,10 @@ blockRamU clk rst0 en rstStrategy n@SNat rd0 mw0 = case toUNat n of
       where
         rd1 = mux rstBool 0 (fromEnum <$> rd0)
         we1 = mux rstBool (pure True) we0
-        wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
+        -- SAFETY: This fails if n > 2^(WORD_SIZE_IN_BITS-1), but such large
+        -- memories don't make sense in hardware. Note that 'numConvert' cannot
+        -- be used here, as its 'Index n -> Int' instance would constrain @n@.
+        wa1 = mux rstBool (fromEnum <$> waCounter) (fromEnum <$> wa0)
         w1  = mux rstBool (initF <$> waCounter) w0
     NoClearOnReset ->
       -- Ignore reset infrastructure, pass values unchanged
@@ -1011,7 +1014,8 @@ blockRam1 clk rst0 en rstStrategy n@SNat a rd0 mw0 = case toUNat n of
 
   rd1 = mux rstBool 0 (fromEnum <$> rd0)
   we1 = mux rstBool (pure True) we0
-  wa1 = mux rstBool (fromInteger . toInteger <$> waCounter) (fromEnum <$> wa0)
+  -- SAFETY: see the note on 'wa1' in 'blockRamU'
+  wa1 = mux rstBool (fromEnum <$> waCounter) (fromEnum <$> wa0)
   w1  = mux rstBool (pure a) w0
 
 -- | blockRAM1 primitive
