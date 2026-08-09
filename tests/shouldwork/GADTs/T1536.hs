@@ -1,5 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses, UndecidableInstances #-} -- Needed for `TypeError` only
+-- The overlap the coverage checker reports is intrinsic to the GADT encoding
+-- this test exercises
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 module T1536 where
 

@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+-- 'topEntity' deliberately has a partial type signature
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module ExternalPrimitive where
 

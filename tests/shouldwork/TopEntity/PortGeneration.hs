@@ -2,6 +2,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+-- 'makeTopEntity' emits a Template Haskell warning ("Make sure HDL port names
+-- are correct") that has no GHC warning flag of its own, so only a blanket
+-- -Wwarn demotes it
+{-# OPTIONS_GHC -Wwarn #-}
 
 module PortGeneration where
 

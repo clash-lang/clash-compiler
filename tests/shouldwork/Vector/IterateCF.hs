@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+-- The redundant alternatives the coverage checker reports are intrinsic to the
+-- type-level encoding this test exercises
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 module IterateCF where
 

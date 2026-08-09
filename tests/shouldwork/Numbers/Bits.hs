@@ -4,6 +4,8 @@
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+-- 'bitSize' is deprecated, and testing it is the point
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 {-|
 This checks that the methods of the Bits and FiniteBits typeclasses

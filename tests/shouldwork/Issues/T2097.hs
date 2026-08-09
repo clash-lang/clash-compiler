@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+-- 'MyFloat' only implements the methods this test needs
+{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module T2097 where
 
