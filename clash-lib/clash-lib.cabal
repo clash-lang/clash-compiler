@@ -308,10 +308,9 @@ Library
                       Clash.Util.Interpolate
                       Clash.Util.Supply
                       Clash.Pretty
+                      Clash.Warning
 
                       Clash.Verification.Pretty
-
-                      Clash.Warning
 
                       -- Used in v16-upgrade-primitives to decode our non-standard
                       -- JSON primitive files.
@@ -437,6 +436,7 @@ test-suite unittests
                  Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist.Id
+                 Clash.Tests.Util
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize.Transformations
                  Clash.Tests.Warning

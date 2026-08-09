@@ -105,7 +105,7 @@ import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Unique        (fromGhcUnique)
 import           Clash.Util
-  (MonadUnique (..), clogBase, flogBase, curLoc, namePat)
+  (MonadUnique (..), clogBase, flogBase, logBaseOutOfDomain, curLoc, namePat)
 import           Clash.Util.Supply   (Supply,freshId)
 import           Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, typeNatAdd, vecLastPrim, vecInitPrim, vecHeadPrim,
@@ -1530,6 +1530,13 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- integerLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
+    -- The arguments are out of the domain of 'flogBase', but
+    -- 'integerLogBase#' is total: mirror the values GHC computes at runtime.
+    -- Such calls typically appear in (unused) 'KnownNat' evidence for
+    -- ill-defined applications of e.g. 'GHC.TypeLits.Extra.CLog'.
+    | Just (a,b) <- integerLiterals args
+    , a > 1
+    -> (reduce . Literal . WordLiteral) (logBaseOutOfDomain a b)
 
   $(namePat 'GHC.Float.integerToFloat#)
     | [v] <- args
@@ -1545,6 +1552,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     | Just (a,b) <- naturalLiterals args
     , Just c <- flogBase a b
     -> (reduce . Literal . WordLiteral . toInteger) c
+    -- See the note at 'GHC.Num.Integer.integerLogBase#' above.
+    | Just (a,b) <- naturalLiterals args
+    , a > 1
+    -> (reduce . Literal . WordLiteral) (logBaseOutOfDomain a b)
 
 
   $(namePat 'GHC.Num.Integer.integerToInt#)

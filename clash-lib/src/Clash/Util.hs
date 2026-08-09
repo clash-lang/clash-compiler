@@ -273,6 +273,23 @@ clogBase x y | x > 1 && y > 0 =
                 else Just (I# z1)
 clogBase _ _ = Nothing
 
+-- | The value 'GHC.Num.Integer.integerLogBase#' computes at runtime for
+-- arguments outside the domain of 'flogBase', i.e. @y <= 0@, given a @base@
+-- greater than 1.
+--
+-- 'GHC.Num.Integer.integerLogBase#' is total: it returns @0@ for negative
+-- values, and for zero it computes @wordLog2# 0##@ when the base is 2, which
+-- underflows to @maxBound :: Word@ (and is @0@ for any other base). Clash's
+-- evaluator mirrors these values so that constant folding agrees with
+-- simulation; such calls show up in (dead) 'KnownNat' evidence for ill-defined
+-- applications of e.g. @GHC.TypeLits.Extra.CLog@.
+--
+-- Pinned to GHC's behaviour by @Clash.Tests.Util@ in @clash-lib:unittests@.
+logBaseOutOfDomain :: Integer -> Integer -> Integer
+logBaseOutOfDomain base y
+  | y == 0 && base == 2 = toInteger (maxBound :: Word)
+  | otherwise = 0
+
 -- | Get the package id of the type of a value
 --
 -- >>> pkgIdFromTypeable (0 :: Unsigned 32)
