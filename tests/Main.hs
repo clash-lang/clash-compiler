@@ -474,6 +474,8 @@ runClashTest = defaultMain
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
         , runTest "AppendZero" def
+        , runTest "SplitZeroWidth"
+            def{clashFlags=["-Werror=clash-unmatchable-constant"]}
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}

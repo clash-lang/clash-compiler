@@ -46,7 +46,7 @@ import Clash.Core.Util (mkVec, shouldSplit, tyNatSize, mkInternalVar)
 import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
-import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Transformations.Specialize (zeroWidthTypeElem)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, normalizeUltra)
@@ -707,22 +707,30 @@ reduceSplitHandler ReduceNonRepPrimContext{..}
   | (tmArgs,[nTy,mTy]) <- Either.partitionEithers primArguments
   = case (runExcept (tyNatSize tyConMap nTy), runExcept (tyNatSize tyConMap mTy), resultTypeView) of
       (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
-        | n == 0 -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
+        -- A zero-width half is the single inhabitant of its type, so emit that
+        -- value rather than an opaque one: the evaluator can fold through a
+        -- literal, which keeps constructs like @fst (split# bv) ++# x@
+        -- constant.
+        | n == 0
+        , Just zeroWidthR <- zeroWidthTypeElem tyConMap rTy
+        -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
             \(_kn :: Term) bvArg (_ctx :: TransformContext) -> do
               let tup = mkApps (Data tupDc)
                            [Right lTy
                            ,Right rTy
                            ,Left  bvArg
-                           ,Left  (TyApp (Prim removedArg) rTy)
+                           ,Left  zeroWidthR
                            ]
 
               (changed (mkTicks tup primTicks) :: NormalizeSession Term)
-        | m == 0 -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
+        | m == 0
+        , Just zeroWidthL <- zeroWidthTypeElem tyConMap lTy
+        -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
             \(_kn :: Term) bvArg (_ctx :: TransformContext) -> do
               let tup = mkApps (Data tupDc)
                            [Right lTy
                            ,Right rTy
-                           ,Left  (TyApp (Prim removedArg) lTy)
+                           ,Left  zeroWidthL
                            ,Left  bvArg
                            ]
 
