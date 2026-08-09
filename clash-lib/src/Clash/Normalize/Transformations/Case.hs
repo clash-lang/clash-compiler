@@ -28,6 +28,7 @@ module Clash.Normalize.Transformations.Case
   ) where
 
 import Control.Exception.Base (patError)
+import Control.Monad (when)
 import GHC.Prim.Panic (absentError)
 import qualified Control.Lens as Lens
 
@@ -63,23 +64,25 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
 import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
 import Clash.Core.Util (listToLets, mkInternalVar)
+import Clash.Core.Var (varName)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
-import Clash.Debug (traceIf)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
+import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
+  ( TransformContext(..), bindings, curFun, customReprs, debugOpts, tcCache
   , typeTranslator, workFreeBinders)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatableType, runWithHWTypeCache, whnfRW)
 import Clash.Rewrite.WorkFree
 import Clash.Util (curLoc)
+import Clash.Warning (ClashWarning(WarnUnmatchableConstant))
 
 import Clash.XException (errorX)
 
@@ -315,14 +318,17 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
           _ -> do
             opts <- Lens.view debugOpts
+            (curFunId,sp) <- Lens.use curFun
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
-            traceIf (dbg_invariants opts && isConstant subj)
-              ("Unmatchable constant as case subject: " ++ showPpr subj ++
-                 "\nWHNF is: " ++ showPpr subj1)
-              -- Otherwise check whether the entire case-expression has a
-              -- single alternative, and pick that one.
-              (caseOneAlt e)
+            when (dbg_invariants opts && isConstant subj)
+              $ warnAboutM WarnUnmatchableConstant sp
+              $ "Unmatchable constant as case subject in " ++
+                  showPpr (varName curFunId) ++ ": " ++ showPpr subj ++
+                  "\nWHNF is: " ++ showPpr subj1
+            -- Otherwise check whether the entire case-expression has a
+            -- single alternative, and pick that one.
+            caseOneAlt e
 
   -- The subject is a variable
   (Var v, [], _) | isNum0 (coreTypeOf v) ->

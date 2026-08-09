@@ -77,6 +77,12 @@ data ClashWarning
   -- possibly dropping most significant bits.
   --
   -- Flag: @-Wclash-integer-narrowing@
+  | WarnUnmatchableConstant
+  -- ^ A case subject evaluated to a constant that matches none of the
+  -- alternatives, usually a missing reduction rule in the primitive evaluator.
+  -- Only reported when invariants are being checked (@-fclash-debug@).
+  --
+  -- Flag: @-Wclash-unmatchable-constant@
   deriving (Show, Eq, Ord, Enum, Bounded, Generic, NFData, Hashable)
 
 -- | The name of a warning as used in command line flags, e.g.
@@ -88,6 +94,7 @@ warningName = \case
   WarnPrimitiveDefinition -> "clash-primitive-definition"
   WarnCastSpecialization -> "clash-cast-specialization"
   WarnIntegerNarrowing -> "clash-integer-narrowing"
+  WarnUnmatchableConstant -> "clash-unmatchable-constant"
 
 -- | Inverse of 'warningName'
 parseWarningName :: String -> Maybe ClashWarning
