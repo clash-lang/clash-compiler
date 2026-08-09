@@ -427,7 +427,11 @@ runClashTest = defaultMain
         , runTest "Shift" def{hdlSim=[]}
         , runTest "SimOnly" def{hdlTargets=[VHDL],hdlSim=[]}
         , runTest "SimpleConstructor" def{hdlSim=[]}
-        , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=[]}
+        , runTest "SomeNatVal" def{
+            hdlTargets=[VHDL]
+          , hdlSim=[]
+          , clashFlags=["-Werror=clash-unmatchable-constant"]
+          }
         , runTest "TyEqConstraints" def{
             hdlSim=[]
           , buildTargets=BuildSpecific ["top1"]

@@ -50,6 +50,7 @@ import Clash.Sized.Internal.Signed as S (Signed, eq#)
 import Clash.Sized.Internal.Unsigned as U (Unsigned, eq#)
 
 import Clash.Core.DataCon (DataCon(..))
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.EqSolver
 import Clash.Core.FreeVars (freeLocalIds, localVarsDoNotOccurIn)
 import Clash.Core.HasType
@@ -60,8 +61,9 @@ import Clash.Core.Subst
 import Clash.Core.Term
   ( Alt, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
   , collectTicks, mkApps, mkTicks, patIds, stripTicks, Bind(..))
-import Clash.Core.TyCon (TyConMap)
-import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
+import Clash.Core.TyCon (TyConMap, isNewTypeTc)
+import Clash.Core.Type
+  (LitTy(..), Type(..), TypeView(..), coreView1, splitFunForallTy, tyView)
 import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
 import Clash.Core.Util (listToLets, mkInternalVar)
 import Clash.Core.Var (varName)
@@ -179,6 +181,13 @@ caseCon' :: HasCallStack => NormRewrite
 caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
  tcm <- Lens.view tcCache
  case collectArgsTicks subj of
+  -- The subject is a newtype constructor while the alternatives belong to the
+  -- type it represents. 'equalCon' compares tags, which cannot tell those
+  -- apart, so it would bind a field to a pattern variable of the wrong type.
+  (Data dc, args, ticks)
+    | Just fieldE <- newTypeField tcm dc alts args
+    -> caseCon ctx (Case (mkTicks fieldE ticks) ty alts)
+
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
     Just (DataPat _ tvs xs, altE) -> do
@@ -631,6 +640,25 @@ caseLet (TransformContext is0 _) (Case (collectTicks -> (Let xes e,ticks)) ty al
 
 caseLet _ e = return e
 {-# SCC caseLet #-}
+
+-- | The value a newtype constructor wraps, provided the alternatives it is
+-- matched against do not mention that constructor. GHC casts freely between a
+-- newtype and its representation, so a case on a newtype value can carry
+-- alternatives for the represented type.
+newTypeField :: TyConMap -> DataCon -> [Alt] -> [Either Term Type] -> Maybe Term
+newTypeField tcm dc alts args
+  | not (any isSameDc alts)
+  , TyConApp tcNm _ <- tyView (snd (splitFunForallTy (dcType dc)))
+  , Just tc <- UniqMap.lookup tcNm tcm
+  , isNewTypeTc tc
+  , [fieldE] <- Either.lefts args
+  = Just fieldE
+  | otherwise
+  = Nothing
+ where
+  isSameDc (DataPat dcPat _ _, _) = dcUniq dcPat == dcUniq dc
+  isSameDc _ = False
+{-# SCC newTypeField #-}
 
 caseOneAlt :: Term -> NormalizeSession Term
 caseOneAlt e@(Case _ _ [(pat,altE)]) =
