@@ -241,7 +241,7 @@ i = QuasiQuoter {
   }
   where
     err name =
-      error ("Clash.Util.Interpolate.i: This QuasiQuoter can not be used as a "
+      error ("Clash.Util.Interpolate.i: This QuasiQuoter cannot be used as a "
            ++ name ++ "!")
 
     toExp:: [Node] -> Q Exp
