@@ -532,6 +532,8 @@ runClashTest t3105Env = defaultMain
         , runTest "AppendZero" def
         , runTest "PopCountNoInteger"
             def{clashFlags=["-Werror=clash-dubious-primitive"]}
+        , runTest "SplitZeroWidth"
+            def{clashFlags=["-Werror=clash-unmatchable-constant"]}
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
