@@ -895,12 +895,16 @@ instance KnownNat n => Bits (BitVector n) where
   shiftR v i        = shiftR# v i
   rotateL v i       = rotateL# v i
   rotateR v i       = rotateR# v i
-  popCount bv       = fromInteger (I.toInteger# (popCountBV (bv ++# (0 :: BitVector 1))))
+  -- Note the use of 'I.fromEnum#' instead of e.g. 'fromInteger . toInteger#':
+  -- 'I.fromEnum#' has a black box, so 'Integer' does not end up in the
+  -- generated HDL.
+  popCount bv       = I.fromEnum# (popCountBV (bv ++# (0 :: BitVector 1)))
 
 instance KnownNat n => FiniteBits (BitVector n) where
   finiteBitSize       = size#
-  countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV
-  countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
+  -- See the note on 'popCount' on why 'I.fromEnum#' is used
+  countLeadingZeros   = I.fromEnum# . countLeadingZerosBV
+  countTrailingZeros  = I.fromEnum# . countTrailingZerosBV
 
 type BitVectorPositiveLiteralError lit n =
   PotentiallyOutOfBounds

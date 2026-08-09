@@ -478,6 +478,10 @@ runClashTest = defaultMain
           -- error, see the module header.
         , runTest "AppendRemovedArg"
             def{clashFlags=["-Werror=clash-unmatchable-constant"]}
+          -- Promotes the "Dubious primitive instantiation" warning for Integer
+          -- primitives to an error, see the module header.
+        , runTest "PopCountNoInteger"
+            def{clashFlags=["-Werror=clash-dubious-primitive"]}
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
