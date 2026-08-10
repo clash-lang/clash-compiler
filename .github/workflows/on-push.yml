@@ -342,4 +342,23 @@ jobs:
 
       - name: Run clash-testsuite
         run: |
-          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite -- -j$(nproc) --hide-successes -p .${{matrix.hdl}} --no-vivado --no-modelsim
+          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite -- -j$(nproc) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
+
+  all:
+    name: All on-push jobs finished
+    if: ${{ !cancelled() }}
+    needs: [
+      cabal,
+      stack,
+      packages_common,
+      packages_other,
+      developer_shells,
+      packages_testsuite,
+      running_testsuite
+    ]
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+      - uses: clash-lang/all-jobs-ok@v2
+        with:
+          needs: ${{ toJSON(needs) }}
