@@ -60,10 +60,17 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install libtinfo-dev tree iverilog -y
+          sudo apt-get install libtinfo-dev -y
+
+        # Test if cabal can generate a build plan using the index state as specified in
+        # cabal.project
+        # This should be ran before cabal.project.local gets moved into the project root
+      - name: Test build plan
+        run: cabal v2-build --dry-run all > /dev/null || (echo "Maybe state index should be updated?"; false)
 
       - name: Build dependencies
         run: |
+          cp .ci/cabal.project.local .
           cabal v2-build all --dependencies-only
 
       - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
@@ -90,12 +97,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: [
-          9.12.4,
-          9.10.3,
-          9.8.4,
-          9.6.7
-        ]
+        ghc: [ 9.12.4 ]
     steps:
       - uses: actions/checkout@v6
 
@@ -107,6 +109,7 @@ jobs:
         with:
           ghc-version: ${{ matrix.ghc }}
           enable-stack: true
+          stack-no-global: true
           stack-version: latest
 
       - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
@@ -137,7 +140,7 @@ jobs:
 
       - name: Build Dependencies
         run:
-          stack build -j$(nproc) --pedantic --dependencies-only
+          stack build -j$(nproc) --dependencies-only
 
       - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
@@ -155,6 +158,9 @@ jobs:
 
       - name: Build
         run:
+          # Note: the --pedantic switch adds -Wall -Werror to the options passed to GHC. Options
+          # specified in stack.yaml (like -Wcompat) are still passed; it is cumulative. Future
+          # versions of Stack might add behavior to --pedantic.
           stack build -j$(nproc) --pedantic
 
 
@@ -198,7 +204,7 @@ jobs:
           attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-ghc)
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: |
@@ -242,7 +248,7 @@ jobs:
         run: attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.${{matrix.package}})
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#clashPackages-${{matrix.ghc}}.${{matrix.package}} | cachix push clash-lang
@@ -275,7 +281,7 @@ jobs:
         run: attic push public $(nix path-info .#devShells.x86_64-linux.${{matrix.ghc}})
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#devShells.x86_64-linux.${{matrix.ghc}} | cachix push clash-lang
@@ -308,7 +314,7 @@ jobs:
           attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-prelude)
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: |
@@ -349,6 +355,7 @@ jobs:
     if: ${{ !cancelled() }}
     needs: [
       cabal,
+      cabal-haddock,
       stack,
       packages_common,
       packages_other,
