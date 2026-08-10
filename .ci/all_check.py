@@ -7,9 +7,10 @@ Makes sure:
 
 import sys
 import yaml
+import os
 
-CI_PATH = ".github/workflows/ci.yml"
-ALL_TEST = "all"
+CI_PATH = os.getenv("CI_ALL_DONE_PATH", ".github/workflows/ci.yml")
+ALL_TEST = os.getenv("CI_ALL_DONE_JOB", "all")
 
 def main():
   ci_yml_fp = open(CI_PATH, "r")
