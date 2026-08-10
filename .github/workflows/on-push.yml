@@ -47,10 +47,10 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
           restore-keys: |
-            ${{ runner.os }}-${{ github.ref_name }}-cabal-
-            ${{ runner.os }}-master-cabal-
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}
+            ${{ runner.os }}-master-cabal-${{ matrix.ghc }}
           path: ${{ steps.ghc-install.outputs.cabal-store }}
 
       - name: Version information
@@ -60,7 +60,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install libtinfo-dev -y
+          sudo apt-get install libtinfo-dev tree -y
 
         # Test if cabal can generate a build plan using the index state as specified in
         # cabal.project
@@ -84,12 +84,15 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
           path: ${{ steps.ghc-install.outputs.cabal-store }}
 
       - name: Build
         run: |
           cabal v2-build all
+
+      - name: Clash-dev test
+        run: .ci/build_clash_dev.sh
 
   stack:
     name: Stack compilation test
@@ -123,11 +126,14 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'stack.yml', '**/*.cabal' ) }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
           restore-keys: |
-            ${{ runner.os }}-${{ github.ref_name }}-stack-
-            ${{ runner.os }}-master-stack-
-          path: ${{ steps.ghc-install.outputs.stack-root }}
+            ${{ runner.os }}-${{ github.ref_name }}-stack-${{ matrix.ghc }}
+            ${{ runner.os }}-master-stack-${{ matrix.ghc }}
+          # stack-root is set to null for some reason, which in turn breaks the entire stack cache
+          # Hardcoding the stack path... for now
+          # path: ${{ steps.ghc-install.outputs.stack-root }}
+          path: ~/.stack
 
       - name: Version information
         run:
@@ -153,8 +159,11 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'stack.yml', '**/*.cabal' ) }}
-          path: ${{ steps.ghc-install.outputs.stack-root }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          # stack-root is set to null for some reason, which in turn breaks the entire stack cache
+          # Hardcoding the stack path... for now
+          # path: ${{ steps.ghc-install.outputs.stack-root }}
+          path: ~/.stack
 
       - name: Build
         run:
