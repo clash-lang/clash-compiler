@@ -26,7 +26,7 @@ module Clash.Rewrite.Util
 
 import           Control.DeepSeq
 import           Control.Exception           (throw)
-import           Control.Lens ((%=), (+=), (^.))
+import           Control.Lens                ((%=), (+=), (^.), Lens')
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.IO.Class      (liftIO)
@@ -36,6 +36,7 @@ import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
+import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.List                   (group, partition, sort, sortOn)
 import qualified Data.List                   as List
@@ -133,6 +134,16 @@ findAccidentialShadows =
   findDups :: [Id] -> [[Id]]
   findDups ids = filter ((1 <) . length) (group (sort ids))
 
+-- | Strictly bump a counter in 'RewriteState', typically 'transformTriedCounters'
+-- or 'transformAppliedCounters'.
+bumpCounter
+  :: String
+  -> Lens' (RewriteState extra) (HashMap Text Word)
+  -> RewriteMonad extra ()
+bumpCounter name l = do
+  counters <- Lens.use l
+  -- Note: Using $! to force thunks to prevent a gigantic pile of +1s in memory
+  Lens.assign l $! HashMap.insertWith (+) (Text.pack name) 1 counters
 
 -- | Record if a transformation is successfully applied
 apply
@@ -197,8 +208,10 @@ applyDebug ctx name exprOld hasChanged exprNew = do
   go opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
     nTrans <- pred <$> Lens.use transformCounter
 
-    Monad.when (dbg_countTransformations opts && hasChanged) $ do
-      transformCounters %= HashMap.insertWith (const succ) (Text.pack name) 1
+    Monad.when (dbg_countTransformations opts) $ do
+      bumpCounter name transformTriedCounters
+      Monad.when hasChanged $
+        bumpCounter name transformAppliedCounters
 
     Monad.when (dbg_invariants opts && hasChanged) $ do
       tcm                  <- Lens.view tcCache
@@ -293,8 +306,15 @@ runRewriteSession :: RewriteEnv
                   -> IO a
 runRewriteSession r s m = do
   (a, s', _) <- runR m r s
+
+  let
+    triedTransformationsMessage =
+      ("Clash: Tried transformations:\n" ++ Text.unpack (showCounters (s' ^. transformTriedCounters)))
+    appliedTransformationsMessage =
+      ("Clash: Applied transformations:\n" ++ Text.unpack (showCounters (s' ^. transformAppliedCounters)))
+
   traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
-    ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
+    (triedTransformationsMessage ++ "\n" ++ appliedTransformationsMessage) $
     traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
       ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
       pure a

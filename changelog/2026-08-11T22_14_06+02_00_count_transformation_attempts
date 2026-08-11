@@ -1,0 +1,1 @@
+CHANGED: `-fclash-debug-count-transformations` now also reports how often each transformation was attempted (counters suffixed "!try"), next to the existing applied-rewrite counts.

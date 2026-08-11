@@ -88,7 +88,8 @@ instance Default RewriteEnv where
 instance Default extra => Default (RewriteState extra) where
   def = RewriteState
     { _transformCounter=0
-    , _transformCounters=mempty
+    , _transformAppliedCounters=mempty
+    , _transformTriedCounters=mempty
     , _bindings=emptyVarEnv
     , _uniqSupply=unsafePerformIO newSupply
     , _curFun=error "_curFun: NYI"
