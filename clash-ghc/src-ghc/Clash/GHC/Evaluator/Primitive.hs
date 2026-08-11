@@ -123,7 +123,6 @@ import Clash.XException (isX)
 
 import {-# SOURCE #-} Clash.GHC.Evaluator
 
-import qualified Clash.Annotations.BitRepresentation.Deriving
 import qualified Clash.Class.BitPack.Internal
 import qualified Clash.Class.Exp
 import qualified Clash.Promoted.Nat
@@ -3508,7 +3507,7 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
            [wordDc] = tyConDataCons wordTc
        in  reduce (mkApps (Data wordDc) [Left (Literal (WordLiteral (toInteger b)))])
 
-  $(namePat 'Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL)
+  $(namePat 'Clash.Class.BitPack.Internal.dontApplyInHDL)
     | isSubj
     , f : a : _ <- args
     -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])

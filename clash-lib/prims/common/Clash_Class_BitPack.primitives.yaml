@@ -32,3 +32,10 @@
     type: 'xToBV :: KnownNat n => BitVector n -> BitVector n'
     template: ~ARG[1]
     workInfo: Never
+- BlackBox:
+    name: Clash.Class.BitPack.Internal.dontApplyInHDL
+    kind: Expression
+    type: 'dontApplyInHDL
+      :: (a -> b) -> a -> b'
+    template: ~FROMBV[~TOBV[~VAR[v][1]][~TYP[1]]][~TYPO]
+    workInfo: Never

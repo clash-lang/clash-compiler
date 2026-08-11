@@ -10,6 +10,7 @@ module Clash.Tests.BitPack where
 
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Tasty.HUnit.Extra (expectXException)
 
 import Clash.Class.BitPack
 import Clash.Sized.BitVector
@@ -194,6 +195,12 @@ maybeUnpackTuple4All =
     :> Nothing
     :> Nil )
 
+unpackBigSumInvalid :: Assertion
+unpackBigSumInvalid = expectXException (unpack @BigSum 0b101)
+
+unpackWrappedIndexInvalid :: Assertion
+unpackWrappedIndexInvalid = expectXException (unpack @WrappedIndex 0b11)
+
 packTuple4Layout :: Assertion
 packTuple4Layout =
   pack ((0, 1, 2, 0) :: (Index 3, Index 3, Index 3, Index 3))
@@ -241,6 +248,11 @@ tests =
         , testCase "Generic propagation only rejects wrapped invalid Index fields" maybeUnpackWrappedIndexAll
         , testCase "Tuples reject an invalid field at every position" maybeUnpackTuple4All
         , testCase "Balanced tuple packing preserves field order" packTuple4Layout
+        ]
+    , testGroup
+        "unpack"
+        [ testCase "Generic sums are undefined for unused constructor tags" unpackBigSumInvalid
+        , testCase "Generic types are undefined for invalid fields" unpackWrappedIndexInvalid
         ]
     , testCase "undefSpineVec" undefSpineVec
     , testCase "undefSpineRTree" undefSpineRTree

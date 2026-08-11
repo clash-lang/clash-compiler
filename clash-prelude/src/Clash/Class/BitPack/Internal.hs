@@ -50,10 +50,11 @@ import Numeric.Half                   (Half (..))
 import Clash.Annotations.Primitive    (hasBlackBox)
 import Clash.Class.BitPack.Internal.TH (deriveBitPackTuples)
 import Clash.Class.Resize             (zeroExtend, resize)
-import Clash.Promoted.Nat             (SNat(..), snatToNum)
+import Clash.Promoted.Nat             (SNat(..), SNatLE(..), compareSNat, snatToNum)
 import Clash.Sized.Internal.BitVector
   (pack#, split#, checkUnpackUndef, undefined#, unpack#, unsafeToNatural, isLike#,
    BitVector, Bit, (++#), xToBV)
+import Clash.XException              (errorX)
 
 {- $setup
 >>> :m -Prelude
@@ -134,7 +135,11 @@ class KnownNat (BitSize a) => BitPack a where
        , (constrSize + fieldSize) ~ BitSize a
        )
     => a -> BitVector (BitSize a)
-  pack = packXWith go
+  pack v = case compareSNat (SNat @(BitSize a)) (SNat @0) of
+    -- Zero-width primitives cannot be rendered; there is nothing to convert
+    -- anyway. The case is resolved at compile time.
+    SNatLE -> packXWith go v
+    SNatGT -> dontApplyInHDL (packXWith go) v
    where
     go a = resize (pack sc) ++# packedFields
      where
@@ -142,9 +147,11 @@ class KnownNat (BitSize a) => BitPack a where
 
   -- | Convert a 'BitVector' to an element of type @a@
   --
-  -- When the bit pattern is not the representation of any value of type @a@,
-  -- @unpack@ can return an invalid value, or some value @y@ where @'pack' y@
-  -- is not equal to the input. Use 'maybeUnpack' to detect such bit patterns.
+  -- If the bit pattern is not the representation of any value of type @a@,
+  -- i.e. there is no @x@ such that @bv == 'pack' x@, then @unpack bv@ is
+  -- undefined: an unused constructor encoding returns a fully undefined
+  -- value, while an invalid field encoding returns a value whose affected
+  -- fields are undefined. Use 'maybeUnpack' to detect such bit patterns.
   --
   -- >>> pack (-5 :: Signed 6)
   -- 0b11_1011
@@ -164,18 +171,21 @@ class KnownNat (BitSize a) => BitPack a where
        , (constrSize + fieldSize) ~ BitSize a
        )
     => BitVector (BitSize a) -> a
-  unpack b =
-    to (gUnpack sc 0 bFields)
+  unpack b = case compareSNat (SNat @(BitSize a)) (SNat @0) of
+    -- Zero-width primitives cannot be rendered; there is nothing to convert
+    -- anyway. The case is resolved at compile time.
+    SNatLE -> x
+    SNatGT -> dontApplyInHDL (const x) b
    where
-    (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
+    (_, x) = unpackGeneric b :: (Bool, a)
 
   -- | Attempt to convert a 'BitVector' to an element of type @a@. If the unpacking
   -- is successful, outputs @Just a@, otherwise outputs @Nothing@.
   --
   -- Not every bit pattern is necessarily the representation of a value of type
   -- @a@. If there is no @x@ such that @bv == 'pack' x@, then @maybeUnpack bv@
-  -- returns @Nothing@. Conversely, 'unpack' @bv@ would return an invalid value,
-  -- or some value @y@ where @'pack' y@ is not equal to @bv@.
+  -- returns @Nothing@. Conversely, 'unpack' @bv@ would return an undefined
+  -- value.
   --
   -- >>> pack (maxBound :: Index 13)
   -- 0b1100
@@ -218,9 +228,15 @@ class KnownNat (BitSize a) => BitPack a where
        , (constrSize + fieldSize) ~ BitSize a
        )
     => BitVector (BitSize a) -> Maybe a
-  maybeUnpack b = to <$> gMaybeUnpack True sc 0 bFields
+  maybeUnpack b =
+    if valid then Just payload else Nothing
    where
-    (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
+    (valid, x) = unpackGeneric b :: (Bool, a)
+    -- Zero-width primitives cannot be rendered; there is nothing to convert
+    -- anyway. The case is resolved at compile time.
+    payload = case compareSNat (SNat @(BitSize a)) (SNat @0) of
+      SNatLE -> x
+      SNatGT -> dontApplyInHDL (const x) b
 
 packXWith
   :: KnownNat n
@@ -229,6 +245,42 @@ packXWith
   -> BitVector n
 packXWith f = xToBV . f
 {-# INLINE packXWith #-}
+
+-- | In Haskell, apply the first argument to the second argument. In HDL,
+-- convert the second argument to the result type directly instead -- a no-op
+-- in hardware. This is sound because a lawful 'BitPack' instance accurately
+-- reflects the bit representation of the data in HDL, and converting a bit
+-- pattern that does not encode a value is undefined, which the
+-- passed-through bits refine.
+--
+-- This is used by the generated pack/unpack of custom bit representations,
+-- and by the 'Generic' default implementations of 'pack', 'unpack', and
+-- 'maybeUnpack', to not instantiate any conversion logic in HDL.
+dontApplyInHDL :: (a -> b) -> a -> b
+dontApplyInHDL f a = f a
+{-# OPAQUE dontApplyInHDL #-}
+{-# ANN dontApplyInHDL hasBlackBox #-}
+
+-- | Generic implementation of 'unpack': reports whether the bit pattern
+-- encodes a value of the type, alongside the unpacked value. Wherever the
+-- bit pattern does not encode a value, the returned value is undefined in
+-- the affected parts.
+unpackGeneric
+  :: ( Generic a
+     , GBitPack (Rep a)
+     , KnownNat (BitSize a)
+     , KnownNat constrSize
+     , KnownNat fieldSize
+     , constrSize ~ CLog 2 (GConstructorCount (Rep a))
+     , fieldSize ~ GFieldSize (Rep a)
+     , (constrSize + fieldSize) ~ BitSize a
+     )
+  => BitVector (BitSize a)
+  -> (Bool, a)
+unpackGeneric b =
+  let (valid, x) = gUnpack True sc 0 bFields in (valid, to x)
+ where
+  (checkUnpackUndef unpack . resize -> sc, bFields) = split# b
 
 -- | Pack both arguments to a 'BitVector' and use
 -- 'Clash.Sized.Internal.BitVector.isLike#' to compare them. This is a more
@@ -574,19 +626,12 @@ class GBitPack f where
     -> (Int, BitVector (GFieldSize f))
     -- ^ (Constructor number, Packed fields)
 
-  -- | Unpack whole type.
+  -- | Unpack whole type. Reports whether the bit pattern encodes a value of
+  -- the type, alongside the value itself. Wherever the bit pattern does not
+  -- encode a value, the returned value is undefined in the affected parts.
+  -- Both 'unpack' and 'maybeUnpack' are implemented in terms of this
+  -- function.
   gUnpack
-    :: Int
-    -- ^ Construct with constructor /n/
-    -> Int
-    -- ^ Current constructor
-    -> BitVector (GFieldSize f)
-    -- ^ BitVector containing fields
-    -> f a
-    -- ^ Unpacked result
-
-  -- | Attempt to unpack whole type.
-  gMaybeUnpack
     :: Bool
     -- ^ Check whether the constructor is in range. This should only be 'True'
     -- for the root of a generic representation.
@@ -596,17 +641,16 @@ class GBitPack f where
     -- ^ Current constructor
     -> BitVector (GFieldSize f)
     -- ^ BitVector containing fields
-    -> Maybe (f a)
-    -- ^ Possibly unpacked result
+    -> (Bool, f a)
+    -- ^ (Bit pattern encodes a value, unpacked result)
 
 instance GBitPack a => GBitPack (M1 m d a) where
   type GFieldSize (M1 m d a) = GFieldSize a
   type GConstructorCount (M1 m d a) = GConstructorCount a
 
   gPackFields cc (M1 m1) = gPackFields cc m1
-  gUnpack c cc b = M1 (gUnpack c cc b)
-  gMaybeUnpack checkBounds c cc b =
-    M1 <$> gMaybeUnpack checkBounds c cc b
+  gUnpack checkBounds c cc b =
+    let (valid, x) = gUnpack checkBounds c cc b in (valid, M1 x)
 
 instance ( KnownNat (GFieldSize g)
          , KnownNat (GFieldSize f)
@@ -628,28 +672,16 @@ instance ( KnownNat (GFieldSize g)
     let padding = undefined# :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g) in
     (sc, packed ++# padding)
 
-  gUnpack c cc b =
-    let cLeft = snatToNum (SNat @(GConstructorCount f)) in
-    if c < cc + cLeft then
-      L1 (gUnpack c cc f)
-    else
-      R1 (gUnpack c (cc + cLeft) g)
-
-   where
-    -- It's a thing of beauty, if I may say so myself!
-    (f, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f)) = split# b
-    (g, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g)) = split# b
-
-  gMaybeUnpack checkBounds c cc b =
+  gUnpack checkBounds c cc b =
     let
       cLeft = snatToNum (SNat @(GConstructorCount f))
       cTotal = snatToNum (SNat @(GConstructorCount (f :+: g)))
     in
     if not checkBounds || c < cc + cTotal
       then if c < cc + cLeft
-        then L1 <$> gMaybeUnpack False c cc f
-        else R1 <$> gMaybeUnpack False c (cc + cLeft) g
-      else Nothing
+        then let (valid, l) = gUnpack False c cc f in (valid, L1 l)
+        else let (valid, r) = gUnpack False c (cc + cLeft) g in (valid, R1 r)
+      else (False, errorX "unpack: bit pattern does not encode a value of the target type")
    where
     (f, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize f)) = split# b
     (g, _ :: BitVector (Max (GFieldSize f) (GFieldSize g) - GFieldSize g)) = split# b
@@ -666,33 +698,32 @@ instance (KnownNat (GFieldSize g), KnownNat (GFieldSize f), GBitPack f, GBitPack
       let (_, r1) = gPackFields cc r0 in
       l1 ++# r1
 
-  gUnpack c cc b =
-    gUnpack c cc front :*: gUnpack c cc back
+  gUnpack checkBounds c cc b =
+    let
+      (frontValid, front1) = gUnpack checkBounds c cc front0
+      (backValid, back1) = gUnpack checkBounds c cc back0
+    in
+    (frontValid && backValid, front1 :*: back1)
    where
-    (front, back) = split# b
-
-  gMaybeUnpack checkBounds c cc b =
-    (:*:)
-      <$> gMaybeUnpack checkBounds c cc front
-      <*> gMaybeUnpack checkBounds c cc back
-   where
-    (front, back) = split# b
+    (front0, back0) = split# b
 
 instance BitPack c => GBitPack (K1 i c) where
   type GFieldSize (K1 i c) = BitSize c
   type GConstructorCount (K1 i c)  = 1
 
   gPackFields cc (K1 i) = (cc, pack i)
-  gUnpack _c _cc b      = K1 (unpack b)
-  gMaybeUnpack _checkBounds _c _cc b = K1 <$> maybeUnpack b
+  gUnpack _checkBounds _c _cc b =
+    case maybeUnpack b of
+      Just x -> (True, K1 x)
+      Nothing ->
+        (False, K1 (errorX "unpack: bit pattern does not encode a value of the target type"))
 
 instance GBitPack U1 where
   type GFieldSize U1 = 0
   type GConstructorCount U1 = 1
 
   gPackFields cc U1 = (cc, 0)
-  gUnpack _c _cc _b = U1
-  gMaybeUnpack _checkBounds _c _cc _b = Just U1
+  gUnpack _checkBounds _c _cc _b = (True, U1)
 
 -- Instances derived using Generic
 instance BitPack Ordering

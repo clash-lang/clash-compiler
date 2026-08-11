@@ -39,7 +39,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
-import Clash.Annotations.BitRepresentation.Deriving (dontApplyInHDL)
+import Clash.Class.BitPack.Internal (dontApplyInHDL)
 import Clash.Sized.Vector as Vec (Vec(Cons), splitAt)
 
 import Clash.Annotations.Primitive (extractPrim)

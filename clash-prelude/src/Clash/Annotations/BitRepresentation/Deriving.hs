@@ -57,9 +57,9 @@ import Clash.Annotations.BitRepresentation.Util
 import qualified Clash.Annotations.BitRepresentation.Util
   as Util
 
-import           Clash.Annotations.Primitive  (hasBlackBox)
 import           Clash.Class.BitPack
   (BitPack, BitSize, pack, packXWith, unpack, maybeUnpack)
+import           Clash.Class.BitPack.Internal (dontApplyInHDL)
 import           Clash.Class.Resize           (resize)
 import           Language.Haskell.TH.Compat   (mkTySynInstD)
 import           Clash.Sized.BitVector        (BitVector, low, (++#))
@@ -906,15 +906,6 @@ buildPack dataRepr@(DataReprAnn _name _size constrs) = do
   let func        = FunD 'pack [Clause [VarP argNameIn] (NormalB packApplied) []]
   return [func]
 
-
--- | In Haskell apply the first argument to the second argument,
---   in HDL just return the second argument.
---
--- This is used in the generated pack/unpack to not do anything in HDL.
-dontApplyInHDL :: (a -> b) -> a -> b
-dontApplyInHDL f a = f a
-{-# OPAQUE dontApplyInHDL #-}
-{-# ANN dontApplyInHDL hasBlackBox #-}
 
 buildUnpackField
   :: Name
