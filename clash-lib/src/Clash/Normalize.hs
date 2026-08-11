@@ -412,11 +412,12 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     -- fresh propagation redexes for the next top-down pass.
     repeatR (topdownFixR (apply "appProp" appProp >->
                apply "bindConstantVar" bindConstantVar >->
-               apply "caseCon" caseCon >->
-               (apply "reduceConst" reduceConst !-> apply "deadcode" deadCode) >->
-               apply "reduceNonRepPrim" reduceNonRepPrim >->
-               apply "removeUnusedExpr" removeUnusedExpr) >->
-             bottomupR (apply "flattenLet" flattenLet)) !->
+               apply "caseCon" caseCon) >->
+             bottomupR (apply "flattenLet" flattenLet) >->
+             bottomupR ((apply "reduceConst" reduceConst !->
+                           apply "deadcode" deadCode) >->
+                        apply "reduceNonRepPrim" reduceNonRepPrim >->
+                        apply "removeUnusedExpr" removeUnusedExpr)) !->
     topdownSucR (apply "topLet" topLet) >->
     -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
     -- Note that we do this as the very last step, after all constant propagation
