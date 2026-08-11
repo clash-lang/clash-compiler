@@ -65,7 +65,7 @@ import qualified Clash.Core.Term as Term
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
   , collectArgsTicks, mkApps , mkTicks, stripTicks)
-import Clash.Core.TermInfo (isLocalVar, termSize)
+import Clash.Core.TermInfo (isLocalVar, termSizeSmallerThan)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
 import Clash.Core.Util (isSignalType, primUCo)
@@ -132,7 +132,7 @@ bindConstantVar = inlineBinders test
           case isWorkFreeIsh tcm e of
             True -> Lens.view inlineConstantLimit >>= \case
               0 -> return True
-              n -> return (termSize e <= n)
+              n -> return (termSizeSmallerThan (n + 1) e)
             _ -> return False
 {-# SCC bindConstantVar #-}
 
@@ -618,7 +618,7 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks))
           case lookupVarEnv f bndrs of
             Just b
               | not (isNoInline (bindingSpec b))
-              , termSize (bindingTerm b) < sizeLimit
+              , termSizeSmallerThan sizeLimit (bindingTerm b)
               -> do
                 -- Don't inline recursive expressions
                 isRecBndr <- isRecursiveBndr f
@@ -712,7 +712,7 @@ inlineWorkFree _ e@(Var f)
                       sizeLimit <- Lens.view inlineWFCacheLimit
                       -- caching only worth it from a certain size onwards, otherwise
                       -- the caching mechanism itself brings more of an overhead.
-                      if termSize topB < sizeLimit then
+                      if termSizeSmallerThan sizeLimit topB then
                         changed topB
                       else do
                         b <- normalizeTopLvlBndr False f top
