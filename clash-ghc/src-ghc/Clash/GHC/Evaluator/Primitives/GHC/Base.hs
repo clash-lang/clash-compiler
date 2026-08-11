@@ -7,12 +7,9 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE UnboxedTuples #-}
 
 module Clash.GHC.Evaluator.Primitives.GHC.Base
   ( primitives
@@ -20,9 +17,6 @@ module Clash.GHC.Evaluator.Primitives.GHC.Base
 
 import           Data.Text           (Text)
 
-#if MIN_VERSION_ghc(9,10,0)
-import           Clash.Core.DataCon  (DataCon (..))
-#endif
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.Literal  (Literal (..))
 import Clash.Core.Term (Term (..))
@@ -74,13 +68,4 @@ primitives =
           ] <- args
         -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `mod` j)))))
       _ -> Nothing
-
-#if MIN_VERSION_ghc(9,10,0)
-  , primStepEntry $(textNameLit 'GHC.Base.dataToTag#) $ \case
-      PrimStepContext{..}
-        | [DC dc _] <- args
-        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-      _ -> Nothing
-
-#endif
   ]

@@ -47,36 +47,49 @@ import qualified Clash.GHC.Evaluator.Primitives.GHC.TypeNats as GHC.TypeNats
 import qualified Clash.GHC.Evaluator.Primitives.GHC.Types as GHC.Types
 import qualified Clash.GHC.Evaluator.Primitives.GHC.Word as GHC.Word
 
+-- | All primitive evaluation rules of the GHC frontend, indexed by primitive
+-- name. Errors if multiple implementations are registered under the same name.
 ghcPrimStepImpls :: HashMap.HashMap Text PrimStep
-ghcPrimStepImpls = HashMap.fromList $ concat
-  [ Clash.Annotations.BitRepresentation.Deriving.primitives
-  , Clash.Class.BitPack.Internal.primitives
-  , Clash.Class.Exp.primitives
-  , Clash.Promoted.Nat.primitives
-  , Clash.Sized.Internal.BitVector.primitives
-  , Clash.Sized.Internal.Index.primitives
-  , Clash.Sized.Internal.Signed.primitives
-  , Clash.Sized.Internal.Unsigned.primitives
-  , Clash.Sized.RTree.primitives
-  , Clash.Sized.Vector.primitives
-  , Data.Singletons.TypeLits.Internal.primitives
-  , Data.Text.Show.primitives
-  , GHC.Base.primitives
-  , GHC.Classes.primitives
-  , GHC.Float.primitives
-  , GHC.Int.primitives
-  , GHC.Internal.Float.primitives
-  , GHC.Internal.Real.primitives
-  , GHC.Magic.primitives
-  , GHC.Num.primitives
-  , GHC.Num.BigNat.primitives
-  , GHC.Num.Integer.primitives
-  , GHC.Num.Natural.primitives
-  , GHC.Prim.primitives
-  , GHC.PrimopWrappers.primitives
-  , GHC.Real.primitives
-  , GHC.TypeLits.primitives
-  , GHC.TypeNats.primitives
-  , GHC.Types.primitives
-  , GHC.Word.primitives
-  ]
+ghcPrimStepImpls
+  | HashMap.null duplicateNames = HashMap.fromList allPrimitives
+  | otherwise = error $
+      "ghcPrimStepImpls: multiple implementations registered for: "
+        <> show (HashMap.keys duplicateNames)
+ where
+  duplicateNames =
+    HashMap.filter (> 1) $
+      HashMap.fromListWith (+) [(name, 1 :: Int) | (name, _) <- allPrimitives]
+
+  allPrimitives :: [(Text, PrimStep)]
+  allPrimitives = concat
+    [ Clash.Annotations.BitRepresentation.Deriving.primitives
+    , Clash.Class.BitPack.Internal.primitives
+    , Clash.Class.Exp.primitives
+    , Clash.Promoted.Nat.primitives
+    , Clash.Sized.Internal.BitVector.primitives
+    , Clash.Sized.Internal.Index.primitives
+    , Clash.Sized.Internal.Signed.primitives
+    , Clash.Sized.Internal.Unsigned.primitives
+    , Clash.Sized.RTree.primitives
+    , Clash.Sized.Vector.primitives
+    , Data.Singletons.TypeLits.Internal.primitives
+    , Data.Text.Show.primitives
+    , GHC.Base.primitives
+    , GHC.Classes.primitives
+    , GHC.Float.primitives
+    , GHC.Int.primitives
+    , GHC.Internal.Float.primitives
+    , GHC.Internal.Real.primitives
+    , GHC.Magic.primitives
+    , GHC.Num.primitives
+    , GHC.Num.BigNat.primitives
+    , GHC.Num.Integer.primitives
+    , GHC.Num.Natural.primitives
+    , GHC.Prim.primitives
+    , GHC.PrimopWrappers.primitives
+    , GHC.Real.primitives
+    , GHC.TypeLits.primitives
+    , GHC.TypeNats.primitives
+    , GHC.Types.primitives
+    , GHC.Word.primitives
+    ]

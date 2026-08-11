@@ -23,7 +23,7 @@ import           Data.Text           (Text)
 
 import           Clash.Core.Evaluator.Types
 
-#if MIN_VERSION_ghc(9,12,0)
+#if MIN_VERSION_ghc(9,10,0)
 import           Clash.Core.DataCon  (DataCon (..))
 import           Clash.Core.Literal  (Literal (..))
 import Clash.Core.Term (Term (..))
@@ -50,7 +50,7 @@ primitives =
         -> reduce (valToTerm arg)
       _ -> Nothing
 
-#if MIN_VERSION_ghc(9,12,0)
+#if MIN_VERSION_ghc(9,10,0)
   , primStepEntry $(textNameLit 'GHC.Magic.dataToTag#) $ \case
       PrimStepContext{..}
         | [DC dc _] <- args
