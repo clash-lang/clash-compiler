@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -30,24 +31,19 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'GHC.Num.Natural.naturalSubUnsafe)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | Just (i,j) <- naturalLiterals args
-            ->
-             let nTy = snd (splitFunForallTy ty) in
-             reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
-              naturalToNaturalLiteral (naturalSubUnsafe i' j')))
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.Num.Natural.naturalSubUnsafe) $ \case
+      PrimStepContext{..}
+        | Just (i,j) <- naturalLiterals args
+        ->
+         let nTy = snd (splitFunForallTy ty) in
+         reduce (checkNaturalRange nTy [i, j] (\[i', j'] ->
+          naturalToNaturalLiteral (naturalSubUnsafe i' j')))
+      _ -> Nothing
 
-  , ( "GHC.Num.Natural.$wnaturalSignum"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [i] <- naturalLiterals' args
-            -> reduce (Literal (WordLiteral (signum i)))
-          _ -> Nothing
-    )
+  , primStepEntry "GHC.Num.Natural.$wnaturalSignum" $ \case
+      PrimStepContext{..}
+        | [i] <- naturalLiterals' args
+        -> reduce (Literal (WordLiteral (signum i)))
+      _ -> Nothing
+
   ]

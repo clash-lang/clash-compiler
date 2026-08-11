@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -33,52 +34,44 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'GHC.Word.W8#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Word8Literal c)] <- args
-            ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-                    (Just wordTc) = UniqMap.lookup wordTcNm tcm
-                    [wordDc] = tyConDataCons wordTc
-                in  reduce (mkApps (Data wordDc) [Left (Literal (Word8Literal c))])
-          _ -> Nothing
-    )
-  , ( $(textNameLit 'GHC.Word.W16#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Word16Literal c)] <- args
-            ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-                    (Just wordTc) = UniqMap.lookup wordTcNm tcm
-                    [wordDc] = tyConDataCons wordTc
-                in  reduce (mkApps (Data wordDc) [Left (Literal (Word16Literal c))])
-          _ -> Nothing
-    )
-  , ( $(textNameLit 'GHC.Word.W32#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Word32Literal c)] <- args
-            ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-                    (Just wordTc) = UniqMap.lookup wordTcNm tcm
-                    [wordDc] = tyConDataCons wordTc
-                in  reduce (mkApps (Data wordDc) [Left (Literal (Word32Literal c))])
-          _ -> Nothing
-    )
-  , ( $(textNameLit 'GHC.Word.W64#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Word64Literal c)] <- args
-            ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
-                    (Just wordTc) = UniqMap.lookup wordTcNm tcm
-                    [wordDc] = tyConDataCons wordTc
-                in  reduce (mkApps (Data wordDc) [Left (Literal (Word64Literal c))])
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.Word.W8#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Word8Literal c)] <- args
+        ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+                (Just wordTc) = UniqMap.lookup wordTcNm tcm
+                [wordDc] = tyConDataCons wordTc
+            in  reduce (mkApps (Data wordDc) [Left (Literal (Word8Literal c))])
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Word.W16#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Word16Literal c)] <- args
+        ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+                (Just wordTc) = UniqMap.lookup wordTcNm tcm
+                [wordDc] = tyConDataCons wordTc
+            in  reduce (mkApps (Data wordDc) [Left (Literal (Word16Literal c))])
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Word.W32#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Word32Literal c)] <- args
+        ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+                (Just wordTc) = UniqMap.lookup wordTcNm tcm
+                [wordDc] = tyConDataCons wordTc
+            in  reduce (mkApps (Data wordDc) [Left (Literal (Word32Literal c))])
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Word.W64#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Word64Literal c)] <- args
+        ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+                (Just wordTc) = UniqMap.lookup wordTcNm tcm
+                [wordDc] = tyConDataCons wordTc
+            in  reduce (mkApps (Data wordDc) [Left (Literal (Word64Literal c))])
+      _ -> Nothing
+
   ]

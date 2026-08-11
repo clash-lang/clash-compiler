@@ -108,13 +108,17 @@ instance MonadUnique PrimEvalMonad where
 runPEM :: PrimEvalMonad a -> Supply -> (a, Supply)
 runPEM (PEM m) = State.runState m
 
--- | Helpers from ghcPrimStep's pre-map implementation. This is mostly there to
--- have a way to do a machine-based conversion of the old situation (one gigantic
--- case expression) to the current one (HashMap based lookups).
---
--- TODO: Remove this in favor of a more Haskelly approach?
+-- | Arguments and shared helpers available to primitive implementations.
+-- 'primStepEntry' constructs this context after a successful name lookup,
+-- keeping the evaluator calling convention out of each individual entry.
 data PrimStepContext = PrimStepContext
-  { ty :: Type
+  { tcm :: TyConMap
+  , isSubj :: Bool
+  , pInfo :: PrimInfo
+  , tys :: [Type]
+  , args :: [Value]
+  , mach :: Machine
+  , ty :: Type
   , checkNaturalRange1 :: Type -> Integer -> (Natural -> Natural) -> Term
   , checkNaturalRange2 :: Type -> Integer -> Integer -> (Natural -> Natural -> Natural) -> Term
   , checkNaturalRange :: Type -> [Integer] -> ([Natural] -> Term) -> Term
@@ -197,6 +201,15 @@ mkPrimStepContext tcm isSubj pInfo tys args mach = PrimStepContext{..}
     catchDivByZero = makeUndefinedIf (==DivideByZero)
 
     catchErrorCall = makeUndefinedIf (const True :: ErrorCall -> Bool)
+
+-- | Associate a primitive name with an implementation. The adapter from the
+-- evaluator's calling convention to 'PrimStepContext' lives here so individual
+-- primitive implementations do not have to repeat it.
+primStepEntry :: Text -> (PrimStepContext -> Maybe Machine) -> (Text, PrimStep)
+primStepEntry name impl =
+  (name, \tcm isSubj pInfo tys args mach ->
+    impl (mkPrimStepContext tcm isSubj pInfo tys args mach))
+{-# INLINE primStepEntry #-}
 
 -- Helper functions for literals
 

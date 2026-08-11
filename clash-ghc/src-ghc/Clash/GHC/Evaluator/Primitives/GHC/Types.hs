@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -34,29 +35,24 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'GHC.Types.I#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (IntLiteral i)] <- args
-            ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-                    (Just intTc) = UniqMap.lookup intTcNm tcm
-                    [intDc] = tyConDataCons intTc
-                in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.Types.I#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (IntLiteral i)] <- args
+        ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+                (Just intTc) = UniqMap.lookup intTcNm tcm
+                [intDc] = tyConDataCons intTc
+            in  reduce (mkApps (Data intDc) [Left (Literal (IntLiteral i))])
+      _ -> Nothing
 
-  , ( $(textNameLit 'GHC.Types.W#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (WordLiteral i)] <- args
-            ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-                    (Just intTc) = UniqMap.lookup intTcNm tcm
-                    [intDc] = tyConDataCons intTc
-                in  reduce (mkApps (Data intDc) [Left (Literal (WordLiteral i))])
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.Types.W#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (WordLiteral i)] <- args
+        ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+                (Just intTc) = UniqMap.lookup intTcNm tcm
+                [intDc] = tyConDataCons intTc
+            in  reduce (mkApps (Data intDc) [Left (Literal (WordLiteral i))])
+      _ -> Nothing
+
   ]

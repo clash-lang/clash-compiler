@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -26,61 +27,47 @@ primitives :: [(Text, PrimStep)]
 primitives =
   -- GHC.Real.^  -- XXX: Very fragile
   --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
-  [ ( "GHC.Real.^_f"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}  -- :: Integer -> Integer -> Integer
-            | [i,j] <- integerLiterals' args
-            -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
-          _ -> Nothing
-    )
-  , ( "GHC.Real.$wf"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}  -- :: Integer -> Int# -> Integer
-            | [iV, Lit (IntLiteral j)] <- args
-            , [i] <- integerLiterals' [iV]
-            -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
-          _ -> Nothing
-    )
-  , ( "GHC.Real.$wf1"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..} -- :: Int# -> Int# -> Int#
-            | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
-            -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-          _ -> Nothing
-    )
-  , ( "GHC.Real.^_$s$spowImpl2"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..} -- :: Int# -> Integer -> Integer
-            | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-            -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-          _ -> Nothing
-    )
-  , ( "GHC.Real.$w$spowImpl"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..} -- :: Integer -> Int# -> Integer
-            | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-            -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-          _ -> Nothing
-    )
-  , ( "GHC.Real.$w$spowImpl1"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..} -- :: Int# -> Int# -> Integer
-            | [intLiteral -> Just i, intLiteral -> Just j] <- args
-            -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-          _ -> Nothing
-    )
-  , ( "GHC.Real.^_$sf2"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..} -- :: Int# -> Integer -> Integer
-            | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-            -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-          _ -> Nothing
-    )
+  [ primStepEntry "GHC.Real.^_f" $ \case
+      PrimStepContext{..}  -- :: Integer -> Integer -> Integer
+        | [i,j] <- integerLiterals' args
+        -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+      _ -> Nothing
+
+  , primStepEntry "GHC.Real.$wf" $ \case
+      PrimStepContext{..}  -- :: Integer -> Int# -> Integer
+        | [iV, Lit (IntLiteral j)] <- args
+        , [i] <- integerLiterals' [iV]
+        -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+      _ -> Nothing
+
+  , primStepEntry "GHC.Real.$wf1" $ \case
+      PrimStepContext{..} -- :: Int# -> Int# -> Int#
+        | [Lit (IntLiteral i), Lit (IntLiteral j)] <- args
+        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      _ -> Nothing
+
+  , primStepEntry "GHC.Real.^_$s$spowImpl2" $ \case
+      PrimStepContext{..} -- :: Int# -> Integer -> Integer
+        | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      _ -> Nothing
+
+  , primStepEntry "GHC.Real.$w$spowImpl" $ \case
+      PrimStepContext{..} -- :: Integer -> Int# -> Integer
+        | [integerLiteral -> Just i, intLiteral -> Just j] <- args
+        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      _ -> Nothing
+
+  , primStepEntry "GHC.Real.$w$spowImpl1" $ \case
+      PrimStepContext{..} -- :: Int# -> Int# -> Integer
+        | [intLiteral -> Just i, intLiteral -> Just j] <- args
+        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      _ -> Nothing
+
+  , primStepEntry "GHC.Real.^_$sf2" $ \case
+      PrimStepContext{..} -- :: Int# -> Integer -> Integer
+        | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+      _ -> Nothing
+
   ]

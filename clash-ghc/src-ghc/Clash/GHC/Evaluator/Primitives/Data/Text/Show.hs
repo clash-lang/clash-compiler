@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -34,20 +35,18 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( "Data.Text.Show.$wunpackCStringAscii#"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Lit (StringLiteral addr)] <- args
-            , Text.Text (Text.ByteArray ba) _off len <- Text.pack addr
-            -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-                   (Just tupTc) = UniqMap.lookup tupTcNm tcm
-                   [tupDc] = tyConDataCons tupTc
-                   ret     = mkApps (Data tupDc) (map Right tyArgs ++
-                            [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
-                            , Left (Literal (IntLiteral 0))
-                            , Left (Literal (IntLiteral (toInteger len)))])
-                in reduce ret
-          _ -> Nothing
-    )
+  [ primStepEntry "Data.Text.Show.$wunpackCStringAscii#" $ \case
+      PrimStepContext{..}
+        | [Lit (StringLiteral addr)] <- args
+        , Text.Text (Text.ByteArray ba) _off len <- Text.pack addr
+        -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+               (Just tupTc) = UniqMap.lookup tupTcNm tcm
+               [tupDc] = tyConDataCons tupTc
+               ret     = mkApps (Data tupDc) (map Right tyArgs ++
+                        [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
+                        , Left (Literal (IntLiteral 0))
+                        , Left (Literal (IntLiteral (toInteger len)))])
+            in reduce ret
+      _ -> Nothing
+
   ]

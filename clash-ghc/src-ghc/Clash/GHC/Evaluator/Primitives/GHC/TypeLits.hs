@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.GHC.Evaluator.Primitives.GHC.TypeLits
@@ -27,23 +28,19 @@ import Clash.GHC.Evaluator.Primitive.Util
 primitives :: [(Text, PrimStep)]
 primitives =
   -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
-  [ ( $(textNameLit 'GHC.TypeLits.natVal)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Lit (NaturalLiteral n), _] <- args
-            -> reduce (integerToIntegerLiteral n)
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.TypeLits.natVal) $ \case
+      PrimStepContext{..}
+        | [Lit (NaturalLiteral n), _] <- args
+        -> reduce (integerToIntegerLiteral n)
+      _ -> Nothing
+
 
   -- XXX: Does it make sense to match on a @NaturalLiteral@ here?
-  , ( $(textNameLit 'GHC.TypeLits.someNatVal)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Lit (NaturalLiteral n)] <- args
-            -> let resTy = getResultTy tcm ty tys
-                in reduce (mkSomeNat tcm n resTy)
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.TypeLits.someNatVal) $ \case
+      PrimStepContext{..}
+        | [Lit (NaturalLiteral n)] <- args
+        -> let resTy = getResultTy tcm ty tys
+            in reduce (mkSomeNat tcm n resTy)
+      _ -> Nothing
+
   ]

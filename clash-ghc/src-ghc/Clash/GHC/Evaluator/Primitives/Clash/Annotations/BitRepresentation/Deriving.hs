@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.GHC.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving
@@ -26,13 +27,11 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , f : a : _ <- args
-            -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , f : a : _ <- args
+        -> reduceWHNF (mkApps (valToTerm f) [Left (valToTerm a)])
+      _ -> Nothing
+
   ]

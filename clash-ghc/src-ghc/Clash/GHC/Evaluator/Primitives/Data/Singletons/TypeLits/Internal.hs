@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Clash.GHC.Evaluator.Primitives.Data.Singletons.TypeLits.Internal
@@ -26,20 +27,16 @@ primitives :: [(Text, PrimStep)]
 primitives =
   -- Type level ^    -- XXX: Very fragile
   -- These is are specialized versions of ^_f, named by some combination of ghc and singletons.
-  [ ( "Data.Singletons.TypeLits.Internal.$fSingI->^@#@$_f"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..} -- ghc-8.6.5, singletons-2.5.1
-            | [i,j] <- naturalLiterals' args
-            -> reduce (Literal (NaturalLiteral (i ^ j)))
-          _ -> Nothing
-    )
-  , ( "Data.Singletons.TypeLits.Internal.%^_f"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}             -- ghc-8.8.1, singletons-2.6
-            | [i,j] <- naturalLiterals' args
-            -> reduce (Literal (NaturalLiteral (i ^ j)))
-          _ -> Nothing
-    )
+  [ primStepEntry "Data.Singletons.TypeLits.Internal.$fSingI->^@#@$_f" $ \case
+      PrimStepContext{..} -- ghc-8.6.5, singletons-2.5.1
+        | [i,j] <- naturalLiterals' args
+        -> reduce (Literal (NaturalLiteral (i ^ j)))
+      _ -> Nothing
+
+  , primStepEntry "Data.Singletons.TypeLits.Internal.%^_f" $ \case
+      PrimStepContext{..}             -- ghc-8.8.1, singletons-2.6
+        | [i,j] <- naturalLiterals' args
+        -> reduce (Literal (NaturalLiteral (i ^ j)))
+      _ -> Nothing
+
   ]

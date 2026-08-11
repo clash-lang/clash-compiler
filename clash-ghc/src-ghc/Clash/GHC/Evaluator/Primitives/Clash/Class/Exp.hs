@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -33,43 +34,37 @@ primitives =
   --   => Index m
   --   -> SNat n
   --   -> Index (n^m)
-  [ ( $(textNameLit 'Clash.Class.Exp.expIndex#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [b] <- indexLiterals' args
-            , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
-            -> reduce (mkIndexLit ty (LitTy (NumTy (km^e))) (km^e) (b^e))
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'Clash.Class.Exp.expIndex#) $ \case
+      PrimStepContext{..}
+        | [b] <- indexLiterals' args
+        , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+        -> reduce (mkIndexLit ty (LitTy (NumTy (km^e))) (km^e) (b^e))
+      _ -> Nothing
+
 
   -- expSigned#
   --   :: KnownNat m
   --   => Signed m
   --   -> SNat n
   --   -> Signed (n*m)
-  , ( $(textNameLit 'Clash.Class.Exp.expSigned#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [b] <- signedLiterals' args
-            , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
-            -> reduce (mkSignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'Clash.Class.Exp.expSigned#) $ \case
+      PrimStepContext{..}
+        | [b] <- signedLiterals' args
+        , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+        -> reduce (mkSignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
+      _ -> Nothing
+
 
   -- expUnsigned#
   --   :: KnownNat m
   --   => Unsigned m
   --   -> SNat n
   --   -> Unsigned m
-  , ( $(textNameLit 'Clash.Class.Exp.expUnsigned#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [b] <- unsignedLiterals' args
-            , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
-            -> reduce (mkUnsignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'Clash.Class.Exp.expUnsigned#) $ \case
+      PrimStepContext{..}
+        | [b] <- unsignedLiterals' args
+        , [(_mTy, km), (_, e)] <- extractKnownNats tcm tys
+        -> reduce (mkUnsignedLit ty (LitTy (NumTy (km*e))) (km*e) (b^e))
+      _ -> Nothing
+
   ]

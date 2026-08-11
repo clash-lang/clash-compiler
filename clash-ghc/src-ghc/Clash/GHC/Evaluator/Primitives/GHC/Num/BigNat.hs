@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -30,13 +31,11 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'GHC.Num.BigNat.bigNatEq#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [ Lit (ByteArrayLiteral (BA.ByteArray i))
-              , Lit (ByteArrayLiteral (BA.ByteArray j))] <- args
-            -> reduce (Literal (IntLiteral (IS (bigNatEq# i j))))
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.Num.BigNat.bigNatEq#) $ \case
+      PrimStepContext{..}
+        | [ Lit (ByteArrayLiteral (BA.ByteArray i))
+          , Lit (ByteArrayLiteral (BA.ByteArray j))] <- args
+        -> reduce (Literal (IntLiteral (IS (bigNatEq# i j))))
+      _ -> Nothing
+
   ]

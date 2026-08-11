@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.GHC.Evaluator.Primitives.GHC.TypeNats
@@ -31,37 +32,30 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'GHC.TypeNats.natVal)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Lit (NaturalLiteral n), _] <- args
-            -> reduce (Literal (NaturalLiteral n))
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.TypeNats.natVal) $ \case
+      PrimStepContext{..}
+        | [Lit (NaturalLiteral n), _] <- args
+        -> reduce (Literal (NaturalLiteral n))
+      _ -> Nothing
 
-  , ( $(textNameLit 'GHC.TypeNats.someNatVal)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Lit (NaturalLiteral n)] <- args
-            -> let resTy = getResultTy tcm ty tys
-                in reduce (mkSomeNat tcm n resTy)
-          _ -> Nothing
-    )
-  , ( $(textNameLit 'GHC.TypeNats.withSomeSNat)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | Lit (NaturalLiteral n) : fun : _ <- args
-            , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
-            , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
-            , Just snatTc <- UniqMap.lookup snatTcNm tcm
-            , [snatDc] <- tyConDataCons snatTc
-            -> let nTy = LitTy (NumTy n)
-                   snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
-                   ret = mkApps (valToTerm fun) [Right nTy, Left snat]
-                in reduce ret
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.TypeNats.someNatVal) $ \case
+      PrimStepContext{..}
+        | [Lit (NaturalLiteral n)] <- args
+        -> let resTy = getResultTy tcm ty tys
+            in reduce (mkSomeNat tcm n resTy)
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.TypeNats.withSomeSNat) $ \case
+      PrimStepContext{..}
+        | Lit (NaturalLiteral n) : fun : _ <- args
+        , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
+        , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
+        , Just snatTc <- UniqMap.lookup snatTcNm tcm
+        , [snatDc] <- tyConDataCons snatTc
+        -> let nTy = LitTy (NumTy n)
+               snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+               ret = mkApps (valToTerm fun) [Right nTy, Left snat]
+            in reduce ret
+      _ -> Nothing
+
   ]

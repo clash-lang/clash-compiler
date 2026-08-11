@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -35,69 +36,58 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'Clash.Promoted.Nat.powSNat)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-            -> let c = case a of
-                         2 -> 1 `shiftL` (fromInteger b)
-                         _ -> a ^ b
-                   (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-                   (Just snatTc) = UniqMap.lookup snatTcNm tcm
-                   [snatDc] = tyConDataCons snatTc
-               in  reduce $
-                   mkApps (Data snatDc) [ Right (LitTy (NumTy c))
-                                        , Left (Literal (NaturalLiteral c))]
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'Clash.Promoted.Nat.powSNat) $ \case
+      PrimStepContext{..}
+        | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+        -> let c = case a of
+                     2 -> 1 `shiftL` (fromInteger b)
+                     _ -> a ^ b
+               (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+               (Just snatTc) = UniqMap.lookup snatTcNm tcm
+               [snatDc] = tyConDataCons snatTc
+           in  reduce $
+               mkApps (Data snatDc) [ Right (LitTy (NumTy c))
+                                    , Left (Literal (NaturalLiteral c))]
+      _ -> Nothing
 
-  , ( $(textNameLit 'Clash.Promoted.Nat.flogBaseSNat)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-            , Just c <- flogBase a b
-            , let c' = toInteger c
-            -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-                   (Just snatTc) = UniqMap.lookup snatTcNm tcm
-                   [snatDc] = tyConDataCons snatTc
-               in  reduce $
-                   mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                        , Left (Literal (NaturalLiteral c'))]
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'Clash.Promoted.Nat.flogBaseSNat) $ \case
+      PrimStepContext{..}
+        | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+        , Just c <- flogBase a b
+        , let c' = toInteger c
+        -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+               (Just snatTc) = UniqMap.lookup snatTcNm tcm
+               [snatDc] = tyConDataCons snatTc
+           in  reduce $
+               mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+                                    , Left (Literal (NaturalLiteral c'))]
+      _ -> Nothing
 
-  , ( $(textNameLit 'Clash.Promoted.Nat.clogBaseSNat)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-            , Just c <- clogBase a b
-            , let c' = toInteger c
-            -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-                   (Just snatTc) = UniqMap.lookup snatTcNm tcm
-                   [snatDc] = tyConDataCons snatTc
-               in  reduce $
-                   mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                        , Left (Literal (NaturalLiteral c'))]
-            | otherwise
-            -> error ("clogBaseSNat: args = " <> show args <> ", tys = " <> show tys)
-    )
+  , primStepEntry $(textNameLit 'Clash.Promoted.Nat.clogBaseSNat) $ \case
+      PrimStepContext{..}
+        | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+        , Just c <- clogBase a b
+        , let c' = toInteger c
+        -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+               (Just snatTc) = UniqMap.lookup snatTcNm tcm
+               [snatDc] = tyConDataCons snatTc
+           in  reduce $
+               mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+                                    , Left (Literal (NaturalLiteral c'))]
+        | otherwise
+        -> error ("clogBaseSNat: args = " <> show args <> ", tys = " <> show tys)
 
-  , ( $(textNameLit 'Clash.Promoted.Nat.logBaseSNat)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
-            , Just c <- flogBase a b
-            , let c' = toInteger c
-            -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-                   (Just snatTc) = UniqMap.lookup snatTcNm tcm
-                   [snatDc] = tyConDataCons snatTc
-               in  reduce $
-                   mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
-                                        , Left (Literal (NaturalLiteral c'))]
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'Clash.Promoted.Nat.logBaseSNat) $ \case
+      PrimStepContext{..}
+        | [Right a, Right b] <- map (runExcept . tyNatSize tcm) tys
+        , Just c <- flogBase a b
+        , let c' = toInteger c
+        -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+               (Just snatTc) = UniqMap.lookup snatTcNm tcm
+               [snatDc] = tyConDataCons snatTc
+           in  reduce $
+               mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+                                    , Left (Literal (NaturalLiteral c'))]
+      _ -> Nothing
+
   ]

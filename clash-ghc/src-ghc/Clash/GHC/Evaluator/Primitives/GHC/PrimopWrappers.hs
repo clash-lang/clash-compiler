@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -35,23 +36,18 @@ import Clash.GHC.Evaluator.Primitive.Util
 primitives :: [(Text, PrimStep)]
 #if MIN_VERSION_ghc_prim(0,12,0)
 primitives =
-  [ ( $(textNameLit 'GHC.PrimopWrappers.dataToTagSmall#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [DC dc _] <- args
-            -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.PrimopWrappers.dataToTagSmall#) $ \case
+      PrimStepContext{..}
+        | [DC dc _] <- args
+        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      _ -> Nothing
 
-  , ( $(textNameLit 'GHC.PrimopWrappers.dataToTagLarge#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [DC dc _] <- args
-            -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.PrimopWrappers.dataToTagLarge#) $ \case
+      PrimStepContext{..}
+        | [DC dc _] <- args
+        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      _ -> Nothing
+
   ]
 #else
 primitives = []

@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -36,31 +37,25 @@ import Clash.GHC.Evaluator.Primitive.Util
 primitives :: [(Text, PrimStep)]
 primitives =
   -- XXX: Does not seem to exist?
-  [ ( "GHC.Magic.noinlineConstraint"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [arg] <- args
-            -> reduce (valToTerm arg)
-          _ -> Nothing
-    )
+  [ primStepEntry "GHC.Magic.noinlineConstraint" $ \case
+      PrimStepContext{..}
+        | [arg] <- args
+        -> reduce (valToTerm arg)
+      _ -> Nothing
+
   -- XXX: Does not seem to exist?
-  , ( "GHC.Magic.nospec"
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [arg] <- args
-            -> reduce (valToTerm arg)
-          _ -> Nothing
-    )
+  , primStepEntry "GHC.Magic.nospec" $ \case
+      PrimStepContext{..}
+        | [arg] <- args
+        -> reduce (valToTerm arg)
+      _ -> Nothing
+
 #if MIN_VERSION_ghc(9,12,0)
-  , ( $(textNameLit 'GHC.Magic.dataToTag#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [DC dc _] <- args
-            -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.Magic.dataToTag#) $ \case
+      PrimStepContext{..}
+        | [DC dc _] <- args
+        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      _ -> Nothing
+
 #endif
   ]

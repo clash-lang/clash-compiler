@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -33,52 +34,44 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'GHC.Int.I8#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Int8Literal i)] <- args
-            ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-                    (Just intTc) = UniqMap.lookup intTcNm tcm
-                    [intDc] = tyConDataCons intTc
-                in  reduce (mkApps (Data intDc) [Left (Literal (Int8Literal i))])
-          _ -> Nothing
-    )
-  , ( $(textNameLit 'GHC.Int.I16#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Int16Literal i)] <- args
-            ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-                    (Just intTc) = UniqMap.lookup intTcNm tcm
-                    [intDc] = tyConDataCons intTc
-                in  reduce (mkApps (Data intDc) [Left (Literal (Int16Literal i))])
-          _ -> Nothing
-    )
-  , ( $(textNameLit 'GHC.Int.I32#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Int32Literal i)] <- args
-            ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-                    (Just intTc) = UniqMap.lookup intTcNm tcm
-                    [intDc] = tyConDataCons intTc
-                in  reduce (mkApps (Data intDc) [Left (Literal (Int32Literal i))])
-          _ -> Nothing
-    )
-  , ( $(textNameLit 'GHC.Int.I64#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | isSubj
-            , [Lit (Int64Literal i)] <- args
-            ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-                    (Just intTc) = UniqMap.lookup intTcNm tcm
-                    [intDc] = tyConDataCons intTc
-                in  reduce (mkApps (Data intDc) [Left (Literal (Int64Literal i))])
-          _ -> Nothing
-    )
+  [ primStepEntry $(textNameLit 'GHC.Int.I8#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Int8Literal i)] <- args
+        ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+                (Just intTc) = UniqMap.lookup intTcNm tcm
+                [intDc] = tyConDataCons intTc
+            in  reduce (mkApps (Data intDc) [Left (Literal (Int8Literal i))])
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Int.I16#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Int16Literal i)] <- args
+        ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+                (Just intTc) = UniqMap.lookup intTcNm tcm
+                [intDc] = tyConDataCons intTc
+            in  reduce (mkApps (Data intDc) [Left (Literal (Int16Literal i))])
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Int.I32#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Int32Literal i)] <- args
+        ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+                (Just intTc) = UniqMap.lookup intTcNm tcm
+                [intDc] = tyConDataCons intTc
+            in  reduce (mkApps (Data intDc) [Left (Literal (Int32Literal i))])
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Int.I64#) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [Lit (Int64Literal i)] <- args
+        ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+                (Just intTc) = UniqMap.lookup intTcNm tcm
+                [intDc] = tyConDataCons intTc
+            in  reduce (mkApps (Data intDc) [Left (Literal (Int64Literal i))])
+      _ -> Nothing
+
   ]

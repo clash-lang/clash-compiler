@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -33,69 +34,53 @@ import Clash.GHC.Evaluator.Primitive.Util
 
 primitives :: [(Text, PrimStep)]
 primitives =
-  [ ( $(textNameLit 'GHC.Base.eqString)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [PrimVal _ _ [Lit (StringLiteral s1)]
-              ,PrimVal _ _ [Lit (StringLiteral s2)]
-              ] <- args
-            -> reduce (boolToBoolLiteral tcm ty (s1 == s2))
-            | otherwise -> error (show args)
-    )
+  [ primStepEntry $(textNameLit 'GHC.Base.eqString) $ \case
+      PrimStepContext{..}
+        | [PrimVal _ _ [Lit (StringLiteral s1)]
+          ,PrimVal _ _ [Lit (StringLiteral s2)]
+          ] <- args
+        -> reduce (boolToBoolLiteral tcm ty (s1 == s2))
+        | otherwise -> error (show args)
 
-  , ( $(textNameLit 'GHC.Base.quotInt)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [ DC intDc [Left (Literal (IntLiteral i))]
-              , DC _     [Left (Literal (IntLiteral j))]
-              ] <- args
-            -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `quot` j)))))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.Base.quotInt) $ \case
+      PrimStepContext{..}
+        | [ DC intDc [Left (Literal (IntLiteral i))]
+          , DC _     [Left (Literal (IntLiteral j))]
+          ] <- args
+        -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `quot` j)))))
+      _ -> Nothing
 
-  , ( $(textNameLit 'GHC.Base.remInt)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [ DC intDc [Left (Literal (IntLiteral i))]
-              , DC _     [Left (Literal (IntLiteral j))]
-              ] <- args
-            -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `rem` j)))))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.Base.remInt) $ \case
+      PrimStepContext{..}
+        | [ DC intDc [Left (Literal (IntLiteral i))]
+          , DC _     [Left (Literal (IntLiteral j))]
+          ] <- args
+        -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `rem` j)))))
+      _ -> Nothing
 
-  , ( $(textNameLit 'GHC.Base.divInt)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [ DC intDc [Left (Literal (IntLiteral i))]
-              , DC _     [Left (Literal (IntLiteral j))]
-              ] <- args
-            -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `div` j)))))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.Base.divInt) $ \case
+      PrimStepContext{..}
+        | [ DC intDc [Left (Literal (IntLiteral i))]
+          , DC _     [Left (Literal (IntLiteral j))]
+          ] <- args
+        -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `div` j)))))
+      _ -> Nothing
 
 
-  , ( $(textNameLit 'GHC.Base.modInt)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [ DC intDc [Left (Literal (IntLiteral i))]
-              , DC _     [Left (Literal (IntLiteral j))]
-              ] <- args
-            -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `mod` j)))))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.Base.modInt) $ \case
+      PrimStepContext{..}
+        | [ DC intDc [Left (Literal (IntLiteral i))]
+          , DC _     [Left (Literal (IntLiteral j))]
+          ] <- args
+        -> reduce (catchDivByZero (App (Data intDc) (Literal (IntLiteral (i `mod` j)))))
+      _ -> Nothing
+
 #if MIN_VERSION_ghc(9,10,0)
-  , ( $(textNameLit 'GHC.Base.dataToTag#)
-    , \tcm isSubj pInfo tys args mach ->
-        case mkPrimStepContext tcm isSubj pInfo tys args mach of
-          PrimStepContext{..}
-            | [DC dc _] <- args
-            -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
-          _ -> Nothing
-    )
+  , primStepEntry $(textNameLit 'GHC.Base.dataToTag#) $ \case
+      PrimStepContext{..}
+        | [DC dc _] <- args
+        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      _ -> Nothing
+
 #endif
   ]
