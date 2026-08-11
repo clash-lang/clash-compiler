@@ -126,7 +126,8 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
 
     rwState   = RewriteState
                   0
-                  mempty       -- transformCounters Map
+                  mempty       -- transformAppliedCounters Map
+                  mempty       -- transformTriedCounters Map
                   globals
                   supply
                   (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
