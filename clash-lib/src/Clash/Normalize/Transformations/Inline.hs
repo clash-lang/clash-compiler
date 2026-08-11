@@ -64,7 +64,7 @@ import Clash.Core.Subst
 import qualified Clash.Core.Term as Term
 import Clash.Core.Term
   ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
-  , collectArgsTicks, mkApps , mkTicks, stripTicks)
+  , collectArgsTicks, collectTicks, mkApps , mkTicks, stripTicks)
 import Clash.Core.TermInfo (isLocalVar, termSizeSmallerThan)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
@@ -603,8 +603,46 @@ inlineSimIO = inlineBinders test
       _ -> return False
 {-# SCC inlineSimIO #-}
 
+-- | True when @e@, appearing at context @cc@, is an inner (partial) position
+-- of a Var-headed application spine. That is, for a fully applied function call:
+--
+--     f a b c
+--
+-- this function returns 'True' for:
+--
+--     f
+--     f a
+--     f a b
+--
+-- This is useful for functions such as 'inlineSmall' and 'inlineWorkFree'. The
+-- former doesn't really care about arguments at all, but it is still useful to
+-- only run once while traversing the tree. The latter will refuse to do any work
+-- for partially applied functions in the first place -- but it only finds out
+-- after performing relatively expensive checks.
+--
+-- Note that this will also return 'True' in context of 'TickC's. That means that
+-- transformations using this as a performance guard should be careful to use
+-- 'collectTicks' before matching on a constructor.
+isPartOfVarAppSpine :: CoreContext -> Term -> Bool
+isPartOfVarAppSpine cc e = isSpineCtx cc && isSpineNode e
+ where
+  isSpineCtx AppFun = True
+  isSpineCtx TyAppC = True
+  isSpineCtx (TickC _) = True
+  isSpineCtx _ = False
+
+  isSpineNode Var {} = True
+  isSpineNode App {} = True
+  isSpineNode TyApp {} = True
+  isSpineNode Tick {} = True
+  isSpineNode _ = False
+
 -- | Inline small functions
 inlineSmall :: HasCallStack => NormRewrite
+inlineSmall (TransformContext _ (cc:_)) e
+  | isPartOfVarAppSpine cc e
+  = return e
+
 inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks))
   | isLocalId f = return e
   | otherwise = do
@@ -640,6 +678,10 @@ inlineSmall _ e = return e
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
 inlineWorkFree :: HasCallStack => NormRewrite
+inlineWorkFree (TransformContext _ (cc:_)) e
+  | isPartOfVarAppSpine cc e
+  = return e
+
 inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
   | isLocalId f = return e
   | otherwise
@@ -686,7 +728,7 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
           let e'Ty = inferCoreTypeOf tcm e'
           return (isSignalType tcm e'Ty)
 
-inlineWorkFree _ e@(Var f)
+inlineWorkFree _ e@(collectTicks -> (Var f, ticks))
   | isLocalId f = return e
   | otherwise = do
       topEnts <- Lens.view topEntities
@@ -713,10 +755,10 @@ inlineWorkFree _ e@(Var f)
                       -- caching only worth it from a certain size onwards, otherwise
                       -- the caching mechanism itself brings more of an overhead.
                       if termSizeSmallerThan sizeLimit topB then
-                        changed topB
+                        changed (mkTicks topB ticks)
                       else do
                         b <- normalizeTopLvlBndr False f top
-                        changed (bindingTerm b)
+                        changed (mkTicks (bindingTerm b) ticks)
                 _ -> return e
 
 inlineWorkFree _ e = return e
