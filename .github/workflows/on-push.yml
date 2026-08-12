@@ -36,6 +36,9 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           cabal-version: latest
 
+      - name: Nproc
+        run: echo $(nproc)
+
       - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
           endpoint: '192.168.102.136'
@@ -93,6 +96,41 @@ jobs:
 
       - name: Clash-dev test
         run: .ci/build_clash_dev.sh
+
+  cabal-haddock:
+    name: Haddock tests
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        # Documentation is built at 9.6.7, testing on other versions therefore does not make a lot
+        # of sense
+        ghc: [ 9.6.7 ]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install GHC
+        id: ghc-install
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: latest
+
+      - name: Version information
+        run:
+          cabal --version
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libtinfo-dev -y
+
+      - name: Build & check documentation
+        env:
+          PKG: ${{ matrix.pkg }}
+        run: |
+          cp .ci/cabal.project.local .
+          .ci/build_docs.sh
 
   stack:
     name: Stack compilation test
