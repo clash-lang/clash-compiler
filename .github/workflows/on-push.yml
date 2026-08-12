@@ -36,9 +36,6 @@ jobs:
           ghc-version: ${{ matrix.ghc }}
           cabal-version: latest
 
-      - name: Nproc
-        run: echo $(nproc)
-
       - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
           endpoint: '192.168.102.136'
@@ -60,21 +57,11 @@ jobs:
         run:
           cabal --version
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install libtinfo-dev tree -y
-
-        # Test if cabal can generate a build plan using the index state as specified in
-        # cabal.project
-        # This should be ran before cabal.project.local gets moved into the project root
-      - name: Test build plan
-        run: cabal v2-build --dry-run all > /dev/null || (echo "Maybe state index should be updated?"; false)
+      - name: Setup
+        run: .ci/gh-setup.sh
 
       - name: Build dependencies
-        run: |
-          cp .ci/cabal.project.local .
-          cabal v2-build all --dependencies-only
+        run: cabal v2-build all -j$(.ci/effective_cpus.sh) --dependencies-only
 
       - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
@@ -92,7 +79,10 @@ jobs:
 
       - name: Build
         run: |
-          cabal v2-build all
+          cabal v2-build all -j$(.ci/effective_cpus.sh)
+
+      - name: Run small tests
+        run: .ci/small-tests.sh
 
       - name: Clash-dev test
         run: .ci/build_clash_dev.sh
@@ -120,17 +110,13 @@ jobs:
         run:
           cabal --version
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install libtinfo-dev -y
+      - name: Setup
+        run: .ci/gh-setup.sh
 
       - name: Build & check documentation
         env:
           PKG: ${{ matrix.pkg }}
-        run: |
-          cp .ci/cabal.project.local .
-          .ci/build_docs.sh
+        run: .ci/build_docs.sh
 
   stack:
     name: Stack compilation test
@@ -173,18 +159,19 @@ jobs:
           # path: ${{ steps.ghc-install.outputs.stack-root }}
           path: ~/.stack
 
+      - name: Ensure stack is initialized
+        run: .ci/retry.sh stack build base -j1 +RTS -N1
+
       - name: Version information
         run:
           stack --version
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install libtinfo-dev -y
+      - name: Setup
+        run: .ci/gh-setup.sh
 
       - name: Build Dependencies
         run:
-          stack build -j$(nproc) --dependencies-only
+          stack build -j$(.ci/effective_cpus.sh) --dependencies-only
 
       - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
@@ -208,7 +195,7 @@ jobs:
           # Note: the --pedantic switch adds -Wall -Werror to the options passed to GHC. Options
           # specified in stack.yaml (like -Wcompat) are still passed; it is cumulative. Future
           # versions of Stack might add behavior to --pedantic.
-          stack build -j$(nproc) --pedantic
+          stack build -j$(.ci/effective_cpus.sh) --pedantic
 
 
   packages_common:
@@ -395,7 +382,7 @@ jobs:
 
       - name: Run clash-testsuite
         run: |
-          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite -- -j$(nproc) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
+          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
 
   all:
     name: All on-push jobs finished
