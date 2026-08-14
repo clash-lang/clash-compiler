@@ -77,7 +77,10 @@ constantPropagation =
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down bundle from the
     -- new root.
-    inlineAndPropagate = repeatR (topdownFixR (applyMany transPropagateAndInline) >-> inlineNR)
+    --
+    -- NB: 'topdownFixR' is deliberately _not_ used here, see
+    -- Note [topdownFixR is not for inlining bundles].
+    inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = topdownFixR (apply "caseFlat" caseFlat)
     dec                = topdownFixR (apply "DEC" disjointExpressionConsolidation)
