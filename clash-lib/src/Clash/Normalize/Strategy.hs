@@ -331,11 +331,17 @@ liftNonRep.
 
 -- | Topdown traversal, stops upon first success
 topdownSucR :: Rewrite extra -> Rewrite extra
-topdownSucR r = r >-! (allR (topdownSucR r))
+-- See Note [combinator inlining] in "Clash.Rewrite.Combinators"
+topdownSucR r = go
+ where
+  go = r >-! allR go
 {-# INLINE topdownSucR #-}
 
 innerMost :: Rewrite extra -> Rewrite extra
-innerMost = let go r = bottomupR (r !-> innerMost r) in go
+-- See Note [combinator inlining] in "Clash.Rewrite.Combinators"
+innerMost r = go
+ where
+  go = bottomupR (r !-> go)
 {-# INLINE innerMost #-}
 
 applyMany :: [(String,Rewrite extra)] -> Rewrite extra
