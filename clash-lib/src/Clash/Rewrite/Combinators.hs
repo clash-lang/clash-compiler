@@ -76,6 +76,7 @@ allR trans (TransformContext is c) (Tick sp e) =
   Tick sp <$> trans (TransformContext is (TickC sp:c)) e
 
 allR _ _ tm = pure tm
+{-# INLINABLE allR #-}
 
 infixr 6 >->
 -- | Apply two transformations in succession
@@ -114,10 +115,41 @@ inlineBinders would inline x and return:
 Then we must repeat the transformation to let it also inline y.
 -}
 
+{-
+Note [combinator inlining]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The traversal combinators carry INLINE pragmas so that a call site applying
+them to a statically-known transformation gets its own copy of the traversal
+loop: GHC then fuses the RWST/Writer plumbing into an unboxed state loop and
+calls the transformation directly instead of through a function argument.
+
+That only works when two conditions hold:
+
+* The combinator is not (mutually) recursive at the top level. GHC picks a
+  loop-breaker in every top-level recursive group and never inlines it, so an
+  INLINE pragma on such a function is silently ignored. The recursion has to
+  go through a local binding instead.
+
+* The local loop closes over the transformation rather than passing it along
+  as an argument. GHC does not specialize a loop on an invariant argument
+  (the static argument transformation is off by default), so with
+  'go r = r !-> go r' the call to 'r' stays a call to an unknown function;
+  with 'go = r !-> go' the simplifier sees the concrete 'r' once the
+  combinator is inlined.
+
+'allR' is INLINABLE rather than INLINE: specializing it to the concrete monad
+removes the per-node Monad-dictionary dispatch, while full inlining would
+duplicate its per-constructor case alternatives at every call site for no
+extra benefit.
+-}
+
 -- | Apply a transformation in a topdown traversal
 topdownR :: Rewrite m -> Rewrite m
--- See Note [topdown repeatR]
-topdownR r = repeatR r >-> allR (topdownR r)
+-- See Note [topdown repeatR] and Note [combinator inlining]
+topdownR r = go
+ where
+  go = repeatR r >-> allR go
+{-# INLINE topdownR #-}
 
 {-
 Note [topdownFixR]
@@ -207,7 +239,11 @@ topdownFixR r = go True
 
 -- | Apply a transformation in a bottomup traversal
 bottomupR :: Monad m => Transform m -> Transform m
-bottomupR r = allR (bottomupR r) >-> r
+-- See Note [combinator inlining]
+bottomupR r = go
+ where
+  go = allR go >-> r
+{-# INLINE bottomupR #-}
 
 infixr 5 !->
 -- | Only apply the second transformation if the first one succeeds.
@@ -231,5 +267,8 @@ infixr 5 >-!
 
 -- | Keep applying a transformation until it fails.
 repeatR :: Rewrite m -> Rewrite m
-repeatR = let go r = r !-> repeatR r in go
+-- See Note [combinator inlining]
+repeatR r = go
+ where
+  go = r !-> go
 {-# INLINE repeatR #-}
