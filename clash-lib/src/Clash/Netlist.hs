@@ -69,9 +69,10 @@ import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
+import           Clash.Core.FreeVars              (globalIds)
 import           Clash.Core.VarEnv
-  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
-   lookupVarEnv')
+  (VarEnv, eltsVarEnv, elemVarSet, emptyInScopeSet, emptyVarEnv, emptyVarSet,
+   extendVarEnv, extendVarSet, lookupVarEnv, lookupVarEnv')
 import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
@@ -118,7 +119,7 @@ genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefix
   return (topComponent, _components s, seen1)
  where
   (componentNames_, seen1) =
-    genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
+    genNames (opt_newInlineStrat (envOpts env)) prefixM topEntity seen0 topNames globals
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
@@ -173,21 +174,46 @@ runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentName
 
 -- | Generate names for all binders in "BindingMap", except for the ones already
 -- present in given identifier varenv.
+--
+-- Binders are named following a depth-first walk of the call graph rooted at
+-- the top entity, so the name a binder gets (in particular which of several
+-- same-named binders gets the bare name and which get @_N@ suffixes) depends
+-- only on the structure of the normalized terms — not on the unique each
+-- binder happens to carry, which varies with normalization order and, when
+-- normalizing concurrently (the default), with the thread schedule.
 genNames
   :: Bool
   -- ^ New inline strategy enabled?
   -> Maybe StrictText.Text
   -- ^ Prefix
+  -> Id
+  -- ^ Top entity, the root of the call-graph walk that determines the
+  -- naming order
   -> IdentifierSet
   -- ^ Identifier set to extend
   -> VarEnv Identifier
   -- ^ Pre-generated names
   -> BindingMap
   -> (VarEnv Identifier, IdentifierSet)
-genNames newInlineStrat prefixM is env bndrs =
-  runState (foldlM go env bndrs) is
+genNames newInlineStrat prefixM topEntity is env bndrs =
+  runState (foldlM go env orderedIds) is
  where
-  go env_ (bindingId -> id_) =
+  -- All binders reachable from the top entity in depth-first call-graph
+  -- order, followed by any unreachable leftovers (which never end up in the
+  -- generated HDL, so their relative order cannot influence it).
+  orderedIds = reachable ++ map bindingId (eltsVarEnv bndrs)
+
+  reachable = dfs emptyVarSet [topEntity]
+
+  dfs _ [] = []
+  dfs seen (i:rest)
+    | i `elemVarSet` seen = dfs seen rest
+    | Just b <- lookupVarEnv i bndrs =
+        i : dfs (extendVarSet seen i)
+                (Lens.toListOf globalIds (bindingTerm b) ++ rest)
+    | otherwise = dfs seen rest
+
+  go env_ id_ =
     case lookupVarEnv id_ env_ of
       Just _ -> pure env_
       Nothing -> do
