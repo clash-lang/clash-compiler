@@ -21,6 +21,7 @@ import Data.Text (Text)
 data IdentifierType
 data Identifier
 data IdentifierSet
+data IdentifierScopes
 data HWType
 data Declaration
 data Component
@@ -30,11 +31,8 @@ data TopEntityT
 
 instance NFData BlackBox
 
-class Monad m => IdentifierSetMonad m where
-  identifierSetM :: (IdentifierSet -> IdentifierSet) -> m IdentifierSet
-
-class HasIdentifierSet s where
-  identifierSet :: Lens' s IdentifierSet
+class HasIdentifierScopes s where
+  identifierScopes :: Lens' s IdentifierScopes
 
 type role NetlistMonad nominal
 data NetlistMonad a

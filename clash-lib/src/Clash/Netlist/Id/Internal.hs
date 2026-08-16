@@ -12,8 +12,9 @@ import           Clash.Core.Name (Name(nameOcc))
 import           Clash.Core.Var (Id, varName)
 import           Clash.Debug (debugIsOn)
 import           Clash.Netlist.Types
-  (PreserveCase(..), IdentifierSet(..), Identifier(..), FreshCache,
-   IdentifierType(..))
+  (PreserveCase(..), IdentifierSet(..), IdentifierScopes(..), Scope(..),
+   Identifier(..), FreshCache, IdentifierType(..))
+import           Control.Applicative ((<|>))
 import           Control.Arrow (second)
 import qualified Data.Char as Char
 import qualified Data.List as List
@@ -66,117 +67,154 @@ updateFreshCache# fresh id_ =
   exts = i_extensionsRev id_
   base = i_baseNameCaseFold id_
 
+-- | The set a 'Scope' registers identifiers in
+scopeSet :: Scope -> IdentifierScopes -> IdentifierSet
+scopeSet Local = _localIds
+scopeSet Global = _globalIds
+
+-- | Both sets of a well-formed 'IdentifierScopes' carry the same options;
+-- read them from the local set.
+scopeOpts# :: IdentifierScopes -> IdentifierSet
+scopeOpts# = _localIds
+
+-- | Is the identifier present in either scope?
+memberScopes# :: IdentifierScopes -> Identifier -> Bool
+memberScopes# (IdentifierScopes glob loc) id0 =
+  HashSet.member id0 (is_store glob) || HashSet.member id0 (is_store loc)
+
+-- | Return identifier with the highest extension over both scopes. See
+-- 'lookupFreshCache#'.
+lookupFreshCaches# :: IdentifierScopes -> Identifier -> Maybe Word
+lookupFreshCaches# (IdentifierScopes glob loc) id0 =
+  case (go glob, go loc) of
+    (Just g, Just l) -> Just (max g l)
+    (g, l) -> g <|> l
+ where
+  go is = lookupFreshCache# (is_freshCache is) id0
+
+-- | Insert an identifier into the set given by the scope
+insertScope# :: HasCallStack => Scope -> IdentifierScopes -> Identifier -> IdentifierScopes
+insertScope# scope iss id0 = case scope of
+  Local -> iss{_localIds=go (_localIds iss)}
+  Global -> iss{_globalIds=go (_globalIds iss)}
+ where
+  go is@(IdentifierSet{..}) =
+    is{ is_freshCache=updateFreshCache# is_freshCache id0
+      , is_store=HashSet.insert id0 is_store }
+
 -- | Adds identifier at verbatim if its basename hasn't been used before.
 -- Otherwise it will return the first free identifier.
 mkUnique#
   :: HasCallStack
-  => IdentifierSet
+  => Scope
+  -> IdentifierScopes
   -> Identifier
-  -> (IdentifierSet, Identifier)
-mkUnique# _is0 (RawIdentifier {}) =
+  -> (IdentifierScopes, Identifier)
+mkUnique# _scope _is0 (RawIdentifier {}) =
   error "Internal error: mkUnique# cannot be used on RawIdentifiers"
-mkUnique# is0 id_@(i_extensionsRev -> []) = deepen# is0 id_
-mkUnique# is id0 = (is{is_freshCache=freshCache, is_store=isStore}, id2)
+mkUnique# scope is0 id_@(i_extensionsRev -> []) = deepen# scope is0 id_
+mkUnique# scope is id0 = (insertScope# scope is id2, id2)
  where
-  freshCache = updateFreshCache# (is_freshCache is) id2
-  isStore = HashSet.insert id2 (is_store is)
   id2 = case id1 of
           x@RawIdentifier{} -> x
           y -> y{i_provenance=if debugIsOn then callStack else emptyCallStack}
-  id1 = case lookupFreshCache# (is_freshCache is) id0 of
+  id1 = case lookupFreshCaches# is id0 of
     Just currentMax ->
       id0{i_extensionsRev=currentMax+1 : drop 1 (i_extensionsRev id0)}
     Nothing ->
-      -- Identifier doesn't exist in set yet, so just return it.
+      -- Identifier doesn't exist in either scope yet, so just return it.
       id0
 
 -- | Non-monadic, internal version of 'add'
-add# :: HasCallStack => IdentifierSet -> Identifier -> IdentifierSet
-add# is0@(IdentifierSet{..}) (RawIdentifier t Nothing _) = add# is0 (make## is_hdl t)
-add# is0 (RawIdentifier _ (Just id0) _) = add# is0 id0
-add# is0@(IdentifierSet{..}) id0 = is0{is_freshCache=fresh1, is_store=ids1}
- where
-  ids1 = HashSet.insert id0 is_store
-  fresh1 = updateFreshCache# is_freshCache id0
+add# :: HasCallStack => Scope -> IdentifierScopes -> Identifier -> IdentifierScopes
+add# scope is0 (RawIdentifier t Nothing _) =
+  add# scope is0 (make## (is_hdl (scopeOpts# is0)) t)
+add# scope is0 (RawIdentifier _ (Just id0) _) = add# scope is0 id0
+add# scope is0 id0 = insertScope# scope is0 id0
 
 -- | Non-monadic, internal version of 'addMultiple'
-addMultiple# :: (HasCallStack, Foldable t) => IdentifierSet -> t Identifier -> IdentifierSet
-addMultiple# is ids = List.foldl' add# is ids
+addMultiple#
+  :: (HasCallStack, Foldable t)
+  => Scope -> IdentifierScopes -> t Identifier -> IdentifierScopes
+addMultiple# scope is ids = List.foldl' (add# scope) is ids
 
 -- | Non-monadic, internal version of 'addRaw'
-addRaw# :: HasCallStack => IdentifierSet -> Text -> (IdentifierSet, Identifier)
-addRaw# is0 id0 =
+addRaw# :: HasCallStack => Scope -> IdentifierScopes -> Text -> (IdentifierScopes, Identifier)
+addRaw# scope is0 id0 =
   second
     (\i -> RawIdentifier id0 (Just i) (if debugIsOn then callStack else emptyCallStack))
-    (make# is0 (unextend id0))
+    (make# scope is0 (unextend id0))
  where
-  unextend = case is_hdl is0 of
+  unextend = case is_hdl (scopeOpts# is0) of
     VHDL -> VHDL.unextend
     Verilog -> Verilog.unextend
     SystemVerilog -> SystemVerilog.unextend
 
 -- | Non-monadic, internal version of 'make'
-make# :: HasCallStack => IdentifierSet -> Text -> (IdentifierSet, Identifier)
-make# is0@(IdentifierSet esc lw hdl fresh0 ids0) (Common.prettyName -> id0) =
-  if id1 `HashSet.member` ids0 then
+make# :: HasCallStack => Scope -> IdentifierScopes -> Text -> (IdentifierScopes, Identifier)
+make# scope is0 (Common.prettyName -> id0) =
+  if memberScopes# is0 id1 then
     -- Ideally we'd like to continue with the id from the HashSet so all the old
     -- strings can be garbage collected, but I haven't found an efficient way of
     -- doing so. I also doubt that this case will get hit often..
-    deepen# is0 id1
+    deepen# scope is0 id1
   else
-    (is0{is_freshCache=fresh1, is_store=ids1}, id1)
+    (insertScope# scope is0 id1, id1)
  where
-  ids1 = HashSet.insert id1 ids0
-  fresh1 = updateFreshCache# fresh0 id1
-  id1 = make## (is_hdl is0) (if esc then id0 else toBasicId# hdl lw id0)
+  IdentifierSet esc lw hdl _ _ = scopeOpts# is0
+  id1 = make## hdl (if esc then id0 else toBasicId# hdl lw id0)
 
 -- | Non-monadic, internal version of 'makeBasic'
-makeBasic# :: HasCallStack => IdentifierSet -> Text -> (IdentifierSet, Identifier)
-makeBasic# is0 = make# is0 . toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0)
+makeBasic# :: HasCallStack => Scope -> IdentifierScopes -> Text -> (IdentifierScopes, Identifier)
+makeBasic# scope is0 =
+  make# scope is0 . toBasicId# (is_hdl opts) (is_lowerCaseBasicIds opts)
+ where
+  opts = scopeOpts# is0
 
 -- | Non-monadic, internal version of 'makeBasicOr'
-makeBasicOr# :: HasCallStack => IdentifierSet -> Text -> Text -> (IdentifierSet, Identifier)
-makeBasicOr# is0 hint altHint = make# is0 id1
+makeBasicOr# :: HasCallStack => Scope -> IdentifierScopes -> Text -> Text -> (IdentifierScopes, Identifier)
+makeBasicOr# scope is0 hint altHint = make# scope is0 id1
  where
-  id0 = toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0) hint
+  opts = scopeOpts# is0
+  id0 = toBasicId# (is_hdl opts) (is_lowerCaseBasicIds opts) hint
   id1 = if Text.null id0
-        then toBasicId# (is_hdl is0) (is_lowerCaseBasicIds is0) altHint
+        then toBasicId# (is_hdl opts) (is_lowerCaseBasicIds opts) altHint
         else id0
 
 -- | Non-monadic, internal version of 'next'
-next# :: HasCallStack => IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
-next# is0 (RawIdentifier t Nothing _) = uncurry next# (make# is0 t)
-next# is0 (RawIdentifier _ (Just id_) _) = next# is0 id_
-next# is0 id_@(i_extensionsRev -> []) = deepen# is0 id_
-next# is0 id_ = mkUnique# is0 id_
+next# :: HasCallStack => Scope -> IdentifierScopes -> Identifier ->  (IdentifierScopes, Identifier)
+next# scope is0 (RawIdentifier t Nothing _) = uncurry (next# scope) (make# scope is0 t)
+next# scope is0 (RawIdentifier _ (Just id_) _) = next# scope is0 id_
+next# scope is0 id_@(i_extensionsRev -> []) = deepen# scope is0 id_
+next# scope is0 id_ = mkUnique# scope is0 id_
 
 -- | Non-monadic, internal version of 'nextN'
-nextN# :: HasCallStack => Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
-nextN# n is0 id0 = List.mapAccumL (\is1 _n -> next# is1 id0) is0 [1..n]
+nextN# :: HasCallStack => Int -> Scope -> IdentifierScopes -> Identifier ->  (IdentifierScopes, [Identifier])
+nextN# n scope is0 id0 = List.mapAccumL (\is1 _n -> next# scope is1 id0) is0 [1..n]
 -- TODO: ^ More efficient implementation.
 
 -- | Non-monadic, internal version of 'deepenN'
-deepenN# :: HasCallStack => Int -> IdentifierSet -> Identifier ->  (IdentifierSet, [Identifier])
-deepenN# n is0 id0 = List.mapAccumL (\is1 _n -> deepen# is1 id0) is0 [1..n]
+deepenN# :: HasCallStack => Int -> Scope -> IdentifierScopes -> Identifier ->  (IdentifierScopes, [Identifier])
+deepenN# n scope is0 id0 = List.mapAccumL (\is1 _n -> deepen# scope is1 id0) is0 [1..n]
 -- TODO: ^ More efficient implementation.
 
 -- | Non-monadic, internal version of 'deepen'
-deepen# :: HasCallStack => IdentifierSet -> Identifier ->  (IdentifierSet, Identifier)
-deepen# is0 (RawIdentifier t Nothing _) = uncurry deepen# (make# is0 t)
-deepen# is0 (RawIdentifier _ (Just id_) _) = deepen# is0 id_
-deepen# is0 id_ = mkUnique# is0 (id_{i_extensionsRev=0:i_extensionsRev id_})
+deepen# :: HasCallStack => Scope -> IdentifierScopes -> Identifier ->  (IdentifierScopes, Identifier)
+deepen# scope is0 (RawIdentifier t Nothing _) = uncurry (deepen# scope) (make# scope is0 t)
+deepen# scope is0 (RawIdentifier _ (Just id_) _) = deepen# scope is0 id_
+deepen# scope is0 id_ = mkUnique# scope is0 (id_{i_extensionsRev=0:i_extensionsRev id_})
 
 -- | Non-monadic, internal version of 'suffix'
-suffix# :: HasCallStack => IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
-suffix# is0 (RawIdentifier t Nothing _) suffix_ = (uncurry suffix# (make# is0 t)) suffix_
-suffix# is0 (RawIdentifier _ (Just id_) _) suffix_ = suffix# is0 id_ suffix_
-suffix# is0 id0 suffix_ = make# is0 (i_baseName id0 <> "_" <> suffix_)
+suffix# :: HasCallStack => Scope -> IdentifierScopes -> Identifier -> Text -> (IdentifierScopes, Identifier)
+suffix# scope is0 (RawIdentifier t Nothing _) suffix_ = (uncurry (suffix# scope) (make# scope is0 t)) suffix_
+suffix# scope is0 (RawIdentifier _ (Just id_) _) suffix_ = suffix# scope is0 id_ suffix_
+suffix# scope is0 id0 suffix_ = make# scope is0 (i_baseName id0 <> "_" <> suffix_)
 
 -- | Non-monadic, internal version of 'prefix'
-prefix# :: HasCallStack => IdentifierSet -> Identifier -> Text -> (IdentifierSet, Identifier)
-prefix# is0 (RawIdentifier t Nothing _) prefix_ = (uncurry prefix# (make# is0 t)) prefix_
-prefix# is0 (RawIdentifier _ (Just id_) _) prefix_ = prefix# is0 id_ prefix_
-prefix# is0 id0 prefix_ = make# is0 (prefix_ <> "_" <> i_baseName id0)
+prefix# :: HasCallStack => Scope -> IdentifierScopes -> Identifier -> Text -> (IdentifierScopes, Identifier)
+prefix# scope is0 (RawIdentifier t Nothing _) prefix_ = (uncurry (prefix# scope) (make# scope is0 t)) prefix_
+prefix# scope is0 (RawIdentifier _ (Just id_) _) prefix_ = prefix# scope is0 id_ prefix_
+prefix# scope is0 id0 prefix_ = make# scope is0 (prefix_ <> "_" <> i_baseName id0)
 
 toText# :: Identifier -> Text
 toText# (RawIdentifier t _ _) = t
@@ -253,8 +291,8 @@ toBasicId# hdl lw id0 =
 
 -- | Convert a Clash Core Id to an identifier. Makes sure returned identifier
 -- is unique.
-fromCoreId# :: IdentifierSet -> Id -> (IdentifierSet, Identifier)
-fromCoreId# is0 id0 = make# is0 (nameOcc (varName id0))
+fromCoreId# :: Scope -> IdentifierScopes -> Id -> (IdentifierScopes, Identifier)
+fromCoreId# scope is0 id0 = make# scope is0 (nameOcc (varName id0))
 
 instance PP.Pretty Identifier where
   pretty = PP.pretty . toText#

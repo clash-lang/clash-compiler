@@ -76,7 +76,7 @@ clockWizardTemplate isDifferential bbCtx
   , Product _ _ (init -> pllOutTys) <- resultTy
   , [compName] <- bbQsysIncName bbCtx
   = do
-      clkWizInstName <- Id.makeBasic $ fromMaybe "clk_wiz" $ bbCtxName bbCtx
+      clkWizInstName <- Id.makeBasic Id.Local $ fromMaybe "clk_wiz" $ bbCtxName bbCtx
       DSL.declarationReturn bbCtx blockName $ do
 
         rstHigh <- DSL.unsafeToActiveHigh "reset" rst

@@ -33,9 +33,9 @@ myTemplate
   => BlackBoxContext
   -> State s Doc
 myTemplate bbCtx = do
-  blkName  <- Id.makeBasic "blkName"
-  compInst <- Id.makeBasic "test_inst"
-  compName <- Id.makeBasic "TEST"
+  blkName  <- Id.makeBasic Id.Local "blkName"
+  compInst <- Id.makeBasic Id.Local "test_inst"
+  compName <- Id.makeBasic Id.Local "TEST"
   let
     attrs =
       [ IntegerAttr "my_int_attr"    7

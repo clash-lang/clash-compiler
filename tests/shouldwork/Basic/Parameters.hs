@@ -40,8 +40,8 @@ myAddTemplate
 myAddTemplate bbCtx = do
   let [_, (xExp, xTy, _), (yExp, yTy, _)] = bbInputs bbCtx
       [(resExp, resTy)] = bbResults bbCtx
-  blockId <- Id.make "my_add_block"
-  myAddInstId <- Id.make "my_add_inst"
+  blockId <- Id.make Id.Local "my_add_block"
+  myAddInstId <- Id.make Id.Local "my_add_inst"
   let myAddId = Id.unsafeMake "my_add"
   getAp $ blockDecl blockId
     [ InstDecl Comp Nothing [] myAddId myAddInstId

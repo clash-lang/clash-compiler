@@ -32,8 +32,8 @@ myMultiplyTemplate
   => BlackBoxContext
   -> State s Doc
 myMultiplyTemplate bbCtx = do
-  x <- Id.make "x123456"
-  y <- Id.make "y123456"
+  x <- Id.make Id.Local "x123456"
+  y <- Id.make Id.Local "y123456"
   getAp $ blockDecl x [NetDecl Nothing y Bool]
 
 

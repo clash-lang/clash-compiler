@@ -79,7 +79,7 @@ data SystemVerilogState =
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: ModName
     , _topNm     :: Identifier
-    , _idSeen    :: IdentifierSet
+    , _idScopes  :: IdentifierScopes
     , _oports    :: [Identifier]
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
@@ -107,8 +107,8 @@ data SystemVerilogState =
 
 makeLenses ''SystemVerilogState
 
-instance HasIdentifierSet SystemVerilogState where
-  identifierSet = idSeen
+instance HasIdentifierScopes SystemVerilogState where
+  identifierScopes = idScopes
 
 instance HasUsageMap SystemVerilogState where
   usageMap = usages
@@ -120,7 +120,7 @@ instance Backend SystemVerilogState where
     , _genDepth=0
     , _modNm=""
     , _topNm=Id.unsafeMake ""
-    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) SystemVerilog
+    , _idScopes=Id.emptyIdentifierScopes (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) SystemVerilog
     , _oports=[]
     , _srcSpan=noSrcSpan
     , _includes=[]
@@ -222,13 +222,12 @@ genSystemVerilog
   -> Component
   -> SystemVerilogM ((String, Doc), [(String, Doc)])
 genSystemVerilog opts _ sp seen us c = do
-    -- Don't have type names conflict with module names or with previously
-    -- generated type names.
-    --
-    -- TODO: Collect all type names up front, to prevent relatively costly union.
-    -- TODO: Investigate whether type names / signal names collide in the first place
+    -- Start a fresh local identifier scope for this module. 'seen' holds the
+    -- names generated for this component during netlist generation. Names
+    -- that must stay unique design-wide (component names, type names in the
+    -- types package) live in the global scope.
     Ap $ do
-      idSeen %= Id.union seen
+      idScopes %= Id.setLocalScope seen
       usages .= us
       setSrcSpan sp
 
@@ -657,7 +656,7 @@ tyName t@(Product nm _ _)      = do
   PP.pretty =<< Ap (makeCached tN nameCache prodName)
  where
   prodName :: State SystemVerilogState Identifier
-  prodName = Id.makeBasicOr (last (TextS.splitOn "." nm)) "product"
+  prodName = Id.makeBasicOr Global (last (TextS.splitOn "." nm)) "product"
 
 tyName t@(SP _ _) = "logic_vector_" <> int (typeSize t)
 tyName (Clock _)  = "logic"
@@ -825,7 +824,7 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
     ; p   <- Ap $ use oports
     ; if syn == Vivado && id_ `elem` p
          then do
-              { regId <- Id.suffix id_ "reg"
+              { regId <- Id.suffix Local id_ "reg"
               ; verilogType ty <+> pretty regId <> semi <> line <>
                 "always_comb begin" <> line <>
                 indent 2 ("if" <> parens (expr_ True scrut) <> line <>
@@ -859,7 +858,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     ; p <- Ap $ use oports
     ; if syn == Vivado && id_ `elem` p
          then do
-           { regId <- Id.suffix id_ "reg"
+           { regId <- Id.suffix Local id_ "reg"
            ; verilogType ty <+> pretty regId <> semi <> line <>
              "always_comb begin" <> line <>
              indent 2 ("case" <> parens (expr_ True scrut) <> line <>

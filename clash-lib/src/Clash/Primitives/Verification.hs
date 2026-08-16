@@ -85,7 +85,7 @@ checkBBF _isD _primName args _ty =
   bindMaybe Nothing t = bindMaybe (Just "s") t
   bindMaybe (Just nm) t = do
     tcm <- Lens.view tcCache
-    newId <- Id.make nm
+    newId <- Id.make Id.Local nm
     (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
     assn <- contAssign newId expr0
     pure
@@ -120,7 +120,7 @@ checkTF'
   -> BlackBoxContext
   -> State s Doc
 checkTF' decls (clkId, clkDecls) propName renderAs prop bbCtx = do
-  blockName <- Id.makeBasic (propName <> "_block")
+  blockName <- Id.makeBasic Id.Local (propName <> "_block")
   getAp (blockDecl blockName (clkDecls <> (renderedPslProperty : decls)))
 
  where

@@ -91,7 +91,7 @@ import           Clash.Util
 data VerilogState =
   VerilogState
     { _genDepth  :: Int -- ^ Depth of current generative block
-    , _idSeen    :: IdentifierSet
+    , _idScopes  :: IdentifierScopes
     , _topNm     :: Identifier
     , _srcSpan   :: SrcSpan
     , _includes  :: [(String,Doc)]
@@ -118,8 +118,8 @@ data VerilogState =
 
 makeLenses ''VerilogState
 
-instance HasIdentifierSet VerilogState where
-  identifierSet = idSeen
+instance HasIdentifierScopes VerilogState where
+  identifierScopes = idScopes
 
 instance HasUsageMap VerilogState where
   usageMap = usages
@@ -127,7 +127,7 @@ instance HasUsageMap VerilogState where
 instance Backend VerilogState where
   initBackend opts = VerilogState
     { _genDepth=0
-    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) Verilog
+    , _idScopes=Id.emptyIdentifierScopes (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) Verilog
     , _topNm=Id.unsafeMake ""
     , _srcSpan=noSrcSpan
     , _includes=[]
@@ -224,13 +224,12 @@ genVerilog
   -> Component
   -> VerilogM ((String, Doc), [(String, Doc)])
 genVerilog opts  _ sp seen usage c = do
-    -- Don't have type names conflict with module names or with previously
-    -- generated type names.
-    --
-    -- TODO: Collect all type names up front, to prevent relatively costly union.
-    -- TODO: Investigate whether type names / signal names collide in the first place
+    -- Start a fresh local identifier scope for this module. 'seen' holds the
+    -- names generated for this component during netlist generation. Names
+    -- that must stay unique design-wide (component names, constructor
+    -- functions in include files) live in the global scope.
     Ap $ do
-      idSeen %= Id.union seen
+      idScopes %= Id.setLocalScope seen
       usages .= usage
       setSrcSpan sp
 
@@ -971,9 +970,10 @@ customReprDataCon dataRepr constrRepr args = do
     let size    = drSize dataRepr
         aTys    = map fst args
         origins = bitOrigins dataRepr constrRepr :: [BitOrigin]
-    let mkId nm = Id.makeBasic nm
-    ids <- mapM (\n -> mkId (TextS.pack ('v':show n))) [1..length args]
-    fId <- mkId (crName constrRepr)
+    ids <- mapM (\n -> Id.makeBasic Local (TextS.pack ('v':show n))) [1..length args]
+    -- The function ends up in an include file shared between modules, so its
+    -- name is registered in the global scope.
+    fId <- Id.makeBasic Global (crName constrRepr)
     let fInps =
           [ case typeSize t of
               0 -> emptyDoc

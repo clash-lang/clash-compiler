@@ -25,7 +25,8 @@ import GHC.Types.SrcLoc (SrcSpan)
 
 import Clash.Driver.Types (ClashOpts)
 import {-# SOURCE #-} Clash.Netlist.Types
-  (Component, Declaration, Expr, HWType, Identifier, IdentifierSet, HasIdentifierSet, UsageMap)
+  (Component, Declaration, Expr, HWType, Identifier, IdentifierSet,
+   HasIdentifierScopes, UsageMap)
 import Clash.Netlist.BlackBox.Types
 
 import Clash.Signal.Internal                (VDomainConfiguration)
@@ -88,7 +89,7 @@ emptyDomainMap = empty
 class HasUsageMap s where
   usageMap :: Lens' s UsageMap
 
-class (HasUsageMap state, HasIdentifierSet state) => Backend state where
+class (HasUsageMap state, HasIdentifierScopes state) => Backend state where
   -- | Initial state for state monad
   initBackend :: ClashOpts -> state
 
@@ -108,7 +109,9 @@ class (HasUsageMap state, HasIdentifierSet state) => Backend state where
   -- | Get the set of types out of state
   extractTypes     :: state -> HashSet HWType
 
-  -- | Generate HDL for a Netlist component
+  -- | Generate HDL for a Netlist component. The 'IdentifierSet' holds the
+  -- names generated for the component during netlist generation; it seeds the
+  -- local identifier scope the component is rendered in.
   genHDL           :: ClashOpts -> ModName -> SrcSpan -> IdentifierSet -> UsageMap -> Component -> Ap (State state) ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: ModName -> [HWType] -> Ap (State state) [(String, Doc)]

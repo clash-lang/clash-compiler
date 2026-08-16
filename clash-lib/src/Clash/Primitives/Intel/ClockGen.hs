@@ -102,7 +102,7 @@ hdlTemplate variant bbCtx
       rstName Altpll = "areset"
       rstName AlteraPll = "rst"
 
-    instName <- Id.makeBasic $ fromMaybe (stdName variant) $ bbCtxName bbCtx
+    instName <- Id.makeBasic Id.Local $ fromMaybe (stdName variant) $ bbCtxName bbCtx
 
     -- TODO: unsafeMake is dubious here: I don't think we take names in
     -- TODO: bbQsysIncName into account when generating fresh ids

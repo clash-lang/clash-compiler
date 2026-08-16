@@ -545,7 +545,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
                       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-                      tmpRhs <- Id.make "c$tte_rhs"
+                      tmpRhs <- Id.make Local "c$tte_rhs"
                       netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
                       return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
                 _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
@@ -734,7 +734,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   id_ = mkLocalId ty' nm'
               return (Just ([id_],[dstL],[]))
             True -> do
-              nm2 <- Id.suffix dstL "res"
+              nm2 <- Id.suffix Local dstL "res"
               -- TODO: check that it's okay to use `mkUnsafeInternalName`
               let nm3 = mkUnsafeSystemName (Id.toText nm2) 0
                   id_ = mkLocalId ty nm3
@@ -790,7 +790,7 @@ mkDataToTag declType assignTy scrut = do
   (scrutId, scrutDecls') <- case scrutExpr of
     Identifier id_ Nothing -> pure (id_, scrutDecls)
     _ -> do
-      tmpRhs <- Id.make "c$dtt_rhs"
+      tmpRhs <- Id.make Local "c$dtt_rhs"
       netDecl <- N.mkInit declType assignTy tmpRhs scrutHTy scrutExpr
       pure (tmpRhs, netDecl ++ scrutDecls)
   let nReprs = case scrutHTy of
@@ -807,7 +807,7 @@ mkDataToTag declType assignTy scrut = do
         then pure ( N.Literal (Just (sIw, iw)) (NumLit 0)
                   , scrutDecls' )
         else do
-          tag <- Id.make "c$dtt_tag"
+          tag <- Id.make Local "c$dtt_tag"
           let alts = [ ( Just (NumLit (toInteger i))
                        , N.Literal (Just (sIw, iw)) (NumLit (toInteger i)))
                      | i <- [0 .. k - 1] ]
@@ -1245,7 +1245,7 @@ mkFunInput parentName declType resId e =
 
                               Please report this as an issue.
                             |]
-                      instLabel <- Id.next compName
+                      instLabel <- Id.next Local compName
                       let
                         portMap = NamedPortMap (outpAssigns ++ inpAssigns)
                         instDecl = InstDecl Entity Nothing [] compName instLabel [] portMap
@@ -1302,11 +1302,11 @@ mkFunInput parentName declType resId e =
       if null tyArgs
         then
           withTicks ticks $ \tickDecls -> do
-            resNm <- Id.make "result"
+            resNm <- Id.make Local "result"
             appDecls <- mkFunApp declType resNm fun tmArgs tickDecls
             let assn = [ Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier resNm Nothing)
                        , NetDecl Nothing resNm resTy ]
-            nm <- Id.makeBasic "block"
+            nm <- Id.makeBasic Local "block"
             return (Right ((nm,assn++appDecls), assignTy))
         else do
           (_,sp) <- Lens.use curCompNm
@@ -1318,7 +1318,7 @@ mkFunInput parentName declType resId e =
       let assn = Assignment (Id.unsafeMake "~RESULT") assignTy appExpr
       nm <- if null appDecls
                then return (Id.unsafeMake "")
-               else Id.makeBasic "block"
+               else Id.makeBasic Local "block"
       return (Right ((nm,appDecls ++ [assn]), assignTy))
 
     go is0 n (Lam id_ e') = do
@@ -1342,11 +1342,11 @@ mkFunInput parentName declType resId e =
       let assn = Assignment (Id.unsafeMake "~RESULT") assignTy projection
       nm <- if null decls
                then return (Id.unsafeMake "")
-               else Id.makeBasic "projection"
+               else Id.makeBasic Local "projection"
       return (Right ((nm,decls ++ [assn]), assignTy))
 
     go _ _ (Case scrut ty (alt:alts@(_:_))) = do
-      resNm <- Id.make "result"
+      resNm <- Id.make Local "result"
       resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
       -- It's safe to use 'mkUnsafeSystemName' here: only the name, not the
       -- unique, will be used
@@ -1354,7 +1354,7 @@ mkFunInput parentName declType resId e =
       selectionDecls <- mkSelection declType resId' scrut ty (alt :| alts) []
       let assn = [ NetDecl' Nothing resNm resTy Nothing
                  , Assignment (Id.unsafeMake "~RESULT") assignTy (Identifier resNm Nothing) ]
-      nm <- Id.makeBasic "selection"
+      nm <- Id.makeBasic Local "selection"
       return (Right ((nm,assn++selectionDecls), assignTy))
 
     go is0 _ e'@(Let{}) = do
@@ -1368,7 +1368,7 @@ mkFunInput parentName declType resId e =
           -- TODO: figure out what to do with multires blackboxes here
           netDecls <- concatMapM mkNetDecl $ binders
           decls    <- concatMapM (uncurry mkDeclarations) binders
-          nm <- Id.makeBasic "fun"
+          nm <- Id.makeBasic Local "fun"
           let resultId = Id.unsafeFromCoreId result
           -- TODO: Due to reasons lost in the mists of time, #1265 creates an
           -- assignement here, whereas it previously wouldn't. With the PR in

@@ -1046,7 +1046,7 @@ mkUnique = go []
     go :: [Id] -> Subst -> [Id] -> NetlistMonad ([Id],Subst)
     go processed subst []     = return (reverse processed,subst)
     go processed subst@(Subst isN _ _ _) (i:is) = do
-      iN <- Id.toText <$> Id.fromCoreId i
+      iN <- Id.toText <$> Id.fromCoreId Local i
       let i' = uniqAway isN (modifyVarName (setRepName iN) i)
           subst' = extendInScopeId (extendIdSubst subst i (Var i')) i'
       go (i':processed)
@@ -1064,7 +1064,7 @@ preserveState action = do
   State.put state
   pure val
 
--- | Preserve the Netlist '_curCompNm','_seenIds','_usageMap' when executing
+-- | Preserve the Netlist 'curCompNm', 'seenIds' and 'usageMap' when executing
 -- a monadic action
 preserveVarEnv
   :: NetlistMonad a
@@ -1325,7 +1325,7 @@ toPrimitiveType
   -> HWType
   -> NetlistMonad ([Declaration], Identifier, Expr, HWType)
 toPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
-  id1 <- Id.next id0
+  id1 <- Id.next Local id0
   ds  <- mkInit Concurrent Cont id1 hwty1 expr
   pure (ds, id1, expr, hwty1)
  where
@@ -1343,7 +1343,7 @@ fromPrimitiveType
   -> HWType
   -> NetlistMonad ([Declaration], Identifier, Expr, HWType)
 fromPrimitiveType id0 hwty0 = convPrimitiveType hwty0 dflt $ do
-  id1 <- Id.next id0
+  id1 <- Id.next Local id0
   ds <- mkInit Concurrent Cont id1 hwty0 expr
   pure (ds, id1, expr, hwty1)
  where
@@ -1363,7 +1363,7 @@ mkTopInput (ExpandedPortName hwty0 i0) = do
   return ([(i0, hwty1)], decls, expr, i1)
 
 mkTopInput epp@(ExpandedPortProduct p hwty ps) = do
-  pN <- Id.makeBasic p
+  pN <- Id.makeBasic Local p
   case hwty of
     Vector sz eHwty -> do
       (ports, _, exprs, _) <- unzip4 <$> mapM mkTopInput ps
@@ -1460,7 +1460,7 @@ genComponentName newInlineStrat prefixM nm =
   prefix = fromMaybe (if newInlineStrat then [] else init nm0) (pure <$> prefixM)
 
 genTopName
-  :: IdentifierSetMonad m
+  :: IdentifierScopesMonad m
   => Maybe Text
   -- ^ Top entity name prefix
   -> TopEntity
@@ -1470,9 +1470,9 @@ genTopName
 genTopName prefixM ann =
   case prefixM of
     Just prefix | not (Text.null prefix) ->
-      Id.addRaw (Text.concat [prefix, "_", Text.pack (t_name ann)])
+      Id.addRaw Global (Text.concat [prefix, "_", Text.pack (t_name ann)])
     _ ->
-      Id.addRaw (Text.pack (t_name ann))
+      Id.addRaw Global (Text.pack (t_name ann))
 
 -- | Strips one or more layers of attributes from a HWType; stops at first
 -- non-Annotated. Accumulates all attributes of nested annotations.
@@ -1492,7 +1492,7 @@ mkTopOutput
   :: ExpandedPortName Identifier
   -> NetlistMonad ([(Identifier, HWType)], [Declaration], Identifier)
 mkTopOutput (ExpandedPortName hwty0 i0) = do
-  i1 <- Id.next i0
+  i1 <- Id.next Local i0
   (_, _, bvExpr, hwty1) <- toPrimitiveType i1 hwty0
   if hwty0 == hwty1 then
     -- No type conversion happened, so we can just request caller to assign to
@@ -1504,7 +1504,7 @@ mkTopOutput (ExpandedPortName hwty0 i0) = do
     pure ( [(i0, hwty1)], [NetDecl' Nothing i1 hwty0 Nothing, assn], i1)
 
 mkTopOutput epp@(ExpandedPortProduct p hwty ps) = do
-  pN <- Id.makeBasic p
+  pN <- Id.makeBasic Local p
   let netdecl = NetDecl' Nothing pN hwty Nothing
   case hwty of
     Vector {} -> do
@@ -1609,7 +1609,7 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
 
   instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
   instLabel2 <- affixName instLabel1
-  instLabel3 <- Id.makeBasic instLabel2
+  instLabel3 <- Id.makeBasic Local instLabel2
   topOutputM <- traverse mkTopInstOutput (et_output annM)
 
   let topDecl = mkTopCompDecl (Just topName) [] topIdentifier instLabel3 [] (concat iports)
@@ -1638,14 +1638,14 @@ mkTopInstInput
   -> NetlistMonad ([InstancePort], [Declaration], Identifier)
   -- ^ (ports to assign, declarations for intermediate signals, argument signal)
 mkTopInstInput (ExpandedPortName hwty0 pN) = do
-  pN' <- Id.next pN
+  pN' <- Id.next Local pN
   (decls, pN'', _bvExpr, hwty1) <- toPrimitiveType pN' hwty0
   return ( [InstancePort pN'' hwty1]
           , NetDecl' Nothing pN' hwty0 Nothing : decls
           , pN' )
 
 mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
-  pName <- Id.makeBasic pNameHint
+  pName <- Id.makeBasic Local pNameHint
   let pDecl = NetDecl' Nothing pName hwty0 Nothing
 
   let
@@ -1735,13 +1735,13 @@ mkTopInstOutput
   -> NetlistMonad ([InstancePort], [Declaration], Identifier)
   -- ^ (ports to assign, declarations for intermediate signals, result signal)
 mkTopInstOutput (ExpandedPortName hwty0 portName) = do
-  assignName0 <- Id.next portName
+  assignName0 <- Id.next Local portName
   (decls, assignName1, _expr, hwty1) <- fromPrimitiveType assignName0 hwty0
   let net = NetDecl' Nothing assignName0 hwty1 Nothing
   return ([InstancePort assignName0 hwty1], net : decls, assignName1)
 
 mkTopInstOutput epp@(ExpandedPortProduct productNameHint hwty ps) = do
-  pName <- Id.makeBasic productNameHint
+  pName <- Id.makeBasic Local productNameHint
   let pDecl = NetDecl' Nothing pName hwty Nothing
   let (attrs, hwty') = stripAttributes hwty
   case hwty' of
@@ -2071,10 +2071,12 @@ expandTopEntityOrErrM
   -- identifiers in the expanded top entity will be added to NetlistState's
   -- IdentifierSet.
 expandTopEntityOrErrM ihwtys ohwty topM = do
-  is <- identifierSetM id
+  is <- Lens.use seenIds
   let eTop = expandTopEntityOrErr ihwtys ohwty topM
-  let ete = evalState (traverse (either Id.addRaw Id.makeBasic) eTop) (Id.clearSet is)
-  Id.addMultiple (toList ete)
+  let ete = evalState
+              (traverse (either (Id.addRaw Local) (Id.makeBasic Local)) eTop)
+              (Id.fromGlobalSet (Id.clearSet is))
+  Id.addMultiple Local (toList ete)
   pure ete
 
 -- | Take a top entity and /expand/ its port names. I.e., make sure that every

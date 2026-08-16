@@ -17,6 +17,7 @@ import Clash.Annotations.Primitive
 import Control.Monad.Trans.State.Lazy
 import qualified Data.ByteString as BS
 import Data.Coerce
+import qualified Data.List as List
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
@@ -41,14 +42,17 @@ instance Arbitrary NonEmptyText where
   arbitrary = coerce genValidUtf81
   shrink = coerce shrinkValidUtf81
 
-eval :: Bool -> HDL -> State Id.IdentifierSet a -> a
-eval esc hdl a = evalState a (Id.emptyIdentifierSet esc Id.PreserveCase hdl)
+eval :: Bool -> HDL -> State Id.IdentifierScopes a -> a
+eval esc hdl a = evalState a (Id.emptyIdentifierScopes esc Id.PreserveCase hdl)
 
-eval' :: State Id.IdentifierSet a -> a
+eval' :: State Id.IdentifierScopes a -> a
 eval' = eval True VHDL
 
+emptyScopes :: Id.IdentifierScopes
+emptyScopes = Id.emptyIdentifierScopes True Id.PreserveCase VHDL
+
 roundTrip :: Bool -> HDL -> Text -> Text
-roundTrip esc hdl = Id.toText . eval esc hdl . Id.make
+roundTrip esc hdl = Id.toText . eval esc hdl . Id.make Id.Local
 
 roundTrip' :: Text -> Text
 roundTrip' = roundTrip True VHDL
@@ -59,7 +63,7 @@ roundTripTest t =
 
 -- | Raw identifiers should always come up the same after 'Id.toText'
 rawToIdProperty :: NonEmptyText -> Property
-rawToIdProperty t = coerce t === Id.toText (eval' (Id.addRaw (coerce t)))
+rawToIdProperty t = coerce t === Id.toText (eval' (Id.addRaw Id.Local (coerce t)))
 
 xor :: Bool -> Bool -> Bool
 xor True True = False
@@ -82,22 +86,22 @@ tests =
 
     , testGroup "no collisions (one id)" $ flip map [minBound..maxBound] $ \hdl ->
         testProperty (show hdl) $ \id0 -> eval True hdl $ do
-          id0t <- Id.toText <$> Id.make (coerce @ArbitraryAsciiText id0)
-          id1t <- Id.toText <$> Id.make (coerce @ArbitraryAsciiText id0)
+          id0t <- Id.toText <$> Id.make Id.Local (coerce @ArbitraryAsciiText id0)
+          id1t <- Id.toText <$> Id.make Id.Local (coerce @ArbitraryAsciiText id0)
           pure (id0t /= id1t)
 
     , testGroup "no collisions (two ids)" $ flip map [minBound..maxBound] $ \hdl ->
         testProperty (show hdl) $ \id0 id1 -> eval True hdl $ do
-          id0t <- Id.toText <$> Id.make (coerce @ArbitraryAsciiText id0)
-          id1t <- Id.toText <$> Id.make (coerce @ArbitraryAsciiText id1)
+          id0t <- Id.toText <$> Id.make Id.Local (coerce @ArbitraryAsciiText id0)
+          id1t <- Id.toText <$> Id.make Id.Local (coerce @ArbitraryAsciiText id1)
           pure (id0t /= id1t)
 
     , testGroup "make0" $ eval' $ do
-        id0 <- Id.toText <$> Id.make "foo"
-        id1 <- Id.toText <$> Id.make "foo"
-        id2 <- Id.toText <$> Id.make "foo_0"
-        id3 <- Id.toText <$> Id.make "foo"
-        id4 <- Id.toText <$> Id.make "foo_0"
+        id0 <- Id.toText <$> Id.make Id.Local "foo"
+        id1 <- Id.toText <$> Id.make Id.Local "foo"
+        id2 <- Id.toText <$> Id.make Id.Local "foo_0"
+        id3 <- Id.toText <$> Id.make Id.Local "foo"
+        id4 <- Id.toText <$> Id.make Id.Local "foo_0"
         pure [ testCase "id0 == foo"     $ id0 @?= "foo"
              , testCase "id1 == foo_0"   $ id1 @?= "foo_0"
              , testCase "id2 == foo_0_0" $ id2 @?= "foo_0_0"
@@ -106,10 +110,10 @@ tests =
              ]
 
     , testGroup "make1" $ eval' $ do
-        id0 <- Id.toText <$> Id.make "foo"
-        id1 <- Id.toText <$> Id.make "foo_37"
-        id2 <- Id.toText <$> Id.make "foo"
-        id3 <- Id.toText <$> Id.make "foo_3"
+        id0 <- Id.toText <$> Id.make Id.Local "foo"
+        id1 <- Id.toText <$> Id.make Id.Local "foo_37"
+        id2 <- Id.toText <$> Id.make Id.Local "foo"
+        id3 <- Id.toText <$> Id.make Id.Local "foo_3"
         pure [ testCase "id0 == foo"    $ id0 @?= "foo"
              , testCase "id1 == foo_37" $ id1 @?= "foo_37"
              , testCase "id2 == foo_38" $ id2 @?= "foo_38"
@@ -118,16 +122,46 @@ tests =
 
     , testGroup "Id.add" $ eval' $ do
         old <- get
-        id0 <- Id.addRaw "LED"
+        id0 <- Id.addRaw Id.Local "LED"
         put old
-        Id.add id0
-        id1 <- Id.toText <$> Id.make "led"
+        Id.add Id.Local id0
+        id1 <- Id.toText <$> Id.make Id.Local "led"
         pure [ testCase "id1 == led_0" $ id1 @?= "led_0" ]
+
+    -- Test that names in either scope conflict with new names in the other,
+    -- that each name is only registered in the scope it was made in, and that
+    -- global names survive 'setLocalScope' while local names do not.
+    , testGroup "scopes" $ eval' $ do
+        glob0 <- Id.toText <$> Id.makeBasic Id.Global "top"
+        loc0  <- Id.toText <$> Id.make Id.Local "foo"
+        glob1 <- Id.toText <$> Id.makeBasic Id.Global "foo"
+        loc5  <- Id.toText <$> Id.make Id.Local "top"
+        globNames <- gets (List.sort . map Id.toText . Id.toList . Id._globalIds)
+        locNames  <- gets (List.sort . map Id.toText . Id.toList . Id._localIds)
+        let seed = Id._localIds (flip execState emptyScopes (Id.addRaw Id.Local "bar"))
+        modify (Id.setLocalScope seed)
+        loc1  <- Id.toText <$> Id.make Id.Local "foo"
+        loc2  <- Id.toText <$> Id.make Id.Local "top"
+        loc3  <- Id.toText <$> Id.make Id.Local "foo_0"
+        loc4  <- Id.toText <$> Id.make Id.Local "bar"
+        pure [ testCase "glob0 == top"    $ glob0 @?= "top"
+             , testCase "loc0 == foo"     $ loc0 @?= "foo"
+             , testCase "glob1 == foo_0"  $ glob1 @?= "foo_0"
+             , testCase "loc5 == top_0"   $ loc5 @?= "top_0"
+             , testCase "global scope only holds globals" $
+                 globNames @?= ["foo_0", "top"]
+             , testCase "local scope only holds locals" $
+                 locNames @?= ["foo", "top_0"]
+             , testCase "loc1 == foo"     $ loc1 @?= "foo"
+             , testCase "loc2 == top_0"   $ loc2 @?= "top_0"
+             , testCase "loc3 == foo_0_0" $ loc3 @?= "foo_0_0"
+             , testCase "loc4 == bar_0"   $ loc4 @?= "bar_0"
+             ]
 
     -- Some tools/hdls are case insensitive, so we should make sure we are too
     , testGroup "case sensitivity" $ eval' $ do
-        id0 <- Id.toText <$> Id.make "foobar"
-        id1 <- Id.toText <$> Id.make "fOoBAr"
+        id0 <- Id.toText <$> Id.make Id.Local "foobar"
+        id1 <- Id.toText <$> Id.make Id.Local "fOoBAr"
         pure [ testCase "id0 == foobar"   $ id0 @?= "foobar"
              , testCase "id1 == fOoBAr_0" $ id1 @?= "fOoBAr_0"
              ]
@@ -192,26 +226,26 @@ tests =
     , testGroup "raw identifiers"
       [ testProperty "id" rawToIdProperty
       , testGroup "Verilog: \\foo bar␣" $ eval True Verilog $ do
-          id0 <- Id.toText <$> Id.addRaw "\\foo bar "
-          id1 <- Id.toText <$> Id.make "foo bar"
+          id0 <- Id.toText <$> Id.addRaw Id.Local "\\foo bar "
+          id1 <- Id.toText <$> Id.make Id.Local "foo bar"
           pure [ testCase "id0 == \\foo bar " $ id0 @?= "\\foo bar "
                , testCase "id1 == \\foo bar_0 " $ id1 @?= "\\foo bar_0 "
                ]
       , testGroup "Verilog: \\foo bar␣␣" $ eval True Verilog $ do
-          id0 <- Id.toText <$> Id.addRaw "\\foo bar  "
-          id1 <- Id.toText <$> Id.make "foo bar"
+          id0 <- Id.toText <$> Id.addRaw Id.Local "\\foo bar  "
+          id1 <- Id.toText <$> Id.make Id.Local "foo bar"
           pure [ testCase "id0 == \\foo bar  " $ id0 @?= "\\foo bar  "
                , testCase "id1 == \\foo bar_0 " $ id1 @?= "\\foo bar_0 "
                ]
       , testGroup "VHDL: \\foo bar\\" $ eval True VHDL $ do
-          id0 <- Id.toText <$> Id.addRaw "\\foo bar\\"
-          id1 <- Id.toText <$> Id.make "foo bar"
+          id0 <- Id.toText <$> Id.addRaw Id.Local "\\foo bar\\"
+          id1 <- Id.toText <$> Id.make Id.Local "foo bar"
           pure [ testCase "id0 == \\foo bar\\" $ id0 @?= "\\foo bar\\"
                , testCase "id1 == \\foo bar_0\\ " $ id1 @?= "\\foo bar_0\\"
                ]
       , testGroup "VHDL: \\foo bar \\" $ eval True VHDL $ do
-          id0 <- Id.toText <$> Id.addRaw "\\foo bar \\"
-          id1 <- Id.toText <$> Id.make "foo bar"
+          id0 <- Id.toText <$> Id.addRaw Id.Local "\\foo bar \\"
+          id1 <- Id.toText <$> Id.make Id.Local "foo bar"
           -- While 'id1' could strictly be \foo bar\, it's probably best to be
           -- whitespace insensitive.
           pure [ testCase "id0 == \\foo bar \\" $ id0 @?= "\\foo bar \\"

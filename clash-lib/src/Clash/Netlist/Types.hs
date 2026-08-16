@@ -190,6 +190,37 @@ data IdentifierSet
       -- ^ Identifier store
     } deriving (Generic, NFData, Show)
 
+-- | Does an identifier need to remain unique for the entire design ('Global'
+-- — component names, type names, enum literals, names in shared include
+-- files) or only within the scope currently generating names ('Local' — e.g.,
+-- signals of the HDL module being rendered)? All identifier creation
+-- functions in "Clash.Netlist.Id" take a 'Scope' as their first argument.
+data Scope = Local | Global
+  deriving (Show, Generic, NFData, Eq)
+
+-- | Identifier scoping: a set of names that must remain unique for the entire
+-- design next to a set of names that only need to be unique within the scope
+-- currently generating names. The sets are disjoint: an identifier is
+-- registered in the set given by the 'Scope' argument of the creation
+-- functions in "Clash.Netlist.Id", but uniqueness checks consult both sets —
+-- a new global name must not collide with names in the current local scope
+-- (e.g., a type name created while rendering an HDL module that references
+-- it) and vice versa.
+--
+-- A fresh local scope is started with 'Clash.Netlist.Id.setLocalScope'; names
+-- only present in the previous local scope go out of scope. This means a
+-- global name created later cannot see the discarded locals of earlier
+-- scopes. That is sound: a scope that was rendered before a global name
+-- existed cannot reference it, so a collision with its discarded locals is
+-- harmless.
+data IdentifierScopes
+  = IdentifierScopes {
+      _globalIds :: !IdentifierSet
+      -- ^ Names that must remain unique for the entire design
+    , _localIds :: !IdentifierSet
+      -- ^ Names local to the scope currently generating names
+    } deriving (Generic, NFData, Show)
+
 -- | HDL identifier. Consists of a base name and a number of extensions. An
 -- identifier with a base name of "foo" and a list of extensions [1, 2] will be
 -- rendered as "foo_1_2".
@@ -290,6 +321,8 @@ data ComponentMeta = ComponentMeta
   { cmWereVoids :: [Bool]
   , cmLoc :: SrcSpan
   , cmScope :: IdentifierSet
+  -- ^ Names generated for this component during netlist generation; seeds the
+  -- local scope when the component is rendered to HDL.
   , cmUsage :: UsageMap
   } deriving (Generic, Show, NFData)
 
@@ -307,12 +340,12 @@ data NetlistState
                     -> Strict.State HWMap (Maybe (Either String FilteredHWType))
   -- ^ Hardcoded Type -> HWType translator
   , _curCompNm      :: !(Identifier,SrcSpan)
-  , _seenIds        :: IdentifierSet
-  -- ^ All names currently in scope.
-  , _seenComps      :: IdentifierSet
-  -- ^ Components (to be) generated during this netlist run. This is always a
-  -- subset of 'seenIds'. Reason d'etre: we currently generate components in a
-  -- top down manner. E.g. given:
+  , _seenScopes     :: IdentifierScopes
+  -- ^ Global scope: components (to be) generated during this netlist run.
+  -- Local scope: names generated for the component currently being generated.
+  --
+  -- Component names live in the global scope because we currently generate
+  -- components in a top down manner. E.g. given:
   --
   --   - A
   --   -- B
@@ -327,7 +360,7 @@ data NetlistState
   -- would be called "foo", thereby forcing the component 'B' to be called
   -- "foo_1". Ideally, we'd use the "nice" names for components, and the "ugly"
   -- names for signals. To achieve this, we generate all the component names
-  -- up front and subsequently store them in '_seenComps'.
+  -- up front and subsequently store them in the global scope.
   , _seenPrimitives :: Set.Set Text
   -- ^ Keeps track of invocations of ´mkPrimitive´. It is currently used to
   -- filter duplicate warning invocations for dubious blackbox instantiations,
@@ -985,8 +1018,18 @@ emptyBBContext name
   , bbCtxName     = Nothing
   }
 
+Lens.makeLenses ''IdentifierScopes
 Lens.makeLenses ''NetlistEnv
 Lens.makeLenses ''NetlistState
+
+-- | Names generated for the component currently being generated. See
+-- '_seenScopes'.
+seenIds :: Lens' NetlistState IdentifierSet
+seenIds = seenScopes . localIds
+
+-- | Components (to be) generated during this netlist run. See '_seenScopes'.
+seenComps :: Lens' NetlistState IdentifierSet
+seenComps = seenScopes . globalIds
 
 intWidth :: Lens.Getter NetlistEnv Int
 intWidth = clashEnv . Lens.to (opt_intWidth . envOpts)
@@ -1003,44 +1046,42 @@ primitives = clashEnv . Lens.to envPrimitives
 clashOpts :: Lens.Getter NetlistEnv ClashOpts
 clashOpts = clashEnv . Lens.to envOpts
 
--- | Structures that hold an 'IdentifierSet'
-class HasIdentifierSet s where
-  identifierSet :: Lens' s IdentifierSet
-
-instance HasIdentifierSet IdentifierSet where
-  identifierSet = ($)
-
 instance HasUsageMap NetlistState where
   usageMap = usages
 
-instance HasIdentifierSet s => HasIdentifierSet (s, a) where
-  identifierSet = Lens._1 . identifierSet
+-- | Structures that hold an 'IdentifierScopes'
+class HasIdentifierScopes s where
+  identifierScopes :: Lens' s IdentifierScopes
 
--- | An "IdentifierSetMonad" supports unique name generation for Clash Netlist
-class Monad m => IdentifierSetMonad m where
-  identifierSetM :: (IdentifierSet -> IdentifierSet) -> m IdentifierSet
+instance HasIdentifierScopes IdentifierScopes where
+  identifierScopes = ($)
 
-instance IdentifierSetMonad NetlistMonad where
-  identifierSetM f = do
-    is0 <- Lens.use seenIds
+-- | An "IdentifierScopesMonad" supports unique name generation for Clash
+-- Netlist. See 'IdentifierScopes'.
+class Monad m => IdentifierScopesMonad m where
+  identifierScopesM :: (IdentifierScopes -> IdentifierScopes) -> m IdentifierScopes
+
+instance IdentifierScopesMonad NetlistMonad where
+  identifierScopesM f = do
+    is0 <- Lens.use seenScopes
     let is1 = f is0
-    seenIds .= is1
+    seenScopes .= is1
     pure is1
-  {-# INLINE identifierSetM #-}
+  {-# INLINE identifierScopesM #-}
 
-instance HasIdentifierSet s => IdentifierSetMonad (Strict.State s) where
-  identifierSetM f = do
-    is0 <- Lens.use identifierSet
-    identifierSet .= f is0
-    Lens.use identifierSet
-  {-# INLINE identifierSetM #-}
+instance HasIdentifierScopes s => IdentifierScopesMonad (Strict.State s) where
+  identifierScopesM f = do
+    is0 <- Lens.use identifierScopes
+    identifierScopes .= f is0
+    Lens.use identifierScopes
+  {-# INLINE identifierScopesM #-}
 
-instance HasIdentifierSet s => IdentifierSetMonad (Lazy.State s) where
-  identifierSetM f = do
-    is0 <- Lens.use identifierSet
-    identifierSet .= f is0
-    Lens.use identifierSet
-  {-# INLINE identifierSetM #-}
+instance HasIdentifierScopes s => IdentifierScopesMonad (Lazy.State s) where
+  identifierScopesM f = do
+    is0 <- Lens.use identifierScopes
+    identifierScopes .= f is0
+    Lens.use identifierScopes
+  {-# INLINE identifierScopesM #-}
 
-instance IdentifierSetMonad m => IdentifierSetMonad (Ap m) where
-  identifierSetM = Ap . identifierSetM
+instance IdentifierScopesMonad m => IdentifierScopesMonad (Ap m) where
+  identifierScopesM = Ap . identifierScopesM

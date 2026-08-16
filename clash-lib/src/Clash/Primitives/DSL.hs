@@ -198,9 +198,9 @@ data BlockState backend = BlockState
   }
 makeLenses ''BlockState
 
-instance Backend backend => HasIdentifierSet (BlockState backend) where
-  identifierSet :: Lens' (BlockState backend) IdentifierSet
-  identifierSet = bsBackend . identifierSet
+instance Backend backend => HasIdentifierScopes (BlockState backend) where
+  identifierScopes :: Lens' (BlockState backend) IdentifierScopes
+  identifierScopes = bsBackend . identifierScopes
 
 instance HasUsageMap backend => HasUsageMap (BlockState backend) where
   usageMap = bsBackend.usageMap
@@ -265,7 +265,7 @@ declaration blockName c = do
   let initState = emptyBlockState backend0
       (BlockState {..}) = execState c initState
   put _bsBackend
-  blockNameUnique <- Id.makeBasic blockName
+  blockNameUnique <- Id.makeBasic Local blockName
   getAp $ blockDecl blockNameUnique (reverse _bsDeclarations)
 
 -- | Add a declaration to the state.
@@ -282,7 +282,7 @@ declare'
   -> State (BlockState backend) Identifier
   -- ^ Expression pointing the the new signal
 declare' decName ty = do
-  uniqueName <- Id.makeBasic decName
+  uniqueName <- Id.makeBasic Local decName
   addDeclaration (NetDecl' Nothing uniqueName ty Nothing)
   pure uniqueName
 
@@ -309,8 +309,8 @@ declareN
   -> State (BlockState backend) [TExpr]
   -- ^ Expressions pointing the the new signals
 declareN decName tys = do
-  firstName <- Id.makeBasic decName
-  nextNames <- Id.nextN (length tys - 1) firstName
+  firstName <- Id.makeBasic Local decName
+  nextNames <- Id.nextN Local (length tys - 1) firstName
   let uniqueNames = firstName : nextNames
   zipWithM
     (\uniqueName ty -> do
@@ -590,7 +590,7 @@ outputCoerce
 outputCoerce fromType toType exprStringFn inName0 expr_
   | TExpr outType (Identifier outName Nothing) <- expr_
   , outType == toType = do
-      inName1 <- Id.makeBasic inName0
+      inName1 <- Id.makeBasic Local inName0
       let inName2 = Id.unsafeMake (exprStringFn (Id.toText inName1))
           exprIdent = Identifier inName2 Nothing
       addDeclaration (NetDecl Nothing inName1 fromType)
@@ -615,7 +615,7 @@ outputFn
   -> State (BlockState backend) [TExpr]
 outputFn fromTypes toType exprFn inNames0 (TExpr outType (Identifier outName Nothing))
   | outType == toType = do
-      inNames1 <- mapM Id.makeBasic inNames0
+      inNames1 <- mapM (Id.makeBasic Local) inNames0
       let idExpr = Id.unsafeMake (exprFn (map Id.toText inNames1))
           exprIdent = Identifier idExpr Nothing
       sequenceOf_ each [ addDeclaration (NetDecl Nothing nm t)

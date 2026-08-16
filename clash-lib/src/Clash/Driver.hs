@@ -31,6 +31,7 @@ import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM)
 import           Control.Monad.Catch              (MonadThrow (throwM), try)
 import           Control.Monad.Extra              (whenM, ifM, unlessM)
+import           Control.Lens                     ((%=))
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
@@ -380,7 +381,8 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
 
   modifyMVar_ seenV $ \seen ->
-    pure $! State.execState (Id.addRaw (Data.Text.pack modName1)) seen
+    pure $! Id._globalIds $
+      State.execState (Id.addRaw Id.Global (Data.Text.pack modName1)) (Id.fromGlobalSet seen)
 
   let topNm = lookupVarEnv' compNames topEntity
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
@@ -410,7 +412,10 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         putStrLn ("Clash: Using cached result for: " ++ topEntityS)
 
       modifyMVar_ seenV $ \seen ->
-        pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
+        pure $! Id._globalIds $
+          State.execState
+            (mapM_ (Id.addRaw Id.Global) (componentNames manifest0))
+            (Id.fromGlobalSet seen)
 
       fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
@@ -924,11 +929,20 @@ createHDL
   -- + The data files that need to be copied
 createHDL backend opts modName seen components domainConfs top topName = flip evalState backend $ getAp $ do
   let componentsL = map snd (OMap.assocs components)
+
+  -- Component names must stay unique design-wide, so they seed the global
+  -- scope. Each component's 'genHDL' starts a fresh local scope from its
+  -- 'cmScope'.
+  Ap (Id.identifierScopes . Id.globalIds %= Id.union seen)
+
   (hdlNmDocs0,incs) <-
     fmap unzip $
       forM componentsL $ \(ComponentMeta{cmLoc, cmScope,cmUsage}, comp) ->
-         genHDL opts modName cmLoc (Id.union seen cmScope) cmUsage comp
+         genHDL opts modName cmLoc cmScope cmUsage comp
 
+  -- Render the types package in a fresh local scope: names generated there
+  -- only need to be unique w.r.t. design-wide names.
+  Ap (Id.identifierScopes . Id.localIds %= Id.clearSet)
   hwtys <- HashSet.toList <$> extractTypes <$> Ap get
   typesPkg0 <- mkTyPackage modName hwtys
   dataFiles <- Ap getDataFiles

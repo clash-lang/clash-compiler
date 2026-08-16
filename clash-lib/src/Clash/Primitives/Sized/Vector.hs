@@ -138,10 +138,10 @@ foldTF = TemplateFunction [] (const True) foldTF'
 foldTF' :: forall s . (HasCallStack, Backend s) => BlackBoxContext -> State s Doc
 foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
   -- Create an id for every element in the vector
-  baseId <- Id.make "acc_0"
-  vecIds <- replicateM n (Id.next baseId)
+  baseId <- Id.make Id.Local "acc_0"
+  vecIds <- replicateM n (Id.next Id.Local baseId)
 
-  vecId <- Id.make "vec"
+  vecId <- Id.make Id.Local "vec"
   let vecDecl = sigDecl vecType vecId
       vecAssign = Assignment vecId Cont vec
       elemAssigns = zipWith3 Assignment vecIds (repeat Cont) (map (iIndex vecId) [0..])
@@ -159,7 +159,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
       resultAssign = Assignment resultId Cont (Identifier result Nothing)
 
   callDecls <- zipWithM callDecl [0..] fCalls
-  foldNm <- Id.make "fold"
+  foldNm <- Id.make Id.Local "fold"
 
   getAp $ blockDecl foldNm $
     resultAssign :
@@ -218,7 +218,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
     -> [Identifier]
     -> State s ([FCall], [Identifier])
   mkLevel (!lvl, !offset) (a:b:rest) = do
-    c <- Id.makeBasic ("acc_" <> showt lvl <> "_" <> showt offset)
+    c <- Id.makeBasic Id.Local ("acc_" <> showt lvl <> "_" <> showt offset)
     (calls, results) <- mkLevel (lvl, offset+1) rest
     pure (FCall a b c:calls, c:results)
   mkLevel _lvl rest =

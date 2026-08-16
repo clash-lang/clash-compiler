@@ -255,7 +255,7 @@ extractLiterals = map (\case (e,_,_) -> e)
 -- counter for every newly encountered symbol.
 setSym
   :: forall m
-   . Id.IdentifierSetMonad m
+   . Id.IdentifierScopesMonad m
   => BlackBoxContext
   -> BlackBoxTemplate
   -> m (BlackBoxTemplate,[N.Declaration])
@@ -281,7 +281,7 @@ setSym bbCtx l = do
           varM <- IntMap.lookup i <$> use _3
           case varM of
             Nothing -> do
-              nm' <- lift (Id.make (Text.toStrict (concatT (Text "c$":nm))))
+              nm' <- lift (Id.make N.Local (Text.toStrict (concatT (Text "c$":nm))))
               let decls = case typeSize hwTy of
                     0 -> []
                     _ -> [N.NetDecl Nothing nm' hwTy
@@ -295,7 +295,7 @@ setSym bbCtx l = do
         symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t <- Id.toText <$> lift (Id.make "c$n")
+            t <- Id.toText <$> lift (Id.make N.Local "c$n")
             _1 %= (IntMap.insert i t)
             return (Sym (Text.fromStrict t) x)
           Just t -> return (Sym (Text.fromStrict t) x)
@@ -303,7 +303,7 @@ setSym bbCtx l = do
         symM <- HashMap.lookup nm <$> use _2
         case symM of
           Nothing -> do
-            t <- Id.toText <$> lift (Id.make $ Text.toStrict nm)
+            t <- Id.toText <$> lift (Id.make N.Local $ Text.toStrict nm)
             _2 %= (HashMap.insert nm (Just t))
             return (Sym (Text.fromStrict t) x)
           Just (Just t) -> return (Sym (Text.fromStrict t) x)
@@ -323,7 +323,7 @@ setSym bbCtx l = do
             symM <- IntMap.lookup i <$> use _1
             case symM of
               Nothing -> do
-                t' <- Id.toText <$> lift (Id.makeBasic (Text.toStrict nm))
+                t' <- Id.toText <$> lift (Id.makeBasic N.Local (Text.toStrict nm))
                 _1 %= (IntMap.insert i t')
                 _2 %= (HashMap.insert nm Nothing) -- mark name as taken by GENSYM
                 return (GenSym [Text (Text.fromStrict t')] i)
@@ -544,7 +544,7 @@ renderElem b (Component (Decl n subN (l:ls))) = do
           Left t ->
             return t
           Right (nm0,ds) -> do
-            nm1 <- Id.next nm0
+            nm1 <- Id.next N.Local nm0
             block <- getAp (blockDecl nm1 ds)
             return (render block)
 
@@ -558,8 +558,8 @@ renderElem b (Component (Decl n subN (l:ls))) = do
               [] ->
                 return (N.BBTemplate templ3)
               _ -> do
-                nm1 <- Id.toText <$> Id.makeBasic "bb"
-                nm2 <- Id.makeBasic "bb"
+                nm1 <- Id.toText <$> Id.makeBasic N.Local "bb"
+                nm2 <- Id.makeBasic N.Local "bb"
                 let bbD = BlackBoxD nm1 libs imps inc (N.BBTemplate templ3) b'
                 block <- getAp (blockDecl nm2 (templDecls ++ [bbD]))
                 return (render block)

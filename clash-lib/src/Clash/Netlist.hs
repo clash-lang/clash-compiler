@@ -23,7 +23,7 @@
 module Clash.Netlist where
 
 import           Control.Exception                (throw)
-import           Control.Lens                     ((.=), (<~))
+import           Control.Lens                     ((.=), (%=))
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
@@ -157,8 +157,7 @@ runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentName
         , _components=OMap.empty
         , _typeTranslator=typeTrans
         , _curCompNm=(error "genComponent should have set _curCompNm", noSrcSpan)
-        , _seenIds=seenIds_
-        , _seenComps=seenIds_
+        , _seenScopes=IdentifierScopes seenIds_ (Id.clearSet seenIds_)
         , _seenPrimitives=Set.empty
         , _componentNames=componentNames_
         , _topEntityAnns=tops
@@ -185,13 +184,13 @@ genNames
   -> BindingMap
   -> (VarEnv Identifier, IdentifierSet)
 genNames newInlineStrat prefixM is env bndrs =
-  runState (foldlM go env bndrs) is
+  second _globalIds (runState (foldlM go env bndrs) (Id.fromGlobalSet is))
  where
   go env_ (bindingId -> id_) =
     case lookupVarEnv id_ env_ of
       Just _ -> pure env_
       Nothing -> do
-        nm <- Id.makeBasic (genComponentName newInlineStrat prefixM id_)
+        nm <- Id.makeBasic Global (genComponentName newInlineStrat prefixM id_)
         pure (extendVarEnv id_ nm env_)
 
 -- | Generate names for top entities. Should be executed at the very start of
@@ -204,7 +203,7 @@ genTopNames
   -> (VarEnv Identifier, IdentifierSet)
 genTopNames opts hdl tops =
   -- TODO: Report error if fixed top entities have conflicting names
-  flip runState (Id.emptyIdentifierSet esc lw hdl) $ do
+  second _globalIds $ flip runState (Id.emptyIdentifierScopes esc lw hdl) $ do
     env0 <- foldlM goFixed emptyVarEnv fixedTops
     env1 <- foldlM goNonFixed env0 nonFixedTops
     pure env1
@@ -221,7 +220,7 @@ genTopNames opts hdl tops =
     pure (extendVarEnv topId topNm env)
 
   goNonFixed env id_ = do
-    topNm <- Id.makeBasic (genComponentName True prefixM id_)
+    topNm <- Id.makeBasic Global (genComponentName True prefixM id_)
     pure (extendVarEnv id_ topNm env)
 
 -- | Generate a component for a given function (caching)
@@ -258,7 +257,7 @@ genComponentT compName0 componentExpr = do
   let topAnnMM = topAnnotation <$> topEntityTM
       topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
-  seenIds <~ Lens.use seenComps
+  seenIds %= Id.clearSet
   (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
     case splitNormalized tcm componentExpr of
       Right (args, binds, res) -> do
@@ -495,7 +494,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
   tcm <- Lens.view tcCache
   let scrutTy = inferCoreTypeOf tcm scrut
   scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-  scrutId  <- Id.suffix dstId "selection"
+  scrutId  <- Id.suffix Local dstId "selection"
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
   altHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
@@ -509,8 +508,8 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
         SP {} -> first (mkScrutExpr sp scrutHTy (fst (NE.last alts0))) <$>
                    mkExpr True declType (NetlistId scrutId scrutTy) scrut
         _ -> mkExpr False declType (NetlistId scrutId scrutTy) scrut
-      altTId <- Id.suffix dstId "sel_alt_t"
-      altFId <- Id.suffix dstId "sel_alt_f"
+      altTId <- Id.suffix Local dstId "sel_alt_t"
+      altFId <- Id.suffix Local dstId "sel_alt_f"
       (altTExpr,altTDecls) <- mkExpr False declType (NetlistId altTId altTy) altT
       (altFExpr,altFDecls) <- mkExpr False declType (NetlistId altFId altTy) altF
       -- This logic (and the same logic a few lines below) is faulty in the
@@ -554,7 +553,7 @@ mkSelection declType bndr scrut altTy alts0 tickDecls = do
  where
   mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
   mkCondExpr scrutHTy (pat,alt) = do
-    altId <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_alt"
+    altId <- Id.suffix Local (netlistId1 id Id.unsafeFromCoreId bndr) "sel_alt"
     (altExpr,altDecls) <- mkExpr False declType (NetlistId altId altTy) alt
     (,altDecls) <$> case pat of
       DefaultPat           -> return (Nothing,altExpr)
@@ -759,7 +758,7 @@ mkFunApp declType dstId fun args tickDecls = do
               let instLabel0 = StrictText.concat [Id.toText compName, "_", Id.toText dstId]
               instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
               instLabel2 <- affixName instLabel1
-              instLabel3 <- Id.makeBasic instLabel2
+              instLabel3 <- Id.makeBasic Local instLabel2
               let portMap = NamedPortMap (outpAssign ++ inpAssigns)
                   instDecl = InstDecl Entity Nothing [] compName instLabel3 [] portMap
               declareInstUses outpAssign
@@ -821,7 +820,7 @@ toSimpleVar :: DeclarationType
             -> NetlistMonad (Expr,[Declaration])
 toSimpleVar _ _ (e@(Identifier _ Nothing),_) = return (e,[])
 toSimpleVar declType dstId (e,ty) = do
-  argNm <- Id.suffix dstId "fun_arg"
+  argNm <- Id.suffix Local dstId "fun_arg"
   hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) ty
   let assignTy = declTypeUsage declType
   argDecl <- mkInit declType assignTy argNm hTy e
@@ -860,7 +859,7 @@ mkExpr bbEasD declType bndr app =
             return (Identifier (Id.unsafeFromCoreId f) Nothing, [])
       | not (null tyArgs) -> invalid "Var-application with type arguments"
       | otherwise -> do
-          argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "fun_arg"
+          argNm <- Id.suffix Local (netlistId1 id Id.unsafeFromCoreId bndr) "fun_arg"
           decls  <- mkFunApp declType argNm f tmArgs tickDecls
           if isVoid hwTyA then
             return (Noop, decls)
@@ -870,7 +869,7 @@ mkExpr bbEasD declType bndr app =
                    , NetDecl Nothing argNm hwTyA : decls)
     Case scrut ty' [alt] -> mkProjection declType bbEasD bndr scrut ty' alt
     Case scrut tyA (alt:alts) -> do
-      argNm <- Id.suffix (netlistId1 id Id.unsafeFromCoreId bndr) "sel_arg"
+      argNm <- Id.suffix Local (netlistId1 id Id.unsafeFromCoreId bndr) "sel_arg"
       decls  <- mkSelection declType (NetlistId argNm (netlistTypes1 bndr))
                             scrut tyA (alt :| alts) tickDecls
       if isVoid hwTyA then
@@ -926,8 +925,8 @@ mkProjection declType mkDec bndr scrut altTy alt@(pat,v) = do
   scrutRendered <- do
     scrutNm <-
       netlistId1
-        Id.next
-        (\b -> Id.suffix (Id.unsafeFromCoreId b) "projection")
+        (Id.next Local)
+        (\b -> Id.suffix Local (Id.unsafeFromCoreId b) "projection")
         bndr
     (scrutExpr,newDecls) <- mkExpr False declType (NetlistId scrutNm scrutTy) scrut
     case scrutExpr of
@@ -976,7 +975,7 @@ mkProjection declType mkDec bndr scrut altTy alt@(pat,v) = do
       let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
       case bndr of
         NetlistId scrutNm _ | mkDec -> do
-          scrutNm' <- Id.next scrutNm
+          scrutNm' <- Id.next Local scrutNm
           scrutDecl <- mkInit declType assignTy scrutNm' vHwTy extractExpr
           return (Identifier scrutNm' Nothing, scrutDecl ++ decls)
         MultiId {} -> error "mkProjection: MultiId"
@@ -1005,7 +1004,7 @@ mkDcApplication declType [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache
   let argTys = map (inferCoreTypeOf tcm) args
-  argNm <- netlistId1 return (\b -> Id.suffix (Id.unsafeFromCoreId b) "dc_arg") bndr
+  argNm <- netlistId1 return (\b -> Id.suffix Local (Id.unsafeFromCoreId b) "dc_arg") bndr
   argHWTys <- mapM coreTypeToHWTypeM' argTys
 
   (argExprs, concat -> argDecls) <- unzip <$>

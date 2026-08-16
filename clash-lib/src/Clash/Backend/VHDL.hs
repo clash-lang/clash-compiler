@@ -107,7 +107,7 @@ data VHDLState =
   , _memoryDataFiles:: [(String,String)]
   -- ^ Files to be stored: (filename, contents). These files are generated
   -- during the execution of 'genNetlist'.
-  , _idSeen    :: IdentifierSet
+  , _idScopes  :: IdentifierScopes
   , _tyPkgCtx :: Bool
   -- ^ Are we in the context of generating the @_types@ package?
   , _intWidth  :: Int
@@ -127,8 +127,8 @@ data VHDLState =
 
 makeLenses ''VHDLState
 
-instance HasIdentifierSet VHDLState where
-  identifierSet = idSeen
+instance HasIdentifierScopes VHDLState where
+  identifierScopes = idScopes
 
 instance HasUsageMap VHDLState where
   usageMap = usages
@@ -146,7 +146,7 @@ instance Backend VHDLState where
     , _dataFiles=mempty
     , _includeDirs = opt_importPaths opts
     , _memoryDataFiles=[]
-    , _idSeen=Id.emptyIdentifierSet (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) VHDL
+    , _idScopes=Id.emptyIdentifierScopes (opt_escapedIds opts) (opt_lowerCaseBasicIds opts) VHDL
     , _tyPkgCtx=False
     , _intWidth=opt_intWidth opts
     , _hdlsyn=opt_hdlSyn opts
@@ -324,7 +324,7 @@ productFieldNames labels0 fields = do
     -> HWType
     -> VHDLM IdentifierText
   hName Nothing field = tyName' False field
-  hName (Just label) _field = Id.toText <$> Id.makeBasic label
+  hName (Just label) _field = Id.toText <$> Id.makeBasic Global label
 
   name'
     :: HashMap IdentifierText Int
@@ -384,7 +384,7 @@ enumVariantName ty@(Sum _ vs) i = do
   pure (PP.pretty (names !! i))
  where
   -- Make a basic identifier from the last part of a qualified name
-  variantName = fmap Id.toText . Id.makeBasic . snd . TextS.breakOnEnd "."
+  variantName = fmap Id.toText . Id.makeBasic Global . snd . TextS.breakOnEnd "."
 
 enumVariantName _ _ =
   error $ $(curLoc) ++ "enumVariantName called on non-enum type"
@@ -399,13 +399,12 @@ genVHDL
   -> Component
   -> VHDLM ((String, Doc), [(String, Doc)])
 genVHDL _ nm sp seen us c = do
-    -- Don't have type names conflict with module names or with previously
-    -- generated type names.
-    --
-    -- TODO: Collect all type names up front, to prevent relatively costly union.
-    -- TODO: Investigate whether type names / signal names collide in the first place
+    -- Start a fresh local identifier scope for this module. 'seen' holds the
+    -- names generated for this component during netlist generation. Names
+    -- that must stay unique design-wide (component names, type names in the
+    -- types package) live in the global scope.
     Ap $ do
-      idSeen %= Id.union seen
+      idScopes %= Id.setLocalScope seen
       usages .= us
       setSrcSpan sp
 
@@ -1354,7 +1353,7 @@ userTyName
   -> StateT VHDLState Identity IdentifierText
 userTyName dflt nm0 hwTy = do
   tyCache %= HashSet.insert hwTy
-  Id.toText <$> Id.makeBasicOr (last (TextS.splitOn "." nm0)) dflt
+  Id.toText <$> Id.makeBasicOr Global (last (TextS.splitOn "." nm0)) dflt
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 sizedQualTyNameErrValue :: HWType -> VHDLM Doc
