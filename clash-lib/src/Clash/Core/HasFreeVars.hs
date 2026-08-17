@@ -61,6 +61,11 @@ instance HasFreeVars Term where
   freeVarsOf =
     Lens.foldMapOf freeLocalVars unitVarSet
 
+  -- "Override" default implementation: this one stops early instead of computing
+  -- every free variable first.
+  isClosed e =
+    getAll (Lens.foldMapOf freeLocalVars (const (All False)) e)
+
   elemFreeVars v e =
     getAny (Lens.foldMapOf freeLocalVars (Any . (== v)) e)
 
