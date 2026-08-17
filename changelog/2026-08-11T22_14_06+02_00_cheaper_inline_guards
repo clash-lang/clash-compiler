@@ -1,0 +1,1 @@
+CHANGED: The inlining transformations (`inlineWorkFree`, `inlineSmall`, `bindConstantVar`) now run their cheap binder-only guards before computing any type information, skip attempts at inner nodes of application spines, and stop measuring term size once it exceeds the inline limit. On larger designs we measured a ~8% reduction in compiler run time.
