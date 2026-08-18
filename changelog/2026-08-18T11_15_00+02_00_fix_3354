@@ -1,0 +1,1 @@
+FIXED: Clash no longer enables `-dynamic-too` when the build is already dynamic, which made GHC emit an `-Winconsistent-flags` warning. See [#3354](https://github.com/clash-lang/clash-compiler/issues/3354).
