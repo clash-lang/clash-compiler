@@ -69,10 +69,16 @@ varKey Id{varUniq,idScope} = (varUniq, Just idScope)
 instance Hashable (Var a) where
   hashWithSalt salt a = hashWithSalt salt (varKey a)
 
+-- | N.B.: Equality checking assumes two variables are compared in the same
+-- scope, similar to `aeqType` and friends. If you want structural equality,
+-- use Subst's `eqVar`.
 instance Eq (Var a) where
   (==) = (==) `on` varKey
   (/=) = (/=) `on` varKey
 
+-- | N.B.: Equality checking assumes two variables are compared in the same
+-- scope, similar to `acmpType` and friends. If you want structural equality,
+-- use Subst's `ordVar`.
 instance Ord (Var a) where
   compare = compare `on` varKey
 
