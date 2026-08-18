@@ -35,6 +35,6 @@ fi
 
 #Test if cabal can generate a build plan using the index state as specified in cabal.project
 # We should not have cabal.project.local in place for this
-rm $GIT_ROOT/cabal.project.local
-cabal v2-build -j$THREADS --dry-run all > /dev/null || (echo "Maybe state index should be updated?"; false)
-cp $CI_DIR/cabal.project.local $GIT_ROOT
+mv $GIT_ROOT/cabal.project.local $GIT_ROOT/cabal.project.local.disabled
+cabal v2-build -j$THREADS --dry-run all > /dev/null || { echo "Maybe state index should be updated?"; exit 1; }
+mv $GIT_ROOT/cabal.project.local.disabled $GIT_ROOT/cabal.project.local
