@@ -728,6 +728,12 @@ runClashTest = defaultMain
           []
       , clashTestGroup "LoadModules"
         [ runTest "T1796" def{hdlSim=[]}
+          -- Clash should not set '-dynamic-too' if '-dynamic' is already set
+        , runTest "T3354" def
+            { hdlTargets=[VHDL]
+            , clashFlags=["-dynamic"]
+            , expectClashFail=Just (TestSpecificExitCode 0, "NOT:-dynamic-too")
+            }
         ]
       , clashTestGroup "Naming"
         [ runTest "T967a" def{hdlSim=[]}
