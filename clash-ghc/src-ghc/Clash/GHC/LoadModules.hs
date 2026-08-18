@@ -325,8 +325,12 @@ setupGhc useColor dflagsM idirs = do
       ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
                     Just "YES" -> True
                     _          -> False
-      dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
-                              else dflags2
+      -- If the build is already dynamic, dynamic objects get built anyway and GHC
+      -- warns about '-dynamic-too' being ignored. See #3354.
+      targetIsDynamic = DynFlags.ways dflags2 `Ways.hasWay` Ways.WayDyn
+      dflags3 = if ghcDynamic && not targetIsDynamic
+                  then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
+                  else dflags2
 
   when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags3) $
     trace
