@@ -1456,7 +1456,7 @@ modifier offset mods (Indexed (ty@(RTree d argTy),1,0)) = case mods of
   where
     start   = typeSize ty - 1
     end     = typeSize ty `div` 2
-    lhsSz   = (d-1)^(2 :: Int)
+    lhsSz   = 2^(d-1)
 
 modifier offset mods (Indexed (ty@(RTree d argTy),1,1)) = case mods of
     Right {}:rest -> Just (Right (NRange (start+offset) offset):rest, RTree  (d-1) argTy)
@@ -1464,8 +1464,8 @@ modifier offset mods (Indexed (ty@(RTree d argTy),1,1)) = case mods of
     _ -> Just (Left (NRange rhsS rhsE):mods,RTree (d-1) argTy)
   where
     start   = (typeSize ty `div` 2) - 1
-    rhsS    = (d-1)^(2 :: Int)
-    rhsE    = d^(2 :: Int)-1
+    rhsS    = 2^(d-1)
+    rhsE    = 2^d - 1
 
 -- This is a HACK for Clash.Netlist.Util.mkTopOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
