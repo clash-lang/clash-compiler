@@ -47,7 +47,7 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
           restore-keys: |
             ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}
             ${{ runner.os }}-master-cabal-${{ matrix.ghc }}
@@ -74,7 +74,7 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
           path: ${{ steps.ghc-install.outputs.cabal-store }}
 
       - name: Build
@@ -150,10 +150,10 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('stack.yaml', '.github/workflow/on-push.yml', '**/*.cabal' ) }}
           restore-keys: |
-            ${{ runner.os }}-${{ github.ref_name }}-stack-${{ matrix.ghc }}
-            ${{ runner.os }}-master-stack-${{ matrix.ghc }}
+            ${{ runner.os }}-${{ github.ref_name }}-stack-
+            ${{ runner.os }}-master-stack-
           # stack-root is set to null for some reason, which in turn breaks the entire stack cache
           # Hardcoding the stack path... for now
           # path: ${{ steps.ghc-install.outputs.stack-root }}
@@ -184,7 +184,7 @@ jobs:
           region: local
           use-fallback: false
           retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('stack.yaml', '.github/workflow/on-push.yml', '**/*.cabal' ) }}
           # stack-root is set to null for some reason, which in turn breaks the entire stack cache
           # Hardcoding the stack path... for now
           # path: ${{ steps.ghc-install.outputs.stack-root }}
