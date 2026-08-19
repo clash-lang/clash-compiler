@@ -145,7 +145,7 @@ Library
                       RecordWildCards
                       TemplateHaskell
 
-  Build-depends:      aeson                   >= 2.0.0.0  && < 2.3,
+  Build-depends:      aeson                   >= 2.0.0.0  && < 2.4,
                       attoparsec-aeson        >= 2.1      && < 2.3,
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 1.2,
@@ -171,6 +171,7 @@ Library
                       ghc-boot-th,
                       ghc-prim,
                       ghc-bignum              >=1.0       && <1.4,
+                      ghci                    >= 9.6.0    && < 9.13,
                       hashable                >= 1.4.1.0  && < 1.6,
                       haskell-src-meta        >= 0.8      && < 0.9,
                       hint                    >= 0.7      && < 0.10,
@@ -182,12 +183,12 @@ Library
                       prettyprinter-interp    ^>= 0.2,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
-                      string-interpolate      ^>= 0.3,
+                      string-interpolate      >= 0.3      && < 1.1,
                       template-haskell        >= 2.20.0.0  && < 2.24,
                       temporary               >= 1.2.1    && < 1.4,
                       terminal-size           >= 0.3      && < 0.4,
                       text                    >= 1.2.2    && < 2.2,
-                      time                    >= 1.4.0.1  && < 1.15,
+                      time                    >= 1.4.0.1  && < 1.17,
                       transformers            >= 0.6.1.0  && < 0.7,
                       trifecta                >= 1.7.1.1  && < 2.2,
                       vector                  >= 0.11     && < 1.0,
