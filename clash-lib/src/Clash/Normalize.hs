@@ -79,7 +79,7 @@ import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
-  ((>->), (>-!), (!->), allR, bottomupWithR, repeatR, topdownFixWithR)
+  ((>->), (>-!), (!->), allR, bottomupWithR, repeatR, topdownFixWithR, topdownSucR)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..), bindings,
    curFun, debugOpts, extra, tcCache, topEntities, newInlineStrategy)
