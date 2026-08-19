@@ -98,6 +98,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type (tyConAppFunTy_maybe)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
+import GHC.Core.Utils (exprType)
 import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
 import GHC.Types.Unique (Uniquable (..), Unique, getKey)
 import GHC.Types.Var
@@ -114,6 +115,7 @@ import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Pretty           as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
+import qualified Clash.Core.Subst            as C (aeqType)
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
@@ -448,6 +450,66 @@ coreToTerm primMap unlocs = term
         -- are translated to terms casting between @Signal dom a@ and @a@.
         -- See Note [Casting signals].
 
+        -- Saturated applications of the cast-translated Signal combinators
+        -- are beta-reduced at translation time, with 'mkCastS' cancelling
+        -- the cast pairs of directly composed combinators (e.g.
+        -- @f \<$\> x \<*\> y@) before normalization ever sees them. See
+        -- Note [Casting signals]. Unsaturated occurrences fall through to
+        -- 'var', which emits the lambda-with-casts form.
+        go "Clash.Signal.Internal.mapSignal#" args
+          | [Type _aTy, Type bTy, Type _domTy, fE, xE] <- args
+          = do bC  <- coreToType bTy
+               aC  <- coreToType (exprType fE) >>= \fTyC -> case C.tyView fTyC of
+                        C.FunTy argC _ -> return argC
+                        _ -> return bC -- unreachable for well-typed input
+               saC <- coreToType (exprType xE)
+               sbC <- coreToType (exprType e)
+               fC  <- term fE
+               xC  <- term xE
+               return (mkCastS (C.App fC (mkCastS xC saC aC)) bC sbC)
+        go "Clash.Signal.Internal.signal#" args
+          | [Type aTy, Type _domTy, xE] <- args
+          = do aC  <- coreToType aTy
+               saC <- coreToType (exprType e)
+               xC  <- term xE
+               return (mkCastS xC aC saC)
+        go "Clash.Signal.Internal.appSignal#" args
+          | [Type _domTy, Type aTy, Type bTy, fE, xE] <- args
+          = do aC  <- coreToType aTy
+               bC  <- coreToType bTy
+               sfC <- coreToType (exprType fE)
+               saC <- coreToType (exprType xE)
+               sbC <- coreToType (exprType e)
+               fC  <- term fE
+               xC  <- term xE
+               return (mkCastS (C.App (mkCastS fC sfC (C.mkFunTy aC bC))
+                                      (mkCastS xC saC aC))
+                               bC sbC)
+        go "Clash.Signal.Internal.traverse#" args
+          | [Type _fTy, Type aTy, Type _bTy, Type _domTy, _dictE, gE, xE] <- args
+          = do aC  <- coreToType aTy
+               saC <- coreToType (exprType xE)
+               gTyC <- coreToType (exprType gE)
+               fsbC <- coreToType (exprType e)
+               case C.tyView gTyC of
+                 C.FunTy _ fbC -> do
+                   gC <- term gE
+                   xC <- term xE
+                   return (mkCastS (C.App gC (mkCastS xC saC aC)) fbC fsbC)
+                 _ -> term' e -- unreachable for well-typed input
+        go "Clash.Signal.Internal.joinSignal#" args
+          | [Type _domTy, Type _aTy, xE] <- args
+          = castOnly xE
+        go "Clash.Signal.Bundle.vecBundle#" args
+          | [Type _, Type _, Type _, xE] <- args
+          = castOnly xE
+        -- The generated bundle#/unbundle# functions: any number of
+        -- foralls, one value argument, a pure cast.
+        go nm args
+          | Just _ <- parseBundle "bundle" nm <|> parseBundle "unbundle" nm
+          , (tyArgs, [xE]) <- span isTypeArg args
+          , all isTypeArg tyArgs
+          = castOnly xE
         --- Remove `$`
         go "GHC.Base.$"                        args
           | length args == 5
@@ -498,6 +560,17 @@ coreToTerm primMap unlocs = term
           | [ Type nTy, _domTy, _aTy, attrs, x] <- args
           = C.Tick <$> (C.Attributes <$> coreToType nTy <*> term attrs) <*> term x
         go _ _ = term' e
+
+        -- A combinator whose whole meaning is a cast of its single value
+        -- argument from its own type to the application's result type.
+        castOnly xE = do
+          fromC <- coreToType (exprType xE)
+          toC   <- coreToType (exprType e)
+          xC    <- term xE
+          return (mkCastS xC fromC toC)
+
+        isTypeArg (Type {}) = True
+        isTypeArg _         = False
 
     parseBundle :: Text -> Text -> Maybe Int
     parseBundle fNm nm0 = do
@@ -1131,6 +1204,19 @@ bundleUnbundleTerm nTyVarsExpected = go []
 -- /\(a:*)./\(b:*)./\(clk:Clock).\(f : (Signal clk a -> Signal clk b)).
 -- \(x : Signal clk a).f x
 -- @
+-- | Syntactic smart constructor for the casts of the Signal combinators:
+-- drops casts between alpha-equivalent types and merges (cancels)
+-- back-to-back casts. Only used for the pairwise-introduced Signal casts,
+-- whose types match syntactically when they meet; the full cast-equality
+-- oracle is not needed (nor available) during GHC-to-Clash translation.
+mkCastS :: C.Term -> C.Type -> C.Type -> C.Term
+mkCastS e from to
+  | C.aeqType from to = e
+mkCastS (C.Tick t e) from to = C.Tick t (mkCastS e from to)
+mkCastS (C.Cast e from0 to0) from to
+  | C.aeqType to0 from = mkCastS e from0 to
+mkCastS e from to = C.Cast e from to
+
 mapSignalTerm :: C.Type
               -> C.Term
 mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy)))
