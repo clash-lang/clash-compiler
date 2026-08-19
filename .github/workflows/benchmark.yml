@@ -1,0 +1,19 @@
+name: Request benchmark
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    if: contains(github.event.pull_request.labels.*.name, 'performance')
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          # This token lapses every year, so we need to refresh it every now and then
+          GH_TOKEN: ${{ secrets.CLASH_BENCHMARKS_DISPATCH_TOKEN }}
+        run: |
+          gh workflow run benchmark.yml -R clash-lang/clash-benchmarks \
+            -f repo="${{ github.event.pull_request.head.repo.full_name }}" \
+            -f ref="${{ github.event.pull_request.head.ref }}"
