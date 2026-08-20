@@ -144,18 +144,32 @@ instance Hashable StructuralType where
 eqType :: Type -> Type -> Bool
 eqType = go
  where
-  go (TyVarTy v1) (TyVarTy v2) = v1 == v2
+  go (TyVarTy v1) (TyVarTy v2) = eqVar v1 v2
   go (AppTy l1 r1) (AppTy l2 r2) = go l1 l2 && go r1 r2
   go (TyConApp tc1 args1) (TyConApp tc2 args2) =
     tc1 == tc2 && goList args1 args2
   go (ForAllTy (Bndr v1 f1) t1) (ForAllTy (Bndr v2 f2) t2) =
-    v1 == v2 && f1 == f2 && go t1 t2
+    eqVar v1 v2 && f1 == f2 && go t1 t2
   go (FunTy f1 m1 a1 r1) (FunTy f2 m2 a2 r2) =
     f1 == f2 && go m1 m2 && go a1 a2 && go r1 r2
   go (LitTy l1) (LitTy l2) = l1 == l2
   -- XXX: Not sure how to handle casts/coercions, so for now just claim they're
   --      not equal. That's fair in the only context this is used: caching.
   go _ _ = False
+
+  -- GHC's 'Eq' on 'Var' and on 'Name' only compares uniques, and a unique only
+  -- identifies a variable within one scope. We want to use it for cache lookups,
+  -- so we should also take name and type differences into account!
+  eqVar v1 v2 =
+    v1 == v2 && eqVarName (varName v1) (varName v2)
+             && go (varType v1) (varType v2)
+
+  -- 'coreToName' reads a name's occurrence name and module (as a qualified
+  -- string, which also decides its 'C.NameSort') and its source span
+  eqVarName n1 n2 =
+    nameOccName n1 == nameOccName n2
+      && nameModule_maybe n1 == nameModule_maybe n2
+      && getSrcSpan n1 == getSrcSpan n2
 
   goList (t1:ts1) (t2:ts2) = go t1 t2 && goList ts1 ts2
   goList [] [] = True
@@ -166,10 +180,10 @@ hashType :: Int -> Type -> Int
 hashType = go
  where
   go s ty = case ty of
-    TyVarTy v -> hashWithSalt (tag s 0) (getKey (varUnique v))
+    TyVarTy v -> hashVar (tag s 0) v
     AppTy l r -> go (go (tag s 1) l) r
     TyConApp tc args -> foldl go (hashWithSalt (tag s 2) (getKey (tyConUnique tc))) args
-    ForAllTy (Bndr v _) t -> go (hashWithSalt (tag s 3) (getKey (varUnique v))) t
+    ForAllTy (Bndr v _) t -> go (hashVar (tag s 3) v) t
     FunTy _ m a r -> go (go (go (tag s 4) m) a) r
     LitTy l -> case l of
       NumTyLit i -> hashWithSalt (tag s 5) i
@@ -177,6 +191,11 @@ hashType = go
       CharTyLit c -> hashWithSalt (tag s 7) c
     CastTy t _ -> go (tag s 8) t
     CoercionTy _ -> tag s 9
+
+  -- Matching 'eqType', see comment there. Deliberately coarser than 'eqVar':
+  -- it skips the name, which only costs the odd collision. The hash law needs
+  -- equal values to hash equally, not the other way around.
+  hashVar s v = go (hashWithSalt s (getKey (varUnique v))) (varType v)
 
   tag :: Int -> Int -> Int
   tag = hashWithSalt

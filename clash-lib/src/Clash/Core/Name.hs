@@ -26,7 +26,8 @@ import           Data.Text                              (Text, append)
 import           GHC.BasicTypes.Extra                   ()
 import           GHC.Generics                           (Generic)
 import           GHC.SrcLoc.Extra                       ()
-import           GHC.Types.SrcLoc                       (SrcSpan, noSrcSpan)
+import           GHC.Types.SrcLoc
+  (SrcSpan, leftmost_smallest, noSrcSpan)
 
 import           Clash.Unique
 
@@ -39,12 +40,32 @@ data Name a
   }
   deriving (Show,Generic,NFData,Binary)
 
+-- | N.B.: Equality checking only compares uniques, which only identify a name
+-- within one scope. If you want structural equality, use `eqName`.
 instance Eq (Name a) where
   (==) = (==) `on` nameUniq
   (/=) = (/=) `on` nameUniq
 
+-- | N.B.: Comparison only looks at uniques, which only identify a name within
+-- one scope. If you want structural comparison, use `ordName`.
 instance Ord (Name a) where
   compare = compare `on` nameUniq
+
+-- | Structural equality on 'Name's. See 'ordName'.
+eqName :: Name a -> Name a -> Bool
+eqName n1 n2 = ordName n1 n2 == EQ
+
+-- | Structural comparison on 'Name's: on top of the 'Ord' instance, which only
+-- compares uniques, this compares every other field too.
+--
+-- 'SrcSpan's are compared with 'leftmost_smallest', which treats all unhelpful
+-- spans alike, matching how they are hashed in "Clash.Core.Subst".
+ordName :: Name a -> Name a -> Ordering
+ordName n1 n2 =
+  compare (nameUniq n1) (nameUniq n2)
+    <> compare (nameSort n1) (nameSort n2)
+    <> compare (nameOcc n1) (nameOcc n2)
+    <> leftmost_smallest (nameLoc n1) (nameLoc n2)
 
 instance Hashable (Name a) where
   hashWithSalt salt nm = hashWithSalt salt (nameUniq nm)
