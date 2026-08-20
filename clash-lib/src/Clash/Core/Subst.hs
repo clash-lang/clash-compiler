@@ -66,6 +66,9 @@ module Clash.Core.Subst
     -- * Structural equivalence
   , eqTerm
   , eqType
+  , ordType
+  , eqVar
+  , ordVar
   )
 where
 
@@ -88,6 +91,7 @@ import           GHC.Types.SrcLoc
   (SrcSpan (RealSrcSpan, UnhelpfulSpan), leftmost_smallest)
 
 import           Clash.Core.HasFreeVars
+import           Clash.Core.Name           (eqName, ordName)
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
   (Alt, Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
@@ -923,6 +927,22 @@ acmpType
   -> Ordering
 acmpType = acmpTypeLevels 0 emptyVarEnv emptyVarEnv
 
+-- | Structural equality on 'Var's. See 'ordVar'.
+eqVar :: Var a -> Var a -> Bool
+eqVar v1 v2 =
+  v1 == v2 &&
+    eqName (varName v1) (varName v2) &&
+      eqType (varType v1) (varType v2)
+
+-- | Structural comparison on 'Var's: on top of the 'Ord' instance, which only
+-- compares uniques (and scope), this compares the variable's name and its
+-- type\/kind.
+ordVar :: Var a -> Var a -> Ordering
+ordVar v1 v2 =
+  compare (varKey v1) (varKey v2) `thenCompare`
+    ordName (varName v1) (varName v2) `thenCompare`
+      ordType (varType v1) (varType v2)
+
 -- | Structural equality on 'Type'
 eqType
   :: Type
@@ -930,14 +950,36 @@ eqType
   -> Bool
 eqType = go
  where
-  go (VarTy tv1) (VarTy tv2) = tv1 == tv2
+  go (VarTy tv1) (VarTy tv2) = eqVar tv1 tv2
   go (ConstTy c1) (ConstTy c2) = c1 == c2
-  go (ForAllTy tv1 t1) (ForAllTy tv2 t2) =
-    tv1 == tv2 && go (varType tv1) (varType tv2) && go t1 t2
+  go (ForAllTy tv1 t1) (ForAllTy tv2 t2) = eqVar tv1 tv2 && go t1 t2
   go (AppTy s1 t1) (AppTy s2 t2) = go s1 s2 && go t1 t2
   go (LitTy l1) (LitTy l2) = l1 == l2
   go (AnnType a1 t1) (AnnType a2 t2) = a1 == a2 && go t1 t2
   go _ _ = False
+
+-- | Structural comparison on 'Type'. See 'eqType'.
+ordType
+  :: Type
+  -> Type
+  -> Ordering
+ordType = go
+ where
+  go (VarTy tv1) (VarTy tv2) = ordVar tv1 tv2
+  go (ConstTy c1) (ConstTy c2) = compare c1 c2
+  go (ForAllTy tv1 t1) (ForAllTy tv2 t2) = ordVar tv1 tv2 `thenCompare` go t1 t2
+  go (AppTy s1 t1) (AppTy s2 t2) = go s1 s2 `thenCompare` go t1 t2
+  go (LitTy l1) (LitTy l2) = compare l1 l2
+  go (AnnType a1 t1) (AnnType a2 t2) = compare a1 a2 `thenCompare` go t1 t2
+  go t1 t2 = compare (getRank t1) (getRank t2)
+
+  getRank :: Type -> Word
+  getRank (VarTy {})    = 0
+  getRank (LitTy {})    = 1
+  getRank (ConstTy {})  = 2
+  getRank (AnnType {})  = 3
+  getRank (AppTy {})    = 4
+  getRank (ForAllTy {}) = 5
 
 -- | Alpha equality for terms
 aeqTerm
@@ -975,14 +1017,12 @@ acmpTickInfo =
 eqTerm :: Term -> Term -> Bool
 eqTerm = go
  where
-  go (Var id1) (Var id2) = id1 == id2
+  go (Var id1) (Var id2) = eqVar id1 id2
   go (Data dc1) (Data dc2) = dc1 == dc2
   go (Literal l1) (Literal l2) = l1 == l2
   go (Prim p1) (Prim p2) = primName p1 == primName p2
-  go (Lam b1 e1) (Lam b2 e2) =
-    b1 == b2 && eqType (varType b1) (varType b2) && go e1 e2
-  go (TyLam b1 e1) (TyLam b2 e2) =
-    b1 == b2 && eqType (varType b1) (varType b2) && go e1 e2
+  go (Lam b1 e1) (Lam b2 e2) = eqVar b1 b2 && go e1 e2
+  go (TyLam b1 e1) (TyLam b2 e2) = eqVar b1 b2 && go e1 e2
   go (App l1 r1) (App l2 r2) = go l1 l2 && go r1 r2
   go (TyApp l1 r1) (TyApp l2 r2) = go l1 l2 && eqType r1 r2
   go (Let bs1 e1) (Let bs2 e2) =
@@ -995,17 +1035,7 @@ eqTerm = go
       b1 == b2 && go r1 r2
     goBind (Rec brs1) (Rec brs2) =
       List.all2
-        (\(b1,r1) (b2,r2) ->
-          b1 == b2 &&
-          -- We need to check the types of Rec bindings, because:
-          --
-          -- letrec (x : Bool) = x in X
-          --
-          -- is not structurally equivalent to
-          --
-          -- letrec (x : Int) = x in x
-          eqType (varType b1) (varType b2) &&
-          go r1 r2)
+        (\(b1,r1) (b2,r2) -> eqVar b1 b2 && go r1 r2)
         brs1 brs2
     goBind _ _ = False
   -- Note [Case result types and alpha-equivalence]

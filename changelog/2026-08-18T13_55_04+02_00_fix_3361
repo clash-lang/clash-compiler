@@ -1,0 +1,1 @@
+FIXED: `eqType` (and friends) now take types of variables into account. See [#3361](https://github.com/clash-lang/clash-compiler/issues/3361).
