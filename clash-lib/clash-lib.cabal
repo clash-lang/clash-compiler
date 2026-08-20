@@ -431,6 +431,7 @@ test-suite unittests
 
   Other-Modules: Clash.Tests.Core.AlphaEquivalence
                  Clash.Tests.Core.FreeVars
+                 Clash.Tests.Core.StructuralEquivalence
                  Clash.Tests.Core.Subst
                  Clash.Tests.Core.TermLiteral
                  Clash.Tests.Core.TermLiteral.Types
