@@ -347,6 +347,37 @@ flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
            then return (Right ((nm,e),us))
            else return (Left b)
 
+{-
+Note [flatten pass structure]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Through experimentation we've learned the following:
+
+1. The evaluator-backed rewrites ('reduceConst', 'reduceNonRepPrim') must not
+   sit inside the top-down propagation bundle. 'topdownFixR' settles that bundle
+   at each node with 'repeatR', so a bundled 'reduceConst' is re-attempted -
+   evaluator call and all - for every 'appProp' or 'caseCon' that fires there.
+   On large designs we've measured that dominates; hoisting them out was worth
+   ~30%. See #3338.
+
+2. There should be exactly two traversals per round, and the bottom-up one has
+   to come first.
+
+   'allR' rebuilds every node it walks, so each extra traversal costs a full
+   term rebuild per round even when nothing fires. Running 'flattenLet' and the
+   evaluator-backed rewrites as one fused bottom-up pass instead of two
+   consecutive ones is therefore free of charge (it does not change which
+   rewrites fire, or in which order they fire relative to each other).
+
+   Running that bottom-up pass _before_ the top-down one lets the constants it
+   folds be consumed by 'caseCon' in the same round. With the passes the other
+   way round the folded constants sit unused until the next round, so
+   constant-heavy designs pay for an extra iteration of the whole loop:
+   @tests/shouldwork/Basic/AES.hs@ did ~36k extra node visits per transformation
+   that way.
+
+If you touch code related to this, please make sure to run benchmarks.
+-}
+
 -- | Flatten a 'CallTree', memoizing results by binder Id within one cleanup
 -- pass. Without the cache, every binder reachable from the root is flattened
 -- as many times as it appears in the (un-deduplicated) call tree.
@@ -407,17 +438,15 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   flatten =
-    -- topdownFixR reaches a fixpoint for the top-down propagation bundle.
-    -- Keep flattenLet in the outer fixed-point loop: flattening can expose
-    -- fresh propagation redexes for the next top-down pass.
-    repeatR (topdownFixR (apply "appProp" appProp >->
-               apply "bindConstantVar" bindConstantVar >->
-               apply "caseCon" caseCon) >->
-             bottomupR (apply "flattenLet" flattenLet) >->
-             bottomupR ((apply "reduceConst" reduceConst !->
+    -- See Note [flatten pass structure].
+    repeatR (bottomupR (apply "flattenLet" flattenLet >->
+                        (apply "reduceConst" reduceConst !->
                            apply "deadcode" deadCode) >->
                         apply "reduceNonRepPrim" reduceNonRepPrim >->
-                        apply "removeUnusedExpr" removeUnusedExpr)) !->
+                        apply "removeUnusedExpr" removeUnusedExpr) >->
+             topdownFixR (apply "appProp" appProp >->
+               apply "bindConstantVar" bindConstantVar >->
+               apply "caseCon" caseCon)) !->
     topdownSucR (apply "topLet" topLet) >->
     -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
     -- Note that we do this as the very last step, after all constant propagation
