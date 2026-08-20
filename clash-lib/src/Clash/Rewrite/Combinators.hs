@@ -159,6 +159,29 @@ the relevant parts of 'TransformContext' should not change when sibling
 subtrees are rewritten. Rewrites that inspect let-bound context whose binding
 terms may have changed, for example through 'whnfRW', still need an outer
 repeat or a normal repeated top-down traversal.
+
+Note [topdownFixR is not for inlining bundles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'topdownFixR' trades traversals for re-descents, and that trade is only a win
+when rewrites are cheap and rarely fire at the same node twice.
+
+Whenever 'r' succeeds at a node, 'topdownFixR' re-descends into that node's
+_entire_ subtree, because the rewrite may have restructured it. So one
+'topdownFixR' costs
+
+> n + sum over nodes v of (times r fired at v) * size of subtree(v)
+
+node visits, where 'repeatR (topdownR r)' costs 'n' per round. 'topdownFixR'
+wins when it saves enough rounds to pay for those re-descents.
+
+For bundles that inline (@inlineWorkFree@, @inlineSmall@, @inlineOrLiftNonRep@)
+it loses: inlining replaces a small node by an arbitrarily large body, every
+enclosing node tends to become rewritable in turn, and each of those rewrites
+re-descends a subtree that just grew. Measured on
+@tests/shouldwork/Basic/T1354B.hs@ (a deeply nested chain of function
+compositions), using 'topdownFixR' for 'inlineAndPropagate' reaches exactly the
+same fixed point but needs 1.57x the node visits, costing ~40% wall-clock. It
+was ~3% slower on a larger industrial design we've measured too. See #3250.
 -}
 
 -- | Apply a transformation in a repeated top-down traversal.
