@@ -81,6 +81,22 @@ jobs:
         run: |
           cabal v2-build all -j$(.ci/effective_cpus.sh)
 
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
+        with:
+          endpoint: '192.168.102.136'
+          port: 9000
+          insecure: true
+          accessKey: '${{ secrets.S3_ACCESS_KEY }}'
+          secretKey: '${{ secrets.S3_SECRET_KEY }}'
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          # Notice the small change in the key here! Save the build artifacts so the clash-testsuite does not
+          # have to recompile itself (since we compile it here already)
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-testsuite-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          path: ${{ steps.ghc-install.outputs.cabal-store }}
+
       - name: Run small tests
         run: .ci/small-tests.sh
 
@@ -313,69 +329,54 @@ jobs:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#devShells.x86_64-linux.${{matrix.ghc}} | cachix push clash-lang
 
-  packages_testsuite:
-    name: Packaging clash-testsuite (${{matrix.ghc}})
+  cabal_testsuite:
+    name: Running clash-testsuite (${{matrix.ghc}})
     runs-on: self-hosted
     strategy:
       # If caching fails for one package, then we are still interested in caching other packages
       fail-fast: false
       matrix:
         ghc: [
-          ghc9124,
-          ghc9103,
-          ghc984,
-          ghc967
+          9.12.4,
+          9.10.3,
+          9.8.4,
+          9.6.7
         ]
     needs: packages_common
     steps:
       - uses: actions/checkout@v6
 
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
+      - name: Install GHC
+        id: ghc-install
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: latest
 
-      - name: Build clash-testsuite
-        run: |
-          nix build -L .#clashPackages-${{matrix.ghc}}.clash-testsuite
-          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-prelude)
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
+        with:
+          endpoint: '192.168.102.136'
+          port: 9000
+          insecure: true
+          accessKey: '${{ secrets.S3_ACCESS_KEY }}'
+          secretKey: '${{ secrets.S3_SECRET_KEY }}'
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-testsuite-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-testsuite-${{ matrix.ghc }}
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}
+            ${{ runner.os }}-master-cabal-testsuite-${{ matrix.ghc }}
+            ${{ runner.os }}-master-cabal-${{ matrix.ghc }}
+          path: ${{ steps.ghc-install.outputs.cabal-store }}
 
-      - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
-        run: |
-          nix path-info .#clashPackages-${{matrix.ghc}}.clash-testsuite | cachix push clash-lang
-
-  running_testsuite:
-    name: Running clash-testsuite (${{matrix.ghc}}, ${{matrix.hdl}})
-    runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix:
-        hdl: [
-          'VHDL',
-          'Verilog',
-          'SystemVerilog'
-        ]
-        ghc: [
-          ghc9124,
-          ghc9103,
-          ghc984,
-          ghc967
-        ]
-    needs: packages_testsuite
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
+      - name: Setup
+        run: .ci/gh-setup.sh
 
       - name: Run clash-testsuite
-        run: |
-          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
+        run: cabal v2-run clash-testsuite -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
 
   all:
     name: All on-push jobs finished
@@ -387,8 +388,7 @@ jobs:
       packages_common,
       packages_other,
       developer_shells,
-      packages_testsuite,
-      running_testsuite
+      cabal_testsuite,
     ]
     runs-on: ubuntu-slim
     steps:
