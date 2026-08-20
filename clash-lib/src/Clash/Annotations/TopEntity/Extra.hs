@@ -16,16 +16,19 @@ import Data.Binary                 (Binary)
 import Data.Hashable               (Hashable)
 import Control.DeepSeq             (NFData)
 
+-- Orphan instances:
+--
+--   Binary Name
+--   Binary OccName
+--   Binary NameFlavour
+--   Binary ModName
+--   Binary NameSpace
+--   Binary PkgName
+import GHCi.TH.Binary ()
+
 instance Binary TopEntityT
 instance Binary TopEntity
 instance Binary PortName
-
-instance Binary Name
-instance Binary OccName
-instance Binary NameFlavour
-instance Binary ModName
-instance Binary NameSpace
-instance Binary PkgName
 
 instance Hashable TopEntityT
 instance Hashable TopEntity
