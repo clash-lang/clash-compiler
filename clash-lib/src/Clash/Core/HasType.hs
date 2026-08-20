@@ -18,6 +18,7 @@ module Clash.Core.HasType
   , InferType(..)
   , inferCoreKindOf
   , applyTypeToArgs
+  , applyTypeToArgsM
   , piResultTy
   , piResultTys
   ) where
@@ -33,6 +34,7 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.DataCon (DataCon(dcType))
 import Clash.Core.HasFreeVars
 import Clash.Core.Literal (Literal(..))
+import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term (Term(..), IsMultiPrim(..), PrimInfo(..), collectArgs)
@@ -185,6 +187,64 @@ applyTypeToArgs e m opTy args = go opTy args
   goTyArgs opTy' revTys (Right ty:args') = goTyArgs opTy' (ty:revTys) args'
   goTyArgs opTy' revTys args'            = go (piResultTys m opTy' (reverse revTys)) args'
 
+-- | Total variant of 'applyTypeToArgs': returns 'Nothing' when the arguments
+-- cannot be applied to the given (function) type. This happens for instance
+-- when a term argument would be consumed by an /uninstantiated/ type variable:
+--
+-- @
+--   f :: forall a. Int -> a
+--   f \@b 5 x   -- 'x' is applied to the type variable 'b'
+-- @
+--
+-- Such applications are only well-typed when the type variable is known to be
+-- a function type.
+applyTypeToArgsM
+  :: TyConMap
+  -> Type
+  -> [Either Term Type]
+  -> Maybe Type
+applyTypeToArgsM m opTy args = go opTy args
+ where
+  go opTy' []               = Just opTy'
+  go opTy' (Right ty:args') = goTyArgs opTy' [ty] args'
+  go opTy' (Left _:args')   = case splitFunTy m opTy' of
+    Just (_,resTy) -> go resTy args'
+    _ -> Nothing
+
+  goTyArgs opTy' revTys (Right ty:args') = goTyArgs opTy' (ty:revTys) args'
+  goTyArgs opTy' revTys args' =
+    piResultTysM m opTy' (reverse revTys) >>= \ty -> go ty args'
+
+-- | Total variant of 'piResultTys': returns 'Nothing' where 'piResultTys'
+-- would panic. Does not check that the applied types have the expected kinds.
+piResultTysM :: TyConMap -> Type -> [Type] -> Maybe Type
+piResultTysM _ ty [] = Just ty
+piResultTysM m ty origArgs@(arg:args)
+  | Just ty' <- coreView1 m ty
+  = piResultTysM m ty' origArgs
+  | FunTy _ res <- tyView ty
+  = piResultTysM m res args
+  | ForAllTy tv res <- ty
+  = go (extendVarEnv tv arg emptyVarEnv) res args
+  | otherwise
+  = Nothing
+ where
+  inScope = mkInScopeSet (freeVarsOf (ty:origArgs))
+
+  go env ty' [] = Just (substTy (mkTvSubst inScope env) ty')
+  go env ty' allArgs@(arg':args')
+    | Just ty'' <- coreView1 m ty'
+    = go env ty'' allArgs
+    | FunTy _ res <- tyView ty'
+    = go env res args'
+    | ForAllTy tv res <- ty'
+    = go (extendVarEnv tv arg' env) res args'
+    | VarTy tv <- ty'
+    , Just ty'' <- lookupVarEnv tv env
+    = piResultTysM m ty'' allArgs
+    | otherwise
+    = Nothing
+
 -- | Like 'piResultTys', but only applies a single type. If multiple types are
 -- being applied use 'piResultTys', as it is more efficient to only substitute
 -- once with many types.
@@ -234,7 +294,16 @@ piResultTys m ty origArgs@(arg:args)
   -- TODO coreView is used here because the partial evaluator will sometimes
   -- encounter / not encounter a Signal as an argument unexpectedly. When PR
   -- #1064 is merged the coreView calls should be removed again.
-  = if debugIsOn && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
+  --
+  -- N.B. this case is also used for kind applications, e.g. the kind of a
+  -- type family like @GHC.TypeNats.^@ applied to a type-level literal. In
+  -- that case the argument's *kind* must match the expected type.
+  = if debugIsOn
+       && not (aeqType (coreView m a) (coreView m arg))
+       && not (aeqType (coreView m a) (coreView m (inferCoreKindOf m arg)))
+       -- 'Type' and 'TYPE (BoxedRep Lifted)' are represented by distinct
+       -- type constructors, but denote the same kind.
+       && not (isStarLike a && isStarLike (inferCoreKindOf m arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
@@ -251,6 +320,10 @@ piResultTys m ty origArgs@(arg:args)
   = pprPanic "piResultTys1" (ppr ty <> line <> ppr origArgs)
  where
   inScope = mkInScopeSet (freeVarsOf (ty:origArgs))
+
+  isStarLike (tyView . coreView m -> TyConApp nm _) =
+    nameOcc nm `elem` ["Type", "GHC.Prim.TYPE"]
+  isStarLike _ = False
 
   go env ty' [] = substTy (mkTvSubst inScope env) ty'
   go env ty' allArgs@(arg':args')

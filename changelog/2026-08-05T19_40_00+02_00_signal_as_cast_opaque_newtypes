@@ -1,0 +1,10 @@
+CHANGED: `Signal`, `BiSignal`, and newtypes are no longer transparent in Clash's
+core type system. The Signal combinators (`fmap`, `<*>`, `pure`, `bundle`,
+`unbundle`, ...) are translated to casts between `Signal dom a` and `a`, and
+newtype equalities are carried by the casts GHC produces (see
+Note [Casting signals] in `Clash.GHC.GHC2Core`). Class dictionaries and
+singleton evidence newtypes (`SNat`, `SSymbol`, `SChar`) remain transparent;
+they never reach the HDL. This fixes
+[#760](https://github.com/clash-lang/clash-compiler/issues/760): type
+families over newtypes are no longer resolved with the instance of the
+underlying type.

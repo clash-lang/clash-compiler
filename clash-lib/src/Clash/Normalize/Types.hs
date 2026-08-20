@@ -51,6 +51,14 @@ data NormalizeState
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
+  , _binderOrigin :: VarEnv Id
+  -- ^ Maps binders created during normalization (specializations, cast
+  -- wrappers) to the *original* binder they derive from. Binders absent
+  -- from the map are their own origin. Used to detect recursion through
+  -- clones of the same original binder, which have different uniques.
+  , _originReachable :: Map (Id, Id) Bool
+  -- ^ Memoized verdicts of 'Clash.Normalize.Util.originReachableFrom',
+  -- keyed on binder origins.
   }
 
 Lens.makeLenses ''NormalizeState

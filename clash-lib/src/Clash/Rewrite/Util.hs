@@ -64,7 +64,8 @@ import           Clash.Core.Subst
   (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
 import           Clash.Core.Term
 import           Clash.Core.TyCon            (TyConMap)
-import           Clash.Core.Type             (Type (..), normalizeType)
+import           Clash.Core.Util             (castEqType)
+import           Clash.Core.Type             (Type (..), normalizeType, stripAnnTypes)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
@@ -236,11 +237,30 @@ applyDebug ctx name exprOld hasChanged exprNew = do
                        , "substitution."
                        ])
 
-      -- TODO This check should be an error instead of a trace, however this is
-      -- currently very fragile as Clash doesn't keep casts in core. This should
-      -- be changed when #1064 is merged.
-      Monad.when (hasDebugInfo AppliedTerm name opts && not (normalizeType tcm beforeTy `aeqType` normalizeType tcm afterTy)) $
-        traceM ( concat [ $(curLoc)
+      -- Now that Clash keeps casts in core, transformations must preserve
+      -- the type of an expression up to the cast-equality oracle
+      -- ('castEqType', which sanctions e.g. eliminating casts between a
+      -- class dictionary and its contents) and 'normalizeType'.
+      -- 'separateArguments' is exempt: it intentionally changes the type of
+      -- a binder by splitting product-typed arguments into separate
+      -- arguments. The composite 'normalization' rewrite contains it and is
+      -- therefore exempt as well; its constituents are all checked
+      -- individually. Results that are plain literals are exempt too:
+      -- constant folding replaces e.g. an 'Integer'-typed expression by an
+      -- 'Int#' literal (the evaluator's representation of small integers).
+      let resultIsLiteral = case exprNew of
+            Literal {} -> True
+            _ -> False
+          -- Type annotations (AnnType) are irrelevant to this check and are
+          -- not always preserved consistently between a cast's stated
+          -- endpoints and the inferred type of an expression.
+          beforeTy' = stripAnnTypes beforeTy
+          afterTy' = stripAnnTypes afterTy
+      Monad.when (name `notElem` ["separateArguments", "normalization"]
+                  && not resultIsLiteral
+                  && not (castEqType tcm beforeTy' afterTy')
+                  && not (stripAnnTypes (normalizeType tcm beforeTy') `aeqType` stripAnnTypes (normalizeType tcm afterTy'))) $
+        error ( concat [ $(curLoc)
                        , "Error when applying rewrite ", name
                        , " to:\n" , before
                        , "\nResult:\n" ++ after ++ "\n"
@@ -430,6 +450,8 @@ tailCalls id_ = \case
     in  case scrutTl of
           Just 0 | all (/= Nothing) altsTl -> Just (sum (catMaybes altsTl))
           _ -> Nothing
+  Tick _ e -> tailCalls id_ e
+  Cast e _ _ -> tailCalls id_ e
   _ -> Just 0
 
 -- | Determines whether a function has the following shape:

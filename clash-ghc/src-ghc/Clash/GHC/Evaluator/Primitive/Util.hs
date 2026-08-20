@@ -264,6 +264,9 @@ integerLiteral v =
       -> Just (IP ba)
       | dcTag dc == 3
       -> Just (IN ba)
+    CastValue v0 _ _
+      | Just i <- integerLiteral v0
+      -> Just i
     _ -> Nothing
 
 naturalLiterals :: [Value] -> Maybe (Integer, Integer)
@@ -279,6 +282,9 @@ naturalLiteral v =
     DC dc [Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))]
       | dcTag dc == 2
       -> Just (IP ba)
+    CastValue v0 _ _
+      | Just i <- naturalLiteral v0
+      -> Just i
     _ -> Nothing
 
 integerLiterals' :: [Value] -> [Integer]

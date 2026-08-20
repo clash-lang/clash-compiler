@@ -24,11 +24,19 @@ module Clash.Core.Subst
     -- ** Substitution environments
     TvSubst (..)
   , TvSubstEnv
+  , mkEmptyTvSubst
+  , getTvInScope
+  , composeTvSubst
+  , isValidSubst
   -- , mkTvSubst
+  , extendTvInScope
+  , extendTvInScopeSet
   , extendTvSubst
   , extendTvSubstList
     -- ** Applying substitutions
   , substTy
+  , substTyVar
+  , substTyTvSubst
   , substTyWith
   , substTyInVar
   , substGlobalsInExistentials
@@ -90,7 +98,8 @@ import           GHC.Types.SrcLoc
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
-  (Alt, Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
+  (Alt, AppArg (..), Bind(..), Pat (..), Term (..), TickInfo (..),
+   PrimInfo(primName))
 import           Clash.Core.Type           (Type (..))
 import           Clash.Core.VarEnv
 import           Clash.Core.Var
@@ -259,6 +268,45 @@ mkTvSubst
   -> Subst
 mkTvSubst is env = Subst is emptyVarEnv env emptyVarEnv
 
+mkEmptyTvSubst
+  :: InScopeSet
+  -> TvSubst
+mkEmptyTvSubst is = TvSubst is emptyVarEnv
+
+getTvInScope :: TvSubst -> InScopeSet
+getTvInScope (TvSubst is _) = is
+
+extendTvInScope :: TvSubst -> TyVar -> TvSubst
+extendTvInScope (TvSubst is tenv) var =
+  TvSubst (extendInScopeSet is var) tenv
+
+extendTvInScopeSet :: TvSubst -> VarSet -> TvSubst
+extendTvInScopeSet (TvSubst is tenv) vars =
+  TvSubst (extendInScopeSetList is (eltsVarSet vars)) tenv
+
+-- | Composes two substitutions, applying the second one provided first,
+-- like in function composition.
+composeTvSubst :: TvSubst -> TvSubst -> TvSubst
+composeTvSubst (TvSubst is1 tenv1) (TvSubst is2 tenv2) = TvSubst is3 tenv3
+ where
+  is3 = is1 `unionInScope` is2
+  tenv3 = composeTvSubstEnv is3 tenv1 tenv2
+
+-- | @(composeTvSubstEnv is env1 env2)(x)@ is @env1(env2(x))@; i.e. apply
+-- @env2@ then @env1@. It assumes that both are idempotent. Typically, @env1@
+-- is the refinement to a base substitution @env2@.
+composeTvSubstEnv ::
+  InScopeSet -> TvSubstEnv -> TvSubstEnv
+  -> TvSubstEnv
+composeTvSubstEnv inScope tenv1 tenv2 =
+  mapVarEnv (substTyTvSubst subst1) tenv2 `unionVarEnv` tenv1
+  -- First apply env1 to the range of env2
+  -- Then combine the two, making sure that env1 loses if
+  -- both bind the same variable; 'unionVarEnv' is left-biased,
+  -- so the mapped env2 is the *left* argument.
+ where
+  subst1 = TvSubst inScope tenv1
+
 -- | Generates the in-scope set for the 'Subst' from the types in the incoming
 -- environment.
 --
@@ -387,6 +435,18 @@ substTyUnchecked subst@(TvSubst _ tvS) ty
   = ty
   | otherwise
   = substTy' subst ty
+
+-- | Like 'substTy', but takes a 'TvSubst' instead of a 'Subst'
+substTyTvSubst
+  :: HasCallStack
+  => TvSubst
+  -> Type
+  -> Type
+substTyTvSubst s@(TvSubst _ tvS) ty
+  | nullVarEnv tvS
+  = ty
+  | otherwise
+  = checkValidSubst s [ty] (substTy' s ty)
 
 -- Safely substitute global type variables in a list of potentially
 -- shadowing type variables.
@@ -1474,3 +1534,5 @@ instance Hashable Type where
 
 instance Hashable Term where
   hashWithSalt = aTermHashWithSalt
+
+deriving instance Eq AppArg

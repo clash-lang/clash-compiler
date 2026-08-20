@@ -56,7 +56,9 @@ import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Name                  (Name(..))
+import           Clash.Core.HasFreeVars           (freeVarsOf)
 import           Clash.Core.Pretty                (showPpr)
+import           Clash.Core.Subst                 (extendIdSubstList, mkSubst, substTm)
 import           Clash.Core.Term
   (IsMultiPrim (..), PrimInfo (..), mpi_resultTypes,  Alt, Pat (..), Term (..),
    TickInfo (..), collectArgs, collectArgsTicks,
@@ -64,14 +66,14 @@ import           Clash.Core.Term
 import qualified Clash.Core.Term                  as Core
 import           Clash.Core.TermInfo              (multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Type
-  (Type (..), coreView1, splitFunForallTy, splitCoreFunForallTy)
+  (Type (..), coreView1, splitFunForallTy, splitRepFunForallTy)
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
-   lookupVarEnv')
+   lookupVarEnv', mkInScopeSet)
 import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
@@ -256,7 +258,7 @@ genComponentT compName0 componentExpr = do
 
   topEntityTM <- lookupVarEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
-      topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
+      topVarTypeM = snd . splitRepFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
   seenIds <~ Lens.use seenComps
   (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
@@ -425,8 +427,25 @@ mkDeclarations'
   -> Term
   -- ^ RHS of the let-binder
   -> NetlistMonad [Declaration]
-mkDeclarations' declType bndr (collectTicks -> (Var v,ticks)) =
-  withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) v [])
+-- A cast can be dropped when both types have the same HDL representation.
+-- Note that this is not a given: custom bit representations and
+-- width-changing coercions (e.g. @Index 256 ~ Integer@) yield casts between
+-- types whose representations differ.
+mkDeclarations' declType bndr e0@(collectTicks -> (Cast e from to,ticks)) = do
+  sameRepr <- castHasSameRepr from to
+  if sameRepr
+    then mkDeclarations' declType bndr (mkTicks e ticks)
+    else do
+      (_,sp) <- Lens.use curCompNm
+      throw (ClashException sp ($(curLoc) ++ "Not in normal form: cast between types with different HDL representations:\n\n" ++ showPpr e0) Nothing)
+
+mkDeclarations' declType bndr (collectTicks -> (Var v,ticks)) = do
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf bndr)
+  -- No signal is declared for zero-width results, so don't assign to it
+  -- either.
+  if isVoid hwTy
+    then return []
+    else withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) v [])
 
 mkDeclarations' _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
@@ -446,6 +465,10 @@ mkDeclarations' declType bndr app = do
   let (appF,args0,ticks) = collectArgsTicks app
       (args,tyArgs) = partitionEithers args0
   case appF of
+    -- A cast in function position has no HDL significance; see the
+    -- corresponding case in 'mkExpr'.
+    Cast e _ _ | not (null args0) ->
+      mkDeclarations' declType bndr (mkApps (mkTicks e ticks) args0)
     Var f
       | null tyArgs ->
         withTicks ticks (mkFunApp declType (Id.unsafeFromCoreId bndr) f args)
@@ -885,11 +908,24 @@ mkExpr bbEasD declType bndr app =
       decls    <- concatMapM (uncurry (mkDeclarations' declType)) binders
       (bodyE,bodyDecls) <- mkExpr bbEasD declType bndr (mkApps (mkTicks body ticks) args)
       return (bodyE,netDecls ++ decls ++ bodyDecls)
+    -- A cast can be dropped when both types have the same HDL
+    -- representation; see 'castHasSameRepr'.
+    Cast e0 from to | null args -> do
+      sameRepr <- castHasSameRepr from to
+      if sameRepr
+        then mkExpr bbEasD declType bndr (mkTicks e0 ticks)
+        else invalid "cast between types with different HDL representations"
     Core.Literal _ -> invalid "application of literal"
     Let _ _ -> invalid "application of let"
     TyApp _ _ -> invalid "application of type application"
     Tick _ _ -> invalid "application of tick"
-    Cast _ _ _ -> invalid "application of cast"
+    -- A cast in function position has no HDL significance: functions do not
+    -- exist as values in HDL. By this stage only casts that cannot be pushed
+    -- into the arguments remain, e.g. between a newtype of a function type
+    -- (like clash-protocols' @Circuit@) and its underlying function type. The
+    -- component instantiation is fully determined by the head variable and
+    -- the collected arguments.
+    Cast e0 _ _ -> mkExpr bbEasD declType bndr (mkApps (mkTicks e0 ticks) args)
     Lam _ _ -> invalid "application of lambda"
     TyLam _ _ -> invalid "application of type lambda"
     App _ _ -> invalid "application of application"
@@ -916,75 +952,110 @@ mkProjection declType mkDec bndr scrut altTy alt@(pat,v) = do
   let scrutTy = inferCoreTypeOf tcm scrut
       e = Case scrut scrutTy [alt]
   (_,sp) <- Lens.use curCompNm
-  varTm <- case v of
-    (Var n) -> return n
-    _ -> throw (ClashException sp ($(curLoc) ++
+  varTmM <- case stripTicks v of
+    (Var n) -> return (Just n)
+    -- A cast on the projected variable can be ignored when both sides have
+    -- the same HDL representation; see 'castHasSameRepr'.
+    (Cast (stripTicks -> Var n) from to) ->
+      castHasSameRepr from to >>= \case
+        True -> return (Just n)
+        False -> throw (ClashException sp ($(curLoc) ++
+                  "Not in normal form: RHS of case-projection is cast between types with different HDL representations:\n\n"
+                   ++ showPpr e) Nothing)
+    _ -> return Nothing
+  case varTmM of
+    -- The alternative is not (a cast of) a variable, i.e. the term is not in
+    -- A-normal form. This can happen when flattening inlines a binder that
+    -- could not be normalized (e.g. one with a non-representable result
+    -- type). Substitute the pattern variables with projections of the
+    -- subject and compile the right-hand side as an expression.
+    Nothing
+      | DataPat dc exts xs <- pat
+      , not (bindsExistentials exts xs) -> do
+          let is0 = mkInScopeSet (freeVarsOf e)
+              projOf x = Case scrut (coreTypeOf x) [(DataPat dc exts xs, Var x)]
+              subst = extendIdSubstList (mkSubst is0)
+                        [ (x, projOf x) | x <- xs ]
+              v' = substTm "mkProjection.nonVarAlt" subst v
+          (expr,decls) <- mkExpr False declType bndr v'
+          case bndr of
+            NetlistId nm _ | mkDec -> do
+              vHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
+              nm' <- Id.next nm
+              exprDecl <- mkInit declType assignTy nm' vHwTy expr
+              return (Identifier nm' Nothing, decls ++ exprDecl)
+            MultiId {} -> error "mkProjection: MultiId"
+            _ -> return (expr,decls)
+    Nothing -> throw (ClashException sp ($(curLoc) ++
                 "Not in normal form: RHS of case-projection is not a variable:\n\n"
                  ++ showPpr e) Nothing)
-  sHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
-  vHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
-  scrutRendered <- do
-    scrutNm <-
-      netlistId1
-        Id.next
-        (\b -> Id.suffix (Id.unsafeFromCoreId b) "projection")
-        bndr
-    (scrutExpr,newDecls) <- mkExpr False declType (NetlistId scrutNm scrutTy) scrut
-    case scrutExpr of
-      Identifier newId modM ->
-        pure (Right (newId, modM, newDecls))
-      Noop ->
-        -- Scrutinee was a zero-width / void construct. We need to render its
-        -- declarations, but it's no use assigning it to a new variable.
-        -- TODO: Figure out whether we need to render alternatives too.
-        -- TODO: seems useless?
-        pure (Left newDecls)
-      _ -> do
-        scrutDecl <- mkInit declType assignTy scrutNm sHwTy scrutExpr
-        pure (Right (scrutNm, Nothing, newDecls ++ scrutDecl))
+    Just varTm -> goVar assignTy scrutTy e sp varTm
+ where
+  goVar assignTy scrutTy e sp varTm = do
+   sHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
+   vHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) altTy
+   scrutRendered <- do
+     scrutNm <-
+       netlistId1
+         Id.next
+         (\b -> Id.suffix (Id.unsafeFromCoreId b) "projection")
+         bndr
+     (scrutExpr,newDecls) <- mkExpr False declType (NetlistId scrutNm scrutTy) scrut
+     case scrutExpr of
+       Identifier newId modM ->
+         pure (Right (newId, modM, newDecls))
+       Noop ->
+         -- Scrutinee was a zero-width / void construct. We need to render its
+         -- declarations, but it's no use assigning it to a new variable.
+         -- TODO: Figure out whether we need to render alternatives too.
+         -- TODO: seems useless?
+         pure (Left newDecls)
+       _ -> do
+         scrutDecl <- mkInit declType assignTy scrutNm sHwTy scrutExpr
+         pure (Right (scrutNm, Nothing, newDecls ++ scrutDecl))
 
-  case scrutRendered of
-    Left newDecls -> pure (Noop, newDecls)
-    Right (selId, modM, decls) -> do
-      let altVarId = Id.unsafeFromCoreId varTm
-      modifier <- case pat of
-        DataPat dc exts tms -> do
-          let
-            tms' =
-              if bindsExistentials exts tms then
-                throw (ClashException sp ($(curLoc)
-                  ++ "Not in normal form: Pattern binds existential variables:\n\n"
-                  ++ showPpr e) Nothing)
-              else
-                tms
-          argHWTys <- mapM coreTypeToHWTypeM' (map coreTypeOf tms)
-          let tmsBundled   = zip argHWTys tms'
-              tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
-              tmsFiltered' = map snd tmsFiltered
-          case elemIndex varTm {varType = altTy} tmsFiltered' of
-            Nothing -> pure Nothing
-            Just fI
-              | sHwTy /= vHwTy ->
-                pure $ nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
-              -- When element and subject have the same HW-type,
-              -- then the projections is just the identity
-              | otherwise ->
-                pure $ nestModifier modM (Just (DC (Void Nothing,0)))
-        _ -> throw (ClashException sp ($(curLoc)
-               ++ "Not in normal form: Unexpected pattern in case-projection:\n\n"
-               ++ showPpr e) Nothing)
-      let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
-      case bndr of
-        NetlistId scrutNm _ | mkDec -> do
-          scrutNm' <- Id.next scrutNm
-          scrutDecl <- mkInit declType assignTy scrutNm' vHwTy extractExpr
-          return (Identifier scrutNm' Nothing, scrutDecl ++ decls)
-        MultiId {} -> error "mkProjection: MultiId"
-        _ -> return (extractExpr,decls)
-  where
-    nestModifier Nothing  m          = m
-    nestModifier m Nothing           = m
-    nestModifier (Just m1) (Just m2) = Just (Nested m1 m2)
+   case scrutRendered of
+     Left newDecls -> pure (Noop, newDecls)
+     Right (selId, modM, decls) -> do
+       let altVarId = Id.unsafeFromCoreId varTm
+       modifier <- case pat of
+         DataPat dc exts tms -> do
+           let
+             tms' =
+               if bindsExistentials exts tms then
+                 throw (ClashException sp ($(curLoc)
+                   ++ "Not in normal form: Pattern binds existential variables:\n\n"
+                   ++ showPpr e) Nothing)
+               else
+                 tms
+           argHWTys <- mapM coreTypeToHWTypeM' (map coreTypeOf tms)
+           let tmsBundled   = zip argHWTys tms'
+               tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
+               tmsFiltered' = map snd tmsFiltered
+           case elemIndex varTm {varType = altTy} tmsFiltered' of
+             Nothing -> pure Nothing
+             Just fI
+               | sHwTy /= vHwTy ->
+                 pure $ nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
+               -- When element and subject have the same HW-type,
+               -- then the projections is just the identity
+               | otherwise ->
+                 pure $ nestModifier modM (Just (DC (Void Nothing,0)))
+         _ -> throw (ClashException sp ($(curLoc)
+                ++ "Not in normal form: Unexpected pattern in case-projection:\n\n"
+                ++ showPpr e) Nothing)
+       let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+       case bndr of
+         NetlistId scrutNm _ | mkDec -> do
+           scrutNm' <- Id.next scrutNm
+           scrutDecl <- mkInit declType assignTy scrutNm' vHwTy extractExpr
+           return (Identifier scrutNm' Nothing, scrutDecl ++ decls)
+         MultiId {} -> error "mkProjection: MultiId"
+         _ -> return (extractExpr,decls)
+
+  nestModifier Nothing  m          = m
+  nestModifier m Nothing           = m
+  nestModifier (Just m1) (Just m2) = Just (Nested m1 m2)
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication

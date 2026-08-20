@@ -19,6 +19,9 @@ module Clash.Normalize.Util
  , alreadyInlined
  , addNewInline
  , isRecursiveBndr
+ , originOf
+ , recordBinderOrigin
+ , originReachableFrom
  , callGraph
  , collectCallGraphUniques
  , classifyFunction
@@ -40,6 +43,7 @@ import           Data.Either             (lefts,rights)
 import qualified Data.List               as List
 import qualified Data.List.Extra         as List
 import qualified Data.Map                as Map
+import qualified Data.Maybe              as Maybe
 import qualified Data.HashMap.Strict     as HashMapS
 import qualified Data.HashSet            as HashSet
 import           Data.Text               (Text)
@@ -66,8 +70,9 @@ import           Clash.Core.Util
   (isClockOrReset)
 import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
-  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
-   lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
+  (VarEnv, elemVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv,
+   extendVarEnvWith, lookupVarEnv, unionVarEnvWith, unitVarEnv,
+   extendInScopeSetList, mkInScopeSet, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types
@@ -181,6 +186,49 @@ isRecursiveBndr f = do
           let isR = f `globalIdOccursIn` bindingTerm b
           (extra.recursiveComponents) %= extendVarEnv f isR
           return isR
+
+-- | The original binder a normalization-created binder (a specialization, a
+-- cast wrapper) derives from. Binders that were not created during
+-- normalization are their own origin. See 'Clash.Normalize.Types.binderOrigin'.
+originOf :: Id -> NormalizeSession Id
+originOf f = Maybe.fromMaybe f . lookupVarEnv f <$> Lens.use (extra.binderOrigin)
+
+-- | Record that a binder created during normalization derives from (the
+-- origin of) the given parent binder.
+recordBinderOrigin :: Id -> Id -> NormalizeSession ()
+recordBinderOrigin new parent = do
+  root <- originOf parent
+  (extra.binderOrigin) %= extendVarEnv new root
+
+-- | Is (the origin of) the second binder reachable from the first binder
+-- through the bodies of global binders, comparing visited binders by their
+-- 'originOf'? Comparing origins is essential: a recursive call may go
+-- through a clone (e.g. a pre-specialization copy) of the target, which has
+-- a different unique.
+--
+-- Verdicts are memoized per (origin, origin) pair. This is sound: clones
+-- mirror the origin-level edges of their parents, and rewrites only remove
+-- references, so a verdict can only become conservative over time.
+originReachableFrom :: Id -> Id -> NormalizeSession Bool
+originReachableFrom f0 target0 = do
+  fOrig <- originOf f0
+  target <- originOf target0
+  cache <- Lens.use (extra.originReachable)
+  case Map.lookup (fOrig, target) cache of
+    Just res -> return res
+    Nothing -> do
+      bndrs <- Lens.use bindings
+      origins <- Lens.use (extra.binderOrigin)
+      let orig g = Maybe.fromMaybe g (lookupVarEnv g origins)
+          step g = maybe [] (Lens.toListOf globalIds . bindingTerm) (lookupVarEnv g bndrs)
+          go _ [] = False
+          go visited (g:rest)
+            | g `elemVarEnv` visited = go visited rest
+            | orig g == target = True
+            | otherwise = go (extendVarEnv g () visited) (step g ++ rest)
+          res = go emptyVarEnv (step f0)
+      (extra.originReachable) %= Map.insert (fOrig, target) res
+      return res
 
 data ConstantSpecInfo =
   ConstantSpecInfo
@@ -379,6 +427,7 @@ classifyFunction = go (TermClassification 0 0 0)
       (_:_:_) -> c & selection  +~ 1
       _ -> c
     go !c (Tick _ e) = go c e
+    go !c (Cast e _ _) = go c e
     go c _ = c
 
 -- | Determine whether a function adds a lot of hardware or not.

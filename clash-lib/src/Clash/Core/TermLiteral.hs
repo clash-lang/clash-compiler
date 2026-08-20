@@ -48,7 +48,8 @@ import           Clash.Core.DataCon              (DataCon(..))
 import           Clash.Core.Literal
 import           Clash.Core.Name                 (Name(..))
 import           Clash.Core.Pretty               (showPpr)
-import           Clash.Core.Term                 (Term(Literal, Data), collectArgs, stripAllTicks)
+import           Clash.Core.Term
+  (Bind(..), Term(..), collectArgs, stripAllTicks)
 import           Clash.Promoted.Nat
 import           Clash.Promoted.Nat.Unsafe
 import           Clash.Sized.Index               (Index)
@@ -222,10 +223,28 @@ deriveTermLiteral ''Cv.Property'
 deriveTermLiteral ''Attr
 
 -- | Convert 'Term' to the constant it represents. Wraps 'termToData#': ticks
--- are stripped from the term (recursively) before delegating, so instances
--- never have to special-case them.
+-- and casts are stripped from the term (recursively) before delegating, so
+-- instances never have to special-case them.
 termToData :: forall a. (HasCallStack, TermLiteral a) => Term -> Either Term a
-termToData = termToData# . stripAllTicks
+termToData = termToData# . stripAllCasts . stripAllTicks
+
+-- | Remove all casts from a term, recursively. Casts carry no information
+-- for the constant a term represents.
+stripAllCasts :: Term -> Term
+stripAllCasts = go
+ where
+  go (Lam i x) = Lam i (go x)
+  go (TyLam i x) = TyLam i (go x)
+  go (App f x) = App (go f) (go x)
+  go (TyApp f a) = TyApp (go f) a
+  go (Let bs x) = Let (goBinds bs) (go x)
+  go (Case x ty alts) = Case (go x) ty (fmap go <$> alts)
+  go (Cast x _ _) = go x
+  go (Tick t x) = Tick t (go x)
+  go x = x
+
+  goBinds (NonRec i x) = NonRec i (go x)
+  goBinds (Rec ixs) = Rec (fmap go <$> ixs)
 
 -- | Same as 'termToData', but returns printable error message if it couldn't
 -- translate a term.
