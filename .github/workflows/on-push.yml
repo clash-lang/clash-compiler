@@ -92,10 +92,6 @@ jobs:
     runs-on: self-hosted
     strategy:
       fail-fast: false
-      matrix:
-        # Documentation is built at 9.6.7, testing on other versions therefore does not make a lot
-        # of sense
-        ghc: [ 9.6.7 ]
     steps:
       - uses: actions/checkout@v6
 
@@ -103,7 +99,7 @@ jobs:
         id: ghc-install
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: ${{ matrix.ghc }}
+          ghc-version: 9.6.7
           cabal-version: latest
 
       - name: Version information
@@ -123,8 +119,6 @@ jobs:
     runs-on: self-hosted
     strategy:
       fail-fast: false
-      matrix:
-        ghc: [ 9.12.4 ]
     steps:
       - uses: actions/checkout@v6
 
@@ -134,7 +128,6 @@ jobs:
       - name: Install GHC
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: ${{ matrix.ghc }}
           enable-stack: true
           stack-no-global: true
           stack-version: latest
