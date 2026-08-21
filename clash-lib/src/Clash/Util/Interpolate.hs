@@ -40,13 +40,16 @@ OTHER DEALINGS IN THE SOFTWARE.
 -}
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- TODO: only export the @i@ quasiquoter when `ghcide` stops type-checking
 -- expanded quasiquote splices
 module Clash.Util.Interpolate (i, format, toString) where
 
-import           Language.Haskell.Meta.Parse (parseExp)
+-- This module also exists in @ghc-hs-meta@, see
+-- https://github.com/clash-lang/clash-compiler/pull/3366
+import "haskell-src-meta" Language.Haskell.Meta.Parse (parseExp)
 import           Language.Haskell.TH.Lib     (appE, varE)
 import           Language.Haskell.TH.Quote   (QuasiQuoter(..))
 import           Language.Haskell.TH.Syntax  (Q, Exp)
