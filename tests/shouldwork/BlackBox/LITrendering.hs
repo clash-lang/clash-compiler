@@ -46,7 +46,7 @@ foo !x1
   [ { "BlackBox" :
       { "name"      : "LITrendering.foo"
       , "kind"      : "Declaration"
-      , "template"  : "// #{L.intercalate "," ["~LIT[" <> show n <> "]" | n <- [0..18]]}"
+      , "template"  : "// #{L.intercalate "," (L.map (\n -> "~LIT[" <> show n <> "]") [0..18])}"
       }
     }
   ]
