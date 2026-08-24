@@ -60,9 +60,9 @@ runNormalisationStage idirs src = do
   let topEntityNames = fmap topId (designEntities design)
   case topEntityNames of
     topEntity:_ -> do
-      transformedBindings <-
+      (transformedBindings, _) <-
             normalizeEntity env (designBindings design)
-              (ghcTypeToHWType (opt_intWidth (opts idirs)))
+              (ghcTypeToHWType (envDomainTCUs env) (opt_intWidth (opts idirs)))
               ghcEvaluator
               evaluator
               topEntityNames supplyN topEntity
