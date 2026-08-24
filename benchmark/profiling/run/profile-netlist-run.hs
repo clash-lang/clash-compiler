@@ -40,7 +40,7 @@ main = do
 
 benchFile :: [FilePath] -> FilePath -> IO ()
 benchFile idirs src = do
-  (transformedBindings, topEntities, primMap, tcm, reprs, topEntity, domains) <- setupEnv src
+  (transformedBindings, topEntities, primMap, tcm, reprs, topEntity, _) <- setupEnv src
   putStrLn $ "Doing netlist generation of " ++ src
 
   let env = ClashEnv
@@ -49,7 +49,7 @@ benchFile idirs src = do
                    , envTupleTyCons = mempty
                    , envPrimitives = fmap (fmap unremoveBBfunc) primMap
                    , envCustomReprs = reprs
-                   , envDomains = domains
+                   , envDomainTCUs = Nothing
                    }
 
       topEntityS = Text.unpack (nameOcc (varName topEntity))
@@ -64,7 +64,7 @@ benchFile idirs src = do
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
     genNetlist env ghcEvaluator False transformedBindings topEntityMap compNames
-               (ghcTypeToHWType (opt_intWidth (envOpts env)))
+               (ghcTypeToHWType Nothing (opt_intWidth (envOpts env)))
                ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 

@@ -30,8 +30,11 @@ executable clash-profile-normalization-prepare
   build-depends:       base,
                        binary,
                        bytestring,
+                       text,
+                       unordered-containers,
 
                        clash-lib,
+                       clash-prelude,
                        clash-benchmark,
                        clash-profiling-prepare
 
