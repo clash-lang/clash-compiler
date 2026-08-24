@@ -82,7 +82,7 @@ instance Diff Term where
   ppr' = Pr.ppr'
 
   initOptions :: PrettyOptions
-  initOptions = PrettyOptions True True True True
+  initOptions = PrettyOptions True True True True False
 
   flagFields :: [(PrettyOptions -> Bool, PrettyOptions -> Bool -> PrettyOptions, String)]
   flagFields =
