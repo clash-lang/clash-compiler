@@ -32,7 +32,7 @@ main = do
 benchFile :: [FilePath] -> FilePath -> IO ()
 benchFile idirs src = do
   supplyN <- Supply.newSupply
-  (bindingsMap, tcm, tupTcm, primMap, reprs, topEntityNames, topEntity, domains) <- setupEnv src
+  (bindingsMap, tcm, tupTcm, primMap, reprs, topEntityNames, topEntity, _) <- setupEnv src
   putStrLn $ "Doing normalization of " ++ src
 
   let clashEnv = ClashEnv
@@ -41,11 +41,11 @@ benchFile idirs src = do
                    , envTupleTyCons = tupTcm
                    , envPrimitives = fmap (fmap unremoveBBfunc) primMap
                    , envCustomReprs = reprs
-                   , envDomains = domains
+                   , envDomainTCUs = Nothing
                    }
 
   res <- normalizeEntity clashEnv bindingsMap
-                   (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                   (ghcTypeToHWType Nothing (opt_intWidth (envOpts clashEnv)))
                    ghcEvaluator
                    evaluator
                    topEntityNames supplyN topEntity
