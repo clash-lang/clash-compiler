@@ -54,6 +54,7 @@ import           Text.Read (readMaybe)
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Core.Name (nameOcc)
+import           Clash.Core.Subst (hashTerm)
 import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
@@ -493,7 +494,9 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
     { dshTops = Sha256.hashlazy (Binary.encode tops)
     , dshPrimMap = Sha256.hashlazy (Binary.encode (hashCompiledPrimMap primMap))
     , dshClashModDate = Sha256.hashlazy (Binary.encode (show clashModDate))
-    , dshCallGraph = Sha256.hashlazy (Binary.encode (callGraphBindings bindingsMap topId))
+    , dshCallGraph =
+        Sha256.hashlazy
+          (Binary.encode (map (hashTerm 0) (callGraphBindings bindingsMap topId)))
     , dshOpts = Sha256.hashlazy (Binary.encode optsHash)
     }
 
