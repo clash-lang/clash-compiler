@@ -35,6 +35,7 @@ module Clash.Normalize.Transformations.Case
   , elimCaseBigNumInternalsWorker
   ) where
 
+import qualified Clash.Data.RwVar as RwVar
 import qualified Clash.Normalize.TracedMVar as MVar
 import qualified Control.Lens as Lens
 import Control.Exception.Base (patError)
@@ -270,7 +271,7 @@ caseCon' ctx@(TransformContext is0 _) e subj ty alts = do
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
         bindingsV <- Lens.use bindings
-        wf <- MVar.withMVar "bindings" bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+        wf <- (\bndrs -> isWorkFree workFreeBinders bndrs arg) =<< RwVar.readRwVar bindingsV
         case wf of
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->

@@ -25,6 +25,7 @@ module Clash.Rewrite.Util
   ) where
 
 import           Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Data.RwVar as RwVar
 import qualified Clash.Normalize.TracedMVar as MVar
 import           Control.DeepSeq
 import           Control.Exception           (throw)
@@ -35,6 +36,7 @@ import qualified Control.Monad.IO.Class      as Monad
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import qualified Control.Monad.Writer        as Writer
+import qualified Data.Map                    as Map
 import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
@@ -680,53 +682,55 @@ liftBinding (var@Id {varName = idName} ,e) = do
   thread <- myThreadId
   Just (cf,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
   bindersV <- Lens.use bindings
-  binders <- MVar.takeMVar "bindings" bindersV
-  newBodyNm <-
-    cloneNameWithBindingMap
-      binders
-      (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
-  let newBodyId = mkGlobalId newBodyTy newBodyNm {nameSort = Internal}
+  -- Deriving the new name from the binding map, and checking whether an
+  -- alpha-equivalent binder already exists, both have to see the same map the
+  -- new binder is inserted into, so this whole section is one write.
+  RwVar.modifyRwVar bindersV $ \binders -> do
+    newBodyNm <-
+      cloneNameWithBindingMap
+        binders
+        (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
+    let newBodyId = mkGlobalId newBodyTy newBodyNm {nameSort = Internal}
 
-  -- Make a new expression, consisting of the the lifted function applied to
-  -- its free variables
-  let newExpr = mkTmApps
-                  (mkTyApps (Var newBodyId)
-                            (map VarTy boundFTVs))
-                  (map Var boundFVs)
-      inScope0 = mkInScopeSet (coerce boundFVsSet)
-      inScope1 = extendInScopeSetList inScope0 [var,newBodyId]
-  let subst    = extendIdSubst (mkSubst inScope1) var newExpr
-      -- Substitute the recursive calls by the new expression
-      e' = substTm "liftBinding" subst e
-      -- Create a new body that abstracts over the free variables
-      newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
+    -- Make a new expression, consisting of the the lifted function applied to
+    -- its free variables
+    let newExpr = mkTmApps
+                    (mkTyApps (Var newBodyId)
+                              (map VarTy boundFTVs))
+                    (map Var boundFVs)
+        inScope0 = mkInScopeSet (coerce boundFVsSet)
+        inScope1 = extendInScopeSetList inScope0 [var,newBodyId]
+    let subst    = extendIdSubst (mkSubst inScope1) var newExpr
+        -- Substitute the recursive calls by the new expression
+        e' = substTm "liftBinding" subst e
+        -- Create a new body that abstracts over the free variables
+        newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
-  -- Check if an alpha-equivalent global binder already exists
-  let aeqExisting = UniqMap.elems . UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) $ binders
-  case aeqExisting of
-    -- If it doesn't, create a new binder
-    [] -> do -- Add the created function to the list of global bindings
-             let r = newBodyId `globalIdOccursIn` newBody
-             MVar.putMVar "bindings" bindersV $
-               UniqMap.insert
-                 newBodyNm
-                 -- We mark this function as internal so that it can be inlined
-                 -- at the very end of the normalization pipeline as part of the
-                 -- flattening pass. We don't inline right away because we are
-                 -- lifting this function at this moment for a reason!
-                 -- (termination, CSE and DEC opportunities, etc.)
-                 (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
-                 binders
+    -- Check if an alpha-equivalent global binder already exists
+    let aeqExisting = UniqMap.elems . UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) $ binders
+    case aeqExisting of
+      -- If it doesn't, create a new binder
+      [] -> do -- Add the created function to the list of global bindings
+               let r = newBodyId `globalIdOccursIn` newBody
+               let binders1 =
+                     UniqMap.insert
+                       newBodyNm
+                       -- We mark this function as internal so that it can be inlined
+                       -- at the very end of the normalization pipeline as part of the
+                       -- flattening pass. We don't inline right away because we are
+                       -- lifting this function at this moment for a reason!
+                       -- (termination, CSE and DEC opportunities, etc.)
+                       (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
+                       binders
 
-             return (var, newExpr)
-    -- If it does, use the existing binder
-    (b:_) -> do
-      let newExpr' = mkTmApps
-                      (mkTyApps (Var $ bindingId b)
-                                (map VarTy boundFTVs))
-                      (map Var boundFVs)
-      MVar.putMVar "bindings" bindersV binders
-      return (var, newExpr')
+               return (binders1, (var, newExpr))
+      -- If it does, use the existing binder
+      (b:_) -> do
+        let newExpr' = mkTmApps
+                        (mkTyApps (Var $ bindingId b)
+                                  (map VarTy boundFTVs))
+                        (map Var boundFVs)
+        return (binders, (var, newExpr'))
 
 liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 
@@ -745,7 +749,7 @@ mkFunction bndrNm sp inl body = do
   let bodyTy = inferCoreTypeOf tcm body
   bindersV <- Lens.use bindings
 
-  MVar.modifyMVar "bindings" bindersV $ \binders -> do
+  RwVar.modifyRwVar bindersV $ \binders -> do
     bodyNm <- cloneNameWithBindingMap binders bndrNm
     let vId = mkGlobalId bodyTy bodyNm
         r = vId `globalIdOccursIn` body
@@ -786,6 +790,34 @@ runWithHWTypeCache m = do
   hwTypeCache Lens..= cache1
   pure a
 
+-- | Seed this task's HWType cache from the shared one, and publish what the
+-- task learned when it finishes.
+--
+-- The cache is a plain (task-local) field because it is updated on nearly every
+-- type translation — millions of times per compilation — which is far too hot
+-- to synchronize per update. Sharing it at task boundaries instead keeps the
+-- translations one task performed available to the tasks that start after it,
+-- rather than discarding them when the task's state copy dies.
+withSharedHWTypeCache :: RewriteMonad extra a -> RewriteMonad extra a
+withSharedHWTypeCache m = do
+  var <- Lens.use sharedHwTypeCache
+  shared0 <- RwVar.readRwVar var
+  hwTypeCache Lens..= shared0
+  a <- m
+  cache1 <- Lens.use hwTypeCache
+  Monad.when (Map.size cache1 > Map.size shared0) $
+    RwVar.modifyRwVar_ var (pure . Map.union cache1)
+  pure a
+
+-- Note [rewriting a let's bindings concurrently]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The bindings of a let are independent, so rewriting them on separate threads
+-- looks like free parallelism inside a single binder. It was measured on
+-- wireDemoTest (fork above 32 bindings) and made normalization 2.8x slower:
+-- 2m39s against 57.6s. The settle loop traverses the same let on every
+-- iteration, so each traversal pays for forking again, against rewrites that
+-- cost microseconds per node.
+--
 -- | Determine if a term cannot be represented in hardware
 isUntranslatable
   :: Bool
@@ -839,7 +871,7 @@ whnfRW isSubj (TransformContext is0 hist) e0 rw = do
   ids <- Lens.use uniqSupply
   ghV <- Lens.use globalHeap
 
-  bndrs <- MVar.takeMVar "bindings" bndrsV
+  bndrs <- RwVar.readRwVar bndrsV
   gh <- MVar.takeMVar "globalHeap" ghV
 
   let (ids1,ids2) = splitSupply ids
@@ -849,7 +881,6 @@ whnfRW isSubj (TransformContext is0 hist) e0 rw = do
   case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e0 of
     (!gh1,ph,v) -> do
       let result = bindPureHeap tcm bndrs (ph `differenceVarEnv` lh) v
-      MVar.putMVar "bindings" bndrsV bndrs
       MVar.putMVar "globalHeap" ghV gh1
       result
  where

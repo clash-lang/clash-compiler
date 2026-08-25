@@ -22,9 +22,8 @@ module Clash.Rewrite.WorkFree
   , isConstantNotClockReset
   ) where
 
-import Control.Concurrent.MVar (MVar)
-import qualified Clash.Normalize.TracedMVar as MVar
 import Control.Lens as Lens (Lens', use)
+import Control.Monad (when)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.Text.Extra as Text
@@ -39,7 +38,10 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (isPolyFunTy)
 import Clash.Core.Util
 import Clash.Core.Var (Id, isLocalId)
-import Clash.Core.VarEnv (VarEnv, extendVarEnv, lookupVarEnv, unionVarEnv)
+import Clash.Core.VarEnv
+  (VarEnv, extendVarEnv, lookupVarEnv, sizeVarEnv, unionVarEnv)
+import Clash.Data.RwVar (RwVar)
+import qualified Clash.Data.RwVar as RwVar
 import Clash.Driver.Types (BindingMap, Binding(..))
 import Clash.Normalize.Primitives (removedArg)
 
@@ -49,13 +51,20 @@ import Clash.Normalize.Primitives (removedArg)
 {-# INLINABLE isWorkFree #-}
 isWorkFree
   :: (HasCallStack, MonadState s m, MonadBaseControl IO m)
-  => Lens' s (MVar (VarEnv Bool))
+  => Lens' s (RwVar (VarEnv Bool))
   -> BindingMap
   -> Term
   -> m Bool
 isWorkFree cacheL bndrs bndr = do
-  lock <- Lens.use cacheL
-  MVar.modifyMVar "workFreeBinders" lock (\cache -> pure (isWorkFreePure cache bndrs bndr))
+  var <- Lens.use cacheL
+  cache0 <- RwVar.readRwVar var
+  let (cache1, res) = isWorkFreePure cache0 bndrs bndr
+  -- The traversal is the expensive part and depends only on immutable data, so
+  -- it runs outside the lock. Entries other threads added in the meantime are
+  -- kept: every entry for a given binder has the same value.
+  when (sizeVarEnv cache1 /= sizeVarEnv cache0) $
+    RwVar.modifyRwVar_ var (pure . unionVarEnv cache1)
+  pure res
 
 -- | Determines whether a global binder is work free. Errors if binder does
 -- not exist.

@@ -30,6 +30,7 @@ module Clash.Normalize.Transformations.Letrec
   ) where
 
 import Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Data.RwVar as RwVar
 import qualified Clash.Normalize.TracedMVar as MVar
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
@@ -267,7 +268,7 @@ flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
     case binds1 of
       [(_,e1)] -> do
         bndrsV <- Lens.use bindings
-        MVar.withMVar "bindings" bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e1)
+        (\bndrs -> isWorkFree workFreeBinders bndrs e1) =<< RwVar.readRwVar bndrsV
 
       _ -> pure (error "flattenLet: unreachable")
 
@@ -311,7 +312,7 @@ flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
         case binds2 of
           [(_,e2)] -> do
             bndrsV <- Lens.use bindings
-            MVar.withMVar "bindings" bndrsV (\bndrs ->isWorkFree workFreeBinders bndrs e2)
+            (\bndrs -> isWorkFree workFreeBinders bndrs e2) =<< RwVar.readRwVar bndrsV
 
           _ -> pure (error "flattenLet: unreachable")
 

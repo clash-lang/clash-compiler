@@ -40,6 +40,7 @@ module Clash.Normalize.Transformations.DEC
   , disjointExpressionConsolidationWorker
   ) where
 
+import qualified Clash.Data.RwVar as RwVar
 import qualified Clash.Normalize.TracedMVar as MVar
 import           Control.Lens ((^.), _1)
 import qualified Control.Lens as Lens
@@ -340,10 +341,10 @@ collectGlobals is0 substitution seen e@(collectArgsTicks -> (fun, args@(_:_), ti
 
     ghV <- Lens.use globalHeap
 
+    bndrs <- RwVar.readRwVar bndrsV
     eval <-
-      MVar.withMVar "bindings" bndrsV $ \bndrs ->
-        MVar.withMVar "globalHeap" ghV $ \gh ->
-          pure $ (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
+      MVar.withMVar "globalHeap" ghV $ \gh ->
+        pure $ (Lens.view Lens._3) . whnf' evaluate bndrs mempty tcm gh ids1 is0 False
 
     let eTy  = inferCoreTypeOf tcm e
     untran <- isUntranslatableType False eTy
