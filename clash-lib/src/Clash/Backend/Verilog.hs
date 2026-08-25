@@ -239,7 +239,10 @@ genVerilog opts  _ sp seen usage c = do
             timescale <> line <>
             module_ c <> line <>
             nettypeDefault
+    -- 'includes' is part of the backend state, which is shared by every
+    -- component. Hand back only the includes this component generated.
     incs <- Ap $ use includes
+    Ap $ includes .= []
     return ((TextS.unpack (Id.toText cName), v), incs)
   where
     cName    = componentName c

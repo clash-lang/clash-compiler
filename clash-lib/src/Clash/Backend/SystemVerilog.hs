@@ -233,7 +233,10 @@ genSystemVerilog opts _ sp seen us c = do
       setSrcSpan sp
 
     v    <- verilog
+    -- 'includes' is part of the backend state, which is shared by every
+    -- component. Hand back only the includes this component generated.
     incs <- Ap $ use includes
+    Ap $ includes .= []
     return ((TextS.unpack (Id.toText cName), v), incs)
   where
     cName   = componentName c

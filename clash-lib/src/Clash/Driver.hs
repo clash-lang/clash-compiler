@@ -936,7 +936,11 @@ createHDL backend opts modName seen components domainConfs top topName = flip ev
   let
     typesPkg1 = map (first (<.> Clash.Backend.extension backend)) typesPkg0
     hdlNmDocs1 = map (first (<.> Clash.Backend.extension backend)) hdlNmDocs0
-    topFiles = concat incs ++ typesPkg1 ++ hdlNmDocs1
+    -- The name of an include carries a hash of its contents, so a blackbox
+    -- instantiated in several components yields the same include more than
+    -- once. They all write to the same path; render and write one.
+    incFiles = List.nubOrdOn fst (concat incs)
+    topFiles = incFiles ++ typesPkg1 ++ hdlNmDocs1
 
     topClks = findClocks top
     sdcInfo = fmap findDomainConfig <$> topClks

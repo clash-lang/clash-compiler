@@ -410,7 +410,10 @@ genVHDL _ nm sp seen us c = do
       setSrcSpan sp
 
     v <- vhdl
+    -- 'includes' is part of the backend state, which is shared by every
+    -- component. Hand back only the includes this component generated.
     i <- Ap $ use includes
+    Ap $ includes  .= []
     Ap $ libraries .= []
     Ap $ packages  .= []
     return ((TextS.unpack (Id.toText cName), v), i)
