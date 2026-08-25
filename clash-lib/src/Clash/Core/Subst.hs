@@ -69,6 +69,10 @@ module Clash.Core.Subst
   , ordType
   , eqVar
   , ordVar
+  , hashTerm
+  , hashType
+  , hashVar
+  , hashName
   )
 where
 
@@ -91,7 +95,9 @@ import           GHC.Types.SrcLoc
   (SrcSpan (RealSrcSpan, UnhelpfulSpan), leftmost_smallest)
 
 import           Clash.Core.HasFreeVars
-import           Clash.Core.Name           (eqName, ordName)
+import           Clash.Core.DataCon        (dcUniq)
+import           Clash.Core.Name
+  (Name, eqName, ordName, nameLoc, nameOcc, nameSort, nameUniq)
 import           Clash.Core.Pretty         (ppr, fromPpr)
 import           Clash.Core.Term
   (Alt, Bind(..), Pat (..), Term (..), TickInfo (..), PrimInfo(primName))
@@ -1075,6 +1081,95 @@ by the subterms, so @(case x of {}) :: A@ and @(case x of {}) :: B@ compare
 equal even though their types differ. Such case expressions don't occur in
 CoreHW: @Clash.GHC.GHC2Core@ turns them into an @undefined@ or @undefinedX@.
 -}
+
+-- | Structural hash on 'Name's, as fine as 'Clash.Core.Name.eqName': on top of
+-- the unique, this takes in the name's sort, its occurrence name and its
+-- location.
+hashName :: Int -> Name a -> Int
+hashName salt nm =
+  hashSrcSpan
+    (hashWithSalt
+      (hashWithSalt (hashWithSalt salt (nameUniq nm)) (nameSort nm))
+      (nameOcc nm))
+    (nameLoc nm)
+
+-- | Structural hash on 'Var's, as fine as 'eqVar': on top of the unique (and
+-- scope), this takes in the variable's name and its type\/kind.
+hashVar :: Int -> Var a -> Int
+hashVar salt v =
+  hashType (hashName (hashWithSalt salt (varKey v)) (varName v)) (varType v)
+
+-- | Structural hash on 'Type', consistent with 'eqType': types that 'eqType'
+-- considers equal hash equally.
+hashType :: Int -> Type -> Int
+hashType = go
+ where
+  go :: Int -> Type -> Int
+  go salt = \case
+    VarTy tv -> hashVar (hashTag salt 0) tv
+    ConstTy c -> hashWithSalt (hashTag salt 1) c
+    ForAllTy tv t -> go (hashVar (hashTag salt 2) tv) t
+    AppTy t1 t2 -> go (go (hashTag salt 3) t1) t2
+    LitTy l -> hashWithSalt (hashTag salt 4) l
+    AnnType attrs t -> go (hashWithSalt (hashTag salt 5) attrs) t
+
+-- | Structural hash on 'Term', consistent with 'eqTerm': terms that 'eqTerm'
+-- considers equal hash equally. Unlike 'aTermHashWithSalt' this is not modulo
+-- alpha, so it tells terms apart that differ only in the names of their
+-- binders.
+hashTerm :: Int -> Term -> Int
+hashTerm = go
+ where
+  go :: Int -> Term -> Int
+  go salt = \case
+    Var i -> hashVar (hashTag salt 0) i
+    -- @Eq DataCon@ compares uniques
+    Data dc -> hashWithSalt (hashTag salt 1) (dcUniq dc)
+    Literal l -> hashWithSalt (hashTag salt 2) l
+    -- 'eqTerm' identifies a primitive by its name
+    Prim p -> hashWithSalt (hashTag salt 3) (primName p)
+    Lam b e -> go (hashVar (hashTag salt 4) b) e
+    TyLam b e -> go (hashVar (hashTag salt 5) b) e
+    App e1 e2 -> go (go (hashTag salt 6) e1) e2
+    TyApp e t -> hashType (go (hashTag salt 7) e) t
+    -- 'eqTerm' leaves the type of a 'NonRec' binder out: its right-hand side
+    -- pins the type down.
+    Let (NonRec i x) e ->
+      go (go (hashWithSalt (hashTag salt 8) (varKey i)) x) e
+    Let (Rec bs) e -> go (List.foldl' goBind (hashTag salt 9) bs) e
+    -- Note [Case result types and alpha-equivalence]
+    Case subj _ty alts -> List.foldl' goAlt (go (hashTag salt 10) subj) alts
+    Cast e t1 t2 -> hashType (hashType (go (hashTag salt 11) e) t1) t2
+    Tick tick e -> go (goTick (hashTag salt 12) tick) e
+
+  goBind :: Int -> (Id, Term) -> Int
+  goBind salt (i, x) = go (hashVar salt i) x
+
+  goAlt :: Int -> (Pat, Term) -> Int
+  goAlt salt (pat, e) = go (goPat salt pat) e
+
+  -- @Eq Pat@ is derived, so it compares a 'DataCon' and the variables a
+  -- 'DataPat' binds by their uniques.
+  goPat :: Int -> Pat -> Int
+  goPat salt = \case
+    DataPat dc tvs ids ->
+      hashWithSalt
+        (hashWithSalt
+          (hashWithSalt (hashTag salt 0) (dcUniq dc))
+          (map varKey tvs))
+        (map varKey ids)
+    LitPat l -> hashWithSalt (hashTag salt 1) l
+    DefaultPat -> hashTag salt 2
+
+  -- @Eq TickInfo@ compares 'NameMod' and 'Attributes' with alpha-equivalence,
+  -- which is too coarse here, just as it is for 'eqTerm'.
+  goTick :: Int -> TickInfo -> Int
+  goTick salt = \case
+    SrcSpan s -> hashSrcSpan (hashTag salt 0) s
+    NameMod m t -> hashType (hashWithSalt (hashTag salt 1) m) t
+    DeDup -> hashTag salt 2
+    NoDeDup -> hashTag salt 3
+    Attributes t e -> go (hashType (hashTag salt 4) t) e
 
 instance Eq Type where
   (==) = aeqType

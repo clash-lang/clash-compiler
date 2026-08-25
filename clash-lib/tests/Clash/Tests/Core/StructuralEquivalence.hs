@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for structural equality and comparison of 'Type'
+  Tests for structural equality, comparison and hashing of 'Type' and 'Term'
 -}
 
 {-# LANGUAGE LambdaCase #-}
@@ -13,19 +13,22 @@
 module Clash.Tests.Core.StructuralEquivalence (tests) where
 
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH (testGroupGenerator)
 
+import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (NameSort (..), mkUnsafeName)
-import Clash.Core.Subst (eqType, eqVar, ordType)
+import Clash.Core.Subst (eqTerm, eqType, eqVar, hashTerm, hashType, ordType)
+import Clash.Core.Term (Bind (..), Pat (..), Term (..), TickInfo (..))
 import Clash.Core.Type (Kind, LitTy (..), Type (..))
 import Clash.Core.TysPrim (liftedTypeKind)
-import Clash.Core.Var (TyVar, Var (..))
+import Clash.Core.Var (Id, TyVar, Var (..))
 import Clash.Unique (Unique)
 
-import Test.Clash.Rewrite (intTy, parseTyConTy)
+import Test.Clash.Rewrite (intTy, localId, parseTyConTy)
 
 -- | A 'TyVar' with the given human readable name, unique and kind. Unlike
 -- 'Test.Clash.Rewrite.tyVar', whose kind is always 'liftedTypeKind'.
@@ -183,6 +186,84 @@ case_ordTypeTransitive =
     , ordType t1 t2 /= GT
     , ordType t2 t3 /= GT
     ]
+
+-- | An @Int@ binder with the given human readable name and unique.
+intId :: Text -> Unique -> Id
+intId nm uniq = localId User (Text.unpack nm) uniq intTy
+
+-- | At least one term per 'Term' constructor that is cheap to build, plus
+-- pairs differing only in a nested detail.
+representativeTerms :: [Term]
+representativeTerms =
+  [ Var (intId "x" 1)
+  , Var (intId "y" 2)
+  , Var (intId "y" 1)
+  , Literal (IntLiteral 1)
+  , Literal (IntLiteral 2)
+  , Lam (intId "x" 1) (Var (intId "x" 1))
+  , Lam (intId "y" 1) (Var (intId "y" 1))
+  , TyLam bLifted (Var (intId "x" 1))
+  , App (Var (intId "x" 1)) (Var (intId "y" 2))
+  , App (Var (intId "y" 2)) (Var (intId "x" 1))
+  , TyApp (Var (intId "x" 1)) intTy
+  , TyApp (Var (intId "x" 1)) boolTy
+  , Let (NonRec (intId "x" 1) (Var (intId "y" 2))) (Var (intId "x" 1))
+  , Let (Rec [(intId "x" 1, Var (intId "x" 1))]) (Var (intId "x" 1))
+  , Case (Var (intId "x" 1)) intTy [(DefaultPat, Var (intId "y" 2))]
+  , Case (Var (intId "x" 1)) intTy [(LitPat (IntLiteral 1), Var (intId "y" 2))]
+  , Cast (Var (intId "x" 1)) intTy boolTy
+  , Tick DeDup (Var (intId "x" 1))
+  , Tick NoDeDup (Var (intId "x" 1))
+  ]
+
+-- | 'hashType' hashes structurally equal types alike. This is the direction of
+-- the hash law that holds; the converse may fail on a collision.
+case_hashTypeAgreesWithEqType :: Assertion
+case_hashTypeAgreesWithEqType =
+  sequence_
+    [ assertEqual (show (t1, t2)) (hashType 0 t1) (hashType 0 t2)
+    | t1 <- representativeTypes
+    , t2 <- representativeTypes
+    , eqType t1 t2
+    ]
+
+-- | 'hashTerm' hashes structurally equal terms alike. See
+-- 'case_hashTypeAgreesWithEqType'.
+case_hashTermAgreesWithEqTerm :: Assertion
+case_hashTermAgreesWithEqTerm =
+  sequence_
+    [ assertEqual (show (t1, t2)) (hashTerm 0 t1) (hashTerm 0 t2)
+    | t1 <- representativeTerms
+    , t2 <- representativeTerms
+    , eqTerm t1 t2
+    ]
+
+-- | Types that differ only in a human readable name hash differently. Like the
+-- corresponding alpha-equivalence tests this is a sanity check on how chaotic
+-- the hash is rather than a law: a collision here is allowed, just unlikely.
+case_hashTypeNameSignificant :: Assertion
+case_hashTypeNameSignificant =
+  assertBool "hashes differ" $
+    hashType 0 (VarTy kindVarK)
+      /= hashType 0 (VarTy (kindedTyVar "k0" 0 liftedTypeKind))
+
+-- | 'hashTerm' is /not/ modulo alpha: terms differing only in the name of a
+-- binder hash differently, even though they are alpha-equivalent.
+--
+-- Clash splices the occurrence name of a Core binder into the HDL verbatim
+-- (see 'Clash.Netlist.Id.unsafeFromCoreId'), so a design hash that could not
+-- tell these apart would report a cache hit after a rename and leave HDL
+-- carrying the old names in place.
+case_hashTermBinderNameSignificant :: Assertion
+case_hashTermBinderNameSignificant = do
+  -- @Eq Term@ is alpha equivalence, and these two are alpha-equivalent
+  idX @=? idY
+  assertBool "not (eqTerm idX idY)" (not (eqTerm idX idY))
+  assertBool "hashes differ" (hashTerm 0 idX /= hashTerm 0 idY)
+ where
+  idX = identity "x"
+  idY = identity "y"
+  identity nm = let b = intId nm 1 in Lam b (Var b)
 
 tests :: TestTree
 tests = $(testGroupGenerator)
