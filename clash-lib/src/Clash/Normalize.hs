@@ -22,6 +22,7 @@ module Clash.Normalize where
 import           Control.Concurrent.MVar.Lifted   (MVar)
 import qualified Clash.Data.RwVar                as RwVar
 import qualified Clash.Normalize.TracedMVar       as MVar
+import qualified Control.Concurrent               as Concurrent
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (when)
@@ -160,10 +161,18 @@ supplies :: Int -> Supply -> [Supply]
 supplies 0 _ = []
 supplies n s = let (s0', s1') = splitSupply s in s0' : supplies (n-1) s1'
 
+-- | Whether to normalize concurrently: requested by the user and if there is more
+-- than one thread available to the runtime.
+useConcurrency :: NormalizeSession Bool
+useConcurrency = do
+  requested <- Lens.view (clashEnv . Lens.to (opt_concurrentNormalization . envOpts))
+  capabilities <- liftIO Concurrent.getNumCapabilities
+  pure (requested && capabilities > 1)
+
 normalize :: [Id] -> NormalizeSession BindingMap
 normalize tops = do
   binds <- MVar.newMVar "normalizeBinds" (emptyVarSet, [])
-  concurrent <- Lens.view (clashEnv . Lens.to (opt_concurrentNormalization . envOpts))
+  concurrent <- useConcurrency
   uniq0 <- Lens.use uniqSupply
   let ss = supplies (length tops) uniq0
   normalizeMany concurrent (normalizeStep concurrent binds) (zip tops ss)
