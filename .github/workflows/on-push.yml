@@ -126,8 +126,6 @@ jobs:
         run: .ci/gh-setup.sh
 
       - name: Build & check documentation
-        env:
-          PKG: ${{ matrix.pkg }}
         run: .ci/build_docs.sh
 
   stack:
@@ -247,7 +245,7 @@ jobs:
           attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-ghc)
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: |
@@ -291,7 +289,7 @@ jobs:
         run: attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.${{matrix.package}})
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#clashPackages-${{matrix.ghc}}.${{matrix.package}} | cachix push clash-lang
@@ -324,7 +322,7 @@ jobs:
         run: attic push public $(nix path-info .#devShells.x86_64-linux.${{matrix.ghc}})
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v1.10.0'
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#devShells.x86_64-linux.${{matrix.ghc}} | cachix push clash-lang
@@ -372,8 +370,38 @@ jobs:
             ${{ runner.os }}-master-cabal-${{ matrix.ghc }}
           path: ${{ steps.ghc-install.outputs.cabal-store }}
 
-      - name: Setup
-        run: .ci/gh-setup.sh
+      - name: Cachix
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
+        run: |
+          nix path-info .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug | cachix push clash-lang
+
+  running_testsuite:
+    name: Running clash-testsuite (${{matrix.ghc}}, ${{matrix.hdl}})
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        hdl: [
+          'VHDL',
+          'Verilog',
+          'SystemVerilog'
+        ]
+        ghc: [
+          ghc9124,
+          ghc9103,
+          ghc984,
+          ghc967
+        ]
+    needs: packages_testsuite
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
 
       - name: Run clash-testsuite
         run: cabal v2-run clash-testsuite -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
