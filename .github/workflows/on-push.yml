@@ -324,7 +324,6 @@ jobs:
           ghc984,
           ghc967
         ]
-    needs: packages_common
     steps:
       - uses: actions/checkout@v6
 
@@ -335,8 +334,8 @@ jobs:
 
       - name: Build clash-testsuite
         run: |
-          nix build -L .#clashPackages-${{matrix.ghc}}.clash-testsuite
-          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-prelude)
+          nix build -L .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug
+          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug)
 
       - name: Cachix
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
@@ -373,7 +372,7 @@ jobs:
 
       - name: Run clash-testsuite
         run: |
-          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
+          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
 
   all:
     name: All on-push jobs finished
