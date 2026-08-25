@@ -234,6 +234,7 @@ Library
                       Clash.Core.Var
                       Clash.Core.VarEnv
 
+                      Clash.Data.RwVar
                       Clash.Data.UniqMap
 
                       Clash.DataFiles

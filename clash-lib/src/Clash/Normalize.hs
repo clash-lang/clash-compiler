@@ -18,6 +18,7 @@
 module Clash.Normalize where
 
 import           Control.Concurrent.MVar.Lifted   (MVar)
+import qualified Clash.Data.RwVar                as RwVar
 import qualified Clash.Normalize.TracedMVar       as MVar
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
@@ -84,7 +85,7 @@ import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, clashEnv, debugOpts, uniqSupply,
    tcCache, topEntities, newInlineStrategy, ioLock)
 import           Clash.Rewrite.Util
-  (apply, isUntranslatableType, runRewriteSession)
+  (apply, isUntranslatableType, runRewriteSession, withSharedHWTypeCache)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply, splitSupply)
@@ -125,19 +126,20 @@ runNormalization env supply globals typeTrans peEval eval rcsMap lock entities s
     <*> MVar.newMVar "specialisationCache" Map.empty
     <*> MVar.newMVar "specialisationHistory" emptyVarEnv
     <*> MVar.newMVar "inlineHistory" emptyVarEnv
-    <*> MVar.newMVar "primitiveArgs" Map.empty
-    <*> MVar.newMVar "recursiveComponents" rcsMap
+    <*> RwVar.newRwVar Map.empty
+    <*> RwVar.newRwVar rcsMap
 
   rwState <- RewriteState
     <$> MVar.newMVar "transformAppliedCounters" mempty
     <*> MVar.newMVar "transformTriedCounters" mempty
-    <*> MVar.newMVar "bindings" globals
+    <*> RwVar.newRwVar globals
     <*> pure supply
     <*> MVar.newMVar "curFun" HashMap.empty
     <*> MVar.newMVar "nameCounter" 0
     <*> MVar.newMVar "globalHeap" (mempty, 0)
-    <*> MVar.newMVar "workFreeBinders" mempty
-    <*> pure Map.empty  -- hwTypeCache
+    <*> RwVar.newRwVar mempty
+    <*> pure Map.empty  -- hwTypeCache (task-local)
+    <*> RwVar.newRwVar Map.empty  -- sharedHwTypeCache
     <*> pure lock
     <*> pure normState
 
@@ -181,18 +183,23 @@ normalizeStep concurrent binds (id', s) = do
     else pure
       ( (bound `extendVarSet` id', pairs)
       , do
-          (pair, new) <- normalize' id'
+          -- This task runs with its own copy of the state, so the type
+          -- translations it performs would be lost without this.
+          (pair, new) <- shareCache (normalize' id')
           MVar.modifyMVar_ "normalizeBinds" binds (pure . second (pair:))
           pure new
       )
 
   new <- work
   normalizeMany concurrent (normalizeStep concurrent binds) new
+ where
+  shareCache | concurrent = withSharedHWTypeCache
+             | otherwise = id
 
 normalize' :: Id -> NormalizeSession ((Id, Binding Term), [(Id, Supply)])
 normalize' nm = do
   bndrsV <- Lens.use bindings
-  exprM <- MVar.withMVar "bindings" bndrsV (pure . lookupVarEnv nm)
+  exprM <- lookupVarEnv nm <$> RwVar.readRwVar bndrsV
   let nmS = showPpr (varName nm)
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do
@@ -405,6 +412,14 @@ If you touch code related to this, please make sure to run benchmarks.
 -- | Flatten a 'CallTree', memoizing results by binder Id within one cleanup
 -- pass. Without the cache, every binder reachable from the root is flattened
 -- as many times as it appears in the (un-deduplicated) call tree.
+-- Note [flattening is a chain, not a fan-out]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Flattening sibling branches concurrently was measured on wireDemoTest and
+-- gained nothing: of the 1016 nodes in that call tree, 415 have exactly one
+-- child, and the root's flattening spans the entire phase because every level
+-- has to wait for the child whose flattened body it substitutes. The phase is
+-- a dependency chain; the way to make it faster is to make each node's rewrite
+-- cheaper, not to run nodes at the same time.
 flattenCallTree
   :: IORef.IORef (UniqMap CallTree)
   -- ^ Memo cache, keyed by binder Id. Local to one 'cleanupGraph' call.
@@ -412,8 +427,6 @@ flattenCallTree
   -> NormalizeSession CallTree
 flattenCallTree _ c@(CLeaf _) = return c
 flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
-  -- XXX: Careful! If you ever add concurrency, this will have to be changed to
-  --      account for multiple workers.
   cached <- liftIO (UniqMap.lookup nm <$> IORef.readIORef cache)
   case cached of
     Just ct -> pure ct

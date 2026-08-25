@@ -9,6 +9,7 @@ module Clash.Core.VarEnv
     -- ** Accessors
     -- *** Size information
   , nullVarEnv
+  , sizeVarEnv
     -- ** Indexing
   , lookupVarEnv
   , lookupVarEnv'
@@ -206,6 +207,12 @@ nullVarEnv
   :: VarEnv a
   -> Bool
 nullVarEnv = UniqMap.null
+
+-- | The number of elements in a 'VarEnv'
+sizeVarEnv
+  :: VarEnv a
+  -> Int
+sizeVarEnv = UniqMap.size
 
 -- | Get the (left-biased) union of two environments
 unionVarEnv

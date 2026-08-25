@@ -24,6 +24,7 @@ import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
 import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
+import qualified Clash.Data.RwVar as RwVar
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Types
@@ -92,19 +93,20 @@ defRewriteState = do
     <*> newMVar Map.empty
     <*> newMVar emptyVarEnv
     <*> newMVar emptyVarEnv
-    <*> newMVar Map.empty
-    <*> newMVar emptyVarEnv
+    <*> RwVar.newRwVar Map.empty
+    <*> RwVar.newRwVar emptyVarEnv
 
   RewriteState
     <$> newMVar mempty
     <*> newMVar mempty
-    <*> newMVar emptyVarEnv
+    <*> RwVar.newRwVar emptyVarEnv
     <*> newSupply
     <*> pure (error "_curFun: NYI")
     <*> newMVar 2
     <*> newMVar (error "_globalHeap: NYI")
-    <*> newMVar emptyVarEnv
+    <*> RwVar.newRwVar emptyVarEnv
     <*> pure mempty
+    <*> RwVar.newRwVar mempty
     <*> newMVar ()
     <*> pure normState
 
