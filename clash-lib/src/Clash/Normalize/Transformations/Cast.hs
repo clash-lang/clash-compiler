@@ -16,6 +16,7 @@ module Clash.Normalize.Transformations.Cast
   ) where
 
 import Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Data.RwVar as RwVar
 import qualified Clash.Normalize.TracedMVar as MVar
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
@@ -79,7 +80,7 @@ argCastSpecWorker ctx node f (stripTicks -> Cast e' _ _)
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
   bndrsV <- Lens.use bindings
-  wf <- MVar.withMVar "bindings" bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
+  wf <- (\bndrs -> isWorkFree workFreeBinders bndrs e') =<< RwVar.readRwVar bndrsV
   Monad.unless wf warn
   specializeNode
  where

@@ -35,6 +35,7 @@ module Clash.Normalize.Util
  where
 
 import           Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Data.RwVar as RwVar
 import qualified Clash.Normalize.TracedMVar as MVar
 import           Control.Lens            ((&),(+~))
 import qualified Control.Lens            as Lens
@@ -102,25 +103,27 @@ isConstantArg
 isConstantArg "Clash.Explicit.SimIO.mealyIO" i = pure (i == 2 || i == 3)
 isConstantArg nm i = do
   argMapV <- Lens.use (extra.primitiveArgs)
+  argMap <- RwVar.readRwVar argMapV
 
-  MVar.modifyMVar "primitiveArgs" argMapV $ \argMap ->
-    case Map.lookup nm argMap of
-      Nothing -> do
-        prims <- Lens.view primitives
-        -- Constant args not yet calculated, or primitive does not exist
-        case extractPrim =<< HashMapS.lookup nm prims of
-          Nothing ->
-            -- Primitive does not exist:
-            pure (argMap, False)
+  case Map.lookup nm argMap of
+    Nothing -> do
+      prims <- Lens.view primitives
+      -- Constant args not yet calculated, or primitive does not exist
+      case extractPrim =<< HashMapS.lookup nm prims of
+        Nothing ->
+          -- Primitive does not exist:
+          pure False
 
-          Just p ->
-            -- Calculate constant arguments:
-            let m = constantArgs nm p
-             in pure (Map.insert nm m argMap, i `elem` m)
+        Just p -> do
+          -- Calculate constant arguments. Depends only on the primitive
+          -- definition, so it is computed outside the lock.
+          let m = constantArgs nm p
+          RwVar.modifyRwVar_ argMapV (pure . Map.insert nm m)
+          pure (i `elem` m)
 
-      Just m ->
-        -- Cached version found
-        pure (argMap, i `elem` m)
+    Just m ->
+      -- Cached version found
+      pure (i `elem` m)
 
 -- | Given a list of transformation contexts, determine if any of the contexts
 -- indicates that the current arg is to be reduced to a constant / literal.
@@ -177,22 +180,27 @@ isRecursiveBndr
   -> NormalizeSession Bool
 isRecursiveBndr f = do
   cgV <- Lens.use (extra.recursiveComponents)
+  cg <- RwVar.readRwVar cgV
 
-  MVar.modifyMVar "recursiveComponents" cgV $ \cg ->
-    case lookupVarEnv f cg of
-      Just isR -> pure (cg, isR)
-      Nothing -> do
-        bindingsV <- Lens.use bindings
-        mBind <- MVar.withMVar "bindings" bindingsV (pure . lookupVarEnv f)
+  case lookupVarEnv f cg of
+    Just isR -> pure isR
+    Nothing -> do
+      bindingsV <- Lens.use bindings
+      mBind <- lookupVarEnv f <$> RwVar.readRwVar bindingsV
 
-        case mBind of
-          Nothing -> pure (cg, False)
-          Just b ->
-            -- There are no global mutually-recursive functions, only self-recursive
-            -- ones, so checking whether 'f' is part of the free variables of the
-            -- body of 'f' is sufficient.
-            let isR = f `globalIdOccursIn` bindingTerm b
-             in pure (extendVarEnv f isR cg, isR)
+      case mBind of
+        Nothing -> pure False
+        Just b -> do
+          -- There are no global mutually-recursive functions, only self-recursive
+          -- ones, so checking whether 'f' is part of the free variables of the
+          -- body of 'f' is sufficient.
+          --
+          -- The answer only depends on the (immutable) body of 'f', so it is
+          -- computed outside the lock: two threads racing on the same binder
+          -- compute the same value.
+          let isR = f `globalIdOccursIn` bindingTerm b
+          RwVar.modifyRwVar_ cgV (pure . extendVarEnv f isR)
+          pure isR
 
 data ConstantSpecInfo =
   ConstantSpecInfo
@@ -490,19 +498,19 @@ normalizeWorkFreeApp f b args = do
   -- The cache lock is not held while normalizing: the application's body can
   -- contain work-free applications itself.
   cacheV <- Lens.use (extra.workFreeAppCache)
-  cached <- HashMapS.lookup app <$> MVar.readMVar "workFreeAppCache" cacheV
+  cached <- HashMapS.lookup app <$> RwVar.readRwVar cacheV
   case cached of
     Just tm -> pure tm
     Nothing -> do
       tm <- normalizeApp
-      MVar.modifyMVar_ "workFreeAppCache" cacheV (pure . HashMapS.insert app tm)
+      RwVar.modifyRwVar_ cacheV (pure . HashMapS.insert app tm)
       pure tm
  where
   app = mkApps (Var f) args
 
   normalizeApp = do
     tcm <- Lens.view tcCache
-    bndrs <- MVar.readMVar "bindings" =<< Lens.use bindings
+    bndrs <- RwVar.readRwVar =<< Lens.use bindings
     -- The application is normalized as if it were the body of a binder of
     -- its own. That binder is never referenced, so it isn't added to
     -- 'bindings'. It is named after 'f', so binders lifted out of the

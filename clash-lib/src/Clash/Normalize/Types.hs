@@ -25,6 +25,7 @@ import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
+import Clash.Data.RwVar       (RwVar)
 import Clash.Driver.Types     (Binding)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
@@ -49,9 +50,9 @@ data NormalizeState
   -- * Key: function where inlining took place
   --
   -- * Elem: (functions which were inlined, number of times inlined)
-  , _primitiveArgs :: MVar (Map Text (Set Int))
+  , _primitiveArgs :: RwVar (Map Text (Set Int))
   -- ^ Cache for looking up constantness of blackbox arguments
-  , _recursiveComponents :: MVar (VarEnv Bool)
+  , _recursiveComponents :: RwVar (VarEnv Bool)
   -- ^ Map telling whether a components is recursively defined.
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
@@ -65,7 +66,7 @@ data NormalizeState
   , _constantPropagationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
   -- for "Clash.Normalize.PrimitiveReductions". See '_normalizationStrategy'.
-  , _workFreeAppCache :: MVar (HashMap Term Term)
+  , _workFreeAppCache :: RwVar (HashMap Term Term)
   -- ^ Cache of normalized work-free applications, i.e. global functions
   -- applied to closed arguments:
   --

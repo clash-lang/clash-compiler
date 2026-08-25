@@ -64,6 +64,7 @@ import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
+import Clash.Data.RwVar          (RwVar)
 import Clash.Driver.Types
   (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts, HasClashOpts(..))
 import Clash.Driver.Warning      (CanWarn (..), warnAbout)
@@ -112,8 +113,9 @@ data RewriteState extra
   -- number of applied transformations is the 'sum' of this map.
   , _transformTriedCounters :: MVar (HashMap Text Word)
   -- ^ Map that tracks how many times each transformation has been tried
-  , _bindings         :: MVar BindingMap
-  -- ^ Global binders
+  , _bindings         :: RwVar BindingMap
+  -- ^ Global binders. Read on nearly every rewrite and written only when a
+  -- binder is created or updated, hence a 'RwVar' rather than an 'MVar'.
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
   , _curFun           :: MVar (HashMap ThreadId (Id,SrcSpan))
@@ -122,13 +124,22 @@ data RewriteState extra
   -- ^ Used for 'Fresh'
   , _globalHeap       :: MVar PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _workFreeBinders  :: MVar (VarEnv Bool)
+  , _workFreeBinders  :: RwVar (VarEnv Bool)
   -- ^ Map telling whether a binder's definition is work-free
   , _hwTypeCache      :: HWMap
   -- ^ Cache for the Core-type to HWType translation. The translation only
   -- depends on environment that is constant for the whole rewrite session
   -- (the type translator, custom representations, and the TyConMap), so the
   -- cache never has to be invalidated.
+  --
+  -- Updated on nearly every type translation, so this stays a plain field: it
+  -- is far too hot to synchronize per update. It is task-local, and exchanged
+  -- with '_sharedHwTypeCache' at task boundaries.
+  , _sharedHwTypeCache :: RwVar HWMap
+  -- ^ Translations learned by tasks that have finished. A normalization task
+  -- starts from this cache and merges its own entries back when it is done, so
+  -- that what one task translated is not re-translated by every task after it.
+  -- See 'Clash.Rewrite.Util.withSharedHWTypeCache'.
   , _ioLock           :: MVar ()
   -- ^ Synchronization for logging to stdout
   , _extra            :: !extra
@@ -296,7 +307,7 @@ type Rewrite extra = Transform (RewriteMonad extra)
 
 -- TODO:
 -- {-# SPECIALIZE isWorkFree
---       :: Lens' (RewriteState extra) (MVar (VarEnv Bool))
+--       :: Lens' (RewriteState extra) (RwVar (VarEnv Bool))
 --       -> BindingMap
 --       -> Term
 --       -> RewriteMonad extra Bool

@@ -15,6 +15,7 @@ module Clash.Data.UniqMap
   , singleton
   , singletonUnique
   , null
+  , size
   , insert
   , insertUnique
   , insertWith
@@ -122,6 +123,11 @@ singletonUnique v =
 null :: UniqMap a -> Bool
 null =
   IntMap.null . uniqMapToIntMap
+
+-- | The number of elements in the map.
+size :: UniqMap a -> Int
+size =
+  IntMap.size . uniqMapToIntMap
 
 {-# SPECIALIZE insert :: Unique -> b -> UniqMap b -> UniqMap b #-}
 -- | Insert a new key-value pair into the map.

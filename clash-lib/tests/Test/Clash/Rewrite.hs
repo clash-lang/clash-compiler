@@ -32,6 +32,7 @@ import Clash.Core.VarEnv
 import Clash.Driver.Types
   ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), IsPrim (IsFun)
   , defClashOpts, debugSilent )
+import qualified Clash.Data.RwVar as RwVar
 import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
@@ -43,7 +44,7 @@ import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
 import Control.Concurrent (myThreadId)
-import Control.Concurrent.MVar (newMVar, readMVar)
+import Control.Concurrent.MVar (newMVar)
 import qualified Control.Lens as Lens
 import Control.Monad.Trans.State.Strict (State)
 import Control.DeepSeq (NFData, force)
@@ -126,11 +127,11 @@ defNormalizeState =
     <*> newMVar Map.empty
     <*> newMVar emptyVarEnv
     <*> newMVar emptyVarEnv
-    <*> newMVar Map.empty
-    <*> newMVar emptyVarEnv
+    <*> RwVar.newRwVar Map.empty
+    <*> RwVar.newRwVar emptyVarEnv
     <*> pure normalization
     <*> pure constantPropagation
-    <*> newMVar HashMap.empty
+    <*> RwVar.newRwVar HashMap.empty
 
 -- | A fresh 'RewriteState' with the given additional state. Every call creates
 -- new 'MVar's, so states are never shared between tests.
@@ -139,13 +140,14 @@ defRewriteStateWith ext =
   RewriteState
     <$> newMVar mempty
     <*> newMVar mempty
-    <*> newMVar emptyVarEnv
+    <*> RwVar.newRwVar emptyVarEnv
     <*> newSupply
     <*> newMVar HashMap.empty -- curFun
     <*> newMVar 2
     <*> newMVar (error "_globalHeap: NYI")
-    <*> newMVar emptyVarEnv
+    <*> RwVar.newRwVar emptyVarEnv
     <*> pure mempty
+    <*> RwVar.newRwVar mempty
     <*> newMVar ()
     <*> pure ext
 
@@ -155,7 +157,7 @@ defRewriteState = defNormalizeState >>= defRewriteStateWith
 -- | Set the global binders of a 'RewriteState'
 setBindings :: BindingMap -> RewriteState extra -> IO (RewriteState extra)
 setBindings bs st = do
-  bsV <- newMVar bs
+  bsV <- RwVar.newRwVar bs
   pure st{_bindings = bsV}
 
 -- | Set the function currently being normalized by the calling thread
@@ -171,7 +173,7 @@ setUniqSupply supply st = pure st{_uniqSupply = supply}
 
 -- | Get the global binders of a 'RewriteState'
 getBindings :: RewriteState extra -> IO BindingMap
-getBindings = readMVar . _bindings
+getBindings = RwVar.readRwVar . _bindings
 
 instance Default InScopeSet where
   def = emptyInScopeSet
