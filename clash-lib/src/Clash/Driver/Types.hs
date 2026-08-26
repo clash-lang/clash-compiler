@@ -415,6 +415,10 @@ data ClashOpts = ClashOpts
   , opt_concurrentNormalization :: Bool
   -- ^ Toggle concurrent normalization (usually slower, faster on large designs)
   --
+  -- Has no effect when the RTS runs on a single capability: normalization then
+  -- runs sequentially rather than paying for synchronization it cannot use.
+  -- Pass @+RTS -N -RTS@ to give it capabilities to work with.
+  --
   -- Command line flag: -fclash-no-concurrent-normalization
   }
   deriving (Show, Eq, NFData, Generic, Hashable)
