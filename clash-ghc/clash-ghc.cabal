@@ -88,7 +88,10 @@ executable clash
     --
     -- -H and -K512M: Trade slight memory increase for better performance in
     -- large designs.
-    "-with-rtsopts=-K512M -H -I5 -T"
+    --
+    -- -N: auto set number of capabilities ("number of threads") for Haskell
+    -- runtime.
+    "-with-rtsopts=-K512M -H -I5 -T -N -qn4"
     -Wall
     -Wcompat
     -threaded
@@ -96,18 +99,18 @@ executable clash
   if flag(dynamic)
     GHC-Options: -dynamic
   if arch(x86_64) && flag(workaround-ghc-mmap-crash)
-    GHC-Options: "-with-rtsopts=-K512M -H -I5 -T -xm20000000"
+    GHC-Options: "-with-rtsopts=-K512M -H -I5 -T -N -qn4 -xm20000000"
   extra-libraries:    pthread
   default-language:   Haskell2010
 
 executable clashi
   Main-Is:            src-ghc/Interactive.hs
   Build-Depends:      base, clash-ghc
-  GHC-Options:        -Wall -Wcompat -threaded -rtsopts "-with-rtsopts=-K512M -H -I5 -T"
+  GHC-Options:        -Wall -Wcompat -threaded -rtsopts "-with-rtsopts=-K512M -H -I5 -T -N -qn4"
   if flag(dynamic)
     GHC-Options: -dynamic
   if arch(x86_64) && flag(workaround-ghc-mmap-crash)
-    GHC-Options: "-with-rtsopts=-K512M -H -I5 -T -xm20000000"
+    GHC-Options: "-with-rtsopts=-K512M -H -I5 -T -N -qn4 -xm20000000"
   extra-libraries:    pthread
   default-language:   Haskell2010
 
