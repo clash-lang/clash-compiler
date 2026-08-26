@@ -1,6 +1,5 @@
 {-|
-Copyright   : (C) 2020-2021, QBayLogic B.V.,
-                  2022     , Google Inc.
+Copyright   : (C) 2020-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -27,10 +26,8 @@ module Clash.Core.PartialEval.NormalForm
   , Normal(..)
   , LocalEnv(..)
   , GlobalEnv(..)
-  , workFreeCache
   ) where
 
-import Control.Lens (Lens', lens)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 
@@ -199,6 +196,3 @@ data GlobalEnv = GlobalEnv
     -- ^ Cache for the results of isWorkFree. This is required to use
     -- Clash.Rewrite.WorkFree.isWorkFree.
   }
-
-workFreeCache :: Lens' GlobalEnv (VarEnv Bool)
-workFreeCache = lens genvWorkCache (\env x -> env { genvWorkCache = x })

@@ -24,15 +24,19 @@ module Clash.Rewrite.Util
   , module Clash.Rewrite.WorkFree
   ) where
 
+import           Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Data.RwVar as RwVar
+import qualified Clash.Normalize.TracedMVar as MVar
 import           Control.DeepSeq
 import           Control.Exception           (throw)
-import           Control.Lens                ((%=), (+=), (^.), Lens')
+import           Control.Lens ((^.), Lens')
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
-import           Control.Monad.IO.Class      (liftIO)
+import qualified Control.Monad.IO.Class      as Monad
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import qualified Control.Monad.Writer        as Writer
+import qualified Data.Map                    as Map
 import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
@@ -91,10 +95,10 @@ import qualified Clash.Util.Interpolate as I
 import           Clash.Util.Supply           (splitSupply)
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
-zoomExtra :: State.State extra a -> RewriteMonad extra a
-zoomExtra m = R . RWS.rwsT $ \_ s ->
-  let (a, st') = State.runState m (_extra s)
-   in pure (a, s { _extra = st' }, mempty)
+zoomExtra :: State.StateT extra IO a -> RewriteMonad extra a
+zoomExtra m = R . RWS.rwsT $ \_ s -> do
+  (a, st') <- State.runStateT m (_extra s)
+  pure (a, s { _extra = st' }, mempty)
 
 -- | Some transformations might erroneously introduce shadowing. For example,
 -- a transformation might result in:
@@ -138,12 +142,16 @@ findAccidentialShadows =
 -- or 'transformAppliedCounters'.
 bumpCounter
   :: String
-  -> Lens' (RewriteState extra) (HashMap Text Word)
+  -- ^ Name of the 'MVar', used for lock tracing
+  -> String
+  -- ^ Name of the transformation
+  -> Lens' (RewriteState extra) (MVar.MVar (HashMap Text Word))
   -> RewriteMonad extra ()
-bumpCounter name l = do
-  counters <- Lens.use l
-  -- Note: Using $! to force thunks to prevent a gigantic pile of +1s in memory
-  Lens.assign l $! HashMap.insertWith (+) (Text.pack name) 1 counters
+bumpCounter mvarName name l = do
+  countersV <- Lens.use l
+  -- Note: Forcing the map to prevent a gigantic pile of +1s in memory
+  MVar.modifyMVar_ mvarName countersV
+    (pure . force . HashMap.insertWith (+) (Text.pack name) 1)
 
 -- | Record if a transformation is successfully applied
 apply
@@ -154,29 +162,50 @@ apply
   -> Rewrite extra
 apply = \s rewrite ctx expr0 -> do
   opts <- Lens.view debugOpts
-  traceIf (hasDebugInfo TryName s opts) ("Trying: " <> s) (pure ())
+  ioLockV <- Lens.use ioLock
+
+  Monad.when (hasDebugInfo TryName s opts) $
+    MVar.withMVar "ioLock" ioLockV $ \() ->
+      traceM ("Trying: " <> s)
 
   (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
-  Monad.when hasChanged (transformCounter += 1)
+
+  Monad.when hasChanged $
+    bumpCounter "transformAppliedCounters" s transformAppliedCounters
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
   let rewriteHistFile = dbg_historyFile opts
   Monad.when (isJust rewriteHistFile && hasChanged) $ do
-    (curBndr, _) <- Lens.use curFun
-    liftIO
-      $ BS.appendFile (fromJust rewriteHistFile)
-      $ BL.toStrict
-      $ encode RewriteStep
-          { t_ctx    = tfContext ctx
-          , t_name   = s
-          , t_bndrS  = showPpr (varName curBndr)
-          , t_before = expr0
-          , t_after  = expr1
-          }
+    thread <- myThreadId
+    curFunsV <- Lens.use curFun
+
+    MVar.withMVar "curFun" curFunsV $ \curFuns ->
+      case fst <$> HashMap.lookup thread curFuns of
+        Just curBndr ->
+          -- TODO Although we're locking access to the history file, entries
+          -- may still be written to it interleaved by entity. I'm not sure if
+          -- clash-term can handle this correctly...
+          MVar.withMVar "ioLock" ioLockV $ \() ->
+            Monad.liftIO
+              . BS.appendFile (fromJust rewriteHistFile)
+              . BL.toStrict
+              $ encode RewriteStep
+                         { t_ctx    = tfContext ctx
+                         , t_name   = s
+                         , t_bndrS  = showPpr (varName curBndr)
+                         , t_before = expr0
+                         , t_after  = expr1
+                         }
+
+        Nothing ->
+          error "apply: Normalizing from an unknown thread"
 
   if isDebugging opts
-    then applyDebug ctx s expr0 hasChanged expr1
+    then do
+      countersV <- Lens.use transformAppliedCounters
+      nTrans <- sum <$> MVar.readMVar "transformAppliedCounters" countersV
+      applyDebug ctx s expr0 hasChanged expr1 nTrans
     else return expr1
 {-# INLINE apply #-}
 
@@ -190,28 +219,32 @@ applyDebug
   -- ^ Whether the rewrite indicated change
   -> Term
   -- ^ New expression
+  -> Word
   -> RewriteMonad extra Term
-applyDebug ctx name exprOld hasChanged exprNew = do
-  nTrans <- Lens.use transformCounter
+applyDebug ctx name exprOld hasChanged exprNew nTrans = do
   opts <- Lens.view debugOpts
 
   let from = fromMaybe 0 (dbg_transformationsFrom opts)
   let limit = fromMaybe maxBound (dbg_transformationsLimit opts)
 
-  if | nTrans - from > limit ->
+  if | nTrans - from > limit -> do
          error "-fclash-debug-transformations-limit exceeded"
-     | nTrans <= from ->
+     | nTrans <= from -> do
          pure exprNew
      | otherwise ->
-         go opts
+         go (pred nTrans) opts
  where
-  go opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
-    nTrans <- pred <$> Lens.use transformCounter
+  go nTrans' opts = do
+    ioLockV <- Lens.use ioLock
 
-    Monad.when (dbg_countTransformations opts) $ do
-      bumpCounter name transformTriedCounters
-      Monad.when hasChanged $
-        bumpCounter name transformAppliedCounters
+    Monad.when (hasDebugInfo TryTerm name opts) $
+      MVar.withMVar "ioLock" ioLockV $ \() ->
+        traceM ("Tried: " ++ name ++ " on:\n" ++ before)
+
+    -- NB: 'transformAppliedCounters' is bumped unconditionally in 'apply', as
+    -- the total transformation count is derived from it.
+    Monad.when (dbg_countTransformations opts) $
+      bumpCounter "transformTriedCounters" name transformTriedCounters
 
     Monad.when (dbg_invariants opts && hasChanged) $ do
       tcm                  <- Lens.view tcCache
@@ -267,12 +300,20 @@ applyDebug ctx name exprOld hasChanged exprNew = do
       error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                         ++ before ++ "\nafter:\n" ++ after
 
-    traceIf (hasDebugInfo AppliedName name opts && hasChanged) (name <> " {" <> show nTrans <> "}") $
-      traceIf (hasDebugInfo AppliedTerm name opts && hasChanged) ("Changes when applying rewrite to:\n"
-                        ++ before ++ "\nResult:\n" ++ after ++ "\n") $
-        traceIf (hasDebugInfo TryTerm name opts && not hasChanged) ("No changes when applying rewrite "
-                          ++ name ++ " to:\n" ++ after ++ "\n") $
-          return exprNew
+    let traceName = hasDebugInfo AppliedName name opts && hasChanged
+        traceTerm = hasDebugInfo AppliedTerm name opts && hasChanged
+        traceTryTerm = hasDebugInfo TryTerm name opts && not hasChanged
+        shouldTrace = traceName || traceTerm || traceTryTerm
+
+    Monad.when shouldTrace $
+      MVar.withMVar "ioLock" ioLockV $ \() -> do
+        traceWhen traceName (name <> " {" <> show nTrans' <> "}")
+        traceWhen traceTerm
+          ("Changes when applying rewrite to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n")
+        traceWhen traceTryTerm
+          ("No changes when applying rewrite " ++ name ++ " to:\n" ++ after ++ "\n")
+
+    return exprNew
    where
     before = showPpr exprOld
     after  = showPpr exprNew
@@ -304,20 +345,23 @@ runRewriteSession :: RewriteEnv
                   -> RewriteState extra
                   -> RewriteMonad extra a
                   -> IO a
-runRewriteSession r s m = do
-  (a, s', _) <- runR m r s
+runRewriteSession rwEnv rwState session = do
+  (a, session1, _) <- runR session rwEnv rwState
+  tried <- MVar.readMVar "transformTriedCounters" (session1 ^. transformTriedCounters)
+  applied <- MVar.readMVar "transformAppliedCounters" (session1 ^. transformAppliedCounters)
 
-  let
-    triedTransformationsMessage =
-      ("Clash: Tried transformations:\n" ++ Text.unpack (showCounters (s' ^. transformTriedCounters)))
-    appliedTransformationsMessage =
-      ("Clash: Applied transformations:\n" ++ Text.unpack (showCounters (s' ^. transformAppliedCounters)))
+  let opts = opt_debug (envOpts (_clashEnv rwEnv))
+      shouldTrace = dbg_countTransformations opts || None < dbg_transformationInfo opts
 
-  traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
-    (triedTransformationsMessage ++ "\n" ++ appliedTransformationsMessage) $
-    traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
-      ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
-      pure a
+  Monad.when shouldTrace $
+    MVar.withMVar "ioLock" (session1 ^. ioLock) $ \() -> do
+      traceWhen (dbg_countTransformations opts) $
+        "Clash: Tried transformations:\n" ++ Text.unpack (showCounters tried) ++
+        "\nClash: Applied transformations:\n" ++ Text.unpack (showCounters applied)
+      traceWhen (None < dbg_transformationInfo opts)
+        ("Clash: Applied " ++ show (sum applied) ++ " transformations")
+
+  pure a
   where
     showCounters =
       Text.unlines
@@ -527,7 +571,9 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
                                                 (substTmEnv subst) }
         subst2 = extendIdSubst subst1 x e2
     if x `elemFreeVars` e2 then do
-      (_,sp) <- Lens.use curFun
+      curFunsV <- Lens.use curFun
+      thread <- myThreadId
+      Just (_,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
       throw (ClashException sp [I.i|
         Internal error: inlineOrLiftBInders failed on:
 
@@ -606,53 +652,59 @@ liftBinding (var@Id {varName = idName} ,e) = do
   -- Make a new global ID
   tcm       <- Lens.view tcCache
   let newBodyTy = inferCoreTypeOf tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
-  (cf,sp)   <- Lens.use curFun
-  binders <- Lens.use bindings
-  newBodyNm <-
-    cloneNameWithBindingMap
-      binders
-      (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
-  let newBodyId = mkGlobalId newBodyTy newBodyNm {nameSort = Internal}
+  curFunsV <- Lens.use curFun
+  thread <- myThreadId
+  Just (cf,sp) <- MVar.withMVar "curFun" curFunsV (pure . HashMap.lookup thread)
+  bindersV <- Lens.use bindings
+  -- Deriving the new name from the binding map, and checking whether an
+  -- alpha-equivalent binder already exists, both have to see the same map the
+  -- new binder is inserted into, so this whole section is one write.
+  RwVar.modifyRwVar bindersV $ \binders -> do
+    newBodyNm <-
+      cloneNameWithBindingMap
+        binders
+        (appendToName (varName cf) ("_" `Text.append` nameOcc idName))
+    let newBodyId = mkGlobalId newBodyTy newBodyNm {nameSort = Internal}
 
-  -- Make a new expression, consisting of the the lifted function applied to
-  -- its free variables
-  let newExpr = mkTmApps
-                  (mkTyApps (Var newBodyId)
-                            (map VarTy boundFTVs))
-                  (map Var boundFVs)
-      inScope0 = mkInScopeSet (coerce boundFVsSet)
-      inScope1 = extendInScopeSetList inScope0 [var,newBodyId]
-  let subst    = extendIdSubst (mkSubst inScope1) var newExpr
-      -- Substitute the recursive calls by the new expression
-      e' = substTm "liftBinding" subst e
-      -- Create a new body that abstracts over the free variables
-      newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
+    -- Make a new expression, consisting of the the lifted function applied to
+    -- its free variables
+    let newExpr = mkTmApps
+                    (mkTyApps (Var newBodyId)
+                              (map VarTy boundFTVs))
+                    (map Var boundFVs)
+        inScope0 = mkInScopeSet (coerce boundFVsSet)
+        inScope1 = extendInScopeSetList inScope0 [var,newBodyId]
+    let subst    = extendIdSubst (mkSubst inScope1) var newExpr
+        -- Substitute the recursive calls by the new expression
+        e' = substTm "liftBinding" subst e
+        -- Create a new body that abstracts over the free variables
+        newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
-  -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (UniqMap.elems . UniqMap.filter ((`aeqTerm` newBody) . bindingTerm)) <$> Lens.use bindings
-  case aeqExisting of
-    -- If it doesn't, create a new binder
-    [] -> do -- Add the created function to the list of global bindings
-             let r = newBodyId `globalIdOccursIn` newBody
-             bindings %= UniqMap.insert newBodyNm
-                                    -- We mark this function as internal so that
-                                    -- it can be inlined at the very end of
-                                    -- the normalisation pipeline as part of the
-                                    -- flattening pass. We don't inline
-                                    -- right away because we are lifting this
-                                    -- function at this moment for a reason!
-                                    -- (termination, CSE and DEC oppertunities,
-                                    -- ,etc.)
-                                    (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
-             -- Return the new binder
-             return (var, newExpr)
-    -- If it does, use the existing binder
-    (b:_) ->
-      let newExpr' = mkTmApps
-                      (mkTyApps (Var $ bindingId b)
-                                (map VarTy boundFTVs))
-                      (map Var boundFVs)
-      in  return (var, newExpr')
+    -- Check if an alpha-equivalent global binder already exists
+    let aeqExisting = UniqMap.elems . UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) $ binders
+    case aeqExisting of
+      -- If it doesn't, create a new binder
+      [] -> do -- Add the created function to the list of global bindings
+               let r = newBodyId `globalIdOccursIn` newBody
+               let binders1 =
+                     UniqMap.insert
+                       newBodyNm
+                       -- We mark this function as internal so that it can be inlined
+                       -- at the very end of the normalization pipeline as part of the
+                       -- flattening pass. We don't inline right away because we are
+                       -- lifting this function at this moment for a reason!
+                       -- (termination, CSE and DEC opportunities, etc.)
+                       (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
+                       binders
+
+               return (binders1, (var, newExpr))
+      -- If it does, use the existing binder
+      (b:_) -> do
+        let newExpr' = mkTmApps
+                        (mkTyApps (Var $ bindingId b)
+                                  (map VarTy boundFTVs))
+                        (map Var boundFVs)
+        return (binders, (var, newExpr'))
 
 liftBinding _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 
@@ -669,23 +721,16 @@ mkFunction
 mkFunction bndrNm sp inl body = do
   tcm <- Lens.view tcCache
   let bodyTy = inferCoreTypeOf tcm body
-  binders <- Lens.use bindings
-  bodyNm <- cloneNameWithBindingMap binders bndrNm
-  addGlobalBind bodyNm bodyTy sp inl body
-  return (mkGlobalId bodyTy bodyNm)
+  bindersV <- Lens.use bindings
 
--- | Add a function to the set of global binders
-addGlobalBind
-  :: TmName
-  -> Type
-  -> SrcSpan
-  -> InlineSpec
-  -> Term
-  -> RewriteMonad extra ()
-addGlobalBind vNm ty sp inl body = do
-  let vId = mkGlobalId ty vNm
-      r = vId `globalIdOccursIn` body
-  (ty,body) `deepseq` bindings %= UniqMap.insert vNm (Binding vId sp inl IsFun body r)
+  RwVar.modifyRwVar bindersV $ \binders -> do
+    bodyNm <- cloneNameWithBindingMap binders bndrNm
+    let vId = mkGlobalId bodyTy bodyNm
+        r = vId `globalIdOccursIn` body
+        bind = Binding vId sp inl IsFun body r
+        binders' = UniqMap.insert vId bind binders
+
+    bodyTy `deepseq` body `deepseq` binders' `seq` pure (binders', vId)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.
@@ -719,6 +764,34 @@ runWithHWTypeCache m = do
   hwTypeCache Lens..= cache1
   pure a
 
+-- | Seed this task's HWType cache from the shared one, and publish what the
+-- task learned when it finishes.
+--
+-- The cache is a plain (task-local) field because it is updated on nearly every
+-- type translation — millions of times per compilation — which is far too hot
+-- to synchronize per update. Sharing it at task boundaries instead keeps the
+-- translations one task performed available to the tasks that start after it,
+-- rather than discarding them when the task's state copy dies.
+withSharedHWTypeCache :: RewriteMonad extra a -> RewriteMonad extra a
+withSharedHWTypeCache m = do
+  var <- Lens.use sharedHwTypeCache
+  shared0 <- RwVar.readRwVar var
+  hwTypeCache Lens..= shared0
+  a <- m
+  cache1 <- Lens.use hwTypeCache
+  Monad.when (Map.size cache1 > Map.size shared0) $
+    RwVar.modifyRwVar_ var (pure . Map.union cache1)
+  pure a
+
+-- Note [rewriting a let's bindings concurrently]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The bindings of a let are independent, so rewriting them on separate threads
+-- looks like free parallelism inside a single binder. It was measured on
+-- wireDemoTest (fork above 32 bindings) and made normalization 2.8x slower:
+-- 2m39s against 57.6s. The settle loop traverses the same let on every
+-- iteration, so each traversal pays for forking again, against rewrites that
+-- cost microseconds per node.
+--
 -- | Determine if a term cannot be represented in hardware
 isUntranslatable
   :: Bool
@@ -756,84 +829,88 @@ normalizeId _   tyvar     = tyvar
 -- | Evaluate an expression to weak-head normal form (WHNF), and apply a
 -- transformation on the expression in WHNF.
 whnfRW
-  :: Bool
+  :: forall extra
+   . Bool
   -- ^ Whether the expression we're reducing to WHNF is the subject of a
   -- case expression.
   -> TransformContext
   -> Term
   -> Rewrite extra
   -> RewriteMonad extra Term
-whnfRW isSubj ctx@(TransformContext is0 hist) e rw = do
+whnfRW isSubj (TransformContext is0 hist) e0 rw = do
   tcm <- Lens.view tcCache
-  bndrs <- Lens.use bindings
   eval <- Lens.view evaluator
+
+  bndrsV <- Lens.use bindings
   ids <- Lens.use uniqSupply
+  ghV <- Lens.use globalHeap
+
+  bndrs <- RwVar.readRwVar bndrsV
+  gh <- MVar.takeMVar "globalHeap" ghV
+
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
-  gh <- Lens.use globalHeap
   let lh = localBinders mempty hist
 
-  case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e of
+  case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e0 of
     (!gh1,ph,v) -> do
-      globalHeap Lens..= gh1
-      bindPureHeap tcm (ph `differenceVarEnv` lh) rw ctx v
+      let result = bindPureHeap tcm bndrs (ph `differenceVarEnv` lh) v
+      MVar.putMVar "globalHeap" ghV gh1
+      result
  where
   localBinders acc [] = acc
   localBinders !acc (h:hs) = case h of
     LetBody ls -> localBinders (acc <> mkVarEnv ls) hs
     _ -> localBinders acc hs
 
-{-# SCC whnfRW #-}
-
--- | Binds variables on the PureHeap over the result of the rewrite
---
--- To prevent unnecessary rewrites only do this when rewrite changed something.
-bindPureHeap
-  :: TyConMap
-  -> PureHeap
-  -> Rewrite extra
-  -> Rewrite extra
-bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
-  (e1, Monoid.getAny -> hasChanged) <- Writer.listen $ rw ctx e
-  if hasChanged && not (null bndrs) then do
-    -- The evaluator results are post-processed with two operations:
-    --
-    --   1. Inline work free binders. We've seen cases in the wild† where the
-    --      evaluator (or rather, 'bindPureHeap') would let-bind work-free
-    --      binders that were crucial for eliminating case constructs. If these
-    --      case constructs were used in a self-referential (but terminating)
-    --      manner, Clash would get stuck in an infinite loop. The proper
-    --      solution would be to use 'isWorkFree', instead of 'isWorkFreeIsh',
-    --      in 'bindConstantVar' such that these work free constructs would get
-    --      inlined again. However, this incurs a great performance penalty so
-    --      we opt to prevent the evaluator from introducing this situation in
-    --      the first place.
-    --
-    --      I'd like to stress that this is not a proper solution though, as GHC
-    --      might produce a similar situation. We plan on properly solving this
-    --      by eliminating the current lift/bind/eval strategy, instead replacing
-    --      it by a partial evaluator‡.
-    --
-    --   2. Remove any unused let-bindings. Similar to (1), we risk Clash getting
-    --      stuck in an infinite loop if we don't remove unused (eliminated by
-    --      evaluation!) binders.
-    --
-    -- † https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374
-    -- ‡ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf
-    bs <- Lens.use bindings
-    inlineBinders (inlineTest bs) ctx0 (Letrec bndrs e1) >>= \case
-      e2@(Let bnders1 e3) ->
-        pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
-      e2 ->
-        pure e2
-  else
-    return e1
-  where
-    heapIds = map fst bndrs
+  -- | Binds variables on the PureHeap over the result of the rewrite
+  -- To prevent unnecessary rewrites only do this when rewrite changed something.
+  bindPureHeap
+    :: TyConMap
+    -> BindingMap
+    -> PureHeap
+    -> Term
+    -> RewriteMonad extra Term
+  bindPureHeap tcm bs heap e1 = do
+    (e2, Monoid.getAny -> hasChanged) <- Writer.listen $ rw ctx e1
+    if hasChanged && not (null letBndrs) then do
+      -- The evaluator results are post-processed with two operations:
+      --
+      --   1. Inline work free binders. We've seen cases in the wild† where the
+      --      evaluator (or rather, 'bindPureHeap') would let-bind work-free
+      --      binders that were crucial for eliminating case constructs. If these
+      --      case constructs were used in a self-referential (but terminating)
+      --      manner, Clash would get stuck in an infinite loop. The proper
+      --      solution would be to use 'isWorkFree', instead of 'isWorkFreeIsh',
+      --      in 'bindConstantVar' such that these work free constructs would get
+      --      inlined again. However, this incurs a great performance penalty so
+      --      we opt to prevent the evaluator from introducing this situation in
+      --      the first place.
+      --
+      --      I'd like to stress that this is not a proper solution though, as GHC
+      --      might produce a similar situation. We plan on properly solving this
+      --      by eliminating the current lift/bind/eval strategy, instead replacing
+      --      it by a partial evaluator‡.
+      --
+      --   2. Remove any unused let-bindings. Similar to (1), we risk Clash getting
+      --      stuck in an infinite loop if we don't remove unused (eliminated by
+      --      evaluation!) binders.
+      --
+      -- † https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374
+      -- ‡ https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf
+      inlineBinders inlineTest ctx (Letrec letBndrs e2) >>= \case
+        e3@(Let bnders1 e4) ->
+          pure (fromMaybe e3 (removeUnusedBinders bnders1 e4))
+        e3 ->
+          pure e3
+    else
+      return e2
+   where
+    heapIds = map fst letBndrs
     is1 = extendInScopeSetList is0 heapIds
-    ctx = TransformContext is1 (LetBody bndrs : hist)
+    ctx = TransformContext is1 (LetBody letBndrs : hist)
 
-    bndrs = map toLetBinding $ UniqMap.toList heap
+    letBndrs = map toLetBinding $ UniqMap.toList heap
 
     toLetBinding :: (Unique,Term) -> LetBinding
     toLetBinding (uniq,term) = (nm, term)
@@ -841,7 +918,8 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
         ty = inferCoreTypeOf tcm term
         nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
 
-    inlineTest bs _ (_, stripTicks -> e_) = isWorkFree workFreeBinders bs e_
+    inlineTest _ (_, stripTicks -> e_) = isWorkFree workFreeBinders bs e_
+{-# SCC whnfRW #-}
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
 -- binders were found.

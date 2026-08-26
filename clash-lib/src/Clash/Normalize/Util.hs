@@ -10,7 +10,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.Util
  ( ConstantSpecInfo(..)
@@ -33,13 +33,18 @@ module Clash.Normalize.Util
  )
  where
 
-import           Control.Lens            ((&),(+~),(%=),(.=))
+import           Control.Concurrent.Lifted (myThreadId)
+import qualified Clash.Data.RwVar as RwVar
+import qualified Clash.Normalize.TracedMVar as MVar
+import           Control.Lens            ((&),(+~))
 import qualified Control.Lens            as Lens
+import           Control.Monad           (when)
 import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts,rights)
 import qualified Data.List               as List
 import qualified Data.List.Extra         as List
 import qualified Data.Map                as Map
+import           Data.Maybe              (fromMaybe)
 import qualified Data.HashMap.Strict     as HashMapS
 import qualified Data.HashSet            as HashSet
 import           Data.Text               (Text)
@@ -69,7 +74,7 @@ import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Debug             (traceIf)
+import           Clash.Debug             (traceM)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
 import           Clash.Normalize.Primitives (removedArg)
@@ -78,11 +83,11 @@ import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
-   tcCache, primitives)
+   tcCache, primitives, ioLock)
 import           Clash.Rewrite.Util
   (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
-import           Clash.Util              (SrcSpan, makeCachedU)
+import           Clash.Util              (SrcSpan, curLoc, noSrcSpan)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -97,20 +102,25 @@ isConstantArg
   -- blackbox.
 isConstantArg "Clash.Explicit.SimIO.mealyIO" i = pure (i == 2 || i == 3)
 isConstantArg nm i = do
-  argMap <- Lens.use (extra.primitiveArgs)
+  argMapV <- Lens.use (extra.primitiveArgs)
+  argMap <- RwVar.readRwVar argMapV
+
   case Map.lookup nm argMap of
     Nothing -> do
-      -- Constant args not yet calculated, or primitive does not exist
       prims <- Lens.view primitives
+      -- Constant args not yet calculated, or primitive does not exist
       case extractPrim =<< HashMapS.lookup nm prims of
         Nothing ->
           -- Primitive does not exist:
           pure False
+
         Just p -> do
-          -- Calculate constant arguments:
+          -- Calculate constant arguments. Depends only on the primitive
+          -- definition, so it is computed outside the lock.
           let m = constantArgs nm p
-          (extra.primitiveArgs) Lens.%= Map.insert nm m
+          RwVar.modifyRwVar_ argMapV (pure . Map.insert nm m)
           pure (i `elem` m)
+
     Just m ->
       -- Cached version found
       pure (i `elem` m)
@@ -134,10 +144,12 @@ alreadyInlined
   -- ^ Function in which we want to perform the inlining
   -> NormalizeMonad (Maybe Int)
 alreadyInlined f cf = do
-  inlinedHM <- Lens.use inlineHistory
-  case lookupVarEnv cf inlinedHM of
-    Nothing       -> return Nothing
-    Just inlined' -> return (lookupVarEnv f inlined')
+  inlinedHMV <- Lens.use inlineHistory
+
+  MVar.withMVar "inlineHistory" inlinedHMV $ \inlinedHM ->
+    case lookupVarEnv cf inlinedHM of
+      Nothing       -> return Nothing
+      Just inlined' -> return (lookupVarEnv f inlined')
 
 -- | Record a new inlining in the `inlineHistory`
 addNewInline
@@ -146,11 +158,11 @@ addNewInline
   -> Id
   -- ^ Function in which we're inlining it
   -> NormalizeMonad ()
-addNewInline f cf =
-  inlineHistory %= extendVarEnvWith
-                     cf
-                     (unitVarEnv f 1)
-                     (\_ hm -> extendVarEnvWith f 1 (+) hm)
+addNewInline f cf = do
+  inlineHistV <- Lens.use inlineHistory
+
+  MVar.modifyMVar_ "inlineHistory" inlineHistV $
+    pure . extendVarEnvWith cf (unitVarEnv f 1) (\_ hm -> extendVarEnvWith f 1 (+) hm)
 
 -- | Test whether a given term represents a non-recursive global variable
 isNonRecursiveGlobalVar
@@ -167,20 +179,28 @@ isRecursiveBndr
   :: Id
   -> NormalizeSession Bool
 isRecursiveBndr f = do
-  cg <- Lens.use (extra.recursiveComponents)
+  cgV <- Lens.use (extra.recursiveComponents)
+  cg <- RwVar.readRwVar cgV
+
   case lookupVarEnv f cg of
-    Just isR -> return isR
+    Just isR -> pure isR
     Nothing -> do
-      fBodyM <- lookupVarEnv f <$> Lens.use bindings
-      case fBodyM of
-        Nothing -> return False
+      bindingsV <- Lens.use bindings
+      mBind <- lookupVarEnv f <$> RwVar.readRwVar bindingsV
+
+      case mBind of
+        Nothing -> pure False
         Just b -> do
           -- There are no global mutually-recursive functions, only self-recursive
           -- ones, so checking whether 'f' is part of the free variables of the
           -- body of 'f' is sufficient.
+          --
+          -- The answer only depends on the (immutable) body of 'f', so it is
+          -- computed outside the lock: two threads racing on the same binder
+          -- compute the same value.
           let isR = f `globalIdOccursIn` bindingTerm b
-          (extra.recursiveComponents) %= extendVarEnv f isR
-          return isR
+          RwVar.modifyRwVar_ cgV (pure . extendVarEnv f isR)
+          pure isR
 
 data ConstantSpecInfo =
   ConstantSpecInfo
@@ -318,7 +338,9 @@ constantSpecInfo ctx e = do
           pure (constantCsr e)
 
       (var@(Var f), args, ticks) -> do
-        (curF, _) <- Lens.use curFun
+        curFunsV <- Lens.use curFun
+        thread <- myThreadId
+        Just (curF, _) <- MVar.withMVar "curFun" curFunsV (pure . HashMapS.lookup thread)
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
         if isNonRecGlobVar && f /= curF then do
           csr <- mergeCsrs ctx ticks e (mkApps var) args
@@ -403,22 +425,44 @@ normalizeTopLvlBndr
   -> Id
   -> Binding Term
   -> NormalizeSession (Binding Term)
-normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extra.normalized) $ do
-  tcm <- Lens.view tcCache
-  let nmS = showPpr (varName nm)
-  -- We deshadow the term because sometimes GHC gives us
-  -- code where a local binder has the same unique as a
-  -- global binder, sometimes causing the inliner to go
-  -- into a loop. Deshadowing freshens all the bindings
-  -- to avoid this.
-  let tm1 = deShadowTerm emptyInScopeSet tm
-      tm2 = if isTop then substWithTyEq tm1 else tm1
-  old <- Lens.use curFun
-  tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
-  curFun .= old
-  let ty' = inferCoreTypeOf tcm tm3
-  let r' = nm' `globalIdOccursIn` tm3
-  return (Binding nm'{varType = ty'} sp inl pr tm3 r')
+normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
+  normalizedV <- Lens.use (extra.normalized)
+
+  -- TODO This was a call to makeCachedU, but since there was no variation
+  -- for MVar, I unrolled everything. Maybe there should be MVar versions of
+  -- the makeCachedX functions needed in normalization.
+
+  cache <- MVar.takeMVar "normalized" normalizedV
+  case lookupVarEnv nm cache of
+    Just vMVar -> do
+      MVar.putMVar "normalized" normalizedV cache
+      MVar.readMVar "normalizedBinding" vMVar
+    Nothing -> do
+      tmp <- MVar.newEmptyMVar "normalizedTmp"
+      MVar.putMVar "normalized" normalizedV (extendVarEnv nm tmp cache)
+
+      tcm <- Lens.view tcCache
+      let nmS = showPpr (varName nm)
+      -- We deshadow the term because sometimes GHC gives us
+      -- code where a local binder has the same unique as a
+      -- global binder, sometimes causing the inliner to go
+      -- into a loop. Deshadowing freshens all the bindings
+      -- to avoid this.
+      let tm1 = deShadowTerm emptyInScopeSet tm
+          tm2 = if isTop then substWithTyEq tm1 else tm1
+      -- TODO Should tm3 be done async / added to the job queue when it's made?
+      curFunsV <- Lens.use curFun
+      thread <- myThreadId
+      old <- MVar.withMVar "curFun" curFunsV (pure . HashMapS.lookup thread)
+      tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
+      MVar.modifyMVar_ "curFun" curFunsV $
+        pure . HashMapS.insert thread (fromMaybe (error $ $(curLoc) ++ "Report as bug: no curFun", noSrcSpan) old)
+      let ty' = inferCoreTypeOf tcm tm3
+      let r' = nm' `globalIdOccursIn` tm3
+      let value = Binding nm'{varType = ty'} sp inl pr tm3 r'
+
+      MVar.putMVar "normalizedTmp" tmp value
+      pure value
 
 -- | Turn type equality constraints into substitutions and apply them.
 --
@@ -489,17 +533,23 @@ rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
             -> (Id, SrcSpan)        -- ^ Renew current function being rewritten
             -> NormalizeSession Term
 rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
-  curFun .= (nm, sp)
+  curFunsV <- Lens.use curFun
+  thread <- myThreadId
+  MVar.modifyMVar_ "curFun" curFunsV (pure . HashMapS.insert thread (nm, sp))
   opts <- Lens.view debugOpts
-  let before = showPpr expr
-  let expr' = traceIf (hasTransformationInfo FinalTerm opts)
-                (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
-                expr
-  rewritten <- runRewrite nrwS emptyInScopeSet nrw expr'
-  let after = showPpr rewritten
-  traceIf (hasTransformationInfo FinalTerm opts)
-    (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
-    return rewritten
+  ioLockV <- Lens.use ioLock
+
+  when (hasTransformationInfo FinalTerm opts) $
+    MVar.withMVar "ioLock" ioLockV $ \() ->
+      traceM (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ showPpr expr ++ "\n")
+
+  rewritten <- runRewrite nrwS emptyInScopeSet nrw expr
+
+  when (hasTransformationInfo FinalTerm opts) $
+    MVar.withMVar "ioLock" ioLockV $ \() ->
+      traceM (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ showPpr rewritten ++ "\n")
+
+  return rewritten
 
 -- | A tick to prefix an inlined expression with it's original name.
 -- For example, given

@@ -9,6 +9,7 @@ module Clash.Core.VarEnv
     -- ** Accessors
     -- *** Size information
   , nullVarEnv
+  , sizeVarEnv
     -- ** Indexing
   , lookupVarEnv
   , lookupVarEnv'
@@ -39,6 +40,8 @@ module Clash.Core.VarEnv
     -- ** Conversions
     -- *** Lists
   , eltsVarEnv
+  , toListVarEnv
+  , listToVarEnv
     -- * Sets of variables
   , VarSet
     -- ** Construction
@@ -205,6 +208,12 @@ nullVarEnv
   -> Bool
 nullVarEnv = UniqMap.null
 
+-- | The number of elements in a 'VarEnv'
+sizeVarEnv
+  :: VarEnv a
+  -> Int
+sizeVarEnv = UniqMap.size
+
 -- | Get the (left-biased) union of two environments
 unionVarEnv
   :: VarEnv a
@@ -263,6 +272,15 @@ eltsVarEnv
   :: VarEnv a
   -> [a]
 eltsVarEnv = UniqMap.elems
+
+toListVarEnv :: VarEnv a -> [(Unique, a)]
+toListVarEnv = UniqMap.toList
+
+listToVarEnv
+  :: Uniquable a
+  => [(a, b)]
+  -> VarEnv b
+listToVarEnv = UniqMap.fromList
 
 -- | Does the variable exist in the environment
 elemVarEnv
