@@ -1,1 +1,0 @@
-FIXED: Errors in `Synthesize` port annotations (e.g. a `PortProduct` on a non-product port) are now reported before a design is normalized, instead of afterwards. This avoids waiting for a potentially long normalization only to get a trivial port error. See [#3305](https://github.com/clash-lang/clash-compiler/issues/3305).
