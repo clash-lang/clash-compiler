@@ -426,7 +426,8 @@ test-suite unittests
       transformers,
       unordered-containers
 
-  Other-Modules: Clash.Tests.Core.FreeVars
+  Other-Modules: Clash.Tests.Core.AlphaEquivalence
+                 Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.Subst
                  Clash.Tests.Core.TermLiteral
                  Clash.Tests.Core.TermLiteral.Types
