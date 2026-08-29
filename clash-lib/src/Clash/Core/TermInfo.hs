@@ -5,7 +5,7 @@
 
 module Clash.Core.TermInfo where
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.HasType
@@ -36,6 +36,37 @@ termSize (Case subj _ alts) = sum (subjSz:altSzs)
  where
   subjSz = termSize subj
   altSzs = map (termSize . snd) alts
+
+-- | @termSizeSmallerThan n t@ is @'termSize' t < n@, but stops traversing @t@
+-- as soon as the size reaches @n@. Use this instead of 'termSize' when
+-- comparing against a limit: inlining heuristics routinely compare very large
+-- terms against small limits, and only the first @n@ nodes decide the answer.
+termSizeSmallerThan :: Word -> Term -> Bool
+termSizeSmallerThan n t0
+  | n == 0 = False
+  | otherwise = isJust (go (n - 1) [t0])
+ where
+  -- @go budget ts@ returns the remaining budget after spending the summed
+  -- 'termSize' of @ts@, or 'Nothing' if the budget does not cover it
+  go :: Word -> [Term] -> Maybe Word
+  go budget [] = Just budget
+  go budget (t:rest) = case t of
+    Var {}     -> spend budget rest
+    Data {}    -> spend budget rest
+    Literal {} -> spend budget rest
+    Prim {}    -> spend budget rest
+    Lam _ e    -> spend budget (e:rest)
+    TyLam _ e  -> go budget (e:rest)
+    App e1 e2  -> go budget (e1:e2:rest)
+    TyApp e _  -> go budget (e:rest)
+    Cast e _ _ -> go budget (e:rest)
+    Tick _ e   -> go budget (e:rest)
+    Let (NonRec _ x) e -> go budget (x:e:rest)
+    Let (Rec xs) e -> go budget (map snd xs ++ e:rest)
+    Case subj _ alts -> go budget (subj : map snd alts ++ rest)
+
+  spend 0 _ = Nothing
+  spend budget rest = go (budget - 1) rest
 
 multPrimErr :: PrimInfo -> String
 multPrimErr primInfo =  [I.i|
