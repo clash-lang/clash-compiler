@@ -4578,38 +4578,51 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
          n' | Right m <- runExcept (tyNatSize tcm mTy) ->
           let Just vecTc  = UniqMap.lookup vecTcNm tcm
               [_,consCon] = tyConDataCons vecTc
-              tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
-              Just tupTc  = UniqMap.lookup tupTcNm tcm
-              [tupDc]     = tyConDataCons tupTc
-              splitCall   =
-                mkApps (bvSplitPrim bvTcNm)
-                       [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
-                       , Right mTy
-                       , Left (Literal (NaturalLiteral ((n'-1)*m)))
-                       , Left (valToTerm bv)
-                       ]
               mBVTy       = mkTyConApp bvTcNm [mTy]
-              n1BVTy      = mkTyConApp bvTcNm
-                              [mkTyConApp typeNatMul
-                                [LitTy (NumTy (n'-1))
-                                ,mTy]]
-              -- Guaranteed no capture, so okay to use unsafe name generation
-              xNm         = mkUnsafeSystemName "x" 0
-              bvNm        = mkUnsafeSystemName "bv'" 1
-              xId         = mkLocalId mBVTy xNm
-              bvId        = mkLocalId n1BVTy bvNm
-              tupPat      = DataPat tupDc [] [xId,bvId]
-              xAlt        = (tupPat, (Var xId))
-              bvAlt       = (tupPat, (Var bvId))
+              n1MTy       = mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy]
+              n1BVTy      = mkTyConApp bvTcNm [n1MTy]
 
-          in  reduce $ mkVecCons consCon (mkTyConApp bvTcNm [mTy]) n'
-                (Case splitCall mBVTy [xAlt])
+              (hd, tl) = case bitVectorLiteral bv of
+                -- Fast path for literals
+                Just (mski, i) ->
+                  let sh     = fromInteger ((n'-1) * m)
+                      loMask = bit sh - 1
+                  in  ( mkBitVectorLit mBVTy mTy m
+                          (mski `shiftR` sh) (i `shiftR` sh)
+                      , mkBitVectorLit n1BVTy n1MTy ((n'-1)*m)
+                          (mski .&. loMask) (i .&. loMask)
+                      )
+                Nothing ->
+                  let tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
+                      Just tupTc  = UniqMap.lookup tupTcNm tcm
+                      [tupDc]     = tyConDataCons tupTc
+                      splitCall   =
+                        mkApps (bvSplitPrim bvTcNm)
+                               [ Right n1MTy
+                               , Right mTy
+                               , Left (Literal (NaturalLiteral ((n'-1)*m)))
+                               , Left (valToTerm bv)
+                               ]
+                      -- Guaranteed no capture, so okay to use unsafe name
+                      -- generation
+                      xNm         = mkUnsafeSystemName "x" 0
+                      bvNm        = mkUnsafeSystemName "bv'" 1
+                      xId         = mkLocalId mBVTy xNm
+                      bvId        = mkLocalId n1BVTy bvNm
+                      tupPat      = DataPat tupDc [] [xId,bvId]
+                      xAlt        = (tupPat, (Var xId))
+                      bvAlt       = (tupPat, (Var bvId))
+                  in  ( Case splitCall mBVTy [xAlt]
+                      , Case splitCall n1BVTy [bvAlt]
+                      )
+
+          in  reduce $ mkVecCons consCon mBVTy n' hd
                 (mkApps (Prim pInfo)
                         [ Right (LitTy (NumTy (n'-1)))
                         , Right mTy
                         , Left (Literal (NaturalLiteral (n'-1)))
                         , Left (valToTerm km)
-                        , Left (Case splitCall n1BVTy [bvAlt])
+                        , Left tl
                         ])
          _ -> Nothing
   "Data.Text.Show.$wunpackCStringAscii#"
