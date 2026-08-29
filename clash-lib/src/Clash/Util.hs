@@ -11,6 +11,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -34,6 +35,7 @@ import qualified Data.List.Extra      as List
 import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes)
 import Data.Map.Ordered               (OMap)
 import qualified Data.Map.Ordered     as OMap
+import qualified Data.Text            as Text
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import Prettyprinter
@@ -81,6 +83,12 @@ instance Exception.Exception ClashException
 -- | Construct a string pattern match out of the given @TemplateHaskell@ name
 namePat :: TH.Name -> TH.Q TH.Pat
 namePat = return . TH.LitP . TH.StringL . show
+
+-- | Like 'Data.Text.pack', but used with a TemplateHaskell name. As a
+-- TemplateHaskell expression itself to make sure GHC can optimize the call.
+textNameLit :: TH.Name -> TH.Q TH.Exp
+textNameLit nm =
+  TH.appE (TH.varE 'Text.pack) (TH.litE (TH.stringL (show nm)))
 
 assertPanic
   :: String -> Int -> a
