@@ -102,12 +102,46 @@ jobs:
           ghc-version: 9.6.7
           cabal-version: latest
 
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
+        with:
+          endpoint: '192.168.102.136'
+          port: 9000
+          insecure: true
+          accessKey: '${{ secrets.S3_ACCESS_KEY }}'
+          secretKey: '${{ secrets.S3_SECRET_KEY }}'
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-
+            ${{ runner.os }}-master-cabal-
+          path: ${{ steps.ghc-install.outputs.cabal-store }}
+
       - name: Version information
         run:
           cabal --version
 
       - name: Setup
         run: .ci/gh-setup.sh
+
+      - name: Build dependencies
+        run: cabal v2-build clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog -O0 --enable-documentation --only-dependencies
+
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9
+        with:
+          endpoint: '192.168.102.136'
+          port: 9000
+          insecure: true
+          accessKey: '${{ secrets.S3_ACCESS_KEY }}'
+          secretKey: '${{ secrets.S3_SECRET_KEY }}'
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/on-push.yml', 'cabal.project', '**/*.cabal' ) }}
+          path: ${{ steps.ghc-install.outputs.cabal-store }}
 
       - name: Build & check documentation
         run: .ci/build_docs.sh
