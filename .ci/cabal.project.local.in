@@ -1,0 +1,43 @@
+-- use latest packages from hackage
+index-state: HEAD
+
+package *
+  ghc-options: -j__THREADS__
+
+  -- don't generate haddock for all our deps
+  documentation: False
+
+  -- Dynamic executables save oozles of space when archiving it on CI
+  executable-dynamic: True
+
+package clash-prelude
+  ghc-options: -Werror
+  tests: True
+  benchmarks: True
+
+package clash-lib
+  ghc-options: -Werror
+  tests: True
+
+package clash-ghc
+  ghc-options: -Werror
+
+package clash-prelude-hedgehog
+  ghc-options: -Werror
+  tests: True
+
+package clash-lib-hedgehog
+  ghc-options: -Werror
+  tests: True
+
+package clash-testsuite
+  ghc-options: -Werror
+
+package clash-benchmark
+  ghc-options: -Werror
+
+package clash-profiling
+  ghc-options: -Werror
+
+package clash-profiling-prepare
+  ghc-options: -Werror

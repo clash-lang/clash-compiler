@@ -3,6 +3,13 @@ include:
   - '/.ci/gitlab/publish.yml'
 #   - '/.ci/gitlab/benchmark.yml'
 
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH                  # Pushes
+      when: never
+    - if: $CI_COMMIT_TAG                     # When tags are set (releases)
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
 variables:
   # Default GHC / Cabal version. Used for generating Haddock and releasing to
   # Hackage.
