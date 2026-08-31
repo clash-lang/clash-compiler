@@ -21,16 +21,16 @@
       ~GENSYM[~COMPNAME_blockRamFile][1] : block
         type ~GENSYM[RamType][7] is array(natural range <>) of bit_vector(~LIT[1]-1 downto 0);
 
-        impure function ~GENSYM[InitRamFromFile][2] (RamFileName : in string) return ~SYM[7] is
-          FILE RamFile : text open read_mode is RamFileName;
-          variable RamFileLine : line;
-          variable RAM : ~SYM[7](0 to ~LIT[5]-1);
+        impure function ~GENSYM[InitRamFromFile][2] (~SYM[RamFileName] : in string) return ~SYM[7] is
+          FILE ~SYM[RamFile] : text open read_mode is ~SYM[RamFileName];
+          variable ~SYM[RamFileLine] : line;
+          variable ~SYM[RAM_contents] : ~SYM[7](0 to ~LIT[5]-1);
         begin
-          for i in RAM'range loop
-            readline(RamFile,RamFileLine);
-            read(RamFileLine,RAM(i));
+          for ~SYM[i] in ~SYM[RAM_contents]'range loop
+            readline(~SYM[RamFile],~SYM[RamFileLine]);
+            read(~SYM[RamFileLine],~SYM[RAM_contents](~SYM[i]));
           end loop;
-          return RAM;
+          return ~SYM[RAM_contents];
         end function;
 
         signal ~GENSYM[RAM][3] : ~SYM[7](0 to ~LIT[5]-1) := ~SYM[2](~FILE[~LIT[6]]);
