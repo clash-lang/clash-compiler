@@ -1,11 +1,15 @@
-Inspired by [Solving Gitlab's CHANGELOG crisis](https://about.gitlab.com/blog/2018/07/03/solving-gitlabs-changelog-conflict-crisis/)
-we now use a single file per change. Of course, if you feel adding an entry to
-the CHANGELOG would only pollute it, feel free to not make a file. To keep it
-somewhat manageable:
+The changelog is managed using [qlog](https://github.com/marijn-qbaylogic/qlog/).
 
-* Create a changelog file: `touch changelog/$(date --iso-8601=seconds | tr : _)_my_change_message`
-* We collect these files for each release and put their messages in
-  `CHANGELOG.md`. The files are subsequently deleted.
-* Messages should be valid Markdown
+Changelog entries are stored in files, and then aggregated into `CHANGELOG.md`.
+Simple entries can be created using `qlog entry`, but more is possible by editing
+the files manually. See the `qlog` documentation for more information.
 
-I've added an example to the commit introducing this change.
+Keep in mind that the entries are written in Markdown.
+For example, when including Haskell code, use
+````
+```hs
+<code>
+```
+````
+
+Issue links are added to the end of entries automatically.
