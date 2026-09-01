@@ -177,11 +177,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1784212375,
-        "narHash": "sha256-kfpI+ndTfd5EuB1CFdROqJtVKWPECmLJThtWrMewdYw=",
-        "owner": "marijn-qbaylogic",
+        "lastModified": 1786022622,
+        "narHash": "sha256-9DoW04VvDAACRjmkVnHxQP8l/EG3hL+8M5alQeGDboY=",
+        "owner": "QBayLogic",
         "repo": "qlog",
-        "rev": "76a6dffc498e03eb49554d9a5d84505965ec44f6",
+        "rev": "ed1931375a9d18894ffc11c0e18d92eeb098b0d3",
         "type": "github"
       },
       "original": {
