@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2019     , Google Inc.,
-                     2021-2022, QBayLogic B.V.,
+                     2021-2025, QBayLogic B.V.,
                      2021-2022, Myrtle.ai
   License     :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -19,7 +19,8 @@ module Clash.Class.AutoReg.Internal
   )
   where
 
-import           Data.List                    (nub,zipWith4)
+import           Data.List                    (zipWith4)
+import           Data.List.Extra              (nubOrd)
 import           Data.Maybe                   (fromMaybe,isJust)
 
 import           GHC.Stack                    (HasCallStack)
@@ -326,7 +327,10 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
             [] -> [| $tyConE |]
 
     autoRegDec <- funD 'autoReg [clause argsP (normalB body) decls]
-    ctx <- calculateRequiredContext conInfo
+    ctxAutoReg <- calculateRequiredContext conInfo
+    -- look up if the NFDataX superclass has any (extra) constraints
+    ctxNFDataX <- constraintsWantedFor ''NFDataX [ty]
+    let ctx = nubOrd (ctxAutoReg ++ ctxNFDataX)
     return [InstanceD Nothing ctx (AppT (ConT ''AutoReg) ty)
               [ autoRegDec
               , PragmaD (InlineP 'autoReg Inline FunLike AllPhases) ]]
@@ -336,8 +340,8 @@ deriveAutoRegProduct tyInfo conInfo = go (constructorName conInfo) fieldInfos
 calculateRequiredContext :: ConstructorInfo -> Q Cxt
 calculateRequiredContext conInfo = do
   let fieldTys = constructorFields conInfo
-  wantedInstances <- mapM (\ty -> constraintsWantedFor ''AutoReg [ty]) (nub fieldTys)
-  return $ nub (concat wantedInstances)
+  wantedInstances <- mapM (\ty -> constraintsWantedFor ''AutoReg [ty]) (nubOrd fieldTys)
+  return $ nubOrd (concat wantedInstances)
 
 constraintsWantedFor :: Name -> [Type] -> Q Cxt
 constraintsWantedFor clsNm tys
@@ -353,8 +357,8 @@ constraintsWantedFor clsNm [ty] = case ty of
   _ -> do
     insts <- reifyInstances clsNm [ty]
     case insts of
-      [InstanceD _ cxtInst (AppT autoRegCls instTy) _]
-        | autoRegCls == ConT clsNm -> do
+      [InstanceD _ cxtInst (AppT instanceCls instTy) _]
+        | instanceCls == ConT clsNm -> do
           let substs = findTyVarSubsts instTy ty
               cxt2 = map (applyTyVarSubsts substs) cxtInst
               okCxt = filter isOk cxt2
@@ -367,9 +371,10 @@ constraintsWantedFor clsNm [ty] = case ty of
       _ -> fail $ "Got unexpected instance: " ++ pprint insts
  where
   isOk :: Type -> Bool
-  isOk (unfoldType -> (_cls,tys)) =
+  isOk (unfoldType -> (cls,tys)) =
     case tys of
       [VarT _] -> True
+      [SigT t _] -> isOk (AppT cls t)  -- look through a kind signature
       [_] -> False
       _ -> True -- see [NOTE: MultiParamTypeClasses]
   needRecurse :: Type -> Bool
@@ -380,6 +385,7 @@ constraintsWantedFor clsNm [ty] = case ty of
       [ConT _] -> False  -- we can just drop constraints like: "AutoReg Bool => ..."
       [LitT _] -> False  -- or "KnownNat 4 =>"
       [TupleT 0] -> False  -- handle Unit ()
+      [SigT t _] -> needRecurse (AppT cls t)  -- look through a kind signature
       [_] -> error ( "Error while deriveAutoReg: don't know how to handle: "
                   ++ pprint cls ++ " (" ++ pprint tys ++ ")" )
       _ -> False  -- see [NOTE: MultiParamTypeClasses]
@@ -421,6 +427,7 @@ findTyVarSubsts = go
     (ImplicitParamT _ x1, ImplicitParamT _ x2) -> go x1 x2
     (PromotedT _          , PromotedT _          ) -> []
     (TupleT _             , TupleT _             ) -> []
+    (TupleT _             , ConT _               ) -> [] -- see NOTE [TupleT ConT equality]
     (UnboxedTupleT _      , UnboxedTupleT _      ) -> []
     (UnboxedSumT _        , UnboxedSumT _        ) -> []
     (ArrowT               , ArrowT               ) -> []
@@ -435,6 +442,21 @@ findTyVarSubsts = go
     (WildCardT            , WildCardT            ) -> []
     _ -> error $ unlines [ "findTyVarSubsts: Unexpected types"
                          , "ty1:", pprint ty1,"ty2:", pprint ty2]
+{-
+NOTE [TupleT ConT equality]
+
+When looking up typeclass instances for tuples we get a slight mismatch
+in the representation of the tuple types.
+
+Internally in GHC a 3-tuple is represented as `TupleT 3`.
+But our API is Name based, so we look them up as `ConT "(,,)"`, see 'deriveAutoRegTuple'.
+This confused 'findTyVarSubsts', as it gets both forms and tries to unify them.
+To allow it to continue I just allowed it to see them as equal.
+This may seem dangerous, but isn't any more dangerous than seeing arbitrary ConT's
+as equal.
+And we should only get things from GHC that unify.
+-}
+
 
 applyTyVarSubsts :: [(Name,Type)] -> Type -> Type
 applyTyVarSubsts substs ty = go ty
