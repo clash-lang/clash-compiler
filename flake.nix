@@ -77,7 +77,13 @@
     # Overlays are specified here, since they are not a per-system attribute of
       # a flake (unlike packages, apps, devShells etc.) which are system-specific.
     { inherit overlays; } //
-    flake-utils.lib.eachDefaultSystem (system:
+    # Nixpkgs 26.11 no longer supports x86_64-darwin. Keep generating outputs
+    # for the supported systems while avoiding evaluation of that platform.
+    flake-utils.lib.eachSystem [
+      "aarch64-linux"
+      "aarch64-darwin"
+      "x86_64-linux"
+    ] (system:
       let
         # Our final nixpkgs has an overlay applied for each supported version of
         # GHC for the repository. We can extract all the flake outputs from this
