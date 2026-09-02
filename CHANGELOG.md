@@ -1,5 +1,72 @@
 # Changelog for the Clash project
 
+## 1.10.1 *Aug 27th, 2026*
+
+Highlights:
+ * Very significant performance improvements, further detailed below. We also created a site https://clash-lang.github.io/clash-benchmarks/ where we track performance improvements. These graphs are for the current `master` branch, not for released Clash versions.
+ * We have added support for the `checked-literals` package. Numeric literals (e.g., `5` or `3.2`) can now be checked at compile time. That is, you'll get a compile error if the literal does not fit the target type -- even in polymorphic contexts! You can enable the checker by adding the following to your project's Cabal file:
+
+    ```
+    library
+      [..]
+
+      build-depends:
+        [..]
+        checked-literals
+
+      ghc-options: -fplugin=CheckedLiterals
+    ```
+
+    See https://clash-lang.org/blog/2026-04-07-checked-literals/.
+
+Performance:
+* `clash` and `clashi` now use GHC-style RTS defaults through executable `-with-rtsopts` flags instead of linking RTS hooks. The existing unused hooks have been removed. **Existing users should set `-with-rtsopts` to `-K512M -H -I5 -T` if they use their own Clash executable. These flags has been shown to give a ~25% compilation speed up in larger designs.** If you used a Clash starter project to initialize your design, you should change:
+
+    ```haskell
+    executable clash
+      [..]
+    ```
+
+    To:
+
+    ```haskell
+    executable clash
+      [..]
+      ghc-options: "-with-rtsopts=-K512M -H -I5 -T"
+    ```
+
+    in the cabal file. See [#3252](https://github.com/clash-lang/clash-compiler/issues/3252).
+* Improved normalization performance for repeated top-down rewrite loops by avoiding full root restarts after every successful rewrite. This gives a ~17% performance improvements on larger designs [#3249](https://github.com/clash-lang/clash-compiler/issues/3249).
+* Clash now converts GHC Core to its own Clash Core in parallel. For larger projects, this can shave off ~40% of load times. See [#3299](https://github.com/clash-lang/clash-compiler/issues/3299).
+* Clash now prunes the binders it collects from top modules when loading from precompiled core. For larger projects, this can shave off 15% of package loading times. See [#3298](https://github.com/clash-lang/clash-compiler/issues/3298).
+* `flattenCallTree` now caches intermediate results, reducing Clash normalization by 10% for realistic designs. Fixes #[3246](https://github.com/clash-lang/clash-compiler/issues/3246).
+
+Added:
+* `-fclash-debug-manifest-hash`. When enabled, Clash emits a `__debug_hash` object in `clash-manifest.json` listing the SHA256 of each input that feeds into the top-level `hash` (`tops`, `prim_map`, `clash_mod_date`, `call_graph`, `opts`). As the name implies, this should only be used to debug and should not be relied upon by tooling. See [#3280](https://github.com/clash-lang/clash-compiler/pull/3280).
+* `SaturatingNum` instances for `Erroring`, `Overflowing`, `Saturating`, `Wrapping`, and `Zeroing`.
+
+Changed:
+* Replaced the deprecated `data-binary-ieee754` dependency with `castDoubleToWord64`, `castFloatToWord32`, `castWord32ToFloat`, and `castWord64ToDouble` from `GHC.Float`. See [#3174](https://github.com/clash-lang/clash-compiler/issues/3174).
+* `flake.nix` now advertises the [clash-lang Cachix binary cache](https://clash-lang.cachix.org) via `nixConfig.extra-substituters`. Running `nix develop` will prompt you to trust the cache, avoiding having to build Clash from source. See [#3213](https://github.com/clash-lang/clash-compiler/issues/3213).
+
+Fixed:
+* Clash no longer crashes for self-recursive global binders in very specific circumstances. See [#3311](https://github.com/clash-lang/clash-compiler/issues/3311).
+* Clash no longer crashes upon calling `sequenceA`/`traverse#` on a zero-sized `Vec`. See [#3290](https://github.com/clash-lang/clash-compiler/issues/3290).
+* Clash no longer crashes when constant-folding partial primitives in the GHC evaluator. This covers `shiftL`/`shiftR`/`rotateL`/`rotateR` with negative shift amounts on `BitVector`/`Signed`/`Unsigned`, `(^)` with negative exponents, `chr` on out-of-range integers, and `quot`/`rem`/`div`/`mod` by zero on `Int`/`Word`/`Int{8,16,32,64}`/`Word{8,16,32,64}`. Such expressions now fold to `undefined` (rather than crashing the compiler). Fixes [#3234](https://github.com/clash-lang/clash-compiler/issues/3234).
+* Clash no longer crashes with `mkVecNil: failed to instantiate Nil DC` when unfolding `traverse#` in very specific circumstances. See [#3291](https://github.com/clash-lang/clash-compiler/issues/3291).
+* Clash no longer errors when two `-i` import paths refer to the same directory via different syntactic spellings (e.g. `-isrc -isrc/.`) and a data file lives in that directory. See [#3142](https://github.com/clash-lang/clash-compiler/issues/3142).
+* Clash no longer produces an error when using `dataToTag` in combination with custom bit representations. See [#2724](https://github.com/clash-lang/clash-compiler/issues/2724).
+* Clash no longer takes exponential time and memory normalizing `foldl`/`scanl`/`splitAt` over a vector when the result keeps the (co-recursively defined) vector spine alive, e.g. `snd (foldl const (z, s) (xs :: Vec n a))`. The evaluator's `zipWith` and `splitAt` reductions now share their arguments instead of duplicating the vector spine on every peel. See [#3308](https://github.com/clash-lang/clash-compiler/issues/3308).
+* Clash now recognizes `~` when solving GADT arms. Fixes [#3232](https://github.com/clash-lang/clash-compiler/issues/3232).
+* Clash will no longer generate duplicate `attribute` when they're both used for top entity ports and internal signals. See [#3218](https://github.com/clash-lang/clash-compiler/issues/3218). The VHDL backend now also reports a clearer error when a synthesis attribute is declared with conflicting types in the same design.
+* Due to HDL standards, when the result of a top entity is read by another binder Clash is forced to introduce an internal indirection signal. Clash no longer attaches the top entity's `Annotate` synthesis attributes to that internal signal, preventing duplicate synthesis attributes in the generated HDL. See [#3224](https://github.com/clash-lang/clash-compiler/issues/3224).
+* Errors in `Synthesize` port annotations (e.g. a `PortProduct` on a non-product port) are now reported before a design is normalized, instead of afterwards. This avoids waiting for a potentially long normalization only to get a trivial port error. See [#3305](https://github.com/clash-lang/clash-compiler/issues/3305).
+* Run `bindConstantVar` after post-normalization `inlineCleanup`/`caseCon` so constant let-bindings exposed late are inlined before netlist generation [#3041](https://github.com/clash-lang/clash-compiler/issues/3041).
+* The VHDL primitives for `integerToNaturalThrow` and `integerToNaturalClamp` no longer contain syntax errors. See [#3315](https://github.com/clash-lang/clash-compiler/pull/3315).
+* The internal function `Clash.Util.Interpolate.i` in `clash-lib` no longer inserts an extra blank line after a paragraph that gets reflowed onto multiple lines. See [#2753](https://github.com/clash-lang/clash-compiler/issues/2753).
+* `deriveAutoReg` no longer fails on GHC versions where `KnownNat` lives in `GHC.Internal.TypeNats` rather than `GHC.TypeNats`. See [#3100](https://github.com/clash-lang/clash-compiler/issues/3100).
+* `makeTopEntity` now accounts for unary product types. See [#3066](https://github.com/clash-lang/clash-compiler/issues/3066).
+
 ## 1.10.0 *Apr 23rd, 2026*
 
 Release highlight:
