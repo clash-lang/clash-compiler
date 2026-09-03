@@ -57,6 +57,7 @@ import           Clash.Core.Name (nameOcc)
 import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
+import           Clash.Warning (defWarningOpts)
 import           Clash.Core.Var (Id, varName)
 import           Clash.Netlist.Types
   (TopEntityT, Component(..), HWType (Clock, ClockN), hwTypeDomain)
@@ -456,7 +457,8 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
     , opt_cachehdl = True
 
       -- 3. Warnings / errors
-    , opt_primWarn = True
+    , opt_warnings = defWarningOpts
+    , opt_werror = False
     , opt_color = Auto
     , opt_errorExtra = False
     , opt_checkIDir = True

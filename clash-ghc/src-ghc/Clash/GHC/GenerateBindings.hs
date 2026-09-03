@@ -19,11 +19,12 @@ where
 import           Control.Arrow           ((***))
 import           Control.DeepSeq         (NFData, deepseq)
 import           Control.Lens            ((%~),(&),(.~),(^.))
-import           Control.Monad           (forM, unless)
+import           Control.Monad           (forM, unless, when)
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.RWS.Strict as RWS
 import           Data.Coerce             (coerce)
 import           Data.Either             (partitionEithers, lefts ,rights)
+import           Data.Foldable           (traverse_)
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
 import qualified Data.HashMap.Strict     as HashMap
@@ -45,7 +46,6 @@ import qualified GHC.Core                as GHC
 import qualified GHC.Types.Demand        as GHC
 import qualified GHC.Driver.Session      as GHC
 import qualified GHC.Types.Id.Info       as GHC
-import qualified GHC.Utils.Outputable    as GHC
 import qualified GHC.Types.Name          as GHC hiding (varName)
 import qualified GHC.Core.FamInstEnv     as GHC
 import qualified GHC.Core.TyCon          as GHC
@@ -70,13 +70,14 @@ import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
   ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Debug             (traceIf)
 import           Clash.Driver            (compilePrimitives)
 import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
+import           Clash.Driver.Warning    (warnAbout, warnAboutM)
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
-   makeAllTyCons, qualifiedNameString, emptyGHC2CoreState, srcSpan)
+   makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
+   srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
@@ -86,6 +87,7 @@ import           Clash.Primitives.Util   (generatePrimMap)
 import           Clash.Unique            (Unique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
+import           Clash.Warning           (ClashWarning(WarnPrimitiveDefinition))
 
 -- | Safe indexing, returns a 'Nothing' if the index does not exist
 indexMaybe :: [a] -> Int -> Maybe a
@@ -126,10 +128,10 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   primMapC <- compilePrimitives importDirs dbs tdir primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
-                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs)
+                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
                    emptyGHC2CoreState
-      (tcMap',tupTcCache)           = mkTupTyCons tcMap
-      tcCache                       = makeAllTyCons tcMap' fiEnvs
+      (tcMap',tupTcCache)           = mkTupTyCons opts tcMap
+      tcCache                       = makeAllTyCons opts tcMap' fiEnvs
       allTcCache                    = tysPrimMap <> tcCache
       inScope0 = mkInScopeSet (
                       (fmap (coerce . bindingId) bindingsMap) <>
@@ -143,7 +145,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
              clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
-        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs) tcMap')) $
+        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts) tcMap')) $
           mapM (\(topEnt,annM,isTb) -> do
             topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
             return (topEnt', annM, isTb)) topEntities
@@ -162,6 +164,10 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   putStrLn $ "Clash: Parsing and compiling primitives took " ++ prepStartDiff
 
   let allBindings' = setNoInlineTopEntities allBindings topEntities''
+
+  -- 'C2C' is pure, so the warnings it ran into were collected rather than
+  -- printed. Report them now, in the order the binders were converted.
+  traverse_ (warnAbout opts) (tcMap ^. pendingWarnings)
 
   return
     ( ClashEnv
@@ -217,12 +223,14 @@ mkBindings primMap bindings clsOps unlocatable = do
   let
     bindingsList = parRunC2C env (map (processBind primMap unlocatable) bindings)
     clsOpList    = parRunC2C env (map processClsOp clsOps)
-  -- Merge the 'TyCon' maps discovered while converting; the name caches are
-  -- not used after this point, so they are dropped. 'makeAllTyCons' later
-  -- recomputes over the merged map, so a plain union suffices.
-  RWS.modify (tyConMap %~ \tcm0 ->
-    foldl' (\acc st -> acc <> (st ^. tyConMap)) tcm0
-      (map snd bindingsList ++ map snd clsOpList))
+    states       = map snd bindingsList ++ map snd clsOpList
+  -- Merge the 'TyCon' maps discovered while converting, and collect the
+  -- warnings the conversions reported; the name caches are not used after this
+  -- point, so they are dropped. 'makeAllTyCons' later recomputes over the
+  -- merged map, so a plain union suffices.
+  RWS.modify $ \st -> st
+    & tyConMap %~ (\tcm0 -> foldl' (\acc s -> acc <> (s ^. tyConMap)) tcm0 states)
+    & pendingWarnings %~ (<> foldMap (^. pendingWarnings) states)
 
   return ( mkVarEnv (concatMap fst bindingsList)
          , mkVarEnv (map fst clsOpList) )
@@ -356,10 +364,8 @@ checkPrimitive primMap v = do
         (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
         (dmdArgs,_dmdRes) = GHC.splitDmdSig strictness
         nrOfArgs = length argTys
-        loc = case GHC.getSrcLoc v of
-                GHC.UnhelpfulLoc _ -> ""
-                GHC.RealSrcLoc l _ -> showPpr l ++ ": "
-        warnIf cond msg = traceIf cond ("\n"++loc++"Warning: "++msg) return ()
+        warnIf cond msg =
+          when cond (warnAboutM WarnPrimitiveDefinition (GHC.getSrcSpan v) msg)
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
       let usedArgs = concat [ concatMap getUsedArguments resultNames
@@ -388,9 +394,6 @@ checkPrimitive primMap v = do
           ++ "calls to this primitive by an undefined value.")
         warnArgs usedArgs
     _ -> return ()
-  where
-    showPpr :: GHC.Outputable a => a -> String
-    showPpr = GHC.showSDocUnsafe . GHC.ppr
 
 mkClassSelector
   :: InScopeSet
@@ -421,15 +424,15 @@ mkClassSelector inScope0 tcm ty sel = newExpr
               return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
       Nothing -> error "mkClassSelector: expected at least one dictionary argument"
 
-mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
-mkTupTyCons tcMap = (tcMap'',tupTcCache)
+mkTupTyCons :: ClashOpts -> GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
+mkTupTyCons opts tcMap = (tcMap'',tupTcCache)
   where
     tupTyCons        = GHC.boolTyCon : GHC.promotedTrueDataCon : GHC.promotedFalseDataCon
                      : map (GHC.tupleTyCon GHC.Boxed) [2..GHC.mAX_TUPLE_SIZE]
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
                                           qualifiedNameString tc) tupTyCons)
-                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs)
+                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs opts)
                  tcMap
     tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
     tupHM            = UniqMap.fromList (zip tcNames tupTyCons)

@@ -30,6 +30,7 @@ import           Clash.Backend.Verilog.Time     (parsePeriod)
 import           Clash.Driver.Types
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import           Clash.Netlist.Types            (PreserveCase (ToLower))
+import           Clash.Warning
 
 parseClashFlags :: IORef ClashOpts -> [Located String]
                 -> IO ([Located String],[Warn])
@@ -64,7 +65,7 @@ flagsClash r = [
   , defFlag "fclash-no-check-inaccessible-idirs" $ NoArg (liftEwM (setNoIDirCheck r))
   , defFlag "fclash-no-clean"                    $ NoArg (setNoClean r)
   , defFlag "fclash-clear"                       $ NoArg (liftEwM (setClear r))
-  , defFlag "fclash-no-prim-warn"                $ NoArg (liftEwM (setNoPrimWarn r))
+  , defFlag "fclash-no-prim-warn"                $ NoArg (setNoPrimWarn r)
   , defFlag "fclash-spec-limit"                  $ IntSuffix (liftEwM . setSpecLimit r)
   , defFlag "fclash-inline-limit"                $ IntSuffix (liftEwM . setInlineLimit r)
   , defFlag "fclash-inline-function-limit"       $ IntSuffix (liftEwM . setInlineFunctionLimit r)
@@ -88,7 +89,26 @@ flagsClash r = [
   , defFlag "fclash-ignore-broken-ghcs"          $ NoArg (liftEwM (setIgnoreBrokenGhcs r))
   , defFlag "fclash-no-concurrent-topentity-compilation" $ NoArg (liftEwM (setNoConcurrentTopEntities r))
   , defFlag "fclash-debug-manifest-hash"         $ NoArg (liftEwM (setDebugManifestHash r))
+  ] ++ warningFlags r
+
+-- | GHC-style warning flags for every warning in 'ClashWarning':
+-- @-W\<name\>@, @-Wno-\<name\>@, @-Werror=\<name\>@, @-Wwarn=\<name\>@, and
+-- @-Wno-error=\<name\>@. These are consumed before GHC parses its own flags;
+-- misspelled warning names fall through to GHC's
+-- @-Wunrecognised-warning-flags@ handling.
+warningFlags :: IORef ClashOpts -> [Flag IO]
+warningFlags r = concat
+  [ [ defFlag ("W"          ++ nm) $ NoArg (liftEwM (adjust (enableWarning  w)))
+    , defFlag ("Wno-"       ++ nm) $ NoArg (liftEwM (adjust (disableWarning w)))
+    , defFlag ("Werror="    ++ nm) $ NoArg (liftEwM (adjust (promoteWarning w)))
+    , defFlag ("Wwarn="     ++ nm) $ NoArg (liftEwM (adjust (demoteWarning  w)))
+    , defFlag ("Wno-error=" ++ nm) $ NoArg (liftEwM (adjust (demoteWarning  w)))
+    ]
+  | w <- [minBound .. maxBound]
+  , let nm = warningName w
   ]
+ where
+  adjust f = modifyIORef r (\c -> c {opt_warnings = f (opt_warnings c)})
 
 -- | Print deprecated flag warning
 deprecated
@@ -239,8 +259,15 @@ setNoClean _ = addWarn "-fclash-no-clean has been removed"
 setClear :: IORef ClashOpts -> IO ()
 setClear r = modifyIORef r (\c -> c {opt_clear = True})
 
-setNoPrimWarn :: IORef ClashOpts -> IO ()
-setNoPrimWarn r = modifyIORef r (\c -> c {opt_primWarn = False})
+setNoPrimWarn :: IORef ClashOpts -> EwM IO ()
+setNoPrimWarn r = do
+  addWarn ("Using '-fclash-no-prim-warn' is deprecated. Use "
+           ++ "'-Wno-clash-dubious-primitive' and/or "
+           ++ "'-Wno-clash-non-synthesizable' instead.")
+  liftEwM $ modifyIORef r $ \c ->
+    c { opt_warnings =
+          disableWarning WarnDubiousPrimitive
+            (disableWarning WarnNonSynthesizable (opt_warnings c)) }
 
 setIntWidth :: IORef ClashOpts
             -> Int

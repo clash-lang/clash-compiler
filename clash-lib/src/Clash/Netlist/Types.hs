@@ -76,7 +76,8 @@ import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types
-  (BindingMap, ClashEnv(..), ClashOpts(..))
+  (BindingMap, ClashEnv(..), ClashOpts(..), HasClashOpts(..))
+import Clash.Driver.Warning                 (CanWarn)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
 import Clash.Signal.Internal
@@ -1002,6 +1003,11 @@ primitives = clashEnv . Lens.to envPrimitives
 
 clashOpts :: Lens.Getter NetlistEnv ClashOpts
 clashOpts = clashEnv . Lens.to envOpts
+
+instance HasClashOpts NetlistMonad where
+  askClashOpts = Lens.view clashOpts
+
+instance CanWarn NetlistMonad
 
 -- | Structures that hold an 'IdentifierSet'
 class HasIdentifierSet s where

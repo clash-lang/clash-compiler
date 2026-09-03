@@ -6,7 +6,6 @@
   Blackbox implementations for "Clash.Sized.Internal.*.toInteger#".
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 module Clash.Primitives.Sized.ToInteger
   ( bvToIntegerVerilog
@@ -22,34 +21,17 @@ where
 
 import qualified Control.Lens as Lens
 import Control.Monad (when)
-import Control.Monad.IO.Class (liftIO)
 import Data.Text.Lazy (pack)
-import System.IO (hPutStrLn, stderr)
 import Text.Trifecta.Result (Result(Success))
 
-#if MIN_VERSION_ghc(9,8,0)
-import GHC.Unit.Module.Warnings (emptyWarningCategorySet)
-import GHC.Utils.Error
-  (DiagOpts(..), mkPlainDiagnostic, mkPlainMsgEnvelope, pprLocMsgEnvelopeDefault)
 import GHC.Utils.Outputable
-  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>),
-   defaultSDocContext )
+  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>))
 import qualified GHC.Utils.Outputable as Outputable
-import GHC.Types.Error (DiagnosticReason (WarningWithoutFlag))
 import GHC.Types.SrcLoc (isGoodSrcSpan)
-#else
-import GHC.Utils.Error
-  (DiagOpts(..), mkPlainDiagnostic, mkPlainMsgEnvelope, pprLocMsgEnvelopeDefault)
-import GHC.Utils.Outputable
-  (blankLine, empty, int, integer, showSDocUnsafe, text, ($$), ($+$), (<+>),
-   defaultSDocContext )
-import qualified GHC.Utils.Outputable as Outputable
-import GHC.Types.Error (DiagnosticReason (WarningWithoutFlag))
-import GHC.Types.SrcLoc (isGoodSrcSpan)
-#endif
 
 import Clash.Annotations.Primitive (HDL (Verilog,VHDL))
 import Clash.Core.Type (Type (LitTy), LitTy (NumTy))
+import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.BlackBox.Parser (runParse)
 import Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta (bbKind), TemplateKind (TExpr),
@@ -57,6 +39,7 @@ import Clash.Netlist.BlackBox.Types
 import Clash.Netlist.Types
   (BlackBox (BBTemplate), HWType (..), curCompNm, intWidth)
 import Clash.Util (clogBase)
+import Clash.Warning (ClashWarning(WarnIntegerNarrowing))
 
 bvToIntegerVerilog, bvToIntegerVHDL, indexToIntegerVerilog,
   indexToIntegerVHDL,  signedToIntegerVerilog, signedToIntegerVHDL,
@@ -81,19 +64,9 @@ toIntegerBB hdl hty _isD _primName args _ty = do
         (_,sp) <- Lens.use curCompNm
         let srcInfo1 | isGoodSrcSpan sp = srcInfo
                      | otherwise        = empty
-#if MIN_VERSION_ghc(9,8,0)
-            opts     = DiagOpts mempty mempty emptyWarningCategorySet emptyWarningCategorySet False False Nothing defaultSDocContext
-            diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
-            warnMsg1 = mkPlainMsgEnvelope opts sp diag
-            warnMsg2 = pprLocMsgEnvelopeDefault warnMsg1
-#else
-            opts     = DiagOpts mempty mempty False False Nothing defaultSDocContext
-            diag     = mkPlainDiagnostic WarningWithoutFlag [] (warnMsg i1 iw $+$ blankLine $+$ srcInfo1)
-            warnMsg1 = mkPlainMsgEnvelope opts sp diag
-            warnMsg2 = pprLocMsgEnvelopeDefault warnMsg1
-#endif
+            msg = warnMsg i1 iw $+$ blankLine $+$ srcInfo1
 
-        liftIO (hPutStrLn stderr (showSDocUnsafe warnMsg2))
+        warnAboutM WarnIntegerNarrowing sp (showSDocUnsafe msg)
     _ -> return ()
   return ((meta,) <$> bb)
  where
