@@ -26,8 +26,8 @@ import           Control.DeepSeq                (NFData(rnf), deepseq)
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
-import           Data.HashMap.Strict            (HashMap)
 import           Data.IntMap.Strict             (IntMap)
+import           Data.Map.Strict                (Map)
 import           Data.Maybe                     (isJust)
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -46,11 +46,12 @@ import           GHC.Types.Basic                (InlineSpec)
 import           GHC.Types.SrcLoc               (SrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Signal.Internal
+import           Clash.Signal.Internal          (VDomainConfiguration(..))
 
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
 import           Clash.Core.Term                (Term)
+import           Clash.Core.Type                (Type)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
@@ -58,6 +59,7 @@ import           Clash.Driver.Bool              (OverridingBool(..))
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
 import           Clash.Primitives.Types         (CompiledPrimMap)
+import           Clash.Unique                   (Unique)
 
 data ClashEnv = ClashEnv
   { envOpts        :: ClashOpts
@@ -65,8 +67,17 @@ data ClashEnv = ClashEnv
   , envTupleTyCons :: IntMap TyConName
   , envPrimitives  :: CompiledPrimMap
   , envCustomReprs :: CustomReprs
-  , envDomains     :: DomainMap
-  } deriving (Generic, NFData)
+  , envDomainTCUs  :: Maybe KnownDomainTyConUniques
+  }
+
+data KnownDomainTyConUniques = KnownDomainTyConUniques
+  { domainPeriodTCU         :: Unique
+  , domainActiveEdgeTCU     :: Unique
+  , domainResetKindTCU      :: Unique
+  , domainInitBehaviorTCU   :: Unique
+  , domainResetPolarityTCU  :: Unique
+  , domainPeriodFractionTCU :: Unique
+  }
 
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
@@ -114,7 +125,11 @@ data Binding a = Binding
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
 type BindingMap = VarEnv (Binding Term)
-type DomainMap = HashMap Text VDomainConfiguration
+
+-- | Maps core types with a 'Clash.Signal.Internal.KnownDomain'
+-- instance that appear in the design to their corresponding
+-- 'VDomainConfiguration'.
+type DomainMap = Map Type VDomainConfiguration
 
 -- | Information to show about transformations during compilation.
 --

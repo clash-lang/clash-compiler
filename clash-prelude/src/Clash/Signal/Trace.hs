@@ -102,7 +102,7 @@ module Clash.Signal.Trace
 import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.Signal.Internal (fromList)
 import           Clash.Signal
-  (KnownDomain(..), SDomainConfiguration(..), Signal, bundle, unbundle)
+  (KnownDomain, SDomainConfiguration(..), Signal, knownDomain, bundle, unbundle)
 import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)

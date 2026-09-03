@@ -89,7 +89,9 @@ data PrettyOptions = PrettyOptions
   -- ^ whether to display module qualifiers
   , displayTicks      :: Bool
   -- ^ whether to display ticks
-  }
+  , useStableNames    :: Bool
+  -- ^ whether to stable names
+  } deriving (Bounded)
 
 instance Default PrettyOptions where
   def = PrettyOptions
@@ -97,6 +99,7 @@ instance Default PrettyOptions where
     , displayTypes      = unsafeLookupEnvBool "CLASH_PPR_TYPES" True
     , displayQualifiers = unsafeLookupEnvBool "CLASH_PPR_QUALIFIERS" True
     , displayTicks      = unsafeLookupEnvBool "CLASH_PPR_TICKS" True
+    , useStableNames    = unsafeLookupEnvBool "CLASH_PPR_STABLE" False
     }
 
 -- | Annotations carried on pretty-printed code.
@@ -105,6 +108,9 @@ data ClashAnnotation
   -- ^ marking navigation to a different context
   | AnnSyntax  SyntaxElement
   -- ^ marking a specific sort of syntax
+  | AnnStableAlternative Text
+  -- ^ a plain text alternative (not allowed to contain any
+  -- newlines)
   deriving Eq
 
 -- | Specific places in the program syntax.
@@ -133,6 +139,8 @@ class PrettyPrec p where
         Column f             -> Column (hide . f)
         WithPageWidth f      -> WithPageWidth (hide . f)
         Nesting f            -> Nesting (hide . f)
+        Annotated (AnnStableAlternative t) _ | useStableNames opts
+                             -> unsafeTextWithoutNewlines t
         Annotated ann d'     ->
           if not (displayTypes opts)      && ann == AnnSyntax Type
           || not (displayUniques opts)    && ann == AnnSyntax Unique
@@ -195,11 +203,12 @@ viewName n = (qual, occ, T.pack $ show $ nameUniq n)
   where (qual, occ) = T.breakOnEnd "." $ nameOcc n
 
 instance PrettyPrec (Name a) where
-  pprPrec p (viewName -> (qual, occ, uniq)) = do
+  pprPrec p name@(viewName -> (qual, occ, uniq)) = do
     qual' <- annotate (AnnSyntax Qualifier) <$> pprPrec p qual
     occ'  <- pprPrec p occ
     uniq' <- annotate (AnnSyntax Unique) . brackets <$> (pprPrec p uniq)
-    return $ qual' <> occ' <> uniq'
+    return $ annotate (AnnStableAlternative $ nameStable name)
+           $ qual' <> occ' <> uniq'
 
 instance ClashPretty (Name a) where
   clashPretty = fromPpr

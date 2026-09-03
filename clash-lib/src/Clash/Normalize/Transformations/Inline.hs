@@ -34,7 +34,7 @@ module Clash.Normalize.Transformations.Inline
 
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
-import Control.Monad ((>=>))
+import Control.Monad ((>=>), filterM)
 import Control.Monad.Extra (anyM)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Writer (lift,listen)
@@ -535,7 +535,6 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
       notClassTy = not (isClassTy tcm scrutTy)
       overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
 
-
     bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
     nonRepScrut <- isUntranslatableType False scrutTy
     case (nonRepScrut, bodyMaybe) of
@@ -757,8 +756,16 @@ inlineWorkFree _ e@(collectTicks -> (Var f, ticks))
                       if termSizeSmallerThan sizeLimit topB then
                         changed (mkTicks topB ticks)
                       else do
-                        b <- normalizeTopLvlBndr False f top
-                        changed (mkTicks (bindingTerm b) ticks)
+                        e0 <- bindingTerm <$> normalizeTopLvlBndr False f top
+                        case e0 of
+                          Let (Term.NonRec i0 e1) (Var i1) | i0 == i1 -> changed e1
+                          Let (Term.Rec xs) (Var i1) ->
+                            case filter ((== i1) . fst) xs of
+                              [] -> changed e0
+                              ys -> filterM (fmap not . isRecursiveBndr . fst) ys >>= \case
+                                []          -> changed e0
+                                (_, e1) : _ -> changed e1
+                          _ -> changed (mkTicks e0 ticks)
                 _ -> return e
 
 inlineWorkFree _ e = return e

@@ -43,7 +43,7 @@ import           GHC.Word
 import           System.IO.Unsafe    (unsafeDupablePerformIO)
 
 import           GHC.Types.Basic     (Boxity (..))
-import           GHC.Types.Name      (getSrcSpan, nameOccName, occNameString)
+import           GHC.Types.Name      (getName, getSrcSpan, nameOccName, occNameString, nameStableString)
 import           GHC.Builtin.Names   (trueDataConKey, falseDataConKey)
 import qualified GHC.Core.TyCon      as TyCon
 import           GHC.Builtin.Types   (tupleTyCon)
@@ -1369,6 +1369,7 @@ ghcTyconToTyConName
   -> TyConName
 ghcTyconToTyConName tc =
     Name User n' (fromGhcUnique (TyCon.tyConUnique tc)) (getSrcSpan n)
+      (Text.pack $ nameStableString $ getName tc)
   where
     n'      = fromMaybe "_INTERNAL_" (modNameM n) `Text.append`
               ('.' `Text.cons` Text.pack occName)

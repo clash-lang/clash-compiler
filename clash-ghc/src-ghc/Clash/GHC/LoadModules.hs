@@ -32,12 +32,14 @@ where
 -- External Modules
 import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard(..))
 import           Clash.Annotations.TopEntity     (TopEntity (..))
+import           Clash.Driver.Types              (KnownDomainTyConUniques(..))
 import           Clash.Primitives.Types          (UnresolvedPrimitive)
+import           Clash.Unique                    (fromGhcUnique)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
 import           Control.Exception               (SomeException, throw)
-import           Control.Monad                   (forM, join, when)
+import           Control.Monad                   (forM, when)
 import           Data.List.Extra                 (nubSort)
 import           Control.Exception               (Exception, throwIO)
 import           Control.Monad                   (foldM)
@@ -49,27 +51,22 @@ import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.Data                       (Data)
 import           Data.Functor                    ((<&>))
 import           Data.Foldable                   (toList)
-import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
-import           Data.List                       (nub, find)
+import           Data.List                       (nub, find, sortOn)
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List                       (foldl')
 #endif
 import qualified Data.Map                        as Map
-import           Data.Maybe
-  (catMaybes, fromMaybe, listToMaybe, mapMaybe)
+import           Data.Maybe                      (catMaybes, fromMaybe, mapMaybe)
 import qualified Data.Text                       as Text
-import qualified Data.Text.Encoding              as Text
 import qualified Data.Time.Clock                 as Clock
 import qualified Data.Set                        as Set
 import qualified Data.Sequence                   as Seq
 import           Debug.Trace
 import           Language.Haskell.TH.Syntax      (lift)
-import           GHC.Natural                     (naturalFromInteger)
 import           GHC.Stack                       (HasCallStack)
 import           System.FilePath.Posix           (dropExtension, takeDirectory)
-import           Text.Read                       (readMaybe)
 
 #ifdef USE_GHC_PATHS
 import           GHC.Paths                       (libdir)
@@ -94,6 +91,7 @@ import           GHC.Driver.Errors.Types (GhcMessage(GhcTcRnMessage))
 import           GHC.Driver.Monad (modifySession)
 import           GHC.Unit.Env (addHomeModInfoToHug)
 import           GHC.Unit.Home.ModInfo (HomeModInfo(HomeModInfo))
+import qualified GHC.Unit.Module as Module (moduleName)
 import           GHC.Unit.Module.ModSummary (findTarget)
 import qualified GHC.Driver.Env as HscTypes
 import qualified GHC.Unit.Module.ModGuts as HscTypes
@@ -105,12 +103,10 @@ import qualified GHC.Platform.Ways as Ways
 import qualified GHC.Types.Annotations as Annotations
 import qualified GHC.Core.FVs as CoreFVs
 import qualified GHC.Core as CoreSyn
-import qualified GHC.Core.DataCon as DataCon
 import qualified GHC.Data.Graph.Directed as Digraph
 import qualified GHC.Runtime.Loader as DynamicLoading
 import           GHC.Driver.Session (GeneralFlag (..))
 import qualified GHC.Driver.Session as DynFlags
-import qualified GHC.Data.FastString as FastString
 import qualified GHC
 import qualified GHC.Driver.Main as HscMain
 import qualified GHC.Iface.Load as IfaceLoad
@@ -121,8 +117,6 @@ import qualified GHC.Unit.Types as UnitTypes (unitIdString)
 import qualified GHC.Tc.Utils.Monad as TcRnMonad
 import qualified GHC.Tc.Types as TcRnTypes
 import qualified GHC.Iface.Tidy as TidyPgm
-import qualified GHC.Core.TyCon as TyCon
-import qualified GHC.Core.Type as Type
 import qualified GHC.Types.Unique as Unique
 import qualified GHC.Tc.Instance.Family as FamInst
 import qualified GHC.Core.FamInstEnv as FamInstEnv
@@ -132,6 +126,7 @@ import qualified GHC.Types.Name.Occurrence as OccName
 import           GHC.Utils.Outputable (ppr)
 import qualified GHC.Utils.Outputable as Outputable
 import qualified GHC.Types.Unique.Set as UniqSet
+import qualified GHC.Types.Unique.DSet as UniqDSet
 import qualified GHC.Types.Var as Var
 import qualified GHC.Unit.Module.Env as ModuleEnv
 import qualified GHC.Types.Name.Env as NameEnv
@@ -142,7 +137,7 @@ import           Clash.GHC.LoadInterfaceFiles
   (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders,
    LoadedBinders(..))
 import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
-import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff
+import           Clash.Util                                   (noSrcSpan, reportTimeDiff
                                                               ,wantedLanguageExtensions, unwantedLanguageExtensions)
 import           Clash.Annotations.BitRepresentation.Internal
   (DataRepr', dataReprAnnToDataRepr')
@@ -538,7 +533,7 @@ loadModules
         , [Either UnresolvedPrimitive FilePath]
         , [DataRepr']
         , [(Text.Text, PrimitiveGuard ())]
-        , HashMap Text.Text VDomainConfiguration -- domain names to configuration
+        , Maybe KnownDomainTyConUniques
         )
 loadModules startAction useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
@@ -651,19 +646,46 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
         allTCInsts   = FamInstEnv.famInstEnvElts (fst famInstEnvs')
                          ++ FamInstEnv.famInstEnvElts (snd famInstEnvs')
 
-        knownConfs   = filter (\x -> "KnownConf" == nameString (FamInstEnv.fi_fam x)) allTCInsts
+        qualifiedNameString name =
+          maybe "_INTERNAL_" (GHC.moduleNameString . Module.moduleName)
+                             (Name.nameModule_maybe name)
+            <> ('.' : OccName.occNameString (Name.nameOccName name))
 
-        fsToText     = Text.decodeUtf8 . FastString.bytesFS
+        knownTyCons
+          = sortOn (nameString . Name.getName)
+          $ UniqDSet.uniqDSetToList
+          $ foldl g UniqDSet.emptyUniqDSet allTCInsts
+         where
+          g s inst =
+            if qualifiedNameString (FamInstEnv.fi_fam inst) `elem`
+                 map show [ ''DomainPeriod         , ''DomainActiveEdge
+                          , ''DomainResetKind      , ''DomainInitBehavior
+                          , ''DomainResetPolarity  , ''DomainPeriodFraction
+                          , ''DomainPeriodFraction
+                          ]
+            then UniqDSet.addOneToUniqDSet s
+                   $ FamInstEnv.famInstTyCon inst
+            else s
 
-        famToDomain  = fromMaybe (error "KnownConf: Expected Symbol at LHS of type family")
-                         . join . fmap (fmap fsToText) . fmap Type.isStrLitTy
-                         . listToMaybe . FamInstEnv.fi_tys
-        famToConf    = unpackKnownConf . FamInstEnv.fi_rhs
-
-        knownConfNms = fmap famToDomain knownConfs
-        knownConfDs  = fmap famToConf knownConfs
-
-        knownConfMap = HashMap.fromList (zip knownConfNms knownConfDs)
+        mKnownDomainTyConUniques
+          | [ domainActiveEdgeTC
+             , domainInitBehaviorTC
+             , domainPeriodTC
+             , domainPeriodFractionTC
+             , domainResetKindTC
+             , domainResetPolarityTC
+             ] <- knownTyCons
+          = Just KnownDomainTyConUniques
+             { domainPeriodTCU         = fromTC domainPeriodTC
+             , domainActiveEdgeTCU     = fromTC domainActiveEdgeTC
+             , domainResetKindTCU      = fromTC domainResetKindTC
+             , domainInitBehaviorTCU   = fromTC domainInitBehaviorTC
+             , domainResetPolarityTCU  = fromTC domainResetPolarityTC
+             , domainPeriodFractionTCU = fromTC domainPeriodFractionTC
+             }
+          | otherwise = Nothing
+         where
+          fromTC = fromGhcUnique . Unique.getUnique
 
     return ( allBinders
            , Map.assocs lbClassOps
@@ -673,55 +695,8 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
            , toList lbPrims
            , toList reprs1
            , primGuards
-           , knownConfMap
+           , mKnownDomainTyConUniques
            )
-
--- | Given a type that represents the RHS of a KnownConf type family instance,
--- unpack the fields of the DomainConfiguration and make a VDomainConfiguration.
---
-unpackKnownConf :: Type.Type -> VDomainConfiguration
-unpackKnownConf ty
-  | [d,p,ae,rk,ib,rp] <- Type.tyConAppArgs ty
-    -- Domain name
-  , Just dom <- fmap FastString.unpackFS (Type.isStrLitTy d)
-    -- Period
-  , Just period <- fmap naturalFromInteger (Type.isNumLitTy p)
-    -- Active Edge
-  , aeTc <- Type.tyConAppTyCon ae
-  , Just aeDc <- TyCon.isPromotedDataCon_maybe aeTc
-  , aeNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName aeDc)
-    -- Reset Kind
-  , rkTc <- Type.tyConAppTyCon rk
-  , Just rkDc <- TyCon.isPromotedDataCon_maybe rkTc
-  , rkNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rkDc)
-    -- Init Behavior
-  , ibTc <- Type.tyConAppTyCon ib
-  , Just ibDc <- TyCon.isPromotedDataCon_maybe ibTc
-  , ibNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName ibDc)
-    -- Reset Polarity
-  , rpTc <- Type.tyConAppTyCon rp
-  , Just rpDc <- TyCon.isPromotedDataCon_maybe rpTc
-  , rpNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rpDc)
-  = VDomainConfiguration dom period
-      (asActiveEdge aeNm)
-      (asResetKind rkNm)
-      (asInitBehavior ibNm)
-      (asResetPolarity rpNm)
-
-  | otherwise
-  = error $ $(curLoc) ++ "Could not unpack domain configuration."
- where
-  asActiveEdge :: HasCallStack => String -> ActiveEdge
-  asActiveEdge x = fromMaybe (error $ $(curLoc) ++ "Unknown active edge: " ++ show x) (readMaybe x)
-
-  asResetKind :: HasCallStack => String -> ResetKind
-  asResetKind x = fromMaybe (error $ $(curLoc) ++ "Unknown reset kind: " ++ show x) (readMaybe x)
-
-  asInitBehavior :: HasCallStack => String -> InitBehavior
-  asInitBehavior x = fromMaybe (error $ $(curLoc) ++ "Unknown init behavior: " ++ show x) (readMaybe x)
-
-  asResetPolarity :: HasCallStack => String -> ResetPolarity
-  asResetPolarity x = fromMaybe (error $ $(curLoc) ++ "Unknown reset polarity: " ++ show x) (readMaybe x)
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
 -- recursive binding groups.

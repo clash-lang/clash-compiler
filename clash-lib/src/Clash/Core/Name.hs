@@ -33,10 +33,11 @@ import           Clash.Unique
 
 data Name a
   = Name
-  { nameSort :: NameSort
-  , nameOcc  :: !OccName
-  , nameUniq :: {-# UNPACK #-} !Unique
-  , nameLoc  :: !SrcSpan
+  { nameSort   :: NameSort
+  , nameOcc    :: !OccName
+  , nameUniq   :: {-# UNPACK #-} !Unique
+  , nameLoc    :: !SrcSpan
+  , nameStable :: Text
   }
   deriving (Show,Generic,NFData,Binary)
 
@@ -87,22 +88,24 @@ mkUnsafeName
   -> Text
   -> Unique
   -> Name a
-mkUnsafeName ns s i = Name ns s i noSrcSpan
+mkUnsafeName ns s i = Name ns s i noSrcSpan ("$unsafe" `append` s)
 
 mkUnsafeSystemName
   :: Text
   -> Unique
   -> Name a
-mkUnsafeSystemName s i = Name System s i noSrcSpan
+mkUnsafeSystemName s i = Name System s i noSrcSpan ("$unsafe" `append` s)
 
 mkUnsafeInternalName
   :: Text
   -> Unique
   -> Name a
-mkUnsafeInternalName s i = Name Internal ("c$" `append` s) i noSrcSpan
+mkUnsafeInternalName s i =
+  Name Internal ("c$" `append` s) i noSrcSpan ("$unsafe" `append` s)
 
 appendToName :: Name a -> Text -> Name a
-appendToName (Name sort nm uniq loc) s = Name Internal nm2 uniq loc
+appendToName (Name sort nm uniq loc sn) s = Name Internal nm2 uniq loc sn1
   where
     nm1 = case sort of {Internal -> nm; _ -> "c$" `append` nm}
     nm2 = nm1 `append` s
+    sn1 = sn `append` s

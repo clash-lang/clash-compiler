@@ -24,6 +24,7 @@
 module Clash.Netlist.Util where
 
 import           Data.Coerce             (coerce)
+import           Control.Arrow           (first)
 import           Control.Exception       (throw)
 import           Control.Lens            ((.=), (%=))
 import qualified Control.Lens            as Lens
@@ -32,7 +33,7 @@ import           Control.Monad.Extra     (concatMapM)
 import           Control.Monad.Reader    (ask, local)
 import qualified Control.Monad.State as State
 import           Control.Monad.State.Strict
-  (State, evalState, get, modify, runState)
+  (State, evalState, gets, modify, runState)
 import           Control.Monad.Trans.Except
   (ExceptT (..), runExcept, runExceptT, throwE)
 import           Data.Bifunctor          (second)
@@ -49,7 +50,6 @@ import           Data.List               (unzip4, partition)
 import qualified Data.List               as List
 import           Data.List.NonEmpty      (NonEmpty((:|)))
 import qualified Data.Map                as Map
-import           Data.Map                (Map)
 import           Data.Maybe
   (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
 import           Text.Printf             (printf)
@@ -78,7 +78,10 @@ import           Clash.Annotations.BitRepresentation.Internal
    uncheckedGetConstrRepr)
 import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Annotations.Primitive (HDL(VHDL))
-import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
+import           Clash.Backend
+  ( HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind
+  , domainConfigurations, setDomainConfigurations
+  )
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
@@ -109,6 +112,7 @@ import           Clash.Core.Var
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv, emptyInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
+import           Clash.Driver.Types      (DomainMap)
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
@@ -199,11 +203,11 @@ unsafeCoreTypeToHWType
   -- ^ Approximate location in original source file
   -> String
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> TyConMap
   -> Type
-  -> State HWMap FilteredHWType
+  -> State TTState FilteredHWType
 unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty =
   either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id <$>
     coreTypeToHWType builtInTranslation reprs m ty
@@ -221,13 +225,17 @@ unsafeCoreTypeToHWTypeM
   -> Type
   -> NetlistMonad FilteredHWType
 unsafeCoreTypeToHWTypeM loc ty = do
-  (_,cmpNm) <- Lens.use curCompNm
-  tt        <- Lens.use typeTranslator
-  reprs     <- Lens.view customReprs
-  tcm       <- Lens.view tcCache
-  htm0      <- Lens.use htyCache
-  let (hty,htm1) = runState (unsafeCoreTypeToHWType cmpNm loc tt reprs tcm ty) htm0
+  (_,cmpNm)     <- Lens.use curCompNm
+  tt            <- Lens.use typeTranslator
+  reprs         <- Lens.view customReprs
+  tcm           <- Lens.view tcCache
+  htm0          <- Lens.use htyCache
+  SomeBackend b <- Lens.use backend
+  let doms0  = State.evalState domainConfigurations b
+      action = unsafeCoreTypeToHWType cmpNm loc tt reprs tcm ty
+      (hty, (htm1, doms1)) = runState action (htm0, doms0)
   htyCache Lens..= htm1
+  backend  Lens..= SomeBackend (setDomainConfigurations doms1 b)
   return hty
 
 -- | Same as @coreTypeToHWTypeM@, but discards void filter information
@@ -238,20 +246,23 @@ coreTypeToHWTypeM'
 coreTypeToHWTypeM' ty =
   fmap stripFiltered <$> coreTypeToHWTypeM ty
 
-
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
 coreTypeToHWTypeM
   :: Type
   -- ^ Type to convert to HWType
   -> NetlistMonad (Maybe FilteredHWType)
 coreTypeToHWTypeM ty = do
-  tt    <- Lens.use typeTranslator
-  reprs <- Lens.view customReprs
-  tcm   <- Lens.view tcCache
-  htm0  <- Lens.use htyCache
-  let (hty,htm1) = runState (coreTypeToHWType tt reprs tcm ty) htm0
+  tt            <- Lens.use typeTranslator
+  reprs         <- Lens.view customReprs
+  tcm           <- Lens.view tcCache
+  htm0          <- Lens.use htyCache
+  SomeBackend b <- Lens.use backend
+  let doms0  = State.evalState domainConfigurations b
+      action = coreTypeToHWType tt reprs tcm ty
+      (hty, (htm1, doms1)) = runState action (htm0, doms0)
   htyCache Lens..= htm1
-  return (either (const Nothing) Just hty)
+  backend  Lens..= SomeBackend (setDomainConfigurations doms1 b)
+  return $ either (const Nothing) Just hty
 
 -- | Constructs error message for unexpected projections out of a type annotated
 -- with a custom bit representation.
@@ -356,42 +367,40 @@ maybeConvertToCustomRepr _reprs _ty hwTy = hwTy
 -- | Same as @coreTypeToHWType@, but discards void filter information
 coreTypeToHWType'
   :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> TyConMap
   -> Type
   -- ^ Type to convert to HWType
-  -> State HWMap (Either String HWType)
+  -> State TTState (Either String HWType)
 coreTypeToHWType' builtInTranslation reprs m ty =
   fmap stripFiltered <$> coreTypeToHWType builtInTranslation reprs m ty
-
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
 coreTypeToHWType
   :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> TyConMap
   -> Type
   -- ^ Type to convert to HWType
-  -> State HWMap (Either String FilteredHWType)
+  -> State TTState (Either String FilteredHWType)
 coreTypeToHWType builtInTranslation reprs m ty = do
-  htyM <- Map.lookup ty <$> get
-  case htyM of
+  hwm <- gets fst
+  case Map.lookup ty hwm of
     Just hty -> return hty
     _ -> do
       hty0M <- builtInTranslation reprs m ty
       hty1  <- go hty0M ty
-      modify (Map.insert ty hty1)
+      modify $ first $ Map.insert ty hty1
       return hty1
  where
   -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
   go :: Maybe (Either String FilteredHWType)
      -> Type
-     -> State (Map Type (Either String FilteredHWType))
-              (Either String FilteredHWType)
+     -> State TTState (Either String FilteredHWType)
   go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
   -- Strip transparant types:
   go _ (coreView1 m -> Just ty') =
@@ -419,7 +428,7 @@ originalIndices wereVoids =
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT
   :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> CustomReprs
   -> TyConMap
@@ -430,7 +439,7 @@ mkADT
   -- ^ The TyCon
   -> [Type]
   -- ^ Its applied arguments
-  -> ExceptT String (State HWMap) FilteredHWType
+  -> ExceptT String (State TTState) FilteredHWType
   -- ^ An error string or a tuple with the type and possibly a list of
   -- removed arguments.
 mkADT _ _ m tyString tc _
@@ -645,31 +654,33 @@ isRecursiveTy m tc = case tyConDataCons (UniqMap.find tc m) of
 -- translates certain builtin types.
 representableType
   :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
+  -> DomainMap
   -> CustomReprs
   -> Bool
   -- ^ String considered representable
   -> TyConMap
   -> Type
-  -> Bool
-representableType builtInTranslation reprs stringRepresentable m =
-    flip evalState mempty .
+  -> (Bool, DomainMap)
+representableType builtInTranslation doms0 reprs stringRepresentable m =
+    flip evalState (mempty, doms0) .
     representableTypeState builtInTranslation reprs stringRepresentable m
 
 -- | Like 'representableType', but memoizes the Core-type to HWType
 -- translation in the given state.
 representableTypeState
   :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -> CustomReprs
   -> Bool
   -- ^ String considered representable
   -> TyConMap
   -> Type
-  -> State HWMap Bool
-representableTypeState builtInTranslation reprs stringRepresentable m =
-    fmap (either (const False) isRepresentable) .
-    coreTypeToHWType' builtInTranslation reprs m
+  -> State TTState (Bool, DomainMap)
+representableTypeState builtInTranslation reprs stringRepresentable m ty = do
+  eshty <- coreTypeToHWType' builtInTranslation reprs m ty
+  doms1 <- gets snd
+  return $ (, doms1) $ either (const False) isRepresentable eshty
   where
     isRepresentable hty = case hty of
       String            -> stringRepresentable
@@ -678,7 +689,7 @@ representableTypeState builtInTranslation reprs stringRepresentable m =
       Product _ _ elTys -> all isRepresentable elTys
       SP _ elTyss       -> all (all isRepresentable . snd) elTyss
       BiDirectional _ t -> isRepresentable t
-      Annotated _ ty    -> isRepresentable ty
+      Annotated _ ty1   -> isRepresentable ty1
       _                 -> True
 
 -- | Determines the bitsize of a type. For types that don't get turned
@@ -1030,7 +1041,7 @@ idToPort var = do
     else return (Just (Id.unsafeFromCoreId var, hwTy))
 
 setRepName :: Text -> Name a -> Name a
-setRepName s (Name sort' _ i loc) = Name sort' s i loc
+setRepName s name = name { nameOcc = s }
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.
@@ -2023,7 +2034,7 @@ expandTopEntityOrErr ihwtys ohwty topM =
 checkTopEntityPorts
   :: HasCallStack
   => (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> CustomReprs
   -> TyConMap

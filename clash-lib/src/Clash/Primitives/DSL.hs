@@ -205,17 +205,6 @@ instance Backend backend => HasIdentifierSet (BlockState backend) where
 instance HasUsageMap backend => HasUsageMap (BlockState backend) where
   usageMap = bsBackend.usageMap
 
-liftToBlockState
-  :: forall backend a. Backend backend
-   => State backend a -> State (BlockState backend) a
-liftToBlockState (StateT f) = StateT g
- where
-  g :: BlockState backend -> Identity (a, BlockState backend)
-  g sbsIn = do
-    let sIn = _bsBackend sbsIn
-    (res,sOut) <- f sIn
-    pure (res, sbsIn{_bsBackend = sOut})
-
 -- | A typed expression.
 data TExpr = TExpr
   { ety :: HWType
@@ -1051,7 +1040,7 @@ unsafeToActiveHigh
   -- ^ Reset signal
   -> State (BlockState backend) TExpr
 unsafeToActiveHigh nm rExpr = do
-  resetLevel <- vResetPolarity <$> liftToBlockState (getDomainConf (ety rExpr))
+  let resetLevel = vResetPolarity $ getDomainConf $ ety rExpr
   case resetLevel of
     ActiveHigh -> pure rExpr
     ActiveLow -> notExpr nm rExpr
@@ -1065,7 +1054,7 @@ unsafeToActiveLow
   -- ^ Reset signal
   -> State (BlockState backend) TExpr
 unsafeToActiveLow nm rExpr = do
-  resetLevel <- vResetPolarity <$> liftToBlockState (getDomainConf (ety rExpr))
+  let resetLevel = vResetPolarity $ getDomainConf $ ety rExpr
   case resetLevel of
     ActiveLow -> pure rExpr
     ActiveHigh -> notExpr nm rExpr
