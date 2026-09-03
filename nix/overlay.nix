@@ -229,7 +229,7 @@ let
                 # make and python3 are used in verilator invocations
                 prev.gnumake
                 prev.python3
-                final.ghdl-llvm
+                final.ghdl-clash
                 prev.sby
                 final.verilator
                 prev.iverilog
@@ -237,7 +237,7 @@ let
                 prev.z3
               ]} \
               --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
-                final.ghdl-llvm
+                final.ghdl-clash
                 prev.zlib.static
               ]}
           '';
@@ -297,7 +297,7 @@ let
                 # make and python3 are used in verilator invocations
                 prev.gnumake
                 prev.python3
-                final.ghdl-llvm
+                final.ghdl-clash
                 prev.sby
                 final.verilator
                 prev.iverilog
@@ -305,7 +305,7 @@ let
                 prev.z3
               ]} \
               --set LIBRARY_PATH ${prev.lib.makeLibraryPath [
-                final.ghdl-llvm
+                final.ghdl-clash
                 prev.zlib.static
               ]}
           '';
@@ -323,6 +323,11 @@ in
   # gnat13 which is the default as of 11.03.2026 does not support aarch64
   # but ghdl-llvm works fine with gnat14 which does support aarch64.
   ghdl-llvm = prev.ghdl-llvm.override { gnat = prev.gnat14; };
+
+  # GHDL's LLVM backend has a performance bug, making `clash-testsuite`'s
+  # `IntegralTB` test execute very slow. We therefore prefer the MCODE backend,
+  # but fall back to LLVM on platforms where it isn't available.
+  ghdl-clash = if prev.stdenv.hostPlatform.isx86_64 then prev.ghdl-mcode else final.ghdl-llvm;
 
   "clashPackages-${compilerVersion}" =
     prev.haskell.packages.${compilerVersion}.extend haskellOverlays;

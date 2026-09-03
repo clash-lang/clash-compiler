@@ -28,7 +28,7 @@ clashPkgs.shellFor {
     # https://discourse.nixos.org/t/non-interactive-bash-errors-from-flake-nix-mkshell/33310
     pkgs.bashInteractive
 
-    pkgs.ghdl-llvm
+    pkgs.ghdl-clash
     pkgs.nixpkgs-fmt
     pkgs.sby
     pkgs.verilator
