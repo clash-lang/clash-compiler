@@ -35,6 +35,7 @@ jobs:
         with:
           ghc-version: ${{ matrix.ghc }}
           cabal-version: latest
+          cabal-update: false
 
       - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9
         with:
@@ -56,6 +57,10 @@ jobs:
       - name: Version information
         run:
           cabal --version
+
+      - name: Cabal update
+        run:
+          .ci/retry.sh cabal update
 
       - name: Setup
         run: .ci/gh-setup.sh
