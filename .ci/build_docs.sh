@@ -10,6 +10,7 @@ for pkg in ${haddock_pkgs}; do
   set -e
 
   # Cache dependencies
+  # This should be a no-op in the Github CI, but keeping it here just in case
   cabal v2-build ${pkg} -O0 --enable-documentation --only-dependencies
 
   # The preludes yield link destination warnings we cannot fix. Maybe fixed by:
