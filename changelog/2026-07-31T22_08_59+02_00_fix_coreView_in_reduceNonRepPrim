@@ -1,1 +1,0 @@
-FIXED: `reduceNonRepPrim` now pierces through type families, `newtype`s and `Signal` constructors when determining a primitive's result type.

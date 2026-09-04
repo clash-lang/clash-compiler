@@ -1,1 +1,0 @@
-FIXED: The SystemVerilog backend no longer emits out-of-bounds array indices when a nested modifier selects a half of an `RTree`. The size of a tree half was computed as `(d-1)^2` instead of `2^(d-1)`, so for an `RTree 3` the right half was emitted as `[4:8]` on an array whose valid indices are `0..7`. See [#3359](https://github.com/clash-lang/clash-compiler/issues/3359).

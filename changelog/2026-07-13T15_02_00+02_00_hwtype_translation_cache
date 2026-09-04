@@ -1,1 +1,0 @@
-CHANGED: The Core-type to HWType translation used by representability queries during normalization is memoized across the whole rewrite session, instead of being recomputed from scratch on every query. This speeds up normalization of designs with large or deeply nested types.

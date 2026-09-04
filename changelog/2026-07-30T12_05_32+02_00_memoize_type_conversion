@@ -1,1 +1,0 @@
-CHANGED: The GHC-to-Clash type conversion is memoized on the GHC type, with unchanged output. Types repeat massively across binders, and converting one evaluates family-instance reductions and name conversions per node. On larger designs we've tested this halved the loading stage.
