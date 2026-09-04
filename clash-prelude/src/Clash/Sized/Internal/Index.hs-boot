@@ -18,3 +18,4 @@ data Index :: Nat -> Type
 
 instance KnownNat n => Num (Index n)
 toInteger# :: Index n -> Integer
+fromEnum# :: KnownNat n => Index n -> Int

@@ -28,6 +28,7 @@ module Clash.Normalize.Transformations.Case
   ) where
 
 import Control.Exception.Base (patError)
+import Control.Monad (when)
 import GHC.Prim.Panic (absentError)
 import qualified Control.Lens as Lens
 
@@ -49,6 +50,7 @@ import Clash.Sized.Internal.Signed as S (Signed, eq#)
 import Clash.Sized.Internal.Unsigned as U (Unsigned, eq#)
 
 import Clash.Core.DataCon (DataCon(..))
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.EqSolver
 import Clash.Core.FreeVars (freeLocalIds, localVarsDoNotOccurIn)
 import Clash.Core.HasType
@@ -59,27 +61,30 @@ import Clash.Core.Subst
 import Clash.Core.Term
   ( Alt, Pat(..), PrimInfo(..), Term(..), collectArgs, collectArgsTicks
   , collectTicks, mkApps, mkTicks, patIds, stripTicks, Bind(..))
-import Clash.Core.TyCon (TyConMap)
-import Clash.Core.Type (LitTy(..), Type(..), TypeView(..), coreView1, tyView)
+import Clash.Core.TyCon (TyConMap, isNewTypeTc)
+import Clash.Core.Type
+  (LitTy(..), Type(..), TypeView(..), coreView1, splitFunForallTy, tyView)
 import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
 import Clash.Core.Util (listToLets, mkInternalVar)
+import Clash.Core.Var (varName)
 import Clash.Core.VarEnv
   ( InScopeSet, elemVarSet, extendInScopeSet, extendInScopeSetList, mkVarSet
   , unitVarSet, uniqAway)
-import Clash.Debug (traceIf)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
+import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
-import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
+import qualified Clash.Normalize.Primitives as NP (removedArg, undefined, undefinedX)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators ((>-!))
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, customReprs, debugOpts, tcCache
+  ( TransformContext(..), bindings, curFun, customReprs, debugOpts, tcCache
   , typeTranslator, workFreeBinders)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatableType, runWithHWTypeCache, whnfRW)
 import Clash.Rewrite.WorkFree
 import Clash.Util (curLoc)
+import Clash.Warning (ClashWarning(WarnUnmatchableConstant))
 
 import Clash.XException (errorX)
 
@@ -176,6 +181,13 @@ caseCon' :: HasCallStack => NormRewrite
 caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
  tcm <- Lens.view tcCache
  case collectArgsTicks subj of
+  -- The subject is a newtype constructor while the alternatives belong to the
+  -- type it represents. 'equalCon' compares tags, which cannot tell those
+  -- apart, so it would bind a field to a pattern variable of the wrong type.
+  (Data dc, args, ticks)
+    | Just fieldE <- newTypeField tcm dc alts args
+    -> caseCon ctx (Case (mkTicks fieldE ticks) ty alts)
+
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case List.find (equalCon . fst) alts of
     Just (DataPat _ tvs xs, altE) -> do
@@ -287,7 +299,8 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- WHNF of subject is _|_, in the form of our internal _|_-values: that
       -- means the entire case-expression is _|_
       (Prim pInfo,[_],ticks)
-        | primName pInfo `elem` [ Text.showt 'NP.undefined
+        | primName pInfo `elem` [ Text.showt 'NP.removedArg
+                                , Text.showt 'NP.undefined
                                 , Text.showt 'NP.undefinedX ] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks) [Right ty]
         in changed e1
@@ -315,14 +328,17 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
             -> caseCon ctx1 (Case (Literal (IntegerLiteral 0)) ty alts)
           _ -> do
             opts <- Lens.view debugOpts
+            (curFunId,sp) <- Lens.use curFun
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
-            traceIf (dbg_invariants opts && isConstant subj)
-              ("Unmatchable constant as case subject: " ++ showPpr subj ++
-                 "\nWHNF is: " ++ showPpr subj1)
-              -- Otherwise check whether the entire case-expression has a
-              -- single alternative, and pick that one.
-              (caseOneAlt e)
+            when (dbg_invariants opts && isConstant subj)
+              $ warnAboutM WarnUnmatchableConstant sp
+              $ "Unmatchable constant as case subject in " ++
+                  showPpr (varName curFunId) ++ ": " ++ showPpr subj ++
+                  "\nWHNF is: " ++ showPpr subj1
+            -- Otherwise check whether the entire case-expression has a
+            -- single alternative, and pick that one.
+            caseOneAlt e
 
   -- The subject is a variable
   (Var v, [], _) | isNum0 (coreTypeOf v) ->
@@ -624,6 +640,25 @@ caseLet (TransformContext is0 _) (Case (collectTicks -> (Let xes e,ticks)) ty al
 
 caseLet _ e = return e
 {-# SCC caseLet #-}
+
+-- | The value a newtype constructor wraps, provided the alternatives it is
+-- matched against do not mention that constructor. GHC casts freely between a
+-- newtype and its representation, so a case on a newtype value can carry
+-- alternatives for the represented type.
+newTypeField :: TyConMap -> DataCon -> [Alt] -> [Either Term Type] -> Maybe Term
+newTypeField tcm dc alts args
+  | not (any isSameDc alts)
+  , TyConApp tcNm _ <- tyView (snd (splitFunForallTy (dcType dc)))
+  , Just tc <- UniqMap.lookup tcNm tcm
+  , isNewTypeTc tc
+  , [fieldE] <- Either.lefts args
+  = Just fieldE
+  | otherwise
+  = Nothing
+ where
+  isSameDc (DataPat dcPat _ _, _) = dcUniq dcPat == dcUniq dc
+  isSameDc _ = False
+{-# SCC newTypeField #-}
 
 caseOneAlt :: Term -> NormalizeSession Term
 caseOneAlt e@(Case _ _ [(pat,altE)]) =

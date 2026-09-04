@@ -25,6 +25,7 @@ import           Data.Text           (Text)
 import GHC.Integer (compareInteger)
 import GHC.Num.Integer (Integer (..))
 import           GHC.Natural
+import           GHC.Word (Word(W#))
 
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.Literal  (Literal (..))
@@ -32,7 +33,7 @@ import Clash.Core.Term (Term (..), mkApps)
 import Clash.Core.Type (TypeView (..), splitFunForallTy, tyView)
 import Clash.Core.TyCon (tyConDataCons)
 import qualified Clash.Data.UniqMap as UniqMap
-import Clash.Util (flogBase, textNameLit)
+import Clash.Util (textNameLit)
 
 import qualified GHC.Num
 
@@ -43,8 +44,10 @@ primitives =
   [ primStepEntry $(textNameLit 'GHC.Num.naturalLogBase#) $ \case
       PrimStepContext{..}
         | Just (a,b) <- naturalLiterals args
-        , Just c <- flogBase a b
-        -> (reduce . Literal . WordLiteral . toInteger) c
+        , a > 1
+        -> reduce $ catchErrorCall
+             (Literal (WordLiteral (toInteger
+               (W# (GHC.Num.naturalLogBase# (fromInteger a) (fromInteger b))))))
       _ -> Nothing
 
   , primStepEntry $(textNameLit 'GHC.Num.NS) $ \case

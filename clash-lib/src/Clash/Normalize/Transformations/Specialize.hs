@@ -25,6 +25,7 @@ module Clash.Normalize.Transformations.Specialize
   , nonRepSpec
   , typeSpec
   , zeroWidthSpec
+  , zeroWidthTypeElem
   ) where
 
 import Control.Arrow ((***), (&&&))

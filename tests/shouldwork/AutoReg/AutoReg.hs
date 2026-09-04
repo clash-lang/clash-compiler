@@ -9,6 +9,9 @@
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# OPTIONS_GHC -fconstraint-solver-iterations=10 #-}
+-- 'OtherPair' derives NFDataX with both DeriveAnyClass and
+-- GeneralizedNewtypeDeriving in scope, which GHC defaults for
+{-# OPTIONS_GHC -Wno-deriving-defaults #-}
 
 module AutoReg where
 import Data.Int

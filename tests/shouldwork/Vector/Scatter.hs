@@ -9,7 +9,7 @@ topEntity :: Vec 5 (Unsigned 10) -> Vec 5 (Unsigned 10)
 topEntity = scatter defvec to
   where
     defvec = replicate d5 99
-    to = 0 :> 4 :> 2 :> 3 :> 1 :> Nil
+    to = 0 :> 4 :> 2 :> 3 :> 1 :> Nil :: Vec 5 (Index 5)
 {-# OPAQUE topEntity #-}
 
 testBench :: Signal System Bool

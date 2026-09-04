@@ -147,6 +147,15 @@ clashTestVariants testName testTrees =
     testGroup testName $
       zipWith ($) testTrees (repeat parentNames)
 
+-- | Demote the @clash-non-synthesizable@ warning, which the testsuite's global
+-- @-Werror@ (see 'Test.Tasty.Clash.commonArgs') would otherwise promote to an
+-- error. For tests that deliberately instantiate non-synthesizable primitives:
+-- arithmetic on 'Integer', clock generators inside the top entity, and the
+-- like.
+allowNonSynthesizable :: TestOptions -> TestOptions
+allowNonSynthesizable opts =
+  opts{clashFlags="-Wwarn=clash-non-synthesizable" : clashFlags opts}
+
 -- | Auto-retry failures caused by GHC bug #19421. See clash-compiler PR #2444.
 workaroundMmapCrash :: TestTree -> TestTree
 workaroundMmapCrash = flakyTestWithRetryAction retryAction retryPolicy
@@ -171,7 +180,8 @@ runClashTest = defaultMain
   $ workaroundMmapCrash
   $ clashTestRoot
   [ clashTestGroup "examples"
-    [ runTest "ALU" def{hdlSim=[]}
+      -- Performs arithmetic on 'Integer'
+    [ runTest "ALU" (allowNonSynthesizable def{hdlSim=[]})
     , let _opts = def { hdlSim=[]
                       , hdlTargets=[VHDL]
                       , buildTargets=BuildSpecific ["blinker"]
@@ -180,7 +190,8 @@ runClashTest = defaultMain
     , runTest "BlockRamTest" def{hdlSim=[]}
     , runTest "Calculator" def
     , runTest "CHIP8" def{hdlSim=[]}
-    , runTest "CochleaPlus" def{hdlSim=[]}
+      -- Performs arithmetic on 'Integer'
+    , runTest "CochleaPlus" (allowNonSynthesizable def{hdlSim=[]})
     ,
       -- Vivado segfaults
       let _opts = def { clashFlags=["-fclash-component-prefix", "test"]
@@ -208,13 +219,15 @@ runClashTest = defaultMain
         ,
           -- TODO: this uses finish_and_return, with is Icarus Verilog only.
           -- see: https://github.com/clash-lang/clash-compiler/issues/2265
+          --
+          -- Generates its clock inside the design ('tbClockGen')
           let _opts = def { buildTargets = BuildSpecific ["system"]
                           , hdlTargets = [Verilog]
                           , hdlLoad = [IVerilog]
                           , hdlSim = [IVerilog]
                           , vvpStdoutNonEmptyFail = False
                           }
-           in runTest "I2Ctest" _opts
+           in runTest "I2Ctest" (allowNonSynthesizable _opts)
 
         ]
     ]
@@ -272,10 +285,12 @@ runClashTest = defaultMain
           }
         ]
       , clashTestGroup "Signal"
-        [ runTest "MAC" def{
+          -- Performs arithmetic on 'Integer'; without the exemption that error
+          -- is reported before the one this test is about
+        [ runTest "MAC" (allowNonSynthesizable def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
-          }
+          })
         ]
       , clashTestGroup "SynthesisAttributes"
         [ runTest "ProductInArgs" def{
@@ -292,8 +307,9 @@ runClashTest = defaultMain
           }
         ]
       , clashTestGroup "Testbench"
-        [ runTest "UnsafeOutputVerifier" def{
-            expectClashFail=Just ( TestSpecificExitCode 0
+        [ -- The testsuite's global -Werror promotes the warning to an error
+          runTest "UnsafeOutputVerifier" def{
+            expectClashFail=Just ( def
                                  , "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!")
           }
         ]
@@ -308,6 +324,8 @@ runClashTest = defaultMain
           }
         ]
       , clashTestGroup "Verification"
+          -- The assertion designs generate their clock inside the design
+          -- ('tbClockGen')
         [ let n = 9 -- GHDL only has VERY basic PSL support
               _opts = def { hdlTargets=[VHDL]
                           , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
@@ -315,7 +333,7 @@ runClashTest = defaultMain
                           , hdlSim=[GHDL]
                           , expectSimFail=Just (def, "psl assertion failed")
                           }
-           in runTest "NonTemporalPSL" _opts
+           in runTest "NonTemporalPSL" (allowNonSynthesizable _opts)
         , let n = 13
               _opts = def { hdlTargets=[SystemVerilog]
                           , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
@@ -324,16 +342,16 @@ runClashTest = defaultMain
                           , hdlLoad=[ModelSim]
                           , hdlSim=[]
                           }
-           in runTest "NonTemporalPSL" _opts
+           in runTest "NonTemporalPSL" (allowNonSynthesizable _opts)
         , let is = [(1::Int)..13] \\ [4, 6, 7, 8, 10, 11, 12] in
-          runTest "NonTemporalSVA" def{
+          runTest "NonTemporalSVA" (allowNonSynthesizable def{
             hdlTargets=[SystemVerilog]
           , buildTargets=BuildSpecific ["fails" <> show i | i <- is]
           -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
           -- for syntax errors.
           , hdlLoad=[ModelSim]
           , hdlSim=[]
-          }
+          })
         , runTest "SymbiYosys" def{
             hdlTargets=[Verilog, SystemVerilog]
           , hdlLoad=[]
@@ -397,7 +415,8 @@ runClashTest = defaultMain
         , runTest "CaseOfErr" def{hdlTargets=[VHDL],hdlSim=[]}
         , runTest "Trace" def{hdlSim=[]}
         , runTest "DivMod" def{hdlSim=[]}
-        , runTest "DivZero" def
+          -- Performs arithmetic on 'Integer'
+        , runTest "DivZero" (allowNonSynthesizable def)
         , runTest "LambdaDrop" def{hdlSim=[]}
         , runTest "IrrefError" def{hdlSim=[]}
         , outputTest "NameInlining" def
@@ -408,7 +427,8 @@ runClashTest = defaultMain
         , runTest "PatError" def{hdlSim=[]}
         , runTest "ByteSwap32" def
         , runTest "CharTest" def
-        , runTest "ClassOps" def
+          -- Performs arithmetic on 'Integer'
+        , runTest "ClassOps" (allowNonSynthesizable def)
         , runTest "CountTrailingZeros" def
         , runTest "DeepseqX" def
         , runTest "LotOfStates" def
@@ -427,7 +447,11 @@ runClashTest = defaultMain
         , runTest "Shift" def{hdlSim=[]}
         , runTest "SimOnly" def{hdlTargets=[VHDL],hdlSim=[]}
         , runTest "SimpleConstructor" def{hdlSim=[]}
-        , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=[]}
+        , runTest "SomeNatVal" def{
+            hdlTargets=[VHDL]
+          , hdlSim=[]
+          , clashFlags=["-Werror=clash-unmatchable-constant"]
+          }
         , runTest "TyEqConstraints" def{
             hdlSim=[]
           , buildTargets=BuildSpecific ["top1"]
@@ -474,6 +498,10 @@ runClashTest = defaultMain
         , runTest "ReduceOne" def
         , runTest "ExtendingNumZero" def
         , runTest "AppendZero" def
+        , runTest "SplitZeroWidth"
+            def{clashFlags=["-Werror=clash-unmatchable-constant"]}
+        , runTest "PopCountNoInteger"
+            def{clashFlags=["-Werror=clash-dubious-primitive"]}
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
@@ -495,7 +523,12 @@ runClashTest = defaultMain
             hdlTargets=[VHDL]
           , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
           }
-        , outputTest "LITrendering" def{hdlTargets=[Verilog]}
+          -- Its blackbox deliberately uses arguments the Haskell definition
+          -- does not use, which warns with -Wclash-primitive-definition
+        , outputTest "LITrendering" def{
+            hdlTargets=[Verilog]
+          , clashFlags=["-Wwarn=clash-primitive-definition"]
+          }
         , runTest "T2117" def{
             clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
           , hdlTargets=[VHDL]
@@ -507,7 +540,8 @@ runClashTest = defaultMain
         [ runTest "DeadRecursiveBoxed" def{hdlSim=[]}
         ]
       , clashTestGroup "CSignal"
-        [ runTest "MAC" def{hdlSim=[]}
+        [ -- Performs arithmetic on 'Integer'
+          runTest "MAC" (allowNonSynthesizable def{hdlSim=[]})
         , runTest "CBlockRamTest" def{hdlSim=[]}
         ]
       , clashTestGroup "CustomReprs"
@@ -599,9 +633,9 @@ runClashTest = defaultMain
         , runTest "ZeroInt" def
         ]
       , clashTestGroup "Floating"
-        [ runTest "FloatPack" def{hdlSim=[], clashFlags=["-fclash-float-support"]}
-        , runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]}
-        , runTest "T1803" def{clashFlags=["-fclash-float-support"]}
+        [ runTest "FloatPack" def{hdlSim=[]}
+        , runTest "FloatConstFolding" def
+        , runTest "T1803" def
         ]
       , clashTestGroup "GADTs"
         [ runTest "Constrained" def
@@ -627,8 +661,9 @@ runClashTest = defaultMain
       , clashTestGroup "Issues" $
         [ runTest "T359" def{hdlSim=[]}
         , clashLibTest "T508" def
+          -- Generates its reset inside the design ('resetGenN')
         , let _opts = def { hdlSim = [], hdlTargets = [Verilog] }
-           in runTest "T1187" _opts
+           in runTest "T1187" (allowNonSynthesizable _opts)
         , clashLibTest "T1388" def{hdlTargets=[VHDL]}
         , outputTest "T1171" def
         , clashLibTest "T1439" def{hdlTargets=[VHDL]}
@@ -670,7 +705,8 @@ runClashTest = defaultMain
         , runTest "T2046C" def{hdlSim=[],clashFlags=["-Werror"]}
         , runTest "T2097" def{hdlSim=[]}
         , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=[]}
-        , runTest "T2220_toEnumOOB" def{hdlTargets=[VHDL]}
+          -- Converts to 'Int' through 'Integer' ('fromIntegral')
+        , runTest "T2220_toEnumOOB" (allowNonSynthesizable def{hdlTargets=[VHDL]})
         , runTest "T2272" def{hdlTargets=[VHDL], hdlSim=[]}
         , outputTest "T2334" def{hdlTargets=[VHDL]}
         , outputTest "T2325" def{hdlTargets=[VHDL]}
@@ -690,7 +726,8 @@ runClashTest = defaultMain
           }
         , outputTest "T2510" def{hdlTargets=[VHDL], clashFlags=["-DNOINLINE=OPAQUE"]}
         , outputTest "T2542" def{hdlTargets=[VHDL]}
-        , runTest "T2593" def{hdlSim=[]}
+          -- Generates its clock inside the design ('tbClockGen')
+        , runTest "T2593" (allowNonSynthesizable def{hdlSim=[]})
         , runTest "T2623CaseConFVs" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2628" def{hdlTargets=[VHDL], buildTargets=BuildSpecific ["TACacheServerStep"], hdlSim=[]}
         , runTest "T2724" def
@@ -698,8 +735,10 @@ runClashTest = defaultMain
         , runTest "T2729" def
         , runTest "T2770" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
         , runTest "T2831" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
-        , runTest "T2839" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
-        , runTest "T2845" def{hdlSim=[],hdlTargets=[Verilog]}
+          -- Generates its clock inside the design ('tbClockGen')
+        , runTest "T2839" (allowNonSynthesizable def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]})
+          -- Generates its clock inside the design ('tbClockGen')
+        , runTest "T2845" (allowNonSynthesizable def{hdlSim=[],hdlTargets=[Verilog]})
         , runTest "T2904" def
         , runTest "T2966" def{hdlSim=[],hdlTargets=[Verilog]}
         , runTest "T2988" def{hdlSim=[]}
@@ -744,7 +783,8 @@ runClashTest = defaultMain
         else
           []
       , clashTestGroup "LoadModules"
-        [ runTest "T1796" def{hdlSim=[]}
+        [ -- Generates its clock inside the design ('tbClockGen')
+          runTest "T1796" (allowNonSynthesizable def{hdlSim=[]})
           -- Clash should not set '-dynamic-too' if '-dynamic' is already set
         , runTest "T3354" def
             { hdlTargets=[VHDL]
@@ -768,8 +808,10 @@ runClashTest = defaultMain
           , outputTest "HDLNotContainsLoc" def{hdlSim=[]}
           ]
       , clashTestGroup "Numbers"
-        [ runTest "BitInteger" def
-        , runTest "BitReverse" def
+        [ -- Performs arithmetic on 'Integer'
+          runTest "BitInteger" (allowNonSynthesizable def)
+          -- Takes 'Integer' input
+        , runTest "BitReverse" (allowNonSynthesizable def)
         , runTest "BitsTB" def { buildTargets = BuildSpecific [ "bitsTB1"
                                                               , "bitsTB2"
                                                               , "bitsTB3"
@@ -779,8 +821,9 @@ runClashTest = defaultMain
           runTest "Bounds" def { hdlSim=hdlSim def \\ [Vivado] }
 
         , runTest "DivideByZero" def
+          -- Performs arithmetic on 'Integer'
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
-           in runTest "ExpWithGhcCF" _opts
+           in runTest "ExpWithGhcCF" (allowNonSynthesizable _opts)
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in runTest "ExpWithClashCF" _opts
         , outputTest "ExpWithClashCF" def{ghcFlags=["-itests/shouldwork/Numbers"]}
@@ -789,7 +832,8 @@ runClashTest = defaultMain
         ,
           -- see https://github.com/clash-lang/clash-compiler/issues/2262,
           -- Vivado's mod misbehaves on negative dividend
-          runTest "IntegralTB" def{hdlSim=hdlSim def \\ [Vivado]}
+          -- Performs arithmetic on 'Integer'
+          runTest "IntegralTB" (allowNonSynthesizable def{hdlSim=hdlSim def \\ [Vivado]})
 
         , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
         , outputTest "NumConstantFolding_1" def
@@ -805,25 +849,33 @@ runClashTest = defaultMain
             { clashFlags=["-fconstraint-solver-iterations=15"]
             , ghcFlags=["-itests/shouldwork/Numbers"]
             }
-        , runTest "Naturals" def
+        , runTest "LogBaseOutOfDomain"
+            def{hdlSim=[], clashFlags=["-Werror=clash-non-synthesizable"]}
+          -- Performs arithmetic on 'Natural'
+        , runTest "Naturals" (allowNonSynthesizable def)
         , runTest "NaturalToInteger" def{hdlSim=[]}
         , runTest "NegativeLits" def
         , runTest "Resize" def
         , runTest "Resize2" def
         , runTest "Resize3" def
         , runTest "SatMult" def{hdlSim=[]}
-        , runTest "ShiftRotate" def
-        , runTest "ShiftRotateNegative" def{hdlTargets=[VHDL]}
+          -- Converts to 'Int' through 'Integer' ('fromIntegral')
+        , runTest "ShiftRotate" (allowNonSynthesizable def)
+          -- Shifts 'Integer' and 'Natural' values on purpose, to pin down how
+          -- they render in HDL
+        , runTest "ShiftRotateNegative" (allowNonSynthesizable def{hdlTargets=[VHDL]})
         , runTest "SignedProjectionTB" def
         , runTest "SignedZero" def
-        , runTest "Signum" def
+          -- Performs arithmetic on 'Integer'
+        , runTest "Signum" (allowNonSynthesizable def)
         ,
           -- vivado segfaults
           runTest "Strict" def{hdlSim=hdlSim def \\ [Vivado]}
 
         , runTest "T1019" def{hdlSim=[]}
         , runTest "T1351" def
-        , runTest "T2149" def
+          -- Converts 'Word' to 'Signed 8' through 'Integer' ('fromIntegral')
+        , runTest "T2149" (allowNonSynthesizable def)
         , outputTest "UndefinedConstantFolding" def{ghcFlags=["-itests/shouldwork/Numbers"]}
         , runTest "UnsignedZero" def
         ]
@@ -838,8 +890,14 @@ runClashTest = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (NoTestExitCode, "You shouldn't use 'primitive'!")
           }
+          -- The test asserts that /all/ of a primitive's warning guards are
+          -- reported, so neither the guards themselves nor the warning about
+          -- the primitive not being marked OPAQUE may be promoted: the first
+          -- one promoted aborts before the rest are printed.
         , runTest "MultipleGuards" def{
             hdlTargets=[VHDL]
+          , clashFlags=[ "-Wwarn=clash-primitive-definition"
+                       , "-Wwarn=clash-dubious-primitive" ]
           , expectClashFail=Just (NoTestExitCode, "You should know that ...")
           }
         ]
@@ -878,9 +936,12 @@ runClashTest = defaultMain
                                                         , "testBench53"]}
             in runTest "RWMultiTop" _opts
           ]
-        , runTest "HoldResetAsync" def
-        , runTest "HoldResetSync" def
-        , runTest "ResetGen" def
+          -- These reset their design with 'resetGenN', whose SystemVerilog
+          -- black box is marked non-synthesizable (the VHDL and Verilog ones
+          -- are not)
+        , runTest "HoldResetAsync" (allowNonSynthesizable def)
+        , runTest "HoldResetSync" (allowNonSynthesizable def)
+        , runTest "ResetGen" (allowNonSynthesizable def)
         ,
           -- TODO: we do not support memory files in Vivado
           --
@@ -966,7 +1027,7 @@ runClashTest = defaultMain
                           , hdlLoad = [IVerilog]
                           , hdlSim = [IVerilog]
                           }
-           in runTest "Test00" _opts
+           in runTest "Test00" (allowNonSynthesizable _opts)
         ]
       , clashTestGroup "SynthesisAttributes"
         [ outputTest "Annotate" def{hdlTargets=[VHDL]}
