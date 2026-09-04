@@ -2,7 +2,7 @@
 set -xueo pipefail
 
 # Check that documentation was generated successfully
-haddock_pkgs="clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog clash-cosim"
+haddock_pkgs="clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog"
 
 mkdir -p hadocs
 

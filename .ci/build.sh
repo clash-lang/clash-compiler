@@ -2,9 +2,7 @@
 set -xueo pipefail
 
 # Generate source distributions for all our packages
-# TODO: `sdist clash-cosim` only works _after_ building it
 cabal v2-sdist \
-    clash-ffi \
     clash-ghc \
     clash-lib \
     clash-lib-hedgehog \
@@ -27,20 +25,12 @@ cabal v2-build all --write-ghc-environment-files=always
 
 # Put all the test binaries in a predictable location
 TESTS="
-clash-cosim:test
 clash-lib:doctests
 clash-lib:unittests
 clash-prelude:doctests
 clash-prelude:unittests
 clash-testsuite:clash-testsuite
 "
-
-# GHC 9.8.3, 9.8.4 and 9.10.2 have issues, see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12264#note_602406
-set +u
-if [[ "$SKIP_CLASH_FFI_EXAMPLE" != "yes" ]]; then
-  TESTS="$TESTS clash-ffi:ffi-interface-tests"
-fi
-set -u
 
 mkdir bin
 for TEST in $TESTS; do

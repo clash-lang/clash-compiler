@@ -31,9 +31,5 @@ done
 echo "${GIT_ROOT}"/dist-newstyle
 ls "${GIT_ROOT}"/.ghc.environment.*
 
-# Some build products for clash-cosim are here
-echo "${GIT_ROOT}"/clash-cosim/src/cbits
-echo "${GIT_ROOT}"/clash-cosim/src/prims
-
 # Include symlinks to built binaries
 echo "${GIT_ROOT}"/bin
