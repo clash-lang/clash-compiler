@@ -37,14 +37,32 @@ import Clash.GHC.Evaluator.Primitive.Util
 primitives :: [(Text, PrimStep)]
 primitives =
   -- XXX: Does not seem to exist?
+  -- 'noinlineConstraint' (if it exists) is a wired-in magic Id; not
+  -- user-importable and so not TH-quotable. Match both the pre-9.14
+  -- 'GHC.Magic' and the post-9.14 'GHC.Internal.Magic' module names.
   [ primStepEntry "GHC.Magic.noinlineConstraint" $ \case
       PrimStepContext{..}
         | [arg] <- args
         -> reduce (valToTerm arg)
       _ -> Nothing
 
+  , primStepEntry "GHC.Internal.Magic.noinlineConstraint" $ \case
+      PrimStepContext{..}
+        | [arg] <- args
+        -> reduce (valToTerm arg)
+      _ -> Nothing
+
   -- XXX: Does not seem to exist?
+  -- 'nospec' is a wired-in magic Id; not user-importable and so not
+  -- TH-quotable. Match both the pre-9.14 'GHC.Magic' and the post-9.14
+  -- 'GHC.Internal.Magic' module names.
   , primStepEntry "GHC.Magic.nospec" $ \case
+      PrimStepContext{..}
+        | [arg] <- args
+        -> reduce (valToTerm arg)
+      _ -> Nothing
+
+  , primStepEntry "GHC.Internal.Magic.nospec" $ \case
       PrimStepContext{..}
         | [arg] <- args
         -> reduce (valToTerm arg)

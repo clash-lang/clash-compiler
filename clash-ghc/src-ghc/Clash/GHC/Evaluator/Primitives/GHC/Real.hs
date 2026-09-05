@@ -26,7 +26,7 @@ import Clash.GHC.Evaluator.Primitive.Util
 primitives :: [(Text, PrimStep)]
 primitives =
   -- GHC.Real.^  -- XXX: Very fragile
-  --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
+  --   ^_f, $wf, $wf1 are specializations of the internal function f in the implementation of (^) in GHC.Real
   [ primStepEntry "GHC.Real.^_f" $ \case
       PrimStepContext{..}  -- :: Integer -> Integer -> Integer
         | [i,j] <- integerLiterals' args
@@ -46,23 +46,14 @@ primitives =
         -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
       _ -> Nothing
 
-  , primStepEntry "GHC.Real.^_$s$spowImpl2" $ \case
-      PrimStepContext{..} -- :: Int# -> Integer -> Integer
-        | [intLiteral -> Just j, integerLiteral -> Just i] <- args
-        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-      _ -> Nothing
-
-  , primStepEntry "GHC.Real.$w$spowImpl" $ \case
-      PrimStepContext{..} -- :: Integer -> Int# -> Integer
-        | [integerLiteral -> Just i, intLiteral -> Just j] <- args
-        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-      _ -> Nothing
-
-  , primStepEntry "GHC.Real.$w$spowImpl1" $ \case
-      PrimStepContext{..} -- :: Int# -> Int# -> Integer
-        | [intLiteral -> Just i, intLiteral -> Just j] <- args
-        -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
-      _ -> Nothing
+  -- Which specialization each worker name implements shifts between GHC
+  -- versions, so they all share one shape-dispatching implementation. See
+  -- 'powImplWorker'.
+  , primStepEntry "GHC.Real.^_$s$spowImpl" powImplWorker
+  , primStepEntry "GHC.Real.^_$s$spowImpl1" powImplWorker
+  , primStepEntry "GHC.Real.^_$s$spowImpl2" powImplWorker
+  , primStepEntry "GHC.Real.$w$spowImpl" powImplWorker
+  , primStepEntry "GHC.Real.$w$spowImpl1" powImplWorker
 
   , primStepEntry "GHC.Real.^_$sf2" $ \case
       PrimStepContext{..} -- :: Int# -> Integer -> Integer

@@ -11,7 +11,9 @@
 module GHC.BasicTypes.Extra where
 
 import GHC.Types.Basic
+#if !MIN_VERSION_ghc(9,14,0)
 import Control.DeepSeq
+#endif
 import Data.Binary
 import GHC.Generics
 
@@ -19,7 +21,9 @@ import GHC.Data.FastString.Extra ()
 import GHC.Types.SourceText
 
 deriving instance Generic InlineSpec
+#if !MIN_VERSION_ghc(9,14,0)
 instance NFData InlineSpec
+#endif
 instance Binary InlineSpec
 
 deriving instance Generic SourceText

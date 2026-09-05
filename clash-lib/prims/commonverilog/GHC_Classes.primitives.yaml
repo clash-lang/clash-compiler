@@ -1,29 +1,29 @@
 - BlackBox:
-    name: GHC.Classes.eqInt
+    name: ["GHC.Classes.eqInt", "GHC.Internal.Classes.eqInt"]
     kind: Expression
     type: 'eqInt :: Int ->
       Int -> Bool'
     template: ~ARG[0] == ~ARG[1]
 - BlackBox:
-    name: GHC.Classes.neInt
+    name: ["GHC.Classes.neInt", "GHC.Internal.Classes.neInt"]
     kind: Expression
     type: 'neInt :: Int ->
       Int -> Bool'
     template: ~ARG[0] != ~ARG[1]
 - BlackBox:
-    name: GHC.Classes.&&
+    name: ["GHC.Classes.&&", "GHC.Internal.Classes.&&"]
     kind: Expression
     type: '(&&) :: Bool ->
       Bool -> Bool'
     template: ~ARG[0] & ~ARG[1]
 - BlackBox:
-    name: GHC.Classes.||
+    name: ["GHC.Classes.||", "GHC.Internal.Classes.||"]
     kind: Expression
     type: '(||) :: Bool ->
       Bool -> Bool'
     template: ~ARG[0] | ~ARG[1]
 - BlackBox:
-    name: GHC.Classes.not
+    name: ["GHC.Classes.not", "GHC.Internal.Classes.not"]
     kind: Expression
     type: 'not :: Bool ->
       Bool'

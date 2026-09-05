@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -714,6 +715,39 @@ integerToWord64Literal = Literal . Word64Literal . toInteger . (fromInteger :: I
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
+
+-- | Implementation shared by every worker of GHC's @powImpl@, i.e. the
+-- internal function behind '(^)'.
+--
+-- GHC's powImpl workers come in five flavors and get renumbered across
+-- versions: the (numeric-suffix -> signature) mapping changes between 9.10,
+-- 9.12 and 9.14, and may shift again. Rather than hard-code a fragile
+-- name->signature table, we register this single implementation under every
+-- worker name and dispatch by argument shape: the worker name is known, but
+-- which specialization it implements is inferred from the arg literals.
+--
+-- Shapes:
+--   [Int#, Integer]      -> Integer  (small-exponent path, IS exp#)
+--   [Int#, Int#]         -> Int#     (Int -> Int -> Int spec, $w$*)
+--   [Integer, Int#]      -> Integer  (Integer -> Int -> Integer spec, $w$*)
+--   [ByteArray#, Integer]-> Integer  (large-exponent path, IP/IN)
+--
+-- For the ByteArray# variant we reconstruct the exponent as a positive
+-- bignum (IP ba). The negative-bignum (IN) arm is in practice dead: (^)
+-- errors on negative exponents before recursing, so reducing IN positively
+-- only affects DCE-able code.
+powImplWorker :: PrimStepContext -> Maybe Machine
+powImplWorker = \case
+  PrimStepContext{..}
+    | [intLiteral -> Just j, integerLiteral -> Just i] <- args
+    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+    | [integerLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+    | [intLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))
+    | [Lit (ByteArrayLiteral (BA.ByteArray ba)), integerLiteral -> Just i] <- args
+    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ IP ba))
+  _ -> Nothing
 
 naturalToNaturalLiteral :: Natural -> Term
 naturalToNaturalLiteral = Literal . NaturalLiteral . toInteger
