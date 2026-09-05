@@ -1,0 +1,4 @@
+CHANGED: `deriveAutoReg` to improve the calculated constraints
+
+In addition to looking for constraints on AutoReg instances fields,
+it now also looks for constraints on the NFDataX instance of the whole type.
