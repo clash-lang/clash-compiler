@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -100,7 +100,6 @@ data SystemVerilogState =
     , _hdlsyn    :: HdlSyn
     , _undefValue :: Maybe (Maybe Int)
     , _aggressiveXOptBB_ :: AggressiveXOptBB
-    , _renderEnums_ :: RenderEnums
     , _domainConfigurations_ :: DomainMap
     , _usages :: UsageMap
     }
@@ -134,7 +133,6 @@ instance Backend SystemVerilogState where
     , _hdlsyn=opt_hdlSyn opts
     , _undefValue=opt_forceUndefined opts
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
-    , _renderEnums_=coerce (opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
     , _usages=mempty
     }
@@ -206,7 +204,6 @@ instance Backend SystemVerilogState where
   getMemoryDataFiles = use memoryDataFiles
   ifThenElseExpr _ = True
   aggressiveXOptBB = use aggressiveXOptBB_
-  renderEnums = use renderEnums_
   domainConfigurations = use domainConfigurations_
   setDomainConfigurations confs s = s {_domainConfigurations_ = confs}
 
