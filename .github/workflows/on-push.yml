@@ -21,7 +21,6 @@ jobs:
           9.14.1,
           9.12.4,
           9.10.3,
-          9.8.4,
           9.6.7
         ]
     steps:
@@ -365,7 +364,6 @@ jobs:
           ghc9141,
           ghc9124,
           ghc9103,
-          ghc984,
           ghc967
         ]
     steps:
@@ -403,7 +401,6 @@ jobs:
           ghc9141,
           ghc9124,
           ghc9103,
-          ghc984,
           ghc967
         ]
     needs: packages_testsuite
