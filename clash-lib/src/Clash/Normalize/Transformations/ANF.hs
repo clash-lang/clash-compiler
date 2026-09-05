@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021,      QBayLogic B.V.
+                    2021,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -11,10 +11,12 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.ANF
   ( makeANF
   , nonRepANF
+  , nonRepANFWorker
   ) where
 
 import Control.Arrow ((***))
@@ -49,6 +51,7 @@ import Clash.Netlist.Util (bindsExistentials)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
 import Clash.Rewrite.Util
@@ -394,8 +397,14 @@ collectANF _ e = return e
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
-nonRepANF :: HasCallStack => NormRewrite
-nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
+nonRepANF :: Transformation
+nonRepANF = toTransformation "nonRepANF" (onApp 'nonRepANFWorker)
+
+-- | The 'App' handler of 'nonRepANF'.
+nonRepANFWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
+nonRepANFWorker ctx@(TransformContext is0 _) e appConPrim arg
   | (conPrim, _) <- collectArgs e
   , isCon conPrim || isPrim conPrim
   = do
@@ -410,5 +419,5 @@ nonRepANF ctx@(TransformContext is0 _) e@(App appConPrim arg)
       (True,TyLam {}) -> specialize ctx e
       _               -> return e
 
-nonRepANF _ e = return e
-{-# SCC nonRepANF #-}
+nonRepANFWorker _ e _ _ = return e
+{-# SCC nonRepANFWorker #-}

@@ -18,7 +18,9 @@
 module Clash.Normalize.Transformations.Reduce
   ( reduceBinders
   , reduceConst
+  , reduceConstWorker
   , reduceNonRepPrim
+  , reduceNonRepPrimWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -47,8 +49,9 @@ import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
-import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
+import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, normalizeUltra)
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
 import qualified Clash.Sized.Internal.BitVector
@@ -85,21 +88,27 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
   = reduceBinders subst ((i,e):processed) rest
 {-# SCC reduceBinders #-}
 
-reduceConst :: HasCallStack => NormRewrite
+reduceConst :: Transformation
+reduceConst = toTransformation "reduceConst" (onApp 'reduceConstWorker)
+
+-- | The 'App' handler of 'reduceConst'.
+reduceConstWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
 -- An 'App' in an 'AppFun' context is an inner node of an application spine,
 -- e.g. the @f a@ inside @f a b c@. Only evaluate at the root (@f a b c@):
 -- an under-applied primitive cannot fold, and if @f@ is itself an application
 -- (@(g x) a b c@) the evaluator reduces the whole thing to WHNF anyway, so it
 -- folds @g x@ as part of folding the root. Skip the evaluator call here.
-reduceConst (TransformContext _ (AppFun:_)) e = return e
-reduceConst ctx e@(App _ _)
+reduceConstWorker (TransformContext _ (AppFun:_)) e _appFunction _appArgument = return e
+reduceConstWorker ctx e _appFunction _appArgument
   | (Prim p0, _) <- collectArgs e
   = whnfRW False ctx e $ \_ctx1 e1 -> case e1 of
       (collectArgs -> (Prim p1, _)) | primName p0 == primName p1 -> return e
       _ -> changed e1
 
-reduceConst _ e = return e
-{-# SCC reduceConst #-}
+reduceConstWorker _ e _ _ = return e
+{-# SCC reduceConstWorker #-}
 
 -- | Replace primitives by their "definition" if they would lead to let-bindings
 -- with a non-representable type when a function is in ANF. This happens for
@@ -142,12 +151,19 @@ reduceConst _ e = return e
 -- It's easier to just unroll the recursive definitions.
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
-reduceNonRepPrim :: HasCallStack => NormRewrite
+reduceNonRepPrim :: Transformation
+reduceNonRepPrim =
+  toTransformation "reduceNonRepPrim" (onApp 'reduceNonRepPrimWorker)
+
+-- | The 'Clash.Core.Term.App' handler of 'reduceNonRepPrim'.
+reduceNonRepPrimWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
 -- Only consider the root of an application spine (see 'reduceConst'): the root
 -- sees all arguments, and the @Vec 0@-to-@Nil@ rewrite below is only
 -- type-correct at the root, where no more arguments follow.
-reduceNonRepPrim (TransformContext _ (AppFun:_)) e = return e
-reduceNonRepPrim c e@(App _ _)
+reduceNonRepPrimWorker (TransformContext _ (AppFun:_)) e _appFunction _appArgument = return e
+reduceNonRepPrimWorker c e _appFunction _appArgument
   | (Prim p, args, ticks) <- collectArgsTicks e
   = do
     tcm <- Lens.view tcCache
@@ -191,8 +207,8 @@ reduceNonRepPrim c e@(App _ _)
               , resultTypeView = tv
               }
 
-reduceNonRepPrim _ e = return e
-{-# SCC reduceNonRepPrim #-}
+reduceNonRepPrimWorker _ e _ _ = return e
+{-# SCC reduceNonRepPrimWorker #-}
 
 -- | The name of the 'Clash.Sized.Vector.Vec' type constructor.
 vecTcName :: Text

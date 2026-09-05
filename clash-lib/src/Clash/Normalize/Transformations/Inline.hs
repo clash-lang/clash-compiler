@@ -18,18 +18,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Transformations.Inline
   ( bindConstantVar
+  , bindConstantVarWorker
   , inlineBndrsCleanup
   , inlineCast
+  , inlineCastWorker
   , inlineCleanup
+  , inlineCleanupWorker
   , collapseRHSNoops
+  , collapseRHSNoopsWorker
   , inlineNonRep
   , inlineOrLiftNonRep
+  , inlineOrLiftNonRepWorker
   , inlineSimIO
+  , inlineSimIOWorker
   , inlineSmall
+  , inlineSmallWorker
   , inlineWorkFree
+  , inlineWorkFreeWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -63,8 +72,9 @@ import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
 import Clash.Core.Subst
 import qualified Clash.Core.Term as Term
 import Clash.Core.Term
-  ( CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..), collectArgs
-  , collectArgsTicks, collectTicks, mkApps , mkTicks, stripTicks)
+  ( Bind, CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..)
+  , bindToList, collectArgs, collectArgsTicks, collectTicks, mkApps , mkTicks
+  , stripTicks)
 import Clash.Core.TermInfo (isLocalVar, termSizeSmallerThan)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
@@ -80,6 +90,9 @@ import Clash.Driver.Types (Binding(..))
 import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
+import Clash.Rewrite.StrategyDSL
+  ( Transformation, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
+  , toTransformation)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, curFun, tcCache, topEntities
   , inlineConstantLimit, inlineFunctionLimit, inlineLimit
@@ -88,7 +101,7 @@ import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
   , isUntranslatable, isUntranslatableType, isVoidWrapper, zoomExtra)
 import Clash.Rewrite.WorkFree (isWorkFreeIsh)
-import Clash.Normalize.Types ( NormRewrite, NormalizeSession)
+import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
   , normalizeTopLvlBndr)
@@ -113,8 +126,15 @@ as they'd need to be.
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
-bindConstantVar :: HasCallStack => NormRewrite
-bindConstantVar = inlineBinders test
+bindConstantVar :: Transformation
+bindConstantVar =
+  toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
+
+-- | The 'Let' handler of 'bindConstantVar'.
+bindConstantVarWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+bindConstantVarWorker = inlineBinders test
   where
     test _ (i,stripTicks -> e) = case isLocalVar e of
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
@@ -134,7 +154,7 @@ bindConstantVar = inlineBinders test
               0 -> return True
               n -> return (termSizeSmallerThan (n + 1) e)
             _ -> return False
-{-# SCC bindConstantVar #-}
+{-# SCC bindConstantVarWorker #-}
 
 -- | Mark to track progress of 'reduceBindersCleanup'
 data Mark = Temp | Done | Rec
@@ -279,12 +299,18 @@ inlineBndrsCleanup isN origInl = go
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
-inlineCast :: HasCallStack => NormRewrite
-inlineCast = inlineBinders test
+inlineCast :: Transformation
+inlineCast = toTransformation "inlineCast" (onLet 'inlineCastWorker)
+
+-- | The 'Let' handler of 'inlineCast'.
+inlineCastWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineCastWorker = inlineBinders test
   where
     test _ (_, (Cast (stripTicks -> Var {}) _ _)) = return True
     test _ _ = return False
-{-# SCC inlineCast #-}
+{-# SCC inlineCastWorker #-}
 
 -- | Given a function in the desired normal form, inline all the following
 -- let-bindings:
@@ -295,8 +321,14 @@ inlineCast = inlineBinders test
 --   * a projection case-expression (1 alternative)
 --   * a data constructor
 --   * I/O actions
-inlineCleanup :: HasCallStack => NormRewrite
-inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
+inlineCleanup :: Transformation
+inlineCleanup = toTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
+
+-- | The 'Let' handler of 'inlineCleanup'.
+inlineCleanupWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineCleanupWorker (TransformContext is0 _) _node (bindToList -> binds) body = do
   prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
@@ -384,9 +416,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
           _ -> False
 
     isInteresting _ _ _ _ = False
-
-inlineCleanup _ e = return e
-{-# SCC inlineCleanup #-}
+{-# SCC inlineCleanupWorker #-}
 
 {- [Note] relation `collapseRHSNoops` and `inlineCleanup`
 The `collapseRHSNoops` transformation replaces functions/primitives that are the identity
@@ -398,8 +428,15 @@ simply a variable reference. See issue #779 -}
 -- | Takes a binding and collapses its term if it is a noop. Only runs at
 -- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
 -- on functions that might be inlined later. See #3036.
-collapseRHSNoops :: HasCallStack => NormRewrite
-collapseRHSNoops _ letrec@(Let letBind body) = do
+collapseRHSNoops :: Transformation
+collapseRHSNoops =
+  toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
+
+-- | The 'Let' handler of 'collapseRHSNoops'.
+collapseRHSNoopsWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+collapseRHSNoopsWorker _ letrec letBind body = do
   (curFunId, _) <- Lens.use curFun
   curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
   case curBinding of
@@ -471,9 +508,7 @@ collapseRHSNoops _ letrec@(Let letBind body) = do
       arg@(App {}) <- getTermArg (lefts args) 1
       isNoopApp x (collectArgs arg)
     isNoopApp _ _ = return False
-
-collapseRHSNoops _ e = return e
-{-# SCC collapseRHSNoops #-}
+{-# SCC collapseRHSNoopsWorker #-}
 
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition. It's a custom topdown traversal that -for efficiency
@@ -566,9 +601,16 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
 inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
 
-inlineOrLiftNonRep :: HasCallStack => NormRewrite
-inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
-    inlineOrLiftBinders nonRepTest inlineTest ctx eLet
+inlineOrLiftNonRep :: Transformation
+inlineOrLiftNonRep =
+  toTransformation "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepWorker)
+
+-- | The 'Let' handler of 'inlineOrLiftNonRep'.
+inlineOrLiftNonRepWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineOrLiftNonRepWorker ctx eLet bind body =
+    inlineOrLiftBinders nonRepTest inlineTest ctx eLet bind body
   where
     bodyFreeOccs = countFreeOccurances body
 
@@ -590,18 +632,22 @@ inlineOrLiftNonRep ctx eLet@(Letrec _ body) =
           -- XXX: Check whether we can extend this to the binders as well
         , maybe False (>1) (lookupVarEnv id_ bodyFreeOccs)
         ]
-
-inlineOrLiftNonRep _ e = return e
-{-# SCC inlineOrLiftNonRep #-}
+{-# SCC inlineOrLiftNonRepWorker #-}
 
 -- | Inline anything of type `SimIO`: IO actions cannot be shared
-inlineSimIO :: HasCallStack => NormRewrite
-inlineSimIO = inlineBinders test
+inlineSimIO :: Transformation
+inlineSimIO = toTransformation "bindSimIO" (onLet 'inlineSimIOWorker)
+
+-- | The 'Let' handler of 'inlineSimIO'.
+inlineSimIOWorker
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineSimIOWorker = inlineBinders test
   where
     test _ (i,_) = case tyView (coreTypeOf i) of
       TyConApp tc _ -> return $! nameOcc tc == Text.showt ''SimIO.SimIO
       _ -> return False
-{-# SCC inlineSimIO #-}
+{-# SCC inlineSimIOWorker #-}
 
 -- | True when @e@, appearing at context @cc@, is an inner (partial) position
 -- of a Var-headed application spine. That is, for a fully applied function call:
@@ -638,12 +684,19 @@ isPartOfVarAppSpine cc e = isSpineCtx cc && isSpineNode e
   isSpineNode _ = False
 
 -- | Inline small functions
-inlineSmall :: HasCallStack => NormRewrite
-inlineSmall (TransformContext _ (cc:_)) e
+inlineSmall :: Transformation
+inlineSmall =
+  toTransformation "inlineSmall"
+    (onVarNode 'inlineSmallWorker <> onAppNode 'inlineSmallWorker
+      <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)
+
+-- | The application-spine handler of 'inlineSmall'.
+inlineSmallWorker :: HasCallStack => NormRewrite
+inlineSmallWorker (TransformContext _ (cc:_)) e
   | isPartOfVarAppSpine cc e
   = return e
 
-inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks))
+inlineSmallWorker _ e@(collectArgsTicks -> (Var f,args,ticks))
   | isLocalId f = return e
   | otherwise = do
       -- XXX: This is deeply nested to short-circuit expensive checks
@@ -672,17 +725,24 @@ inlineSmall _ e@(collectArgsTicks -> (Var f,args,ticks))
 
             _ -> return e
 
-inlineSmall _ e = return e
-{-# SCC inlineSmall #-}
+inlineSmallWorker _ e = return e
+{-# SCC inlineSmallWorker #-}
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
-inlineWorkFree :: HasCallStack => NormRewrite
-inlineWorkFree (TransformContext _ (cc:_)) e
+inlineWorkFree :: Transformation
+inlineWorkFree =
+  toTransformation "inlineWorkFree"
+    (onVarNode 'inlineWorkFreeWorker <> onAppNode 'inlineWorkFreeWorker
+      <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)
+
+-- | The application-spine handler of 'inlineWorkFree'.
+inlineWorkFreeWorker :: HasCallStack => NormRewrite
+inlineWorkFreeWorker (TransformContext _ (cc:_)) e
   | isPartOfVarAppSpine cc e
   = return e
 
-inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
+inlineWorkFreeWorker _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
   | isLocalId f = return e
   | otherwise
   = do
@@ -728,7 +788,7 @@ inlineWorkFree _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
           let e'Ty = inferCoreTypeOf tcm e'
           return (isSignalType tcm e'Ty)
 
-inlineWorkFree _ e@(collectTicks -> (Var f, ticks))
+inlineWorkFreeWorker _ e@(collectTicks -> (Var f, ticks))
   | isLocalId f = return e
   | otherwise = do
       topEnts <- Lens.view topEntities
@@ -761,5 +821,5 @@ inlineWorkFree _ e@(collectTicks -> (Var f, ticks))
                         changed (mkTicks (bindingTerm b) ticks)
                 _ -> return e
 
-inlineWorkFree _ e = return e
-{-# SCC inlineWorkFree #-}
+inlineWorkFreeWorker _ e = return e
+{-# SCC inlineWorkFreeWorker #-}
