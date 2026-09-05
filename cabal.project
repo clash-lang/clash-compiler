@@ -49,21 +49,22 @@ optional-packages:
   ./benchmark
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
-  ./clash-term
+
+-- clash-term depends on a rewrite-inspector that needs base >= 4.19 (GHC 9.8)
+if impl(ghc >= 9.8)
+  optional-packages: ./clash-term
+
+  source-repository-package
+      type: git
+      location: https://github.com/leonschoorl/rewrite-inspector.git
+      tag: 22aebf38177baafce1f2ed503be6e7e06f8e0888
 
 allow-newer:
-  brick:base,
-  brick:deepseq,
-  hashable,
-  hedgehog-fakedata:hedgehog,
-  rewrite-inspector:binary,
-  rewrite-inspector:containers,
-  vty:deepseq,
+  config-ini:containers,
   string-random:text,
   string-random:containers,
-  string-interpolate:template-haskell,
-  string-interpolate:text,
-  hint:ghc
+  ordered-containers:containers,
+  boring:base,
 
 -- Works around: https://github.com/recursion-schemes/recursion-schemes/issues/128. This
 -- shouldn't harm (runtime) performance of Clash, as we only use recursion-schemes with
@@ -74,6 +75,3 @@ package recursion-schemes
 package regex-tdfa
     optimization: 2
 
-
--- rewrite-inspector-0.1.0.11 uses brick-0.50 which doesn't compile with vty-6.0
-constraints: vty < 6.0

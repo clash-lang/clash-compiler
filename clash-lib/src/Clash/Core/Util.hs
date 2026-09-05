@@ -629,7 +629,11 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   --
   isHidden :: Name a -> [Type] -> Bool
   isHidden nm [a1, a2] | TyConApp a2Nm _ <- tyView a2 =
-       nameOcc nm `elem` ["GHC.Classes.(%,%)", "GHC.Classes.CTuple2"]
+       -- Constraint-tuple type constructors moved from 'GHC.Classes' (<= 9.12)
+       -- to 'GHC.Internal.Classes' (>= 9.14); both forms appear here.
+       nameOcc nm `elem` [ "GHC.Classes.(%,%)", "GHC.Internal.Classes.(%,%)"
+                         , "GHC.Classes.CTuple2", "GHC.Internal.Classes.CTuple2"
+                         ]
     && splitTy (tyView (stripIP a1))
     && nameOcc a2Nm == "Clash.Signal.Internal.KnownDomain"
   isHidden _ _ = False
@@ -643,7 +647,10 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
                            -- in a bitvector, so we need to make sure Clash
                            -- splits them off
                            , "Clash.Explicit.SimIO.File"
+                           -- Handle moved to 'GHC.Internal.IO.Handle.Types' on
+                           -- GHC >= 9.14.
                            , "GHC.IO.Handle.Types.Handle"
+                           , "GHC.Internal.IO.Handle.Types.Handle"
                            ]
   splitTy _ = False
 

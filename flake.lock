@@ -69,11 +69,11 @@
     "ghc-typelits-knownnat": {
       "flake": false,
       "locked": {
-        "lastModified": 1778679058,
-        "narHash": "sha256-Bs6eovpLjo6svx2g2eb03VF9rpwtOKvjQ37eYWnU+/8=",
+        "lastModified": 1781866384,
+        "narHash": "sha256-/RkOyd3kOLKqDcs3yVNnnnyE4YBw0mjqsJI8HvxIpD0=",
         "owner": "clash-lang",
         "repo": "ghc-typelits-knownnat",
-        "rev": "1ccb90d574726f2efe573c19802a962ca47c2352",
+        "rev": "a0a66943dcc477d8a4f33d315283df5ad1df9a53",
         "type": "github"
       },
       "original": {
@@ -85,11 +85,11 @@
     "ghc-typelits-natnormalise": {
       "flake": false,
       "locked": {
-        "lastModified": 1778677210,
-        "narHash": "sha256-HTYF1r3BQEHlsPn0OSSW+nTmF0AoOvoNfF3oRgS3fAo=",
+        "lastModified": 1784203202,
+        "narHash": "sha256-fWgZ+T5NTufJ+L7hxFk2sWkeIfIBxy7K675+lAZO6gY=",
         "owner": "clash-lang",
         "repo": "ghc-typelits-natnormalise",
-        "rev": "76dc51382c1f51161af84bebdfed253103c7f7dd",
+        "rev": "66c5c5caec8cad1930c60e35ea1696dbfb534c4b",
         "type": "github"
       },
       "original": {

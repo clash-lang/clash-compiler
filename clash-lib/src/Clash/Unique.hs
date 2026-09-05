@@ -11,7 +11,11 @@
 
 module Clash.Unique
   ( Unique
+#if __GLASGOW_HASKELL__ >= 914
+  , data Unique#
+#else
   , pattern Unique#
+#endif
   , Unique#
   , Uniquable (..)
   , fromGhcUnique

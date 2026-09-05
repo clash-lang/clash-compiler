@@ -47,10 +47,13 @@ import           Clash.Annotations.Primitive
   , extractPrim, extractWarnings)
 import           Clash.Core.Term        (Term)
 import           Clash.Core.Type        (Type)
+import qualified Data.List.NonEmpty     as NE
+
 import           Clash.Primitives.Types
   ( Primitive(BlackBox), CompiledPrimitive, ResolvedPrimitive, ResolvedPrimMap
   , includes, template, TemplateSource(TFile, TInline), Primitive(..)
-  , UnresolvedPrimitive, CompiledPrimMap, GuardedResolvedPrimitive)
+  , UnresolvedPrimitive, UnresolvedPrimitiveEntry(..)
+  , CompiledPrimMap, GuardedResolvedPrimitive)
 import           Clash.Netlist.Types    (BlackBox(..), NetlistMonad)
 import           Clash.Netlist.Util     (preserveState)
 import           Clash.Netlist.BlackBox.Util
@@ -113,12 +116,18 @@ resolvePrimitive' metaPath (BlackBoxHaskell bbName wf usedArgs multiRes funcName
 
 -- | Interprets contents of json file as list of @Primitive@s. Throws
 -- exception if it fails.
+--
+-- Each YAML/JSON entry may bind one or more @name@s (when the @name@ field
+-- is a list), in which case a separate 'UnresolvedPrimitive' is produced
+-- per name. See 'UnresolvedPrimitiveEntry'.
 resolvePrimitive
   :: HasCallStack
   => FilePath
   -> IO [(TS.Text, GuardedResolvedPrimitive)]
 resolvePrimitive fileName = do
-  prims <- decoder fileName <$> LZ.readFile fileName
+  entries <- (decoder fileName :: LZ.ByteString -> [UnresolvedPrimitiveEntry])
+               <$> LZ.readFile fileName
+  let prims = concatMap (NE.toList . unUnresolvedPrimitiveEntry) entries
   mapM (resolvePrimitive' fileName) prims
  where
   decoder

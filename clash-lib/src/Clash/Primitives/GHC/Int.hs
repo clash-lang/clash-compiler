@@ -12,6 +12,8 @@
 
 module Clash.Primitives.GHC.Int (intTF) where
 
+import           Data.List.NonEmpty           (NonEmpty(..))
+
 import           Clash.Core.Literal           (Literal(..))
 import           Clash.Core.Term              (Term(Literal))
 import           Clash.Core.Type              (Type)
@@ -37,7 +39,8 @@ getIntLit =
 
 -- | Template function for Int8,Int16,.. Constructs "clean" literals.
 intTF :: BlackBoxFunction
-intTF = literalTF "GHC.Int.I" intTF'
+-- 'GHC.Internal.Int.I' covers GHC >= 9.14; 'GHC.Int.I' covers earlier versions.
+intTF = literalTF ("GHC.Int.I" :| ["GHC.Internal.Int.I"]) intTF'
 
 intTF'
   :: Bool

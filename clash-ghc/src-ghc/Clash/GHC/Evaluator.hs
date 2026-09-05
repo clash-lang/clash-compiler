@@ -29,7 +29,10 @@ import           Data.List                               (foldl')
 #endif
 import qualified Data.Primitive.ByteArray                as BA
 import qualified Data.Text as Text
+import           Data.Text.Extra                         (showt)
+import qualified GHC.Classes
 import           GHC.Num.Integer                         (Integer (..))
+import qualified GHC.Prim
 
 import           Clash.Core.DataCon
 import           Clash.Core.Evaluator.Types
@@ -116,7 +119,7 @@ stepLiteral l = ghcUnwind (Lit l)
 
 stepPrim :: PrimInfo -> Step
 stepPrim pInfo m tcm
-  | primName pInfo == "GHC.Prim.realWorld#" =
+  | primName pInfo == showt 'GHC.Prim.realWorld# =
       ghcUnwind (PrimVal pInfo [] []) m tcm
 
   | otherwise =
@@ -158,7 +161,7 @@ stepApp x y m tcm =
               -- even when that 'x' is _|_. This makes the evaluation
               -- rule lazier than the actual Haskel implementations which
               -- are strict in the first argument and lazy in the second.
-              [a0, a1] | primName p `elem` ["GHC.Classes.&&","GHC.Classes.||"] ->
+              [a0, a1] | primName p `elem` [showt '(GHC.Classes.&&), showt '(GHC.Classes.||)] ->
                     let (m0,i) = newLetBinding tcm m  a0
                         (m1,j) = newLetBinding tcm m0 a1
                     in  ghcPrimStep tcm (forcePrims m) p [] [Suspend (Var i), Suspend (Var j)] m1

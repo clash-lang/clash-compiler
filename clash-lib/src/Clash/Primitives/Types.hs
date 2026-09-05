@@ -26,6 +26,7 @@ module Clash.Primitives.Types
   , GuardedResolvedPrimitive
   , PrimMap
   , UnresolvedPrimitive
+  , UnresolvedPrimitiveEntry(..)
   , ResolvedPrimitive
   , ResolvedPrimMap
   , CompiledPrimitive
@@ -41,7 +42,7 @@ import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
 import           Control.Monad                (when)
 import           Data.Aeson
-  (FromJSON (..), Value (..), (.:), (.:?), (.!=))
+  (FromJSON (..), Object, Value (..), (.:), (.:?), (.!=))
 import           Data.Aeson.Types             (Parser)
 import           Data.Binary                  (Binary)
 import           Data.Char                    (isUpper, isLower, isAlphaNum)
@@ -49,6 +50,8 @@ import           Data.Either                  (lefts)
 import           Data.Hashable                (Hashable)
 import qualified Data.HashMap.Strict          as H
 import           Data.List                    (intercalate)
+import           Data.List.NonEmpty           (NonEmpty (..))
+import qualified Data.List.NonEmpty           as NE
 import           Data.Maybe                   (isJust)
 import qualified Data.Text                    as S
 import           Data.Text.Lazy               (Text)
@@ -234,7 +237,40 @@ data Primitive a b c d
   }
   deriving (Show, Generic, NFData, Binary, Eq, Hashable, Functor)
 
-instance FromJSON UnresolvedPrimitive where
+-- | A single YAML/JSON primitive entry. Unlike 'UnresolvedPrimitive', this
+-- newtype can represent multiple primitive records emitted from a single
+-- YAML entry whose @name@ field is a list of names rather than a single
+-- string. For example
+--
+-- @
+-- - Primitive:
+--     name: ["GHC.Num.Integer.IS", "GHC.Internal.Bignum.Integer.IS"]
+--     primType: Constructor
+--     workInfo: Never
+-- @
+--
+-- yields two 'UnresolvedPrimitive's with the same body but different
+-- names. This lets us register one primitive under multiple qualified
+-- names without duplicating the YAML body — useful when GHC moves
+-- wired-in symbols between modules across versions (e.g. 'GHC.Num.Integer'
+-- on GHC <= 9.12 vs 'GHC.Internal.Bignum.Integer' on GHC >= 9.14).
+--
+-- The single-string form @name: "foo"@ still parses; it produces a
+-- 'NonEmpty' of length one.
+newtype UnresolvedPrimitiveEntry =
+  UnresolvedPrimitiveEntry { unUnresolvedPrimitiveEntry :: NonEmpty UnresolvedPrimitive }
+
+-- | Read the @name@ field as either a single string or a non-empty list of
+-- strings.
+parseNames :: Object -> Parser (NonEmpty S.Text)
+parseNames v =
+      (do n <- v .: "name"; pure (n :| []))
+  <|> (do ns <- v .: "name"
+          case ns of
+            []     -> fail "[10] 'name' list must be non-empty"
+            x:xs   -> pure (x :| xs))
+
+instance FromJSON UnresolvedPrimitiveEntry where
   parseJSON (Object v) =
     case KeyMap.toList v of
       [(conKey,Object conVal)] ->
@@ -250,7 +286,7 @@ instance FromJSON UnresolvedPrimitive where
                 (Just _, Just _) ->
                   fail "[8] Don't use both 'usedArguments' and 'ignoredArguments'"
 
-            name' <- conVal .: "name"
+            names <- parseNames conVal
             wf    <- ((conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable)
             fName <- conVal .: "templateFunction"
             isMultiResult <- conVal .:? "multiResult" .!= False
@@ -258,7 +294,8 @@ instance FromJSON UnresolvedPrimitive where
                  <|> (Just . TFile   <$> conVal .: "file")
                  <|> (pure Nothing)
             fName' <- either fail return (parseBBFN fName)
-            return (BlackBoxHaskell name' wf args isMultiResult fName' templ)
+            pure $ UnresolvedPrimitiveEntry $ flip NE.map names $ \name' ->
+              BlackBoxHaskell name' wf args isMultiResult fName' templ
           "BlackBox"  -> do
             outReg <- conVal .:? "outputReg" :: Parser (Maybe Bool)
 
@@ -268,24 +305,28 @@ instance FromJSON UnresolvedPrimitive where
                 , "Use 'outputUsage: Continuous|NonBlocking|Blocking' instead."
                 ]
 
-            BlackBox <$> conVal .: "name"
-                     <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
-                     <*> conVal .:? "renderVoid" .!= NoRenderVoid
-                     <*> conVal .:? "multiResult" .!= False
-                     <*> (conVal .: "kind" >>= parseTemplateKind)
-                     <*> conVal .:? "warning"
-                     <*> conVal .:? "outputUsage" .!= Cont
-                     <*> conVal .:? "libraries" .!= []
-                     <*> conVal .:? "imports" .!= []
-                     <*> pure [] -- functionPlurality not supported in json
-                     <*> (conVal .:? "includes" .!= [] >>= traverse parseInclude)
-                     <*> (conVal .:? "resultName" >>= maybe (pure Nothing) parseResult) .!= []
-                     <*> (conVal .:? "resultInit" >>= maybe (pure Nothing) parseResult) .!= []
-                     <*> parseTemplate conVal
-          "Primitive" ->
-            Primitive <$> conVal .: "name"
-                      <*> (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
-                      <*> conVal .: "primType"
+            names <- parseNames conVal
+            wf <- (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
+            rv <- conVal .:? "renderVoid" .!= NoRenderVoid
+            mr <- conVal .:? "multiResult" .!= False
+            k  <- conVal .: "kind" >>= parseTemplateKind
+            w  <- conVal .:? "warning"
+            ou <- conVal .:? "outputUsage" .!= Cont
+            ls <- conVal .:? "libraries" .!= []
+            is <- conVal .:? "imports" .!= []
+            inc <- conVal .:? "includes" .!= [] >>= traverse parseInclude
+            rn  <- (conVal .:? "resultName" >>= maybe (pure Nothing) parseResult) .!= []
+            ri  <- (conVal .:? "resultInit" >>= maybe (pure Nothing) parseResult) .!= []
+            tmpl <- parseTemplate conVal
+            -- functionPlurality not supported in json
+            pure $ UnresolvedPrimitiveEntry $ flip NE.map names $ \name' ->
+              BlackBox name' wf rv mr k w ou ls is [] inc rn ri tmpl
+          "Primitive" -> do
+            names <- parseNames conVal
+            wf <- (conVal .:? "workInfo" >>= maybe (pure Nothing) parseWorkInfo) .!= WorkVariable
+            ps <- conVal .: "primType"
+            pure $ UnresolvedPrimitiveEntry $ flip NE.map names $ \name' ->
+              Primitive name' wf ps
 
           e -> fail $ "[1] Expected: BlackBox or Primitive object, got: " ++ show e
       e -> fail $ "[2] Expected: BlackBox or Primitive object, got: " ++ show e
@@ -331,3 +372,15 @@ instance FromJSON UnresolvedPrimitive where
 
   parseJSON unexpected =
     fail $ "[3] Expected: BlackBox or Primitive object, got: " ++ show unexpected
+
+-- | Backwards-compatible: parse a single 'UnresolvedPrimitive' from a YAML
+-- entry. Fails if the entry's @name@ field is a list (use
+-- 'UnresolvedPrimitiveEntry' instead).
+instance FromJSON UnresolvedPrimitive where
+  parseJSON v = do
+    UnresolvedPrimitiveEntry ne <- parseJSON v
+    case ne of
+      p :| [] -> pure p
+      _ -> fail $ "[11] 'name' must be a single string when decoding to "
+                ++ "UnresolvedPrimitive; got a list. Decode to "
+                ++ "UnresolvedPrimitiveEntry to handle multi-name entries."

@@ -1,5 +1,5 @@
 - BlackBox:
-    name: GHC.Num.Integer.integerDiv
+    name: ["GHC.Num.Integer.integerDiv", "GHC.Internal.Bignum.Integer.integerDiv"]
     kind: Declaration
     type: 'integerDiv :: Integer
       -> Integer -> Integer'
@@ -27,7 +27,7 @@
     warning: 'GHC.Num.Integer.integerDiv: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerMod
+    name: ["GHC.Num.Integer.integerMod", "GHC.Internal.Bignum.Integer.integerMod"]
     kind: Declaration
     type: 'integerMod :: Integer
       -> Integer -> Integer'
@@ -45,7 +45,7 @@
     warning: 'GHC.Num.Integer.integerMod: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerDivMod#
+    name: ["GHC.Num.Integer.integerDivMod#", "GHC.Internal.Bignum.Integer.integerDivMod#"]
     kind: Declaration
     type: 'integerDivMod ::
       Integer -> Integer -> (# Integer, Integer #)'
@@ -85,7 +85,7 @@
     warning: 'GHC.Num.Integer.integerDivMod#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
-    name: GHC.Num.Integer.integerQuotRem#
+    name: ["GHC.Num.Integer.integerQuotRem#", "GHC.Internal.Bignum.Integer.integerQuotRem#"]
     kind: Declaration
     type: 'integerQuotRem
       :: Integer -> Integer -> (# Integer, Integer #)'

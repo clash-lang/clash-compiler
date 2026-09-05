@@ -11,6 +11,8 @@
 
 module Clash.Primitives.GHC.Word (wordTF) where
 
+import           Data.List.NonEmpty           (NonEmpty(..))
+
 import           Clash.Core.Literal           (Literal(..))
 import           Clash.Core.Term              (Term(Literal))
 import           Clash.Core.Type              (Type)
@@ -24,7 +26,8 @@ import           Clash.Netlist.BlackBox.Types
 -- | Template function for Word8,Word16,.. Constructs "clean" literals. This
 -- function generates valid (System)Verilog only!
 wordTF :: BlackBoxFunction
-wordTF = literalTF "GHC.Word.W" wordTF'
+-- 'GHC.Internal.Word.W' covers GHC >= 9.14; 'GHC.Word.W' covers earlier versions.
+wordTF = literalTF ("GHC.Word.W" :| ["GHC.Internal.Word.W"]) wordTF'
 
 getWordLit
   :: Literal
