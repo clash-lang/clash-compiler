@@ -218,6 +218,7 @@
       -- pragma translate_on
       end block;
       -- resetGen end
+    warning: Clash.Signal.Internal.resetGenN cannot be synthesized to hardware!
     workInfo: Always
 - BlackBox:
     name: Clash.Signal.Internal.unsafeFromReset
