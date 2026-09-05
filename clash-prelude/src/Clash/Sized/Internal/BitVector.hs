@@ -887,12 +887,15 @@ instance KnownNat n => Bits (BitVector n) where
   shiftR v i        = shiftR# v i
   rotateL v i       = rotateL# v i
   rotateR v i       = rotateR# v i
-  popCount bv       = fromInteger (I.toInteger# (popCountBV (bv ++# (0 :: BitVector 1))))
+  -- SAFETY: This fails if n > 2^(WORD_SIZE_IN_BITS-1), but such large vectors
+  -- don't make sense in hardware.
+  popCount bv       = I.fromEnum# (popCountBV (bv ++# (0 :: BitVector 1)))
 
 instance KnownNat n => FiniteBits (BitVector n) where
   finiteBitSize       = size#
-  countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV
-  countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
+  -- SAFETY: see the note on 'popCount'
+  countLeadingZeros   = I.fromEnum# . countLeadingZerosBV
+  countTrailingZeros  = I.fromEnum# . countTrailingZerosBV
 
 type BitVectorPositiveLiteralError lit n =
   PotentiallyOutOfBounds
