@@ -1976,6 +1976,16 @@ data ExpandError
   = AttrError [Attr Text]
   -- | Something was annotated as being a PortProduct, but wasn't one
   | PortProductError PortName HWType
+  -- | More port names were given than there are ports
+  | SuperfluousPortNames
+      Text
+      -- ^ Location of the mismatch (e.g. @"inputs"@ or a 'PortProduct' name)
+      Int
+      -- ^ Number of ports
+      Int
+      -- ^ Number of port names given
+      [PortName]
+      -- ^ The superfluous port names
 
 -- | Render an 'ExpandError' as a human readable error message.
 expandErrorMessage :: ExpandError -> String
@@ -1995,6 +2005,20 @@ expandErrorMessage (PortProductError pn hwty) = [I.i|
     #{hwty}
 
   is not a product!
+|]
+expandErrorMessage (SuperfluousPortNames loc nPorts nNames superfluous) = [I.i|
+  Saw more port names than ports in a Synthesize annotation. Expected at most
+  #{nPorts} port name(s) for the #{loc}, but #{nNames} were given. The
+  superfluous port name(s) were:
+
+    #{superfluous}
+
+  Superfluous port names are likely a mistake: for example, deleting an
+  argument without removing its port name shifts all subsequent names onto
+  the wrong ports. Remove the extra name(s), or add the missing port(s).
+  Note that a product argument is a single port: to name its parts (or the
+  parts of a hidden clock, reset, or enable constraint) use a nested
+  'PortProduct' instead of listing the parts as separate port names.
 |]
 
 -- | Like 'expandTopEntityOrErrM', but pure: expands the top entity and throws a
@@ -2101,13 +2125,23 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM
     argHints = map (maybe "arg" (Id.toText . Id.unsafeFromCoreId) . fst) ihwtys
     resHint = maybe "result" (Id.toText . Id.unsafeFromCoreId) oId
 
+  -- Reject more input port names than there are arguments.
+  case drop (length ihwtys) t_inputs of
+    [] -> Right ()
+    superfluous ->
+      Left (SuperfluousPortNames "inputs" (length ihwtys) (length t_inputs) superfluous)
+
   inputs <- zipWith3M goInput argHints (map snd ihwtys) (extendPorts t_inputs)
 
   output <-
     -- BiSignalOut signals are filtered as their counterpart - BiSignalIn - will
     -- be printed as an inout port in HDL.
-    if isVoid (stripFiltered ohwty) || isBiSignalOut (stripFiltered ohwty) then
+    if isBiSignalOut (stripFiltered ohwty) then
       pure Nothing
+    else if isVoid (stripFiltered ohwty) then
+      -- A void result is not rendered, but its annotation is still checked so
+      -- superfluous port names are rejected (#2243).
+      Nothing <$ goPort resHint ohwty t_output
     else
       Just <$> goPort resHint ohwty t_output
 
@@ -2122,7 +2156,9 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM
     -> Maybe PortName
     -> Either ExpandError (Maybe (ExpandedPortName (Either Text Text)))
   goInput hint fHwty@(FilteredHWType hwty _) pM
-    | isVoid hwty = Right Nothing
+    -- A void argument is not rendered, but its annotation is still checked so
+    -- superfluous port names are rejected (#2243).
+    | isVoid hwty = Nothing <$ traverse (goPort hint fHwty) pM
     | otherwise = Just <$> go hint fHwty pM
 
   -- Vector and RTree are hardcoded as product types, even when instantiated as
@@ -2169,6 +2205,15 @@ expandTopEntity ihwtys (oId, ohwty) topEntityM
     | isProduct fHwty
     , (_:_) <- attrs
     = Left (AttrError attrs)
+
+    -- More port names given than the product has fields.
+    | isProduct fHwty
+    , [fields1] <- fields0
+    , length ps0 > length fields1
+    = Left (SuperfluousPortNames
+              (if null p then hint0 else Text.pack p)
+              (length fields1) (length ps0)
+              (drop (length fields1) ps0))
 
     -- Product types (products, vec, rtree) of which all but one field are
     -- zero-width.

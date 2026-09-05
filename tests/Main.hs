@@ -306,6 +306,41 @@ runClashTest = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Saw a PortProduct in a Synthesize annotation")
           }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "argTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "resTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "splitTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "nestedTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "vecTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "hiddenTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
+        , runTest "T2243" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-main-is", "voidOutTop"]
+          , expectClashFail=Just (def, "Saw more port names than ports in a Synthesize annotation")
+          }
         ]
       , clashTestGroup "Verification"
         [ let n = 9 -- GHDL only has VERY basic PSL support
@@ -1019,6 +1054,7 @@ runClashTest = defaultMain
             , clashFlags = ["-package", "clash-testsuite", "-main-is", "topEntity"]
             }
         , runTest "T1139" def{hdlSim=[]}
+        , outputTest "T2243" def{hdlTargets=[VHDL]}
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNames_testBench"]
                           }
