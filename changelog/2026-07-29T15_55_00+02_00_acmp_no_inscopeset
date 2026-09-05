@@ -1,1 +1,0 @@
-FIXED: `Ord Term` and `Ord Type` now behave lawfully. Comparison used to rename each pair of binders to a variable free in neither argument, preferring the left one, so which name an occurrence resolved to depended on which argument came first: `compare` on `forall a. forall b. b` and `forall c. forall d. c` returned `GT` whichever way round they were passed.

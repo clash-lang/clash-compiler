@@ -1,1 +1,0 @@
-FIXED: Built-in  blackboxes no longer generate name shadowing warnings. See [#3273](https://github.com/clash-lang/clash-compiler/issues/3273).

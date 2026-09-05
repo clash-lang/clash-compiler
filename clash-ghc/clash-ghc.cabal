@@ -1,6 +1,6 @@
 Cabal-version:        2.2
 Name:                 clash-ghc
-Version:              1.10.1
+Version:              1.10.2
 Synopsis:             Clash: a functional hardware description language - GHC frontend
 Description:
   Clash is a functional hardware description language that borrows both its
@@ -173,8 +173,8 @@ library
                       text                      >= 1.2.2    && < 2.2,
                       transformers              >= 0.5.2.0  && < 0.7,
                       unordered-containers      >= 0.2.1.0  && < 0.3,
-                      clash-lib                 == 1.10.1,
-                      clash-prelude             == 1.10.1,
+                      clash-lib                 == 1.10.2,
+                      clash-prelude             == 1.10.2,
                       ghc-typelits-extra,
                       ghc-typelits-knownnat,
                       ghc-typelits-natnormalise,

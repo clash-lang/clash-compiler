@@ -1,1 +1,0 @@
-CHANGED: GHC Core to Clash Core conversion is significantly faster on large designs: type constructor annotations are pre-checked on the interned name, the accumulated TyCon map is no longer re-inserted into at every occurrence, and the types of global variables are converted once and cached.
