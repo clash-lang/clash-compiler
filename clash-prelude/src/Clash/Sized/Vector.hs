@@ -100,7 +100,11 @@ module Clash.Sized.Vector
 where
 
 import Control.DeepSeq            (NFData (..))
+#if __GLASGOW_HASKELL__ >= 914
+import qualified Control.Lens     as Lens hiding (data (:>), data (:<))
+#else
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
+#endif
 import Data.Bits                  ((.|.), shiftL)
 import Data.Constraint            ((:-)(Sub), Dict (..))
 import Data.Constraint.Nat        (leZero)
@@ -1881,8 +1885,13 @@ drawn from /xss/. The result matrix has /m + 1/ rows of /n + 1/ elements.
 >>> :t xss
 xss :: Num a => Vec 4 (Vec 4 a)
 
+#if __GLASGOW_HASKELL__ >= 914
+>>> :t stencil2d d2 d2 (sum . map sum) xss
+stencil2d d2 d2 (sum . map sum) xss :: Num b => Vec 3 (Vec 3 b)
+#else
 >>> :t stencil2d d2 d2 (sum . map sum) xss
 stencil2d d2 d2 (sum . map sum) xss :: Num a => Vec 3 (Vec 3 a)
+#endif
 
 >>> stencil2d d2 d2 (sum . map sum) xss
 (14 :> 18 :> 22 :> Nil) :> (30 :> 34 :> 38 :> Nil) :> (46 :> 50 :> 54 :> Nil) :> Nil
@@ -2435,7 +2444,26 @@ defined in the instance 'Clash.Class.Num.ExtendingNum' instance of 'Index'.
 However, we cannot simply use 'fold' to create a tree-structure of
 'Clash.Class.Num.add'es:
 
-#if __GLASGOW_HASKELL__ >= 910
+#if __GLASGOW_HASKELL__ >= 914
+>>> :{
+let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
+                     => BitVector (n+1) -> Index (n+2)
+    populationCount' = fold add . map fromIntegral . bv2v
+:}
+<interactive>:...
+    • Couldn't match type: ((n + 2) + (n + 2)) - 1
+                     with: n + 2
+      Expected: Index (n + 2)
+        Actual: AResult (Index (n + 2)) (Index (n + 2))
+    • In the first argument of ‘fold’, namely ‘add’
+      In the first argument of ‘(.)’, namely ‘fold add’
+      In the expression: fold add . map fromIntegral . bv2v
+    • Relevant bindings include
+        populationCount' :: BitVector (n + 1) -> Index (n + 2)
+          (bound at ...)
+<BLANKLINE>
+
+#elif __GLASGOW_HASKELL__ >= 910
 >>> :{
 let populationCount' :: (KnownNat (n+1), KnownNat (n+2))
                      => BitVector (n+1) -> Index (n+2)

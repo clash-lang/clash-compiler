@@ -1,107 +1,107 @@
 - Primitive:
-    name: GHC.Prim.dataToTag#
+    name: ["GHC.Prim.dataToTag#", "GHC.Internal.Prim.dataToTag#"]
     primType: Function
 - Primitive:
-    name: GHC.Prim.dataToTagSmall#
+    name: ["GHC.Prim.dataToTagSmall#", "GHC.Internal.Prim.dataToTagSmall#"]
     primType: Function
 - Primitive:
-    name: GHC.Prim.dataToTagLarge#
+    name: ["GHC.Prim.dataToTagLarge#", "GHC.Internal.Prim.dataToTagLarge#"]
     primType: Function
 - Primitive:
-    name: GHC.Prim.tagToEnum#
+    name: ["GHC.Prim.tagToEnum#", "GHC.Internal.Prim.tagToEnum#"]
     primType: Function
 - BlackBox:
-    name: GHC.Prim.unsafeCoerce#
+    name: ["GHC.Prim.unsafeCoerce#", "GHC.Internal.Prim.unsafeCoerce#"]
     kind: Expression
     type: 'unsafeCoerce# ::
       a -> b'
     template: ~ARG[0]
     workInfo: Never
 - BlackBox:
-    name: GHC.Prim.+#
+    name: ["GHC.Prim.+#", "GHC.Internal.Prim.+#"]
     kind: Expression
     type: '(+#) :: Int# ->
       Int# -> Int#'
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusInt8#
+    name: ["GHC.Prim.plusInt8#", "GHC.Internal.Prim.plusInt8#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusInt16#
+    name: ["GHC.Prim.plusInt16#", "GHC.Internal.Prim.plusInt16#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusInt32#
+    name: ["GHC.Prim.plusInt32#", "GHC.Internal.Prim.plusInt32#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusInt64#
+    name: ["GHC.Prim.plusInt64#", "GHC.Internal.Prim.plusInt64#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.-#
+    name: ["GHC.Prim.-#", "GHC.Internal.Prim.-#"]
     kind: Expression
     type: '(-#) :: Int# ->
       Int# -> Int#'
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subInt8#
+    name: ["GHC.Prim.subInt8#", "GHC.Internal.Prim.subInt8#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subInt16#
+    name: ["GHC.Prim.subInt16#", "GHC.Internal.Prim.subInt16#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subInt32#
+    name: ["GHC.Prim.subInt32#", "GHC.Internal.Prim.subInt32#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subInt64#
+    name: ["GHC.Prim.subInt64#", "GHC.Internal.Prim.subInt64#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusWord#
+    name: ["GHC.Prim.plusWord#", "GHC.Internal.Prim.plusWord#"]
     kind: Expression
     type: 'plusWord# :: Word#
       -> Word# -> Word#'
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusWord8#
+    name: ["GHC.Prim.plusWord8#", "GHC.Internal.Prim.plusWord8#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusWord16#
+    name: ["GHC.Prim.plusWord16#", "GHC.Internal.Prim.plusWord16#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusWord32#
+    name: ["GHC.Prim.plusWord32#", "GHC.Internal.Prim.plusWord32#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.plusWord64#
+    name: ["GHC.Prim.plusWord64#", "GHC.Internal.Prim.plusWord64#"]
     kind: Expression
     template: ~ARG[0] + ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.minusWord#
+    name: ["GHC.Prim.minusWord#", "GHC.Internal.Prim.minusWord#"]
     kind: Expression
     type: 'minusWord# :: Word#
       -> Word# -> Word#'
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subWord8#
+    name: ["GHC.Prim.subWord8#", "GHC.Internal.Prim.subWord8#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subWord16#
+    name: ["GHC.Prim.subWord16#", "GHC.Internal.Prim.subWord16#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subWord32#
+    name: ["GHC.Prim.subWord32#", "GHC.Internal.Prim.subWord32#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
 - BlackBox:
-    name: GHC.Prim.subWord64#
+    name: ["GHC.Prim.subWord64#", "GHC.Internal.Prim.subWord64#"]
     kind: Expression
     template: ~ARG[0] - ~ARG[1]
