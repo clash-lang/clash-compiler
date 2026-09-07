@@ -1,0 +1,40 @@
+# A simple pipeline that errors if a PR tries to introduce a new file in changelog/,
+# which is presumably an old-style changelog entry.
+# The CI only protects master and 1.10.
+# This CI is meant to be removed later when there are no more old-style entries
+# floating around.
+
+name: changelog-old-format-check
+
+on:
+  pull_request:
+    branches: [master, 1.10]
+    paths:
+      - 'changelog/**'
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed to diff properly
+
+      - name: Check for changelog entries in the wrong folder
+        run: |
+          # Compare PR branch against master/1.10
+          BASE_REF="origin/${{ github.base_ref }}"
+
+          git fetch origin "${{ github.base_ref }}"
+
+          # List added files in changelog directory
+          changelog_diff=$(git diff --name-status "$BASE_REF"...HEAD | grep '^[A]\s\+changelog/' | grep -v 'changelog/entries/' || true)
+
+          if [ -z "$changelog_diff" ]; then
+            exit 0
+          else
+            echo "::warning title=Old-style changelog entries found::$added"
+            exit 1
+          fi
