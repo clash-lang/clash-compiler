@@ -834,6 +834,7 @@ runClashTest = defaultMain
         , runTest "FunctionInstances" def
         , runTest "GADTExistential" def{hdlSim=[]}
         , runTest "LocalPoly" def{hdlSim=[]}
+        , runTest "UnaryClass" def{hdlSim=[]}
         ]
       , clashTestGroup "PrimitiveGuards"
         [ runTest "WarnAlways" def{
