@@ -1,1 +1,0 @@
-CHANGED: The compile-time evaluator no longer projects the entire global binding map into a fresh heap on (virtually) every invocation. We've observed a 25% Clash compile speedups for larger designs.

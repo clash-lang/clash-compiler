@@ -1,5 +1,66 @@
 # Changelog for the Clash project
 
+## 1.10.2 *Sep 4th, 2026*
+
+Highlights:
+* On a large representative circuit, this release reduces total runtime by 80% compared to 1.10.0; smaller circuits also recover from some previous performance regressions. See the [Clash benchmark results](https://clash-lang.github.io/clash-benchmarks/?machine=oele&branch=clash-lang/clash-compiler@1.10) for the comparison.
+
+Performance:
+* The `clash-lib` compile-time evaluator no longer projects the entire global binding map into a fresh heap on (virtually) every invocation. In the representative benchmark, this reduced runtime by about 27%. See [#3323](https://github.com/clash-lang/clash-compiler/pull/3323).
+* The `clash-ghc` compile-time evaluator peels elements from a literal `BitVector` via `unconcatBitVector#` directly as literals, rather than leaving residual `split#` calls for later rewrite passes. This speeds up normalization of designs that convert large `BitVector` constants to vectors. See [#3323](https://github.com/clash-lang/clash-compiler/pull/3323).
+* In `clash-lib`, the Core-type-to-HWType translation used by representability queries during normalization is memoized across the rewrite session rather than recomputed for every query. This speeds up normalization of designs with large or deeply nested types. See [#3323](https://github.com/clash-lang/clash-compiler/pull/3323).
+* The conversion from GHC Core to Clash Core in `clash-ghc` is faster on large designs: type-constructor annotations are pre-checked on the interned name, the accumulated TyCon map is no longer re-inserted at every occurrence, and global-variable types are converted once and cached. See [#3323](https://github.com/clash-lang/clash-compiler/pull/3323).
+* Identifier-only free-variable folds in `clash-lib` now skip unnecessary type traversal, yielding about 2% faster normalization. See [#3327](https://github.com/clash-lang/clash-compiler/pull/3327).
+* In the `clash-ghc`/`clash-lib` blackbox compilation path, blackbox functions and Haskell template functions now share a single Hint (GHC) session, and each distinct function is compiled exactly once. In larger designs, this reduced load time by about 20% and end-to-end runtime by about 2%. See [#3337](https://github.com/clash-lang/clash-compiler/pull/3337).
+* In `clash-lib`, alpha-equivalence checks on `Term` and `Type` no longer compute free variables. Microbenchmarks show substantial speedups; end-to-end tests show a modest 2.5% improvement in normalization runtime. See [#3335](https://github.com/clash-lang/clash-compiler/pull/3335).
+* In `clash-lib`, the cleanup phase that flattens the function hierarchy now runs the evaluator-backed transformations (`reduceConst`, `reduceNonRepPrim`) and the transformations that piggyback on their output as one bottom-up pass per flattening iteration, rather than during every settle round of the inner fixed-point loop. On larger designs, this produced about a 30% end-to-end improvement without changing generated HDL. See [#3338](https://github.com/clash-lang/clash-compiler/pull/3338).
+* In `clash-ghc`, GHC-to-Clash type conversion is memoized by GHC type, with unchanged output. Types repeat extensively across binders, and converting one evaluates family-instance reductions and name conversions per node. On larger designs, this roughly halved loading time. See [#3340](https://github.com/clash-lang/clash-compiler/pull/3340).
+* In `clash-lib`, `reduceNonRepPrim` dispatches on the primitive's name through a `HashMap` of handlers rather than walking a chain of string comparisons. On larger designs, this produced about a 6% end-to-end improvement. See [#3339](https://github.com/clash-lang/clash-compiler/pull/3339).
+* In `clash-lib`, beta-reduction in the `appProp` transformation now uses a sharing-preserving substitution that leaves unchanged subterms untouched instead of rebuilding every visited node. Output is unchanged. See [#3341](https://github.com/clash-lang/clash-compiler/pull/3341).
+* In `clash-lib`, the inlining transformations (`inlineWorkFree`, `inlineSmall`, `bindConstantVar`) now run cheap binder-only guards before computing type information, skip attempts at inner application-spine nodes, and stop measuring term size once it exceeds the inline limit. On larger designs, this reduced compiler runtime by about 8%. See [#3356](https://github.com/clash-lang/clash-compiler/pull/3356).
+
+Added:
+* Blackboxes `~SYM`s can now be referenced by name
+
+  Instead of doing:
+  ```
+  	signal ~GENSYM[foo][3] : ..;
+  	signal ~GENSYM[bar][4] : ..;
+
+  	.. <= ~SYM[3] - ~SYM[4];
+  ```
+
+  You can now refer to SYMbols by name:
+  ```
+  	signal ~SYM[foo] : ..;
+  	signal ~SYM[bar] : ..;
+
+  	.. <= ~SYM[foo] - ~SYM[bar];
+  ```
+
+  The old behaviour with `~GENSYM` and the numeric references is still fully supported.
+
+  See [#3325](https://github.com/clash-lang/clash-compiler/issues/3325), implemented in [#3326](https://github.com/clash-lang/clash-compiler/pull/3326).
+* `clash-lib` now provides `Hashable Term` and `Hashable Type` instances. These were removed in Clash 1.4.7 due to a faulty implementation, but are now back. They hash modulo alpha equivalence, and so agree with `Eq Term` and `Eq Type`: alpha-equivalent terms hash alike. See [#3336](https://github.com/clash-lang/clash-compiler/pull/3336).
+
+Changed:
+* `clash-cosim` and `clash-ffi` packages have been removed from the `clash-compiler` repository and moved to standalone archived repositories. See [#3330](https://github.com/clash-lang/clash-compiler/pull/3330).
+* The `clash` command-line flag `-fclash-debug-count-transformations` now also reports how often each transformation was attempted (counters suffixed `!try`), next to the existing applied-rewrite counts. See [#3356](https://github.com/clash-lang/clash-compiler/pull/3356).
+
+Fixed:
+* In `clash-lib`, alpha-equivalence on terms now compares the `NameMod` and `Attributes` of a tick under the enclosing renaming environment, instead of in isolation. See [#3335](https://github.com/clash-lang/clash-compiler/pull/3335).
+* In `clash-lib`, `freshenTm` now renames inside of an `Attributes` tick, added by `Clash.Annotations.SynthesisAttributes.annotateReg`. See [#3335](https://github.com/clash-lang/clash-compiler/pull/3335).
+* In `clash-lib`, alpha-equivalence and alpha-comparison on terms now compare the types of `Rec` let binders, which they previously ignored. A `NonRec` binder's type is pinned down by its right-hand side, so it does not need comparing, but a `Rec` binder may occur in its own right-hand side, so its type is not determined by the right-hand side: `let x = x in x` is the same term whether `x` is an `Int` or a `Bool`. `eqTerm` already compared them, so `Eq Term` and `eqTerm` disagreed on such terms. See [#3335](https://github.com/clash-lang/clash-compiler/pull/3335).
+* In `clash-lib`, `Ord Term` and `Ord Type` now behave lawfully. Comparison used to rename each pair of binders to a variable free in neither argument, preferring the left one, so which name an occurrence resolved to depended on which argument came first: `compare` on `forall a. forall b. b` and `forall c. forall d. c` returned `GT` whichever way round they were passed. See [#3335](https://github.com/clash-lang/clash-compiler/pull/3335).
+* In `clash-lib`, `reduceNonRepPrim` now pierces through type families, `newtype`s and `Signal` constructors when determining a primitive's result type. See [#3339](https://github.com/clash-lang/clash-compiler/pull/3339).
+* In `clash-lib`, the disjoint expression consolidation (DEC) transformation created non-exhaustive case-expressions when the consolidated function was not applied in every alternative. When constant propagation later reduced such a case-expression, compilation failed with `Clash error call: scrutinise: ...`. The argument-selecting case-expressions now carry a default alternative for the branches in which the consolidated function is not used [#2770](https://github.com/clash-lang/clash-compiler/issues/2770). See [#3344](https://github.com/clash-lang/clash-compiler/pull/3344).
+* In `clash-ghc`, type family applications no longer get stuck when the top entity's module is loaded from an interface file and nothing else in the design causes the interfaces holding the needed family instances to be read. This made designs mentioning e.g. `BitVector (BitSize Bool)` behind another type family fail with `Cannot reduce to an integer`. See [#1534](https://github.com/clash-lang/clash-compiler/issues/1534), fixed in [#3343](https://github.com/clash-lang/clash-compiler/pull/3343).
+* In `clash-lib`, `reduceNonRepPrim` now correctly accounts for non-work primitives returning a zero-length `Vec` and under-applied ones. See [#3348](https://github.com/clash-lang/clash-compiler/issues/3348), fixed in [#3349](https://github.com/clash-lang/clash-compiler/pull/3349).
+* Name-shadowing warnings caused by blackboxes re-using identifiers has been fixed. See [#3273](https://github.com/clash-lang/clash-compiler/issues/3273), fixed in [#3353](https://github.com/clash-lang/clash-compiler/pull/3353).
+* In `clash-ghc`, Clash no longer enables `-dynamic-too` when the build is already dynamic, which made GHC emit an `-Winconsistent-flags` warning. See [#3354](https://github.com/clash-lang/clash-compiler/issues/3354), fixed in [#3358](https://github.com/clash-lang/clash-compiler/pull/3358).
+* In `clash-lib`, the SystemVerilog backend no longer emits out-of-bounds array indices when a nested modifier selects a half of an `RTree`. The size of a tree half was computed as `(d-1)^2` instead of `2^(d-1)`, so for an `RTree 3` the right half was emitted as `[4:8]` on an array whose valid indices are `0..7`. See [#3359](https://github.com/clash-lang/clash-compiler/issues/3359), fixed in [#3360](https://github.com/clash-lang/clash-compiler/pull/3360).
+* In `clash-lib` and `clash-ghc`, structural equality and ordering now account for the names and types of variables, including in `eqTerm` and `eqType`, instead of relying only on variable uniques. See [#3361](https://github.com/clash-lang/clash-compiler/issues/3361), fixed in [#3362](https://github.com/clash-lang/clash-compiler/pull/3362).
+
 ## 1.10.1 *Aug 27th, 2026*
 
 Highlights:
