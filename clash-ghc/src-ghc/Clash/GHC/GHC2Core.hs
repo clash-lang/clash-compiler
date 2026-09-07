@@ -82,9 +82,6 @@ import GHC.Core
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Core.DataCon
   (DataCon, dataConExTyCoVars, dataConName,
-#if MIN_VERSION_ghc(9,14,0)
-   dataConOrigArgTys,
-#endif
    dataConRepArgTys,
    dataConTag, dataConTyCon, dataConUnivTyVars, dataConWorkId,
    dataConFieldLabels, flLabel, HsImplBang(..), dataConImplBangs)
@@ -390,9 +387,14 @@ makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
     let tvs = tyConTyVars _tc
         -- The DataCon for a unary class has exactly one field; that's the
         -- newtype's RHS (e.g. 'SNat n' for 'KnownNat n').
-        rhsEtad = case dataConOrigArgTys dc of
+        rhsEtad = case dataConRepArgTys dc of
           [scaled] -> scaledThing scaled
-          _ -> error "makeAlgTyConRhs: UnaryClassTyCon DataCon does not have one field"
+          args -> error [__i|
+            makeAlgTyConRhs: UnaryClassTyCon DataCon does not have one field
+              Type constructor: #{showPprUnsafe _tc}
+              Data constructor: #{showPprUnsafe dc}
+              Representation argument types (#{length args}): #{showPprUnsafe args}
+            |]
     Just <$> (C.NewTyCon <$> coreToDataCon dc
                          <*> ((,) <$> mapM coreToTyVar tvs
                                   <*> coreToType rhsEtad))
