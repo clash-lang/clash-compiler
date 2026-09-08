@@ -24,6 +24,7 @@ module Clash.Core.Pretty
   , SyntaxElement (..)
   , ppr, ppr'
   , showPpr, showPpr'
+  , showPprDiag
   , tracePprId
   , tracePpr
   , fromPpr
@@ -168,6 +169,17 @@ showPpr = showPpr' def
 
 showPpr' :: PrettyPrec p => PrettyOptions -> p -> String
 showPpr' opts = showDoc . ppr' opts
+
+-- | Print a 'PrettyPrec' thing for use in a one-line diagnostic: all runs of
+-- whitespace (including newlines) are collapsed into a single space, and the
+-- result is truncated to the given number of characters. Without this, a
+-- warning quoting a term containing a @case@ or @let@ spills over many lines
+-- and drowns out the rest of the message.
+showPprDiag :: PrettyPrec p => Int -> p -> String
+showPprDiag maxLen p =
+  case splitAt maxLen (unwords (words (showPpr p))) of
+    (shown, []) -> shown
+    (shown, _)  -> shown <> "..."
 
 tracePprId :: PrettyPrec p => p -> p
 tracePprId p = trace (showPpr p) p
