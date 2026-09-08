@@ -35,6 +35,6 @@ jobs:
           if [ -z "$changelog_diff" ]; then
             exit 0
           else
-            echo "::warning title=Old-style changelog entries found::$added"
+            echo "::warning title=Old-style changelog entries found::$changelog_diff"
             exit 1
           fi
