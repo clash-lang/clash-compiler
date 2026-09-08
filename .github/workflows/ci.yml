@@ -239,7 +239,7 @@ jobs:
           export CABAL_DIR=$HOME/.cabal
           cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
 
-  qlog-entries:
+  qlog_entries:
     name: "Check qlog entries"
     runs-on: ubuntu-latest
     steps:
@@ -261,6 +261,7 @@ jobs:
     needs: [
         build_mac_windows,
         build_and_test,
+        qlog_entries,
       ]
     runs-on: ubuntu-22.04
     steps:
