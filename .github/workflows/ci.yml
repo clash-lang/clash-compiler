@@ -239,6 +239,21 @@ jobs:
           export CABAL_DIR=$HOME/.cabal
           cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
 
+  qlog-entries:
+    name: "Check qlog entries"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: "Find and check changed entries"
+        id: entries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # List added/modified files in changelog directory
+          gh pr view "${{ github.event.pull_request.number }}" --json files --jq '.files[].path' | while IFS= read -r file; do
+            [[ "$file" == "changelog/entries/*" ]] || continue
+            qlog check -t $file
+          done
 
   all:
     name: All jobs finished
