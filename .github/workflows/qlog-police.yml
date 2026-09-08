@@ -10,7 +10,7 @@ on:
   pull_request:
     branches: [master, 1.10]
     paths:
-      - 'changelog/**'
+      - 'changelog/20*'
 
 jobs:
   changelog:
