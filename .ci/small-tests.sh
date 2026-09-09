@@ -45,7 +45,7 @@ mv $GIT_ROOT/cabal.project.local.disabled $GIT_ROOT/cabal.project.local || exit 
 # Test for old changelog entries
 old_entries=$(find changelog/ -maxdepth 1 -type f -name '20*')
 
-if [ -n "$old_entries" ]; then
-    echo "::warning title=Old-style changelog entries found::$old_entries"
+if [[ -n $old_entries ]]; then
+    echo "::error title=Old-style changelog entries found::$old_entries"
     exit 1
 fi
