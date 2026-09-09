@@ -493,7 +493,7 @@ infixr 0 `deepseqX`
 --
 -- Equivalent to @\\x -> 'seqX' x ()@.
 --
--- Useful for defining 'NFDataX.rnfX' for types for which NF=WHNF holds.
+-- Useful for defining 'rnfX' for types for which NF=WHNF holds.
 rwhnfX :: a -> ()
 rwhnfX = (`seqX` ())
 {-# INLINE rwhnfX #-}

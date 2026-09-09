@@ -184,7 +184,8 @@ The Clash compiler will generate the following @blinker.vhdl@ file instead:
 Where we now have:
 
 * A top-level component that is called @blinker@.
-* Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@, @KEY2@, @LED@, etc.
+* Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@,
+  @KEY2@ and @LED@.
 
 See the documentation of 'Synthesize' for the meaning of all its fields.
 
