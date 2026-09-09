@@ -1,7 +1,7 @@
 {-|
   Copyright  :  (C) 2015-2016, University of Twente,
                     2017     , Myrtle Software Ltd, Google Inc.,
-                    2021-2022, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -63,9 +63,6 @@ data Usage
 
 -- | Is '-fclash-aggresive-x-optimization-blackbox' set?
 newtype AggressiveXOptBB = AggressiveXOptBB Bool
-
--- | Is '-fclash-render-enums' set?
-newtype RenderEnums = RenderEnums Bool
 
 -- | Kind of a HDL type. Used to determine whether types need conversions in
 -- order to cross top entity boundaries.
@@ -162,8 +159,6 @@ class (HasUsageMap state, HasIdentifierSet state) => Backend state where
   ifThenElseExpr :: state -> Bool
   -- | Whether -fclash-aggressive-x-optimization-blackboxes was set
   aggressiveXOptBB :: State state AggressiveXOptBB
-  -- | Whether -fclash-no-render-enums was set
-  renderEnums :: State state RenderEnums
   -- | All the domain configurations of design
   domainConfigurations :: State state DomainMap
   -- | Set the domain configurations

@@ -17,37 +17,37 @@
     kind: Expression
     type: 'eq# :: Index n
       -> Index n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Index.neq#
     kind: Expression
     type: 'neq# :: Index n
       -> Index n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Index.lt#
     kind: Expression
     type: 'lt# :: Index n
       -> Index n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Index.ge#
     kind: Expression
     type: 'ge# :: Index n
       -> Index n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Index.gt#
     kind: Expression
     type: 'gt# :: Index n
       -> Index n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Index.le#
     kind: Expression
     type: 'le# :: Index n
       -> Index n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Index.maxBound#
     kind: Expression

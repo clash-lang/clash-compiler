@@ -24,37 +24,37 @@
     kind: Expression
     type: 'eq# :: Unsigned
       n -> Unsigned n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] = ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Unsigned.neq#
     kind: Expression
     type: 'neq# :: Unsigned
       n -> Unsigned n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] /= ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Unsigned.lt#
     kind: Expression
     type: 'lt# :: Unsigned
       n -> Unsigned n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] < ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Unsigned.ge#
     kind: Expression
     type: 'ge# :: Unsigned
       n -> Unsigned n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] >= ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Unsigned.gt#
     kind: Expression
     type: 'gt# :: Unsigned
       n -> Unsigned n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] > ~ARG[1]~ELSEfalse~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Unsigned.le#
     kind: Expression
     type: 'le# :: Unsigned
       n -> Unsigned n -> Bool'
-    template: ~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI
+    template: to_std_logic(~IF~SIZE[~TYP[0]]~THEN~ARG[0] <= ~ARG[1]~ELSEtrue~FI)
 - BlackBox:
     name: Clash.Sized.Internal.Unsigned.minBound#
     kind: Expression

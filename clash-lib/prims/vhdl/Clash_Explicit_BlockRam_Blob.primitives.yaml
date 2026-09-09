@@ -34,7 +34,7 @@
         ~SYM[6] : process(~ARG[1])
         begin
           if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[1]) then
-            if ~ARG[5]~IF~ISACTIVEENABLE[2]~THEN and ~ARG[2]~ELSE~FI then
+            if ~ARG[5] = '1'~IF~ISACTIVEENABLE[2]~THEN and ~ARG[2] = '1'~ELSE~FI then
               ~SYM[2](~SYM[5]) <= ~ARG[7];
             end if;
             ~RESULT <= ~SYM[2](~SYM[4]);
