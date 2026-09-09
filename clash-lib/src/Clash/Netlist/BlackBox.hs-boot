@@ -16,7 +16,8 @@ import Clash.Primitives.Types (CompiledPrimitive)
 
 extractPrimWarnOrFail
   :: HasCallStack
-  => Text
+  => String
+  -> Text
   -> NetlistMonad CompiledPrimitive
 
 mkBlackBoxContext
