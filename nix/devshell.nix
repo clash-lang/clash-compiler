@@ -38,14 +38,8 @@ clashPkgs.shellFor {
     pkgs.verilator
     pkgs.iverilog
     pkgs.yosys
-<<<<<<< HEAD
-  ] ++ haskellLanguageServer;
-||||||| parent of 7736cbf (Switch changelog entries to qlog)
-  ];
-=======
 
     # Tool used to manage the changelog, see 'changelog/README.md'.
     qlog
-  ];
->>>>>>> 7736cbf (Switch changelog entries to qlog)
+  ] ++ haskellLanguageServer;
 }
