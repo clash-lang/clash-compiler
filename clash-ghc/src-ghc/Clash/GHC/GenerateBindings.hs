@@ -84,7 +84,7 @@ import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
-import           Clash.Unique            (Unique)
+import           Clash.Unique            (Unique, fromGhcUnique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Warning           (ClashWarning(WarnPrimitiveDefinition))
@@ -155,16 +155,24 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
    , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
    , primGuards
-   , domainTCUs ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
+   , domainTCUs
+   , domainTyCons ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
   let hintArgs = maybe [] hintPackageArgs dflagsM
   primMapC <- compilePrimitives importDirs hintArgs tdir primMapR
-  let ((bindingsMap,clsVMap),tcMap,_) =
+
+  -- Domain configuration families need to be translated even when no
+  -- KnownDomain dictionaries survive, for example for an unused clock port.
+  -- Seeding the map also lets makeAllTyCons discover their instances and
+  -- the types referenced by those instances.
+  let domainTyConMap = UniqMap.fromList
+        [(fromGhcUnique (GHC.tyConUnique tc), tc) | tc <- domainTyCons]
+      ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
                    (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
-                   emptyGHC2CoreState
+                   (emptyGHC2CoreState & tyConMap .~ domainTyConMap)
       (tcMap',tupTcCache)           = mkTupTyCons opts tcMap
       tcCache                       = makeAllTyCons opts tcMap' fiEnvs
       allTcCache                    = tysPrimMap <> tcCache
