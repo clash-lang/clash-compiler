@@ -83,7 +83,7 @@ import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
-import           Clash.Unique            (Unique)
+import           Clash.Unique            (Unique, fromGhcUnique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
 
@@ -119,15 +119,22 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
    , partitionEithers -> (unresolvedPrims, pFP)
    , customBitRepresentations
    , primGuards
-   , domainTCUs ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
+   , domainTCUs
+   , domainTyCons ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
   primMapC <- compilePrimitives importDirs dbs tdir primMapR
-  let ((bindingsMap,clsVMap),tcMap,_) =
+  -- Domain configuration families need to be translated even when no
+  -- KnownDomain dictionaries survive, for example for an unused clock port.
+  -- Seeding the map also lets makeAllTyCons discover their instances and
+  -- the types referenced by those instances.
+  let domainTyConMap = UniqMap.fromList
+        [(fromGhcUnique (GHC.tyConUnique tc), tc) | tc <- domainTyCons]
+      ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
                    (GHC2CoreEnv GHC.noSrcSpan fiEnvs)
-                   emptyGHC2CoreState
+                   (emptyGHC2CoreState & tyConMap .~ domainTyConMap)
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap <> tcCache
