@@ -559,6 +559,7 @@ loadModules
         , [DataRepr']
         , [(Text.Text, PrimitiveGuard ())]
         , Maybe KnownDomainTyConUniques
+        , [GHC.TyCon]                           -- Domain configuration families
         )
 loadModules startAction useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
@@ -676,7 +677,6 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
                  map show [ ''DomainPeriod         , ''DomainActiveEdge
                           , ''DomainResetKind      , ''DomainInitBehavior
                           , ''DomainResetPolarity  , ''DomainPeriodFraction
-                          , ''DomainPeriodFraction
                           ]
             then UniqDSet.addOneToUniqDSet s
                    $ FamInstEnv.famInstTyCon inst
@@ -711,6 +711,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
            , toList reprs1
            , primGuards
            , mKnownDomainTyConUniques
+           , knownTyCons
            )
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
