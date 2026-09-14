@@ -241,6 +241,7 @@ jobs:
 
   qlog_entries:
     name: "Check qlog entries"
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -252,6 +253,7 @@ jobs:
           # List added/modified files in changelog directory
           gh pr view "${{ github.event.pull_request.number }}" --json files --jq '.files[].path' | while IFS= read -r file; do
             [[ "$file" == "changelog/entries/*" ]] || continue
+            echo "Checking $file"
             qlog check -t $file
           done
 
