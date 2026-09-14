@@ -36,6 +36,9 @@ clashPkgs.shellFor {
     pkgs.nixpkgs-fmt
     pkgs.sby
     pkgs.verilator
+    # Optional: clash-testsuite uses ccache, when present, to cache Verilator's
+    # runtime objects across tests.
+    pkgs.ccache
     pkgs.iverilog
     pkgs.yosys
 

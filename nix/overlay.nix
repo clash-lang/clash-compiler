@@ -232,6 +232,9 @@ let
                 final.ghdl-clash
                 prev.sby
                 final.verilator
+                # Optional: clash-testsuite uses ccache, when present, to cache
+                # Verilator's runtime objects across tests.
+                prev.ccache
                 prev.iverilog
                 prev.yosys
                 prev.z3
@@ -300,6 +303,9 @@ let
                 final.ghdl-clash
                 prev.sby
                 final.verilator
+                # Optional: clash-testsuite uses ccache, when present, to cache
+                # Verilator's runtime objects across tests.
+                prev.ccache
                 prev.iverilog
                 prev.yosys
                 prev.z3
