@@ -329,6 +329,12 @@ runClashTest = defaultMain
           , expectVerificationFail=Just (def, "Unreached cover statement at topEntity: B")
           }
         ]
+      , clashTestGroup "XException"
+        [ runTest "IsX" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Clash was forced to translate 'Clash.XException.isX', but this value was marked with DontTranslate.")
+          }
+        ]
       , clashTestGroup "ZeroWidth"
         [ runTest "FailGracefully1" def{
             hdlTargets=[VHDL]

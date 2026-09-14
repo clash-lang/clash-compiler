@@ -43,7 +43,7 @@ where
 
 import           Prelude             hiding (undefined)
 
-import           Clash.Annotations.Primitive (hasBlackBox)
+import           Clash.Annotations.Primitive (hasBlackBox, dontTranslate)
 import           Clash.CPP           (maxTupleSize, fSuperStrict)
 import           Clash.XException.Internal
 import           Clash.XException.TH
@@ -297,6 +297,7 @@ maybeX f a = either (const Nothing) Just (f a)
 --
 maybeHasX :: (NFData a, NFDataX a) => a -> Maybe a
 maybeHasX = maybeX hasX
+{-# ANN maybeHasX dontTranslate #-}
 
 -- | Evaluate a value to WHNF, returning 'Nothing' if it throws 'XException'.
 --
@@ -307,6 +308,7 @@ maybeHasX = maybeX hasX
 -- > maybeIsX _|_                 = _|_
 maybeIsX :: a -> Maybe a
 maybeIsX = maybeX isX
+{-# ANN maybeIsX dontTranslate #-}
 
 -- | Fully evaluate a value, returning @'Left' msg@ if it throws 'XException'.
 -- If you want to determine if a value contains undefined parts, use
@@ -333,6 +335,7 @@ hasX a =
       (evaluate (rnf a) >> return (Right a))
       (\(XException msg) -> evaluate (rnfX a) >> return (Left msg)))
 {-# OPAQUE hasX #-}
+{-# ANN hasX dontTranslate #-}
 
 -- | Evaluate a value to WHNF, returning @'Left' msg@ if is a 'XException'.
 --
@@ -348,6 +351,7 @@ isX a =
       (evaluate a >> return (Right a))
       (\(XException msg) -> return (Left msg)))
 {-# OPAQUE isX #-}
+{-# ANN isX dontTranslate #-}
 
 -- | Like the 'Show' class, but values that normally throw an 'XException' are
 -- converted to @undefined@, instead of error'ing out with an exception.
