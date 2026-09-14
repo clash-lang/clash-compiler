@@ -25,7 +25,7 @@
                       ;
         ~GENSYM[romSync][6] : process (~ARG[1])
         begin
-          if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[1])~IF~ISACTIVEENABLE[2]~THEN and ~ARG[2]~ELSE~FI) then
+          if (~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[1])~IF~ISACTIVEENABLE[2]~THEN and ~ARG[2] = '1'~ELSE~FI) then
             ~RESULT <= ~SYM[2](~SYM[3]);
           end if;
         end process;
