@@ -10,6 +10,7 @@ import           Test.Tasty.HUnit
 
 import           GHC.Generics         (Generic)
 import           Clash.Class.BitPack  (pack)
+import           Clash.Signal.Internal (Signal(..), System)
 import           Clash.Sized.Vector   (Vec(..))
 import           Clash.XException
   (NFDataX(rnfX, hasUndefined, deepErrorX), errorX, ensureSpine)
@@ -94,6 +95,9 @@ tests =
         , testCase "ES1" $ case ensureSpine undef of () -> () @?= ()
         , testCase "ES1" $ case ensureSpine undef of ((), ()) -> () @?= ()
         , testCase "ES2" $ case ensureSpine @(Unit, Unit) undef of (Unit, Unit) -> () @?= ()
+        , testCase "ES3" $
+            case ensureSpine @(Signal System (Unit, Unit)) undef of
+              (Unit, Unit) :- ((Unit, Unit) :- _) -> () @?= ()
         ]
     , testGroup
         "ManualRnf"
