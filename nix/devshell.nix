@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, qlog }:
 compilerVersion:
 let
   clashPkgs = pkgs."clashPackages-${compilerVersion}";
@@ -38,5 +38,8 @@ clashPkgs.shellFor {
     pkgs.verilator
     pkgs.iverilog
     pkgs.yosys
+
+    # Tool used to manage the changelog, see 'changelog/README.md'.
+    qlog
   ] ++ haskellLanguageServer;
 }

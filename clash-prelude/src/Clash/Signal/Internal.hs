@@ -1982,7 +1982,7 @@ simulate f = sample . f . fromList
 -- | The above type is a generalization for:
 --
 -- @
--- __sample__ :: 'Clash.Signal.Signal' dom a -> [a]
+-- __sample_lazy__ :: 'Clash.Signal.Signal' dom a -> [a]
 -- @
 --
 -- Get an infinite list of samples from a 'Clash.Signal.Signal'
@@ -1999,7 +1999,7 @@ sample_lazy = foldr (:) []
 -- | The above type is a generalization for:
 --
 -- @
--- __sampleN__ :: Int -> 'Clash.Signal.Signal' dom a -> [a]
+-- __sampleN_lazy__ :: Int -> 'Clash.Signal.Signal' dom a -> [a]
 -- @
 --
 -- Get a list of @n@ samples from a 'Clash.Signal.Signal'
