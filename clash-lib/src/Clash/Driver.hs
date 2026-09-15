@@ -23,10 +23,10 @@
 
 module Clash.Driver where
 
-import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
+import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newEmptyMVar, newMVar, putMVar, takeMVar, withMVar)
 import           Control.Concurrent.Async         (mapConcurrently_)
 import           Control.DeepSeq
-import           Control.Exception                (evaluate, throw, Exception)
+import           Control.Exception                (evaluate, finally, throw, Exception)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM)
 import           Control.Monad.Catch              (MonadThrow (throwM), try)
@@ -352,7 +352,15 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         | opt_concurrentTopEntities opts = mapConcurrently_
         | otherwise = mapM_
 
-    maybeMapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
+    -- See Note [Deterministic component names with concurrent top entities]
+    turns <- mapM (const newEmptyMVar) (() : map (const ()) tes)
+    case turns of
+      firstTurn : _ -> putMVar firstTurn ()
+      [] -> pure ()
+
+    maybeMapConcurrently_
+      (\(turn, top) -> go compNames idSet edamFiles ioLock deps topEntityMap turn top)
+      (zip (zip turns (drop 1 turns)) tes)
 
     time <- Clock.getCurrentTime
     let diff = reportTimeDiff time startTime
@@ -365,9 +373,14 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     -> MVar ()
     -> HashMap Unique [Unique]
     -> VarEnv TopEntityT
+    -> (MVar (), MVar ())
+    -- ^ This top entity's turn token, and the next top entity's. See
+    -- Note [Deterministic component names with concurrent top entities].
     -> TopEntityT
     -> IO ()
-  go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
+  go compNames seenV edamFilesV ioLockV deps topEntityMap (myTurn, nextTurn) (TopEntityT topEntity annM isTb) = do
+  let inTurn :: IO a -> IO a
+      inTurn = withTurn myTurn nextTurn
   let domainConfs = envDomains env
   let bindingsMap = designBindings design
   let primMap = envPrimitives env
@@ -411,7 +424,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Using cached result for: " ++ topEntityS)
 
-      modifyMVar_ seenV $ \seen ->
+      inTurn $ modifyMVar_ seenV $ \seen ->
         pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
 
       fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
@@ -465,24 +478,28 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
-      -- 4. Generate netlist for topEntity
-      (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
-        (topComponent, netlist, seen') <-
-          -- TODO My word, this has far too many arguments.
-          genNetlist env peEval isTb transformedBindings topEntityMap compNames
-            typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+      -- 4. Generate netlist for topEntity, and 5. generate the topEntity
+      -- wrapper. Both claim component names from the shared identifier set,
+      -- so they run in turn; see
+      -- Note [Deterministic component names with concurrent top entities].
+      (topComponent, netlist, hdlDocs, dfiles, mfiles) <- inTurn $ do
+        (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
+          (topComponent, netlist, seen') <-
+            -- TODO My word, this has far too many arguments.
+            genNetlist env peEval isTb transformedBindings topEntityMap compNames
+              typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
-        pure (seen', (topComponent, netlist))
+          pure (seen', (topComponent, netlist))
 
-      netlistTime <- netlist `deepseq` Clock.getCurrentTime
-      let normNetDiff = reportTimeDiff netlistTime normTime
+        netlistTime <- netlist `deepseq` Clock.getCurrentTime
+        let normNetDiff = reportTimeDiff netlistTime normTime
 
-      withMVar ioLockV . const $
-        putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
+        withMVar ioLockV . const $
+          putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
 
-      -- 5. Generate topEntity wrapper
-      (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
-        pure $! createHDL hdlState' opts modNameT seen netlist domainConfs topComponent topNmT
+        (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
+          pure $! createHDL hdlState' opts modNameT seen netlist domainConfs topComponent topNmT
+        pure (topComponent, netlist, hdlDocs, dfiles, mfiles)
 
       -- TODO: Data files should go into their own directory
       -- FIXME: Files can silently overwrite each other
@@ -1177,6 +1194,33 @@ normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = tr
     transformedBindings = runNormalization env supply bindingsMap
                             typeTrans peEval eval emptyVarEnv
                             topEntities doNorm
+
+{- Note [Deterministic component names with concurrent top entities]
+
+Top entities are compiled concurrently by default (see
+'opt_concurrentTopEntities'). Their netlists share one identifier set, so when
+two top entities each produce a component with the same name, the one that
+generates its netlist first gets the plain name and the other gets a suffix.
+Which one is first used to depend on scheduling: the same design could come out
+with @calc.v@ in one top entity's directory on one run and @calc_0.v@ on the
+next. That also breaks HDL caching and makes the generated HDL unfit for
+byte-for-byte comparison.
+
+Normalization, the expensive part, still runs concurrently. Only the phases
+that touch the shared identifier set (netlist generation and HDL construction,
+or the reservation of cached component names) run in turn: 'generateHDL' hands
+out one token per top entity, in the order 'sortTop' produced, and each top
+entity passes the next token on when it is done with those phases. This is
+'withTurn'.
+-}
+
+-- | Run the given action once the top entity holding @myTurn@ may claim
+-- component names, and hand the turn to the next top entity afterwards, also
+-- when the action throws. See Note [Deterministic component names with
+-- concurrent top entities].
+withTurn :: MVar () -> MVar () -> IO a -> IO a
+withTurn myTurn nextTurn act =
+  (takeMVar myTurn >> act) `finally` putMVar nextTurn ()
 
 -- | Reverse topologically sort given top entities. Also returns a mapping that
 -- maps a top entity to its reverse topologically sorted transitive dependencies.
