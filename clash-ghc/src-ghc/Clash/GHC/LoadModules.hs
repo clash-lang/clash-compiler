@@ -343,8 +343,13 @@ setupGhc useColor dflagsM idirs = do
       dflags3 = if ghcDynamic && not targetIsDynamic
                   then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
                   else dflags2
+      -- See Note [Run Template Haskell from bytecode]
+      dflags4 =
+        DynFlags.gopt_set
+          (DynFlags.gopt_set dflags3 DynFlags.Opt_ByteCodeAndObjectCode)
+          DynFlags.Opt_UseBytecodeRatherThanObjects
 
-  when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags3) $
+  when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags4) $
     trace
       (unlines ["WARNING:"
                ,"`-fworker-wrapper` option is globally enabled, this can result in incorrect code."
@@ -354,12 +359,33 @@ setupGhc useColor dflagsM idirs = do
                ])
       (return ())
 
-  _ <- GHC.setSessionDynFlags dflags3
+  _ <- GHC.setSessionDynFlags dflags4
   hscenv <- GHC.getSession
   hscenv1 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv)
   GHC.setSession hscenv1
 
   return ()
+
+{- Note [Run Template Haskell from bytecode]
+
+When a module contains a Template Haskell splice that refers to another module
+of the same project, GHC has to load that other module's code into its
+in-process interpreter before it can run the splice. Clash is a dynamically
+linked executable, and for such executables GHC does this by compiling the
+dependency to a dynamic object and linking it, together with every package in
+scope, into a temporary shared library that it then dlopens. With a package
+environment listing a couple of hundred packages, that link alone takes
+seconds; on a small two-module design it was two thirds of Clash's total
+run time, and it does no useful work.
+
+Since GHC 9.6, @-fbyte-code-and-object-code@ makes GHC produce bytecode next to
+the object code for every module, and @-fprefer-byte-code@ makes it run
+splices from that bytecode. No temporary library is linked, no dynamic object
+is generated, and the object files and interfaces are written as before. The
+bytecode generation itself costs a few milliseconds per module. We set both
+flags by hand here, so the implication the command-line parser would apply
+between them doesn't matter.
+-}
 
 -- | Load a module from a Haskell file. Function does NOT look in currently
 -- loaded modules.
