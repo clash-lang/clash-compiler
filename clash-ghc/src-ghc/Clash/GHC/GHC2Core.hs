@@ -23,6 +23,8 @@ module Clash.GHC.GHC2Core
   ( C2C
   , GHC2CoreState
   , GHC2CoreEnv (..)
+  , uniqueScope
+  , topLevelUniques
   , srcSpan
   , tyConMap
   , coreToTerm
@@ -38,7 +40,7 @@ module Clash.GHC.GHC2Core
 where
 
 -- External Modules
-import           Control.Lens                ((^.), (%~), (&), (%=), (.~), (<>=), use, view, makeLenses)
+import           Control.Lens                ((^.), (%~), (&), (%=), (.~), (.=), (<>=), use, view, makeLenses)
 import           Control.Applicative         ((<|>))
 import           Control.Monad.Extra         (ifM, andM)
 import           Control.Monad.RWS.Strict    (RWS)
@@ -143,6 +145,8 @@ import           Clash.Driver.Warning        (CanWarn(..), PendingWarning)
 import           Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types      hiding (name)
 import           Clash.Unique                (fromGhcUnique)
+import qualified Clash.Unique                as CU
+import           Clash.GHC.Unique            (stableUniqueFor, localUnique, tyConUniqueScope)
 import           Clash.Util
 import           Clash.GHC.Util
 
@@ -235,6 +239,12 @@ data GHC2CoreState
   -- ^ Warnings collected while converting, in the order they were reported.
   -- 'C2C' is pure, so it cannot print them itself; the driver reports these
   -- once the conversion is done. See the 'HasClashOpts' instance below.
+  , _uniqueCache :: C.UniqMap CU.Unique
+  -- ^ Clash uniques handed out so far, keyed by GHC unique. For local names
+  -- this is what makes repeated occurrences agree; for external names it saves
+  -- recomputing the hash. See Note [Deterministic uniques] in "Clash.GHC.Unique".
+  , _localUniqueCounter :: !Int
+  -- ^ Index of the next local name in the current scope. See 'localUniqueFor'.
   }
 
 makeLenses ''GHC2CoreState
@@ -244,6 +254,14 @@ data GHC2CoreEnv
   { _srcSpan :: SrcSpan
   , _famInstEnvs :: FamInstEnvs
   , _clashOpts :: ClashOpts
+  , _uniqueScope :: Int
+  -- ^ Scope for 'localUnique': the number of the binder group being converted,
+  -- or 'tyConUniqueScope'. See Note [Deterministic uniques] in "Clash.GHC.Unique".
+  , _topLevelUniques :: C.UniqMap CU.Unique
+  -- ^ Uniques of top-level binders whose GHC names are internal, keyed by GHC
+  -- unique. Such binders have no stable string of their own, so they are
+  -- numbered by position once for the whole design; see
+  -- 'Clash.GHC.GenerateBindings.mkBindings'.
   }
 
 makeLenses ''GHC2CoreEnv
@@ -258,7 +276,7 @@ instance CanWarn C2C where
 
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState =
-  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty Seq.empty
+  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty Seq.empty C.empty 0
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -285,7 +303,7 @@ makeAllTyCons opts hm fiEnvs = go hm hm
         | otherwise                = tcm <> tcm'
       where
         (tcm,old', _) = RWS.runRWS (T.mapM makeTyCon (new ^. tyConMap))
-                                   (GHC2CoreEnv noSrcSpan fiEnvs opts)
+                                   (GHC2CoreEnv noSrcSpan fiEnvs opts tyConUniqueScope C.empty)
                                    old
         tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
 
@@ -464,7 +482,7 @@ coreToTerm primMap unlocs = term
       = do
         opts <- askClashOpts
         let (nm, st, _) = RWS.runRWS (qualifiedNameString (varName x))
-                                     (GHC2CoreEnv noSrcSpan emptyFamInstEnvs opts)
+                                     (GHC2CoreEnv noSrcSpan emptyFamInstEnvs opts 0 C.empty)
                                      emptyGHC2CoreState
         pendingWarnings <>= st ^. pendingWarnings
         go nm args
@@ -1167,9 +1185,10 @@ coreToName
   -> b
   -> C2C (C.Name a)
 coreToName toName toUnique toString v = do
-  ns <- toString (toName v)
-  let key  = fromGhcUnique (toUnique v)
-      locI = getSrcSpan (toName v)
+  let nm = toName v
+  ns <- toString nm
+  key <- uniqueFor nm (fromGhcUnique (toUnique v))
+  let locI = getSrcSpan nm
       -- Is it one of [ds,ds1,ds2,..]
       isDSX = maybe False (maybe True (isDigit . fst) . Text.uncons) . Text.stripPrefix "ds"
       sort | isDSX ns || Text.isPrefixOf "$" ns
@@ -1179,6 +1198,25 @@ coreToName toName toUnique toString v = do
   locR <- view srcSpan
   let loc = if isGoodSrcSpan locI then locI else locR
   return (C.Name sort ns key loc)
+
+-- | The Clash unique for a GHC name, given the name and its GHC unique. See
+-- Note [Deterministic uniques] in "Clash.GHC.Unique".
+uniqueFor :: Name -> CU.Unique -> C2C CU.Unique
+uniqueFor nm ghcKey = do
+  seen <- use uniqueCache
+  case C.lookup ghcKey seen of
+    Just u -> pure u
+    Nothing -> do
+      topLevel <- view topLevelUniques
+      u <- case C.lookup ghcKey topLevel <|> stableUniqueFor nm of
+        Just u -> pure u
+        Nothing -> do
+          scope <- view uniqueScope
+          n <- use localUniqueCounter
+          localUniqueCounter .= n + 1
+          pure (localUnique scope n)
+      uniqueCache %= C.insert ghcKey u
+      pure u
 
 qualifiedNameString'
   :: Name

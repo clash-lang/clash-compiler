@@ -33,6 +33,7 @@ import           Data.List               (foldl')
 #endif
 import           Data.List               (isPrefixOf)
 import           Data.List.Split         (chunksOf)
+import           Data.List               (sortOn)
 import           Data.Maybe              (listToMaybe)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
@@ -68,14 +69,14 @@ import           Clash.Core.Util         (mkInternalVar, mkSelectorCase)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
-  ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
+  ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet, eltsVarEnv)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver            (compilePrimitives)
 import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.Driver.Warning    (warnAbout, warnAboutM)
 import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
+  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, uniqueScope, topLevelUniques, coreToId, coreToName, coreToTerm,
    makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
@@ -84,7 +85,8 @@ import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
-import           Clash.Unique            (Unique)
+import           Clash.Unique            (Unique, fromGhcUnique)
+import           Clash.GHC.Unique        (globalUnique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Warning           (ClashWarning(WarnPrimitiveDefinition))
@@ -128,7 +130,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   primMapC <- compilePrimitives importDirs dbs tdir primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
-                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
+                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts 0 UniqMap.empty)
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons opts tcMap
       tcCache                       = makeAllTyCons opts tcMap' fiEnvs
@@ -145,7 +147,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
              clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
-        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts) tcMap')) $
+        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts 0 UniqMap.empty) tcMap')) $
           mapM (\(topEnt,annM,isTb) -> do
             topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
             return (topEnt', annM, isTb)) topEntities
@@ -219,11 +221,33 @@ mkBindings primMap bindings clsOps unlocatable = do
   -- 'TyCon' map and a name cache, both of which are pure (deterministic per
   -- key) memo tables. We therefore convert every binder from a fresh state in
   -- parallel and merge the resulting 'TyCon' maps afterwards. See 'parRunC2C'.
-  env <- RWS.ask
+  env0 <- RWS.ask
   let
-    bindingsList = parRunC2C env (map (processBind primMap unlocatable) bindings)
-    clsOpList    = parRunC2C env (map processClsOp clsOps)
+    -- Binder groups are converted in an order that does not depend on GHC's
+    -- uniques, and each group gets its position as the scope for the uniques
+    -- of its local names. See Note [Deterministic uniques] in "Clash.GHC.Unique".
+    sortedBindings = sortOn bindStableName bindings
+    -- Top-level binders GHC left with internal names (no module) cannot be
+    -- identified by their stable string, so they are numbered by their position
+    -- in the sorted list; every conversion sees the same numbering through the
+    -- environment.
+    internalTopLevel =
+      UniqMap.fromList
+        [ (fromGhcUnique (GHC.varUnique v), globalUnique (stableName v ++ "#" ++ show k))
+        | (k, v) <- zip [0 :: Int ..] (GHC.bindersOfBinds sortedBindings)
+        , not (GHC.isExternalName (GHC.varName v))
+        ]
+    env = env0 & topLevelUniques .~ internalTopLevel
+    bindingsList =
+      parRunC2C env
+        (zipWith
+          (\scope bind -> RWS.local (uniqueScope .~ scope) (processBind primMap unlocatable bind))
+          [1 ..]
+          sortedBindings)
+    clsOpList    = parRunC2C env (map processClsOp (sortOn (stableName . fst) clsOps))
     states       = map snd bindingsList ++ map snd clsOpList
+    converted    = concatMap fst bindingsList
+    bindingsMap  = mkVarEnv converted
   -- Merge the 'TyCon' maps discovered while converting, and collect the
   -- warnings the conversions reported; the name caches are not used after this
   -- point, so they are dropped. 'makeAllTyCons' later recomputes over the
@@ -232,8 +256,19 @@ mkBindings primMap bindings clsOps unlocatable = do
     & tyConMap %~ (\tcm0 -> foldl' (\acc s -> acc <> (s ^. tyConMap)) tcm0 states)
     & pendingWarnings %~ (<> foldMap (^. pendingWarnings) states)
 
-  return ( mkVarEnv (concatMap fst bindingsList)
+  -- A unique is a hash for external names (see 'Clash.GHC.Unique.globalUnique');
+  -- two distinct top-level binders hashing alike would silently drop one.
+  when (length (eltsVarEnv bindingsMap) /= length converted) $
+    GHC.pgmError "Clash.GHC.GenerateBindings.mkBindings: unique collision between top-level binders"
+
+  return ( bindingsMap
          , mkVarEnv (map fst clsOpList) )
+ where
+  stableName = GHC.nameStableString . GHC.varName
+  bindStableName (GHC.NonRec v _) = stableName v
+  bindStableName (GHC.Rec bs) = case bs of
+    (v, _) : _ -> stableName v
+    [] -> ""
 
 -- | Convert a single (possibly recursive) binder group to Clash Core bindings.
 -- See 'mkBindings' for how these conversions are run in parallel.
@@ -252,7 +287,10 @@ processBind primMap unlocatable = \case
     let pr = if HashMap.member nm primMap then IsPrim else IsFun
     checkPrimitive primMap v
     return [(v', (Binding v' sp inl pr tm False))]
-  GHC.Rec bs -> do
+  GHC.Rec bs0 -> do
+    -- Sorted so the order of the group, and hence of the local uniques and the
+    -- 'Letrec' below, does not depend on GHC's uniques.
+    let bs = sortOn (GHC.nameStableString . GHC.varName . fst) bs0
     tms <- forM bs $ \(v,e) -> do
       let sp  = GHC.getSrcSpan v
           inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
@@ -432,7 +470,7 @@ mkTupTyCons opts tcMap = (tcMap'',tupTcCache)
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
                                           qualifiedNameString tc) tupTyCons)
-                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs opts)
+                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs opts 0 UniqMap.empty)
                  tcMap
     tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
     tupHM            = UniqMap.fromList (zip tcNames tupTyCons)

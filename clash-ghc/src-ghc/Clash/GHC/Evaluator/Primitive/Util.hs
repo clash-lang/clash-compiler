@@ -80,6 +80,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
 import           Clash.GHC.GHC2Core  (modNameM)
 import           Clash.Unique        (fromGhcUnique)
+import           Clash.GHC.Unique    (stableUniqueFor)
 import Clash.Util (MonadUnique (..), curLoc)
 import           Clash.Util.Supply   (Supply,freshId)
 import Clash.Normalize.PrimitiveReductions (typeNatAdd)
@@ -1402,8 +1403,11 @@ ghcTyconToTyConName
   :: TyCon.TyCon
   -> TyConName
 ghcTyconToTyConName tc =
-    Name User n' (fromGhcUnique (TyCon.tyConUnique tc)) (getSrcSpan n)
+    Name User n' uniq (getSrcSpan n)
   where
+    -- See Note [Deterministic uniques] in "Clash.GHC.Unique"
+    uniq    = fromMaybe (error ("ghcTyconToTyConName: local type constructor " ++ show n'))
+                        (stableUniqueFor n)
     n'      = fromMaybe "_INTERNAL_" (modNameM n) `Text.append`
               ('.' `Text.cons` Text.pack occName)
     occName = occNameString $ nameOccName n

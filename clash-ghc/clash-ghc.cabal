@@ -263,6 +263,7 @@ library
                       Clash.GHC.Evaluator.Primitives.GHC.Word
                       Clash.GHC.GHC2Core
                       Clash.GHC.LoadInterfaceFiles
+                      Clash.GHC.Unique
                       Clash.GHC.Util
                       Clash.GHCi.Util
                       Data.Text.Extra

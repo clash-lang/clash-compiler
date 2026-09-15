@@ -38,7 +38,6 @@ import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
 import           Control.Exception               (SomeException, throw)
 import           Control.Monad                   (forM, join, when)
-import           Data.List.Extra                 (nubSort)
 import           Control.Exception               (Exception, throwIO)
 import           Control.Monad                   (foldM)
 import           Control.Monad.Catch             (catch, throwM)
@@ -54,7 +53,7 @@ import           Data.Foldable                   (toList)
 import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Typeable                   (Typeable)
-import           Data.List                       (nub, find)
+import           Data.List                       (nub, find, sortOn)
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List                       (foldl')
 #endif
@@ -220,7 +219,7 @@ loadExternalModule hdl modName0 mainIsM = MC.try $ do
   -- all exports.
   seed <- loadSeed mainIsM rootIds
   loaded <- loadExternalBinders hdl seed
-  let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded))
+  let allBinders = makeRecursiveGroups (sortOn (stableName . fst) (Map.assocs (lbBinders loaded)))
   -- NB: we return the /full/ export list as the root binders, so resolution of
   -- the @-main-is@ name and of (testbench/synthesize) annotations in
   -- 'loadModules' is unaffected by the pruning above.
@@ -287,7 +286,7 @@ loadSeed (Just nm) rootIds =
           <> Map.keys benchAnns
           <> concat (Map.elems benchAnns)
           <> filter isMagicName rootIds
-      pure (nubSort (mainIs <> implicit))
+      pure (nubSortStable (mainIs <> implicit))
 
 setupGhc
   :: GHC.GhcMonad m
@@ -518,7 +517,13 @@ loadLocalModule hdl modName = do
   localPrims <- findPrimitiveAnnotations hdl binderIds
   let loaded1 = loaded0{lbPrims=lbPrims loaded0 <> Seq.fromList localPrims}
 
-  let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded0))
+  -- Sort top-level binders by stable name; the home module's own binding order
+  -- breaks ties between binders GHC left with internal names (such as several
+  -- @lvl@ or @$s...@ specializations), which have no module to tell them
+  -- apart. See Note [Deterministic uniques] in "Clash.GHC.Unique".
+  let homeOrder = Map.fromList (zip (map fst (CoreSyn.flattenBinds (concat binders))) [0 :: Int ..])
+      bindOrder (v, _) = (stableName v, Map.findWithDefault maxBound v homeOrder)
+      allBinders = makeRecursiveGroups (sortOn bindOrder (Map.assocs (lbBinders loaded0)))
   pure (rootIds, modFamInstEnvs', rootModule, loaded1, allBinders)
 
 nameString :: Name.Name -> String
@@ -526,6 +531,17 @@ nameString = OccName.occNameString . Name.nameOccName
 
 varNameString :: Var.Var -> String
 varNameString = nameString . Var.varName
+
+-- | The stable string of a binder's name (see 'Name.nameStableString'). Unlike
+-- the binder's 'Ord' instance, which compares GHC uniques, this identifies a
+-- top-level binder the same way in every GHC session. See
+-- Note [Deterministic uniques] in "Clash.GHC.Unique".
+stableName :: Var.Var -> String
+stableName = Name.nameStableString . Var.varName
+
+-- | Sort binders by 'stableName' and drop duplicates.
+nubSortStable :: [Var.Var] -> [Var.Var]
+nubSortStable vs = Map.elems (Map.fromList [(stableName v, v) | v <- vs])
 
 -- | Is the binder magically named @topEntity@? Such binders are implicitly
 -- treated as top entities (see 'isMagicName').
@@ -638,7 +654,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
       -- TestBench and the binders they're pointing to, plus magically named
       -- functions called "topEntity" or "testBench". Synthesized in case user
       -- didn't specify a particular target.
-      allImplicit = nubSort $
+      allImplicit = nubSortStable $
            Map.keys benchAnn
         <> Map.keys allSyn
         <> concat (Map.elems benchAnn)
@@ -671,7 +687,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
                 --
                 -- This is quite wasteful though; als Clash will load all
                 -- definitions even though it will end up using just a few. TODO
-                nubSort (top:allImplicit)
+                nubSortStable (top:allImplicit)
           Nothing ->
             -- User didn't specify anything.
             case allImplicit of
