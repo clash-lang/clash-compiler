@@ -82,11 +82,11 @@ testBench = bundle (boolToBit <$> doneStatic, actual)
 
   notDoneStatic  = not <$> doneStatic
   notDoneDynamic = unsafeSynchronizer clkStatic clkDynamic notDoneStatic
-  clkDynamic     = tbDynamicClockGen @"Dynamic" periods notDoneDynamic
-  clkStatic      = tbClockGen @"Static" notDoneStatic
+  clkDynamic     = tbDynamicClockGen @Dynamic periods notDoneDynamic
+  clkStatic      = tbClockGen @Static notDoneStatic
 
-  rstStatic  = resetGen @"Static"
-  rstDynamic = resetGen @"Dynamic"
+  rstStatic  = resetGen @Static
+  rstDynamic = resetGen @Dynamic
 
-  enaDynamic = enableGen @"Dynamic"
+  enaDynamic = enableGen @Dynamic
 {-# OPAQUE testBench #-}
