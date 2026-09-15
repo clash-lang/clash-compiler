@@ -195,6 +195,7 @@ library
                       utf8-string               >= 1.0.0.0  && < 1.1.0.0,
                       vector                    >= 0.11     && < 1.0,
                       exceptions                >= 0.10.4   && < 0.11,
+                      aeson                     >= 2.0      && < 2.3,
 
   if flag(use-ghc-paths)
     Build-Depends:    ghc-paths
@@ -229,6 +230,7 @@ library
                       Clash.GHCi.UI.Monad
 
                       Clash.GHC.ClashFlags
+                      Clash.GHC.Server
                       Clash.GHC.Evaluator.Primitive.Util
                       Clash.GHC.Evaluator.Primitives
                       Clash.GHC.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving

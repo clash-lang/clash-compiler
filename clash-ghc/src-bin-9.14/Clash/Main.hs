@@ -95,6 +95,7 @@ import qualified Data.List.NonEmpty as NE
 -- clash additions
 import           Paths_clash_ghc
 import           Clash.GHCi.UI (makeHDL, SessionMode (..))
+import qualified Clash.GHC.Server
 import           Control.Monad.Catch (catch)
 import           Data.List (nub)
 import           Data.Proxy
@@ -219,6 +220,7 @@ main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
                DoVHDL          -> (CompManager, noBackend,     NoLink)
                DoVerilog       -> (CompManager, noBackend,     NoLink)
                DoSystemVerilog -> (CompManager, noBackend,     NoLink)
+               DoServer        -> (CompManager, noBackend,     NoLink)
                _               -> (OneShot,     dflt_backend, LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
@@ -328,6 +330,7 @@ main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
        DoVHDL                 -> clash makeVHDL
        DoVerilog              -> clash makeVerilog
        DoSystemVerilog        -> clash makeSystemVerilog
+       DoServer               -> Clash.GHC.Server.runServer startAction dflags0
 
   liftIO $ dumpFinalStats logger
 

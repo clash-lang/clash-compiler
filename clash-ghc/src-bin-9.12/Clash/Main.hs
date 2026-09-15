@@ -104,6 +104,7 @@ import qualified Data.List.NonEmpty as NE
 -- clash additions
 import           Paths_clash_ghc
 import           Clash.GHCi.UI (makeHDL, SessionMode (..))
+import qualified Clash.GHC.Server
 import           Control.Monad.Catch (catch)
 import           Data.List (nub)
 import           Data.Proxy
@@ -226,6 +227,7 @@ main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
                DoVHDL          -> (CompManager, noBackend,     NoLink)
                DoVerilog       -> (CompManager, noBackend,     NoLink)
                DoSystemVerilog -> (CompManager, noBackend,     NoLink)
+               DoServer        -> (CompManager, noBackend,     NoLink)
                _               -> (OneShot,     dflt_backend, LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
@@ -368,6 +370,7 @@ main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
        DoVHDL                 -> clash makeVHDL
        DoVerilog              -> clash makeVerilog
        DoSystemVerilog        -> clash makeSystemVerilog
+       DoServer               -> Clash.GHC.Server.runServer startAction dflags0
 
   liftIO $ dumpFinalStats logger
 
@@ -562,9 +565,10 @@ data PostLoadMode
   | DoVHDL                  -- ghc --vhdl
   | DoVerilog               -- ghc --verilog
   | DoSystemVerilog         -- ghc --systemverilog
+  | DoServer                -- clash --server
 
 doMkDependHSMode, doMakeMode, doInteractiveMode, doRunMode,
-  doAbiHashMode, showUnitsMode, doVHDLMode, doVerilogMode,
+  doAbiHashMode, showUnitsMode, doVHDLMode, doVerilogMode, doServerMode,
   doSystemVerilogMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
@@ -575,6 +579,7 @@ showUnitsMode = mkPostLoadMode ShowPackages
 doVHDLMode = mkPostLoadMode DoVHDL
 doVerilogMode = mkPostLoadMode DoVerilog
 doSystemVerilogMode = mkPostLoadMode DoSystemVerilog
+doServerMode = mkPostLoadMode DoServer
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -649,6 +654,7 @@ isCompManagerMode (DoEval _)    = True
 isCompManagerMode DoVHDL        = True
 isCompManagerMode DoVerilog     = True
 isCompManagerMode DoSystemVerilog = True
+isCompManagerMode DoServer      = True
 isCompManagerMode _             = False
 
 -- -----------------------------------------------------------------------------
@@ -737,6 +743,7 @@ mode_flags =
   , defFlag "-vhdl"        (PassFlag (setMode doVHDLMode))
   , defFlag "-verilog"     (PassFlag (setMode doVerilogMode))
   , defFlag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
+  , defFlag "-server"      (PassFlag (setMode doServerMode))
   ]
 
 addUnit :: String -> String -> EwM ModeM ()

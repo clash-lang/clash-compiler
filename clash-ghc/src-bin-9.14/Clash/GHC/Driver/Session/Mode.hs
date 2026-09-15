@@ -93,9 +93,10 @@ data PostLoadMode
   | DoVHDL                  -- ghc --vhdl
   | DoVerilog               -- ghc --verilog
   | DoSystemVerilog         -- ghc --systemverilog
+  | DoServer                -- clash --server
 
 doMkDependHSMode, doMakeMode, doInteractiveMode, doRunMode,
-  doAbiHashMode, showUnitsMode, doVHDLMode, doVerilogMode,
+  doAbiHashMode, showUnitsMode, doVHDLMode, doVerilogMode, doServerMode,
   doSystemVerilogMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
@@ -106,6 +107,7 @@ showUnitsMode = mkPostLoadMode ShowPackages
 doVHDLMode = mkPostLoadMode DoVHDL
 doVerilogMode = mkPostLoadMode DoVerilog
 doSystemVerilogMode = mkPostLoadMode DoSystemVerilog
+doServerMode = mkPostLoadMode DoServer
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -180,6 +182,7 @@ isCompManagerMode (DoEval _)    = True
 isCompManagerMode DoVHDL        = True
 isCompManagerMode DoVerilog     = True
 isCompManagerMode DoSystemVerilog = True
+isCompManagerMode DoServer      = True
 isCompManagerMode _             = False
 
 -- -----------------------------------------------------------------------------
@@ -268,6 +271,7 @@ mode_flags =
   , defFlag "-vhdl"        (PassFlag (setMode doVHDLMode))
   , defFlag "-verilog"     (PassFlag (setMode doVerilogMode))
   , defFlag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
+  , defFlag "-server"      (PassFlag (setMode doServerMode))
   ]
 
 addUnit :: String -> String -> EwM ModeM ()
