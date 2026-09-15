@@ -31,6 +31,7 @@ module Clash.Util.Supply
   ( Supply
   -- * Variables
   , newSupply
+  , resetBlockCounter
   , freshId
   , splitSupply
   -- * Unboxed API
@@ -104,6 +105,13 @@ newBlock = return $! gen ()
 splitBlock# :: Block -> (# Block, Block #)
 splitBlock# (Block i (x :- xs)) = (# x, Block i xs #)
 {-# INLINE splitBlock# #-}
+
+-- | Reset the process-wide counter that 'newSupply' draws blocks from, so the
+-- supplies created afterwards hand out the same uniques as those of a fresh
+-- process. Only safe when no 'Supply' created earlier is in use anymore. See
+-- Note [Deterministic uniques] in "Clash.GHC.Unique".
+resetBlockCounter :: IO ()
+resetBlockCounter = atomicWriteIORef blockCounter 0
 
 -- | A user managed globally unique variable supply.
 data Supply = Supply {-# UNPACK #-} !Unique {-# UNPACK #-} !Unique Block

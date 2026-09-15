@@ -101,7 +101,7 @@ import qualified Data.List.NonEmpty as NE
 
 -- clash additions
 import           Paths_clash_ghc
-import           Clash.GHCi.UI (makeHDL)
+import           Clash.GHCi.UI (makeHDL, SessionMode (..))
 import           Control.Monad.Catch (catch)
 import           Data.List (nub)
 import           Data.Proxy
@@ -1215,7 +1215,7 @@ makeHDL'
   -> [(String,Maybe Phase)]
   -> Ghc ()
 makeHDL' _     _           _ []   = throwGhcException (CmdLineError "No input files")
-makeHDL' proxy startAction r srcs = makeHDL proxy startAction r $ fmap fst srcs
+makeHDL' proxy startAction r srcs = makeHDL proxy (FreshSession startAction) r $ fmap fst srcs
 
 makeVHDL :: Ghc () -> IORef ClashOpts -> [(String, Maybe Phase)] -> Ghc ()
 makeVHDL = makeHDL' (Proxy @VHDLState)

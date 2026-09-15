@@ -28,7 +28,8 @@ module Clash.GHCi.UI (
         defaultGhciSettings,
         ghciCommands,
         ghciWelcomeMsg,
-        makeHDL
+        makeHDL,
+        SessionMode (..)
     ) where
 
 -- GHCi
@@ -183,6 +184,8 @@ import           Clash.Driver.Bool (fromGhcOverridingBool)
 import           Clash.Driver.Types (ClashOpts(..), ClashEnv(..), ClashDesign(..))
 import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
+import           Clash.GHC.LoadModules (applySessionDynFlags, normalizeSessionDynFlags, resetExternalPackageState)
+import qualified Clash.Util.Supply as Supply
 import           Clash.GHC.NetlistTypes
 import           Clash.GHC.PartialEval
 import           Clash.GHCi.Common
@@ -2426,84 +2429,99 @@ makeHDL' backend opts lst = go =<< case lst of
  where
   go srcs = do
     dflags <- GHC.getSessionDynFlags
-    goX dflags srcs `MC.finally` recover dflags
-
-  goX dflags srcs = do
-    -- Issue #439 step 1
-    (dflagsX,_,_) <- parseDynamicFlagsCmdLine dflags
-                       [ noLoc "-fobject-code"   -- For #439
-                       , noLoc "-fforce-recomp"  -- Actually compile to object-code
-                       , noLoc "-keep-tmp-files" -- To prevent linker errors from
-                                                 -- multiple calls to :hdl command
-                       ]
-    _ <- GHC.setSessionDynFlags dflagsX
-    reloadModule ""
-    -- Issue #439 step 2
-    -- Unload any object files
-    -- This fixes: https://github.com/clash-lang/clash-compiler/issues/439#issuecomment-522015868
-    env <- GHC.getSession
-    liftIO (Loader.unload (hscInterp env) env [])
-    -- Finally generate the HDL
-    makeHDL backend (return ()) opts srcs
+    -- The design is compiled in this session, with Clash's flags applied and
+    -- the interactively loaded modules dropped (see Note [Reusing a GHC
+    -- session] in "Clash.GHC.LoadModules"); 'recover' restores both. The
+    -- interfaces GHCi read so far lack the unfoldings Clash needs, so they are
+    -- dropped too and read again with Clash's flags.
+    resetExternalPackageState
+    makeHDL backend ReuseSession opts srcs `MC.finally` recover dflags
 
   recover dflags = do
     _ <- GHC.setSessionDynFlags dflags
     reloadModule ""
 
+-- | Which GHC session 'makeHDL' loads the design in.
+data SessionMode
+  = FreshSession (Ghc ())
+  -- ^ Open a fresh session per design, as the @clash@ executable does. The
+  -- action runs first in the new session; see 'generateBindings'.
+  | ReuseSession
+  -- ^ Load the design in the current session, keeping its interface cache,
+  -- loaded packages and plugins warm. Anything loaded for an earlier design is
+  -- dropped first. See Note [Reusing a GHC session] in "Clash.GHC.LoadModules".
+
 makeHDL
   :: forall backend m
    . (GHC.GhcMonad m, Backend backend)
   => Proxy backend
-  -> Ghc ()
+  -> SessionMode
   -> IORef ClashOpts
   -> [FilePath]
   -> m ()
-makeHDL Proxy startAction optsRef srcs = do
+makeHDL Proxy sessionMode optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
-  liftIO $ do startTime <- Clock.getCurrentTime
-              opts0  <- readIORef optsRef
-              let opts1  = opts0 { opt_color = fromGhcOverridingBool (useColor dflags) }
-              let iw     = opt_intWidth opts1
-                  hdl    = hdlKind backend
-                  -- determine whether `-outputdir` was used
-                  outputDir = do odir <- objectDir dflags
-                                 hidir <- hiDir dflags
-                                 sdir <- stubDir dflags
-                                 ddir <- dumpDir dflags
-                                 if all (== odir) [hidir,sdir,ddir]
-                                    then Just odir
-                                    else Nothing
-                  idirs = importPaths dflags
-                  opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
-                                , opt_importPaths = idirs}
-                  backend = initBackend @backend opts2
+  startTime <- liftIO Clock.getCurrentTime
+  opts0  <- liftIO (readIORef optsRef)
+  let opts1  = opts0 { opt_color = fromGhcOverridingBool (useColor dflags) }
+  let iw     = opt_intWidth opts1
+      hdl    = hdlKind backend
+      -- determine whether `-outputdir` was used
+      outputDir = do odir <- objectDir dflags
+                     hidir <- hiDir dflags
+                     sdir <- stubDir dflags
+                     ddir <- dumpDir dflags
+                     if all (== odir) [hidir,sdir,ddir]
+                        then Just odir
+                        else Nothing
+      idirs = importPaths dflags
+      opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
+                    , opt_importPaths = idirs}
+      backend = initBackend @backend opts2
+      dbs = reverse [p | PackageDB (PkgDbPath p) <- packageDBFlags dflags]
 
-              checkMonoLocalBinds dflags
-              checkImportDirs opts0 idirs
+  liftIO (checkMonoLocalBinds dflags)
+  liftIO (checkImportDirs opts0 idirs)
 
-              primDirs_ <- primDirs backend
+  primDirs_ <- liftIO (primDirs backend)
 
-              forM_ srcs $ \src -> do
-                -- Generate bindings:
-                let dbs = reverse [p | PackageDB (PkgDbPath p) <- packageDBFlags dflags]
-                (clashEnv, clashDesign) <- generateBindings opts2 startAction primDirs_ idirs dbs hdl src (Just dflags)
+  case sessionMode of
+    ReuseSession ->
+      -- 'mainFunIs' is set to Nothing due to issue #1304:
+      -- https://github.com/clash-lang/clash-compiler/issues/1304
+      applySessionDynFlags (normalizeSessionDynFlags dflags { GHC.mainFunIs = Nothing })
+    FreshSession _ -> pure ()
 
-                let getMain = getMainTopEntity src clashDesign
-                mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)
-                prepTime <- startTime `deepseq` designBindings clashDesign `deepseq` envTyConMap clashEnv `deepseq` Clock.getCurrentTime
-                let prepStartDiff = reportTimeDiff prepTime startTime
-                putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ prepStartDiff
+  forM_ srcs $ \src -> do
+    -- Generate bindings:
+    (clashEnv, clashDesign) <- case sessionMode of
+      FreshSession startAction ->
+        liftIO (generateBindings opts2 startAction primDirs_ idirs dbs hdl src (Just dflags))
+      ReuseSession -> do
+        -- Clash's own fresh uniques replay from zero for every design, so a
+        -- design gets the same uniques whether or not others were compiled
+        -- before it in this session. Nothing from those designs is live anymore.
+        -- See Note [Deterministic uniques] in "Clash.GHC.Unique".
+        liftIO Supply.resetBlockCounter
+        generateBindingsIn opts2 primDirs_ idirs dbs hdl src (Just dflags)
 
-                -- Generate HDL:
-                Clash.Driver.generateHDL
-                  clashEnv
-                  clashDesign
-                  (Just backend)
-                  (ghcTypeToHWType iw)
-                  ghcEvaluator
-                  evaluator
-                  mainTopEntity
-                  startTime
+    liftIO $ do
+      let getMain = getMainTopEntity src clashDesign
+      mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)
+      prepTime <- startTime `deepseq` designBindings clashDesign `deepseq` envTyConMap clashEnv `deepseq` Clock.getCurrentTime
+      let prepStartDiff = reportTimeDiff prepTime startTime
+      putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ prepStartDiff
+
+      -- Generate HDL:
+      Clash.Driver.generateHDL
+        clashEnv
+        clashDesign
+        (Just backend)
+        (ghcTypeToHWType iw)
+        ghcEvaluator
+        evaluator
+        mainTopEntity
+        startTime
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (Proxy @VHDLState)

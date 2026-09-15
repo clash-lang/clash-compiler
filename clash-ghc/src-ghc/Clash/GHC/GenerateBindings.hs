@@ -13,7 +13,9 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module Clash.GHC.GenerateBindings
-  (generateBindings)
+  ( generateBindings
+  , generateBindingsIn
+  )
 where
 
 import           Control.Arrow           ((***))
@@ -39,7 +41,8 @@ import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
 import           GHC.Conc                (numCapabilities, par, pseq)
 
-import qualified GHC                     as GHC (Ghc)
+import qualified GHC                     as GHC (Ghc, GhcMonad)
+import           Control.Monad.IO.Class  (liftIO)
 import qualified GHC.Types.SourceText    as GHC
 import qualified GHC.Utils.Panic         as GHC
 import qualified GHC.Types.Basic         as GHC
@@ -79,7 +82,7 @@ import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, uniqueScope, topLevelUniques, coreToId, coreToName, coreToTerm,
    makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan)
-import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
+import           Clash.GHC.LoadModules   (LoadedModules, ghcLibDir, loadModules, loadModulesIn)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
@@ -115,15 +118,43 @@ generateBindings
   -> Maybe GHC.DynFlags
   -> IO (ClashEnv, ClashDesign)
 generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = do
-  (  bindings
-   , clsOps
-   , unlocatable
-   , fiEnvs
-   , topEntities
-   , partitionEithers -> (unresolvedPrims, pFP)
-   , customBitRepresentations
-   , primGuards
-   , domainConfs ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
+  loaded <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
+  generateBindingsFrom opts primDirs importDirs dbs loaded dflagsM
+
+-- | 'generateBindings', but loading the design in the current GHC session
+-- instead of a fresh one. See Note [Reusing a GHC session] in
+-- "Clash.GHC.LoadModules".
+generateBindingsIn
+  :: GHC.GhcMonad m
+  => ClashOpts
+  -> [FilePath]
+  -- ^ primitives (blackbox) directories
+  -> [FilePath]
+  -- ^ import directories (-i flag)
+  -> [FilePath]
+  -- ^ Package database
+  -> HDL
+  -- ^ HDL target
+  -> String
+  -- ^ Module name
+  -> Maybe GHC.DynFlags
+  -> m (ClashEnv, ClashDesign)
+generateBindingsIn opts primDirs importDirs dbs hdl modName dflagsM = do
+  loaded <- loadModulesIn hdl modName (GHC.mainFunIs =<< dflagsM)
+  liftIO (generateBindingsFrom opts primDirs importDirs dbs loaded dflagsM)
+
+-- | Turn what 'loadModules' produced into Clash Core bindings, with the
+-- primitives resolved and compiled.
+generateBindingsFrom
+  :: ClashOpts
+  -> [FilePath]
+  -> [FilePath]
+  -> [FilePath]
+  -> LoadedModules
+  -> Maybe GHC.DynFlags
+  -> IO (ClashEnv, ClashDesign)
+generateBindingsFrom opts primDirs importDirs dbs loaded dflagsM = do
+  let (bindings, clsOps, unlocatable, fiEnvs, topEntities, partitionEithers -> (unresolvedPrims, pFP), customBitRepresentations, primGuards, domainConfs) = loaded
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM

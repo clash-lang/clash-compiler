@@ -18,6 +18,12 @@
 
 module Clash.GHC.LoadModules
   ( loadModules
+  , loadModulesIn
+  , LoadedModules
+  , resetHomeModules
+  , resetExternalPackageState
+  , normalizeSessionDynFlags
+  , applySessionDynFlags
   , ghcLibDir
   , setWantedLanguageExtensions
   )
@@ -92,9 +98,18 @@ import           GHC.Driver.Pipeline.Phases (TPhase(T_HscPostTc))
 import           GHC.Data.Bool (OverridingBool)
 import           GHC.Driver.Config.Tidy (initTidyOpts)
 import           GHC.Driver.Errors.Types (GhcMessage(GhcTcRnMessage))
-#if !MIN_VERSION_ghc(9,14,0)
+#if MIN_VERSION_ghc(9,14,0)
+import           GHC.Driver.Monad (modifySession, modifySessionM)
+import           GHC.Unit.Home.PackageTable (emptyHomePackageTable)
+#else
 import           GHC.Driver.Monad (modifySession)
+import           GHC.Unit.Env (unitEnv_map)
+import           GHC.Unit.Home.ModInfo (emptyHomePackageTable)
 #endif
+import           GHC.Unit.Env (HomeUnitEnv (..), UnitEnv (..))
+import           GHC.Unit.External (initExternalUnitCache)
+import           GHC.Unit.Finder (flushFinderCaches, initFinderCache)
+import qualified GHC.Linker.Loader as Loader
 import           GHC.Unit.Home.ModInfo (HomeModInfo(HomeModInfo))
 import           GHC.Unit.Module.ModSummary (findTarget)
 import qualified GHC.Driver.Env as HscTypes
@@ -320,7 +335,24 @@ setupGhc useColor dflagsM idirs = do
                            }
         return dfPlug
 
-  let dflags1 = dflags
+  applySessionDynFlags (normalizeSessionDynFlags dflags)
+
+-- | The flags Clash needs on a GHC session that compiles designs, on top of
+-- whatever the user asked for: compile to native code (or none, when
+-- profiling), link in memory (Template Haskell), a deep enough type family
+-- reduction depth, none of the optimizations Clash cannot handle, and byte
+-- code for running splices (see Note [Run Template Haskell from bytecode]).
+-- Pure, so a server can compare a request's normalized flags with the
+-- session's. See also 'applySessionDynFlags'.
+normalizeSessionDynFlags :: GHC.DynFlags -> GHC.DynFlags
+normalizeSessionDynFlags dflags0 = dflags4
+ where
+  -- An interactive session has had GHC's optimization flags stripped (GHC does
+  -- that for the interpreter), including the ones Clash relies on for the Core
+  -- it wants to see. Set them again; for the @clash@ executable this repeats
+  -- what its frontend already did.
+  dflags = setWantedLanguageExtensions dflags0
+  dflags1 = dflags
                   { DynFlags.ghcMode  = GHC.CompManager
                   , DynFlags.ghcLink  = GHC.LinkInMemory
                   , DynFlags.backend  =
@@ -329,26 +361,41 @@ setupGhc useColor dflagsM idirs = do
                          else Backend.platformDefaultBackend (DynFlags.targetPlatform dflags)
                   , DynFlags.reductionDepth = 1000
                   }
-  let dflags2 = unwantedOptimizationFlags dflags1
-      ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
+  dflags2 = unwantedOptimizationFlags dflags1
+  ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
                     Just "YES" -> True
                     _          -> False
-      -- If the build is already dynamic, dynamic objects get built anyway and GHC
-      -- warns about '-dynamic-too' being ignored. See #3354.
-      targetIsDynamic =
-           DynFlags.ways dflags2 `Ways.hasWay` Ways.WayDyn
-        || (Ways.hostIsDynamic
-             && not (DynFlags.gopt DynFlags.Opt_ExternalInterpreter dflags2))
-      dflags3 = if ghcDynamic && not targetIsDynamic
-                  then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
-                  else dflags2
-      -- See Note [Run Template Haskell from bytecode]
-      dflags4 =
-        DynFlags.gopt_set
-          (DynFlags.gopt_set dflags3 DynFlags.Opt_ByteCodeAndObjectCode)
-          DynFlags.Opt_UseBytecodeRatherThanObjects
+  -- If the build is already dynamic, dynamic objects get built anyway and GHC
+  -- warns about '-dynamic-too' being ignored. See #3354.
+  targetIsDynamic =
+       DynFlags.ways dflags2 `Ways.hasWay` Ways.WayDyn
+    || (Ways.hostIsDynamic
+         && not (DynFlags.gopt DynFlags.Opt_ExternalInterpreter dflags2))
+  dflags3 = if ghcDynamic && not targetIsDynamic
+              then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
+              else dflags2
+  -- See Note [Run Template Haskell from bytecode]. An interactive session
+  -- (clashi) also carries GHCi's debugger default, breakpoint ticks in the
+  -- desugared Core; those change the Core Clash sees, so they are switched
+  -- off here, as they are in the @clash@ executable.
+  dflags4 =
+    unsetBreakpoints
+      (DynFlags.gopt_set
+        (DynFlags.gopt_set dflags3 DynFlags.Opt_ByteCodeAndObjectCode)
+        DynFlags.Opt_UseBytecodeRatherThanObjects)
+#if MIN_VERSION_ghc(9,8,0)
+  unsetBreakpoints d = DynFlags.gopt_unset d DynFlags.Opt_InsertBreakpoints
+#else
+  -- Before GHC 9.8 breakpoints are tied to the interpreter backend, which
+  -- Clash does not use.
+  unsetBreakpoints d = d
+#endif
 
-  when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags4) $
+-- | Make the session use the given flags and (re)initialize the plugins they
+-- name; the latter is a no-op when the plugin list did not change.
+applySessionDynFlags :: GHC.GhcMonad m => GHC.DynFlags -> m ()
+applySessionDynFlags dflags = do
+  when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags) $
     trace
       (unlines ["WARNING:"
                ,"`-fworker-wrapper` option is globally enabled, this can result in incorrect code."
@@ -358,12 +405,91 @@ setupGhc useColor dflagsM idirs = do
                ])
       (return ())
 
-  _ <- GHC.setSessionDynFlags dflags4
+  waysBefore <- DynFlags.targetWays_ <$> GHC.getSessionDynFlags
+  _ <- GHC.setSessionDynFlags dflags
+  waysAfter <- DynFlags.targetWays_ <$> GHC.getSessionDynFlags
+  -- GHC may adjust the build ways when it takes the flags (since GHC 9.14 the
+  -- internal interpreter forces the compiler's own ways). Interface files and
+  -- the cached locations of external modules are specific to the ways, so a
+  -- session whose ways changed must forget both; see Note [Reusing a GHC session].
+  when (waysBefore /= waysAfter) $ do
+    resetExternalPackageState
+    finderCache <- MonadUtils.liftIO initFinderCache
+    modifySession $ \env -> env { HscTypes.hsc_FC = finderCache }
   hscenv <- GHC.getSession
   hscenv1 <- MonadUtils.liftIO (DynamicLoading.initializePlugins hscenv)
   GHC.setSession hscenv1
 
-  return ()
+{- Note [Reusing a GHC session]
+
+'loadModules' used to open a fresh GHC session for every design. A long-lived
+process (clashi, or a compile server) wants to keep its session instead: that
+keeps the interface cache, the loaded package code and the initialized plugins
+warm, which is most of the time a small design takes to compile. What must not
+survive from one design to the next is the previous design itself:
+
+* its home modules, which 'loadLocalModule' adds to the home unit graph
+  by hand (and nothing removes), plus the module graph and the interactive
+  context that refer to them;
+
+* their code in the interpreter, or a splice in the next design that happens
+  to import a module of the same name would run the old code;
+
+* the finder cache, which maps module names to the files they were found in;
+  with other import directories the same name may now mean another file.
+
+'resetHomeModules' drops exactly these, and 'loadModulesIn' calls it before
+compiling. What a session may keep is its interface cache, but only when the
+interfaces were read with the same flags: GHC drops unfoldings and strictness
+information from interfaces read with @-fignore-interface-pragmas@, which GHCi
+turns on, so an interactive session must also call 'resetExternalPackageState'
+before compiling a design (see @makeHDL'@ in "Clash.GHCi.UI"). A session that
+only ever compiles designs with the flags of 'normalizeSessionDynFlags' can
+keep the cache. This mirrors what GHCi does on @:load@ (see @clearCaches@ in
+"Clash.GHCi.UI"). Uniques stay meaningful across designs because Clash gives
+its names uniques that do not depend on the session's history; see
+Note [Deterministic uniques] in "Clash.GHC.Unique".
+-}
+
+-- | Forget every interface the session has read so far, so that they are read
+-- again with the current flags. Interfaces are cached with the flags in effect
+-- when they were read: a GHCi session, for one, reads them with
+-- @-fignore-interface-pragmas@ and therefore without the unfoldings and
+-- strictness information Clash needs. See Note [Reusing a GHC session].
+resetExternalPackageState :: GHC.GhcMonad m => m ()
+resetExternalPackageState = do
+  eps <- MonadUtils.liftIO initExternalUnitCache
+  modifySession $ \env ->
+    env { HscTypes.hsc_unit_env = (HscTypes.hsc_unit_env env) { ue_eps = eps } }
+
+-- | Forget the home modules of the previous design, see
+-- Note [Reusing a GHC session].
+resetHomeModules :: GHC.GhcMonad m => m ()
+resetHomeModules = do
+  hscEnv <- GHC.getSession
+  case HscTypes.hsc_interp hscEnv of
+    Just interp -> MonadUtils.liftIO (Loader.unload interp hscEnv [])
+    Nothing -> pure ()
+  MonadUtils.liftIO
+    (flushFinderCaches (HscTypes.hsc_FC hscEnv) (HscTypes.hsc_unit_env hscEnv))
+#if MIN_VERSION_ghc(9,14,0)
+  modifySessionM $ \env -> do
+    hug <- MonadUtils.liftIO $
+      traverse
+        (\hue -> do
+           hpt <- emptyHomePackageTable
+           pure hue { homeUnitEnv_hpt = hpt })
+        (HscTypes.hsc_HUG env)
+    pure (HscTypes.setModuleGraph Graph.emptyMG
+            (HscTypes.discardIC (HscTypes.hscUpdateHUG (const hug) env)))
+#else
+  modifySession $ \env ->
+    let env1 = HscTypes.hscUpdateHUG
+                 (unitEnv_map (\hue -> hue { homeUnitEnv_hpt = emptyHomePackageTable }))
+                 env
+    in (HscTypes.discardIC env1) { HscTypes.hsc_mod_graph = Graph.emptyMG }
+#endif
+  GHC.setTargets []
 
 {- Note [Run Template Haskell from bytecode]
 
@@ -594,16 +720,7 @@ loadModules
   -- ^ Flags to run GHC with
   -> [FilePath]
   -- ^ Import dirs to use when no DynFlags are provided
-  -> IO ( [CoreSyn.CoreBind]                     -- Binders
-        , [(CoreSyn.CoreBndr,Int)]               -- Class operations
-        , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
-        , FamInstEnv.FamInstEnvs
-        , [(CoreSyn.CoreBndr, Maybe TopEntity, Bool)]  -- binder + synthesize annotation + is testbench?
-        , [Either UnresolvedPrimitive FilePath]
-        , [DataRepr']
-        , [(Text.Text, PrimitiveGuard ())]
-        , HashMap Text.Text VDomainConfiguration -- domain names to configuration
-        )
+  -> IO LoadedModules
 loadModules startAction useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
@@ -615,8 +732,38 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     setupTime <- MonadUtils.liftIO Clock.getCurrentTime
     let setupStartDiff = reportTimeDiff setupTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
+    loadModulesIn hdl modName (GHC.mainFunIs =<< dflagsM)
 
-    let mainIsM = GHC.mainFunIs =<< dflagsM
+-- | What 'loadModules' extracts from a design, ready for
+-- 'Clash.GHC.GenerateBindings.generateBindings'.
+type LoadedModules =
+        ( [CoreSyn.CoreBind]                     -- Binders
+        , [(CoreSyn.CoreBndr,Int)]               -- Class operations
+        , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
+        , FamInstEnv.FamInstEnvs
+        , [(CoreSyn.CoreBndr, Maybe TopEntity, Bool)]  -- binder + synthesize annotation + is testbench?
+        , [Either UnresolvedPrimitive FilePath]
+        , [DataRepr']
+        , [(Text.Text, PrimitiveGuard ())]
+        , HashMap Text.Text VDomainConfiguration -- domain names to configuration
+        )
+
+-- | Load a design in the current session, which must have been set up with
+-- 'applySessionDynFlags' (or by 'loadModules'). Anything left over from a
+-- design loaded earlier in the same session is dropped first; see
+-- Note [Reusing a GHC session].
+loadModulesIn
+  :: GHC.GhcMonad m
+  => HDL
+  -- ^ HDL target
+  -> String
+  -- ^ Module name
+  -> Maybe String
+  -- ^ @-main-is@: the top entity to compile, if the user picked one
+  -> m LoadedModules
+loadModulesIn hdl modName mainIsM = do
+    setupTime <- MonadUtils.liftIO Clock.getCurrentTime
+    resetHomeModules
     (rootIds, modFamInstEnvs, _rootModule, LoadedBinders{..}, allBinders) <-
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
@@ -663,7 +810,7 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
 
       -- Top entities we wish to synthesize. Users can filter these with -main-is.
       topEntities1 =
-        case GHC.mainFunIs =<< dflagsM of
+        case mainIsM of
           Just mainIsNm ->
             -- Use requested top entity.
             --
