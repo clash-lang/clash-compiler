@@ -47,6 +47,7 @@ import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.Proxy                       (Proxy(..))
+import           Data.IORef                       (IORef, atomicModifyIORef', atomicWriteIORef, newIORef, readIORef)
 import           Data.List                        (intercalate)
 import qualified Data.List                        as List
 import qualified Data.List.Extra                  as List
@@ -65,6 +66,7 @@ import           Data.Text.Prettyprint.Doc.Extra
   (Doc, LayoutOptions (..), PageWidth (..) , layoutPretty, renderLazy)
 import qualified Data.Time.Clock                  as Clock
 import           GHC.Generics                     (Generic)
+import           System.IO.Unsafe                 (unsafePerformIO)
 import           GHC.Stack                        (HasCallStack)
 import qualified Language.Haskell.Interpreter     as Hint
 import qualified Language.Haskell.Interpreter.Extension as Hint
@@ -570,9 +572,77 @@ data InterpretFunctionResult
   = InterpretBBF BlackBoxFunction
   | InterpretTF TemplateFunction
 
+-- | Where 'interpretFunctions' found a function. See
+-- Note [Caching compiled primitives].
+data InterpretedFrom
+  = FromPackageDb
+  -- ^ From a module in the package databases
+  | FromLocalModule
+  -- ^ From inline source or a module in the import directories
+  deriving (Eq, Show)
+
 type InterpretResults =
   HashMap InterpretFunctionRequest
           (Either (NonEmpty Hint.InterpreterError) InterpretFunctionResult)
+
+-- | 'InterpretResults', with every result tagged with where it was found.
+type TaggedInterpretResults =
+  HashMap InterpretFunctionRequest
+          (Either (NonEmpty Hint.InterpreterError) (InterpretFunctionResult, InterpretedFrom))
+
+{- Note [Caching compiled primitives]
+
+Compiling the primitive map costs about a third of a second per design: the
+templates of some 1100 shipped primitives are parsed, and any blackbox or
+template function not in 'knownBlackBoxFunctions'/'knownTemplateFunctions' is
+interpreted through Hint, which starts a GHC session. Both results are the
+same for every design compiled by one process, except for primitives that a
+user can change between two designs. A process that compiles more than one
+design (clashi, a compile server, or @clash@ with several source files) would
+otherwise redo the work for every design.
+
+'compilePrimitives' therefore keeps two process-wide caches:
+
+* interpreted functions, keyed by the request together with the import
+  directories, package databases and GHC library directory the interpreter was
+  configured with;
+
+* compiled primitives, keyed by the resolved primitive itself (its template
+  text and function names are part of the key).
+
+Only functions found in the package databases are cached, and only primitives
+whose functions all come from there (or need none): packages cannot change
+while the process runs (GHC keeps them loaded, too), whereas a module in an
+import directory can be edited between two designs. A cached function is a
+closure over code that is linked into the process either way, so it stays
+valid after the Hint session that produced it is gone, just like the functions
+Clash uses during netlist generation today. 'clearPrimitiveCaches' empties both.
+-}
+
+-- | Key of the interpreted-function cache, see Note [Caching compiled primitives].
+data InterpretCacheKey = InterpretCacheKey
+  { ickImportDirs :: [FilePath]
+  , ickPackageDbs :: [FilePath]
+  , ickTopDir :: FilePath
+  , ickRequest :: InterpretFunctionRequest
+  } deriving (Eq, Generic, Hashable)
+
+-- | The interpreted-function cache, see Note [Caching compiled primitives].
+interpretCache :: IORef (HashMap InterpretCacheKey InterpretFunctionResult)
+interpretCache = unsafePerformIO (newIORef HashMap.empty)
+{-# NOINLINE interpretCache #-}
+
+-- | The compiled-primitive cache, see Note [Caching compiled primitives].
+compiledPrimitiveCache :: IORef (HashMap ResolvedPrimitive CompiledPrimitive)
+compiledPrimitiveCache = unsafePerformIO (newIORef HashMap.empty)
+{-# NOINLINE compiledPrimitiveCache #-}
+
+-- | Forget all cached interpreted functions and compiled primitives, see
+-- Note [Caching compiled primitives].
+clearPrimitiveCaches :: IO ()
+clearPrimitiveCaches = do
+  atomicWriteIORef interpretCache HashMap.empty
+  atomicWriteIORef compiledPrimitiveCache HashMap.empty
 
 -- | Language extensions in effect when interpreting inline primitive sources
 hintLanguageExtensions :: [Hint.Extension]
@@ -634,7 +704,7 @@ interpretFunctions
   -- can be found
   -> [InterpretFunctionRequest]
   -- ^ Functions to interpret
-  -> IO InterpretResults
+  -> IO TaggedInterpretResults
 interpretFunctions _ _ _ [] = pure HashMap.empty
 interpretFunctions idirs pkgDbs topDir reqs = do
   sessionRes <- Hint.unsafeRunInterpreterWithArgsLibdir interpreterArgs topDir $ do
@@ -656,13 +726,13 @@ interpretFunctions idirs pkgDbs topDir reqs = do
       Hint.set [Hint.languageExtensions Hint.:= hintLanguageExtensions]
     forM globalResults $ \(req, globalRes) ->
       case globalRes of
-        Right res -> pure (req, Right res)
+        Right res -> pure (req, Right (res, FromPackageDb))
         Left globalException -> do
           localRes <- tryInterp (interpretLocal defaultPath req)
           case localRes of
             Left localException ->
               pure (req, Left (globalException :| [localException]))
-            Right res -> pure (req, Right res)
+            Right res -> pure (req, Right (res, FromLocalModule))
 
   case sessionRes of
     -- The session itself failed to initialize; attribute the error to every
@@ -767,8 +837,39 @@ compilePrimitives idirs pkgDbs topDir primMapR = do
         concatMap
           neededInterpRequests
           (mapMaybe extractPrim (HashMap.elems primMapR))
-  results <- interpretFunctions idirs pkgDbs topDir reqs
-  traverse (traverse (compilePrimitiveWith (lookupInterpResult results))) primMapR
+      cacheKey = InterpretCacheKey idirs pkgDbs topDir
+  -- See Note [Caching compiled primitives]
+  cached <- readIORef interpretCache
+  let (hits, misses) = List.partition (\req -> HashMap.member (cacheKey req) cached) reqs
+  fresh <- interpretFunctions idirs pkgDbs topDir misses
+  atomicModifyIORef' interpretCache $ \cache ->
+    ( HashMap.union cache
+        (HashMap.fromList
+          [ (cacheKey req, res)
+          | (req, Right (res, FromPackageDb)) <- HashMap.toList fresh ])
+    , () )
+  let results =
+        HashMap.fromList [ (req, Right (cached HashMap.! cacheKey req)) | req <- hits ]
+          <> fmap (fmap fst) fresh
+  -- See Note [Caching compiled primitives]: a primitive whose functions all
+  -- come from the package databases (or need none) compiles to the same
+  -- result in every design, so keep it.
+  let cacheable prim =
+        all (\req -> case HashMap.lookup req fresh of
+                       Nothing -> True                           -- cache hit or known function
+                       Just (Right (_, FromPackageDb)) -> True
+                       Just _ -> False)                          -- local module, or failed
+            (neededInterpRequests prim)
+  compiledCache <- readIORef compiledPrimitiveCache
+  let compileOne prim = case HashMap.lookup prim compiledCache of
+        Just compiled -> pure compiled
+        Nothing -> do
+          compiled <- compilePrimitiveWith (lookupInterpResult results) prim
+          Monad.when (cacheable prim) $
+            atomicModifyIORef' compiledPrimitiveCache
+              (\cache -> (HashMap.insert prim compiled cache, ()))
+          pure compiled
+  traverse (traverse compileOne) primMapR
 
 -- | Compiles a single primitive. Provided for backwards compatibility; when
 -- compiling multiple primitives, 'compilePrimitives' only pays the cost of
@@ -786,7 +887,7 @@ compilePrimitive
   -> IO CompiledPrimitive
 compilePrimitive idirs pkgDbs topDir prim = do
   let reqs = HashSet.toList (HashSet.fromList (neededInterpRequests prim))
-  results <- interpretFunctions idirs pkgDbs topDir reqs
+  results <- fmap (fmap fst) <$> interpretFunctions idirs pkgDbs topDir reqs
   compilePrimitiveWith (lookupInterpResult results) prim
 
 -- | Look up the interpreter result of a request. All requests are
