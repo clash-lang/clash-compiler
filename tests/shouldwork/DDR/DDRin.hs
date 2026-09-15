@@ -24,8 +24,8 @@ The four variants defined here are all the combinations of
 -}
 
 topEntityGeneric
-  :: ( KnownConfiguration fast ('DomainConfiguration fast fPeriod edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) edge reset init polarity) )
+  :: ( KnownConfiguration fast ('DomainConfiguration fast fPeriod fractionFast edge reset init polarity)
+     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) fractionSlow edge reset init polarity) ) -- note: 2*fraction may be greater than 1
   => Clock slow
   -> Reset slow
   -> Enable slow
