@@ -114,6 +114,24 @@ HDL through external simulators/synthesizers.
 cabal run clash-testsuite -- --hide-successes --auto-detect-tools -j$(nproc)
 ```
 
+#### Compile server
+
+`clash --server` keeps one GHC session alive and compiles designs on request,
+which saves the per-process setup of about 1.5 s per design (see
+`Note [Clash compile server]` in `clash-ghc/src-ghc/Clash/GHC/Server.hs`). The
+test suite can use a pool of such workers, one per thread:
+
+```bash
+cabal run clash-testsuite -- --auto-detect-tools -j$(nproc) --clash-server
+```
+
+Workers are `clash --server` processes found on the `PATH`. A worker that dies
+fails only the test it was serving, with its stderr in the failure message, and
+is replaced. `CLASH_SERVER_MAX_REQUESTS` (default 250) and
+`CLASH_SERVER_MAX_LIVE_BYTES` (default 1.5 GB) bound a worker's session before
+it is rebuilt. `CLASH_TESTSUITE_KEEP_TMP=1` keeps the tests' temporary
+directories, for example to compare the HDL of two runs.
+
 #### `--hide-successes`
 The test suite is quite large, so you probably only want to be notified by
 failing test, not every test's pass.

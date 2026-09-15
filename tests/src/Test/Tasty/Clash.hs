@@ -15,15 +15,20 @@ import qualified Data.List                 as List
 import           Data.Maybe                (isJust)
 import qualified Data.Text                 as T
 import qualified System.Directory          as Directory
+import           System.Environment        (lookupEnv)
 import           System.FilePath           ((</>),(<.>))
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.IO.Temp            (createTempDirectory, getCanonicalTemporaryDirectory)
 
+import           Data.Proxy                (Proxy (..))
+import           Data.Tagged
 import           Test.Tasty
+import           Test.Tasty.Options        (OptionDescription (..), lookupOption)
 import           Test.Tasty.Program
 import           Test.Tasty.Providers
 import           Test.Tasty.Runners
 
+import           Test.Tasty.Clash.Server   (ClashServer (..), compileViaServer)
 import           Test.Tasty.Common
 import           Test.Tasty.Ghdl
 import           Test.Tasty.Iverilog
@@ -220,25 +225,45 @@ instance IsTest ClashGenTest where
   run optionSet ClashGenTest{..} progressCallback = do
     oDir <- cgOutputDirectory
     hdlDir <- cgHdlDirectory
-    case cgExpectFailure of
-      Nothing ->
-        run optionSet (program oDir hdlDir) progressCallback
-      Just exit ->
-        run optionSet (failingProgram oDir hdlDir exit) progressCallback
+    let ClashServer useServer = lookupOption optionSet
+        NumThreads numThreads = lookupOption optionSet
+    if useServer
+      then do
+        -- Same command line, same checks, but compiled by a pooled
+        -- `clash --server` worker; see "Test.Tasty.Clash.Server". RTS options
+        -- are per process and go with the worker instead.
+        cwd <- Directory.getCurrentDirectory
+        result <- compileViaServer numThreads cwd (withoutRtsOptions (args oDir hdlDir))
+        pure $ case cgExpectFailure of
+          Nothing ->
+            checkProgramResult "clash" (args oDir hdlDir) PrintNeither False result
+          Just (testExit, expectedErr) ->
+            checkFailingProgramResult (testExitCode testExit) "clash" (args oDir hdlDir)
+              PrintNeither False (specificExitCode testExit) (expected expectedErr) result
+      else case cgExpectFailure of
+        Nothing ->
+          run optionSet (program oDir hdlDir) progressCallback
+        Just exit ->
+          run optionSet (failingProgram oDir hdlDir exit) progressCallback
    where
     program oDir hdlDir =
       TestProgram
         "clash" (args oDir hdlDir) NoGlob PrintNeither False Nothing []
 
-    failingProgram oDir hdlDir (testExit, expectedErr) = let
-        -- TODO: there's no easy way to test for the absence of something in stderr
-        expected = case T.splitAt 4 expectedErr of
-                     ("NOT:", rest) -> ExpectNotStdErr rest
-                     _ -> ExpectStdErr expectedErr
-      in
+    -- TODO: there's no easy way to test for the absence of something in stderr
+    expected expectedErr = case T.splitAt 4 expectedErr of
+      ("NOT:", rest) -> ExpectNotStdErr rest
+      _ -> ExpectStdErr expectedErr
+
+    failingProgram oDir hdlDir (testExit, expectedErr) =
       TestFailingProgram
         (testExitCode testExit) "clash" (args oDir hdlDir) NoGlob PrintNeither
-        False (specificExitCode testExit) expected Nothing []
+        False (specificExitCode testExit) (expected expectedErr) Nothing []
+
+    -- Drop @+RTS ... -RTS@ groups
+    withoutRtsOptions ("+RTS" : rest) = withoutRtsOptions (drop 1 (dropWhile (/= "-RTS") rest))
+    withoutRtsOptions (x : rest) = x : withoutRtsOptions rest
+    withoutRtsOptions [] = []
 
     args oDir hdlDir =
       [ target
@@ -256,7 +281,8 @@ instance IsTest ClashGenTest where
         Verilog       -> "--verilog"
         SystemVerilog -> "--systemverilog"
 
-  testOptions = coerce (testOptions @TestProgram)
+  testOptions =
+    coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @ClashServer)])
 
 data ClashBinaryTest = ClashBinaryTest
   { cbBuildTarget :: HDL
@@ -414,8 +440,15 @@ sbyTests opts@TestOptions {..} parentTmp =
     singleTest t (SbyVerificationTest expectVerificationFail parentTmp (dir t) t)
   dir = targetTempPath parentTmp "symbiyosys"
 
+-- | Remove a test's temporary directory, unless @CLASH_TESTSUITE_KEEP_TMP@ is
+-- set: then the generated HDL of a run stays around, e.g. to compare the
+-- output of two runs.
 rmTmpDir :: FilePath -> IO ()
-rmTmpDir = Directory.removeDirectoryRecursive
+rmTmpDir dir = do
+  keep <- lookupEnv "CLASH_TESTSUITE_KEEP_TMP"
+  case keep of
+    Just _ -> pure ()
+    Nothing -> Directory.removeDirectoryRecursive dir
 
 runTest1
   :: String

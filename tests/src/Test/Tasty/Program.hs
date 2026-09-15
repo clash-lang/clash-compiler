@@ -67,6 +67,8 @@
 module Test.Tasty.Program (
    testProgram
  , testFailingProgram
+ , checkProgramResult
+ , checkFailingProgramResult
  , PrintOutput(..)
  , GlobArgs(..)
  , ExpectOutput(..)
@@ -323,16 +325,30 @@ runProgram program args stdO stdF workDir addEnv = do
   -- For debugging: Uncomment this to print executable and and its arguments
   --putStrLn $ show program ++ " " ++ concatMap (++ " ") args
 
-  let stdoutT = T.pack stdout
-      stderrT = T.pack stderr
+  pure (checkProgramResult program args stdO stdF (exitCode, T.pack stdout, T.pack stderr))
 
+-- | Judge a program's exit code and output as 'runProgram' does: it passes
+-- when it exited with zero, and (if demanded) printed nothing to stdout.
+checkProgramResult
+  :: String
+  -- ^ Program name, for the failure message
+  -> [String]
+  -- ^ Program options, for the failure message
+  -> PrintOutput
+  -- ^ Whether to print stdout or stderr on success
+  -> Bool
+  -- ^ Whether a non-empty stdout means failure
+  -> (ExitCode, T.Text, T.Text)
+  -- ^ Exit code, stdout, stderr
+  -> Result
+checkProgramResult program args stdO stdF (exitCode, stdoutT, stderrT) =
   case exitCode of
     ExitSuccess ->
-      if stdF && not (null stdout)
-        then return (unexpectedNonEmptyStdout program args 0 stderrT stdoutT)
-        else return (testPassed $ T.unpack $ testOutput stdO stderrT stdoutT)
+      if stdF && not (T.null stdoutT)
+        then unexpectedNonEmptyStdout program args 0 stderrT stdoutT
+        else testPassed $ T.unpack $ testOutput stdO stderrT stdoutT
     ExitFailure code ->
-      return $ exitFailure program args code stderrT stdoutT
+      exitFailure program args code stderrT stdoutT
 
 -- | Run a program with given options and optional working directory.
 -- Return success if program exists with error code. Fails if program does
@@ -367,24 +383,37 @@ runFailingProgram testExitCode program args stdO errOnEmptyStderr expectedCode e
   -- For debugging: Uncomment this to print executable and and its arguments
   --putStrLn $ show program ++ " " ++ concatMap (++ " ") args
 
-  let stdoutT = T.pack stdout
-      stderrT = T.pack stderr
+  pure (checkFailingProgramResult testExitCode program args stdO errOnEmptyStderr
+          expectedCode expectedStderr (exitCode0, T.pack stdout, T.pack stderr))
 
-      passed = testPassed (T.unpack $ testOutput stdO stderrT stdoutT)
-
-  return (go (stdoutT, stderrT, stdout, stderr, passed) exitCode0)
-
+-- | Judge a program's exit code and output as 'runFailingProgram' does. See
+-- there for the arguments.
+checkFailingProgramResult
+  :: Bool
+  -> String
+  -> [String]
+  -> PrintOutput
+  -> Bool
+  -> Maybe Int
+  -> ExpectOutput T.Text
+  -> (ExitCode, T.Text, T.Text)
+  -- ^ Exit code, stdout, stderr
+  -> Result
+checkFailingProgramResult testExitCode program args stdO errOnEmptyStderr expectedCode expectedStderr (exitCode0, stdoutT, stderrT) =
+  go exitCode0
  where
+  passed = testPassed (T.unpack $ testOutput stdO stderrT stdoutT)
+
   -- TODO: Clean up this code..
-  go e@(stdoutT, stderrT, _stdout, stderr, passed) exitCode1 =
+  go exitCode1 =
     case exitCode1 of
       ExitSuccess ->
         if (testExitCode && isNothing expectedCode) then
           unexpectedSuccess program stderrT stdoutT
         else
-          go e (ExitFailure 0)
+          go (ExitFailure 0)
       ExitFailure code ->
-        if errOnEmptyStderr && null stderr
+        if errOnEmptyStderr && T.null stderrT
           then
             unexpectedEmptyStderr program code stdoutT
           else

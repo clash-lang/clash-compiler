@@ -38,6 +38,7 @@ common basic-config
   build-depends:
     base,
     aeson,
+    bytestring,
     data-default,
     directory,
     filepath,
@@ -82,6 +83,7 @@ library
     Test.Tasty.Clash
     Test.Tasty.Clash.CollectSimResults
     Test.Tasty.Clash.CoreTest
+    Test.Tasty.Clash.Server
     Test.Tasty.Clash.NetlistTest
     Test.Tasty.Common
     Test.Tasty.Ghdl
