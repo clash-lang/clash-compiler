@@ -3,7 +3,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017     , Google Inc.,
-                    2021-2024, QBayLogic B.V.
+                    2021-2026, QBayLogic B.V.
                     2022     , Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -550,6 +550,9 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
                   (scrutExpr,scrutDecls) <-
                     mkExpr False declType (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
                   case scrutExpr of
+                    -- Singleton enumerations have no hardware representation,
+                    -- just like their constructor applications.
+                    _ | isVoid hwTy -> return (Noop,scrutDecls)
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
                       scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) scrutTy
