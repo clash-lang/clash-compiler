@@ -132,8 +132,7 @@
     type: 'minus# :: Signed
       m -> Signed n -> Signed (1 + Max m n)'
     template: ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THENresize(~ARG[0],~SIZE[~TYPO])
-      - resize(~ARG[1],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEresize(-
-      ~ARG[1],~SIZE[~TYPO])~FI~FI
+      - resize(~ARG[1],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSE-resize(~ARG[1],~SIZE[~TYPO])~FI~FI
 - BlackBox:
     name: Clash.Sized.Internal.Signed.times#
     kind: Expression
