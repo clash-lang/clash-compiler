@@ -252,7 +252,7 @@ jobs:
         run: |
           # List added/modified files in changelog directory
           gh pr view "${{ github.event.pull_request.number }}" --json files --jq '.files[].path' | while IFS= read -r file; do
-            [[ "$file" == "changelog/entries/*" ]] || continue
+            [[ "$file" == changelog/entries/* ]] || continue
             echo "Checking $file"
             nix run github:QBayLogic/qlog -- check -t $file
           done
