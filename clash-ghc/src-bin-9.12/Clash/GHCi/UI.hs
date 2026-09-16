@@ -2437,6 +2437,8 @@ makeHDL
   -> [FilePath]
   -> m ()
 makeHDL Proxy startAction optsRef srcs = do
+  -- Validate every target before loading or synthesizing any of them.
+  mapM_ (\src -> GHC.guessTarget src Nothing Nothing) srcs
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts0  <- readIORef optsRef
