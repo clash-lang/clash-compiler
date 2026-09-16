@@ -117,7 +117,8 @@
     type: 'minus# :: (KnownNat
       m,KnownNat n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)'
     template: ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THENresize(~ARG[2],~SIZE[~TYPO])
-      - resize(~ARG[3],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[2]]~THENresize(~ARG[2],~SIZE[~TYPO])~ELSEresize(~ARG[3],~SIZE[~TYPO])~FI~FI
+      - resize(~ARG[3],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[2]]~THENresize(~ARG[2],~SIZE[~TYPO])~ELSEto_unsigned(0,~SIZE[~TYPO])
+      - resize(~ARG[3],~SIZE[~TYPO])~FI~FI
 - BlackBox:
     name: Clash.Sized.Internal.Unsigned.times#
     kind: Expression
