@@ -448,8 +448,20 @@
     kind: Expression
     type: 'minus# :: (KnownNat
       m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)'
-    template: ~IF~AND[~SIZE[~TYP[2]],~SIZE[~TYP[3]]]~THENstd_logic_vector(resize(unsigned(~ARG[2]),~SIZE[~TYPO])
-      - resize(unsigned(~ARG[3]),~SIZE[~TYPO]))~ELSE~IF~SIZE[~TYP[2]]~THENstd_logic_vector(resize(unsigned(~ARG[2]),~SIZE[~TYPO]))~ELSEstd_logic_vector(-resize(signed(~ARG[3]),~SIZE[~TYPO]))~FI~FI
+    template: |-
+      ~IF ~AND[~SIZE[~TYP[2]], ~SIZE[~TYP[3]]] ~THEN
+        std_logic_vector(
+          resize(unsigned(~ARG[2]), ~SIZE[~TYPO])
+          - resize(unsigned(~ARG[3]), ~SIZE[~TYPO]))
+      ~ELSE
+        ~IF ~SIZE[~TYP[2]] ~THEN
+          std_logic_vector(resize(unsigned(~ARG[2]), ~SIZE[~TYPO]))
+        ~ELSE
+          std_logic_vector(
+            to_unsigned(0, ~SIZE[~TYPO])
+            - resize(unsigned(~ARG[3]), ~SIZE[~TYPO]))
+        ~FI
+      ~FI
 - BlackBox:
     name: Clash.Sized.Internal.BitVector.times#
     kind: Expression
