@@ -242,7 +242,7 @@ jobs:
   qlog_entries:
     name: "Check qlog entries"
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
       - name: "Find and check changed entries"
