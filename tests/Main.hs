@@ -220,7 +220,13 @@ runClashTest = defaultMain
     ]
   , clashTestGroup "tests"
     [ clashTestGroup "shouldfail"
-      [ clashTestGroup "BlackBox"
+      [ clashTestGroup "CommandLine"
+        [ runTest "T3414" def{
+            clashFlags=["fclash-clear"]
+          , expectClashFail=Just (def, "is not a module name or a source file")
+          }
+        ]
+      , clashTestGroup "BlackBox"
         [ runTest "WrongReference" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, Text.pack [I.i|
