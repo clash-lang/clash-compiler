@@ -242,7 +242,7 @@ jobs:
 
   all:
     name: All jobs finished
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     needs: [
         build_mac_windows,
         build_and_test,
