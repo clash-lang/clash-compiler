@@ -1,5 +1,6 @@
 {-|
-Copyright   :  (C) 2024, Martijn Bastiaan
+Copyright   :  (C) 2024, Martijn Bastiaan,
+                   2026, QBayLogic B.V.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -114,7 +115,7 @@ whyPp Why{what, solution, issue}= [I.i|
 
 -- | Which GHCs are broken and why
 brokenGhcs :: [Why]
-brokenGhcs = [brokenClashCores, brokenTypeErrors, slowStarts]
+brokenGhcs = [brokenClashCores, brokenTypeErrors, slowStarts, brokenGhc912]
  where
   brokenClashCores = Why
     { what = "GHC is known to fail compilation of libraries used by the Clash compiler test suite"
@@ -135,6 +136,16 @@ brokenGhcs = [brokenClashCores, brokenTypeErrors, slowStarts]
     , solution = "Upgrade to GHC 9.6.3 or newer, or downgrade to GHC 9.4.7"
     , issue = "https://github.com/clash-lang/clash-compiler/issues/2710"
     , brokenOn = [(All, GhcRange{from=Ghc 9 4 8, to=Ghc 9 6 3})]
+    }
+
+  -- GHC 9.12.4 fixes the bugs affecting Clash reported in:
+  -- https://gitlab.haskell.org/ghc/ghc/-/work_items/26185
+  -- https://gitlab.haskell.org/ghc/ghc/-/work_items/26711
+  brokenGhc912 = Why
+    { what = "GHC 9.12.1 through 9.12.3 contain bugs affecting Clash"
+    , solution = "Upgrade to GHC 9.12.4 or newer"
+    , issue = "https://github.com/clash-lang/clash-compiler/issues/3415"
+    , brokenOn = [(All, GhcRange{from=Ghc 9 12 1, to=Ghc 9 12 4})]
     }
 
 -- | Given a 'BrokenOn', determine whether current OS matches
