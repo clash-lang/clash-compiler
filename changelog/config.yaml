@@ -1,1 +1,2 @@
 project: "clash-lang/clash-compiler"
+md_pr_link: "[#{pr}]({pr_url})"
