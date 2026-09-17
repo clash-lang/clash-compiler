@@ -253,7 +253,7 @@ jobs:
           # List added/modified files in changelog directory
           gh pr view "${{ github.event.pull_request.number }}" --json files --jq '.files[].path' | while IFS= read -r file; do
             [[ "$file" == changelog/entries/* ]] || continue
-            nix run .#devTools.qlog check -t $file
+            nix run .#devTools.qlog -- check -t $file
           done
 
   all:
