@@ -12,7 +12,7 @@
     renderVoid: RenderVoid
     template: |-
       -- writeToBiSignal# begin
-      ~ARG[1] <= ~ARG[4] when ~ARG[3] else (~SIZE[~TYP[1]]-1 downto 0 => 'Z');
+      ~ARG[1] <= ~ARG[4] when ~ARG[3] = '1' else (~SIZE[~TYP[1]]-1 downto 0 => 'Z');
       -- writeToBiSignal# end
 - BlackBox:
     name: Clash.Signal.BiSignal.readFromBiSignal#
