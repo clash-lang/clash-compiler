@@ -335,6 +335,12 @@ runClashTest = defaultMain
           , expectVerificationFail=Just (def, "Unreached cover statement at topEntity: B")
           }
         ]
+      , clashTestGroup "XException"
+        [ runTest "IsX" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Clash was forced to translate 'Clash.XException.isX', but this value was marked with DontTranslate.")
+          }
+        ]
       , clashTestGroup "ZeroWidth"
         [ runTest "FailGracefully1" def{
             hdlTargets=[VHDL]
@@ -943,6 +949,7 @@ runClashTest = defaultMain
         , outputTest "T1102A" def{hdlTargets=[VHDL]}
         , outputTest "T1102B" def{hdlTargets=[VHDL]}
         , runTest "T2069" def
+        , runTest "T3432" def{hdlTargets=[Verilog], hdlSim=[]}
         , clashTestGroup "BiSignal"
           [ runTest "Counter" def
           , runTest "CounterHalfTuple" def
