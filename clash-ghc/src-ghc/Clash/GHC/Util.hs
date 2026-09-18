@@ -31,15 +31,11 @@ import GHC                (GhcMonad(..), printException)
 #if !MIN_VERSION_ghc(9,12,0)
 import Control.Exception  (ErrorCall(..))
 #endif
-#if MIN_VERSION_base(4,20,0)
-import Control.Exception  (someExceptionContext)
-import Control.Exception.Context (displayExceptionContext)
-#endif
 import Control.Exception  (Exception(..))
 import GHC.Exception      (SomeException)
 import System.Exit        (ExitCode(ExitFailure), exitWith)
 
-import Clash.Util         (ClashException(..))
+import Clash.Util         (ClashException(..), exceptionBacktrace, originalException)
 import Clash.Util.Interpolate (i)
 import Clash.Driver.Types (ClashOpts(..))
 
@@ -56,7 +52,7 @@ handleClashException
   -> ClashOpts
   -> SomeException
   -> m a
-handleClashException _df opts e = case fromException e of
+handleClashException _df opts e0 = case fromException e of
   Just (ClashException sp s eM) -> do
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
@@ -88,19 +84,20 @@ handleClashException _df opts e = case fromException e of
 #else
               (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
 #endif
-              (text "Other error:" $$ textLines (displayException e) $$ backtrace e))
+              (text "Other error:" $$ textLines (displayException e) $$ backtrace))
   where
-#if MIN_VERSION_base(4,20,0)
+    -- Anything thrown while compiling top entities concurrently arrives
+    -- wrapped, see 'withPreservedBacktrace'. Unwrap before matching on the
+    -- exception's type, and read the backtrace off the wrapper.
+    e = originalException e0
+
     -- Since base-4.20 (GHC 9.10) 'HasCallStack' backtraces are no longer part
     -- of the exception itself ('ErrorCallWithLocation' is deprecated), but are
     -- attached to its 'ExceptionContext'. 'displayException' does not include
     -- them, so we print them separately.
-    backtrace exc = case displayExceptionContext (someExceptionContext exc) of
+    backtrace = case exceptionBacktrace e0 of
       [] -> empty
       ctx -> blankLine $$ textLines ctx
-#else
-    backtrace _ = empty
-#endif
 
     srcInfo = textLines [i|
       The source location of the error is not exact, only indicative, as it
