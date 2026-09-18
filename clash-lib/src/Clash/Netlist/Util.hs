@@ -398,10 +398,18 @@ coreTypeToHWType builtInTranslation reprs m ty = do
     coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
   go _ (tyView -> TyConApp tc args) = runExceptT $ do
-    hwty <- mkADT builtInTranslation reprs m (showPpr ty) tc args
+    hwty <- mkADT builtInTranslation reprs m (showPpr ty) hasCustomRepr tc args
     return (maybeConvertToCustomRepr reprs ty hwty)
   -- All methods failed:
   go _ _ = return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty
+
+  -- Does 'ty' carry a custom bit representation? If so, 'mkADT' should not
+  -- collapse a single-constructor/single-field type into the HWType of that
+  -- field, as 'convertToCustomRepr' needs the 'Product' to hang the
+  -- representation off of.
+  hasCustomRepr = case coreToType' ty of
+    Right tyName -> isJust (getDataRepr tyName reprs)
+    Left _ -> False
 
 -- | Generates original indices in list before filtering, given a list of
 -- removed indices.
@@ -426,6 +434,10 @@ mkADT
   -- ^ TyCon cache
   -> String
   -- ^ String representation of the Core type for error messages
+  -> Bool
+  -- ^ Whether the type carries a custom bit representation. If it does, a
+  -- single-constructor/single-field type is /not/ collapsed into the HWType of
+  -- that field, as 'convertToCustomRepr' needs a 'Product' to work with.
   -> TyConName
   -- ^ The TyCon
   -> [Type]
@@ -433,11 +445,11 @@ mkADT
   -> ExceptT String (State HWMap) FilteredHWType
   -- ^ An error string or a tuple with the type and possibly a list of
   -- removed arguments.
-mkADT _ _ m tyString tc _
+mkADT _ _ m tyString _ tc _
   | isRecursiveTy m tc
   = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.find tc m) of
+mkADT builtInTranslation reprs m tyString hasCustomRepr tc args = case tyConDataCons (UniqMap.find tc m) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
@@ -464,7 +476,7 @@ mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.
       -- second field of FilteredHWType would then look like:
       --
       -- >>> [[False, True]]
-      (_:[],[[elemTy]]) ->
+      (_:[],[[elemTy]]) | not hasCustomRepr ->
         return (FilteredHWType (stripFiltered elemTy) argHTyss1)
 
       -- Type has one constructor, but multiple fields modulo empty fields
