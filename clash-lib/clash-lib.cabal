@@ -310,6 +310,7 @@ Library
                       Clash.Unique
                       Clash.Util
                       Clash.Util.Eq
+                      Clash.Util.Exception
                       Clash.Util.Graph
                       Clash.Util.Interpolate
                       Clash.Util.Supply
