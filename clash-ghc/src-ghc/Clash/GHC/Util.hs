@@ -31,6 +31,10 @@ import GHC                (GhcMonad(..), printException)
 #if !MIN_VERSION_ghc(9,12,0)
 import Control.Exception  (ErrorCall(..))
 #endif
+#if MIN_VERSION_base(4,20,0)
+import Control.Exception  (someExceptionContext)
+import Control.Exception.Context (displayExceptionContext)
+#endif
 import Control.Exception  (Exception(..))
 import GHC.Exception      (SomeException)
 import System.Exit        (ExitCode(ExitFailure), exitWith)
@@ -84,8 +88,20 @@ handleClashException _df opts e = case fromException e of
 #else
               (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
 #endif
-              (text "Other error:" $$ textLines (displayException e)))
+              (text "Other error:" $$ textLines (displayException e) $$ backtrace e))
   where
+#if MIN_VERSION_base(4,20,0)
+    -- Since base-4.20 (GHC 9.10) 'HasCallStack' backtraces are no longer part
+    -- of the exception itself ('ErrorCallWithLocation' is deprecated), but are
+    -- attached to its 'ExceptionContext'. 'displayException' does not include
+    -- them, so we print them separately.
+    backtrace exc = case displayExceptionContext (someExceptionContext exc) of
+      [] -> empty
+      ctx -> blankLine $$ textLines ctx
+#else
+    backtrace _ = empty
+#endif
+
     srcInfo = textLines [i|
       The source location of the error is not exact, only indicative, as it
       is acquired after optimizations. The actual location of the error can be
