@@ -554,6 +554,7 @@ runClashTest = defaultMain
           [ runTest "ZeroWidth" def{hdlSim=[]}
           ]
         , runTest "SingleFieldProduct" def
+        , runTest "VoidFieldOrder" def
         , runTest "ZeroWidthFieldAnn" def
         , runTest "T694" def{hdlSim=[],hdlTargets=[VHDL]}
         ]

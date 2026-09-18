@@ -457,7 +457,13 @@ mkADT builtInTranslation reprs m tyString hasCustomRepr tc args = case tyConData
     argHTyss0           <- mapM (mapM (ExceptT . coreTypeToHWType builtInTranslation reprs m)) substArgTyss
     let argHTyss1        = map (\tys -> zip (map isFilteredVoid tys) tys) argHTyss0
     let areVoids         = map (map fst) argHTyss1
-    let filteredArgHTyss = map (map snd . filter (not . fst)) argHTyss1
+    let filteredArgHTyss
+          -- 'convertToCustomRepr' lines the field types up with 'crFieldAnns'
+          -- positionally, so for a type with a custom bit representation the
+          -- void fields have to stay where they are. It marks the fields the
+          -- representation gives zero bits to as 'Void' itself.
+          | hasCustomRepr = argHTyss0
+          | otherwise = map (map snd . filter (not . fst)) argHTyss1
 
     -- Every alternative is annotated with some examples. Be sure to read them.
     case (dcs, filteredArgHTyss) of
@@ -491,6 +497,9 @@ mkADT builtInTranslation reprs m tyString hasCustomRepr tc args = case tyConData
         labelsM <-
           if null labels0 then
             return Nothing
+          else if hasCustomRepr then
+            -- Nothing was filtered out, so the labels still line up.
+            return (Just labels0)
           else
             -- Filter out labels belonging to arguments filtered due to being
             -- void. See argHTyss1.
