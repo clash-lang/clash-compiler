@@ -23,6 +23,7 @@ import qualified Clash.Tests.Normalize.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Util
 import qualified Clash.Tests.Rewrite.StrategyDSL
 import qualified Clash.Tests.Rewrite.Util
+import qualified Clash.Tests.Util.Exception
 import qualified Clash.Tests.Util.Interpolate
 import qualified Clash.Tests.Warning
 import qualified Test.Clash.Rewrite
@@ -55,6 +56,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Util.tests
   , Clash.Tests.Rewrite.StrategyDSL.tests
   , Clash.Tests.Rewrite.Util.tests
+  , Clash.Tests.Util.Exception.tests
   , Clash.Tests.Util.Interpolate.tests
   , Clash.Tests.Warning.tests
   , Test.Clash.Rewrite.tests
