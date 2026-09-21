@@ -239,6 +239,17 @@ jobs:
           export CABAL_DIR=$HOME/.cabal
           cabal v2-run clash-testsuite -- -j$THREADS --hide-successes -p .SystemVerilog --no-modelsim --no-vivado
 
+  qlog_entries:
+    name: "Check qlog entries"
+    if: github.event_name == 'pull_request'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+      - name: "Find and check changed entries"
+        id: entries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .ci/check_qlog_entries.sh ${{ github.event.pull_request.number }}
 
   all:
     name: All jobs finished
@@ -246,6 +257,7 @@ jobs:
     needs: [
         build_mac_windows,
         build_and_test,
+        qlog_entries,
       ]
     runs-on: ubuntu-22.04
     steps:

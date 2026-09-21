@@ -201,6 +201,11 @@
             program = "${self.packages.${system}.clash-testsuite}/bin/clash-testsuite";
           };
 
+          devTools.qlog = {
+            type = "app";
+            program = "${args.qlog.packages.${system}.default}/bin/qlog";
+          };
+
           default = self.apps.${system}.clashi;
         };
 
