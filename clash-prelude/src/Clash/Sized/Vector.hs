@@ -168,9 +168,7 @@ import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 >>> import qualified Clash.Sized.Vector as Vec
 -}
 
-#define CONS_PREC 5
-
-infixr CONS_PREC `Cons`
+infixr 5 `Cons`
 -- | Fixed size vectors.
 --
 -- * Lists with their length encoded in their type
@@ -276,18 +274,22 @@ pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
   where
     (:>) x xs = Cons x xs
 
-infixr CONS_PREC :>
+infixr 5 :>
+
+-- Keep this in sync with the fixities of 'Cons' and ':>'.
+consPrec :: Int
+consPrec = 5
 
 instance Show a => Show (Vec n a) where
   showsPrec n = \case
     Nil -> showString "Nil"
-    vs -> showParen (n > CONS_PREC) (go vs)
+    vs -> showParen (n > consPrec) (go vs)
 
    where
     go :: Vec m a -> ShowS
     go Nil = showString "Nil"
     go (x `Cons` xs) =
-        showsPrec (CONS_PREC + 1) x
+        showsPrec (consPrec + 1) x
       . showString " :> "
       . go xs
 
@@ -296,13 +298,13 @@ instance ShowX a => ShowX (Vec n a) where
     case isX vs of
       Right Nil -> showString "Nil"
       Left _ -> showString "undefined"
-      _ -> showParen (n > CONS_PREC) (go vs)
+      _ -> showParen (n > consPrec) (go vs)
    where
     go :: Vec m a -> ShowS
     go (isX -> Left _) = showString "undefined"
     go Nil = showString "Nil"
     go (x `Cons` xs) =
-        showsPrecX (CONS_PREC + 1) x
+        showsPrecX (consPrec + 1) x
       . showString " :> "
       . go xs
 
