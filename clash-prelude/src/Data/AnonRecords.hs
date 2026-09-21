@@ -29,8 +29,10 @@ module Data.AnonRecords (
 ) where
 
 import GHC.Generics (Generic)
+import qualified GHC.Records
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Data.Proxy
+import Data.Type.Equality (type (==))
 import Data.Type.Bool (type (||))
 import Data.Typeable (Typeable)
 
@@ -64,15 +66,21 @@ instance AccessField f (f := a) where
   getField (L x) = x
   setField x _ = L x
 
-class AccessField' f a left where
-  type FieldType' f a left
-  getField' :: a -> FieldType' f a left
-  setField' :: FieldType' f a left -> a -> a
+instance (AccessField f (f2:=b), FieldType f (f2:=b) ~ a) => GHC.Records.HasField f (f2:=b) a where
+  getField = getField @f @(f2:=b)
 
 instance (AccessField' f (a:&:b) (HasField f a)) => AccessField f (a:&:b) where
   type FieldType f (a:&:b) = FieldType' f (a:&:b) (HasField f a)
   getField   ab = getField' @f @(a:&:b) @(HasField f a)   ab
   setField x ab = setField' @f @(a:&:b) @(HasField f a) x ab
+
+instance (AccessField f (l:&:r), FieldType f (l:&:r) ~ a) => GHC.Records.HasField f (l:&:r) a where
+  getField = getField @f @(l:&:r)
+
+class AccessField' f a left where
+  type FieldType' f a left
+  getField' :: a -> FieldType' f a left
+  setField' :: FieldType' f a left -> a -> a
 
 instance (AccessField f a, HasField f a ~ True) => AccessField' f (a:&:b) True where
   type FieldType' f (a:&:b) True = FieldType f a
@@ -89,20 +97,20 @@ instance (AccessField f b, HasField f a ~ False) => AccessField' f (a:&:b) False
 type family WithField (f::Symbol) a r where
   WithField f a () = f:=a
   WithField f a (f:=b) = f:=a
-  WithField f a ((f:=b) :&: r) = (f:=a) :&: rbrace
+  WithField f a ((f:=b) :&: r) = (f:=a) :&: r
   WithField f a (l :&: r) = l :&: WithField f a r
 
 class InsertField f a r where
   insertField :: a -> r -> WithField f a r
 
 instance InsertField f a () where
-  insertField x = L x
+  insertField x _ = L @f x
 
-instance (InsertField' f a (f==f2)) => InsertField f a (f2:=b) where
+instance (InsertField' f a (f2:=b) (f==f2)) => InsertField f a (f2:=b) where
   insertField = insertField' @f @a @(f2:=b) @(f==f2)
 
 instance (InsertField' f a (f2:=b :&: r) (f==f2)) => InsertField f a (f2:=b :&: r) where
-  insertField = insertField' @f @a @(l :&: r) @(f==f2)
+  insertField = insertField' @f @a @(f2:=b :&: r) @(f==f2)
 
 class InsertField' f a r (eq::Bool) where
   insertField' :: a -> r -> WithField f a r
@@ -117,7 +125,7 @@ instance (WithField f a (l :&: r) ~ (f:=a :&: r)) => InsertField' f a (l :&: r) 
   insertField' x (_ :&: r) = L x :&: r
 
 instance (InsertField f a r, WithField f a (l :&: r) ~ (l :&: WithField f a r)) => InsertField' f a (l :&: r) False where
-  insertField' x (l :&: r) = l :&: insertField @f @a @r x
+  insertField' x (l :&: r) = l :&: insertField @f @a @r x r
 
 
 -- FIELD REMOVAL
