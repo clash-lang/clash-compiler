@@ -11,8 +11,10 @@ The module includes a way to construct anonymous records.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-partial-type-signatures -Wterm-variable-capture #-}
 
@@ -22,6 +24,7 @@ The module includes a way to construct anonymous records.
 module Data.AnonRecords (
   (:&:)(..),
   (:=)(..),
+  pattern (:=),
   HasField,
   WithField, WithoutField,
   AccessField(..), InsertField(..), DeleteField(..),
@@ -29,6 +32,7 @@ module Data.AnonRecords (
 ) where
 
 import GHC.Generics (Generic)
+import GHC.OverloadedLabels (IsLabel(..))
 import qualified GHC.Records
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Data.Proxy
@@ -41,13 +45,27 @@ import Clash.Class.BitPack (BitPack)
 import Clash.XException (NFDataX)
 
 infixr 3 :=
-newtype (:=) (x::Symbol) a = L{unLabel::a}
+newtype (:=) (x::Symbol) a = L a
   deriving (Generic, BitPack, NFDataX, Typeable)
 
 infixr 2 :&:
 data (:&:) a b = a :&: b
   deriving (Show, Generic, BitPack, NFDataX, Typeable)
 
+-- CONSTRUCTOR PATTERN
+
+data FieldLabelProxy f = FieldLabelProxy
+  deriving (Show, Generic, BitPack, NFDataX, Typeable)
+
+pattern (:=) :: FieldLabelProxy f -> a -> f:=a
+pattern (:=) p x <- (withFLP -> (p,x)) where
+  (:=) _ x = L x
+
+withFLP :: f:=a -> (FieldLabelProxy f, a)
+withFLP (L x) = (FieldLabelProxy, x)
+
+instance (f~f2) => IsLabel f (FieldLabelProxy f2) where
+  fromLabel = FieldLabelProxy
 
 -- FIELD ACCESS
 
@@ -164,8 +182,7 @@ instance (DeleteField f r, WithoutField f (l :&: r) ~ (l :&: WithoutField f r)) 
 -- SHOW
 
 instance (KnownSymbol x, Show a) => Show (x := a) where
-  -- show (L a) = show (symbolVal $ Proxy @x) <> " := " <> show a
-  show (L a) = "L @" <> show (symbolVal $ Proxy @x) <> " " <> show a
+  show (L a) = "#" <> (symbolVal $ Proxy @x) <> ":=" <> show a
 
 -- BUNDLE
 
@@ -181,7 +198,7 @@ instance (Bundle a, Bundle b) => Bundle (a :&: b) where
 instance Bundle (x := a) where
   type Unbundled dom (x := a) = x := Signal dom a
   bundle (L sig) = L <$> sig
-  unbundle sig = L $ unLabel <$> sig
+  unbundle sig = L $ (\(L x) -> x) <$> sig
 
 
 -- TUPLES
