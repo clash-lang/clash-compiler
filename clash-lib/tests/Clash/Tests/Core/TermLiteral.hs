@@ -1,3 +1,6 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 {-|
 Copyright   :  (C) 2022, Google Inc.
 License     :  BSD2 (see the file LICENSE)
@@ -5,26 +8,20 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Tests for 'Clash.Core.TermLiteral'.
 -}
-{-# LANGUAGE TemplateHaskell #-}
-
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 module Clash.Tests.Core.TermLiteral where
 
+import qualified Clash.Core.Literal as L
+import Clash.Core.Term (Term (App, Literal, Tick), TickInfo (NoDeDup))
+import Clash.Core.TermLiteral
+import Clash.Promoted.Nat
+import Clash.Tests.Core.TermLiteral.Types
 import Data.Proxy
 import Data.Typeable
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH
 
-import qualified Clash.Core.Literal as L
-import Clash.Core.Term (Term(App, Literal, Tick), TickInfo(NoDeDup))
-import Clash.Core.TermLiteral
-import Clash.Promoted.Nat
-
-import Clash.Tests.Core.TermLiteral.Types
-
-showTypeable :: Typeable a => Proxy a -> String
+showTypeable :: (Typeable a) => Proxy a -> String
 showTypeable proxy = showsPrec 0 (typeRep proxy) ""
 
 eqTest :: (TermLiteral a, Typeable a) => Proxy a -> Assertion
@@ -73,8 +70,10 @@ case_termToData_strips_ticks_in_subterm :: Assertion
 case_termToData_strips_ticks_in_subterm =
   Right "hi"
     @=? termToData @String
-          (App (Literal (L.IntegerLiteral 0))
-               (Tick NoDeDup (Literal (L.StringLiteral "hi"))))
+      ( App
+          (Literal (L.IntegerLiteral 0))
+          (Tick NoDeDup (Literal (L.StringLiteral "hi")))
+      )
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.TermLiteral" [$(testGroupGenerator)]

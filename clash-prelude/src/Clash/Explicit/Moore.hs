@@ -1,3 +1,6 @@
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 {-|
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
@@ -11,23 +14,25 @@
   Moore machines are strictly less expressive, but may impose laxer timing
   requirements.
 -}
-
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-
-{-# LANGUAGE Safe #-}
-
 module Clash.Explicit.Moore
   ( -- * Moore machines with explicit clock and reset ports
-    moore
-  , mooreB
-  , medvedev
-  , medvedevB
+    moore,
+    mooreB,
+    medvedev,
+    medvedevB,
   )
 where
 
-import           Clash.Explicit.Signal
-  (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
-import           Clash.XException                 (NFDataX)
+import Clash.Explicit.Signal
+  ( Bundle (..),
+    Clock,
+    Enable,
+    KnownDomain,
+    Reset,
+    Signal,
+    register,
+  )
+import Clash.XException (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -77,39 +82,42 @@ import           Clash.XException                 (NFDataX)
 --     s1 = 'moore' clk rst en macT id 0 ('bundle' (a,x))
 --     s2 = 'moore' clk rst en macT id 0 ('bundle' (b,y))
 -- @
-moore
-  :: ( KnownDomain dom
-     , NFDataX s )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Reset dom
-  -> Enable dom
-  -> (s -> i -> s)
-  -- ^ Transfer function in moore machine form: @state -> input -> newstate@
-  -> (s -> o)
-  -- ^ Output function in moore machine form: @state -> output@
-  -> s
-  -- ^ Initial state
-  -> (Signal dom i -> Signal dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+moore ::
+  ( KnownDomain dom,
+    NFDataX s
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Transfer function in moore machine form: @state -> input -> newstate@
+  (s -> i -> s) ->
+  -- | Output function in moore machine form: @state -> output@
+  (s -> o) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the moore machine
+  (Signal dom i -> Signal dom o)
 moore clk rst en ft fo iS =
-  \i -> let s' = ft <$> s <*> i
-            s  = register clk rst en iS s'
-        in fo <$> s
-{-# INLINABLE moore #-}
+  \i ->
+    let s' = ft <$> s <*> i
+        s = register clk rst en iS s'
+     in fo <$> s
+{-# INLINEABLE moore #-}
 
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
-medvedev
-  :: ( KnownDomain dom
-     , NFDataX s )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> (s -> i -> s)
-  -> s
-  -> (Signal dom i -> Signal dom s)
+medvedev ::
+  ( KnownDomain dom,
+    NFDataX s
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  (s -> i -> s) ->
+  s ->
+  (Signal dom i -> Signal dom s)
 medvedev clk rst en tr st = moore clk rst en tr id st
 {-# INLINE medvedev #-}
 
@@ -140,39 +148,41 @@ medvedev clk rst en tr st = moore clk rst en tr id st
 --     (i1,b1) = 'mooreB' clk rst en t o 0 (a,b)
 --     (i2,b2) = 'mooreB' clk rst en t o 3 (c,i1)
 -- @
-mooreB
-  :: ( KnownDomain dom
-     , NFDataX s
-     , Bundle i
-     , Bundle o )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> (s -> i -> s)
-  -- ^ Transfer function in moore machine form:
+mooreB ::
+  ( KnownDomain dom,
+    NFDataX s,
+    Bundle i,
+    Bundle o
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Transfer function in moore machine form:
   -- @state -> input -> newstate@
-  -> (s -> o)
-  -- ^ Output function in moore machine form:
+  (s -> i -> s) ->
+  -- | Output function in moore machine form:
   -- @state -> output@
-  -> s
-  -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+  (s -> o) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the moore machine
+  (Unbundled dom i -> Unbundled dom o)
 mooreB clk rst en ft fo iS i = unbundle (moore clk rst en ft fo iS (bundle i))
 {-# INLINE mooreB #-}
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
-medvedevB
-  :: ( KnownDomain dom
-     , NFDataX s
-     , Bundle i
-     , Bundle s )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> (s -> i -> s)
-  -> s
-  -> (Unbundled dom i -> Unbundled dom s)
+medvedevB ::
+  ( KnownDomain dom,
+    NFDataX s,
+    Bundle i,
+    Bundle s
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  (s -> i -> s) ->
+  s ->
+  (Unbundled dom i -> Unbundled dom s)
 medvedevB clk rst en tr st = mooreB clk rst en tr id st
 {-# INLINE medvedevB #-}

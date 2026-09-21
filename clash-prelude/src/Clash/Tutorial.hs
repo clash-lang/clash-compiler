@@ -9,10 +9,9 @@ Copyright : © 2014-2016, Christiaan Baaij,
 Licence   : Creative Commons 4.0 (CC BY 4.0) (https://creativecommons.org/licenses/by/4.0/)
 Maintainer:  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-module Clash.Tutorial (
-  -- * The content of this page has been moved
-  -- $moved
+module Clash.Tutorial
+  ( -- * The content of this page has been moved
+    -- $moved
   )
 where
 

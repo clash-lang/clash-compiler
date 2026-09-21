@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+
 {-|
 Copyright  : (C) 2021-2023, QBayLogic B.V.
 License    : BSD2 (see the file LICENSE)
@@ -5,110 +11,121 @@ Maintainer : QBayLogic B.V. <devops@qbaylogic.com>
 
 Functions to read, write, and handle manifest files.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Clash.Driver.Manifest where
 
-import           Control.Exception (tryJust)
-import           Control.Monad (guard, forM)
-import           Control.Monad.State (evalState)
+import Control.Exception (tryJust)
+import Control.Monad (forM, guard)
+import Control.Monad.State (evalState)
 import qualified Crypto.Hash.SHA256 as Sha256
+import Data.Aeson
+  ( FromJSON (parseJSON),
+    KeyValue ((.=)),
+    ToJSON (toJSON),
+    (.:),
+    (.:?),
+  )
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
-import           Data.Aeson
-  (ToJSON(toJSON), FromJSON(parseJSON), KeyValue ((.=)), (.:), (.:?))
-import           Data.Aeson.Types (Parser)
+import Data.Aeson.Types (Parser)
 import qualified Data.Binary as Binary
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteStringLazy
-import           Data.ByteString (ByteString)
-import           Data.Char (toLower)
+import Data.Char (toLower)
 #if MIN_VERSION_base16_bytestring(1,0,0)
-import           Data.Either (fromRight)
+import Data.Either (fromRight)
 #endif
-import           Data.Hashable (hash)
-import           Data.HashMap.Strict (HashMap)
+import Clash.Annotations.TopEntity.Extra ()
+import Clash.Backend (Backend (hdlType), Usage (External))
+import Clash.Core.Name (nameOcc)
+import Clash.Core.Var (Id, varName)
+import Clash.Driver.Bool (OverridingBool (..))
+import Clash.Driver.Types
+import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+  ( Component (..),
+    HWType (Clock, ClockN),
+    TopEntityT,
+    hwTypeDomain,
+  )
+import qualified Clash.Netlist.Types as Netlist
+import Clash.Netlist.Util (typeSize)
+import Clash.Primitives.Types
+import Clash.Primitives.Util (hashCompiledPrimMap)
+import Clash.Signal (VDomainConfiguration (..))
+import Clash.Util.Graph (callGraphBindings)
+import Clash.Warning (defWarningOpts)
+import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Maybe (catMaybes)
-import           Data.Monoid (Ap(getAp))
+import Data.Hashable (hash)
+import Data.Maybe (catMaybes)
+import Data.Monoid (Ap (getAp))
+import qualified Data.Set as Set
+import Data.String (IsString)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Lazy as LText
 import qualified Data.Text.Lazy.Encoding as LText
-import           Data.Text (Text)
-import           Data.Text.Prettyprint.Doc.Extra (renderOneLine)
-import           Data.Time (UTCTime)
-import qualified Data.Set as Set
-import           Data.String (IsString)
-import           GHC.Generics (Generic)
-import           System.IO.Error (isDoesNotExistError)
-import           System.FilePath (takeDirectory, (</>))
-import           System.Directory (listDirectory, doesFileExist)
-import           Text.Read (readMaybe)
-
-import           Clash.Annotations.TopEntity.Extra ()
-import           Clash.Backend (Backend (hdlType), Usage (External))
-import           Clash.Core.Name (nameOcc)
-import           Clash.Driver.Bool (OverridingBool(..))
-import           Clash.Driver.Types
-import           Clash.Primitives.Types
-import           Clash.Warning (defWarningOpts)
-import           Clash.Core.Var (Id, varName)
-import           Clash.Netlist.Types
-  (TopEntityT, Component(..), HWType (Clock, ClockN), hwTypeDomain)
-import qualified Clash.Netlist.Types as Netlist
-import qualified Clash.Netlist.Id as Id
-import           Clash.Netlist.Util (typeSize)
-import           Clash.Primitives.Util (hashCompiledPrimMap)
-import           Clash.Signal (VDomainConfiguration(..))
-import           Clash.Util.Graph (callGraphBindings)
+import Data.Text.Prettyprint.Doc.Extra (renderOneLine)
+import Data.Time (UTCTime)
+import GHC.Generics (Generic)
+import System.Directory (doesFileExist, listDirectory)
+import System.FilePath (takeDirectory, (</>))
+import System.IO.Error (isDoesNotExistError)
+import Text.Read (readMaybe)
 
 data PortDirection
-  = In | Out | InOut
+  = In
+  | Out
+  | InOut
   deriving (Generic, Eq, Read, Show)
 
 instance ToJSON PortDirection where
-  toJSON = Aeson.genericToJSON Aeson.defaultOptions
-    { Aeson.constructorTagModifier = fmap toLower }
+  toJSON =
+    Aeson.genericToJSON
+      Aeson.defaultOptions
+        { Aeson.constructorTagModifier = fmap toLower
+        }
 
 instance FromJSON PortDirection where
-  parseJSON = Aeson.genericParseJSON Aeson.defaultOptions
-    { Aeson.constructorTagModifier = fmap toLower }
+  parseJSON =
+    Aeson.genericParseJSON
+      Aeson.defaultOptions
+        { Aeson.constructorTagModifier = fmap toLower
+        }
 
 data ManifestPort = ManifestPort
-  { mpName :: Text
-  -- ^ Port name (as rendered in HDL)
-  , mpTypeName :: Text
-  -- ^ Type name (as rendered in HDL)
-  , mpDirection :: PortDirection
-  -- ^ Port direction (in / out / inout)
-  , mpWidth :: Int
-  -- ^ Port width in bits
-  , mpIsClock :: Bool
-  -- ^ Is this port a clock?
-  , mpDomain :: Maybe Text
-  -- ^ Domain this port belongs to. This is currently only included for clock,
-  -- reset, and enable ports. TODO: add to all ports originally defined as a
-  -- @Signal@ too.
-  } deriving (Show,Read,Eq)
+  { -- | Port name (as rendered in HDL)
+    mpName :: Text,
+    -- | Type name (as rendered in HDL)
+    mpTypeName :: Text,
+    -- | Port direction (in / out / inout)
+    mpDirection :: PortDirection,
+    -- | Port width in bits
+    mpWidth :: Int,
+    -- | Is this port a clock?
+    mpIsClock :: Bool,
+    -- | Domain this port belongs to. This is currently only included for clock,
+    -- reset, and enable ports. TODO: add to all ports originally defined as a
+    -- @Signal@ too.
+    mpDomain :: Maybe Text
+  }
+  deriving (Show, Read, Eq)
 
 instance ToJSON ManifestPort where
-  toJSON (ManifestPort{..}) =
+  toJSON (ManifestPort {..}) =
     Aeson.object $
-      [ "name" .= mpName
-      , "type_name" .= mpTypeName
-      , "direction" .= mpDirection
-      , "width" .= mpWidth
-      , "is_clock" .= mpIsClock
-      ] <>
-      (case mpDomain of
-        Just dom -> ["domain" .= dom]
-        Nothing -> [] )
+      [ "name" .= mpName,
+        "type_name" .= mpTypeName,
+        "direction" .= mpDirection,
+        "width" .= mpWidth,
+        "is_clock" .= mpIsClock
+      ]
+        <> ( case mpDomain of
+               Just dom -> ["domain" .= dom]
+               Nothing -> []
+           )
 
 instance FromJSON ManifestPort where
   parseJSON = Aeson.withObject "ManifestPort" $ \v ->
@@ -133,70 +150,73 @@ instance FromJSON FilesManifest where
 -- should not rely on these — their existence, names, and contents may change
 -- between Clash versions.
 data DebugSubHashes = DebugSubHashes
-  { dshTops :: ByteString
-    -- ^ Hash of the full @[TopEntityT]@ list discovered in the design.
-  , dshPrimMap :: ByteString
-    -- ^ Hash of the compiled primitive map.
-  , dshClashModDate :: ByteString
-    -- ^ Hash of the @clash@ executable's modification time.
-  , dshCallGraph :: ByteString
-    -- ^ Hash of the call-graph closure of the top entity (i.e., the bindings
+  { -- | Hash of the full @[TopEntityT]@ list discovered in the design.
+    dshTops :: ByteString,
+    -- | Hash of the compiled primitive map.
+    dshPrimMap :: ByteString,
+    -- | Hash of the @clash@ executable's modification time.
+    dshClashModDate :: ByteString,
+    -- | Hash of the call-graph closure of the top entity (i.e., the bindings
     -- that actually contribute to the generated HDL).
-  , dshOpts :: ByteString
-    -- ^ Hash of the (HDL-affecting subset of the) 'ClashOpts'.
-  } deriving (Show, Read, Eq)
+    dshCallGraph :: ByteString,
+    -- | Hash of the (HDL-affecting subset of the) 'ClashOpts'.
+    dshOpts :: ByteString
+  }
+  deriving (Show, Read, Eq)
 
 -- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
   = Manifest
-  { manifestHash :: ByteString
-    -- ^ Hash digest of the TopEntity and all its dependencies.
-  , manifestDebugSubHashes :: Maybe DebugSubHashes
-    -- ^ Per-input subhashes that feed into 'manifestHash'. Debug-only — see
+  { -- | Hash digest of the TopEntity and all its dependencies.
+    manifestHash :: ByteString,
+    -- | Per-input subhashes that feed into 'manifestHash'. Debug-only — see
     -- 'DebugSubHashes'. 'Nothing' when reading an older manifest that
     -- predates this field.
-  , successFlags  :: (Int, Int)
-    -- ^ Compiler flags used to achieve successful compilation:
+    manifestDebugSubHashes :: Maybe DebugSubHashes,
+    -- | Compiler flags used to achieve successful compilation:
     --
     --   * opt_inlineLimit
     --   * opt_specLimit
-  , ports :: [ManifestPort]
-    -- ^ Ports in the generated @TopEntity@.
-  , componentNames :: [Text]
-    -- ^ Names of all the generated components for the @TopEntity@ (does not
+    successFlags :: (Int, Int),
+    -- | Ports in the generated @TopEntity@.
+    ports :: [ManifestPort],
+    -- | Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
     -- the @TopEntity@).
     --
     -- This list is reverse topologically sorted. I.e., a component might depend
     -- on any component listed before it, but not after it.
-  , topComponent :: Text
-    -- ^ Design entry point. This is usually the component annotated with a
+    componentNames :: [Text],
+    -- | Design entry point. This is usually the component annotated with a
     -- @TopEntity@ annotation.
-  , fileNames :: [(FilePath, ByteString)]
-    -- ^ Names and hashes of all the generated files for the @TopEntity@. Hashes
+    topComponent :: Text,
+    -- | Names and hashes of all the generated files for the @TopEntity@. Hashes
     -- are SHA256.
     --
     -- This list is reverse topologically sorted. I.e., a component might depend
     -- on any component listed before it, but not after it.
-  , domains :: HashMap Text VDomainConfiguration
-    -- ^ Domains encountered in design
-  , transitiveDependencies :: [Text]
-    -- ^ Dependencies of this design (fully qualified binder names). Is a
+    fileNames :: [(FilePath, ByteString)],
+    -- | Domains encountered in design
+    domains :: HashMap Text VDomainConfiguration,
+    -- | Dependencies of this design (fully qualified binder names). Is a
     -- transitive closure of all dependencies.
     --
     -- This list is reverse topologically sorted. I.e., a component might depend
     -- on any component listed before it, but not after it.
-  } deriving (Show,Read,Eq)
+    transitiveDependencies :: [Text]
+  }
+  deriving (Show, Read, Eq)
 
 -- | JSON shape for 'DebugSubHashes'. All values are hex-encoded SHA256 digests.
 instance ToJSON DebugSubHashes where
-  toJSON DebugSubHashes{..} = Aeson.object
-    [ "tops" .= toHexDigest dshTops
-    , "prim_map" .= toHexDigest dshPrimMap
-    , "clash_mod_date" .= toHexDigest dshClashModDate
-    , "call_graph" .= toHexDigest dshCallGraph
-    , "opts" .= toHexDigest dshOpts
-    ]
+  toJSON DebugSubHashes {..} =
+    Aeson.object
+      [ "tops" .= toHexDigest dshTops,
+        "prim_map" .= toHexDigest dshPrimMap,
+        "clash_mod_date" .= toHexDigest dshClashModDate,
+        "call_graph" .= toHexDigest dshCallGraph,
+        "opts" .= toHexDigest dshOpts
+      ]
 
 instance FromJSON DebugSubHashes where
   parseJSON = Aeson.withObject "DebugSubHashes" $ \v ->
@@ -209,42 +229,48 @@ instance FromJSON DebugSubHashes where
       <*> (unsafeFromHexDigest <$> v .: "opts")
 
 instance ToJSON Manifest where
-  toJSON (Manifest{..}) =
+  toJSON (Manifest {..}) =
     Aeson.object $
-      [ "version" .= ("unstable" :: Text)
-      , "hash" .= toHexDigest manifestHash
-      ] <>
-      (case manifestDebugSubHashes of
-        Just sh -> ["__debug_hash" .= sh]
-        Nothing -> []) <>
-      [ "flags" .= successFlags
-        -- TODO: add nested ports (i.e., how Clash split/filtered arguments)
-      , "components" .= componentNames
-      , "top_component" .= Aeson.object
-        [ "name" .= topComponent
-        , "ports_flat" .= ports
-        ]
-      , "files" .=
-        [ Aeson.object
-          [ "name" .= fName
-          , "sha256" .= toHexDigest fHash
-            -- TODO: Add Edam like fields
-          ]
-        | (fName, fHash) <- fileNames]
-      , "domains" .= HashMap.fromList
-        [ ( domNm
-          , Aeson.object
-            [ "period" .= vPeriod
-            , "active_edge" .= show vActiveEdge
-            , "reset_kind" .= show vResetKind
-            , "init_behavior" .= show vInitBehavior
-            , "reset_polarity" .= show vResetPolarity
-            ]
-          )
-        | (domNm, VDomainConfiguration{..}) <- HashMap.toList domains ]
-      , "dependencies" .= Aeson.object
-        [ "transitive" .= transitiveDependencies ]
+      [ "version" .= ("unstable" :: Text),
+        "hash" .= toHexDigest manifestHash
       ]
+        <> ( case manifestDebugSubHashes of
+               Just sh -> ["__debug_hash" .= sh]
+               Nothing -> []
+           )
+        <> [ "flags" .= successFlags,
+             -- TODO: add nested ports (i.e., how Clash split/filtered arguments)
+             "components" .= componentNames,
+             "top_component"
+               .= Aeson.object
+                 [ "name" .= topComponent,
+                   "ports_flat" .= ports
+                 ],
+             "files"
+               .= [ Aeson.object
+                      [ "name" .= fName,
+                        "sha256" .= toHexDigest fHash
+                        -- TODO: Add Edam like fields
+                      ]
+                  | (fName, fHash) <- fileNames
+                  ],
+             "domains"
+               .= HashMap.fromList
+                 [ ( domNm,
+                     Aeson.object
+                       [ "period" .= vPeriod,
+                         "active_edge" .= show vActiveEdge,
+                         "reset_kind" .= show vResetKind,
+                         "init_behavior" .= show vInitBehavior,
+                         "reset_polarity" .= show vResetPolarity
+                       ]
+                   )
+                 | (domNm, VDomainConfiguration {..}) <- HashMap.toList domains
+                 ],
+             "dependencies"
+               .= Aeson.object
+                 ["transitive" .= transitiveDependencies]
+           ]
 
 -- Note [Failed hex digest decodes]
 --
@@ -279,48 +305,46 @@ parseFiles v = do
 
 instance FromJSON Manifest where
   parseJSON = Aeson.withObject "Manifest" $ \v ->
-    let
-      topComponent = v .: "top_component"
-    in
-      Manifest
-            -- See Note [Failed hex digest decodes]
-        <$> (unsafeFromHexDigest <$> v .: "hash")
-        <*> v .:? "__debug_hash"
-        <*> v .: "flags"
-        <*> (topComponent >>= (.: "ports_flat"))
-        <*> v .: "components"
-        <*> (topComponent >>= (.: "name"))
-        <*> parseFiles v
-        <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
-        <*> (v .: "dependencies" >>= (.: "transitive"))
-   where
-    parseDomain :: Text -> Aeson.Object -> Parser VDomainConfiguration
-    parseDomain nm v =
-      VDomainConfiguration
-        <$> pure (Text.unpack nm)
-        <*> (v .: "period")
-        <*> parseWithRead "active_edge" v
-        <*> parseWithRead "reset_kind" v
-        <*> parseWithRead "init_behavior" v
-        <*> parseWithRead "reset_polarity" v
+    let topComponent = v .: "top_component"
+     in Manifest
+          -- See Note [Failed hex digest decodes]
+          <$> (unsafeFromHexDigest <$> v .: "hash")
+          <*> v .:? "__debug_hash"
+          <*> v .: "flags"
+          <*> (topComponent >>= (.: "ports_flat"))
+          <*> v .: "components"
+          <*> (topComponent >>= (.: "name"))
+          <*> parseFiles v
+          <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
+          <*> (v .: "dependencies" >>= (.: "transitive"))
+    where
+      parseDomain :: Text -> Aeson.Object -> Parser VDomainConfiguration
+      parseDomain nm v =
+        VDomainConfiguration
+          <$> pure (Text.unpack nm)
+          <*> (v .: "period")
+          <*> parseWithRead "active_edge" v
+          <*> parseWithRead "reset_kind" v
+          <*> parseWithRead "init_behavior" v
+          <*> parseWithRead "reset_polarity" v
 
-    parseWithRead field obj = do
-      v <- obj .:? field
-      case readMaybe =<< v of
-        Just a -> pure a
-        Nothing -> fail $ "Could not read field: " <> show field
+      parseWithRead field obj = do
+        v <- obj .:? field
+        case readMaybe =<< v of
+          Just a -> pure a
+          Nothing -> fail $ "Could not read field: " <> show field
 
 data UnexpectedModification
-  -- | Clash generated file was modified
-  = Modified FilePath
-  -- | Non-clash generated file was added
-  | Added FilePath
-  -- | Clash generated file was removed
-  | Removed FilePath
+  = -- | Clash generated file was modified
+    Modified FilePath
+  | -- | Non-clash generated file was added
+    Added FilePath
+  | -- | Clash generated file was removed
+    Removed FilePath
   deriving (Show)
 
 mkManifestPort ::
-  Backend backend =>
+  (Backend backend) =>
   -- | Backend used to lookup port type names
   backend ->
   -- | Port name
@@ -329,22 +353,22 @@ mkManifestPort ::
   HWType ->
   PortDirection ->
   ManifestPort
-mkManifestPort backend portId portType portDir = ManifestPort{..}
- where
-  mpName = Id.toText portId
-  mpWidth = typeSize portType
-  mpDirection = portDir
-  mpIsClock = case portType of {Clock _ -> True; ClockN _ -> True; _ -> False}
-  mpDomain = hwTypeDomain portType
-  mpTypeName = flip evalState backend $ getAp $ do
-     LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
+mkManifestPort backend portId portType portDir = ManifestPort {..}
+  where
+    mpName = Id.toText portId
+    mpWidth = typeSize portType
+    mpDirection = portDir
+    mpIsClock = case portType of Clock _ -> True; ClockN _ -> True; _ -> False
+    mpDomain = hwTypeDomain portType
+    mpTypeName = flip evalState backend $ getAp $ do
+      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
 
 -- | Filename manifest file should be written to and read from
-manifestFilename :: IsString a => a
+manifestFilename :: (IsString a) => a
 manifestFilename = "clash-manifest.json"
 
 mkManifest ::
-  Backend backend =>
+  (Backend backend) =>
   -- | Backend used to lookup port type names
   backend ->
   -- | Domains encountered in design
@@ -363,28 +387,29 @@ mkManifest ::
   (ByteString, DebugSubHashes) ->
   -- | New manifest
   Manifest
-mkManifest backend domains ClashOpts{..} Component{..} components deps files (topHash, subHashes) = Manifest
-  { manifestHash = topHash
-  , manifestDebugSubHashes = if opt_debugManifestHash then Just subHashes else Nothing
-  , ports = inPorts <> inOutPorts <> outPorts
-  , componentNames = map Id.toText compNames
-  , topComponent = Id.toText componentName
-  , fileNames = files
-  , successFlags = (opt_inlineLimit, opt_specLimit)
-  , domains = domains
-  , transitiveDependencies = map (nameOcc . varName) deps
-  }
- where
-  compNames = map Netlist.componentName components
+mkManifest backend domains ClashOpts {..} Component {..} components deps files (topHash, subHashes) =
+  Manifest
+    { manifestHash = topHash,
+      manifestDebugSubHashes = if opt_debugManifestHash then Just subHashes else Nothing,
+      ports = inPorts <> inOutPorts <> outPorts,
+      componentNames = map Id.toText compNames,
+      topComponent = Id.toText componentName,
+      fileNames = files,
+      successFlags = (opt_inlineLimit, opt_specLimit),
+      domains = domains,
+      transitiveDependencies = map (nameOcc . varName) deps
+    }
+  where
+    compNames = map Netlist.componentName components
 
-  inPorts =
-    [mkManifestPort backend pName pType In | p@(pName, pType) <- inputs, not (Netlist.isBiDirectional p)]
+    inPorts =
+      [mkManifestPort backend pName pType In | p@(pName, pType) <- inputs, not (Netlist.isBiDirectional p)]
 
-  inOutPorts =
-    [mkManifestPort backend pName pType InOut | p@(pName, pType) <- inputs, Netlist.isBiDirectional p]
+    inOutPorts =
+      [mkManifestPort backend pName pType InOut | p@(pName, pType) <- inputs, Netlist.isBiDirectional p]
 
-  outPorts =
-    [mkManifestPort backend pName pType Out | (_, (pName, pType), _) <- outputs]
+    outPorts =
+      [mkManifestPort backend pName pType Out | (_, (pName, pType), _) <- outputs]
 
 -- | Pretty print an unexpected modification as a list item.
 pprintUnexpectedModification :: UnexpectedModification -> String
@@ -399,11 +424,13 @@ pprintUnexpectedModifications :: Int -> [UnexpectedModification] -> String
 pprintUnexpectedModifications 0 us = pprintUnexpectedModifications maxBound us
 pprintUnexpectedModifications _ [] = []
 pprintUnexpectedModifications _ [u] = "* " <> pprintUnexpectedModification u
-pprintUnexpectedModifications 1 (u:us) =
-  "* and " <> show (length (u:us)) <> " more unexpected changes"
-pprintUnexpectedModifications n (u:us) =
-  "* " <> pprintUnexpectedModification u
-        <> "\n" <> pprintUnexpectedModifications (n-1) us
+pprintUnexpectedModifications 1 (u : us) =
+  "* and " <> show (length (u : us)) <> " more unexpected changes"
+pprintUnexpectedModifications n (u : us) =
+  "* "
+    <> pprintUnexpectedModification u
+    <> "\n"
+    <> pprintUnexpectedModifications (n - 1) us
 
 -- | Reads a manifest file. Does not return manifest file if:
 --
@@ -432,132 +459,138 @@ readFreshManifest ::
   --   , Nothing on stale cache, disabled cache, or not manifest file found
   --   , Top-level hash plus per-input subhashes used to derive it )
   IO (Maybe [UnexpectedModification], Maybe Manifest, (ByteString, DebugSubHashes))
-readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashModDate path = do
+readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts {..}) clashModDate path = do
   modificationsM <- traverse (isUserModified path) =<< readManifest path
 
   manifestM <- readManifest path
   pure
-    ( modificationsM
-    , checkManifest =<< if opt_cachehdl then manifestM else Nothing
-    , (topHash, subHashes)
+    ( modificationsM,
+      checkManifest =<< if opt_cachehdl then manifestM else Nothing,
+      (topHash, subHashes)
     )
+  where
+    optsHash =
+      hash
+        opts
+          {
+            -- Ignore the following settings, they don't affect the generated HDL:
 
- where
-  optsHash = hash opts {
-      -- Ignore the following settings, they don't affect the generated HDL:
+            -- 1. Debug
+            opt_debug =
+              opt_debug
+                { dbg_invariants = False,
+                  dbg_transformations = Set.empty,
+                  dbg_historyFile = Nothing
+                },
 
-      -- 1. Debug
-      opt_debug = opt_debug
-        { dbg_invariants = False
-        , dbg_transformations = Set.empty
-        , dbg_historyFile = Nothing
+            -- 2. Caching
+            opt_cachehdl = True,
+
+            -- 3. Warnings / errors
+            opt_warnings = defWarningOpts,
+            opt_werror = False,
+            opt_color = Auto,
+            opt_errorExtra = False,
+            opt_checkIDir = True,
+            opt_ignoreBrokenGhcs = False,
+
+            -- 4. Optional output
+            opt_edalize = False,
+
+            -- Ignore the following settings, they don't affect the generated HDL. However,
+            -- they do influence whether HDL can be generated at all.
+            --
+            -- We therefore check whether the new flags changed in such a way that
+            -- they could affect successful compilation, and use that information
+            -- to decide whether to use caching or not (see: XXXX).
+            --
+            -- 5. termination measures
+            opt_inlineLimit = 20,
+            opt_specLimit = 20,
+
+            -- Finally, also ignore the HDL dir setting, because when a user moves the
+            -- entire dir with generated HDL, they probably still want to use that as
+            -- a cache
+            opt_hdlDir = Nothing
+          }
+
+    -- TODO: Binary encoding does not account for alpha equivalence (nor should
+    --       it?), so the cache behaves more pessimisticly than it could.
+    --
+    -- Compute each input's digest independently so that they can be surfaced
+    -- via 'manifestDebugSubHashes'. The top-level hash is then a digest of the
+    -- subhashes — keeping it a deterministic function of the same inputs while
+    -- making it mechanically obvious which input changed between two runs.
+    subHashes =
+      DebugSubHashes
+        { dshTops = Sha256.hashlazy (Binary.encode tops),
+          dshPrimMap = Sha256.hashlazy (Binary.encode (hashCompiledPrimMap primMap)),
+          dshClashModDate = Sha256.hashlazy (Binary.encode (show clashModDate)),
+          dshCallGraph = Sha256.hashlazy (Binary.encode (callGraphBindings bindingsMap topId)),
+          dshOpts = Sha256.hashlazy (Binary.encode optsHash)
         }
 
-      -- 2. Caching
-    , opt_cachehdl = True
+    topHash =
+      Sha256.hashlazy $
+        Binary.encode
+          ( dshTops subHashes,
+            dshPrimMap subHashes,
+            dshClashModDate subHashes,
+            dshCallGraph subHashes,
+            dshOpts subHashes
+          )
 
-      -- 3. Warnings / errors
-    , opt_warnings = defWarningOpts
-    , opt_werror = False
-    , opt_color = Auto
-    , opt_errorExtra = False
-    , opt_checkIDir = True
-    , opt_ignoreBrokenGhcs = False
+    checkManifest manifest@Manifest {manifestHash, successFlags}
+      | (cachedInline, cachedSpec) <- successFlags,
 
-      -- 4. Optional output
-    , opt_edalize = False
+        -- Higher limits shouldn't affect HDL
+        cachedInline <= opt_inlineLimit,
+        cachedSpec <= opt_specLimit,
 
-      -- Ignore the following settings, they don't affect the generated HDL. However,
-      -- they do influence whether HDL can be generated at all.
-      --
-      -- We therefore check whether the new flags changed in such a way that
-      -- they could affect successful compilation, and use that information
-      -- to decide whether to use caching or not (see: XXXX).
-      --
-      -- 5. termination measures
-    , opt_inlineLimit = 20
-    , opt_specLimit = 20
+        -- Callgraph hashes should correspond
+        manifestHash == topHash =
+          Just manifest
 
-      -- Finally, also ignore the HDL dir setting, because when a user moves the
-      -- entire dir with generated HDL, they probably still want to use that as
-      -- a cache
-    , opt_hdlDir = Nothing
-    }
-
-  -- TODO: Binary encoding does not account for alpha equivalence (nor should
-  --       it?), so the cache behaves more pessimisticly than it could.
-  --
-  -- Compute each input's digest independently so that they can be surfaced
-  -- via 'manifestDebugSubHashes'. The top-level hash is then a digest of the
-  -- subhashes — keeping it a deterministic function of the same inputs while
-  -- making it mechanically obvious which input changed between two runs.
-  subHashes = DebugSubHashes
-    { dshTops = Sha256.hashlazy (Binary.encode tops)
-    , dshPrimMap = Sha256.hashlazy (Binary.encode (hashCompiledPrimMap primMap))
-    , dshClashModDate = Sha256.hashlazy (Binary.encode (show clashModDate))
-    , dshCallGraph = Sha256.hashlazy (Binary.encode (callGraphBindings bindingsMap topId))
-    , dshOpts = Sha256.hashlazy (Binary.encode optsHash)
-    }
-
-  topHash = Sha256.hashlazy $ Binary.encode
-    ( dshTops subHashes
-    , dshPrimMap subHashes
-    , dshClashModDate subHashes
-    , dshCallGraph subHashes
-    , dshOpts subHashes
-    )
-
-  checkManifest manifest@Manifest{manifestHash,successFlags}
-    | (cachedInline, cachedSpec) <- successFlags
-
-    -- Higher limits shouldn't affect HDL
-    , cachedInline <= opt_inlineLimit
-    , cachedSpec <= opt_specLimit
-
-    -- Callgraph hashes should correspond
-    , manifestHash == topHash
-    = Just manifest
-
-    -- One or more checks failed
-    | otherwise = Nothing
+      -- One or more checks failed
+      | otherwise = Nothing
 
 -- | Determines whether the HDL directory the given 'LocatedManifest' was found
 -- in contains any user made modifications. This is used by Clash to protect the
 -- user against lost work.
 isUserModified :: FilePath -> FilesManifest -> IO [UnexpectedModification]
 isUserModified (takeDirectory -> topDir) (FilesManifest fileNames) = do
-  let
-    manifestFiles = Set.fromList (map fst fileNames)
+  let manifestFiles = Set.fromList (map fst fileNames)
 
   currentFiles <- (Set.delete manifestFilename . Set.fromList) <$> listDirectory topDir
 
-  let
-    removedFiles = Set.toList (manifestFiles `Set.difference` currentFiles)
-    addedFiles = Set.toList (currentFiles `Set.difference` manifestFiles)
+  let removedFiles = Set.toList (manifestFiles `Set.difference` currentFiles)
+      addedFiles = Set.toList (currentFiles `Set.difference` manifestFiles)
 
   changedFiles <- catMaybes <$> mapM detectModification fileNames
 
   pure
-    (  map Removed removedFiles
-    <> map Added addedFiles
-    <> map Modified changedFiles )
- where
-  detectModification :: (FilePath, ByteString) -> IO (Maybe FilePath)
-  detectModification (filename, manifestDigest) = do
-    let fullPath = topDir </> filename
-    fileExists <- doesFileExist fullPath
-    if fileExists then do
-      contents <- ByteStringLazy.readFile fullPath
-      if manifestDigest == Sha256.hashlazy contents
-      then pure Nothing
-      else pure (Just filename)
-    else
-      -- Will be caught by @removedFiles@
-      pure Nothing
+    ( map Removed removedFiles
+        <> map Added addedFiles
+        <> map Modified changedFiles
+    )
+  where
+    detectModification :: (FilePath, ByteString) -> IO (Maybe FilePath)
+    detectModification (filename, manifestDigest) = do
+      let fullPath = topDir </> filename
+      fileExists <- doesFileExist fullPath
+      if fileExists
+        then do
+          contents <- ByteStringLazy.readFile fullPath
+          if manifestDigest == Sha256.hashlazy contents
+            then pure Nothing
+            else pure (Just filename)
+        else
+          -- Will be caught by @removedFiles@
+          pure Nothing
 
 -- | Read a manifest file from disk. Returns 'Nothing' if file does not exist.
 -- Any other IO exception is re-raised.
-readManifest :: FromJSON a => FilePath -> IO (Maybe a)
+readManifest :: (FromJSON a) => FilePath -> IO (Maybe a)
 readManifest path = do
   contentsE <- tryJust (guard . isDoesNotExistError) (Aeson.decodeFileStrict path)
   pure (either (const Nothing) id contentsE)

@@ -5,10 +5,9 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Convenience functions \"missing\" in "Test.Tasty.Hedgehog"
 -}
-
 module Test.Tasty.Hedgehog.Extra (testPropertyXXX) where
 
-import Data.String (IsString(fromString))
+import Data.String (IsString (fromString))
 import Hedgehog (Property)
 import Test.Tasty (TestName, TestTree)
 import Test.Tasty.Hedgehog (testPropertyNamed)

@@ -1,3 +1,14 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
   Copyright   :  (C) 2019     , Myrtle Software Ltd.
                      2018     , @blaxill
@@ -6,52 +17,41 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RoleAnnotations #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Signal.Delayed.Internal
   ( -- * Delay-annotated synchronous signals
-    DSignal(..)
-  , feedback
-  , fromSignal
+    DSignal (..),
+    feedback,
+    fromSignal,
+
     -- * List \<-\> DSignal conversion (not synthesizable)
-  , dfromList
+    dfromList,
+
     -- ** lazy versions
-  , dfromList_lazy
+    dfromList_lazy,
+
     -- * Experimental
-  , unsafeFromSignal
-  , antiDelay
-  , forward
+    unsafeFromSignal,
+    antiDelay,
+    forward,
   )
 where
 
-import Data.Coerce                (coerce)
-import Data.Default               (Default(..))
-import GHC.TypeLits               (Nat, type (+))
-import Language.Haskell.TH.Syntax (Lift)
 import CheckedLiterals.Class.Integer
-  ( CheckedNegativeIntegerLiteral
-  , CheckedPositiveIntegerLiteral
+  ( CheckedNegativeIntegerLiteral,
+    CheckedPositiveIntegerLiteral,
   )
 import CheckedLiterals.Class.Rational
-  ( CheckedNegativeRationalLiteral
-  , CheckedPositiveRationalLiteral
+  ( CheckedNegativeRationalLiteral,
+    CheckedPositiveRationalLiteral,
   )
-import Test.QuickCheck            (Arbitrary, CoArbitrary)
-
-import Clash.Promoted.Nat         (SNat)
-import Clash.Signal.Internal      (Signal, Domain, fromList, fromList_lazy)
-import Clash.XException           (NFDataX)
+import Clash.Promoted.Nat (SNat)
+import Clash.Signal.Internal (Domain, Signal, fromList, fromList_lazy)
+import Clash.XException (NFDataX)
+import Data.Coerce (coerce)
+import Data.Default (Default (..))
+import GHC.TypeLits (Nat, type (+))
+import Language.Haskell.TH.Syntax (Lift)
+import Test.QuickCheck (Arbitrary, CoArbitrary)
 
 {- $setup
 >>> :set -XDataKinds
@@ -109,12 +109,25 @@ let numbers
 -- as it is safe to coerce the values in the signal, but not safe to coerce the
 -- synthesis domain or delay in the signal.
 type role DSignal nominal nominal representational
-newtype DSignal (dom :: Domain) (delay :: Nat) a =
-    DSignal { toSignal :: Signal dom a
-              -- ^ Strip a 'DSignal' of its delay information.
-            }
-  deriving ( Show, Default, Functor, Applicative, Num, Fractional
-           , Foldable, Traversable, Arbitrary, CoArbitrary, Lift )
+
+newtype DSignal (dom :: Domain) (delay :: Nat) a
+  = DSignal
+  { -- | Strip a 'DSignal' of its delay information.
+    toSignal :: Signal dom a
+  }
+  deriving
+    ( Show,
+      Default,
+      Functor,
+      Applicative,
+      Num,
+      Fractional,
+      Foldable,
+      Traversable,
+      Arbitrary,
+      CoArbitrary,
+      Lift
+    )
 
 instance
   (CheckedPositiveIntegerLiteral lit a) =>
@@ -141,7 +154,7 @@ instance
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-dfromList :: NFDataX a => [a] -> DSignal dom 0 a
+dfromList :: (NFDataX a) => [a] -> DSignal dom 0 a
 dfromList = coerce . fromList
 
 -- | Create a 'DSignal' from a list
@@ -181,10 +194,10 @@ dfromList_lazy = coerce . fromList_lazy
 --
 -- >>> sampleN 7 (toSignal (mac systemClockGen systemResetGen enableGen (dfromList [0..]) (dfromList [0..])))
 -- [0,0,1,5,14,30,55]
-feedback
-  :: (DSignal dom n a -> (DSignal dom n a,DSignal dom (n + m + 1) a))
-  -> DSignal dom n a
-feedback f = let (o,r) = f (coerce r) in o
+feedback ::
+  (DSignal dom n a -> (DSignal dom n a, DSignal dom (n + m + 1) a)) ->
+  DSignal dom n a
+feedback f = let (o, r) = f (coerce r) in o
 
 -- | 'Signal's are not delayed
 fromSignal :: Signal dom a -> DSignal dom 0 a
@@ -252,6 +265,5 @@ antiDelay _ = coerce
 --
 -- >>> sampleN 8 (toSignal (numbers systemClockGen systemResetGen enableGen))
 -- [(1,0),(1,2),(5,2),(10,10),(100,20),(200,200),(200,400),(200,400)]
-
 forward :: SNat d -> DSignal dom n a -> DSignal dom (n + d) a
 forward _ = coerce

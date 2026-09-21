@@ -3,11 +3,11 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
 module Clash.Class.AutoReg
-  ( AutoReg (autoReg)
-  , deriveAutoReg
-  ) where
+  ( AutoReg (autoReg),
+    deriveAutoReg,
+  )
+where
 
-import Clash.Class.AutoReg.Internal
 import Clash.Class.AutoReg.Instances ()
+import Clash.Class.AutoReg.Internal

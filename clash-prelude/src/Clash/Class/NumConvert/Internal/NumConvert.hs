@@ -19,8 +19,6 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 module Clash.Class.NumConvert.Internal.NumConvert where
 
-import Prelude
-
 import Clash.Class.BitPack
 import Clash.Class.NumConvert.Internal.Canonical
 import Clash.Class.Resize
@@ -28,12 +26,11 @@ import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
-
-import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
-import GHC.TypeLits.Extra (CLogWZ)
-
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Word (Word16, Word32, Word64, Word8)
+import GHC.TypeLits (KnownNat, type (+), type (<=), type (^))
+import GHC.TypeLits.Extra (CLogWZ)
+import Prelude
 
 {- $setup
 >>> import Clash.Prelude
@@ -95,9 +92,9 @@ All implementations should be total, i.e., they should not produce \"bottoms\".
 Additionally, any implementation should be translatable to synthesizable HDL.
 -}
 type NumConvert a b =
-  ( NumConvertCanonical a (Canonical a)
-  , NumConvertCanonical (Canonical a) (Canonical b)
-  , NumConvertCanonical (Canonical b) b
+  ( NumConvertCanonical a (Canonical a),
+    NumConvertCanonical (Canonical a) (Canonical b),
+    NumConvertCanonical (Canonical b) b
   )
 
 {- | Convert a supplied value of type @a@ to a value of type @b@. The conversion
@@ -115,11 +112,11 @@ of @Index 8@ can be represented by an @Unsigned 2@:
 For the time being, if the input is an 'Clash.XException.XException', then
 the output is too. This property might be relaxed in the future.
 -}
-numConvert :: forall a b. NumConvert a b => a -> b
+numConvert :: forall a b. (NumConvert a b) => a -> b
 numConvert =
-    numConvertCanonical @(Canonical b) @b
-  . numConvertCanonical @(Canonical a) @(Canonical b)
-  . numConvertCanonical @a @(Canonical a)
+  numConvertCanonical @(Canonical b) @b
+    . numConvertCanonical @(Canonical a) @(Canonical b)
+    . numConvertCanonical @a @(Canonical a)
 
 instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (Index n) (Index m) where
   numConvertCanonical = resize
@@ -172,57 +169,68 @@ instance (KnownNat n, KnownNat m, n <= m) => NumConvertCanonical (BitVector n) (
 -- Concrete bidirectional instances for Word types
 instance NumConvertCanonical Word (Unsigned WORD_SIZE_IN_BITS) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Unsigned WORD_SIZE_IN_BITS) Word where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Word64 (Unsigned 64) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Unsigned 64) Word64 where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Word32 (Unsigned 32) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Unsigned 32) Word32 where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Word16 (Unsigned 16) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Unsigned 16) Word16 where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Word8 (Unsigned 8) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Unsigned 8) Word8 where
   numConvertCanonical = bitCoerce
 
 -- Concrete bidirectional instances for Int types
 instance NumConvertCanonical Int (Signed WORD_SIZE_IN_BITS) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Signed WORD_SIZE_IN_BITS) Int where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Int64 (Signed 64) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Signed 64) Int64 where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Int32 (Signed 32) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Signed 32) Int32 where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Int16 (Signed 16) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Signed 16) Int16 where
   numConvertCanonical = bitCoerce
 
 instance NumConvertCanonical Int8 (Signed 8) where
   numConvertCanonical = bitCoerce
+
 instance NumConvertCanonical (Signed 8) Int8 where
   numConvertCanonical = bitCoerce
 
 -- Concrete bidirectional instances for Bit
 instance NumConvertCanonical Bit (BitVector 1) where
   numConvertCanonical = pack
+
 instance NumConvertCanonical (BitVector 1) Bit where
   numConvertCanonical = unpack

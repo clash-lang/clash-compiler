@@ -1,3 +1,7 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -5,18 +9,7 @@
 
   Tests for structural equality and comparison of 'Type'
 -}
-
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Tests.Core.StructuralEquivalence (tests) where
-
-import Data.Text (Text)
-
-import Test.Tasty
-import Test.Tasty.HUnit
-import Test.Tasty.TH (testGroupGenerator)
 
 import Clash.Core.Name (NameSort (..), mkUnsafeName)
 import Clash.Core.Subst (eqType, eqVar, ordType)
@@ -24,8 +17,11 @@ import Clash.Core.Type (Kind, LitTy (..), Type (..))
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Var (TyVar, Var (..))
 import Clash.Unique (Unique)
-
+import Data.Text (Text)
 import Test.Clash.Rewrite (intTy, parseTyConTy)
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.TH (testGroupGenerator)
 
 -- | A 'TyVar' with the given human readable name, unique and kind. Unlike
 -- 'Test.Clash.Rewrite.tyVar', whose kind is always 'liftedTypeKind'.
@@ -114,33 +110,33 @@ case_structuralIsFinerThanAlpha = do
   -- @Eq Type@ is alpha equivalence
   t1 @=? t2
   assertNotEqualTy t1 t2
- where
-  t1 = ForAllTy a (VarTy a)
-  t2 = ForAllTy b (VarTy b)
-  a = kindedTyVar "a" 1 liftedTypeKind
-  b = kindedTyVar "b" 2 liftedTypeKind
+  where
+    t1 = ForAllTy a (VarTy a)
+    t2 = ForAllTy b (VarTy b)
+    a = kindedTyVar "a" 1 liftedTypeKind
+    b = kindedTyVar "b" 2 liftedTypeKind
 
 -- | At least one type per 'Type' constructor, plus the pairs that only differ
 -- in a nested detail, so that the 'ordType' laws below are exercised on
 -- types that compare equal as well as on types that don't.
 representativeTypes :: [Type]
 representativeTypes =
-  [ VarTy bLifted
-  , VarTy bKinded
-  , VarTy (kindedTyVar "b'" 2 liftedTypeKind)
-  , VarTy (kindedTyVar "c" 3 liftedTypeKind)
-  , intTy
-  , boolTy
-  , LitTy (NumTy 5)
-  , LitTy (NumTy 6)
-  , LitTy (SymTy "sym")
-  , LitTy (CharTy 'c')
-  , AppTy intTy boolTy
-  , AppTy boolTy intTy
-  , ForAllTy bLifted intTy
-  , ForAllTy bKinded intTy
-  , ForAllTy bLifted boolTy
-  , AnnType [] intTy
+  [ VarTy bLifted,
+    VarTy bKinded,
+    VarTy (kindedTyVar "b'" 2 liftedTypeKind),
+    VarTy (kindedTyVar "c" 3 liftedTypeKind),
+    intTy,
+    boolTy,
+    LitTy (NumTy 5),
+    LitTy (NumTy 6),
+    LitTy (SymTy "sym"),
+    LitTy (CharTy 'c'),
+    AppTy intTy boolTy,
+    AppTy boolTy intTy,
+    ForAllTy bLifted intTy,
+    ForAllTy bKinded intTy,
+    ForAllTy bLifted boolTy,
+    AnnType [] intTy
   ]
 
 -- | 'ordType' yields 'EQ' exactly when 'eqType' holds.
@@ -148,8 +144,8 @@ case_ordTypeAgreesWithEqType :: Assertion
 case_ordTypeAgreesWithEqType =
   sequence_
     [ assertEqual (show (t1, t2)) (eqType t1 t2) (ordType t1 t2 == EQ)
-    | t1 <- representativeTypes
-    , t2 <- representativeTypes
+    | t1 <- representativeTypes,
+      t2 <- representativeTypes
     ]
 
 -- | Swapping 'ordType''s arguments flips the 'Ordering'.
@@ -157,31 +153,31 @@ case_ordTypeAntisymmetric :: Assertion
 case_ordTypeAntisymmetric =
   sequence_
     [ assertEqual (show (t1, t2)) (flipOrdering (ordType t1 t2)) (ordType t2 t1)
-    | t1 <- representativeTypes
-    , t2 <- representativeTypes
+    | t1 <- representativeTypes,
+      t2 <- representativeTypes
     ]
- where
-  flipOrdering = \case
-    LT -> GT
-    EQ -> EQ
-    GT -> LT
+  where
+    flipOrdering = \case
+      LT -> GT
+      EQ -> EQ
+      GT -> LT
 
 -- | 'ordType' is reflexive.
 case_ordTypeReflexive :: Assertion
 case_ordTypeReflexive =
   sequence_
-    [ assertEqual (show t) EQ (ordType t t) | t <- representativeTypes ]
+    [assertEqual (show t) EQ (ordType t t) | t <- representativeTypes]
 
 -- | 'ordType' is transitive.
 case_ordTypeTransitive :: Assertion
 case_ordTypeTransitive =
   sequence_
     [ assertBool (show (t1, t2, t3)) (ordType t1 t3 /= GT)
-    | t1 <- representativeTypes
-    , t2 <- representativeTypes
-    , t3 <- representativeTypes
-    , ordType t1 t2 /= GT
-    , ordType t2 t3 /= GT
+    | t1 <- representativeTypes,
+      t2 <- representativeTypes,
+      t3 <- representativeTypes,
+      ordType t1 t2 /= GT,
+      ordType t2 t3 /= GT
     ]
 
 tests :: TestTree

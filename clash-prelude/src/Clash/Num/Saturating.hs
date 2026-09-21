@@ -1,41 +1,40 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 {-|
 Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module Clash.Num.Saturating
-  ( Saturating
-  , fromSaturating  -- exported here because haddock https://github.com/haskell/haddock/issues/456
-  , toSaturating
-  ) where
+  ( Saturating,
+    fromSaturating, -- exported here because haddock https://github.com/haskell/haddock/issues/456
+    toSaturating,
+  )
+where
 
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral,
+    CheckedPositiveIntegerLiteral,
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral,
+    CheckedPositiveRationalLiteral,
+  )
+import Clash.Class.BitPack (BitPack)
+import Clash.Class.Num (SaturatingNum (..), SaturationMode (SatBound))
+import Clash.Class.Parity (Parity)
+import Clash.Class.Resize (Resize (..))
+import Clash.XException (NFDataX, ShowX)
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
 import Data.Bits (Bits, FiniteBits)
 import Data.Coerce (coerce)
-import Data.Functor.Compose (Compose(..))
+import Data.Functor.Compose (Compose (..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
-import CheckedLiterals.Class.Integer
-  ( CheckedNegativeIntegerLiteral
-  , CheckedPositiveIntegerLiteral
-  )
-import CheckedLiterals.Class.Rational
-  ( CheckedNegativeRationalLiteral
-  , CheckedPositiveRationalLiteral
-  )
 import Test.QuickCheck (Arbitrary)
-
-import Clash.Class.BitPack (BitPack)
-import Clash.Class.Num (SaturationMode(SatBound), SaturatingNum(..))
-import Clash.Class.Parity (Parity)
-import Clash.Class.Resize (Resize(..))
-import Clash.XException (NFDataX, ShowX)
 
 -- | A saturating number type is one where all operations saturate at the
 -- bounds of the underlying type, i.e. operations which overflow return
@@ -43,23 +42,23 @@ import Clash.XException (NFDataX, ShowX)
 --
 -- Numbers can be converted to saturate by default using 'toSaturating'.
 --
-newtype Saturating a =
-  Saturating { fromSaturating :: a }
+newtype Saturating a
+  = Saturating {fromSaturating :: a}
   deriving newtype
-    ( Arbitrary
-    , Binary
-    , Bits
-    , BitPack
-    , Bounded
-    , Eq
-    , FiniteBits
-    , Hashable
-    , NFData
-    , NFDataX
-    , Ord
-    , Parity
-    , Show
-    , ShowX
+    ( Arbitrary,
+      Binary,
+      Bits,
+      BitPack,
+      Bounded,
+      Eq,
+      FiniteBits,
+      Hashable,
+      NFData,
+      NFDataX,
+      Ord,
+      Parity,
+      Show,
+      ShowX
     )
 
 {-# INLINE toSaturating #-}
@@ -84,27 +83,27 @@ instance
 
 instance (Resize f) => Resize (Compose Saturating f) where
   {-# INLINE resize #-}
-  resize
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Saturating f a
-    -> Compose Saturating f b
+  resize ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Saturating f a ->
+    Compose Saturating f b
   resize = coerce (resize @f @a @b)
 
   {-# INLINE zeroExtend #-}
-  zeroExtend
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Saturating f a
-    -> Compose Saturating f (b + a)
+  zeroExtend ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Saturating f a ->
+    Compose Saturating f (b + a)
   zeroExtend = coerce (zeroExtend @f @a @b)
 
   {-# INLINE truncateB #-}
-  truncateB
-    :: forall a b
-     . (KnownNat a)
-    => Compose Saturating f (a + b)
-    -> Compose Saturating f a
+  truncateB ::
+    forall a b.
+    (KnownNat a) =>
+    Compose Saturating f (a + b) ->
+    Compose Saturating f a
   truncateB = coerce (truncateB @f @a @b)
 
 instance (Ord a, SaturatingNum a) => Num (Saturating a) where

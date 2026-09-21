@@ -4,24 +4,21 @@
 
 module Test.Tasty.Vivado where
 
+import Clash.DataFiles (tclConnector)
+import Clash.Driver.Manifest (manifestFilename, topComponent)
 import Data.Coerce (coerce)
-import Data.String.Interpolate (__i)
-import Data.Text (Text)
-import Data.Tagged (Tagged (..))
 import Data.Proxy (Proxy (..))
-
+import Data.String.Interpolate (__i)
+import Data.Tagged (Tagged (..))
+import Data.Text (Text)
 import System.Directory (createDirectory)
-import System.FilePath ((</>), dropFileName)
+import System.FilePath (dropFileName, (</>))
+import Test.Tasty.Common
+import Test.Tasty.Options (IsOption (..), OptionDescription (..), flagCLParser, lookupOption, safeReadBool)
+import Test.Tasty.Program
 import Test.Tasty.Providers (IsTest (..), testPassed)
-import Test.Tasty.Options (IsOption (..), safeReadBool, flagCLParser, lookupOption, OptionDescription (..))
 import Text.Regex.TDFA (ExecOption (..), defaultCompOpt)
 import Text.Regex.TDFA.Text (compile)
-
-import Clash.Driver.Manifest (topComponent, manifestFilename)
-import Clash.DataFiles (tclConnector)
-
-import Test.Tasty.Common
-import Test.Tasty.Program
 
 -- | @--vivado@ flag for enabling tests that use vivado.
 newtype Vivado = Vivado Bool
@@ -34,13 +31,13 @@ instance IsOption Vivado where
   optionCLParser = flagCLParser Nothing (Vivado False)
 
 data VivadoTest = VivadoTest
-  { parentDir :: IO FilePath
-  , hdlDir :: IO FilePath
-  , topEntity :: Text
+  { parentDir :: IO FilePath,
+    hdlDir :: IO FilePath,
+    topEntity :: Text
   }
 
 instance IsTest VivadoTest where
-  run optionSet VivadoTest{..} progressCallback
+  run optionSet VivadoTest {..} progressCallback
     | Vivado True <- lookupOption optionSet = do
         buildTargetDir parentDir hdlDir
         dir <- hdlDir
@@ -51,19 +48,30 @@ instance IsTest VivadoTest where
         writeFile tclFp tcl
         runVivado dir ["-mode", "batch", "-source", tclFp]
     | otherwise = pure (testPassed "Ignoring test due to --no-vivado")
-
-   where
-    vivado workDir args =
-      TestFailingProgram True "vivado" args NoGlob PrintNeither False (Just 0)
-        (ExpectNotMatchStdOut re) (Just workDir)
-        -- Without XILINX_LOCAL_USER_DATA=no, concurrently running instances of
-        -- Vivado might error out while accessing the Xilinx Tcl App Store at
-        -- ~/.Xilinx. https://support.xilinx.com/s/article/63253
-        [("XILINX_LOCAL_USER_DATA", "no")]
-      where re = either error id
+    where
+      vivado workDir args =
+        TestFailingProgram
+          True
+          "vivado"
+          args
+          NoGlob
+          PrintNeither
+          False
+          (Just 0)
+          (ExpectNotMatchStdOut re)
+          (Just workDir)
+          -- Without XILINX_LOCAL_USER_DATA=no, concurrently running instances of
+          -- Vivado might error out while accessing the Xilinx Tcl App Store at
+          -- ~/.Xilinx. https://support.xilinx.com/s/article/63253
+          [("XILINX_LOCAL_USER_DATA", "no")]
+        where
+          re =
+            either
+              error
+              id
               (compile defaultCompOpt (ExecOption False) "^\\s*(@|(Error)|(FATAL_ERROR)|(The simulator has terminated in an unexpected manner))")
-    runVivado workDir args =
-      run optionSet (vivado workDir args) progressCallback
+      runVivado workDir args =
+        run optionSet (vivado workDir args) progressCallback
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Vivado)])
@@ -79,9 +87,10 @@ genSimTcl dir top = do
   connector <- tclConnector
   manifests <- getManifests (dir </> "*" </> manifestFilename)
   let topEntityDir = case filter ((== top) . topComponent . snd) manifests of
-                       (x,_):_ -> dropFileName x
-                       _ -> error "topEntity not found in manifest"
-  pure [__i|
+        (x, _) : _ -> dropFileName x
+        _ -> error "topEntity not found in manifest"
+  pure
+    [__i|
     set_msg_config -severity {CRITICAL WARNING} -new_severity ERROR
     source -notrace {#{connector}}
     clash::readMetadata {#{topEntityDir}}

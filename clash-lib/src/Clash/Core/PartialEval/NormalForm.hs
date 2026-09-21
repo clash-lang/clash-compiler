@@ -1,3 +1,6 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+
 {-|
 Copyright   : (C) 2020-2021, QBayLogic B.V.,
                   2022     , Google Inc.
@@ -10,48 +13,44 @@ give a stronger guarantee that evaluation does not produce invalid results.
 This module is only needed to define new evaluators, for calling an existing
 evaluator see Clash.Core.PartialEval.
 -}
-
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
-
 module Clash.Core.PartialEval.NormalForm
-  ( Arg
-  , Args
-  , Neutral(..)
-  , Value(..)
-  , mkValueTicks
-  , stripValue
-  , collectValueTicks
-  , isUndefined
-  , isUndefinedX
-  , Normal(..)
-  , LocalEnv(..)
-  , GlobalEnv(..)
-  , workFreeCache
-  ) where
+  ( Arg,
+    Args,
+    Neutral (..),
+    Value (..),
+    mkValueTicks,
+    stripValue,
+    collectValueTicks,
+    isUndefined,
+    isUndefinedX,
+    Normal (..),
+    LocalEnv (..),
+    GlobalEnv (..),
+    workFreeCache,
+  )
+where
 
+import Clash.Core.DataCon (DataCon)
+import Clash.Core.Literal
+import Clash.Core.Term (Bind, Pat, PrimInfo (primName), Term (..), TickInfo)
+import Clash.Core.TyCon (TyConMap)
+import Clash.Core.Type (TyVar, Type)
+import Clash.Core.Util (undefinedPrims, undefinedXPrims)
+import Clash.Core.Var (Id)
+import Clash.Core.VarEnv (InScopeSet, VarEnv)
+import Clash.Driver.Types (Binding (..))
+import Clash.Util.Supply (Supply)
 import Control.Lens (Lens', lens)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 
-import Clash.Core.DataCon (DataCon)
-import Clash.Core.Literal
-import Clash.Core.Term (Bind, Term(..), PrimInfo(primName), TickInfo, Pat)
-import Clash.Core.TyCon (TyConMap)
-import Clash.Core.Type (Type, TyVar)
-import Clash.Core.Util (undefinedPrims, undefinedXPrims)
-import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (VarEnv, InScopeSet)
-import Clash.Driver.Types (Binding(..))
-import Clash.Util.Supply (Supply)
-
-type Args a
-  = [Arg a]
+type Args a =
+  [Arg a]
 
 -- | An argument applied to a function / data constructor / primitive.
 --
-type Arg a
-  = Either a Type
+type Arg a =
+  Either a Type
 
 -- | Neutral terms cannot be reduced, as they represent things like variables
 -- which are unknown, partially applied functions, or case expressions where
@@ -71,12 +70,12 @@ type Arg a
 -- let ... in ... Preserved bindings are needed by the body
 --
 data Neutral a
-  = NeVar    !Id
-  | NePrim   !PrimInfo !(Args a)
-  | NeApp    !(Neutral a) !a
-  | NeTyApp  !(Neutral a) !Type
-  | NeLet    !(Bind a) !a
-  | NeCase   !a !Type ![(Pat, a)]
+  = NeVar !Id
+  | NePrim !PrimInfo !(Args a)
+  | NeApp !(Neutral a) !a
+  | NeTyApp !(Neutral a) !Type
+  | NeLet !(Bind a) !a
+  | NeCase !a !Type ![(Pat, a)]
   deriving (Show)
 
 -- TODO Write an instance (InferType a) => InferType (Neutral a)
@@ -94,14 +93,14 @@ data Neutral a
 -- to not be thunks.
 --
 data Value
-  = VNeutral  !(Neutral Value)
-  | VLiteral  !Literal
-  | VData     !DataCon !(Args Value) !LocalEnv
-  | VLam      !Id !Term !LocalEnv
-  | VTyLam    !TyVar !Term !LocalEnv
-  | VCast     !Value !Type !Type
-  | VTick     !Value !TickInfo
-  | VThunk    !Term !LocalEnv
+  = VNeutral !(Neutral Value)
+  | VLiteral !Literal
+  | VData !DataCon !(Args Value) !LocalEnv
+  | VLam !Id !Term !LocalEnv
+  | VTyLam !TyVar !Term !LocalEnv
+  | VCast !Value !Type !Type
+  | VTick !Value !TickInfo
+  | VThunk !Term !LocalEnv
   deriving (Show)
 
 -- TODO Write an instance InferType Value
@@ -115,23 +114,21 @@ stripValue = fst . collectValueTicks
 
 collectValueTicks :: Value -> (Value, [TickInfo])
 collectValueTicks = go []
- where
-  go !acc = \case
-    VTick v tick -> go (tick : acc) v
-    value -> (value, acc)
+  where
+    go !acc = \case
+      VTick v tick -> go (tick : acc) v
+      value -> (value, acc)
 
 isUndefined :: Value -> Bool
 isUndefined = \case
   VNeutral (NePrim pr _) ->
     primName pr `elem` undefinedPrims
-
   _ -> False
 
 isUndefinedX :: Value -> Bool
 isUndefinedX = \case
   VNeutral (NePrim pr _) ->
     primName pr `elem` undefinedXPrims
-
   _ -> False
 
 -- | A term which is in beta-normal eta-long form (NF). This has no redexes,
@@ -143,62 +140,63 @@ isUndefinedX = \case
 -- accidentally floating a let using a lambda bound variable outwards.
 --
 data Normal
-  = NNeutral  !(Neutral Normal)
-  | NLiteral  !Literal
-  | NData     !DataCon !(Args Normal)
-  | NLam      !Id !Normal !LocalEnv
-  | NTyLam    !TyVar !Normal !LocalEnv
-  | NCast     !Normal !Type !Type
-  | NTick     !Normal !TickInfo
+  = NNeutral !(Neutral Normal)
+  | NLiteral !Literal
+  | NData !DataCon !(Args Normal)
+  | NLam !Id !Normal !LocalEnv
+  | NTyLam !TyVar !Normal !LocalEnv
+  | NCast !Normal !Type !Type
+  | NTick !Normal !TickInfo
   deriving (Show)
 
 data LocalEnv = LocalEnv
-  { lenvContext :: Id
-    -- ^ The id of the term currently under evaluation.
-  , lenvTypes :: Map TyVar Type
-    -- ^ Local type environment. These are types that are introduced while
+  { -- | The id of the term currently under evaluation.
+    lenvContext :: Id,
+    -- | Local type environment. These are types that are introduced while
     -- evaluating the current term (i.e. by type applications)
-  , lenvValues :: Map Id Value
-    -- ^ Local term environment. These are WHNF terms or unevaluated thunks
+    lenvTypes :: Map TyVar Type,
+    -- | Local term environment. These are WHNF terms or unevaluated thunks
     -- introduced while evaluating the current term (i.e. by applications)
-  , lenvFuel :: Word
-    -- ^ The amount of fuel left in the local environment when the previous
+    lenvValues :: Map Id Value,
+    -- | The amount of fuel left in the local environment when the previous
     -- head was reached. This is needed so resuming evaluation does not lead
     -- to additional fuel being available.
-  , lenvKeepLifted :: Bool
-    -- ^ When evaluating, keep data constructors for boxed data types (e.g. I#)
+    lenvFuel :: Word,
+    -- | When evaluating, keep data constructors for boxed data types (e.g. I#)
     -- instead of converting these back to their corresponding primitive. This
     -- is used when evaluating terms where the result is subject of a case
     -- expression (see note: lifted data types).
-  } deriving (Show)
+    lenvKeepLifted :: Bool
+  }
+  deriving (Show)
 
 -- TODO Add recursion info to the global environment. Until then we are forced
 -- to spend fuel on non-recursive (terminating) terms.
 
 data GlobalEnv = GlobalEnv
-  { genvBindings :: VarEnv (Binding Value)
-    -- ^ Global term environment. These are the potentially evaluated bodies
+  { -- | Global term environment. These are the potentially evaluated bodies
     -- of the top level definitions which are forced on lookup.
-  , genvTyConMap :: TyConMap
-    -- ^ The type constructors known about by Clash.
-  , genvInScope :: InScopeSet
-    -- ^ The set of in scope variables during partial evaluation. This includes
+    genvBindings :: VarEnv (Binding Value),
+    -- | The type constructors known about by Clash.
+    genvTyConMap :: TyConMap,
+    -- | The set of in scope variables during partial evaluation. This includes
     -- new variables introduced by the evaluator (such as the ids of binders
     -- introduced during eta expansion.)
-  , genvSupply :: Supply
-    -- ^ The supply of fresh names for generating identifiers.
-  , genvFuel :: Word
-    -- ^ The remaining fuel which can be spent inlining global variables. This
+    genvInScope :: InScopeSet,
+    -- | The supply of fresh names for generating identifiers.
+    genvSupply :: Supply,
+    -- | The remaining fuel which can be spent inlining global variables. This
     -- is saved in the local environment, so when evaluation resumes from WHNF
     -- the amount of fuel used is preserved.
-  , genvHeap :: IntMap Value
-    -- ^ The heap containing the results of any evaluated IO primitives.
-  , genvAddr :: Int
-    -- ^ The address of the next element to be inserted into the heap.
-  , genvWorkCache :: VarEnv Bool
-    -- ^ Cache for the results of isWorkFree. This is required to use
+    genvFuel :: Word,
+    -- | The heap containing the results of any evaluated IO primitives.
+    genvHeap :: IntMap Value,
+    -- | The address of the next element to be inserted into the heap.
+    genvAddr :: Int,
+    -- | Cache for the results of isWorkFree. This is required to use
     -- Clash.Rewrite.WorkFree.isWorkFree.
+    genvWorkCache :: VarEnv Bool
   }
 
 workFreeCache :: Lens' GlobalEnv (VarEnv Bool)
-workFreeCache = lens genvWorkCache (\env x -> env { genvWorkCache = x })
+workFreeCache = lens genvWorkCache (\env x -> env {genvWorkCache = x})

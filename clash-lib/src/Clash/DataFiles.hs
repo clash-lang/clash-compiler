@@ -6,12 +6,10 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 This module provides a way to access static files that are useful when working
 with Clash designs.
 -}
-
 module Clash.DataFiles where
 
-import System.FilePath ((</>))
-
 import Paths_clash_lib (getDataFileName)
+import System.FilePath ((</>))
 
 {- | The Tcl Connector: a Tcl script that can parse Clash output and emit the
   correct commands for loading the design into Vivado (Quartus support will be

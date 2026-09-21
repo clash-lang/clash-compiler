@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
 {-|
   Copyright   :  (C) 2022     , Myrtle.ai,
                      2023     , QBayLogic B.V.,
@@ -6,26 +8,24 @@
 
   Blackbox functions for primitives in the @Clash.Magic@ module.
 -}
-
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
 module Clash.Primitives.Magic
-  ( clashCompileErrorBBF
-  ) where
-
-import Data.Either (lefts)
-import GHC.Stack (HasCallStack)
-import Text.Show.Pretty
+  ( clashCompileErrorBBF,
+  )
+where
 
 import Clash.Core.TermLiteral (termToDataError)
 import Clash.Netlist.BlackBox.Types (BlackBoxFunction)
 import Clash.Netlist.Types ()
+import Data.Either (lefts)
+import GHC.Stack (HasCallStack)
+import Text.Show.Pretty
 
-clashCompileErrorBBF :: HasCallStack => BlackBoxFunction
+clashCompileErrorBBF :: (HasCallStack) => BlackBoxFunction
 clashCompileErrorBBF _isD _primName args _ty
-  |   _hasCallstack
-    : (either error id . termToDataError -> msg)
-    : _ <- lefts args
-  = pure $ Left $ "clashCompileError: " <> msg
-  | otherwise
-  = pure $ Left $ show 'clashCompileErrorBBF <> ": bad args:\n" <> ppShow args
+  | _hasCallstack
+      : (either error id . termToDataError -> msg)
+      : _ <-
+      lefts args =
+      pure $ Left $ "clashCompileError: " <> msg
+  | otherwise =
+      pure $ Left $ show 'clashCompileErrorBBF <> ": bad args:\n" <> ppShow args

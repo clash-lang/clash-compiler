@@ -9,32 +9,32 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Clash.Num.Wrapping
-  ( Wrapping(..)
-  , toWrapping
-  ) where
+  ( Wrapping (..),
+    toWrapping,
+  )
+where
 
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral,
+    CheckedPositiveIntegerLiteral,
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral,
+    CheckedPositiveRationalLiteral,
+  )
+import Clash.Class.BitPack (BitPack)
+import Clash.Class.Num (SaturatingNum (..), SaturationMode (SatWrap))
+import Clash.Class.Parity (Parity)
+import Clash.Class.Resize (Resize (..))
+import Clash.XException (NFDataX, ShowX)
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
 import Data.Bits (Bits, FiniteBits)
 import Data.Coerce (coerce)
-import Data.Functor.Compose (Compose(..))
+import Data.Functor.Compose (Compose (..))
 import Data.Hashable (Hashable)
 import GHC.TypeLits (KnownNat, type (+))
-import CheckedLiterals.Class.Integer
-  ( CheckedNegativeIntegerLiteral
-  , CheckedPositiveIntegerLiteral
-  )
-import CheckedLiterals.Class.Rational
-  ( CheckedNegativeRationalLiteral
-  , CheckedPositiveRationalLiteral
-  )
 import Test.QuickCheck (Arbitrary)
-
-import Clash.Class.BitPack (BitPack)
-import Clash.Class.Num (SaturationMode(SatWrap), SaturatingNum(..))
-import Clash.Class.Parity (Parity)
-import Clash.Class.Resize (Resize(..))
-import Clash.XException (NFDataX, ShowX)
 
 -- | A wrapping number type is one where all operations wrap between minBound
 -- and maxBound (and vice-versa) if the result goes out of bounds for the
@@ -42,23 +42,23 @@ import Clash.XException (NFDataX, ShowX)
 --
 -- Numbers can be converted to wrap by default using 'toWrapping'.
 --
-newtype Wrapping a =
-  Wrapping { fromWrapping :: a }
+newtype Wrapping a
+  = Wrapping {fromWrapping :: a}
   deriving newtype
-    ( Arbitrary
-    , Binary
-    , Bits
-    , BitPack
-    , Bounded
-    , Eq
-    , FiniteBits
-    , Hashable
-    , NFData
-    , NFDataX
-    , Ord
-    , Parity
-    , Show
-    , ShowX
+    ( Arbitrary,
+      Binary,
+      Bits,
+      BitPack,
+      Bounded,
+      Eq,
+      FiniteBits,
+      Hashable,
+      NFData,
+      NFDataX,
+      Ord,
+      Parity,
+      Show,
+      ShowX
     )
 
 {-# INLINE toWrapping #-}
@@ -83,27 +83,27 @@ instance
 
 instance (Resize f) => Resize (Compose Wrapping f) where
   {-# INLINE resize #-}
-  resize
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Wrapping f a
-    -> Compose Wrapping f b
+  resize ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Wrapping f a ->
+    Compose Wrapping f b
   resize = coerce (resize @f @a @b)
 
   {-# INLINE zeroExtend #-}
-  zeroExtend
-    :: forall a b
-     . (KnownNat a, KnownNat b)
-    => Compose Wrapping f a
-    -> Compose Wrapping f (b + a)
+  zeroExtend ::
+    forall a b.
+    (KnownNat a, KnownNat b) =>
+    Compose Wrapping f a ->
+    Compose Wrapping f (b + a)
   zeroExtend = coerce (zeroExtend @f @a @b)
 
   {-# INLINE truncateB #-}
-  truncateB
-    :: forall a b
-     . (KnownNat a)
-    => Compose Wrapping f (a + b)
-    -> Compose Wrapping f a
+  truncateB ::
+    forall a b.
+    (KnownNat a) =>
+    Compose Wrapping f (a + b) ->
+    Compose Wrapping f a
   truncateB = coerce (truncateB @f @a @b)
 
 instance (SaturatingNum a) => Num (Wrapping a) where

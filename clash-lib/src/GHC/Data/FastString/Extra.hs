@@ -1,18 +1,22 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 module GHC.Data.FastString.Extra where
 
-import GHC.Data.FastString
-  (FastString (..), FastZString, bytesFS, fastZStringToByteString, mkFastStringByteList)
 import Data.Binary (Binary (..), Get)
 import Data.ByteString (ByteString)
-import Data.Hashable (Hashable(hashWithSalt))
+import Data.Hashable (Hashable (hashWithSalt))
+import GHC.Data.FastString
+  ( FastString (..),
+    FastZString,
+    bytesFS,
+    fastZStringToByteString,
+    mkFastStringByteList,
+  )
 import Unsafe.Coerce (unsafeCoerce)
 
 instance Hashable FastString where

@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                          2017, Google Inc.
@@ -7,50 +9,46 @@
 
   Types used in Normalize modules
 -}
-
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Normalize.Types where
 
+import Clash.Core.Term (Term)
+import Clash.Core.Type (Type)
+import Clash.Core.Var (Id)
+import Clash.Core.VarEnv (VarEnv)
+import Clash.Driver.Types (BindingMap)
+import Clash.Rewrite.Types (Rewrite, RewriteMonad)
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (State)
-import Data.Map                   (Map)
-import Data.Set                   (Set)
-import Data.Text                  (Text)
-
-import Clash.Core.Term        (Term)
-import Clash.Core.Type        (Type)
-import Clash.Core.Var         (Id)
-import Clash.Core.VarEnv      (VarEnv)
-import Clash.Driver.Types     (BindingMap)
-import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
+import Data.Map (Map)
+import Data.Set (Set)
+import Data.Text (Text)
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: BindingMap
-  -- ^ Global binders
-  , _specialisationCache :: Map (Id,Int,Either Term Type) Id
-  -- ^ Cache of previously specialized functions:
-  --
-  -- * Key: (name of the original function, argument position, specialized term/type)
-  --
-  -- * Elem: (name of specialized function,type of specialized function)
-  , _specialisationHistory :: VarEnv Int
-  -- ^ Cache of how many times a function was specialized
-  , _inlineHistory   :: VarEnv (VarEnv Int)
-  -- ^ Cache of function where inlining took place:
-  --
-  -- * Key: function where inlining took place
-  --
-  -- * Elem: (functions which were inlined, number of times inlined)
-  , _primitiveArgs :: Map Text (Set Int)
-  -- ^ Cache for looking up constantness of blackbox arguments
-  , _recursiveComponents :: VarEnv Bool
-  -- ^ Map telling whether a components is recursively defined.
-  --
-  -- NB: there are only no mutually-recursive component, only self-recursive
-  -- ones.
+  { -- | Global binders
+    _normalized :: BindingMap,
+    -- | Cache of previously specialized functions:
+    --
+    -- * Key: (name of the original function, argument position, specialized term/type)
+    --
+    -- * Elem: (name of specialized function,type of specialized function)
+    _specialisationCache :: Map (Id, Int, Either Term Type) Id,
+    -- | Cache of how many times a function was specialized
+    _specialisationHistory :: VarEnv Int,
+    -- | Cache of function where inlining took place:
+    --
+    -- * Key: function where inlining took place
+    --
+    -- * Elem: (functions which were inlined, number of times inlined)
+    _inlineHistory :: VarEnv (VarEnv Int),
+    -- | Cache for looking up constantness of blackbox arguments
+    _primitiveArgs :: Map Text (Set Int),
+    -- | Map telling whether a components is recursively defined.
+    --
+    -- NB: there are only no mutually-recursive component, only self-recursive
+    -- ones.
+    _recursiveComponents :: VarEnv Bool
   }
 
 Lens.makeLenses ''NormalizeState
@@ -69,10 +67,13 @@ type NormRewrite = Rewrite NormalizeState
 -- Is used as a performance/size metric.
 data TermClassification
   = TermClassification
-  { _function   :: !Int -- ^ Number of functions
-  , _primitive  :: !Int -- ^ Number of primitives
-  , _selection  :: !Int -- ^ Number of selections/multiplexers
+  { -- | Number of functions
+    _function :: !Int,
+    -- | Number of primitives
+    _primitive :: !Int,
+    -- | Number of selections/multiplexers
+    _selection :: !Int
   }
-  deriving Show
+  deriving (Show)
 
 Lens.makeLenses ''TermClassification

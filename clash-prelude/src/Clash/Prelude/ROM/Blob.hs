@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2022     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -17,44 +21,40 @@ Unlike "Clash.Prelude.ROM.File", "Clash.Prelude.ROM.Blob" generates practically
 the same HDL as "Clash.Prelude.ROM" and is compatible with all tools consuming
 the generated HDL.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Prelude.ROM.Blob
   ( -- * Asynchronous ROM defined by a 'MemBlob'
-    asyncRomBlob
-  , asyncRomBlobPow2
+    asyncRomBlob,
+    asyncRomBlobPow2,
+
     -- * Synchronous 'MemBlob' ROM synchronized to an arbitrary clock
-  , romBlob
-  , romBlobPow2
+    romBlob,
+    romBlobPow2,
+
     -- * Creating and inspecting 'MemBlob'
-  , MemBlob
-  , createMemBlob
-  , memBlobTH
-  , unpackMemBlob
+    MemBlob,
+    createMemBlob,
+    memBlobTH,
+    unpackMemBlob,
+
     -- * Internal
-  , asyncRomBlob#
+    asyncRomBlob#,
   )
 where
 
-import Data.Array (listArray)
-import Data.Array.Base (unsafeAt)
-import GHC.Stack (withFrozenCallStack)
-import GHC.TypeLits (KnownNat, type (^))
-
 import Clash.Annotations.Primitive (hasBlackBox)
-import qualified Clash.Explicit.ROM.Blob as E
 import Clash.Explicit.BlockRam.Blob (createMemBlob, memBlobTH)
-import Clash.Explicit.BlockRam.Internal (MemBlob(..), unpackMemBlob)
+import Clash.Explicit.BlockRam.Internal (MemBlob (..), unpackMemBlob)
+import qualified Clash.Explicit.ROM.Blob as E
 import Clash.Promoted.Nat (natToNum)
-import Clash.Signal (hideClock, hideEnable, HiddenClock, HiddenEnable)
+import Clash.Signal (HiddenClock, HiddenEnable, hideClock, hideEnable)
 import Clash.Signal.Internal (Signal)
 import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Unsigned (Unsigned)
 import Clash.XException (deepErrorX)
+import Data.Array (listArray)
+import Data.Array.Base (unsafeAt)
+import GHC.Stack (withFrozenCallStack)
+import GHC.TypeLits (KnownNat, type (^))
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
@@ -62,16 +62,16 @@ import Clash.XException (deepErrorX)
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Prelude.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
-asyncRomBlob
-  :: Enum addr
-  => MemBlob n m
-  -- ^ ROM content, also determines the size, @n@, of the ROM
+asyncRomBlob ::
+  (Enum addr) =>
+  -- | ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> addr
-  -- ^ Read address @r@
-  -> BitVector m
-  -- ^ The value of the ROM at address @r@
+  MemBlob n m ->
+  -- | Read address @r@
+  addr ->
+  -- | The value of the ROM at address @r@
+  BitVector m
 asyncRomBlob = \content rd -> asyncRomBlob# content (fromEnum rd)
 {-# INLINE asyncRomBlob #-}
 
@@ -81,43 +81,50 @@ asyncRomBlob = \content rd -> asyncRomBlob# content (fromEnum rd)
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Prelude.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
-asyncRomBlobPow2
-  :: KnownNat n
-  => MemBlob (2^n) m
-  -- ^ ROM content, also determines the size, 2^@n@, of the ROM
+asyncRomBlobPow2 ::
+  (KnownNat n) =>
+  -- | ROM content, also determines the size, 2^@n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> Unsigned n
-  -- ^ Read address @r@
-  -> BitVector m
-  -- ^ The value of the ROM at address @r@
+  MemBlob (2 ^ n) m ->
+  -- | Read address @r@
+  Unsigned n ->
+  -- | The value of the ROM at address @r@
+  BitVector m
 asyncRomBlobPow2 = asyncRomBlob
 {-# INLINE asyncRomBlobPow2 #-}
 
 -- | asyncRomBlob primitive
-asyncRomBlob#
-  :: forall m n
-   . MemBlob n m
-  -- ^ ROM content, also determines the size, @n@, of the ROM
+asyncRomBlob# ::
+  forall m n.
+  -- | ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> Int
-  -- ^ Read address @r@
-  -> BitVector m
-  -- ^ The value of the ROM at address @r@
-asyncRomBlob# content@MemBlob{} = safeAt
+  MemBlob n m ->
+  -- | Read address @r@
+  Int ->
+  -- | The value of the ROM at address @r@
+  BitVector m
+asyncRomBlob# content@MemBlob {} = safeAt
   where
     szI = natToNum @n @Int
-    arr = listArray (0,szI-1) $ unpackMemBlob content
+    arr = listArray (0, szI - 1) $ unpackMemBlob content
 
     safeAt :: Int -> BitVector m
     safeAt i =
-      if (0 <= i) && (i < szI) then
-        unsafeAt arr i
-      else
-        withFrozenCallStack
-          (deepErrorX ("asyncRom: address " ++ show i ++
-                       " not in range [0.." ++ show szI ++ ")"))
+      if (0 <= i) && (i < szI)
+        then
+          unsafeAt arr i
+        else
+          withFrozenCallStack
+            ( deepErrorX
+                ( "asyncRom: address "
+                    ++ show i
+                    ++ " not in range [0.."
+                    ++ show szI
+                    ++ ")"
+                )
+            )
 {-# ANN asyncRomBlob# hasBlackBox #-}
 {-# OPAQUE asyncRomBlob# #-}
 
@@ -131,20 +138,20 @@ asyncRomBlob# content@MemBlob{} = safeAt
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
-romBlob
-  :: forall dom addr m n
-   . ( HiddenClock dom
-     , HiddenEnable dom
-     , Enum addr
-     )
-  => MemBlob n m
-  -- ^ ROM content, also determines the size, @n@, of the ROM
+romBlob ::
+  forall dom addr m n.
+  ( HiddenClock dom,
+    HiddenEnable dom,
+    Enum addr
+  ) =>
+  -- | ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (BitVector m)
-  -- ^ The value of the ROM at address @r@ from the previous clock cycle
+  MemBlob n m ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | The value of the ROM at address @r@ from the previous clock cycle
+  Signal dom (BitVector m)
 romBlob = hideEnable (hideClock E.romBlob)
 {-# INLINE romBlob #-}
 
@@ -158,19 +165,19 @@ romBlob = hideEnable (hideClock E.romBlob)
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
-romBlobPow2
-  :: forall dom m n
-   . ( HiddenClock dom
-     , HiddenEnable dom
-     , KnownNat n
-     )
-  => MemBlob (2^n) m
-  -- ^ ROM content, also determines the size, 2^@n@, of the ROM
+romBlobPow2 ::
+  forall dom m n.
+  ( HiddenClock dom,
+    HiddenEnable dom,
+    KnownNat n
+  ) =>
+  -- | ROM content, also determines the size, 2^@n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom (Unsigned n)
-  -- ^ Read address @r@
-  -> Signal dom (BitVector m)
-  -- ^ The value of the ROM at address @r@ from the previous clock cycle
+  MemBlob (2 ^ n) m ->
+  -- | Read address @r@
+  Signal dom (Unsigned n) ->
+  -- | The value of the ROM at address @r@ from the previous clock cycle
+  Signal dom (BitVector m)
 romBlobPow2 = hideEnable (hideClock E.romBlobPow2)
 {-# INLINE romBlobPow2 #-}

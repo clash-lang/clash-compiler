@@ -1,3 +1,12 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
@@ -374,46 +383,34 @@ to conveniently filter out the undefinedness and replace it with the string @\"u
 This concludes the short introduction to using 'blockRam'.
 
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Prelude.BlockRam
   ( -- * BlockRAM synchronized to the system clock
-    blockRam
-  , blockRamPow2
-  , blockRamU
-  , blockRam1
-  , E.ResetStrategy(..)
+    blockRam,
+    blockRamPow2,
+    blockRamU,
+    blockRam1,
+    E.ResetStrategy (..),
+
     -- ** Read/Write conflict resolution
-  , readNew
+    readNew,
+
     -- * True dual-port block RAM
     -- $tdpbram
-  , trueDualPortBlockRam
-  , E.RamOp(..)
+    trueDualPortBlockRam,
+    E.RamOp (..),
   )
 where
 
-import           Prelude                 (Enum, Maybe, Eq)
-
-import           GHC.TypeLits            (KnownNat, type (^))
-import           GHC.Stack               (HasCallStack, withFrozenCallStack)
-
 import qualified Clash.Explicit.BlockRam as E
-import           Clash.Promoted.Nat      (SNat)
-import           Clash.Signal
-import           Clash.Sized.Index       (Index)
-import           Clash.Sized.Unsigned    (Unsigned)
-import           Clash.Sized.Vector      (Vec)
-import           Clash.XException        (NFDataX)
+import Clash.Promoted.Nat (SNat)
+import Clash.Signal
+import Clash.Sized.Index (Index)
+import Clash.Sized.Unsigned (Unsigned)
+import Clash.Sized.Vector (Vec)
+import Clash.XException (NFDataX)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
+import GHC.TypeLits (KnownNat, type (^))
+import Prelude (Enum, Eq, Maybe)
 
 {- $tdpbram
 A true dual-port block RAM has two fully independent, fully functional access
@@ -710,81 +707,94 @@ prog2 = -- 0 := 4
 --   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
 -- bram40 = 'blockRam' ('Clash.Sized.Vector.replicate' d40 1)
 -- @
-blockRam
-  :: ( HasCallStack
-     , HiddenClock dom
-     , HiddenEnable dom
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr )
-  => Vec n a
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
+blockRam ::
+  ( HasCallStack,
+    HiddenClock dom,
+    HiddenEnable dom,
+    NFDataX a,
+    Enum addr,
+    NFDataX addr
+  ) =>
+  -- | Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-   -- ^ (write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRam = \cnt rd wrM -> withFrozenCallStack
-  (hideEnable (hideClock E.blockRam) cnt rd wrM)
+  Vec n a ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
+blockRam = \cnt rd wrM ->
+  withFrozenCallStack
+    (hideEnable (hideClock E.blockRam) cnt rd wrM)
 {-# INLINE blockRam #-}
 
 -- | A version of 'blockRam' that has no default values set. May be cleared to
 -- an arbitrary state using a reset function.
-blockRamU
-   :: forall n dom a r addr
-   . ( HasCallStack
-     , HiddenClockResetEnable dom
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     )
-  => E.ResetStrategy r (Index n -> a)
-  -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
+blockRamU ::
+  forall n dom a r addr.
+  ( HasCallStack,
+    HiddenClockResetEnable dom,
+    NFDataX a,
+    Enum addr,
+    NFDataX addr
+  ) =>
+  -- | Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
   -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
   -- asserted for at least /n/ cycles to clear the BRAM.
-  -> SNat n
-  -- ^ Number of elements in BRAM
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+  E.ResetStrategy r (Index n -> a) ->
+  -- | Number of elements in BRAM
+  SNat n ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRamU =
-  \rstStrategy cnt rd wrM -> withFrozenCallStack
-    (hideClockResetEnable E.blockRamU) rstStrategy cnt rd wrM
+  \rstStrategy cnt rd wrM ->
+    withFrozenCallStack
+      (hideClockResetEnable E.blockRamU)
+      rstStrategy
+      cnt
+      rd
+      wrM
 {-# INLINE blockRamU #-}
 
 -- | A version of 'blockRam' that is initialized with the same value on all
 -- memory positions
-blockRam1
-   :: forall n dom a r addr
-   . ( HasCallStack
-     , HiddenClockResetEnable dom
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     )
-  => E.ResetStrategy r ()
-  -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
+blockRam1 ::
+  forall n dom a r addr.
+  ( HasCallStack,
+    HiddenClockResetEnable dom,
+    NFDataX a,
+    Enum addr,
+    NFDataX addr
+  ) =>
+  -- | Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
   -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
   -- asserted for at least /n/ cycles to clear the BRAM.
-  -> SNat n
-  -- ^ Number of elements in BRAM
-  -> a
-  -- ^ Initial content of the BRAM (replicated /n/ times)
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+  E.ResetStrategy r () ->
+  -- | Number of elements in BRAM
+  SNat n ->
+  -- | Initial content of the BRAM (replicated /n/ times)
+  a ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 blockRam1 =
-  \rstStrategy cnt initValue rd wrM -> withFrozenCallStack
-    (hideClockResetEnable E.blockRam1) rstStrategy cnt initValue rd wrM
+  \rstStrategy cnt initValue rd wrM ->
+    withFrozenCallStack
+      (hideClockResetEnable E.blockRam1)
+      rstStrategy
+      cnt
+      initValue
+      rd
+      wrM
 {-# INLINE blockRam1 #-}
 
 -- | Create a block RAM with space for 2^@n@ elements
@@ -812,26 +822,27 @@ blockRam1 =
 --   -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2' ('Clash.Sized.Vector.replicate' d32 1)
 -- @
-blockRamPow2
-  :: ( HasCallStack
-     , HiddenClock dom
-     , HiddenEnable dom
-     , NFDataX a
-     , KnownNat n
-     )
-  => Vec (2^n) a
-  -- ^ Initial content of the BRAM
+blockRamPow2 ::
+  ( HasCallStack,
+    HiddenClock dom,
+    HiddenEnable dom,
+    NFDataX a,
+    KnownNat n
+  ) =>
+  -- | Initial content of the BRAM
   --
   -- __NB__: __MUST__ be a constant.
-  -> Signal dom (Unsigned n)
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (Unsigned n, a))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
+  Vec (2 ^ n) a ->
+  -- | Read address @r@
+  Signal dom (Unsigned n) ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (Unsigned n, a)) ->
+  -- | Value of the @blockRAM@ at address @r@ from the previous clock
   -- cycle
-blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
-  (hideEnable (hideClock E.blockRamPow2) cnt rd wrM)
+  Signal dom a
+blockRamPow2 = \cnt rd wrM ->
+  withFrozenCallStack
+    (hideEnable (hideClock E.blockRamPow2) cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
 {- | Create a read-after-write block RAM from a read-before-write one
@@ -853,18 +864,19 @@ readNew (blockRam (0 :> 1 :> Nil))
 
 #endif
 -}
-readNew
-  :: ( HiddenClockResetEnable dom
-     , NFDataX a
-     , Eq addr )
-  => (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a)
-  -- ^ The BRAM component
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, a))
-  -- ^ (Write address @w@, value to write)
-  -> Signal dom a
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+readNew ::
+  ( HiddenClockResetEnable dom,
+    NFDataX a,
+    Eq addr
+  ) =>
+  -- | The BRAM component
+  (Signal dom addr -> Signal dom (Maybe (addr, a)) -> Signal dom a) ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (Write address @w@, value to write)
+  Signal dom (Maybe (addr, a)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom a
 readNew = hideClockResetEnable E.readNew
 {-# INLINE readNew #-}
 
@@ -876,17 +888,17 @@ readNew = hideClockResetEnable E.readNew
 -- is: WriteFirst. For mixed-port read/write, when port A writes to the address
 -- port B reads from, the output of port B is undefined, and vice versa.
 trueDualPortBlockRam ::
-  forall nAddrs dom a .
-  ( HasCallStack
-  , KnownNat nAddrs
-  , HiddenClock dom
-  , NFDataX a
-  )
-  => Signal dom (E.RamOp nAddrs a)
-  -- ^ RAM operation for port A
-  -> Signal dom (E.RamOp nAddrs a)
-  -- ^ RAM operation for port B
-  -> (Signal dom a, Signal dom a)
-  -- ^ Outputs data on /next/ cycle. When writing, the data written
+  forall nAddrs dom a.
+  ( HasCallStack,
+    KnownNat nAddrs,
+    HiddenClock dom,
+    NFDataX a
+  ) =>
+  -- | RAM operation for port A
+  Signal dom (E.RamOp nAddrs a) ->
+  -- | RAM operation for port B
+  Signal dom (E.RamOp nAddrs a) ->
+  -- | Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
+  (Signal dom a, Signal dom a)
 trueDualPortBlockRam inA inB = E.trueDualPortBlockRam hasClock hasClock inA inB

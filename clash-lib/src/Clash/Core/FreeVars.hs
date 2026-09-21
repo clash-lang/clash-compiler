@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+
 {-|
   Copyright   :  (C) 2012-2016, University of Twente
                      2021-2026, QBayLogic B.V.
@@ -6,27 +10,24 @@
 
   Free variable calculations
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
-
 module Clash.Core.FreeVars
-  (-- * Free variable calculation
-    typeFreeVars
-  , freeIds
-  , freeLocalVars
-  , freeLocalIds
-  , globalIds
-  , termFreeTyVars
-  -- * occurrence check
-  , globalIdOccursIn
-  , localVarsDoNotOccurIn
-  , countFreeOccurances
-  -- * Internal
-  , typeFreeVars'
-  , termFreeVars'
-  , termFreeIds'
+  ( -- * Free variable calculation
+    typeFreeVars,
+    freeIds,
+    freeLocalVars,
+    freeLocalIds,
+    globalIds,
+    termFreeTyVars,
+
+    -- * occurrence check
+    globalIdOccursIn,
+    localVarsDoNotOccurIn,
+    countFreeOccurances,
+
+    -- * Internal
+    typeFreeVars',
+    termFreeVars',
+    termFreeIds',
   )
 where
 
@@ -34,23 +35,31 @@ where
 #define UNIQUE_IS_WORD64
 #endif
 
-import qualified Control.Lens           as Lens
-import Control.Lens.Fold                (Fold)
-import Control.Lens.Getter              (Contravariant)
+import qualified Control.Lens as Lens
+import Control.Lens.Fold (Fold)
+import Control.Lens.Getter (Contravariant)
 import Data.Coerce
 #ifdef UNIQUE_IS_WORD64
-import qualified GHC.Data.Word64Set     as IntSet
+import qualified GHC.Data.Word64Set as IntSet
 #else
-import qualified Data.IntSet            as IntSet
+import qualified Data.IntSet as IntSet
 #endif
-import Data.Monoid                      (All (..), Any (..))
-
-import Clash.Core.Term                  (Pat (..), Term (..), TickInfo (..), Bind(..))
-import Clash.Core.Type                  (Type (..))
+import Clash.Core.Term (Bind (..), Pat (..), Term (..), TickInfo (..))
+import Clash.Core.Type (Type (..))
 import Clash.Core.Var
-  (Id, IdScope (..), TyVar, Var (..), isLocalId)
+  ( Id,
+    IdScope (..),
+    TyVar,
+    Var (..),
+    isLocalId,
+  )
 import Clash.Core.VarEnv
-  (VarEnv, emptyVarEnv, unionVarEnvWith, unitVarEnv)
+  ( VarEnv,
+    emptyVarEnv,
+    unionVarEnvWith,
+    unitVarEnv,
+  )
+import Data.Monoid (All (..), Any (..))
 
 -- | Gives the free type-variables in a Type, implemented as a 'Fold'
 --
@@ -87,70 +96,77 @@ typeFreeVars = typeFreeVars' (const True) IntSet.empty
 -- shadowing we close using an empty inScope set.
 --
 -- See also: https://gitlab.haskell.org/ghc/ghc/-/commit/503514b94f8dc7bd9eab5392206649aee45f140b
-typeFreeVars'
-  :: (Contravariant f, Applicative f)
-  => (forall b . Var b -> Bool)
-  -- ^ Predicate telling whether a variable is interesting
+typeFreeVars' ::
+  (Contravariant f, Applicative f) =>
+  -- | Predicate telling whether a variable is interesting
+  (forall b. Var b -> Bool) ->
 #ifdef UNIQUE_IS_WORD64
-  -> IntSet.Word64Set
+  -- | Uniques of the variables in scope, used by 'termFreeVars''
+  IntSet.Word64Set
 #else
-  -> IntSet.IntSet
+  -- | Uniques of the variables in scope, used by 'termFreeVars''
+  IntSet.IntSet
 #endif
-  -- ^ Uniques of the variables in scope, used by 'termFreeVars''
-  -> (Var a -> f (Var a))
-  -> Type
-  -> f Type
-typeFreeVars' interesting is f = go is where
-  go inScope = \case
-    VarTy tv -> tv1 <* go inScope1 (varType tv)
-      where
-        isInteresting = interesting tv
-        tvInScope     = varUniq tv `IntSet.member` inScope
-        inScope1
-          | tvInScope = inScope
-          | otherwise = IntSet.empty -- See Note [Closing over type variables]
+  ->
+  (Var a -> f (Var a)) ->
+  Type ->
+  f Type
+typeFreeVars' interesting is f = go is
+  where
+    go inScope = \case
+      VarTy tv -> tv1 <* go inScope1 (varType tv)
+        where
+          isInteresting = interesting tv
+          tvInScope = varUniq tv `IntSet.member` inScope
+          inScope1
+            | tvInScope = inScope
+            | otherwise = IntSet.empty -- See Note [Closing over type variables]
 
-        tv1 | isInteresting
-            , not tvInScope
-            = VarTy . coerce <$> f (coerce tv)
-            | otherwise
-            = pure (VarTy tv)
+          tv1
+            | isInteresting,
+              not tvInScope =
+                VarTy . coerce <$> f (coerce tv)
+            | otherwise =
+                pure (VarTy tv)
+      ForAllTy tv ty ->
+        ForAllTy
+          <$> goBndr inScope tv
+          <*> go (IntSet.insert (varUniq tv) inScope) ty
+      AppTy l r -> AppTy <$> go inScope l <*> go inScope r
+      ty -> pure ty
 
-    ForAllTy tv ty -> ForAllTy <$> goBndr inScope tv
-                               <*> go (IntSet.insert (varUniq tv) inScope) ty
-    AppTy l r -> AppTy <$> go inScope l <*> go inScope r
-    ty -> pure ty
-
-  goBndr inScope tv = (\t -> tv {varType = t}) <$> go inScope (varType tv)
+    goBndr inScope tv = (\t -> tv {varType = t}) <$> go inScope (varType tv)
 
 -- | Check whether a set of variables does not occur free in a term
-localVarsDoNotOccurIn
-  :: [Var a]
-  -> Term
-  -> Bool
+localVarsDoNotOccurIn ::
+  [Var a] ->
+  Term ->
+  Bool
 localVarsDoNotOccurIn vs e =
   getAll (Lens.foldMapOf freeLocalVars (All . (`notElem` vs)) e)
 
 -- | Check whether a local identifier occurs free in a term
-globalIdOccursIn
-  :: Id
-  -> Term
-  -> Bool
+globalIdOccursIn ::
+  Id ->
+  Term ->
+  Bool
 globalIdOccursIn v e = getAny (Lens.foldMapOf globalIds (Any . (== v)) e)
 
 -- | Calculate the /local/ free variable of an expression: the free type
 -- variables and the free identifiers that are not bound in the global
 -- environment.
 freeLocalVars :: Fold Term (Var a)
-freeLocalVars = termFreeVars' isLocalVar where
-  isLocalVar (Id {idScope = GlobalId}) = False
-  isLocalVar _ = True
+freeLocalVars = termFreeVars' isLocalVar
+  where
+    isLocalVar (Id {idScope = GlobalId}) = False
+    isLocalVar _ = True
 
 -- | Gives the free identifiers of a Term, implemented as a 'Fold'
 freeIds :: Fold Term Id
-freeIds = termFreeIds' isId where
-  isId (Id {}) = True
-  isId _       = False
+freeIds = termFreeIds' isId
+  where
+    isId (Id {}) = True
+    isId _ = False
 
 -- | Calculate the /local/ free identifiers of an expression: the free
 -- identifiers that are not bound in the global environment.
@@ -160,9 +176,10 @@ freeLocalIds = termFreeIds' isLocalId
 -- | Calculate the /global/ free identifiers of an expression: the free
 -- identifiers that are bound in the global environment.
 globalIds :: Fold Term Id
-globalIds = termFreeIds' isGlobalId where
-  isGlobalId (Id {idScope = GlobalId}) = True
-  isGlobalId _ = False
+globalIds = termFreeIds' isGlobalId
+  where
+    isGlobalId (Id {idScope = GlobalId}) = True
+    isGlobalId _ = False
 
 -- | Gives the free type-variables of a Term, implemented as a 'Fold'
 --
@@ -172,9 +189,10 @@ globalIds = termFreeIds' isGlobalId where
 -- foldMapOf termFreeTyVars unitVarSet (case (x : (a:* -> k) Int)) of {}) = {a, k}
 -- @
 termFreeTyVars :: Fold Term TyVar
-termFreeTyVars = termFreeVars' isTV where
-  isTV (TyVar {}) = True
-  isTV _          = False
+termFreeTyVars = termFreeVars' isTV
+  where
+    isTV (TyVar {}) = True
+    isTV _ = False
 
 -- | Gives the "interesting" free variables in a Term, implemented as a 'Fold'
 --
@@ -201,131 +219,142 @@ termFreeTyVars = termFreeVars' isTV where
 -- shadowing we close using an empty inScope set.
 --
 -- See also: https://gitlab.haskell.org/ghc/ghc/-/commit/503514b94f8dc7bd9eab5392206649aee45f140b
-termFreeVars'
-  :: (Contravariant f, Applicative f)
-  => (forall b . Var b -> Bool)
-  -- ^ Predicate telling whether a variable is interesting
-  -> (Var a -> f (Var a))
-  -> Term
-  -> f Term
+termFreeVars' ::
+  (Contravariant f, Applicative f) =>
+  -- | Predicate telling whether a variable is interesting
+  (forall b. Var b -> Bool) ->
+  (Var a -> f (Var a)) ->
+  Term ->
+  f Term
 termFreeVars' = termFreeVarsWorker True
 
 -- | Gives the "interesting" free identifiers in a Term, implemented as a
 -- 'Fold'. Like 'termFreeVars'', but fold does not descend into the types of
 -- variables and binders.
-termFreeIds'
-  :: (Contravariant f, Applicative f)
-  => (forall b . Var b -> Bool)
-  -- ^ Predicate telling whether an identifier is interesting
-  -> (Var a -> f (Var a))
-  -> Term
-  -> f Term
+termFreeIds' ::
+  (Contravariant f, Applicative f) =>
+  -- | Predicate telling whether an identifier is interesting
+  (forall b. Var b -> Bool) ->
+  (Var a -> f (Var a)) ->
+  Term ->
+  f Term
 termFreeIds' = termFreeVarsWorker False
 
 -- | Worker for 'termFreeVars'' and 'termFreeIds''. Has option that selects
 -- whether to descend into types or not.
-termFreeVarsWorker
-  :: forall a f
-   . (Contravariant f, Applicative f)
-  => Bool
-  -- ^ Descend into the types of variables and binders?
-  -> (forall b . Var b -> Bool)
-  -- ^ Predicate telling whether a variable is interesting
-  -> (Var a -> f (Var a))
-  -> Term
-  -> f Term
-termFreeVarsWorker descendIntoTypes interesting f = go IntSet.empty where
-  -- Fold over a type only when descending into types; otherwise leave it as-is.
-  onType inScope ty
-    | descendIntoTypes = typeFreeVars' interesting inScope f ty
-    | otherwise        = pure ty
+termFreeVarsWorker ::
+  forall a f.
+  (Contravariant f, Applicative f) =>
+  -- | Descend into the types of variables and binders?
+  Bool ->
+  -- | Predicate telling whether a variable is interesting
+  (forall b. Var b -> Bool) ->
+  (Var a -> f (Var a)) ->
+  Term ->
+  f Term
+termFreeVarsWorker descendIntoTypes interesting f = go IntSet.empty
+  where
+    -- Fold over a type only when descending into types; otherwise leave it as-is.
+    onType inScope ty
+      | descendIntoTypes = typeFreeVars' interesting inScope f ty
+      | otherwise = pure ty
 
-  go inLocalScope = \case
-    Var v
-      | descendIntoTypes -> v1 <* typeFreeVars' interesting inLocalScope1 f (varType v)
-      | otherwise        -> v1
-      where
-        isInteresting = interesting v
-        vInScope      = isLocalId v && varUniq v `IntSet.member` inLocalScope
-        inLocalScope1
-          | vInScope  = inLocalScope
-          | otherwise = IntSet.empty -- See Note [Closing over type variables]
+    go inLocalScope = \case
+      Var v
+        | descendIntoTypes -> v1 <* typeFreeVars' interesting inLocalScope1 f (varType v)
+        | otherwise -> v1
+        where
+          isInteresting = interesting v
+          vInScope = isLocalId v && varUniq v `IntSet.member` inLocalScope
+          inLocalScope1
+            | vInScope = inLocalScope
+            | otherwise = IntSet.empty -- See Note [Closing over type variables]
 
-        v1 | isInteresting
-           , not vInScope
-           = Var . coerce <$> f (coerce v)
-           | otherwise
-           = pure (Var v)
-
-    Lam id_ tm ->
-      Lam <$> goBndr inLocalScope id_
+          v1
+            | isInteresting,
+              not vInScope =
+                Var . coerce <$> f (coerce v)
+            | otherwise =
+                pure (Var v)
+      Lam id_ tm ->
+        Lam
+          <$> goBndr inLocalScope id_
           <*> go (IntSet.insert (varUniq id_) inLocalScope) tm
-    TyLam tv tm ->
-      TyLam <$> goBndr inLocalScope tv
-            <*> go (IntSet.insert (varUniq tv) inLocalScope) tm
-
-    App l r ->
-      App <$> go inLocalScope l <*> go inLocalScope r
-
-    TyApp l r ->
-      TyApp <$> go inLocalScope l
-            <*> onType inLocalScope r
-
-    Let (NonRec i x) e ->
-      Let <$> (NonRec <$> goBndr inLocalScope i <*> go inLocalScope x)
+      TyLam tv tm ->
+        TyLam
+          <$> goBndr inLocalScope tv
+          <*> go (IntSet.insert (varUniq tv) inLocalScope) tm
+      App l r ->
+        App <$> go inLocalScope l <*> go inLocalScope r
+      TyApp l r ->
+        TyApp
+          <$> go inLocalScope l
+          <*> onType inLocalScope r
+      Let (NonRec i x) e ->
+        Let
+          <$> (NonRec <$> goBndr inLocalScope i <*> go inLocalScope x)
           <*> go (IntSet.insert (varUniq i) inLocalScope) e
-
-    Let (Rec bs) e ->
-      Let <$> (Rec <$> traverse (goBind inLocalScope') bs)
+      Let (Rec bs) e ->
+        Let
+          <$> (Rec <$> traverse (goBind inLocalScope') bs)
           <*> go inLocalScope' e
-     where
-      inLocalScope' = foldr (IntSet.insert . varUniq . fst) inLocalScope bs
+        where
+          inLocalScope' = foldr (IntSet.insert . varUniq . fst) inLocalScope bs
+      Case subj ty alts ->
+        Case
+          <$> go inLocalScope subj
+          <*> onType inLocalScope ty
+          <*> traverse (goAlt inLocalScope) alts
+      Cast tm t1 t2 ->
+        Cast
+          <$> go inLocalScope tm
+          <*> onType inLocalScope t1
+          <*> onType inLocalScope t2
+      Tick tick tm ->
+        Tick
+          <$> goTick inLocalScope tick
+          <*> go inLocalScope tm
+      tm -> pure tm
 
-    Case subj ty alts ->
-      Case <$> go inLocalScope subj
-           <*> onType inLocalScope ty
-           <*> traverse (goAlt inLocalScope) alts
+    -- Fold over a binder's type only when descending; otherwise leave it as-is.
+    goBndr inLocalScope v
+      | descendIntoTypes = (\t -> v {varType = t}) <$> onType inLocalScope (varType v)
+      | otherwise = pure v
 
-    Cast tm t1 t2 ->
-      Cast <$> go inLocalScope tm
-           <*> onType inLocalScope t1
-           <*> onType inLocalScope t2
+    goBind inLocalScope (l, r) = (,) <$> goBndr inLocalScope l <*> go inLocalScope r
 
-    Tick tick tm ->
-      Tick <$> goTick inLocalScope tick
-      <*> go inLocalScope tm
+    goAlt inLocalScope (pat, alt) = case pat of
+      DataPat dc tvs ids ->
+        (,)
+          <$> ( DataPat dc
+                  <$> traverse (goBndr inLocalScope') tvs
+                  <*> traverse (goBndr inLocalScope') ids
+              )
+          <*> go inLocalScope' alt
+        where
+          inLocalScope' =
+            foldr
+              IntSet.insert
+              (foldr IntSet.insert inLocalScope (map varUniq tvs))
+              (map varUniq ids)
+      _ -> (,) pat <$> go inLocalScope alt
 
-    tm -> pure tm
-
-  -- Fold over a binder's type only when descending; otherwise leave it as-is.
-  goBndr inLocalScope v
-    | descendIntoTypes = (\t -> v {varType = t}) <$> onType inLocalScope (varType v)
-    | otherwise        = pure v
-
-  goBind inLocalScope (l,r) = (,) <$> goBndr inLocalScope l <*> go inLocalScope r
-
-  goAlt inLocalScope (pat,alt) = case pat of
-    DataPat dc tvs ids -> (,) <$> (DataPat dc
-                                     <$> traverse (goBndr inLocalScope') tvs
-                                     <*> traverse (goBndr inLocalScope') ids)
-                              <*> go inLocalScope' alt
-      where
-        inLocalScope' = foldr IntSet.insert
-                         (foldr IntSet.insert inLocalScope (map varUniq tvs))
-                         (map varUniq ids)
-    _ -> (,) pat <$> go inLocalScope alt
-
-  goTick inLocalScope = \case
-    NameMod m ty -> NameMod m <$> onType inLocalScope ty
-    Attributes ty tm -> Attributes <$> onType inLocalScope ty
-                                   <*> go inLocalScope tm
-    tick         -> pure tick
+    goTick inLocalScope = \case
+      NameMod m ty -> NameMod m <$> onType inLocalScope ty
+      Attributes ty tm ->
+        Attributes
+          <$> onType inLocalScope ty
+          <*> go inLocalScope tm
+      tick -> pure tick
 {-# INLINE termFreeVarsWorker #-}
 
 -- | Get the free variables of an expression and count the number of occurrences
-countFreeOccurances
-  :: Term
-  -> VarEnv Int
+countFreeOccurances ::
+  Term ->
+  VarEnv Int
 countFreeOccurances =
-  Lens.foldMapByOf freeLocalIds (unionVarEnvWith (+)) emptyVarEnv
-                   (`unitVarEnv` (1 :: Int))
+  Lens.foldMapByOf
+    freeLocalIds
+    (unionVarEnvWith (+))
+    emptyVarEnv
+    (`unitVarEnv` (1 :: Int))

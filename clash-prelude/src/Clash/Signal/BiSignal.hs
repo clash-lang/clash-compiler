@@ -1,3 +1,18 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+-- TryDomain / HasDomain instances
+{-# OPTIONS_GHC -Wno-deprecations #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
+
 {-|
 Copyright  :  (C) 2017, Google Inc.
                   2019, Myrtle Software Ltd
@@ -89,68 +104,49 @@ topEntity clk rst en = readFromBiSignal bus'
     bus' = veryUnsafeToBiSignalIn bus
 @
 -}
+module Clash.Signal.BiSignal
+  ( BiSignalIn (),
+    BiSignalOut (),
+    BiSignalDefault (..),
+    SBiSignalDefault (..),
+    HasBiSignalDefault (..),
+    mergeBiSignalOuts,
+    readFromBiSignal,
+    writeToBiSignal,
+    veryUnsafeToBiSignalIn,
+  )
+where
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RoleAnnotations #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
--- TryDomain / HasDomain instances
-{-# OPTIONS_GHC -Wno-deprecations #-}
-
-module Clash.Signal.BiSignal (
-    BiSignalIn()
-  , BiSignalOut()
-  , BiSignalDefault(..)
-  , SBiSignalDefault(..)
-  , HasBiSignalDefault(..)
-  , mergeBiSignalOuts
-  , readFromBiSignal
-  , writeToBiSignal
-  , veryUnsafeToBiSignalIn
-  ) where
-
-import           Data.Kind                  (Type)
-import           Data.List                  (intercalate)
-import           Data.Maybe                 (fromMaybe,isJust)
-
-import           Clash.Annotations.Primitive (hasBlackBox)
-import           Clash.Class.HasDomain
-import           Clash.Class.BitPack        (BitPack (..))
-import           Clash.Sized.BitVector      (BitVector)
-import qualified Clash.Sized.Vector         as V
-import           Clash.Sized.Vector         (Vec)
-import           Clash.Signal.Internal      (Signal(..), Domain, head#, tail#)
-import           Clash.XException           (errorX, fromJustX, NFDataX)
-
-import           GHC.TypeLits               (KnownNat, Nat)
-import           GHC.Stack                  (HasCallStack)
-import           Data.Reflection            (Given (..))
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Class.BitPack (BitPack (..))
+import Clash.Class.HasDomain
+import Clash.Signal.Internal (Domain, Signal (..), head#, tail#)
+import Clash.Sized.BitVector (BitVector)
+import Clash.Sized.Vector (Vec)
+import qualified Clash.Sized.Vector as V
+import Clash.XException (NFDataX, errorX, fromJustX)
+import Data.Kind (Type)
+import Data.List (intercalate)
+import Data.Maybe (fromMaybe, isJust)
+import Data.Reflection (Given (..))
+import GHC.Stack (HasCallStack)
+import GHC.TypeLits (KnownNat, Nat)
 
 -- | Used to specify the /default/ behavior of a \"BiSignal\" in Haskell simulation, i.e.
 -- what value is read when no value is being written to it.
 data BiSignalDefault
-  = PullUp
-  -- ^ __inout__ port behaves as if connected to a pull-up resistor
-  | PullDown
-  -- ^ __inout__ port behaves as if connected to a pull-down resistor
-  | Floating
-  -- ^ __inout__ port behaves as if is /floating/. Reading a /floating/
-  -- \"BiSignal\" value in simulation will yield an errorX (undefined value).
+  = -- | __inout__ port behaves as if connected to a pull-up resistor
+    PullUp
+  | -- | __inout__ port behaves as if connected to a pull-down resistor
+    PullDown
+  | -- | __inout__ port behaves as if is /floating/. Reading a /floating/
+    -- \"BiSignal\" value in simulation will yield an errorX (undefined value).
+    Floating
   deriving (Show)
 
 -- | Singleton versions of 'BiSignalDefault'
 data SBiSignalDefault :: BiSignalDefault -> Type where
-  SPullUp   :: SBiSignalDefault 'PullUp
+  SPullUp :: SBiSignalDefault 'PullUp
   SPullDown :: SBiSignalDefault 'PullDown
   SFloating :: SBiSignalDefault 'Floating
 
@@ -210,6 +206,7 @@ data BiSignalOut (ds :: BiSignalDefault) (dom :: Domain) (n :: Nat)
   = BiSignalOut ![Signal dom (Maybe (BitVector n))]
 
 type instance HasDomain dom1 (BiSignalOut ds dom2 n) = DomEq dom1 dom2
+
 type instance TryDomain t (BiSignalOut ds dom n) = 'Found dom
 
 -- | __NB__: Not synthesizable
@@ -226,67 +223,69 @@ instance Monoid (BiSignalOut defaultState dom n) where
 --
 -- Uses a /reified/ 'SBiSignalDefault', the 'Given' constraint, so we can fully
 -- create 'BiSignalIn' "out of nowhere" when dealing with circular definitions.
-prepend#
-  :: Given (SBiSignalDefault ds)
-  => Maybe (BitVector n)
-  -> BiSignalIn ds d n
-  -> BiSignalIn ds d n
+prepend# ::
+  (Given (SBiSignalDefault ds)) =>
+  Maybe (BitVector n) ->
+  BiSignalIn ds d n ->
+  BiSignalIn ds d n
 prepend# a ~(BiSignalIn _ as) = BiSignalIn given (a :- as)
 
-readFromBiSignal#
-  :: ( HasCallStack
-     , KnownNat n)
-  => BiSignalIn ds d n
-  -> Signal d (BitVector n)
+readFromBiSignal# ::
+  ( HasCallStack,
+    KnownNat n
+  ) =>
+  BiSignalIn ds d n ->
+  Signal d (BitVector n)
 readFromBiSignal# (BiSignalIn ds s) =
   case ds of
     SFloating -> fromMaybe (errorX " undefined value on BiSignalIn") <$> s
-    SPullDown  -> fromMaybe minBound <$> s
-    SPullUp    -> fromMaybe maxBound <$> s
+    SPullDown -> fromMaybe minBound <$> s
+    SPullUp -> fromMaybe maxBound <$> s
 {-# OPAQUE readFromBiSignal# #-}
 {-# ANN readFromBiSignal# hasBlackBox #-}
 
 -- | Read the value from an __inout__ port
-readFromBiSignal
-  :: ( HasCallStack
-     , BitPack a)
-  => BiSignalIn ds d (BitSize a)
-  -- ^ A 'BiSignalIn' with a number of bits needed to represent /a/
-  -> Signal d a
+readFromBiSignal ::
+  ( HasCallStack,
+    BitPack a
+  ) =>
+  -- | A 'BiSignalIn' with a number of bits needed to represent /a/
+  BiSignalIn ds d (BitSize a) ->
+  Signal d a
 readFromBiSignal = fmap unpack . readFromBiSignal#
 
 -- | Combine several __inout__ signals into one.
-mergeBiSignalOuts
-  :: ( HasCallStack
-     , KnownNat n
-     )
-  => Vec n (BiSignalOut defaultState dom m)
-  -> BiSignalOut defaultState dom m
+mergeBiSignalOuts ::
+  ( HasCallStack,
+    KnownNat n
+  ) =>
+  Vec n (BiSignalOut defaultState dom m) ->
+  BiSignalOut defaultState dom m
 mergeBiSignalOuts = mconcat . V.toList
 {-# OPAQUE mergeBiSignalOuts #-}
 {-# ANN mergeBiSignalOuts hasBlackBox #-}
 
-writeToBiSignal#
-  :: HasCallStack
-  => BiSignalIn ds d n
-  -> Signal d (Maybe (BitVector n))
-  -> Signal d Bool
-  -> Signal d (BitVector n)
-  -> BiSignalOut ds d n
+writeToBiSignal# ::
+  (HasCallStack) =>
+  BiSignalIn ds d n ->
+  Signal d (Maybe (BitVector n)) ->
+  Signal d Bool ->
+  Signal d (BitVector n) ->
+  BiSignalOut ds d n
 writeToBiSignal# bIn maybeSignal wEn val = BiSignalOut [bIn `seq` wEn `seq` val `seq` maybeSignal]
 {-# OPAQUE writeToBiSignal# #-}
 {-# ANN writeToBiSignal# hasBlackBox #-}
 
 -- | Write to an __inout__ port
-writeToBiSignal
-  :: (HasCallStack, BitPack a, NFDataX a)
-  => BiSignalIn ds d (BitSize a)
-  -> Signal d (Maybe a)
-  -- ^ Value to write
+writeToBiSignal ::
+  (HasCallStack, BitPack a, NFDataX a) =>
+  BiSignalIn ds d (BitSize a) ->
+  -- | Value to write
   --
   --   * /Just a/ writes an /a/ value
   --   * /Nothing/ puts the port in a /high-impedance/ state
-  -> BiSignalOut ds d (BitSize a)
+  Signal d (Maybe a) ->
+  BiSignalOut ds d (BitSize a)
 writeToBiSignal input writes =
   writeToBiSignal#
     input
@@ -298,26 +297,27 @@ writeToBiSignal input writes =
 -- | Converts the @out@ part of a BiSignal to an @in@ part. In simulation it
 -- checks whether multiple components are writing and will error accordingly.
 -- Make sure this is only called ONCE for every BiSignal.
-veryUnsafeToBiSignalIn
-  :: ( HasCallStack
-     , KnownNat n
-     , Given (SBiSignalDefault ds)
-     )
-  => BiSignalOut ds d n
-  -> BiSignalIn ds d n
+veryUnsafeToBiSignalIn ::
+  ( HasCallStack,
+    KnownNat n,
+    Given (SBiSignalDefault ds)
+  ) =>
+  BiSignalOut ds d n ->
+  BiSignalIn ds d n
 veryUnsafeToBiSignalIn (BiSignalOut signals) = prepend# result biSignalOut'
   where
     -- Enforce that only one component is writing
     result = case filter (isJust . head#) signals of
-      []  -> Nothing
+      [] -> Nothing
       [w] -> head# w
-      _   -> errorX err
+      _ -> errorX err
 
-    err = unwords
-      [ "Multiple components wrote to the BiSignal. This is undefined behavior"
-      , "in hardware and almost certainly a logic error. The components wrote:\n"
-      , intercalate "\n  " (map (show . head#) signals)
-      ]
+    err =
+      unwords
+        [ "Multiple components wrote to the BiSignal. This is undefined behavior",
+          "in hardware and almost certainly a logic error. The components wrote:\n",
+          intercalate "\n  " (map (show . head#) signals)
+        ]
 
     -- Recursive step
     biSignalOut' = veryUnsafeToBiSignalIn $ BiSignalOut $ map tail# signals

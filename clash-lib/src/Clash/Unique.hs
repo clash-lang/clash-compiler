@@ -1,60 +1,61 @@
-{-|
-  Copyright   :  (C) 2024, QBayLogic B.V.
-  License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
+{-|
+  Copyright   :  (C) 2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.Unique
-  ( Unique
+  ( Unique,
 #if __GLASGOW_HASKELL__ >= 914
-  , data Unique#
+    data Unique#,
 #else
-  , pattern Unique#
+    pattern Unique#,
 #endif
-  , Unique#
-  , Uniquable (..)
-  , fromGhcUnique
-  ) where
+    Unique#,
+    Uniquable (..),
+    fromGhcUnique,
+  )
+where
 
 #if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
 #define UNIQUE_IS_WORD64
 #endif
 
 import Data.Word (Word64)
-
 #ifdef UNIQUE_IS_WORD64
-import GHC.Word (Word64(W64#))
 import GHC.Exts (Word64#)
+import GHC.Word (Word64 (W64#))
 #else
-import GHC.Int (Int(I#))
 import GHC.Exts (Int#)
+import GHC.Int (Int (I#))
 #endif
 import qualified GHC.Types.Unique as GHC
 
 #ifdef UNIQUE_IS_WORD64
 type Unique = Word64
+
 type Unique# = Word64#
 
-pattern Unique#
-  :: Unique#
-  -- ^ Type of signal
-  -> Unique
+pattern Unique# ::
+  -- | Type of signal
+  Unique# ->
+  Unique
 pattern Unique# u <- W64# u
   where
     Unique# u = W64# u
 #else
 type Unique = Int
+
 type Unique# = Int#
 
-pattern Unique#
-  :: Unique#
-  -- ^ Type of signal
-  -> Unique
+pattern Unique# ::
+  -- | Type of signal
+  Unique# ->
+  Unique
 pattern Unique# u <- I# u
   where
     Unique# u = I# u

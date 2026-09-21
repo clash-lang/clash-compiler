@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 {-|
   Copyright   :  (C) 2018,      Google Inc.,
                      2021-2025, QBayLogic B.V.
@@ -9,21 +15,18 @@
   please report any unexpected or broken behavior to Clash's GitHub page
   (<https://github.com/clash-lang/clash-compiler/issues>).
 -}
-
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
 module Clash.Annotations.SynthesisAttributes
-  ( Attr(..)
-  , Annotate
-  , annotate
-  , annotateReg
-  , markDebug
-  ) where
+  ( Attr (..),
+    Annotate,
+    annotate,
+    annotateReg,
+    markDebug,
+  )
+where
 
+import Clash.Annotations.Primitive (Primitive (InlineYamlPrimitive), hasBlackBox)
+import Clash.Signal.Internal (Signal)
+import Clash.Sized.Vector (Vec (..))
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
 import Data.Hashable (Hashable)
@@ -31,10 +34,6 @@ import Data.Kind (Type)
 import Data.String.Interpolate (__i)
 import GHC.Generics (Generic)
 import Language.Haskell.TH.Syntax (Lift)
-
-import Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive), hasBlackBox)
-import Clash.Signal.Internal (Signal)
-import Clash.Sized.Vector (Vec(..))
 
 type Annotate (a :: Type) (attrs :: k) = a
 
@@ -109,35 +108,39 @@ type Annotate (a :: Type) (attrs :: k) = a
 -- Use 'annotate' if you wish to annotate an intermediate signal. Its use is
 -- preferred over type level annotations.
 data Attr a
-  = BoolAttr a Bool
-  -- ^ Attribute which argument is rendered as a bool. Example:
-  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_direct_enable.htm>
-  | IntegerAttr a Integer
-  -- ^ Attribute which argument is rendered as a integer. Example:
-  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_max_depth.htm>
-  | StringAttr a a
-  -- ^ Attribute which argument is rendered as a string. Example:
-  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_chip.htm>
-  | Attr a
-  -- ^ Attribute rendered as constant. Example:
-  -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_keep.htm>
+  = -- | Attribute which argument is rendered as a bool. Example:
+    -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_direct_enable.htm>
+    BoolAttr a Bool
+  | -- | Attribute which argument is rendered as a integer. Example:
+    -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_max_depth.htm>
+    IntegerAttr a Integer
+  | -- | Attribute which argument is rendered as a string. Example:
+    -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_chip.htm>
+    StringAttr a a
+  | -- | Attribute rendered as constant. Example:
+    -- <https://www.intel.com/content/www/us/en/programmable/quartushelp/current/index.htm#hdl/vlog/vlog_file_dir_keep.htm>
+    Attr a
   deriving (Show, Generic, NFData, Binary, Lift, Eq, Ord, Hashable, Functor)
 
 -- | Create a new identifier in HDL and inserts given synthesis attributes. The
 -- name of the intermediate signal can be influenced using naming functions in
 -- "Clash.Magic".
-annotate :: forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
+annotate :: forall n dom a. Vec n (Attr String) -> Signal dom a -> Signal dom a
 annotate !_attrs !a = a
 {-# OPAQUE annotate #-}
 {-# ANN annotate hasBlackBox #-}
-{-# ANN annotate
+{-# ANN
+  annotate
   let primName = show 'annotate
-  in InlineYamlPrimitive [minBound..] [__i|
+   in InlineYamlPrimitive
+        [minBound ..]
+        [__i|
     BlackBoxHaskell:
         name: #{primName}
         templateFunction: "Clash.Primitives.Annotations.SynthesisAttributes.annotateBBF"
         workInfo: Always
-  |] #-}
+  |]
+  #-}
 
 -- | Insert attributes such that signals are preserved in major synthesis tools.
 -- Also inserts "mark_debug", a way of signalling Vivado a signal should show up
@@ -145,16 +148,17 @@ annotate !_attrs !a = a
 --
 -- Attributes inserted: @keep@, @mark_debug@, @noprune@, and @preserve@.
 markDebug :: Signal dom a -> Signal dom a
-markDebug = annotate $
-     BoolAttr "keep" True
+markDebug =
+  annotate $
+    BoolAttr "keep" True
 
-  -- Vivado:
-  :> BoolAttr "mark_debug" True
+      -- Vivado:
+      :> BoolAttr "mark_debug" True
 
-  -- Quartus:
-  :> Attr "noprune"
-  :> Attr "preserve"
-  :> Nil
+      -- Quartus:
+      :> Attr "noprune"
+      :> Attr "preserve"
+      :> Nil
 
 {- | Add synthesis attributes to register declarations in the HDL generated by the Clash
 compiler.
@@ -240,7 +244,7 @@ The above pattern can also be abstracted over, e.g. you could write:
 
 And it will generate exactly the same Verilog as above.
 -}
-annotateReg :: forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
+annotateReg :: forall n dom a. Vec n (Attr String) -> Signal dom a -> Signal dom a
 annotateReg !_ x = x
 {-# OPAQUE annotateReg #-}
 {-# ANN annotateReg hasBlackBox #-}

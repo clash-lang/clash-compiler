@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -17,31 +23,49 @@ Unlike "Clash.Explicit.BlockRam.File", "Clash.Explicit.BlockRam.Blob"
 generates practically the same HDL as "Clash.Explicit.BlockRam" and is
 compatible with all tools consuming the generated HDL.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE TypeApplications #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Explicit.BlockRam.Blob
   ( -- * Block RAMs initialized with a 'MemBlob'
-    blockRamBlob
-  , blockRamBlobPow2
-    -- * Creating and inspecting 'MemBlob'
-  , MemBlob
-  , createMemBlob
-  , memBlobTH
-  , unpackMemBlob
-    -- * Internal
-  , blockRamBlob#
-  ) where
+    blockRamBlob,
+    blockRamBlobPow2,
 
+    -- * Creating and inspecting 'MemBlob'
+    MemBlob,
+    createMemBlob,
+    memBlobTH,
+    unpackMemBlob,
+
+    -- * Internal
+    blockRamBlob#,
+  )
+where
+
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Class.BitPack.Internal (BitPack, BitSize)
+import Clash.Explicit.BlockRam.Internal
+  ( MemBlob (..),
+    packBVs,
+    unpackMemBlob,
+    unpackMemBlob0,
+  )
+import Clash.Explicit.Signal (Enable, KnownDomain, fromEnable)
+import Clash.Promoted.Nat (natToInteger, natToNum)
+import Clash.Signal.Bundle (unbundle)
+import Clash.Signal.Internal (Clock, Signal (..), (.&&.))
+import Clash.Sized.Internal.BitVector (Bit (..), BitVector (..))
+import Clash.Sized.Internal.Unsigned (Unsigned)
+import Clash.XException
+  ( NFDataX,
+    XException (..),
+    deepErrorX,
+    defaultSeqX,
+    fromJustX,
+    maybeIsX,
+    seqX,
+  )
 import Control.Exception (catch, throw)
 import Control.Monad (forM_)
 import Control.Monad.ST (ST, runST)
-import Control.Monad.ST.Unsafe (unsafeInterleaveST, unsafeIOToST, unsafeSTToIO)
+import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeInterleaveST, unsafeSTToIO)
 import Data.Array.MArray (newListArray)
 import qualified Data.ByteString.Lazy as L
 import Data.Maybe (isJust)
@@ -49,21 +73,19 @@ import GHC.Arr (STArray, unsafeReadSTArray, unsafeWriteSTArray)
 import GHC.Stack (withFrozenCallStack)
 import GHC.TypeLits (KnownNat, type (^))
 import Language.Haskell.TH
-  (DecsQ, ExpQ, integerL, litE, litT, mkName, normalB, numTyLit, sigD,
-   stringPrimL, valD, varP)
-
-import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.BitPack.Internal (BitPack, BitSize)
-import Clash.Explicit.BlockRam.Internal
-  (MemBlob(..), packBVs, unpackMemBlob, unpackMemBlob0)
-import Clash.Explicit.Signal (KnownDomain, Enable, fromEnable)
-import Clash.Promoted.Nat (natToInteger, natToNum)
-import Clash.Signal.Bundle (unbundle)
-import Clash.Signal.Internal (Clock, Signal(..), (.&&.))
-import Clash.Sized.Internal.BitVector (Bit(..), BitVector(..))
-import Clash.Sized.Internal.Unsigned (Unsigned)
-import Clash.XException
-  (maybeIsX, deepErrorX, defaultSeqX, fromJustX, NFDataX, XException (..), seqX)
+  ( DecsQ,
+    ExpQ,
+    integerL,
+    litE,
+    litT,
+    mkName,
+    normalB,
+    numTyLit,
+    sigD,
+    stringPrimL,
+    valD,
+    varP,
+  )
 
 -- $setup
 -- >>> :set -XTemplateHaskell
@@ -86,30 +108,30 @@ import Clash.XException
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining
 -- write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew'
 -- clk rst en ('blockRamBlob' clk en content) rd wrM@.
-blockRamBlob
-  :: forall dom addr m n
-   . ( KnownDomain dom
-     , Enum addr
-     , NFDataX addr
-     )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> MemBlob n m
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
+blockRamBlob ::
+  forall dom addr m n.
+  ( KnownDomain dom,
+    Enum addr,
+    NFDataX addr
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  -- | Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (addr, BitVector m))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom (BitVector m)
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamBlob = \clk gen content@MemBlob{} rd wrM ->
-  let en       = isJust <$> wrM
-      (wr,din) = unbundle (fromJustX <$> wrM)
-  in blockRamBlob# clk gen content (fromEnum <$> rd) en (fromEnum <$> wr) din
+  MemBlob n m ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (addr, BitVector m)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom (BitVector m)
+blockRamBlob = \clk gen content@MemBlob {} rd wrM ->
+  let en = isJust <$> wrM
+      (wr, din) = unbundle (fromJustX <$> wrM)
+   in blockRamBlob# clk gen content (fromEnum <$> rd) en (fromEnum <$> wr) din
 {-# INLINE blockRamBlob #-}
 
 -- | Create a block RAM with space for 2^@n@ elements
@@ -125,53 +147,53 @@ blockRamBlob = \clk gen content@MemBlob{} rd wrM ->
 -- * Use the adapter 'Clash.Explicit.BlockRam.readNew' for obtaining
 -- write-before-read semantics like this: @'Clash.Explicit.BlockRam.readNew'
 -- clk rst en ('blockRamBlobPow2' clk en content) rd wrM@.
-blockRamBlobPow2
-  :: forall dom m n
-   . ( KnownDomain dom
-     , KnownNat n
-     )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> MemBlob (2^n) m
-  -- ^ Initial content of the BRAM, also determines the size, 2^@n@, of the BRAM
+blockRamBlobPow2 ::
+  forall dom m n.
+  ( KnownDomain dom,
+    KnownNat n
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  -- | Initial content of the BRAM, also determines the size, 2^@n@, of the BRAM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom (Unsigned n)
-  -- ^ Read address @r@
-  -> Signal dom (Maybe (Unsigned n, BitVector m))
-  -- ^ (write address @w@, value to write)
-  -> Signal dom (BitVector m)
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
+  MemBlob (2 ^ n) m ->
+  -- | Read address @r@
+  Signal dom (Unsigned n) ->
+  -- | (write address @w@, value to write)
+  Signal dom (Maybe (Unsigned n, BitVector m)) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom (BitVector m)
 blockRamBlobPow2 = blockRamBlob
 {-# INLINE blockRamBlobPow2 #-}
 
 -- | blockRAMBlob primitive
-blockRamBlob#
-  :: forall dom m n
-   . KnownDomain dom
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Enable dom
-  -- ^ 'Enable' line
-  -> MemBlob n m
-  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
+blockRamBlob# ::
+  forall dom m n.
+  (KnownDomain dom) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  -- | 'Enable' line
+  Enable dom ->
+  -- | Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom Int
-  -- ^ Read address @r@
-  -> Signal dom Bool
-  -- ^ Write enable
-  -> Signal dom Int
-  -- ^ Write address @w@
-  -> Signal dom (BitVector m)
-  -- ^ Value to write (at address @w@)
-  -> Signal dom (BitVector m)
-  -- ^ Value of the BRAM at address @r@ from the previous clock cycle
-blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
+  MemBlob n m ->
+  -- | Read address @r@
+  Signal dom Int ->
+  -- | Write enable
+  Signal dom Bool ->
+  -- | Write address @w@
+  Signal dom Int ->
+  -- | Value to write (at address @w@)
+  Signal dom (BitVector m) ->
+  -- | Value of the BRAM at address @r@ from the previous clock cycle
+  Signal dom (BitVector m)
+blockRamBlob# !_ gen content@MemBlob {} = \rd wen waS wd -> runST $ do
   bvList <- unsafeIOToST (unpackMemBlob0 content)
-  ramStart <- newListArray (0,szI-1) bvList
+  ramStart <- newListArray (0, szI - 1) bvList
   go
     ramStart
     (withFrozenCallStack (deepErrorX "blockRamBlob: intial value undefined"))
@@ -180,58 +202,98 @@ blockRamBlob# !_ gen content@MemBlob{} = \rd wen waS wd -> runST $ do
     (fromEnable gen .&&. wen)
     waS
     wd
- where
-  szI = natToNum @n @Int
+  where
+    szI = natToNum @n @Int
 
-  go :: STArray s Int (BitVector m) -> BitVector m -> Signal dom Bool
-     -> Signal dom Int -> Signal dom Bool -> Signal dom Int
-     -> Signal dom (BitVector m) -> ST s (Signal dom (BitVector m))
-  go !ram o ret@(~(re :- res)) rt@(~(r :- rs)) et@(~(e :- en)) wt@(~(w :- wr))
-     dt@(~(d :- din)) = do
-    o `seqX` (o :-) <$> (ret `seq` rt `seq` et `seq` wt `seq` dt `seq`
-      unsafeInterleaveST
-        (do o' <- unsafeIOToST
-                    (catch (if re then unsafeSTToIO (ram `safeAt` r) else pure o)
-                    (\err@XException {} -> pure (throw err)))
-            d `defaultSeqX` upd ram e w d
-            go ram o' res rs en wr din))
+    go ::
+      STArray s Int (BitVector m) ->
+      BitVector m ->
+      Signal dom Bool ->
+      Signal dom Int ->
+      Signal dom Bool ->
+      Signal dom Int ->
+      Signal dom (BitVector m) ->
+      ST s (Signal dom (BitVector m))
+    go
+      !ram
+      o
+      ret@(~(re :- res))
+      rt@(~(r :- rs))
+      et@(~(e :- en))
+      wt@(~(w :- wr))
+      dt@(~(d :- din)) = do
+        o `seqX`
+          (o :-)
+            <$> ( ret
+                    `seq` rt
+                    `seq` et
+                    `seq` wt
+                    `seq` dt
+                    `seq` unsafeInterleaveST
+                      ( do
+                          o' <-
+                            unsafeIOToST
+                              ( catch
+                                  (if re then unsafeSTToIO (ram `safeAt` r) else pure o)
+                                  (\err@XException {} -> pure (throw err))
+                              )
+                          d `defaultSeqX` upd ram e w d
+                          go ram o' res rs en wr din
+                      )
+                )
 
-  upd :: STArray s Int (BitVector m) -> Bool -> Int -> BitVector m -> ST s ()
-  upd ram we waddr d = case maybeIsX we of
-    Nothing -> case maybeIsX waddr of
-      Nothing -> -- Put the XException from `waddr` as the value in all
-                 -- locations of `ram`.
-                 forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
-      Just wa -> -- Put the XException from `we` as the value at address
-                 -- `waddr`.
-                 safeUpdate wa (seq we d) ram
-    Just True -> case maybeIsX waddr of
-      Nothing -> -- Put the XException from `waddr` as the value in all
-                 -- locations of `ram`.
-                 forM_ [0..(szI-1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
-      Just wa -> safeUpdate wa d ram
-    _ -> return ()
+    upd :: STArray s Int (BitVector m) -> Bool -> Int -> BitVector m -> ST s ()
+    upd ram we waddr d = case maybeIsX we of
+      Nothing -> case maybeIsX waddr of
+        Nothing -> -- Put the XException from `waddr` as the value in all
+          -- locations of `ram`.
+          forM_ [0 .. (szI - 1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+        Just wa -> -- Put the XException from `we` as the value at address
+          -- `waddr`.
+          safeUpdate wa (seq we d) ram
+      Just True -> case maybeIsX waddr of
+        Nothing -> -- Put the XException from `waddr` as the value in all
+          -- locations of `ram`.
+          forM_ [0 .. (szI - 1)] (\i -> unsafeWriteSTArray ram i (seq waddr d))
+        Just wa -> safeUpdate wa d ram
+      _ -> return ()
 
-  safeAt :: STArray s Int (BitVector m) -> Int -> ST s (BitVector m)
-  safeAt s i =
-    if (0 <= i) && (i < szI) then
-      unsafeReadSTArray s i
-    else pure $
-      withFrozenCallStack
-        (deepErrorX ("blockRamBlob: read address " <> show i <>
-                     " not in range [0.." <> show szI <> ")"))
-  {-# INLINE safeAt #-}
+    safeAt :: STArray s Int (BitVector m) -> Int -> ST s (BitVector m)
+    safeAt s i =
+      if (0 <= i) && (i < szI)
+        then
+          unsafeReadSTArray s i
+        else
+          pure $
+            withFrozenCallStack
+              ( deepErrorX
+                  ( "blockRamBlob: read address "
+                      <> show i
+                      <> " not in range [0.."
+                      <> show szI
+                      <> ")"
+                  )
+              )
+    {-# INLINE safeAt #-}
 
-  safeUpdate :: Int -> BitVector m -> STArray s Int (BitVector m) -> ST s ()
-  safeUpdate i a s =
-    if (0 <= i) && (i < szI) then
-      unsafeWriteSTArray s i a
-    else
-      let d = withFrozenCallStack
-                (deepErrorX ("blockRam: write address " <> show i <>
-                             " not in range [0.." <> show szI <> ")"))
-       in forM_ [0..(szI-1)] (\j -> unsafeWriteSTArray s j d)
-  {-# INLINE safeUpdate #-}
+    safeUpdate :: Int -> BitVector m -> STArray s Int (BitVector m) -> ST s ()
+    safeUpdate i a s =
+      if (0 <= i) && (i < szI)
+        then
+          unsafeWriteSTArray s i a
+        else
+          let d =
+                withFrozenCallStack
+                  ( deepErrorX
+                      ( "blockRam: write address "
+                          <> show i
+                          <> " not in range [0.."
+                          <> show szI
+                          <> ")"
+                      )
+                  )
+           in forM_ [0 .. (szI - 1)] (\j -> unsafeWriteSTArray s j d)
+    {-# INLINE safeUpdate #-}
 {-# ANN blockRamBlob# hasBlackBox #-}
 {-# OPAQUE blockRamBlob# #-}
 
@@ -297,40 +359,49 @@ Note how we hinted to @clashi@ that our multi-line command was a list of
 declarations by including a dummy declaration @x = 1@. Without this trick,
 @clashi@ would expect an expression and the Template Haskell would not work.
 -}
-createMemBlob
-  :: forall a f
-   . ( Foldable f
-     , BitPack a
-     )
-  => String
-  -- ^ Name of the binding to generate
-  -> Maybe Bit
-  -- ^ Value to map don't care bits to. 'Nothing' means throwing an error on
+createMemBlob ::
+  forall a f.
+  ( Foldable f,
+    BitPack a
+  ) =>
+  -- | Name of the binding to generate
+  String ->
+  -- | Value to map don't care bits to. 'Nothing' means throwing an error on
   -- don't care bits.
-  -> f a
-  -- ^ The content for the 'MemBlob'
-  -> DecsQ
+  Maybe Bit ->
+  -- | The content for the 'MemBlob'
+  f a ->
+  DecsQ
 createMemBlob name care es =
   case packed of
     Left err -> fail err
-    Right _ -> sequence
-      [ sigD name0 [t| MemBlob $(n) $(m) |]
-      , valD (varP name0) (normalB [| MemBlob { memBlobRunsLen = $(runsLen)
-                                              , memBlobRuns = $(runs)
-                                              , memBlobEndsLen = $(endsLen)
-                                              , memBlobEnds = $(ends)
-                                              } |]) []
-      ]
- where
-  name0 = mkName name
-  n = litT . numTyLit . toInteger $ len
-  m = litT . numTyLit $ natToInteger @(BitSize a)
-  runsLen = litE . integerL . toInteger $ L.length runsB
-  runs = litE . stringPrimL $ L.unpack runsB
-  endsLen = litE . integerL . toInteger $ L.length endsB
-  ends = litE . stringPrimL $ L.unpack endsB
-  (len, runsB, endsB) = either error id packed
-  packed = packBVs care es
+    Right _ ->
+      sequence
+        [ sigD name0 [t|MemBlob $(n) $(m)|],
+          valD
+            (varP name0)
+            ( normalB
+                [|
+                  MemBlob
+                    { memBlobRunsLen = $(runsLen),
+                      memBlobRuns = $(runs),
+                      memBlobEndsLen = $(endsLen),
+                      memBlobEnds = $(ends)
+                    }
+                  |]
+            )
+            []
+        ]
+  where
+    name0 = mkName name
+    n = litT . numTyLit . toInteger $ len
+    m = litT . numTyLit $ natToInteger @(BitSize a)
+    runsLen = litE . integerL . toInteger $ L.length runsB
+    runs = litE . stringPrimL $ L.unpack runsB
+    endsLen = litE . integerL . toInteger $ L.length endsB
+    ends = litE . stringPrimL $ L.unpack endsB
+    (len, runsB, endsB) = either error id packed
+    packed = packBVs care es
 
 {- | Create a 'MemBlob' from a list of values
 
@@ -381,32 +452,36 @@ does not matter. But the bits need a defined value in the memory. Either 0 or
 
 #endif
 -}
-memBlobTH
-  :: forall a f
-   . ( Foldable f
-     , BitPack a
-     )
-  => Maybe Bit
-  -- ^ Value to map don't care bits to. 'Nothing' means throwing an error on
+memBlobTH ::
+  forall a f.
+  ( Foldable f,
+    BitPack a
+  ) =>
+  -- | Value to map don't care bits to. 'Nothing' means throwing an error on
   -- don't care bits.
-  -> f a
-  -- ^ The content for the 'MemBlob'
-  -> ExpQ
+  Maybe Bit ->
+  -- | The content for the 'MemBlob'
+  f a ->
+  ExpQ
 memBlobTH care es =
   case packed of
     Left err -> fail err
-    Right _ -> [| MemBlob { memBlobRunsLen = $(runsLen)
-                          , memBlobRuns = $(runs)
-                          , memBlobEndsLen = $(endsLen)
-                          , memBlobEnds = $(ends)
-                          }
-                    :: MemBlob $(n) $(m) |]
- where
-  n = litT . numTyLit . toInteger $ len
-  m = litT . numTyLit $ natToInteger @(BitSize a)
-  runsLen = litE . integerL . toInteger $ L.length runsB
-  runs = litE . stringPrimL $ L.unpack runsB
-  endsLen = litE . integerL . toInteger $ L.length endsB
-  ends = litE . stringPrimL $ L.unpack endsB
-  (len, runsB, endsB) = either error id packed
-  packed = packBVs care es
+    Right _ ->
+      [|
+        MemBlob
+          { memBlobRunsLen = $(runsLen),
+            memBlobRuns = $(runs),
+            memBlobEndsLen = $(endsLen),
+            memBlobEnds = $(ends)
+          } ::
+          MemBlob $(n) $(m)
+        |]
+  where
+    n = litT . numTyLit . toInteger $ len
+    m = litT . numTyLit $ natToInteger @(BitSize a)
+    runsLen = litE . integerL . toInteger $ L.length runsB
+    runs = litE . stringPrimL $ L.unpack runsB
+    endsLen = litE . integerL . toInteger $ L.length endsB
+    ends = litE . stringPrimL $ L.unpack endsB
+    (len, runsB, endsB) = either error id packed
+    packed = packBVs care es

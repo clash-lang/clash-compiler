@@ -1,3 +1,7 @@
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# OPTIONS_HADDOCK show-extensions, not-home #-}
+
 {-|
   Copyright   :  (C) 2019, QBayLogic B.V.
                  (C) 2021, QBayLogic B.V.
@@ -11,25 +15,55 @@ Haskell Prelude does. In addition, for the 'Clash.Class.Parity.odd' and
 'Clash.Class.Parity.even' functions a type class called
 'Clash.Class.Parity.Parity' is available at "Clash.Class.Parity".
 -}
+module Clash.HaskellPrelude (module Prelude, (&&), (||), not) where
 
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions, not-home #-}
-
-module Clash.HaskellPrelude
-  (module Prelude, (&&), (||), not)
-where
-
-import Prelude hiding
-  ((++), (!!), concat, concatMap, drop, even, foldl, foldl1, foldr, foldr1, head, init,
-   iterate, last, length, map, odd, repeat, replicate, reverse, scanl, scanl1,
-   scanr, scanr1, splitAt, tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined,
-   (^), getChar, putChar, getLine, (&&), (||), not, maximum, minimum)
-
-import qualified Prelude
 import GHC.Magic (noinline)
+import Prelude hiding
+  ( concat,
+    concatMap,
+    drop,
+    even,
+    foldl,
+    foldl1,
+    foldr,
+    foldr1,
+    getChar,
+    getLine,
+    head,
+    init,
+    iterate,
+    last,
+    length,
+    map,
+    maximum,
+    minimum,
+    not,
+    odd,
+    putChar,
+    repeat,
+    replicate,
+    reverse,
+    scanl,
+    scanl1,
+    scanr,
+    scanr1,
+    splitAt,
+    tail,
+    take,
+    undefined,
+    unzip,
+    unzip3,
+    zip,
+    zip3,
+    zipWith,
+    zipWith3,
+    (!!),
+    (&&),
+    (++),
+    (^),
+    (||),
+  )
+import qualified Prelude
 
 {-
 Note [use of noinline]

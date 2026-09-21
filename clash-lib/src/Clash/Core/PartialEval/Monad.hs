@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+
 {-|
 Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
@@ -8,79 +12,84 @@ auxiliary functions needed to define new evaluator implementations. This
 module is only needed to define new evaluators, for calling an existing
 evaluator see Clash.Core.PartialEval.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Clash.Core.PartialEval.Monad
   ( -- * Partial Evaluation Monad
-    Eval
-  , runEval
+    Eval,
+    runEval,
+
     -- * Local and Global Environments
-  , getLocalEnv
-  , setLocalEnv
-  , modifyLocalEnv
-  , getGlobalEnv
-  , modifyGlobalEnv
+    getLocalEnv,
+    setLocalEnv,
+    modifyLocalEnv,
+    getGlobalEnv,
+    modifyGlobalEnv,
+
     -- * Evaluation Context
-  , getContext
-  , withContext
+    getContext,
+    withContext,
+
     -- * Local Type Bindings
-  , getTvSubst
-  , findTyVar
-  , withTyVar
-  , withTyVars
+    getTvSubst,
+    findTyVar,
+    withTyVar,
+    withTyVars,
+
     -- * Local Term Bindings
-  , findId
-  , withId
-  , withIds
-  , withoutId
+    findId,
+    withId,
+    withIds,
+    withoutId,
+
     -- * Global Term Bindings
-  , findBinding
-  , replaceBinding
+    findBinding,
+    replaceBinding,
+
     -- * IO Heap Bindings
-  , getRef
-  , setRef
+    getRef,
+    setRef,
+
     -- * Lifted Data Constructors
-  , isKeepingLifted
-  , keepLifted
+    isKeepingLifted,
+    keepLifted,
+
     -- * Fuel
-  , getFuel
-  , withFuel
-  , preserveFuel
+    getFuel,
+    withFuel,
+    preserveFuel,
+
     -- * Accessing Global State
-  , getTyConMap
-  , getInScope
+    getTyConMap,
+    getInScope,
+
     -- * Fresh Variable Generation
-  , getUniqueId
-  , getUniqueTyVar
+    getUniqueId,
+    getUniqueTyVar,
+
     -- * Work free check
-  , workFreeValue
-  ) where
+    workFreeValue,
+  )
+where
 
-import           Control.Applicative (Alternative)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, MonadMask)
-import           Control.Monad.IO.Class (MonadIO)
-
-import           Control.Monad.RWS.Strict (RWST, MonadReader, MonadState)
+import Clash.Core.HasFreeVars
+import Clash.Core.Name (OccName)
+import Clash.Core.PartialEval.AsTerm
+import Clash.Core.PartialEval.NormalForm
+import Clash.Core.Subst (Subst, mkTvSubst)
+import Clash.Core.TyCon (TyConMap)
+import Clash.Core.Type (Kind, KindOrType, Type)
+import Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
+import Clash.Core.Var (Id, TyVar, Var)
+import Clash.Core.VarEnv
+import Clash.Driver.Types (Binding (..))
+import Clash.Rewrite.WorkFree (isWorkFree)
+import Clash.Util.Supply (Supply)
+import Control.Applicative (Alternative)
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.RWS.Strict (MonadReader, MonadState, RWST)
 import qualified Control.Monad.RWS.Strict as RWS
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
-
-import           Clash.Core.HasFreeVars
-import           Clash.Core.Name (OccName)
-import           Clash.Core.PartialEval.AsTerm
-import           Clash.Core.PartialEval.NormalForm
-import           Clash.Core.Subst (Subst, mkTvSubst)
-import           Clash.Core.TyCon (TyConMap)
-import           Clash.Core.Type (Kind, KindOrType, Type)
-import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
-import           Clash.Core.Var (Id, TyVar, Var)
-import           Clash.Core.VarEnv
-import           Clash.Driver.Types (Binding(..))
-import           Clash.Rewrite.WorkFree (isWorkFree)
-import           Clash.Util.Supply (Supply)
 
 {-
 NOTE [RWS monad]
@@ -109,19 +118,19 @@ functionality of RWST is not wanted.
 -- evaluation can attempt to evaluate IO actions.
 --
 newtype Eval a = Eval
-  { unEval :: RWST LocalEnv () GlobalEnv IO a }
+  {unEval :: RWST LocalEnv () GlobalEnv IO a}
   deriving
-    ( Functor
-    , Applicative
-    , Alternative
-    , Monad
-    , MonadFail
-    , MonadIO
-    , MonadReader LocalEnv
-    , MonadState GlobalEnv
-    , MonadThrow
-    , MonadCatch
-    , MonadMask
+    ( Functor,
+      Applicative,
+      Alternative,
+      Monad,
+      MonadFail,
+      MonadIO,
+      MonadReader LocalEnv,
+      MonadState GlobalEnv,
+      MonadThrow,
+      MonadCatch,
+      MonadMask
     )
 
 -- | Evaluate an action in the partial evaluator, returning the result,
@@ -158,8 +167,8 @@ getContext = lenvContext <$> getLocalEnv
 
 withContext :: Id -> Eval a -> Eval a
 withContext i = modifyLocalEnv go
- where
-  go env = env { lenvContext = i }
+  where
+    go env = env {lenvContext = i}
 
 findTyVar :: TyVar -> Eval (Maybe Type)
 findTyVar i = Map.lookup i . lenvTypes <$> getLocalEnv
@@ -168,14 +177,14 @@ withTyVar :: TyVar -> Type -> Eval a -> Eval a
 withTyVar i a x = do
   modifyGlobalEnv goGlobal
   modifyLocalEnv goLocal x
- where
-  goGlobal env@GlobalEnv{genvInScope=inScope} =
-    let fvs = unitVarSet i `unionVarSet` freeVarsOf a
-        iss = mkInScopeSet fvs `unionInScope` inScope
-     in env { genvInScope = iss }
+  where
+    goGlobal env@GlobalEnv {genvInScope = inScope} =
+      let fvs = unitVarSet i `unionVarSet` freeVarsOf a
+          iss = mkInScopeSet fvs `unionInScope` inScope
+       in env {genvInScope = iss}
 
-  goLocal env@LocalEnv{lenvTypes=types} =
-    env { lenvTypes = Map.insert i a types }
+    goLocal env@LocalEnv {lenvTypes = types} =
+      env {lenvTypes = Map.insert i a types}
 
 withTyVars :: [(TyVar, Type)] -> Eval a -> Eval a
 withTyVars = flip $ foldr (uncurry withTyVar)
@@ -195,33 +204,33 @@ withId :: Id -> Value -> Eval a -> Eval a
 withId i v x = do
   modifyGlobalEnv goGlobal
   modifyLocalEnv goLocal x
- where
-  goGlobal env@GlobalEnv{genvInScope=inScope} =
-    -- TODO Change this to use an instance HasFreeVars Value
-    let fvs = unitVarSet i `unionVarSet` freeVarsOf (asTerm v)
-        iss = mkInScopeSet fvs `unionInScope` inScope
-     in env { genvInScope = iss }
+  where
+    goGlobal env@GlobalEnv {genvInScope = inScope} =
+      -- TODO Change this to use an instance HasFreeVars Value
+      let fvs = unitVarSet i `unionVarSet` freeVarsOf (asTerm v)
+          iss = mkInScopeSet fvs `unionInScope` inScope
+       in env {genvInScope = iss}
 
-  goLocal env@LocalEnv{lenvValues=values} =
-    env { lenvValues = Map.insert i v values }
+    goLocal env@LocalEnv {lenvValues = values} =
+      env {lenvValues = Map.insert i v values}
 
 withIds :: [(Id, Value)] -> Eval a -> Eval a
 withIds = flip $ foldr (uncurry withId)
 
 withoutId :: Id -> Eval a -> Eval a
 withoutId i = modifyLocalEnv go
- where
-  go env@LocalEnv{lenvValues=values} =
-    env { lenvValues = Map.delete i values }
+  where
+    go env@LocalEnv {lenvValues = values} =
+      env {lenvValues = Map.delete i values}
 
 findBinding :: Id -> Eval (Maybe (Binding Value))
 findBinding i = lookupVarEnv i . genvBindings <$> getGlobalEnv
 
 replaceBinding :: Binding Value -> Eval ()
 replaceBinding b = modifyGlobalEnv go
- where
-  go env@GlobalEnv{genvBindings=bindings} =
-    env { genvBindings = extendVarEnv (bindingId b) b bindings }
+  where
+    go env@GlobalEnv {genvBindings = bindings} =
+      env {genvBindings = extendVarEnv (bindingId b) b bindings}
 
 getRef :: Int -> Eval Value
 getRef addr = do
@@ -229,25 +238,24 @@ getRef addr = do
 
   case IntMap.lookup addr heap of
     Just val -> pure val
-    Nothing  -> error ("getHeap: Address " <> show addr <> " out of bounds")
+    Nothing -> error ("getHeap: Address " <> show addr <> " out of bounds")
 
 setRef :: Int -> Value -> Eval ()
 setRef addr val = modifyGlobalEnv go
- where
-  go env@GlobalEnv{genvHeap=heap,genvAddr=next}
-    | addr == next =
-        env { genvHeap = IntMap.insert addr val heap, genvAddr = addr + 1 }
-
-    | otherwise =
-        env { genvHeap = IntMap.insert addr val heap }
+  where
+    go env@GlobalEnv {genvHeap = heap, genvAddr = next}
+      | addr == next =
+          env {genvHeap = IntMap.insert addr val heap, genvAddr = addr + 1}
+      | otherwise =
+          env {genvHeap = IntMap.insert addr val heap}
 
 isKeepingLifted :: Eval Bool
 isKeepingLifted = lenvKeepLifted <$> getLocalEnv
 
 keepLifted :: Eval a -> Eval a
 keepLifted = modifyLocalEnv forceLifted
- where
-  forceLifted env = env { lenvKeepLifted = True }
+  where
+    forceLifted env = env {lenvKeepLifted = True}
 
 getFuel :: Eval Word
 getFuel = do
@@ -258,19 +266,19 @@ getFuel = do
 
 withFuel :: Eval a -> Eval a
 withFuel x = modifyGlobalEnv go >> x
- where
-  go env@GlobalEnv{genvFuel=fuel} =
-    env { genvFuel = fuel - 1 }
+  where
+    go env@GlobalEnv {genvFuel = fuel} =
+      env {genvFuel = fuel - 1}
 
 preserveFuel :: Eval a -> Eval a
 preserveFuel x = do
   fuel <- getFuel
-  res  <- x
+  res <- x
 
   modifyGlobalEnv (go fuel)
   pure res
- where
-  go fuel env = env { genvFuel = fuel }
+  where
+    go fuel env = env {genvFuel = fuel}
 
 getTyConMap :: Eval TyConMap
 getTyConMap = genvTyConMap <$> getGlobalEnv
@@ -284,13 +292,14 @@ getUniqueId = getUniqueVar mkUniqSystemId
 getUniqueTyVar :: OccName -> Kind -> Eval TyVar
 getUniqueTyVar = getUniqueVar mkUniqSystemTyVar
 
-getUniqueVar
-  :: ((Supply, InScopeSet)
-         -> (OccName, KindOrType)
-         -> ((Supply, InScopeSet), Var a))
-  -> OccName
-  -> KindOrType
-  -> Eval (Var a)
+getUniqueVar ::
+  ( (Supply, InScopeSet) ->
+    (OccName, KindOrType) ->
+    ((Supply, InScopeSet), Var a)
+  ) ->
+  OccName ->
+  KindOrType ->
+  Eval (Var a)
 getUniqueVar f name ty = do
   env <- getGlobalEnv
   let iss = genvInScope env
@@ -299,9 +308,9 @@ getUniqueVar f name ty = do
 
   modifyGlobalEnv (go ids' iss')
   pure i
- where
-  go ids iss env =
-    env { genvInScope = iss, genvSupply = ids }
+  where
+    go ids iss env =
+      env {genvInScope = iss, genvSupply = ids}
 
 workFreeValue :: Value -> Eval Bool
 workFreeValue = \case
@@ -309,5 +318,4 @@ workFreeValue = \case
   VThunk x _ -> do
     bindings <- fmap (fmap asTerm) . genvBindings <$> getGlobalEnv
     isWorkFree workFreeCache bindings x
-
   _ -> pure True

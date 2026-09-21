@@ -1,29 +1,29 @@
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
                   2025     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise  #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Sized.Index
-  ( Index, bv2i, fromSNat
+  ( Index,
+    bv2i,
+    fromSNat,
+
     -- * Type-level error messages
-  , IndexPositiveLiteralError
+    IndexPositiveLiteralError,
   )
 where
 
-import GHC.TypeLits (KnownNat, type (^))
-import GHC.TypeLits.Extra (CLog) -- documentation only
-
 import Clash.Sized.Internal.BitVector (BitVector)
 import Clash.Sized.Internal.Index
+import GHC.TypeLits (KnownNat, type (^))
+import GHC.TypeLits.Extra (CLog) -- documentation only
 
 -- | An alternative implementation of 'Clash.Class.BitPack.unpack' for the
 -- 'Index' data type; for when you know the size of the 'BitVector' and want
@@ -42,5 +42,5 @@ import Clash.Sized.Internal.Index
 --
 -- 'bv2i' on the other hand will /never/ fail at run-time, because the
 -- 'BitVector' argument determines the size.
-bv2i :: KnownNat n => BitVector n -> Index (2^n)
+bv2i :: (KnownNat n) => BitVector n -> Index (2 ^ n)
 bv2i = unpack#

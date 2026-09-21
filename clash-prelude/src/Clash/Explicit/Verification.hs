@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
                   2022, QBayLogic B.V.
@@ -11,63 +15,63 @@ of PSL and an introduction to the concepts of property checking, read
 
 The verification API is currently experimental and subject to change.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE QuasiQuotes #-}
-
 module Clash.Explicit.Verification
   ( -- * Types
-    Assertion
-  , Property
-  , AssertionValue
-  , RenderAs(..)
+    Assertion,
+    Property,
+    AssertionValue,
+    RenderAs (..),
 
     -- * Bootstrapping functions
-  , name
-  , lit
+    name,
+    lit,
 
     -- * Functions to build a PSL/SVA expressions
-  , not
-  , and
-  , or
-  , implies
-  , next
-  , nextN
-  , before
-  , timplies
-  , timpliesOverlapping
-  , always
-  , never
-  , eventually
+    not,
+    and,
+    or,
+    implies,
+    next,
+    nextN,
+    before,
+    timplies,
+    timpliesOverlapping,
+    always,
+    never,
+    eventually,
 
-  -- * Asserts
-  , assert
-  , cover
-  , assume
+    -- * Asserts
+    assert,
+    cover,
+    assume,
 
-  -- * Assertion checking
-  , check
-  , checkI
+    -- * Assertion checking
+    check,
+    checkI,
 
-  -- * Functions to deal with assertion results
-  , hideAssertion
+    -- * Functions to deal with assertion results
+    hideAssertion,
   )
- where
+where
 
-import           Prelude
-  (Bool, Word, (.), pure, max, concat)
-
-import           Data.Text  (Text)
-import           Data.Maybe (Maybe(Just))
-import           Data.String.Interpolate (__i)
-
-import           Clash.Annotations.Primitive
-  (Primitive(InlineYamlPrimitive), HDL(..))
-import           Clash.Signal.Internal (KnownDomain, Signal, Clock, Reset)
-import           Clash.XException      (errorX, hwSeqX)
-
-import           Clash.Verification.Internal
+import Clash.Annotations.Primitive
+  ( HDL (..),
+    Primitive (InlineYamlPrimitive),
+  )
+import Clash.Signal.Internal (Clock, KnownDomain, Reset, Signal)
+import Clash.Verification.Internal
+import Clash.XException (errorX, hwSeqX)
+import Data.Maybe (Maybe (Just))
+import Data.String.Interpolate (__i)
+import Data.Text (Text)
+import Prelude
+  ( Bool,
+    Word,
+    concat,
+    max,
+    pure,
+    (.),
+  )
 
 -- | Convert a signal to a cv expression with a name hint. Clash will try its
 -- best to use this name in the rendered assertion, but might run into
@@ -88,7 +92,7 @@ lit = Assertion IsNotTemporal . CvLit
 -- > ------------
 -- > True  | False
 -- > False | True
-not :: AssertionValue dom a => a -> Assertion dom
+not :: (AssertionValue dom a) => a -> Assertion dom
 not (toAssertionValue -> a) = Assertion (isTemporal a) (CvNot (assertion a))
 {-# INLINE not #-}
 
@@ -147,7 +151,7 @@ implies (toAssertionValue -> Assertion aTmp a) (toAssertionValue -> Assertion bT
 --
 -- where a[n] represents the value of @a@ at cycle @n@ and @a[n+1]@ represents
 -- the value of @a@ at cycle @n+1@. Cycle n is an arbitrary cycle.
-next :: AssertionValue dom a => a -> Assertion dom
+next :: (AssertionValue dom a) => a -> Assertion dom
 next = nextN 1
 {-# INLINE next #-}
 
@@ -162,7 +166,7 @@ next = nextN 1
 --
 -- where a[n] represents the value of @a@ at cycle @n@ and a[n+m] represents
 -- the value of @a@ at cycle @n+m@. Cycle n is an arbitrary cycle.
-nextN :: AssertionValue dom a => Word -> a -> Assertion dom
+nextN :: (AssertionValue dom a) => Word -> a -> Assertion dom
 nextN n = Assertion IsTemporal . CvNext n . assertion . toAssertionValue
 {-# INLINE nextN #-}
 
@@ -170,9 +174,9 @@ nextN n = Assertion IsTemporal . CvNext n . assertion . toAssertionValue
 -- be written as @a \`before\` b@. Might be read as "a happens one cycle before b".
 before :: (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom
 before a0 b0 = Assertion IsTemporal (CvBefore a1 b1)
- where
-  a1 = assertion (toAssertionValue a0)
-  b1 = assertion (toAssertionValue b0)
+  where
+    a1 = assertion (toAssertionValue a0)
+    b1 = assertion (toAssertionValue b0)
 {-# INLINE before #-}
 
 -- | Same as @a \`implies\` next b@ but with a nice syntax. E.g.,
@@ -180,94 +184,104 @@ before a0 b0 = Assertion IsTemporal (CvBefore a1 b1)
 -- as "a at cycle n implies b at cycle n+1".
 timplies :: (AssertionValue dom a, AssertionValue dom b) => a -> b -> Assertion dom
 timplies a0 b0 = Assertion IsTemporal (CvTemporalImplies 1 a1 b1)
- where
-  a1 = toTemporal (toAssertionValue a0)
-  b1 = toTemporal (toAssertionValue b0)
+  where
+    a1 = toTemporal (toAssertionValue a0)
+    b1 = toTemporal (toAssertionValue b0)
 {-# INLINE timplies #-}
 
 -- | Same as 'implies' but strictly temporal.
-timpliesOverlapping
-  :: (AssertionValue dom a, AssertionValue dom b)
-  => a
-  -> b
-  -> Assertion dom
+timpliesOverlapping ::
+  (AssertionValue dom a, AssertionValue dom b) =>
+  a ->
+  b ->
+  Assertion dom
 timpliesOverlapping a0 b0 =
   Assertion IsTemporal (CvTemporalImplies 0 a1 b1)
- where
-  a1 = toTemporal (toAssertionValue a0)
-  b1 = toTemporal (toAssertionValue b0)
+  where
+    a1 = toTemporal (toAssertionValue a0)
+    b1 = toTemporal (toAssertionValue b0)
 {-# INLINE timpliesOverlapping #-}
 
 -- | Specify assertion should _always_ hold
-always :: AssertionValue dom a => a -> Assertion dom
+always :: (AssertionValue dom a) => a -> Assertion dom
 always = Assertion IsTemporal . CvAlways . assertion . toAssertionValue
 {-# INLINE always #-}
 
 -- | Specify assertion should _never_ hold (not supported by SVA)
-never :: AssertionValue dom a => a -> Assertion dom
+never :: (AssertionValue dom a) => a -> Assertion dom
 never = Assertion IsTemporal . CvNever . assertion . toAssertionValue
 {-# INLINE never #-}
 
 -- | Specify assertion should _eventually_ hold
-eventually :: AssertionValue dom a => a -> Assertion dom
+eventually :: (AssertionValue dom a) => a -> Assertion dom
 eventually = Assertion IsTemporal . CvEventually . assertion . toAssertionValue
 {-# INLINE eventually #-}
 
 -- | Check whether given assertion always holds. Results can be collected with
 -- 'check'.
-assert :: AssertionValue dom a => a -> Property dom
+assert :: (AssertionValue dom a) => a -> Property dom
 assert = Property . CvAssert . assertion . toAssertionValue
 {-# INLINE assert #-}
 
 -- | Check whether given assertion holds for at least a single cycle. Results
 -- can be collected with 'check'.
-cover :: AssertionValue dom a => a -> Property dom
+cover :: (AssertionValue dom a) => a -> Property dom
 cover = Property . CvCover . assertion . toAssertionValue
 {-# INLINE cover #-}
 
 -- | Inform the prover that this property is true. This is the same as 'assert'
 -- for simulations.
-assume :: AssertionValue dom a => a -> Property dom
+assume :: (AssertionValue dom a) => a -> Property dom
 assume = Property . CvAssume . assertion . toAssertionValue
 {-# INLINE assume #-}
 
-
 -- | Print property as PSL/SVA in HDL. Clash simulation support not yet
 -- implemented.
-check
-  :: KnownDomain dom
-  => Clock dom
-  -> Reset dom
-  -> Text
-  -- ^ Property name (used in reports and error messages)
-  -> RenderAs
-  -- ^ Assertion language to use in HDL
-  -> Property dom
-  -> Signal dom AssertionResult
+check ::
+  (KnownDomain dom) =>
+  Clock dom ->
+  Reset dom ->
+  -- | Property name (used in reports and error messages)
+  Text ->
+  -- | Assertion language to use in HDL
+  RenderAs ->
+  Property dom ->
+  Signal dom AssertionResult
 check !_clk !_rst !_propName !_renderAs !_prop =
-  pure (errorX (concat [
-      "Simulation for Clash.Verification not yet implemented. If you need this,"
-    , " create an issue at https://github.com/clash-compiler/clash-lang/issues." ]))
+  pure
+    ( errorX
+        ( concat
+            [ "Simulation for Clash.Verification not yet implemented. If you need this,",
+              " create an issue at https://github.com/clash-compiler/clash-lang/issues."
+            ]
+        )
+    )
 {-# OPAQUE check #-}
-{-# ANN check (InlineYamlPrimitive [Verilog, SystemVerilog, VHDL] [__i|
+{-# ANN
+  check
+  ( InlineYamlPrimitive
+      [Verilog, SystemVerilog, VHDL]
+      [__i|
   BlackBoxHaskell:
     name: Clash.Explicit.Verification.check
     templateFunction: Clash.Primitives.Verification.checkBBF
-  |]) #-}
+  |]
+  )
+  #-}
 
 -- | Same as 'check', but doesn't require a design to explicitly carried to
 -- top-level.
-checkI
-  :: KnownDomain dom
-  => Clock dom
-  -> Reset dom
-  -> Text
-  -- ^ Property name (used in reports and error messages)
-  -> RenderAs
-  -- ^ Assertion language to use in HDL
-  -> Property dom
-  -> Signal dom a
-  -> Signal dom a
+checkI ::
+  (KnownDomain dom) =>
+  Clock dom ->
+  Reset dom ->
+  -- | Property name (used in reports and error messages)
+  Text ->
+  -- | Assertion language to use in HDL
+  RenderAs ->
+  Property dom ->
+  Signal dom a ->
+  Signal dom a
 checkI clk rst propName renderAs prop =
   hideAssertion (check clk rst propName renderAs prop)
 

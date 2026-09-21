@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 {-|
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
@@ -12,27 +16,20 @@
   Mealy machines are strictly more expressive, but may impose stricter timing
   requirements.
 -}
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-
-{-# LANGUAGE Safe #-}
-
 module Clash.Prelude.Mealy
   ( -- * Mealy machine synchronized to the system clock
-    mealy
-  , mealyS
-  , mealyB
-  , mealySB
-  , (<^>)
+    mealy,
+    mealyS,
+    mealyB,
+    mealySB,
+    (<^>),
   )
 where
 
 import qualified Clash.Explicit.Mealy as E
-import           Clash.Signal
-import           Clash.XException           (NFDataX)
-
-import           Control.Monad.State.Strict (State)
+import Clash.Signal
+import Clash.XException (NFDataX)
+import Control.Monad.State.Strict (State)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XDeriveGeneric -XDeriveAnyClass
@@ -119,16 +116,17 @@ delayTop = mealyS delayS initialDelayState
 --     s1 = 'mealy' macT 0 ('Clash.Signal.bundle' (a,x))
 --     s2 = 'mealy' macT 0 ('Clash.Signal.bundle' (b,y))
 -- @
-mealy
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s )
-  => (s -> i -> (s,o))
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-  -> s
-  -- ^ Initial state
-  -> (Signal dom i -> Signal dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+mealy ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s
+  ) =>
+  -- | Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  (s -> i -> (s, o)) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the mealy machine
+  (Signal dom i -> Signal dom o)
 mealy = hideClockResetEnable E.mealy
 {-# INLINE mealy #-}
 
@@ -158,21 +156,21 @@ mealy = hideClockResetEnable E.mealy
 --     (i1,b1) = 'mealyB' f 0 (a,b)
 --     (i2,b2) = 'mealyB' f 3 (c,i1)
 -- @
-mealyB
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s
-     , Bundle i
-     , Bundle o )
-  => (s -> i -> (s,o))
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-  -> s
-  -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+mealyB ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s,
+    Bundle i,
+    Bundle o
+  ) =>
+  -- | Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  (s -> i -> (s, o)) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the mealy machine
+  (Unbundled dom i -> Unbundled dom o)
 mealyB = hideClockResetEnable E.mealyB
 {-# INLINE mealyB #-}
-
 
 -- | Create a synchronous function from a combinational function describing
 -- a mealy machine using the state monad. This can be particularly useful
@@ -208,47 +206,52 @@ mealyB = hideClockResetEnable E.mealyB
 -- [Nothing,Nothing,Nothing,Just 1,Just 2,Just 3,Just 4]
 -- ...
 --
-mealyS
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s )
-  => (i -> State s o)
+mealyS ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s
+  ) =>
+  (i -> State s o) ->
   --  ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
-  -> s
-  -- ^ Initial state
-  -> (Signal dom i -> Signal dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the mealy machine
+  (Signal dom i -> Signal dom o)
 mealyS = hideClockResetEnable E.mealyS
 {-# INLINE mealyS #-}
 
 -- | A version of 'mealyS' that does automatic 'Bundle'ing, see 'mealyB' for details.
-mealySB
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s
-     , Bundle i
-     , Bundle o  )
-  => (i -> State s o)
+mealySB ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s,
+    Bundle i,
+    Bundle o
+  ) =>
+  (i -> State s o) ->
   --  ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
-  -> s
-  -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the mealy machine
+  (Unbundled dom i -> Unbundled dom o)
 mealySB = hideClockResetEnable E.mealySB
 {-# INLINE mealySB #-}
 
 -- | Infix version of 'mealyB'
-(<^>)
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s
-     , Bundle i
-     , Bundle o )
-  => (s -> i -> (s,o))
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-  -> s
-  -- ^ Initial state
- -> (Unbundled dom i -> Unbundled dom o)
- -- ^ Synchronous sequential function with input and output matching that
- -- of the mealy machine
+(<^>) ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s,
+    Bundle i,
+    Bundle o
+  ) =>
+  -- | Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  (s -> i -> (s, o)) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
+  -- of the mealy machine
+  (Unbundled dom i -> Unbundled dom o)
 (<^>) = mealyB
 {-# INLINE (<^>) #-}

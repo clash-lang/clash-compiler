@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_HADDOCK show-extensions, not-home #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
@@ -10,156 +16,176 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 This module defines the explicitly clocked counterparts of the functions
 defined in "Clash.Prelude".
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_HADDOCK show-extensions, not-home #-}
-
 module Clash.Explicit.Prelude
   ( -- * Creating synchronous sequential circuits
-    mealy
-  , mealyS
-  , mealyB
-  , mealySB
-  , moore
-  , mooreB
-  , registerB
+    mealy,
+    mealyS,
+    mealyB,
+    mealySB,
+    moore,
+    mooreB,
+    registerB,
+
     -- * Synchronizer circuits for safe clock domain crossings
-  , dualFlipFlopSynchronizer
-  , asyncFIFOSynchronizer
+    dualFlipFlopSynchronizer,
+    asyncFIFOSynchronizer,
+
     -- * ROMs
-  , asyncRom
-  , asyncRomPow2
-  , rom
-  , romPow2
+    asyncRom,
+    asyncRomPow2,
+    rom,
+    romPow2,
+
     -- ** ROMs defined by a 'MemBlob'
-  , asyncRomBlob
-  , asyncRomBlobPow2
-  , romBlob
-  , romBlobPow2
+    asyncRomBlob,
+    asyncRomBlobPow2,
+    romBlob,
+    romBlobPow2,
+
     -- ** ROMs defined by a data file
-  , asyncRomFile
-  , asyncRomFilePow2
-  , romFile
-  , romFilePow2
+    asyncRomFile,
+    asyncRomFilePow2,
+    romFile,
+    romFilePow2,
+
     -- * RAM primitives with a combinational read port
-  , asyncRam
-  , asyncRamPow2
+    asyncRam,
+    asyncRamPow2,
+
     -- * Block RAM primitives
-  , blockRam
-  , blockRamPow2
-  , blockRamU
-  , blockRam1
-  , ResetStrategy(..)
+    blockRam,
+    blockRamPow2,
+    blockRamU,
+    blockRam1,
+    ResetStrategy (..),
+
     -- ** Block RAM primitives initialized with a 'MemBlob'
-  , blockRamBlob
-  , blockRamBlobPow2
+    blockRamBlob,
+    blockRamBlobPow2,
+
     -- *** Creating and inspecting 'MemBlob'
-  , MemBlob
-  , createMemBlob
-  , memBlobTH
-  , unpackMemBlob
+    MemBlob,
+    createMemBlob,
+    memBlobTH,
+    unpackMemBlob,
+
     -- ** Block RAM primitives initialized with a data file
-  , blockRamFile
-  , blockRamFilePow2
-  -- ** Block RAM read/write conflict resolution
-  , readNew
+    blockRamFile,
+    blockRamFilePow2,
+
+    -- ** Block RAM read/write conflict resolution
+    readNew,
+
     -- ** True dual-port block RAM
-  , trueDualPortBlockRam
-  , RamOp(..)
+    trueDualPortBlockRam,
+    RamOp (..),
+
     -- * Utility functions
-  , window
-  , windowD
-  , isRising
-  , isFalling
-  , riseEvery
-  , oscillate
+    window,
+    windowD,
+    isRising,
+    isFalling,
+    riseEvery,
+    oscillate,
+
     -- * Testbench functions
-  , assert
-  , stimuliGenerator
-  , outputVerifier'
+    assert,
+    stimuliGenerator,
+    outputVerifier',
+
     -- * Tracing
+
     -- ** Simple
-  , traceSignal1
-  , traceVecSignal1
+    traceSignal1,
+    traceVecSignal1,
+
     -- ** Tracing in a multi-clock environment
-  , traceSignal
-  , traceVecSignal
+    traceSignal,
+    traceVecSignal,
+
     -- ** VCD dump functions
-  , dumpVCD
+    dumpVCD,
+
     -- * Exported modules
+
     -- ** Synchronous signals
-  , module Clash.Explicit.Reset
-  , module Clash.Explicit.Signal
-  , module Clash.Explicit.Signal.Delayed
+    module Clash.Explicit.Reset,
+    module Clash.Explicit.Signal,
+    module Clash.Explicit.Signal.Delayed,
+
     -- ** Datatypes
+
     -- *** Bit vectors
-  , module Clash.Sized.BitVector
+    module Clash.Sized.BitVector,
+
     -- *** Arbitrary-width numbers
-  , module Clash.Sized.Signed
-  , module Clash.Sized.Unsigned
-  , module Clash.Sized.Index
+    module Clash.Sized.Signed,
+    module Clash.Sized.Unsigned,
+    module Clash.Sized.Index,
+
     -- *** Fixed point numbers
-  , module Clash.Sized.Fixed
+    module Clash.Sized.Fixed,
+
     -- *** Fixed size vectors
-  , module Clash.Sized.Vector
+    module Clash.Sized.Vector,
+
     -- *** Perfect depth trees
-  , module Clash.Sized.RTree
+    module Clash.Sized.RTree,
+
     -- ** Annotations
-  , module Clash.Annotations.TopEntity
+    module Clash.Annotations.TopEntity,
+
     -- ** Generics type-classes
-  , Generic
-  , Generic1
+    Generic,
+    Generic1,
+
     -- ** Type-level natural numbers
-  , module GHC.TypeLits
-  , module GHC.TypeLits.Extra
-  , module Clash.Promoted.Nat
-  , module Clash.Promoted.Nat.Literals
-  , module Clash.Promoted.Nat.TH
+    module GHC.TypeLits,
+    module GHC.TypeLits.Extra,
+    module Clash.Promoted.Nat,
+    module Clash.Promoted.Nat.Literals,
+    module Clash.Promoted.Nat.TH,
+
     -- ** Type-level strings
-  , module Clash.Promoted.Symbol
+    module Clash.Promoted.Symbol,
+
     -- ** Template Haskell
-  , Lift (..)
+    Lift (..),
+
     -- ** Type classes
+
     -- *** Number conversion
-  , NumConvert
-  , numConvert
-  , MaybeNumConvert
-  , maybeNumConvert
+    NumConvert,
+    numConvert,
+    MaybeNumConvert,
+    maybeNumConvert,
+
     -- *** Clash
-  , module Clash.Class.AutoReg
-  , module Clash.Class.BitPack
-  , module Clash.Class.Exp
-  , module Clash.Class.Num
-  , module Clash.Class.Resize
+    module Clash.Class.AutoReg,
+    module Clash.Class.BitPack,
+    module Clash.Class.Exp,
+    module Clash.Class.Num,
+    module Clash.Class.Resize,
+
     -- *** Other
-  , module Control.Applicative
-  , module Data.Bits
-  , module Data.Default
+    module Control.Applicative,
+    module Data.Bits,
+    module Data.Default,
+
     -- ** Exceptions
-  , module Clash.XException
+    module Clash.XException,
+
     -- ** Named types
-  , module Clash.NamedTypes
+    module Clash.NamedTypes,
+
     -- ** Magic
-  , module Clash.Magic
+    module Clash.Magic,
+
     -- ** Haskell Prelude
     -- $hiding
-  , module Clash.HaskellPrelude
+    module Clash.HaskellPrelude,
   )
 where
-
-import Control.Applicative
-import Data.Bits
-import Data.Default
-import GHC.TypeLits
-  hiding (SNat, SSymbol, fromSNat)
-import GHC.TypeLits.Extra
-import Language.Haskell.TH.Syntax  (Lift(..))
-import Clash.HaskellPrelude
 
 import Clash.Annotations.TopEntity
 import Clash.Class.AutoReg
@@ -168,23 +194,24 @@ import Clash.Class.Exp
 import Clash.Class.Num
 import Clash.Class.NumConvert
 import Clash.Class.Resize
-import Clash.Magic
-import Clash.NamedTypes
 import Clash.Explicit.BlockRam
 import Clash.Explicit.BlockRam.Blob
 import Clash.Explicit.BlockRam.File
 import Clash.Explicit.Mealy
 import Clash.Explicit.Moore
-import Clash.Explicit.ROM.File
 import Clash.Explicit.Prelude.Safe
+import Clash.Explicit.ROM.File
 import Clash.Explicit.Reset
 import Clash.Explicit.Signal
 import Clash.Explicit.Signal.Delayed
 import Clash.Explicit.Testbench
-import Clash.Prelude.ROM.File       (asyncRomFile, asyncRomFilePow2)
+import Clash.HaskellPrelude
+import Clash.Magic
+import Clash.NamedTypes
+import Clash.Prelude.ROM.File (asyncRomFile, asyncRomFilePow2)
 import Clash.Promoted.Nat
-import Clash.Promoted.Nat.TH
 import Clash.Promoted.Nat.Literals
+import Clash.Promoted.Nat.TH
 import Clash.Promoted.Symbol
 import Clash.Signal.Trace
 import Clash.Sized.BitVector
@@ -195,6 +222,16 @@ import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 import Clash.Sized.Vector hiding (fromList, unsafeFromList)
 import Clash.XException
+import Control.Applicative
+import Data.Bits
+import Data.Default
+import GHC.TypeLits hiding
+  ( SNat,
+    SSymbol,
+    fromSNat,
+  )
+import GHC.TypeLits.Extra
+import Language.Haskell.TH.Syntax (Lift (..))
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -216,6 +253,7 @@ functions a type class called 'Clash.Class.Parity.Parity' is available at
 --
 -- @
 -- window4
+
 ---  :: Clock dom
 --   -> Reset dom
 --   -> Enable dom
@@ -227,28 +265,29 @@ functions a type class called 'Clash.Class.Parity.Parity' is available at
 -- >>> simulateB (window4 systemClockGen systemResetGen enableGen) [1::Int,2,3,4,5] :: [Vec 4 Int]
 -- [1 :> 0 :> 0 :> 0 :> Nil,2 :> 1 :> 0 :> 0 :> Nil,3 :> 2 :> 1 :> 0 :> Nil,4 :> 3 :> 2 :> 1 :> Nil,5 :> 4 :> 3 :> 2 :> Nil,...
 -- ...
-window
-  :: ( KnownNat n
-     , KnownDomain dom
-     , NFDataX a
-     , Default a
-     )
-  => Clock dom
-  -- ^ Clock to the incoming signal is synchronized
-  -> Reset dom
-  -> Enable dom
-  -> Signal dom a
-  -- ^ Signal to create a window over
-  -> Vec (n + 1) (Signal dom a)
-  -- ^ Window of at least size 1
+window ::
+  ( KnownNat n,
+    KnownDomain dom,
+    NFDataX a,
+    Default a
+  ) =>
+  -- | Clock to the incoming signal is synchronized
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Signal to create a window over
+  Signal dom a ->
+  -- | Window of at least size 1
+  Vec (n + 1) (Signal dom a)
 window clk rst en x = res
   where
-    res  = x :> prev
+    res = x :> prev
     prev = case natVal (asNatProxy prev) of
-             0 -> repeat def
-             _ -> let next = x +>> prev
-                  in  registerB clk rst en (repeat def) next
-{-# INLINABLE window #-}
+      0 -> repeat def
+      _ ->
+        let next = x +>> prev
+         in registerB clk rst en (repeat def) next
+{-# INLINEABLE window #-}
 
 -- | Give a delayed window over a 'Signal'
 --
@@ -266,21 +305,22 @@ window clk rst en x = res
 -- >>> simulateB (windowD3 systemClockGen resetGen enableGen) [1::Int,1,2,3,4] :: [Vec 3 Int]
 -- [0 :> 0 :> 0 :> Nil,0 :> 0 :> 0 :> Nil,1 :> 0 :> 0 :> Nil,2 :> 1 :> 0 :> Nil,3 :> 2 :> 1 :> Nil,4 :> 3 :> 2 :> Nil,...
 -- ...
-windowD
-  :: ( KnownNat n
-     , NFDataX a
-     , Default a
-     , KnownDomain dom )
-  => Clock dom
-  -- ^ Clock to which the incoming signal is synchronized
-  -> Reset dom
-  -> Enable dom
-  -> Signal dom a
-  -- ^ Signal to create a window over
-  -> Vec (n + 1) (Signal dom a)
-  -- ^ Window of at least size 1
+windowD ::
+  ( KnownNat n,
+    NFDataX a,
+    Default a,
+    KnownDomain dom
+  ) =>
+  -- | Clock to which the incoming signal is synchronized
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Signal to create a window over
+  Signal dom a ->
+  -- | Window of at least size 1
+  Vec (n + 1) (Signal dom a)
 windowD clk rst en x =
   let prev = registerB clk rst en (repeat def) next
       next = x +>> prev
-  in  prev
-{-# INLINABLE windowD #-}
+   in prev
+{-# INLINEABLE windowD #-}

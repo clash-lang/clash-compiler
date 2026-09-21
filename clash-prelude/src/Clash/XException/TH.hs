@@ -1,16 +1,16 @@
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
 {-|
 Copyright  :  (C) 2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
 module Clash.XException.TH
-  ( mkShowXTupleInstances
-  , mkNFDataXTupleInstances
-  , mkShowXTupleInstance
-  ) where
+  ( mkShowXTupleInstances,
+    mkNFDataXTupleInstances,
+    mkShowXTupleInstance,
+  )
+where
 
 import Data.Either (isLeft)
 import Data.List (intersperse)
@@ -49,35 +49,45 @@ mkTup names@(length -> n) =
 mkShowXTupleInstance :: Int -> Dec
 mkShowXTupleInstance n =
   InstanceD Nothing constraints instanceTyp [showsPrecXDecl, showXDecl]
- where
-  constraints = fmap (AppT (ConT showxName)) vars
-  instanceTyp = ConT showxName `AppT` mkTup vars
-  names = fmap (mkName . ('a':) . show) [0..n-1]
-  vars = fmap VarT names
+  where
+    constraints = fmap (AppT (ConT showxName)) vars
+    instanceTyp = ConT showxName `AppT` mkTup vars
+    names = fmap (mkName . ('a' :) . show) [0 .. n - 1]
+    vars = fmap VarT names
 
-  x = mkName "x"
-  s = mkName "s"
+    x = mkName "x"
+    s = mkName "s"
 
-  showsPrecXDecl = FunD showsPrecXName
-    [ Clause
-        [WildP, VarP x, VarP s]
-        (NormalB
-          (VarE 'mappend `AppE` (VarE showXFnName `AppE` VarE x) `AppE` VarE s))
-        []
-    ]
+    showsPrecXDecl =
+      FunD
+        showsPrecXName
+        [ Clause
+            [WildP, VarP x, VarP s]
+            ( NormalB
+                (VarE 'mappend `AppE` (VarE showXFnName `AppE` VarE x) `AppE` VarE s)
+            )
+            []
+        ]
 
-  showXDecl = FunD showXFnName
-    [ Clause
-        [TupP (fmap VarP names)]
-        (NormalB
-          (VarE 'mconcat `AppE` (ListE
-            ([LitE (StringL "(")]
-               <> intersperse (LitE (StringL ",")) (fmap toShowX names)
-               <> [LitE (StringL ")")]))))
-        []
-    ]
-   where
-    toShowX a = VarE showXFnName `AppE` VarE a
+    showXDecl =
+      FunD
+        showXFnName
+        [ Clause
+            [TupP (fmap VarP names)]
+            ( NormalB
+                ( VarE 'mconcat
+                    `AppE` ( ListE
+                               ( [LitE (StringL "(")]
+                                   <> intersperse (LitE (StringL ",")) (fmap toShowX names)
+                                   <> [LitE (StringL ")")]
+                               )
+                           )
+                )
+            )
+            []
+        ]
+      where
+        toShowX a = VarE showXFnName `AppE` VarE a
 
 -- | Creates instances of ShowX for all tuple sizes listed.
 -- See 'mkShowXTupleInstance' for more information.
@@ -96,63 +106,77 @@ mkNFDataXTupleInstance n =
     Nothing
     constraints
     instanceTyp
-    [ ensureSpineDecl
-    , hasUndefinedDecl
-    , deepErrorXDecl
-    , rnfXDecl
+    [ ensureSpineDecl,
+      hasUndefinedDecl,
+      deepErrorXDecl,
+      rnfXDecl
     ]
- where
-  constraints = map (AppT (ConT nfdataxName)) vars
-  instanceTyp = ConT nfdataxName `AppT` mkTup vars
-  names = map (mkName . ('a':) . show) [0..n-1]
-  vars = map VarT names
+  where
+    constraints = map (AppT (ConT nfdataxName)) vars
+    instanceTyp = ConT nfdataxName `AppT` mkTup vars
+    names = map (mkName . ('a' :) . show) [0 .. n - 1]
+    vars = map VarT names
 
-  t = mkName "t"
-  s = mkName "s"
+    t = mkName "t"
+    s = mkName "s"
 
-  rnfXDecl = FunD rnfXName [
-    Clause
-      [AsP t (TildeP (TupP (map VarP names)))]
-      (NormalB (
-        CondE
-          (VarE 'isLeft `AppE` (VarE isXName `AppE` VarE t))
-          (TupE [])
-          (case names of
-            (nm:nms) -> foldl
-              (\e1 e2 -> UInfixE e1 (VarE 'seq) (VarE rnfXName `AppE` e2))
-              (VarE rnfXName `AppE` VarE nm)
-              (map VarE nms)
-            [] -> error ("mkNFDataXTupleInstance, n must be atleast 1: " <> show n))
-      ))
-      []
-    ]
+    rnfXDecl =
+      FunD
+        rnfXName
+        [ Clause
+            [AsP t (TildeP (TupP (map VarP names)))]
+            ( NormalB
+                ( CondE
+                    (VarE 'isLeft `AppE` (VarE isXName `AppE` VarE t))
+                    (TupE [])
+                    ( case names of
+                        (nm : nms) ->
+                          foldl
+                            (\e1 e2 -> UInfixE e1 (VarE 'seq) (VarE rnfXName `AppE` e2))
+                            (VarE rnfXName `AppE` VarE nm)
+                            (map VarE nms)
+                        [] -> error ("mkNFDataXTupleInstance, n must be atleast 1: " <> show n)
+                    )
+                )
+            )
+            []
+        ]
 
-  hasUndefinedDecl = FunD hasUndefinedName [
-    Clause
-      [AsP t (TildeP (TupP (map VarP names)))]
-      (NormalB (
-        CondE
-          (VarE 'isLeft `AppE` (VarE isXName `AppE` VarE t))
-          (ConE 'True)
-          (VarE 'or `AppE` ListE
-            (map ((VarE hasUndefinedName `AppE`) . VarE) names))
-      ))
-      []
-    ]
+    hasUndefinedDecl =
+      FunD
+        hasUndefinedName
+        [ Clause
+            [AsP t (TildeP (TupP (map VarP names)))]
+            ( NormalB
+                ( CondE
+                    (VarE 'isLeft `AppE` (VarE isXName `AppE` VarE t))
+                    (ConE 'True)
+                    ( VarE 'or
+                        `AppE` ListE
+                          (map ((VarE hasUndefinedName `AppE`) . VarE) names)
+                    )
+                )
+            )
+            []
+        ]
 
-  ensureSpineDecl = FunD ensureSpineName  [
-    Clause
-      [TildeP (TupP (map VarP names))]
-      (NormalB (mkTupE (map (AppE (VarE ensureSpineName) . VarE) names)))
-      []
-    ]
+    ensureSpineDecl =
+      FunD
+        ensureSpineName
+        [ Clause
+            [TildeP (TupP (map VarP names))]
+            (NormalB (mkTupE (map (AppE (VarE ensureSpineName) . VarE) names)))
+            []
+        ]
 
-  deepErrorXDecl = FunD deepErrorXName [
-     Clause
-       [VarP s]
-       (NormalB (mkTupE (replicate n (VarE deepErrorXName `AppE` VarE s))))
-       []
-     ]
+    deepErrorXDecl =
+      FunD
+        deepErrorXName
+        [ Clause
+            [VarP s]
+            (NormalB (mkTupE (replicate n (VarE deepErrorXName `AppE` VarE s))))
+            []
+        ]
 
 mkNFDataXTupleInstances :: [Int] -> Q [Dec]
 mkNFDataXTupleInstances tupSizes =

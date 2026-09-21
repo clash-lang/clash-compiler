@@ -1,39 +1,38 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Hedgehog.Extra
-  ( throwsException
-  , throwsDeepException
-  , LockstepWalk(..)
-  , lockstepWalk
-  , combinations
-  ) where
+  ( throwsException,
+    throwsDeepException,
+    LockstepWalk (..),
+    lockstepWalk,
+    combinations,
+  )
+where
 
 import Control.DeepSeq (NFData, force)
-
-import Hedgehog (failure, MonadGen, MonadTest, success)
+import Hedgehog (MonadGen, MonadTest, failure, success)
+import qualified Hedgehog.Gen as Gen
 import Hedgehog.Internal.Exception (tryEvaluate)
 import Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 
-import qualified Hedgehog.Gen as Gen
-
-throwsException
-  :: ( MonadTest m
-     , HasCallStack
-     )
-  => a
-  -> m ()
+throwsException ::
+  ( MonadTest m,
+    HasCallStack
+  ) =>
+  a ->
+  m ()
 throwsException x =
   case (tryEvaluate x) of
-    Left _  -> success
+    Left _ -> success
     Right _ -> withFrozenCallStack failure
 
-throwsDeepException
-  :: ( MonadTest m
-     , NFData a
-     , HasCallStack
-     )
-  => a
-  -> m ()
+throwsDeepException ::
+  ( MonadTest m,
+    NFData a,
+    HasCallStack
+  ) =>
+  a ->
+  m ()
 throwsDeepException =
   throwsException . force
 
@@ -92,14 +91,14 @@ combinations ::
 combinations es k
   | k < 0 = error $ "combinations: impossible, k < 0. k = " <> show k
   | otherwise = combinations0 n k es
- where
-  n = length es
-  combinations0 _ 0 _ = pure []
-  combinations0 n0 k0 es0 | n0 == k0 = pure es0
-  combinations0 n0 k0 (e : es0) =
-    Gen.frequency
-      [ (k0, (e :) <$> combinations0 (n0 - 1) (k0 - 1) es0)
-      , (n0 - k0, combinations0 (n0 - 1) k0 es0)
-      ]
-  combinations0 _ _ [] =
-    error $ "combinations: impossible, k > n. k = " <> show k <> ", n = " <> show n
+  where
+    n = length es
+    combinations0 _ 0 _ = pure []
+    combinations0 n0 k0 es0 | n0 == k0 = pure es0
+    combinations0 n0 k0 (e : es0) =
+      Gen.frequency
+        [ (k0, (e :) <$> combinations0 (n0 - 1) (k0 - 1) es0),
+          (n0 - k0, combinations0 (n0 - 1) k0 es0)
+        ]
+    combinations0 _ _ [] =
+      error $ "combinations: impossible, k > n. k = " <> show k <> ", n = " <> show n

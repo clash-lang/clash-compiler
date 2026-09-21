@@ -1,3 +1,13 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
+
 {-|
   Copyright   :  (C) 2019, Google Inc.,
                      2022, QBayLogic B.V.
@@ -6,51 +16,47 @@
 
   I\/O actions that are translatable to HDL
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE BangPatterns, MagicHash, TypeOperators, ScopedTypeVariables, FlexibleContexts #-}
-{-# LANGUAGE DataKinds, GADTs, TypeApplications #-}
-
 module Clash.Explicit.SimIO
   ( -- * I\/O environment for simulation
-    mealyIO
-  , SimIO
-  -- * Display on stdout
-  , display
-  -- * End of simulation
-  , finish
-  -- * Mutable values
-  , Reg
-  , reg
-  , readReg
-  , writeReg
-  -- * File I\/O
-  , File
-  , openFile
-  , closeFile
-  -- ** Reading and writing characters
-  , getChar
-  , putChar
-  -- ** Reading strings
-  , getLine
-  -- ** Detecting the end of input
-  , isEOF
+    mealyIO,
+    SimIO,
+
+    -- * Display on stdout
+    display,
+
+    -- * End of simulation
+    finish,
+
+    -- * Mutable values
+    Reg,
+    reg,
+    readReg,
+    writeReg,
+
+    -- * File I\/O
+    File,
+    openFile,
+    closeFile,
+
+    -- ** Reading and writing characters
+    getChar,
+    putChar,
+
+    -- ** Reading strings
+    getLine,
+
+    -- ** Detecting the end of input
+    isEOF,
+
     -- ** Buffering operations
-  , flush
+    flush,
+
     -- ** Repositioning handles
-  , seek
-  , rewind
-  , tell
+    seek,
+    rewind,
+    tell,
   )
 where
-
-import Control.Monad (when)
-import Data.IORef
-import GHC.TypeLits
-  hiding (SNat)
-import Prelude hiding (getChar, putChar, getLine)
-import qualified System.IO as IO
-import System.IO.Unsafe
 
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Promoted.Nat
@@ -58,12 +64,21 @@ import Clash.Signal.Internal
 import Clash.Sized.Unsigned
 import Clash.Sized.Vector (Vec (..))
 import Clash.XException (seqX)
+import Control.Monad (when)
+import Data.IORef
+import GHC.TypeLits hiding
+  ( SNat,
+  )
+import qualified System.IO as IO
+import System.IO.Unsafe
+import Prelude hiding (getChar, getLine, putChar)
 
 -- | Simulation-level I\/O environment; synthesizable to HDL I\/O, which in
 -- itself is unlikely to be synthesisable to a digital circuit.
 --
 -- See 'mealyIO' as to its use.
 data SimIO a = SimIO {unSimIO :: !(IO a)}
+
 {-# ANN unSimIO hasBlackBox #-}
 
 instance Functor SimIO where
@@ -75,7 +90,7 @@ fmapSimIO# f (SimIO m) = SimIO (fmap f m)
 {-# ANN fmapSimIO# hasBlackBox #-}
 
 instance Applicative SimIO where
-  pure  = pureSimIO#
+  pure = pureSimIO#
   (<*>) = apSimIO#
 
 pureSimIO# :: a -> SimIO a
@@ -89,7 +104,7 @@ apSimIO# (SimIO f) (SimIO m) = SimIO (f <*> m)
 {-# ANN apSimIO# hasBlackBox #-}
 
 instance Monad SimIO where
-  (>>=)  = bindSimIO#
+  (>>=) = bindSimIO#
 
 bindSimIO# :: SimIO a -> (a -> SimIO b) -> SimIO b
 bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` unSimIO (k x)))
@@ -97,19 +112,19 @@ bindSimIO# (SimIO m) k = SimIO (m >>= (\x -> x `seqX` unSimIO (k x)))
 {-# ANN bindSimIO# hasBlackBox #-}
 
 -- | Display a string on /stdout/
-display
-  :: String
-  -- ^ String you want to display
-  -> SimIO ()
+display ::
+  -- | String you want to display
+  String ->
+  SimIO ()
 display s = SimIO (putStrLn s)
 {-# OPAQUE display #-}
 {-# ANN display hasBlackBox #-}
 
 -- | Finish the simulation with an exit code
-finish
-  :: Integer
-  -- ^ The exit code you want to return at the end of the simulation
-  -> SimIO a
+finish ::
+  -- | The exit code you want to return at the end of the simulation
+  Integer ->
+  SimIO a
 finish i = return (error (show i))
 {-# OPAQUE finish #-}
 {-# ANN finish hasBlackBox #-}
@@ -118,10 +133,10 @@ finish i = return (error (show i))
 data Reg a = Reg !(IORef a)
 
 -- | Create a new mutable reference with the given starting value
-reg
-  :: a
-  -- ^ The starting value
-  -> SimIO (Reg a)
+reg ::
+  -- | The starting value
+  a ->
+  SimIO (Reg a)
 reg a = SimIO (Reg <$> newIORef a)
 {-# OPAQUE reg #-}
 {-# ANN reg hasBlackBox #-}
@@ -133,12 +148,12 @@ readReg (Reg a) = SimIO (readIORef a)
 {-# ANN readReg hasBlackBox #-}
 
 -- | Write new value to the mutable reference
-writeReg
-  :: Reg a
-  -- ^ The mutable reference
-  -> a
-  -- ^ The new value
-  -> SimIO ()
+writeReg ::
+  -- | The mutable reference
+  Reg a ->
+  -- | The new value
+  a ->
+  SimIO ()
 writeReg (Reg r) a = SimIO (writeIORef r a)
 {-# OPAQUE writeReg #-}
 {-# ANN writeReg hasBlackBox #-}
@@ -147,11 +162,10 @@ writeReg (Reg r) a = SimIO (writeIORef r a)
 data File = File !IO.Handle
 
 -- | Open a file
-openFile
-  :: FilePath
-  -- ^ File to open
-  -> String
-  -- ^ File mode:
+openFile ::
+  -- | File to open
+  FilePath ->
+  -- | File mode:
   --
   -- * "r": Open for reading
   -- * "w": Create for writing
@@ -159,124 +173,125 @@ openFile
   -- * "r+": Open for update (reading and writing)
   -- * "w+": Create for update
   -- * "a+": Append, open or create for update at end-of-file
-  -> SimIO File
-openFile fp "r"   = SimIO $ fmap File (IO.openFile fp IO.ReadMode)
-openFile fp "w"   = SimIO $ fmap File (IO.openFile fp IO.WriteMode)
-openFile fp "a"   = SimIO $ fmap File (IO.openFile fp IO.AppendMode)
-openFile fp "rb"  = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadMode)
-openFile fp "wb"  = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
-openFile fp "ab"  = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
-openFile fp "r+"  = SimIO $ fmap File (IO.openFile fp IO.ReadWriteMode)
-openFile fp "w+"  = SimIO $ fmap File (IO.openFile fp IO.WriteMode)
-openFile fp "a+"  = SimIO $ fmap File (IO.openFile fp IO.AppendMode)
+  String ->
+  SimIO File
+openFile fp "r" = SimIO $ fmap File (IO.openFile fp IO.ReadMode)
+openFile fp "w" = SimIO $ fmap File (IO.openFile fp IO.WriteMode)
+openFile fp "a" = SimIO $ fmap File (IO.openFile fp IO.AppendMode)
+openFile fp "rb" = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadMode)
+openFile fp "wb" = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
+openFile fp "ab" = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
+openFile fp "r+" = SimIO $ fmap File (IO.openFile fp IO.ReadWriteMode)
+openFile fp "w+" = SimIO $ fmap File (IO.openFile fp IO.WriteMode)
+openFile fp "a+" = SimIO $ fmap File (IO.openFile fp IO.AppendMode)
 openFile fp "r+b" = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadWriteMode)
 openFile fp "w+b" = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
 openFile fp "a+b" = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
 openFile fp "rb+" = SimIO $ fmap File (IO.openBinaryFile fp IO.ReadWriteMode)
 openFile fp "wb+" = SimIO $ fmap File (IO.openBinaryFile fp IO.WriteMode)
 openFile fp "ab+" = SimIO $ fmap File (IO.openBinaryFile fp IO.AppendMode)
-openFile _  m     = error ("openFile unknown mode: " ++ show m)
+openFile _ m = error ("openFile unknown mode: " ++ show m)
 {-# OPAQUE openFile #-}
 {-# ANN openFile hasBlackBox #-}
 
 -- | Close a file
-closeFile
-  :: File
-  -> SimIO ()
+closeFile ::
+  File ->
+  SimIO ()
 closeFile (File fp) = SimIO (IO.hClose fp)
 {-# OPAQUE closeFile #-}
 {-# ANN closeFile hasBlackBox #-}
 
 -- | Read one character from a file
-getChar
-  :: File
-  -- ^ File to read from
-  -> SimIO Char
+getChar ::
+  -- | File to read from
+  File ->
+  SimIO Char
 getChar (File fp) = SimIO (IO.hGetChar fp)
 {-# OPAQUE getChar #-}
 {-# ANN getChar hasBlackBox #-}
 
 -- | Insert a character into a buffer specified by the file
-putChar
-  :: Char
-  -- ^ Character to insert
-  -> File
-  -- ^ Buffer to insert to
-  -> SimIO ()
+putChar ::
+  -- | Character to insert
+  Char ->
+  -- | Buffer to insert to
+  File ->
+  SimIO ()
 putChar c (File fp) = SimIO (IO.hPutChar fp c)
 {-# OPAQUE putChar #-}
 {-# ANN putChar hasBlackBox #-}
 
 -- | Read one line from a file
-getLine
-  :: forall n
-   . KnownNat n
-  => File
-  -- ^ File to read from
-  -> Reg (Vec n (Unsigned 8))
-  -- ^ Vector to store the content
-  -> SimIO Int
+getLine ::
+  forall n.
+  (KnownNat n) =>
+  -- | File to read from
+  File ->
+  -- | Vector to store the content
+  Reg (Vec n (Unsigned 8)) ->
+  SimIO Int
 getLine (File fp) (Reg r) = SimIO $ do
   s <- IO.hGetLine fp
   let d = snatToNum (SNat @n) - length s
   when (d < 0) (IO.hSeek fp IO.RelativeSeek (toInteger d))
   modifyIORef r (rep s)
   return 0
- where
-   rep :: String -> Vec m (Unsigned 8) -> Vec m (Unsigned 8)
-   rep []     vs          = vs
-   rep (x:xs) (Cons _ vs) = Cons (toEnum (fromEnum x)) (rep xs vs)
-   rep _      Nil         = Nil
+  where
+    rep :: String -> Vec m (Unsigned 8) -> Vec m (Unsigned 8)
+    rep [] vs = vs
+    rep (x : xs) (Cons _ vs) = Cons (toEnum (fromEnum x)) (rep xs vs)
+    rep _ Nil = Nil
 {-# OPAQUE getLine #-}
 {-# ANN getLine hasBlackBox #-}
 
 -- | Determine whether we've reached the end of the file
-isEOF
-  :: File
-  -- ^ File we want to inspect
-  -> SimIO Bool
+isEOF ::
+  -- | File we want to inspect
+  File ->
+  SimIO Bool
 isEOF (File fp) = SimIO (IO.hIsEOF fp)
 {-# OPAQUE isEOF #-}
 {-# ANN isEOF hasBlackBox #-}
 
 -- | Set the position of the next operation on the file
-seek
-  :: File
-  -- ^ File to set the position for
-  -> Integer
-  -- ^ Position
-  -> Int
-  -- ^ Mode:
+seek ::
+  -- | File to set the position for
+  File ->
+  -- | Position
+  Integer ->
+  -- | Mode:
   --
   -- * 0: From the beginning of the file
   -- * 1: From the current position
   -- * 2: From the end of the file
-  -> SimIO Int
+  Int ->
+  SimIO Int
 seek (File fp) pos mode = SimIO (IO.hSeek fp (toEnum mode) pos >> return 0)
 {-# OPAQUE seek #-}
 {-# ANN seek hasBlackBox #-}
 
 -- | Set the position of the next operation to the beginning of the file
-rewind
-  :: File
-  -> SimIO Int
+rewind ::
+  File ->
+  SimIO Int
 rewind (File fp) = SimIO (IO.hSeek fp IO.AbsoluteSeek 0 >> return 0)
 {-# OPAQUE rewind #-}
 {-# ANN rewind hasBlackBox #-}
 
 -- | Returns the offset from the beginning of the file (in bytes).
-tell
-  :: File
-  -- ^ File we want to inspect
-  -> SimIO Integer
+tell ::
+  -- | File we want to inspect
+  File ->
+  SimIO Integer
 tell (File fp) = SimIO (IO.hTell fp)
 {-# OPAQUE tell #-}
 {-# ANN tell hasBlackBox #-}
 
 -- | Write any buffered output to file
-flush
-  :: File
-  -> SimIO ()
+flush ::
+  File ->
+  SimIO ()
 flush (File fp) = SimIO (IO.hFlush fp)
 {-# OPAQUE flush #-}
 {-# ANN flush hasBlackBox #-}
@@ -322,18 +337,18 @@ flush (File fp) = SimIO (IO.hFlush fp)
 --     regOut = register clk rst ena (fromEnum \'a\') regIn
 --     regIn  = 'mealyIO' clk tbMachine tbInit regOut
 -- @
-mealyIO
-  :: KnownDomain dom
-  => Clock dom
-  -- ^ Clock at which rate the I\/O environment progresses
-  -> (s -> i -> SimIO o)
-  -- ^ Transition function inside an I\/O environment
-  -> SimIO s
-  -- ^ I/O action to create the initial state
-  -> Signal dom i
-  -> Signal dom o
+mealyIO ::
+  (KnownDomain dom) =>
+  -- | Clock at which rate the I\/O environment progresses
+  Clock dom ->
+  -- | Transition function inside an I\/O environment
+  (s -> i -> SimIO o) ->
+  -- | I/O action to create the initial state
+  SimIO s ->
+  Signal dom i ->
+  Signal dom o
 mealyIO !_ f (SimIO i) inp = unsafePerformIO (i >>= go inp)
- where
-  go q@(~(k :- ks)) s =
-    (:-) <$> unSimIO (f s k) <*> unsafeInterleaveIO ((q `seq` go ks s))
+  where
+    go q@(~(k :- ks)) s =
+      (:-) <$> unSimIO (f s k) <*> unsafeInterleaveIO ((q `seq` go ks s))
 {-# OPAQUE mealyIO #-}
