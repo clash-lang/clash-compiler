@@ -1,0 +1,14 @@
+# These fixtures are compiled by Clash with its own default extensions.
+# They do not use the language settings of the Cabal test harness.
+tests/shouldwork/
+tests/shouldfail/
+
+# These directories contain mostly vendored GHC sources. Keep their formatting
+# close to upstream. Tilia requires literal paths here, so list each directory.
+clash-ghc/src-bin-9.6/
+clash-ghc/src-bin-9.8/
+clash-ghc/src-bin-9.10.1/
+clash-ghc/src-bin-9.10.2/
+clash-ghc/src-bin-9.12/
+clash-ghc/src-bin-9.14/
+clash-ghc/src-bin-common/

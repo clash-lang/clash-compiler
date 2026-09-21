@@ -62,9 +62,9 @@ main = do
   args <- parseArgsOrExit patterns =<< getArgs
   -- Since we got here, we know we got invoked with the sole mandatory option
   -- @--tcl-connector@ and its mandatory argument
-  let force = args `isPresent` (longOption "force")
-      verbose = args `isPresent` (longOption "verbose")
-      Just outFile = args `getArg` (longOption "tcl-connector")
+  let force = isPresent args (longOption "force")
+      verbose = isPresent args (longOption "verbose")
+      Just outFile = getArg args (longOption "tcl-connector")
   createOkayOrDie outFile force
   inFile <- tclConnector
   copyFile inFile outFile
