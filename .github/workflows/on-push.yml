@@ -353,6 +353,16 @@ jobs:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#devShells.x86_64-linux.${{matrix.ghc}} | cachix push clash-lang
 
+  formatting:
+    name: Check Haskell formatting
+    runs-on: self-hosted
+    needs: developer_shells
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Check formatting
+        run: nix develop --command tilia check all
+
   packages_testsuite:
     name: Packaging clash-testsuite (${{matrix.ghc}})
     runs-on: self-hosted
@@ -420,6 +430,7 @@ jobs:
     name: All on-push jobs finished
     if: ${{ !cancelled() }}
     needs: [
+      formatting,
       cabal,
       cabal-haddock,
       stack,
