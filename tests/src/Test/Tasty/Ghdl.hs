@@ -5,28 +5,27 @@
 
 module Test.Tasty.Ghdl where
 
-import           Clash.Driver.Manifest     (Manifest(..), manifestFilename)
-import           Control.Exception         (IOException, try)
-import           Control.Monad             (foldM, forM_)
-import           Control.Monad.Except      (ExceptT, throwError, runExceptT)
-import           Control.Monad.IO.Class    (liftIO)
-import           Data.Char                 (toLower)
-import           Data.Coerce               (coerce)
-import qualified Data.List                 as List
-import           Data.Proxy
-import           Data.Tagged
-import qualified Data.Text                 as T
-import           Data.String.Interpolate   (i)
-import           System.Directory          (createDirectory, listDirectory, copyFile)
-import           System.FilePath           ((</>), replaceFileName)
-import           System.FilePath.Glob      (glob)
-import           System.Process            (readProcess)
-
-import           Test.Tasty.Common
-import           Test.Tasty.Options
-import           Test.Tasty.Program
-import           Test.Tasty.Providers
-import           Test.Tasty.Runners
+import Clash.Driver.Manifest (Manifest (..), manifestFilename)
+import Control.Exception (IOException, try)
+import Control.Monad (foldM, forM_)
+import Control.Monad.Except (ExceptT, runExceptT, throwError)
+import Control.Monad.IO.Class (liftIO)
+import Data.Char (toLower)
+import Data.Coerce (coerce)
+import qualified Data.List as List
+import Data.Proxy
+import Data.String.Interpolate (i)
+import Data.Tagged
+import qualified Data.Text as T
+import System.Directory (copyFile, createDirectory, listDirectory)
+import System.FilePath (replaceFileName, (</>))
+import System.FilePath.Glob (glob)
+import System.Process (readProcess)
+import Test.Tasty.Common
+import Test.Tasty.Options
+import Test.Tasty.Program
+import Test.Tasty.Providers
+import Test.Tasty.Runners
 
 -- | @--no-ghdl@ flag for disabling tests that use GHDL.
 newtype Ghdl = Ghdl Bool
@@ -75,10 +74,10 @@ instance IsOption GhdlMcode where
 -- | The Tasty options that every GHDL @IsTest@ instance below needs to look at.
 ghdlOptions :: [OptionDescription]
 ghdlOptions =
-  [ Option (Proxy @Ghdl)
-  , Option (Proxy @GhdlGcc)
-  , Option (Proxy @GhdlLlvm)
-  , Option (Proxy @GhdlMcode)
+  [ Option (Proxy @Ghdl),
+    Option (Proxy @GhdlGcc),
+    Option (Proxy @GhdlLlvm),
+    Option (Proxy @GhdlMcode)
   ]
 
 -- | Which native code generator backs a GHDL binary. Some invocations need
@@ -100,16 +99,16 @@ getGhdl optionSet =
     xs -> do
       let flags = List.intercalate ", " $ map (\(f, _, _) -> show f) xs
       throwError [i|Conflicting GHDL flags: #{flags}. Pass at most one.|]
- where
-  GhdlGcc gcc = lookupOption optionSet
-  GhdlLlvm llvm = lookupOption optionSet
-  GhdlMcode mcode = lookupOption optionSet
+  where
+    GhdlGcc gcc = lookupOption optionSet
+    GhdlLlvm llvm = lookupOption optionSet
+    GhdlMcode mcode = lookupOption optionSet
 
-  forced :: [(String, String, GhdlFlavor)]
-  forced =
-       [("--ghdl-gcc",   "ghdl-gcc",   GhdlGccBackend)   | gcc]
-    <> [("--ghdl-llvm",  "ghdl-llvm",  GhdlLlvmBackend)  | llvm]
-    <> [("--ghdl-mcode", "ghdl-mcode", GhdlMcodeBackend) | mcode]
+    forced :: [(String, String, GhdlFlavor)]
+    forced =
+      [("--ghdl-gcc", "ghdl-gcc", GhdlGccBackend) | gcc]
+        <> [("--ghdl-llvm", "ghdl-llvm", GhdlLlvmBackend) | llvm]
+        <> [("--ghdl-mcode", "ghdl-mcode", GhdlMcodeBackend) | mcode]
 
 -- | Detect a GHDL binary's backend by parsing the output of @ghdl --version@.
 detectGhdlFlavor :: ExceptT String IO GhdlFlavor
@@ -119,8 +118,8 @@ detectGhdlFlavor = do
     Left err -> throwError (show err)
     Right out
       | "mcode" `List.isInfixOf` out -> pure GhdlMcodeBackend
-      | "GCC"   `List.isInfixOf` out -> pure GhdlGccBackend
-      | "llvm"  `List.isInfixOf` out -> pure GhdlLlvmBackend
+      | "GCC" `List.isInfixOf` out -> pure GhdlGccBackend
+      | "llvm" `List.isInfixOf` out -> pure GhdlLlvmBackend
       | otherwise -> throwError [i|Could not parse backend:\n\n#{out}|]
 
 -- | Search through a directory with VHDL files produced by Clash
@@ -137,14 +136,14 @@ detectGhdlFlavor = do
 -- produce @topEntity@ and @testBench@ instead.
 --
 data GhdlImportTest = GhdlImportTest
-  { gitParentDirectory :: IO FilePath
-    -- ^ Shared temporary directory
-  , gitSourceDirectory :: IO FilePath
-    -- ^ Directory to work from
+  { -- | Shared temporary directory
+    gitParentDirectory :: IO FilePath,
+    -- | Directory to work from
+    gitSourceDirectory :: IO FilePath
   }
 
 instance IsTest GhdlImportTest where
-  run optionSet GhdlImportTest{..} progressCallback = do
+  run optionSet GhdlImportTest {..} progressCallback = do
     ghdlOrException <- runExceptT (getGhdl optionSet)
     case ghdlOrException of
       Left err -> pure (testFailed err)
@@ -156,26 +155,24 @@ instance IsTest GhdlImportTest where
         createDirectory workDir
         manifests <- getManifests (src </> "*" </> manifestFilename)
         foldM (goManifest bin workDir) (testPassed "") manifests
-   where
-    stdArgs  = ["-i", "--std=93"]
-    runGhdlI bin workDir args =
-      run optionSet (ghdlI bin workDir args) progressCallback
-    ghdlI bin workDir args =
-      TestProgram bin (stdArgs <> args) NoGlob PrintNeither False (Just workDir) []
+    where
+      stdArgs = ["-i", "--std=93"]
+      runGhdlI bin workDir args =
+        run optionSet (ghdlI bin workDir args) progressCallback
+      ghdlI bin workDir args =
+        TestProgram bin (stdArgs <> args) NoGlob PrintNeither False (Just workDir) []
 
-    -- Read a manifest file, error if its malformed / inaccessible. Run @ghdl -i@
-    -- on files associated with the component.
-    goManifest :: FilePath -> FilePath -> Result -> (FilePath, Manifest) -> IO Result
-    goManifest bin workDir result (manifestPath, Manifest{topComponent,fileNames})
-      | resultSuccessful result = do
-        let
-          top = T.unpack topComponent
-          relVhdlFiles = filter (".vhdl" `List.isSuffixOf`) (map fst fileNames)
-          absVhdlFiles = map (replaceFileName manifestPath) relVhdlFiles
-        createDirectory (workDir </> top)
-        runGhdlI bin workDir (["--work=" <> top, "--workdir=" <> top] <> absVhdlFiles)
-
-      | otherwise = pure result
+      -- Read a manifest file, error if its malformed / inaccessible. Run @ghdl -i@
+      -- on files associated with the component.
+      goManifest :: FilePath -> FilePath -> Result -> (FilePath, Manifest) -> IO Result
+      goManifest bin workDir result (manifestPath, Manifest {topComponent, fileNames})
+        | resultSuccessful result = do
+            let top = T.unpack topComponent
+                relVhdlFiles = filter (".vhdl" `List.isSuffixOf`) (map fst fileNames)
+                absVhdlFiles = map (replaceFileName manifestPath) relVhdlFiles
+            createDirectory (workDir </> top)
+            runGhdlI bin workDir (["--work=" <> top, "--workdir=" <> top] <> absVhdlFiles)
+        | otherwise = pure result
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> ghdlOptions)
@@ -189,14 +186,14 @@ instance IsTest GhdlImportTest where
 -- > ghdl -m -fpsl --work=i2c --workdir=i2c -PbitMaster -PbyteMaster -Pi2c i2c
 --
 data GhdlMakeTest = GhdlMakeTest
-  { gmtSourceDirectory :: IO FilePath
-    -- ^ Directory containing VHDL files produced by Clash
-  , gmtTop :: String
-    -- ^ Entry point to be converted to executables
+  { -- | Directory containing VHDL files produced by Clash
+    gmtSourceDirectory :: IO FilePath,
+    -- | Entry point to be converted to executables
+    gmtTop :: String
   }
 
 instance IsTest GhdlMakeTest where
-  run optionSet GhdlMakeTest{gmtSourceDirectory,gmtTop} progressCallback = do
+  run optionSet GhdlMakeTest {gmtSourceDirectory, gmtTop} progressCallback = do
     ghdlOrException <- runExceptT (getGhdl optionSet)
     case ghdlOrException of
       Left err -> pure (testFailed err)
@@ -217,9 +214,9 @@ instance IsTest GhdlMakeTest where
             <> ["-P" <> lib | lib <- libs]
             <> outFlag
             <> [gmtTop]
-   where
-    ghdl bin workDir args = TestProgram bin args NoGlob PrintNeither False (Just workDir) []
-    runGhdl bin workDir args = run optionSet (ghdl bin workDir args) progressCallback
+    where
+      ghdl bin workDir args = TestProgram bin args NoGlob PrintNeither False (Just workDir) []
+      runGhdl bin workDir args = run optionSet (ghdl bin workDir args) progressCallback
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> ghdlOptions)
@@ -231,16 +228,16 @@ instance IsTest GhdlMakeTest where
 -- > ghdl -r --workdir=i2c --work=i2c i2c --assert-level=error
 --
 data GhdlSimTest = GhdlSimTest
-  { gstExpectFailure :: Maybe (TestExitCode, T.Text)
-    -- ^ Expected failure code and output (if any)
-  , gstSourceDirectory :: IO FilePath
-    -- ^ Directory containing executables produced by 'GhdlMakeTest'
-  , gstTop :: String
-    -- ^ Entry point to be executed
+  { -- | Expected failure code and output (if any)
+    gstExpectFailure :: Maybe (TestExitCode, T.Text),
+    -- | Directory containing executables produced by 'GhdlMakeTest'
+    gstSourceDirectory :: IO FilePath,
+    -- | Entry point to be executed
+    gstTop :: String
   }
 
 instance IsTest GhdlSimTest where
-  run optionSet GhdlSimTest{..} progressCallback = do
+  run optionSet GhdlSimTest {..} progressCallback = do
     ghdlOrException <- runExceptT (getGhdl optionSet)
     case ghdlOrException of
       Left err -> pure (testFailed err)
@@ -258,38 +255,46 @@ instance IsTest GhdlSimTest where
         case gstExpectFailure of
           Nothing -> run optionSet (program flavor bin workDir libs gstTop) progressCallback
           Just exit -> run optionSet (failingProgram flavor bin workDir libs gstTop exit) progressCallback
-   where
-    program flavor bin workDir libs top =
-      TestProgram bin (args flavor libs top) NoGlob PrintNeither False (Just workDir) []
+    where
+      program flavor bin workDir libs top =
+        TestProgram bin (args flavor libs top) NoGlob PrintNeither False (Just workDir) []
 
-    failingProgram flavor bin workDir libs top (testExit, expectedErr) =
-      TestFailingProgram
-        (testExitCode testExit) bin (args flavor libs top) NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
+      failingProgram flavor bin workDir libs top (testExit, expectedErr) =
+        TestFailingProgram
+          (testExitCode testExit)
+          bin
+          (args flavor libs top)
+          NoGlob
+          PrintNeither
+          False
+          (specificExitCode testExit)
+          (ExpectEither expectedErr)
+          (Just workDir)
+          []
 
-    -- GCC/LLVM produce a linked executable on `-m` named `<lower top>_exe`
-    -- (matching the `-o` we passed there). Pass that filename to `-r`. MCODE has
-    -- no executable pass the unit name to `-r` and it will re-elaborate. The
-    -- `-P` flags are required for MCODE's re-elaboration find sibling libraries
-    -- by directory name; they are harmless for the others.
-    args flavor libs work =
-      [ "-r"
-      , "--workdir=" <> work
-      , "--work=" <> work
-      ]
-      <> ["-P" <> lib | lib <- libs]
-      <> psl
-      <> [target, "--assert-level=error"]
-     where
-      target = case flavor of
-        GhdlMcodeBackend -> work
-        _ -> map toLower (work <> "_exe")
-      -- MCODE re-elaborates at -r time; without -fpsl here, PSL assertions
-      -- elaborated by `ghdl -m -fpsl` are dropped and never fire. GCC/LLVM
-      -- run a linked binary so the flag is irrelevant at -r.
-      psl = case flavor of
-        GhdlMcodeBackend -> ["-fpsl"]
-        _ -> []
+      -- GCC/LLVM produce a linked executable on `-m` named `<lower top>_exe`
+      -- (matching the `-o` we passed there). Pass that filename to `-r`. MCODE has
+      -- no executable pass the unit name to `-r` and it will re-elaborate. The
+      -- `-P` flags are required for MCODE's re-elaboration find sibling libraries
+      -- by directory name; they are harmless for the others.
+      args flavor libs work =
+        [ "-r",
+          "--workdir=" <> work,
+          "--work=" <> work
+        ]
+          <> ["-P" <> lib | lib <- libs]
+          <> psl
+          <> [target, "--assert-level=error"]
+        where
+          target = case flavor of
+            GhdlMcodeBackend -> work
+            _ -> map toLower (work <> "_exe")
+          -- MCODE re-elaborates at -r time; without -fpsl here, PSL assertions
+          -- elaborated by `ghdl -m -fpsl` are dropped and never fire. GCC/LLVM
+          -- run a linked binary so the flag is irrelevant at -r.
+          psl = case flavor of
+            GhdlMcodeBackend -> ["-fpsl"]
+            _ -> []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> ghdlOptions)

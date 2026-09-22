@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
 {-|
   Copyright   :  (C) 2019, Myrtle Software Ltd.
                      2018, @blaxill
@@ -5,34 +10,30 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
+module Clash.Signal.Delayed.Bundle
+  ( Bundle (..),
 
-module Clash.Signal.Delayed.Bundle (
-    Bundle(..)
-  -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
-  , B.EmptyTuple(..)
-  , TaggedEmptyTuple(..)
-  ) where
+    -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
+    B.EmptyTuple (..),
+    TaggedEmptyTuple (..),
+  )
+where
 
-import           GHC.TypeLits                  (KnownNat)
-import           Prelude                       hiding (head, map, tail)
-
-import           Clash.Signal.Internal         (Domain)
-import           Clash.Signal.Delayed (DSignal, toSignal, unsafeFromSignal)
-import qualified Clash.Signal.Bundle           as B
-
-import           Clash.Sized.BitVector         (Bit, BitVector)
-import           Clash.Sized.Fixed             (Fixed)
-import           Clash.Sized.Index             (Index)
-import           Clash.Sized.RTree             (RTree, lazyT)
-import           Clash.Sized.Signed            (Signed)
-import           Clash.Sized.Unsigned          (Unsigned)
-import           Clash.Sized.Vector            (Vec, lazyV)
-
-import           GHC.TypeLits                  (Nat)
+import qualified Clash.Signal.Bundle as B
+import Clash.Signal.Delayed (DSignal, toSignal, unsafeFromSignal)
+import Clash.Signal.Internal (Domain)
+import Clash.Sized.BitVector (Bit, BitVector)
+import Clash.Sized.Fixed (Fixed)
+import Clash.Sized.Index (Index)
+import Clash.Sized.RTree (RTree, lazyT)
+import Clash.Sized.Signed (Signed)
+import Clash.Sized.Unsigned (Unsigned)
+import Clash.Sized.Vector (Vec, lazyV)
+import GHC.TypeLits
+  ( KnownNat,
+    Nat,
+  )
+import Prelude hiding (head, map, tail)
 
 -- | Isomorphism between a 'DSignal' of a product type
 -- (e.g. a tuple) and a product type of 'DSignal's.
@@ -81,9 +82,11 @@ class Bundle a where
   -- @
   bundle :: Unbundled dom d a -> DSignal dom d a
   {-# INLINE bundle #-}
-  default bundle :: (DSignal dom d a ~ Unbundled dom d a)
-                 => Unbundled dom d a -> DSignal dom d a
+  default bundle ::
+    (DSignal dom d a ~ Unbundled dom d a) =>
+    Unbundled dom d a -> DSignal dom d a
   bundle s = s
+
   -- | Example:
   --
   -- @
@@ -97,120 +100,183 @@ class Bundle a where
   -- @
   unbundle :: DSignal dom d a -> Unbundled dom d a
   {-# INLINE unbundle #-}
-  default unbundle :: (Unbundled dom d a ~ DSignal dom d a)
-                   => DSignal dom d a -> Unbundled dom d a
+  default unbundle ::
+    (Unbundled dom d a ~ DSignal dom d a) =>
+    DSignal dom d a -> Unbundled dom d a
   unbundle s = s
 
 instance Bundle ()
+
 instance Bundle Bool
+
 instance Bundle Integer
+
 instance Bundle Int
+
 instance Bundle Float
+
 instance Bundle Double
+
 instance Bundle (Maybe a)
+
 instance Bundle (Either a b)
 
 instance Bundle Bit
+
 instance Bundle (BitVector n)
+
 instance Bundle (Index n)
+
 instance Bundle (Fixed rep int frac)
+
 instance Bundle (Signed n)
+
 instance Bundle (Unsigned n)
 
-instance Bundle (a,b) where
-  type Unbundled t delay (a,b) = (DSignal t delay a, DSignal t delay b)
+instance Bundle (a, b) where
+  type Unbundled t delay (a, b) = (DSignal t delay a, DSignal t delay b)
 
-  bundle       = uncurry (liftA2 (,))
+  bundle = uncurry (liftA2 (,))
   unbundle tup = (fmap fst tup, fmap snd tup)
 
-instance Bundle (a,b,c) where
-  type Unbundled t delay (a,b,c) =
-    ( DSignal t delay a, DSignal t delay b, DSignal t delay c)
+instance Bundle (a, b, c) where
+  type
+    Unbundled t delay (a, b, c) =
+      (DSignal t delay a, DSignal t delay b, DSignal t delay c)
 
-  bundle   (a,b,c) = (,,) <$> a <*> b <*> c
-  unbundle tup     = (fmap (\(x,_,_) -> x) tup
-                      ,fmap (\(_,x,_) -> x) tup
-                      ,fmap (\(_,_,x) -> x) tup
-                      )
-instance Bundle (a,b,c,d) where
-  type Unbundled t delay (a,b,c,d) =
-    ( DSignal t delay a, DSignal t delay b, DSignal t delay c, DSignal t delay d)
+  bundle (a, b, c) = (,,) <$> a <*> b <*> c
+  unbundle tup =
+    ( fmap (\(x, _, _) -> x) tup,
+      fmap (\(_, x, _) -> x) tup,
+      fmap (\(_, _, x) -> x) tup
+    )
 
-  bundle   (a,b,c,d) = (,,,) <$> a <*> b <*> c <*> d
-  unbundle tup     = (fmap (\(x,_,_,_) -> x) tup
-                      ,fmap (\(_,x,_,_) -> x) tup
-                      ,fmap (\(_,_,x,_) -> x) tup
-                      ,fmap (\(_,_,_,x) -> x) tup
-                      )
+instance Bundle (a, b, c, d) where
+  type
+    Unbundled t delay (a, b, c, d) =
+      (DSignal t delay a, DSignal t delay b, DSignal t delay c, DSignal t delay d)
 
-instance Bundle (a,b,c,d,e) where
-  type Unbundled t delay (a,b,c,d,e) =
-    ( DSignal t delay a, DSignal t delay b, DSignal t delay c, DSignal t delay d
-    , DSignal t delay e)
+  bundle (a, b, c, d) = (,,,) <$> a <*> b <*> c <*> d
+  unbundle tup =
+    ( fmap (\(x, _, _, _) -> x) tup,
+      fmap (\(_, x, _, _) -> x) tup,
+      fmap (\(_, _, x, _) -> x) tup,
+      fmap (\(_, _, _, x) -> x) tup
+    )
 
-  bundle   (a,b,c,d,e) = (,,,,) <$> a <*> b <*> c <*> d <*> e
-  unbundle tup     = (fmap (\(x,_,_,_,_) -> x) tup
-                      ,fmap (\(_,x,_,_,_) -> x) tup
-                      ,fmap (\(_,_,x,_,_) -> x) tup
-                      ,fmap (\(_,_,_,x,_) -> x) tup
-                      ,fmap (\(_,_,_,_,x) -> x) tup
-                      )
+instance Bundle (a, b, c, d, e) where
+  type
+    Unbundled t delay (a, b, c, d, e) =
+      ( DSignal t delay a,
+        DSignal t delay b,
+        DSignal t delay c,
+        DSignal t delay d,
+        DSignal t delay e
+      )
 
-instance Bundle (a,b,c,d,e,f) where
-  type Unbundled t delay (a,b,c,d,e,f) =
-    ( DSignal t delay a, DSignal t delay b, DSignal t delay c, DSignal t delay d
-    , DSignal t delay e, DSignal t delay f)
+  bundle (a, b, c, d, e) = (,,,,) <$> a <*> b <*> c <*> d <*> e
+  unbundle tup =
+    ( fmap (\(x, _, _, _, _) -> x) tup,
+      fmap (\(_, x, _, _, _) -> x) tup,
+      fmap (\(_, _, x, _, _) -> x) tup,
+      fmap (\(_, _, _, x, _) -> x) tup,
+      fmap (\(_, _, _, _, x) -> x) tup
+    )
 
-  bundle   (a,b,c,d,e,f) = (,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
-  unbundle tup           = (fmap (\(x,_,_,_,_,_) -> x) tup
-                           ,fmap (\(_,x,_,_,_,_) -> x) tup
-                           ,fmap (\(_,_,x,_,_,_) -> x) tup
-                           ,fmap (\(_,_,_,x,_,_) -> x) tup
-                           ,fmap (\(_,_,_,_,x,_) -> x) tup
-                           ,fmap (\(_,_,_,_,_,x) -> x) tup
-                           )
+instance Bundle (a, b, c, d, e, f) where
+  type
+    Unbundled t delay (a, b, c, d, e, f) =
+      ( DSignal t delay a,
+        DSignal t delay b,
+        DSignal t delay c,
+        DSignal t delay d,
+        DSignal t delay e,
+        DSignal t delay f
+      )
 
-instance Bundle (a,b,c,d,e,f,g) where
-  type Unbundled t delay (a,b,c,d,e,f,g) =
-    ( DSignal t delay a, DSignal t delay b, DSignal t delay c, DSignal t delay d
-    , DSignal t delay e, DSignal t delay f, DSignal t delay g)
+  bundle (a, b, c, d, e, f) = (,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
+  unbundle tup =
+    ( fmap (\(x, _, _, _, _, _) -> x) tup,
+      fmap (\(_, x, _, _, _, _) -> x) tup,
+      fmap (\(_, _, x, _, _, _) -> x) tup,
+      fmap (\(_, _, _, x, _, _) -> x) tup,
+      fmap (\(_, _, _, _, x, _) -> x) tup,
+      fmap (\(_, _, _, _, _, x) -> x) tup
+    )
 
-  bundle   (a,b,c,d,e,f,g) = (,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
-                                      <*> g
-  unbundle tup             = (fmap (\(x,_,_,_,_,_,_) -> x) tup
-                             ,fmap (\(_,x,_,_,_,_,_) -> x) tup
-                             ,fmap (\(_,_,x,_,_,_,_) -> x) tup
-                             ,fmap (\(_,_,_,x,_,_,_) -> x) tup
-                             ,fmap (\(_,_,_,_,x,_,_) -> x) tup
-                             ,fmap (\(_,_,_,_,_,x,_) -> x) tup
-                             ,fmap (\(_,_,_,_,_,_,x) -> x) tup
-                             )
+instance Bundle (a, b, c, d, e, f, g) where
+  type
+    Unbundled t delay (a, b, c, d, e, f, g) =
+      ( DSignal t delay a,
+        DSignal t delay b,
+        DSignal t delay c,
+        DSignal t delay d,
+        DSignal t delay e,
+        DSignal t delay f,
+        DSignal t delay g
+      )
 
-instance Bundle (a,b,c,d,e,f,g,h) where
-  type Unbundled t delay (a,b,c,d,e,f,g,h) =
-    ( DSignal t delay a, DSignal t delay b, DSignal t delay c, DSignal t delay d
-    , DSignal t delay e, DSignal t delay f ,DSignal t delay g, DSignal t delay h)
+  bundle (a, b, c, d, e, f, g) =
+    (,,,,,,)
+      <$> a
+      <*> b
+      <*> c
+      <*> d
+      <*> e
+      <*> f
+      <*> g
+  unbundle tup =
+    ( fmap (\(x, _, _, _, _, _, _) -> x) tup,
+      fmap (\(_, x, _, _, _, _, _) -> x) tup,
+      fmap (\(_, _, x, _, _, _, _) -> x) tup,
+      fmap (\(_, _, _, x, _, _, _) -> x) tup,
+      fmap (\(_, _, _, _, x, _, _) -> x) tup,
+      fmap (\(_, _, _, _, _, x, _) -> x) tup,
+      fmap (\(_, _, _, _, _, _, x) -> x) tup
+    )
 
-  bundle   (a,b,c,d,e,f,g,h) = (,,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
-                                         <*> g <*> h
-  unbundle tup               = (fmap (\(x,_,_,_,_,_,_,_) -> x) tup
-                               ,fmap (\(_,x,_,_,_,_,_,_) -> x) tup
-                               ,fmap (\(_,_,x,_,_,_,_,_) -> x) tup
-                               ,fmap (\(_,_,_,x,_,_,_,_) -> x) tup
-                               ,fmap (\(_,_,_,_,x,_,_,_) -> x) tup
-                               ,fmap (\(_,_,_,_,_,x,_,_) -> x) tup
-                               ,fmap (\(_,_,_,_,_,_,x,_) -> x) tup
-                               ,fmap (\(_,_,_,_,_,_,_,x) -> x) tup
-                               )
+instance Bundle (a, b, c, d, e, f, g, h) where
+  type
+    Unbundled t delay (a, b, c, d, e, f, g, h) =
+      ( DSignal t delay a,
+        DSignal t delay b,
+        DSignal t delay c,
+        DSignal t delay d,
+        DSignal t delay e,
+        DSignal t delay f,
+        DSignal t delay g,
+        DSignal t delay h
+      )
 
-instance KnownNat n => Bundle (Vec n a) where
+  bundle (a, b, c, d, e, f, g, h) =
+    (,,,,,,,)
+      <$> a
+      <*> b
+      <*> c
+      <*> d
+      <*> e
+      <*> f
+      <*> g
+      <*> h
+  unbundle tup =
+    ( fmap (\(x, _, _, _, _, _, _, _) -> x) tup,
+      fmap (\(_, x, _, _, _, _, _, _) -> x) tup,
+      fmap (\(_, _, x, _, _, _, _, _) -> x) tup,
+      fmap (\(_, _, _, x, _, _, _, _) -> x) tup,
+      fmap (\(_, _, _, _, x, _, _, _) -> x) tup,
+      fmap (\(_, _, _, _, _, x, _, _) -> x) tup,
+      fmap (\(_, _, _, _, _, _, x, _) -> x) tup,
+      fmap (\(_, _, _, _, _, _, _, x) -> x) tup
+    )
+
+instance (KnownNat n) => Bundle (Vec n a) where
   type Unbundled t d (Vec n a) = Vec n (DSignal t d a)
-  bundle   = unsafeFromSignal . B.bundle . fmap toSignal
+  bundle = unsafeFromSignal . B.bundle . fmap toSignal
   unbundle = sequenceA . fmap lazyV
 
-instance KnownNat d => Bundle (RTree d a) where
+instance (KnownNat d) => Bundle (RTree d a) where
   type Unbundled t delay (RTree d a) = RTree d (DSignal t delay a)
-  bundle   = sequenceA
+  bundle = sequenceA
   unbundle = sequenceA . fmap lazyT
 
 -- | Same as 'Clash.Signal.Bundle.TaggedEmptyTuple' in "Clash.Signal.Bundle", but adapted for 'DSignal'.

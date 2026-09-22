@@ -1,11 +1,3 @@
-{-|
-Copyright  :  (C) 2013-2016, University of Twente,
-                  2016-2019, Myrtle Software Ltd,
-                  2021-2026, QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -15,124 +7,164 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 {-# LANGUAGE Unsafe #-}
-
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
-
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions not-home #-}
 
+{-|
+Copyright  :  (C) 2013-2016, University of Twente,
+                  2016-2019, Myrtle Software Ltd,
+                  2021-2026, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.Sized.Internal.Index
   ( -- * Datatypes
-    Index (..)
+    Index (..),
+
     -- * Construction
-  , fromSNat
-  -- * Accessors
-  -- ** Length information
-  , size#
+    fromSNat,
+
+    -- * Accessors
+
+    -- ** Length information
+    size#,
+
     -- * Type classes
+
     -- ** BitPack
-  , pack#
-  , unpack#
+    pack#,
+    unpack#,
+
     -- ** Eq
-  , eq#
-  , neq#
+    eq#,
+    neq#,
+
     -- ** Ord
-  , lt#
-  , ge#
-  , gt#
-  , le#
+    lt#,
+    ge#,
+    gt#,
+    le#,
+
     -- ** Enum
-  , toEnum#
-  , fromEnum#
+    toEnum#,
+    fromEnum#,
+
     -- ** Enum (not synthesizable)
-  , enumFrom#
-  , enumFromThen#
-  , enumFromTo#
-  , enumFromThenTo#
+    enumFrom#,
+    enumFromThen#,
+    enumFromTo#,
+    enumFromThenTo#,
+
     -- ** Bounded
-  , maxBound#
+    maxBound#,
+
     -- ** Num
-  , (+#)
-  , (-#)
-  , (*#)
-  , negate#
-  , fromInteger#
+    (+#),
+    (-#),
+    (*#),
+    negate#,
+    fromInteger#,
+
     -- ** ExtendingNum
-  , plus#
-  , minus#
-  , times#
+    plus#,
+    minus#,
+    times#,
+
     -- ** Integral
-  , quot#
-  , rem#
-  , toInteger#
+    quot#,
+    rem#,
+    toInteger#,
+
     -- ** Resize
-  , resize#
+    resize#,
+
     -- * Type-level error messages
-  , IndexPositiveLiteralError
+    IndexPositiveLiteralError,
   )
 where
 
-import Prelude hiding             (even, odd)
-
-import Control.DeepSeq            (NFData (..))
-import Data.Bits                  (Bits (..), FiniteBits (..))
-import Data.Data                  (Data)
-import Data.Default               (Default (..))
-import Text.Read                  (Read (..), ReadPrec)
-import Text.Printf                (PrintfArg (..), printf)
-import Data.Ix                    (Ix(..))
-import Language.Haskell.TH        (appT, conT, litT, numTyLit, sigE)
-import Language.Haskell.TH.Syntax (Lift(..))
-import Language.Haskell.TH.Compat
-import Language.Haskell.TH        (Quote, Type)
-import GHC.Generics               (Generic)
-import GHC.Natural                (Natural, naturalFromInteger)
-import GHC.Natural                (naturalToInteger)
-import GHC.Stack                  (HasCallStack)
-import GHC.TypeError
-  ( Assert
-  , ErrorMessage (ShowType)
-  )
-import GHC.TypeLits
-  ( KnownNat
-  , Nat
-  , natVal
-  , type (+)
-  , type (-)
-  , type (*)
-  , type (<=)
-  , type (<=?)
-  )
-import GHC.TypeLits.Extra         (CLogWZ)
-import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
-                                   arbitraryBoundedIntegral,
-                                   coarbitraryIntegral, shrinkIntegral)
-
-import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.BitPack.Internal (BitPack (..), packXWith)
-import Clash.Class.Num            (ExtendingNum (..), SaturatingNum (..),
-                                   SaturationMode (..))
-import Clash.Class.Parity         (Parity (..))
-import Clash.Class.Resize         (Resize (..))
-import Clash.Class.BitPack.BitIndex (replaceBit)
-import Clash.Magic                 (clashSimulation)
-import Clash.Sized.Internal       (formatRange)
-import Clash.Sized.Internal.CheckedLiterals
-  ( PotentiallyOutOfBounds
-  , UnsignedBounds
-  )
-import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
-import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Promoted.Nat         (SNat(..), UNat(..), toUNat, snatToNum, natToInteger)
 import CheckedLiterals.Class.Integer
-  ( NegativeUnsignedError
-  , CheckedNegativeIntegerLiteral
-  , CheckedPositiveIntegerLiteral
+  ( CheckedNegativeIntegerLiteral,
+    CheckedPositiveIntegerLiteral,
+    NegativeUnsignedError,
+  )
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Class.BitPack.BitIndex (replaceBit)
+import Clash.Class.BitPack.Internal (BitPack (..), packXWith)
+import Clash.Class.Num
+  ( ExtendingNum (..),
+    SaturatingNum (..),
+    SaturationMode (..),
+  )
+import Clash.Class.Parity (Parity (..))
+import Clash.Class.Resize (Resize (..))
+import Clash.Magic (clashSimulation)
+import Clash.Promoted.Nat (SNat (..), UNat (..), natToInteger, snatToNum, toUNat)
+import Clash.Sized.Internal (formatRange)
+import qualified Clash.Sized.Internal.BitVector as BV
+import {-# SOURCE #-} Clash.Sized.Internal.BitVector (BitVector (BV), high, low, undefError)
+import Clash.Sized.Internal.CheckedLiterals
+  ( PotentiallyOutOfBounds,
+    UnsignedBounds,
   )
 import Clash.XException
-  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX, seqX)
+  ( NFDataX (..),
+    ShowX (..),
+    errorX,
+    rwhnfX,
+    seqX,
+    showsPrecXWith,
+  )
+import Control.DeepSeq (NFData (..))
+import Data.Bits (Bits (..), FiniteBits (..))
+import Data.Data (Data)
+import Data.Default (Default (..))
+import Data.Ix (Ix (..))
+import GHC.Generics (Generic)
+import GHC.Natural
+  ( Natural,
+    naturalFromInteger,
+    naturalToInteger,
+  )
+import GHC.Stack (HasCallStack)
+import GHC.TypeError
+  ( Assert,
+    ErrorMessage (ShowType),
+  )
+import GHC.TypeLits
+  ( KnownNat,
+    Nat,
+    natVal,
+    type (*),
+    type (+),
+    type (-),
+    type (<=),
+    type (<=?),
+  )
+import GHC.TypeLits.Extra (CLogWZ)
+import Language.Haskell.TH
+  ( Quote,
+    Type,
+    appT,
+    conT,
+    litT,
+    numTyLit,
+    sigE,
+  )
+import Language.Haskell.TH.Compat
+import Language.Haskell.TH.Syntax (Lift (..))
+import Test.QuickCheck.Arbitrary
+  ( Arbitrary (..),
+    CoArbitrary (..),
+    arbitraryBoundedIntegral,
+    coarbitraryIntegral,
+    shrinkIntegral,
+  )
+import Text.Printf (PrintfArg (..), printf)
+import Text.Read (Read (..), ReadPrec)
+import Prelude hiding (even, odd)
 
 {- $setup
 >>> import Clash.Sized.Internal.Index
@@ -177,28 +209,29 @@ type role Index nominal
 --
 -- as it is not safe to coerce between 'Index'es with different ranges. To
 -- change the size, use the functions in the 'Resize' class.
-data Index (n :: Nat) =
-    -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
+data Index (n :: Nat)
+  = -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesizable.
-    I { unsafeToInteger :: !Integer }
+    I {unsafeToInteger :: !Integer}
   deriving (Data, Generic)
 
 {-# ANN I hasBlackBox #-}
 
 {-# OPAQUE size# #-}
-size# :: KnownNat n => Index n -> Int
+size# :: (KnownNat n) => Index n -> Int
 size# = BV.size# . pack#
 
 instance NFData (Index n) where
   rnf (I i) = rnf i `seq` ()
   {-# NOINLINE rnf #-}
-  -- NOINLINE is needed so that Clash doesn't trip on the "Index ~# Integer"
-  -- coercion
 
-instance KnownNat n => BitPack (Index n) where
+-- NOINLINE is needed so that Clash doesn't trip on the "Index ~# Integer"
+-- coercion
+
+instance (KnownNat n) => BitPack (Index n) where
   type BitSize (Index n) = CLogWZ 2 n 0
-  pack        = packXWith pack#
-  unpack      = unpack#
+  pack = packXWith pack#
+  unpack = unpack#
   maybeUnpack = maybeUnpack#
 
 -- | Safely convert an `SNat` value to an `Index`
@@ -212,22 +245,23 @@ pack# (I i) = BV 0 (naturalFromInteger i)
 
 {-# OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
-unpack# :: KnownNat n => BitVector (CLogWZ 2 n 0) -> Index n
+unpack# :: (KnownNat n) => BitVector (CLogWZ 2 n 0) -> Index n
 unpack# (BV 0 i) = fromInteger_INLINE (naturalToInteger i)
 unpack# bv = undefError "Index.unpack" [bv]
 
 {-# INLINE maybeUnpack# #-}
-maybeUnpack# :: forall n. KnownNat n => BitVector (CLogWZ 2 n 0) -> Maybe (Index n)
+maybeUnpack# :: forall n. (KnownNat n) => BitVector (CLogWZ 2 n 0) -> Maybe (Index n)
 maybeUnpack# bv
   | bound == 0 = Nothing
-  | clashSimulation
-  , BV mask _ <- bv
-  , mask > 0 = undefError "Index.maybeUnpack" [bv]
+  | clashSimulation,
+    BV mask _ <- bv,
+    mask > 0 =
+      undefError "Index.maybeUnpack" [bv]
   | bv <= maxBoundBV = Just (unpack# bv)
   | otherwise = Nothing
- where
-  bound = natToInteger @n
-  maxBoundBV = pack# (maxBound# @n)
+  where
+    bound = natToInteger @n
+    maxBoundBV = pack# (maxBound# @n)
 
 instance Eq (Index n) where
   (==) = eq#
@@ -244,12 +278,12 @@ neq# :: (Index n) -> (Index n) -> Bool
 (I n) `neq#` (I m) = n /= m
 
 instance Ord (Index n) where
-  (<)  = lt#
+  (<) = lt#
   (>=) = ge#
-  (>)  = gt#
+  (>) = gt#
   (<=) = le#
 
-lt#,ge#,gt#,le# :: Index n -> Index n -> Bool
+lt#, ge#, gt#, le# :: Index n -> Index n -> Bool
 {-# OPAQUE lt# #-}
 {-# ANN lt# hasBlackBox #-}
 lt# (I n) (I m) = n < m
@@ -265,31 +299,31 @@ le# (I n) (I m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesizable.
-instance KnownNat n => Enum (Index n) where
-  succ           = (+# fromInteger# 1)
-  pred           = (-# fromInteger# 1)
-  toEnum         = toEnum#
-  fromEnum       = fromEnum#
-  enumFrom       = enumFrom#
-  enumFromThen   = enumFromThen#
-  enumFromTo     = enumFromTo#
+instance (KnownNat n) => Enum (Index n) where
+  succ = (+# fromInteger# 1)
+  pred = (-# fromInteger# 1)
+  toEnum = toEnum#
+  fromEnum = fromEnum#
+  enumFrom = enumFrom#
+  enumFromThen = enumFromThen#
+  enumFromTo = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
-toEnum# :: forall n. KnownNat n => Int -> Index n
+toEnum# :: forall n. (KnownNat n) => Int -> Index n
 toEnum# = fromInteger# . toInteger
 {-# OPAQUE toEnum# #-}
 {-# ANN toEnum# hasBlackBox #-}
 
-fromEnum# :: forall n. KnownNat n => Index n -> Int
+fromEnum# :: forall n. (KnownNat n) => Index n -> Int
 fromEnum# = fromEnum . toInteger#
 {-# OPAQUE fromEnum# #-}
 {-# ANN fromEnum# hasBlackBox #-}
 
-enumFrom# :: forall n. KnownNat n => Index n -> [Index n]
+enumFrom# :: forall n. (KnownNat n) => Index n -> [Index n]
 enumFrom# x = [x .. maxBound]
 {-# OPAQUE enumFrom# #-}
 
-enumFromThen# :: forall n. KnownNat n => Index n -> Index n -> [Index n]
+enumFromThen# :: forall n. (KnownNat n) => Index n -> Index n -> [Index n]
 enumFromThen# x y = if x <= y then [x, y .. maxBound] else [x, y .. minBound]
 {-# OPAQUE enumFromThen# #-}
 
@@ -301,11 +335,11 @@ enumFromThenTo# :: Index n -> Index n -> Index n -> [Index n]
 enumFromThenTo# x1 x2 y = map I [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 {-# OPAQUE enumFromThenTo# #-}
 
-instance KnownNat n => Bounded (Index n) where
+instance (KnownNat n) => Bounded (Index n) where
   minBound = fromInteger# 0
   maxBound = maxBound#
 
-maxBound# :: forall n. KnownNat n => Index n
+maxBound# :: forall n. (KnownNat n) => Index n
 maxBound# =
   case natToInteger @n of
     0 -> errorX "maxBound of 'Index 0' is undefined"
@@ -318,13 +352,13 @@ maxBound# =
 -- __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
 -- 'Integer' is arbitrarily bounded during synthesis.  Prefer
 -- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
-instance KnownNat n => Num (Index n) where
-  (+)         = (+#)
-  (-)         = (-#)
-  (*)         = (*#)
-  negate      = negate#
-  abs         = id
-  signum i    = if i == 0 then 0 else 1
+instance (KnownNat n) => Num (Index n) where
+  (+) = (+#)
+  (-) = (-#)
+  (*) = (*#)
+  negate = negate#
+  abs = id
+  signum i = if i == 0 then 0 else 1
   fromInteger = fromInteger#
 
 type IndexPositiveLiteralError lit n =
@@ -345,38 +379,42 @@ instance
   (NegativeUnsignedError lit (Index n) (n - 1)) =>
   CheckedNegativeIntegerLiteral lit (Index n)
 
-(+#),(-#),(*#) :: KnownNat n => Index n -> Index n -> Index n
+(+#), (-#), (*#) :: (KnownNat n) => Index n -> Index n -> Index n
 {-# OPAQUE (+#) #-}
 {-# ANN (+#) hasBlackBox #-}
 (+#) (I a) (I b) = fromInteger_INLINE $ a + b
-
 {-# OPAQUE (-#) #-}
 {-# ANN (-#) hasBlackBox #-}
 (-#) (I a) (I b) = fromInteger_INLINE $ a - b
-
 {-# OPAQUE (*#) #-}
 {-# ANN (*#) hasBlackBox #-}
 (*#) (I a) (I b) = fromInteger_INLINE $ a * b
 
-negate# :: KnownNat n => Index n -> Index n
+negate# :: (KnownNat n) => Index n -> Index n
 negate# 0 = 0
 negate# i = maxBound -# i +# 1
 
-fromInteger# :: KnownNat n => Integer -> Index n
+fromInteger# :: (KnownNat n) => Integer -> Index n
 {-# OPAQUE fromInteger# #-}
 {-# ANN fromInteger# hasBlackBox #-}
 fromInteger# = fromInteger_INLINE
+
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . (HasCallStack, KnownNat n) => Integer -> Index n
+fromInteger_INLINE :: forall n. (HasCallStack, KnownNat n) => Integer -> Index n
 fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
     bound = natToInteger @n
-    err   = errorX ("Clash.Sized.Index: result " ++ show i ++
-                   " is out of bounds: " ++ formatRange 0 (bound - 1))
+    err =
+      errorX
+        ( "Clash.Sized.Index: result "
+            ++ show i
+            ++ " is out of bounds: "
+            ++ formatRange 0 (bound - 1)
+        )
 
 instance ExtendingNum (Index m) (Index n) where
   type AResult (Index m) (Index n) = Index (m + n - 1)
-  add  = plus#
+  add = plus#
   sub = minus#
   type MResult (Index m) (Index n) = Index (((m - 1) * (n - 1)) + 1)
   mul = times#
@@ -385,91 +423,109 @@ plus#, minus# :: Index m -> Index n -> Index (m + n - 1)
 {-# OPAQUE plus# #-}
 {-# ANN plus# hasBlackBox #-}
 plus# (I a) (I b) = I (a + b)
-
 {-# OPAQUE minus# #-}
 {-# ANN minus# hasBlackBox #-}
 minus# (I a) (I b) =
-  let z   = a - b
-      err = errorX ("Clash.Sized.Index.minus: result " ++ show z ++
-                    " is smaller than 0")
+  let z = a - b
+      err =
+        errorX
+          ( "Clash.Sized.Index.minus: result "
+              ++ show z
+              ++ " is smaller than 0"
+          )
       res = if z < 0 then err else I z
-  in  res
+   in res
 
 {-# OPAQUE times# #-}
 {-# ANN times# hasBlackBox #-}
 times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
-instance KnownNat n => SaturatingNum (Index n) where
+instance (KnownNat n) => SaturatingNum (Index n) where
   satAdd SatWrap a b = case toUNat (SNat @n) of
     UZero -> a
     USucc UZero -> a +# b
     USucc (USucc _) -> case plus# a b of
-      z | let m = fromInteger# (natToInteger @n)
-        , z >= m -> resize# (z - m)
+      z
+        | let m = fromInteger# (natToInteger @n),
+          z >= m ->
+            resize# (z - m)
       z -> resize# z
   satAdd SatZero a b = case toUNat (SNat @n) of
     UZero -> a
     USucc _ ->
       case plus# a b of
-        z | let m = fromInteger# (natToInteger @(n - 1))
-          , z > m -> fromInteger# 0
+        z
+          | let m = fromInteger# (natToInteger @(n - 1)),
+            z > m ->
+              fromInteger# 0
         z -> resize# z
   satAdd SatError a b = case toUNat (SNat @n) of
     UZero -> a
     USucc _ ->
       case plus# a b of
-        z | let m = fromInteger# (natToInteger @(n - 1))
-          , z > m -> errorX "Index.satAdd: overflow"
+        z
+          | let m = fromInteger# (natToInteger @(n - 1)),
+            z > m ->
+              errorX "Index.satAdd: overflow"
         z -> resize# z
   satAdd _ a b = case toUNat (SNat @n) of
     UZero -> a
     USucc _ ->
       case plus# a b of
-        z | let m = fromInteger# (natToInteger @(n - 1))
-          , z > m -> maxBound#
+        z
+          | let m = fromInteger# (natToInteger @(n - 1)),
+            z > m ->
+              maxBound#
         z -> resize# z
 
   satSub SatWrap a b =
     if lt# a b
-       then maxBound -# (b -# a) +# 1
-       else a -# b
+      then maxBound -# (b -# a) +# 1
+      else a -# b
   satSub SatError a b =
     if lt# a b
-       then errorX "Index.satSub: underflow"
-       else a -# b
+      then errorX "Index.satSub: underflow"
+      else a -# b
   satSub _ a b =
     if lt# a b
-       then fromInteger# 0
-       else a -# b
+      then fromInteger# 0
+      else a -# b
 
   satMul SatWrap a b = case toUNat (SNat @n) of
     UZero -> a
     USucc UZero -> a *# b
-    USucc (USucc UZero) -> case a of {0 -> 0; _ -> b}
+    USucc (USucc UZero) -> case a of 0 -> 0; _ -> b
     USucc (USucc (USucc _)) -> case times# a b of
-      z -> let m = fromInteger# (natToInteger @n)
-           in resize# (z `mod` m)
+      z ->
+        let m = fromInteger# (natToInteger @n)
+         in resize# (z `mod` m)
   satMul SatZero a b = case toUNat (SNat @n) of
     UZero -> a
     USucc _ ->
       case times# a b of
-        z | let m = fromInteger# (natToInteger @(n - 1))
-          , z > m -> fromInteger# 0
+        z
+          | let m = fromInteger# (natToInteger @(n - 1)),
+            z > m ->
+              fromInteger# 0
         z -> resize# z
   satMul SatError a b = case toUNat (SNat @n) of
     UZero -> a
     USucc _ ->
       case times# a b of
-        z | let m = fromInteger# (natToInteger @(n - 1))
-          , z > m -> errorX "Index.satMul: overflow"
+        z
+          | let m = fromInteger# (natToInteger @(n - 1)),
+            z > m ->
+              errorX "Index.satMul: overflow"
         z -> resize# z
   satMul _ a b = case toUNat (SNat @n) of
     UZero -> a
     USucc _ ->
       case times# a b of
-        z | let m = fromInteger# (natToInteger @(n - 1))
-          , z > m -> maxBound#
+        z
+          | let m = fromInteger# (natToInteger @(n - 1)),
+            z > m ->
+              maxBound#
         z -> resize# z
 
   satSucc SatError a =
@@ -492,22 +548,22 @@ instance KnownNat n => SaturatingNum (Index n) where
       _ -> satSub satMode a $ fromInteger# 1
   {-# INLINE satPred #-}
 
-instance KnownNat n => Real (Index n) where
+instance (KnownNat n) => Real (Index n) where
   toRational = toRational . toInteger#
 
 -- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
 -- 'Integer' is arbitrarily bounded during synthesis.  Prefer
 -- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
-instance KnownNat n => Integral (Index n) where
-  quot        = quot#
-  rem         = rem#
-  div         = quot#
-  mod         = rem#
-  quotRem n d = (n `quot#` d,n `rem#` d)
-  divMod  n d = (n `quot#` d,n `rem#` d)
-  toInteger   = toInteger#
+instance (KnownNat n) => Integral (Index n) where
+  quot = quot#
+  rem = rem#
+  div = quot#
+  mod = rem#
+  quotRem n d = (n `quot#` d, n `rem#` d)
+  divMod n d = (n `quot#` d, n `rem#` d)
+  toInteger = toInteger#
 
-quot#,rem# :: Index n -> Index n -> Index n
+quot#, rem# :: Index n -> Index n -> Index n
 {-# OPAQUE quot# #-}
 {-# ANN quot# hasBlackBox #-}
 (I a) `quot#` (I b) = I (a `div` b)
@@ -520,10 +576,10 @@ quot#,rem# :: Index n -> Index n -> Index n
 toInteger# :: Index n -> Integer
 toInteger# (I n) = n
 
-instance KnownNat n => PrintfArg (Index n) where
+instance (KnownNat n) => PrintfArg (Index n) where
   formatArg = formatArg . toInteger
 
-instance KnownNat n => Parity (Index n) where
+instance (KnownNat n) => Parity (Index n) where
   even = even . pack
   odd = odd . pack
 
@@ -531,47 +587,47 @@ instance KnownNat n => Parity (Index n) where
 --
 -- * Returns 0 if @n >= 'bitSize' a@
 -- * 'Clash.XException.XException' if @n < 0@
-instance KnownNat n => Bits (Index n) where
-  a .&. b           = unpack# $ BV.and# (pack# a) (pack# b)
-  a .|. b           = unpack# $ BV.or# (pack# a) (pack# b)
-  xor a b           = unpack# $ BV.xor# (pack# a) (pack# b)
-  complement        = unpack# . BV.complement# . pack#
-  zeroBits          = unpack# zeroBits
-  bit i             = unpack# $ bit i
-  setBit v i        = unpack# $ replaceBit i high (pack# v)
-  clearBit v i      = unpack# $ replaceBit i low  (pack# v)
+instance (KnownNat n) => Bits (Index n) where
+  a .&. b = unpack# $ BV.and# (pack# a) (pack# b)
+  a .|. b = unpack# $ BV.or# (pack# a) (pack# b)
+  xor a b = unpack# $ BV.xor# (pack# a) (pack# b)
+  complement = unpack# . BV.complement# . pack#
+  zeroBits = unpack# zeroBits
+  bit i = unpack# $ bit i
+  setBit v i = unpack# $ replaceBit i high (pack# v)
+  clearBit v i = unpack# $ replaceBit i low (pack# v)
   complementBit v i = unpack# $ complementBit (pack# v) i
-  testBit v i       = testBit (pack# v) i
-  bitSizeMaybe v    = Just (size# v)
-  bitSize           = size#
-  isSigned _        = False
-  shiftL v i        = unpack# $ shiftL (pack# v) i
-  shiftR v i        = unpack# $ shiftR (pack# v) i
-  rotateL v i       = unpack# $ rotateL (pack# v) i
-  rotateR v i       = unpack# $ rotateR (pack# v) i
-  popCount i        = popCount (pack# i)
+  testBit v i = testBit (pack# v) i
+  bitSizeMaybe v = Just (size# v)
+  bitSize = size#
+  isSigned _ = False
+  shiftL v i = unpack# $ shiftL (pack# v) i
+  shiftR v i = unpack# $ shiftR (pack# v) i
+  rotateL v i = unpack# $ rotateL (pack# v) i
+  rotateR v i = unpack# $ rotateR (pack# v) i
+  popCount i = popCount (pack# i)
 
-instance KnownNat n => FiniteBits (Index n) where
-  finiteBitSize        = size#
-  countLeadingZeros  i = countLeadingZeros  (pack# i)
+instance (KnownNat n) => FiniteBits (Index n) where
+  finiteBitSize = size#
+  countLeadingZeros i = countLeadingZeros (pack# i)
   countTrailingZeros i = countTrailingZeros (pack# i)
 
 instance Resize Index where
-  resize     = resize#
+  resize = resize#
   zeroExtend = extend
-  truncateB  = resize#
+  truncateB = resize#
 
-resize# :: KnownNat m => Index n -> Index m
+resize# :: (KnownNat m) => Index n -> Index m
 resize# (I i) = fromInteger_INLINE i
 {-# OPAQUE resize# #-}
 {-# ANN resize# hasBlackBox #-}
 
-instance KnownNat n => Lift (Index n) where
-  lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))
+instance (KnownNat n) => Lift (Index n) where
+  lift u@(I i) = sigE [|fromInteger# i|] (decIndex (natVal u))
   {-# NOINLINE lift #-}
   liftTyped = liftTypedFromUntyped
 
-decIndex :: Quote m => Integer -> m Type
+decIndex :: (Quote m) => Integer -> m Type
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 
 instance Show (Index n) where
@@ -587,29 +643,30 @@ instance NFDataX (Index n) where
   rnfX = rwhnfX
 
 -- | None of the 'Read' class' methods are synthesizable.
-instance KnownNat n => Read (Index n) where
+instance (KnownNat n) => Read (Index n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 
-instance KnownNat n => Default (Index n) where
+instance (KnownNat n) => Default (Index n) where
   def = fromInteger# 0
 
-instance KnownNat n => Arbitrary (Index n) where
+instance (KnownNat n) => Arbitrary (Index n) where
   arbitrary = arbitraryBoundedIntegral
-  shrink    = shrinkIndex
+  shrink = shrinkIndex
 
-shrinkIndex :: KnownNat n => Index n -> [Index n]
-shrinkIndex x | natVal x < 3 = case toInteger x of
-                                 1 -> [0]
-                                 _ -> []
-              -- 'shrinkIntegral' uses "`quot` 2", which for 'Index' types with
-              -- an upper bound less than 2 results in an error.
-              | otherwise    = shrinkIntegral x
+shrinkIndex :: (KnownNat n) => Index n -> [Index n]
+shrinkIndex x
+  | natVal x < 3 = case toInteger x of
+      1 -> [0]
+      _ -> []
+  -- 'shrinkIntegral' uses "`quot` 2", which for 'Index' types with
+  -- an upper bound less than 2 results in an error.
+  | otherwise = shrinkIntegral x
 
-instance KnownNat n => CoArbitrary (Index n) where
+instance (KnownNat n) => CoArbitrary (Index n) where
   coarbitrary = coarbitraryIntegral
 
 instance (KnownNat n) => Ix (Index n) where
-  range (a, b) = [a..b]
+  range (a, b) = [a .. b]
   index ab@(a, b) x
     | inRange ab x = fromIntegral $ x - a
     | otherwise = error $ printf "Index (%d) out of range ((%d, %d))" x a b

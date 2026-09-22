@@ -1,3 +1,14 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+
 {-|
 Copyright  :  (C) 2016,      University of Twente,
                   2017,      QBayLogic, Google Inc.
@@ -15,67 +26,83 @@ CallStack (from HasCallStack):
 >>> showX (errorX "No value here" :: Integer, 4 :: Int)
 "(undefined,4)"
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-
-{-# LANGUAGE Trustworthy #-}
-
 module Clash.XException
   ( -- * 'XException': An exception for uninitialized values
-    XException(..), errorX, isX, hasX, maybeIsX, maybeHasX, fromJustX, undefined,
-    xToErrorCtx, xToError
+    XException (..),
+    errorX,
+    isX,
+    hasX,
+    maybeIsX,
+    maybeHasX,
+    fromJustX,
+    undefined,
+    xToErrorCtx,
+    xToError,
+
     -- * Printing 'XException's as @undefined@
-  , ShowX (..), showsX, printX, showsPrecXWith
+    ShowX (..),
+    showsX,
+    printX,
+    showsPrecXWith,
+
     -- * Strict evaluation
-  , seqX, seqErrorX, forceX, deepseqX, rwhnfX, defaultSeqX, hwSeqX
+    seqX,
+    seqErrorX,
+    forceX,
+    deepseqX,
+    rwhnfX,
+    defaultSeqX,
+    hwSeqX,
+
     -- * Structured undefined / deep evaluation with undefined values
-  , NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine)
+    NFDataX (rnfX, deepErrorX, hasUndefined, ensureSpine),
   )
 where
 
-import           Prelude             hiding (undefined)
-
-import           Clash.Annotations.Primitive (hasBlackBox, dontTranslate)
-import           Clash.CPP           (maxTupleSize, fSuperStrict)
-import           Clash.XException.Internal
-import           Clash.XException.TH
-import           Control.Exception
-  (ErrorCall (..), Handler(..), catch, catches, evaluate, throw)
-import           Control.DeepSeq     (NFData, rnf)
-import           Data.Complex        (Complex)
-import           Data.Either         (isLeft)
-import           Data.Foldable       (toList)
-import           Data.Functor.Compose (Compose)
-import           Data.Functor.Const  (Const)
-import           Data.Functor.Identity (Identity)
-import           Data.Functor.Product (Product)
-import           Data.Functor.Sum    (Sum)
-import           Data.Int            (Int8, Int16, Int32, Int64)
-import qualified Data.List.Infinite  as Inf
-import           Data.List.Infinite  (Infinite (..))
-import           Data.List.NonEmpty  (NonEmpty)
-import           Data.Ord            (Down (Down))
-import           Data.Proxy          (Proxy)
-import           Data.Ratio          (Ratio, numerator, denominator)
-import qualified Data.Semigroup      as SG
-import qualified Data.Monoid         as M
-import           Data.Sequence       (Seq(Empty, (:<|)))
-import           Data.Word           (Word8, Word16, Word32, Word64)
-import           Foreign.C.Types     (CUShort)
-import           GHC.Generics
-import           GHC.Natural         (Natural)
-import           GHC.Stack
-  (HasCallStack, callStack, prettyCallStack, withFrozenCallStack)
-import           Numeric.Half        (Half)
-import           System.IO.Unsafe    (unsafeDupablePerformIO)
+import Clash.Annotations.Primitive (dontTranslate, hasBlackBox)
+import Clash.CPP (fSuperStrict, maxTupleSize)
+import Clash.XException.Internal
+import Clash.XException.TH
+import Control.DeepSeq (NFData, rnf)
+import Control.Exception
+  ( ErrorCall (..),
+    Handler (..),
+    catch,
+    catches,
+    evaluate,
+    throw,
+  )
+import Data.Complex (Complex)
+import Data.Either (isLeft)
+import Data.Foldable (toList)
+import Data.Functor.Compose (Compose)
+import Data.Functor.Const (Const)
+import Data.Functor.Identity (Identity)
+import Data.Functor.Product (Product)
+import Data.Functor.Sum (Sum)
+import Data.Int (Int16, Int32, Int64, Int8)
+import Data.List.Infinite (Infinite (..))
+import qualified Data.List.Infinite as Inf
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.Monoid as M
+import Data.Ord (Down (Down))
+import Data.Proxy (Proxy)
+import Data.Ratio (Ratio, denominator, numerator)
+import qualified Data.Semigroup as SG
+import Data.Sequence (Seq (Empty, (:<|)))
+import Data.Word (Word16, Word32, Word64, Word8)
+import Foreign.C.Types (CUShort)
+import GHC.Generics
+import GHC.Natural (Natural)
+import GHC.Stack
+  ( HasCallStack,
+    callStack,
+    prettyCallStack,
+    withFrozenCallStack,
+  )
+import Numeric.Half (Half)
+import Prelude hiding (undefined)
+import System.IO.Unsafe (unsafeDupablePerformIO)
 
 -- $setup
 -- >>> :m -Prelude
@@ -86,20 +113,20 @@ import           System.IO.Unsafe    (unsafeDupablePerformIO)
 -- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> :set -fplugin GHC.TypeLits.KnownNat.Solver
 
-
 -- | Either 'seqX' or 'deepseqX' depending on the value of the cabal flag
 -- '-fsuper-strict'. If enabled, 'defaultSeqX' will be 'deepseqX', otherwise
 -- 'seqX'. Flag defaults to /false/ and thus 'seqX'.
-defaultSeqX :: NFDataX a => a -> b -> b
+defaultSeqX :: (NFDataX a) => a -> b -> b
 defaultSeqX = if fSuperStrict then deepseqX else seqX
 {-# INLINE defaultSeqX #-}
+
 infixr 0 `defaultSeqX`
 
 -- | Like 'error', but throwing an 'XException' instead of an 'ErrorCall'
 --
 -- The 'ShowX' methods print these error-values as @undefined@; instead of error'ing
 -- out with an exception.
-errorX :: HasCallStack => String -> a
+errorX :: (HasCallStack) => String -> a
 errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
 {-# OPAQUE errorX #-}
 {-# ANN errorX hasBlackBox #-}
@@ -150,10 +177,14 @@ errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStac
 --   errorX, called at ...
 -- ...
 xToErrorCtx :: String -> a -> a
-xToErrorCtx ctx a = unsafeDupablePerformIO
-  (catch (evaluate a >> return a)
-         (\(XException msg) ->
-           throw (ErrorCall (unlines [ctx,msg]))))
+xToErrorCtx ctx a =
+  unsafeDupablePerformIO
+    ( catch
+        (evaluate a >> return a)
+        ( \(XException msg) ->
+            throw (ErrorCall (unlines [ctx, msg]))
+        )
+    )
 {-# OPAQUE xToErrorCtx #-}
 
 -- | Convert 'XException' to 'ErrorCall'
@@ -209,7 +240,7 @@ xToErrorCtx ctx a = unsafeDupablePerformIO
 -- CallStack (from HasCallStack):
 --   errorX, called at ...
 -- ...
-xToError :: HasCallStack => a -> a
+xToError :: (HasCallStack) => a -> a
 xToError = xToErrorCtx (prettyCallStack callStack)
 {-# INLINE xToError #-}
 
@@ -222,10 +253,12 @@ xToError = xToErrorCtx (prettyCallStack callStack)
 -- > seqX (XException msg) b = b
 -- > seqX _|_              b = _|_
 seqX :: a -> b -> b
-seqX a b = unsafeDupablePerformIO
-  (catch (evaluate a >> return b) (\(XException _) -> return b))
+seqX a b =
+  unsafeDupablePerformIO
+    (catch (evaluate a >> return b) (\(XException _) -> return b))
 {-# OPAQUE seqX #-}
 {-# ANN seqX hasBlackBox #-}
+
 infixr 0 `seqX`
 
 -- | Like 'seqX', but will also catch ErrorCall exceptions which are thrown.
@@ -235,13 +268,16 @@ infixr 0 `seqX`
 -- > seqErrorX (XException msg) b = b
 -- > seqErrorX _|_              b = _|_
 seqErrorX :: a -> b -> b
-seqErrorX a b = unsafeDupablePerformIO
-  ((evaluate a >> return b) `catches`
-     [ Handler (\(XException _) -> return b)
-     , Handler (\(ErrorCall _) -> return b)
-     ])
+seqErrorX a b =
+  unsafeDupablePerformIO
+    ( (evaluate a >> return b)
+        `catches` [ Handler (\(XException _) -> return b),
+                    Handler (\(ErrorCall _) -> return b)
+                  ]
+    )
 {-# OPAQUE seqErrorX #-}
 {-# ANN seqErrorX hasBlackBox #-}
+
 infixr 0 `seqErrorX`
 
 -- | Like 'seqX' in simulation, but will force its first argument to be rendered
@@ -261,6 +297,7 @@ hwSeqX :: a -> b -> b
 hwSeqX = seqX
 {-# OPAQUE hwSeqX #-}
 {-# ANN hwSeqX hasBlackBox #-}
+
 infixr 0 `hwSeqX`
 
 -- | Evaluate a value with given function, returning 'Nothing' if it throws
@@ -331,9 +368,10 @@ hasX a =
   --       error call. We could prevent the two traversals by making 'hasX' a
   --       type class method. Also see: https://github.com/clash-lang/clash-compiler/issues/2450.
   unsafeDupablePerformIO
-    (catch
-      (evaluate (rnf a) >> return (Right a))
-      (\(XException msg) -> evaluate (rnfX a) >> return (Left msg)))
+    ( catch
+        (evaluate (rnf a) >> return (Right a))
+        (\(XException msg) -> evaluate (rnfX a) >> return (Left msg))
+    )
 {-# OPAQUE hasX #-}
 {-# ANN hasX dontTranslate #-}
 
@@ -347,9 +385,10 @@ hasX a =
 isX :: a -> Either String a
 isX a =
   unsafeDupablePerformIO
-    (catch
-      (evaluate a >> return (Right a))
-      (\(XException msg) -> return (Left msg)))
+    ( catch
+        (evaluate a >> return (Right a))
+        (\(XException msg) -> return (Left msg))
+    )
 {-# OPAQUE isX #-}
 {-# ANN isX dontTranslate #-}
 
@@ -392,19 +431,25 @@ class ShowX a where
 
 -- | Like 'print', but values that normally throw an 'XException' are
 -- converted to @undefined@, instead of error'ing out with an exception
-printX :: ShowX a => a -> IO ()
+printX :: (ShowX a) => a -> IO ()
 printX x = putStrLn $ showX x
 
 instance ShowX ()
+
 -- | @since 1.8.2
 instance ShowX (Proxy a)
-instance ShowX a => ShowX (Identity a)
-instance ShowX a => ShowX (Const a b)
+
+instance (ShowX a) => ShowX (Identity a)
+
+instance (ShowX a) => ShowX (Const a b)
+
 instance (ShowX (f a), ShowX (g a)) => ShowX (Product f g a)
+
 instance (ShowX (f a), ShowX (g a)) => ShowX (Sum f g a)
+
 instance (ShowX (f (g a))) => ShowX (Compose f g a)
 
-instance {-# OVERLAPPABLE #-} ShowX a => ShowX [a] where
+instance {-# OVERLAPPABLE #-} (ShowX a) => ShowX [a] where
   showsPrecX _ = showListX
 
 instance ShowX Char where
@@ -415,7 +460,7 @@ instance ShowX Bool
 instance ShowX Double where
   showsPrecX = showsPrecXWith showsPrec
 
-instance ShowX a => ShowX (Down a) where
+instance (ShowX a) => ShowX (Down a) where
   showsPrecX = showsPrecXWith showsPrecX
 
 instance (ShowX a, ShowX b) => ShowX (Either a b)
@@ -446,7 +491,7 @@ instance ShowX Natural where
 
 instance ShowX Ordering
 
-instance ShowX a => ShowX (Seq a) where
+instance (ShowX a) => ShowX (Seq a) where
   showsPrecX _ = showListX . toList
 
 instance ShowX Word where
@@ -467,30 +512,30 @@ instance ShowX Word64 where
 instance ShowX CUShort where
   showsPrecX = showsPrecXWith showsPrec
 
-instance ShowX a => ShowX (Maybe a)
+instance (ShowX a) => ShowX (Maybe a)
 
-instance ShowX a => ShowX (Ratio a) where
+instance (ShowX a) => ShowX (Ratio a) where
   showsPrecX = showsPrecXWith showsPrecX
 
-instance ShowX a => ShowX (Complex a)
+instance (ShowX a) => ShowX (Complex a)
 
 instance {-# OVERLAPPING #-} ShowX String where
   showsPrecX = showsPrecXWith showsPrec
 
-
 -- | a variant of 'deepseqX' that is useful in some circumstances:
 --
 -- > forceX x = x `deepseqX` x
-forceX :: NFDataX a => a -> a
+forceX :: (NFDataX a) => a -> a
 forceX x = x `deepseqX` x
 {-# INLINE forceX #-}
 
 -- | 'deepseqX': fully evaluates the first argument, before returning the
 -- second. Does not propagate 'XException's.
-deepseqX :: NFDataX a => a -> b -> b
+deepseqX :: (NFDataX a) => a -> b -> b
 deepseqX a b = rnfX a `seq` b
 {-# OPAQUE deepseqX #-}
 {-# ANN deepseqX hasBlackBox #-}
+
 infixr 0 `deepseqX`
 
 -- | Reduce to weak head normal form
@@ -507,8 +552,7 @@ rwhnfX = (`seqX` ())
 class NFDataX a where
   -- | Create a value where all the elements have an 'errorX',
   -- but the spine is defined.
-  deepErrorX :: HasCallStack => String -> a
-
+  deepErrorX :: (HasCallStack) => String -> a
   default deepErrorX :: (HasCallStack, Generic a, GDeepErrorX (Rep a)) => String -> a
   deepErrorX = withFrozenCallStack $ to . gDeepErrorX
 
@@ -525,7 +569,6 @@ class NFDataX a where
   -- True
   --
   hasUndefined :: a -> Bool
-
   default hasUndefined :: (Generic a, GHasUndefined (Rep a)) => a -> Bool
   hasUndefined = gHasUndefined . from
 
@@ -542,58 +585,69 @@ class NFDataX a where
   -- For users familiar with 'Clash.Sized.Vector.lazyV': this is the generalized
   -- version of it.
   ensureSpine :: a -> a
-
   default ensureSpine :: (Generic a, GEnsureSpine (Rep a)) => a -> a
   ensureSpine = to . gEnsureSpine . from
 
   -- | Evaluate a value to NF. As opposed to 'NFData's
   -- 'rnf', it does not bubble up 'XException's.
   rnfX :: a -> ()
-
   default rnfX :: (Generic a, GNFDataX Zero (Rep a)) => a -> ()
   rnfX = grnfX RnfArgs0 . from
 
 instance NFDataX ()
 
-instance NFDataX b => NFDataX (a -> b) where
+instance (NFDataX b) => NFDataX (a -> b) where
   deepErrorX = pure . deepErrorX
   rnfX = rwhnfX
   hasUndefined = error "hasUndefined on NFDataX (a -> b): Not Yet Implemented"
   ensureSpine = id
 
-instance NFDataX a => NFDataX (Down a) where
+instance (NFDataX a) => NFDataX (Down a) where
   deepErrorX = Down . deepErrorX
   rnfX d@(~(Down x)) = if isLeft (isX d) then () else rnfX x
-  hasUndefined d@(~(Down x))= if isLeft (isX d) then True else hasUndefined x
+  hasUndefined d@(~(Down x)) = if isLeft (isX d) then True else hasUndefined x
   ensureSpine ~(Down x) = Down (ensureSpine x)
 
-instance NFDataX a => NFDataX (Infinite a) where
+instance (NFDataX a) => NFDataX (Infinite a) where
   deepErrorX msg = Inf.repeat (deepErrorX msg)
   rnfX d@(~(x :< xs)) =
-    if isLeft (isX d) then
-      ()
-    else
-      rnfX x `seq` rnfX xs
+    if isLeft (isX d)
+      then
+        ()
+      else
+        rnfX x `seq` rnfX xs
   hasUndefined d@(~(x :< xs)) =
-    if isLeft (isX d) then
-      True
-    else
-      hasUndefined x || hasUndefined xs
+    if isLeft (isX d)
+      then
+        True
+      else
+        hasUndefined x || hasUndefined xs
 
   ensureSpine ~(x :< xs) = ensureSpine x :< ensureSpine xs
 
 instance NFDataX Bool
+
 instance NFDataX Ordering
-instance NFDataX a => NFDataX [a]
-instance NFDataX a => NFDataX (NonEmpty a)
+
+instance (NFDataX a) => NFDataX [a]
+
+instance (NFDataX a) => NFDataX (NonEmpty a)
+
 instance (NFDataX a, NFDataX b) => NFDataX (Either a b)
-instance NFDataX a => NFDataX (Maybe a)
+
+instance (NFDataX a) => NFDataX (Maybe a)
+
 -- | @since 1.8.2
 instance NFDataX (Proxy a)
-instance NFDataX a => NFDataX (Identity a)
-instance NFDataX a => NFDataX (Const a b)
+
+instance (NFDataX a) => NFDataX (Identity a)
+
+instance (NFDataX a) => NFDataX (Const a b)
+
 instance (NFDataX (f a), NFDataX (g a)) => NFDataX (Product f g a)
+
 instance (NFDataX (f a), NFDataX (g a)) => NFDataX (Sum f g a)
+
 instance (NFDataX (f (g a))) => NFDataX (Compose f g a)
 
 instance NFDataX Char where
@@ -698,58 +752,70 @@ instance NFDataX Half where
   hasUndefined = isLeft . isX
   ensureSpine = id
 
-instance NFDataX a => NFDataX (Seq a) where
+instance (NFDataX a) => NFDataX (Seq a) where
   deepErrorX = errorX
   rnfX s =
     if isLeft (isX s) then () else go s
-   where
-    go Empty = ()
-    go (x :<| xs) = rnfX x `seq` go xs
+    where
+      go Empty = ()
+      go (x :<| xs) = rnfX x `seq` go xs
   ensureSpine = id
 
   hasUndefined s =
     if isLeft (isX s) then True else go s
-   where
-    go Empty = False
-    go (x :<| xs) = hasUndefined x || hasUndefined xs
+    where
+      go Empty = False
+      go (x :<| xs) = hasUndefined x || hasUndefined xs
 
-instance NFDataX a => NFDataX (Ratio a) where
+instance (NFDataX a) => NFDataX (Ratio a) where
   deepErrorX = errorX
   rnfX r = rnfX (numerator r) `seq` rnfX (denominator r)
   hasUndefined r = isLeft (isX (numerator r)) || isLeft (isX (denominator r))
   ensureSpine = id
 
-instance NFDataX a => NFDataX (Complex a) where
+instance (NFDataX a) => NFDataX (Complex a) where
   deepErrorX = errorX
 
 instance (NFDataX a, NFDataX b) => NFDataX (SG.Arg a b)
+
 instance NFDataX (SG.All)
+
 instance NFDataX (SG.Any)
-instance NFDataX a => NFDataX (SG.Dual a)
-instance NFDataX a => NFDataX (SG.Endo a)
-instance NFDataX a => NFDataX (SG.First a)
-instance NFDataX a => NFDataX (SG.Last a)
-instance NFDataX a => NFDataX (SG.Max a)
-instance NFDataX a => NFDataX (SG.Min a)
-instance NFDataX a => NFDataX (SG.Product a)
-instance NFDataX a => NFDataX (SG.Sum a)
-instance NFDataX a => NFDataX (M.First a)
-instance NFDataX a => NFDataX (M.Last a)
+
+instance (NFDataX a) => NFDataX (SG.Dual a)
+
+instance (NFDataX a) => NFDataX (SG.Endo a)
+
+instance (NFDataX a) => NFDataX (SG.First a)
+
+instance (NFDataX a) => NFDataX (SG.Last a)
+
+instance (NFDataX a) => NFDataX (SG.Max a)
+
+instance (NFDataX a) => NFDataX (SG.Min a)
+
+instance (NFDataX a) => NFDataX (SG.Product a)
+
+instance (NFDataX a) => NFDataX (SG.Sum a)
+
+instance (NFDataX a) => NFDataX (M.First a)
+
+instance (NFDataX a) => NFDataX (M.Last a)
 
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
 -- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.
-mkShowXTupleInstances [2..maxTupleSize]
+mkShowXTupleInstances [2 .. maxTupleSize]
 
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By
 -- default, instances up to and including /12/-tuples will exist. If the flag
 -- @large-tuples@ is set instances up to the GHC imposed limit will exist. The
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.
-mkNFDataXTupleInstances [2..maxTupleSize]
+mkNFDataXTupleInstances [2 .. maxTupleSize]
 
 -- | Call to 'errorX' with default string
-undefined :: HasCallStack => a
+undefined :: (HasCallStack) => a
 undefined = errorX "undefined"
 
 -- | Same as 'Data.Maybe.fromJust', but returns a bottom/undefined value that

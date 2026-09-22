@@ -1,63 +1,68 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+
 module Main (main) where
 
-import qualified Clash.Util.Interpolate    as I
-
-import           Control.Monad             (unless, forM_)
-import           Clash.Annotations.Primitive (HDL(..))
-import qualified Data.Text                 as Text
-import           Data.Default              (def)
-import           Data.List                 ((\\), intercalate)
-import           Data.List.Extra           (trim)
-import           Data.Version              (versionBranch)
-import           System.Directory
-  ( findExecutable, getCurrentDirectory, doesDirectoryExist, makeAbsolute
-  , setCurrentDirectory)
-import           System.Environment
-import           System.Info
-import           System.Process            (readProcess)
-import           GHC.Conc                  (numCapabilities)
-import           GHC.Stack
-import           GHC.IO.Unsafe             (unsafePerformIO)
-import           Text.Printf               (printf)
-
-import           Test.Tasty
-import           Test.Tasty.Common
-import           Test.Tasty.Clash
-
-import           Control.Retry        (RetryAction(ConsultPolicy, DontRetry), RetryPolicyM, RetryStatus)
-import           Data.List            (isInfixOf)
-import           Test.Tasty.Flaky     (flakyTestWithRetryAction, limitRetries)
-import           Test.Tasty.Providers (Result)
+import Clash.Annotations.Primitive (HDL (..))
+import qualified Clash.Util.Interpolate as I
+import Control.Monad (forM_, unless)
+import Control.Retry (RetryAction (ConsultPolicy, DontRetry), RetryPolicyM, RetryStatus)
+import Data.Default (def)
+import Data.List
+  ( intercalate,
+    isInfixOf,
+    (\\),
+  )
+import Data.List.Extra (trim)
+import qualified Data.Text as Text
+import Data.Version (versionBranch)
+import GHC.Conc (numCapabilities)
+import GHC.IO.Unsafe (unsafePerformIO)
+import GHC.Stack
+import System.Directory
+  ( doesDirectoryExist,
+    findExecutable,
+    getCurrentDirectory,
+    makeAbsolute,
+    setCurrentDirectory,
+  )
+import System.Environment
+import System.Info
+import System.Process (readProcess)
+import Test.Tasty
+import Test.Tasty.Clash
+import Test.Tasty.Common
+import Test.Tasty.Flaky (flakyTestWithRetryAction, limitRetries)
+import Test.Tasty.Providers (Result)
+import Text.Printf (printf)
 
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
 ghcVersion3 =
 #ifdef __GLASGOW_HASKELL_PATCHLEVEL2__
   let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__
-      ghc_p2 = __GLASGOW_HASKELL_PATCHLEVEL2__ in
-  case ghc_p2 of
-    0 ->
-      intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
-    _ ->
-      intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1,ghc_p2]))
+      ghc_p2 = __GLASGOW_HASKELL_PATCHLEVEL2__
+   in case ghc_p2 of
+        0 ->
+          intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
+        _ ->
+          intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1, ghc_p2]))
 #else
-  let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__ in
-  intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
+  let ghc_p1 = __GLASGOW_HASKELL_PATCHLEVEL1__
+   in intercalate "." (map show (versionBranch compilerVersion <> [ghc_p1]))
 #endif
 
 -- Directory clash binary is expected to live in
 cabalClashBinDir :: IO String
 cabalClashBinDir = makeAbsolute rel_path
- where
-  rel_path = printf templ platform ghcVersion3 (VERSION_clash_ghc :: String)
-  platform :: String -- XXX: Hardcoded
-  platform = case os of
-     "mingw32" -> arch <> "-windows"
-     _ -> arch <> "-" <> os
-  templ = "dist-newstyle/build/%s/ghc-%s/clash-ghc-%s/x/clash/build/clash/" :: String
+  where
+    rel_path = printf templ platform ghcVersion3 (VERSION_clash_ghc :: String)
+    platform :: String -- XXX: Hardcoded
+    platform = case os of
+      "mingw32" -> arch <> "-windows"
+      _ -> arch <> "-" <> os
+    templ = "dist-newstyle/build/%s/ghc-%s/clash-ghc-%s/x/clash/build/clash/" :: String
 
 -- | Set GHC_PACKAGE_PATH for local Cabal install. Currently hardcoded for Unix;
 -- override by setting @store_dir@ to point to local cabal installation.
@@ -68,13 +73,18 @@ setCabalPackagePaths = do
     Just dir -> pure dir
     Nothing -> case os of
       "mingw32" -> pure "C:/cabal/store" -- default ghcup location
-      _ ->  (<> "/.cabal/store") <$> getEnv "HOME"
+      _ -> (<> "/.cabal/store") <$> getEnv "HOME"
   here <- getCurrentDirectory
   setEnv "GHC_PACKAGE_PATH" $
-       storeDir <> "/ghc-" <> ghcVersion3 <> "/package.db"
-    <> ":"
-    <> here <> "/dist-newstyle/packagedb/ghc-" <> ghcVersion3
-    <> ":"
+    storeDir
+      <> "/ghc-"
+      <> ghcVersion3
+      <> "/package.db"
+      <> ":"
+      <> here
+      <> "/dist-newstyle/packagedb/ghc-"
+      <> ghcVersion3
+      <> ":"
 
 -- | See 'compiledWith'
 data RunWith
@@ -97,38 +107,38 @@ compiledWith = unsafePerformIO $ do
   distNewstyleExists <- doesDirectoryExist "dist-newstyle"
 
   pure $ case (clash_global, stack_exe, distNewstyleExists) of
-    (Just "1", Just _, _   ) -> error "Can't use global clash with 'stack run'"
-    (Just "1", _,      _   ) -> Global
-    (_,        Just _, _   ) -> Stack
-    (_,        _     , True) -> Cabal
-    (_,        _     , _   ) -> Global
+    (Just "1", Just _, _) -> error "Can't use global clash with 'stack run'"
+    (Just "1", _, _) -> Global
+    (_, Just _, _) -> Stack
+    (_, _, True) -> Cabal
+    (_, _, _) -> Global
 {-# NOINLINE compiledWith #-}
 
 -- | Set environment variables that allow Clash to be executed by simply calling
 -- 'clash' without extra arguments.
-setClashEnvs :: HasCallStack => RunWith -> IO ()
+setClashEnvs :: (HasCallStack) => RunWith -> IO ()
 setClashEnvs Global = setEnv "GHC_ENVIRONMENT" "-"
 setClashEnvs Stack = pure ()
 setClashEnvs Cabal = do
   binDir <- cabalClashBinDir
   path <- getEnv "PATH"
-  let seperator = case os of { "mingw32" -> ";"; _ -> ":" }
+  let seperator = case os of "mingw32" -> ";"; _ -> ":"
   setEnv "PATH" (binDir <> seperator <> path)
   setCabalPackagePaths
 
-clashTestRoot
-  :: [[TestName] -> TestTree]
-  -> TestTree
+clashTestRoot ::
+  [[TestName] -> TestTree] ->
+  TestTree
 clashTestRoot testTrees =
   clashTestGroup "." testTrees []
 
 -- | `clashTestGroup` and `clashTestRoot` make sure that each test knows its
 -- fully qualified test name at construction time. This is used to pass -i flags
 -- to Clash as the test layout matches the layout in @shouldwork/@.
-clashTestGroup
-  :: TestName
-  -> [[TestName] -> TestTree]
-  -> ([TestName] -> TestTree)
+clashTestGroup ::
+  TestName ->
+  [[TestName] -> TestTree] ->
+  ([TestName] -> TestTree)
 clashTestGroup testName testTrees =
   \parentNames ->
     testGroup testName $
@@ -138,10 +148,10 @@ clashTestGroup testName testTrees =
 -- Unlike 'clashTestGroup', the name given here is only a test name: it does not
 -- correspond to a directory, so the tests below it keep looking for their
 -- module in the directory of the enclosing 'clashTestGroup'.
-clashTestVariants
-  :: TestName
-  -> [[TestName] -> TestTree]
-  -> ([TestName] -> TestTree)
+clashTestVariants ::
+  TestName ->
+  [[TestName] -> TestTree] ->
+  ([TestName] -> TestTree)
 clashTestVariants testName testTrees =
   \parentNames ->
     testGroup testName $
@@ -150,14 +160,14 @@ clashTestVariants testName testTrees =
 -- | Auto-retry failures caused by GHC bug #19421. See clash-compiler PR #2444.
 workaroundMmapCrash :: TestTree -> TestTree
 workaroundMmapCrash = flakyTestWithRetryAction retryAction retryPolicy
- where
-  retryAction :: RetryStatus -> Result -> IO RetryAction
-  retryAction _ result
-    | "m32_allocator_init: Failed to map" `isInfixOf` show result = pure ConsultPolicy
-    | otherwise = pure DontRetry
+  where
+    retryAction :: RetryStatus -> Result -> IO RetryAction
+    retryAction _ result
+      | "m32_allocator_init: Failed to map" `isInfixOf` show result = pure ConsultPolicy
+      | otherwise = pure DontRetry
 
-  retryPolicy :: RetryPolicyM IO
-  retryPolicy = limitRetries 5
+    retryPolicy :: RetryPolicyM IO
+    retryPolicy = limitRetries 5
 
 -- | Default timeout applied to each test, unless the user explicitly set one
 -- with @--timeout@ or @TASTY_TIMEOUT@.
@@ -166,1065 +176,1318 @@ defaultTimeout NoTimeout = mkTimeout (5 * 60 * 1000000) -- 5 minutes
 defaultTimeout userSet = userSet
 
 runClashTest :: IO ()
-runClashTest = defaultMain
-  $ adjustOption defaultTimeout
-  $ workaroundMmapCrash
-  $ clashTestRoot
-  [ clashTestGroup "examples"
-    [ runTest "ALU" def{hdlSim=[]}
-    , let _opts = def { hdlSim=[]
-                      , hdlTargets=[VHDL]
-                      , buildTargets=BuildSpecific ["blinker"]
-                      }
-       in runTest "Blinker" _opts
-    , runTest "BlockRamTest" def{hdlSim=[]}
-    , runTest "Calculator" def
-    , runTest "CHIP8" def{hdlSim=[]}
-    , runTest "CochleaPlus" def{hdlSim=[]}
-    ,
-      -- Vivado segfaults
-      let _opts = def { clashFlags=["-fclash-component-prefix", "test"]
-                      , buildTargets=BuildSpecific ["test_testBench"]
-                      , hdlSim=hdlSim def \\ [Vivado]
-                      }
-       in runTest "FIR" _opts
-
-    , runTest "Fifo" def{hdlSim=[]}
-    , runTest "MAC" def
-    , runTest "MatrixVect" def
-    , runTest "Queens" def{hdlSim=[]}
-    , runTest "Reducer" def{hdlSim=[]}
-    , runTest "Sprockell" def{hdlSim=[]}
-    , runTest "Windows" def{hdlSim=[]}
-    , clashTestGroup "crc32"
-        [ runTest "CRC32" def
-        ]
-    , clashTestGroup "i2c"
-        [ let _opts = def { clashFlags=["-O2","-fclash-component-prefix","test"]
-                        , buildTargets=BuildSpecific ["test_i2c"]
-                        , hdlSim=[]
+runClashTest =
+  defaultMain
+    $ adjustOption defaultTimeout
+    $ workaroundMmapCrash
+    $ clashTestRoot
+      [ clashTestGroup
+          "examples"
+          [ runTest "ALU" def {hdlSim = []},
+            let _opts =
+                  def
+                    { hdlSim = [],
+                      hdlTargets = [VHDL],
+                      buildTargets = BuildSpecific ["blinker"]
+                    }
+             in runTest "Blinker" _opts,
+            runTest "BlockRamTest" def {hdlSim = []},
+            runTest "Calculator" def,
+            runTest "CHIP8" def {hdlSim = []},
+            runTest "CochleaPlus" def {hdlSim = []},
+            -- Vivado segfaults
+            let _opts =
+                  def
+                    { clashFlags = ["-fclash-component-prefix", "test"],
+                      buildTargets = BuildSpecific ["test_testBench"],
+                      hdlSim = hdlSim def \\ [Vivado]
+                    }
+             in runTest "FIR" _opts,
+            runTest "Fifo" def {hdlSim = []},
+            runTest "MAC" def,
+            runTest "MatrixVect" def,
+            runTest "Queens" def {hdlSim = []},
+            runTest "Reducer" def {hdlSim = []},
+            runTest "Sprockell" def {hdlSim = []},
+            runTest "Windows" def {hdlSim = []},
+            clashTestGroup
+              "crc32"
+              [ runTest "CRC32" def
+              ],
+            clashTestGroup
+              "i2c"
+              [ let _opts =
+                      def
+                        { clashFlags = ["-O2", "-fclash-component-prefix", "test"],
+                          buildTargets = BuildSpecific ["test_i2c"],
+                          hdlSim = []
                         }
-           in runTest "I2C" _opts
-        ,
-          -- TODO: this uses finish_and_return, with is Icarus Verilog only.
-          -- see: https://github.com/clash-lang/clash-compiler/issues/2265
-          let _opts = def { buildTargets = BuildSpecific ["system"]
-                          , hdlTargets = [Verilog]
-                          , hdlLoad = [IVerilog]
-                          , hdlSim = [IVerilog]
-                          , vvpStdoutNonEmptyFail = False
-                          }
-           in runTest "I2Ctest" _opts
-
-        ]
-    ]
-  , clashTestGroup "tests"
-    [ clashTestGroup "shouldfail"
-      [ clashTestGroup "CommandLine"
-        [ runTest "T3414" def{
-            clashFlags=["fclash-clear"]
-          , expectClashFail=Just (def, "is not a module name or a source file")
-          }
-        ]
-      , clashTestGroup "BlackBox"
-        [ runTest "WrongReference" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, Text.pack [I.i|
+                 in runTest "I2C" _opts,
+                -- TODO: this uses finish_and_return, with is Icarus Verilog only.
+                -- see: https://github.com/clash-lang/clash-compiler/issues/2265
+                let _opts =
+                      def
+                        { buildTargets = BuildSpecific ["system"],
+                          hdlTargets = [Verilog],
+                          hdlLoad = [IVerilog],
+                          hdlSim = [IVerilog],
+                          vvpStdoutNonEmptyFail = False
+                        }
+                 in runTest "I2Ctest" _opts
+              ]
+          ],
+        clashTestGroup
+          "tests"
+          [ clashTestGroup
+              "shouldfail"
+              [ clashTestGroup
+                  "CommandLine"
+                  [ runTest
+                      "T3414"
+                      def
+                        { clashFlags = ["fclash-clear"],
+                          expectClashFail = Just (def, "is not a module name or a source file")
+                        }
+                  ],
+                clashTestGroup
+                  "BlackBox"
+                  [ runTest
+                      "WrongReference"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail =
+                            Just
+                              ( def,
+                                Text.pack
+                                  [I.i|
               Function WrongReference.myMultiply was annotated with an inline
               primitive for WrongReference.myMultiplyX. These names should be
-              the same. |])
-          }
-        , runTest "NamedSymbolsAndNumberedSymbols" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "~SYM[mySymbol] uses the same name as previously used in ~GENSYM")
-          }
-        , runTest "NamedSymbolsAndNumberedSymbols2" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "~GENSYM[mySymbol][1] would overwrite an earlier ~SYM[mySymbol]")
-          }
-        , runTest "T1945" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Template function for returned False")
-          }
-        ]
-      , clashTestGroup "InvalidPrimitive"
-        [ runTest "InvalidPrimitive" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "InvalidPrimitive.primitives")
-          }
-        ]
-      , clashTestGroup "GADTs"
-        [ runTest "T1311" def {
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, Text.pack [I.i|
-            Can't translate data types with unconstrained existentials|])
-          }
-        ]
-      , clashTestGroup "PrimitiveGuards"
-        [ runTest "DontTranslate" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, Text.pack [I.i|
+              the same. |]
+                              )
+                        },
+                    runTest
+                      "NamedSymbolsAndNumberedSymbols"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "~SYM[mySymbol] uses the same name as previously used in ~GENSYM")
+                        },
+                    runTest
+                      "NamedSymbolsAndNumberedSymbols2"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "~GENSYM[mySymbol][1] would overwrite an earlier ~SYM[mySymbol]")
+                        },
+                    runTest
+                      "T1945"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Template function for returned False")
+                        }
+                  ],
+                clashTestGroup
+                  "InvalidPrimitive"
+                  [ runTest
+                      "InvalidPrimitive"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "InvalidPrimitive.primitives")
+                        }
+                  ],
+                clashTestGroup
+                  "GADTs"
+                  [ runTest
+                      "T1311"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail =
+                            Just
+                              ( def,
+                                Text.pack
+                                  [I.i|
+            Can't translate data types with unconstrained existentials|]
+                              )
+                        }
+                  ],
+                clashTestGroup
+                  "PrimitiveGuards"
+                  [ runTest
+                      "DontTranslate"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail =
+                            Just
+                              ( def,
+                                Text.pack
+                                  [I.i|
               Clash was forced to translate 'DontTranslate.primitive', but this
               value was marked with DontTranslate. Did you forget to include a
               blackbox for one of the constructs using this?
-            |])
-          }
-        , runTest "HasBlackBox" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, Text.pack [I.i|
+            |]
+                              )
+                        },
+                    runTest
+                      "HasBlackBox"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail =
+                            Just
+                              ( def,
+                                Text.pack
+                                  [I.i|
               No BlackBox definition for 'HasBlackBox.primitive' even though
               this value was annotated with 'HasBlackBox'.
-            |])
-          }
-        ]
-      , clashTestGroup "Signal"
-        [ runTest "MAC" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
-          }
-        ]
-      , clashTestGroup "SynthesisAttributes"
-        [ runTest "ProductInArgs" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Cannot use attribute annotations on product types of top entities")
-          }
-        , runTest "ProductInResult" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Cannot use attribute annotations on product types of top entities")
-          }
-        , runTest "ConflictingAttrTypes" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Synthesis attribute 'foo' was declared with conflicting types")
-          }
-        ]
-      , clashTestGroup "Testbench"
-        [ runTest "UnsafeOutputVerifier" def{
-            expectClashFail=Just ( TestSpecificExitCode 0
-                                 , "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!")
-          }
-        ]
-      , clashTestGroup "TopEntity"
-        [ runTest "T1033" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "PortProduct \"wrong\" []")
-          }
-        , runTest "T1063" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Saw a PortProduct in a Synthesize annotation")
-          }
-        ]
-      , clashTestGroup "Verification"
-        [ let n = 9 -- GHDL only has VERY basic PSL support
-              _opts = def { hdlTargets=[VHDL]
-                          , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
-                          , hdlLoad=[GHDL]
-                          , hdlSim=[GHDL]
-                          , expectSimFail=Just (def, "psl assertion failed")
-                          }
-           in runTest "NonTemporalPSL" _opts
-        , let n = 13
-              _opts = def { hdlTargets=[SystemVerilog]
-                          , buildTargets=BuildSpecific ["fails" <> show i | i <- [(1::Int)..n]]
-                          -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
-                          -- for syntax errors.
-                          , hdlLoad=[ModelSim]
-                          , hdlSim=[]
-                          }
-           in runTest "NonTemporalPSL" _opts
-        , let is = [(1::Int)..13] \\ [4, 6, 7, 8, 10, 11, 12] in
-          runTest "NonTemporalSVA" def{
-            hdlTargets=[SystemVerilog]
-          , buildTargets=BuildSpecific ["fails" <> show i | i <- is]
-          -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
-          -- for syntax errors.
-          , hdlLoad=[ModelSim]
-          , hdlSim=[]
-          }
-        , runTest "SymbiYosys" def{
-            hdlTargets=[Verilog, SystemVerilog]
-          , hdlLoad=[]
-          , hdlSim=[]
-          , verificationTool=Just SymbiYosys
-          , expectVerificationFail=Just (def, "Unreached cover statement at topEntity: B")
-          }
-        ]
-      , clashTestGroup "XException"
-        [ runTest "IsX" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Clash was forced to translate 'Clash.XException.isX', but this value was marked with DontTranslate.")
-          }
-        ]
-      , clashTestGroup "ZeroWidth"
-        [ runTest "FailGracefully1" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Unexpected projection of zero-width type")
-          }
-        , runTest "FailGracefully2" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Unexpected projection of zero-width type")
-          }
-        , runTest "FailGracefully3" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (def, "Unexpected projection of zero-width type")
-          }
-        ]
-      , runTest "LiftRecursiveGroup" def{
-          hdlTargets=[VHDL]
-        , expectClashFail=Just (def,"Callgraph after normalization contains following recursive components:")
-        }
-      , runTest "Poly" def{
-          hdlTargets=[VHDL]
-        , expectClashFail=Just (def, "Clash can only normalize monomorphic functions, but this is polymorphic:")
-        }
-      , runTest "Poly2" def{
-          hdlTargets=[VHDL]
-        , clashFlags=["-fclash-error-extra"]
-        , expectClashFail=Just (def, "Even after applying type equality constraints it remained polymorphic:")
-        }
-      , runTest "RecursiveBoxed" def{
-          hdlTargets=[VHDL]
-        , expectClashFail=Just (def, " already inlined 20 times in: ")  -- (RecursiveBoxed\.)?topEntity
-        }
-      , runTest "RecursiveDatatype" def{
-          hdlTargets=[VHDL]
-        , expectClashFail=Just (def, "This bndr has a non-representable return type and can't be normalized:")
-        }
---        Disabled, due to it eating gigabytes of memory:
---      , runTest "RecursivePoly" def{
---          hdlTargets=[VHDL]
---        , expectClashFail=Just (def, "??")
---        }
-      ]
-    , clashTestGroup "shouldwork"
-      [ clashTestGroup "AutoReg"
-        [ outputTest "AutoReg" def
-        , runTest "T1507" def{hdlSim=[]}
-        , let _opts = def{hdlSim=[], hdlTargets=[VHDL]}
-           in runTest "T1632" _opts
-        , runTest "T3100" def{hdlSim=[]}
-        ]
-      , clashTestGroup "Basic"
-        [ runTest "AES" def{hdlSim=[]}
-        , runTest "BangData" def{hdlSim=[]}
-        , runTest "CaseOfErr" def{hdlTargets=[VHDL],hdlSim=[]}
-        , runTest "Trace" def{hdlSim=[]}
-        , runTest "DivMod" def{hdlSim=[]}
-        , runTest "DivZero" def
-        , runTest "LambdaDrop" def{hdlSim=[]}
-        , runTest "IrrefError" def{hdlSim=[]}
-        , outputTest "NameInlining" def
-        , runTest "NameInstance" def{hdlSim=[]}
-        , outputTest "NameInstance" def
-        , outputTest "SetName" def{hdlTargets=[VHDL]}
-        , outputTest "SimulationMagic2736" def{hdlTargets=[VHDL]}
-        , runTest "PatError" def{hdlSim=[]}
-        , runTest "ByteSwap32" def
-        , runTest "CharTest" def
-        , runTest "ClassOps" def
-        , runTest "CountTrailingZeros" def
-        , runTest "DeepseqX" def
-        , runTest "LotOfStates" def
-        , let _opts = def { buildTargets = BuildSpecific ["nameoverlap"]
-                          , hdlSim = []
-                          }
-           in runTest "NameOverlap" _opts
-        , runTest "NestedPrimitives" def{hdlSim=[]}
-        , runTest "NestedPrimitives2" def{hdlSim=[]}
-        , runTest "NORX" def
-        , runTest "Parameters" def{hdlTargets=[VHDL]}
-        , runTest "RecordSumOfProducts" def{hdlSim=[]}
-        , runTest "Replace" def
-        , runTest "TestIndex" def{hdlSim=[]}
-        , runTest "Time" def
-        , runTest "Shift" def{hdlSim=[]}
-        , runTest "SimOnly" def{hdlTargets=[VHDL],hdlSim=[]}
-        , runTest "SimpleConstructor" def{hdlSim=[]}
-        , runTest "SomeNatVal" def{hdlTargets=[VHDL],hdlSim=[]}
-        , runTest "TyEqConstraints" def{
-            hdlSim=[]
-          , buildTargets=BuildSpecific ["top1"]
-          }
-        , runTest "T1012" def{hdlSim=[]}
-        , runTest "T1240" def{hdlSim=[]}
-        , let _opts = def {hdlTargets = [VHDL], hdlSim = []}
-           in runTest "T1297" _opts
-        , runTest "T1254" def{hdlTargets=[VHDL,SystemVerilog],hdlSim=[]}
-        , runTest "T1242" def{hdlSim=[]}
-        , runTest "T1292" def{hdlTargets=[VHDL]}
-        , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim=[] }
-           in runTest "T1304" _opts
-        , let _opts = def { hdlTargets=[VHDL]
-                          , hdlSim=[]
-                          , clashFlags=["-main-is", "plus"]
-                          , buildTargets=BuildSpecific ["plus"]
-                          }
-           in runTest "T1305" _opts
-        , let _opts = def {hdlTargets = [VHDL], hdlSim = []}
-           in runTest "T1316" _opts
-        , runTest "T1322" def{hdlTargets=[VHDL]}
-        , let _opts = def {hdlTargets = [VHDL], hdlSim = []}
-           in runTest "T1340" _opts
-        , let _opts = def { hdlTargets = [VHDL], hdlSim = []}
-           in runTest "T1354A" _opts
-        , let _opts = def { hdlTargets = [VHDL], hdlSim = []}
-           in runTest "T1354B" _opts
-        , runTest "T1402" def{clashFlags=["-O"]}
-        , runTest "T1402b" def{hdlTargets=[VHDL], hdlSim=[]}
-        , runTest "T1556" def
-        , runTest "T1591" def{hdlTargets=[VHDL], hdlSim=[]}
-        , runTest "TagToEnum" def{hdlSim=[]}
-        , runTest "TwoFunctions" def{hdlSim=[]}
-        , runTest "XToError" def{hdlSim=[]}
-        ]
-      , clashTestGroup "BitVector"
-        [ runTest "Box" def
-        , runTest "BoxGrow" def
-        , runTest "CLZ" def
-        , runTest "MaybeUnpack" def
-        , runTest "RePack" def{hdlSim=[]}
-        , runTest "ReduceZero" def
-        , runTest "ReduceOne" def
-        , runTest "ExtendingNumZero" def
-        , runTest "AppendZero" def
-        , runTest "PopCountNoInteger"
-            def{clashFlags=["-Werror=clash-dubious-primitive"]}
-        , runTest "PackGHCNums" def
-        , runTest "UnpackGHCNums" def
-        , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
-        , runTest "MaybeUnpackUndefined" def{hdlSim=[]}
-        , runTest "UnpackUndefined" def{hdlSim=[]}
-        ]
-      , clashTestGroup "BlackBox"
-        [ outputTest "TemplateFunction" def{hdlTargets=[VHDL]}
-        , outputTest "BlackBoxFunction" def{hdlTargets=[VHDL]}
-        , runTest "BlackBoxFunctionHO" def{hdlTargets=[VHDL]}
-        , outputTest "ExternalPrimitive" def{hdlTargets=[VHDL]}
-        , outputTest "ZeroWidth" def{hdlTargets=[VHDL]}
-        , outputTest "MultiResult" def{hdlTargets=[VHDL]}
-        , runTest "DSL" def
-        , runTest "MultiResult" def
-        , runTest "T919" def{hdlSim=[]}
-        , runTest "T1524" def
-        , runTest "T1786" def{
-            hdlTargets=[VHDL]
-          , buildTargets=BuildSpecific ["testEnableTB", "testBoolTB"]
-          }
-        , outputTest "LITrendering" def{hdlTargets=[Verilog]}
-        , runTest "T2117" def{
-            clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
-          , hdlTargets=[VHDL]
-          , buildTargets=BuildSpecific [ "testBenchUndefBV"
-                                       , "testBenchUndefTup"
-                                       , "testBenchPartialDefTup"]}
-        ]
-      , clashTestGroup "BoxedFunctions"
-        [ runTest "DeadRecursiveBoxed" def{hdlSim=[]}
-        ]
-      , clashTestGroup "CSignal"
-        [ runTest "MAC" def{hdlSim=[]}
-        , runTest "CBlockRamTest" def{hdlSim=[]}
-        ]
-      , clashTestGroup "CustomReprs"
-        [ clashTestGroup "RotateC"
-          [ runTest "RotateC" def
-          , runTest "ReprCompact" def
-          , runTest "ReprCompactScrambled"   def
-          , runTest "ReprLastBitConstructor" def
-          , let _opts = def { hdlTargets = [VHDL, Verilog] }
-             in runTest "ReprStrangeMasks" _opts
-          , runTest "ReprWide" def
-          , runTest "RotateCScrambled" def
-          ]
-        , clashTestGroup "RotateCNested"
-          [ runTest "RotateCNested" def
-          ]
-        , clashTestGroup "Rotate"
-          [ runTest "Rotate" def
-          ]
-        , clashTestGroup "Deriving"
-          [ runTest "BitPackDerivation" def
-          , runTest "MaybeUnpackDerivation" def{hdlTargets=[Verilog]}
-          ]
-        , clashTestGroup "Indexed"
-          [ runTest "Indexed" def
-          ]
-        ]
-      , clashTestGroup "CustomReprs"
-        [ clashTestGroup "ZeroWidth"
-          [ runTest "ZeroWidth" def{hdlSim=[]}
-          ]
-        , runTest "T694" def{hdlSim=[],hdlTargets=[VHDL]}
-        ]
-      , clashTestGroup "DDR"
-        [
-          -- Since the `XilinxDDR` test is more comprehensive than these tests,
-          -- we skip these tests for Vivado and only run `XilinxDDR`.
-          let _opts = def{ buildTargets = BuildSpecific [ "testBenchGA"
-                                                        , "testBenchGS"
-                                                        , "testBenchUA"
-                                                        , "testBenchUS"
-                                                        ]
-                         , hdlLoad = hdlLoad def \\ [Vivado]
-                         , hdlSim = hdlSim def \\ [Vivado]
-                         }
-          in runTest "DDRin" _opts
-
-          -- XXX: `ddrOut` contains a number of (implicit) parallel, coinciding
-          --      processes. Execution for these processes is left undefined in
-          --      the Verilog spec, nor is there a mechanism to get consistent
-          --      behavior (like in VHDL). Therefore, simulators are free to pick
-          --      any execution order they'd like. ModelSim and Verilator pick
-          --      differently, so when a test works in one, it doesn't in the
-          --      other. As a quick "fix" we disable Verilator, though we might
-          --      consider rewriting the test such that it doesn't depend or
-          --      accounts for the raciness.
-          --
-          -- Since the `XilinxDDR` test is more comprehensive than these tests,
-          -- we skip these tests for Vivado and only run `XilinxDDR`.
-        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchUA"
-                                                        , "testBenchUS"
-                                                        , "testBenchGA"
-                                                        , "testBenchGS"
-                                                        ]
-                         , hdlLoad = hdlLoad def \\ [Vivado, Verilator]
-                         , hdlSim = hdlSim def \\ [Vivado, Verilator]
-                         }
-          in runTest "DDRout" _opts
-        , let _opts = def{ buildTargets = BuildSpecific ["testBenchAll"]
-                         , hdlLoad = [Vivado]
-                         , hdlSim = [Vivado]
-                         , clashFlags=["-fclash-hdlsyn", "Vivado"]
-                         }
-          in runTest "XilinxDDR" _opts
-        ]
-      , clashTestGroup "DSignal"
-        [ runTest "DelayedFold" def
-        , runTest "DelayI" def
-        , runTest "DelayN" def
-        ]
-      , clashTestGroup "Feedback"
-        [ runTest "Fib" def
-        , runTest "MutuallyRecursive" def
-        ]
-      , clashTestGroup "Fixed"
-        [ runTest "Mixer" def
-        , runTest "SFixedTest" def
-        , runTest "SatWrap" def{hdlSim=[]}
-        , runTest "ZeroInt" def
-        ]
-      , clashTestGroup "Floating"
-        [ runTest "FloatPack" def{hdlSim=[], clashFlags=["-fclash-float-support"]}
-        , runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]}
-        , runTest "T1803" def{clashFlags=["-fclash-float-support"]}
-        ]
-      , clashTestGroup "GADTs"
-        [ runTest "Constrained" def
-        , runTest "Head" def
-        , runTest "HeadM" def
-        , runTest "MonomorphicTopEntity" def
-        , runTest "Record" def
-        , runTest "Tail" def
-        , runTest "TailM" def
-        , runTest "TailOfTail" def
-        , runTest "T1310" def{hdlSim=[]}
-        , runTest "T1536" def{hdlSim=[]}
-        ]
-      , clashTestGroup "HOPrim"
-        [ runTest "HOIdx" def
-        , runTest "HOImap" def
-        , runTest "Map" def
-        , runTest "Map2" def
-        , runTest "TestMap" def
-        , runTest "Transpose" def
-        , runTest "VecFun" def
-      ]
-      , clashTestGroup "Issues" $
-        [ runTest "T359" def{hdlSim=[]}
-        , clashLibTest "T508" def
-        , let _opts = def { hdlSim = [], hdlTargets = [Verilog] }
-           in runTest "T1187" _opts
-        , clashLibTest "T1388" def{hdlTargets=[VHDL]}
-        , outputTest "T1171" def
-        , clashLibTest "T1439" def{hdlTargets=[VHDL]}
-        , runTest "T1477" def{hdlSim=[]}
-        , runTest "T1534" def{hdlSim = [], hdlLoad = []}
-        , runTest "T1506A" def{hdlSim=[], clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]}
-        , outputTest "T1506B" def
-            { clashFlags=["-fclash-aggressive-x-optimization-blackboxes"]
-            , ghcFlags=["-itests/shouldwork/Issues"]
-            }
-        , runTest "T1615" def{hdlSim=[], hdlTargets=[Verilog]}
-        , runTest "T1663" def{hdlTargets=[VHDL], hdlSim=[]}
-        , runTest "T1669_DEC" def{hdlTargets=[VHDL]}
-        , runTest "T1715" def
-        , runTest "T1721" def{hdlSim=[]}
-        , runTest "T1606A" def{hdlSim=[]}
-        , runTest "T1606B" def{hdlSim=[]}
-        , runTest "T1742" def{hdlSim=[], buildTargets=BuildSpecific ["shell"]}
-        , runTest "T1756" def{hdlSim=[]}
-        , outputTest "T431" def{hdlTargets=[VHDL]}
-        , clashLibTest "T779" def{hdlTargets=[Verilog]}
-        , outputTest "T1881" def{hdlSim=[]}
-        , runTest "T1921" def{hdlTargets=[Verilog], hdlSim=[]}
-        , runTest "T1933" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (NoTestExitCode, "NOT:WARNING")
-          }
-        , outputTest "T1996" def{hdlTargets=[VHDL]}
-        , runTest "T2040" def{hdlTargets=[VHDL],clashFlags=["-fclash-compile-ultra"]}
-        -- TODO I wanted to call this T2046A since there are multiple tests
-        -- for T2046. However, doing so completely breaks HDL loading because
-        -- it completely ignores the BuildSpecific...
-        , runTest "T2046" def
-            { hdlSim=[]
-            , clashFlags=["-Werror"]
-            , buildTargets=BuildSpecific["top_bit", "top_bitvector", "top_index", "top_signed", "top_unsigned"]
-            }
-        , runTest "T2046B" def{clashFlags=["-Werror"]}
-        , runTest "T2046C" def{hdlSim=[],clashFlags=["-Werror"]}
-        , runTest "T2097" def{hdlSim=[]}
-        , runTest "T2154" def{hdlTargets=[VHDL], hdlSim=[]}
-        , runTest "T2220_toEnumOOB" def{hdlTargets=[VHDL]}
-        , runTest "T2272" def{hdlTargets=[VHDL], hdlSim=[]}
-        , outputTest "T2334" def{hdlTargets=[VHDL]}
-        , outputTest "T2325" def{hdlTargets=[VHDL]}
-        , outputTest "T2325f" def{hdlTargets=[VHDL]}
-        , runTest "T2342A" def{hdlSim=[]}
-        , runTest "T2342B" def{hdlSim=[]}
-        , runTest "T2360" def{hdlSim=[],clashFlags=["-fclash-force-undefined=0"]}
-        , outputTest "T2502" def{hdlTargets=[VHDL]}
-        , outputTest "T2508" def{hdlTargets=[VHDL]}
-          -- Promotes the "primitive isn't marked OPAQUE" warning to an error,
-          -- so the test does not depend on how warnings are formatted.
-        , runTest "T2510" def{
-            hdlTargets=[VHDL]
-          , hdlSim=[]
-          , clashFlags=["-Werror=clash-primitive-definition"]
-          , expectClashFail=Just (def, "primitive T2510.bb isn't marked OPAQUE.")
-          }
-        , outputTest "T2510" def{hdlTargets=[VHDL], clashFlags=["-DNOINLINE=OPAQUE"]}
-        , outputTest "T2542" def{hdlTargets=[VHDL]}
-        , runTest "T2593" def{hdlSim=[]}
-        , runTest "T2623CaseConFVs" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
-        , runTest "T2628" def{hdlTargets=[VHDL], buildTargets=BuildSpecific ["TACacheServerStep"], hdlSim=[]}
-        , runTest "T2724" def
-        , runTest "T2724B" def
-        , runTest "T2729" def
-        , runTest "T2770" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
-        , runTest "T2831" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
-        , runTest "T2839" def{hdlLoad=[],hdlSim=[],hdlTargets=[VHDL]}
-        , runTest "T2845" def{hdlSim=[],hdlTargets=[Verilog]}
-        , runTest "T2904" def
-        , runTest "T2966" def{hdlSim=[],hdlTargets=[Verilog]}
-        , runTest "T2988" def{hdlSim=[]}
-        , outputTest "T3008" def{hdlSim=[]}
-        , outputTest "T3011" def{hdlSim=[]}
-        , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
-           in runTest "T3021" _opts
-        , runTest "T3041" def{hdlSim=[], hdlLoad=[]}
-        , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
-           in runTest "T3066" _opts
-        , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
-           in runTest "T3084" _opts
-        , runTest "T3141" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141"]}
-        , runTest "T3142" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141/."]}
-        , outputTest "T3147" def{hdlTargets=[Verilog], hdlSim=[]}
-        , clashLibTest "T3157_IntegerNaturalInternals" def{hdlTargets=[Verilog]}
-        , runTest "T3159" def{hdlSim=[], hdlLoad=[] }
-        , runTest "T3185" def
-        , runTest "T3204" def{hdlSim=[], hdlLoad=[], hdlTargets=[Verilog]}
-        , runTest "T3218" def{hdlTargets=[VHDL], hdlSim=[]}
-        , outputTest "T3232" def{hdlTargets=[Verilog], hdlSim=[]}
-        , outputTest "T3224" def{hdlTargets=[VHDL], hdlSim=[], hdlLoad=[]}
-        , runTest "T3234" def
-            { hdlTargets=[Verilog]
-            , hdlLoad=[IVerilog]
-            , hdlSim=[IVerilog]
-            }
-        , runTest "T3290" def{hdlSim=[], hdlLoad=[]}
-        , runTest "T3291" def{hdlTargets=[Verilog]}
-        , runTest "T3311" def{hdlSim=[]}
-        , runTest "T3308" def
-        , runTest "T3308b" def
-        , runTest "T3348" def{hdlTargets=[Verilog], hdlSim=[]}
-        , outputTest "T3359" def{hdlTargets=[SystemVerilog], hdlSim=[]}
-        , runTest "T3407_deadCode_after_appProp" def{hdlTargets=[Verilog], hdlSim=[]}
-        , runTest "T3439" def{hdlSim=[]}
-        ] <>
-        if compiledWith == Cabal then
-          -- This tests fails without environment files present, which are only
-          -- generated by Cabal. It complains it is trying to import "BasicTypes"
-          -- which is a member of the hidden package 'ghc'. Passing
-          -- '-package ghc' doesn't seem to help though. TODO: Investigate.
-          [clashLibTest "T1568" def]
-        else
-          []
-      , clashTestGroup "LoadModules"
-        [ runTest "T1796" def{hdlSim=[]}
-          -- Clash should not set '-dynamic-too' if '-dynamic' is already set
-        , runTest "T3354" def
-            { hdlTargets=[VHDL]
-            , clashFlags=["-dynamic"]
-            , expectClashFail=Just (TestSpecificExitCode 0, "NOT:-dynamic-too")
-            }
-        ]
-      , clashTestGroup "Naming"
-        [ runTest "T967a" def{hdlSim=[]}
-        , runTest "T967b" def{hdlSim=[]}
-        , runTest "T967c" def{hdlSim=[]}
-        , clashLibTest "T1041" def
-        , clashLibTest "NameHint" def{hdlTargets=[VHDL,Verilog]}
-        ]
-      , clashTestGroup "Netlist"
-          [ clashLibTest "Identity" def
-          , clashLibTest "NoDeDup" def{hdlTargets=[VHDL]}
-          , clashLibTest "T1766" def
-          , clashLibTest "T1935" def
-          , outputTest "HDLContainsLoc" def{hdlSim=[], clashFlags=["-g"]}
-          , outputTest "HDLNotContainsLoc" def{hdlSim=[]}
-          ]
-      , clashTestGroup "Numbers"
-        [ runTest "BitInteger" def
-        , runTest "BitReverse" def
-        , runTest "BitsTB" def { buildTargets = BuildSpecific [ "bitsTB1"
-                                                              , "bitsTB2"
-                                                              , "bitsTB3"
-                                                              ]}
-        ,
-          -- vivado segfaults
-          runTest "Bounds" def { hdlSim=hdlSim def \\ [Vivado] }
-
-        , runTest "DivideByZero" def
-        , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
-           in runTest "ExpWithGhcCF" _opts
-        , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
-           in runTest "ExpWithClashCF" _opts
-        , outputTest "ExpWithClashCF" def{ghcFlags=["-itests/shouldwork/Numbers"]}
-        , let _opts = def { hdlTargets = [VHDL], hdlSim = [] }
-           in runTest "HalfAsBlackboxArg" _opts
-        ,
-          -- see https://github.com/clash-lang/clash-compiler/issues/2262,
-          -- Vivado's mod misbehaves on negative dividend
-          runTest "IntegralTB" def{hdlSim=hdlSim def \\ [Vivado]}
-
-        , runTest "NumConstantFoldingTB_1" def{clashFlags=["-itests/shouldwork/Numbers"]}
-        , outputTest "NumConstantFolding_1" def
-            { clashFlags=["-fconstraint-solver-iterations=15"]
-            , ghcFlags=["-itests/shouldwork/Numbers"]
-            }
-        , let _opts = def { clashFlags=["-itests/shouldwork/Numbers"]
-                          , hdlLoad = hdlLoad def \\ [Verilator]
-                          , hdlSim = hdlSim def \\ [Verilator]
-                          }
-          in runTest "NumConstantFoldingTB_2" _opts
-        , outputTest "NumConstantFolding_2" def
-            { clashFlags=["-fconstraint-solver-iterations=15"]
-            , ghcFlags=["-itests/shouldwork/Numbers"]
-            }
-        , runTest "Naturals" def
-        , runTest "NaturalToInteger" def{hdlSim=[]}
-        , runTest "NegativeLits" def
-        , runTest "Resize" def
-        , runTest "Resize2" def
-        , runTest "Resize3" def
-        , runTest "SatMult" def{hdlSim=[]}
-        , runTest "ShiftRotate" def
-        , runTest "ShiftRotateNegative" def{hdlTargets=[VHDL]}
-        , runTest "SignedProjectionTB" def
-        , runTest "SignedZero" def
-        , runTest "Signum" def
-        ,
-          -- vivado segfaults
-          runTest "Strict" def{hdlSim=hdlSim def \\ [Vivado]}
-
-        , runTest "T1019" def{hdlSim=[]}
-        , runTest "T1351" def
-        , runTest "T2149" def
-        , outputTest "UndefinedConstantFolding" def{ghcFlags=["-itests/shouldwork/Numbers"]}
-        , runTest "UnsignedZero" def
-        ]
-      , clashTestGroup "Polymorphism"
-        [ runTest "ExistentialBoxed" def{hdlSim=[]}
-        , runTest "FunctionInstances" def
-        , runTest "GADTExistential" def{hdlSim=[]}
-        , runTest "LocalPoly" def{hdlSim=[]}
-        , runTest "UnaryClass" def{hdlSim=[]}
-        ]
-      , clashTestGroup "PrimitiveGuards"
-        [ runTest "WarnAlways" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (NoTestExitCode, "You shouldn't use 'primitive'!")
-          }
-        , runTest "MultipleGuards" def{
-            hdlTargets=[VHDL]
-          , expectClashFail=Just (NoTestExitCode, "You should know that ...")
-          }
-        ]
-      , clashTestGroup "PrimitiveReductions"
-        [ runTest "Lambda" def
-        , runTest "ReplaceInt" def
-        ]
-      , clashTestGroup "RTree"
-        [ runTest "TZip" def{hdlSim=[]}
-        , runTest "TFold" def{hdlSim=[]}
-        , runTest "TRepeat" def
-        , runTest "TRepeat2" def
-        ]
-      , clashTestGroup "Shadowing"
-        [ runTest "T990" def
-        ]
-      , clashTestGroup "Signal"
-        [ runTest "AlwaysHigh" def{hdlSim=[]}
-        , runTest "BangPatterns" def
-        ,
-          -- TODO: we do not support memory files in Vivado
-          --
-          -- see: https://github.com/clash-lang/clash-compiler/issues/2269
-          runTest "BlockRamFile" def{hdlSim=hdlSim def \\ [Vivado]}
-
-        , runTest "BlockRam0" def
-        , runTest "BlockRam1" def
-        , clashTestGroup "BlockRam"
-          [ runTest "Blob" def
-          ]
-        , runTest "AndEnable" def
-        , runTest "Ram" def
-        , clashTestGroup "Ram"
-          [ runTest "RMultiTop" def
-          , let _opts = def{ buildTargets=BuildSpecific [ "testBench35"
-                                                        , "testBench53"]}
-            in runTest "RWMultiTop" _opts
-          ]
-        , runTest "HoldResetAsync" def
-        , runTest "HoldResetSync" def
-        , runTest "ResetGen" def
-        ,
-          -- TODO: we do not support memory files in Vivado
-          --
-          -- see: https://github.com/clash-lang/clash-compiler/issues/2269
-          runTest "RomFile" def{hdlSim=hdlSim def \\ [Vivado]}
-
-        , outputTest "BlockRamLazy" def
-        , runTest "BlockRamTest" def{hdlSim=[]}
-        , runTest "Compression" def
-        , runTest "DelayedReset" def
-        , let _opts = def{ -- Vivado segfaults
-                           hdlLoad=hdlLoad def \\ [Verilator, Vivado]
-                         , hdlSim=hdlSim def \\ [Verilator, Vivado]
-                         , buildTargets=BuildSpecific [ "testBenchAB"
-                                                      , "testBenchBC"]
-                         }
-          in runTest "DualBlockRam" _opts
-        , let _opts = def { buildTargets=BuildSpecific ["example"]
-                          , hdlSim=[]
-                          }
-           in runTest "NoCPR" _opts
-        , runTest "DynamicClocks" def
-            { hdlTargets = [VHDL]
-              -- Vivado often fails with "Iteration limit reached"
-            , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
-            , hdlSim = hdlSim def \\ [Verilator, Vivado]
-            , clashFlags = ["-fclash-timescale-precision", "1fs"]
-            }
-        , runTest "DynamicClocks" def
-            { hdlTargets = [Verilog, SystemVerilog]
-            , hdlLoad = hdlLoad def \\ [Verilator]
-            , hdlSim = hdlSim def \\ [Verilator]
-            , clashFlags = ["-fclash-timescale-precision", "1fs"]
-            }
-        , runTest "Oversample" def
-            { hdlTargets = [VHDL]
-              -- Vivado fails "exceptional condition"
-            , hdlLoad = hdlLoad def \\ [Vivado]
-            , hdlSim = hdlSim def \\ [Vivado]
-            }
-        , runTest "Oversample" def
-            { hdlTargets = [Verilog, SystemVerilog] }
-        , runTest "RegisterAR" def
-        , runTest "RegisterSR" def
-        , runTest "RegisterAE" def
-        , runTest "RegisterSE" def
-        , let _opts = def{ buildTargets=BuildSpecific [ "testBenchAsync"
-                                                      , "testBenchSync"]}
-          in runTest "ResetSynchronizer" _opts
-        , runTest "ResetLow" def
-        , runTest "Rom" def
-        , runTest "RomNegative" def
-        , clashTestGroup "ROM"
-          [ runTest "Async" def
-          , runTest "AsyncBlob" def
-          , runTest "Blob" def
-          ,
-            -- TODO: When issue #2039 is fixed, it should be possible to drop
-            -- compile-ultra.
-            -- TODO: Vivado is disabled because it gives different results, see
-            -- https://github.com/clash-lang/clash-compiler/issues/2268
-            let _opts = def { clashFlags=["-fclash-compile-ultra"]
-                            , hdlSim=hdlSim def \\ [Vivado]
+            |]
+                              )
+                        }
+                  ],
+                clashTestGroup
+                  "Signal"
+                  [ runTest
+                      "MAC"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
+                        }
+                  ],
+                clashTestGroup
+                  "SynthesisAttributes"
+                  [ runTest
+                      "ProductInArgs"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Cannot use attribute annotations on product types of top entities")
+                        },
+                    runTest
+                      "ProductInResult"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Cannot use attribute annotations on product types of top entities")
+                        },
+                    runTest
+                      "ConflictingAttrTypes"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Synthesis attribute 'foo' was declared with conflicting types")
+                        }
+                  ],
+                clashTestGroup
+                  "Testbench"
+                  [ runTest
+                      "UnsafeOutputVerifier"
+                      def
+                        { expectClashFail =
+                            Just
+                              ( TestSpecificExitCode 0,
+                                "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!"
+                              )
+                        }
+                  ],
+                clashTestGroup
+                  "TopEntity"
+                  [ runTest
+                      "T1033"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "PortProduct \"wrong\" []")
+                        },
+                    runTest
+                      "T1063"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Saw a PortProduct in a Synthesize annotation")
+                        }
+                  ],
+                clashTestGroup
+                  "Verification"
+                  [ let n = 9 -- GHDL only has VERY basic PSL support
+                        _opts =
+                          def
+                            { hdlTargets = [VHDL],
+                              buildTargets = BuildSpecific ["fails" <> show i | i <- [(1 :: Int) .. n]],
+                              hdlLoad = [GHDL],
+                              hdlSim = [GHDL],
+                              expectSimFail = Just (def, "psl assertion failed")
                             }
-            in runTest "BlobVec" _opts
-          ]
-        , runTest "SigP" def{hdlSim=[]}
-        , outputTest "T1102A" def{hdlTargets=[VHDL]}
-        , outputTest "T1102B" def{hdlTargets=[VHDL]}
-        , runTest "T2069" def
-        , runTest "T3432" def{hdlTargets=[Verilog], hdlSim=[]}
-        , clashTestGroup "BiSignal"
-          [ runTest "Counter" def
-          , runTest "CounterHalfTuple" def
-          , runTest "CounterHalfTupleRev" def
-          , outputTest "T2472" def{hdlTargets=[VHDL]}
-          ]
-        , runTest "T1007" def{hdlSim=[]}
-        ]
-      , clashTestGroup "SimIO"
-        [ let _opts = def { hdlTargets=[Verilog]
-                          , vvpStdoutNonEmptyFail=False
-                          , buildTargets=BuildSpecific ["topEntity"]
-                          , hdlLoad = [IVerilog]
-                          , hdlSim = [IVerilog]
-                          }
-           in runTest "Test00" _opts
-        ]
-      , clashTestGroup "SynthesisAttributes"
-        [ outputTest "Annotate" def{hdlTargets=[VHDL]}
-        , outputTest "AnnotateReg" def
-        , outputTest "InstDeclAnnotations" def
-        , outputTest "MultipleAnnotations" def
-        , outputTest "Product" def
-        , outputTest "Simple" def
-        , outputTest "T1771" def
-        , runTest "Product" def
-        , outputTest "T3024" def{hdlTargets=[VHDL], hdlLoad = [], hdlSim = []}
-        ]
-      , clashTestGroup "Testbench"
-        [ runTest "TB" def{clashFlags=["-fclash-inline-limit=0"]}
-        , runTest "SyncTB" def
-        ]
-      , clashTestGroup "Types"
-        [ runTest "TypeFamilyReduction" def{hdlSim=[]}
-        , runTest "NatExp" def{hdlSim=[]}
-        ]
-      , clashTestGroup "TopEntity"
-        -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
-        [ outputTest "PortGeneration" def
-        , outputTest "PortNamesWithSingletonVector" def{hdlTargets=[Verilog]}
-        , runTest "TopEntHOArg" def{buildTargets=BuildSpecific ["f"], hdlSim=[]}
-        , runTest "T701" def {hdlSim=[]}
-        , runTest "T1033" def {hdlSim=[],buildTargets=BuildSpecific ["top"]}
-        , outputTest "T1033" def
-        , outputTest "T1072" def
-        , outputTest "T1074" def
-        , outputTest "Multiple" def
-            { hdlTargets = [SystemVerilog]
-            , clashFlags = ["-main-is", "topEntity1"]
-            }
-        , outputTest "Multiple" def
-            { hdlTargets = [VHDL]
-            , clashFlags = ["-main-is", "topEntity3"]
-            }
-        , -- Regression test for #3297: with -main-is, a magically named
-          -- 'testBench' living outside 'topEntity's closure must not be pruned
-          -- before it is loaded. 'T3297a' is compiled into the clash-testsuite
-          -- library, so (with no source on the search path) Clash loads it from
-          -- its external interface file, exercising the pruning in
-          -- 'loadExternalModule'. Gen-only: we only need loading to succeed.
-          runTest "T3297a" def
-            { hdlSim = []
-            , hdlLoad = []
-            , clashFlags = ["-package", "clash-testsuite", "-main-is", "topEntity"]
-            }
-        , runTest "T1139" def{hdlSim=[]}
-        , let _opts = def { hdlTargets=[Verilog]
-                          , buildTargets=BuildSpecific ["PortNames_testBench"]
-                          }
-           in runTest "PortNames" _opts
-        , outputTest "PortNames" def{hdlTargets=[Verilog]}
-        , let _opts = def { hdlTargets=[Verilog]
-                          , buildTargets=BuildSpecific ["PortProducts_testBench"]
-                          }
-           in runTest "PortProducts" _opts
-        , outputTest "PortProducts" def{hdlTargets=[Verilog]}
-        , let _opts = def { hdlTargets=[Verilog]
-                          , buildTargets=BuildSpecific ["PortProductsSum_testBench"]
-                          }
-           in runTest "PortProductsSum" _opts
-        , outputTest "PortProductsSum" def{hdlTargets=[Verilog]}
-        , let _opts = def { hdlTargets=[Verilog]
-                          , buildTargets=BuildSpecific ["PortNamesWithUnit_testBench"]
-                          }
-           in runTest "PortNamesWithUnit" _opts
-        , outputTest "PortNamesWithUnit" def{hdlTargets=[Verilog]}
-        , let _opts = def { hdlTargets=[Verilog]
-                          , buildTargets=BuildSpecific ["PortNamesWithVector_testBench"]
-                          }
-           in runTest "PortNamesWithVector" _opts
-        , outputTest "PortNamesWithVector" def{hdlTargets=[Verilog]}
-        , let _opts = def { hdlTargets=[Verilog]
-                          , buildTargets=BuildSpecific ["PortNamesWithRTree_testBench"]
-                          }
-           in runTest "PortNamesWithRTree" _opts
-        , outputTest "PortNamesWithRTree" def{hdlTargets=[Verilog]}
-        , clashLibTest "T1182A" def
-        , clashLibTest "T1182B" def
-        , runTest "T3129" def{hdlSim=[], clashFlags=["-fclash-spec-limit=400"]}
-        ]
-      , clashTestGroup "Unit"
-        [ runTest "Imap" def
-        , runTest "ZipWithUnitVector" def
-        , runTest "ZipWithTupleWithUnitLeft" def
-        , runTest "ZipWithTupleWithUnitRight" def
-        , runTest "ZipWithTripleWithUnitMiddle" def
-        , runTest "ZipWithUnitSP" def
-        , runTest "ZipWithUnitSP2" def
-        ]
-      , clashTestGroup "Vector"
-        [ runTest "EnumTypes" def{hdlSim=[]}
-        , runTest "HOCon" def{hdlSim=[]}
-        , runTest "VMapAccum" def{hdlSim=[]}
-        , runTest "VScan" def{hdlSim=[]}
-        , runTest "VZip" def{hdlSim=[]}
-        , runTest "VecConst" def{hdlSim=[]}
-        ,
-          -- vivado segfaults
-          runTest "FirOddSize" def{hdlSim=hdlSim def \\ [Vivado]}
+                     in runTest "NonTemporalPSL" _opts,
+                    let n = 13
+                        _opts =
+                          def
+                            { hdlTargets = [SystemVerilog],
+                              buildTargets = BuildSpecific ["fails" <> show i | i <- [(1 :: Int) .. n]],
+                              -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
+                              -- for syntax errors.
+                              hdlLoad = [ModelSim],
+                              hdlSim = []
+                            }
+                     in runTest "NonTemporalPSL" _opts,
+                    let is = [(1 :: Int) .. 13] \\ [4, 6, 7, 8, 10, 11, 12]
+                     in runTest
+                          "NonTemporalSVA"
+                          def
+                            { hdlTargets = [SystemVerilog],
+                              buildTargets = BuildSpecific ["fails" <> show i | i <- is],
+                              -- Only QuestaSim supports simulating SVA/PSL, but ModelSim does check
+                              -- for syntax errors.
+                              hdlLoad = [ModelSim],
+                              hdlSim = []
+                            },
+                    runTest
+                      "SymbiYosys"
+                      def
+                        { hdlTargets = [Verilog, SystemVerilog],
+                          hdlLoad = [],
+                          hdlSim = [],
+                          verificationTool = Just SymbiYosys,
+                          expectVerificationFail = Just (def, "Unreached cover statement at topEntity: B")
+                        }
+                  ],
+                clashTestGroup
+                  "XException"
+                  [ runTest
+                      "IsX"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Clash was forced to translate 'Clash.XException.isX', but this value was marked with DontTranslate.")
+                        }
+                  ],
+                clashTestGroup
+                  "ZeroWidth"
+                  [ runTest
+                      "FailGracefully1"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Unexpected projection of zero-width type")
+                        },
+                    runTest
+                      "FailGracefully2"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Unexpected projection of zero-width type")
+                        },
+                    runTest
+                      "FailGracefully3"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (def, "Unexpected projection of zero-width type")
+                        }
+                  ],
+                runTest
+                  "LiftRecursiveGroup"
+                  def
+                    { hdlTargets = [VHDL],
+                      expectClashFail = Just (def, "Callgraph after normalization contains following recursive components:")
+                    },
+                runTest
+                  "Poly"
+                  def
+                    { hdlTargets = [VHDL],
+                      expectClashFail = Just (def, "Clash can only normalize monomorphic functions, but this is polymorphic:")
+                    },
+                runTest
+                  "Poly2"
+                  def
+                    { hdlTargets = [VHDL],
+                      clashFlags = ["-fclash-error-extra"],
+                      expectClashFail = Just (def, "Even after applying type equality constraints it remained polymorphic:")
+                    },
+                runTest
+                  "RecursiveBoxed"
+                  def
+                    { hdlTargets = [VHDL],
+                      expectClashFail = Just (def, " already inlined 20 times in: ") -- (RecursiveBoxed\.)?topEntity
+                    },
+                runTest
+                  "RecursiveDatatype"
+                  def
+                    { hdlTargets = [VHDL],
+                      expectClashFail = Just (def, "This bndr has a non-representable return type and can't be normalized:")
+                    }
+                --        Disabled, due to it eating gigabytes of memory:
+                --      , runTest "RecursivePoly" def{
+                --          hdlTargets=[VHDL]
+                --        , expectClashFail=Just (def, "??")
+                --        }
+              ],
+            clashTestGroup
+              "shouldwork"
+              [ clashTestGroup
+                  "AutoReg"
+                  [ outputTest "AutoReg" def,
+                    runTest "T1507" def {hdlSim = []},
+                    let _opts = def {hdlSim = [], hdlTargets = [VHDL]}
+                     in runTest "T1632" _opts,
+                    runTest "T3100" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "Basic"
+                  [ runTest "AES" def {hdlSim = []},
+                    runTest "BangData" def {hdlSim = []},
+                    runTest "CaseOfErr" def {hdlTargets = [VHDL], hdlSim = []},
+                    runTest "Trace" def {hdlSim = []},
+                    runTest "DivMod" def {hdlSim = []},
+                    runTest "DivZero" def,
+                    runTest "LambdaDrop" def {hdlSim = []},
+                    runTest "IrrefError" def {hdlSim = []},
+                    outputTest "NameInlining" def,
+                    runTest "NameInstance" def {hdlSim = []},
+                    outputTest "NameInstance" def,
+                    outputTest "SetName" def {hdlTargets = [VHDL]},
+                    outputTest "SimulationMagic2736" def {hdlTargets = [VHDL]},
+                    runTest "PatError" def {hdlSim = []},
+                    runTest "ByteSwap32" def,
+                    runTest "CharTest" def,
+                    runTest "ClassOps" def,
+                    runTest "CountTrailingZeros" def,
+                    runTest "DeepseqX" def,
+                    runTest "LotOfStates" def,
+                    let _opts =
+                          def
+                            { buildTargets = BuildSpecific ["nameoverlap"],
+                              hdlSim = []
+                            }
+                     in runTest "NameOverlap" _opts,
+                    runTest "NestedPrimitives" def {hdlSim = []},
+                    runTest "NestedPrimitives2" def {hdlSim = []},
+                    runTest "NORX" def,
+                    runTest "Parameters" def {hdlTargets = [VHDL]},
+                    runTest "RecordSumOfProducts" def {hdlSim = []},
+                    runTest "Replace" def,
+                    runTest "TestIndex" def {hdlSim = []},
+                    runTest "Time" def,
+                    runTest "Shift" def {hdlSim = []},
+                    runTest "SimOnly" def {hdlTargets = [VHDL], hdlSim = []},
+                    runTest "SimpleConstructor" def {hdlSim = []},
+                    runTest "SomeNatVal" def {hdlTargets = [VHDL], hdlSim = []},
+                    runTest
+                      "TyEqConstraints"
+                      def
+                        { hdlSim = [],
+                          buildTargets = BuildSpecific ["top1"]
+                        },
+                    runTest "T1012" def {hdlSim = []},
+                    runTest "T1240" def {hdlSim = []},
+                    let _opts = def {hdlTargets = [VHDL], hdlSim = []}
+                     in runTest "T1297" _opts,
+                    runTest "T1254" def {hdlTargets = [VHDL, SystemVerilog], hdlSim = []},
+                    runTest "T1242" def {hdlSim = []},
+                    runTest "T1292" def {hdlTargets = [VHDL]},
+                    let _opts = def {hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
+                     in runTest "T1304" _opts,
+                    let _opts =
+                          def
+                            { hdlTargets = [VHDL],
+                              hdlSim = [],
+                              clashFlags = ["-main-is", "plus"],
+                              buildTargets = BuildSpecific ["plus"]
+                            }
+                     in runTest "T1305" _opts,
+                    let _opts = def {hdlTargets = [VHDL], hdlSim = []}
+                     in runTest "T1316" _opts,
+                    runTest "T1322" def {hdlTargets = [VHDL]},
+                    let _opts = def {hdlTargets = [VHDL], hdlSim = []}
+                     in runTest "T1340" _opts,
+                    let _opts = def {hdlTargets = [VHDL], hdlSim = []}
+                     in runTest "T1354A" _opts,
+                    let _opts = def {hdlTargets = [VHDL], hdlSim = []}
+                     in runTest "T1354B" _opts,
+                    runTest "T1402" def {clashFlags = ["-O"]},
+                    runTest "T1402b" def {hdlTargets = [VHDL], hdlSim = []},
+                    runTest "T1556" def,
+                    runTest "T1591" def {hdlTargets = [VHDL], hdlSim = []},
+                    runTest "TagToEnum" def {hdlSim = []},
+                    runTest "TwoFunctions" def {hdlSim = []},
+                    runTest "XToError" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "BitVector"
+                  [ runTest "Box" def,
+                    runTest "BoxGrow" def,
+                    runTest "CLZ" def,
+                    runTest "MaybeUnpack" def,
+                    runTest "RePack" def {hdlSim = []},
+                    runTest "ReduceZero" def,
+                    runTest "ReduceOne" def,
+                    runTest "ExtendingNumZero" def,
+                    runTest "AppendZero" def,
+                    runTest
+                      "PopCountNoInteger"
+                      def {clashFlags = ["-Werror=clash-dubious-primitive"]},
+                    runTest "PackGHCNums" def,
+                    runTest "UnpackGHCNums" def,
+                    runTest "GenericBitPack" def {clashFlags = ["-fconstraint-solver-iterations=15"]},
+                    runTest "MaybeUnpackUndefined" def {hdlSim = []},
+                    runTest "UnpackUndefined" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "BlackBox"
+                  [ outputTest "TemplateFunction" def {hdlTargets = [VHDL]},
+                    outputTest "BlackBoxFunction" def {hdlTargets = [VHDL]},
+                    runTest "BlackBoxFunctionHO" def {hdlTargets = [VHDL]},
+                    outputTest "ExternalPrimitive" def {hdlTargets = [VHDL]},
+                    outputTest "ZeroWidth" def {hdlTargets = [VHDL]},
+                    outputTest "MultiResult" def {hdlTargets = [VHDL]},
+                    runTest "DSL" def,
+                    runTest "MultiResult" def,
+                    runTest "T919" def {hdlSim = []},
+                    runTest "T1524" def,
+                    runTest
+                      "T1786"
+                      def
+                        { hdlTargets = [VHDL],
+                          buildTargets = BuildSpecific ["testEnableTB", "testBoolTB"]
+                        },
+                    outputTest "LITrendering" def {hdlTargets = [Verilog]},
+                    runTest
+                      "T2117"
+                      def
+                        { clashFlags = ["-fclash-aggressive-x-optimization-blackboxes"],
+                          hdlTargets = [VHDL],
+                          buildTargets =
+                            BuildSpecific
+                              [ "testBenchUndefBV",
+                                "testBenchUndefTup",
+                                "testBenchPartialDefTup"
+                              ]
+                        }
+                  ],
+                clashTestGroup
+                  "BoxedFunctions"
+                  [ runTest "DeadRecursiveBoxed" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "CSignal"
+                  [ runTest "MAC" def {hdlSim = []},
+                    runTest "CBlockRamTest" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "CustomReprs"
+                  [ clashTestGroup
+                      "RotateC"
+                      [ runTest "RotateC" def,
+                        runTest "ReprCompact" def,
+                        runTest "ReprCompactScrambled" def,
+                        runTest "ReprLastBitConstructor" def,
+                        let _opts = def {hdlTargets = [VHDL, Verilog]}
+                         in runTest "ReprStrangeMasks" _opts,
+                        runTest "ReprWide" def,
+                        runTest "RotateCScrambled" def
+                      ],
+                    clashTestGroup
+                      "RotateCNested"
+                      [ runTest "RotateCNested" def
+                      ],
+                    clashTestGroup
+                      "Rotate"
+                      [ runTest "Rotate" def
+                      ],
+                    clashTestGroup
+                      "Deriving"
+                      [ runTest "BitPackDerivation" def,
+                        runTest "MaybeUnpackDerivation" def {hdlTargets = [Verilog]}
+                      ],
+                    clashTestGroup
+                      "Indexed"
+                      [ runTest "Indexed" def
+                      ]
+                  ],
+                clashTestGroup
+                  "CustomReprs"
+                  [ clashTestGroup
+                      "ZeroWidth"
+                      [ runTest "ZeroWidth" def {hdlSim = []}
+                      ],
+                    runTest "T694" def {hdlSim = [], hdlTargets = [VHDL]}
+                  ],
+                clashTestGroup
+                  "DDR"
+                  [
+                    -- Since the `XilinxDDR` test is more comprehensive than these tests,
+                    -- we skip these tests for Vivado and only run `XilinxDDR`.
+                    let _opts =
+                          def
+                            { buildTargets =
+                                BuildSpecific
+                                  [ "testBenchGA",
+                                    "testBenchGS",
+                                    "testBenchUA",
+                                    "testBenchUS"
+                                  ],
+                              hdlLoad = hdlLoad def \\ [Vivado],
+                              hdlSim = hdlSim def \\ [Vivado]
+                            }
+                     in runTest "DDRin" _opts,
 
-        , runTest "IndexInt" def
-        ,
-          -- Vivado segfaults
-          runTest "IndexInt2" def {hdlSim=hdlSim def \\ [Vivado]}
-
-        , outputTest "IndexInt2" def{hdlTargets=[Verilog]}
-        , runTest "Concat" def
-        , runTest "DFold" def{hdlTargets = [VHDL, Verilog]}
-        ,
-          -- With GHC 9.0 and 9.2 specifically, Vivado doesn't compile with
-          -- error
-          --     illegal context for assignment pattern
-          -- and Verilator errors on the same line with
-          --     Assignment pattern member not underneath a supported
-          --     construct: NEQCASE
-          -- GHC 8.10 and 9.4 through 9.10 work fine, though.
-          -- https://github.com/clash-lang/clash-compiler/issues/2932
-          let _opts = def { hdlTargets = [SystemVerilog]
-                          , hdlLoad = hdlLoad def \\ [Verilator, Vivado]
-                          , hdlSim = hdlSim def \\ [Verilator, Vivado]
-                          }
-          in runTest "DFold" _opts
-        , runTest "DFold2" def
-        , runTest "DTFold" def
-        ,
-          -- vivado segfaults
-          runTest "FindIndex" def{hdlSim=hdlSim def \\ [Vivado]}
-
-        , runTest "Fold" def
-        , runTest "FoldlFuns" def{hdlSim=[]}
-        , runTest "Foldr" def
-        , runTest "FoldrEmpty" def
-        , runTest "HOClock" def{hdlSim=[]}
-        , runTest "HOPrim" def{hdlSim=[]}
-        , runTest "Indices" def
-        , runTest "Iterate" def
-        , outputTest "IterateCF" def{hdlTargets=[VHDL]}
-        , runTest "Minimum" def
-        , runTest "MovingAvg" def{hdlSim=[]}
-        , runTest "PatHOCon" def{hdlSim=[]}
-        , runTest "Scatter" def
-        , runTest "Split" def{hdlSim=[]}
-        , runTest "ToList" def
-        , runTest "Unconcat" def
+                    -- XXX: `ddrOut` contains a number of (implicit) parallel, coinciding
+                    --      processes. Execution for these processes is left undefined in
+                    --      the Verilog spec, nor is there a mechanism to get consistent
+                    --      behavior (like in VHDL). Therefore, simulators are free to pick
+                    --      any execution order they'd like. ModelSim and Verilator pick
+                    --      differently, so when a test works in one, it doesn't in the
+                    --      other. As a quick "fix" we disable Verilator, though we might
+                    --      consider rewriting the test such that it doesn't depend or
+                    --      accounts for the raciness.
+                    --
+                    -- Since the `XilinxDDR` test is more comprehensive than these tests,
+                    -- we skip these tests for Vivado and only run `XilinxDDR`.
+                    let _opts =
+                          def
+                            { buildTargets =
+                                BuildSpecific
+                                  [ "testBenchUA",
+                                    "testBenchUS",
+                                    "testBenchGA",
+                                    "testBenchGS"
+                                  ],
+                              hdlLoad = hdlLoad def \\ [Vivado, Verilator],
+                              hdlSim = hdlSim def \\ [Vivado, Verilator]
+                            }
+                     in runTest "DDRout" _opts,
+                    let _opts =
+                          def
+                            { buildTargets = BuildSpecific ["testBenchAll"],
+                              hdlLoad = [Vivado],
+                              hdlSim = [Vivado],
+                              clashFlags = ["-fclash-hdlsyn", "Vivado"]
+                            }
+                     in runTest "XilinxDDR" _opts
+                  ],
+                clashTestGroup
+                  "DSignal"
+                  [ runTest "DelayedFold" def,
+                    runTest "DelayI" def,
+                    runTest "DelayN" def
+                  ],
+                clashTestGroup
+                  "Feedback"
+                  [ runTest "Fib" def,
+                    runTest "MutuallyRecursive" def
+                  ],
+                clashTestGroup
+                  "Fixed"
+                  [ runTest "Mixer" def,
+                    runTest "SFixedTest" def,
+                    runTest "SatWrap" def {hdlSim = []},
+                    runTest "ZeroInt" def
+                  ],
+                clashTestGroup
+                  "Floating"
+                  [ runTest "FloatPack" def {hdlSim = [], clashFlags = ["-fclash-float-support"]},
+                    runTest "FloatConstFolding" def {clashFlags = ["-fclash-float-support"]},
+                    runTest "T1803" def {clashFlags = ["-fclash-float-support"]}
+                  ],
+                clashTestGroup
+                  "GADTs"
+                  [ runTest "Constrained" def,
+                    runTest "Head" def,
+                    runTest "HeadM" def,
+                    runTest "MonomorphicTopEntity" def,
+                    runTest "Record" def,
+                    runTest "Tail" def,
+                    runTest "TailM" def,
+                    runTest "TailOfTail" def,
+                    runTest "T1310" def {hdlSim = []},
+                    runTest "T1536" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "HOPrim"
+                  [ runTest "HOIdx" def,
+                    runTest "HOImap" def,
+                    runTest "Map" def,
+                    runTest "Map2" def,
+                    runTest "TestMap" def,
+                    runTest "Transpose" def,
+                    runTest "VecFun" def
+                  ],
+                clashTestGroup "Issues" $
+                  [ runTest "T359" def {hdlSim = []},
+                    clashLibTest "T508" def,
+                    let _opts = def {hdlSim = [], hdlTargets = [Verilog]}
+                     in runTest "T1187" _opts,
+                    clashLibTest "T1388" def {hdlTargets = [VHDL]},
+                    outputTest "T1171" def,
+                    clashLibTest "T1439" def {hdlTargets = [VHDL]},
+                    runTest "T1477" def {hdlSim = []},
+                    runTest "T1534" def {hdlSim = [], hdlLoad = []},
+                    runTest "T1506A" def {hdlSim = [], clashFlags = ["-fclash-aggressive-x-optimization-blackboxes"]},
+                    outputTest
+                      "T1506B"
+                      def
+                        { clashFlags = ["-fclash-aggressive-x-optimization-blackboxes"],
+                          ghcFlags = ["-itests/shouldwork/Issues"]
+                        },
+                    runTest "T1615" def {hdlSim = [], hdlTargets = [Verilog]},
+                    runTest "T1663" def {hdlTargets = [VHDL], hdlSim = []},
+                    runTest "T1669_DEC" def {hdlTargets = [VHDL]},
+                    runTest "T1715" def,
+                    runTest "T1721" def {hdlSim = []},
+                    runTest "T1606A" def {hdlSim = []},
+                    runTest "T1606B" def {hdlSim = []},
+                    runTest "T1742" def {hdlSim = [], buildTargets = BuildSpecific ["shell"]},
+                    runTest "T1756" def {hdlSim = []},
+                    outputTest "T431" def {hdlTargets = [VHDL]},
+                    clashLibTest "T779" def {hdlTargets = [Verilog]},
+                    outputTest "T1881" def {hdlSim = []},
+                    runTest "T1921" def {hdlTargets = [Verilog], hdlSim = []},
+                    runTest
+                      "T1933"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (NoTestExitCode, "NOT:WARNING")
+                        },
+                    outputTest "T1996" def {hdlTargets = [VHDL]},
+                    runTest "T2040" def {hdlTargets = [VHDL], clashFlags = ["-fclash-compile-ultra"]},
+                    -- TODO I wanted to call this T2046A since there are multiple tests
+                    -- for T2046. However, doing so completely breaks HDL loading because
+                    -- it completely ignores the BuildSpecific...
+                    runTest
+                      "T2046"
+                      def
+                        { hdlSim = [],
+                          clashFlags = ["-Werror"],
+                          buildTargets = BuildSpecific ["top_bit", "top_bitvector", "top_index", "top_signed", "top_unsigned"]
+                        },
+                    runTest "T2046B" def {clashFlags = ["-Werror"]},
+                    runTest "T2046C" def {hdlSim = [], clashFlags = ["-Werror"]},
+                    runTest "T2097" def {hdlSim = []},
+                    runTest "T2154" def {hdlTargets = [VHDL], hdlSim = []},
+                    runTest "T2220_toEnumOOB" def {hdlTargets = [VHDL]},
+                    runTest "T2272" def {hdlTargets = [VHDL], hdlSim = []},
+                    outputTest "T2334" def {hdlTargets = [VHDL]},
+                    outputTest "T2325" def {hdlTargets = [VHDL]},
+                    outputTest "T2325f" def {hdlTargets = [VHDL]},
+                    runTest "T2342A" def {hdlSim = []},
+                    runTest "T2342B" def {hdlSim = []},
+                    runTest "T2360" def {hdlSim = [], clashFlags = ["-fclash-force-undefined=0"]},
+                    outputTest "T2502" def {hdlTargets = [VHDL]},
+                    outputTest "T2508" def {hdlTargets = [VHDL]},
+                    -- Promotes the "primitive isn't marked OPAQUE" warning to an error,
+                    -- so the test does not depend on how warnings are formatted.
+                    runTest
+                      "T2510"
+                      def
+                        { hdlTargets = [VHDL],
+                          hdlSim = [],
+                          clashFlags = ["-Werror=clash-primitive-definition"],
+                          expectClashFail = Just (def, "primitive T2510.bb isn't marked OPAQUE.")
+                        },
+                    outputTest "T2510" def {hdlTargets = [VHDL], clashFlags = ["-DNOINLINE=OPAQUE"]},
+                    outputTest "T2542" def {hdlTargets = [VHDL]},
+                    runTest "T2593" def {hdlSim = []},
+                    runTest "T2623CaseConFVs" def {hdlLoad = [], hdlSim = [], hdlTargets = [VHDL]},
+                    runTest "T2628" def {hdlTargets = [VHDL], buildTargets = BuildSpecific ["TACacheServerStep"], hdlSim = []},
+                    runTest "T2724" def,
+                    runTest "T2724B" def,
+                    runTest "T2729" def,
+                    runTest "T2770" def {hdlLoad = [], hdlSim = [], hdlTargets = [VHDL]},
+                    runTest "T2831" def {hdlLoad = [], hdlSim = [], hdlTargets = [VHDL]},
+                    runTest "T2839" def {hdlLoad = [], hdlSim = [], hdlTargets = [VHDL]},
+                    runTest "T2845" def {hdlSim = [], hdlTargets = [Verilog]},
+                    runTest "T2904" def,
+                    runTest "T2966" def {hdlSim = [], hdlTargets = [Verilog]},
+                    runTest "T2988" def {hdlSim = []},
+                    outputTest "T3008" def {hdlSim = []},
+                    outputTest "T3011" def {hdlSim = []},
+                    let _opts = def {hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
+                     in runTest "T3021" _opts,
+                    runTest "T3041" def {hdlSim = [], hdlLoad = []},
+                    let _opts = def {hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
+                     in runTest "T3066" _opts,
+                    let _opts = def {hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
+                     in runTest "T3084" _opts,
+                    runTest "T3141" def {hdlSim = [], hdlLoad = [], clashFlags = ["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141"]},
+                    runTest "T3142" def {hdlSim = [], hdlLoad = [], clashFlags = ["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141/."]},
+                    outputTest "T3147" def {hdlTargets = [Verilog], hdlSim = []},
+                    clashLibTest "T3157_IntegerNaturalInternals" def {hdlTargets = [Verilog]},
+                    runTest "T3159" def {hdlSim = [], hdlLoad = []},
+                    runTest "T3185" def,
+                    runTest "T3204" def {hdlSim = [], hdlLoad = [], hdlTargets = [Verilog]},
+                    runTest "T3218" def {hdlTargets = [VHDL], hdlSim = []},
+                    outputTest "T3232" def {hdlTargets = [Verilog], hdlSim = []},
+                    outputTest "T3224" def {hdlTargets = [VHDL], hdlSim = [], hdlLoad = []},
+                    runTest
+                      "T3234"
+                      def
+                        { hdlTargets = [Verilog],
+                          hdlLoad = [IVerilog],
+                          hdlSim = [IVerilog]
+                        },
+                    runTest "T3290" def {hdlSim = [], hdlLoad = []},
+                    runTest "T3291" def {hdlTargets = [Verilog]},
+                    runTest "T3311" def {hdlSim = []},
+                    runTest "T3308" def,
+                    runTest "T3308b" def,
+                    runTest "T3348" def {hdlTargets = [Verilog], hdlSim = []},
+                    outputTest "T3359" def {hdlTargets = [SystemVerilog], hdlSim = []},
+                    runTest "T3407_deadCode_after_appProp" def {hdlTargets = [Verilog], hdlSim = []},
+                    runTest "T3439" def {hdlSim = []}
+                  ]
+                    <> if compiledWith == Cabal
+                      then
+                        -- This tests fails without environment files present, which are only
+                        -- generated by Cabal. It complains it is trying to import "BasicTypes"
+                        -- which is a member of the hidden package 'ghc'. Passing
+                        -- '-package ghc' doesn't seem to help though. TODO: Investigate.
+                        [clashLibTest "T1568" def]
+                      else
+                        [],
+                clashTestGroup
+                  "LoadModules"
+                  [ runTest "T1796" def {hdlSim = []},
+                    -- Clash should not set '-dynamic-too' if '-dynamic' is already set
+                    runTest
+                      "T3354"
+                      def
+                        { hdlTargets = [VHDL],
+                          clashFlags = ["-dynamic"],
+                          expectClashFail = Just (TestSpecificExitCode 0, "NOT:-dynamic-too")
+                        }
+                  ],
+                clashTestGroup
+                  "Naming"
+                  [ runTest "T967a" def {hdlSim = []},
+                    runTest "T967b" def {hdlSim = []},
+                    runTest "T967c" def {hdlSim = []},
+                    clashLibTest "T1041" def,
+                    clashLibTest "NameHint" def {hdlTargets = [VHDL, Verilog]}
+                  ],
+                clashTestGroup
+                  "Netlist"
+                  [ clashLibTest "Identity" def,
+                    clashLibTest "NoDeDup" def {hdlTargets = [VHDL]},
+                    clashLibTest "T1766" def,
+                    clashLibTest "T1935" def,
+                    outputTest "HDLContainsLoc" def {hdlSim = [], clashFlags = ["-g"]},
+                    outputTest "HDLNotContainsLoc" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "Numbers"
+                  [ runTest "BitInteger" def,
+                    runTest "BitReverse" def,
+                    runTest
+                      "BitsTB"
+                      def
+                        { buildTargets =
+                            BuildSpecific
+                              [ "bitsTB1",
+                                "bitsTB2",
+                                "bitsTB3"
+                              ]
+                        },
+                    -- vivado segfaults
+                    runTest "Bounds" def {hdlSim = hdlSim def \\ [Vivado]},
+                    runTest "DivideByZero" def,
+                    let _opts = def {clashFlags = ["-fconstraint-solver-iterations=15"]}
+                     in runTest "ExpWithGhcCF" _opts,
+                    let _opts = def {clashFlags = ["-fconstraint-solver-iterations=15"]}
+                     in runTest "ExpWithClashCF" _opts,
+                    outputTest "ExpWithClashCF" def {ghcFlags = ["-itests/shouldwork/Numbers"]},
+                    let _opts = def {hdlTargets = [VHDL], hdlSim = []}
+                     in runTest "HalfAsBlackboxArg" _opts,
+                    -- see https://github.com/clash-lang/clash-compiler/issues/2262,
+                    -- Vivado's mod misbehaves on negative dividend
+                    runTest "IntegralTB" def {hdlSim = hdlSim def \\ [Vivado]},
+                    runTest "NumConstantFoldingTB_1" def {clashFlags = ["-itests/shouldwork/Numbers"]},
+                    outputTest
+                      "NumConstantFolding_1"
+                      def
+                        { clashFlags = ["-fconstraint-solver-iterations=15"],
+                          ghcFlags = ["-itests/shouldwork/Numbers"]
+                        },
+                    let _opts =
+                          def
+                            { clashFlags = ["-itests/shouldwork/Numbers"],
+                              hdlLoad = hdlLoad def \\ [Verilator],
+                              hdlSim = hdlSim def \\ [Verilator]
+                            }
+                     in runTest "NumConstantFoldingTB_2" _opts,
+                    outputTest
+                      "NumConstantFolding_2"
+                      def
+                        { clashFlags = ["-fconstraint-solver-iterations=15"],
+                          ghcFlags = ["-itests/shouldwork/Numbers"]
+                        },
+                    runTest "Naturals" def,
+                    runTest "NaturalToInteger" def {hdlSim = []},
+                    runTest "NegativeLits" def,
+                    runTest "Resize" def,
+                    runTest "Resize2" def,
+                    runTest "Resize3" def,
+                    runTest "SatMult" def {hdlSim = []},
+                    runTest "ShiftRotate" def,
+                    runTest "ShiftRotateNegative" def {hdlTargets = [VHDL]},
+                    runTest "SignedProjectionTB" def,
+                    runTest "SignedZero" def,
+                    runTest "Signum" def,
+                    -- vivado segfaults
+                    runTest "Strict" def {hdlSim = hdlSim def \\ [Vivado]},
+                    runTest "T1019" def {hdlSim = []},
+                    runTest "T1351" def,
+                    runTest "T2149" def,
+                    outputTest "UndefinedConstantFolding" def {ghcFlags = ["-itests/shouldwork/Numbers"]},
+                    runTest "UnsignedZero" def
+                  ],
+                clashTestGroup
+                  "Polymorphism"
+                  [ runTest "ExistentialBoxed" def {hdlSim = []},
+                    runTest "FunctionInstances" def,
+                    runTest "GADTExistential" def {hdlSim = []},
+                    runTest "LocalPoly" def {hdlSim = []},
+                    runTest "UnaryClass" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "PrimitiveGuards"
+                  [ runTest
+                      "WarnAlways"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (NoTestExitCode, "You shouldn't use 'primitive'!")
+                        },
+                    runTest
+                      "MultipleGuards"
+                      def
+                        { hdlTargets = [VHDL],
+                          expectClashFail = Just (NoTestExitCode, "You should know that ...")
+                        }
+                  ],
+                clashTestGroup
+                  "PrimitiveReductions"
+                  [ runTest "Lambda" def,
+                    runTest "ReplaceInt" def
+                  ],
+                clashTestGroup
+                  "RTree"
+                  [ runTest "TZip" def {hdlSim = []},
+                    runTest "TFold" def {hdlSim = []},
+                    runTest "TRepeat" def,
+                    runTest "TRepeat2" def
+                  ],
+                clashTestGroup
+                  "Shadowing"
+                  [ runTest "T990" def
+                  ],
+                clashTestGroup
+                  "Signal"
+                  [ runTest "AlwaysHigh" def {hdlSim = []},
+                    runTest "BangPatterns" def,
+                    -- TODO: we do not support memory files in Vivado
+                    --
+                    -- see: https://github.com/clash-lang/clash-compiler/issues/2269
+                    runTest "BlockRamFile" def {hdlSim = hdlSim def \\ [Vivado]},
+                    runTest "BlockRam0" def,
+                    runTest "BlockRam1" def,
+                    clashTestGroup
+                      "BlockRam"
+                      [ runTest "Blob" def
+                      ],
+                    runTest "AndEnable" def,
+                    runTest "Ram" def,
+                    clashTestGroup
+                      "Ram"
+                      [ runTest "RMultiTop" def,
+                        let _opts =
+                              def
+                                { buildTargets =
+                                    BuildSpecific
+                                      [ "testBench35",
+                                        "testBench53"
+                                      ]
+                                }
+                         in runTest "RWMultiTop" _opts
+                      ],
+                    runTest "HoldResetAsync" def,
+                    runTest "HoldResetSync" def,
+                    runTest "ResetGen" def,
+                    -- TODO: we do not support memory files in Vivado
+                    --
+                    -- see: https://github.com/clash-lang/clash-compiler/issues/2269
+                    runTest "RomFile" def {hdlSim = hdlSim def \\ [Vivado]},
+                    outputTest "BlockRamLazy" def,
+                    runTest "BlockRamTest" def {hdlSim = []},
+                    runTest "Compression" def,
+                    runTest "DelayedReset" def,
+                    let _opts =
+                          def -- Vivado segfaults
+                            { hdlLoad = hdlLoad def \\ [Verilator, Vivado],
+                              hdlSim = hdlSim def \\ [Verilator, Vivado],
+                              buildTargets =
+                                BuildSpecific
+                                  [ "testBenchAB",
+                                    "testBenchBC"
+                                  ]
+                            }
+                     in runTest "DualBlockRam" _opts,
+                    let _opts =
+                          def
+                            { buildTargets = BuildSpecific ["example"],
+                              hdlSim = []
+                            }
+                     in runTest "NoCPR" _opts,
+                    runTest
+                      "DynamicClocks"
+                      def
+                        { hdlTargets = [VHDL],
+                          -- Vivado often fails with "Iteration limit reached"
+                          hdlLoad = hdlLoad def \\ [Verilator, Vivado],
+                          hdlSim = hdlSim def \\ [Verilator, Vivado],
+                          clashFlags = ["-fclash-timescale-precision", "1fs"]
+                        },
+                    runTest
+                      "DynamicClocks"
+                      def
+                        { hdlTargets = [Verilog, SystemVerilog],
+                          hdlLoad = hdlLoad def \\ [Verilator],
+                          hdlSim = hdlSim def \\ [Verilator],
+                          clashFlags = ["-fclash-timescale-precision", "1fs"]
+                        },
+                    runTest
+                      "Oversample"
+                      def
+                        { hdlTargets = [VHDL],
+                          -- Vivado fails "exceptional condition"
+                          hdlLoad = hdlLoad def \\ [Vivado],
+                          hdlSim = hdlSim def \\ [Vivado]
+                        },
+                    runTest
+                      "Oversample"
+                      def
+                        { hdlTargets = [Verilog, SystemVerilog]
+                        },
+                    runTest "RegisterAR" def,
+                    runTest "RegisterSR" def,
+                    runTest "RegisterAE" def,
+                    runTest "RegisterSE" def,
+                    let _opts =
+                          def
+                            { buildTargets =
+                                BuildSpecific
+                                  [ "testBenchAsync",
+                                    "testBenchSync"
+                                  ]
+                            }
+                     in runTest "ResetSynchronizer" _opts,
+                    runTest "ResetLow" def,
+                    runTest "Rom" def,
+                    runTest "RomNegative" def,
+                    clashTestGroup
+                      "ROM"
+                      [ runTest "Async" def,
+                        runTest "AsyncBlob" def,
+                        runTest "Blob" def,
+                        -- TODO: When issue #2039 is fixed, it should be possible to drop
+                        -- compile-ultra.
+                        -- TODO: Vivado is disabled because it gives different results, see
+                        -- https://github.com/clash-lang/clash-compiler/issues/2268
+                        let _opts =
+                              def
+                                { clashFlags = ["-fclash-compile-ultra"],
+                                  hdlSim = hdlSim def \\ [Vivado]
+                                }
+                         in runTest "BlobVec" _opts
+                      ],
+                    runTest "SigP" def {hdlSim = []},
+                    outputTest "T1102A" def {hdlTargets = [VHDL]},
+                    outputTest "T1102B" def {hdlTargets = [VHDL]},
+                    runTest "T2069" def,
+                    runTest "T3432" def {hdlTargets = [Verilog], hdlSim = []},
+                    clashTestGroup
+                      "BiSignal"
+                      [ runTest "Counter" def,
+                        runTest "CounterHalfTuple" def,
+                        runTest "CounterHalfTupleRev" def,
+                        outputTest "T2472" def {hdlTargets = [VHDL]}
+                      ],
+                    runTest "T1007" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "SimIO"
+                  [ let _opts =
+                          def
+                            { hdlTargets = [Verilog],
+                              vvpStdoutNonEmptyFail = False,
+                              buildTargets = BuildSpecific ["topEntity"],
+                              hdlLoad = [IVerilog],
+                              hdlSim = [IVerilog]
+                            }
+                     in runTest "Test00" _opts
+                  ],
+                clashTestGroup
+                  "SynthesisAttributes"
+                  [ outputTest "Annotate" def {hdlTargets = [VHDL]},
+                    outputTest "AnnotateReg" def,
+                    outputTest "InstDeclAnnotations" def,
+                    outputTest "MultipleAnnotations" def,
+                    outputTest "Product" def,
+                    outputTest "Simple" def,
+                    outputTest "T1771" def,
+                    runTest "Product" def,
+                    outputTest "T3024" def {hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
+                  ],
+                clashTestGroup
+                  "Testbench"
+                  [ runTest "TB" def {clashFlags = ["-fclash-inline-limit=0"]},
+                    runTest "SyncTB" def
+                  ],
+                clashTestGroup
+                  "Types"
+                  [ runTest "TypeFamilyReduction" def {hdlSim = []},
+                    runTest "NatExp" def {hdlSim = []}
+                  ],
+                clashTestGroup
+                  "TopEntity"
+                  -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
+                  [ outputTest "PortGeneration" def,
+                    outputTest "PortNamesWithSingletonVector" def {hdlTargets = [Verilog]},
+                    runTest "TopEntHOArg" def {buildTargets = BuildSpecific ["f"], hdlSim = []},
+                    runTest "T701" def {hdlSim = []},
+                    runTest "T1033" def {hdlSim = [], buildTargets = BuildSpecific ["top"]},
+                    outputTest "T1033" def,
+                    outputTest "T1072" def,
+                    outputTest "T1074" def,
+                    outputTest
+                      "Multiple"
+                      def
+                        { hdlTargets = [SystemVerilog],
+                          clashFlags = ["-main-is", "topEntity1"]
+                        },
+                    outputTest
+                      "Multiple"
+                      def
+                        { hdlTargets = [VHDL],
+                          clashFlags = ["-main-is", "topEntity3"]
+                        },
+                    -- Regression test for #3297: with -main-is, a magically named
+                    -- 'testBench' living outside 'topEntity's closure must not be pruned
+                    -- before it is loaded. 'T3297a' is compiled into the clash-testsuite
+                    -- library, so (with no source on the search path) Clash loads it from
+                    -- its external interface file, exercising the pruning in
+                    -- 'loadExternalModule'. Gen-only: we only need loading to succeed.
+                    runTest
+                      "T3297a"
+                      def
+                        { hdlSim = [],
+                          hdlLoad = [],
+                          clashFlags = ["-package", "clash-testsuite", "-main-is", "topEntity"]
+                        },
+                    runTest "T1139" def {hdlSim = []},
+                    let _opts =
+                          def
+                            { hdlTargets = [Verilog],
+                              buildTargets = BuildSpecific ["PortNames_testBench"]
+                            }
+                     in runTest "PortNames" _opts,
+                    outputTest "PortNames" def {hdlTargets = [Verilog]},
+                    let _opts =
+                          def
+                            { hdlTargets = [Verilog],
+                              buildTargets = BuildSpecific ["PortProducts_testBench"]
+                            }
+                     in runTest "PortProducts" _opts,
+                    outputTest "PortProducts" def {hdlTargets = [Verilog]},
+                    let _opts =
+                          def
+                            { hdlTargets = [Verilog],
+                              buildTargets = BuildSpecific ["PortProductsSum_testBench"]
+                            }
+                     in runTest "PortProductsSum" _opts,
+                    outputTest "PortProductsSum" def {hdlTargets = [Verilog]},
+                    let _opts =
+                          def
+                            { hdlTargets = [Verilog],
+                              buildTargets = BuildSpecific ["PortNamesWithUnit_testBench"]
+                            }
+                     in runTest "PortNamesWithUnit" _opts,
+                    outputTest "PortNamesWithUnit" def {hdlTargets = [Verilog]},
+                    let _opts =
+                          def
+                            { hdlTargets = [Verilog],
+                              buildTargets = BuildSpecific ["PortNamesWithVector_testBench"]
+                            }
+                     in runTest "PortNamesWithVector" _opts,
+                    outputTest "PortNamesWithVector" def {hdlTargets = [Verilog]},
+                    let _opts =
+                          def
+                            { hdlTargets = [Verilog],
+                              buildTargets = BuildSpecific ["PortNamesWithRTree_testBench"]
+                            }
+                     in runTest "PortNamesWithRTree" _opts,
+                    outputTest "PortNamesWithRTree" def {hdlTargets = [Verilog]},
+                    clashLibTest "T1182A" def,
+                    clashLibTest "T1182B" def,
+                    runTest "T3129" def {hdlSim = [], clashFlags = ["-fclash-spec-limit=400"]}
+                  ],
+                clashTestGroup
+                  "Unit"
+                  [ runTest "Imap" def,
+                    runTest "ZipWithUnitVector" def,
+                    runTest "ZipWithTupleWithUnitLeft" def,
+                    runTest "ZipWithTupleWithUnitRight" def,
+                    runTest "ZipWithTripleWithUnitMiddle" def,
+                    runTest "ZipWithUnitSP" def,
+                    runTest "ZipWithUnitSP2" def
+                  ],
+                clashTestGroup
+                  "Vector"
+                  [ runTest "EnumTypes" def {hdlSim = []},
+                    runTest "HOCon" def {hdlSim = []},
+                    runTest "VMapAccum" def {hdlSim = []},
+                    runTest "VScan" def {hdlSim = []},
+                    runTest "VZip" def {hdlSim = []},
+                    runTest "VecConst" def {hdlSim = []},
+                    -- vivado segfaults
+                    runTest "FirOddSize" def {hdlSim = hdlSim def \\ [Vivado]},
+                    runTest "IndexInt" def,
+                    -- Vivado segfaults
+                    runTest "IndexInt2" def {hdlSim = hdlSim def \\ [Vivado]},
+                    outputTest "IndexInt2" def {hdlTargets = [Verilog]},
+                    runTest "Concat" def,
+                    runTest "DFold" def {hdlTargets = [VHDL, Verilog]},
+                    -- With GHC 9.0 and 9.2 specifically, Vivado doesn't compile with
+                    -- error
+                    --     illegal context for assignment pattern
+                    -- and Verilator errors on the same line with
+                    --     Assignment pattern member not underneath a supported
+                    --     construct: NEQCASE
+                    -- GHC 8.10 and 9.4 through 9.10 work fine, though.
+                    -- https://github.com/clash-lang/clash-compiler/issues/2932
+                    let _opts =
+                          def
+                            { hdlTargets = [SystemVerilog],
+                              hdlLoad = hdlLoad def \\ [Verilator, Vivado],
+                              hdlSim = hdlSim def \\ [Verilator, Vivado]
+                            }
+                     in runTest "DFold" _opts,
+                    runTest "DFold2" def,
+                    runTest "DTFold" def,
+                    -- vivado segfaults
+                    runTest "FindIndex" def {hdlSim = hdlSim def \\ [Vivado]},
+                    runTest "Fold" def,
+                    runTest "FoldlFuns" def {hdlSim = []},
+                    runTest "Foldr" def,
+                    runTest "FoldrEmpty" def,
+                    runTest "HOClock" def {hdlSim = []},
+                    runTest "HOPrim" def {hdlSim = []},
+                    runTest "Indices" def,
+                    runTest "Iterate" def,
+                    outputTest "IterateCF" def {hdlTargets = [VHDL]},
+                    runTest "Minimum" def,
+                    runTest "MovingAvg" def {hdlSim = []},
+                    runTest "PatHOCon" def {hdlSim = []},
+                    runTest "Scatter" def,
+                    runTest "Split" def {hdlSim = []},
+                    runTest "ToList" def,
+                    runTest "Unconcat" def,
 #if !defined(darwin_HOST_OS)
-        , clashLibTest "UnconcatBitVectorLiteral" def{hdlTargets=[Verilog]}
+                    clashLibTest "UnconcatBitVectorLiteral" def {hdlTargets = [Verilog]},
 #endif
-        , runTest "VACC" def{hdlSim=[]}
-        , runTest "VEmpty" def
-        , runTest "VIndex" def{hdlSim=[]}
-        , runTest "VIndicesI" def
-        , runTest "VFold" def{hdlSim=hdlSim def \\ [Vivado]} -- vivado segfaults
-        , runTest "VMerge" def
-        , runTest "VReplace" def
-        , runTest "VReverse" def
-        , runTest "VRotate" def
-        , runTest "VSelect" def
-        , runTest "VecOfSum" def{hdlSim=[]}
-        , runTest "T452" def{hdlSim=[]}
-        , runTest "T478" def{hdlSim=[]}
-        , let _opts = def {hdlSim = [], hdlTargets = [VHDL]}
-           in runTest "T895" _opts
-        , let _opts = def {hdlSim = [], hdlTargets = [VHDL]}
-           in runTest "T1360" _opts
-        ] -- end vector
-      , clashTestGroup "Verification" [
-          runTest "SymbiYosys" def{
-            hdlTargets=[Verilog, SystemVerilog]
-          , buildTargets=BuildSpecific ["topEntity"]
-          , hdlLoad=[]
-          , hdlSim=[]
-          , verificationTool=Just SymbiYosys
-          }
-        ]
-      , clashTestGroup "Warnings"
-        -- One module instantiating a non-synthesizable primitive, compiled
-        -- with different combinations of warning flags.
-        [ clashTestVariants "Promoted"
-          [ runTest "NonSynthesizable" def{
-              hdlTargets=[VHDL]
-            , clashFlags=["-Werror=clash-non-synthesizable"]
-            , expectClashFail=Just (def, "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!")
-            }
-          ]
-        , clashTestVariants "Demoted"
-          [ runTest "NonSynthesizable" def{
-              hdlTargets=[VHDL]
-            , clashFlags=["-Werror=clash-non-synthesizable", "-Wwarn=clash-non-synthesizable"]
-            , expectClashFail=Just ( TestSpecificExitCode 0
-                                   , "[-Wclash-non-synthesizable]")
-            }
-          ]
-        , clashTestVariants "Suppressed"
-          [ runTest "NonSynthesizable" def{
-              hdlTargets=[VHDL]
-            , hdlLoad=[]
-            , hdlSim=[]
-            , clashFlags=["-Werror=clash-non-synthesizable", "-Wno-clash-non-synthesizable"]
-            }
-          ]
-        ]
-      , clashTestGroup "Xilinx"
-        [ let _opts = def{ hdlLoad=[Vivado]
-                         , hdlSim=[Vivado]
-                         }
-          in runTest "ClockWizard" _opts
-        ]
-      , clashTestGroup "XOptimization"
-        [ outputTest "Conjunction" def
-        , outputTest "Disjunction" def
-        , clashLibTest "OneDefinedDataPat" def
-        , clashLibTest "OneDefinedLitPat" def
-        , clashLibTest "OneDefinedDefaultPat" def
-        , clashLibTest "ManyDefined" def
-        ]
---    , clashTestGroup "PartialEvaluation"
---      [ clashLibTest "EtaExpansion" def
---      , clashLibTest "KnownCase" def
---      , clashLibTest "CaseOfCase" def
---      , clashLibTest "LazyEvaluation" def
---      , clashLibTest "MutualRecursion" def
---      ]
-      ] -- end shouldwork
-    ] -- end tests
-  ] -- end .
+                    runTest "VACC" def {hdlSim = []},
+                    runTest "VEmpty" def,
+                    runTest "VIndex" def {hdlSim = []},
+                    runTest "VIndicesI" def,
+                    runTest "VFold" def {hdlSim = hdlSim def \\ [Vivado]}, -- vivado segfaults
+                    runTest "VMerge" def,
+                    runTest "VReplace" def,
+                    runTest "VReverse" def,
+                    runTest "VRotate" def,
+                    runTest "VSelect" def,
+                    runTest "VecOfSum" def {hdlSim = []},
+                    runTest "T452" def {hdlSim = []},
+                    runTest "T478" def {hdlSim = []},
+                    let _opts = def {hdlSim = [], hdlTargets = [VHDL]}
+                     in runTest "T895" _opts,
+                    let _opts = def {hdlSim = [], hdlTargets = [VHDL]}
+                     in runTest "T1360" _opts
+                  ], -- end vector
+                clashTestGroup
+                  "Verification"
+                  [ runTest
+                      "SymbiYosys"
+                      def
+                        { hdlTargets = [Verilog, SystemVerilog],
+                          buildTargets = BuildSpecific ["topEntity"],
+                          hdlLoad = [],
+                          hdlSim = [],
+                          verificationTool = Just SymbiYosys
+                        }
+                  ],
+                clashTestGroup
+                  "Warnings"
+                  -- One module instantiating a non-synthesizable primitive, compiled
+                  -- with different combinations of warning flags.
+                  [ clashTestVariants
+                      "Promoted"
+                      [ runTest
+                          "NonSynthesizable"
+                          def
+                            { hdlTargets = [VHDL],
+                              clashFlags = ["-Werror=clash-non-synthesizable"],
+                              expectClashFail = Just (def, "Clash.Explicit.Testbench.unsafeSimSynchronizer is not safely synthesizable!")
+                            }
+                      ],
+                    clashTestVariants
+                      "Demoted"
+                      [ runTest
+                          "NonSynthesizable"
+                          def
+                            { hdlTargets = [VHDL],
+                              clashFlags = ["-Werror=clash-non-synthesizable", "-Wwarn=clash-non-synthesizable"],
+                              expectClashFail =
+                                Just
+                                  ( TestSpecificExitCode 0,
+                                    "[-Wclash-non-synthesizable]"
+                                  )
+                            }
+                      ],
+                    clashTestVariants
+                      "Suppressed"
+                      [ runTest
+                          "NonSynthesizable"
+                          def
+                            { hdlTargets = [VHDL],
+                              hdlLoad = [],
+                              hdlSim = [],
+                              clashFlags = ["-Werror=clash-non-synthesizable", "-Wno-clash-non-synthesizable"]
+                            }
+                      ]
+                  ],
+                clashTestGroup
+                  "Xilinx"
+                  [ let _opts =
+                          def
+                            { hdlLoad = [Vivado],
+                              hdlSim = [Vivado]
+                            }
+                     in runTest "ClockWizard" _opts
+                  ],
+                clashTestGroup
+                  "XOptimization"
+                  [ outputTest "Conjunction" def,
+                    outputTest "Disjunction" def,
+                    clashLibTest "OneDefinedDataPat" def,
+                    clashLibTest "OneDefinedLitPat" def,
+                    clashLibTest "OneDefinedDefaultPat" def,
+                    clashLibTest "ManyDefined" def
+                  ]
+                --    , clashTestGroup "PartialEvaluation"
+                --      [ clashLibTest "EtaExpansion" def
+                --      , clashLibTest "KnownCase" def
+                --      , clashLibTest "CaseOfCase" def
+                --      , clashLibTest "LazyEvaluation" def
+                --      , clashLibTest "MutualRecursion" def
+                --      ]
+              ] -- end shouldwork
+          ] -- end tests
+      ] -- end .
 
 -- | Mapping from tasty flag to executables that must be on @PATH@ for that
 -- backend to be considered available.
 autoDetectTools :: [(String, [String])]
 autoDetectTools =
-  [ ("--no-modelsim",   ["vsim"])
-  , ("--no-vivado",     ["vivado"])
-  , ("--no-verilator",  case os of {"mingw32" -> ["verilator_bin"]; _ -> ["verilator"]})
-  , ("--no-ghdl",       ["ghdl"])
-  , ("--no-symbiyosys", ["sby"])
-  , ("--no-iverilog",   ["iverilog"])
+  [ ("--no-modelsim", ["vsim"]),
+    ("--no-vivado", ["vivado"]),
+    ("--no-verilator", case os of "mingw32" -> ["verilator_bin"]; _ -> ["verilator"]),
+    ("--no-ghdl", ["ghdl"]),
+    ("--no-symbiyosys", ["sby"]),
+    ("--no-iverilog", ["iverilog"])
   ]
 
 -- | Replace @--auto-detect-tools@ in the argument list with @--no-*@ flags for
@@ -1232,20 +1495,20 @@ autoDetectTools =
 expandAutoDetectTools :: [String] -> IO [String]
 expandAutoDetectTools args
   | autoFlag `elem` args = do
-    let rest = filter (/= autoFlag) args
-    missing <- mapM detectMissing autoDetectTools
-    let injected = [flag | (flag, Nothing) <- zip (map fst autoDetectTools) missing]
-    unless (null injected) $ do
-      putStrLn $ "Ignoring one or more tool due to " <> autoFlag <> ". Running with implicit flags: "
-      forM_ injected $ \i -> do
-        putStrLn $ "  " <> i
-    pure (injected <> rest)
+      let rest = filter (/= autoFlag) args
+      missing <- mapM detectMissing autoDetectTools
+      let injected = [flag | (flag, Nothing) <- zip (map fst autoDetectTools) missing]
+      unless (null injected) $ do
+        putStrLn $ "Ignoring one or more tool due to " <> autoFlag <> ". Running with implicit flags: "
+        forM_ injected $ \i -> do
+          putStrLn $ "  " <> i
+      pure (injected <> rest)
   | otherwise = pure args
- where
-  autoFlag = "--auto-detect-tools"
-  detectMissing (_, exes) = findFirst exes
-  findFirst [] = pure Nothing
-  findFirst (e:es) = findExecutable e >>= maybe (findFirst es) (pure . Just)
+  where
+    autoFlag = "--auto-detect-tools"
+    detectMissing (_, exes) = findFirst exes
+    findFirst [] = pure Nothing
+    findFirst (e : es) = findExecutable e >>= maybe (findFirst es) (pure . Just)
 
 main :: IO ()
 main = do

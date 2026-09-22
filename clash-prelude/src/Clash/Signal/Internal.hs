@@ -1,15 +1,5 @@
-{-|
-Copyright  :  (C) 2013-2016, University of Twente,
-                  2017-2019, Myrtle Software Ltd,
-                  2017-2022, Google Inc.,
-                  2020     , Gergő Érdi,
-                  2021-2026, QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -23,214 +13,283 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 {-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
 -- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
 -- as to why we need this.
 {-# OPTIONS_GHC -fno-cpr-anal #-}
-
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Extra.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions not-home #-}
 
+{-|
+Copyright  :  (C) 2013-2016, University of Twente,
+                  2017-2019, Myrtle Software Ltd,
+                  2017-2022, Google Inc.,
+                  2020     , Gergő Érdi,
+                  2021-2026, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.Signal.Internal
   ( -- * Datatypes
-    Signal(..)
-  , head#
-  , tail#
+    Signal (..),
+    head#,
+    tail#,
+
     -- * Domains
-  , Domain
-  , sameDomain
-  , KnownDomain(..)
-  , KnownConfiguration
-  , knownDomainByName
-  , ActiveEdge(..)
-  , SActiveEdge(..)
-  , InitBehavior(..)
-  , SInitBehavior(..)
-  , ResetKind(..)
-  , SResetKind(..)
-  , ResetPolarity(..)
-  , SResetPolarity(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
+    Domain,
+    sameDomain,
+    KnownDomain (..),
+    KnownConfiguration,
+    knownDomainByName,
+    ActiveEdge (..),
+    SActiveEdge (..),
+    InitBehavior (..),
+    SInitBehavior (..),
+    ResetKind (..),
+    SResetKind (..),
+    ResetPolarity (..),
+    SResetPolarity (..),
+    DomainConfiguration (..),
+    SDomainConfiguration (..),
 
-  , DomainConfigurationPeriod
-  , DomainConfigurationActiveEdge
-  , DomainConfigurationResetKind
-  , DomainConfigurationInitBehavior
-  , DomainConfigurationResetPolarity
+    -- ** Configuration type families
+    DomainPeriod,
+    DomainActiveEdge,
+    DomainResetKind,
+    DomainInitBehavior,
+    DomainResetPolarity,
+    DomainConfigurationPeriod,
+    DomainConfigurationActiveEdge,
+    DomainConfigurationResetKind,
+    DomainConfigurationInitBehavior,
+    DomainConfigurationResetPolarity,
 
-  -- *** Convenience types
-  , HasSynchronousReset
-  , HasAsynchronousReset
-  , HasDefinedInitialValues
-  -- **** Time representations
-  , Seconds
-  , Milliseconds
-  , Microseconds
-  , Nanoseconds
-  , Picoseconds
-  -- **** Time conversions
-  , DomainToHz
-  , HzToPeriod
-  , PeriodToHz
-  , PeriodToCycles
-  , ClockDivider
+    -- *** Convenience types
+    HasSynchronousReset,
+    HasAsynchronousReset,
+    HasDefinedInitialValues,
+
+    -- **** Time representations
+    Seconds,
+    Milliseconds,
+    Microseconds,
+    Nanoseconds,
+    Picoseconds,
+
+    -- **** Time conversions
+    DomainToHz,
+    HzToPeriod,
+    PeriodToHz,
+    PeriodToCycles,
+    ClockDivider,
+
     -- ** Default domains
-  , System
-  , XilinxSystem
-  , IntelSystem
-  , vSystem
-  , vIntelSystem
-  , vXilinxSystem
-    -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , createDomain
-    -- * Clocks
-  , Clock (..)
-  , ClockN (..)
-  , DiffClock (..)
-  , hzToPeriod
-  , periodToHz
-  , ClockAB (..)
-  , clockTicks
-  , clockTicksEither
-    -- ** Enabling
-  , Enable(..)
-  , toEnable
-  , fromEnable
-  , enableGen
-    -- * Resets
-  , Reset(..)
-  , unsafeToReset
-  , unsafeFromReset
-  , unsafeToActiveHigh
-  , unsafeToActiveLow
-  , unsafeFromActiveHigh
-  , unsafeFromActiveLow
-  , invertReset
-    -- * Basic circuits
-  , delay#
-  , register#
-  , asyncRegister#
-  , syncRegister#
-  , registerPowerup#
-  , mux
-  , apEn
-    -- * Simulation and testbench functions
-  , clockGen
-  , tbClockGen
-  , Femtoseconds(..)  -- experimental, do not expose in public API
-  , fsToHz            -- experimental, do not expose in public API
-  , hzToFs            -- experimental, do not expose in public API
-  , unFemtoseconds    -- experimental, do not expose in public API
-  , mapFemtoseconds   -- experimental, do not expose in public API
-  , tbDynamicClockGen -- experimental, do not expose in public API
-  , dynamicClockGen   -- experimental, do not expose in public API
-  , resetGen
-  , resetGenN
-    -- * Boolean connectives
-  , (.&&.), (&&.), (.&&), (.||.), (||.), (.||)
-    -- * Simulation functions (not synthesizable)
-  , simulate
-    -- ** lazy version
-  , simulate_lazy
-    -- ** Automaton
-  , signalAutomaton
-    -- * List \<-\> Signal conversion (not synthesizable)
-  , sample
-  , sampleN
-  , fromList
-    -- ** lazy versions
-  , sample_lazy
-  , sampleN_lazy
-  , fromList_lazy
-    -- * QuickCheck combinators
-  , testFor
-    -- * Type classes
-    -- ** 'Eq'-like
-  , (.==.), (.==), (==.), (./=.), (./=), (/=.)
-    -- ** 'Ord'-like
-  , (.<.), (.<), (<.), (.<=.), (.<=), (<=.), (.>=.), (.>=), (>=.), (.>.), (.>), (>.)
-    -- ** 'Functor'
-  , mapSignal#
-    -- ** 'Applicative'
-  , signal#
-  , appSignal#
-    -- ** 'Foldable'
-  , foldr#
-    -- ** 'Traversable'
-  , traverse#
-  -- * EXTREMELY EXPERIMENTAL
-  , joinSignal#
+    System,
+    XilinxSystem,
+    IntelSystem,
+    vSystem,
+    vIntelSystem,
+    vXilinxSystem,
 
-  -- * Deprecated
-  , unsafeFromHighPolarity
-  , unsafeFromLowPolarity
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
+    -- ** Domain utilities
+    VDomainConfiguration (..),
+    vDomain,
+    createDomain,
+
+    -- * Clocks
+    Clock (..),
+    ClockN (..),
+    DiffClock (..),
+    hzToPeriod,
+    periodToHz,
+    ClockAB (..),
+    clockTicks,
+    clockTicksEither,
+
+    -- ** Enabling
+    Enable (..),
+    toEnable,
+    fromEnable,
+    enableGen,
+
+    -- * Resets
+    Reset (..),
+    unsafeToReset,
+    unsafeFromReset,
+    unsafeToActiveHigh,
+    unsafeToActiveLow,
+    unsafeFromActiveHigh,
+    unsafeFromActiveLow,
+    invertReset,
+
+    -- * Basic circuits
+    delay#,
+    register#,
+    asyncRegister#,
+    syncRegister#,
+    registerPowerup#,
+    mux,
+    apEn,
+
+    -- * Simulation and testbench functions
+    clockGen,
+    tbClockGen,
+    Femtoseconds (..), -- experimental, do not expose in public API
+    fsToHz, -- experimental, do not expose in public API
+    hzToFs, -- experimental, do not expose in public API
+    unFemtoseconds, -- experimental, do not expose in public API
+    mapFemtoseconds, -- experimental, do not expose in public API
+    tbDynamicClockGen, -- experimental, do not expose in public API
+    dynamicClockGen, -- experimental, do not expose in public API
+    resetGen,
+    resetGenN,
+
+    -- * Boolean connectives
+    (.&&.),
+    (&&.),
+    (.&&),
+    (.||.),
+    (||.),
+    (.||),
+
+    -- * Simulation functions (not synthesizable)
+    simulate,
+
+    -- ** lazy version
+    simulate_lazy,
+
+    -- ** Automaton
+    signalAutomaton,
+
+    -- * List \<-\> Signal conversion (not synthesizable)
+    sample,
+    sampleN,
+    fromList,
+
+    -- ** lazy versions
+    sample_lazy,
+    sampleN_lazy,
+    fromList_lazy,
+
+    -- * QuickCheck combinators
+    testFor,
+
+    -- * Type classes
+
+    -- ** 'Eq'-like
+    (.==.),
+    (.==),
+    (==.),
+    (./=.),
+    (./=),
+    (/=.),
+
+    -- ** 'Ord'-like
+    (.<.),
+    (.<),
+    (<.),
+    (.<=.),
+    (.<=),
+    (<=.),
+    (.>=.),
+    (.>=),
+    (>=.),
+    (.>.),
+    (.>),
+    (>.),
+
+    -- ** 'Functor'
+    mapSignal#,
+
+    -- ** 'Applicative'
+    signal#,
+    appSignal#,
+
+    -- ** 'Foldable'
+    foldr#,
+
+    -- ** 'Traversable'
+    traverse#,
+
+    -- * EXTREMELY EXPERIMENTAL
+    joinSignal#,
+
+    -- * Deprecated
+    unsafeFromHighPolarity,
+    unsafeFromLowPolarity,
+    unsafeToHighPolarity,
+    unsafeToLowPolarity,
   )
 where
 
-import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
+import Data.IORef (IORef, atomicModifyIORef, newIORef, readIORef)
 #if __GLASGOW_HASKELL__ < 912
-import Type.Reflection            (Typeable)
+import Type.Reflection (Typeable)
 #endif
-import Control.Arrow.Transformer.Automaton
-import Control.Applicative        (liftA3)
-import Control.DeepSeq            (NFData)
-import Clash.Annotations.Primitive (hasBlackBox, dontTranslate)
-import Data.Binary                (Binary)
-import Data.Char                  (isAsciiUpper, isAlphaNum, isAscii)
-import Data.Coerce                (coerce)
-import Data.Data                  (Data)
-import Data.Default               (Default (..))
-import Data.Hashable              (Hashable)
-import Data.Int                   (Int64)
-import Data.Maybe                 (isJust)
-import Data.Proxy                 (Proxy(..))
-import Data.Ratio                 (Ratio)
-import Data.Type.Equality         ((:~:))
-import GHC.Generics               (Generic)
-import GHC.Stack                  (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits
-  (Div, KnownSymbol, KnownNat, Nat, Symbol, type (<=), type (*), sameSymbol)
-import GHC.TypeLits.Extra         (DivRU)
-import GHC.Records                (HasField(getField))
-import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
-import Language.Haskell.TH.Compat
-import Numeric.Natural            (Natural)
 import CheckedLiterals.Class.Integer
-  ( CheckedNegativeIntegerLiteral
-  , CheckedPositiveIntegerLiteral
+  ( CheckedNegativeIntegerLiteral,
+    CheckedPositiveIntegerLiteral,
   )
 import CheckedLiterals.Class.Rational
-  ( CheckedNegativeRationalLiteral
-  , CheckedPositiveRationalLiteral
+  ( CheckedNegativeRationalLiteral,
+    CheckedPositiveRationalLiteral,
   )
-import System.IO.Unsafe           (unsafeInterleaveIO, unsafePerformIO)
-import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
-                                   property)
-
-import Clash.Class.Num            (SaturatingNum(..))
-import Clash.CPP                  (fStrictMapSignal)
-import Clash.Magic                (clashSimulation)
+import Clash.Annotations.Primitive (dontTranslate, hasBlackBox)
+import Clash.CPP (fStrictMapSignal)
+import Clash.Class.Num (SaturatingNum (..))
+import Clash.Magic (clashSimulation)
 import Clash.NamedTypes
-import Clash.Promoted.Nat         (SNat (..), snatToNum, snatToNatural)
-import Clash.Promoted.Symbol      (SSymbol (..), ssymbolToString)
+import Clash.Promoted.Nat (SNat (..), snatToNatural, snatToNum)
+import Clash.Promoted.Symbol (SSymbol (..), ssymbolToString)
 import Clash.XException
-  (NFDataX(..), errorX, isX, deepseqX, defaultSeqX, seqX)
+  ( NFDataX (..),
+    deepseqX,
+    defaultSeqX,
+    errorX,
+    isX,
+    seqX,
+  )
+import Control.Applicative (liftA3)
+import Control.Arrow.Transformer.Automaton
+import Control.DeepSeq (NFData)
+import Data.Binary (Binary)
+import Data.Char (isAlphaNum, isAscii, isAsciiUpper)
+import Data.Coerce (coerce)
+import Data.Data (Data)
+import Data.Default (Default (..))
+import Data.Hashable (Hashable)
+import Data.Int (Int64)
+import Data.Maybe (isJust)
+import Data.Proxy (Proxy (..))
+import Data.Ratio (Ratio)
+import Data.Type.Equality ((:~:))
+import GHC.Generics (Generic)
+import GHC.Records (HasField (getField))
+import GHC.Stack (HasCallStack, withFrozenCallStack)
+import GHC.TypeLits
+  ( Div,
+    KnownNat,
+    KnownSymbol,
+    Nat,
+    Symbol,
+    sameSymbol,
+    type (*),
+    type (<=),
+  )
+import GHC.TypeLits.Extra (DivRU)
+import Language.Haskell.TH.Compat
+import Language.Haskell.TH.Syntax -- (Lift (..), Q, Dec)
+import Numeric.Natural (Natural)
+import System.IO.Unsafe (unsafeInterleaveIO, unsafePerformIO)
+import Test.QuickCheck
+  ( Arbitrary (..),
+    CoArbitrary (..),
+    Property,
+    property,
+  )
 
 {- $setup
 >>> :set -XDataKinds
@@ -256,16 +315,18 @@ import Clash.XException
 -- | Determines clock edge memory elements are sensitive to. Not yet
 -- implemented.
 data ActiveEdge
-  -- TODO: Implement in blackboxes:
-  = Rising
-  -- ^ Elements are sensitive to the rising edge (low-to-high) of the clock.
-  | Falling
-  -- ^ Elements are sensitive to the falling edge (high-to-low) of the clock.
+  =
+    -- TODO: Implement in blackboxes:
+
+    -- | Elements are sensitive to the rising edge (low-to-high) of the clock.
+    Rising
+  | -- | Elements are sensitive to the falling edge (high-to-low) of the clock.
+    Falling
   deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
 -- | Singleton version of 'ActiveEdge'
 data SActiveEdge (edge :: ActiveEdge) where
-  SRising  :: SActiveEdge 'Rising
+  SRising :: SActiveEdge 'Rising
   SFalling :: SActiveEdge 'Falling
 
 instance Show (SActiveEdge edge) where
@@ -273,14 +334,14 @@ instance Show (SActiveEdge edge) where
   show SFalling = "SFalling"
 
 data ResetKind
-  = Asynchronous
-  -- ^ Elements respond /asynchronously/ to changes in their reset input. This
-  -- means that they do /not/ wait for the next active clock edge, but respond
-  -- immediately instead. Common on Intel FPGA platforms.
-  | Synchronous
-  -- ^ Elements respond /synchronously/ to changes in their reset input. This
-  -- means that changes in their reset input won't take effect until the next
-  -- active clock edge. Common on Xilinx FPGA platforms.
+  = -- | Elements respond /asynchronously/ to changes in their reset input. This
+    -- means that they do /not/ wait for the next active clock edge, but respond
+    -- immediately instead. Common on Intel FPGA platforms.
+    Asynchronous
+  | -- | Elements respond /synchronously/ to changes in their reset input. This
+    -- means that changes in their reset input won't take effect until the next
+    -- active clock edge. Common on Xilinx FPGA platforms.
+    Synchronous
   deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
 -- | Singleton version of 'ResetKind'
@@ -288,8 +349,9 @@ data SResetKind (resetKind :: ResetKind) where
   SAsynchronous :: SResetKind 'Asynchronous
   -- See 'Asynchronous' ^
 
-  SSynchronous  :: SResetKind 'Synchronous
-  -- See 'Synchronous' ^
+  SSynchronous :: SResetKind 'Synchronous
+
+-- See 'Synchronous' ^
 
 instance Show (SResetKind reset) where
   show SAsynchronous = "SAsynchronous"
@@ -297,10 +359,10 @@ instance Show (SResetKind reset) where
 
 -- | Determines the value for which a reset line is considered "active"
 data ResetPolarity
-  = ActiveHigh
-  -- ^ Reset is considered active if underlying signal is 'True'.
-  | ActiveLow
-  -- ^ Reset is considered active if underlying signal is 'False'.
+  = -- | Reset is considered active if underlying signal is 'True'.
+    ActiveHigh
+  | -- | Reset is considered active if underlying signal is 'False'.
+    ActiveLow
   deriving (Eq, Ord, Show, Read, Generic, NFData, Data, Hashable, Binary)
 
 -- | Singleton version of 'ResetPolarity'
@@ -309,19 +371,20 @@ data SResetPolarity (polarity :: ResetPolarity) where
   -- See: 'ActiveHigh' ^
 
   SActiveLow :: SResetPolarity 'ActiveLow
-  -- See: 'ActiveLow' ^
+
+-- See: 'ActiveLow' ^
 
 instance Show (SResetPolarity polarity) where
   show SActiveHigh = "SActiveHigh"
   show SActiveLow = "SActiveLow"
 
 data InitBehavior
-  = Unknown
-  -- ^ Power up value of memory elements is /unknown/.
-  | Defined
-  -- ^ If applicable, power up value of a memory element is defined. Applies to
-  -- 'Clash.Signal.register's for example, but not to
-  -- 'Clash.Prelude.BlockRam.blockRam'.
+  = -- | Power up value of memory elements is /unknown/.
+    Unknown
+  | -- | If applicable, power up value of a memory element is defined. Applies to
+    -- 'Clash.Signal.register's for example, but not to
+    -- 'Clash.Prelude.BlockRam.blockRam'.
+    Defined
   deriving (Show, Read, Eq, Ord, Generic, NFData, Data, Hashable, Binary)
 
 data SInitBehavior (init :: InitBehavior) where
@@ -329,7 +392,8 @@ data SInitBehavior (init :: InitBehavior) where
   -- See: 'Unknown' ^
 
   SDefined :: SInitBehavior 'Defined
-  -- See: 'Defined' ^
+
+-- See: 'Defined' ^
 
 instance Show (SInitBehavior init) where
   show SUnknown = "SUnknown"
@@ -343,19 +407,19 @@ instance Show (SInitBehavior init) where
 -- how to create custom synthesis domains.
 data DomainConfiguration
   = DomainConfiguration
-  { _name :: Domain
-  -- ^ Domain name
-  , _period :: Nat
-  -- ^ Period of clock in /ps/
-  , _activeEdge :: ActiveEdge
-  -- ^ Active edge of the clock
-  , _resetKind :: ResetKind
-  -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-  , _initBehavior :: InitBehavior
-  -- ^ Whether the initial (or "power up") value of memory elements is
-  -- unknown/undefined, or configurable to a specific value
-  , _resetPolarity :: ResetPolarity
-  -- ^ Whether resets are active high or active low
+  { -- | Domain name
+    _name :: Domain,
+    -- | Period of clock in /ps/
+    _period :: Nat,
+    -- | Active edge of the clock
+    _activeEdge :: ActiveEdge,
+    -- | Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
+    _resetKind :: ResetKind,
+    -- | Whether the initial (or "power up") value of memory elements is
+    -- unknown/undefined, or configurable to a specific value
+    _initBehavior :: InitBehavior,
+    -- | Whether resets are active high or active low
+    _resetPolarity :: ResetPolarity
   }
 #if __GLASGOW_HASKELL__ < 912
   deriving (Typeable)
@@ -470,15 +534,19 @@ type DomainResetPolarity (dom :: Domain) =
 -- * Time representation
 
 -- | Gets time in 'Picoseconds' from time in 'Seconds'
-type Seconds      (s  :: Nat) = Milliseconds (1000 * s)
+type Seconds (s :: Nat) = Milliseconds (1000 * s)
+
 -- | Gets time in 'Picoseconds' from time in 'Milliseconds'
 type Milliseconds (ms :: Nat) = Microseconds (1000 * ms)
+
 -- | Gets time in 'Picoseconds' from time in 'Microseconds'
-type Microseconds (us :: Nat) = Nanoseconds  (1000 * us)
+type Microseconds (us :: Nat) = Nanoseconds (1000 * us)
+
 -- | Gets time in 'Picoseconds' from time in 'Nanoseconds'
-type Nanoseconds  (ns :: Nat) = Picoseconds  (1000 * ns)
+type Nanoseconds (ns :: Nat) = Picoseconds (1000 * ns)
+
 -- | Gets time in 'Picoseconds' from time in picoseconds, essentially 'id'
-type Picoseconds  (ps :: Nat) = ps
+type Picoseconds (ps :: Nat) = ps
 
 -- | Converts a frequency in hertz to a period in picoseconds. This might lead to rounding
 -- errors.
@@ -490,7 +558,7 @@ type DomainToHz (dom :: Domain) = PeriodToHz (DomainPeriod dom)
 
 -- | Number of clock cycles required at the clock frequency of @dom@ before a minimum
 -- @period@ has passed
-type PeriodToCycles (dom :: Domain) (period :: Nat) =  period `DivRU` DomainPeriod dom
+type PeriodToCycles (dom :: Domain) (period :: Nat) = period `DivRU` DomainPeriod dom
 
 -- | Converts a period in picoseconds to a frequency in hertz. This might lead to rounding
 -- errors.
@@ -503,21 +571,22 @@ type ClockDivider (dom :: Domain) (period :: Nat) = PeriodToCycles dom period
 -- | Singleton version of 'DomainConfiguration'
 data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
   SDomainConfiguration ::
-    1 <= period =>
-    { sName :: SSymbol dom
-      -- ^ Domain name
-    , sPeriod :: SNat period
-    -- ^ Period of clock in /ps/
-    , sActiveEdge :: SActiveEdge edge
-    -- ^ Active edge of the clock (not yet implemented)
-    , sResetKind :: SResetKind reset
-    -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-    , sInitBehavior :: SInitBehavior init
-    -- ^ Whether the initial (or "power up") value of memory elements is
-    -- unknown/undefined, or configurable to a specific value
-    , sResetPolarity :: SResetPolarity polarity
-    -- ^ Whether resets are active high or active low
-    } -> SDomainConfiguration dom ('DomainConfiguration dom period edge reset init polarity)
+    (1 <= period) =>
+    { -- | Domain name
+      sName :: SSymbol dom,
+      -- | Period of clock in /ps/
+      sPeriod :: SNat period,
+      -- | Active edge of the clock (not yet implemented)
+      sActiveEdge :: SActiveEdge edge,
+      -- | Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
+      sResetKind :: SResetKind reset,
+      -- | Whether the initial (or "power up") value of memory elements is
+      -- unknown/undefined, or configurable to a specific value
+      sInitBehavior :: SInitBehavior init,
+      -- | Whether resets are active high or active low
+      sResetPolarity :: SResetPolarity polarity
+    } ->
+    SDomainConfiguration dom ('DomainConfiguration dom period edge reset init polarity)
 
 deriving instance Show (SDomainConfiguration dom conf)
 
@@ -527,6 +596,7 @@ type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
 -- some properties of a domain. See 'DomainConfiguration' for more information.
 class (KnownSymbol dom, KnownNat (DomainPeriod dom)) => KnownDomain (dom :: Domain) where
   type KnownConf dom :: DomainConfiguration
+
   -- | Returns 'SDomainConfiguration' corresponding to an instance's 'DomainConfiguration'.
   --
   -- Example usage:
@@ -539,11 +609,11 @@ class (KnownSymbol dom, KnownNat (DomainPeriod dom)) => KnownDomain (dom :: Doma
 --
 -- >>> knownDomainByName (SSymbol @"System")
 -- SDomainConfiguration {sName = SSymbol @"System", sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
-knownDomainByName
-  :: forall dom
-   . KnownDomain dom
-  => SSymbol dom
-  -> SDomainConfiguration dom (KnownConf dom)
+knownDomainByName ::
+  forall dom.
+  (KnownDomain dom) =>
+  SSymbol dom ->
+  SDomainConfiguration dom (KnownConf dom)
 knownDomainByName =
   const knownDomain
 {-# INLINE knownDomainByName #-}
@@ -579,7 +649,6 @@ vSystem = vDomain (knownDomain @System)
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
 type System = ("System" :: Domain)
-
 
 -- | Convenience value to allow easy "subclassing" of IntelSystem domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
@@ -628,18 +697,18 @@ type XilinxSystem = ("XilinxSystem" :: Domain)
 --
 data VDomainConfiguration
   = VDomainConfiguration
-  { vName :: String
-  -- ^ Corresponds to '_name' on 'DomainConfiguration'
-  , vPeriod :: Natural
-  -- ^ Corresponds to '_period' on 'DomainConfiguration'
-  , vActiveEdge :: ActiveEdge
-  -- ^ Corresponds to '_activeEdge' on 'DomainConfiguration'
-  , vResetKind :: ResetKind
-  -- ^ Corresponds to '_resetKind' on 'DomainConfiguration'
-  , vInitBehavior :: InitBehavior
-  -- ^ Corresponds to '_initBehavior' on 'DomainConfiguration'
-  , vResetPolarity :: ResetPolarity
-  -- ^ Corresponds to '_resetPolarity' on 'DomainConfiguration'
+  { -- | Corresponds to '_name' on 'DomainConfiguration'
+    vName :: String,
+    -- | Corresponds to '_period' on 'DomainConfiguration'
+    vPeriod :: Natural,
+    -- | Corresponds to '_activeEdge' on 'DomainConfiguration'
+    vActiveEdge :: ActiveEdge,
+    -- | Corresponds to '_resetKind' on 'DomainConfiguration'
+    vResetKind :: ResetKind,
+    -- | Corresponds to '_initBehavior' on 'DomainConfiguration'
+    vInitBehavior :: InitBehavior,
+    -- | Corresponds to '_resetPolarity' on 'DomainConfiguration'
+    vResetPolarity :: ResetPolarity
   }
   deriving (Eq, Generic, NFData, Show, Read, Binary)
 
@@ -650,14 +719,14 @@ vDomain (SDomainConfiguration dom period edge reset init_ polarity) =
   VDomainConfiguration
     (ssymbolToString dom)
     (snatToNatural period)
-    (case edge of {SRising -> Rising; SFalling -> Falling})
-    (case reset of {SAsynchronous -> Asynchronous; SSynchronous -> Synchronous})
-    (case init_ of {SDefined -> Defined; SUnknown -> Unknown})
-    (case polarity of {SActiveHigh -> ActiveHigh; SActiveLow -> ActiveLow})
+    (case edge of SRising -> Rising; SFalling -> Falling)
+    (case reset of SAsynchronous -> Asynchronous; SSynchronous -> Synchronous)
+    (case init_ of SDefined -> Defined; SUnknown -> Unknown)
+    (case polarity of SActiveHigh -> ActiveHigh; SActiveLow -> ActiveLow)
 
 -- TODO: Function might reject valid type names. Figure out what's allowed.
 isValidDomainName :: String -> Bool
-isValidDomainName (x:xs) = isAsciiUpper x && all isAscii xs && all isAlphaNum xs
+isValidDomainName (x : xs) = isAsciiUpper x && all isAscii xs && all isAlphaNum xs
 isValidDomainName _ = False
 
 -- | Convenience method to express new domains in terms of others.
@@ -692,105 +761,103 @@ isValidDomainName _ = False
 -- > createDomain vSystem{vName="CustomDomain"}
 createDomain :: VDomainConfiguration -> Q [Dec]
 createDomain (VDomainConfiguration name period edge reset init_ polarity) =
-  if isValidDomainName name then do
-    kdType <- [t| KnownDomain $nameT |]
-    kcType <- [t| ('DomainConfiguration $nameT $periodT $edgeT $resetKindT $initT $polarityT) |]
-    sDom <- [| SDomainConfiguration SSymbol SNat $edgeE $resetKindE $initE $polarityE |]
+  if isValidDomainName name
+    then do
+      kdType <- [t|KnownDomain $nameT|]
+      kcType <- [t|('DomainConfiguration $nameT $periodT $edgeT $resetKindT $initT $polarityT)|]
+      sDom <- [|SDomainConfiguration SSymbol SNat $edgeE $resetKindE $initE $polarityE|]
 
-    let vNameImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
-        kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
-        kcImpl = mkTySynInstD ''KnownConf [LitT (StrTyLit name)] kcType
-        vName' = mkName ('v':name)
+      let vNameImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (LitT (StrTyLit name)))
+          kdImpl = FunD 'knownDomain [Clause [] (NormalB sDom) []]
+          kcImpl = mkTySynInstD ''KnownConf [LitT (StrTyLit name)] kcType
+          vName' = mkName ('v' : name)
 
-    tySynExists <- isJust <$> lookupTypeName name
-    vHelperExists <- isJust <$> lookupValueName ('v':name)
+      tySynExists <- isJust <$> lookupTypeName name
+      vHelperExists <- isJust <$> lookupValueName ('v' : name)
 
-    pure $ concat
-      [
-        [ -- Type synonym (ex: type System = "System")
-          TySynD (mkName name) [] (LitT (StrTyLit name)  `SigT`  ConT ''Domain)
-        | not tySynExists
-        ]
-
-      , concat
-        [ -- vDomain helper (ex: vSystem = vDomain (knownDomain @System))
-          [ SigD vName' (ConT ''VDomainConfiguration)
-          , FunD vName' [Clause [] (NormalB vNameImpl) []]
+      pure $
+        concat
+          [ [ -- Type synonym (ex: type System = "System")
+            TySynD (mkName name) [] (LitT (StrTyLit name) `SigT` ConT ''Domain)
+            | not tySynExists
+            ],
+            concat
+              [ -- vDomain helper (ex: vSystem = vDomain (knownDomain @System))
+              [ SigD vName' (ConT ''VDomainConfiguration),
+                FunD vName' [Clause [] (NormalB vNameImpl) []]
+              ]
+              | not vHelperExists
+              ],
+            [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)
+              InstanceD Nothing [] kdType [kcImpl, kdImpl]
+            ]
           ]
-        | not vHelperExists
-        ]
-      , [ -- KnownDomain instance (ex: instance KnownDomain "System" where ...)
-          InstanceD Nothing [] kdType [kcImpl, kdImpl]
-        ]
-      ]
+    else
+      error ("Domain names should be a valid Haskell type name, not: " ++ name)
+  where
+    edgeE =
+      pure $
+        case edge of
+          Rising -> ConE 'SRising
+          Falling -> ConE 'SFalling
 
-  else
-    error ("Domain names should be a valid Haskell type name, not: " ++ name)
- where
+    resetKindE =
+      pure $
+        case reset of
+          Asynchronous -> ConE 'SAsynchronous
+          Synchronous -> ConE 'SSynchronous
 
-  edgeE =
-    pure $
-    case edge of
-      Rising -> ConE 'SRising
-      Falling -> ConE 'SFalling
+    initE =
+      pure $
+        case init_ of
+          Unknown -> ConE 'SUnknown
+          Defined -> ConE 'SDefined
 
-  resetKindE =
-    pure $
-    case reset of
-      Asynchronous -> ConE 'SAsynchronous
-      Synchronous -> ConE 'SSynchronous
+    polarityE =
+      pure $
+        case polarity of
+          ActiveHigh -> ConE 'SActiveHigh
+          ActiveLow -> ConE 'SActiveLow
 
-  initE =
-    pure $
-    case init_ of
-      Unknown -> ConE 'SUnknown
-      Defined -> ConE 'SDefined
+    nameT = pure (LitT (StrTyLit name))
+    periodT = pure (LitT (NumTyLit (toInteger period)))
 
-  polarityE =
-    pure $
-    case polarity of
-      ActiveHigh -> ConE 'SActiveHigh
-      ActiveLow -> ConE 'SActiveLow
+    edgeT =
+      pure $
+        case edge of
+          Rising -> PromotedT 'Rising
+          Falling -> PromotedT 'Falling
 
-  nameT   = pure (LitT (StrTyLit name))
-  periodT = pure (LitT (NumTyLit (toInteger period)))
+    resetKindT =
+      pure $
+        case reset of
+          Asynchronous -> PromotedT 'Asynchronous
+          Synchronous -> PromotedT 'Synchronous
 
-  edgeT =
-    pure $
-    case edge of
-      Rising -> PromotedT 'Rising
-      Falling -> PromotedT 'Falling
+    initT =
+      pure $
+        case init_ of
+          Unknown -> PromotedT 'Unknown
+          Defined -> PromotedT 'Defined
 
-  resetKindT =
-    pure $
-    case reset of
-      Asynchronous -> PromotedT 'Asynchronous
-      Synchronous -> PromotedT 'Synchronous
-
-  initT =
-    pure $
-    case init_ of
-      Unknown -> PromotedT 'Unknown
-      Defined -> PromotedT 'Defined
-
-  polarityT =
-    pure $
-    case polarity of
-      ActiveHigh -> PromotedT 'ActiveHigh
-      ActiveLow -> PromotedT 'ActiveLow
-
+    polarityT =
+      pure $
+        case polarity of
+          ActiveHigh -> PromotedT 'ActiveHigh
+          ActiveLow -> PromotedT 'ActiveLow
 
 type Domain = Symbol
 
 -- | We either get evidence that this function was instantiated with the same
 -- domains, or Nothing.
-sameDomain
-  :: forall (domA :: Domain) (domB :: Domain)
-   . (KnownDomain domA, KnownDomain domB)
-  => Maybe (domA :~: domB)
+sameDomain ::
+  forall (domA :: Domain) (domB :: Domain).
+  (KnownDomain domA, KnownDomain domB) =>
+  Maybe (domA :~: domB)
 sameDomain = sameSymbol (Proxy @domA) (Proxy @domB)
 
 infixr 5 :-
+
 {- | Clash has synchronous 'Signal's in the form of:
 
 @
@@ -827,27 +894,28 @@ See the module documentation of "Clash.Signal" for more information about
 domains.
 -}
 type role Signal nominal representational
+
 data Signal (dom :: Domain) a
-  -- | The constructor, @(':-')@, is __not__ synthesizable.
-  = a :- Signal dom a
+  = -- | The constructor, @(':-')@, is __not__ synthesizable.
+    a :- Signal dom a
 
 head# :: Signal dom a -> a
-head# (x' :- _ )  = x'
+head# (x' :- _) = x'
 
 tail# :: Signal dom a -> Signal dom a
-tail# (_  :- xs') = xs'
+tail# (_ :- xs') = xs'
 
-instance HasField (x :: k) r a => HasField x (Signal dom r) (Signal dom a) where
+instance (HasField (x :: k) r a) => HasField x (Signal dom r) (Signal dom a) where
   getField = fmap (getField @x @r @a)
 
-instance Show a => Show (Signal dom a) where
+instance (Show a) => Show (Signal dom a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
-instance Lift a => Lift (Signal dom a) where
-  lift ~(x :- _) = [| signal# x |]
+instance (Lift a) => Lift (Signal dom a) where
+  lift ~(x :- _) = [|signal# x|]
   liftTyped = liftTypedFromUntyped
 
-instance Default a => Default (Signal dom a) where
+instance (Default a) => Default (Signal dom a) where
   def = signal# def
 
 instance Functor (Signal dom) where
@@ -855,15 +923,15 @@ instance Functor (Signal dom) where
 
 mapSignal# :: forall a b dom. (a -> b) -> Signal dom a -> Signal dom b
 mapSignal# f = go
- where
-  -- See -fstrict-mapSignal documentation in clash-prelude.cabal
-  theSeq = if fStrictMapSignal then seqX else flip const
-  go ~(xs@(a :- as)) = f a :- (a `theSeq` (xs `seq` go as))
+  where
+    -- See -fstrict-mapSignal documentation in clash-prelude.cabal
+    theSeq = if fStrictMapSignal then seqX else flip const
+    go ~(xs@(a :- as)) = f a :- (a `theSeq` (xs `seq` go as))
 {-# OPAQUE mapSignal# #-}
 {-# ANN mapSignal# hasBlackBox #-}
 
 instance Applicative (Signal dom) where
-  pure  = signal#
+  pure = signal#
   (<*>) = appSignal#
 
 signal# :: a -> Signal dom a
@@ -876,8 +944,9 @@ appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See
 {-# OPAQUE appSignal# #-}
 {-# ANN appSignal# hasBlackBox #-}
 
-instance NFDataX a => NFDataX (Signal domain a) where
+instance (NFDataX a) => NFDataX (Signal domain a) where
   deepErrorX = pure . deepErrorX
+
   -- The simulation implementation pattern matches on ':-', which Clash cannot
   -- translate to HDL: exposing the constructor crashes Clash with an internal
   -- error (#3432). In HDL spines do not exist, so returning the original arg
@@ -885,10 +954,10 @@ instance NFDataX a => NFDataX (Signal domain a) where
   ensureSpine s0
     | clashSimulation = go s0
     | otherwise = s0
-   where
-    go s = case isX s of
-      Left e -> deepErrorX e
-      Right (a :- s') -> ensureSpine a :- go s'
+    where
+      go s = case isX s of
+        Left e -> deepErrorX e
+        Right (a :- s') -> ensureSpine a :- go s'
   hasUndefined = error "hasUndefined on (Signal domain a): No sensible implementation exists"
   rnfX = error "rnfX on (Signal domain a): No sensible implementation exists"
 
@@ -913,7 +982,6 @@ Is lazy enough to handle the earlier mentioned feedback loops, but doesn't leak
 of the second argument is evaluated as soon as the tail of the result is evaluated.
 -}
 
-
 -- | __WARNING: EXTREMELY EXPERIMENTAL__
 --
 -- The circuit semantics of this operation are unclear and/or non-existent.
@@ -925,13 +993,13 @@ joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
 {-# OPAQUE joinSignal# #-}
 {-# ANN joinSignal# hasBlackBox #-}
 
-instance Num a => Num (Signal dom a) where
-  (+)         = liftA2 (+)
-  (-)         = liftA2 (-)
-  (*)         = liftA2 (*)
-  negate      = fmap negate
-  abs         = fmap abs
-  signum      = fmap signum
+instance (Num a) => Num (Signal dom a) where
+  (+) = liftA2 (+)
+  (-) = liftA2 (-)
+  (*) = liftA2 (*)
+  negate = fmap negate
+  abs = fmap abs
+  signum = fmap signum
   fromInteger = signal# . fromInteger
 
 instance
@@ -950,11 +1018,11 @@ instance
   (CheckedNegativeRationalLiteral str num den a) =>
   CheckedNegativeRationalLiteral str num den (Signal dom a)
 
-instance Bounded a => Bounded (Signal dom a) where
+instance (Bounded a) => Bounded (Signal dom a) where
   minBound = pure minBound
   maxBound = pure maxBound
 
-instance SaturatingNum a => SaturatingNum (Signal dom a) where
+instance (SaturatingNum a) => SaturatingNum (Signal dom a) where
   satAdd mode = liftA2 (satAdd mode)
   satSub mode = liftA2 (satSub mode)
   satMul mode = liftA2 (satMul mode)
@@ -984,7 +1052,7 @@ foldr# f z (a :- s) = a `f` (foldr# f z s)
 instance Traversable (Signal dom) where
   traverse = traverse#
 
-traverse# :: Applicative f => (a -> f b) -> Signal dom a -> f (Signal dom b)
+traverse# :: (Applicative f) => (a -> f b) -> Signal dom a -> f (Signal dom b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
 {-# OPAQUE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
@@ -1014,12 +1082,11 @@ enableGen = toEnable (pure True)
 -- | A clock signal belonging to a domain named /dom/.
 data Clock (dom :: Domain) = Clock
   { -- | Domain associated with the clock
-    clockTag :: SSymbol dom
-
+    clockTag :: SSymbol dom,
     -- | Periods of the clock. This is an experimental feature used to simulate
     -- clock frequency correction mechanisms. Currently, all ways to contruct
     -- such a clock are hidden from the public API.
-  , clockPeriods :: Maybe (Signal dom Femtoseconds)
+    clockPeriods :: Maybe (Signal dom Femtoseconds)
   }
 
 instance Show (Clock dom) where
@@ -1029,7 +1096,7 @@ instance Show (Clock dom) where
 -- | The negative or inverted phase of a differential clock signal. HDL
 -- generation will treat it the same as 'Clock', except that no @create_clock@
 -- command is issued in the SDC file for 'ClockN'. Used in 'DiffClock'.
-newtype ClockN (dom :: Domain) = ClockN { clockNTag :: SSymbol dom }
+newtype ClockN (dom :: Domain) = ClockN {clockNTag :: SSymbol dom}
 
 instance Show (ClockN dom) where
   show (ClockN dom) = "<ClockN: " ++ ssymbolToString dom ++ ">"
@@ -1042,8 +1109,8 @@ instance Show (ClockN dom) where
 --
 -- To create a differential clock in a test bench, you can use
 -- 'Clash.Explicit.Testbench.clockToDiffClock'.
-data DiffClock (dom :: Domain) =
-  DiffClock ("p" ::: Clock dom) ("n" ::: ClockN dom)
+data DiffClock (dom :: Domain)
+  = DiffClock ("p" ::: Clock dom) ("n" ::: ClockN dom)
 
 instance Show (DiffClock dom) where
   show (DiffClock (Clock dom Nothing) _) =
@@ -1061,9 +1128,9 @@ instance Show (DiffClock dom) where
 -- @
 --
 -- See 'DomainConfiguration' for more information on how to use synthesis domains.
-clockGen
-  :: KnownDomain dom
-  => Clock dom
+clockGen ::
+  (KnownDomain dom) =>
+  Clock dom
 clockGen = tbClockGen (pure True)
 
 -- | Clock generator to be used in the /testBench/ function.
@@ -1113,10 +1180,10 @@ clockGen = tbClockGen (pure True)
 --     rstA1          = 'Clash.Signal.resetGen' \@\"Fast\"
 --     rstB2          = 'Clash.Signal.resetGen' \@\"Slow\"
 -- @
-tbClockGen
-  :: KnownDomain testDom
-  => Signal testDom Bool
-  -> Clock testDom
+tbClockGen ::
+  (KnownDomain testDom) =>
+  Signal testDom Bool ->
+  Clock testDom
 tbClockGen done = Clock (done `seq` SSymbol) Nothing
 {-# OPAQUE tbClockGen #-}
 {-# ANN tbClockGen hasBlackBox #-}
@@ -1147,7 +1214,7 @@ mapFemtoseconds f (Femtoseconds fs) = Femtoseconds (f fs)
 --
 -- See 'DomainConfiguration' for more information on how to use synthesis domains.
 dynamicClockGen ::
-  KnownDomain dom =>
+  (KnownDomain dom) =>
   -- | Clock period in /femto/seconds.
   --
   -- * __NB__: Beware that the periods are given in femtoseconds; this differs
@@ -1177,7 +1244,7 @@ dynamicClockGen periods = tbDynamicClockGen periods (pure True)
 --
 -- See 'DomainConfiguration' for more information on how to use synthesis domains.
 tbDynamicClockGen ::
-  KnownDomain dom =>
+  (KnownDomain dom) =>
   -- | Clock period in /femto/seconds.
   --
   -- * __NB__: Beware that the periods are given in femtoseconds; this differs
@@ -1199,7 +1266,6 @@ tbDynamicClockGen periods ena =
 {-# OPAQUE tbDynamicClockGen #-}
 {-# ANN tbDynamicClockGen hasBlackBox #-}
 
-
 -- | Reset generator for simulation purposes. Asserts the reset for a single
 -- cycle.
 --
@@ -1213,10 +1279,10 @@ tbDynamicClockGen periods ena =
 --
 -- __NB__: While this can be used in the @testBench@ function, it cannot be
 -- synthesized to hardware.
-resetGen
-  :: forall dom
-   . KnownDomain dom
-  => Reset dom
+resetGen ::
+  forall dom.
+  (KnownDomain dom) =>
+  Reset dom
 resetGen = resetGenN (SNat @1)
 {-# INLINE resetGen #-}
 
@@ -1236,18 +1302,17 @@ resetGen = resetGenN (SNat @1)
 --
 -- __NB__: While this can be used in the @testBench@ function, it cannot be
 -- synthesized to hardware.
-resetGenN
-  :: forall dom n
-   . (KnownDomain dom, 1 <= n)
-  => SNat n
-  -- ^ Number of initial cycles to hold reset high
-  -> Reset dom
+resetGenN ::
+  forall dom n.
+  (KnownDomain dom, 1 <= n) =>
+  -- | Number of initial cycles to hold reset high
+  SNat n ->
+  Reset dom
 resetGenN n =
-  let asserted = replicate (snatToNum n) True in
-  unsafeFromActiveHigh (fromList (asserted ++ repeat False))
+  let asserted = replicate (snatToNum n) True
+   in unsafeFromActiveHigh (fromList (asserted ++ repeat False))
 {-# ANN resetGenN hasBlackBox #-}
 {-# OPAQUE resetGenN #-}
-
 
 -- | A reset signal belonging to a domain called /dom/.
 --
@@ -1255,11 +1320,11 @@ resetGenN n =
 data Reset (dom :: Domain) = Reset (Signal dom Bool)
 
 -- | Non-ambiguous version of 'Clash.Signal.Internal.Ambiguous.resetPolarity'
-resetPolarityProxy
-  :: forall dom proxy polarity
-   . (KnownDomain dom, DomainResetPolarity dom ~ polarity)
-  => proxy dom
-  -> SResetPolarity polarity
+resetPolarityProxy ::
+  forall dom proxy polarity.
+  (KnownDomain dom, DomainResetPolarity dom ~ polarity) =>
+  proxy dom ->
+  SResetPolarity polarity
 resetPolarityProxy _proxy =
   case knownDomain @dom of
     SDomainConfiguration _dom _period _edge _sync _init polarity ->
@@ -1274,11 +1339,11 @@ resetPolarityProxy _proxy =
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeToActiveHigh
-  :: forall dom
-   . KnownDomain dom
-  => Reset dom
-  -> Signal dom Bool
+unsafeToActiveHigh ::
+  forall dom.
+  (KnownDomain dom) =>
+  Reset dom ->
+  Signal dom Bool
 unsafeToActiveHigh (unsafeFromReset -> r) =
   case resetPolarityProxy (Proxy @dom) of
     SActiveHigh -> r
@@ -1294,11 +1359,11 @@ unsafeToActiveHigh (unsafeFromReset -> r) =
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeToHighPolarity
-  :: forall dom
-   . KnownDomain dom
-  => Reset dom
-  -> Signal dom Bool
+unsafeToHighPolarity ::
+  forall dom.
+  (KnownDomain dom) =>
+  Reset dom ->
+  Signal dom Bool
 unsafeToHighPolarity = unsafeToActiveHigh
 {-# DEPRECATED unsafeToHighPolarity "Use 'unsafeToActiveHigh' instead. This function will be removed in Clash 1.12." #-}
 {-# INLINE unsafeToHighPolarity #-}
@@ -1312,11 +1377,11 @@ unsafeToHighPolarity = unsafeToActiveHigh
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeToActiveLow
-  :: forall dom
-   . KnownDomain dom
-  => Reset dom
-  -> Signal dom Bool
+unsafeToActiveLow ::
+  forall dom.
+  (KnownDomain dom) =>
+  Reset dom ->
+  Signal dom Bool
 unsafeToActiveLow (unsafeFromReset -> r) =
   case resetPolarityProxy (Proxy @dom) of
     SActiveHigh -> not <$> r
@@ -1332,11 +1397,11 @@ unsafeToActiveLow (unsafeFromReset -> r) =
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeToLowPolarity
-  :: forall dom
-   . KnownDomain dom
-  => Reset dom
-  -> Signal dom Bool
+unsafeToLowPolarity ::
+  forall dom.
+  (KnownDomain dom) =>
+  Reset dom ->
+  Signal dom Bool
 unsafeToLowPolarity = unsafeToActiveLow
 {-# DEPRECATED unsafeToLowPolarity "Use 'unsafeToActiveLow' instead. This function will be removed in Clash 1.12." #-}
 {-# INLINE unsafeToLowPolarity #-}
@@ -1352,9 +1417,9 @@ unsafeToLowPolarity = unsafeToActiveLow
 --
 -- __NB__: You probably want to use 'unsafeToActiveLow' or
 -- 'unsafeToActiveHigh'.
-unsafeFromReset
-  :: Reset dom
-  -> Signal dom Bool
+unsafeFromReset ::
+  Reset dom ->
+  Signal dom Bool
 unsafeFromReset (Reset r) = r
 {-# OPAQUE unsafeFromReset #-}
 {-# ANN unsafeFromReset hasBlackBox #-}
@@ -1366,10 +1431,10 @@ unsafeFromReset (Reset r) = r
 --
 -- __NB__: You probably want to use 'unsafeFromActiveLow' or
 -- 'unsafeFromActiveHigh'.
-unsafeToReset
-  :: KnownDomain dom
-  => Signal dom Bool
-  -> Reset dom
+unsafeToReset ::
+  (KnownDomain dom) =>
+  Signal dom Bool ->
+  Reset dom
 unsafeToReset r = Reset r
 {-# OPAQUE unsafeToReset #-}
 {-# ANN unsafeToReset hasBlackBox #-}
@@ -1381,12 +1446,12 @@ unsafeToReset r = Reset r
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeFromHighPolarity
-  :: forall dom
-   . KnownDomain dom
-  => Signal dom Bool
-  -- ^ Reset signal that's 'True' when active, and 'False' when inactive.
-  -> Reset dom
+unsafeFromHighPolarity ::
+  forall dom.
+  (KnownDomain dom) =>
+  -- | Reset signal that's 'True' when active, and 'False' when inactive.
+  Signal dom Bool ->
+  Reset dom
 unsafeFromHighPolarity = unsafeFromActiveHigh
 {-# DEPRECATED unsafeFromHighPolarity "Use 'unsafeFromActiveHigh' instead. This function will be removed in Clash 1.12." #-}
 {-# INLINE unsafeFromHighPolarity #-}
@@ -1398,12 +1463,12 @@ unsafeFromHighPolarity = unsafeFromActiveHigh
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeFromActiveHigh
-  :: forall dom
-   . KnownDomain dom
-  => Signal dom Bool
-  -- ^ Reset signal that's 'True' when active, and 'False' when inactive.
-  -> Reset dom
+unsafeFromActiveHigh ::
+  forall dom.
+  (KnownDomain dom) =>
+  -- | Reset signal that's 'True' when active, and 'False' when inactive.
+  Signal dom Bool ->
+  Reset dom
 unsafeFromActiveHigh r =
   unsafeToReset $
     case resetPolarityProxy (Proxy @dom) of
@@ -1417,12 +1482,12 @@ unsafeFromActiveHigh r =
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeFromLowPolarity
-  :: forall dom
-   . KnownDomain dom
-  => Signal dom Bool
-  -- ^ Reset signal that's 'False' when active, and 'True' when inactive.
-  -> Reset dom
+unsafeFromLowPolarity ::
+  forall dom.
+  (KnownDomain dom) =>
+  -- | Reset signal that's 'False' when active, and 'True' when inactive.
+  Signal dom Bool ->
+  Reset dom
 unsafeFromLowPolarity = unsafeFromActiveLow
 {-# DEPRECATED unsafeFromLowPolarity "Use 'unsafeFromActiveLow' instead. This function will be removed in Clash 1.12." #-}
 {-# INLINE unsafeFromLowPolarity #-}
@@ -1434,12 +1499,12 @@ unsafeFromLowPolarity = unsafeFromActiveLow
 -- loops. In case of synchronous resets it can lead to
 -- <Clash-Explicit-Signal.html#metastability meta-stability> in the presence of
 -- asynchronous resets.
-unsafeFromActiveLow
-  :: forall dom
-   . KnownDomain dom
-  => Signal dom Bool
-  -- ^ Reset signal that's 'False' when active, and 'True' when inactive.
-  -> Reset dom
+unsafeFromActiveLow ::
+  forall dom.
+  (KnownDomain dom) =>
+  -- | Reset signal that's 'False' when active, and 'True' when inactive.
+  Signal dom Bool ->
+  Reset dom
 unsafeFromActiveLow r =
   unsafeToReset $
     case resetPolarityProxy (Proxy @dom) of
@@ -1447,10 +1512,11 @@ unsafeFromActiveLow r =
       SActiveLow -> r
 
 -- | Invert reset signal
-invertReset :: KnownDomain dom => Reset dom -> Reset dom
+invertReset :: (KnownDomain dom) => Reset dom -> Reset dom
 invertReset = unsafeToReset . fmap not . unsafeFromReset
 
 infixr 2 .||.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1458,10 +1524,11 @@ infixr 2 .||.
 -- @
 --
 -- It is a version of ('||') that returns a 'Clash.Signal.Signal' of 'Bool'
-(.||.) :: Applicative f => f Bool -> f Bool -> f Bool
+(.||.) :: (Applicative f) => f Bool -> f Bool -> f Bool
 (.||.) = liftA2 (||)
 
 infix 2 .||
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1470,10 +1537,11 @@ infix 2 .||
 --
 -- It is a version of ('||') that allows comparing a @'Clash.Signal.Signal' Bool@ with a constant
 -- @Bool@ and returns a 'Clash.Signal.Signal' of 'Bool'
-(.||) :: Functor f => f Bool -> Bool -> f Bool
+(.||) :: (Functor f) => f Bool -> Bool -> f Bool
 a .|| b = fmap (|| b) a
 
 infixr 2 ||.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1482,10 +1550,11 @@ infixr 2 ||.
 --
 -- It is a version of ('||') that allows comparing a constant @Bool@ with a @'Clash.Signal.Signal' Bool@
 -- and returns a 'Clash.Signal.Signal' of 'Bool'
-(||.) :: Functor f => Bool -> f Bool -> f Bool
+(||.) :: (Functor f) => Bool -> f Bool -> f Bool
 a ||. b = fmap (a ||) b
 
 infixr 3 .&&.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1493,10 +1562,11 @@ infixr 3 .&&.
 -- @
 --
 -- It is a version of ('&&') that returns a 'Clash.Signal.Signal' of 'Bool'
-(.&&.) :: Applicative f => f Bool -> f Bool -> f Bool
+(.&&.) :: (Applicative f) => f Bool -> f Bool -> f Bool
 (.&&.) = liftA2 (&&)
 
 infixr 3 .&&
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1509,6 +1579,7 @@ infixr 3 .&&
 (.&&) a b = fmap (&& b) a
 
 infixr 3 &&.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1538,17 +1609,18 @@ infixr 3 &&.
 -- signal 'e', it will be forced by the 'if'/'then' statement and we don't
 -- need to 'seq' it explicitly.
 
-delay#
-  :: forall dom a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -> Enable dom
-  -> a
-  -> Signal dom a
-  -> Signal dom a
+delay# ::
+  forall dom a.
+  ( KnownDomain dom,
+    NFDataX a
+  ) =>
+  Clock dom ->
+  Enable dom ->
+  a ->
+  Signal dom a ->
+  Signal dom a
 delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
-    go powerUpVal1 en
+  go powerUpVal1 en
   where
     powerUpVal1 :: a
     powerUpVal1 =
@@ -1560,8 +1632,9 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 
     go o (e :- es) as@(~(x :- xs)) =
       let o' = if e then x else o
-      -- See [Note: register strictness annotations]
-      in  o `defaultSeqX` o :- (as `seq` go o' es xs)
+       in
+          -- See [Note: register strictness annotations]
+          o `defaultSeqX` o :- (as `seq` go o' es xs)
 {-# OPAQUE delay# #-}
 {-# ANN delay# hasBlackBox #-}
 
@@ -1576,19 +1649,20 @@ delay# (Clock dom _) (fromEnable -> en) powerUpVal0 =
 -- Intel: power up values and reset values MUST be the same. If they are not,
 -- the Intel tooling __will ignore the power up value__ and use the reset value
 -- instead. Source: https://www.intel.com/content/www/us/en/programmable/support/support-resources/knowledge-base/solutions/rd01072011_91.html
-register#
-  :: forall dom  a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> a
-  -- ^ Power up value
-  -> a
-  -- ^ Reset value
-  -> Signal dom a
-  -> Signal dom a
+register# ::
+  forall dom a.
+  ( KnownDomain dom,
+    NFDataX a
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Power up value
+  a ->
+  -- | Reset value
+  a ->
+  Signal dom a ->
+  Signal dom a
 register# clk@(Clock dom _) rst ena powerUpVal resetVal =
   case knownDomainByName dom of
     SDomainConfiguration _name _period _edge SSynchronous _init _polarity ->
@@ -1600,14 +1674,15 @@ register# clk@(Clock dom _) rst ena powerUpVal resetVal =
 
 -- | Acts like 'id' if given domain allows powerup values, but returns a
 -- value constructed with 'deepErrorX' otherwise.
-registerPowerup#
-  :: forall dom a
-   . ( KnownDomain dom
-     , NFDataX a
-     , HasCallStack )
-  => Clock dom
-  -> a
-  -> a
+registerPowerup# ::
+  forall dom a.
+  ( KnownDomain dom,
+    NFDataX a,
+    HasCallStack
+  ) =>
+  Clock dom ->
+  a ->
+  a
 registerPowerup# (Clock dom _) a =
   case knownDomainByName dom of
     SDomainConfiguration _dom _period _edge _sync SDefined _polarity -> a
@@ -1616,59 +1691,63 @@ registerPowerup# (Clock dom _) a =
 
 -- | Version of 'register#' that simulates a register on an asynchronous
 -- domain. Is synthesizable.
-asyncRegister#
-  :: forall dom  a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock signal
-  -> Reset dom
-  -- ^ Reset signal
-  -> Enable dom
-  -- ^ Enable signal
-  -> a
-  -- ^ Power up value
-  -> a
-  -- ^ Reset value
-  -> Signal dom a
-  -> Signal dom a
+asyncRegister# ::
+  forall dom a.
+  ( KnownDomain dom,
+    NFDataX a
+  ) =>
+  -- | Clock signal
+  Clock dom ->
+  -- | Reset signal
+  Reset dom ->
+  -- | Enable signal
+  Enable dom ->
+  -- | Power up value
+  a ->
+  -- | Reset value
+  a ->
+  Signal dom a ->
+  Signal dom a
 asyncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
   go (registerPowerup# clk initVal) rst ena
- where
-  go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
-    let oR = if r then resetVal else o
-        oE = if r then resetVal else (if e then x else o)
-        -- [Note: register strictness annotations]
-    in  o `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
+  where
+    go o (r :- rs) enas@(~(e :- es)) as@(~(x :- xs)) =
+      let oR = if r then resetVal else o
+          oE = if r then resetVal else (if e then x else o)
+       in
+          -- [Note: register strictness annotations]
+          o `defaultSeqX` oR :- (as `seq` enas `seq` go oE rs es xs)
 {-# OPAQUE asyncRegister# #-}
 {-# ANN asyncRegister# hasBlackBox #-}
 
 -- | Version of 'register#' that simulates a register on a synchronous
 -- domain. Not synthesizable.
-syncRegister#
-  :: forall dom  a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -- ^ Clock signal
-  -> Reset dom
-  -- ^ Reset signal
-  -> Enable dom
-  -- ^ Enable signal
-  -> a
-  -- ^ Power up value
-  -> a
-  -- ^ Reset value
-  -> Signal dom a
-  -> Signal dom a
+syncRegister# ::
+  forall dom a.
+  ( KnownDomain dom,
+    NFDataX a
+  ) =>
+  -- | Clock signal
+  Clock dom ->
+  -- | Reset signal
+  Reset dom ->
+  -- | Enable signal
+  Enable dom ->
+  -- | Power up value
+  a ->
+  -- | Reset value
+  a ->
+  Signal dom a ->
+  Signal dom a
 syncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetVal =
   go (registerPowerup# clk initVal) rst ena
- where
-  go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
-    let oE = if e then x else o
-        oR = if r then resetVal else oE
-        -- [Note: register strictness annotations]
-    in  o `defaultSeqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
+  where
+    go o rt@(~(r :- rs)) enas@(~(e :- es)) as@(~(x :- xs)) =
+      let oE = if e then x else o
+          oR = if r then resetVal else oE
+       in
+          -- [Note: register strictness annotations]
+          o `defaultSeqX` o :- (rt `seq` enas `seq` as `seq` go oR rs es xs)
 {-# OPAQUE syncRegister# #-}
 {-# ANN syncRegister# dontTranslate #-}
 
@@ -1680,18 +1759,19 @@ syncRegister# clk (unsafeToActiveHigh -> rst) (fromEnable -> ena) initVal resetV
 --
 -- A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
 -- when @b@ is 'False'.
-mux :: Applicative f => f Bool -> f a -> f a -> f a
+mux :: (Applicative f) => f Bool -> f a -> f a -> f a
 mux = liftA3 (\b t f -> if b then t else f)
 {-# INLINE mux #-}
 
 -- | A 'mux' extension muxing between a given argument and an updated version.
 -- Given @apEn b f s@, output an updated version of @s@ (i.e., @f s@)
 -- when @b@ is 'True', but return it unchanged (i.e., @s@) when @b@ is 'False'.
-apEn :: Applicative f => f Bool -> (a -> a) -> f a -> f a
+apEn :: (Applicative f) => f Bool -> (a -> a) -> f a -> f a
 apEn cond upd x = mux cond (upd <$> x) x
 {-# INLINE apEn #-}
 
 infix 4 .==.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1703,6 +1783,7 @@ infix 4 .==.
 (.==.) = liftA2 (==)
 
 infix 4 .==
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1712,9 +1793,10 @@ infix 4 .==
 -- It is a version of ('==') that allows comparing a @'Clash.Signal.Signal' a@ with a
 -- constant @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (.==) :: (Eq a, Functor f) => f a -> a -> f Bool
-(.==) a b = fmap (==b) a
+(.==) a b = fmap (== b) a
 
 infix 4 ==.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1724,9 +1806,10 @@ infix 4 ==.
 -- It is a version of ('==') that allows comparing a @'Clash.Signal.Signal' a@ with a
 -- constant @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (==.) :: (Eq a, Functor f) => a -> f a -> f Bool
-(==.) a b = fmap (a==) b
+(==.) a b = fmap (a ==) b
 
 infix 4 ./=.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1738,6 +1821,7 @@ infix 4 ./=.
 (./=.) = liftA2 (/=)
 
 infix 4 ./=
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1747,9 +1831,10 @@ infix 4 ./=
 -- It is a version of ('/=') that allows comparing a @'Clash.Signal.Signal' a@ with a
 -- constant @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (./=) :: (Eq a, Functor f) => f a -> a -> f Bool
-(./=) a b = fmap (/=b) a
+(./=) a b = fmap (/= b) a
 
 infix 4 /=.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1758,11 +1843,11 @@ infix 4 /=.
 --
 -- It is a version of ('/=') that allows comparing a @'Clash.Signal.Signal' a@ with a
 -- constant @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
-
 (/=.) :: (Eq a, Functor f) => a -> f a -> f Bool
 (/=.) a b = fmap (a /=) b
 
 infix 4 .<.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1774,6 +1859,7 @@ infix 4 .<.
 (.<.) = liftA2 (<)
 
 infix 4 <.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1783,9 +1869,10 @@ infix 4 <.
 -- It is a version of ('<') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (<.) :: (Ord a, Functor f) => a -> f a -> f Bool
-(<.) a b = fmap (a<) b
+(<.) a b = fmap (a <) b
 
 infix 4 .<
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1795,9 +1882,10 @@ infix 4 .<
 -- It is a version of ('<') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (.<) :: (Ord a, Functor f) => f a -> a -> f Bool
-(.<) a b = fmap (<b) a
+(.<) a b = fmap (< b) a
 
 infix 4 .<=.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1809,6 +1897,7 @@ infix 4 .<=.
 (.<=.) = liftA2 (<=)
 
 infix 4 .<=
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1818,9 +1907,10 @@ infix 4 .<=
 -- It is a version of ('GHC.TypeNats.<=') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (.<=) :: (Ord a, Functor f) => f a -> a -> f Bool
-(.<=) a b = fmap (<=b) a
+(.<=) a b = fmap (<= b) a
 
 infix 4 <=.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1830,9 +1920,10 @@ infix 4 <=.
 -- It is a version of ('GHC.TypeNats.<=') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (<=.) :: (Ord a, Functor f) => a -> f a -> f Bool
-(<=.) a b = fmap (a<=)b
+(<=.) a b = fmap (a <=) b
 
 infix 4 .>.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1844,6 +1935,7 @@ infix 4 .>.
 (.>.) = liftA2 (>)
 
 infix 4 .>
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1853,9 +1945,10 @@ infix 4 .>
 -- It is a version of ('>') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (.>) :: (Ord a, Functor f) => f a -> a -> f Bool
-(.>) a b = fmap (>b) a
+(.>) a b = fmap (> b) a
 
 infix 4 >.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1865,9 +1958,10 @@ infix 4 >.
 -- It is a version of ('>') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (>.) :: (Ord a, Functor f) => a -> f a -> f Bool
-(>.) a b = fmap (a>) b
+(>.) a b = fmap (a >) b
 
 infix 4 .>=.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1879,6 +1973,7 @@ infix 4 .>=.
 (.>=.) = liftA2 (>=)
 
 infix 4 .>=
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1888,9 +1983,10 @@ infix 4 .>=
 -- It is a version of ('>=') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (.>=) :: (Ord a, Functor f) => f a -> a -> f Bool
-(.>=) a b = fmap (>=b) a
+(.>=) a b = fmap (>= b) a
 
 infix 4 >=.
+
 -- | The above type is a generalization for:
 --
 -- @
@@ -1900,17 +1996,17 @@ infix 4 >=.
 -- It is a version of ('>=') that allows comparing a @'Clash.Signal.Signal' a@ with a constant
 -- @a@ and returns a 'Clash.Signal.Signal' of 'Bool'
 (>=.) :: (Ord a, Functor f) => a -> f a -> f Bool
-(>=.) a b = fmap (a>=) b
+(>=.) a b = fmap (a >=) b
 
-instance Fractional a => Fractional (Signal dom a) where
-  (/)          = liftA2 (/)
-  recip        = fmap recip
+instance (Fractional a) => Fractional (Signal dom a) where
+  (/) = liftA2 (/)
+  recip = fmap recip
   fromRational = signal# . fromRational
 
-instance Arbitrary a => Arbitrary (Signal dom a) where
+instance (Arbitrary a) => Arbitrary (Signal dom a) where
   arbitrary = liftA2 (:-) arbitrary arbitrary
 
-instance CoArbitrary a => CoArbitrary (Signal dom a) where
+instance (CoArbitrary a) => CoArbitrary (Signal dom a) where
   coarbitrary xs gen = do
     n <- arbitrary
     coarbitrary (take (abs n) (sample_lazy xs)) gen
@@ -1924,7 +2020,7 @@ instance CoArbitrary a => CoArbitrary (Signal dom a) where
 -- @testFor n s@ tests the signal @s@ for @n@ cycles.
 --
 -- __NB__: This function is not synthesizable
-testFor :: Foldable f => Int -> f Bool -> Property
+testFor :: (Foldable f) => Int -> f Bool -> Property
 testFor n = property . and . take n . sample
 
 -- * List \<-\> Signal conversion (not synthesizable)
@@ -1972,7 +2068,7 @@ sampleN n = take n . sample
 -- [1,2]
 --
 -- __NB__: This function is not synthesizable
-fromList :: NFDataX a => [a] -> Signal dom a
+fromList :: (NFDataX a) => [a] -> Signal dom a
 fromList = Prelude.foldr (\a b -> deepseqX a (a :- b)) (errorX "finite list")
 
 -- * Simulation functions (not synthesizable)
@@ -2002,7 +2098,7 @@ simulate f = sample . f . fromList
 -- > sample s == [s0, s1, s2, s3, ...
 --
 -- __NB__: This function is not synthesizable
-sample_lazy :: Foldable f => f a -> [a]
+sample_lazy :: (Foldable f) => f a -> [a]
 sample_lazy = foldr (:) []
 
 -- | The above type is a generalization for:
@@ -2019,7 +2115,7 @@ sample_lazy = foldr (:) []
 -- > sampleN 3 s == [s0, s1, s2]
 --
 -- __NB__: This function is not synthesizable
-sampleN_lazy :: Foldable f => Int -> f a -> [a]
+sampleN_lazy :: (Foldable f) => Int -> f a -> [a]
 sampleN_lazy n = take n . sample_lazy
 
 -- | Create a 'Clash.Signal.Signal' from a list
@@ -2070,7 +2166,7 @@ simulate_lazy f = sample_lazy . f . fromList_lazy
 -- * __NB__: This function is lossy. I.e., @periodToHz . hzToPeriod /= id@.
 hzToPeriod :: (HasCallStack, Integral a) => Ratio Natural -> a
 hzToPeriod freq
-  | freq > 0  = floor ((1.0 / freq) / 1e-12)
+  | freq > 0 = floor ((1.0 / freq) / 1e-12)
   | otherwise = withFrozenCallStack $ error "Zero frequency"
 
 -- | Calculate the period in __fs__, given a frequency in __Hz__
@@ -2088,9 +2184,9 @@ hzToPeriod freq
 --
 -- * __NB__: This function is not synthesizable
 -- * __NB__: This function is lossy. I.e.,  @fsToHz . hzToFs /= id@.
-hzToFs :: HasCallStack => Ratio Natural -> Femtoseconds
+hzToFs :: (HasCallStack) => Ratio Natural -> Femtoseconds
 hzToFs freq
-  | freq > 0  = Femtoseconds (floor ((1.0 / freq) / 1e-15))
+  | freq > 0 = Femtoseconds (floor ((1.0 / freq) / 1e-15))
   | otherwise = withFrozenCallStack $ error "Zero frequency"
 
 -- | Calculate the frequency in __Hz__, given the period in __ps__
@@ -2115,7 +2211,7 @@ hzToFs freq
 periodToHz :: (HasCallStack, Fractional a) => Natural -> a
 periodToHz period
   | period > 0 = fromRational $ 1.0 / (fromIntegral period * 1e-12)
-  | otherwise  = withFrozenCallStack $ error "Zero period"
+  | otherwise = withFrozenCallStack $ error "Zero period"
 
 -- | Calculate the frequency in __Hz__, given the period in __fs__
 --
@@ -2128,13 +2224,13 @@ periodToHz period
 fsToHz :: (HasCallStack, Fractional a) => Femtoseconds -> a
 fsToHz (Femtoseconds period)
   | period > 0 = fromRational $ 1.0 / (fromIntegral period * 1e-15)
-  | otherwise  = withFrozenCallStack $ error "Zero period"
+  | otherwise = withFrozenCallStack $ error "Zero period"
 
 -- | Build an 'Automaton' from a function over 'Signal's.
 --
 -- __NB__: Each continuation function must be called at most once.
 signalAutomaton ::
-  forall dom a b .
+  forall dom a b.
   (Signal dom a -> Signal dom b) -> IO (Automaton (->) a b)
 signalAutomaton dut = do
   inputRefs <- infiniteRefList Nothing
@@ -2142,7 +2238,7 @@ signalAutomaton dut = do
         val <- readIORef ref
         case val of
           Nothing -> fail "signalAutomaton: input not set: did you call the continuation more than once?"
-          Just x  -> return x
+          Just x -> return x
 
       step input0 = unsafePerformIO $ do
         let inputs = input0 :- fmap readInput inputRefs
@@ -2150,10 +2246,10 @@ signalAutomaton dut = do
         let go (inRef :- inRefs) (out :- rest) = do
               let next :: Automaton (->) a b
                   next = Automaton $ \i -> unsafePerformIO $ do
-                    old <- atomicModifyIORef inRef (\old -> (Just i,old))
+                    old <- atomicModifyIORef inRef (\old -> (Just i, old))
                     case old of
                       Nothing -> return ()
-                      Just _  -> fail "signalAutomaton: input not consumed: did you call the continuation more than once?"
+                      Just _ -> fail "signalAutomaton: input not consumed: did you call the continuation more than once?"
                     unsafeInterleaveIO (go inRefs rest)
               return (out, next)
 
@@ -2164,19 +2260,19 @@ signalAutomaton dut = do
 
 infiniteRefList :: a -> IO (Signal dom (IORef a))
 infiniteRefList val = go
- where
-  go = do
-    rest <- unsafeInterleaveIO go
-    ref  <- newIORef val
-    return (ref :- rest)
+  where
+    go = do
+      rest <- unsafeInterleaveIO go
+      ref <- newIORef val
+      return (ref :- rest)
 
 data ClockAB
-  -- | Clock edge A produced
-  = ClockA
-  -- | Clock edge B produced
-  | ClockB
-  -- | Clock edges coincided
-  | ClockAB
+  = -- | Clock edge A produced
+    ClockA
+  | -- | Clock edge B produced
+    ClockB
+  | -- | Clock edges coincided
+    ClockAB
   deriving (Generic, Eq, Show, NFData, NFDataX)
 
 -- | Given two clocks, produce a list of clock ticks indicating which clock
@@ -2191,23 +2287,23 @@ clockTicks ::
   Clock domB ->
   [ClockAB]
 clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
- where
-  toEither ::
-    forall dom.
-    KnownDomain dom =>
-    Clock dom ->
-    Either Int64 (Signal dom Int64)
-  toEither (Clock _ maybePeriods)
-    | Just periods <- maybePeriods =
-        Right (unFemtosecondsSignal periods)
-    | SDomainConfiguration{sPeriod} <- knownDomain @dom =
-        -- Convert to femtoseconds - dynamic clocks use them
-        Left (1000 * snatToNum sPeriod)
+  where
+    toEither ::
+      forall dom.
+      (KnownDomain dom) =>
+      Clock dom ->
+      Either Int64 (Signal dom Int64)
+    toEither (Clock _ maybePeriods)
+      | Just periods <- maybePeriods =
+          Right (unFemtosecondsSignal periods)
+      | SDomainConfiguration {sPeriod} <- knownDomain @dom =
+          -- Convert to femtoseconds - dynamic clocks use them
+          Left (1000 * snatToNum sPeriod)
 
-  -- Coerce whole signal instead of `fmap coerce` to prevent useless constructor
-  -- packing and unpacking.
-  unFemtosecondsSignal :: forall dom . Signal dom Femtoseconds -> Signal dom Int64
-  unFemtosecondsSignal = coerce
+    -- Coerce whole signal instead of `fmap coerce` to prevent useless constructor
+    -- packing and unpacking.
+    unFemtosecondsSignal :: forall dom. Signal dom Femtoseconds -> Signal dom Int64
+    unFemtosecondsSignal = coerce
 
 -- | Given two clock periods, produce a list of clock ticks indicating which clock
 -- (or both) ticked. Can be used in components handling multiple clocks, such
@@ -2221,33 +2317,33 @@ clockTicksEither ::
   [ClockAB]
 clockTicksEither clkA clkB =
   case (clkA, clkB) of
-    (Left  tA, Left  tB) | tA == tB -> repeat ClockAB
-    (Left  tA, Left  tB) -> goStatic 0 tA tB
+    (Left tA, Left tB) | tA == tB -> repeat ClockAB
+    (Left tA, Left tB) -> goStatic 0 tA tB
     (Right tA, Right tB) -> goDynamic 0 tA tB
-    (Left  tA, Right tB) -> clockTicksEither (Right (pure tA)) (Right tB)
-    (Right tA, Left  tB) -> clockTicksEither (Right tA) (Right (pure tB))
- where
-  -- Given
-  --   tAbsA = absolute time of next active edge of clock A
-  --   tAbsB = absolute time of next active edge of clock B
-  -- relativeTime is defined as relativeTime = tAbsB - tAbsA
-  --
-  -- Put differently, relative time 0 points at the next active edge of
-  -- clock A, and relativeTime points at the next active edge of clock B.
+    (Left tA, Right tB) -> clockTicksEither (Right (pure tA)) (Right tB)
+    (Right tA, Left tB) -> clockTicksEither (Right tA) (Right (pure tB))
+  where
+    -- Given
+    --   tAbsA = absolute time of next active edge of clock A
+    --   tAbsB = absolute time of next active edge of clock B
+    -- relativeTime is defined as relativeTime = tAbsB - tAbsA
+    --
+    -- Put differently, relative time 0 points at the next active edge of
+    -- clock A, and relativeTime points at the next active edge of clock B.
 
-  goStatic :: Int64 -> Int64 -> Int64 -> [ClockAB]
-  goStatic relativeTime tA tB =
-    case compare relativeTime 0 of
-      LT -> ClockB  : goStatic (relativeTime + tB)      tA tB
-      EQ -> ClockAB : goStatic (relativeTime - tA + tB) tA tB
-      GT -> ClockA  : goStatic (relativeTime - tA)      tA tB
+    goStatic :: Int64 -> Int64 -> Int64 -> [ClockAB]
+    goStatic relativeTime tA tB =
+      case compare relativeTime 0 of
+        LT -> ClockB : goStatic (relativeTime + tB) tA tB
+        EQ -> ClockAB : goStatic (relativeTime - tA + tB) tA tB
+        GT -> ClockA : goStatic (relativeTime - tA) tA tB
 
-  goDynamic :: Int64 -> Signal domA Int64 -> Signal domB Int64 -> [ClockAB]
-  goDynamic relativeTime tsA@(~(tA :- tsA0)) tsB@(~(tB :- tsB0)) =
-    -- Even though we lazily match on the signal's constructor, this shouldn't
-    -- build up a significant chain of chunks as 'relativeTime' gets evaluated
-    -- every iteration.
-    case compare relativeTime 0 of
-      LT -> ClockB  : goDynamic (relativeTime + tB)      tsA  tsB0
-      EQ -> ClockAB : goDynamic (relativeTime - tA + tB) tsA0 tsB0
-      GT -> ClockA  : goDynamic (relativeTime - tA)      tsA0 tsB
+    goDynamic :: Int64 -> Signal domA Int64 -> Signal domB Int64 -> [ClockAB]
+    goDynamic relativeTime tsA@(~(tA :- tsA0)) tsB@(~(tB :- tsB0)) =
+      -- Even though we lazily match on the signal's constructor, this shouldn't
+      -- build up a significant chain of chunks as 'relativeTime' gets evaluated
+      -- every iteration.
+      case compare relativeTime 0 of
+        LT -> ClockB : goDynamic (relativeTime + tB) tsA tsB0
+        EQ -> ClockAB : goDynamic (relativeTime - tA + tB) tsA0 tsB0
+        GT -> ClockA : goDynamic (relativeTime - tA) tsA0 tsB

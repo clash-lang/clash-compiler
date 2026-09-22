@@ -1,13 +1,12 @@
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 {-|
   Copyright   :  (C) 2017, Google Inc.
                      2023, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module GHC.BasicTypes.Extra where
 
 import GHC.Types.Basic
@@ -15,32 +14,35 @@ import GHC.Types.Basic
 import Control.DeepSeq
 #endif
 import Data.Binary
-import GHC.Generics
-
 import GHC.Data.FastString.Extra ()
+import GHC.Generics
 import GHC.Types.SourceText
 
 deriving instance Generic InlineSpec
+
 #if !MIN_VERSION_ghc(9,14,0)
 instance NFData InlineSpec
 #endif
+
 instance Binary InlineSpec
 
 deriving instance Generic SourceText
+
 #if !MIN_VERSION_ghc(9,8,0)
 instance NFData SourceText
 #endif
+
 instance Binary SourceText
 
 -- | Determine whether given 'InlineSpec' is NOINLINE or more strict (OPAQUE)
 isNoInline :: InlineSpec -> Bool
-isNoInline NoInline{} = True
-isNoInline Opaque{} = True
+isNoInline NoInline {} = True
+isNoInline Opaque {} = True
 isNoInline _ = False
 
 -- | Determine whether given 'InlineSpec' is OPAQUE. If this function is used on
 -- a GHC that does not support OPAQUE yet (<9.4), it will return 'True' if given
 -- 'InlineSpec' is NOINLINE instead.
 isOpaque :: InlineSpec -> Bool
-isOpaque Opaque{} = True
+isOpaque Opaque {} = True
 isOpaque _ = False

@@ -5,83 +5,111 @@
 
 module Clash.Core.VarEnv
   ( -- * Environment with variables as keys
-    VarEnv
+    VarEnv,
+
     -- ** Accessors
+
     -- *** Size information
-  , nullVarEnv
+    nullVarEnv,
+
     -- ** Indexing
-  , lookupVarEnv
-  , lookupVarEnv'
-  , lookupVarEnvDirectly
+    lookupVarEnv,
+    lookupVarEnv',
+    lookupVarEnvDirectly,
+
     -- ** Construction
-  , emptyVarEnv
-  , unitVarEnv
-  , mkVarEnv
+    emptyVarEnv,
+    unitVarEnv,
+    mkVarEnv,
+
     -- ** Modification
-  , extendVarEnv
-  , extendVarEnvList
-  , extendVarEnvWith
-  , delVarEnv
-  , delVarEnvList
-  , unionVarEnv
-  , unionVarEnvWith
-  , differenceVarEnv
+    extendVarEnv,
+    extendVarEnvList,
+    extendVarEnvWith,
+    delVarEnv,
+    delVarEnvList,
+    unionVarEnv,
+    unionVarEnvWith,
+    differenceVarEnv,
+
     -- ** Element-wise operations
+
     -- *** Mapping
-  , mapVarEnv
-  , mapMaybeVarEnv
+    mapVarEnv,
+    mapMaybeVarEnv,
+
     -- ** Folding
-  , foldlWithUniqueVarEnv'
+    foldlWithUniqueVarEnv',
+
     -- ** Working with predicates
+
     -- *** Searching
-  , elemVarEnv
-  , notElemVarEnv
+    elemVarEnv,
+    notElemVarEnv,
+
     -- ** Conversions
+
     -- *** Lists
-  , eltsVarEnv
+    eltsVarEnv,
+
     -- * Sets of variables
-  , VarSet
+    VarSet,
+
     -- ** Construction
-  , emptyVarSet
-  , unitVarSet
+    emptyVarSet,
+    unitVarSet,
+
     -- ** Modification
-  , extendVarSet
-  , delVarSetByKey
-  , unionVarSet
-  , differenceVarSet
+    extendVarSet,
+    delVarSetByKey,
+    unionVarSet,
+    differenceVarSet,
+
     -- ** Working with predicates
-  , nullVarSet
+    nullVarSet,
+
     -- *** Searching
-  , elemVarSet
-  , notElemVarSet
-  , subsetVarSet
-  , disjointVarSet
+    elemVarSet,
+    notElemVarSet,
+    subsetVarSet,
+    disjointVarSet,
+
     -- ** Conversions
+
     -- *** Lists
-  , mkVarSet
-  , eltsVarSet
+    mkVarSet,
+    eltsVarSet,
+
     -- * In-scope sets
-  , InScopeSet
+    InScopeSet,
+
     -- ** Accessors
+
     -- *** Size information
-  , emptyInScopeSet
+    emptyInScopeSet,
+
     -- *** Indexing
-  , lookupInScope
+    lookupInScope,
+
     -- ** Construction
-  , mkInScopeSet
+    mkInScopeSet,
+
     -- ** Modification
-  , extendInScopeSet
-  , extendInScopeSetList
-  , unionInScope
+    extendInScopeSet,
+    extendInScopeSetList,
+    unionInScope,
+
     -- ** Working with predicates
+
     -- *** Searching
-  , elemInScopeSet
-  , elemUniqInScopeSet
-  , notElemInScopeSet
-  , varSetInScope
+    elemInScopeSet,
+    elemUniqInScopeSet,
+    notElemInScopeSet,
+    varSetInScope,
+
     -- ** Unique generation
-  , uniqAway
-  , uniqAway'
+    uniqAway,
+    uniqAway',
   )
 where
 
@@ -89,32 +117,29 @@ where
 #define UNIQUE_IS_WORD64
 #endif
 
-import           Control.DeepSeq           (NFData)
-import           Data.Binary               (Binary)
-import           Data.Coerce               (coerce)
-import qualified Data.List                 as List
+import Control.DeepSeq (NFData)
+import Data.Binary (Binary)
+import Data.Coerce (coerce)
+import qualified Data.List as List
 #ifdef UNIQUE_IS_WORD64
-import           Data.Word                 (Word64)
+import Data.Word (Word64)
 #endif
-
 #if MIN_VERSION_prettyprinter(1,7,0)
-import           Prettyprinter
+import Prettyprinter
 #else
-import           Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc
 #endif
-
-import           GHC.Exts                  (Any)
-import           GHC.Generics              (Generic)
-import           GHC.Stack                 (HasCallStack)
-
-import           Clash.Core.Pretty         ()
-import           Clash.Core.Var
-import           Clash.Data.UniqMap        (UniqMap)
+import Clash.Core.Pretty ()
+import Clash.Core.Var
+import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Debug               (debugIsOn)
-import           Clash.Unique
-import           Clash.Util
-import           Clash.Pretty
+import Clash.Debug (debugIsOn)
+import Clash.Pretty
+import Clash.Unique
+import Clash.Util
+import GHC.Exts (Any)
+import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack)
 
 -- * VarEnv
 
@@ -122,160 +147,160 @@ import           Clash.Pretty
 type VarEnv a = UniqMap a
 
 -- | Empty map
-emptyVarEnv
-  :: VarEnv a
+emptyVarEnv ::
+  VarEnv a
 emptyVarEnv = UniqMap.empty
 
 -- | Environment containing a single variable-value pair
-unitVarEnv
-  :: Var b
-  -> a
-  -> VarEnv a
+unitVarEnv ::
+  Var b ->
+  a ->
+  VarEnv a
 unitVarEnv = UniqMap.singleton
 
 -- | Look up a value based on the variable
-lookupVarEnv
-  :: Var b
-  -> VarEnv a
-  -> Maybe a
+lookupVarEnv ::
+  Var b ->
+  VarEnv a ->
+  Maybe a
 lookupVarEnv = UniqMap.lookup
 
 -- | Lookup a value based on the unique of a variable
-lookupVarEnvDirectly
-  :: Unique
-  -> VarEnv a
-  -> Maybe a
+lookupVarEnvDirectly ::
+  Unique ->
+  VarEnv a ->
+  Maybe a
 lookupVarEnvDirectly = UniqMap.lookup
 
 -- | Lookup a value based on the variable
 --
 -- Errors out when the variable is not present
-lookupVarEnv'
-  :: HasCallStack
-  => VarEnv a
-  -> Var b
-  -> a
+lookupVarEnv' ::
+  (HasCallStack) =>
+  VarEnv a ->
+  Var b ->
+  a
 lookupVarEnv' = flip UniqMap.find
 
 -- | Remove a variable-value pair from the environment
-delVarEnv
-  :: VarEnv a
-  -> Var b
-  -> VarEnv a
+delVarEnv ::
+  VarEnv a ->
+  Var b ->
+  VarEnv a
 delVarEnv = flip UniqMap.delete
 
 -- | Remove a list of variable-value pairs from the environment
-delVarEnvList
-  :: VarEnv a
-  -> [Var b]
-  -> VarEnv a
+delVarEnvList ::
+  VarEnv a ->
+  [Var b] ->
+  VarEnv a
 delVarEnvList = flip UniqMap.deleteMany
 
 -- | Add a variable-value pair to the environment; overwrites the value if the
 -- variable already exists
-extendVarEnv
-  :: Var b
-  -> a
-  -> VarEnv a
-  -> VarEnv a
+extendVarEnv ::
+  Var b ->
+  a ->
+  VarEnv a ->
+  VarEnv a
 extendVarEnv = UniqMap.insert
 
 -- | Add a variable-value pair to the environment; if the variable already
 -- exists, the two values are merged with the given function
-extendVarEnvWith
-  :: Var b
-  -> a
-  -> (a -> a -> a)
-  -> VarEnv a
-  -> VarEnv a
+extendVarEnvWith ::
+  Var b ->
+  a ->
+  (a -> a -> a) ->
+  VarEnv a ->
+  VarEnv a
 extendVarEnvWith k v f =
   UniqMap.insertWith f k v
 
 -- | Add a list of variable-value pairs; the values of existing keys will be
 -- overwritten
-extendVarEnvList
-  :: VarEnv a
-  -> [(Var b, a)]
-  -> VarEnv a
+extendVarEnvList ::
+  VarEnv a ->
+  [(Var b, a)] ->
+  VarEnv a
 extendVarEnvList = flip UniqMap.insertMany
 
 -- | Is the environment empty
-nullVarEnv
-  :: VarEnv a
-  -> Bool
+nullVarEnv ::
+  VarEnv a ->
+  Bool
 nullVarEnv = UniqMap.null
 
 -- | Get the (left-biased) union of two environments
-unionVarEnv
-  :: VarEnv a
-  -> VarEnv a
-  -> VarEnv a
+unionVarEnv ::
+  VarEnv a ->
+  VarEnv a ->
+  VarEnv a
 unionVarEnv = (<>)
 
 -- | Get the union of two environments, mapped values existing in both
 -- environments will be merged with the given function.
-unionVarEnvWith
-  :: (a -> a -> a)
-  -> VarEnv a
-  -> VarEnv a
-  -> VarEnv a
+unionVarEnvWith ::
+  (a -> a -> a) ->
+  VarEnv a ->
+  VarEnv a ->
+  VarEnv a
 unionVarEnvWith = UniqMap.unionWith
 
 -- | Filter the first varenv to only contain keys which are not in the second varenv.
-differenceVarEnv
-  :: VarEnv a
-  -> VarEnv a
-  -> VarEnv a
+differenceVarEnv ::
+  VarEnv a ->
+  VarEnv a ->
+  VarEnv a
 differenceVarEnv = UniqMap.difference
 
 -- | Create an environment given a list of var-value pairs
-mkVarEnv
-  :: [(Var a,b)]
-  -> VarEnv b
+mkVarEnv ::
+  [(Var a, b)] ->
+  VarEnv b
 mkVarEnv = UniqMap.fromList
 
 -- | Apply a function to every element in the environment
-mapVarEnv
-  :: (a -> b)
-  -> VarEnv a
-  -> VarEnv b
+mapVarEnv ::
+  (a -> b) ->
+  VarEnv a ->
+  VarEnv b
 mapVarEnv = fmap
 
 -- | Apply a function to every element in the environment; values for which the
 -- function returns 'Nothing' are removed from the environment
-mapMaybeVarEnv
-  :: (a -> Maybe b)
-  -> VarEnv a
-  -> VarEnv b
+mapMaybeVarEnv ::
+  (a -> Maybe b) ->
+  VarEnv a ->
+  VarEnv b
 mapMaybeVarEnv = UniqMap.mapMaybe
 
 -- | Strict left-fold over an environment using both the unique of the
 -- the variable and the value
-foldlWithUniqueVarEnv'
-  :: (a -> Unique -> b -> a)
-  -> a
-  -> VarEnv b
-  -> a
+foldlWithUniqueVarEnv' ::
+  (a -> Unique -> b -> a) ->
+  a ->
+  VarEnv b ->
+  a
 foldlWithUniqueVarEnv' = UniqMap.foldlWithUnique'
 
 -- | Extract the elements
-eltsVarEnv
-  :: VarEnv a
-  -> [a]
+eltsVarEnv ::
+  VarEnv a ->
+  [a]
 eltsVarEnv = UniqMap.elems
 
 -- | Does the variable exist in the environment
-elemVarEnv
-  :: Var a
-  -> VarEnv b
-  -> Bool
+elemVarEnv ::
+  Var a ->
+  VarEnv b ->
+  Bool
 elemVarEnv = UniqMap.elem
 
 -- | Does the variable not exist in the environment
-notElemVarEnv
-  :: Var a
-  -> VarEnv b
-  -> Bool
+notElemVarEnv ::
+  Var a ->
+  VarEnv b ->
+  Bool
 notElemVarEnv = UniqMap.notElem
 
 -- * VarSet
@@ -284,105 +309,105 @@ notElemVarEnv = UniqMap.notElem
 type VarSet = UniqMap (Var Any)
 
 -- | The empty set
-emptyVarSet
-  :: VarSet
+emptyVarSet ::
+  VarSet
 emptyVarSet = UniqMap.empty
 
 -- | The set of a single variable
-unitVarSet
-  :: Var a
-  -> VarSet
+unitVarSet ::
+  Var a ->
+  VarSet
 unitVarSet v = UniqMap.singletonUnique (coerce v)
 
 -- | Add a variable to the set
-extendVarSet
-  :: VarSet
-  -> Var a
-  -> VarSet
+extendVarSet ::
+  VarSet ->
+  Var a ->
+  VarSet
 extendVarSet env v = UniqMap.insertUnique (coerce v) env
 
 -- | Union two sets
-unionVarSet
-  :: VarSet
-  -> VarSet
-  -> VarSet
+unionVarSet ::
+  VarSet ->
+  VarSet ->
+  VarSet
 unionVarSet = (<>)
 
 -- | Take the difference of two sets
-differenceVarSet
-  :: VarSet
-  -> VarSet
-  -> VarSet
+differenceVarSet ::
+  VarSet ->
+  VarSet ->
+  VarSet
 differenceVarSet = UniqMap.difference
 
 -- | Is the variable an element in the set
-elemVarSet
-  :: Var a
-  -> VarSet
-  -> Bool
+elemVarSet ::
+  Var a ->
+  VarSet ->
+  Bool
 elemVarSet v = UniqMap.elem (getUnique v)
 
 -- | Is the variable not an element in the set
-notElemVarSet
-  :: Var a
-  -> VarSet
-  -> Bool
+notElemVarSet ::
+  Var a ->
+  VarSet ->
+  Bool
 notElemVarSet v = UniqMap.notElem (getUnique v)
 
 -- | Is the set of variables A a subset of the variables B
-subsetVarSet
-  :: VarSet
-  -- ^ Set of variables A
-  -> VarSet
-  -- ^ Set of variables B
-  -> Bool
+subsetVarSet ::
+  -- | Set of variables A
+  VarSet ->
+  -- | Set of variables B
+  VarSet ->
+  Bool
 subsetVarSet = UniqMap.submap
 
 -- | Are the sets of variables disjoint
-disjointVarSet
-  :: VarSet
-  -> VarSet
-  -> Bool
+disjointVarSet ::
+  VarSet ->
+  VarSet ->
+  Bool
 disjointVarSet = UniqMap.disjoint
 
 -- | Check whether a varset is empty
-nullVarSet
-  :: VarSet
-  -> Bool
+nullVarSet ::
+  VarSet ->
+  Bool
 nullVarSet = UniqMap.null
 
 -- | Look up a variable in the set, returns it if it exists
-lookupVarSet
-  :: Var a
-  -> VarSet
-  -> Maybe (Var Any)
+lookupVarSet ::
+  Var a ->
+  VarSet ->
+  Maybe (Var Any)
 lookupVarSet = UniqMap.lookup
 
 -- | Remove a variable from the set based on its 'Unique'
-delVarSetByKey
-  :: Unique
-  -> VarSet
-  -> VarSet
+delVarSetByKey ::
+  Unique ->
+  VarSet ->
+  VarSet
 delVarSetByKey = UniqMap.delete
 
 -- | Create a set from a list of variables
-mkVarSet
-  :: [Var a]
-  -> VarSet
+mkVarSet ::
+  [Var a] ->
+  VarSet
 mkVarSet xs = UniqMap.fromList $ fmap (\x -> (getUnique x, coerce x)) xs
 
-eltsVarSet
-  :: VarSet
-  -> [Var Any]
+eltsVarSet ::
+  VarSet ->
+  [Var Any]
 eltsVarSet = UniqMap.elems
 
 -- * InScopeSet
 
-type Seed
+type Seed =
 #ifdef UNIQUE_IS_WORD64
-  = Word64
+  Word64
 #else
-  = Int
+  Int
 #endif
 
 -- | Set of variables that is in scope at some point
@@ -399,117 +424,118 @@ instance ClashPretty InScopeSet where
   clashPretty (InScopeSet s _) = clashPretty s
 
 -- | The empty set
-extendInScopeSet
-  :: InScopeSet
-  -> Var a
-  -> InScopeSet
+extendInScopeSet ::
+  InScopeSet ->
+  Var a ->
+  InScopeSet
 extendInScopeSet (InScopeSet inScope n) v =
   InScopeSet (extendVarSet inScope v) (n + 1)
 
 -- | Add a list of variables in scope
-extendInScopeSetList
-  :: InScopeSet
-  -> [Var a]
-  -> InScopeSet
+extendInScopeSetList ::
+  InScopeSet ->
+  [Var a] ->
+  InScopeSet
 extendInScopeSetList (InScopeSet inScope n) vs =
   InScopeSet (List.foldl' extendVarSet inScope vs) (n + fromIntegral (length vs))
 
 -- | Union two sets of in scope variables
-unionInScope
-  :: InScopeSet
-  -> InScopeSet
-  -> InScopeSet
-unionInScope (InScopeSet s1 _) (InScopeSet s2 n2)
-  = InScopeSet (s1 `unionVarSet` s2) n2
+unionInScope ::
+  InScopeSet ->
+  InScopeSet ->
+  InScopeSet
+unionInScope (InScopeSet s1 _) (InScopeSet s2 n2) =
+  InScopeSet (s1 `unionVarSet` s2) n2
 
 -- | Is the set of variables in scope
-varSetInScope
-  :: VarSet
-  -> InScopeSet
-  -> Bool
-varSetInScope vars (InScopeSet s1 _)
-  = vars `subsetVarSet` s1
+varSetInScope ::
+  VarSet ->
+  InScopeSet ->
+  Bool
+varSetInScope vars (InScopeSet s1 _) =
+  vars `subsetVarSet` s1
 
 -- | Look up a variable in the 'InScopeSet'. This gives you the canonical
 -- version of the variable
-lookupInScope
-  :: InScopeSet
-  -> Var a
-  -> Maybe (Var Any)
+lookupInScope ::
+  InScopeSet ->
+  Var a ->
+  Maybe (Var Any)
 lookupInScope (InScopeSet s _) v = lookupVarSet v s
 
 -- | Is the variable in scope
-elemInScopeSet
-  :: Var a
-  -> InScopeSet
-  -> Bool
+elemInScopeSet ::
+  Var a ->
+  InScopeSet ->
+  Bool
 elemInScopeSet v (InScopeSet s _) = elemVarSet v s
 
 -- | Check whether an element exists in the set based on the `Unique` contained
 -- in that element
-elemUniqInScopeSet
-  :: Unique
-  -> InScopeSet
-  -> Bool
+elemUniqInScopeSet ::
+  Unique ->
+  InScopeSet ->
+  Bool
 elemUniqInScopeSet u (InScopeSet s _) = UniqMap.elem u s
 
 -- | Is the variable not in scope
-notElemInScopeSet
-  :: Var a
-  -> InScopeSet
-  -> Bool
+notElemInScopeSet ::
+  Var a ->
+  InScopeSet ->
+  Bool
 notElemInScopeSet v (InScopeSet s _) = notElemVarSet v s
 
 -- | Create a set of variables in scope
-mkInScopeSet
-  :: VarSet
-  -> InScopeSet
+mkInScopeSet ::
+  VarSet ->
+  InScopeSet
 mkInScopeSet is = InScopeSet is 1
 
 -- | The empty set
-emptyInScopeSet
-  :: InScopeSet
+emptyInScopeSet ::
+  InScopeSet
 emptyInScopeSet = mkInScopeSet emptyVarSet
 
 -- | Ensure that the 'Unique' of a variable does not occur in the 'InScopeSet'
-uniqAway
-  :: (Uniquable a, ClashPretty a)
-  => InScopeSet
-  -> a
-  -> a
+uniqAway ::
+  (Uniquable a, ClashPretty a) =>
+  InScopeSet ->
+  a ->
+  a
 uniqAway (InScopeSet set n) a =
   uniqAway' (`UniqMap.elem` set) n a
 
-uniqAway'
-  :: (Uniquable a, ClashPretty a)
-  => (Unique -> Bool)
-  -- ^ Unique in scope test
-  -> Seed
-  -- ^ Seed
-  -> a
-  -> a
+uniqAway' ::
+  (Uniquable a, ClashPretty a) =>
+  -- | Unique in scope test
+  (Unique -> Bool) ->
+  -- | Seed
+  Seed ->
+  a ->
+  a
 uniqAway' inScopeTest n u =
-  if inScopeTest (getUnique u) then
-    try 1
-  else
-    u
- where
-  origUniq = getUnique u
-  try k
-    | debugIsOn && k > 1000
-    = pprPanic "uniqAway loop:" msg
-    | inScopeTest uniq
-    = try (k + 1)
-    | k > 3
-    = pprTraceDebug "uniqAway:" msg (setUnique u uniq)
-    | otherwise
-    = setUnique u uniq
-    where
-      msg  = fromPretty k <+> "tries" <+> clashPretty u <+> fromPretty n
-      uniq = deriveUnique origUniq (n * k)
+  if inScopeTest (getUnique u)
+    then
+      try 1
+    else
+      u
+  where
+    origUniq = getUnique u
+    try k
+      | debugIsOn && k > 1000 =
+          pprPanic "uniqAway loop:" msg
+      | inScopeTest uniq =
+          try (k + 1)
+      | k > 3 =
+          pprTraceDebug "uniqAway:" msg (setUnique u uniq)
+      | otherwise =
+          setUnique u uniq
+      where
+        msg = fromPretty k <+> "tries" <+> clashPretty u <+> fromPretty n
+        uniq = deriveUnique origUniq (n * k)
 
-deriveUnique
-  :: Unique
-  -> Seed
-  -> Unique
+deriveUnique ::
+  Unique ->
+  Seed ->
+  Unique
 deriveUnique i delta = i + delta

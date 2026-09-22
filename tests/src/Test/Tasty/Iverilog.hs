@@ -4,19 +4,18 @@
 
 module Test.Tasty.Iverilog where
 
-import           Control.Monad             (forM_)
-import           Data.Coerce               (coerce)
-import           Data.Proxy
-import           Data.Tagged
-import qualified Data.Text                 as T
-import           System.Directory          (listDirectory, copyFile)
-import           System.FilePath           ((</>))
-import           System.FilePath.Glob      (glob)
-
-import           Test.Tasty.Common
-import           Test.Tasty.Options
-import           Test.Tasty.Program
-import           Test.Tasty.Providers
+import Control.Monad (forM_)
+import Data.Coerce (coerce)
+import Data.Proxy
+import Data.Tagged
+import qualified Data.Text as T
+import System.Directory (copyFile, listDirectory)
+import System.FilePath ((</>))
+import System.FilePath.Glob (glob)
+import Test.Tasty.Common
+import Test.Tasty.Options
+import Test.Tasty.Program
+import Test.Tasty.Providers
 
 -- | @--iverilog@ flag for enabling tests that use iverilog.
 newtype Iverilog = Iverilog Bool
@@ -39,33 +38,32 @@ instance IsOption Iverilog where
 -- >   <verilog_files>
 --
 data IVerilogMakeTest = IVerilogMakeTest
-  { ivmParentDirectory :: IO FilePath
-    -- ^ Shared temporary directory
-  , ivmSourceDirectory :: IO FilePath
-    -- ^ Directory to work from
-  , ivmTop :: String
-    -- ^ Entry point to be compiled
+  { -- | Shared temporary directory
+    ivmParentDirectory :: IO FilePath,
+    -- | Directory to work from
+    ivmSourceDirectory :: IO FilePath,
+    -- | Entry point to be compiled
+    ivmTop :: String
   }
 
 instance IsTest IVerilogMakeTest where
-  run optionSet IVerilogMakeTest{..} progressCallback
+  run optionSet IVerilogMakeTest {..} progressCallback
     | Iverilog True <- lookupOption optionSet = do
         buildTargetDir ivmParentDirectory ivmSourceDirectory
         src <- ivmSourceDirectory
         libs <- listDirectory src
         verilogFiles <- glob (src </> "*" </> "*.v")
         runIcarus src (mkArgs libs verilogFiles ivmTop)
-
     | otherwise =
         pure (testPassed "Ignoring test due to --no-verilog")
-   where
-    mkArgs libs files top =
-         concat [["-I", l] | l <- libs]
-      <> ["-g2", "-s", top, "-o", top <> ".exe"]
-      <> files
+    where
+      mkArgs libs files top =
+        concat [["-I", l] | l <- libs]
+          <> ["-g2", "-s", top, "-o", top <> ".exe"]
+          <> files
 
-    icarus workDir args = TestProgram "iverilog" args NoGlob PrintNeither False (Just workDir) []
-    runIcarus workDir args = run optionSet (icarus workDir args) progressCallback
+      icarus workDir args = TestProgram "iverilog" args NoGlob PrintNeither False (Just workDir) []
+      runIcarus workDir args = run optionSet (icarus workDir args) progressCallback
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Iverilog)])
@@ -77,18 +75,18 @@ instance IsTest IVerilogMakeTest where
 -- > vvp test_i2c.exe
 --
 data IVerilogSimTest = IVerilogSimTest
-  { ivsExpectFailure :: Maybe (TestExitCode, T.Text)
-    -- ^ Expected failure code and output (if any)
-  , ivsStdoutNonEmptyFail :: Bool
-    -- ^ Whether a non-empty stdout means failure
-  , ivsSourceDirectory :: IO FilePath
-    -- ^ Directory containing executables produced by 'IVerilogMakeTest'
-  , ivsTop :: String
-    -- ^ Entry point to simulate
+  { -- | Expected failure code and output (if any)
+    ivsExpectFailure :: Maybe (TestExitCode, T.Text),
+    -- | Whether a non-empty stdout means failure
+    ivsStdoutNonEmptyFail :: Bool,
+    -- | Directory containing executables produced by 'IVerilogMakeTest'
+    ivsSourceDirectory :: IO FilePath,
+    -- | Entry point to simulate
+    ivsTop :: String
   }
 
 instance IsTest IVerilogSimTest where
-  run optionSet IVerilogSimTest{..} progressCallback
+  run optionSet IVerilogSimTest {..} progressCallback
     | Iverilog True <- lookupOption optionSet = do
         src <- ivsSourceDirectory
 
@@ -101,17 +99,24 @@ instance IsTest IVerilogSimTest where
         case ivsExpectFailure of
           Nothing -> run optionSet (vvp src [topExe]) progressCallback
           Just exit -> run optionSet (failingVvp src [topExe] exit) progressCallback
-
     | otherwise =
         pure (testPassed "Ignoring test due to --no-iverilog")
-   where
-    vvp workDir args =
-      TestProgram "vvp" args NoGlob PrintNeither ivsStdoutNonEmptyFail (Just workDir) []
+    where
+      vvp workDir args =
+        TestProgram "vvp" args NoGlob PrintNeither ivsStdoutNonEmptyFail (Just workDir) []
 
-    failingVvp workDir args (testExit, expectedErr) =
-      TestFailingProgram
-        (testExitCode testExit) "vvp" args NoGlob PrintNeither False
-        (specificExitCode testExit) (ExpectEither expectedErr) (Just workDir) []
+      failingVvp workDir args (testExit, expectedErr) =
+        TestFailingProgram
+          (testExitCode testExit)
+          "vvp"
+          args
+          NoGlob
+          PrintNeither
+          False
+          (specificExitCode testExit)
+          (ExpectEither expectedErr)
+          (Just workDir)
+          []
 
   testOptions =
     coerce (coerce (testOptions @TestProgram) <> [Option (Proxy @Iverilog)])

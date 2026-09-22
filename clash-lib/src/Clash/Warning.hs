@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE LambdaCase #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -19,70 +22,68 @@
   explicit @-Wwarn=\<name\>@ always wins over a global @-Werror@. Ordering
   among the Clash warning flags themselves is positional (last one wins).
 -}
-
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Clash.Warning
-  ( ClashWarning(..)
-  , warningName
-  , parseWarningName
+  ( ClashWarning (..),
+    warningName,
+    parseWarningName,
+
     -- * Warning options
-  , WarningOpts(..)
-  , defWarningOpts
-  , wopt
-  , woptFatal
+    WarningOpts (..),
+    defWarningOpts,
+    wopt,
+    woptFatal,
+
     -- * Flag-parsing state transitions
-  , enableWarning
-  , disableWarning
-  , promoteWarning
-  , demoteWarning
-  ) where
+    enableWarning,
+    disableWarning,
+    promoteWarning,
+    demoteWarning,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Data.Hashable (Hashable)
 import Data.Map.Strict (Map)
-import Data.Set (Set)
-import GHC.Generics (Generic)
-
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC.Generics (Generic)
 
 -- | Warnings Clash can emit. See the module documentation of "Clash.Warning"
 -- for the command line flags controlling each of these.
 data ClashWarning
-  = WarnDubiousPrimitive
-  -- ^ A primitive marked with @WarnAlways@ was instantiated, e.g. a primitive
-  -- that only approximates its Haskell model.
-  --
-  -- Flag: @-Wclash-dubious-primitive@
-  | WarnNonSynthesizable
-  -- ^ A primitive marked with @WarnNonSynthesizable@ was instantiated outside
-  -- of a test bench context.
-  --
-  -- Flag: @-Wclash-non-synthesizable@
-  | WarnPrimitiveDefinition
-  -- ^ A primitive's Haskell definition looks problematic: it isn't marked
-  -- OPAQUE, its result is always an error, or its blackbox uses arguments the
-  -- Haskell definition doesn't use.
-  --
-  -- Flag: @-Wclash-primitive-definition@
-  | WarnCastSpecialization
-  -- ^ A function is specialized on a non work-free cast, possibly duplicating
-  -- work.
-  --
-  -- Flag: @-Wclash-cast-specialization@
-  | WarnIntegerNarrowing
-  -- ^ A @toInteger@ conversion narrows its argument to the width of 'Int',
-  -- possibly dropping most significant bits.
-  --
-  -- Flag: @-Wclash-integer-narrowing@
-  | WarnUnmatchableConstant
-  -- ^ A case subject evaluated to a constant that matches none of the
-  -- alternatives, usually a missing reduction rule in the primitive evaluator.
-  -- Only reported when invariants are being checked (@-fclash-debug@).
-  --
-  -- Flag: @-Wclash-unmatchable-constant@
+  = -- | A primitive marked with @WarnAlways@ was instantiated, e.g. a primitive
+    -- that only approximates its Haskell model.
+    --
+    -- Flag: @-Wclash-dubious-primitive@
+    WarnDubiousPrimitive
+  | -- | A primitive marked with @WarnNonSynthesizable@ was instantiated outside
+    -- of a test bench context.
+    --
+    -- Flag: @-Wclash-non-synthesizable@
+    WarnNonSynthesizable
+  | -- | A primitive's Haskell definition looks problematic: it isn't marked
+    -- OPAQUE, its result is always an error, or its blackbox uses arguments the
+    -- Haskell definition doesn't use.
+    --
+    -- Flag: @-Wclash-primitive-definition@
+    WarnPrimitiveDefinition
+  | -- | A function is specialized on a non work-free cast, possibly duplicating
+    -- work.
+    --
+    -- Flag: @-Wclash-cast-specialization@
+    WarnCastSpecialization
+  | -- | A @toInteger@ conversion narrows its argument to the width of 'Int',
+    -- possibly dropping most significant bits.
+    --
+    -- Flag: @-Wclash-integer-narrowing@
+    WarnIntegerNarrowing
+  | -- | A case subject evaluated to a constant that matches none of the
+    -- alternatives, usually a missing reduction rule in the primitive evaluator.
+    -- Only reported when invariants are being checked (@-fclash-debug@).
+    --
+    -- Flag: @-Wclash-unmatchable-constant@
+    WarnUnmatchableConstant
   deriving (Show, Eq, Ord, Enum, Bounded, Generic, NFData, Hashable)
 
 -- | The name of a warning as used in command line flags, e.g.
@@ -99,32 +100,33 @@ warningName = \case
 -- | Inverse of 'warningName'
 parseWarningName :: String -> Maybe ClashWarning
 parseWarningName = flip Map.lookup warningsByName
- where
-  warningsByName :: Map String ClashWarning
-  warningsByName =
-    Map.fromList [(warningName w, w) | w <- [minBound .. maxBound]]
+  where
+    warningsByName :: Map String ClashWarning
+    warningsByName =
+      Map.fromList [(warningName w, w) | w <- [minBound .. maxBound]]
 
 -- | Which warnings are enabled, and which of them are fatal. Construct with
 -- 'defWarningOpts' and the state transitions below; query with 'wopt' and
 -- 'woptFatal'.
 data WarningOpts = WarningOpts
-  { warn_enabled :: Set ClashWarning
-  -- ^ Warnings that are enabled. All warnings are enabled by default.
-  , warn_fatal :: Set ClashWarning
-  -- ^ Warnings explicitly promoted to errors with @-Werror=\<name\>@
-  , warn_nonFatal :: Set ClashWarning
-  -- ^ Warnings explicitly demoted with @-Wwarn=\<name\>@; these are also
-  -- exempt from a global @-Werror@
+  { -- | Warnings that are enabled. All warnings are enabled by default.
+    warn_enabled :: Set ClashWarning,
+    -- | Warnings explicitly promoted to errors with @-Werror=\<name\>@
+    warn_fatal :: Set ClashWarning,
+    -- | Warnings explicitly demoted with @-Wwarn=\<name\>@; these are also
+    -- exempt from a global @-Werror@
+    warn_nonFatal :: Set ClashWarning
   }
   deriving (Show, Eq, Generic, NFData, Hashable)
 
 -- | All warnings enabled, none fatal
 defWarningOpts :: WarningOpts
-defWarningOpts = WarningOpts
-  { warn_enabled = Set.fromList [minBound .. maxBound]
-  , warn_fatal = Set.empty
-  , warn_nonFatal = Set.empty
-  }
+defWarningOpts =
+  WarningOpts
+    { warn_enabled = Set.fromList [minBound .. maxBound],
+      warn_fatal = Set.empty,
+      warn_nonFatal = Set.empty
+    }
 
 -- | Is the given warning enabled?
 wopt :: ClashWarning -> WarningOpts -> Bool
@@ -140,26 +142,29 @@ woptFatal werror w opts =
 -- | @-W\<name\>@
 enableWarning :: ClashWarning -> WarningOpts -> WarningOpts
 enableWarning w opts =
-  opts { warn_enabled = Set.insert w (warn_enabled opts) }
+  opts {warn_enabled = Set.insert w (warn_enabled opts)}
 
 -- | @-Wno-\<name\>@
 disableWarning :: ClashWarning -> WarningOpts -> WarningOpts
-disableWarning w opts = opts
-  { warn_enabled = Set.delete w (warn_enabled opts)
-  , warn_fatal = Set.delete w (warn_fatal opts)
-  }
+disableWarning w opts =
+  opts
+    { warn_enabled = Set.delete w (warn_enabled opts),
+      warn_fatal = Set.delete w (warn_fatal opts)
+    }
 
 -- | @-Werror=\<name\>@. Implies @-W\<name\>@, like in GHC.
 promoteWarning :: ClashWarning -> WarningOpts -> WarningOpts
-promoteWarning w opts = opts
-  { warn_enabled = Set.insert w (warn_enabled opts)
-  , warn_fatal = Set.insert w (warn_fatal opts)
-  , warn_nonFatal = Set.delete w (warn_nonFatal opts)
-  }
+promoteWarning w opts =
+  opts
+    { warn_enabled = Set.insert w (warn_enabled opts),
+      warn_fatal = Set.insert w (warn_fatal opts),
+      warn_nonFatal = Set.delete w (warn_nonFatal opts)
+    }
 
 -- | @-Wwarn=\<name\>@ / @-Wno-error=\<name\>@
 demoteWarning :: ClashWarning -> WarningOpts -> WarningOpts
-demoteWarning w opts = opts
-  { warn_fatal = Set.delete w (warn_fatal opts)
-  , warn_nonFatal = Set.insert w (warn_nonFatal opts)
-  }
+demoteWarning w opts =
+  opts
+    { warn_fatal = Set.delete w (warn_fatal opts),
+      warn_nonFatal = Set.insert w (warn_nonFatal opts)
+    }

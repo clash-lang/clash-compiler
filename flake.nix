@@ -35,6 +35,11 @@
       flake = false;
     };
 
+    tilia = {
+      url = "github:mrkkrp/tilia/master";
+      flake = false;
+    };
+
     # Tool used to manage the changelog, see 'changelog/README.md'.
     qlog = {
       url = "github:QBayLogic/qlog";
@@ -214,6 +219,7 @@
             makeDevShell = import ./nix/devshell.nix {
               inherit pkgs;
               qlog = args.qlog.packages.${system}.default;
+              tilia-src = args.tilia;
             };
 
             clashDevShells =

@@ -199,7 +199,8 @@
         "ghc-typelits-knownnat": "ghc-typelits-knownnat",
         "ghc-typelits-natnormalise": "ghc-typelits-natnormalise",
         "nixpkgs": "nixpkgs",
-        "qlog": "qlog"
+        "qlog": "qlog",
+        "tilia": "tilia"
       }
     },
     "systems": {
@@ -214,6 +215,23 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "tilia": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790019799,
+        "narHash": "sha256-itiCE+zVrxRov9ZKHg+kysewhqMUlubxf2zVHIAxbkM=",
+        "owner": "mrkkrp",
+        "repo": "tilia",
+        "rev": "261ee8726bab8c60aa9afa8ccd5a36178efec026",
+        "type": "github"
+      },
+      "original": {
+        "owner": "mrkkrp",
+        "ref": "master",
+        "repo": "tilia",
         "type": "github"
       }
     },

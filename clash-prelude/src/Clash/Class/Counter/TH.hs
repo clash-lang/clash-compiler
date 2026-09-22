@@ -18,26 +18,25 @@ mkTup :: [Exp] -> Exp
 mkTup = TupE . map Just
 
 genTupleInstances :: Int -> Q [Dec]
-genTupleInstances maxTupleSize = mapM genTupleInstance [3..maxTupleSize]
+genTupleInstances maxTupleSize = mapM genTupleInstance [3 .. maxTupleSize]
 
 genTupleInstance :: Int -> Q Dec
 genTupleInstance tupSize = do
-  typeVars <- mapM (\n -> VarT <$> newName ("a" <> show n)) [0..tupSize-1]
+  typeVars <- mapM (\n -> VarT <$> newName ("a" <> show n)) [0 .. tupSize - 1]
 
   succOverflowBody <- genCountOverflow countSuccName tupSize
   predOverflowBody <- genCountOverflow countPredName tupSize
 
-  let
-    minBody = genCount countMinName tupSize
-    maxBody = genCount countMaxName tupSize
-    ctx = map (ConT counterName `AppT`) typeVars
-    typ = ConT counterName `AppT` mkTupTy typeVars
-    decls =
-      [ FunD countMinName [minBody]
-      , FunD countMaxName [maxBody]
-      , FunD (mkName "countSuccOverflow") [succOverflowBody]
-      , FunD (mkName "countPredOverflow") [predOverflowBody]
-      ]
+  let minBody = genCount countMinName tupSize
+      maxBody = genCount countMaxName tupSize
+      ctx = map (ConT counterName `AppT`) typeVars
+      typ = ConT counterName `AppT` mkTupTy typeVars
+      decls =
+        [ FunD countMinName [minBody],
+          FunD countMaxName [maxBody],
+          FunD (mkName "countSuccOverflow") [succOverflowBody],
+          FunD (mkName "countPredOverflow") [predOverflowBody]
+        ]
 
   pure (InstanceD Nothing ctx typ decls)
 
@@ -46,32 +45,30 @@ genCount nm n = Clause [] (NormalB (mkTup (replicate n (VarE nm)))) []
 
 genCountOverflow :: Name -> Int -> Q Clause
 genCountOverflow nm tupSize = do
-  varNms <- mapM (\n -> newName ("a" <> show n)) [0..tupSize-1]
+  varNms <- mapM (\n -> newName ("a" <> show n)) [0 .. tupSize - 1]
   let vars = map VarE varNms
 
   overflowLastNm <- newName "overflowLast"
   lastNm <- newName "last"
 
   overflowInitNm <- newName "overflowInit"
-  initNms <- mapM (\n -> newName ("a" <> show n)) [0..tupSize-2]
+  initNms <- mapM (\n -> newName ("a" <> show n)) [0 .. tupSize - 2]
 
-  let
-    body =
-      CondE
-        (VarE overflowLastNm)
-        (mkTup [VarE overflowInitNm, mkTup (map VarE (initNms <> [lastNm]))])
-        (mkTup [VarE overflowLastNm, mkTup (init vars <> [VarE lastNm])])
+  let body =
+        CondE
+          (VarE overflowLastNm)
+          (mkTup [VarE overflowInitNm, mkTup (map VarE (initNms <> [lastNm]))])
+          (mkTup [VarE overflowLastNm, mkTup (init vars <> [VarE lastNm])])
 
-    decs =
-      [ ValD
-          (TupP [VarP overflowLastNm, VarP lastNm])
-          (NormalB (VarE nm `AppE` last vars))
-          []
-
-      , ValD
-          (TupP [VarP overflowInitNm, TupP (map VarP initNms)])
-          (NormalB (VarE nm `AppE` mkTup (init vars)))
-          []
-      ]
+      decs =
+        [ ValD
+            (TupP [VarP overflowLastNm, VarP lastNm])
+            (NormalB (VarE nm `AppE` last vars))
+            [],
+          ValD
+            (TupP [VarP overflowInitNm, TupP (map VarP initNms)])
+            (NormalB (VarE nm `AppE` mkTup (init vars)))
+            []
+        ]
 
   pure (Clause [TupP (map VarP varNms)] (NormalB body) decs)

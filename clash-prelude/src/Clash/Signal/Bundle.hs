@@ -1,3 +1,10 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
+-- {-# OPTIONS_GHC -ddump-splices #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2019, Myrtle Software Ltd, Google Inc.
@@ -7,41 +14,32 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 The Product/Signal isomorphism
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-
-{-# LANGUAGE Trustworthy #-}
-
---{-# OPTIONS_GHC -ddump-splices #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Signal.Bundle
-  ( Bundle (..)
-  -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
-  , EmptyTuple(..)
-  , TaggedEmptyTuple(..)
-  -- ** Internal
-  , vecBundle#
+  ( Bundle (..),
+
+    -- ** Tools to emulate pre Clash 1.0 @Bundle ()@ instance
+    EmptyTuple (..),
+    TaggedEmptyTuple (..),
+
+    -- ** Internal
+    vecBundle#,
   )
 where
 
-import Data.Functor.Compose
-import GHC.Generics
-import GHC.TypeLits                 (KnownNat)
-import Prelude                      hiding (head, map, tail)
-
 import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Signal.Bundle.Internal (deriveBundleTuples)
-import Clash.Signal.Internal        (Signal (..), Domain)
-import Clash.Sized.BitVector        (Bit, BitVector)
-import Clash.Sized.Fixed            (Fixed)
-import Clash.Sized.Index            (Index)
-import Clash.Sized.Signed           (Signed)
-import Clash.Sized.Unsigned         (Unsigned)
-import Clash.Sized.Vector           (Vec, traverse#, lazyV)
-import Clash.Sized.RTree            (RTree, lazyT)
+import Clash.Signal.Internal (Domain, Signal (..))
+import Clash.Sized.BitVector (Bit, BitVector)
+import Clash.Sized.Fixed (Fixed)
+import Clash.Sized.Index (Index)
+import Clash.Sized.RTree (RTree, lazyT)
+import Clash.Sized.Signed (Signed)
+import Clash.Sized.Unsigned (Unsigned)
+import Clash.Sized.Vector (Vec, lazyV, traverse#)
+import Data.Functor.Compose
+import GHC.Generics
+import GHC.TypeLits (KnownNat)
+import Prelude hiding (head, map, tail)
 
 -- | Isomorphism between a 'Clash.Signal.Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Clash.Signal.Signal's.
@@ -87,10 +85,10 @@ import Clash.Sized.RTree            (RTree, lazyT)
 --   -- unbundle :: Signal dom (Pair a b) -> Pair (Signal dom a) (Signal dom b)
 --   unbundle pairs = MkPair (getA '<$>' pairs) (getB '<$>' pairs)
 -- @
-
 class Bundle a where
   type Unbundled (dom :: Domain) a = res | res -> dom a
   type Unbundled dom a = Signal dom a
+
   -- | Example:
   --
   -- @
@@ -103,11 +101,12 @@ class Bundle a where
   -- __bundle__ :: 'Signal' dom 'Clash.Sized.BitVector.Bit' -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
   -- @
   bundle :: Unbundled dom a -> Signal dom a
-
   {-# INLINE bundle #-}
-  default bundle :: (Signal dom a ~ Unbundled dom a)
-                 => Unbundled dom a -> Signal dom a
+  default bundle ::
+    (Signal dom a ~ Unbundled dom a) =>
+    Unbundled dom a -> Signal dom a
   bundle s = s
+
   -- | Example:
   --
   -- @
@@ -120,26 +119,38 @@ class Bundle a where
   -- __unbundle__ :: 'Signal' dom 'Clash.Sized.BitVector.Bit' -> 'Signal' dom 'Clash.Sized.BitVector.Bit'
   -- @
   unbundle :: Signal dom a -> Unbundled dom a
-
   {-# INLINE unbundle #-}
-  default unbundle :: (Unbundled dom a ~ Signal dom a)
-                   => Signal dom a -> Unbundled dom a
+  default unbundle ::
+    (Unbundled dom a ~ Signal dom a) =>
+    Signal dom a -> Unbundled dom a
   unbundle s = s
 
 instance Bundle ()
+
 instance Bundle Bool
+
 instance Bundle Integer
+
 instance Bundle Int
+
 instance Bundle Float
+
 instance Bundle Double
+
 instance Bundle (Maybe a)
+
 instance Bundle (Either a b)
 
 instance Bundle Bit
+
 instance Bundle (BitVector n)
+
 instance Bundle (Index n)
+
 instance Bundle (Fixed rep int frac)
+
 instance Bundle (Signed n)
+
 instance Bundle (Unsigned n)
 
 -- | __NB__: The documentation only shows instances up to /3/-tuples. By
@@ -148,11 +159,12 @@ instance Bundle (Unsigned n)
 -- GHC imposed limit is either 62 or 64 depending on the GHC version.
 deriveBundleTuples ''Bundle ''Unbundled 'bundle 'unbundle
 
-instance KnownNat n => Bundle (Vec n a) where
+instance (KnownNat n) => Bundle (Vec n a) where
   type Unbundled t (Vec n a) = Vec n (Signal t a)
+
   -- The 'Traversable' instance of 'Vec' is not synthesizable, so we must
   -- define 'bundle' as a primitive.
-  bundle   = vecBundle#
+  bundle = vecBundle#
   unbundle = sequenceA . fmap lazyV
 
 {-# OPAQUE vecBundle# #-}
@@ -160,18 +172,18 @@ instance KnownNat n => Bundle (Vec n a) where
 vecBundle# :: Vec n (Signal t a) -> Signal t (Vec n a)
 vecBundle# = traverse# id
 
-instance KnownNat d => Bundle (RTree d a) where
+instance (KnownNat d) => Bundle (RTree d a) where
   type Unbundled t (RTree d a) = RTree d (Signal t a)
-  bundle   = sequenceA
+  bundle = sequenceA
   unbundle = sequenceA . fmap lazyT
 
 instance Bundle ((f :*: g) a) where
   type Unbundled t ((f :*: g) a) = (Compose (Signal t) f :*: Compose (Signal t) g) a
   bundle (Compose l :*: Compose r) = (:*:) <$> l <*> r
   unbundle s = Compose (getL <$> s) :*: Compose (getR <$> s)
-   where
-    getL (l :*: _) = l
-    getR (_ :*: r) = r
+    where
+      getL (l :*: _) = l
+      getR (_ :*: r) = r
 
 -- | See 'TaggedEmptyTuple'
 data EmptyTuple = EmptyTuple

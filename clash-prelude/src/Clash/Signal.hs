@@ -1,3 +1,13 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software Ltd,
@@ -66,103 +76,100 @@ never create a clock that goes any faster!
 * __NB__: Whether 'System' has good defaults depends on your target platform.
 Check out 'IntelSystem' and 'XilinxSystem' too!
 -}
-
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Signal
   ( -- * Synchronous signals
-    Signal
-  , BiSignalIn
-  , BiSignalOut
-  , BiSignalDefault(..)
+    Signal,
+    BiSignalIn,
+    BiSignalOut,
+    BiSignalDefault (..),
+
     -- * Domain
-  , Domain
-  , sameDomain
-  , KnownDomain(..)
-  , KnownConfiguration
-  , ActiveEdge(..)
-  , SActiveEdge(..)
-  , InitBehavior(..)
-  , SInitBehavior(..)
-  , ResetKind(..)
-  , SResetKind(..)
-  , ResetPolarity(..)
-  , SResetPolarity(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
+    Domain,
+    sameDomain,
+    KnownDomain (..),
+    KnownConfiguration,
+    ActiveEdge (..),
+    SActiveEdge (..),
+    InitBehavior (..),
+    SInitBehavior (..),
+    ResetKind (..),
+    SResetKind (..),
+    ResetPolarity (..),
+    SResetPolarity (..),
+    DomainConfiguration (..),
+    SDomainConfiguration (..),
+
+    -- ** Configuration type families
+    DomainPeriod,
+    DomainActiveEdge,
+    DomainResetKind,
+    DomainInitBehavior,
+    DomainResetPolarity,
+
     -- *** Convenience types
     -- $conveniencetypes
+    HasSynchronousReset,
+    HasAsynchronousReset,
+    HasDefinedInitialValues,
 
-  , HasSynchronousReset
-  , HasAsynchronousReset
-  , HasDefinedInitialValues
-  -- **** Time representations
-  , Seconds
-  , Milliseconds
-  , Microseconds
-  , Nanoseconds
-  , Picoseconds
-  -- **** Time conversions
-  , DomainToHz
-  , HzToPeriod
-  , PeriodToHz
-  , PeriodToCycles
-  , ClockDivider
+    -- **** Time representations
+    Seconds,
+    Milliseconds,
+    Microseconds,
+    Nanoseconds,
+    Picoseconds,
+
+    -- **** Time conversions
+    DomainToHz,
+    HzToPeriod,
+    PeriodToHz,
+    PeriodToCycles,
+    ClockDivider,
+
     -- ** Default domains
-  , System
-  , XilinxSystem
-  , IntelSystem
-  , vSystem
-  , vIntelSystem
-  , vXilinxSystem
+    System,
+    XilinxSystem,
+    IntelSystem,
+    vSystem,
+    vIntelSystem,
+    vXilinxSystem,
+
     -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , createDomain
-  , knownVDomain
-  , clockPeriod
-  , activeEdge
-  , resetKind
-  , initBehavior
-  , resetPolarity
+    VDomainConfiguration (..),
+    vDomain,
+    createDomain,
+    knownVDomain,
+    clockPeriod,
+    activeEdge,
+    resetKind,
+    initBehavior,
+    resetPolarity,
+
     -- * Clock
-  , Clock
-  , DiffClock
-  , periodToHz
-  , hzToPeriod
+    Clock,
+    DiffClock,
+    periodToHz,
+    hzToPeriod,
+
     -- * Reset
-  , Reset
-  , unsafeToReset
-  , unsafeFromReset
-  , unsafeToActiveHigh
-  , unsafeToActiveLow
-  , unsafeFromActiveHigh
-  , unsafeFromActiveLow
-  , resetSynchronizer
-  , resetGlitchFilter
-  , registerSyncReset
-  , holdReset
+    Reset,
+    unsafeToReset,
+    unsafeFromReset,
+    unsafeToActiveHigh,
+    unsafeToActiveLow,
+    unsafeFromActiveHigh,
+    unsafeFromActiveLow,
+    resetSynchronizer,
+    resetGlitchFilter,
+    registerSyncReset,
+    holdReset,
+
     -- * Enabling
-  , Enable
-  , toEnable
-  , fromEnable
-  , E.enableGen
+    Enable,
+    toEnable,
+    fromEnable,
+    E.enableGen,
+
     -- * Hidden clock, reset, and enable arguments
     -- $hiddenclockandreset
 
@@ -170,124 +177,177 @@ module Clash.Signal
     -- $monomorphism
 
     -- ** Hidden clock
-  , HiddenClock
-  , hideClock
-  , exposeClock
-  , withClock
-  , hasClock
+    HiddenClock,
+    hideClock,
+    exposeClock,
+    withClock,
+    hasClock,
+
     -- ** Hidden reset
-  , HiddenReset
-  , hideReset
-  , exposeReset
-  , withReset
-  , hasReset
+    HiddenReset,
+    hideReset,
+    exposeReset,
+    withReset,
+    hasReset,
+
     -- ** Hidden enable
-  , HiddenEnable
-  , hideEnable
-  , exposeEnable
-  , withEnable
-  , hasEnable
+    HiddenEnable,
+    hideEnable,
+    exposeEnable,
+    withEnable,
+    hasEnable,
+
     -- ** Hidden clock, reset, and enable
-  , HiddenClockResetEnable
-  , hideClockResetEnable
-  , exposeClockResetEnable
-  , withClockResetEnable
-  , SystemClockResetEnable
+    HiddenClockResetEnable,
+    hideClockResetEnable,
+    exposeClockResetEnable,
+    withClockResetEnable,
+    SystemClockResetEnable,
+
     -- * Basic circuit functions
-  , andEnable
-  , dflipflop
-  , delay
-  , delayMaybe
-  , delayEn
-  , register
-  , regMaybe
-  , regEn
-  , regEnN
-  , mux
-  , apEn
+    andEnable,
+    dflipflop,
+    delay,
+    delayMaybe,
+    delayEn,
+    register,
+    regMaybe,
+    regEn,
+    regEnN,
+    mux,
+    apEn,
+
     -- * Simulation and testbench functions
-  , clockGen
-  , resetGen
-  , resetGenN
-  , systemClockGen
-  , systemResetGen
+    clockGen,
+    resetGen,
+    resetGenN,
+    systemClockGen,
+    systemResetGen,
+
     -- * Boolean connectives
-  ,(.&&.), (&&.), (.&&), (.||.), (||.), (.||)
+    (.&&.),
+    (&&.),
+    (.&&),
+    (.||.),
+    (||.),
+    (.||),
+
     -- * Product/Signal isomorphism
-  , Bundle(..)
-  , EmptyTuple(..)
-  , TaggedEmptyTuple(..)
+    Bundle (..),
+    EmptyTuple (..),
+    TaggedEmptyTuple (..),
+
     -- * Simulation functions (not synthesizable)
-  , simulate
-  , simulateB
-  , simulateN
-  , simulateWithReset
-  , simulateWithResetN
-  , runUntil
+    simulate,
+    simulateB,
+    simulateN,
+    simulateWithReset,
+    simulateWithResetN,
+    runUntil,
+
     -- ** lazy versions
-  , simulate_lazy
-  , simulateB_lazy
+    simulate_lazy,
+    simulateB_lazy,
+
     -- ** Automaton
-  , signalAutomaton
+    signalAutomaton,
+
     -- * List \<-\> Signal conversion (not synthesizable)
-  , sample
-  , sampleN
-  , sampleWithReset
-  , sampleWithResetN
-  , fromList
-  , fromListWithReset
+    sample,
+    sampleN,
+    sampleWithReset,
+    sampleWithResetN,
+    fromList,
+    fromListWithReset,
+
     -- ** lazy versions
-  , sample_lazy
-  , sampleN_lazy
-  , fromList_lazy
+    sample_lazy,
+    sampleN_lazy,
+    fromList_lazy,
+
     -- * QuickCheck combinators
-  , testFor
+    testFor,
+
     -- * Type classes
+
     -- ** 'Eq'-like
-  , (.==.), (.==), (==.), (./=.), (./=), (/=.)
+    (.==.),
+    (.==),
+    (==.),
+    (./=.),
+    (./=),
+    (/=.),
+
     -- ** 'Ord'-like
-  , (.<.), (.<), (<.), (.<=.), (.<=), (<=.), (.>=.), (.>=), (>=.), (.>.), (.>), (>.)
+    (.<.),
+    (.<),
+    (<.),
+    (.<=.),
+    (.<=),
+    (<=.),
+    (.>=.),
+    (.>=),
+    (>=.),
+    (.>.),
+    (.>),
+    (>.),
+
     -- * Bisignal functions
-  , veryUnsafeToBiSignalIn
-  , readFromBiSignal
-  , writeToBiSignal
-  , mergeBiSignalOuts
+    veryUnsafeToBiSignalIn,
+    readFromBiSignal,
+    writeToBiSignal,
+    mergeBiSignalOuts,
 
     -- * Internals
-  , HiddenClockName
-  , HiddenResetName
-  , HiddenEnableName
+    HiddenClockName,
+    HiddenResetName,
+    HiddenEnableName,
 
     -- * Deprecated
-  , unsafeFromHighPolarity
-  , unsafeFromLowPolarity
-  , unsafeToHighPolarity
-  , unsafeToLowPolarity
+    unsafeFromHighPolarity,
+    unsafeFromLowPolarity,
+    unsafeToHighPolarity,
+    unsafeToLowPolarity,
   )
 where
 
-import           Control.Arrow.Transformer.Automaton (Automaton)
-import           GHC.TypeLits          (type (<=))
-import           Data.List             (uncons)
-import           Data.Proxy            (Proxy(..))
-import           Prelude
-import           Test.QuickCheck       (Property, property)
-
+import Clash.Explicit.Reset (resetGlitchFilter, resetSynchronizer)
+import qualified Clash.Explicit.Reset as E
+import Clash.Explicit.Signal (systemClockGen, systemResetGen)
 import qualified Clash.Explicit.Signal as E
-import qualified Clash.Explicit.Reset  as E
-import           Clash.Explicit.Reset  (resetSynchronizer, resetGlitchFilter)
-import           Clash.Explicit.Signal (systemClockGen, systemResetGen)
-import           Clash.Hidden
-import           Clash.Promoted.Nat    (SNat (..), snatToNum)
-import           Clash.Signal.Bundle
-  (Bundle (..), EmptyTuple(..), TaggedEmptyTuple(..))
-import           Clash.Signal.BiSignal --(BisignalIn, BisignalOut, )
-import           Clash.Signal.Internal hiding
-  (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor,
-   signalAutomaton)
-import           Clash.Signal.Internal.Ambiguous
-  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
-import           Clash.XException      (NFDataX, ShowX)
+import Clash.Hidden
+import Clash.Promoted.Nat (SNat (..), snatToNum)
+import Clash.Signal.BiSignal -- (BisignalIn, BisignalOut, )
+import Clash.Signal.Bundle
+  ( Bundle (..),
+    EmptyTuple (..),
+    TaggedEmptyTuple (..),
+  )
+import Clash.Signal.Internal hiding
+  ( sample,
+    sampleN,
+    sampleN_lazy,
+    sample_lazy,
+    signalAutomaton,
+    simulate,
+    simulate_lazy,
+    testFor,
+  )
+import Clash.Signal.Internal.Ambiguous
+  ( activeEdge,
+    clockPeriod,
+    initBehavior,
+    knownVDomain,
+    resetKind,
+    resetPolarity,
+  )
+import Clash.XException (NFDataX, ShowX)
+import Control.Arrow.Transformer.Automaton (Automaton)
+import Data.List (uncons)
+import Data.Proxy (Proxy (..))
+import GHC.TypeLits (type (<=))
+import Test.QuickCheck (Property, property)
+import Prelude
 
 {- $setup
 >>> :set -XFlexibleContexts -XTypeApplications
@@ -570,38 +630,43 @@ to 'andEnable' as an argument would have avoided this hard to debug problem.
 -}
 
 type HiddenClockName (dom :: Domain) = "clock"
+
 type HiddenResetName (dom :: Domain) = "reset"
+
 type HiddenEnableName (dom :: Domain) = "enable"
 
 -- | A /constraint/ that indicates the component has a hidden 'Clock'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenClock dom =
-  ( Hidden (HiddenClockName dom) (Clock dom)
-  , KnownDomain dom )
+  ( Hidden (HiddenClockName dom) (Clock dom),
+    KnownDomain dom
+  )
 
 -- | A /constraint/ that indicates the component needs a 'Reset'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenReset dom =
-  ( Hidden (HiddenResetName dom) (Reset dom)
-  , KnownDomain dom )
+  ( Hidden (HiddenResetName dom) (Reset dom),
+    KnownDomain dom
+  )
 
 -- | A /constraint/ that indicates the component needs an 'Enable'
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type HiddenEnable dom =
-  ( Hidden (HiddenEnableName dom) (Enable dom)
-  , KnownDomain dom )
+  ( Hidden (HiddenEnableName dom) (Enable dom),
+    KnownDomain dom
+  )
 
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
 -- and an 'Enable' belonging to the same @dom@.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-type HiddenClockResetEnable dom  =
-  ( HiddenClock dom
-  , HiddenReset dom
-  , HiddenEnable dom
+type HiddenClockResetEnable dom =
+  ( HiddenClock dom,
+    HiddenReset dom,
+    HiddenEnable dom
   )
 
 -- | A /constraint/ that indicates the component needs a 'Clock', a 'Reset',
@@ -609,11 +674,10 @@ type HiddenClockResetEnable dom  =
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
 type SystemClockResetEnable =
-  ( Hidden (HiddenClockName System) (Clock System)
-  , Hidden (HiddenResetName System) (Reset System)
-  , Hidden (HiddenEnableName System) (Enable System)
+  ( Hidden (HiddenClockName System) (Clock System),
+    Hidden (HiddenResetName System) (Reset System),
+    Hidden (HiddenEnableName System) (Enable System)
   )
-
 
 {- | Expose a hidden 'Clock' argument of a component, so it can be applied
 explicitly.
@@ -636,24 +700,24 @@ domain later):
 >>> sampleN 10 sig
 [5,5,6,7,8,9,10,11,12,13]
 -}
-exposeClock
-  :: forall dom  r
-   . (HiddenClock dom => r)
-  -- ^ The component with a hidden clock
-  -> (KnownDomain dom => Clock dom -> r)
-  -- ^ The component with its clock argument exposed
+exposeClock ::
+  forall dom r.
+  -- | The component with a hidden clock
+  ((HiddenClock dom) => r) ->
+  -- | The component with its clock argument exposed
+  ((KnownDomain dom) => Clock dom -> r)
 exposeClock = \f clk -> expose @(HiddenClockName dom) f clk
 {-# INLINE exposeClock #-}
 
 -- | Hide the 'Clock' argument of a component, so it can be routed implicitly.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-hideClock
-  :: forall dom r
-   . HiddenClock dom
-  => (Clock dom -> r)
-  -- ^ Function whose clock argument you want to hide
-  -> r
+hideClock ::
+  forall dom r.
+  (HiddenClock dom) =>
+  -- | Function whose clock argument you want to hide
+  (Clock dom -> r) ->
+  r
 hideClock = \f -> f (fromLabel @(HiddenClockName dom))
 {-# INLINE hideClock #-}
 
@@ -677,14 +741,14 @@ domain later):
 >>> sampleN 10 sig
 [5,5,6,7,8,9,10,11,12,13]
 -}
-withClock
-  :: forall dom r
-   . KnownDomain dom
-  => Clock dom
-  -- ^ The 'Clock' we want to connect
-  -> (HiddenClock dom => r)
-  -- ^ The function with a hidden 'Clock' argument
-  -> r
+withClock ::
+  forall dom r.
+  (KnownDomain dom) =>
+  -- | The 'Clock' we want to connect
+  Clock dom ->
+  -- | The function with a hidden 'Clock' argument
+  ((HiddenClock dom) => r) ->
+  r
 withClock = \clk f -> expose @(HiddenClockName dom) f clk
 {-# INLINE withClock #-}
 
@@ -692,10 +756,10 @@ withClock = \clk f -> expose @(HiddenClockName dom) f clk
 -- was expected.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-hasClock
-  :: forall dom
-   . HiddenClock dom
-  => Clock dom
+hasClock ::
+  forall dom.
+  (HiddenClock dom) =>
+  Clock dom
 hasClock = fromLabel @(HiddenClockName dom)
 {-# INLINE hasClock #-}
 
@@ -718,24 +782,24 @@ domain later):
 >>> sampleN 10 sig
 [5,5,6,7,8,9,10,11,12,13]
 -}
-exposeReset
-  :: forall dom r
-   . (HiddenReset dom => r)
-  -- ^ The component with a hidden reset
-  -> (KnownDomain dom => Reset dom -> r)
-  -- ^ The component with its reset argument exposed
+exposeReset ::
+  forall dom r.
+  -- | The component with a hidden reset
+  ((HiddenReset dom) => r) ->
+  -- | The component with its reset argument exposed
+  ((KnownDomain dom) => Reset dom -> r)
 exposeReset = \f rst -> expose @(HiddenResetName dom) f rst
 {-# INLINE exposeReset #-}
 
 -- | Hide the 'Reset' argument of a component, so it can be routed implicitly.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-hideReset
-  :: forall dom r
-   . HiddenReset dom
-  => (Reset dom -> r)
-  -- ^ Component whose reset argument you want to hide
-  -> r
+hideReset ::
+  forall dom r.
+  (HiddenReset dom) =>
+  -- | Component whose reset argument you want to hide
+  (Reset dom -> r) ->
+  r
 hideReset = \f -> f (fromLabel @(HiddenResetName dom))
 {-# INLINE hideReset #-}
 
@@ -758,14 +822,14 @@ domain later):
 >>> sampleN 10 sig
 [5,5,6,7,8,9,10,11,12,13]
 -}
-withReset
-  :: forall dom r
-   . KnownDomain dom
-  => Reset dom
-  -- ^ The 'Reset' we want to connect
-  -> (HiddenReset dom => r)
-  -- ^ The function with a hidden 'Reset' argument
-  -> r
+withReset ::
+  forall dom r.
+  (KnownDomain dom) =>
+  -- | The 'Reset' we want to connect
+  Reset dom ->
+  -- | The function with a hidden 'Reset' argument
+  ((HiddenReset dom) => r) ->
+  r
 withReset = \rst f -> expose @(HiddenResetName dom) f rst
 {-# INLINE withReset #-}
 
@@ -773,10 +837,10 @@ withReset = \rst f -> expose @(HiddenResetName dom) f rst
 -- was expected.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-hasReset
-  :: forall dom
-   . HiddenReset dom
-  => Reset dom
+hasReset ::
+  forall dom.
+  (HiddenReset dom) =>
+  Reset dom
 hasReset = fromLabel @(HiddenResetName dom)
 {-# INLINE hasReset #-}
 
@@ -801,24 +865,24 @@ explicit domain later):
 >>> sampleN 10 sig
 [5,5,6,7,8,9,10,11,12,13]
 -}
-exposeEnable
-  :: forall dom  r
-  .  (HiddenEnable dom => r)
-  -- ^ The component with a hidden enable
-  -> (KnownDomain dom => Enable dom -> r)
-  -- ^ The component with its enable argument exposed
+exposeEnable ::
+  forall dom r.
+  -- | The component with a hidden enable
+  ((HiddenEnable dom) => r) ->
+  -- | The component with its enable argument exposed
+  ((KnownDomain dom) => Enable dom -> r)
 exposeEnable = \f gen -> expose @(HiddenEnableName dom) f gen
 {-# INLINE exposeEnable #-}
 
 -- | Hide the 'Enable' argument of a component, so it can be routed implicitly.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-hideEnable
-  :: forall dom r
-   . HiddenEnable dom
-  => (Enable dom -> r)
-  -- ^ Component whose enable argument you want to hide
-  -> r
+hideEnable ::
+  forall dom r.
+  (HiddenEnable dom) =>
+  -- | Component whose enable argument you want to hide
+  (Enable dom -> r) ->
+  r
 hideEnable = \f -> f (fromLabel @(HiddenEnableName dom))
 {-# INLINE hideEnable #-}
 
@@ -842,14 +906,14 @@ domain later):
 >>> sampleN 10 sig
 [5,5,6,7,8,9,10,11,12,13]
 -}
-withEnable
-  :: forall dom r
-   . KnownDomain dom
-  => Enable dom
-  -- ^ The 'Enable' we want to connect
-  -> (HiddenEnable dom => r)
-  -- ^ The function with a hidden 'Enable' argument
-  -> r
+withEnable ::
+  forall dom r.
+  (KnownDomain dom) =>
+  -- | The 'Enable' we want to connect
+  Enable dom ->
+  -- | The function with a hidden 'Enable' argument
+  ((HiddenEnable dom) => r) ->
+  r
 withEnable = \gen f -> expose @(HiddenEnableName dom) f gen
 {-# INLINE withEnable #-}
 
@@ -857,10 +921,10 @@ withEnable = \gen f -> expose @(HiddenEnableName dom) f gen
 -- was expected.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-hasEnable
-  :: forall dom
-   . HiddenEnable dom
-  => Enable dom
+hasEnable ::
+  forall dom.
+  (HiddenEnable dom) =>
+  Enable dom
 hasEnable = fromLabel @(HiddenEnableName dom)
 {-# INLINE hasEnable #-}
 
@@ -892,24 +956,24 @@ domain later):
 >>> sampleN 10 (f (riseEvery d2))
 [5,5,5,6,6,7,7,8,8,9]
 -}
-andEnable
-  :: forall dom r
-   . HiddenEnable dom
-  => Signal dom Bool
-  -- ^ The signal to AND with
-  -> (HiddenEnable dom => r)
-  -- ^ The component whose enable is modified
-  -> r
+andEnable ::
+  forall dom r.
+  (HiddenEnable dom) =>
+  -- | The signal to AND with
+  Signal dom Bool ->
+  -- | The component whose enable is modified
+  ((HiddenEnable dom) => r) ->
+  r
 andEnable = \en f -> andEnable0 hasEnable en f
- where
-  andEnable0
-    :: Enable dom
-    -> Signal dom Bool
-    -> (HiddenEnable dom => r)
-    -> r
-  andEnable0 gen en f =
-    let en0 = E.andEnable gen en
-    in withEnable @dom en0 f
+  where
+    andEnable0 ::
+      Enable dom ->
+      Signal dom Bool ->
+      ((HiddenEnable dom) => r) ->
+      r
+    andEnable0 gen en f =
+      let en0 = E.andEnable gen en
+       in withEnable @dom en0 f
 {-# INLINE andEnable #-}
 
 {- | Expose hidden 'Clock', 'Reset', and 'Enable' arguments of a component, so
@@ -950,12 +1014,12 @@ testBench = done
     en             = enableGen
 @
 -}
-exposeClockResetEnable
-  :: forall dom r .
-     (HiddenClockResetEnable dom => r)
-  -- ^ The component with hidden clock, reset, and enable arguments
-  -> (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
-  -- ^ The component with its clock, reset, and enable arguments exposed
+exposeClockResetEnable ::
+  forall dom r.
+  -- | The component with hidden clock, reset, and enable arguments
+  ((HiddenClockResetEnable dom) => r) ->
+  -- | The component with its clock, reset, and enable arguments exposed
+  ((KnownDomain dom) => Clock dom -> Reset dom -> Enable dom -> r)
 exposeClockResetEnable =
   \f clk rst en ->
     exposeClock (exposeReset (exposeEnable f)) clk rst en
@@ -965,12 +1029,12 @@ exposeClockResetEnable =
 -- can be routed implicitly.
 --
 -- <Clash-Signal.html#hiddenclockandreset Click here to read more about hidden clocks, resets, and enables>
-hideClockResetEnable
-  :: forall dom r
-   . HiddenClockResetEnable dom
-  => (KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> r)
-  -- ^ Component whose clock, reset, and enable argument you want to hide
-  -> r
+hideClockResetEnable ::
+  forall dom r.
+  (HiddenClockResetEnable dom) =>
+  -- | Component whose clock, reset, and enable argument you want to hide
+  ((KnownDomain dom) => Clock dom -> Reset dom -> Enable dom -> r) ->
+  r
 hideClockResetEnable =
   \f ->
     f
@@ -1000,19 +1064,19 @@ an explicit domain later):
 >>> sampleN 10 sig
 [5,5,6,7,8,9,10,11,12,13]
 -}
-withClockResetEnable
-  :: forall dom r
-   . KnownDomain dom
-  => Clock dom
-  -- ^ The 'Clock' we want to connect
-  -> Reset dom
-  -- ^ The 'Reset' we want to connect
-  -> Enable dom
-  -- ^ The 'Enable' we want to connect
-  -> (HiddenClockResetEnable dom => r)
-  -- ^ The function with a hidden 'Clock', hidden 'Reset', and hidden
+withClockResetEnable ::
+  forall dom r.
+  (KnownDomain dom) =>
+  -- | The 'Clock' we want to connect
+  Clock dom ->
+  -- | The 'Reset' we want to connect
+  Reset dom ->
+  -- | The 'Enable' we want to connect
+  Enable dom ->
+  -- | The function with a hidden 'Clock', hidden 'Reset', and hidden
   -- 'Enable' argument
-  -> r
+  ((HiddenClockResetEnable dom) => r) ->
+  r
 withClockResetEnable =
   \clk rst en f -> withClock clk (withReset rst (withEnable en f))
 {-# INLINE withClockResetEnable #-}
@@ -1021,12 +1085,13 @@ withClockResetEnable =
 
 -- | Special version of 'delay' that doesn't take enable signals of any kind.
 -- Initial value will be undefined.
-dflipflop
-  :: forall dom a
-   . ( HiddenClock dom
-     , NFDataX a )
-  => Signal dom a
-  -> Signal dom a
+dflipflop ::
+  forall dom a.
+  ( HiddenClock dom,
+    NFDataX a
+  ) =>
+  Signal dom a ->
+  Signal dom a
 dflipflop =
   E.dflipflop (fromLabel @(HiddenClockName dom))
 {-# INLINE dflipflop #-}
@@ -1036,16 +1101,17 @@ dflipflop =
 --
 -- >>> sampleN @System 3 (delay 0 (fromList [1,2,3,4]))
 -- [0,1,2]
-delay
-  :: forall dom a
-   . ( NFDataX a
-     , HiddenClock dom
-     , HiddenEnable dom  )
-  => a
-  -- ^ Initial value
-  -> Signal dom a
-  -- ^ Signal to delay
-  -> Signal dom a
+delay ::
+  forall dom a.
+  ( NFDataX a,
+    HiddenClock dom,
+    HiddenEnable dom
+  ) =>
+  -- | Initial value
+  a ->
+  -- | Signal to delay
+  Signal dom a ->
+  Signal dom a
 delay = \dflt i ->
   delay#
     (fromLabel @(HiddenClockName dom))
@@ -1060,15 +1126,16 @@ delay = \dflt i ->
 -- >>> let input = fromList [Just 1, Just 2, Nothing, Nothing, Just 5, Just 6, Just (7::Int)]
 -- >>> sampleN @System 7 (delayMaybe 0 input)
 -- [0,1,2,2,2,5,6]
-delayMaybe
-  :: forall dom a
-   . ( NFDataX a
-     , HiddenClock dom
-     , HiddenEnable dom  )
-  => a
-  -- ^ Initial value
-  -> Signal dom (Maybe a)
-  -> Signal dom a
+delayMaybe ::
+  forall dom a.
+  ( NFDataX a,
+    HiddenClock dom,
+    HiddenEnable dom
+  ) =>
+  -- | Initial value
+  a ->
+  Signal dom (Maybe a) ->
+  Signal dom a
 delayMaybe = \dflt i ->
   E.delayMaybe
     (fromLabel @(HiddenClockName dom))
@@ -1083,17 +1150,18 @@ delayMaybe = \dflt i ->
 -- >>> let enable = fromList [True,True,False,False,True,True,True]
 -- >>> sampleN @System 7 (delayEn 0 enable input)
 -- [0,1,2,2,2,5,6]
-delayEn
-  :: forall dom a
-   . ( NFDataX a
-     , HiddenClock dom
-     , HiddenEnable dom  )
-  => a
-  -- ^ Initial value
-  -> Signal dom Bool
-  -- ^ Enable
-  -> Signal dom a
-  -> Signal dom a
+delayEn ::
+  forall dom a.
+  ( NFDataX a,
+    HiddenClock dom,
+    HiddenEnable dom
+  ) =>
+  -- | Initial value
+  a ->
+  -- | Enable
+  Signal dom Bool ->
+  Signal dom a ->
+  Signal dom a
 delayEn = \dflt en i ->
   E.delayEn
     (fromLabel @(HiddenClockName dom))
@@ -1108,16 +1176,17 @@ delayEn = \dflt en i ->
 --
 -- >>> sampleN @System 5 (register 8 (fromList [1,1,2,3,4]))
 -- [8,8,1,2,3]
-register
-  :: forall dom a
-   . ( HiddenClockResetEnable dom
-     , NFDataX a )
-  => a
-  -- ^ Reset value. 'register' outputs the reset value when the reset is active.
+register ::
+  forall dom a.
+  ( HiddenClockResetEnable dom,
+    NFDataX a
+  ) =>
+  -- | Reset value. 'register' outputs the reset value when the reset is active.
   -- If the domain has initial values enabled, the reset value will also be the
   -- initial value.
-  -> Signal dom a
-  -> Signal dom a
+  a ->
+  Signal dom a ->
+  Signal dom a
 register = \i s ->
   E.register
     (fromLabel @(HiddenClockName dom))
@@ -1126,6 +1195,7 @@ register = \i s ->
     i
     s
 {-# INLINE register #-}
+
 infixr 3 `register`
 
 -- | Version of 'register' that only updates its content when its second
@@ -1149,16 +1219,17 @@ infixr 3 `register`
 -- [Nothing,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
 -- >>> sampleN @System 9 countSometimes
 -- [0,0,0,1,1,2,2,3,3]
-regMaybe
-  :: forall dom a
-   . ( HiddenClockResetEnable dom
-     , NFDataX a )
-  => a
-  -- ^ Reset value. 'regMaybe' outputs the reset value when the reset is active.
+regMaybe ::
+  forall dom a.
+  ( HiddenClockResetEnable dom,
+    NFDataX a
+  ) =>
+  -- | Reset value. 'regMaybe' outputs the reset value when the reset is active.
   -- If the domain has initial values enabled, the reset value will also be the
   -- initial value.
-  -> Signal dom (Maybe a)
-  -> Signal dom a
+  a ->
+  Signal dom (Maybe a) ->
+  Signal dom a
 regMaybe = \initial iM ->
   E.regMaybe
     (fromLabel @(HiddenClockName dom))
@@ -1167,6 +1238,7 @@ regMaybe = \initial iM ->
     initial
     iM
 {-# INLINE regMaybe #-}
+
 infixr 3 `regMaybe`
 
 -- | Version of 'register' that only updates its content when its second argument
@@ -1183,17 +1255,18 @@ infixr 3 `regMaybe`
 -- [False,False,True,False,True,False,True,False,True]
 -- >>> sampleN @System 9 count
 -- [0,0,0,1,1,2,2,3,3]
-regEn
-  :: forall dom a
-   . ( HiddenClockResetEnable dom
-     , NFDataX a )
-  => a
-  -- ^ Reset value. 'regEn' outputs the reset value when the reset is active.
+regEn ::
+  forall dom a.
+  ( HiddenClockResetEnable dom,
+    NFDataX a
+  ) =>
+  -- | Reset value. 'regEn' outputs the reset value when the reset is active.
   -- If the domain has initial values enabled, the reset value will also be the
   -- initial value.
-  -> Signal dom Bool
-  -> Signal dom a
-  -> Signal dom a
+  a ->
+  Signal dom Bool ->
+  Signal dom a ->
+  Signal dom a
 regEn = \initial en i ->
   E.regEn
     (fromLabel @(HiddenClockName dom))
@@ -1243,14 +1316,15 @@ regEnN = \sn initial en i ->
 -- single cycle reset, consider using 'sampleWithReset'.
 --
 -- __NB__: This function is not synthesizable
-sample
-  :: forall dom a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => (HiddenClockResetEnable dom  => Signal dom a)
-  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+sample ::
+  forall dom a.
+  ( KnownDomain dom,
+    NFDataX a
+  ) =>
+  -- | 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
+  ((HiddenClockResetEnable dom) => Signal dom a) ->
+  [a]
 sample s =
   E.sample (exposeClockResetEnable @dom s clockGen resetGen enableGen)
 {-# OPAQUE sample #-}
@@ -1269,19 +1343,20 @@ sample s =
 -- single cycle reset, consider using 'sampleWithResetN'.
 --
 -- __NB__: This function is not synthesizable
-sampleN
-  :: forall dom a
-   . ( KnownDomain dom
-     , NFDataX a )
-  => Int
-  -- ^ Number of samples to produce
-  -> (HiddenClockResetEnable dom => Signal dom a)
-  -- ^ 'Signal' to sample, whose source potentially has a hidden clock
+sampleN ::
+  forall dom a.
+  ( KnownDomain dom,
+    NFDataX a
+  ) =>
+  -- | Number of samples to produce
+  Int ->
+  -- | 'Signal' to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
+  ((HiddenClockResetEnable dom) => Signal dom a) ->
+  [a]
 sampleN n s0 =
-  let s1 = exposeClockResetEnable @dom s0 clockGen resetGen enableGen in
-  E.sampleN n s1
+  let s1 = exposeClockResetEnable @dom s0 clockGen resetGen enableGen
+   in E.sampleN n s1
 {-# OPAQUE sampleN #-}
 
 -- | Get an infinite list of samples from a 'Signal', while asserting the reset
@@ -1289,20 +1364,21 @@ sampleN n s0 =
 -- cycles, i.e., when the reset is asserted.
 --
 -- __NB__: This function is not synthesizable
-sampleWithReset
-  :: forall dom a m
-   . ( KnownDomain dom
-     , NFDataX a
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> (HiddenClockResetEnable dom => Signal dom a)
-  -- ^ 'Signal' to sample, whose source potentially has a hidden clock
+sampleWithReset ::
+  forall dom a m.
+  ( KnownDomain dom,
+    NFDataX a,
+    1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | 'Signal' to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
+  ((HiddenClockResetEnable dom) => Signal dom a) ->
+  [a]
 sampleWithReset nReset f0 =
-  let f1 = exposeClockResetEnable f0 clockGen (resetGenN @dom nReset) enableGen in
-  drop (snatToNum nReset) (E.sample f1)
+  let f1 = exposeClockResetEnable f0 clockGen (resetGenN @dom nReset) enableGen
+   in drop (snatToNum nReset) (E.sample f1)
 {-# OPAQUE sampleWithReset #-}
 
 -- | Get a list of /n/ samples from a 'Signal', while asserting the reset line
@@ -1310,19 +1386,20 @@ sampleWithReset nReset f0 =
 -- i.e., while the reset is asserted.
 --
 -- __NB__: This function is not synthesizable
-sampleWithResetN
-  :: forall dom a m
-   . ( KnownDomain dom
-     , NFDataX a
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> Int
-  -- ^ Number of samples to produce
-  -> (HiddenClockResetEnable dom => Signal dom a)
-  -- ^ 'Signal' to sample, whose source potentially has a hidden clock
+sampleWithResetN ::
+  forall dom a m.
+  ( KnownDomain dom,
+    NFDataX a,
+    1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | Number of samples to produce
+  Int ->
+  -- | 'Signal' to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
+  ((HiddenClockResetEnable dom) => Signal dom a) ->
+  [a]
 sampleWithResetN nReset nSamples f =
   take nSamples (sampleWithReset nReset f)
 
@@ -1339,13 +1416,13 @@ sampleWithResetN nReset nSamples f =
 -- circuit while the reset was asserted.
 --
 -- __NB__: This function is not synthesizable
-sample_lazy
-  :: forall dom a
-   . KnownDomain dom
-  => (HiddenClockResetEnable dom  => Signal dom a)
-  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+sample_lazy ::
+  forall dom a.
+  (KnownDomain dom) =>
+  -- | 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
+  ((HiddenClockResetEnable dom) => Signal dom a) ->
+  [a]
 sample_lazy s =
   E.sample_lazy (exposeClockResetEnable @dom s clockGen resetGen enableGen)
 {-# OPAQUE sample_lazy #-}
@@ -1363,14 +1440,14 @@ sample_lazy s =
 -- circuit while the reset was asserted.
 --
 -- __NB__: This function is not synthesizable
-sampleN_lazy
-  :: forall dom a
-   . KnownDomain dom
-  => Int
-  -> (HiddenClockResetEnable dom  => Signal dom a)
-  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+sampleN_lazy ::
+  forall dom a.
+  (KnownDomain dom) =>
+  Int ->
+  -- | 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
+  ((HiddenClockResetEnable dom) => Signal dom a) ->
+  [a]
 sampleN_lazy n s =
   E.sampleN_lazy n (exposeClockResetEnable @dom s clockGen resetGen enableGen)
 {-# OPAQUE sampleN_lazy #-}
@@ -1394,16 +1471,17 @@ sampleN_lazy n s =
 -- need a custom reset value, see 'simulateWithReset' and 'simulateWithResetN'.
 --
 -- __NB__: This function is not synthesizable
-simulate
-  :: forall dom a b
-   . ( KnownDomain dom
-     , NFDataX a
-     , NFDataX b )
-  => (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
-  -- ^ Circuit to simulate, whose source potentially has a hidden clock, reset,
+simulate ::
+  forall dom a b.
+  ( KnownDomain dom,
+    NFDataX a,
+    NFDataX b
+  ) =>
+  -- | Circuit to simulate, whose source potentially has a hidden clock, reset,
   -- and/or enable.
-  -> [a]
-  -> [b]
+  ((HiddenClockResetEnable dom) => Signal dom a -> Signal dom b) ->
+  [a] ->
+  [b]
 simulate f as = simulateWithReset (SNat @1) rval f as
   where
     rval = maybe (error "simulate: no stimuli") fst (uncons as)
@@ -1412,18 +1490,19 @@ simulate f as = simulateWithReset (SNat @1) rval f as
 -- | Same as 'simulate', but only sample the first /Int/ output values.
 --
 -- __NB__: This function is not synthesizable
-simulateN
-  :: forall dom a b
-   . ( KnownDomain dom
-     , NFDataX a
-     , NFDataX b )
-  => Int
-  -- ^ Number of cycles to simulate (excluding cycle spent in reset)
-  -> (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
-  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+simulateN ::
+  forall dom a b.
+  ( KnownDomain dom,
+    NFDataX a,
+    NFDataX b
+  ) =>
+  -- | Number of cycles to simulate (excluding cycle spent in reset)
+  Int ->
+  -- | 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
-  -> [b]
+  ((HiddenClockResetEnable dom) => Signal dom a -> Signal dom b) ->
+  [a] ->
+  [b]
 simulateN n f as = simulateWithResetN (SNat @1) rval n f as
   where
     rval = maybe (error "simulate: no stimuli") fst (uncons as)
@@ -1433,47 +1512,48 @@ simulateN n f as = simulateWithResetN (SNat @1) rval n f as
 -- to 'simulate', 'simulateWithReset' will drop the output values produced while
 -- the reset is asserted. While the reset is asserted, the reset value /a/ is
 -- supplied to the circuit.
-simulateWithReset
-  :: forall dom a b m
-   . ( KnownDomain dom
-     , NFDataX a
-     , NFDataX b
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> a
-  -- ^ Reset value
-  -> (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
-  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+simulateWithReset ::
+  forall dom a b m.
+  ( KnownDomain dom,
+    NFDataX a,
+    NFDataX b,
+    1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | Reset value
+  a ->
+  -- | 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
-  -> [b]
+  ((HiddenClockResetEnable dom) => Signal dom a -> Signal dom b) ->
+  [a] ->
+  [b]
 simulateWithReset n resetVal f as =
   E.simulateWithReset n resetVal (exposeClockResetEnable f) as
 {-# INLINE simulateWithReset #-}
 
 -- | Same as 'simulateWithReset', but only sample the first /Int/ output values.
-simulateWithResetN
-  :: forall dom a b m
-   . ( KnownDomain dom
-     , NFDataX a
-     , NFDataX b
-     , 1 <= m )
-  => SNat m
-  -- ^ Number of cycles to assert the reset
-  -> a
-  -- ^ Reset value
-  -> Int
-  -- ^ Number of cycles to simulate (excluding cycles spent in reset)
-  -> (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
-  -- ^ 'Signal' we want to sample, whose source potentially has a hidden clock
+simulateWithResetN ::
+  forall dom a b m.
+  ( KnownDomain dom,
+    NFDataX a,
+    NFDataX b,
+    1 <= m
+  ) =>
+  -- | Number of cycles to assert the reset
+  SNat m ->
+  -- | Reset value
+  a ->
+  -- | Number of cycles to simulate (excluding cycles spent in reset)
+  Int ->
+  -- | 'Signal' we want to sample, whose source potentially has a hidden clock
   -- (and reset)
-  -> [a]
-  -> [b]
+  ((HiddenClockResetEnable dom) => Signal dom a -> Signal dom b) ->
+  [a] ->
+  [b]
 simulateWithResetN nReset resetVal nSamples f as =
   E.simulateWithResetN nReset resetVal nSamples (exposeClockResetEnable f) as
 {-# INLINE simulateWithResetN #-}
-
 
 -- | /Lazily/ simulate a (@'Signal' a -> 'Signal' b@) function given a list of
 -- samples of type /a/
@@ -1483,18 +1563,19 @@ simulateWithResetN nReset resetVal nSamples f as =
 -- ...
 --
 -- __NB__: This function is not synthesizable
-simulate_lazy
-  :: forall dom a b
-   . KnownDomain dom
-  => (HiddenClockResetEnable dom  =>
-      Signal dom a -> Signal dom b)
-  -- ^ Function we want to simulate, whose components potentially have a hidden
+simulate_lazy ::
+  forall dom a b.
+  (KnownDomain dom) =>
+  -- | Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
-  -> [a]
-  -> [b]
+  ( (HiddenClockResetEnable dom) =>
+    Signal dom a -> Signal dom b
+  ) ->
+  [a] ->
+  [b]
 simulate_lazy f0 =
-  let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
-  drop 1 . E.simulate_lazy f1 . dup1
+  let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen
+   in drop 1 . E.simulate_lazy f1 . dup1
 {-# OPAQUE simulate_lazy #-}
 
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
@@ -1505,30 +1586,31 @@ simulate_lazy f0 =
 -- ...
 --
 -- __NB__: This function is not synthesizable
-simulateB
-  :: forall dom a b
-   . ( KnownDomain dom
-     , Bundle a
-     , Bundle b
-     , NFDataX a
-     , NFDataX b
-     )
-  => (HiddenClockResetEnable dom  =>
-      Unbundled dom a -> Unbundled dom b)
-  -- ^ Function we want to simulate, whose components potentially have a hidden
+simulateB ::
+  forall dom a b.
+  ( KnownDomain dom,
+    Bundle a,
+    Bundle b,
+    NFDataX a,
+    NFDataX b
+  ) =>
+  -- | Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
-  -> [a]
-  -> [b]
+  ( (HiddenClockResetEnable dom) =>
+    Unbundled dom a -> Unbundled dom b
+  ) ->
+  [a] ->
+  [b]
 simulateB f0 =
   drop 1 . E.simulateB f1 . dup1
- where
-  f1 =
-    withClockResetEnable
-      clockGen
-      resetGen
-      enableGen
-      (const f0)
-      (Proxy @dom)
+  where
+    f1 =
+      withClockResetEnable
+        clockGen
+        resetGen
+        enableGen
+        (const f0)
+        (Proxy @dom)
 {-# OPAQUE simulateB #-}
 
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
@@ -1539,33 +1621,34 @@ simulateB f0 =
 -- ...
 --
 -- __NB__: This function is not synthesizable
-simulateB_lazy
-  :: forall dom a b
-   . ( KnownDomain dom
-     , Bundle a
-     , Bundle b )
-  => (HiddenClockResetEnable dom  =>
-      Unbundled dom a -> Unbundled dom b)
-  -- ^ Function we want to simulate, whose components potentially have a hidden
+simulateB_lazy ::
+  forall dom a b.
+  ( KnownDomain dom,
+    Bundle a,
+    Bundle b
+  ) =>
+  -- | Function we want to simulate, whose components potentially have a hidden
   -- clock (and reset)
-  -> [a]
-  -> [b]
+  ( (HiddenClockResetEnable dom) =>
+    Unbundled dom a -> Unbundled dom b
+  ) ->
+  [a] ->
+  [b]
 simulateB_lazy f0 =
   drop 1 . E.simulateB_lazy f1 . dup1
- where
-  f1 =
-    withClockResetEnable
-      clockGen
-      resetGen
-      enableGen
-      (const f0)
-      (Proxy @dom)
+  where
+    f1 =
+      withClockResetEnable
+        clockGen
+        resetGen
+        enableGen
+        (const f0)
+        (Proxy @dom)
 {-# OPAQUE simulateB_lazy #-}
 
 dup1 :: [a] -> [a]
-dup1 (x:xs) = x:x:xs
-dup1 _      = error "empty list"
-
+dup1 (x : xs) = x : x : xs
+dup1 _ = error "empty list"
 
 -- | Simulate a component until it matches a condition
 --
@@ -1634,15 +1717,15 @@ dup1 _      = error "empty list"
 -- @
 -- > 'sequence_' [ runUntil id testBenchA, runUntil id testBenchB ]
 -- @
-runUntil
-  :: forall dom a
-   . (KnownDomain dom, NFDataX a, ShowX a)
-  => (a -> Bool)
-  -- ^ Condition checking function, should return @True@ to finish run
-  -> (HiddenClockResetEnable dom => Signal dom a)
-  -- ^ 'Signal' we want to sample for the condition, potentially having a
+runUntil ::
+  forall dom a.
+  (KnownDomain dom, NFDataX a, ShowX a) =>
+  -- | Condition checking function, should return @True@ to finish run
+  (a -> Bool) ->
+  -- | 'Signal' we want to sample for the condition, potentially having a
   -- hidden clock, reset and/or enable
-  -> IO ()
+  ((HiddenClockResetEnable dom) => Signal dom a) ->
+  IO ()
 runUntil check s =
   E.runUntil check $ exposeClockResetEnable @dom s clockGen resetGen enableGen
 
@@ -1651,16 +1734,15 @@ runUntil check s =
 -- |  @testFor n s@ tests the signal /s/ for /n/ cycles.
 --
 -- __NB__: This function is not synthesizable
-testFor
-  :: KnownDomain dom
-  => Int
-  -- ^ The number of cycles we want to test for
-  -> (HiddenClockResetEnable dom  => Signal dom Bool)
-  -- ^ 'Signal' we want to evaluate, whose source potentially has a hidden clock
+testFor ::
+  (KnownDomain dom) =>
+  -- | The number of cycles we want to test for
+  Int ->
+  -- | 'Signal' we want to evaluate, whose source potentially has a hidden clock
   -- (and reset)
-  -> Property
+  ((HiddenClockResetEnable dom) => Signal dom Bool) ->
+  Property
 testFor n s = property (and (Clash.Signal.sampleN n s))
-
 
 -- | Register a synchronous reset signal.
 --
@@ -1678,16 +1760,16 @@ testFor n s = property (and (Clash.Signal.sampleN n s))
 -- >>> sampleN 7 (exposeReset (registerSyncResetBool True) rst)
 -- [True,False,True,False,False,True,False]
 --
-registerSyncReset
-  :: forall dom
-   . HiddenClockResetEnable dom
-  => KnownDomain dom
-  => DomainResetKind dom ~ 'Synchronous
-  => Bool
-  -- ^ Initial assert value of the register if supported by the domain.
+registerSyncReset ::
+  forall dom.
+  (HiddenClockResetEnable dom) =>
+  (KnownDomain dom) =>
+  (DomainResetKind dom ~ 'Synchronous) =>
+  -- | Initial assert value of the register if supported by the domain.
   --   If True the initial reset value is asserted.
   --   If False the initial reset value is de-asserted.
-  -> Reset dom
+  Bool ->
+  Reset dom
 registerSyncReset initialValue = hideClockResetEnable E.registerSyncReset initialValue
 
 -- | Hold reset for a number of cycles relative to an incoming reset
@@ -1711,12 +1793,12 @@ registerSyncReset initialValue = hideClockResetEnable E.registerSyncReset initia
 -- >>> sampleN 8 (exposeReset (holdResetBool (SNat @2)) (unsafeFromActiveHigh rst))
 -- [True,True,True,False,True,True,True,False]
 --
-holdReset
-  :: forall dom m
-   . HiddenClockResetEnable dom
-  => SNat m
-  -- ^ Hold for /m/ cycles
-  -> Reset dom
+holdReset ::
+  forall dom m.
+  (HiddenClockResetEnable dom) =>
+  -- | Hold for /m/ cycles
+  SNat m ->
+  Reset dom
 holdReset m =
   hideClockResetEnable (\clk rst en -> E.holdReset clk en m rst)
 
@@ -1728,24 +1810,24 @@ holdReset m =
 -- [Nothing,Nothing,Just 'a',Just 'b',Nothing,Just 'a']
 --
 -- __NB__: This function is not synthesizable
-fromListWithReset
-  :: forall dom a
-   . (HiddenReset dom, NFDataX a)
-  => a
-  -> [a]
-  -> Signal dom a
+fromListWithReset ::
+  forall dom a.
+  (HiddenReset dom, NFDataX a) =>
+  a ->
+  [a] ->
+  Signal dom a
 fromListWithReset = hideReset E.fromListWithReset
 {-# INLINE fromListWithReset #-}
 
 -- | Build an 'Automaton' from a function over 'Signal's.
 --
 -- __NB__: Each continuation function must be called at most once.
-signalAutomaton
-  :: forall dom a b
-   . KnownDomain dom
-  => (HiddenClockResetEnable dom => Signal dom a -> Signal dom b)
-  -> IO (Automaton (->) a b)
+signalAutomaton ::
+  forall dom a b.
+  (KnownDomain dom) =>
+  ((HiddenClockResetEnable dom) => Signal dom a -> Signal dom b) ->
+  IO (Automaton (->) a b)
 signalAutomaton f0 =
-  let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen in
-  E.signalAutomaton f1
+  let f1 = exposeClockResetEnable @dom f0 clockGen resetGen enableGen
+   in E.signalAutomaton f1
 {-# OPAQUE signalAutomaton #-}

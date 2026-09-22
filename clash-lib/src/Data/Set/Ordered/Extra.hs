@@ -6,14 +6,14 @@
   Convenience functions for "Data.Set.Ordered" from the package
   "ordered-containers".
 -}
-
 module Data.Set.Ordered.Extra
-  ( OLSet
-  , toListL
-  ) where
+  ( OLSet,
+    toListL,
+  )
+where
 
-import           Data.Coerce                 (coerce)
-import           Data.Foldable               (toList)
+import Data.Coerce (coerce)
+import Data.Foldable (toList)
 import qualified Data.Set.Ordered as OSet
 
 type OLSet a = OSet.Bias OSet.L (OSet.OSet a)

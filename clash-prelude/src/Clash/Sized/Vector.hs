@@ -1,12 +1,3 @@
-{-|
-Copyright  :  (C) 2013-2016, University of Twente,
-                  2017     , Myrtle Software Ltd
-                  2022-2025, QBayLogic B.V.
-                  2024,      Alex Mason
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -16,144 +7,305 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
-{-# LANGUAGE Trustworthy #-}
-
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
-
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
+{-|
+Copyright  :  (C) 2013-2016, University of Twente,
+                  2017     , Myrtle Software Ltd
+                  2022-2025, QBayLogic B.V.
+                  2024,      Alex Mason
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.Sized.Vector
   ( -- * 'Vec'tor data type
-    Vec(Nil,(:>),(:<),Cons)
+    Vec (Nil, (:>), (:<), Cons),
+
     -- * Accessors
+
     -- ** Length information
-  , length, lengthS
+    length,
+    lengthS,
+
     -- ** Indexing
-  , (!!), head, last, at
-  , indices, indicesI
-  , findIndex, elemIndex
+    (!!),
+    head,
+    last,
+    at,
+    indices,
+    indicesI,
+    findIndex,
+    elemIndex,
+
     -- ** Extracting sub-vectors (slicing)
-  , tail, init
-  , take, takeI, drop, dropI
-  , select, selectI
+    tail,
+    init,
+    take,
+    takeI,
+    drop,
+    dropI,
+    select,
+    selectI,
+
     -- *** Splitting
-  , splitAt, splitAtI
-  , unconcat, unconcatI
+    splitAt,
+    splitAtI,
+    unconcat,
+    unconcatI,
+
     -- * Construction
+
     -- ** Initialization
-  , singleton
-  , replicate, repeat
-  , iterate, iterateI, generate, generateI
-  , unfoldr, unfoldrI
+    singleton,
+    replicate,
+    repeat,
+    iterate,
+    iterateI,
+    generate,
+    generateI,
+    unfoldr,
+    unfoldrI,
+
     -- *** Initialization from a list
-  , listToVecTH
+    listToVecTH,
+
     -- ** Concatenation
-  , (++), (+>>), (<<+), concat, concatMap
-  , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
-  , merge
+    (++),
+    (+>>),
+    (<<+),
+    concat,
+    concatMap,
+    shiftInAt0,
+    shiftInAtN,
+    shiftOutFrom0,
+    shiftOutFromN,
+    merge,
+
     -- * Modifying vectors
-  , replace
+    replace,
+
     -- ** Permutations
-  , permute, backpermute, scatter, gather
+    permute,
+    backpermute,
+    scatter,
+    gather,
+
     -- *** Specialized permutations
-  , reverse, transpose, interleave
-  , rotateLeft, rotateRight, rotateLeftS, rotateRightS
+    reverse,
+    transpose,
+    interleave,
+    rotateLeft,
+    rotateRight,
+    rotateLeftS,
+    rotateRightS,
+
     -- * Element-wise operations
+
     -- ** Mapping
-  , map, imap, smap, smapWithBounds
+    map,
+    imap,
+    smap,
+    smapWithBounds,
+
     -- ** Zipping
-  , zipWith, zipWith3, zipWith4, zipWith5, zipWith6, zipWith7
-  , zip, zip3, zip4, zip5, zip6, zip7
-  , izipWith
+    zipWith,
+    zipWith3,
+    zipWith4,
+    zipWith5,
+    zipWith6,
+    zipWith7,
+    zip,
+    zip3,
+    zip4,
+    zip5,
+    zip6,
+    zip7,
+    izipWith,
+
     -- ** Unzipping
-  , unzip, unzip3, unzip4, unzip5, unzip6, unzip7
+    unzip,
+    unzip3,
+    unzip4,
+    unzip5,
+    unzip6,
+    unzip7,
+
     -- * Folding
-  , foldr, foldl, foldr1, foldl1, fold
-  , ifoldr, ifoldl
+    foldr,
+    foldl,
+    foldr1,
+    foldl1,
+    fold,
+    ifoldr,
+    ifoldl,
+
     -- ** Specialized folds
-  , dfold, dtfold, vfold, maximum, minimum
+    dfold,
+    dtfold,
+    vfold,
+    maximum,
+    minimum,
+
     -- * Prefix sums (scans)
-  , scanl, scanl1, scanr, scanr1, postscanl, postscanr
-  , mapAccumL, mapAccumR
+    scanl,
+    scanl1,
+    scanr,
+    scanr1,
+    postscanl,
+    postscanr,
+    mapAccumL,
+    mapAccumR,
+
     -- * Stencil computations
-  , stencil1d, stencil2d
-  , windows1d, windows2d
+    stencil1d,
+    stencil2d,
+    windows1d,
+    windows2d,
+
     -- * Conversions
-  , toList
-  , fromList
-  , unsafeFromList
-  , bv2v
-  , v2bv
+    toList,
+    fromList,
+    unsafeFromList,
+    bv2v,
+    v2bv,
+
     -- * Misc
-  , lazyV, VCons, asNatProxy, seqV, forceV, seqVX, forceVX
+    lazyV,
+    VCons,
+    asNatProxy,
+    seqV,
+    forceV,
+    seqVX,
+    forceVX,
+
     -- * Primitives
+
     -- ** 'Traversable' instance
-  , traverse#
+    traverse#,
+
     -- ** 'BitPack' instance
-  , concatBitVector#
-  , unconcatBitVector#
+    concatBitVector#,
+    unconcatBitVector#,
   )
 where
 
-import Control.DeepSeq            (NFData (..))
+import Control.DeepSeq (NFData (..))
 #if __GLASGOW_HASKELL__ >= 914
-import qualified Control.Lens     as Lens hiding (data (:>), data (:<))
+import qualified Control.Lens as Lens hiding (data (:<), data (:>))
 #else
-import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
+import qualified Control.Lens as Lens hiding (pattern (:<), pattern (:>))
 #endif
-import Data.Bits                  ((.|.), shiftL)
-import Data.Constraint            ((:-)(Sub), Dict (..))
-import Data.Constraint.Nat        (leZero)
-import Data.Data
-  (Data (..), Constr, DataType, Fixity (..), Typeable, mkConstr, mkDataType)
-import Data.Either                (isLeft)
-import Data.Distributive
-import Data.Functor.Rep
-import qualified Data.Foldable1   as F1
-import Data.Default               (Default (..))
-import qualified Data.Foldable    as F
-import Data.Kind                  (Type)
-import Data.Maybe                 (isJust, fromJust)
-import Data.Proxy                 (Proxy (..))
-import Data.Singletons            (TyFun,Apply,type (@@))
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
-                                   type (^), type (<=), natVal)
-import GHC.Base                   (Int(I#),Int#,isTrue#)
-import GHC.Generics               hiding (Fixity (..))
-import qualified GHC.Magic
-import GHC.Prim                   ((==#),(<#),(-#))
-import Language.Haskell.TH        (ExpQ)
-import Language.Haskell.TH.Syntax (Lift(..))
-import Language.Haskell.TH.Compat
-import Prelude                    hiding ((++), (!!), concat, concatMap, drop,
-                                          foldl, foldl1, foldr, foldr1, head,
-                                          init, iterate, last, length, map,
-                                          repeat, replicate, reverse, scanl,
-                                          scanl1, scanr, scanr1, splitAt, tail,
-                                          take, unzip, unzip3, zip, zip3, zipWith,
-                                          zipWith3, maximum, minimum)
-import qualified Data.String.Interpolate as I
-import qualified Prelude          as P
-import Test.QuickCheck
-  (Arbitrary(arbitrary, shrink), CoArbitrary(coarbitrary))
-
 import Clash.Annotations.Primitive
-  (Primitive(InlineYamlPrimitive), HDL(..), dontTranslate, hasBlackBox)
+  ( HDL (..),
+    Primitive (InlineYamlPrimitive),
+    dontTranslate,
+    hasBlackBox,
+  )
+import Clash.Class.BitPack (BitPack (..))
 import Clash.Magic (clashCompileError, clashSimulation)
 import Clash.Promoted.Nat
-  (SNat (..), SNatLE (..), UNat (..), compareSNat, pow2SNat,
-   snatProxy, snatToInteger, subSNat, withSNat, toUNat, natToInteger)
-import Clash.Promoted.Nat (leToPlus)
+  ( SNat (..),
+    SNatLE (..),
+    UNat (..),
+    compareSNat,
+    leToPlus,
+    natToInteger,
+    pow2SNat,
+    snatProxy,
+    snatToInteger,
+    subSNat,
+    toUNat,
+    withSNat,
+  )
 import Clash.Promoted.Nat.Literals (d1)
+import Clash.Sized.Index (Index)
 import Clash.Sized.Internal.BitVector (Bit, BitVector (..), split#)
-import Clash.Sized.Index          (Index)
-
-import Clash.Class.BitPack        (BitPack (..))
-import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
+import Clash.XException (NFDataX (..), ShowX (..), isX, seqX)
+import Data.Bits (shiftL, (.|.))
+import Data.Constraint (Dict (..), (:-) (Sub))
+import Data.Constraint.Nat (leZero)
+import Data.Data
+  ( Constr,
+    Data (..),
+    DataType,
+    Fixity (..),
+    Typeable,
+    mkConstr,
+    mkDataType,
+  )
+import Data.Default (Default (..))
+import Data.Distributive
+import Data.Either (isLeft)
+import qualified Data.Foldable as F
+import qualified Data.Foldable1 as F1
+import Data.Functor.Rep
+import Data.Kind (Type)
+import Data.Maybe (fromJust, isJust)
+import Data.Proxy (Proxy (..))
+import Data.Singletons (Apply, TyFun, type (@@))
+import qualified Data.String.Interpolate as I
+import GHC.Base (Int (I#), Int#, isTrue#)
+import GHC.Generics hiding (Fixity (..))
+import qualified GHC.Magic
+import GHC.Prim ((-#), (<#), (==#))
+import GHC.TypeLits
+  ( KnownNat,
+    Nat,
+    natVal,
+    type (*),
+    type (+),
+    type (-),
+    type (<=),
+    type (^),
+  )
+import Language.Haskell.TH (ExpQ)
+import Language.Haskell.TH.Compat
+import Language.Haskell.TH.Syntax (Lift (..))
+import Test.QuickCheck
+  ( Arbitrary (arbitrary, shrink),
+    CoArbitrary (coarbitrary),
+  )
+import Prelude hiding
+  ( concat,
+    concatMap,
+    drop,
+    foldl,
+    foldl1,
+    foldr,
+    foldr1,
+    head,
+    init,
+    iterate,
+    last,
+    length,
+    map,
+    maximum,
+    minimum,
+    repeat,
+    replicate,
+    reverse,
+    scanl,
+    scanl1,
+    scanr,
+    scanr1,
+    splitAt,
+    tail,
+    take,
+    unzip,
+    unzip3,
+    zip,
+    zip3,
+    zipWith,
+    zipWith3,
+    (!!),
+    (++),
+  )
+import qualified Prelude as P
 
 {- $setup
 >>> :set -XTypeFamilies
@@ -168,16 +320,15 @@ import Clash.XException           (ShowX (..), NFDataX (..), seqX, isX)
 >>> import qualified Clash.Sized.Vector as Vec
 -}
 
-#define CONS_PREC 5
+infixr 5 `Cons`
 
-infixr CONS_PREC `Cons`
 -- | Fixed size vectors.
 --
 -- * Lists with their length encoded in their type
 -- * 'Vec'tor elements have an __ASCENDING__ subscript starting from 0 and
 --   ending at @'length' - 1@.
 data Vec :: Nat -> Type -> Type where
-  Nil  :: Vec 0 a
+  Nil :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
 
 {-# COMPLETE Nil, (:>) #-}
@@ -192,22 +343,33 @@ data N
 -- We'll have to wait for things like
 -- https://ryanglscott.github.io/2018/02/11/how-to-derive-generic-for-some-gadts/
 -- before we can work around this limitation
-instance KnownNat n => Generic (Vec n a) where
-  type Rep (Vec n a) =
-    D1 ('MetaData "Vec" "Clash.Data.Vector" "clash-prelude" 'False)
-      (C1 ('MetaCons "Nil" 'PrefixI 'False) (K1 N (Dict (n ~ 0))) :+:
-       C1 ('MetaCons "Cons" 'PrefixI 'False)
-        (S1 ('MetaSel 'Nothing
-                'NoSourceUnpackedness
-                'NoSourceStrictness
-                'DecidedLazy)
-            (Rec0 a) :*:
-         S1 ('MetaSel 'Nothing
-                'NoSourceUnpackedness
-                'NoSourceStrictness
-                'DecidedLazy)
-            (Rec0 (Vec (n-1) a))))
-  from Nil         = M1 (L1 (M1 (K1 Dict)))
+instance (KnownNat n) => Generic (Vec n a) where
+  type
+    Rep (Vec n a) =
+      D1
+        ('MetaData "Vec" "Clash.Data.Vector" "clash-prelude" 'False)
+        ( C1 ('MetaCons "Nil" 'PrefixI 'False) (K1 N (Dict (n ~ 0)))
+            :+: C1
+                  ('MetaCons "Cons" 'PrefixI 'False)
+                  ( S1
+                      ( 'MetaSel
+                          'Nothing
+                          'NoSourceUnpackedness
+                          'NoSourceStrictness
+                          'DecidedLazy
+                      )
+                      (Rec0 a)
+                      :*: S1
+                            ( 'MetaSel
+                                'Nothing
+                                'NoSourceUnpackedness
+                                'NoSourceStrictness
+                                'DecidedLazy
+                            )
+                            (Rec0 (Vec (n - 1) a))
+                  )
+        )
+  from Nil = M1 (L1 (M1 (K1 Dict)))
   from (Cons x xs) = M1 (R1 (M1 (M1 (K1 x) :*: M1 (K1 xs))))
   to (M1 g) = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
@@ -220,21 +382,21 @@ instance (KnownNat n, Typeable a, Data a) => Data (Vec n a) where
   gunfold k z _ = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
       Sub Dict -> z Nil
-    SNatGT -> k (k (z @(a -> Vec (n-1) a -> Vec n a) Cons))
-  toConstr Nil        = cNil
+    SNatGT -> k (k (z @(a -> Vec (n - 1) a -> Vec n a) Cons))
+  toConstr Nil = cNil
   toConstr (Cons _ _) = cCons
-  dataTypeOf _        = tVec
+  dataTypeOf _ = tVec
 
-  gfoldl
-    :: (forall d b. Data d => c (d -> b) -> d -> c b)
-    -> (forall g. g -> c g)
-    -> Vec n a
-    -> c (Vec n a)
+  gfoldl ::
+    (forall d b. (Data d) => c (d -> b) -> d -> c b) ->
+    (forall g. g -> c g) ->
+    Vec n a ->
+    c (Vec n a)
   gfoldl f z xs = case compareSNat (SNat @n) (SNat @0) of
     SNatLE -> case leZero @n of
-                  Sub Dict -> z Nil
+      Sub Dict -> z Nil
     SNatGT -> case xs of
-                  (y :> ys) -> (z @(a -> Vec (n-1) a -> Vec n a) (:>) `f` y `f` ys)
+      (y :> ys) -> (z @(a -> Vec (n - 1) a -> Vec n a) (:>) `f` y `f` ys)
 
 tVec :: DataType
 tVec = mkDataType "Vec" [cNil, cCons]
@@ -245,7 +407,7 @@ cNil = mkConstr tVec "Nil" [] Prefix
 cCons :: Constr
 cCons = mkConstr tVec "Cons" [] Prefix
 
-instance NFData a => NFData (Vec n a) where
+instance (NFData a) => NFData (Vec n a) where
   rnf = foldl (\() -> rnf) ()
 
 -- | Add an element to the head of a vector.
@@ -272,48 +434,52 @@ instance NFData a => NFData (Vec n a) where
 -- >>> g (1:>2:>3:>4:>5:>Nil)
 -- 12
 pattern (:>) :: a -> Vec n a -> Vec (n + 1) a
-pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
+pattern (:>) x xs <- ((\ys -> (head ys, tail ys)) -> (x, xs))
   where
     (:>) x xs = Cons x xs
 
-infixr CONS_PREC :>
+infixr 5 :>
 
-instance Show a => Show (Vec n a) where
+-- Keep this in sync with the fixities of 'Cons' and ':>'.
+consPrec :: Int
+consPrec = 5
+
+instance (Show a) => Show (Vec n a) where
   showsPrec n = \case
     Nil -> showString "Nil"
-    vs -> showParen (n > CONS_PREC) (go vs)
+    vs -> showParen (n > consPrec) (go vs)
+    where
+      go :: Vec m a -> ShowS
+      go Nil = showString "Nil"
+      go (x `Cons` xs) =
+        showsPrec (consPrec + 1) x
+          . showString " :> "
+          . go xs
 
-   where
-    go :: Vec m a -> ShowS
-    go Nil = showString "Nil"
-    go (x `Cons` xs) =
-        showsPrec (CONS_PREC + 1) x
-      . showString " :> "
-      . go xs
-
-instance ShowX a => ShowX (Vec n a) where
+instance (ShowX a) => ShowX (Vec n a) where
   showsPrecX n vs =
     case isX vs of
       Right Nil -> showString "Nil"
       Left _ -> showString "undefined"
-      _ -> showParen (n > CONS_PREC) (go vs)
-   where
-    go :: Vec m a -> ShowS
-    go (isX -> Left _) = showString "undefined"
-    go Nil = showString "Nil"
-    go (x `Cons` xs) =
-        showsPrecX (CONS_PREC + 1) x
-      . showString " :> "
-      . go xs
+      _ -> showParen (n > consPrec) (go vs)
+    where
+      go :: Vec m a -> ShowS
+      go (isX -> Left _) = showString "undefined"
+      go Nil = showString "Nil"
+      go (x `Cons` xs) =
+        showsPrecX (consPrec + 1) x
+          . showString " :> "
+          . go xs
 
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
-  (==) Nil _            = True
+  (==) Nil _ = True
   (==) v1@(Cons _ _) v2 = fold (&&) (zipWith (==) v1 v2)
 
 instance (KnownNat n, Ord a) => Ord (Vec n a) where
   compare x y = foldr f EQ $ zipWith compare x y
-    where f EQ   keepGoing = keepGoing
-          f done _         = done
+    where
+      f EQ keepGoing = keepGoing
+      f done _ = done
 
 instance (KnownNat n, Semigroup a) => Semigroup (Vec n a) where
   (<>) = zipWith (<>)
@@ -322,56 +488,56 @@ instance (KnownNat n, Monoid a) => Monoid (Vec n a) where
   mempty = repeat mempty
   mappend = (<>)
 
-instance KnownNat n => Applicative (Vec n) where
-  pure      = repeat
+instance (KnownNat n) => Applicative (Vec n) where
+  pure = repeat
   fs <*> xs = zipWith ($) fs xs
 
 {-# RULES
 "zipWith$map" forall f xs ys. zipWith (\g a -> g a) (map f xs) ys = zipWith f xs ys
   #-}
 
-instance KnownNat n => F.Foldable (Vec n) where
-  fold Nil      = mempty
-  fold z@Cons{} = fold mappend z
-  foldMap _ Nil      = mempty
-  foldMap f z@Cons{} = fold mappend (map f z)
-  foldr     = foldr
-  foldl     = foldl
-  foldr1 _ Nil      = clashCompileError "foldr1: empty Vec"
-  foldr1 f z@Cons{} = foldr1 f z
-  foldl1 _ Nil      = clashCompileError "foldl1: empty Vec"
-  foldl1 f z@Cons{} = foldl1 f z
-  toList    = toList
-  null Nil  = True
-  null _    = False
-  length    = length
-  maximum Nil      = clashCompileError "maximum: empty Vec"
-  maximum z@Cons{} = fold (\x y -> if x >= y then x else y) z
-  minimum Nil      = clashCompileError "minimum: empty Vec"
-  minimum z@Cons{} = fold (\x y -> if x <= y then x else y) z
-  sum Nil      = 0
-  sum z@Cons{} = fold (+) z
-  product Nil      = 1
-  product z@Cons{} = fold (*) z
+instance (KnownNat n) => F.Foldable (Vec n) where
+  fold Nil = mempty
+  fold z@Cons {} = fold mappend z
+  foldMap _ Nil = mempty
+  foldMap f z@Cons {} = fold mappend (map f z)
+  foldr = foldr
+  foldl = foldl
+  foldr1 _ Nil = clashCompileError "foldr1: empty Vec"
+  foldr1 f z@Cons {} = foldr1 f z
+  foldl1 _ Nil = clashCompileError "foldl1: empty Vec"
+  foldl1 f z@Cons {} = foldl1 f z
+  toList = toList
+  null Nil = True
+  null _ = False
+  length = length
+  maximum Nil = clashCompileError "maximum: empty Vec"
+  maximum z@Cons {} = fold (\x y -> if x >= y then x else y) z
+  minimum Nil = clashCompileError "minimum: empty Vec"
+  minimum z@Cons {} = fold (\x y -> if x <= y then x else y) z
+  sum Nil = 0
+  sum z@Cons {} = fold (+) z
+  product Nil = 1
+  product z@Cons {} = fold (*) z
 
 instance (KnownNat n, 1 <= n) => F1.Foldable1 (Vec n) where
-  fold1         = leToPlus @1 @n $ fold (<>)
-  foldMap1 f    = leToPlus @1 @n $ fold (<>) . map f
-  maximum       = leToPlus @1 @n maximum
-  minimum       = leToPlus @1 @n minimum
-  head          = leToPlus @1 @n head
-  last          = leToPlus @1 @n last
+  fold1 = leToPlus @1 @n $ fold (<>)
+  foldMap1 f = leToPlus @1 @n $ fold (<>) . map f
+  maximum = leToPlus @1 @n maximum
+  minimum = leToPlus @1 @n minimum
+  head = leToPlus @1 @n head
+  last = leToPlus @1 @n last
 
 instance Functor (Vec n) where
   fmap = map
 
-instance KnownNat n => Traversable (Vec n) where
+instance (KnownNat n) => Traversable (Vec n) where
   traverse = traverse#
 
 {-# OPAQUE traverse# #-}
 {-# ANN traverse# hasBlackBox #-}
-traverse# :: forall a f b n . Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
-traverse# _ Nil           = pure Nil
+traverse# :: forall a f b n. (Applicative f) => (a -> f b) -> Vec n a -> f (Vec n b)
+traverse# _ Nil = pure Nil
 traverse# f (x `Cons` xs) = Cons <$> f x <*> traverse# f xs
 
 instance (Default a, KnownNat n) => Default (Vec n a) where
@@ -388,14 +554,15 @@ instance (NFDataX a, KnownNat n) => NFDataX (Vec n a) where
 
   hasUndefined v =
     if isLeft (isX v) then True else go v
-   where
-    go :: forall m b . (NFDataX b, KnownNat m) => Vec m b -> Bool
-    go Nil = False
-    go (x `Cons` xs) = hasUndefined x || hasUndefined xs
+    where
+      go :: forall m b. (NFDataX b, KnownNat m) => Vec m b -> Bool
+      go Nil = False
+      go (x `Cons` xs) = hasUndefined x || hasUndefined xs
 
   ensureSpine = map ensureSpine . lazyV
 
 {-# INLINE singleton #-}
+
 -- | Create a vector of one element
 --
 -- >>> singleton 5
@@ -405,6 +572,7 @@ singleton = (`Cons` Nil)
 
 {-# OPAQUE head #-}
 {-# ANN head hasBlackBox #-}
+
 {- | Extract the first element of a vector
 
 >>> head (1:>2:>3:>Nil)
@@ -438,13 +606,14 @@ head :: Vec (n + 1) a -> a
 head (x `Cons` _) = x
 #if __GLASGOW_HASKELL__ < 912
 head xs = unreachable xs
- where
-  unreachable :: forall n a. 1 <= n => Vec n a -> a
-  unreachable (x `Cons` _) = x
+  where
+    unreachable :: forall n a. (1 <= n) => Vec n a -> a
+    unreachable (x `Cons` _) = x
 #endif
 
 {-# OPAQUE tail #-}
 {-# ANN tail hasBlackBox #-}
+
 {- | Extract the elements after the head of a vector
 
 >>> tail (1:>2:>3:>Nil)
@@ -478,13 +647,14 @@ tail :: Vec (n + 1) a -> Vec n a
 tail (_ `Cons` xr) = xr
 #if __GLASGOW_HASKELL__ < 912
 tail xs = unreachable xs
- where
-  unreachable :: forall n a. 1 <= n => Vec n a -> Vec (n - 1) a
-  unreachable (_ `Cons` xr) = xr
+  where
+    unreachable :: forall n a. (1 <= n) => Vec n a -> Vec (n - 1) a
+    unreachable (_ `Cons` xr) = xr
 #endif
 
 {-# OPAQUE last #-}
 {-# ANN last hasBlackBox #-}
+
 {- | Extract the last element of a vector
 
 >>> last (1:>2:>3:>Nil)
@@ -515,17 +685,18 @@ tail xs = unreachable xs
 #endif
 -}
 last :: Vec (n + 1) a -> a
-last (x `Cons` Nil)         = x
+last (x `Cons` Nil) = x
 last (_ `Cons` y `Cons` xr) = last (y `Cons` xr)
 #if __GLASGOW_HASKELL__ < 912
 last xs = unreachable xs
- where
-  unreachable :: 1 <= n => Vec n a -> a
-  unreachable ys@(Cons _ _) = last ys
+  where
+    unreachable :: (1 <= n) => Vec n a -> a
+    unreachable ys@(Cons _ _) = last ys
 #endif
 
 {-# OPAQUE init #-}
 {-# ANN init hasBlackBox #-}
+
 {- | Extract all the elements of a vector except the last element
 
 >>> init (1:>2:>3:>Nil)
@@ -556,16 +727,17 @@ last xs = unreachable xs
 #endif
 -}
 init :: Vec (n + 1) a -> Vec n a
-init (_ `Cons` Nil)         = Nil
+init (_ `Cons` Nil) = Nil
 init (x `Cons` y `Cons` xr) = x `Cons` init (y `Cons` xr)
 #if __GLASGOW_HASKELL__ < 912
 init xs = unreachable xs
- where
-  unreachable :: 1 <= n => Vec n a -> Vec (n - 1) a
-  unreachable ys@(Cons _ _) = init ys
+  where
+    unreachable :: (1 <= n) => Vec n a -> Vec (n - 1) a
+    unreachable ys@(Cons _ _) = init ys
 #endif
 
 {-# INLINE shiftInAt0 #-}
+
 -- | Shift in elements to the head of a vector, bumping out elements at the
 -- tail. The result is a tuple containing:
 --
@@ -576,15 +748,20 @@ init xs = unreachable xs
 -- (-1 :> 0 :> 1 :> 2 :> Nil,3 :> 4 :> Nil)
 -- >>> shiftInAt0 (1 :> Nil) ((-1) :> 0 :> Nil)
 -- (-1 :> Nil,0 :> 1 :> Nil)
-shiftInAt0 :: KnownNat n
-           => Vec n a -- ^ The old vector
-           -> Vec m a -- ^ The elements to shift in at the head
-           -> (Vec n a, Vec m a) -- ^ (The new vector, shifted out elements)
+shiftInAt0 ::
+  (KnownNat n) =>
+  -- | The old vector
+  Vec n a ->
+  -- | The elements to shift in at the head
+  Vec m a ->
+  -- | (The new vector, shifted out elements)
+  (Vec n a, Vec m a)
 shiftInAt0 xs ys = splitAtI zs
   where
     zs = ys ++ xs
 
 {-# INLINE shiftInAtN #-}
+
 -- | Shift in element to the tail of a vector, bumping out elements at the head.
 -- The result is a tuple containing:
 --
@@ -595,16 +772,21 @@ shiftInAt0 xs ys = splitAtI zs
 -- (3 :> 4 :> 5 :> 6 :> Nil,1 :> 2 :> Nil)
 -- >>> shiftInAtN (1 :> Nil) (2 :> 3 :> Nil)
 -- (3 :> Nil,1 :> 2 :> Nil)
-shiftInAtN :: KnownNat m
-           => Vec n a -- ^ The old vector
-           -> Vec m a -- ^ The elements to shift in at the tail
-           -> (Vec n a,Vec m a) -- ^ (The new vector, shifted out elements)
+shiftInAtN ::
+  (KnownNat m) =>
+  -- | The old vector
+  Vec n a ->
+  -- | The elements to shift in at the tail
+  Vec m a ->
+  -- | (The new vector, shifted out elements)
+  (Vec n a, Vec m a)
 shiftInAtN xs ys = (zsR, zsL)
   where
-    zs        = xs ++ ys
-    (zsL,zsR) = splitAtI zs
+    zs = xs ++ ys
+    (zsL, zsR) = splitAtI zs
 
 infixl 5 :<
+
 -- | Add an element to the tail of a vector.
 --
 -- >>> (3:>4:>5:>Nil) :< 1
@@ -628,12 +810,13 @@ infixl 5 :<
 -- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
 -- >>> g (1:>2:>3:>4:>5:>Nil)
 -- 12
-pattern (:<) :: Vec n a -> a -> Vec (n+1) a
-pattern (:<) xs x <- ((\ys -> (init ys,last ys)) -> (xs,x))
+pattern (:<) :: Vec n a -> a -> Vec (n + 1) a
+pattern (:<) xs x <- ((\ys -> (init ys, last ys)) -> (xs, x))
   where
     (:<) xs x = xs ++ singleton x
 
 infixr 4 +>>
+
 -- | Add an element to the head of a vector, and extract all but the last
 -- element.
 --
@@ -641,12 +824,12 @@ infixr 4 +>>
 -- 1 :> 3 :> 4 :> Nil
 -- >>> 1 +>> Nil
 -- Nil
-(+>>) :: forall n a . a -> Vec n a -> Vec n a
+(+>>) :: forall n a. a -> Vec n a -> Vec n a
 s +>> xs = init (s :> xs)
 {-# INLINE (+>>) #-}
 
-
 infixl 4 <<+
+
 -- | Add an element to the tail of a vector, and extract all but the first
 -- element.
 --
@@ -666,11 +849,14 @@ xs <<+ s = fst (shiftInAtN xs (singleton s))
 --
 -- >>> shiftOutFrom0 d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
 -- (3 :> 4 :> 5 :> 0 :> 0 :> Nil,1 :> 2 :> Nil)
-shiftOutFrom0 :: (Default a, KnownNat m)
-              => SNat m        -- ^ @m@, the number of elements to shift out
-              -> Vec (m + n) a -- ^ The old vector
-              -> (Vec (m + n) a, Vec m a)
-              -- ^ (The new vector, shifted out elements)
+shiftOutFrom0 ::
+  (Default a, KnownNat m) =>
+  -- | @m@, the number of elements to shift out
+  SNat m ->
+  -- | The old vector
+  Vec (m + n) a ->
+  -- | (The new vector, shifted out elements)
+  (Vec (m + n) a, Vec m a)
 shiftOutFrom0 m xs = shiftInAtN xs (replicate m def)
 {-# INLINE shiftOutFrom0 #-}
 
@@ -682,21 +868,25 @@ shiftOutFrom0 m xs = shiftInAtN xs (replicate m def)
 --
 -- >>> shiftOutFromN d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
 -- (0 :> 0 :> 1 :> 2 :> 3 :> Nil,4 :> 5 :> Nil)
-shiftOutFromN :: (Default a, KnownNat n)
-              => SNat m        -- ^ @m@, the number of elements to shift out
-              -> Vec (m + n) a -- ^ The old vector
-              -> (Vec (m + n) a, Vec m a)
-              -- ^ (The new vector, shifted out elements)
+shiftOutFromN ::
+  (Default a, KnownNat n) =>
+  -- | @m@, the number of elements to shift out
+  SNat m ->
+  -- | The old vector
+  Vec (m + n) a ->
+  -- | (The new vector, shifted out elements)
+  (Vec (m + n) a, Vec m a)
 shiftOutFromN m@SNat xs = shiftInAt0 xs (replicate m def)
 {-# INLINE shiftOutFromN #-}
 
 infixr 5 ++
+
 -- | Append two vectors.
 --
 -- >>> (1:>2:>3:>Nil) ++ (7:>8:>Nil)
 -- 1 :> 2 :> 3 :> 7 :> 8 :> Nil
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
-Nil           ++ ys = ys
+Nil ++ ys = ys
 (x `Cons` xs) ++ ys = x `Cons` xs ++ ys
 {-# OPAQUE (++) #-}
 {-# ANN (++) hasBlackBox #-}
@@ -713,16 +903,17 @@ splitAt n xs = splitAtU (toUNat n) xs
 {-# ANN splitAt hasBlackBox #-}
 
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
-splitAtU UZero     ys = (Nil, ys)
-splitAtU (USucc s) ys = let (as, bs) = splitAtU s $ tail ys
-                        in  (head ys `Cons` as, bs)
+splitAtU UZero ys = (Nil, ys)
+splitAtU (USucc s) ys =
+  let (as, bs) = splitAtU s $ tail ys
+   in (head ys `Cons` as, bs)
 
 -- | Split a vector into two vectors where the length of the two is determined
 -- by the context.
 --
 -- >>> splitAtI (1:>2:>3:>7:>8:>Nil) :: (Vec 2 Int, Vec 3 Int)
 -- (1 :> 2 :> Nil,3 :> 7 :> 8 :> Nil)
-splitAtI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
+splitAtI :: (KnownNat m) => Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtI = withSNat splitAt
 {-# INLINE splitAtI #-}
 
@@ -731,7 +922,7 @@ splitAtI = withSNat splitAt
 -- >>> concat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
 -- 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> 10 :> 11 :> 12 :> Nil
 concat :: Vec n (Vec m a) -> Vec (n * m) a
-concat Nil           = Nil
+concat Nil = Nil
 concat (x `Cons` xs) = x ++ concat xs
 {-# OPAQUE concat #-}
 {-# ANN concat hasBlackBox #-}
@@ -749,15 +940,16 @@ concatMap f xs = concat (map f xs)
 --
 -- >>> unconcat d4 (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil)
 -- (1 :> 2 :> 3 :> 4 :> Nil) :> (5 :> 6 :> 7 :> 8 :> Nil) :> (9 :> 10 :> 11 :> 12 :> Nil) :> Nil
-unconcat :: KnownNat n => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
+unconcat :: (KnownNat n) => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
 {-# OPAQUE unconcat #-}
 {-# ANN unconcat hasBlackBox #-}
 
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
-unconcatU UZero      _ _  = Nil
-unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
-                            in  as `Cons` unconcatU n' m bs
+unconcatU UZero _ _ = Nil
+unconcatU (USucc n') m ys =
+  let (as, bs) = splitAtU m ys
+   in as `Cons` unconcatU n' m bs
 
 -- | Split a vector of /(n * m)/ elements into a vector of \"vectors of length
 -- /m/\", where the length /m/ is determined by the context.
@@ -782,10 +974,10 @@ merge x y = concat $ zipWith (\a b -> a :> singleton b) x y
 -- 4 :> 3 :> 2 :> 1 :> Nil
 reverse :: Vec n a -> Vec n a
 reverse xs = go Nil xs
- where
-  go :: i <= n => Vec (n - i) a -> Vec i a -> Vec n a
-  go a (y `Cons` ys) = go (y `Cons` a) ys
-  go a Nil = a
+  where
+    go :: (i <= n) => Vec (n - i) a -> Vec i a -> Vec n a
+    go a (y `Cons` ys) = go (y `Cons` a) ys
+    go a Nil = a
 {-# OPAQUE reverse #-}
 {-# ANN reverse hasBlackBox #-}
 
@@ -798,7 +990,7 @@ reverse xs = go Nil xs
 --
 -- <<doc/map.svg>>
 map :: (a -> b) -> Vec n a -> Vec n b
-map _ Nil           = Nil
+map _ Nil = Nil
 map f (x `Cons` xs) = f x `Cons` map f xs
 {-# OPAQUE map #-}
 {-# ANN map hasBlackBox #-}
@@ -816,13 +1008,13 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- \"'imap' @f xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/imap.svg>>
-imap :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
+imap :: forall n a b. (KnownNat n) => (Index n -> a -> b) -> Vec n a -> Vec n b
 imap f = go 0
   where
     -- NOTE This has a black box called imap_go
     go :: Index n -> Vec m a -> Vec m b
-    go _ Nil           = Nil
-    go n (x `Cons` xs) = f n x `Cons` go (n+1) xs
+    go _ Nil = Nil
+    go n (x `Cons` xs) = f n x `Cons` go (n + 1) xs
 {-# OPAQUE imap #-}
 {-# ANN imap hasBlackBox #-}
 
@@ -842,8 +1034,12 @@ __NB__: 'izipWith' is /strict/ in its second argument, and /lazy/ in its
 third. This matters when 'izipWith' is used in a recursive setting. See
 'lazyV' for more information.
 -}
-izipWith :: KnownNat n => (Index n -> a -> b -> c) -> Vec n a -> Vec n b
-         -> Vec n c
+izipWith ::
+  (KnownNat n) =>
+  (Index n -> a -> b -> c) ->
+  Vec n a ->
+  Vec n b ->
+  Vec n c
 izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 {-# INLINE izipWith #-}
 
@@ -858,7 +1054,7 @@ izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 -- \"'ifoldr' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/ifoldr.svg>>
-ifoldr :: KnownNat n => (Index n -> a -> b -> b) -> b -> Vec n a -> b
+ifoldr :: (KnownNat n) => (Index n -> a -> b -> b) -> b -> Vec n a -> b
 ifoldr f z xs = head ws
   where
     ws = izipWith f xs ((tail ws)) :< z
@@ -875,7 +1071,7 @@ ifoldr f z xs = head ws
 -- \"'ifoldl' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/ifoldl.svg>>
-ifoldl :: KnownNat n => (a -> Index n -> b -> a) -> a -> Vec n b -> a
+ifoldl :: (KnownNat n) => (a -> Index n -> b -> a) -> a -> Vec n b -> a
 ifoldl f z xs = last ws
   where
     ws = z `Cons` izipWith (\i b a -> f a i b) xs (init ws)
@@ -885,7 +1081,7 @@ ifoldl f z xs = last ws
 --
 -- >>> indices d4
 -- 0 :> 1 :> 2 :> 3 :> Nil
-indices :: KnownNat n => SNat n -> Vec n (Index n)
+indices :: (KnownNat n) => SNat n -> Vec n (Index n)
 indices _ = indicesI
 {-# INLINE indices #-}
 
@@ -894,7 +1090,7 @@ indices _ = indicesI
 --
 -- >>> indicesI :: Vec 4 (Index 4)
 -- 0 :> 1 :> 2 :> 3 :> Nil
-indicesI :: KnownNat n => Vec n (Index n)
+indicesI :: (KnownNat n) => Vec n (Index n)
 indicesI = imap const (repeat ())
 {-# INLINE indicesI #-}
 
@@ -905,7 +1101,7 @@ indicesI = imap const (repeat ())
 -- Just 3
 -- >>> findIndex (> 8) (1:>3:>2:>4:>3:>5:>6:>Nil)
 -- Nothing
-findIndex :: KnownNat n => (a -> Bool) -> Vec n a -> Maybe (Index n)
+findIndex :: (KnownNat n) => (a -> Bool) -> Vec n a -> Maybe (Index n)
 findIndex f = ifoldr (\i a b -> if f a then Just i else b) Nothing
 {-# INLINE findIndex #-}
 
@@ -936,7 +1132,7 @@ elemIndex x = findIndex (x ==)
 -- third. This matters when 'zipWith' is used in a recursive setting. See
 -- 'lazyV' for more information.
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
-zipWith _ Nil           _  = Nil
+zipWith _ Nil _ = Nil
 zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
 {-# OPAQUE zipWith #-}
 {-# ANN zipWith hasBlackBox #-}
@@ -954,7 +1150,7 @@ zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
 -- third and fourth. This matters when 'zipWith3' is used in a recursive setting.
 -- See 'lazyV' for more information.
 zipWith3 :: (a -> b -> c -> d) -> Vec n a -> Vec n b -> Vec n c -> Vec n d
-zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
+zipWith3 f us vs ws = zipWith (\a (b, c) -> f a b c) us (zip vs ws)
 {-# INLINE zipWith3 #-}
 
 -- 'zipWith4' is analogous to 'zipWith3', but with four vectors.
@@ -962,15 +1158,15 @@ zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
 -- __NB__: 'zipWith4' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith4' is used in a recursive setting. See
 -- 'lazyV' for more information.
-zipWith4
-  :: (a -> b -> c -> d -> e)
-  -> Vec n a
-  -> Vec n b
-  -> Vec n c
-  -> Vec n d
-  -> Vec n e
+zipWith4 ::
+  (a -> b -> c -> d -> e) ->
+  Vec n a ->
+  Vec n b ->
+  Vec n c ->
+  Vec n d ->
+  Vec n e
 zipWith4 f us vs ws xs =
-  zipWith (\a (b,c,d) -> f a b c d) us (zip3 vs ws xs)
+  zipWith (\a (b, c, d) -> f a b c d) us (zip3 vs ws xs)
 {-# INLINE zipWith4 #-}
 
 -- 'zipWith5' is analogous to 'zipWith3', but with five vectors.
@@ -978,16 +1174,16 @@ zipWith4 f us vs ws xs =
 -- __NB__: 'zipWith5' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith5' is used in a recursive setting. See
 -- 'lazyV' for more information.
-zipWith5
-  :: (a -> b -> c -> d -> e -> f)
-  -> Vec n a
-  -> Vec n b
-  -> Vec n c
-  -> Vec n d
-  -> Vec n e
-  -> Vec n f
+zipWith5 ::
+  (a -> b -> c -> d -> e -> f) ->
+  Vec n a ->
+  Vec n b ->
+  Vec n c ->
+  Vec n d ->
+  Vec n e ->
+  Vec n f
 zipWith5 f us vs ws xs ys =
-  zipWith (\a (b,c,d,e) -> f a b c d e) us (zip4 vs ws xs ys)
+  zipWith (\a (b, c, d, e) -> f a b c d e) us (zip4 vs ws xs ys)
 {-# INLINE zipWith5 #-}
 
 -- 'zipWith6' is analogous to 'zipWith3', but with six vectors.
@@ -995,17 +1191,17 @@ zipWith5 f us vs ws xs ys =
 -- __NB__: 'zipWith6' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith6' is used in a recursive setting. See
 -- 'lazyV' for more information.
-zipWith6
-  :: (a -> b -> c -> d -> e -> f -> g)
-  -> Vec n a
-  -> Vec n b
-  -> Vec n c
-  -> Vec n d
-  -> Vec n e
-  -> Vec n f
-  -> Vec n g
+zipWith6 ::
+  (a -> b -> c -> d -> e -> f -> g) ->
+  Vec n a ->
+  Vec n b ->
+  Vec n c ->
+  Vec n d ->
+  Vec n e ->
+  Vec n f ->
+  Vec n g
 zipWith6 f us vs ws xs ys zs =
-  zipWith (\u (v,w,x,y,z) -> f u v w x y z) us (zip5 vs ws xs ys zs)
+  zipWith (\u (v, w, x, y, z) -> f u v w x y z) us (zip5 vs ws xs ys zs)
 {-# INLINE zipWith6 #-}
 
 -- 'zipWith7' is analogous to 'zipWith3', but with seven vectors.
@@ -1013,18 +1209,18 @@ zipWith6 f us vs ws xs ys zs =
 -- __NB__: 'zipWith7' is /strict/ in its second argument, and /lazy/ its following
 -- arguments. This matters when 'zipWith7' is used in a recursive setting. See
 -- 'lazyV' for more information.
-zipWith7
-  :: (a -> b -> c -> d -> e -> f -> g -> h)
-  -> Vec n a
-  -> Vec n b
-  -> Vec n c
-  -> Vec n d
-  -> Vec n e
-  -> Vec n f
-  -> Vec n g
-  -> Vec n h
+zipWith7 ::
+  (a -> b -> c -> d -> e -> f -> g -> h) ->
+  Vec n a ->
+  Vec n b ->
+  Vec n c ->
+  Vec n d ->
+  Vec n e ->
+  Vec n f ->
+  Vec n g ->
+  Vec n h
 zipWith7 f ts us vs ws xs ys zs =
-  zipWith (\t (u,v,w,x,y,z) -> f t u v w x y z) ts (zip6 us vs ws xs ys zs)
+  zipWith (\t (u, v, w, x, y, z) -> f t u v w x y z) ts (zip6 us vs ws xs ys zs)
 {-# INLINE zipWith7 #-}
 
 -- | 'foldr', applied to a binary operator, a starting value (typically
@@ -1046,7 +1242,7 @@ zipWith7 f ts us vs ws xs ys zs =
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
 foldr :: (a -> b -> b) -> b -> Vec n a -> b
-foldr _ z Nil           = z
+foldr _ z Nil = z
 foldr f z (x `Cons` xs) = f x (foldr f z xs)
 {-# OPAQUE foldr #-}
 {-# ANN foldr hasBlackBox #-}
@@ -1069,7 +1265,7 @@ foldr f z (x `Cons` xs) = f x (foldr f z xs)
 -- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
-foldl :: forall b a n . (b -> a -> b) -> b -> Vec n a -> b
+foldl :: forall b a n. (b -> a -> b) -> b -> Vec n a -> b
 foldl f z0 xs0
   -- We use 'go' to make 'foldl' strict during Haskell simulation, while using
   -- 'scanl' to make Clash's life easier during normalization. We make 'foldl'
@@ -1083,12 +1279,12 @@ foldl f z0 xs0
   --
   | clashSimulation = go z0 xs0
   | otherwise = last (scanl f z0 xs0)
- where
-  go :: forall m. b -> Vec m a -> b
-  go z Nil = z
-  go z (Cons x xs) =
-    let z1 = f z x
-    in z1 `seq` go z1 xs
+  where
+    go :: forall m. b -> Vec m a -> b
+    go z Nil = z
+    go z (Cons x xs) =
+      let z1 = f z x
+       in z1 `seq` go z1 xs
 {-# INLINE foldl #-}
 
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
@@ -1153,19 +1349,25 @@ foldl1 f xs = foldl f (head xs) (tail xs)
 -- \"'fold' @f xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/fold.svg>>
-fold :: forall n a . (a -> a -> a) -> Vec (n + 1) a -> a
+fold :: forall n a. (a -> a -> a) -> Vec (n + 1) a -> a
 fold f vs = fold' (toList vs)
   where
     fold' [x] = x
-    fold' xs  = fold' ys `f` fold' zs
+    fold' xs = fold' ys `f` fold' zs
       where
-        (ys,zs) = P.splitAt (P.length xs `div` 2) xs
+        (ys, zs) = P.splitAt (P.length xs `div` 2) xs
 {-# OPAQUE fold #-}
-{-# ANN fold (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [I.__i|
+{-# ANN
+  fold
+  ( InlineYamlPrimitive
+      [VHDL, Verilog, SystemVerilog]
+      [I.__i|
   BlackBoxHaskell:
     name: Clash.Sized.Vector.fold
     templateFunction: Clash.Primitives.Sized.Vector.foldBBF
-  |]) #-}
+  |]
+  )
+  #-}
 
 -- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:
@@ -1195,7 +1397,7 @@ scanl f z xs = ws
 --
 -- >>> scanl1 (-) (1 :> 2 :> 3 :> 4 :> Nil)
 -- 1 :> -1 :> -4 :> -8 :> Nil
-scanl1 :: forall n a. (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
+scanl1 :: forall n a. (a -> a -> a) -> Vec (n + 1) a -> Vec (n + 1) a
 scanl1 op vs = scanl op (head vs) (tail vs)
 {-# INLINE scanl1 #-}
 
@@ -1203,7 +1405,7 @@ scanl1 op vs = scanl op (head vs) (tail vs)
 --
 -- >>> scanr1 (-) (1 :> 2 :> 3 :> 4 :> Nil)
 -- -2 :> 3 :> -1 :> 4 :> Nil
-scanr1 :: forall n a. (a -> a -> a) -> Vec (n+1) a -> Vec (n+1) a
+scanr1 :: forall n a. (a -> a -> a) -> Vec (n + 1) a -> Vec (n + 1) a
 scanr1 op vs = scanr op (last vs) (init vs)
 {-# INLINE scanr1 #-}
 
@@ -1270,13 +1472,13 @@ postscanr f z xs = init (scanr f z xs)
 -- \"'mapAccumL' @f acc xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/mapAccumL.svg>>
-mapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc,Vec n y)
-mapAccumL f acc xs = (acc',ys)
+mapAccumL :: (acc -> x -> (acc, y)) -> acc -> Vec n x -> (acc, Vec n y)
+mapAccumL f acc xs = (acc', ys)
   where
-    accs        = acc `Cons` accs'
-    ws          = zipWith (flip f) xs (init accs)
+    accs = acc `Cons` accs'
+    ws = zipWith (flip f) xs (init accs)
     (accs', ys) = unzip ws
-    acc'        = last accs
+    acc' = last accs
 {-# INLINE mapAccumL #-}
 
 -- | The 'mapAccumR' function behaves like a combination of 'map' and 'foldr';
@@ -1290,20 +1492,20 @@ mapAccumL f acc xs = (acc',ys)
 -- \"'mapAccumR' @f acc xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/mapAccumR.svg>>
-mapAccumR :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
-mapAccumR f acc xs = (acc',ys)
+mapAccumR :: (acc -> x -> (acc, y)) -> acc -> Vec n x -> (acc, Vec n y)
+mapAccumR f acc xs = (acc', ys)
   where
-    accs        = accs' :< acc
-    ws          = zipWith (flip f) xs (tail accs)
+    accs = accs' :< acc
+    ws = zipWith (flip f) xs (tail accs)
     (accs', ys) = unzip ws
-    acc'        = head accs
+    acc' = head accs
 {-# INLINE mapAccumR #-}
 
 -- | 'zip' takes two vectors and returns a vector of corresponding pairs.
 --
 -- >>> zip (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil)
 -- (1,4) :> (2,3) :> (3,2) :> (4,1) :> Nil
-zip :: Vec n a -> Vec n b -> Vec n (a,b)
+zip :: Vec n a -> Vec n b -> Vec n (a, b)
 zip = zipWith (,)
 {-# INLINE zip #-}
 
@@ -1311,46 +1513,46 @@ zip = zipWith (,)
 --
 -- >>> zip3 (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil) (5:>6:>7:>8:>Nil)
 -- (1,4,5) :> (2,3,6) :> (3,2,7) :> (4,1,8) :> Nil
-zip3 :: Vec n a -> Vec n b -> Vec n c -> Vec n (a,b,c)
+zip3 :: Vec n a -> Vec n b -> Vec n c -> Vec n (a, b, c)
 zip3 = zipWith3 (,,)
 {-# INLINE zip3 #-}
 
 -- | 'zip4' takes four vectors and returns a list of quadruples, analogous
 -- to 'zip'.
-zip4 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n (a,b,c,d)
+zip4 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n (a, b, c, d)
 zip4 = zipWith4 (,,,)
 {-# INLINE zip4 #-}
 
 -- | 'zip5' takes five vectors and returns a list of five-tuples, analogous
 -- to 'zip'.
-zip5 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n e -> Vec n (a,b,c,d,e)
+zip5 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n e -> Vec n (a, b, c, d, e)
 zip5 = zipWith5 (,,,,)
 {-# INLINE zip5 #-}
 
 -- | 'zip6' takes six vectors and returns a list of six-tuples, analogous
 -- to 'zip'.
-zip6
-  :: Vec n a
-  -> Vec n b
-  -> Vec n c
-  -> Vec n d
-  -> Vec n e
-  -> Vec n f
-  -> Vec n (a,b,c,d,e,f)
+zip6 ::
+  Vec n a ->
+  Vec n b ->
+  Vec n c ->
+  Vec n d ->
+  Vec n e ->
+  Vec n f ->
+  Vec n (a, b, c, d, e, f)
 zip6 = zipWith6 (,,,,,)
 {-# INLINE zip6 #-}
 
 -- | 'zip7' takes seven vectors and returns a list of seven-tuples, analogous
 -- to 'zip'.
-zip7
-  :: Vec n a
-  -> Vec n b
-  -> Vec n c
-  -> Vec n d
-  -> Vec n e
-  -> Vec n f
-  -> Vec n g
-  -> Vec n (a,b,c,d,e,f,g)
+zip7 ::
+  Vec n a ->
+  Vec n b ->
+  Vec n c ->
+  Vec n d ->
+  Vec n e ->
+  Vec n f ->
+  Vec n g ->
+  Vec n (a, b, c, d, e, f, g)
 zip7 = zipWith7 (,,,,,,)
 {-# INLINE zip7 #-}
 
@@ -1359,16 +1561,16 @@ zip7 = zipWith7 (,,,,,,)
 --
 -- >>> unzip ((1,4):>(2,3):>(3,2):>(4,1):>Nil)
 -- (1 :> 2 :> 3 :> 4 :> Nil,4 :> 3 :> 2 :> 1 :> Nil)
-unzip :: Vec n (a,b) -> (Vec n a, Vec n b)
+unzip :: Vec n (a, b) -> (Vec n a, Vec n b)
 unzip xs
   | clashSimulation = unzipSim xs
   | otherwise = (map fst xs, map snd xs)
- where
-  unzipSim :: Vec m (a,b) -> (Vec m a, Vec m b)
-  unzipSim Nil = (Nil, Nil)
-  unzipSim (~(a,b) `Cons` rest) =
-    let (as, bs) = unzipSim rest
-    in (a `Cons` as, b `Cons` bs)
+  where
+    unzipSim :: Vec m (a, b) -> (Vec m a, Vec m b)
+    unzipSim Nil = (Nil, Nil)
+    unzipSim (~(a, b) `Cons` rest) =
+      let (as, bs) = unzipSim rest
+       in (a `Cons` as, b `Cons` bs)
 {-# INLINE unzip #-}
 
 -- | 'unzip3' transforms a vector of triplets into a vector of first components,
@@ -1376,118 +1578,127 @@ unzip xs
 --
 -- >>> unzip3 ((1,4,5):>(2,3,6):>(3,2,7):>(4,1,8):>Nil)
 -- (1 :> 2 :> 3 :> 4 :> Nil,4 :> 3 :> 2 :> 1 :> Nil,5 :> 6 :> 7 :> 8 :> Nil)
-unzip3 :: Vec n (a,b,c) -> (Vec n a, Vec n b, Vec n c)
+unzip3 :: Vec n (a, b, c) -> (Vec n a, Vec n b, Vec n c)
 unzip3 xs
   | clashSimulation = unzip3Sim xs
-  | otherwise = ( map (\(x,_,_) -> x) xs
-                , map (\(_,y,_) -> y) xs
-                , map (\(_,_,z) -> z) xs
-                )
- where
-  unzip3Sim :: Vec m (a,b,c) -> (Vec m a, Vec m b, Vec m c)
-  unzip3Sim Nil = (Nil, Nil, Nil)
-  unzip3Sim (~(a,b,c) `Cons` rest) =
-    let (as, bs, cs) = unzip3Sim rest
-    in (a `Cons` as, b `Cons` bs, c `Cons` cs)
+  | otherwise =
+      ( map (\(x, _, _) -> x) xs,
+        map (\(_, y, _) -> y) xs,
+        map (\(_, _, z) -> z) xs
+      )
+  where
+    unzip3Sim :: Vec m (a, b, c) -> (Vec m a, Vec m b, Vec m c)
+    unzip3Sim Nil = (Nil, Nil, Nil)
+    unzip3Sim (~(a, b, c) `Cons` rest) =
+      let (as, bs, cs) = unzip3Sim rest
+       in (a `Cons` as, b `Cons` bs, c `Cons` cs)
 {-# INLINE unzip3 #-}
 
 -- | 'unzip4' takes a vector of quadruples and returns four vectors, analogous
 -- to 'unzip'.
-unzip4 :: Vec n (a,b,c,d) -> (Vec n a, Vec n b, Vec n c, Vec n d)
+unzip4 :: Vec n (a, b, c, d) -> (Vec n a, Vec n b, Vec n c, Vec n d)
 unzip4 xs
   | clashSimulation = unzip4Sim xs
-  | otherwise = ( map (\(w,_,_,_) -> w) xs
-                , map (\(_,x,_,_) -> x) xs
-                , map (\(_,_,y,_) -> y) xs
-                , map (\(_,_,_,z) -> z) xs
-                )
- where
-  unzip4Sim :: Vec m (a,b,c,d) -> (Vec m a, Vec m b, Vec m c, Vec m d)
-  unzip4Sim Nil = (Nil, Nil, Nil, Nil)
-  unzip4Sim (~(a,b,c,d) `Cons` rest) =
-    let (as, bs, cs, ds) = unzip4Sim rest
-    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds)
+  | otherwise =
+      ( map (\(w, _, _, _) -> w) xs,
+        map (\(_, x, _, _) -> x) xs,
+        map (\(_, _, y, _) -> y) xs,
+        map (\(_, _, _, z) -> z) xs
+      )
+  where
+    unzip4Sim :: Vec m (a, b, c, d) -> (Vec m a, Vec m b, Vec m c, Vec m d)
+    unzip4Sim Nil = (Nil, Nil, Nil, Nil)
+    unzip4Sim (~(a, b, c, d) `Cons` rest) =
+      let (as, bs, cs, ds) = unzip4Sim rest
+       in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds)
 {-# INLINE unzip4 #-}
 
 -- | 'unzip5' takes a vector of five-tuples and returns five vectors, analogous
 -- to 'unzip'.
-unzip5 :: Vec n (a,b,c,d,e) -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e)
+unzip5 :: Vec n (a, b, c, d, e) -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e)
 unzip5 xs
   | clashSimulation = unzip5Sim xs
-  | otherwise = ( map (\(v,_,_,_,_) -> v) xs
-                , map (\(_,w,_,_,_) -> w) xs
-                , map (\(_,_,x,_,_) -> x) xs
-                , map (\(_,_,_,y,_) -> y) xs
-                , map (\(_,_,_,_,z) -> z) xs
-                )
- where
-  unzip5Sim :: Vec m (a,b,c,d,e) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e)
-  unzip5Sim Nil = (Nil, Nil, Nil, Nil, Nil)
-  unzip5Sim (~(a,b,c,d,e) `Cons` rest) =
-    let (as, bs, cs, ds, es) = unzip5Sim rest
-    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es)
+  | otherwise =
+      ( map (\(v, _, _, _, _) -> v) xs,
+        map (\(_, w, _, _, _) -> w) xs,
+        map (\(_, _, x, _, _) -> x) xs,
+        map (\(_, _, _, y, _) -> y) xs,
+        map (\(_, _, _, _, z) -> z) xs
+      )
+  where
+    unzip5Sim :: Vec m (a, b, c, d, e) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e)
+    unzip5Sim Nil = (Nil, Nil, Nil, Nil, Nil)
+    unzip5Sim (~(a, b, c, d, e) `Cons` rest) =
+      let (as, bs, cs, ds, es) = unzip5Sim rest
+       in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es)
 {-# INLINE unzip5 #-}
 
 -- | 'unzip6' takes a vector of six-tuples and returns six vectors, analogous
 -- to 'unzip'.
-unzip6
-  :: Vec n (a,b,c,d,e,f)
-  -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f)
+unzip6 ::
+  Vec n (a, b, c, d, e, f) ->
+  (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f)
 unzip6 xs
   | clashSimulation = unzip6Sim xs
-  | otherwise = ( map (\(u,_,_,_,_,_) -> u) xs
-                , map (\(_,v,_,_,_,_) -> v) xs
-                , map (\(_,_,w,_,_,_) -> w) xs
-                , map (\(_,_,_,x,_,_) -> x) xs
-                , map (\(_,_,_,_,y,_) -> y) xs
-                , map (\(_,_,_,_,_,z) -> z) xs
-                )
- where
-  unzip6Sim :: Vec m (a,b,c,d,e,f) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e, Vec m f)
-  unzip6Sim Nil = (Nil, Nil, Nil, Nil, Nil, Nil)
-  unzip6Sim (~(a,b,c,d,e,f) `Cons` rest) =
-    let (as, bs, cs, ds, es, fs) = unzip6Sim rest
-    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es, f `Cons` fs)
+  | otherwise =
+      ( map (\(u, _, _, _, _, _) -> u) xs,
+        map (\(_, v, _, _, _, _) -> v) xs,
+        map (\(_, _, w, _, _, _) -> w) xs,
+        map (\(_, _, _, x, _, _) -> x) xs,
+        map (\(_, _, _, _, y, _) -> y) xs,
+        map (\(_, _, _, _, _, z) -> z) xs
+      )
+  where
+    unzip6Sim :: Vec m (a, b, c, d, e, f) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e, Vec m f)
+    unzip6Sim Nil = (Nil, Nil, Nil, Nil, Nil, Nil)
+    unzip6Sim (~(a, b, c, d, e, f) `Cons` rest) =
+      let (as, bs, cs, ds, es, fs) = unzip6Sim rest
+       in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es, f `Cons` fs)
 {-# INLINE unzip6 #-}
 
 -- | 'unzip7' takes a vector of seven-tuples and returns seven vectors, analogous
 -- to 'unzip'.
-unzip7
-  :: Vec n (a,b,c,d,e,f,g)
-  -> (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f, Vec n g)
+unzip7 ::
+  Vec n (a, b, c, d, e, f, g) ->
+  (Vec n a, Vec n b, Vec n c, Vec n d, Vec n e, Vec n f, Vec n g)
 unzip7 xs
   | clashSimulation = unzip7Sim xs
-  | otherwise = ( map (\(t,_,_,_,_,_,_) -> t) xs
-                , map (\(_,u,_,_,_,_,_) -> u) xs
-                , map (\(_,_,v,_,_,_,_) -> v) xs
-                , map (\(_,_,_,w,_,_,_) -> w) xs
-                , map (\(_,_,_,_,x,_,_) -> x) xs
-                , map (\(_,_,_,_,_,y,_) -> y) xs
-                , map (\(_,_,_,_,_,_,z) -> z) xs
-                )
- where
-  unzip7Sim :: Vec m (a,b,c,d,e,f,g) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e, Vec m f, Vec m g)
-  unzip7Sim Nil = (Nil, Nil, Nil, Nil, Nil, Nil, Nil)
-  unzip7Sim (~(a,b,c,d,e,f,g) `Cons` rest) =
-    let (as, bs, cs, ds, es, fs, gs) = unzip7Sim rest
-    in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es, f `Cons` fs, g `Cons` gs)
+  | otherwise =
+      ( map (\(t, _, _, _, _, _, _) -> t) xs,
+        map (\(_, u, _, _, _, _, _) -> u) xs,
+        map (\(_, _, v, _, _, _, _) -> v) xs,
+        map (\(_, _, _, w, _, _, _) -> w) xs,
+        map (\(_, _, _, _, x, _, _) -> x) xs,
+        map (\(_, _, _, _, _, y, _) -> y) xs,
+        map (\(_, _, _, _, _, _, z) -> z) xs
+      )
+  where
+    unzip7Sim :: Vec m (a, b, c, d, e, f, g) -> (Vec m a, Vec m b, Vec m c, Vec m d, Vec m e, Vec m f, Vec m g)
+    unzip7Sim Nil = (Nil, Nil, Nil, Nil, Nil, Nil, Nil)
+    unzip7Sim (~(a, b, c, d, e, f, g) `Cons` rest) =
+      let (as, bs, cs, ds, es, fs, gs) = unzip7Sim rest
+       in (a `Cons` as, b `Cons` bs, c `Cons` cs, d `Cons` ds, e `Cons` es, f `Cons` fs, g `Cons` gs)
 {-# INLINE unzip7 #-}
 
-
-index_int :: KnownNat n => Vec n a -> Int -> a
+index_int :: (KnownNat n) => Vec n a -> Int -> a
 index_int xs i@(I# n0)
   | isTrue# (n0 <# 0#) = error "Clash.Sized.Vector.(!!): negative index"
-  | otherwise          = sub xs n0
+  | otherwise = sub xs n0
   where
     sub :: Vec m a -> Int# -> a
-    sub Nil     _ = error (P.concat [ "Clash.Sized.Vector.(!!): index "
-                                    , show i
-                                    , " is larger than maximum index "
-                                    , show ((length xs)-1)
-                                    ])
-    sub (y `Cons` (!ys)) n = if isTrue# (n ==# 0#)
-                                then y
-                                else sub ys (n -# 1#)
+    sub Nil _ =
+      error
+        ( P.concat
+            [ "Clash.Sized.Vector.(!!): index ",
+              show i,
+              " is larger than maximum index ",
+              show ((length xs) - 1)
+            ]
+        )
+    sub (y `Cons` (!ys)) n =
+      if isTrue# (n ==# 0#)
+        then y
+        else sub ys (n -# 1#)
 {-# OPAQUE index_int #-}
 {-# ANN index_int hasBlackBox #-}
 
@@ -1513,27 +1724,32 @@ xs !! i = index_int xs (fromEnum i)
 --
 -- >>> length (6 :> 7 :> 8 :> Nil)
 -- 3
-length :: KnownNat n => Vec n a -> Int
+length :: (KnownNat n) => Vec n a -> Int
 length = fromInteger . natVal . asNatProxy
 {-# OPAQUE length #-}
 {-# ANN length hasBlackBox #-}
 
-replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
+replace_int :: (KnownNat n) => Vec n a -> Int -> a -> Vec n a
 replace_int xs i@(I# n0) a
   | isTrue# (n0 <# 0#) = error "Clash.Sized.Vector.replace: negative index"
-  | otherwise          = sub xs n0 a
+  | otherwise = sub xs n0 a
   where
     sub :: Vec m b -> Int# -> b -> Vec m b
-    sub Nil     _ _ = error (P.concat [ "Clash.Sized.Vector.replace: index "
-                                      , show i
-                                      , " is out of bounds: "
-                                      , if length xs == 0
-                                         then "<empty range>"
-                                         else "[0.." <> show (length xs - 1) <> "]"
-                                      ])
-    sub (y `Cons` (!ys)) n b = if isTrue# (n ==# 0#)
-                                 then b `Cons` ys
-                                 else y `Cons` sub ys (n -# 1#) b
+    sub Nil _ _ =
+      error
+        ( P.concat
+            [ "Clash.Sized.Vector.replace: index ",
+              show i,
+              " is out of bounds: ",
+              if length xs == 0
+                then "<empty range>"
+                else "[0.." <> show (length xs - 1) <> "]"
+            ]
+        )
+    sub (y `Cons` (!ys)) n b =
+      if isTrue# (n ==# 0#)
+        then b `Cons` ys
+        else y `Cons` sub ys (n -# 1#) b
 {-# OPAQUE replace_int #-}
 {-# ANN replace_int hasBlackBox #-}
 
@@ -1609,7 +1825,7 @@ take n = fst . splitAt n
 --
 -- >>> takeI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
 -- 1 :> 2 :> Nil
-takeI :: KnownNat m => Vec (m + n) a -> Vec m a
+takeI :: (KnownNat m) => Vec (m + n) a -> Vec m a
 takeI = withSNat take
 {-# INLINE takeI #-}
 
@@ -1659,7 +1875,7 @@ drop n = snd . splitAt n
 --
 -- >>> dropI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
 -- 4 :> 5 :> Nil
-dropI :: KnownNat m => Vec (m + n) a -> Vec n a
+dropI :: (KnownNat m) => Vec (m + n) a -> Vec n a
 dropI = withSNat drop
 {-# INLINE dropI #-}
 
@@ -1683,24 +1899,25 @@ at n xs = head $ snd $ splitAt n xs
 -- 2 :> 4 :> 6 :> Nil
 -- >>> select d1 d2 d3 (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
 -- 2 :> 4 :> 6 :> Nil
-select :: forall i s n f a. s * n + 1 <= i + s
-       => SNat f
-       -> SNat s
-       -> SNat n
-       -> Vec (f + i) a
-       -> Vec n a
+select ::
+  forall i s n f a.
+  (s * n + 1 <= i + s) =>
+  SNat f ->
+  SNat s ->
+  SNat n ->
+  Vec (f + i) a ->
+  Vec n a
 select f s n xs = select' (toUNat n) $ drop f xs
- where
-  select' :: forall m j b. (s * m + 1 <= j + s) => UNat m -> Vec j b -> Vec m b
-  select' m vs = case m of
-    UZero -> Nil
-    USucc UZero -> head @(j - 1) vs `Cons` Nil
-    USucc m'@(USucc _) -> case deduce @(s * (m - 1) + 1) @j Proxy Proxy of
-      Dict -> head @(j - 1) vs `Cons` select' m' (drop @s @(j - s) s vs)
+  where
+    select' :: forall m j b. (s * m + 1 <= j + s) => UNat m -> Vec j b -> Vec m b
+    select' m vs = case m of
+      UZero -> Nil
+      USucc UZero -> head @(j - 1) vs `Cons` Nil
+      USucc m'@(USucc _) -> case deduce @(s * (m - 1) + 1) @j Proxy Proxy of
+        Dict -> head @(j - 1) vs `Cons` select' m' (drop @s @(j - s) s vs)
 
-  deduce :: e + s <= k + s => p e -> p k -> Dict (e <= k)
-  deduce _ _ = Dict
-
+    deduce :: (e + s <= k + s) => p e -> p k -> Dict (e <= k)
+    deduce _ _ = Dict
 {-# OPAQUE select #-}
 {-# ANN select hasBlackBox #-}
 
@@ -1709,11 +1926,12 @@ select f s n xs = select' (toUNat n) $ drop f xs
 --
 -- >>> selectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
 -- 2 :> 4 :> Nil
-selectI :: (1 <= s, s * n + 1 <= i + s, KnownNat n)
-        => SNat f
-        -> SNat s
-        -> Vec (f + i) a
-        -> Vec n a
+selectI ::
+  (1 <= s, s * n + 1 <= i + s, KnownNat n) =>
+  SNat f ->
+  SNat s ->
+  Vec (f + i) a ->
+  Vec n a
 selectI f s xs = withSNat (\n -> select f s n xs)
 {-# INLINE selectI #-}
 
@@ -1729,7 +1947,7 @@ replicate n a = replicateU (toUNat n) a
 {-# ANN replicate hasBlackBox #-}
 
 replicateU :: UNat n -> a -> Vec n a
-replicateU UZero     _ = Nil
+replicateU UZero _ = Nil
 replicateU (USucc s) x = x `Cons` replicateU s x
 
 -- | \"'repeat' @a@\" creates a vector with as many copies of /a/ as demanded
@@ -1737,7 +1955,7 @@ replicateU (USucc s) x = x `Cons` replicateU s x
 --
 -- >>> repeat 6 :: Vec 5 Int
 -- 6 :> 6 :> 6 :> 6 :> 6 :> Nil
-repeat :: KnownNat n => a -> Vec n a
+repeat :: (KnownNat n) => a -> Vec n a
 repeat = withSNat replicate
 {-# INLINE repeat #-}
 
@@ -1768,18 +1986,24 @@ iterate SNat = iterateI
 -- \"'iterateI' @f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/iterate.svg>>
-iterateI :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
+iterateI :: forall n a. (KnownNat n) => (a -> a) -> a -> Vec n a
 iterateI f = iterateU (toUNat (SNat @n))
- where
-  iterateU :: forall m. UNat m -> a -> Vec m a
-  iterateU UZero _ = Nil
-  iterateU (USucc s) a = a `Cons` iterateU s (f a)
+  where
+    iterateU :: forall m. UNat m -> a -> Vec m a
+    iterateU UZero _ = Nil
+    iterateU (USucc s) a = a `Cons` iterateU s (f a)
 {-# OPAQUE iterateI #-}
-{-# ANN iterateI (InlineYamlPrimitive [VHDL,Verilog,SystemVerilog] [I.__i|
+{-# ANN
+  iterateI
+  ( InlineYamlPrimitive
+      [VHDL, Verilog, SystemVerilog]
+      [I.__i|
   BlackBoxHaskell:
     name: Clash.Sized.Vector.iterateI
     templateFunction: Clash.Primitives.Sized.Vector.iterateBBF
-  |]) #-}
+  |]
+  )
+  #-}
 
 -- | \"'unfoldr' @n f s@\" builds a vector of length @n@ from a seed value @s@,
 -- where every element @a@ is created by successive calls of @f@ on @s@. Unlike
@@ -1790,7 +2014,7 @@ iterateI f = iterateU (toUNat (SNat @n))
 --
 -- >>> unfoldr d10 (\s -> (s,s-1)) 10
 -- 10 :> 9 :> 8 :> 7 :> 6 :> 5 :> 4 :> 3 :> 2 :> 1 :> Nil
-unfoldr :: SNat n -> (s -> (a,s)) -> s -> Vec n a
+unfoldr :: SNat n -> (s -> (a, s)) -> s -> Vec n a
 unfoldr SNat = unfoldrI
 {-# INLINE unfoldr #-}
 
@@ -1804,11 +2028,11 @@ unfoldr SNat = unfoldrI
 --
 -- >>> unfoldrI (\s -> (s,s-1)) 10 :: Vec 10 Int
 -- 10 :> 9 :> 8 :> 7 :> 6 :> 5 :> 4 :> 3 :> 2 :> 1 :> Nil
-unfoldrI :: KnownNat n => (s -> (a,s)) -> s -> Vec n a
+unfoldrI :: (KnownNat n) => (s -> (a, s)) -> s -> Vec n a
 unfoldrI f s0 = map fst xs
- where
-  xs = init (f s0 `Cons` ws)
-  ws = map (f . snd) (lazyV xs)
+  where
+    xs = init (f s0 `Cons` ws)
+    ws = map (f . snd) (lazyV xs)
 {-# INLINE unfoldrI #-}
 
 -- | \"'generate' @n f x@\" returns a vector with @n@ repeated applications of
@@ -1838,7 +2062,7 @@ generate SNat f a = iterateI f (f a)
 -- \"'generateI' @f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/generate.svg>>
-generateI :: KnownNat n => (a -> a) -> a -> Vec n a
+generateI :: (KnownNat n) => (a -> a) -> a -> Vec n a
 generateI f a = iterateI f (f a)
 {-# INLINE generateI #-}
 
@@ -1849,7 +2073,7 @@ generateI f a = iterateI f (f a)
 -- (1 :> 2 :> Nil) :> (3 :> 4 :> Nil) :> (5 :> 6 :> Nil) :> Nil
 -- >>> transpose xss
 -- (1 :> 3 :> 5 :> Nil) :> (2 :> 4 :> 6 :> Nil) :> Nil
-transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
+transpose :: (KnownNat n) => Vec m (Vec n a) -> Vec n (Vec m a)
 transpose = traverse# id
 {-# OPAQUE transpose #-}
 {-# ANN transpose hasBlackBox #-}
@@ -1867,11 +2091,14 @@ transpose = traverse# id
 -- stencil1d d2 sum xs :: Num b => Vec 5 b
 -- >>> stencil1d d2 sum xs
 -- 3 :> 5 :> 7 :> 9 :> 11 :> Nil
-stencil1d :: KnownNat n
-          => SNat (stX + 1) -- ^ Windows length /stX/, at least size 1
-          -> (Vec (stX + 1) a -> b) -- ^ The stencil (function)
-          -> Vec ((stX + n) + 1) a
-          -> Vec (n + 1) b
+stencil1d ::
+  (KnownNat n) =>
+  -- | Windows length /stX/, at least size 1
+  SNat (stX + 1) ->
+  -- | The stencil (function)
+  (Vec (stX + 1) a -> b) ->
+  Vec ((stX + n) + 1) a ->
+  Vec (n + 1) b
 stencil1d stX f xs = map f (windows1d stX xs)
 {-# INLINE stencil1d #-}
 
@@ -1897,13 +2124,17 @@ stencil2d d2 d2 (sum . map sum) xss :: Num a => Vec 3 (Vec 3 a)
 >>> stencil2d d2 d2 (sum . map sum) xss
 (14 :> 18 :> 22 :> Nil) :> (30 :> 34 :> 38 :> Nil) :> (46 :> 50 :> 54 :> Nil) :> Nil
 -}
-stencil2d :: (KnownNat n, KnownNat m)
-          => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
-          -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1
-          -> (Vec (stY + 1) (Vec (stX + 1) a) -> b) -- ^ The stencil (function)
-          -> Vec ((stY + m) + 1) (Vec ((stX + n) + 1) a)
-          -> Vec (m + 1) (Vec (n + 1) b)
-stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
+stencil2d ::
+  (KnownNat n, KnownNat m) =>
+  -- | Window hight /stY/, at least size 1
+  SNat (stY + 1) ->
+  -- | Window width /stX/, at least size 1
+  SNat (stX + 1) ->
+  -- | The stencil (function)
+  (Vec (stY + 1) (Vec (stX + 1) a) -> b) ->
+  Vec ((stY + m) + 1) (Vec ((stX + n) + 1) a) ->
+  Vec (m + 1) (Vec (n + 1) b)
+stencil2d stY stX f xss = (map . map) f (windows2d stY stX xss)
 {-# INLINE stencil2d #-}
 
 -- | \"'windows1d' @stX xs@\", where the vector /xs/ has /stX + n/ elements,
@@ -1916,13 +2147,15 @@ stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
 -- windows1d d2 xs :: Num a => Vec 5 (Vec 2 a)
 -- >>> windows1d d2 xs
 -- (1 :> 2 :> Nil) :> (2 :> 3 :> Nil) :> (3 :> 4 :> Nil) :> (4 :> 5 :> Nil) :> (5 :> 6 :> Nil) :> Nil
-windows1d :: KnownNat n
-          => SNat (stX + 1) -- ^ Length of the window, at least size 1
-          -> Vec ((stX + n) + 1) a
-          -> Vec (n + 1) (Vec (stX + 1) a)
+windows1d ::
+  (KnownNat n) =>
+  -- | Length of the window, at least size 1
+  SNat (stX + 1) ->
+  Vec ((stX + n) + 1) a ->
+  Vec (n + 1) (Vec (stX + 1) a)
 windows1d stX xs = map (take stX) (rotations xs)
   where
-    rotateL ys   = tail ys :< head ys
+    rotateL ys = tail ys :< head ys
     rotations ys = iterateI rotateL ys
 {-# INLINE windows1d #-}
 
@@ -1938,11 +2171,14 @@ windows1d stX xs = map (take stX) (rotations xs)
 -- windows2d d2 d2 xss :: Num a => Vec 3 (Vec 3 (Vec 2 (Vec 2 a)))
 -- >>> windows2d d2 d2 xss
 -- (((1 :> 2 :> Nil) :> (5 :> 6 :> Nil) :> Nil) :> ((2 :> 3 :> Nil) :> (6 :> 7 :> Nil) :> Nil) :> ((3 :> 4 :> Nil) :> (7 :> 8 :> Nil) :> Nil) :> Nil) :> (((5 :> 6 :> Nil) :> (9 :> 10 :> Nil) :> Nil) :> ((6 :> 7 :> Nil) :> (10 :> 11 :> Nil) :> Nil) :> ((7 :> 8 :> Nil) :> (11 :> 12 :> Nil) :> Nil) :> Nil) :> (((9 :> 10 :> Nil) :> (13 :> 14 :> Nil) :> Nil) :> ((10 :> 11 :> Nil) :> (14 :> 15 :> Nil) :> Nil) :> ((11 :> 12 :> Nil) :> (15 :> 16 :> Nil) :> Nil) :> Nil) :> Nil
-windows2d :: (KnownNat n,KnownNat m)
-          => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
-          -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1
-          -> Vec ((stY + m) + 1) (Vec (stX + n + 1) a)
-          -> Vec (m + 1) (Vec (n + 1) (Vec (stY + 1) (Vec (stX + 1) a)))
+windows2d ::
+  (KnownNat n, KnownNat m) =>
+  -- | Window hight /stY/, at least size 1
+  SNat (stY + 1) ->
+  -- | Window width /stX/, at least size 1
+  SNat (stX + 1) ->
+  Vec ((stY + m) + 1) (Vec (stX + n + 1) a) ->
+  Vec (m + 1) (Vec (n + 1) (Vec (stY + 1) (Vec (stX + 1) a)))
 windows2d stY stX xss = map (transpose . (map (windows1d stX))) (windows1d stY xss)
 {-# INLINE windows2d #-}
 
@@ -1952,16 +2188,21 @@ windows2d stY stX xss = map (transpose . (map (windows1d stX))) (windows1d stY x
 -- combination function, /f/.
 --
 -- The combination function must be /associative/ and /commutative/.
-permute :: (Enum i, KnownNat n, KnownNat m)
-        => (a -> a -> a)  -- ^ Combination function, /f/
-        -> Vec n a        -- ^ Default values, /def/
-        -> Vec m i        -- ^ Index mapping, /is/
-        -> Vec (m + k) a  -- ^ Vector to be permuted, /xs/
-        -> Vec n a
+permute ::
+  (Enum i, KnownNat n, KnownNat m) =>
+  -- | Combination function, /f/
+  (a -> a -> a) ->
+  -- | Default values, /def/
+  Vec n a ->
+  -- | Index mapping, /is/
+  Vec m i ->
+  -- | Vector to be permuted, /xs/
+  Vec (m + k) a ->
+  Vec n a
 permute f defs is xs = ys
   where
     ixs = zip is (takeI xs)
-    ys  = foldl (\ks (i,x) -> let ki = ks!!i in replace i (f x ki) ks) defs ixs
+    ys = foldl (\ks (i, x) -> let ki = ks !! i in replace i (f x ki) ks) defs ixs
 {-# INLINE permute #-}
 
 -- | Backwards permutation specified by an index mapping, /is/, from the
@@ -1976,11 +2217,14 @@ permute f defs is xs = ys
 -- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
 -- >>> backpermute input from
 -- 9 :> 4 :> 1 :> 6 :> 2 :> 4 :> Nil
-backpermute :: (Enum i, KnownNat n)
-            => Vec n a  -- ^ Source vector, /xs/
-            -> Vec m i  -- ^ Index mapping, /is/
-            -> Vec m a
-backpermute xs = map (xs!!)
+backpermute ::
+  (Enum i, KnownNat n) =>
+  -- | Source vector, /xs/
+  Vec n a ->
+  -- | Index mapping, /is/
+  Vec m i ->
+  Vec m a
+backpermute xs = map (xs !!)
 {-# INLINE backpermute #-}
 
 -- | Copy elements from the source vector, /xs/, to the destination vector
@@ -1998,11 +2242,15 @@ backpermute xs = map (xs!!)
 --
 -- __NB__: If the same index appears in the index mapping more than once, the
 -- latest mapping is chosen.
-scatter :: (Enum i, KnownNat n, KnownNat m)
-        => Vec n a       -- ^ Default values, /def/
-        -> Vec m i       -- ^ Index mapping, /is/
-        -> Vec (m + k) a -- ^ Vector to be scattered, /xs/
-        -> Vec n a
+scatter ::
+  (Enum i, KnownNat n, KnownNat m) =>
+  -- | Default values, /def/
+  Vec n a ->
+  -- | Index mapping, /is/
+  Vec m i ->
+  -- | Vector to be scattered, /xs/
+  Vec (m + k) a ->
+  Vec n a
 scatter = permute const
 {-# INLINE scatter #-}
 
@@ -2018,11 +2266,14 @@ scatter = permute const
 -- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
 -- >>> gather input from
 -- 9 :> 4 :> 1 :> 6 :> 2 :> 4 :> Nil
-gather :: (Enum i, KnownNat n)
-       => Vec n a  -- ^ Source vector, /xs/
-       -> Vec m i  -- ^ Index mapping, /is/
-       -> Vec m a
-gather xs = map (xs!!)
+gather ::
+  (Enum i, KnownNat n) =>
+  -- | Source vector, /xs/
+  Vec n a ->
+  -- | Index mapping, /is/
+  Vec m i ->
+  Vec m a
+gather xs = map (xs !!)
 {-# INLINE gather #-}
 
 -- | \"'interleave' @d xs@\" creates a vector:
@@ -2032,10 +2283,12 @@ gather xs = map (xs!!)
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> Nil
 -- >>> interleave d3 xs
 -- 1 :> 4 :> 7 :> 2 :> 5 :> 8 :> 3 :> 6 :> 9 :> Nil
-interleave :: KnownNat n
-           => SNat d -- ^ Interleave step, /d/
-           -> Vec (n * d) a
-           -> Vec (d * n) a
+interleave ::
+  (KnownNat n) =>
+  -- | Interleave step, /d/
+  SNat d ->
+  Vec (n * d) a ->
+  Vec (d * n) a
 interleave d@SNat = concat . transpose . unconcat d
 {-# INLINE interleave #-}
 
@@ -2050,13 +2303,14 @@ interleave d@SNat = concat . transpose . unconcat d
 -- 4 :> 1 :> 2 :> 3 :> Nil
 --
 -- __NB__: Use `rotateLeftS` if you want to rotate left by a /static/ amount.
-rotateLeft :: (Enum i, KnownNat n)
-           => Vec n a
-           -> i
-           -> Vec n a
-rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
+rotateLeft ::
+  (Enum i, KnownNat n) =>
+  Vec n a ->
+  i ->
+  Vec n a
+rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+ 1) i')
   where
-    i'  = fromEnum i
+    i' = fromEnum i
     len = length xs
 {-# INLINE rotateLeft #-}
 
@@ -2071,13 +2325,14 @@ rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- 2 :> 3 :> 4 :> 1 :> Nil
 --
 -- __NB__: Use `rotateRightS` if you want to rotate right by a /static/ amount.
-rotateRight :: (Enum i, KnownNat n)
-            => Vec n a
-            -> i
-            -> Vec n a
-rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
+rotateRight ::
+  (Enum i, KnownNat n) =>
+  Vec n a ->
+  i ->
+  Vec n a
+rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+ 1) i')
   where
-    i'  = negate (fromEnum i)
+    i' = negate (fromEnum i)
     len = length xs
 {-# INLINE rotateRight #-}
 
@@ -2088,16 +2343,17 @@ rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- 2 :> 3 :> 4 :> 1 :> Nil
 --
 -- __NB__: Use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
-rotateLeftS :: KnownNat n
-            => Vec n a
-            -> SNat d
-            -> Vec n a
+rotateLeftS ::
+  (KnownNat n) =>
+  Vec n a ->
+  SNat d ->
+  Vec n a
 rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
   where
     go :: Integer -> Vec k a -> Vec k a
-    go _ Nil           = Nil
-    go 0 ys            = ys
-    go n (y `Cons` ys) = go (n-1) (ys :< y)
+    go _ Nil = Nil
+    go 0 ys = ys
+    go n (y `Cons` ys) = go (n - 1) (ys :< y)
 {-# OPAQUE rotateLeftS #-}
 {-# ANN rotateLeftS hasBlackBox #-}
 
@@ -2108,15 +2364,16 @@ rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
 -- 4 :> 1 :> 2 :> 3 :> Nil
 --
 -- __NB__: Use `rotateRight` if you want to rotate right by a /dynamic/ amount.
-rotateRightS :: KnownNat n
-             => Vec n a
-             -> SNat d
-             -> Vec n a
+rotateRightS ::
+  (KnownNat n) =>
+  Vec n a ->
+  SNat d ->
+  Vec n a
 rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
   where
-    go _ Nil            = Nil
-    go 0 ys             = ys
-    go n ys@(Cons _ _)  = go (n-1) (last ys :> init ys)
+    go _ Nil = Nil
+    go 0 ys = ys
+    go n ys@(Cons _ _) = go (n - 1) (last ys :> init ys)
 {-# OPAQUE rotateRightS #-}
 {-# ANN rotateRightS hasBlackBox #-}
 
@@ -2149,10 +2406,10 @@ fromList :: forall n a. (KnownNat n) => [a] -> Maybe (Vec n a)
 fromList xs
   | exactLength (natToInteger @n) xs = Just (unsafeFromList xs)
   | otherwise = Nothing
- where
-  exactLength 0 acc = null acc
-  exactLength _ []  = False
-  exactLength i (_:ys) = exactLength (i - 1) ys
+  where
+    exactLength 0 acc = null acc
+    exactLength _ [] = False
+    exactLength i (_ : ys) = exactLength (i - 1) ys
 {-# OPAQUE fromList #-}
 {-# ANN fromList dontTranslate #-}
 
@@ -2175,12 +2432,12 @@ fromList xs
 --
 unsafeFromList :: forall n a. (KnownNat n) => [a] -> Vec n a
 unsafeFromList = unfoldr SNat go
- where
-  go :: [a] -> (a, [a])
-  go (x:xs) = (x, xs)
-  go [] =
-    let item = error "Clash.Sized.Vector.unsafeFromList: vector larger than list"
-     in (item, [])
+  where
+    go :: [a] -> (a, [a])
+    go (x : xs) = (x, xs)
+    go [] =
+      let item = error "Clash.Sized.Vector.unsafeFromList: vector larger than list"
+       in (item, [])
 {-# OPAQUE unsafeFromList #-}
 {-# ANN unsafeFromList dontTranslate #-}
 
@@ -2192,16 +2449,16 @@ unsafeFromList = unfoldr SNat go
 -- [1,2,3,4,5]
 -- >>> $(listToVecTH [1::Signed 8,2,3,4,5])
 -- 1 :> 2 :> 3 :> 4 :> 5 :> Nil
-listToVecTH :: Lift a => [a] -> ExpQ
-listToVecTH []     = [| Nil |]
-listToVecTH (x:xs) = [| x :> $(listToVecTH xs) |]
+listToVecTH :: (Lift a) => [a] -> ExpQ
+listToVecTH [] = [|Nil|]
+listToVecTH (x : xs) = [|x :> $(listToVecTH xs)|]
 
 -- | 'Vec'tor as a 'Proxy' for 'Nat'
 asNatProxy :: Vec n a -> Proxy n
 asNatProxy _ = Proxy
 
 -- | Length of a 'Vec'tor as an 'SNat' value
-lengthS :: KnownNat n => Vec n a -> SNat n
+lengthS :: (KnownNat n) => Vec n a -> SNat n
 lengthS _ = SNat
 {-# INLINE lengthS #-}
 
@@ -2274,13 +2531,14 @@ lengthS _ = SNat
 --
 -- >>> sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
 -- 1 :> 2 :> 3 :> 4 :> Nil
-lazyV :: KnownNat n
-      => Vec n a
-      -> Vec n a
+lazyV ::
+  (KnownNat n) =>
+  Vec n a ->
+  Vec n a
 lazyV = lazyV' (repeat ())
   where
     lazyV' :: Vec n () -> Vec n a -> Vec n a
-    lazyV' Nil           _  = Nil
+    lazyV' Nil _ = Nil
     lazyV' (_ `Cons` xs) ys = head ys `Cons` lazyV' xs (tail ys)
 {-# OPAQUE lazyV #-}
 {-# ANN lazyV hasBlackBox #-}
@@ -2371,24 +2629,29 @@ lazyV = lazyV' (repeat ())
 -- __NB__: \"@'dfold' m f z xs@\" creates a linear structure, which has a depth,
 -- or delay, of O(@'length' xs@). Look at 'dtfold' for a /dependently/ typed
 -- fold that produces a structure with a depth of O(log_2(@'length' xs@)).
-dfold :: forall p k a . KnownNat k
-      => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
-      -> (forall n . n + 1 <= k => SNat n -> a -> (p @@ n) -> (p @@ (n + 1)))
-      -- ^ Function to fold.
-      --
-      -- __NB__: The @SNat l@ is __not__ the index (see (`!!`)) to the
-      -- element /a/. @SNat l@ is the number of elements that occur to the
-      -- right of /a/.
-      -> (p @@ 0) -- ^ Initial element
-      -> Vec k a -- ^ Vector to fold over
-      -> (p @@ k)
+dfold ::
+  forall p k a.
+  (KnownNat k) =>
+  -- | The /motive/
+  Proxy (p :: TyFun Nat Type -> Type) ->
+  -- | Function to fold.
+  --
+  -- __NB__: The @SNat l@ is __not__ the index (see (`!!`)) to the
+  -- element /a/. @SNat l@ is the number of elements that occur to the
+  -- right of /a/.
+  (forall n. (n + 1 <= k) => SNat n -> a -> (p @@ n) -> (p @@ (n + 1))) ->
+  -- | Initial element
+  (p @@ 0) ->
+  -- | Vector to fold over
+  Vec k a ->
+  (p @@ k)
 dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
   where
-    go :: n <= k => SNat n -> Vec n a -> (p @@ n)
-    go _ Nil                        = z
+    go :: (n <= k) => SNat n -> Vec n a -> (p @@ n)
+    go _ Nil = z
     go s (y `Cons` ys) =
       let s' = s `subSNat` d1
-      in  f s' y (go s' ys)
+       in f s' y (go s' ys)
 {-# OPAQUE dfold #-}
 {-# ANN dfold hasBlackBox #-}
 
@@ -2549,31 +2812,35 @@ Some final remarks:
 __NB__: The depth, or delay, of the structure produced by
 \"@'dtfold' m f g xs@\" is O(log_2(@'length' xs@)).
 -}
-dtfold :: forall p k a . KnownNat k
-       => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
-       -> (a -> (p @@ 0)) -- ^ Function to apply to every element
-       -> (forall n . SNat n -> (p @@ n) -> (p @@ n) -> (p @@ (n + 1)))
-       -- ^ Function to combine results.
-       --
-       -- __NB__: The @SNat l@ indicates the depth/height of the node in the
-       -- tree that is created by applying this function. The leafs of the tree
-       -- have depth\/height /0/, and the root of the tree has height /k/.
-       -> Vec (2^k) a
-       -- ^ Vector to fold over.
-       --
-       -- __NB__: Must have a length that is a power of 2.
-       -> (p @@ k)
+dtfold ::
+  forall p k a.
+  (KnownNat k) =>
+  -- | The /motive/
+  Proxy (p :: TyFun Nat Type -> Type) ->
+  -- | Function to apply to every element
+  (a -> (p @@ 0)) ->
+  -- | Function to combine results.
+  --
+  -- __NB__: The @SNat l@ indicates the depth/height of the node in the
+  -- tree that is created by applying this function. The leafs of the tree
+  -- have depth\/height /0/, and the root of the tree has height /k/.
+  (forall n. SNat n -> (p @@ n) -> (p @@ n) -> (p @@ (n + 1))) ->
+  -- | Vector to fold over.
+  --
+  -- __NB__: Must have a length that is a power of 2.
+  Vec (2 ^ k) a ->
+  (p @@ k)
 dtfold _ f g = go (SNat :: SNat k)
   where
-    go :: forall n . SNat n -> Vec (2^n) a -> (p @@ n)
-    go _  (x `Cons` Nil) = f x
+    go :: forall n. SNat n -> Vec (2 ^ n) a -> (p @@ n)
+    go _ (x `Cons` Nil) = f x
     go sn xs@(Cons _ (Cons _ _)) =
       let sn' :: SNat (n - 1)
-          sn'       = sn `subSNat` d1
-          (xsL,xsR) = splitAt (pow2SNat sn') xs
-      in  g sn' (go sn' xsL) (go sn' xsR)
+          sn' = sn `subSNat` d1
+          (xsL, xsR) = splitAt (pow2SNat sn') xs
+       in g sn' (go sn' xsL) (go sn' xsR)
 #if __GLASGOW_HASKELL__ < 912
-    go _  Nil =
+    go _ Nil =
       case (const Dict :: forall m. Proxy m -> Dict (1 <= 2 ^ m)) (Proxy @n) of
         {}
 #endif
@@ -2588,6 +2855,7 @@ dtfold _ f g = go (SNat :: SNat k)
 -- map' f = 'dfold' (Proxy @('VCons' b)) (\_ x xs -> f x :> xs)
 -- @
 data VCons (a :: Type) (f :: TyFun Nat Type) :: Type
+
 type instance Apply (VCons a) l = Vec l a
 
 -- | Specialised version of 'dfold' that builds a triangular computational
@@ -2614,23 +2882,25 @@ type instance Apply (VCons a) l = Vec l a
 -- The circuit layout of @insertionSort@, build using 'vfold', is:
 --
 -- <<doc/csSort.svg>>
-vfold :: forall k a b . KnownNat k
-      => (forall n . SNat n -> a -> Vec n b -> Vec (n + 1) b)
-      -> Vec k a
-      -> Vec k b
+vfold ::
+  forall k a b.
+  (KnownNat k) =>
+  (forall n. SNat n -> a -> Vec n b -> Vec (n + 1) b) ->
+  Vec k a ->
+  Vec k b
 vfold f xs = dfold (Proxy @(VCons b)) f Nil xs
 {-# INLINE vfold #-}
 
 -- | The largest element of a non-empty vector
 maximum ::
-  Ord a =>
+  (Ord a) =>
   Vec (n + 1) a ->
   a
 maximum = fold (\x y -> if x >= y then x else y)
 
 -- | The least element of a non-empty vector
 minimum ::
-  Ord a =>
+  (Ord a) =>
   Vec (n + 1) a ->
   a
 minimum = fold (\x y -> if x <= y then x else y)
@@ -2644,11 +2914,14 @@ minimum = fold (\x y -> if x <= y then x else y)
 -- (1 :> 2 :> 3 :> Nil) :> (1 :> 2 :> 3 :> Nil) :> (1 :> 2 :> 3 :> Nil) :> Nil
 -- >>> rotateMatrix xss
 -- (1 :> 2 :> 3 :> Nil) :> (3 :> 1 :> 2 :> Nil) :> (2 :> 3 :> 1 :> Nil) :> Nil
-smap :: forall k a b . KnownNat k => (forall n . SNat n -> a -> b) -> Vec k a -> Vec k b
-smap f xs = reverse
-          $ dfold (Proxy @(VCons b))
-                  (\sn x xs' -> f sn x :> xs')
-                  Nil (reverse xs)
+smap :: forall k a b. (KnownNat k) => (forall n. SNat n -> a -> b) -> Vec k a -> Vec k b
+smap f xs =
+  reverse $
+    dfold
+      (Proxy @(VCons b))
+      (\sn x xs' -> f sn x :> xs')
+      Nil
+      (reverse xs)
 {-# INLINE smap #-}
 
 -- | Extended version of 'smap' offering an additional boundary proof to
@@ -2656,61 +2929,65 @@ smap f xs = reverse
 -- annotations to resolve type ambiguity for this. Thus, if the boundary constraint
 -- is not needed it is recommended to stay with 'smap' instead.
 smapWithBounds ::
-  forall k a b .
-  KnownNat k =>
-  (forall n . n + 1 <= k => SNat n -> a -> b) ->
+  forall k a b.
+  (KnownNat k) =>
+  (forall n. (n + 1 <= k) => SNat n -> a -> b) ->
   Vec k a ->
   Vec k b
-smapWithBounds f xs = reverse
-                    $ dfold (Proxy @(VCons b))
-                            (\sn x xs' -> f sn x :> xs')
-                            Nil (reverse xs)
+smapWithBounds f xs =
+  reverse $
+    dfold
+      (Proxy @(VCons b))
+      (\sn x xs' -> f sn x :> xs')
+      Nil
+      (reverse xs)
 {-# INLINE smapWithBounds #-}
 
 instance (KnownNat n, BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
-  pack        = concatBitVector# . map pack . lazyV
-  unpack      = map unpack . unconcatBitVector#
+  pack = concatBitVector# . map pack . lazyV
+  unpack = map unpack . unconcatBitVector#
   maybeUnpack bv =
     case compareSNat (SNat @n) (SNat @0) of
       SNatLE -> Just unpacked
-      SNatGT -> leToPlus @1 @n $
-        if fold (&&) (map isJust decoded)
-          then Just unpacked
-          else Nothing
-   where
-    decoded :: Vec n (Maybe a)
-    decoded = map maybeUnpack (unconcatBitVector# bv)
-    unpacked = map fromJust decoded
+      SNatGT ->
+        leToPlus @1 @n $
+          if fold (&&) (map isJust decoded)
+            then Just unpacked
+            else Nothing
+    where
+      decoded :: Vec n (Maybe a)
+      decoded = map maybeUnpack (unconcatBitVector# bv)
+      unpacked = map fromJust decoded
 
-concatBitVector#
-  :: forall n m
-   . (KnownNat n, KnownNat m)
-  => Vec n (BitVector m)
-  -> BitVector (n * m)
+concatBitVector# ::
+  forall n m.
+  (KnownNat n, KnownNat m) =>
+  Vec n (BitVector m) ->
+  BitVector (n * m)
 concatBitVector# = go 0
- where
-  go :: BitVector (n*m) -> Vec p (BitVector m) -> BitVector (n * m)
-  go acc Nil = acc
-  go (BV accMsk accVal) ((BV xMsk xVal) `Cons` xs) =
-    let sh = fromInteger (natVal (Proxy @m)) :: Int in
-    go (BV (shiftL accMsk sh .|. xMsk) (shiftL accVal sh .|. xVal)) xs
+  where
+    go :: BitVector (n * m) -> Vec p (BitVector m) -> BitVector (n * m)
+    go acc Nil = acc
+    go (BV accMsk accVal) ((BV xMsk xVal) `Cons` xs) =
+      let sh = fromInteger (natVal (Proxy @m)) :: Int
+       in go (BV (shiftL accMsk sh .|. xMsk) (shiftL accVal sh .|. xVal)) xs
 {-# OPAQUE concatBitVector# #-}
 {-# ANN concatBitVector# hasBlackBox #-}
 
-unconcatBitVector#
-  :: forall n m
-   . (KnownNat n, KnownNat m)
-  => BitVector (n * m)
-  -> Vec n (BitVector m)
+unconcatBitVector# ::
+  forall n m.
+  (KnownNat n, KnownNat m) =>
+  BitVector (n * m) ->
+  Vec n (BitVector m)
 unconcatBitVector# orig = snd (go (toUNat (SNat @n)))
   where
-    go :: forall p . (p <= n) => UNat p -> (BitVector ((n-p)*m), Vec p (BitVector m))
-    go UZero = (orig,Nil)
-    go (USucc (n :: UNat (p-1))) =
-      let (bv,xs) = go n
-          (l,x) = (GHC.Magic.noinline split#) bv
-      in  (l,x :> xs)
+    go :: forall p. (p <= n) => UNat p -> (BitVector ((n - p) * m), Vec p (BitVector m))
+    go UZero = (orig, Nil)
+    go (USucc (n :: UNat (p - 1))) =
+      let (bv, xs) = go n
+          (l, x) = (GHC.Magic.noinline split#) bv
+       in (l, x :> xs)
 {-# OPAQUE unconcatBitVector# #-}
 {-# ANN unconcatBitVector# hasBlackBox #-}
 
@@ -2721,7 +2998,7 @@ unconcatBitVector# orig = snd (go (toUNat (SNat @n)))
 -- 0b0000_0110
 -- >>> bv2v x
 -- 0 :> 0 :> 0 :> 0 :> 0 :> 1 :> 1 :> 0 :> Nil
-bv2v :: KnownNat n => BitVector n -> Vec n Bit
+bv2v :: (KnownNat n) => BitVector n -> Vec n Bit
 bv2v = unpack
 
 -- | Convert a 'Vec' of 'Bit's to a 'BitVector'.
@@ -2731,81 +3008,85 @@ bv2v = unpack
 -- 0 :> 0 :> 0 :> 1 :> 0 :> 0 :> 1 :> 0 :> Nil
 -- >>> v2bv x
 -- 0b0001_0010
-v2bv :: KnownNat n => Vec n Bit -> BitVector n
+v2bv :: (KnownNat n) => Vec n Bit -> BitVector n
 v2bv = pack
 
 -- | Evaluate all elements of a vector to WHNF, returning the second argument
-seqV
-  :: KnownNat n
-  => Vec n a
-  -> b
-  -> b
+seqV ::
+  (KnownNat n) =>
+  Vec n a ->
+  b ->
+  b
 seqV v b =
-  let s () e = seq e () in
-  foldl s () v `seq` b
+  let s () e = seq e ()
+   in foldl s () v `seq` b
 {-# OPAQUE seqV #-}
 {-# ANN seqV hasBlackBox #-}
+
 infixr 0 `seqV`
 
 -- | Evaluate all elements of a vector to WHNF
-forceV
-  :: KnownNat n
-  => Vec n a
-  -> Vec n a
+forceV ::
+  (KnownNat n) =>
+  Vec n a ->
+  Vec n a
 forceV v =
   v `seqV` v
 {-# INLINE forceV #-}
 
 -- | Evaluate all elements of a vector to WHNF, returning the second argument.
 -- Does not propagate 'Clash.XException.XException's.
-seqVX
-  :: KnownNat n
-  => Vec n a
-  -> b
-  -> b
+seqVX ::
+  (KnownNat n) =>
+  Vec n a ->
+  b ->
+  b
 seqVX v b =
-  let s () e = seqX e () in
-  foldl s () v `seqX` b
+  let s () e = seqX e ()
+   in foldl s () v `seqX` b
 {-# OPAQUE seqVX #-}
 {-# ANN seqVX hasBlackBox #-}
+
 infixr 0 `seqVX`
 
 -- | Evaluate all elements of a vector to WHNF. Does not propagate
 -- 'Clash.XException.XException's.
-forceVX
-  :: KnownNat n
-  => Vec n a
-  -> Vec n a
+forceVX ::
+  (KnownNat n) =>
+  Vec n a ->
+  Vec n a
 forceVX v =
   v `seqVX` v
 {-# INLINE forceVX #-}
 
-instance Lift a => Lift (Vec n a) where
-  lift Nil           = [| Nil |]
-  lift (x `Cons` xs) = [| x `Cons` $(lift xs) |]
+instance (Lift a) => Lift (Vec n a) where
+  lift Nil = [|Nil|]
+  lift (x `Cons` xs) = [|x `Cons` $(lift xs)|]
   liftTyped = liftTypedFromUntyped
 
 instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
   arbitrary = traverse# id $ repeat arbitrary
-  shrink    = traverse# id . fmap shrink
+  shrink = traverse# id . fmap shrink
 
-instance CoArbitrary a => CoArbitrary (Vec n a) where
+instance (CoArbitrary a) => CoArbitrary (Vec n a) where
   coarbitrary = coarbitrary . toList
 
-type instance Lens.Index   (Vec n a) = Index n
+type instance Lens.Index (Vec n a) = Index n
+
 type instance Lens.IxValue (Vec n a) = a
-instance KnownNat n => Lens.Ixed (Vec n a) where
+
+instance (KnownNat n) => Lens.Ixed (Vec n a) where
   ix i f xs = replace_int xs (fromEnum i) <$> f (index_int xs (fromEnum i))
 
-instance KnownNat n => Distributive (Vec n) where
-    distribute fxs = tabulate $ \i -> fmap (!! i) fxs
-    {-# INLINE distribute #-}
+instance (KnownNat n) => Distributive (Vec n) where
+  distribute fxs = tabulate $ \i -> fmap (!! i) fxs
+  {-# INLINE distribute #-}
 
-instance KnownNat n => Representable (Vec n) where
-    type Rep (Vec n) = Index n
+instance (KnownNat n) => Representable (Vec n) where
+  type Rep (Vec n) = Index n
 
-    tabulate f = map f indicesI
-    {-# INLINE tabulate #-}
+  tabulate f = map f indicesI
+  {-# INLINE tabulate #-}
 
-    index = (!!)
-    {-# INLINE index #-}
+  index = (!!)
+  {-# INLINE index #-}

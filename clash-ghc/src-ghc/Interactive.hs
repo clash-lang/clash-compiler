@@ -5,13 +5,13 @@
 
   Entry point for the @clashi@ executable.
 -}
-
 module Main
-  ( main -- :: IO ()
-  ) where
+  ( main, -- :: IO ()
+  )
+where
 
-import           System.Environment ( getArgs )
-import           Clash.Main         ( defaultMain )
+import Clash.Main (defaultMain)
+import System.Environment (getArgs)
 
 main :: IO ()
-main = getArgs >>= defaultMain . ("--interactive":)
+main = getArgs >>= defaultMain . ("--interactive" :)

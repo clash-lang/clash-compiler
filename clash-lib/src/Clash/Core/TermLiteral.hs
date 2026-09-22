@@ -1,3 +1,11 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
 Copyright   :  (C) 2019, Myrtle Software Ltd,
                    2021, QBayLogic B.V.
@@ -8,58 +16,49 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 Tools to convert a 'Term' into its "real" representation
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
-
---{-# OPTIONS_GHC -ddump-splices #-}
+-- {-# OPTIONS_GHC -ddump-splices #-}
 
 module Clash.Core.TermLiteral
-  ( TermLiteral
-  , showsTypePrec
-  , showType
-  , termToData
-  , termToData#
-  , termToDataError
-  , deriveTermLiteral
-  ) where
+  ( TermLiteral,
+    showsTypePrec,
+    showType,
+    termToData,
+    termToData#,
+    termToDataError,
+    deriveTermLiteral,
+  )
+where
 
-import           Data.Bifunctor                  (bimap)
-import           Data.Either                     (lefts)
-import           Data.Proxy                      (Proxy(..))
-import           Data.Text                       (Text)
-import qualified Data.Text                       as Text
-import           Data.Text.Extra                 (showt)
-import qualified Data.Text.Internal              as Text
-import qualified Data.Text.Array                 as Text
-import qualified Data.Primitive.ByteArray        as BA
-import           Data.Typeable                   (Typeable, typeRep)
-import           GHC.Natural
-import           GHC.Stack
-import           GHC.TypeNats (KnownNat)
-import           Text.Show.Pretty                (ppShow)
-
-import           Clash.Annotations.SynthesisAttributes (Attr)
-import           Clash.Core.DataCon              (DataCon(..))
-import           Clash.Core.Literal
-import           Clash.Core.Name                 (Name(..))
-import           Clash.Core.Pretty               (showPpr)
-import           Clash.Core.Term                 (Term(Literal, Data), collectArgs, stripAllTicks)
-import           Clash.Promoted.Nat
-import           Clash.Promoted.Nat.Unsafe
-import           Clash.Sized.Index               (Index)
-import           Clash.Sized.Vector              (Vec (Nil, Cons), fromList)
-import qualified Clash.Util.Interpolate          as I
-import qualified Clash.Verification.Internal     as Cv
-
-import           Clash.Core.TermLiteral.TH
+import Clash.Annotations.SynthesisAttributes (Attr)
+import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.Literal
+import Clash.Core.Name (Name (..))
+import Clash.Core.Pretty (showPpr)
+import Clash.Core.Term (Term (Data, Literal), collectArgs, stripAllTicks)
+import Clash.Core.TermLiteral.TH
+import Clash.Promoted.Nat
+import Clash.Promoted.Nat.Unsafe
+import Clash.Sized.Index (Index)
+import Clash.Sized.Vector (Vec (Cons, Nil), fromList)
+import qualified Clash.Util.Interpolate as I
+import qualified Clash.Verification.Internal as Cv
+import Data.Bifunctor (bimap)
+import Data.Either (lefts)
+import qualified Data.Primitive.ByteArray as BA
+import Data.Proxy (Proxy (..))
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Array as Text
+import Data.Text.Extra (showt)
+import qualified Data.Text.Internal as Text
+import Data.Typeable (Typeable, typeRep)
+import GHC.Natural
+import GHC.Stack
+import GHC.TypeNats (KnownNat)
+import Text.Show.Pretty (ppShow)
 
 -- | Pretty print type @a@
-showType :: TermLiteral a => Proxy a -> String
+showType :: (TermLiteral a) => Proxy a -> String
 showType proxy = showsTypePrec 0 proxy ""
 
 -- | Tools to deal with literals encoded as a 'Term'.
@@ -70,13 +69,13 @@ class TermLiteral a where
   -- This is the primitive method instances must implement. Callers should
   -- generally use 'termToData' instead, which strips ticks before delegating
   -- to this method.
-  termToData#
-    :: HasCallStack
-    => Term
-    -- ^ Term to convert
-    -> Either Term a
-    -- ^ 'Left' indicates a failure, containing the (sub)term that failed to
+  termToData# ::
+    (HasCallStack) =>
+    -- | Term to convert
+    Term ->
+    -- | 'Left' indicates a failure, containing the (sub)term that failed to
     -- translate. 'Right' indicates a success.
+    Either Term a
 
   -- | Pretty print the type of a term (for error messages). Its default implementation
   -- uses 'Typeable' to print the type. Note that this method is there to allow
@@ -91,8 +90,7 @@ class TermLiteral a where
     -- | Proxy for a term whose type needs to be pretty printed
     Proxy a ->
     ShowS
-
-  default showsTypePrec :: Typeable a => Int -> Proxy a -> ShowS
+  default showsTypePrec :: (Typeable a) => Int -> Proxy a -> ShowS
   showsTypePrec n _ = showsPrec n (typeRep (Proxy @a))
 
 instance TermLiteral Term where
@@ -105,13 +103,19 @@ instance TermLiteral String where
 instance TermLiteral Text where
   termToData# (collectArgs -> (_, [Left (Literal (StringLiteral s))])) =
     Right (Text.pack s)
-  termToData# (collectArgs -> (_, [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba)))
-                                  , Left (Literal (IntLiteral off))
-                                  , Left (Literal (IntLiteral len))])) =
-    Right (Text.Text (Text.ByteArray ba) (fromInteger off) (fromInteger len))
+  termToData#
+    ( collectArgs ->
+        ( _,
+          [ Left (Literal (ByteArrayLiteral (BA.ByteArray ba))),
+            Left (Literal (IntLiteral off)),
+            Left (Literal (IntLiteral len))
+            ]
+          )
+      ) =
+      Right (Text.Text (Text.ByteArray ba) (fromInteger off) (fromInteger len))
   termToData# t = Left t
 
-instance KnownNat n => TermLiteral (Index n) where
+instance (KnownNat n) => TermLiteral (Index n) where
   termToData# t@(collectArgs -> (_, [_, _, Left (Literal (IntegerLiteral n))]))
     | n < 0 = Left t
     | n >= natToNum @n = Left t
@@ -155,14 +159,14 @@ instance TermLiteral Natural where
 instance TermLiteral (SNat n) where
   termToData# = \case
     Literal (NaturalLiteral n) -> Right (unsafeSNat n)
-    t                          -> Left t
+    t -> Left t
 
-  showsTypePrec n _
+  showsTypePrec n _ =
     -- We don't know the literal /n/ at this point. However, we can't simply put
     -- and /n/ here either, as it might collide with other type variables. To
     -- prevent confusion, we put an underscore. This is obviously "wrong", but
     -- good enough for error messages - the main purpose of this function.
-    = showParen (n > 10) $ showString "SNat _"
+    showParen (n > 10) $ showString "SNat _"
 
 instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
   termToData# (collectArgs -> (_, lefts -> [a, b])) = do
@@ -176,11 +180,11 @@ instance (TermLiteral a, TermLiteral b) => TermLiteral (a, b) where
     --      any parentheses for fields in tuples. However, Typeable's show
     --      implementation does put parentheses around tuple fields - so we
     --      replicate that behavior here for ease of testing.
-      showChar '('
-    . showsTypePrec 11 (Proxy @a)
-    . showString ","
-    . showsTypePrec 11 (Proxy @b)
-    . showChar ')'
+    showChar '('
+      . showsTypePrec 11 (Proxy @a)
+      . showString ","
+      . showsTypePrec 11 (Proxy @b)
+      . showChar ')'
 
 instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
   termToData# term = do
@@ -190,28 +194,28 @@ instance (TermLiteral a, KnownNat n) => TermLiteral (Vec n a) where
     case res of
       Nothing -> Left term
       Just v -> Right v
-   where
-    -- Construct a list from given term
-    go t@(collectArgs -> (constr, args)) =
-      case constr of
-        Data (MkData{dcName=Name{nameOcc}})
-          | nameOcc == showt 'Nil -> Right []
-          | nameOcc == showt 'Cons ->
-            case lefts args of
-              [_gadtProof, c0, cs0] -> do
-                c1 <- termToData# @a c0
-                cs1 <- go cs0
-                Right (c1:cs1)
-              _ -> Left t
-        _ -> Left t
+    where
+      -- Construct a list from given term
+      go t@(collectArgs -> (constr, args)) =
+        case constr of
+          Data (MkData {dcName = Name {nameOcc}})
+            | nameOcc == showt 'Nil -> Right []
+            | nameOcc == showt 'Cons ->
+                case lefts args of
+                  [_gadtProof, c0, cs0] -> do
+                    c1 <- termToData# @a c0
+                    cs1 <- go cs0
+                    Right (c1 : cs1)
+                  _ -> Left t
+          _ -> Left t
 
   showsTypePrec n _ =
     showParen (n > 10) $
-        showString "Vec"
-      . showChar ' '
-      . showString (show (natToInteger @n))
-      . showChar ' '
-      . showsTypePrec 11 (Proxy @a)
+      showString "Vec"
+        . showChar ' '
+        . showString (show (natToInteger @n))
+        . showChar ' '
+        . showsTypePrec 11 (Proxy @a)
 
 deriveTermLiteral ''Bool
 deriveTermLiteral ''Maybe
@@ -229,16 +233,17 @@ termToData = termToData# . stripAllTicks
 
 -- | Same as 'termToData', but returns printable error message if it couldn't
 -- translate a term.
-termToDataError :: forall a. TermLiteral a => Term -> Either String a
+termToDataError :: forall a. (TermLiteral a) => Term -> Either String a
 termToDataError term = bimap err id (termToData term)
- where
-  -- XXX: If we put this construct in the quasiquoted part, it yields a parse
-  --      error on some platforms. This is likely related to some older version
-  --      of dependencies. In the interested of time yours truly just moved it
-  --      outside of the quasiquoter.
-  shownType = showType (Proxy @a)
+  where
+    -- XXX: If we put this construct in the quasiquoted part, it yields a parse
+    --      error on some platforms. This is likely related to some older version
+    --      of dependencies. In the interested of time yours truly just moved it
+    --      outside of the quasiquoter.
+    shownType = showType (Proxy @a)
 
-  err failedTerm = [I.i|
+    err failedTerm =
+      [I.i|
     Failed to translate term to literal. Term that failed to translate:
 
       #{showPpr failedTerm}

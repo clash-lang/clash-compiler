@@ -1,3 +1,10 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.
@@ -8,41 +15,31 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 ROMs
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Prelude.ROM
   ( -- * Asynchronous ROM
-    asyncRom
-  , asyncRomPow2
+    asyncRom,
+    asyncRomPow2,
+
     -- * Synchronous ROM synchronized to an arbitrary clock
-  , rom
-  , romPow2
+    rom,
+    romPow2,
+
     -- * Internal
-  , asyncRom#
+    asyncRom#,
   )
 where
 
-import           Data.Array           (listArray)
-import           Data.Array.Base      (unsafeAt)
-import           GHC.Stack            (withFrozenCallStack)
-import           GHC.TypeLits         (KnownNat, type (^))
-import           Prelude              hiding (length)
-
-import           Clash.Annotations.Primitive (hasBlackBox)
-import qualified Clash.Explicit.ROM   as E
-import           Clash.Signal
-import           Clash.Sized.Unsigned (Unsigned)
-import           Clash.Sized.Vector   (Vec, length, toList)
-
-import           Clash.XException     (NFDataX, deepErrorX)
+import Clash.Annotations.Primitive (hasBlackBox)
+import qualified Clash.Explicit.ROM as E
+import Clash.Signal
+import Clash.Sized.Unsigned (Unsigned)
+import Clash.Sized.Vector (Vec, length, toList)
+import Clash.XException (NFDataX, deepErrorX)
+import Data.Array (listArray)
+import Data.Array.Base (unsafeAt)
+import GHC.Stack (withFrozenCallStack)
+import GHC.TypeLits (KnownNat, type (^))
+import Prelude hiding (length)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
@@ -54,19 +51,19 @@ import           Clash.XException     (NFDataX, deepErrorX)
 -- is constructed. See 'Clash.Prelude.ROM.File.asyncRomFile' and
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlob' for different approaches that scale
 -- well.
-asyncRom
-  :: ( KnownNat n
-     , Enum addr
-     , NFDataX a
-     )
-  => Vec n a
-  -- ^ ROM content, also determines the size, @n@, of the ROM
+asyncRom ::
+  ( KnownNat n,
+    Enum addr,
+    NFDataX a
+  ) =>
+  -- | ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> addr
-  -- ^ Read address @r@
-  -> a
-  -- ^ The value of the ROM at address @r@
+  Vec n a ->
+  -- | Read address @r@
+  addr ->
+  -- | The value of the ROM at address @r@
+  a
 asyncRom = \content rd -> asyncRom# content (fromEnum rd)
 {-# INLINE asyncRom #-}
 
@@ -80,48 +77,55 @@ asyncRom = \content rd -> asyncRom# content (fromEnum rd)
 -- is constructed. See 'Clash.Prelude.ROM.File.asyncRomFilePow2' and
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlobPow2' for different approaches that scale
 -- well.
-asyncRomPow2
-  :: ( KnownNat n
-     , NFDataX a
-     )
-  => Vec (2^n) a
-  -- ^ ROM content
+asyncRomPow2 ::
+  ( KnownNat n,
+    NFDataX a
+  ) =>
+  -- | ROM content
   --
   -- __NB__: __MUST__ be a constant
-  -> Unsigned n
-  -- ^ Read address @r@
-  -> a
-  -- ^ The value of the ROM at address @r@
+  Vec (2 ^ n) a ->
+  -- | Read address @r@
+  Unsigned n ->
+  -- | The value of the ROM at address @r@
+  a
 asyncRomPow2 = asyncRom
 {-# INLINE asyncRomPow2 #-}
 
 -- | asyncRom primitive
-asyncRom#
-  :: forall n a
-   . ( KnownNat n
-     , NFDataX a
-     )
-  => Vec n a
-  -- ^ ROM content, also determines the size, @n@, of the ROM
+asyncRom# ::
+  forall n a.
+  ( KnownNat n,
+    NFDataX a
+  ) =>
+  -- | ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> Int
-  -- ^ Read address @r@
-  -> a
-  -- ^ The value of the ROM at address @r@
+  Vec n a ->
+  -- | Read address @r@
+  Int ->
+  -- | The value of the ROM at address @r@
+  a
 asyncRom# content = safeAt
   where
     szI = length content
-    arr = listArray (0,szI-1) (toList content)
+    arr = listArray (0, szI - 1) (toList content)
 
     safeAt :: Int -> a
     safeAt i =
-      if (0 <= i) && (i < szI) then
-        unsafeAt arr i
-      else
-        withFrozenCallStack
-          (deepErrorX ("asyncRom: address " ++ show i ++
-                       " not in range [0.." ++ show szI ++ ")"))
+      if (0 <= i) && (i < szI)
+        then
+          unsafeAt arr i
+        else
+          withFrozenCallStack
+            ( deepErrorX
+                ( "asyncRom: address "
+                    ++ show i
+                    ++ " not in range [0.."
+                    ++ show szI
+                    ++ ")"
+                )
+            )
 {-# OPAQUE asyncRom# #-}
 {-# ANN asyncRom# hasBlackBox #-}
 
@@ -141,21 +145,22 @@ asyncRom# content = safeAt
 -- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.romFile' and
 -- 'Clash.Prelude.ROM.Blob.romBlob' for different approaches that scale well.
-rom
-  :: forall dom n addr a
-   . ( Enum addr
-     , NFDataX a
-     , KnownNat n
-     , HiddenClock dom
-     , HiddenEnable dom  )
-  => Vec n a
-  -- ^ ROM content, also determines the size, @n@, of the ROM
+rom ::
+  forall dom n addr a.
+  ( Enum addr,
+    NFDataX a,
+    KnownNat n,
+    HiddenClock dom,
+    HiddenEnable dom
+  ) =>
+  -- | ROM content, also determines the size, @n@, of the ROM
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom addr
-  -- ^ Read address @r@
-  -> Signal dom a
-  -- ^ The value of the ROM at address @r@ from the previous clock cycle
+  Vec n a ->
+  -- | Read address @r@
+  Signal dom addr ->
+  -- | The value of the ROM at address @r@ from the previous clock cycle
+  Signal dom a
 rom = hideEnable (hideClock E.rom)
 {-# INLINE rom #-}
 
@@ -176,19 +181,20 @@ rom = hideEnable (hideClock E.rom)
 -- is constructed. See 'Clash.Prelude.ROM.File.romFilePow2' and
 -- 'Clash.Prelude.ROM.Blob.romBlobPow2' for different approaches that scale
 -- well.
-romPow2
-  :: forall dom n a
-   . ( KnownNat n
-     , NFDataX a
-     , HiddenClock dom
-     , HiddenEnable dom  )
-  => Vec (2^n) a
-  -- ^ ROM content
+romPow2 ::
+  forall dom n a.
+  ( KnownNat n,
+    NFDataX a,
+    HiddenClock dom,
+    HiddenEnable dom
+  ) =>
+  -- | ROM content
   --
   -- __NB__: __MUST__ be a constant
-  -> Signal dom (Unsigned n)
-  -- ^ Read address @r@
-  -> Signal dom a
-  -- ^ The value of the ROM at address @r@ from the previous clock cycle
+  Vec (2 ^ n) a ->
+  -- | Read address @r@
+  Signal dom (Unsigned n) ->
+  -- | The value of the ROM at address @r@ from the previous clock cycle
+  Signal dom a
 romPow2 = hideEnable (hideClock E.romPow2)
 {-# INLINE romPow2 #-}

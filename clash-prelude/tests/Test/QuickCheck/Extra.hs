@@ -1,15 +1,15 @@
 module Test.QuickCheck.Extra
-  ( expectException
-  , expectXException
-  , expectExceptionNoX
-  ) where
-
-import Test.Tasty.QuickCheck
-import Control.DeepSeq (NFData)
-import Control.Exception (SomeException, try, evaluate)
-import Data.Either (isLeft)
+  ( expectException,
+    expectXException,
+    expectExceptionNoX,
+  )
+where
 
 import Clash.XException (XException)
+import Control.DeepSeq (NFData)
+import Control.Exception (SomeException, evaluate, try)
+import Data.Either (isLeft)
+import Test.Tasty.QuickCheck
 
 -- | Succeed if evaluating leads to an XException
 expectXException :: (Show a, NFData a) => a -> Property

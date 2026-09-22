@@ -1,3 +1,6 @@
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 {-|
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
@@ -12,26 +15,29 @@
   Mealy machines are strictly more expressive, but may impose stricter timing
   requirements.
 -}
-
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-
-{-# LANGUAGE Safe #-}
-
 module Clash.Explicit.Mealy
   ( -- * Mealy machines with explicit clock and reset ports
-    mealy
-  , mealyS
-  , mealyB
-  , mealySB
+    mealy,
+    mealyS,
+    mealyB,
+    mealySB,
   )
 where
 
-import           Clash.Explicit.Signal
-  (KnownDomain, Bundle (..), Clock, Reset, Signal, Enable, register)
-import           Clash.XException      (NFDataX)
-
-import           Control.Monad.State.Strict
-  (State, runState)
+import Clash.Explicit.Signal
+  ( Bundle (..),
+    Clock,
+    Enable,
+    KnownDomain,
+    Reset,
+    Signal,
+    register,
+  )
+import Clash.XException (NFDataX)
+import Control.Monad.State.Strict
+  ( State,
+    runState,
+  )
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications -XDeriveGeneric -XDeriveAnyClass
@@ -130,26 +136,28 @@ delayTop clk rst en = mealyS clk rst en delayS initialDelayState
 --     s1 = 'mealy' clk rst en macT 0 ('bundle' (a,x))
 --     s2 = 'mealy' clk rst en macT 0 ('bundle' (b,y))
 -- @
-mealy
-  :: ( KnownDomain dom
-     , NFDataX s )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Reset dom
-  -> Enable dom
-  -- ^ Global enable
-  -> (s -> i -> (s,o))
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-  -> s
-  -- ^ Initial state
-  -> (Signal dom i -> Signal dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+mealy ::
+  ( KnownDomain dom,
+    NFDataX s
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  Reset dom ->
+  -- | Global enable
+  Enable dom ->
+  -- | Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  (s -> i -> (s, o)) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the mealy machine
+  (Signal dom i -> Signal dom o)
 mealy clk rst en f iS =
-  \i -> let (s',o) = unbundle $ f <$> s <*> i
-            s      = register clk rst en iS s'
-        in  o
-{-# INLINABLE mealy #-}
+  \i ->
+    let (s', o) = unbundle $ f <$> s <*> i
+        s = register clk rst en iS s'
+     in o
+{-# INLINEABLE mealy #-}
 
 -- | Create a synchronous function from a combinational function describing
 -- a mealy machine using the state monad. This can be particularly useful
@@ -188,26 +196,28 @@ mealy clk rst en f iS =
 -- >>> L.take 7 $ simulate (delayTop systemClockGen systemResetGen enableGen) [-100,1,2,3,4,5,6,7,8]
 -- [Nothing,Nothing,Nothing,Nothing,Just 1,Just 2,Just 3]
 --
-mealyS
-  :: ( KnownDomain dom
-     , NFDataX s )
-  => Clock dom
-  -- ^ 'Clock' to synchronize to
-  -> Reset dom
-  -> Enable dom
-  -- ^ Global enable
-  -> (i -> State s o)
-  -- ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
-  -> s
-  -- ^ Initial state
-  -> (Signal dom i -> Signal dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+mealyS ::
+  ( KnownDomain dom,
+    NFDataX s
+  ) =>
+  -- | 'Clock' to synchronize to
+  Clock dom ->
+  Reset dom ->
+  -- | Global enable
+  Enable dom ->
+  -- | Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
+  (i -> State s o) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the mealy machine
+  (Signal dom i -> Signal dom o)
 mealyS clk rst en f iS =
-  \i -> let (o,s') = unbundle $ (runState . f) <$> i <*> s
-            s      = register clk rst en iS s'
-        in o
-{-# INLINABLE mealyS #-}
+  \i ->
+    let (o, s') = unbundle $ (runState . f) <$> i <*> s
+        s = register clk rst en iS s'
+     in o
+{-# INLINEABLE mealyS #-}
 
 -- | A version of 'mealy' that does automatic 'Bundle'ing
 --
@@ -235,40 +245,41 @@ mealyS clk rst en f iS =
 --     (i1,b1) = 'mealyB' clk rst en f 0 (a,b)
 --     (i2,b2) = 'mealyB' clk rst en f 3 (c,i1)
 -- @
-mealyB
-  :: ( KnownDomain dom
-     , NFDataX s
-     , Bundle i
-     , Bundle o )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> (s -> i -> (s,o))
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-  -> s
-  -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
- -- ^ Synchronous sequential function with input and output matching that
- -- of the mealy machine
+mealyB ::
+  ( KnownDomain dom,
+    NFDataX s,
+    Bundle i,
+    Bundle o
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  (s -> i -> (s, o)) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
+  -- of the mealy machine
+  (Unbundled dom i -> Unbundled dom o)
 mealyB clk rst en f iS i = unbundle (mealy clk rst en f iS (bundle i))
 {-# INLINE mealyB #-}
 
-
 -- | A version of 'mealyS' that does automatic 'Bundle'ing, see 'mealyB' for details.
-mealySB
-  :: ( KnownDomain dom
-     , NFDataX s
-     , Bundle i
-     , Bundle o )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> (i -> State s o)
-  -- ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
-  -> s
-  -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
- -- ^ Synchronous sequential function with input and output matching that
- -- of the mealy machine
+mealySB ::
+  ( KnownDomain dom,
+    NFDataX s,
+    Bundle i,
+    Bundle o
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
+  (i -> State s o) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
+  -- of the mealy machine
+  (Unbundled dom i -> Unbundled dom o)
 mealySB clk rst en f iS i = unbundle (mealyS clk rst en f iS (bundle i))
 {-# INLINE mealySB #-}

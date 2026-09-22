@@ -1,3 +1,11 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
 Copyright  :  (C) 2018, Google Inc.,
                   2022, QBayLogic B.V.
@@ -15,94 +23,123 @@ This module contains:
     e.g. one-hot, for a data type.
 
 -}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Annotations.BitRepresentation.Deriving
-  (
-  -- * Derivation functions
-    deriveAnnotation
-  , deriveBitPack
-  , deriveDefaultAnnotation
-  , derivePackedAnnotation
-  , derivePackedMaybeAnnotation
-  , deriveBlueSpecAnnotation
-  -- * Derivators
-  , defaultDerivator
-  , blueSpecDerivator
-  , packedDerivator
-  , packedMaybeDerivator
-  , simpleDerivator
-  -- * Util functions
-  , dontApplyInHDL
-  -- * Types associated with various functions
-  , ConstructorType(..)
-  , FieldsType(..)
-  -- * Convenience type synonyms
-  , Derivator
-  , DataReprAnnExp
-  ) where
+  ( -- * Derivation functions
+    deriveAnnotation,
+    deriveBitPack,
+    deriveDefaultAnnotation,
+    derivePackedAnnotation,
+    derivePackedMaybeAnnotation,
+    deriveBlueSpecAnnotation,
+
+    -- * Derivators
+    defaultDerivator,
+    blueSpecDerivator,
+    packedDerivator,
+    packedMaybeDerivator,
+    simpleDerivator,
+
+    -- * Util functions
+    dontApplyInHDL,
+
+    -- * Types associated with various functions
+    ConstructorType (..),
+    FieldsType (..),
+
+    -- * Convenience type synonyms
+    Derivator,
+    DataReprAnnExp,
+  )
+where
 
 import Clash.Annotations.BitRepresentation
-  (DataReprAnn(..), ConstrRepr(..), BitMask, Value, Size, liftQ)
+  ( BitMask,
+    ConstrRepr (..),
+    DataReprAnn (..),
+    Size,
+    Value,
+    liftQ,
+  )
 import Clash.Annotations.BitRepresentation.Internal
-  (dataReprAnnToDataRepr', constrReprToConstrRepr', DataRepr'(..))
+  ( DataRepr' (..),
+    constrReprToConstrRepr',
+    dataReprAnnToDataRepr',
+  )
 import Clash.Annotations.BitRepresentation.Util
-  (bitOrigins, bitOrigins', BitOrigin(..), bitRanges, Bit)
-import qualified Clash.Annotations.BitRepresentation.Util
-  as Util
-
-import           Clash.Annotations.Primitive  (hasBlackBox)
-import           Clash.Class.BitPack
-  (BitPack, BitSize, pack, packXWith, unpack, maybeUnpack)
-import           Clash.Class.Resize           (resize)
-import           Language.Haskell.TH.Compat   (mkTySynInstD)
-import           Clash.Sized.BitVector        (BitVector, low, (++#))
-import           Clash.Sized.Internal.BitVector (undefined#)
-import           Control.Applicative          (liftA3)
-import           Control.DeepSeq              (NFData)
-import           Control.Monad                (forM)
-import           Data.Bits
-  (shiftL, shiftR, complement, (.&.), (.|.), zeroBits, popCount, bit, testBit,
-   Bits, setBit)
-import           Data.Data                    (Data)
-import           Data.Containers.ListUtils    (nubOrd)
-import           Data.List
-  (mapAccumL, zipWith4, sortOn, partition, uncons)
+  ( Bit,
+    BitOrigin (..),
+    bitOrigins,
+    bitOrigins',
+    bitRanges,
+  )
+import qualified Clash.Annotations.BitRepresentation.Util as Util
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Class.BitPack
+  ( BitPack,
+    BitSize,
+    maybeUnpack,
+    pack,
+    packXWith,
+    unpack,
+  )
+import Clash.Class.Resize (resize)
+import Clash.Sized.BitVector (BitVector, low, (++#))
+import Clash.Sized.Internal.BitVector (undefined#)
+import Control.Applicative (liftA3)
+import Control.DeepSeq (NFData)
+import Control.Monad (forM)
+import Data.Bits
+  ( Bits,
+    bit,
+    complement,
+    popCount,
+    setBit,
+    shiftL,
+    shiftR,
+    testBit,
+    zeroBits,
+    (.&.),
+    (.|.),
+  )
+import Data.Containers.ListUtils (nubOrd)
+import Data.Data (Data)
+import Data.List
+  ( mapAccumL,
+    partition,
+    sortOn,
+    uncons,
+    zipWith4,
+  )
+import Language.Haskell.TH.Compat (mkTySynInstD)
 #if __GLASGOW_HASKELL__ < 912
-import           Data.Typeable                (Typeable)
+import Data.Typeable (Typeable)
 #endif
-import qualified Data.Map                     as Map
-import           Data.Maybe                   (fromMaybe)
-import qualified Data.Set                     as Set
-import           Data.Proxy                   (Proxy(..))
-import           GHC.Exts                     (Int(I#))
-import           GHC.Generics                 (Generic)
-import           GHC.Integer.Logarithms       (integerLog2#)
-import           GHC.TypeLits                 (natVal)
-import           Language.Haskell.TH
-import           Language.Haskell.TH.Syntax
-import           Language.Haskell.TH.Datatype (resolveTypeSynonyms)
+import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
+import Data.Proxy (Proxy (..))
+import qualified Data.Set as Set
+import GHC.Exts (Int (I#))
+import GHC.Generics (Generic)
+import GHC.Integer.Logarithms (integerLog2#)
+import GHC.TypeLits (natVal)
+import Language.Haskell.TH
+import Language.Haskell.TH.Datatype (resolveTypeSynonyms)
+import Language.Haskell.TH.Syntax
 
 -- | Used to track constructor bits in packed derivation
 data BitMaskOrigin
-  = External
-  -- ^ Constructor bit should be stored externally
-  | Embedded BitMask Value
-  -- ^ Constructor bit should be stored in one of the constructor's fields
-    deriving (Show, Data, Lift)
+  = -- | Constructor bit should be stored externally
+    External
+  | -- | Constructor bit should be stored in one of the constructor's fields
+    Embedded BitMask Value
+  deriving (Show, Data, Lift)
 #if __GLASGOW_HASKELL__ < 912
-    deriving (Typeable)
+  deriving (Typeable)
 #endif
 
 isExternal :: BitMaskOrigin -> Bool
 isExternal External = True
-isExternal _        = False
+isExternal _ = False
 
 type ReprAnnCache = Map.Map Type DataReprAnn
 
@@ -116,32 +153,32 @@ type Derivator = Type -> Q DataReprAnnExp
 
 -- | Indicates how to pack constructor for simpleDerivator
 data ConstructorType
-  = Binary
-  -- ^ First constructor will be encoded as 0b0, the second as 0b1, the third
-  -- as 0b10, etc.
-  | OneHot
-  -- ^ Reserve a single bit for each constructor marker.
+  = -- | First constructor will be encoded as 0b0, the second as 0b1, the third
+    -- as 0b10, etc.
+    Binary
+  | -- | Reserve a single bit for each constructor marker.
+    OneHot
 
 -- | Indicates how to pack (constructor) fields for simpleDerivator
 data FieldsType
-  = OverlapL
-  -- ^ Store fields of different constructors at (possibly) overlapping bit
-  -- positions. That is, a data type with two constructors with each two fields
-  -- of each one bit will take /two/ bits for its whole representation (plus
-  -- constructor bits). Overlap is left-biased, i.e. don't care bits are padded
-  -- to the right.
-  --
-  -- This is the default behavior of Clash.
-  | OverlapR
-  -- ^ Store fields of different constructors at (possibly) overlapping bit
-  -- positions. That is, a data type with two constructors with each two fields
-  -- of each one bit will take /two/ bits for its whole representation (plus
-  -- constructor bits). Overlap is right biased, i.e. don't care bits are padded
-  -- between between the constructor bits and the field bits.
-  | Wide
-  -- ^ Store fields of different constructs at non-overlapping positions. That
-  -- is, a data type with two constructors with each two fields of each one bit
-  -- will take /four/ bits for its whole representation (plus constructor bits).
+  = -- | Store fields of different constructors at (possibly) overlapping bit
+    -- positions. That is, a data type with two constructors with each two fields
+    -- of each one bit will take /two/ bits for its whole representation (plus
+    -- constructor bits). Overlap is left-biased, i.e. don't care bits are padded
+    -- to the right.
+    --
+    -- This is the default behavior of Clash.
+    OverlapL
+  | -- | Store fields of different constructors at (possibly) overlapping bit
+    -- positions. That is, a data type with two constructors with each two fields
+    -- of each one bit will take /two/ bits for its whole representation (plus
+    -- constructor bits). Overlap is right biased, i.e. don't care bits are padded
+    -- between between the constructor bits and the field bits.
+    OverlapR
+  | -- | Store fields of different constructs at non-overlapping positions. That
+    -- is, a data type with two constructors with each two fields of each one bit
+    -- will take /four/ bits for its whole representation (plus constructor bits).
+    Wide
 
 -- | Determine most significant bit set for given integer.
 --
@@ -159,8 +196,8 @@ mkReprAnnCache anns =
 -- | Integer version of (ceil . log2). Can handle arguments up to 2^(2^WORDWIDTH).
 integerLog2Ceil :: Integer -> Int
 integerLog2Ceil n =
-  let nlog2 = fromIntegral $ I# (integerLog2# n) in
-  if n > 2^nlog2 then nlog2 + 1 else nlog2
+  let nlog2 = fromIntegral $ I# (integerLog2# n)
+   in if n > 2 ^ nlog2 then nlog2 + 1 else nlog2
 
 -- | Determine number of bits needed to represent /n/ options. Alias for
 -- integerLog2Ceil to increase readability of programmer intentention.
@@ -193,8 +230,8 @@ resolveCon _name constr =
 collectTypeArgs :: Type -> (Type, [Type])
 collectTypeArgs t@(ConT _name) = (t, [])
 collectTypeArgs (AppT t1 t2) =
-  let (base, args) = collectTypeArgs t1 in
-  (base, args ++ [t2])
+  let (base, args) = collectTypeArgs t1
+   in (base, args ++ [t2])
 collectTypeArgs t =
   error $ "Unexpected type: " ++ show t
 
@@ -206,30 +243,32 @@ typeSize typ = do
   bitSizeInstances <- reifyInstances ''BitSize [typ]
   case bitSizeInstances of
     [] ->
-      fail $ unwords [
-          "Could not find custom bit representation nor BitSize instance"
-        , "for", show typ ++ "." ]
+      fail $
+        unwords
+          [ "Could not find custom bit representation nor BitSize instance",
+            "for",
+            show typ ++ "."
+          ]
     [TySynInstD (TySynEqn _ _ (LitT (NumTyLit n)))] ->
-      [| n |]
+      [|n|]
     [_impl] ->
-      [| fromIntegral $ natVal (Proxy :: Proxy (BitSize $(return typ))) |]
+      [|fromIntegral $ natVal (Proxy :: Proxy (BitSize $(return typ)))|]
     unexp ->
       fail $ "Unexpected result from reifyInstances: " ++ show unexp
 
 -- | Generate bitmask from a given bit, with a certain size
-bitmask
-  :: Int
-  -- ^ Bitmask starts at bit /n/
-  -> Int
-  -- ^ Bitmask has size /m/
-  -> Integer
-bitmask _start 0    = 0
-bitmask start  size
-  | start < 0        = error $ "Start cannot be <0. Was: " ++ show start
-  | size < 0         = error $ "Size cannot be <0. Was: " ++ show size
-  | start + 1 < size = error $ "Start + 1 (" ++ show start ++ " - 1) cannot be smaller than size (" ++ show size ++  ")."
-  | otherwise        = shiftL (2^(toInteger size) - 1) (start - (size - 1))
-
+bitmask ::
+  -- | Bitmask starts at bit /n/
+  Int ->
+  -- | Bitmask has size /m/
+  Int ->
+  Integer
+bitmask _start 0 = 0
+bitmask start size
+  | start < 0 = error $ "Start cannot be <0. Was: " ++ show start
+  | size < 0 = error $ "Size cannot be <0. Was: " ++ show size
+  | start + 1 < size = error $ "Start + 1 (" ++ show start ++ " - 1) cannot be smaller than size (" ++ show size ++ ")."
+  | otherwise = shiftL (2 ^ (toInteger size) - 1) (start - (size - 1))
 
 fieldTypes :: Con -> [Type]
 fieldTypes (NormalC _nm bTys) =
@@ -243,8 +282,8 @@ fieldTypes con =
 
 conName :: Con -> Name
 conName c = case c of
-  NormalC nm _  -> nm
-  RecC    nm _  -> nm
+  NormalC nm _ -> nm
+  RecC nm _ -> nm
   InfixC _ nm _ -> nm
   _ -> error $ "No GADT support"
 
@@ -256,24 +295,27 @@ mkLet nm qe = do
 fieldSizeLets :: [[Type]] -> ([Q Dec], [[Q Exp]])
 fieldSizeLets fieldtypess = (fieldSizeDecls, fieldSizessExps)
   where
-    nums = map show [(0 :: Int)..]
+    nums = map show [(0 :: Int) ..]
     uqFieldTypes = nubOrd (concat fieldtypess)
     uqFieldSizes = map typeSize uqFieldTypes
-    (fieldSizeDecls, szVars) = unzip $ zipWith
-                                 (\i sz -> mkLet ("_f" ++ i) sz)
-                                 nums
-                                 uqFieldSizes
+    (fieldSizeDecls, szVars) =
+      unzip $
+        zipWith
+          (\i sz -> mkLet ("_f" ++ i) sz)
+          nums
+          uqFieldSizes
     tySizeMap = Map.fromList (zip uqFieldTypes szVars)
     fieldSizessExps = map (map (tySizeMap Map.!)) fieldtypess
 
 complementInteger :: Int -> Integer -> Integer
 complementInteger 0 _i = 0
 complementInteger size i =
-  let size' = size - 1 in
-  if testBit i size' then
-    complementInteger size' i
-  else
-    (.|.) (bit size') (complementInteger size' i)
+  let size' = size - 1
+   in if testBit i size'
+        then
+          complementInteger size' i
+        else
+          (.|.) (bit size') (complementInteger size' i)
 
 deriveAnnotation :: Derivator -> Q Type -> Q [Dec]
 deriveAnnotation deriv typ =
@@ -282,34 +324,35 @@ deriveAnnotation deriv typ =
 --------------------------------------------
 ------------ SIMPLE DERIVATIONS ------------
 --------------------------------------------
-buildConstrRepr
-  :: Q Exp
-  -- ^ Data size (excluding constructor size)
-  -> Name
-  -- ^ Constr name
-  -> [Q Exp]
-  -- ^ Field masks
-  -> BitMask
-  -- ^ Constructor mask
-  -> Value
-  -- ^ Constructor value
-  -> Q Exp
-buildConstrRepr dataSize constrName fieldAnns constrMask constrValue = [|
-  ConstrRepr
-    constrName
-    $mask
-    $value
-    $(listE fieldAnns)
-  |]
+buildConstrRepr ::
+  -- | Data size (excluding constructor size)
+  Q Exp ->
+  -- | Constr name
+  Name ->
+  -- | Field masks
+  [Q Exp] ->
+  -- | Constructor mask
+  BitMask ->
+  -- | Constructor value
+  Value ->
+  Q Exp
+buildConstrRepr dataSize constrName fieldAnns constrMask constrValue =
+  [|
+    ConstrRepr
+      constrName
+      $mask
+      $value
+      $(listE fieldAnns)
+    |]
   where
-    mask  = [| shiftL constrMask  ($dataSize)|]
-    value = [| shiftL constrValue ($dataSize)|]
+    mask = [|shiftL constrMask ($dataSize)|]
+    value = [|shiftL constrValue ($dataSize)|]
 
 countConstructor :: [Int] -> [(BitMask, Value)]
 countConstructor ns = zip (repeat mask) (map toInteger ns)
   where
     maskSize = bitsNeeded $ toInteger $ maximum ns + 1
-    mask = 2^maskSize - 1
+    mask = 2 ^ maskSize - 1
 
 oneHotConstructor :: [Int] -> [(BitMask, Value)]
 oneHotConstructor ns = zip values values
@@ -317,19 +360,19 @@ oneHotConstructor ns = zip values values
     values = [shiftL 1 n | n <- ns]
 
 overlapFieldAnnsL :: [[Q Exp]] -> ([Q Dec], [[Q Exp]])
-overlapFieldAnnsL fieldSizess = ([maxDecl],  resExp)
+overlapFieldAnnsL fieldSizess = ([maxDecl], resExp)
   where
     (maxDecl, maxExp) = mkLet "_maxf" maxConstrSize
     resExp = map go fieldSizess
     fieldSizess' = listE $ map listE fieldSizess
-    constructorSizes = [| map (sum @[] @Int) $fieldSizess' |]
-    maxConstrSize = [| maximum $constructorSizes - 1 |]
+    constructorSizes = [|map (sum @[] @Int) $fieldSizess'|]
+    maxConstrSize = [|maximum $constructorSizes - 1|]
     go fieldsizes =
       snd $
-      mapAccumL
-        (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
-        maxExp
-        fieldsizes
+        mapAccumL
+          (\start size -> ([|$start - $size|], [|bitmask $start $size|]))
+          maxExp
+          fieldsizes
 
 overlapFieldAnnsR :: [[Q Exp]] -> ([Q Dec], [[Q Exp]])
 overlapFieldAnnsR fieldSizess = (sumFieldDecl, resExp)
@@ -338,62 +381,66 @@ overlapFieldAnnsR fieldSizess = (sumFieldDecl, resExp)
 
     nums = map show [(0 :: Int) ..]
 
-    (sumFieldDecl, sumFieldExp)
-      = unzip $ zipWith
+    (sumFieldDecl, sumFieldExp) =
+      unzip $
+        zipWith
           (\fs i -> mkLet ("_sumf" ++ i) [|sum @[] @Int $(listE fs)|])
           fieldSizess
           nums
 
     go fieldSizes sumFieldsSize =
       snd $
-      mapAccumL
-        (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
-        [| $sumFieldsSize - 1 |]
-        fieldSizes
+        mapAccumL
+          (\start size -> ([|$start - $size|], [|bitmask $start $size|]))
+          [|$sumFieldsSize - 1|]
+          fieldSizes
 
 wideFieldAnns :: [[Q Exp]] -> ([Q Dec], [[Q Exp]])
 wideFieldAnns fieldSizess = (decs, resExp)
   where
-    decs = (dataSizeDec:constrSizeDecs) ++ constrOffsetDecs
+    decs = (dataSizeDec : constrSizeDecs) ++ constrOffsetDecs
     resExp = zipWith id (map go constrOffsetsExps) fieldSizess
     nums = map show [(0 :: Int) ..]
 
     constrSizeExps :: [Q Exp]
-    (constrSizeDecs, constrSizeExps)
-      = unzip $ zipWith
+    (constrSizeDecs, constrSizeExps) =
+      unzip $
+        zipWith
           (\fs i -> mkLet ("_sumf" ++ i) [|sum @[] @Int $(listE fs)|])
           fieldSizess
           nums
 
     constrOffsetsExps :: [Q Exp]
     (last -> constrOffsetDecs, constrOffsetsExps) =
-      unzip $ init $ scanl
-        (\(ds, offset) (size, i) ->
-          let e = [| $offset + $size |]
-              (d, ve) = mkLet ("_constroffset" ++ i) e
-          in (d:ds, ve)
-        )
-        ([], [| 0 |])
-        (zip constrSizeExps nums)
+      unzip
+        $ init
+        $ scanl
+          ( \(ds, offset) (size, i) ->
+              let e = [|$offset + $size|]
+                  (d, ve) = mkLet ("_constroffset" ++ i) e
+               in (d : ds, ve)
+          )
+          ([], [|0|])
+          (zip constrSizeExps nums)
 
     dataSizeExp :: Q Exp
-    (dataSizeDec, dataSizeExp)
-      = mkLet "_widedatasize" [| sum @[] @Int $(listE constrSizeExps) - 1 |]
+    (dataSizeDec, dataSizeExp) =
+      mkLet "_widedatasize" [|sum @[] @Int $(listE constrSizeExps) - 1|]
     go :: Q Exp -> [Q Exp] -> [Q Exp]
     go offset fieldSizes =
       snd $
-      mapAccumL
-        (\start size -> ([| $start - $size |], [| bitmask $start $size |]))
-        [| $dataSizeExp - $offset |]
-        fieldSizes
+        mapAccumL
+          (\start size -> ([|$start - $size|], [|bitmask $start $size|]))
+          [|$dataSizeExp - $offset|]
+          fieldSizes
 
 -- | Derive DataRepr' for a specific type.
-deriveDataRepr
-  :: ([Int] -> [(BitMask, Value)])
-  -- ^ Constructor derivator
-  -> ([[Q Exp]] -> ([Q Dec], [[Q Exp]]) )
-  -- ^ Field derivator
-  -> Derivator
+deriveDataRepr ::
+  -- | Constructor derivator
+  ([Int] -> [(BitMask, Value)]) ->
+  -- | Field derivator
+  ([[Q Exp]] -> ([Q Dec], [[Q Exp]])) ->
+  Derivator
 deriveDataRepr constrDerivator fieldsDerivator typ = do
   let (fun, typeArgs) = collectTypeArgs typ
       tyConstrName = case fun of
@@ -402,57 +449,61 @@ deriveDataRepr constrDerivator fieldsDerivator typ = do
   info <- reify tyConstrName
   case info of
     (TyConI (DataD [] _constrName vars _kind dConstructors _clauses)) ->
-      let varMap = Map.fromList $ zip (map tyVarBndrName vars) typeArgs in
-      let resolvedConstructors = map (resolveCon varMap) dConstructors in do
-      let nums = map show [(0 :: Int)..]
-      let fieldtypess = map fieldTypes resolvedConstructors
+      let varMap = Map.fromList $ zip (map tyVarBndrName vars) typeArgs
+       in let resolvedConstructors = map (resolveCon varMap) dConstructors
+           in do
+                let nums = map show [(0 :: Int) ..]
+                let fieldtypess = map fieldTypes resolvedConstructors
 
-      let (fieldSzDecs, fieldSizess) = fieldSizeLets fieldtypess
+                let (fieldSzDecs, fieldSizess) = fieldSizeLets fieldtypess
 
-      -- Get sizes and names of all constructors
-      let constrNames = map conName resolvedConstructors
+                -- Get sizes and names of all constructors
+                let constrNames = map conName resolvedConstructors
 
-      let
-        (constrMasks, constrValues) =
-          unzip $ constrDerivator [0..length dConstructors - 1]
+                let (constrMasks, constrValues) =
+                      unzip $ constrDerivator [0 .. length dConstructors - 1]
 
-      let constrSize = 1 + (msb $ maximum @[] @Integer constrMasks)
-      let (fieldDecs, fieldAnns) = fieldsDerivator fieldSizess
+                let constrSize = 1 + (msb $ maximum @[] @Integer constrMasks)
+                let (fieldDecs, fieldAnns) = fieldsDerivator fieldSizess
 
-      -- extract field annotations into declarations
-      let mkAnnDecl i j an = mkLet ("_fa" ++ i ++ "_" ++ j) an
-      let
-        fieldAnnTup =
-          zipWith (\i -> zipWith (mkAnnDecl i) nums) nums fieldAnns
+                -- extract field annotations into declarations
+                let mkAnnDecl i j an = mkLet ("_fa" ++ i ++ "_" ++ j) an
+                let fieldAnnTup =
+                      zipWith (\i -> zipWith (mkAnnDecl i) nums) nums fieldAnns
 
-      let
-        (fieldAnnDecs, fieldAnnVars) =
-          (concat $ map (map fst) fieldAnnTup, map (map snd) fieldAnnTup)
+                let (fieldAnnDecs, fieldAnnVars) =
+                      (concat $ map (map fst) fieldAnnTup, map (map snd) fieldAnnTup)
 
-      let fieldAnnsFlat = listE $ concat fieldAnnVars
+                let fieldAnnsFlat = listE $ concat fieldAnnVars
 
-      let dataSize | null $ concat fieldAnns = [| 0 |]
-                   | otherwise = [| 1 + (msb $ maximum @[] @Integer $ $fieldAnnsFlat) |]
+                let dataSize
+                      | null $ concat fieldAnns = [|0|]
+                      | otherwise = [|1 + (msb $ maximum @[] @Integer $ $fieldAnnsFlat)|]
 
-      -- Extract data size into a declaration
-      let (dataSizeDec, dataSizeExp) = mkLet "_datasize" dataSize
+                -- Extract data size into a declaration
+                let (dataSizeDec, dataSizeExp) = mkLet "_datasize" dataSize
 
-      let decls = (dataSizeDec:fieldSzDecs) ++ fieldDecs ++ fieldAnnDecs
+                let decls = (dataSizeDec : fieldSzDecs) ++ fieldDecs ++ fieldAnnDecs
 
-      -- Determine at which bits various fields start
-      let constrReprs = zipWith4
-                          (buildConstrRepr dataSizeExp)
-                          constrNames
-                          fieldAnnVars
-                          constrMasks
-                          constrValues
+                -- Determine at which bits various fields start
+                let constrReprs =
+                      zipWith4
+                        (buildConstrRepr dataSizeExp)
+                        constrNames
+                        fieldAnnVars
+                        constrMasks
+                        constrValues
 
-      resolvedType <- resolveTypeSynonyms typ
+                resolvedType <- resolveTypeSynonyms typ
 
-      letE decls [| DataReprAnn
-          $(liftQ $ return resolvedType)
-          ($dataSizeExp + constrSize)
-          $(listE constrReprs) |]
+                letE
+                  decls
+                  [|
+                    DataReprAnn
+                      $(liftQ $ return resolvedType)
+                      ($dataSizeExp + constrSize)
+                      $(listE constrReprs)
+                    |]
     _ ->
       fail $ "Could not derive dataRepr for: " ++ show info
 
@@ -487,7 +538,6 @@ blueSpecDerivator = simpleDerivator Binary OverlapR
 deriveDefaultAnnotation :: Q Type -> Q [Dec]
 deriveDefaultAnnotation = deriveAnnotation defaultDerivator
 
-
 -- | Derives bit representation corresponding to the default manner in which
 -- BlueSpec stores types.
 deriveBlueSpecAnnotation :: Q Type -> Q [Dec]
@@ -496,36 +546,37 @@ deriveBlueSpecAnnotation = deriveAnnotation blueSpecDerivator
 ---------------------------------------------------------------
 ------------ DERIVING PACKED MAYBE REPRESENTATIONS ------------
 ---------------------------------------------------------------
-toBits'
-  :: Bits a
-  => Size
-  -> a
-  -> [Bit']
+toBits' ::
+  (Bits a) =>
+  Size ->
+  a ->
+  [Bit']
 toBits' 0 _ = []
 toBits' size bits = bit' : toBits' (size - 1) bits
-  where bit' = if testBit bits (size - 1) then H else L
+  where
+    bit' = if testBit bits (size - 1) then H else L
 
 bitsToInteger' :: (Bit' -> Bool) -> [Bit'] -> Integer
 bitsToInteger' predFunc bits = foldl setBit 0 toSet
   where
-    toSet = [n | (n, b) <- zip [0..] (reverse bits), predFunc b]
+    toSet = [n | (n, b) <- zip [0 ..] (reverse bits), predFunc b]
 
 bitsToInteger :: [Bit'] -> Integer
-bitsToInteger = bitsToInteger' (==H)
+bitsToInteger = bitsToInteger' (== H)
 
 bitsToMask :: [Bit'] -> Integer
 bitsToMask = bitsToInteger' (\b -> b == H || b == L)
 
 data Bit'
-  = X
-  -- ^ Could be both 1 or 0
-  | L
-  -- ^ 0
-  | H
-  -- ^ 1
-  | U
-  -- ^ Unused
-    deriving (Show, Eq, Generic, NFData)
+  = -- | Could be both 1 or 0
+    X
+  | -- | 0
+    L
+  | -- | 1
+    H
+  | -- | Unused
+    U
+  deriving (Show, Eq, Generic, NFData)
 
 -- | Given a number of possible values, construct a list of all complement values.
 -- For example, Given a list:
@@ -541,105 +592,120 @@ data Bit'
 -- @
 --
 -- would be complements.
-complementValues
-  :: Size
-  -> [[Bit']]
-  -> [[Bit']]
+complementValues ::
+  Size ->
+  [[Bit']] ->
+  [[Bit']]
 complementValues 0 _ = []
 complementValues 1 xs
-  | X `elem` xs'                 = []
+  | X `elem` xs' = []
   | H `elem` xs' && L `elem` xs' = []
-  | H `elem` xs'                 = [[L]]
-  | otherwise                    = [[H]]
+  | H `elem` xs' = [[L]]
+  | otherwise = [[H]]
   where
     xs' = map (maybe (error "complementValues: expected at least 1 bit") fst . uncons) xs
 complementValues size [] = [replicate size U]
 complementValues size values =
-  if | all (maybe False ((==U) . fst) . uncons) values' -> map (U:) (recc (map (drop 1) values'))
-     | any (maybe False ((==X) . fst) . uncons) values' -> map (X:) (recc (map (drop 1) values'))
-     | otherwise ->
-        (map (L:) (recc (map (drop 1) lows))) ++
-        (map (H:) (recc (map (drop 1) highs')))
+  if
+    | all (maybe False ((== U) . fst) . uncons) values' -> map (U :) (recc (map (drop 1) values'))
+    | any (maybe False ((== X) . fst) . uncons) values' -> map (X :) (recc (map (drop 1) values'))
+    | otherwise ->
+        (map (L :) (recc (map (drop 1) lows)))
+          ++ (map (H :) (recc (map (drop 1) highs')))
   where
-    values'       = filter (any (/= U)) values
-    recc          = complementValues (size - 1)
+    values' = filter (any (/= U)) values
+    recc = complementValues (size - 1)
     (highs, lows) = partition (maybe False ((== H) . fst) . uncons) values'
-    highs'        = highs ++ filter (maybe False ((`elem` [X, U]) . fst) . uncons) values'
+    highs' = highs ++ filter (maybe False ((`elem` [X, U]) . fst) . uncons) values'
 
 -- | Generate all bitvalues the given type can assume.
-possibleValues
-  :: ReprAnnCache
-  -> Type
-  -> Size
-  -> Q [[Bit']]
+possibleValues ::
+  ReprAnnCache ->
+  Type ->
+  Size ->
+  Q [[Bit']]
 possibleValues typeMap typ size =
   let typeName = case fst (collectTypeArgs typ) of
         ConT t -> t
         fun -> error ("possibleValues: expected a type constructor, but got" <> show fun)
-  in case Map.lookup typ typeMap of
-    -- No custom data representation found.
-    Nothing -> do
-      info <- reify typeName
-      case info of
-        -- TODO: check if fields have custom bit representations
-        (TyConI (DataD [] _constrName _vars _kind dConstructors _clauses)) ->
-          let nConstrBits = bitsNeeded (toInteger $ length dConstructors) in
-          let fieldBits = replicate (size - nConstrBits) X in
-          let constrBits = [toBits' nConstrBits n | n <- [0..length dConstructors - 1]] in
-          return $ zipWith (++) constrBits (repeat fieldBits)
-        _ ->
-          return [replicate size X]
-
-    Just (dataReprAnnToDataRepr' -> dataRepr) ->
-      -- TODO: check if fields have custom bit representations
-      let (DataRepr' _name _size constrs) = dataRepr in
-      forM constrs $ \constr -> do
-        return $
-          map
-            (\case { Lit [Util.H] -> H;
-                     Lit [Util.L] -> L;
-                     Lit [Util.U] -> U;
-                     Field _ _ _  -> X;
-                     c -> error $ "possibleValues (2): unexpected: " ++ show c; })
-            (bitOrigins' dataRepr constr)
+   in case Map.lookup typ typeMap of
+        -- No custom data representation found.
+        Nothing -> do
+          info <- reify typeName
+          case info of
+            -- TODO: check if fields have custom bit representations
+            (TyConI (DataD [] _constrName _vars _kind dConstructors _clauses)) ->
+              let nConstrBits = bitsNeeded (toInteger $ length dConstructors)
+               in let fieldBits = replicate (size - nConstrBits) X
+                   in let constrBits = [toBits' nConstrBits n | n <- [0 .. length dConstructors - 1]]
+                       in return $ zipWith (++) constrBits (repeat fieldBits)
+            _ ->
+              return [replicate size X]
+        Just (dataReprAnnToDataRepr' -> dataRepr) ->
+          -- TODO: check if fields have custom bit representations
+          let (DataRepr' _name _size constrs) = dataRepr
+           in forM constrs $ \constr -> do
+                return $
+                  map
+                    ( \case
+                        Lit [Util.H] -> H
+                        Lit [Util.L] -> L
+                        Lit [Util.U] -> U
+                        Field _ _ _ -> X
+                        c -> error $ "possibleValues (2): unexpected: " ++ show c
+                    )
+                    (bitOrigins' dataRepr constr)
 
 packedMaybe :: Size -> Type -> Q (Maybe DataReprAnn)
 packedMaybe size typ = do
   cache <- mkReprAnnCache <$> collectDataReprs
   values <- possibleValues cache typ size
   return $ case complementValues size values of
-             (value:_) ->
-               Just $ DataReprAnn
-                        (AppT (ConT ''Maybe) typ)
-                        size
-                        [ ConstrRepr
-                            'Nothing
-                            (bitsToMask value)
-                            (bitsToInteger value)
-                            []
-                        , ConstrRepr
-                            'Just
-                            0
-                            0
-                            [bitmask (size - 1) size] ]
-             [] ->
-               Nothing
-
+    (value : _) ->
+      Just $
+        DataReprAnn
+          (AppT (ConT ''Maybe) typ)
+          size
+          [ ConstrRepr
+              'Nothing
+              (bitsToMask value)
+              (bitsToInteger value)
+              [],
+            ConstrRepr
+              'Just
+              0
+              0
+              [bitmask (size - 1) size]
+          ]
+    [] ->
+      Nothing
 
 packedMaybeDerivator :: DataReprAnn -> Derivator
 packedMaybeDerivator (DataReprAnn _ size _) typ =
   case maybeCon of
     ConT nm ->
-      if nm == ''Maybe then do
-        let err = unwords [ "Could not derive packed maybe for:", show typ
-                          , ";", "Does its subtype have any space left to store"
-                          , "the constructor in?" ]
-        packedM <- packedMaybe (size - 1)
-                    (maybe (error "Maybe type without argument") fst (uncons maybeTyps))
-        (fromMaybe (fail err) . fmap lift) packedM
-      else
-        fail $ unwords [ "You can only pass Maybe types to packedMaybeDerivator,"
-                        , "not", show nm]
+      if nm == ''Maybe
+        then do
+          let err =
+                unwords
+                  [ "Could not derive packed maybe for:",
+                    show typ,
+                    ";",
+                    "Does its subtype have any space left to store",
+                    "the constructor in?"
+                  ]
+          packedM <-
+            packedMaybe
+              (size - 1)
+              (maybe (error "Maybe type without argument") fst (uncons maybeTyps))
+          (fromMaybe (fail err) . fmap lift) packedM
+        else
+          fail $
+            unwords
+              [ "You can only pass Maybe types to packedMaybeDerivator,",
+                "not",
+                show nm
+              ]
     unexpected ->
       fail $ "packedMaybeDerivator: unexpected constructor: " ++ show unexpected
   where
@@ -653,26 +719,25 @@ derivePackedMaybeAnnotation defaultDataRepr@(DataReprAnn typ _ _) = do
 ---------------------------------------------------------
 ------------ DERIVING PACKED REPRESENTATIONS ------------
 ---------------------------------------------------------
-packedConstrRepr
-  :: Int
-  -- ^ Data width
-  -> Int
-  -- ^ External constructor width
-  -> Int
-  -- ^ nth External so far
-  -> [(BitMaskOrigin, ConstrRepr)]
-  -> [ConstrRepr]
+packedConstrRepr ::
+  -- | Data width
+  Int ->
+  -- | External constructor width
+  Int ->
+  -- | nth External so far
+  Int ->
+  [(BitMaskOrigin, ConstrRepr)] ->
+  [ConstrRepr]
 packedConstrRepr _ _ _ [] = []
 packedConstrRepr dataWidth constrWidth n ((External, ConstrRepr name _ _ anns) : constrs) =
-  constr : packedConstrRepr dataWidth constrWidth (n+1) constrs
+  constr : packedConstrRepr dataWidth constrWidth (n + 1) constrs
   where
     constr =
       ConstrRepr
         name
-        (shiftL (2^constrWidth - 1) dataWidth)
+        (shiftL (2 ^ constrWidth - 1) dataWidth)
         (shiftL (toInteger n) dataWidth)
         anns
-
 packedConstrRepr dataWidth constrWidth n ((Embedded mask value, ConstrRepr name _ _ anns) : constrs) =
   constr : packedConstrRepr dataWidth constrWidth n constrs
   where
@@ -683,70 +748,70 @@ packedConstrRepr dataWidth constrWidth n ((Embedded mask value, ConstrRepr name 
         value
         anns
 
-packedDataRepr
-  :: Type
-  -> Size
-  -> [(BitMaskOrigin, ConstrRepr)]
-  -> DataReprAnn
+packedDataRepr ::
+  Type ->
+  Size ->
+  [(BitMaskOrigin, ConstrRepr)] ->
+  DataReprAnn
 packedDataRepr typ dataWidth constrs =
   DataReprAnn
     typ
     (dataWidth + constrWidth)
     (packedConstrRepr dataWidth constrWidth 0 constrs)
   where
-    external    = filter isExternal (map fst constrs)
+    external = filter isExternal (map fst constrs)
     constrWidth = bitsNeeded $ toInteger $ min (length external + 1) (length constrs)
 
 -- | Try to distribute constructor bits over fields
-storeInFields
-  :: Int
-  -- ^ data width
-  -> BitMask
-  -- ^ Additional mask gathered so far
-  -> [BitMask]
-  -- ^ Repr bitmasks to try and pack
-  -> [BitMaskOrigin]
+storeInFields ::
+  -- | data width
+  Int ->
+  -- | Additional mask gathered so far
+  BitMask ->
+  -- | Repr bitmasks to try and pack
+  [BitMask] ->
+  [BitMaskOrigin]
 storeInFields _dataWidth _additionalMask [] = []
 storeInFields _dataWidth _additionalMask [_] =
   -- Last constructor is implict
   [Embedded 0 0]
-storeInFields dataWidth additionalMask constrs@(constr:constrRest) =
-  if commonMask == fullMask then
-    -- We can't store the constructor anywhere special, so we need a special
-    -- constructor bit stored besides fields
-    External : storeInFields dataWidth additionalMask constrRest
-  else
-    -- Hooray, we can store it somewhere.
-    maskOrigins ++ (storeInFields dataWidth additionalMask' (drop storeSize constrs))
-
+storeInFields dataWidth additionalMask constrs@(constr : constrRest) =
+  if commonMask == fullMask
+    then
+      -- We can't store the constructor anywhere special, so we need a special
+      -- constructor bit stored besides fields
+      External : storeInFields dataWidth additionalMask constrRest
+    else
+      -- Hooray, we can store it somewhere.
+      maskOrigins ++ (storeInFields dataWidth additionalMask' (drop storeSize constrs))
   where
-    headMask   = constr
+    headMask = constr
     commonMask = (.|.) headMask additionalMask
 
     -- Variables for the case that we can store something:
-    storeMask       = complementInteger dataWidth commonMask
+    storeMask = complementInteger dataWidth commonMask
     additionalMask' = (.|.) additionalMask storeMask
-    storeSize       = 2^(popCount storeMask) - 1
-    maskOrigins     = [Embedded storeMask (toInteger n) | n <- [1..storeSize]]
+    storeSize = 2 ^ (popCount storeMask) - 1
+    maskOrigins = [Embedded storeMask (toInteger n) | n <- [1 .. storeSize]]
 
     -- BitMask which spans the complete data size
-    fullMask = 2^dataWidth - 1
+    fullMask = 2 ^ dataWidth - 1
 
 derivePackedAnnotation' :: DataReprAnn -> DataReprAnn
 derivePackedAnnotation' (DataReprAnn typ size constrs) =
   dataRepr
   where
     constrWidth = bitsNeeded $ toInteger $ length constrs
-    dataWidth   = size - constrWidth
-    fieldMasks  = [foldl (.|.) zeroBits anns | ConstrRepr _ _ _ anns <- constrs]
+    dataWidth = size - constrWidth
+    fieldMasks = [foldl (.|.) zeroBits anns | ConstrRepr _ _ _ anns <- constrs]
 
     -- Default annotation will overlap "to the left", so sorting on size will
     -- actually provide us with the 'fullest' constructors first and the
     -- 'empties' last.
     sortedMasks = reverse $ sortOn fst $ zip fieldMasks constrs
-    origins     = storeInFields dataWidth zeroBits (map fst sortedMasks)
-    constrs'    = zip origins $ map snd sortedMasks
-    dataRepr    = packedDataRepr typ dataWidth constrs'
+    origins = storeInFields dataWidth zeroBits (map fst sortedMasks)
+    constrs' = zip origins $ map snd sortedMasks
+    dataRepr = packedDataRepr typ dataWidth constrs'
 
 -- | This derivator tries to distribute its constructor bits over space left
 -- by the difference in constructor sizes. Example:
@@ -767,7 +832,7 @@ derivePackedAnnotation' (DataReprAnn typ size constrs) =
 -- packed representation will store the rest of the constructor bits there.
 packedDerivator :: Derivator
 packedDerivator typ =
-  [| derivePackedAnnotation' $(defaultDerivator typ ) |]
+  [|derivePackedAnnotation' $(defaultDerivator typ)|]
 
 derivePackedAnnotation :: Q Type -> Q [Dec]
 derivePackedAnnotation = deriveAnnotation packedDerivator
@@ -783,10 +848,10 @@ collectDataReprs = do
   unresolved <- go [thisMod] Set.empty []
   mapM resolveTyps unresolved
   where
-    resolveTyps (DataReprAnn t s c)
-      = liftA3 DataReprAnn (resolveTypeSynonyms t) (pure s) (pure c)
-    go []     _visited acc = return acc
-    go (x:xs) visited  acc
+    resolveTyps (DataReprAnn t s c) =
+      liftA3 DataReprAnn (resolveTypeSynonyms t) (pure s) (pure c)
+    go [] _visited acc = return acc
+    go (x : xs) visited acc
       | x `Set.member` visited = go xs visited acc
       | otherwise = do
           ModuleInfo newMods <- reifyModule x
@@ -795,117 +860,116 @@ collectDataReprs = do
 
 group :: [Bit] -> [(Int, Bit)]
 group [] = []
-group bs@(b:_) = (length head', b) : rest
+group bs@(b : _) = (length head', b) : rest
   where
-    tail' = dropWhile (==b) bs
-    head' = takeWhile (==b) bs
-    rest  = group tail'
+    tail' = dropWhile (== b) bs
+    head' = takeWhile (== b) bs
+    rest = group tail'
 
 bitToExpr' :: (Int, Bit) -> Q Exp -- BitVector n
 bitToExpr' (0, _) = fail $ "Unexpected group length: 0"
 bitToExpr' (numTyLit' -> n, Util.H) =
-  [| complement (resize (pack low) :: BitVector $n) |]
+  [|complement (resize (pack low) :: BitVector $n)|]
 bitToExpr' (numTyLit' -> n, Util.L) =
-  [| resize (pack low) :: BitVector $n |]
+  [|resize (pack low) :: BitVector $n|]
 bitToExpr' (numTyLit' -> n, _) =
-  [| undefined# :: BitVector $n |]
+  [|undefined# :: BitVector $n|]
 
 bitsToExpr :: [Bit] -> Q Exp -- BitVector n
 bitsToExpr [] = fail $ "Unexpected empty bit list"
 bitsToExpr bits =
   foldl1
-    (\v1 v2 -> [| $v1 ++# $v2 |])
+    (\v1 v2 -> [|$v1 ++# $v2|])
     (map bitToExpr' $ group bits)
 
-numTyLit' :: Integral a => a -> Q Type
+numTyLit' :: (Integral a) => a -> Q Type
 numTyLit' n = LitT <$> (numTyLit $ toInteger n)
 
 -- | Select a list of ranges from a bitvector expression
-select'
-  :: Exp
-  -> [(Int, Int)]
-  -> Q Exp
+select' ::
+  Exp ->
+  [(Int, Int)] ->
+  Q Exp
 select' _vec [] =
   fail $ "Unexpected empty list of intervals"
 select' vec ranges =
-  foldl1 (\v1 v2 -> [| $v1 ++# $v2 |]) $ map (return . select'') ranges
-    where
-      select'' :: (Int, Int) -> Exp
-      select'' (from, downto) =
-        let size = from - downto + 1 in
-        let
-          shifted
-            | downto == 0 =
-                vec
-            | otherwise =
-                AppE
-                  (AppE (VarE 'shiftR) vec)
-                  (LitE $ IntegerL $ toInteger downto) in
-
-        SigE
-          -- Select from whole vector
-          (AppE (VarE 'resize) shifted)
-          -- Type signature:
-          (AppT (ConT ''BitVector) (LitT $ NumTyLit $ toInteger size))
+  foldl1 (\v1 v2 -> [|$v1 ++# $v2|]) $ map (return . select'') ranges
+  where
+    select'' :: (Int, Int) -> Exp
+    select'' (from, downto) =
+      let size = from - downto + 1
+       in let shifted
+                | downto == 0 =
+                    vec
+                | otherwise =
+                    AppE
+                      (AppE (VarE 'shiftR) vec)
+                      (LitE $ IntegerL $ toInteger downto)
+           in SigE
+                -- Select from whole vector
+                (AppE (VarE 'resize) shifted)
+                -- Type signature:
+                (AppT (ConT ''BitVector) (LitT $ NumTyLit $ toInteger size))
 
 -- | Select a range (bitorigin) from a bitvector
-select
-  :: [Exp]
-  -- ^ BitVectors of fields
-  -> BitOrigin
-  -- ^ Select bits
-  -> Q Exp
+select ::
+  -- | BitVectors of fields
+  [Exp] ->
+  -- | Select bits
+  BitOrigin ->
+  Q Exp
 select _fields (Lit []) =
   fail $ "Unexpected empty literal."
 select _fields (Lit lits) = do
   let size = length lits
   vec <- bitsToExpr lits
-  return $ SigE
-            -- Apply bLit to literal string
-            vec
-            -- Type signature:
-            (AppT (ConT ''BitVector) (LitT $ NumTyLit $ toInteger size))
-
+  return $
+    SigE
+      -- Apply bLit to literal string
+      vec
+      -- Type signature:
+      (AppT (ConT ''BitVector) (LitT $ NumTyLit $ toInteger size))
 select fields (Field fieldn from downto) =
   select' (fields !! fieldn) [(from, downto)]
 
-buildPackMatch
-  :: DataReprAnn
-  -> ConstrRepr
-  -> Q Match
+buildPackMatch ::
+  DataReprAnn ->
+  ConstrRepr ->
+  Q Match
 buildPackMatch dataRepr cRepr@(ConstrRepr name _ _ fieldanns) = do
   fieldNames <-
-    mapM (\n -> newName $ "field" ++ show n) [0..length fieldanns-1]
+    mapM (\n -> newName $ "field" ++ show n) [0 .. length fieldanns - 1]
   fieldPackedNames <-
-    mapM (\n -> newName $ "fieldPacked" ++ show n) [0..length fieldanns-1]
+    mapM (\n -> newName $ "fieldPacked" ++ show n) [0 .. length fieldanns - 1]
 
   let packed fName = AppE (VarE 'pack) (VarE fName)
   let pack' pName fName = ValD (VarP pName) (NormalB $ packed fName) []
   let fieldPackedDecls = zipWith pack' fieldPackedNames fieldNames
-  let origins = bitOrigins
-                  (dataReprAnnToDataRepr' dataRepr)
-                  (constrReprToConstrRepr' undefined cRepr)
+  let origins =
+        bitOrigins
+          (dataReprAnnToDataRepr' dataRepr)
+          (constrReprToConstrRepr' undefined cRepr)
 
-  vec <- foldl1
-              (\v1 v2 -> [| $v1 ++# $v2 |])
-              (map (select $ map VarE fieldPackedNames) origins)
+  vec <-
+    foldl1
+      (\v1 v2 -> [|$v1 ++# $v2|])
+      (map (select $ map VarE fieldPackedNames) origins)
 
   return $ Match (ConP name [] (VarP <$> fieldNames)) (NormalB vec) fieldPackedDecls
 
 -- | Build a /pack/ function corresponding to given DataRepr
-buildPack
-  :: DataReprAnn
-  -> Q [Dec]
+buildPack ::
+  DataReprAnn ->
+  Q [Dec]
 buildPack dataRepr@(DataReprAnn _name _size constrs) = do
-  argNameIn    <- newName "toBePackedIn"
-  argName      <- newName "toBePacked"
-  constrs'     <- mapM (buildPackMatch dataRepr) constrs
-  let packBody    = CaseE (VarE argName) constrs'
-  let packLambda  = LamE [VarP argName] packBody
+  argNameIn <- newName "toBePackedIn"
+  argName <- newName "toBePacked"
+  constrs' <- mapM (buildPackMatch dataRepr) constrs
+  let packBody = CaseE (VarE argName) constrs'
+  let packLambda = LamE [VarP argName] packBody
   let packApplied = (VarE 'dontApplyInHDL) `AppE` (VarE 'packXWith `AppE` packLambda) `AppE` (VarE argNameIn)
-  let func        = FunD 'pack [Clause [VarP argNameIn] (NormalB packApplied) []]
+  let func = FunD 'pack [Clause [VarP argNameIn] (NormalB packApplied) []]
   return [func]
-
 
 -- | In Haskell apply the first argument to the second argument,
 --   in HDL just return the second argument.
@@ -916,73 +980,73 @@ dontApplyInHDL f a = f a
 {-# OPAQUE dontApplyInHDL #-}
 {-# ANN dontApplyInHDL hasBlackBox #-}
 
-buildUnpackField
-  :: Name
-  -> Name
-  -> Integer
-  -> Q Exp
+buildUnpackField ::
+  Name ->
+  Name ->
+  Integer ->
+  Q Exp
 buildUnpackField decoderName valueName mask = do
   let ranges = bitRanges mask
   vec <- select' (VarE valueName) ranges
   pure (AppE (VarE decoderName) vec)
 
-buildConstr
-  :: Name
-  -> [Exp]
-  -> Exp
+buildConstr ::
+  Name ->
+  [Exp] ->
+  Exp
 buildConstr name = foldl AppE (ConE name)
 
-buildMaybeConstr
-  :: Name
-  -> [Exp]
-  -> Exp
+buildMaybeConstr ::
+  Name ->
+  [Exp] ->
+  Exp
 buildMaybeConstr name [] =
   AppE (ConE 'Just) (ConE name)
-buildMaybeConstr name (field:rest) =
+buildMaybeConstr name (field : rest) =
   foldl
     (\acc arg -> InfixE (Just acc) (VarE '(<*>)) (Just arg))
     (AppE (AppE (VarE 'fmap) (ConE name)) field)
     rest
 
-buildUnpackIfE
-  :: (Name -> [Exp] -> Exp)
-  -> Name
-  -> Name
-  -> ConstrRepr
-  -> Q (Guard, Exp)
+buildUnpackIfE ::
+  (Name -> [Exp] -> Exp) ->
+  Name ->
+  Name ->
+  ConstrRepr ->
+  Q (Guard, Exp)
 buildUnpackIfE buildResult decoderName valueName (ConstrRepr name mask value fieldanns) = do
   let valueName' = pure (VarE valueName)
-  guard  <- NormalG <$> [| ((.&.) $valueName' mask) == value |]
+  guard <- NormalG <$> [|((.&.) $valueName' mask) == value|]
   fields <- mapM (buildUnpackField decoderName valueName) fieldanns
   pure (guard, buildResult name fields)
 
 -- | Build an /unpack/ function corresponding to given DataRepr
-buildUnpack
-  :: DataReprAnn
-  -> Q [Dec]
+buildUnpack ::
+  DataReprAnn ->
+  Q [Dec]
 buildUnpack (DataReprAnn _name _size constrs) = do
-  argNameIn   <- newName "toBeUnpackedIn"
-  argName     <- newName "toBeUnpacked"
-  matches     <- mapM (buildUnpackIfE buildConstr 'unpack argName) constrs
-  let fallThroughLast []      = []
-      fallThroughLast [(_,e)] = [(NormalG (ConE 'True), e)]
-      fallThroughLast (x:xs)  = x:fallThroughLast xs
+  argNameIn <- newName "toBeUnpackedIn"
+  argName <- newName "toBeUnpacked"
+  matches <- mapM (buildUnpackIfE buildConstr 'unpack argName) constrs
+  let fallThroughLast [] = []
+      fallThroughLast [(_, e)] = [(NormalG (ConE 'True), e)]
+      fallThroughLast (x : xs) = x : fallThroughLast xs
 
-  let unpackBody    = MultiIfE (fallThroughLast matches)
-  let unpackLambda  = LamE [VarP argName] unpackBody
+  let unpackBody = MultiIfE (fallThroughLast matches)
+  let unpackLambda = LamE [VarP argName] unpackBody
   let unpackApplied = (VarE 'dontApplyInHDL) `AppE` unpackLambda `AppE` (VarE argNameIn)
-  let func          = FunD 'unpack [Clause [VarP argNameIn] (NormalB unpackApplied) []]
+  let func = FunD 'unpack [Clause [VarP argNameIn] (NormalB unpackApplied) []]
   return [func]
 
-buildMaybeUnpack
-  :: DataReprAnn
-  -> Q [Dec]
+buildMaybeUnpack ::
+  DataReprAnn ->
+  Q [Dec]
 buildMaybeUnpack (DataReprAnn _name _size constrs) = do
-  argName     <- newName "toBeUnpacked"
-  matches     <- mapM (buildUnpackIfE buildMaybeConstr 'maybeUnpack argName) constrs
+  argName <- newName "toBeUnpacked"
+  matches <- mapM (buildUnpackIfE buildMaybeConstr 'maybeUnpack argName) constrs
   let otherwiseNothing = [(NormalG (ConE 'True), ConE 'Nothing)]
-      unpackBody       = MultiIfE (matches ++ otherwiseNothing)
-      func             = FunD 'maybeUnpack [Clause [VarP argName] (NormalB unpackBody) []]
+      unpackBody = MultiIfE (matches ++ otherwiseNothing)
+      func = FunD 'maybeUnpack [Clause [VarP argName] (NormalB unpackBody) []]
   return [func]
 
 -- | Derives BitPack instances for given type. Will account for custom bit
@@ -1016,34 +1080,36 @@ buildMaybeUnpack (DataReprAnn _name _size constrs) = do
 deriveBitPack :: Q Type -> Q [Dec]
 deriveBitPack typQ = do
   anns <- collectDataReprs
-  typ  <- typQ
+  typ <- typQ
   rTyp <- resolveTypeSynonyms typ
 
   ann <- case filter (\(DataReprAnn t _ _) -> t == rTyp) anns of
-              [a] -> return a
-              []  -> fail "No custom bit annotation found."
-              _   -> fail "Overlapping bit annotations found."
+    [a] -> return a
+    [] -> fail "No custom bit annotation found."
+    _ -> fail "Overlapping bit annotations found."
 
-  packFunc        <- buildPack ann
-  unpackFunc      <- buildUnpack ann
+  packFunc <- buildPack ann
+  unpackFunc <- buildUnpack ann
   maybeUnpackFunc <- buildMaybeUnpack ann
 
   let (DataReprAnn _name dataSize _constrs) = ann
 
   let bitSizeInst = mkTySynInstD ''BitSize [typ] (LitT (NumTyLit $ toInteger dataSize))
 
-  let bpInst = [ InstanceD
-                   (Just Overlapping)
-                   -- Overlap
-                   []
-                   -- Context
-                   (AppT (ConT ''BitPack) typ)
-                   -- Type
-                   (bitSizeInst : packFunc ++ unpackFunc ++ maybeUnpackFunc)
-                   -- Declarations
-               ]
+  let bpInst =
+        [ InstanceD
+            (Just Overlapping)
+            -- Overlap
+            []
+            -- Context
+            (AppT (ConT ''BitPack) typ)
+            -- Type
+            (bitSizeInst : packFunc ++ unpackFunc ++ maybeUnpackFunc)
+          -- Declarations
+        ]
   alreadyIsInstance <- isInstance ''BitPack [typ]
-  if alreadyIsInstance then
-    fail $ show typ ++ " already has a BitPack instance."
-  else
-    return bpInst
+  if alreadyIsInstance
+    then
+      fail $ show typ ++ " already has a BitPack instance."
+    else
+      return bpInst

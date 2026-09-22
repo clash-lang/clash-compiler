@@ -1,3 +1,10 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE Unsafe #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017-2022, Google Inc.
@@ -6,60 +13,60 @@ Copyright  :  (C) 2013-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
 module Clash.Explicit.Testbench
   ( -- * Testbench functions for circuits
-    assert
-  , assertBitVector
-  , ignoreFor
-  , stimuliGenerator
-
-  , tbClockGen
-  , tbEnableGen
-  , tbSystemClockGen
-  , clockToDiffClock
-
-  , outputVerifier
-  , outputVerifier'
-  , outputVerifierBitVector
-  , outputVerifierBitVector'
-  , biTbClockGen
-  , unsafeSimSynchronizer
-  , outputVerifierWith
+    assert,
+    assertBitVector,
+    ignoreFor,
+    stimuliGenerator,
+    tbClockGen,
+    tbEnableGen,
+    tbSystemClockGen,
+    clockToDiffClock,
+    outputVerifier,
+    outputVerifier',
+    outputVerifierBitVector,
+    outputVerifierBitVector',
+    biTbClockGen,
+    unsafeSimSynchronizer,
+    outputVerifierWith,
   )
 where
 
-import Control.Exception     (catch, evaluate)
-import Debug.Trace           (trace)
-import GHC.TypeLits          (KnownNat, type (+), type (<=))
-import Prelude               hiding ((!!), length)
-import System.IO.Unsafe      (unsafeDupablePerformIO)
-
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.Num       (satSucc, SaturationMode(SatBound))
-import Clash.Promoted.Nat    (SNat(..))
-import Clash.Promoted.Symbol (SSymbol(..))
+import Clash.Class.Num (SaturationMode (SatBound), satSucc)
 import Clash.Explicit.Signal
-  (Clock, Reset, System, Signal, toEnable, fromList, register,
-  unbundle, unsafeSynchronizer)
+  ( Clock,
+    Reset,
+    Signal,
+    System,
+    fromList,
+    register,
+    toEnable,
+    unbundle,
+    unsafeSynchronizer,
+  )
+import Clash.Promoted.Nat (SNat (..))
+import Clash.Promoted.Symbol (SSymbol (..))
+import Clash.Signal (Enable, KnownDomain, mux)
 import Clash.Signal.Internal
-  (ClockN (..), DiffClock (..), Reset (..), tbClockGen)
-import Clash.Signal          (mux, KnownDomain, Enable)
-import Clash.Sized.Index     (Index)
+  ( ClockN (..),
+    DiffClock (..),
+    Reset (..),
+    tbClockGen,
+  )
+import Clash.Sized.Index (Index)
 import Clash.Sized.Internal.BitVector
-  (BitVector, isLike#)
-import Clash.Sized.Vector    (Vec, (!!), length)
-import Clash.XException      (ShowX (..), XException)
+  ( BitVector,
+    isLike#,
+  )
+import Clash.Sized.Vector (Vec, length, (!!))
+import Clash.XException (ShowX (..), XException)
+import Control.Exception (catch, evaluate)
+import Debug.Trace (trace)
+import GHC.TypeLits (KnownNat, type (+), type (<=))
+import System.IO.Unsafe (unsafeDupablePerformIO)
+import Prelude hiding (length, (!!))
 
 -- Note that outputVerifier' is used in $setup, while the examples mention
 -- outputVerifier. This is fine, as the examples have explicit type
@@ -85,74 +92,98 @@ import Clash.XException      (ShowX (..), XException)
 -- computation, and warnings will once again be emitted.
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
-assert
-  :: (KnownDomain dom, Eq a, ShowX a)
-  => Clock dom
-  -> Reset dom
-  -> String
-  -- ^ Additional message
-  -> Signal dom a
-  -- ^ Checked value
-  -> Signal dom a
-  -- ^ Expected value
-  -> Signal dom b
-  -- ^ Return value
-  -> Signal dom b
+assert ::
+  (KnownDomain dom, Eq a, ShowX a) =>
+  Clock dom ->
+  Reset dom ->
+  -- | Additional message
+  String ->
+  -- | Checked value
+  Signal dom a ->
+  -- | Expected value
+  Signal dom a ->
+  -- | Return value
+  Signal dom b ->
+  Signal dom b
 assert clk (Reset _) msg checked expected returned =
-  (\c e cnt r ->
+  ( \c e cnt r ->
       if eqX c e
-         then r
-         else trace (concat [ "\ncycle(" ++ show clk ++ "): "
-                            , show cnt
-                            , ", "
-                            , msg
-                            , "\nexpected value: "
-                            , showX e
-                            , ", not equal to actual value: "
-                            , showX c
-                            ]) r)
-  <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
+        then r
+        else
+          trace
+            ( concat
+                [ "\ncycle(" ++ show clk ++ "): ",
+                  show cnt,
+                  ", ",
+                  msg,
+                  "\nexpected value: ",
+                  showX e,
+                  ", not equal to actual value: ",
+                  showX c
+                ]
+            )
+            r
+  )
+    <$> checked
+    <*> expected
+    <*> fromList [(0 :: Integer) ..]
+    <*> returned
   where
-    eqX a b = unsafeDupablePerformIO (catch (evaluate (a == b))
-                                            (\(_ :: XException) -> return False))
+    eqX a b =
+      unsafeDupablePerformIO
+        ( catch
+            (evaluate (a == b))
+            (\(_ :: XException) -> return False)
+        )
 {-# OPAQUE assert #-}
 {-# ANN assert hasBlackBox #-}
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
-assertBitVector
-  :: (KnownDomain dom, KnownNat n)
-  => Clock dom
-  -> Reset dom
-  -> String
-  -- ^ Additional message
-  -> Signal dom (BitVector n)
-  -- ^ Checked value
-  -> Signal dom (BitVector n)
-  -- ^ Expected value
-  -> Signal dom b
-  -- ^ Return value
-  -> Signal dom b
+assertBitVector ::
+  (KnownDomain dom, KnownNat n) =>
+  Clock dom ->
+  Reset dom ->
+  -- | Additional message
+  String ->
+  -- | Checked value
+  Signal dom (BitVector n) ->
+  -- | Expected value
+  Signal dom (BitVector n) ->
+  -- | Return value
+  Signal dom b ->
+  Signal dom b
 assertBitVector clk (Reset _) msg checked expected returned =
-  (\c e cnt r ->
+  ( \c e cnt r ->
       if eqX c e
-         then r
-         else trace (concat [ "\ncycle(" ++ show clk ++ "): "
-                            , show cnt
-                            , ", "
-                            , msg
-                            , "\nexpected value: "
-                            , showX e
-                            , ", not equal to actual value: "
-                            , showX c
-                            ]) r)
-  <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
+        then r
+        else
+          trace
+            ( concat
+                [ "\ncycle(" ++ show clk ++ "): ",
+                  show cnt,
+                  ", ",
+                  msg,
+                  "\nexpected value: ",
+                  showX e,
+                  ", not equal to actual value: ",
+                  showX c
+                ]
+            )
+            r
+  )
+    <$> checked
+    <*> expected
+    <*> fromList [(0 :: Integer) ..]
+    <*> returned
   where
-    eqX a b = unsafeDupablePerformIO (catch (evaluate (a `isLike#` b))
-                                            (\(_ :: XException) -> return False))
+    eqX a b =
+      unsafeDupablePerformIO
+        ( catch
+            (evaluate (a `isLike#` b))
+            (\(_ :: XException) -> return False)
+        )
 {-# OPAQUE assertBitVector #-}
 {-# ANN assertBitVector hasBlackBox #-}
-
-
 
 -- |
 --
@@ -169,51 +200,53 @@ assertBitVector clk (Reset _) msg checked expected returned =
 --
 -- >>> sampleN 14 (testInput systemClockGen resetGen)
 -- [1,1,3,5,7,9,11,13,15,17,19,21,21,21]
-stimuliGenerator
-  :: forall l dom   a
-   . ( KnownNat l
-     , KnownDomain dom )
-  => Clock dom
-  -- ^ Clock to which to synchronize the output signal
-  -> Reset dom
-  -> Vec l a
-  -- ^ Samples to generate
-  -> Signal dom a
-  -- ^ Signal of given samples
+stimuliGenerator ::
+  forall l dom a.
+  ( KnownNat l,
+    KnownDomain dom
+  ) =>
+  -- | Clock to which to synchronize the output signal
+  Clock dom ->
+  Reset dom ->
+  -- | Samples to generate
+  Vec l a ->
+  -- | Signal of given samples
+  Signal dom a
 stimuliGenerator clk rst samples =
-    let (r,o) = unbundle (genT <$> register clk rst (toEnable (pure True)) 0 r)
-    in  o
+  let (r, o) = unbundle (genT <$> register clk rst (toEnable (pure True)) 0 r)
+   in o
   where
-    genT :: Index l -> (Index l,a)
-    genT s = (s',samples !! s)
+    genT :: Index l -> (Index l, a)
+    genT s = (s', samples !! s)
       where
         maxI = toEnum (length samples - 1)
 
-        s' = if s < maxI
-                then s + 1
-                else s
-{-# INLINABLE stimuliGenerator #-}
+        s' =
+          if s < maxI
+            then s + 1
+            else s
+{-# INLINEABLE stimuliGenerator #-}
 
 -- | Same as 'outputVerifier' but used in cases where the test bench domain and
 -- the domain of the circuit under test are the same.
-outputVerifier'
-  :: forall l a dom
-   . ( KnownNat l
-     , KnownDomain dom
-     , Eq a
-     , ShowX a
-     , 1 <= l
-     )
-  => Clock dom
-  -- ^ Clock to which the test bench is synchronized
-  -> Reset dom
-  -- ^ Reset line of test bench
-  -> Vec l a
-  -- ^ Samples to compare with
-  -> Signal dom a
-  -- ^ Signal to verify
-  -> Signal dom Bool
-  -- ^ Indicator that all samples are verified
+outputVerifier' ::
+  forall l a dom.
+  ( KnownNat l,
+    KnownDomain dom,
+    Eq a,
+    ShowX a,
+    1 <= l
+  ) =>
+  -- | Clock to which the test bench is synchronized
+  Clock dom ->
+  -- | Reset line of test bench
+  Reset dom ->
+  -- | Samples to compare with
+  Vec l a ->
+  -- | Signal to verify
+  Signal dom a ->
+  -- | Indicator that all samples are verified
+  Signal dom Bool
 outputVerifier' clk =
   outputVerifier @l @a clk clk
 {-# INLINE outputVerifier' #-}
@@ -264,164 +297,165 @@ outputVerifier' clk =
 --
 -- If you're working with 'BitVector's containing don't care bits you should
 -- use 'outputVerifierBitVector'.
-outputVerifier
-  :: forall l a testDom circuitDom
-   . ( KnownNat l
-     , KnownDomain testDom
-     , KnownDomain circuitDom
-     , Eq a
-     , ShowX a
-     , 1 <= l
-     )
-  => Clock testDom
-  -- ^ Clock to which the test bench is synchronized (but not necessarily
+outputVerifier ::
+  forall l a testDom circuitDom.
+  ( KnownNat l,
+    KnownDomain testDom,
+    KnownDomain circuitDom,
+    Eq a,
+    ShowX a,
+    1 <= l
+  ) =>
+  -- | Clock to which the test bench is synchronized (but not necessarily
   -- the circuit under test)
-  -> Clock circuitDom
-  -- ^ Clock to which the circuit under test is synchronized
-  -> Reset testDom
-  -- ^ Reset line of test bench
-  -> Vec l a
-  -- ^ Samples to compare with
-  -> Signal circuitDom a
-  -- ^ Signal to verify
-  -> Signal testDom Bool
-  -- ^ True if all samples are verified
+  Clock testDom ->
+  -- | Clock to which the circuit under test is synchronized
+  Clock circuitDom ->
+  -- | Reset line of test bench
+  Reset testDom ->
+  -- | Samples to compare with
+  Vec l a ->
+  -- | Signal to verify
+  Signal circuitDom a ->
+  -- | True if all samples are verified
+  Signal testDom Bool
 outputVerifier =
   outputVerifierWith (\clk rst -> assert clk rst "outputVerifier")
 {-# INLINE outputVerifier #-}
 
 -- | Same as 'outputVerifier'', but can handle don't care bits in its expected
 -- values.
-outputVerifierBitVector'
-  :: forall l n dom
-   . ( KnownNat l
-     , KnownNat n
-     , KnownDomain dom
-     , 1 <= l
-     )
-  => Clock dom
-  -- ^ Clock to which the input signal is synchronized
-  -> Reset dom
-  -> Vec l (BitVector n)
-  -- ^ Samples to compare with
-  -> Signal dom (BitVector n)
-  -- ^ Signal to verify
-  -> Signal dom Bool
-  -- ^ Indicator that all samples are verified
+outputVerifierBitVector' ::
+  forall l n dom.
+  ( KnownNat l,
+    KnownNat n,
+    KnownDomain dom,
+    1 <= l
+  ) =>
+  -- | Clock to which the input signal is synchronized
+  Clock dom ->
+  Reset dom ->
+  -- | Samples to compare with
+  Vec l (BitVector n) ->
+  -- | Signal to verify
+  Signal dom (BitVector n) ->
+  -- | Indicator that all samples are verified
+  Signal dom Bool
 outputVerifierBitVector' clk =
   outputVerifierBitVector @l @n clk clk
 {-# INLINE outputVerifierBitVector' #-}
 
 -- | Same as 'outputVerifier', but can handle don't care bits in its
 -- expected values.
-outputVerifierBitVector
-  :: forall l n testDom circuitDom
-   . ( KnownNat l
-     , KnownNat n
-     , KnownDomain testDom
-     , KnownDomain circuitDom
-     , 1 <= l
-     )
-  => Clock testDom
-  -- ^ Clock to which the test bench is synchronized (but not necessarily
+outputVerifierBitVector ::
+  forall l n testDom circuitDom.
+  ( KnownNat l,
+    KnownNat n,
+    KnownDomain testDom,
+    KnownDomain circuitDom,
+    1 <= l
+  ) =>
+  -- | Clock to which the test bench is synchronized (but not necessarily
   -- the circuit under test)
-  -> Clock circuitDom
-  -- ^ Clock to which the circuit under test is synchronized
-  -> Reset testDom
-  -- ^ Reset line of test bench
-  -> Vec l (BitVector n)
-  -- ^ Samples to compare with
-  -> Signal circuitDom (BitVector n)
-  -- ^ Signal to verify
-  -> Signal testDom Bool
-  -- ^ Indicator that all samples are verified
+  Clock testDom ->
+  -- | Clock to which the circuit under test is synchronized
+  Clock circuitDom ->
+  -- | Reset line of test bench
+  Reset testDom ->
+  -- | Samples to compare with
+  Vec l (BitVector n) ->
+  -- | Signal to verify
+  Signal circuitDom (BitVector n) ->
+  -- | Indicator that all samples are verified
+  Signal testDom Bool
 outputVerifierBitVector =
   outputVerifierWith
     (\clk rst -> assertBitVector clk rst "outputVerifierBitVector")
 {-# INLINE outputVerifierBitVector #-}
 
-outputVerifierWith
-  :: forall l a testDom circuitDom
-   . ( KnownNat l
-     , KnownDomain testDom
-     , KnownDomain circuitDom
-     , Eq a
-     , ShowX a
-     , 1 <= l
-     )
-  => (    Clock testDom
-       -> Reset testDom
-       -> Signal testDom a
-       -> Signal testDom a
-       -> Signal testDom Bool
-       -> Signal testDom Bool
-      )
-  -- ^ The @assert@ function to use
-  -> Clock testDom
-  -- ^ Clock to which the test bench is synchronized (but not necessarily
+outputVerifierWith ::
+  forall l a testDom circuitDom.
+  ( KnownNat l,
+    KnownDomain testDom,
+    KnownDomain circuitDom,
+    Eq a,
+    ShowX a,
+    1 <= l
+  ) =>
+  -- | The @assert@ function to use
+  ( Clock testDom ->
+    Reset testDom ->
+    Signal testDom a ->
+    Signal testDom a ->
+    Signal testDom Bool ->
+    Signal testDom Bool
+  ) ->
+  -- | Clock to which the test bench is synchronized (but not necessarily
   -- the circuit under test)
-  -> Clock circuitDom
-  -- ^ Clock to which the circuit under test is synchronized
-  -> Reset testDom
-  -- ^ Reset line of test bench
-  -> Vec l a
-  -- ^ Samples to compare with
-  -> Signal circuitDom a
-  -- ^ Signal to verify
-  -> Signal testDom Bool
-  -- ^ True if all samples are verified
+  Clock testDom ->
+  -- | Clock to which the circuit under test is synchronized
+  Clock circuitDom ->
+  -- | Reset line of test bench
+  Reset testDom ->
+  -- | Samples to compare with
+  Vec l a ->
+  -- | Signal to verify
+  Signal circuitDom a ->
+  -- | True if all samples are verified
+  Signal testDom Bool
 outputVerifierWith assertF clkTest clkCircuit rst samples i0 =
-    let i1    = unsafeSimSynchronizer clkCircuit clkTest i0
-        en    = toEnable (pure True)
-        (s,o) = unbundle (genT <$> register clkTest rst en 0 s)
-        (e,f) = unbundle o
-        f'    = register clkTest rst en False f
-        -- Only assert while not finished
-    in  mux f' f' $ assertF clkTest rst i1 e f'
+  let i1 = unsafeSimSynchronizer clkCircuit clkTest i0
+      en = toEnable (pure True)
+      (s, o) = unbundle (genT <$> register clkTest rst en 0 s)
+      (e, f) = unbundle o
+      f' = register clkTest rst en False f
+   in
+      -- Only assert while not finished
+      mux f' f' $ assertF clkTest rst i1 e f'
   where
-    genT :: Index l -> (Index l,(a,Bool))
-    genT s = (s',(samples !! s,finished))
+    genT :: Index l -> (Index l, (a, Bool))
+    genT s = (s', (samples !! s, finished))
       where
         s' = satSucc SatBound s
         finished = s == maxBound
-{-# INLINABLE outputVerifierWith #-}
+{-# INLINEABLE outputVerifierWith #-}
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
-ignoreFor
-  :: forall dom  n a
-   . KnownDomain dom
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> SNat n
-  -- ^ Number of cycles to ignore incoming signal
-  -> a
-  -- ^ Value function produces when ignoring signal
-  -> Signal dom a
-  -- ^ Incoming signal
-  -> Signal dom a
-  -- ^ Either a passthrough of the incoming signal, or the static value
+ignoreFor ::
+  forall dom n a.
+  (KnownDomain dom) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Number of cycles to ignore incoming signal
+  SNat n ->
+  -- | Value function produces when ignoring signal
+  a ->
+  -- | Incoming signal
+  Signal dom a ->
+  -- | Either a passthrough of the incoming signal, or the static value
   -- provided as the second argument.
+  Signal dom a
 ignoreFor clk rst en SNat a i =
   mux ((==) <$> counter <*> (pure maxBound)) i (pure a)
- where
-  counter :: Signal dom (Index (n+1))
-  counter = register clk rst en 0 (satSucc SatBound <$> counter)
+  where
+    counter :: Signal dom (Index (n + 1))
+    counter = register clk rst en 0 (satSucc SatBound <$> counter)
 
 -- | Same as 'tbClockGen', but returns two clocks on potentially different
 -- domains. To be used in situations where the test circuit potentially operates
 -- on a different clock than the device under test.
-biTbClockGen
-  :: forall testDom circuitDom
-   . ( KnownDomain testDom
-     , KnownDomain circuitDom
-     )
-  => Signal testDom Bool
-  -> (Clock testDom, Clock circuitDom)
+biTbClockGen ::
+  forall testDom circuitDom.
+  ( KnownDomain testDom,
+    KnownDomain circuitDom
+  ) =>
+  Signal testDom Bool ->
+  (Clock testDom, Clock circuitDom)
 biTbClockGen done = (testClk, circuitClk)
- where
-  testClk = tbClockGen done
-  circuitClk = tbClockGen (unsafeSynchronizer testClk circuitClk done)
+  where
+    testClk = tbClockGen done
+    circuitClk = tbClockGen (unsafeSynchronizer testClk circuitClk done)
 
 -- | Enable signal that's always enabled. Because it has a blackbox definition
 -- this enable signal is opaque to other blackboxes. It will therefore never
@@ -450,9 +484,9 @@ tbEnableGen = toEnable (pure True)
 --     clk            = 'tbSystemClockGen' (not \<\$> done)
 --     rst            = systemResetGen
 -- @
-tbSystemClockGen
-  :: Signal System Bool
-  -> Clock System
+tbSystemClockGen ::
+  Signal System Bool ->
+  Clock System
 tbSystemClockGen = tbClockGen
 
 -- | Convert a single-ended clock to a differential clock
@@ -470,7 +504,7 @@ tbSystemClockGen = tbClockGen
 -- clk = clockToDiffClock $ tbClockGen (not \<\$\> done)
 -- @
 clockToDiffClock ::
-  KnownDomain dom =>
+  (KnownDomain dom) =>
   -- | Single-ended input
   Clock dom ->
   -- | Differential output
@@ -486,16 +520,17 @@ clockToDiffClock clk = DiffClock clk (ClockN SSymbol)
 -- bench. 'outputVerifier' uses this function when it needs to cross between
 -- clock domains, which will render it unsuitable for synthesis, but good enough
 -- for simulating the generated HDL.
-unsafeSimSynchronizer
-  :: forall dom1 dom2 a
-   . ( KnownDomain dom1
-     , KnownDomain dom2 )
-  => Clock dom1
-  -- ^ 'Clock' of the incoming signal
-  -> Clock dom2
-  -- ^ 'Clock' of the outgoing signal
-  -> Signal dom1 a
-  -> Signal dom2 a
+unsafeSimSynchronizer ::
+  forall dom1 dom2 a.
+  ( KnownDomain dom1,
+    KnownDomain dom2
+  ) =>
+  -- | 'Clock' of the incoming signal
+  Clock dom1 ->
+  -- | 'Clock' of the outgoing signal
+  Clock dom2 ->
+  Signal dom1 a ->
+  Signal dom2 a
 unsafeSimSynchronizer = unsafeSynchronizer
 {-# OPAQUE unsafeSimSynchronizer #-}
 {-# ANN unsafeSimSynchronizer hasBlackBox #-}

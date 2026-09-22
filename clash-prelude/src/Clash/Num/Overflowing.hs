@@ -1,9 +1,3 @@
-{-|
-Copyright  :  (C) 2021-2026, QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,35 +5,39 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+{-|
+Copyright  :  (C) 2021-2026, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.Num.Overflowing
-  ( Overflowing
-  , fromOverflowing
-  , hasOverflowed
-  , toOverflowing
-  , clearOverflow
-  ) where
+  ( Overflowing,
+    fromOverflowing,
+    hasOverflowed,
+    toOverflowing,
+    clearOverflow,
+  )
+where
 
-import Prelude hiding (even, odd)
-
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral,
+    CheckedPositiveIntegerLiteral,
+  )
+import CheckedLiterals.Class.Rational
+  ( CheckedNegativeRationalLiteral,
+    CheckedPositiveRationalLiteral,
+  )
+import Clash.Class.BitPack (BitPack (..))
+import Clash.Class.Num (SaturatingNum (..), SaturationMode (SatWrap, SatZero))
+import Clash.Class.Parity (Parity (..))
+import Clash.XException (NFDataX, ShowX)
 import Control.DeepSeq (NFData)
 import Data.Binary (Binary)
 import Data.Function (on)
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, type (+))
-import CheckedLiterals.Class.Integer
-  ( CheckedNegativeIntegerLiteral
-  , CheckedPositiveIntegerLiteral
-  )
-import CheckedLiterals.Class.Rational
-  ( CheckedNegativeRationalLiteral
-  , CheckedPositiveRationalLiteral
-  )
-
-import Clash.Class.BitPack (BitPack(..))
-import Clash.Class.Num (SaturationMode(SatWrap, SatZero), SaturatingNum(..))
-import Clash.Class.Parity (Parity(..))
-import Clash.XException (NFDataX, ShowX)
+import Prelude hiding (even, odd)
 
 -- | An overflowing number behaves similarly to a 'Clash.Num.Wrapping.Wrapping'
 -- number, but also includes an overflow status flag which can be used to more
@@ -48,10 +46,10 @@ import Clash.XException (NFDataX, ShowX)
 -- Numbers can be converted to be 'Overflowing' using 'toOverflowing'.
 --
 data Overflowing a = Overflowing
-  { fromOverflowing :: a
-    -- ^ Retrieve the value
-  , hasOverflowed :: Bool
-    -- ^ 'True' when a computation has overflowed
+  { -- | Retrieve the value
+    fromOverflowing :: a,
+    -- | 'True' when a computation has overflowed
+    hasOverflowed :: Bool
   }
   deriving stock (Generic, Show)
   deriving anyclass (Binary, Hashable, NFData, NFDataX, ShowX)
@@ -61,9 +59,10 @@ toOverflowing :: a -> Overflowing a
 toOverflowing x = Overflowing x False
 
 {-# INLINE clearOverflow #-}
+
 -- | Reset the overflow status flag to False.
 clearOverflow :: Overflowing a -> Overflowing a
-clearOverflow x = x { hasOverflowed = False }
+clearOverflow x = x {hasOverflowed = False}
 
 instance
   (CheckedPositiveIntegerLiteral lit a) =>
@@ -91,7 +90,8 @@ instance (Ord a) => Ord (Overflowing a) where
 
 instance (BitPack a, KnownNat (BitSize a + 1)) => BitPack (Overflowing a) where
   type BitSize (Overflowing a) = BitSize a + 1
-  -- Default instance, no explicit implementations.
+
+-- Default instance, no explicit implementations.
 
 instance (Parity a) => Parity (Overflowing a) where
   {-# INLINE even #-}
@@ -102,51 +102,46 @@ instance (Parity a) => Parity (Overflowing a) where
 
 instance (Bounded a, Ord a, SaturatingNum a) => Num (Overflowing a) where
   Overflowing x a + Overflowing y b
-    | y > 0
-    , x > satSub SatWrap maxBound y
-    = withOverflow True
-
-    | y < 0
-    , x < satSub SatWrap minBound y
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
-   where
-    withOverflow = Overflowing (satAdd SatWrap x y)
+    | y > 0,
+      x > satSub SatWrap maxBound y =
+        withOverflow True
+    | y < 0,
+      x < satSub SatWrap minBound y =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
+    where
+      withOverflow = Overflowing (satAdd SatWrap x y)
 
   Overflowing x a - Overflowing y b
-    | y < 0
-    , x > satAdd SatWrap maxBound y
-    = withOverflow True
-
-    | y > 0
-    , x < satAdd SatWrap minBound y
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
-   where
-    withOverflow = Overflowing (satSub SatWrap x y)
+    | y < 0,
+      x > satAdd SatWrap maxBound y =
+        withOverflow True
+    | y > 0,
+      x < satAdd SatWrap minBound y =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
+    where
+      withOverflow = Overflowing (satSub SatWrap x y)
 
   Overflowing x a * Overflowing y b
-    | x /= 0
-    , y /= 0
-    , satMul SatZero x y == 0
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
-   where
-    withOverflow = Overflowing (satMul SatWrap x y)
+    | x /= 0,
+      y /= 0,
+      satMul SatZero x y == 0 =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
+    where
+      withOverflow = Overflowing (satMul SatWrap x y)
 
   negate n@(Overflowing x a)
     | 0 == x = n
     | 0 <= minBound @a = withOverflow True
     | x == minBound = withOverflow True
     | otherwise = withOverflow a
-   where
-    withOverflow = Overflowing (negate x)
+    where
+      withOverflow = Overflowing (negate x)
 
   abs (Overflowing x a)
     | x == minBound && x < 0 = Overflowing x True
@@ -176,76 +171,71 @@ instance (Bounded a) => Bounded (Overflowing a) where
 instance (Ord a, SaturatingNum a) => SaturatingNum (Overflowing a) where
   {-# INLINE satAdd #-}
   satAdd mode (Overflowing x a) (Overflowing y b)
-    | y > 0
-    , x > satSub SatWrap maxBound y
-    = withOverflow True
-
-    | y < 0
-    , x < satSub SatWrap minBound y
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
-   where
-    withOverflow =
-      let r = satAdd mode x y
-       in seq r $ Overflowing r
+    | y > 0,
+      x > satSub SatWrap maxBound y =
+        withOverflow True
+    | y < 0,
+      x < satSub SatWrap minBound y =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
+    where
+      withOverflow =
+        let r = satAdd mode x y
+         in seq r $ Overflowing r
 
   {-# INLINE satSub #-}
   satSub mode (Overflowing x a) (Overflowing y b)
-    | y < 0
-    , x > satAdd SatWrap maxBound y
-    = withOverflow True
-
-    | y > 0
-    , x < satAdd SatWrap minBound y
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
-   where
-    withOverflow =
-      let r = satSub mode x y
-       in seq r $ Overflowing r
+    | y < 0,
+      x > satAdd SatWrap maxBound y =
+        withOverflow True
+    | y > 0,
+      x < satAdd SatWrap minBound y =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
+    where
+      withOverflow =
+        let r = satSub mode x y
+         in seq r $ Overflowing r
 
   {-# INLINE satMul #-}
   satMul mode (Overflowing x a) (Overflowing y b)
-    | x /= 0
-    , y /= 0
-    , satMul SatZero x y == 0
-    = withOverflow True
-
-    | otherwise
-    = withOverflow (a || b)
-   where
-    withOverflow =
-      let r = satMul mode x y
-       in seq r $ Overflowing r
+    | x /= 0,
+      y /= 0,
+      satMul SatZero x y == 0 =
+        withOverflow True
+    | otherwise =
+        withOverflow (a || b)
+    where
+      withOverflow =
+        let r = satMul mode x y
+         in seq r $ Overflowing r
 
   {-# INLINE satSucc #-}
   satSucc mode (Overflowing x a) =
     let xSucc = satSucc mode x
-     in seq xSucc
-      $ Overflowing xSucc (a || x == maxBound)
+     in seq xSucc $
+          Overflowing xSucc (a || x == maxBound)
 
   {-# INLINE satPred #-}
   satPred mode (Overflowing x a) =
     let xPred = satPred mode x
-     in seq xPred
-      $ Overflowing (satPred mode x) (a || x == minBound)
+     in seq xPred $
+          Overflowing (satPred mode x) (a || x == minBound)
 
 instance (Enum a, Eq a, SaturatingNum a) => Enum (Overflowing a) where
   succ (Overflowing x a)
     | x == maxBound = withOverflow True
     | otherwise = withOverflow a
-   where
-    withOverflow = Overflowing (satSucc SatWrap x)
+    where
+      withOverflow = Overflowing (satSucc SatWrap x)
 
   pred (Overflowing x a)
     | x == minBound = withOverflow True
     | otherwise = withOverflow a
-   where
-    withOverflow = Overflowing (satPred SatWrap x)
+    where
+      withOverflow = Overflowing (satPred SatWrap x)
 
   toEnum i = Overflowing (toEnum i) False
   fromEnum = fromEnum . fromOverflowing
@@ -258,30 +248,28 @@ instance (Integral a, SaturatingNum a) => Integral (Overflowing a) where
   quotRem (Overflowing x a) (Overflowing y b)
     | x == minBound && y < 0 && y == -1 =
         withOverflow True
-
     | otherwise =
         withOverflow (a || b)
-   where
-    withOverflow o =
-      let (q, r) = quotRem x y
-       in (Overflowing q o, Overflowing r False)
+    where
+      withOverflow o =
+        let (q, r) = quotRem x y
+         in (Overflowing q o, Overflowing r False)
 
   divMod (Overflowing x a) (Overflowing y b)
     | x == minBound && y < 0 && y == -1 =
         withOverflow True
-
     | otherwise =
         withOverflow (a || b)
-   where
-    withOverflow o =
-      let (d, m) = divMod x y
-       in (Overflowing d o, Overflowing m False)
+    where
+      withOverflow o =
+        let (d, m) = divMod x y
+         in (Overflowing d o, Overflowing m False)
 
   toInteger = toInteger . fromOverflowing
 
 instance (Fractional a, Ord a, SaturatingNum a) => Fractional (Overflowing a) where
   recip x =
-    x { fromOverflowing = recip (fromOverflowing x) }
+    x {fromOverflowing = recip (fromOverflowing x)}
 
   -- TODO This does what the underlying representation does if the Rational
   -- is not in range (typically wrapping). It would be better if this also

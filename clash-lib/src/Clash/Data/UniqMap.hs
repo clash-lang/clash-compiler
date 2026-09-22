@@ -10,96 +10,104 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Data.UniqMap
-  ( UniqMap(..)
-  , empty
-  , singleton
-  , singletonUnique
-  , null
-  , insert
-  , insertUnique
-  , insertWith
-  , insertMany
-  , insertIfAbsent
-  , lookup
-  , find
-  , elem
-  , notElem
-  , filter
-  , mapMaybe
-  , foldrWithUnique
-  , foldlWithUnique'
-  , delete
-  , deleteMany
-  , unionWith
-  , difference
-  , disjoint
-  , submap
-  , fromList
-  , toList
-  , keys
-  , elems
-  ) where
+  ( UniqMap (..),
+    empty,
+    singleton,
+    singletonUnique,
+    null,
+    insert,
+    insertUnique,
+    insertWith,
+    insertMany,
+    insertIfAbsent,
+    lookup,
+    find,
+    elem,
+    notElem,
+    filter,
+    mapMaybe,
+    foldrWithUnique,
+    foldlWithUnique',
+    delete,
+    deleteMany,
+    unionWith,
+    difference,
+    disjoint,
+    submap,
+    fromList,
+    toList,
+    keys,
+    elems,
+  )
+where
 
 #if MIN_VERSION_ghc(9,8,4) || (MIN_VERSION_ghc(9,6,7) && !MIN_VERSION_ghc(9,8,0))
 #define UNIQUE_IS_WORD64
 #endif
 
-import           Prelude hiding (elem, filter, lookup, notElem, null)
-
-import           Control.DeepSeq (NFData)
-import           Data.Binary (Binary (..))
-import           Data.Bifunctor (first)
-import           Data.Function (on)
+import Control.DeepSeq (NFData)
+import Data.Bifunctor (first)
+import Data.Binary (Binary (..))
+import Data.Function (on)
+import Prelude hiding (elem, filter, lookup, notElem, null)
 #ifdef UNIQUE_IS_WORD64
-import           GHC.Data.Word64Map.Strict (Word64Map)
+import GHC.Data.Word64Map.Strict (Word64Map)
 import qualified GHC.Data.Word64Map.Strict as IntMap
 #else
-import           Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 #endif
 import qualified Data.List as List (foldl')
-
 #if MIN_VERSION_prettyprinter(1,7,0)
-import           Prettyprinter
+import Prettyprinter
 #else
-import           Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc
 #endif
-
-import           Clash.Pretty
-import           Clash.Unique (Unique, Uniquable(getUnique))
+import Clash.Pretty
+import Clash.Unique (Uniquable (getUnique), Unique)
 
 -- | A map indexed by a 'Unique'. Typically the elements of this map are also
 -- uniqueable and provide their own key, however a unique can be associated
 -- with any value.
+#ifdef UNIQUE_IS_WORD64
 newtype UniqMap a
-#ifdef UNIQUE_IS_WORD64
-  = UniqMap { uniqMapToIntMap :: Word64Map a }
-#else
-  = UniqMap { uniqMapToIntMap :: IntMap a }
-#endif
-  deriving stock Traversable
+  = UniqMap {uniqMapToIntMap :: Word64Map a}
+  deriving stock (Traversable)
   deriving newtype
-    ( Foldable
-    , Functor
-    , Monoid
-    , NFData
-    , Semigroup
-    , Show
+    ( Foldable,
+      Functor,
+      Monoid,
+      NFData,
+      Semigroup,
+      Show
     )
-#ifdef UNIQUE_IS_WORD64
-instance Binary a => Binary (UniqMap a) where
+
+instance (Binary a) => Binary (UniqMap a) where
   put (UniqMap m) = put (IntMap.size m) <> mapM_ put (IntMap.toAscList m)
-  get             = fmap (UniqMap . IntMap.fromDistinctAscList) get
+  get = fmap (UniqMap . IntMap.fromDistinctAscList) get
 #else
-  deriving newtype Binary
+newtype UniqMap a
+  = UniqMap {uniqMapToIntMap :: IntMap a}
+  deriving stock (Traversable)
+  deriving newtype
+    ( Foldable,
+      Functor,
+      Monoid,
+      NFData,
+      Semigroup,
+      Show
+    )
+  deriving newtype (Binary)
 #endif
 
-instance ClashPretty a => ClashPretty (UniqMap a) where
+instance (ClashPretty a) => ClashPretty (UniqMap a) where
   clashPretty xs =
-    brackets $ fillSep $ punctuate comma $
-      [ fromPretty k <+> ":->" <+> clashPretty v
-      | (k, v) <- toList xs
-      ]
+    brackets
+      $ fillSep
+      $ punctuate comma
+      $ [ fromPretty k <+> ":->" <+> clashPretty v
+        | (k, v) <- toList xs
+        ]
 
 -- | An empty map.
 empty :: UniqMap a
@@ -107,14 +115,16 @@ empty =
   UniqMap IntMap.empty
 
 {-# SPECIALIZE singleton :: Unique -> b -> UniqMap b #-}
+
 -- | A map containing a single value indexed by the given key's unique.
-singleton :: Uniquable a => a -> b -> UniqMap b
+singleton :: (Uniquable a) => a -> b -> UniqMap b
 singleton k v =
   UniqMap (IntMap.singleton (getUnique k) v)
 
 {-# SPECIALIZE singletonUnique :: Unique -> UniqMap Unique #-}
+
 -- | A map containing a single value indexed by the value's unique.
-singletonUnique :: Uniquable a => a -> UniqMap a
+singletonUnique :: (Uniquable a) => a -> UniqMap a
 singletonUnique v =
   singleton (getUnique v) v
 
@@ -124,60 +134,67 @@ null =
   IntMap.null . uniqMapToIntMap
 
 {-# SPECIALIZE insert :: Unique -> b -> UniqMap b -> UniqMap b #-}
+
 -- | Insert a new key-value pair into the map.
-insert :: Uniquable a => a -> b -> UniqMap b -> UniqMap b
+insert :: (Uniquable a) => a -> b -> UniqMap b -> UniqMap b
 insert k v =
   UniqMap . IntMap.insert (getUnique k) v . uniqMapToIntMap
 
 {-# SPECIALIZE insertUnique :: Unique -> UniqMap Unique -> UniqMap Unique #-}
+
 -- | Insert a new value into the map, using the unique of the value as the key.
-insertUnique :: Uniquable a => a -> UniqMap a -> UniqMap a
+insertUnique :: (Uniquable a) => a -> UniqMap a -> UniqMap a
 insertUnique v =
   insert (getUnique v) v
 
 -- | Insert a new key-value pair into the map, using the given combining
 -- function if there is already an entry with the same unique in the map.
-insertWith :: Uniquable a => (b -> b -> b) -> a -> b -> UniqMap b -> UniqMap b
+insertWith :: (Uniquable a) => (b -> b -> b) -> a -> b -> UniqMap b -> UniqMap b
 insertWith f k v =
   UniqMap . IntMap.insertWith f (getUnique k) v . uniqMapToIntMap
 
 -- | Insert a list of key-value pairs into the map.
-insertMany :: Uniquable a => [(a, b)] -> UniqMap b -> UniqMap b
+insertMany :: (Uniquable a) => [(a, b)] -> UniqMap b -> UniqMap b
 insertMany kvs xs =
   List.foldl' (\acc (k, v) -> insert k v acc) xs kvs
 
 {-# SPECIALIZE insertIfAbsent :: Unique -> b -> UniqMap b -> UniqMap b #-}
+
 -- | Insert a key-value pair into the map if the key is not already present. Note
 -- that this will first do a lookup and only then use insert (when applicable).
 -- Use this when you can reasonably expect the key to already exist.
-insertIfAbsent :: Uniquable a => a -> b -> UniqMap b -> UniqMap b
+insertIfAbsent :: (Uniquable a) => a -> b -> UniqMap b -> UniqMap b
 insertIfAbsent k v m = if elem k m then m else insert k v m
 
 {-# SPECIALIZE lookup :: Unique -> UniqMap b -> Maybe b #-}
+
 -- | Lookup an item in the map, using the unique of the given key.
-lookup :: Uniquable a => a -> UniqMap b -> Maybe b
+lookup :: (Uniquable a) => a -> UniqMap b -> Maybe b
 lookup k =
   IntMap.lookup (getUnique k) . uniqMapToIntMap
 
 {-# SPECIALIZE find :: Unique -> UniqMap b -> b #-}
+
 -- | Lookup and item in the map, using the unique of the given key. If the item
 -- is not found in the map an error is raised.
-find :: Uniquable a => a -> UniqMap b -> b
+find :: (Uniquable a) => a -> UniqMap b -> b
 find k =
   let notFound =
         error ("find: Key " <> show (getUnique k) <> " is not in the UniqMap")
    in IntMap.findWithDefault notFound (getUnique k) . uniqMapToIntMap
 
 {-# SPECIALIZE elem :: Unique -> UniqMap b -> Bool #-}
+
 -- | Check if there is an entry in the map for the unique of the given value.
-elem :: Uniquable a => a -> UniqMap b -> Bool
+elem :: (Uniquable a) => a -> UniqMap b -> Bool
 elem k =
   IntMap.member (getUnique k) . uniqMapToIntMap
 
 {-# SPECIALIZE notElem :: Unique -> UniqMap b -> Bool #-}
+
 -- | Check if there is not an entry in the map for the unique of the given
 -- value.
-notElem :: Uniquable a => a -> UniqMap b -> Bool
+notElem :: (Uniquable a) => a -> UniqMap b -> Bool
 notElem k =
   IntMap.notMember (getUnique k) . uniqMapToIntMap
 
@@ -203,13 +220,14 @@ foldlWithUnique' f x =
   IntMap.foldlWithKey' f x . uniqMapToIntMap
 
 {-# SPECIALIZE delete :: Unique -> UniqMap b -> UniqMap b #-}
+
 -- | Delete the entry in the map indexed by the unique of the given value.
-delete :: Uniquable a => a -> UniqMap b -> UniqMap b
+delete :: (Uniquable a) => a -> UniqMap b -> UniqMap b
 delete k =
   UniqMap . IntMap.delete (getUnique k) . uniqMapToIntMap
 
 -- | Delete all entries in the map indexed by the uniques of the given values.
-deleteMany :: Uniquable a => [a] -> UniqMap b -> UniqMap b
+deleteMany :: (Uniquable a) => [a] -> UniqMap b -> UniqMap b
 deleteMany ks xs =
   List.foldl' (\acc k -> delete k acc) xs ks
 
@@ -237,8 +255,9 @@ submap =
   IntMap.isSubmapOfBy (\_ _ -> True) `on` uniqMapToIntMap
 
 {-# SPECIALIZE fromList :: [(Unique, b)] -> UniqMap b #-}
+
 -- | Convert a list of key-value pairs to a map.
-fromList :: Uniquable a => [(a, b)] -> UniqMap b
+fromList :: (Uniquable a) => [(a, b)] -> UniqMap b
 fromList =
   UniqMap . IntMap.fromList . fmap (first getUnique)
 

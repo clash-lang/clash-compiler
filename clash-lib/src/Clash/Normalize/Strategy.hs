@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                 (C) 2021-2026, QBayLogic B.V.
@@ -6,9 +8,6 @@
 
   Transformation process for normalization
 -}
-
-{-# LANGUAGE CPP #-}
-
 module Clash.Normalize.Strategy where
 
 import Clash.Normalize.Transformations
@@ -32,48 +31,65 @@ import Clash.Rewrite.Util
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization =
-  rmDeadcode >-> multPrim >-> constantPropagation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-  bindConst >-> letTL
-  >-> evalConst
-  >-!-> cse >-!-> cleanup >->
-  elimCaseBigNum >->  -- see [Note] late elimCaseBigNum
-  xOptim >-> rmDeadcode >->
-  cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
+  rmDeadcode
+    >-> multPrim
+    >-> constantPropagation
+    >-> rmUnusedExpr
+    >-!-> anf
+    >-!-> rmDeadcode
+    >-> bindConst
+    >-> letTL
+    >-> evalConst
+    >-!-> cse
+    >-!-> cleanup
+    >-> elimCaseBigNum
+    >-> xOptim -- see [Note] late elimCaseBigNum
+    >-> rmDeadcode
+    >-> cleanup
+    >-> bindSimIO
+    >-> recLetRec
+    >-> splitArgs
   where
-    multPrim   = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
-    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
-    letTL      = topdownSucR (apply "topLet" topLet)
-    recLetRec  = apply "recToLetRec" recToLetRec
+    multPrim = topdownR (apply "setupMultiResultPrim" setupMultiResultPrim)
+    anf = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF >-> topdownR (apply "caseCon" caseCon)
+    letTL = topdownSucR (apply "topLet" topLet)
+    recLetRec = apply "recToLetRec" recToLetRec
     rmUnusedExpr = bottomupR (apply "removeUnusedExpr" removeUnusedExpr)
     rmDeadcode = bottomupR (apply "deadcode" deadCode)
-    bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
+    bindConst = topdownR (apply "bindConstantVar" bindConstantVar)
     -- See [Note] bottomup traversal reduceConst:
-    evalConst  = bottomupR (apply "reduceConst" reduceConst)
-    cse        = topdownR (apply "CSE" simpleCSE)
+    evalConst = bottomupR (apply "reduceConst" reduceConst)
+    cse = topdownR (apply "CSE" simpleCSE)
     elimCaseBigNum = topdownR (apply "elimCaseBigNum" elimCaseBigNumInternals)
-    xOptim     = bottomupR (apply "xOptimize" xOptimize)
-    cleanup    = topdownR (apply "etaExpandSyn" etaExpandSyn) >->
-                 topdownSucR (apply "inlineCleanup" inlineCleanup) !->
-                 innerMost (applyMany [("caseCon"        , caseCon)
-                                      ,("bindConstantVar", bindConstantVar)
-                                      ,("letFlat"        , flattenLet)])
-                 >-> rmDeadcode >-> letTL
-    splitArgs  = topdownR (apply "separateArguments" separateArguments) !->
-                 bottomupR (apply "caseCon" caseCon)
-    bindSimIO  = topdownR (apply "bindSimIO" inlineSimIO)
-
+    xOptim = bottomupR (apply "xOptimize" xOptimize)
+    cleanup =
+      topdownR (apply "etaExpandSyn" etaExpandSyn)
+        >-> topdownSucR (apply "inlineCleanup" inlineCleanup)
+        !-> innerMost
+          ( applyMany
+              [ ("caseCon", caseCon),
+                ("bindConstantVar", bindConstantVar),
+                ("letFlat", flattenLet)
+              ]
+          )
+          >-> rmDeadcode
+          >-> letTL
+    splitArgs =
+      topdownR (apply "separateArguments" separateArguments)
+        !-> bottomupR (apply "caseCon" caseCon)
+    bindSimIO = topdownR (apply "bindSimIO" inlineSimIO)
 
 constantPropagation :: NormRewrite
 constantPropagation =
-  inlineAndPropagate >->
-  caseFlattening >->
-  etaTL >->
-  dec >->
-  spec >->
-  dec >->
-  conSpec
+  inlineAndPropagate
+    >-> caseFlattening
+    >-> etaTL
+    >-> dec
+    >-> spec
+    >-> dec
+    >-> conSpec
   where
-    etaTL              = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
+    etaTL = apply "etaTL" etaExpansionTL !-> topdownR (apply "applicationPropagation" appProp)
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down bundle from the
     -- new root.
@@ -81,38 +97,40 @@ constantPropagation =
     -- NB: 'topdownFixR' is deliberately _not_ used here, see
     -- Note [topdownFixR is not for inlining bundles].
     inlineAndPropagate = repeatR (topdownR (applyMany transPropagateAndInline) >-> inlineNR)
-    spec               = bottomupR (applyMany specTransformations)
-    caseFlattening     = topdownFixR (apply "caseFlat" caseFlat)
-    dec                = topdownFixR (apply "DEC" disjointExpressionConsolidation)
-    conSpec            = bottomupR  ((apply "appPropCS" appProp !->
-                                     bottomupR (apply "constantSpec" constantSpec)) >-!
-                                     apply "constantSpec" constantSpec)
+    spec = bottomupR (applyMany specTransformations)
+    caseFlattening = topdownFixR (apply "caseFlat" caseFlat)
+    dec = topdownFixR (apply "DEC" disjointExpressionConsolidation)
+    conSpec =
+      bottomupR
+        ( ( apply "appPropCS" appProp
+              !-> bottomupR (apply "constantSpec" constantSpec)
+          )
+            >-! apply "constantSpec" constantSpec
+        )
 
-    transPropagateAndInline :: [(String,NormRewrite)]
+    transPropagateAndInline :: [(String, NormRewrite)]
     transPropagateAndInline =
-      [ ("applicationPropagation", appProp              )
-      , ("bindConstantVar"       , bindConstantVar      )
-      , ("caseLet"               , caseLet              )
-      , ("caseCase"              , caseCase             )
-      , ("caseCon"               , caseCon              )
-      , ("elimExistentials"      , elimExistentials     )
-      , ("caseEliminateNonReachable"  , caseEliminateNonReachable )
-      , ("removeUnusedExpr"      , removeUnusedExpr     )
-      -- These transformations can safely be applied in a top-down traversal as
-      -- they themselves check whether the to-be-inlined binder is recursive or not.
-      , ("inlineWorkFree"  , inlineWorkFree)
-      , ("inlineSmall"     , inlineSmall)
-      , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
-                                                 -- See: [Note] bottom-up traversal for liftNonRep
-      , ("reduceNonRepPrim", reduceNonRepPrim)
-
-
-      , ("caseCast"        , caseCast)
-      , ("letCast"         , letCast)
-      , ("splitCastWork"   , splitCastWork)
-      , ("argCastSpec"     , argCastSpec)
-      , ("inlineCast"      , inlineCast)
-      , ("elimCastCast"    , elimCastCast)
+      [ ("applicationPropagation", appProp),
+        ("bindConstantVar", bindConstantVar),
+        ("caseLet", caseLet),
+        ("caseCase", caseCase),
+        ("caseCon", caseCon),
+        ("elimExistentials", elimExistentials),
+        ("caseEliminateNonReachable", caseEliminateNonReachable),
+        ("removeUnusedExpr", removeUnusedExpr),
+        -- These transformations can safely be applied in a top-down traversal as
+        -- they themselves check whether the to-be-inlined binder is recursive or not.
+        ("inlineWorkFree", inlineWorkFree),
+        ("inlineSmall", inlineSmall),
+        ("bindOrLiftNonRep", inlineOrLiftNonRep), -- See: [Note] bindNonRep before liftNonRep
+        -- See: [Note] bottom-up traversal for liftNonRep
+        ("reduceNonRepPrim", reduceNonRepPrim),
+        ("caseCast", caseCast),
+        ("letCast", letCast),
+        ("splitCastWork", splitCastWork),
+        ("argCastSpec", argCastSpec),
+        ("inlineCast", inlineCast),
+        ("elimCastCast", elimCastCast)
       ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
@@ -133,14 +151,14 @@ constantPropagation =
     --
     inlineNR :: NormRewrite
     inlineNR =
-          bottomupR (apply "deadCode" deadCode)
-      >-! apply "inlineNonRep" inlineNonRep
+      bottomupR (apply "deadCode" deadCode)
+        >-! apply "inlineNonRep" inlineNonRep
 
-    specTransformations :: [(String,NormRewrite)]
+    specTransformations :: [(String, NormRewrite)]
     specTransformations =
-      [ ("typeSpec"    , typeSpec)
-      , ("nonRepSpec"  , nonRepSpec)
-      , ("zeroWidthSpec", zeroWidthSpec)
+      [ ("typeSpec", typeSpec),
+        ("nonRepSpec", nonRepSpec),
+        ("zeroWidthSpec", zeroWidthSpec)
         -- See Note [zeroWidthSpec enabling transformations]
       ]
 
@@ -338,6 +356,6 @@ innerMost :: Rewrite extra -> Rewrite extra
 innerMost = let go r = bottomupR (r !-> innerMost r) in go
 {-# INLINE innerMost #-}
 
-applyMany :: [(String,Rewrite extra)] -> Rewrite extra
+applyMany :: [(String, Rewrite extra)] -> Rewrite extra
 applyMany = foldr1 (>->) . map (uncurry apply)
 {-# INLINE applyMany #-}

@@ -1,29 +1,26 @@
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_HADDOCK hide #-}
+
 {-|
 Copyright  :  (C) 2019     , Myrtle Software Ltd,
                   2023     , QBayLogic B.V.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE CPP #-}
-
-{-# OPTIONS_HADDOCK hide #-}
-
 module Clash.CPP
- ( maxTupleSize
- , haddockOnly
+  ( maxTupleSize,
+    haddockOnly,
 
- -- ** Cabal flags
- , fSuperStrict
- , fStrictMapSignal
- ) where
+    -- ** Cabal flags
+    fSuperStrict,
+    fStrictMapSignal,
+  )
+where
 
 #ifndef MAX_TUPLE_SIZE
 #ifdef LARGE_TUPLES
-
 import GHC.Settings.Constants (mAX_TUPLE_SIZE)
 #define MAX_TUPLE_SIZE (fromIntegral mAX_TUPLE_SIZE)
-
 #else
 #ifdef HADDOCK_ONLY
 #define MAX_TUPLE_SIZE 3
@@ -33,7 +30,7 @@ import GHC.Settings.Constants (mAX_TUPLE_SIZE)
 #endif
 #endif
 
-maxTupleSize :: Num a => a
+maxTupleSize :: (Num a) => a
 maxTupleSize = MAX_TUPLE_SIZE
 
 haddockOnly :: Bool

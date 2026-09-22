@@ -1,7 +1,16 @@
-{ pkgs, qlog }:
+{ pkgs, qlog, tilia-src }:
 compilerVersion:
 let
   clashPkgs = pkgs."clashPackages-${compilerVersion}";
+  tilia = pkgs.haskell.lib.justStaticExecutables (
+    # The upstream tests download formatting corpora and need network access.
+    pkgs.haskell.lib.dontCheck (pkgs.haskellPackages.callCabal2nix
+      "tilia"
+      tilia-src
+      {
+        ghc-lib-parser = pkgs.haskellPackages.ghc-lib-parser_9_14_1_20251220;
+      })
+  );
   haskellLanguageServer =
     if compilerVersion == "ghc9141" then
       [ ]
@@ -28,6 +37,7 @@ clashPkgs.shellFor {
 
   buildInputs = [
     pkgs.cabal-install
+    tilia
 
     # https://discourse.nixos.org/t/non-interactive-bash-errors-from-flake-nix-mkshell/33310
     pkgs.bashInteractive

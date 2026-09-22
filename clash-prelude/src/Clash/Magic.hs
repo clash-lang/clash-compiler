@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE Trustworthy #-}
+
 {-|
   Copyright   :  (C) 2019-2023, Myrtle Software Ltd
   License     :  BSD2 (see the file LICENSE)
@@ -15,61 +21,54 @@ things include:
 Refer to "Clash.Annotations.TopEntity" for controlling naming of entities
 (VHDL) / modules ((System)Verilog) and their ports.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
-{-# LANGUAGE Trustworthy #-}
-
 module Clash.Magic
-  (
-  -- ** Functions to control names of identifiers in HDL
-    prefixName
-  , suffixName
-  , suffixNameP
-  , suffixNameFromNat
-  , suffixNameFromNatP
-  , setName
-  , nameHint
+  ( -- ** Functions to control names of identifiers in HDL
+    prefixName,
+    suffixName,
+    suffixNameP,
+    suffixNameFromNat,
+    suffixNameFromNatP,
+    setName,
+    nameHint,
 
-  -- ** Functions to control Clash's (de)duplication mechanisms
-  , deDup
-  , noDeDup
+    -- ** Functions to control Clash's (de)duplication mechanisms
+    deDup,
+    noDeDup,
 
-  -- ** Utilities to differentiate between simulation and generating HDL
-  , clashSimulation
-  , SimOnly (..)
+    -- ** Utilities to differentiate between simulation and generating HDL
+    clashSimulation,
+    SimOnly (..),
 
-  -- * Static assertions
-  , clashCompileError
-  ) where
+    -- * Static assertions
+    clashCompileError,
+  )
+where
 
-import Clash.Annotations.Primitive (Primitive(..), hasBlackBox)
-import Clash.NamedTypes            ((:::))
-import Clash.Promoted.Symbol       (SSymbol)
-import Clash.XException            (NFDataX)
-import Data.String.Interpolate     (__i)
-import GHC.Generics                (Generic)
-import GHC.Magic                   (noinline)
-import GHC.Stack                   (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits                (Nat,Symbol)
+import Clash.Annotations.Primitive (Primitive (..), hasBlackBox)
+import Clash.NamedTypes ((:::))
+import Clash.Promoted.Symbol (SSymbol)
+import Clash.XException (NFDataX)
+import Data.String.Interpolate (__i)
+import GHC.Generics (Generic)
+import GHC.Magic (noinline)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
+import GHC.TypeLits (Nat, Symbol)
 
 -- | Prefix instance and register names with the given 'Symbol'
-prefixName
-  :: forall (name :: Symbol) a . a -> name ::: a
+prefixName ::
+  forall (name :: Symbol) a. a -> name ::: a
 prefixName = id
 {-# OPAQUE prefixName #-}
 
 -- | Suffix instance and register names with the given 'Symbol'
-suffixName
-  :: forall (name :: Symbol) a . a -> name ::: a
+suffixName ::
+  forall (name :: Symbol) a. a -> name ::: a
 suffixName = id
 {-# OPAQUE suffixName #-}
 
 -- | Suffix instance and register names with the given 'Nat'
-suffixNameFromNat
-  :: forall (name :: Nat) a . a -> name ::: a
+suffixNameFromNat ::
+  forall (name :: Nat) a. a -> name ::: a
 suffixNameFromNat = id
 {-# OPAQUE suffixNameFromNat #-}
 
@@ -91,8 +90,8 @@ suffixNameFromNat = id
 -- @
 --
 -- so that names inside /f/ will have the suffix "_A_B"
-suffixNameP
-  :: forall (name :: Symbol) a . a -> name ::: a
+suffixNameP ::
+  forall (name :: Symbol) a. a -> name ::: a
 suffixNameP = id
 {-# OPAQUE suffixNameP #-}
 
@@ -114,8 +113,8 @@ suffixNameP = id
 -- @
 --
 -- so that names inside /f/ will have the suffix "_1_B"
-suffixNameFromNatP
-  :: forall (name :: Nat) a . a -> name ::: a
+suffixNameFromNatP ::
+  forall (name :: Nat) a. a -> name ::: a
 suffixNameFromNatP = id
 {-# OPAQUE suffixNameFromNatP #-}
 
@@ -123,8 +122,8 @@ suffixNameFromNatP = id
 -- an auto-generated name. Pre- and suffixes annotated with 'prefixName' and
 -- 'suffixName' will be added to both instances and registers named with
 -- 'setName' and instances and registers that are auto-named.
-setName
-  :: forall (name :: Symbol) a . a -> name ::: a
+setName ::
+  forall (name :: Symbol) a. a -> name ::: a
 setName = id
 {-# OPAQUE setName #-}
 
@@ -140,10 +139,11 @@ setName = id
 --
 -- __NB__: The given name should be considered a hint as it may be expanded,
 -- e.g. if it collides with existing identifiers.
-nameHint
-  :: SSymbol sym
-  -- ^ A hint for a name
-  -> a -> a
+nameHint ::
+  -- | A hint for a name
+  SSymbol sym ->
+  a ->
+  a
 nameHint = seq
 {-# OPAQUE nameHint #-}
 {-# ANN nameHint hasBlackBox #-}
@@ -189,8 +189,8 @@ nameHint = seq
 --   A -> 'deDup' (3 + y)
 --   B -> 'deDup' (x + x)
 -- @
-deDup
-  :: forall a . a -> a
+deDup ::
+  forall a. a -> a
 deDup = id
 {-# OPAQUE deDup #-}
 
@@ -248,8 +248,8 @@ deDup = id
 -- Note that if the /C/-alternative also had an application of /f/, then the
 -- applications of /f/ in the /B/- and /C/-alternatives would have been
 -- deduplicated; i.e. the final circuit would have had two application of /f/.
-noDeDup
-  :: forall a . a -> a
+noDeDup ::
+  forall a. a -> a
 noDeDup = id
 {-# OPAQUE noDeDup #-}
 
@@ -279,10 +279,10 @@ instance Applicative SimOnly where
 instance Monad SimOnly where
   (SimOnly a) >>= f = f a
 
-instance Semigroup a => Semigroup (SimOnly a) where
+instance (Semigroup a) => Semigroup (SimOnly a) where
   (SimOnly a) <> (SimOnly b) = SimOnly (a <> b)
 
-instance Monoid a => Monoid (SimOnly a) where
+instance (Monoid a) => Monoid (SimOnly a) where
   mempty = SimOnly mempty
 
 -- | Same as 'error' but will make HDL generation fail if included in the
@@ -293,13 +293,18 @@ instance Monoid a => Monoid (SimOnly a) where
 -- Note that the error message needs to be a literal, and during HDL generation
 -- the error message does not include a stack trace, so it had better be
 -- descriptive.
-clashCompileError :: forall a . HasCallStack => String -> a
+clashCompileError :: forall a. (HasCallStack) => String -> a
 clashCompileError msg = withFrozenCallStack $ error msg
 {-# OPAQUE clashCompileError #-}
-{-# ANN clashCompileError (
-  let primName = 'clashCompileError
-  in InlineYamlPrimitive [minBound..] [__i|
+{-# ANN
+  clashCompileError
+  ( let primName = 'clashCompileError
+     in InlineYamlPrimitive
+          [minBound ..]
+          [__i|
     BlackBoxHaskell:
       name: #{primName}
       templateFunction: Clash.Primitives.Magic.clashCompileErrorBBF
-    |]) #-}
+    |]
+  )
+  #-}

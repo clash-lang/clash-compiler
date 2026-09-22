@@ -1,11 +1,3 @@
-{-|
-Copyright  :  (C) 2013-2016, University of Twente,
-                  2016     , Myrtle Software Ltd,
-                  2021-2025, QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -15,142 +7,186 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 {-# LANGUAGE Unsafe #-}
-
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions not-home #-}
 
+{-|
+Copyright  :  (C) 2013-2016, University of Twente,
+                  2016     , Myrtle Software Ltd,
+                  2021-2025, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.Sized.Internal.Unsigned
   ( -- * Datatypes
-    Unsigned (..)
+    Unsigned (..),
+
     -- * Accessors
+
     -- ** Length information
-  , size#
+    size#,
+
     -- * Type classes
+
     -- ** BitPack
-  , pack#
-  , unpack#
+    pack#,
+    unpack#,
+
     -- ** Eq
-  , eq#
-  , neq#
+    eq#,
+    neq#,
+
     -- ** Ord
-  , lt#
-  , ge#
-  , gt#
-  , le#
+    lt#,
+    ge#,
+    gt#,
+    le#,
+
     -- ** Enum
-  , toEnum#
-  , fromEnum#
+    toEnum#,
+    fromEnum#,
+
     -- ** Enum (not synthesizable)
-  , enumFrom#
-  , enumFromThen#
-  , enumFromTo#
-  , enumFromThenTo#
+    enumFrom#,
+    enumFromThen#,
+    enumFromTo#,
+    enumFromThenTo#,
+
     -- ** Bounded
-  , minBound#
-  , maxBound#
+    minBound#,
+    maxBound#,
+
     -- ** Num
-  , (+#)
-  , (-#)
-  , (*#)
-  , negate#
-  , fromInteger#
+    (+#),
+    (-#),
+    (*#),
+    negate#,
+    fromInteger#,
+
     -- ** ExtendingNum
-  , plus#
-  , minus#
-  , times#
+    plus#,
+    minus#,
+    times#,
+
     -- ** Integral
-  , quot#
-  , rem#
-  , toInteger#
+    quot#,
+    rem#,
+    toInteger#,
+
     -- ** Bits
-  , and#
-  , or#
-  , xor#
-  , complement#
-  , shiftL#
-  , shiftR#
-  , rotateL#
-  , rotateR#
+    and#,
+    or#,
+    xor#,
+    complement#,
+    shiftL#,
+    shiftR#,
+    rotateL#,
+    rotateR#,
+
     -- ** Resize
-  , resize#
+    resize#,
+
     -- ** Conversions
-  , unsignedToWord
-  , unsigned8toWord8
-  , unsigned16toWord16
-  , unsigned32toWord32
+    unsignedToWord,
+    unsigned8toWord8,
+    unsigned16toWord16,
+    unsigned32toWord32,
+
     -- * Type-level error messages
-  , UnsignedPositiveLiteralError
+    UnsignedPositiveLiteralError,
   )
 where
 
-import Prelude hiding                 (even, odd)
-
-import Control.DeepSeq                (NFData (..))
-import Control.Lens                   (Index, Ixed (..), IxValue)
-import Data.Bits                      (Bits (..), FiniteBits (..))
-import Data.Data                      (Data)
-import Data.Default                   (Default (..))
-import Data.Proxy                     (Proxy (..))
-import Data.Type.Bool                 (If)
-import Text.Read                      (Read (..), ReadPrec)
-import Text.Printf                    (PrintfArg (..), printf)
-import GHC.Exts                       (wordToWord8#, wordToWord16#, wordToWord32#)
-import GHC.Generics                   (Generic)
-import GHC.Num.BigNat                 (bigNatToWord, bigNatToWord#)
+import CheckedLiterals.Class.Integer
+  ( CheckedNegativeIntegerLiteral,
+    CheckedPositiveIntegerLiteral,
+    NegativeUnsignedError,
+  )
+import Clash.Annotations.Primitive (hasBlackBox)
+import Clash.Class.BitPack (BitPack (..), bitCoerce, packXWith)
+import Clash.Class.BitPack.BitIndex (msb, replaceBit, split, (!))
+import Clash.Class.BitPack.BitReduction (reduceOr)
+import Clash.Class.Num
+  ( ExtendingNum (..),
+    SaturatingNum (..),
+    SaturationMode (..),
+  )
+import Clash.Class.Parity (Parity (..))
+import Clash.Class.Resize (Resize (..))
+import Clash.Promoted.Nat (natToNatural, natToNum)
+import Clash.Sized.Internal.BitVector (Bit, BitVector (BV), high, low, undefError)
+import qualified Clash.Sized.Internal.BitVector as BV
+import Clash.Sized.Internal.CheckedLiterals
+  ( PotentiallyOutOfBounds,
+    UnsignedBounds,
+  )
+import Clash.Sized.Internal.Mod
+import Clash.XException
+  ( NFDataX (..),
+    ShowX (..),
+    errorX,
+    rwhnfX,
+    showsPrecXWith,
+  )
+import Control.DeepSeq (NFData (..))
+import Control.Lens (Index, IxValue, Ixed (..))
+import Data.Bits (Bits (..), FiniteBits (..))
+import Data.Data (Data)
+import Data.Default (Default (..))
+import Data.Ix (Ix (..))
+import Data.Proxy (Proxy (..))
+import Data.Type.Bool (If)
+import GHC.Exts (wordToWord16#, wordToWord32#, wordToWord8#)
+import GHC.Generics (Generic)
+import GHC.Natural (naturalToInteger)
+import GHC.Num.BigNat (bigNatToWord, bigNatToWord#)
 import GHC.Num.Integer
-  (integerFromNatural, integerShiftL, integerToNatural)
+  ( integerFromNatural,
+    integerShiftL,
+    integerToNatural,
+  )
 import GHC.Num.Natural
-  (Natural (..), naturalShiftL, naturalShiftR, naturalToWord)
-import GHC.Natural                    (naturalToInteger)
+  ( Natural (..),
+    naturalShiftL,
+    naturalShiftR,
+    naturalToWord,
+  )
 import GHC.TypeError
-  ( Assert
-  , ErrorMessage (ShowType)
+  ( Assert,
+    ErrorMessage (ShowType),
   )
 import GHC.TypeLits
-  ( KnownNat
-  , Nat
-  , type (+)
-  , type (-)
-  , type (<=?)
-  , type (^)
+  ( KnownNat,
+    Nat,
+    type (+),
+    type (-),
+    type (<=?),
+    type (^),
   )
-import GHC.TypeNats                   (natVal)
-import GHC.TypeLits.Extra             (CLog, Max)
-import GHC.Word                       (Word (..), Word8 (..), Word16 (..), Word32 (..))
-import Data.Ix                        (Ix(..))
-import Language.Haskell.TH            (appT, conT, litT, numTyLit, sigE)
-import Language.Haskell.TH.Syntax     (Lift(..))
+import GHC.TypeLits.Extra (CLog, Max)
+import GHC.TypeNats (natVal)
+import GHC.Word (Word (..), Word16 (..), Word32 (..), Word8 (..))
+import Language.Haskell.TH
+  ( Quote,
+    Type,
+    appT,
+    conT,
+    litT,
+    numTyLit,
+    sigE,
+  )
 import Language.Haskell.TH.Compat
-import Language.Haskell.TH            (Quote, Type)
-import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
-                                       arbitraryBoundedIntegral,
-                                       coarbitraryIntegral)
-
-import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.BitPack            (BitPack (..), packXWith, bitCoerce)
-import Clash.Class.Num                (ExtendingNum (..), SaturatingNum (..),
-                                       SaturationMode (..))
-import Clash.Class.Parity             (Parity (..))
-import Clash.Class.Resize             (Resize (..))
-import Clash.Class.BitPack.BitIndex   ((!), msb, replaceBit, split)
-import Clash.Class.BitPack.BitReduction (reduceOr)
-import Clash.Promoted.Nat             (natToNum, natToNatural)
-import Clash.Sized.Internal.BitVector (BitVector (BV), Bit, high, low, undefError)
-import Clash.Sized.Internal.CheckedLiterals
-  ( PotentiallyOutOfBounds
-  , UnsignedBounds
+import Language.Haskell.TH.Syntax (Lift (..))
+import Test.QuickCheck.Arbitrary
+  ( Arbitrary (..),
+    CoArbitrary (..),
+    arbitraryBoundedIntegral,
+    coarbitraryIntegral,
   )
-import qualified Clash.Sized.Internal.BitVector as BV
-import Clash.Sized.Internal.Mod
-import CheckedLiterals.Class.Integer
-  ( NegativeUnsignedError
-  , CheckedNegativeIntegerLiteral
-  , CheckedPositiveIntegerLiteral
-  )
-import Clash.XException
-  (ShowX (..), NFDataX (..), errorX, showsPrecXWith, rwhnfX)
+import Text.Printf (PrintfArg (..), printf)
+import Text.Read (Read (..), ReadPrec)
+import Prelude hiding (even, odd)
 
 {- $setup
 >>> :m -Prelude
@@ -205,24 +241,25 @@ type role Unsigned nominal
 --
 -- as it is not safe to coerce between different width Unsigned. To change the
 -- width, use the functions in the 'Clash.Class.Resize.Resize' class.
-data Unsigned (n :: Nat) =
-    -- | The constructor, 'U', and the field, 'unsafeToNatural', are not
+data Unsigned (n :: Nat)
+  = -- | The constructor, 'U', and the field, 'unsafeToNatural', are not
     -- synthesizable.
-    U { unsafeToNatural :: !Natural }
+    U {unsafeToNatural :: !Natural}
   deriving (Data, Generic)
 
 {-# ANN U hasBlackBox #-}
 
 {-# OPAQUE size# #-}
 {-# ANN size# hasBlackBox #-}
-size# :: KnownNat n => Unsigned n -> Int
+size# :: (KnownNat n) => Unsigned n -> Int
 size# u = fromIntegral (natVal u)
 
 instance NFData (Unsigned n) where
   rnf (U i) = rnf i `seq` ()
   {-# NOINLINE rnf #-}
-  -- NOINLINE is needed so that Clash doesn't trip on the "Unsigned ~# Natural"
-  -- coercion
+
+-- NOINLINE is needed so that Clash doesn't trip on the "Unsigned ~# Natural"
+-- coercion
 
 instance Show (Unsigned n) where
   show (U i) = show i
@@ -237,13 +274,13 @@ instance NFDataX (Unsigned n) where
   rnfX = rwhnfX
 
 -- | None of the 'Read' class' methods are synthesizable.
-instance KnownNat n => Read (Unsigned n) where
+instance (KnownNat n) => Read (Unsigned n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Natural)
 
-instance KnownNat n => BitPack (Unsigned n) where
+instance (KnownNat n) => BitPack (Unsigned n) where
   type BitSize (Unsigned n) = n
-  pack        = packXWith pack#
-  unpack      = unpack#
+  pack = packXWith pack#
+  unpack = unpack#
   maybeUnpack = Just . unpack#
 
 {-# OPAQUE pack# #-}
@@ -253,7 +290,7 @@ pack# (U i) = BV 0 i
 
 {-# OPAQUE unpack# #-}
 {-# ANN unpack# hasBlackBox #-}
-unpack# :: KnownNat n => BitVector n -> Unsigned n
+unpack# :: (KnownNat n) => BitVector n -> Unsigned n
 unpack# (BV 0 i) = U i
 unpack# bv = undefError "Unsigned.unpack" [bv]
 
@@ -272,12 +309,12 @@ neq# :: Unsigned n -> Unsigned n -> Bool
 neq# (U v1) (U v2) = v1 /= v2
 
 instance Ord (Unsigned n) where
-  (<)  = lt#
+  (<) = lt#
   (>=) = ge#
-  (>)  = gt#
+  (>) = gt#
   (<=) = le#
 
-lt#,ge#,gt#,le# :: Unsigned n -> Unsigned n -> Bool
+lt#, ge#, gt#, le# :: Unsigned n -> Unsigned n -> Bool
 {-# OPAQUE lt# #-}
 {-# ANN lt# hasBlackBox #-}
 lt# (U n) (U m) = n < m
@@ -293,63 +330,73 @@ le# (U n) (U m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesizable.
-instance KnownNat n => Enum (Unsigned n) where
+instance (KnownNat n) => Enum (Unsigned n) where
   succ n
     | n == maxBound =
-        error $ "'succ' was called on (" <> show @(Unsigned n) maxBound <> " :: "
-             <> "Unsigned " <> show (natToNatural @n) <> ") and caused an "
-             <> "overflow. Use 'satSucc' and specify a SaturationMode if you "
-             <> "need other behavior."
+        error $
+          "'succ' was called on ("
+            <> show @(Unsigned n) maxBound
+            <> " :: "
+            <> "Unsigned "
+            <> show (natToNatural @n)
+            <> ") and caused an "
+            <> "overflow. Use 'satSucc' and specify a SaturationMode if you "
+            <> "need other behavior."
     | otherwise = n +# fromInteger# 1
 
   pred n
     | n == minBound =
-        error $ "'pred' was called on (0 :: Unsigned " <> show (natToNatural @n)
-             <> ") and caused an overflow. Use 'satPred' and specify a "
-             <> "SaturationMode if you need other behavior."
+        error $
+          "'pred' was called on (0 :: Unsigned "
+            <> show (natToNatural @n)
+            <> ") and caused an overflow. Use 'satPred' and specify a "
+            <> "SaturationMode if you need other behavior."
     | otherwise = n -# fromInteger# 1
 
-  toEnum         = toEnum#
-  fromEnum       = fromEnum#
-  enumFrom       = enumFrom#
-  enumFromThen   = enumFromThen#
-  enumFromTo     = enumFromTo#
+  toEnum = toEnum#
+  fromEnum = fromEnum#
+  enumFrom = enumFrom#
+  enumFromThen = enumFromThen#
+  enumFromTo = enumFromTo#
   enumFromThenTo = enumFromThenTo#
 
-toEnum# :: forall n. KnownNat n => Int -> Unsigned n
+toEnum# :: forall n. (KnownNat n) => Int -> Unsigned n
 toEnum# = fromInteger# . toInteger
 {-# OPAQUE toEnum# #-}
 {-# ANN toEnum# hasBlackBox #-}
 
-fromEnum# :: forall n. KnownNat n => Unsigned n -> Int
+fromEnum# :: forall n. (KnownNat n) => Unsigned n -> Int
 fromEnum# = fromEnum . toInteger#
 {-# OPAQUE fromEnum# #-}
 {-# ANN fromEnum# hasBlackBox #-}
 
-enumFrom# :: forall n. KnownNat n => Unsigned n -> [Unsigned n]
+enumFrom# :: forall n. (KnownNat n) => Unsigned n -> [Unsigned n]
 enumFrom# = \x -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural (maxBound :: Unsigned n)]
-  where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
+  where
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 {-# OPAQUE enumFrom# #-}
 
-enumFromThen# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThen# :: forall n. (KnownNat n) => Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromThen# = \x y -> toUnsigneds [unsafeToNatural x, unsafeToNatural y .. bound x y]
- where
-  toUnsigneds = map (U . (`mod` m))
-  bound x y = unsafeToNatural (if x <= y then maxBound else minBound :: Unsigned n)
-  m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
+  where
+    toUnsigneds = map (U . (`mod` m))
+    bound x y = unsafeToNatural (if x <= y then maxBound else minBound :: Unsigned n)
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 {-# OPAQUE enumFromThen# #-}
 
-enumFromTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromTo# :: forall n. (KnownNat n) => Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromTo# = \x y -> map (U . (`mod` m)) [unsafeToNatural x .. unsafeToNatural y]
-  where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
+  where
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 {-# OPAQUE enumFromTo# #-}
 
-enumFromThenTo# :: forall n. KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenTo# :: forall n. (KnownNat n) => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromThenTo# = \x1 x2 y -> map (U . (`mod` m)) [unsafeToNatural x1, unsafeToNatural x2 .. unsafeToNatural y]
-  where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
+  where
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 {-# OPAQUE enumFromThenTo# #-}
 
-instance KnownNat n => Bounded (Unsigned n) where
+instance (KnownNat n) => Bounded (Unsigned n) where
   minBound = minBound#
   maxBound = maxBound#
 
@@ -358,55 +405,57 @@ minBound# = U 0
 {-# OPAQUE minBound# #-}
 {-# ANN minBound# hasBlackBox #-}
 
-maxBound# :: forall n. KnownNat n => Unsigned n
-maxBound# = let m = 1 `shiftL` (natToNum @n) in  U (m - 1)
+maxBound# :: forall n. (KnownNat n) => Unsigned n
+maxBound# = let m = 1 `shiftL` (natToNum @n) in U (m - 1)
 {-# OPAQUE maxBound# #-}
 {-# ANN maxBound# hasBlackBox #-}
 
 -- | __NB__: 'fromInteger'/'fromIntegral' can cause unexpected truncation, as
 -- 'Integer' is arbitrarily bounded during synthesis.  Prefer
 -- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
-instance KnownNat n => Num (Unsigned n) where
-  (+)         = (+#)
-  (-)         = (-#)
-  (*)         = (*#)
-  negate      = negate#
-  abs         = id
-  signum bv   = resize# (unpack# (BV.pack# (reduceOr bv)))
+instance (KnownNat n) => Num (Unsigned n) where
+  (+) = (+#)
+  (-) = (-#)
+  (*) = (*#)
+  negate = negate#
+  abs = id
+  signum bv = resize# (unpack# (BV.pack# (reduceOr bv)))
   fromInteger = fromInteger#
 
-(+#),(-#),(*#) :: forall n . KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+(+#), (-#), (*#) :: forall n. (KnownNat n) => Unsigned n -> Unsigned n -> Unsigned n
 {-# OPAQUE (+#) #-}
 {-# ANN (+#) hasBlackBox #-}
 (+#) = \(U i) (U j) -> U (addMod m i j)
-  where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-
+  where
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 {-# OPAQUE (-#) #-}
 {-# ANN (-#) hasBlackBox #-}
 (-#) = \(U i) (U j) -> U (subMod m i j)
-  where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
-
+  where
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 {-# OPAQUE (*#) #-}
 {-# ANN (*#) hasBlackBox #-}
 (*#) = \(U i) (U j) -> U (mulMod2 m i j)
-  where m = (1 `naturalShiftL` naturalToWord (natVal (Proxy @n))) - 1
+  where
+    m = (1 `naturalShiftL` naturalToWord (natVal (Proxy @n))) - 1
 
 {-# OPAQUE negate# #-}
 {-# ANN negate# hasBlackBox #-}
-negate# :: forall n . KnownNat n => Unsigned n -> Unsigned n
+negate# :: forall n. (KnownNat n) => Unsigned n -> Unsigned n
 negate# = \(U i) -> U (negateMod m i)
-  where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
+  where
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @n))
 
 {-# OPAQUE fromInteger# #-}
 {-# ANN fromInteger# hasBlackBox #-}
-fromInteger# :: forall n . KnownNat n => Integer -> Unsigned n
+fromInteger# :: forall n. (KnownNat n) => Integer -> Unsigned n
 fromInteger# = \x -> U (integerToNatural (x `mod` m))
- where
-  m = 1 `integerShiftL` naturalToWord (natVal (Proxy @n))
+  where
+    m = 1 `integerShiftL` naturalToWord (natVal (Proxy @n))
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
-  add  = plus#
+  add = plus#
   sub = minus#
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
   mul = times#
@@ -418,34 +467,38 @@ plus# (U a) (U b) = U (a + b)
 
 {-# OPAQUE minus# #-}
 {-# ANN minus# hasBlackBox #-}
-minus# :: forall m n . (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n
-                                                -> Unsigned (Max m n + 1)
+minus# ::
+  forall m n.
+  (KnownNat m, KnownNat n) =>
+  Unsigned m ->
+  Unsigned n ->
+  Unsigned (Max m n + 1)
 minus# = \(U a) (U b) -> U (subMod mask a b)
- where
-  sz   = naturalToWord (natVal (Proxy @(Max m n + 1)))
-  mask = 1 `naturalShiftL` sz
+  where
+    sz = naturalToWord (natVal (Proxy @(Max m n + 1)))
+    mask = 1 `naturalShiftL` sz
 
 {-# OPAQUE times# #-}
 {-# ANN times# hasBlackBox #-}
 times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)
 times# (U a) (U b) = U (a * b)
 
-instance KnownNat n => Real (Unsigned n) where
+instance (KnownNat n) => Real (Unsigned n) where
   toRational = toRational . toInteger#
 
 -- | __NB__: 'toInteger'/'fromIntegral' can cause unexpected truncation, as
 -- 'Integer' is arbitrarily bounded during synthesis.  Prefer
 -- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
-instance KnownNat n => Integral (Unsigned n) where
-  quot        = quot#
-  rem         = rem#
-  div         = quot#
-  mod         = rem#
-  quotRem n d = (n `quot#` d,n `rem#` d)
-  divMod  n d = (n `quot#` d,n `rem#` d)
-  toInteger   = toInteger#
+instance (KnownNat n) => Integral (Unsigned n) where
+  quot = quot#
+  rem = rem#
+  div = quot#
+  mod = rem#
+  quotRem n d = (n `quot#` d, n `rem#` d)
+  divMod n d = (n `quot#` d, n `rem#` d)
+  toInteger = toInteger#
 
-quot#,rem# :: Unsigned n -> Unsigned n -> Unsigned n
+quot#, rem# :: Unsigned n -> Unsigned n -> Unsigned n
 {-# OPAQUE quot# #-}
 {-# ANN quot# hasBlackBox #-}
 quot# (U i) (U j) = U (i `quot` j)
@@ -458,10 +511,10 @@ rem# (U i) (U j) = U (i `rem` j)
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = naturalToInteger i
 
-instance KnownNat n => PrintfArg (Unsigned n) where
+instance (KnownNat n) => PrintfArg (Unsigned n) where
   formatArg = formatArg . toInteger
 
-instance KnownNat n => Parity (Unsigned n) where
+instance (KnownNat n) => Parity (Unsigned n) where
   even = even . pack
   odd = odd . pack
 
@@ -469,25 +522,25 @@ instance KnownNat n => Parity (Unsigned n) where
 --
 -- * Returns 0 if @n >= 'bitSize' a@
 -- * 'Clash.XException.XException' if @n < 0@
-instance KnownNat n => Bits (Unsigned n) where
-  (.&.)             = and#
-  (.|.)             = or#
-  xor               = xor#
-  complement        = complement#
-  zeroBits          = 0
-  bit i             = replaceBit i high 0
-  setBit v i        = replaceBit i high v
-  clearBit v i      = replaceBit i low  v
+instance (KnownNat n) => Bits (Unsigned n) where
+  (.&.) = and#
+  (.|.) = or#
+  xor = xor#
+  complement = complement#
+  zeroBits = 0
+  bit i = replaceBit i high 0
+  setBit v i = replaceBit i high v
+  clearBit v i = replaceBit i low v
   complementBit v i = replaceBit i (BV.complement## (v ! i)) v
-  testBit v i       = v ! i == high
-  bitSizeMaybe v    = Just (size# v)
-  bitSize           = size#
-  isSigned _        = False
-  shiftL v i        = shiftL# v i
-  shiftR v i        = shiftR# v i
-  rotateL v i       = rotateL# v i
-  rotateR v i       = rotateR# v i
-  popCount u        = popCount (pack# u)
+  testBit v i = v ! i == high
+  bitSizeMaybe v = Just (size# v)
+  bitSize = size#
+  isSigned _ = False
+  shiftL v i = shiftL# v i
+  shiftR v i = shiftR# v i
+  rotateL v i = rotateL# v i
+  rotateR v i = rotateR# v i
+  popCount u = popCount (pack# u)
 
 {-# OPAQUE and# #-}
 {-# ANN and# hasBlackBox #-}
@@ -506,68 +559,69 @@ xor# (U v1) (U v2) = U (v1 `xor` v2)
 
 {-# OPAQUE complement# #-}
 {-# ANN complement# hasBlackBox #-}
-complement# :: forall n . KnownNat n => Unsigned n -> Unsigned n
+complement# :: forall n. (KnownNat n) => Unsigned n -> Unsigned n
 complement# = \(U i) -> U (complementN i)
-  where complementN = complementMod (natVal (Proxy @n))
+  where
+    complementN = complementMod (natVal (Proxy @n))
 
-shiftL#, shiftR#, rotateL#, rotateR# :: forall n .KnownNat n => Unsigned n -> Int -> Unsigned n
+shiftL#, shiftR#, rotateL#, rotateR# :: forall n. (KnownNat n) => Unsigned n -> Int -> Unsigned n
 {-# OPAQUE shiftL# #-}
 {-# ANN shiftL# hasBlackBox #-}
 shiftL# = \(U v) i ->
-  let i' = fromIntegral i in
-  if | i < 0     -> errorX $ "'shiftL' undefined for negative number: " ++ show i
-     | i' >= sz  -> U 0
-     | otherwise -> U ((naturalShiftL v i') `mod` m)
- where
-  sz = naturalToWord (natVal (Proxy @n))
-  m  = 1 `naturalShiftL` sz
-
+  let i' = fromIntegral i
+   in if
+        | i < 0 -> errorX $ "'shiftL' undefined for negative number: " ++ show i
+        | i' >= sz -> U 0
+        | otherwise -> U ((naturalShiftL v i') `mod` m)
+  where
+    sz = naturalToWord (natVal (Proxy @n))
+    m = 1 `naturalShiftL` sz
 {-# OPAQUE shiftR# #-}
 {-# ANN shiftR# hasBlackBox #-}
 -- shiftR# doesn't need the KnownNat constraint
 -- But having the same type signature for all shift and rotate functions
 -- makes implementing the Evaluator easier.
 shiftR# (U v) i
-  | i < 0     = errorX
-              $ "'shiftR' undefined for negative number: " ++ show i
+  | i < 0 =
+      errorX $
+        "'shiftR' undefined for negative number: " ++ show i
   | otherwise = U (shiftR v i)
-
 {-# OPAQUE rotateL# #-}
 {-# ANN rotateL# hasBlackBox #-}
 rotateL# =
   \(U n) b ->
-    if b >= 0 then
-      let l   = naturalShiftL n b'
-          r   = naturalShiftR n b''
-          b'  = fromIntegral b `mod` sz
-          b'' = sz - b'
-      in  U ((l .|. r) `mod` m)
-    else
-      errorX $ "'rotateL' undefined for negative number: " ++ show b
+    if b >= 0
+      then
+        let l = naturalShiftL n b'
+            r = naturalShiftR n b''
+            b' = fromIntegral b `mod` sz
+            b'' = sz - b'
+         in U ((l .|. r) `mod` m)
+      else
+        errorX $ "'rotateL' undefined for negative number: " ++ show b
   where
     sz = naturalToWord (natVal (Proxy @n))
-    m  = 1 `naturalShiftL` sz
-
+    m = 1 `naturalShiftL` sz
 {-# OPAQUE rotateR# #-}
 {-# ANN rotateR# hasBlackBox #-}
 rotateR# =
   \(U n) b ->
-    if b >= 0 then
-      let l   = naturalShiftR n b'
-          r   = naturalShiftL n b''
-          b'  = fromIntegral b `mod` sz
-          b'' = sz - b'
-      in  U ((l .|. r) `mod` m)
-    else
-      errorX $ "'rotateR' undefined for negative number: " ++ show b
+    if b >= 0
+      then
+        let l = naturalShiftR n b'
+            r = naturalShiftL n b''
+            b' = fromIntegral b `mod` sz
+            b'' = sz - b'
+         in U ((l .|. r) `mod` m)
+      else
+        errorX $ "'rotateR' undefined for negative number: " ++ show b
   where
     sz = naturalToWord (natVal (Proxy @n))
-    m  = 1 `naturalShiftL` sz
+    m = 1 `naturalShiftL` sz
 
-
-instance KnownNat n => FiniteBits (Unsigned n) where
-  finiteBitSize        = size#
-  countLeadingZeros  u = countLeadingZeros  (pack# u)
+instance (KnownNat n) => FiniteBits (Unsigned n) where
+  finiteBitSize = size#
+  countLeadingZeros u = countLeadingZeros (pack# u)
   countTrailingZeros u = countTrailingZeros (pack# u)
 
 type UnsignedPositiveLiteralError lit n =
@@ -589,74 +643,75 @@ instance
   CheckedNegativeIntegerLiteral lit (Unsigned n)
 
 instance Resize Unsigned where
-  resize     = resize#
+  resize = resize#
   zeroExtend = extend
-  truncateB  = resize#
+  truncateB = resize#
 
 {-# OPAQUE resize# #-}
 {-# ANN resize# hasBlackBox #-}
-resize# :: forall n m . KnownNat m => Unsigned n -> Unsigned m
+resize# :: forall n m. (KnownNat m) => Unsigned n -> Unsigned m
 resize# = \(U i) -> if i >= m then U (i `mod` m) else U i
-  where m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @m))
+  where
+    m = 1 `naturalShiftL` naturalToWord (natVal (Proxy @m))
 
 instance Default (Unsigned n) where
   def = minBound#
 
-instance KnownNat n => Lift (Unsigned n) where
-  lift u@(U i) = sigE [| fromInteger# i |] (decUnsigned (natVal u))
+instance (KnownNat n) => Lift (Unsigned n) where
+  lift u@(U i) = sigE [|fromInteger# i|] (decUnsigned (natVal u))
   {-# NOINLINE lift #-}
   liftTyped = liftTypedFromUntyped
 
-decUnsigned :: Quote m => Natural -> m Type
+decUnsigned :: (Quote m) => Natural -> m Type
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit (integerFromNatural n))
 
-instance KnownNat n => SaturatingNum (Unsigned n) where
+instance (KnownNat n) => SaturatingNum (Unsigned n) where
   satAdd SatWrap a b = a +# b
   satAdd SatZero a b =
     let r = plus# a b
-    in  case msb r of
+     in case msb r of
           0 -> resize# r
           _ -> minBound#
   satAdd SatError a b =
     let r = plus# a b
-    in  case msb r of
+     in case msb r of
           0 -> resize# r
           _ -> errorX "Unsigned.satAdd: overflow"
   satAdd _ a b =
-    let r  = plus# a b
-    in  case msb r of
+    let r = plus# a b
+     in case msb r of
           0 -> resize# r
           _ -> maxBound#
 
   satSub SatWrap a b = a -# b
   satSub SatError a b =
     let r = minus# a b
-    in  case msb r of
+     in case msb r of
           0 -> resize# r
           _ -> errorX "Unsigned.satSub: overflow"
   satSub _ a b =
     let r = minus# a b
-    in  case msb r of
+     in case msb r of
           0 -> resize# r
           _ -> minBound#
 
   satMul SatWrap a b = a *# b
   satMul SatZero a b =
-    let r       = times# a b
-        (rL,rR) = split r
-    in  case rL of
+    let r = times# a b
+        (rL, rR) = split r
+     in case rL of
           0 -> unpack# rR
           _ -> minBound#
   satMul SatError a b =
-    let r       = times# a b
-        (rL,rR) = split r
-    in  case rL of
+    let r = times# a b
+        (rL, rR) = split r
+     in case rL of
           0 -> unpack# rR
           _ -> errorX "Unsigned.satMul: overflow"
   satMul _ a b =
-    let r       = times# a b
-        (rL,rR) = split r
-    in  case rL of
+    let r = times# a b
+        (rL, rR) = split r
+     in case rL of
           0 -> unpack# rR
           _ -> maxBound#
 
@@ -673,21 +728,25 @@ instance KnownNat n => SaturatingNum (Unsigned n) where
   satPred satMode a = satSub satMode a 1
   {-# INLINE satPred #-}
 
-instance KnownNat n => Arbitrary (Unsigned n) where
+instance (KnownNat n) => Arbitrary (Unsigned n) where
   arbitrary = arbitraryBoundedIntegral
-  shrink    = BV.shrinkSizedUnsigned
+  shrink = BV.shrinkSizedUnsigned
 
-instance KnownNat n => CoArbitrary (Unsigned n) where
+instance (KnownNat n) => CoArbitrary (Unsigned n) where
   coarbitrary = coarbitraryIntegral
 
-type instance Index   (Unsigned n) = Int
+type instance Index (Unsigned n) = Int
+
 type instance IxValue (Unsigned n) = Bit
-instance KnownNat n => Ixed (Unsigned n) where
-  ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
-                     <$> f (BV.index# (pack# s) i)
+
+instance (KnownNat n) => Ixed (Unsigned n) where
+  ix i f s =
+    unpack#
+      <$> BV.replaceBit# (pack# s) i
+      <$> f (BV.index# (pack# s) i)
 
 instance (KnownNat n) => Ix (Unsigned n) where
-  range (a, b) = [a..b]
+  range (a, b) = [a .. b]
   index ab@(a, b) x
     | inRange ab x = fromIntegral $ x - a
     | otherwise = error $ printf "Index (%d) out of range ((%d, %d))" x a b
@@ -722,4 +781,4 @@ unsigned32toWord32 (U (NB u#)) = W32# (wordToWord32# (bigNatToWord# u#))
 "bitCoerce/Unsigned 8 -> Word8" bitCoerce = unsigned8toWord8
 "bitCoerce/Unsigned 16 -> Word16" bitCoerce = unsigned16toWord16
 "bitCoerce/Unsigned 32 -> Word32" bitCoerce = unsigned32toWord32
- #-}
+  #-}

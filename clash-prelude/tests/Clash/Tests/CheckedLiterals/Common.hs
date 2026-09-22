@@ -1,11 +1,10 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 {-|
 Copyright  :  (C) 2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE QuasiQuotes #-}
-
 module Clash.Tests.CheckedLiterals.Common where
 
 import Data.List (intercalate)
@@ -35,12 +34,12 @@ toTestCase (moduleNames, typeName, literal, expectedErrors) =
         then ExpectSuccess
         else ExpectFailure expectedErrors
     )
- where
-  imports = intercalate "\n" ["import " ++ m | m <- splitOnCommaSpace moduleNames]
+  where
+    imports = intercalate "\n" ["import " ++ m | m <- splitOnCommaSpace moduleNames]
 
-  splitOnCommaSpace :: String -> [String]
-  splitOnCommaSpace s = case break (== ',') s of
-    (x, "")       -> [x]
-    (x, ',':' ':r) -> x : splitOnCommaSpace r
-    (x, ',':r)    -> x : splitOnCommaSpace r
-    (x, _)        -> [x]
+    splitOnCommaSpace :: String -> [String]
+    splitOnCommaSpace s = case break (== ',') s of
+      (x, "") -> [x]
+      (x, ',' : ' ' : r) -> x : splitOnCommaSpace r
+      (x, ',' : r) -> x : splitOnCommaSpace r
+      (x, _) -> [x]

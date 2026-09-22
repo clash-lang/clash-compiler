@@ -1,3 +1,13 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
@@ -6,59 +16,66 @@ Copyright  :  (C) 2013-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Explicit.Signal.Delayed
-  ( DSignal
+  ( DSignal,
+
     -- * Delay-annotated synchronous signals
-  , delayed
-  , delayedI
-  , delayN
-  , delayI
-  , delayedFold
-  , feedback
+    delayed,
+    delayedI,
+    delayN,
+    delayI,
+    delayedFold,
+    feedback,
+
     -- * Signal \<-\> DSignal conversion
-  , fromSignal
-  , toSignal
+    fromSignal,
+    toSignal,
+
     -- * List \<-\> DSignal conversion (not synthesizable)
-  , dfromList
+    dfromList,
+
     -- ** lazy versions
-  , dfromList_lazy
+    dfromList_lazy,
+
     -- * Experimental
-  , unsafeFromSignal
-  , antiDelay
-  , forward
+    unsafeFromSignal,
+    antiDelay,
+    forward,
   )
 where
 
-import Prelude                    ((.), (<$>), (<*>), id, Num(..))
-
-import Data.Coerce                (coerce)
-import Data.Kind                  (Type)
-import Data.Proxy                 (Proxy (..))
-import Data.Singletons            (Apply, TyFun, type (@@))
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (^), type (*))
-
-import Clash.Sized.Vector
-import Clash.Signal.Delayed.Internal
-  (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
-   unsafeFromSignal, antiDelay, feedback, forward)
-
 import Clash.Explicit.Signal
-  (KnownDomain, Clock, Domain, Reset, Signal, Enable, register, delay, bundle, unbundle)
-import Clash.Promoted.Nat         (SNat (..), snatToInteger)
-import Clash.XException           (NFDataX)
+  ( Clock,
+    Domain,
+    Enable,
+    KnownDomain,
+    Reset,
+    Signal,
+    bundle,
+    delay,
+    register,
+    unbundle,
+  )
+import Clash.Promoted.Nat (SNat (..), snatToInteger)
+import Clash.Signal.Delayed.Internal
+  ( DSignal (..),
+    antiDelay,
+    dfromList,
+    dfromList_lazy,
+    feedback,
+    forward,
+    fromSignal,
+    toSignal,
+    unsafeFromSignal,
+  )
+import Clash.Sized.Vector
+import Clash.XException (NFDataX)
+import Data.Coerce (coerce)
+import Data.Kind (Type)
+import Data.Proxy (Proxy (..))
+import Data.Singletons (Apply, TyFun, type (@@))
+import GHC.TypeLits (KnownNat, Nat, type (*), type (+), type (^))
+import Prelude (Num (..), id, (.), (<$>), (<*>))
 
 {- $setup
 >>> :set -XDataKinds
@@ -87,6 +104,7 @@ let mac :: Clock System
 -}
 
 -- TODO: Reimplement with dtfold
+
 -- | Delay a 'DSignal' for @d@ periods.
 --
 -- @
@@ -102,26 +120,28 @@ let mac :: Clock System
 --
 -- >>> sampleN 7 (delay3 systemClockGen resetGen enableGen (dfromList [0..]))
 -- [-1,-1,-1,-1,1,2,3]
-delayed
-  :: forall dom  a n d
-   . ( KnownDomain dom
-     , KnownNat d
-     , NFDataX a )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> Vec d a
-  -- ^ Initial values
-  -> DSignal dom n a
-  -> DSignal dom (n + d) a
+delayed ::
+  forall dom a n d.
+  ( KnownDomain dom,
+    KnownNat d,
+    NFDataX a
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Initial values
+  Vec d a ->
+  DSignal dom n a ->
+  DSignal dom (n + d) a
 delayed clk rst en m ds = coerce (delaySignal (coerce ds))
   where
     delaySignal :: Signal dom a -> Signal dom a
     delaySignal s = case length m of
       0 -> s
-      _ -> let (r',o) = shiftInAt0 (unbundle r) (singleton s)
-               r      = register clk rst en m (bundle r')
-           in  head o
+      _ ->
+        let (r', o) = shiftInAt0 (unbundle r) (singleton s)
+            r = register clk rst en m (bundle r')
+         in head o
 
 -- | Delay a 'DSignal' for @d@ periods, where @d@ is derived from the
 -- context.
@@ -152,17 +172,18 @@ delayed clk rst en m ds = coerce (delaySignal (coerce ds))
 --      -> a
 --      -> DSignal dom n a
 --      -> DSignal dom (n + 3) a
-delayedI
-  :: ( KnownNat d
-     , KnownDomain dom
-     , NFDataX a )
-  => Clock dom
-  -> Reset dom
-  -> Enable dom
-  -> a
-  -- ^ Initial value
-  -> DSignal dom n a
-  -> DSignal dom (n + d) a
+delayedI ::
+  ( KnownNat d,
+    KnownDomain dom,
+    NFDataX a
+  ) =>
+  Clock dom ->
+  Reset dom ->
+  Enable dom ->
+  -- | Initial value
+  a ->
+  DSignal dom n a ->
+  DSignal dom (n + d) a
 delayedI clk rst en dflt = delayed clk rst en (repeat dflt)
 
 -- | Delay a 'DSignal' for @d@ cycles, the value at time 0..d-1 is /a/.
@@ -180,21 +201,22 @@ delayedI clk rst en dflt = delayed clk rst en (repeat dflt)
 --
 -- >>> printX $ sampleN 6 (delayN2 (-1) enableGen systemClockGen (dfromList [1..]))
 -- [-1,-1,1,2,3,4]
-delayN
-  :: forall dom a d n
-   . ( KnownDomain dom
-     , NFDataX a )
-  => SNat d
-  -> a
-  -- ^ Initial value
-  -> Enable dom
-  -> Clock dom
-  -> DSignal dom n a
-  -> DSignal dom (n+d) a
+delayN ::
+  forall dom a d n.
+  ( KnownDomain dom,
+    NFDataX a
+  ) =>
+  SNat d ->
+  -- | Initial value
+  a ->
+  Enable dom ->
+  Clock dom ->
+  DSignal dom n a ->
+  DSignal dom (n + d) a
 delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a)
   where
     go 0 = id
-    go i = delay clk ena dflt . go (i-1)
+    go i = delay clk ena dflt . go (i - 1)
 
 -- | Delay a 'DSignal' for @d@ cycles, where @d@ is derived from the context.
 -- The value at time 0..d-1 is a default value.
@@ -217,21 +239,23 @@ delayN d dflt ena clk = coerce . go (snatToInteger d) . coerce @_ @(Signal dom a
 --
 -- >>> sampleN 6 (delayI @2 (-1) enableGen systemClockGen (dfromList [1..]))
 -- [-1,-1,1,2,3,4]
-delayI
-  :: forall d n a dom
-   . ( NFDataX a
-     , KnownDomain dom
-     , KnownNat d )
-  => a
-  -- ^ Initial value
-  -> Enable dom
-  -> Clock dom
-  -> DSignal dom n a
-  -> DSignal dom (n+d) a
+delayI ::
+  forall d n a dom.
+  ( NFDataX a,
+    KnownDomain dom,
+    KnownNat d
+  ) =>
+  -- | Initial value
+  a ->
+  Enable dom ->
+  Clock dom ->
+  DSignal dom n a ->
+  DSignal dom (n + d) a
 delayI dflt = delayN (SNat :: SNat d) dflt
 
 data DelayedFold (dom :: Domain) (n :: Nat) (delay :: Nat) (a :: Type) (f :: TyFun Nat Type) :: Type
-type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) a
+
+type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay * k)) a
 
 -- | Tree fold over a 'Vec' of 'DSignal's with a combinational function,
 -- and delaying @delay@ cycles after each application.
@@ -247,28 +271,30 @@ type instance Apply (DelayedFold dom n delay a) k = DSignal dom (n + (delay*k)) 
 --
 -- >>> printX $ sampleN 8 (delayedFold d2 (-1) (*) enableGen systemClockGen countingSignals)
 -- [-1,-1,1,1,0,1,16,81]
-delayedFold
-  :: forall dom  n delay k a
-   . ( NFDataX a
-     , KnownDomain dom
-     , KnownNat delay
-     , KnownNat k )
-  => SNat delay
-  -- ^ Delay applied after each step
-  -> a
-  -- ^ Initial value
-  -> (a -> a -> a)
-  -- ^ Fold operation to apply
-  -> Enable dom
-  -> Clock dom
-  -> Vec (2^k) (DSignal dom n a)
-  -- ^ Vector input of size 2^k
-  -> DSignal dom (n + (delay * k)) a
-  -- ^ Output Signal delayed by (delay * k)
+delayedFold ::
+  forall dom n delay k a.
+  ( NFDataX a,
+    KnownDomain dom,
+    KnownNat delay,
+    KnownNat k
+  ) =>
+  -- | Delay applied after each step
+  SNat delay ->
+  -- | Initial value
+  a ->
+  -- | Fold operation to apply
+  (a -> a -> a) ->
+  Enable dom ->
+  Clock dom ->
+  -- | Vector input of size 2^k
+  Vec (2 ^ k) (DSignal dom n a) ->
+  -- | Output Signal delayed by (delay * k)
+  DSignal dom (n + (delay * k)) a
 delayedFold _ dflt op ena clk = dtfold (Proxy :: Proxy (DelayedFold dom n delay a)) id go
   where
-    go :: SNat l
-       -> DelayedFold dom n delay a @@ l
-       -> DelayedFold dom n delay a @@ l
-       -> DelayedFold dom n delay a @@ (l+1)
+    go ::
+      SNat l ->
+      DelayedFold dom n delay a @@ l ->
+      DelayedFold dom n delay a @@ l ->
+      DelayedFold dom n delay a @@ (l + 1)
     go SNat x y = delayI dflt ena clk (op <$> x <*> y)

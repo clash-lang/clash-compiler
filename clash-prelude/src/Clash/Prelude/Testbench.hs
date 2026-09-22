@@ -1,3 +1,8 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE Unsafe #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
@@ -6,40 +11,36 @@ Copyright  :  (C) 2013-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Prelude.Testbench
   ( -- * Testbench functions for circuits
-    assert
-  , assertBitVector
-  , ignoreFor
-  , outputVerifier'
-  , outputVerifierBitVector'
-  , stimuliGenerator
-
-  , E.tbClockGen
-  , E.tbEnableGen
-  , E.tbSystemClockGen
-  , E.clockToDiffClock
+    assert,
+    assertBitVector,
+    ignoreFor,
+    outputVerifier',
+    outputVerifierBitVector',
+    stimuliGenerator,
+    E.tbClockGen,
+    E.tbEnableGen,
+    E.tbSystemClockGen,
+    E.clockToDiffClock,
   )
 where
 
-import GHC.TypeLits                       (KnownNat, type (<=))
-
 import qualified Clash.Explicit.Testbench as E
-import           Clash.Signal
-  (HiddenClock, HiddenReset, HiddenClockResetEnable, Signal,
-  hideClock, hideReset, hideClockResetEnable)
-import Clash.Promoted.Nat                 (SNat)
-import Clash.Sized.BitVector              (BitVector)
-import Clash.Sized.Vector                 (Vec)
-import Clash.XException                   (ShowX)
+import Clash.Promoted.Nat (SNat)
+import Clash.Signal
+  ( HiddenClock,
+    HiddenClockResetEnable,
+    HiddenReset,
+    Signal,
+    hideClock,
+    hideClockResetEnable,
+    hideReset,
+  )
+import Clash.Sized.BitVector (BitVector)
+import Clash.Sized.Vector (Vec)
+import Clash.XException (ShowX)
+import GHC.TypeLits (KnownNat, type (<=))
 
 {- $setup
 >>> :set -XTemplateHaskell -XDataKinds -XTypeApplications
@@ -65,33 +66,33 @@ import Clash.XException                   (ShowX)
 -- computation, and warnings will once again be emitted.
 --
 -- __NB__: This function /can/ be used in synthesizable designs.
-assert
-  :: (Eq a, ShowX a, HiddenClock dom , HiddenReset dom )
-  => String
-  -- ^ Additional message
-  -> Signal dom a
-  -- ^ Checked value
-  -> Signal dom a
-  -- ^ Expected value
-  -> Signal dom b
-  -- ^ Return value
-  -> Signal dom b
+assert ::
+  (Eq a, ShowX a, HiddenClock dom, HiddenReset dom) =>
+  -- | Additional message
+  String ->
+  -- | Checked value
+  Signal dom a ->
+  -- | Expected value
+  Signal dom a ->
+  -- | Return value
+  Signal dom b ->
+  Signal dom b
 assert msg actual expected ret =
   hideReset (hideClock E.assert) msg actual expected ret
 {-# INLINE assert #-}
 
 -- | The same as 'assert', but can handle don't care bits in its expected value.
-assertBitVector
-  :: (KnownNat n, HiddenClock dom , HiddenReset dom )
-  => String
-  -- ^ Additional message
-  -> Signal dom (BitVector n)
-  -- ^ Checked value
-  -> Signal dom (BitVector n)
-  -- ^ Expected value
-  -> Signal dom b
-  -- ^ Return value
-  -> Signal dom b
+assertBitVector ::
+  (KnownNat n, HiddenClock dom, HiddenReset dom) =>
+  -- | Additional message
+  String ->
+  -- | Checked value
+  Signal dom (BitVector n) ->
+  -- | Expected value
+  Signal dom (BitVector n) ->
+  -- | Return value
+  Signal dom b ->
+  Signal dom b
 assertBitVector msg actual expected ret =
   hideReset (hideClock E.assertBitVector) msg actual expected ret
 {-# INLINE assertBitVector #-}
@@ -109,14 +110,15 @@ assertBitVector msg actual expected ret =
 --
 -- >>> sampleN @System 13 testInput
 -- [1,1,3,5,7,9,11,13,15,17,19,21,21]
-stimuliGenerator
-  :: ( KnownNat l
-     , HiddenClock dom
-     , HiddenReset dom  )
-  => Vec l a
-  -- ^ Samples to generate
-  -> Signal dom a
-  -- ^ Signal of given samples
+stimuliGenerator ::
+  ( KnownNat l,
+    HiddenClock dom,
+    HiddenReset dom
+  ) =>
+  -- | Samples to generate
+  Vec l a ->
+  -- | Signal of given samples
+  Signal dom a
 stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 {-# INLINE stimuliGenerator #-}
 
@@ -163,53 +165,52 @@ stimuliGenerator = hideReset (hideClock E.stimuliGenerator)
 -- ,False,True]
 --
 -- If you're working with 'BitVector's containing don't care bits you should use 'outputVerifierBitVector''.
-outputVerifier'
-  :: ( KnownNat l
-     , Eq a
-     , ShowX a
-     , HiddenClock dom
-     , HiddenReset dom
-     , 1 <= l
-     )
-  => Vec l a
-  -- ^ Samples to compare with
-  -> Signal dom a
-  -- ^ Signal to verify
-  -> Signal dom Bool
-  -- ^ Indicator that all samples are verified
+outputVerifier' ::
+  ( KnownNat l,
+    Eq a,
+    ShowX a,
+    HiddenClock dom,
+    HiddenReset dom,
+    1 <= l
+  ) =>
+  -- | Samples to compare with
+  Vec l a ->
+  -- | Signal to verify
+  Signal dom a ->
+  -- | Indicator that all samples are verified
+  Signal dom Bool
 outputVerifier' = hideReset (hideClock E.outputVerifier')
 {-# INLINE outputVerifier' #-}
 
-
 -- | Same as 'outputVerifier'',
 -- but can handle don't care bits in its expected values.
-outputVerifierBitVector'
-  :: ( KnownNat l
-     , KnownNat n
-     , HiddenClock dom
-     , HiddenReset dom
-     , 1 <= l
-     )
-  => Vec l (BitVector n)
-  -- ^ Samples to compare with
-  -> Signal dom (BitVector n)
-  -- ^ Signal to verify
-  -> Signal dom Bool
-  -- ^ Indicator that all samples are verified
+outputVerifierBitVector' ::
+  ( KnownNat l,
+    KnownNat n,
+    HiddenClock dom,
+    HiddenReset dom,
+    1 <= l
+  ) =>
+  -- | Samples to compare with
+  Vec l (BitVector n) ->
+  -- | Signal to verify
+  Signal dom (BitVector n) ->
+  -- | Indicator that all samples are verified
+  Signal dom Bool
 outputVerifierBitVector' = hideReset (hideClock E.outputVerifierBitVector')
 {-# INLINE outputVerifierBitVector' #-}
 
 -- | Ignore signal for a number of cycles, while outputting a static value.
-ignoreFor
-  :: HiddenClockResetEnable dom
-  => SNat n
-  -- ^ Number of cycles to ignore incoming signal
-  -> a
-  -- ^ Value function produces when ignoring signal
-  -> Signal dom a
-  -- ^ Incoming signal
-  -> Signal dom a
-  -- ^ Either a passthrough of the incoming signal, or the static value
+ignoreFor ::
+  (HiddenClockResetEnable dom) =>
+  -- | Number of cycles to ignore incoming signal
+  SNat n ->
+  -- | Value function produces when ignoring signal
+  a ->
+  -- | Incoming signal
+  Signal dom a ->
+  -- | Either a passthrough of the incoming signal, or the static value
   -- provided as the second argument.
+  Signal dom a
 ignoreFor = hideClockResetEnable E.ignoreFor
 {-# INLINE ignoreFor #-}

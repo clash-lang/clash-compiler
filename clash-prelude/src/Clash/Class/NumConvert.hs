@@ -27,18 +27,19 @@ ways:
 If you want to implement 'NumConvert' and 'MaybeNumConvert' for your own type,
 see 'NumConvertCanonical'.
 -}
-module Clash.Class.NumConvert (
-  NumConvert,
-  numConvert,
-  MaybeNumConvert,
-  maybeNumConvert,
+module Clash.Class.NumConvert
+  ( NumConvert,
+    numConvert,
+    MaybeNumConvert,
+    maybeNumConvert,
 
-  -- * For implementers only
-  NumConvertCanonical(..),
-  MaybeNumConvertCanonical(..),
-  Canonical,
-) where
+    -- * For implementers only
+    NumConvertCanonical (..),
+    MaybeNumConvertCanonical (..),
+    Canonical,
+  )
+where
 
+import Clash.Class.NumConvert.Internal.Canonical
 import Clash.Class.NumConvert.Internal.MaybeNumConvert
 import Clash.Class.NumConvert.Internal.NumConvert
-import Clash.Class.NumConvert.Internal.Canonical

@@ -1,12 +1,3 @@
-{-|
-  Copyright   :  (C) 2013-2016, University of Twente,
-                     2016-2017, Myrtle Software Ltd,
-                     2017-2024, Google Inc.
-                     2021-2024, QBayLogic B.V.
-  License     :  BSD2 (see the file LICENSE)
-  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -16,10 +7,18 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-|
+  Copyright   :  (C) 2013-2016, University of Twente,
+                     2016-2017, Myrtle Software Ltd,
+                     2017-2024, Google Inc.
+                     2021-2024, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.GHC.LoadModules
-  ( loadModules
-  , ghcLibDir
-  , setWantedLanguageExtensions
+  ( loadModules,
+    ghcLibDir,
+    setWantedLanguageExtensions,
   )
 where
 
@@ -30,182 +29,208 @@ where
 #endif
 
 -- External Modules
-import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard(..))
-import           Clash.Annotations.TopEntity     (TopEntity (..))
-import           Clash.Primitives.Types          (UnresolvedPrimitive)
-import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
-import qualified Clash.Util.Interpolate          as I
-import           Control.Arrow                   (first)
-import           Control.Exception               (SomeException, throw)
-import           Control.Monad                   (forM, join, when)
-import           Data.List.Extra                 (nubSort)
-import           Control.Exception               (Exception, throwIO)
-import           Control.Monad                   (foldM)
-import           Control.Monad.Catch             (catch, throwM)
-import           Control.Monad.Catch             as MC (try)
-import           Control.Monad.IO.Class          (liftIO)
-import           Data.Char                       (isDigit)
+import Clash.Annotations.Primitive (HDL, PrimitiveGuard (..))
+import Clash.Annotations.TopEntity (TopEntity (..))
+import Clash.Primitives.Types (UnresolvedPrimitive)
+import Clash.Util (ClashException (..), pkgIdFromTypeable)
+import qualified Clash.Util.Interpolate as I
+import Control.Arrow (first)
+import Control.Exception
+  ( Exception,
+    SomeException,
+    throw,
+    throwIO,
+  )
+import Control.Monad
+  ( foldM,
+    forM,
+    join,
+    when,
+  )
+import Control.Monad.Catch (catch, throwM)
+import Control.Monad.Catch as MC (try)
+import Control.Monad.IO.Class (liftIO)
+import Data.Char (isDigit)
+import Data.List.Extra (nubSort)
 #if !MIN_VERSION_ghc(9,14,0)
-import           Data.Generics.Uniplate.DataOnly (transform)
+import Data.Generics.Uniplate.DataOnly (transform)
 #endif
-import           Data.Data                       (Data)
-import           Data.Functor                    ((<&>))
-import           Data.Foldable                   (toList)
-import           Data.HashMap.Strict             (HashMap)
-import qualified Data.HashMap.Strict             as HashMap
-import           Data.Typeable                   (Typeable)
-import           Data.List                       (nub, find)
+import Data.Data (Data)
+import Data.Foldable (toList)
+import Data.Functor ((<&>))
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
+import Data.List (find, nub)
+import Data.Typeable (Typeable)
 #if !MIN_VERSION_base(4,20,0)
-import           Data.List                       (foldl')
+import Data.List (foldl')
 #endif
-import qualified Data.Map                        as Map
-import           Data.Maybe
-  (catMaybes, fromMaybe, listToMaybe, mapMaybe)
-import qualified Data.Text                       as Text
-import qualified Data.Text.Encoding              as Text
-import qualified Data.Time.Clock                 as Clock
-import qualified Data.Set                        as Set
-import qualified Data.Sequence                   as Seq
-import           Debug.Trace
-import           Language.Haskell.TH.Syntax      (lift)
-import           GHC.Natural                     (naturalFromInteger)
-import           GHC.Stack                       (HasCallStack)
-import           System.FilePath.Posix           (dropExtension, takeDirectory)
-import           Text.Read                       (readMaybe)
-
+import qualified Data.Map as Map
+import Data.Maybe
+  ( catMaybes,
+    fromMaybe,
+    listToMaybe,
+    mapMaybe,
+  )
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import qualified Data.Time.Clock as Clock
+import Debug.Trace
+import GHC.Natural (naturalFromInteger)
+import GHC.Stack (HasCallStack)
+import Language.Haskell.TH.Syntax (lift)
+import System.FilePath.Posix (dropExtension, takeDirectory)
+import Text.Read (readMaybe)
 #ifdef USE_GHC_PATHS
-import           GHC.Paths                       (libdir)
+import GHC.Paths (libdir)
 #else
-import           System.Exit                     (ExitCode (..))
-import           System.IO                       (hGetLine)
-import           System.IO.Error                 (tryIOError)
-import           System.Process                  (runInteractiveCommand,
-                                                  waitForProcess)
+import System.Exit (ExitCode (..))
+import System.IO (hGetLine)
+import System.IO.Error (tryIOError)
+import System.Process
+  ( runInteractiveCommand,
+    waitForProcess,
+  )
 #endif
+import GHC.Data.Bool (OverridingBool)
+import GHC.Driver.Config.Tidy (initTidyOpts)
+import GHC.Driver.Errors.Types (GhcMessage (GhcTcRnMessage))
 
 -- GHC API
-import           GHC.Driver.Phases (StopPhase(NoStop))
-import           GHC.Driver.Pipeline (mkPipeEnv, runPipeline, hscBackendPipeline)
-import           GHC.SysTools.Cpp (offsetIncludePaths)
-import           GHC.Unit.Home.ModInfo (homeMod_bytecode)
-import           GHC.Driver.Pipeline.Monad ( MonadUse(use) )
-import           GHC.Driver.Pipeline.Phases (TPhase(T_HscPostTc))
-import           GHC.Data.Bool (OverridingBool)
-import           GHC.Driver.Config.Tidy (initTidyOpts)
-import           GHC.Driver.Errors.Types (GhcMessage(GhcTcRnMessage))
+import GHC.Driver.Phases (StopPhase (NoStop))
+import GHC.Driver.Pipeline (hscBackendPipeline, mkPipeEnv, runPipeline)
+import GHC.Driver.Pipeline.Monad (MonadUse (use))
+import GHC.Driver.Pipeline.Phases (TPhase (T_HscPostTc))
+import GHC.SysTools.Cpp (offsetIncludePaths)
+import GHC.Unit.Home.ModInfo (homeMod_bytecode)
 #if !MIN_VERSION_ghc(9,14,0)
-import           GHC.Driver.Monad (modifySession)
+import GHC.Driver.Monad (modifySession)
 #endif
-import           GHC.Unit.Home.ModInfo (HomeModInfo(HomeModInfo))
-import           GHC.Unit.Module.ModSummary (findTarget)
-import qualified GHC.Driver.Env as HscTypes
-import qualified GHC.Unit.Module.ModGuts as HscTypes
-import qualified GHC.Types.SourceError as HscTypes
-import qualified GHC.Unit.Module.Deps as HscTypes
-import qualified GHC.Driver.Backend as Backend
-import qualified GHC.Unit.Module.Graph as Graph
-import qualified GHC.Platform.Ways as Ways
-import qualified GHC.Types.Annotations as Annotations
-import qualified GHC.Core.FVs as CoreFVs
+import qualified GHC
 import qualified GHC.Core as CoreSyn
 import qualified GHC.Core.DataCon as DataCon
-import qualified GHC.Data.Graph.Directed as Digraph
-import qualified GHC.Runtime.Loader as DynamicLoading
-import           GHC.Driver.Session (GeneralFlag (..))
-import qualified GHC.Driver.Session as DynFlags
-import qualified GHC.Data.FastString as FastString
-import qualified GHC
-import qualified GHC.Driver.Main as HscMain
-import qualified GHC.Iface.Load as IfaceLoad
-import qualified GHC.Utils.Monad as MonadUtils
-import qualified GHC.Utils.Panic as Panic
-import qualified GHC.Serialized as Serialized (deserializeWithData)
-import qualified GHC.Unit.Types as UnitTypes (unitIdString)
-import qualified GHC.Tc.Utils.Monad as TcRnMonad
-import qualified GHC.Tc.Types as TcRnTypes
-import qualified GHC.Iface.Tidy as TidyPgm
+import qualified GHC.Core.FVs as CoreFVs
+import qualified GHC.Core.FamInstEnv as FamInstEnv
 import qualified GHC.Core.TyCon as TyCon
 import qualified GHC.Core.Type as Type
-import qualified GHC.Types.Unique as Unique
-import qualified GHC.Tc.Instance.Family as FamInst
-import qualified GHC.Core.FamInstEnv as FamInstEnv
+import qualified GHC.Data.FastString as FastString
+import qualified GHC.Data.Graph.Directed as Digraph
+import qualified GHC.Driver.Backend as Backend
+import qualified GHC.Driver.Env as HscTypes
+import qualified GHC.Driver.Main as HscMain
+import GHC.Driver.Session (GeneralFlag (..))
+import qualified GHC.Driver.Session as DynFlags
+import qualified GHC.Iface.Load as IfaceLoad
+import qualified GHC.Iface.Tidy as TidyPgm
 import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Platform.Ways as Ways
+import qualified GHC.Runtime.Loader as DynamicLoading
+import qualified GHC.Serialized as Serialized (deserializeWithData)
+import qualified GHC.Tc.Instance.Family as FamInst
+import qualified GHC.Tc.Types as TcRnTypes
+import qualified GHC.Tc.Utils.Monad as TcRnMonad
+import qualified GHC.Types.Annotations as Annotations
 import qualified GHC.Types.Name as Name
+import qualified GHC.Types.Name.Env as NameEnv
 import qualified GHC.Types.Name.Occurrence as OccName
-import           GHC.Utils.Outputable (ppr)
-import qualified GHC.Utils.Outputable as Outputable
+import qualified GHC.Types.SourceError as HscTypes
+import qualified GHC.Types.Unique as Unique
 import qualified GHC.Types.Unique.Set as UniqSet
 import qualified GHC.Types.Var as Var
+import GHC.Unit.Home.ModInfo (HomeModInfo (HomeModInfo))
+import qualified GHC.Unit.Module.Deps as HscTypes
 import qualified GHC.Unit.Module.Env as ModuleEnv
-import qualified GHC.Types.Name.Env as NameEnv
-
+import qualified GHC.Unit.Module.Graph as Graph
+import qualified GHC.Unit.Module.ModGuts as HscTypes
+import GHC.Unit.Module.ModSummary (findTarget)
+import qualified GHC.Unit.Types as UnitTypes (unitIdString)
+import qualified GHC.Utils.Monad as MonadUtils
+import GHC.Utils.Outputable (ppr)
+import qualified GHC.Utils.Outputable as Outputable
+import qualified GHC.Utils.Panic as Panic
 #if MIN_VERSION_ghc(9,14,0)
 import GHC.Unit.Home.Graph (addHomeModInfoToHug)
 #else
 import GHC.Unit.Env (addHomeModInfoToHug)
 #endif
+import Clash.Annotations.BitRepresentation.Internal
+  ( DataRepr',
+    dataReprAnnToDataRepr',
+  )
 
 -- Internal Modules
-import           Clash.GHC.GHC2Core                           (modNameM, qualifiedNameString')
-import           Clash.GHC.LoadInterfaceFiles
-  (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders,
-   LoadedBinders(..))
-import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
-import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff
-                                                              ,wantedLanguageExtensions, unwantedLanguageExtensions)
-import           Clash.Annotations.BitRepresentation.Internal
-  (DataRepr', dataReprAnnToDataRepr')
-
-import           Clash.Signal.Internal
+import Clash.GHC.GHC2Core (modNameM, qualifiedNameString')
+import Clash.GHC.LoadInterfaceFiles
+  ( LoadedBinders (..),
+    getUnresolvedPrimitives,
+    loadExternalBinders,
+    loadExternalExprs,
+  )
+import Clash.GHCi.Common (checkMonoLocalBindsMod)
+import Clash.Signal.Internal
+import Clash.Util
+  ( curLoc,
+    noSrcSpan,
+    reportTimeDiff,
+    unwantedLanguageExtensions,
+    wantedLanguageExtensions,
+  )
 
 ghcLibDir :: IO FilePath
 #ifdef USE_GHC_PATHS
 ghcLibDir = return libdir
 #else
 ghcLibDir = do
-  (libDirM,exitCode) <- getProcessOutput $ "ghc-" ++ TOOL_VERSION_ghc ++ " --print-libdir"
+  (libDirM, exitCode) <- getProcessOutput $ "ghc-" ++ TOOL_VERSION_ghc ++ " --print-libdir"
   case exitCode of
-     ExitSuccess   -> case libDirM of
-       Just libDir -> return libDir
-       Nothing     -> Panic.pgmError noGHC
-     ExitFailure i -> case i of
-       127         -> Panic.pgmError noGHC
-       i'          -> Panic.pgmError $ "Calling GHC failed with error code: " ++ show i'
+    ExitSuccess -> case libDirM of
+      Just libDir -> return libDir
+      Nothing -> Panic.pgmError noGHC
+    ExitFailure i -> case i of
+      127 -> Panic.pgmError noGHC
+      i' -> Panic.pgmError $ "Calling GHC failed with error code: " ++ show i'
   where
-    noGHC = "Clash needs the GHC compiler it was built with, ghc-" ++ TOOL_VERSION_ghc ++
-            ", but it was not found. Make sure its location is in your PATH variable."
+    noGHC =
+      "Clash needs the GHC compiler it was built with, ghc-"
+        ++ TOOL_VERSION_ghc
+        ++ ", but it was not found. Make sure its location is in your PATH variable."
 
 getProcessOutput :: String -> IO (Maybe String, ExitCode)
 getProcessOutput command =
-     -- Create the process
-  do (_, pOut, _, handle) <- runInteractiveCommand command
-     -- Wait for the process to finish and store its exit code
-     exitCode <- waitForProcess handle
-     -- Get the standard output.
-     output   <- either (const Nothing) Just <$> tryIOError (hGetLine pOut)
-     -- return both the output and the exit code.
-     return (output, exitCode)
+  -- Create the process
+  do
+    (_, pOut, _, handle) <- runInteractiveCommand command
+    -- Wait for the process to finish and store its exit code
+    exitCode <- waitForProcess handle
+    -- Get the standard output.
+    output <- either (const Nothing) Just <$> tryIOError (hGetLine pOut)
+    -- return both the output and the exit code.
+    return (output, exitCode)
 #endif
 
 -- | Search databases for given module
-loadExternalModule
-  :: (HasCallStack, GHC.GhcMonad m)
-  => HDL
-  -> String
-  -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
+loadExternalModule ::
+  (HasCallStack, GHC.GhcMonad m) =>
+  HDL ->
+  -- | Module name. Can either be a filepath pointing to a .hs file, or a
   -- qualified module name (example: "Data.List").
-  -> Maybe String
-  -- ^ Name passed with @-main-is@, if any. When set, only the transitive
+  String ->
+  -- | Name passed with @-main-is@, if any. When set, only the transitive
   -- closure of this binder is loaded (instead of the closure of all exports of
   -- the module). See 'loadSeed'.
-  -> m (Either
-          SomeException
-          ( [CoreSyn.CoreBndr]                     -- Root binders
-          , FamInstEnv.FamInstEnv                  -- Local type family instances
-          , GHC.ModuleName                         -- Module name
-          , LoadedBinders
-          , [CoreSyn.CoreBind]                     -- All bindings
-          ) )
+  Maybe String ->
+  m
+    ( Either
+        SomeException
+        ( [CoreSyn.CoreBndr], -- Root binders
+          FamInstEnv.FamInstEnv, -- Local type family instances
+          GHC.ModuleName, -- Module name
+          LoadedBinders,
+          [CoreSyn.CoreBind] -- All bindings
+        )
+    )
 loadExternalModule hdl modName0 mainIsM = MC.try $ do
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
@@ -229,16 +254,16 @@ loadExternalModule hdl modName0 mainIsM = MC.try $ do
 -- | Read the interfaces of all modules that (transitively) contain type family
 -- instances, so that those instances are visible in the external package state.
 -- Also see https://github.com/clash-lang/clash-compiler/issues/1534.
-loadFamilyInstanceModules :: GHC.GhcMonad m => GHC.Module -> m ()
+loadFamilyInstanceModules :: (GHC.GhcMonad m) => GHC.Module -> m ()
 loadFamilyInstanceModules rootModule = runTcInteractive $ do
   iface <- IfaceLoad.loadModuleInterface doc rootModule
   IfaceLoad.loadModuleInterfaces doc (HscTypes.dep_finsts (GHC.mi_deps iface))
- where
-  doc = Outputable.text "Clash: reading type family instances"
+  where
+    doc = Outputable.text "Clash: reading type family instances"
 
 -- | Run a type checker action in the interactive context of the current session,
 -- turning a failure into a source error.
-runTcInteractive :: GHC.GhcMonad m => TcRnTypes.TcM a -> m a
+runTcInteractive :: (GHC.GhcMonad m) => TcRnTypes.TcM a -> m a
 runTcInteractive action = do
   hscEnv <- GHC.getSession
   (msgs, res) <- liftIO (TcRnMonad.initTcInteractive hscEnv action)
@@ -269,11 +294,11 @@ runTcInteractive action = do
 -- If the @-main-is@ name cannot be found among the exports we fall back to all
 -- exports and let 'loadModules' produce the usual \"no top-level function
 -- called ...\" error.
-loadSeed
-  :: GHC.GhcMonad m
-  => Maybe String
-  -> [CoreSyn.CoreBndr]
-  -> m [CoreSyn.CoreBndr]
+loadSeed ::
+  (GHC.GhcMonad m) =>
+  Maybe String ->
+  [CoreSyn.CoreBndr] ->
+  m [CoreSyn.CoreBndr]
 loadSeed Nothing rootIds = pure rootIds
 loadSeed (Just nm) rootIds =
   case filter ((== nm) . varNameString) rootIds of
@@ -281,20 +306,19 @@ loadSeed (Just nm) rootIds =
     mainIs -> do
       synAnns <- findSynthesizeAnnotations rootIds
       benchAnns <- findTestBenches rootIds
-      let
-        implicit =
-             map fst synAnns
-          <> Map.keys benchAnns
-          <> concat (Map.elems benchAnns)
-          <> filter isMagicName rootIds
+      let implicit =
+            map fst synAnns
+              <> Map.keys benchAnns
+              <> concat (Map.elems benchAnns)
+              <> filter isMagicName rootIds
       pure (nubSort (mainIs <> implicit))
 
-setupGhc
-  :: GHC.GhcMonad m
-  => OverridingBool
-  -> Maybe GHC.DynFlags
-  -> [FilePath]
-  -> m ()
+setupGhc ::
+  (GHC.GhcMonad m) =>
+  OverridingBool ->
+  Maybe GHC.DynFlags ->
+  [FilePath] ->
+  m ()
 setupGhc useColor dflagsM idirs = do
   dflags <-
     case dflagsM of
@@ -312,46 +336,56 @@ setupGhc useColor dflagsM idirs = do
         let df1 = setWantedLanguageExtensions df
             ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
             ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
-            ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
-            dfPlug = df1 { DynFlags.pluginModNames = nub $
-                                ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
-                                ghcTyLitKNPlugin : DynFlags.pluginModNames df1
-                           , DynFlags.useColor = useColor
-                           , DynFlags.importPaths = idirs
-                           }
+            ghcTyLitKNPlugin = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
+            dfPlug =
+              df1
+                { DynFlags.pluginModNames =
+                    nub $
+                      ghcTyLitNormPlugin
+                        : ghcTyLitExtrPlugin
+                        : ghcTyLitKNPlugin
+                        : DynFlags.pluginModNames df1,
+                  DynFlags.useColor = useColor,
+                  DynFlags.importPaths = idirs
+                }
         return dfPlug
 
-  let dflags1 = dflags
-                  { DynFlags.ghcMode  = GHC.CompManager
-                  , DynFlags.ghcLink  = GHC.LinkInMemory
-                  , DynFlags.backend  =
-                      if Ways.hostIsProfiled
-                         then Backend.noBackend
-                         else Backend.platformDefaultBackend (DynFlags.targetPlatform dflags)
-                  , DynFlags.reductionDepth = 1000
-                  }
+  let dflags1 =
+        dflags
+          { DynFlags.ghcMode = GHC.CompManager,
+            DynFlags.ghcLink = GHC.LinkInMemory,
+            DynFlags.backend =
+              if Ways.hostIsProfiled
+                then Backend.noBackend
+                else Backend.platformDefaultBackend (DynFlags.targetPlatform dflags),
+            DynFlags.reductionDepth = 1000
+          }
   let dflags2 = unwantedOptimizationFlags dflags1
       ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
-                    Just "YES" -> True
-                    _          -> False
+        Just "YES" -> True
+        _ -> False
       -- If the build is already dynamic, dynamic objects get built anyway and GHC
       -- warns about '-dynamic-too' being ignored. See #3354.
       targetIsDynamic =
-           DynFlags.ways dflags2 `Ways.hasWay` Ways.WayDyn
-        || (Ways.hostIsDynamic
-             && not (DynFlags.gopt DynFlags.Opt_ExternalInterpreter dflags2))
-      dflags3 = if ghcDynamic && not targetIsDynamic
-                  then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
-                  else dflags2
+        DynFlags.ways dflags2 `Ways.hasWay` Ways.WayDyn
+          || ( Ways.hostIsDynamic
+                 && not (DynFlags.gopt DynFlags.Opt_ExternalInterpreter dflags2)
+             )
+      dflags3 =
+        if ghcDynamic && not targetIsDynamic
+          then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
+          else dflags2
 
   when (DynFlags.gopt DynFlags.Opt_WorkerWrapper dflags3) $
     trace
-      (unlines ["WARNING:"
-               ,"`-fworker-wrapper` option is globally enabled, this can result in incorrect code."
-               ,"Are you compiling with `-O` or `-O2`? Consider adding `-fno-worker-wrapper`."
-               ,"`-fworker-wrapper` can be use in a diligent manner on a file-by-file basis"
-               ,"by using a `{-# OPTIONS_GHC -fworker-wrapper` #-} pragma."
-               ])
+      ( unlines
+          [ "WARNING:",
+            "`-fworker-wrapper` option is globally enabled, this can result in incorrect code.",
+            "Are you compiling with `-O` or `-O2`? Consider adding `-fno-worker-wrapper`.",
+            "`-fworker-wrapper` can be use in a diligent manner on a file-by-file basis",
+            "by using a `{-# OPTIONS_GHC -fworker-wrapper` #-} pragma."
+          ]
+      )
       (return ())
 
   _ <- GHC.setSessionDynFlags dflags3
@@ -363,18 +397,19 @@ setupGhc useColor dflagsM idirs = do
 
 -- | Load a module from a Haskell file. Function does NOT look in currently
 -- loaded modules.
-loadLocalModule
-  :: GHC.GhcMonad m
-  => HDL
-  -> String
-  -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
+loadLocalModule ::
+  (GHC.GhcMonad m) =>
+  HDL ->
+  -- | Module name. Can either be a filepath pointing to a .hs file, or a
   -- qualified module name (example: "Data.List").
-  -> m ( [CoreSyn.CoreBndr]                     -- Root binders
-       , FamInstEnv.FamInstEnv                  -- Local type family instances
-       , GHC.ModuleName                         -- Module name
-       , LoadedBinders
-       , [CoreSyn.CoreBind]                     -- All bindings
-       )
+  String ->
+  m
+    ( [CoreSyn.CoreBndr], -- Root binders
+      FamInstEnv.FamInstEnv, -- Local type family instances
+      GHC.ModuleName, -- Module name
+      LoadedBinders,
+      [CoreSyn.CoreBind] -- All bindings
+    )
 loadLocalModule hdl modName = do
   target <- GHC.guessTarget modName Nothing Nothing
   GHC.setTargets [target]
@@ -385,19 +420,23 @@ loadLocalModule hdl modName = do
       modGraph2 =
 #if MIN_VERSION_ghc(9,14,0)
         mapMaybe
-          (\case
-             Graph.ModuleNodeCompile ms -> Just ms
-             _ -> Nothing) $
+          ( \case
+              Graph.ModuleNodeCompile ms -> Just ms
+              _ -> Nothing
+          )
+          $ Digraph.flattenSCCs
+#else
+        Digraph.flattenSCCs
 #endif
-        Digraph.flattenSCCs $
-        -- TODO: this might break backpack
-        Graph.filterToposortToModules $
-        GHC.topSortModuleGraph True modGraph' Nothing
+          $
+          -- TODO: this might break backpack
+          Graph.filterToposortToModules
+          $ GHC.topSortModuleGraph True modGraph' Nothing
   liftIO $ mapM_ checkMonoLocalBindsMod modGraph2
 
   tidiedMods <- forM modGraph2 $ \m -> do
     oldDFlags <- GHC.getSessionDynFlags
-    pMod  <- parseModule m
+    pMod <- parseModule m
     _ <- GHC.setSessionDynFlags (GHC.ms_hspp_opts (GHC.pm_mod_summary pMod))
     tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
 
@@ -417,54 +456,67 @@ loadLocalModule hdl modName = do
     --
     -- Given that TH splices can do non-trivial computation and I/O,
     -- running TH twice must be avoid.
-    let (tc_result,_) = GHC.tm_internals_ tcMod
+    let (tc_result, _) = GHC.tm_internals_ tcMod
     let tcMod' = tcMod
     dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
     hsc_env <- GHC.getSession
     simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env [] dsMod
     checkForInvalidPrelude simpl_guts
     opts <- liftIO (initTidyOpts hsc_env)
-    (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram opts simpl_guts
-    let
-      loadAsByteCode
-        | Just GHC.Target { targetAllowObjCode = obj }
-            <- findTarget m (HscTypes.hsc_targets hsc_env)
-        , not obj
-        = True
-        | otherwise = False
-      lcl_dflags = GHC.ms_hspp_opts m
-      old_paths  = GHC.includePaths lcl_dflags
-      location = GHC.ms_location m
-      input_fn = fromMaybe (error "loadLocalModule") (GHC.ml_hs_file location)
-      basename = dropExtension input_fn
-      current_dir = takeDirectory basename
-      interpreterBackend = Backend.interpreterBackend
-      (bcknd, dflags3)
-        | loadAsByteCode
-        = ( interpreterBackend
-          , DynFlags.gopt_set
-              (lcl_dflags { GHC.backend = interpreterBackend })
-              Opt_ForceRecomp
-          )
-        | otherwise
-        = (GHC.backend dflags, lcl_dflags)
-      dflags = dflags3
-              { GHC.includePaths = offsetIncludePaths dflags3 $
-                                    DynFlags.addImplicitQuoteInclude
-                                      old_paths
-                                      [current_dir] }
-      pipelineOutput = Backend.backendPipelineOutput bcknd
-      upd_summary = m { GHC.ms_hspp_opts = dflags }
-      hsc_env1 = HscTypes.hscSetFlags dflags hsc_env
-      pipe_env = mkPipeEnv NoStop input_fn Nothing pipelineOutput
-      pipeline = do
-        ac <- use (T_HscPostTc hsc_env1 upd_summary
-                      (TcRnTypes.FrontendTypecheck tc_result) mempty Nothing )
-        hscBackendPipeline pipe_env hsc_env1 upd_summary ac
+    (tidy_guts, _) <- MonadUtils.liftIO $ TidyPgm.tidyProgram opts simpl_guts
+    let loadAsByteCode
+          | Just GHC.Target {targetAllowObjCode = obj} <-
+              findTarget m (HscTypes.hsc_targets hsc_env),
+            not obj =
+              True
+          | otherwise = False
+        lcl_dflags = GHC.ms_hspp_opts m
+        old_paths = GHC.includePaths lcl_dflags
+        location = GHC.ms_location m
+        input_fn = fromMaybe (error "loadLocalModule") (GHC.ml_hs_file location)
+        basename = dropExtension input_fn
+        current_dir = takeDirectory basename
+        interpreterBackend = Backend.interpreterBackend
+        (bcknd, dflags3)
+          | loadAsByteCode =
+              ( interpreterBackend,
+                DynFlags.gopt_set
+                  (lcl_dflags {GHC.backend = interpreterBackend})
+                  Opt_ForceRecomp
+              )
+          | otherwise =
+              (GHC.backend dflags, lcl_dflags)
+        dflags =
+          dflags3
+            { GHC.includePaths =
+                offsetIncludePaths dflags3 $
+                  DynFlags.addImplicitQuoteInclude
+                    old_paths
+                    [current_dir]
+            }
+        pipelineOutput = Backend.backendPipelineOutput bcknd
+        upd_summary = m {GHC.ms_hspp_opts = dflags}
+        hsc_env1 = HscTypes.hscSetFlags dflags hsc_env
+        pipe_env = mkPipeEnv NoStop input_fn Nothing pipelineOutput
+        pipeline = do
+          ac <-
+            use
+              ( T_HscPostTc
+                  hsc_env1
+                  upd_summary
+                  (TcRnTypes.FrontendTypecheck tc_result)
+                  mempty
+                  Nothing
+              )
+          hscBackendPipeline pipe_env hsc_env1 upd_summary ac
     (iface, linkable) <- liftIO (runPipeline (HscTypes.hsc_hooks hsc_env1) pipeline)
     details <- liftIO (HscMain.initModDetails hsc_env1 iface)
-    linkable1 <- liftIO (traverse (HscMain.initWholeCoreBindings hsc_env1 iface details)
-                                  (homeMod_bytecode linkable))
+    linkable1 <-
+      liftIO
+        ( traverse
+            (HscMain.initWholeCoreBindings hsc_env1 iface details)
+            (homeMod_bytecode linkable)
+        )
     let linkable2 = linkable {homeMod_bytecode = linkable1}
     let mod_info = HomeModInfo iface details linkable2
 #if MIN_VERSION_ghc(9,14,0)
@@ -472,16 +524,16 @@ loadLocalModule hdl modName = do
 #else
     modifySession $ HscTypes.hscUpdateHUG (addHomeModInfoToHug mod_info)
 #endif
-    let pgm        = HscTypes.cg_binds tidy_guts
+    let pgm = HscTypes.cg_binds tidy_guts
     let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
     _ <- GHC.setSessionDynFlags oldDFlags
-    return (pgm,modFamInstEnv)
+    return (pgm, modFamInstEnv)
 
-  let (binders,modFamInstEnvs) = unzip tidiedMods
-      binderIds                = map fst (CoreSyn.flattenBinds (concat binders))
-      plusFamInst f1 f2        = FamInstEnv.extendFamInstEnvList f1 (FamInstEnv.famInstEnvElts f2)
-      modFamInstEnvs'          = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
-      rootModule               = GHC.ms_mod_name . last $ modGraph2
+  let (binders, modFamInstEnvs) = unzip tidiedMods
+      binderIds = map fst (CoreSyn.flattenBinds (concat binders))
+      plusFamInst f1 f2 = FamInstEnv.extendFamInstEnvList f1 (FamInstEnv.famInstEnvElts f2)
+      modFamInstEnvs' = foldl' plusFamInst FamInstEnv.emptyFamInstEnv modFamInstEnvs
+      rootModule = GHC.ms_mod_name . last $ modGraph2
 
   -- Because tidiedMods is in topological order, binders is also, and hence
   -- the binders belonging to the "root" module are the last binders
@@ -490,7 +542,7 @@ loadLocalModule hdl modName = do
 
   -- Find local primitive annotations
   localPrims <- findPrimitiveAnnotations hdl binderIds
-  let loaded1 = loaded0{lbPrims=lbPrims loaded0 <> Seq.fromList localPrims}
+  let loaded1 = loaded0 {lbPrims = lbPrims loaded0 <> Seq.fromList localPrims}
 
   let allBinders = makeRecursiveGroups (Map.assocs (lbBinders loaded0))
   pure (rootIds, modFamInstEnvs', rootModule, loaded1, allBinders)
@@ -518,14 +570,17 @@ isMagicName :: Var.Var -> Bool
 isMagicName v = isTopEntityName v || isTestBenchName v
 
 data LoadModulesException = LoadModulesException
-  { moduleName :: String
-  , externalError :: String
-  , localError :: String
-  } deriving (Exception)
+  { moduleName :: String,
+    externalError :: String,
+    localError :: String
+  }
+  deriving (Exception)
 
 instance Show LoadModulesException where
   showsPrec :: Int -> LoadModulesException -> ShowS
-  showsPrec _ LoadModulesException{moduleName, externalError, localError} = showString [I.i|
+  showsPrec _ LoadModulesException {moduleName, externalError, localError} =
+    showString
+      [I.i|
     Failed to load module '#{moduleName}'.
 
     Tried to load it from precompiled sources, error was:
@@ -537,31 +592,32 @@ instance Show LoadModulesException where
       #{localError}
   |]
 
-loadModules
-  :: GHC.Ghc ()
-  -- ^ Allows us to have some initial action, such as sharing a linker state
+loadModules ::
+  -- | Allows us to have some initial action, such as sharing a linker state
   -- See https://github.com/clash-lang/clash-compiler/issues/1686 and
   -- https://mail.haskell.org/pipermail/ghc-devs/2021-March/019605.html
-  -> OverridingBool
-  -- ^ Use color
-  -> HDL
-  -- ^ HDL target
-  -> String
-  -- ^ Module name
-  -> Maybe (DynFlags.DynFlags)
-  -- ^ Flags to run GHC with
-  -> [FilePath]
-  -- ^ Import dirs to use when no DynFlags are provided
-  -> IO ( [CoreSyn.CoreBind]                     -- Binders
-        , [(CoreSyn.CoreBndr,Int)]               -- Class operations
-        , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
-        , FamInstEnv.FamInstEnvs
-        , [(CoreSyn.CoreBndr, Maybe TopEntity, Bool)]  -- binder + synthesize annotation + is testbench?
-        , [Either UnresolvedPrimitive FilePath]
-        , [DataRepr']
-        , [(Text.Text, PrimitiveGuard ())]
-        , HashMap Text.Text VDomainConfiguration -- domain names to configuration
-        )
+  GHC.Ghc () ->
+  -- | Use color
+  OverridingBool ->
+  -- | HDL target
+  HDL ->
+  -- | Module name
+  String ->
+  -- | Flags to run GHC with
+  Maybe (DynFlags.DynFlags) ->
+  -- | Import dirs to use when no DynFlags are provided
+  [FilePath] ->
+  IO
+    ( [CoreSyn.CoreBind], -- Binders
+      [(CoreSyn.CoreBndr, Int)], -- Class operations
+      [CoreSyn.CoreBndr], -- Unlocatable Expressions
+      FamInstEnv.FamInstEnvs,
+      [(CoreSyn.CoreBndr, Maybe TopEntity, Bool)], -- binder + synthesize annotation + is testbench?
+      [Either UnresolvedPrimitive FilePath],
+      [DataRepr'],
+      [(Text.Text, PrimitiveGuard ())],
+      HashMap Text.Text VDomainConfiguration -- domain names to configuration
+    )
 loadModules startAction useColor hdl modName dflagsM idirs = do
   libDir <- MonadUtils.liftIO ghcLibDir
   startTime <- Clock.getCurrentTime
@@ -569,26 +625,28 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     startAction
     -- 'mainFunIs' is set to Nothing due to issue #1304:
     -- https://github.com/clash-lang/clash-compiler/issues/1304
-    setupGhc useColor ((\d -> d{GHC.mainFunIs=Nothing}) <$> dflagsM) idirs
+    setupGhc useColor ((\d -> d {GHC.mainFunIs = Nothing}) <$> dflagsM) idirs
     setupTime <- MonadUtils.liftIO Clock.getCurrentTime
     let setupStartDiff = reportTimeDiff setupTime startTime
     MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
 
     let mainIsM = GHC.mainFunIs =<< dflagsM
-    (rootIds, modFamInstEnvs, _rootModule, LoadedBinders{..}, allBinders) <-
+    (rootIds, modFamInstEnvs, _rootModule, LoadedBinders {..}, allBinders) <-
       -- We need to try and load external modules first, because we can't
       -- recover from errors in 'loadLocalModule'.
       loadExternalModule hdl modName mainIsM >>= \case
         Left loadExternalErr -> do
           catch @_ @SomeException
             (loadLocalModule hdl modName)
-            (\localError ->
-              throwM
-                (LoadModulesException
-                  { moduleName = modName
-                  , externalError = show loadExternalErr
-                  , localError = show localError
-                  }))
+            ( \localError ->
+                throwM
+                  ( LoadModulesException
+                      { moduleName = modName,
+                        externalError = show loadExternalErr,
+                        localError = show localError
+                      }
+                  )
+            )
         Right res -> pure res
 
     let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
@@ -602,148 +660,159 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     -- 'loadFamilyInstanceModules' for modules loaded from interface files.
     famInstEnvs <- runTcInteractive FamInst.tcGetFamInstEnvs
 
-    allSyn     <- Map.fromList <$> findSynthesizeAnnotations allBinderIds
-    topSyn     <- map fst <$> findSynthesizeAnnotations rootIds
-    benchAnn   <- findTestBenches rootIds
-    reprs'     <- findCustomReprAnnotations
+    allSyn <- Map.fromList <$> findSynthesizeAnnotations allBinderIds
+    topSyn <- map fst <$> findSynthesizeAnnotations rootIds
+    benchAnn <- findTestBenches rootIds
+    reprs' <- findCustomReprAnnotations
     primGuards <- findPrimitiveGuardAnnotations allBinderIds
     let
-      -- All binders synthesized with Synthesize, all binders annotated with
-      -- TestBench and the binders they're pointing to, plus magically named
-      -- functions called "topEntity" or "testBench". Synthesized in case user
-      -- didn't specify a particular target.
-      allImplicit = nubSort $
-           Map.keys benchAnn
-        <> Map.keys allSyn
-        <> concat (Map.elems benchAnn)
-        <> filter isMagicName rootIds
-        <> topSyn
+        -- All binders synthesized with Synthesize, all binders annotated with
+        -- TestBench and the binders they're pointing to, plus magically named
+        -- functions called "topEntity" or "testBench". Synthesized in case user
+        -- didn't specify a particular target.
+        allImplicit =
+          nubSort $
+            Map.keys benchAnn
+              <> Map.keys allSyn
+              <> concat (Map.elems benchAnn)
+              <> filter isMagicName rootIds
+              <> topSyn
 
-      -- Top entities we wish to synthesize. Users can filter these with -main-is.
-      topEntities1 =
-        case GHC.mainFunIs =<< dflagsM of
-          Just mainIsNm ->
-            -- Use requested top entity.
-            --
-            -- TODO: Look up associated test benches in 'benchAnn'. This would
-            --       be wasted effort if implemented right now, as 'getMainTopEntity'
-            --       would later remove them again. Functionality of that function
-            --       should be moved here.
-            --
-            -- TODO: Handle fully qualified names to -main-is
-            case find ((==mainIsNm) . varNameString) rootIds of
-              Nothing ->
-                Panic.pgmError [I.i|
+        -- Top entities we wish to synthesize. Users can filter these with -main-is.
+        topEntities1 =
+          case GHC.mainFunIs =<< dflagsM of
+            Just mainIsNm ->
+              -- Use requested top entity.
+              --
+              -- TODO: Look up associated test benches in 'benchAnn'. This would
+              --       be wasted effort if implemented right now, as 'getMainTopEntity'
+              --       would later remove them again. Functionality of that function
+              --       should be moved here.
+              --
+              -- TODO: Handle fully qualified names to -main-is
+              case find ((== mainIsNm) . varNameString) rootIds of
+                Nothing ->
+                  Panic.pgmError
+                    [I.i|
                   No top-level function called '#{mainIsNm}' found. Did you
                   forget to export it?
                 |]
-              Just top ->
-                -- Note that we return /all/ top entities here, even the ones
-                -- we don't which to synthesize. 'getMainTopEntity' will later
-                -- restrict this to just this top entity (and its dependencies,
-                -- which is why we return everything in the first place).
-                --
-                -- This is quite wasteful though; als Clash will load all
-                -- definitions even though it will end up using just a few. TODO
-                nubSort (top:allImplicit)
-          Nothing ->
-            -- User didn't specify anything.
-            case allImplicit of
-              [] ->
-                Panic.pgmError [I.i|
+                Just top ->
+                  -- Note that we return /all/ top entities here, even the ones
+                  -- we don't which to synthesize. 'getMainTopEntity' will later
+                  -- restrict this to just this top entity (and its dependencies,
+                  -- which is why we return everything in the first place).
+                  --
+                  -- This is quite wasteful though; als Clash will load all
+                  -- definitions even though it will end up using just a few. TODO
+                  nubSort (top : allImplicit)
+            Nothing ->
+              -- User didn't specify anything.
+              case allImplicit of
+                [] ->
+                  Panic.pgmError
+                    [I.i|
                   No top-level function called 'topEntity' or 'testBench' found,
                   nor any function annotated with a 'Synthesize' or 'TestBench'
                   annotation. If you want to synthesize a specific binder in
                   #{show modName}, use '-main-is myTopEntity'.
                 |]
-              _ ->
-                allImplicit
+                _ ->
+                  allImplicit
 
-      -- Include whether found top entity is a test bench
-      allBenchIds = Set.fromList (concat (Map.elems benchAnn))
-      topEntities2 = topEntities1 <&> \tid ->
-        ( tid
-        , tid `Map.lookup` allSyn       -- include top entity annotation (if any)
-        , tid `Set.member` allBenchIds  -- indicate whether top entity is test bench
-        )
+        -- Include whether found top entity is a test bench
+        allBenchIds = Set.fromList (concat (Map.elems benchAnn))
+        topEntities2 =
+          topEntities1 <&> \tid ->
+            ( tid,
+              tid `Map.lookup` allSyn, -- include top entity annotation (if any)
+              tid `Set.member` allBenchIds -- indicate whether top entity is test bench
+            )
 
     let reprs1 = lbReprs <> Seq.fromList reprs'
 
     let famInstEnvs' = (fst famInstEnvs, modFamInstEnvs)
-        allTCInsts   = FamInstEnv.famInstEnvElts (fst famInstEnvs')
-                         ++ FamInstEnv.famInstEnvElts (snd famInstEnvs')
+        allTCInsts =
+          FamInstEnv.famInstEnvElts (fst famInstEnvs')
+            ++ FamInstEnv.famInstEnvElts (snd famInstEnvs')
 
-        knownConfs   = filter (\x -> "KnownConf" == nameString (FamInstEnv.fi_fam x)) allTCInsts
+        knownConfs = filter (\x -> "KnownConf" == nameString (FamInstEnv.fi_fam x)) allTCInsts
 
-        fsToText     = Text.decodeUtf8 . FastString.bytesFS
+        fsToText = Text.decodeUtf8 . FastString.bytesFS
 
-        famToDomain  = fromMaybe (error "KnownConf: Expected Symbol at LHS of type family")
-                         . join . fmap (fmap fsToText) . fmap Type.isStrLitTy
-                         . listToMaybe . FamInstEnv.fi_tys
-        famToConf    = unpackKnownConf . FamInstEnv.fi_rhs
+        famToDomain =
+          fromMaybe (error "KnownConf: Expected Symbol at LHS of type family")
+            . join
+            . fmap (fmap fsToText)
+            . fmap Type.isStrLitTy
+            . listToMaybe
+            . FamInstEnv.fi_tys
+        famToConf = unpackKnownConf . FamInstEnv.fi_rhs
 
         knownConfNms = fmap famToDomain knownConfs
-        knownConfDs  = fmap famToConf knownConfs
+        knownConfDs = fmap famToConf knownConfs
 
         knownConfMap = HashMap.fromList (zip knownConfNms knownConfDs)
 
-    return ( allBinders
-           , Map.assocs lbClassOps
-           , Set.toList lbUnlocatable
-           , famInstEnvs'
-           , topEntities2
-           , toList lbPrims
-           , toList reprs1
-           , primGuards
-           , knownConfMap
-           )
+    return
+      ( allBinders,
+        Map.assocs lbClassOps,
+        Set.toList lbUnlocatable,
+        famInstEnvs',
+        topEntities2,
+        toList lbPrims,
+        toList reprs1,
+        primGuards,
+        knownConfMap
+      )
 
 -- | Given a type that represents the RHS of a KnownConf type family instance,
 -- unpack the fields of the DomainConfiguration and make a VDomainConfiguration.
 --
 unpackKnownConf :: Type.Type -> VDomainConfiguration
 unpackKnownConf ty
-  | [d,p,ae,rk,ib,rp] <- Type.tyConAppArgs ty
+  | [d, p, ae, rk, ib, rp] <- Type.tyConAppArgs ty,
     -- Domain name
-  , Just dom <- fmap FastString.unpackFS (Type.isStrLitTy d)
+    Just dom <- fmap FastString.unpackFS (Type.isStrLitTy d),
     -- Period
-  , Just period <- fmap naturalFromInteger (Type.isNumLitTy p)
+    Just period <- fmap naturalFromInteger (Type.isNumLitTy p),
     -- Active Edge
-  , aeTc <- Type.tyConAppTyCon ae
-  , Just aeDc <- TyCon.isPromotedDataCon_maybe aeTc
-  , aeNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName aeDc)
+    aeTc <- Type.tyConAppTyCon ae,
+    Just aeDc <- TyCon.isPromotedDataCon_maybe aeTc,
+    aeNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName aeDc),
     -- Reset Kind
-  , rkTc <- Type.tyConAppTyCon rk
-  , Just rkDc <- TyCon.isPromotedDataCon_maybe rkTc
-  , rkNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rkDc)
+    rkTc <- Type.tyConAppTyCon rk,
+    Just rkDc <- TyCon.isPromotedDataCon_maybe rkTc,
+    rkNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rkDc),
     -- Init Behavior
-  , ibTc <- Type.tyConAppTyCon ib
-  , Just ibDc <- TyCon.isPromotedDataCon_maybe ibTc
-  , ibNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName ibDc)
+    ibTc <- Type.tyConAppTyCon ib,
+    Just ibDc <- TyCon.isPromotedDataCon_maybe ibTc,
+    ibNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName ibDc),
     -- Reset Polarity
-  , rpTc <- Type.tyConAppTyCon rp
-  , Just rpDc <- TyCon.isPromotedDataCon_maybe rpTc
-  , rpNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rpDc)
-  = VDomainConfiguration dom period
-      (asActiveEdge aeNm)
-      (asResetKind rkNm)
-      (asInitBehavior ibNm)
-      (asResetPolarity rpNm)
+    rpTc <- Type.tyConAppTyCon rp,
+    Just rpDc <- TyCon.isPromotedDataCon_maybe rpTc,
+    rpNm <- OccName.occNameString $ Name.nameOccName (DataCon.dataConName rpDc) =
+      VDomainConfiguration
+        dom
+        period
+        (asActiveEdge aeNm)
+        (asResetKind rkNm)
+        (asInitBehavior ibNm)
+        (asResetPolarity rpNm)
+  | otherwise =
+      error $ $(curLoc) ++ "Could not unpack domain configuration."
+  where
+    asActiveEdge :: (HasCallStack) => String -> ActiveEdge
+    asActiveEdge x = fromMaybe (error $ $(curLoc) ++ "Unknown active edge: " ++ show x) (readMaybe x)
 
-  | otherwise
-  = error $ $(curLoc) ++ "Could not unpack domain configuration."
- where
-  asActiveEdge :: HasCallStack => String -> ActiveEdge
-  asActiveEdge x = fromMaybe (error $ $(curLoc) ++ "Unknown active edge: " ++ show x) (readMaybe x)
+    asResetKind :: (HasCallStack) => String -> ResetKind
+    asResetKind x = fromMaybe (error $ $(curLoc) ++ "Unknown reset kind: " ++ show x) (readMaybe x)
 
-  asResetKind :: HasCallStack => String -> ResetKind
-  asResetKind x = fromMaybe (error $ $(curLoc) ++ "Unknown reset kind: " ++ show x) (readMaybe x)
+    asInitBehavior :: (HasCallStack) => String -> InitBehavior
+    asInitBehavior x = fromMaybe (error $ $(curLoc) ++ "Unknown init behavior: " ++ show x) (readMaybe x)
 
-  asInitBehavior :: HasCallStack => String -> InitBehavior
-  asInitBehavior x = fromMaybe (error $ $(curLoc) ++ "Unknown init behavior: " ++ show x) (readMaybe x)
-
-  asResetPolarity :: HasCallStack => String -> ResetPolarity
-  asResetPolarity x = fromMaybe (error $ $(curLoc) ++ "Unknown reset polarity: " ++ show x) (readMaybe x)
+    asResetPolarity :: (HasCallStack) => String -> ResetPolarity
+    asResetPolarity x = fromMaybe (error $ $(curLoc) ++ "Unknown reset polarity: " ++ show x) (readMaybe x)
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
 -- recursive binding groups.
@@ -754,264 +823,273 @@ unpackKnownConf ty
 --    only self-recursive.
 -- 3. Clash.GHC.GenerateBindings.mkBindings turns groups of mutually recursive
 --    bindings into self-recursive bindings which can go into the BindingsMap.
-makeRecursiveGroups
-  :: [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)]
-  -> [CoreSyn.CoreBind]
-makeRecursiveGroups
-  = map makeBind
-  . Digraph.stronglyConnCompFromEdgedVerticesUniq
-  . map makeNode
+makeRecursiveGroups ::
+  [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)] ->
+  [CoreSyn.CoreBind]
+makeRecursiveGroups =
+  map makeBind
+    . Digraph.stronglyConnCompFromEdgedVerticesUniq
+    . map makeNode
   where
-    makeNode
-      :: (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
-      -> Digraph.Node Unique.Unique (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
-    makeNode (b,e) =
+    makeNode ::
+      (CoreSyn.CoreBndr, CoreSyn.CoreExpr) ->
+      Digraph.Node Unique.Unique (CoreSyn.CoreBndr, CoreSyn.CoreExpr)
+    makeNode (b, e) =
       Digraph.DigraphNode
-        (b,e)
+        (b, e)
         (Var.varUnique b)
         (UniqSet.nonDetKeysUniqSet (CoreFVs.exprSomeFreeVars Var.isId e))
 
-    makeBind
-      :: Digraph.SCC (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
-      -> CoreSyn.CoreBind
-    makeBind (Digraph.AcyclicSCC (b,e)) = CoreSyn.NonRec b e
-    makeBind (Digraph.CyclicSCC bs)     = CoreSyn.Rec bs
+    makeBind ::
+      Digraph.SCC (CoreSyn.CoreBndr, CoreSyn.CoreExpr) ->
+      CoreSyn.CoreBind
+    makeBind (Digraph.AcyclicSCC (b, e)) = CoreSyn.NonRec b e
+    makeBind (Digraph.CyclicSCC bs) = CoreSyn.Rec bs
 
-errOnDuplicateAnnotations
-  :: String
-  -- ^ Name of annotation
-  -> [CoreSyn.CoreBndr]
-  -- ^ Binders searched for
-  -> [[a]]
-  -- ^ Parsed annotations
-  -> [(CoreSyn.CoreBndr, a)]
+errOnDuplicateAnnotations ::
+  -- | Name of annotation
+  String ->
+  -- | Binders searched for
+  [CoreSyn.CoreBndr] ->
+  -- | Parsed annotations
+  [[a]] ->
+  [(CoreSyn.CoreBndr, a)]
 errOnDuplicateAnnotations nm =
   combineAnnotationsWith err nm
- where
-  err _ _ = Left $ "A binder can't have more than one '" ++ nm ++ "' annotation."
+  where
+    err _ _ = Left $ "A binder can't have more than one '" ++ nm ++ "' annotation."
 
-combineAnnotationsWith
-  :: forall a. (a -> a -> Either String a)
-  -- ^ function to (attempts to) combine different annotations
-  -> String
-  -- ^ Name of annotation
-  -> [CoreSyn.CoreBndr]
-  -- ^ Binders searched for
-  -> [[a]]
-  -- ^ Parsed annotations
-  -> [(CoreSyn.CoreBndr, a)]
+combineAnnotationsWith ::
+  forall a.
+  -- | function to (attempts to) combine different annotations
+  (a -> a -> Either String a) ->
+  -- | Name of annotation
+  String ->
+  -- | Binders searched for
+  [CoreSyn.CoreBndr] ->
+  -- | Parsed annotations
+  [[a]] ->
+  [(CoreSyn.CoreBndr, a)]
 combineAnnotationsWith f nm bndrs anns =
   go (zip bndrs anns)
- where
-  go :: [(CoreSyn.CoreBndr, [a])] -> [(CoreSyn.CoreBndr, a)]
-  go []             = []
-  go ((_, []):ps)   = go ps
-  go ((b, (a:as)):ps) = case foldM f a as of
-    Left err ->
-      Panic.pgmError $ "Error processing '" ++ nm ++ "' annotations on "
-                       ++ Outputable.showSDocUnsafe (pprQualified $ Var.varName b)
-                       ++ ":\n" ++ err
-    Right x -> (b, x) : go ps
-  pprQualified :: Name.Name -> Outputable.SDoc
-  pprQualified x = case Name.nameModule_maybe x of
-    Just m  -> Outputable.hcat [ppr m, Outputable.dot, ppr x]
-    Nothing -> ppr x
-
+  where
+    go :: [(CoreSyn.CoreBndr, [a])] -> [(CoreSyn.CoreBndr, a)]
+    go [] = []
+    go ((_, []) : ps) = go ps
+    go ((b, (a : as)) : ps) = case foldM f a as of
+      Left err ->
+        Panic.pgmError $
+          "Error processing '"
+            ++ nm
+            ++ "' annotations on "
+            ++ Outputable.showSDocUnsafe (pprQualified $ Var.varName b)
+            ++ ":\n"
+            ++ err
+      Right x -> (b, x) : go ps
+    pprQualified :: Name.Name -> Outputable.SDoc
+    pprQualified x = case Name.nameModule_maybe x of
+      Just m -> Outputable.hcat [ppr m, Outputable.dot, ppr x]
+      Nothing -> ppr x
 
 -- | Find annotations by given targets
-findAnnotationsByTargets
-  :: (GHC.GhcMonad m, Data a, Typeable a)
-  => [Annotations.AnnTarget Name.Name]
-  -> m [[a]]
+findAnnotationsByTargets ::
+  (GHC.GhcMonad m, Data a, Typeable a) =>
+  [Annotations.AnnTarget Name.Name] ->
+  m [[a]]
 findAnnotationsByTargets targets =
   mapM (GHC.findGlobalAnns Serialized.deserializeWithData) targets
 
 -- | Find all annotations of a certain type in all modules seen so far.
-findAllModuleAnnotations
-  :: (GHC.GhcMonad m, Data a, Typeable a)
-  => m [a]
+findAllModuleAnnotations ::
+  (GHC.GhcMonad m, Data a, Typeable a) =>
+  m [a]
 findAllModuleAnnotations = do
   hsc_env <- GHC.getSession
   ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
-  return $ concat
-        $ (\(mEnv,nEnv) -> ModuleEnv.moduleEnvElts mEnv <> NameEnv.nonDetNameEnvElts nEnv)
-         $ Annotations.deserializeAnns
-              Serialized.deserializeWithData
-              ann_env
+  return
+    $ concat
+    $ (\(mEnv, nEnv) -> ModuleEnv.moduleEnvElts mEnv <> NameEnv.nonDetNameEnvElts nEnv)
+    $ Annotations.deserializeAnns
+      Serialized.deserializeWithData
+      ann_env
 
 -- | Find all annotations belonging to all binders seen so far.
-findNamedAnnotations
-  :: (GHC.GhcMonad m, Data a, Typeable a)
-  => [CoreSyn.CoreBndr]
-  -> m [[a]]
+findNamedAnnotations ::
+  (GHC.GhcMonad m, Data a, Typeable a) =>
+  [CoreSyn.CoreBndr] ->
+  m [[a]]
 findNamedAnnotations bndrs =
   findAnnotationsByTargets (map (Annotations.NamedTarget . Var.varName) bndrs)
 
-findPrimitiveGuardAnnotations
-  :: GHC.GhcMonad m
-  => [CoreSyn.CoreBndr]
-  -> m [(Text.Text, (PrimitiveGuard ()))]
+findPrimitiveGuardAnnotations ::
+  (GHC.GhcMonad m) =>
+  [CoreSyn.CoreBndr] ->
+  m [(Text.Text, (PrimitiveGuard ()))]
 findPrimitiveGuardAnnotations bndrs = do
   anns0 <- findNamedAnnotations bndrs
   let anns1 = combineAnnotationsWith combinePrimGuards "PrimitiveGuard" bndrs anns0
   pure (map (first (qualifiedNameString' . Var.varName)) anns1)
- where
-  combinePrimGuards a b = case (a,b) of
-    (HasBlackBox x _, HasBlackBox y _) -> Right (HasBlackBox (x++y) ())
-    (DontTranslate  , DontTranslate)   -> Right DontTranslate
-    (_,_) -> Left "One binder can't have both HasBlackBox and DontTranslate annotations."
-
+  where
+    combinePrimGuards a b = case (a, b) of
+      (HasBlackBox x _, HasBlackBox y _) -> Right (HasBlackBox (x ++ y) ())
+      (DontTranslate, DontTranslate) -> Right DontTranslate
+      (_, _) -> Left "One binder can't have both HasBlackBox and DontTranslate annotations."
 
 -- | Find annotations of type @DataReprAnn@ and convert them to @DataRepr'@
-findCustomReprAnnotations
-  :: GHC.GhcMonad m
-  => m [DataRepr']
+findCustomReprAnnotations ::
+  (GHC.GhcMonad m) =>
+  m [DataRepr']
 findCustomReprAnnotations =
   map dataReprAnnToDataRepr' <$> findAllModuleAnnotations
 
 -- | Find synthesize annotations and make sure each binder has no more than
 -- a single annotation.
-findSynthesizeAnnotations
-  :: GHC.GhcMonad m
-  => [CoreSyn.CoreBndr]
-  -> m [(CoreSyn.CoreBndr, TopEntity)]
+findSynthesizeAnnotations ::
+  (GHC.GhcMonad m) =>
+  [CoreSyn.CoreBndr] ->
+  m [(CoreSyn.CoreBndr, TopEntity)]
 findSynthesizeAnnotations bndrs = do
   anns <- findNamedAnnotations bndrs
   pure (errOnDuplicateAnnotations "Synthesize" bndrs (map (filter isSyn) anns))
- where
-  isSyn (Synthesize {}) = True
-  isSyn _               = False
+  where
+    isSyn (Synthesize {}) = True
+    isSyn _ = False
 
 -- | Find test bench annotations and return a map tying top entities to their
 -- test benches. If there is a binder called @testBench@ _without_ an annotation
 -- it assumed to belong to a binder called @topEntity@. If the latter does not
 -- exist, the function @testBench@ is left alone.
 findTestBenches ::
-  GHC.GhcMonad m =>
+  (GHC.GhcMonad m) =>
   -- | Root binders
   [CoreSyn.CoreBndr] ->
   -- | (design under test, associated test benches)
   m (Map.Map CoreSyn.CoreBndr [CoreSyn.CoreBndr])
 findTestBenches bndrs0 = do
   anns <- findNamedAnnotations bndrs0
-  let
-    duts0 = foldl' insertTb Map.empty (concat (zipWith go0 bndrs0 anns))
-    duts1 = specialCaseMagicName duts0
+  let duts0 = foldl' insertTb Map.empty (concat (zipWith go0 bndrs0 anns))
+      duts1 = specialCaseMagicName duts0
   pure duts1
- where
-  insertTb m (dut, tb) = Map.insertWith (<>) dut [tb] m
-  bndrsMap = HashMap.fromList (map (\x -> (toQualNm x, x)) bndrs0)
+  where
+    insertTb m (dut, tb) = Map.insertWith (<>) dut [tb] m
+    bndrsMap = HashMap.fromList (map (\x -> (toQualNm x, x)) bndrs0)
 
-  -- Special case magic name 'testBench'. See function documentation.
-  specialCaseMagicName m =
-    let
-      topEntM = find isTopEntityName bndrs0
-      tbM = find isTestBenchName bndrs0
-    in
-      case (topEntM, tbM) of
-        (Just dut, Just tb) -> insertTb m (dut, tb)
-        _ -> m
+    -- Special case magic name 'testBench'. See function documentation.
+    specialCaseMagicName m =
+      let topEntM = find isTopEntityName bndrs0
+          tbM = find isTestBenchName bndrs0
+       in case (topEntM, tbM) of
+            (Just dut, Just tb) -> insertTb m (dut, tb)
+            _ -> m
 
-  -- go0 + go1: map over all annotations; look for test bench annotations and
-  -- tie them to top entities indicated in the annotation.
-  go0 bndr anns = mapMaybe (go1 bndr) anns
-  go1 tbBndr (TestBench dutNm) =
-    case HashMap.lookup (Text.pack (show dutNm)) bndrsMap of
-      Nothing ->
-        Panic.pgmError [I.i|
+    -- go0 + go1: map over all annotations; look for test bench annotations and
+    -- tie them to top entities indicated in the annotation.
+    go0 bndr anns = mapMaybe (go1 bndr) anns
+    go1 tbBndr (TestBench dutNm) =
+      case HashMap.lookup (Text.pack (show dutNm)) bndrsMap of
+        Nothing ->
+          Panic.pgmError
+            [I.i|
           Could not find design under test #{show (show dutNm)}, associated with
           test bench #{show (toQualNm tbBndr)}. Note that testbenches should be
           exported from the same module as the design under test.
         |]
-      Just dutBndr ->
-        Just (dutBndr, tbBndr)
-  go1 _ _ = Nothing
+        Just dutBndr ->
+          Just (dutBndr, tbBndr)
+    go1 _ _ = Nothing
 
 -- | Create a fully qualified name from a var, excluding package. Example
 -- output: @Clash.Sized.Internal.BitVector.low@.
 toQualNm :: Var.Var -> Text.Text
 toQualNm bndr =
-  let
-    bndrNm  = Var.varName bndr
-    occName = Text.pack (OccName.occNameString (Name.nameOccName bndrNm))
-  in
-    maybe
-      occName
-      (\modName -> modName `Text.append` ('.' `Text.cons` occName))
-      (modNameM bndrNm)
+  let bndrNm = Var.varName bndr
+      occName = Text.pack (OccName.occNameString (Name.nameOccName bndrNm))
+   in maybe
+        occName
+        (\modName -> modName `Text.append` ('.' `Text.cons` occName))
+        (modNameM bndrNm)
 
 -- | Find primitive annotations bound to given binders, or annotations made
 -- in modules of those binders.
-findPrimitiveAnnotations
-  :: GHC.GhcMonad m
-  => HDL
-  -> [CoreSyn.CoreBndr]
-  -> m [Either UnresolvedPrimitive FilePath]
+findPrimitiveAnnotations ::
+  (GHC.GhcMonad m) =>
+  HDL ->
+  [CoreSyn.CoreBndr] ->
+  m [Either UnresolvedPrimitive FilePath]
 findPrimitiveAnnotations hdl bndrs = do
-  let
-    annTargets =
-     map
-       (fmap Annotations.ModuleTarget . Name.nameModule_maybe)
-       (map Var.varName bndrs)
+  let annTargets =
+        map
+          (fmap Annotations.ModuleTarget . Name.nameModule_maybe)
+          (map Var.varName bndrs)
 
-  let
-    targets =
-      (catMaybes annTargets) ++
-        (map (Annotations.NamedTarget . Var.varName) bndrs)
+  let targets =
+        (catMaybes annTargets)
+          ++ (map (Annotations.NamedTarget . Var.varName) bndrs)
 
   anns <- findAnnotationsByTargets targets
 
-  concat <$>
-    mapM (getUnresolvedPrimitives hdl)
-    (concat $ zipWith (\t -> map ((,) t)) targets anns)
+  concat
+    <$> mapM
+      (getUnresolvedPrimitives hdl)
+      (concat $ zipWith (\t -> map ((,) t)) targets anns)
 
-parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
+parseModule :: (GHC.GhcMonad m) => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do
   (GHC.ParsedModule pmModSum pmParsedSource extraSrc) <-
     GHC.parseModule modSum
-  return (GHC.ParsedModule
-            (disableOptimizationsFlags pmModSum)
-            pmParsedSource extraSrc)
+  return
+    ( GHC.ParsedModule
+        (disableOptimizationsFlags pmModSum)
+        pmParsedSource
+        extraSrc
+    )
 
 disableOptimizationsFlags :: GHC.ModSummary -> GHC.ModSummary
-disableOptimizationsFlags ms@(GHC.ModSummary {..})
-  = ms {GHC.ms_hspp_opts = dflags}
+disableOptimizationsFlags ms@(GHC.ModSummary {..}) =
+  ms {GHC.ms_hspp_opts = dflags}
   where
-    dflags = unwantedOptimizationFlags (ms_hspp_opts
-              { DynFlags.reductionDepth = 1000
-              })
+    dflags =
+      unwantedOptimizationFlags
+        ( ms_hspp_opts
+            { DynFlags.reductionDepth = 1000
+            }
+        )
 
 unwantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
 unwantedOptimizationFlags df =
-  foldl' DynFlags.xopt_unset
-    (foldl' DynFlags.gopt_unset df unwanted) unwantedLang
+  foldl'
+    DynFlags.xopt_unset
+    (foldl' DynFlags.gopt_unset df unwanted)
+    unwantedLang
   where
-    unwanted = [ Opt_LiberateCase -- Perform unrolling of recursive RHS: avoid
-               , Opt_SpecConstr -- Creates local-functions: avoid
-               , Opt_IgnoreAsserts -- We don't care about assertions
-               , Opt_DoEtaReduction -- We want eta-expansion
-               , Opt_UnboxStrictFields -- Unboxed types are not handled properly: avoid
-               , Opt_UnboxSmallStrictFields -- Unboxed types are not handled properly: avoid
-               , Opt_RegsGraph -- Don't care
-               , Opt_RegsGraph -- Don't care
-               , Opt_PedanticBottoms -- Stops eta-expansion through case: avoid
-               , Opt_CmmSink -- Don't care
-               , Opt_CmmElimCommonBlocks -- Don't care
-               , Opt_OmitYields -- Don't care
-               , Opt_IgnoreInterfacePragmas -- We need all the unfoldings we can get
-               , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
-               , Opt_IrrefutableTuples -- Introduce irrefutPatError: avoid
-               , Opt_Loopification -- STG pass, don't care
-               , Opt_CprAnal -- The worker/wrapper introduced by CPR breaks Clash, see [NOTE: CPR breaks Clash]
-               , Opt_FullLaziness -- increases sharing, but seems to result in worse circuits (in both area and propagation delay)
-               ]
+    unwanted =
+      [ Opt_LiberateCase, -- Perform unrolling of recursive RHS: avoid
+        Opt_SpecConstr, -- Creates local-functions: avoid
+        Opt_IgnoreAsserts, -- We don't care about assertions
+        Opt_DoEtaReduction, -- We want eta-expansion
+        Opt_UnboxStrictFields, -- Unboxed types are not handled properly: avoid
+        Opt_UnboxSmallStrictFields, -- Unboxed types are not handled properly: avoid
+        Opt_RegsGraph, -- Don't care
+        Opt_RegsGraph, -- Don't care
+        Opt_PedanticBottoms, -- Stops eta-expansion through case: avoid
+        Opt_CmmSink, -- Don't care
+        Opt_CmmElimCommonBlocks, -- Don't care
+        Opt_OmitYields, -- Don't care
+        Opt_IgnoreInterfacePragmas, -- We need all the unfoldings we can get
+        Opt_OmitInterfacePragmas, -- We need all the unfoldings we can get
+        Opt_IrrefutableTuples, -- Introduce irrefutPatError: avoid
+        Opt_Loopification, -- STG pass, don't care
+        Opt_CprAnal, -- The worker/wrapper introduced by CPR breaks Clash, see [NOTE: CPR breaks Clash]
+        Opt_FullLaziness -- increases sharing, but seems to result in worse circuits (in both area and propagation delay)
+      ]
 
     -- Coercions between Integer and Clash' numeric primitives cause Clash to
     -- fail. As strictness only affects simulation behavior, removing them
     -- is perfectly safe.
-    unwantedLang = [ LangExt.Strict
-                   , LangExt.StrictData
-                   ]
+    unwantedLang =
+      [ LangExt.Strict,
+        LangExt.StrictData
+      ]
 
 -- [NOTE: CPR breaks Clash]
 -- We used to completely disable strictness analysis because it causes GHC to
@@ -1037,33 +1115,35 @@ unwantedOptimizationFlags df =
 -- recursive functions involved, and hence we need to disable this useful transformation. After
 -- everything is done properly, we should enable it again.
 
-
 setWantedLanguageExtensions :: GHC.DynFlags -> GHC.DynFlags
 setWantedLanguageExtensions df =
-   foldl' DynFlags.gopt_set
-    (foldl' DynFlags.xopt_unset
-      (foldl' DynFlags.xopt_set df wantedLanguageExtensions)
-      unwantedLanguageExtensions)
+  foldl'
+    DynFlags.gopt_set
+    ( foldl'
+        DynFlags.xopt_unset
+        (foldl' DynFlags.xopt_set df wantedLanguageExtensions)
+        unwantedLanguageExtensions
+    )
     wantedOptimizations
- where
-  wantedOptimizations =
-    [ Opt_CSE -- CSE
-    , Opt_Specialise -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
-    , Opt_DoLambdaEtaExpansion -- transform nested series of lambdas into one with multiple arguments, helps us achieve only top-level lambdas
-    , Opt_CaseMerge -- We want fewer case-statements
-    , Opt_DictsCheap -- Makes dictionaries seem cheap to optimizer: hopefully inline
-    , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
-    , Opt_ForceRecomp -- Force recompilation: never bad
-    , Opt_EnableRewriteRules -- Reduce number of functions
-    , Opt_SimplPreInlining -- Inlines simple functions, we only care about the major first-order structure
-    , Opt_StaticArgumentTransformation -- Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop.
-    , Opt_FloatIn -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
-    , Opt_DictsStrict -- Hopefully helps remove class method selectors
-    , Opt_DmdTxDictSel -- I think demand and strictness are related, strictness helps with dead-code, enable
-    , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks Clash]
-    , Opt_SpecialiseAggressively -- Needed to compile Fixed point number functions quickly
-    , Opt_CrossModuleSpecialise -- Needed to compile Fixed point number functions quickly
-    ]
+  where
+    wantedOptimizations =
+      [ Opt_CSE, -- CSE
+        Opt_Specialise, -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
+        Opt_DoLambdaEtaExpansion, -- transform nested series of lambdas into one with multiple arguments, helps us achieve only top-level lambdas
+        Opt_CaseMerge, -- We want fewer case-statements
+        Opt_DictsCheap, -- Makes dictionaries seem cheap to optimizer: hopefully inline
+        Opt_ExposeAllUnfoldings, -- We need all the unfoldings we can get
+        Opt_ForceRecomp, -- Force recompilation: never bad
+        Opt_EnableRewriteRules, -- Reduce number of functions
+        Opt_SimplPreInlining, -- Inlines simple functions, we only care about the major first-order structure
+        Opt_StaticArgumentTransformation, -- Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop.
+        Opt_FloatIn, -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
+        Opt_DictsStrict, -- Hopefully helps remove class method selectors
+        Opt_DmdTxDictSel, -- I think demand and strictness are related, strictness helps with dead-code, enable
+        Opt_Strictness, -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks Clash]
+        Opt_SpecialiseAggressively, -- Needed to compile Fixed point number functions quickly
+        Opt_CrossModuleSpecialise -- Needed to compile Fixed point number functions quickly
+      ]
 
 -- | Remove all strictness annotations:
 --
@@ -1081,17 +1161,17 @@ setWantedLanguageExtensions df =
 -- Removing these strictness annotations is perfectly safe, as they only
 -- affect simulation behavior.
 removeStrictnessAnnotations ::
-     GHC.ParsedModule
-  -> GHC.ParsedModule
+  GHC.ParsedModule ->
+  GHC.ParsedModule
 removeStrictnessAnnotations pm =
-    pm {GHC.pm_parsed_source = fmap rmPS (GHC.pm_parsed_source pm)}
+  pm {GHC.pm_parsed_source = fmap rmPS (GHC.pm_parsed_source pm)}
   where
     -- rmPS :: GHC.DataId name => GHC.HsModule name -> GHC.HsModule name
     rmPS hsm = hsm {GHC.hsmodDecls = (fmap . fmap) rmHSD (GHC.hsmodDecls hsm)}
 
     -- rmHSD :: GHC.DataId name => GHC.HsDecl name -> GHC.HsDecl name
     rmHSD (GHC.TyClD x tyClDecl) = GHC.TyClD x (rmTyClD tyClDecl)
-    rmHSD hsd                  = hsd
+    rmHSD hsd = hsd
 
     -- rmTyClD :: GHC.DataId name => GHC.TyClDecl name -> GHC.TyClDecl name
     rmTyClD dc@(GHC.DataDecl {}) = dc {GHC.tcdDataDefn = rmDataDefn (GHC.tcdDataDefn dc)}
@@ -1102,10 +1182,12 @@ removeStrictnessAnnotations pm =
     rmDataDefn hdf = hdf {GHC.dd_cons = (fmap . fmap) rmCD (GHC.dd_cons hdf)}
 
     -- rmCD :: GHC.DataId name => GHC.ConDecl name -> GHC.ConDecl name
-    rmCD gadt@(GHC.ConDeclGADT {}) = gadt {GHC.con_res_ty = rmHsType (GHC.con_res_ty gadt)
-                                          ,GHC.con_g_args = rmGConDetails (GHC.con_g_args gadt)
-                                          }
-    rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_args = rmConDetails (GHC.con_args h98)}
+    rmCD gadt@(GHC.ConDeclGADT {}) =
+      gadt
+        { GHC.con_res_ty = rmHsType (GHC.con_res_ty gadt),
+          GHC.con_g_args = rmGConDetails (GHC.con_g_args gadt)
+        }
+    rmCD h98@(GHC.ConDeclH98 {}) = h98 {GHC.con_args = rmConDetails (GHC.con_args h98)}
 
 #if MIN_VERSION_ghc(9,10,0)
     rmGConDetails :: GHC.HsConDeclGADTDetails GHC.GhcPs -> GHC.HsConDeclGADTDetails GHC.GhcPs
@@ -1127,14 +1209,13 @@ removeStrictnessAnnotations pm =
     -- rmConDetails :: _ => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
 #if MIN_VERSION_ghc(9,14,0)
     rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmConDeclF args)
-    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmConDeclF l) (rmConDeclF r)
-    rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclRecF rec)
+    rmConDetails (GHC.InfixCon l r) = GHC.InfixCon (rmConDeclF l) (rmConDeclF r)
+    rmConDetails (GHC.RecCon rec) = GHC.RecCon ((fmap . fmap . fmap) rmConDeclRecF rec)
 #else
     rmConDetails (GHC.PrefixCon tys args) = GHC.PrefixCon tys (fmap rmHsScaledType args)
-    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
-    rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
+    rmConDetails (GHC.InfixCon l r) = GHC.InfixCon (rmHsScaledType l) (rmHsScaledType r)
+    rmConDetails (GHC.RecCon rec) = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
 #endif
-
 
 #if MIN_VERSION_ghc(9,14,0)
     rmHsType = id
@@ -1142,9 +1223,9 @@ removeStrictnessAnnotations pm =
     -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf =
       cdf
-        { GHC.cdf_unpack = GHC.NoSrcUnpack
-        , GHC.cdf_bang = GHC.NoSrcStrict
-        , GHC.cdf_type = rmHsType (GHC.cdf_type cdf)
+        { GHC.cdf_unpack = GHC.NoSrcUnpack,
+          GHC.cdf_bang = GHC.NoSrcStrict,
+          GHC.cdf_type = rmHsType (GHC.cdf_type cdf)
         }
 
     rmConDeclRecF (GHC.HsConDeclRecField ext names spec) =
@@ -1158,7 +1239,7 @@ removeStrictnessAnnotations pm =
         --   GHC.LBangType GHC.GhcPs ->
         --   GHC.LBangType GHC.GhcPs
         go (GHC.unLoc -> GHC.HsBangTy _ _ ty) = ty
-        go ty                               = ty
+        go ty = ty
 
     rmHsScaledType = transform go
       where
@@ -1179,11 +1260,11 @@ preludePkgId = $(lift $ pkgIdFromTypeable (undefined :: TopEntity))
 -- | Check that we're using the same clash-prelude as we were built with
 --
 -- Because if they differ clash won't be able to recognize any ANNotations.
-checkForInvalidPrelude :: Monad m => HscTypes.ModGuts -> m ()
+checkForInvalidPrelude :: (Monad m) => HscTypes.ModGuts -> m ()
 checkForInvalidPrelude guts =
   case filter isWrongPrelude pkgIds of
-    []    -> return ()
-    (x:_) -> throw (ClashException noSrcSpan (msgWrongPrelude x) Nothing)
+    [] -> return ()
+    (x : _) -> throw (ClashException noSrcSpan (msgWrongPrelude x) Nothing)
   where
     pkgs = HscTypes.dep_direct_pkgs . HscTypes.mg_deps $ guts
 #if MIN_VERSION_ghc(9,14,0)
@@ -1193,10 +1274,12 @@ checkForInvalidPrelude guts =
 #endif
     prelude = "clash-prelude-"
     isPrelude pkg = case splitAt (length prelude) pkg of
-      (x,y:_) | x == prelude && isDigit y -> True     -- check for a digit so we don't match clash-prelude-extras
+      (x, y : _) | x == prelude && isDigit y -> True -- check for a digit so we don't match clash-prelude-extras
       _ -> False
     isWrongPrelude pkg = isPrelude pkg && pkg /= preludePkgId
-    msgWrongPrelude pkg = unlines ["Clash only works with the exact clash-prelude it was built with."
-                                  ,"Clash was built with: " ++ preludePkgId
-                                  ,"So can't run with:    " ++ pkg
-                                  ]
+    msgWrongPrelude pkg =
+      unlines
+        [ "Clash only works with the exact clash-prelude it was built with.",
+          "Clash was built with: " ++ preludePkgId,
+          "So can't run with:    " ++ pkg
+        ]

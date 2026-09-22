@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 {-|
 Copyright   :  (C) 2022     , Google Inc.
 License     :  BSD2 (see the file LICENSE)
@@ -5,25 +7,28 @@ Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Produce static files that are useful when working with Clash designs.
 -}
-
-{-# LANGUAGE QuasiQuotes #-}
-
 module Main where
 
+import Clash.DataFiles
 import Control.Monad (when)
-import Control.Monad.Extra (whenM, unlessM)
-import Prelude
+import Control.Monad.Extra (unlessM, whenM)
 import System.Console.Docopt
-  (Docopt, docopt, isPresent, getArg, longOption, parseArgsOrExit)
+  ( Docopt,
+    docopt,
+    getArg,
+    isPresent,
+    longOption,
+    parseArgsOrExit,
+  )
 import System.Directory (copyFile, doesDirectoryExist, doesFileExist)
 import System.Environment (getArgs)
 import System.Exit (die)
 import System.FilePath (takeDirectory)
-
-import Clash.DataFiles
+import Prelude
 
 patterns :: Docopt
-patterns = [docopt|
+patterns =
+  [docopt|
 Obtain static files useful when working with Clash designs
 
 Currently, only the Tcl connector is available.
@@ -48,23 +53,27 @@ createOkayOrDie ::
   IO ()
 createOkayOrDie path force = do
   let pathDir = takeDirectory path
-  unlessM (doesDirectoryExist pathDir) $
-    die $ "Directory not found: " ++ pathDir
-  whenM (doesDirectoryExist path) $
-    die $ path ++ " is a directory. Please specify a file name."
+  unlessM (doesDirectoryExist pathDir)
+    $ die
+    $ "Directory not found: " ++ pathDir
+  whenM (doesDirectoryExist path)
+    $ die
+    $ path ++ " is a directory. Please specify a file name."
   exists <- doesFileExist path
-  when (exists && not force) $
-    die $ path ++ " already exists and --force not specified. " ++
-                  "Refusing to overwrite."
+  when (exists && not force)
+    $ die
+    $ path
+      ++ " already exists and --force not specified. "
+      ++ "Refusing to overwrite."
 
 main :: IO ()
 main = do
   args <- parseArgsOrExit patterns =<< getArgs
   -- Since we got here, we know we got invoked with the sole mandatory option
   -- @--tcl-connector@ and its mandatory argument
-  let force = args `isPresent` (longOption "force")
-      verbose = args `isPresent` (longOption "verbose")
-      Just outFile = args `getArg` (longOption "tcl-connector")
+  let force = isPresent args (longOption "force")
+      verbose = isPresent args (longOption "verbose")
+      Just outFile = getArg args (longOption "tcl-connector")
   createOkayOrDie outFile force
   inFile <- tclConnector
   copyFile inFile outFile

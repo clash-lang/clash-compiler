@@ -1,26 +1,31 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
                   2021-2024, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Class.BitPack.BitIndex where
 
-import GHC.TypeLits                   (KnownNat, type (+), type (-))
-
-import Clash.Class.BitPack.Internal   (BitPack (..))
-import Clash.Promoted.Nat             (SNat (..))
+import Clash.Class.BitPack.Internal (BitPack (..))
+import Clash.Promoted.Nat (SNat (..))
 import Clash.Sized.Internal.BitVector
-  (BitVector, Bit, index#, lsb#, msb#, replaceBit#, setSlice#, slice#, split#)
+  ( Bit,
+    BitVector,
+    index#,
+    lsb#,
+    msb#,
+    replaceBit#,
+    setSlice#,
+    slice#,
+    split#,
+  )
+import GHC.TypeLits (KnownNat, type (+), type (-))
 
 {- $setup
 >>> :set -XDataKinds
@@ -28,6 +33,7 @@ import Clash.Sized.Internal.BitVector
 -}
 
 {-# INLINE (!) #-}
+
 -- | Get the bit at the specified bit index.
 --
 -- __NB__: Bit indices are __DESCENDING__.
@@ -45,6 +51,7 @@ import Clash.Sized.Internal.BitVector
 (!) v i = index# (pack v) (fromEnum i)
 
 {-# INLINE slice #-}
+
 {- | Get a slice between bit index @m@ and and bit index @n@.
 
 __NB__: Bit indices are __DESCENDING__.
@@ -86,15 +93,16 @@ __NB__: Bit indices are __DESCENDING__.
 
 #endif
 -}
-slice
-  :: (BitPack a, BitSize a ~ ((m + 1) + i))
-  => SNat m
-  -> SNat n
-  -> a
-  -> BitVector (m + 1 - n)
+slice ::
+  (BitPack a, BitSize a ~ ((m + 1) + i)) =>
+  SNat m ->
+  SNat n ->
+  a ->
+  BitVector (m + 1 - n)
 slice m n v = slice# (pack v) m n
 
 {-# INLINE split #-}
+
 -- | Split a value of a bit size @m + n@ into a tuple of values with size @m@
 -- and size @n@.
 --
@@ -102,13 +110,14 @@ slice m n v = slice# (pack v) m n
 -- 0b00_0111
 -- >>> split (7 :: Unsigned 6) :: (BitVector 2, BitVector 4)
 -- (0b00,0b0111)
-split
-  :: (BitPack a, BitSize a ~ (m + n), KnownNat n)
-  => a
-  -> (BitVector m, BitVector n)
+split ::
+  (BitPack a, BitSize a ~ (m + n), KnownNat n) =>
+  a ->
+  (BitVector m, BitVector n)
 split v = split# (pack v)
 
 {-# INLINE replaceBit #-}
+
 -- | Set the bit at the specified index
 --
 -- __NB__: Bit indices are __DESCENDING__.
@@ -130,6 +139,7 @@ replaceBit :: (BitPack a, Enum i) => i -> Bit -> a -> a
 replaceBit i b v = unpack (replaceBit# (pack v) (fromEnum i) b)
 
 {-# INLINE setSlice #-}
+
 {- | Set the bits between bit index @m@ and bit index @n@.
 
 __NB__: Bit indices are __DESCENDING__.
@@ -173,16 +183,17 @@ __NB__: Bit indices are __DESCENDING__.
 
 #endif
 -}
-setSlice
-  :: (BitPack a, BitSize a ~ ((m + 1) + i))
-  => SNat m
-  -> SNat n
-  -> BitVector (m + 1 - n)
-  -> a
-  -> a
+setSlice ::
+  (BitPack a, BitSize a ~ ((m + 1) + i)) =>
+  SNat m ->
+  SNat n ->
+  BitVector (m + 1 - n) ->
+  a ->
+  a
 setSlice m n w v = unpack (setSlice# SNat (pack v) m n w)
 
 {-# INLINE msb #-}
+
 -- | Get the most significant bit.
 --
 -- >>> pack (-4 :: Signed 6)
@@ -193,10 +204,11 @@ setSlice m n w v = unpack (setSlice# SNat (pack v) m n w)
 -- 0b00_0100
 -- >>> msb (4 :: Signed 6)
 -- 0
-msb :: BitPack a => a -> Bit
+msb :: (BitPack a) => a -> Bit
 msb v = msb# (pack v)
 
 {-# INLINE lsb #-}
+
 -- | Get the least significant bit.
 --
 -- >>> pack (-9 :: Signed 6)
@@ -207,5 +219,5 @@ msb v = msb# (pack v)
 -- 0b11_1000
 -- >>> lsb (-8 :: Signed 6)
 -- 0
-lsb :: BitPack a => a -> Bit
+lsb :: (BitPack a) => a -> Bit
 lsb v = lsb# (pack v)

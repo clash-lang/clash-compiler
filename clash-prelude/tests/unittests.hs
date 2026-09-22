@@ -1,7 +1,5 @@
 module Main where
 
-import Test.Tasty
-
 import qualified Clash.Tests.AsyncFIFOSynchronizer
 import qualified Clash.Tests.AutoReg
 import qualified Clash.Tests.BitPack
@@ -16,6 +14,9 @@ import qualified Clash.Tests.DumpVCD
 import qualified Clash.Tests.Fixed
 import qualified Clash.Tests.FixedExhaustive
 import qualified Clash.Tests.Index
+import qualified Clash.Tests.Laws.Enum
+import qualified Clash.Tests.Laws.Num
+import qualified Clash.Tests.Laws.SaturatingNum
 import qualified Clash.Tests.MaybeNumConvert
 import qualified Clash.Tests.MaybeX
 import qualified Clash.Tests.NFDataX
@@ -30,47 +31,47 @@ import qualified Clash.Tests.TopEntityGeneration
 import qualified Clash.Tests.Unsigned
 import qualified Clash.Tests.Vector
 import qualified Clash.Tests.XException
-
-import qualified Clash.Tests.Laws.Enum
-import qualified Clash.Tests.Laws.Num
-import qualified Clash.Tests.Laws.SaturatingNum
+import Test.Tasty
 
 tests :: TestTree
-tests = testGroup "Unittests"
-  [ Clash.Tests.AsyncFIFOSynchronizer.tests
-  , Clash.Tests.AutoReg.tests
-  , Clash.Tests.BitPack.tests
-  , Clash.Tests.BitVector.tests
-  , Clash.Tests.BlockRam.Blob.tests
-  , Clash.Tests.BlockRam.tests
-  , Clash.Tests.CheckedLiterals.tests
-  , Clash.Tests.Clocks.tests
-  , Clash.Tests.Counter.tests
-  , Clash.Tests.DerivingDataRepr.tests
-  , Clash.Tests.DumpVCD.tests
-  , Clash.Tests.Fixed.tests
-  , Clash.Tests.FixedExhaustive.tests
-  , Clash.Tests.Index.tests
-  , Clash.Tests.MaybeNumConvert.tests
-  , Clash.Tests.MaybeX.tests
-  , Clash.Tests.NFDataX.tests
-  , Clash.Tests.NumConvert.tests
-  , Clash.Tests.NumNewtypes.tests
-  , Clash.Tests.Ram.tests
-  , Clash.Tests.Reset.tests
-  , Clash.Tests.Resize.tests
-  , Clash.Tests.Signal.tests
-  , Clash.Tests.Signed.tests
-  , Clash.Tests.TopEntityGeneration.tests
-  , Clash.Tests.Unsigned.tests
-  , Clash.Tests.Vector.tests
-  , Clash.Tests.XException.tests
-  , testGroup "Laws"
-    [ Clash.Tests.Laws.Enum.tests
-    , Clash.Tests.Laws.Num.tests
-    , Clash.Tests.Laws.SaturatingNum.tests
+tests =
+  testGroup
+    "Unittests"
+    [ Clash.Tests.AsyncFIFOSynchronizer.tests,
+      Clash.Tests.AutoReg.tests,
+      Clash.Tests.BitPack.tests,
+      Clash.Tests.BitVector.tests,
+      Clash.Tests.BlockRam.Blob.tests,
+      Clash.Tests.BlockRam.tests,
+      Clash.Tests.CheckedLiterals.tests,
+      Clash.Tests.Clocks.tests,
+      Clash.Tests.Counter.tests,
+      Clash.Tests.DerivingDataRepr.tests,
+      Clash.Tests.DumpVCD.tests,
+      Clash.Tests.Fixed.tests,
+      Clash.Tests.FixedExhaustive.tests,
+      Clash.Tests.Index.tests,
+      Clash.Tests.MaybeNumConvert.tests,
+      Clash.Tests.MaybeX.tests,
+      Clash.Tests.NFDataX.tests,
+      Clash.Tests.NumConvert.tests,
+      Clash.Tests.NumNewtypes.tests,
+      Clash.Tests.Ram.tests,
+      Clash.Tests.Reset.tests,
+      Clash.Tests.Resize.tests,
+      Clash.Tests.Signal.tests,
+      Clash.Tests.Signed.tests,
+      Clash.Tests.TopEntityGeneration.tests,
+      Clash.Tests.Unsigned.tests,
+      Clash.Tests.Vector.tests,
+      Clash.Tests.XException.tests,
+      testGroup
+        "Laws"
+        [ Clash.Tests.Laws.Enum.tests,
+          Clash.Tests.Laws.Num.tests,
+          Clash.Tests.Laws.SaturatingNum.tests
+        ]
     ]
-  ]
 
 main :: IO ()
 main = defaultMain tests

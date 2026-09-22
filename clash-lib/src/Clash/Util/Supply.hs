@@ -1,8 +1,13 @@
-{-# LANGUAGE MagicHash, UnboxedTuples, CPP, PatternSynonyms #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE Trustworthy #-}
-{-# OPTIONS_GHC -fno-full-laziness #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -fno-full-laziness #-}
+
 -----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Clash.Util.Supply
 -- Copyright   :  (C) 2011-2013 Edward Kmett
@@ -26,22 +31,25 @@
 -- locally. Internally it pulls from a unique supply one block at a time as
 -- you walk into parts of the tree that haven't been explored.
 --
+
 ----------------------------------------------------------------------------
 module Clash.Util.Supply
-  ( Supply
-  -- * Variables
-  , newSupply
-  , freshId
-  , splitSupply
-  -- * Unboxed API
-  , freshId#
-  , splitSupply#
-  ) where
+  ( Supply,
+
+    -- * Variables
+    newSupply,
+    freshId,
+    splitSupply,
+
+    -- * Unboxed API
+    freshId#,
+    splitSupply#,
+  )
+where
 
 import Data.Hashable
 import Data.IORef
 import GHC.IO (unsafeDupablePerformIO, unsafePerformIO)
-
 #if __GLASGOW_HASKELL__ >= 914
 import Clash.Unique (Unique, Unique#, data Unique#)
 #else
@@ -49,6 +57,7 @@ import Clash.Unique (Unique, Unique#, pattern Unique#)
 #endif
 
 infixr 5 :-
+
 data Stream a = a :- Stream a
 
 instance Functor Stream where
@@ -70,8 +79,9 @@ instance Ord Block where
   Block a (Block b _ :- _) `compare` Block c (Block d _ :- _) = compare a c `mappend` compare b d
 
 instance Show Block where
-  showsPrec d (Block a (Block b _ :- _)) = showParen (d >= 10) $
-    showString "Block " . showsPrec 10 a . showString " (Block " . showsPrec 10 b . showString " ... :- ...)"
+  showsPrec d (Block a (Block b _ :- _)) =
+    showParen (d >= 10) $
+      showString "Block " . showsPrec 10 a . showString " (Block " . showsPrec 10 b . showString " ... :- ...)"
 
 instance Hashable Block where
   hashWithSalt s (Block a (Block b _ :- _)) = s `hashWithSalt` a `hashWithSalt` b
@@ -90,7 +100,7 @@ blockCounter = unsafePerformIO (newIORef 0)
 {-# NOINLINE blockCounter #-}
 
 modifyBlock :: a -> IO Unique
-modifyBlock _ = atomicModifyIORef blockCounter $ \ i -> let i' = i + blockSize in i' `seq` (i', i)
+modifyBlock _ = atomicModifyIORef blockCounter $ \i -> let i' = i + blockSize in i' `seq` (i', i)
 {-# NOINLINE modifyBlock #-}
 
 gen :: a -> Block
@@ -107,7 +117,7 @@ splitBlock# (Block i (x :- xs)) = (# x, Block i xs #)
 
 -- | A user managed globally unique variable supply.
 data Supply = Supply {-# UNPACK #-} !Unique {-# UNPACK #-} !Unique Block
-  deriving (Eq,Ord,Show)
+  deriving (Eq, Ord, Show)
 
 instance Hashable Supply where
   hashWithSalt s (Supply i j b) = s `hashWithSalt` i `hashWithSalt` j `hashWithSalt` b
@@ -145,12 +155,12 @@ freshId# (Supply i@(Unique# i#) j b)
 -- | An unboxed version of splitSupply
 splitSupply# :: Supply -> (# Supply, Supply #)
 splitSupply# (Supply i k b) = case splitBlock# b of
-    (# bl, br #)
-      | k - i >= minSplitSupplySize
-      , j <- i + div (k - i) 2 ->
+  (# bl, br #)
+    | k - i >= minSplitSupplySize,
+      j <- i + div (k - i) 2 ->
         (# Supply i j bl, Supply (j + 1) k br #)
-      | Block x (l :- r :- _) <- bl
-      , y <- x + div blockSize 2
-      , z <- x + blockSize - 1 ->
+    | Block x (l :- r :- _) <- bl,
+      y <- x + div blockSize 2,
+      z <- x + blockSize - 1 ->
         (# Supply x (y - 1) l, Supply y z r #)
 {-# INLINE splitSupply# #-}

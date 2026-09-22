@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+
 {-|
 Copyright   : (C) 2021-2022, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
@@ -5,45 +9,40 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random generation of Index.
 -}
-
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-
 module Clash.Hedgehog.Sized.Index
-  ( genIndex
-  , SomeIndex(..)
-  , genSomeIndex
-  ) where
+  ( genIndex,
+    SomeIndex (..),
+    genSomeIndex,
+  )
+where
 
-import GHC.TypeNats
-  hiding (SNat)
+import Clash.Promoted.Nat
+import Clash.Sized.Internal.Index
+import GHC.TypeNats hiding
+  ( SNat,
+  )
 import Hedgehog (MonadGen, Range)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Clash.Promoted.Nat
-import Clash.Sized.Internal.Index
-
 genIndex :: forall n m. (MonadGen m, KnownNat n) => Range (Index n) -> m (Index n)
 genIndex range =
   Gen.frequency
-    [ (70, Gen.integral range)
-    , (30, Gen.constant (Range.upperBound 99 range))
+    [ (70, Gen.integral range),
+      (30, Gen.constant (Range.upperBound 99 range))
     ]
 
 data SomeIndex atLeast where
   SomeIndex :: SNat n -> Index (atLeast + n) -> SomeIndex atLeast
 
-instance KnownNat atLeast => Show (SomeIndex atLeast) where
+instance (KnownNat atLeast) => Show (SomeIndex atLeast) where
   show (SomeIndex SNat ix) = show ix
 
-genSomeIndex
-  :: forall atLeast m
-  . (MonadGen m, KnownNat atLeast)
-  => Range Natural
-  -> m (SomeIndex atLeast)
+genSomeIndex ::
+  forall atLeast m.
+  (MonadGen m, KnownNat atLeast) =>
+  Range Natural ->
+  m (SomeIndex atLeast)
 genSomeIndex rangeIx = do
   numExtra <- Gen.integral rangeIx
 

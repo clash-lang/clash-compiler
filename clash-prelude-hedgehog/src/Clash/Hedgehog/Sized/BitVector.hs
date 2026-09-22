@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
+
 {-|
 Copyright   : (C) 2021-2024, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
@@ -5,35 +11,27 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random generation of BitVector.
 -}
-
-{-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE RankNTypes #-}
-
 module Clash.Hedgehog.Sized.BitVector
-  ( genDefinedBit
-  , genBit
-  , genDefinedBitVector
-  , genBitVector
-  , SomeBitVector(..)
-  , genSomeBitVector
-  ) where
-
-import GHC.TypeNats
-  hiding (SNat)
-import Hedgehog (MonadGen, Range)
-import Hedgehog.Internal.Range (constantBounded, constant)
-import qualified Hedgehog.Gen as Gen
+  ( genDefinedBit,
+    genBit,
+    genDefinedBitVector,
+    genBitVector,
+    SomeBitVector (..),
+    genSomeBitVector,
+  )
+where
 
 import Clash.Class.BitPack (pack)
+import Clash.Hedgehog.Sized.Unsigned
 import Clash.Promoted.Nat
 import Clash.Sized.Internal.BitVector
 import Clash.XException (errorX)
-
-import Clash.Hedgehog.Sized.Unsigned
+import GHC.TypeNats hiding
+  ( SNat,
+  )
+import Hedgehog (MonadGen, Range)
+import qualified Hedgehog.Gen as Gen
+import Hedgehog.Internal.Range (constant, constantBounded)
 
 -- | Generate a bit which is guaranteed to be defined.
 -- This will either have the value 'low' or 'high'.
@@ -57,26 +55,26 @@ genDefinedBitVector = pack <$> genUnsigned constantBounded
 genBitVector :: forall n m. (MonadGen m, KnownNat n) => m (BitVector n)
 genBitVector =
   Gen.frequency
-    [ (70, BV <$> genNatural <*> genNatural)
-    , (10, Gen.constant minBound)
-    , (10, Gen.constant maxBound)
-    , (10, Gen.constant undefined#)
+    [ (70, BV <$> genNatural <*> genNatural),
+      (10, Gen.constant minBound),
+      (10, Gen.constant maxBound),
+      (10, Gen.constant undefined#)
     ]
- where
-  genNatural = Gen.integral $ constant 0 (2^natToNatural @n - 1)
+  where
+    genNatural = Gen.integral $ constant 0 (2 ^ natToNatural @n - 1)
 
 data SomeBitVector atLeast where
   SomeBitVector :: SNat n -> BitVector (atLeast + n) -> SomeBitVector atLeast
 
-instance KnownNat atLeast => Show (SomeBitVector atLeast) where
+instance (KnownNat atLeast) => Show (SomeBitVector atLeast) where
   show (SomeBitVector SNat bv) = show bv
 
-genSomeBitVector
-  :: forall atLeast m
-   . (MonadGen m, KnownNat atLeast)
-  => Range Natural
-  -> (forall n. KnownNat n => m (BitVector n))
-  -> m (SomeBitVector atLeast)
+genSomeBitVector ::
+  forall atLeast m.
+  (MonadGen m, KnownNat atLeast) =>
+  Range Natural ->
+  (forall n. (KnownNat n) => m (BitVector n)) ->
+  m (SomeBitVector atLeast)
 genSomeBitVector rangeBv genBv = do
   numExtra <- Gen.integral rangeBv
 

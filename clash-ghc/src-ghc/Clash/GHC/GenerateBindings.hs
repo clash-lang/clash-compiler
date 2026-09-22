@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                           2017, QBayLogic, Google Inc.,
@@ -5,161 +11,189 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
+module Clash.GHC.GenerateBindings (generateBindings) where
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-
-module Clash.GHC.GenerateBindings
-  (generateBindings)
-where
-
-import           Control.Arrow           ((***))
-import           Control.DeepSeq         (NFData, deepseq)
-import           Control.Lens            ((%~),(&),(.~),(^.))
-import           Control.Monad           (forM, unless, when)
-import qualified Control.Monad.State     as State
+import Control.Arrow ((***))
+import Control.DeepSeq (NFData, deepseq)
+import Control.Lens ((%~), (&), (.~), (^.))
+import Control.Monad (forM, unless, when)
 import qualified Control.Monad.RWS.Strict as RWS
-import           Data.Coerce             (coerce)
-import           Data.Either             (partitionEithers, lefts ,rights)
-import           Data.Foldable           (traverse_)
-import           Data.IntMap.Strict      (IntMap)
-import qualified Data.IntMap.Strict      as IMS
-import qualified Data.HashMap.Strict     as HashMap
+import qualified Control.Monad.State as State
+import Data.Coerce (coerce)
+import Data.Either (lefts, partitionEithers, rights)
+import Data.Foldable (traverse_)
+import qualified Data.HashMap.Strict as HashMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IMS
 #if !MIN_VERSION_base(4,20,0)
-import           Data.List               (foldl')
+import Data.List (foldl')
 #endif
-import           Data.List               (isPrefixOf)
-import           Data.List.Split         (chunksOf)
-import           Data.Maybe              (listToMaybe)
-import qualified Data.Text               as Text
-import qualified Data.Time.Clock         as Clock
-import           GHC.Conc                (numCapabilities, par, pseq)
-
-import qualified GHC                     as GHC (Ghc)
-import qualified GHC.Types.SourceText    as GHC
-import qualified GHC.Utils.Panic         as GHC
-import qualified GHC.Types.Basic         as GHC
-import qualified GHC.Core                as GHC
-import qualified GHC.Types.Demand        as GHC
-import qualified GHC.Driver.Session      as GHC
-import qualified GHC.Types.Id.Info       as GHC
-import qualified GHC.Types.Name          as GHC hiding (varName)
-import qualified GHC.Core.FamInstEnv     as GHC
-import qualified GHC.Core.TyCon          as GHC
-import qualified GHC.Core.Type           as GHC
-import qualified GHC.Builtin.Types       as GHC
-import qualified GHC.Settings.Constants  as GHC
-import qualified GHC.Types.Var           as GHC
-import qualified GHC.Types.SrcLoc        as GHC
-import           GHC.BasicTypes.Extra (isOpaque)
-
-import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
-import           Clash.Annotations.Primitive (HDL, extractPrim)
-
-import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
-import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
-import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc)
-import           Clash.Core.TysPrim      (tysPrimMap)
-import           Clash.Core.Util         (mkInternalVar, mkSelectorCase)
-import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
-import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
-  ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
+import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import Clash.Annotations.Primitive (HDL, extractPrim)
+import Clash.Core.Subst (extendGblSubstList, mkSubst, substTm)
+import Clash.Core.Term (Term (..), mkLams, mkTyLams)
+import Clash.Core.TyCon (TyConMap, TyConName, isNewTypeTc)
+import Clash.Core.Type (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
+import Clash.Core.TysPrim (tysPrimMap)
+import Clash.Core.Util (mkInternalVar, mkSelectorCase)
+import Clash.Core.Var (Id, IdScope (..), Var (..), setIdScope)
+import Clash.Core.VarEnv
+  ( InScopeSet,
+    VarEnv,
+    elemVarSet,
+    emptyInScopeSet,
+    extendInScopeSet,
+    mkInScopeSet,
+    mkVarEnv,
+    mkVarSet,
+    unionVarEnv,
+  )
 import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Driver            (compilePrimitives)
-import           Clash.Driver.Bool       (toGhcOverridingBool)
-import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
-import           Clash.Driver.Warning    (warnAbout, warnAboutM)
-import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
-   makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
-   srcSpan)
-import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
-import           Clash.Netlist.BlackBox.Util (getUsedArguments)
-import           Clash.Netlist.Types     (TopEntityT(..))
-import           Clash.Primitives.Types
-  (Primitive (..), CompiledPrimMap)
-import           Clash.Primitives.Util   (generatePrimMap)
-import           Clash.Unique            (Unique)
-import           Clash.Util              (reportTimeDiff)
+import Clash.Driver (compilePrimitives)
+import Clash.Driver.Bool (toGhcOverridingBool)
+import Clash.Driver.Types (Binding (..), BindingMap, ClashDesign (..), ClashEnv (..), ClashOpts (..), IsPrim (..))
+import Clash.Driver.Warning (warnAbout, warnAboutM)
+import Clash.GHC.GHC2Core
+  ( C2C,
+    GHC2CoreEnv (..),
+    GHC2CoreState,
+    coreToId,
+    coreToName,
+    coreToTerm,
+    emptyGHC2CoreState,
+    makeAllTyCons,
+    pendingWarnings,
+    qualifiedNameString,
+    srcSpan,
+    tyConMap,
+  )
+import Clash.GHC.LoadModules (ghcLibDir, loadModules)
+import Clash.Netlist.BlackBox.Util (getUsedArguments)
+import Clash.Netlist.Types (TopEntityT (..))
+import Clash.Primitives.Types
+  ( CompiledPrimMap,
+    Primitive (..),
+  )
+import Clash.Primitives.Util (generatePrimMap)
+import Clash.Unique (Unique)
+import Clash.Util (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
-import           Clash.Warning           (ClashWarning(WarnPrimitiveDefinition))
+import Clash.Warning (ClashWarning (WarnPrimitiveDefinition))
+import Data.List (isPrefixOf)
+import Data.List.Split (chunksOf)
+import Data.Maybe (listToMaybe)
+import qualified Data.Text as Text
+import qualified Data.Time.Clock as Clock
+import qualified GHC as GHC (Ghc)
+import GHC.BasicTypes.Extra (isOpaque)
+import qualified GHC.Builtin.Types as GHC
+import GHC.Conc (numCapabilities, par, pseq)
+import qualified GHC.Core as GHC
+import qualified GHC.Core.FamInstEnv as GHC
+import qualified GHC.Core.TyCon as GHC
+import qualified GHC.Core.Type as GHC
+import qualified GHC.Driver.Session as GHC
+import qualified GHC.Settings.Constants as GHC
+import qualified GHC.Types.Basic as GHC
+import qualified GHC.Types.Demand as GHC
+import qualified GHC.Types.Id.Info as GHC
+import qualified GHC.Types.Name as GHC hiding (varName)
+import qualified GHC.Types.SourceText as GHC
+import qualified GHC.Types.SrcLoc as GHC
+import qualified GHC.Types.Var as GHC
+import qualified GHC.Utils.Panic as GHC
 
 -- | Safe indexing, returns a 'Nothing' if the index does not exist
 indexMaybe :: [a] -> Int -> Maybe a
-indexMaybe [] _     = Nothing
-indexMaybe (x:_)  0 = Just x
-indexMaybe (_:xs) n = indexMaybe xs (n-1)
+indexMaybe [] _ = Nothing
+indexMaybe (x : _) 0 = Just x
+indexMaybe (_ : xs) n = indexMaybe xs (n - 1)
 
-generateBindings
-  :: ClashOpts
-  -> GHC.Ghc ()
-  -- ^ Allows us to have some initial action, such as sharing a linker state
+generateBindings ::
+  ClashOpts ->
+  -- | Allows us to have some initial action, such as sharing a linker state
   -- See https://github.com/clash-lang/clash-compiler/issues/1686 and
   -- https://mail.haskell.org/pipermail/ghc-devs/2021-March/019605.html
-  -> [FilePath]
-  -- ^ primitives (blackbox) directories
-  -> [FilePath]
-  -- ^ import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package database
-  -> HDL
-  -- ^ HDL target
-  -> String
-  -> Maybe GHC.DynFlags
-  -> IO (ClashEnv, ClashDesign)
+  GHC.Ghc () ->
+  -- | primitives (blackbox) directories
+  [FilePath] ->
+  -- | import directories (-i flag)
+  [FilePath] ->
+  -- | Package database
+  [FilePath] ->
+  -- | HDL target
+  HDL ->
+  String ->
+  Maybe GHC.DynFlags ->
+  IO (ClashEnv, ClashDesign)
 generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = do
-  (  bindings
-   , clsOps
-   , unlocatable
-   , fiEnvs
-   , topEntities
-   , partitionEithers -> (unresolvedPrims, pFP)
-   , customBitRepresentations
-   , primGuards
-   , domainConfs ) <- loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
+  ( bindings,
+    clsOps,
+    unlocatable,
+    fiEnvs,
+    topEntities,
+    partitionEithers -> (unresolvedPrims, pFP),
+    customBitRepresentations,
+    primGuards,
+    domainConfs
+    ) <-
+    loadModules startAction (toGhcOverridingBool (opt_color opts)) hdl modName dflagsM importDirs
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
   primMapC <- compilePrimitives importDirs dbs tdir primMapR
-  let ((bindingsMap,clsVMap),tcMap,_) =
-        RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
-                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
-                   emptyGHC2CoreState
-      (tcMap',tupTcCache)           = mkTupTyCons opts tcMap
-      tcCache                       = makeAllTyCons opts tcMap' fiEnvs
-      allTcCache                    = tysPrimMap <> tcCache
-      inScope0 = mkInScopeSet (
-                      (fmap (coerce . bindingId) bindingsMap) <>
-                      (fmap (coerce . bindingId) clsMap))
-                                    -- Recursion info is always False for class
-                                    -- selectors, no need to check free vars.
+  let ((bindingsMap, clsVMap), tcMap, _) =
+        RWS.runRWS
+          (mkBindings primMapC bindings clsOps unlocatable)
+          (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
+          emptyGHC2CoreState
+      (tcMap', tupTcCache) = mkTupTyCons opts tcMap
+      tcCache = makeAllTyCons opts tcMap' fiEnvs
+      allTcCache = tysPrimMap <> tcCache
+      inScope0 =
+        mkInScopeSet
+          ( (fmap (coerce . bindingId) bindingsMap)
+              <> (fmap (coerce . bindingId) clsMap)
+          )
+      -- Recursion info is always False for class
+      -- selectors, no need to check free vars.
       clsMap =
-        fmap (\(v,i) ->
-               (Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
-                  (mkClassSelector inScope0 allTcCache (varType v) i) False))
-             clsVMap
-      allBindings                   = bindingsMap `unionVarEnv` clsMap
-      topEntities'                  =
+        fmap
+          ( \(v, i) ->
+              ( Binding
+                  v
+                  GHC.noSrcSpan
+                  (GHC.Inline GHC.NoSourceText)
+                  IsFun
+                  (mkClassSelector inScope0 allTcCache (varType v) i)
+                  False
+              )
+          )
+          clsVMap
+      allBindings = bindingsMap `unionVarEnv` clsMap
+      topEntities' =
         (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts) tcMap')) $
-          mapM (\(topEnt,annM,isTb) -> do
-            topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
-            return (topEnt', annM, isTb)) topEntities
+          mapM
+            ( \(topEnt, annM, isTb) -> do
+                topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
+                return (topEnt', annM, isTb)
+            )
+            topEntities
       topEntities'' =
-        map (\(topEnt, annM, isTb) ->
-                case UniqMap.lookup topEnt allBindings of
-                  Just b -> TopEntityT (bindingId b) annM isTb
-                  Nothing -> GHC.pgmError [I.i|
+        map
+          ( \(topEnt, annM, isTb) ->
+              case UniqMap.lookup topEnt allBindings of
+                Just b -> TopEntityT (bindingId b) annM isTb
+                Nothing ->
+                  GHC.pgmError
+                    [I.i|
                     No top entity called '#{topEnt}' found. Make sure you are
                     compiling with the '-fexpose-all-unfoldings' flag.
                   |]
-            ) topEntities'
+          )
+          topEntities'
   -- Parsing / compiling primitives:
-  prepTime  <- startTime `deepseq` primMapC `seq` Clock.getCurrentTime
+  prepTime <- startTime `deepseq` primMapC `seq` Clock.getCurrentTime
   let prepStartDiff = reportTimeDiff prepTime startTime
   putStrLn $ "Clash: Parsing and compiling primitives took " ++ prepStartDiff
 
@@ -171,77 +205,80 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
 
   return
     ( ClashEnv
-        { envOpts = opts
-        , envTyConMap = allTcCache
-        , envTupleTyCons = tupTcCache
-        , envPrimitives = primMapC
-        , envCustomReprs = buildCustomReprs customBitRepresentations
-        , envDomains = domainConfs
-        }
-    , ClashDesign
-        { designEntities = topEntities''
-        , designBindings = allBindings'
+        { envOpts = opts,
+          envTyConMap = allTcCache,
+          envTupleTyCons = tupTcCache,
+          envPrimitives = primMapC,
+          envCustomReprs = buildCustomReprs customBitRepresentations,
+          envDomains = domainConfs
+        },
+      ClashDesign
+        { designEntities = topEntities'',
+          designBindings = allBindings'
         }
     )
 
-setNoInlineTopEntities
-  :: BindingMap
-  -> [TopEntityT]
-  -> BindingMap
+setNoInlineTopEntities ::
+  BindingMap ->
+  [TopEntityT] ->
+  BindingMap
 setNoInlineTopEntities bm tes =
   fmap go bm
- where
-  ids = mkVarSet (fmap topId tes)
+  where
+    ids = mkVarSet (fmap topId tes)
 
-  go b@Binding{bindingId}
-    | bindingId `elemVarSet` ids
-    = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
-    | otherwise = b
+    go b@Binding {bindingId}
+      | bindingId `elemVarSet` ids =
+          b {bindingSpec = GHC.Opaque GHC.NoSourceText}
+      | otherwise = b
 
 -- TODO This function should be changed to provide the information that
 -- Clash.Core.Termination.mkRecInfo provides. To achieve this, it should also
 -- be changed to no longer flatten recursive groups (see the documentation for
 -- mkRecInfo for an explanation of these).
 --
-mkBindings
-  :: CompiledPrimMap
-  -> [GHC.CoreBind]
+mkBindings ::
+  CompiledPrimMap ->
+  [GHC.CoreBind] ->
   -- Binders
-  -> [(GHC.CoreBndr,Int)]
+  [(GHC.CoreBndr, Int)] ->
   -- Class operations
-  -> [GHC.CoreBndr]
+  [GHC.CoreBndr] ->
   -- Unlocatable Expressions
-  -> C2C ( BindingMap
-         , VarEnv (Id,Int)
-         )
+  C2C
+    ( BindingMap,
+      VarEnv (Id, Int)
+    )
 mkBindings primMap bindings clsOps unlocatable = do
   -- Converting each binder is independent: 'GHC2CoreState' only accumulates a
   -- 'TyCon' map and a name cache, both of which are pure (deterministic per
   -- key) memo tables. We therefore convert every binder from a fresh state in
   -- parallel and merge the resulting 'TyCon' maps afterwards. See 'parRunC2C'.
   env <- RWS.ask
-  let
-    bindingsList = parRunC2C env (map (processBind primMap unlocatable) bindings)
-    clsOpList    = parRunC2C env (map processClsOp clsOps)
-    states       = map snd bindingsList ++ map snd clsOpList
+  let bindingsList = parRunC2C env (map (processBind primMap unlocatable) bindings)
+      clsOpList = parRunC2C env (map processClsOp clsOps)
+      states = map snd bindingsList ++ map snd clsOpList
   -- Merge the 'TyCon' maps discovered while converting, and collect the
   -- warnings the conversions reported; the name caches are not used after this
   -- point, so they are dropped. 'makeAllTyCons' later recomputes over the
   -- merged map, so a plain union suffices.
-  RWS.modify $ \st -> st
-    & tyConMap %~ (\tcm0 -> foldl' (\acc s -> acc <> (s ^. tyConMap)) tcm0 states)
-    & pendingWarnings %~ (<> foldMap (^. pendingWarnings) states)
+  RWS.modify $ \st ->
+    st
+      & tyConMap %~ (\tcm0 -> foldl' (\acc s -> acc <> (s ^. tyConMap)) tcm0 states)
+      & pendingWarnings %~ (<> foldMap (^. pendingWarnings) states)
 
-  return ( mkVarEnv (concatMap fst bindingsList)
-         , mkVarEnv (map fst clsOpList) )
+  return
+    ( mkVarEnv (concatMap fst bindingsList),
+      mkVarEnv (map fst clsOpList)
+    )
 
 -- | Convert a single (possibly recursive) binder group to Clash Core bindings.
 -- See 'mkBindings' for how these conversions are run in parallel.
-processBind
-  :: CompiledPrimMap
-  -> [GHC.CoreBndr]
-  -> GHC.CoreBind
-  -> C2C [(Id, Binding Term)]
+processBind ::
+  CompiledPrimMap ->
+  [GHC.CoreBndr] ->
+  GHC.CoreBind ->
+  C2C [(Id, Binding Term)]
 processBind primMap unlocatable = \case
   GHC.NonRec v e -> do
     let sp = GHC.getSrcSpan v
@@ -253,8 +290,8 @@ processBind primMap unlocatable = \case
     checkPrimitive primMap v
     return [(v', (Binding v' sp inl pr tm False))]
   GHC.Rec bs -> do
-    tms <- forM bs $ \(v,e) -> do
-      let sp  = GHC.getSrcSpan v
+    tms <- forM bs $ \(v, e) -> do
+      let sp = GHC.getSrcSpan v
           inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
       tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
       v' <- coreToId v
@@ -267,18 +304,19 @@ processBind primMap unlocatable = \case
 
       -- Rewrite the bindings to avoid triggering the recursion check.
       -- See NOTE [bindings in recursive groups]
-      _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
-               vsV   = map Var vsL
-               subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
-               lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-               tms1  = zipWith (\b (i, _) -> (bindingId b, b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
-           in  return tms1
+      _ ->
+        let vsL = map (setIdScope LocalId . bindingId) tms
+            vsV = map Var vsL
+            subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
+            lbs = zipWith (\b vL -> (vL, substTm "mkBindings" subst (bindingTerm b))) tms vsL
+            tms1 = zipWith (\b (i, _) -> (bindingId b, b {bindingTerm = Letrec lbs (Var i), bindingRecursive = False})) tms lbs
+         in return tms1
 
 -- | Convert a single class operation. See 'processBind'.
 processClsOp :: (GHC.CoreBndr, Int) -> C2C (Id, (Id, Int))
-processClsOp (v,i) = do
+processClsOp (v, i) = do
   v' <- coreToId v
-  return (v', (v',i))
+  return (v', (v', i))
 
 -- | Run a list of independent 'C2C' computations, each starting from an empty
 -- 'GHC2CoreState', forcing their results to normal form in parallel across the
@@ -288,34 +326,34 @@ processClsOp (v,i) = do
 -- This only runs in parallel when the RTS has more than one capability, i.e.,
 -- when the executable is run with @+RTS -N@ or built with @-with-rtsopts=-N@.
 -- With a single capability it degrades to sequential evaluation.
-parRunC2C :: NFData a => GHC2CoreEnv -> [C2C a] -> [(a, GHC2CoreState)]
+parRunC2C :: (NFData a) => GHC2CoreEnv -> [C2C a] -> [(a, GHC2CoreState)]
 parRunC2C env ms = parListChunk chunkSize forceResult (map runC2C ms)
- where
-  runC2C m = case RWS.runRWS m env emptyGHC2CoreState of
-    (a, s, _w) -> (a, s)
-  -- Force the converted result to normal form (this is the expensive
-  -- 'coreToTerm' work we want to parallelize). The state is left to be forced
-  -- lazily when its 'TyCon' map is merged; its entries are cheap GHC 'TyCon'
-  -- references (the heavy 'makeAllTyCons' conversion happens later).
-  forceResult p@(a, _s) = a `deepseq` p
-  -- Keep chunks small so the work stays balanced even when a few binders are
-  -- far larger than the rest; ~16 measured as a good size on large downstream
-  -- designs. For small designs we make chunks finer still, scaling with the
-  -- number of capabilities, but never below 1.
-  chunkSize = min 16 (max 1 (length ms `div` (numCapabilities * 4)))
+  where
+    runC2C m = case RWS.runRWS m env emptyGHC2CoreState of
+      (a, s, _w) -> (a, s)
+    -- Force the converted result to normal form (this is the expensive
+    -- 'coreToTerm' work we want to parallelize). The state is left to be forced
+    -- lazily when its 'TyCon' map is merged; its entries are cheap GHC 'TyCon'
+    -- references (the heavy 'makeAllTyCons' conversion happens later).
+    forceResult p@(a, _s) = a `deepseq` p
+    -- Keep chunks small so the work stays balanced even when a few binders are
+    -- far larger than the rest; ~16 measured as a good size on large downstream
+    -- designs. For small designs we make chunks finer still, scaling with the
+    -- number of capabilities, but never below 1.
+    chunkSize = min 16 (max 1 (length ms `div` (numCapabilities * 4)))
 
 -- | Evaluate a list in parallel, in chunks, using only @base@ (@par@/@pseq@).
 -- Equivalent in spirit to @Control.Parallel.Strategies@' @parListChunk n@ with
 -- a caller-supplied forcing function, but avoids adding a dependency.
 parListChunk :: Int -> (a -> a) -> [a] -> [a]
 parListChunk n forceElem = concat . go . chunksOf n
- where
-  forceChunk c = foldr (\x xs -> forceElem x `pseq` xs) () c `pseq` c
-  go []     = []
-  go (c:cs) =
-    let c'  = forceChunk c
-        cs' = go cs
-    in  c' `par` (cs' `pseq` (c' : cs'))
+  where
+    forceChunk c = foldr (\x xs -> forceElem x `pseq` xs) () c `pseq` c
+    go [] = []
+    go (c : cs) =
+      let c' = forceChunk c
+          cs' = go cs
+       in c' `par` (cs' `pseq` (c' : cs'))
 
 {-
 NOTE [bindings in recursive groups]
@@ -355,85 +393,110 @@ checkPrimitive :: CompiledPrimMap -> GHC.CoreBndr -> C2C ()
 checkPrimitive primMap v = do
   nm <- qualifiedNameString (GHC.varName v)
   case HashMap.lookup nm primMap >>= extractPrim of
-    Just (BlackBox{resultNames, resultInits, template, includes}) -> do
-      let
-        info = GHC.idInfo v
-        inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
-        strictness = GHC.dmdSigInfo info
-        ty = GHC.varType v
-        (argTys,_resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
-        (dmdArgs,_dmdRes) = GHC.splitDmdSig strictness
-        nrOfArgs = length argTys
-        warnIf cond msg =
-          when cond (warnAboutM WarnPrimitiveDefinition (GHC.getSrcSpan v) msg)
+    Just (BlackBox {resultNames, resultInits, template, includes}) -> do
+      let info = GHC.idInfo v
+          inline = GHC.inlinePragmaSpec $ GHC.inlinePragInfo info
+          strictness = GHC.dmdSigInfo info
+          ty = GHC.varType v
+          (argTys, _resTy) = GHC.splitFunTys (snd (GHC.splitForAllTyCoVars ty))
+          (dmdArgs, _dmdRes) = GHC.splitDmdSig strictness
+          nrOfArgs = length argTys
+          warnIf cond msg =
+            when cond (warnAboutM WarnPrimitiveDefinition (GHC.getSrcSpan v) msg)
       qName <- Text.unpack <$> qualifiedNameString (GHC.varName v)
       let primStr = "primitive " ++ qName ++ " "
-      let usedArgs = concat [ concatMap getUsedArguments resultNames
-                            , concatMap getUsedArguments resultInits
-                            , getUsedArguments template
-                            , concatMap (getUsedArguments . snd) includes
-                            ]
+      let usedArgs =
+            concat
+              [ concatMap getUsedArguments resultNames,
+                concatMap getUsedArguments resultInits,
+                getUsedArguments template,
+                concatMap (getUsedArguments . snd) includes
+              ]
 
       let warnArgs [] = return ()
-          warnArgs (x:xs) = do
-            warnIf (maybe False GHC.isAbsDmd (indexMaybe dmdArgs x))
-              ("The Haskell implementation of " ++ primStr ++ "isn't using argument #" ++
-               show x ++ ", but the corresponding primitive blackbox does.\n" ++
-               "This can lead to incorrect HDL output because GHC can replace these " ++
-               "arguments by an undefined value.")
+          warnArgs (x : xs) = do
+            warnIf
+              (maybe False GHC.isAbsDmd (indexMaybe dmdArgs x))
+              ( "The Haskell implementation of "
+                  ++ primStr
+                  ++ "isn't using argument #"
+                  ++ show x
+                  ++ ", but the corresponding primitive blackbox does.\n"
+                  ++ "This can lead to incorrect HDL output because GHC can replace these "
+                  ++ "arguments by an undefined value."
+              )
             warnArgs xs
 
       unless (qName == "Clash.XException.errorX" || "GHC." `isPrefixOf` qName) $ do
-        warnIf (not (isOpaque inline))
-          (primStr ++ "isn't marked OPAQUE."
-          ++ "\nThis might make Clash ignore this primitive.")
-        warnIf (GHC.isDeadEndAppSig strictness nrOfArgs)
-          ("The Haskell implementation of " ++ primStr
-          ++ "produces a result that always results in an error.\n"
-          ++ "This can lead to compile failures because GHC can replace entire "
-          ++ "calls to this primitive by an undefined value.")
+        warnIf
+          (not (isOpaque inline))
+          ( primStr
+              ++ "isn't marked OPAQUE."
+              ++ "\nThis might make Clash ignore this primitive."
+          )
+        warnIf
+          (GHC.isDeadEndAppSig strictness nrOfArgs)
+          ( "The Haskell implementation of "
+              ++ primStr
+              ++ "produces a result that always results in an error.\n"
+              ++ "This can lead to compile failures because GHC can replace entire "
+              ++ "calls to this primitive by an undefined value."
+          )
         warnArgs usedArgs
     _ -> return ()
 
-mkClassSelector
-  :: InScopeSet
-  -> TyConMap
-  -> Type
-  -> Int
-  -> Term
+mkClassSelector ::
+  InScopeSet ->
+  TyConMap ->
+  Type ->
+  Int ->
+  Term
 mkClassSelector inScope0 tcm ty sel = newExpr
   where
     -- TODO: why can't we just use partitionEithers here?
-    (tvs,dicts) = (lefts *** rights)
-                . span (\l -> case l of {Left _ -> True; _ -> False})
-                $ fst (splitFunForallTy ty)
+    (tvs, dicts) =
+      (lefts *** rights)
+        . span (\l -> case l of Left _ -> True; _ -> False)
+        $ fst (splitFunForallTy ty)
     newExpr = case listToMaybe dicts of
       Just dictTy@(tyView -> TyConApp tcNm _)
-        | Just tc <- UniqMap.lookup tcNm tcm
-        , not (isNewTypeTc tc)
-        -> flip State.evalState (0 :: Unique) $ do
+        | Just tc <- UniqMap.lookup tcNm tcm,
+          not (isNewTypeTc tc) ->
+            flip State.evalState (0 :: Unique) $ do
               dcId <- mkInternalVar inScope0 "dict" dictTy
               let inScope1 = extendInScopeSet inScope0 dcId
               selE <- mkSelectorCase "mkClassSelector" inScope1 tcm (Var dcId) 1 sel
               return (mkTyLams (mkLams selE [dcId]) tvs)
       Just (tyView -> FunTy arg res) -> flip State.evalState (0 :: Unique) $ do
-              dcId <- mkInternalVar inScope0 "dict" (mkFunTy arg res)
-              return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
+        dcId <- mkInternalVar inScope0 "dict" (mkFunTy arg res)
+        return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
       Just dictTy -> flip State.evalState (0 :: Unique) $ do
-              dcId <- mkInternalVar inScope0 "dict" dictTy
-              return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
+        dcId <- mkInternalVar inScope0 "dict" dictTy
+        return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
       Nothing -> error "mkClassSelector: expected at least one dictionary argument"
 
-mkTupTyCons :: ClashOpts -> GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
-mkTupTyCons opts tcMap = (tcMap'',tupTcCache)
+mkTupTyCons :: ClashOpts -> GHC2CoreState -> (GHC2CoreState, IntMap TyConName)
+mkTupTyCons opts tcMap = (tcMap'', tupTcCache)
   where
-    tupTyCons        = GHC.boolTyCon : GHC.promotedTrueDataCon : GHC.promotedFalseDataCon
-                     : map (GHC.tupleTyCon GHC.Boxed) [2..GHC.mAX_TUPLE_SIZE]
-    (tcNames,tcMap',_) =
-      RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
-                                          qualifiedNameString tc) tupTyCons)
-                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs opts)
-                 tcMap
-    tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
-    tupHM            = UniqMap.fromList (zip tcNames tupTyCons)
-    tcMap''          = tcMap' & tyConMap %~ (<> tupHM)
+    tupTyCons =
+      GHC.boolTyCon
+        : GHC.promotedTrueDataCon
+        : GHC.promotedFalseDataCon
+        : map (GHC.tupleTyCon GHC.Boxed) [2 .. GHC.mAX_TUPLE_SIZE]
+    (tcNames, tcMap', _) =
+      RWS.runRWS
+        ( mapM
+            ( \tc ->
+                coreToName
+                  GHC.tyConName
+                  GHC.tyConUnique
+                  qualifiedNameString
+                  tc
+            )
+            tupTyCons
+        )
+        (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs opts)
+        tcMap
+    tupTcCache = IMS.fromList (zip [2 .. GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
+    tupHM = UniqMap.fromList (zip tcNames tupTyCons)
+    tcMap'' = tcMap' & tyConMap %~ (<> tupHM)

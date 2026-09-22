@@ -1,89 +1,109 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
+
 {-|
 Copyright  :  (C) 2016, University of Twente
                   2022-2025, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
-
 module Clash.Sized.RTree
   ( -- * 'RTree' data type
-    RTree (LR, BR, RLeaf, RBranch)
+    RTree (LR, BR, RLeaf, RBranch),
+
     -- * Construction
-  , treplicate
-  , trepeat
+    treplicate,
+    trepeat,
+
     -- * Accessors
-  , thead
-  , tlast
+    thead,
+    tlast,
+
     -- ** Indexing
-  , indexTree
-  , tindices
+    indexTree,
+    tindices,
+
     -- * Modifying trees
-  , replaceTree
+    replaceTree,
+
     -- * Element-wise operations
+
     -- ** Mapping
-  , tmap
-  , tzipWith
+    tmap,
+    tzipWith,
+
     -- ** Zipping
-  , tzip
+    tzip,
+
     -- ** Unzipping
-  , tunzip
+    tunzip,
+
     -- * Folding
-  , tfold
+    tfold,
+
     -- ** Specialised folds
-  , tdfold
+    tdfold,
+
     -- ** Prefix sums (scans)
     -- $scans
-  , scanlPar
-  , tscanl
-  , scanrPar
-  , tscanr
-    -- * Conversions
-  , v2t
-  , t2v
-    -- * Misc
-  , lazyT
+    scanlPar,
+    tscanl,
+    scanrPar,
+    tscanr,
 
-  -- * Internal
-  , textract
-  , tsplit
+    -- * Conversions
+    v2t,
+    t2v,
+
+    -- * Misc
+    lazyT,
+
+    -- * Internal
+    textract,
+    tsplit,
   )
 where
 
-import Control.DeepSeq             (NFData(..))
-import qualified Control.Lens      as Lens
-import Data.Default                (Default (..))
-import Data.Either                 (isLeft)
-import Data.Foldable               (toList)
-import Data.Kind                   (Type)
-import Data.Singletons             (Apply, TyFun, type (@@))
-import Data.Proxy                  (Proxy (..))
-import GHC.TypeLits                (KnownNat, Nat, type (+), type (^), type (*))
-import Language.Haskell.TH.Syntax  (Lift(..))
-import Language.Haskell.TH.Compat
-import Prelude                     hiding ((++), (!!), map)
-import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
-
 import Clash.Annotations.Primitive (hasBlackBox)
-import Clash.Class.BitPack         (BitPack (..))
-import Clash.Promoted.Nat          (SNat (..), UNat (..),
-                                    pow2SNat, snatToNum, subSNat, toUNat)
+import Clash.Class.BitPack (BitPack (..))
+import Clash.Promoted.Nat
+  ( SNat (..),
+    UNat (..),
+    pow2SNat,
+    snatToNum,
+    subSNat,
+    toUNat,
+  )
 import Clash.Promoted.Nat.Literals (d1)
-import Clash.Sized.Index           (Index)
-import Clash.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
+import Clash.Sized.Index (Index)
+import Clash.Sized.Vector (Vec (..), dtfold, replace, (!!), (++))
 import Clash.XException
-  (ShowX (..), NFDataX (..), isX, showsX, showsPrecXWith)
+  ( NFDataX (..),
+    ShowX (..),
+    isX,
+    showsPrecXWith,
+    showsX,
+  )
+import Control.DeepSeq (NFData (..))
+import qualified Control.Lens as Lens
+import Data.Default (Default (..))
+import Data.Either (isLeft)
+import Data.Foldable (toList)
+import Data.Kind (Type)
+import Data.Proxy (Proxy (..))
+import Data.Singletons (Apply, TyFun, type (@@))
+import GHC.TypeLits (KnownNat, Nat, type (*), type (+), type (^))
+import Language.Haskell.TH.Compat
+import Language.Haskell.TH.Syntax (Lift (..))
+import Test.QuickCheck (Arbitrary (..), CoArbitrary (..))
+import Prelude hiding (map, (!!), (++))
 
 {- $setup
 >>> :set -XDataKinds
@@ -115,24 +135,24 @@ let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index
 -- * A tree of depth /d/ has /2^d/ elements.
 data RTree :: Nat -> Type -> Type where
   RLeaf :: a -> RTree 0 a
-  RBranch :: RTree d a -> RTree d a -> RTree (d+1) a
+  RBranch :: RTree d a -> RTree d a -> RTree (d + 1) a
 
-instance NFData a => NFData (RTree d a) where
-    rnf (RLeaf x) = rnf x
-    rnf (RBranch l r ) = rnf l `seq` rnf r
+instance (NFData a) => NFData (RTree d a) where
+  rnf (RLeaf x) = rnf x
+  rnf (RBranch l r) = rnf l `seq` rnf r
 
 textract :: RTree 0 a -> a
-textract (RLeaf x)   = x
+textract (RLeaf x) = x
 #if __GLASGOW_HASKELL__ < 912
 textract (RBranch _ _) = error $ "textract: nodes hold no values"
 #endif
 {-# OPAQUE textract #-}
 {-# ANN textract hasBlackBox #-}
 
-tsplit :: RTree (d+1) a -> (RTree d a,RTree d a)
-tsplit (RBranch l r) = (l,r)
+tsplit :: RTree (d + 1) a -> (RTree d a, RTree d a)
+tsplit (RBranch l r) = (l, r)
 #if __GLASGOW_HASKELL__ < 912
-tsplit (RLeaf _)   = error $ "tsplit: leaf is atomic"
+tsplit (RLeaf _) = error $ "tsplit: leaf is atomic"
 #endif
 {-# OPAQUE tsplit #-}
 {-# ANN tsplit hasBlackBox #-}
@@ -172,8 +192,8 @@ pattern LR x <- (textract -> x)
 -- f :: Num a => RTree 1 a -> RTree 0 a
 -- >>> f (BR (LR 1) (LR 2))
 -- 3
-pattern BR :: RTree d a -> RTree d a -> RTree (d+1) a
-pattern BR l r <- ((\t -> (tsplit t)) -> (l,r))
+pattern BR :: RTree d a -> RTree d a -> RTree (d + 1) a
+pattern BR l r <- ((\t -> (tsplit t)) -> (l, r))
   where
     BR l r = RBranch l r
 
@@ -183,59 +203,66 @@ instance (KnownNat d, Eq a) => Eq (RTree d a) where
 instance (KnownNat d, Ord a) => Ord (RTree d a) where
   compare t1 t2 = compare (t2v t1) (t2v t2)
 
-instance Show a => Show (RTree n a) where
-  showsPrec _ (RLeaf a)   = shows a
-  showsPrec _ (RBranch l r) = \s -> '<':shows l (',':shows r ('>':s))
+instance (Show a) => Show (RTree n a) where
+  showsPrec _ (RLeaf a) = shows a
+  showsPrec _ (RBranch l r) = \s -> '<' : shows l (',' : shows r ('>' : s))
 
-instance ShowX a => ShowX (RTree n a) where
+instance (ShowX a) => ShowX (RTree n a) where
   showsPrecX = showsPrecXWith go
     where
       go :: Int -> RTree d a -> ShowS
-      go _ (RLeaf a)   = showsX a
-      go _ (RBranch l r) = \s -> '<':showsX l (',':showsX r ('>':s))
+      go _ (RLeaf a) = showsX a
+      go _ (RBranch l r) = \s -> '<' : showsX l (',' : showsX r ('>' : s))
 
-instance KnownNat d => Functor (RTree d) where
+instance (KnownNat d) => Functor (RTree d) where
   fmap = tmap
 
-instance KnownNat d => Applicative (RTree d) where
-  pure  = trepeat
+instance (KnownNat d) => Applicative (RTree d) where
+  pure = trepeat
   (<*>) = tzipWith ($)
 
-instance KnownNat d => Foldable (RTree d) where
+instance (KnownNat d) => Foldable (RTree d) where
   foldMap f = tfold f mappend
 
 data TraversableTree (g :: Type -> Type) (a :: Type) (f :: TyFun Nat Type) :: Type
+
 type instance Apply (TraversableTree f a) d = f (RTree d a)
 
-instance KnownNat d => Traversable (RTree d) where
-  traverse :: forall f a b . Applicative f => (a -> f b) -> RTree d a -> f (RTree d b)
-  traverse f = tdfold (Proxy @(TraversableTree f b))
-                      (fmap LR . f)
-                      (const (liftA2 BR))
+instance (KnownNat d) => Traversable (RTree d) where
+  traverse :: forall f a b. (Applicative f) => (a -> f b) -> RTree d a -> f (RTree d b)
+  traverse f =
+    tdfold
+      (Proxy @(TraversableTree f b))
+      (fmap LR . f)
+      (const (liftA2 BR))
 
-instance (KnownNat d, BitPack a) =>
-  BitPack (RTree d a) where
-  type BitSize (RTree d a) = (2^d) * (BitSize a)
-  pack        = pack . t2v . lazyT
-  unpack      = v2t . unpack
+instance
+  (KnownNat d, BitPack a) =>
+  BitPack (RTree d a)
+  where
+  type BitSize (RTree d a) = (2 ^ d) * (BitSize a)
+  pack = pack . t2v . lazyT
+  unpack = v2t . unpack
   maybeUnpack = fmap v2t . maybeUnpack
 
-type instance Lens.Index   (RTree d a) = Int
+type instance Lens.Index (RTree d a) = Int
+
 type instance Lens.IxValue (RTree d a) = a
-instance KnownNat d => Lens.Ixed (RTree d a) where
+
+instance (KnownNat d) => Lens.Ixed (RTree d a) where
   ix i f t = replaceTree i <$> f (indexTree t i) <*> pure t
 
 instance (KnownNat d, Default a) => Default (RTree d a) where
   def = trepeat def
 
-instance Lift a => Lift (RTree d a) where
-  lift (RLeaf a)     = [| RLeaf a |]
-  lift (RBranch t1 t2) = [| RBranch $(lift t1) $(lift t2) |]
+instance (Lift a) => Lift (RTree d a) where
+  lift (RLeaf a) = [|RLeaf a|]
+  lift (RBranch t1 t2) = [|RBranch $(lift t1) $(lift t2)|]
   liftTyped = liftTypedFromUntyped
 
 instance (KnownNat d, Arbitrary a) => Arbitrary (RTree d a) where
   arbitrary = sequenceA (trepeat arbitrary)
-  shrink    = sequenceA . fmap shrink
+  shrink = sequenceA . fmap shrink
 
 instance (KnownNat d, CoArbitrary a) => CoArbitrary (RTree d a) where
   coarbitrary = coarbitrary . toList
@@ -244,19 +271,18 @@ instance (KnownNat d, NFDataX a) => NFDataX (RTree d a) where
   deepErrorX x = pure (deepErrorX x)
 
   rnfX t = if isLeft (isX t) then () else go t
-   where
-    go :: RTree d a -> ()
-    go (RLeaf x)   = rnfX x
-    go (RBranch l r) = rnfX l `seq` rnfX r
+    where
+      go :: RTree d a -> ()
+      go (RLeaf x) = rnfX x
+      go (RBranch l r) = rnfX l `seq` rnfX r
 
   hasUndefined t = if isLeft (isX t) then True else go t
-   where
-    go :: RTree d a -> Bool
-    go (RLeaf x)   = hasUndefined x
-    go (RBranch l r) = hasUndefined l || hasUndefined r
+    where
+      go :: RTree d a -> Bool
+      go (RLeaf x) = hasUndefined x
+      go (RBranch l r) = hasUndefined l || hasUndefined r
 
   ensureSpine = fmap ensureSpine . lazyT
-
 
 {- | A /dependently/ typed fold over trees.
 
@@ -392,35 +418,46 @@ populationCount' (7 :: BitVector 16) :: Index 17
 >>> populationCount' (7 :: BitVector 16)
 3
 -}
-tdfold :: forall p k a . KnownNat k
-       => Proxy (p :: TyFun Nat Type -> Type) -- ^ The /motive/
-       -> (a -> (p @@ 0)) -- ^ Function to apply to the elements on the leafs
-       -> (forall l . SNat l -> (p @@ l) -> (p @@ l) -> (p @@ (l+1)))
-       -- ^ Function to fold the branches with.
-       --
-       -- __NB__: @SNat l@ is the depth of the two sub-branches.
-       -> RTree k a -- ^ Tree to fold over.
-       -> (p @@ k)
+tdfold ::
+  forall p k a.
+  (KnownNat k) =>
+  -- | The /motive/
+  Proxy (p :: TyFun Nat Type -> Type) ->
+  -- | Function to apply to the elements on the leafs
+  (a -> (p @@ 0)) ->
+  -- | Function to fold the branches with.
+  --
+  -- __NB__: @SNat l@ is the depth of the two sub-branches.
+  (forall l. SNat l -> (p @@ l) -> (p @@ l) -> (p @@ (l + 1))) ->
+  -- | Tree to fold over.
+  RTree k a ->
+  (p @@ k)
 tdfold _ f g = go SNat
   where
     go :: SNat m -> RTree m a -> (p @@ m)
-    go _  (RLeaf a)   = f a
-    go sn (RBranch l r) = let sn' = sn `subSNat` d1
-                      in  g sn' (go sn' l) (go sn' r)
+    go _ (RLeaf a) = f a
+    go sn (RBranch l r) =
+      let sn' = sn `subSNat` d1
+       in g sn' (go sn' l) (go sn' r)
 {-# OPAQUE tdfold #-}
 {-# ANN tdfold hasBlackBox #-}
 
 data TfoldTree (a :: Type) (f :: TyFun Nat Type) :: Type
+
 type instance Apply (TfoldTree a) d = a
 
 -- | Reduce a tree to a single element
-tfold :: forall d a b .
-         KnownNat d
-      => (a -> b) -- ^ Function to apply to the leaves
-      -> (b -> b -> b) -- ^ Function to combine the results of the reduction
-                       -- of two branches
-      -> RTree d a -- ^ Tree to fold reduce
-      -> b
+tfold ::
+  forall d a b.
+  (KnownNat d) =>
+  -- | Function to apply to the leaves
+  (a -> b) ->
+  -- | Function to combine the results of the reduction
+  -- of two branches
+  (b -> b -> b) ->
+  -- | Tree to fold reduce
+  RTree d a ->
+  b
 tfold f g = tdfold (Proxy @(TfoldTree b)) f (const g)
 
 -- | \"'treplicate' @d a@\" returns a tree of depth /d/, and has /2^d/ copies
@@ -430,11 +467,11 @@ tfold f g = tdfold (Proxy @(TfoldTree b)) f (const g)
 -- <<<6,6>,<6,6>>,<<6,6>,<6,6>>>
 -- >>> treplicate d3 6
 -- <<<6,6>,<6,6>>,<<6,6>,<6,6>>>
-treplicate :: forall d a . SNat d -> a -> RTree d a
+treplicate :: forall d a. SNat d -> a -> RTree d a
 treplicate sn a = go (toUNat sn)
   where
     go :: UNat n -> RTree n a
-    go UZero      = LR a
+    go UZero = LR a
     go (USucc un) = BR (go un) (go un)
 {-# OPAQUE treplicate #-}
 {-# ANN treplicate hasBlackBox #-}
@@ -444,17 +481,18 @@ treplicate sn a = go (toUNat sn)
 --
 -- >>> trepeat 6 :: RTree 2 Int
 -- <<6,6>,<6,6>>
-trepeat :: KnownNat d => a -> RTree d a
+trepeat :: (KnownNat d) => a -> RTree d a
 trepeat = treplicate SNat
 
 data MapTree (a :: Type) (f :: TyFun Nat Type) :: Type
+
 type instance Apply (MapTree a) d = RTree d a
 
 -- | \"'tmap' @f t@\" is the tree obtained by apply /f/ to each element of /t/,
 -- i.e.,
 --
 -- > tmap f (BR (LR a) (LR b)) == BR (LR (f a)) (LR (f b))
-tmap :: forall d a b . KnownNat d => (a -> b) -> RTree d a -> RTree d b
+tmap :: forall d a b. (KnownNat d) => (a -> b) -> RTree d a -> RTree d b
 tmap f = tdfold (Proxy @(MapTree b)) (LR . f) (\_ l r -> BR l r)
 
 -- | Generate a tree of indices, where the depth of the tree is determined by
@@ -462,24 +500,28 @@ tmap f = tdfold (Proxy @(MapTree b)) (LR . f) (\_ l r -> BR l r)
 --
 -- >>> tindices :: RTree 3 (Index 8)
 -- <<<0,1>,<2,3>>,<<4,5>,<6,7>>>
-tindices :: forall d . KnownNat d => RTree d (Index (2^d))
+tindices :: forall d. (KnownNat d) => RTree d (Index (2 ^ d))
 tindices =
-  tdfold (Proxy @(MapTree (Index (2^d)))) LR
-         (\s@SNat l r -> BR l (tmap (+(snatToNum (pow2SNat s))) r))
-         (treplicate SNat 0)
+  tdfold
+    (Proxy @(MapTree (Index (2 ^ d))))
+    LR
+    (\s@SNat l r -> BR l (tmap (+ (snatToNum (pow2SNat s))) r))
+    (treplicate SNat 0)
 
 data V2TTree (a :: Type) (f :: TyFun Nat Type) :: Type
+
 type instance Apply (V2TTree a) d = RTree d a
 
 -- | Convert a vector with /2^d/ elements to a tree of depth /d/.
 --
 -- >>> v2t (1 :> 2 :> 3 :> 4:> Nil)
 -- <<1,2>,<3,4>>
-v2t :: forall d a . KnownNat d => Vec (2^d) a -> RTree d a
+v2t :: forall d a. (KnownNat d) => Vec (2 ^ d) a -> RTree d a
 v2t = dtfold (Proxy @(V2TTree a)) LR (const BR)
 
 data T2VTree (a :: Type) (f :: TyFun Nat Type) :: Type
-type instance Apply (T2VTree a) d = Vec (2^d) a
+
+type instance Apply (T2VTree a) d = Vec (2 ^ d) a
 
 -- | Convert a tree of depth /d/ to a vector of /2^d/ elements
 --
@@ -487,7 +529,7 @@ type instance Apply (T2VTree a) d = Vec (2^d) a
 -- <<1,2>,<3,4>>
 -- >>> t2v (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
 -- 1 :> 2 :> 3 :> 4 :> Nil
-t2v :: forall d a . KnownNat d => RTree d a -> Vec (2^d) a
+t2v :: forall d a. (KnownNat d) => RTree d a -> Vec (2 ^ d) a
 t2v = tdfold (Proxy @(T2VTree a)) (:> Nil) (\_ l r -> l ++ r)
 
 -- | \"'indexTree' @t n@\" returns the /n/'th element of /t/.
@@ -522,6 +564,7 @@ replaceTree :: (KnownNat d, Enum i) => i -> a -> RTree d a -> RTree d a
 replaceTree i a = v2t . replace i a . t2v
 
 data ZipWithTree (b :: Type) (c :: Type) (f :: TyFun Nat Type) :: Type
+
 type instance Apply (ZipWithTree b c) d = RTree d b -> RTree d c
 
 -- | 'tzipWith' generalizes 'tzip' by zipping with the function given as the
@@ -529,45 +572,47 @@ type instance Apply (ZipWithTree b c) d = RTree d b -> RTree d c
 -- applied to two trees produces the tree of corresponding sums.
 --
 -- > tzipWith f (BR (LR a1) (LR b1)) (BR (LR a2) (LR b2)) == BR (LR (f a1 a2)) (LR (f b1 b2))
-tzipWith :: forall a b c d . KnownNat d => (a -> b -> c) -> RTree d a -> RTree d b -> RTree d c
+tzipWith :: forall a b c d. (KnownNat d) => (a -> b -> c) -> RTree d a -> RTree d b -> RTree d c
 tzipWith f = tdfold (Proxy @(ZipWithTree b c)) lr br
   where
     lr :: a -> RTree 0 b -> RTree 0 c
     lr a t = LR (f a (textract t))
 
-    br :: SNat l
-       -> (RTree l b -> RTree l c)
-       -> (RTree l b -> RTree l c)
-       -> RTree (l+1) b
-       -> RTree (l+1) c
+    br ::
+      SNat l ->
+      (RTree l b -> RTree l c) ->
+      (RTree l b -> RTree l c) ->
+      RTree (l + 1) b ->
+      RTree (l + 1) c
     br _ fl fr t = BR (fl l) (fr r)
       where
-        (l,r) = tsplit t
-
+        (l, r) = tsplit t
 
 -- | 'tzip' takes two trees and returns a tree of corresponding pairs.
-tzip :: KnownNat d => RTree d a -> RTree d b -> RTree d (a,b)
+tzip :: (KnownNat d) => RTree d a -> RTree d b -> RTree d (a, b)
 tzip = tzipWith (,)
 
 data UnzipTree (a :: Type) (b :: Type) (f :: TyFun Nat Type) :: Type
+
 type instance Apply (UnzipTree a b) d = (RTree d a, RTree d b)
 
 -- | 'tunzip' transforms a tree of pairs into a tree of first components and a
 -- tree of second components.
-tunzip :: forall d a b . KnownNat d => RTree d (a,b) -> (RTree d a,RTree d b)
+tunzip :: forall d a b. (KnownNat d) => RTree d (a, b) -> (RTree d a, RTree d b)
 tunzip = tdfold (Proxy @(UnzipTree a b)) lr br
   where
-    lr   (a,b) = (LR a,LR b)
+    lr (a, b) = (LR a, LR b)
 
-    br _ (l1,r1) (l2,r2) = (BR l1 l2, BR r1 r2)
+    br _ (l1, r1) (l2, r2) = (BR l1 l2, BR r1 r2)
 
 -- | Given a function @f@ that is strict in its /n/th 'RTree' argument, make it
 -- lazy by applying 'lazyT' to this argument:
 --
 -- > f x0 x1 .. (lazyT xn) .. xn_plus_k
-lazyT :: KnownNat d
-      => RTree d a
-      -> RTree d a
+lazyT ::
+  (KnownNat d) =>
+  RTree d a ->
+  RTree d a
 lazyT = tzipWith (flip const) (trepeat ())
 
 -- | Extract the first element of a tree
@@ -619,11 +664,11 @@ instantiations of @f@ given a tree of depth /d/ is:
 -- >>> scanlPar (+) (1 :> 2 :> 3 :> 4 :> Nil)
 -- 1 :> 3 :> 6 :> 10 :> Nil
 scanlPar ::
-  KnownNat n =>
+  (KnownNat n) =>
   -- | Must be associative
   (a -> a -> a) ->
-  Vec (2^n) a ->
-  Vec (2^n) a
+  Vec (2 ^ n) a ->
+  Vec (2 ^ n) a
 scanlPar op = t2v . tscanl op . v2t
 {-# INLINE scanlPar #-}
 
@@ -632,11 +677,11 @@ scanlPar op = t2v . tscanl op . v2t
 -- >>> scanrPar (+) (1 :> 2 :> 3 :> 4 :> Nil)
 -- 10 :> 9 :> 7 :> 4 :> Nil
 scanrPar ::
-  KnownNat n =>
-   -- | Must be associative
+  (KnownNat n) =>
+  -- | Must be associative
   (a -> a -> a) ->
-  Vec (2^n) a ->
-  Vec (2^n) a
+  Vec (2 ^ n) a ->
+  Vec (2 ^ n) a
 scanrPar op = t2v . tscanr op . v2t
 {-# INLINE scanrPar #-}
 
@@ -653,7 +698,7 @@ scanrPar op = t2v . tscanr op . v2t
 -- <<doc/scanlPar.svg>>
 tscanl ::
   forall a n.
-  KnownNat n =>
+  (KnownNat n) =>
   -- | Must be associative
   (a -> a -> a) ->
   RTree n a ->
@@ -662,11 +707,10 @@ tscanl op tr =
   case tr of
     RLeaf x -> LR x
     RBranch x y ->
-      let
-        x' = tscanl op x
-        y' = tscanl op y
-        l = tlast x'
-      in BR x' (fmap (l `op`) y')
+      let x' = tscanl op x
+          y' = tscanl op y
+          l = tlast x'
+       in BR x' (fmap (l `op`) y')
 
 -- | Low-depth right scan
 --
@@ -679,7 +723,7 @@ tscanl op tr =
 -- <<10,9>,<7,4>>
 tscanr ::
   forall a n.
-  KnownNat n =>
+  (KnownNat n) =>
   (a -> a -> a) ->
   RTree n a ->
   RTree n a
@@ -687,8 +731,7 @@ tscanr op tr =
   case tr of
     RLeaf x -> LR x
     RBranch x y ->
-        let
-          x' = tscanr op x
+      let x' = tscanr op x
           y' = tscanr op y
           l = thead y'
-        in BR (fmap (l `op`) x') y'
+       in BR (fmap (l `op`) x') y'

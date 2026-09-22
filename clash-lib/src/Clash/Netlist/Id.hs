@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 {-|
   Copyright  :  (C) 2020, QBayLogic B.V.
                     2022, Google Inc.
@@ -6,109 +10,108 @@
 
   Transform/format a Netlist Identifier so that it is acceptable as a HDL identifier
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Clash.Netlist.Id
   ( -- * Utilities to use IdentifierSet
-    IdentifierSet
-  , IdentifierSetMonad(..)
-  , HasIdentifierSet(..)
-  , emptyIdentifierSet
-  , makeSet
-  , clearSet
+    IdentifierSet,
+    IdentifierSetMonad (..),
+    HasIdentifierSet (..),
+    emptyIdentifierSet,
+    makeSet,
+    clearSet,
 
     -- * Unsafe creation and extracting identifiers
-  , Identifier
-  , IdentifierType (..)
-  , unsafeMake
-  , unsafeFromCoreId
-  , toText
-  , toLazyText
-  , toList
-  , union
+    Identifier,
+    IdentifierType (..),
+    unsafeMake,
+    unsafeFromCoreId,
+    toText,
+    toLazyText,
+    toList,
+    union,
 
     -- * Creating and extending identifiers
-  , make
-  , makeBasic
-  , makeBasicOr
-  , makeAs
-  , add
-  , addMultiple
-  , addRaw
-  , deepen
-  , deepenN
-  , next
-  , nextN
-  , prefix
-  , suffix
-  , fromCoreId
+    make,
+    makeBasic,
+    makeBasicOr,
+    makeAs,
+    add,
+    addMultiple,
+    addRaw,
+    deepen,
+    deepenN,
+    next,
+    nextN,
+    prefix,
+    suffix,
+    fromCoreId,
 
-  -- * Misc. and internals
-  , VHDL.stripDollarPrefixes
-  , toBasicId#
-  , isBasic#
-  , isExtended#
+    -- * Misc. and internals
+    VHDL.stripDollarPrefixes,
+    toBasicId#,
+    isBasic#,
+    isExtended#,
   )
 where
 
-import           Clash.Annotations.Primitive (HDL (..))
-import           Clash.Core.Name (nameOcc)
-import           Clash.Core.Var (Id, varName)
-import           Clash.Debug (debugIsOn)
-import           Clash.Netlist.Types
-  (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
-   IdentifierType(..), IdentifierSetMonad(identifierSetM))
-import qualified Data.HashSet as HashSet
+import Clash.Annotations.Primitive (HDL (..))
+import Clash.Core.Name (nameOcc)
+import Clash.Core.Var (Id, varName)
+import Clash.Debug (debugIsOn)
+import Clash.Netlist.Id.Internal
+import qualified Clash.Netlist.Id.VHDL as VHDL
+import Clash.Netlist.Types
+  ( HasIdentifierSet (..),
+    Identifier (..),
+    IdentifierSet (..),
+    IdentifierSetMonad (identifierSetM),
+    IdentifierType (..),
+    PreserveCase (..),
+  )
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as HashSet
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
-import           Data.Text (Text)
+import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
-import           GHC.Stack
-
-import qualified Clash.Netlist.Id.VHDL as VHDL
-import           Clash.Netlist.Id.Internal
+import GHC.Stack
 
 -- | Identifier set without identifiers
-emptyIdentifierSet
-  :: Bool
-  -- ^ Allow escaped identifiers?
-  -> PreserveCase
-  -- ^ Should all basic identifiers be lower case?
-  -> HDL
-  -- ^ HDL to generate names for
-  -> IdentifierSet
+emptyIdentifierSet ::
+  -- | Allow escaped identifiers?
+  Bool ->
+  -- | Should all basic identifiers be lower case?
+  PreserveCase ->
+  -- | HDL to generate names for
+  HDL ->
+  IdentifierSet
 emptyIdentifierSet esc lw hdl = makeSet esc lw hdl mempty
 
 -- | Union of two identifier sets. Errors if given sets have been made with
 -- different options enabled.
-union :: HasCallStack => IdentifierSet -> IdentifierSet -> IdentifierSet
+union :: (HasCallStack) => IdentifierSet -> IdentifierSet -> IdentifierSet
 union (IdentifierSet escL lwL hdlL freshL idsL) (IdentifierSet escR lwR hdlR freshR idsR)
   | escL /= escR = error $ "Internal error: escL /= escR, " <> show (escL, escR)
   | hdlL /= hdlR = error $ "Internal error: hdlL /= hdlR, " <> show (hdlL, hdlR)
   | lwL /= lwR = error $ "Internal error: lwL /= lwR , " <> show (lwL, lwR)
   | otherwise = IdentifierSet escR lwR hdlR fresh ids
- where
-  fresh = HashMap.unionWith (IntMap.unionWith max) freshL freshR
-  ids = HashSet.union idsL idsR
+  where
+    fresh = HashMap.unionWith (IntMap.unionWith max) freshL freshR
+    ids = HashSet.union idsL idsR
 
 -- | Make a identifier set filled with given identifiers
-makeSet
-  :: Bool
-  -- ^ Allow escaped identifiers?
-  -> PreserveCase
-  -- ^ Should all basic identifiers be lower case?
-  -> HDL
-  -- ^ HDL to generate names for
-  -> HashSet.HashSet Identifier
-  -- ^ Identifiers to add to set
-  -> IdentifierSet
+makeSet ::
+  -- | Allow escaped identifiers?
+  Bool ->
+  -- | Should all basic identifiers be lower case?
+  PreserveCase ->
+  -- | HDL to generate names for
+  HDL ->
+  -- | Identifiers to add to set
+  HashSet.HashSet Identifier ->
+  IdentifierSet
 makeSet esc lw hdl ids = IdentifierSet esc lw hdl fresh ids
- where
-  fresh = List.foldl' updateFreshCache# mempty ids
+  where
+    fresh = List.foldl' updateFreshCache# mempty ids
 
 -- | Remove all identifiers from a set
 clearSet :: IdentifierSet -> IdentifierSet
@@ -127,21 +130,21 @@ toLazyText :: Identifier -> LT.Text
 toLazyText = LT.fromStrict . toText
 
 -- | Helper function to define pure Id functions in terms of a IdentifierSetMonad
-withIdentifierSetM'
-  :: IdentifierSetMonad m
-  => (IdentifierSet -> a -> IdentifierSet)
-  -> a
-  -> m ()
+withIdentifierSetM' ::
+  (IdentifierSetMonad m) =>
+  (IdentifierSet -> a -> IdentifierSet) ->
+  a ->
+  m ()
 withIdentifierSetM' f a = do
   is0 <- identifierSetM id
   identifierSetM (const (f is0 a)) >> pure ()
 
 -- | Helper function to define pure Id functions in terms of a IdentifierSetMonad
-withIdentifierSetM
-  :: IdentifierSetMonad m
-  => (IdentifierSet -> a -> (IdentifierSet, b))
-  -> a
-  -> m b
+withIdentifierSetM ::
+  (IdentifierSetMonad m) =>
+  (IdentifierSet -> a -> (IdentifierSet, b)) ->
+  a ->
+  m b
 withIdentifierSetM f a = do
   is0 <- identifierSetM id
   let (is1, b) = f is0 a
@@ -151,12 +154,12 @@ withIdentifierSetM f a = do
 -- | Like 'addRaw', 'unsafeMake' creates an identifier that will be spliced
 -- at verbatim in the HDL. As opposed to 'addRaw', the resulting Identifier
 -- might be generated at a later point as it is NOT added to an IdentifierSet.
-unsafeMake :: HasCallStack => Text -> Identifier
+unsafeMake :: (HasCallStack) => Text -> Identifier
 unsafeMake t =
   RawIdentifier t Nothing (if debugIsOn then callStack else emptyCallStack)
 
 -- | Add an identifier to an IdentifierSet
-add :: HasCallStack => IdentifierSetMonad m => Identifier -> m ()
+add :: (HasCallStack) => (IdentifierSetMonad m) => Identifier -> m ()
 add = withIdentifierSetM' add#
 
 -- | Add identifiers to an IdentifierSet
@@ -181,13 +184,13 @@ makeBasic = withIdentifierSetM makeBasic#
 -- | Make unique basic identifier based on given string. If given string can't
 -- be converted to a basic identifier (i.e., it would yield an empty string) the
 -- alternative name is used.
-makeBasicOr
-  :: (HasCallStack, IdentifierSetMonad m)
-  => Text
-  -- ^ Name hint
-  -> Text
-  -- ^ If name hint can't be converted to a sensible basic id, use this instead
-  -> m Identifier
+makeBasicOr ::
+  (HasCallStack, IdentifierSetMonad m) =>
+  -- | Name hint
+  Text ->
+  -- | If name hint can't be converted to a sensible basic id, use this instead
+  Text ->
+  m Identifier
 makeBasicOr hint altHint =
   withIdentifierSetM
     (\is0 -> uncurry (makeBasicOr# is0))
@@ -240,5 +243,5 @@ fromCoreId = withIdentifierSetM fromCoreId#
 -- spliced at verbatim in the HDL. As opposed to 'fromCoreId', the resulting
 -- Identifier might be generated at a later point as it is NOT added to an
 -- IdentifierSet.
-unsafeFromCoreId :: HasCallStack => Id -> Identifier
+unsafeFromCoreId :: (HasCallStack) => Id -> Identifier
 unsafeFromCoreId = unsafeMake . nameOcc . varName

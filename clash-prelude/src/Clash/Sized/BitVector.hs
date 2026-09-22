@@ -1,47 +1,55 @@
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
                   2022-2024, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE TypeFamilies #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Sized.BitVector
   ( -- * Bit
-    Bit
+    Bit,
+
     -- ** Construction
+
     -- *** Initialisation
-  , high
-  , low
+    high,
+    low,
+
     -- * BitVector
-  , BitVector
+    BitVector,
+
     -- ** Accessors
+
     -- *** Length information
-  , size#
-  , maxIndex#
+    size#,
+    maxIndex#,
+
     -- ** Construction
-  , bLit
-  , hLit
-  , oLit
+    bLit,
+    hLit,
+    oLit,
+
     -- ** Concatenation
-  , (++#)
+    (++#),
+
     -- * Modification
-  , (+>>.)
-  , (.<<+)
+    (+>>.),
+    (.<<+),
+
     -- ** Pattern matching
-  , bitPattern
+    bitPattern,
+
     -- * Type-level error messages
-  , BitPositiveLiteralError
-  , BitVectorPositiveLiteralError
+    BitPositiveLiteralError,
+    BitVectorPositiveLiteralError,
   )
 where
 
+import Clash.Promoted.Nat (SNat (..), SNatLE (..), compareSNat, natToNum)
 import Clash.Sized.Internal.BitVector
-import Clash.Promoted.Nat (SNat(..), SNatLE(..), compareSNat, natToNum)
 import Data.Bits (shiftL, shiftR)
 import GHC.TypeNats (KnownNat)
 
@@ -50,6 +58,7 @@ import GHC.TypeNats (KnownNat)
 -}
 
 infixr 4 +>>.
+
 -- | Shift in a bit from the MSB side of a 'BitVector'. Equal to right shifting
 -- the 'BitVector' by one and replacing the MSB with the bit to be shifted in.
 --
@@ -58,12 +67,13 @@ infixr 4 +>>.
 -- >>> 0 +>>. 0b1111_0000 :: BitVector 8
 -- 0b0111_1000
 --
-(+>>.) :: forall n. KnownNat n => Bit -> BitVector n -> BitVector n
+(+>>.) :: forall n. (KnownNat n) => Bit -> BitVector n -> BitVector n
 b +>>. bv = case compareSNat (SNat @n) (SNat @0) of
   SNatGT -> replaceBit# (shiftR bv 1) (natToNum @n - 1) b
   SNatLE -> bv
 
 infixr 4 .<<+
+
 -- | Shift in a bit from the LSB side of a 'BitVector'. Equal to left shifting
 -- the 'BitVector' by one and replacing the LSB with the bit to be shifted in.
 --
@@ -72,7 +82,7 @@ infixr 4 .<<+
 -- >>> 0b1111_0000 .<<+ 1 :: BitVector 8
 -- 0b1110_0001
 --
-(.<<+) :: forall n. KnownNat n => BitVector n -> Bit -> BitVector n
+(.<<+) :: forall n. (KnownNat n) => BitVector n -> Bit -> BitVector n
 bv .<<+ b = case compareSNat (SNat @n) (SNat @0) of
   SNatGT -> replaceBit# (shiftL bv 1) 0 b
   SNatLE -> bv

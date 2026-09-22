@@ -15,25 +15,25 @@ import Clash.Prelude
 -- compiling with a reasonable specialization limit (under 100) and amount of
 -- time for each entity (under 10s).
 
-stage
-  :: (HiddenClockResetEnable System, KnownNat n)
-  => (Unsigned n)
-  -> Signal System (Unsigned n)
-  -> Signal System (Unsigned n)
+stage ::
+  (HiddenClockResetEnable System, KnownNat n) =>
+  (Unsigned n) ->
+  Signal System (Unsigned n) ->
+  Signal System (Unsigned n)
 stage i s = let delay = register i $ xor <$> delay <*> s in delay
 
-entity
-  :: (HiddenClockResetEnable System, KnownNat n)
-  => SNat n
-  -> Signal System (Unsigned n)
-  -> Signal System (Unsigned n)
+entity ::
+  (HiddenClockResetEnable System, KnownNat n) =>
+  SNat n ->
+  Signal System (Unsigned n) ->
+  Signal System (Unsigned n)
 entity n =
   foldr (.) id $ map stage $ iterate n (+ 1) 1
 
 type Top n =
-  HiddenClockResetEnable System
-    => Signal System (Unsigned n)
-    -> Signal System (Unsigned n)
+  (HiddenClockResetEnable System) =>
+  Signal System (Unsigned n) ->
+  Signal System (Unsigned n)
 
 {-# OPAQUE top0 #-}
 {-# ANN top0 (defSyn "top_0") #-}

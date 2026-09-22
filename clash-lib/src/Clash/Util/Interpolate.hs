@@ -1,10 +1,3 @@
-{-|
-Copyright  :  (C) 2019-2022, QBayLogic B.V.
-                  2013     , Nikita Volkov
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-
 This is an adaptation of
 
@@ -43,22 +36,34 @@ OTHER DEALINGS IN THE SOFTWARE.
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-|
+Copyright  :  (C) 2019-2022, QBayLogic B.V.
+                  2013     , Nikita Volkov
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+
 -- TODO: only export the @i@ quasiquoter when `ghcide` stops type-checking
 -- expanded quasiquote splices
 module Clash.Util.Interpolate (i, format, toString) where
 
+import Data.Char
+  ( chr,
+    isDigit,
+    isHexDigit,
+    isOctDigit,
+    isSpace,
+  )
+import Data.Maybe (catMaybes, fromMaybe, isJust)
+import Language.Haskell.TH.Lib (appE, varE)
+import Language.Haskell.TH.Quote (QuasiQuoter (..))
+import Language.Haskell.TH.Syntax (Exp, Q)
+import qualified Numeric as N
+import Text.Read (readMaybe)
+
 -- This module also exists in @ghc-hs-meta@, see
 -- https://github.com/clash-lang/clash-compiler/pull/3366
 import "haskell-src-meta" Language.Haskell.Meta.Parse (parseExp)
-import           Language.Haskell.TH.Lib     (appE, varE)
-import           Language.Haskell.TH.Quote   (QuasiQuoter(..))
-import           Language.Haskell.TH.Syntax  (Q, Exp)
-
-import qualified Numeric                as N
-import           Data.Char
-  (isHexDigit, chr, isOctDigit, isDigit, isSpace)
-import           Data.Maybe             (fromMaybe, isJust, catMaybes)
-import           Text.Read              (readMaybe)
 
 data Line
   = EmptyLine
@@ -75,138 +80,137 @@ type Indent = Int
 
 format :: [Node] -> String
 format = stripWhiteSpace . showLines . nodesToLines
- where
-  go _ [] = []
-  go n (c:cs) | c == ' ' = go (n+1) cs
-  go 0 (c:cs) = c : go 0 cs
-  go n cs = replicate n ' ' ++ (go 0 cs)
+  where
+    go _ [] = []
+    go n (c : cs) | c == ' ' = go (n + 1) cs
+    go 0 (c : cs) = c : go 0 cs
+    go n cs = replicate n ' ' ++ (go 0 cs)
 
-  stripWhiteSpace = go 0 . dropWhile isSpace
-
+    stripWhiteSpace = go 0 . dropWhile isSpace
 
 showLines :: [Line] -> String
 showLines [] = ""
 showLines ns = init (concatMap showLine ns)
- where
-  showLine :: Line -> String
-  showLine EmptyLine = "\n"
-  showLine (Line n ns') =
-    let theIndent = replicate (n - commonIndent) ' ' in
-    theIndent ++ (concatMap nodeToString ns') ++ "\n"
-  showLine (ExprLine n s) =
-    let theIndent = replicate (n - commonIndent) ' ' in
-    concat [theIndent ++ l ++ "\n" | l <- lines s]
+  where
+    showLine :: Line -> String
+    showLine EmptyLine = "\n"
+    showLine (Line n ns') =
+      let theIndent = replicate (n - commonIndent) ' '
+       in theIndent ++ (concatMap nodeToString ns') ++ "\n"
+    showLine (ExprLine n s) =
+      let theIndent = replicate (n - commonIndent) ' '
+       in concat [theIndent ++ l ++ "\n" | l <- lines s]
 
-  nodeToString :: Node -> String
-  nodeToString (Literal s) = s
-  nodeToString (Expression s) = s
+    nodeToString :: Node -> String
+    nodeToString (Literal s) = s
+    nodeToString (Expression s) = s
 
-  commonIndent :: Indent
-  commonIndent = foldl1 min (catMaybes (map indent ns))
+    commonIndent :: Indent
+    commonIndent = foldl1 min (catMaybes (map indent ns))
 
-  indent :: Line -> Maybe Indent
-  indent EmptyLine = Nothing
-  indent (ExprLine n _) = Just n
-  indent (Line n _) = Just n
+    indent :: Line -> Maybe Indent
+    indent EmptyLine = Nothing
+    indent (ExprLine n _) = Just n
+    indent (Line n _) = Just n
 
 -- | Collects nodes into lines. Expressions might still contain newlines! Does
 -- not start or end with 'EmptyLine'.
 nodesToLines :: [Node] -> [Line]
 nodesToLines =
-    concatMap splitLines
-  . mergeLines
-  . dropEmpty
-  . map splitWords
-  . map toLine
-  . map dropTrailingEmpty
-  . collectLines []
-  . joinLiterals
- where
-  emptyLit (Literal s) =
-    if all isSpace s then
-      Just (length s)
-    else
-      Nothing
-  emptyLit _ = Nothing
+  concatMap splitLines
+    . mergeLines
+    . dropEmpty
+    . map splitWords
+    . map toLine
+    . map dropTrailingEmpty
+    . collectLines []
+    . joinLiterals
+  where
+    emptyLit (Literal s) =
+      if all isSpace s
+        then
+          Just (length s)
+        else
+          Nothing
+    emptyLit _ = Nothing
 
-  isEmptyLine EmptyLine = True
-  isEmptyLine _ = False
+    isEmptyLine EmptyLine = True
+    isEmptyLine _ = False
 
-  dropEmpty = reverse . dropWhile isEmptyLine . reverse . dropWhile isEmptyLine
-  dropTrailingEmpty = reverse . dropWhile (isJust . emptyLit) . reverse
+    dropEmpty = reverse . dropWhile isEmptyLine . reverse . dropWhile isEmptyLine
+    dropTrailingEmpty = reverse . dropWhile (isJust . emptyLit) . reverse
 
-  splitLines :: Line -> [Line]
-  splitLines EmptyLine = [EmptyLine]
-  splitLines e@(ExprLine {}) = [e]
-  splitLines (Line n nodes) = map (Line n) (go 0 [] nodes)
-   where
-    maxLength = 80
+    splitLines :: Line -> [Line]
+    splitLines EmptyLine = [EmptyLine]
+    splitLines e@(ExprLine {}) = [e]
+    splitLines (Line n nodes) = map (Line n) (go 0 [] nodes)
+      where
+        maxLength = 80
 
-    go :: Int -> [Node] -> [Node] -> [[Node]]
-    -- Only break when there's still content to put on the next line; otherwise
-    -- we'd emit a trailing empty line. See issue #2753.
-    go accLen acc goNodes@(_:_) | accLen > maxLength = reverse acc : go 0 [] goNodes
-    go accLen acc (l@(Literal s):goNodes) = go (accLen + length s) (l:acc) goNodes
-    go accLen acc (e@(Expression s):goNodes) = go (accLen + length s) (e:acc) goNodes
-    go _accLen acc [] = [reverse acc]
+        go :: Int -> [Node] -> [Node] -> [[Node]]
+        -- Only break when there's still content to put on the next line; otherwise
+        -- we'd emit a trailing empty line. See issue #2753.
+        go accLen acc goNodes@(_ : _) | accLen > maxLength = reverse acc : go 0 [] goNodes
+        go accLen acc (l@(Literal s) : goNodes) = go (accLen + length s) (l : acc) goNodes
+        go accLen acc (e@(Expression s) : goNodes) = go (accLen + length s) (e : acc) goNodes
+        go _accLen acc [] = [reverse acc]
 
-  mergeLines :: [Line] -> [Line]
-  mergeLines (l0@(Line n0 nodes0):l1@(Line n1 nodes1):ls) =
-    if n0 == n1 then
-      mergeLines (Line n0 (nodes0 ++ [Literal " "] ++ nodes1) : ls)
-    else
-      l0:mergeLines (l1:ls)
-  mergeLines (l:ls) = l:mergeLines ls
-  mergeLines [] = []
+    mergeLines :: [Line] -> [Line]
+    mergeLines (l0@(Line n0 nodes0) : l1@(Line n1 nodes1) : ls) =
+      if n0 == n1
+        then
+          mergeLines (Line n0 (nodes0 ++ [Literal " "] ++ nodes1) : ls)
+        else
+          l0 : mergeLines (l1 : ls)
+    mergeLines (l : ls) = l : mergeLines ls
+    mergeLines [] = []
 
-  splitWords :: Line -> Line
-  splitWords EmptyLine = EmptyLine
-  splitWords e@(ExprLine {})= e
-  splitWords (Line n nodes) = Line n (concatMap go nodes)
-   where
-    go (Expression s) = [Expression s]
-    go (Literal "") = []
-    go (Literal s0) =
-      let
-        pre = takeWhile (not . (==' ')) s0
-        post = dropWhile (not . (== ' ')) s0
-      in case post of
-        [] -> [Literal s0]
-        (_:s1) -> Literal (pre ++ " ") : go (Literal s1)
+    splitWords :: Line -> Line
+    splitWords EmptyLine = EmptyLine
+    splitWords e@(ExprLine {}) = e
+    splitWords (Line n nodes) = Line n (concatMap go nodes)
+      where
+        go (Expression s) = [Expression s]
+        go (Literal "") = []
+        go (Literal s0) =
+          let pre = takeWhile (not . (== ' ')) s0
+              post = dropWhile (not . (== ' ')) s0
+           in case post of
+                [] -> [Literal s0]
+                (_ : s1) -> Literal (pre ++ " ") : go (Literal s1)
 
-  -- Convert to 'Line' type
-  toLine = \case
-    [] -> EmptyLine
-    [emptyLit -> Just _] -> EmptyLine
-    [Expression s] -> ExprLine 0 s
-    [emptyLit -> Just n, Expression s] -> ExprLine n s
-    ns@(Expression _:_) -> Line 0 ns
-    (Literal s:ns) ->
-      Line
-        (length (takeWhile (==' ') s))
-        (Literal (dropWhile (==' ') s):ns)
+    -- Convert to 'Line' type
+    toLine = \case
+      [] -> EmptyLine
+      [emptyLit -> Just _] -> EmptyLine
+      [Expression s] -> ExprLine 0 s
+      [emptyLit -> Just n, Expression s] -> ExprLine n s
+      ns@(Expression _ : _) -> Line 0 ns
+      (Literal s : ns) ->
+        Line
+          (length (takeWhile (== ' ') s))
+          (Literal (dropWhile (== ' ') s) : ns)
 
-  -- collects list of nodes, where each list is a single line
-  collectLines collected todo =
-    case (collected, todo) of
-      ([], []) -> []
-      (_, []) -> [reverse collected]
-      (_, s@(Expression _):ns) ->
-        collectLines (s:collected) ns
-      (_, Literal s0:ns) ->
-        let
-          pre = takeWhile (/= '\n') s0
-          post = dropWhile (/= '\n') s0
-        in case post of
-          [] ->
-            collectLines (Literal s0:collected) ns
-          (_:s1) ->
-            reverse (Literal pre:collected) : collectLines [] (Literal s1:ns)
+    -- collects list of nodes, where each list is a single line
+    collectLines collected todo =
+      case (collected, todo) of
+        ([], []) -> []
+        (_, []) -> [reverse collected]
+        (_, s@(Expression _) : ns) ->
+          collectLines (s : collected) ns
+        (_, Literal s0 : ns) ->
+          let pre = takeWhile (/= '\n') s0
+              post = dropWhile (/= '\n') s0
+           in case post of
+                [] ->
+                  collectLines (Literal s0 : collected) ns
+                (_ : s1) ->
+                  reverse (Literal pre : collected) : collectLines [] (Literal s1 : ns)
 
-  joinLiterals :: [Node] -> [Node]
-  joinLiterals [] = []
-  joinLiterals (Literal s0:Literal s1:ss) = joinLiterals (Literal (s0 ++ s1):ss)
-  joinLiterals (n:ns) = n:joinLiterals ns
+    joinLiterals :: [Node] -> [Node]
+    joinLiterals [] = []
+    joinLiterals (Literal s0 : Literal s1 : ss) = joinLiterals (Literal (s0 ++ s1) : ss)
+    joinLiterals (n : ns) = n : joinLiterals ns
 
 {-|
 @i@ will reflow the quasi-quoted text to 90 columns wide. If an interpolation
@@ -233,24 +237,28 @@ This line will be reflowed and the interpolated multi-line string here:
 will be indented. This text is outdented again.
 -}
 i :: QuasiQuoter
-i = QuasiQuoter {
-    quoteExp = (varE 'format `appE`) . toExp . parseNodes . decodeNewlines
-  , quotePat = err "pattern"
-  , quoteType = err "type"
-  , quoteDec = err "declaration"
-  }
+i =
+  QuasiQuoter
+    { quoteExp = (varE 'format `appE`) . toExp . parseNodes . decodeNewlines,
+      quotePat = err "pattern",
+      quoteType = err "type",
+      quoteDec = err "declaration"
+    }
   where
     err name =
-      error ("Clash.Util.Interpolate.i: This QuasiQuoter cannot be used as a "
-           ++ name ++ "!")
+      error
+        ( "Clash.Util.Interpolate.i: This QuasiQuoter cannot be used as a "
+            ++ name
+            ++ "!"
+        )
 
-    toExp:: [Node] -> Q Exp
+    toExp :: [Node] -> Q Exp
     toExp nodes = case nodes of
       [] -> [|[]|]
-      (x:xs) -> f x `appE` toExp xs
+      (x : xs) -> f x `appE` toExp xs
       where
-        f (Literal s) = [|(Literal s:)|]
-        f (Expression e) = [|(Expression (toString ($(reifyExpression e))):)|]
+        f (Literal s) = [|(Literal s :)|]
+        f (Expression e) = [|(Expression (toString ($(reifyExpression e))) :)|]
 
         reifyExpression :: String -> Q Exp
         reifyExpression s = case parseExp s of
@@ -263,15 +271,15 @@ parseNodes = go ""
   where
     go :: String -> String -> [Node]
     go acc input = case input of
-      ""  -> [(lit . reverse) acc]
-      '\\':x:xs -> go (x:'\\':acc) xs
-      '#':'{':xs -> goExpr input acc [] xs
-      x:xs -> go (x:acc) xs
+      "" -> [(lit . reverse) acc]
+      '\\' : x : xs -> go (x : '\\' : acc) xs
+      '#' : '{' : xs -> goExpr input acc [] xs
+      x : xs -> go (x : acc) xs
     -- allow '}' to be escaped in code sections
     goExpr input accLit accExpr xs = case span (\x -> x /= '}' && x /= '\\') xs of
-      (ys, '}' :zs) -> (lit . reverse) accLit : Expression (reverse accExpr ++ ys) : go "" zs
-      (ys, '\\':'}':zs) -> goExpr input accLit ('}' : reverse ys ++ accExpr) zs
-      (ys, '\\':zs) -> goExpr input accLit ('\\' : reverse ys ++ accExpr) zs
+      (ys, '}' : zs) -> (lit . reverse) accLit : Expression (reverse accExpr ++ ys) : go "" zs
+      (ys, '\\' : '}' : zs) -> goExpr input accLit ('}' : reverse ys ++ accExpr) zs
+      (ys, '\\' : zs) -> goExpr input accLit ('\\' : reverse ys ++ accExpr) zs
       (_, "") -> [lit (reverse accLit ++ input)]
       _ -> error "(impossible) parseError in parseNodes"
     lit :: String -> Node
@@ -289,13 +297,18 @@ decodeNewlines = go
       y : ys -> y : go ys
       [] -> []
 
-toString :: Show a => a -> String
+toString :: (Show a) => a -> String
 toString a = let s = show a in fromMaybe s (readMaybe s)
 {-# NOINLINE toString #-}
+
 {-# RULES "toString/String" toString = id #-}
+
 {-# RULES "toString/Int" toString = show :: Int -> String #-}
+
 {-# RULES "toString/Integer" toString = show :: Integer -> String #-}
+
 {-# RULES "toString/Float" toString = show :: Float -> String #-}
+
 {-# RULES "toString/Double" toString = show :: Double -> String #-}
 
 -- Haskell 2010 character unescaping, see:
@@ -306,11 +319,11 @@ unescape = go
     go input = case input of
       "" -> ""
       '\\' : 'x' : x : xs | isHexDigit x -> case span isHexDigit xs of
-        (ys, zs) -> (chr . readHex $ x:ys) : go zs
+        (ys, zs) -> (chr . readHex $ x : ys) : go zs
       '\\' : 'o' : x : xs | isOctDigit x -> case span isOctDigit xs of
-        (ys, zs) -> (chr . readOct $ x:ys) : go zs
+        (ys, zs) -> (chr . readOct $ x : ys) : go zs
       '\\' : x : xs | isDigit x -> case span isDigit xs of
-        (ys, zs) -> (chr . read $ x:ys) : go zs
+        (ys, zs) -> (chr . read $ x : ys) : go zs
       '\\' : input_ -> case input_ of
         '\\' : xs -> '\\' : go xs
         'a' : xs -> '\a' : go xs
@@ -321,74 +334,74 @@ unescape = go
         't' : xs -> '\t' : go xs
         'v' : xs -> '\v' : go xs
         '&' : xs -> go xs
-        'N':'U':'L' : xs -> '\NUL' : go xs
-        'S':'O':'H' : xs -> '\SOH' : go xs
-        'S':'T':'X' : xs -> '\STX' : go xs
-        'E':'T':'X' : xs -> '\ETX' : go xs
-        'E':'O':'T' : xs -> '\EOT' : go xs
-        'E':'N':'Q' : xs -> '\ENQ' : go xs
-        'A':'C':'K' : xs -> '\ACK' : go xs
-        'B':'E':'L' : xs -> '\BEL' : go xs
-        'B':'S' : xs -> '\BS' : go xs
-        'H':'T' : xs -> '\HT' : go xs
-        'L':'F' : xs -> '\LF' : go xs
-        'V':'T' : xs -> '\VT' : go xs
-        'F':'F' : xs -> '\FF' : go xs
-        'C':'R' : xs -> '\CR' : go xs
-        'S':'O' : xs -> '\SO' : go xs
-        'S':'I' : xs -> '\SI' : go xs
-        'D':'L':'E' : xs -> '\DLE' : go xs
-        'D':'C':'1' : xs -> '\DC1' : go xs
-        'D':'C':'2' : xs -> '\DC2' : go xs
-        'D':'C':'3' : xs -> '\DC3' : go xs
-        'D':'C':'4' : xs -> '\DC4' : go xs
-        'N':'A':'K' : xs -> '\NAK' : go xs
-        'S':'Y':'N' : xs -> '\SYN' : go xs
-        'E':'T':'B' : xs -> '\ETB' : go xs
-        'C':'A':'N' : xs -> '\CAN' : go xs
-        'E':'M' : xs -> '\EM' : go xs
-        'S':'U':'B' : xs -> '\SUB' : go xs
-        'E':'S':'C' : xs -> '\ESC' : go xs
-        'F':'S' : xs -> '\FS' : go xs
-        'G':'S' : xs -> '\GS' : go xs
-        'R':'S' : xs -> '\RS' : go xs
-        'U':'S' : xs -> '\US' : go xs
-        'S':'P' : xs -> '\SP' : go xs
-        'D':'E':'L' : xs -> '\DEL' : go xs
-        '^':'@' : xs -> '\^@' : go xs
-        '^':'A' : xs -> '\^A' : go xs
-        '^':'B' : xs -> '\^B' : go xs
-        '^':'C' : xs -> '\^C' : go xs
-        '^':'D' : xs -> '\^D' : go xs
-        '^':'E' : xs -> '\^E' : go xs
-        '^':'F' : xs -> '\^F' : go xs
-        '^':'G' : xs -> '\^G' : go xs
-        '^':'H' : xs -> '\^H' : go xs
-        '^':'I' : xs -> '\^I' : go xs
-        '^':'J' : xs -> '\^J' : go xs
-        '^':'K' : xs -> '\^K' : go xs
-        '^':'L' : xs -> '\^L' : go xs
-        '^':'M' : xs -> '\^M' : go xs
-        '^':'N' : xs -> '\^N' : go xs
-        '^':'O' : xs -> '\^O' : go xs
-        '^':'P' : xs -> '\^P' : go xs
-        '^':'Q' : xs -> '\^Q' : go xs
-        '^':'R' : xs -> '\^R' : go xs
-        '^':'S' : xs -> '\^S' : go xs
-        '^':'T' : xs -> '\^T' : go xs
-        '^':'U' : xs -> '\^U' : go xs
-        '^':'V' : xs -> '\^V' : go xs
-        '^':'W' : xs -> '\^W' : go xs
-        '^':'X' : xs -> '\^X' : go xs
-        '^':'Y' : xs -> '\^Y' : go xs
-        '^':'Z' : xs -> '\^Z' : go xs
-        '^':'[' : xs -> '\^[' : go xs
-        '^':'\\' : xs -> '\^\' : go xs
-        '^':']' : xs -> '\^]' : go xs
-        '^':'^' : xs -> '\^^' : go xs
-        '^':'_' : xs -> '\^_' : go xs
+        'N' : 'U' : 'L' : xs -> '\NUL' : go xs
+        'S' : 'O' : 'H' : xs -> '\SOH' : go xs
+        'S' : 'T' : 'X' : xs -> '\STX' : go xs
+        'E' : 'T' : 'X' : xs -> '\ETX' : go xs
+        'E' : 'O' : 'T' : xs -> '\EOT' : go xs
+        'E' : 'N' : 'Q' : xs -> '\ENQ' : go xs
+        'A' : 'C' : 'K' : xs -> '\ACK' : go xs
+        'B' : 'E' : 'L' : xs -> '\BEL' : go xs
+        'B' : 'S' : xs -> '\BS' : go xs
+        'H' : 'T' : xs -> '\HT' : go xs
+        'L' : 'F' : xs -> '\LF' : go xs
+        'V' : 'T' : xs -> '\VT' : go xs
+        'F' : 'F' : xs -> '\FF' : go xs
+        'C' : 'R' : xs -> '\CR' : go xs
+        'S' : 'O' : xs -> '\SO' : go xs
+        'S' : 'I' : xs -> '\SI' : go xs
+        'D' : 'L' : 'E' : xs -> '\DLE' : go xs
+        'D' : 'C' : '1' : xs -> '\DC1' : go xs
+        'D' : 'C' : '2' : xs -> '\DC2' : go xs
+        'D' : 'C' : '3' : xs -> '\DC3' : go xs
+        'D' : 'C' : '4' : xs -> '\DC4' : go xs
+        'N' : 'A' : 'K' : xs -> '\NAK' : go xs
+        'S' : 'Y' : 'N' : xs -> '\SYN' : go xs
+        'E' : 'T' : 'B' : xs -> '\ETB' : go xs
+        'C' : 'A' : 'N' : xs -> '\CAN' : go xs
+        'E' : 'M' : xs -> '\EM' : go xs
+        'S' : 'U' : 'B' : xs -> '\SUB' : go xs
+        'E' : 'S' : 'C' : xs -> '\ESC' : go xs
+        'F' : 'S' : xs -> '\FS' : go xs
+        'G' : 'S' : xs -> '\GS' : go xs
+        'R' : 'S' : xs -> '\RS' : go xs
+        'U' : 'S' : xs -> '\US' : go xs
+        'S' : 'P' : xs -> '\SP' : go xs
+        'D' : 'E' : 'L' : xs -> '\DEL' : go xs
+        '^' : '@' : xs -> '\^@' : go xs
+        '^' : 'A' : xs -> '\^A' : go xs
+        '^' : 'B' : xs -> '\^B' : go xs
+        '^' : 'C' : xs -> '\^C' : go xs
+        '^' : 'D' : xs -> '\^D' : go xs
+        '^' : 'E' : xs -> '\^E' : go xs
+        '^' : 'F' : xs -> '\^F' : go xs
+        '^' : 'G' : xs -> '\^G' : go xs
+        '^' : 'H' : xs -> '\^H' : go xs
+        '^' : 'I' : xs -> '\^I' : go xs
+        '^' : 'J' : xs -> '\^J' : go xs
+        '^' : 'K' : xs -> '\^K' : go xs
+        '^' : 'L' : xs -> '\^L' : go xs
+        '^' : 'M' : xs -> '\^M' : go xs
+        '^' : 'N' : xs -> '\^N' : go xs
+        '^' : 'O' : xs -> '\^O' : go xs
+        '^' : 'P' : xs -> '\^P' : go xs
+        '^' : 'Q' : xs -> '\^Q' : go xs
+        '^' : 'R' : xs -> '\^R' : go xs
+        '^' : 'S' : xs -> '\^S' : go xs
+        '^' : 'T' : xs -> '\^T' : go xs
+        '^' : 'U' : xs -> '\^U' : go xs
+        '^' : 'V' : xs -> '\^V' : go xs
+        '^' : 'W' : xs -> '\^W' : go xs
+        '^' : 'X' : xs -> '\^X' : go xs
+        '^' : 'Y' : xs -> '\^Y' : go xs
+        '^' : 'Z' : xs -> '\^Z' : go xs
+        '^' : '[' : xs -> '\^[' : go xs
+        '^' : '\\' : xs -> '\^\' : go xs
+        '^' : ']' : xs -> '\^]' : go xs
+        '^' : '^' : xs -> '\^^' : go xs
+        '^' : '_' : xs -> '\^_' : go xs
         xs -> go xs
-      x:xs -> x : go xs
+      x : xs -> x : go xs
 
     readHex :: String -> Int
     readHex xs = case N.readHex xs of

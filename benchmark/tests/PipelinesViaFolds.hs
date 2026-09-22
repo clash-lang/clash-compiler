@@ -5,7 +5,7 @@ module PipelinesViaFolds where
 import Clash.Prelude
 import Data.Word
 
-topEntity :: SystemClockResetEnable => Signal System Word32 -> Signal System Word32
+topEntity :: (SystemClockResetEnable) => Signal System Word32 -> Signal System Word32
 topEntity = pipeline
   where
     pipeline :: Signal System Word32 -> Signal System Word32
@@ -13,7 +13,7 @@ topEntity = pipeline
     -- pipeline = foldr (\x acc -> stage x . acc) id $ iterate d32 (+1) 1
 
     -- slow normalisation, killed after 60s
-    pipeline = foldr (.) id $ map stage $ iterate d32 (+1) 1
+    pipeline = foldr (.) id $ map stage $ iterate d32 (+ 1) 1
 
     -- fast normalisation, 1s
     -- pipeline =
@@ -31,5 +31,6 @@ topEntity = pipeline
 
     -- Simple example where `stage` is configured by its order in the pipeline
     stage :: Word32 -> Signal System Word32 -> Signal System Word32
-    stage i s = let delay = register i $ xor <$> delay <*> s
-                in delay
+    stage i s =
+      let delay = register i $ xor <$> delay <*> s
+       in delay

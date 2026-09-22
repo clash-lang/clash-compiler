@@ -18,15 +18,14 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 module Clash.Class.NumConvert.Internal.MaybeNumConvert where
 
 import Clash.Class.BitPack
-import Clash.Class.NumConvert.Internal.NumConvert (NumConvertCanonical (..))
 import Clash.Class.NumConvert.Internal.Canonical (Canonical)
+import Clash.Class.NumConvert.Internal.NumConvert (NumConvertCanonical (..))
 import Clash.Class.Resize
 import Clash.Promoted.Nat
 import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
-
 import GHC.TypeLits (KnownNat, type (+), type (^))
 import GHC.TypeLits.Extra (CLogWZ)
 
@@ -77,9 +76,9 @@ All implementations should be total, i.e., they should not produce \"bottoms\".
 Additionally, any implementation should be translatable to synthesizable HDL.
 -}
 type MaybeNumConvert a b =
-  ( NumConvertCanonical a (Canonical a)
-  , MaybeNumConvertCanonical (Canonical a) (Canonical b)
-  , NumConvertCanonical (Canonical b) b
+  ( NumConvertCanonical a (Canonical a),
+    MaybeNumConvertCanonical (Canonical a) (Canonical b),
+    NumConvertCanonical (Canonical b) b
   )
 
 {- | Convert a supplied value of type @a@ to a value of type @b@. If the value
@@ -93,11 +92,11 @@ Nothing
 For the time being, if the input is an 'Clash.XException.XException', then
 the output is too. This property might be relaxed in the future.
 -}
-maybeNumConvert :: forall a b. MaybeNumConvert a b => a -> Maybe b
+maybeNumConvert :: forall a b. (MaybeNumConvert a b) => a -> Maybe b
 maybeNumConvert a =
-    fmap (numConvertCanonical @(Canonical b) @b)
-  $ maybeNumConvertCanonical @(Canonical a) @(Canonical b)
-  $ numConvertCanonical @a @(Canonical a) a
+  fmap (numConvertCanonical @(Canonical b) @b)
+    $ maybeNumConvertCanonical @(Canonical a) @(Canonical b)
+    $ numConvertCanonical @a @(Canonical a) a
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Index n) (Index m) where
   maybeNumConvertCanonical !a = case natToInteger @m of
@@ -130,7 +129,8 @@ instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Unsigned n) (BitV
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Signed n) (Index m) where
   maybeNumConvertCanonical n = case natToInteger @m of
     0 -> Nothing
-    _ | n < 0 -> Nothing
+    _
+      | n < 0 -> Nothing
       | otherwise -> maybeResize (bitCoerce @_ @(Index (2 ^ n)) (resize n))
 
 instance (KnownNat n, KnownNat m) => MaybeNumConvertCanonical (Signed n) (Unsigned m) where

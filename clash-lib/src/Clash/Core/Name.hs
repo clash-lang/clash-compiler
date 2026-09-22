@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 {-|
   Copyright   :  (C) 2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
@@ -5,40 +11,35 @@
 
   Names
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module Clash.Core.Name
-  ( module Clash.Core.Name
-  , noSrcSpan
+  ( module Clash.Core.Name,
+    noSrcSpan,
   )
 where
 
-import           Control.DeepSeq                        (NFData)
-import           Data.Binary                            (Binary)
-import           Data.Function                          (on)
-import           Data.Hashable                          (Hashable (..))
-import           Data.Text                              (Text, append)
-import           GHC.BasicTypes.Extra                   ()
-import           GHC.Generics                           (Generic)
-import           GHC.SrcLoc.Extra                       ()
-import           GHC.Types.SrcLoc
-  (SrcSpan, leftmost_smallest, noSrcSpan)
-
-import           Clash.Unique
+import Clash.Unique
+import Control.DeepSeq (NFData)
+import Data.Binary (Binary)
+import Data.Function (on)
+import Data.Hashable (Hashable (..))
+import Data.Text (Text, append)
+import GHC.BasicTypes.Extra ()
+import GHC.Generics (Generic)
+import GHC.SrcLoc.Extra ()
+import GHC.Types.SrcLoc
+  ( SrcSpan,
+    leftmost_smallest,
+    noSrcSpan,
+  )
 
 data Name a
   = Name
-  { nameSort :: NameSort
-  , nameOcc  :: !OccName
-  , nameUniq :: {-# UNPACK #-} !Unique
-  , nameLoc  :: !SrcSpan
+  { nameSort :: NameSort,
+    nameOcc :: !OccName,
+    nameUniq :: {-# UNPACK #-} !Unique,
+    nameLoc :: !SrcSpan
   }
-  deriving (Show,Generic,NFData,Binary)
+  deriving (Show, Generic, NFData, Binary)
 
 -- | N.B.: Equality checking only compares uniques, which only identify a name
 -- within one scope. If you want structural equality, use `eqName`.
@@ -72,7 +73,7 @@ instance Hashable (Name a) where
 
 instance Uniquable (Name a) where
   getUnique = nameUniq
-  setUnique nm u = nm {nameUniq=u}
+  setUnique nm u = nm {nameUniq = u}
 
 type OccName = Text
 
@@ -80,29 +81,29 @@ data NameSort
   = User
   | System
   | Internal
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq, Ord, Show, Generic, NFData, Hashable, Binary)
 
-mkUnsafeName
-  :: NameSort
-  -> Text
-  -> Unique
-  -> Name a
+mkUnsafeName ::
+  NameSort ->
+  Text ->
+  Unique ->
+  Name a
 mkUnsafeName ns s i = Name ns s i noSrcSpan
 
-mkUnsafeSystemName
-  :: Text
-  -> Unique
-  -> Name a
+mkUnsafeSystemName ::
+  Text ->
+  Unique ->
+  Name a
 mkUnsafeSystemName s i = Name System s i noSrcSpan
 
-mkUnsafeInternalName
-  :: Text
-  -> Unique
-  -> Name a
+mkUnsafeInternalName ::
+  Text ->
+  Unique ->
+  Name a
 mkUnsafeInternalName s i = Name Internal ("c$" `append` s) i noSrcSpan
 
 appendToName :: Name a -> Text -> Name a
 appendToName (Name sort nm uniq loc) s = Name Internal nm2 uniq loc
   where
-    nm1 = case sort of {Internal -> nm; _ -> "c$" `append` nm}
+    nm1 = case sort of Internal -> nm; _ -> "c$" `append` nm
     nm2 = nm1 `append` s

@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2015-2016, University of Twente,
                   2017     , Google Inc.,
@@ -211,63 +217,55 @@ the device under test, so the 'defSyn' in the example could have been omitted.
 We recommend you supply 'defSyn' explicitly nonetheless. In any case, it will
 still need the @NOINLINE@ annotation.
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Annotations.TopEntity
   ( -- * Data types
-    TopEntity (..)
-  , PortName (..)
+    TopEntity (..),
+    PortName (..),
+
     -- * Convenience functions
-  , defSyn
+    defSyn,
   )
 where
 
-import           GHC.Generics
-import qualified Language.Haskell.TH        as TH
-import           Language.Haskell.TH.Syntax (Lift(..))
-import           Language.Haskell.TH.Compat
-import           Data.Data
+import Data.Data
+import GHC.Generics
+import qualified Language.Haskell.TH as TH
+import Language.Haskell.TH.Compat
+import Language.Haskell.TH.Syntax (Lift (..))
 
 -- | TopEntity annotation
 data TopEntity
-  -- | Instruct the Clash compiler to use this top-level function as a separately
-  -- synthesizable component.
-  = Synthesize
-  { t_name    :: String
-  -- ^ The name the top-level component should have, put in a correspondingly
-  -- named file.
-  , t_inputs  :: [PortName]
-  -- ^ List of names that are assigned in-order to the inputs of the component.
-  , t_output  :: PortName
-  -- ^ Name assigned in-order to the outputs of the component. As a Haskell
-  -- function can only truly return a single value -- with multiple values
-  -- \"wrapped\" by a tuple -- this field is not a list, but a single
-  -- @'PortName'@. Use @'PortProduct'@ to give names to the individual components
-  -- of the output tuple.
-  }
-  -- | Tell what binder is the 'TestBench' for a 'Synthesize'-annotated binder.
-  --
-  -- @
-  -- {\-\# NOINLINE myTestBench \#-\}
-  -- {\-\# ANN myTestBench (TestBench \'entityBeingTested) \#-\}
-  -- @
-  | TestBench TH.Name
-  deriving (Eq,Data,Show,Generic)
+  = -- | Instruct the Clash compiler to use this top-level function as a separately
+    -- synthesizable component.
+    Synthesize
+      { -- | The name the top-level component should have, put in a correspondingly
+        -- named file.
+        t_name :: String,
+        -- | List of names that are assigned in-order to the inputs of the component.
+        t_inputs :: [PortName],
+        -- | Name assigned in-order to the outputs of the component. As a Haskell
+        -- function can only truly return a single value -- with multiple values
+        -- \"wrapped\" by a tuple -- this field is not a list, but a single
+        -- @'PortName'@. Use @'PortProduct'@ to give names to the individual components
+        -- of the output tuple.
+        t_output :: PortName
+      }
+  | -- | Tell what binder is the 'TestBench' for a 'Synthesize'-annotated binder.
+    --
+    -- @
+    -- {\-\# NOINLINE myTestBench \#-\}
+    -- {\-\# ANN myTestBench (TestBench \'entityBeingTested) \#-\}
+    -- @
+    TestBench TH.Name
+  deriving (Eq, Data, Show, Generic)
 
 instance Lift TopEntity where
   lift (Synthesize name inputs output) =
     TH.appsE
-      [ TH.conE 'Synthesize
-      , lift name
-      , lift inputs
-      , lift output
+      [ TH.conE 'Synthesize,
+        lift name,
+        lift inputs,
+        lift output
       ]
   lift (TestBench _) = error "Cannot lift a TestBench"
   liftTyped = liftTypedFromUntyped
@@ -340,21 +338,21 @@ instance Lift TopEntity where
 -- Notice how we didn't name the second field of the result, and the second
 -- output port got 'PortProduct' name, \"res\", as a prefix for its name.
 data PortName
-  = PortName String
-  -- ^ You want a port, with the given name, for the entire argument\/type
-  --
-  -- You can use an empty String ,@""@ , in case you want an auto-generated name.
-  | PortProduct String [PortName]
-  -- ^ You want to assign ports to fields of a product argument\/type
-  --
-  -- The first argument of 'PortProduct' is the name of:
-  --
-  -- 1. The signal/wire to which the individual ports are aggregated.
-  --
-  -- 2. The prefix for any unnamed ports below the 'PortProduct'
-  --
-  -- You can use an empty String ,@""@ , in case you want an auto-generated name.
-  deriving (Eq,Data,Show,Generic,Lift)
+  = -- | You want a port, with the given name, for the entire argument\/type
+    --
+    -- You can use an empty String ,@""@ , in case you want an auto-generated name.
+    PortName String
+  | -- | You want to assign ports to fields of a product argument\/type
+    --
+    -- The first argument of 'PortProduct' is the name of:
+    --
+    -- 1. The signal/wire to which the individual ports are aggregated.
+    --
+    -- 2. The prefix for any unnamed ports below the 'PortProduct'
+    --
+    -- You can use an empty String ,@""@ , in case you want an auto-generated name.
+    PortProduct String [PortName]
+  deriving (Eq, Data, Show, Generic, Lift)
 
 -- | Default 'Synthesize' annotation which has no specified names for the input
 -- and output ports.
@@ -362,8 +360,9 @@ data PortName
 -- >>> defSyn "foo"
 -- Synthesize {t_name = "foo", t_inputs = [], t_output = PortName ""}
 defSyn :: String -> TopEntity
-defSyn name = Synthesize
-  { t_name   = name
-  , t_inputs = []
-  , t_output = PortName ""
-  }
+defSyn name =
+  Synthesize
+    { t_name = name,
+      t_inputs = [],
+      t_output = PortName ""
+    }

@@ -1,10 +1,3 @@
-{-|
-Copyright  :  (C) 2013-2016, University of Twente
-                  2022     , QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
@@ -14,24 +7,26 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-module Clash.Promoted.Symbol
-  (SSymbol (..), ssymbolProxy, ssymbolToString)
-where
-
-import Language.Haskell.TH.Syntax
-import GHC.Show     (appPrec)
-import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
+{-|
+Copyright  :  (C) 2013-2016, University of Twente
+                  2022     , QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
+module Clash.Promoted.Symbol (SSymbol (..), ssymbolProxy, ssymbolToString) where
 
 import Clash.Annotations.Primitive (hasBlackBox)
+import GHC.Show (appPrec)
+import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
+import Language.Haskell.TH.Syntax
 
 -- | Singleton value for a type-level string @s@
 data SSymbol (s :: Symbol) where
-  SSymbol :: KnownSymbol s => SSymbol s
-
+  SSymbol :: (KnownSymbol s) => SSymbol s
 {-# ANN SSymbol hasBlackBox #-}
 
-instance KnownSymbol s => Lift (SSymbol (s :: Symbol)) where
---  lift :: t -> Q Exp
+instance (KnownSymbol s) => Lift (SSymbol (s :: Symbol)) where
+  --  lift :: t -> Q Exp
   lift t = pure (AppTypeE (ConE 'SSymbol) tt)
     where
       tt = LitT (StrTyLit (ssymbolToString t))
@@ -39,16 +34,19 @@ instance KnownSymbol s => Lift (SSymbol (s :: Symbol)) where
   liftTyped = unsafeCodeCoerce . lift
 
 instance Show (SSymbol s) where
-  showsPrec d s@SSymbol = showParen (d > appPrec) $
-    showString "SSymbol @" . shows (ssymbolToString s)
+  showsPrec d s@SSymbol =
+    showParen (d > appPrec) $
+      showString "SSymbol @" . shows (ssymbolToString s)
 
 {-# INLINE ssymbolProxy #-}
+
 -- | Create a singleton symbol literal @'SSymbol' s@ from a proxy for
 -- /s/
-ssymbolProxy :: KnownSymbol s => proxy s -> SSymbol s
+ssymbolProxy :: (KnownSymbol s) => proxy s -> SSymbol s
 ssymbolProxy _ = SSymbol
 
 {-# INLINE ssymbolToString #-}
+
 -- | Reify the type-level 'Symbol' @s@ to it's term-level 'String'
 -- representation.
 ssymbolToString :: SSymbol s -> String

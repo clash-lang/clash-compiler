@@ -1,25 +1,23 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
-{-# LANGUAGE TemplateHaskell #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Promoted.Nat.TH
   ( -- * Declare a single @d\<N\>@ literal
-    decLiteralD
+    decLiteralD,
+
     -- * Declare ranges of @d\<N\>@ literals
-  , decLiteralsD
+    decLiteralsD,
   )
 where
 
-import Language.Haskell.TH
 import Clash.Promoted.Nat
+import Language.Haskell.TH
 
 {- $setup
 >>> :set -XDataKinds
@@ -38,14 +36,15 @@ import Clash.Promoted.Nat
 -- >>> :t d1111
 -- d1111 :: SNat 1111
 --
-decLiteralD :: Integer
-            -> Q [Dec]
+decLiteralD ::
+  Integer ->
+  Q [Dec]
 decLiteralD n = do
-  let suffix  = if n < 0 then error ("Can't make negative SNat: " ++ show n) else show n
-      valName = mkName $ 'd':suffix
-  sig   <- sigD valName (appT (conT ''SNat) (litT (numTyLit n)))
-  val   <- valD (varP valName) (normalB [| SNat |]) []
-  return [ sig, val ]
+  let suffix = if n < 0 then error ("Can't make negative SNat: " ++ show n) else show n
+      valName = mkName $ 'd' : suffix
+  sig <- sigD valName (appT (conT ''SNat) (litT (numTyLit n)))
+  val <- valD (varP valName) (normalB [|SNat|]) []
+  return [sig, val]
 
 -- | Create a range of 'SNat' literals
 --
@@ -58,8 +57,9 @@ decLiteralD n = do
 -- >>> :t d1202
 -- d1202 :: SNat 1202
 --
-decLiteralsD :: Integer
-             -> Integer
-             -> Q [Dec]
+decLiteralsD ::
+  Integer ->
+  Integer ->
+  Q [Dec]
 decLiteralsD from to =
-    fmap concat $ sequence $ [ decLiteralD n | n <- [from..to] ]
+  fmap concat $ sequence $ [decLiteralD n | n <- [from .. to]]
