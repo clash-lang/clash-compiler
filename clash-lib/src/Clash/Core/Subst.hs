@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                           2017, Google Inc.
-                          2021, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
                           2026, Martijn Bastiaan
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -88,7 +88,11 @@ import           Data.Ord                  (comparing)
 import           GHC.Stack                 (HasCallStack)
 import           GHC.SrcLoc.Extra          () -- Hashable RealSrcSpan
 import           GHC.Types.SrcLoc
-  (SrcSpan (RealSrcSpan, UnhelpfulSpan), leftmost_smallest)
+  (SrcSpan (RealSrcSpan, UnhelpfulSpan
+#if MIN_VERSION_ghc(10,0,0)
+           , GeneratedSrcSpan
+#endif
+           ), leftmost_smallest)
 
 import           Clash.Core.HasFreeVars
 import           Clash.Core.Name           (eqName, ordName)
@@ -1371,6 +1375,9 @@ hashSrcSpan :: Int -> SrcSpan -> Int
 hashSrcSpan salt = \case
   RealSrcSpan realSrcSpan _bufSpan -> hashWithSalt salt (0 :: Int, realSrcSpan)
   UnhelpfulSpan _reason -> hashWithSalt salt (1 :: Int)
+#if MIN_VERSION_ghc(10,0,0)
+  GeneratedSrcSpan _details -> hashWithSalt salt (1 :: Int)
+#endif
 
 -- | Hash a 'Type' modulo alpha, under the binders enclosing it.
 -- See Note [Numbering binders by De Bruijn level].

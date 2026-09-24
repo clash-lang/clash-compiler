@@ -42,7 +42,11 @@ import           Data.Text.Prettyprint.Doc
 
 import           GHC.Generics                   (Generic)
 
+#if MIN_VERSION_ghc(10,0,0)
+import           GHC.Types.InlinePragma         (InlineSpec)
+#else
 import           GHC.Types.Basic                (InlineSpec)
+#endif
 import           GHC.Types.SrcLoc               (SrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
