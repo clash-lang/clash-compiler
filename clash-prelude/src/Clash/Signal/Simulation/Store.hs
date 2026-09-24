@@ -1,23 +1,30 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Signal.Simulation.Store where
 
+import           Control.Monad         (foldM)
 import           Data.Aeson            (encode,eitherDecode,ToJSON,FromJSON)
+import           Data.AnonRecords
 import           Data.ByteString.Lazy  (ByteString)
 import qualified Data.ByteString.Lazy  as B
 -- import           Data.Maybe            (fromMaybe)
-import           Data.Word             (Word8)
-import           GHC.Bits              (shiftL,shiftR)
+import           Data.List             (transpose)
+import           Data.Typeable
+import           GHC.Bits              (shiftL, shiftR, (.|.), (.&.))
 import           GHC.Generics          (Generic)
 import           GHC.Natural           (Natural)
+import           GHC.TypeLits          (KnownSymbol, symbolVal, natVal)
 
-import           Clash.Signal          (KnownDomain, Signal)
+import           Clash.Signal          (KnownDomain, Signal, Bundle, Unbundled, bundle, unbundle)
 -- import           Clash.Sized.Internal.BitVector
 --   (BitVector(BV))
+import           Clash.Class.BitPack
 import           Clash.Time            (clockPeriodTime)
 
 import           Clash.Signal.Simulation
@@ -100,14 +107,16 @@ storeTrace name samples (ty,_period,width,values) = storeTrace0 samples [SignalD
 -- All traces must have the same clock period.
 storeTraces :: (Int,Int) -> [(String,Trace)] -> Either String ByteString
 storeTraces samples traces = do
-  let same (a:r(b:_)) = a==b && (same r)
+  let same (a:r@(b:_)) = a==b && (same r)
       same _ = True
-  if same (map (\(_,_,p,_) -> p) traces)
+  if same (map (\(_,(_,_,p,_)) -> p) traces)
     then Right ()
     else Left "Attempting to store multiple traces with different periods in one signal dump file."
 
   let meta = map (\(name,(ty,_,width,_)) -> SignalDescr{name, width, datatype=ty}) traces
-      values = ... -- combine values
+      widths = map (\(_,(_,_,w,_)) -> w) traces
+      ccat vs = foldl (\(v,m) (w,(v',m')) -> ((v `shiftL` w).|.v', (m `shiftL` w).|.m')) (0,0) (zip widths vs)
+      values = map ccat $ transpose $ map (\(_,(_,_,_,vs)) -> vs) traces -- combine values TODO: make more efficient
 
   return $ storeTrace0 samples meta values
 
@@ -135,7 +144,7 @@ stores names sim@Simulation{simConfig} = do
     [] -> Left "stores called without any trace names"
     (t:_) -> Right t
   let samples = simulationTimeRangeToCycles simConfig period
-  storeTraces samples traces
+  storeTraces samples (zip names traces)
 
 -- | Store a 'Signal' in binary form.
 storeSignal ::
@@ -155,13 +164,13 @@ storeSignal name samples signal = storeTrace name samples $ toTrace signal
 storeSignals ::
   forall dom a.
   KnownDomain dom =>
-  StoreSignal a =>
-  Traceable (Unbundled a) =>
+  StoreSignals a =>
+  Traceable a =>
   Bundle a =>
   -- | Range of samples to dump
   (Int,Int) ->
   -- | Bundle of signals to dump
-  a ->
+  (Unbundled dom a) ->
   ByteString
 storeSignals samples sigs = storeTrace0 samples signals values
  where
@@ -176,24 +185,22 @@ instance (KnownSymbol x, BitPack a, Typeable a) => StoreSignals (x := Signal dom
   storeSignalMeta =
     [ SignalDescr
       { name = symbolVal (Proxy @x)
-      , width = natVal (Proxy @(BitSize a))
-      , datatype = typeRep @a } ]
-instance (StoreSignals a, StorSignals b) => StoreSignas (a :&: b) where
+      , width = fromInteger $ natVal (Proxy @(BitSize a))
+      , datatype = Clash.Signal.Simulation.DataType.typeRep @a } ]
+instance (StoreSignals a, StoreSignals b) => StoreSignals (a :&: b) where
   storeSignalMeta = storeSignalMeta @a <> storeSignalMeta @b
 
 -- | Read the file but do not finalize the trace yet
 loadTrace0 ::
-  Period ->
   ByteString ->
   Either String (FileHeader,[Value])
-loadTrace0 period bs =
-  let (header,rest) = B.span (/=0) bin
+loadTrace0 bs = do
+  let (header',rest) = B.span (/=0) bs
       rawValues' = B.drop 1 rest
 
-  header@FileHeader{width,undefined=storesUndefined,offset,signals} <- eitherDecode header
+  header@FileHeader{width,undefined=storesUndefined,offset} <- eitherDecode header'
 
   let k = (width+7) `div` 8
-      ty = constructRecord $ map (\SignalDescr{name,datatype} -> (name,datatype)) signals
       values =
         if storesUndefined then
           undefinedValues
@@ -213,7 +220,7 @@ loadTrace0 period bs =
               | otherwise = v : cut r
          where (v,r) = B.splitAt (fromIntegral k) b
 
-      bsToNat bs = sum $ zipWith (shiftL . fromIntegral) (B.unpack bs) [0,8..8*k-1]
+      bsToNat bs' = sum $ zipWith (shiftL . fromIntegral) (B.unpack bs') [0,8..8*k-1]
 
       undef = ((1 `shiftL` width)-1,0)
 
@@ -228,7 +235,7 @@ loadTrace ::
   ByteString ->
   Either String Trace
 loadTrace period bs = do
-  (header, values) <- loadTrace0 period bs
+  (header, values) <- loadTrace0 bs
   let FileHeader{width, signals} = header
       ty = constructRecord $ map (\SignalDescr{name,datatype} -> (name,datatype)) signals
 
@@ -242,10 +249,10 @@ loadTrace period bs = do
 -- | Load multiple traces from a single binary.
 loadTraces :: Period -> ByteString -> Either String [(String,Trace)]
 loadTraces period bs = do
-  (header, values) <- loadTrace0 period bs
+  (header, values) <- loadTrace0 bs
 
   let FileHeader{width, signals} = header
-      names, widths, types = uncurry3 (map (\SignalDescr n w t -> (n w t))) signals
+      (names, widths, types) = unzip3 $ map (\(SignalDescr n w t) -> (n, w, t)) signals
       cWidths = scanl (+) 0 widths
       ranges = zip cWidths (drop 1 cWidths)
 
@@ -253,13 +260,13 @@ loadTraces period bs = do
     Left "Subsignal widths do not add up to signal width"
   else Right ()
 
-  let slice (from, to) (m,v) = (go m, go v)
+  let slice' (from, to) (m,v) = (go m, go v)
        where
         lo = width-to
         bits = to-from
         go n = (n `shiftR` lo) .&. ((1 `shiftL` bits) - 1)
 
-      valuess = map (\r -> map (slice r) values) ranges
+      valuess = map (\r -> map (slice' r) values) ranges
       traces = zipWith3 (\t w vs -> (t, period, w, vs)) types widths valuess
 
   return $ zip names traces
@@ -283,7 +290,7 @@ load name bs sim = do
 -- The traces will be loaded into a single domain.
 loads :: forall dom. KnownDomain dom => ByteString -> Simulation -> Either String Simulation
 loads bs sim = do
-  traces <- loadTraces (clockPeriodTime @dom)
+  traces <- loadTraces (clockPeriodTime @dom) bs
   foldM (\s (n,t) -> addTrace n t s) sim traces
 
 -- | Load a 'Signal' from binary form.
