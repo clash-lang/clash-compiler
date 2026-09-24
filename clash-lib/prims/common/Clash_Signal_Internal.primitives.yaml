@@ -26,3 +26,7 @@
     name: Clash.Signal.Internal.switchDomain
     primType: Function
     workInfo: Never
+- Primitive:
+    name: Clash.Signal.Internal.sameDomain
+    primType: Function
+    workInfo: Never
