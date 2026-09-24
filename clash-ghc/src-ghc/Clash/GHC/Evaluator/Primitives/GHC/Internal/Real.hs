@@ -32,4 +32,6 @@ primitives =
   , primStepEntry "GHC.Internal.Real.^_$s$spowImpl2" powImplWorker
   , primStepEntry "GHC.Internal.Real.$w$spowImpl" powImplWorker
   , primStepEntry "GHC.Internal.Real.$w$spowImpl1" powImplWorker
+  , primStepEntry "GHC.Internal.Real.powImpl_$spowImpl2" powImplWorker
+  , primStepEntry "GHC.Internal.Real.^%^_$spowImpl1" powImplWorker
   ]
