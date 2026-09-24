@@ -1,0 +1,75 @@
+# Blackboxes for the TypeRep constructor functions
+- BlackBox: #optional?
+    name: GHC.Internal.Data.Typeable.Internal.mkTrType
+    kind: Expression
+    type: 'mkTrType :: TypeRep Type'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox: # required for unknown reasons
+    name: GHC.Internal.Data.Typeable.Internal.mkTrCon
+    kind: Expression
+    type: 'mkTrCon :: forall k (a :: k). TyCon -> [SomeTypeRep] -> TypeRep a'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox: #optional?
+    name: GHC.Internal.Data.Typeable.Internal.mkTrApp
+    kind: Expression
+    type: 'mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1). TypeRep (a :: k1 -> k2) -> TypeRep (b :: k1) -> TypeRep (a b)'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox: #optional?
+    name: GHC.Internal.Data.Typeable.Internal.mkTrAppChecked
+    kind: Expression
+    type: 'mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1). TypeRep (a :: k1 -> k2) -> TypeRep (b :: k1) -> TypeRep (a b)'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox: #optional?
+    name: GHC.Internal.Data.Typeable.Internal.mkTrFun
+    kind: Expression
+    type: 'mkTrFun :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                  (a :: TYPE r1) (b :: TYPE r2).
+           TypeRep m -> TypeRep a -> TypeRep b -> TypeRep ((FUN m a b) :: Type)'
+    template: ~ERRORO
+    workInfo: Constant
+
+# Blackbox the TypeRep constructors directly
+- BlackBox:
+    name: GHC.Internal.Data.Typeable.Internal.TrType
+    kind: Expression
+    type: 'TrType :: TypeRep Type'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: GHC.Internal.Data.Typeable.Internal.TrTyCon
+    kind: Expression
+    type: 'TrTyCon ::
+               { trTyConFingerprint :: {-# UNPACK #-} !Fingerprint
+               , trTyCon :: !TyCon
+               , trKindVars :: [SomeTypeRep]
+               , trTyConKind :: !(TypeRep k) }
+            -> TypeRep (a :: k)'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: GHC.Internal.Data.Typeable.Internal.TrApp
+    kind: Expression
+    type: 'TrApp   :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
+               { trAppFingerprint :: {-# UNPACK #-} !Fingerprint
+               , trAppFun :: !(TypeRep (a :: k1 -> k2))
+               , trAppArg :: !(TypeRep (b :: k1))
+               , trAppKind :: !(TypeRep k2) }   -- See Note [Kind caching]
+            -> TypeRep (a b)'
+    template: ~ERRORO
+    workInfo: Constant
+- BlackBox:
+    name: GHC.Internal.Data.Typeable.Internal.TrFun
+    kind: Expression
+    type: 'TrFun   :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                      (a :: TYPE r1) (b :: TYPE r2).
+               { trFunFingerprint :: {-# UNPACK #-} !Fingerprint
+               , trFunMul :: !(TypeRep m)
+               , trFunArg :: !(TypeRep a)
+               , trFunRes :: !(TypeRep b) }
+            -> TypeRep (FUN m a b)'
+    template: ~ERRORO
+    workInfo: Constant
