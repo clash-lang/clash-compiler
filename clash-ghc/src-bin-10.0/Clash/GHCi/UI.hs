@@ -1,3 +1,5 @@
+{-# LANGUAGE GHC2024 #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -19,22 +21,21 @@
 --
 -----------------------------------------------------------------------------
 
-module GHCi.UI (
+module Clash.GHCi.UI (
         interactiveUI,
         GhciSettings(..),
         defaultGhciSettings,
         ghciCommands,
         ghciWelcomeMsg,
+        makeHDL,
         languageEditionMsg
     ) where
 
 -- GHCi
-import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
-import GHCi.UI.Monad hiding ( args, runStmt )
-import GHCi.UI.Info
-import GHCi.UI.Exception hiding (GHCi)
-import GHCi.Leak
-import GHCi.UI.Print
+import qualified Clash.GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
+import Clash.GHCi.UI.Monad hiding ( args, runStmt )
+import Clash.GHCi.UI.Info
+import Clash.GHCi.UI.Exception hiding (GHCi)
 
 import GHC.Runtime.Debugger
 import GHC.Runtime.Debugger.Breakpoints
@@ -100,7 +101,6 @@ import GHC.Utils.Logger
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
-import GHC.Settings.Config
 import GHC.Data.Graph.Directed
 import GHC.Utils.Encoding
 import GHC.Data.FastString
@@ -179,6 +179,29 @@ import GHC.TopHandler ( topHandler )
 
 import qualified GHC.Unit.Module.Graph as GHC
 
+
+-- clash additions
+import           Clash.Backend (Backend(initBackend, hdlKind, primDirs))
+import           Clash.Backend.SystemVerilog (SystemVerilogState)
+import           Clash.Backend.VHDL (VHDLState)
+import           Clash.Backend.Verilog (VerilogState)
+import qualified Clash.Driver
+import           Clash.Driver.Bool (fromGhcOverridingBool)
+import           Clash.Driver.Types (ClashOpts(..), ClashEnv(..), ClashDesign(..))
+import           Clash.GHC.Evaluator
+import           Clash.GHC.GenerateBindings
+import           Clash.GHC.NetlistTypes
+import           Clash.GHC.PartialEval
+import           Clash.GHCi.Common
+import           Clash.GHCi.Leak
+import           Clash.GHCi.UI.Print
+import           Clash.Util (clashLibVersion, reportTimeDiff)
+import           Data.Proxy
+import qualified Data.Time.Clock as Clock
+import qualified Paths_clash_ghc
+import GHC.Settings.Config (cProjectVersion)
+import qualified System.OsPath as OsPath
+
 -----------------------------------------------------------------------------
 
 data GhciSettings = GhciSettings {
@@ -188,10 +211,10 @@ data GhciSettings = GhciSettings {
         defPromptCont     :: PromptFunction
     }
 
-defaultGhciSettings :: GhciSettings
-defaultGhciSettings =
+defaultGhciSettings :: IORef ClashOpts -> GhciSettings
+defaultGhciSettings opts =
     GhciSettings {
-        availableCommands = ghciCommands,
+        availableCommands = ghciCommands opts,
         defPrompt         = default_prompt,
         defPromptCont     = default_prompt_cont,
         fullHelpText      = defFullHelpText
@@ -201,14 +224,17 @@ versionString :: String
 versionString = "GHCi, version " ++ cProjectVersion
 
 ghciWelcomeMsg :: String
-ghciWelcomeMsg = versionString ++ ": https://www.haskell.org/ghc/  :? for help"
+ghciWelcomeMsg =
+  "Clashi, version " ++ Data.Version.showVersion Paths_clash_ghc.version ++
+  " (using clash-lib, version " ++ Data.Version.showVersion clashLibVersion ++
+  "):\nhttps://clash-lang.org/  :? for help"
 
 languageEditionMsg :: Maybe Language -> String
 languageEditionMsg Nothing     = "Using default language edition: " ++ show defaultLanguage
 languageEditionMsg (Just lang) = "Using language edition: " ++ show lang
 
-ghciCommands :: [Command]
-ghciCommands = map mkCmd [
+ghciCommands :: IORef ClashOpts -> [Command]
+ghciCommands opts = map mkCmd [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",         keepGoing help,                 noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
@@ -265,6 +291,9 @@ ghciCommands = map mkCmd [
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
   ("version",   keepGoing showVersion',         noCompletion),
   ("where",     keepGoing whereCmd,             noCompletion),
+  ("vhdl",      keepGoingPaths (makeVHDL opts), completeHomeModuleOrFile),
+  ("verilog",   keepGoingPaths (makeVerilog opts), completeHomeModuleOrFile),
+  ("systemverilog", keepGoingPaths (makeSystemVerilog opts), completeHomeModuleOrFile),
   ("instances", keepGoing' instancesCmd,        completeExpression)
   ] ++ map mkCmdHidden [ -- hidden commands
   ("all-types", keepGoing' allTypesCmd),
@@ -380,6 +409,12 @@ defFullHelpText =
   "   :version                    display the current GHC version\n" ++
   "   ::<cmd>                     run the builtin command\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
+  "   :vhdl                       synthesize currently loaded module to vhdl\n" ++
+  "   :vhdl [<module>]            synthesize specified modules/files to vhdl\n" ++
+  "   :verilog                    synthesize currently loaded module to verilog\n" ++
+  "   :verilog [<module>]         synthesize specified modules/files to verilog\n" ++
+  "   :systemverilog              synthesize currently loaded module to systemverilog\n" ++
+  "   :systemverilog [<module>]   synthesize specified modules/files to systemverilog\n" ++
   "   :shell <command>            run shell via sh -c <command>\n" ++
   "\n" ++
   " -- Commands for debugging:\n" ++
@@ -481,8 +516,8 @@ default_progname = "<interactive>"
 default_stop = ""
 
 default_prompt, default_prompt_cont :: PromptFunction
-default_prompt = generatePromptFunctionFromString "ghci> "
-default_prompt_cont = generatePromptFunctionFromString "ghci| "
+default_prompt = generatePromptFunctionFromString "clashi> "
+default_prompt_cont = generatePromptFunctionFromString "clashi| "
 
 default_args :: [String]
 default_args = []
@@ -949,13 +984,13 @@ ghciLogAction lastErrLocations old_log_action
 getAppDataFile :: XdgDirectory -> FilePath -> IO (Maybe FilePath)
 getAppDataFile xdgDir file = do
   xdgAppDir <-
-    tryIO (getXdgDirectory xdgDir "ghc") >>= \case
+    tryIO (getXdgDirectory xdgDir "clash") >>= \case
       Left _ -> pure Nothing
       Right dir -> flip catchIO (const $ pure Nothing) $ do
         createDirectoryIfMissing False dir
         pure $ Just dir
   appDir <-
-    tryIO (getAppUserDataDirectory "ghc") >>= \case
+    tryIO (getAppUserDataDirectory "clash") >>= \case
       Right dir ->
         doesDirectoryExist dir >>= \case
           True -> pure $ Just dir
@@ -969,11 +1004,11 @@ runGHCi paths maybe_exprs = do
   let
    ignore_dot_ghci = gopt Opt_IgnoreDotGhci dflags
 
-   appDataCfg = liftIO $ getAppDataFile XdgConfig "ghci.conf"
+   appDataCfg = liftIO $ getAppDataFile XdgConfig "clashi.conf"
 
    homeCfg = do
     liftIO $ tryIO (getEnv "HOME") >>= \case
-      Right home -> pure $ Just $ home </> ".ghci"
+      Right home -> pure $ Just $ home </> ".clashi"
       _ -> pure Nothing
 
    canonicalizePath' :: FilePath -> IO (Maybe FilePath)
@@ -998,7 +1033,7 @@ runGHCi paths maybe_exprs = do
                 -- Also, let the user silence the message with -v0
                 -- (the default verbosity in GHCi is 1).
                 when (isNothing maybe_exprs && verbosity dflags > 0) $
-                  liftIO $ putStrLn ("Loaded GHCi configuration from " ++ file)
+                  liftIO $ putStrLn ("Loaded Clashi configuration from " ++ file)
 
   --
 
@@ -1013,7 +1048,7 @@ runGHCi paths maybe_exprs = do
         liftIO . fmap (nub . catMaybes) $ mapM canonicalizePath' checkedPaths
 
       localCfg <- do
-        let path = ".ghci"
+        let path = ".clashi"
         ok <- liftIO $ checkFileAndDirPerms path
         if ok then liftIO $ canonicalizePath' path else pure Nothing
 
@@ -1066,10 +1101,19 @@ runGHCi paths maybe_exprs = do
   case maybe_exprs of
         Nothing ->
           do
+            runGHCiExpressions
+              ["default ((), [], Prelude.Integer, Prelude.Int, Prelude.Double, Prelude.String)"]
             -- enter the interactive loop
             runGHCiInput $ runCommands $ nextInputLine show_prompt is_tty
         Just exprs -> do
             -- just evaluate the expression we were given
+            runGHCiExpressions exprs
+
+  -- and finally, exit
+  liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving Clashi."
+
+runGHCiExpressions :: [String] -> GHCi ()
+runGHCiExpressions exprs = do
             enqueueCommands exprs
             let hdle e = do st <- getGHCiState
                             -- flush the interpreter's stdout/stderr on exit (#3890)
@@ -1087,9 +1131,6 @@ runGHCi paths maybe_exprs = do
                      (return Nothing)
                 return ()
 
-  -- and finally, exit
-  liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
-
 runGHCiInput :: InputT GHCi a -> GHCi a
 runGHCiInput f = do
     dflags <- getDynFlags
@@ -1098,8 +1139,8 @@ runGHCiInput f = do
     currentDirectory <- liftIO getCurrentDirectory
 
     histFile <- case (ghciHistory, localGhciHistory) of
-      (True, True) -> pure $ Just $ currentDirectory </> ".ghci_history"
-      (True, _) -> liftIO $ getAppDataFile XdgData "ghci_history"
+      (True, True) -> pure $ Just $ currentDirectory </> ".clashi_history"
+      (True, _) -> liftIO $ getAppDataFile XdgData "clashi_history"
       _ -> pure Nothing
 
     runInputT
@@ -2673,6 +2714,135 @@ runExceptGhciMonad act = handleSourceError printGhciException $
 exceptT :: Applicative m => Either e a -> ExceptT e m a
 exceptT = ExceptT . pure
 
+makeHDL'
+  :: forall backend
+   . Backend backend
+  => Proxy backend
+  -> IORef ClashOpts
+  -> [FilePath]
+  -> InputT GHCi ()
+makeHDL' backend opts lst = go =<< case lst of
+  srcs@(_:_) -> return srcs
+  []         -> do
+    modGraph <- GHC.getModuleGraph
+    let sortedGraph =
+          -- TODO: this might break backpack
+          filterToposortToModules $
+          GHC.topSortModuleGraph False modGraph Nothing
+    return $ case (reverse sortedGraph) of
+      ((AcyclicSCC (GHC.ModuleNodeCompile top)) : _) ->
+        maybeToList $ (GHC.ml_hs_file . GHC.ms_location) top
+      _ -> []
+ where
+  go srcs = do
+    !originalHUG <- hsc_HUG <$> GHC.getSession
+    goX srcs `MC.finally` recover originalHUG
+
+  goX srcs = do
+    -- Issue #439 step 1
+    addToProgramDynFlags
+                       [ noLoc "-fobject-code"   -- For #439
+                       , noLoc "-fforce-recomp"  -- Actually compile to object-code
+                       , noLoc "-keep-tmp-files" -- To prevent linker errors from
+                                                 -- multiple calls to :hdl command
+                       ]
+    reloadModule ""
+    -- Issue #439 step 2
+    -- Unload any object files
+    -- This fixes: https://github.com/clash-lang/clash-compiler/issues/439#issuecomment-522015868
+    env <- GHC.getSession
+    liftIO (Loader.unload (hscInterp env) env)
+    -- Finally generate the HDL
+    makeHDL backend (return ()) opts srcs
+
+  recover originalHUG = do
+    let restoreFlags (HUG.UnitEnvGraph old) (HUG.UnitEnvGraph new) =
+          HUG.UnitEnvGraph $ M.unionWith
+            (\before after -> after { homeUnitEnv_dflags = homeUnitEnv_dflags before })
+            old new
+    modifySession (hscUpdateHUG (restoreFlags originalHUG))
+    idflags <- hsc_dflags <$> GHC.getSession
+    modifySessionM (GHC.initialiseInteractiveDynFlags idflags)
+    reloadModule ""
+
+makeHDL
+  :: forall backend m
+   . (GHC.GhcMonad m, Backend backend)
+  => Proxy backend
+  -> Ghc ()
+  -> IORef ClashOpts
+  -> [FilePath]
+  -> m ()
+makeHDL Proxy startAction optsRef srcs = do
+  -- Validate every target before loading or synthesizing any of them.
+  mapM_ (\src -> GHC.guessTarget src Nothing Nothing) srcs
+  env <- GHC.getSession
+  let hug = hsc_HUG env
+      -- Synthesis runs in a fresh session. Use the source-loading unit's
+      -- flags, without dependencies on GHCi's temporary home units.
+      dflags = case HUG.unitEnv_lookup_maybe interactiveSessionUnitId hug of
+        Nothing -> hsc_dflags env
+        Just homeEnv ->
+          let sourceFlags = homeUnitEnv_dflags homeEnv
+          in sourceFlags
+            { packageFlags = filter (not . selectHptFlag (HUG.allUnits hug))
+                (packageFlags sourceFlags)
+            }
+  liftIO $ do startTime <- Clock.getCurrentTime
+              opts0  <- readIORef optsRef
+              let opts1  = opts0 { opt_color = fromGhcOverridingBool (useColor dflags) }
+              let iw     = opt_intWidth opts1
+                  hdl    = hdlKind backend
+                  -- determine whether `-outputdir` was used
+                  outputDir = do odir <- objectDir dflags
+                                 hidir <- hiDir dflags
+                                 sdir <- stubDir dflags
+                                 ddir <- dumpDir dflags
+                                 if all (== odir) [hidir,sdir,ddir]
+                                    then Just odir
+                                    else Nothing
+                  idirs = importPaths dflags
+                  opts2 = opts1 { opt_hdlDir = maybe outputDir Just (opt_hdlDir opts1)
+                                , opt_importPaths = idirs}
+                  backend = initBackend @backend opts2
+
+              checkMonoLocalBinds dflags
+              checkImportDirs opts0 idirs
+
+              primDirs_ <- primDirs backend
+
+              forM_ srcs $ \src -> do
+                -- Generate bindings:
+                dbs <- traverse OsPath.decodeFS $
+                  reverse [p | PackageDB (PkgDbPath p) <- packageDBFlags dflags]
+                (clashEnv, clashDesign) <- generateBindings opts2 startAction primDirs_ idirs dbs hdl src (Just dflags)
+
+                let getMain = getMainTopEntity src clashDesign
+                mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)
+                prepTime <- startTime `deepseq` designBindings clashDesign `deepseq` envTyConMap clashEnv `deepseq` Clock.getCurrentTime
+                let prepStartDiff = reportTimeDiff prepTime startTime
+                putStrLn $ "GHC+Clash: Loading modules cumulatively took " ++ prepStartDiff
+
+                -- Generate HDL:
+                Clash.Driver.generateHDL
+                  clashEnv
+                  clashDesign
+                  (Just backend)
+                  (ghcTypeToHWType iw)
+                  ghcEvaluator
+                  evaluator
+                  mainTopEntity
+                  startTime
+
+makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
+makeVHDL = makeHDL' (Proxy @VHDLState)
+
+makeVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
+makeVerilog = makeHDL' (Proxy @VerilogState)
+
+makeSystemVerilog :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
+makeSystemVerilog = makeHDL' (Proxy @SystemVerilogState)
+
 -----------------------------------------------------------------------------
 -- | @:type@ command. See also Note [TcRnExprMode] in GHC.Tc.Module.
 
@@ -3218,7 +3388,6 @@ setGHCContextFromGHCiState = do
 getImplicitPreludeImports :: GhciMonad m
                           => [InteractiveImport] -> m [InteractiveImport]
 getImplicitPreludeImports iidecls = do
-  dflags <- GHC.getInteractiveDynFlags
      -- allow :seti to override -XNoImplicitPrelude
   st <- getGHCiState
 
@@ -3227,7 +3396,7 @@ getImplicitPreludeImports iidecls = do
   -- of the same module.  This means that you can override the prelude import
   -- with "import Prelude hiding (map)", for example.
   let prel_iidecls =
-         if xopt LangExt.ImplicitPrelude dflags && not (any isIIModule iidecls)
+         if not (any isIIModule iidecls)
             then [ IIDecl imp
                  | imp <- prelude_imports st
                  , not (any (sameImpModule imp) iidecls) ]
@@ -3257,7 +3426,7 @@ iiModuleName (IIModule m) = moduleName m
 iiModuleName (IIDecl d)   = unLoc (ideclName d)
 
 preludeModuleName :: ModuleName
-preludeModuleName = GHC.mkModuleName "Prelude"
+preludeModuleName = GHC.mkModuleName "Clash.Prelude"
 
 sameImpModule :: ImportDecl GhcPs -> InteractiveImport -> Bool
 sameImpModule _ (IIModule _) = False -- we only care about imports here

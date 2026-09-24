@@ -1,7 +1,9 @@
+{-# LANGUAGE GHC2024 #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
-module GHCi.UI.Exception
+{-# LANGUAGE NoImplicitPrelude #-}
+module Clash.GHCi.UI.Exception
   ( GhciCommandError(..)
   , throwGhciCommandError
   , handleGhciCommandError

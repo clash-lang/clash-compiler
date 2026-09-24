@@ -1,6 +1,7 @@
+{-# LANGUAGE GHC2024 #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-module GHC.Driver.Session.Lint (checkOptions) where
+module Clash.GHC.Driver.Session.Lint (checkOptions) where
 
 import GHC.Driver.Backend
 import GHC.Driver.Phases
@@ -17,7 +18,7 @@ import Control.Monad
 import qualified Data.Set as Set
 import Prelude
 
-import GHC.Driver.Session.Mode
+import Clash.GHC.Driver.Session.Mode
 
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
