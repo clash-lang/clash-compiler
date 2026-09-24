@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2017-2022, Google Inc.,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -112,7 +112,10 @@ stepVar i m _
   toStr = Text.unpack . unQualName . flip Text.snoc '_' . nameOcc . varName
 
 stepData :: DataCon -> Step
-stepData dc = ghcUnwind (DC dc [])
+stepData dc m tcm =
+  case fst $ splitFunForallTy (dcType dc) of
+    [] -> ghcUnwind (DC dc []) m tcm
+    tys -> newBinder tys (Data dc) m tcm
 
 stepLiteral :: Literal -> Step
 stepLiteral l = ghcUnwind (Lit l)
