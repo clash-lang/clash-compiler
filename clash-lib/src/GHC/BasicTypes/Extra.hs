@@ -10,7 +10,11 @@
 
 module GHC.BasicTypes.Extra where
 
+#if MIN_VERSION_ghc(10,0,0)
+import GHC.Types.InlinePragma
+#else
 import GHC.Types.Basic
+#endif
 #if !MIN_VERSION_ghc(9,14,0)
 import Control.DeepSeq
 #endif

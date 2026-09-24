@@ -20,6 +20,9 @@ import GHC.Types.SrcLoc
    srcLocFile, srcLocLine, srcLocCol,
    srcSpanFile, srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol)
 import qualified GHC.Data.Strict
+#if MIN_VERSION_ghc(10,0,0)
+import GHC.Types.SrcLoc (GeneratedSrcSpanDetails(..))
+#endif
 
 import GHC.BasicTypes.Extra ()
 
@@ -51,6 +54,12 @@ instance Hashable BufPos
 deriving instance Generic UnhelpfulSpanReason
 instance Binary UnhelpfulSpanReason
 instance Hashable UnhelpfulSpanReason
+
+#if MIN_VERSION_ghc(10,0,0)
+deriving instance Generic GeneratedSrcSpanDetails
+instance Binary GeneratedSrcSpanDetails
+instance Hashable GeneratedSrcSpanDetails
+#endif
 
 deriving instance Generic BufSpan
 instance Binary BufSpan
