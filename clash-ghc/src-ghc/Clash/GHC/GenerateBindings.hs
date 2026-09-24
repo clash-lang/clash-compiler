@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                           2017, QBayLogic, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -39,9 +39,15 @@ import qualified Data.Time.Clock         as Clock
 import           GHC.Conc                (numCapabilities, par, pseq)
 
 import qualified GHC                     as GHC (Ghc)
+#if !MIN_VERSION_ghc(10,0,0)
 import qualified GHC.Types.SourceText    as GHC
+#endif
 import qualified GHC.Utils.Panic         as GHC
+#if MIN_VERSION_ghc(10,0,0)
+import qualified GHC.Types.InlinePragma  as GHC
+#else
 import qualified GHC.Types.Basic         as GHC
+#endif
 import qualified GHC.Core                as GHC
 import qualified GHC.Types.Demand        as GHC
 import qualified GHC.Driver.Session      as GHC
@@ -140,7 +146,13 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                                     -- selectors, no need to check free vars.
       clsMap =
         fmap (\(v,i) ->
-               (Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
+               (Binding v GHC.noSrcSpan
+#if MIN_VERSION_ghc(10,0,0)
+                  GHC.Inline
+#else
+                  (GHC.Inline GHC.NoSourceText)
+#endif
+                  IsFun
                   (mkClassSelector inScope0 allTcCache (varType v) i) False))
              clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
@@ -195,7 +207,11 @@ setNoInlineTopEntities bm tes =
 
   go b@Binding{bindingId}
     | bindingId `elemVarSet` ids
-    = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
+    = b { bindingSpec = GHC.Opaque
+#if !MIN_VERSION_ghc(10,0,0)
+            GHC.NoSourceText
+#endif
+        }
     | otherwise = b
 
 -- TODO This function should be changed to provide the information that

@@ -97,6 +97,10 @@ import GHC.Data.FastString (FastString, mkFastString, unpackFS, bytesFS)
 import GHC.Types.Id (isDataConId_maybe)
 import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
 import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
+#if MIN_VERSION_ghc(10,0,0)
+import GHC.Types.Literal.Floating
+  (LitFloatingType (..), litFloatingToHostFloat, litFloatingToHostDouble)
+#endif
 import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
@@ -107,7 +111,12 @@ import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
 import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
    isNewTyCon, isPrimTyCon, isTupleTyCon,
-   isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
+#if MIN_VERSION_ghc(10,0,0)
+   isClosedFamilyTyCon_maybe,
+#else
+   isClosedSynFamilyTyConWithAxiom_maybe,
+#endif
+   expandSynTyCon_maybe, tyConArity,
    tyConDataCons, tyConKind,
 #if MIN_VERSION_ghc(9,14,0)
    tyConTyVars,
@@ -323,7 +332,12 @@ makeTyCon tc = tycon
         mkFunTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          substs <- case isClosedSynFamilyTyConWithAxiom_maybe tc of
+          substs <- case
+#if MIN_VERSION_ghc(10,0,0)
+            isClosedFamilyTyCon_maybe tc of
+#else
+            isClosedSynFamilyTyConWithAxiom_maybe tc of
+#endif
             Nothing -> do
                        instances <- familyInstances <$> view famInstEnvs <*> pure tc
                        mapM famInstToSubst instances
@@ -771,8 +785,15 @@ coreToTerm primMap unlocs = term
         LitNumWord8   -> C.Word8Literal i
         LitNumWord16  -> C.Word16Literal i
         LitNumWord32  -> C.Word32Literal i
+#if MIN_VERSION_ghc(10,0,0)
+      LitFloating LitFloat r ->
+        C.FloatLiteral . castFloatToWord32 $ litFloatingToHostFloat r
+      LitFloating LitDouble r ->
+        C.DoubleLiteral . castDoubleToWord64 $ litFloatingToHostDouble r
+#else
       LitFloat r    -> C.FloatLiteral . castFloatToWord32 $ fromRational r
       LitDouble r   -> C.DoubleLiteral . castDoubleToWord64 $ fromRational r
+#endif
       LitNullAddr   -> C.StringLiteral []
 #if MIN_VERSION_ghc(9,12,0)
       LitLabel fs _ -> C.StringLiteral (unpackFS fs)

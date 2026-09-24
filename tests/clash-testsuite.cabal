@@ -10,7 +10,7 @@ license-file:        LICENSE
 author:              Christiaan Baaij
 maintainer:          Christiaan Baaij <christiaan.baaij@gmail.com>
 copyright:           Copyright © 2015 University of Twente
-                                 2022 QBayLogic B.V.
+                                 2022-2026 QBayLogic B.V.
 category:            Testing
 build-type:          Simple
 data-files:
@@ -94,6 +94,7 @@ library
 
     -- From tests/shouldwork/LoadModules/precompiled
     T1796a
+    THCorePlugin
 
     -- From tests/shouldwork/Basic/precompiled
     SimulationMagic2736a
