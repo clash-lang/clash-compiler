@@ -233,6 +233,7 @@ library
                       Clash.GHC.Evaluator.Primitives.Clash.Class.BitPack.Internal
                       Clash.GHC.Evaluator.Primitives.Clash.Class.Exp
                       Clash.GHC.Evaluator.Primitives.Clash.Promoted.Nat
+                      Clash.GHC.Evaluator.Primitives.Clash.Signal.Internal
                       Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.BitVector
                       Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Index
                       Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Signed

@@ -300,6 +300,9 @@ ghcTypeToHWType mkdtcus iw = go
         "GHC.Stack.Types.CallStack" -> returnN (Void Nothing)
         "GHC.Internal.Stack.Types.CallStack" -> returnN (Void Nothing)
 
+        -- Similarly, discard runtime type representations.
+        "GHC.Internal.Data.Typeable.Internal.TypeRep" -> returnN (Void Nothing)
+
         "Clash.Explicit.SimIO.SimIO" | a0:_ <- args ->
           ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m a0
 

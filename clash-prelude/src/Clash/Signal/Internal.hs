@@ -932,6 +932,8 @@ sameDomain
    . (KnownDomain domA, KnownDomain domB)
   => Maybe (domA :~: domB)
 sameDomain = testEquality (typeRep @domA) (typeRep @domB)
+{-# OPAQUE sameDomain #-}
+{-# ANN sameDomain hasBlackBox #-}
 
 -- | An open type family for keeping track of the supported domain
 -- switches. Instantiating this type family with a 'True' value is a

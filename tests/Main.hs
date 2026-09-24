@@ -907,6 +907,7 @@ runClashTest = defaultMain
             }
         , runTest "Oversample" def
             { hdlTargets = [Verilog, SystemVerilog] }
+        , runTest "SameDomain" def
         , runTest "RegisterAR" def
         , runTest "RegisterSR" def
         , runTest "RegisterAE" def
