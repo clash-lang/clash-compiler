@@ -718,7 +718,10 @@ resize# s@(S i)
 
     mask      = 1 `shiftL` fromInteger (natVal (Proxy @m) -1)
     i'        = i `mod` mask
-    truncated = if testBit i (n-1)
+    -- The Integer representation is already sign-extended. Inspect its sign
+    -- directly: GHC's integerTestBit# can read beyond the stored limbs when
+    -- testing a high bit of a negative Integer.
+    truncated = if i < 0
                    then S (i' - mask)
                    else S i'
 
