@@ -1,10 +1,11 @@
+{-# LANGUAGE GHC2024 #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
 
 {-# OPTIONS -fno-warn-name-shadowing #-}
 
 -- | Get information on modules, expressions, and identifiers
-module GHCi.UI.Info
+module Clash.GHCi.UI.Info
     ( ModInfo(..)
     , SpanInfo(..)
     , spanInfoFromRealSrcSpan
@@ -49,7 +50,7 @@ import qualified GHC.Data.Strict as Strict
 import           GHC.Runtime.Loader (initializePlugins)
 import           Data.Containers.ListUtils (nubOrd)
 
-import           GHCi.UI.Exception
+import           Clash.GHCi.UI.Exception
 
 -- | Info about a module. This information is generated every time a
 -- module is loaded.
