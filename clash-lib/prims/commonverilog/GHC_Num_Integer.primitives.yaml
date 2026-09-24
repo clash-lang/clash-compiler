@@ -203,7 +203,7 @@
     kind: Expression
     type: 'integerBit# ::
       Word# -> Integer'
-    template: 1 << ~ARG[0]
+    template: ~SIZE[~TYPO]'sd1 << ~ARG[0]
     warning: 'GHC.Num.Integer.integerBit#: Integers are dynamically sized in simulation,
       but fixed-length after synthesis. Use carefully.'
 - BlackBox:
