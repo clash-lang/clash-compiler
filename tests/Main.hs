@@ -484,7 +484,6 @@ runClashTest = defaultMain
         , runTest "RePack" def{hdlSim=[]}
         , runTest "ReduceZero" def
         , runTest "ReduceOne" def
-        , runTest "ExtendingNumZero" def
         , runTest "AppendZero" def
         , runTest "PopCountNoInteger"
             def{clashFlags=["-Werror=clash-dubious-primitive"]}
@@ -795,6 +794,12 @@ runClashTest = defaultMain
           runTest "Bounds" def { hdlSim=hdlSim def \\ [Vivado] }
 
         , runTest "DivideByZero" def
+        , runTest "ExtendingNumZero" def{
+            buildTargets=BuildSpecific
+              [ "testBenchBitVector", "testBenchSigned", "testBenchUnsigned"
+              , "testBenchIndex", "testBenchBothZero"
+              ]
+          }
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
            in runTest "ExpWithGhcCF" _opts
         , let _opts = def { clashFlags=["-fconstraint-solver-iterations=15"] }
