@@ -99,19 +99,22 @@
     kind: Expression
     type: Index m -> Index
       n -> Index (m + n - 1)
-    template: resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])
+    template: ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THENresize(~ARG[0],~SIZE[~TYPO])
+      + resize(~ARG[1],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEresize(~ARG[1],~SIZE[~TYPO])~FI~FI
 - BlackBox:
     name: Clash.Sized.Internal.Index.minus#
     kind: Expression
     type: Index m -> Index
       n -> Index (m + n - 1)
-    template: resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])
+    template: ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THENresize(~ARG[0],~SIZE[~TYPO])
+      - resize(~ARG[1],~SIZE[~TYPO])~ELSE~IF~SIZE[~TYP[0]]~THENresize(~ARG[0],~SIZE[~TYPO])~ELSEto_unsigned(0,~SIZE[~TYPO])
+      - resize(~ARG[1],~SIZE[~TYPO])~FI~FI
 - BlackBox:
     name: Clash.Sized.Internal.Index.times#
     kind: Expression
     type: Index m -> Index
       n -> Index (((m-1) * (n-1)) + 1)
-    template: resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])
+    template: ~IF~AND[~SIZE[~TYP[0]],~SIZE[~TYP[1]]]~THENresize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])~ELSEto_unsigned(0,~SIZE[~TYPO])~FI
 - BlackBox:
     name: Clash.Sized.Internal.Index.rem#
     kind: Declaration
