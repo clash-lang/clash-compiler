@@ -20,6 +20,7 @@ import qualified Clash.GHC.Evaluator.Primitives.Clash.Annotations.BitRepresentat
 import qualified Clash.GHC.Evaluator.Primitives.Clash.Class.BitPack.Internal as Clash.Class.BitPack.Internal
 import qualified Clash.GHC.Evaluator.Primitives.Clash.Class.Exp as Clash.Class.Exp
 import qualified Clash.GHC.Evaluator.Primitives.Clash.Promoted.Nat as Clash.Promoted.Nat
+import qualified Clash.GHC.Evaluator.Primitives.Clash.Signal.Internal as Clash.Signal.Internal
 import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.BitVector as Clash.Sized.Internal.BitVector
 import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Index as Clash.Sized.Internal.Index
 import qualified Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Signed as Clash.Sized.Internal.Signed
@@ -66,6 +67,7 @@ ghcPrimStepImpls
     , Clash.Class.BitPack.Internal.primitives
     , Clash.Class.Exp.primitives
     , Clash.Promoted.Nat.primitives
+    , Clash.Signal.Internal.primitives
     , Clash.Sized.Internal.BitVector.primitives
     , Clash.Sized.Internal.Index.primitives
     , Clash.Sized.Internal.Signed.primitives
