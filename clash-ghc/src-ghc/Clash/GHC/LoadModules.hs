@@ -53,6 +53,9 @@ import           Data.Functor                    ((<&>))
 import           Data.Foldable                   (toList)
 import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as HashMap
+#if MIN_VERSION_ghc(10,0,0)
+import           Data.IORef                      (readIORef)
+#endif
 import           Data.Typeable                   (Typeable)
 import           Data.List                       (nub, find)
 #if !MIN_VERSION_base(4,20,0)
@@ -87,9 +90,15 @@ import           System.Process                  (runInteractiveCommand,
 import           GHC.Driver.Phases (StopPhase(NoStop))
 import           GHC.Driver.Pipeline (mkPipeEnv, runPipeline, hscBackendPipeline)
 import           GHC.SysTools.Cpp (offsetIncludePaths)
+#if !MIN_VERSION_ghc(10,0,0)
 import           GHC.Unit.Home.ModInfo (homeMod_bytecode)
+#endif
+#if MIN_VERSION_ghc(10,0,0)
+import           GHC.Iface.Make (mkPartialIface)
+#else
 import           GHC.Driver.Pipeline.Monad ( MonadUse(use) )
 import           GHC.Driver.Pipeline.Phases (TPhase(T_HscPostTc))
+#endif
 import           GHC.Data.Bool (OverridingBool)
 import           GHC.Driver.Config.Tidy (initTidyOpts)
 import           GHC.Driver.Errors.Types (GhcMessage(GhcTcRnMessage))
@@ -241,9 +250,17 @@ loadFamilyInstanceModules rootModule = runTcInteractive $ do
 runTcInteractive :: GHC.GhcMonad m => TcRnTypes.TcM a -> m a
 runTcInteractive action = do
   hscEnv <- GHC.getSession
-  (msgs, res) <- liftIO (TcRnMonad.initTcInteractive hscEnv action)
+  (msgs, res) <- liftIO (TcRnMonad.initTcInteractive
+#if MIN_VERSION_ghc(10,0,0)
+    TcRnMonad.StartAndStopTcMPlugins
+#endif
+    hscEnv action)
   case res of
-    Nothing -> liftIO (throwIO (HscTypes.mkSrcErr (fmap GhcTcRnMessage msgs)))
+    Nothing -> liftIO (throwIO (HscTypes.mkSrcErr
+#if MIN_VERSION_ghc(10,0,0)
+      (HscTypes.initSourceErrorContext (HscTypes.hsc_dflags hscEnv))
+#endif
+      (fmap GhcTcRnMessage msgs)))
     Just a -> pure a
 
 -- | Restrict the set of binders we load the transitive closure of. When a
@@ -399,7 +416,11 @@ loadLocalModule hdl modName = do
     oldDFlags <- GHC.getSessionDynFlags
     pMod  <- parseModule m
     _ <- GHC.setSessionDynFlags (GHC.ms_hspp_opts (GHC.pm_mod_summary pMod))
-    tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
+    tcMod <- GHC.typecheckModule
+#if MIN_VERSION_ghc(10,0,0)
+      TcRnMonad.StartAndKeepRunningTcMPlugins
+#endif
+      (removeStrictnessAnnotations pMod)
 
     -- The purpose of the home package table (HPT) is to track
     -- the already compiled modules, so subsequent modules can
@@ -421,10 +442,20 @@ loadLocalModule hdl modName = do
     let tcMod' = tcMod
     dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
     hsc_env <- GHC.getSession
-    simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env [] dsMod
+    simpl_guts <- MonadUtils.liftIO $ do
+#if MIN_VERSION_ghc(10,0,0)
+      -- GHC 10.0 reuses this Core for code generation instead of T_HscPostTc,
+      -- so we must also run the Core plugins registered by TH. In particular,
+      -- later splices must see the plugin-transformed code of this module.
+      corePlugins <- readIORef (TcRnTypes.tcg_th_coreplugins tc_result)
+#else
+      -- T_HscPostTc runs TH-registered plugins for code generation below.
+      let corePlugins = []
+#endif
+      HscMain.hscSimplify hsc_env corePlugins dsMod
     checkForInvalidPrelude simpl_guts
     opts <- liftIO (initTidyOpts hsc_env)
-    (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram opts simpl_guts
+    (tidy_guts,_tidy_details) <- MonadUtils.liftIO $ TidyPgm.tidyProgram opts simpl_guts
     let
       loadAsByteCode
         | Just GHC.Target { targetAllowObjCode = obj }
@@ -458,14 +489,32 @@ loadLocalModule hdl modName = do
       hsc_env1 = HscTypes.hscSetFlags dflags hsc_env
       pipe_env = mkPipeEnv NoStop input_fn Nothing pipelineOutput
       pipeline = do
+#if MIN_VERSION_ghc(10,0,0)
+        -- Desugaring stops TcM plugins on GHC 10.0, so we cannot pass tc_result
+        -- through T_HscPostTc a second time. Reuse the Core prepared above.
+        partialIface <- liftIO $ mkPartialIface hsc_env1
+          (HscTypes.cg_binds tidy_guts) _tidy_details upd_summary
+          (TcRnTypes.tcg_import_decls tc_result) simpl_guts
+        let ac = HscMain.HscRecomp
+              { HscMain.hscs_guts = tidy_guts
+              , HscMain.hscs_mod_location = location
+              , HscMain.hscs_partial_iface = partialIface
+              , HscMain.hscs_old_iface_hash = Nothing
+              }
+#else
         ac <- use (T_HscPostTc hsc_env1 upd_summary
                       (TcRnTypes.FrontendTypecheck tc_result) mempty Nothing )
+#endif
         hscBackendPipeline pipe_env hsc_env1 upd_summary ac
     (iface, linkable) <- liftIO (runPipeline (HscTypes.hsc_hooks hsc_env1) pipeline)
     details <- liftIO (HscMain.initModDetails hsc_env1 iface)
+#if MIN_VERSION_ghc(10,0,0)
+    linkable2 <- liftIO (HscMain.initWholeCoreBindings hsc_env1 iface details linkable)
+#else
     linkable1 <- liftIO (traverse (HscMain.initWholeCoreBindings hsc_env1 iface details)
                                   (homeMod_bytecode linkable))
     let linkable2 = linkable {homeMod_bytecode = linkable1}
+#endif
     let mod_info = HomeModInfo iface details linkable2
 #if MIN_VERSION_ghc(9,14,0)
     liftIO $ addHomeModInfoToHug mod_info (HscTypes.hsc_HUG hsc_env)

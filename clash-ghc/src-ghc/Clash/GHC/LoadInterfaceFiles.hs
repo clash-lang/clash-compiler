@@ -76,6 +76,9 @@ import qualified GHC.IfaceToCore as TcIface
 import qualified GHC.Tc.Utils.Monad as TcRnMonad
 import qualified GHC.Tc.Types as TcRnTypes
 import qualified GHC.Types.Unique.FM as UniqFM
+#if MIN_VERSION_ghc(10,0,0)
+import GHC.Types.Unique (UniqueTag (HscTag))
+#endif
 import qualified GHC.Types.Var as Var
 import qualified GHC.Unit.Types as UnitTypes
 
@@ -210,7 +213,13 @@ runIfl modName action = do
 
   hscEnv <- GHC.getSession
   MonadUtils.liftIO $
-    TcRnMonad.initTcRnIf 'r' hscEnv globalEnv localEnv action
+    TcRnMonad.initTcRnIf
+#if MIN_VERSION_ghc(10,0,0)
+      HscTag
+#else
+      'r'
+#endif
+      hscEnv globalEnv localEnv action
 
 loadDecl :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL GHC.TyThing
 loadDecl = TcIface.tcIfaceDecl False

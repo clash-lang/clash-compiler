@@ -94,6 +94,7 @@ library
 
     -- From tests/shouldwork/LoadModules/precompiled
     T1796a
+    THCorePlugin
 
     -- From tests/shouldwork/Basic/precompiled
     SimulationMagic2736a
