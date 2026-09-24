@@ -236,6 +236,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
+          ghc1001,
           ghc9141,
           ghc9124,
           ghc9103,
@@ -284,6 +285,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
+          ghc1001,
           ghc9141,
           ghc9124,
           ghc9103,
@@ -326,6 +328,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
+          ghc1001,
           ghc9141,
           ghc9124,
           ghc9103,
@@ -361,6 +364,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: [
+          ghc1001,
           ghc9141,
           ghc9124,
           ghc9103,
@@ -398,6 +402,7 @@ jobs:
           'SystemVerilog'
         ]
         ghc: [
+          ghc1001,
           ghc9141,
           ghc9124,
           ghc9103,
