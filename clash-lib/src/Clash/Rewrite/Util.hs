@@ -52,7 +52,11 @@ import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
 
+#if MIN_VERSION_ghc(10,0,0)
+import           GHC.Types.InlinePragma      (InlineSpec (..))
+#else
 import           GHC.Types.Basic             (InlineSpec (..))
+#endif
 
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars

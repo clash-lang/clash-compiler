@@ -719,7 +719,7 @@ integerToIntegerLiteral = Literal . IntegerLiteral
 -- | Implementation shared by every worker of GHC's @powImpl@, i.e. the
 -- internal function behind '(^)'.
 --
--- GHC's powImpl workers come in five flavors and get renumbered across
+-- GHC's powImpl workers come in several flavors and get renumbered across
 -- versions: the (numeric-suffix -> signature) mapping changes between 9.10,
 -- 9.12 and 9.14, and may shift again. Rather than hard-code a fragile
 -- name->signature table, we register this single implementation under every
@@ -730,6 +730,7 @@ integerToIntegerLiteral = Literal . IntegerLiteral
 --   [Int#, Integer]      -> Integer  (small-exponent path, IS exp#)
 --   [Int#, Int#]         -> Int#     (Int -> Int -> Int spec, $w$*)
 --   [Integer, Int#]      -> Integer  (Integer -> Int -> Integer spec, $w$*)
+--   [Integer, Integer]   -> Integer  (boxed specialization in GHC 10.0)
 --   [ByteArray#, Integer]-> Integer  (large-exponent path, IP/IN)
 --
 -- For the ByteArray# variant we reconstruct the exponent as a positive
@@ -742,6 +743,8 @@ powImplWorker = \case
     | [intLiteral -> Just j, integerLiteral -> Just i] <- args
     -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
     | [integerLiteral -> Just i, intLiteral -> Just j] <- args
+    -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
+    | [integerLiteral -> Just i, integerLiteral -> Just j] <- args
     -> reduce (catchErrorCall (integerToIntegerLiteral $ i ^ j))
     | [intLiteral -> Just i, intLiteral -> Just j] <- args
     -> reduce (catchErrorCall (integerToIntLiteral $ i ^ j))

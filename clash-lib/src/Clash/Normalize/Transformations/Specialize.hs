@@ -48,7 +48,11 @@ import qualified Data.Text.Extra as Text
 import GHC.BasicTypes.Extra (isNoInline)
 import GHC.Stack (HasCallStack)
 
+#if MIN_VERSION_ghc(10,0,0)
+import GHC.Types.InlinePragma (InlineSpec (..))
+#else
 import GHC.Types.Basic (InlineSpec (..))
+#endif
 
 import qualified Clash.Sized.Internal.BitVector as BV (BitVector, fromInteger#)
 import qualified Clash.Sized.Internal.Index as I (Index, fromInteger#)

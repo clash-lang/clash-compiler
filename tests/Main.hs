@@ -613,6 +613,7 @@ runClashTest = defaultMain
         ]
       , clashTestGroup "Floating"
         [ runTest "FloatPack" def{hdlSim=[], clashFlags=["-fclash-float-support"]}
+        , runTest "FloatLiterals" def
         , runTest "FloatConstFolding" def{clashFlags=["-fclash-float-support"]}
         , runTest "T1803" def{clashFlags=["-fclash-float-support"]}
         ]
@@ -760,6 +761,7 @@ runClashTest = defaultMain
           []
       , clashTestGroup "LoadModules"
         [ runTest "T1796" def{hdlSim=[]}
+        , runTest "THCorePluginRegistration" def
           -- Clash should not set '-dynamic-too' if '-dynamic' is already set
         , runTest "T3354" def
             { hdlTargets=[VHDL]

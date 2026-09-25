@@ -1,0 +1,3407 @@
+From: Sam Derbyshire <sam.derbyshire@gmail.com>
+Subject: [PATCH] Carefully implement coercion zapping (GHC 10.0 backport)
+
+Backport of f56f7c594bee4ca2d578c116fe684545c65e3dbf from GHC !16378:
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/16378
+
+Adapted to GHC 10.0.0.20260917's Core Lint API and UnivCoProvenance.
+The release source archive omits testsuite/, so upstream tests are not
+included in this build patch.
+
+diff --git a/changelog.d/zap-coercions b/changelog.d/zap-coercions
+new file mode 100644
+--- /dev/null
++++ b/changelog.d/zap-coercions
+@@ -0,0 +1,13 @@
++section: compiler
++synopsis: Speed up type-family-heavy programs by zapping coercions
++issues: #8095 #27336 #27518
++mrs: !16378
++description: {
++  GHC now erases the coercions that it produces when reducing type family
++  applications, keeping only their endpoints and the assumptions they used
++  (a process called "zapping").
++  This greatly speeds up the compilation of type-family-heavy programs (#8095).
++
++  This behaviour is controlled by ``-fzap-coercions`` and enabled by default;
++  disable with ``-fno-zap-coercions``.
++}
+diff --git a/compiler/GHC/Core/Coercion.hs b/compiler/GHC/Core/Coercion.hs
+--- a/compiler/GHC/Core/Coercion.hs
++++ b/compiler/GHC/Core/Coercion.hs
+@@ -39,7 +39,9 @@
+         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
+         mkHomoForAllCo, mkHomoForAllCos,
+         mkPhantomCo, mkAxiomCo,
+-        mkHoleCo, mkUnivCo, mkSubCo,
++        mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
++        checkUnivCoDepsInv,
++        mkSubCo,
+         mkProofIrrelCo,
+         downgradeRole,
+         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
+@@ -153,6 +155,7 @@
+ import GHC.Data.List.SetOps
+ import GHC.Data.Maybe
+ import GHC.Types.Unique.FM
++import GHC.Types.Unique.DSet ( nonDetStrictFoldUniqDSet )
+ import GHC.Data.List.Infinite (Infinite (..))
+ import qualified GHC.Data.List.Infinite as Inf
+ 
+@@ -1141,17 +1144,119 @@
+ mkHoleCo h = HoleCo h
+ 
+ -- | Make a universal coercion between two arbitrary types.
+-mkUnivCo :: UnivCoProvenance
++mkUnivCo :: HasDebugCallStack
++         => UnivCoProvenance
+          -> [Coercion] -- ^ Coercions on which this depends
+          -> Role       -- ^ role of the built coercion, "r"
+          -> Type       -- ^ t1 :: k1
+          -> Type       -- ^ t2 :: k2
+          -> Coercion   -- ^ :: t1 ~r t2
+-mkUnivCo prov deps role ty1 ty2
++mkUnivCo prov dep_cos r ty1 ty2 =
++  mkUnivCoAddTypeDeps prov (mkUnivCoDeps dep_cos) r ty1 ty2
++
++-- | Like 'mkUnivCo', but takes a 'UnivCoDeps' instead of a @[Coercion]@.
++mkUnivCoFromDeps
++  :: HasDebugCallStack
++  => UnivCoProvenance
++  -> UnivCoDeps -- ^ Coercions on which this depends
++  -> Role       -- ^ role of the built coercion, "r"
++  -> Type       -- ^ t1 :: k1
++  -> Type       -- ^ t2 :: k2
++  -> Coercion   -- ^ :: t1 ~r t2
++mkUnivCoFromDeps prov deps role ty1 ty2
+   | ty1 `eqType` ty2 = mkReflCo role ty1
+-  | otherwise        = UnivCo { uco_prov = prov, uco_role = role
+-                              , uco_lty = ty1, uco_rty = ty2
+-                              , uco_deps = deps }
++  | otherwise        = mk_univ_co prov deps role ty1 ty2
++
++-- | Like 'mkUnivCoFromDeps', but establishes (UnivCoDepsInv) itself, adding the
++-- 'CoVar's and 'CoercionHole's of the LHS and RHS types to the dependencies.
++mkUnivCoAddTypeDeps :: HasDebugCallStack
++                    => UnivCoProvenance -> UnivCoDeps -> Role -> Type -> Type -> Coercion
++mkUnivCoAddTypeDeps prov deps role ty1 ty2
++  | ty1 `eqType` ty2 = mkReflCo role ty1
++  | otherwise
++  = let !deps' = addUnivCoTypeDeps [ty1, ty2] deps
++    in mk_univ_co prov deps' role ty1 ty2
++
++-- | Shared helper for 'mkUnivCoFromDeps' and 'mkUnivCoAddTypeDeps'.
++mk_univ_co :: HasDebugCallStack
++           => UnivCoProvenance -> UnivCoDeps -> Role -> Type -> Type -> Coercion
++mk_univ_co prov deps role ty1 ty2 =
++  -- Assert (UnivCoDepsInv) from Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
++  assertPprMaybe (checkUnivCoDepsInv ty1 ty2 deps) $
++    UnivCo { uco_prov = prov, uco_role = role
++           , uco_lty = ty1, uco_rty = ty2
++           , uco_deps = deps }
++{-# INLINE mk_univ_co #-}
++
++-- | Checks (UnivCoDepsInv) from Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
++--
++-- Returns an error message text in case of failure.
++checkUnivCoDepsInv :: Type -> Type -> UnivCoDeps -> Maybe SDoc
++checkUnivCoDepsInv ty1 ty2 deps
++  | isEmptyUnivCoDeps undeclared
++  = Nothing
++  | otherwise
++  = Just $ hang (text "UnivCo: incomplete dependencies") 2 $ vcat
++      [ text "undeclared:" <+> ppr undeclared
++      , text "       lhs:" <+> ppr ty1
++      , text "       rhs:" <+> ppr ty2
++      , text "      deps:" <+> ppr deps ]
++  where
++    undeclared = addUnivCoTypeDeps [ty1, ty2] emptyUnivCoDeps `minusUnivCoDeps` deps
++
++{- Note [Propagating zappedness]
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++mkTransCo collapses a composition involving a zapped coercion, thusly:
++
++  ZappedCo l m ; ZappedCo m r = ZappedCo l r
++  ZappedCo l m ; co2          = ZappedCo l (coercionRKind co2)
++  co1          ; ZappedCo m r = ZappedCo (coercionLKind co1) r
++
++This avoids accumulating large types in transitive chains involving zapped
++coercions.
++
++How do these chains arise? The simplifier (and the simple optimiser) merge
++nested casts using 'mkTransCo', without calling the coercion optimiser on the
++result (see Note [Avoid re-simplifying coercions] in GHC.Core.Opt.Simplify.Iteration).
++
++A typical example is T12227, which has a zapped type family reduction followed
++by newtype axioms involving large GHC.Generics types:
++
++  x |> ( ZappedCo (Rep Foo) T
++       ; N:M1 <..> <D> <md> <C1 mc T_inner>
++       ; N:M1 <..> <C> <mc> <T_inner> )
++
++This zaps to "x |> ZappedCo (Rep Foo) T_inner" which is much smaller.
++
++This is a performance heuristic more than anything else. Tests on which this
++makes a significant difference in coercion sizes:
++
++  T5321Fun, CoOpt_Singletons, T12227, T15703, T9630, T12707
++    - coercion sizes: -42% (geo. mean), ranging from -17% (T15703)
++      to -73% (T5321Fun)
++    - compile-time allocations: -1.3% (geo. mean), at most -3.9% (T12227)
++
++NB: the mixed cases (ZappedCo ; co2 and co1 ; ZappedCo) are the ones that
++matter. Only collapsing (ZappedCo ; ZappedCo) was measured to make no
++difference at all on the tests above (0.0% on every metric).
++
++One might expect that the extra calls to 'coercionLKind'/'coercionRKind' would
++cost runtime, but empirically this does not seem to be the case, perhaps because
++this optimisation prevents large chains involving ZappedCo from forming at all,
++so we never need to traverse a long transitive chain to compute 'coercionLKind'
++and 'coercionRKind'.
++
++Other smart constructors (such as mkInstCo, mkSymCo, mkSelCo) do not seem to
++benefit from propagating zappedness (0.0% change on perf/compiler).
++Note however that this only holds with the current design, detailed in
++Note [Coercion zapping] in GHC.Tc.Solver.Rewrite, in which only the coercions
++produced by the rewriter are zapped. If we were to zap more coercions, then
++propagating zappedness in 'mkInstCo' may become important. For example, MR !611
++(a prior attempt at coercion zapping) significantly regressed because it lacked
++this 'mkInstCo' optimisation, resulting in large coercions of the form
++
++   Nth (Nth (... (Inst univ_co_with_large_types arg)))
++-}
+ 
+ -- | Create a symmetric version of the given 'Coercion' that asserts
+ --   equality between the same types but in the other "direction", so
+@@ -1182,8 +1287,41 @@
+    , GRefl _ _  (MCo kco2) <- co2
+    = GRefl r t1 (MCo $ mkTransCo kco1 kco2)
+ 
++   -- Important performance optimisation: propagate zappedness.
++   -- See Note [Propagating zappedness].
++   | UnivCo { uco_prov = ZappedProv, uco_role = r
++            , uco_lty = lty, uco_deps = deps1 } <- co1
++   = assert_same_role $
++     case co2 of
++       UnivCo { uco_prov = ZappedProv, uco_rty = rty2, uco_deps = deps2 }
++         -> mk_zapped_co (deps1 `unionUnivCoDeps` deps2) r lty rty2
++       _ -> let rty = coercionRKind co2
++            in mk_zapped_co (addUnivCoTypeDeps [rty] $ deps1 `addUnivCoDep` co2)
++                            r lty rty
++   | UnivCo { uco_prov = ZappedProv, uco_role = r
++            , uco_rty = rty, uco_deps = deps2 } <- co2
++   = assert_same_role $
++     let lty = coercionLKind co1
++     in mk_zapped_co (addUnivCoTypeDeps [lty] $ deps2 `addUnivCoDep` co1)
++                     r lty rty
++
+    | otherwise
+    = TransCo co1 co2
++   where
++     -- Establishing (UnivCoDepsInv) for the result:
++     --   * an endpoint taken from a zapped coercion is covered by its own 'uco_deps';
++     --   * an endpoint taken from a non-zapped 'co' is covered by
++     --     'addUnivCoDep co' with the exception of those that only appear in
++     --     it LHS or RHS type, so we add those on explicitly.
++     mk_zapped_co = mkUnivCoFromDeps ZappedProv
++
++     -- See Note [Core Lint and zapped coercions] in GHC.Tc.Solver.Rewrite.
++     assert_same_role :: Coercion -> Coercion
++     assert_same_role =
++       assertPpr (coercionRole co1 == coercionRole co2) $
++         vcat [ text "mkTransCo: role mismatch when propagating zappedness"
++              , text "co1:" <+> ppr co1
++              , text "co2:" <+> ppr co2 ]
+ 
+ --------------------
+ {- Note [mkSelCo precondition]
+@@ -1500,6 +1638,8 @@
+                      ProofIrrelProv {} -> True   -- it's always safe
+                      PluginProv {}     -> False  -- who knows? This choice is conservative.
+                      SubMultProv {}    -> True
++                     ZappedProv {}     -> False  -- may have been produced by a
++                                                 -- representational-only rewrite
+       = Just $ co { uco_role = Nominal }
+     setNominalRole_maybe_helper _ = Nothing
+ 
+@@ -2456,11 +2596,18 @@
+   = r `seq` af1 `seq` af2 `seq` seqCo w `seq` seqCo co1 `seq` seqCo co2
+ seqCo (UnivCo { uco_prov = p, uco_role = r
+               , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+-  = p `seq` r `seq` seqType t1 `seq` seqType t2 `seq` seqCos deps
++  = p `seq` r `seq` seqType t1 `seq` seqType t2 `seq` seqUnivCoDeps deps
+ 
+ seqCos :: [Coercion] -> ()
+ seqCos []       = ()
+ seqCos (co:cos) = seqCo co `seq` seqCos cos
++
++seqUnivCoDeps :: UnivCoDeps -> ()
++seqUnivCoDeps NoUnivCoDeps = ()
++seqUnivCoDeps (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
++  = nonDetStrictFoldDVarSet seq () cvs
++      `seq` nonDetStrictFoldUniqDSet (seq . coHoleCoVar) () holes
++  -- Non-determinism is fine: we just care about forcing all the elements.
+ 
+ {-
+ %************************************************************************
+diff --git a/compiler/GHC/Core/Coercion.hs-boot b/compiler/GHC/Core/Coercion.hs-boot
+--- a/compiler/GHC/Core/Coercion.hs-boot
++++ b/compiler/GHC/Core/Coercion.hs-boot
+@@ -20,7 +20,9 @@
+ mkFunCo2     :: Role -> FunTyFlag -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+ mkCoVarCo :: CoVar -> Coercion
+ mkPhantomCo :: Coercion -> Type -> Type -> Coercion
+-mkUnivCo :: UnivCoProvenance -> [Coercion] -> Role -> Type -> Type -> Coercion
++mkUnivCo :: HasDebugCallStack => UnivCoProvenance -> [Coercion] -> Role -> Type -> Type -> Coercion
++mkUnivCoFromDeps :: HasDebugCallStack => UnivCoProvenance -> UnivCoDeps -> Role -> Type -> Type -> Coercion
++mkUnivCoAddTypeDeps :: HasDebugCallStack => UnivCoProvenance -> UnivCoDeps -> Role -> Type -> Type -> Coercion
+ mkSymCo :: Coercion -> Coercion
+ mkTransCo :: HasDebugCallStack => Coercion -> Coercion -> Coercion
+ mkSelCo :: HasDebugCallStack => CoSel -> Coercion -> Coercion
+diff --git a/compiler/GHC/Core/Coercion/Opt.hs b/compiler/GHC/Core/Coercion/Opt.hs
+--- a/compiler/GHC/Core/Coercion/Opt.hs
++++ b/compiler/GHC/Core/Coercion/Opt.hs
+@@ -13,6 +13,7 @@
+ import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
+ 
+ import GHC.Core.TyCo.Rep
++import GHC.Core.TyCo.FVs( mkUnivCoDeps, mapUnivCoDeps, unionUnivCoDeps, addUnivCoTypeDeps )
+ import GHC.Core.TyCo.Subst
+ import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity )
+ import GHC.Core.Coercion
+@@ -421,7 +422,7 @@
+       -- Note that the_co does *not* have sym pushed into it
+ 
+ opt_co4' env sym rep r (UnivCo { uco_prov = prov, uco_lty = t1
+-                              , uco_rty = t2, uco_deps = deps })
++                               , uco_rty = t2, uco_deps = deps })
+   = opt_univ env sym prov deps (chooseRole rep r) t1 t2
+ 
+ opt_co4' env sym rep r (TransCo co1 co2)
+@@ -576,7 +577,7 @@
+   = opt_univ env sym prov deps Phantom t1 t2
+ 
+ opt_phantom env sym co
+-  = opt_univ env sym PhantomProv [mkKindCo co] Phantom ty1 ty2
++  = opt_univ env sym PhantomProv (mkUnivCoDeps [mkKindCo co]) Phantom ty1 ty2
+   where
+     Pair ty1 ty2 = coercionKind co
+ 
+@@ -612,27 +613,30 @@
+  -}
+ 
+ opt_univ :: LiftingContext -> SwapFlag -> UnivCoProvenance
+-         -> [Coercion]
++         -> UnivCoDeps
+          -> Role -> Type -> Type -> Coercion
+ opt_univ env sym prov deps role ty1 ty2
+   = let ty1'  = substTyUnchecked (lcSubstLeft  env) ty1
+         ty2'  = substTyUnchecked (lcSubstRight env) ty2
+-        deps' = map (opt_co1 env sym) deps
+-        (ty1'', ty2'') = swapSym sym (ty1', ty2')
++        deps' = mapUnivCoDeps (opt_co1 env sym) deps
+     in
+       -- We only Lint multiplicities in the output of the typechecker, as
+       -- described in Note [Linting linearity] in GHC.Core.Lint. This means
+-      -- we can use 'eqTypeIgnoringMultiplicity' instea of 'eqType' below.
++      -- we can use 'eqTypeIgnoringMultiplicity' instead of 'eqType' below.
+       --
+       -- In particular, this gets rid of 'SubMultProv' coercions that were
+       -- introduced for typechecking multiplicities of data constructors, as
+       -- described in Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
+-      if ty1'' `eqTypeIgnoringMultiplicity` ty2''
+-      then mkReflCo role ty2''
++      if ty1' `eqTypeIgnoringMultiplicity` ty2'
++      then mkReflCo role ty2'
+       else
+-        UnivCo { uco_prov = prov, uco_role = role
+-               , uco_lty = ty1'', uco_rty = ty2''
+-               , uco_deps = deps' }
++        let (ty1'', ty2'') = swapSym sym (ty1', ty2')
++            deps'' = addUnivCoTypeDeps [ty1'', ty2''] deps'
++        in
++          UnivCo { uco_prov = prov, uco_role = role
++                 , uco_lty  = ty1'', uco_rty = ty2''
++                 , uco_deps = deps''
++                 }
+ 
+ {-
+ opt_univ env PhantomProv cvs _r ty1 ty2
+@@ -809,7 +813,7 @@
+   | p1 == p2    -- If the provenances are different, opt'ing will be very confusing
+   = assert (r1 == r2) $
+     fireTransRule "UnivCo" in_co1 in_co2 $
+-    mkUnivCo p1 (deps1 ++ deps2) r1 tyl1 tyr2
++    mkUnivCoFromDeps p1 (deps1 `unionUnivCoDeps` deps2) r1 tyl1 tyr2
+ 
+ -- Push transitivity down through matching top-level constructors.
+ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2)
+diff --git a/compiler/GHC/Core/FamInstEnv.hs b/compiler/GHC/Core/FamInstEnv.hs
+--- a/compiler/GHC/Core/FamInstEnv.hs
++++ b/compiler/GHC/Core/FamInstEnv.hs
+@@ -1531,7 +1531,7 @@
+ -- cf. GHC.Tc.Solver.Rewrite.rewrite_args_slow
+ normalise_args fun_ki roles args
+   = do { normed_args <- zipWithM normalise1 (Inf.toList roles) args
+-       ; return $ simplifyArgsWorker ki_binders inner_ki fvs roles normed_args }
++       ; return $ simplifyArgsWorker ki_binders inner_ki fvs roles args normed_args }
+   where
+     (ki_binders, inner_ki) = splitPiTys fun_ki
+     fvs = tyCoVarsOfTypes args
+diff --git a/compiler/GHC/Core/Lint.hs b/compiler/GHC/Core/Lint.hs
+--- a/compiler/GHC/Core/Lint.hs
++++ b/compiler/GHC/Core/Lint.hs
+@@ -21,6 +21,7 @@
+     lintCoreBindings', lintUnfolding,
+     lintPassResult, lintExpr,
+     lintAnnots, lintAxioms,
++    lintTcCoercion,
+ 
+     -- ** Debug output
+     EndPassConfig (..),
+@@ -2355,14 +2356,7 @@
+ -- If you edit this function, you may need to update the GHC formalism
+ -- See Note [GHC Formalism]
+ 
+-lintCoercion (CoVarCo cv)
+-  | not (isCoVar cv)
+-  = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)
+-                  2 (text "With offending type:" <+> ppr (varType cv)))
+-
+-  | otherwise  -- C.f. lintType (TyVarTy tv), which has better docs
+-  = do { _ <- lintVarOcc cv; return () }
+-
++lintCoercion (CoVarCo cv) = lintCoVarOcc cv
+ lintCoercion (Refl ty)          = lintType ty
+ lintCoercion (GRefl _r ty MRefl) = lintType ty
+ 
+@@ -2508,11 +2502,19 @@
+        ; tk1 <- substTyM (typeKind ty1)
+        ; tk2 <- substTyM (typeKind ty2)
+ 
+-       ; when (r /= Phantom && isTYPEorCONSTRAINT tk1 && isTYPEorCONSTRAINT tk2)
++         -- Runtime representations are not settled until after constraint solving,
++         -- so skip those checks when dealing with a 'TcCoercion'.
++       ; tc_co <- lf_tc_coercion <$> getLintFlags
++       ; when (not tc_co && r /= Phantom && isTYPEorCONSTRAINT tk1 && isTYPEorCONSTRAINT tk2)
+               (checkTypes ty1 ty2)
+ 
+-       -- Check the coercions on which this UnivCo depends
+-       ; mapM_ lintCoercion deps }
++       -- Check all dependencies of the UnivCo.
++       ; mapM_ lintCoVarOcc  $ univCoDepsCoVars deps
++       ; mapM_ lintCoHoleOcc $ univCoDepsHoles  deps
++
++       -- Check the invariant of Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
++       ; for_ (checkUnivCoDepsInv ty1 ty2 deps) failWithL
++       }
+    where
+      report s = hang (text $ "Unsafe coercion: " ++ s)
+                      2 (vcat [ text "From:" <+> ppr ty1
+@@ -2709,8 +2711,45 @@
+   = do { lintCoercion co
+        ; lintRole co Nominal (coercionRole co) }
+ 
+-lintCoercion (HoleCo h)
+-  = failWithL (text "Unfilled coercion hole:" <+> ppr h)
++lintCoercion (HoleCo h) = lintCoHoleOcc h
++
++lintCoVarOcc :: HasDebugCallStack => CoVar -> LintM ()
++lintCoVarOcc cv
++  | not (isCoVar cv)
++  = failWithL (mkBadCoVarMsg cv)
++
++  | otherwise  -- C.f. lintType (TyVarTy tv), which has better docs
++  = do { _ <- lintVarOcc cv; return () }
++
++mkBadCoVarMsg :: CoVar -> SDoc
++mkBadCoVarMsg cv
++  = hang (text "Bad CoVarCo:" <+> ppr cv)
++       2 (text "With offending type:" <+> ppr (varType cv))
++
++lintCoHoleOcc :: CoercionHole -> LintM ()
++lintCoHoleOcc h
++  = do { tc_co <- lf_tc_coercion <$> getLintFlags
++       ; if tc_co
++           -- When allowing coercion holes, don't try to look up the CoVar from
++           -- the environment: the coercion hole has no binding site.
++         then lintL (isCoVar cv) (mkBadCoVarMsg cv)
++         else failWithL (text "Unfilled coercion hole:" <+> ppr h) }
++  where
++    cv = coHoleCoVar h
++
++-- | Lint a coercion which may contain unfilled metavariables and coercion
++-- holes.
++--
++-- Precondition: the coercion is zonked.
++lintTcCoercion :: LintConfig -> Coercion -> WarnsAndErrs
++lintTcCoercion cfg co
++  = initL cfg' $
++    addLoc (InCo co) $
++    noFixedRuntimeRepChecks $ setReportUnsat False $ lintCoercion co
++  where
++    cfg' = cfg { l_vars  = tyCoVarsOfCoList co -- skip in-scope checks as we don't
++                                               -- have an InScope set to provide
++               , l_flags = (l_flags cfg) { lf_tc_coercion = True } }
+ 
+ {-
+ Note [Conflict checking for axiom applications]
+@@ -3012,6 +3051,9 @@
+        , lf_check_fixed_rep :: Bool    -- ^ See Note [Checking for representation polymorphism]
+        , lf_check_rubbish_lits :: Bool -- ^ See Note [Checking for rubbish literals]
+        , lf_allow_weak_joins :: Bool -- ^ See Note [Linting join points with casts or ticks]
++       , lf_tc_coercion :: Bool
++           -- ^ Allow unfilled metavariables and coercion holes when linting
++           -- a typechecker coercion; see 'lintTcCoercion'.
+     }
+ 
+ -- See Note [Checking StaticPtrs]
+diff --git a/compiler/GHC/Core/Reduction.hs b/compiler/GHC/Core/Reduction.hs
+--- a/compiler/GHC/Core/Reduction.hs
++++ b/compiler/GHC/Core/Reduction.hs
+@@ -5,7 +5,7 @@
+      Reduction(..), ReductionN, ReductionR, HetReduction(..),
+      Reductions(..),
+      mkReduction, mkReductions, mkHetReduction, coercionRedn,
+-     reductionOriginalType,
++     isReflRedn,
+      downgradeRedn, mkSubRedn,
+      mkTransRedn, mkCoherenceRightRedn, mkCoherenceRightMRedn,
+      mkCastRedn1, mkCastRedn2,
+@@ -41,7 +41,7 @@
+ 
+ import GHC.Utils.Misc      ( HasDebugCallStack, equalLength )
+ import GHC.Utils.Outputable
+-import GHC.Utils.Panic     ( assertPpr )
++import GHC.Utils.Panic     ( assertPpr, panic )
+ 
+ {-
+ %************************************************************************
+@@ -52,34 +52,30 @@
+ 
+ Note [The Reduction type]
+ ~~~~~~~~~~~~~~~~~~~~~~~~~
+-Many functions in the type-checker rewrite a type, using Given type equalitie
++Many functions in the type-checker rewrite a type, using Given type equalities
+ or type-family reductions, and return a Reduction, which is just a pair of the
+ coercion and the RHS type of the coercion:
+   data Reduction = Reduction Coercion !Type
+ 
+ The order of the arguments to the constructor serves as a reminder
+-of what the Type is.  In
+-    Reduction co ty
+-`ty` appears to the right of `co`, reminding us that we must have:
+-    co :: unrewritten_ty ~ ty
++of what the 'Type' is: the reduced type `xi` appears to the right of the coercion
++`co`, reminding us that we must have:
++    co :: ty ~ xi
++
++Using 'Reduction' thus allows us to keep track of the coercion orientation,
++reducing mistakes (e.g. forgetting a 'mkSymCo'; see #20161).
++
++Having 'Reduction' be strict in its 'Type' field is important for performance,
++having been observed to reduce allocations by ~2.5% in T9872.
+ 
+ Example functions that use this datatype:
+    GHC.Core.FamInstEnv.topNormaliseType_maybe
+      :: FamInstEnvs -> Type -> Maybe Reduction
+    GHC.Tc.Solver.Rewrite.rewrite
+-     :: CtEvidence -> TcType -> TcS Reduction
+-
+-Having Reduction as a data type, with a strict Type field, rather than using
+-a pair (Coercion,Type) gives several advantages (see #20161)
+-* The strictness in Type improved performance in rewriting of type families
+-  (around 2.5% improvement in T9872),
+-* Compared to the situation before, it gives improved consistency around
+-  orientation of rewritings, as a Reduction is always left-to-right
+-  (the coercion's RHS type is always the type stored in the 'Reduction').
+-  No more 'mkSymCo's needed to convert between left-to-right and right-to-left.
++     :: CtEvidence -> TcType -> TcS (Reduction, CoHoleSet)
+ 
+ One could imagine storing the LHS type of the coercion in the Reduction as well,
+-but in fact `reductionOriginalType` is very seldom used, so it's not worth it.
++but in fact this LHS type is almost never needed so this would be wasteful.
+ -}
+ 
+ -- | A 'Reduction' is the result of an operation that rewrites a type @ty_in@.
+@@ -161,9 +157,8 @@
+ instance Outputable Reduction where
+   ppr redn =
+     braces $ vcat
+-      [ text "reductionOriginalType:" <+> ppr (reductionOriginalType redn)
++      [ text "    reductionCoercion:" <+> ppr (reductionCoercion redn)
+       , text " reductionReducedType:" <+> ppr (reductionReducedType redn)
+-      , text "    reductionCoercion:" <+> ppr (reductionCoercion redn)
+       ]
+ 
+ -- | A 'Reduction' in which the 'Coercion' has 'Nominal' role.
+@@ -171,14 +166,6 @@
+ 
+ -- | A 'Reduction' in which the 'Coercion' has 'Representational' role.
+ type ReductionR = Reduction
+-
+--- | Get the original, unreduced type corresponding to a 'Reduction'.
+---
+--- This is obtained by computing the LHS kind of the stored coercion,
+--- which may be slow.
+-reductionOriginalType :: Reduction -> Type
+-reductionOriginalType = coercionLKind . reductionCoercion
+-{-# INLINE reductionOriginalType #-}
+ 
+ -- | Turn a 'Coercion' into a 'Reduction'
+ -- by inspecting the RHS type of the coercion.
+@@ -188,6 +175,13 @@
+ coercionRedn :: Coercion -> Reduction
+ coercionRedn co = Reduction co (coercionRKind co)
+ {-# INLINE coercionRedn #-}
++
++-- | Is this reduction reflexive?
++--
++-- See Note [Rewriting with Refl] in GHC.Tc.Solver.Equality.
++isReflRedn :: Reduction -> Bool
++isReflRedn (Reduction co _) = isReflCo co
++{-# INLINE isReflRedn #-}
+ 
+ -- | Downgrade the role of the coercion stored in the 'Reduction'.
+ downgradeRedn :: Role -- ^ desired role
+@@ -651,8 +645,8 @@
+ decomposePiCos.) Because the rewritten types have unrewritten kinds (because
+ rewriting is homogeneous), passing the list of rewritten types to decomposePiCos
+ just won't do: later arguments' kinds won't be as expected. So we need to get
+-the *unrewritten* types to pass to decomposePiCos. We can do this easily enough
+-by taking the kind of the argument coercions, passed in originally.
++the *unrewritten* types to pass to decomposePiCos. We achieve this by passing
++the unrewritten argument types into simplifyArgsWorker.
+ 
+ (Alternative 1: We could re-engineer decomposePiCos to deal with this situation.
+ But that function is already gnarly, and other call sites of decomposePiCos
+@@ -662,13 +656,6 @@
+ behavior into simplifyArgsWorker. This would work, I think, but then all of the
+ complication of decomposePiCos would end up layered on top of all the complication
+ here. Please, no.)
+-
+-(Alternative 3: We could pass the unrewritten arguments into simplifyArgsWorker
+-so that we don't have to recreate them. But that would complicate the interface
+-of this function to handle a very dark, dark corner case. Better to keep our
+-demons to ourselves here instead of exposing them to callers. This decision is
+-easily reversed if there is ever any performance trouble due to the call of
+-coercionKind.)
+ 
+ So we now call
+ 
+@@ -788,6 +775,8 @@
+                        -- list of binders can be shorter or longer than the list of args
+                    -> TyCoVarSet   -- free vars of the args
+                    -> Infinite Role-- list of roles, r
++                   -> [Type]       -- the unrewritten arguments, ty_i
++                                   -- See Note [Last case in simplifyArgsWorker]
+                    -> [Reduction]  -- rewritten type arguments, arg_i
+                                    -- each comes with the coercion used to rewrite it,
+                                    -- arg_co_i :: ty_i ~ arg_i
+@@ -801,10 +790,10 @@
+ -- function is all about. That is, (f xi_1 ... xi_n), where xi_i are the returned arguments,
+ -- *is* well kinded.
+ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
+-                   orig_roles orig_simplified_args
++                   orig_roles orig_tys orig_simplified_args
+   = go orig_lc
+        orig_ki_binders orig_inner_ki
+-       orig_roles orig_simplified_args
++       orig_roles orig_tys orig_simplified_args
+   where
+     orig_lc = emptyLiftingContext $ mkInScopeSet orig_fvs
+ 
+@@ -812,9 +801,10 @@
+        -> [PiTyBinder]    -- Unsubsted binders of function's kind
+        -> Kind            -- Unsubsted result kind of function (not a Pi-type)
+        -> Infinite Role   -- Roles at which to rewrite these ...
++       -> [Type]          -- the unrewritten arguments
+        -> [Reduction]     -- rewritten arguments, with their rewriting coercions
+        -> ArgsReductions
+-    go !lc binders inner_ki _ []
++    go !lc binders inner_ki _ _ []
+         -- The !lc makes the function strict in the lifting context
+         -- which means GHC can unbox that pair.  A modest win.
+       = ArgsReductions
+@@ -825,7 +815,7 @@
+         kind_co | noFreeVarsOfType final_kind = MRefl
+                 | otherwise                   = MCo $ liftCoSubst Nominal lc final_kind
+ 
+-    go lc (binder:binders) inner_ki (Inf role roles) (arg_redn:arg_redns)
++    go lc (binder:binders) inner_ki (Inf role roles) orig_tys0 (arg_redn:arg_redns)
+       =  -- We rewrite an argument ty with arg_redn = Reduction arg_co arg
+          -- By Note [Rewriting] in GHC.Tc.Solver.Rewrite invariant (F2),
+          -- typeKind(ty) = typeKind(arg).
+@@ -836,7 +826,10 @@
+          --
+          -- The bangs here have been observed to improve performance
+          -- significantly in optimized builds; see #18502
+-         let !kind_co = liftCoSubst Nominal lc (piTyBinderType binder)
++         let !rest_orig_tys = case orig_tys0 of
++                                _:rest_tys -> rest_tys
++                                []    -> panic "simplifyArgsWorker: too few types"
++             !kind_co = liftCoSubst Nominal lc (piTyBinderType binder)
+              !(Reduction casted_co casted_xi)
+                       = mkCoherenceRightRedn role arg_redn kind_co
+          -- now, extend the lifting context with the new binding
+@@ -845,17 +838,17 @@
+                      | otherwise
+                      = lc
+              !(ArgsReductions (Reductions cos xis) final_kind_co)
+-               = go new_lc binders inner_ki roles arg_redns
++               = go new_lc binders inner_ki roles rest_orig_tys arg_redns
+          in ArgsReductions
+               (Reductions (casted_co:cos) (casted_xi:xis))
+               final_kind_co
+ 
+     -- See Note [Last case in simplifyArgsWorker]
+-    go lc [] inner_ki roles arg_redns
++    go lc [] inner_ki roles orig_tys arg_redns
+       = let co1 = liftCoSubst Nominal lc inner_ki
+             co1_kind              = coercionKind co1
+-            unrewritten_tys       = map reductionOriginalType arg_redns
+-            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unrewritten_tys
++            -- Here is where we make use of the passed-in unrewritten types 'orig_tys'.
++            (arg_cos, res_co)     = decomposePiCos co1 co1_kind orig_tys
+             casted_args           = assertPpr (equalLength arg_redns arg_cos)
+                                               (ppr arg_redns $$ ppr arg_cos)
+                                   $ zipWith3 mkCoherenceRightRedn (Inf.toList roles) arg_redns arg_cos
+@@ -870,6 +863,8 @@
+             (bndrs, new_inner)    = splitPiTys rewritten_kind
+ 
+             ArgsReductions redns_out res_co_out
+-              = go zapped_lc bndrs new_inner roles casted_args
++              -- The added casts do not affect the unrewritten (LHS) types,
++              -- so recurring with 'orig_tys' here is OK.
++              = go zapped_lc bndrs new_inner roles orig_tys casted_args
+         in
+           ArgsReductions redns_out (res_co `mkTransMCoR` res_co_out)
+diff --git a/compiler/GHC/Core/TyCo/FVs.hs b/compiler/GHC/Core/TyCo/FVs.hs
+--- a/compiler/GHC/Core/TyCo/FVs.hs
++++ b/compiler/GHC/Core/TyCo/FVs.hs
+@@ -18,6 +18,13 @@
+         tyCoVarsOfThingsDSet,
+         deepDetTypeFV, deepDetTypesFV, deepDetCoFV,
+ 
++        -- UnivCoDeps
++        mkUnivCoDeps, addUnivCoDep, addUnivCoDeps,
++        unitUnivCoDepCoVar, unitUnivCoDepHole,
++        mapUnivCoDeps, mapUnivCoDepsM, unionUnivCoDeps, minusUnivCoDeps,
++        addUnivCoTypeDeps,
++        univCoDepsShallowCoVars, univCoDepsDeepCoVars, univCoDepsHasHoles,
++
+         -- Selective
+         someTyCoVarsOfType, someTyCoVarsOfTypes,
+ 
+@@ -69,6 +76,7 @@
+ import GHC.Types.Var.FV
+ import GHC.Types.Unique.FM
+ import GHC.Types.Unique.Set
++import GHC.Types.Unique.DSet
+ 
+ import GHC.Types.Var.Set
+ import GHC.Types.Var.Env
+@@ -375,6 +383,144 @@
+ -- See Note [Computing deep free variables]
+ tyCoVarsOfCoList ty = dVarSetElems $ tyCoVarsOfCoDSet ty
+ 
++{- *********************************************************************
++*                                                                      *
++                 UnivCoDeps
++*                                                                      *
++********************************************************************* -}
++
++-- | Build the dependencies of a 'UnivCo': all its coercion variables and
++-- coercion holes, in deterministic order.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
++mkUnivCoDeps :: [Coercion] -> UnivCoDeps
++mkUnivCoDeps = addUnivCoDeps emptyUnivCoDeps
++
++-- | The dependency on a single coercion variable.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
++unitUnivCoDepCoVar :: CoVar -> UnivCoDeps
++unitUnivCoDepCoVar cv =
++  UnivCoDeps { ucd_cvs = unitDVarSet cv, ucd_holes = emptyUniqDSet }
++
++-- | The dependency on a single coercion hole.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
++unitUnivCoDepHole :: CoercionHole -> UnivCoDeps
++unitUnivCoDepHole hole =
++  UnivCoDeps { ucd_cvs = emptyDVarSet, ucd_holes = unitUniqDSet hole }
++
++-- | Add a single coercion variable to a 'UnivCoDeps'.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
++addUnivCoDepCoVar :: CoVar -> UnivCoDeps -> UnivCoDeps
++addUnivCoDepCoVar cv NoUnivCoDeps = unitUnivCoDepCoVar cv
++addUnivCoDepCoVar cv deps@(UnivCoDeps { ucd_cvs = cvs })
++  -- The membership test allows us to preserve sharing.
++  | cv `elemDVarSet` cvs = deps
++  | otherwise            = deps { ucd_cvs = cvs `extendDVarSet` cv }
++
++-- | Add a single coercion hole to a 'UnivCoDeps'.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
++addUnivCoDepHole :: CoercionHole -> UnivCoDeps -> UnivCoDeps
++addUnivCoDepHole hole NoUnivCoDeps = unitUnivCoDepHole hole
++addUnivCoDepHole hole deps@(UnivCoDeps { ucd_holes = holes })
++  -- The membership test allows us to preserve sharing.
++  | hole `elementOfUniqDSet` holes = deps
++  | otherwise                      = deps { ucd_holes = holes `addOneToUniqDSet` hole }
++
++-- | Add a list of coercions to a 'UnivCoDeps'.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
++addUnivCoDeps :: UnivCoDeps -> [Coercion] -> UnivCoDeps
++addUnivCoDeps = foldl' addUnivCoDep
++
++-- | Add a single coercion to a 'UnivCoDeps'.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
++addUnivCoDep :: UnivCoDeps -> Coercion -> UnivCoDeps
++addUnivCoDep deps co =
++  case co of
++    -- Fast paths for simple cases.
++    CoVarCo cv -> addUnivCoDepCoVar cv deps
++    HoleCo h   -> addUnivCoDepHole  h  deps
++    -- A 'UnivCo' already records all the coercion variables and coercion holes
++    -- it depends on, including those of its LHS and RHS types, so there is no
++    -- need to look inside it.
++    -- See Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep
++    UnivCo { uco_deps = co_deps } -> deps `unionUnivCoDeps` co_deps
++
++    -- General case: accumulate directly into 'deps'.
++    _ -> runFVAcc (univCoDepsOfCoFV co) deps
++
++-- | Does this set of dependencies contain any coercion holes,
++-- including deeply (looking into kinds)?
++univCoDepsHasHoles :: UnivCoDeps -> Bool
++univCoDepsHasHoles NoUnivCoDeps = False
++univCoDepsHasHoles (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes }) =
++  not (isEmptyUniqDSet holes) || anyDVarSet coVarKindHasHole cvs
++
++-- | Map a function over 'UnivCoDeps', e.g. substitution.
++mapUnivCoDeps
++  :: (Coercion -> Coercion) -- ^ function to map
++  -> UnivCoDeps -> UnivCoDeps
++mapUnivCoDeps f deps
++  | isEmptyUnivCoDeps deps = deps -- fast path
++  | otherwise              = mkUnivCoDeps (map f (univCoDepsCoercions deps))
++
++-- | Like 'mapUnivCoDeps', but effectful.
++mapUnivCoDepsM
++  :: Monad m
++  => (Coercion -> m Coercion) -- ^ function to map
++  -> UnivCoDeps -> m UnivCoDeps
++mapUnivCoDepsM f deps
++  | isEmptyUnivCoDeps deps = return deps -- fast path
++  | otherwise              = mkUnivCoDeps <$> mapM f (univCoDepsCoercions deps)
++{-# INLINEABLE mapUnivCoDepsM #-}
++
++-- | Union two 'UnivCoDeps'.
++unionUnivCoDeps :: UnivCoDeps -> UnivCoDeps -> UnivCoDeps
++unionUnivCoDeps NoUnivCoDeps deps2 = deps2
++unionUnivCoDeps deps1 NoUnivCoDeps = deps1
++unionUnivCoDeps (UnivCoDeps cvs1 holes1) (UnivCoDeps cvs2 holes2) =
++  non_empty_union_univ_co_deps cvs1 holes1 cvs2 holes2
++{-# INLINE unionUnivCoDeps #-} -- ensure fast paths are inlined
++
++non_empty_union_univ_co_deps :: DCoVarSet -> UniqDSet CoercionHole -> DCoVarSet -> UniqDSet CoercionHole -> UnivCoDeps
++non_empty_union_univ_co_deps cvs1 holes1 cvs2 holes2 =
++  UnivCoDeps (cvs1 `unionDVarSet` cvs2) (holes1 `unionUniqDSets` holes2)
++{-# NOINLINE non_empty_union_univ_co_deps #-} -- don't inline cold path
++
++-- | Remove the second 'UnivCoDeps' from the first.
++minusUnivCoDeps :: UnivCoDeps -> UnivCoDeps -> UnivCoDeps
++minusUnivCoDeps NoUnivCoDeps _ = NoUnivCoDeps
++minusUnivCoDeps deps1 NoUnivCoDeps = deps1
++minusUnivCoDeps (UnivCoDeps cvs1 holes1) (UnivCoDeps cvs2 holes2) =
++  mkUnivCoDepsSets (cvs1 `minusDVarSet` cvs2) (holes1 `minusUniqDSet` holes2)
++
++-- | The coercion variables a 'UnivCoDeps' depends on, including those free in
++-- the kinds of the coercions.
++univCoDepsDeepCoVars :: UnivCoDeps -> CoVarSet
++univCoDepsDeepCoVars deps
++  = coVarsOfTypes (map varType dep_cvs) `extendVarSetList` dep_cvs
++  where
++    dep_cvs = univCoDepsShallowCoVars deps
++
++-- | Add the (shallow) coercion variables and coercion holes free in the given
++-- types to the dependencies.
++--
++-- See Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
++addUnivCoTypeDeps :: [Type] -> UnivCoDeps -> UnivCoDeps
++addUnivCoTypeDeps tys deps
++  = runFVAcc (univCoDepsOfTypesFV tys) deps
++
++-- | The (shallow) coercion variables a 'UnivCoDeps' depends on, including
++-- the 'coHoleCoVar's of the coercion holes.
++univCoDepsShallowCoVars :: UnivCoDeps -> [CoVar]
++univCoDepsShallowCoVars deps =
++  univCoDepsCoVars deps ++ map coHoleCoVar (univCoDepsHoles deps)
++
+ -- | Returns free variables of types, including kind variables as
+ -- a deterministically ordered list. For type synonyms it does /not/ expand the
+ -- synonym.
+@@ -542,6 +688,95 @@
+ 
+     do_hole hole  = do_covar (coHoleCoVar hole)
+ 
++-------- Accumulating UnivCoDeps -----------
++
++-- | Accumulate the __shallow__ free coercion variables and coercion holes of
++-- these types into a 'UnivCoDeps', in left-to-right order.
++--
++-- The 'coHoleCoVar's of the coercion holes are /not/ added to 'ucd_cvs'.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep.
++univCoDepsOfTypesFV :: [Type]   -> FV BoundVars (EndoOS UnivCoDeps)
++
++-- | Accumulate the __shallow__ free coercion variables and coercion holes of
++-- this coercion into a 'UnivCoDeps', in left-to-right order.
++--
++-- The 'coHoleCoVar's of the coercion holes are /not/ added to 'ucd_cvs'.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep.
++univCoDepsOfCoFV    :: Coercion -> FV BoundVars (EndoOS UnivCoDeps)
++(_, univCoDepsOfTypesFV, univCoDepsOfCoFV, _) = foldTyCo univCoDepsFolder
++
++univCoDepsFolder :: TyCoFolder (FV BoundVars (EndoOS UnivCoDeps))
++univCoDepsFolder
++  = TyCoFolder
++  { tcf_view       = noView
++
++    -- The following is incorrect: it ignores CoVars/CoercionHoles in the kinds
++    -- of TyVars. This replicates the long-standing wart in 'deepCoVarFolder'.
++  , tcf_tyvar      = \ _ -> mempty
++
++  , tcf_covar      = do_covar
++  , tcf_hole       = do_hole
++  , tcf_tycobinder = addBndrFV }
++  where
++    do_covar v = MkFV $ \ bvs -> EndoOS (add_covar bvs v)
++    do_hole h  = MkFV $ \ _   -> EndoOS (addUnivCoDepHole h)
++
++    add_covar :: BoundVars -> CoVar -> UnivCoDeps -> UnivCoDeps
++    add_covar bvs v deps
++      | v `elemVarSet` bvs = deps
++      | otherwise          = addUnivCoDepCoVar v deps
++
++-------- Detecting CoercionHoles in the kind of a CoVar -----------
++
++-- | Does the kind of this coercion variable mention a coercion hole?
++--
++-- Looks transitively through the kinds of any coercion variables encountered
++-- along the way.
++coVarKindHasHole :: CoVar -> Bool
++coVarKindHasHole cv
++  = hs_found $
++    runFVAcc (hole_search_ty (varType cv)) $
++    HoleSearch { hs_found = False, hs_seen = unitVarSet cv }
++
++data HoleSearch
++  = HoleSearch
++      { hs_found :: !Bool
++          -- ^ Have we found a coercion hole yet?
++      , hs_seen  :: !CoVarSet
++          -- ^ The CoVars whose kind we have already searched.
++      }
++
++hole_search_ty :: Type -> FV BoundVars (EndoOS HoleSearch)
++(hole_search_ty, _, _, _) = foldTyCo holeSearchFolder
++
++holeSearchFolder :: TyCoFolder (FV BoundVars (EndoOS HoleSearch))
++holeSearchFolder
++  = TyCoFolder
++  { tcf_view       = noView
++
++    -- Wart (see 'deepCoVarFolder'): don't look into the kinds of TyVars.
++  , tcf_tyvar      = \ _ -> mempty
++
++  , tcf_covar      = do_covar
++  , tcf_hole       = do_hole
++  , tcf_tycobinder = addBndrFV }
++  where
++    do_covar v = MkFV $ \ bvs -> EndoOS (search_kind bvs v)
++    do_hole _  = MkFV $ \ _   -> EndoOS found_hole
++
++    found_hole :: HoleSearch -> HoleSearch
++    found_hole acc = acc { hs_found = True }
++
++    search_kind :: BoundVars -> CoVar -> HoleSearch -> HoleSearch
++    search_kind bvs v acc@(HoleSearch { hs_found = found, hs_seen = seen })
++      | found               = acc
++      | v `elemVarSet` bvs  = acc
++      | v `elemVarSet` seen = acc
++      | otherwise
++      = runEndoOS (runFV (hole_search_ty (varType v)) bvs)
++                  (acc { hs_seen = seen `extendVarSet` v })
+ 
+ {- *********************************************************************
+ *                                                                      *
+@@ -606,7 +841,7 @@
+ almost_devoid_co_var_of_co (AxiomCo _ cs) cv
+   = almost_devoid_co_var_of_cos cs cv
+ almost_devoid_co_var_of_co (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps }) cv
+-  =  almost_devoid_co_var_of_cos deps cv
++  =  not (cv `elemUnivCoDeps` deps)
+   && almost_devoid_co_var_of_type t1 cv
+   && almost_devoid_co_var_of_type t2 cv
+ almost_devoid_co_var_of_co (SymCo co) cv
+@@ -937,8 +1172,10 @@
+      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
+                                    = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
+      go_co (AxiomCo ax args)       = go_ax ax `unionUniqSets` go_cos args
+-     go_co (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = cos })
+-                                   = go t1 `unionUniqSets` go t2 `unionUniqSets` go_cos cos
++     go_co (UnivCo { uco_lty = t1, uco_rty = t2 })
++                                   = go t1 `unionUniqSets` go t2
++               -- NB: uco_deps holds only coercion variables and coercion holes,
++               -- which contribute no TyCons
+      go_co (CoVarCo {})            = emptyUniqSet
+      go_co (HoleCo {})             = emptyUniqSet
+      go_co (SymCo co)              = go_co co
+@@ -1146,19 +1383,37 @@
+            ; w' <- go_co cxt w
+            ; return (co { fco_mult = w', fco_arg = co1', fco_res = co2' })}
+ 
+-    go_co (as,env) co@(CoVarCo c)
+-      | Just c' <- lookupVarEnv env c   = return (CoVarCo c')
+-      | bad_var_occ as c                = Nothing
+-      | otherwise                       = return co
+-
+-    go_co (as,_) co@(HoleCo h)
+-      | bad_var_occ as (ch_co_var h)    = Nothing
+-      | otherwise                       = return co
++    go_co cxt (CoVarCo c)               = CoVarCo <$> go_cv cxt c
++    go_co cxt co@(HoleCo h)             = co <$ go_hole cxt h
+ 
+     go_co cxt (AxiomCo ax cs)           = do { cs' <- mapM (go_co cxt) cs
+                                              ; return (AxiomCo ax cs') }
+-    go_co cxt co@(UnivCo { uco_lty = ty1, uco_rty = ty2, uco_deps = cos })
++    go_co cxt co@(UnivCo { uco_lty = ty1, uco_rty = ty2, uco_deps = deps })
+       = do { ty1' <- go cxt ty1
+            ; ty2' <- go cxt ty2
+-           ; cos' <- mapM (go_co cxt) cos
+-           ; return (co { uco_lty = ty1', uco_rty = ty2', uco_deps = cos' }) }
++           ; deps' <- go_deps cxt deps
++           ; return $
++               co { uco_lty = ty1', uco_rty = ty2', uco_deps = deps' }
++           }
++
++    ------------------
++    go_deps :: (VarSet, VarEnv TyCoVar) -> UnivCoDeps -> Maybe UnivCoDeps
++    go_deps _ NoUnivCoDeps = return NoUnivCoDeps
++    go_deps cxt deps@(UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
++      = do { cvs' <- mapMUniqDSet (go_cv cxt) cvs
++                       -- go_cv preserves uniques, as mapMUniqDSet requires
++           ; mapM_ (go_hole cxt) (uniqDSetToList holes)
++           ; return (deps { ucd_cvs = cvs' }) }
++                       -- mapMUniqDSet preserves size, so this stays non-empty
++
++    go_cv :: (VarSet, VarEnv TyCoVar) -> CoVar -> Maybe CoVar
++    go_cv (as, env) c
++      | Just c' <- lookupVarEnv env c = return c'
++      | bad_var_occ as c              = Nothing
++      | otherwise                     = return c
++
++    -- A coercion hole is never expanded, so we only check its variable
++    go_hole :: (VarSet, VarEnv TyCoVar) -> CoercionHole -> Maybe ()
++    go_hole (as, _) h
++      | bad_var_occ as (ch_co_var h)  = Nothing
++      | otherwise                     = return ()
+diff --git a/compiler/GHC/Core/TyCo/Rep.hs b/compiler/GHC/Core/TyCo/Rep.hs
+--- a/compiler/GHC/Core/TyCo/Rep.hs
++++ b/compiler/GHC/Core/TyCo/Rep.hs
+@@ -35,6 +35,11 @@
+         -- * Coercions
+         Coercion(..), CoSel(..), FunSel(..),
+         UnivCoProvenance(..),
++
++        UnivCoDeps(..), emptyUnivCoDeps, isEmptyUnivCoDeps, mkUnivCoDepsSets,
++        univCoDepsCoVars, univCoDepsHoles, univCoDepsCoercions,
++        univCoDepsSize, elemUnivCoDeps,
++
+         CoercionHole(..), CoercionPlusHoles(..), coHoleCoVar, setCoHoleCoVar,
+         CoercionN, CoercionR, CoercionP, KindCoercion,
+         MCoercion(..), MCoercionR, MCoercionN, KindMCoercion,
+@@ -80,7 +85,15 @@
+ 
+ -- friends:
+ import GHC.Types.Var
+-import GHC.Types.Var.Set( elemVarSet )
++import GHC.Types.Var.Set
++  ( elemVarSet
++  , DCoVarSet
++  , isEmptyDVarSet
++  , dVarSetElems, elemDVarSet
++  , sizeDVarSet )
++import GHC.Types.Unique.DSet
++  ( UniqDSet, uniqDSetToList
++  , isEmptyUniqDSet, sizeUniqDSet, anyUniqDSet )
+ import GHC.Types.Unique.Set
+ import GHC.Core.TyCon
+ import GHC.Core.Coercion.Axiom
+@@ -96,10 +109,10 @@
+ import GHC.Utils.Binary
+ 
+ -- libraries
++import Control.DeepSeq
++import Data.Coerce
+ import qualified Data.Data as Data hiding ( TyCon )
+-import Data.Coerce
+ import Data.IORef ( IORef )   -- for CoercionHole
+-import Control.DeepSeq
+ 
+ {- **********************************************************************
+ *                                                                       *
+@@ -912,13 +925,19 @@
+      -- The roles of the argument coercions are determined
+      -- by the cab_roles field of the relevant branch of the CoAxiom
+ 
++  -- | A coercion from some type to some other type, with (in general)
++  -- no restrictions on the type.
++  --
++  -- For simplicity, we have just one 'UnivCo' constructor, with the specific
++  -- details of the 'UnivCo' stored in 'UnivCoProvenance'.
+   | UnivCo  -- See Note [UnivCo]
+             -- Of kind (lty ~role rty)
+       { uco_prov         :: UnivCoProvenance
+       , uco_role         :: Role
+       , uco_lty, uco_rty :: Type
+-      , uco_deps         :: [Coercion]  -- Coercions on which it depends
++      , uco_deps         :: UnivCoDeps  -- Coercions on which it depends
+                --   See Note [The importance of tracking UnivCo dependencies]
++               --   and Note [UnivCoDeps]
+       }
+ 
+   | SymCo Coercion             -- :: e -> e
+@@ -976,6 +995,9 @@
+ 
+ instance Outputable Coercion where
+   ppr = pprCo
++
++instance Outputable UnivCoDeps where
++  ppr = ppr . univCoDepsCoercions
+ 
+ instance Outputable CoSel where
+   ppr (SelTyCon n r) = text "Tc" <> parens (int n <> comma <> pprOneCharRole r)
+@@ -1540,7 +1562,7 @@
+       { uco_prov         :: UnivCoProvenance
+       , uco_role         :: Role
+       , uco_lty, uco_rty :: Type
+-      , uco_deps         :: [Coercion]  -- Coercions on which it depends
++      , uco_deps         :: UnivCoDeps  -- Coercions on which it depends
+ 
+ Here,
+  * uco_role, uco_lty, uco_rty express the type of the coercion
+@@ -1550,13 +1572,119 @@
+    Note [The importance of tracking UnivCo dependencies]
+ -}
+ 
+--- | For simplicity, we have just one UnivCo that represents a coercion from
+--- some type to some other type, with (in general) no restrictions on the
+--- type. The UnivCoProvenance specifies more exactly what the coercion really
+--- is and why a program should (or shouldn't!) trust the coercion.
++-- | The coercions a 'UnivCo' depends on.
++--
++-- See Note [The importance of tracking UnivCo dependencies]
++-- and Note [UnivCoDeps].
++data UnivCoDeps
++  -- | No dependencies at all.
++  --
++  -- (This constructor avoids allocation in the extremely common case that there
++  -- are no dependencies.)
++  = NoUnivCoDeps
++  -- | A collection of 'CoVar's and 'CoercionHole's that a coercion depends on.
++  --
++  -- Invariant: the two fields are not both empty (use 'NoUnivCoDeps' for that).
++  | UnivCoDeps
++      { ucd_cvs   :: !DCoVarSet
++          -- ^ The (shallow) coercion variables the 'UnivCo' depends on, not including
++          -- any 'coHoleCoVar's.
++          --
++          -- Why shallow? See (UCD1) in Note [UnivCoDeps].
++      , ucd_holes :: !(UniqDSet CoercionHole)
++          -- ^ The (shallow) coercion holes the 'UnivCo' depends on.
++          --
++          -- Why shallow? See (UCD1) in Note [UnivCoDeps].
++      }
++  deriving Data.Data
++
++-- | An empty set of dependent coercions.
++emptyUnivCoDeps :: UnivCoDeps
++emptyUnivCoDeps = NoUnivCoDeps
++
++-- | Build a 'UnivCoDeps' out of its two sets, maintaining the invariant
++-- that 'UnivCoDeps' is used only for a non-empty set of dependencies.
++mkUnivCoDepsSets :: DCoVarSet -> UniqDSet CoercionHole -> UnivCoDeps
++mkUnivCoDepsSets cvs holes
++  | isEmptyDVarSet cvs && isEmptyUniqDSet holes
++  = NoUnivCoDeps
++  | otherwise
++  = UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes }
++
++-- | Are there no dependent coercions?
++isEmptyUnivCoDeps :: UnivCoDeps -> Bool
++isEmptyUnivCoDeps NoUnivCoDeps   = True
++isEmptyUnivCoDeps (UnivCoDeps{}) = False
++
++-- | The coercion variables a 'UnivCo' depends on, in deterministic order.
++univCoDepsCoVars :: UnivCoDeps -> [CoVar]
++univCoDepsCoVars NoUnivCoDeps = []
++univCoDepsCoVars (UnivCoDeps { ucd_cvs = cvs })
++  -- Fast path: avoid paying for the sorting that 'dVarSetElems' would perform.
++  | isEmptyDVarSet cvs = []
++  | otherwise          = dVarSetElems cvs
++
++-- | The coercion holes a 'UnivCo' depends on, in deterministic order.
++univCoDepsHoles :: UnivCoDeps -> [CoercionHole]
++univCoDepsHoles NoUnivCoDeps = []
++univCoDepsHoles (UnivCoDeps { ucd_holes = holes })
++  -- NB: same fast path as 'univCoDepsCoVars'.
++  | isEmptyUniqDSet holes = []
++  | otherwise             = uniqDSetToList holes
++
++-- | The coercions a 'UnivCo' depends on, in deterministic order.
++univCoDepsCoercions :: UnivCoDeps -> [Coercion]
++univCoDepsCoercions NoUnivCoDeps = []
++univCoDepsCoercions deps
++  = map CoVarCo (univCoDepsCoVars deps) ++ map HoleCo (univCoDepsHoles deps)
++
++-- | The number of dependent coercions.
++univCoDepsSize :: UnivCoDeps -> Int
++univCoDepsSize NoUnivCoDeps = 0
++univCoDepsSize (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
++  = sizeDVarSet cvs + sizeUniqDSet holes
++
++-- | Does the given coercion variable occur in these dependent coercions?
++--
++-- The 'CoVar' of a dependent 'CoercionHole' counts as an occurrence.
++elemUnivCoDeps :: CoVar -> UnivCoDeps -> Bool
++elemUnivCoDeps _ NoUnivCoDeps = False
++elemUnivCoDeps cv (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
++  =  cv `elemDVarSet` cvs
++  || anyUniqDSet ((== cv) . coHoleCoVar) holes
++
++{- Note [UnivCoDeps]
++~~~~~~~~~~~~~~~~~~~~
++All that matters for tracking the dependencies of a UnivCo (see Note [The
++importance of tracking UnivCo dependencies]) are the coercion variables and the
++coercion holes it depends on, so that is exactly what UnivCoDeps stores.
++This reduces the size of the dependencies, which is particularly important for
++coercion zapping; see Note [Coercion zapping] in GHC.Tc.Solver.Rewrite.
++
++Coercion holes are stored separately from coercion variables, because they have
++no binding site, being instead filled in by the typechecker.
++
++Zonking may fill a coercion hole with a large coercion, so we immediately
++gather the resulting coercion's free coercion variables and coercion holes in
++order to avoid accumulating large coercions (see the use of 'mapUnivCoDepsM' in
++GHC.Core.Type.mapTyCoX).
++
++  (UCD1) We deliberately store /shallow/ dependencies:
++
++    - Keeping 'ucd_cvs' shallow keeps the set small, which saves work when
++      performing substitution (fewer variables to substitute).
++    - Several consumers want the shallow version (e.g. 'elemUnivCoDeps' used
++      by 'almost_devoid_co_var_of_co'). The consumers that want the deep
++      version can close over kinds themselves (e.g. 'univCoDepsDeepCoVars',
++      'univCoDepsHasHoles').
++-}
++
++-- | The 'UnivCoProvenance' specifies more precisely where a 'UnivCo' comes from
++-- and why a program should (or shouldn't!) trust the coercion.
++--
+ -- It is reasonable to consider each constructor of 'UnivCoProvenance'
+ -- as a totally independent coercion form; their only commonality is
+--- that they don't tell you what types they coercion between. (That info
++-- that they don't tell you what types they coerce between. (That info
+ -- is in the 'UnivCo' constructor of 'Coercion'.
+ data UnivCoProvenance
+   = PhantomProv    -- ^ See Note [Phantom coercions]. Only in Phantom
+@@ -1570,7 +1698,17 @@
+       -- ^ From a plugin, which asserts that this coercion is sound.
+       --   The string and the variable set are for the use by the plugin.
+ 
+-  | SubMultProv -- ^ A submultiplicity coercion
++  | SubMultProv
++    -- ^ A sub-multiplicity coercion.
++    --
++    -- See 'mkSubMultFunCo' as well as
++    -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
++
++  | ZappedProv
++      -- ^ A zapped coercion: a proof that has been erased, keeping only its
++      --   LHS and RHS types and its dependencies.
++      --
++      --   See Note [Coercion zapping] in GHC.Tc.Solver.Rewrite.
+ 
+   deriving (Eq, Ord, Data.Data)
+   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type
+@@ -1580,6 +1718,7 @@
+   ppr (ProofIrrelProv {})  = text "(proof irrel)"
+   ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
+   ppr SubMultProv          = text "(sub-mult)"
++  ppr ZappedProv           = text "(zapped)"
+ 
+ instance NFData UnivCoProvenance where
+   rnf p = p `seq` ()
+@@ -1589,6 +1728,7 @@
+   put_ bh ProofIrrelProv = putByte bh 2
+   put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
+   put_ bh SubMultProv    = putByte bh 4
++  put_ bh ZappedProv     = putByte bh 6
+   get bh = do
+       tag <- getByte bh
+       case tag of
+@@ -1597,6 +1737,7 @@
+            3 -> do a <- get bh
+                    return $ PluginProv a
+            4 -> return SubMultProv
++           6 -> return ZappedProv
+            _ -> panic ("get UnivCoProvenance " ++ show tag)
+ 
+ 
+@@ -1673,11 +1814,63 @@
+ So it is /crucial/ for the `UnivCo` to mention, in `uco_deps`, the coercion
+ variables used by the plugin to justify the `UnivCo` that it builds.  You
+ should think of it like `TyConAppCo`: the `UnivCo` proof constructor is
+-applied to a list of coercions, just as `TyConAppCo` is
+-
+-It's very convenient to record a full coercion, not just a set of free coercion
+-variables, because during typechecking those coercions might contain coercion
+-holes `HoleCo`, which get filled in later.
++applied to a list of coercions, just as `TyConAppCo` is.
++
++Note [UnivCoDepsInv]
++~~~~~~~~~~~~~~~~~~~~
++There is a design choice to be made with regards to the 'uco_deps' field of
++'UnivCo': does it also store the 'CoVar's of the LHS and RHS types of the
++'UnivCo'?
++
++Our answer: YES. That is, we require:
++
++  (UnivCoDepsInv)
++    shallowCoVars(lty) ∪ shallowCoVars(rty)  ⊆    ucd_cvs(deps)
++     shallowHoles(lty) ∪  shallowHoles(rty)  ⊆  ucd_holes(deps)
++
++which in particular implies (recalling that 'coVarsOfType' is deep):
++
++    coVarsOfType(lty) ∪ coVarsOfType(rty)  ⊆  univCoDepsDeepCoVars(deps)
++
++The invariant is established by 'mkUnivCoAddTypeDeps'/'addUnivCoTypeDeps'.
++
++This invariant is not required for soundness: it would be perfectly fine to
++omit 'coVarsOfType(lty)' and 'coVarsOfType(rty)' from 'deps', as the 'UnivCo'
++still stores 'lty' and 'rty', so no dependency is lost.
++
++However, the invariant is useful: it amounts to caching the result of
++'coVarsOfTypes [lty, rty]' into 'deps', which unlocks some performance
++optimisations.
++The main benefit we get is when performing coercion zapping in the rewriter.
++As described in Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite,
++when the rewriter uses a reduction that was returned by a plugin or looked up in
++the type family application cache, it records the dependencies of that
++reduction's coercion in the 're_used_cos' field (which is later consulted when
++zapping): see 'record_deps' in GHC.Tc.Solver.Rewrite, which calls
++'addUnivCoDep'. (UnivCoDepsInv) allows 'addUnivCoDep' to directly
++union in the 'uco_deps' field of a 'UnivCo' without traversing its LHS and RHS
++types, which is a big win in the FamAppCachePerf test (saving ~23% allocations
++and ~37% maximum residency).
++
++  Aside: rejected alternate design.
++
++    The optimisation in the rewriter described above would also be possible
++    with the following weaker invariant:
++
++      coVarsOfType(rty)  ⊆  coVarsOfType(lty) ∪ univCoDepsDeepCoVars(deps)
++
++    This would seem beneficial in some ways (it requires storing fewer CoVars,
++    which means less work when substituting). However, it is more complex; in
++    particular, it is asymmetric, thus requiring care when calling 'mkSymCo' on
++    a 'UnivCo' (as in 'GHC.Core.Coercion.Opt.opt_univ' say).
++    Empirically, using this weaker invariant does not result in any measurable
++    change in compile times across the testsuite (neither runtime nor allocations).
++
++To conclude: (UnivCoDepsInv) is not required for correctness, but it unlocks some
++performance benefits. In practice, these performance benefits only manifest at
++'ZappedProv' provenance (and theoretically at 'PluginProv' depending on what the
++plugin is doing), but for simplicity we require this invariant to hold regardless
++of the 'UnivCoProvenance'.
+ -}
+ 
+ {- **********************************************************************
+@@ -1945,8 +2138,8 @@
+   confident it'll be lambda lifted in the end. It seems more direct just to write
+   the code we want.
+ 
+-  On the other hand in `go_cvs` we might hope that the `foldr` will fuse with the
+-  `dVarSetElems` so I have used `foldr`.
++  On the other hand in `go_deps` we might hope that the `foldr` will fuse with
++  the `dVarSetElems` and `uniqDSetToList`, so there we use `foldr`.
+ -}
+ 
+ data TyCoFolder a
+@@ -2003,9 +2196,11 @@
+     go_co (AxiomCo _ cos)          = go_cos cos
+     go_co (HoleCo hole)            = cohole hole
+     go_co (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
++      -- NB: we could skip lty and rty here when only collecting CoVars,
++      -- due to Note [UnivCoDepsInv].
+                                    = go_ty t1
+                                      `mappend` go_ty t2
+-                                     `mappend` go_cos deps
++                                     `mappend` go_deps deps
+     go_co (SymCo co)               = go_co co
+     go_co (TransCo c1 c2)          = go_co c1 `mappend` go_co c2
+     go_co (SelCo _ co)             = go_co co
+@@ -2023,6 +2218,14 @@
+ 
+     go_mco MRefl    = mempty
+     go_mco (MCo co) = go_co co
++
++    -- See Note [Use explicit recursion in foldTyCo] for the use of foldr here
++    go_deps deps
++      | isEmptyUnivCoDeps deps = mempty   -- The common case; see univCoDepsCoVars
++      | otherwise
++      = foldr (mappend . covar)  (foldr (mappend . cohole) mempty
++                                        (univCoDepsHoles deps))
++                                 (univCoDepsCoVars deps)
+ 
+ -- | A view function that looks through nothing.
+ noView :: Type -> Maybe Type
+@@ -2076,7 +2279,7 @@
+ coercionSize (AxiomCo _ cs)      = 1 + sum (map coercionSize cs)
+ coercionSize (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                                  = 1 + typeSize t1 + typeSize t2
+-                                     + sum (map coercionSize deps)
++                                     + univCoDepsSize deps
+ coercionSize (SymCo co)          = 1 + coercionSize co
+ coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+ coercionSize (SelCo _ co)        = 1 + coercionSize co
+diff --git a/compiler/GHC/Core/TyCo/Rep.hs-boot b/compiler/GHC/Core/TyCo/Rep.hs-boot
+--- a/compiler/GHC/Core/TyCo/Rep.hs-boot
++++ b/compiler/GHC/Core/TyCo/Rep.hs-boot
+@@ -12,6 +12,7 @@
+ data FunSel
+ data CoSel
+ data UnivCoProvenance
++data UnivCoDeps
+ data TyLit
+ data MCoercion
+ 
+diff --git a/compiler/GHC/Core/TyCo/Subst.hs b/compiler/GHC/Core/TyCo/Subst.hs
+--- a/compiler/GHC/Core/TyCo/Subst.hs
++++ b/compiler/GHC/Core/TyCo/Subst.hs
+@@ -40,7 +40,7 @@
+         cloneTyVarBndr, cloneTyVarBndrs,
+         substVarBndr, substVarBndrs,
+         substTyVarBndr, substTyVarBndrs,
+-        substCoVarBndr, substDCoVarSet,
++        substCoVarBndr,
+         substTyVar, substTyVars, substTyVarToTyVar,
+         substTyCoVars,
+         substTyCoBndr,
+@@ -55,7 +55,7 @@
+ import {-# SOURCE #-} GHC.Core.Coercion
+    ( mkCoVarCo, mkKindCo, mkSelCo, mkTransCo
+    , mkNomReflCo, mkSubCo, mkSymCo
+-   , mkFunCo2, mkForAllCo, mkUnivCo
++   , mkFunCo2, mkForAllCo, mkUnivCoAddTypeDeps
+    , mkAxiomCo, mkAppCo, mkGReflCo
+    , mkInstCo, mkLRCo, mkTyConAppCo
+    , mkCoercionType
+@@ -879,8 +879,10 @@
+     go (CoVarCo cv)          = substCoVar subst cv
+     go (UnivCo { uco_prov = p, uco_role = r
+                , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+-                             = ((((mkUnivCo $! p) $! go_cos deps) $! r) $!
+-                                  (go_ty t1)) $! (go_ty t2)
++      = let !t1'   = go_ty t1
++            !t2'   = go_ty t2
++            !deps0 = mapUnivCoDeps go deps
++        in ((((mkUnivCoAddTypeDeps $! p) $! deps0) $! r) $! t1') $! t2'
+     go (SymCo co)            = mkSymCo $! (go co)
+     go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
+     go (SelCo d co)          = mkSelCo d $! (go co)
+@@ -895,12 +897,6 @@
+ 
+     -- See Note [Substituting in a coercion hole]
+     go_hole h@(CH { ch_co_var = cv }) = h { ch_co_var = updateVarType go_ty cv }
+-
+--- | Perform a substitution within a 'DVarSet' of free variables,
+--- returning the free coercion variables.
+-substDCoVarSet :: Subst -> DCoVarSet -> DCoVarSet
+-substDCoVarSet subst cvs = coVarsOfCosDSet $ map (substCoVar subst) $
+-                           dVarSetElems cvs
+ 
+ substCoVar :: Subst -> CoVar -> Coercion
+ substCoVar (Subst _ _ _ cenv) cv
+diff --git a/compiler/GHC/Core/TyCo/Tidy.hs b/compiler/GHC/Core/TyCo/Tidy.hs
+--- a/compiler/GHC/Core/TyCo/Tidy.hs
++++ b/compiler/GHC/Core/TyCo/Tidy.hs
+@@ -24,7 +24,9 @@
+ import GHC.Core.TyCo.FVs
+ import GHC.Types.Name hiding (varName)
+ import GHC.Types.Var
++import GHC.Types.Var.Set
+ import GHC.Types.Var.Env
++import GHC.Types.Unique.DSet ( mapUniqDSet )
+ import GHC.Utils.Misc (strictMap)
+ 
+ import Data.List (mapAccumL)
+@@ -342,11 +344,11 @@
+     go (CoVarCo cv)          = CoVarCo $! go_cv cv
+     go (HoleCo h)            = HoleCo $! go_hole h
+     go (AxiomCo ax cos)      = AxiomCo ax $ strictMap go cos
+-    go (UnivCo prov role t1 t2 cos)
++    go (UnivCo prov role t1 t2 deps)
+                              = ((UnivCo prov role
+                                 $! tidyType env t1)
+                                 $! tidyType env t2)
+-                                $! strictMap go cos
++                                $! go_deps deps
+     go (SymCo co)            = SymCo $! go co
+     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
+     go (SelCo d co)          = SelCo d $! go co
+@@ -355,6 +357,12 @@
+     go (KindCo co)           = KindCo $! go co
+     go (SubCo co)            = SubCo $! go co
+ 
++    go_deps NoUnivCoDeps = NoUnivCoDeps
++    go_deps (UnivCoDeps cvs holes)
++      = (UnivCoDeps $! mapDVarSet go_cv cvs) $! mapUniqDSet go_hole holes
++      -- NB: go_cv/go_hole preserve uniques, as mapDVarSet/mapUniqDSet require
++      -- (this also means the dependencies remain non-empty)
++
+     go_cv cv = tidyTyCoVarOcc env cv
+ 
+     go_hole (CH cv r) = (CH $! go_cv cv) r
+diff --git a/compiler/GHC/Core/Type.hs b/compiler/GHC/Core/Type.hs
+--- a/compiler/GHC/Core/Type.hs
++++ b/compiler/GHC/Core/Type.hs
+@@ -251,7 +251,7 @@
+ import {-# SOURCE #-} GHC.Core.Coercion
+    ( mkNomReflCo, mkGReflCo, mkReflCo
+    , mkTyConAppCo, mkAppCo
+-   , mkForAllCo, mkFunCo2, mkAxiomCo, mkUnivCo
++   , mkForAllCo, mkFunCo2, mkAxiomCo, mkUnivCoAddTypeDeps
+    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
+    , mkKindCo, mkSubCo, mkFunCo, funRole
+    , decomposePiCos, coercionKind
+@@ -538,8 +538,15 @@
+       = substCoVar subst cv
+     go_co subst (AxiomCo ax cs)
+       = mkAxiomCo ax (map (go_co subst) cs)
+-    go_co subst co@(UnivCo { uco_lty = lty, uco_rty = rty })
+-      = co { uco_lty = go subst lty, uco_rty = go subst rty }
++    go_co subst co@(UnivCo { uco_lty = lty, uco_rty = rty, uco_deps = deps })
++      = co { uco_lty  = lty'
++           , uco_rty  = rty'
++           , uco_deps = addUnivCoTypeDeps [lty', rty'] $
++                        mapUnivCoDeps (go_co subst) deps
++           }
++      where
++        lty' = go subst lty
++        rty' = go subst rty
+     go_co subst (SymCo co)
+       = mkSymCo (go_co subst co)
+     go_co subst (TransCo co1 co2)
+@@ -941,11 +948,12 @@
+     go_co !env (CoVarCo cv)               = covar env cv
+     go_co !env (HoleCo hole)              = cohole env hole
+     go_co !env (UnivCo { uco_prov = p, uco_role = r
+-                       , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+-                                          = mkUnivCo <$> pure p
+-                                                     <*> go_cos env deps
+-                                                     <*> pure r
+-                                                     <*> go_ty env t1 <*> go_ty env t2
++                       , uco_lty = t1, uco_rty = t2, uco_deps = deps }) = do
++      t1' <- go_ty env t1
++      t2' <- go_ty env t2
++      deps' <- mapUnivCoDepsM (go_co env) deps -- re-computes dependent CoVars after substituting
++      return $
++        mkUnivCoAddTypeDeps p deps' r t1' t2'
+     go_co !env (SymCo co)                 = mkSymCo <$> go_co env co
+     go_co !env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
+     go_co !env (AxiomCo r cos)            = mkAxiomCo r <$> go_cos env cos
+diff --git a/compiler/GHC/CoreToIface.hs b/compiler/GHC/CoreToIface.hs
+--- a/compiler/GHC/CoreToIface.hs
++++ b/compiler/GHC/CoreToIface.hs
+@@ -300,7 +300,8 @@
+     go (SubCo co)          = IfaceSubCo (go co)
+     go (AxiomCo ax cs)     = IfaceAxiomCo (toIfaceAxiomRule ax) (map go cs)
+     go (UnivCo { uco_prov = p, uco_role = r, uco_lty = t1, uco_rty = t2, uco_deps = deps })
+-        = IfaceUnivCo p r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2) (map go deps)
++        = IfaceUnivCo p r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
++                      (go_deps deps)
+ 
+     go co@(TyConAppCo r tc cos)
+       =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
+@@ -317,6 +318,17 @@
+                       (toIfaceCoercionX fr' co)
+                           where
+                             fr' = fr `delVarSet` tv
++
++    go_deps deps
++      = map go_dep_cv   (univCoDepsCoVars deps) ++
++        map go_dep_hole (univCoDepsHoles  deps)
++
++    go_dep_cv cv
++      -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
++      | cv `elemVarSet` fr = IfaceUnivCoDepFreeCoVar cv
++      | otherwise          = IfaceUnivCoDepCoVar (toIfaceCoVar cv)
++
++    go_dep_hole h = IfaceUnivCoDepHole (coHoleCoVar h)
+ 
+ toIfaceAxiomRule :: CoAxiomRule -> IfaceAxiomRule
+ toIfaceAxiomRule (BuiltInFamRew  bif) = IfaceAR_X (mkIfLclName (bifrw_name bif))
+diff --git a/compiler/GHC/Driver/Config/Core/Lint.hs b/compiler/GHC/Driver/Config/Core/Lint.hs
+--- a/compiler/GHC/Driver/Config/Core/Lint.hs
++++ b/compiler/GHC/Driver/Config/Core/Lint.hs
+@@ -175,4 +175,5 @@
+                              , lf_check_fixed_rep = True
+                              , lf_check_rubbish_lits = True
+                              , lf_allow_weak_joins = False
++                             , lf_tc_coercion = False
+                              }
+diff --git a/compiler/GHC/Driver/DynFlags.hs b/compiler/GHC/Driver/DynFlags.hs
+--- a/compiler/GHC/Driver/DynFlags.hs
++++ b/compiler/GHC/Driver/DynFlags.hs
+@@ -1219,6 +1219,7 @@
+       Opt_DiagnosticsShowCaret,
+       Opt_EmbedManifest,
+       Opt_FamAppCache,
++      Opt_ZapCoercions,
+       Opt_GenManifest,
+       Opt_GhciHistory,
+       Opt_GhciSandbox,
+diff --git a/compiler/GHC/Driver/Flags.hs b/compiler/GHC/Driver/Flags.hs
+--- a/compiler/GHC/Driver/Flags.hs
++++ b/compiler/GHC/Driver/Flags.hs
+@@ -787,6 +787,9 @@
+    | Opt_CompactUnwind               -- ^ @-fcompact-unwind@
+    | Opt_Hpc
+    | Opt_FamAppCache
++   | Opt_ZapCoercions                -- ^ @-fzap-coercions@: erase coercion proofs
++                                     -- built by the typechecker's rewriter.
++                                     -- See Note [Coercion zapping] in GHC.Tc.Solver.Rewrite
+    | Opt_ExternalInterpreter
+    | Opt_OptimalApplicativeDo
+    | Opt_VersionMacros
+diff --git a/compiler/GHC/Driver/Session.hs b/compiler/GHC/Driver/Session.hs
+--- a/compiler/GHC/Driver/Session.hs
++++ b/compiler/GHC/Driver/Session.hs
+@@ -2540,6 +2540,7 @@
+   flagSpec "external-dynamic-refs"            Opt_ExternalDynamicRefs,
+   flagSpec "external-interpreter"             Opt_ExternalInterpreter,
+   flagSpec "family-application-cache"         Opt_FamAppCache,
++  flagSpec "zap-coercions"                    Opt_ZapCoercions,
+   flagSpec "float-in"                         Opt_FloatIn,
+   flagSpec "force-recomp"                     Opt_ForceRecomp,
+   flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
+diff --git a/compiler/GHC/Iface/Rename.hs b/compiler/GHC/Iface/Rename.hs
+--- a/compiler/GHC/Iface/Rename.hs
++++ b/compiler/GHC/Iface/Rename.hs
+@@ -906,7 +906,9 @@
+     = (\bndr' co1' co2' -> IfaceForAllCo bndr' visL visR co1' co2')
+       <$> rnIfaceBndr bndr <*> rnIfaceMCo co1 <*> rnIfaceCo co2
+ rnIfaceCo (IfaceUnivCo s r t1 t2 deps)
+-    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> mapM rnIfaceCo deps
++    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> pure deps
++      -- The dependencies are either coercion variables or holes.
++      -- These are all local, and thus need no renaming.
+ 
+ rnIfaceTyCon :: Rename IfaceTyCon
+ rnIfaceTyCon (IfaceTyCon n info)
+diff --git a/compiler/GHC/Iface/Syntax.hs b/compiler/GHC/Iface/Syntax.hs
+--- a/compiler/GHC/Iface/Syntax.hs
++++ b/compiler/GHC/Iface/Syntax.hs
+@@ -2089,8 +2089,10 @@
+ freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
+ freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
+ freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet
+-freeNamesIfCoercion (IfaceUnivCo _ _ t1 t2 cos)
+-  = freeNamesIfType t1 &&& freeNamesIfType t2 &&& fnList freeNamesIfCoercion cos
++freeNamesIfCoercion (IfaceUnivCo _ _ t1 t2 _deps)
++  = freeNamesIfType t1 &&& freeNamesIfType t2
++    -- The dependencies are either coercion variables or holes.
++    -- These are all local, thus contributing no free names.
+ freeNamesIfCoercion (IfaceSymCo c)
+   = freeNamesIfCoercion c
+ freeNamesIfCoercion (IfaceTransCo c1 c2)
+diff --git a/compiler/GHC/Iface/Type.hs b/compiler/GHC/Iface/Type.hs
+--- a/compiler/GHC/Iface/Type.hs
++++ b/compiler/GHC/Iface/Type.hs
+@@ -13,6 +13,7 @@
+         IfLclName(..), mkIfLclName, ifLclNameFS,
+ 
+         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
++        IfaceUnivCoDep(..),
+         IfaceAxiomRule(..),IfaceMCoercion(..),
+         IfaceMult,
+         IfaceTyCon(..),
+@@ -486,7 +487,7 @@
+        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
+        -- to use an IfaceLclName to distinguish them.
+        -- See Note [Adding built-in type families] in GHC.Builtin.Types.Literals
+-  | IfaceUnivCo       UnivCoProvenance Role IfaceType IfaceType [IfaceCoercion]
++  | IfaceUnivCo       UnivCoProvenance Role IfaceType IfaceType [IfaceUnivCoDep]
+   | IfaceSymCo        IfaceCoercion
+   | IfaceTransCo      IfaceCoercion IfaceCoercion
+   | IfaceSelCo        CoSel IfaceCoercion
+@@ -499,6 +500,24 @@
+   deriving (Eq, Ord)
+   -- Why Ord?  See Note [Ord instance of IfaceType]
+ 
++-- | A single dependency of an 'IfaceUnivCo'.
++--
++-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep.
++data IfaceUnivCoDep
++  = IfaceUnivCoDepCoVar     IfLclName
++      -- ^ An in-scope coercion variable (bound by an enclosing binder).
++      --
++      -- This is the only form that occurs in interface files.
++  | IfaceUnivCoDepFreeCoVar CoVar
++      -- ^ A free coercion variable.
++      --
++      -- See Note [Free TyVars and CoVars in IfaceType]
++  | IfaceUnivCoDepHole      CoVar
++      -- ^ A coercion hole.
++      --
++      -- See Note [Holes in IfaceCoercion]
++  deriving (Eq, Ord)
++
+ data IfaceAxiomRule
+   = IfaceAR_X IfLclName               -- Built-in
+   | IfaceAR_B IfExtName BranchIndex   -- Branched
+@@ -514,6 +533,9 @@
+ to render Types. For this reason IfaceCoercion has a IfaceHoleCo
+ constructor; however, we fails when asked to serialize to a
+ IfaceHoleCo to ensure that they don't end up in an interface file.
++
++The dependencies of a UnivCo are subject to the same treatment, via
++IfaceUnivCoDepHole.
+ 
+ 
+ %************************************************************************
+@@ -782,7 +804,7 @@
+     go_co (IfaceFreeCoVar cv)        = IfaceFreeCoVar cv
+     go_co (IfaceCoVarCo cv)          = IfaceCoVarCo cv
+     go_co (IfaceHoleCo cv)           = IfaceHoleCo cv
+-    go_co (IfaceUnivCo p r t1 t2 ds) = IfaceUnivCo p r (go t1) (go t2) (go_cos ds)
++    go_co (IfaceUnivCo p r t1 t2 ds) = IfaceUnivCo p r (go t1) (go t2) ds
+     go_co (IfaceSymCo co)            = IfaceSymCo (go_co co)
+     go_co (IfaceTransCo co1 co2)     = IfaceTransCo (go_co co1) (go_co co2)
+     go_co (IfaceSelCo n co)          = IfaceSelCo n (go_co co)
+@@ -2139,6 +2161,12 @@
+ ppr_special_co ctxt_prec doc cos
+   = maybeParen ctxt_prec appPrec
+                (sep [doc, nest 4 (sep (map pprParendIfaceCoercion cos))])
++
++-- Rendered as for the corresponding IfaceCoercion constructors above
++instance Outputable IfaceUnivCoDep where
++  ppr (IfaceUnivCoDepCoVar     covar) = ppr covar
++  ppr (IfaceUnivCoDepFreeCoVar covar) = ppr covar
++  ppr (IfaceUnivCoDepHole      covar) = braces (ppr covar)
+ 
+ pprIfAxRule :: IfaceAxiomRule -> SDoc
+ pprIfAxRule (IfaceAR_X n)   = ppr n
+@@ -2584,6 +2612,18 @@
+                    return $ IfaceAxiomCo a b
+            _ -> panic ("get IfaceCoercion " ++ show tag)
+ 
++-- | Only 'IfaceUnivCoDepCoVar' can be serialised, so no tag is written.
++instance Binary IfaceUnivCoDep where
++  put_ bh (IfaceUnivCoDepCoVar n) = put_ bh n
++  put_ _ (IfaceUnivCoDepFreeCoVar cv)
++       = pprPanic "Can't serialise IfaceUnivCoDepFreeCoVar" (ppr cv)
++           -- See Note [Free TyVars and CoVars in IfaceType]
++  put_ _ (IfaceUnivCoDepHole cv)
++       = pprPanic "Can't serialise IfaceUnivCoDepHole" (ppr cv)
++           -- See Note [Holes in IfaceCoercion]
++
++  get bh = IfaceUnivCoDepCoVar <$> get bh
++
+ instance Binary IfaceAxiomRule where
+   put_ bh (IfaceAR_X n)   = putByte bh 0 >> put_ bh n
+   put_ bh (IfaceAR_U n)   = putByte bh 1 >> put_ bh n
+@@ -2653,6 +2693,14 @@
+     IfaceFreeCoVar f1 -> f1 `seq` ()
+     IfaceHoleCo f1 -> f1 `seq` ()
+ 
++instance NFData IfaceUnivCoDep where
++  rnf = \case
++    IfaceUnivCoDepCoVar f1 -> rnf f1
++    -- As for IfaceFreeCoVar and IfaceHoleCo above, these are only used for
++    -- pretty-printing, so they are not deeply forced.
++    IfaceUnivCoDepFreeCoVar f1 -> f1 `seq` ()
++    IfaceUnivCoDepHole f1 -> f1 `seq` ()
++
+ instance NFData IfaceAxiomRule where
+   rnf = \case
+     IfaceAR_X n   -> rnf n
+diff --git a/compiler/GHC/IfaceToCore.hs b/compiler/GHC/IfaceToCore.hs
+--- a/compiler/GHC/IfaceToCore.hs
++++ b/compiler/GHC/IfaceToCore.hs
+@@ -107,7 +107,7 @@
+ import GHC.Types.Avail
+ import GHC.Types.TypeEnv
+ import GHC.Types.Unique.FM
+-import GHC.Types.Unique.DSet ( mkUniqDSet )
++import GHC.Types.Unique.DSet ( mkUniqDSet, emptyUniqDSet )
+ import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
+ import GHC.Types.Unique.Supply
+ import GHC.Types.Demand( isDeadEndSig )
+@@ -1593,11 +1593,18 @@
+            ; return (ForAllCo { fco_tcv = tv', fco_visL = visL, fco_visR = visR
+                               , fco_kind = k', fco_body = co' }) } }
+     go (IfaceCoVarCo n)           = CoVarCo <$> go_var n
+-    go (IfaceUnivCo p r t1 t2 ds) = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2
+-                                       ; ds' <- mapM go ds
+-                                       ; return (UnivCo { uco_prov = p, uco_role = r
+-                                                        , uco_lty = t1', uco_rty = t2'
+-                                                        , uco_deps = ds' }) }
++    go (IfaceUnivCo p r t1 t2 ds) =
++      do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2
++         ; cvs <- mapM go_dep ds
++         ; return $
++             UnivCo
++               { uco_prov = p, uco_role = r
++               , uco_lty = t1', uco_rty = t2'
++                 -- No coercion holes in interface files, as per
++                 -- Note [Holes in IfaceCoercion] in GHC.Iface.Type
++               , uco_deps = mkUnivCoDepsSets (mkDVarSet cvs) emptyUniqDSet
++              }
++         }
+     go (IfaceSymCo c)            = SymCo    <$> go c
+     go (IfaceTransCo c1 c2)      = TransCo  <$> go c1
+                                             <*> go c2
+@@ -1612,6 +1619,11 @@
+                                            <*> mapM go cos
+     go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
+     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
++
++    go_dep :: IfaceUnivCoDep -> IfL CoVar
++    go_dep (IfaceUnivCoDepCoVar n)      = go_var n
++    go_dep (IfaceUnivCoDepFreeCoVar cv) = pprPanic "tcIfaceCo:IfaceUnivCoDepFreeCoVar" (ppr cv)
++    go_dep (IfaceUnivCoDepHole cv)      = pprPanic "tcIfaceCo:IfaceUnivCoDepHole"      (ppr cv)
+ 
+     go_var :: IfLclName -> IfL CoVar
+     go_var = tcIfaceLclId
+diff --git a/compiler/GHC/Tc/Instance/Family.hs b/compiler/GHC/Tc/Instance/Family.hs
+--- a/compiler/GHC/Tc/Instance/Family.hs
++++ b/compiler/GHC/Tc/Instance/Family.hs
+@@ -954,4 +954,6 @@
+ -- and the home-pkg inst env (includes module being compiled)
+ tcGetFamInstEnvs
+   = do { eps <- getEps; env <- getGblEnv
+-       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
++       ; let !pkg_env  = eps_fam_inst_env eps
++             !home_env = tcg_fam_inst_env env
++       ; return (pkg_env, home_env) }
+diff --git a/compiler/GHC/Tc/Solver/Default.hs b/compiler/GHC/Tc/Solver/Default.hs
+--- a/compiler/GHC/Tc/Solver/Default.hs
++++ b/compiler/GHC/Tc/Solver/Default.hs
+@@ -25,11 +25,11 @@
+ import GHC.Tc.Utils.TcType
+ 
+ import GHC.Core.Class
+-import GHC.Core.Reduction( Reduction, reductionCoercion )
++import GHC.Core.Reduction( Reduction, isReflRedn )
+ import GHC.Core
+ import GHC.Core.DataCon
+ import GHC.Core.Make
+-import GHC.Core.Coercion( isReflCo, mkSubCo, hasCoercionHole )
++import GHC.Core.Coercion( mkSubCo, hasCoercionHole )
+ import GHC.Core.Unify    ( tcMatchTyKis )
+ import GHC.Core.Predicate
+ import GHC.Core.Type
+@@ -527,7 +527,7 @@
+ 
+            ; case res of
+                PuFail {}   -> cant_default_tv "checkTyEqRhs"
+-               PuOK _ redn -> assertPpr (isReflCo (reductionCoercion redn)) (ppr redn) $
++               PuOK _ redn -> assertPpr (isReflRedn redn) (ppr redn) $
+                                -- With TEFA_Recurse we never get any reductions
+                               default_tv }
+       | otherwise
+diff --git a/compiler/GHC/Tc/Solver/Equality.hs b/compiler/GHC/Tc/Solver/Equality.hs
+--- a/compiler/GHC/Tc/Solver/Equality.hs
++++ b/compiler/GHC/Tc/Solver/Equality.hs
+@@ -2268,7 +2268,7 @@
+            -- We unify alpha := Int, and set co := <Int>.  No need to
+            -- swap to   co = sym co'
+            --           co' = <Int>
+-           new_ev <- if isReflCo (reductionCoercion rhs_redn)
++           new_ev <- if isReflRedn rhs_redn
+                      then return ev
+                      else rewriteEqEvidence ev swapped
+                               (mkReflRedn Nominal (mkTyVarTy tv)) rhs_redn
+diff --git a/compiler/GHC/Tc/Solver/InertSet.hs b/compiler/GHC/Tc/Solver/InertSet.hs
+--- a/compiler/GHC/Tc/Solver/InertSet.hs
++++ b/compiler/GHC/Tc/Solver/InertSet.hs
+@@ -326,14 +326,10 @@
+        , inert_cycle_breakers :: CycleBreakerVarStack
+ 
+        , inert_famapp_cache :: FunEqMap Reduction
+-              -- Just a hash-cons cache for use when reducing family applications
+-              -- only
++              -- ^ The family application cache: a cache of type family reductions
++              -- used to speed up rewriting of type family applications.
+               --
+-              -- If    F tys :-> (co, rhs, flav),
+-              -- then  co :: F tys ~N rhs
+-              -- all evidence is from instances or Givens; no coercion holes here
+-              -- (We have no way of "kicking out" from the cache, so putting
+-              --  wanteds here means we can end up solving a Wanted with itself. Bad)
++              -- See Note [The family application cache] in GHC.Tc.Solver.Rewrite.
+ 
+        , inert_solved_dicts :: DictMap DictCt
+               -- All Wanteds, of form (C t1 .. tn)
+diff --git a/compiler/GHC/Tc/Solver/Monad.hs b/compiler/GHC/Tc/Solver/Monad.hs
+--- a/compiler/GHC/Tc/Solver/Monad.hs
++++ b/compiler/GHC/Tc/Solver/Monad.hs
+@@ -481,6 +481,9 @@
+               -- The famapp-cache contains Given evidence from the inert set.
+               -- If we're kicking out Givens, we need to remove this evidence
+               -- from the cache, too.
++              -- For now the famapp-cache never contains Wanted evidence, so
++              -- kicking out Wanteds requires no such treatment.
++              -- See (FAC_Holes) in Note [The family application cache] in GHC.Tc.Solver.Rewrite.
+             ; let kicked_given_ev_vars = foldr add_one emptyVarSet kicked_out
+                   add_one :: Ct -> VarSet -> VarSet
+                   add_one ct vs | CtGiven (GivenCt { ctev_evar = ev_var }) <- ctEvidence ct
+@@ -902,9 +905,10 @@
+            Nothing -> return Nothing }
+ 
+ extendFamAppCache :: TyCon -> [Type] -> Reduction -> TcS ()
+--- NB: co :: rhs ~ F tys, to match expectations of rewriter
+ extendFamAppCache tc xi_args stuff@(Reduction _ ty)
+   = do { dflags <- getDynFlags
++         -- See (FAC_Flag) in Note [The family application cache]
++         -- in GHC.Tc.Solver.Rewrite
+        ; when (gopt Opt_FamAppCache dflags) $
+     do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
+                                             , ppr ty ])
+diff --git a/compiler/GHC/Tc/Solver/Rewrite.hs b/compiler/GHC/Tc/Solver/Rewrite.hs
+--- a/compiler/GHC/Tc/Solver/Rewrite.hs
++++ b/compiler/GHC/Tc/Solver/Rewrite.hs
+@@ -15,12 +15,18 @@
+ import GHC.Tc.Types.Evidence
+ import GHC.Core.TyCon
+ import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
++import GHC.Core.TyCo.FVs( univCoDepsDeepCoVars, univCoDepsHasHoles
++                        , addUnivCoDep
++                        , unionUnivCoDeps
++                        )
+ import GHC.Core.Coercion
++import GHC.Core.Lint( lintTcCoercion )
+ import GHC.Core.Reduction
+ import GHC.Types.Unique.FM
+ import GHC.Types.Var
+ import GHC.Types.Var.Set
+ import GHC.Types.Var.Env
++import GHC.Driver.Config.Core.Lint( initLintConfig )
+ import GHC.Driver.DynFlags
+ import GHC.Tc.Utils.Monad (rewriterTcMPlugins)
+ import GHC.Utils.Outputable
+@@ -35,7 +41,8 @@
+ import GHC.Builtin.Types (tYPETyCon)
+ import Data.List ( find )
+ import GHC.Data.List.Infinite (Infinite)
+-import GHC.Data.Bag( listToBag )
++import GHC.Data.Bag( listToBag, bagToList, isEmptyBag )
++import GHC.Data.Pair (Pair(..))
+ import qualified GHC.Data.List.Infinite as Inf
+ 
+ {-
+@@ -87,12 +94,16 @@
+ -- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
+ runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
+ runRewrite loc flav eq_rel thing_inside
+-  = do { rewriters_ref <- newTcRef emptyCoHoleSet
++  = do { dflags <- getDynFlags
++       ; used_cos_ref  <- newTcRef emptyUnivCoDeps
++       ; rewriters_ref <- newTcRef emptyCoHoleSet
+        ; let fmode = RE { re_loc       = resetCtLocDepth loc
+                             -- Start reducing from zero
+                         , re_flavour   = flav
+                         , re_eq_rel    = eq_rel
+-                        , re_rewriters = rewriters_ref }
++                        , re_rewriters = rewriters_ref
++                        , re_used_cos  = used_cos_ref
++                        , re_zap_coercions = gopt Opt_ZapCoercions dflags }
+        ; res <- runRewriteM thing_inside fmode
+        ; rewriters <- readTcRef rewriters_ref
+        ; return (res, rewriters) }
+@@ -143,15 +154,22 @@
+       ; thing_inside env' }
+ 
+ recordRewriter :: CtEvidence -> RewriteM ()
+--- Record that we have rewritten the target with this (equality) evidence
++-- ^ Record that we have rewritten the target with this (equality) evidence
++--
+ -- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
++--
+ -- Precondition: the CtEvidence is for an equality constraint
+-recordRewriter (CtGiven {})
+-  = return ()
+-recordRewriter (CtWanted (WantedCt { ctev_dest = dest }))
+-  = case dest of
+-      HoleDest hole -> RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriter` hole)
+-      other         -> pprPanic "recordRewriter: non-equality constraint" (ppr other)
++--
++-- Also records the evidence coercion in 're_used_cos',
++-- as per Note [Computing coercion dependencies].
++recordRewriter (CtGiven (GivenCt { ctev_evar = evar })) = mkRewriteM $ \env ->
++  updTcRef (re_used_cos env) (`addUnivCoDep` mkCoVarCo evar)
++recordRewriter (CtWanted (WantedCt { ctev_dest = dest })) =
++  case dest of
++    HoleDest hole -> mkRewriteM $ \env ->
++      do { updTcRef (re_rewriters env) (`addRewriter` hole)
++         ; updTcRef (re_used_cos env) (`addUnivCoDep` mkHoleCo hole) }
++    other -> pprPanic "recordRewriter: non-equality constraint" (ppr other)
+ 
+ {- Note [Rewriter EqRels]
+ ~~~~~~~~~~~~~~~~~~~~~~~~~
+@@ -213,10 +231,11 @@
+ -}
+ 
+ -- | See Note [Rewriting].
+--- If (xi, co, rewriters) <- rewrite mode ev ty, then co :: xi ~r ty
+--- where r is the role in @ev@.
+--- `rewriters` is the set of coercion holes that have been used to rewrite
+--- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
++--
++-- If @(Reduction co xi, rws) <- rewrite ev ty@,
++-- then @co :: ty ~r xi@, where @r@ is the role in @ev@ and @rws@ is the set of
++-- coercion holes that have been used to rewrite (see Note [Wanteds rewrite Wanteds: rewriter-sets]
++-- in GHC.Tc.Types.Constraint).
+ rewrite :: CtEvidence -> TcType
+         -> TcS (Reduction, CoHoleSet)
+ rewrite ev ty
+@@ -367,20 +386,137 @@
+ duplicate the rewriter code for the nominal case, and make that case
+ faster. This doesn't seem quite worth it, yet.
+ 
+-Note [rewrite_exact_fam_app performance]
+-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-Once we've got a rewritten rhs, we extend the famapp-cache to record
+-the result. Doing so can save lots of work when the same redex shows up more
+-than once. Note that we record the link from the redex all the way to its
+-*final* value, not just the single step reduction.
+-
+-If we can reduce the family application right away (the first call
+-to try_to_reduce), we do *not* add to the cache. There are two possibilities
+-here: 1) we just read the result from the cache, or 2) we used one type
+-family instance. In either case, recording the result in the cache doesn't
+-save much effort the next time around. And adding to the cache here is
+-actually disastrous: it more than doubles the allocations for T9872a. So
+-we skip adding to the cache here.
++Note [The family application cache]
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++To speed up the compilation of type-family heavy programs, when reducing a type
++family application, we /sometimes/ store the resulting reduction in a cache
++(the family application cache) so that further computations that rewrite this
++same type family application directly look up the result in the cache instead of
++re-deriving the reduction from scratch.
++
++Specifically:
++
++  - when we rewrite a type family application, and then
++    recursively rewrite the RHS of this reduction, obtaining
++
++      F tys ~> Reduction co xi
++
++  - and [Conditions for adding to the cache] are satisfied
++
++then 'rewrite_exact_fam_app' stores the reduction 'redn = Reduction co xi'
++into the cache ('inert_famapp_cache'), under the cache key 'F tys'.
++
++Caching the entire chain of reductions, rather than each single reduction step,
++was measured to reduce the number of type family reductions in T9872{a,b,c} by ~12%.
++Note however that a nested family application inside of an argument of the tyfam-app
++we are rewriting will itself be rewritten by a fresh call to 'rewrite_exact_fam_app',
++so that will have its own reduction chain and its own cache entry.
++
++[Conditions for adding to the cache]
++
++  We only store a reduction in the family application cache when /all/ of the
++  following conditions are satisfied:
++
++  (FAC_Flag)    The -ffamily-application-cache flag is on (which it is by default)
++
++    The cache is just a performance optimisation. It is controlled by a flag to
++    allow A/B testing its effect, and to let users turn it off if it causes issues.
++
++  (FAC_Role)    The ambient role is Nominal
++
++    Type family axioms have Nominal role, and Nominal cache entries can be
++    downgraded to Representational when the ambient role is Representational.
++
++    Storing Representational reductions would require storing the role in the
++    cache key, for an unclear payoff.
++
++  (FAC_Holes)   The reduction's coercion does not contain any coercion holes
++
++    This is to avoid using the cache to solve a Wanted with itself. For example,
++    suppose we rewrite using an inert [W] w : F a ~ b, and end up caching 'F a ~> b'.
++    Then, if 'w' is later kicked out and rewritten, we may end up using the
++    cached entry and solve 'w' with itself!
++
++    This is precisely what 'dropFromFamAppCache' is designed to solve, but today
++    it's used for Givens only. We'd need to make use of it whenever we kick out
++    a Wanted; as we kick out Wanteds much more often than Givens, scanning the
++    entire cache like this may turn out to be expensive (but it also may not!).
++
++  (FAC_WorthCaching) The reduction is "worth caching".
++
++    See Note [When is a reduction worth caching?]
++
++Note [When is a reduction worth caching?]
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++Whether a chain of type family reductions is "worth caching" is a heuristic
++tuned for compiler performance. Currently, we consider a chain of type family
++reductions "worth caching" precisely when at least one step in the chain has
++one of the following shapes:
++
++  (WorthCaching1)
++    We succeeded in rewriting a type family application,
++    but only after rewriting one of its arguments.
++  (WorthCaching2)
++    We rewrote a type family application using an exactly-matching inert.
++
++In particular, if every step in the chain reduces immediately, using a type
++family equation (or a previously cached reduction) without having to rewrite any
++arguments first, then we don't add to the cache. This is the most important part
++here; adding to the cache in such cases can have disastrous consequences, more
++than doubling the allocations for T9872a.
++
++Examples:
++
++  Id Int ~> Int
++    not worth caching: immediately reduces using an axiom; cheap
++
++  (1 + 2) + 4 ~> 3 + 4 ~> 7
++    worth caching: we had to rewrite (1+2) ~> 3 inside the first argument
++    of the outer (+) in order to make progress
++
++  Id (2 + 3) ~> 2 + 3 ~> 5
++    not worth caching: we did not need to rewrite the argument to 'Id'
++    before reducing it
++
++This heuristic isn't particularly great, it's just what we have today.
++Case in point:
++
++  data Peano = Z | S Peano
++
++  type Length :: [k] -> Peano
++  type family Length xs where
++    Length '[]       = 'Z
++    Length (_ ': xs) = 'S (Length xs)
++
++A reduction chain for this type family looks like:
++
++  Length [x1, ..., x100]
++    ~> 'S (Length [x2, ..., x100])
++    ~> 'S ('S (Length [x3, ..., x100]))
++    ~> ...
++    ~> 100 (as a Peano natural number)
++
++At no point do we rewrite an argument to a type family (given that S is a
++promoted data constructor), so we don't cache any reduction at all in this entire
++chain, and we will re-run the entire computation at every occurrence of
++'Length [x1, ..., x100]'.
++
++On the other hand, consider a reduction chain for factorial:
++
++  type family Factorial n where
++    Factorial 0 = 1
++    Factorial n = n * Factorial (n - 1)
++
++  Factorial 9
++    ~>
++      9 * Factorial (9 - 1)
++        ~> (rewrite_fam_app_result)
++          362880
++
++The (*) type family cannot reduce until its second argument is rewritten,
++so this chain of reductions /will/ be cached.
++The result reduction proceeds by rewriting the second argument to (*),
++namely 'Factorial (9 - 1) ~> 40320', which will also be cached.
+ -}
+ 
+ {-# INLINE rewrite_args_tc #-}
+@@ -460,7 +596,9 @@
+                   -> RewriteM ArgsReductions
+ rewrite_args_slow binders inner_ki fvs roles tys
+   = do { rewritten_args <- zipWithM rw (Inf.toList roles) tys
+-       ; return (simplifyArgsWorker binders inner_ki fvs roles rewritten_args) }
++       ; return $
++           simplifyArgsWorker binders inner_ki fvs roles tys rewritten_args
++       }
+   where
+     {-# INLINE rw #-}
+     rw :: Role -> Type -> RewriteM Reduction
+@@ -475,7 +613,7 @@
+     rw Phantom ty
+     -- See Note [Phantoms in the rewriter]
+       = do { ty <- liftTcS $ zonkTcType ty
+-           ; return $ mkReflRedn Phantom ty }
++           ; return $! mkReflRedn Phantom ty }
+ 
+ ------------------
+ rewrite_one :: TcType -> RewriteM Reduction
+@@ -492,7 +630,7 @@
+ 
+ rewrite_one xi@(LitTy {})
+   = do { role <- getRole
+-       ; return $ mkReflRedn role xi }
++       ; return $! mkReflRedn role xi }
+ 
+ rewrite_one (TyVarTy tv)
+   = rewriteTyVar tv
+@@ -540,7 +678,7 @@
+           -- be done if we used TyConApp instead of FunTy. These rewritten
+           -- representations are seen only in casts of the arg and res, below.
+           -- Forgetting this caused #19677.
+-       ; return $ mkFunRedn role vis w_redn casted_arg_redn casted_res_redn }
++       ; return $! mkFunRedn role vis w_redn casted_arg_redn casted_res_redn }
+ 
+ rewrite_one ty@(ForAllTy {})
+ -- TODO (RAE): This is inadequate, as it doesn't rewrite the kind of
+@@ -551,13 +689,13 @@
+ -- applications inside the forall involve the bound type variables.
+   = do { let (bndrs, rho) = tcSplitForAllTyVarBinders ty
+        ; redn <- rewrite_one rho
+-       ; return $ mkHomoForAllRedn bndrs redn }
++       ; return $! mkHomoForAllRedn bndrs redn }
+ 
+ rewrite_one (CastTy ty g)
+   = do { redn <- rewrite_one ty
+        ; g'   <- rewrite_co g
+        ; role <- getRole
+-       ; return $ mkCastRedn1 role ty g' redn }
++       ; return $! mkCastRedn1 role ty g' redn }
+       -- This calls castCoercionKind1.
+       -- It makes a /big/ difference to call castCoercionKind1 not
+       -- the more general castCoercionKind2.
+@@ -566,7 +704,7 @@
+ rewrite_one (CoercionTy co)
+   = do { co' <- rewrite_co co
+        ; role <- getRole
+-       ; return $ mkReflCoRedn role co' }
++       ; return $! mkReflCoRedn role co' }
+ 
+ -- | "Rewrite" a coercion. Really, just zonk it so we can uphold
+ -- (F1) of Note [Rewriting]
+@@ -577,7 +715,7 @@
+ rewrite_reduction :: Reduction -> RewriteM Reduction
+ rewrite_reduction (Reduction co xi)
+   = do { redn <- rewrite_one xi
+-       ; return $ co `mkTransRedn` redn }
++       ; return $! co `mkTransRedn` redn }
+ 
+ -- rewrite (nested) AppTys
+ rewrite_app_tys :: Type -> [Type] -> RewriteM Reduction
+@@ -712,9 +850,23 @@
+ Given an exactly saturated family application, how should we normalise it?
+ This Note spells out the algorithm and its reasoning.
+ 
+-First, we attempt to directly rewrite the type family application,
+-without simplifying any of the arguments first, in an attempt to avoid
+-doing unnecessary work.
++We proceed in two layers:
++
++  * The inner layer, 'rewrite_exact_fam_app_chain', performs the reduction
++    itself, in the STEPs described below. It may reduce a whole chain of redexes
++    (see FINISH), and returns the composite reduction.
++
++  * The outer layer, 'rewrite_exact_fam_app', decides what to do with that
++    reduction as a whole: it may zap it, and it may add it to the family
++    application cache.
++
++    Caching the reduction as a whole (instead of every sub-reduction) means
++    we cache the entire chain of reductions, instead of caching individual steps.
++    See Note [The family application cache].
++
++Inside the inner layer, we first attempt to directly rewrite the type family
++application without simplifying any of the arguments first, in an attempt to
++avoid doing unnecessary work. The steps are as follows:
+ 
+ STEP 1a. Call the rewriting plugins. If any plugin rewrites the type family
+ application, jump to FINISH.
+@@ -735,71 +887,106 @@
+   pick up a top-level instance.
+ 
+ STEP 3. Try the inerts. Note that we try the inerts *after* rewriting the
+-  arguments, because the inerts will have rewritten LHSs.
++  arguments, because the inerts will have rewritten LHSs. That is, trying the
++  inerts is not part of Step 1.
+ 
+   If an inert is found, jump to FINISH.
+ 
+ Next, we try STEP 1 again, as we might be able to make further progress after
+ having rewritten the arguments:
+ 
+-STEP 4a. Query the rewriting plugins again.
++STEP 4a (like STEP 1a). Query the rewriting plugins again.
+ 
+   If any plugin supplies a rewriting, jump to FINISH.
+ 
+-STEP 4b. Try the famapp-cache again.
++STEP 4b (like STEP 1b). Try the famapp-cache again.
+ 
+   If we get a cache hit, jump to FINISH.
+ 
+-STEP 4c. Try top-level instances again.
++STEP 4c (like STEP 1c). Try top-level instances again.
+ 
+   If an instance is found, jump to FINISH.
+ 
+ STEP 5: GIVEUP. No progress to be made. Return what we have. (Do not FINISH.)
+ 
+-FINISH 1. We've made a reduction, but the new type may still have more
+-  work to do. So rewrite the new type.
+-
+-FINISH 2. Add the result to the famapp-cache, connecting the type we started
+-  with to the one we ended with.
++FINISH (see `finish`). The rewriter produced a reduction: we proceed to
++  recursively rewrite its RHS type until there is no more work to do (or we hit
++  the rewriter's depth limit). We then return this composite reduction.
+ 
+ Because STEP 1{a,b,c} and STEP 4{a,b,c} happen the same way, they are abstracted into
+ try_to_reduce.
+-
+-FINISH is naturally implemented in `finish`. But, Note [rewrite_exact_fam_app performance]
+-tells us that we should not add to the famapp-cache after STEP 1. So `finish`
+-is inlined in that case, and only FINISH 1 is performed.
+-
+ -}
+ 
++-- | Split the arguments of a (possibly oversaturated) type family application
++-- into the arguments that exactly saturate the 'TyCon', and the remaining
++-- arguments.
++splitFamAppArgs :: TyCon -> [TcType] -> ([TcType], [TcType])
++splitFamAppArgs tc tys
++    -- Type functions are saturated, but might be *over* saturated,
++    -- in which case the remaining arguments are dealt with by AppTys.
++  = assertPpr (tys `lengthAtLeast` arity) (ppr tc $$ ppr arity $$ ppr tys) $
++    splitAt arity tys
++  where
++    arity = tyConArity tc
++
++-- | Rewrite a (possibly oversaturated) type family application.
+ rewrite_fam_app :: TyCon -> [TcType] -> RewriteM Reduction
+-  --   rewrite_fam_app            can be over-saturated
+-  --   rewrite_exact_fam_app      lifts out the application to top level
+-  -- Postcondition: Coercion :: Xi ~ F tys
+-rewrite_fam_app tc tys  -- Can be over-saturated
+-    = assertPpr (tys `lengthAtLeast` tyConArity tc)
+-                (ppr tc $$ ppr (tyConArity tc) $$ ppr tys) $
+-
+-                 -- Type functions are saturated
+-                 -- The type function might be *over* saturated
+-                 -- in which case the remaining arguments should
+-                 -- be dealt with by AppTys
+-      do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
+-         ; redn <- rewrite_exact_fam_app tc tys1
+-         ; rewrite_app_ty_args redn tys_rest }
+-
+--- the [TcType] exactly saturate the TyCon
+--- See Note [How to normalise a family application]
+-rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM Reduction
+-rewrite_exact_fam_app tc tys
+-  = do { -- Query the typechecking plugins for all their rewriting functions
++rewrite_fam_app tc tys
++  = do { let (tys1, tys_rest) = splitFamAppArgs tc tys
++       ; redn <- rewrite_exact_fam_app tc tys1
++       ; rewrite_app_ty_args redn tys_rest }
++
++-- | Rewrite an exactly-saturated family application: the outer layer of
++-- Note [How to normalise a family application].
++--
++-- This function handles:
++--
++--  - dependency tracking (Note [Computing coercion dependencies]),
++--  - zapping (Note [Coercion zapping]),
++--  - extending the family application cache (Note [The family application cache])
++rewrite_exact_fam_app
++  :: TyCon      -- ^ @F@
++  -> [TcType]   -- ^ @tys@, exactly saturating @F@
++  -> RewriteM Reduction
++rewrite_exact_fam_app tc tys =
++  do { let !fam_ty = mkTyConApp tc tys
++     ; (deps, res) <- trackingDependencies $
++                      rewrite_exact_fam_app_chain fam_ty tc tys
++     ; case res of
++         FamAppNotReduced redn ->
++            -- We only rewrote the arguments: nothing to zap nor cache.
++           return redn
++         FamAppReduced redn worth_caching ->
++           do { -- Zap the reduction (when -fzap-coercions is on).
++              ; zapped_redn <- zapRedn deps fam_ty redn
++              ; eq_rel <- getEqRel
++
++                -- See Note [The family application cache]
++              ; when (  worth_caching                 -- (FAC_WorthCaching)
++                     && eq_rel == NomEq               -- (FAC_Role)
++                     && not (univCoDepsHasHoles deps) -- (FAC_Holes)
++                     ) $
++                  -- NB: (FAC_Flag) is checked in 'extendFamAppCache'.
++                  liftTcS $ extendFamAppCache tc tys zapped_redn
++              ; return zapped_redn
++              }}
++
++-- | Reduce an exactly-saturated type family application: the inner layer of
++-- Note [How to normalise a family application], i.e. STEPs 1-5 and FINISH.
++rewrite_exact_fam_app_chain :: TcType -> TyCon -> [TcType] -> RewriteM FamAppRewrite
++rewrite_exact_fam_app_chain fam_ty tc tys
++  = assertPpr (fam_ty `eqType` mkTyConApp tc tys)
++              (ppr fam_ty $$ ppr tc $$ ppr tys) $
++
++    do { -- Query the typechecking plugins for all their rewriting functions
+          -- which apply to a type family application headed by the TyCon 'tc'.
+        ; tc_rewriters <- getTcPluginRewritersForTyCon tc
+ 
+        -- STEP 1. Try to reduce without reducing arguments first.
+        ; result1 <- try_to_reduce tc tys tc_rewriters
+        ; case result1 of
+-             -- Don't use the cache;
+-             -- See Note [rewrite_exact_fam_app performance]
++             -- We reduced without rewriting any arguments: not worth caching.
++             -- See Note [When is a reduction worth caching?]
+          { Just redn -> finish False redn
+          ; Nothing ->
+ 
+@@ -828,16 +1015,18 @@
+        ; let
+            role    = eqRelRole eq_rel
+            args_co = mkTyConAppCo role tc cos
+-       ;  let homogenise :: Reduction -> Reduction
+-              homogenise redn
+-                = homogeniseHetRedn role
+-                $ mkHetReduction
+-                    (args_co `mkTransRedn` redn)
+-                    kind_co
+-
+-              give_up :: Reduction
+-              give_up = homogenise $ mkReflRedn role reduced
+-                where reduced = mkTyConApp tc xis
++       ;  let
++            -- Compose the argument reductions with the given reduction, then homogenise
++            redn_args_and_then :: Reduction -> Reduction
++            redn_args_and_then redn
++              = homogeniseHetRedn role
++              $ mkHetReduction
++                  (args_co `mkTransRedn` redn)
++                  kind_co
++
++            give_up :: Reduction
++            give_up = redn_args_and_then $ mkReflRedn role reduced
++              where reduced = mkTyConApp tc xis
+ 
+          -- STEP 3: try the inerts
+        ; flavour <- getFlavour
+@@ -847,7 +1036,8 @@
+              -> do { traceRewriteM "rewrite family application with inert"
+                                 (ppr tc <+> ppr xis $$ ppr redn)
+                    ; recordRewriter inert_ev
+-                   ; finish (isGiven inert_ev) (homogenise downgraded_redn) }
++                     -- (WorthCaching2) in Note [When is a reduction worth caching?]
++                   ; finish True (redn_args_and_then downgraded_redn) }
+                -- This will sometimes duplicate an inert in the cache,
+                -- but avoiding doing so had no impact on performance, and
+                -- it seems easier not to weed out that special case
+@@ -859,43 +1049,683 @@
+ 
+          ; _ ->
+ 
+-         -- inerts didn't work. Try to reduce again, in STEP 4.
++         -- Inerts didn't work. Try to reduce again, in STEP 4.
+     do { result3 <- try_to_reduce tc xis tc_rewriters
+        ; case result3 of
+-           Just redn -> finish True (homogenise redn)
+-           -- we have made no progress at all: STEP 5 (GIVEUP).
+-           _         -> return give_up }}}}}
++           -- (WorthCaching1) in Note [When is a reduction worth caching?]
++           Just redn -> finish True (redn_args_and_then redn)
++           -- We have made no progress at all: STEP 5 (GIVEUP).
++           _         -> return $! FamAppNotReduced give_up }}}}}
+   where
+-      -- call this if the above attempts made progress.
+-      -- This recursively rewrites the result and then adds to the cache
+-    finish :: Bool  -- add to the cache?
+-                    -- Precondition: True ==> input coercion has
+-                    --                        no coercion holes
+-           -> Reduction -> RewriteM Reduction
+-    finish use_cache redn
+-      = do { -- rewrite the result: FINISH 1
+-             final_redn <- bumpReductionDepthRM (mkTyConApp tc tys) $
+-                           rewrite_reduction redn
+-           ; eq_rel <- getEqRel
+-
+-             -- extend the cache: FINISH 2
+-           ; when (use_cache && eq_rel == NomEq) $
+-             -- the cache only wants Nominal eqs
+-             liftTcS $ extendFamAppCache tc tys final_redn
+-           ; return final_redn }
++    -- Call this if the above attempts made progress: FINISH.
++    finish :: Bool  -- (FAC_WorthCaching) from Note [The family application cache]
++           -> Reduction
++           -> RewriteM FamAppRewrite
++    finish worth_caching (Reduction co xi)
++      = do { (rest_redn, rest_worth_caching)
++               <- bumpReductionDepthRM fam_ty $
++                  rewrite_fam_app_result xi
++           ; return $! FamAppReduced (co `mkTransRedn` rest_redn)
++                                     (worth_caching || rest_worth_caching) }
+     {-# INLINE finish #-}
+ 
+--- Returned coercion is input ~r output, where r is the role in the RewriteM monad
++-- | The result of rewriting an exactly-saturated type family application.
++--
++-- See Note [How to normalise a family application].
++data FamAppRewrite
++  -- | The type family application was reduced.
++  = FamAppReduced
++      !Reduction -- ^ the type family reduction @F tys ~ ξ@
++      !Bool -- ^ is this reduction worth caching?
++            -- See (FAC_WorthCaching) in Note [The family application cache].
++
++  -- | The type family application was not reduced, but we have rewritten
++  -- its arguments.
++  | FamAppNotReduced !Reduction
++
++-- | The 'Reduction' obtained by rewriting a type family application, together
++-- with whether it is worth recording in the family application cache.
++famAppRewriteRedn :: FamAppRewrite -> (Reduction, Bool)
++famAppRewriteRedn (FamAppReduced redn worth_caching) = (redn, worth_caching)
++famAppRewriteRedn (FamAppNotReduced redn)            = (redn, False)
++
++-- | Rewrite the result of a type family reduction.
++--
++-- See FINISH in Note [How to normalise a family application].
++--
++-- Also returns whether the reduction is worth adding to the famapp cache.
++rewrite_fam_app_result
++  :: TcType
++  -> RewriteM (Reduction, Bool)
++rewrite_fam_app_result xi
++  | Just (fam_ty, tc, tys, tys_rest) <- splitTyFamApp_maybe xi
++  = do { res <- rewrite_exact_fam_app_chain fam_ty tc tys
++       ; let (redn, worth_caching) = famAppRewriteRedn res
++       ; redn' <- rewrite_app_ty_args redn tys_rest
++       ; return (redn', worth_caching) }
++  | otherwise
++  = do { redn <- rewrite_one xi
++       ; return (redn, False) }
++
++-- | Is this type a (possibly oversaturated) type family application?
++--
++-- Returns the exactly-saturated application, its 'TyCon', the arguments that
++-- saturate it, and any remaining arguments (in case of over-saturation).
++splitTyFamApp_maybe :: TcType -> Maybe (TcType, TyCon, [TcType], [TcType])
++splitTyFamApp_maybe ty
++  | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
++  = splitTyFamApp_maybe ty'
++  | TyConApp tc tys <- ty
++  , isTypeFamilyTyCon tc
++  = Just $! case splitFamAppArgs tc tys of
++      (_   , [])       -> (ty                , tc, tys , [])
++      (tys1, tys_rest) -> (mkTyConApp tc tys1, tc, tys1, tys_rest)
++  | otherwise
++  = Nothing
++
++-- | Collect all dependent coercions used within a rewriting action.
++--
++-- Continues to record all inner dependencies in the outer action.
++--
++-- See Note [Computing coercion dependencies].
++trackingDependencies :: RewriteM a -> RewriteM (UnivCoDeps, a)
++trackingDependencies thing_inside = mkRewriteM $ \ env ->
++  do { let ref = re_used_cos env
++     ; outer_deps <- readTcRef ref
++     ; unless (isEmptyUnivCoDeps outer_deps) $
++         writeTcRef ref emptyUnivCoDeps
++     ; res  <- runRewriteM thing_inside env
++     ; deps <- readTcRef ref
++       -- Restore the outer dependencies, adding on the inner ones.
++     ; unless (isEmptyUnivCoDeps outer_deps) $
++         writeTcRef ref $! outer_deps `unionUnivCoDeps` deps
++     ; return (deps, res) }
++{-# INLINE trackingDependencies #-} -- avoid allocating the return pair
++
++{- Note [Coercion zapping]
++~~~~~~~~~~~~~~~~~~~~~~~~~~
++When typechecking programs that involve long chains of type family reductions,
++the rewriter naturally produces large proof terms witnessing the reductions.
++
++Two examples illustrate the problem:
++
++  Example A.
++
++    data Nat = Z | S Nat
++
++    type F :: Nat -> Nat
++    type family F n where
++      F Z = Z
++      F (S n) = F n
++
++    co :: F ( S ( S ( S Z ) ) ) ~ Z
++    co = AxiomCo F[1] <S(S Z)>   -- F (S(S(S Z))) ~ F (S(S Z))
++       ; AxiomCo F[1] <S Z>      -- F (S(S Z))    ~ F (S Z)
++       ; AxiomCo F[1] <Z>        -- F (S Z)       ~ F Z
++       ; AxiomCo F[0]            -- F Z           ~ Z
++
++    The proof is a composition of a linear number of type family reduction steps.
++    However, the stored sizes also grow linearly, giving rise to a typical
++    triangular shape, with a total coercion size ≈ O(n²).
++
++  Example B.
++
++    type (++) :: [k] -> [k] -> [k]
++    type family xs ++ ys where
++      '[] ++ ys = ys
++      (x ': xs) ++ ys = x ': (xs ++ ys)
++
++    co :: ([x1, x2, x3] ++ ys) ~ (x1 ': x2 ': x3 ': ys)
++    co = AxiomCo (++)[1] <x1> <[x2, x3]> <ys>  -- Reduce at the top
++       ; TyConAppCo (:) <k> <x1>
++         ( AxiomCo (++)[1] <x2> <[x3]> <ys>    -- reduce under (x1:)
++         ; TyConAppCo (:) <k> <x2>
++           ( AxiomCo (++)[1] <x3> <[]> <ys>    -- reduce under (x1:x2:)
++           ; TyConAppCo (:) <k> <x3>
++             ( AxiomCo (++)[0] <ys> )          -- reduce under (x1:x2:x3:)
++           )
++         )
++
++    This time, the proof interleaves AxiomCo and TyConAppCo. It otherwise has
++    a similar shape as above, with the stored types giving rise to a total
++    coercion size ≈ O(n²).
++
++These large coercions cause significant slowdown (e.g. the simplifier needs to
++traverse them when substituting). To solve this, we need a smaller
++representation of these proof terms. Today, GHC does this by /coercion zapping/.
++
++To /zap/ a coercion is to replace it with a 'UnivCo' with 'ZappedProv' provenance.
++That is, we discard the proof, keeping only the LHS and RHS types it relates,
++together with its dependencies (as required by
++Note [The importance of tracking UnivCo dependencies] in GHC.Core.TyCo.Rep).
++
++Specifically, zapped coercions are created in exactly one place in the compiler:
++
++  (ZapRewrite)
++
++    When -fzap-coercions is on (which it is by default), each time the rewriter
++    produces a chain of type family reductions (see Note [How to normalise a family application]),
++    we zap the coercion stored in the reduction returned by the rewriter.
++
++    The zapped coercion thus relates the original type family application with
++    its final reduct, not storing any intermediate types.
++
++    In both Example A and Example B, we end up with a single 'UnivCo' relating
++    the two endpoints, of size O(n).
++
++    The rewriter is the right place to create zapped coercions, because of
++    Wrinkle [Don't look at what you are about to zap].
++
++    A mild bonus of storing both the LHS and RHS types is that 'coercionKind' of
++    a zapped coercion is O(1), which is a boon to 'isReflexiveCo_maybe'.
++
++We make sure to lint the coercion we are about to zap to check we have a valid
++proof before we throw it away forevermore. See Note [Core Lint and zapped coercions].
++
++Wrinkle [We also propagate zappedness]
++
++  The rewriter is the unique birth place of zapped coercions, but we also
++  /propagate/ zappedness in transitive chains of coercions, regardless of
++  -fzap-coercions.
++
++  This is a small optimisation that is not at all central to the implementation
++  of coercion zapping. See Note [Propagating zappedness] in GHC.Core.Coercion.
++
++Wrinkle [Don't look at what you are about to zap]
++
++  The 'Coercion' field of 'Reduction' is deliberately kept lazy so that we don't
++  pay to build a coercion we don't need. It is /critical/ that we never so much
++  as peek at the 'Coercion' we are about to zap. This is because, in practice,
++  the coercions built up by the rewriter are often large trees of smart
++  constructors (particularly 'mkTyConAppCo' and 'mkTransCo').
++  Empirically, compiling T9872a generates about 170k calls to 'mkTyConAppCo'
++  even though we end up zapping only ~1300 coercions in total. Moreover,
++  forcing such trees of smart constructors can be surprisingly expensive
++  (e.g. reflexivity checks).
++
++  This is why zapping in the rewriter is a good fit: we already have in our
++  hands everything we need to produce the zapped coercion, without looking at
++  the coercion we are about to zap:
++
++    - The LHS and RHS types are the type family application we started with
++      and its final reduct (computed by the rewriter).
++
++    - The dependencies are accumulated in the rewriter monad during rewriting,
++      as explained in Note [Computing coercion dependencies].
++
++  In contrast, zapping coercions after the fact (e.g. when zonking, as was
++  attempted in MR !3792) requires traversing the big coercion in order to
++  compute its kind and its dependencies.
++
++  The only exception to this rule is that we do look at the coercion we are
++  about to zap when running Core Lint.
++
++Wrinkle [Zapping a coercion may increase its size]
++
++  Perhaps surprisingly, zapping a coercion may **increase** its size, because
++  a 'UnivCo' must store both its LHS and RHS types.
++
++  For example, if we have:
++    type family F a where F Int = (Int, Bool, Char, [Word], ...) -- some huge type
++  then 'AxiomCo F[0] <Int>' is a much smaller coercion than
++    UnivCo { uco_lty = F Int, uco_rty = (Int, Bool, Char, [Word], ...) }
++
++  You might naively think this can be trivially solved by ad-hoc logic such as
++  "if the zapped coercion is larger, don't zap", but this /does not work/:
++  computing 'coercionSize' traverses the big coercion, which contravenes
++  Wrinkle [Don't look at what you are about to zap]. The same goes for
++  a budgeted traversal (bail out and zap once the coercion looks big).
++
++  We don't have a convincing answer to this today. What limits the damage is
++  that we are careful about which coercions we zap, only zapping entire chains
++  of type family reductions in the rewriter.
++
++  This ensures that, in the following example (taken from T3064), we zap the
++  type family reduction but not the 'TyConAppCo' around it:
++
++    -- all types stored are small
++    ResourceT <[Ch]> <(s,c)> (UnivCo { uco_lty = CtxLabel (CAT s c m), uco_rty = c })
++
++  If we propagated zappedness in 'mkTyConAppCo', we would instead end up with:
++
++    -- very big stored types
++    UnivCo { uco_lty = ResourceT [Ch] (..., CtxLabel (ResourceT ...))
++           , uco_rty = ResourceT [Ch] (..., ...)
++           }
++
++  which would unacceptably regress coercion sizes.
++
++  A more comprehensive potential solution to the problem described here is
++  provided in Note [Directed coercions].
++
++Note [Core Lint and zapped coercions]
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++When zapping a coercion, we are turning a proof (checkable by Core Lint) into
++a "trust me" atom.
++To avoid losing soundness, we check /at the point of zapping/ that the coercion
++we are zapping is valid.
++
++The checks are performed in 'checkZappedRedn' called by 'zapRedn', when
++Core Lint is enabled. We check the following:
++
++  (ZapCheck1)
++    The coercion we are about to zap proves what it claims to: it has the right
++    role, and its LHS (RHS) type equals the redex we are rewriting (respectively,
++    the rewritten type), up to zonking.
++
++  (ZapCheck2)
++    The dependencies we are about to declare (the 'UnivCoDeps'), together with
++    the LHS and RHS types of the 'UnivCo' we are about to build, cover every
++    CoVar mentioned in the coercion we are about to zap.
++
++  (ZapCheck3)
++    The coercion we are about to zap is a valid coercion: it passes Core Lint.
++    This makes sure e.g. that all types line up in 'TransCo' chains, etc.
++
++    Traditionally, Core Lint only runs after typechecking is complete. To allow
++    us to run Core Lint in the rewriter, on a coercion that may contain unfilled
++    coercion holes and metavariables, we run a pared-down version of Core Lint
++    which tolerates unfilled coercion holes, using the 'lf_tc_coercion' flag.
++
++This checks every 'ZappedProv' 'UnivCo' at birth, in the rewriter.
++Note that, even with -fno-zap-coercions, Core Lint may still encounter zapped
++coercions (e.g. loaded from interface files that were produced with
++-fzap-coercions). That's fine: Core Lint treats them like any other 'UnivCo'.
++
++One edge case is that we also propagate zappedness in TransCo. 'mkTransCo'
++collapses (zapped_co ; co) into a single zapped coercion. We can't run Core Lint
++inside 'mkTransCo' (it's a pure function that doesn't know whether -dcore-lint
++is enabled), so we do the best we can instead:
++
++  - We assert that the roles match.
++  - We don't check that the types line up, because 'mkTransCo' can be called
++    during typechecking, at which point we only expect equality up to zonking.
++  - We don't run Core Lint on 'co' itself
++
++Note [Computing coercion dependencies]
++~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++Two situations require us to compute the dependencies of a coercion produced by
++the rewriter:
++
++  1. When we add a reduction to the type family application cache, we must
++     ensure it does not contain any coercion holes.
++     See (FAC_Holes) in Note [The family application cache].
++
++  2. When we zap a coercion, we need to populate the 'uco_deps' field of
++     the 'ZappedProv' 'UnivCo' we are building.
++
++(1) only requires us to know whether there are coercion holes or not, while (2)
++requires a precise accounting of the exact set of dependencies. That is,
++if we zap 'co :: lhs ~ xi' to 'UnivCo ZappedProv deps lhs xi', then 'deps' must
++be exactly the dependencies of 'co', no less and no more.
++See the explanation in Wrinkle [Coercion dependencies must be exact].
++
++As explained in Wrinkle [Don't look at what you are about to zap]
++in Note [Coercion zapping], we must compute 'deps' without inspecting the
++coercion 'co' we are about to zap (e.g. we /must not/ call 'coVarsOfCo co').
++We do so by keeping track, in the rewriter monad, of the inert equalities used
++during rewriting, in the field 're_used_cos' of GHC.Tc.Types.RewriteEnv. Such
++inert equalities can be used in the following ways, each recording the
++dependency in 're_used_cos':
++
++  - Directly, when the rewriter rewrites using an inert equality (either
++    Given or Wanted); see 'recordRewriter'.
++  - Indirectly via a reduction that was stashed in the family application cache
++    and that used an inert equality; see 'lookupFamAppCache'.
++  - Indirectly via a typechecker plugin, which has the obligation to declare
++    dependencies on used inert equalities; see 'runTcPluginRewriters'.
++
++The dependency tracking mechanism is scoped to individual chains of type family
++reductions, in the sense of Note [How to normalise a family application].
++That is, each call to 'rewrite_exact_fam_app' has its own dependency tracking
++scope (see 'trackingDependencies'), which also means there is exactly one scope
++per zapping site.
++
++These scopes can nest: for example, we may rewrite 'F (G a)' by first rewriting
++the argument 'G a', and the latter is its own chain of type family reductions,
++with its own dependency tracking scope. As the reduction for 'G a' is part of
++the overall reduction of 'F (G a)', everything recorded in the inner scope is
++also added on to the outer scope.
++
++The dependencies recorded in a scope tell us whether the reduction mentions any
++coercion holes, as needed for (1). This is why we track dependencies even with
++-fno-zap-coercions. (This solves #27518.)
++
++When we come to zapping a coercion 'co :: lhs ~ xi' (in 'zapRedn'), we set
++
++  uco_deps = re_used_cos ∪ shallowCoVarsOfTypes [lhs, xi]
++
++NB: we union-in the shallow CoVars (and coercion holes) of the LHS and RHS
++types to satisfy (UnivCoDepsInv) from Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
++
++Wrinkle [Coercion dependencies must be exact]
++
++  When we zap 'co :: lhs ~ xi' to 'UnivCo ZappedProv deps lhs xi', we must
++  certainly not under-estimate the dependencies, as explained in
++  Note [The importance of tracking UnivCo dependencies] in GHC.Core.TyCo.Rep.
++  So we must have:
++
++    (NoMissingDeps)   coVarsOfCo co  ⊆  deps
++
++  This is checked by Core Lint: see (ZapCheck2) in
++  Note [Core Lint and zapped coercions].
++  Perhaps more surprisingly, we in fact need the converse containment:
++
++    (NoSpuriousDeps)       deps      ⊆ coVarsOfCo co
++
++  This is because over-estimating the set of dependencies, while sound,
++  can cause us to reject valid programs. See
++  Wrinkle [Spurious dependencies can cause a program to be rejected].
++
++  The dependency tracking scheme outlined above upholds (NoMissingDeps) because
++  every coercion variable or coercion hole appearing in a coercion produced by
++  the rewriter was either:
++
++    - introduced by using an inert equality, which was recorded in one of the
++      three ways listed above, or
++    - already present in the type being rewritten, in which case it appears
++      in 'lhs' (up to zonking), and is thus added to 'deps' by (UnivCoDepsInv).
++
++  It is vitally important that the recording sites stay exhaustive, as missing a
++  dependency risks re-introducing #23923.
++
++  (NoSpuriousDeps) is also upheld. This is clear for the dependencies that come
++  from 'lhs' and 'xi', which are the LHS and RHS types of 'co'. As for the
++  recorded dependencies, every dependency recorded in a scope really is
++  a dependency of the coercion zapped at the end of it:
++
++    a. Every dependency recorded inside a scope ends up stored into a
++       Reduction that is then incorporated (via some Reduction smart constructor)
++       into the final Reduction returned at the end of the scope.
++    b. None of the reduction combinators (mkTransRedn, mkAppRedns...) ever
++       discard any part of a coercion.
++
++  (NB: (b) is not entirely true: for example, 'mkUnivCo' may optimise a
++  reflexive coercion to 'Refl', discarding any inner 'CoVar's or 'CoercionHole's.
++  This infelicity is not specific to zapping, so we accept it.)
++
++Wrinkle [Spurious dependencies can cause a program to be rejected]
++
++  Over-estimating the dependencies may cause a spurious occurs-check failure.
++  This is quite tricky to trigger, but an example is the ZapDeps test. The
++  constraint solving derivation is incredibly painful to write out in full, but
++  it goes roughly like this:
++
++    [W] {hole} :: F (F x) ~ x
++    [G] g1 :: FX xs ~# '[x]
++
++    [G] g2 :: FX (FX xs) ~# xs
++
++      ==> rewrite using g1
++
++      [G] g3 :: FX '[x] ~# xs
++
++      ==> type family reductions (no Givens used)
++
++      [G] g4 :: (F x ': (FX @[Type] '[] |> γ)) ~# xs
++
++        -- here 'γ' is made up entirely of TyConAppCo/CoAxiom/TransCo
++        -- it does not contain a single CoVar (no Givens used)
++
++      ==> re-orient to get a TyVarLHS
++
++      [G] g5 :: xs ~# (F x ': (FX @[Type] '[] |> γ))
++
++  Now, if, in the process of producing the kind coercion 'γ', the rewriter
++  makes the mistake of recording 'g1' as a dependency of 'γ' (e.g. because
++  all dependencies were recorded in a single global scope), this causes an
++  occurs-check failure, because the LHS 'xs' of 'g5' occurs in 'g1'. In this
++  case 'g5' becomes an IrredCt, so we can't use it to now rewrite 'g1'. This
++  stops us from solving the Wanted; that would otherwise proceed as follows
++  (omitting all casts for simplicity):
++
++    [G] g1 :: FX xs ~# '[x]
++
++      ==> rewrite using g5
++
++      [G] g6 :: FX (F x : FX '[]) ~# '[x]
++
++      ==> type family reductions
++
++      [G] g7 :: F ( F x ) ': [] ~# '[x]
++
++      ==> decomposing
++
++      [G] g8 :: F ( F x ) ~ x
++
++  which allows us to solve the Wanted {hole} := g8.
++
++Graveyard: rejected ways to compute coercion dependencies.
++
++  Alternative 1: compute dependencies using 'coVarsOfCo'.
++
++    When zapping, we have the coercion 'co' produced by the rewriter in hand.
++    We could just call 'coVarsOfCo co' to get its dependencies and store that
++    in the zapped coercion.
++
++    The problem with this approach is that it evaluates the coercion, which
++    is exactly what Wrinkle [Don't look at what you are about to zap]
++    in Note [Coercion zapping] warns against.
++
++    Empirically, this approach added ~250MB allocations (~+15%) when compiling
++    T9872a, and ~+35% runtime.
++
++  Alternative 2: store the dependencies in the 'Reduction'.
++
++    Instead of keeping track of dependencies in the rewriter monad, we could
++    store them in the 'Reduction' datatype, updating the combinators to union
++    these dependencies when combining coercions.
++
++    There are two ways we could proceed here:
++
++      2A: Store the dependencies alongside the coercion.
++
++        This is workable, but it is a much bigger amount of code to change for
++        no gain, given that this computes the exact same set of dependencies as
++        the monadic approach. In particular, making sure that the extra field of
++        'Reduction' does not result in extra allocations, while possible,
++        requires a fair amount of delicately crafted code.
++
++      2B: Store the dependencies, don't store the coercion at all.
++
++        It seems wasteful for the rewriter to accumulate a big thunk for the
++        coercion if we are not even going to look at it. This suggests removing
++        the 'Coercion' field of 'Reduction' entirely, replacing it with a set of
++        dependencies.
++
++        However, we only want to zap chains of type family reductions, not
++        arbitrary coercions. So if we tried something like:
++
++          data Reduction = Reduction  Coercion   !Type
++                         | ZappedRedn UnivCoDeps !Type
++
++        the combinators (such as 'mkTyConAppRedn') would have to be implemented
++        either by materialising intermediate UnivCos with possibly large types,
++        or by infectiously propagating zappedness (which would end up zapping
++        way more coercions than we bargained for and bloat coercion sizes
++        as explained in Wrinkle [Zapping a coercion may increase its size]
++        in Note [Coercion zapping]).
++
++Note [Directed coercions]
++~~~~~~~~~~~~~~~~~~~~~~~~~
++This note describes a **non-implemented** alternative design to solve the issues
++described in Note [Coercion zapping], in particular addressing
++Wrinkle [Zapping a coercion may increase its size].
++
++As Example A and Example B from that Note show, the coercions only grow
++quadratically in size because of the types stored therein.
++
++The idea of directed coercions is to use a different coercion representation in
++which we no longer store the LHS type. It becomes implicit from the context
++(e.g. the input type in a reduction). Instead of
++
++  coercionRKind :: Coercion -> Type
++
++one gets:
++
++  dcoercionRKind :: Role -> Type -> DCoercion -> Type
++  dcoercionRKind r lhs_ty dco =
++    case dco of
++      DRefl -> lhs_ty
++      (dco1 ; dco2) ->
++        let mid_ty = dcoercionRKind r lhs_ty dco1
++        in dcoercionRKind r mid_ty dco2
++      ...
++
++The benefit of this approach compared to coercion zapping is that the full proofs
++are retained in Core Lint (no "trust me" 'UnivCo's), and we avoid the problem
++where the zapped coercion may be larger than the original coercion.
++
++This approach was attempted in MR !6476, but that work stalled due to
++difficulties in implementing coercion optimisation (and also due to the
++significant implementation cost).
++-}
++
++-- | When @-fzap-coercions@ is enabled: zap the 'Coercion' stored in the
++-- 'Reduction', replacing it with a 'UnivCo' with 'ZappedProv' provenance.
++--
++-- See (ZapRewrite) in Note [Coercion zapping].
++--
++-- No-op under @-fno-zap-coercions@.
++zapRedn :: UnivCoDeps -- ^ dependencies of the coercion being zapped
++        -> TcType     -- ^ LHS type of the reduction
++        -> Reduction
++        -> RewriteM Reduction
++zapRedn deps lhs redn@(Reduction _co xi) = mkRewriteM $ \env ->
++  if not (re_zap_coercions env)
++  then return redn
++  else
++  do { let
++         -- See Note [Bangs in zapRedn]
++         !r = eqRelRole $ re_eq_rel env
++
++       -- When Core Lint is enabled: check the zapping is valid while we still
++       -- have the proof in hand. See Note [Core Lint and zapped coercions].
++     ; dflags <- getDynFlags
++     ; when (gopt Opt_DoCoreLinting dflags) $
++         checkZappedRedn dflags deps r lhs redn
++
++       -- Crucially, nothing here (save for the check above) inspects
++       -- the reduction's coercion at all.
++       -- See Wrinkle [Don't look at what you are about to zap]
++       -- in Note [Coercion zapping].
++     ; return $! -- See Note [Bangs in zapRedn]
++         mkReduction
++           (mkUnivCoAddTypeDeps ZappedProv deps r lhs xi) xi
++     }
++
++{- Note [Bangs in zapRedn]
++~~~~~~~~~~~~~~~~~~~~~~~~~~
++zapRedn is on a hot path, being hammered by the rewriter when reducing type
++family applications.
++
++It's important to make it allocate as little as possible. The bangs in 'zapRedn'
++were measured to shave off about 1% of allocations in T9872{a,b,c}, as they
++avoid allocating intermediate thunks that would end up being forced anyway.
++
++These banging opportunities were found with the usual strategy:
++use -ddump-stg-final and hunt for naughty allocating 'let' bindings.
++
++checkZappedRedn still ends up costing a ~0.3% increase in allocations in those
++tests when Core Lint is off (so the check is skipped), but so be it.
++-}
++
++{-# NOINLINE checkZappedRedn #-} -- cold code (only for Core Lint)
++
++-- | Check that the coercion we are about to zap is valid.
++--
++-- See Note [Core Lint and zapped coercions].
++checkZappedRedn :: DynFlags -> UnivCoDeps -> Role -> TcType -> Reduction -> TcS ()
++checkZappedRedn dflags deps r lhs_ty (Reduction co xi)
++  = do { -- Zonk to handle metavariables that the rewriter looked through.
++         -- See (F0) in Note [Rewriting].
++         lhs_ty <- zonkTcType lhs_ty
++       ; co     <- zonkCo co
++
++       ; let (Pair co_lhs co_rhs, co_role) = coercionKindRole co
++
++             checkEq :: Outputable a => (a -> a -> Bool) -> SDoc -> a -> a -> Maybe SDoc
++             checkEq eq what expected actual
++               | expected `eq` actual
++               = Nothing
++               | otherwise
++               = Just $
++                   hang (text "coercion has incorrect" <+> what)
++                      2 $ vcat [ text "expected:" <+> ppr expected
++                               , text "  actual:" <+> ppr actual ]
++
++             -- The CoVars of the LHS and RHS types count as declared: they are
++             -- stored in the 'UnivCo' we are about to build.
++             deep_deps =
++                univCoDepsDeepCoVars deps
++                  `unionVarSet` coVarsOfTypes [lhs_ty, xi]
++             co_cvs = coVarsOfCo co
++
++             (_warns, lint_errs) = lintTcCoercion (initLintConfig dflags []) co
++
++             errs =
++              catMaybes
++                -- (ZapCheck1): the coercion proves what we want it to prove.
++                [ checkEq eqType (text "LHS")  lhs_ty co_lhs
++                , checkEq eqType (text "RHS")  xi     co_rhs
++                , checkEq (==)   (text "role") r      co_role
++
++                -- (ZapCheck2): the declared dependencies cover the actual dependencies
++                , if co_cvs `subVarSet` deep_deps
++                  then Nothing
++                  else
++                    Just $
++                      hang (text "unrecorded coercion dependency") 2 $
++                        vcat [ text "coercion CoVars:" <+> ppr co_cvs
++                             , text "declared deps:" <+> ppr deps
++                             , text " missing deps:" <+> ppr (co_cvs `minusVarSet` deep_deps)
++                             ]
++                ]
++              ++
++                -- (ZapCheck3): the coercion we are zapping is valid (passes Core Lint).
++                [ hang (text "ill-formed coercion")
++                     2 (vcat $ bagToList lint_errs)
++                | not $ isEmptyBag lint_errs ]
++
++       ; case errs of
++           []  -> return ()
++           _:_ -> pprPanic "checkZappedRedn" $
++                    vcat [ text "  co:" <+> ppr co
++                         , text "deps:" <+> ppr deps
++                         , vcat errs
++                         ]
++       }
++
++-- | Try to reduce a type family application.
++-- Returns a 'Reduction' whose role is the role in the 'RewriteM' monad.
++--
+ -- See Note [How to normalise a family application]
+ try_to_reduce :: TyCon -> [TcType] -> [TcPluginRewriter]
+               -> RewriteM (Maybe Reduction)
+ try_to_reduce tc tys tc_rewriters
+   = do { rewrite_env <- getRewriteEnv
++       ; let -- Record the dependencies of this reduction, to handle any
++             -- reduction introduced by plugins or looked up in the famapp cache.
++             record_deps :: Maybe Reduction -> TcS (Maybe Reduction)
++             record_deps mb_redn
++               | Just redn <- mb_redn
++               = do { updTcRef (re_used_cos rewrite_env)
++                        ( `addUnivCoDep` reductionCoercion redn )
++                    ; return mb_redn }
++               | otherwise
++               = return mb_redn
++
+        ; result <-
+             liftTcS $ firstJustsM
+-              [ runTcPluginRewriters rewrite_env tc_rewriters tys -- STEP 1a & STEP 4a
+-              , lookupFamAppCache tc tys                          -- STEP 1b & STEP 4b
+-              , matchFam tc tys ]                                 -- STEP 1c & STEP 4c
++              [ -- STEP 1a & STEP 4a
++                record_deps
++                  =<< runTcPluginRewriters rewrite_env tc_rewriters tys
++              , -- STEP 1b & STEP 4b
++                record_deps
++                  =<< lookupFamAppCache tc tys
++              , -- STEP 1c & STEP 4c
++                matchFam tc tys
++              ]
+        ; traverse downgrade result }
+   where
+     -- The result above is always Nominal. We might want a Representational
+@@ -912,7 +1742,7 @@
+               -- common NomEq case
+            ; case eq_rel of
+                NomEq  -> return redn
+-               ReprEq -> return $ mkSubRedn redn }
++               ReprEq -> return $! mkSubRedn redn }
+ 
+ -- Retrieve all type-checking plugins that can rewrite a (saturated) type-family application
+ -- headed by the given 'TyCon`.
+@@ -985,7 +1815,7 @@
+              -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
+                    ; role <- getRole
+                    ; let ty' = mkTyVarTy tv'
+-                   ; return $ mkReflRedn role ty' } }
++                   ; return $! mkReflRedn role ty' } }
+ 
+ rewrite_tyvar1 :: TcTyVar -> RewriteM RewriteTvResult
+ -- "Rewriting" a type variable means to apply the substitution to it
+@@ -1000,7 +1830,7 @@
+            Just ty -> do { traceRewriteM "Following filled tyvar"
+                              (ppr tv <+> equals <+> ppr ty)
+                          ; role <- getRole
+-                         ; return $ RTRFollowed $
++                         ; return $! RTRFollowed $!
+                              mkReflRedn role ty }
+            Nothing -> do { traceRewriteM "Unfilled tyvar" (pprTyVar tv)
+                          ; fr <- getFlavourRole
+@@ -1035,7 +1865,7 @@
+                             (NomEq, NomEq)  -> rewriting_co1
+                             (NomEq, ReprEq) -> mkSubCo rewriting_co1
+ 
+-                   ; return $ RTRFollowed $ mkReduction rewriting_co rhs_ty }
++                   ; return $! RTRFollowed $! mkReduction rewriting_co rhs_ty }
+ 
+            _other -> return RTRNotFollowed }
+ 
+diff --git a/compiler/GHC/Tc/Solver/Solve.hs b/compiler/GHC/Tc/Solver/Solve.hs
+--- a/compiler/GHC/Tc/Solver/Solve.hs
++++ b/compiler/GHC/Tc/Solver/Solve.hs
+@@ -1775,7 +1775,7 @@
+     do { let loc = ctEvLoc ev
+              -- mkEvCast optimises ReflCo
+              ev_rw_role = ctEvRewriteRole ev
+-             new_tm = assert (coercionRole co == ev_rw_role)
++             new_tm = assert (coercionRole co == ev_rw_role) $
+                       evCast (evId old_evar) $   -- evCast optimises ReflCo
+                       downgradeRole Representational ev_rw_role co
+        ; new_ev <- newGivenEv loc (new_pred, new_tm)
+diff --git a/compiler/GHC/Tc/Types.hs b/compiler/GHC/Tc/Types.hs
+--- a/compiler/GHC/Tc/Types.hs
++++ b/compiler/GHC/Tc/Types.hs
+@@ -140,6 +140,7 @@
+ 
+ import GHC.Core.Reduction ( Reduction(..) )
+ import GHC.Core.Type
++import GHC.Core.TyCo.Rep ( UnivCoDeps )
+ import GHC.Core.TyCon  ( TyCon )
+ import GHC.Core.PatSyn ( PatSyn )
+ import GHC.Core.Lint   ( lintAxioms )
+@@ -341,6 +342,21 @@
+           -- See Note [Rewriter EqRels] in GHC.Tc.Solver.Rewrite
+ 
+        , re_rewriters :: !(TcRef CoHoleSet)  -- ^ See Note [Wanteds rewrite Wanteds: rewriter-sets]
++
++       , re_used_cos :: !(TcRef UnivCoDeps)
++          -- ^ Accumulates the coercions used to justify the rewrites
++          -- performed in the current scope.
++          --
++          -- Accumulated whether or not we are zapping: we also consult this
++          -- to determine whether a type family reduction may be recorded
++          -- in the family application cache.
++          --
++          -- See Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite.
++
++       , re_zap_coercions :: !Bool
++          -- ^ Whether to perform coercion zapping.
++          --
++          -- See Note [Coercion zapping] in GHC.Tc.Solver.Rewrite
+        }
+ -- RewriteEnv is mostly used in @GHC.Tc.Solver.Rewrite@, but it is defined
+ -- here so that it can also be passed to rewriting plugins.
+diff --git a/compiler/GHC/Tc/Utils/TcMType.hs b/compiler/GHC/Tc/Utils/TcMType.hs
+--- a/compiler/GHC/Tc/Utils/TcMType.hs
++++ b/compiler/GHC/Tc/Utils/TcMType.hs
+@@ -1518,7 +1518,8 @@
+     go_co dv (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                                      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv t1
+                                           ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t2
+-                                          ; foldM go_co dv2 deps }
++                                          ; dv3 <- foldM go_cv dv2 (univCoDepsCoVars deps)
++                                          ; foldM go_hole dv3 (univCoDepsHoles deps) }
+     go_co dv (SymCo co)              = go_co dv co
+     go_co dv (TransCo co1 co2)       = foldlM go_co dv [co1, co2]
+     go_co dv (SelCo _ co)            = go_co dv co
+@@ -1526,21 +1527,22 @@
+     go_co dv (InstCo co1 co2)        = foldlM go_co dv [co1, co2]
+     go_co dv (KindCo co)             = go_co dv co
+     go_co dv (SubCo co)              = go_co dv co
+-
+-    go_co dv (HoleCo hole)
++    go_co dv (HoleCo hole)           = go_hole dv hole
++    go_co dv (CoVarCo cv)            = go_cv dv cv
++
++    go_co dv (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
++      = do { dv1 <- go_mco dv kind_co
++           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
++
++    go_mco dv MRefl    = return dv
++    go_mco dv (MCo co) = go_co dv co
++
++    go_hole :: CandidatesQTvs -> CoercionHole -> TcM CandidatesQTvs
++    go_hole dv hole
+       = do m_co <- liftZonkM (unpackCoercionHole_maybe hole)
+            case m_co of
+              Just (CPH { cph_co = co }) -> go_co dv co
+              Nothing                    -> go_cv dv (coHoleCoVar hole)
+-
+-    go_co dv (CoVarCo cv) = go_cv dv cv
+-
+-    go_co dv (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
+-      = do { dv1 <- go_mco dv kind_co
+-           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
+-
+-    go_mco dv MRefl    = return dv
+-    go_mco dv (MCo co) = go_co dv co
+ 
+     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
+     go_cv dv@(DV { dv_cvs = cvs }) cv
+diff --git a/compiler/GHC/Types/Unique/DSet.hs b/compiler/GHC/Types/Unique/DSet.hs
+--- a/compiler/GHC/Types/Unique/DSet.hs
++++ b/compiler/GHC/Types/Unique/DSet.hs
+@@ -26,6 +26,7 @@
+         intersectUniqDSets, uniqDSetIntersectUniqSet,
+         nonDetStrictFoldUniqDSet,
+         elementOfUniqDSet,
++        anyUniqDSet,
+         filterUniqDSet,
+         sizeUniqDSet,
+         isEmptyUniqDSet,
+@@ -105,6 +106,9 @@
+ elementOfUniqDSet :: Uniquable a => a -> UniqDSet a -> Bool
+ elementOfUniqDSet k = elemUDFM k . getUniqDSet
+ 
++anyUniqDSet :: (a -> Bool) -> UniqDSet a -> Bool
++anyUniqDSet p = anyUDFM p . getUniqDSet
++
+ filterUniqDSet :: (a -> Bool) -> UniqDSet a -> UniqDSet a
+ filterUniqDSet p (UniqDSet s) = UniqDSet (filterUDFM p s)
+ 
+diff --git a/compiler/GHC/Types/Var/Set.hs b/compiler/GHC/Types/Var/Set.hs
+--- a/compiler/GHC/Types/Var/Set.hs
++++ b/compiler/GHC/Types/Var/Set.hs
+@@ -54,7 +54,7 @@
+ import GHC.Types.Unique.Set
+ import GHC.Types.Unique.DSet
+ import GHC.Types.Unique.FM( disjointUFM, pluralUFM, pprUFM )
+-import GHC.Types.Unique.DFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
++import GHC.Types.Unique.DFM( disjointUDFM, udfmToUfm, allUDFM )
+ import GHC.Utils.Outputable (SDoc)
+ 
+ -- | A non-deterministic Variable Set
+@@ -306,7 +306,7 @@
+ nonDetStrictFoldDVarSet = nonDetStrictFoldUniqDSet
+ 
+ anyDVarSet :: (Var -> Bool) -> DVarSet -> Bool
+-anyDVarSet p = anyUDFM p . getUniqDSet
++anyDVarSet = anyUniqDSet
+ 
+ allDVarSet :: (Var -> Bool) -> DVarSet -> Bool
+ allDVarSet p = allUDFM p . getUniqDSet
+diff --git a/docs/users_guide/extending_ghc.rst b/docs/users_guide/extending_ghc.rst
+--- a/docs/users_guide/extending_ghc.rst
++++ b/docs/users_guide/extending_ghc.rst
+@@ -783,24 +783,25 @@
+ respectively.
+ 
+ It is up to the plugin to construct a suitable coercion ``co``.
+-However, one possibility is to construct one of form ::
+-
+-    UnivCo (PluginProv "my-plugin" gcvs) role t1 t2
+-
+-A ``UnivCo`` of this form says "trust me: my-plugin has solved this Wanted
+-using (only) ``gcvs``".
++However, one possibility is to construct a universal coercion using
++``mkUnivCo`` ::
++
++    mkUnivCo (PluginProv "my-plugin") deps role t1 t2
++
++A coercion of this form says "trust me: my-plugin has solved this Wanted
++using (only) ``deps``".
+ 
+ Here
+ 
+ * The ``role`` should be the role of the original equality constraint
+   (nominal or representational).
+-* The ``gcvs`` is a set of "given coercion variables"; these are the coercion
+-  variable bound by enclosing Given constraints, which the plugin has used
+-  to justify solving the Wanted.
+-
+-For soundness, it is very important to include the ``gcvs``; otherwise
++* The ``deps :: [Coercion]`` are the coercions which the plugin has used to
++  justify solving the Wanted; typically, the evidence of enclosing Given
++  constraints (as obtained with ``ctEvCoercion``).
++
++For soundness, it is very important to include the ``deps``; otherwise
+ GHC may transform the program into a form that seg-faults.
+-See :ghc-ticket:`23923` for a long dicussion.
++See :ghc-ticket:`23923` for a long discussion.
+ 
+ Evidence is required also when creating new Given constraints, which are
+ usually implied by old ones. It is not uncommon that the evidence of a new
+@@ -822,10 +823,10 @@
+ That is, the plugin registers a map, from a type family's ``TyCon`` to its
+ associated rewriting function: ::
+ 
+-    type TcPluginRewriter = [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
+-
+-This rewriting function is supplied with the Given constraints from the current
+-context, and the type family arguments.
++    type TcPluginRewriter = RewriteEnv -> [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
++
++This rewriting function is supplied with the rewriter environment, the Given
++constraints from the current context, and the type family arguments.
+ Note that the type family application is guaranteed to be exactly saturated.
+ This function should then return a possible rewriting of the type family
+ application, by means of the following datatype: ::
+@@ -853,6 +854,10 @@
+ Note in particular that the LHS type of the coercion should be the original
+ type-family application, while its RHS type is the type that the plugin wants
+ to rewrite the type-family application to.
++
++As in :ref:`constraint-solving-with-plugins`, if the plugin used any Given
++constraints to justify the rewriting, the coercion must mention their evidence,
++e.g. by passing it as the dependencies of a coercion built with ``mkUnivCo``.
+ 
+ .. _source-plugins:
+ 
+diff --git a/docs/users_guide/exts/type_families.rst b/docs/users_guide/exts/type_families.rst
+--- a/docs/users_guide/exts/type_families.rst
++++ b/docs/users_guide/exts/type_families.rst
+@@ -599,6 +599,37 @@
+     this will speed up compilation. The use of this flag will not affect
+     runtime behaviour.
+ 
++.. ghc-flag:: -fzap-coercions
++    :shortdesc: Erase the proofs of type family reductions
++    :type: dynamic
++    :reverse: -fno-zap-coercions
++    :category:
++
++    :default: on
++
++    :since: 10.2.1
++
++    When reducing type family applications, GHC normally builds a proof
++    (a *coercion*) recording every reduction step. In type-family-heavy
++    programs these proofs can grow very large and dominate compilation
++    time and memory usage (see `#8095
++    <https://gitlab.haskell.org/ghc/ghc/-/issues/8095>`_).
++
++    With ``-fzap-coercions``, GHC erases these proofs, keeping only the
++    types they relate and the local assumptions they used. This can
++    dramatically speed up compilation of programs that perform many type
++    family reductions.
++
++    The proofs are only ever used internally, by Core Lint and various debug
++    assertions in the compiler, as a soundness check on GHC itself. Only
++    consumers who extend the compiler (GHC API users, typechecker plugin authors)
++    might want to see the original un-zapped coercions, in which case
++    we recommend using ``-dcore-lint -fno-zap-coercions``.
++    General usage doesn't lose anything from zapping, and stands to win big
++    thanks to reduced compilation times.
++
++    This flag does not affect runtime behaviour.
++
+ When GHC encounters a type family application (like ``F Int a``) in a program,
+ it must often reduce it in order to complete type checking. Here is a simple
+ example::

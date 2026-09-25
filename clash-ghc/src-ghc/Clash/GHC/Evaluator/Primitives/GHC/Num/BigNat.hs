@@ -9,6 +9,7 @@
 
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -25,6 +26,9 @@ import GHC.Num.Integer (Integer (..))
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.Literal  (Literal (..))
 import Clash.Core.Term (Term (..))
+import Clash.Core.TyCon (tyConDataCons)
+import Clash.Core.Type (TypeView (..), tyView)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Util (textNameLit)
 
 import Clash.GHC.Evaluator.Primitive.Util
@@ -38,4 +42,19 @@ primitives =
         -> reduce (Literal (IntLiteral (IS (bigNatEq# i j))))
       _ -> Nothing
 
+  -- These constants are NOINLINE CAFs in GHC 10.0. Evaluating their allocation
+  -- code would require mutable byte arrays and state tokens.
+  , primStepEntry "GHC.Internal.Bignum.BigNat.bigNatZero"
+      (bigNatConstant (BA.byteArrayFromList ([] :: [Word])))
+  , primStepEntry "GHC.Internal.Bignum.BigNat.bigNatOne"
+      (bigNatConstant (BA.byteArrayFromList [1 :: Word]))
   ]
+
+bigNatConstant :: BA.ByteArray -> PrimStepContext -> Maybe Machine
+bigNatConstant value PrimStepContext{..}
+  | [] <- args
+  , TyConApp tcName [] <- tyView ty
+  , Just tc <- UniqMap.lookup tcName tcm
+  , [dc] <- tyConDataCons tc
+  = reduce (App (Data dc) (Literal (ByteArrayLiteral value)))
+  | otherwise = Nothing

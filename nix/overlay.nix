@@ -16,7 +16,8 @@ final: prev:
 let
   # An overlay with the things we need to change for the specified GHC version.
   # The overlays are named without the GHC minor version, so we need to strip the last character from the version
-  strippedMinorVersion = builtins.substring 0 (builtins.stringLength compilerVersion - 1) compilerVersion;
+  strippedMinorVersion =
+    builtins.substring 0 (builtins.stringLength compilerVersion - 1) compilerVersion;
   ghcOverlay = import (./. + "/overlay-${strippedMinorVersion}.nix") {
     pkgs = prev;
   };
@@ -336,5 +337,16 @@ in
   ghdl-clash = if prev.stdenv.hostPlatform.isx86_64 then prev.ghdl-mcode else final.ghdl-llvm;
 
   "clashPackages-${compilerVersion}" =
-    prev.haskell.packages.${compilerVersion}.extend haskellOverlays;
+    if compilerVersion == "ghc1001" then
+      let
+        # Setup scripts and compiler plugins must use the same patched compiler
+        # as the libraries. Otherwise the native compiler wins on PATH.
+        ghc100Packages = (prev.haskell.packages.ghc9141.override {
+          ghc = import ./ghc-10.0.nix { pkgs = prev; };
+          buildHaskellPackages = ghc100Packages;
+        }).extend haskellOverlays;
+      in
+      ghc100Packages
+    else
+      prev.haskell.packages.${compilerVersion}.extend haskellOverlays;
 }
