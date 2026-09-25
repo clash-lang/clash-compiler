@@ -1,16 +1,19 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 #include "MachDeps.h"
 
 {- |
 Copyright  :  (C) 2026     , Martijn Bastiaan
+                  2026     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 module Clash.Class.NumConvert.Internal.Canonical where
 
+import Clash.Promoted.Nat (SNat)
 import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
@@ -18,6 +21,8 @@ import Clash.Sized.Unsigned
 
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Word (Word16, Word32, Word64, Word8)
+
+import GHC.TypeLits (type (+))
 
 -- | Type family mapping types to their canonical \"unwrapped\" Clash form.
 -- This is used by 'Clash.Class.NumConvert.numConvert' and
@@ -38,10 +43,11 @@ type instance Canonical Int32 = Signed 32
 type instance Canonical Int16 = Signed 16
 type instance Canonical Int8 = Signed 8
 
--- Bit
+-- Clash types that are not in canonical form themselves
 type instance Canonical Bit = BitVector 1
+type instance Canonical (SNat n) = Index (n + 1)
 
--- Clash types are already in canonical form
+-- Clash types that are already in canonical form
 type instance Canonical (Unsigned n) = Unsigned n
 type instance Canonical (Signed n) = Signed n
 type instance Canonical (BitVector n) = BitVector n
