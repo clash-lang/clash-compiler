@@ -416,6 +416,47 @@ jobs:
         run: |
           nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
 
+  nightly_testsuite:
+    # XXX: With VHDL, Vivado randomly fails with the following error message:
+    #
+    #          FATAL_ERROR: Vivado Simulator kernel has discovered an exceptional
+    #          condition from which it cannot recover. Process will terminate. For
+    #          technical support on this issue, please open a WebCase with this
+    #          project attached at http://www.xilinx.com/support.
+    #
+    #      Until we have a way of retrying these test cases or marking them as
+    #      skipped, these nightlies have been disabled to prevent a "boy who cried
+    #      wolf" situtation.
+    name: Running clash-testsuite nightly (${{matrix.ghc}}, ${{matrix.hdl}})
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        hdl: [
+          'VHDL',
+          'Verilog',
+          'SystemVerilog'
+        ]
+        ghc: [
+          ghc9141,
+          ghc9124,
+          ghc9103,
+          ghc967
+        ]
+    needs: packages_testsuite
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Run clash-testsuite
+        run: |
+          source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}.tools.Vivado.
+
   all:
     name: All on-push jobs finished
     if: ${{ !cancelled() }}
