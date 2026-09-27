@@ -24,6 +24,7 @@ import Prelude
 import Clash.Class.BitPack
 import Clash.Class.NumConvert.Internal.Canonical
 import Clash.Class.Resize
+import Clash.Promoted.Nat (SNat (SNat), snatToNum)
 import Clash.Sized.BitVector
 import Clash.Sized.Index
 import Clash.Sized.Signed
@@ -226,3 +227,14 @@ instance NumConvertCanonical Bit (BitVector 1) where
   numConvertCanonical = pack
 instance NumConvertCanonical (BitVector 1) Bit where
   numConvertCanonical = unpack
+
+{- | Concrete unidirectional instance for converting a type level 'SNat' to a
+term level number.
+
+Note: This is intentionally unidirectional: a reverse instance maintaining the
+lossless round trip conversion law would require an existential (producing a
+type level @n@ that is not determined by the call site) which the type of
+`numConvertCanonical` cannot express.
+-}
+instance m ~ n + 1 => NumConvertCanonical (SNat n) (Index m) where
+  numConvertCanonical sn@SNat = snatToNum sn
