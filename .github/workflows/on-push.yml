@@ -79,4 +79,4 @@ jobs:
       - name: Run clash-testsuite
         run: |
           source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}.tools.Vivado.
+          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) -p .${{matrix.hdl}}.tools.Vivado.
