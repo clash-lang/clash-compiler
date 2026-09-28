@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
@@ -9,14 +10,17 @@ import           Control.Monad             (unless, forM_)
 import           Clash.Annotations.Primitive (HDL(..))
 import qualified Data.Text                 as Text
 import           Data.Default              (def)
-import           Data.List                 ((\\), intercalate)
+import           Data.List                 ((\\), intercalate, isPrefixOf, isSuffixOf)
 import           Data.List.Extra           (trim)
+import           Data.Maybe                (mapMaybe)
 import           Data.Version              (versionBranch)
 import           System.Directory
   ( findExecutable, getCurrentDirectory, doesDirectoryExist, makeAbsolute
-  , setCurrentDirectory)
+  , setCurrentDirectory, listDirectory)
 import           System.Environment
+import           System.FilePath           ((</>))
 import           System.Info
+import           System.IO.Temp            (withSystemTempDirectory)
 import           System.Process            (readProcess)
 import           GHC.Conc                  (numCapabilities)
 import           GHC.Stack
@@ -31,6 +35,9 @@ import           Control.Retry        (RetryAction(ConsultPolicy, DontRetry), Re
 import           Data.List            (isInfixOf)
 import           Test.Tasty.Flaky     (flakyTestWithRetryAction, limitRetries)
 import           Test.Tasty.Providers (Result)
+
+import qualified Language.Haskell.TH.Syntax as TH
+import qualified T3105
 
 -- | GHC version as major.minor.patch1. For example: 8.10.2.
 ghcVersion3 :: String
@@ -122,6 +129,40 @@ clashTestRoot
 clashTestRoot testTrees =
   clashTestGroup "." testTrees []
 
+-- | Unit id of the private sublibrary @clash-testsuite:t3105-hidden@, which
+-- Cabal registers as a hidden package. See T3105.
+t3105UnitId :: String
+t3105UnitId =
+  $(maybe (fail "T3105.topEntity has no package") TH.lift
+      (TH.namePackage 'T3105.topEntity))
+
+-- | Extra environment variables for T3105. When run through Cabal, Clash picks
+-- up the package environment file Cabal writes to the project root. That file
+-- exposes all local components, including @t3105-hidden@, which would mask the
+-- issue. We point @GHC_ENVIRONMENT@ at a copy that doesn't expose it.
+mkT3105Env :: FilePath -> IO [(String, String)]
+mkT3105Env tmpDir
+  | compiledWith /= Cabal = pure []
+  | otherwise = do
+    root <- getCurrentDirectory
+    envFiles <- filter isEnvFile <$> listDirectory root
+    case envFiles of
+      [envFile] -> do
+        content <- readFile (root </> envFile)
+        let newEnvFile = tmpDir </> envFile
+        writeFile newEnvFile (unlines (mapMaybe (fixLine root) (lines content)))
+        pure [("GHC_ENVIRONMENT", newEnvFile)]
+      _ -> pure []
+ where
+  isEnvFile f =
+    ".ghc.environment." `isPrefixOf` f && ("-" <> ghcVersion3) `isSuffixOf` f
+
+  fixLine root l = case words l of
+    ["package-id", unitId] | unitId == t3105UnitId -> Nothing
+    -- Relative package databases are relative to the environment file
+    ("package-db":_) -> Just ("package-db " <> (root </> drop 11 l))
+    _ -> Just l
+
 -- | `clashTestGroup` and `clashTestRoot` make sure that each test knows its
 -- fully qualified test name at construction time. This is used to pass -i flags
 -- to Clash as the test layout matches the layout in @shouldwork/@.
@@ -165,8 +206,8 @@ defaultTimeout :: Timeout -> Timeout
 defaultTimeout NoTimeout = mkTimeout (5 * 60 * 1000000) -- 5 minutes
 defaultTimeout userSet = userSet
 
-runClashTest :: IO ()
-runClashTest = defaultMain
+runClashTest :: [(String, String)] -> IO ()
+runClashTest t3105Env = defaultMain
   $ adjustOption defaultTimeout
   $ workaroundMmapCrash
   $ clashTestRoot
@@ -725,6 +766,14 @@ runClashTest = defaultMain
            in runTest "T3066" _opts
         , let _opts = def { hdlTargets = [VHDL], hdlLoad = [], hdlSim = []}
            in runTest "T3084" _opts
+        , -- The top entity and its blackbox function live in a hidden package,
+          -- exposed with -package-id.
+          runTest "T3105" def
+            { hdlSim=[]
+            , hdlLoad=[]
+            , clashFlags=["-package-id", t3105UnitId]
+            , clashEnv=t3105Env
+            }
         , runTest "T3141" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141"]}
         , runTest "T3142" def{hdlSim=[], hdlLoad=[], clashFlags=["-itests/shouldwork/Issues/T3141", "-itests/shouldwork/Issues/T3141/."]}
         , outputTest "T3147" def{hdlTargets=[Verilog], hdlSim=[]}
@@ -1037,7 +1086,7 @@ runClashTest = defaultMain
           runTest "T3297a" def
             { hdlSim = []
             , hdlLoad = []
-            , clashFlags = ["-package", "clash-testsuite", "-main-is", "topEntity"]
+            , clashFlags = ["-package-id", testsuiteUnitId, "-main-is", "topEntity"]
             }
         , runTest "T1139" def{hdlSim=[]}
         , let _opts = def { hdlTargets=[Verilog]
@@ -1259,4 +1308,6 @@ main = do
   setCurrentDirectory projectRoot
   setEnv "TASTY_NUM_THREADS" (show numCapabilities)
   setClashEnvs compiledWith
-  withArgs args runClashTest
+  withSystemTempDirectory "clash-testsuite" $ \tmpDir -> do
+    t3105Env <- mkT3105Env tmpDir
+    withArgs args (runClashTest t3105Env)
