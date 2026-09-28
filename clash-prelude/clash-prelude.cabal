@@ -348,7 +348,7 @@ Library
                       checked-literals          >= 0.1.1   && < 0.2,
                       singletons                >= 2.0     && < 3.1,
                       string-interpolate        >= 0.3     && < 1.1,
-                      tagged                    >= 0.8     && < 0.9,
+                      tagged                    >= 0.8     && < 0.10,
                       template-haskell          >= 2.20.0.0 && < 2.25,
                       th-abstraction            >= 0.3.0 && < 0.8.0,
                       th-lift                   >= 0.7.0    && < 0.9,
