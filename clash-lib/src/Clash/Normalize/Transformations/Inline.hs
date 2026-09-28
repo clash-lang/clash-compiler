@@ -756,16 +756,8 @@ inlineWorkFree _ e@(collectTicks -> (Var f, ticks))
                       if termSizeSmallerThan sizeLimit topB then
                         changed (mkTicks topB ticks)
                       else do
-                        e0 <- bindingTerm <$> normalizeTopLvlBndr False f top
-                        case e0 of
-                          Let (Term.NonRec i0 e1) (Var i1) | i0 == i1 -> changed e1
-                          Let (Term.Rec xs) (Var i1) ->
-                            case filter ((== i1) . fst) xs of
-                              [] -> changed e0
-                              ys -> filterM (fmap not . isRecursiveBndr . fst) ys >>= \case
-                                []          -> changed e0
-                                (_, e1) : _ -> changed e1
-                          _ -> changed (mkTicks e0 ticks)
+                        b <- normalizeTopLvlBndr False f top
+                        changed (mkTicks (bindingTerm b) ticks)
                 _ -> return e
 
 inlineWorkFree _ e = return e
