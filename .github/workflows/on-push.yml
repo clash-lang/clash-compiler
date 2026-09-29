@@ -229,18 +229,22 @@ jobs:
 
 
   packages_common:
-    name: Build Common (${{matrix.ghc}})
+    name: Build Common (${{matrix.packageSet}})
     runs-on: self-hosted
     strategy:
       # If caching fails for one package, then we are still interested in caching other packages
       fail-fast: false
       matrix:
-        ghc: [
-          ghc9141,
-          ghc9124,
-          ghc9103,
-          ghc984,
-          ghc967
+        # Flake attributes of the package sets to build. Package sets named
+        # 'clashPackagesUpperBounds-*' are built against the newest versions of
+        # some of our dependencies, see 'nix/overlay-upper-bounds.nix'.
+        packageSet: [
+          clashPackages-ghc9141,
+          clashPackages-ghc9124,
+          clashPackages-ghc9103,
+          clashPackages-ghc984,
+          clashPackages-ghc967,
+          clashPackagesUpperBounds-ghc9141
         ]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -259,36 +263,38 @@ jobs:
         # Well, it does not cause any harm so might as well keep it
 
       - run: |
-          nix build -L .#clashPackages-${{matrix.ghc}}.clash-prelude
-          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-prelude)
+          nix build -L .#${{matrix.packageSet}}.clash-prelude
+          attic push public $(nix path-info .#${{matrix.packageSet}}.clash-prelude)
       - run: |
-          nix build -L .#clashPackages-${{matrix.ghc}}.clash-lib
-          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-lib)
+          nix build -L .#${{matrix.packageSet}}.clash-lib
+          attic push public $(nix path-info .#${{matrix.packageSet}}.clash-lib)
       - run: |
-          nix build -L .#clashPackages-${{matrix.ghc}}.clash-ghc
-          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-ghc)
+          nix build -L .#${{matrix.packageSet}}.clash-ghc
+          attic push public $(nix path-info .#${{matrix.packageSet}}.clash-ghc)
 
       - name: Cachix
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: |
-          nix path-info .#clashPackages-${{matrix.ghc}}.clash-prelude | cachix push clash-lang
-          nix path-info .#clashPackages-${{matrix.ghc}}.clash-lib | cachix push clash-lang
-          nix path-info .#clashPackages-${{matrix.ghc}}.clash-ghc | cachix push clash-lang
+          nix path-info .#${{matrix.packageSet}}.clash-prelude | cachix push clash-lang
+          nix path-info .#${{matrix.packageSet}}.clash-lib | cachix push clash-lang
+          nix path-info .#${{matrix.packageSet}}.clash-ghc | cachix push clash-lang
 
   packages_other:
-    name: Build Other (${{matrix.ghc}}, ${{matrix.package}})
+    name: Build Other (${{matrix.packageSet}}, ${{matrix.package}})
     runs-on: self-hosted
     strategy:
       fail-fast: false
       matrix:
-        ghc: [
-          ghc9141,
-          ghc9124,
-          ghc9103,
-          ghc984,
-          ghc967
+        # See 'packages_common'
+        packageSet: [
+          clashPackages-ghc9141,
+          clashPackages-ghc9124,
+          clashPackages-ghc9103,
+          clashPackages-ghc984,
+          clashPackages-ghc967,
+          clashPackagesUpperBounds-ghc9141
         ]
         package: [
             'clash-benchmark',
@@ -307,17 +313,17 @@ jobs:
           ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
         run: .ci/attic-auth.sh
 
-      - name: Building ${{matrix.ghc}}
-        run: nix build -L .#clashPackages-${{matrix.ghc}}.${{matrix.package}}
+      - name: Building ${{matrix.packageSet}}
+        run: nix build -L .#${{matrix.packageSet}}.${{matrix.package}}
 
       - name: Local cache
-        run: attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.${{matrix.package}})
+        run: attic push public $(nix path-info .#${{matrix.packageSet}}.${{matrix.package}})
 
       - name: Cachix
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
-        run: nix path-info .#clashPackages-${{matrix.ghc}}.${{matrix.package}} | cachix push clash-lang
+        run: nix path-info .#${{matrix.packageSet}}.${{matrix.package}} | cachix push clash-lang
 
   developer_shells:
     name: Build Developer Shells (${{matrix.ghc}})
@@ -354,17 +360,19 @@ jobs:
         run: nix path-info .#devShells.x86_64-linux.${{matrix.ghc}} | cachix push clash-lang
 
   packages_testsuite:
-    name: Packaging clash-testsuite (${{matrix.ghc}})
+    name: Packaging clash-testsuite (${{matrix.packageSet}})
     runs-on: self-hosted
     strategy:
       # If caching fails for one package, then we are still interested in caching other packages
       fail-fast: false
       matrix:
-        ghc: [
-          ghc9141,
-          ghc9124,
-          ghc9103,
-          ghc967
+        # See 'packages_common'
+        packageSet: [
+          clashPackages-ghc9141,
+          clashPackages-ghc9124,
+          clashPackages-ghc9103,
+          clashPackages-ghc967,
+          clashPackagesUpperBounds-ghc9141
         ]
     steps:
       - uses: actions/checkout@v6
@@ -376,18 +384,18 @@ jobs:
 
       - name: Build clash-testsuite
         run: |
-          nix build -L .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug
-          attic push public $(nix path-info .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug)
+          nix build -L .#${{matrix.packageSet}}.clash-testsuite-debug
+          attic push public $(nix path-info .#${{matrix.packageSet}}.clash-testsuite-debug)
 
       - name: Cachix
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: |
-          nix path-info .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug | cachix push clash-lang
+          nix path-info .#${{matrix.packageSet}}.clash-testsuite-debug | cachix push clash-lang
 
   running_testsuite:
-    name: Running clash-testsuite (${{matrix.ghc}}, ${{matrix.hdl}})
+    name: Running clash-testsuite (${{matrix.packageSet}}, ${{matrix.hdl}})
     runs-on: self-hosted
     strategy:
       fail-fast: false
@@ -397,11 +405,13 @@ jobs:
           'Verilog',
           'SystemVerilog'
         ]
-        ghc: [
-          ghc9141,
-          ghc9124,
-          ghc9103,
-          ghc967
+        # See 'packages_common'
+        packageSet: [
+          clashPackages-ghc9141,
+          clashPackages-ghc9124,
+          clashPackages-ghc9103,
+          clashPackages-ghc967,
+          clashPackagesUpperBounds-ghc9141
         ]
     needs: packages_testsuite
     steps:
@@ -414,7 +424,7 @@ jobs:
 
       - name: Run clash-testsuite
         run: |
-          nix run .#clashPackages-${{matrix.ghc}}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
+          nix run .#${{matrix.packageSet}}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{matrix.hdl}}. --no-vivado --no-modelsim
 
   all:
     name: All on-push jobs finished

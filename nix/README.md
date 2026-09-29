@@ -23,6 +23,14 @@ across a few files:
       When adding support for a new version of GHC this is all that needs to
       be changed.
 
+    * `nix/overlay-upper-bounds.nix`
+
+      This file turns `pkgs.clashPackages-ghcXXX` into
+      `pkgs.clashPackagesUpperBounds-ghcXXX`, which is built against newer
+      versions of some dependencies than nixpkgs provides. CI uses it to test
+      upper bounds we bumped. When bumping the upper bound of a dependency
+      beyond what nixpkgs provides, add the new version here.
+
     * `nix/devshell.nix`
 
       This file defines a development environment which contains everything
