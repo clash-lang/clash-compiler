@@ -105,30 +105,10 @@
         ghcVersion = defaultGhcVersion;
         supportedGhcVersions = ghcVersions;
 
-        packages = {
-          inherit (pkgs."clashPackages-${defaultGhcVersion}")
-            clash-benchmark
-            clash-ghc
-            clash-lib
-            clash-lib-hedgehog
-            clash-prelude
-            clash-prelude-hedgehog
-            clash-profiling
-            clash-profiling-prepare
-            clash-term
-            clash-testsuite
-            # Debug versions, mostly used for the CI
-            clash-lib-debug
-            clash-ghc-debug
-            clash-testsuite-debug;
-
-          default =
-            pkgs."clashPackages-${defaultGhcVersion}".clash-ghc;
-        } // builtins.listToAttrs
-          (builtins.map (version: {
-            name = "clashPackages-" + version;
-            value = {
-              inherit (pkgs."clashPackages-${version}")
+        packages =
+          let
+            exportPackages = packageSet: {
+              inherit (packageSet)
                 clash-benchmark
                 clash-ghc
                 clash-lib
@@ -144,7 +124,23 @@
                 clash-ghc-debug
                 clash-testsuite-debug;
             };
-          }) ghcVersions);
+
+            # Export a package set for every GHC version, e.g.
+            # `clashPackages-ghc967`.
+            exportPackageSets = prefix: builtins.listToAttrs
+              (builtins.map (version: {
+                name = prefix + version;
+                value = exportPackages pkgs."${prefix}${version}";
+              }) ghcVersions);
+          in
+          exportPackages pkgs."clashPackages-${defaultGhcVersion}" // {
+            default =
+              pkgs."clashPackages-${defaultGhcVersion}".clash-ghc;
+          }
+          // exportPackageSets "clashPackages-"
+          # Only tested on CI for the most recent GHC version, see
+          # `nix/overlay-upper-bounds.nix`.
+          // exportPackageSets "clashPackagesUpperBounds-";
 
         apps = {
           # Executables listed here can be run using the `nix run` command, which

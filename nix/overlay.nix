@@ -337,4 +337,10 @@ in
 
   "clashPackages-${compilerVersion}" =
     prev.haskell.packages.${compilerVersion}.extend haskellOverlays;
+
+  # The same package set, but built against the newest versions of some of our
+  # dependencies. See 'overlay-upper-bounds.nix'.
+  "clashPackagesUpperBounds-${compilerVersion}" =
+    final."clashPackages-${compilerVersion}".extend
+      (import ./overlay-upper-bounds.nix { pkgs = prev; });
 }
