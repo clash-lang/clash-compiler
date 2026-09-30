@@ -269,7 +269,6 @@ Library
                       Clash.Signal.Simulation.Vcd
                       Clash.Signal.Simulation.DataType
                       Clash.Signal.Simulation.Store
-                      Data.AnonRecords
 
                       Clash.Sized.BitVector
                       Clash.Sized.Fixed
@@ -306,6 +305,8 @@ Library
                       Clash.Examples
                       Clash.Examples.Internal
 
+                      Data.AnonRecords
+                      Data.Internal.TH.AnonRecords
   other-modules:
                       Clash.Class.AutoReg.Instances
                       Clash.Clocks.Internal
