@@ -20,22 +20,29 @@ import Text.Read
 import Clash.Promoted.Nat (snatToNum)
 import Clash.Signal (KnownDomain(..), Signal, SDomainConfiguration(..))
 
-
-newtype Time = TimeFS Integer
+-- | Time with up to fs precision.
+-- The constructors 'TimeFS', 'TimePS', 'TimeNS', 'TimeUS', 'TimeMS' and 'TimeMS',
+-- different units can be used for constructing and matching time values.
+newtype Time = TimeFS Integer -- ^ Time in femtoseconds.
   deriving (Eq, Ord)
 
+-- | Time in picoseconds.
 pattern TimePS :: Integer -> Time
 pattern TimePS t <- (getTimePat 3 -> Just t) where
   TimePS t = TimeFS (t * 10^(3::Integer))
+-- | Time in nanoseconds.
 pattern TimeNS :: Integer -> Time
 pattern TimeNS t <- (getTimePat 6 -> Just t) where
   TimeNS t = TimeFS (t * 10^(6::Integer))
+-- | Time in microseconds
 pattern TimeUS :: Integer -> Time
 pattern TimeUS t <- (getTimePat 9 -> Just t) where
   TimeUS t = TimeFS (t * 10^(9::Integer))
+-- | Time in milliseconds.
 pattern TimeMS :: Integer -> Time
 pattern TimeMS t <- (getTimePat 12 -> Just t) where
   TimeMS t = TimeFS (t * 10^(12::Integer))
+-- | Time in seconds.
 pattern TimeS :: Integer -> Time
 pattern TimeS t <- (getTimePat 15 -> Just t) where
   TimeS  t = TimeFS (t * 10^(15::Integer))
@@ -44,6 +51,7 @@ pattern TimeS t <- (getTimePat 15 -> Just t) where
 getTimePat :: Int -> Time -> Maybe Integer
 getTimePat k (TimeFS t) = if t `rem` (10^k) == 0 then Just (t `div` (10^k)) else Nothing
 
+-- | Time is shown, and can be read, in a @<value><unit>@ format.
 instance Show Time where
   show (TimeS  t) = show t <> "s"
   show (TimeMS t) = show t <> "ms"
@@ -63,6 +71,7 @@ instance Show Time where
   --   split (TimeFS t) = ("TimeFS ",t)
   --   app_prec = 10
 
+-- | Time can be read from the Haskell constructors, as well as with a unit postfix.
 instance Read Time where
   readPrec =
     parens
@@ -93,6 +102,7 @@ instance Read Time where
     app_prec = 10
     pfix_prec = 11
 
+-- | __NB__: Some functions are unavailable.
 instance Num Time where
   (+) (TimeFS a) (TimeFS b) = TimeFS (a+b)
   negate (TimeFS a) = TimeFS (-a)
