@@ -1,17 +1,19 @@
 {-|
-Copyright  :  (C) 2026     , QBayLogic B.V.,
+Copyright  :  (C) 2026, QBayLogic B.V.,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-The module includes a way to construct anonymous records.
+Module to construct and use anonymous records.
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -24,7 +26,7 @@ The module includes a way to construct anonymous records.
 module Data.AnonRecords (
   (:&:)(..),
   (:=)(..),
-  pattern (:=),
+  pattern (:=), FieldLabelProxy,
   HasField,
   WithField, WithoutField,
   AccessField(..), InsertField(..), DeleteField(..),
@@ -42,50 +44,86 @@ import Data.Typeable (Typeable)
 
 import Clash.Signal
 import Clash.Class.BitPack (BitPack)
+import Clash.CPP (maxTupleSize)
 import Clash.XException (NFDataX)
 
+import Data.Internal.TH.AnonRecords (deriveAsTuple)
+
+-- RECORD COMPONENTS
+
+-- | Anonymous record field.
+-- See '(:=)' for constructing fields with explicit field labels
 infixr 3 :=
 newtype (:=) (x::Symbol) a = L a
   deriving (Generic, BitPack, NFDataX, Typeable)
 
+-- | Anonymous record product type.
+-- This operator should always be applied as a right infix operator:
+--
+-- > "a":=a :&: "b":=b :&: "c":=c
+-- > "a":=a :&: ("b":=b :&: "c":=c)
+--
+-- Changing the structure will break most record functionality,
+-- because class instances will be missing.
 infixr 2 :&:
 data (:&:) a b = a :&: b
   deriving (Show, Generic, BitPack, NFDataX, Typeable)
 
+
 -- CONSTRUCTOR PATTERN
 
-data FieldLabelProxy f = FieldLabelProxy
+-- | A proxy for field labels, to be used as labels with '(:=)'.
+-- Because the 'IsLabel' instance, you can write @#field@
+-- rather than @FieldLabelProxy \@"field"@.
+data FieldLabelProxy (f::Symbol) = FieldLabelProxy
   deriving (Show, Generic, BitPack, NFDataX, Typeable)
 
+-- | Constructor that can be used in combination with 'FieldLabelProxy' labels
+-- to add field names with cleaner syntax. Instead of writing:
+--
+-- > L @"x" x :&: L @"y" y
+--
+-- you can write:
+--
+-- > #x:=x :&: #y:=y
 pattern (:=) :: FieldLabelProxy f -> a -> f:=a
 pattern (:=) p x <- (withFLP -> (p,x)) where
   (:=) _ x = L x
+{-# COMPLETE (:=) #-}
 
 withFLP :: f:=a -> (FieldLabelProxy f, a)
 withFLP (L x) = (FieldLabelProxy, x)
 
-instance (f~f2) => IsLabel f (FieldLabelProxy f2) where
+instance IsLabel f (FieldLabelProxy f) where
   fromLabel = FieldLabelProxy
+
 
 -- FIELD ACCESS
 
+-- | Type-level boolean indicating whether a field exists in a record.
 type family HasField f a where
   HasField x (x:=_) = True
   HasField x (a:&:b) = HasField x a || HasField x b
   HasField _ _ = False
 
+-- | Class for getting and setting record fields.
 class AccessField (f::Symbol) a where
   type FieldType f a
   getField :: a -> FieldType f a
+  -- | Set the value of a field. To replace the value with one of a different type,
+  -- see 'insertField'.
   setField :: FieldType f a -> a -> a
+  -- | Modify a field value in place.
+  modifyField :: (FieldType f a -> FieldType f a) -> a -> a
+  modifyField m r = setField @f (m $ getField @f r) r
 
 instance AccessField f (f := a) where
   type FieldType f (f:=a) = a
   getField (L x) = x
   setField x _ = L x
 
-instance (AccessField f (f2:=b), FieldType f (f2:=b) ~ a) => GHC.Records.HasField f (f2:=b) a where
-  getField = getField @f @(f2:=b)
+instance (AccessField f (f:=b), FieldType f (f:=b) ~ a) => GHC.Records.HasField f (f:=b) a where
+  getField = getField @f @(f:=b)
 
 instance (AccessField' f (a:&:b) (HasField f a)) => AccessField f (a:&:b) where
   type FieldType f (a:&:b) = FieldType' f (a:&:b) (HasField f a)
@@ -110,15 +148,20 @@ instance (AccessField f b, HasField f a ~ False) => AccessField' f (a:&:b) False
   getField'   (_:&:b) = getField @f b
   setField' y (a:&:b) = a :&: setField @f y b
 
+
 -- FIELD ADDITION
 
+-- | Returns the record type after a field has been inserted.
 type family WithField (f::Symbol) a r where
   WithField f a () = f:=a
   WithField f a (f:=b) = f:=a
   WithField f a ((f:=b) :&: r) = (f:=a) :&: r
   WithField f a (l :&: r) = l :&: WithField f a r
 
+-- | Class for inserting fields into records.
 class InsertField f a r where
+  -- | If the record already has a field with the provided name, it is replaced.
+  -- Otherwise, the field is added to the end.
   insertField :: a -> r -> WithField f a r
 
 instance InsertField f a () where
@@ -154,10 +197,12 @@ type family WithoutField (f::Symbol) r where
   WithoutField f (l :&: (f:=a)) = l
   WithoutField f (l :&: r) = WithoutField f r
 
+-- | Class denoting that a field may be removed from a record.
 class DeleteField (f::Symbol) r where
+  -- | Remove a field from a record. Only possible if the field exists.
   deleteField :: r -> WithoutField f r
 
-instance (f~f2) => DeleteField f (f2:=b) where
+instance DeleteField f (f:=b) where
   deleteField _ = ()
 
 instance (DeleteField' f (f2:=b :&: f3:=b) (f==f2) (f==f3)) => DeleteField f (f2:=b :&: f3:=b) where
@@ -184,6 +229,7 @@ instance (DeleteField f r, WithoutField f (l :&: r) ~ (l :&: WithoutField f r)) 
 instance (KnownSymbol x, Show a) => Show (x := a) where
   show (L a) = "#" <> (symbolVal $ Proxy @x) <> ":=" <> show a
 
+
 -- BUNDLE
 
 instance (Bundle a, Bundle b) => Bundle (a :&: b) where
@@ -202,8 +248,14 @@ instance Bundle (x := a) where
 
 
 -- TUPLES
--- from/to records up to size 3, presently
 
+{- | Class for converting between records and tuples.
+
+__NB__: The documentation only shows instances up to /3/-tuples. By
+default, instances up to and including /12/-tuples will exist. If the flag
+@large-tuples@ is set instances up to the GHC imposed limit will exist. The
+GHC imposed limit is either 62 or 64 depending on the GHC version.
+-}
 class AsTuple a where
   type Tupled a
   fromTuple :: Tupled a -> a
@@ -214,12 +266,4 @@ instance AsTuple (x := a) where
   fromTuple a = L a
   toTuple (L a) = a
 
-instance AsTuple (x:=a :&: y:=b) where
-  type Tupled (x:=a :&: y:=b) = (a,b)
-  fromTuple (a,b) = L a :&: L b
-  toTuple (L a :&: L b) = (a,b)
-
-instance AsTuple (x:=a :&: y:=b :&: z:=c) where
-  type Tupled (x:=a :&: y:=b :&: z:=c) = (a,b,c)
-  fromTuple (a,b,c) = L a :&: L b :&: L c
-  toTuple (L a :&: L b :&: L c) = (a,b,c)
+deriveAsTuple 2 maxTupleSize
