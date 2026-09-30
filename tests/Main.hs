@@ -749,6 +749,7 @@ runClashTest = defaultMain
         , outputTest "T3359" def{hdlTargets=[SystemVerilog], hdlSim=[]}
         , runTest "T3407_deadCode_after_appProp" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "T3439" def{hdlSim=[]}
+        , runTest "T3460_void_projection" def
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
