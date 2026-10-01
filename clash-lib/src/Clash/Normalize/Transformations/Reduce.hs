@@ -298,16 +298,19 @@ reduceZipWithHandler ReduceNonRepPrimContext{..}
   , let rhsTy = mkTyConApp vecTcNm [nTy,rhsElty]
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
+        lhsNonRep <- isUntranslatableType_not_poly lhsElTy
+        rhsNonRep <- isUntranslatableType_not_poly rhsElty
+        resNonRep <- isUntranslatableType_not_poly resElTy
         shouldReduce1 <- List.orM [ pure (ultra || n < 2)
                              , shouldReduce (tfContext transformContext)
-                             , List.anyM isUntranslatableType_not_poly
-                                    [lhsElTy,rhsElty,resElTy]
+                             , pure (lhsNonRep || rhsNonRep || resNonRep)
                              -- Note [Unroll shouldSplit types]
                              , pure (any (Maybe.isJust . shouldSplit tyConMap)
                                          [lhsTy,rhsTy,resultType]) ]
         if shouldReduce1
            then abstractOverMissingArgs primTicks tmArgs termType transformContext
-                  (reduceZipWith primInfo n lhsElTy rhsElty resElTy)
+                  (reduceZipWith primInfo n lhsElTy rhsElty resElTy
+                     (not lhsNonRep) (not rhsNonRep))
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 4
@@ -322,16 +325,17 @@ reduceMapHandler ReduceNonRepPrimContext{..}
   , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
+        argNonRep <- isUntranslatableType_not_poly argElTy
+        resNonRep <- isUntranslatableType_not_poly resElTy
         shouldReduce1 <- List.orM [ pure (ultra || n < 2 )
                              , shouldReduce (tfContext transformContext)
-                             , List.anyM isUntranslatableType_not_poly
-                                    [argElTy,resElTy]
+                             , pure (argNonRep || resNonRep)
                              -- Note [Unroll shouldSplit types]
                              , pure (any (Maybe.isJust . shouldSplit tyConMap)
                                          [argTy,resultType]) ]
         if shouldReduce1
            then abstractOverMissingArgs primTicks tmArgs termType transformContext
-                  (reduceMap primInfo n argElTy resElTy)
+                  (reduceMap primInfo n argElTy resElTy (not argNonRep))
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 3
@@ -378,14 +382,16 @@ reduceFoldrHandler ReduceNonRepPrimContext{..}
   , (_:_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [aTy,bTy,nTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
+        aNonRep <- isUntranslatableType_not_poly aTy
+        bNonRep <- isUntranslatableType_not_poly bTy
         shouldReduce1 <- List.orM [ pure ultra
                              , shouldReduce (tfContext transformContext)
-                             , List.anyM isUntranslatableType_not_poly [aTy,bTy]
+                             , pure (aNonRep || bNonRep)
                              -- Note [Unroll shouldSplit types]
                              , pure (Maybe.isJust (shouldSplit tyConMap argTy)) ]
         if shouldReduce1
           then abstractOverMissingArgs primTicks tmArgs termType transformContext
-                 (reduceFoldr primInfo n aTy)
+                 (reduceFoldr primInfo n aTy (not aNonRep))
           else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 3
@@ -493,13 +499,14 @@ reduceInitHandler ReduceNonRepPrimContext{..}
   , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,aTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
+        aNonRep <- isUntranslatableType_not_poly aTy
         shouldReduce1 <- List.orM [ shouldReduce (tfContext transformContext)
-                             , isUntranslatableType_not_poly aTy
+                             , pure aNonRep
                              -- Note [Unroll shouldSplit types]
                              , pure (Maybe.isJust (shouldSplit tyConMap argTy)) ]
         if shouldReduce1
            then abstractOverMissingArgs primTicks tmArgs termType transformContext
-                  (reduceInit primInfo n aTy)
+                  (reduceInit primInfo n aTy (not aNonRep))
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2

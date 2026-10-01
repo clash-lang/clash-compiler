@@ -76,6 +76,7 @@ library
     shouldwork/Basic/precompiled
     shouldwork/Issues/T1534-precompiled
     shouldwork/Issues/T3291-precompiled
+    shouldwork/Issues/T3461-precompiled
     shouldwork/TopEntity/precompiled
 
   exposed-modules:
@@ -103,6 +104,9 @@ library
 
     -- From tests/shouldwork/Issues/T3291-precompiled
     T3291.BitPackC
+
+    -- From tests/shouldwork/Issues/T3461-precompiled
+    T3461
 
     -- From tests/shouldwork/TopEntity/precompiled
     T3297a
