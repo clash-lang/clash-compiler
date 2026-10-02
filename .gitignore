@@ -1,6 +1,7 @@
 dist/
 build/
 dist-newstyle/
+dist-newstyle-*/
 .stack-work/
 stack.yaml.lock
 cabal-dev

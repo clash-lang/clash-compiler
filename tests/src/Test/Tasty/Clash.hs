@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Tasty.Clash where
@@ -14,6 +15,7 @@ import           Data.Default              (Default, def)
 import qualified Data.List                 as List
 import           Data.Maybe                (isJust)
 import qualified Data.Text                 as T
+import qualified Language.Haskell.TH.Syntax as TH
 import qualified System.Directory          as Directory
 import           System.FilePath           ((</>),(<.>))
 import           System.IO.Unsafe          (unsafePerformIO)
@@ -121,6 +123,8 @@ data TestOptions =
     -- ^ Extra flags to pass to GHC
     , clashFlags :: [String]
     -- ^ Extra flags to pass to Clash
+    , clashEnv :: [(String, String)]
+    -- ^ Extra environment variables to set when running Clash
     , buildTargets :: BuildTargets
     -- ^ Indicates what should be built to an executable. Defaults to @["testBench"]@
     -- if 'hdlSim' is set, otherwise @["topEntity"]@.
@@ -143,6 +147,7 @@ instance Default TestOptions where
       , hdlTargets=allTargets
       , ghcFlags=[]
       , clashFlags=[]
+      , clashEnv=[]
       , buildTargets=BuildAuto
       , vvpStdoutNonEmptyFail=True
       }
@@ -202,10 +207,17 @@ data ClashGenTest = ClashGenTest
   , cgBuildTarget :: HDL
   , cgSourceDirectory :: FilePath
   , cgExtraArgs :: [String]
+  , cgExtraEnv :: [(String, String)]
   , cgModName :: String
   , cgOutputDirectory :: IO FilePath
   , cgHdlDirectory :: IO FilePath
   }
+
+-- | Unit id of this library. Pass it to Clash with @-package-id@ instead of
+-- using @-package clash-testsuite@: the latter also matches the sublibrary
+-- @clash-testsuite:t3105-hidden@, and GHC might expose that one instead.
+testsuiteUnitId :: String
+testsuiteUnitId = $(TH.lift . TH.loc_package =<< TH.location)
 
 commonArgs :: [String]
 commonArgs =
@@ -228,7 +240,7 @@ instance IsTest ClashGenTest where
    where
     program oDir hdlDir =
       TestProgram
-        "clash" (args oDir hdlDir) NoGlob PrintNeither False Nothing []
+        "clash" (args oDir hdlDir) NoGlob PrintNeither False Nothing cgExtraEnv
 
     failingProgram oDir hdlDir (testExit, expectedErr) = let
         -- TODO: there's no easy way to test for the absence of something in stderr
@@ -238,7 +250,7 @@ instance IsTest ClashGenTest where
       in
       TestFailingProgram
         (testExitCode testExit) "clash" (args oDir hdlDir) NoGlob PrintNeither
-        False (specificExitCode testExit) expected Nothing []
+        False (specificExitCode testExit) expected Nothing cgExtraEnv
 
     args oDir hdlDir =
       [ target
@@ -280,7 +292,7 @@ instance IsTest ClashBinaryTest where
       TestProgram "clash" (buildArgs oDir) NoGlob PrintStdErr False Nothing []
 
     buildArgs oDir =
-      [ "-package", "clash-testsuite"
+      [ "-package-id", testsuiteUnitId
       , "-main-is", cbModName <> ".main" <> show cbBuildTarget
       , "-o", oDir </> "out"
       , "-i" <> cbSourceDirectory
@@ -439,6 +451,7 @@ runTest1 modName opts@TestOptions{..} path target =
     , cgBuildTarget=target
     , cgSourceDirectory=sourceDir
     , cgExtraArgs=clashFlags
+    , cgExtraEnv=clashEnv
     , cgModName=modName
     , cgOutputDirectory=tmpDir
     , cgHdlDirectory=fmap (</> "hdl") tmpDir
@@ -519,6 +532,7 @@ outputTest' modName target extraClashArgs extraGhcArgs path =
     , cgBuildTarget=target
     , cgSourceDirectory=sourceDir
     , cgExtraArgs=extraClashArgs
+    , cgExtraEnv=[]
     , cgModName=modName
     , cgOutputDirectory=workDir
     , cgHdlDirectory=workDir

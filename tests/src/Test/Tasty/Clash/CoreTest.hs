@@ -61,7 +61,7 @@ runToCoreStage
 runToCoreStage _target f src = do
   ids <- newSupply
   pds <- primDirs backend
-  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) (hdlKind backend) src Nothing
 
   return (env, design, ids)
  where

@@ -70,7 +70,7 @@ runToNetlistStage
   -> IO [(ComponentMeta, Component)]
 runToNetlistStage target f src = do
   pds <- primDirs backend
-  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) [] (hdlKind backend) src Nothing
+  (env, design) <- generateBindings opts (return ()) pds (opt_importPaths opts) (hdlKind backend) src Nothing
 
   let (compNames, initIs) = genTopNames opts hdl (designEntities design)
       teNames = fmap topId (designEntities design)
