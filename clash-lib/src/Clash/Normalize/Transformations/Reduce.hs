@@ -18,7 +18,7 @@
 module Clash.Normalize.Transformations.Reduce
   ( reduceBinders
   , reduceConst
-  , reduceNonRepPrim
+  , reducePrim
   ) where
 
 import qualified Control.Lens as Lens
@@ -106,6 +106,12 @@ reduceConst _ e = return e
 -- example when Clash.Size.Vector.map consumes or produces a vector of
 -- non-representable elements.
 --
+-- This transformation used to be called @reduceNonRepPrim@, but nowadays it
+-- also replaces primitives for other reasons: e.g., because they are applied
+-- to short vectors, because they occur in a context that should be reduced
+-- (see 'shouldReduce'), or because @-fclash-ultra@ is enabled. The conditions
+-- differ per primitive, see the handlers in 'reducePrimImpls'.
+--
 -- Basically what this transformation does is replace a primitive the completely
 -- unrolled recursive definition that it represents. e.g.
 --
@@ -121,7 +127,7 @@ reduceConst _ e = return e
 -- >     (y1  :: Int                 = case yr0 of (:>) _ y yr -> y
 -- > in  (($) x0 y0 :> ($) x1 y1 :> Nil)
 --
--- Currently, it only handles the functions in 'reduceNonRepPrimImpls'.
+-- Currently, it only handles the functions in 'reducePrimImpls'.
 --
 -- Note [Unroll shouldSplit types]
 -- 1. Certain higher-order functions over Vec, such as map, have specialized
@@ -142,16 +148,16 @@ reduceConst _ e = return e
 -- It's easier to just unroll the recursive definitions.
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
-reduceNonRepPrim :: HasCallStack => NormRewrite
+reducePrim :: HasCallStack => NormRewrite
 -- Only consider the root of an application spine (see 'reduceConst'): the root
 -- sees all arguments, and the @Vec 0@-to-@Nil@ rewrite below is only
 -- type-correct at the root, where no more arguments follow.
-reduceNonRepPrim (TransformContext _ (AppFun:_)) e = return e
-reduceNonRepPrim c e@(App _ _)
+reducePrim (TransformContext _ (AppFun:_)) e = return e
+reducePrim c e@(App _ _)
   | (Prim p, args, ticks) <- collectArgsTicks e
   = do
     tcm <- Lens.view tcCache
-    let handlerM = HashMap.lookup (primName p) reduceNonRepPrimImpls
+    let handlerM = HashMap.lookup (primName p) reducePrimImpls
     -- Every primitive whose result type is @Vec 0 a@ reduces to @Nil@, not
     -- just the ones with a handler. That takes the type of the applied
     -- primitive, which is expensive to infer, so for a primitive without a
@@ -178,7 +184,7 @@ reduceNonRepPrim c e@(App _ _)
           Nothing -> return e
           Just handler -> do
             ultraArg <- Lens.view normalizeUltra
-            handler ReduceNonRepPrimContext
+            handler ReducePrimContext
               { transformContext = c
               , originalTerm = e
               , primInfo = p
@@ -191,8 +197,8 @@ reduceNonRepPrim c e@(App _ _)
               , resultTypeView = tv
               }
 
-reduceNonRepPrim _ e = return e
-{-# SCC reduceNonRepPrim #-}
+reducePrim _ e = return e
+{-# SCC reducePrim #-}
 
 -- | The name of the 'Clash.Sized.Vector.Vec' type constructor.
 vecTcName :: Text
@@ -204,7 +210,7 @@ zeroLengthVecTerm tcm tv
   | TyConApp vecTcNm [nTy, aTy] <- tv
   , nameOcc vecTcNm == vecTcName
   , Right 0 <- runExcept (tyNatSize tcm nTy)
-  = Just $ fromMaybe (error "reduceNonRepPrim: unable to create Vec DCs") $ do
+  = Just $ fromMaybe (error "reducePrim: unable to create Vec DCs") $ do
       vecTc <- UniqMap.lookup vecTcNm tcm
       [nilCon,consCon] <- pure (tyConDataCons vecTc)
       return (mkVec nilCon consCon aTy 0 [])
@@ -219,7 +225,7 @@ zeroLengthVecTerm tcm tv
 -- A result headed by a concrete type constructor other than @Vec@ can never
 -- instantiate to a @Vec@. Everything else -- type variables, type families,
 -- type constructors we know nothing about -- might, and yields 'True'.
--- Over-approximating is sound: a 'True' only makes 'reduceNonRepPrim' infer
+-- Over-approximating is sound: a 'True' only makes 'reducePrim' infer
 -- the type of the applied primitive and ask 'zeroLengthVecTerm' for a verdict.
 mayReturnVec :: TyConMap -> Type -> Bool
 mayReturnVec tcm ty = case tyView (snd (splitFunForallTy ty)) of
@@ -232,9 +238,9 @@ mayReturnVec tcm ty = case tyView (snd (splitFunForallTy ty)) of
         Nothing -> True
   _ -> True
 
--- | Everything the handlers in 'reduceNonRepPrimImpls' receive from the
--- dispatch site in 'reduceNonRepPrim'.
-data ReduceNonRepPrimContext = ReduceNonRepPrimContext
+-- | Everything the handlers in 'reducePrimImpls' receive from the
+-- dispatch site in 'reducePrim'.
+data ReducePrimContext = ReducePrimContext
   { transformContext :: TransformContext
   , originalTerm :: Term
     -- ^ The primitive applied to its arguments
@@ -252,16 +258,16 @@ data ReduceNonRepPrimContext = ReduceNonRepPrimContext
     -- ^ 'tyView' of 'resultType'
   }
 
--- | A handler for a specific primitive in 'reduceNonRepPrimImpls'.
-type ReduceNonRepPrimHandler
-  = ReduceNonRepPrimContext -> NormalizeSession Term
+-- | A handler for a specific primitive in 'reducePrimImpls'.
+type ReducePrimHandler
+  = ReducePrimContext -> NormalizeSession Term
 
--- | The primitives 'reduceNonRepPrim' can reduce, keyed on primitive
+-- | The primitives 'reducePrim' can reduce, keyed on primitive
 -- name. The handlers are the arms of the @case@ expression this map replaced;
 -- a handler whose guards do not apply returns 'originalTerm' unchanged, like
 -- the fall-through of the @case@ did.
-reduceNonRepPrimImpls :: HashMap Text ReduceNonRepPrimHandler
-reduceNonRepPrimImpls = HashMap.fromList
+reducePrimImpls :: HashMap Text ReducePrimHandler
+reducePrimImpls = HashMap.fromList
   [ ($(textNameLit 'Clash.Sized.Vector.zipWith), reduceZipWithHandler)
   , ($(textNameLit 'Clash.Sized.Vector.map), reduceMapHandler)
   , ($(textNameLit 'Clash.Sized.Vector.traverse#), reduceTraverseHandler)
@@ -290,8 +296,8 @@ reduceNonRepPrimImpls = HashMap.fromList
   , ($(textNameLit 'Clash.Sized.Internal.BitVector.eq#), reduceEqHandler)
   ]
 
-reduceZipWithHandler :: ReduceNonRepPrimHandler
-reduceZipWithHandler ReduceNonRepPrimContext{..}
+reduceZipWithHandler :: ReducePrimHandler
+reduceZipWithHandler ReducePrimContext{..}
   | (tmArgs,[lhsElTy,rhsElty,resElTy,nTy]) <- Either.partitionEithers primArguments
   , TyConApp vecTcNm _ <- resultTypeView
   , let lhsTy = mkTyConApp vecTcNm [nTy,lhsElTy]
@@ -314,12 +320,12 @@ reduceZipWithHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 4
-  = error ("reduceNonRepPrim: zipWith bad args" <> showPpr originalTerm)
+  = error ("reducePrim: zipWith bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceMapHandler :: ReduceNonRepPrimHandler
-reduceMapHandler ReduceNonRepPrimContext{..}
+reduceMapHandler :: ReducePrimHandler
+reduceMapHandler ReducePrimContext{..}
   | (tmArgs,[argElTy,resElTy,nTy]) <- Either.partitionEithers primArguments
   , TyConApp vecTcNm _ <- resultTypeView
   , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
@@ -339,24 +345,24 @@ reduceMapHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: map bad args" <> showPpr originalTerm)
+  = error ("reducePrim: map bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceTraverseHandler :: ReduceNonRepPrimHandler
-reduceTraverseHandler ReduceNonRepPrimContext{..}
+reduceTraverseHandler :: ReducePrimHandler
+reduceTraverseHandler ReducePrimContext{..}
   | (tmArgs,[aTy,fTy,bTy,nTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> abstractOverMissingArgs primTicks tmArgs termType transformContext
                    (reduceTraverse n aTy fTy bTy)
       _ -> return originalTerm
   | length primArguments >= 4
-  = error ("reduceNonRepPrim: traverse# bad args" <> showPpr originalTerm)
+  = error ("reducePrim: traverse# bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceFoldHandler :: ReduceNonRepPrimHandler
-reduceFoldHandler ReduceNonRepPrimContext{..}
+reduceFoldHandler :: ReducePrimHandler
+reduceFoldHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   , (_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,aTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
@@ -372,12 +378,12 @@ reduceFoldHandler ReduceNonRepPrimContext{..}
         else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: fold bad args" <> showPpr originalTerm)
+  = error ("reducePrim: fold bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceFoldrHandler :: ReduceNonRepPrimHandler
-reduceFoldrHandler ReduceNonRepPrimContext{..}
+reduceFoldrHandler :: ReducePrimHandler
+reduceFoldrHandler ReducePrimContext{..}
   | (tmArgs,[aTy,bTy,nTy]) <- Either.partitionEithers primArguments
   , (_:_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [aTy,bTy,nTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
@@ -395,24 +401,24 @@ reduceFoldrHandler ReduceNonRepPrimContext{..}
           else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: foldr bad args" <> showPpr originalTerm)
+  = error ("reducePrim: foldr bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceDFoldHandler :: ReduceNonRepPrimHandler
-reduceDFoldHandler ReduceNonRepPrimContext{..}
+reduceDFoldHandler :: ReducePrimHandler
+reduceDFoldHandler ReducePrimContext{..}
   | (tmArgs,[_mTy,nTy,aTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> abstractOverMissingArgs primTicks tmArgs termType transformContext
                    (reduceDFold n aTy)
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: dfold bad args" <> showPpr originalTerm)
+  = error ("reducePrim: dfold bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceAppendHandler :: ReduceNonRepPrimHandler
-reduceAppendHandler ReduceNonRepPrimContext{..}
+reduceAppendHandler :: ReducePrimHandler
+reduceAppendHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy,mTy]) <- Either.partitionEithers primArguments
   = case (runExcept (tyNatSize tyConMap nTy), runExcept (tyNatSize tyConMap mTy)) of
       (Right n, Right m) -> do
@@ -428,12 +434,12 @@ reduceAppendHandler ReduceNonRepPrimContext{..}
                else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: ++ bad args" <> showPpr originalTerm)
+  = error ("reducePrim: ++ bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceHeadHandler :: ReduceNonRepPrimHandler
-reduceHeadHandler ReduceNonRepPrimContext{..}
+reduceHeadHandler :: ReducePrimHandler
+reduceHeadHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,aTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
@@ -448,12 +454,12 @@ reduceHeadHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: head bad args" <> showPpr originalTerm)
+  = error ("reducePrim: head bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceTailHandler :: ReduceNonRepPrimHandler
-reduceTailHandler ReduceNonRepPrimContext{..}
+reduceTailHandler :: ReducePrimHandler
+reduceTailHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,aTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
@@ -468,12 +474,12 @@ reduceTailHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: tail bad args" <> showPpr originalTerm)
+  = error ("reducePrim: tail bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceLastHandler :: ReduceNonRepPrimHandler
-reduceLastHandler ReduceNonRepPrimContext{..}
+reduceLastHandler :: ReducePrimHandler
+reduceLastHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,aTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
@@ -489,12 +495,12 @@ reduceLastHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: last bad args" <> showPpr originalTerm)
+  = error ("reducePrim: last bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceInitHandler :: ReduceNonRepPrimHandler
-reduceInitHandler ReduceNonRepPrimContext{..}
+reduceInitHandler :: ReducePrimHandler
+reduceInitHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   , (Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,aTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
@@ -510,12 +516,12 @@ reduceInitHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: init bad args" <> showPpr originalTerm)
+  = error ("reducePrim: init bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceUnconcatHandler :: ReduceNonRepPrimHandler
-reduceUnconcatHandler ReduceNonRepPrimContext{..}
+reduceUnconcatHandler :: ReducePrimHandler
+reduceUnconcatHandler ReducePrimContext{..}
   | (tmArgs,[nTy,mTy,aTy]) <- Either.partitionEithers primArguments
   , (_:_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,mTy,aTy]))
   = case (runExcept (tyNatSize tyConMap nTy), runExcept (tyNatSize tyConMap mTy)) of
@@ -533,24 +539,24 @@ reduceUnconcatHandler ReduceNonRepPrimContext{..}
           return originalTerm
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: unconcat bad args" <> showPpr originalTerm)
+  = error ("reducePrim: unconcat bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceTransposeHandler :: ReduceNonRepPrimHandler
-reduceTransposeHandler ReduceNonRepPrimContext{..}
+reduceTransposeHandler :: ReducePrimHandler
+reduceTransposeHandler ReducePrimContext{..}
   | (tmArgs,[mTy,nTy,aTy]) <- Either.partitionEithers primArguments
   = case (runExcept (tyNatSize tyConMap nTy), runExcept (tyNatSize tyConMap mTy)) of
       (Right n, Right 0) -> abstractOverMissingArgs primTicks tmArgs termType transformContext
                               (reduceTranspose n 0 aTy)
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: transpose bad args" <> showPpr originalTerm)
+  = error ("reducePrim: transpose bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceReplicateHandler :: ReduceNonRepPrimHandler
-reduceReplicateHandler ReduceNonRepPrimContext{..}
+reduceReplicateHandler :: ReducePrimHandler
+reduceReplicateHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
@@ -565,13 +571,13 @@ reduceReplicateHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: replicate bad args" <> showPpr originalTerm)
+  = error ("reducePrim: replicate bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
 -- replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
-reduceReplaceIntHandler :: ReduceNonRepPrimHandler
-reduceReplaceIntHandler ReduceNonRepPrimContext{..}
+reduceReplaceIntHandler :: ReducePrimHandler
+reduceReplaceIntHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
@@ -587,12 +593,12 @@ reduceReplaceIntHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: replace_int bad args" <> showPpr originalTerm)
+  = error ("reducePrim: replace_int bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceIndexIntHandler :: ReduceNonRepPrimHandler
-reduceIndexIntHandler ReduceNonRepPrimContext{..}
+reduceIndexIntHandler :: ReducePrimHandler
+reduceIndexIntHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   , (_:Right argTy:_) <- fst (splitFunForallTy (piResultTys tyConMap (primType primInfo) [nTy,aTy]))
   = case runExcept (tyNatSize tyConMap nTy) of
@@ -608,12 +614,12 @@ reduceIndexIntHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: index_int bad args" <> showPpr originalTerm)
+  = error ("reducePrim: index_int bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceImapHandler :: ReduceNonRepPrimHandler
-reduceImapHandler ReduceNonRepPrimContext{..}
+reduceImapHandler :: ReducePrimHandler
+reduceImapHandler ReducePrimContext{..}
   | (tmArgs,[nTy,argElTy,resElTy]) <- Either.partitionEithers primArguments
   , TyConApp vecTcNm _ <- resultTypeView
   , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
@@ -631,12 +637,12 @@ reduceImapHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: imap bad args" <> showPpr originalTerm)
+  = error ("reducePrim: imap bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceIterateIHandler :: ReduceNonRepPrimHandler
-reduceIterateIHandler ReduceNonRepPrimContext{..}
+reduceIterateIHandler :: ReducePrimHandler
+reduceIterateIHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
@@ -654,24 +660,24 @@ reduceIterateIHandler ReduceNonRepPrimContext{..}
           return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: iterateI bad args" <> showPpr originalTerm)
+  = error ("reducePrim: iterateI bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceDTFoldHandler :: ReduceNonRepPrimHandler
-reduceDTFoldHandler ReduceNonRepPrimContext{..}
+reduceDTFoldHandler :: ReducePrimHandler
+reduceDTFoldHandler ReducePrimContext{..}
   | (tmArgs,[_mTy,nTy,aTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> abstractOverMissingArgs primTicks tmArgs termType transformContext
                    (reduceDTFold n aTy)
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: dtfold bad args" <> showPpr originalTerm)
+  = error ("reducePrim: dtfold bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceReverseHandler :: ReduceNonRepPrimHandler
-reduceReverseHandler ReduceNonRepPrimContext{..}
+reduceReverseHandler :: ReducePrimHandler
+reduceReverseHandler ReducePrimContext{..}
   | ultra
   , (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   , Right n <- runExcept (tyNatSize tyConMap nTy)
@@ -680,20 +686,20 @@ reduceReverseHandler ReduceNonRepPrimContext{..}
   | otherwise
   = return originalTerm
 
-reduceTDFoldHandler :: ReduceNonRepPrimHandler
-reduceTDFoldHandler ReduceNonRepPrimContext{..}
+reduceTDFoldHandler :: ReducePrimHandler
+reduceTDFoldHandler ReducePrimContext{..}
   | (tmArgs,[_mTy,nTy,aTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> abstractOverMissingArgs primTicks tmArgs termType transformContext
                    (reduceTFold n aTy)
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: tdfold bad args" <> showPpr originalTerm)
+  = error ("reducePrim: tdfold bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceTReplicateHandler :: ReduceNonRepPrimHandler
-reduceTReplicateHandler ReduceNonRepPrimContext{..}
+reduceTReplicateHandler :: ReducePrimHandler
+reduceTReplicateHandler ReducePrimContext{..}
   | (tmArgs,[nTy,aTy]) <- Either.partitionEithers primArguments
   = case runExcept (tyNatSize tyConMap nTy) of
       Right n -> do
@@ -705,12 +711,12 @@ reduceTReplicateHandler ReduceNonRepPrimContext{..}
            else return originalTerm
       _ -> return originalTerm
   | length primArguments >= 2
-  = error ("reduceNonRepPrim: treplicate bad args" <> showPpr originalTerm)
+  = error ("reducePrim: treplicate bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceSplitHandler :: ReduceNonRepPrimHandler
-reduceSplitHandler ReduceNonRepPrimContext{..}
+reduceSplitHandler :: ReducePrimHandler
+reduceSplitHandler ReducePrimContext{..}
   | (tmArgs,[nTy,mTy]) <- Either.partitionEithers primArguments
   = case (runExcept (tyNatSize tyConMap nTy), runExcept (tyNatSize tyConMap mTy), resultTypeView) of
       (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
@@ -735,23 +741,23 @@ reduceSplitHandler ReduceNonRepPrimContext{..}
 
               (changed (mkTicks tup primTicks) :: NormalizeSession Term)
        where
-        tupDc = fromMaybe (error "reduceNonRepPrim: faield to create tup DC") $ do
+        tupDc = fromMaybe (error "reducePrim: faield to create tup DC") $ do
                 tupTc <- UniqMap.lookup tupTcNm tyConMap
                 listToMaybe (tyConDataCons tupTc)
       _ -> return originalTerm
   | length primArguments >= 3
-  = error ("reduceNonRepPrim: split# bad args" <> showPpr originalTerm)
+  = error ("reducePrim: split# bad args" <> showPpr originalTerm)
   | otherwise
   = return originalTerm
 
-reduceEqHandler :: ReduceNonRepPrimHandler
-reduceEqHandler ReduceNonRepPrimContext{..}
+reduceEqHandler :: ReducePrimHandler
+reduceEqHandler ReducePrimContext{..}
   | (tmArgs,[nTy]) <- Either.partitionEithers primArguments
   , Right 0 <- runExcept (tyNatSize tyConMap nTy)
   , TyConApp boolTcNm [] <- resultTypeView
   = abstractOverMissingArgs primTicks tmArgs termType transformContext $
       \(_kn :: Term) (_l :: Term) (_r :: Term) (_ctx :: TransformContext) ->
-        let trueDc = fromMaybe (error "reduceNonRepPrim: failed to create True DC") $ do
+        let trueDc = fromMaybe (error "reducePrim: failed to create True DC") $ do
               boolTc <- UniqMap.lookup boolTcNm tyConMap
               [_falseDc,dc] <- pure (tyConDataCons boolTc)
               return dc
@@ -776,7 +782,7 @@ class AbstractOverMissingArgs a where
     [Term] ->
     -- | The type of the expression containing the applied primitive
     Type ->
-    -- | The context in which reduceNonRepPrim was called
+    -- | The context in which reducePrim was called
     TransformContext ->
     a ->
     NormalizeSession Term
