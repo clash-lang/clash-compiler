@@ -1047,9 +1047,13 @@ mkDcApplication declType [dstHType] bndr dc args = do
                                 , "hWTysFilt=" ++ unlines [" - " ++ show x | x <- hWTysFiltered]
                                 , "argExprsFilt=" ++ unlines [" - " ++ show x | x <- argExprsFiltered]
                                 ]
+      -- NB. Custom representations keep /every/ field of the constructor, with
+      -- the ones they give zero bits to marked 'Void'. The backends index this
+      -- list with the field indices in 'bitOrigins', which count the original
+      -- fields, so the arguments must not be filtered here either.
       CustomProduct _ _ _ _ dcArgs ->
-        case compare (length dcArgs) (length argExprsFiltered) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprsFiltered)
+        case compare (length dcArgs) (length argExprs) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
           LT -> error $ $(curLoc) ++ "Over-applied constructor: " ++ StrictText.unpack dcNm
           GT -> error $ $(curLoc) ++ "Under-applied constructor: " ++ StrictText.unpack dcNm
       Sum _ _ ->
@@ -1061,8 +1065,9 @@ mkDcApplication declType [dstHType] bndr dc args = do
         let argTup = indexNote note dcArgsTups dcI
         let (_, _, dcArgs) = argTup
 
-        case compare (length dcArgs) (length argExprsFiltered) of
-          EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprsFiltered)
+        -- See the note on 'CustomProduct' above.
+        case compare (length dcArgs) (length argExprs) of
+          EQ -> return (HW.DataCon dstHType (DC (dstHType, dcI)) argExprs)
           LT -> error $ $(curLoc) ++ "Over-applied constructor: " ++ StrictText.unpack dcNm
           GT -> error $ $(curLoc) ++ "Under-applied constructor: " ++ StrictText.unpack dcNm
 

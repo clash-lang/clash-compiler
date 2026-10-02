@@ -826,7 +826,10 @@ select'
   -> [(Int, Int)]
   -> Q Exp
 select' _vec [] =
-  fail $ "Unexpected empty list of intervals"
+  -- A field annotated with a mask of zero is stored in no bits at all, so
+  -- 'bitRanges' yields no intervals for it. Selecting nothing is a zero-width
+  -- 'BitVector', which is what such a field unpacks from.
+  [| 0 :: BitVector 0 |]
 select' vec ranges =
   foldl1 (\v1 v2 -> [| $v1 ++# $v2 |]) $ map (return . select'') ranges
     where
