@@ -7,6 +7,7 @@
   'Type'
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -15,6 +16,9 @@
 module Clash.Tests.Core.AlphaEquivalence (tests) where
 
 import Data.Hashable (Hashable, hash)
+#if MIN_VERSION_ghc(10,0,0)
+import GHC.Types.SrcLoc (generatedSrcSpan, noSrcSpan)
+#endif
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -65,6 +69,18 @@ assertAlphaNotEqual t1 t2 = do
   assertBool
     "If you see this read the TODO comment ^: hash t1 /= hash t2"
     (hash t1 /= hash t2)
+
+#if MIN_VERSION_ghc(10,0,0)
+-- GHC's source-span ordering treats generated and unhelpful spans alike.
+-- Alpha hashing must use that same equivalence relation.
+case_generatedSourceSpanHash :: Assertion
+case_generatedSourceSpanHash =
+  assertAlphaEqual
+    (Tick (SrcSpan generatedSrcSpan) term)
+    (Tick (SrcSpan noSrcSpan) term)
+ where
+  term = [parseToTermQQ|\(x :: Int) -> x|]
+#endif
 
 case_arxiv_2105_02856_eq1 :: Assertion
 case_arxiv_2105_02856_eq1 = assertAlphaEqual a b

@@ -75,3 +75,118 @@ package recursion-schemes
 package regex-tdfa
     optimization: 2
 
+-- Dependency forks for the patched compiler in `nix develop .#ghc1001`.
+if impl(ghc >= 10.0)
+  allow-newer:
+    *:base,
+    *:ghc,
+    *:ghc-boot,
+    *:ghci,
+    *:ghc-prim,
+    *:template-haskell,
+    *:time,
+    *:ghc-tcplugin-api
+
+  -- string-interpolate 1.0 uses ghc-hs-meta, which does not support GHC 10.0.
+  constraints: string-interpolate < 1.0
+
+  -- Upstream plugin revisions with GHC 10.0 support.
+  source-repository-package
+    type: git
+    location: https://github.com/sheaf/ghc-tcplugin-api.git
+    tag: dfb818fe279d29fd4e7fbec027bbdf40ce8cc0ad
+
+  source-repository-package
+    type: git
+    location: https://github.com/clash-lang/ghc-typelits-natnormalise.git
+    tag: 44c1a880be312d73c175dda131a8f97ff0d22a75
+
+  source-repository-package
+    type: git
+    location: https://github.com/clash-lang/ghc-typelits-knownnat.git
+    tag: 4f041a82edad86e4a8ff8db057922bfe66a272a8
+
+  -- Waiting for upstream: https://github.com/clash-lang/checked-literals/pull/21
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/checked-literals.git
+    tag: e0aed5a613d19b5c4fb326dcc14c63bbe2a02e98
+
+  -- Waiting for upstream: https://github.com/sol/doctest/pull/493
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/doctest.git
+    tag: c38f60af631735927a6deca95bf1241991be9605
+
+  -- GHC 10.0 support pending upstream: https://github.com/martijnbastiaan/doctest-parallel
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/doctest-parallel.git
+    tag: ec2efedfe93b4ad072450abf0fd594b01a803fb6
+
+  -- Waiting for upstream: https://github.com/Lysxia/first-class-families/pull/70
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/first-class-families.git
+    tag: 423173d74b5bb7a1fa706f25a1da386ecaeb5acb
+
+  -- GHC 10.0 support pending upstream: https://github.com/alanz/ghc-exactprint
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/ghc-exactprint.git
+    tag: 6bf758597ee25cd27953528e400747e653013297
+
+  -- Waiting for upstream: https://github.com/clash-lang/ghc-typelits-extra/pull/79
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/ghc-typelits-extra.git
+    tag: ec4e9efd31c66c5f027cdb4322462194ef4a3bf0
+
+  -- Upstream ghc-10.0 branch.
+  source-repository-package
+    type: git
+    location: https://github.com/haskell-unordered-containers/hashable.git
+    tag: c7202c5a061a46753f2cd0b6bd82a40ee22ee401
+
+  -- Waiting for upstream: https://github.com/haskell-hint/hint/pull/187
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/hint.git
+    tag: cfcf1a5fd1663399f77f73a5866ead21536fc406
+
+  -- Waiting for upstream: https://github.com/nomeata/inspection-testing/pull/102
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/inspection-testing.git
+    tag: b38452dda0cb13991bbe6749810fb18f0dbfbbda
+
+  -- Waiting for upstream: https://github.com/snoyberg/mono-traversable/pull/262
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/mono-traversable.git
+    tag: 1b7777a104cd326840e945480bcc954b69ad03c8
+    subdir: mono-traversable
+
+  -- Waiting for upstream: https://github.com/recursion-schemes/recursion-schemes/pull/176
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/recursion-schemes.git
+    tag: 9f1384f718f07178d65f71786d47ebae4ec66f80
+
+  -- Waiting for upstream: https://github.com/Bodigrim/tasty-inspection-testing/pull/12
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/tasty-inspection-testing.git
+    tag: d618bc2bd368ed6e07c2077c20ec2001e2a984d7
+
+  -- Waiting for upstream: https://github.com/haskell-compat/th-compat/pull/25
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/th-compat.git
+    tag: 85c922ef33ccba51e25945b3fad0f608857e8a74
+
+  -- Waiting for upstream: https://github.com/mgsloan/th-orphans/pull/43
+  source-repository-package
+    type: git
+    location: https://github.com/rowanG077/th-orphans.git
+    tag: e2e088696de8b13e758a70c173dc5ff0beff2aeb

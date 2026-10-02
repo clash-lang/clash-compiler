@@ -40,6 +40,11 @@ tests = localOption (QuickCheckMaxRatio 2) $ testGroup "All"
     [ testCase "maxBound :: Signed 0" $ maxBound @(Signed 0) @?= 0
     , testCase "minBound :: Signed 0" $ minBound @(Signed 0) @?= 0
     ]
+  , testGroup "resize"
+    [ testCase "preserves a negative value with fewer limbs than its width" $
+        resize# (negate (2 ^ (120 :: Int)) :: Signed 484)
+          @?= (negate (2 ^ (120 :: Int)) :: Signed 242)
+    ]
   , testGroup "shiftR"
     [ testCase "shiftR 5 0 == 5" $
         shiftR (5 :: Signed 8) 0 @?= 5
