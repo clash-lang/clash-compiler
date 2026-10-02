@@ -104,7 +104,7 @@ constantPropagation =
       , ("inlineSmall"     , inlineSmall)
       , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
                                                  -- See: [Note] bottom-up traversal for liftNonRep
-      , ("reduceNonRepPrim", reduceNonRepPrim)
+      , ("reducePrim"      , reducePrim)
 
 
       , ("caseCast"        , caseCast)
