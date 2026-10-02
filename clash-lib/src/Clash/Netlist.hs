@@ -950,6 +950,10 @@ mkProjection declType mkDec bndr scrut altTy alt@(pat,v) = do
 
   case scrutRendered of
     Left newDecls -> pure (Noop, newDecls)
+    -- The projected field is zero-width / void, so it is filtered out of the
+    -- subject's fields below and there is nothing to select. Rendering it
+    -- anyway would reference the pattern's binder, which is never declared.
+    Right (_, _, decls) | isVoid vHwTy -> pure (Noop, decls)
     Right (selId, modM, decls) -> do
       let altVarId = Id.unsafeFromCoreId varTm
       modifier <- case pat of
