@@ -353,7 +353,7 @@ Note [flatten pass structure]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Through experimentation we've learned the following:
 
-1. The evaluator-backed rewrites ('reduceConst', 'reduceNonRepPrim') must not
+1. The evaluator-backed rewrites ('reduceConst', 'reducePrim') must not
    sit inside the top-down propagation bundle. 'topdownFixR' settles that bundle
    at each node with 'repeatR', so a bundled 'reduceConst' is re-attempted -
    evaluator call and all - for every 'appProp' or 'caseCon' that fires there.
@@ -443,7 +443,7 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     repeatR (bottomupR (apply "flattenLet" flattenLet >->
                         (apply "reduceConst" reduceConst !->
                            apply "deadCode" deadCode) >->
-                        apply "reduceNonRepPrim" reduceNonRepPrim >->
+                        apply "reducePrim" reducePrim >->
                         apply "removeUnusedExpr" removeUnusedExpr) >->
              topdownFixR (apply "appProp" appProp >->
                apply "bindConstantVar" bindConstantVar >->
