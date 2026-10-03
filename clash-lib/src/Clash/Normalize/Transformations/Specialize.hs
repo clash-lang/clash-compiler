@@ -52,6 +52,8 @@ import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.BasicTypes.Extra (isNoInline)
 import GHC.Stack (HasCallStack)
+import GHC.Num.Integer (Integer(IS))
+import GHC.Num.Natural (Natural(NS))
 
 import GHC.Types.Basic (InlineSpec (..))
 
@@ -70,7 +72,7 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
   ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
-  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..), stripAllTicks)
+  , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..))
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
 import Clash.Core.TyCon (TyConMap, tyConDataCons)
 import Clash.Core.Type
@@ -361,8 +363,8 @@ cache. Consider these applications which differ only by ticks:
 
 If one of these had been specialized, the other two would hit that term in the
 specialization cache, saving Clash from having to re-do work which is in effect
-the same. To preserve this behavior, we use 'stripAllTicks' on the keys for
-the specialization cache.
+the same. To preserve this behavior, we strip all ticks from the keys for the
+specialization cache, see 'specCacheKey'.
 
 TODO While this preserves the old behavior, the old behavior is likely not
 quite what we want. Using a value from the specialization cache may change the
@@ -370,6 +372,45 @@ ticks present, which can affect naming / debugging information in generated HDL.
 We may also not want to look at ticks, as then the specialization cache will
 miss on virtually every lookup which could add to normalization time.
 -}
+
+{-
+Note [bignum literals and specialization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC represents a small 'Natural' or 'Integer' constant as a constructor applied
+to a literal, e.g. @NS 8000##@. The evaluator reads such a constant back as a
+plain literal, @8000@, so a constant that went through 'reduceConst' looks
+different from one that didn't, even though they're the same value. Both forms
+reach 'specialize', for example when a 'KnownDomain' dictionary built by GHC is
+passed to a function at one call site, while at another call site the same
+dictionary is the result of normalizing an application of a work-free function
+(see 'Clash.Normalize.Util.normalizeWorkFreeApp'). To prevent creating two
+identical specializations, we use the literal form in the keys of the
+specialization cache.
+-}
+
+-- | Prepare a term for use as a key in the specialization cache: strip all
+-- ticks (see Note [ticks and specialization]) and replace small bignum
+-- constants by literals (see Note [bignum literals and specialization]).
+specCacheKey :: Term -> Term
+specCacheKey = go
+ where
+  go (Lam i x) = Lam i (go x)
+  go (TyLam i x) = TyLam i (go x)
+  go (App f x) = case (go f, go x) of
+    (Prim p, Literal (WordLiteral w))
+      | primName p == Text.showt 'NS -> Literal (NaturalLiteral w)
+    (Prim p, Literal (IntLiteral i))
+      | primName p == Text.showt 'IS -> Literal (IntegerLiteral i)
+    (f', x') -> App f' x'
+  go (TyApp f a) = TyApp (go f) a
+  go (Let bs x) = Let (goBinds bs) (go x)
+  go (Case x ty alts) = Case (go x) ty (fmap go <$> alts)
+  go (Cast x a b) = Cast (go x) a b
+  go (Tick _ x) = go x
+  go x = x
+
+  goBinds (NonRec i x) = NonRec i (go x)
+  goBinds (Rec ixs) = Rec (fmap go <$> ixs)
 
 -- | Given two 'InlineSpec's, return the \"strongest\" one. I.e., the one that's
 -- closest to @NoInline@ (or @Opaque@ for newer GHCs).
@@ -428,9 +469,10 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       specBndrs :: [Either Id TyVar]
       specBndrs = map (Lens.over Lens._Left (normalizeId tcm)) specBndrsIn
 
-      -- See Note [ticks and specialization]
+      -- See Note [ticks and specialization] and
+      -- Note [bignum literals and specialization]
       specAbs :: Either Term Type
-      specAbs = either (Left . stripAllTicks . (`mkAbstraction` specBndrs)) (Right . id) specArg
+      specAbs = either (Left . specCacheKey . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
   specM <- Map.lookup (f,argLen,specAbs) <$> Lens.use (extra.specialisationCache)
   case specM of

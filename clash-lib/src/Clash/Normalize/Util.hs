@@ -431,6 +431,9 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extr
 -- are cached regardless of the size of @f@: most of the work is in the arguments
 -- and in the functions @f@ calls, so even tiny functions such as dictionary
 -- selectors benefit.
+--
+-- Note that a normalized constant can look different from its unnormalized
+-- form, see Note [bignum literals and specialization].
 normalizeWorkFreeApp
   :: Id
   -- ^ Global function
