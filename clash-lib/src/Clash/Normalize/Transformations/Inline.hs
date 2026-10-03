@@ -25,6 +25,7 @@ module Clash.Normalize.Transformations.Inline
   , inlineCast
   , inlineCleanup
   , collapseRHSNoops
+  , curFunIsNoInline
   , inlineNonRep
   , inlineOrLiftNonRep
   , inlineSimIO
@@ -296,7 +297,7 @@ inlineCast = inlineBinders test
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: HasCallStack => NormRewrite
-inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
+inlineCleanup (TransformContext is0 _) e0@(Letrec binds body) = do
   prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
@@ -311,7 +312,7 @@ inlineCleanup (TransformContext is0 _) (Letrec binds body) = do
       keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
                 $ map snd keep
 
-  if | null il -> return  (Letrec binds body)
+  if | null il -> return e0
      | null keep' -> changed body
      | otherwise -> changed (Letrec keep' body)
   where
@@ -404,10 +405,9 @@ simply a variable reference. See issue #779 -}
 -- on functions that might be inlined later. See #3036.
 collapseRHSNoops :: HasCallStack => NormRewrite
 collapseRHSNoops _ letrec@(Let letBind body) = do
-  (curFunId, _) <- Lens.use curFun
-  curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
-  case curBinding of
-    Just binding | isNoInline (bindingSpec binding) -> do
+  isSynthesisBoundary <- curFunIsNoInline
+  case isSynthesisBoundary of
+    True -> do
       -- Explicitly match on Let instead of using LetRec, because we need to
       -- preserve the structure. See https://github.com/clash-lang/clash-compiler/issues/3044.
       case letBind of
@@ -417,7 +417,7 @@ collapseRHSNoops _ letrec@(Let letBind body) = do
         Term.NonRec b0 e0 -> do
           (b1, e1) <- runCollapseNoop (b0, e0)
           pure (Let (Term.NonRec b1 e1) body)
-    _ -> pure letrec
+    False -> pure letrec
   where
     runCollapseNoop orig =
       runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed
@@ -478,6 +478,14 @@ collapseRHSNoops _ letrec@(Let letBind body) = do
 
 collapseRHSNoops _ e = return e
 {-# SCC collapseRHSNoops #-}
+
+-- | Whether the function currently being rewritten is NOINLINE/OPAQUE, i.e. a
+-- synthesis boundary. 'collapseRHSNoops' only fires in such functions.
+curFunIsNoInline :: NormalizeSession Bool
+curFunIsNoInline = do
+  (curFunId, _) <- Lens.use curFun
+  curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
+  pure (maybe False (isNoInline . bindingSpec) curBinding)
 
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition. It's a custom topdown traversal that -for efficiency

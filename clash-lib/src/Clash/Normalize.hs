@@ -11,14 +11,17 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Clash.Normalize where
 
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    ((>=>), when)
+import qualified Control.Monad.Writer             as Writer
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
@@ -31,6 +34,7 @@ import           Data.List
   (intercalate, intersect, mapAccumL)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
+import qualified Data.Monoid                      as Monoid
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 
@@ -46,23 +50,25 @@ import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.FreeVars
-  (freeLocalIds, globalIds)
+  (freeLocalIds, globalIdOccursIn, globalIds)
 import           Clash.Core.HasFreeVars           (notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
-  (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term                  (Term (..), collectArgsTicks
-                                                  ,mkApps, mkTicks)
+  (eqTerm, extendGblSubstList, mkSubst, substTm)
+import           Clash.Core.Term
+  (CoreContext (..), Term (..), collectArgsTicks, mkApps,
+   mkTicks, pattern Letrec)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+   delVarEnv, extendInScopeSetList, extendVarEnv, lookupVarEnv, mapVarEnv,
+   mapMaybeVarEnv, mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet,
+   nullVarEnv, unionVarEnv)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
@@ -75,13 +81,14 @@ import           Clash.Normalize.Transformations
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Combinators
-  ((>->), (!->), bottomupR, repeatR, topdownFixR)
+  ((>->), (>-!), (!->), allR, bottomupWithR, repeatR, topdownFixWithR)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
-   tcCache, topEntities, newInlineStrategy)
+  (RewriteEnv (..), RewriteState (..), TransformContext (..), bindings,
+   curFun, debugOpts, extra, tcCache, topEntities, newInlineStrategy)
 import           Clash.Rewrite.Util
   (apply, isUntranslatableType, runRewriteSession)
 import           Clash.Util
+import           Clash.Util.Eq                    (fastEqBy)
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)
 
@@ -280,8 +287,8 @@ cleanupGraph
   -> NormalizeSession BindingMap
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
-  = do cache <- liftIO (IORef.newIORef UniqMap.empty)
-       ctFlat <- flattenCallTree cache ct
+  = do memo <- liftIO newFlattenMemo
+       ctFlat <- flattenCallTree memo ct
        return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
@@ -393,21 +400,143 @@ Through experimentation we've learned the following:
    @tests/shouldwork/Basic/AES.hs@ did ~36k extra node visits per transformation
    that way.
 
+3. Traversals skip let-bindings that a pass has already seen without anything
+   firing, see Note [flatten memo]. Passes that can only fire in a few places,
+   such as 'topLet' and 'collapseRHSNoops', don't traverse the whole term.
+
 If you touch code related to this, please make sure to run benchmarks.
 -}
+
+-- | Memo tables of one 'cleanupGraph' call
+data FlattenMemo = FlattenMemo
+  { fmCallTree :: IORef.IORef (UniqMap CallTree)
+  -- ^ Flattened call trees, keyed by binder Id. See 'flattenCallTree'.
+  , fmBottomUp :: CleanBinders
+  -- ^ Let-bindings the bottom-up pass of the 'flatten' loop does not change
+  , fmTopDown :: CleanBinders
+  -- ^ Let-bindings the top-down pass of the 'flatten' loop does not change
+  , fmDeadCode :: CleanBinders
+  -- ^ Let-bindings 'deadCode' does not change
+  }
+
+newFlattenMemo :: IO FlattenMemo
+newFlattenMemo =
+  FlattenMemo
+    <$> IORef.newIORef UniqMap.empty
+    <*> IORef.newIORef emptyVarEnv
+    <*> IORef.newIORef emptyVarEnv
+    <*> IORef.newIORef emptyVarEnv
+
+{-
+Note [flatten memo]
+~~~~~~~~~~~~~~~~~~~
+'flattenCallTree' flattens a function after inlining the flattened bodies of
+its callees, so the passes of 'flatten' mostly visit let-bindings they have
+visited before: in an earlier round of the fixpoint loop, or while flattening
+the callee. Thin wrappers make this very visible: each level of a chain like
+@top -> wrapper -> body@ used to traverse all of @body@ more than ten times,
+while rewrites only fired where @body@ got inlined.
+
+The passes of 'flatten' therefore remember the let-bindings they visited
+without anything firing, by mapping the binder to the right-hand side it had
+('CleanBinders'). They skip a right-hand side that is (structurally) equal to
+the remembered one. The tables live for one 'cleanupGraph' call, so they carry
+over from callees to their callers.
+
+This only skips work that would not have changed anything. Whether a rewrite
+fires at a node depends on the subterm at that node, its context, and global
+state that doesn't change during 'cleanupGraph' (global binders are only
+added). The rewrites in 'flatten' only look at these parts of a context:
+
+  * Its head, e.g. 'reduceConst' skips 'AppFun' positions. For the nodes in
+    a right-hand side, that is either an entry within the right-hand side or
+    the 'LetBinding' of the binding itself.
+
+  * 'LetBody' entries, whose bindings 'whnfRW' hands to the evaluator, and
+    'AppArg' entries of primitive arguments, see 'shouldReduce'. 'allCleanR'
+    only skips bindings whose context has neither.
+
+  * Whether it consists of lambda bodies and ticks only ('topLet'), which is
+    never the case below a 'LetBinding'.
+
+The one exception is 'bindConstantVar': it never inlines a binding whose
+right-hand side is a reference to the function being rewritten ('curFun'). We
+therefore don't remember right-hand sides that mention that function.
+
+A table also tells where the individual rewrites of its pass won't fire: the
+top-down pass applies 'caseCon' and 'bindConstantVar' at every node, and the
+bottom-up pass applies 'flattenLet' at every node. The passes after the loop
+make use of that.
+
+Skipping work changes which uniques fresh binders get, but not which rewrites
+fire.
+-}
+
+-- | Let-bindings in which a pass found nothing to rewrite: the binder and the
+-- right-hand side it had then. See Note [flatten memo].
+type CleanBinders = IORef.IORef (VarEnv Term)
+
+-- | Like 'allR', but skips the right-hand sides of let-bindings that the given
+-- table has as clean. See Note [flatten memo].
+allCleanR
+  :: CleanBinders
+  -> Bool
+  -- ^ Whether to add the right-hand sides in which nothing fired to the table
+  -> NormRewrite
+  -> NormRewrite
+allCleanR cleanRef record trans (TransformContext is0 ctx) (Letrec xes e)
+  | all plainCtx ctx = do
+      clean <- liftIO (IORef.readIORef cleanRef)
+      xes1 <- traverse (rewriteBind clean) xes
+      e1 <- trans (TransformContext is1 (LetBody xes:ctx)) e
+      return (Letrec xes1 e1)
+ where
+  bndrs = map fst xes
+  is1 = extendInScopeSetList is0 bndrs
+
+  rewriteBind clean (b,rhs0)
+    | Just rhsClean <- lookupVarEnv b clean
+    , fastEqBy eqTerm rhsClean rhs0
+    = return (b,rhs0)
+    | otherwise = do
+      (rhs1, Monoid.getAny -> rhsChanged) <-
+        Writer.listen (trans (TransformContext is1 (LetBinding b bndrs:ctx)) rhs0)
+      when record $ do
+        (fn,_) <- Lens.use curFun
+        liftIO . IORef.modifyIORef' cleanRef $
+          if rhsChanged || fn `globalIdOccursIn` rhs1
+            then (`delVarEnv` b)
+            else extendVarEnv b rhs1
+      return (b,rhs1)
+
+  plainCtx LetBody{} = False
+  plainCtx (AppArg (Just _)) = False
+  plainCtx _ = True
+
+allCleanR _ _ trans ctx e = allR trans ctx e
+
+-- | 'topdownSucR' for 'topLet': it only fires along the spine of lambdas (and
+-- ticks) of a function, so there is no need to look further.
+topLetR :: NormRewrite
+topLetR = apply "topLet" topLet >-! spine
+ where
+  spine ctx e@Lam{} = allR topLetR ctx e
+  spine ctx e@Tick{} = allR topLetR ctx e
+  spine _ e = return e
 
 -- | Flatten a 'CallTree', memoizing results by binder Id within one cleanup
 -- pass. Without the cache, every binder reachable from the root is flattened
 -- as many times as it appears in the (un-deduplicated) call tree.
 flattenCallTree
-  :: IORef.IORef (UniqMap CallTree)
-  -- ^ Memo cache, keyed by binder Id. Local to one 'cleanupGraph' call.
+  :: FlattenMemo
+  -- ^ Memo tables. Local to one 'cleanupGraph' call.
   -> CallTree
   -> NormalizeSession CallTree
 flattenCallTree _ c@(CLeaf _) = return c
-flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
+flattenCallTree memo (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   -- XXX: Careful! If you ever add concurrency, this will have to be changed to
   --      account for multiple workers.
+  let cache = fmCallTree memo
   cached <- liftIO (UniqMap.lookup nm <$> IORef.readIORef cache)
   case cached of
     Just ct -> pure ct
@@ -417,7 +546,7 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       pure ct
  where
   doFlatten = do
-   flattenedUsed   <- mapM (flattenCallTree cache) used
+   flattenedUsed   <- mapM (flattenCallTree memo) used
    (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
    let (toInline,il_used) = unzip il_ct
        subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
@@ -456,26 +585,40 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   flatten =
-    -- See Note [flatten pass structure].
-    repeatR (bottomupR (apply "flattenLet" flattenLet >->
+    -- See Note [flatten pass structure] and Note [flatten memo].
+    repeatR (bottomupWithR (allCleanR (fmBottomUp memo) True)
+                       (apply "flattenLet" flattenLet >->
                         (apply "reduceConst" reduceConst !->
                            apply "deadCode" deadCode) >->
                         apply "reducePrim" reducePrim >->
                         apply "removeUnusedExpr" removeUnusedExpr) >->
-             topdownFixR (apply "appProp" appProp >->
+             topdownFixWithR (allCleanR (fmTopDown memo) True)
+              (apply "appProp" appProp >->
                apply "bindConstantVar" bindConstantVar >->
                apply "caseCon" caseCon)) !->
-    bottomupR (apply "deadCode" deadCode) >-> -- See #3407
-    topdownSucR (apply "topLet" topLet) >->
+    bottomupWithR (allCleanR (fmDeadCode memo) True)
+      (apply "deadCode" deadCode) >-> -- See #3407
+    topLetR >->
     -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
     -- Note that we do this as the very last step, after all constant propagation
     -- has been done to avoid #3036.
-    topdownSucR (apply "collapseRHSNoops" collapseRHSNoops) >->
+    onlyNoInline (topdownSucR (apply "collapseRHSNoops" collapseRHSNoops)) >->
     topdownSucR (apply "inlineCleanup" inlineCleanup) >->
-    bottomupR (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
-    bottomupR (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
-    bottomupR (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
-    topdownSucR (apply "topLet" topLet)
+    -- The next three passes only revisit let-bindings that changed since the
+    -- loop above, see Note [flatten memo].
+    bottomupWithR (allCleanR (fmTopDown memo) False)
+      (apply "caseCon" caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
+    bottomupWithR (allCleanR (fmBottomUp memo) False)
+      (apply "flattenLet" flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+    bottomupWithR (allCleanR (fmTopDown memo) False)
+      (apply "bindConstantVar" bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
+    topLetR
+
+  -- 'collapseRHSNoops' only fires in synthesis boundaries, don't traverse the
+  -- term for nothing.
+  onlyNoInline rw ctx e = do
+    noInline <- curFunIsNoInline
+    if noInline then rw ctx e else return e
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
     | isNoInline inl2  = (Nothing     ,[c])
