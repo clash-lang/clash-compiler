@@ -826,6 +826,7 @@ runClashTest t3105Env = defaultMain
           , hdlSim=[]
           , expectClashFail=Just (def, "This binder has a non-representable return type and can't be normalized")
           }
+        , runTest "T3477_readback_sharing" def
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
