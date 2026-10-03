@@ -22,11 +22,13 @@
 
 module Clash.Tests.Rewrite.StrategyDSL (tests) where
 
+import Control.Monad.IO.Class (liftIO)
 import Data.Default (def)
+import Data.IORef (IORef)
 
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Term (Bind (..), Term (..))
-import Clash.Core.VarEnv (emptyInScopeSet)
+import Clash.Core.VarEnv (VarEnv, emptyInScopeSet)
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
 import Clash.Rewrite.Types (Rewrite, RewriteState (..), TransformContext (..), runR)
@@ -62,6 +64,15 @@ assertAgree candidate reference term = do
   assertEqual "result" (show referenceTerm) (show candidateTerm)
   assertEqual "transformation count" referenceCount candidateCount
   assertEqual "change flag" referenceChanged candidateChanged
+
+-- | 'assertAgree' for strategies using a memo table: both start with an empty
+-- table.
+assertAgreeFresh
+  :: IORef (VarEnv Term) -> Rewrite () -> Rewrite () -> Term -> Assertion
+assertAgreeFresh table candidate reference =
+  assertAgree (fresh candidate) (fresh reference)
+ where
+  fresh rewrite ctx term = liftIO (resetTestClean table) >> rewrite ctx term
 
 -- * Compiled strategies referenced by other compiled strategies
 
@@ -248,6 +259,58 @@ tests = testGroup "Clash.Tests.Rewrite.StrategyDSL"
           assertAgree
             $(compileStrategy (callStrategyStrat 'calleeFast))
             $(compileStrategyReference (callStrategyStrat 'calleeReference))
+            nestedTerm
+      ]
+
+  , testGroup "memoized traversals, spine and guard"
+      [ testCase "memoized bottomup: record twice, then read-only" $
+          assertAgreeFresh testCleanRefA
+            $(compileStrategy
+                (memoized 'testCleanA Record (bottomup literalStep) >->
+                 memoized 'testCleanA Record (bottomup literalStep) >->
+                 memoized 'testCleanA ReadOnly (bottomup constructorChangingStep)))
+            $(compileStrategyReference
+                (memoized 'testCleanA Record (bottomup literalStep) >->
+                 memoized 'testCleanA Record (bottomup literalStep) >->
+                 memoized 'testCleanA ReadOnly (bottomup constructorChangingStep)))
+            memoTerm
+      , testCase "memoized topdownFix: record twice, then read-only" $
+          assertAgreeFresh testCleanRefB
+            $(compileStrategy
+                (memoized 'testCleanB Record (topdownFix constructorChangingStep) >->
+                 memoized 'testCleanB Record (topdownFix literalStep) >->
+                 memoized 'testCleanB ReadOnly (topdownFix literalStep)))
+            $(compileStrategyReference
+                (memoized 'testCleanB Record (topdownFix constructorChangingStep) >->
+                 memoized 'testCleanB Record (topdownFix literalStep) >->
+                 memoized 'testCleanB ReadOnly (topdownFix literalStep)))
+            memoTerm
+      , testCase "memoized traversals inside repeatR" $
+          assertAgreeFresh testCleanRefC
+            $(compileStrategy
+                (repeatR (memoized 'testCleanC Record (bottomup literalStep) >->
+                          memoized 'testCleanC Record (topdownFix constructorChangingStep))))
+            $(compileStrategyReference
+                (repeatR (memoized 'testCleanC Record (bottomup literalStep) >->
+                          memoized 'testCleanC Record (topdownFix constructorChangingStep))))
+            memoTerm
+      , testCase "topdownSuc along the lambda spine" $ do
+          assertAgree
+            $(compileStrategy (topdownSucSpine literalStep))
+            $(compileStrategyReference (topdownSucSpine literalStep))
+            allConstructorsTerm
+          assertAgree
+            $(compileStrategy (topdownSucSpine contextProbeStep))
+            $(compileStrategyReference (topdownSucSpine contextProbeStep))
+            allConstructorsTerm
+      , testCase "guarded strategies" $ do
+          assertAgree
+            $(compileStrategy (guarded 'guardTrue (topdown literalStep)))
+            $(compileStrategyReference (guarded 'guardTrue (topdown literalStep)))
+            nestedTerm
+          assertAgree
+            $(compileStrategy (guarded 'guardFalse (topdown literalStep)))
+            $(compileStrategyReference (guarded 'guardFalse (topdown literalStep)))
             nestedTerm
       ]
 

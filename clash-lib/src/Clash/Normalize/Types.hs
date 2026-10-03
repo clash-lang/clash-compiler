@@ -21,7 +21,7 @@ import Data.Text                  (Text)
 import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
-import Clash.Core.VarEnv      (VarEnv)
+import Clash.Core.VarEnv      (VarEnv, emptyVarEnv)
 import Clash.Driver.Types     (BindingMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 
@@ -69,8 +69,29 @@ data NormalizeState
   , _constantPropagationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
   -- for "Clash.Normalize.PrimitiveReductions". See '_normalizationStrategy'.
+  , _flattenClean :: FlattenClean
+  -- ^ Let-bindings in which the passes of flattening found nothing to
+  -- rewrite. Reset by every 'Clash.Normalize.cleanupGraph' call. See Note
+  -- [flatten memo] in "Clash.Normalize".
   }
 
+-- | For each memoized pass of flattening, the let-bindings in which it found
+-- nothing to rewrite, mapped to the right-hand side they had then. See Note
+-- [flatten memo] in "Clash.Normalize".
+data FlattenClean = FlattenClean
+  { _fcBottomUp :: VarEnv Term
+  -- ^ Let-bindings the bottom-up pass of the flattening loop doesn't change
+  , _fcTopDown :: VarEnv Term
+  -- ^ Let-bindings the top-down pass of the flattening loop doesn't change
+  , _fcDeadCode :: VarEnv Term
+  -- ^ Let-bindings 'Clash.Normalize.Transformations.deadCode' doesn't change
+  }
+
+-- | No let-bindings known to be clean
+emptyFlattenClean :: FlattenClean
+emptyFlattenClean = FlattenClean emptyVarEnv emptyVarEnv emptyVarEnv
+
+Lens.makeLenses ''FlattenClean
 Lens.makeLenses ''NormalizeState
 
 -- | State monad that stores specialisation and inlining information

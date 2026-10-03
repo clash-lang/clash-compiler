@@ -9,6 +9,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
@@ -31,6 +32,9 @@ module Clash.Normalize.Util
  , mkInlineTick
  , substWithTyEq
  , tvSubstWithTyEq
+ , flattenBottomUpClean
+ , flattenTopDownClean
+ , flattenDeadCodeClean
  )
  where
 
@@ -67,7 +71,7 @@ import           Clash.Core.Util
   (isClockOrReset)
 import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId, mkGlobalId)
 import           Clash.Core.VarEnv
-  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
+  (VarEnv, delVarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
@@ -79,6 +83,7 @@ import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
    tcCache, primitives)
+import           Clash.Rewrite.Combinators (CleanTable (..))
 import           Clash.Rewrite.Util
   (cloneNameWithBindingMap, runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
@@ -596,3 +601,26 @@ mkInlineTick :: Id -> TickInfo
 mkInlineTick n = NameMod PrefixName (LitTy . SymTy $ toStr n)
  where
   toStr = Text.unpack . snd . Text.breakOnEnd "." . nameOcc . varName
+
+-- | The tables of the memoized passes of flattening, see Note [flatten memo]
+-- in "Clash.Normalize" and 'Clash.Normalize.Strategy.Spec.flattenSpec'.
+flattenBottomUpClean, flattenTopDownClean, flattenDeadCodeClean
+  :: CleanTable NormalizeState
+flattenBottomUpClean = flattenCleanTable fcBottomUp
+flattenTopDownClean = flattenCleanTable fcTopDown
+flattenDeadCodeClean = flattenCleanTable fcDeadCode
+
+flattenCleanTable
+  :: Lens.Lens' FlattenClean (VarEnv Term) -> CleanTable NormalizeState
+flattenCleanTable table = CleanTable
+  { cleanBinders = Lens.use (extra . flattenClean . table)
+  , markBinder = \b rhs changed -> do
+      -- 'bindConstantVar' never inlines a binding whose right-hand side is a
+      -- reference to the function being rewritten, so whether it fires in such
+      -- a right-hand side depends on that function.
+      (fn,_) <- Lens.use curFun
+      extra . flattenClean . table %=
+        if changed || fn `globalIdOccursIn` rhs
+          then (`delVarEnv` b)
+          else extendVarEnv b rhs
+  }
