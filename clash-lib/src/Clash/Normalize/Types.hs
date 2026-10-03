@@ -51,6 +51,15 @@ data NormalizeState
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
+  , _workFreeAppCache :: Map Term Term
+  -- ^ Cache of normalized work-free applications, i.e. global functions
+  -- applied to closed arguments:
+  --
+  -- * Key: the application, e.g. @f \@7 dict@
+  --
+  -- * Elem: the normalized body of @f@ applied to the arguments
+  --
+  -- See Note [Caching work-free applications] in "Clash.Normalize.Util".
   }
 
 Lens.makeLenses ''NormalizeState
