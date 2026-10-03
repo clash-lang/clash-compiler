@@ -144,6 +144,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   emptyVarEnv
                   Map.empty
                   rcsMap
+                  Map.empty    -- workFreeAppCache
 
 normalize
   :: [Id]

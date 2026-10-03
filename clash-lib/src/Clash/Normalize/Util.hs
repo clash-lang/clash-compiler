@@ -26,6 +26,7 @@ module Clash.Normalize.Util
  , isNonRecursiveGlobalVar
  , constantSpecInfo
  , normalizeTopLvlBndr
+ , normalizeWorkFreeApp
  , rewriteExpr
  , mkInlineTick
  , substWithTyEq
@@ -64,7 +65,7 @@ import           Clash.Core.Type
    splitTyConAppM, mkPolyFunTy)
 import           Clash.Core.Util
   (isClockOrReset)
-import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
+import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId, mkGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
@@ -80,7 +81,7 @@ import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
    tcCache, primitives)
 import           Clash.Rewrite.Util
-  (runRewrite, mkTmBinderFor, mkDerivedName)
+  (cloneNameWithBindingMap, runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
 import           Clash.Util              (SrcSpan, makeCachedU)
 
@@ -419,6 +420,79 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extr
   let ty' = inferCoreTypeOf tcm tm3
   let r' = nm' `globalIdOccursIn` tm3
   return (Binding nm'{varType = ty'} sp inl pr tm3 r')
+
+{- Note [Caching work-free applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'inlineWorkFree' inlines global functions applied to closed arguments, such as
+
+    f @7 dict
+
+The result is a constant, so every occurrence can have its own copy without
+costing any hardware. It used to inline the unnormalized body of @f@, after
+which every copy was normalized from scratch. That is very expensive
+for code that computes with type-level naturals: selectors of class
+dictionaries (e.g. @$p1BitPackC@) and the term-level evidence of constraints
+like @KnownNat (CLog 2 n)@ are applied to the same closed arguments over and
+over again. Every occurrence, in every specialization of the function it's in,
+then derived @CLog 2 7@ again in a couple of dozen rewrite steps.
+
+Instead, 'normalizeWorkFreeApp' normalizes every distinct application only
+once, as if it were the body of a binder of its own, and caches the result in
+'workFreeAppCache'. 'inlineWorkFree' then inlines the normalized term. This is
+sound because the application is closed: it means the same in any context, so
+its normalized form is a valid replacement anywhere. Every occurrence still
+gets its own copy, so the circuit doesn't change. Only names in the HDL can:
+binders lifted out of the application are named after @f@, not after the
+function the application occurs in.
+
+The cache is keyed on the application, compared modulo alpha-equivalence. That
+is enough, because the binding of @f@ never changes during normalization: only
+new bindings are added. Type arguments are part of the key too, so they must not
+mention type variables bound in the context. Normalizing an application only
+runs into the same application again if unfolding it never terminates, in
+which case inlining it wouldn't terminate either.
+
+Unlike unapplied work-free binders (see 'inlineWFCacheLimit'), applications
+are cached regardless of the size of @f@. Most of the work hides in the
+arguments and in the functions @f@ calls: the tiny dictionary selectors
+benefit the most.
+-}
+
+-- | Normalize a global function applied to closed arguments, i.e. a work-free
+-- application. The result is cached, so every distinct application is only
+-- normalized once. See Note [Caching work-free applications].
+normalizeWorkFreeApp
+  :: Id
+  -- ^ Global function
+  -> Binding Term
+  -- ^ Binding of the global function
+  -> [Either Term Type]
+  -- ^ Closed arguments
+  -> NormalizeSession Term
+normalizeWorkFreeApp f b args = do
+  let app = mkApps (Var f) args
+  cache <- Lens.use (extra.workFreeAppCache)
+  case Map.lookup app cache of
+    Just tm -> return tm
+    Nothing -> do
+      tcm <- Lens.view tcCache
+      bndrs <- Lens.use bindings
+      -- The application is normalized as if it were the body of a binder of
+      -- its own. That binder is never referenced, so it isn't added to
+      -- 'bindings'. It is named after 'f', so binders lifted out of the
+      -- application are named after 'f' too.
+      nm <- cloneNameWithBindingMap bndrs (varName f)
+      let g = mkGlobalId (inferCoreTypeOf tcm app) nm
+          -- Normalize the beta-redex rather than 'app': normalizing 'app'
+          -- would bring us right back here. We deshadow for the same reason
+          -- 'normalizeTopLvlBndr' does.
+          redex = deShadowTerm emptyInScopeSet (mkApps (bindingTerm b) args)
+      old <- Lens.use curFun
+      tm <- rewriteExpr ("normalization",normalization)
+                        (showPpr (varName f),redex) (g,bindingLoc b)
+      curFun .= old
+      extra.workFreeAppCache %= Map.insert app tm
+      return tm
 
 -- | Turn type equality constraints into substitutions and apply them.
 --
