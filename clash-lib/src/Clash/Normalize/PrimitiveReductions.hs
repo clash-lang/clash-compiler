@@ -64,6 +64,7 @@ import           GHC.Types.SrcLoc                 (wiredInSrcSpan)
 
 import           Clash.Core.DataCon               (DataCon)
 import           Clash.Core.FreeVars              (typeFreeVars)
+import           Clash.Core.HasFreeVars           (isClosed)
 import           Clash.Core.HasType
 
 import           Clash.Core.Literal               (Literal (..))
@@ -73,7 +74,8 @@ import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Subst                 (extendTvSubst, mkSubst, substTy)
 import           Clash.Core.Term
   (Bind (..), IsMultiPrim (..), CoreContext (..), PrimInfo (..), Term (..), WorkInfo (..),
-   Pat (..), collectTermIds, mkApps, PrimUnfolding(..), stripTicks)
+   Pat (..), collectArgsTicks, collectTermIds, mkApps, mkTicks,
+   PrimUnfolding(..), stripTicks)
 import           Clash.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView1,
                                                    mkFunTy, mkTyConApp,
@@ -88,11 +90,12 @@ import           Clash.Core.Util
    mkInternalVar, mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys, primCo)
 import           Clash.Core.Var                   (isLocalId, mkTyVar, mkLocalId)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSet, extendInScopeSetList)
+  (InScopeSet, extendInScopeSet, extendInScopeSetList, uniqAway)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP (undefined)
 import           Clash.Sized.RTree                (RTree)
 import           Clash.Sized.Vector               (Vec)
+import qualified Clash.Sized.Vector
 import           Clash.Normalize.Types
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
@@ -196,7 +199,9 @@ vecTailTy vecNm =
 --
 -- Non-representable vectors are never let-bound:
 -- 'Clash.Normalize.Transformations.Inline.inlineOrLiftNonRep' would inline or
--- lift such a let-binding, undoing the sharing.
+-- lift such a let-binding, undoing the sharing. Use 'unconsVec' instead of
+-- calling this function directly: it avoids copying non-representable vectors
+-- built by @map@ and @zipWith@.
 shareVec
   :: Bool
   -- ^ Whether the vector is representable
@@ -217,9 +222,16 @@ shareVec isRepresentable is0 vec
 
 -- | Makes two case statements: the first one extract the _head_ from the given
 -- vector, the latter the tail. Use 'shareVec' on the vector first to prevent
--- it from being duplicated.
+-- it from being duplicated, or use 'unconsVec', which does that for you.
+--
+-- The pattern variables get fresh uniques. They used to have fixed ones, which
+-- variables taken from the unique supply, such as the ones 'shareVec' binds,
+-- could share. 'Clash.Normalize.Transformations.Specialize.appProp' then
+-- captured such a variable when it substituted a projection for one lambda
+-- binder and then substituted for the next one.
 extractHeadTail
-  :: DataCon
+  :: InScopeSet
+  -> DataCon
   -- ^ The Cons (:>) constructor
   -> Type
   -- ^ Element type
@@ -227,24 +239,146 @@ extractHeadTail
   -- ^ Length of the vector, must be positive
   -> Term
   -- ^ Vector to extract head from
-  -> (Term, Term)
+  -> NormalizeSession (Term, Term)
   -- ^ (head of vector, tail of vector)
-extractHeadTail consCon elTy n vec =
+extractHeadTail is consCon elTy n vec =
   case dataConInstArgTys consCon tys of
-    Just [coTy, _elTy, restTy] ->
-      let
-        mTV = mkTyVar typeNatKind (mkUnsafeSystemName "m" 0)
-        co = mkLocalId coTy (mkUnsafeSystemName "_co_" 1)
-        el = mkLocalId elTy (mkUnsafeSystemName "el" 2)
-        rest = mkLocalId restTy (mkUnsafeSystemName "res" 3)
-
-        pat = DataPat consCon [mTV] [co, el, rest]
-      in
-        ( Case vec elTy [(pat, Var el)]
-        , Case vec restTy [(pat, Var rest)] )
+    Just [coTy, _elTy, restTy] -> do
+      mTV <- fresh (mkTyVar typeNatKind) "m"
+      co <- fresh (mkLocalId coTy) "_co_"
+      el <- fresh (mkLocalId elTy) "el"
+      rest <- fresh (mkLocalId restTy) "res"
+      let pat = DataPat consCon [mTV] [co, el, rest]
+      pure ( Case vec elTy [(pat, Var el)]
+           , Case vec restTy [(pat, Var rest)] )
     _ -> error "extractHeadTail: failed to instantiate Cons DC"
  where
   tys = [(LitTy (NumTy n)), elTy, (LitTy (NumTy (n-1)))]
+  fresh mk nm = uniqAway is . mk . mkUnsafeSystemName nm <$> getUniqueM
+
+-- | Split a vector of a known, positive length into a term for its head and a
+-- term for its tail, for single-step reductions such as the one of @map@.
+--
+-- Representable vectors are shared using 'shareVec' and projected using
+-- 'extractHeadTail'. Non-representable vectors cannot be shared, so both
+-- projections get their own copy. That is fine for a vector in constructor
+-- form, which case-of-known-constructor then removes, but not for a @map@ or
+-- @zipWith@ that is not reduced yet. Applicative-style code such as:
+--
+-- > f <$> xs <*> ys <*> zs  ==  zipWith ($) (zipWith ($) (map f xs) ys) zs
+--
+-- creates exactly that. Primitives are reduced top-down, so the outer
+-- @zipWith@ is reduced first, after which the inner @zipWith@ and @map@ are
+-- reduced once for every copy. For a chain of @d@ primitives over vectors of
+-- length @n@ that takes O(n^d) reductions.
+--
+-- Instead, this function looks through non-representable @map@s and
+-- @zipWith@s and splits their argument vectors:
+--
+-- > head (map f xs)        = f (head xs)
+-- > tail (map f xs)        = map f (tail xs)
+-- > head (zipWith f xs ys) = f (head xs) (head ys)
+-- > tail (zipWith f xs ys) = zipWith f (tail xs) (tail ys)
+--
+-- This is what reducing the inner primitive followed by case-of-known-
+-- constructor would produce. Nothing gets unrolled that would not be unrolled
+-- anyway: 'Clash.Normalize.Transformations.Reduce.reducePrim' always reduces
+-- non-representable @map@s and @zipWith@s. The next reduction step of the
+-- outer primitive splits the tail in the same way, so only the vectors at the
+-- leaves get projected, and the representable ones among them are shared.
+--
+-- A @map@ or @zipWith@ that is built from closed vectors only, e.g. from
+-- @iterateI (+1) 0@, is copied instead. Projections of such copies are cheap:
+-- 'Clash.Normalize.Transformations.Case.caseCon' evaluates them right away.
+-- Sharing a constant vector is not: its let-binding and those of its tails
+-- get inlined one element per traversal of the whole term, see
+-- 'Clash.Normalize.Transformations.Inline.bindConstantVar'.
+unconsVec
+  :: DataCon
+  -- ^ The Cons (:>) constructor
+  -> Type
+  -- ^ Element type
+  -> Bool
+  -- ^ Whether the vector is representable, see 'shareVec'
+  -> Integer
+  -- ^ Length of the vector, must be positive
+  -> InScopeSet
+  -> Term
+  -- ^ Vector to split
+  -> NormalizeSession (InScopeSet, Term -> Term, (Term, Term))
+  -- ^ (Updated in scope set, function binding shared vectors, (head, tail))
+unconsVec consCon elTy isRepresentable n is0 vec
+  | not isRepresentable
+  , (Prim p, args, ticks) <- collectArgsTicks vec
+  , primName p == $(textNameLit 'Clash.Sized.Vector.map)
+  , [Right aTy, Right bTy, Right _nTy, Left f, Left xs] <- args
+  , not (closedLeaves xs)
+  = do
+      aRep <- not <$> isUntranslatableType_not_poly aTy
+      (is1, bindXs, (x, xs1)) <- unconsArg aTy aRep is0 xs
+      let
+        xs2 = mkApps (Prim p) [Right aTy, Right bTy, nPredTy, Left f, Left xs1]
+      pure (is1, bindXs, (mkTicks (mkApps f [Left x]) ticks, mkTicks xs2 ticks))
+
+  | not isRepresentable
+  , (Prim p, args, ticks) <- collectArgsTicks vec
+  , primName p == $(textNameLit 'Clash.Sized.Vector.zipWith)
+  , [Right aTy, Right bTy, Right cTy, Right _nTy, Left f, Left xs, Left ys]
+      <- args
+  , not (closedLeaves xs && closedLeaves ys)
+  = do
+      aRep <- not <$> isUntranslatableType_not_poly aTy
+      bRep <- not <$> isUntranslatableType_not_poly bTy
+      (is1, bindXs, (x, xs1)) <- unconsArg aTy aRep is0 xs
+      (is2, bindYs, (y, ys1)) <- unconsArg bTy bRep is1 ys
+      let
+        zs = mkApps (Prim p) [ Right aTy, Right bTy, Right cTy, nPredTy
+                             , Left f, Left xs1, Left ys1 ]
+      pure ( is2
+           , bindXs . bindYs
+           , (mkTicks (mkApps f [Left x, Left y]) ticks, mkTicks zs ticks) )
+
+  | otherwise = do
+      (is1, bindVec, vec1) <- shareVec isRepresentable is0 vec
+      (is1, bindVec,) <$> extractHeadTail is1 consCon elTy n vec1
+ where
+  nPredTy = Right (LitTy (NumTy (n - 1)))
+
+  -- Split an argument vector of a looked-through @map@ or @zipWith@.
+  unconsArg ty isRep is1 xs = do
+    (is2, bindXs, (x0, xs1)) <- unconsVec consCon ty isRep n is1 xs
+    if isRep then do
+      -- Let-bind the element before passing it to the function. Specializing
+      -- on an application of that function, e.g. by
+      -- 'Clash.Normalize.Transformations.Specialize.nonRepSpec', abstracts
+      -- over the free variables of the application. Without the let-binding,
+      -- one of those is the vector the element is projected from, whose length
+      -- differs for every element: every element would get its own
+      -- specialization.
+      x1 <- mkInternalVar is2 "el" ty
+      pure (extendInScopeSet is2 x1, bindXs . Let (NonRec x1 x0), (Var x1, xs1))
+    else
+      pure (is2, bindXs, (x0, xs1))
+
+  -- Whether all vectors the given vector is built from by @map@s and
+  -- @zipWith@s are closed.
+  closedLeaves (collectArgsTicks -> (Prim p, args, _))
+    | primName p == $(textNameLit 'Clash.Sized.Vector.map)
+    , [Right _, Right _, Right _, Left _, Left xs] <- args
+    = closedLeaves xs
+    | primName p == $(textNameLit 'Clash.Sized.Vector.zipWith)
+    , [Right _, Right _, Right _, Right _, Left _, Left xs, Left ys] <- args
+    = closedLeaves xs && closedLeaves ys
+  closedLeaves t = isClosed t
+
+-- | Whether a type is untranslatable, i.e., not representable in HDL. Types
+-- with free type variables are considered representable.
+isUntranslatableType_not_poly :: Type -> NormalizeSession Bool
+isUntranslatableType_not_poly t = do
+  u <- isUntranslatableType False t
+  if u
+     then return (null $ Lens.toListOf typeFreeVars t)
+     else return False
 
 -- | Create a vector of supplied elements
 mkVecCons
@@ -335,23 +469,21 @@ reduceZipWith
   -> Term -- ^ The 2nd vector argument
   -> TransformContext
   -> NormalizeSession Term
-reduceZipWith zipWithPrimInfo n lhsElTy rhsElTy resElTy lhsRep rhsRep fun lhsArg0 rhsArg0 (TransformContext is0 _) = do
+reduceZipWith zipWithPrimInfo n lhsElTy rhsElTy resElTy lhsRep rhsRep fun lhsArg rhsArg (TransformContext is0 _) = do
   tcm <- Lens.view tcCache
-  (is1, bindLhs, lhsArg1) <- shareVec lhsRep is0 lhsArg0
-  (_, bindRhs, rhsArg1) <- shareVec rhsRep is1 rhsArg0
-  changed (bindLhs (bindRhs (go tcm lhsArg1 rhsArg1 (inferCoreTypeOf tcm lhsArg0))))
+  go tcm (inferCoreTypeOf tcm lhsArg)
  where
-  go tcm lhsArg rhsArg (coreView1 tcm -> Just ty) = go tcm lhsArg rhsArg ty
-  go tcm lhsArg rhsArg (tyView -> TyConApp vecTcNm _)
+  go tcm (coreView1 tcm -> Just ty) = go tcm ty
+  go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc) <- UniqMap.lookup vecTcNm tcm
     , nameOcc vecTcNm == showt ''Vec
     , [nilCon, consCon] <- tyConDataCons vecTc
     = if n == 0 then
-        mkVecNil nilCon resElTy
-      else
+        changed (mkVecNil nilCon resElTy)
+      else do
+        (is1, bindLhs, (a, as)) <- unconsVec consCon lhsElTy lhsRep n is0 lhsArg
+        (_, bindRhs, (b, bs)) <- unconsVec consCon rhsElTy rhsRep n is1 rhsArg
         let
-          (a, as) = extractHeadTail consCon lhsElTy n lhsArg
-          (b, bs) = extractHeadTail consCon rhsElTy n rhsArg
           c = mkApps fun [Left a, Left b]
           cs = mkApps (Prim zipWithPrimInfo) [ Right lhsElTy
                                              , Right rhsElTy
@@ -360,9 +492,8 @@ reduceZipWith zipWithPrimInfo n lhsElTy rhsElTy resElTy lhsRep rhsRep fun lhsArg
                                              , Left fun
                                              , Left as
                                              , Left bs ]
-        in
-          mkVecCons consCon resElTy n c cs
-  go _ _ _ ty =
+        changed (bindLhs (bindRhs (mkVecCons consCon resElTy n c cs)))
+  go _ ty =
     error $ $(curLoc) ++ [I.i|
       reduceZipWith: argument does not have a vector type:
 
@@ -382,32 +513,30 @@ reduceMap
   -> Term -- ^ The map'd over vector
   -> TransformContext
   -> NormalizeSession Term
-reduceMap mapPrimInfo n argElTy resElTy argRep fun arg0 (TransformContext is0 _) = do
+reduceMap mapPrimInfo n argElTy resElTy argRep fun arg (TransformContext is0 _) = do
     tcm <- Lens.view tcCache
-    let ty = inferCoreTypeOf tcm arg0
-    (_, bindArg, arg1) <- shareVec argRep is0 arg0
-    changed (bindArg (go tcm arg1 ty))
+    let ty = inferCoreTypeOf tcm arg
+    go tcm ty
   where
-    go tcm arg (coreView1 tcm -> Just ty') = go tcm arg ty'
-    go tcm arg (tyView -> TyConApp vecTcNm _)
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- UniqMap.lookup vecTcNm tcm
       , nameOcc vecTcNm == showt ''Vec
       , [nilCon,consCon] <- tyConDataCons vecTc
       = if n == 0 then
-          mkVecNil nilCon argElTy
-        else
+          changed (mkVecNil nilCon argElTy)
+        else do
+          (_, bindArg, (a, as)) <- unconsVec consCon argElTy argRep n is0 arg
           let
             nPredTy = Right (LitTy (NumTy (n - 1)))
-            (a, as) = extractHeadTail consCon argElTy n arg
             b = mkApps fun [Left a]
             bs = mkApps (Prim mapPrimInfo) [ Right argElTy
                                            , Right resElTy
                                            , nPredTy
                                            , Left fun
                                            , Left as ]
-          in
-            mkVecCons consCon resElTy n b bs
-    go _ _ ty =
+          changed (bindArg (mkVecCons consCon resElTy n b bs))
+    go _ ty =
       error $ $(curLoc) ++ [I.i|
         reduceMap: argument does not have a vector type:
 
@@ -678,29 +807,28 @@ reduceFoldr
   -> TransformContext
   -> NormalizeSession Term
 reduceFoldr _ 0 _ _ _ start _ _ = changed start
-reduceFoldr foldrPrimInfo n aTy argRep fun start arg0 (TransformContext is0 _) = do
+reduceFoldr foldrPrimInfo n aTy argRep fun start arg (TransformContext is0 _) = do
     tcm <- Lens.view tcCache
-    let ty = inferCoreTypeOf tcm arg0
-    (_, bindArg, arg1) <- shareVec argRep is0 arg0
-    changed (bindArg (go tcm arg1 ty))
+    let ty = inferCoreTypeOf tcm arg
+    go tcm ty
   where
-    go tcm arg (coreView1 tcm -> Just ty') = go tcm arg ty'
-    go tcm arg (tyView -> TyConApp vecTcNm _)
+    go tcm (coreView1 tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
       | nameOcc vecTcNm == showt ''Vec
       , Just vecTc <- UniqMap.lookup vecTcNm tcm
       , [_nilCon, consCon] <- tyConDataCons vecTc
-      = let
-          (a, as) = extractHeadTail consCon aTy n arg
+      = do
+        (_, bindArg, (a, as)) <- unconsVec consCon aTy argRep n is0 arg
+        let
           b = mkApps (Prim foldrPrimInfo) [ Right aTy
                                           , Right (inferCoreTypeOf tcm start)
                                           , Right (LitTy (NumTy (n - 1)))
                                           , Left fun
                                           , Left start
                                           , Left as ]
-        in
-          mkApps fun [Left a, Left b]
+        changed (bindArg (mkApps fun [Left a, Left b]))
 
-    go _ _ ty =
+    go _ ty =
       error $ $(curLoc) ++ [I.i|
         reduceFoldr: argument does not have a vector type:
 
@@ -916,28 +1044,26 @@ reduceInit
   -> Term -- ^ The argument vector
   -> TransformContext
   -> NormalizeSession Term
-reduceInit initPrimInfo n aTy vArgRep vArg0 (TransformContext is0 _) = do
+reduceInit initPrimInfo n aTy vArgRep vArg (TransformContext is0 _) = do
   tcm <- Lens.view tcCache
-  let ty = inferCoreTypeOf tcm vArg0
-  (_, bindArg, vArg1) <- shareVec vArgRep is0 vArg0
-  changed (bindArg (go tcm vArg1 ty))
+  let ty = inferCoreTypeOf tcm vArg
+  go tcm ty
  where
-  go tcm vArg (coreView1 tcm -> Just ty') = go tcm vArg ty'
-  go tcm vArg (tyView -> TyConApp vecTcNm _)
+  go tcm (coreView1 tcm -> Just ty') = go tcm ty'
+  go tcm (tyView -> TyConApp vecTcNm _)
     | (Just vecTc) <- UniqMap.lookup vecTcNm tcm
     , nameOcc vecTcNm == showt ''Vec
     , [nilCon, consCon]  <- tyConDataCons vecTc
     = if n == 0 then
-        mkVecNil nilCon aTy
-      else
+        changed (mkVecNil nilCon aTy)
+      else do
+        (_, bindArg, (a, as0)) <- unconsVec consCon aTy vArgRep (n+1) is0 vArg
         let
           nPredTy = Right (LitTy (NumTy (n - 1)))
-          (a, as0) = extractHeadTail consCon aTy (n+1) vArg
           as1 = mkApps (Prim initPrimInfo) [nPredTy, Right aTy, Left as0]
-        in
-          mkVecCons consCon aTy n a as1
+        changed (bindArg (mkVecCons consCon aTy n a as1))
 
-  go _ _ ty =
+  go _ ty =
     error $ $(curLoc) ++ [I.i|
       reduceInit: argument does not have a vector type:
 

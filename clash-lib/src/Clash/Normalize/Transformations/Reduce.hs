@@ -34,7 +34,6 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 
-import Clash.Core.FreeVars (typeFreeVars)
 import Clash.Core.HasType
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
@@ -780,13 +779,6 @@ reduceEqHandler ReducePrimContext{..}
         in (changed (Data trueDc) :: NormalizeSession Term)
   | otherwise
   = return originalTerm
-
-isUntranslatableType_not_poly :: Type -> NormalizeSession Bool
-isUntranslatableType_not_poly t = do
-  u <- isUntranslatableType False t
-  if u
-     then return (null $ Lens.toListOf typeFreeVars t)
-     else return False
 
 class AbstractOverMissingArgs a where
   -- | Abstract over a primitive until it is saturated
