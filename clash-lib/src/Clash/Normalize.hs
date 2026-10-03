@@ -11,7 +11,6 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -58,8 +57,7 @@ import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, s
 import           Clash.Core.Subst
   (eqTerm, extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term
-  (CoreContext (..), Term (..), collectArgsTicks, mkApps,
-   mkTicks, pattern Letrec)
+  (CoreContext (..), Term (..), collectArgsTicks, mkApps, mkTicks)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
