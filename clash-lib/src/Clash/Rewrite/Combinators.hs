@@ -14,9 +14,11 @@ module Clash.Rewrite.Combinators
   , (>-!->)
   , (>->)
   , bottomupR
+  , bottomupWithR
   , repeatR
   , topdownR
   , topdownFixR
+  , topdownFixWithR
   ) where
 
 import           Control.DeepSeq             (deepseq)
@@ -188,14 +190,20 @@ was ~3% slower on a larger industrial design we've measured too. See #3250.
 --
 -- Optimized for local, context-stable transformations. See Note [topdownFixR].
 topdownFixR :: Rewrite m -> Rewrite m
-topdownFixR r = go True
+topdownFixR = topdownFixWithR allR
+{-# INLINE topdownFixR #-}
+
+-- | 'topdownFixR', descending into the subtrees of a node with the given
+-- traversal instead of 'allR'.
+topdownFixWithR :: (Rewrite m -> Rewrite m) -> Rewrite m -> Rewrite m
+topdownFixWithR allR' r = go True
  where
   go tryParent ctx term = do
     term1 <-
       if tryParent
         then repeatR r ctx term
         else pure term
-    (term2, Monoid.getAny -> childChanged) <- Writer.listen (allR (go True) ctx term1)
+    (term2, Monoid.getAny -> childChanged) <- Writer.listen (allR' (go True) ctx term1)
     if childChanged
       then do
         (term3, Monoid.getAny -> parentChanged) <- Writer.listen (repeatR r ctx term2)
@@ -203,11 +211,19 @@ topdownFixR r = go True
           then go False ctx term3
           else return term3
       else return term2
-{-# INLINE topdownFixR #-}
+{-# INLINE topdownFixWithR #-}
 
 -- | Apply a transformation in a bottomup traversal
 bottomupR :: Monad m => Transform m -> Transform m
 bottomupR r = allR (bottomupR r) >-> r
+
+-- | 'bottomupR', descending into the subtrees of a node with the given
+-- traversal instead of 'allR'.
+bottomupWithR :: Monad m => (Transform m -> Transform m) -> Transform m -> Transform m
+bottomupWithR allR' r = go
+ where
+  go = allR' go >-> r
+{-# INLINE bottomupWithR #-}
 
 infixr 5 !->
 -- | Only apply the second transformation if the first one succeeds.
