@@ -1086,7 +1086,8 @@ runClashTest = defaultMain
         , runTest "ZipWithUnitSP2" def
         ]
       , clashTestGroup "Vector"
-        [ runTest "EnumTypes" def{hdlSim=[]}
+        [ runTest "ApplicativeChain" def
+        , runTest "EnumTypes" def{hdlSim=[]}
         , runTest "HOCon" def{hdlSim=[]}
         , runTest "VMapAccum" def{hdlSim=[]}
         , runTest "VScan" def{hdlSim=[]}
