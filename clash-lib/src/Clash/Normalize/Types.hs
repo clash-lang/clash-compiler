@@ -14,6 +14,7 @@ module Clash.Normalize.Types where
 
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (State)
+import Data.HashMap.Strict        (HashMap)
 import Data.Map                   (Map)
 import Data.Set                   (Set)
 import Data.Text                  (Text)
@@ -60,6 +61,15 @@ data NormalizeState
   , _constantPropagationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
   -- for "Clash.Normalize.PrimitiveReductions". See '_normalizationStrategy'.
+  , _workFreeAppCache :: HashMap Term Term
+  -- ^ Cache of normalized work-free applications, i.e. global functions
+  -- applied to closed arguments:
+  --
+  -- * Key: the application, e.g. @f \@7 dict@
+  --
+  -- * Elem: the normalized body of @f@ applied to the arguments
+  --
+  -- See 'Clash.Normalize.Util.normalizeWorkFreeApp'.
   }
 
 Lens.makeLenses ''NormalizeState

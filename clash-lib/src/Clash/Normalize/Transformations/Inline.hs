@@ -48,7 +48,7 @@ import Control.Monad.Extra (anyM)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Writer (lift,listen)
 import Data.Default (Default(..))
-import Data.Either  (lefts)
+import Data.Either  (lefts, rights)
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
@@ -104,7 +104,7 @@ import Clash.Rewrite.WorkFree (isWorkFreeIsh)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
-  , normalizeTopLvlBndr)
+  , normalizeTopLvlBndr, normalizeWorkFreeApp)
 import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
@@ -733,7 +733,8 @@ inlineSmallWorker _ e = return e
 {-# SCC inlineSmallWorker #-}
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
--- a constant
+-- a constant. Applications to closed arguments are normalized before they're
+-- inlined, see 'normalizeWorkFreeApp'.
 inlineWorkFree :: Transformation
 inlineWorkFree =
   toTransformation "inlineWorkFree"
@@ -772,9 +773,15 @@ inlineWorkFreeWorker _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
                   else do
                     -- Don't inline recursive expressions
                     isRecBndr <- isRecursiveBndr f
-                    if isRecBndr
-                       then return e
-                       else do
+                    if | isRecBndr -> return e
+                       -- Type arguments can still mention type variables bound
+                       -- in the context, which rules out caching. Note that
+                       -- closedness for the term is already checked in
+                      -- 'expressionHasWork'.
+                       | all isClosed (rights args) -> do
+                         tm <- normalizeWorkFreeApp f b args
+                         changed (mkTicks tm (mkInlineTick f : ticks))
+                       | otherwise -> do
                          let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
                          changed $ mkApps tm args
 

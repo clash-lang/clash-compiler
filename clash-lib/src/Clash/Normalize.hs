@@ -31,6 +31,7 @@ import           Clash.Data.UniqMap               (UniqMap)
 import qualified Clash.Data.UniqMap               as UniqMap
 import           Data.List
   (intercalate, intersect, mapAccumL)
+import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
@@ -147,6 +148,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   rcsMap
                   normalization
                   constantPropagation
+                  HashMap.empty -- workFreeAppCache
 
 normalize
   :: [Id]
