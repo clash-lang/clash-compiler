@@ -456,6 +456,9 @@ Unlike unapplied work-free binders (see 'inlineWFCacheLimit'), applications
 are cached regardless of the size of @f@. Most of the work hides in the
 arguments and in the functions @f@ calls: the tiny dictionary selectors
 benefit the most.
+
+Note that a normalized constant can look different from its unnormalized form,
+see Note [bignum literals and specialization].
 -}
 
 -- | Normalize a global function applied to closed arguments, i.e. a work-free
