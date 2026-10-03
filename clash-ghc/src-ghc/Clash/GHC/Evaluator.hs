@@ -310,7 +310,7 @@ ghcUnwind v m tcm = do
   go (Apply x)                = return . apply tcm v x
   go (Instantiate ty)         = return . instantiate tcm v ty
   go (PrimApply p tys vs tms) = ghcPrimUnwind tcm p tys vs v tms
-  go (Scrutinise altTy as)    = return . scrutinise v altTy as
+  go (Scrutinise altTy as)    = return . scrutinise tcm v altTy as
   go (Tickish _)              = return . setTerm (valToTerm v)
 
 -- | Update the Heap with the evaluated term
@@ -372,15 +372,15 @@ instantiate tcm pVal@(PrimVal (PrimInfo{primType}) tys es) ty m
 instantiate _ p _ _ = error $ "Evaluator.instantiate: Not a tylambda: " ++ show p
 
 -- | Evaluate a case-expression
-scrutinise :: Value -> Type -> [Alt] -> Machine -> Machine
-scrutinise v _altTy [] m = setTerm (valToTerm v) m
+scrutinise :: TyConMap -> Value -> Type -> [Alt] -> Machine -> Machine
+scrutinise _tcm v _altTy [] m = setTerm (valToTerm v) m
 -- [Note: empty case expressions]
 --
 -- Clash does not have empty case-expressions; instead, empty case-expressions
 -- are used to indicate that the `whnf` function was called the context of a
 -- case-expression, which means certain special primitives must be forced.
 -- See also [Note: forcing special primitives]
-scrutinise (Lit l) _altTy alts m = case alts of
+scrutinise _tcm (Lit l) _altTy alts m = case alts of
   (DefaultPat, altE):alts1 -> setTerm (go altE alts1) m
   _ -> let term = go (error $ "Evaluator.scrutinise: no match "
                     <> showPpr (Case (valToTerm (Lit l)) (ConstTy Arrow) alts)) alts
@@ -421,13 +421,43 @@ scrutinise (Lit l) _altTy alts m = case alts of
       in  substTm "Evaluator.scrutinise" subst1 altE
   go def (_:alts1) = go def alts1
 
-scrutinise (DC dc xs) _altTy alts m
-  | altE:_ <- [substInAlt altDc tvs pxs xs altE
-              | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
-              [altE | (DefaultPat,altE) <- alts ]
-  = setTerm altE m
+scrutinise tcm (DC dc xs) _altTy alts m
+  | (m1,altE):_ <- [ bindFields altDc tvs pxs altE
+                   | (DataPat altDc tvs pxs,altE) <- alts, altDc == dc ] ++
+                   [ (m,altE) | (DefaultPat,altE) <- alts ]
+  = setTerm altE m1
+ where
+  -- Bind the fields used by the alternative on the heap instead of
+  -- substituting them into it, so they are evaluated at most once. With
+  -- substitution, an alternative such as @Just n -> if n == maxBound then
+  -- Nothing else Just (n + 1)@ evaluates one copy of @n@ and returns another,
+  -- unevaluated, copy. Iterating such a function (e.g. with 'iterateI') then
+  -- builds terms that grow with every iteration.
+  bindFields altDc tvs pxs altE =
+    let altFvs = freeVarsOf altE
+        (m1,tms) = mapAccumL (bindField altFvs) m (zip pxs (lefts xs))
+     in (m1, substInAlt altDc tvs pxs (rights xs) tms altE)
 
-scrutinise v@(PrimVal p _ vs) altTy alts m
+  bindField altFvs m0 (x,tm)
+    | x `elemVarSet` altFvs
+    , not (isAtomic tm)
+    = Var <$> newLetBinding tcm m0 tm
+    | otherwise
+    = (m0,tm)
+
+  -- Terms we can substitute without duplicating work
+  isAtomic = \case
+    Var {} -> True
+    Data {} -> True
+    Literal {} -> True
+    Prim {} -> True
+    Lam {} -> True
+    TyLam {} -> True
+    TyApp e _ -> isAtomic e
+    Tick _ e -> isAtomic e
+    _ -> False
+
+scrutinise _tcm v@(PrimVal p _ vs) altTy alts m
   | isUndefinedXPrimVal v
   = setTerm (TyApp (Prim NP.undefinedX) altTy) m
   | isUndefinedPrimVal v
@@ -457,14 +487,12 @@ scrutinise v@(PrimVal p _ vs) altTy alts m
           | [_,Lit l0] <- vs -> l0
         _ -> error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-scrutinise v _altTy alts _ =
+scrutinise _tcm v _altTy alts _ =
   error ("scrutinise: " ++ showPpr (Case (valToTerm v) (ConstTy Arrow) alts))
 
-substInAlt :: DataCon -> [TyVar] -> [Id] -> [Either Term Type] -> Term -> Term
-substInAlt dc tvs xs args e = substTm "Evaluator.substInAlt" subst e
+substInAlt :: DataCon -> [TyVar] -> [Id] -> [Type] -> [Term] -> Term -> Term
+substInAlt dc tvs xs tys tms e = substTm "Evaluator.substInAlt" subst e
  where
-  tys        = rights args
-  tms        = lefts args
   substTyMap = zip tvs (drop (length (dcUnivTyVars dc)) tys)
   substTmMap = zip xs tms
   inScope    = freeVarsOf tys `unionVarSet` freeVarsOf (e:tms)

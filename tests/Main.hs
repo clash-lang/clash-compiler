@@ -1133,6 +1133,7 @@ runClashTest = defaultMain
         , runTest "Indices" def
         , runTest "Iterate" def
         , outputTest "IterateCF" def{hdlTargets=[VHDL]}
+        , runTest "IterateSharing" def
         , runTest "Minimum" def
         , runTest "MovingAvg" def{hdlSim=[]}
         , runTest "PatHOCon" def{hdlSim=[]}
