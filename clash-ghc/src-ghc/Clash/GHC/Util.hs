@@ -26,6 +26,9 @@ import GHC.Plugins
    noSrcSpan, text, throwOneError)
 import GHC.Types.Error (UnknownDiagnostic(..))
 #endif
+#if MIN_VERSION_ghc(10,0,0)
+import GHC.Types.SourceError (initSourceErrorContext)
+#endif
 import GHC                (GhcMonad(..), printException)
 
 #if !MIN_VERSION_ghc(9,12,0)
@@ -57,6 +60,9 @@ handleClashException _df opts e = case fromException e of
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
     throwOneError
+#if MIN_VERSION_ghc(10,0,0)
+      (initSourceErrorContext _df)
+#endif
 #if MIN_VERSION_ghc(9,8,0)
       (mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
 #else
@@ -79,6 +85,9 @@ handleClashException _df opts e = case fromException e of
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)
       _ -> throwOneError
+#if MIN_VERSION_ghc(10,0,0)
+              (initSourceErrorContext _df)
+#endif
 #if MIN_VERSION_ghc(9,8,0)
               (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
 #else

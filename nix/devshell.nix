@@ -3,7 +3,7 @@ compilerVersion:
 let
   clashPkgs = pkgs."clashPackages-${compilerVersion}";
   haskellLanguageServer =
-    if compilerVersion == "ghc9141" then
+    if builtins.elem compilerVersion [ "ghc9141" "ghc1001" ] then
       [ ]
     else
       [ clashPkgs.haskell-language-server ];
