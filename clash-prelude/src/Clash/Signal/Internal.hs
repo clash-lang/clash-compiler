@@ -750,8 +750,8 @@ instance Show Period where
 --
 instance Integral Period where
   quotRem (Period (a :% b)) (Period (c :% d)) =
-    ( Period $ (a * d `div` b * c) :% 1
-    , Period $ (a * d `mod` b * c) :% (b * c)
+    ( Period $ ((a * d) `div` (b * c)) % 1
+    , Period $ ((a * d) `mod` (b * c)) % (b * d)
     )
   quot x y = fst $ quotRem x y
   rem x y = snd $ quotRem x y
