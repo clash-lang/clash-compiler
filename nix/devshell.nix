@@ -34,6 +34,7 @@ clashPkgs.shellFor {
 
     pkgs.ghdl-clash
     pkgs.nixpkgs-fmt
+    pkgs.python3
     pkgs.sby
     pkgs.verilator
     # Optional: clash-testsuite uses ccache, when present, to cache Verilator's
@@ -41,6 +42,7 @@ clashPkgs.shellFor {
     pkgs.ccache
     pkgs.iverilog
     pkgs.yosys
+    pkgs.z3
 
     # Tool used to manage the changelog, see 'changelog/README.md'.
     qlog
