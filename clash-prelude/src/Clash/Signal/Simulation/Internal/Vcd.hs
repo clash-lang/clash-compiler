@@ -24,7 +24,7 @@ import Data.Bits (testBit)
 import qualified Data.List as L
 import Data.List.Extra (snoc)
 import Data.List.Split (splitOn)
-import qualified Data.Map as M
+import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Data.Text (Text)
@@ -139,7 +139,7 @@ vcd Simulation
   allLabels = concatMap (\s -> map (snoc s) alphabet) ("": labels)
     where alphabet = map chr [33..126]
 
-  allTraces = M.toList traceMap
+  allTraces = Map.toList traceMap
   (allNames, _) = L.unzip allTraces
 
   nonUnitTraces = filter (\(_,(_,(_,_,w,_))) -> w>0) $ zip allLabels allTraces -- TODO: Use warnZeroWidth here?
