@@ -115,7 +115,7 @@ SIMULATION
 emptySim :: Config -> IO Simulation
 emptySim config = do
   simTimestamp <- getCurrentTime
-  return Simulation
+  pure Simulation
     { simConfig = config
     , simTraces = Map.empty
     , simTimestamp
@@ -185,7 +185,7 @@ simulate0 ref simConfig@Config{..} clockWaves signals sig = do
   -- create Simulation
   GlobalData{globTraces} <- readIORef ref
   let simTraces = Map.union (Map.fromList $ L.map (second clockTrace) clockWaves) globTraces
-  return $ evalResult >>= const (Right Simulation{simConfig, simTraces, simTimestamp})
+  pure $ evalResult >>= const (Right Simulation{simConfig, simTraces, simTimestamp})
 
 simulationTimeRangeToCycles :: Config -> Time -> (Int,Int)
 simulationTimeRangeToCycles Config{start,stop,clockStart} period =
@@ -216,10 +216,10 @@ forceEvaluateSignal ::
   IO (Either String ())
 forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   case (waitFor, statusMsgs) of
-    ([],False) -> return $ Right $ deepseqX values' ()
+    ([],False) -> pure $ Right $ deepseqX values' ()
     ([],True)  -> do
       mapM_ printFound values'
-      return $ Right ()
+      pure $ Right ()
     (_,False) -> lookFor values  waitFor
     (_,True)  -> lookFor values' waitFor
  where
@@ -253,7 +253,7 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
     evaluate $ rnfX x
     (_,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
     mapM_ (hPutStrLn stderr) newMsgs
-    return ()
+    pure ()
 
   -- Evaluate a list of values, looking for certain signals.
   -- For implementation simplicity, does not check for signals that appear after
@@ -262,8 +262,8 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   lookFor xs' ss' = lookFor' (xs' <> [Clash.Explicit.Prelude.Safe.undefined]) ss' [] True
    where
     lookFor' :: [a] -> [String] -> [String] -> Bool -> IO (Either String ())
-    lookFor' _ [] _ _ = return $ Right ()
-    lookFor' [] (s:_) _ _ = return $ Left ("Did not find signal " <> s)
+    lookFor' _ [] _ _ = pure $ Right ()
+    lookFor' [] (s:_) _ _ = pure $ Left ("Did not find signal " <> s)
     lookFor' xss@(x:xs) sss@(s:ss) found firstTime = do
       (newFound,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
 

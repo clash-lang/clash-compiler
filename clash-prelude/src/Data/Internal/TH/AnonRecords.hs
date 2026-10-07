@@ -39,7 +39,7 @@ deriveAsTuple minSize maxSize = do
   typeNames  <- replicateM maxSize (newName "a")
   valNames   <- replicateM maxSize (newName "x")
 
-  return $ flip map [minSize .. maxSize] $ \tupleNum ->
+  pure $ flip map [minSize .. maxSize] $ \tupleNum ->
     let fields = map VarT $ take tupleNum fieldNames
         types  = map VarT $ take tupleNum  typeNames
         vals   =            take tupleNum   valNames
