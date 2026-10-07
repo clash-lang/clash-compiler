@@ -13,7 +13,6 @@ module Clash.Signal.Simulation where
 import Control.Exception (evaluate)
 import Control.Monad (foldM)
 import Data.Bifunctor (second)
-import Data.ByteString.Lazy (ByteString)
 import Data.Default (Default(..))
 import Data.Either.Extra (maybeToEither)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
@@ -27,22 +26,19 @@ import GHC.TypeLits (KnownNat, natVal, symbolVal)
 import System.IO (hPutStrLn, stderr)
 import System.IO.Unsafe (unsafePerformIO)
 
-import Clash.Class.BitPack   (BitPack(..), BitSize)
+import Clash.Class.BitPack (BitPack(..), BitSize)
 import Clash.Explicit.Prelude.Safe (undefined)
-import Clash.XException      (NFDataX(rnfX), deepseqX)
+import Clash.XException (NFDataX(rnfX), deepseqX)
 import Clash.Signal
   (KnownDomain, SDomainConfiguration(..), knownDomain,
   Signal, sample, fromList,
   Clock, Reset, Enable, fromEnable, unsafeFromReset,
   unbundle)
 import Clash.Sized.Internal.BitVector (BitVector(BV))
-import Clash.Sized.Vector    (Vec, toList)
+import Clash.Sized.Vector (Vec, toList)
 import Clash.Time (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
 
 import Clash.Signal.Simulation.DataType (DataType, compatible, typeRep)
-
---data DataType = DT String [DataType] deriving (Show)
--- type DataType = ByteString
 
 type Period = Time
 type Width = Int

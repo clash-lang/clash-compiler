@@ -9,7 +9,6 @@ module Data.Internal.TH.AnonRecords where
 
 import Control.Monad (replicateM)
 import Language.Haskell.TH
-import Prelude
 
 -- | Derive 'Data.AnonRecord.AsTuple' implementations for tuples in the specified range.
 deriveAsTuple :: Int -> Int -> DecsQ

@@ -8,27 +8,24 @@
 
 module Clash.Signal.Simulation.Store where
 
-import           Control.Monad         (foldM)
-import           Data.Aeson            (encode,eitherDecode,ToJSON,FromJSON)
-import           Data.AnonRecords
-import           Data.ByteString.Lazy  (ByteString)
-import qualified Data.ByteString.Lazy  as B
--- import           Data.Maybe            (fromMaybe)
-import           Data.List             (transpose)
-import           Data.Typeable
-import           GHC.Bits              (shiftL, shiftR, (.|.), (.&.))
-import           GHC.Generics          (Generic)
-import           GHC.Natural           (Natural)
-import           GHC.TypeLits          (KnownSymbol, symbolVal, natVal)
+import Control.Monad (foldM)
+import Data.Aeson (encode,eitherDecode,ToJSON,FromJSON)
+import Data.AnonRecords
+import qualified Data.ByteString.Lazy as B
+import Data.ByteString.Lazy (ByteString)
+import Data.List (transpose)
+import Data.Typeable
+import GHC.Bits (shiftL, shiftR, (.|.), (.&.))
+import GHC.Generics (Generic)
+import GHC.Natural (Natural)
+import GHC.TypeLits (KnownSymbol, symbolVal, natVal)
 
+import Clash.Class.BitPack
 import Clash.Signal (KnownDomain, Signal, Bundle, Unbundled, bundle, unbundle)
--- import           Clash.Sized.Internal.BitVector
---   (BitVector(BV))
-import           Clash.Class.BitPack
-import           Clash.Time            (clockPeriodTime)
+import Clash.Time (clockPeriodTime)
 
-import           Clash.Signal.Simulation
-import           Clash.Signal.Simulation.DataType
+import Clash.Signal.Simulation
+import Clash.Signal.Simulation.DataType
 
 
 {-
