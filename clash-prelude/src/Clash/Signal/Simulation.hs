@@ -216,18 +216,18 @@ forceEvaluateSignal ::
   IO (Either String ())
 forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   case (waitFor, statusMsgs) of
-    ([],False) -> pure $ Right $ deepseqX values' ()
+    ([],False) -> pure $ Right $ deepseqX values0 ()
     ([],True)  -> do
-      mapM_ printFound values'
+      mapM_ printFound values0
       pure $ Right ()
     (_,False) -> lookFor values  waitFor
-    (_,True)  -> lookFor values' waitFor
+    (_,True)  -> lookFor values0 waitFor
  where
   values :: [a]
   values = drop (fromIntegral start) $ take (fromIntegral stop) $ foldr (:) [] sig
 
-  values' :: [a]
-  values' =
+  values0 :: [a]
+  values0 =
     if statusMsgs then
       zipWith ($) (progress $ stop - start) values
     else
@@ -259,12 +259,12 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   -- For implementation simplicity, does not check for signals that appear after
   -- evalutating the last value.
   lookFor :: [a] -> [String] -> IO (Either String ())
-  lookFor xs' ss' = lookFor' (xs' <> [Clash.Explicit.Prelude.Safe.undefined]) ss' [] True
+  lookFor xs0 ss0 = lookFor0 (xs0 <> [Clash.Explicit.Prelude.Safe.undefined]) ss0 [] True
    where
-    lookFor' :: [a] -> [String] -> [String] -> Bool -> IO (Either String ())
-    lookFor' _ [] _ _ = pure $ Right ()
-    lookFor' [] (s:_) _ _ = pure $ Left ("Did not find signal " <> s)
-    lookFor' xss@(x:xs) sss@(s:ss) found firstTime = do
+    lookFor0 :: [a] -> [String] -> [String] -> Bool -> IO (Either String ())
+    lookFor0 _ [] _ _ = pure $ Right ()
+    lookFor0 [] (s:_) _ _ = pure $ Left ("Did not find signal " <> s)
+    lookFor0 xss@(x:xs) sss@(s:ss) found firstTime = do
       (newFound,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
 
       if statusMsgs then
@@ -272,12 +272,12 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
       else
         pure ()
 
-      let found' = newFound <> found
-      if s `elem` (if firstTime then found' else newFound) then do
-        lookFor' xss ss found' True
+      let found0 = newFound <> found
+      if s `elem` (if firstTime then foun$(1)0 else newFound) then do
+        lookFor0 xss ss found0 True
       else do
         evaluate $ rnfX x
-        lookFor' xs sss found' False
+        lookFor0 xs sss found0 False
 
 
 

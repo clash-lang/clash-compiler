@@ -80,7 +80,7 @@ data SignalDescr = SignalDescr
 
 
 storeTrace0 :: (Int,Int) -> [SignalDescr] -> [Value] -> ByteString
-storeTrace0 (start,stop) signals values = header' <> "\n\0" <> rawValues
+storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
  where
   width = sum $ map (\SignalDescr{width=w}->w) signals
 
@@ -91,10 +91,10 @@ storeTrace0 (start,stop) signals values = header' <> "\n\0" <> rawValues
     , undefined = True
     , signals = signals
     }
-  header' = encode header
+  header0 = encode header
 
-  values' = drop start $ take stop $ values
-  rawValues = B.pack $ concatMap valToBytes values'
+  values0 = drop start $ take stop $ values
+  rawValues = B.pack $ concatMap valToBytes values0
 
   k = (width+7) `div` 9
   valToBytes (m,v) = concatMap natToBytes [v,m]
@@ -119,7 +119,7 @@ storeTraces samples traces = do
   let meta = map (\(name,(ty,_,width,_)) -> SignalDescr{name, width, datatype=ty}) traces
       widths = map (\(_,(_,_,w,_)) -> w) traces
       ccat vs = foldl
-        (\(v,m) (w,(v',m')) -> ((v `shiftL` w).|.v', (m `shiftL` w).|.m')) (0,0)
+        (\(v,m) (w,(v0,m0)) -> ((v `shiftL` w).|.v0, (m `shiftL` w).|.m0)) (0,0)
         (zip widths vs)
       values = map ccat $ transpose $ map (\(_,(_,_,_,vs)) -> vs) traces -- combine values TODO: make more efficient
 
@@ -201,10 +201,10 @@ loadTrace0 ::
   ByteString ->
   Either String (FileHeader,[Value])
 loadTrace0 bs = do
-  let (header',rest) = B.span (/=0) bs
-      rawValues' = B.drop 1 rest
+  let (header0,rest) = B.span (/=0) bs
+      rawValues0 = B.drop 1 rest
 
-  header@FileHeader{width,undefined=storesUndefined,offset} <- eitherDecode header'
+  header@FileHeader{width,undefined=storesUndefined,offset} <- eitherDecode header0
 
   let k = (width+7) `div` 8
       values =
@@ -220,13 +220,13 @@ loadTrace0 bs = do
       definedValues = map (0,) rawValues
 
       rawValues :: [Natural]
-      rawValues = map bsToNat $ cut rawValues'
+      rawValues = map bsToNat $ cut rawValues0
        where
         cut b | B.null b = []
               | otherwise = v : cut r
          where (v,r) = B.splitAt (fromIntegral k) b
 
-      bsToNat bs' = sum $ zipWith (shiftL . fromIntegral) (B.unpack bs') [0,8..8*k-1]
+      bsToNat bs0 = sum $ zipWith (shiftL . fromIntegral) (B.unpack bs0) [0,8..8*k-1]
 
       undef = ((1 `shiftL` width)-1,0)
 
@@ -266,13 +266,13 @@ loadTraces period bs = do
     Left "Subsignal widths do not add up to signal width"
   else Right ()
 
-  let slice' (from, to) (m,v) = (go m, go v)
+  let slice0 (from, to) (m,v) = (go m, go v)
        where
         lo = width-to
         bits = to-from
         go n = (n `shiftR` lo) .&. ((1 `shiftL` bits) - 1)
 
-      valuess = map (\r -> map (slice' r) values) ranges
+      valuess = map (\r -> map (slice0 r) values) ranges
       traces = zipWith3 (\t w vs -> (t, period, w, vs)) types widths valuess
 
   Right $ zip names traces

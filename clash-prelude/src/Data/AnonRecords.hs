@@ -111,7 +111,7 @@ class AccessField (f::Symbol) a where
   type FieldType f a
   getField :: a -> FieldType f a
   -- | Set the value of a field. To replace the value with one of a different type,
-  -- see 'insertField'.
+  -- see 'insertField0.
   setField :: FieldType f a -> a -> a
   -- | Modify a field value in place.
   modifyField :: (FieldType f a -> FieldType f a) -> a -> a
@@ -128,10 +128,10 @@ instance
   => GHC.Records.HasField f (f:=b) a where
   getField = getField @f @(f:=b)
 
-instance (AccessField' f (a:&:b) (HasField f a)) => AccessField f (a:&:b) where
-  type FieldType f (a:&:b) = FieldType' f (a:&:b) (HasField f a)
-  getField   ab = getField' @f @(a:&:b) @(HasField f a)   ab
-  setField x ab = setField' @f @(a:&:b) @(HasField f a) x ab
+instance (AccessField0 f (a:&:b) (HasField f a)) => AccessField f (a:&:b) where
+  type FieldType f (a:&:b) = FieldType0 f (a:&:b) (HasField f a)
+  getField   ab = getField0 @f @(a:&:b) @(HasField f a)   ab
+  setField x ab = setField0 @f @(a:&:b) @(HasField f a) x ab
 
 instance
   ( AccessField f (l:&:r)
@@ -139,20 +139,20 @@ instance
   => GHC.Records.HasField f (l:&:r) a where
   getField = getField @f @(l:&:r)
 
-class AccessField' f a left where
-  type FieldType' f a left
-  getField' :: a -> FieldType' f a left
-  setField' :: FieldType' f a left -> a -> a
+class AccessField0 f a left where
+  type FieldType0 f a left
+  getField0 :: a -> FieldType0 f a left
+  setField0 :: FieldType0 f a left -> a -> a
 
-instance (AccessField f a, HasField f a ~ True) => AccessField' f (a:&:b) True where
-  type FieldType' f (a:&:b) True = FieldType f a
-  getField'   (a:&:_) = getField @f a
-  setField' x (a:&:b) = setField @f x a :&: b
+instance (AccessField f a, HasField f a ~ True) => AccessField0 f (a:&:b) True where
+  type FieldType0 f (a:&:b) True = FieldType f a
+  getField0   (a:&:_) = getField @f a
+  setField0 x (a:&:b) = setField @f x a :&: b
 
-instance (AccessField f b, HasField f a ~ False) => AccessField' f (a:&:b) False where
-  type FieldType' f (a:&:b) False = FieldType f b
-  getField'   (_:&:b) = getField @f b
-  setField' y (a:&:b) = a :&: setField @f y b
+instance (AccessField f b, HasField f a ~ False) => AccessField0 f (a:&:b) False where
+  type FieldType0 f (a:&:b) False = FieldType f b
+  getField0   (_:&:b) = getField @f b
+  setField0 y (a:&:b) = a :&: setField @f y b
 
 
 -- FIELD ADDITION
@@ -173,35 +173,35 @@ class InsertField f a r where
 instance InsertField f a () where
   insertField x _ = L @f x
 
-instance (InsertField' f a (f2:=b) (f==f2)) => InsertField f a (f2:=b) where
-  insertField = insertField' @f @a @(f2:=b) @(f==f2)
+instance (InsertField0 f a (f2:=b) (f==f2)) => InsertField f a (f2:=b) where
+  insertField = insertField0 @f @a @(f2:=b) @(f==f2)
 
-instance (InsertField' f a (f2:=b :&: r) (f==f2)) => InsertField f a (f2:=b :&: r) where
-  insertField = insertField' @f @a @(f2:=b :&: r) @(f==f2)
+instance (InsertField0 f a (f2:=b :&: r) (f==f2)) => InsertField f a (f2:=b :&: r) where
+  insertField = insertField0 @f @a @(f2:=b :&: r) @(f==f2)
 
-class InsertField' f a r (eq::Bool) where
-  insertField' :: a -> r -> WithField f a r
+class InsertField0 f a r (eq::Bool) where
+  insertField0 :: a -> r -> WithField f a r
 
-instance (WithField f a (f2:=b) ~ (f:=a)) => InsertField' f a (f2:=b) True where
-  insertField' x _ = L x
+instance (WithField f a (f2:=b) ~ (f:=a)) => InsertField0 f a (f2:=b) True where
+  insertField0 x _ = L x
 
 instance
   (WithField f a (f2:=b) ~ (f2:=b :&: f:=a)) =>
-  InsertField' f a (f2:=b) False
+  InsertField0 f a (f2:=b) False
   where
-  insertField' x r = r :&: L x
+  insertField0 x r = r :&: L x
 
 instance
   (WithField f a (l :&: r) ~ (f:=a :&: r)) =>
-  InsertField' f a (l :&: r) True
+  InsertField0 f a (l :&: r) True
   where
-  insertField' x (_ :&: r) = L x :&: r
+  insertField0 x (_ :&: r) = L x :&: r
 
 instance
   (InsertField f a r, WithField f a (l :&: r) ~ (l :&: WithField f a r)) =>
-  InsertField' f a (l :&: r) False
+  InsertField0 f a (l :&: r) False
   where
-  insertField' x (l :&: r) = l :&: insertField @f @a @r x r
+  insertField0 x (l :&: r) = l :&: insertField @f @a @r x r
 
 
 -- FIELD REMOVAL
@@ -221,34 +221,34 @@ instance DeleteField f (f:=b) where
   deleteField _ = ()
 
 instance
-  ( DeleteField' f (f2:=b :&: f3:=b) (f==f2) (f==f3) )
+  ( DeleteField0 f (f2:=b :&: f3:=b) (f==f2) (f==f3) )
   => DeleteField f (f2:=b :&: f3:=b) where
-  deleteField = deleteField' @f @_ @(f==f2) @(f==f3)
+  deleteField = deleteField0 @f @_ @(f==f2) @(f==f3)
 
 instance
-  ( DeleteField' f (f2:=b :&: r :&: rr) (f==f2) False )
+  ( DeleteField0 f (f2:=b :&: r :&: rr) (f==f2) False )
   => DeleteField f (f2:=b :&: r :&: rr) where
-  deleteField = deleteField' @f @_ @(f==f2) @False
+  deleteField = deleteField0 @f @_ @(f==f2) @False
 
-class DeleteField' (f::Symbol) r (eqL::Bool) (eqR::Bool) where
-  deleteField' :: r -> WithoutField f r
+class DeleteField0 (f::Symbol) r (eqL::Bool) (eqR::Bool) where
+  deleteField0 :: r -> WithoutField f r
 
 instance
   ( WithoutField f (l :&: r) ~ r )
-  => DeleteField' f (l :&: r) True eqR where
-  deleteField' (_ :&: r) = r
+  => DeleteField0 f (l :&: r) True eqR where
+  deleteField0 (_ :&: r) = r
 
 instance
   (WithoutField f (l :&: r) ~ l) =>
-  DeleteField' f (l :&: r) False True
+  DeleteField0 f (l :&: r) False True
   where
-  deleteField' (l :&: _) = l
+  deleteField0 (l :&: _) = l
 
 instance
   (DeleteField f r, WithoutField f (l :&: r) ~ (l :&: WithoutField f r)) =>
-  DeleteField' f (l :&: r) False False
+  DeleteField0 f (l :&: r) False False
   where
-  deleteField' (l :&: r) = l :&: deleteField @f r
+  deleteField0 (l :&: r) = l :&: deleteField @f r
 
 
 -- SHOW
