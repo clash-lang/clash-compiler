@@ -123,7 +123,7 @@ storeTraces samples traces = do
         (zip widths vs)
       values = map ccat $ transpose $ map (\(_,(_,_,_,vs)) -> vs) traces -- combine values TODO: make more efficient
 
-  return $ storeTrace0 samples meta values
+  Right $ storeTrace0 samples meta values
 
 -- | Store a trace in binary form.
 store ::
@@ -134,7 +134,7 @@ store ::
 store name sim@Simulation{simConfig} = do
   trc@(_,period,_,_) <- fetchTrace name sim
   let samples = simulationTimeRangeToCycles simConfig period
-  return $ storeTrace name samples trc
+  pure $ storeTrace name samples trc
 
 -- | Store multiple traces into a single binary.
 -- All traces must have the same clock period.
@@ -230,7 +230,7 @@ loadTrace0 bs = do
 
       undef = ((1 `shiftL` width)-1,0)
 
-  return
+  pure
     ( header
     , (replicate offset undef) <> values <> repeat undef
     )
@@ -245,7 +245,7 @@ loadTrace period bs = do
   let FileHeader{width, signals} = header
       ty = constructRecord $ map (\SignalDescr{name,datatype} -> (name,datatype)) signals
 
-  return
+  pure
     ( ty
     , period
     , width
@@ -275,7 +275,7 @@ loadTraces period bs = do
       valuess = map (\r -> map (slice' r) values) ranges
       traces = zipWith3 (\t w vs -> (t, period, w, vs)) types widths valuess
 
-  return $ zip names traces
+  Right $ zip names traces
 
 -- | Load a trace from binary form.
 load ::
@@ -325,4 +325,4 @@ loadSignals ::
   Either String (Unbundled dom a)
 loadSignals bs = do
   sig <- loadSignal @a @dom bs
-  return $ unbundle sig
+  pure $ unbundle sig
