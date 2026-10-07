@@ -44,7 +44,7 @@ deriveAsTuple minSize maxSize = do
         types  = map VarT $ take tupleNum  typeNames
         vals   =            take tupleNum   valNames
 
-        tupleT' = foldl AppT (TupleT tupleNum) types
+        tupleT0 = foldl AppT (TupleT tupleNum) types
         recordT = mkRecordT $ zip fields types
 
         context = []
@@ -61,7 +61,7 @@ deriveAsTuple minSize maxSize = do
           TySynEqn
             Nothing
             (AppT tupledT recordT)
-            tupleT'
+            tupleT0
 
         toTuple =
           FunD

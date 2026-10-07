@@ -216,10 +216,10 @@ vcd Simulation
     largestPow10 p x | x>=10*p = largestPow10 (p*10) x
                      | otherwise = p
 
-  timeScale = timeScale' vcdTimeScaleFS "fs" ["ps","ns","us","ms","s"]
+  timeScale = timeScale0 vcdTimeScaleFS "fs" ["ps","ns","us","ms","s"]
    where
-    timeScale' t u [] = (t,u)
-    timeScale' t u (u':r) | t>=1000 = timeScale' (t `div` 1000) u' r
+    timeScale0 t u [] = (t,u)
+    timeScale0 t u (u0:r) | t>=1000 = timeScale0 (t `div` 1000) u0 r
                           | otherwise = (t,u)
 
   timeOffset =
@@ -277,14 +277,14 @@ vcd Simulation
   -- | Merge items with the given function using a binary tree.
   -- A linear fold would incur quadratic runtime.
   treeFold :: (a -> a -> a) -> [a] -> a
-  treeFold ff xx = treeFold' (length xx) ff xx
+  treeFold f0 xs0 = treeFold0 (length xs0) f0 xs0
    where
-    treeFold' _ _ [] = error "treeFold used on empty sequence"
-    treeFold' _ _ [x] = x
-    treeFold' l f xs = treeFold' l' f as `f` treeFold' (l - l') f bs
+    treeFold0 _ _ []  = error "treeFold used on empty sequence"
+    treeFold0 _ _ [x] = x
+    treeFold0 l f xs  = treeFold0 l0 f as `f` treeFold0 (l - l0) f bs
      where
-      l' = l `div` 2
-      (as, bs) = L.splitAt l' xs
+      l0 = l `div` 2
+      (as, bs) = L.splitAt l0 xs
 
   -- | Zip two lists of timestamped lists of changes.
   -- A single merge in the merge sort
@@ -301,16 +301,16 @@ vcd Simulation
   findChanges
     :: (Period,([Width],[String],[[Value]]))
     -> ([ValueChange],[(VcdTime,[ValueChange])])
-  findChanges (period,(widths',labels',valuess')) = (initial', samples')
+  findChanges (period,(widths0,labels0,valuess0)) = (initial0, samples0)
     where
       clkEdges :: [VcdTime]
-      clkEdges = [vClockStart, vClockStart + period' ..]
+      clkEdges = [vClockStart, vClockStart + period0 ..]
        where
-        period' = timeInFS period `div` vcdTimeScaleFS
+        period0 = timeInFS period `div` vcdTimeScaleFS
 
       -- group by clock cycle and add timestamps (the initial value starts at -inf)
       valuessFrom :: [(VcdTime,[Value])]
-      valuessFrom = zip (-1000000000000:clkEdges) $ L.transpose valuess'
+      valuessFrom = zip (-1000000000000:clkEdges) $ L.transpose valuess0
         --TODO: minBound, but we're using integers, which are unbounded :/
 
       skipStart :: [(VcdTime,[Value])]
@@ -323,14 +323,14 @@ vcd Simulation
 
       filterChanges (_ta,va) (tb,vb) =
         (tb
-        , [ValueChange w l b | (a,b,w,l) <- L.zip4 va vb widths' labels', a /= b]
+        , [ValueChange w l b | (a,b,w,l) <- L.zip4 va vb widths0 labels0, a /= b]
         )
 
-      initial' :: [ValueChange]
-      initial' = zipWith3 ValueChange widths' labels' initial
+      initial0 :: [ValueChange]
+      initial0 = zipWith3 ValueChange widths0 labels0 initial
 
-      samples' :: [(VcdTime,[ValueChange])]
-      samples' = filter (not . null . snd) $ zipWith filterChanges skipStart samples
+      samples0 :: [(VcdTime,[ValueChange])]
+      samples0 = filter (not . null . snd) $ zipWith filterChanges skipStart samples
 
 
 -- | Create a VCD file for the given traces and simulation configuration.

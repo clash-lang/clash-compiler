@@ -87,24 +87,24 @@ compatible (DT a     ra   ) (DT b     rb    ) | a == b
                                               = and $ zipWith compatible ra rb
 compatible (DT LABEL _    ) (DT LABEL _     ) = False -- cut off before removing labels
 compatible (DT TUP2 [a,b] ) (DT TUP2 [c,d]  ) = compatible a c && compatible b d
-compatible x'               y'                = compatible' x' y' || compatible' y' x'
+compatible x0               y0                = compatible0 x0 y0 || compatible0 y0 x0
                                                 -- ^ asymmetric reductions
  where
   -- a:&:b ~ (a,b)
-  compatible' (DT JOIN [a,b] ) y = compatible (DT TUP2 [a,b]) y
+  compatible0 (DT JOIN [a,b] ) y = compatible (DT TUP2 [a,b]) y
   -- (a,()) ~ a
-  compatible' (DT TUP2 [a,DT UNIT []]) b = compatible a b
+  compatible0 (DT TUP2 [a,DT UNIT []]) b = compatible a b
   -- (a,b,c,d) ~ (a,(b,c,d))
-  compatible' (DT tup (a0:args)) y | Just n' <- stripPrefix TUP_BASE tup
-                                   , n <- read n'
+  compatible0 (DT tup (a0:args)) y | Just n0 <- stripPrefix TUP_BASE tup
+                                   , n <- read n0
                                    , n>2 =
     let tupN = TUP_BASE <> show (n - 1 :: Int)
     in compatible (DT TUP2 [a0, DT tupN args]) y
 
   -- l := a ~ a
-  compatible' (DT LABEL [_,a]) b = compatible a b
+  compatible0 (DT LABEL [_,a]) b = compatible a b
 
-  compatible' _ _ = False
+  compatible0 _ _ = False
 
 
 -- | Turn a list of fields and their types into an anonymous record.
