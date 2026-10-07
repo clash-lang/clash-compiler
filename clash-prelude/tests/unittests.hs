@@ -13,6 +13,7 @@ import qualified Clash.Tests.Clocks
 import qualified Clash.Tests.Counter
 import qualified Clash.Tests.DerivingDataRepr
 import qualified Clash.Tests.DumpVCD
+import qualified Clash.Tests.SimVCD
 import qualified Clash.Tests.Fixed
 import qualified Clash.Tests.FixedExhaustive
 import qualified Clash.Tests.Index
@@ -48,6 +49,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Counter.tests
   , Clash.Tests.DerivingDataRepr.tests
   , Clash.Tests.DumpVCD.tests
+  , Clash.Tests.SimVCD.tests
   , Clash.Tests.Fixed.tests
   , Clash.Tests.FixedExhaustive.tests
   , Clash.Tests.Index.tests
