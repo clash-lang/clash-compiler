@@ -5,11 +5,11 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Clash.Signal.Simulation.Internal.Vcd (
-  VcdFile,
-  DeclarationCommand, SimulationCommand,
-  Var,
-  ValueChange,
-  Scope, IDCode, VcdTime, TimeUnit,
+  VcdFile(..),
+  DeclarationCommand(..), SimulationCommand(..),
+  Var(..),
+  ValueChange(..),
+  Scope, IDCode, VcdTime, TimeUnit, Value, TimeScale,
   vcd,
   vcdText,
   writeVcd,
@@ -49,7 +49,8 @@ data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand]
 data DeclarationCommand
   = Version String                   -- ^ The (Clash) version used to generate the VCD.
   | Date UTCTime                     -- ^ The timestamp the VCD was created.
-  | TimeScale (Integer,TimeUnit)     -- ^ The unit of the VCD time stamps. Must be 1, 10 or 100 and an appropriate unit.
+  | TimeScale TimeScale              -- ^ The unit of the VCD time stamps.
+                                     -- Must be 1, 10 or 100 and an appropriate unit.
   | VarDec Var                       -- ^ Variable declaration.
   | Scope Scope [DeclarationCommand] -- ^ A closed scope declaration.
   | Comment String                   -- ^ A comment.
@@ -84,6 +85,7 @@ type Scope = String
 type IDCode = String
 type VcdTime = Integer --TODO: check if Int is faster
 type TimeUnit = String
+type TimeScale = (Integer, TimeUnit)
 
 -- | Create a 'Vcd' object from a 'Simulation'.
 vcd ::
@@ -99,24 +101,32 @@ vcd Simulation
       , simTraces = traceMap
       , simTimestamp
       }
-  | absTime start stop < start =
-      Left $ "VCD: stop was " <> show stop <> ", which is earlier than start (" <> show start <> ")."
-  | start < 0 && shiftToZero == False =
-      Left $ "VCD: Start time was " <> show start <> ", but cannot be negative without shifting the start to 0."
-  | null names =
-      Left $ "VCD: No traces found."
-  | (nm:_) <- offensiveNames =
-      Left $ unwords [ "Trace '" ++ nm ++ "' contains"
-                     , "non-printable ASCII characters, which is not"
-                     , "supported by VCD." ]
-  | (nm:_) <- emptyScopes =
-      Left $ unwords [ "Trace '" ++ nm ++ "' contains"
-                     , "empty scope names, which is not"
-                     , "supported by VCD." ]
-  | otherwise =
-      Right $ VcdFile
-        ( headers ++ variables )
-        simulation
+  | absTime start stop < start
+  = Left $
+         "VCD: stop was "
+      <> show stop
+      <> ", which is earlier than start ("
+      <> show start
+      <> ")."
+  | start < 0 && shiftToZero == False
+  = Left $
+         "VCD: Start time was "
+      <> show start
+      <> ", but cannot be negative without shifting the start to 0."
+  | null names
+  = Left "VCD: No traces found."
+  | (nm:_) <- offensiveNames
+  = Left $
+         "Trace '"
+      <> nm
+      <> "' contains non-printable ASCII characters, which is not supported by VCD."
+  | (nm:_) <- emptyScopes
+  = Left $
+         "Trace '"
+      <> nm
+      <> "' contains empty scope names, which is not supported by VCD."
+  | otherwise
+  = Right $ VcdFile (headers ++ variables) simulation
  where
   offensiveNames = filter (any (not . printable)) allNames
   emptyScopes = filter (\nm -> ".." `L.isInfixOf` ('.' : nm <> ".")) allNames
@@ -124,7 +134,8 @@ vcd Simulation
   {--------------------------
     SPLIT TRACES INTO PARTS
   --------------------------}
-  -- (slightly more complex to cut out zero-width traces while keeping them for the signal declarations, so we can add comments)
+  -- (slightly more complex to cut out zero-width traces
+  -- while keeping them for the signal declarations, so we can add comments)
 
   allLabels = concatMap (\s -> map (snoc s) alphabet) ("": labels)
     where alphabet = map chr [33..126]
@@ -176,7 +187,7 @@ vcd Simulation
 
   mkScope :: [String] -> Width -> IDCode -> DeclarationCommand
   mkScope [] _ _ = error "empty signal name"
-  mkScope [varReference] varSize varIDCode = VarDec $ Var{varSize, varIDCode, varReference}
+  mkScope [varReference] varSize varIDCode = VarDec $ Var{..}
   mkScope (n:ns) w l = Scope n [mkScope ns w l]
 
   {--------------------------
@@ -212,8 +223,10 @@ vcd Simulation
     timeScale' t u (u':r) | t>=1000 = timeScale' (t `div` 1000) u' r
                           | otherwise = (t,u)
 
-  timeOffset = if shiftToZero then timeInFS (-start) `div` vcdTimeScaleFS else 0 :: VcdTime
-  -- timeMult = simTimeScaleFS `div` vcdTimeScaleFS :: VcdTime
+  timeOffset =
+    if shiftToZero
+    then timeInFS (-start) `div` vcdTimeScaleFS
+    else 0 :: VcdTime
 
   vClockStart = timeInFS clockStart `div` vcdTimeScaleFS :: VcdTime
   vStart = timeInFS start `div` vcdTimeScaleFS + timeOffset :: VcdTime
@@ -235,7 +248,12 @@ vcd Simulation
 
   -- [(period in VCDTime,([widths))]
   domains :: [(Period,([Width],[IDCode],[[Value]]))]
-  domains = map (\traces -> (fst $ unsafeHead traces, unzip3 $ map (snd) traces)) $ groupWith fst $ zip periods $ zip3 widths labels valuess
+  domains =
+    map
+      (\traces -> (fst $ unsafeHead traces, unzip3 $ map (snd) traces))
+      $ groupWith fst
+      $ zip periods
+      $ zip3 widths labels valuess
 
   unsafeHead (x:_) = x
   unsafeHead [] = error "Cannot take head of empty list"
@@ -248,7 +266,9 @@ vcd Simulation
 
   -- essentially merge sort with nested merging on equal values
   blocks :: [(VcdTime, [ValueChange])]
-  blocks = treeFold zipTimed $ (L.map snd changesPerDomain :: [[(VcdTime,[ValueChange])]])
+  blocks =
+    treeFold zipTimed
+      $ (L.map snd changesPerDomain :: [[(VcdTime,[ValueChange])]])
 
   changes :: [SimulationCommand]
   changes = concatMap (\(t,cs) -> [SimulationTime t, ValueChanges cs]) blocks
@@ -279,7 +299,9 @@ vcd Simulation
       GT -> (tb,    vb) : zipTimed aa bs
 
   -- Find changes in a list of signals with equal period
-  findChanges :: (Period,([Width],[String],[[Value]])) -> ([ValueChange],[(VcdTime,[ValueChange])])
+  findChanges
+    :: (Period,([Width],[String],[[Value]]))
+    -> ([ValueChange],[(VcdTime,[ValueChange])])
   findChanges (period,(widths',labels',valuess')) = (initial', samples')
     where
       clkEdges :: [VcdTime]
@@ -289,7 +311,8 @@ vcd Simulation
 
       -- group by clock cycle and add timestamps (the initial value starts at -inf)
       valuessFrom :: [(VcdTime,[Value])]
-      valuessFrom = zip (-1000000000000:clkEdges) $ L.transpose valuess' --TODO: minBound, but we're using integers :/
+      valuessFrom = zip (-1000000000000:clkEdges) $ L.transpose valuess'
+        --TODO: minBound, but we're using integers, which are unbounded :/
 
       skipStart :: [(VcdTime,[Value])]
       skipStart = map fst $ dropWhile ((<= vStart) . snd) $ zip valuessFrom clkEdges
@@ -337,7 +360,10 @@ writeVcd file sim = do
     IO b
   assertRight = either err pure
    where
-    err a = withFrozenCallStack $ errorIO $ "assertRight: expected a Right value, given " <> show (Left a :: Either a a)
+    err a =
+      withFrozenCallStack
+        $ errorIO
+        $ "assertRight: expected a Right value, given " <> show (Left a :: Either a a)
 
 -- | Render a 'Vcd' object as 'Text'.
 renderVcd ::
@@ -360,7 +386,11 @@ renderDecl = \case
   TimeScale (x,unit) ->
     vcdCommand "timescale" [Text.show x, Text.pack unit]
   VarDec Var{varSize, varIDCode, varReference} ->
-    vcdCommand "var" ["wire", Text.show varSize, Text.pack varIDCode, Text.pack varReference]
+    vcdCommand "var"
+      [ "wire"
+      , Text.show varSize
+      , Text.pack varIDCode
+      , Text.pack varReference ]
   Scope name subs -> Text.unlines $ -- unlines introduces a trailing newline, but oh well
     vcdCommand "scope" ["module", Text.pack name]
     : L.map renderDecl subs

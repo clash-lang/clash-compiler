@@ -21,7 +21,7 @@ import           GHC.Generics          (Generic)
 import           GHC.Natural           (Natural)
 import           GHC.TypeLits          (KnownSymbol, symbolVal, natVal)
 
-import           Clash.Signal          (KnownDomain, Signal, Bundle, Unbundled, bundle, unbundle)
+import Clash.Signal (KnownDomain, Signal, Bundle, Unbundled, bundle, unbundle)
 -- import           Clash.Sized.Internal.BitVector
 --   (BitVector(BV))
 import           Clash.Class.BitPack
@@ -40,13 +40,17 @@ The header looking something like:
 
 {
   "samples": 200,     # number of samples in the file
-  "offset": 0,        # optional; note that with an offset of 0, the first value is the value /before/ the first clock edge
+  "offset": 0,        # optional; note that with an offset of 0, the first value
+                      # is the value /before/ the first clock edge
   "width": 17,        # number of bits
-  "undefined": true,  # whether or not the undefined bits mask is stored; usually true for simulation and false for hardware output
+  "undefined": true,  # whether or not the undefined bits mask is stored;
+                      # usually true for simulation and false for hardware output
   "values": [         # list of "subsignals"; always at least one present
     {
       "name": "a",
-      "type": "A",    # exact type format yet to be determined, but should be easy to combine into other formats, like (named) tuples
+      "type": "A",    # exact type format yet to be determined,
+                      # but should be easy to combine into other formats,
+                      # like (named) tuples
       "width": 12,    # widths must add up
     },
     {
@@ -101,7 +105,8 @@ storeTrace0 (start,stop) signals values = header' <> "\n\0" <> rawValues
 
 -- | Store a single trace as a signal dump.
 storeTrace :: String -> (Int,Int) -> Trace -> ByteString
-storeTrace name samples (ty,_period,width,values) = storeTrace0 samples [SignalDescr{name,width,datatype=ty}] values
+storeTrace name samples (ty,_period,width,values) =
+  storeTrace0 samples [SignalDescr{name,width,datatype=ty}] values
 
 -- | Store multiple traces in a single binary file.
 -- All traces must have the same clock period.
@@ -110,12 +115,15 @@ storeTraces samples traces = do
   let same (a:r@(b:_)) = a==b && (same r)
       same _ = True
   if same (map (\(_,(_,_,p,_)) -> p) traces)
-    then Right ()
-    else Left "Attempting to store multiple traces with different periods in one signal dump file."
+  then Right ()
+  else Left
+    "Attempting to store multiple traces with different periods in one signal dump file."
 
   let meta = map (\(name,(ty,_,width,_)) -> SignalDescr{name, width, datatype=ty}) traces
       widths = map (\(_,(_,_,w,_)) -> w) traces
-      ccat vs = foldl (\(v,m) (w,(v',m')) -> ((v `shiftL` w).|.v', (m `shiftL` w).|.m')) (0,0) (zip widths vs)
+      ccat vs = foldl
+        (\(v,m) (w,(v',m')) -> ((v `shiftL` w).|.v', (m `shiftL` w).|.m')) (0,0)
+        (zip widths vs)
       values = map ccat $ transpose $ map (\(_,(_,_,_,vs)) -> vs) traces -- combine values TODO: make more efficient
 
   return $ storeTrace0 samples meta values
@@ -178,7 +186,8 @@ storeSignals samples sigs = storeTrace0 samples signals values
   signals = storeSignalMeta @a
 
 -- | Helper class to get signal information from anonymous records.
--- Extending could allow tuples to be stored, though the subsignals would be nameless (enumerated).
+-- Extending could allow tuples to be stored,
+-- though the subsignals would be nameless (enumerated).
 class StoreSignals a where
   storeSignalMeta :: [SignalDescr]
 instance (KnownSymbol x, BitPack a, Typeable a) => StoreSignals (x := Signal dom a) where
@@ -288,7 +297,12 @@ load name bs sim = do
 
 -- | Load multiple traces from a single binary.
 -- The traces will be loaded into a single domain.
-loads :: forall dom. KnownDomain dom => ByteString -> Simulation -> Either String Simulation
+loads
+  :: forall dom
+   . KnownDomain dom
+  => ByteString
+  -> Simulation
+  -> Either String Simulation
 loads bs sim = do
   traces <- loadTraces (clockPeriodTime @dom) bs
   foldM (\s (n,t) -> addTrace n t s) sim traces
