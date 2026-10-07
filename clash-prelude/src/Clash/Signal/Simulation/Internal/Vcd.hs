@@ -18,23 +18,22 @@ module Clash.Signal.Simulation.Internal.Vcd (
   iso8601Format,
 ) where
 
-import           Data.Char             (chr, ord)
-import           Control.Exception.Extra
-  (errorIO)
-import           Data.Bits             (testBit)
-import qualified Data.List             as L
-import           Data.List.Extra       (snoc)
-import           Data.List.Split       (splitOn)
-import qualified Data.Map              as M
-import           Data.Maybe            (fromMaybe)
-import           Data.Text             (Text)
-import qualified Data.Text             as Text
+import Control.Exception.Extra (errorIO)
+import Data.Char (chr, ord)
+import Data.Bits (testBit)
+import qualified Data.List as L
+import Data.List.Extra (snoc)
+import Data.List.Split (splitOn)
+import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as Text
+import Data.Text (Text)
 import qualified Data.Text.IO
+import Data.Time.Clock (UTCTime)
+import Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified Data.Version
-import           Data.Time.Clock       (UTCTime)
-import           Data.Time.Format      (formatTime, defaultTimeLocale)
-import           GHC.Exts              (groupWith)
-import           GHC.Stack             (HasCallStack, withFrozenCallStack)
+import GHC.Exts (groupWith)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 
 import           Clash.Signal.Simulation
 import           Clash.Time            (timeInFS, absTime)

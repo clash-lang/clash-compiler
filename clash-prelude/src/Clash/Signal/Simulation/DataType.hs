@@ -42,11 +42,11 @@ Nil = ()
 This cannot be done through a coercible class, as the values exist in runtime only.
 
 -}
-import Type.Reflection
-import GHC.Generics
 import Data.Aeson
-import Data.Typeable
 import Data.List (stripPrefix)
+import Data.Typeable
+import GHC.Generics
+import Type.Reflection
 
 
 data DataType = DT String [DataType] deriving (Show,Generic,ToJSON,FromJSON)
