@@ -107,9 +107,9 @@ instance Default GlobalData where
       }
 
 
-{----------------------------------------
-SIMULATION
-----------------------------------------}
+----------------------------------------------
+--                SIMULATION                --
+----------------------------------------------
 
 -- | Create an empty simulation from a configuration.
 emptySim :: Config -> IO Simulation
@@ -273,7 +273,7 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
         pure ()
 
       let found0 = newFound <> found
-      if s `elem` (if firstTime then foun$(1)0 else newFound) then do
+      if s `elem` (if firstTime then found0 else newFound) then do
         lookFor0 xss ss found0 True
       else do
         evaluate $ rnfX x
@@ -281,7 +281,7 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
 
 
 
--- Change when the 'Simulation' starts and stops.
+-- | Change when the 'Simulation' starts and stops.
 setStartStop ::
   Time ->
   AtOrForTime ->
@@ -304,9 +304,10 @@ clockWave ::
   ClockWave
 clockWave name = (name, clockPeriodTime @dom)
 
-{----------------------------------------
-TRACING
-----------------------------------------}
+
+----------------------------------------------
+--                 TRACING                  --
+----------------------------------------------
 
 -- | Put a trace in the global data.
 registerTrace :: String -> Trace -> GlobalData -> Either String GlobalData
@@ -443,9 +444,9 @@ clockTrace t
   unsafeToTup (BV mask value) = (mask, value)
 
 
-{----------------------------------------
-TRACES
-----------------------------------------}
+----------------------------------------------
+--                 TRACES                   --
+----------------------------------------------
 
 -- | Create a 'Trace' from a 'Signal'.
 toTrace ::
@@ -504,7 +505,11 @@ fetch ::
 fetch name sim = fetchTrace name sim >>= fromTrace
 
 
-{---REST--}
+----------------------------------------------
+--                   MISC                   --
+----------------------------------------------
+
+-- | Get the name of a domain.
 domainName ::
   forall dom.
   KnownDomain dom =>
@@ -513,6 +518,8 @@ domainName =
   case knownDomain @dom of
     SDomainConfiguration{sName} -> symbolVal sName
 
+-- TODO: fix this, probably introduces bugs when function names include $
+-- | Internal: function removing $ from names
 replaceDollar :: String -> String -> String
 replaceDollar _ "" = ""
 replaceDollar n ('$':rest) = n <> replaceDollar n rest

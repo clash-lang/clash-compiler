@@ -49,7 +49,10 @@ import Clash.XException (NFDataX)
 
 import Data.Internal.TH.AnonRecords (deriveAsTuple)
 
--- RECORD COMPONENTS
+
+----------------------------------------------
+--             RECORD COMPONENTS            --
+----------------------------------------------
 
 -- | Anonymous record field.
 -- See '(:=)' for constructing fields with explicit field labels
@@ -70,7 +73,9 @@ data (:&:) a b = a :&: b
   deriving (Show, Generic, BitPack, NFDataX, Typeable)
 
 
--- CONSTRUCTOR PATTERN
+----------------------------------------------
+--            CONSTRUCTOR PATTERN           --
+----------------------------------------------
 
 -- | A proxy for field labels, to be used as labels with '(:=)'.
 -- Because the 'IsLabel' instance, you can write @#field@
@@ -98,7 +103,9 @@ instance IsLabel f (FieldLabelProxy f) where
   fromLabel = FieldLabelProxy
 
 
--- FIELD ACCESS
+----------------------------------------------
+--              FIELD ACCESS                --
+----------------------------------------------
 
 -- | Type-level boolean indicating whether a field exists in a record.
 type family HasField f a where
@@ -155,7 +162,9 @@ instance (AccessField f b, HasField f a ~ False) => AccessField0 f (a:&:b) False
   setField0 y (a:&:b) = a :&: setField @f y b
 
 
--- FIELD ADDITION
+----------------------------------------------
+--              FIELD ADDITION              --
+----------------------------------------------
 
 -- | Returns the record type after a field has been inserted.
 type family WithField (f::Symbol) a r where
@@ -204,7 +213,9 @@ instance
   insertField0 x (l :&: r) = l :&: insertField @f @a @r x r
 
 
--- FIELD REMOVAL
+----------------------------------------------
+--              FIELD REMOVAL               --
+----------------------------------------------
 
 type family WithoutField (f::Symbol) r where
   WithoutField f (f:=a) = ()
@@ -250,14 +261,12 @@ instance
   where
   deleteField0 (l :&: r) = l :&: deleteField @f r
 
-
--- SHOW
+----------------------------------------------
+--                INSTANCES                 --
+----------------------------------------------
 
 instance (KnownSymbol x, Show a) => Show (x := a) where
   show (L a) = "#" <> (symbolVal $ Proxy @x) <> ":=" <> show a
-
-
--- BUNDLE
 
 instance (Bundle a, Bundle b) => Bundle (a :&: b) where
   type Unbundled dom (a :&: b) = (Unbundled dom a) :&: (Unbundled dom b)
@@ -273,8 +282,9 @@ instance Bundle (x := a) where
   bundle (L sig) = L <$> sig
   unbundle sig = L $ (\(L x) -> x) <$> sig
 
-
--- TUPLES
+----------------------------------------------
+--             TUPLE CONVERSION             --
+----------------------------------------------
 
 {- | Class for converting between records and tuples.
 
