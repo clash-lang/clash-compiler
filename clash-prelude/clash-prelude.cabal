@@ -460,6 +460,7 @@ test-suite unittests
                  Clash.Tests.Clocks
                  Clash.Tests.Counter
                  Clash.Tests.DumpVCD
+                 Clash.Tests.SimVCD
                  Clash.Tests.NumConvert
                  Clash.Tests.DerivingDataRepr
                  Clash.Tests.DerivingDataReprTypes
