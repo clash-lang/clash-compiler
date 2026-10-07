@@ -34,7 +34,7 @@ module Clash.Normalize.Transformations.Inline
 
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
-import Control.Monad ((>=>), filterM)
+import Control.Monad ((>=>))
 import Control.Monad.Extra (anyM)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Writer (lift,listen)
