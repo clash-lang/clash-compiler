@@ -87,17 +87,20 @@ compatible (DT a     ra   ) (DT b     rb    ) | a == b
                                               = and $ zipWith compatible ra rb
 compatible (DT LABEL _    ) (DT LABEL _     ) = False -- cut off before removing labels
 compatible (DT TUP2 [a,b] ) (DT TUP2 [c,d]  ) = compatible a c && compatible b d
-compatible x'               y'                = compatible' x' y' || compatible' y' x' -- asymmetric reductions
+compatible x'               y'                = compatible' x' y' || compatible' y' x'
+                                                -- ^ asymmetric reductions
  where
   -- a:&:b ~ (a,b)
   compatible' (DT JOIN [a,b] ) y = compatible (DT TUP2 [a,b]) y
   -- (a,()) ~ a
   compatible' (DT TUP2 [a,DT UNIT []]) b = compatible a b
   -- (a,b,c,d) ~ (a,(b,c,d))
-  compatible' (DT tup (a0:args)) y | Just n' <- stripPrefix TUP_BASE tup, n <- read n', n>2 =
+  compatible' (DT tup (a0:args)) y | Just n' <- stripPrefix TUP_BASE tup
+                                   , n <- read n'
+                                   , n>2 =
     let tupN = TUP_BASE <> show (n - 1 :: Int)
     in compatible (DT TUP2 [a0, DT tupN args]) y
-  
+
   -- l := a ~ a
   compatible' (DT LABEL [_,a]) b = compatible a b
 
@@ -111,7 +114,8 @@ compatible x'               y'                = compatible' x' y' || compatible'
 constructRecord :: [(String,DataType)] -> DataType
 constructRecord [] = DT UNIT []
 constructRecord [(field,ty)] = constructLabel field ty
-constructRecord ((field,ty):rest) = DT JOIN [constructLabel field ty, constructRecord rest]
+constructRecord ((field,ty):rest) =
+  DT JOIN [constructLabel field ty, constructRecord rest]
 
 -- | Create an anonymous record label from the type.
 constructLabel :: String -> DataType -> DataType

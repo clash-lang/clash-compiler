@@ -122,7 +122,10 @@ instance AccessField f (f := a) where
   getField (L x) = x
   setField x _ = L x
 
-instance (AccessField f (f:=b), FieldType f (f:=b) ~ a) => GHC.Records.HasField f (f:=b) a where
+instance
+  ( AccessField f (f:=b)
+  , FieldType f (f:=b) ~ a )
+  => GHC.Records.HasField f (f:=b) a where
   getField = getField @f @(f:=b)
 
 instance (AccessField' f (a:&:b) (HasField f a)) => AccessField f (a:&:b) where
@@ -130,7 +133,10 @@ instance (AccessField' f (a:&:b) (HasField f a)) => AccessField f (a:&:b) where
   getField   ab = getField' @f @(a:&:b) @(HasField f a)   ab
   setField x ab = setField' @f @(a:&:b) @(HasField f a) x ab
 
-instance (AccessField f (l:&:r), FieldType f (l:&:r) ~ a) => GHC.Records.HasField f (l:&:r) a where
+instance
+  ( AccessField f (l:&:r)
+  , FieldType f (l:&:r) ~ a )
+  => GHC.Records.HasField f (l:&:r) a where
   getField = getField @f @(l:&:r)
 
 class AccessField' f a left where
@@ -179,13 +185,22 @@ class InsertField' f a r (eq::Bool) where
 instance (WithField f a (f2:=b) ~ (f:=a)) => InsertField' f a (f2:=b) True where
   insertField' x _ = L x
 
-instance (WithField f a (f2:=b) ~ (f2:=b :&: f:=a)) => InsertField' f a (f2:=b) False where
+instance
+  (WithField f a (f2:=b) ~ (f2:=b :&: f:=a)) =>
+  InsertField' f a (f2:=b) False
+  where
   insertField' x r = r :&: L x
 
-instance (WithField f a (l :&: r) ~ (f:=a :&: r)) => InsertField' f a (l :&: r) True where
+instance
+  (WithField f a (l :&: r) ~ (f:=a :&: r)) =>
+  InsertField' f a (l :&: r) True
+  where
   insertField' x (_ :&: r) = L x :&: r
 
-instance (InsertField f a r, WithField f a (l :&: r) ~ (l :&: WithField f a r)) => InsertField' f a (l :&: r) False where
+instance
+  (InsertField f a r, WithField f a (l :&: r) ~ (l :&: WithField f a r)) =>
+  InsertField' f a (l :&: r) False
+  where
   insertField' x (l :&: r) = l :&: insertField @f @a @r x r
 
 
@@ -205,22 +220,34 @@ class DeleteField (f::Symbol) r where
 instance DeleteField f (f:=b) where
   deleteField _ = ()
 
-instance (DeleteField' f (f2:=b :&: f3:=b) (f==f2) (f==f3)) => DeleteField f (f2:=b :&: f3:=b) where
+instance
+  ( DeleteField' f (f2:=b :&: f3:=b) (f==f2) (f==f3) )
+  => DeleteField f (f2:=b :&: f3:=b) where
   deleteField = deleteField' @f @_ @(f==f2) @(f==f3)
 
-instance (DeleteField' f (f2:=b :&: r :&: rr) (f==f2) False) => DeleteField f (f2:=b :&: r :&: rr) where
+instance
+  ( DeleteField' f (f2:=b :&: r :&: rr) (f==f2) False )
+  => DeleteField f (f2:=b :&: r :&: rr) where
   deleteField = deleteField' @f @_ @(f==f2) @False
 
 class DeleteField' (f::Symbol) r (eqL::Bool) (eqR::Bool) where
   deleteField' :: r -> WithoutField f r
 
-instance (WithoutField f (l :&: r) ~ r) => DeleteField' f (l :&: r) True eqR where
+instance
+  ( WithoutField f (l :&: r) ~ r )
+  => DeleteField' f (l :&: r) True eqR where
   deleteField' (_ :&: r) = r
 
-instance (WithoutField f (l :&: r) ~ l) => DeleteField' f (l :&: r) False True where
+instance
+  (WithoutField f (l :&: r) ~ l) =>
+  DeleteField' f (l :&: r) False True
+  where
   deleteField' (l :&: _) = l
 
-instance (DeleteField f r, WithoutField f (l :&: r) ~ (l :&: WithoutField f r)) => DeleteField' f (l :&: r) False False where
+instance
+  (DeleteField f r, WithoutField f (l :&: r) ~ (l :&: WithoutField f r)) =>
+  DeleteField' f (l :&: r) False False
+  where
   deleteField' (l :&: r) = l :&: deleteField @f r
 
 

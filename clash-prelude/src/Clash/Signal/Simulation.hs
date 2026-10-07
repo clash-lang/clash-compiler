@@ -10,38 +10,36 @@
 
 module Clash.Signal.Simulation where
 
-import           Control.Exception     (evaluate)
-import           Control.Monad         (foldM)
-import           Data.Bifunctor        (second)
-import           Data.ByteString.Lazy  (ByteString)
-import           Data.Default          (Default(..))
-import           Data.Either.Extra     (maybeToEither)
-import           Data.IORef
-  (IORef, atomicModifyIORef', newIORef, readIORef)
-import qualified Data.List             as L
-import qualified Data.Map              as M
-import           Data.Time.Clock       (UTCTime, getCurrentTime)
-import           Data.Typeable         (Typeable, Proxy(..))
+import Control.Exception (evaluate)
+import Control.Monad (foldM)
+import Data.Bifunctor (second)
+import Data.ByteString.Lazy (ByteString)
+import Data.Default (Default(..))
+import Data.Either.Extra (maybeToEither)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
+import qualified Data.List as L
+import qualified Data.Map as M
+import Data.Time.Clock (UTCTime, getCurrentTime)
+import Data.Typeable (Typeable, Proxy(..))
 import qualified Debug.Trace
-import           GHC.Natural           (Natural)
-import           GHC.TypeLits          (KnownNat, natVal, symbolVal)
-import           System.IO             (hPutStrLn, stderr)
-import           System.IO.Unsafe      (unsafePerformIO)
+import GHC.Natural (Natural)
+import GHC.TypeLits (KnownNat, natVal, symbolVal)
+import System.IO (hPutStrLn, stderr)
+import System.IO.Unsafe (unsafePerformIO)
 
-import           Clash.Class.BitPack   (BitPack(..), BitSize)
-import           Clash.Explicit.Prelude.Safe (undefined)
-import           Clash.XException      (NFDataX(rnfX), deepseqX)
-import           Clash.Signal
+import Clash.Class.BitPack   (BitPack(..), BitSize)
+import Clash.Explicit.Prelude.Safe (undefined)
+import Clash.XException      (NFDataX(rnfX), deepseqX)
+import Clash.Signal
   (KnownDomain, SDomainConfiguration(..), knownDomain,
   Signal, sample, fromList,
   Clock, Reset, Enable, fromEnable, unsafeFromReset,
   unbundle)
-import           Clash.Sized.Internal.BitVector
-  (BitVector(BV))
-import           Clash.Sized.Vector    (Vec, toList)
-import           Clash.Time            (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
+import Clash.Sized.Internal.BitVector (BitVector(BV))
+import Clash.Sized.Vector    (Vec, toList)
+import Clash.Time (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
 
-import           Clash.Signal.Simulation.DataType (DataType, compatible, typeRep)
+import Clash.Signal.Simulation.DataType (DataType, compatible, typeRep)
 
 --data DataType = DT String [DataType] deriving (Show)
 -- type DataType = ByteString
@@ -58,7 +56,8 @@ type Traceable a = (NFDataX a, BitPack a, Typeable a)
 -- the clock wave. The clock will have 50% duty cycle.
 type ClockWave = (String, Time)
 
--- | Object containing the simulation configuration and the traces captured during simulation.
+-- | Object containing the simulation configuration
+-- and the traces captured during simulation.
 data Simulation = Simulation
   { simConfig :: Config
   , simTraces :: TraceMap
@@ -172,10 +171,11 @@ simulate0 ::
   [String] ->
   Signal dom a ->
   IO (Either String Simulation)
-simulate0 ref simConfig@Config{start,stop,clockStart,statusMsgs,warnZeroWidth} clockWaves signals sig = do
+simulate0 ref simConfig@Config{..} clockWaves signals sig = do
   simTimestamp <- getCurrentTime
 
-  firstRun <- atomicModifyIORef' ref (\glob@GlobalData{globFirstRun} -> (glob{globFirstRun=False},globFirstRun))
+  firstRun <- atomicModifyIORef' ref
+    (\glob@GlobalData{globFirstRun} -> (glob{globFirstRun=False},globFirstRun))
 
   if not firstRun && statusMsgs then
     hPutStrLn stderr "Warning: `simulate` can only be safely called once"
@@ -191,15 +191,16 @@ simulate0 ref simConfig@Config{start,stop,clockStart,statusMsgs,warnZeroWidth} c
   return $ evalResult >>= const (Right Simulation{simConfig, simTraces, simTimestamp})
 
 simulationTimeRangeToCycles :: Config -> Time -> (Int,Int)
-simulationTimeRangeToCycles Config{start,stop,clockStart} period = (fromInteger cStart,fromInteger cStop)
+simulationTimeRangeToCycles Config{start,stop,clockStart} period =
+  (fromInteger cStart, fromInteger cStop)
  where
     cStart = max 0
       $ timeInFS (start - clockStart)
       `div` timeInFS period
       + 1 -- t=0 for sample 1
     cStop = max 0
-      $ ((timeInFS $ absTime start stop - clockStart) - 1) -- -1 to not include a cycle that starts at <stop>
-      `div` timeInFS period
+      $ ((timeInFS $ absTime start stop - clockStart) - 1) -- -1 to not include a cycle
+      `div` timeInFS period                                -- that starts at <stop>
       + 2 -- add 1 for exclusive range
 
 
@@ -242,10 +243,12 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
         Debug.Trace.trace $ show ((20*k) `div` n * 5) ++ "%"
       else id
 
-  -- Reset the found and messages fields of the global data, returning their previous values.
+  -- Reset the found and messages fields of the global data,
+  -- returning their previous values.
   -- Meant for @atomicModifyIORef'@.
   extractFoundAndMsgs :: GlobalData -> (GlobalData, ([String],[String]))
-  extractFoundAndMsgs glob@GlobalData{globFound,globMessages} = (glob{globFound = [], globMessages = []}, (globFound,globMessages))
+  extractFoundAndMsgs glob@GlobalData{globFound,globMessages} =
+    (glob{globFound = [], globMessages = []}, (globFound,globMessages))
 
   -- Evaluate a value and print messages that have popped up.
   printFound :: a -> IO ()
@@ -333,7 +336,9 @@ trace ::
   String ->
   Signal dom a ->
   Signal dom a
-trace name sig = unsafePerformIO $ atomicModifyIORef' globalDataRef $ \g -> (trace0 @dom name (toTrace sig) g, sig)
+trace name sig =
+  unsafePerformIO
+    $ atomicModifyIORef' globalDataRef (\g -> (trace0 @dom name (toTrace sig) g, sig))
 {-# OPAQUE trace #-}
 
 trace0 ::
@@ -343,7 +348,11 @@ trace0 ::
   Trace ->
   GlobalData ->
   GlobalData
-trace0 name trc = right . registerTrace fullName trc . registerFound found . registerMsg ("Found signal " <> fullName)
+trace0 name trc =
+  right
+    . registerTrace fullName trc
+    . registerFound found
+    . registerMsg ("Found signal " <> fullName)
  where
   fullName = replaceDollar (domainName @dom) name
   found = if fullName == name then [name] else [name, fullName]
@@ -360,7 +369,9 @@ traceVec ::
   String ->
   Signal dom (Vec n a) ->
   Signal dom (Vec n a)
-traceVec name sig = unsafePerformIO $ atomicModifyIORef' globalDataRef $ \g -> (traceVec0 name sig g,sig)
+traceVec name sig =
+  unsafePerformIO
+    $ atomicModifyIORef' globalDataRef (\g -> (traceVec0 name sig g,sig))
 {-# OPAQUE traceVec #-}
 
 traceVec0 ::
@@ -372,7 +383,10 @@ traceVec0 ::
   Signal dom (Vec n a) ->
   GlobalData ->
   GlobalData
-traceVec0 name sig = registerTraces . registerFound found . registerMsg ("Found vector signal " <> fullName)
+traceVec0 name sig =
+  registerTraces
+    . registerFound found
+    . registerMsg ("Found vector signal " <> fullName)
  where
   traces = toList $ toTrace <$> unbundle sig
   fullName = replaceDollar (domainName @dom) name
@@ -413,7 +427,8 @@ traceClock ::
   String ->
   Clock dom ->
   Clock dom
-traceClock name clk = unsafePerformIO (atomicModifyIORef' globalDataRef ((,clk) . trace0 @dom name trc))
+traceClock name clk =
+  unsafePerformIO (atomicModifyIORef' globalDataRef ((,clk) . trace0 @dom name trc))
  where
   trc = clockTrace (clockPeriodTime @dom)
 {-# OPAQUE traceClock #-}
