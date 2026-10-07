@@ -17,7 +17,8 @@ import Data.Default (Default(..))
 import Data.Either.Extra (maybeToEither)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import qualified Data.List as L
-import qualified Data.Map as M
+import qualified Data.Map as Map
+import Data.Map (Map)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import Data.Typeable (Typeable, Proxy(..))
 import qualified Debug.Trace
@@ -44,7 +45,7 @@ type Period = Time
 type Width = Int
 type Value = (Natural, Natural) -- (mask, value)
 type Trace = (DataType,Period,Width,[Value])
-type TraceMap = M.Map String Trace
+type TraceMap = Map String Trace
 
 type Traceable a = (NFDataX a, BitPack a, Typeable a)
 
@@ -99,7 +100,7 @@ instance Default Config where
 instance Default GlobalData where
   def =
     GlobalData
-      { globTraces = M.empty
+      { globTraces = Map.empty
       , globFound = []
       , globMessages = []
       , globFirstRun = True
@@ -116,7 +117,7 @@ emptySim config = do
   simTimestamp <- getCurrentTime
   return Simulation
     { simConfig = config
-    , simTraces = M.empty
+    , simTraces = Map.empty
     , simTimestamp
     }
 
@@ -183,7 +184,7 @@ simulate0 ref simConfig@Config{..} clockWaves signals sig = do
 
   -- create Simulation
   GlobalData{globTraces} <- readIORef ref
-  let simTraces = M.union (M.fromList $ L.map (second clockTrace) clockWaves) globTraces
+  let simTraces = Map.union (Map.fromList $ L.map (second clockTrace) clockWaves) globTraces
   return $ evalResult >>= const (Right Simulation{simConfig, simTraces, simTimestamp})
 
 simulationTimeRangeToCycles :: Config -> Time -> (Int,Int)
@@ -310,10 +311,10 @@ TRACING
 -- | Put a trace in the global data.
 registerTrace :: String -> Trace -> GlobalData -> Either String GlobalData
 registerTrace name trc glob@GlobalData{globTraces} =
-  if M.member name globTraces then
+  if Map.member name globTraces then
     Left ("Trace " <> name <> " already exists")
   else
-    Right glob{globTraces = M.insert name trc globTraces}
+    Right glob{globTraces = Map.insert name trc globTraces}
 
 -- | Mark a signal/signals as found.
 registerFound :: [String] -> GlobalData -> GlobalData
@@ -479,10 +480,10 @@ addTrace ::
   Simulation ->
   Either String Simulation
 addTrace name trc sim@Simulation{simTraces} =
-  if M.member name simTraces then
+  if Map.member name simTraces then
     Left ("Trace " <> name <> " already exists")
   else
-    Right sim{simTraces = M.insert name trc simTraces}
+    Right sim{simTraces = Map.insert name trc simTraces}
 
 -- | Retrieve a captured 'Trace'.
 fetchTrace ::
@@ -490,7 +491,7 @@ fetchTrace ::
   Simulation ->
   Either String Trace
 fetchTrace name Simulation{simTraces} =
-  maybeToEither ("Trace " <> name <> " not found") $ M.lookup name simTraces
+  maybeToEither ("Trace " <> name <> " not found") $ Map.lookup name simTraces
 
 -- | Retrieve a 'Signal' from the captured traces.
 fetch ::
