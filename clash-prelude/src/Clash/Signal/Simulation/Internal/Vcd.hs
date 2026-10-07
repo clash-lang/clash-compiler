@@ -130,12 +130,12 @@ vcd Simulation
   offensiveNames = filter (any (not . printable)) allNames
   emptyScopes = filter (\nm -> ".." `L.isInfixOf` ('.' : nm <> ".")) allNames
 
-  {--------------------------
-    SPLIT TRACES INTO PARTS
-  --------------------------}
-  -- (slightly more complex to cut out zero-width traces
-  -- while keeping them for the signal declarations, so we can add comments)
+  ----------------------------------------------
+  --         SPLIT TRACES INTO PARTS          --
+  ----------------------------------------------
 
+  -- (slightly more complex so we can cut out zero-width traces
+  -- while keeping them for the signal declarations, so we can add comments)
   allLabels = concatMap (\s -> map (snoc s) alphabet) ("": labels)
     where alphabet = map chr [33..126]
 
@@ -147,9 +147,9 @@ vcd Simulation
   (labels,names,periods,widths,valuess) = L.unzip5
     $ L.map (\(l,(n,(_t,p,w,vs))) -> (l,n,p,w,vs)) nonUnitTraces
 
-  {--------------------------
-    VCD FILE CONSTRUCTION
-  --------------------------}
+  ----------------------------------------------
+  --          VCD FILE CONSTRUCTION           --
+  ----------------------------------------------
 
   headers =
     [ Date simTimestamp
@@ -164,9 +164,9 @@ vcd Simulation
     <> changes
     <> [SimulationTime vStop]
 
-  {--------------------------
-    SIGNAL DECLARATIONS
-  --------------------------}
+  ----------------------------------------------
+  --           SIGNAL DECLARATIONS            --
+  ----------------------------------------------
 
   variables = mergeScopes varScopes []
    where
@@ -189,9 +189,9 @@ vcd Simulation
   mkScope [varReference] varSize varIDCode = VarDec $ Var{..}
   mkScope (n:ns) w l = Scope n [mkScope ns w l]
 
-  {--------------------------
-    TIME UNITS
-  --------------------------}
+  ----------------------------------------------
+  --               TIME UNITS                 --
+  ----------------------------------------------
 
   {-
 
@@ -233,9 +233,9 @@ vcd Simulation
 
   -- simTimeToVcd x = x*timeMult + timeOffset + vClockStart
 
-  {--------------------------
-    SIGNAL VALUES
-  --------------------------}
+  ----------------------------------------------
+  --              SIGNAL VALUES               --
+  ----------------------------------------------
 
   {-
   - group signals by period
