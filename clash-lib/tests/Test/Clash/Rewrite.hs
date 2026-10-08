@@ -111,6 +111,7 @@ instance Default NormalizeState where
     , _recursiveComponents=emptyVarEnv
     , _normalizationStrategy=normalization
     , _constantPropagationStrategy=constantPropagation
+    , _workFreeAppCache=HashMap.empty
     }
 
 instance Default InScopeSet where
