@@ -12,6 +12,9 @@ import Language.Haskell.TH
 
 -- | Derive 'Data.AnonRecord.AsTuple' implementations for tuples in the specified range.
 deriveAsTuple :: Int -> Int -> DecsQ
+deriveAsTuple minSize _
+  | minSize < 2
+  = error "Cannot derive AsTuple for tuples of size 1 or smaller"
 deriveAsTuple minSize maxSize = do
   let asTuple = ConT $ mkName "AsTuple"
       tupledT = ConT $ mkName "Tupled"
@@ -25,15 +28,15 @@ deriveAsTuple minSize maxSize = do
 
       mkRecordT [(f,a)] = AppT (AppT fieldT f) a
       mkRecordT (a:b)   = AppT (AppT prodT $ mkRecordT [a]) $ mkRecordT b
-      mkRecordT []      = error "cannot construct empty record"
+      mkRecordT []      = error "(unreachable) cannot construct empty record"
 
       mkRecordE [a]     = AppE fieldE a
       mkRecordE (a:b)   = AppE (AppE prodE $ mkRecordE [a]) $ mkRecordE b
-      mkRecordE []      = error "cannot construct empty record"
+      mkRecordE []      = error "(unreachable) cannot construct empty record"
 
       mkRecordP [a]     = ConP fieldN [] [a]
       mkRecordP (a:b)   = ConP prodN [] [mkRecordP [a], mkRecordP b]
-      mkRecordP []      = error "cannot construct empty record"
+      mkRecordP []      = error "(unreachable) cannot construct empty record"
 
   fieldNames <- replicateM maxSize (newName "f")
   typeNames  <- replicateM maxSize (newName "a")
