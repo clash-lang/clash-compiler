@@ -1,0 +1,32 @@
+name: Benchmark links
+# Keeps one comment on each pull request with the "performance" label, with
+# links to the benchmark site. See .ci/benchmark_comment.py.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled]
+
+permissions: {}
+
+# Runs for one pull request edit the same comment, so they must not overlap.
+# A run that waits here may be replaced by a newer one; the newer one still
+# picks up the replaced push through the "before" commit of its event.
+concurrency:
+  group: benchmark-comment-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  comment:
+    if: contains(github.event.pull_request.labels.*.name, 'performance')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: .ci/benchmark_comment.py
+          sparse-checkout-cone-mode: false
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .ci/benchmark_comment.py
