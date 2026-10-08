@@ -174,9 +174,10 @@ simulate0 ref simConfig@Config{..} clockWaves signals sig = do
   firstRun <- atomicModifyIORef' ref
     (\glob@GlobalData{globFirstRun} -> (glob{globFirstRun=False},globFirstRun))
 
-  if not firstRun && statusMsgs then
+  if not firstRun && statusMsgs then do
     hPutStrLn stderr "Warning: `simulate` can only be safely called once"
-  else pure ()
+  else do
+    pure ()
 
   -- evaluate signal
   let (cStart,cStop) = simulationTimeRangeToCycles simConfig (clockPeriodTime @dom)
@@ -238,7 +239,8 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
     go k =
       if (20*k `div` n) /= (20*(k-1) `div` n) then
         Debug.Trace.trace $ show ((20*k) `div` n * 5) ++ "%"
-      else id
+      else
+        id
 
   -- Reset the found and messages fields of the global data,
   -- returning their previous values.
@@ -267,9 +269,9 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
     lookFor0 xss@(x:xs) sss@(s:ss) found firstTime = do
       (newFound,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
 
-      if statusMsgs then
+      if statusMsgs then do
         mapM_ (hPutStrLn stderr) newMsgs
-      else
+      else do
         pure ()
 
       let found0 = newFound <> found
@@ -354,6 +356,7 @@ trace0 name trc =
  where
   fullName = replaceDollar (domainName @dom) name
   found = if fullName == name then [name] else [name, fullName]
+
   right (Right x) = x
   right (Left e) = error e
 {-# OPAQUE trace0 #-}
@@ -392,6 +395,7 @@ traceVec0 name sig =
   fullNames = map (\i -> fullName <> "." <> show i) [0..length traces-1]
   found = if fullName == name then name:names else [name, fullName]<>names<>fullNames
   registerTraces g = right $ foldM (flip ($)) g $ zipWith registerTrace fullNames traces
+
   right (Right x) = x
   right (Left e) = error e
 {-# OPAQUE traceVec0 #-}

@@ -130,9 +130,7 @@ vcd Simulation
   offensiveNames = filter (any (not . printable)) allNames
   emptyScopes = filter (\nm -> ".." `L.isInfixOf` ('.' : nm <> ".")) allNames
 
-  ----------------------------------------------
-  --         SPLIT TRACES INTO PARTS          --
-  ----------------------------------------------
+  ----------- SPLIT TRACES INTO PARTS -----------
 
   -- (slightly more complex so we can cut out zero-width traces
   -- while keeping them for the signal declarations, so we can add comments)
@@ -147,9 +145,7 @@ vcd Simulation
   (labels,names,periods,widths,valuess) = L.unzip5
     $ L.map (\(l,(n,(_t,p,w,vs))) -> (l,n,p,w,vs)) nonUnitTraces
 
-  ----------------------------------------------
-  --          VCD FILE CONSTRUCTION           --
-  ----------------------------------------------
+  ----------- VCD FILE CONSTRUCTION ------------
 
   headers =
     [ Date simTimestamp
@@ -164,9 +160,7 @@ vcd Simulation
     <> changes
     <> [SimulationTime vStop]
 
-  ----------------------------------------------
-  --           SIGNAL DECLARATIONS            --
-  ----------------------------------------------
+  ------------ SIGNAL DECLARATIONS -------------
 
   variables = mergeScopes varScopes []
    where
@@ -189,9 +183,7 @@ vcd Simulation
   mkScope [varReference] varSize varIDCode = VarDec $ Var{..}
   mkScope (n:ns) w l = Scope n [mkScope ns w l]
 
-  ----------------------------------------------
-  --               TIME UNITS                 --
-  ----------------------------------------------
+  ----------------- TIME UNITS -----------------
 
   {-
 
@@ -223,19 +215,17 @@ vcd Simulation
                           | otherwise = (t,u)
 
   timeOffset =
-    if shiftToZero
-    then timeInFS (-start) `div` vcdTimeScaleFS
-    else 0 :: VcdTime
+    if shiftToZero then
+      timeInFS (-start) `div` vcdTimeScaleFS
+    else
+      0 :: VcdTime
 
   vClockStart = timeInFS clockStart `div` vcdTimeScaleFS :: VcdTime
   vStart = timeInFS start `div` vcdTimeScaleFS + timeOffset :: VcdTime
   vStop = timeInFS (absTime start stop) `div` vcdTimeScaleFS + timeOffset :: VcdTime
 
-  -- simTimeToVcd x = x*timeMult + timeOffset + vClockStart
 
-  ----------------------------------------------
-  --              SIGNAL VALUES               --
-  ----------------------------------------------
+  --------------- SIGNAL VALUES ----------------
 
   {-
   - group signals by period
@@ -255,7 +245,7 @@ vcd Simulation
       $ zip3 widths labels valuess
 
   unsafeHead (x:_) = x
-  unsafeHead [] = error "Cannot take head of empty list"
+  unsafeHead [] = error "(unreachable) cannot take head of empty list"
 
   changesPerDomain :: [([ValueChange],[(VcdTime,[ValueChange])])]
   changesPerDomain = L.map findChanges domains
@@ -316,7 +306,7 @@ vcd Simulation
       skipStart :: [(VcdTime,[Value])]
       skipStart = map fst $ dropWhile ((<= vStart) . snd) $ zip valuessFrom clkEdges
 
-      ((_,initial) , rest) = fromMaybe (error "Finite signal") $ L.uncons skipStart
+      ((_,initial) , rest) = fromMaybe (error "(unreachable) finite signal") $ L.uncons skipStart
 
       samples :: [(VcdTime,[Value])]
       samples = takeWhile ((< vStop) . fst) rest

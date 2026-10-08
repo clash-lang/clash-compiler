@@ -78,6 +78,9 @@ data SignalDescr = SignalDescr
   }
  deriving (Show,Generic,ToJSON,FromJSON)
 
+----------------------------------------------
+--                 STORING                  --
+----------------------------------------------
 
 storeTrace0 :: (Int,Int) -> [SignalDescr] -> [Value] -> ByteString
 storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
@@ -111,9 +114,10 @@ storeTraces :: (Int,Int) -> [(String,Trace)] -> Either String ByteString
 storeTraces samples traces = do
   let same (a:r@(b:_)) = a==b && (same r)
       same _ = True
-  if same (map (\(_,(_,_,p,_)) -> p) traces)
-  then Right ()
-  else Left
+  if same (map (\(_,(_,_,p,_)) -> p) traces) then do
+    Right ()
+  else do
+    Left
     "Attempting to store multiple traces with different periods in one signal dump file."
 
   let meta = map (\(name,(ty,_,width,_)) -> SignalDescr{name, width, datatype=ty}) traces
@@ -196,6 +200,11 @@ instance (KnownSymbol x, BitPack a, Typeable a) => StoreSignals (x := Signal dom
 instance (StoreSignals a, StoreSignals b) => StoreSignals (a :&: b) where
   storeSignalMeta = storeSignalMeta @a <> storeSignalMeta @b
 
+
+----------------------------------------------
+--                 LOADING                  --
+----------------------------------------------
+
 -- | Read the file but do not finalize the trace yet
 loadTrace0 ::
   ByteString ->
@@ -262,9 +271,10 @@ loadTraces period bs = do
       cWidths = scanl (+) 0 widths
       ranges = zip cWidths (drop 1 cWidths)
 
-  if width /= last cWidths then
+  if width /= last cWidths then do
     Left "Subsignal widths do not add up to signal width"
-  else Right ()
+  else do
+    Right ()
 
   let slice0 (from, to) (m,v) = (go m, go v)
        where
