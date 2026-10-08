@@ -113,6 +113,8 @@ module Clash.Explicit.Prelude
   , module Clash.Sized.RTree
     -- ** Annotations
   , module Clash.Annotations.TopEntity
+    -- ** Time
+  , module Clash.Time
     -- ** Generics type-classes
   , Generic
   , Generic1
@@ -201,6 +203,7 @@ import Clash.Sized.RTree
 import Clash.Sized.Signed
 import Clash.Sized.Unsigned
 import Clash.Sized.Vector hiding (fromList, unsafeFromList)
+import Clash.Time
 import Clash.XException
 
 {- $setup
