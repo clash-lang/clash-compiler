@@ -20,7 +20,10 @@
 
 module Clash.Tests.Rewrite.StrategyDSL.Stubs where
 
+import Control.Monad.IO.Class (liftIO)
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Language.Haskell.TH (Exp, Name, Q, listE, stringE)
+import System.IO.Unsafe (unsafePerformIO)
 
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (mkUnsafeSystemName)
@@ -29,6 +32,8 @@ import Clash.Core.Term
    Term (..), TickInfo (..), WorkInfo (..))
 import Clash.Core.Type (ConstTy (..), Type (..))
 import Clash.Core.Var (Id, mkLocalId, mkTyVar)
+import Clash.Core.VarEnv (VarEnv, delVarEnv, emptyVarEnv, extendVarEnv)
+import Clash.Rewrite.Combinators (CleanTable (..))
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH (compileStrategy, compileStrategyReference)
 import Clash.Rewrite.Types (Rewrite, RewriteMonad, TransformContext (..))
@@ -209,6 +214,54 @@ allConstructorsTerm =
   lamBinder = someId 3
   tyVariable = mkTyVar someType (mkUnsafeSystemName "a" 100)
   subject = Let (NonRec (someId 5) (integer 7)) (Var (someId 5))
+
+-- | Let-bindings for the memoized traversals: one that 'incrementOdd'
+-- changes, one it leaves alone, and lets nested in a right-hand side and in a
+-- body (the latter has a 'Clash.Core.Term.LetBody' context, so a memoized
+-- traversal doesn't skip anything there).
+memoTerm :: Term
+memoTerm =
+  Let (Rec [ (a, integer 3)
+           , (b, integer 4)
+           , (c, Let (NonRec d (integer 5)) (App (Var d) (integer 8)))
+           ])
+    (App (Var a) (Let (Rec [(e, integer 7)]) (Var e)))
+ where
+  a = someId 10
+  b = someId 11
+  c = someId 12
+  d = someId 13
+  e = someId 14
+
+-- | Tables for the memoized traversals in the tests, one per test case: the
+-- test runner runs test cases concurrently. Reset a table before every run.
+testCleanRefA, testCleanRefB, testCleanRefC :: IORef (VarEnv Term)
+testCleanRefA = unsafePerformIO (newIORef emptyVarEnv)
+{-# NOINLINE testCleanRefA #-}
+testCleanRefB = unsafePerformIO (newIORef emptyVarEnv)
+{-# NOINLINE testCleanRefB #-}
+testCleanRefC = unsafePerformIO (newIORef emptyVarEnv)
+{-# NOINLINE testCleanRefC #-}
+
+testCleanA, testCleanB, testCleanC :: CleanTable ()
+testCleanA = testClean testCleanRefA
+testCleanB = testClean testCleanRefB
+testCleanC = testClean testCleanRefC
+
+testClean :: IORef (VarEnv Term) -> CleanTable ()
+testClean ref = CleanTable
+  { cleanBinders = liftIO (readIORef ref)
+  , markBinder = \b rhs rhsChanged -> liftIO $ modifyIORef' ref $
+      if rhsChanged then (`delVarEnv` b) else extendVarEnv b rhs
+  }
+
+resetTestClean :: IORef (VarEnv Term) -> IO ()
+resetTestClean ref = writeIORef ref emptyVarEnv
+
+-- | Predicates for 'guarded'
+guardTrue, guardFalse :: RewriteMonad () Bool
+guardTrue = pure True
+guardFalse = pure False
 
 simpleApplication :: Term
 simpleApplication = App (Var (someId 6)) (integer 3)

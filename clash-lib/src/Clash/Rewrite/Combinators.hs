@@ -9,16 +9,22 @@
 
 module Clash.Rewrite.Combinators
   ( allR
+  , CleanTable (..)
+  , allCleanR
+  , descendLetClean
   , (!->)
   , (>-!)
   , (>-!->)
   , (>->)
   , bottomupR
+  , bottomupWithR
   , innerMost
   , repeatR
   , topdownR
   , topdownFixR
+  , topdownFixWithR
   , topdownSucR
+  , topdownSucSpineR
   ) where
 
 import           Control.DeepSeq             (deepseq)
@@ -26,10 +32,14 @@ import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
 
-import           Clash.Core.Term             (Term (..), CoreContext (..), primArg, patIds)
+import           Clash.Core.Subst            (eqTerm)
+import           Clash.Core.Term
+  (Term (..), CoreContext (..), LetBinding, primArg, patIds)
+import           Clash.Core.Var              (Id)
 import           Clash.Core.VarEnv
-  (extendInScopeSet, extendInScopeSetList)
+  (VarEnv, extendInScopeSet, extendInScopeSetList, lookupVarEnv)
 import           Clash.Rewrite.Types
+import           Clash.Util.Eq               (fastEqBy)
 
 -- | Apply a transformation on the subtrees of an term
 allR
@@ -79,6 +89,76 @@ allR trans (TransformContext is c) (Tick sp e) =
 
 allR _ _ tm = pure tm
 {-# INLINABLE allR #-}
+
+-- | The let-bindings in which a traversal found nothing to rewrite, see
+-- 'allCleanR'.
+data CleanTable extra = CleanTable
+  { cleanBinders :: RewriteMonad extra (VarEnv Term)
+  -- ^ The binders known to be clean, mapped to the right-hand side they had
+  -- when nothing fired in them
+  , markBinder :: Id -> Term -> Bool -> RewriteMonad extra ()
+  -- ^ Record the outcome of rewriting a binding: the binder, its new
+  -- right-hand side, and whether anything fired. The table decides what to
+  -- remember.
+  }
+
+-- | Like 'allR', but at a let-expression skip the right-hand sides that the
+-- table has as clean, i.e. that are structurally equal to the right-hand side
+-- they had when nothing fired in them. When the 'Bool' is set, record the
+-- outcome of every right-hand side it rewrites in the table.
+--
+-- This only skips work that would not change anything if the transformation
+-- only depends on the subterm, the head of its context, and global state that
+-- doesn't change while the table lives. Two kinds of context entries break
+-- that assumption, so let-expressions below them are traversed normally:
+-- 'LetBody' entries, whose bindings the evaluator gets to see, and arguments
+-- of primitives ('AppArg' with a 'Just'), see
+-- 'Clash.Normalize.Util.shouldReduce'. See Note [flatten memo] in
+-- "Clash.Normalize" for why this holds for flattening.
+allCleanR :: CleanTable extra -> Bool -> Rewrite extra -> Rewrite extra
+allCleanR table record trans ctx (Letrec xes e) = do
+  (xes1, e1) <- descendLetClean table record trans ctx xes e
+  return (Letrec xes1 e1)
+allCleanR _ _ trans ctx e = allR trans ctx e
+{-# INLINABLE allCleanR #-}
+
+-- | The let-expression case of 'allCleanR': rewrite the bindings and the body
+-- of a let-expression, with the same contexts as 'allR'.
+descendLetClean
+  :: CleanTable extra
+  -> Bool
+  -> Rewrite extra
+  -> TransformContext
+  -> [LetBinding]
+  -> Term
+  -> RewriteMonad extra ([LetBinding], Term)
+descendLetClean table record trans (TransformContext is0 ctx) xes e
+  | all plainCtx ctx = do
+      clean <- cleanBinders table
+      xes1 <- traverse (rewriteBind clean) xes
+      e1 <- trans (TransformContext is1 (LetBody xes:ctx)) e
+      return (xes1, e1)
+  | otherwise = do
+      xes1 <- traverse (\(b,rhs) -> (b,) <$> rewriteRhs b rhs) xes
+      e1 <- trans (TransformContext is1 (LetBody xes:ctx)) e
+      return (xes1, e1)
+ where
+  bndrs = map fst xes
+  is1 = extendInScopeSetList is0 bndrs
+  rewriteRhs b = trans (TransformContext is1 (LetBinding b bndrs:ctx))
+
+  rewriteBind clean (b,rhs0)
+    | Just rhsClean <- lookupVarEnv b clean
+    , fastEqBy eqTerm rhsClean rhs0
+    = return (b,rhs0)
+    | otherwise = do
+      (rhs1, Monoid.getAny -> rhsChanged) <- Writer.listen (rewriteRhs b rhs0)
+      if record then markBinder table b rhs1 rhsChanged else pure ()
+      return (b,rhs1)
+
+  plainCtx LetBody{} = False
+  plainCtx (AppArg (Just _)) = False
+  plainCtx _ = True
 
 infixr 6 >->
 -- | Apply two transformations in succession
@@ -222,14 +302,20 @@ was ~3% slower on a larger industrial design we've measured too. See #3250.
 --
 -- Optimized for local, context-stable transformations. See Note [topdownFixR].
 topdownFixR :: Rewrite m -> Rewrite m
-topdownFixR r = go True
+topdownFixR = topdownFixWithR allR
+{-# INLINE topdownFixR #-}
+
+-- | 'topdownFixR', descending into the subtrees of a node with the given
+-- traversal instead of 'allR'.
+topdownFixWithR :: (Rewrite m -> Rewrite m) -> Rewrite m -> Rewrite m
+topdownFixWithR allR' r = go True
  where
   go tryParent ctx term = do
     term1 <-
       if tryParent
         then repeatR r ctx term
         else pure term
-    (term2, Monoid.getAny -> childChanged) <- Writer.listen (allR (go True) ctx term1)
+    (term2, Monoid.getAny -> childChanged) <- Writer.listen (allR' (go True) ctx term1)
     if childChanged
       then do
         (term3, Monoid.getAny -> parentChanged) <- Writer.listen (repeatR r ctx term2)
@@ -237,7 +323,7 @@ topdownFixR r = go True
           then go False ctx term3
           else return term3
       else return term2
-{-# INLINE topdownFixR #-}
+{-# INLINE topdownFixWithR #-}
 
 -- | Apply a transformation in a bottomup traversal
 bottomupR :: Monad m => Transform m -> Transform m
@@ -246,6 +332,14 @@ bottomupR r = go
  where
   go = allR go >-> r
 {-# INLINE bottomupR #-}
+
+-- | 'bottomupR', descending into the subtrees of a node with the given
+-- traversal instead of 'allR'.
+bottomupWithR :: Monad m => (Transform m -> Transform m) -> Transform m -> Transform m
+bottomupWithR allR' r = go
+ where
+  go = allR' go >-> r
+{-# INLINE bottomupWithR #-}
 
 infixr 5 !->
 -- | Only apply the second transformation if the first one succeeds.
@@ -282,6 +376,18 @@ topdownSucR r = go
  where
   go = r >-! allR go
 {-# INLINE topdownSucR #-}
+
+-- | 'topdownSucR' that only descends into the bodies of lambdas and ticks, for
+-- transformations that can only fire along the outer spine of a function
+-- (@topLet@).
+topdownSucSpineR :: Rewrite extra -> Rewrite extra
+topdownSucSpineR r = go
+ where
+  go = r >-! spine
+  spine ctx e@Lam{} = allR go ctx e
+  spine ctx e@Tick{} = allR go ctx e
+  spine _ e = return e
+{-# INLINE topdownSucSpineR #-}
 
 -- | Bottomup traversal; when the transformation succeeds, re-traverse the
 -- result until the innermost fixpoint is reached.

@@ -27,6 +27,8 @@ module Clash.Normalize.Strategy.Spec
 import Language.Haskell.TH.Syntax (Name)
 
 import Clash.Normalize.Transformations
+import Clash.Normalize.Util
+  (flattenBottomUpClean, flattenDeadCodeClean, flattenTopDownClean)
 import Clash.Rewrite.StrategyDSL
 
 -- [Note: bottomup traversal reduceConst]
@@ -186,35 +188,50 @@ Through experimentation we've learned the following:
    @tests/shouldwork/Basic/AES.hs@ did ~36k extra node visits per transformation
    that way.
 
+3. Traversals skip let-bindings that a pass has already seen without anything
+   firing, see Note [flatten memo] in "Clash.Normalize". Passes that can only
+   fire in a few places, such as 'topLet' and 'collapseRHSNoops', don't
+   traverse the whole term.
+
 If you touch code related to this, please make sure to run benchmarks.
 -}
 
 -- | The flattening strategy of 'Clash.Normalize.flattenCallTree'.
 flattenSpec :: Strat
 flattenSpec =
-  -- See Note [flatten pass structure].
-  repeatR (bottomup (one flattenLet >->
-                     (one reduceConst !-> one deadCode) >->
-                     chain [ reducePrim
-                           , removeUnusedExpr
-                           ]) >->
-           topdownFix (chain [ named "appProp" appProp
-                             , bindConstantVar
-                             , caseCon
-                             ])) !->
-  bottomup deadCode >-> -- See #3407
+  -- See Note [flatten pass structure] and Note [flatten memo] in
+  -- "Clash.Normalize".
+  repeatR (memoized 'flattenBottomUpClean Record
+             (bottomup (one flattenLet >->
+                        (one reduceConst !-> one deadCode) >->
+                        chain [ reducePrim
+                              , removeUnusedExpr
+                              ])) >->
+           memoized 'flattenTopDownClean Record
+             (topdownFix (chain [ named "appProp" appProp
+                                , bindConstantVar
+                                , caseCon
+                                ]))) !->
+  memoized 'flattenDeadCodeClean Record (bottomup deadCode) >-> -- See #3407
   letTL >->
   -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
   -- Note that we do this as the very last step, after all constant propagation
-  -- has been done to avoid #3036.
-  topdownSuc collapseRHSNoops >->
+  -- has been done to avoid #3036. 'collapseRHSNoops' only fires in synthesis
+  -- boundaries, so don't traverse other functions.
+  guarded 'curFunIsNoInline (topdownSuc collapseRHSNoops) >->
   topdownSuc inlineCleanup >->
-  bottomup caseCon >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
-  bottomup flattenLet >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
-  bottomup bindConstantVar >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
+  -- The next three passes only revisit let-bindings that changed since the
+  -- loop above, see Note [flatten memo].
+  memoized 'flattenTopDownClean ReadOnly
+    (bottomup caseCon) >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
+  memoized 'flattenBottomUpClean ReadOnly
+    (bottomup flattenLet) >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
+  memoized 'flattenTopDownClean ReadOnly
+    (bottomup bindConstantVar) >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
   letTL
   where
-    letTL = topdownSuc topLet
+    -- 'topLet' only fires along the spine of lambdas (and ticks) of a function
+    letTL = topdownSucSpine topLet
 
 {-
 [Note] late elimCaseBigNum

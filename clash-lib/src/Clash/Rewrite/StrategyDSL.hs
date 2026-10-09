@@ -66,6 +66,10 @@ module Clash.Rewrite.StrategyDSL
   , topdownFix
   , topdownSuc
   , innerMost
+  , topdownSucSpine
+  , MemoMode (..)
+  , memoized
+  , guarded
   , pass
   , callStrategy
   , repeatR
@@ -198,6 +202,20 @@ data Strat
   | InnerMost Step
   -- ^ Fused 'Clash.Rewrite.Combinators.innerMost': bottom-up; when the step
   -- fires, re-traverse the result until the innermost fixpoint is reached.
+  | TopDownSucSpine Step
+  -- ^ 'TopDownSuc' that only descends into lambda bodies and ticks: the
+  -- outer spine of a function, where @topLet@ fires. Fused
+  -- 'Clash.Rewrite.Combinators.topdownSucSpineR'.
+  | Memoized Name MemoMode Strat
+  -- ^ A 'BottomUp' or 'TopDownFix' traversal that skips the right-hand sides
+  -- of let-bindings in which it found nothing to rewrite before. The 'Name'
+  -- refers to a 'Clash.Rewrite.Combinators.CleanTable'. Fused
+  -- @bottomupWithR (allCleanR table record)@ /
+  -- @topdownFixWithR (allCleanR table record)@; mind the assumption
+  -- documented at 'Clash.Rewrite.Combinators.allCleanR'.
+  | Guarded Name Strat
+  -- ^ Run the strategy only if the predicate holds. The 'Name' refers to a
+  -- @RewriteMonad extra Bool@.
   | Pass String Name
   -- ^ A whole-term pass: @apply \<name\> \<rewrite\>@, for transformations
   -- that traverse the term themselves (@makeANF@, @etaExpansionTL@, …).
@@ -240,6 +258,30 @@ bottomup   = BottomUp . toStep
 topdownFix = TopDownFix . toStep
 topdownSuc = TopDownSuc . toStep
 innerMost  = InnerMost . toStep
+
+-- | 'topdownSuc' along the outer spine of lambdas and ticks only. See
+-- 'TopDownSucSpine'.
+topdownSucSpine :: ToStep s => s -> Strat
+topdownSucSpine = TopDownSucSpine . toStep
+
+-- | Whether a 'memoized' traversal adds what it learns to its table, or only
+-- uses it.
+data MemoMode
+  = Record
+  -- ^ Use the table, and record the outcome of every right-hand side the
+  -- traversal rewrites
+  | ReadOnly
+  -- ^ Only skip what the table has as clean
+  deriving (Eq, Show)
+
+-- | Make a 'bottomup' or 'topdownFix' traversal skip the let-bindings that a
+-- 'Clash.Rewrite.Combinators.CleanTable' has as clean. See 'Memoized'.
+memoized :: Name -> MemoMode -> Strat -> Strat
+memoized = Memoized
+
+-- | Run a strategy only if a predicate holds. See 'Guarded'.
+guarded :: Name -> Strat -> Strat
+guarded = Guarded
 
 -- | A whole-term pass, run as @apply \<name\> \<rewrite\>@.
 pass :: String -> Name -> Strat

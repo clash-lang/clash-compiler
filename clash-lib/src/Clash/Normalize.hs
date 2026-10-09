@@ -149,6 +149,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   normalization
                   constantPropagation
                   HashMap.empty -- workFreeAppCache
+                  emptyFlattenClean
 
 normalize
   :: [Id]
@@ -285,7 +286,10 @@ cleanupGraph
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
   = do cache <- liftIO (IORef.newIORef UniqMap.empty)
+       -- See Note [flatten memo]
+       extra.flattenClean Lens..= emptyFlattenClean
        ctFlat <- flattenCallTree cache ct
+       extra.flattenClean Lens..= emptyFlattenClean
        return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
@@ -368,6 +372,54 @@ flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
         if newInlineStrat || isCheapFunction e
            then return (Right ((nm,e),us))
            else return (Left b)
+
+{-
+Note [flatten memo]
+~~~~~~~~~~~~~~~~~~~
+'flattenCallTree' flattens a function after inlining the flattened bodies of
+its callees, so the passes of 'flatten' mostly visit let-bindings they have
+visited before: in an earlier round of the fixpoint loop, or while flattening
+the callee. Thin wrappers make this very visible: each level of a chain like
+@top -> wrapper -> body@ used to traverse all of @body@ more than ten times,
+while rewrites only fired where @body@ got inlined.
+
+The passes of 'flatten' therefore remember the let-bindings they visited
+without anything firing, by mapping the binder to the right-hand side it had.
+They skip a right-hand side that is (structurally) equal to the remembered
+one. In 'Clash.Normalize.Strategy.Spec.flattenSpec' these are the 'memoized'
+traversals, which use 'Clash.Rewrite.Combinators.allCleanR' to descend into
+let-expressions. The tables ('FlattenClean') live in the normalization state
+for one 'cleanupGraph' call, so they carry over from callees to their
+callers.
+
+This only skips work that would not have changed anything. Whether a rewrite
+fires at a node depends on the subterm at that node, its context, and global
+state that doesn't change during 'cleanupGraph' (global binders are only
+added). The rewrites in 'flatten' only look at these parts of a context:
+
+  * Its head, e.g. 'reduceConst' skips 'AppFun' positions. For the nodes in
+    a right-hand side, that is either an entry within the right-hand side or
+    the 'LetBinding' of the binding itself.
+
+  * 'LetBody' entries, whose bindings 'whnfRW' hands to the evaluator, and
+    'AppArg' entries of primitive arguments, see 'shouldReduce'. 'allCleanR'
+    only skips bindings whose context has neither.
+
+  * Whether it consists of lambda bodies and ticks only ('topLet'), which is
+    never the case below a 'LetBinding'.
+
+The one exception is 'bindConstantVar': it never inlines a binding whose
+right-hand side is a reference to the function being rewritten ('curFun'). We
+therefore don't remember right-hand sides that mention that function.
+
+A table also tells where the individual rewrites of its pass won't fire: the
+top-down pass applies 'caseCon' and 'bindConstantVar' at every node, and the
+bottom-up pass applies 'flattenLet' at every node. The passes after the loop
+make use of that.
+
+Skipping work changes which uniques fresh binders get, but not which rewrites
+fire.
+-}
 
 -- | Flatten a 'CallTree', memoizing results by binder Id within one cleanup
 -- pass. Without the cache, every binder reachable from the root is flattened

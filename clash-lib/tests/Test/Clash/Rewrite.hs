@@ -112,6 +112,7 @@ instance Default NormalizeState where
     , _normalizationStrategy=normalization
     , _constantPropagationStrategy=constantPropagation
     , _workFreeAppCache=HashMap.empty
+    , _flattenClean=emptyFlattenClean
     }
 
 instance Default InScopeSet where

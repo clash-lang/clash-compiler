@@ -32,7 +32,7 @@ import Clash.Core.Term
   (Bind (..), CoreContext (..), Term (..), bindToList, patIds, primArg)
 import Clash.Core.VarEnv (extendInScopeSet, extendInScopeSetList)
 import Clash.Rewrite.StrategyDSL
-  ( Constructor (..), Step (..), Strat (..), Transformation (..)
+  ( Constructor (..), MemoMode (..), Step (..), Strat (..), Transformation (..)
   , TransformationWorker (..)
   )
 import Clash.Rewrite.Types (TransformContext (..))
@@ -485,6 +485,36 @@ genDescend con go (isE, cE) nodeE fieldEs continue = case (con, fieldEs) of
   leaf = continue fieldEs nodeE
   continueWith fieldEs' rebuiltE = noBindS (continue fieldEs' rebuiltE)
 
+-- | 'genDescend', except that a let-expression descends through
+-- 'Comb.descendLetClean' when the traversal is 'Memoized'.
+descendWith
+  :: Maybe (Name, MemoMode)
+  -> Constructor
+  -> Q Exp
+  -> (Q Exp, Q Exp)
+  -> Q Exp
+  -> [Q Exp]
+  -> ([Q Exp] -> Q Exp -> Q Exp)
+  -> Q Exp
+descendWith (Just (table, mode)) CLet go (isE, cE) _nodeE [bnd, body] continue = do
+  -- See Note [NonRec erasure during descent]
+  bs' <- newName "bs'"
+  body' <- newName "body'"
+  doE
+    [ bindS (tupP [varP bs', varP body'])
+        [| Comb.descendLetClean $(varE table) $(recordE mode) $go
+             (TransformContext $isE $cE) (bindToList $bnd) $body |]
+    , noBindS (continue [[| Rec $(varE bs') |], varE body']
+                        [| Let (Rec $(varE bs')) $(varE body') |])
+    ]
+descendWith _ con go ctxE nodeE fieldEs continue =
+  genDescend con go ctxE nodeE fieldEs continue
+
+-- | Whether a 'Memoized' traversal records what it learns.
+recordE :: MemoMode -> Q Exp
+recordE Record = [| True |]
+recordE ReadOnly = [| False |]
+
 -- | What a traversal does at one node: given the recursion function, the
 -- node program for the matched constructor ('Nothing' when the program is the
 -- identity there), the context, the node, its fields, and a descent builder,
@@ -515,28 +545,30 @@ type NodeArm
 --   result until the innermost fixpoint is reached.
 -- * 'TopDownFix': see 'genTopDownFix'.
 genTraversal :: Strat -> Q Exp
-genTraversal strat = case strat of
-  TopDown step -> fused step $ \goE known ctxE tmE fieldEs descend ->
+genTraversal = genTraversalWith Nothing
+
+-- | 'genTraversal' for a traversal that is optionally 'Memoized'. Only the
+-- descent into let-expressions differs, see 'descendWith'.
+genTraversalWith :: Maybe (Name, MemoMode) -> Strat -> Q Exp
+genTraversalWith memo strat = case strat of
+  TopDown step -> fused everywhere step $ \goE known ctxE tmE fieldEs descend ->
     case known of
       Nothing -> descend rebuildOnly
       Just ka ->
         withListen (ka ctxE tmE fieldEs) $ \tE changedE ->
           condE changedE [| $goE $ctxE $tE |] (descend rebuildOnly)
 
-  TopDownSuc step -> fused step $ \_goE known ctxE tmE fieldEs descend ->
-    case known of
-      Nothing -> descend rebuildOnly
-      Just ka ->
-        withListen (ka ctxE tmE fieldEs) $ \tE changedE ->
-          condE changedE [| pure $tE |] (descend rebuildOnly)
+  TopDownSuc step -> fused everywhere step topDownSucArm
 
-  BottomUp step -> fused step $ \_goE known ctxE _tmE _fieldEs descend ->
+  TopDownSucSpine step -> fused (`elem` [CLam, CTick]) step topDownSucArm
+
+  BottomUp step -> fused everywhere step $ \_goE known ctxE _tmE _fieldEs descend ->
     descend $ \fieldEs' rebuiltE ->
       case known of
         Nothing -> [| pure $rebuiltE |]
         Just ka -> bindTo "tm'" rebuiltE $ \tmE' -> ka ctxE tmE' fieldEs'
 
-  InnerMost step -> fused step $ \goE known ctxE _tmE _fieldEs descend ->
+  InnerMost step -> fused everywhere step $ \goE known ctxE _tmE _fieldEs descend ->
     descend $ \fieldEs' rebuiltE ->
       case known of
         Nothing -> [| pure $rebuiltE |]
@@ -546,29 +578,47 @@ genTraversal strat = case strat of
 
   TopDownFix step -> do
     cs <- compileStep step
-    genTopDownFix cs
+    genTopDownFix memo cs
 
   _ -> fail "genTraversal: not a traversal"
  where
   rebuildOnly :: [Q Exp] -> Q Exp -> Q Exp
   rebuildOnly _fieldEs' rebuiltE = [| pure $rebuiltE |]
 
-  fused :: Step -> NodeArm -> Q Exp
-  fused step mkArm = do
+  everywhere :: Constructor -> Bool
+  everywhere _ = True
+
+  topDownSucArm :: NodeArm
+  topDownSucArm _goE known ctxE tmE fieldEs descend =
+    case known of
+      Nothing -> descend rebuildOnly
+      Just ka ->
+        withListen (ka ctxE tmE fieldEs) $ \tE changedE ->
+          condE changedE [| pure $tE |] (descend rebuildOnly)
+
+  -- The first argument says at which constructors the traversal descends;
+  -- elsewhere the node is returned after its program ran.
+  fused :: (Constructor -> Bool) -> Step -> NodeArm -> Q Exp
+  fused descendsAt step mkArm = do
     cs <- compileStep step
     go <- newName "go"
-    clauses <- traverse (goClause cs (varE go) mkArm) allConstructors
+    clauses <- traverse (goClause cs (varE go) descendsAt mkArm) allConstructors
     letE (cs.decs <> [pure (FunD go clauses)]) (varE go)
 
-  goClause :: CompiledStep -> Q Exp -> NodeArm -> Constructor -> Q Clause
-  goClause cs goE mkArm con = do
+  goClause
+    :: CompiledStep -> Q Exp -> (Constructor -> Bool) -> NodeArm -> Constructor
+    -> Q Clause
+  goClause cs goE descendsAt mkArm con = do
     ctx <- newName "_ctx"
     is <- newName "_is"
     c <- newName "_c"
     tm <- newName "_tm"
     fieldNames <- constructorFieldNames con
     let fieldEs = map varE fieldNames
-        descend = genDescend con goE (varE is, varE c) (varE tm) fieldEs
+        descend
+          | descendsAt con =
+              descendWith memo con goE (varE is, varE c) (varE tm) fieldEs
+          | otherwise = \continue -> continue fieldEs (varE tm)
     body <- mkArm goE (cs.known con) (varE ctx) (varE tm) fieldEs descend
     pats <- sequence
       [ asP ctx (conP 'TransformContext [varP is, varP c])
@@ -580,8 +630,8 @@ genTraversal strat = case strat of
 -- (@'Comb.repeatR' r@) plus the tryParent\/childChanged\/parentChanged loop
 -- from Note [topdownFixR] in "Clash.Rewrite.Combinators", over a generated
 -- 'Comb.allR' replica.
-genTopDownFix :: CompiledStep -> Q Exp
-genTopDownFix cs = do
+genTopDownFix :: Maybe (Name, MemoMode) -> CompiledStep -> Q Exp
+genTopDownFix memo cs = do
   goFix <- newName "goFix"
   settle <- newName "settle"
   descendD <- newName "descendD"
@@ -615,7 +665,7 @@ genTopDownFix cs = do
     c <- newName "_c"
     tm <- newName "_tm"
     fieldNames <- constructorFieldNames con
-    body <- genDescend con (varE rec') (varE is, varE c) (varE tm)
+    body <- descendWith memo con (varE rec') (varE is, varE c) (varE tm)
               (map varE fieldNames) (\_fieldEs' rebuiltE -> [| pure $rebuiltE |])
     pats <- sequence
       [ varP rec'
@@ -640,7 +690,16 @@ compileStrategy strat = case strat of
   BottomUp{} -> genTraversal strat
   TopDownFix{} -> genTraversal strat
   TopDownSuc{} -> genTraversal strat
+  TopDownSucSpine{} -> genTraversal strat
   InnerMost{} -> genTraversal strat
+  Memoized table mode inner -> case inner of
+    BottomUp{} -> genTraversalWith (Just (table, mode)) inner
+    TopDownFix{} -> genTraversalWith (Just (table, mode)) inner
+    _ -> fail "compileStrategy: memoized supports only bottomup and topdownFix"
+  Guarded predicate inner ->
+    [| \ctx tm -> do
+         ok <- $(varE predicate)
+         if ok then $(compileStrategy inner) ctx tm else pure tm |]
 
 -- | Compile a strategy into its unfused reference: the same transformations,
 -- run as a plain @apply@ chain through the "Clash.Rewrite.Combinators"
@@ -661,7 +720,20 @@ compileStrategyReference = goStrat
     BottomUp step -> [| Comb.bottomupR $(goStep step) |]
     TopDownFix step -> [| Comb.topdownFixR $(goStep step) |]
     TopDownSuc step -> [| Comb.topdownSucR $(goStep step) |]
+    TopDownSucSpine step -> [| Comb.topdownSucSpineR $(goStep step) |]
     InnerMost step -> [| Comb.innerMost $(goStep step) |]
+    Memoized table mode inner -> case inner of
+      BottomUp step ->
+        [| Comb.bottomupWithR (Comb.allCleanR $(varE table) $(recordE mode))
+             $(goStep step) |]
+      TopDownFix step ->
+        [| Comb.topdownFixWithR (Comb.allCleanR $(varE table) $(recordE mode))
+             $(goStep step) |]
+      _ -> fail "compileStrategyReference: memoized supports only bottomup and topdownFix"
+    Guarded predicate inner ->
+      [| \ctx tm -> do
+           ok <- $(varE predicate)
+           if ok then $(goStrat inner) ctx tm else pure tm |]
 
   goStep step = case step of
     SeqS a b -> [| $(goStep a) Comb.>-> $(goStep b) |]
