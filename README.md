@@ -78,6 +78,7 @@ Note that release branches might contain non-released patches.
 | 9.8  | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8 - 1.10       | ️&#x2714;&#xfe0f;
 | 9.10 | &#x2714;&#xfe0f;                | &#x2714;&#xfe0f;<sup>4</sup>    | &#x2714;&#xfe0f;                | 1.8 - 1.10       | ️&#x2714;&#xfe0f;
 | 9.12 | &#x2714;&#xfe0f;<sup>5</sup>    | &#x2714;&#xfe0f;<sup>4,5</sup>  | &#x2714;&#xfe0f;<sup>5</sup>    | 1.10             | ️&#x2714;&#xfe0f;
+| 9.14 | &#x2714;&#xfe0f;                | &#x26a0;&#xfe0f;<sup>6</sup>    | &#x26a0;&#xfe0f;<sup>6</sup>    | 1.10.3           | &#x2714;&#xfe0f;
 
 
 <sup>1</sup> GHC 9.2 contains a regression, rendering Clash error messages indecipherable. This change was reverted in 9.4.
@@ -89,6 +90,8 @@ Note that release branches might contain non-released patches.
 <sup>4</sup> Clash starts extremely slowly on Windows with GHC 9.6 through 9.12, consider downgrading to 9.4.7
 
 <sup>5</sup> GHC 9.12.1 through 9.12.3 contain bugs affecting Clash. Use GHC 9.12.4 or newer. See [#3415](https://github.com/clash-lang/clash-compiler/issues/3415).
+
+<sup>6</sup> GHC 9.14 is tested on Linux. Windows and macOS are not yet covered by the GHC 9.14 CI matrix.
 
 ## Cabal
 To use Cabal you need both Cabal and GHC installed on your system. We recommend using [ghcup](https://www.haskell.org/ghcup/). For more information, see [https://www.haskell.org/downloads/](https://www.haskell.org/downloads/).
