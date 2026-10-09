@@ -82,8 +82,8 @@ import Clash.Core.TysPrim
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
-  ( InScopeSet, emptyVarEnv, extendInScopeSet, extendInScopeSetList
-  , lookupVarEnv, mkInScopeSet, mkVarSet, unionInScope, unitVarEnv, elemVarSet)
+  ( InScopeSet, extendInScopeSet, extendInScopeSetList
+  , lookupVarEnv, mkInScopeSet, mkVarSet, unionInScope, elemVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
@@ -218,14 +218,8 @@ appPropWorker ctx@(TransformContext is _) node = case node of
     bndrs <- Lens.use bindings
     orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
       True ->
-        -- 'e' is deshadowed w.r.t. an in-scope set that contains the free
-        -- variables of 'arg': 'appProp' deshadows the function expression
-        -- w.r.t. 'is0' up front, and 'go' re-deshadows whenever it extends the
-        -- in-scope set. So no binder in 'e' shadows 'v' — the binder of the
-        -- enclosing lambda -- nor captures a free variable of 'arg', which is
-        -- exactly the precondition of 'unsafeSubstTm'.
-        (`mkTicks` ticks)
-          <$> go is0 (unsafeSubstTm emptyVarEnv (unitVarEnv v arg) e) args []
+        let subst = extendIdSubst (mkSubst is0) v arg in
+        (`mkTicks` ticks) <$> go is0 (substTm "appProp.AppLam" subst e) args []
       False ->
         let is1 = extendInScopeSet is0 v in
         Let (NonRec v arg) <$> go is1 (deShadowTerm is1 e) args ticks

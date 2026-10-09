@@ -7,18 +7,22 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 module Clash.Tests.Normalize.Transformations where
 
+import Data.Default (def)
 import Data.Maybe (fromMaybe)
 
 import Clash.Normalize.Transformations (inlineBndrsCleanup)
+import Clash.Normalize.Transformations.Specialize (appPropWorker)
 import Clash.Core.VarEnv
   (mkInScopeSet, mkVarSet, mkVarEnv, emptyVarEnv)
 import Clash.Core.FreeVars (countFreeOccurances)
+import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Test.Clash.Rewrite (parseToTermQQ, parseToTerm)
+import Test.Clash.Rewrite
+  (parseToTermQQ, parseToTerm, runSingleTransformation)
 
 t1337a :: Term
 t1337a = fromMaybe (error "failed to build term") $ do
@@ -124,6 +128,21 @@ t1337c_result = [parseToTermQQ|
     result_1
 |]
 
+-- | @(\f -> f) (\k x -> k) x y@ reduces to the free variable @x@. The first
+-- argument binds @x_2@, which is also free in the second argument. 'appProp'
+-- substitutes work-free arguments using 'unsafeSubstTm', which does not avoid
+-- capture: after substituting the first argument for @f_1@, that argument is
+-- the head of the application, and substituting @x_2@ for @k_4@ puts it under
+-- the binder @x_2@.
+appPropCapture :: IO Term
+appPropCapture = do
+  Var x <- pure (parseToTerm "x_2 :: Int")
+  Var y <- pure (parseToTerm "y_5 :: Int")
+  let is = mkInScopeSet (mkVarSet [x, y])
+  runSingleTransformation def def is appPropWorker [parseToTermQQ|
+    (\(f_1 :: Int) -> f_1) (\(k_4 :: Int) (x_2 :: Int) -> k_4) (x_2 :: Int) (y_5 :: Int)
+  |]
+
 tests :: TestTree
 tests =
   testGroup
@@ -131,4 +150,8 @@ tests =
     [ testCase "T1337a" $ t1337a_result @=? t1337a
     , testCase "T1337b" $ t1337b_result @=? t1337b
     , testCase "T1337c" $ t1337c_result @=? t1337c
+    , testCase "appProp does not capture free variables" $ do
+        actual <- appPropCapture
+        assertBool ("Expected the free variable x, but got: " <> showPpr actual)
+          (actual == parseToTerm "x_2 :: Int")
     ]
