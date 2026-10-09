@@ -603,6 +603,7 @@ runClashTest = defaultMain
         ]
       , clashTestGroup "Evaluator"
         [ runTest "FreeVarHeapBinding" def{hdlTargets=[Verilog], hdlSim=[]}
+        , runTest "SplitAtFoldFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
         ]
       , clashTestGroup "Feedback"
         [ runTest "Fib" def
