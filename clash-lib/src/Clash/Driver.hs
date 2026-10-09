@@ -139,7 +139,7 @@ import           Clash.Primitives.Types
 import           Clash.Signal.Internal
 import           Clash.Unique                     (Unique, getUnique, fromGhcUnique)
 import           Clash.Util
-  (ClashException(..), reportTimeDiff,
+  (ClashException(..), reportTimeDiff, withPreservedBacktrace,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
 import           Clash.Util.Graph                 (reverseTopSort)
 import qualified Clash.Util.Interpolate           as I
@@ -348,9 +348,11 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     ioLock <- newMVar ()
 
     let
-      maybeMapConcurrently_
-        | opt_concurrentTopEntities opts = mapConcurrently_
-        | otherwise = mapM_
+      -- 'mapConcurrently_' re-throws whatever a worker threw, which drops the
+      -- backtrace that exception was thrown with. See 'withPreservedBacktrace'.
+      maybeMapConcurrently_ f
+        | opt_concurrentTopEntities opts = mapConcurrently_ (withPreservedBacktrace . f)
+        | otherwise = mapM_ f
 
     maybeMapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
 
