@@ -1,5 +1,46 @@
 # Changelog for the Clash project
 
+## 1.10.3 - *09 Oct, 2026*
+
+### Added:
+- Added support for GHC 9.14.
+  [#3182](https://github.com/clash-lang/clash-compiler/pull/3182)
+- Add `NumConvert` support for converting from `SNat`
+  [#3455](https://github.com/clash-lang/clash-compiler/pull/3455)
+
+### Changed:
+- Normalization now knows which `Term` constructors each transformation can fire on, and only offers a node to the transformations that can match it. Measured ~25% faster HDL generation end-to-end on a large industrial design, with identical HDL. Transformations that cannot match a node no longer show up in `-fclash-debug-transformations` and `-fclash-debug-count-transformations` output.
+  [#3328](https://github.com/clash-lang/clash-compiler/pull/3328)
+- `Clash.Signal.Internal.resetGenN` now reports `clash-non-synthesizable` on every backend, instead of only on SystemVerilog.
+  [#3410](https://github.com/clash-lang/clash-compiler/pull/3410)
+- In `clash-lib`, the `reduceNonRepPrim` transformation is renamed to `reducePrim`, because it replaces primitives for more reasons than non-representable arguments or results. To debug it with `-fclash-debug-transformations`, use the new name.
+  [#3462](https://github.com/clash-lang/clash-compiler/pull/3462)
+- In `clash-lib`, the `inlineWorkFree` transformation now normalizes an application of a function to constant arguments only once, and reuses the result at every place the same application occurs. Before, every occurrence was normalized separately. This speeds up normalization of designs that compute a lot with type-level naturals at compile time, for example through `KnownNat` constraints.
+  [#3472](https://github.com/clash-lang/clash-compiler/pull/3472)
+
+### Fixed:
+- Clash no longer errors when unused arguments of local functions are non-representable in very specific circumstances
+  [#3407](https://github.com/clash-lang/clash-compiler/issues/3407)
+- `ensureSpine` on a `Signal` no longer crashes Clash with an internal error. When generating HDL, `ensureSpine` on a `Signal` is the identity function.
+  [#3432](https://github.com/clash-lang/clash-compiler/issues/3432)
+- Functions testing for `XException` (`isX`, `hasX`, `maybeIsX`, and `maybeHasX`) are now marked non-translatable. This makes the Clash compiler throw a proper error, instead of an internal one when it encounters their use.
+  [#3434](https://github.com/clash-lang/clash-compiler/pull/3434)
+- Clash no longer crashes when generating HDL for `toEnum` on an enumeration with a single constructor.
+  [#3439](https://github.com/clash-lang/clash-compiler/issues/3439)
+- Clash now reports an error when using GHC 9.12.1 through 9.12.3, which contain bugs affecting Clash. The GHC compatibility matrix now lists 9.12.4 as the minimum supported GHC 9.12 release.
+  [#3415](https://github.com/clash-lang/clash-compiler/issues/3415)
+- Extending arithmetic (`add`, `sub`, and `mul`) on `Index` now handles zero-width
+  arguments correctly. VHDL subtraction from zero-width `BitVector`, `Signed`, and
+  `Unsigned` values now negates the widened operand correctly, including boundary
+  values.
+  [#3310](https://github.com/clash-lang/clash-compiler/issues/3310)
+- Clash now checks all input targets before loading modules or generating HDL. Invalid arguments, including Clash flags passed without their leading dash, are reported immediately, instead of after compiling earlier inputs.
+  [#3314](https://github.com/clash-lang/clash-compiler/issues/3314) [#3442](https://github.com/clash-lang/clash-compiler/pull/3442)
+- Projecting a zero-width field, such as a `CallStack`, no longer renders a reference to an undeclared `c$sel` in the HDL in very specific circumstances.
+  [#3460](https://github.com/clash-lang/clash-compiler/issues/3460) [#3459](https://github.com/clash-lang/clash-compiler/pull/3459)
+- Clash no longer takes minutes to compile designs that unroll `map`, `zipWith`, `foldr`, or `init` over vectors bound to top-level definitions. This most often happened with modules compiled with `-ffull-laziness`, which is enabled by `-O`, for example by Cabal.
+  [#3461](https://github.com/clash-lang/clash-compiler/issues/3461)
+
 ## 1.10.2 *Sep 4th, 2026*
 
 Highlights:
