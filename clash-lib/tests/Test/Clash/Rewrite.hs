@@ -24,6 +24,7 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
+import Clash.Core.FreeVars (freeLocalIds)
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Core.VarEnv
   ( InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet
@@ -41,12 +42,14 @@ import Clash.Util.Supply (newSupply)
 import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
+import qualified Control.Lens as Lens
 import Control.Monad.Trans.State.Strict (State)
 import Control.DeepSeq (NFData, force)
 import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
 import Data.Default
 import Data.Maybe (fromMaybe)
+import Data.Monoid (Any (..))
 import GHC.Types.Basic (InlineSpec (NoUserInlinePrag))
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
@@ -157,8 +160,20 @@ runSingleTransformation
   -- ^ Term to transform
   -> IO C.Term
 runSingleTransformation rwEnv rwState is trans term = do
-  (t, _, _) <- runR (runRewrite "" is trans term) rwEnv rwState
+  (t, _, _) <- runRewriteTest rwEnv rwState (runRewrite "" is trans term)
   pure t
+
+-- | Run an action in the rewrite monad, such as a transformation applied with
+-- 'Clash.Rewrite.Util.runRewrite'. Returns its result, the final state, and
+-- whether any transformation signalled a change.
+runRewriteTest
+  :: RewriteEnv
+  -> RewriteState extra
+  -> RewriteMonad extra a
+  -> IO (a, RewriteState extra, Bool)
+runRewriteTest rwEnv rwState m = do
+  (a, rwState1, anyChanged) <- runR m rwEnv rwState
+  pure (a, rwState1, getAny anyChanged)
 
 -- | Run a single transformation with an empty environment and empty
 -- InScopeSet. See Default instances ^ to inspect the precise definition of
@@ -708,6 +723,55 @@ assertAlphaEq expected actual =
     ("Expected (up to alpha equivalence):\n" <> showPprU expected
       <> "\nbut got:\n" <> showPprU actual)
     (expected == actual)
+
+-- | Term binders that shadow a binder they are in scope of, or another binder
+-- of the same let-expression or pattern
+shadowingBinders :: C.Term -> [C.Id]
+shadowingBinders = go []
+ where
+  go :: [Unique] -> C.Term -> [C.Id]
+  go scope = \case
+    C.Lam i e -> check scope [i] <> go (C.varUniq i : scope) e
+    C.TyLam _ e -> go scope e
+    C.App e1 e2 -> go scope e1 <> go scope e2
+    C.TyApp e _ -> go scope e
+    C.Letrec bs e ->
+      let is = map fst bs
+          scope1 = map C.varUniq is <> scope
+      in  check scope is <> concatMap (go scope1 . snd) bs <> go scope1 e
+    C.Case scrut _ alts -> go scope scrut <> concatMap (goAlt scope) alts
+    C.Cast e _ _ -> go scope e
+    C.Tick _ e -> go scope e
+    _ -> []
+
+  goAlt scope (p, e) =
+    let is = snd (C.patIds p)
+    in  check scope is <> go (map C.varUniq is <> scope) e
+
+  -- Binders that are already in scope, or bound earlier in the same group
+  check _ [] = []
+  check scope (i:is)
+    | C.varUniq i `elem` scope = i : check scope is
+    | otherwise = check (C.varUniq i : scope) is
+
+-- | Assert that no binder in a term shadows another, see 'shadowingBinders'
+assertNoShadowing :: HasCallStack => C.Term -> Assertion
+assertNoShadowing tm = case shadowingBinders tm of
+  [] -> pure ()
+  bs -> assertFailure
+    ("Unexpected shadowing binders " <> showPprU bs <> " in:\n" <> showPprU tm)
+
+-- | Assert that a term has no free local variables
+assertNoFreeLocals :: HasCallStack => C.Term -> Assertion
+assertNoFreeLocals tm = case Lens.toListOf freeLocalIds tm of
+  [] -> pure ()
+  fvs -> assertFailure
+    ("Unexpected free variables " <> showPprU fvs <> " in:\n" <> showPprU tm)
+
+-- | Assert that a term has no free local variables, and no binders that shadow
+-- each other. See 'assertNoFreeLocals' and 'assertNoShadowing'.
+assertWellScoped :: HasCallStack => C.Term -> Assertion
+assertWellScoped tm = assertNoFreeLocals tm >> assertNoShadowing tm
 
 -- | Assert that two terms are structurally equal, by comparing their 'Show'
 -- output.
