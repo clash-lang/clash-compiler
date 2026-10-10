@@ -6,6 +6,7 @@
   Tests for "Clash.Normalize.Transformations.Specialize"
 -}
 
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -17,18 +18,24 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Name (NameSort (User), noSrcSpan)
-import Clash.Core.Term (Bind (..), Pat (..), Term (..), mkApps)
-import Clash.Core.Var (Id)
+import Clash.Core.Term (Bind (..), Pat (..), Term (..), collectArgs, mkApps)
+import Clash.Core.Type (Type)
+import Clash.Core.Var (Id, Var (varUniq))
+import Clash.Core.VarEnv (lookupVarEnv)
+import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVar)
-import Clash.Normalize.Transformations.Specialize (appProp)
-import Clash.Normalize.Types (NormRewrite)
+import Clash.Normalize.Transformations.Specialize (appProp, specialize)
+import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
+import Clash.Rewrite.Util (runRewrite)
+import Clash.Unique (Unique)
+import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intTy, localId
-  , pairDataCon, pairTy, parseToTerm, parseToTermQQ, runSingleTransformation
-  , showPprU )
+  ( assertAlphaEq, assertNoFreeLocals, globalId, inScopeOf, intFunTy, intId
+  , intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy, parseToTerm
+  , parseToTermQQ, runRewriteTest, runSingleTransformation, showPprU )
 
 appPropR :: NormRewrite
 appPropR = $(asRewriteQ appProp)
@@ -184,6 +191,70 @@ appPropCapture = runAppProp [intId User "x" 2, intId User "y" 5] [parseToTermQQ|
   (\(f_1 :: Int) -> f_1) (\(k_4 :: Int) (x_2 :: Int) -> k_4) (x_2 :: Int) (y_5 :: Int)
 |]
 
+-- * specialize
+
+-- | Global function @f :: Int -> Int@ with body @\\a -> a@
+fId :: Id
+fId = globalId User "f" 10 (intFunTy 1)
+
+fBinding :: (Id, Term)
+fBinding = (fId, Lam a (Var a))
+ where
+  a = intId User "a" 20
+
+-- | Global function @g :: Int -> Int -> Int@. It has no binding: we only
+-- specialize on applications of it.
+gId :: Id
+gId = globalId User "g" 11 (intFunTy 2)
+
+-- | Specialize @f@ on @g x y@. Returns the result, the body of the specialized
+-- function, and the final state.
+specializeF
+  :: RewriteState NormalizeState
+  -> Id
+  -> Id
+  -> IO (Term, Maybe Term, RewriteState NormalizeState)
+specializeF st x y = do
+  let tm = App (Var fId) (mkApps (Var gId) [Left (Var x), Left (Var y)])
+  (res, st1, _) <-
+    runRewriteTest def st (runRewrite "specialize" (inScopeOf [x, y]) specialize tm)
+  let newBody = case collectArgs res of
+        (Var fSpec, _) -> bindingTerm <$> lookupVarEnv fSpec (_bindings st1)
+        _ -> Nothing
+  pure (res, newBody, st1)
+
+-- | The uniques of arguments that are variable references
+argUniques :: [Either Term Type] -> [Maybe Unique]
+argUniques = map $ \case
+  Left (Var v) -> Just (varUniq v)
+  _ -> Nothing
+
+-- | 'specArgBndrsAndVars' used to determine whether a free variable of the
+-- argument specialized on is global by looking up its unique in the global
+-- bindings. A local variable with the same unique as a global binder was
+-- therefore not abstracted over, and ended up free in the specialized function.
+-- Clash creates such variables when it turns a group of mutually recursive
+-- global binders into a let-expression.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/712
+specializeLocalShadowingGlobal :: Assertion
+specializeLocalShadowingGlobal = do
+  supply <- newSupply
+  let xGlobal = globalId User "x" 12 intTy
+      xLocal = intId User "x" 12
+      yLocal = intId User "y" 13
+      bs = mkBindingMap [fBinding, (xGlobal, intLit 1)]
+  (res, newBody, _) <- specializeF def{_bindings = bs, _uniqSupply = supply} xLocal yLocal
+  case (collectArgs res, newBody) of
+    ((Var fSpec, args), Just body) -> do
+      assertBool ("Expected a new specialized function, but got:\n" <> showPprU res)
+        (varUniq fSpec `notElem` [varUniq fId, varUniq xGlobal])
+      assertEqual ("Arguments of the specialized function in:\n" <> showPprU res)
+        (map (Just . varUniq) [xLocal, yLocal])
+        (argUniques args)
+      assertNoFreeLocals body
+    _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
+
 tests :: TestTree
 tests =
   testGroup
@@ -202,4 +273,6 @@ tests =
         bindConstantVarAppPropLet >>= assertAlphaEq appPropLamCaptureExpected
     , testCase "appProp does not capture free variables (#3479)" $
         appPropCapture >>= assertAlphaEq (parseToTerm "x_2 :: Int")
+    , testCase "specialize abstracts over locals that shadow a global (#712)"
+        specializeLocalShadowingGlobal
     ]
