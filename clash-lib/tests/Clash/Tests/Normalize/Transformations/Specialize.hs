@@ -191,6 +191,86 @@ appPropCapture = runAppProp [intId User "x" 2, intId User "y" 5] [parseToTermQQ|
   (\(f_1 :: Int) -> f_1) (\(k_4 :: Int) (x_2 :: Int) -> k_4) (x_2 :: Int) (y_5 :: Int)
 |]
 
+-- | 'appProp' substitutes work-free arguments into the body of the lambda it
+-- applies them to. Such an argument can then end up as the function part of
+-- the application, but unlike the original function part, it was never
+-- deshadowed. Its binders can then capture the free variables of the
+-- remaining arguments, which 'appProp' moves under them.
+--
+-- The tests below apply @\\f -> f@ to a work-free function of the given number
+-- of arguments that binds @x@, followed by arguments in which @x@ is free.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/3479
+appPropSubstitutedArg :: [Id] -> Int -> Term -> [Term] -> IO Term
+appPropSubstitutedArg inScope arity arg args =
+  runAppProp inScope (mkApps (Lam f (Var f)) (map Left (arg : args)))
+ where
+  f = localId User "f" 20 (intFunTy arity)
+
+-- | Lambda path: the binder @x@ of the argument becomes a let-binder for the
+-- argument @g x@, which performs work:
+--
+-- > (\f -> f) (\x k -> k) (g x) x  ==>  let x' = g x in x
+appPropSubstitutedLam :: IO Term
+appPropSubstitutedLam =
+  appPropSubstitutedArg [g, x] 2 (Lam x (Lam k (Var k))) [App (Var g) (Var x), Var x]
+ where
+  g = localId User "g" 4 (intFunTy 1)
+  k = intId User "k" 6
+  x = intId User "x" 7
+
+-- | Let path:
+--
+-- > (\f -> f) (let x = w in \k -> k) x  ==>  let x' = w in x
+appPropSubstitutedLet :: IO Term
+appPropSubstitutedLet =
+  appPropSubstitutedArg [w, x] 1 (Let (NonRec x (Var w)) (Lam k (Var k))) [Var x]
+ where
+  k = intId User "k" 6
+  x = intId User "x" 7
+  w = intId User "w" 8
+
+-- | Case path:
+--
+-- > (\f -> f) (case s of MkPair a b -> \k -> k) b  ==>  case s of MkPair a b' -> b
+appPropSubstitutedCase :: IO Term
+appPropSubstitutedCase =
+  appPropSubstitutedArg [s, b] 1 fun [Var b]
+ where
+  s = localId User "s" 5 pairTy
+  a = intId User "a" 1
+  b = intId User "b" 2
+  k = intId User "k" 6
+  fun = Case (Var s) (intFunTy 1) [(DataPat pairDataCon [] [a, b], Lam k (Var k))]
+
+-- | 'bindConstantVar' inlines let-bound lambdas without deshadowing them, so
+-- it creates such arguments:
+--
+-- > let a = \x k -> k in \x -> (\f -> f) a (g x) x
+-- >   ==> (bindConstantVar)  \x -> (\f -> f) (\x k -> k) (g x) x
+-- >   ==> (appProp)          \x -> let x' = g x in x
+bindConstantVarAppPropSubstituted :: IO Term
+bindConstantVarAppPropSubstituted = bindConstantVarThenAppProp [g] term
+ where
+  g = localId User "g" 4 (intFunTy 1)
+  k = intId User "k" 6
+  x = intId User "x" 7
+  a = localId User "a" 11 (intFunTy 2)
+  f = localId User "f" 20 (intFunTy 2)
+  term =
+    Let (NonRec a (Lam x (Lam k (Var k))))
+      (Lam x (mkApps (Lam f (Var f))
+        [Left (Var a), Left (App (Var g) (Var x)), Left (Var x)]))
+
+-- | The expected result of 'appPropSubstitutedLam' and
+-- 'bindConstantVarAppPropSubstituted'
+appPropSubstitutedLamExpected :: Term
+appPropSubstitutedLamExpected = Let (NonRec x9 (App (Var g) (Var x))) (Var x)
+ where
+  g = localId User "g" 4 (intFunTy 1)
+  x = intId User "x" 7
+  x9 = intId User "x" 9
+
 -- * specialize
 
 -- | Global function @f :: Int -> Int@ with body @\\a -> a@
@@ -323,6 +403,15 @@ tests =
         bindConstantVarAppPropLet >>= assertAlphaEq appPropLamCaptureExpected
     , testCase "appProp does not capture free variables (#3479)" $
         appPropCapture >>= assertAlphaEq (parseToTerm "x_2 :: Int")
+    , testCase "appProp deshadows substituted arguments, lambda" $
+        appPropSubstitutedLam >>= assertAlphaEq appPropSubstitutedLamExpected
+    , testCase "appProp deshadows substituted arguments, let" $
+        appPropSubstitutedLet >>= assertAlphaEq
+          (Let (NonRec (intId User "x" 9) (Var (intId User "w" 8))) (Var (intId User "x" 7)))
+    , testCase "appProp deshadows substituted arguments, case" $
+        appPropSubstitutedCase >>= assertAlphaEq appPropCaseCaptureExpected
+    , testCase "appProp deshadows substituted arguments after bindConstantVar" $
+        bindConstantVarAppPropSubstituted >>= assertAlphaEq appPropSubstitutedLamExpected
     , testCase "specialize abstracts over locals that shadow a global (#712)"
         specializeLocalShadowingGlobal
     , testCase "specialize orders free variables by occurrence (#1087)"

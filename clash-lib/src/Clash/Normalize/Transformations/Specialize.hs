@@ -218,7 +218,10 @@ appPropWorker ctx@(TransformContext is _) node = case node of
     bndrs <- Lens.use bindings
     orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
       True ->
-        let subst = extendIdSubst (mkSubst is0) v arg in
+        -- 'arg' can end up as the function part of the application, so we
+        -- must deshadow it like we deshadowed the original function part. See
+        -- Note [AppProp no shadowing].
+        let subst = extendIdSubst (mkSubst is0) v (deShadowTerm is0 arg) in
         (`mkTicks` ticks) <$> go is0 (substTm "appProp.AppLam" subst e) args []
       False ->
         let is1 = extendInScopeSet is0 v in
