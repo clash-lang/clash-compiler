@@ -46,6 +46,10 @@ mkTestId scope occ uniq = Id {
 termVar :: Var Term
 termVar = mkTestId LocalId "term" unique
 
+-- | A type variable with the same unique as 'termVar'
+typeVar :: TyVar
+typeVar = tyVar User "type" unique
+
 term1 :: Term
 term1 = Var termVar
 
@@ -145,8 +149,15 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Core.Subst"
-    [ testCase "deShadow type/term" $
-        term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet termVar) term1
+    -- A type variable and a term variable can share a unique. 'lookupIdSubst'
+    -- used to find the type variable in the in-scope set when looking up the
+    -- term variable, and replaced the term variable by it. Note that, with the
+    -- fix, this triggers a "Subst.lookupIdSubst" warning on debug builds of
+    -- clash-lib, as the in-scope set doesn't contain the term variable.
+    -- https://github.com/clash-lang/clash-compiler/issues/1046,
+    -- https://github.com/clash-lang/clash-compiler/pull/1048
+    [ testCase "deShadow type/term (#1048)" $
+        term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet typeVar) term1
 
     , testCase "unsafeSubstTm substitutes a local variable" $
         App payload (Var localZ) @=?
