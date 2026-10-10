@@ -15,10 +15,11 @@
 
 module Test.Clash.Rewrite where
 
-import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
@@ -27,6 +28,7 @@ import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Core.VarEnv
   (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet, mkVarSet)
 import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
+import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
@@ -36,6 +38,7 @@ import Clash.Util.Supply (newSupply)
 import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
+import Control.Monad.Trans.State.Strict (State)
 import Control.DeepSeq (NFData, force)
 import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
@@ -57,6 +60,7 @@ import qualified Text.Show.Pretty as Pretty
 import qualified Language.Haskell.TH.Syntax as TH
 import qualified Language.Haskell.TH.Quote as TH
 
+import qualified Clash.Data.UniqMap as UniqMap
 import qualified Data.List as List
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
@@ -78,17 +82,31 @@ instance Default RewriteEnv where
   def = RewriteEnv
     { _clashEnv = ClashEnv
         { envOpts = defClashOpts { opt_debug = debugSilent }
-        , envTyConMap = mempty
+        , envTyConMap = UniqMap.singletonUnique intTyCon
         , envTupleTyCons = IntMap.empty
         , envPrimitives = HashMap.empty
         , envCustomReprs = buildCustomReprs []
         , envDomains = HashMap.empty
         }
-    , _typeTranslator=error "_typeTranslator: NYI"
+    , _typeTranslator=testTypeTranslator
     , _peEvaluator=error "_peEvaluator: NYI"
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
     }
+
+-- | The type translator of the default 'RewriteEnv': function types are not
+-- representable, all other types are, as a 64-bit signed number. Clash's own
+-- translator is a lot more refined, but this suffices for transformations that
+-- only look at /whether/ a type is representable, such as 'caseCase' and
+-- 'nonRepANF'.
+testTypeTranslator
+  :: CustomReprs
+  -> C.TyConMap
+  -> C.Type
+  -> State HWMap (Maybe (Either String FilteredHWType))
+testTypeTranslator _reprs _tcm ty = pure $ Just $ case C.tyView ty of
+  C.FunTy {} -> Left "function types are not representable"
+  _ -> Right (FilteredHWType (Signed 64) [])
 
 instance Default extra => Default (RewriteState extra) where
   def = RewriteState
@@ -551,16 +569,25 @@ parseToTermQQ = TH.QuasiQuoter{
   , TH.quoteDec = error "parseToTerm.quoteDec: NYI"
   }
 
+-- | The name 'parseType' produces for a type constructor whose name it
+-- derives a unique from, e.g. @Int@
+parseTyConName :: HasCallStack => String -> C.TyConName
+parseTyConName nm = C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan
+
 -- | The type 'parseType' produces for a type constructor whose name it derives
 -- a unique from, e.g. @Int@
 parseTyConTy :: HasCallStack => String -> C.Type
-parseTyConTy nm =
-  C.ConstTy
-    (C.TyCon (C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan))
+parseTyConTy = C.ConstTy . C.TyCon . parseTyConName
 
 -- | The type 'parseType' produces for the type constructor @Int@
 intTy :: C.Type
 intTy = parseTyConTy "Int"
+
+-- | The type constructor of 'intTy'. The default 'RewriteEnv' knows it.
+intTyCon :: C.TyCon
+intTyCon = C.PrimTyCon (C.nameUniq nm) nm C.liftedTypeKind 0
+ where
+  nm = parseTyConName "Int"
 
 -- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
@@ -622,6 +649,10 @@ kindedTyVar nmSort nm uniq =
 tyVar :: C.NameSort -> String -> Unique -> C.TyVar
 tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
 
+-- | An @Int@ literal
+intLit :: Integer -> C.Term
+intLit = C.Literal . C.IntLiteral
+
 -- | A reference to a local variable of type @Int@. See 'intId'.
 intVar :: C.NameSort -> String -> Unique -> C.Term
 intVar nmSort nm uniq = C.Var (intId nmSort nm uniq)
@@ -673,17 +704,23 @@ assertStructurallyEqual expected actual =
 -- | Assert that forcing a value throws an 'ErrorCall' mentioning the given
 -- substring
 assertErrorContains
-  :: (HasCallStack, NFData a, Show a) => String -> a -> Assertion
-assertErrorContains needle a = do
-  parsed <- try (evaluate (force a))
-  case parsed of
+  :: (HasCallStack, NFData a, PrettyPrec a) => String -> a -> Assertion
+assertErrorContains needle = assertErrorContainsIO needle . pure
+
+-- | Assert that running an action, and forcing its result, throws an
+-- 'ErrorCall' mentioning the given substring
+assertErrorContainsIO
+  :: (HasCallStack, NFData a, PrettyPrec a) => String -> IO a -> Assertion
+assertErrorContainsIO needle action = do
+  result <- try (action >>= evaluate . force)
+  case result of
     Left (ErrorCall msg)
       | needle `List.isInfixOf` msg -> pure ()
       | otherwise -> assertFailure
           ("Expected an error mentioning '" <> needle <> "', but got:\n" <> msg)
-    Right parsed1 -> assertFailure
+    Right a -> assertFailure
       ("Expected an error mentioning '" <> needle
-        <> "', but parsing succeeded:\n" <> Pretty.ppShow parsed1)
+        <> "', but got the result:\n" <> showPprU a)
 
 tests :: TestTree
 tests = testGroup "Test.Clash.Rewrite"
