@@ -6,6 +6,7 @@
   Tests for "Clash.Normalize.Transformations.ANF"
 -}
 
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Transformations.ANF (tests) where
@@ -16,18 +17,24 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon)
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term (Bind (..), Term (..), mkApps)
+import Clash.Core.Name (NameSort (User), noSrcSpan)
+import Clash.Core.Term
+  ( Bind (..), IsMultiPrim (SingleResult), PrimInfo (..)
+  , PrimUnfolding (NoUnfolding), Term (..), WorkInfo (WorkVariable), mkApps )
+import Clash.Core.Type (mkFunTy)
 import Clash.Core.Var (Id, Var (varUniq))
+import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Normalize.Transformations.ANF (makeANF, nonRepANF)
 import Clash.Normalize.Types (NormRewrite)
+import Clash.Rewrite.Combinators ((>->))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Unique (Unique)
 import Clash.Util.Supply (Supply, newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertNoShadowing, globalId, inScopeOf, intFunTy, intId
+  ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, globalId, inScopeOf
+  , intFunTy, intId
   , intLit, intTy, letBinders, mkDataCon, parseTyConTy, runSingleTransformation
   , showPprU )
 
@@ -112,6 +119,31 @@ anfDoesNotDuplicateBinders = do
     2 (length (letBinders res2))
   assertNoShadowing res2
 
+-- | ANF moves all let-bindings it creates to the root of the term. It used to
+-- also let-bind expressions referring to local variables that would not end up
+-- in scope there, introducing free variables. Today, ANF relies on
+-- 'nonRepANF', which runs right before it, to turn non-representable arguments
+-- of primitives and constructors, such as lambdas, into applications of new
+-- global functions. This checks that the two together don't let-bind @h z@ in
+-- @p (\\z -> k (h z) z)@ outside of the lambda binding @z@.
+--
+-- https://github.com/clash-lang/clash-compiler/commit/36d60f54bf90f03b0cbf2d291f6411252c86dc7f
+anfDoesNotLiftOutOfLambdas :: Assertion
+anfDoesNotLiftOutOfLambdas = do
+  supply <- newSupply
+  let p = PrimInfo
+        { primName = "p"
+        , primType = mkFunTy (intFunTy 1) intTy
+        , primWorkInfo = WorkVariable
+        , primMultiResult = SingleResult
+        , primUnfolding = NoUnfolding }
+      z = intId User "z" 71
+      cf = globalId User "top" 42 (intFunTy 1)
+      tm = App (Prim p) (Lam z (mkApps (Var kId) [Left (App (Var hId) (Var z)), Left (Var z)]))
+      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+  runSingleTransformation def st emptyInScopeSet (nonRepANFR >-> makeANF) tm
+    >>= assertNoFreeLocals
+
 tests :: TestTree
 tests =
   testGroup
@@ -124,4 +156,6 @@ tests =
         nonRepANFCapture >>= assertAlphaEq nonRepANFCaptureExpected
     , testCase "ANF does not duplicate binders"
         anfDoesNotDuplicateBinders
+    , testCase "ANF does not lift expressions out of lambdas"
+        anfDoesNotLiftOutOfLambdas
     ]
