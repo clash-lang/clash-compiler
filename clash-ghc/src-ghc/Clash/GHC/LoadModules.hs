@@ -33,7 +33,7 @@ where
 import           Clash.Annotations.Primitive     (HDL, PrimitiveGuard(..))
 import           Clash.Annotations.TopEntity     (TopEntity (..))
 import           Clash.Primitives.Types          (UnresolvedPrimitive)
-import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
+import           Clash.Util                      (ClashException(..))
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
 import           Control.Exception               (SomeException, throw)
@@ -67,7 +67,6 @@ import qualified Data.Time.Clock                 as Clock
 import qualified Data.Set                        as Set
 import qualified Data.Sequence                   as Seq
 import           Debug.Trace
-import           Language.Haskell.TH.Syntax      (lift)
 import           GHC.Natural                     (naturalFromInteger)
 import           GHC.Stack                       (HasCallStack)
 import           System.FilePath.Posix           (dropExtension, takeDirectory)
@@ -150,6 +149,8 @@ import           Clash.GHC.GHC2Core                           (modNameM, qualifi
 import           Clash.GHC.LoadInterfaceFiles
   (loadExternalExprs, getUnresolvedPrimitives, loadExternalBinders,
    LoadedBinders(..))
+import           Clash.GHC.PackageEnv
+  (addInstallationPackageEnv, preludePkgId)
 import           Clash.GHCi.Common                            (checkMonoLocalBindsMod)
 import           Clash.Util                                   (curLoc, noSrcSpan, reportTimeDiff
                                                               ,wantedLanguageExtensions, unwantedLanguageExtensions)
@@ -305,7 +306,8 @@ setupGhc useColor dflagsM idirs = do
           df <- GHC.getSessionDynFlags
           logger <- GHC.getLogger
           df1 <- liftIO (GHC.interpretPackageEnv logger df)
-          _ <- GHC.setSessionDynFlags df1
+          df2 <- liftIO (addInstallationPackageEnv logger df1)
+          _ <- GHC.setSessionDynFlags df2
 
           GHC.getSessionDynFlags
 
@@ -1171,10 +1173,6 @@ removeStrictnessAnnotations pm =
     -- rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
     rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
 #endif
-
--- | The package id of the clash-prelude we were built with
-preludePkgId :: String
-preludePkgId = $(lift $ pkgIdFromTypeable (undefined :: TopEntity))
 
 -- | Check that we're using the same clash-prelude as we were built with
 --

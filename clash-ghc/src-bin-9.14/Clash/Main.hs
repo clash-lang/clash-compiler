@@ -112,6 +112,7 @@ import           Clash.Driver.Types
 import           Clash.GHC.ClashFlags
 import           Clash.Util (clashLibVersion)
 import           Clash.GHC.LoadModules (ghcLibDir, setWantedLanguageExtensions)
+import           Clash.GHC.PackageEnv (addInstallationPackageEnv)
 import           Clash.GHC.Util (handleClashException)
 
 -----------------------------------------------------------------------------
@@ -277,8 +278,10 @@ main' postLoadMode units dflags0 args flagWarnings startAction clashOpts = do
 
   let (dflags5, srcs, objs) = parseTargetFiles dflags4 (map unLoc fileish_args)
 
+  dflags5' <- liftIO $ addInstallationPackageEnv logger4 dflags5
+
   -- we've finished manipulating the DynFlags, update the session
-  _ <- GHC.setSessionDynFlags dflags5
+  _ <- GHC.setSessionDynFlags dflags5'
   dflags6 <- GHC.getSessionDynFlags
 
   liftIO . modifyIORef' clashOpts $ \opts ->
