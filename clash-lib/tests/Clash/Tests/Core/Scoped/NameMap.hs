@@ -16,7 +16,9 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 
+import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.NameMap
+import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite (assertErrorContains, globalId, intId, intTy)
@@ -39,4 +41,15 @@ tests = testGroup "Clash.Tests.Core.Scoped.NameMap"
       assertErrorContains "not a global variable"
         (C.Var (globalIdVar (mkGlobalId (intId C.User "x" 1))))
 
+  , testCase "NameSet and NameMap" $
+      case fromClashTermClosed (C.Lam (intId C.User "x" 1) (C.Var (intId C.User "x" 1))) of
+        Lam b e -> openIdBinder emptyScope b e $ \_ b1 _ -> do
+          let n = tmNameOf b1
+              m = singletonNameMap n 'x'
+          lookupNameMap n m @?= Just 'x'
+          nameMapKeys m @?= [n]
+          -- Out of the scope of the binder, the map is empty
+          sizeNameMap (unsinkNameMap (idBinderNameBinders b1) m) @?= 0
+          sizeNameSet (unsinkNameSet (idBinderNameBinders b1) (singletonNameSet n)) @?= 0
+        _ -> assertFailure "unexpected shape"
   ]
