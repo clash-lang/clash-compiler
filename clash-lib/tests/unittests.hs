@@ -7,6 +7,7 @@ import qualified Clash.Tests.Core.AlphaEquivalence
 import qualified Clash.Tests.Core.FreeVars
 import qualified Clash.Tests.Core.HasType
 import qualified Clash.Tests.Core.Lint
+import qualified Clash.Tests.Core.Scoped.Scope
 import qualified Clash.Tests.Core.StructuralEquivalence
 import qualified Clash.Tests.Core.Subst
 import qualified Clash.Tests.Core.TermLiteral
@@ -50,6 +51,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.FreeVars.tests
   , Clash.Tests.Core.HasType.tests
   , Clash.Tests.Core.Lint.tests
+  , Clash.Tests.Core.Scoped.Scope.tests
   , Clash.Tests.Core.StructuralEquivalence.tests
   , Clash.Tests.Core.Subst.tests
   , Clash.Tests.Core.TermLiteral.tests

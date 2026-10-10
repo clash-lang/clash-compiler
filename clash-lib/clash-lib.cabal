@@ -220,6 +220,7 @@ Library
                       Clash.Core.PartialEval.Monad
                       Clash.Core.PartialEval.NormalForm
                       Clash.Core.Pretty
+                      Clash.Core.Scoped.Internal.Scope
                       Clash.Core.Subst
                       Clash.Core.Term
                       Clash.Core.TermInfo
@@ -440,6 +441,7 @@ test-suite unittests
                  Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.HasType
                  Clash.Tests.Core.Lint
+                 Clash.Tests.Core.Scoped.Scope
                  Clash.Tests.Core.StructuralEquivalence
                  Clash.Tests.Core.Subst
                  Clash.Tests.Core.TermLiteral
