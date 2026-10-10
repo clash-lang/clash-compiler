@@ -12,6 +12,8 @@ packages:
 - tests
 
 extra-deps:
+  # Needed to build clash-ghc's setup script (build-type: Hooks)
+  - Cabal-hooks-3.14@sha256:6d7cd57c7c70b2c90b2f2e818efcd0bdaaae14309b784643c1b284e69a0bb6db,1788
   - QuickCheck-2.15.0.1@sha256:0cfd337bb9e6fbf09255bd24bb498a156f1d9bcd465396ac8657b25034b9ee31,9046
   - tasty-flaky-0.1.2.0@sha256:2f91ab9f55ae0c472474087f98bb54076aca18f8b058343479d24597a3aa181b,1858
   - hedgehog-1.5@sha256:c904dc9d8ae7b47a58771a0fbfb7a77882059a2b77c9c0c722dc16de504d0bd4,4817

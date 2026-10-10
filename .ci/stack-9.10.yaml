@@ -12,6 +12,10 @@ packages:
 - tests
 
 extra-deps:
+# Needed to build clash-ghc's setup script (build-type: Hooks)
+- Cabal-3.14.2.0@sha256:5608a3091be7c029a3e8b2585ed51f41edd58effd1b51f3ad32504847e6f9753,14148
+- Cabal-hooks-3.14@sha256:6d7cd57c7c70b2c90b2f2e818efcd0bdaaae14309b784643c1b284e69a0bb6db,1788
+- Cabal-syntax-3.14.2.0@sha256:6653175960c346f01152223972a3292c56723c1bfab61f4603ca66cb264297b0,7646
 - ghc-tcplugin-api-0.18.2.0@sha256:126b0b16d56b5ecb3b5a3dd74e1581619208604d89db8f09bc1bdba95a08b8f2,5414
 - ghc-typelits-extra-0.5.3@sha256:4fae3c698c15132181a431e52f95aa8f655dc78bcd2a5fdf35a7e222eb7d2d19,5830
 - ghc-typelits-knownnat-0.8.3@sha256:84114e2d8a4389c37921ed1b3dd030c6acd8af0eb47d5cb516e3a374ade0f9b4,5993

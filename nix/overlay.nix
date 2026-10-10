@@ -105,6 +105,9 @@ let
               "clash-ghc"
               ../clash-ghc {
               inherit (hfinal) clash-lib clash-prelude;
+              # Its setup script needs the Cabal that nixpkgs builds
+              # Cabal-hooks against.
+              Cabal = hfinal.Cabal_3_16_1_0;
             };
         in
         prev.haskell.lib.enableSharedExecutables
@@ -334,6 +337,15 @@ in
   # `IntegralTB` test execute very slow. We therefore prefer the MCODE backend,
   # but fall back to LLVM on platforms where it isn't available.
   ghdl-clash = if prev.stdenv.hostPlatform.isx86_64 then prev.ghdl-mcode else final.ghdl-llvm;
+
+  # clash-ghc uses `build-type: Hooks`, which requires `cabal-version: 3.14`.
+  # The Cabal-syntax nixpkgs builds cabal2nix against is too old to parse that.
+  cabal2nix-unwrapped = prev.haskell.lib.compose.justStaticExecutables (
+    prev.haskellPackages.cabal2nix.overrideScope (hfinal: hprev: {
+      Cabal = hfinal.Cabal_3_16_1_0;
+      Cabal-syntax = hfinal.Cabal-syntax_3_16_1_0;
+    })
+  );
 
   "clashPackages-${compilerVersion}" =
     prev.haskell.packages.${compilerVersion}.extend haskellOverlays;
