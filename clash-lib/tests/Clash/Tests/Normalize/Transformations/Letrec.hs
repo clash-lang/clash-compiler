@@ -6,6 +6,7 @@
   Tests for "Clash.Normalize.Transformations.Letrec"
 -}
 
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Transformations.Letrec (tests) where
@@ -20,16 +21,21 @@ import Clash.Core.Term (Bind (..), Term (..))
 import Clash.Core.Var (Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..), debugNone)
-import Clash.Normalize.Transformations.Letrec (topLet)
+import Clash.Normalize.Transformations.Letrec (flattenLet, topLet)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
+import Clash.Rewrite.Util (runRewrite)
 
 import Clash.Util.Supply (freshId, newSupply)
 
-import Test.Clash.Rewrite (intId, intLit, runSingleTransformation, showPprU)
+import Test.Clash.Rewrite
+  ( assertAlphaEq, assertWellScoped, intId, intLit, parseToTermQQ
+  , runRewriteTest, runSingleTransformation, runSingleTransformationDef
+  , showPprU )
 
-topLetR :: NormRewrite
+flattenLetR, topLetR :: NormRewrite
+flattenLetR = $(asRewriteQ flattenLet)
 topLetR = $(asRewriteQ topLet)
 
 -- * topLet (#490)
@@ -72,4 +78,54 @@ tests =
     "Clash.Tests.Normalize.Transformations.Letrec"
     [ testCase "topLet does not reuse the unique of a let-binder (#490)"
         topLetFreshBinder
+
+    -- #1766 / #1837: 'flattenLet' did not flatten a let-expression whose body
+    -- is another let-expression. Doing so requires deshadowing the inner
+    -- bindings, as they may reuse uniques of the outer ones. Unflattened, and
+    -- with shadowing binders, Clash generated duplicate signal names.
+    -- https://github.com/clash-lang/clash-compiler/pull/1837
+    , testCase "flattenLet deshadows when flattening nested letrec (#1837)" $ do
+        actual <- runSingleTransformationDef flattenLetR [parseToTermQQ|
+          let
+            x_1, y_2 :: Int
+            x_1 = f_G y_2
+            y_2 = f_G x_1
+          in
+            let
+              x_1, z_3 :: Int
+              x_1 = g_G y_2 z_3
+              z_3 = g_G x_1 x_1
+            in
+              h_G x_1 z_3 y_2
+        |]
+        assertAlphaEq [parseToTermQQ|
+          let
+            x_1, y_2, x_4, z_3 :: Int
+            x_1 = f_G y_2
+            y_2 = f_G x_1
+            x_4 = g_G y_2 z_3
+            z_3 = g_G x_4 x_4
+          in
+            h_G x_4 z_3 y_2
+        |] actual
+        assertWellScoped actual
+
+    -- #1837 also made flattening a nested letrec signal a change (it merely
+    -- merges two let-expressions, so no other code path in 'flattenLet' does).
+    -- Without it, the strategy might not run to a fixed point.
+    , testCase "flattenLet signals change when flattening nested letrec (#1837)" $ do
+        (_, _, hasChanged) <- runRewriteTest def def $
+          runRewrite "flattenLet" emptyInScopeSet flattenLetR [parseToTermQQ|
+            let
+              a_1, b_2 :: Int
+              a_1 = f_G b_2
+              b_2 = f_G a_1
+            in
+              let
+                c_3 :: Int
+                c_3 = g_G a_1 b_2
+              in
+                h_G c_3 c_3
+          |]
+        assertBool "flattenLet did not signal a change" hasChanged
     ]
