@@ -16,6 +16,7 @@
 module Test.Clash.Rewrite where
 
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Literal as C
@@ -571,6 +572,45 @@ mkId scope nmSort nm uniq typ =
 localId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
 localId = mkId C.LocalId
 
+-- | A global 'C.Id'. See 'mkId'.
+globalId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
+globalId = mkId C.GlobalId
+
+-- | A local 'C.Id' of type @Int@. See 'localId'.
+intId :: C.NameSort -> String -> Unique -> C.Id
+intId nmSort nm uniq = localId nmSort nm uniq intTy
+
+-- | The function type @Int -> .. -> Int@ with the given number of arguments
+intFunTy :: Int -> C.Type
+intFunTy n = foldr C.mkFunTy intTy (replicate n intTy)
+
+-- | A data constructor with the given name, unique, universally quantified type
+-- variables, existentially quantified type variables, (lazy) field types, and
+-- result type. Its tag is 1, i.e. it is the first constructor of its type.
+mkDataCon
+  :: String -> Unique -> [C.TyVar] -> [C.TyVar] -> [C.Type] -> C.Type
+  -> C.DataCon
+mkDataCon nm uniq univTvs extTvs argTys resTy = C.MkData
+  { C.dcName = C.mkUnsafeName C.User (Text.pack nm) uniq
+  , C.dcUniq = uniq
+  , C.dcTag = 1
+  , C.dcType =
+      foldr C.ForAllTy (foldr C.mkFunTy resTy argTys) (univTvs <> extTvs)
+  , C.dcUnivTyVars = univTvs
+  , C.dcExtTyVars = extTvs
+  , C.dcArgTys = argTys
+  , C.dcArgStrict = map (const C.Lazy) argTys
+  , C.dcFieldLabels = []
+  }
+
+-- | @Pair@, a data type with a single constructor 'pairDataCon'
+pairTy :: C.Type
+pairTy = parseTyConTy "Pair"
+
+-- | @MkPair :: Int -> Int -> Pair@
+pairDataCon :: C.DataCon
+pairDataCon = mkDataCon "MkPair" 100 [] [] [intTy, intTy] pairTy
+
 -- | A 'C.TyVar' with the given name sort, human readable name, unique, and
 -- kind
 kindedTyVar :: C.NameSort -> String -> Unique -> C.Kind -> C.TyVar
@@ -582,13 +622,13 @@ kindedTyVar nmSort nm uniq =
 tyVar :: C.NameSort -> String -> Unique -> C.TyVar
 tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
 
--- | A reference to a local variable of type @Int@. See 'localId'.
+-- | A reference to a local variable of type @Int@. See 'intId'.
 intVar :: C.NameSort -> String -> Unique -> C.Term
-intVar nmSort nm uniq = C.Var (localId nmSort nm uniq intTy)
+intVar nmSort nm uniq = C.Var (intId nmSort nm uniq)
 
--- | A reference to a global variable of type @Int@. See 'mkId'.
+-- | A reference to a global variable of type @Int@. See 'globalId'.
 globalIntVar :: C.NameSort -> String -> Unique -> C.Term
-globalIntVar nmSort nm uniq = C.Var (mkId C.GlobalId nmSort nm uniq intTy)
+globalIntVar nmSort nm uniq = C.Var (globalId nmSort nm uniq intTy)
 
 -- | A reference to a variable without a declared type. See 'freeVarType'.
 freeVar :: C.NameSort -> String -> Unique -> C.Term
