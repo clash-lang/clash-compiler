@@ -12,7 +12,9 @@
 
 module Clash.Tests.Normalize.Transformations.Specialize (tests) where
 
+import qualified Control.Lens as Lens
 import Data.Default (def)
+import qualified Data.Map.Strict as Map
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -25,9 +27,9 @@ import Clash.Core.VarEnv (lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVar)
 import Clash.Normalize.Transformations.Specialize (appProp, specialize)
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
+import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..))
+import Clash.Rewrite.Types (RewriteState (..), extra)
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Unique (Unique)
 import Clash.Util.Supply (newSupply)
@@ -255,6 +257,34 @@ specializeLocalShadowingGlobal = do
       assertNoFreeLocals body
     _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
 
+-- | 'specArgBndrsAndVars' used to collect the free variables of the argument
+-- specialized on in a set ordered by unique. Specializing @f (g x_123 y_456)@
+-- and @f (g x_456 y_123)@ then yielded the binders @[x, y]@ and @[y, x]@, so the
+-- second specialization missed the specialization cache.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/1087
+specializeCacheFreeVarOrder :: Assertion
+specializeCacheFreeVarOrder = do
+  supply <- newSupply
+  let st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
+      x123 = intId User "x" 123
+      y456 = intId User "y" 456
+      x456 = intId User "x" 456
+      y123 = intId User "y" 123
+  (res1, _, st1) <- specializeF st0 x123 y456
+  (res2, _, st2) <- specializeF st1 x456 y123
+  let cacheSize = Map.size (Lens.view (extra . specialisationCache) st2)
+  assertEqual "Number of specializations" 1 cacheSize
+  case (collectArgs res1, collectArgs res2) of
+    ((Var f1, _), (Var f2, args2)) -> do
+      assertEqual "Specialized functions" (showPprU f1) (showPprU f2)
+      assertEqual "Arguments of the second specialization"
+        (map (Just . varUniq) [x456, y123])
+        (argUniques args2)
+    _ -> assertFailure
+      ("Expected applications of globals, but got:\n" <> showPprU res1
+        <> "\nand:\n" <> showPprU res2)
+
 tests :: TestTree
 tests =
   testGroup
@@ -275,4 +305,6 @@ tests =
         appPropCapture >>= assertAlphaEq (parseToTerm "x_2 :: Int")
     , testCase "specialize abstracts over locals that shadow a global (#712)"
         specializeLocalShadowingGlobal
+    , testCase "specialize orders free variables by occurrence (#1087)"
+        specializeCacheFreeVarOrder
     ]
