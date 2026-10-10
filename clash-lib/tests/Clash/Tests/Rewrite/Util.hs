@@ -13,17 +13,20 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term (Bind (..), Term (..))
-import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (emptyInScopeSet)
-import Clash.Normalize.Types (NormRewrite)
+import Clash.Core.Name (NameSort (User), noSrcSpan)
+import Clash.Core.Term (Bind (..), Term (..), collectArgs, mkApps)
+import Clash.Core.Var (Id, Var (varUniq))
+import Clash.Core.VarEnv (emptyInScopeSet, lookupVarEnv)
+import Clash.Driver.Types (Binding (..))
+import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Types (RewriteState (..))
-import Clash.Rewrite.Util (changed, runRewrite)
+import Clash.Rewrite.Util (changed, liftBinding, runRewrite)
+import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertErrorContainsIO, inScopeOf, intId, intLit
-  , runRewriteTest, runSingleTransformation )
+  ( argUniques, assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals
+  , globalId, inScopeOf, intFunTy, intId, intLit, localId, runRewriteTest
+  , runSingleTransformation, showPprU )
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
 
@@ -70,6 +73,38 @@ replaceBy name inScope before new = do
   rw :: NormRewrite
   rw _ctx _e = changed (Var new)
 
+-- * liftBinding
+
+-- | 'liftBinding' lifts a (recursive) let-binding to a global function,
+-- abstracting over the free variables of the binding. It must replace the
+-- recursive occurrences by an application of the new function /before/
+-- abstracting over the free variables. Doing it afterwards puts the applied
+-- free variables under the new lambdas, which a capture-avoiding substitution
+-- then renames, leaving them free.
+--
+-- https://github.com/clash-lang/clash-compiler/commit/e4cdac6ea66d1a12d7f63ef5e2e3722021680a4b
+liftBindingSubstitutesBeforeAbstracting :: Assertion
+liftBindingSubstitutesBeforeAbstracting = do
+  supply <- newSupply
+  let r = localId User "r" 40 (intFunTy 1)
+      z = intId User "z" 41
+      x = intId User "x" 31
+      k = globalId User "k" 33 (intFunTy 2)
+      cf = globalId User "top" 42 (intFunTy 1)
+      -- r = \z -> k (r z) x
+      e = Lam z (mkApps (Var k) [Left (App (Var r) (Var z)), Left (Var x)])
+      st :: RewriteState NormalizeState
+      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+  ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
+  case collectArgs newExpr of
+    (Var rLifted, args) -> do
+      assertEqual ("Arguments of the lifted function in:\n" <> showPprU newExpr)
+        [Just (varUniq x)] (argUniques args)
+      case lookupVarEnv rLifted (_bindings st1) of
+        Nothing -> assertFailure "Lifted function not found in global bindings"
+        Just b -> assertNoFreeLocals (bindingTerm b)
+    _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
+
 tests :: TestTree
 tests =
   testGroup
@@ -102,6 +137,8 @@ tests =
             assertErrorContainsIO "It introduces free variables" $
               replaceBy "caseCase" [x, y] (Var x) y
         ]
+    , testCase "liftBinding substitutes before abstracting"
+        liftBindingSubstitutesBeforeAbstracting
     ]
  where
   x = intId User "x" 1
