@@ -731,6 +731,13 @@ assertAlphaEq expected actual =
       <> "\nbut got:\n" <> showPprU actual)
     (expected == actual)
 
+-- | The uniques of the arguments of an application (see 'C.collectArgs') that
+-- are variable references
+argUniques :: [Either C.Term C.Type] -> [Maybe Unique]
+argUniques = map $ \case
+  Left (C.Var v) -> Just (C.varUniq v)
+  _ -> Nothing
+
 -- | The binders of a let-expression, or none for any other term
 letBinders :: C.Term -> [C.Id]
 letBinders (C.Letrec bs _) = map fst bs
