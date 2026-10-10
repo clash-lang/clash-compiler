@@ -6,7 +6,6 @@
   Tests for "Clash.Normalize.Transformations.Specialize"
 -}
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -21,7 +20,6 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Name (NameSort (User), noSrcSpan)
 import Clash.Core.Term (Bind (..), Pat (..), Term (..), collectArgs, mkApps)
-import Clash.Core.Type (Type)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
@@ -31,11 +29,10 @@ import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), extra)
 import Clash.Rewrite.Util (runRewrite)
-import Clash.Unique (Unique)
 import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
+  ( argUniques, assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
   , intFunTy, intId, intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy
   , parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
   , showPprU )
@@ -225,12 +222,6 @@ specializeF st x y = do
         (Var fSpec, _) -> bindingTerm <$> lookupVarEnv fSpec (_bindings st1)
         _ -> Nothing
   pure (res, newBody, st1)
-
--- | The uniques of arguments that are variable references
-argUniques :: [Either Term Type] -> [Maybe Unique]
-argUniques = map $ \case
-  Left (Var v) -> Just (varUniq v)
-  _ -> Nothing
 
 -- | 'specArgBndrsAndVars' used to determine whether a free variable of the
 -- argument specialized on is global by looking up its unique in the global
