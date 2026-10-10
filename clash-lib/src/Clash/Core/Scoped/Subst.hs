@@ -1,0 +1,642 @@
+{-|
+  Copyright   :  (C) 2026, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Capture-avoiding substitution, going under binders, creating fresh binders,
+  and moving values out of the scope of binders, for scoped Clash Core.
+
+  = Substitutions
+
+  A @'Subst' i o@ maps the variables of scope @i@ to types and terms in scope
+  @o@. Variables without an entry map to themselves, which is why the only
+  ways to build a substitution are 'idSubst', 'closedSubst', and extending one
+  with a /binder/ ('extendTySubst', 'extendTmSubst'): you can only substitute
+  for a variable whose binder you are eliminating. E.g. to beta-reduce
+  @'App' ('Lam' b e) arg@ in scope @n@:
+
+  @
+  'substTm' ('extendTmSubst' ('idSubst' sc) b arg) e
+  @
+
+  Like Clash's 'Clash.Core.Subst.Subst', substitution renames a binder only if
+  it may clash with the output scope: if it is at or below the watermark of the
+  scope (see 'Scope'). When a binder's type changes or the binder is renamed,
+  its occurrences are mapped to the updated variable.
+
+  = Going under binders
+
+  A traversal that goes under a binder needs the scope extended with it, to
+  create fresh binders there. 'openIdBinder', 'openTyBinder', 'openAlt' and
+  'openBind' provide it. They rename the binder (and its scope) only if it
+  clashes with the scope, which is rare: conversion numbers binders such that
+  names increase along every path from the root.
+
+  = Trusted code
+
+  This module is part of the trusted core of "Clash.Core.Scoped". Its unsafe
+  operations, the invariants they rely on, and why these hold:
+
+  * __The 'Subst' invariant__: every type variable of scope @i@ without an
+    entry in the type map, and every term variable of scope @i@ without an
+    entry in the term map, is a variable of scope @o@; the entries are in
+    scope @o@. 'idSubst' has no entries and @i = o@. 'closedSubst' has no
+    entries and @i@ has no variables. 'extendTySubst' and 'extendTmSubst' add
+    an entry for the new variable. 'extendSubstScope' extends @o@.
+    'substTyBinder' and 'substIdBinder' extend @o@ with a fresh binder, and add
+    an entry for the old one unless it keeps its name and its type or kind
+    (when there are no type entries); then the variable of @i'@ is the new
+    binder of @o'@. When the old binder shadows a variable that has an entry,
+    that entry is removed or overwritten. 'freshen' only sets a flag.
+
+  * __Substitution__ (@coerceTy@, @coerceTm@, @coerceTyName@,
+    @coerceTmName@): a variable without an entry is kept as it is, which by the
+    invariant is a variable of @o@. The type of a term variable occurrence and
+    the kind of a type variable occurrence are substituted too, if there are
+    type entries: normally they only mention variables that are in scope at
+    the binder, but a type or term built by hand may have an occurrence with
+    another type. A type or term without entries for it (no type entries for a
+    type, no entries at all for a term) is kept as it is, as all its free
+    variables are variables of @o@.
+
+  * __Fresh binders__ ('UnsafeTyNameBinder', 'UnsafeTmNameBinder'): only
+    applied to binders that 'withFresh' or 'withRefreshed' just created, see
+    "Clash.Core.Scoped.Internal.Names".
+
+  * __Opening binders__ ('unsafeCoerce' of a binder and its scope): if the
+    names a binder (or pattern, or let-binding) binds are fresh for the scope,
+    as 'withFreshRaw' and 'withFreshRaws' check, then the scope @l@ that the
+    binder extends @n@ to has the same names as the fresh extension @l'@ that
+    they provide. So the binder and the values in its scope are valid in @l'@
+    as they are.
+
+  * __Unsinking__ ('unsafeCoerce' in 'unsinkTerm' and friends): a value in
+    scope @l@ in which none of the names bound between @n@ and @l@ occur free
+    only mentions names of @n@. "Clash.Core.Scoped.FreeVars" checks this,
+    including the types of variable occurrences and the kinds of type variable
+    occurrences.
+
+  * __Strengthening__ ('unsafeCoerce' in 'strengthenTyId' and
+    'strengthenTyIds'): a type only mentions type variables. A term variable
+    binder binds no type variable, and the type variables in scope @l@ are
+    those of @n@, so a type in @l@ is a type in @n@. This relies on binders
+    being sorted, see "Clash.Core.Scoped.Internal.Names".
+-}
+
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RoleAnnotations #-}
+
+module Clash.Core.Scoped.Subst
+  ( -- * Substitutions
+    Subst
+  , substScope
+  , idSubst
+  , closedSubst
+  , extendTySubst
+  , extendTmSubst
+  , extendTySubstTele
+  , extendTmSubstTele
+  , extendSubstScope
+    -- * Applying substitutions
+  , HasSubst (..)
+  , substTy
+  , substTm
+  , substAlt
+  , substTickInfo
+  , substTyBinder
+  , substIdBinder
+  , substTele
+  , substPat
+  , substBind
+  , freshen
+    -- * Going under binders
+  , openTyBinder
+  , openIdBinder
+  , openAlt
+  , openBind
+    -- * Fresh binders
+  , withFreshTyBinder
+  , withFreshIdBinder
+  , withFreshIdBinders
+    -- * Moving out of the scope of binders
+  , unsinkTerm
+  , unsinkType
+  , unsinkTyBinder
+  , unsinkIdBinder
+  , unsinkAlt
+  , strengthenTyId
+  , strengthenTyIds
+  , strengthenTyPat
+  ) where
+
+import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.Kind as K
+import Unsafe.Coerce (unsafeCoerce)
+
+import qualified Clash.Core.Name as C
+import qualified Clash.Core.Term as C
+import qualified Clash.Core.Type as C
+
+import Clash.Core.Scoped.FreeVars
+import Clash.Core.Scoped.Internal.Names
+import Clash.Core.Scoped.Internal.Scope
+import Clash.Core.Scoped.Syntax
+
+-- * Substitutions
+
+-- | A substitution from scope @i@ to scope @o@. See the module header.
+data Subst (i :: S) (o :: S) = UnsafeSubst
+  { substScope :: !(Scope o)
+  -- ^ The output scope
+  , _substTys :: !(IntMap (Type o))
+  -- ^ Types for type variables, by raw name
+  , _substTms :: !(IntMap (Term o))
+  -- ^ Terms for term variables, by raw name
+  , _substFresh :: !Bool
+  -- ^ Rename every binder, see 'freshen'
+  }
+type role Subst nominal nominal
+
+-- | The identity substitution
+idSubst :: Scope n -> Subst n n
+idSubst sc = UnsafeSubst sc IntMap.empty IntMap.empty False
+
+-- | The substitution from the empty scope, to move a closed value into a
+-- scope, e.g. the type of a data constructor
+closedSubst :: Scope o -> Subst 'VoidS o
+closedSubst sc = UnsafeSubst sc IntMap.empty IntMap.empty False
+
+-- | Substitute a type for the variable bound by a type binder
+extendTySubst :: Subst i o -> TyBinder i i' -> Type o -> Subst i' o
+extendTySubst (UnsafeSubst sc tys tms fr) b ty =
+  UnsafeSubst sc (IntMap.insert k ty tys) (IntMap.delete k tms) fr
+ where
+  k = tyNameRaw (tyNameOf b)
+
+-- | Substitute a term for the variable bound by a term binder
+extendTmSubst :: Subst i o -> IdBinder i i' -> Term o -> Subst i' o
+extendTmSubst (UnsafeSubst sc tys tms fr) b tm =
+  UnsafeSubst sc (IntMap.delete k tys) (IntMap.insert k tm tms) fr
+ where
+  k = tmNameRaw (tmNameOf b)
+
+-- | Substitute types for the variables bound by a telescope. 'Nothing' if
+-- there are more or fewer types than binders.
+extendTySubstTele :: Subst i o -> Tele TyBinder i i' -> [Type o] -> Maybe (Subst i' o)
+extendTySubstTele s TNil [] = Just s
+extendTySubstTele s (TCons b bs) (t:ts) = extendTySubstTele (extendTySubst s b t) bs ts
+extendTySubstTele _ _ _ = Nothing
+
+-- | Substitute terms for the variables bound by a telescope. 'Nothing' if
+-- there are more or fewer terms than binders.
+extendTmSubstTele :: Subst i o -> Tele IdBinder i i' -> [Term o] -> Maybe (Subst i' o)
+extendTmSubstTele s TNil [] = Just s
+extendTmSubstTele s (TCons b bs) (t:ts) = extendTmSubstTele (extendTmSubst s b t) bs ts
+extendTmSubstTele _ _ _ = Nothing
+
+-- | Move the output of a substitution into an extended scope
+extendSubstScope :: DExt o o' => Scope o' -> Subst i o -> Subst i o'
+extendSubstScope sc (UnsafeSubst _ tys tms fr) = UnsafeSubst sc (sink1 tys) (sink1 tms) fr
+{-# INLINE extendSubstScope #-}
+
+-- Trusted: see the module header
+coerceTy :: Type i -> Type o
+coerceTy = unsafeCoerce
+{-# INLINE coerceTy #-}
+
+-- Trusted: see the module header
+coerceTm :: Term i -> Term o
+coerceTm = unsafeCoerce
+{-# INLINE coerceTm #-}
+
+-- Trusted: see the module header
+coerceTyName :: TyName i -> TyName o
+coerceTyName = unsafeCoerce
+{-# INLINE coerceTyName #-}
+
+-- Trusted: see the module header
+coerceTmName :: TmName i -> TmName o
+coerceTmName = unsafeCoerce
+{-# INLINE coerceTmName #-}
+
+-- * Applying substitutions
+
+-- | Values that a substitution can be applied to
+class HasSubst (e :: S -> K.Type) where
+  -- | Apply a substitution
+  subst :: Distinct o => Subst i o -> e i -> e o
+
+instance HasSubst Type where
+  subst = substTy
+  {-# INLINE subst #-}
+
+instance HasSubst Term where
+  subst = substTm
+  {-# INLINE subst #-}
+
+instance HasSubst Alt where
+  subst = substAlt
+  {-# INLINE subst #-}
+
+instance HasSubst TickInfo where
+  subst = substTickInfo
+  {-# INLINE subst #-}
+
+-- | Apply a substitution to a type
+substTy :: Distinct o => Subst i o -> Type i -> Type o
+substTy s@(UnsafeSubst _ tys _ fr) ty0
+  | IntMap.null tys && not fr = coerceTy ty0
+  | otherwise = go ty0
+ where
+  go ty = case ty of
+    VarTy occ k n -> case IntMap.lookup (tyNameRaw n) tys of
+      Just ty' -> ty'
+      -- The kind of the occurrence may mention a substituted variable, see the
+      -- module header
+      Nothing -> VarTy occ (go k) (coerceTyName n)
+    ConstTy c -> ConstTy c
+    ForAllTy b t -> substTyBinder s b $ \s' b' -> ForAllTy b' (substTy s' t)
+    AppTy t1 t2 -> AppTy (go t1) (go t2)
+    LitTy l -> LitTy l
+    AnnType a t -> AnnType a (go t)
+
+-- | Apply a substitution to a term
+substTm :: Distinct o => Subst i o -> Term i -> Term o
+substTm s@(UnsafeSubst _ tys tms fr) tm0
+  | not fr && IntMap.null tys && IntMap.null tms = coerceTm tm0
+  | otherwise = go tm0
+ where
+  goTy = substTy s
+  go tm = case tm of
+    Var occ ty n -> case IntMap.lookup (tmNameRaw n) tms of
+      Just tm' -> tm'
+      Nothing
+        | IntMap.null tys && not fr -> coerceTm tm
+        -- The type of the occurrence may mention a substituted variable, see
+        -- the module header
+        | otherwise -> Var occ (goTy ty) (coerceTmName n)
+    GlobalVar g -> GlobalVar g
+    Data dc -> Data dc
+    Literal l -> Literal l
+    Prim p -> Prim p
+    Lam b e -> substIdBinder s b $ \s' b' -> Lam b' (substTm s' e)
+    TyLam b e -> substTyBinder s b $ \s' b' -> TyLam b' (substTm s' e)
+    App e1 e2 -> App (go e1) (go e2)
+    TyApp e ty -> TyApp (go e) (goTy ty)
+    Let bs e -> substBind s bs $ \s' bs' -> Let bs' (substTm s' e)
+    Case e ty alts -> Case (go e) (goTy ty) (map (substAlt s) alts)
+    Cast e t1 t2 -> Cast (go e) (goTy t1) (goTy t2)
+    Tick t e -> Tick (substTickInfo s t) (go e)
+
+-- | Apply a substitution to a case alternative
+substAlt :: Distinct o => Subst i o -> Alt i -> Alt o
+substAlt s (Alt p e) = substPat s p $ \s' p' -> Alt p' (substTm s' e)
+
+-- | Apply a substitution to a tick
+substTickInfo :: Distinct o => Subst i o -> TickInfo i -> TickInfo o
+substTickInfo s = \case
+  SrcSpan sp -> SrcSpan sp
+  NameMod m ty -> NameMod m (substTy s ty)
+  DeDup -> DeDup
+  NoDeDup -> NoDeDup
+  Attributes ty e -> Attributes (substTy s ty) (substTm s e)
+
+-- Rename a binder if it may clash with the scope, or always when asked to
+refresh
+  :: Distinct o
+  => Scope o -> NameBinder i i' -> Bool
+  -> (forall o'. DExt o o' => NameBinder o o' -> r) -> r
+refresh sc b fr cont
+  | fr = withFresh sc cont
+  | otherwise = withRefreshed sc (nameOf b) cont
+{-# INLINE refresh #-}
+
+-- | Go under a type binder: substitute in its kind, and rename it if it
+-- clashes with the output scope
+substTyBinder
+  :: Distinct o
+  => Subst i o
+  -> TyBinder i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> TyBinder o o' -> r)
+  -> r
+substTyBinder s@(UnsafeSubst sc tys tms fr) (TyBinder occ k b) cont =
+  refresh sc (unsortTyNameBinder b) fr $ \b' ->
+    let new = nameId (nameOf b')
+        k' = substTy s k
+        -- Trusted: b' is fresh, see the module header
+        bndr' = TyBinder occ k' (UnsafeTyNameBinder b')
+        sc' = extendScope b' sc
+        tms' = IntMap.delete old (sink1 tms)
+    in if old == new && IntMap.null tys
+         then cont (UnsafeSubst sc' (sink1 tys) tms' fr) bndr'
+         else cont
+           (UnsafeSubst sc'
+             (IntMap.insert old (VarTy occ (sink k') (tyNameOf bndr')) (sink1 tys))
+             tms'
+             fr)
+           bndr'
+ where
+  old = tyNameBinderRaw b
+
+-- | Go under a term binder: substitute in its type, and rename it if it
+-- clashes with the output scope
+substIdBinder
+  :: Distinct o
+  => Subst i o
+  -> IdBinder i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> IdBinder o o' -> r)
+  -> r
+substIdBinder s@(UnsafeSubst sc tys tms fr) (IdBinder occ ty b) cont =
+  refresh sc (unsortTmNameBinder b) fr $ \b' ->
+    let new = nameId (nameOf b')
+        ty' = substTy s ty
+        -- Trusted: b' is fresh, see the module header
+        bndr' = IdBinder occ ty' (UnsafeTmNameBinder b')
+        sc' = extendScope b' sc
+        tys' = IntMap.delete old (sink1 tys)
+    in if old == new && IntMap.null tys
+         then cont (UnsafeSubst sc' tys' (IntMap.delete old (sink1 tms)) fr) bndr'
+         else cont
+           (UnsafeSubst sc'
+             tys'
+             (IntMap.insert old (Var occ (sink ty') (tmNameOf bndr')) (sink1 tms))
+             fr)
+           bndr'
+ where
+  old = tmNameBinderRaw b
+
+-- | Go under a telescope of binders
+substTele
+  :: Distinct o
+  => (forall x x' y r'. Distinct y => Subst x y -> b x x' -> (forall y'. DExt y y' => Subst x' y' -> b y y' -> r') -> r')
+  -- ^ How to go under a single binder: 'substTyBinder' or 'substIdBinder'
+  -> Subst i o
+  -> Tele b i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> Tele b o o' -> r)
+  -> r
+substTele _ s TNil cont = cont s TNil
+substTele substB s (TCons b bs) cont =
+  substB s b $ \s1 b' ->
+    substTele substB s1 bs $ \s2 bs' ->
+      cont s2 (TCons b' bs')
+
+-- | Go under a pattern
+substPat
+  :: Distinct o
+  => Subst i o
+  -> Pat i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> Pat o o' -> r)
+  -> r
+substPat s p cont = case p of
+  DataPat dc tvs ids ->
+    substTele substTyBinder s tvs $ \s1 tvs' ->
+      substTele substIdBinder s1 ids $ \s2 ids' ->
+        cont s2 (DataPat dc tvs' ids')
+  LitPat l -> cont s (LitPat l)
+  DefaultPat -> cont s DefaultPat
+
+-- | Go under let-bindings, substituting in their right-hand sides
+substBind
+  :: Distinct o
+  => Subst i o
+  -> Bind i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> Bind o o' -> r)
+  -> r
+substBind s bs cont = case bs of
+  NonRec b e ->
+    let e' = substTm s e in
+    substIdBinder s b $ \s' b' -> cont s' (NonRec b' e')
+  Rec bndrs es ->
+    substTele substIdBinder s bndrs $ \s' bndrs' ->
+      cont s' (Rec bndrs' (map (substTm s') es))
+
+-- | Rename every binder in a value to the name just above the watermark of
+-- the scope at the binder, i.e. as conversion from Clash Core would name them.
+-- A binder that doesn't clash with the scope may keep its name.
+freshen :: (Distinct n, HasSubst e) => Scope n -> e n -> e n
+freshen sc = subst (UnsafeSubst sc IntMap.empty IntMap.empty True)
+
+-- * Going under binders
+--
+-- Going under a binder is substituting the identity, which only renames
+-- binders that may clash with the scope. The functions below first check
+-- whether all of the binders are surely fresh, and if they are, reuse the
+-- binders and their scope as they are.
+
+-- | Go under a type binder, renaming it (and its scope) only if it clashes
+-- with the scope
+openTyBinder
+  :: (Distinct n, HasSubst e)
+  => Scope n
+  -> TyBinder n l
+  -> e l
+  -> (forall l'. DExt n l' => Scope l' -> TyBinder n l' -> e l' -> r)
+  -> r
+openTyBinder sc b e cont =
+  withFreshRaw sc (tyNameRaw (tyNameOf b))
+    -- Trusted: see the module header
+    (\sc' -> cont sc' (unsafeCoerce b) (unsafeCoerce e))
+    (substTyBinder (idSubst sc) b $ \s' b' -> cont (substScope s') b' (subst s' e))
+{-# INLINE openTyBinder #-}
+
+-- | Go under a term binder, renaming it (and its scope) only if it clashes
+-- with the scope
+openIdBinder
+  :: (Distinct n, HasSubst e)
+  => Scope n
+  -> IdBinder n l
+  -> e l
+  -> (forall l'. DExt n l' => Scope l' -> IdBinder n l' -> e l' -> r)
+  -> r
+openIdBinder sc b e cont =
+  withFreshRaw sc (tmNameRaw (tmNameOf b))
+    -- Trusted: see the module header
+    (\sc' -> cont sc' (unsafeCoerce b) (unsafeCoerce e))
+    (substIdBinder (idSubst sc) b $ \s' b' -> cont (substScope s') b' (subst s' e))
+{-# INLINE openIdBinder #-}
+
+-- | Go under the pattern of a case alternative, renaming the variables it
+-- binds (and their scope) only if they clash with the scope
+openAlt
+  :: Distinct n
+  => Scope n
+  -> Alt n
+  -> (forall l. DExt n l => Scope l -> Pat n l -> Term l -> r)
+  -> r
+openAlt sc (Alt p e) cont = case p of
+  DataPat _ tvs ids ->
+    withFreshRaws sc
+      (\step done ->
+         teleRawsF tyNameBinderRaw tyBinderName tvs step
+           (teleRawsF tmNameBinderRaw idBinderName ids step done))
+      -- Trusted: see the module header
+      (\sc' -> cont sc' (unsafeCoerce p) (unsafeCoerce e))
+      (substPat (idSubst sc) p $ \s' p' -> cont (substScope s') p' (substTm s' e))
+  LitPat {} -> cont sc p e
+  DefaultPat -> cont sc p e
+{-# INLINE openAlt #-}
+
+-- | Go under let-bindings, renaming the variables they bind (and their scope)
+-- only if they clash with the scope
+openBind
+  :: (Distinct n, HasSubst e)
+  => Scope n
+  -> Bind n l
+  -> e l
+  -> (forall l'. DExt n l' => Scope l' -> Bind n l' -> e l' -> r)
+  -> r
+openBind sc bs e cont =
+  withFreshRaws sc bindRaws
+    -- Trusted: see the module header
+    (\sc' -> cont sc' (unsafeCoerce bs) (unsafeCoerce e))
+    (substBind (idSubst sc) bs $ \s' bs' -> cont (substScope s') bs' (subst s' e))
+ where
+  bindRaws :: (Int -> (Int -> a) -> Int -> a) -> (Int -> a) -> Int -> a
+  bindRaws step done = case bs of
+    NonRec b _ -> step (tmNameRaw (tmNameOf b)) done
+    Rec bndrs _ -> teleRawsF tmNameBinderRaw idBinderName bndrs step done
+{-# INLINE openBind #-}
+
+-- | The raw names bound by a telescope, as a fold for 'withFreshRaws'
+teleRawsF
+  :: forall b sb n l acc a
+   . (forall x y. sb x y -> Int)
+  -> (forall x y. b x y -> sb x y)
+  -> Tele b n l
+  -> (Int -> (acc -> a) -> acc -> a)
+  -> (acc -> a)
+  -> acc
+  -> a
+teleRawsF raw binder tele step done = go tele
+ where
+  go :: Tele b x y -> acc -> a
+  go TNil = done
+  go (TCons b bs) = step (raw (binder b)) (go bs)
+{-# INLINE teleRawsF #-}
+
+-- * Fresh binders
+
+-- | Create a type variable binder with a fresh name
+withFreshTyBinder
+  :: Distinct n
+  => Scope n
+  -> C.Name C.Type
+  -- ^ Human readable name. Its unique is not used.
+  -> Kind n
+  -> (forall l. DExt n l => Scope l -> TyBinder n l -> r)
+  -> r
+withFreshTyBinder sc occ k cont =
+  withFresh sc $ \b ->
+    -- Trusted: b is fresh, see the module header
+    cont (extendScope b sc) (TyBinder occ k (UnsafeTyNameBinder b))
+{-# INLINE withFreshTyBinder #-}
+
+-- | Create a term variable binder with a fresh name
+withFreshIdBinder
+  :: Distinct n
+  => Scope n
+  -> C.Name C.Term
+  -- ^ Human readable name. Its unique is not used.
+  -> Type n
+  -> (forall l. DExt n l => Scope l -> IdBinder n l -> r)
+  -> r
+withFreshIdBinder sc occ ty cont =
+  withFresh sc $ \b ->
+    -- Trusted: b is fresh, see the module header
+    cont (extendScope b sc) (IdBinder occ ty (UnsafeTmNameBinder b))
+{-# INLINE withFreshIdBinder #-}
+
+-- | Create a telescope of term variable binders with fresh names, e.g. for
+-- the fields of a 'DataPat'. Also gives the variables they bind.
+withFreshIdBinders
+  :: forall n r
+   . Distinct n
+  => Scope n
+  -> [(C.Name C.Term, Type n)]
+  -- ^ Human readable names (whose uniques are not used) and types
+  -> (forall l. DExt n l => Scope l -> Tele IdBinder n l -> [Term l] -> r)
+  -> r
+withFreshIdBinders sc0 bs0 cont = go sc0 [] bs0 cont
+ where
+  -- The types of the remaining binders are in scope n, and are sunk into x.
+  -- The variables bound so far are in reverse order.
+  go
+    :: DExt n x
+    => Scope x
+    -> [Term x]
+    -> [(C.Name C.Term, Type n)]
+    -> (forall l. DExt x l => Scope l -> Tele IdBinder x l -> [Term l] -> r')
+    -> r'
+  go sc vs [] k = k sc TNil (reverse vs)
+  go sc vs ((occ, ty):bs) k =
+    withFreshIdBinder sc occ (sink ty) $ \sc1 b ->
+      go sc1 (idBinderVar b : sink1 vs) bs $ \sc2 bs' vs' -> k sc2 (TCons b bs') vs'
+
+-- * Moving out of the scope of binders
+
+-- | Move a term out of the scope of binders, if none of the variables they
+-- bind occur in it
+unsinkTerm :: NameBinders n l -> Term l -> Maybe (Term n)
+unsinkTerm bs e
+  | anyBoundOccursIn bs e = Nothing
+  -- Trusted: see the module header
+  | otherwise = Just (unsafeCoerce e)
+
+-- | Move a type out of the scope of binders, if none of the variables they
+-- bind occur in it
+unsinkType :: NameBinders n l -> Type l -> Maybe (Type n)
+unsinkType bs ty
+  | anyBoundOccursInType bs ty = Nothing
+  -- Trusted: see the module header
+  | otherwise = Just (unsafeCoerce ty)
+
+-- | Move a term out of the scope of a type variable binder, if the variable
+-- doesn't occur in it
+unsinkTyBinder :: TyBinder n l -> Term l -> Maybe (Term n)
+unsinkTyBinder b e
+  | tyNameOccursIn (tyNameOf b) e = Nothing
+  -- Trusted: see the module header
+  | otherwise = Just (unsafeCoerce e)
+
+-- | Move a term out of the scope of a term variable binder, if the variable
+-- doesn't occur in it
+unsinkIdBinder :: IdBinder n l -> Term l -> Maybe (Term n)
+unsinkIdBinder b e
+  | tmNameOccursIn (tmNameOf b) e = Nothing
+  -- Trusted: see the module header
+  | otherwise = Just (unsafeCoerce e)
+
+-- | Move the right-hand side of a case alternative out of the scope of its
+-- pattern, if none of the variables the pattern binds occur in it
+unsinkAlt :: Pat n l -> Term l -> Maybe (Term n)
+unsinkAlt p e
+  | patBindersOccurIn p e = Nothing
+  -- Trusted: see the module header
+  | otherwise = Just (unsafeCoerce e)
+
+-- | Move a type out of the scope of a term variable binder. Always possible:
+-- a type only mentions type variables.
+strengthenTyId :: IdBinder n l -> Type l -> Type n
+-- Trusted: see the module header
+strengthenTyId _ = unsafeCoerce
+{-# INLINE strengthenTyId #-}
+
+-- | Move a type out of the scope of term variable binders, see
+-- 'strengthenTyId'
+strengthenTyIds :: Tele IdBinder n l -> Type l -> Type n
+-- Trusted: see the module header
+strengthenTyIds _ = unsafeCoerce
+{-# INLINE strengthenTyIds #-}
+
+-- | Move a type out of the scope of a pattern, if the type variables the
+-- pattern binds don't occur in it
+strengthenTyPat :: Pat n l -> Type l -> Maybe (Type n)
+strengthenTyPat p ty = case p of
+  DataPat _ TNil ids -> Just (strengthenTyIds ids ty)
+  DataPat {} -> unsinkType (patNameBinders p) ty
+  LitPat _ -> Just ty
+  DefaultPat -> Just ty

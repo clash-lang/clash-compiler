@@ -17,6 +17,7 @@
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Test.Clash.Scoped
@@ -29,6 +30,9 @@ module Test.Clash.Scoped
   , assertScopedAlphaEq
   , assertScopedTyAlphaEq
   , nameSetRaws
+    -- * Beta reduction
+  , betaTm
+  , betaTy
   ) where
 
 import qualified Control.Lens as Lens
@@ -44,6 +48,7 @@ import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.NameMap
+import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite (assertAlphaEq, intId)
@@ -95,3 +100,15 @@ assertScopedTyAlphaEq expected actual = assertAlphaEq expected (toClashType actu
 -- | The raw names in a set, in ascending order
 nameSetRaws :: ScopedName k => NameSet k n -> [Int]
 nameSetRaws = map scopedNameRaw . nameSetToList
+
+-- | Beta-reduce an application of a lambda. Errors on other terms.
+betaTm :: (HasCallStack, Distinct n) => Scope n -> Term n -> Term n
+betaTm sc = \case
+  App (Lam b e) arg -> substTm (extendTmSubst (idSubst sc) b arg) e
+  _ -> error "betaTm: not an application of a lambda"
+
+-- | Beta-reduce a type application of a type lambda. Errors on other terms.
+betaTy :: (HasCallStack, Distinct n) => Scope n -> Term n -> Term n
+betaTy sc = \case
+  TyApp (TyLam b e) ty -> substTm (extendTySubst (idSubst sc) b ty) e
+  _ -> error "betaTy: not a type application of a type lambda"
