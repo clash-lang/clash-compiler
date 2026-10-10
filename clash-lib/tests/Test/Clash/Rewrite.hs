@@ -25,6 +25,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Core.FreeVars (freeLocalIds)
+import Clash.Core.Lint (LintError, lintTerm, mkLintEnv)
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Core.VarEnv
   ( InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet
@@ -174,6 +175,17 @@ runRewriteTest
 runRewriteTest rwEnv rwState m = do
   (a, rwState1, anyChanged) <- runR m rwEnv rwState
   pure (a, rwState1, getAny anyChanged)
+
+-- | Lint a term with all checks of "Clash.Core.Lint" enabled. The term appears
+-- in a context with the given in-scope set and binders, and the given global
+-- binders exist.
+lintIn :: [C.Id] -> InScopeSet -> C.Context -> C.Term -> [LintError]
+lintIn globals is ctx =
+  lintTerm (mkLintEnv (const True) (`elem` map C.varUniq globals) is ctx)
+
+-- | Lint a closed term with all checks enabled, see 'lintIn'
+lintClosed :: C.Term -> [LintError]
+lintClosed = lintIn [] emptyInScopeSet []
 
 -- | Run a single transformation with an empty environment and empty
 -- InScopeSet. See Default instances ^ to inspect the precise definition of
