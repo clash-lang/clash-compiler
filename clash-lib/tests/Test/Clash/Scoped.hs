@@ -28,6 +28,7 @@ module Test.Clash.Scoped
     -- * Assertions
   , assertScopedAlphaEq
   , assertScopedTyAlphaEq
+  , nameSetRaws
   ) where
 
 import qualified Control.Lens as Lens
@@ -42,6 +43,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite (assertAlphaEq, intId)
@@ -89,3 +91,7 @@ assertScopedAlphaEq expected actual = assertAlphaEq expected (toClashTerm actual
 -- Clash type
 assertScopedTyAlphaEq :: HasCallStack => C.Type -> Type n -> Assertion
 assertScopedTyAlphaEq expected actual = assertAlphaEq expected (toClashType actual)
+
+-- | The raw names in a set, in ascending order
+nameSetRaws :: ScopedName k => NameSet k n -> [Int]
+nameSetRaws = map scopedNameRaw . nameSetToList
