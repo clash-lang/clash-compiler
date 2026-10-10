@@ -19,9 +19,9 @@ import Test.Tasty.HUnit
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Name (NameSort (User), noSrcSpan)
 import Clash.Core.Term
-  ( Bind (..), IsMultiPrim (SingleResult), PrimInfo (..)
+  ( Bind (..), IsMultiPrim (SingleResult), Pat (..), PrimInfo (..)
   , PrimUnfolding (NoUnfolding), Term (..), WorkInfo (WorkVariable), mkApps )
-import Clash.Core.Type (mkFunTy)
+import Clash.Core.Type (Type (VarTy), mkFunTy)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Normalize.Transformations.ANF (makeANF, nonRepANF)
@@ -33,10 +33,9 @@ import Clash.Unique (Unique)
 import Clash.Util.Supply (Supply, newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, globalId, inScopeOf
-  , intFunTy, intId
-  , intLit, intTy, letBinders, mkDataCon, parseTyConTy, runSingleTransformation
-  , showPprU )
+  ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, assertWellScoped
+  , globalId, inScopeOf, intFunTy, intId, intLit, intTy, letBinders, localId
+  , mkDataCon, parseTyConTy, runSingleTransformation, showPprU, tyVar )
 
 nonRepANFR :: NormRewrite
 nonRepANFR = $(asRewriteQ nonRepANF)
@@ -144,6 +143,56 @@ anfDoesNotLiftOutOfLambdas = do
   runSingleTransformation def st emptyInScopeSet (nonRepANFR >-> makeANF) tm
     >>= assertNoFreeLocals
 
+-- | A stand-in for @Signal@, see 'signalCons'
+signalTy :: Type
+signalTy = parseTyConTy "Sig"
+
+-- | @(:-) :: Int -> Sig -> Sig@. ANF recognizes this constructor by its
+-- name.
+signalCons :: DataCon
+signalCons =
+  mkDataCon "Clash.Signal.Internal.:-" 1101 [] [] [intTy, signalTy] signalTy
+
+-- | ANF used to leave case-expressions with an alternative for the @(:-)@
+-- constructor of @Signal@ in place, but still let-bound the subterms of that
+-- alternative outside of it. Here, it let-bound @h x@ outside of the
+-- alternative binding @x@:
+--
+-- > \s -> case s of x :- xs -> k (h x) x
+anfSignalCons :: Assertion
+anfSignalCons = do
+  supply <- newSupply
+  runSingleTransformation def def{_uniqSupply = supply} emptyInScopeSet makeANF
+    (Lam s (Case (Var s) intTy
+      [ (DataPat signalCons [] [x, xs]
+        , mkApps (Var kId) [Left (App (Var hId) (Var x)), Left (Var x)]) ]))
+    >>= assertWellScoped
+ where
+  s = localId User "s" 1102 signalTy
+  x = intId User "x" 1103
+  xs = localId User "xs" 1104 signalTy
+
+-- | ANF leaves alternatives whose pattern binds existential type variables in
+-- place, but used to let-bind the subterms of these alternatives outside of
+-- them. Here, it let-bound @h y@ outside of the alternative binding @y@:
+--
+-- > \e -> case e of MkE @m (x :: m) (y :: Int) -> k (h y) y
+anfExistential :: Assertion
+anfExistential = do
+  supply <- newSupply
+  runSingleTransformation def def{_uniqSupply = supply} emptyInScopeSet makeANF
+    (Lam e (Case (Var e) intTy
+      [ (DataPat mkE [m] [x, y]
+        , mkApps (Var kId) [Left (App (Var hId) (Var y)), Left (Var y)]) ]))
+    >>= assertWellScoped
+ where
+  m = tyVar User "m" 1201
+  -- MkE :: forall m. m -> Int -> E
+  mkE = mkDataCon "MkE" 1202 [] [m] [VarTy m, intTy] (parseTyConTy "E")
+  e = localId User "e" 1203 (parseTyConTy "E")
+  x = localId User "x" 1204 (VarTy m)
+  y = intId User "y" 1205
+
 tests :: TestTree
 tests =
   testGroup
@@ -158,4 +207,8 @@ tests =
         anfDoesNotDuplicateBinders
     , testCase "ANF does not lift expressions out of lambdas"
         anfDoesNotLiftOutOfLambdas
+    , testCase "ANF does not lift expressions out of Signal (:-) alternatives"
+        anfSignalCons
+    , testCase "ANF does not lift expressions out of existential alternatives"
+        anfExistential
     ]

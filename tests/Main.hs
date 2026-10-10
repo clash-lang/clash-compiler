@@ -1030,6 +1030,7 @@ runClashTest t3105Env = defaultMain
             in runTest "BlobVec" _opts
           ]
         , runTest "SigP" def{hdlSim=[]}
+        , runTest "SignalConsPattern" def{hdlSim=[]}
         , outputTest "T1102A" def{hdlTargets=[VHDL]}
         , outputTest "T1102B" def{hdlTargets=[VHDL]}
         , runTest "T2069" def

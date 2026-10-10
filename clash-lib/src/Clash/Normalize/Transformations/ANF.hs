@@ -25,7 +25,7 @@ import Control.Arrow ((***))
 import Control.Lens (_2)
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
-import Control.Monad.State (StateT, lift, modify, runStateT)
+import Control.Monad.State (StateT, get, lift, modify, put, runStateT)
 import Control.Monad.Writer (listen)
 import Data.Bifunctor (second)
 import qualified Data.Monoid as Monoid (Any(..))
@@ -43,17 +43,17 @@ import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst (deshadowLetExpr, freshenTm)
 import Clash.Core.Term
   ( Alt, CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
-  , collectArgs, collectTicks, mkTicks, partitionTicks, stripTicks)
+  , collectArgs, collectTicks, mkTicks, partitionTicks, patIds, stripTicks)
 import Clash.Core.TermInfo (isCon, isLocalVar, isPrim, isVar)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type, TypeView(..), coreView, tyView)
-import Clash.Core.Util (mkSelectorCase)
+import Clash.Core.Util (mkInternalVar, mkSelectorCase)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList, mkVarSet)
 import Clash.Netlist.Util (bindsExistentials)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
-import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.Combinators (allR, (>->))
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
@@ -162,7 +162,7 @@ makeANF ctx@(TransformContext is0 _) e0 = do
     -- See also Note [ANF InScopeSet]
     let (is2,e1) = freshenTm is0 e0
     ((e2,(bndrs,_)),Monoid.getAny -> hasChanged) <-
-      listen (runStateT (bottomupR collectANF ctx e1) ([],is2))
+      listen (runStateT (anfTraverse ctx e1) ([],is2))
     case bndrs of
       [] -> if hasChanged then return e2 else return e0
       _  -> do
@@ -173,6 +173,40 @@ makeANF ctx@(TransformContext is0 _) e0 = do
 {-# SCC makeANF #-}
 
 type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) NormalizeSession)
+
+-- | Apply 'collectANF' bottom-up, like 'bottomupR' would. Except for
+-- alternatives with patterns that bind existential type variables: 'collectANF'
+-- leaves these alternatives in place, as it cannot let-bind projections of
+-- fields with an existential type. The let-bindings created for the subterms
+-- of such an alternative must therefore stay in the alternative as well:
+-- lifting them out, like the let-bindings created for other subterms, would
+-- move the variables bound by its pattern out of scope.
+anfTraverse :: NormRewriteW
+anfTraverse ctx@(TransformContext is0 c) e = case e of
+  Case scrut ty alts
+    | any altBindsExistentials alts -> do
+      scrut1 <- anfTraverse (TransformContext is0 (CaseScrut:c)) scrut
+      alts1 <- mapM goAlt alts
+      collectANF ctx (Case scrut1 ty alts1)
+  _ -> (allR anfTraverse >-> collectANF) ctx e
+ where
+  goAlt alt@(p,altE) = do
+    let (tvs,ids) = patIds p
+        ctx1 = TransformContext
+                 (extendInScopeSetList (extendInScopeSetList is0 tvs) ids)
+                 (CaseAlt p:c)
+    if altBindsExistentials alt then do
+      (bs0,isA0) <- get
+      put ([],isA0)
+      altE1 <- anfTraverse ctx1 altE
+      (bsAlt,isA1) <- get
+      put (bs0,isA1)
+      return (p, if null bsAlt then altE1 else Letrec bsAlt altE1)
+    else
+      (p,) <$> anfTraverse ctx1 altE
+
+  altBindsExistentials (DataPat _ exts xs,_) = bindsExistentials exts xs
+  altBindsExistentials _ = False
 
 -- | See Note [ANF InScopeSet]
 tellBinders :: [LetBinding] -> StateT ([LetBinding],InScopeSet) NormalizeSession ()
@@ -301,25 +335,6 @@ collectANF _ (Letrec binds body) = do
       tellBinders binds
       return (Var argId)
 
--- TODO: The code below special-cases ANF for the ':-' constructor for the
--- 'Signal' type. The 'Signal' type is essentially treated as a "transparent"
--- type by the Clash compiler, so observing its constructor leads to all kinds
--- of problems. In this case that "Clash.Rewrite.Util.mkSelectorCase" will
--- try to project the LHS and RHS of the ':-' constructor, however,
--- 'mkSelectorCase' uses 'coreView1' to find the "real" data-constructor.
--- 'coreView1' however looks through the 'Signal' type, and hence 'mkSelector'
--- finds the data constructors for the element type of Signal. This resulted in
--- error #24 (https://github.com/christiaanb/clash2/issues/24), where we
--- try to get the first field out of the 'Vec's 'Nil' constructor.
---
--- Ultimately we should stop treating Signal as a "transparent" type and deal
--- handling of the Signal type, and the involved co-recursive functions,
--- properly. At the moment, Clash cannot deal with this recursive type and the
--- recursive functions involved, hence the need for special-casing code. After
--- everything is done properly, we should remove the two lines below.
-collectANF _ e@(Case _ _ [(DataPat dc _ _,_)])
-  | nameOcc (dcName dc) == Text.showt '(:-) = return e
-
 collectANF ctx (Case subj ty alts) = do
     let localVar = isLocalVar subj
     let isConstantSubj = isConstant subj
@@ -350,7 +365,7 @@ collectANF ctx (Case subj ty alts) = do
     doAlt :: Bool -> Term -> Alt -> StateT ([LetBinding],InScopeSet) NormalizeSession Alt
     doAlt isSimIOAlt subj' alt@(DataPat dc exts xs,altExpr) | not (bindsExistentials exts xs) = do
       let lv = isLocalVar altExpr
-      patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
+      patSels <- Monad.zipWithM (doPatBndr subj' dc xs) xs [0..]
       let altExprIsConstant = isConstant altExpr
       let usesXs (Var n) = any (== n) xs
           usesXs _       = False
@@ -383,12 +398,15 @@ collectANF ctx (Case subj ty alts) = do
           tellBinders [(altId,altExpr)]
           return (pat,Var altId)
 
-    doPatBndr :: Term -> DataCon -> Id -> Int -> StateT ([LetBinding],InScopeSet) NormalizeSession LetBinding
-    doPatBndr subj' dc pId i = do
+    doPatBndr :: Term -> DataCon -> [Id] -> Id -> Int -> StateT ([LetBinding],InScopeSet) NormalizeSession LetBinding
+    doPatBndr subj' dc xs pId i = do
       tcm <- Lens.view tcCache
       -- See Note [ANF InScopeSet]
       is1 <- Lens.use _2
-      patExpr <- lift (mkSelectorCase ($(curLoc) ++ "doPatBndr") is1 tcm subj' (dcTag dc) i)
+      patExpr <- lift $
+        if nameOcc (dcName dc) == Text.showt '(:-)
+          then mkSignalConsSelector is1 subj' dc xs i
+          else mkSelectorCase ($(curLoc) ++ "doPatBndr") is1 tcm subj' (dcTag dc) i
       -- No need to 'tellBinders' here because 'pId' is already in the ANF
       -- InScopeSet.
       --
@@ -397,6 +415,32 @@ collectANF ctx (Case subj ty alts) = do
 
 collectANF _ e = return e
 {-# SCC collectANF #-}
+
+-- | Project the field with the given index out of a 'Signal' constructed with
+-- @(:-)@, given the variables an alternative for @(:-)@ binds.
+--
+-- 'Clash.Core.Util.mkSelectorCase' cannot do this: Clash treats 'Signal' as a
+-- "transparent" type, and 'mkSelectorCase' uses 'coreView1' to find the data
+-- constructors of the subject, which looks through 'Signal' and finds those of
+-- the element type instead. See error #24
+-- (https://github.com/christiaanb/clash2/issues/24), where it tried to get the
+-- first field out of the 'Vec's 'Nil' constructor.
+mkSignalConsSelector
+  :: InScopeSet
+  -> Term
+  -- ^ Subject
+  -> DataCon
+  -- ^ The @(:-)@ constructor
+  -> [Id]
+  -- ^ Variables bound by the alternative for @(:-)@
+  -> Int
+  -- ^ Index of the field to project
+  -> NormalizeSession Term
+mkSignalConsSelector is subj dc xs i = do
+  bndrs <- mapM (mkInternalVar is "sel" . coreTypeOf) xs
+  case drop i bndrs of
+    sel:_ -> return (Case subj (coreTypeOf sel) [(DataPat dc [] bndrs, Var sel)])
+    [] -> error ($(curLoc) ++ "mkSignalConsSelector: no field " ++ show i)
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
