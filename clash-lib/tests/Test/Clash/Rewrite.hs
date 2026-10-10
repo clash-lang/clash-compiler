@@ -38,7 +38,7 @@ import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
-import Clash.Util.Supply (newSupply)
+import Clash.Util.Supply (Supply, freshId, newSupply)
 import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
@@ -702,6 +702,13 @@ freeVar nmSort nm uniq = C.Var (localId nmSort nm uniq freeVarType)
 -- | An 'InScopeSet' containing exactly the given variables
 inScopeOf :: [C.Var a] -> InScopeSet
 inScopeOf = mkInScopeSet . mkVarSet
+
+-- | The first /n/ uniques a supply hands out. Tests use these to give a
+-- binder the unique a transformation would otherwise pick for a new binder.
+firstUniques :: Int -> Supply -> [Unique]
+firstUniques n = take n . go
+ where
+  go s0 = let (u, s1) = freshId s0 in u : go s1
 
 -- | Pretty print, always showing uniques (regardless of @CLASH_PPR_UNIQUES@)
 -- but no types. Tests on scoping are about binders that share a name but not a

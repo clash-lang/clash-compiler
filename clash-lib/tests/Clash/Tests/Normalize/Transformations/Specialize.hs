@@ -35,9 +35,10 @@ import Clash.Unique (Unique)
 import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertNoFreeLocals, globalId, inScopeOf, intFunTy, intId
-  , intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy, parseToTerm
-  , parseToTermQQ, runRewriteTest, runSingleTransformation, showPprU )
+  ( assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
+  , intFunTy, intId, intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy
+  , parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
+  , showPprU )
 
 appPropR :: NormRewrite
 appPropR = $(asRewriteQ appProp)
@@ -285,6 +286,34 @@ specializeCacheFreeVarOrder = do
       ("Expected applications of globals, but got:\n" <> showPprU res1
         <> "\nand:\n" <> showPprU res2)
 
+-- | 'mkFunction', used by 'specialize' to create the specialized function, used
+-- to give the new function a fresh unique without checking whether a global
+-- binder with that unique already exists, overwriting it.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/790
+specializeDoesNotOverwriteBinders :: Assertion
+specializeDoesNotOverwriteBinders = do
+  supply <- newSupply
+  let -- Global binders occupying the uniques the supply hands out first
+      victims =
+        [ (globalId User "victim" u intTy, intLit (toInteger n))
+        | (n, u) <- zip [0 :: Int ..] (firstUniques 8 supply) ]
+      x = intId User "x" 12
+      y = intId User "y" 13
+      bs = mkBindingMap (fBinding : victims)
+  (res, _, st1) <- specializeF def{_bindings = bs, _uniqSupply = supply} x y
+  case collectArgs res of
+    (Var fSpec, _) ->
+      assertBool ("Specialized function reuses a unique of an existing binder:\n" <> showPprU res)
+        (varUniq fSpec `notElem` map (varUniq . fst) (fBinding : victims))
+    _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU res)
+  mapM_
+    (\(v, t) -> case lookupVarEnv v (_bindings st1) of
+        Just b | showPprU (bindingId b) == showPprU v, bindingTerm b == t -> pure ()
+        b -> assertFailure
+          ("Binder " <> showPprU v <> " was overwritten by: " <> maybe "nothing" (showPprU . bindingId) b))
+    victims
+
 tests :: TestTree
 tests =
   testGroup
@@ -307,4 +336,6 @@ tests =
         specializeLocalShadowingGlobal
     , testCase "specialize orders free variables by occurrence (#1087)"
         specializeCacheFreeVarOrder
+    , testCase "specialize does not overwrite existing binders (#790)"
+        specializeDoesNotOverwriteBinders
     ]
