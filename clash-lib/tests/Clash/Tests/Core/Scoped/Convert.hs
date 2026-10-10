@@ -21,12 +21,13 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertErrorContains, assertNoShadowing, assertStructurallyEqual
   , existentialDataCon, existentialTy, existentialTyVar, globalId, intId, intTy
-  , localId, parseToTermQQ, tyVar)
+  , localId, parseToTermQQ, showPprU, tyVar)
 import Test.Clash.Scoped (roundTrip, withFreeVarsOf)
 
 tests :: TestTree
@@ -124,6 +125,10 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
               Var _ _ n -> assertBool "renamed" (tmNameRaw n /= 1)
               _ -> assertFailure "unexpected shape"
         _ -> assertFailure "unexpected shape"
+
+  , testCase "pretty printing shows the converted term" $ do
+      let tm = fromClashTermClosed [parseToTermQQ| \(x :: Int) (y :: Int) -> x |]
+      showPprU tm @?= showPprU (toClashTerm tm)
 
   , testCase "conversion keeps the uniques of free variables" $ do
       let x = intId C.User "x" 5
