@@ -85,6 +85,7 @@ instance HasFreeVars Type where
       VarTy{} -> False
       ForAllTy{} -> getAll (Lens.foldMapOf typeFreeVars (const (All False)) ty)
       AppTy l r -> isClosed l && isClosed r
+      AnnType _ t -> isClosed t
       _ -> True
 
   elemFreeVars v ty =
