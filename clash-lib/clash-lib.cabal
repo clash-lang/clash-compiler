@@ -446,6 +446,7 @@ test-suite unittests
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize
                  Clash.Tests.Normalize.Transformations
+                 Clash.Tests.Normalize.Transformations.ANF
                  Clash.Tests.Normalize.Transformations.Case
                  Clash.Tests.Normalize.Transformations.Inline
                  Clash.Tests.Normalize.Transformations.Letrec
