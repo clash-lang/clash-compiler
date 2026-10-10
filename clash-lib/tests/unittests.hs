@@ -12,6 +12,7 @@ import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist
 import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Normalize
+import qualified Clash.Tests.Normalize.PrimitiveReductions
 import qualified Clash.Tests.Normalize.Transformations
 import qualified Clash.Tests.Normalize.Transformations.ANF
 import qualified Clash.Tests.Normalize.Transformations.Case
@@ -43,6 +44,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Netlist.tests
   , Clash.Tests.Netlist.Id.tests
   , Clash.Tests.Normalize.tests
+  , Clash.Tests.Normalize.PrimitiveReductions.tests
   , Clash.Tests.Normalize.Transformations.tests
   , Clash.Tests.Normalize.Transformations.ANF.tests
   , Clash.Tests.Normalize.Transformations.Case.tests

@@ -1156,12 +1156,14 @@ runClashTest t3105Env = defaultMain
           -- vivado segfaults
           runTest "FirOddSize" def{hdlSim=hdlSim def \\ [Vivado]}
 
+        , runTest "ImapEmpty" def{hdlSim=[]}
         , runTest "IndexInt" def
         ,
           -- Vivado segfaults
           runTest "IndexInt2" def {hdlSim=hdlSim def \\ [Vivado]}
 
         , outputTest "IndexInt2" def{hdlTargets=[Verilog]}
+        , runTest "IndexIntEmpty" def{hdlSim=[], clashFlags=["-fclash-compile-ultra"]}
         , runTest "Concat" def
         , runTest "DFold" def{hdlTargets = [VHDL, Verilog]}
         ,
