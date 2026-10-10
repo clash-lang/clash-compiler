@@ -22,7 +22,9 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
+import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
+import Clash.Core.VarEnv
+  (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet, mkVarSet)
 import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
@@ -44,7 +46,8 @@ import Language.Haskell.Exts.Parser
   (ParseMode (..), defaultParseMode, fromParseResult, parseExpWithMode)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase)
+import Test.Tasty.HUnit
+  (Assertion, assertBool, assertEqual, assertFailure, testCase)
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 
@@ -585,6 +588,31 @@ globalIntVar nmSort nm uniq = C.Var (mkId C.GlobalId nmSort nm uniq intTy)
 -- | A reference to a variable without a declared type. See 'freeVarType'.
 freeVar :: C.NameSort -> String -> Unique -> C.Term
 freeVar nmSort nm uniq = C.Var (localId nmSort nm uniq freeVarType)
+
+-- | An 'InScopeSet' containing exactly the given variables
+inScopeOf :: [C.Var a] -> InScopeSet
+inScopeOf = mkInScopeSet . mkVarSet
+
+-- | Pretty print, always showing uniques (regardless of @CLASH_PPR_UNIQUES@)
+-- but no types. Tests on scoping are about binders that share a name but not a
+-- unique, or vice versa.
+showPprU :: PrettyPrec p => p -> String
+showPprU = showPpr' PrettyOptions
+  { displayUniques = True
+  , displayTypes = False
+  , displayQualifiers = False
+  , displayTicks = False
+  }
+
+-- | Assert that two terms, or two types, are alpha equivalent: 'Eq' on
+-- 'C.Term' and 'C.Type' is alpha equivalence. Shows both, with uniques, if
+-- they're not.
+assertAlphaEq :: (HasCallStack, Eq a, PrettyPrec a) => a -> a -> Assertion
+assertAlphaEq expected actual =
+  assertBool
+    ("Expected (up to alpha equivalence):\n" <> showPprU expected
+      <> "\nbut got:\n" <> showPprU actual)
+    (expected == actual)
 
 -- | Assert that two terms are structurally equal, by comparing their 'Show'
 -- output.
