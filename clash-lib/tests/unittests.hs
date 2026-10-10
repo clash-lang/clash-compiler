@@ -15,6 +15,7 @@ import qualified Clash.Tests.Normalize
 import qualified Clash.Tests.Normalize.Transformations
 import qualified Clash.Tests.Normalize.Transformations.ANF
 import qualified Clash.Tests.Normalize.Transformations.Case
+import qualified Clash.Tests.Normalize.Transformations.DEC
 import qualified Clash.Tests.Normalize.Transformations.Inline
 import qualified Clash.Tests.Normalize.Transformations.Letrec
 import qualified Clash.Tests.Normalize.Transformations.Specialize
@@ -45,6 +46,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Transformations.tests
   , Clash.Tests.Normalize.Transformations.ANF.tests
   , Clash.Tests.Normalize.Transformations.Case.tests
+  , Clash.Tests.Normalize.Transformations.DEC.tests
   , Clash.Tests.Normalize.Transformations.Inline.tests
   , Clash.Tests.Normalize.Transformations.Letrec.tests
   , Clash.Tests.Normalize.Transformations.Specialize.tests

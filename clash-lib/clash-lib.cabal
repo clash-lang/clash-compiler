@@ -449,6 +449,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Transformations
                  Clash.Tests.Normalize.Transformations.ANF
                  Clash.Tests.Normalize.Transformations.Case
+                 Clash.Tests.Normalize.Transformations.DEC
                  Clash.Tests.Normalize.Transformations.Inline
                  Clash.Tests.Normalize.Transformations.Letrec
                  Clash.Tests.Normalize.Transformations.Specialize
