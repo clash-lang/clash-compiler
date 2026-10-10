@@ -446,10 +446,12 @@ test-suite unittests
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize.Transformations
                  Clash.Tests.Normalize.Transformations.Case
+                 Clash.Tests.Normalize.Transformations.Letrec
                  Clash.Tests.Normalize.Transformations.Specialize
                  Clash.Tests.Normalize.Util
                  Clash.Tests.Rewrite.StrategyDSL
                  Clash.Tests.Rewrite.StrategyDSL.Stubs
+                 Clash.Tests.Rewrite.Util
                  Clash.Tests.Warning
 
                  Test.Clash.Rewrite

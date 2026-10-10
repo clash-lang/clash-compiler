@@ -12,9 +12,11 @@ import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Normalize.Transformations
 import qualified Clash.Tests.Normalize.Transformations.Case
+import qualified Clash.Tests.Normalize.Transformations.Letrec
 import qualified Clash.Tests.Normalize.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Util
 import qualified Clash.Tests.Rewrite.StrategyDSL
+import qualified Clash.Tests.Rewrite.Util
 import qualified Clash.Tests.Util.Interpolate
 import qualified Clash.Tests.Warning
 import qualified Test.Clash.Rewrite
@@ -36,9 +38,11 @@ tests = testGroup "Unittests"
   , Clash.Tests.Netlist.Id.tests
   , Clash.Tests.Normalize.Transformations.tests
   , Clash.Tests.Normalize.Transformations.Case.tests
+  , Clash.Tests.Normalize.Transformations.Letrec.tests
   , Clash.Tests.Normalize.Transformations.Specialize.tests
   , Clash.Tests.Normalize.Util.tests
   , Clash.Tests.Rewrite.StrategyDSL.tests
+  , Clash.Tests.Rewrite.Util.tests
   , Clash.Tests.Util.Interpolate.tests
   , Clash.Tests.Warning.tests
   , Test.Clash.Rewrite.tests
