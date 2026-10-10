@@ -9,6 +9,7 @@ import qualified Clash.Tests.Core.HasType
 import qualified Clash.Tests.Core.Lint
 import qualified Clash.Tests.Core.Scoped.Alpha
 import qualified Clash.Tests.Core.Scoped.Convert
+import qualified Clash.Tests.Core.Scoped.DataCon
 import qualified Clash.Tests.Core.Scoped.FreeVars
 import qualified Clash.Tests.Core.Scoped.NameMap
 import qualified Clash.Tests.Core.Scoped.Scope
@@ -58,6 +59,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Lint.tests
   , Clash.Tests.Core.Scoped.Alpha.tests
   , Clash.Tests.Core.Scoped.Convert.tests
+  , Clash.Tests.Core.Scoped.DataCon.tests
   , Clash.Tests.Core.Scoped.FreeVars.tests
   , Clash.Tests.Core.Scoped.NameMap.tests
   , Clash.Tests.Core.Scoped.Scope.tests

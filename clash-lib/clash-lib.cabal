@@ -223,6 +223,7 @@ Library
                       Clash.Core.Pretty
                       Clash.Core.Scoped.Alpha
                       Clash.Core.Scoped.Convert
+                      Clash.Core.Scoped.DataCon
                       Clash.Core.Scoped.FreeVars
                       Clash.Core.Scoped.Internal.Names
                       Clash.Core.Scoped.Internal.Scope
@@ -451,6 +452,7 @@ test-suite unittests
                  Clash.Tests.Core.Lint
                  Clash.Tests.Core.Scoped.Alpha
                  Clash.Tests.Core.Scoped.Convert
+                 Clash.Tests.Core.Scoped.DataCon
                  Clash.Tests.Core.Scoped.FreeVars
                  Clash.Tests.Core.Scoped.NameMap
                  Clash.Tests.Core.Scoped.Scope
