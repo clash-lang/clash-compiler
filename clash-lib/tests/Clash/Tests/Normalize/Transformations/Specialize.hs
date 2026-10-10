@@ -146,6 +146,31 @@ bindConstantVarAppProp = bindConstantVarThenAppProp [p] term
     Let (NonRec a (Lam k (Lam x (Var k))))
       (Lam x (mkApps (Var a) [Left (Var x), Left (Var p)]))
 
+-- | Issue #990: inlining let-bindings ('inlineBinders', used by
+-- 'bindConstantVar') introduced shadowing, after which 'appProp' let-bound an
+-- argument with a binder that captured the free variables of the other
+-- arguments. The resulting HDL contained a signal assigned to itself. #991
+-- deshadowed after inlining let-bindings; #1040 replaced that by deshadowing
+-- in 'appProp'.
+--
+-- > let a = \x y -> y in \x -> a (f x) (f x)
+-- >   ==> (bindConstantVar)  \x -> (\x y -> y) (f x) (f x)
+-- >   ==> (appProp)          \x -> let x' = f x in let y = f x in y
+--
+-- https://github.com/clash-lang/clash-compiler/issues/990
+-- https://github.com/clash-lang/clash-compiler/pull/991
+bindConstantVarAppPropLet :: IO Term
+bindConstantVarAppPropLet = bindConstantVarThenAppProp [f] term
+ where
+  x = intId User "x" 1
+  y = intId User "y" 2
+  f = localId User "f" 3 (intFunTy 1)
+  a = localId User "a" 4 (intFunTy 2)
+  fx = App (Var f) (Var x)
+  term =
+    Let (NonRec a (Lam x (Lam y (Var y))))
+      (Lam x (mkApps (Var a) [Left fx, Left fx]))
+
 -- | @(\\f -> f) (\\k x -> k) x y@ reduces to the free variable @x@. The first
 -- argument binds @x_2@, which is also free in the second argument. 'appProp'
 -- substitutes work-free arguments using 'unsafeSubstTm', which does not avoid
@@ -173,6 +198,8 @@ tests =
         appPropCaseCapture >>= assertAlphaEq appPropCaseCaptureExpected
     , testCase "appProp handles shadowing introduced by bindConstantVar (#1035)" $
         bindConstantVarAppProp >>= assertAlphaEq (parseToTerm "x_1 :: Int")
+    , testCase "appProp does not let-bind a captured argument after inlining (#991)" $
+        bindConstantVarAppPropLet >>= assertAlphaEq appPropLamCaptureExpected
     , testCase "appProp does not capture free variables (#3479)" $
         appPropCapture >>= assertAlphaEq (parseToTerm "x_2 :: Int")
     ]
