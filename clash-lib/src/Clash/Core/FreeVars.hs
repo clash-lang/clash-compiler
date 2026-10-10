@@ -119,6 +119,7 @@ typeFreeVars' interesting is f = go is where
     ForAllTy tv ty -> ForAllTy <$> goBndr inScope tv
                                <*> go (IntSet.insert (varUniq tv) inScope) ty
     AppTy l r -> AppTy <$> go inScope l <*> go inScope r
+    AnnType attrs ty -> AnnType attrs <$> go inScope ty
     ty -> pure ty
 
   goBndr inScope tv = (\t -> tv {varType = t}) <$> go inScope (varType tv)
