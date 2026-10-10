@@ -62,7 +62,7 @@ import qualified Clash.Sized.Internal.Index as I (Index, fromInteger#)
 import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
 import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 
-import Clash.Core.DataCon (DataCon(dcArgTys))
+import Clash.Core.DataCon (DataCon(dcExtTyVars))
 import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars, typeFreeVars)
 import Clash.Core.HasType
 import Clash.Core.Literal (Literal(..))
@@ -71,15 +71,15 @@ import Clash.Core.Name
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTmApps, mkTicks, patIds, Bind(..)
+  ( Term(..), TickInfo, collectArgs, collectArgsTicks, mkApps, mkTicks, patIds, Bind(..)
   , patVars, mkAbstraction, PrimInfo(..), WorkInfo(..), IsMultiPrim(..), PrimUnfolding(..))
 import Clash.Core.TermInfo (isLocalVar, isVar, isPolyFun)
-import Clash.Core.TyCon (TyConMap, tyConDataCons)
+import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type
   (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
   , mkPolyFunTy, mkTyConApp)
 import Clash.Core.TysPrim
-import Clash.Core.Util (listToLets)
+import Clash.Core.Util (dataConInstArgTys, listToLets)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, extendInScopeSetList
@@ -756,7 +756,14 @@ zeroWidthSpecWorker (TransformContext is _) e i x0 = do
 -- Get the only element of a type, if it is zero-width.
 --
 zeroWidthTypeElem :: TyConMap -> Type -> Maybe Term
-zeroWidthTypeElem tcm ty = do
+zeroWidthTypeElem tcm = zeroWidthTypeElemIn tcm []
+
+-- | 'zeroWidthTypeElem' for a type that is the type of a field of types with
+-- the given type constructors. We do not look into the fields of a type with a
+-- type constructor we are already looking into: recursive types, such as
+-- 'Signal', would make us loop.
+zeroWidthTypeElemIn :: TyConMap -> [TyConName] -> Type -> Maybe Term
+zeroWidthTypeElemIn tcm enclosing ty = do
   (tcNm, args) <- splitTyConAppM ty
 
   if | nameOcc tcNm == Text.showt ''BV.BitVector
@@ -776,15 +783,19 @@ zeroWidthTypeElem tcm ty = do
      -> return (unsignedZW tcNm args)
 
      -- Any other zero-width type should only have a single data constructor
-     -- where all fields are also zero-width.
+     -- where all fields are also zero-width. We don't handle constructors with
+     -- existential type variables, as we don't know which types to apply them
+     -- to.
      | otherwise
      -> do
+       Monad.guard (tcNm `notElem` enclosing)
        tc <- UniqMap.lookup tcNm tcm
 
        case tyConDataCons tc of
-         [dc] -> do
-           zwArgs <- traverse (zeroWidthTypeElem tcm) (dcArgTys dc)
-           return (mkTmApps (Data dc) zwArgs)
+         [dc] | null (dcExtTyVars dc) -> do
+           argTys <- dataConInstArgTys dc args
+           zwArgs <- traverse (zeroWidthTypeElemIn tcm (tcNm : enclosing)) argTys
+           return (mkApps (Data dc) (fmap Right args <> fmap Left zwArgs))
 
          _ ->
            Nothing

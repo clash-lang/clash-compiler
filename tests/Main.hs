@@ -1071,6 +1071,7 @@ runClashTest t3105Env = defaultMain
       , clashTestGroup "Types"
         [ runTest "TypeFamilyReduction" def{hdlSim=[]}
         , runTest "NatExp" def{hdlSim=[]}
+        , runTest "ZeroWidthTyArgs" def{hdlSim=[]}
         ]
       , clashTestGroup "TopEntity"
         -- VHDL tests disabled for now: I can't figure out how to generate a static name whilst retaining the ability to actually test..
