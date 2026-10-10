@@ -442,9 +442,17 @@ test-suite unittests
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize.Transformations
                  Clash.Tests.Normalize.Transformations.Case
+                 Clash.Tests.Normalize.Transformations.Letrec
                  Clash.Tests.Normalize.Transformations.Specialize
                  Clash.Tests.Normalize.Util
                  Clash.Tests.Rewrite.StrategyDSL
                  Clash.Tests.Rewrite.StrategyDSL.Stubs
+<<<<<<< HEAD
+||||||| parent of 030b238 (Add regression tests for `topLet`'s in-scope set and `apply`'s shadowing check)
+                 Clash.Tests.Warning
+=======
+                 Clash.Tests.Rewrite.Util
+                 Clash.Tests.Warning
+>>>>>>> 030b238 (Add regression tests for `topLet`'s in-scope set and `apply`'s shadowing check)
 
                  Test.Clash.Rewrite
