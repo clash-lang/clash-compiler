@@ -221,6 +221,7 @@ Library
                       Clash.Core.PartialEval.Monad
                       Clash.Core.PartialEval.NormalForm
                       Clash.Core.Pretty
+                      Clash.Core.Scoped.Convert
                       Clash.Core.Scoped.Internal.Names
                       Clash.Core.Scoped.Internal.Scope
                       Clash.Core.Scoped.NameMap
@@ -445,6 +446,7 @@ test-suite unittests
                  Clash.Tests.Core.FreeVars
                  Clash.Tests.Core.HasType
                  Clash.Tests.Core.Lint
+                 Clash.Tests.Core.Scoped.Convert
                  Clash.Tests.Core.Scoped.NameMap
                  Clash.Tests.Core.Scoped.Scope
                  Clash.Tests.Core.StructuralEquivalence
@@ -480,3 +482,4 @@ test-suite unittests
                  Clash.Tests.Warning
 
                  Test.Clash.Rewrite
+                 Test.Clash.Scoped
