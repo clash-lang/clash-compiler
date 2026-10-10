@@ -718,6 +718,20 @@ pairTy = parseTyConTy "Pair"
 pairDataCon :: C.DataCon
 pairDataCon = mkDataCon "MkPair" 100 [] [] [intTy, intTy] pairTy
 
+-- | @E@, a data type with a single constructor 'existentialDataCon'
+existentialTy :: C.Type
+existentialTy = parseTyConTy "E"
+
+-- | The existentially quantified type variable @b@ of 'existentialDataCon'
+existentialTyVar :: C.TyVar
+existentialTyVar = tyVar C.User "b" 50
+
+-- | @MkE :: forall b. b -> E@, a data constructor with an existentially
+-- quantified type variable
+existentialDataCon :: C.DataCon
+existentialDataCon =
+  mkDataCon "MkE" 1002 [] [existentialTyVar] [C.VarTy existentialTyVar] existentialTy
+
 -- | A 'C.TyVar' with the given name sort, human readable name, unique, and
 -- kind
 kindedTyVar :: C.NameSort -> String -> Unique -> C.Kind -> C.TyVar
