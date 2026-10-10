@@ -724,6 +724,11 @@ assertAlphaEq expected actual =
       <> "\nbut got:\n" <> showPprU actual)
     (expected == actual)
 
+-- | The binders of a let-expression, or none for any other term
+letBinders :: C.Term -> [C.Id]
+letBinders (C.Letrec bs _) = map fst bs
+letBinders _ = []
+
 -- | Term binders that shadow a binder they are in scope of, or another binder
 -- of the same let-expression or pattern
 shadowingBinders :: C.Term -> [C.Id]

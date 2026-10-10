@@ -30,9 +30,9 @@ import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (freshId, newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertWellScoped, intId, intLit, parseToTermQQ
-  , runRewriteTest, runSingleTransformation, runSingleTransformationDef
-  , showPprU )
+  ( assertAlphaEq, assertNoShadowing, assertWellScoped, inScopeOf, intId
+  , intLit, letBinders, parseToTermQQ, runRewriteTest, runSingleTransformation
+  , runSingleTransformationDef, showPprU )
 
 flattenLetR, topLetR :: NormRewrite
 flattenLetR = $(asRewriteQ flattenLet)
@@ -128,4 +128,55 @@ tests =
                 h_G c_3 c_3
           |]
         assertBool "flattenLet did not signal a change" hasChanged
+
+    -- #1103 made 'flattenLet' deshadow a let-expression in the right-hand side
+    -- of a let-binding (before merging it into the outer let-expression) only
+    -- when one of its binders is already in scope. That set of in-scope
+    -- variables must include the context of the let-expression, the outer
+    -- binders, /and/ the binders merged in from earlier right-hand sides. Here:
+    --
+    --   * the binder @x_9@ in @a_1@ is also a free variable (bound in the
+    --     context), referred to by @b_2@: not renaming it captures that
+    --     reference;
+    --   * the binder @u_4@ in @b_2@ was already merged in from @a_1@;
+    --   * the binder @a_1@ in @b_2@ is also an outer binder.
+    --
+    -- https://github.com/clash-lang/clash-compiler/pull/1103
+    , testCase "flattenLet deshadows nested let-bindings when needed (#1103)" $ do
+        let x = intId User "x" 9
+        actual <- runSingleTransformation def def (inScopeOf [x]) flattenLetR
+          [parseToTermQQ|
+            let
+              a_1, b_2 :: Int
+              a_1 =
+                let
+                  x_9, u_4 :: Int
+                  x_9 = f_G c_G
+                  u_4 = g_G x_9 x_9
+                in
+                  u_4
+              b_2 =
+                let
+                  u_4, a_1 :: Int
+                  u_4 = f_G x_9
+                  a_1 = g_G u_4 u_4
+                in
+                  a_1
+            in
+              h_G a_1 b_2 x_9
+          |]
+        assertAlphaEq [parseToTermQQ|
+          let
+            x_10, u_4, a_1, u_11, a_12, b_2 :: Int
+            x_10 = f_G c_G
+            u_4 = g_G x_10 x_10
+            a_1 = u_4
+            u_11 = f_G x_9
+            a_12 = g_G u_11 u_11
+            b_2 = a_12
+          in
+            h_G a_1 b_2 x_9
+        |] actual
+        assertNoShadowing actual
+        assertBool "The free variable x_9 is captured" (x `notElem` letBinders actual)
     ]
