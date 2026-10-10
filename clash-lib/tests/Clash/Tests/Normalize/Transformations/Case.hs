@@ -17,10 +17,10 @@ import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term (Pat (..), Term (..), mkApps)
+import Clash.Core.Term (Bind (..), Pat (..), Term (..), mkApps)
 import Clash.Core.Type (Type)
 import Clash.Core.Var (Id)
-import Clash.Normalize.Transformations.Case (caseCase, caseCon)
+import Clash.Normalize.Transformations.Case (caseCase, caseCon, caseLet)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 
@@ -28,9 +28,10 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, assertStructurallyEqual, inScopeOf, intFunTy, intId, intTy
   , localId, mkDataCon, pairDataCon, parseTyConTy, runSingleTransformation )
 
-caseCaseR, caseConR :: NormRewrite
+caseCaseR, caseConR, caseLetR :: NormRewrite
 caseCaseR = $(asRewriteQ caseCase)
 caseConR = $(asRewriteQ caseCon)
+caseLetR = $(asRewriteQ caseLet)
 
 -- | @T@, a data type with a single constructor 'mkT'
 tTy :: Type
@@ -94,6 +95,25 @@ caseCaseCaptureExpected =
   x = intId User "x" 3
   x1 = intId User "x" 4
 
+-- | @case (let x = u in x) of {_ -> x}@, with @x@ free in the alternative.
+-- 'caseLet' must not move the alternative under the let-binder @x@.
+caseLetCapture :: IO Term
+caseLetCapture =
+  runSingleTransformation def def (inScopeOf [u, x]) caseLetR $
+    Case (Let (NonRec x (Var u)) (Var x)) intTy [(DefaultPat, Var x)]
+ where
+  u = intId User "u" 1
+  x = intId User "x" 2
+
+-- | The expected result of 'caseLetCapture'
+caseLetCaptureExpected :: Term
+caseLetCaptureExpected =
+  Let (NonRec x1 (Var u)) (Case (Var x1) intTy [(DefaultPat, Var x)])
+ where
+  u = intId User "u" 1
+  x = intId User "x" 2
+  x1 = intId User "x" 3
+
 tests :: TestTree
 tests =
   testGroup
@@ -107,4 +127,10 @@ tests =
     -- https://github.com/clash-lang/clash-compiler/pull/1067
     , testCase "caseCase deshadows alternatives (#1067)" $
         caseCaseCapture >>= assertAlphaEq caseCaseCaptureExpected
+
+    -- 'caseLet' moved the let-bindings out of the subject of a case-expression
+    -- without renaming them. They could then capture free variables of the
+    -- alternatives. https://github.com/clash-lang/clash-compiler/pull/1071
+    , testCase "caseLet deshadows let-bindings (#1071)" $
+        caseLetCapture >>= assertAlphaEq caseLetCaptureExpected
     ]
