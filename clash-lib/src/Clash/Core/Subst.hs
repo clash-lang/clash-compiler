@@ -499,6 +499,7 @@ substTy' subst = go where
     ForAllTy tv ty -> case substTyVarBndr subst tv of
       (subst', tv') -> ForAllTy tv' (substTy' subst' ty)
     AppTy fun arg -> AppTy (go fun) (go arg)
+    AnnType attrs ty -> AnnType attrs (go ty)
     ty -> ty
 
 -- | Substitute a variable with a type if it's within the substitution's domain.
