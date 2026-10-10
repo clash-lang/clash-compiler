@@ -292,7 +292,7 @@ mkVecNil nilCon resTy = case dataConInstArgTys nilCon [LitTy (NumTy 0), resTy] o
 -- of @Clash.Sized.Vector.reverse@
 reduceReverse
   :: Integer
-  -- ^ Length of the vector, must be positive
+  -- ^ Length of the vector
   -> Type
   -- ^ Element of type of the vector
   -> Term
@@ -309,7 +309,7 @@ reduceReverse n elTy vArg (TransformContext inScope0 _ctx) = do
     | Just vecTc <- UniqMap.lookup vecTcNm tcm
       , nameOcc vecTcNm == showt ''Vec
     , [nilCon, consCon] <- tyConDataCons vecTc
-    = do
+    = if n == 0 then changed (mkVecNil nilCon elTy) else do
       uniqs0 <- Lens.use uniqSupply
       let (uniqs1,(vars,elems)) = second (second sconcat . NE.unzip)
                                 $ extractElems uniqs0 inScope0 consCon elTy 'V' n vArg
@@ -418,7 +418,7 @@ reduceMap mapPrimInfo n argElTy resElTy argRep fun arg0 (TransformContext is0 _)
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @Clash.Sized.Vector.imap@
 reduceImap
-  :: Integer  -- ^ Length of the vector, must be positive
+  :: Integer  -- ^ Length of the vector
   -> Type -- ^ Argument type of the function
   -> Type -- ^ Result type of the function
   -> Term -- ^ Lenght of the vector (as a KnownNat)
@@ -436,7 +436,7 @@ reduceImap n argElTy resElTy _kn fun arg (TransformContext is0 ctx) = do
       | (Just vecTc)     <- UniqMap.lookup vecTcNm tcm
       , nameOcc vecTcNm == showt ''Vec
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = do
+      = if n == 0 then changed (mkVecNil nilCon resElTy) else do
         uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
         let is1 = extendInScopeSetList is0 (collectTermIds fun1)
@@ -1096,7 +1096,7 @@ reduceReplicate n aTy eTy _sn arg _ctx = do
 -- TODO: It would of course be best to not create the cases in the first place!
 reduceReplace_int
   :: Integer
-  -- ^ Size of vector, must be positive
+  -- ^ Size of vector
   -> Type
   -- ^ Type of vector element
   -> Type
@@ -1173,7 +1173,7 @@ reduceReplace_int n aTy vTy _kn v i newA (TransformContext is0 _ctx) = do
     | (Just vecTc)     <- UniqMap.lookup vecTcNm tcm
       , nameOcc vecTcNm == showt ''Vec
     , [nilCon,consCon] <- tyConDataCons vecTc
-    = do
+    = if n == 0 then changed (mkVecNil nilCon aTy) else do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
       let iTy                   = inferCoreTypeOf tcm i
@@ -1208,7 +1208,7 @@ reduceReplace_int n aTy vTy _kn v i newA (TransformContext is0 _ctx) = do
 -- TODO: It would of course be best to not create the cases in the first place!
 reduceIndex_int
   :: Integer
-  -- ^ Size of vector, must be positive
+  -- ^ Size of vector
   -> Type
   -- ^ Type of vector element
   -> Term
@@ -1282,7 +1282,8 @@ reduceIndex_int n aTy _kn v i (TransformContext is0 _ctx) = do
     | (Just vecTc)     <- UniqMap.lookup vecTcNm tcm
     , nameOcc vecTcNm == showt ''Vec
     , [_nilCon,consCon] <- tyConDataCons vecTc
-    = do
+    -- Every index is out of bounds
+    = if n == 0 then changed (TyApp (Prim NP.undefined) aTy) else do
       -- Get data constructors of 'Int'
       uniqs0                   <- Lens.use uniqSupply
       let iTy                   = inferCoreTypeOf tcm i
