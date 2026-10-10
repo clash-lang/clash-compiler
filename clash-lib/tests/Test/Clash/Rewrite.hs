@@ -26,8 +26,11 @@ import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Core.VarEnv
-  (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet, mkVarSet)
-import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
+  ( InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet
+  , mkVarEnv, mkVarSet )
+import Clash.Driver.Types
+  ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), IsPrim (IsFun)
+  , defClashOpts, debugSilent )
 import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
@@ -44,6 +47,7 @@ import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
 import Data.Default
 import Data.Maybe (fromMaybe)
+import GHC.Types.Basic (InlineSpec (NoUserInlinePrag))
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
 import Language.Haskell.Exts.Parser
@@ -648,6 +652,21 @@ kindedTyVar nmSort nm uniq =
 -- See 'kindedTyVar'.
 tyVar :: C.NameSort -> String -> Unique -> C.TyVar
 tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
+
+-- | A global binding of the given term, of a function without an inline pragma
+mkBinding :: C.Id -> C.Term -> Binding C.Term
+mkBinding i t = Binding
+  { bindingId = i
+  , bindingLoc = C.noSrcSpan
+  , bindingSpec = NoUserInlinePrag
+  , bindingIsPrim = IsFun
+  , bindingTerm = t
+  , bindingRecursive = False
+  }
+
+-- | A 'BindingMap' with the given global bindings. See 'mkBinding'.
+mkBindingMap :: [(C.Id, C.Term)] -> BindingMap
+mkBindingMap bs = mkVarEnv [(i, mkBinding i t) | (i, t) <- bs]
 
 -- | An @Int@ literal
 intLit :: Integer -> C.Term
