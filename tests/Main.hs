@@ -601,6 +601,11 @@ runClashTest = defaultMain
         , runTest "DelayI" def
         , runTest "DelayN" def
         ]
+      , clashTestGroup "Evaluator"
+        [ runTest "EmptyCaseFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
+        , runTest "FreeVarHeapBinding" def{hdlTargets=[Verilog], hdlSim=[]}
+        , runTest "SplitAtFoldFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
+        ]
       , clashTestGroup "Feedback"
         [ runTest "Fib" def
         , runTest "MutuallyRecursive" def

@@ -15,36 +15,50 @@
 
 module Test.Clash.Rewrite where
 
-import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
+import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
-import Clash.Driver.Types (ClashEnv(..), ClashOpts(..), defClashOpts, debugSilent)
+import Clash.Core.FreeVars (freeLocalIds)
+import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
+import Clash.Core.VarEnv
+  ( InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet
+  , mkVarEnv, mkVarSet )
+import Clash.Driver.Types
+  ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), IsPrim (IsFun)
+  , defClashOpts, debugSilent )
+import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
-import Clash.Util.Supply (newSupply)
+import Clash.Util.Supply (Supply, freshId, newSupply)
 import Clash.Unique (Unique)
 
 import Control.Applicative ((<|>))
+import qualified Control.Lens as Lens
+import Control.Monad.Trans.State.Strict (State)
 import Control.DeepSeq (NFData, force)
 import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
 import Data.Default
 import Data.Maybe (fromMaybe)
+import Data.Monoid (Any (..))
+import GHC.Types.Basic (InlineSpec (NoUserInlinePrag))
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
 import Language.Haskell.Exts.Parser
   (ParseMode (..), defaultParseMode, fromParseResult, parseExpWithMode)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase)
+import Test.Tasty.HUnit
+  (Assertion, assertBool, assertEqual, assertFailure, testCase)
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 
@@ -53,6 +67,7 @@ import qualified Text.Show.Pretty as Pretty
 import qualified Language.Haskell.TH.Syntax as TH
 import qualified Language.Haskell.TH.Quote as TH
 
+import qualified Clash.Data.UniqMap as UniqMap
 import qualified Data.List as List
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
@@ -74,17 +89,31 @@ instance Default RewriteEnv where
   def = RewriteEnv
     { _clashEnv = ClashEnv
         { envOpts = defClashOpts { opt_debug = debugSilent }
-        , envTyConMap = mempty
+        , envTyConMap = UniqMap.singletonUnique intTyCon
         , envTupleTyCons = IntMap.empty
         , envPrimitives = HashMap.empty
         , envCustomReprs = buildCustomReprs []
         , envDomains = HashMap.empty
         }
-    , _typeTranslator=error "_typeTranslator: NYI"
+    , _typeTranslator=testTypeTranslator
     , _peEvaluator=error "_peEvaluator: NYI"
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
     }
+
+-- | The type translator of the default 'RewriteEnv': function types are not
+-- representable, all other types are, as a 64-bit signed number. Clash's own
+-- translator is a lot more refined, but this suffices for transformations that
+-- only look at /whether/ a type is representable, such as 'caseCase' and
+-- 'nonRepANF'.
+testTypeTranslator
+  :: CustomReprs
+  -> C.TyConMap
+  -> C.Type
+  -> State HWMap (Maybe (Either String FilteredHWType))
+testTypeTranslator _reprs _tcm ty = pure $ Just $ case C.tyView ty of
+  C.FunTy {} -> Left "function types are not representable"
+  _ -> Right (FilteredHWType (Signed 64) [])
 
 instance Default extra => Default (RewriteState extra) where
   def = RewriteState
@@ -131,8 +160,20 @@ runSingleTransformation
   -- ^ Term to transform
   -> IO C.Term
 runSingleTransformation rwEnv rwState is trans term = do
-  (t, _, _) <- runR (runRewrite "" is trans term) rwEnv rwState
+  (t, _, _) <- runRewriteTest rwEnv rwState (runRewrite "" is trans term)
   pure t
+
+-- | Run an action in the rewrite monad, such as a transformation applied with
+-- 'Clash.Rewrite.Util.runRewrite'. Returns its result, the final state, and
+-- whether any transformation signalled a change.
+runRewriteTest
+  :: RewriteEnv
+  -> RewriteState extra
+  -> RewriteMonad extra a
+  -> IO (a, RewriteState extra, Bool)
+runRewriteTest rwEnv rwState m = do
+  (a, rwState1, anyChanged) <- runR m rwEnv rwState
+  pure (a, rwState1, getAny anyChanged)
 
 -- | Run a single transformation with an empty environment and empty
 -- InScopeSet. See Default instances ^ to inspect the precise definition of
@@ -547,16 +588,25 @@ parseToTermQQ = TH.QuasiQuoter{
   , TH.quoteDec = error "parseToTerm.quoteDec: NYI"
   }
 
+-- | The name 'parseType' produces for a type constructor whose name it
+-- derives a unique from, e.g. @Int@
+parseTyConName :: HasCallStack => String -> C.TyConName
+parseTyConName nm = C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan
+
 -- | The type 'parseType' produces for a type constructor whose name it derives
 -- a unique from, e.g. @Int@
 parseTyConTy :: HasCallStack => String -> C.Type
-parseTyConTy nm =
-  C.ConstTy
-    (C.TyCon (C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan))
+parseTyConTy = C.ConstTy . C.TyCon . parseTyConName
 
 -- | The type 'parseType' produces for the type constructor @Int@
 intTy :: C.Type
 intTy = parseTyConTy "Int"
+
+-- | The type constructor of 'intTy'. The default 'RewriteEnv' knows it.
+intTyCon :: C.TyCon
+intTyCon = C.PrimTyCon (C.nameUniq nm) nm C.liftedTypeKind 0
+ where
+  nm = parseTyConName "Int"
 
 -- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
@@ -568,23 +618,179 @@ mkId scope nmSort nm uniq typ =
 localId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
 localId = mkId C.LocalId
 
--- | A 'C.TyVar' with the given name sort, human readable name, and unique. Its
--- kind is 'C.liftedTypeKind', see 'parseTyVar'.
+-- | A global 'C.Id'. See 'mkId'.
+globalId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
+globalId = mkId C.GlobalId
+
+-- | A local 'C.Id' of type @Int@. See 'localId'.
+intId :: C.NameSort -> String -> Unique -> C.Id
+intId nmSort nm uniq = localId nmSort nm uniq intTy
+
+-- | The function type @Int -> .. -> Int@ with the given number of arguments
+intFunTy :: Int -> C.Type
+intFunTy n = foldr C.mkFunTy intTy (replicate n intTy)
+
+-- | A data constructor with the given name, unique, universally quantified type
+-- variables, existentially quantified type variables, (lazy) field types, and
+-- result type. Its tag is 1, i.e. it is the first constructor of its type.
+mkDataCon
+  :: String -> Unique -> [C.TyVar] -> [C.TyVar] -> [C.Type] -> C.Type
+  -> C.DataCon
+mkDataCon nm uniq univTvs extTvs argTys resTy = C.MkData
+  { C.dcName = C.mkUnsafeName C.User (Text.pack nm) uniq
+  , C.dcUniq = uniq
+  , C.dcTag = 1
+  , C.dcType =
+      foldr C.ForAllTy (foldr C.mkFunTy resTy argTys) (univTvs <> extTvs)
+  , C.dcUnivTyVars = univTvs
+  , C.dcExtTyVars = extTvs
+  , C.dcArgTys = argTys
+  , C.dcArgStrict = map (const C.Lazy) argTys
+  , C.dcFieldLabels = []
+  }
+
+-- | @Pair@, a data type with a single constructor 'pairDataCon'
+pairTy :: C.Type
+pairTy = parseTyConTy "Pair"
+
+-- | @MkPair :: Int -> Int -> Pair@
+pairDataCon :: C.DataCon
+pairDataCon = mkDataCon "MkPair" 100 [] [] [intTy, intTy] pairTy
+
+-- | A 'C.TyVar' with the given name sort, human readable name, unique, and
+-- kind
+kindedTyVar :: C.NameSort -> String -> Unique -> C.Kind -> C.TyVar
+kindedTyVar nmSort nm uniq =
+  C.TyVar (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq
+
+-- | A 'C.TyVar' of kind 'C.liftedTypeKind', the only kind 'parseTyVar' produces.
+-- See 'kindedTyVar'.
 tyVar :: C.NameSort -> String -> Unique -> C.TyVar
-tyVar nmSort nm uniq =
-  C.TyVar (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq C.liftedTypeKind
+tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
 
--- | A reference to a local variable of type @Int@. See 'localId'.
+-- | A global binding of the given term, of a function without an inline pragma
+mkBinding :: C.Id -> C.Term -> Binding C.Term
+mkBinding i t = Binding
+  { bindingId = i
+  , bindingLoc = C.noSrcSpan
+  , bindingSpec = NoUserInlinePrag
+  , bindingIsPrim = IsFun
+  , bindingTerm = t
+  , bindingRecursive = False
+  }
+
+-- | A 'BindingMap' with the given global bindings. See 'mkBinding'.
+mkBindingMap :: [(C.Id, C.Term)] -> BindingMap
+mkBindingMap bs = mkVarEnv [(i, mkBinding i t) | (i, t) <- bs]
+
+-- | An @Int@ literal
+intLit :: Integer -> C.Term
+intLit = C.Literal . C.IntLiteral
+
+-- | A reference to a local variable of type @Int@. See 'intId'.
 intVar :: C.NameSort -> String -> Unique -> C.Term
-intVar nmSort nm uniq = C.Var (localId nmSort nm uniq intTy)
+intVar nmSort nm uniq = C.Var (intId nmSort nm uniq)
 
--- | A reference to a global variable of type @Int@. See 'mkId'.
+-- | A reference to a global variable of type @Int@. See 'globalId'.
 globalIntVar :: C.NameSort -> String -> Unique -> C.Term
-globalIntVar nmSort nm uniq = C.Var (mkId C.GlobalId nmSort nm uniq intTy)
+globalIntVar nmSort nm uniq = C.Var (globalId nmSort nm uniq intTy)
 
 -- | A reference to a variable without a declared type. See 'freeVarType'.
 freeVar :: C.NameSort -> String -> Unique -> C.Term
 freeVar nmSort nm uniq = C.Var (localId nmSort nm uniq freeVarType)
+
+-- | An 'InScopeSet' containing exactly the given variables
+inScopeOf :: [C.Var a] -> InScopeSet
+inScopeOf = mkInScopeSet . mkVarSet
+
+-- | The first /n/ uniques a supply hands out. Tests use these to give a
+-- binder the unique a transformation would otherwise pick for a new binder.
+firstUniques :: Int -> Supply -> [Unique]
+firstUniques n = take n . go
+ where
+  go s0 = let (u, s1) = freshId s0 in u : go s1
+
+-- | Pretty print, always showing uniques (regardless of @CLASH_PPR_UNIQUES@)
+-- but no types. Tests on scoping are about binders that share a name but not a
+-- unique, or vice versa.
+showPprU :: PrettyPrec p => p -> String
+showPprU = showPpr' PrettyOptions
+  { displayUniques = True
+  , displayTypes = False
+  , displayQualifiers = False
+  , displayTicks = False
+  }
+
+-- | Assert that two terms, or two types, are alpha equivalent: 'Eq' on
+-- 'C.Term' and 'C.Type' is alpha equivalence. Shows both, with uniques, if
+-- they're not.
+assertAlphaEq :: (HasCallStack, Eq a, PrettyPrec a) => a -> a -> Assertion
+assertAlphaEq expected actual =
+  assertBool
+    ("Expected (up to alpha equivalence):\n" <> showPprU expected
+      <> "\nbut got:\n" <> showPprU actual)
+    (expected == actual)
+
+-- | The uniques of the arguments of an application (see 'C.collectArgs') that
+-- are variable references
+argUniques :: [Either C.Term C.Type] -> [Maybe Unique]
+argUniques = map $ \case
+  Left (C.Var v) -> Just (C.varUniq v)
+  _ -> Nothing
+
+-- | The binders of a let-expression, or none for any other term
+letBinders :: C.Term -> [C.Id]
+letBinders (C.Letrec bs _) = map fst bs
+letBinders _ = []
+
+-- | Term binders that shadow a binder they are in scope of, or another binder
+-- of the same let-expression or pattern
+shadowingBinders :: C.Term -> [C.Id]
+shadowingBinders = go []
+ where
+  go :: [Unique] -> C.Term -> [C.Id]
+  go scope = \case
+    C.Lam i e -> check scope [i] <> go (C.varUniq i : scope) e
+    C.TyLam _ e -> go scope e
+    C.App e1 e2 -> go scope e1 <> go scope e2
+    C.TyApp e _ -> go scope e
+    C.Letrec bs e ->
+      let is = map fst bs
+          scope1 = map C.varUniq is <> scope
+      in  check scope is <> concatMap (go scope1 . snd) bs <> go scope1 e
+    C.Case scrut _ alts -> go scope scrut <> concatMap (goAlt scope) alts
+    C.Cast e _ _ -> go scope e
+    C.Tick _ e -> go scope e
+    _ -> []
+
+  goAlt scope (p, e) =
+    let is = snd (C.patIds p)
+    in  check scope is <> go (map C.varUniq is <> scope) e
+
+  -- Binders that are already in scope, or bound earlier in the same group
+  check _ [] = []
+  check scope (i:is)
+    | C.varUniq i `elem` scope = i : check scope is
+    | otherwise = check (C.varUniq i : scope) is
+
+-- | Assert that no binder in a term shadows another, see 'shadowingBinders'
+assertNoShadowing :: HasCallStack => C.Term -> Assertion
+assertNoShadowing tm = case shadowingBinders tm of
+  [] -> pure ()
+  bs -> assertFailure
+    ("Unexpected shadowing binders " <> showPprU bs <> " in:\n" <> showPprU tm)
+
+-- | Assert that a term has no free local variables
+assertNoFreeLocals :: HasCallStack => C.Term -> Assertion
+assertNoFreeLocals tm = case Lens.toListOf freeLocalIds tm of
+  [] -> pure ()
+  fvs -> assertFailure
+    ("Unexpected free variables " <> showPprU fvs <> " in:\n" <> showPprU tm)
+
+-- | Assert that a term has no free local variables, and no binders that shadow
+-- each other. See 'assertNoFreeLocals' and 'assertNoShadowing'.
+assertWellScoped :: HasCallStack => C.Term -> Assertion
+assertWellScoped tm = assertNoFreeLocals tm >> assertNoShadowing tm
 
 -- | Assert that two terms are structurally equal, by comparing their 'Show'
 -- output.
@@ -600,17 +806,23 @@ assertStructurallyEqual expected actual =
 -- | Assert that forcing a value throws an 'ErrorCall' mentioning the given
 -- substring
 assertErrorContains
-  :: (HasCallStack, NFData a, Show a) => String -> a -> Assertion
-assertErrorContains needle a = do
-  parsed <- try (evaluate (force a))
-  case parsed of
+  :: (HasCallStack, NFData a, PrettyPrec a) => String -> a -> Assertion
+assertErrorContains needle = assertErrorContainsIO needle . pure
+
+-- | Assert that running an action, and forcing its result, throws an
+-- 'ErrorCall' mentioning the given substring
+assertErrorContainsIO
+  :: (HasCallStack, NFData a, PrettyPrec a) => String -> IO a -> Assertion
+assertErrorContainsIO needle action = do
+  result <- try (action >>= evaluate . force)
+  case result of
     Left (ErrorCall msg)
       | needle `List.isInfixOf` msg -> pure ()
       | otherwise -> assertFailure
           ("Expected an error mentioning '" <> needle <> "', but got:\n" <> msg)
-    Right parsed1 -> assertFailure
+    Right a -> assertFailure
       ("Expected an error mentioning '" <> needle
-        <> "', but parsing succeeded:\n" <> Pretty.ppShow parsed1)
+        <> "', but got the result:\n" <> showPprU a)
 
 tests :: TestTree
 tests = testGroup "Test.Clash.Rewrite"
