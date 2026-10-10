@@ -17,6 +17,7 @@ import Clash.Core.Name (NameSort (User))
 import Clash.Core.Term (Bind (..), Term (..))
 import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Normalize.Types (NormRewrite)
+import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Rewrite.Util (changed)
 
 import Test.Clash.Rewrite
@@ -39,10 +40,29 @@ applyShadowCheck =
   bad _ _ = changed (Let (Rec [(x, intLit 1), (x, intLit 2)]) (Var x))
   x = intId User "x" 1
 
+-- | #1837: with @-fclash-debug-invariants@, 'Clash.Rewrite.Util.apply' should
+-- error when a transformation changes a term without signalling so. It used to
+-- compare the original term against itself (it discarded the result of
+-- transformations that did not signal a change), so it never fired.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/1837
+applyUnsignalledChange :: Assertion
+applyUnsignalledChange =
+  assertErrorContainsIO "Expression changed without notice" $
+    runSingleTransformation def st emptyInScopeSet sneaky (intLit 0)
+ where
+  sneaky :: NormRewrite
+  sneaky _ _ = pure (intLit 1)
+  -- 'applyDebug' skips its checks until the first transformation that signals
+  -- a change, so pretend one already did
+  st = def { _transformCounter = 1 }
+
 tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Rewrite.Util"
     [ testCase "apply reports transformations that introduce shadowing (#490)"
         applyShadowCheck
+    , testCase "apply errors on unsignalled change (#1837)"
+        applyUnsignalledChange
     ]
