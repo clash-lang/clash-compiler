@@ -571,11 +571,16 @@ mkId scope nmSort nm uniq typ =
 localId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
 localId = mkId C.LocalId
 
--- | A 'C.TyVar' with the given name sort, human readable name, and unique. Its
--- kind is 'C.liftedTypeKind', see 'parseTyVar'.
+-- | A 'C.TyVar' with the given name sort, human readable name, unique, and
+-- kind
+kindedTyVar :: C.NameSort -> String -> Unique -> C.Kind -> C.TyVar
+kindedTyVar nmSort nm uniq =
+  C.TyVar (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq
+
+-- | A 'C.TyVar' of kind 'C.liftedTypeKind', the only kind 'parseTyVar' produces.
+-- See 'kindedTyVar'.
 tyVar :: C.NameSort -> String -> Unique -> C.TyVar
-tyVar nmSort nm uniq =
-  C.TyVar (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq C.liftedTypeKind
+tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
 
 -- | A reference to a local variable of type @Int@. See 'localId'.
 intVar :: C.NameSort -> String -> Unique -> C.Term
