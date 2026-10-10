@@ -14,11 +14,14 @@ import           Test.Tasty.HUnit
 
 import           Clash.Core.Name         (Name(..), NameSort(..), OccName)
 import           Clash.Core.Term         (Bind(..), Pat(..), Term(..))
-import           Clash.Core.Type         (ConstTy(..), Type(ConstTy))
+import           Clash.Core.Type         (ConstTy(..), Type(..))
 import           Clash.Core.Subst
 import           Clash.Core.VarEnv
-import           Clash.Core.Var          (Id, IdScope(..), Var(..))
+import           Clash.Core.Var          (Id, IdScope(..), TyVar, Var(..))
 import           Clash.Unique            (Unique)
+
+import           Test.Clash.Rewrite
+  (assertAlphaEq, inScopeOf, intTy, localId, showPprU, tyVar)
 
 fakeName :: Name a
 fakeName =
@@ -69,6 +72,75 @@ deshadowedTerm =
       (Case (Var localW) fakeType
         [(DefaultPat, App (Var localX) (Var localZ))]))
 
+-- Variables for the capture-avoidance tests below
+x2, y1, z3 :: Id
+x2 = localId User "x" 2 intTy
+y1 = localId User "y" 1 intTy
+z3 = localId User "z" 3 intTy
+
+a2, b1, c3 :: TyVar
+a2 = tyVar User "a" 2
+b1 = tyVar User "b" 1
+c3 = tyVar User "c" 3
+
+-- | Substituting @[y := x]@ in @\\x -> y@ must rename the binder @x@, rather
+-- than capture the free @x@ of the substitution range. This is the core
+-- promise of the capture-avoiding substitution introduced by
+-- https://github.com/clash-lang/clash-compiler/pull/361.
+substTmLam :: Assertion
+substTmLam =
+  assertAlphaEq (Lam z3 (Var x2)) (substTm "substTmLam" subst (Lam x2 (Var y1)))
+ where
+  subst = extendIdSubst (mkSubst (inScopeOf [x2])) y1 (Var x2)
+
+-- | Like 'substTmLam', but the term variable is captured through its /type/:
+-- substituting @[y := (x :: a)]@ in @/\\a -> y@ must rename the type binder.
+-- Note that alpha equivalence doesn't look at the types of variable
+-- occurrences, so this checks the binder itself.
+-- https://github.com/clash-lang/clash-compiler/pull/361
+substTmTyLam :: Assertion
+substTmTyLam =
+  case substTm "substTmTyLam" subst (TyLam a2 (Var y1)) of
+    tm@(TyLam a (Var x))
+      | a == a2 -> assertFailure ("binder not renamed: " <> showPprU tm)
+      | otherwise -> x @=? xa
+    tm -> assertFailure ("unexpected result: " <> showPprU tm)
+ where
+  xa = localId User "x" 5 (VarTy a2)
+  subst = extendIdSubst (mkSubst (inScopeOf [a2])) y1 (Var xa)
+
+-- | Substituting @[b := a]@ in @forall a. b@ must rename the binder @a@.
+-- https://github.com/clash-lang/clash-compiler/pull/361
+substTyForAll :: Assertion
+substTyForAll =
+  assertAlphaEq (ForAllTy c3 (VarTy a2)) (substTy subst (ForAllTy a2 (VarTy b1)))
+ where
+  subst = extendTvSubst (mkSubst (inScopeOf [a2])) b1 (VarTy a2)
+
+-- | 'deShadowTerm' must rename a binder that is already in scope.
+-- https://github.com/clash-lang/clash-compiler/pull/361
+deShadowTermRenames :: Assertion
+deShadowTermRenames =
+  case deShadowTerm (inScopeOf [x2]) (Lam x2 (Var x2)) of
+    tm@(Lam x (Var x'))
+      | x == x2 -> assertFailure ("binder not renamed: " <> showPprU tm)
+      | otherwise -> x @=? x'
+    tm -> assertFailure ("unexpected result: " <> showPprU tm)
+
+-- | 'freshenTm' must rename a binder that is already in scope, and return an
+-- in-scope set that includes the new binder.
+-- https://github.com/clash-lang/clash-compiler/pull/361
+freshenTmRenames :: Assertion
+freshenTmRenames =
+  case freshenTm (inScopeOf [x2]) (Lam x2 (Var x2)) of
+    (is1, tm@(Lam x (Var x')))
+      | x == x2 -> assertFailure ("binder not renamed: " <> showPprU tm)
+      | otherwise -> do
+          x @=? x'
+          assertBool "new binder not in returned in-scope set"
+            (x `elemInScopeSet` is1)
+    (_, tm) -> assertFailure ("unexpected result: " <> showPprU tm)
+
 tests :: TestTree
 tests =
   testGroup
@@ -103,4 +175,15 @@ tests =
           substTm "unsafeSubstTm test" subst deshadowedTerm @=?
             unsafeSubstTm emptyVarEnv (unitVarEnv localX payload)
               deshadowedTerm
+
+    , testCase "substTm renames a Lam binder that would capture (#361)"
+        substTmLam
+    , testCase "substTm renames a TyLam binder that would capture (#361)"
+        substTmTyLam
+    , testCase "substTy renames a ForAllTy binder that would capture (#361)"
+        substTyForAll
+    , testCase "deShadowTerm renames a binder that is in scope (#361)"
+        deShadowTermRenames
+    , testCase "freshenTm renames a binder that is in scope (#361)"
+        freshenTmRenames
     ]
