@@ -7,25 +7,75 @@
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Tests.Core.Scoped.DataCon (tests) where
 
+import Data.Maybe (fromMaybe)
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 
 import qualified Clash.Core.DataCon as C
+import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
+import qualified Clash.Core.Subst as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.Util as C (dataConInstArgTys)
+import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.DataCon
+import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite
   (intId, intTy, localId, mkDataCon, pairDataCon, pairTy, parseTyConTy, tyVar)
-import Test.Clash.Scoped (assertScopedAlphaEq, assertScopedTyAlphaEq)
+import Test.Clash.Scoped
+  ( assertScopedAlphaEq, assertScopedTyAlphaEq, lintScopeOf, lintTerm, withFreeVars
+  , withTests)
+import Test.Clash.Scoped.Gen (DataConInst (..), genDataConInst, showType)
+
+-- | Whether two lists of types are pairwise alpha-equivalent
+aeqTypes :: [C.Type] -> [C.Type] -> Property
+aeqTypes expected actual =
+  counterexample
+    ( "expected:\n" <> unlines (map showType expected) <>
+      "but got:\n" <> unlines (map showType actual) )
+    (length expected == length actual && and (zipWith C.aeqType expected actual))
+
+-- | Check the existentials and field types that 'dataConInstExtTyVars' gives,
+-- given the watermarks of the scopes it was given and gave
+extTyVarsAgree :: C.DataCon -> [C.Type] -> Int -> Int -> [C.TyVar] -> [C.Type] -> Property
+extTyVarsAgree dc univTys wm wm1 exts argTys =
+  counterexample "existentials above the watermark" (all (> wm) raws) .&&.
+    counterexample "existentials increasing" (and (zipWith (<) raws (drop 1 raws))) .&&.
+    counterexample "scope watermark" (wm1 === maximum (wm : raws)) .&&.
+    counterexample "kinds" (aeqTypes expectedKinds (map C.varType exts)) .&&.
+    counterexample "field types" (aeqTypes expectedArgTys argTys)
+ where
+  raws = map (fromIntegral . C.varUniq) exts :: [Int]
+  univ = C.dcUnivTyVars dc
+  expectedKinds = map (C.substTyWith univ univTys . C.varType) (C.dcExtTyVars dc)
+  -- The field types, with the existentials as arguments
+  expectedArgTys = fromMaybe [] (C.dataConInstArgTys dc (univTys <> map C.VarTy exts))
+
+-- | The raw names that a pattern binds
+patRaws :: Pat n l -> [Int]
+patRaws = \case
+  DataPat _ tvs ids -> map (fromIntegral . C.varUniq) (teleTyVars tvs) <> idRaws ids
+  _ -> []
+ where
+  idRaws :: Tele IdBinder x y -> [Int]
+  idRaws TNil = []
+  idRaws (TCons b bs) = tmNameRaw (tmNameOf b) : idRaws bs
+
+-- | The type variables of a telescope, in Clash Core
+teleTyVars :: Tele TyBinder n l -> [C.TyVar]
+teleTyVars TNil = []
+teleTyVars (TCons b bs) = toClashTyBinder b : teleTyVars bs
 
 -- | @MkF :: forall a. forall b. a -> b -> F a@, with an existential type
 -- variable @b@
@@ -99,4 +149,45 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
             Nothing -> assertFailure "withDataConPat failed"
   , testCase "dataConType" $
       assertScopedTyAlphaEq (C.dcType mkF) (dataConType emptyScope mkF)
+
+  , withTests 1000 $ testGroup "properties"
+      [ testProperty "dataConInstArgTys agrees with Clash" $
+          forAll genDataConInst $ \(DataConInst fvs dc univTys extTys) ->
+            withFreeVars fvs $ \env -> do
+              let tys = univTys <> extTys
+                  expected = C.dataConInstArgTys dc tys
+                  actual = dataConInstArgTys (convScope env) dc (map (fromClashType env) tys)
+              case (expected, map toClashType <$> actual) of
+                (Just e, Just a) -> aeqTypes e a
+                (Nothing, Nothing) -> property True
+                (e, a) -> counterexample (show (fmap (map showType) e, fmap (map showType) a)) False
+
+        -- The existentials are bound by fresh binders, whose kinds are
+        -- instantiated
+      , testProperty "dataConInstExtTyVars agrees with Clash" $
+          forAll genDataConInst $ \(DataConInst fvs dc univTys _) ->
+            withFreeVars fvs $ \env -> do
+              let sc = convScope env
+                  univTys1 = map (fromClashType env) univTys
+              fromMaybe (counterexample "Nothing" False) $
+                dataConInstExtTyVars sc dc univTys1 $ \sc1 ext argTys ->
+                  extTyVarsAgree dc univTys (scopeWatermark sc) (scopeWatermark sc1)
+                    (teleTyVars ext) (map toClashType argTys)
+
+      , testProperty "withDataConPat binds fresh variables" $
+          forAll genDataConInst $ \(DataConInst fvs dc univTys _) ->
+            withFreeVars fvs $ \env -> do
+              let sc = convScope env
+                  wm = scopeWatermark sc
+                  names = take (length (C.dcArgTys dc)) (map (C.mkUnsafeSystemName "f") [0 ..])
+                  res = withDataConPat sc dc (map (fromClashType env) univTys) names $ \sc1 p vars ->
+                          let tm = Case (Literal (C.IntLiteral 0)) (fromClashTypeClosed sc intTy)
+                                     [Alt p (foldl App (Data dc) vars)]
+                              raws = patRaws p
+                          in  counterexample "binders above the watermark" (all (> wm) raws) .&&.
+                                counterexample "binders increasing" (and (zipWith (<) raws (drop 1 raws))) .&&.
+                                counterexample "scope watermark" (scopeWatermark sc1 === maximum (wm : raws)) .&&.
+                                lintTerm (lintScopeOf env fvs) tm === []
+              fromMaybe (counterexample "Nothing" False) res
+      ]
   ]

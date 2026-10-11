@@ -19,20 +19,26 @@
 
 module Clash.Tests.Core.Scoped.Subst (tests) where
 
+import qualified Control.Lens as Lens
 import Data.Maybe (isJust, isNothing)
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 
+import qualified Clash.Core.FreeVars as C
 import Clash.Core.Literal (Literal (IntLiteral))
 import qualified Clash.Core.Name as C
+import qualified Clash.Core.Subst as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Unique (Unique)
 
+import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars
+import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
@@ -41,7 +47,79 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, existentialDataCon, existentialTy, existentialTyVar, intId
   , intTy, localId, parseToTermQQ, tyVar)
 import Test.Clash.Scoped
-  (assertScopedAlphaEq, assertScopedTyAlphaEq, betaTm, betaTy, extendSunk, sunkVar)
+  ( LintScope, aeqTermTyped, assertScopedAlphaEq, assertScopedTyAlphaEq, betaTm
+  , betaTy, binderRaws, bindersNot, extendFreeVars, extendSunk, forAllScrambled
+  , lintScopeOf, lintTerm, reopenTerm, sinkInto, sunkVar, withFreeVars, withTests)
+import Test.Clash.Scoped.Gen
+  ( InScope (..), KnownCon (..), Redex (..), Sunk (..), genInScope, genKnownCon
+  , genRedex, genSunk, inScopeOf, shrinkInScope, shrinkKnownCon, shrinkRedex
+  , shrinkSunk, showTerm)
+
+-- | Beta-reduce a redex with Clash's 'C.substTm', and with scoped Core
+-- (converted to Clash Core), and check that the results agree. The function of
+-- the redex is converted in the scope of its free variables, sunk into the
+-- scope of those of the argument too, where its binders clash, and the
+-- binders of both are scrambled.
+betaAgrees :: Redex -> Property
+betaAgrees redex = case redex of
+  TmRedex fvs0 fvs1 x body arg ->
+    let s = C.mkSubst (inScopeOf (fvs0 <> fvs1))
+        expected = C.substTm "betaAgrees" (C.extendIdSubst s x arg) body
+        d5 = C.varUniq x `elem` map C.varUniq (Lens.toListOf C.globalIds body)
+    in  classify d5 "binder shares a unique with a global it mentions" $
+        withFreeVars fvs0 $ \env0 -> do
+          let fun = fromClashTerm env0 (C.Lam x body)
+          extendFreeVars env0 fvs1 $ \env1 -> do
+            let sc = convScope env1
+            forAllScrambled sc (sinkInto sc fun) $ \fun1 ->
+              forAllScrambled sc (fromClashTerm env1 arg) $ \arg1 ->
+                resultAgrees expected (lintScopeOf env1 (fvs0 <> fvs1)) sc
+                  (betaTm sc (App fun1 arg1))
+  TyRedex fvs0 fvs1 a body ty ->
+    let s = C.mkSubst (inScopeOf (fvs0 <> fvs1))
+        expected = C.substTm "betaAgrees" (C.extendTvSubst s a ty) body
+    in  withFreeVars fvs0 $ \env0 -> do
+          let fun = fromClashTerm env0 (C.TyLam a body)
+          extendFreeVars env0 fvs1 $ \env1 -> do
+            let sc = convScope env1
+            forAllScrambled sc (sinkInto sc fun) $ \fun1 ->
+              resultAgrees expected (lintScopeOf env1 (fvs0 <> fvs1)) sc
+                (betaTy sc (TyApp fun1 (fromClashType env1 ty)))
+
+-- | Check the result of a substitution in scoped Core against that of Clash:
+-- they must be alpha-equivalent, also in their types, and the result must be
+-- well-scoped. Opening its binders must work as well.
+resultAgrees :: Distinct n => C.Term -> LintScope -> Scope n -> Term n -> Property
+resultAgrees expected ls sc res =
+  let res1 = toClashTerm res
+      (problems, _) = reopenTerm sc res
+  in  counterexample ("Clash:\n" <> showTerm expected <> "\nscoped:\n" <> showTerm res1) $
+        counterexample "aeqTerm" (C.aeqTerm expected res1) .&&.
+        counterexample "aeqTermTyped" (aeqTermTyped expected res1) .&&.
+        counterexample "lint" (lintTerm ls res === []) .&&.
+        counterexample "reopen" (problems === [])
+
+-- | Substitute for the variables that the pattern of an alternative binds, as
+-- case-of-known-constructor does, with Clash's 'C.substTm' and in scoped Core
+knownConAgrees :: KnownCon -> Property
+knownConAgrees (KnownCon fvs0 fvs1 (pat, rhs) tys tms) = case pat of
+  C.DataPat _ tvs ids ->
+    let s0 = C.mkSubst (inScopeOf (fvs0 <> fvs1))
+        expected = C.substTm "knownConAgrees"
+          (C.extendIdSubstList (C.extendTvSubstList s0 (zip tvs tys)) (zip ids tms)) rhs
+    in  withFreeVars fvs0 $ \env0 ->
+          case fromClashTerm env0 (C.Case (C.Literal (IntLiteral 0)) intTy [(pat, rhs)]) of
+            cs@Case {} -> extendFreeVars env0 fvs1 $ \env1 -> do
+              let sc = convScope env1
+              forAllScrambled sc (sinkInto sc cs) $ \case
+                Case _ _ [Alt (DataPat _ tvs1 ids1) e] ->
+                  case extendTySubstTele (idSubst sc) tvs1 (map (fromClashType env1) tys) >>= \s1 ->
+                         extendTmSubstTele s1 ids1 (map (fromClashTerm env1) tms) of
+                    Just s2 -> resultAgrees expected (lintScopeOf env1 (fvs0 <> fvs1)) sc (substTm s2 e)
+                    Nothing -> counterexample "extendSubstTele" False
+                _ -> counterexample "unexpected shape" False
+            _ -> counterexample "unexpected shape" False
+  _ -> discard
 
 -- | The uniques of the binders of the lambdas and type lambdas at the head of
 -- a Clash term
@@ -276,4 +354,72 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
             [tmNameRaw n1, tmNameRaw n2] @?= [8, 9]
           _ -> assertFailure "unexpected shape"
 
+  , withTests 500 $ testGroup "properties"
+      [ testProperty "substitution agrees with Clash" $
+          forAllShrink genRedex shrinkRedex betaAgrees
+
+      , testProperty "substitution for the variables of a pattern agrees with Clash" $
+          forAllShrink genKnownCon shrinkKnownCon knownConAgrees
+
+        -- A binder in a value may have the name of a variable in scope, of
+        -- either sort, if that doesn't occur in its scope: e.g. that of a
+        -- binder created for the value. Substitution must not substitute for
+        -- it.
+      , testProperty "substitution keeps binders that shadow the substituted one" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> do
+              let sc = convScope env
+                  body = fromClashTerm env tm
+                  int = fromClashTypeClosed sc intTy
+                  kind = fromClashTypeClosed sc C.liftedTypeKind
+                  -- The binders get the name just above the watermark of the
+                  -- scope, like the first binder of the body
+                  lam = withFreshIdBinder sc (C.mkUnsafeSystemName "x" 0) int $ \sc1 b ->
+                          Lam b (sinkInto sc1 body)
+                  tyLam = withFreshTyBinder sc (C.mkUnsafeSystemName "a" 0) kind $ \sc1 b ->
+                            TyLam b (sinkInto sc1 body)
+                  ls = lintScopeOf env fvs
+              resultAgrees tm ls sc (betaTm sc (App lam (Literal (IntLiteral 1)))) .&&.
+                resultAgrees tm ls sc (betaTy sc (TyApp tyLam int))
+
+        -- Every binder gets the name just above the watermark of the scope at
+        -- it: binders in different subterms may get the same name.
+      , testProperty "freshen is alpha-equivalent and renames binders just above the watermark" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 -> do
+                  let tm2 = freshen sc tm1
+                  counterexample ("freshened:\n" <> showTerm (toClashTerm tm2)) $
+                    counterexample "aeqTm" (aeqTm tm1 tm2) .&&.
+                    counterexample "aeqTerm" (C.aeqTerm tm (toClashTerm tm2)) .&&.
+                    counterexample "binders just above the watermark"
+                      (bindersNot (\w k -> k == w + 1) (scopeWatermark sc) tm2 === []) .&&.
+                    lintTerm (lintScopeOf env1 (fvs0 <> fvs1)) tm2 === []
+
+      , testProperty "opening binders is alpha-equivalent and renames binders that clash" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 -> do
+                  let (problems, tm2) = reopenTerm sc tm1
+                  counterexample ("reopened:\n" <> showTerm (toClashTerm tm2)) $
+                    problems === [] .&&.
+                    counterexample "aeqTm" (aeqTm tm1 tm2) .&&.
+                    counterexample "aeqTerm" (C.aeqTerm tm (toClashTerm tm2)) .&&.
+                    lintTerm (lintScopeOf env1 (fvs0 <> fvs1)) tm2 === []
+
+        -- Conversion numbers binders such that they never clash
+      , testProperty "opening the binders of a converted term keeps them" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> do
+              let tm1 = fromClashTerm env tm
+                  (problems, tm2) = reopenTerm (convScope env) tm1
+              problems === [] .&&. binderRaws tm2 === binderRaws tm1 .&&.
+                property (aeqTm tm1 tm2)
+      ]
   ]

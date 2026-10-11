@@ -8,26 +8,61 @@
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Clash.Tests.Core.Scoped.FreeVars (tests) where
 
+import qualified Control.Lens as Lens
+import qualified Data.List as List
+import Data.Maybe (isJust)
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 
+import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars
 import Clash.Core.Scoped.NameMap
+import Clash.Core.Scoped.Subst
+  (strengthenTyPat, unsinkAlt, unsinkIdBinder, unsinkTerm, unsinkTyBinder, unsinkType)
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite
   ( globalId, intId, intTy, kindedTyVar, localId, pairDataCon, pairTy
   , parseToTermQQ, tyVar)
-import Test.Clash.Scoped (extendSunk, nameSetRaws, withFreeVarsOf)
+import Test.Clash.Scoped
+  ( extendFreeVars, extendSunk, forAllScrambled, nameSetRaws, sinkInto, withFreeVars
+  , withFreeVarsOf, withTests)
+import Test.Clash.Scoped.Gen
+  ( FreeVars (..), InScope (..), Redex (..), Sunk (..), genInScope, genRedex
+  , genSameRhsCase, genSunk, patBindersFreeIn, shrinkInScope, shrinkRedex, shrinkSunk
+  , showTerm)
+
+-- | The uniques of the free local term variables of a Clash term, as raw
+-- names, in ascending order
+clashFreeIds :: C.Term -> [Int]
+clashFreeIds =
+  List.sort . List.nub . map (fromIntegral . C.varUniq) . Lens.toListOf C.freeLocalIds
+
+-- | The uniques of the free type variables of a Clash term, as raw names, in
+-- ascending order
+clashFreeTyVars :: C.Term -> [Int]
+clashFreeTyVars =
+  List.sort . List.nub . map (fromIntegral . C.varUniq) . Lens.toListOf C.termFreeTyVars
+
+-- | The free variables of a converted term are those of the Clash term, as
+-- the free variables of the conversion environment keep their uniques
+freeVarsAgree :: C.Term -> Term n -> Property
+freeVarsAgree tm tm1 =
+  counterexample "free term variables" (nameSetRaws (freeTmVars tm1) === clashFreeIds tm) .&&.
+    counterexample "free type variables" (nameSetRaws (freeTyVars tm1) === clashFreeTyVars tm)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.FreeVars"
@@ -117,4 +152,152 @@ tests = testGroup "Clash.Tests.Core.Scoped.FreeVars"
                 (nameSetRaws (freeTmVars e) == [tmNameRaw (tmNameOf ba)])
             _ -> assertFailure "unexpected pattern"
         _ -> assertFailure "unexpected shape"
+
+  , withTests 500 $ testGroup "properties"
+      [ testProperty "free variables agree with Clash, per namespace" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> freeVarsAgree tm (fromClashTerm env tm)
+
+      , testProperty "free variables of sunk terms agree with Clash" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 ->
+                freeVarsAgree tm (sinkInto (convScope env1) tm0)
+
+      , testProperty "globals agree with Clash" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env ->
+              map globalIdUniq (globalSetToList (termGlobalIds (fromClashTerm env tm)))
+                === List.sort (List.nub (map C.varUniq (Lens.toListOf C.globalIds tm)))
+
+      , testProperty "occurrence checks agree with free variables" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs@(FreeVars tvs ids) tm) ->
+            withFreeVars fvs $ \env -> do
+              let tm1 = fromClashTerm env tm
+              conjoin $
+                [ counterexample (show (tmNameRaw n)) $
+                    tmNameOccursIn n tm1 === memberNameSet n (freeTmVars tm1)
+                | Var _ _ n <- map (fromClashTerm env . C.Var) ids ] <>
+                [ counterexample (show (tyNameRaw n)) $
+                    tyNameOccursIn n tm1 === memberNameSet n (freeTyVars tm1)
+                | VarTy _ _ n <- map (fromClashType env . C.VarTy) tvs ]
+
+        -- Moving a term out of the scope of a binder succeeds if and only if
+        -- the binder doesn't occur in it
+      , testProperty "unsinking a binder agrees with Clash's free variables" $
+          forAllShrink genRedex shrinkRedex $ \redex -> case redex of
+            TmRedex fvs0 _ x body _ -> withFreeVars fvs0 $ \env ->
+              case fromClashTerm env (C.Lam x body) of
+                Lam b e -> isJust (unsinkIdBinder b e)
+                  === notElem (fromIntegral (C.varUniq x)) (clashFreeIds body)
+                _ -> property False
+            TyRedex fvs0 _ a body _ -> withFreeVars fvs0 $ \env ->
+              case fromClashTerm env (C.TyLam a body) of
+                TyLam b e -> isJust (unsinkTyBinder b e)
+                  === notElem (fromIntegral (C.varUniq a)) (clashFreeTyVars body)
+                _ -> property False
+
+        -- With scrambled binders, binders have the names of variables in
+        -- scope, and shadow each other
+      , testProperty "unsinking agrees with free variables at every binder" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 ->
+                  conjoin (freeVarsAgree tm tm1 : unsinkChecks tm1)
+
+      , testProperty "unsinking an alternative agrees with Clash's free variables" $
+          forAllShrink genSameRhsCase shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> case (tm, fromClashTerm env tm) of
+              (C.Case _ _ alts, Case _ _ alts1) ->
+                conjoin
+                  [ counterexample (showTerm rhs) $
+                      isJust (unsinkAlt p e) === not (patBindersFreeIn pat rhs)
+                  | ((pat, rhs), Alt p e) <- zip alts alts1 ]
+              _ -> property False
+      ]
   ]
+
+-- | At every binder in a term, and in its types, check that moving a value out
+-- of its scope succeeds if and only if the variables it binds are not among the
+-- free variables of the value
+unsinkChecks :: Term n -> [Property]
+unsinkChecks = goTm
+ where
+  agree :: String -> Bool -> [Int] -> [Int] -> Property
+  agree what ok bound free =
+    counterexample (what <> ": binds " <> show bound <> ", free " <> show free) $
+      ok === not (any (`elem` free) bound)
+
+  goTy :: Type x -> [Property]
+  goTy = \case
+    ForAllTy b t ->
+      agree "forall" (isJust (unsinkType (tyBinderNameBinders b) t))
+        [tyNameRaw (tyNameOf b)] (nameSetRaws (freeTyVarsOfType t))
+      : goTy (tyBinderKind b) <> goTy t
+    VarTy _ k _ -> goTy k
+    AppTy t1 t2 -> goTy t1 <> goTy t2
+    AnnType _ t -> goTy t
+    _ -> []
+
+  goTm :: Term x -> [Property]
+  goTm = \case
+    Var _ ty _ -> goTy ty
+    Lam b e ->
+      agree "lambda" (isJust (unsinkIdBinder b e)) [tmNameRaw (tmNameOf b)] (nameSetRaws (freeTmVars e))
+      : goTy (idBinderType b) <> goTm e
+    TyLam b e ->
+      agree "type lambda" (isJust (unsinkTyBinder b e)) [tyNameRaw (tyNameOf b)] (nameSetRaws (freeTyVars e))
+      : goTy (tyBinderKind b) <> goTm e
+    App e1 e2 -> goTm e1 <> goTm e2
+    TyApp e ty -> goTm e <> goTy ty
+    Let bs e ->
+      agree "let" (isJust (unsinkTerm (bindNameBinders bs) e)) (bindRaws bs) (nameSetRaws (freeTmVars e))
+      : (case bs of
+           NonRec b x -> goTy (idBinderType b) <> goTm x
+           Rec _ xs -> concatMap goTm xs)
+      <> goTm e
+    Case e ty alts -> goTm e <> goTy ty <> concatMap goAlt alts
+    Cast e t1 t2 -> goTm e <> goTy t1 <> goTy t2
+    Tick (Attributes ty x) e -> goTy ty <> goTm x <> goTm e
+    Tick (NameMod _ ty) e -> goTy ty <> goTm e
+    Tick _ e -> goTm e
+    _ -> []
+
+  goAlt :: Alt x -> [Property]
+  goAlt (Alt p e) = case p of
+    DataPat _ tvs ids ->
+      let tvRaws = teleRaws tyNameRaw tyNameOf tvs
+          idRaws = teleRaws tmNameRaw tmNameOf ids
+          freeTvs = nameSetRaws (freeTyVars e)
+      in  agree "pattern" (isJust (unsinkAlt p e)) (tvRaws <> idRaws)
+            (freeTvs <> nameSetRaws (freeTmVars e))
+          -- The types of the variable occurrences in the alternative
+          : [ agree "pattern, type" (isJust (strengthenTyPat p ty)) tvRaws
+                (nameSetRaws (freeTyVarsOfType ty))
+            | ty <- occTypes e ]
+          <> goTm e
+    _ -> goTm e
+
+  bindRaws :: Bind x y -> [Int]
+  bindRaws = \case
+    NonRec b _ -> [tmNameRaw (tmNameOf b)]
+    Rec bs _ -> teleRaws tmNameRaw tmNameOf bs
+
+  teleRaws :: (forall z. k z -> Int) -> (forall x' y'. b x' y' -> k y') -> Tele b x y -> [Int]
+  teleRaws _ _ TNil = []
+  teleRaws raw nm (TCons b bs) = raw (nm b) : teleRaws raw nm bs
+
+  -- The types of the variable occurrences that are not under binders
+  occTypes :: Term x -> [Type x]
+  occTypes = \case
+    Var _ ty _ -> [ty]
+    App e1 e2 -> occTypes e1 <> occTypes e2
+    TyApp e _ -> occTypes e
+    Cast e _ _ -> occTypes e
+    Tick _ e -> occTypes e
+    Case e _ _ -> occTypes e
+    _ -> []

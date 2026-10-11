@@ -3,7 +3,14 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the conversion between Clash Core and scoped Clash Core
+  Tests for the conversion between Clash Core and scoped Clash Core.
+
+  The properties of scoped Clash Core run on generated terms
+  ("Test.Clash.Scoped.Gen"), with the number of tests that 'withTests' gives
+  them. To run more tests, on larger terms, e.g. after changing the trusted
+  core:
+
+  > cabal run clash-lib:unittests -- -p Scoped --quickcheck-tests 100000 --quickcheck-max-size 200
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -14,21 +21,32 @@ module Clash.Tests.Core.Scoped.Convert (tests) where
 
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 
 import qualified Clash.Core.Name as C
+import qualified Clash.Core.Subst as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 
+import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertErrorContains, assertNoShadowing, assertStructurallyEqual
   , existentialDataCon, existentialTy, existentialTyVar, globalId, intId, intTy
-  , localId, parseToTermQQ, showPprU, tyVar)
-import Test.Clash.Scoped (roundTrip, withFreeVarsOf)
+  , localId, parseToTermQQ, shadowingBinders, showPprU, tyVar)
+import Test.Clash.Scoped
+  ( aeqTermTyped, binderRaws, extendFreeVars, forAllScrambled, lintScopeOf, lintTerm
+  , lowBinders, roundTrip, sinkInto, withFreeVars, withFreeVarsOf, withTests)
+import Test.Clash.Scoped.Gen
+  ( InScope (..), Sunk (..), ctxOf, freeVarsUniqs, genFreeVars, genInScope, genSunk
+  , genType, kindOf, runG, shrinkInScope, shrinkSunk, showFreeVars, showTerm
+  , showType, termFeatures, wellScopedIn)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Convert"
@@ -137,4 +155,89 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
       withFreeVarsOf [tm] $ \env ->
         assertStructurallyEqual tm (toClashTerm (fromClashTerm env tm))
 
+
+  , withTests 500 $ testGroup "properties"
+      [ testProperty "generated terms are well-scoped" $
+          forAll genInScope $ \(InScope fvs tm) -> do
+            let fs = termFeatures fvs tm
+                coverF p f = cover p (f `elem` fs) f
+            coverF 30 "shadowing binder" $
+              coverF 20 "binder shares a unique with a variable of the other sort" $
+              coverF 30 "binder shares a unique with a global" $
+              coverF 30 "free variable shares a unique with a global" $
+              coverF 30 "field type mentions an existential" $
+              tabulate "features" fs (wellScopedIn fvs tm)
+
+        -- Kinds are plausible, but some types of kind variables can't be
+        -- generated, so this only checks types of kind Type
+      , testProperty "generated types have the kind they are generated at" $
+          forAllBlind genFreeVars $ \fvs ->
+            forAllShow (runG 30 (genType (ctxOf fvs) C.liftedTypeKind 3)) showType $ \ty ->
+              counterexample (showFreeVars fvs) $
+                fmap showType (kindOf ty) === Just (showType C.liftedTypeKind)
+
+      , testProperty "round trip is alpha-equivalent" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> do
+              let tm1 = toClashTerm (fromClashTerm env tm)
+              counterexample ("round trip:\n" <> showTerm tm1) $
+                C.aeqTerm tm tm1 .&&. aeqTermTyped tm tm1
+
+        -- The free variables keep their uniques, so the round trip of a term
+        -- that conversion has numbered is the same term
+      , testProperty "conversion is idempotent" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> do
+              let tm1 = toClashTerm (fromClashTerm env tm)
+              property (C.eqTerm (toClashTerm (fromClashTerm env tm1)) tm1)
+
+      , testProperty "conversion numbers binders depth-first above the watermark" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> do
+              let raws = binderRaws (fromClashTerm env tm)
+                  wm = scopeWatermark (convScope env)
+              raws === take (length raws) [wm + 1 ..]
+
+      , testProperty "converted terms are well-scoped" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env ->
+              lintTerm (lintScopeOf env fvs) (fromClashTerm env tm) === []
+
+        -- The free variables keep their uniques, and the watermark is the
+        -- largest of them
+      , testProperty "the watermark of a conversion environment bounds its names" $
+          forAll genSunk $ \(Sunk fvs0 fvs1 _) ->
+            withFreeVars fvs0 $ \env0 -> extendFreeVars env0 fvs1 $ \env1 -> do
+              let uniqs = map fromIntegral (freeVarsUniqs (fvs0 <> fvs1))
+              scopeWatermark (convScope env1) === maximum (0 : uniqs)
+
+        -- Sinking a converted term into a scope with more variables leaves
+        -- binders that clash with them, but means the same
+      , testProperty "sinking is alpha-equivalent to converting in the larger scope" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let tm1 = sinkInto (convScope env1) tm0
+                property (aeqTm tm1 (fromClashTerm env1 tm)) .&&.
+                  lintTerm (lintScopeOf env1 (fvs0 <> fvs1)) tm1 === []
+
+        -- Binders that shadow variables in scope, and each other, convert to
+        -- Clash binders that shadow them too
+      , testProperty "scrambled binders convert to Clash" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 -> do
+                  let tm2 = toClashTerm tm1
+                  classify (not (null (lowBinders (scopeWatermark sc) tm1)))
+                    "binders at or below the watermark" $
+                    classify (not (null (shadowingBinders tm2))) "term binders that shadow" $
+                    counterexample "aeqTm" (aeqTm tm1 (fromClashTerm env1 tm)) .&&.
+                    counterexample "aeqTerm" (C.aeqTerm tm tm2) .&&.
+                    counterexample "aeqTermTyped" (aeqTermTyped tm tm2) .&&.
+                    lintTerm (lintScopeOf env1 (fvs0 <> fvs1)) tm1 === []
+      ]
   ]
