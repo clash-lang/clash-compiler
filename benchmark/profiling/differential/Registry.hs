@@ -82,13 +82,13 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["splitCastWork"], $(asRewriteQ Current.splitCastWork), [])
     , (["etaExpandSyn"], $(asRewriteQ Current.etaExpandSyn), [])
     , (["etaTL"], Current.etaExpansionTL, [])
+    , (["separateArguments"], $(asRewriteQ Current.separateArguments), [coercionForm])
     ]
 
   unported =
     -- Others
     [ (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
     , (["xOptimize"], $(asRewriteQ xOptimize))
-    , (["separateArguments"], $(asRewriteQ separateArguments))
     ]
 
 -- | The current transformation captured under a name
