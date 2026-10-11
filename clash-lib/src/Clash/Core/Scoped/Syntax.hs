@@ -84,6 +84,7 @@ module Clash.Core.Scoped.Syntax
   , Distinct
   , Ext
   , DExt
+  , withExtTrans
     -- * Sinking
   , Sinkable (sinkabilityProof)
   , sink
