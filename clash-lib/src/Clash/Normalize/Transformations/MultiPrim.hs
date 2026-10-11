@@ -24,15 +24,16 @@ import Data.Text.Extra (showt)
 import GHC.Stack (HasCallStack)
 
 import Clash.Annotations.Primitive (extractPrim)
-import Clash.Core.Name (mkUnsafeInternalName)
+import Clash.Core.Name (mkUnsafeInternalName, mkUnsafeSystemName)
 import Clash.Core.Term
   ( IsMultiPrim(..), MultiPrimInfo(..), PrimInfo(..), Term(..), WorkInfo(..)
   , mkAbstraction, mkApps, mkTmApps, mkTyApps, PrimUnfolding(..))
 import Clash.Core.TermInfo (multiPrimInfo')
 import Clash.Core.TyCon (TyConMap)
-import Clash.Core.Type (Type(..), mkPolyFunTy, splitFunForallTy)
+import Clash.Core.Type (Type(..), mkFunTy, splitFunForallTy)
+import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Util (listToLets)
-import Clash.Core.Var (mkLocalId)
+import Clash.Core.Var (mkLocalId, mkTyVar)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
 import Clash.Rewrite.StrategyDSL (Transformation, onPrim, toTransformation)
@@ -64,14 +65,18 @@ import Clash.Rewrite.Util (changed)
 --   \\(x :: a) ->
 --         let
 --            r  = prim @a @b @c x r0 r1 -- With 'Clash.Core.Term.MultiPrim'
---            r0 = c$multiPrimSelect r0 r
---            r1 = c$multiPrimSelect r1 r
+--            r0 = c$multiPrimSelect @b @(b, c) r0 r
+--            r1 = c$multiPrimSelect @c @(b, c) r1 r
 --          in
 --            (r0, r1)
 -- @
 --
 -- Netlist will not render any @multiPrimSelect@ primitives. Similar to
 -- primitives having a /void/ return type, /r/ is not rendered either.
+--
+-- @c$multiPrimSelect@ has the closed type @forall a b. a -> b -> a@: the type
+-- of a primitive must not mention type variables of the term it occurs in, as
+-- substitution doesn't go into it.
 --
 -- This transformation is currently hardcoded to recognize tuples as return
 -- types, not any product type. It will error if it sees a multi result primitive
@@ -117,7 +122,8 @@ setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
   MultiPrimInfo{mpi_resultDc=tupTc, mpi_resultTypes=resTypes} =
     multiPrimInfo' tcm primInfo
 
-  multiPrimSelect r t = (r, mkTmApps (Prim (multiPrimSelectInfo t)) [Var r, Var resId])
+  multiPrimSelect r t =
+    (r, mkApps (Prim multiPrimSelectInfo) [Right t, Right pResTy, Left (Var r), Left (Var resId)])
   multiPrimSelectBinds = zipWith multiPrimSelect  resIds resTypes
   multiPrimTermArgs = map (Left . Var) (argIds <> resIds)
   multiPrimTypeArgs = map (Right . VarTy) typeVars
@@ -126,13 +132,18 @@ setupMultiResultPrim' tcm primInfo@PrimInfo{primType} =
       (Prim primInfo{primMultiResult=MultiResult})
       (multiPrimTypeArgs <> multiPrimTermArgs)
 
-  multiPrimSelectInfo t = PrimInfo
+  -- forall a b. a -> b -> a
+  multiPrimSelectInfo = PrimInfo
     { primName = "c$multiPrimSelect"
-    , primType = mkPolyFunTy pResTy [Right pResTy, Right t]
+    , primType =
+        ForAllTy selA (ForAllTy selB (mkFunTy (VarTy selA) (mkFunTy (VarTy selB) (VarTy selA))))
     , primWorkInfo = WorkAlways
     , primMultiResult = SingleResult
     , primUnfolding = NoUnfolding
     }
+
+  selA = mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 0)
+  selB = mkTyVar liftedTypeKind (mkUnsafeSystemName "b" 1)
 
   letTerm =
     listToLets
