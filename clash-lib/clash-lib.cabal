@@ -238,6 +238,7 @@ Library
                       Clash.Core.Scoped.TyCon
                       Clash.Core.Scoped.Type
                       Clash.Core.Scoped.TysPrim
+                      Clash.Core.Scoped.TypeEnv
                       Clash.Core.Scoped.Util
                       Clash.Core.Subst
                       Clash.Core.Term
@@ -480,6 +481,7 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.TermInfo
                  Clash.Tests.Core.Scoped.TyCon
                  Clash.Tests.Core.Scoped.Type
+                 Clash.Tests.Core.Scoped.TypeEnv
                  Clash.Tests.Core.Scoped.TysPrim
                  Clash.Tests.Core.Scoped.Util
                  Clash.Tests.Core.StructuralEquivalence

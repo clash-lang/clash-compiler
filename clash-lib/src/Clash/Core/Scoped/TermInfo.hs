@@ -47,13 +47,13 @@ import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TermInfo as C
-import qualified Clash.Core.TyCon as C
 
 import Clash.Core.Scoped.FreeVars (freeTmVars, freeTyVars)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap (nullNameSet)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type (isFunTy, isPolyFunCoreTy)
+import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 -- * Measures
 
@@ -112,12 +112,12 @@ termSizeSmallerThan n t0
 -- * Predicates
 
 -- | Does a term have a function type?
-isFun :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> Term n -> Bool
-isFun tcm sc t = isFunTy tcm sc (inferCoreTypeOf tcm sc t)
+isFun :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Bool
+isFun tenv sc t = isFunTy tenv sc (inferCoreTypeOf tenv sc t)
 
 -- | Does a term have a function or polymorphic type?
-isPolyFun :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> Term n -> Bool
-isPolyFun tcm sc t = isPolyFunCoreTy tcm sc (inferCoreTypeOf tcm sc t)
+isPolyFun :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Bool
+isPolyFun tenv sc t = isPolyFunCoreTy tenv sc (inferCoreTypeOf tenv sc t)
 
 -- | Is a term a let-expression?
 isLet :: Term n -> Bool

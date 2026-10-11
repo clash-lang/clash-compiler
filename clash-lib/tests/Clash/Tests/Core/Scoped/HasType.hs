@@ -32,6 +32,7 @@ import qualified Clash.Core.Var as C
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.HasType
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Test.Clash.Rewrite
   ( boolTy, globalId, intTy, justDataCon, localId, maybeTy, nTy, pTy
@@ -40,6 +41,9 @@ import Test.Clash.Scoped
 
 tcm :: C.TyConMap
 tcm = testTyConMap
+
+tenv :: TypeEnv
+tenv = testTypeEnv
 
 aTv, bTv, cTv :: C.TyVar
 aTv = tyVar C.User "a" 4000
@@ -132,7 +136,7 @@ tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.HasType"
   [ testCase "inferCoreTypeOf agrees with Clash.Core.HasType" $
       forM_ terms $ \tm -> withTermScopes tm $ \sc tm' ->
-        assertScopedTyAlphaEq (C.inferCoreTypeOf tcm tm) (inferCoreTypeOf tcm sc tm')
+        assertScopedTyAlphaEq (C.inferCoreTypeOf tcm tm) (inferCoreTypeOf tenv sc tm')
 
   , testCase "literalType agrees with Clash.Core.HasType" $
       forM_ literals $ \l ->
@@ -148,7 +152,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.HasType"
       forM_ piCases $ \(ty, args) ->
         withFreeTyVarsOf (ty : args) $ \env ->
           assertScopedTyAlphaEq (C.piResultTys tcm ty args)
-            (piResultTys tcm (convScope env) (fromClashType env ty)
+            (piResultTys tenv (convScope env) (fromClashType env ty)
               (map (fromClashType env) args))
 
     -- Instantiating @forall a b. a -> b@ with @c@, where @c@ has the same
@@ -156,7 +160,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.HasType"
   , testCase "piResultTys renames binders that would capture" $
       withFreeTyVarsOf [c] $ \env ->
         assertScopedTyAlphaEq (C.ForAllTy bTv (C.mkFunTy c b))
-          (piResultTys tcm (convScope env)
+          (piResultTys tenv (convScope env)
             (fromClashType env (C.ForAllTy aTv (C.ForAllTy bTv (C.mkFunTy a b))))
             [fromClashType env c])
 
@@ -165,12 +169,12 @@ tests = testGroup "Clash.Tests.Core.Scoped.HasType"
         let sc = convScope env
             ty = fromClashTypeClosed sc (C.ForAllTy aTv (C.mkFunTy a (C.mkFunTy a a)))
         in assertScopedTyAlphaEq (C.mkFunTy intTy intTy)
-             (applyTypeToArgs (fromClashTerm env x) tcm sc ty
+             (applyTypeToArgs (fromClashTerm env x) tenv sc ty
                [Right (fromClashTypeClosed sc intTy), Left (fromClashTerm env x)])
 
   , testCase "inferCoreKindOf agrees with Clash.Core.HasType" $
       forM_ kindCases $ \ty -> withTypeScopes ty $ \sc ty' ->
-        assertScopedTyAlphaEq (C.inferCoreKindOf tcm ty) (inferCoreKindOf tcm sc ty')
+        assertScopedTyAlphaEq (C.inferCoreKindOf tcm ty) (inferCoreKindOf tenv sc ty')
 
     -- With the @debug@ flag, 'piResultTys' checks that the types it drops the
     -- arrows of a function type with match the argument types of the
@@ -180,10 +184,10 @@ tests = testGroup "Clash.Tests.Core.Scoped.HasType"
     -- 'inferCoreKindOf' errored.
   , testCase "inferCoreKindOf of a type constructor applied to a type" $
       withTypeScopes (maybeTy intTy) $ \sc ty ->
-        assertScopedTyAlphaEq C.liftedTypeKind (inferCoreKindOf tcm sc ty)
+        assertScopedTyAlphaEq C.liftedTypeKind (inferCoreKindOf tenv sc ty)
   , testCase "inferCoreKindOf of a type constructor applied to a type variable" $
       withTypeScopes (maybeTy a) $ \sc ty ->
-        assertScopedTyAlphaEq C.liftedTypeKind (inferCoreKindOf tcm sc ty)
+        assertScopedTyAlphaEq C.liftedTypeKind (inferCoreKindOf tenv sc ty)
   ]
 
 literals :: [C.Literal]

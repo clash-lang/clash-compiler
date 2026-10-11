@@ -8,8 +8,10 @@
 
   Local variables carry their type ('Var', and 'idBinderType'), and so do
   case-expressions and casts. Globals, data constructors and primitives have
-  closed Clash types, which 'globalIdType', 'dataConType' and 'primInfoType'
-  convert into the scope they're used in.
+  closed Clash types. 'globalIdType' and 'dataConType' look them up in a
+  t'TypeEnv', which converts them at most once, see
+  "Clash.Core.Scoped.TypeEnv". 'primInfoType' converts the type of a primitive
+  for every use.
 
   = Inferring types under binders
 
@@ -51,24 +53,20 @@ import qualified Clash.Core.HasType as C
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term (PrimInfo)
-import Clash.Core.TyCon (TyConMap)
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
-import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (debugIsOn)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Convert (fromClashTypeClosed)
-import Clash.Core.Scoped.DataCon (dataConType)
 import Clash.Core.Scoped.NameMap (tyBinderNameBinders)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs)
-import Clash.Core.Scoped.TyCon (tyConKindOf)
 import Clash.Core.Scoped.Type
+import Clash.Core.Scoped.TypeEnv (TypeEnv, dataConType, globalIdType, tyConKindOf)
 import Clash.Core.Scoped.TysPrim
 
 -- * Types of terms
@@ -100,37 +98,33 @@ literalType = \case
 primInfoType :: (HasCallStack, Distinct n) => Scope n -> PrimInfo -> Type n
 primInfoType sc p = fromClashTypeClosed sc (C.coreTypeOf p)
 
--- | The type of a global variable, in any scope
-globalIdType :: (HasCallStack, Distinct n) => Scope n -> GlobalId -> Type n
-globalIdType sc g = fromClashTypeClosed sc (C.varType (globalIdVar g))
-
 -- | The type of a term. See 'C.inferCoreTypeOf', and the module header.
-inferCoreTypeOf :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> Term n -> Type n
+inferCoreTypeOf :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Type n
 inferCoreTypeOf = inferTypeOpen
 
 -- | Goes under binders that don't clash with the scope as they are. At a
 -- binder that does, continues with 'inferTypeSubst'.
-inferTypeOpen :: Distinct n => TyConMap -> Scope n -> Term n -> Type n
-inferTypeOpen tcm sc tm = case tm of
+inferTypeOpen :: Distinct n => TypeEnv -> Scope n -> Term n -> Type n
+inferTypeOpen tenv sc tm = case tm of
   Lam b e -> openIdBinder sc b (Opened False e) $ \sc' b' (Opened renamed e') ->
-    if renamed then inferTypeSubst tcm (idSubst sc) tm else
-    mkFunTy (idBinderType b') (strengthenTyId b' (inferTypeOpen tcm sc' e'))
+    if renamed then inferTypeSubst tenv (idSubst sc) tm else
+    mkFunTy (idBinderType b') (strengthenTyId b' (inferTypeOpen tenv sc' e'))
   TyLam b e -> openTyBinder sc b (Opened False e) $ \sc' b' (Opened renamed e') ->
-    if renamed then inferTypeSubst tcm (idSubst sc) tm else
-    ForAllTy b' (inferTypeOpen tcm sc' e')
-  App {} -> inferTypeOpenApp tcm sc tm
-  TyApp {} -> inferTypeOpenApp tcm sc tm
+    if renamed then inferTypeSubst tenv (idSubst sc) tm else
+    ForAllTy b' (inferTypeOpen tenv sc' e')
+  App {} -> inferTypeOpenApp tenv sc tm
+  TyApp {} -> inferTypeOpenApp tenv sc tm
   Let bs e -> openBind sc bs (Opened False e) $ \sc' bs' (Opened renamed e') ->
-    if renamed then inferTypeSubst tcm (idSubst sc) tm else
+    if renamed then inferTypeSubst tenv (idSubst sc) tm else
     case bs' of
-      NonRec b _ -> strengthenTyId b (inferTypeOpen tcm sc' e')
-      Rec bndrs _ -> strengthenTyIds bndrs (inferTypeOpen tcm sc' e')
-  Tick _ e -> inferTypeOpen tcm sc e
-  _ -> inferTypeSubst tcm (idSubst sc) tm
+      NonRec b _ -> strengthenTyId b (inferTypeOpen tenv sc' e')
+      Rec bndrs _ -> strengthenTyIds bndrs (inferTypeOpen tenv sc' e')
+  Tick _ e -> inferTypeOpen tenv sc e
+  _ -> inferTypeSubst tenv (idSubst sc) tm
 
-inferTypeOpenApp :: Distinct n => TyConMap -> Scope n -> Term n -> Type n
-inferTypeOpenApp tcm sc tm = case collectArgs tm of
-  (fun, args) -> applyTypeToArgsWith tm tcm sc (inferTypeOpen tcm sc fun) args
+inferTypeOpenApp :: Distinct n => TypeEnv -> Scope n -> Term n -> Type n
+inferTypeOpenApp tenv sc tm = case collectArgs tm of
+  (fun, args) -> applyTypeToArgsWith tm tenv sc (inferTypeOpen tenv sc fun) args
 
 -- | A term under a binder, and whether going under the binder renamed it. See
 -- 'inferCoreTypeOf'. The term is lazy, so that it isn't renamed unless it is
@@ -142,14 +136,14 @@ instance HasSubst Opened where
 
 -- | The type of a term in scope @i@, substituted into scope @o@. Goes under
 -- binders by renaming only the binders, see the module header.
-inferTypeSubst :: (HasCallStack, Distinct o) => TyConMap -> Subst i o -> Term i -> Type o
-inferTypeSubst tcm = go
+inferTypeSubst :: (HasCallStack, Distinct o) => TypeEnv -> Subst i o -> Term i -> Type o
+inferTypeSubst tenv = go
  where
   go :: Distinct y => Subst x y -> Term x -> Type y
   go s = \case
     Var _ ty _ -> substTy s ty
-    GlobalVar g -> globalIdType (substScope s) g
-    Data dc -> dataConType (substScope s) dc
+    GlobalVar g -> globalIdType tenv (substScope s) g
+    Data dc -> dataConType tenv (substScope s) dc
     Literal l -> literalType l
     Prim p -> primInfoType (substScope s) p
     Lam b e -> substIdBinder s b $ \s' b' ->
@@ -169,7 +163,7 @@ inferTypeSubst tcm = go
   goApp :: Distinct y => Subst x y -> Term x -> Type y
   goApp s e = case collectArgs e of
     (fun, args) ->
-      applyTypeToArgsWith e tcm (substScope s) (go s fun) (map (fmap (substTy s)) args)
+      applyTypeToArgsWith e tenv (substScope s) (go s fun) (map (fmap (substTy s)) args)
 
 -- | The result type of a function, given its type and its arguments. See
 -- 'C.applyTypeToArgs'.
@@ -177,7 +171,7 @@ applyTypeToArgs
   :: (HasCallStack, Distinct n)
   => Term n
   -- ^ The complete term, used for error messages
-  -> TyConMap
+  -> TypeEnv
   -> Scope n
   -> Type n
   -> [Either (Term n) (Type n)]
@@ -189,16 +183,16 @@ applyTypeToArgs = applyTypeToArgsWith
 applyTypeToArgsWith
   :: (HasCallStack, Distinct n)
   => Term x
-  -> TyConMap
+  -> TypeEnv
   -> Scope n
   -> Type n
   -> [Either (Term x) (Type n)]
   -> Type n
-applyTypeToArgsWith e tcm sc = go
+applyTypeToArgsWith e tenv sc = go
  where
   go opTy [] = opTy
   go opTy (Right ty:args) = goTyArgs opTy [ty] args
-  go opTy (Left a:args) = case splitFunTy tcm sc opTy of
+  go opTy (Left a:args) = case splitFunTy tenv sc opTy of
     Just (_, resTy) -> go resTy args
     _ -> error [I.i|
         Unexpected application. The term
@@ -215,11 +209,11 @@ applyTypeToArgsWith e tcm sc = go
       |]
 
   goTyArgs opTy revTys (Right ty:args) = goTyArgs opTy (ty:revTys) args
-  goTyArgs opTy revTys args = go (piResultTys tcm sc opTy (reverse revTys)) args
+  goTyArgs opTy revTys args = go (piResultTys tenv sc opTy (reverse revTys)) args
 
 -- | Like 'piResultTys', but only applies a single type. See 'C.piResultTy'.
-piResultTy :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> Type n -> Type n -> Type n
-piResultTy tcm sc ty arg = piResultTys tcm sc ty [arg]
+piResultTy :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Type n -> Type n
+piResultTy tenv sc ty arg = piResultTys tenv sc ty [arg]
 
 -- | @(piResultTys f_ty [ty1, ..., tyn])@ gives the type of @(f ty1 .. tyn)@
 -- where @f :: f_ty@. See 'C.piResultTys'.
@@ -232,7 +226,7 @@ piResultTy tcm sc ty arg = piResultTys tcm sc ty [arg]
 -- must match the argument types of the function type.
 piResultTys
   :: (HasCallStack, Distinct n)
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> Type n
   -> [Type n]
@@ -244,7 +238,7 @@ piResultTys = piResultTysWith True
 -- @piResultKinds@ in "Clash.Core.HasType".
 piResultKinds
   :: (HasCallStack, Distinct n)
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> Kind n
   -> [Type n]
@@ -258,18 +252,18 @@ piResultTysWith
   => Bool
   -- ^ Check (with the @debug@ flag) that the types dropping an arrow match its
   -- argument type
-  -> TyConMap
+  -> TypeEnv
   -> Scope n
   -> Type n
   -> [Type n]
   -> Type n
 piResultTysWith _ _ _ ty [] = ty
-piResultTysWith checkArgs tcm sc ty origArgs@(arg:args)
-  | Just ty' <- coreView1 tcm sc ty
-  = piResultTysWith checkArgs tcm sc ty' origArgs
+piResultTysWith checkArgs tenv sc ty origArgs@(arg:args)
+  | Just ty' <- coreView1 tenv sc ty
+  = piResultTysWith checkArgs tenv sc ty' origArgs
   | FunTy a res <- tyView ty
   -- See 'C.piResultTys' for why this uses 'coreView'
-  = if debugIsOn && checkArgs && not (aeqTy (coreView tcm sc a) (coreView tcm sc arg)) then error [I.i|
+  = if debugIsOn && checkArgs && not (aeqTy (coreView tenv sc a) (coreView tenv sc arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
@@ -279,7 +273,7 @@ piResultTysWith checkArgs tcm sc ty origArgs@(arg:args)
         #{showPpr arg}
     |]
     else
-      piResultTysWith checkArgs tcm sc res args
+      piResultTysWith checkArgs tenv sc res args
   | ForAllTy b res <- ty
   = go (extendTySubst (idSubst sc) b arg) res args
   | otherwise
@@ -298,20 +292,20 @@ piResultTysWith checkArgs tcm sc ty origArgs@(arg:args)
     -- arguments
     | otherwise
     = let ty'' = substTy s ty' in
-      case coreView1 tcm sc ty'' of
+      case coreView1 tenv sc ty'' of
         Just ty3 -> go (idSubst sc) ty3 allArgs
-        Nothing -> piResultTysWith checkArgs tcm sc ty'' allArgs
+        Nothing -> piResultTysWith checkArgs tenv sc ty'' allArgs
 
 -- * Kinds of types
 
 -- | The kind of a type. See 'C.inferCoreKindOf'.
-inferCoreKindOf :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> Type n -> Kind n
-inferCoreKindOf tcm sc ty = case tyView ty of
+inferCoreKindOf :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Kind n
+inferCoreKindOf tenv sc ty = case tyView ty of
   FunTy {} ->
     liftedTypeKind
 
   TyConApp tc args ->
-    piResultKinds tcm sc (tyConKindOf sc (UniqMap.find tc tcm)) args
+    piResultKinds tenv sc (tyConKindOf tenv tc) args
 
   OtherType {} ->
     case ty of
@@ -321,12 +315,12 @@ inferCoreKindOf tcm sc ty = case tyView ty of
         fromMaybe
           (error $ $(curLoc) ++ "inferCoreKindOf: kind mentions the type variable: "
                      ++ showPpr ty)
-          (unsinkType (tyBinderNameBinders b') (inferCoreKindOf tcm sc' a'))
+          (unsinkType (tyBinderNameBinders b') (inferCoreKindOf tenv sc' a'))
       LitTy C.NumTy {} -> typeNatKind
       LitTy C.SymTy {} -> typeSymbolKind
       LitTy C.CharTy {} -> charPrimTy
-      AnnType _ a -> inferCoreKindOf tcm sc a
+      AnnType _ a -> inferCoreKindOf tenv sc a
       AppTy a b -> goApp a [b]
  where
   goApp (AppTy c d) args = goApp c (d : args)
-  goApp c args = piResultKinds tcm sc (inferCoreKindOf tcm sc c) args
+  goApp c args = piResultKinds tenv sc (inferCoreKindOf tenv sc c) args

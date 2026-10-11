@@ -80,7 +80,6 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Util as C
-import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Util (curLoc, indexNote)
 
 import Clash.Core.Scoped.DataCon (dataConInstArgTys, dataConInstExtTyVars)
@@ -95,6 +94,7 @@ import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (appendTele, mkApps, splitTele)
 import Clash.Core.Scoped.Type
+import Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, lookupTyCon)
 import Clash.Core.Scoped.TysPrim (typeNatKind)
 
 -- * Let-bindings
@@ -338,15 +338,16 @@ numTy = LitTy . C.NumTy
 
 -- | The first field type of a data constructor instantiated at the given
 -- types: the type of its coercion, for the constructors of @Vec@ and @RTree@
-coercionTy :: (HasCallStack, Distinct n) => Scope n -> DataCon -> [Type n] -> Type n
-coercionTy sc dc tys = case dataConInstArgTys sc dc tys of
+coercionTy :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> DataCon -> [Type n] -> Type n
+coercionTy tenv sc dc tys = case dataConInstArgTys tenv sc dc tys of
   Just (ty:_) -> ty
   _ -> error ("coercionTy: can't instantiate " <> show dc)
 
 -- | Create a vector of the given elements, see 'C.mkVec'
 mkVec
   :: (HasCallStack, Distinct n)
-  => Scope n
+  => TypeEnv
+  -> Scope n
   -> DataCon
   -- ^ The @Nil@ constructor
   -> DataCon
@@ -358,17 +359,18 @@ mkVec
   -> [Term n]
   -- ^ Elements
   -> Term n
-mkVec sc nilCon consCon resTy n0 xs0 = appendVec sc consCon resTy nil n0 xs0
+mkVec tenv sc nilCon consCon resTy n0 xs0 = appendVec tenv sc consCon resTy nil n0 xs0
  where
   nil = mkApps (Data nilCon)
     [ Right (numTy 0)
     , Right resTy
-    , Left (primCo (coercionTy sc nilCon [numTy 0, resTy])) ]
+    , Left (primCo (coercionTy tenv sc nilCon [numTy 0, resTy])) ]
 
 -- | Prepend the given elements to a vector, see 'C.appendToVec'
 appendToVec
   :: (HasCallStack, Distinct n)
-  => Scope n
+  => TypeEnv
+  -> Scope n
   -> DataCon
   -- ^ The @Cons@ constructor
   -> Type n
@@ -384,15 +386,15 @@ appendToVec = appendVec
 
 appendVec
   :: (HasCallStack, Distinct n)
-  => Scope n -> DataCon -> Type n -> Term n -> Integer -> [Term n] -> Term n
-appendVec sc consCon resTy vec = go
+  => TypeEnv -> Scope n -> DataCon -> Type n -> Term n -> Integer -> [Term n] -> Term n
+appendVec tenv sc consCon resTy vec = go
  where
   go _ [] = vec
   go n (x:xs) = mkApps (Data consCon)
     [ Right (numTy n)
     , Right resTy
     , Right (numTy (n - 1))
-    , Left (primCo (coercionTy sc consCon [numTy n, resTy, numTy (n - 1)]))
+    , Left (primCo (coercionTy tenv sc consCon [numTy n, resTy, numTy (n - 1)]))
     , Left x
     , Left (go (n - 1) xs) ]
 
@@ -402,7 +404,8 @@ appendVec sc consCon resTy vec = go
 -- field types are those of the instantiation.
 selectField
   :: (HasCallStack, Distinct n)
-  => Scope n
+  => TypeEnv
+  -> Scope n
   -> DataCon
   -> [Type n]
   -- ^ Types for the universally and existentially quantified variables
@@ -415,7 +418,7 @@ selectField
   -> Int
   -- ^ Field to select
   -> Term n
-selectField sc dc tys nExts fieldNms subj fieldI = case dataConInstArgTys sc dc tys of
+selectField tenv sc dc tys nExts fieldNms subj fieldI = case dataConInstArgTys tenv sc dc tys of
   Nothing -> error ("selectField: can't instantiate " <> show dc)
   Just argTys -> bindExts sc nExts $ \sc1 exts ->
     withFreshIdBinders sc1 (zip (map systemName fieldNms) (sink1 argTys)) $ \_ fields vars ->
@@ -457,7 +460,8 @@ internalName nm = C.mkUnsafeInternalName nm 0
 extractElems
   :: forall n r
    . (HasCallStack, Distinct n)
-  => Scope n
+  => TypeEnv
+  -> Scope n
   -> DataCon
   -- ^ The @Cons@ constructor
   -> Type n
@@ -472,7 +476,7 @@ extractElems
   -- ^ The vector
   -> (forall l. DExt n l => Scope l -> Tele IdBinder n l -> [Term l] -> [Term l] -> Term l -> r)
   -> r
-extractElems sc0 consCon resTy0 s maxN count vec0 cont
+extractElems tenv sc0 consCon resTy0 s maxN count vec0 cont
   | count < 1 || count > maxN =
       error ("extractElems: can't extract " <> show count <> " elements of a vector of "
         <> show maxN)
@@ -498,10 +502,10 @@ extractElems sc0 consCon resTy0 s maxN count vec0 cont
    where
     n = maxN - i
     tys = [numTy n, resTy, numTy (n - 1)]
-    restTy = case dataConInstArgTys sc consCon tys of
+    restTy = case dataConInstArgTys tenv sc consCon tys of
       Just [_, _, ty] -> ty
       _ -> error "extractElems: can't instantiate Cons"
-    sel = selectField sc consCon tys 1 ["_co_", "el", "rest"] vec
+    sel = selectField tenv sc consCon tys 1 ["_co_", "el", "rest"] vec
     elRhs = sel 1
     restRhs = sel 2
 
@@ -512,7 +516,8 @@ extractElems sc0 consCon resTy0 s maxN count vec0 cont
 -- | Create a tree of the given elements, see 'C.mkRTree'
 mkRTree
   :: (HasCallStack, Distinct n)
-  => Scope n
+  => TypeEnv
+  -> Scope n
   -> DataCon
   -- ^ The @LR@ constructor
   -> DataCon
@@ -524,12 +529,12 @@ mkRTree
   -> [Term n]
   -- ^ Elements
   -> Term n
-mkRTree sc lrCon brCon resTy = go
+mkRTree tenv sc lrCon brCon resTy = go
  where
   go _ [x] = mkApps (Data lrCon)
     [ Right (numTy 0)
     , Right resTy
-    , Left (primCo (coercionTy sc lrCon [numTy 0, resTy]))
+    , Left (primCo (coercionTy tenv sc lrCon [numTy 0, resTy]))
     , Left x ]
   go n xs =
     let (xsL, xsR) = splitAt (length xs `div` 2) xs
@@ -537,7 +542,7 @@ mkRTree sc lrCon brCon resTy = go
          [ Right (numTy n)
          , Right resTy
          , Right (numTy (n - 1))
-         , Left (primCo (coercionTy sc brCon [numTy n, resTy, numTy (n - 1)]))
+         , Left (primCo (coercionTy tenv sc brCon [numTy n, resTy, numTy (n - 1)]))
          , Left (go (n - 1) xsL)
          , Left (go (n - 1) xsR) ]
 
@@ -548,7 +553,8 @@ mkRTree sc lrCon brCon resTy = go
 extractTElems
   :: forall n r
    . (HasCallStack, Distinct n)
-  => Scope n
+  => TypeEnv
+  -> Scope n
   -> DataCon
   -- ^ The @LR@ constructor
   -> DataCon
@@ -563,7 +569,7 @@ extractTElems
   -- ^ The tree
   -> (forall l. DExt n l => Scope l -> Tele IdBinder n l -> [Term l] -> [Term l] -> r)
   -> r
-extractTElems sc0 lrCon brCon resTy0 s maxN tree0 =
+extractTElems tenv sc0 lrCon brCon resTy0 s maxN tree0 =
   go sc0 resTy0 maxN [0 .. (2 ^ (maxN + 1)) - 2] [0 .. (2 ^ maxN) - 1] tree0
  where
   go
@@ -575,16 +581,16 @@ extractTElems sc0 lrCon brCon resTy0 s maxN tree0 =
     kIx:_ ->
       withFreshIdBinder sc (systemName ("el" <> suffix kIx)) resTy $ \sc1 elB ->
         k sc1 (TCons elB TNil)
-          [sink (selectField sc lrCon [numTy 0, resTy] 0 ["_co_", "el"] tree 1)]
+          [sink (selectField tenv sc lrCon [numTy 0, resTy] 0 ["_co_", "el"] tree 1)]
           [idBinderVar elB]
     [] -> error "extractTElems: no name for an element"
   go sc resTy n bs ks tree k = case splitAt (length bs `div` 2) bs of
     (b0:bL, b1:bR) ->
       let tys = [numTy n, resTy, numTy (n - 1)]
-          brTy = case dataConInstArgTys sc brCon tys of
+          brTy = case dataConInstArgTys tenv sc brCon tys of
             Just [_, ty, _] -> ty
             _ -> error "extractTElems: can't instantiate BR"
-          sel = selectField sc brCon tys 1 ["_co_", "lt", "rt"] tree
+          sel = selectField tenv sc brCon tys 1 ["_co_", "lt", "rt"] tree
           (kL, kR) = splitAt (length ks `div` 2) ks
       in withFreshIdBinder sc (systemName ("lt" <> suffix b0)) brTy $ \sc1 ltB ->
            withFreshIdBinder sc1 (systemName ("rt" <> suffix b1)) (sink brTy) $ \sc2 rtB ->
@@ -606,9 +612,10 @@ extractTElems sc0 lrCon brCon resTy0 s maxN tree0 =
 -- there are more or fewer types than universally quantified type variables,
 -- or if a field type mentions an existentially quantified type variable,
 -- which 'C.substArgTys' leaves free.
-substArgTys :: (HasCallStack, Distinct n) => Scope n -> DataCon -> [Type n] -> Maybe [Type n]
-substArgTys sc dc tys = join $
-  dataConInstExtTyVars sc dc tys $ \_ exts argTys ->
+substArgTys
+  :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> DataCon -> [Type n] -> Maybe [Type n]
+substArgTys tenv sc dc tys = join $
+  dataConInstExtTyVars tenv sc dc tys $ \_ exts argTys ->
     traverse (unsinkType (teleNameBinders exts)) argTys
 
 -- | Make a case-expression that selects a field of a data constructor, see
@@ -620,7 +627,7 @@ mkSelectorCase
   => String
   -- ^ Name of the caller
   -> Scope n
-  -> C.TyConMap
+  -> TypeEnv
   -> Term n
   -- ^ Subject
   -> Int
@@ -628,18 +635,18 @@ mkSelectorCase
   -> Int
   -- ^ The @n@-th field, from 0
   -> Term n
-mkSelectorCase caller sc tcm scrut dcI fieldI = go (inferCoreTypeOf tcm sc scrut)
+mkSelectorCase caller sc tenv scrut dcI fieldI = go (inferCoreTypeOf tenv sc scrut)
  where
   go scrutTy
-    | Just ty' <- coreView1 tcm sc scrutTy = go ty'
+    | Just ty' <- coreView1 tenv sc scrutTy = go ty'
     | TyConApp tc args <- tyView scrutTy =
-        case C.tyConDataCons (UniqMap.find tc tcm) of
+        case C.tyConDataCons (findTyCon tenv tc) of
           [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc) scrutTy
           dcs
             | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
             | otherwise ->
                 let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI - 1)) dcs (dcI - 1)
-                    res = dataConInstArgTysE tcm sc dc args $ \sc1 exts fieldTys ->
+                    res = dataConInstArgTysE tenv sc dc args $ \sc1 exts fieldTys ->
                       if fieldI >= length fieldTys then
                         cantCreate $(curLoc) "Field index exceed max" scrutTy
                       else
@@ -697,43 +704,43 @@ data SplitInfo n = SplitInfo
 -- Unlike 'C.shouldSplit', doesn't split product types of which the type of a
 -- field mentions an existentially quantified type variable, see
 -- 'substArgTys'.
-shouldSplit :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> Type n -> Maybe (SplitInfo n)
-shouldSplit tcm sc ty = case tyView ty of
+shouldSplit :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Maybe (SplitInfo n)
+shouldSplit tenv sc ty = case tyView ty of
   -- Look through SimIO to find things like Files
-  TyConApp tcNm [tyArg] | C.nameOcc tcNm == "Clash.Explicit.SimIO.SimIO" -> shouldSplit tcm sc tyArg
-  _ -> shouldSplit0 tcm sc (tyView (coreView tcm sc ty))
+  TyConApp tcNm [tyArg] | C.nameOcc tcNm == "Clash.Explicit.SimIO.SimIO" -> shouldSplit tenv sc tyArg
+  _ -> shouldSplit0 tenv sc (tyView (coreView tenv sc ty))
 
 -- | Worker of 'shouldSplit', on a 'TypeView'
 shouldSplit0
   :: forall n
    . (HasCallStack, Distinct n)
-  => C.TyConMap -> Scope n -> TypeView n -> Maybe (SplitInfo n)
-shouldSplit0 tcm sc = \case
+  => TypeEnv -> Scope n -> TypeView n -> Maybe (SplitInfo n)
+shouldSplit0 tenv sc = \case
   TyConApp tcNm tyArgs
-    | Just tc <- UniqMap.lookup tcNm tcm
+    | Just tc <- lookupTyCon tenv tcNm
     , [dc] <- C.tyConDataCons tc
-    , Just dcArgs <- substArgTys sc dc tyArgs
+    , Just dcArgs <- substArgTys tenv sc dc tyArgs
     , let dcArgsLen = length dcArgs
     , dcArgsLen > 1
-    -> if any (shouldSplitTy . tyView . coreView tcm sc) dcArgs && not (isHidden tcNm tyArgs) then
+    -> if any (shouldSplitTy . tyView . coreView tenv sc) dcArgs && not (isHidden tcNm tyArgs) then
          Just SplitInfo
            { splitConstruct = \_ args ->
                mkApps (Data dc) (map Right (sink1 tyArgs) ++ map Left args)
            , splitProject = \scx subj ->
-               map (mkSelectorCase ($(curLoc) ++ "splitArg") scx tcm subj 1) [0 .. dcArgsLen - 1]
+               map (mkSelectorCase ($(curLoc) ++ "splitArg") scx tenv subj 1) [0 .. dcArgsLen - 1]
            , splitArgTys = dcArgs
            }
        else
          Nothing
     | C.nameOcc tcNm == "Clash.Sized.Vector.Vec"
     , [nTy, argTy] <- tyArgs
-    , Right n <- runExcept (tyNatSize tcm sc nTy)
+    , Right n <- runExcept (tyNatSize tenv sc nTy)
     , n > 1
-    , Just tc <- UniqMap.lookup tcNm tcm
+    , Just tc <- lookupTyCon tenv tcNm
     , [nil, cons] <- C.tyConDataCons tc
-    -> if shouldSplitTy (tyView (coreView tcm sc argTy)) then
+    -> if shouldSplitTy (tyView (coreView tenv sc argTy)) then
          Just SplitInfo
-           { splitConstruct = \scx -> mkVec scx nil cons (sink argTy) n
+           { splitConstruct = \scx -> mkVec tenv scx nil cons (sink argTy) n
            , splitProject = \scx subj -> map (mkVecSelector scx subj) [0 .. n - 1]
            , splitArgTys = replicate (fromInteger n) argTy
            }
@@ -743,12 +750,12 @@ shouldSplit0 tcm sc = \case
  where
   -- Project the n'th element out of a vector
   mkVecSelector :: Distinct x => Scope x -> Term x -> Integer -> Term x
-  mkVecSelector scx subj 0 = mkSelectorCase ($(curLoc) ++ "mkVecSelector") scx tcm subj 2 1
+  mkVecSelector scx subj 0 = mkSelectorCase ($(curLoc) ++ "mkVecSelector") scx tenv subj 2 1
   mkVecSelector scx subj i =
-    mkVecSelector scx (mkSelectorCase ($(curLoc) ++ "mkVecSelector") scx tcm subj 2 2) (i - 1)
+    mkVecSelector scx (mkSelectorCase ($(curLoc) ++ "mkVecSelector") scx tenv subj 2 2) (i - 1)
 
   shouldSplitTy :: TypeView n -> Bool
-  shouldSplitTy ty = isJust (shouldSplit0 tcm sc ty) || splitTy ty
+  shouldSplitTy ty = isJust (shouldSplit0 tenv sc ty) || splitTy ty
 
   -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split,
   -- see 'C.shouldSplit'
@@ -776,9 +783,9 @@ shouldSplit0 tcm sc = \case
 
 -- | Split the types of the arguments of a function that 'shouldSplit' splits,
 -- recursively, see 'C.splitShouldSplit'
-splitShouldSplit :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> [Type n] -> [Type n]
-splitShouldSplit tcm sc = foldr go []
+splitShouldSplit :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> [Type n] -> [Type n]
+splitShouldSplit tenv sc = foldr go []
  where
-  go ty rest = case shouldSplit tcm sc ty of
-    Just info -> splitShouldSplit tcm sc (splitArgTys info) ++ rest
+  go ty rest = case shouldSplit tenv sc ty of
+    Just info -> splitShouldSplit tenv sc (splitArgTys info) ++ rest
     Nothing -> ty : rest

@@ -35,6 +35,7 @@ module Test.Clash.Scoped
   , withTypeScopes
   , withTermScopes
   , mkScopedBindingMap
+  , testTypeEnv
     -- * Assertions
   , assertScopedAlphaEq
   , assertAgreesTm
@@ -100,6 +101,7 @@ import Clash.Core.Scoped.Internal.Scope
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import Clash.Rewrite.Scoped (ScopedRewrite, rootContext, runScopedTransform)
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.Types
@@ -107,7 +109,8 @@ import Clash.Rewrite.Types
 
 import Clash.Driver.Types (Binding)
 
-import Test.Clash.Rewrite (assertAlphaEq, intId, mkBinding, runRewriteTest)
+import Test.Clash.Rewrite
+  (assertAlphaEq, intId, mkBinding, runRewriteTest, testTyConMap)
 import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
 
 -- | A conversion environment with the free variables of the given Clash terms
@@ -160,6 +163,10 @@ withTermScopes tm k = withFreeVarsOf [tm] $ \env -> do
 -- variables
 roundTrip :: HasCallStack => C.Term -> C.Term
 roundTrip tm = withFreeVarsOf [tm] $ \env -> toClashTerm (fromClashTerm env tm)
+
+-- | The environment of the types of 'testTyConMap'
+testTypeEnv :: TypeEnv
+testTypeEnv = mkTypeEnv testTyConMap
 
 -- | Global bindings of the given closed terms, converted to scoped Core. See
 -- 'Test.Clash.Rewrite.mkBindingMap'.

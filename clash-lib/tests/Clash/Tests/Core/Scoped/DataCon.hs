@@ -30,12 +30,13 @@ import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.DataCon
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.TyCon (dataConSig)
 
 import Test.Clash.Rewrite
   (intId, intTy, localId, mkDataCon, pairDataCon, pairTy, parseTyConTy, tyVar)
 import Test.Clash.Scoped
-  ( assertScopedAlphaEq, assertScopedTyAlphaEq, lintScopeOf, lintTerm, withFreeVars
-  , withTests)
+  ( assertScopedAlphaEq, assertScopedTyAlphaEq, lintScopeOf, lintTerm, testTypeEnv
+  , withFreeVars, withTests)
 import Test.Clash.Scoped.Gen (DataConInst (..), genDataConInst, showType)
 
 -- | Whether two lists of types are pairwise alpha-equivalent
@@ -104,18 +105,18 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
 
   , testCase "dataConInstArgTys" $ do
       let int = fromClashTypeClosed emptyScope intTy
-      case dataConInstArgTys emptyScope pairDataCon [] of
+      case dataConInstArgTys testTypeEnv emptyScope pairDataCon [] of
         Just [t1, t2] -> do
           assertScopedTyAlphaEq intTy t1
           assertScopedTyAlphaEq intTy t2
         _ -> assertFailure "unexpected result"
-      case dataConInstArgTys emptyScope mkF [int, int] of
+      case dataConInstArgTys testTypeEnv emptyScope mkF [int, int] of
         Just [t1, t2] -> do
           assertScopedTyAlphaEq intTy t1
           assertScopedTyAlphaEq intTy t2
         _ -> assertFailure "unexpected result"
-      assertBool "too few types" (null (dataConInstArgTys emptyScope mkF [int]))
-      assertBool "too many types" (null (dataConInstArgTys emptyScope mkF [int, int, int]))
+      assertBool "too few types" (null (dataConInstArgTys testTypeEnv emptyScope mkF [int]))
+      assertBool "too many types" (null (dataConInstArgTys testTypeEnv emptyScope mkF [int, int, int]))
 
     -- Instantiating @a := c@, where the free type variable @c@ has the same
     -- name as the existential @b@, must rename @b@.
@@ -123,7 +124,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
       -- In the empty scope, a gets name 1 and b gets name 2
       let c = tyVar C.User "c" 2
       withConvEnv [c] [] $ \env -> do
-        let r = dataConInstExtTyVars (convScope env) mkF [fromClashType env (C.VarTy c)] $
+        let r = dataConInstExtTyVars testTypeEnv (convScope env) mkF [fromClashType env (C.VarTy c)] $
                   \_ ext fieldTys -> case (ext, fieldTys) of
                     (TCons eb TNil, [VarTy _ _ n1, VarTy _ _ n2]) -> do
                       assertBool "renamed" (tyNameRaw (tyNameOf eb) /= 2)
@@ -138,7 +139,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
       withConvEnv [] [s] $ \env -> case fromClashTerm env (C.Var s) of
         sVar -> do
           let sc = convScope env
-              r = withDataConPat sc pairDataCon [] names $ \_ p vars -> case vars of
+              r = withDataConPat testTypeEnv sc pairDataCon [] names $ \_ p vars -> case vars of
                 [va, _] -> Case sVar (fromClashTypeClosed sc intTy) [Alt p va]
                 _ -> error "unexpected fields"
           case r of
@@ -148,7 +149,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
               tm
             Nothing -> assertFailure "withDataConPat failed"
   , testCase "dataConType" $
-      assertScopedTyAlphaEq (C.dcType mkF) (dataConType emptyScope mkF)
+      assertScopedTyAlphaEq (C.dcType mkF) (dataConType testTypeEnv emptyScope mkF)
 
   , withTests 1000 $ testGroup "properties"
       [ testProperty "dataConInstArgTys agrees with Clash" $
@@ -156,7 +157,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
             withFreeVars fvs $ \env -> do
               let tys = univTys <> extTys
                   expected = C.dataConInstArgTys dc tys
-                  actual = dataConInstArgTys (convScope env) dc (map (fromClashType env) tys)
+                  actual = dataConInstArgTys testTypeEnv (convScope env) dc (map (fromClashType env) tys)
               case (expected, map toClashType <$> actual) of
                 (Just e, Just a) -> aeqTypes e a
                 (Nothing, Nothing) -> property True
@@ -170,7 +171,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
               let sc = convScope env
                   univTys1 = map (fromClashType env) univTys
               fromMaybe (counterexample "Nothing" False) $
-                dataConInstExtTyVars sc dc univTys1 $ \sc1 ext argTys ->
+                dataConInstExtTyVars testTypeEnv sc dc univTys1 $ \sc1 ext argTys ->
                   extTyVarsAgree dc univTys (scopeWatermark sc) (scopeWatermark sc1)
                     (teleTyVars ext) (map toClashType argTys)
 
@@ -180,7 +181,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
               let sc = convScope env
                   wm = scopeWatermark sc
                   names = take (length (C.dcArgTys dc)) (map (C.mkUnsafeSystemName "f") [0 ..])
-                  res = withDataConPat sc dc (map (fromClashType env) univTys) names $ \sc1 p vars ->
+                  res = withDataConPat testTypeEnv sc dc (map (fromClashType env) univTys) names $ \sc1 p vars ->
                           let tm = Case (Literal (C.IntLiteral 0)) (fromClashTypeClosed sc intTy)
                                      [Alt p (foldl App (Data dc) vars)]
                               raws = patRaws p

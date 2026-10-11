@@ -48,15 +48,15 @@ import GHC.Builtin.Names
 
 import Clash.Core.DataCon (DataCon (dcUniq))
 import Clash.Core.Name (Name (nameUniq))
-import Clash.Core.TyCon (TyConMap)
 import qualified Clash.Core.Type as C
 import Clash.Unique (fromGhcUnique)
 
-import Clash.Core.Scoped.DataCon (DataConSig (..), dataConSig)
+import Clash.Core.Scoped.DataCon (DataConSig (..), dataConSigOf)
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type
+import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 -- * Solving equations
 
@@ -82,14 +82,14 @@ catSolutions = mapMaybe getSol
 -- non-absurd solutions. See 'Clash.Core.EqSolver.solveNonAbsurds'.
 solveNonAbsurds
   :: Distinct n
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> NameSet TyName n
   -- ^ The type variables to solve for
   -> [(Type n, Type n)]
   -> [(TyName n, Type 'VoidS)]
-solveNonAbsurds tcm sc solveSet = concatMap $ \eq ->
-  catSolutions (solveAdd solveSet eq : solveEq tcm sc solveSet eq)
+solveNonAbsurds tenv sc solveSet = concatMap $ \eq ->
+  catSolutions (solveAdd solveSet eq : solveEq tenv sc solveSet eq)
 
 -- | Solve simple equalities such as:
 --
@@ -102,13 +102,13 @@ solveNonAbsurds tcm sc solveSet = concatMap $ \eq ->
 -- See 'Clash.Core.EqSolver.solveEq'.
 solveEq
   :: Distinct n
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> NameSet TyName n
   -- ^ The type variables to solve for
   -> (Type n, Type n)
   -> [TypeEqSolution n]
-solveEq tcm sc solveSet (coreView tcm sc -> left, coreView tcm sc -> right) =
+solveEq tenv sc solveSet (coreView tenv sc -> left, coreView tenv sc -> right) =
   case (left, right) of
     (VarTy _ _ tv, ConstTy c) | memberNameSet tv solveSet ->
       -- a ~ Int
@@ -126,14 +126,14 @@ solveEq tcm sc solveSet (coreView tcm sc -> left, coreView tcm sc -> right) =
       -- The call to 'coreView' at the start of 'solveEq' should have reduced
       -- all solvable type families. If we encounter one here that means the
       -- type family is stuck (and that we shouldn't compare it to anything!).
-      if any (isTypeFamilyApplication tcm) [left, right] then
+      if any (isTypeFamilyApplication tenv) [left, right] then
         []
       else
         case (tyView left, tyView right) of
           (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
             -- SomeType a b ~ SomeType 3 5 (or other way around)
             if leftNm == rightNm then
-              concatMap (solveEq tcm sc solveSet) (zipEqual leftTys rightTys)
+              concatMap (solveEq tenv sc solveSet) (zipEqual leftTys rightTys)
             else
               [AbsurdSolution]
           _ ->
@@ -182,16 +182,16 @@ normalizeAdd (a, b) = do
 
 -- | If the type is an equation, its left-hand and right-hand side. See
 -- 'Clash.Core.EqSolver.typeEq'.
-typeEq :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe (Type n, Type n)
-typeEq tcm sc ty =
-  case tyView (coreView tcm sc ty) of
+typeEq :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n, Type n)
+typeEq tenv sc ty =
+  case tyView (coreView tenv sc ty) of
     TyConApp tc [_, _, left, right]
       | nameUniq tc == fromGhcUnique eqPrimTyConKey ->
-      Just (coreView tcm sc left, coreView tcm sc right)
+      Just (coreView tenv sc left, coreView tenv sc right)
     TyConApp tc [_, left, right]
       -- Lifted equality (~), see 'Clash.Core.EqSolver.typeEq'
       | nameUniq tc == fromGhcUnique eqTyConKey ->
-      Just (coreView tcm sc left, coreView tcm sc right)
+      Just (coreView tenv sc left, coreView tenv sc right)
     _ ->
       Nothing
 
@@ -200,18 +200,18 @@ typeEq tcm sc ty =
 -- -1. See 'Clash.Core.EqSolver.isAbsurdEq'.
 isAbsurdEq
   :: Distinct n
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> NameSet TyName n
   -- ^ The existentially quantified type variables
   -> (Type n, Type n)
   -> Bool
-isAbsurdEq tcm sc exts (left0, right0) =
+isAbsurdEq tenv sc exts (left0, right0) =
   case solveAdd exts lr of
     AbsurdSolution -> True
-    _ -> any isAbsurd (solveEq tcm sc exts lr)
+    _ -> any isAbsurd (solveEq tenv sc exts lr)
  where
-  lr = (coreView tcm sc left0, coreView tcm sc right0)
+  lr = (coreView tenv sc left0, coreView tenv sc right0)
 
   isAbsurd AbsurdSolution = True
   isAbsurd _ = False
@@ -226,29 +226,29 @@ isAbsurdEq tcm sc exts (left0, right0) =
 -- clash with the scope.
 withPatEqs
   :: Distinct n
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> Pat n l
   -> (forall i. DExt n i => Scope i -> NameSet TyName i -> [(Type i, Type i)] -> r)
   -> r
-withPatEqs tcm sc pat k = case pat of
+withPatEqs tenv sc pat k = case pat of
   DataPat _ tvs ids ->
     openTyVars IntMap.empty (idSubst sc) tvs $ \s _ names ->
       let sc' = substScope s
       in k sc' (nameSetFromList names)
-           (mapMaybe (typeEq tcm sc' . substTy s) (teleIdBinderTypes ids))
+           (mapMaybe (typeEq tenv sc' . substTy s) (teleIdBinderTypes ids))
   LitPat _ -> k sc emptyNameSet []
   DefaultPat -> k sc emptyNameSet []
 
 -- | Whether a pattern can never match, because its equations are absurd. See
 -- 'Clash.Core.EqSolver.isAbsurdPat'.
-isAbsurdPat :: Distinct n => TyConMap -> Scope n -> Pat n l -> Bool
+isAbsurdPat :: Distinct n => TypeEnv -> Scope n -> Pat n l -> Bool
 isAbsurdPat _ _ (DataPat dc _ _)
   -- unsafeCoerce is not absurd in the way intended by 'isAbsurdPat'
   | dcUniq dc == fromGhcUnique unsafeReflDataConKey
   = False
-isAbsurdPat tcm sc pat =
-  withPatEqs tcm sc pat $ \sc' exts eqs -> any (isAbsurdEq tcm sc' exts) eqs
+isAbsurdPat tenv sc pat =
+  withPatEqs tenv sc pat $ \sc' exts eqs -> any (isAbsurdEq tenv sc' exts) eqs
 
 -- | Solve the equations of the field types of a pattern for its existentially
 -- quantified type variables, and substitute the solutions. Gives the pattern,
@@ -260,17 +260,17 @@ isAbsurdPat tcm sc pat =
 -- solvable. See @elimExistentials@ in "Clash.Normalize.Transformations.Case".
 solvePatExistentials
   :: Distinct n
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> Pat n l
   -> (forall l'. DExt n l' => Subst l l' -> Pat n l' -> r)
   -> Maybe r
-solvePatExistentials tcm sc pat k = case pat of
+solvePatExistentials tenv sc pat k = case pat of
   DataPat dc tvs ids ->
     openTyVars IntMap.empty (idSubst sc) tvs $ \s0 _ names ->
       let sc0 = substScope s0
-          eqs = mapMaybe (typeEq tcm sc0 . substTy s0) (teleIdBinderTypes ids)
-      in case solveNonAbsurds tcm sc0 (nameSetFromList names) eqs of
+          eqs = mapMaybe (typeEq tenv sc0 . substTy s0) (teleIdBinderTypes ids)
+      in case solveNonAbsurds tenv sc0 (nameSetFromList names) eqs of
            [] -> Nothing
            sols -> Just $
              openTyVars (solutionPositions names sols) (idSubst sc) tvs $ \s1 tvs' _ ->
@@ -295,14 +295,14 @@ solvePatExistentials tcm sc pat k = case pat of
 dataConInstArgTysE
   :: forall n r
    . (HasCallStack, Distinct n)
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> DataCon
   -> [Type n]
   -- ^ Types for the universally quantified type variables
   -> (forall l. DExt n l => Scope l -> Tele TyBinder n l -> [Type l] -> r)
   -> Maybe r
-dataConInstArgTysE tcm sc dc univTys k = case dataConSig dc of
+dataConInstArgTysE tenv sc dc univTys k = case dataConSigOf tenv dc of
   DataConSig univ ext argTys -> do
     s1 <- extendTySubstTele (closedSubst sc) univ univTys
     pure $ openTyVars IntMap.empty s1 ext $ \s2 ext' names ->
@@ -311,8 +311,8 @@ dataConInstArgTysE tcm sc dc univTys k = case dataConSig dc of
   solveLoop
     :: DExt n o => Scope o -> Tele TyBinder n o -> [TyName o] -> [Type o] -> r
   solveLoop sc1 ext names tys =
-    let eqs = mapMaybe (typeEq tcm sc1) tys in
-    case solveNonAbsurds tcm sc1 (nameSetFromList names) eqs of
+    let eqs = mapMaybe (typeEq tenv sc1) tys in
+    case solveNonAbsurds tenv sc1 (nameSetFromList names) eqs of
       [] -> k sc1 ext tys
       sols ->
         openTyVars (solutionPositions names sols) (idSubst sc) ext $ \s ext' names' ->

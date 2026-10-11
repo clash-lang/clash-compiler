@@ -29,7 +29,7 @@ import Clash.Core.Scoped.TermInfo
 
 import Test.Clash.Rewrite
   ( globalId, intId, intTy, localId, parseToTermQQ, testTyConMap, tyVar )
-import Test.Clash.Scoped (assertScopedAlphaEq, withFreeVarsOf)
+import Test.Clash.Scoped (assertScopedAlphaEq, testTypeEnv, withFreeVarsOf)
 
 -- | Terms of all shapes
 examples :: [C.Term]
@@ -69,9 +69,9 @@ tests = testGroup "Clash.Tests.Core.Scoped.TermInfo"
         [ assertAgreesOnExamples (C.termSizeSmallerThan k) (const (termSizeSmallerThan k))
         | k <- [0..6] ]
   , testCase "isFun" $
-      assertAgreesOnExamples (C.isFun testTyConMap) (isFun testTyConMap)
+      assertAgreesOnExamples (C.isFun testTyConMap) (isFun testTypeEnv)
   , testCase "isPolyFun" $
-      assertAgreesOnExamples (C.isPolyFun testTyConMap) (isPolyFun testTyConMap)
+      assertAgreesOnExamples (C.isPolyFun testTyConMap) (isPolyFun testTypeEnv)
   , testCase "isLet" $ assertAgreesOnExamples C.isLet (const isLet)
   , testCase "isVar" $ assertAgreesOnExamples C.isVar (const isVar)
   , testCase "isLocalVar" $ assertAgreesOnExamples C.isLocalVar (const isLocalVar)
