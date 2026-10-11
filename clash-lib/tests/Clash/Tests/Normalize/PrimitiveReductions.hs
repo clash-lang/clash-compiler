@@ -16,23 +16,27 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon (..))
-import Clash.Core.Name (NameSort (..), mkUnsafeName, nameUniq)
+import Clash.Core.Name (Name (..), NameSort (..), mkUnsafeName, nameUniq)
 import Clash.Core.Literal (Literal (..))
-import Clash.Core.Term (Term (..))
+import Clash.Core.Subst (extendTvSubst, mkSubst, substTm)
+import Clash.Core.Term
+  ( IsMultiPrim (..), PrimInfo (..), PrimUnfolding (..), Term (..)
+  , WorkInfo (..), collectTermIds, mkApps )
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..), TyConName)
-import Clash.Core.Type (LitTy (..), Type (..), mkTyConApp)
+import Clash.Core.Type (LitTy (..), Type (..), mkFunTy, mkTyConApp)
 import Clash.Core.TysPrim (liftedTypeKind)
-import Clash.Core.Var (TyVar)
+import Clash.Core.Var (TyVar, Var (..))
+import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Normalize.PrimitiveReductions
-  (mkVecNil, reduceReplace_int, reduceReverse)
+  (mkVecNil, reduceMap, reduceReplace_int, reduceReverse)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.Types (RewriteEnv (..), TransformContext)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, inScopeOf, intId, intTy, localId, mkDataCon
-  , runSingleTransformation, tyVar )
+  , runSingleTransformation, showPprU, tyVar )
 
 -- | The name of @Vec@. The primitive reductions recognize vectors by this name.
 vecTcNm :: TyConName
@@ -86,6 +90,38 @@ envVec = def { _clashEnv = env { envTyConMap = tcm } }
     , isClassTc = False
     }
 
+-- | Run 'reduceMap' on @map f v@, with @v :: Vec 1 a@ and @f :: a -> a@ free,
+-- where the type variable @a@ has unique 0. Then substitute @Int@ for @a@,
+-- like specializing the function this term belongs to would.
+--
+-- 'reduceMap' extracts the head and tail of @v@ with a case-expression, whose
+-- pattern binds the existential type variable of @Cons@, and the element of
+-- @v@ at type @a@:
+--
+-- > case v of Cons @m _co (el :: a) res -> el
+reduceMapSubstElemTy :: IO Term
+reduceMapSubstElemTy = do
+  let
+    a = tyVar User "a" 0
+    aTy = VarTy a
+    v = localId User "v" 1000 (vecTy (LitTy (NumTy 1)) aTy)
+    f = localId User "f" 1001 (mkFunTy aTy aTy)
+    is0 = extendInScopeSet (inScopeOf [v, f]) a
+    -- map :: forall a b n. (a -> b) -> Vec n a -> Vec n b
+    mapTy =
+      ForAllTy vecA (ForAllTy vecM (ForAllTy vecN
+        (mkFunTy (mkFunTy (VarTy vecA) (VarTy vecM))
+          (mkFunTy (vecTy (VarTy vecN) (VarTy vecA))
+                   (vecTy (VarTy vecN) (VarTy vecM))))))
+    mapInfo =
+      PrimInfo "Clash.Sized.Vector.map" mapTy WorkNever SingleResult NoUnfolding
+    mapApp =
+      mkApps (Prim mapInfo)
+        [Right aTy, Right aTy, Right (LitTy (NumTy 1)), Left (Var f), Left (Var v)]
+  res <- runSingleTransformation envVec def is0
+    (\ctx _ -> reduceMap mapInfo 1 aTy aTy False (Var f) (Var v) ctx) mapApp
+  pure (substTm "reduceMapSubstElemTy" (extendTvSubst (mkSubst is0) a intTy) res)
+
 -- | Run a primitive reduction on an empty vector @v :: Vec 0 Int@, given @v@.
 -- The reductions of primitives returning a vector usually don't see empty
 -- vectors, as 'Clash.Normalize.Transformations.Reduce.reducePrim' replaces a
@@ -110,6 +146,20 @@ tests =
           (\v -> reduceReplace_int 0 intTy (vecTy (LitTy (NumTy 0)) intTy)
                     (Literal (NaturalLiteral 0)) v (Var i) (Var a))
           >>= assertAlphaEq (mkVecNil nilDc intTy)
+
+    -- 'extractHeadTail' used fixed uniques for the binders of the pattern. If
+    -- the element type mentions a type variable with the unique of the type
+    -- variable the pattern binds, that pattern captures it. Substituting for
+    -- the type variable then no longer changes the type of the element.
+    , testCase "reduceMap binds the elements of a vector at their type" $ do
+        actual <- reduceMapSubstElemTy
+        let els = filter ((== "el") . nameOcc . varName) (collectTermIds actual)
+        assertBool ("Expected elements in:\n" <> showPprU actual) (not (null els))
+        mapM_
+          (\el -> assertBool
+             ("Element " <> showPprU el <> " is not of type Int in:\n" <> showPprU actual)
+             (varType el == intTy))
+          els
     ]
  where
   i = intId User "i" 2
