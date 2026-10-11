@@ -63,7 +63,7 @@ import           GHC.Builtin.Names
 import           GHC.Types.SrcLoc                 (wiredInSrcSpan)
 
 import           Clash.Core.DataCon               (DataCon)
-import           Clash.Core.FreeVars              (typeFreeVars)
+import           Clash.Core.FreeVars              (freeLocalVars, typeFreeVars)
 import           Clash.Core.HasType
 
 import           Clash.Core.Literal               (Literal (..))
@@ -88,7 +88,7 @@ import           Clash.Core.Util
    mkInternalVar, mkUniqInternalId, mkUniqSystemTyVar, mkVec, dataConInstArgTys, primCo)
 import           Clash.Core.Var                   (isLocalId, mkTyVar, mkLocalId)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSet, extendInScopeSetList)
+  (InScopeSet, extendInScopeSet, extendInScopeSetList, uniqAway)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP (undefined)
 import           Clash.Sized.RTree                (RTree)
@@ -219,7 +219,9 @@ shareVec isRepresentable is0 vec
 -- vector, the latter the tail. Use 'shareVec' on the vector first to prevent
 -- it from being duplicated.
 extractHeadTail
-  :: DataCon
+  :: MonadUnique m
+  => InScopeSet
+  -> DataCon
   -- ^ The Cons (:>) constructor
   -> Type
   -- ^ Element type
@@ -227,24 +229,30 @@ extractHeadTail
   -- ^ Length of the vector, must be positive
   -> Term
   -- ^ Vector to extract head from
-  -> (Term, Term)
+  -> m (Term, Term)
   -- ^ (head of vector, tail of vector)
-extractHeadTail consCon elTy n vec =
+extractHeadTail is0 consCon elTy n vec =
   case dataConInstArgTys consCon tys of
-    Just [coTy, _elTy, restTy] ->
-      let
-        mTV = mkTyVar typeNatKind (mkUnsafeSystemName "m" 0)
-        co = mkLocalId coTy (mkUnsafeSystemName "_co_" 1)
-        el = mkLocalId elTy (mkUnsafeSystemName "el" 2)
-        rest = mkLocalId restTy (mkUnsafeSystemName "res" 3)
+    Just [coTy, _elTy, restTy] -> do
+      -- The pattern binds these at the element type, so they must be fresh:
+      -- otherwise the pattern could capture type variables of the element type
+      mTV <- fresh (mkTyVar typeNatKind) "m"
+      co <- fresh (mkLocalId coTy) "_co_"
+      el <- fresh (mkLocalId elTy) "el"
+      rest <- fresh (mkLocalId restTy) "res"
 
-        pat = DataPat consCon [mTV] [co, el, rest]
-      in
+      let pat = DataPat consCon [mTV] [co, el, rest]
+      pure
         ( Case vec elTy [(pat, Var el)]
         , Case vec restTy [(pat, Var rest)] )
     _ -> error "extractHeadTail: failed to instantiate Cons DC"
  where
   tys = [(LitTy (NumTy n)), elTy, (LitTy (NumTy (n-1)))]
+  is1 = extendInScopeSetList (extendInScopeSetList is0 (Lens.toListOf typeFreeVars elTy))
+                             (Lens.toListOf freeLocalVars vec)
+  fresh mk nm = do
+    u <- getUniqueM
+    pure (uniqAway is1 (mk (mkUnsafeSystemName nm u)))
 
 -- | Create a vector of supplied elements
 mkVecCons
@@ -338,20 +346,21 @@ reduceZipWith
 reduceZipWith zipWithPrimInfo n lhsElTy rhsElTy resElTy lhsRep rhsRep fun lhsArg0 rhsArg0 (TransformContext is0 _) = do
   tcm <- Lens.view tcCache
   (is1, bindLhs, lhsArg1) <- shareVec lhsRep is0 lhsArg0
-  (_, bindRhs, rhsArg1) <- shareVec rhsRep is1 rhsArg0
-  changed (bindLhs (bindRhs (go tcm lhsArg1 rhsArg1 (inferCoreTypeOf tcm lhsArg0))))
+  (is2, bindRhs, rhsArg1) <- shareVec rhsRep is1 rhsArg0
+  res <- go is2 tcm lhsArg1 rhsArg1 (inferCoreTypeOf tcm lhsArg0)
+  changed (bindLhs (bindRhs res))
  where
-  go tcm lhsArg rhsArg (coreView1 tcm -> Just ty) = go tcm lhsArg rhsArg ty
-  go tcm lhsArg rhsArg (tyView -> TyConApp vecTcNm _)
+  go is tcm lhsArg rhsArg (coreView1 tcm -> Just ty) = go is tcm lhsArg rhsArg ty
+  go is tcm lhsArg rhsArg (tyView -> TyConApp vecTcNm _)
     | (Just vecTc) <- UniqMap.lookup vecTcNm tcm
     , nameOcc vecTcNm == showt ''Vec
     , [nilCon, consCon] <- tyConDataCons vecTc
     = if n == 0 then
-        mkVecNil nilCon resElTy
-      else
+        pure (mkVecNil nilCon resElTy)
+      else do
+        (a, as) <- extractHeadTail is consCon lhsElTy n lhsArg
+        (b, bs) <- extractHeadTail is consCon rhsElTy n rhsArg
         let
-          (a, as) = extractHeadTail consCon lhsElTy n lhsArg
-          (b, bs) = extractHeadTail consCon rhsElTy n rhsArg
           c = mkApps fun [Left a, Left b]
           cs = mkApps (Prim zipWithPrimInfo) [ Right lhsElTy
                                              , Right rhsElTy
@@ -360,9 +369,8 @@ reduceZipWith zipWithPrimInfo n lhsElTy rhsElTy resElTy lhsRep rhsRep fun lhsArg
                                              , Left fun
                                              , Left as
                                              , Left bs ]
-        in
-          mkVecCons consCon resElTy n c cs
-  go _ _ _ ty =
+        pure (mkVecCons consCon resElTy n c cs)
+  go _ _ _ _ ty =
     error $ $(curLoc) ++ [I.i|
       reduceZipWith: argument does not have a vector type:
 
@@ -385,29 +393,29 @@ reduceMap
 reduceMap mapPrimInfo n argElTy resElTy argRep fun arg0 (TransformContext is0 _) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg0
-    (_, bindArg, arg1) <- shareVec argRep is0 arg0
-    changed (bindArg (go tcm arg1 ty))
+    (is1, bindArg, arg1) <- shareVec argRep is0 arg0
+    res <- go is1 tcm arg1 ty
+    changed (bindArg res)
   where
-    go tcm arg (coreView1 tcm -> Just ty') = go tcm arg ty'
-    go tcm arg (tyView -> TyConApp vecTcNm _)
+    go is tcm arg (coreView1 tcm -> Just ty') = go is tcm arg ty'
+    go is tcm arg (tyView -> TyConApp vecTcNm _)
       | (Just vecTc)     <- UniqMap.lookup vecTcNm tcm
       , nameOcc vecTcNm == showt ''Vec
       , [nilCon,consCon] <- tyConDataCons vecTc
       = if n == 0 then
-          mkVecNil nilCon argElTy
-        else
+          pure (mkVecNil nilCon argElTy)
+        else do
+          (a, as) <- extractHeadTail is consCon argElTy n arg
           let
             nPredTy = Right (LitTy (NumTy (n - 1)))
-            (a, as) = extractHeadTail consCon argElTy n arg
             b = mkApps fun [Left a]
             bs = mkApps (Prim mapPrimInfo) [ Right argElTy
                                            , Right resElTy
                                            , nPredTy
                                            , Left fun
                                            , Left as ]
-          in
-            mkVecCons consCon resElTy n b bs
-    go _ _ ty =
+          pure (mkVecCons consCon resElTy n b bs)
+    go _ _ _ ty =
       error $ $(curLoc) ++ [I.i|
         reduceMap: argument does not have a vector type:
 
@@ -681,26 +689,27 @@ reduceFoldr _ 0 _ _ _ start _ _ = changed start
 reduceFoldr foldrPrimInfo n aTy argRep fun start arg0 (TransformContext is0 _) = do
     tcm <- Lens.view tcCache
     let ty = inferCoreTypeOf tcm arg0
-    (_, bindArg, arg1) <- shareVec argRep is0 arg0
-    changed (bindArg (go tcm arg1 ty))
+    (is1, bindArg, arg1) <- shareVec argRep is0 arg0
+    res <- go is1 tcm arg1 ty
+    changed (bindArg res)
   where
-    go tcm arg (coreView1 tcm -> Just ty') = go tcm arg ty'
-    go tcm arg (tyView -> TyConApp vecTcNm _)
+    go is tcm arg (coreView1 tcm -> Just ty') = go is tcm arg ty'
+    go is tcm arg (tyView -> TyConApp vecTcNm _)
       | nameOcc vecTcNm == showt ''Vec
       , Just vecTc <- UniqMap.lookup vecTcNm tcm
       , [_nilCon, consCon] <- tyConDataCons vecTc
-      = let
-          (a, as) = extractHeadTail consCon aTy n arg
+      = do
+        (a, as) <- extractHeadTail is consCon aTy n arg
+        let
           b = mkApps (Prim foldrPrimInfo) [ Right aTy
                                           , Right (inferCoreTypeOf tcm start)
                                           , Right (LitTy (NumTy (n - 1)))
                                           , Left fun
                                           , Left start
                                           , Left as ]
-        in
-          mkApps fun [Left a, Left b]
+        pure (mkApps fun [Left a, Left b])
 
-    go _ _ ty =
+    go _ _ _ ty =
       error $ $(curLoc) ++ [I.i|
         reduceFoldr: argument does not have a vector type:
 
@@ -919,25 +928,25 @@ reduceInit
 reduceInit initPrimInfo n aTy vArgRep vArg0 (TransformContext is0 _) = do
   tcm <- Lens.view tcCache
   let ty = inferCoreTypeOf tcm vArg0
-  (_, bindArg, vArg1) <- shareVec vArgRep is0 vArg0
-  changed (bindArg (go tcm vArg1 ty))
+  (is1, bindArg, vArg1) <- shareVec vArgRep is0 vArg0
+  res <- go is1 tcm vArg1 ty
+  changed (bindArg res)
  where
-  go tcm vArg (coreView1 tcm -> Just ty') = go tcm vArg ty'
-  go tcm vArg (tyView -> TyConApp vecTcNm _)
+  go is tcm vArg (coreView1 tcm -> Just ty') = go is tcm vArg ty'
+  go is tcm vArg (tyView -> TyConApp vecTcNm _)
     | (Just vecTc) <- UniqMap.lookup vecTcNm tcm
     , nameOcc vecTcNm == showt ''Vec
     , [nilCon, consCon]  <- tyConDataCons vecTc
     = if n == 0 then
-        mkVecNil nilCon aTy
-      else
+        pure (mkVecNil nilCon aTy)
+      else do
+        (a, as0) <- extractHeadTail is consCon aTy (n+1) vArg
         let
           nPredTy = Right (LitTy (NumTy (n - 1)))
-          (a, as0) = extractHeadTail consCon aTy (n+1) vArg
           as1 = mkApps (Prim initPrimInfo) [nPredTy, Right aTy, Left as0]
-        in
-          mkVecCons consCon aTy n a as1
+        pure (mkVecCons consCon aTy n a as1)
 
-  go _ _ ty =
+  go _ _ _ ty =
     error $ $(curLoc) ++ [I.i|
       reduceInit: argument does not have a vector type:
 
