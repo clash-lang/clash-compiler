@@ -25,6 +25,7 @@ import Test.Tasty.HUnit
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (NameSort (..))
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.Types (NormalizeState (..))
@@ -36,13 +37,149 @@ import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkTicks)
+import Clash.Core.Scoped.TermInfo (isClosed)
 import qualified Clash.Normalize.Scoped.Util as Scoped
 import Clash.Rewrite.Scoped.Types (Frame (..), pushFrame, rootContext)
 
 import Test.Clash.Rewrite
-  ( globalId, intFunTy, intId, intLit, intTy, localId, mkBindingMap
-  , nameToUnique, runRewriteTest )
+  ( globalId, intFunTy, intId, intLit, intTy, liftedEqTy, localId
+  , mkBindingMap, nameToUnique, runRewriteTest, signalTy, systemDomTy, tyVar )
 import Test.Clash.Scoped
+
+-- * Type equality constraints
+
+dom, dom2, a2, c3 :: C.TyVar
+dom = tyVar User "dom" 1
+a2 = tyVar User "a" 2
+c3 = tyVar User "c" 3
+dom2 = tyVar User "dom2" 8
+
+-- | @a ~ b@
+eqTy :: C.Type -> C.Type -> C.Type
+eqTy = liftedEqTy
+
+-- | Assert that 'Scoped.substWithTyEq' agrees with 'Current.substWithTyEq',
+-- also in a scope where all binders of the term clash with the scope
+agreesSubst :: C.Term -> Assertion
+agreesSubst tm = withTermScopes tm $ \sc tm' ->
+  assertScopedAlphaEq (Current.substWithTyEq tm) (Scoped.substWithTyEq sc tm')
+
+-- | Assert the result of 'Scoped.substWithTyEq', also in a scope where all
+-- binders of the term clash with the scope
+substGives :: C.Term -> C.Term -> Assertion
+substGives tm expected = withTermScopes tm $ \sc tm' ->
+  assertScopedAlphaEq expected (Scoped.substWithTyEq sc tm')
+
+-- | Assert the result of 'Scoped.tvSubstWithTyEq', also in a scope where all
+-- binders of the type clash with the scope
+tvSubstGives :: C.Type -> C.Type -> Assertion
+tvSubstGives ty expected = withTypeScopes ty $ \sc ty' ->
+  assertScopedTyAlphaEq expected (Scoped.tvSubstWithTyEq sc ty')
+
+substWithTyEqTests :: [TestTree]
+substWithTyEqTests =
+  -- The regression tests of "Clash.Tests.Normalize.Util"
+  [ testCase "substWithTyEq doesn't introduce free variables (#1060)" $ do
+      -- /\dom -> \(eq :: dom ~ System) -> eq
+      let eq = localId User "eq" 2 (eqTy (C.VarTy dom) systemDomTy)
+          tm = C.TyLam dom (C.Lam eq (C.Var eq))
+      agreesSubst tm
+      -- \(eq :: System ~ System) -> removedArg @(System ~ System)
+      assertBool "closed" (isClosed (Scoped.substWithTyEq emptyScope (fromClashTermClosed tm)))
+  , testCase "substWithTyEq avoids capture (#1868)" $ do
+      let eq = localId User "eq" 3 (eqTy (C.VarTy dom) (C.VarTy a2))
+          x = localId User "x" 4 (C.VarTy dom)
+      -- /\a -> /\dom -> \(eq :: dom ~ a) -> /\a -> \(x :: dom) -> x
+      agreesSubst (C.TyLam a2 (C.TyLam dom (C.Lam eq (C.TyLam a2 (C.Lam x (C.Var x))))))
+  , testCase "substWithTyEq keeps the order of TyLams and Lams (#1868)" $ do
+      let eq = localId User "eq" 3 (eqTy (C.VarTy dom) systemDomTy)
+          x = localId User "x" 4 (C.VarTy a2)
+          y = localId User "y" 5 (C.VarTy a2)
+      -- /\a -> \(x :: a) -> /\dom -> \(eq :: dom ~ System) -> \(y :: a) -> y
+      agreesSubst (C.TyLam a2 (C.Lam x (C.TyLam dom (C.Lam eq (C.Lam y (C.Var y))))))
+
+  , testCase "substWithTyEq handles several constraints, either way around" $ do
+      let eq1 = localId User "eq1" 3 (eqTy (C.VarTy dom) systemDomTy)
+          eq2 = localId User "eq2" 4 (eqTy systemDomTy (C.VarTy dom2))
+          x = localId User "x" 5 (signalTy (C.VarTy dom2) intTy)
+      -- /\dom -> /\dom2 -> \(eq1 :: dom ~ System) -> \(eq2 :: System ~ dom2) ->
+      -- \(x :: Signal dom2 Int) -> eq1 `seq` x
+      agreesSubst (C.TyLam dom (C.TyLam dom2 (C.Lam eq1 (C.Lam eq2 (C.Lam x
+        (C.App (C.Var x) (C.Var eq1)))))))
+  , testCase "substWithTyEq without constraints changes nothing" $ do
+      let x = localId User "x" 4 (C.VarTy a2)
+      agreesSubst (C.TyLam a2 (C.Lam x (C.Var x)))
+      agreesSubst (intLit 3)
+
+  , testCase "substWithTyEq moves a type lambda past binders that don't mention it" $ do
+      let eq = localId User "eq" 3 (eqTy (C.VarTy dom) (C.VarTy a2))
+          x = localId User "x" 4 (C.VarTy dom)
+          y = localId User "y" 5 intTy
+      -- /\dom -> \(y :: Int) -> /\a -> \(eq :: dom ~ a) -> \(x :: dom) -> x
+      -- gives
+      -- \(y :: Int) -> /\a -> \(eq :: a ~ a) -> \(x :: a) -> x
+      let tm = C.TyLam dom (C.Lam y (C.TyLam a2 (C.Lam eq (C.Lam x (C.Var x)))))
+      agreesSubst tm
+
+    -- TODO(substWithTyEq): 'Current.substWithTyEq' leaves @dom@ free in the
+    -- type of @c@. 'Scoped.substWithTyEq' can't: the type of @c@ is in scope
+    -- of @dom@.
+  , testCase "substWithTyEq substitutes in the binders before the constraint" $ do
+      let c = localId User "c" 3 (signalTy (C.VarTy dom) intTy)
+          eq = localId User "eq" 4 (eqTy (C.VarTy dom) systemDomTy)
+          c' = localId User "c" 3 (signalTy systemDomTy intTy)
+          eq' = localId User "eq" 4 (eqTy systemDomTy systemDomTy)
+      -- /\dom -> \(c :: Signal dom Int) -> \(eq :: dom ~ System) -> c
+      substGives (C.TyLam dom (C.Lam c (C.Lam eq (C.Var c))))
+                 (C.Lam c' (C.Lam eq' (C.Var c')))
+  , testCase "substWithTyEq keeps a constraint whose type isn't in scope" $ do
+      let y = localId User "y" 3 (C.VarTy dom)
+          eq = localId User "eq" 4 (eqTy (C.VarTy dom) (C.VarTy a2))
+          -- /\dom -> \(y :: dom) -> /\a -> \(eq :: dom ~ a) -> y: the type of
+          -- y can't mention a
+          tm = C.TyLam dom (C.Lam y (C.TyLam a2 (C.Lam eq (C.Var y))))
+      substGives tm tm
+  ]
+
+tvSubstWithTyEqTests :: [TestTree]
+tvSubstWithTyEqTests =
+  -- The regression test of "Clash.Tests.Normalize.Util"
+  [ testCase "tvSubstWithTyEq avoids capture (#1868)" $
+      -- forall a dom. (dom ~ a) -> forall a. dom -> a
+      -- gives
+      -- forall a. (a ~ a) -> forall c. a -> c
+      tvSubstGives
+        (C.ForAllTy a2 $ C.ForAllTy dom $
+          eqTy (C.VarTy dom) (C.VarTy a2) `C.mkFunTy`
+            C.ForAllTy a2 (C.VarTy dom `C.mkFunTy` C.VarTy a2))
+        (C.ForAllTy a2 $
+          eqTy (C.VarTy a2) (C.VarTy a2) `C.mkFunTy`
+            C.ForAllTy c3 (C.VarTy a2 `C.mkFunTy` C.VarTy c3))
+
+    -- TODO(substWithTyEq): 'Current.tvSubstWithTyEq' leaves @dom@ free in the
+    -- constraint
+  , testCase "tvSubstWithTyEq substitutes in the constraint" $
+      -- forall dom. (dom ~ System) -> Signal dom Int
+      tvSubstGives
+        (C.ForAllTy dom (eqTy (C.VarTy dom) systemDomTy `C.mkFunTy` signalTy (C.VarTy dom) intTy))
+        (eqTy systemDomTy systemDomTy `C.mkFunTy` signalTy systemDomTy intTy)
+  , testCase "tvSubstWithTyEq substitutes in the arguments before the constraint" $
+      -- forall dom. Signal dom Int -> (System ~ dom) -> Int
+      tvSubstGives
+        (C.ForAllTy dom (signalTy (C.VarTy dom) intTy `C.mkFunTy`
+          (eqTy systemDomTy (C.VarTy dom) `C.mkFunTy` intTy)))
+        (signalTy systemDomTy intTy `C.mkFunTy`
+          (eqTy systemDomTy systemDomTy `C.mkFunTy` intTy))
+  , testCase "tvSubstWithTyEq moves a forall past binders that don't mention it" $
+      -- forall dom a. (dom ~ a) -> dom
+      tvSubstGives
+        (C.ForAllTy dom $ C.ForAllTy a2 $ eqTy (C.VarTy dom) (C.VarTy a2) `C.mkFunTy` C.VarTy dom)
+        (C.ForAllTy a2 $ eqTy (C.VarTy a2) (C.VarTy a2) `C.mkFunTy` C.VarTy a2)
+  , testCase "tvSubstWithTyEq without constraints changes nothing" $ do
+      let ty = C.ForAllTy a2 (C.VarTy a2 `C.mkFunTy` C.VarTy a2)
+      assertAgreesTy Current.tvSubstWithTyEq Scoped.tvSubstWithTyEq ty
+      tvSubstGives ty ty
+  ]
 
 -- * Recursive globals
 
@@ -175,7 +312,9 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Scoped.Util"
-    [ testGroup "recursion" recursionTests
+    [ testGroup "substWithTyEq" substWithTyEqTests
+    , testGroup "tvSubstWithTyEq" tvSubstWithTyEqTests
+    , testGroup "recursion" recursionTests
     , testGroup "inlining" inliningTests
     , testGroup "shouldReduce" shouldReduceTests
     , testGroup "callGraph" callGraphTests

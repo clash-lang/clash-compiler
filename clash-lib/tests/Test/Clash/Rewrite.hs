@@ -67,7 +67,7 @@ import Test.Tasty.HUnit
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 import GHC.Builtin.Names
-  ( boolTyConKey, falseDataConKey, ordEQDataConKey, ordGTDataConKey
+  ( boolTyConKey, eqTyConKey, falseDataConKey, ordEQDataConKey, ordGTDataConKey
   , ordLTDataConKey, trueDataConKey, typeNatAddTyFamNameKey
   , typeNatCmpTyFamNameKey, typeUnconsSymbolTyFamNameKey )
 
@@ -891,6 +891,14 @@ unconsSymbolTyConName =
 -- equality coercions that "Clash.Core.EqSolver" recognizes
 eqTy :: C.Kind -> C.Type -> C.Type -> C.Type
 eqTy k a b = foldl C.AppTy C.eqPrimTy [k, k, a, b]
+
+-- | Lifted equality, @a ~ b@, of types of kind @Type@: the type of the
+-- equality constraints that 'Clash.Normalize.Util.substWithTyEq' and
+-- 'Clash.Normalize.Util.tvSubstWithTyEq' substitute
+liftedEqTy :: C.Type -> C.Type -> C.Type
+liftedEqTy a b = C.mkTyConApp eqTyConNm [C.liftedTypeKind, a, b]
+ where
+  eqTyConNm = C.mkUnsafeName C.User (Text.pack "~") (fromGhcUnique eqTyConKey)
 
 -- | @data V n where VNil :: (n ~ 0) => V n; VCons :: forall m. (n ~ m + 1) =>
 -- Int -> V m -> V n@, a data type with equality constraints and an

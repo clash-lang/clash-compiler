@@ -11,9 +11,12 @@
 
 module Comparisons (comparisons) where
 
+import qualified Clash.Normalize.Util as Current
 import Clash.Rewrite.StrategyDSL.TH (compileStrategy)
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
+import Clash.Core.Scoped.Syntax (emptyScope)
+import qualified Clash.Normalize.Scoped.Util as Scoped
 
 import Test.Clash.Differential
 
@@ -30,6 +33,15 @@ comparisons =
           \from scoped Core on the scoped side"
       , cmpCurrent = pureSide (toClashTerm . fromClashTermClosed)
       , cmpScoped = pureSide (fromClashTermClosed . toClashTerm)
+      , cmpKnownDifferences = []
+      }
+
+  -- Clash.Normalize.Scoped.Util
+  , Comparison
+      { cmpName = "substWithTyEq"
+      , cmpDescription = "substWithTyEq, on every binding rather than only on top entities"
+      , cmpCurrent = pureSide Current.substWithTyEq
+      , cmpScoped = pureSide (Scoped.substWithTyEq emptyScope)
       , cmpKnownDifferences = []
       }
 
