@@ -52,6 +52,7 @@ import           Data.Binary                 (encode)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
 
+import           GHC.Exts                    (Any)
 import           GHC.Types.Basic             (InlineSpec (..))
 
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
@@ -72,7 +73,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet,
-   differenceVarEnv)
+   differenceVarEnv, extendVarSet)
 import           Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug
@@ -797,17 +798,51 @@ whnfRW isSubj ctx@(TransformContext is0 hist) e rw = do
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
   gh <- Lens.use globalHeap
-  let lh = localBinders mempty hist
+  let lh = localBinders [] [] hist
 
   case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       bindPureHeap tcm (ph `differenceVarEnv` lh) rw ctx v
  where
-  localBinders acc [] = acc
-  localBinders !acc (h:hs) = case h of
-    LetBody ls -> localBinders (acc <> mkVarEnv ls) hs
-    _ -> localBinders acc hs
+  -- The let-bindings of the context, walking it from the term outwards.
+  -- 'bound' holds the variables bound between the term and the current point
+  -- of the context, as a list of the binders of each binding construct.
+  -- 'lets' collects the let-bindings on the way, outermost first, each with
+  -- the 'bound' at its let.
+  localBinders bound lets (h:hs) = case h of
+    LetBody ls -> localBinders (bindVars (map fst ls) bound) ((bound, ls) : lets) hs
+    LetBinding _ ids -> localBinders (bindVars ids bound) lets hs
+    LamBody x -> localBinders (bindVars [x] bound) lets hs
+    TyLamBody tv -> localBinders (bindVars [tv] bound) lets hs
+    CaseAlt p -> localBinders (bindVars (patVars p) bound) lets hs
+    _ -> localBinders bound lets hs
+  localBinders _ lets []
+    | all (null . fst) lets = mkVarEnv (concatMap snd lets)
+    | otherwise = reachable emptyVarEnv (Lens.toListOf freeLocalIds e)
+   where
+    -- Inner let-bindings come last, so they take precedence
+    cands = mkVarEnv [(x, (bound, rhs)) | (bound, ls) <- lets, (x, rhs) <- ls]
+
+    -- A let-binding can only be used when neither its binder nor a free
+    -- variable of its right-hand side is in its 'bound': otherwise that
+    -- variable means something else at the term. 'bound' can hold all binders
+    -- of a large letrec, so only the let-bindings the evaluator can reach from
+    -- the term are checked.
+    reachable acc [] = acc
+    reachable acc (x:xs)
+      | x `elemVarEnv` acc = reachable acc xs
+      | Just (bound, rhs) <- lookupVarEnv x cands
+      , usable bound x rhs
+      = reachable (extendVarEnv x rhs acc) (Lens.toListOf freeLocalIds rhs <> xs)
+      | otherwise = reachable acc xs
+
+    usable bound x rhs = not (any (any (`elemVarSet` refs)) bound)
+     where
+      refs = extendVarSet (Lens.foldMapOf freeLocalVars unitVarSet rhs) x
+
+  bindVars :: [Var a] -> [[Var Any]] -> [[Var Any]]
+  bindVars vs bound = coerce vs : bound
 
 {-# SCC whnfRW #-}
 
