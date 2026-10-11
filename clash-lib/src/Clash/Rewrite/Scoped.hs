@@ -73,6 +73,13 @@
   let-binder, like 'Clash.Rewrite.Util.mkDerivedName'. Its unique is
   irrelevant: binders get their names from the scope.
 
+  = Utilities
+
+  The counterparts of the utilities in "Clash.Rewrite.Util" are in
+  "Clash.Rewrite.Scoped.Util". Read and create global bindings with
+  "Clash.Rewrite.Scoped.Globals", which converts them while the binding map
+  holds Clash Core.
+
   = Evaluation
 
   'whnfRW' evaluates a term to WHNF, using the let-bindings of the context,
@@ -113,10 +120,10 @@
       Nothing -> return e
   @
 
-  where @removeUnusedBinders@ moves the body out of the scope of unused
-  binders with 'Clash.Core.Scoped.Subst.unsinkIdBinder', and opens a recursive
-  let-binding ('Clash.Core.Scoped.Subst.openBind') before it looks at its
-  variables.
+  where 'Clash.Rewrite.Scoped.Util.removeUnusedBinders' moves the body out of
+  the scope of unused binders with 'Clash.Core.Scoped.Subst.unsinkIdBinder',
+  and opens a recursive let-binding ('Clash.Core.Scoped.Subst.openBind')
+  before it looks at its variables.
 
   The swap is then a single line in the module of Clash Core, which keeps the
   name every strategy refers to:

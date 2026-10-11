@@ -326,6 +326,7 @@ Library
                       Clash.Rewrite.Scoped.Combinators
                       Clash.Rewrite.Scoped.Globals
                       Clash.Rewrite.Scoped.Types
+                      Clash.Rewrite.Scoped.Util
                       Clash.Rewrite.Scoped.ViaFoil
                       Clash.Rewrite.Scoped.Whnf
                       Clash.Rewrite.Scoped.WorkFree
@@ -518,6 +519,7 @@ test-suite unittests
                  Clash.Tests.Rewrite.Scoped.Combinators
                  Clash.Tests.Rewrite.Scoped.StrategyDSL
                  Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
+                 Clash.Tests.Rewrite.Scoped.Util
                  Clash.Tests.Rewrite.Scoped.ViaFoil
                  Clash.Tests.Rewrite.Scoped.Whnf
                  Clash.Tests.Rewrite.Scoped.WorkFree

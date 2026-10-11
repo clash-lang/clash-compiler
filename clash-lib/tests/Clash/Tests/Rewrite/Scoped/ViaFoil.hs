@@ -46,10 +46,11 @@ import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.Scoped.ViaFoil (rootVars, whnfRWViaClash)
 import Clash.Rewrite.Types (RewriteMonad)
 
+import Clash.Tests.Rewrite.Util (whnfContextTests)
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertErrorContainsIO, firstUniques, globalIntVar
   , heapLookupEvaluator, inScopeOf, intId, intLit, intTy, letBinders
-  , pairDataCon, rewriteEnvWithDebug, tyVar, localId )
+  , pairDataCon, rewriteEnvWithDebug )
 import Test.Clash.Scoped (runViaFoil, somePrim)
 
 -- * Running scoped transformations
@@ -191,44 +192,7 @@ allocTerm =
 -- | The cases of "whnfRW uses the context's let-bindings (#2571)" in
 -- "Clash.Tests.Rewrite.Util", in a Clash Core context
 contextTests :: Which -> [TestTree]
-contextTests which =
-  [ testCase "let x = 3 in \\y -> x" $
-      whnfIn [x, y] [C.LamBody y, C.LetBody [(x, intLit 3)]] (C.Var x)
-        >>= assertAlphaEq (intLit 3)
-  , testCase "let x = 3 in \\x -> x" $
-      whnfIn [x] [C.LamBody x, C.LetBody [(x, intLit 3)]] (C.Var x)
-        >>= assertAlphaEq (C.Var x)
-  , testCase "let x = y in \\y -> x" $
-      whnfIn [x, y] [C.LamBody y, C.LetBody [(x, C.Var y)]] (C.Var x)
-        >>= assertAlphaEq (C.Var x)
-  , testCase "let x = y in case s of MkPair y z -> x" $
-      whnfIn [x, y, z, s]
-        [ C.CaseAlt (C.DataPat pairDataCon [] [y, z])
-        , C.LetBody [(x, C.Var y)] ]
-        (C.Var x)
-        >>= assertAlphaEq (C.Var x)
-  , testCase "let x = 3 in letrec { x = 4; w = x } in .." $
-      whnfIn [x, w]
-        [C.LetBinding w [x, w], C.LetBody [(x, intLit 3)]] (C.Var x)
-        >>= assertAlphaEq (C.Var x)
-  , testCase "let x = y in let y = 5 in x" $
-      whnfIn [x, y]
-        [C.LetBody [(y, intLit 5)], C.LetBody [(x, C.Var y)]] (C.Var x)
-        >>= assertAlphaEq (C.Var x)
-  , testCase "let x = (v :: a) in /\\a -> x" $
-      whnfIn [x, v]
-        [C.TyLamBody a, C.LetBody [(x, C.Var v)]] (C.Var x)
-        >>= assertAlphaEq (C.Var x)
-  ]
- where
-  whnfIn = whnfInContext which heapLookupEvaluator
-  x = intId User "x" 1
-  y = intId User "y" 2
-  z = intId User "z" 3
-  s = intId User "s" 4
-  w = intId User "w" 5
-  a = tyVar User "a" 6
-  v = localId User "v" 7 (CT.VarTy a)
+contextTests which = whnfContextTests (whnfInContext which heapLookupEvaluator)
 
 whnfTests :: [TestTree]
 whnfTests =
