@@ -9,7 +9,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Tests.Normalize.Transformations.DEC (tests) where
+module Clash.Tests.Normalize.Transformations.DEC
+  ( tests
+  , decTests
+  , envT
+  , mkTDc
+  , tTy
+  , tN
+  ) where
 
 import qualified Control.Lens as Lens
 import Data.Default (def)
@@ -30,8 +37,9 @@ import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Var (Id, TyVar, Var (..))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
-import Clash.Normalize.Transformations.DEC (disjointExpressionConsolidation)
+import Clash.Normalize.Transformations.DEC (disjointExpressionConsolidationWorker)
 import Clash.Normalize.Types (NormRewrite)
+import Clash.Rewrite.StrategyDSL (onCase, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 import Clash.Unique (Unique)
@@ -43,8 +51,11 @@ import Test.Clash.Rewrite
   , pairDataCon, pairTy, parseTyConName, parseTyConTy, runSingleTransformation
   , showPprU, tyVar, withTyConMap )
 
+-- | The DEC of Clash Core. 'Clash.Normalize.Transformations.DEC.disjointExpressionConsolidation'
+-- is the port to scoped Clash Core, see
+-- "Clash.Tests.Normalize.Scoped.Transformations.DEC".
 decR :: NormRewrite
-decR = $(asRewriteQ disjointExpressionConsolidation)
+decR = $(asRewriteQ (toTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)))
 
 -- | @MkEx :: forall n. n -> Ex@, a constructor with an existential type variable
 mkEx :: DataCon
@@ -79,11 +90,11 @@ exEnv = withTyConMap (UniqMap.insert exNm exTc (envTyConMap env)) def
 -- let-binder of the lifted argument of @f@ the type of the argument of the
 -- first application, @n@, which leaves @n@ free outside of the pattern that
 -- binds it.
-decExistentialArgType :: Assertion
-decExistentialArgType = do
+decExistentialArgType :: NormRewrite -> Assertion
+decExistentialArgType dec = do
   supply <- newSupply
   let st = def{_bindings = mkBindingMap [(fId, Lam a (Var a))], _uniqSupply = supply}
-  res <- runSingleTransformation exEnv st (inScopeOf [sId, eId, xId]) decR term
+  res <- runSingleTransformation exEnv st (inScopeOf [sId, eId, xId]) dec term
   case Lens.toListOf termFreeTyVars res of
     [] -> pure ()
     tvs -> assertFailure
@@ -126,13 +137,13 @@ decTerm bUniq =
   b = intId User "b" bUniq
 
 -- | Run DEC on a term, with the given unique supply
-runDEC :: Supply -> Term -> IO Term
-runDEC supply = runDECIn supply [sId, xId, yId]
+runDEC :: NormRewrite -> Supply -> Term -> IO Term
+runDEC dec supply = runDECIn dec supply [sId, xId, yId]
 
 -- | Run DEC on a term, with the given unique supply and variables in scope,
 -- in an environment that knows @T@ and @Pair@
-runDECIn :: Supply -> [Id] -> Term -> IO Term
-runDECIn supply inScope = runSingleTransformation envT st (inScopeOf inScope) decR
+runDECIn :: NormRewrite -> Supply -> [Id] -> Term -> IO Term
+runDECIn dec supply inScope = runSingleTransformation envT st (inScopeOf inScope) dec
  where
   st = def{_bindings = mkBindingMap [(fId, Lam a (Var a))], _uniqSupply = supply}
   a = intId User "a" 20
@@ -149,14 +160,14 @@ runDECIn supply inScope = runSingleTransformation envT st (inScopeOf inScope) de
 --
 -- https://github.com/clash-lang/clash-compiler/pull/1317
 -- https://github.com/clash-lang/clash-compiler/commit/959ee9072fdd0c5deaf91f5e82adc2c23b0f8e16
-decDoesNotCaptureLiftedExpression :: Assertion
-decDoesNotCaptureLiftedExpression = do
+decDoesNotCaptureLiftedExpression :: NormRewrite -> Assertion
+decDoesNotCaptureLiftedExpression dec = do
   supply <- newSupply
-  res1 <- runDEC supply (decTerm 1000)
+  res1 <- runDEC dec supply (decTerm 1000)
   fOut <- case find (Text.isSuffixOf "f_out" . nameOcc . varName) (letBinders res1) of
     Just i -> pure i
     Nothing -> assertFailure ("DEC did not lift out f:\n" <> showPprU res1)
-  runDEC supply (decTerm (varUniq fOut)) >>= assertNoShadowing
+  runDEC dec supply (decTerm (varUniq fOut)) >>= assertNoShadowing
 
 -- | @T@, a data type with a single constructor 'mkTDc'
 tTy :: Type
@@ -204,10 +215,10 @@ assertFreeLocalsIn inScope tm =
 -- themselves. DEC used to consider every local variable in scope of an
 -- application interesting to lift, including those bound inside the
 -- alternatives, and lifted @g@ out of the alternatives that bind it.
-decLocalFunctionBoundInAlts :: Assertion
-decLocalFunctionBoundInAlts = do
+decLocalFunctionBoundInAlts :: NormRewrite -> Assertion
+decLocalFunctionBoundInAlts dec = do
   supply <- newSupply
-  res <- runDEC supply term
+  res <- runDEC dec supply term
   assertFreeLocalsIn [sId, xId, yId] res
  where
   g = localId User "g" 40 (intFunTy 1)
@@ -224,10 +235,10 @@ decLocalFunctionBoundInAlts = do
 -- without checking whether they mention type variables bound by the patterns
 -- of the alternatives. It lifted @h \@n@ out of the case-expression that binds
 -- @n@.
-decTypeArgBoundInAlts :: Assertion
-decTypeArgBoundInAlts = do
+decTypeArgBoundInAlts :: NormRewrite -> Assertion
+decTypeArgBoundInAlts dec = do
   supply <- newSupply
-  res <- runDECIn supply [sId, tId] term
+  res <- runDECIn dec supply [sId, tId] term
   assertFreeLocalsIn [sId, tId] res
  where
   tId = localId User "t" 42 tTy
@@ -252,10 +263,10 @@ decTypeArgBoundInAlts = do
 -- scope of the case-expression. The pattern-bound @x@ has the same unique as
 -- the @x@ in scope, so DEC shared @f x@, making the second alternative refer
 -- to the wrong @x@.
-decSharedArgShadowsContext :: Assertion
-decSharedArgShadowsContext = do
+decSharedArgShadowsContext :: NormRewrite -> Assertion
+decSharedArgShadowsContext dec = do
   supply <- newSupply
-  res <- runDECIn supply [sId, xId, pId] term
+  res <- runDECIn dec supply [sId, xId, pId] term
   -- DEC itself does not deshadow, so the pattern binder still shadows @x@. But
   -- the argument of @f@ has to be selected by the case-expression.
   let fArg = intId User "f_arg0" 50
@@ -291,15 +302,19 @@ decSharedArgShadowsContext = do
 
 tests :: TestTree
 tests =
-  testGroup
-    "Clash.Tests.Normalize.Transformations.DEC"
-    [ testCase "DEC gives lifted arguments a type in scope" decExistentialArgType
-    , testCase "DEC does not capture lifted expressions (#1317)"
-        decDoesNotCaptureLiftedExpression
-    , testCase "DEC does not lift local functions bound in the alternatives"
-        decLocalFunctionBoundInAlts
-    , testCase "DEC does not share type arguments bound in the alternatives"
-        decTypeArgBoundInAlts
-    , testCase "DEC does not share arguments bound in the alternatives"
-        decSharedArgShadowsContext
-    ]
+  testGroup "Clash.Tests.Normalize.Transformations.DEC" (decTests decR)
+
+-- | The regression tests of DEC, for an implementation of it
+decTests :: NormRewrite -> [TestTree]
+decTests dec =
+  [ testCase "DEC gives lifted arguments a type in scope"
+      (decExistentialArgType dec)
+  , testCase "DEC does not capture lifted expressions (#1317)"
+      (decDoesNotCaptureLiftedExpression dec)
+  , testCase "DEC does not lift local functions bound in the alternatives"
+      (decLocalFunctionBoundInAlts dec)
+  , testCase "DEC does not share type arguments bound in the alternatives"
+      (decTypeArgBoundInAlts dec)
+  , testCase "DEC does not share arguments bound in the alternatives"
+      (decSharedArgShadowsContext dec)
+  ]

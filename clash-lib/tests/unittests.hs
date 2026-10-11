@@ -36,6 +36,7 @@ import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Netlist.Util
 import qualified Clash.Tests.Normalize
 import qualified Clash.Tests.Normalize.PrimitiveReductions
+import qualified Clash.Tests.Normalize.Scoped.Transformations.DEC
 import qualified Clash.Tests.Normalize.Scoped.Transformations.Letrec
 import qualified Clash.Tests.Normalize.Scoped.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Scoped.Util
@@ -108,6 +109,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Netlist.Util.tests
   , Clash.Tests.Normalize.tests
   , Clash.Tests.Normalize.PrimitiveReductions.tests
+  , Clash.Tests.Normalize.Scoped.Transformations.DEC.tests
   , Clash.Tests.Normalize.Scoped.Transformations.Letrec.tests
   , Clash.Tests.Normalize.Scoped.Transformations.Specialize.tests
   , Clash.Tests.Normalize.Scoped.Util.tests
