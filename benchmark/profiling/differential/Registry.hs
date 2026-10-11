@@ -35,7 +35,7 @@ import qualified Current
 -- A ported transformation has the known differences with its port: the
 -- normalizer runs the port, so its captured results are those of the port.
 currentRewrites :: [([Text], NormRewrite, [KnownDifference])]
-currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
+currentRewrites = ported
  where
   ported =
     [ (["deadCode", "deadcode"], $(asRewriteQ Current.deadCode), [letrecOrder])
@@ -84,11 +84,7 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["etaTL"], Current.etaExpansionTL, [])
     , (["separateArguments"], $(asRewriteQ Current.separateArguments), [coercionForm])
     , (["xOptimize"], $(asRewriteQ Current.xOptimize), [primTypeForm])
-    ]
-
-  unported =
-    -- Others
-    [ (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
+    , (["setupMultiResultPrim"], $(asRewriteQ Current.setupMultiResultPrim), [letrecOrder])
     ]
 
 -- | The current transformation captured under a name
