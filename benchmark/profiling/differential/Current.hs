@@ -23,6 +23,7 @@ module Current
   , elimExistentials
   , flattenLet
   , nonRepANF
+  , recToLetRec
   , reduceConst
   , reducePrim
   , removeUnusedExpr
@@ -35,10 +36,10 @@ import qualified Clash.Normalize.Transformations.Case as Case
 import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
 import qualified Clash.Normalize.Transformations.Reduce as Reduce
+import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLet, onLetNode
-  , onPrimNode, onTickNode
-  , onTyAppNode, toTransformation )
+  , onPrimNode, onTickNode, onTyAppNode, toTransformation )
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.deadCode' replaced
@@ -132,3 +133,9 @@ topLet = anyConstructor "topLet" 'Letrec.topLetWorker
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.simpleCSE' replaced
 simpleCSE :: Transformation
 simpleCSE = toTransformation "CSE" (onLet 'Letrec.simpleCSEWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Letrec.recToLetRec', which
+-- 'Clash.Normalize.Scoped.Transformations.Letrec.recToLetRec' replaced in the
+-- normalization strategy
+recToLetRec :: NormRewrite
+recToLetRec = Letrec.recToLetRec

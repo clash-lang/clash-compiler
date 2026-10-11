@@ -27,6 +27,7 @@ module Clash.Normalize.Strategy.Spec
 import Language.Haskell.TH.Syntax (Name)
 
 import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
+import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
 import Clash.Normalize.Transformations
 import Clash.Rewrite.StrategyDSL
 
@@ -58,7 +59,7 @@ normalizationSpec constantPropagationName =
     multPrim   = topdown setupMultiResultPrim
     anf        = topdown nonRepANF >-> scopedPass "ANF" 'Scoped.makeANF >-> topdown caseCon
     letTL      = topdownSuc topLet
-    recLetRec  = pass "recToLetRec" 'recToLetRec
+    recLetRec  = scopedPass "recToLetRec" 'Scoped.recToLetRec
     rmUnusedExpr = bottomup removeUnusedExpr
     rmDeadcode = bottomup (named "deadcode" deadCode)
     bindConst  = topdown bindConstantVar

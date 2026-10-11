@@ -303,5 +303,15 @@ siteComparisons =
       , scScoped = Just $(asScopedRewriteQ S.topLet)
       , scKnownDifferences = []
       }
+  , SiteComparison
+      { scName = "recToLetRec"
+      , scDescription =
+          "The current recToLetRec (Clash.Normalize.Transformations.Letrec.recToLetRec) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Letrec.recToLetRec)"
+      , scTransformations = ["recToLetRec"]
+      , scCurrent = Current.recToLetRec
+      , scScoped = Just (ScopedTransform S.recToLetRec)
+      , scKnownDifferences = []
+      }
   ]
 
