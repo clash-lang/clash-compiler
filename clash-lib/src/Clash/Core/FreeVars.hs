@@ -19,6 +19,8 @@ module Clash.Core.FreeVars
   , freeLocalIds
   , globalIds
   , termFreeTyVars
+  -- * Ordering type variables
+  , dependencySortTyVars
   -- * occurrence check
   , globalIdOccursIn
   , localVarsDoNotOccurIn
@@ -38,6 +40,8 @@ import qualified Control.Lens           as Lens
 import Control.Lens.Fold                (Fold)
 import Control.Lens.Getter              (Contravariant)
 import Data.Coerce
+import qualified Data.List              as List
+import Data.Maybe                       (mapMaybe)
 #ifdef UNIQUE_IS_WORD64
 import qualified GHC.Data.Word64Set     as IntSet
 #else
@@ -50,7 +54,8 @@ import Clash.Core.Type                  (Type (..))
 import Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isLocalId)
 import Clash.Core.VarEnv
-  (VarEnv, emptyVarEnv, unionVarEnvWith, unitVarEnv)
+  (VarEnv, elemVarSet, emptyVarEnv, emptyVarSet, extendVarSet, lookupVarEnv,
+   mkVarEnv, unionVarEnvWith, unitVarEnv)
 
 -- | Gives the free type-variables in a Type, implemented as a 'Fold'
 --
@@ -176,6 +181,28 @@ termFreeTyVars :: Fold Term TyVar
 termFreeTyVars = termFreeVars' isTV where
   isTV (TyVar {}) = True
   isTV _          = False
+
+-- | Order type variables such that every type variable comes after the type
+-- variables in its kind, so a term or type can abstract over them in that
+-- order. A list that already has this property is returned unchanged.
+--
+-- Only the dependencies between the given type variables are taken into
+-- account: a type variable in a kind that is not in the input list is ignored.
+--
+-- @
+-- dependencySortTyVars [a :: k, k :: Type] = [k :: Type, a :: k]
+-- @
+dependencySortTyVars :: [TyVar] -> [TyVar]
+dependencySortTyVars tvs = reverse (snd (List.foldl' visit (emptyVarSet, []) tvs))
+ where
+  tvEnv = mkVarEnv (zip tvs tvs)
+  visit (seen, acc) tv
+    | tv `elemVarSet` seen = (seen, acc)
+    | otherwise =
+        let kindTvs = mapMaybe (`lookupVarEnv` tvEnv)
+                        (Lens.toListOf typeFreeVars (varType tv))
+            (seen1, acc1) = List.foldl' visit (extendVarSet seen tv, acc) kindTvs
+        in  (seen1, tv : acc1)
 
 -- | Gives the "interesting" free variables in a Term, implemented as a 'Fold'
 --
