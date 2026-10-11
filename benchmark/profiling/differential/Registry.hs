@@ -21,7 +21,7 @@ module Registry
 
 import Data.Text (Text)
 
-import Test.Clash.Differential (KnownDifference, letrecOrder)
+import Test.Clash.Differential (KnownDifference, letrecOrder, recToNonRec)
 
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types (NormRewrite)
@@ -36,7 +36,9 @@ currentRewrites :: [([Text], NormRewrite, [KnownDifference])]
 currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
  where
   ported =
-    [ (["deadCode", "deadcode"], $(asRewriteQ Current.deadCode), [letrecOrder]) ]
+    [ (["deadCode", "deadcode"], $(asRewriteQ Current.deadCode), [letrecOrder])
+    , (["DEC"], $(asRewriteQ Current.disjointExpressionConsolidation), [recToNonRec, letrecOrder])
+    ]
 
   unported =
     -- Case
@@ -56,8 +58,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["CSE"], $(asRewriteQ simpleCSE))
     , (["topLet"], $(asRewriteQ topLet))
     , (["recToLetRec"], recToLetRec)
-    -- DEC
-    , (["DEC"], $(asRewriteQ disjointExpressionConsolidation))
     -- Cast
     , (["argCastSpec"], $(asRewriteQ argCastSpec))
     , (["caseCast"], $(asRewriteQ caseCast))
