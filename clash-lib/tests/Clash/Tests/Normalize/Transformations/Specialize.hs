@@ -397,6 +397,30 @@ specializeCacheFreeVarOrder = do
       ("Expected applications of globals, but got:\n" <> showPprU res1
         <> "\nand:\n" <> showPprU res2)
 
+-- | 'specialize' abstracts the specialized function over the free type
+-- variables of the argument it specializes on. 'specArgBndrsAndVars' used to
+-- order them by occurrence, without regard for their kinds. Specializing
+-- @f (case (x :: a) of {})@, with @a :: k@, created:
+--
+-- > f_spec = /\(a :: k) -> /\k -> \(x :: a) -> f (case x of {})
+--
+-- in which the @k@ in the kind of @a@ is free.
+specializeTyVarKindOrder :: Assertion
+specializeTyVarKindOrder = do
+  supply <- newSupply
+  let k = Rewrite.tyVar User "k" 51
+      a = Rewrite.kindedTyVar User "a" 50 (Type.VarTy k)
+      x = localId User "x" 12 (Type.VarTy a)
+      tm = App (Var fId) (Case (Var x) intTy [])
+      st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
+      is = VarEnv.extendInScopeSetList (inScopeOf [x]) [k, a]
+  (res, st1, _) <-
+    runRewriteTest def st0 (runRewrite "specialize" is specialize tm)
+  case collectArgs res of
+    (Var fSpec, _) | Just body <- bindingTerm <$> lookupVarEnv fSpec (_bindings st1) ->
+      Rewrite.assertNoFreeTyVars body
+    _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
+
 -- | 'mkFunction', used by 'specialize' to create the specialized function, used
 -- to give the new function a fresh unique without checking whether a global
 -- binder with that unique already exists, overwriting it.
@@ -534,6 +558,8 @@ tests =
         specializeArgBinderTypes
     , testCase "specialize orders free variables by occurrence (#1087)"
         specializeCacheFreeVarOrder
+    , testCase "specialize orders type variables after the variables in their kinds"
+        specializeTyVarKindOrder
     , testCase "specialize does not overwrite existing binders (#790)"
         specializeDoesNotOverwriteBinders
     , testCase "specialize does not specialize a local head that shares a unique with a global"

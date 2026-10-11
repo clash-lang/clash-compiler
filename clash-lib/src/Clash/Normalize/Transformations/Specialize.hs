@@ -63,7 +63,8 @@ import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
 import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 
 import Clash.Core.DataCon (DataCon(dcExtTyVars))
-import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars, typeFreeVars)
+import Clash.Core.FreeVars
+  (dependencySortTyVars, freeLocalVars, termFreeTyVars, typeFreeVars)
 import Clash.Core.HasType
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name
@@ -678,12 +679,15 @@ specArgBndrsAndVars specArg =
       unitFV v@(Id {}) = Const (mempty, coerce (OSet.singleton (coerce v)))
       unitFV v@(TyVar {}) = Const (coerce (OSet.singleton (coerce v)), mempty)
 
-      (specFTVs,specFVs) = case specArg of
+      (specFTVs0,specFVs) = case specArg of
         Left tm  -> (OSet.toListL *** OSet.toListL) . getConst $
                     Lens.foldMapOf freeLocalVars unitFV tm
         Right ty -> ( UniqMap.elems
                         (Lens.foldMapOf typeFreeVars (\x -> UniqMap.singletonUnique (coerce x)) ty)
                     , [] :: [Id])
+
+      -- A type variable must be bound after the type variables in its kind
+      specFTVs = dependencySortTyVars specFTVs0
 
       specTyBndrs = map Right specFTVs
       specTmBndrs = map Left  specFVs
