@@ -435,7 +435,13 @@ specialize'
   -> Either Term Type
   -- ^ Argument to specialize on
   -> NormalizeSession Term
-specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
+specialize' (TransformContext is0 _) e (fHd@(Var f), args, ticks) specArgIn
+  -- Only global functions have a binding to specialize. The binding map,
+  -- 'topEntities', and the specialisation history are keyed on uniques alone,
+  -- so we must not look up a local variable in them: it can share its unique
+  -- with a global binder.
+  | isLocalVar fHd = return e
+  | otherwise = do
   opts <- Lens.view debugOpts
   tcm <- Lens.view tcCache
 
@@ -512,7 +518,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
               (newName, inl', specArg') <- case specArg of
-                Left a@(collectArgsTicks -> (Var g,gArgs,_gTicks)) -> if isPolyFun tcm a
+                Left a@(collectArgsTicks -> (gHd@(Var g),gArgs,_gTicks)) -> if isPolyFun tcm a
                     then do
                       -- In case we are specializing on an argument that is a
                       -- global function then we use that function's name as part
@@ -539,7 +545,9 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                       -- Finally, we must make sure we do not inline the bodies
                       -- of functions with a Synthesize annotation, as that would
                       -- duplicate Clash compiler work. See also issue #3024
-                      gTmM <- fmap (UniqMap.lookup g) $ Lens.use bindings
+                      gTmM <- if isLocalVar gHd
+                                then pure Nothing
+                                else UniqMap.lookup g <$> Lens.use bindings
                       let gBody = if g `elemVarSet` topEnts then
                                     Nothing
                                   else
@@ -695,7 +703,8 @@ nonRepSpecWorker ctx e e1 e2
       :: Term
       -> NormalizeSession Term
     inlineInternalSpecialisationArgument app
-      | (Var f,fArgs,ticks) <- collectArgsTicks app
+      | (fHd@(Var f),fArgs,ticks) <- collectArgsTicks app
+      , not (isLocalVar fHd)
       = do
         fTmM <- lookupVarEnv f <$> Lens.use bindings
         case fTmM of

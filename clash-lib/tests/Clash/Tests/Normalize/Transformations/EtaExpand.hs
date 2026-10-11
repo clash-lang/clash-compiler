@@ -15,13 +15,18 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Term (Term)
-import Clash.Normalize.Transformations.EtaExpand (etaExpansionTL)
+import Clash.Core.Name (NameSort (User))
+import Clash.Core.Term (Term (..))
+import Clash.Core.Var (Id)
+import Clash.Core.VarEnv (mkVarSet)
+import Clash.Normalize.Transformations.EtaExpand
+  (etaExpandSynWorker, etaExpansionTL)
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Types (RewriteState)
+import Clash.Rewrite.Types (RewriteEnv (..), RewriteState)
 
 import Test.Clash.Rewrite
-  (assertAlphaEq, parseToTermQQ, runSingleTransformation)
+  ( assertAlphaEq, globalId, inScopeOf, intFunTy, localId, parseToTermQQ
+  , runSingleTransformation, showPprU )
 
 -- | Run 'etaExpansionTL' on a closed term
 runEtaTL :: Term -> IO Term
@@ -81,6 +86,35 @@ etaTLLambdaCapturesLet = do
     |]
     res
 
+-- * etaExpandSyn
+
+-- | A global function @f :: Int -> Int@
+fGlobal :: Id
+fGlobal = globalId User "f" 10 (intFunTy 1)
+
+-- | A local variable with the same unique as 'fGlobal'
+fLocal :: Id
+fLocal = localId User "f" 10 (intFunTy 1)
+
+-- | 'etaExpandSyn' eta-expands references to top entities. It shares
+-- 'topEntities' with 'Clash.Normalize.Transformations.Specialize.specialize',
+-- and also looked up whether a variable is a top entity by its unique alone,
+-- so it eta-expanded a local that shares its unique with a top entity.
+etaExpandSynLocal :: Assertion
+etaExpandSynLocal = do
+  expanded <- etaExpandSyn1 fGlobal
+  case expanded of
+    Lam _ (App (Var f) (Var _)) | f == fGlobal -> pure ()
+    _ -> assertFailure ("Expected an eta-expanded top entity, but got:\n" <> showPprU expanded)
+  etaExpandSyn1 fLocal >>= assertAlphaEq (Var fLocal)
+ where
+  -- Run 'etaExpandSyn' on a reference to a variable, with 'fGlobal' as the
+  -- only top entity
+  etaExpandSyn1 v =
+    runSingleTransformation env st (inScopeOf [v]) etaExpandSynWorker (Var v)
+  env = def{_topEntities = mkVarSet [fGlobal]}
+  st = def :: RewriteState NormalizeState
+
 tests :: TestTree
 tests =
   testGroup
@@ -89,4 +123,6 @@ tests =
         etaTLLetCapturesLambda
     , testCase "etaExpansionTL: lambda does not capture let-binding"
         etaTLLambdaCapturesLet
+    , testCase "etaExpandSyn does not expand a local that shares a unique with a top entity"
+        etaExpandSynLocal
     ]

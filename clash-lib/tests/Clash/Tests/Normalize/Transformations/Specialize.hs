@@ -18,13 +18,14 @@ import qualified Data.Map.Strict as Map
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User), noSrcSpan)
+import Clash.Core.Name (NameSort (Internal, User), noSrcSpan)
 import Clash.Core.Term (Bind (..), Pat (..), Term (..), collectArgs, mkApps)
+import Clash.Core.Type (mkFunTy)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVar)
-import Clash.Normalize.Transformations.Specialize (appProp, specialize)
+import Clash.Normalize.Transformations.Specialize (appProp, nonRepSpec, specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), extra)
@@ -42,6 +43,9 @@ appPropR = $(asRewriteQ appProp)
 
 bindConstantVarR :: NormRewrite
 bindConstantVarR = $(asRewriteQ bindConstantVar)
+
+nonRepSpecR :: NormRewrite
+nonRepSpecR = $(asRewriteQ nonRepSpec)
 
 -- | Run 'appProp' on a term, with the given variables in scope
 runAppProp :: [Id] -> Term -> IO Term
@@ -385,6 +389,82 @@ specializeDoesNotOverwriteBinders = do
           ("Binder " <> showPprU v <> " was overwritten by: " <> maybe "nothing" (showPprU . bindingId) b))
     victims
 
+-- * Local heads that share a unique with a global binder
+--
+-- The binding map and the specialisation history are keyed on uniques alone,
+-- but a local variable can have the same unique as a global binder. Clash
+-- creates such variables when it turns a group of mutually recursive global
+-- binders into a let-expression, and new local and global binders are made
+-- unique with respect to their own namespace only. 'specialize' used to look up
+-- the head of an application, and the head of the argument specialized on, in
+-- the binding map regardless of whether it was a global.
+
+-- | A local variable with the same unique as the global 'fId'
+fLocal :: Id
+fLocal = localId User "f" 10 (intFunTy 1)
+
+-- | Specialize a local function that shares its unique with a global function.
+-- There is nothing to specialize, but 'specialize' used to create a new
+-- function from the body of the global.
+specializeLocalHead :: Assertion
+specializeLocalHead = do
+  supply <- newSupply
+  let x = intId User "x" 12
+      y = intId User "y" 13
+      tm = App (Var fLocal) (mkApps (Var gId) [Left (Var x), Left (Var y)])
+      st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
+  (res, st1, _) <-
+    runRewriteTest def st0 (runRewrite "specialize" (inScopeOf [fLocal, x, y]) specialize tm)
+  assertAlphaEq tm res
+  assertEqual "Number of global binders" 1 (length (_bindings st1))
+
+-- | Global function @fHo :: (Int -> Int) -> Int@ with body @\\h -> h 1@
+fHoId :: Id
+fHoId = globalId User "fHo" 30 (mkFunTy (intFunTy 1) intTy)
+
+fHoBody :: Term
+fHoBody = Lam h (App (Var h) (intLit 1))
+ where
+  h = localId User "h" 40 (intFunTy 1)
+
+-- | Run a transformation on @fHo (k x)@, where @k@ is a local function that
+-- shares its unique with the global function @k@, given the binding of that
+-- global. Returns the body of the new specialized function.
+specializeOnLocalArgHead :: NormRewrite -> NameSort -> Term -> IO (Maybe Term)
+specializeOnLocalArgHead rw kSort kBody = do
+  supply <- newSupply
+  let kGlobal = globalId kSort "k" 31 (intFunTy 2)
+      st0 = def
+        { _bindings = mkBindingMap [(fHoId, fHoBody), (kGlobal, kBody)]
+        , _uniqSupply = supply }
+      tm = App (Var fHoId) (App (Var kLocal) (Var xArg))
+  (res, st1, _) <-
+    runRewriteTest def st0 (runRewrite "specialize" (inScopeOf [kLocal, xArg]) rw tm)
+  case collectArgs res of
+    (Var fSpec, args) | fSpec /= fHoId -> do
+      assertEqual ("Arguments of the specialized function in:\n" <> showPprU res)
+        (map (Just . varUniq) [kLocal, xArg])
+        (argUniques args)
+      pure (bindingTerm <$> lookupVarEnv fSpec (_bindings st1))
+    _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
+
+kLocal, xArg :: Id
+kLocal = localId User "k" 31 (intFunTy 2)
+xArg = intId User "x" 12
+
+-- | The expected body of the function created by 'specializeOnLocalArgHead':
+-- it abstracts over the local @k@ rather than inlining the body of the global
+-- @k@.
+specializeOnLocalArgHeadExpected :: Term
+specializeOnLocalArgHeadExpected =
+  Lam kLocal (Lam xArg (App fHoBody (App (Var kLocal) (Var xArg))))
+
+-- | The body of the global @k@: @\\p q -> q@
+kGlobalBody :: Term
+kGlobalBody = Lam (intId User "p" 41) (Lam q (Var q))
+ where
+  q = intId User "q" 42
+
 tests :: TestTree
 tests =
   testGroup
@@ -418,4 +498,12 @@ tests =
         specializeCacheFreeVarOrder
     , testCase "specialize does not overwrite existing binders (#790)"
         specializeDoesNotOverwriteBinders
+    , testCase "specialize does not specialize a local head that shares a unique with a global"
+        specializeLocalHead
+    , testCase "specialize does not inline a global into a local argument head that shares its unique" $
+        specializeOnLocalArgHead specialize User kGlobalBody
+          >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
+    , testCase "nonRepSpec does not inline a global into a local argument head that shares its unique" $
+        specializeOnLocalArgHead nonRepSpecR Internal kGlobalBody
+          >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
     ]
