@@ -948,7 +948,7 @@ entity c = do
     rec (p,ls) <- fmap unzip (ports (maximum ls))
     "entity" <+> pretty (componentName c) <+> "is" <> line <>
       (case p of
-         [] -> emptyDoc
+         [] -> "end" <> semi
          _  -> case syn of
           -- See: [Note] Hack entity attributes in architecture
           Other -> indent 2 (rports p <> if null attrs then emptyDoc else
@@ -1589,17 +1589,24 @@ inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
     maybe (return ()) (\lib -> Ap (libraries %= (T.fromStrict lib:))) libM
     fmap Just $
       nest 2 $ pretty lbl <+> colon <> entOrComp'
-                <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> line <> gms <> pms2 <> semi
+                <+> maybe emptyDoc ((<> ".") . pretty) libM <> pretty nm <> gms <> pms2 <> semi
   where
     gms | [] <- gens = emptyDoc
         | otherwise =  do
       rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,e) <- gens]
-      nest 2 ("generic map" <> line <> tupled (pure p)) <> line
-    pms2 = do
+      line <> nest 2 ("generic map" <> line <> tupled (pure p))
+    -- VHDL does not allow an empty port map, so omit it for an entity without
+    -- ports
+    pms2 | noPorts = emptyDoc
+         | otherwise = do
       rec (p,ls) <- case pms0 of
                       NamedPortMap pms1 -> fmap unzip $ sequence [pm ls i e | (i,_,_,e) <- pms1]
                       IndexedPortMap pms1 -> fmap unzip $ sequence [pmi e | (_,_,e) <- pms1]
-      nest 2 $ "port map" <> line <> tupled (pure p)
+      line <> nest 2 ("port map" <> line <> tupled (pure p))
+
+    noPorts = case pms0 of
+      NamedPortMap pms1 -> null pms1
+      IndexedPortMap pms1 -> null pms1
 
     pm ls i e = (,formalLength i) <$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e
     pmi e = (,0) <$> expr_ False e
