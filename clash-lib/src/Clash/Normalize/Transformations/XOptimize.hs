@@ -32,10 +32,11 @@ import Clash.Core.HasType
 import Clash.Core.Term
   ( Alt, IsMultiPrim(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
   , WorkInfo(..), collectArgs, PrimUnfolding(..))
+import Clash.Core.Subst (deShadowAlt)
 import Clash.Core.Type (TyVar, Type)
 import Clash.Core.Util (mkInternalVar)
 import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (InScopeSet)
+import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList)
 import Clash.Netlist.BlackBox.Types (Element(Err))
 import Clash.Netlist.Types (BlackBox(..))
 import Clash.Normalize.Types (NormalizeSession)
@@ -85,7 +86,7 @@ xOptimizeWorker (TransformContext is0 _) node subj ty alts = do
     case defPart of
       ([], _)    -> return node
       (_, [])    -> changed (Prim (PrimInfo (Text.showt 'errorX) ty WorkConstant SingleResult NoUnfolding))
-      (_, [alt]) -> xOptimizeSingle is0 subj alt
+      (_, [alt]) -> xOptimizeSingle is0 subj ty alt
       (_, defs)  -> xOptimizeMany is0 subj ty defs
   else
     return node
@@ -95,17 +96,29 @@ xOptimizeWorker (TransformContext is0 _) node subj ty alts = do
 -- alternative is defined the result of this function is used to replace the
 -- case expression.
 --
-xOptimizeSingle :: InScopeSet -> Term -> Alt -> NormalizeSession Term
-xOptimizeSingle is subj (DataPat dc tvs vars, expr) = do
+-- We can't let-bind the type variables bound by the pattern, so we keep the
+-- case-expression for patterns with existential type variables.
+--
+-- The pattern binders end up in the same let-expression as the subject, so we
+-- first rename those that are in scope of the case-expression, as they would
+-- otherwise capture the free variables of the subject.
+--
+xOptimizeSingle :: InScopeSet -> Term -> Type -> Alt -> NormalizeSession Term
+xOptimizeSingle _ subj ty alt@(DataPat _ (_:_) _, _) =
+  changed (Case subj ty [alt])
+
+xOptimizeSingle is0 subj _ (deShadowAlt is0 -> (DataPat dc tvs vars, expr)) = do
+  let is1 = extendInScopeSetList is0 vars
   tcm    <- Lens.view tcCache
-  subjId <- mkInternalVar is "subj" (inferCoreTypeOf tcm subj)
+  subjId <- mkInternalVar is1 "subj" (inferCoreTypeOf tcm subj)
 
   let fieldTys = fmap coreTypeOf vars
-  lets <- Monad.zipWithM (mkFieldSelector is subjId dc tvs fieldTys) vars [0..]
+      is2 = extendInScopeSet is1 subjId
+  lets <- Monad.zipWithM (mkFieldSelector is2 subjId dc tvs fieldTys) vars [0..]
 
   changed (Letrec ((subjId, subj) : lets) expr)
 
-xOptimizeSingle _ _ (_, expr) = changed expr
+xOptimizeSingle _ _ _ (_, expr) = changed expr
 
 -- Given a list of alternatives which are defined, create a new case
 -- expression which only ever returns a defined value.
@@ -120,7 +133,7 @@ xOptimizeMany
 xOptimizeMany is subj ty defs@(d:ds)
   | isAnyDefault defs = changed (Case subj ty defs)
   | otherwise = do
-      newAlt <- xOptimizeSingle is subj d
+      newAlt <- xOptimizeSingle is subj ty d
       changed (Case subj ty $ ds <> [(DefaultPat, newAlt)])
  where
   isAnyDefault :: [Alt] -> Bool
