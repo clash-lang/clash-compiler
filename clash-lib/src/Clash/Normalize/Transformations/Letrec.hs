@@ -230,6 +230,20 @@ removeUnusedExprSpine _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,
 removeUnusedExprSpine _ e = return e
 {-# SCC removeUnusedExprSpine #-}
 
+-- | Prepare a let-expression for merging its bindings into a recursive group.
+-- The binder of a 'NonRec' binding is not in scope of its right-hand side,
+-- which can therefore refer to a variable that the binder shadows:
+--
+-- > \x -> let x = g x in ...
+--
+-- Merging that binding into a 'Rec' group as is would turn it into the loop
+-- @letrec x = g x@, so this renames its binder first.
+deshadowNonRec
+  :: HasCallStack => InScopeSet -> Bind Term -> Term -> (Bind Term, Term)
+deshadowNonRec is0 bind@(NonRec x e) body
+  | x `elemFreeVars` e = deshadowLetExpr is0 bind body
+deshadowNonRec _ bind body = (bind, body)
+
 -- | Flatten's letrecs after `inlineCleanup`
 --
 -- `inlineCleanup` sometimes exposes additional possibilities for `caseCon`,
@@ -243,6 +257,11 @@ flattenLet = toTransformation "flattenLet" (onLetNode 'flattenLetWorker)
 -- | The 'Let' handler of 'flattenLet'; recurses on the rebuilt let-expression
 -- after merging nested bindings.
 flattenLetWorker :: HasCallStack => NormRewrite
+-- Flattening merges the binding into a recursive group, see 'deshadowNonRec'
+flattenLetWorker ctx@(TransformContext is0 _) (Let bind@(NonRec x e) body)
+  | x `elemFreeVars` e
+  = flattenLetWorker ctx (uncurry Let (deshadowNonRec is0 bind body))
+
 flattenLetWorker ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = do
   -- deshadow binds1, so binds0 and binds1 don't conflict when merged
   let is1 = extendInScopeSetList is0 (fmap fst binds0)
@@ -522,23 +541,29 @@ topLetWorker (TransformContext is0 ctx) e
             argId <- mkTmBinderFor is0 tcm (mkUnsafeSystemName "result" 0) e
             changed (Let (NonRec argId e) (Var argId))
 
-topLetWorker (TransformContext is0 ctx) e@(Letrec binds body)
+topLetWorker (TransformContext is0 ctx) e@(Let bind0 body0)
   | all (\c -> isLambdaBodyCtx c || isTickCtx c) ctx
   = do
-    let localVar = isLocalVar body
-    untranslatable <- isUntranslatable False body
+    let localVar = isLocalVar body0
+    untranslatable <- isUntranslatable False body0
     if localVar || untranslatable
       then return e
       else do
         tcm <- Lens.view tcCache
+        -- The new binder joins the bindings in a recursive group, see
+        -- 'deshadowNonRec'
+        let (bindToList -> binds, body) = deshadowNonRec is0 bind0 body0
         let is2 = extendInScopeSetList is0 (fmap fst binds)
         argId <- mkTmBinderFor is2 tcm (mkUnsafeSystemName "result" 0) body
 
-        -- TODO We would like this to be
+        -- NB: We cannot nest the new binding instead:
         --
-        -- Let binds (Let (NonRec argId body) (Var argId))
+        -- Let bind0 (Let (NonRec argId body0) (Var argId))
         --
-        -- but this makes tests/shouldwork/SimIO/Test00.hs fail.
+        -- 'flattenLet' would later inline the single use of its binder, e.g.
+        -- after this let-expression was inlined into an argument of
+        -- 'bindSimIO#', leaving a let-expression whose body is not a variable.
+        -- That makes tests/shouldwork/SimIO/Test00.hs fail.
         changed (Letrec (binds ++ [(argId, body)]) (Var argId))
 
 topLetWorker _ e = return e

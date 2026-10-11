@@ -17,8 +17,8 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term (Bind (..), Term (..))
-import Clash.Core.Var (Var (varUniq))
+import Clash.Core.Term (Bind (..), Term (..), mkApps)
+import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..), debugNone)
 import Clash.Normalize.Transformations.Letrec (flattenLet, topLet)
@@ -27,12 +27,13 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 import Clash.Rewrite.Util (runRewrite)
 
+import Clash.Unique (Unique)
 import Clash.Util.Supply (freshId, newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertNoShadowing, assertWellScoped, inScopeOf, intId
-  , intLit, letBinders, parseToTermQQ, runRewriteTest, runSingleTransformation
-  , runSingleTransformationDef, showPprU )
+  ( assertAlphaEq, assertNoShadowing, assertWellScoped, globalId, inScopeOf
+  , intFunTy, intId, intLit, letBinders, parseToTermQQ, runRewriteTest
+  , runSingleTransformation, runSingleTransformationDef, showPprU )
 
 flattenLetR, topLetR :: NormRewrite
 flattenLetR = $(asRewriteQ flattenLet)
@@ -71,6 +72,91 @@ topLetFreshBinder = do
   env = _clashEnv def
   envNoChecks =
     def { _clashEnv = env { envOpts = (envOpts env) { opt_debug = debugNone } } }
+
+-- * Merging a non-recursive let-binding into a recursive one
+
+-- | The variables of the tests below. The right-hand side of the non-recursive
+-- let-binding @x = g x@ refers to the outer @x@ (which is in scope), not to the
+-- binding itself. Merging it into a recursive group as is, turns it into the
+-- loop @x = g x@.
+nonRecX :: Id
+nonRecX = intId User "x" 0
+
+nonRecApp :: String -> Unique -> [Term] -> Term
+nonRecApp f u args =
+  mkApps (Var (globalId User f u (intFunTy (length args)))) (map Left args)
+
+-- | 'flattenLet' merges a let-expression into the non-recursive let-expression
+-- whose body it is:
+--
+-- @
+-- let x = g x in let y = h x in y
+-- @
+--
+-- must become @letrec x' = g x; y = h x' in y@, not @letrec x = g x; y = h x
+-- in y@.
+flattenLetNonRecBody :: Assertion
+flattenLetNonRecBody = do
+  actual <- runSingleTransformation def def (inScopeOf [x]) flattenLetR
+    (Let (NonRec x (nonRecApp "g" 10 [Var x]))
+      (Let (NonRec y (nonRecApp "h" 11 [Var x])) (Var y)))
+  assertAlphaEq
+    (Let (Rec [(x', nonRecApp "g" 10 [Var x]), (y, nonRecApp "h" 11 [Var x'])])
+      (Var y))
+    actual
+ where
+  x = nonRecX
+  x' = intId User "x'" 1
+  y = intId User "y" 2
+
+-- | 'flattenLet' merges a let-expression in the right-hand side of a
+-- non-recursive let-binding into it:
+--
+-- @
+-- let x = (letrec y = h x; z = k y in z) in f x x
+-- @
+--
+-- must become @letrec y = h x; z = k y; x' = z in f x' x'@, where @h x@ still
+-- refers to the outer @x@.
+flattenLetNonRecRhs :: Assertion
+flattenLetNonRecRhs = do
+  actual <- runSingleTransformation def def (inScopeOf [x]) flattenLetR
+    (Let (NonRec x (Let (Rec [(y, h x), (z, k y)]) (Var z))) (f x x))
+  assertAlphaEq
+    (Let (Rec [(y, h x), (z, k y), (x', Var z)]) (f x' x'))
+    actual
+ where
+  x = nonRecX
+  x' = intId User "x'" 1
+  y = intId User "y" 2
+  z = intId User "z" 3
+  f a b = nonRecApp "f" 10 [Var a, Var b]
+  h a = nonRecApp "h" 11 [Var a]
+  k a = nonRecApp "k" 12 [Var a]
+
+-- | 'topLet' adds a binder for the body of a non-recursive let-expression to
+-- its bindings:
+--
+-- @
+-- let x = g x in f x
+-- @
+--
+-- must become @letrec x' = g x; result = f x' in result@.
+topLetNonRec :: Assertion
+topLetNonRec = do
+  actual <- runSingleTransformation def def (inScopeOf [x]) topLetR
+    (Let (NonRec x (nonRecApp "g" 10 [Var x])) (nonRecApp "f" 11 [Var x]))
+  case actual of
+    Let (Rec [_, (result, _)]) _ ->
+      assertAlphaEq
+        (Let (Rec [ (x', nonRecApp "g" 10 [Var x])
+                  , (result, nonRecApp "f" 11 [Var x'])])
+          (Var result))
+        actual
+    _ -> assertFailure ("Unexpected result of topLet:\n" <> showPprU actual)
+ where
+  x = nonRecX
+  x' = intId User "x'" 1
 
 tests :: TestTree
 tests =
@@ -179,4 +265,10 @@ tests =
         |] actual
         assertNoShadowing actual
         assertBool "The free variable x_9 is captured" (x `notElem` letBinders actual)
+
+    , testCase "flattenLet merges a let into a shadowing NonRec let"
+        flattenLetNonRecBody
+    , testCase "flattenLet merges a let into a shadowing NonRec binding"
+        flattenLetNonRecRhs
+    , testCase "topLet adds its binder to a shadowing NonRec let" topLetNonRec
     ]
