@@ -198,7 +198,16 @@ tests =
         assertBool
           ("Next unique " <> show next <> " is already used in:\n" <> showPprU actual)
           (next `notElem` map varUniq (collectTermIds actual))
+
+    -- 'reduceMap' gave an empty vector of the argument element type, rather
+    -- than one of the result element type
+    , testCase "reduceMap on an empty vector gives an empty vector of the result element type" $
+        reduceEmptyVec (reduceMap mapInfo 0 intTy (intFunTy 1) True (Var f))
+          >>= assertAlphaEq (mkVecNil nilDc (intFunTy 1))
     ]
  where
   i = intId User "i" 2
   a = intId User "a" 3
+  f = localId User "f" 4 (intFunTy 2)
+  -- The reduction of an empty vector doesn't look at the type of 'map'
+  mapInfo = PrimInfo "Clash.Sized.Vector.map" intTy WorkNever SingleResult NoUnfolding
