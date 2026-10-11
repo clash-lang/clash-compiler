@@ -14,12 +14,10 @@
 
   'reducePrim' decides, per primitive, whether to replace an application of
   it by its unrolled definition. The definitions are those of
-  "Clash.Normalize.PrimitiveReductions", which is not ported yet: they run on
-  Clash Core, through 'Clash.Rewrite.Scoped.ViaFoil.viaLegacy'. The
-  boundary is 'runPrimReduction', and only that: the handlers describe the
-  reduction they want as a 'PrimReduction', and 'reduceWith' abstracts over
-  missing arguments on scoped Core, so the port of
-  "Clash.Normalize.PrimitiveReductions" only changes 'runPrimReduction'.
+  "Clash.Normalize.Scoped.PrimitiveReductions". The handlers describe the
+  reduction they want as a 'PrimReduction', 'reduceWith' abstracts over
+  missing arguments, and 'runPrimReduction' runs the reduction on the
+  saturated application.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -49,20 +47,17 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 
-import qualified Clash.Core.HasType as C
 import qualified Clash.Core.Name as C
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term (PrimInfo (..), WorkInfo (..))
-import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (TyCon (..), tyConDataCons)
 import qualified Clash.Core.Type as C
-import Clash.Normalize.PrimitiveReductions
+import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
-import qualified Clash.Rewrite.Types as C
-import Clash.Rewrite.Types (normalizeUltra, scopedTypeEnv, tcCache)
+import Clash.Rewrite.Types (normalizeUltra, scopedTypeEnv)
 import qualified Clash.Sized.Internal.BitVector
 import qualified Clash.Sized.RTree
 import qualified Clash.Sized.Vector
@@ -83,11 +78,10 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Scoped.Util (mkVec, shouldSplit)
 import Clash.Normalize.Scoped.Util (shouldReduce)
 import Clash.Rewrite.Scoped
-  ( FrameKind (..), ScopedTransform (..), TransformContext, Under (LamBody)
+  ( FrameKind (..), TransformContext, Under (LamBody)
   , changed, ctxFrames, pushUnder, setChanged, tfScope, whnfRW )
 import Clash.Rewrite.Scoped.Util
   (LetBinding (..), isUntranslatableType, letBindingVar, substVars)
-import Clash.Rewrite.Scoped.ViaFoil (viaLegacy)
 
 -- | Remove the bindings whose right-hand side is alpha-equivalent to that of
 -- a binding before it, substituting the variable of the earlier binding for
@@ -820,9 +814,9 @@ abstractOverMissingArgs arity ticks args0 ty0 ctx0 f
           in Lam b <$> go ctx1 (missing - 1) (idBinderVar b : map sink argsRev) (sink resTy)
     _ -> error ("not a funty: " <> showPpr ty)
 
--- * The boundary to "Clash.Normalize.PrimitiveReductions"
+-- * Running the reductions
 
--- | A reduction of "Clash.Normalize.PrimitiveReductions", with the parameters
+-- | A reduction of "Clash.Normalize.Scoped.PrimitiveReductions", with the parameters
 -- that the handlers in 'reducePrimImpls' decided on. The type arguments of the
 -- reduction are those of the primitive, and the type of its result, so they
 -- are not part of it. See 'runPrimReduction'.
@@ -891,11 +885,9 @@ reduceWith ReducePrimContext{..} red =
  where
   (tmArgs, tyArgs) = Either.partitionEithers primArguments
 
--- | Run a reduction on a primitive, given its type arguments and as many term
--- arguments as the reduction takes ('primReductionArity'). This is the
--- boundary to "Clash.Normalize.PrimitiveReductions", which is not ported yet:
--- it runs the reduction on Clash Core, on the saturated application of the
--- primitive, through 'viaLegacy'.
+-- | Run a reduction of "Clash.Normalize.Scoped.PrimitiveReductions" on a
+-- primitive, given its type arguments and as many term arguments as the
+-- reduction takes ('primReductionArity').
 runPrimReduction
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -906,73 +898,56 @@ runPrimReduction
   -> [Term n]
   -- ^ Term arguments
   -> NormalizeSession (Term n)
-runPrimReduction ctx red p tys tms =
-  runScopedTransform (viaLegacy legacy) ctx (mkApps (Prim p) (map Right tys <> map Left tms))
- where
-  legacy ctxC eC = case C.collectArgs eC of
-    (C.Prim pC, argsC) -> do
-      tcm <- Lens.view tcCache
-      let (tmsC, tysC) = Either.partitionEithers argsC
-      legacyPrimReduction red pC tysC tmsC (C.inferCoreTypeOf tcm eC) ctxC
-    _ -> error ("runPrimReduction: not a primitive application: " <> showPpr eC)
-
--- | Run a reduction of "Clash.Normalize.PrimitiveReductions" on Clash Core,
--- given the type and term arguments of the primitive, and the type of the
--- saturated application. See 'runPrimReduction'.
-legacyPrimReduction
-  :: HasCallStack
-  => PrimReduction
-  -> PrimInfo
-  -> [C.Type]
-  -> [C.Term]
-  -> C.Type
-  -> C.TransformContext
-  -> NormalizeSession C.Term
-legacyPrimReduction red p tys tms resTy ctx = case (red, tys, tms) of
-  (ReduceZipWith n lRep rRep, [lhsElTy, rhsElTy, resElTy, _], [f, xs, ys]) ->
-    reduceZipWith p n lhsElTy rhsElTy resElTy lRep rRep f xs ys ctx
-  (ReduceMap n argRep, [argElTy, resElTy, _], [f, xs]) ->
-    reduceMap p n argElTy resElTy argRep f xs ctx
-  (ReduceTraverse n, [aTy, fTy, bTy, _], [dict, f, xs]) ->
-    reduceTraverse n aTy fTy bTy dict f xs ctx
-  (ReduceFold n, [_, aTy], [f, xs]) ->
-    reduceFold n aTy f xs ctx
-  (ReduceFoldr n aRep, [aTy, _, _], [f, z, xs]) ->
-    reduceFoldr p n aTy aRep f z xs ctx
-  (ReduceDFold n, [_, _, aTy], [kn, proxy, f, z, xs]) ->
-    reduceDFold n aTy kn proxy f z xs ctx
-  (ReduceAppend n m, [_, aTy, _], [xs, ys]) ->
-    reduceAppend n m aTy xs ys ctx
-  (ReduceHead n, [_, aTy], [xs]) ->
-    reduceHead n aTy xs ctx
-  (ReduceTail n, [_, aTy], [xs]) ->
-    reduceTail n aTy xs ctx
-  (ReduceLast n, [_, aTy], [xs]) ->
-    reduceLast n aTy xs ctx
-  (ReduceInit n aRep, [_, aTy], [xs]) ->
-    reduceInit p n aTy aRep xs ctx
-  (ReduceUnconcat n m, [_, _, aTy], [kn, sm, xs]) ->
-    reduceUnconcat p n m aTy kn sm xs ctx
-  (ReduceTranspose n, [_, _, aTy], [kn, xss]) ->
-    reduceTranspose n 0 aTy kn xss ctx
-  (ReduceReplicate n, [_, aTy], [sn, x]) ->
-    reduceReplicate n aTy resTy sn x ctx
-  (ReduceReplaceInt n, [_, aTy], [kn, xs, i, x]) ->
-    reduceReplace_int n aTy resTy kn xs i x ctx
-  (ReduceIndexInt n, [_, aTy], [kn, xs, i]) ->
-    reduceIndex_int n aTy kn xs i ctx
-  (ReduceImap n, [_, argElTy, resElTy], [kn, f, xs]) ->
-    reduceImap n argElTy resElTy kn f xs ctx
-  (ReduceIterateI n, [_, aTy], [kn, f, x]) ->
-    reduceIterateI n aTy resTy kn f x ctx
-  (ReduceDTFold n, [_, _, aTy], [kn, proxy, lrFun, brFun, xs]) ->
-    reduceDTFold n aTy kn proxy lrFun brFun xs ctx
-  (ReduceReverse n, [_, aTy], [xs]) ->
-    reduceReverse n aTy xs ctx
-  (ReduceTDFold n, [_, _, aTy], [kn, proxy, lrFun, brFun, t]) ->
-    reduceTFold n aTy kn proxy lrFun brFun t ctx
-  (ReduceTReplicate n, [_, aTy], [sn, x]) ->
-    reduceTReplicate n aTy resTy sn x ctx
-  _ ->
-    error ("legacyPrimReduction: unexpected arguments for " <> show red <> ": "
-           <> showPpr (C.mkApps (C.Prim p) (map Right tys <> map Left tms)))
+runPrimReduction ctx red p tys tms = do
+  te <- Lens.view scopedTypeEnv
+  let
+    -- The type of the saturated application
+    resTy = inferCoreTypeOf te (tfScope ctx) (mkApps (Prim p) (map Right tys <> map Left tms))
+  case (red, tys, tms) of
+    (ReduceZipWith n lRep rRep, [lhsElTy, rhsElTy, resElTy, _], [f, xs, ys]) ->
+      PR.reduceZipWith p n lhsElTy rhsElTy resElTy lRep rRep f xs ys ctx
+    (ReduceMap n argRep, [argElTy, resElTy, _], [f, xs]) ->
+      PR.reduceMap p n argElTy resElTy argRep f xs ctx
+    (ReduceTraverse n, [aTy, fTy, bTy, _], [dict, f, xs]) ->
+      PR.reduceTraverse n aTy fTy bTy dict f xs ctx
+    (ReduceFold n, [_, aTy], [f, xs]) ->
+      PR.reduceFold n aTy f xs ctx
+    (ReduceFoldr n aRep, [aTy, _, _], [f, z, xs]) ->
+      PR.reduceFoldr p n aTy aRep f z xs ctx
+    (ReduceDFold n, [_, _, aTy], [kn, proxy, f, z, xs]) ->
+      PR.reduceDFold n aTy kn proxy f z xs ctx
+    (ReduceAppend n m, [_, aTy, _], [xs, ys]) ->
+      PR.reduceAppend n m aTy xs ys ctx
+    (ReduceHead n, [_, aTy], [xs]) ->
+      PR.reduceHead n aTy xs ctx
+    (ReduceTail n, [_, aTy], [xs]) ->
+      PR.reduceTail n aTy xs ctx
+    (ReduceLast n, [_, aTy], [xs]) ->
+      PR.reduceLast n aTy xs ctx
+    (ReduceInit n aRep, [_, aTy], [xs]) ->
+      PR.reduceInit p n aTy aRep xs ctx
+    (ReduceUnconcat n m, [_, _, aTy], [kn, sm, xs]) ->
+      PR.reduceUnconcat p n m aTy kn sm xs ctx
+    (ReduceTranspose n, [_, _, aTy], [kn, xss]) ->
+      PR.reduceTranspose n 0 aTy kn xss ctx
+    (ReduceReplicate n, [_, aTy], [sn, x]) ->
+      PR.reduceReplicate n aTy resTy sn x ctx
+    (ReduceReplaceInt n, [_, aTy], [kn, xs, i, x]) ->
+      PR.reduceReplace_int n aTy resTy kn xs i x ctx
+    (ReduceIndexInt n, [_, aTy], [kn, xs, i]) ->
+      PR.reduceIndex_int n aTy kn xs i ctx
+    (ReduceImap n, [_, argElTy, resElTy], [kn, f, xs]) ->
+      PR.reduceImap n argElTy resElTy kn f xs ctx
+    (ReduceIterateI n, [_, aTy], [kn, f, x]) ->
+      PR.reduceIterateI n aTy resTy kn f x ctx
+    (ReduceDTFold n, [_, _, aTy], [kn, proxy, lrFun, brFun, xs]) ->
+      PR.reduceDTFold n aTy kn proxy lrFun brFun xs ctx
+    (ReduceReverse n, [_, aTy], [xs]) ->
+      PR.reduceReverse n aTy xs ctx
+    (ReduceTDFold n, [_, _, aTy], [kn, proxy, lrFun, brFun, t]) ->
+      PR.reduceTFold n aTy kn proxy lrFun brFun t ctx
+    (ReduceTReplicate n, [_, aTy], [sn, x]) ->
+      PR.reduceTReplicate n aTy resTy sn x ctx
+    _ ->
+      error ("runPrimReduction: unexpected arguments for " <> show red <> ": "
+             <> showPpr (mkApps (Prim p) (map Right tys <> map Left tms)))
