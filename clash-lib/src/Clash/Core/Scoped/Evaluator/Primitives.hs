@@ -182,8 +182,10 @@ import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Bit
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Unsigned as Clash.Sized.Internal.Unsigned
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector as Clash.Sized.Vector
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes as GHC.Classes
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Magic as GHC.Magic
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer as GHC.Num.Integer
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim as GHC.Prim
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.PrimopWrappers as GHC.PrimopWrappers
 
 -- | The ported reductions, by the name of their primitive. See the module
 -- header.
@@ -204,6 +206,8 @@ scopedPrimitives = concat
   , Clash.Sized.Internal.Unsigned.primitives
   , Clash.Sized.Vector.primitives
   , GHC.Classes.primitives
+  , GHC.Magic.primitives
   , GHC.Num.Integer.primitives
   , GHC.Prim.primitives
+  , GHC.PrimopWrappers.primitives
   ]
