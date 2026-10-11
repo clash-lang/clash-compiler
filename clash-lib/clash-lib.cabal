@@ -234,7 +234,10 @@ Library
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Magic
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Num
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.BigNat
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Natural
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.PrimopWrappers
                       Clash.Core.Scoped.Evaluator.Primitives.Util
