@@ -69,6 +69,8 @@ module Clash.Core.Scoped.Evaluator
   , isUndefinedXPrimVal
   , integerLiteral
   , naturalLiteral
+  , wrapUnsigned
+  , wrapSigned
   , nameModTick
   ) where
 

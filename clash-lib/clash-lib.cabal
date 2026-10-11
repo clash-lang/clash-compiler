@@ -183,6 +183,7 @@ Library
                       prettyprinter-interp    ^>= 0.2,
                       pretty-show             >= 1.9      && < 2.0,
                       primitive               >= 0.5.0.1  && < 1.0,
+                      reflection              >= 2.1.2    && < 3.0,
                       string-interpolate      >= 0.3      && < 1.1,
                       template-haskell        >= 2.20.0.0  && < 2.25,
                       temporary               >= 1.2.1    && < 1.4,
@@ -223,6 +224,7 @@ Library
                       Clash.Core.Scoped.Evaluator
                       Clash.Core.Scoped.Evaluator.Adapter
                       Clash.Core.Scoped.Evaluator.Primitives
+                      Clash.Core.Scoped.Evaluator.Primitives.Util
                       Clash.Core.Scoped.Evaluator.Types
                       Clash.Core.Scoped.FreeVars
                       Clash.Core.Scoped.HasType
