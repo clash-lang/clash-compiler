@@ -24,7 +24,7 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term
-  (Bind, LetBinding, Term(..), bindToList, collectArgs, stripTicks)
+  (Bind(..), LetBinding, Term(..), bindToList, collectArgs, stripTicks)
 import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (Type, normalizeType)
 import Clash.Core.Var (isGlobalId, varName)
@@ -167,9 +167,15 @@ splitCastWorkWorker ctx@(TransformContext is0 _) node bind body = do
   (vss', Monoid.getAny -> hasChanged) <-
     listen (mapM (splitCastLetBinding is0) (bindToList bind))
   let vs' = concat vss'
-  if hasChanged then changed (Letrec vs' body)
+  if hasChanged then changed (rebuild vs')
                 else return node
  where
+  -- The binding keeps its form: rebuilding a 'NonRec' as a 'Rec' would bring
+  -- its binder into scope of its own right-hand side.
+  rebuild vs' = case bind of
+    NonRec {} -> foldr (\(i, x) -> Let (NonRec i x)) body vs'
+    Rec {} -> Let (Rec vs') body
+
   splitCastLetBinding
     :: InScopeSet
     -> LetBinding

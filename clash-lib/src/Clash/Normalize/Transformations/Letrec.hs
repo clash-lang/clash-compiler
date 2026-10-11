@@ -252,7 +252,7 @@ flattenLetWorker ctx@(TransformContext is0 _) (Letrec binds0 body0@Letrec{}) = d
       flattenLetWorker ctx{tfInScope=is1} (Letrec (binds0 <> binds1) body1)
     _ -> error "internal error"
 
-flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
+flattenLetWorker (TransformContext is0 _) letE@(Letrec binds body) = do
   let is1 = extendInScopeSetList is0 (map fst binds)
       bodyOccs = Lens.foldMapByOf
                    freeLocalIds (unionVarEnvWith (+))
@@ -270,11 +270,16 @@ flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
     [(id1,e1)] | Just occ <- lookupVarEnv id1 bodyOccs, e1WorkFree || occ < 2 ->
       if id1 `elemFreeVars` e1
          -- Except when the binder is recursive!
-         then return (Letrec binds1 body)
+         then return (rebuild binds1)
          else let subst = extendIdSubst (mkSubst is2) id1 e1
               in changed (substTm "flattenLet" subst body)
-    _ -> return (Letrec binds1 body)
+    _ -> return (rebuild binds1)
   where
+    -- A single binding keeps its form. Rebuilding a 'NonRec' as a 'Rec' would
+    -- bring its binder into scope of its own right-hand side.
+    rebuild [(id1,e1)] | Let NonRec{} _ <- letE = Let (NonRec id1 e1) body
+    rebuild binds1 = Letrec binds1 body
+
     go :: InScopeSet -> LetBinding -> NormalizeSession (InScopeSet,[LetBinding])
     go isN (id1,collectTicks -> (Letrec binds1 body1,ticks)) = do
       let bs1 = map fst binds1

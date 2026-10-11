@@ -21,7 +21,8 @@ import           Clash.Core.Var          (Id, IdScope(..), TyVar, Var(..))
 import           Clash.Unique            (Unique)
 
 import           Test.Clash.Rewrite
-  (assertAlphaEq, inScopeOf, intTy, localId, showPprU, tyVar)
+  ( assertAlphaEq, assertNoShadowing, inScopeOf, intTy, localId, showPprU
+  , tyVar )
 
 fakeName :: Name a
 fakeName =
@@ -145,6 +146,22 @@ freshenTmRenames =
             (x `elemInScopeSet` is1)
     (_, tm) -> assertFailure ("unexpected result: " <> showPprU tm)
 
+-- | 'freshenTm' must make all binders unique, also those in the right-hand
+-- side of a non-recursive let that share a unique with the let's binder:
+-- @let x = \\x -> x in x@. The binder is not in scope of its right-hand side,
+-- but 'makeANF' relies on all binders being unique.
+freshenTmNonRec :: Assertion
+freshenTmNonRec = do
+  let tm = Let (NonRec x2 (Lam x2 (Var x2))) (Var x2)
+      (is1, tm1) = freshenTm emptyInScopeSet tm
+  assertAlphaEq tm tm1
+  assertNoShadowing tm1
+  case tm1 of
+    Let (NonRec x (Lam y _)) _ ->
+      assertBool "binders not in returned in-scope set"
+        (all (`elemInScopeSet` is1) [x, y])
+    _ -> assertFailure ("unexpected result: " <> showPprU tm1)
+
 tests :: TestTree
 tests =
   testGroup
@@ -208,4 +225,6 @@ tests =
         deShadowTermRenames
     , testCase "freshenTm renames a binder that is in scope (#361)"
         freshenTmRenames
+    , testCase "freshenTm renames binders in a NonRec RHS away from its binder"
+        freshenTmNonRec
     ]

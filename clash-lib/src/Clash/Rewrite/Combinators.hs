@@ -9,6 +9,8 @@
 
 module Clash.Rewrite.Combinators
   ( allR
+  , letRhsInScope
+  , rebuildBind
   , (!->)
   , (>-!)
   , (>-!->)
@@ -26,9 +28,11 @@ import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
 
-import           Clash.Core.Term             (Term (..), CoreContext (..), primArg, patIds)
+import           Clash.Core.Term
+  (Bind (..), Term (..), CoreContext (..), bindToList, primArg, patIds)
+import           Clash.Core.Var              (Id)
 import           Clash.Core.VarEnv
-  (extendInScopeSet, extendInScopeSetList)
+  (InScopeSet, extendInScopeSet, extendInScopeSetList)
 import           Clash.Rewrite.Types
 
 -- | Apply a transformation on the subtrees of an term
@@ -55,14 +59,16 @@ allR trans (TransformContext is c) (TyApp e ty) =
 allR trans (TransformContext is c) (Cast e ty1 ty2) =
   Cast <$> trans (TransformContext is (CastBody:c)) e <*> pure ty1 <*> pure ty2
 
-allR trans (TransformContext is c) (Letrec xes e) = do
+allR trans (TransformContext is c) (Let bind e) = do
   xes' <- traverse rewriteBind xes
   e'   <- trans (TransformContext is' (LetBody xes:c)) e
-  return (Letrec xes' e')
+  return (Let (rebuildBind bind xes') e')
  where
+  xes                = bindToList bind
   bndrs              = map fst xes
-  is'                = extendInScopeSetList is (map fst xes)
-  rewriteBind (b,e') = (b,) <$> trans (TransformContext is' (LetBinding b bndrs:c)) e'
+  is'                = extendInScopeSetList is bndrs
+  isRhs              = letRhsInScope is is' bind
+  rewriteBind (b,e') = (b,) <$> trans (TransformContext isRhs (LetBinding b bndrs:c)) e'
 
 allR trans (TransformContext is c) (Case scrut ty alts) =
   Case <$> trans (TransformContext is (CaseScrut:c)) scrut
@@ -79,6 +85,21 @@ allR trans (TransformContext is c) (Tick sp e) =
 
 allR _ _ tm = pure tm
 {-# INLINABLE allR #-}
+
+-- | The variables in scope of the right-hand sides of a let-expression, given
+-- those in scope of the let-expression and those in scope of its body. The
+-- binder of a 'NonRec' let is in scope of the body only, not of its own
+-- right-hand side, which might refer to a variable it shadows.
+letRhsInScope :: InScopeSet -> InScopeSet -> Bind a -> InScopeSet
+letRhsInScope is _ NonRec{} = is
+letRhsInScope _ is' Rec{} = is'
+
+-- | Rebuild a binding from its (rewritten) let-bindings, keeping its form: a
+-- 'NonRec' let rebuilt as a 'Rec' would bring its binder into scope of its own
+-- right-hand side.
+rebuildBind :: Bind a -> [(Id, b)] -> Bind b
+rebuildBind NonRec{} [(b, x)] = NonRec b x
+rebuildBind _ xes = Rec xes
 
 infixr 6 >->
 -- | Apply two transformations in succession

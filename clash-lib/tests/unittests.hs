@@ -15,11 +15,13 @@ import qualified Clash.Tests.Normalize
 import qualified Clash.Tests.Normalize.Transformations
 import qualified Clash.Tests.Normalize.Transformations.ANF
 import qualified Clash.Tests.Normalize.Transformations.Case
+import qualified Clash.Tests.Normalize.Transformations.Cast
 import qualified Clash.Tests.Normalize.Transformations.DEC
 import qualified Clash.Tests.Normalize.Transformations.Inline
 import qualified Clash.Tests.Normalize.Transformations.Letrec
 import qualified Clash.Tests.Normalize.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Util
+import qualified Clash.Tests.Rewrite.Combinators
 import qualified Clash.Tests.Rewrite.StrategyDSL
 import qualified Clash.Tests.Rewrite.Util
 import qualified Clash.Tests.Util.Interpolate
@@ -46,11 +48,13 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Transformations.tests
   , Clash.Tests.Normalize.Transformations.ANF.tests
   , Clash.Tests.Normalize.Transformations.Case.tests
+  , Clash.Tests.Normalize.Transformations.Cast.tests
   , Clash.Tests.Normalize.Transformations.DEC.tests
   , Clash.Tests.Normalize.Transformations.Inline.tests
   , Clash.Tests.Normalize.Transformations.Letrec.tests
   , Clash.Tests.Normalize.Transformations.Specialize.tests
   , Clash.Tests.Normalize.Util.tests
+  , Clash.Tests.Rewrite.Combinators.tests
   , Clash.Tests.Rewrite.StrategyDSL.tests
   , Clash.Tests.Rewrite.Util.tests
   , Clash.Tests.Util.Interpolate.tests

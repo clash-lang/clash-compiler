@@ -252,16 +252,16 @@ tests = testGroup "Clash.Tests.Rewrite.StrategyDSL"
       ]
 
   , testGroup "descent"
-      [ testCase "NonRec lets are rebuilt as Rec, like allR" $ do
-          -- See Note [NonRec erasure during descent] in
-          -- Clash.Rewrite.StrategyDSL.TH.
+      [ testCase "NonRec lets stay NonRec, like allR" $ do
+          -- Rebuilding @let x = e@ as @letrec x = e@ would bring @x@ into
+          -- scope of @e@
           let term = Let (NonRec (someId 0) (integer 3)) (integer 5)
           (result, _, _) <- runRewriteOn
             $(compileStrategy (topdown literalStep)) term
           case result of
-            Let (Rec [(_, boundTerm)]) _body ->
+            Let (NonRec _ boundTerm) _body ->
               assertEqual "binder rewritten" (show (integer 4)) (show boundTerm)
-            _ -> assertFailure ("expected a Rec let, got: " <> show result)
+            _ -> assertFailure ("expected a NonRec let, got: " <> show result)
       , testCase "AppArg context in the probe result mentions the primitive" $ do
           -- The argument is probed after the function position rewrote to a
           -- primitive; its recorded context must carry that primitive's
