@@ -54,10 +54,7 @@ import qualified Data.Set.Ordered as OSet
 import qualified Data.Set.Ordered.Extra as OSet
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
-import GHC.BasicTypes.Extra (isNoInline)
 import GHC.Stack (HasCallStack)
-import GHC.Num.Integer (Integer(IS))
-import GHC.Num.Natural (Natural(NS))
 
 import GHC.Types.Basic (InlineSpec (..))
 
@@ -105,6 +102,8 @@ import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
   , isUntranslatableType, normalizeTermTypes, normalizeId, whnfRW)
 import Clash.Rewrite.WorkFree (isWorkFree)
+import Clash.Normalize.Scoped.Transformations.Specialize
+  (preferNoInline, specCacheKey, specializeName)
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
@@ -353,83 +352,6 @@ specialize ctx e = case e of
   (App e1 e2)   -> specialize' ctx e (collectArgsTicks e1) (Left  e2)
   _             -> return e
 
-{-
-Note [ticks and specialization]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As Clash now distinguishes between ticks in expressions when comparing for
-alpha equality, this has a knock-on effect when accessing the specialization
-cache. Consider these applications which differ only by ticks:
-
-    f[GlobalId] (\x -> ... x[LocalId])
-    f[GlobalId] <tick>(\x -> ... x[LocalId])
-    f[GlobalId] (\x -> ... <tick>x[LocalId])
-
-If one of these had been specialized, the other two would hit that term in the
-specialization cache, saving Clash from having to re-do work which is in effect
-the same. To preserve this behavior, we strip all ticks from the keys for the
-specialization cache, see 'specCacheKey'.
-
-TODO While this preserves the old behavior, the old behavior is likely not
-quite what we want. Using a value from the specialization cache may change the
-ticks present, which can affect naming / debugging information in generated HDL.
-We may also not want to look at ticks, as then the specialization cache will
-miss on virtually every lookup which could add to normalization time.
--}
-
-{-
-Note [bignum literals and specialization]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GHC represents a small 'Natural' or 'Integer' constant as a constructor applied
-to a literal, e.g. @NS 8000##@. The evaluator reads such a constant back as a
-plain literal, @8000@, so a constant that went through 'reduceConst' looks
-different from one that didn't, even though they're the same value. Both forms
-reach 'specialize', for example when a 'KnownDomain' dictionary built by GHC is
-passed to a function at one call site, while at another call site the same
-dictionary is the result of normalizing an application of a work-free function
-(see 'Clash.Normalize.Util.normalizeWorkFreeApp'). To prevent creating two
-identical specializations, we use the literal form in the keys of the
-specialization cache.
--}
-
--- | Prepare a term for use as a key in the specialization cache: strip all
--- ticks (see Note [ticks and specialization]) and replace small bignum
--- constants by literals (see Note [bignum literals and specialization]).
-specCacheKey :: Term -> Term
-specCacheKey = go
- where
-  go (Lam i x) = Lam i (go x)
-  go (TyLam i x) = TyLam i (go x)
-  go (App f x) = case (go f, go x) of
-    (Prim p, Literal (WordLiteral w))
-      | primName p == Text.showt 'NS -> Literal (NaturalLiteral w)
-    (Prim p, Literal (IntLiteral i))
-      | primName p == Text.showt 'IS -> Literal (IntegerLiteral i)
-    (f', x') -> App f' x'
-  go (TyApp f a) = TyApp (go f) a
-  go (Let bs x) = Let (goBinds bs) (go x)
-  go (Case x ty alts) = Case (go x) ty (fmap go <$> alts)
-  go (Cast x a b) = Cast (go x) a b
-  go (Tick _ x) = go x
-  go x = x
-
-  goBinds (NonRec i x) = NonRec i (go x)
-  goBinds (Rec ixs) = Rec (fmap go <$> ixs)
-
--- | Given two 'InlineSpec's, return the \"strongest\" one. I.e., the one that's
--- closest to @NoInline@ (or @Opaque@ for newer GHCs).
-preferNoInline :: InlineSpec -> InlineSpec -> InlineSpec
-preferNoInline is0 is1
-  | enumInlineSpec is0 >= enumInlineSpec is1 = is0
-  | otherwise                                = is1
- where
-  enumInlineSpec :: InlineSpec -> Int
-  enumInlineSpec = \case
-    NoUserInlinePrag {} -> -1
-    Inline {} -> 0
-    Inlinable {} -> 1
-    NoInline {} -> 2
-    Opaque {} -> 3
-
 -- | Specialize an application on its argument
 specialize'
   :: TransformContext
@@ -479,7 +401,8 @@ specialize' (TransformContext is0 _) e (fHd@(Var f), args, ticks) specArgIn
       specBndrs = map (Lens.over Lens._Left (normalizeId tcm)) specBndrsIn
 
       -- See Note [ticks and specialization] and
-      -- Note [bignum literals and specialization]
+      -- Note [bignum literals and specialization] in
+      -- "Clash.Normalize.Scoped.Transformations.Specialize"
       specAbs :: Either Term Type
       specAbs = either (Left . specCacheKey . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
@@ -616,22 +539,6 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   changed newExpr
 
 specialize' _ e _ _ = return e
-
--- | The name of the function that specializes function @f@ on function @g@,
--- given their inline specifications (if @g@ has a binding) and names. It
--- depends on their NOINLINE / OPAQUE annotations, see 'specialize''.
-specializeName :: (InlineSpec, Name Term) -> (Maybe InlineSpec, Name Term) -> Name Term
-specializeName (spec0, n0) (spec1, n1)
-  | (ann0 && ann1) || (not ann0 && not ann1)
-  = n0{nameOcc=nameOcc n0 <> "_" <> stripMods (nameOcc n1)}
-  | ann0 = n0
-  | otherwise = n1
- where
-  ann0 = isNoInline spec0
-  ann1 = fmap isNoInline spec1 == Just True
-
-  stripMods :: Text.Text -> Text.Text
-  stripMods = Text.takeWhileEnd (/= '.')
 
 -- | Give the binders for the arguments of a function, of the given type, the
 -- types of the corresponding parameters of the function. Type binders replace
