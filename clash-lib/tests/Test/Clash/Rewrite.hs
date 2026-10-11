@@ -828,6 +828,30 @@ justDataCon =
 tupleTy :: [C.Type] -> C.Type
 tupleTy = tcApp (mkTyConName "GHC.Tuple.(,)" 3036)
 
+-- | The tuple type constructor @TupN@ of the given arity (at most 9), with a
+-- single data constructor @MkTupN :: forall t1 .. tN. t1 -> .. -> tN -> TupN
+-- t1 .. tN@, for 'Clash.Rewrite.Types.tupleTcCache'
+tupleTyCon :: Int -> C.TyCon
+tupleTyCon n = mkAlgTyCon nm tvs [dc]
+ where
+  nm = mkTyConName ("Tup" <> show n) (3500 + fromIntegral n)
+  tvs = [tyVar C.User ("t" <> show i) (3600 + 10 * fromIntegral n + fromIntegral i) | i <- [1 .. n]]
+  dc = mkDataCon ("MkTup" <> show n) (3700 + fromIntegral n) tvs []
+         (map C.VarTy tvs) (tcApp nm (map C.VarTy tvs))
+
+-- | Add the tuple type constructors of arity 2 up to the given one
+-- ('tupleTyCon') to a 'RewriteEnv': to its type constructors, and to its
+-- 'Clash.Rewrite.Types.tupleTcCache'
+withTupleTyCons :: Int -> RewriteEnv -> RewriteEnv
+withTupleTyCons maxN env =
+  withTyConMap tcm env{_clashEnv = clashEnv0{envTupleTyCons = tups}}
+ where
+  clashEnv0 = _clashEnv env
+  tcs = [(n, tupleTyCon n) | n <- [2 .. maxN]]
+  tcm = foldr (\(_, tc) -> UniqMap.insert (C.tyConName tc) tc) (envTyConMap clashEnv0) tcs
+  tups = IntMap.union (IntMap.fromList [(n, C.tyConName tc) | (n, tc) <- tcs])
+                      (envTupleTyCons clashEnv0)
+
 -- | @newtype N a = MkN (Maybe a)@
 nTy :: C.Type -> C.Type
 nTy a = tcApp nTyConName [a]
