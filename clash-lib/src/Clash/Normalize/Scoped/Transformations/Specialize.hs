@@ -44,6 +44,8 @@ module Clash.Normalize.Scoped.Transformations.Specialize
   , specializeIn
   , nonRepSpec
   , nonRepSpecWorker
+  , typeSpec
+  , typeSpecWorker
   , specArgBndrsAndVars
     -- * Helpers of 'specialize'
   , specCacheKey
@@ -81,7 +83,7 @@ import           Clash.Driver.Types
 import           Clash.Normalize.Types
   (NormalizeSession, specialisationCache, specialisationHistory)
 import           Clash.Rewrite.StrategyDSL
-  (Transformation, onApp, onAppNode, onTyAppNode, toScopedTransformation)
+  (Transformation, onApp, onAppNode, onTyApp, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
   (censor, curFun, debugOpts, extra, scopedTypeEnv, specializationLimit)
 import           Clash.Unique                (Unique)
@@ -607,6 +609,28 @@ nonRepSpecWorker ctx e e1 e2
       _ -> return app
     _ -> return app
 {-# SCC nonRepSpecWorker #-}
+
+-- | Specialize functions on their type, see
+-- 'Clash.Normalize.Transformations.Specialize.typeSpec'
+typeSpec :: Transformation
+typeSpec = toScopedTransformation "typeSpec" (onTyApp 'typeSpecWorker)
+
+-- | The 'TyApp' handler of 'typeSpec'
+typeSpecWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> Term n
+  -> Type n
+  -> NormalizeSession (Term n)
+typeSpecWorker ctx e e1 ty
+  | (hd, args) <- collectArgs e1
+  , isVar hd
+  , nullNameSet (freeTyVarsOfType ty)
+  , null (rights args)
+  = specialize ctx e
+  | otherwise = return e
+{-# SCC typeSpecWorker #-}
 
 -- | The body of the specialized function: the body of the function applied
 -- to its arguments, and to the argument specialized on, abstracted over the

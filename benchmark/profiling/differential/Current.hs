@@ -43,6 +43,7 @@ module Current
   , appProp
   , constantSpec
   , nonRepSpec
+  , typeSpec
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -55,7 +56,7 @@ import qualified Clash.Normalize.Transformations.Specialize as Specialize
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLet, onLetNode
-  , onPrimNode, onTickNode, onTyAppNode, onVarNode, toTransformation )
+  , onPrimNode, onTickNode, onTyApp, onTyAppNode, onVarNode, toTransformation )
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.deadCode' replaced
@@ -218,3 +219,8 @@ constantSpec = toTransformation "constantSpec" (onApp 'Specialize.constantSpecWo
 -- replaced
 nonRepSpec :: Transformation
 nonRepSpec = toTransformation "nonRepSpec" (onApp 'Specialize.nonRepSpecWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Specialize.typeSpec', which
+-- 'Clash.Normalize.Scoped.Transformations.Specialize.typeSpec' replaced
+typeSpec :: Transformation
+typeSpec = toTransformation "typeSpec" (onTyApp 'Specialize.typeSpecWorker)

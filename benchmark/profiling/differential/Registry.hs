@@ -72,6 +72,7 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
       , $(asRewriteQ Current.appProp), [nonRecLetOrder] )
     , (["constantSpec"], $(asRewriteQ Current.constantSpec), [nonRecLetOrder])
     , (["nonRepSpec"], $(asRewriteQ Current.nonRepSpec), [])
+    , (["typeSpec"], $(asRewriteQ Current.typeSpec), [])
     ]
 
   unported =
@@ -82,7 +83,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["letCast"], $(asRewriteQ letCast))
     , (["splitCastWork"], $(asRewriteQ splitCastWork))
     -- Specialize
-    , (["typeSpec"], $(asRewriteQ typeSpec))
     , (["zeroWidthSpec"], $(asRewriteQ zeroWidthSpec))
     -- Others
     , (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
