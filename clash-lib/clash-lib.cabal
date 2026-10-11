@@ -292,6 +292,7 @@ Library
                       Clash.Normalize.Scoped.Transformations.EtaExpand
                       Clash.Normalize.Scoped.Transformations.Inline
                       Clash.Normalize.Scoped.Transformations.Letrec
+                      Clash.Normalize.Scoped.Transformations.MultiPrim
                       Clash.Normalize.Scoped.Transformations.Reduce
                       Clash.Normalize.Scoped.Transformations.SeparateArgs
                       Clash.Normalize.Scoped.Transformations.Specialize
@@ -523,6 +524,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Scoped.Transformations.EtaExpand
                  Clash.Tests.Normalize.Scoped.Transformations.Inline
                  Clash.Tests.Normalize.Scoped.Transformations.Letrec
+                 Clash.Tests.Normalize.Scoped.Transformations.MultiPrim
                  Clash.Tests.Normalize.Scoped.Transformations.Reduce
                  Clash.Tests.Normalize.Scoped.Transformations.SeparateArgs
                  Clash.Tests.Normalize.Scoped.Transformations.Specialize

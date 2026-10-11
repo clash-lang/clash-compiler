@@ -1,0 +1,162 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente,
+                    2016-2017, Myrtle Software Ltd,
+                    2017-2018, Google Inc.
+                    2022-2026, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Transformations on primitives with multiple results, of scoped Clash Core:
+  the ported counterparts of "Clash.Normalize.Transformations.MultiPrim". See
+  Note [MultiResult type] there.
+
+  @c$multiPrimSelect@ has the closed type @forall a b. a -> b -> a@, as in
+  Clash Core.
+-}
+
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
+module Clash.Normalize.Scoped.Transformations.MultiPrim
+  ( setupMultiResultPrim
+  , setupMultiResultPrimWorker
+  ) where
+
+import qualified Control.Lens as Lens
+import Data.Text.Extra (showt)
+import GHC.Stack (HasCallStack)
+
+import Clash.Annotations.Primitive (extractPrim)
+import qualified Clash.Core.Name as C (mkUnsafeSystemName)
+import qualified Clash.Core.Term as C
+import qualified Clash.Core.Type as C (Type (..), mkFunTy)
+import Clash.Core.TysPrim (liftedTypeKind)
+import qualified Clash.Core.Var as C (mkTyVar)
+import Clash.Core.TyCon (TyConMap)
+import Clash.Normalize.Types (NormalizeSession)
+import Clash.Primitives.Types (Primitive (..))
+import Clash.Rewrite.StrategyDSL (Transformation, onPrim, toScopedTransformation)
+import Clash.Rewrite.Types (primitives, tcCache)
+import Clash.Util (curLoc)
+
+import Clash.Core.Scoped.HasType (primInfoType)
+import Clash.Core.Scoped.Subst
+  (Subst, idSubst, substScope, substTy, substTyBinder, withFreshIdBinders)
+import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (mkApps, mkLams, mkTmApps, mkTyApps, mkTyLams)
+import Clash.Core.Scoped.TermInfo (MultiPrimInfo (..), multiPrimInfo')
+import Clash.Core.Scoped.Type
+  (PiTele (..), SplitFunForall (..), TypeView (..), splitFunForallTy, tyView)
+import Clash.Core.Scoped.Util (internalName, listToLets)
+import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
+
+-- | Rewrite primitives that can assign their results to multiple signals,
+-- see 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
+setupMultiResultPrim :: Transformation
+setupMultiResultPrim =
+  toScopedTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)
+
+-- | The 'Prim' handler of 'setupMultiResultPrim'
+setupMultiResultPrimWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> C.PrimInfo
+  -> NormalizeSession (Term n)
+setupMultiResultPrimWorker ctx node pInfo@C.PrimInfo{C.primMultiResult = C.SingleResult} = do
+  tcm <- Lens.view tcCache
+  prim <- Lens.view (primitives . Lens.at (C.primName pInfo))
+
+  case prim >>= extractPrim of
+    Just (BlackBoxHaskell{multiResult=True}) ->
+      changed (setupMultiResultPrim' tcm (tfScope ctx) pInfo)
+    Just (BlackBox{multiResult=True}) ->
+      changed (setupMultiResultPrim' tcm (tfScope ctx) pInfo)
+    _ ->
+      return node
+setupMultiResultPrimWorker _ctx node _primInfo = return node
+{-# SCC setupMultiResultPrimWorker #-}
+
+-- | For @prim :: forall a b c. a -> (b, c)@:
+--
+-- @
+--   /\\a b c -> \\(a1 :: a) ->
+--     letrec
+--       r  = prim \@a \@b \@c a1 r2 r3 -- With 'C.MultiResult'
+--       r2 = c$multiPrimSelect \@b \@(b, c) r2 r
+--       r3 = c$multiPrimSelect \@c \@(b, c) r3 r
+--     in
+--       (r2, r3)
+-- @
+setupMultiResultPrim' :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> C.PrimInfo -> Term n
+setupMultiResultPrim' tcm sc pInfo@C.PrimInfo{C.primType} =
+  case splitFunForallTy (primInfoType sc pInfo) of
+    SplitFunForall tele res -> openPi (idSubst sc) tele res $ \scT tvs tyVars argTys resTy ->
+      let
+        resTypes = case tyView resTy of
+          TyConApp _ tys -> tys
+          _ -> error ($(curLoc) ++ "not a tuple: " ++ show primType)
+        nArgs = length argTys
+        argNms = [internalName ("a" <> showt i) | i <- [1 .. nArgs]]
+        resNms = [internalName ("r" <> showt i) | i <- [nArgs + 1 .. nArgs + length resTypes]]
+      in
+        withFreshIdBinders scT (zip argNms argTys) $ \scA argBs argVs ->
+          withFreshIdBinders scA ((internalName "r", sink resTy) : zip resNms (map sink resTypes)) $
+            \_ letBs letVs -> case letVs of
+              resV : resVs ->
+                let
+                  resTyL = sink resTy
+                  resTypesL = map sink resTypes
+                  multiPrimBind =
+                    mkApps
+                      (Prim pInfo{C.primMultiResult = C.MultiResult})
+                      (map (Right . sink) tyVars ++ map Left (map sink argVs ++ resVs))
+                  multiPrimSelect r t =
+                    mkApps (Prim multiPrimSelectInfo) [Right t, Right resTyL, Left r, Left resV]
+                  body = mkTmApps (mkTyApps (Data tupDc) resTypesL) resVs
+                in
+                  mkTyLams
+                    (mkLams
+                      (listToLets scA letBs (multiPrimBind : zipWith multiPrimSelect resVs resTypesL) body)
+                      argBs)
+                    tvs
+              [] -> error ($(curLoc) ++ "no binders")
+ where
+  MultiPrimInfo{mpi_resultDc = tupDc} = multiPrimInfo' tcm pInfo
+
+  multiPrimSelectInfo = C.PrimInfo
+    { C.primName = "c$multiPrimSelect"
+    , C.primType =
+        C.ForAllTy selA (C.ForAllTy selB
+          (C.mkFunTy (C.VarTy selA) (C.mkFunTy (C.VarTy selB) (C.VarTy selA))))
+    , C.primWorkInfo = C.WorkAlways
+    , C.primMultiResult = C.SingleResult
+    , C.primUnfolding = C.NoUnfolding
+    }
+
+  -- forall a b. a -> b -> a, see
+  -- 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
+  selA = C.mkTyVar liftedTypeKind (C.mkUnsafeSystemName "a" 0)
+  selB = C.mkTyVar liftedTypeKind (C.mkUnsafeSystemName "b" 1)
+
+-- | Go under the quantified type variables of a polymorphic function type.
+-- Gives their binders, the type variables, the argument types and the
+-- result type, in the scope extended with the type variables.
+openPi
+  :: Distinct o
+  => Subst i o
+  -> PiTele i l
+  -> Type l
+  -> (forall o'. DExt o o'
+        => Scope o' -> Tele TyBinder o o' -> [Type o'] -> [Type o'] -> Type o' -> r)
+  -> r
+openPi s tele res k = case tele of
+  PiNil -> k (substScope s) TNil [] [] (substTy s res)
+  PiArg t rest -> openPi s rest res $ \sc' tvs vs args res' ->
+    k sc' tvs vs (sink (substTy s t) : args) res'
+  PiForall b rest -> substTyBinder s b $ \s1 b' -> openPi s1 rest res $ \sc' tvs vs args res' ->
+    k sc' (TCons b' tvs) (sink (tyBinderVar b') : vs) args res'
