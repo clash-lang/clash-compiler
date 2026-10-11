@@ -112,8 +112,4 @@ tests = testGroup "Clash.Tests.Core.Scoped.TyCon"
 
   , testCase "tyFamEqns of a type that is not a type family" $
       assertBool "not a type family" (null (tyFamEqns nTyCon))
-
-  , testCase "tyConKindOf" $
-      assertScopedTyAlphaEq (C.mkFunTy C.liftedTypeKind C.liftedTypeKind)
-        (tyConKindOf emptyScope nTyCon)
   ]

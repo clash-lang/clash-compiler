@@ -31,7 +31,6 @@ import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Driver.Types (Binding (..))
@@ -45,6 +44,7 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs, stripTicks)
 import Clash.Core.Scoped.TermInfo (isClosed)
 import Clash.Core.Scoped.Type (isClockOrReset, isEnable, isPolyFunTy)
+import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 -- | Whether a global binder is work free, see 'isWorkFree'. Errors if there is
 -- no binding for it.
@@ -132,9 +132,9 @@ isConstant e = case collectArgs e of
 -- | Like 'isConstant', but a clock or reset is only constant if it is a
 -- removed argument, see 'Clash.Rewrite.WorkFree.isConstantNotClockReset'
 isConstantNotClockReset
-  :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> Term n -> Bool
-isConstantNotClockReset tcm sc e
-  | isClockOrReset tcm sc (inferCoreTypeOf tcm sc e) =
+  :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Bool
+isConstantNotClockReset tenv sc e
+  | isClockOrReset tenv sc (inferCoreTypeOf tenv sc e) =
       case fst (collectArgs e) of
         Prim pr -> C.primName pr == Text.showt 'removedArg
         _ -> False
@@ -144,10 +144,10 @@ isConstantNotClockReset tcm sc e
 -- 'Clash.Rewrite.WorkFree.isWorkFreeClockOrResetOrEnable'. 'Nothing' if the
 -- term is not a clock, reset or enable.
 isWorkFreeClockOrResetOrEnable
-  :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> Term n -> Maybe Bool
-isWorkFreeClockOrResetOrEnable tcm sc e =
-  let eTy = inferCoreTypeOf tcm sc e in
-  if isClockOrReset tcm sc eTy || isEnable tcm sc eTy then
+  :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Maybe Bool
+isWorkFreeClockOrResetOrEnable tenv sc e =
+  let eTy = inferCoreTypeOf tenv sc e in
+  if isClockOrReset tenv sc eTy || isEnable tenv sc eTy then
     case collectArgs e of
       (Prim p, _) -> Just (C.primName p == Text.showt 'removedArg)
       -- Only local variables with a clock type are work-free. A global
@@ -163,9 +163,9 @@ isWorkFreeClockOrResetOrEnable tcm sc e =
 
 -- | A conservative version of 'isWorkFree', which also considers references
 -- to clocks and resets constant, see 'Clash.Rewrite.WorkFree.isWorkFreeIsh'
-isWorkFreeIsh :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> Term n -> Bool
-isWorkFreeIsh tcm sc e =
-  case isWorkFreeClockOrResetOrEnable tcm sc e of
+isWorkFreeIsh :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Bool
+isWorkFreeIsh tenv sc e =
+  case isWorkFreeClockOrResetOrEnable tenv sc e of
     Just b -> b
     Nothing -> case collectArgs e of
       (Data _, args) -> all isWorkFreeIshArg args
@@ -178,5 +178,5 @@ isWorkFreeIsh tcm sc e =
       (Literal _, _) -> True
       _ -> False
  where
-  isWorkFreeIshArg = either (isWorkFreeIsh tcm sc) (const True)
+  isWorkFreeIshArg = either (isWorkFreeIsh tenv sc) (const True)
   isConstantArg = either isConstant (const True)

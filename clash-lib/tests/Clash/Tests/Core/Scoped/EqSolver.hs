@@ -38,6 +38,7 @@ import Clash.Core.Scoped.Subst (substTm)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.DataCon (withDataConPat)
 import Clash.Core.Scoped.Type (mkFunTy)
+import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Test.Clash.Rewrite
   ( addTy, boolTy, eqTy, fTy, intTy, kindedTyVar, localId, maybeTy, nTy
@@ -46,6 +47,9 @@ import Test.Clash.Scoped
 
 tcm :: C.TyConMap
 tcm = testTyConMap
+
+tenv :: TypeEnv
+tenv = testTypeEnv
 
 mTv, n0Tv, xTv :: C.TyVar
 mTv = kindedTyVar C.User "m" 5000 C.typeNatKind
@@ -131,7 +135,7 @@ tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
   [ testGroup "agrees with Clash.Core.EqSolver"
     [ testCase "solveEq" $ forM_ equations $ \eq -> withEquation eq $ \sc set eq' ->
-        map newSol (solveEq tcm sc set eq') @?=
+        map newSol (solveEq tenv sc set eq') @?=
           map oldSol (C.solveEq tcm (C.mkVarSet [mTv]) eq)
     , testCase "solveAdd" $ forM_ equations $ \eq -> withEquation eq $ \_ set eq' ->
         newSol (solveAdd set eq') @?= oldSol (C.solveAdd (C.mkVarSet [mTv]) eq)
@@ -142,30 +146,30 @@ tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
           withFreeTyVarsOf [m, n0, x] $ \env -> case fromClashType env m of
             VarTy _ _ mName ->
               map (newSol . uncurry Solution)
-                (solveNonAbsurds tcm (convScope env) (singletonNameSet mName)
+                (solveNonAbsurds tenv (convScope env) (singletonNameSet mName)
                   [(fromClashType env l, fromClashType env r) | (l, r) <- eqs])
                 @?= map (oldSol . C.Solution) (C.solveNonAbsurds tcm (C.mkVarSet [mTv]) eqs)
             _ -> assertFailure "unexpected conversion"
     , testCase "isAbsurdEq" $ forM_ equations $ \eq -> withEquation eq $ \sc set eq' ->
-        isAbsurdEq tcm sc set eq' @?= C.isAbsurdEq tcm (C.mkVarSet [mTv]) eq
+        isAbsurdEq tenv sc set eq' @?= C.isAbsurdEq tcm (C.mkVarSet [mTv]) eq
     , testCase "typeEq" $
         forM_ [eqTy C.typeNatKind m (lit 1), intTy, nTy intTy] $ \ty ->
           withTypeScopes ty $ \sc ty' ->
-            fmap (\(l, r) -> (toClashType l, toClashType r)) (typeEq tcm sc ty')
+            fmap (\(l, r) -> (toClashType l, toClashType r)) (typeEq tenv sc ty')
               @?= C.typeEq tcm ty
     , testCase "isAbsurdPat" $
         forM_ [vNilDataCon, vConsDataCon] $ \dc -> forM_ vInsts $ \inst ->
           withFreeTyVarsOf [inst] $ \env -> do
             let sc = convScope env
                 names = map fieldName [1 .. fromIntegral (length (C.dcArgTys dc))]
-                r = withDataConPat sc dc [fromClashType env inst] names $
-                      \_ pat _ -> isAbsurdPat tcm sc pat
+                r = withDataConPat testTypeEnv sc dc [fromClashType env inst] names $
+                      \_ pat _ -> isAbsurdPat tenv sc pat
             r @?= Just (C.isAbsurdPat tcm (oldPat dc inst))
     , testCase "dataConInstArgTysE" $
         forM_ [vNilDataCon, vConsDataCon] $ \dc -> forM_ vInsts $ \inst ->
           withFreeTyVarsOf [inst] $ \env -> do
             let old = C.dataConInstArgTysE (C.mkInScopeSet (C.mkVarSet [n0Tv])) tcm dc [inst]
-                new = dataConInstArgTysE tcm (convScope env) dc [fromClashType env inst] $
+                new = dataConInstArgTysE tenv (convScope env) dc [fromClashType env inst] $
                         \sc ext tys -> forAllTele ext (foldr mkFunTy (fromClashTypeClosed sc intTy) tys)
                 oldTy = fmap (\tys -> foldr C.ForAllTy (fieldsTy tys) (C.dcExtTyVars dc)) old
             assertEqual ("instantiated at " <> show inst) oldTy new
@@ -175,8 +179,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
       forM_ [(vNilDataCon, 3, True), (vNilDataCon, 0, False), (vConsDataCon, 0, True), (vConsDataCon, 3, False)] $
         \(dc, i, absurd) -> do
           let names = map fieldName [1 .. fromIntegral (length (C.dcArgTys dc))]
-              r = withDataConPat emptyScope dc [LitTy (C.NumTy i)] names $
-                    \_ pat _ -> isAbsurdPat tcm emptyScope pat
+              r = withDataConPat testTypeEnv emptyScope dc [LitTy (C.NumTy i)] names $
+                    \_ pat _ -> isAbsurdPat tenv emptyScope pat
           assertEqual (show (C.dcName dc) <> " at " <> show i) (Just absurd) r
 
   , testCase "solvePatExistentials substitutes in the pattern and the alternative" $ do
@@ -189,7 +193,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
           tm = C.Case (C.Var sId) intTy [(pat0, C.Var xs)]
       withFreeVarsOf [tm] $ \env -> case fromClashTerm env tm of
         Case _ _ [Alt pat body] ->
-          case solvePatExistentials tcm (convScope env) pat $ \s pat' ->
+          case solvePatExistentials tenv (convScope env) pat $ \s pat' ->
                  (lastFieldTy pat', varTy (substTm s body)) of
             Just (Just xsTy, Just ty) -> do
               assertEqual "field type" (vTy (lit 2)) xsTy
@@ -200,8 +204,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
   , testCase "solvePatExistentials without solutions" $
       withFreeTyVarsOf [n0] $ \env -> do
         let sc = convScope env
-            r = withDataConPat sc vConsDataCon [fromClashType env n0] (map fieldName [1..3]) $
-                  \_ pat _ -> isNothing (solvePatExistentials tcm sc pat (\_ _ -> ()))
+            r = withDataConPat testTypeEnv sc vConsDataCon [fromClashType env n0] (map fieldName [1..3]) $
+                  \_ pat _ -> isNothing (solvePatExistentials tenv sc pat (\_ _ -> ()))
         r @?= Just True
   ]
  where

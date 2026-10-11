@@ -18,6 +18,10 @@
   rename binders (see "Clash.Core.Scoped.TyCon"). Closed types, such as the
   types of globals, are in the empty scope 'emptyScope'.
 
+  Where the functions of "Clash.Core.Type" take a 'Clash.Core.TyCon.TyConMap',
+  these take a t'TypeEnv', which caches the signatures of the type
+  constructors as scoped types (see "Clash.Core.Scoped.TypeEnv").
+
   = Function types
 
   A polymorphic function type binds type variables, which scope over the rest
@@ -120,10 +124,8 @@ import Clash.Annotations.SynthesisAttributes (Attr)
 import Clash.Core.DataCon (DataCon (dcName))
 import Clash.Core.Name (Name (..), NameSort (User))
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.TyCon
-  (TyCon (..), TyConMap, TyConName, tyConDataCons)
+import Clash.Core.TyCon (TyCon (..), TyConName, tyConDataCons)
 import qualified Clash.Core.Type as C
-import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf)
 import Clash.Unique (fromGhcUnique)
 import Clash.Util (clogBase, curLoc)
@@ -136,6 +138,7 @@ import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
+import Clash.Core.Scoped.TypeEnv
 
 -- * Views
 
@@ -183,18 +186,18 @@ tyView tOrig = case tOrig of
 -- 'C.coreView'.
 --
 -- Strips away all layers. If no layers are found it returns the given type.
-coreView :: Distinct n => TyConMap -> Scope n -> Type n -> Type n
-coreView tcm sc ty = case coreView1 tcm sc ty of
+coreView :: Distinct n => TypeEnv -> Scope n -> Type n -> Type n
+coreView tenv sc ty = case coreView1 tenv sc ty of
   Nothing -> ty
-  Just ty' -> coreView tcm sc ty'
+  Just ty' -> coreView tenv sc ty'
 
 -- | A view on types in which newtypes are transparent, the Signal type is
 -- transparent, and type functions are evaluated to WHNF (when possible). See
 -- 'C.coreView1'.
 --
 -- Only strips away one layer.
-coreView1 :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe (Type n)
-coreView1 tcm sc ty = case tyView ty of
+coreView1 :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n)
+coreView1 tenv sc ty = case tyView ty of
   TyConApp tcNm args
     | nameOcc tcNm == "Clash.Signal.BiSignal.BiSignalIn"
     , [_, _, _, elTy] <- args
@@ -206,11 +209,10 @@ coreView1 tcm sc ty = case tyView ty of
     , [_, elTy] <- args
     -> Just elTy
     | otherwise
-    -> let tc = UniqMap.find tcNm tcm in
-       case newTyConSig tc of
+    -> case newTyConSigOf tenv tcNm of
          Just sig -> newTyConInstRhs sc sig args
-         Nothing -> reduceTyConApp tcm sc tcNm args
-  OtherType (AnnType _ ty') -> coreView1 tcm sc ty'
+         Nothing -> reduceTyConApp tenv sc tcNm args
+  OtherType (AnnType _ ty') -> coreView1 tenv sc ty'
   _ -> Nothing
 
 -- | Normalize a type, looking through Signals and newtypes. See
@@ -218,8 +220,8 @@ coreView1 tcm sc ty = case tyView ty of
 --
 -- For example: @Signal a (Vec (6-1) (Unsigned (3+1)))@ normalizes to
 -- @Vec 5 (Unsigned 4)@
-normalizeType :: Distinct n => TyConMap -> Scope n -> Type n -> Type n
-normalizeType tcm = go
+normalizeType :: Distinct n => TypeEnv -> Scope n -> Type n -> Type n
+normalizeType tenv = go
  where
   go :: Distinct x => Scope x -> Type x -> Type x
   go sc ty = case tyView ty of
@@ -233,15 +235,14 @@ normalizeType tcm = go
         nameOcc tcNm == "Clash.Sized.Internal.Unsigned.Unsigned"
       -> mkTyConApp tcNm (map (go sc) args)
       | otherwise
-      -> let tc = UniqMap.find tcNm tcm in
-         case newTyConSig tc of
+      -> case newTyConSigOf tenv tcNm of
            Just sig -> case newTyConInstRhs sc sig args of
              Just ty' -> go sc ty'
              Nothing -> ty
            Nothing ->
              let args' = map (go sc) args
                  ty' = mkTyConApp tcNm args'
-             in case reduceTypeFamily tcm sc ty' of
+             in case reduceTypeFamily tenv sc ty' of
                   Just ty'' -> go sc ty''
                   Nothing -> ty'
     FunTy ty1 ty2 -> mkFunTy (go sc ty1) (go sc ty2)
@@ -354,12 +355,12 @@ data SplitCoreFunForall n where
 --
 -- Gives the scope of the result type: this goes under the quantified type
 -- variables, renaming them if they clash with the scope.
-splitCoreFunForallTy :: Distinct n => TyConMap -> Scope n -> Type n -> SplitCoreFunForall n
-splitCoreFunForallTy tcm sc0 ty0 = go sc0 ty0 ty0
+splitCoreFunForallTy :: Distinct n => TypeEnv -> Scope n -> Type n -> SplitCoreFunForall n
+splitCoreFunForallTy tenv sc0 ty0 = go sc0 ty0 ty0
  where
   go :: Distinct x => Scope x -> Type x -> Type x -> SplitCoreFunForall x
   go sc origTy ty
-    | Just ty' <- coreView1 tcm sc ty = go sc origTy ty'
+    | Just ty' <- coreView1 tenv sc ty = go sc origTy ty'
     | ForAllTy b res <- ty =
         openTyBinder sc b res $ \sc' b' res' -> case go sc' res' res' of
           SplitCoreFunForall scR tele r -> SplitCoreFunForall scR (PiForall b' tele) r
@@ -368,33 +369,33 @@ splitCoreFunForallTy tcm sc0 ty0 = go sc0 ty0 ty0
     | otherwise = SplitCoreFunForall sc PiNil origTy
 
 -- | Split a function type in an argument and result type. See 'C.splitFunTy'.
-splitFunTy :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe (Type n, Type n)
-splitFunTy tcm sc ty
-  | Just ty' <- coreView1 tcm sc ty = splitFunTy tcm sc ty'
+splitFunTy :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n, Type n)
+splitFunTy tenv sc ty
+  | Just ty' <- coreView1 tenv sc ty = splitFunTy tenv sc ty'
   | FunTy arg res <- tyView ty = Just (arg, res)
   | otherwise = Nothing
 
 -- | Split a (monomorphic) function type in its argument types and result type.
 -- See 'C.splitFunTys'.
-splitFunTys :: Distinct n => TyConMap -> Scope n -> Type n -> ([Type n], Type n)
-splitFunTys tcm sc ty0 = go [] ty0 ty0
+splitFunTys :: Distinct n => TypeEnv -> Scope n -> Type n -> ([Type n], Type n)
+splitFunTys tenv sc ty0 = go [] ty0 ty0
  where
   go args origTy ty
-    | Just ty' <- coreView1 tcm sc ty = go args origTy ty'
+    | Just ty' <- coreView1 tenv sc ty = go args origTy ty'
     | FunTy arg res <- tyView ty = go (arg:args) res res
     | otherwise = (reverse args, origTy)
 
 -- | Apply a function type to an argument type and get the result type. See
 -- 'C.applyFunTy'.
-applyFunTy :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> Type n -> Type n -> Type n
-applyFunTy tcm sc ty arg
-  | Just ty' <- coreView1 tcm sc ty = applyFunTy tcm sc ty' arg
+applyFunTy :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Type n -> Type n
+applyFunTy tenv sc ty arg
+  | Just ty' <- coreView1 tenv sc ty = applyFunTy tenv sc ty' arg
   | FunTy _ resTy <- tyView ty = resTy
   | otherwise = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
 -- | Is a type a function type? See 'C.isFunTy'.
-isFunTy :: Distinct n => TyConMap -> Scope n -> Type n -> Bool
-isFunTy tcm sc = isJust . splitFunTy tcm sc
+isFunTy :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
+isFunTy tenv sc = isJust . splitFunTy tenv sc
 
 -- | Is a type polymorphic? See 'C.isPolyTy'.
 isPolyTy :: Type n -> Bool
@@ -412,9 +413,9 @@ isPolyFunTy = \case
 
 -- | Is a type a polymorphic or function type under 'coreView1'? See
 -- 'C.isPolyFunCoreTy'.
-isPolyFunCoreTy :: Distinct n => TyConMap -> Scope n -> Type n -> Bool
-isPolyFunCoreTy tcm sc ty
-  | Just ty' <- coreView1 tcm sc ty = isPolyFunCoreTy tcm sc ty'
+isPolyFunCoreTy :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
+isPolyFunCoreTy tenv sc ty
+  | Just ty' <- coreView1 tenv sc ty = isPolyFunCoreTy tenv sc ty'
   | otherwise = case tyView ty of
       FunTy {} -> True
       OtherType (ForAllTy {}) -> True
@@ -429,31 +430,31 @@ isPolyFunCoreTy tcm sc ty
 -- Unlike 'C.reduceTypeFamily', this does not reduce with an equation whose
 -- right-hand side mentions a pattern variable that its left-hand side doesn't
 -- bind: that would give a type with a free type variable.
-reduceTypeFamily :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe (Type n)
-reduceTypeFamily tcm sc (tyView -> TyConApp tc tys) = reduceTyConApp tcm sc tc tys
+reduceTypeFamily :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n)
+reduceTypeFamily tenv sc (tyView -> TyConApp tc tys) = reduceTyConApp tenv sc tc tys
 reduceTypeFamily _ _ _ = Nothing
 
 -- | 'reduceTypeFamily' of an applied type constructor
 reduceTyConApp
-  :: Distinct n => TyConMap -> Scope n -> TyConName -> [Type n] -> Maybe (Type n)
-reduceTyConApp tcm sc tc tys
+  :: Distinct n => TypeEnv -> Scope n -> TyConName -> [Type n] -> Maybe (Type n)
+reduceTyConApp tenv sc tc tys
   | nameUniq tc == fromGhcUnique typeNatAddTyFamNameKey
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2] -> Just (LitTy (C.NumTy (i1 + i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatMulTyFamNameKey
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2] -> Just (LitTy (C.NumTy (i1 * i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatExpTyFamNameKey
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2] -> Just (LitTy (C.NumTy (i1 ^ i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatSubTyFamNameKey
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | let z = i1 - i2
         , z >= 0
@@ -461,36 +462,36 @@ reduceTyConApp tcm sc tc tys
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2] -> Just (orderingTy (compare i1 i2))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeSymbolCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
-  = case mapMaybe (symLitView tcm sc) tys of
+  = case mapMaybe (symLitView tenv sc) tys of
       [s1, s2] -> Just (orderingTy (compare s1 s2))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeCharCmpTyFamNameKey -- "GHC.TypeNats.CmpChar"
-  = case mapMaybe (charLitView tcm sc) tys of
+  = case mapMaybe (charLitView tenv sc) tys of
       [s1, s2] -> Just (orderingTy (compare s1 s2))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeConsSymbolTyFamNameKey -- ConsSymbol
   , [c0, s0] <- tys
-  , Just c1 <- charLitView tcm sc c0
-  , Just s1 <- symLitView tcm sc s0
+  , Just c1 <- charLitView tenv sc c0
+  , Just s1 <- symLitView tenv sc s0
   = Just (LitTy (C.SymTy (c1:s1)))
 
   | nameUniq tc == fromGhcUnique typeUnconsSymbolTyFamNameKey -- UnconsSymbol
-  , [s1] <- mapMaybe (symLitView tcm sc) tys
+  , [s1] <- mapMaybe (symLitView tenv sc) tys
   = fromMaybe (error "reduceTypeFamily: cannot construct UnconsSymbol result") $ do
-      tcon@FunTyCon {} <- UniqMap.lookup tc tcm
+      FunTyCon {} <- lookupTyCon tenv tc
       TyConApp maybeTcNm [tupTcApp] <-
-        pure (tyView (snd (splitFunTys tcm sc (tyConKindOf sc tcon))))
-      maybeTc <- UniqMap.lookup maybeTcNm tcm
+        pure (tyView (snd (splitFunTys tenv sc (tyConKindOf tenv tc))))
+      maybeTc <- lookupTyCon tenv maybeTcNm
       [nothingTc, justTc] <- pure (map (coerce . dcName) (tyConDataCons maybeTc))
       TyConApp tupTcNm [charTy, symbolTy] <- pure (tyView tupTcApp)
-      tupTc <- UniqMap.lookup tupTcNm tcm
+      tupTc <- lookupTyCon tenv tupTcNm
       [tupDc] <- pure (map (coerce . dcName) (tyConDataCons tupTc))
       case s1 of
         [] ->
@@ -501,20 +502,20 @@ reduceTyConApp tcm sc tc tys
            in pure (Just (mkTyConApp justTc [tupTcApp, tup]))
 
   | nameUniq tc == fromGhcUnique typeCharToNatTyFamNameKey -- CharToNat
-  , [c1] <- mapMaybe (charLitView tcm sc) tys
+  , [c1] <- mapMaybe (charLitView tenv sc) tys
   = Just (LitTy (C.NumTy (fromIntegral (ord c1))))
 
   | nameUniq tc == fromGhcUnique typeNatToCharTyFamNameKey -- NatToChar
-  , [n1] <- mapMaybe (litView tcm sc) tys
+  , [n1] <- mapMaybe (litView tenv sc) tys
   = Just (LitTy (C.CharTy (chr (fromInteger n1))))
 
   | nameUniq tc == fromGhcUnique typeSymbolAppendFamNameKey -- "GHC.TypeLits.AppendSymbol"
-  = case mapMaybe (symLitView tcm sc) tys of
+  = case mapMaybe (symLitView tenv sc) tys of
       [s1, s2] -> Just (LitTy (C.SymTy (s1 ++ s2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.FLog", "GHC.TypeNats.FLog"]
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i1 > 1
         , i2 > 0
@@ -522,14 +523,14 @@ reduceTyConApp tcm sc tc tys
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.CLog", "GHC.TypeNats.CLog"]
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | Just k <- clogBase i1 i2
         -> Just (LitTy (C.NumTy (toInteger k)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Log", "GHC.TypeNats.Log"]
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i1 > 1
         , i2 > 0
@@ -543,48 +544,47 @@ reduceTyConApp tcm sc tc tys
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.GCD", "GHC.TypeNats.GCD"]
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2] -> Just (LitTy (C.NumTy (i1 `gcd` i2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.LCM", "GHC.TypeNats.LCM"]
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2] -> Just (LitTy (C.NumTy (i1 `lcm` i2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Div"]
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (C.NumTy (i1 `div` i2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Mod"]
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (C.NumTy (i1 `mod` i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatDivTyFamNameKey
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (C.NumTy (i1 `div` i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatModTyFamNameKey
-  = case mapMaybe (litView tcm sc) tys of
+  = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
         -> Just (LitTy (C.NumTy (i1 `mod` i2)))
       _ -> Nothing
 
-  | Just tcon@FunTyCon {} <- UniqMap.lookup tc tcm
-  , Just eqns <- tyFamEqns tcon
+  | Just eqns <- tyFamEqnsOf tenv tc
   = let -- See [Note: Eager type families] in "Clash.Core.Type"
-        tysR = map (argView tcm sc) tys
-     in findFunSubst tcm sc eqns tysR
+        tysR = map (argView tenv sc) tys
+     in findFunSubst tenv sc eqns tysR
 
   | otherwise
   = Nothing
@@ -598,19 +598,19 @@ orderingTy o = ConstTy $ C.TyCon $ case o of
 
 -- | The right-hand side of the first equation whose patterns match the given
 -- types. See 'C.findFunSubst'.
-findFunSubst :: Distinct n => TyConMap -> Scope n -> [TyFamEqn] -> [Type n] -> Maybe (Type n)
+findFunSubst :: Distinct n => TypeEnv -> Scope n -> [TyFamEqn] -> [Type n] -> Maybe (Type n)
 findFunSubst _ _ [] _ = Nothing
-findFunSubst tcm sc (eqn:rest) args = case funSubsts tcm sc eqn args of
+findFunSubst tenv sc (eqn:rest) args = case funSubsts tenv sc eqn args of
   Just ty -> Just ty
-  Nothing -> findFunSubst tcm sc rest args
+  Nothing -> findFunSubst tenv sc rest args
 
 -- | If the patterns of an equation match the given types, its right-hand side,
 -- with the matched types substituted for its pattern variables, applied to the
 -- types the patterns don't consume
-funSubsts :: Distinct n => TyConMap -> Scope n -> TyFamEqn -> [Type n] -> Maybe (Type n)
-funSubsts tcm sc (TyFamEqn tvs lhs rhs) args = do
+funSubsts :: Distinct n => TypeEnv -> Scope n -> TyFamEqn -> [Type n] -> Maybe (Type n)
+funSubsts tenv sc (TyFamEqn tvs lhs rhs) args = do
   let (funArgs, remainder) = zipAtLeast lhs args
-  matched <- foldM (\m (p, t) -> funSubst tcm sc m p t) IntMap.empty funArgs
+  matched <- foldM (\m (p, t) -> funSubst tenv sc m p t) IntMap.empty funArgs
   s <- matchedSubst sc tvs matched
   -- Type functions can return higher-kinded types, so don't forget to apply
   -- the arguments not consumed by the type function application. Forgetting
@@ -653,13 +653,13 @@ matchedSubst sc tvs matched = go (closedSubst sc) tvs
 -- binder never matches.
 funSubst
   :: Distinct n
-  => TyConMap
+  => TypeEnv
   -> Scope n
   -> IntMap (Type n)
   -> Type p
   -> Type n
   -> Maybe (IntMap (Type n))
-funSubst tcm sc = go
+funSubst tenv sc = go
  where
   go s pat ty = case (pat, ty) of
     -- AnnType cannot be matched in type families within regular GHC (as they
@@ -681,7 +681,7 @@ funSubst tcm sc = go
     (AppTy p1 r1, AppTy t1 r2) -> do
       s1 <- go s p1 t1
       -- See [Note: Eager type families] in "Clash.Core.Type"
-      go s1 r1 (argView tcm sc r2)
+      go s1 r1 (argView tenv sc r2)
 
     (ConstTy c1, ConstTy c2) | c1 == c2 -> Just s
     (LitTy l1, LitTy l2) | l1 == l2 -> Just s
@@ -689,48 +689,48 @@ funSubst tcm sc = go
 
 -- | Is the type an application of a type family? See
 -- 'C.isTypeFamilyApplication'.
-isTypeFamilyApplication :: TyConMap -> Type n -> Bool
-isTypeFamilyApplication tcm (tyView -> TyConApp tcNm _args)
-  | Just (FunTyCon {}) <- UniqMap.lookup tcNm tcm = True
+isTypeFamilyApplication :: TypeEnv -> Type n -> Bool
+isTypeFamilyApplication tenv (tyView -> TyConApp tcNm _args)
+  | Just (FunTyCon {}) <- lookupTyCon tenv tcNm = True
 isTypeFamilyApplication _ _ = False
 
 -- | Reduce type families at the head of a type, until it no longer reduces
-argView :: Distinct n => TyConMap -> Scope n -> Type n -> Type n
-argView tcm sc t = case reduceTypeFamily tcm sc t of
+argView :: Distinct n => TypeEnv -> Scope n -> Type n -> Type n
+argView tenv sc t = case reduceTypeFamily tenv sc t of
   Nothing -> t
-  Just tR -> argView tcm sc tR
+  Just tR -> argView tenv sc tR
 
 -- * Literal types
 
 -- | The number of a type that reduces to a type-level number
-litView :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe Integer
+litView :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe Integer
 litView _ _ (LitTy (C.NumTy i)) = Just i
-litView tcm sc (reduceTypeFamily tcm sc -> Just ty') = litView tcm sc ty'
+litView tenv sc (reduceTypeFamily tenv sc -> Just ty') = litView tenv sc ty'
 litView _ _ _ = Nothing
 
 -- | The string of a type that reduces to a type-level symbol
-symLitView :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe String
+symLitView :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe String
 symLitView _ _ (LitTy (C.SymTy s)) = Just s
-symLitView tcm sc (reduceTypeFamily tcm sc -> Just ty') = symLitView tcm sc ty'
+symLitView tenv sc (reduceTypeFamily tenv sc -> Just ty') = symLitView tenv sc ty'
 symLitView _ _ _ = Nothing
 
 -- | The character of a type that reduces to a type-level character
-charLitView :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe Char
+charLitView :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe Char
 charLitView _ _ (LitTy (C.CharTy c)) = Just c
-charLitView tcm sc (reduceTypeFamily tcm sc -> Just ty') = charLitView tcm sc ty'
+charLitView tenv sc (reduceTypeFamily tenv sc -> Just ty') = charLitView tenv sc ty'
 charLitView _ _ _ = Nothing
 
 -- | The number a type reduces to under 'coreView1'. See
 -- 'Clash.Core.Util.tyNatSize'.
-tyNatSize :: Distinct n => TyConMap -> Scope n -> Type n -> Except String Integer
-tyNatSize tcm sc (coreView1 tcm sc -> Just ty) = tyNatSize tcm sc ty
+tyNatSize :: Distinct n => TypeEnv -> Scope n -> Type n -> Except String Integer
+tyNatSize tenv sc (coreView1 tenv sc -> Just ty) = tyNatSize tenv sc ty
 tyNatSize _ _ (LitTy (C.NumTy i)) = return i
 tyNatSize _ _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showPpr ty
 
 -- | The string representation of the symbol or number a type reduces to under
 -- 'coreView1'. See 'Clash.Core.Util.tyLitShow'.
-tyLitShow :: Distinct n => TyConMap -> Scope n -> Type n -> Except String String
-tyLitShow tcm sc (coreView1 tcm sc -> Just ty) = tyLitShow tcm sc ty
+tyLitShow :: Distinct n => TypeEnv -> Scope n -> Type n -> Except String String
+tyLitShow tenv sc (coreView1 tenv sc -> Just ty) = tyLitShow tenv sc ty
 tyLitShow _ _ (LitTy (C.SymTy s)) = return s
 tyLitShow _ _ (LitTy (C.NumTy s)) = return (show s)
 tyLitShow _ _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
@@ -738,9 +738,9 @@ tyLitShow _ _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showP
 -- * Predicates
 
 -- | Is the type a class dictionary? See 'C.isClassTy'.
-isClassTy :: TyConMap -> Type n -> Bool
-isClassTy tcm (tyView -> TyConApp tcNm _) =
-  case UniqMap.lookup tcNm tcm of
+isClassTy :: TypeEnv -> Type n -> Bool
+isClassTy tenv (tyView -> TyConApp tcNm _) =
+  case lookupTyCon tenv tcNm of
     Just (AlgTyCon {isClassTc}) -> isClassTc
     _ -> False
 isClassTy _ _ = False
@@ -752,18 +752,18 @@ isIntegerTy _ = False
 
 -- | Determine whether a type is isomorphic to "Clash.Signal.Internal.Signal",
 -- or contains one. See 'Clash.Core.Util.isSignalType'.
-isSignalType :: Distinct n => TyConMap -> Scope n -> Type n -> Bool
-isSignalType tcm sc = go HashSet.empty
+isSignalType :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
+isSignalType tenv sc = go HashSet.empty
  where
   go tcSeen (tyView -> TyConApp tcNm args) = case nameOcc tcNm of
     "Clash.Signal.Internal.Signal" -> True
     "Clash.Signal.BiSignal.BiSignalIn" -> True
     "Clash.Signal.BiSignal.BiSignalOut" -> True
     _ | tcNm `HashSet.member` tcSeen -> False -- Do not follow rec types
-      | otherwise -> case UniqMap.lookup tcNm tcm of
+      | otherwise -> case lookupTyCon tenv tcNm of
           Just tc ->
             let dcs = tyConDataCons tc
-                dcInsArgTys = concat (mapMaybe (\dc -> dataConInstArgTys sc dc args) dcs)
+                dcInsArgTys = concat (mapMaybe (\dc -> dataConInstArgTys tenv sc dc args) dcs)
                 tcSeen' = HashSet.insert tcNm tcSeen
             in any (go tcSeen') dcInsArgTys
           Nothing -> traceIf True ($(curLoc) ++ "isSignalType: " ++ show tcNm
@@ -772,16 +772,16 @@ isSignalType tcm sc = go HashSet.empty
 
 -- | Determines whether a type is (an alias of) an Enable line. See
 -- 'Clash.Core.Util.isEnable'.
-isEnable :: Distinct n => TyConMap -> Scope n -> Type n -> Bool
-isEnable tcm sc ty0
+isEnable :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
+isEnable tenv sc ty0
   | TyConApp (nameOcc -> "Clash.Signal.Internal.Enable") _ <- tyView ty0 = True
-  | Just ty1 <- coreView1 tcm sc ty0 = isEnable tcm sc ty1
+  | Just ty1 <- coreView1 tenv sc ty0 = isEnable tenv sc ty1
   | otherwise = False
 
 -- | Determines whether a type is (an alias of) a Clock or Reset line. See
 -- 'Clash.Core.Util.isClockOrReset'.
-isClockOrReset :: Distinct n => TyConMap -> Scope n -> Type n -> Bool
-isClockOrReset tcm sc (coreView1 tcm sc -> Just ty) = isClockOrReset tcm sc ty
+isClockOrReset :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
+isClockOrReset tenv sc (coreView1 tenv sc -> Just ty) = isClockOrReset tenv sc ty
 isClockOrReset _ _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
   "Clash.Signal.Internal.Clock" -> True
   "Clash.Signal.Internal.ClockN" -> True

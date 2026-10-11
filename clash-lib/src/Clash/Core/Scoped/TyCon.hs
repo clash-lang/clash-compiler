@@ -3,15 +3,17 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Type constructors in scoped Clash Core: the right-hand sides of newtypes and
-  the equations of type families, as scoped types.
+  The signatures of type constructors and data constructors in scoped Clash
+  Core: the right-hand sides of newtypes, the equations of type families, and
+  the types of the fields of data constructors, as scoped types.
 
   = Transition
 
   Scoped types refer to type constructors by name (in a 'C.ConstTy'), and
-  look them up in Clash's 'TyConMap', whose 'TyCon's have closed Clash
-  'C.Type's. Like "Clash.Core.Scoped.DataCon" does for data constructors, this
-  module gives the parts of a 'TyCon' that mention type variables as scoped
+  look them up in Clash's 'Clash.Core.TyCon.TyConMap', whose 'TyCon's have
+  closed Clash 'C.Type's. Scoped terms refer to data constructors with Clash's
+  'DataCon', whose types are closed Clash types too. This module gives the
+  parts of a 'TyCon' and a 'DataCon' that mention type variables as scoped
   types, by converting them:
 
   * The /signature of a newtype/ (t'NewTyConSig'): a telescope of the type
@@ -28,18 +30,21 @@
     the patterns and substituting the matched types for the pattern variables
     (see 'Clash.Core.Scoped.Type.reduceTypeFamily').
 
-  The kind of a type constructor is closed, and converted into any scope by
-  'tyConKindOf'.
+  * The /signature of a data constructor/ (t'DataConSig'): a telescope of its
+    universally quantified type variables, in the empty scope; a telescope of
+    its existentially quantified type variables, in the scope of the universal
+    ones; and the types of its fields, in the scope of both. Instantiating a
+    data constructor is then substituting types for the variables of these
+    telescopes (see "Clash.Core.Scoped.DataCon").
 
-  The conversion is redone for every use. It is cheap, as these types are
-  small, and type family equations are only converted when they are tried; if
-  it shows up in profiles, cache the signatures by 'tyConUniq'.
+  The functions below convert for every call. Use the ones of
+  "Clash.Core.Scoped.TypeEnv", which convert every signature at most once.
 
   = Migration
 
-  Once 'TyCon' stores scoped types (in place of 'ntEtadRhs' and 'tyConSubst'),
-  'newTyConSig' and 'tyFamEqns' become field selectors, and their users keep
-  working.
+  Once 'TyCon' and 'DataCon' store scoped types (in place of 'ntEtadRhs',
+  'tyConSubst', 'dcUnivTyVars', 'dcExtTyVars' and 'dcArgTys'), the functions
+  below become field selectors.
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
@@ -55,14 +60,16 @@ module Clash.Core.Scoped.TyCon
     -- * Type families
   , TyFamEqn (..)
   , tyFamEqns
-    -- * Kinds
-  , tyConKindOf
+    -- * Data constructors
+  , DataConSig (..)
+  , dataConSig
   ) where
 
 import qualified Control.Lens as Lens
 import qualified Data.List as List
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.FreeVars (dependencySortTyVars, typeFreeVars)
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..))
 import qualified Clash.Core.Type as C
@@ -149,8 +156,27 @@ tyFamEqn (lhs, rhs) =
   sameUniq :: C.TyVar -> C.TyVar -> Bool
   sameUniq v1 v2 = C.varUniq v1 == C.varUniq v2
 
--- * Kinds
+-- * Data constructors
 
--- | The kind of a type constructor, in any scope
-tyConKindOf :: (HasCallStack, Distinct n) => Scope n -> TyCon -> Kind n
-tyConKindOf sc tc = fromClashTypeClosed sc (tyConKind tc)
+-- | The signature of a data constructor, see the module header
+data DataConSig where
+  DataConSig
+    :: (DExt 'VoidS u, DExt u e)
+    => Tele TyBinder 'VoidS u
+    -- ^ Universally quantified type variables
+    -> Tele TyBinder u e
+    -- ^ Existentially quantified type variables
+    -> [Type e]
+    -- ^ Types of the fields
+    -> DataConSig
+
+deriving instance Show DataConSig
+
+-- | The signature of a data constructor. Errors if the types of its fields
+-- mention type variables other than its universally and existentially
+-- quantified ones.
+dataConSig :: HasCallStack => DataCon -> DataConSig
+dataConSig dc =
+  fromClashTyVars emptyConvEnv (dcUnivTyVars dc) $ \env1 univ ->
+    fromClashTyVars env1 (dcExtTyVars dc) $ \env2 ext ->
+      DataConSig univ ext (map (fromClashType env2) (dcArgTys dc))

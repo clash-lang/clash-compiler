@@ -32,7 +32,7 @@ import Clash.Rewrite.Scoped.WorkFree
 import Test.Clash.Rewrite
   ( clockTy, globalId, intFunTy, intId, intLit, intTy, localId, mkBindingMap
   , parseToTermQQ, testTyConMap )
-import Test.Clash.Scoped (mkScopedBindingMap, withFreeVarsOf)
+import Test.Clash.Scoped (mkScopedBindingMap, testTypeEnv, withFreeVarsOf)
 
 -- | Global bindings: @lit = 1@, @work = p lit@ with a primitive @p@ that
 -- always does work, and @loop = loop@
@@ -113,13 +113,13 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.WorkFree"
   , testCase "isConstantNotClockReset" $
       assertAgreesOnExamples
         (C.isConstantNotClockReset testTyConMap)
-        (isConstantNotClockReset testTyConMap)
+        (isConstantNotClockReset testTypeEnv)
   , testCase "isWorkFreeClockOrResetOrEnable" $
       assertAgreesOnExamples
         (C.isWorkFreeClockOrResetOrEnable testTyConMap)
-        (isWorkFreeClockOrResetOrEnable testTyConMap)
+        (isWorkFreeClockOrResetOrEnable testTypeEnv)
   , testCase "isWorkFreeIsh" $
-      assertAgreesOnExamples (C.isWorkFreeIsh testTyConMap) (isWorkFreeIsh testTyConMap)
+      assertAgreesOnExamples (C.isWorkFreeIsh testTyConMap) (isWorkFreeIsh testTypeEnv)
   ]
  where
   bindings' = (funG, C.Lam (intId C.User "z" 5) (C.Var (intId C.User "z" 5))) : bindings

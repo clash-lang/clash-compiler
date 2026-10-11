@@ -20,6 +20,7 @@ import qualified Clash.Tests.Core.Scoped.Term
 import qualified Clash.Tests.Core.Scoped.TermInfo
 import qualified Clash.Tests.Core.Scoped.TyCon
 import qualified Clash.Tests.Core.Scoped.Type
+import qualified Clash.Tests.Core.Scoped.TypeEnv
 import qualified Clash.Tests.Core.Scoped.TysPrim
 import qualified Clash.Tests.Core.Scoped.Util
 import qualified Clash.Tests.Core.StructuralEquivalence
@@ -84,6 +85,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Scoped.TermInfo.tests
   , Clash.Tests.Core.Scoped.TyCon.tests
   , Clash.Tests.Core.Scoped.Type.tests
+  , Clash.Tests.Core.Scoped.TypeEnv.tests
   , Clash.Tests.Core.Scoped.TysPrim.tests
   , Clash.Tests.Core.Scoped.Util.tests
   , Clash.Tests.Core.StructuralEquivalence.tests

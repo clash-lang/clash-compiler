@@ -45,7 +45,7 @@ import Test.Clash.Rewrite
   , signalTy, systemDomTy, testTyConMap, tyVar, vecTy )
 import Test.Clash.Scoped
   ( assertAgreesTm, assertScopedAlphaEq, assertScopedTyAlphaEq, extendSunk
-  , sunkVar, withFreeVarsOf )
+  , sunkVar, testTypeEnv, withFreeVarsOf )
 
 -- * Let-bindings
 
@@ -207,19 +207,19 @@ vecTests :: TestTree
 vecTests = testGroup "Vectors and trees"
   [ testCase "mkVec agrees" $ do
       assertBuildsLike (C.mkVec nilDc consDc aTy 2 [el1, el2]) [el1, el2] $ \sc ty es ->
-        mkVec sc nilDc consDc ty 2 es
+        mkVec testTypeEnv sc nilDc consDc ty 2 es
       assertBuildsLike (C.mkVec nilDc consDc aTy 0 []) [] $ \sc ty es ->
-        mkVec sc nilDc consDc ty 0 es
+        mkVec testTypeEnv sc nilDc consDc ty 0 es
 
   , testCase "appendToVec agrees" $
       assertBuildsLike (C.appendToVec consDc aTy vecVar 5 [el1, el2]) [vecVar, el1, el2] $
         \sc ty es -> case es of
-          [v, e1, e2] -> appendToVec sc consDc ty v 5 [e1, e2]
+          [v, e1, e2] -> appendToVec testTypeEnv sc consDc ty v 5 [e1, e2]
           _ -> error "unexpected inputs"
 
   , testCase "mkRTree agrees" $
       assertBuildsLike (C.mkRTree lrDc brDc aTy 2 [el1, el2, el3, el4]) [el1, el2, el3, el4] $
-        \sc ty es -> mkRTree sc lrDc brDc ty 2 es
+        \sc ty es -> mkRTree testTypeEnv sc lrDc brDc ty 2 es
 
   , testCase "extractElems agrees" $ do
       supply <- newSupply
@@ -227,8 +227,8 @@ vecTests = testGroup "Vectors and trees"
           (vars, binds) = unzipElems (snd (C.extractElems supply is0 consDc aTy 'V' 3 vecVar))
           expected = C.Letrec (NE.init binds) (C.mkVec nilDc consDc aTy 3 (NE.toList vars))
       assertBuildsLike expected [vecVar] $ \sc ty es -> case es of
-        [v] -> extractElems sc consDc ty 'V' 3 3 v $ \sc1 bs rhss vs _ ->
-          Let (Rec bs rhss) (mkVec sc1 nilDc consDc (sink ty) 3 vs)
+        [v] -> extractElems testTypeEnv sc consDc ty 'V' 3 3 v $ \sc1 bs rhss vs _ ->
+          Let (Rec bs rhss) (mkVec testTypeEnv sc1 nilDc consDc (sink ty) 3 vs)
         _ -> error "unexpected inputs"
 
   , testCase "extractElems of fewer elements agrees" $ do
@@ -237,14 +237,14 @@ vecTests = testGroup "Vectors and trees"
           (vars, binds) = unzipElems (snd (C.extractElems supply is0 consDc aTy 'V' 3 vecVar))
       -- The head, as 'Clash.Normalize.PrimitiveReductions.reduceHead' makes it
       assertBuildsLike (C.Letrec [NE.head binds] (NE.head vars)) [vecVar] $ \sc ty es -> case es of
-        [v] -> extractElems sc consDc ty 'V' 3 1 v $ \_ bs rhss vs _ ->
+        [v] -> extractElems testTypeEnv sc consDc ty 'V' 3 1 v $ \_ bs rhss vs _ ->
           case vs of
             v1:_ -> Let (Rec bs rhss) v1
             [] -> error "no elements"
         _ -> error "unexpected inputs"
       -- The tail, as the right-hand side of the binder of the tail
       assertBuildsLike (snd (binds NE.!! 1)) [vecVar] $ \sc ty es -> case es of
-        [v] -> extractElems sc consDc ty 'V' 3 1 v $ \_ bs _ _ tl ->
+        [v] -> extractElems testTypeEnv sc consDc ty 'V' 3 1 v $ \_ bs _ _ tl ->
           case unsinkTerm (teleBinders bs) tl of
             Just tl' -> tl'
             Nothing -> error "the tail refers to a binder"
@@ -253,7 +253,7 @@ vecTests = testGroup "Vectors and trees"
   , testCase "extractElems gives fresh binders" $
       withFreeVarsOf [C.Var (localId C.User "dummy" 99 aTy), vecVar] $ \env ->
         extendSunk env [] [] $ \env1 ->
-          extractElems (convScope env1) consDc (sink (fromClashType env aTy)) 'V' 3 3
+          extractElems testTypeEnv (convScope env1) consDc (sink (fromClashType env aTy)) 'V' 3 3
             (sink (fromClashTerm env vecVar)) $ \_ bs rhss _ _ -> do
               assertBool "fresh binders"
                 (all (> fromIntegral (C.varUniq sunkVar)) (teleRawsOf bs))
@@ -266,8 +266,8 @@ vecTests = testGroup "Vectors and trees"
           (vars, binds) = snd (C.extractTElems supply is0 lrDc brDc aTy 'T' 2 treeVar)
           expected = C.Letrec binds (C.mkRTree lrDc brDc aTy 2 vars)
       assertBuildsLike expected [treeVar] $ \sc ty es -> case es of
-        [t] -> extractTElems sc lrDc brDc ty 'T' 2 t $ \sc1 bs rhss vs ->
-          Let (Rec bs rhss) (mkRTree sc1 lrDc brDc (sink ty) 2 vs)
+        [t] -> extractTElems testTypeEnv sc lrDc brDc ty 'T' 2 t $ \sc1 bs rhss vs ->
+          Let (Rec bs rhss) (mkRTree testTypeEnv sc1 lrDc brDc (sink ty) 2 vs)
         _ -> error "unexpected inputs"
   ]
  where
@@ -301,7 +301,7 @@ assertSelectorAgrees subj dcI fieldI = do
   expected <- runTest $
     C.mkSelectorCase "test" (extendInScopeSet (inScopeOf [C.varToId subj]) aTv) testTyConMap subj dcI fieldI
   assertAgreesTm (const expected)
-    (\sc tm -> mkSelectorCase "test" sc testTyConMap tm dcI fieldI)
+    (\sc tm -> mkSelectorCase "test" sc testTypeEnv tm dcI fieldI)
     subj
 
 dataConTests :: TestTree
@@ -320,7 +320,7 @@ dataConTests = testGroup "Data constructors"
   , testCase "mkSelectorCase gives fresh binders" $
       withFreeVarsOf [vecVar] $ \env ->
         extendSunk env [] [] $ \env1 ->
-          case mkSelectorCase "test" (convScope env1) testTyConMap (sink (fromClashTerm env vecVar)) 2 2 of
+          case mkSelectorCase "test" (convScope env1) testTypeEnv (sink (fromClashTerm env vecVar)) 2 2 of
             Case _ _ [Alt (DataPat _ (TCons m TNil) ids) _] ->
               assertBool "fresh binders"
                 (all (> fromIntegral (C.varUniq sunkVar)) (tyNameRaw (tyNameOf m) : idRaws ids))
@@ -328,10 +328,10 @@ dataConTests = testGroup "Data constructors"
 
   , testCase "substArgTys" $ do
       withFreeVarsOf [] $ \env -> do
-        case substArgTys (convScope env) consDc [fromClashType env (numTy 3), fromClashType env intTy] of
+        case substArgTys testTypeEnv (convScope env) consDc [fromClashType env (numTy 3), fromClashType env intTy] of
           Nothing -> pure ()
           Just _ -> assertFailure "the type of a field of Cons mentions an existential"
-        case substArgTys (convScope env) lrDc [fromClashType env (numTy 0), fromClashType env intTy] of
+        case substArgTys testTypeEnv (convScope env) lrDc [fromClashType env (numTy 0), fromClashType env intTy] of
           Just [_, ty] -> assertScopedTyAlphaEq intTy ty
           _ -> assertFailure "unexpected result"
   ]
@@ -353,7 +353,7 @@ typeTests :: TestTree
 typeTests = testGroup "Types"
   [ testCase "splitShouldSplit" $
       withConvEnv [aTv] [] $ \env -> do
-        let res = splitShouldSplit testTyConMap (convScope env) (map (fromClashType env) exampleTypes)
+        let res = splitShouldSplit testTypeEnv (convScope env) (map (fromClashType env) exampleTypes)
             expected = C.splitShouldSplit testTyConMap exampleTypes
         length res @?= length expected
         sequence_ (zipWith assertScopedTyAlphaEq expected res)
@@ -375,7 +375,7 @@ assertShouldSplitAgrees ty = case C.shouldSplit testTyConMap ty of
     projected <- runTest (projections (extendInScopeSet (inScopeOf [C.varToId subj]) aTv) subj)
     withFreeVarsOf (subj : fields) $ \env -> do
       let sc = convScope env
-      case shouldSplit testTyConMap sc (fromClashType env ty) of
+      case shouldSplit testTypeEnv sc (fromClashType env ty) of
         Nothing -> assertFailure "not split"
         Just info -> do
           length (splitArgTys info) @?= length tys

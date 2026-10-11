@@ -41,6 +41,7 @@ import Clash.Core.Scoped.NameMap (nullNameSet)
 import Clash.Core.Scoped.Subst (unsinkType)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type
+import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 
 import Test.Clash.Rewrite
   ( addTy, boolTy, clkPairTy, clockTy, cmpNatTy, enableTy, fTy, intTy, kTy
@@ -50,6 +51,9 @@ import Test.Clash.Scoped
 
 tcm :: C.TyConMap
 tcm = testTyConMap
+
+tenv :: TypeEnv
+tenv = testTypeEnv
 
 xTv, cTv, aTv, bTv :: C.TyVar
 xTv = tyVar C.User "x" 3100
@@ -161,47 +165,47 @@ tests = testGroup "Clash.Tests.Core.Scoped.Type"
   [ testGroup "agrees with Clash.Core.Type"
     [ testCase "tyView" $
         agreesOn corpus C.tyView $ \ty e _ ty' -> assertViewAgrees ty e (tyView ty')
-    , testCase "coreView1" $ agreesMaybeTy (C.coreView1 tcm) (coreView1 tcm)
-    , testCase "coreView" $ agreesTy (C.coreView tcm) (coreView tcm)
-    , testCase "normalizeType" $ agreesTy (C.normalizeType tcm) (normalizeType tcm)
+    , testCase "coreView1" $ agreesMaybeTy (C.coreView1 tcm) (coreView1 tenv)
+    , testCase "coreView" $ agreesTy (C.coreView tcm) (coreView tenv)
+    , testCase "normalizeType" $ agreesTy (C.normalizeType tcm) (normalizeType tenv)
     , testCase "reduceTypeFamily" $
-        agreesMaybeTy (C.reduceTypeFamily tcm) (reduceTypeFamily tcm)
+        agreesMaybeTy (C.reduceTypeFamily tcm) (reduceTypeFamily tenv)
     , testCase "isTypeFamilyApplication" $
-        agreesEq (C.isTypeFamilyApplication tcm) (const (isTypeFamilyApplication tcm))
+        agreesEq (C.isTypeFamilyApplication tcm) (const (isTypeFamilyApplication tenv))
     , testCase "splitTyConAppM" $
         agreesOn corpus C.splitTyConAppM $ \_ e _ ty ->
           assertEqual "split" e (fmap (fmap (map toClashType)) (splitTyConAppM ty))
     , testCase "splitFunTy" $
         agreesOn corpus (C.splitFunTy tcm) $ \_ e sc ty ->
           assertEqual "split" e
-            (fmap (\(t1, t2) -> (toClashType t1, toClashType t2)) (splitFunTy tcm sc ty))
+            (fmap (\(t1, t2) -> (toClashType t1, toClashType t2)) (splitFunTy tenv sc ty))
     , testCase "splitFunTys" $
-        agreesOn corpus (C.splitFunTys tcm) $ \_ e sc ty -> case splitFunTys tcm sc ty of
+        agreesOn corpus (C.splitFunTys tcm) $ \_ e sc ty -> case splitFunTys tenv sc ty of
           (args, res) -> assertEqual "split" e (map toClashType args, toClashType res)
     , testCase "applyFunTy" $
         agreesOn (filter (C.isFunTy tcm) corpus) (\ty -> C.applyFunTy tcm ty intTy) $
-          \_ e sc ty -> assertScopedTyAlphaEq e (applyFunTy tcm sc ty (fromClashTypeClosed sc intTy))
-    , testCase "isFunTy" $ agreesEq (C.isFunTy tcm) (isFunTy tcm)
+          \_ e sc ty -> assertScopedTyAlphaEq e (applyFunTy tenv sc ty (fromClashTypeClosed sc intTy))
+    , testCase "isFunTy" $ agreesEq (C.isFunTy tcm) (isFunTy tenv)
     , testCase "isPolyTy" $ agreesEq C.isPolyTy (const isPolyTy)
     , testCase "isPolyFunTy" $ agreesEq C.isPolyFunTy (const isPolyFunTy)
-    , testCase "isPolyFunCoreTy" $ agreesEq (C.isPolyFunCoreTy tcm) (isPolyFunCoreTy tcm)
+    , testCase "isPolyFunCoreTy" $ agreesEq (C.isPolyFunCoreTy tcm) (isPolyFunCoreTy tenv)
     , testCase "splitFunForallTy" $
         agreesOn corpus C.splitFunForallTy $ \_ e _ ty ->
           case splitFunForallTy ty of SplitFunForall tele res -> assertSplitAgrees e tele res
     , testCase "splitCoreFunForallTy" $
         agreesOn corpus (C.splitCoreFunForallTy tcm) $ \_ e sc ty ->
-          case splitCoreFunForallTy tcm sc ty of
+          case splitCoreFunForallTy tenv sc ty of
             SplitCoreFunForall _ tele res -> assertSplitAgrees e tele res
     , testCase "tyNatSize" $
         agreesEq (eitherToMaybe . runExcept . C.tyNatSize tcm)
-          (\sc -> eitherToMaybe . runExcept . tyNatSize tcm sc)
+          (\sc -> eitherToMaybe . runExcept . tyNatSize tenv sc)
     , testCase "tyLitShow" $
         agreesEq (eitherToMaybe . runExcept . C.tyLitShow tcm)
-          (\sc -> eitherToMaybe . runExcept . tyLitShow tcm sc)
-    , testCase "isSignalType" $ agreesEq (C.isSignalType tcm) (isSignalType tcm)
-    , testCase "isEnable" $ agreesEq (C.isEnable tcm) (isEnable tcm)
-    , testCase "isClockOrReset" $ agreesEq (C.isClockOrReset tcm) (isClockOrReset tcm)
-    , testCase "isClassTy" $ agreesEq (C.isClassTy tcm) (const (isClassTy tcm))
+          (\sc -> eitherToMaybe . runExcept . tyLitShow tenv sc)
+    , testCase "isSignalType" $ agreesEq (C.isSignalType tcm) (isSignalType tenv)
+    , testCase "isEnable" $ agreesEq (C.isEnable tcm) (isEnable tenv)
+    , testCase "isClockOrReset" $ agreesEq (C.isClockOrReset tcm) (isClockOrReset tenv)
+    , testCase "isClassTy" $ agreesEq (C.isClassTy tcm) (const (isClassTy tenv))
     , testCase "isIntegerTy" $ agreesEq C.isIntegerTy (const isIntegerTy)
     , testCase "typeAttrs" $ agreesEq C.typeAttrs (const typeAttrs)
     , testCase "stripAnnTypes" $ agreesTy C.stripAnnTypes (const stripAnnTypes)
@@ -210,11 +214,11 @@ tests = testGroup "Clash.Tests.Core.Scoped.Type"
 
   , testCase "tyNatSize of a type family application" $
       withTypeScopes (addTy (lit 3) (lit 4)) $ \sc ty ->
-        runExcept (tyNatSize tcm sc ty) @?= Right 7
+        runExcept (tyNatSize tenv sc ty) @?= Right 7
 
   , testCase "tyNatSize fails on a type that is not a number" $
       withTypeScopes (maybeTy intTy) $ \sc ty ->
-        assertBool "fails" (isLeft (runExcept (tyNatSize tcm sc ty)))
+        assertBool "fails" (isLeft (runExcept (tyNatSize tenv sc ty)))
 
     -- A newtype whose representation type binds a type variable, applied to a
     -- type variable with the same raw name as that binder
@@ -222,54 +226,54 @@ tests = testGroup "Clash.Tests.Core.Scoped.Type"
       withTypeScopes (pTy c) $ \sc ty ->
         assertScopedMaybeTyAlphaEq
           (Just (C.ForAllTy bTv (C.mkFunTy c (C.VarTy bTv))))
-          (coreView1 tcm sc ty)
+          (coreView1 tenv sc ty)
 
     -- The same for a type family whose right-hand side binds a type variable
   , testCase "reduceTypeFamily renames binders that would capture" $
       withTypeScopes (qTy c) $ \sc ty ->
         assertScopedMaybeTyAlphaEq
           (Just (C.ForAllTy bTv (C.mkFunTy c (C.VarTy bTv))))
-          (reduceTypeFamily tcm sc ty)
+          (reduceTypeFamily tenv sc ty)
 
   , testCase "reduceTypeFamily of builtin type families" $
       forM_ [addTy (lit 3) (lit 4), cmpNatTy (lit 1) (lit 2), unconsSymbolTy (sym "ab")] $ \ty0 ->
         withTypeScopes ty0 $ \sc ty ->
-          assertBool ("reduces: " <> show ty0) (isJust (reduceTypeFamily tcm sc ty))
+          assertBool ("reduces: " <> show ty0) (isJust (reduceTypeFamily tenv sc ty))
 
   , testCase "reduceTypeFamily matches repeated pattern variables" $ do
       withTypeScopes (maxTy x x) $ \sc ty ->
-        assertScopedMaybeTyAlphaEq (Just x) (reduceTypeFamily tcm sc ty)
+        assertScopedMaybeTyAlphaEq (Just x) (reduceTypeFamily tenv sc ty)
       withTypeScopes (maxTy x intTy) $ \sc ty ->
-        assertScopedMaybeTyAlphaEq (Just (maybeTy intTy)) (reduceTypeFamily tcm sc ty)
+        assertScopedMaybeTyAlphaEq (Just (maybeTy intTy)) (reduceTypeFamily tenv sc ty)
 
   , testCase "reduceTypeFamily applies the remaining arguments" $
       withTypeScopes (C.AppTy kTy intTy) $ \sc ty ->
-        assertScopedMaybeTyAlphaEq (Just (maybeTy intTy)) (reduceTypeFamily tcm sc ty)
+        assertScopedMaybeTyAlphaEq (Just (maybeTy intTy)) (reduceTypeFamily tenv sc ty)
 
   , testCase "reduceTypeFamily reduces the arguments" $
       withTypeScopes (fTy (fTy intTy)) $ \sc ty ->
         -- F (F Int) = F Bool = N Bool
-        assertScopedMaybeTyAlphaEq (Just (nTy boolTy)) (reduceTypeFamily tcm sc ty)
+        assertScopedMaybeTyAlphaEq (Just (nTy boolTy)) (reduceTypeFamily tenv sc ty)
 
     -- Unlike Clash.Core.Type, an equation whose right-hand side mentions a
     -- pattern variable that its left-hand side doesn't bind doesn't reduce
   , testCase "reduceTypeFamily of an equation with an unbound pattern variable" $ do
       let uTc = mkFunTyCon (mkTyConName "U" 3105) (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
                   [([intTy], C.VarTy xTv)]
-          tcm' = UniqMap.insert (C.tyConName uTc) uTc tcm
+          tenv' = mkTypeEnv (UniqMap.insert (C.tyConName uTc) uTc tcm)
           uInt = C.mkTyConApp (C.tyConName uTc) [intTy]
       withTypeScopes uInt $ \sc ty ->
-        assertScopedMaybeTyAlphaEq Nothing (reduceTypeFamily tcm' sc ty)
+        assertScopedMaybeTyAlphaEq Nothing (reduceTypeFamily tenv' sc ty)
 
   , testCase "splitCoreFunForallTy gives the scope of the result type" $
       withTypeScopes (C.ForAllTy aTv (C.mkFunTy (C.VarTy aTv) (signalTy dom (nTy (C.VarTy aTv))))) $
-        \sc ty -> case splitCoreFunForallTy tcm sc ty of
+        \sc ty -> case splitCoreFunForallTy tenv sc ty of
           SplitCoreFunForall sc' (PiForall a (PiArg _ PiNil)) res -> do
             let a' = C.VarTy (toClashTyBinder a)
             -- The result type keeps the Signal, and looks through it in its
             -- scope
             assertScopedTyAlphaEq (signalTy dom (nTy a')) res
-            assertScopedTyAlphaEq (maybeTy a') (coreView tcm sc' res)
+            assertScopedTyAlphaEq (maybeTy a') (coreView tenv sc' res)
           _ -> assertFailure "unexpected split"
 
   , testCase "piTele arities" $
