@@ -480,7 +480,9 @@ collapseRHSNoopsWorker _ letrec letBind body = do
       Monad.guard $ i <= length args - 1
       return $ args !! i
 
-    isNoop (Var i) = do
+    -- Only global binders can be no-ops: a local variable can have the same
+    -- unique as a global binder, see #405.
+    isNoop (Var i) | isGlobalId i = do
       binding     <- MaybeT $ lookupVarEnv i <$> Lens.use bindings
       isRecursive <- lift $ isRecursiveBndr $ bindingId binding
       Monad.guard $ not isRecursive
