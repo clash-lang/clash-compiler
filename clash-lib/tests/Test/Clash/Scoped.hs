@@ -35,6 +35,7 @@ module Test.Clash.Scoped
   , withTermScopes
     -- * Assertions
   , assertScopedAlphaEq
+  , assertAgreesTm
   , assertScopedTyAlphaEq
   , assertScopedMaybeTyAlphaEq
   , nameSetRaws
@@ -169,6 +170,20 @@ extendSunk env tvs ids = extendConvEnv env tvs (sunkVar : ids)
 -- Clash term
 assertScopedAlphaEq :: HasCallStack => C.Term -> Term n -> Assertion
 assertScopedAlphaEq expected actual = assertAlphaEq expected (toClashTerm actual)
+
+-- | Assert that a function on scoped terms agrees with one on Clash terms:
+-- applied to a Clash term converted to scoped Core, in the scope of its free
+-- variables, and converted back, it gives a term alpha-equivalent to the one
+-- the function on Clash terms gives.
+assertAgreesTm
+  :: HasCallStack
+  => (C.Term -> C.Term)
+  -> (forall n. Distinct n => Scope n -> Term n -> Term n)
+  -> C.Term
+  -> Assertion
+assertAgreesTm f g tm =
+  withFreeVarsOf [tm] $ \env ->
+    assertScopedAlphaEq (f tm) (g (convScope env) (fromClashTerm env tm))
 
 -- | Assert that a scoped type, converted to Clash, is alpha-equivalent to a
 -- Clash type

@@ -66,6 +66,7 @@ import Clash.Core.Scoped.NameMap (tyBinderNameBinders)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Core.Scoped.TyCon (tyConKindOf)
 import Clash.Core.Scoped.Type
 import Clash.Core.Scoped.TysPrim
@@ -169,16 +170,6 @@ inferTypeSubst tcm = go
   goApp s e = case collectArgs e of
     (fun, args) ->
       applyTypeToArgsWith e tcm (substScope s) (go s fun) (map (fmap (substTy s)) args)
-
--- | The function a term applies, and its arguments. Looks through ticks.
-collectArgs :: Term n -> (Term n, [Either (Term n) (Type n)])
-collectArgs = go []
- where
-  go args = \case
-    App e1 e2 -> go (Left e2:args) e1
-    TyApp e t -> go (Right t:args) e
-    Tick _ e -> go args e
-    e -> (e, args)
 
 -- | The result type of a function, given its type and its arguments. See
 -- 'C.applyTypeToArgs'.
