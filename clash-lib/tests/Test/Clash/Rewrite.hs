@@ -194,6 +194,22 @@ runRewriteTest rwEnv rwState m = do
   (a, rwState1, anyChanged) <- runR m rwEnv rwState
   pure (a, rwState1, getAny anyChanged)
 
+-- | Assert that a rewrite fires on a term, i.e. signals a change, or that it
+-- doesn't
+assertFires
+  :: HasCallStack
+  => Bool
+  -- ^ Whether it should fire
+  -> RewriteEnv
+  -> RewriteState extra
+  -> TransformContext
+  -> Rewrite extra
+  -> C.Term
+  -> Assertion
+assertFires expected rwEnv rwState ctx rw tm = do
+  (_, _, fired) <- runRewriteTest rwEnv rwState (rw ctx tm)
+  assertEqual "fired" expected fired
+
 -- | The default 'RewriteEnv', with the given debug options instead of
 -- 'debugSilent'
 rewriteEnvWithDebug :: DebugOpts -> RewriteEnv
