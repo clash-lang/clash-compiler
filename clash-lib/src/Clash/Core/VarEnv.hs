@@ -73,6 +73,7 @@ module Clash.Core.VarEnv
   , extendInScopeSet
   , extendInScopeSetList
   , unionInScope
+  , restrictInScopeSet
     -- ** Working with predicates
     -- *** Searching
   , elemInScopeSet
@@ -421,6 +422,17 @@ unionInScope
   -> InScopeSet
 unionInScope (InScopeSet s1 _) (InScopeSet s2 n2)
   = InScopeSet (s1 `unionVarSet` s2) n2
+
+-- | Keep the variables of the set whose uniques are in the given set. Keeps
+-- the variables of the in-scope set (see 'lookupInScope') and the 'Seed', so
+-- that 'uniqAway' tries the same uniques for a variable that is in the set.
+-- Costs a lookup per variable of the given set.
+restrictInScopeSet
+  :: VarSet
+  -> InScopeSet
+  -> InScopeSet
+restrictInScopeSet vs (InScopeSet s n) =
+  InScopeSet (UniqMap.fromList [(u, v) | u <- UniqMap.keys vs, Just v <- [UniqMap.lookup u s]]) n
 
 -- | Is the set of variables in scope
 varSetInScope
