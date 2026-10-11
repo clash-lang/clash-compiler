@@ -1,0 +1,315 @@
+{-|
+  Copyright   :  (C) 2021-2026, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  The types of scoped Clash Core terms, and the kinds of their types. Ports of
+  "Clash.Core.HasType".
+
+  Local variables carry their type ('Var', and 'idBinderType'), and so do
+  case-expressions and casts. Globals, data constructors and primitives have
+  closed Clash types, which 'globalIdType', 'dataConType' and 'primInfoType'
+  convert into the scope they're used in.
+
+  = Inferring types under binders
+
+  'inferCoreTypeOf' goes under the binders of a term, e.g. into the body of a
+  lambda, to infer its type. It doesn't rename the term to do so. Binders that
+  don't clash with the scope are used as they are (like 'openIdBinder' does).
+  Below a binder that does clash, it only renames the binders, and
+  substitutes the types it gives back. So inferring the type of a term whose
+  binders clash with the scope, e.g. one that was sunk into it, doesn't copy
+  the term.
+-}
+
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+module Clash.Core.Scoped.HasType
+  ( -- * Types of terms
+    literalType
+  , primInfoType
+  , globalIdType
+  , inferCoreTypeOf
+  , applyTypeToArgs
+  , piResultTy
+  , piResultTys
+    -- * Kinds of types
+  , inferCoreKindOf
+  ) where
+
+import Data.Maybe (fromMaybe)
+import GHC.Stack (HasCallStack)
+
+import qualified Clash.Core.HasType as C
+import Clash.Core.Literal (Literal (..))
+import Clash.Core.Pretty (showPpr)
+import Clash.Core.Term (PrimInfo)
+import Clash.Core.TyCon (TyConMap)
+import qualified Clash.Core.Type as C
+import qualified Clash.Core.Var as C
+import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Debug (debugIsOn)
+import Clash.Util (curLoc)
+import qualified Clash.Util.Interpolate as I
+
+import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Scoped.Convert (fromClashTypeClosed)
+import Clash.Core.Scoped.DataCon (dataConType)
+import Clash.Core.Scoped.NameMap (tyBinderNameBinders)
+import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Scoped.Subst
+import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.TyCon (tyConKindOf)
+import Clash.Core.Scoped.Type
+import Clash.Core.Scoped.TysPrim
+
+-- * Types of terms
+
+-- | The type of a literal, in any scope
+literalType :: Literal -> Type n
+literalType = \case
+  IntegerLiteral _ -> integerPrimTy
+  IntLiteral _ -> intPrimTy
+  WordLiteral _ -> wordPrimTy
+  StringLiteral _ -> stringPrimTy
+  FloatLiteral _ -> floatPrimTy
+  DoubleLiteral _ -> doublePrimTy
+  CharLiteral _ -> charPrimTy
+  Int64Literal _ -> int64PrimTy
+  Word64Literal _ -> word64PrimTy
+  Int8Literal _ -> int8PrimTy
+  Int16Literal _ -> int16PrimTy
+  Int32Literal _ -> int32PrimTy
+  Word8Literal _ -> word8PrimTy
+  Word16Literal _ -> word16PrimTy
+  Word32Literal _ -> word32PrimTy
+  NaturalLiteral _ -> naturalPrimTy
+  ByteArrayLiteral _ -> byteArrayPrimTy
+
+-- | The type of a primitive, in any scope. The type of a multi-result
+-- primitive returns its results as separate arguments, see Note [MultiResult
+-- type] in "Clash.Normalize.Transformations.MultiPrim".
+primInfoType :: (HasCallStack, Distinct n) => Scope n -> PrimInfo -> Type n
+primInfoType sc p = fromClashTypeClosed sc (C.coreTypeOf p)
+
+-- | The type of a global variable, in any scope
+globalIdType :: (HasCallStack, Distinct n) => Scope n -> GlobalId -> Type n
+globalIdType sc g = fromClashTypeClosed sc (C.varType (globalIdVar g))
+
+-- | The type of a term. See 'C.inferCoreTypeOf', and the module header.
+inferCoreTypeOf :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> Term n -> Type n
+inferCoreTypeOf = inferTypeOpen
+
+-- | Goes under binders that don't clash with the scope as they are. At a
+-- binder that does, continues with 'inferTypeSubst'.
+inferTypeOpen :: Distinct n => TyConMap -> Scope n -> Term n -> Type n
+inferTypeOpen tcm sc tm = case tm of
+  Lam b e -> openIdBinder sc b (Opened False e) $ \sc' b' (Opened renamed e') ->
+    if renamed then inferTypeSubst tcm (idSubst sc) tm else
+    mkFunTy (idBinderType b') (strengthenTyId b' (inferTypeOpen tcm sc' e'))
+  TyLam b e -> openTyBinder sc b (Opened False e) $ \sc' b' (Opened renamed e') ->
+    if renamed then inferTypeSubst tcm (idSubst sc) tm else
+    ForAllTy b' (inferTypeOpen tcm sc' e')
+  App {} -> inferTypeOpenApp tcm sc tm
+  TyApp {} -> inferTypeOpenApp tcm sc tm
+  Let bs e -> openBind sc bs (Opened False e) $ \sc' bs' (Opened renamed e') ->
+    if renamed then inferTypeSubst tcm (idSubst sc) tm else
+    case bs' of
+      NonRec b _ -> strengthenTyId b (inferTypeOpen tcm sc' e')
+      Rec bndrs _ -> strengthenTyIds bndrs (inferTypeOpen tcm sc' e')
+  Tick _ e -> inferTypeOpen tcm sc e
+  _ -> inferTypeSubst tcm (idSubst sc) tm
+
+inferTypeOpenApp :: Distinct n => TyConMap -> Scope n -> Term n -> Type n
+inferTypeOpenApp tcm sc tm = case collectArgs tm of
+  (fun, args) -> applyTypeToArgsWith tm tcm sc (inferTypeOpen tcm sc fun) args
+
+-- | A term under a binder, and whether going under the binder renamed it. See
+-- 'inferCoreTypeOf'. The term is lazy, so that it isn't renamed unless it is
+-- used.
+data Opened (n :: S) = Opened Bool (Term n)
+
+instance HasSubst Opened where
+  subst s (Opened _ e) = Opened True (subst s e)
+
+-- | The type of a term in scope @i@, substituted into scope @o@. Goes under
+-- binders by renaming only the binders, see the module header.
+inferTypeSubst :: (HasCallStack, Distinct o) => TyConMap -> Subst i o -> Term i -> Type o
+inferTypeSubst tcm = go
+ where
+  go :: Distinct y => Subst x y -> Term x -> Type y
+  go s = \case
+    Var _ ty _ -> substTy s ty
+    GlobalVar g -> globalIdType (substScope s) g
+    Data dc -> dataConType (substScope s) dc
+    Literal l -> literalType l
+    Prim p -> primInfoType (substScope s) p
+    Lam b e -> substIdBinder s b $ \s' b' ->
+      mkFunTy (idBinderType b') (strengthenTyId b' (go s' e))
+    TyLam b e -> substTyBinder s b $ \s' b' ->
+      ForAllTy b' (go s' e)
+    e@App {} -> goApp s e
+    e@TyApp {} -> goApp s e
+    Let (NonRec b _) e -> substIdBinder s b $ \s' b' ->
+      strengthenTyId b' (go s' e)
+    Let (Rec bs _) e -> substTele substIdBinder s bs $ \s' bs' ->
+      strengthenTyIds bs' (go s' e)
+    Case _ ty _ -> substTy s ty
+    Cast _ _ ty -> substTy s ty
+    Tick _ e -> go s e
+
+  goApp :: Distinct y => Subst x y -> Term x -> Type y
+  goApp s e = case collectArgs e of
+    (fun, args) ->
+      applyTypeToArgsWith e tcm (substScope s) (go s fun) (map (fmap (substTy s)) args)
+
+-- | The function a term applies, and its arguments. Looks through ticks.
+collectArgs :: Term n -> (Term n, [Either (Term n) (Type n)])
+collectArgs = go []
+ where
+  go args = \case
+    App e1 e2 -> go (Left e2:args) e1
+    TyApp e t -> go (Right t:args) e
+    Tick _ e -> go args e
+    e -> (e, args)
+
+-- | The result type of a function, given its type and its arguments. See
+-- 'C.applyTypeToArgs'.
+applyTypeToArgs
+  :: (HasCallStack, Distinct n)
+  => Term n
+  -- ^ The complete term, used for error messages
+  -> TyConMap
+  -> Scope n
+  -> Type n
+  -> [Either (Term n) (Type n)]
+  -> Type n
+applyTypeToArgs = applyTypeToArgsWith
+
+-- | 'applyTypeToArgs', where the terms are only used for error messages, and
+-- may be in another scope
+applyTypeToArgsWith
+  :: (HasCallStack, Distinct n)
+  => Term x
+  -> TyConMap
+  -> Scope n
+  -> Type n
+  -> [Either (Term x) (Type n)]
+  -> Type n
+applyTypeToArgsWith e tcm sc = go
+ where
+  go opTy [] = opTy
+  go opTy (Right ty:args) = goTyArgs opTy [ty] args
+  go opTy (Left a:args) = case splitFunTy tcm sc opTy of
+    Just (_, resTy) -> go resTy args
+    _ -> error [I.i|
+        Unexpected application. The term
+
+          #{showPpr e}
+
+        applied an argument
+
+          #{showPpr a}
+
+        to something with the non-function type
+
+          #{showPpr opTy}
+      |]
+
+  goTyArgs opTy revTys (Right ty:args) = goTyArgs opTy (ty:revTys) args
+  goTyArgs opTy revTys args = go (piResultTys tcm sc opTy (reverse revTys)) args
+
+-- | Like 'piResultTys', but only applies a single type. See 'C.piResultTy'.
+piResultTy :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> Type n -> Type n -> Type n
+piResultTy tcm sc ty arg = piResultTys tcm sc ty [arg]
+
+-- | @(piResultTys f_ty [ty1, ..., tyn])@ gives the type of @(f ty1 .. tyn)@
+-- where @f :: f_ty@. See 'C.piResultTys'.
+--
+-- The function type may have more or fewer foralls than there are arguments:
+-- e.g. @piResultTys (forall a. a) [forall b. b -> b, Int]@ is @Int -> Int@.
+--
+-- When there are no foralls, this simply drops arrows from a function type or
+-- kind.
+piResultTys
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => TyConMap
+  -> Scope n
+  -> Type n
+  -> [Type n]
+  -> Type n
+piResultTys _ _ ty [] = ty
+piResultTys tcm sc ty origArgs@(arg:args)
+  | Just ty' <- coreView1 tcm sc ty
+  = piResultTys tcm sc ty' origArgs
+  | FunTy a res <- tyView ty
+  -- See 'C.piResultTys' for why this uses 'coreView'
+  = if debugIsOn && not (aeqTy (coreView tcm sc a) (coreView tcm sc arg)) then error [I.i|
+      Unexpected application. A function with type:
+
+        #{showPpr ty}
+
+      Got applied to an argument of type:
+
+        #{showPpr arg}
+    |]
+    else
+      piResultTys tcm sc res args
+  | ForAllTy b res <- ty
+  = go (extendTySubst (idSubst sc) b arg) res args
+  | otherwise
+  = error ($(curLoc) ++ "piResultTys1: " ++ showPpr ty ++ "\n" ++ showPpr origArgs)
+ where
+  -- Substitutes for the foralls in one go
+  go :: Subst i n -> Type i -> [Type n] -> Type n
+  go s ty' [] = substTy s ty'
+  go s ty' allArgs@(arg':args')
+    | ForAllTy b res <- ty'
+    = go (extendTySubst s b arg') res args'
+    | FunTy _ res <- tyView ty'
+    = go s res args'
+    -- Look through the type, or deal with (piResultTys (forall a.a) [forall
+    -- b.b, Int]), after substituting: the type is not in the scope of the
+    -- arguments
+    | otherwise
+    = let ty'' = substTy s ty' in
+      case coreView1 tcm sc ty'' of
+        Just ty3 -> go (idSubst sc) ty3 allArgs
+        Nothing -> piResultTys tcm sc ty'' allArgs
+
+-- * Kinds of types
+
+-- | The kind of a type. See 'C.inferCoreKindOf'.
+inferCoreKindOf :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> Type n -> Kind n
+inferCoreKindOf tcm sc ty = case tyView ty of
+  FunTy {} ->
+    liftedTypeKind
+
+  TyConApp tc args ->
+    piResultTys tcm sc (tyConKindOf sc (UniqMap.find tc tcm)) args
+
+  OtherType {} ->
+    case ty of
+      ConstTy c -> error $ $(curLoc) ++ "inferCoreKindOf: naked ConstTy: " ++ show c
+      VarTy _ k _ -> k
+      ForAllTy b a -> openTyBinder sc b a $ \sc' b' a' ->
+        fromMaybe
+          (error $ $(curLoc) ++ "inferCoreKindOf: kind mentions the type variable: "
+                     ++ showPpr ty)
+          (unsinkType (tyBinderNameBinders b') (inferCoreKindOf tcm sc' a'))
+      LitTy C.NumTy {} -> typeNatKind
+      LitTy C.SymTy {} -> typeSymbolKind
+      LitTy C.CharTy {} -> charPrimTy
+      AnnType _ a -> inferCoreKindOf tcm sc a
+      AppTy a b -> goApp a [b]
+ where
+  goApp (AppTy c d) args = goApp c (d : args)
+  goApp c args = piResultTys tcm sc (inferCoreKindOf tcm sc c) args

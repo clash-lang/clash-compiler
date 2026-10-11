@@ -11,6 +11,7 @@ import qualified Clash.Tests.Core.Scoped.Alpha
 import qualified Clash.Tests.Core.Scoped.Convert
 import qualified Clash.Tests.Core.Scoped.DataCon
 import qualified Clash.Tests.Core.Scoped.FreeVars
+import qualified Clash.Tests.Core.Scoped.HasType
 import qualified Clash.Tests.Core.Scoped.NameMap
 import qualified Clash.Tests.Core.Scoped.Scope
 import qualified Clash.Tests.Core.Scoped.Subst
@@ -64,6 +65,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Scoped.Convert.tests
   , Clash.Tests.Core.Scoped.DataCon.tests
   , Clash.Tests.Core.Scoped.FreeVars.tests
+  , Clash.Tests.Core.Scoped.HasType.tests
   , Clash.Tests.Core.Scoped.NameMap.tests
   , Clash.Tests.Core.Scoped.Scope.tests
   , Clash.Tests.Core.Scoped.Subst.tests
