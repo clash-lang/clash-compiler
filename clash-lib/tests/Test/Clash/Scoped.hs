@@ -65,6 +65,8 @@ module Test.Clash.Scoped
   , runScopedClosed
   , runViaFoil
   , somePrim
+    -- * Evaluating
+  , scopedWhnf
   ) where
 
 import qualified Control.Lens as Lens
@@ -106,10 +108,12 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import Clash.Rewrite.Scoped (ScopedRewrite, rootContext, runScopedTransform)
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
+import Clash.Core.Scoped.Evaluator.Types (Env, Machine (..), initMachine)
 import Clash.Rewrite.Types
   (RewriteEnv, RewriteState (..), TransformContext)
 
-import Clash.Driver.Types (Binding)
+import Clash.Driver.Types (Binding, BindingMap)
 
 import Test.Clash.Rewrite
   (assertAlphaEq, intId, mkBinding, runRewriteTest, testTyConMap)
@@ -828,3 +832,14 @@ somePrim = C.PrimInfo
   , C.primMultiResult = C.SingleResult
   , C.primUnfolding = C.NoUnfolding
   }
+
+-- * Evaluating
+
+-- | Evaluate a Clash term to WHNF with the evaluator of scoped Clash Core, in
+-- the scope of its free variables, with the given environment and global
+-- bindings. Gives the result, bound by the bindings the evaluator allocated,
+-- as Clash Core: its free variables keep their uniques.
+scopedWhnf :: Env -> BindingMap -> Bool -> C.Term -> C.Term
+scopedWhnf env bm isSubj t = withFreeVarsOf [t] $ \cenv ->
+  let m0 = initMachine (convScope cenv) emptyNameMap bm (IntMap.empty, 0) (fromClashTerm cenv t)
+  in whnf env isSubj m0 $ \m -> toClashTerm (bindAllocated m (mTerm m))

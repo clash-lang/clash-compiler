@@ -220,6 +220,9 @@ Library
                       Clash.Core.Scoped.Convert
                       Clash.Core.Scoped.DataCon
                       Clash.Core.Scoped.EqSolver
+                      Clash.Core.Scoped.Evaluator
+                      Clash.Core.Scoped.Evaluator.Primitives
+                      Clash.Core.Scoped.Evaluator.Types
                       Clash.Core.Scoped.FreeVars
                       Clash.Core.Scoped.HasType
                       Clash.Core.Scoped.Internal.Names
@@ -467,6 +470,7 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.Convert
                  Clash.Tests.Core.Scoped.DataCon
                  Clash.Tests.Core.Scoped.EqSolver
+                 Clash.Tests.Core.Scoped.Evaluator
                  Clash.Tests.Core.Scoped.FreeVars
                  Clash.Tests.Core.Scoped.HasType
                  Clash.Tests.Core.Scoped.NameMap
