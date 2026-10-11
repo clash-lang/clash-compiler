@@ -77,6 +77,10 @@ primitives =
         -- to make `&&` lazy in both arguments
         , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
         , mach2@Machine{mStack=[],mTerm=rArgWHNF} <- whnf eval tcm True (setTerm (valToTerm rArg) $ stackClear mach1)
+        -- Continue in the machine that evaluated the arguments: their WHNFs can
+        -- refer to heap bindings made there, and the unique supply of 'mach'
+        -- would hand out the uniques of those bindings again.
+        , let reduce2 = reduceWith mach2 { mStack = mStack mach }
         -> case [ lArgWHNF, rArgWHNF ] of
              [ Data lCon, Data rCon ] ->
                Just $ mach2
@@ -85,12 +89,12 @@ primitives =
                  }
 
              [ Data lCon, _ ]
-               | isTrueDC lCon -> reduce rArgWHNF
-               | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
+               | isTrueDC lCon -> reduce2 rArgWHNF
+               | otherwise     -> reduce2 (boolToBoolLiteral tcm ty False)
 
              [ _, Data rCon ]
-               | isTrueDC rCon -> reduce lArgWHNF
-               | otherwise     -> reduce (boolToBoolLiteral tcm ty False)
+               | isTrueDC rCon -> reduce2 lArgWHNF
+               | otherwise     -> reduce2 (boolToBoolLiteral tcm ty False)
 
              _ -> Nothing
       _ -> Nothing
@@ -103,6 +107,10 @@ primitives =
         -- to make `||` lazy in both arguments
         , mach1@Machine{mStack=[],mTerm=lArgWHNF} <- whnf eval tcm True (setTerm (valToTerm lArg) $ stackClear mach)
         , mach2@Machine{mStack=[],mTerm=rArgWHNF} <- whnf eval tcm True (setTerm (valToTerm rArg) $ stackClear mach1)
+        -- Continue in the machine that evaluated the arguments: their WHNFs can
+        -- refer to heap bindings made there, and the unique supply of 'mach'
+        -- would hand out the uniques of those bindings again.
+        , let reduce2 = reduceWith mach2 { mStack = mStack mach }
         -> case [ lArgWHNF, rArgWHNF ] of
              [ Data lCon, Data rCon ] ->
                Just $ mach2
@@ -111,12 +119,12 @@ primitives =
                  }
 
              [ Data lCon, _ ]
-               | isFalseDC lCon -> reduce rArgWHNF
-               | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
+               | isFalseDC lCon -> reduce2 rArgWHNF
+               | otherwise      -> reduce2 (boolToBoolLiteral tcm ty True)
 
              [ _, Data rCon ]
-               | isFalseDC rCon -> reduce lArgWHNF
-               | otherwise      -> reduce (boolToBoolLiteral tcm ty True)
+               | isFalseDC rCon -> reduce2 lArgWHNF
+               | otherwise      -> reduce2 (boolToBoolLiteral tcm ty True)
 
              _ -> Nothing
       _ -> Nothing
