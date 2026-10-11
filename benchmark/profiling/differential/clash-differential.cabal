@@ -17,8 +17,11 @@ executable clash-differential
   -- The harness itself is shared with clash-lib's unit tests
   hs-source-dirs:      ., ../../../clash-lib/tests
   other-modules:       Comparisons
+                       Current
                        Demo
+                       Registry
                        Test.Clash.Differential
+                       Test.Clash.Differential.Sites
                        WhnfReplay
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wcompat -rtsopts "-with-rtsopts=-A64m"
@@ -27,8 +30,10 @@ executable clash-differential
                        bytestring,
                        containers,
                        deepseq,
+                       directory,
                        lens,
                        mtl,
+                       process,
                        text,
                        unordered-containers,
 

@@ -498,6 +498,7 @@ test-suite unittests
                  Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Core.Util
                  Clash.Tests.Differential
+                 Clash.Tests.Differential.Sites
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist
                  Clash.Tests.Netlist.Id
@@ -537,6 +538,7 @@ test-suite unittests
                  Clash.Tests.Warning
 
                  Test.Clash.Differential
+                 Test.Clash.Differential.Sites
                  Test.Clash.Rewrite
                  Test.Clash.Scoped
                  Test.Clash.Scoped.Gen

@@ -6,9 +6,12 @@
   Runs a comparison of "Comparisons" on serialized designs: the inputs of
   normalization (@*.bin@, see @clash-profile-normalization-prepare@), or of
   netlist generation, i.e. normalized bindings (@*.net.bin@, see
-  @clash-profile-netlist-prepare@). See README.md.
+  @clash-profile-netlist-prepare@). Or runs a comparison at the sites
+  captured while normalizing designs (@*.corpus@, see
+  "Clash.Rewrite.Capture"). See README.md.
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Main (main) where
@@ -17,14 +20,20 @@ import Control.Monad (forM, forM_, unless, when)
 import Data.Binary (decode)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import Data.Maybe (isNothing)
+import Data.Text (Text)
 import qualified Data.Text as Text
+import System.Directory (getFileSize)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitWith, ExitCode (..))
 import System.IO (hFlush, hPutStrLn, stderr, stdout)
+import System.Process (StdStream (CreatePipe), createProcess, proc, std_out)
 import Text.Read (readMaybe)
 
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Scoped.TypeEnv (addGlobalTypes, mkTypeEnv)
+import Clash.Core.TermInfo (termSizeSmallerThan)
 import Clash.Core.Var (varName)
 import Clash.Core.VarEnv (mapMaybeVarEnv, mkVarSet)
 import Clash.Driver.Types
@@ -32,15 +41,19 @@ import Clash.Driver.Types
 -- For the orphan 'Binary' instance of 'TopEntityT'
 import Clash.Driver.Manifest ()
 import Clash.Netlist.Types (TopEntityT (topId))
+import Clash.Rewrite.Capture
 import Clash.Rewrite.Types (RewriteEnv (..))
 
 import Clash.GHC.Evaluator (evaluator)
 import Clash.GHC.NetlistTypes (ghcTypeToHWType)
 
-import SerialiseInstances (NetlistInputs, NormalizationInputs, unremoveBBfunc)
+import SerialiseInstances
+  (NetlistInputs, NormalizationInputs, decodeCorpus, unremoveBBfunc)
 
-import Comparisons (comparisons)
+import Comparisons (comparisons, siteComparisons)
+import Registry (currentRewrites, lookupCurrent)
 import Test.Clash.Differential
+import Test.Clash.Differential.Sites
 import WhnfReplay (whnfReplay)
 
 data Options = Options
@@ -48,14 +61,20 @@ data Options = Options
   , optLines :: Int
   , optWidth :: Int
   , optBinding :: Maybe String
+  , optTimeout :: Int
+  -- ^ Seconds
+  , optTransformation :: Maybe String
   }
 
 defOptions :: Options
-defOptions = Options 3 30 200 Nothing
+defOptions = Options 3 30 200 Nothing 20 Nothing
 
 usage :: String
 usage = unlines
   [ "Usage: clash-differential [OPTIONS] COMPARISON FILE..."
+  , "       clash-differential --sites [OPTIONS] COMPARISON CORPUS..."
+  , "       clash-differential --replay [OPTIONS] CORPUS..."
+  , "       clash-differential --corpus-stats CORPUS..."
   , "       clash-differential --list"
   , "       clash-differential whnf [--reps N] [--show N] [--top N] [--call N] DESIGN.bin DUMP..."
   , ""
@@ -63,11 +82,22 @@ usage = unlines
   , "are *.bin files written by clash-profile-normalization-prepare, or"
   , "*.net.bin files written by clash-profile-netlist-prepare."
   , ""
+  , "With --sites, runs a site comparison at the sites at which its"
+  , "transformation fired while normalizing the designs, captured in the"
+  , "*.corpus files that clash-profile-normalization-run writes when"
+  , "CLASH_CAPTURE_REWRITES is set. With --replay, reruns every captured"
+  , "transformation at its sites, and reports where it doesn't reproduce the"
+  , "captured result. With --corpus-stats, counts the captures."
+  , ""
   , "Options:"
   , "  --show N        print the first N differences per design (default 3)"
   , "  --lines N       print at most N lines of a term (default 30)"
   , "  --width N       print at most N characters of a line (default 200)"
-  , "  --binding NAME  only compare the bindings whose name contains NAME"
+  , "  --binding NAME  only compare the bindings whose name contains NAME;"
+  , "                  for sites: the sites in such bindings"
+  , "  --timeout S     sites: give up on a side after S seconds (default 20)"
+  , "  --transformation NAME"
+  , "                  --replay: only replay this transformation"
   , ""
   , "The whnf command replays the whnfRW calls in DUMP with the evaluators of"
   , "Clash Core and of scoped Clash Core, with the global bindings of"
@@ -84,9 +114,25 @@ main = getArgs >>= \case
       (bm, tcm, _, _, _, _, _, _) <- decode <$> B.readFile design :: IO NormalizationInputs
       forM_ dumps (whnfReplay reps nShow nTop only tcm bm)
     _ -> die usage
-  ["--list"] -> forM_ comparisons $ \(Comparison nm desc _ _ kds) -> do
-    putStrLn (nm <> ": " <> desc)
-    forM_ kds $ \kd -> putStrLn ("  known difference " <> kdName kd <> ": " <> kdDescription kd)
+  ["--list"] -> do
+    putStrLn "Comparisons on bindings:"
+    forM_ comparisons $ \(Comparison nm desc _ _ kds) -> do
+      putStrLn ("  " <> nm <> ": " <> desc)
+      forM_ kds $ \kd -> putStrLn ("    known difference " <> kdName kd <> ": " <> kdDescription kd)
+    putStrLn "Comparisons at captured sites (--sites):"
+    forM_ siteComparisons $ \sc -> do
+      putStrLn ("  " <> scName sc <> ": " <> scDescription sc)
+      forM_ (scKnownDifferences sc) $ \kd ->
+        putStrLn ("    known difference " <> kdName kd <> ": " <> kdDescription kd)
+  "--sites" : args -> case parseArgs defOptions args of
+    Just (opts, nm : files@(_:_)) -> case List.find ((== nm) . scName) siteComparisons of
+      Just sc -> runSites opts sc files
+      Nothing -> die ("Unknown site comparison: " <> nm <> ", see --list")
+    _ -> die usage
+  "--replay" : args -> case parseArgs defOptions args of
+    Just (opts, files@(_:_)) -> runReplay opts files
+    _ -> die usage
+  "--corpus-stats" : files@(_:_) -> corpusStats files
   args -> case parseArgs defOptions args of
     Just (opts, nm : files@(_:_)) -> case List.find (\c -> name c == nm) comparisons of
       Just cmp -> run opts cmp files
@@ -94,7 +140,9 @@ main = getArgs >>= \case
     _ -> die usage
  where
   name (Comparison nm _ _ _ _) = nm
-  die msg = hPutStrLn stderr msg >> exitWith (ExitFailure 2)
+
+die :: String -> IO a
+die msg = hPutStrLn stderr msg >> exitWith (ExitFailure 2)
 
 -- | The options of the whnf command, and the other arguments
 data WhnfOptions = WhnfOptions
@@ -123,6 +171,8 @@ parseArgs opts = \case
   "--lines" : n : rest -> readMaybe n >>= \k -> parseArgs opts {optLines = k} rest
   "--width" : n : rest -> readMaybe n >>= \k -> parseArgs opts {optWidth = k} rest
   "--binding" : nm : rest -> parseArgs opts {optBinding = Just nm} rest
+  "--timeout" : n : rest -> readMaybe n >>= \k -> parseArgs opts {optTimeout = k} rest
+  "--transformation" : nm : rest -> parseArgs opts {optTransformation = Just nm} rest
   a : rest
     | "--" `List.isPrefixOf` a -> Nothing
     | otherwise -> fmap (a :) <$> parseArgs opts rest
@@ -176,3 +226,147 @@ loadDesign opts f = do
                    then Just b else Nothing)
           bindings
   mkDesign env selected
+
+-- * Captured sites
+
+-- | Load the captures of a design: the corpus, how often every
+-- transformation fired, and the captures, which are decoded as they are
+-- consumed
+loadCorpus :: FilePath -> IO (Corpus, CaptureLog)
+loadCorpus f = do
+  bytes <-
+    if ".zst" `List.isSuffixOf` f
+      then do
+        (_, Just h, _, _) <- createProcess (proc "zstd" ["-q", "-d", "-c", f]) {std_out = CreatePipe}
+        B.hGetContents h
+      else B.readFile f
+  let ((bm, tcm, tupTcm, primMap, reprs, _, _, domains), cl) = decodeCorpus bytes
+      fs = clFinal cl
+      clashEnv = ClashEnv
+        { envOpts = applyCaptureOpts (fsOpts fs) defClashOpts
+        , envTyConMap = tcm
+        , envTupleTyCons = tupTcm
+        , envPrimitives = fmap (fmap unremoveBBfunc) primMap
+        , envCustomReprs = reprs
+        , envDomains = domains
+        }
+      env = RewriteEnv
+        { _clashEnv = clashEnv
+        , _typeTranslator = ghcTypeToHWType (opt_intWidth (envOpts clashEnv))
+        , _evaluator = evaluator
+        , _topEntities = mkVarSet (fsTopEntities fs)
+        , _scopedTypeEnv = addGlobalTypes (fmap bindingId bm) (mkTypeEnv tcm)
+        }
+  c <- mkCorpus env fs (clBindingEpochs cl)
+  pure (c, cl)
+
+-- | Whether a site is in a binding selected with --binding
+inBinding :: Options -> Capture -> Bool
+inBinding opts cap = case optBinding opts of
+  Nothing -> True
+  Just nm -> Text.pack nm `Text.isInfixOf` nameOcc (varName (fst (capCurFun cap)))
+
+runSites :: Options -> SiteComparison -> [FilePath] -> IO ()
+runSites opts sc files = do
+  summaries <- forM files $ \f -> do
+    (c, cl) <- loadCorpus f
+    s <- compareCorpus (optTimeout opts * 1000000) (optShow opts) (inBinding opts) sc c (clCaptures cl)
+    forM_ (ssMismatches s) $ \(cap, m) ->
+      putStr (renderSite (optLines opts) (optWidth opts) cap m)
+    putStrLn (renderSiteSummary f s)
+    hFlush stdout
+    pure s
+  when (length files > 1) $
+    putStrLn (renderSiteSummary "total" (mconcat summaries))
+  unless (all ok summaries) exitFailure
+ where
+  ok s = ssNotReproduced s == 0 && ssNotFired s == 0 && sumDifferent (ssScoped s) == 0
+
+-- | Rerun every captured transformation at its sites, in one pass over the
+-- captures of every corpus
+runReplay :: Options -> [FilePath] -> IO ()
+runReplay opts files = do
+  results <- forM files $ \f -> do
+    (c, cl) <- loadCorpus f
+    let selected cap = inBinding opts cap
+          && maybe True ((== capName cap) . Text.pack) (optTransformation opts)
+        go !acc [] = pure acc
+        go !acc (cap : caps)
+          | not (selected cap) = go acc caps
+          | otherwise = case lookupCurrent (capName cap) of
+              Nothing -> go (Map.insertWith (\_ old -> old) (capName cap) Nothing acc) caps
+              Just (rw, kds) -> do
+                let sc = SiteComparison
+                      { scName = Text.unpack (capName cap)
+                      , scDescription = ""
+                      , scTransformations = [capName cap]
+                      , scCurrent = rw
+                      , scScoped = Nothing
+                      , scKnownDifferences = kds
+                      }
+                o <- compareSite (optTimeout opts * 1000000) sc c cap
+                let s0 = maybe mempty id (Map.findWithDefault Nothing (capName cap) acc)
+                    s1 = addOutcome (optShow opts) cap o s0
+                go (Map.insert (capName cap) (Just s1) acc) caps
+    rs <- go Map.empty (clCaptures cl)
+    forM_ (Map.toList rs) $ \case
+      (nm, Nothing) ->
+        putStrLn (f <> ": " <> Text.unpack nm <> ": not in Registry.currentRewrites, not replayed")
+      (nm, Just s) -> do
+        forM_ (reverse (ssMismatches s)) $ \(cap, m) ->
+          putStr (renderSite (optLines opts) (optWidth opts) cap m)
+        putStrLn (renderSiteSummary (f <> ": " <> Text.unpack nm) s)
+    hFlush stdout
+    pure (Map.mapMaybe id rs)
+  putStrLn "\nPer transformation, over all corpora:"
+  let total = Map.unionsWith (<>) [Map.map (\s -> s {ssMismatches = []}) r | r <- results]
+  forM_ (Map.toList total) $ \(nm, s) ->
+    putStrLn (renderSiteSummary (Text.unpack nm) s)
+  unless (all (\s -> ssNotReproduced s == 0 && ssNotFired s == 0) total) exitFailure
+
+-- | Statistics of the captures of a transformation in a corpus
+data Stats = Stats
+  { stFired :: !Word
+  , stCaptured :: !Int
+  , stLarge :: !Int
+  -- ^ Captures of large sites, see 'Clash.Rewrite.Capture.largeSite'
+  , stDesigns :: !Int
+  }
+
+instance Semigroup Stats where
+  Stats a b c d <> Stats a' b' c' d' = Stats (a + a') (b + b') (c + c') (d + d')
+
+-- | Count the captures of corpora, per transformation
+corpusStats :: [FilePath] -> IO ()
+corpusStats files = do
+  perFile <- forM files $ \f -> do
+    (_, CaptureLog _ firings _ caps) <- loadCorpus f
+    size <- getFileSize f
+    let large cap = not (termSizeSmallerThan largeSite (capInput cap)
+                         && termSizeSmallerThan largeSite (capOutput cap))
+        step m cap =
+          Map.insertWith (<>) (capName cap) (Stats 0 1 (if large cap then 1 else 0) 0) m
+        captured = List.foldl' step Map.empty caps
+    putStrLn (f <> ": " <> show (sum (map stCaptured (Map.elems captured))) <> " captures of "
+              <> show (Map.size captured) <> " transformations, "
+              <> mib size <> " on disk")
+    pure (Map.unionWith (<>)
+            (Map.fromList [(nm, Stats n 0 0 1) | (nm, n) <- firings])
+            captured)
+  let total = Map.unionsWith (<>) perFile
+      known = concat [nms | (nms, _, _) <- currentRewrites]
+      missing = filter (`Map.notMember` total) known
+      unknown = filter (isNothing . lookupCurrent) (Map.keys total)
+  putStrLn "\ntransformation: fired, captured (of which large), designs"
+  forM_ (Map.toList total) $ \(nm, st) ->
+    putStrLn ("  " <> Text.unpack nm <> ": " <> show (stFired st) <> ", " <> show (stCaptured st)
+              <> " (" <> show (stLarge st) <> "), " <> show (stDesigns st))
+  unless (null missing) $
+    putStrLn ("\nNever captured: " <> List.intercalate ", " (map Text.unpack missing))
+  unless (null unknown) $
+    putStrLn ("Captured, but not in Registry.currentRewrites: "
+              <> List.intercalate ", " (map Text.unpack (unknown :: [Text])))
+
+-- | A number of bytes, in MiB
+mib :: Integral a => a -> String
+mib n = show (fromIntegral (round (fromIntegral n / (1024 * 1024 / 10 :: Double)) :: Int) / 10 :: Double) <> " MiB"
