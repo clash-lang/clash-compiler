@@ -234,6 +234,7 @@ Library
                       Clash.Core.Scoped.Evaluator.Primitives.Data.Singletons.TypeLits.Internal
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Float
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Int
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Float
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Real
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Magic
@@ -244,6 +245,8 @@ Library
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.PrimopWrappers
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Real
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Types
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Word
                       Clash.Core.Scoped.Evaluator.Primitives.Util
                       Clash.Core.Scoped.Evaluator.Types
                       Clash.Core.Scoped.FreeVars
