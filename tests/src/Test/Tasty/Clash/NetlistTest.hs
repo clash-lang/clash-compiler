@@ -31,7 +31,6 @@ import           Clash.Core.VarEnv
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
 
-import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
@@ -84,7 +83,6 @@ runToNetlistStage target f src = do
   transformedBindings <-
     normalizeEntity env (designBindings design)
       (ghcTypeToHWType (opt_intWidth opts))
-      ghcEvaluator
       evaluator
       teNames supplyN te
 

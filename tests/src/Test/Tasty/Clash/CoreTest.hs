@@ -7,26 +7,17 @@
 module Test.Tasty.Clash.CoreTest
   ( TargetToState
   , runToCoreStage
-  , findBinding
   ) where
-
-import qualified Data.List as List (find)
 
 import Clash.Annotations.Primitive (HDL(..))
 import Clash.Backend
 import Clash.Backend.SystemVerilog
 import Clash.Backend.Verilog
 import Clash.Backend.VHDL
-import Clash.Core.PartialEval
-import Clash.Core.Name
-import Clash.Core.Term
-import Clash.Core.Var
-import Clash.Core.VarEnv
 import Clash.Driver.Types
 import Clash.Util.Supply
 
 import Clash.GHC.GenerateBindings
-import Clash.GHC.PartialEval
 
 import Test.Tasty.Clash
 
@@ -67,17 +58,3 @@ runToCoreStage _target f src = do
  where
   opts = f mkClashOpts
   backend = initBackend @(TargetToState target) opts
-
-findBinding
-  :: OccName
-  -> (ClashEnv, ClashDesign, Supply)
-  -> IO Term
-findBinding nm (envTyConMap -> tcm, designBindings -> bm, ids) =
-  case List.find byName (eltsVarEnv bm) of
-    Just bd ->
-      let env = mkGlobalEnv bm tcm emptyInScopeSet ids 20 mempty 0
-       in fst <$> nf ghcEvaluator env False (bindingId bd) (bindingTerm bd)
-
-    Nothing -> error ("Not in binding map: " <> show nm)
- where
-  byName b = nm == nameOcc (varName $ bindingId b)

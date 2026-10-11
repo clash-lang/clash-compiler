@@ -104,7 +104,6 @@ instance Default RewriteEnv where
         , envDomains = HashMap.empty
         }
     , _typeTranslator=testTypeTranslator
-    , _peEvaluator=error "_peEvaluator: NYI"
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
     , _scopedTypeEnv=mkTypeEnv UniqMap.empty

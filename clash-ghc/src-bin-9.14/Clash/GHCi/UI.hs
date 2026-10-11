@@ -190,7 +190,6 @@ import           Clash.Driver.Types (ClashOpts(..), ClashEnv(..), ClashDesign(..
 import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
-import           Clash.GHC.PartialEval
 import           Clash.GHCi.Common
 import           Clash.GHCi.Leak
 import           Clash.GHCi.UI.Print
@@ -2689,7 +2688,6 @@ makeHDL Proxy startAction optsRef srcs = do
                   clashDesign
                   (Just backend)
                   (ghcTypeToHWType iw)
-                  ghcEvaluator
                   evaluator
                   mainTopEntity
                   startTime

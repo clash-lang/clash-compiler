@@ -12,7 +12,6 @@ import Clash.Backend.VHDL (VHDLState)
 import Clash.Driver
 import Clash.Driver.Types (ClashEnv(..), ClashOpts(..))
 
-import Clash.GHC.PartialEval
 import Clash.GHC.Evaluator
 import Clash.GHC.NetlistTypes (ghcTypeToHWType)
 
@@ -42,4 +41,4 @@ benchFile idirs src =
             (nfIO (generateHDL clashEnv clashDesign
                      (Just (initBackend @VHDLState (envOpts clashEnv)))
                      (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
-                     ghcEvaluator evaluator Nothing startTime))
+                     evaluator Nothing startTime))

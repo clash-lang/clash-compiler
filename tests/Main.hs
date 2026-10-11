@@ -1230,13 +1230,6 @@ runClashTest = defaultMain
         , clashLibTest "OneDefinedDefaultPat" def
         , clashLibTest "ManyDefined" def
         ]
---    , clashTestGroup "PartialEvaluation"
---      [ clashLibTest "EtaExpansion" def
---      , clashLibTest "KnownCase" def
---      , clashLibTest "CaseOfCase" def
---      , clashLibTest "LazyEvaluation" def
---      , clashLibTest "MutualRecursion" def
---      ]
       ] -- end shouldwork
     ] -- end tests
   ] -- end .

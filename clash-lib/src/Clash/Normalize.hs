@@ -52,7 +52,6 @@ import           Clash.Core.FreeVars
   (freeLocalIds, globalIds)
 import           Clash.Core.HasFreeVars           (notElemFreeVars)
 import           Clash.Core.HasType
-import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
@@ -105,10 +104,8 @@ runNormalization
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
-  -> PE.Evaluator
-  -- ^ Hardcoded evaluator for partial evaluation
   -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF (old evaluator)
+  -- ^ Hardcoded evaluator for WHNF
   -> VarEnv Bool
   -- ^ Map telling whether a components is part of a recursive group
   -> [Id]
@@ -116,14 +113,13 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> IO a
-runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
+runNormalization env supply globals typeTrans eval rcsMap topEnts =
   runRewriteSession rwEnv rwState
   where
     -- TODO The RewriteEnv should just take ClashOpts.
     rwEnv     = RewriteEnv
                   env
                   typeTrans
-                  peEval
                   eval
                   (mkVarSet topEnts)
                   (addGlobalTypes (fmap bindingId globals) (mkTypeEnv (envTyConMap env)))

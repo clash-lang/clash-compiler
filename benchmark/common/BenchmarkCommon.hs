@@ -11,7 +11,6 @@ import Clash.Driver.Types
 import Clash.Netlist.Types (TopEntityT(topId))
 import Clash.Util.Supply as Supply
 
-import Clash.GHC.PartialEval
 import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
@@ -63,7 +62,6 @@ runNormalisationStage idirs src = do
       transformedBindings <-
             normalizeEntity env (designBindings design)
               (ghcTypeToHWType (opt_intWidth (opts idirs)))
-              ghcEvaluator
               evaluator
               topEntityNames supplyN topEntity
       return (env, design{designBindings=transformedBindings},topEntity)

@@ -215,10 +215,6 @@ Library
                       Clash.Core.Lint
                       Clash.Core.Literal
                       Clash.Core.Name
-                      Clash.Core.PartialEval
-                      Clash.Core.PartialEval.AsTerm
-                      Clash.Core.PartialEval.Monad
-                      Clash.Core.PartialEval.NormalForm
                       Clash.Core.Pretty
                       Clash.Core.Scoped.Alpha
                       Clash.Core.Scoped.Convert

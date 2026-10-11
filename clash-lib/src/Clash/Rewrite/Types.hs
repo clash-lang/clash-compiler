@@ -39,7 +39,6 @@ import Data.Monoid                           (Any)
 import Data.Text                             (Text)
 import GHC.Generics
 
-import Clash.Core.PartialEval as PE          (Evaluator)
 import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
@@ -117,10 +116,8 @@ data RewriteEnv
                     -> Type
                     -> State HWMap (Maybe (Either String FilteredHWType))
   -- ^ Hardcode Type -> FilteredHWType translator
-  , _peEvaluator    :: PE.Evaluator
-  -- ^ Hardcoded evaluator for partial evaluation
   , _evaluator      :: WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF (old evaluator)
+  -- ^ Hardcoded evaluator for WHNF
   , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
   , _scopedTypeEnv  :: TypeEnv
