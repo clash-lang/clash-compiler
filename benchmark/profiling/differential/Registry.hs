@@ -76,16 +76,15 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["nonRepSpec"], $(asRewriteQ Current.nonRepSpec), [])
     , (["typeSpec"], $(asRewriteQ Current.typeSpec), [])
     , (["zeroWidthSpec"], $(asRewriteQ Current.zeroWidthSpec), [])
+    , (["caseCast"], $(asRewriteQ Current.caseCast), [])
+    , (["elimCastCast"], $(asRewriteQ Current.elimCastCast), [])
+    , (["letCast"], $(asRewriteQ Current.letCast), [])
+    , (["splitCastWork"], $(asRewriteQ Current.splitCastWork), [])
     ]
 
   unported =
-    -- Cast
-    [ (["caseCast"], $(asRewriteQ caseCast))
-    , (["elimCastCast"], $(asRewriteQ elimCastCast))
-    , (["letCast"], $(asRewriteQ letCast))
-    , (["splitCastWork"], $(asRewriteQ splitCastWork))
     -- Others
-    , (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
+    [ (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
     , (["xOptimize"], $(asRewriteQ xOptimize))
     , (["separateArguments"], $(asRewriteQ separateArguments))
     , (["etaExpandSyn"], $(asRewriteQ etaExpandSyn))
