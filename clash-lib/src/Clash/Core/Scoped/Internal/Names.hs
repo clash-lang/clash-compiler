@@ -55,6 +55,9 @@
     constructors are not exported. The functions that build sets and maps take
     the names of their sort and scope, except for the ones above.
     'emptyNameBinders' and 'snocNameBinders' only add names of binders.
+    'appendNameBinders' takes the union of the names bound between scopes
+    @n@ and @i@, and between @i@ and @l@, which are the names bound between
+    @n@ and @l@.
 -}
 
 {-# LANGUAGE MonoLocalBinds #-}
@@ -119,6 +122,7 @@ module Clash.Core.Scoped.Internal.Names
   , NameBinders
   , emptyNameBinders
   , snocNameBinders
+  , appendNameBinders
   , nameBindersRaw
   ) where
 
@@ -431,6 +435,12 @@ emptyNameBinders = UnsafeNameBinders IntSet.empty
 snocNameBinders :: NameBinders n i -> NameBinder i l -> NameBinders n l
 snocNameBinders (UnsafeNameBinders bs) b = UnsafeNameBinders (IntSet.insert (nameId (nameOf b)) bs)
 {-# INLINE snocNameBinders #-}
+
+-- | The names bound between scopes @n@ and @i@, and between @i@ and @l@
+appendNameBinders :: NameBinders n i -> NameBinders i l -> NameBinders n l
+appendNameBinders (UnsafeNameBinders bs1) (UnsafeNameBinders bs2) =
+  UnsafeNameBinders (IntSet.union bs1 bs2)
+{-# INLINE appendNameBinders #-}
 
 -- | The raw names of the binders
 nameBindersRaw :: NameBinders n l -> IntSet

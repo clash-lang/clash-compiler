@@ -76,11 +76,12 @@
     including the types of variable occurrences and the kinds of type variable
     occurrences.
 
-  * __Strengthening__ ('unsafeCoerce' in 'strengthenTyId' and
-    'strengthenTyIds'): a type only mentions type variables. A term variable
-    binder binds no type variable, and the type variables in scope @l@ are
-    those of @n@, so a type in @l@ is a type in @n@. This relies on binders
-    being sorted, see "Clash.Core.Scoped.Internal.Names".
+  * __Strengthening__ ('unsafeCoerce' in 'strengthenTyId',
+    'strengthenTyIds' and 'teleIdBinderTypes'): a type only mentions type
+    variables. A term variable binder binds no type variable, and the type
+    variables in scope @l@ are those of @n@, so a type in @l@ is a type in
+    @n@. This relies on binders being sorted, see
+    "Clash.Core.Scoped.Internal.Names".
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -130,6 +131,7 @@ module Clash.Core.Scoped.Subst
   , strengthenTyId
   , strengthenTyIds
   , strengthenTyPat
+  , teleIdBinderTypes
   ) where
 
 import qualified Data.IntMap.Strict as IntMap
@@ -641,3 +643,15 @@ strengthenTyPat p ty = case p of
   DataPat {} -> unsinkType (patNameBinders p) ty
   LitPat _ -> Just ty
   DefaultPat -> Just ty
+
+-- | The types of the binders of a telescope of term variable binders, moved
+-- into the scope the telescope extends. Always possible, see
+-- 'strengthenTyId'. ('strengthenTyIds' would need the telescope of the
+-- binders before each binder.)
+teleIdBinderTypes :: Tele IdBinder n l -> [Type n]
+teleIdBinderTypes = go
+ where
+  go :: Tele IdBinder x l -> [Type n]
+  go TNil = []
+  -- Trusted: see the module header
+  go (TCons b bs) = unsafeCoerce (idBinderType b) : go bs

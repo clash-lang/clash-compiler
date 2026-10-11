@@ -285,6 +285,21 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
         Lam _ (Lam by e) -> assertBool "y occurs" (isNothing (unsinkIdBinder by e))
         _ -> assertFailure "unexpected shape"
 
+  , testCase "teleIdBinderTypes" $ do
+      -- @letrec (x :: Int) = 1; (y :: a) = y in x@, with a free type variable
+      -- @a@
+      let a = tyVar C.User "a" 1
+          x = intId C.User "x" 2
+          y = localId C.User "y" 3 (C.VarTy a)
+          tm = C.Letrec [(x, C.Literal (IntLiteral 1)), (y, C.Var y)] (C.Var x)
+      withConvEnv [a] [] $ \env -> case fromClashTerm env tm of
+        Let (Rec bs _) _ -> case teleIdBinderTypes bs of
+          [t1, t2] -> do
+            assertScopedTyAlphaEq intTy t1
+            assertScopedTyAlphaEq (C.VarTy a) t2
+          tys -> assertFailure ("unexpected number of types: " <> show (length tys))
+        _ -> assertFailure "unexpected shape"
+
     -- The existential type variable only occurs in the type of an occurrence
     -- of a variable from outside the alternative, as one could build by hand
   , testCase "unsinkAlt looks at the types of occurrences" $ do

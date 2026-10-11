@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Clash.Tests.Core.Scoped.NameMap (tests) where
 
@@ -52,4 +53,23 @@ tests = testGroup "Clash.Tests.Core.Scoped.NameMap"
           sizeNameMap (unsinkNameMap (idBinderNameBinders b1) m) @?= 0
           sizeNameSet (unsinkNameSet (idBinderNameBinders b1) (singletonNameSet n)) @?= 0
         _ -> assertFailure "unexpected shape"
+
+  , testCase "appendNameBinders" $ do
+      let x = intId C.User "x" 1
+          y = intId C.User "y" 2
+      case fromClashTermClosed (C.Lam x (C.Lam y (C.Var x))) of
+        Lam bx (Lam by e) -> do
+          let nbs = appendNameBinders (idBinderNameBinders bx) (idBinderNameBinders by)
+          -- Both variables are bound between the scopes
+          sizeNameSet (unsinkNameSet nbs (freeTmVarsSet e)) @?= 0
+          -- Only x occurs in the body
+          assertBool "x occurs" (null (unsinkTerm nbs e))
+          assertBool "y doesn't occur"
+            (not (null (unsinkTerm (idBinderNameBinders by) e)))
+        _ -> assertFailure "unexpected shape"
   ]
+ where
+  freeTmVarsSet :: Term n -> NameSet TmName n
+  freeTmVarsSet = \case
+    Var _ _ n -> singletonNameSet n
+    _ -> emptyNameSet
