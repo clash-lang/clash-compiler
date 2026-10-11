@@ -81,7 +81,7 @@ import Clash.Core.Type
 import Clash.Core.Util (isSignalType, primUCo)
 import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
 import Clash.Core.VarEnv
-  ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarEnv, elemVarSet
+  ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarSet
   , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
   , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
   , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
@@ -220,7 +220,17 @@ reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ =
                 eFVs
 
             e1 = maybeSubstTm "reduceBindersCleanup" sM e
-        in  if v `elemVarEnv` substFVsE then
+
+            -- The let-binding is part of a cycle if it refers to a let-binding
+            -- that is still being processed: itself, or one of the let-bindings
+            -- that led us here. We must not inline it then: its substituted
+            -- term would refer to that let-binding, which we might inline and
+            -- drop later on.
+            inCycle = foldlWithUniqueVarEnv' anyTemp False substFVsE
+            anyTemp acc i _ = acc || case lookupVarEnvDirectly i doneInl1 of
+              Just (_,_,Temp) -> True
+              _ -> False
+        in  if inCycle then
               -- We cannot inline recursive let-bindings, so we do not extend
               -- the substitution environment.
               ( substM
