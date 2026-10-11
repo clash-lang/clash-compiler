@@ -16,8 +16,10 @@ module Comparisons (comparisons, siteComparisons) where
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Util as Current
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrategy)
+import qualified Clash.Normalize.Scoped.Transformations.Case as SC
 import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
+import qualified Clash.Normalize.Transformations.Case as Case
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
@@ -143,4 +145,80 @@ siteComparisons =
       , scScoped = Just $(asScopedRewriteQ S.disjointExpressionConsolidation)
       , scKnownDifferences = [recToNonRec, letrecOrder]
       }
+
+  -- Clash.Normalize.Scoped.Transformations.Case
+  , SiteComparison
+      { scName = "caseCase"
+      , scDescription =
+          "The current caseCase (Clash.Normalize.Transformations.Case.caseCaseWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Case.caseCase)"
+      , scTransformations = ["caseCase"]
+      , scCurrent = $(asRewriteQ Case.caseCase)
+      , scScoped = Just $(asScopedRewriteQ SC.caseCase)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "caseCon"
+      , scDescription =
+          "The current caseCon (Clash.Normalize.Transformations.Case.caseConWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Case.caseCon)"
+      , scTransformations = ["caseCon"]
+      , scCurrent = $(asRewriteQ Case.caseCon)
+      , scScoped = Just $(asScopedRewriteQ SC.caseCon)
+      , scKnownDifferences = [coercionForm]
+      }
+  , SiteComparison
+      { scName = "caseEliminateNonReachable"
+      , scDescription =
+          "The current caseEliminateNonReachable \
+          \(Clash.Normalize.Transformations.Case.caseEliminateNonReachableWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Case.caseEliminateNonReachable)"
+      , scTransformations = ["caseEliminateNonReachable"]
+      , scCurrent = $(asRewriteQ Case.caseEliminateNonReachable)
+      , scScoped = Just $(asScopedRewriteQ SC.caseEliminateNonReachable)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "caseFlat"
+      , scDescription =
+          "The current caseFlat (Clash.Normalize.Transformations.Case.caseFlatWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Case.caseFlat)"
+      , scTransformations = ["caseFlat"]
+      , scCurrent = $(asRewriteQ Case.caseFlat)
+      , scScoped = Just $(asScopedRewriteQ SC.caseFlat)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "caseLet"
+      , scDescription =
+          "The current caseLet (Clash.Normalize.Transformations.Case.caseLetWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Case.caseLet)"
+      , scTransformations = ["caseLet"]
+      , scCurrent = $(asRewriteQ Case.caseLet)
+      , scScoped = Just $(asScopedRewriteQ SC.caseLet)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "elimExistentials"
+      , scDescription =
+          "The current elimExistentials \
+          \(Clash.Normalize.Transformations.Case.elimExistentialsWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Case.elimExistentials)"
+      , scTransformations = ["elimExistentials"]
+      , scCurrent = $(asRewriteQ Case.elimExistentials)
+      , scScoped = Just $(asScopedRewriteQ SC.elimExistentials)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "elimCaseBigNum"
+      , scDescription =
+          "The current elimCaseBigNumInternals \
+          \(Clash.Normalize.Transformations.Case.elimCaseBigNumInternalsWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Case.elimCaseBigNumInternals)"
+      , scTransformations = ["elimCaseBigNum"]
+      , scCurrent = $(asRewriteQ Case.elimCaseBigNumInternals)
+      , scScoped = Just $(asScopedRewriteQ SC.elimCaseBigNumInternals)
+      , scKnownDifferences = []
+      }
   ]
+
