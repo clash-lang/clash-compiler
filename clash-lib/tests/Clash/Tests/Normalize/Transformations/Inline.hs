@@ -3,13 +3,20 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Transformations.Inline"
+  Tests for "Clash.Normalize.Transformations.Inline". The regression tests
+  are parameterised over the implementation of the transformations
+  ('InlineRewrites'): "Clash.Tests.Normalize.Scoped.Transformations.Inline"
+  runs them on the ports to scoped Clash Core too.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Tests.Normalize.Transformations.Inline (tests) where
+module Clash.Tests.Normalize.Transformations.Inline
+  ( tests
+  , InlineRewrites (..)
+  , inlineTests
+  ) where
 
 import Data.Default (def)
 import GHC.Types.Basic (InlineSpec (Opaque))
@@ -28,8 +35,9 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline
-  (collapseRHSNoops, inlineCleanup, inlineSmall, inlineWorkFree)
+  (collapseRHSNoopsWorker, inlineCleanupWorker, inlineSmall, inlineWorkFree)
 import Clash.Normalize.Types (NormRewrite)
+import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 
@@ -38,15 +46,24 @@ import Test.Clash.Rewrite
   , inScopeOf, intFunTy, intId, intLit, intTy, localId, mkBinding, mkBindingMap
   , pairDataCon, pairTy, runSingleTransformation )
 
-collapseRHSNoopsR, inlineSmallR, inlineWorkFreeR :: NormRewrite
-collapseRHSNoopsR = $(asRewriteQ collapseRHSNoops)
-inlineSmallR = $(asRewriteQ inlineSmall)
-inlineWorkFreeR = $(asRewriteQ inlineWorkFree)
+-- | The implementations of the transformations that the tests run
+data InlineRewrites = InlineRewrites
+  { irInlineCleanup :: NormRewrite
+  , irCollapseRHSNoops :: NormRewrite
+  }
+
+-- | The implementations of Clash Core. The transformations of
+-- "Clash.Normalize.Transformations.Inline" are the ports to scoped Clash Core,
+-- so these are built from the workers of Clash Core.
+currentRewrites :: InlineRewrites
+currentRewrites = InlineRewrites
+  { irInlineCleanup =
+      $(asRewriteQ (toTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)))
+  , irCollapseRHSNoops =
+      $(asRewriteQ (toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)))
+  }
 
 -- * inlineCleanup
-
-inlineCleanupR :: NormRewrite
-inlineCleanupR = $(asRewriteQ inlineCleanup)
 
 -- | Run 'inlineCleanup' on a let-expression in which the binders that it wants
 -- to inline (data constructor applications bound to system names) form two
@@ -68,8 +85,8 @@ inlineCleanupR = $(asRewriteQ inlineCleanup)
 -- >   y = MkPair (MkPair (MkPair y y) y) (MkPair (MkPair y y) y)
 -- >   k = MkPair (MkPair y y) (MkPair w y)
 -- > in k
-inlineCleanupNestedCycles :: IO Term
-inlineCleanupNestedCycles =
+inlineCleanupNestedCycles :: NormRewrite -> IO Term
+inlineCleanupNestedCycles inlineCleanupR =
   runSingleTransformation def def (inScopeOf []) inlineCleanupR $
     Letrec
       [ (w, pair y y)
@@ -119,14 +136,14 @@ mapPrim = Prim PrimInfo
 -- variable is not a no-op, regardless of its unique, so the term should stay as
 -- it is. 'collapseRHSNoops' used to look up @f@ in the global binders, and
 -- turned the let-binding into @r = unsafeCoerce# xs@.
-collapseRHSNoopsLocalVar :: IO Term
-collapseRHSNoopsLocalVar = runCollapseRHSNoops fLocalFun
+collapseRHSNoopsLocalVar :: NormRewrite -> IO Term
+collapseRHSNoopsLocalVar rw = runCollapseRHSNoops rw fLocalFun
 
 -- | Run 'collapseRHSNoops' on @let r = mapPrim f xs in r@, with the given @f@,
 -- in a function in which the global @f = \\x -> x@ is defined. See
 -- 'collapseRHSNoopsLocalVar'.
-runCollapseRHSNoops :: Id -> IO Term
-runCollapseRHSNoops f =
+runCollapseRHSNoops :: NormRewrite -> Id -> IO Term
+runCollapseRHSNoops collapseRHSNoopsR f =
   runSingleTransformation def st (inScopeOf [fLocalFun, xs]) collapseRHSNoopsR
     (collapseRHSNoopsTerm f)
  where
@@ -157,19 +174,25 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.Inline"
+    (inlineTests currentRewrites <>
+      [ testCase "inlineSmall does not inline a local variable (#405)" $
+          inlineLocalVar $(asRewriteQ inlineSmall) >>= assertStructurallyEqual (Var fLocal)
+      , testCase "inlineWorkFree does not inline a local variable (#405)" $
+          inlineLocalVar $(asRewriteQ inlineWorkFree) >>= assertStructurallyEqual (Var fLocal)
+      ])
+
+-- | The regression tests, on the given implementation of the transformations
+inlineTests :: InlineRewrites -> [TestTree]
+inlineTests rws =
     [ testCase "inlineCleanup keeps binders that inlined binders refer to" $
-        inlineCleanupNestedCycles >>= assertNoFreeLocals
-    , testCase "inlineSmall does not inline a local variable (#405)" $
-        inlineLocalVar inlineSmallR >>= assertStructurallyEqual (Var fLocal)
-    , testCase "inlineWorkFree does not inline a local variable (#405)" $
-        inlineLocalVar inlineWorkFreeR >>= assertStructurallyEqual (Var fLocal)
+        inlineCleanupNestedCycles (irInlineCleanup rws) >>= assertNoFreeLocals
     , testCase "collapseRHSNoops collapses a global no-op" $
-        runCollapseRHSNoops fGlobal >>= assertAlphaEq
+        runCollapseRHSNoops (irCollapseRHSNoops rws) fGlobal >>= assertAlphaEq
           (Let
             (NonRec r
               (mkApps primUCo [Right intTy, Right intTy, Left (Var xs)]))
             (Var r))
     , testCase "collapseRHSNoops does not treat a local variable as a no-op" $
-        collapseRHSNoopsLocalVar
+        collapseRHSNoopsLocalVar (irCollapseRHSNoops rws)
           >>= assertAlphaEq (collapseRHSNoopsTerm fLocalFun)
     ]

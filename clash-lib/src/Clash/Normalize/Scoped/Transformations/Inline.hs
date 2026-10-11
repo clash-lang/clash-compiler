@@ -43,8 +43,13 @@
 module Clash.Normalize.Scoped.Transformations.Inline
   ( bindConstantVar
   , bindConstantVarWorker
+  , inlineBndrsCleanup
   , inlineCast
   , inlineCastWorker
+  , inlineCleanup
+  , inlineCleanupWorker
+  , collapseRHSNoops
+  , collapseRHSNoopsWorker
   , inlineOrLiftNonRep
   , inlineOrLiftNonRepWorker
   , inlineSimIO
@@ -52,26 +57,48 @@ module Clash.Normalize.Scoped.Transformations.Inline
   ) where
 
 import qualified Control.Lens as Lens
+import qualified Control.Monad as Monad
+import Control.Monad ((>=>))
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe (MaybeT (..))
+import qualified Control.Monad.Writer as Writer
+import Data.Either (lefts)
+import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
+import qualified Data.Monoid as Monoid
+import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
+import GHC.BasicTypes.Extra (isNoInline)
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Explicit.SimIO as SimIO
+import qualified Clash.Sized.Internal.BitVector as BV (Bit (Bit), BitVector (BV), xToBV)
 
+import Clash.Annotations.Primitive (extractPrim)
+import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Name as C
+import qualified Clash.Core.Term as C
+import Clash.Driver.Types (Binding (..))
+import Clash.Primitives.Types (CompiledPrimMap, Primitive (..), TemplateKind (..))
 import Clash.Rewrite.StrategyDSL (Transformation, onLet, toScopedTransformation)
-import Clash.Rewrite.Types (curFun, inlineConstantLimit, scopedTypeEnv)
+import Clash.Rewrite.Types (curFun, inlineConstantLimit, primitives, scopedTypeEnv)
 import Clash.Normalize.Types (NormalizeSession)
 
-import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences, tmNameOccursIn)
-import Clash.Core.Scoped.NameMap (lookupNameMap)
+import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences, freeTmVars, tmNameOccursIn)
+import Clash.Core.Scoped.HasType (inferCoreTypeOf)
+import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (stripTicks)
+import Clash.Core.Scoped.Term (collectArgs, stripTicks)
 import Clash.Core.Scoped.TermInfo (isLocalVar, termSizeSmallerThan)
 import Clash.Core.Scoped.Type (TypeView (..), tyView)
-import Clash.Rewrite.Scoped (TransformContext)
+import Clash.Core.Scoped.Util (primUCo)
+import Clash.Normalize.Scoped.Util (isRecursiveBndr)
+import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
+import Clash.Rewrite.Scoped.Globals (lookupBinding)
 import Clash.Rewrite.Scoped.Util
   ( LetBinding (..), inlineBinders, inlineOrLiftBinders, isJoinPointIn
-  , isUntranslatableType, isVoidWrapper )
+  , isUntranslatableType, isVoidWrapper, keepBindings, openLetBindings, substVars )
 import Clash.Rewrite.Scoped.WorkFree (isWorkFreeIsh)
 
 -- | The function being normalized, see 'Clash.Rewrite.Types.curFun'. It is
@@ -182,3 +209,367 @@ inlineOrLiftNonRepWorker = inlineOrLiftBinders nonRepTest inlineTest
    where
     bodyFreeOccs = freeTmVarOccurrences body
 {-# SCC inlineOrLiftNonRepWorker #-}
+
+-- * inlineCleanup
+
+-- | The occurrences of the free term variables of a term, see
+-- 'freeTmVarOccurrences'
+type Occs l = NameMap TmName l Int
+
+-- | Mark to track progress of 'reduceBindersCleanup'
+data Mark
+  = MTemp
+  -- ^ Will eventually form a recursive cycle
+  | MDone
+  -- ^ Processed, non-recursive
+  | MRec
+  -- ^ Processed, recursive
+
+-- | Used (transitively) by 'inlineCleanup' to inline to-inline let-binders
+-- into the other to-inline let-binders. See
+-- 'Clash.Normalize.Transformations.Inline.reduceBindersCleanup'.
+--
+-- The let-bindings are those of a let-expression opened with
+-- 'openLetBindings', in the scope of its body. A free variable of a
+-- right-hand side that is not one of its binders is a variable of the scope of
+-- the let-expression: there's nothing to do for it.
+reduceBindersCleanup
+  :: (HasCallStack, Distinct l)
+  => Scope l
+  -> NameMap TmName l (LetBinding l, Occs l)
+  -- ^ Original let-binders with their free variables (+ #occurrences)
+  -> (NameMap TmName l (Term l), Occs l, NameMap TmName l (LetBinding l, Occs l, Mark))
+  -- ^ Accumulated:
+  --
+  -- 1. The substitution built up so far
+  -- 2. The free variables of the range of the substitution
+  -- 3. Processed let-binders with their free variables and a tag to mark
+  --    the progress, see 'Mark'
+  -> TmName l
+  -- ^ The let-binding that we want to simplify
+  -> (NameMap TmName l (Term l), Occs l, NameMap TmName l (LetBinding l, Occs l, Mark))
+  -- ^ Same as the third argument
+reduceBindersCleanup scL origInl (!subst, !substFVs, !doneInl) u =
+  case lookupNameMap u doneInl of
+    Nothing -> case lookupNameMap u origInl of
+      -- Not a let-binding we want to inline: cannot extend the substitution
+      Nothing -> (subst, substFVs, doneInl)
+      Just (lb, eFVs) ->
+        -- Simplify the transitive dependencies
+        let (sM, substFVsE, doneInl1) =
+              List.foldl'
+                (reduceBindersCleanup scL origInl)
+                ( emptyNameMap
+                -- It's okay/needed to over-approximate the free variables of
+                -- the range of the new substitution by including the free
+                -- variables of the original let-binder, because this set of
+                -- free variables is only used to check whether let-binding will
+                -- become self-recursive after applying the substitution.
+                --
+                -- That is, it was already self-recursive, or becomes
+                -- self-recursive after applying the substitution because it was
+                -- part of a recursive group. And we do not want to inline
+                -- recursive binders.
+                , eFVs
+                -- Temporarily extend the processing environment with the
+                -- let-binding so we don't end up in a loop in case there is a
+                -- recursive group.
+                , insertNameMap u (lb, eFVs, MTemp) doneInl )
+                (nameMapKeys eFVs)
+
+            e1 = substVars scL sM (lbRhs lb)
+
+            -- The let-binding is part of a cycle if it refers to a let-binding
+            -- that is still being processed: itself, or one of the let-bindings
+            -- that led us here. We must not inline it then: its substituted
+            -- term would refer to that let-binding, which we might inline and
+            -- drop later on.
+            inCycle = any isTemp (nameMapKeys substFVsE)
+            isTemp i = case lookupNameMap i doneInl1 of
+              Just (_, _, MTemp) -> True
+              _ -> False
+        in  if inCycle then
+              -- We cannot inline recursive let-bindings, so we do not extend
+              -- the substitution.
+              ( subst
+              , substFVs
+              -- And we explicitly mark the let-binding as recursive in the
+              -- processing environment. So that it will be kept around at the
+              -- end of 'inlineCleanup'
+              , insertNameMap u (lb {lbRhs = e1}, substFVsE, MRec) doneInl1
+              )
+            else
+              -- Extend the substitution
+              ( insertNameMap u e1 subst
+              , unionWithNameMap (+) substFVsE substFVs
+              -- Mark the let-binding a fully "reduced", so we don't repeat
+              -- this process when we encounter it again.
+              , insertNameMap u (lb {lbRhs = e1}, substFVsE, MDone) doneInl1
+              )
+    -- It's already been processed, just extend the substitution
+    Just (lb, eFVs, MDone) ->
+      ( insertNameMap u (lbRhs lb) subst
+      , unionWithNameMap (+) eFVs substFVs
+      , doneInl
+      )
+    -- It's either recursive (MRec), or part of a recursive group (MTemp)
+    -- where we originally entered a different part of the cycle. Regardless,
+    -- we do not extend the substitution.
+    Just _ -> (subst, substFVs, doneInl)
+{-# SCC reduceBindersCleanup #-}
+
+-- | Used by 'inlineCleanup' to inline binders that we want to inline into the
+-- binders that we want to keep. See
+-- 'Clash.Normalize.Transformations.Inline.inlineBndrsCleanup'.
+--
+-- Gives the bindings to keep: the given ones, followed by those of the
+-- bindings to inline that turned out to be recursive, in the order of their
+-- names.
+inlineBndrsCleanup
+  :: (HasCallStack, Distinct l)
+  => Scope l
+  -> NameMap TmName l (LetBinding l, Occs l)
+  -- ^ Original let-binders with their free variables (+ #occurrences), that we
+  -- want to inline
+  -> NameMap TmName l (LetBinding l, Occs l, Mark)
+  -- ^ Processed let-binders with their free variables and a tag to mark the
+  -- progress, see 'Mark'
+  -> [(LetBinding l, Occs l)]
+  -- ^ The let-binders with their free variables (+ #occurrences), that we want
+  -- to keep
+  -> [LetBinding l]
+inlineBndrsCleanup scL origInl = go
+ where
+  go doneInl [] =
+    -- If some of the let-binders that we wanted to inline turn out to be
+    -- recursive, then we have to keep those around as well, as we weren't able
+    -- to inline them. Furthermore, for every recursive binder there might still
+    -- be non-inlined variables left, see #1337.
+    [ lb {lbRhs = substVars scL substM (lbRhs lb)}
+    | (lb, eFVs, MRec) <- nameMapElems doneInl
+    , let (substM, _, _) =
+            List.foldl'
+              (reduceBindersCleanup scL emptyNameMap)
+              (emptyNameMap, emptyNameMap, doneInl)
+              (nameMapKeys eFVs)
+    ]
+  go !doneInl0 ((lb, eFVs) : il) =
+    let (sM, _, doneInl1) =
+          List.foldl'
+            (reduceBindersCleanup scL origInl)
+            (emptyNameMap, emptyNameMap, doneInl0)
+            (nameMapKeys eFVs)
+    in  lb {lbRhs = substVars scL sM (lbRhs lb)} : go doneInl1 il
+{-# SCC inlineBndrsCleanup #-}
+
+-- | Given a function in the desired normal form, inline all the following
+-- let-bindings:
+--
+-- Let-bindings with an internal name that is only used once, where it binds:
+--   * a primitive that will be translated to an HDL expression (as opposed to
+--     a HDL declaration)
+--   * a projection case-expression (1 alternative)
+--   * a data constructor
+--   * I/O actions
+--
+-- See 'Clash.Normalize.Transformations.Inline.inlineCleanup'.
+inlineCleanup :: Transformation
+inlineCleanup = toScopedTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
+
+-- | The 'Let' handler of 'inlineCleanup'
+inlineCleanupWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> Bind n l -> Term l -> NormalizeSession (Term n)
+inlineCleanupWorker ctx node bind body0 = do
+  prims <- Lens.view primitives
+  openLetBindings sc bind body0 $ \scL bs lbs body ->
+    -- For all let-bindings, count the number of times they are referenced.
+    -- We only inline let-bindings which are referenced only once, otherwise
+    -- we would lose sharing.
+    let bindsFvs = [(lb, freeTmVarOccurrences (lbRhs lb)) | lb <- lbs]
+        allOccs = List.foldl' (unionWithNameMap (+)) emptyNameMap (map snd bindsFvs)
+        bodyFVs = freeTmVars body
+        (il, keep) = List.partition (isInteresting allOccs prims bodyFVs) bindsFvs
+        keep' = inlineBndrsCleanup scL
+                  (nameMapFromList [(lbName lb, x) | x@(lb, _) <- il])
+                  emptyNameMap
+                  keep
+    in  if null il then
+          return node
+        else case keepBindings sc bs keep' body of
+          Just e -> changed e
+          Nothing -> error "inlineCleanup: an inlined binder remains"
+ where
+  sc = tfScope ctx
+
+  -- Determine whether a let-binding is interesting to inline
+  isInteresting
+    :: Occs l'
+    -> CompiledPrimMap
+    -> NameSet TmName l'
+    -> (LetBinding l', Occs l')
+    -> Bool
+  isInteresting allOccs prims bodyFVs (lb, _)
+    | lbName lb `memberNameSet` bodyFVs = False
+    -- Try to keep user defined names, but inline names generated by GHC or
+    -- Clash. For example, if a user were to write:
+    --
+    --    x = 2 * y
+    --
+    -- Even if 'x' is only used once, we'd like to keep it around to produce
+    -- more readable HDL. In contrast, if a user were to write:
+    --
+    --    let x = f (2 * y)
+    --
+    -- ANF would transform that to:
+    --
+    --    let x = f f_arg; f_arg = 2 * y
+    --
+    -- In that case, there's no harm in inlining f_arg.
+    | C.nameSort (lbOcc lb) /= C.User
+    = case tm of
+        Prim pInfo
+          | let nm = C.primName pInfo
+          , Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims
+          , TExpr <- kind p
+          , Just occ <- lookupNameMap (lbName lb) allOccs
+          , occ < 2
+          -> True
+          | otherwise
+          -> C.primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+        Case _ _ [_] -> True
+        Data _ -> True
+        Case _ aTy (_:_:_)
+          | TyConApp nm _ <- tyView aTy
+          , C.nameOcc nm == Text.showt ''SimIO.SimIO
+          -> True
+        _ -> False
+    | otherwise
+    = case tm of
+        Prim pInfo
+          | C.primName pInfo `elem`
+                      [ Text.showt 'SimIO.openFile
+                      , Text.showt 'SimIO.getChar
+                      , Text.showt 'SimIO.isEOF
+                      ]
+          , Just occ <- lookupNameMap (lbName lb) allOccs
+          , occ < 2
+          -> True
+          | otherwise
+          -> C.primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+        Case _ _ [Alt (DataPat dcE _ _) _]
+          -> let nm = C.nameOcc (dcName dcE)
+             in -- Inlines WW projection that exposes internals of the BitVector types
+                nm == Text.showt 'BV.BV  ||
+                nm == Text.showt 'BV.Bit ||
+                -- Inlines projections out of constraint-tuples (e.g. HiddenClockReset).
+                -- The 'GHC.Classes' module hosts these on GHC <= 9.12; on
+                -- GHC >= 9.14 'base'\''s GHC.Classes re-exports them from
+                -- 'ghc-internal:GHC.Internal.Classes'.
+                "GHC.Classes" `Text.isPrefixOf` nm ||
+                "GHC.Internal.Classes" `Text.isPrefixOf` nm
+        Case _ aTy (_:_:_)
+          | TyConApp nm _ <- tyView aTy
+          , C.nameOcc nm == Text.showt ''SimIO.SimIO
+          -> True
+        _ -> False
+   where
+    tm = fst (collectArgs (lbRhs lb))
+{-# SCC inlineCleanupWorker #-}
+
+-- * collapseRHSNoops
+
+-- | Takes a binding and collapses its term if it is a noop. Only runs at
+-- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
+-- on functions that might be inlined later. See #3036, and
+-- 'Clash.Normalize.Transformations.Inline.collapseRHSNoops'.
+collapseRHSNoops :: Transformation
+collapseRHSNoops =
+  toScopedTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
+
+-- | The 'Let' handler of 'collapseRHSNoops'
+collapseRHSNoopsWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> Bind n l -> Term l -> NormalizeSession (Term n)
+collapseRHSNoopsWorker ctx letrec letBind body = do
+  curBinding <- lookupBinding =<< curFunGlobal
+  case curBinding of
+    Just binding | isNoInline (bindingSpec binding) ->
+      -- Keep the structure of the let-expression: a non-recursive binding
+      -- stays non-recursive. See
+      -- https://github.com/clash-lang/clash-compiler/issues/3044.
+      case letBind of
+        NonRec b0 e0 -> do
+          (e1, Monoid.getAny -> collapsed) <-
+            Writer.listen (runCollapseNoop sc (idBinderType b0) e0)
+          pure (if collapsed then Let (NonRec b0 e1) body else letrec)
+        Rec {} -> openLetBindings sc letBind body $ \scL bs lbs body1 -> do
+          (es, Monoid.getAny -> collapsed) <-
+            Writer.listen (mapM (\lb -> runCollapseNoop scL (lbType lb) (lbRhs lb)) lbs)
+          pure (if collapsed then Let (Rec bs es) body1 else letrec)
+    _ -> pure letrec
+ where
+  sc = tfScope ctx
+
+  runCollapseNoop :: Distinct x => Scope x -> Type x -> Term x -> NormalizeSession (Term x)
+  runCollapseNoop scX ty orig =
+    runMaybeT (collapseNoop scX ty orig) >>= Maybe.maybe (return orig) changed
+
+  collapseNoop :: Distinct x => Scope x -> Type x -> Term x -> MaybeT NormalizeSession (Term x)
+  collapseNoop scX bTy term = do
+    (Prim info, args) <- return (collectArgs term)
+    identity <- getIdentity info (lefts args)
+    te <- Lens.view scopedTypeEnv
+    let aTy = inferCoreTypeOf te scX identity
+    return (primUCo `TyApp` aTy `TyApp` bTy `App` identity)
+
+  getIdentity :: C.PrimInfo -> [Term x] -> MaybeT NormalizeSession (Term x)
+  getIdentity primInfo termArgs = do
+    C.WorkIdentity idIdx noopIdxs <- return (C.primWorkInfo primInfo)
+    mapM_ (getTermArg termArgs >=> isNoop >=> Monad.guard) noopIdxs
+    getTermArg termArgs idIdx
+
+  getTermArg :: [a] -> Int -> MaybeT NormalizeSession a
+  getTermArg args i = do
+    Monad.guard (i <= length args - 1)
+    return (args !! i)
+
+  -- Only global binders can be no-ops: a local variable can have the same
+  -- unique as a global binder (#405), but it is a 'Var', not a 'GlobalVar'.
+  isNoop :: Term x -> MaybeT NormalizeSession Bool
+  isNoop = \case
+    GlobalVar g -> do
+      binding <- MaybeT (lookupBinding g)
+      isRecursive <- lift (isRecursiveBndr g)
+      Monad.guard (not isRecursive)
+      isNoop (bindingTerm binding)
+    Prim C.PrimInfo {C.primWorkInfo = C.WorkIdentity _ []} -> return True
+    Lam x e -> isNoopApp (tmNameOf x) (collectArgs e)
+    _ -> return False
+
+  -- Check whether we have a term of the form:
+  --
+  -- primX a (primY b (primZ c (... x ...))))
+  --
+  -- Where primX, primY and primZ are either:
+  --
+  --  1. xToBV, or
+  --  2. Primitives that are the identity on their argument
+  --
+  -- And that the variable 'x' is used by the last primitive in the chain.
+  isNoopApp :: TmName x -> (Term x, [Either (Term x) (Type x)]) -> MaybeT NormalizeSession Bool
+  isNoopApp x = \case
+    (Var _ _ y, []) -> return (tmNameRaw x == tmNameRaw y)
+    (Prim C.PrimInfo {C.primWorkInfo = C.WorkIdentity i []}, args) -> do
+      arg <- getTermArg (lefts args) i
+      isNoopApp x (collectArgs arg)
+    (Prim C.PrimInfo {C.primName}, args)
+      | primName == Text.showt 'BV.xToBV -> do
+      -- We don't make 'xToBV' something of 'WorkIdentity 1 []' because we don't
+      -- want 'getIdentity' to replace "naked" occurances of 'xToBV' by
+      -- 'unsafeCoerce#'. We don't want that since 'xToBV' has a special evaluator
+      -- rule that can translate XExceptions to 'undefined# :: BitVector n'.
+      arg@(App {}) <- getTermArg (lefts args) 1
+      isNoopApp x (collectArgs arg)
+    _ -> return False
+{-# SCC collapseRHSNoopsWorker #-}

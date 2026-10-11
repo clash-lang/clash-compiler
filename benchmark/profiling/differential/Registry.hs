@@ -59,6 +59,8 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     -- Inline
     , (["bindConstantVar"], $(asRewriteQ Current.bindConstantVar), [])
     , (["inlineCast"], $(asRewriteQ Current.inlineCast), [])
+    , (["inlineCleanup"], $(asRewriteQ Current.inlineCleanup), [letrecOrder])
+    , (["collapseRHSNoops"], $(asRewriteQ Current.collapseRHSNoops), [])
     , (["bindOrLiftNonRep"], $(asRewriteQ Current.inlineOrLiftNonRep), [letrecOrder, globalUniques])
     , (["bindSimIO"], $(asRewriteQ Current.inlineSimIO), [])
     ]
@@ -83,8 +85,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["etaExpandSyn"], $(asRewriteQ etaExpandSyn))
     , (["etaTL"], etaExpansionTL)
     -- Inline
-    , (["inlineCleanup"], $(asRewriteQ inlineCleanup))
-    , (["collapseRHSNoops"], $(asRewriteQ collapseRHSNoops))
     , (["inlineSmall"], $(asRewriteQ inlineSmall))
     , (["inlineWorkFree"], $(asRewriteQ inlineWorkFree))
     , (["inlineNonRep"], inlineNonRep)
