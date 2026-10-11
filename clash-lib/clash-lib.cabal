@@ -234,6 +234,8 @@ Library
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector
                       Clash.Core.Scoped.Evaluator.Primitives.Data.Singletons.TypeLits.Internal
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Float
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Float
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Real
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Magic
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Num
