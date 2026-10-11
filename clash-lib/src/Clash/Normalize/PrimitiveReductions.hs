@@ -403,7 +403,7 @@ reduceMap mapPrimInfo n argElTy resElTy argRep fun arg0 (TransformContext is0 _)
       , nameOcc vecTcNm == showt ''Vec
       , [nilCon,consCon] <- tyConDataCons vecTc
       = if n == 0 then
-          pure (mkVecNil nilCon argElTy)
+          pure (mkVecNil nilCon resElTy)
         else do
           (a, as) <- extractHeadTail is consCon argElTy n arg
           let
