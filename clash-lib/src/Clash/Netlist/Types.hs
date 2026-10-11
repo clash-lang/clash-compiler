@@ -70,7 +70,7 @@ import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
-import Clash.Core.PartialEval               (Evaluator)
+import Clash.Core.Evaluator.Types           (Evaluator)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
@@ -283,8 +283,9 @@ data NetlistEnv
   , _localAttrs :: [Attr Text]
   -- ^ Synthesis attributes brough into scope by
   -- 'Clash.Annotations.SynthesisAttributes.annotateReg'
-  , _peEvaluator :: Evaluator
-  -- ^ Evaluator to evaluate a term to Normal Form
+  , _whnfEvaluator :: Evaluator
+  -- ^ Evaluator for evaluating the attributes of 'Attributes' ticks, see
+  -- 'Clash.Core.Evaluator.Types.nfData'
   }
 
 data ComponentMeta = ComponentMeta

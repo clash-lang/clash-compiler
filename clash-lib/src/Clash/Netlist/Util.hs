@@ -86,8 +86,8 @@ import           Clash.Core.HasFreeVars  (elemFreeVars, freeVarsOf, isClosed)
 import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
-  (Name (..), appendToName, mkUnsafeSystemName, nameOcc)
-import           Clash.Core.PartialEval
+  (Name (..), appendToName, nameOcc)
+import           Clash.Core.Evaluator.Types (nfData)
 import           Clash.Core.Pretty       (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Subst
   (Subst (..), deshadowLetExpr, extendIdSubst, extendIdSubstList,
@@ -121,6 +121,7 @@ import qualified Clash.Sized.Vector as V
 import           Clash.Util
 import qualified Clash.Util.Interpolate  as I
 import Clash.Util.Supply
+import qualified Data.IntMap.Strict as IntMap
 
 hmFindWithDefault :: (Eq k, Hashable k) => v -> k -> HashMap k v -> v
 hmFindWithDefault = HashMap.findWithDefault
@@ -1969,7 +1970,7 @@ withTicks ticks0 k = do
     -- which `termToDataError` would create an error-value.
     --
     -- To ensure that we only pass literals to `termToDataError` we first evaluate
-    -- `attrs0` to Normal Form (NF) using the partial evaluators.
+    -- `attrs0` to Normal Form (NF) using the whnf evaluator, see 'nfData'.
     tcm <- Lens.view tcCache
     case coreView tcm ty of
       LitTy (NumTy n)
@@ -1978,17 +1979,10 @@ withTicks ticks0 k = do
             -- Step 1. Evaluate to normal form
             nm <- Lens.use bindings
             ids <- State.liftIO newSupply
-            eval <- Lens.view peEvaluator
-            let attrsTy = inferCoreTypeOf tcm attrs0
-                -- Safe to use `mkUnsafeSystemName` here, because attrs0 has no
-                -- free variables (it's closed), meaning there can be no shadowing
-                attrsName = mkUnsafeSystemName "attrs" 0
-                attrsId = mkLocalId attrsTy attrsName
-
-                genv = mkGlobalEnv nm tcm emptyInScopeSet ids 20 mempty 0
+            eval <- Lens.view whnfEvaluator
             -- Force attributes term to Normal Form so that it is a simple literal
             -- that is understood by `termToDataError`.
-            (attrs1,_) <- State.liftIO (nf eval genv True attrsId attrs0)
+            let attrs1 = nfData eval nm tcm (IntMap.empty, 0) ids attrs0
 
             -- Step 2. Create data from the term
             case termToDataError attrs1 of
