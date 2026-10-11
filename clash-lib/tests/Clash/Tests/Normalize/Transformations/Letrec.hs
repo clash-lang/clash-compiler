@@ -215,6 +215,22 @@ tests =
           |]
         assertBool "flattenLet did not signal a change" hasChanged
 
+    -- 'flattenLet' deshadowed a non-recursive let-expression in a right-hand
+    -- side as if it were recursive. Its binder @x_9@ shadows the variable
+    -- @x_9@ its right-hand side refers to, so renaming both turned
+    --
+    --   let y_2 = (let x_9 = g_5 x_9 in x_9) in y_2
+    --
+    -- into the loop @letrec x' = g_5 x'; y_2 = x' in y_2@.
+    , testCase "flattenLet keeps a shadowing NonRec let in a right-hand side non-recursive" $ do
+        let x = intId User "x" 9
+            y = intId User "y" 2
+            g = intId User "g" 5
+        actual <- runSingleTransformation def def (inScopeOf [g, x]) flattenLetR
+          (Let (NonRec y (Let (NonRec x [parseToTermQQ| g_5 x_9 |]) (Var x)))
+            (Var y))
+        assertAlphaEq [parseToTermQQ| g_5 x_9 |] actual
+
     -- #1103 made 'flattenLet' deshadow a let-expression in the right-hand side
     -- of a let-binding (before merging it into the outer let-expression) only
     -- when one of its binders is already in scope. That set of in-scope
