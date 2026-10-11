@@ -66,3 +66,23 @@ nonRecToRec sc (Let bind body) = openBind sc bind body $ \_ bind1 body1 -> case 
   NonRec b rhs -> Let (Rec (TCons b TNil) [sink rhs]) body1
   Rec {} -> Let bind1 body1
 nonRecToRec _ e = e
+
+-- N11
+appPropLet :: Distinct n => Scope n -> Term n -> [Term n] -> Term n
+appPropLet sc fun args = case fun of
+  Let bind e -> openBind sc bind e $ \sc1 bind1 e1 -> Let bind1 (appPropLet sc1 e1 (map sink args))
+  _ -> foldl App fun args
+
+-- N12
+appPropLam :: Distinct n => Scope n -> Term n -> [Term n] -> Term n
+appPropLam sc fun args = case (fun, args) of
+  (Lam b e, arg : rest) ->
+    openIdBinder sc b e $ \_ b1 e1 -> Let (NonRec b1 arg) (foldl App e1 (map sink rest))
+  _ -> foldl App fun args
+
+-- N13
+appPropAlt :: Distinct n => Scope n -> Term n -> [Term n] -> Term n
+appPropAlt sc fun args = case fun of
+  Case scrut ty alts ->
+    Case scrut ty [openAlt sc alt (\_ p e -> Alt p (foldl App e (map sink args))) | alt <- alts]
+  _ -> foldl App fun args
