@@ -510,6 +510,7 @@ test-suite unittests
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize
                  Clash.Tests.Normalize.PrimitiveReductions
+                 Clash.Tests.Normalize.Scoped.PrimitiveReductions
                  Clash.Tests.Normalize.Scoped.Transformations.ANF
                  Clash.Tests.Normalize.Scoped.Transformations.Case
                  Clash.Tests.Normalize.Scoped.Transformations.DEC
