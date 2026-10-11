@@ -16,6 +16,7 @@ module Comparisons (comparisons, siteComparisons) where
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Util as Current
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrategy)
+import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
@@ -130,5 +131,16 @@ siteComparisons =
       , scCurrent = $(asRewriteQ Current.deadCode)
       , scScoped = Just $(asScopedRewriteQ S.deadCode)
       , scKnownDifferences = [letrecOrder]
+      }
+  , SiteComparison
+      { scName = "DEC"
+      , scDescription =
+          "The current disjointExpressionConsolidation \
+          \(Clash.Normalize.Transformations.DEC.disjointExpressionConsolidationWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.DEC)"
+      , scTransformations = ["DEC"]
+      , scCurrent = $(asRewriteQ Current.disjointExpressionConsolidation)
+      , scScoped = Just $(asScopedRewriteQ S.disjointExpressionConsolidation)
+      , scKnownDifferences = [recToNonRec, letrecOrder]
       }
   ]
