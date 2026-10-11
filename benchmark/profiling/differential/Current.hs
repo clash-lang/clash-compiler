@@ -32,6 +32,8 @@ module Current
     -- * Inline
   , bindConstantVar
   , inlineCast
+  , inlineCleanup
+  , collapseRHSNoops
   , inlineOrLiftNonRep
   , inlineSimIO
   ) where
@@ -153,6 +155,14 @@ bindConstantVar = toTransformation "bindConstantVar" (onLet 'Inline.bindConstant
 -- | The current 'Clash.Normalize.Transformations.Inline.inlineCast'
 inlineCast :: Transformation
 inlineCast = toTransformation "inlineCast" (onLet 'Inline.inlineCastWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.inlineCleanup'
+inlineCleanup :: Transformation
+inlineCleanup = toTransformation "inlineCleanup" (onLet 'Inline.inlineCleanupWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.collapseRHSNoops'
+collapseRHSNoops :: Transformation
+collapseRHSNoops = toTransformation "collapseRHSNoops" (onLet 'Inline.collapseRHSNoopsWorker)
 
 -- | The current 'Clash.Normalize.Transformations.Inline.inlineOrLiftNonRep'
 inlineOrLiftNonRep :: Transformation

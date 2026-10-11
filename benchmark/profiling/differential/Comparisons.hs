@@ -320,6 +320,10 @@ siteComparisons =
       $(asRewriteQ Current.bindConstantVar) $(asScopedRewriteQ SI.bindConstantVar)
   , inlineSites "inlineCast" ["inlineCast"]
       $(asRewriteQ Current.inlineCast) $(asScopedRewriteQ SI.inlineCast)
+  , inlineSites "inlineCleanup" ["inlineCleanup"]
+      $(asRewriteQ Current.inlineCleanup) $(asScopedRewriteQ SI.inlineCleanup)
+  , inlineSites "collapseRHSNoops" ["collapseRHSNoops"]
+      $(asRewriteQ Current.collapseRHSNoops) $(asScopedRewriteQ SI.collapseRHSNoops)
   , inlineSites "inlineOrLiftNonRep" ["bindOrLiftNonRep"]
       $(asRewriteQ Current.inlineOrLiftNonRep) $(asScopedRewriteQ SI.inlineOrLiftNonRep)
   , inlineSites "inlineSimIO" ["bindSimIO"]

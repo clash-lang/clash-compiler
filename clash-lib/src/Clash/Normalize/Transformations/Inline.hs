@@ -91,7 +91,7 @@ import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
+  ( Transformation, onAppNode, onTickNode, onTyAppNode, onVarNode
   , toTransformation)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, curFun, tcCache, topEntities
@@ -333,7 +333,7 @@ inlineCastWorker = inlineBinders test
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: Transformation
-inlineCleanup = toTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
+inlineCleanup = Scoped.inlineCleanup
 
 -- | The 'Let' handler of 'inlineCleanup'.
 inlineCleanupWorker
@@ -444,8 +444,7 @@ simply a variable reference. See issue #779 -}
 -- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
 -- on functions that might be inlined later. See #3036.
 collapseRHSNoops :: Transformation
-collapseRHSNoops =
-  toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
+collapseRHSNoops = Scoped.collapseRHSNoops
 
 -- | The 'Let' handler of 'collapseRHSNoops'.
 collapseRHSNoopsWorker
