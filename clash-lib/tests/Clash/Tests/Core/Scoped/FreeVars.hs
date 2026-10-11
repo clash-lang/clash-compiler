@@ -27,6 +27,7 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars
@@ -165,6 +166,12 @@ tests = testGroup "Clash.Tests.Core.Scoped.FreeVars"
               let tm0 = fromClashTerm env0 tm
               extendFreeVars env0 fvs1 $ \env1 ->
                 freeVarsAgree tm (sinkInto (convScope env1) tm0)
+
+      , testProperty "occurrence counts agree with Clash" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env ->
+              [ (tmNameRaw x, k) | (x, k) <- nameMapToList (freeTmVarOccurrences (fromClashTerm env tm)) ]
+                === [ (fromIntegral u, k) | (u, k) <- UniqMap.toList (C.countFreeOccurances tm) ]
 
       , testProperty "globals agree with Clash" $
           forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->

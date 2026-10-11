@@ -27,6 +27,7 @@ module Clash.Core.Scoped.FreeVars
   , freeTmVars
   , freeTyVars
   , freeTyVarsOfType
+  , freeTmVarOccurrences
   , termGlobalIds
   , hasFreeVars
   , hasFreeVarsType
@@ -210,6 +211,34 @@ freeTyVarsOfType = \case
   AppTy t1 t2 -> freeTyVarsOfType t1 <> freeTyVarsOfType t2
   LitTy {} -> emptyNameSet
   AnnType _ t -> freeTyVarsOfType t
+
+-- | The free term variables of a term, with the number of times they occur
+-- in it. See 'Clash.Core.FreeVars.countFreeOccurances'.
+freeTmVarOccurrences :: Term n -> NameMap TmName n Int
+freeTmVarOccurrences = \case
+  Var _ _ n -> singletonNameMap n 1
+  GlobalVar {} -> emptyNameMap
+  Data {} -> emptyNameMap
+  Literal {} -> emptyNameMap
+  Prim {} -> emptyNameMap
+  Lam b e -> unsinkNameMap (idBinderNameBinders b) (freeTmVarOccurrences e)
+  TyLam b e -> unsinkNameMap (tyBinderNameBinders b) (freeTmVarOccurrences e)
+  App e1 e2 -> plus (freeTmVarOccurrences e1) (freeTmVarOccurrences e2)
+  TyApp e _ -> freeTmVarOccurrences e
+  Let (NonRec b x) e ->
+    plus (freeTmVarOccurrences x) (unsinkNameMap (idBinderNameBinders b) (freeTmVarOccurrences e))
+  Let (Rec bs xs) e ->
+    unsinkNameMap (teleNameBinders bs) (List.foldl' plus emptyNameMap (map freeTmVarOccurrences (e:xs)))
+  Case e _ alts -> List.foldl' plus (freeTmVarOccurrences e) (map alt alts)
+  Cast e _ _ -> freeTmVarOccurrences e
+  Tick (Attributes _ e') e -> plus (freeTmVarOccurrences e') (freeTmVarOccurrences e)
+  Tick _ e -> freeTmVarOccurrences e
+ where
+  plus :: NameMap TmName x Int -> NameMap TmName x Int -> NameMap TmName x Int
+  plus = unionWithNameMap (+)
+
+  alt :: Alt x -> NameMap TmName x Int
+  alt (Alt p e) = unsinkNameMap (patNameBinders p) (freeTmVarOccurrences e)
 
 -- | The global variables a term refers to
 termGlobalIds :: Term n -> GlobalSet
