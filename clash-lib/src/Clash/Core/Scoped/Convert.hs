@@ -41,7 +41,10 @@
     none, 'extendConvEnv' and 'fromClashTyVars' insert every name they bind.
     The environments that conversion builds under binders don't update it, as
     they are never extended with free variables, nor passed outside of this
-    module.
+    module. Neither are the environments that 'fromClashTypeClosed',
+    'fromClashTermClosedIn' and 'fromClashTermWith' build for a scope: they
+    don't record its names, and are only used to convert binders, which get
+    names above the watermark of the scope.
 
   * __Binders__ ('UnsafeTyNameBinder', 'UnsafeTmNameBinder'): only applied to
     binders that 'withRefreshed' or 'withFresh' just created, or that the
@@ -70,6 +73,8 @@ module Clash.Core.Scoped.Convert
   , fromClashTypeClosed
   , fromClashTerm
   , fromClashTermClosed
+  , fromClashTermClosedIn
+  , fromClashTermWith
   , fromClashTyVars
     -- * To Clash
   , toClashType
@@ -307,6 +312,36 @@ fromClashTerm env tm = runST (newSupply (convScope env) >>= \sup -> goTmS sup en
 -- | Convert a closed Clash term, such as the body of a global binding
 fromClashTermClosed :: HasCallStack => C.Term -> Term 'VoidS
 fromClashTermClosed = fromClashTerm emptyConvEnv
+
+-- | Convert a closed Clash term, such as the body of a global binding, into
+-- any scope. Unlike @'sinkClosed' . 'fromClashTermClosed'@, this numbers the
+-- binders from just above the watermark of the scope, so that opening them
+-- doesn't rename them.
+fromClashTermClosedIn :: (HasCallStack, Distinct n) => Scope n -> C.Term -> Term n
+fromClashTermClosedIn sc =
+  fromClashTerm (ConvEnv sc IntMap.empty IntMap.empty IntSet.empty)
+
+-- | Convert a Clash term into a scope, given the scoped counterparts of its
+-- free variables, by their Clash variables. Errors on other free variables.
+-- Like 'fromClashTermClosedIn', this numbers the binders from just above the
+-- watermark of the scope.
+--
+-- E.g. to convert back the result of a function of Clash Core on terms that
+-- were converted from the scope.
+fromClashTermWith
+  :: (HasCallStack, Distinct n)
+  => Scope n
+  -> [(C.TyVar, Type n)]
+  -- ^ The free type variables
+  -> [(C.Id, Term n)]
+  -- ^ The free term variables
+  -> C.Term
+  -> Term n
+fromClashTermWith sc tvs ids =
+  fromClashTerm (ConvEnv sc tys tms IntSet.empty)
+ where
+  tys = IntMap.fromList [(uniqToRaw (C.varUniq tv), ty) | (tv, ty) <- tvs]
+  tms = IntMap.fromList [(uniqToRaw (C.varUniq i), tm) | (i, tm) <- ids]
 
 goTmS
   :: (HasCallStack, Distinct n) => Supply s -> ConvEnv n -> C.Term -> ST s (Term n)
