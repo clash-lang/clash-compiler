@@ -113,6 +113,9 @@ Available:
 * `letrecOrder`: the bindings of a `Rec` are in the order in which the body,
   and then the bindings, refer to them. The current code orders bindings by
   unique in places (e.g. `removeUnusedBinders`), where ports keep their order.
+* `coercionForm`: a coercion is the primitive `_CO_` without a type argument.
+  The primitive reductions of the scoped evaluator apply `_CO_` to its type,
+  as GHC2Core does.
 
 Add new ones to `Test.Clash.Differential`, next to `recToNonRec`, and make them
 as narrow as possible. A known difference gets the scope of the results.
