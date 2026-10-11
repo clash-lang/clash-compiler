@@ -26,6 +26,7 @@ module Clash.Normalize.Strategy.Spec
 
 import Language.Haskell.TH.Syntax (Name)
 
+import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
 import Clash.Normalize.Transformations
 import Clash.Rewrite.StrategyDSL
 
@@ -55,7 +56,7 @@ normalizationSpec constantPropagationName =
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
     multPrim   = topdown setupMultiResultPrim
-    anf        = topdown nonRepANF >-> pass "ANF" 'makeANF >-> topdown caseCon
+    anf        = topdown nonRepANF >-> scopedPass "ANF" 'Scoped.makeANF >-> topdown caseCon
     letTL      = topdownSuc topLet
     recLetRec  = pass "recToLetRec" 'recToLetRec
     rmUnusedExpr = bottomup removeUnusedExpr
