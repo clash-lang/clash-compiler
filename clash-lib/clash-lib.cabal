@@ -442,6 +442,7 @@ test-suite unittests
                  Clash.Tests.Core.Subst
                  Clash.Tests.Core.TermLiteral
                  Clash.Tests.Core.TermLiteral.Types
+                 Clash.Tests.Core.Util
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist
                  Clash.Tests.Netlist.Id
