@@ -24,6 +24,7 @@ module Current
   , nonRepANF
   , reduceConst
   , reducePrim
+  , removeUnusedExpr
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -31,7 +32,9 @@ import qualified Clash.Normalize.Transformations.Case as Case
 import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
 import qualified Clash.Normalize.Transformations.Reduce as Reduce
-import Clash.Rewrite.StrategyDSL (Transformation, onApp, onCase, onLet, toTransformation)
+import Clash.Rewrite.StrategyDSL
+  ( Transformation, onApp, onAppNode, onCase, onLet, onPrimNode, onTickNode, onTyAppNode
+  , toTransformation )
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.deadCode' replaced
@@ -99,3 +102,14 @@ reduceConst = toTransformation "reduceConst" (onApp 'Reduce.reduceConstWorker)
 -- 'Clash.Normalize.Scoped.Transformations.Reduce.reducePrim' replaced
 reducePrim :: Transformation
 reducePrim = toTransformation "reducePrim" (onApp 'Reduce.reducePrimWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Letrec.removeUnusedExpr',
+-- which 'Clash.Normalize.Scoped.Transformations.Letrec.removeUnusedExpr'
+-- replaced
+removeUnusedExpr :: Transformation
+removeUnusedExpr = toTransformation "removeUnusedExpr"
+  (  onPrimNode 'Letrec.removeUnusedExprSpine
+  <> onAppNode 'Letrec.removeUnusedExprSpine
+  <> onTyAppNode 'Letrec.removeUnusedExprSpine
+  <> onTickNode 'Letrec.removeUnusedExprSpine
+  <> onCase 'Letrec.removeUnusedExprCase)

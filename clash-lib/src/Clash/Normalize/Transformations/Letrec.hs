@@ -80,9 +80,7 @@ import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, anyConstructor, onAppNode, onCase, onLet, onLetNode
-  , onPrimNode, onTickNode, onTyAppNode, toTransformation
-  )
+  (Transformation, anyConstructor, onLet, onLetNode, toTransformation)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
@@ -110,12 +108,7 @@ deadCodeWorker _ e binds body =
 {-# SCC deadCodeWorker #-}
 
 removeUnusedExpr :: Transformation
-removeUnusedExpr = toTransformation "removeUnusedExpr"
-  (  onPrimNode 'removeUnusedExprSpine
-  <> onAppNode 'removeUnusedExprSpine
-  <> onTyAppNode 'removeUnusedExprSpine
-  <> onTickNode 'removeUnusedExprSpine
-  <> onCase 'removeUnusedExprCase)
+removeUnusedExpr = Scoped.removeUnusedExpr
 
 -- | The 'Case' handler of 'removeUnusedExpr': a single-alternative case whose
 -- pattern binds no used variables is replaced by the alternative.
