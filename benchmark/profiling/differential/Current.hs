@@ -13,9 +13,17 @@
 
 module Current
   ( deadCode
+  , caseCase
+  , caseCon
+  , caseEliminateNonReachable
+  , caseFlat
+  , caseLet
   , disjointExpressionConsolidation
+  , elimCaseBigNumInternals
+  , elimExistentials
   ) where
 
+import qualified Clash.Normalize.Transformations.Case as Case
 import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, onLet, toTransformation)
@@ -31,3 +39,43 @@ deadCode = toTransformation "deadCode" (onLet 'Letrec.deadCodeWorker)
 disjointExpressionConsolidation :: Transformation
 disjointExpressionConsolidation =
   toTransformation "DEC" (onCase 'DEC.disjointExpressionConsolidationWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Case.caseCase', which
+-- 'Clash.Normalize.Scoped.Transformations.Case.caseCase' replaced
+caseCase :: Transformation
+caseCase = toTransformation "caseCase" (onCase 'Case.caseCaseWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Case.caseCon', which
+-- 'Clash.Normalize.Scoped.Transformations.Case.caseCon' replaced
+caseCon :: Transformation
+caseCon = toTransformation "caseCon" (onCase 'Case.caseConWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Case.caseEliminateNonReachable',
+-- which 'Clash.Normalize.Scoped.Transformations.Case.caseEliminateNonReachable'
+-- replaced
+caseEliminateNonReachable :: Transformation
+caseEliminateNonReachable =
+  toTransformation "caseEliminateNonReachable" (onCase 'Case.caseEliminateNonReachableWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Case.caseFlat', which
+-- 'Clash.Normalize.Scoped.Transformations.Case.caseFlat' replaced
+caseFlat :: Transformation
+caseFlat = toTransformation "caseFlat" (onCase 'Case.caseFlatWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Case.caseLet', which
+-- 'Clash.Normalize.Scoped.Transformations.Case.caseLet' replaced
+caseLet :: Transformation
+caseLet = toTransformation "caseLet" (onCase 'Case.caseLetWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Case.elimExistentials', which
+-- 'Clash.Normalize.Scoped.Transformations.Case.elimExistentials' replaced
+elimExistentials :: Transformation
+elimExistentials =
+  toTransformation "elimExistentials" (onCase 'Case.elimExistentialsWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Case.elimCaseBigNumInternals',
+-- which 'Clash.Normalize.Scoped.Transformations.Case.elimCaseBigNumInternals'
+-- replaced
+elimCaseBigNumInternals :: Transformation
+elimCaseBigNumInternals =
+  toTransformation "elimCaseBigNum" (onCase 'Case.elimCaseBigNumInternalsWorker)

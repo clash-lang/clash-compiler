@@ -21,7 +21,7 @@ module Registry
 
 import Data.Text (Text)
 
-import Test.Clash.Differential (KnownDifference, letrecOrder, recToNonRec)
+import Test.Clash.Differential (KnownDifference, coercionForm, letrecOrder, recToNonRec)
 
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types (NormRewrite)
@@ -38,19 +38,19 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
   ported =
     [ (["deadCode", "deadcode"], $(asRewriteQ Current.deadCode), [letrecOrder])
     , (["DEC"], $(asRewriteQ Current.disjointExpressionConsolidation), [recToNonRec, letrecOrder])
+    -- Case
+    , (["caseCase"], $(asRewriteQ Current.caseCase), [])
+    , (["caseCon"], $(asRewriteQ Current.caseCon), [coercionForm])
+    , (["caseEliminateNonReachable"], $(asRewriteQ Current.caseEliminateNonReachable), [])
+    , (["caseFlat"], $(asRewriteQ Current.caseFlat), [])
+    , (["caseLet"], $(asRewriteQ Current.caseLet), [])
+    , (["elimExistentials"], $(asRewriteQ Current.elimExistentials), [])
+    , (["elimCaseBigNum"], $(asRewriteQ Current.elimCaseBigNumInternals), [])
     ]
 
   unported =
-    -- Case
-    [ (["caseCase"], $(asRewriteQ caseCase))
-    , (["caseCon"], $(asRewriteQ caseCon))
-    , (["caseEliminateNonReachable"], $(asRewriteQ caseEliminateNonReachable))
-    , (["caseFlat"], $(asRewriteQ caseFlat))
-    , (["caseLet"], $(asRewriteQ caseLet))
-    , (["elimExistentials"], $(asRewriteQ elimExistentials))
-    , (["elimCaseBigNum"], $(asRewriteQ elimCaseBigNumInternals))
     -- ANF
-    , (["nonRepANF"], $(asRewriteQ nonRepANF))
+    [ (["nonRepANF"], $(asRewriteQ nonRepANF))
     , (["ANF"], makeANF)
     -- Letrec
     , (["removeUnusedExpr"], $(asRewriteQ removeUnusedExpr))
