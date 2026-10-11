@@ -23,6 +23,7 @@ import qualified Clash.Tests.Normalize.Transformations.Cast
 import qualified Clash.Tests.Normalize.Transformations.DEC
 import qualified Clash.Tests.Normalize.Transformations.EtaExpand
 import qualified Clash.Tests.Normalize.Transformations.Inline
+import qualified Clash.Tests.Normalize.Transformations.MultiPrim
 import qualified Clash.Tests.Normalize.Transformations.Letrec
 import qualified Clash.Tests.Normalize.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Transformations.XOptimize
@@ -63,6 +64,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Transformations.DEC.tests
   , Clash.Tests.Normalize.Transformations.EtaExpand.tests
   , Clash.Tests.Normalize.Transformations.Inline.tests
+  , Clash.Tests.Normalize.Transformations.MultiPrim.tests
   , Clash.Tests.Normalize.Transformations.Letrec.tests
   , Clash.Tests.Normalize.Transformations.Specialize.tests
   , Clash.Tests.Normalize.Transformations.XOptimize.tests
