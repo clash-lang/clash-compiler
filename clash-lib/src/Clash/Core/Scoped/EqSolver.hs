@@ -1,0 +1,371 @@
+{-|
+  Copyright  :  (C) 2021-2026, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Solving the type equations of the fields of data constructors, for their
+  existentially quantified type variables, in scoped Clash Core. Ports of
+  "Clash.Core.EqSolver".
+
+  A solution gives a type variable a closed type: a type constructor or a
+  number (see 'solveEq' and 'solveAdd'). Substituting a solution for an
+  existentially quantified type variable keeps its binder, as a pattern has to
+  bind all of them, but replaces its occurrences ('solvePatExistentials',
+  'dataConInstArgTysE').
+-}
+
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
+module Clash.Core.Scoped.EqSolver
+  ( -- * Solving equations
+    TypeEqSolution (..)
+  , catSolutions
+  , solveNonAbsurds
+  , solveEq
+  , solveAdd
+  , normalizeAdd
+  , typeEq
+  , isAbsurdEq
+    -- * Patterns
+  , withPatEqs
+  , isAbsurdPat
+  , solvePatExistentials
+    -- * Data constructors
+  , dataConInstArgTysE
+  ) where
+
+import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict (IntMap)
+import qualified Data.List as List
+import Data.List.Extra (zipEqual)
+import Data.Maybe (mapMaybe)
+import GHC.Stack (HasCallStack)
+
+import GHC.Builtin.Names
+  (eqPrimTyConKey, eqTyConKey, typeNatAddTyFamNameKey, unsafeReflDataConKey)
+
+import Clash.Core.DataCon (DataCon (dcUniq))
+import Clash.Core.Name (Name (nameUniq))
+import Clash.Core.TyCon (TyConMap)
+import qualified Clash.Core.Type as C
+import Clash.Unique (fromGhcUnique)
+
+import Clash.Core.Scoped.DataCon (DataConSig (..), dataConSig)
+import Clash.Core.Scoped.NameMap
+import Clash.Core.Scoped.Subst
+import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Type
+
+-- * Solving equations
+
+-- | What kind of solution (if any) was found. See 'Clash.Core.EqSolver.TypeEqSolution'.
+data TypeEqSolution n
+  = Solution !(TyName n) !(Type 'VoidS)
+  -- ^ A solution was found: the variable equals a closed type
+  | AbsurdSolution
+  -- ^ A solution was found, but it involved negative naturals, or the
+  -- equation equates different types
+  | NoSolution
+  -- ^ The type wasn't an equation, or it was unsolvable
+  deriving (Show)
+
+-- | The solutions
+catSolutions :: [TypeEqSolution n] -> [(TyName n, Type 'VoidS)]
+catSolutions = mapMaybe getSol
+ where
+  getSol (Solution tv ty) = Just (tv, ty)
+  getSol _ = Nothing
+
+-- | Solve the given equations for the given type variables, and return all
+-- non-absurd solutions. See 'Clash.Core.EqSolver.solveNonAbsurds'.
+solveNonAbsurds
+  :: Distinct n
+  => TyConMap
+  -> Scope n
+  -> NameSet TyName n
+  -- ^ The type variables to solve for
+  -> [(Type n, Type n)]
+  -> [(TyName n, Type 'VoidS)]
+solveNonAbsurds tcm sc solveSet = concatMap $ \eq ->
+  catSolutions (solveAdd solveSet eq : solveEq tcm sc solveSet eq)
+
+-- | Solve simple equalities such as:
+--
+--   * a ~ Int
+--   * Int ~ a
+--   * SomeType a b ~ SomeType Int Bool
+--   * SomeType Int Bool ~ SomeType a b
+--   * SomeType a Bool ~ SomeType Int b
+--
+-- See 'Clash.Core.EqSolver.solveEq'.
+solveEq
+  :: Distinct n
+  => TyConMap
+  -> Scope n
+  -> NameSet TyName n
+  -- ^ The type variables to solve for
+  -> (Type n, Type n)
+  -> [TypeEqSolution n]
+solveEq tcm sc solveSet (coreView tcm sc -> left, coreView tcm sc -> right) =
+  case (left, right) of
+    (VarTy _ _ tv, ConstTy c) | memberNameSet tv solveSet ->
+      -- a ~ Int
+      [Solution tv (ConstTy c)]
+    (ConstTy c, VarTy _ _ tv) | memberNameSet tv solveSet ->
+      -- Int ~ a
+      [Solution tv (ConstTy c)]
+    (ConstTy c1, ConstTy c2) ->
+      -- Int /= Char
+      [AbsurdSolution | c1 /= c2]
+    (LitTy l1, LitTy l2) ->
+      -- 3 /= 5
+      [AbsurdSolution | l1 /= l2]
+    _ ->
+      -- The call to 'coreView' at the start of 'solveEq' should have reduced
+      -- all solvable type families. If we encounter one here that means the
+      -- type family is stuck (and that we shouldn't compare it to anything!).
+      if any (isTypeFamilyApplication tcm) [left, right] then
+        []
+      else
+        case (tyView left, tyView right) of
+          (TyConApp leftNm leftTys, TyConApp rightNm rightTys) ->
+            -- SomeType a b ~ SomeType 3 5 (or other way around)
+            if leftNm == rightNm then
+              concatMap (solveEq tcm sc solveSet) (zipEqual leftTys rightTys)
+            else
+              [AbsurdSolution]
+          _ ->
+            []
+
+-- | Solve equations supported by 'normalizeAdd'. See
+-- 'Clash.Core.EqSolver.solveAdd'.
+solveAdd
+  :: NameSet TyName n
+  -- ^ The type variables to solve for
+  -> (Type n, Type n)
+  -> TypeEqSolution n
+solveAdd solveSet ab =
+  case normalizeAdd ab of
+    Just (n, m, VarTy _ _ tv) | memberNameSet tv solveSet ->
+      if n >= 0 && m >= 0 && n - m >= 0 then
+        Solution tv (LitTy (C.NumTy (n - m)))
+      else
+        AbsurdSolution
+    _ ->
+      NoSolution
+
+-- | Given the left and right side of an equation, normalize it such that
+-- equations of the following forms:
+--
+--     * 5     ~ n + 2
+--     * 5     ~ 2 + n
+--     * n + 2 ~ 5
+--     * 2 + n ~ 5
+--
+-- are returned as (5, 2, n). See 'Clash.Core.EqSolver.normalizeAdd'.
+normalizeAdd :: (Type n, Type n) -> Maybe (Integer, Integer, Type n)
+normalizeAdd (a, b) = do
+  (n, rhs) <- lhsLit a b
+  case tyView rhs of
+    TyConApp tc [left, right]
+      | nameUniq tc == fromGhcUnique typeNatAddTyFamNameKey -> do
+      (m, o) <- lhsLit left right
+      return (n, m, o)
+    _ ->
+      Nothing
+ where
+  lhsLit x (LitTy (C.NumTy n)) = Just (n, x)
+  lhsLit (LitTy (C.NumTy n)) y = Just (n, y)
+  lhsLit _ _ = Nothing
+
+-- | If the type is an equation, its left-hand and right-hand side. See
+-- 'Clash.Core.EqSolver.typeEq'.
+typeEq :: Distinct n => TyConMap -> Scope n -> Type n -> Maybe (Type n, Type n)
+typeEq tcm sc ty =
+  case tyView (coreView tcm sc ty) of
+    TyConApp tc [_, _, left, right]
+      | nameUniq tc == fromGhcUnique eqPrimTyConKey ->
+      Just (coreView tcm sc left, coreView tcm sc right)
+    TyConApp tc [_, left, right]
+      -- Lifted equality (~), see 'Clash.Core.EqSolver.typeEq'
+      | nameUniq tc == fromGhcUnique eqTyConKey ->
+      Just (coreView tcm sc left, coreView tcm sc right)
+    _ ->
+      Nothing
+
+-- | Whether an equation is absurd: it equates types that are definitely not
+-- equal, or the solution involves an absurd (intermediate) result, such as
+-- -1. See 'Clash.Core.EqSolver.isAbsurdEq'.
+isAbsurdEq
+  :: Distinct n
+  => TyConMap
+  -> Scope n
+  -> NameSet TyName n
+  -- ^ The existentially quantified type variables
+  -> (Type n, Type n)
+  -> Bool
+isAbsurdEq tcm sc exts (left0, right0) =
+  case solveAdd exts lr of
+    AbsurdSolution -> True
+    _ -> any isAbsurd (solveEq tcm sc exts lr)
+ where
+  lr = (coreView tcm sc left0, coreView tcm sc right0)
+
+  isAbsurd AbsurdSolution = True
+  isAbsurd _ = False
+
+-- * Patterns
+
+-- | The equations of the field types of a pattern, in the scope of its
+-- existentially quantified type variables, which are also given. See
+-- 'Clash.Core.EqSolver.patEqs'.
+--
+-- Goes under the existentially quantified type variables, renaming them if they
+-- clash with the scope.
+withPatEqs
+  :: Distinct n
+  => TyConMap
+  -> Scope n
+  -> Pat n l
+  -> (forall i. DExt n i => Scope i -> NameSet TyName i -> [(Type i, Type i)] -> r)
+  -> r
+withPatEqs tcm sc pat k = case pat of
+  DataPat _ tvs ids ->
+    openTyVars IntMap.empty (idSubst sc) tvs $ \s _ names ->
+      let sc' = substScope s
+      in k sc' (nameSetFromList names)
+           (mapMaybe (typeEq tcm sc' . substTy s) (teleFieldTys ids))
+  LitPat _ -> k sc emptyNameSet []
+  DefaultPat -> k sc emptyNameSet []
+
+-- | Whether a pattern can never match, because its equations are absurd. See
+-- 'Clash.Core.EqSolver.isAbsurdPat'.
+isAbsurdPat :: Distinct n => TyConMap -> Scope n -> Pat n l -> Bool
+isAbsurdPat _ _ (DataPat dc _ _)
+  -- unsafeCoerce is not absurd in the way intended by 'isAbsurdPat'
+  | dcUniq dc == fromGhcUnique unsafeReflDataConKey
+  = False
+isAbsurdPat tcm sc pat =
+  withPatEqs tcm sc pat $ \sc' exts eqs -> any (isAbsurdEq tcm sc' exts) eqs
+
+-- | Solve the equations of the field types of a pattern for its existentially
+-- quantified type variables, and substitute the solutions. Gives the pattern,
+-- whose binders still bind the solved type variables, and the substitution to
+-- apply to the right-hand side of the alternative. 'Nothing' if nothing was
+-- solved.
+--
+-- This solves the equations once: a solution may make other equations
+-- solvable. See @elimExistentials@ in "Clash.Normalize.Transformations.Case".
+solvePatExistentials
+  :: Distinct n
+  => TyConMap
+  -> Scope n
+  -> Pat n l
+  -> (forall l'. DExt n l' => Subst l l' -> Pat n l' -> r)
+  -> Maybe r
+solvePatExistentials tcm sc pat k = case pat of
+  DataPat dc tvs ids ->
+    openTyVars IntMap.empty (idSubst sc) tvs $ \s0 _ names ->
+      let sc0 = substScope s0
+          eqs = mapMaybe (typeEq tcm sc0 . substTy s0) (teleFieldTys ids)
+      in case solveNonAbsurds tcm sc0 (nameSetFromList names) eqs of
+           [] -> Nothing
+           sols -> Just $
+             openTyVars (solutionPositions names sols) (idSubst sc) tvs $ \s1 tvs' _ ->
+               substTele substIdBinder s1 ids $ \s2 ids' ->
+                 k s2 (DataPat dc tvs' ids')
+  LitPat _ -> Nothing
+  DefaultPat -> Nothing
+
+-- * Data constructors
+
+-- | The types of the fields of a data constructor, given types for its
+-- universally quantified type variables, in the scope of fresh binders of its
+-- existentially quantified type variables. Solves the equations of the field
+-- types for the existentially quantified type variables (see
+-- 'solveNonAbsurds'), until no more solutions are found, and substitutes the
+-- solutions. 'Nothing' if there are more or fewer types than universally
+-- quantified type variables.
+--
+-- See 'Clash.Core.Util.dataConInstArgTysE', which gives the field types
+-- without the binders of the existentially quantified type variables they may
+-- mention.
+dataConInstArgTysE
+  :: forall n r
+   . (HasCallStack, Distinct n)
+  => TyConMap
+  -> Scope n
+  -> DataCon
+  -> [Type n]
+  -- ^ Types for the universally quantified type variables
+  -> (forall l. DExt n l => Scope l -> Tele TyBinder n l -> [Type l] -> r)
+  -> Maybe r
+dataConInstArgTysE tcm sc dc univTys k = case dataConSig dc of
+  DataConSig univ ext argTys -> do
+    s1 <- extendTySubstTele (closedSubst sc) univ univTys
+    pure $ openTyVars IntMap.empty s1 ext $ \s2 ext' names ->
+      solveLoop (substScope s2) ext' names (map (substTy s2) argTys)
+ where
+  solveLoop
+    :: DExt n o => Scope o -> Tele TyBinder n o -> [TyName o] -> [Type o] -> r
+  solveLoop sc1 ext names tys =
+    let eqs = mapMaybe (typeEq tcm sc1) tys in
+    case solveNonAbsurds tcm sc1 (nameSetFromList names) eqs of
+      [] -> k sc1 ext tys
+      sols ->
+        openTyVars (solutionPositions names sols) (idSubst sc) ext $ \s ext' names' ->
+          solveLoop (substScope s) ext' names' (map (substTy s) tys)
+
+-- * Substituting solutions
+
+-- | The solutions, by the position of their type variable in the given list.
+-- Later solutions win, like they do in 'Clash.Core.Subst.extendTvSubstList'.
+solutionPositions :: [TyName n] -> [(TyName n, Type 'VoidS)] -> IntMap (Type 'VoidS)
+solutionPositions names sols = IntMap.fromList
+  [ (pos, ty)
+  | (tv, ty) <- sols
+  , Just pos <- [List.elemIndex (tyNameRaw tv) raws] ]
+ where
+  raws = map tyNameRaw names
+
+-- | Go under a telescope of type variable binders, renaming them if they clash
+-- with the scope, and substituting the given solutions, by position, for the
+-- type variables they bind. A binder whose type variable is solved is kept,
+-- but nothing refers to it. Also gives the type variables the new binders
+-- bind, in order.
+openTyVars
+  :: Distinct o
+  => IntMap (Type 'VoidS)
+  -> Subst x o
+  -> Tele TyBinder x i
+  -> (forall o'. DExt o o' => Subst i o' -> Tele TyBinder o o' -> [TyName o'] -> r)
+  -> r
+openTyVars sols = go 0 []
+ where
+  go
+    :: Distinct o1
+    => Int
+    -> [TyName o1]
+    -> Subst x1 o1
+    -> Tele TyBinder x1 i1
+    -> (forall o'. DExt o1 o' => Subst i1 o' -> Tele TyBinder o1 o' -> [TyName o'] -> r1)
+    -> r1
+  go !_ acc s TNil k = k s TNil (reverse acc)
+  go !pos acc s (TCons b bs) k =
+    substTyBinder s b $ \s1 b' ->
+      let s2 = case IntMap.lookup pos sols of
+            Nothing -> s1
+            Just sol -> extendTySubst (extendSubstScope (substScope s1) s) b (sinkClosed sol)
+      in go (pos + 1) (tyNameOf b' : sink1 acc) s2 bs $ \s' bs' names ->
+           k s' (TCons b' bs') names
+
+-- | The types of the fields a telescope binds, moved out of the scope of the
+-- fields before them: a type only mentions type variables
+teleFieldTys :: Tele IdBinder i l -> [Type i]
+teleFieldTys = go id
+ where
+  go :: (Type x -> Type i) -> Tele IdBinder x l -> [Type i]
+  go _ TNil = []
+  go f (TCons b bs) = f (idBinderType b) : go (f . strengthenTyId b) bs
