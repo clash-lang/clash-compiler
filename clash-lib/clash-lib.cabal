@@ -444,6 +444,7 @@ test-suite unittests
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist
                  Clash.Tests.Netlist.Id
+                 Clash.Tests.Netlist.Util
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize
                  Clash.Tests.Normalize.PrimitiveReductions
