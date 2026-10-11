@@ -470,8 +470,12 @@ renderSiteSummary nm s =
 
 -- | A mismatch at a site, with terms truncated to @l@ lines of @w@ characters
 renderSite :: Int -> Int -> Capture -> Either Replay Mismatch -> String
-renderSite l w cap r = header <> body
+renderSite l w cap r = header <> body <> input
  where
+  input = case r of
+    Left Reproduced -> ""
+    Left (ReproducedKnown _) -> ""
+    _ -> "input:\n" <> unlines (map ("    " <>) (lines (truncateText l w (showPpr (capInput cap)))))
   (cf, _) = capCurFun cap
   header =
     "=== " <> Text.unpack (capName cap) <> " #" <> show (capFiring cap)
