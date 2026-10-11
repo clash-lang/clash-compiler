@@ -1233,12 +1233,356 @@ primitives =
       _ -> Nothing
 
 
--------------------
--- GHC.Prim.Double#
--------------------
+----------
+-- Double#
+----------
+  , primStepEntry $(textNameLit '(GHC.Prim.>##)) $ \case
+      PrimStepContext{..}  | Just r <- liftDDI (>##)  args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim.>=##)) $ \case
+      PrimStepContext{..} | Just r <- liftDDI (>=##) args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim.==##)) $ \case
+      PrimStepContext{..} | Just r <- liftDDI (==##) args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim./=##)) $ \case
+      PrimStepContext{..} | Just r <- liftDDI (/=##) args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim.<##)) $ \case
+      PrimStepContext{..}  | Just r <- liftDDI (<##)  args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim.<=##)) $ \case
+      PrimStepContext{..} | Just r <- liftDDI (<=##) args
+        -> reduce r
+      _ -> Nothing
+
   , primStepEntry $(textNameLit '(GHC.Prim.+##)) $ \case
       PrimStepContext{..}  | Just r <- liftDDD (+##)  args
         -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim.-##)) $ \case
+      PrimStepContext{..}  | Just r <- liftDDD (-##)  args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim.*##)) $ \case
+      PrimStepContext{..}  | Just r <- liftDDD (*##)  args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim./##)) $ \case
+      PrimStepContext{..}  | Just r <- liftDDD (/##)  args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.negateDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD negateDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.fabsDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD fabsDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.double2Int#) $ \case
+      PrimStepContext{..} | [i] <- doubleLiterals' args
+        -> let !(D# a) = castWord64ToDouble i
+               r = double2Int# a
+           in  reduce . Literal . IntLiteral . toInteger $ I# r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.double2Float#) $ \case
+      PrimStepContext{..}
+        | [Lit (DoubleLiteral d)] <- args
+        -> let !(D# a) = castWord64ToDouble d
+               r = double2Float# a
+           in reduce . Literal . FloatLiteral . castFloatToWord32 $ F# r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.expDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD expDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.logDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD logDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.sqrtDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD sqrtDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.sinDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD sinDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.cosDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD cosDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.tanDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD tanDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.asinDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD asinDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.acosDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD acosDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.atanDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD atanDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.sinhDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD sinhDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.coshDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD coshDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.tanhDouble#) $ \case
+      PrimStepContext{..} | Just r <- liftDD tanhDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.asinhDouble#) $ \case
+      PrimStepContext{..}  | Just r <- liftDD asinhDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.acoshDouble#) $ \case
+      PrimStepContext{..}  | Just r <- liftDD acoshDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.atanhDouble#) $ \case
+      PrimStepContext{..}  | Just r <- liftDD atanhDouble# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit '(GHC.Prim.**##)) $ \case
+      PrimStepContext{..} | Just r <- liftDDD (**##) args
+        -> reduce r
+      _ -> Nothing
+
+-- decodeDouble_2Int# :: Double# -> (#Int#, Word#, Word#, Int##)
+  , primStepEntry $(textNameLit 'GHC.Prim.decodeDouble_2Int#) $ \case
+      PrimStepContext{..} | [i] <- doubleLiterals' args
+        -> let !(D# a) = castWord64ToDouble i
+               !(# p, q, r, s #) = decodeDouble_2Int# a
+           in reduce $
+              mkResultCon te sc ty tys
+                       [ (Literal . IntLiteral  . toInteger $ I# p)
+                       , (Literal . WordLiteral . toInteger $ W# q)
+                       , (Literal . WordLiteral . toInteger $ W# r)
+                       , (Literal . IntLiteral  . toInteger $ I# s)]
+      _ -> Nothing
+
+-- decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
+  , primStepEntry $(textNameLit 'GHC.Prim.decodeDouble_Int64#) $ \case
+      PrimStepContext{..} | [i] <- doubleLiterals' args
+        -> let !(D# a) = castWord64ToDouble i
+               !(# p, q #) = decodeDouble_Int64# a
+           in reduce $
+              mkResultCon te sc ty tys
+                       [ (Literal . Int64Literal  . toInteger $ I64# p)
+                       , (Literal . IntLiteral  . toInteger $ I# q)]
+      _ -> Nothing
+
+
+--------
+-- Float
+--------
+  , primStepEntry $(textNameLit 'GHC.Prim.gtFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFI gtFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFI geFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFI eqFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFI neFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFI ltFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFI leFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFF plusFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.minusFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFF minusFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFF timesFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.divideFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFF divideFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.negateFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF negateFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.fabsFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF fabsFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.float2Int#) $ \case
+      PrimStepContext{..} | [i] <- floatLiterals' args
+        -> let !(F# a) = castWord32ToFloat i
+               r = float2Int# a
+           in  reduce . Literal . IntLiteral . toInteger $ I# r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.expFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF expFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.logFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF logFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.sqrtFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF sqrtFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.sinFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF sinFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.cosFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF cosFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.tanFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF tanFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.asinFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF asinFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.acosFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF acosFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.atanFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF atanFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.sinhFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF sinhFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.coshFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF coshFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.tanhFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF tanhFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.powerFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFFF powerFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.asinhFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF asinhFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.acoshFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF acoshFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.atanhFloat#) $ \case
+      PrimStepContext{..}  | Just r <- liftFF atanhFloat# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.float2Double#) $ \case
+      PrimStepContext{..} | [i] <- floatLiterals' args
+        -> let !(F# a) = castWord32ToFloat i
+               r = float2Double# a
+           in  reduce . Literal . DoubleLiteral . castDoubleToWord64 $ D# r
+      _ -> Nothing
+
+
+-- decodeFloat_Int# :: Float# -> (#Int#, Int##)
+  , primStepEntry $(textNameLit 'GHC.Prim.decodeFloat_Int#) $ \case
+      PrimStepContext{..} | [i] <- floatLiterals' args
+        -> let !(F# a) = castWord32ToFloat i
+               !(# p, q #) = decodeFloat_Int# a
+           in reduce $
+              mkResultCon te sc ty tys
+                       [ (Literal . IntLiteral  . toInteger $ I# p)
+                       , (Literal . IntLiteral  . toInteger $ I# q)]
       _ -> Nothing
 
 ----------------------
