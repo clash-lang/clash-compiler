@@ -50,10 +50,12 @@ import Clash.Driver.Types (Binding (..), BindingMap)
 import Clash.GHC.Evaluator (evaluator)
 
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimitives)
-import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
+import Clash.Core.Scoped.Evaluator.Types (PrimReduction)
+import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 
 import Test.Clash.Scoped.Evaluator
-  (PrimOutcome (..), comparePrimCall, genOpenPrimCall, genPrimCall, outcomeKey)
+  ( PrimOutcome (..), adapterEnv, comparePrimCall, genOpenPrimCall, genPrimCall
+  , onlyPortedEnv, outcomeKey, scopedWhnf )
 
 -- | The options of the prims command
 data PrimsOptions = PrimsOptions
@@ -106,10 +108,10 @@ comparePrims opts designs = do
              outcomes <- forM [ (s, c) | c <- calls, s <- [False, True] ] $ \(isSubj, c) -> do
                o <- try (timeout 10000000 (evaluate (forceOutcome
                       (comparePrimCall te evaluator mempty nm r isSubj c))))
-               pure $ (,,) isSubj c $ case o of
-                 Left (ex :: SomeException) -> Left (takeWhile (/= '\n') (show ex))
-                 Right Nothing -> Left "timeout"
-                 Right (Just o') -> Right o'
+               (,,) isSubj c <$> case o of
+                 Left (ex :: SomeException) -> Left <$> failure te nm r isSubj c ex
+                 Right Nothing -> pure (Left "timeout")
+                 Right (Just o') -> pure (Right o')
              pure (nm, Compared outcomes)
   report opts results
   pure (and [ all (agrees . third) os | (_, Compared os) <- results ])
@@ -118,6 +120,7 @@ comparePrims opts designs = do
   agrees = \case
     Right Agree -> True
     Right BothStuck -> True
+    Left e -> bothFailPrefix `List.isPrefixOf` e
     _ -> False
 
   forceOutcome o = case o of
@@ -125,6 +128,33 @@ comparePrims opts designs = do
     OnlyPorted a -> length a `seq` o
     OnlyReference a -> length a `seq` o
     _ -> o
+
+-- | Why the comparison of a call failed with an exception. If the ported
+-- reduction and the reference both fail on their own, with the same
+-- exception, they agree: e.g. the reduction of Clash Core of
+-- @Clash.Sized.Internal.Signed.minBound#@ fails on @Signed 0@ too.
+failure
+  :: TypeEnv -> Text -> PrimReduction -> Bool -> C.Term -> SomeException -> IO String
+failure te nm r isSubj c ex = do
+  ported <- run (onlyPortedEnv te evaluator nm r)
+  reference <- run (adapterEnv te evaluator)
+  pure $ case (ported, reference) of
+    (Just p, Just q) | p == q -> bothFailPrefix <> p
+    _ -> firstLine ex
+ where
+  -- The first line of the exception evaluating the call on one side throws
+  run env = do
+    res <- try (timeout 10000000 (evaluate (length (showPpr (scopedWhnf env mempty isSubj c)))))
+    pure $ case res of
+      Left (e :: SomeException) -> Just (firstLine e)
+      Right _ -> Nothing
+  firstLine :: SomeException -> String
+  firstLine = takeWhile (/= '\n') . show
+
+-- | The prefix of the failure of a call on which the ported reduction and the
+-- reference fail alike
+bothFailPrefix :: String
+bothFailPrefix = "both fail: "
 
 -- | The primitives in a term
 prims :: C.Term -> [C.PrimInfo]
@@ -159,10 +189,15 @@ report opts results = do
           (if s then " (as a subject)" else "") (oneLine (showPpr c)) (details o)
   hFlush stdout
  where
-  key = either ("failed: " <>) outcomeKey
+  key = \case
+    Left e
+      | bothFailPrefix `List.isPrefixOf` e -> e
+      | otherwise -> "failed: " <> e
+    Right o -> outcomeKey o
   agree = \case
     Right Agree -> True
     Right BothStuck -> True
+    Left e -> bothFailPrefix `List.isPrefixOf` e
     _ -> False
   oneLine = take 1500 . unwords . words
   details = \case

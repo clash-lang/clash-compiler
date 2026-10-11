@@ -334,4 +334,8 @@ clash-differential prims inputs/*.bin
 ```
 
 `both stuck` means that neither side reduced the call, e.g. because the
-reduction only reduces as the subject of a case-expression.
+reduction only reduces as the subject of a case-expression. `both fail`
+means that evaluating the call throws the same exception on either side, e.g.
+`Clash.Sized.Internal.Signed.minBound#` on `Signed 0`; that counts as
+agreement too. `failed` means that the comparison threw an exception
+otherwise.
