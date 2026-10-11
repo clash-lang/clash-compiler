@@ -41,6 +41,7 @@ module Test.Clash.Scoped
     -- * Assertions
   , assertScopedAlphaEq
   , assertAgreesTm
+  , assertAgreesTy
   , assertScopedTyAlphaEq
   , assertScopedMaybeTyAlphaEq
   , nameSetRaws
@@ -236,6 +237,17 @@ assertAgreesTm
 assertAgreesTm f g tm =
   withFreeVarsOf [tm] $ \env ->
     assertScopedAlphaEq (f tm) (g (convScope env) (fromClashTerm env tm))
+
+-- | The type version of 'assertAgreesTm'
+assertAgreesTy
+  :: HasCallStack
+  => (C.Type -> C.Type)
+  -> (forall n. Distinct n => Scope n -> Type n -> Type n)
+  -> C.Type
+  -> Assertion
+assertAgreesTy f g ty =
+  withFreeTyVarsOf [ty] $ \env ->
+    assertScopedTyAlphaEq (f ty) (g (convScope env) (fromClashType env ty))
 
 -- | Assert that a scoped type, converted to Clash, is alpha-equivalent to a
 -- Clash type
