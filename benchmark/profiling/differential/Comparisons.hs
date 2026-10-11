@@ -284,6 +284,16 @@ siteComparisons =
       , scKnownDifferences = []
       }
   , SiteComparison
+      { scName = "CSE"
+      , scDescription =
+          "The current simpleCSE (Clash.Normalize.Transformations.Letrec.simpleCSEWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Letrec.simpleCSE)"
+      , scTransformations = ["CSE"]
+      , scCurrent = $(asRewriteQ Current.simpleCSE)
+      , scScoped = Just $(asScopedRewriteQ S.simpleCSE)
+      , scKnownDifferences = [letrecOrder]
+      }
+  , SiteComparison
       { scName = "topLet"
       , scDescription =
           "The current topLet (Clash.Normalize.Transformations.Letrec.topLetWorker) \

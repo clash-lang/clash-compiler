@@ -24,9 +24,13 @@
 
   = Order of let-bindings
 
-  'flattenLet' keeps the order of the Clash Core version: the bindings of a
-  let-expression in a right-hand side come right before the binding whose
-  right-hand side it was.
+  'simpleCSE' keeps the bindings in the order of the Clash Core version: the
+  reverse of the inverse topological order in which it visits them. But that
+  order is computed from the positions of the bindings
+  ('inverseTopSortOrder'), where the Clash Core version uses their uniques: the
+  @letrecOrder@ difference of the differential tests. 'flattenLet' keeps the
+  order of the Clash Core version: the bindings of a let-expression in a
+  right-hand side come right before the binding whose right-hand side it was.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -45,6 +49,8 @@ module Clash.Normalize.Scoped.Transformations.Letrec
   , removeUnusedExpr
   , removeUnusedExprCase
   , removeUnusedExprSpine
+  , simpleCSE
+  , simpleCSEWorker
   , topLet
   , topLetWorker
   ) where
@@ -76,6 +82,7 @@ import qualified Clash.Core.Type as C
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Scoped.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
 import Clash.Rewrite.StrategyDSL
@@ -83,9 +90,11 @@ import Clash.Rewrite.StrategyDSL
   , onTyAppNode, scopedAnyConstructor, toScopedTransformation )
 import Clash.Rewrite.Types (primitives, scopedTypeEnv)
 
+import Clash.Core.Scoped.Alpha ()
 import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences, teleNameBinders, tmNameOccursIn)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.NameMap (lookupNameMap, singletonNameMap)
+import Clash.Core.Scoped.NameMap
+  (emptyNameMap, lookupNameMap, singletonNameMap)
 import Clash.Core.Scoped.Subst (unsinkAlt, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
@@ -94,14 +103,15 @@ import Clash.Core.Scoped.Term
 import Clash.Core.Scoped.TermInfo (isCon, isLocalVar)
 import Clash.Core.Scoped.Type (TypeView (..), tyNatSize, tyView)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
-import Clash.Core.Scoped.Util (LetGroup (..), mkLets, mkVec, regroupLetBindings)
+import Clash.Core.Scoped.Util
+  (LetGroup (..), inverseTopSortOrder, mkLets, mkVec, regroupLetBindings)
 import Clash.Rewrite.Scoped
   ( FrameKind (..), TransformContext, changed, ctxFrames, isLambdaBodyKind
   , isTickKind, setChanged, tfScope )
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Scoped.Util
-  ( LetBinding (..), isFromInt, isUntranslatable, mkTmBinderFor, openLetBindings
-  , removeUnusedBinders, substVars )
+  ( LetBinding (..), isFromInt, isUntranslatable, keepBindings, mkTmBinderFor
+  , openLetBindings, removeUnusedBinders, substVars )
 
 -- | Remove unused let-bindings
 deadCode :: Transformation
@@ -413,6 +423,46 @@ mergeLetRhss sc0 xs0 body0 k = go sc0 TNil (length xs0) [] (zip [0..] xs0) body0
                      Nothing -> error "flattenLet: an inlined binder remains"
           _ -> mergeAll (mkTicks ibody1 (map sink srcTicks))
     _ -> go sc ext next ((pos, rhs) : done) todo body merged
+
+-- * simpleCSE
+
+-- | Simplified CSE, only works on let-bindings, does an inverse topological
+-- sort of the let-bindings and then works from top to bottom. See
+-- 'Clash.Normalize.Transformations.Letrec.simpleCSE'.
+simpleCSE :: Transformation
+simpleCSE = toScopedTransformation "CSE" (onLet 'simpleCSEWorker)
+
+-- | The 'Let' handler of 'simpleCSE'
+simpleCSEWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> Bind n l
+  -> Term l
+  -> NormalizeSession (Term n)
+simpleCSEWorker ctx term bind body = case bind of
+  -- A single binding has nothing to be shared with
+  NonRec {} -> return term
+  Rec {} -> openLetBindings sc bind body $ \scL bs lbs body1 ->
+    let lbsArr = IntMap.fromList (zip [0..] lbs)
+        order = inverseTopSortOrder bs (map lbRhs lbs)
+    in  do
+      ((m, kept), Monoid.getAny -> replaced) <-
+        listen (reduceBinders scL emptyNameMap [] [lbsArr IntMap.! i | i <- order])
+      if replaced
+        then do
+          -- The substitution is applied to the kept bindings too: the
+          -- bindings of a recursive group can refer to a binding that is
+          -- only replaced later in the order.
+          let substM = substVars scL m
+              kept1 = [lb {lbRhs = substM (lbRhs lb)} | lb <- kept]
+          case keepBindings sc bs kept1 (substM body1) of
+            Just t -> changed t
+            Nothing -> error "simpleCSE: a replaced binder remains"
+        else return term
+ where
+  sc = tfScope ctx
+{-# SCC simpleCSEWorker #-}
 
 -- * topLet
 
