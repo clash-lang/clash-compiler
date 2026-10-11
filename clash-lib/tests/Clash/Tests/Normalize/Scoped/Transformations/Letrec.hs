@@ -77,6 +77,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Letrec"
   [ deadCodeTests
   , removeUnusedExprTests
   , flattenLetTests
+  , topLetTests
   , regressionTests
   ]
 
@@ -255,11 +256,38 @@ flattenLetTests = testGroup "flattenLet"
               (app "k" 12 [C.Var a, C.Var b]))
       ]
 
+-- * topLet
+
+-- | The context of the body of lambdas binding the given variables
+lamBodyCtx :: [Id] -> TransformContext
+lamBodyCtx vs = TransformContext (inScopeOf vs) (map C.LamBody (reverse vs))
+
+topLetC, topLetS :: NormRewrite
+topLetC = apply "topLet" Current.topLetWorker
+topLetS = $(asRewriteQ S.topLet)
+
+topLetTests :: TestTree
+topLetTests = testGroup "topLet"
+      [ testCase "binds the body of a function" $
+          agrees def (lamBodyCtx [x]) topLetC topLetS (app "g" 10 [C.Var x])
+      , testCase "adds a binding for the body of a let-expression" $
+          agrees def (lamBodyCtx [x]) topLetC topLetS
+            (C.Letrec [(a, app "g" 10 [C.Var x])] (app "k" 12 [C.Var a, C.Var x]))
+      , testCase "adds a binding for the body of a non-recursive let-expression" $
+          agrees def (lamBodyCtx [x]) topLetC topLetS
+            (C.Let (C.NonRec a (app "g" 10 [C.Var x])) (app "k" 12 [C.Var a, C.Var x]))
+      , testCase "doesn't fire on a let-expression whose body is a variable" $
+          agrees def (lamBodyCtx [x]) topLetC topLetS
+            (C.Letrec [(a, app "g" 10 [C.Var x])] (C.Var a))
+      , testCase "doesn't fire on a tick" $
+          agrees def (lamBodyCtx [x]) topLetC topLetS (C.Tick srcTick (app "g" 10 [C.Var x]))
+      , testCase "doesn't fire on an untranslatable term" $
+          agrees def (lamBodyCtx [x]) topLetC topLetS (C.Var (globalId User "g" 10 (intFunTy 1)))
+      , testCase "doesn't fire outside the body of a function" $
+          agrees def (TransformContext (inScopeOf [x]) [C.AppArg Nothing, C.LamBody x])
+            topLetC topLetS (app "g" 10 [C.Var x])
+      ]
+
 -- | The regression tests of the Clash Core versions
 regressionTests :: TestTree
-regressionTests = testGroup "regression tests" (letrecTests flattenLetS topLetC)
-
-
--- | The current 'Clash.Normalize.Transformations.Letrec.topLet'
-topLetC :: NormRewrite
-topLetC = apply "topLet" Current.topLetWorker
+regressionTests = testGroup "regression tests" (letrecTests flattenLetS topLetS)

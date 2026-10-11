@@ -26,6 +26,7 @@ module Current
   , reduceConst
   , reducePrim
   , removeUnusedExpr
+  , topLet
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -34,7 +35,8 @@ import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
 import qualified Clash.Normalize.Transformations.Reduce as Reduce
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, onApp, onAppNode, onCase, onLet, onLetNode, onPrimNode, onTickNode
+  ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLet, onLetNode
+  , onPrimNode, onTickNode
   , onTyAppNode, toTransformation )
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
@@ -119,3 +121,8 @@ removeUnusedExpr = toTransformation "removeUnusedExpr"
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.flattenLet' replaced
 flattenLet :: Transformation
 flattenLet = toTransformation "flattenLet" (onLetNode 'Letrec.flattenLetWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Letrec.topLet', which
+-- 'Clash.Normalize.Scoped.Transformations.Letrec.topLet' replaced
+topLet :: Transformation
+topLet = anyConstructor "topLet" 'Letrec.topLetWorker

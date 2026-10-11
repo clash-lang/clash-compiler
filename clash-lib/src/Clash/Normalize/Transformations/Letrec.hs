@@ -80,7 +80,7 @@ import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.StrategyDSL
-  (Transformation, anyConstructor, onLet, toTransformation)
+  (Transformation, onLet, toTransformation)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
@@ -532,7 +532,7 @@ simpleCSEWorker (TransformContext is0 _) term (bindToList -> bndrsX) body = do
 -- | Ensure that top-level lambda's eventually bind a let-expression of which
 -- the body is a variable-reference.
 topLet :: Transformation
-topLet = anyConstructor "topLet" 'topLetWorker
+topLet = Scoped.topLet
 
 -- | The worker of 'topLet': a plain rewrite, offered at every node.
 topLetWorker :: HasCallStack => NormRewrite

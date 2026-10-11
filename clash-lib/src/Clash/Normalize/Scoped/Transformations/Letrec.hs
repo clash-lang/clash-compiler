@@ -45,6 +45,8 @@ module Clash.Normalize.Scoped.Transformations.Letrec
   , removeUnusedExpr
   , removeUnusedExprCase
   , removeUnusedExprSpine
+  , topLet
+  , topLetWorker
   ) where
 
 import qualified Control.Lens as Lens
@@ -78,7 +80,7 @@ import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onCase, onLet, onLetNode, onPrimNode, onTickNode
-  , onTyAppNode, toScopedTransformation )
+  , onTyAppNode, scopedAnyConstructor, toScopedTransformation )
 import Clash.Rewrite.Types (primitives, scopedTypeEnv)
 
 import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences, teleNameBinders, tmNameOccursIn)
@@ -89,15 +91,17 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
   ( appendTele, collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks
   , partitionTicks )
-import Clash.Core.Scoped.TermInfo (isCon)
+import Clash.Core.Scoped.TermInfo (isCon, isLocalVar)
 import Clash.Core.Scoped.Type (TypeView (..), tyNatSize, tyView)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Scoped.Util (LetGroup (..), mkLets, mkVec, regroupLetBindings)
 import Clash.Rewrite.Scoped
-  (FrameKind (..), TransformContext, changed, ctxFrames, setChanged, tfScope)
+  ( FrameKind (..), TransformContext, changed, ctxFrames, isLambdaBodyKind
+  , isTickKind, setChanged, tfScope )
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Scoped.Util
-  ( LetBinding (..), isFromInt, openLetBindings, removeUnusedBinders, substVars )
+  ( LetBinding (..), isFromInt, isUntranslatable, mkTmBinderFor, openLetBindings
+  , removeUnusedBinders, substVars )
 
 -- | Remove unused let-bindings
 deadCode :: Transformation
@@ -409,3 +413,52 @@ mergeLetRhss sc0 xs0 body0 k = go sc0 TNil (length xs0) [] (zip [0..] xs0) body0
                      Nothing -> error "flattenLet: an inlined binder remains"
           _ -> mergeAll (mkTicks ibody1 (map sink srcTicks))
     _ -> go sc ext next ((pos, rhs) : done) todo body merged
+
+-- * topLet
+
+-- | Ensure that top-level lambda's eventually bind a let-expression of which
+-- the body is a variable-reference. See
+-- 'Clash.Normalize.Transformations.Letrec.topLet'.
+topLet :: Transformation
+topLet = scopedAnyConstructor "topLet" 'topLetWorker
+
+-- | The worker of 'topLet': a plain rewrite, offered at every node
+topLetWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> NormalizeSession (Term n)
+topLetWorker ctx e
+  | all (\c -> isLambdaBodyKind c || isTickKind c) (ctxFrames ctx) = case e of
+      Tick {} -> return e
+      Let bind body
+        | isLocalVar body -> return e
+        | otherwise -> openLetBindings sc bind body $ \scL bs lbs body1 -> do
+            untranslatable <- isUntranslatable False scL body1
+            if untranslatable
+              then return e
+              else do
+                te <- Lens.view scopedTypeEnv
+                -- The new binder joins the bindings in a recursive group,
+                -- which needs the right-hand side of a 'NonRec' binding to
+                -- be moved into the scope of its binder: opening it renamed
+                -- the binder if it could capture a variable.
+                --
+                -- NB: We cannot nest the new binding instead, see
+                -- 'Clash.Normalize.Transformations.Letrec.topLet'.
+                mkTmBinderFor te scL (C.mkUnsafeSystemName "result" 0) body1 $ \_ b ->
+                  changed (Let (Rec (appendTele bs (TCons b TNil))
+                                    (map (sink . lbRhs) lbs ++ [sink body1]))
+                               (idBinderVar b))
+      _ -> do
+        untranslatable <- isUntranslatable False sc e
+        if untranslatable
+          then return e
+          else do
+            te <- Lens.view scopedTypeEnv
+            mkTmBinderFor te sc (C.mkUnsafeSystemName "result" 0) e $ \_ b ->
+              changed (Let (NonRec b e) (idBinderVar b))
+  | otherwise = return e
+ where
+  sc = tfScope ctx
+{-# SCC topLetWorker #-}
