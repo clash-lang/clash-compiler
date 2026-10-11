@@ -36,7 +36,7 @@ tests :: TestTree
 tests = testGroup "Clash.Tests.Differential.Sites"
   [ testCase "deadCode reproduces its captured result, and its port agrees" $ do
       cap <- mkCapture "deadCode" f site deadLet (C.Var a)
-      SiteOutcome replay scoped <- compareAt deadCodeCmp cap
+      SiteOutcome replay scoped _ <- compareAt deadCodeCmp cap
       assertReproduced replay
       case scoped of
         Just Equal -> pure ()
@@ -44,14 +44,14 @@ tests = testGroup "Clash.Tests.Differential.Sites"
 
   , testCase "a wrong captured result is not reproduced" $ do
       cap <- mkCapture "deadCode" f site deadLet (C.Var b)
-      SiteOutcome replay _ <- compareAt deadCodeCmp cap
+      SiteOutcome replay _ _ <- compareAt deadCodeCmp cap
       case replay of
         NotReproduced (Mismatch {}) -> pure ()
         _ -> assertFailure "expected the current side not to reproduce it"
 
   , testCase "a transformation that doesn't fire at the site" $ do
       cap <- mkCapture "deadCode" f site (C.Var a) (C.Var a)
-      SiteOutcome replay _ <- compareAt deadCodeCmp cap
+      SiteOutcome replay _ _ <- compareAt deadCodeCmp cap
       case replay of
         NotFired _ -> pure ()
         _ -> assertFailure "expected the current side not to fire"
@@ -59,7 +59,7 @@ tests = testGroup "Clash.Tests.Differential.Sites"
   , testCase "a scoped side that doesn't fire is different" $ do
       cap <- mkCapture "deadCode" f site deadLet (C.Var a)
       let cmp = deadCodeCmp {scScoped = Just (ScopedTransform (\_ e -> pure e))}
-      SiteOutcome replay scoped <- compareAt cmp cap
+      SiteOutcome replay scoped _ <- compareAt cmp cap
       assertReproduced replay
       case scoped of
         Just (Different (Mismatch {})) -> pure ()
