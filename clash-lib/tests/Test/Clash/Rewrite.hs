@@ -1015,6 +1015,101 @@ brDc =
     (rtreeTy (C.VarTy rtreeD) (C.VarTy rtreeA)))
   { C.dcTag = 2 }
 
+-- | @SNat n@, with @SNat :: forall n. Natural -> SNat n@. The primitive
+-- reductions find this constructor through the types of the functions that
+-- @dfold@, @dtfold@ and @tdfold@ apply to @SNat@s.
+snatTcNm :: C.TyConName
+snatTcNm = mkTyConName "Clash.Promoted.Nat.SNat" 2030
+
+snatTy :: C.Type -> C.Type
+snatTy n = tcApp snatTcNm [n]
+
+snatN :: C.TyVar
+snatN = kindedTyVar C.User "n" 2031 C.typeNatKind
+
+snatDc :: C.DataCon
+snatDc = mkDataCon "SNat" 2032 [snatN] [] [C.naturalPrimTy] (snatTy (C.VarTy snatN))
+
+-- | GHC's boxed @Int@: @data Int = I# Int#@, unlike 'intTy'. The primitive
+-- reductions of @replace_int@ and @index_int@ compare the index with boxed
+-- literals.
+hIntTcNm :: C.TyConName
+hIntTcNm = mkTyConName "GHC.Types.Int" 2033
+
+hIntTy :: C.Type
+hIntTy = tcTy hIntTcNm
+
+iHashDc :: C.DataCon
+iHashDc = mkDataCon "GHC.Types.I#" 2034 [] [] [C.intPrimTy] hIntTy
+
+-- | A proof of an upper bound, as @dfold@ takes one: @data UBP l n = MkUBP@
+ubpTcNm :: C.TyConName
+ubpTcNm = mkTyConName "UBP" 2035
+
+ubpL, ubpN :: C.TyVar
+ubpL = kindedTyVar C.User "l" 2036 C.typeNatKind
+ubpN = kindedTyVar C.User "n" 2037 C.typeNatKind
+
+ubpTy :: C.Type -> C.Type -> C.Type
+ubpTy l n = tcApp ubpTcNm [l, n]
+
+ubpDc :: C.DataCon
+ubpDc = mkDataCon "MkUBP" 2038 [ubpL, ubpN] [] [] (ubpTy (C.VarTy ubpL) (C.VarTy ubpN))
+
+-- | The name of @Index@, as the function @imap@ takes indexes it
+indexTcNm :: C.TyConName
+indexTcNm = mkTyConName "Clash.Sized.Internal.Index.Index" 2039
+
+-- | @Index n@
+indexTy :: C.Type -> C.Type
+indexTy n = tcApp indexTcNm [n]
+
+-- | The @Functor@ and @Applicative@ dictionaries of @traverse#@:
+--
+-- > data Functor f = CFunctor (forall a b. (a -> b) -> f a -> f b) Int
+-- > data Applicative f =
+-- >   CApplicative (Functor f) (forall a. a -> f a)
+-- >     (forall a b. f (a -> b) -> f a -> f b) Int Int Int
+--
+-- The fields of type @Int@ stand in for the methods the reduction of
+-- @traverse#@ doesn't use.
+functorTcNm, applicativeTcNm :: C.TyConName
+functorTcNm = mkTyConName "GHC.Base.Functor" 2040
+applicativeTcNm = mkTyConName "GHC.Base.Applicative" 2041
+
+dictF, dictA, dictB :: C.TyVar
+dictF = kindedTyVar C.User "f" 2042 (C.mkFunTy C.liftedTypeKind C.liftedTypeKind)
+dictA = tyVar C.User "a" 2043
+dictB = tyVar C.User "b" 2044
+
+functorTy, applicativeTy :: C.Type -> C.Type
+functorTy f = tcApp functorTcNm [f]
+applicativeTy f = tcApp applicativeTcNm [f]
+
+functorDc, applicativeDc :: C.DataCon
+functorDc =
+  mkDataCon "CFunctor" 2045 [dictF] []
+    [ C.ForAllTy dictA (C.ForAllTy dictB
+        (C.mkFunTy (C.mkFunTy a b) (C.mkFunTy (C.AppTy f a) (C.AppTy f b))))
+    , intTy ]
+    (functorTy f)
+ where
+  f = C.VarTy dictF
+  a = C.VarTy dictA
+  b = C.VarTy dictB
+applicativeDc =
+  mkDataCon "CApplicative" 2046 [dictF] []
+    [ functorTy f
+    , C.ForAllTy dictA (C.mkFunTy a (C.AppTy f a))
+    , C.ForAllTy dictA (C.ForAllTy dictB
+        (C.mkFunTy (C.AppTy f (C.mkFunTy a b)) (C.mkFunTy (C.AppTy f a) (C.AppTy f b))))
+    , intTy, intTy, intTy ]
+    (applicativeTy f)
+ where
+  f = C.VarTy dictF
+  a = C.VarTy dictA
+  b = C.VarTy dictB
+
 -- | The names of the types of clock, reset and enable lines. Clash recognizes
 -- them by their names.
 clockTcNm, resetTcNm, enableTcNm :: C.TyConName
@@ -1093,6 +1188,12 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
         {C.tyConKind = C.mkFunTy C.typeNatKind C.liftedTypeKind, C.tyConArity = 1}
     , mkAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
     , mkAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
+    , mkAlgTyCon snatTcNm [snatN] [snatDc]
+    , mkAlgTyCon hIntTcNm [] [iHashDc]
+    , mkAlgTyCon ubpTcNm [ubpL, ubpN] [ubpDc]
+    , C.PrimTyCon (C.nameUniq indexTcNm) indexTcNm (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
+    , mkAlgTyCon functorTcNm [dictF] [functorDc]
+    , mkAlgTyCon applicativeTcNm [dictF] [applicativeDc]
     , C.PrimTyCon (C.nameUniq clockTcNm) clockTcNm C.liftedTypeKind 1
     , C.PrimTyCon (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
     , C.PrimTyCon (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
