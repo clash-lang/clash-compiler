@@ -20,6 +20,7 @@
 module Clash.Tests.Core.Scoped.Subst (tests) where
 
 import qualified Control.Lens as Lens
+import qualified Data.List as List
 import Data.Maybe (isJust, isNothing)
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -42,6 +43,7 @@ import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (mkLams, mkTyLams)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, existentialDataCon, existentialTy, existentialTyVar, intId
@@ -504,6 +506,35 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
               problems === [] .&&. binderRaws tm2 === binderRaws tm1 .&&.
                 property (aeqTm tm1 tm2)
       ]
+  , testGroup "closing over variables" closeOverTests
+  , withTests 500 $ testGroup "closing over variables, properties"
+      [ testProperty "freeVarOccs visits the free variables in the order Clash does" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 ->
+                  let (tys, tms) = freeVarOccs tm1
+                      (cTys, cTms) = clashFreeVarOrder tm
+                  in  map tyOccRaw tys === cTys .&&. map tmOccRaw tms === cTms
+      , testProperty "abstracting over the free variables agrees with Clash" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> do
+              let tm1 = fromClashTerm env tm
+                  (tys, tms) = freeVarOccs tm1
+                  tvsC = C.dependencySortTyVars (List.nubBy sameUniq (Lens.toListOf C.termFreeTyVars tm))
+                  idsC = List.nubBy sameUniq (Lens.toListOf C.freeLocalIds tm)
+                  -- The scoped type variables in the order of the Clash ones
+                  tys1 = [ty | tv <- tvsC, ty <- tys, tyOccRaw ty == fromIntegral (C.varUniq tv)]
+                  expected = C.mkTyLams (C.mkLams tm idsC) tvsC
+              case closeOver tys1 tms (\_ tvTele idTele cl -> (\t -> mkTyLams (mkLams t idTele) tvTele) <$> closureTerm cl tm1) of
+                Just (Just closed) ->
+                  let res = toClashTerm closed in
+                  counterexample ("Clash:\n" <> showTerm expected <> "\nscoped:\n" <> showTerm res) $
+                    property (aeqTermTyped expected res)
+                _ -> counterexample "closeOver failed" False
+      ]
   , testCase "teleIdVars gives the variables of a telescope in its scope" $ do
       let tm = [parseToTermQQ| let { (x :: Int) = y; (y :: Int) = x } in x |]
       case fromClashTermClosed tm of
@@ -534,3 +565,89 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
           _ -> assertFailure "unexpected variables"
         _ -> assertFailure "unexpected shape"
   ]
+
+-- * Closing over variables
+
+-- | The raw name of a type variable occurrence
+tyOccRaw :: Type n -> Int
+tyOccRaw = \case
+  VarTy _ _ n -> tyNameRaw n
+  _ -> error "tyOccRaw: not a type variable"
+
+-- | The raw name of a term variable occurrence
+tmOccRaw :: Term n -> Int
+tmOccRaw = \case
+  Var _ _ n -> tmNameRaw n
+  _ -> error "tmOccRaw: not a variable"
+
+sameUniq :: C.Var a -> C.Var a -> Bool
+sameUniq v1 v2 = C.varUniq v1 == C.varUniq v2
+
+-- | The uniques of the free type variables and the free term variables of a
+-- Clash term, in the order 'C.freeLocalVars' visits them first
+clashFreeVarOrder :: C.Term -> ([Int], [Int])
+clashFreeVarOrder tm =
+  ( List.nub [fromIntegral (C.varUniq v) | v <- vs, isTyVar v]
+  , List.nub [fromIntegral (C.varUniq v) | v <- vs, not (isTyVar v)] )
+ where
+  isTyVar = \case
+    C.TyVar {} -> True
+    C.Id {} -> False
+
+  vs :: [C.Var ()]
+  vs = Lens.toListOf C.freeLocalVars tm
+
+closeOverTests :: [TestTree]
+closeOverTests =
+  [ testCase "binds the variables with their names, kinds and types" $
+      withConvEnv [k, a] [x] $ \env -> do
+        let res = closeOver [tyOcc env k, tyOcc env a] [tmOcc env x] $ \_ tvTele idTele _ ->
+              case (tvTele, idTele) of
+                (TCons bk (TCons ba TNil), TCons bx TNil) ->
+                  [ tyNameRaw (tyNameOf bk), tyNameRaw (tyNameOf ba), tmNameRaw (tmNameOf bx) ]
+                    == [51, 50, 31]
+                    && C.aeqType (toClashType (tyBinderKind ba)) (C.VarTy k)
+                    && C.aeqType (toClashType (idBinderType bx)) (C.VarTy a)
+                _ -> False
+        res @?= Just True
+  , testCase "closes terms and types that only mention the variables" $
+      withConvEnv [k, a] [x, y] $ \env -> do
+        let res = closeOver [tyOcc env k, tyOcc env a] [tmOcc env x] $ \_ _ _ cl ->
+              ( isJust (closureTerm cl (fromClashTerm env (C.Var x)))
+              , isNothing (closureTerm cl (fromClashTerm env (C.Var y)))
+              , isJust (closureType cl (fromClashType env (C.VarTy a)))
+              )
+        res @?= Just (True, True, True)
+  , testCase "rejects a term whose types mention other type variables" $
+      withConvEnv [k, a] [x] $ \env -> do
+        let res = closeOver [tyOcc env k] [] $ \_ _ _ cl ->
+              isNothing (closureTerm cl (fromClashTerm env (C.Var x)))
+        res @?= Just True
+  , testCase "rejects a type variable before the type variables in its kind" $
+      withConvEnv [k, a] [] $ \env ->
+        assertBool "Nothing" (isNothing (closeOver [tyOcc env a, tyOcc env k] [] (\_ _ _ _ -> ())))
+  , testCase "rejects a term variable whose type mentions other type variables" $
+      withConvEnv [k, a] [x] $ \env ->
+        assertBool "Nothing" (isNothing (closeOver [tyOcc env k] [tmOcc env x] (\_ _ _ _ -> ())))
+  , testCase "rejects a variable given twice" $
+      withConvEnv [] [y] $ \env ->
+        assertBool "Nothing" (isNothing (closeOver [] [tmOcc env y, tmOcc env y] (\_ _ _ _ -> ())))
+  , testCase "freeVarOccs gives the occurrences of free variables, not bound ones" $
+      withConvEnv [k, a] [x, y] $ \env -> do
+        -- @\(z :: a) -> x y z@
+        let z = localId C.User "z" 40 (C.VarTy a)
+            tm = fromClashTerm env (C.Lam z (C.mkTmApps (C.Var x) [C.Var y, C.Var z]))
+            (tys, tms) = freeVarOccs tm
+        (map tyOccRaw tys, map tmOccRaw tms) @?= ([50, 51], [31, 32])
+  ]
+ where
+  k = tyVar C.User "k" 51
+  a = C.TyVar (C.mkUnsafeSystemName "a" 50) 50 (C.VarTy k)
+  x = localId C.User "x" 31 (C.VarTy a)
+  y = intId C.User "y" 32
+
+  tyOcc :: Distinct n => ConvEnv n -> C.TyVar -> Type n
+  tyOcc env tv = fromClashType env (C.VarTy tv)
+
+  tmOcc :: Distinct n => ConvEnv n -> C.Id -> Term n
+  tmOcc env i = fromClashTerm env (C.Var i)

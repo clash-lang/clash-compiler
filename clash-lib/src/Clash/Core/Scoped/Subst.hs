@@ -100,8 +100,30 @@
     @l@ binds a name of @l@, and as @l@ is t'Distinct', no binder after it
     shadows that name. Its type or kind lives in the scope extended by the
     binders before it, all of whose names are names of @l@ too.
+
+  * __Free variable occurrences__ ('unsafeCoerce' in 'freeVarOccs' and
+    'freeTyVarOccsOfType'): an occurrence of a variable that no binder on the
+    path to it binds is an occurrence of a variable of the scope of the term
+    (or type). Its kind or type is one of that scope too if it doesn't
+    mention a variable bound on the path, which is checked.
+
+  * __Closing over variables__ ('closeOver'): the telescopes bind the given
+    variables in the empty scope, with their raw names and sorts
+    ('UnsafeTyNameBinder' and 'UnsafeTmNameBinder' of names that are fresh
+    for the empty scope). Their names are checked to be distinct, so the
+    scopes the telescopes extend the empty scope to are t'Distinct'. The kind
+    of every type variable binder only mentions the type variables before it,
+    and the type of every term variable binder only the type variables, which
+    is checked: these are names of the scopes the kinds and types live in. A
+    type or term of scope @n@ whose free type variables and free term
+    variables are among the given ones ('closureType', 'closureTerm', which
+    check this) only mentions names of the scope @l@ the telescopes extend the
+    empty scope to, with the same raw names and sorts, so it is a value of
+    @l@ as it is. The watermark of @l@ is the largest of these names, which
+    keeps the 'Scope' invariant.
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
@@ -156,11 +178,20 @@ module Clash.Core.Scoped.Subst
     -- * Variables of binders
   , teleIdVars
   , patVars
+    -- * Closing over variables
+  , freeVarOccs
+  , freeTyVarOccsOfType
+  , Closure (..)
+  , closeOver
   ) where
 
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntMap.Strict (IntMap)
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import qualified Data.Kind as K
+import qualified Data.List as List
+import GHC.Stack (HasCallStack)
 import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Clash.Core.Name as C
@@ -881,3 +912,227 @@ unsafeTeleTyVars TNil = []
 unsafeTeleTyVars (TCons b bs) =
   VarTy (tyBinderOcc b) (unsafeCoerce (tyBinderKind b)) (unsafeCoerce (tyNameOf b))
     : unsafeTeleTyVars bs
+
+-- * Closing over variables
+
+-- | Free variables found so far by 'freeVarOccs': the raw names of the type
+-- and term variables, and their first occurrences, in reverse order
+data Occs (n :: S) = Occs !IntSet !IntSet [Type n] [Term n]
+
+-- | The free type variables and the free term variables of a term, as their
+-- first occurrences ('VarTy' and 'Var'), which carry their kinds and types.
+-- In the order of their first occurrences, like the free variables that
+-- 'Clash.Core.FreeVars.freeLocalVars' visits: depth-first, left to right, a
+-- variable before the variables in its type or kind, and the type of a
+-- binder before its scope. Includes the variables of the types in the term,
+-- like 'freeVars'.
+--
+-- Errors if the type or kind of a first occurrence mentions a type variable
+-- bound in the term: that is not a type of the scope of the term, which an
+-- occurrence built by hand may have.
+freeVarOccs :: HasCallStack => Term n -> ([Type n], [Term n])
+freeVarOccs tm =
+  case occsTm IntSet.empty tm (Occs IntSet.empty IntSet.empty [] []) of
+    Occs _ _ tys tms -> (reverse tys, reverse tms)
+
+-- | The free type variables of a type, as their first occurrences, see
+-- 'freeVarOccs'
+freeTyVarOccsOfType :: HasCallStack => Type n -> [Type n]
+freeTyVarOccsOfType ty =
+  case occsTy IntSet.empty ty (Occs IntSet.empty IntSet.empty [] []) of
+    Occs _ _ tys _ -> reverse tys
+
+-- | Whether a type mentions one of the given raw names
+mentions :: IntSet -> Type x -> Bool
+mentions bound ty =
+  not (IntSet.null bound)
+    && any ((`IntSet.member` bound) . tyNameRaw) (nameSetToList (freeTyVarsOfType ty))
+
+-- | Add the free variables of a type, given the raw names of the variables
+-- bound on the path to it
+occsTy :: HasCallStack => IntSet -> Type x -> Occs n -> Occs n
+occsTy bound ty acc@(Occs seenTy seenTm tys tms) = case ty of
+  VarTy occ k nm
+    | let r = tyNameRaw nm
+    , not (IntSet.member r bound) && not (IntSet.member r seenTy)
+    -> if mentions bound k
+         then error ("freeVarOccs: the kind of type variable " <> show occ
+                     <> " mentions a type variable bound in the term")
+         -- Trusted: a free occurrence, see the module header
+         else occsTy bound k (Occs (IntSet.insert r seenTy) seenTm (unsafeCoerce ty : tys) tms)
+    | otherwise -> occsTy bound k acc
+  ConstTy {} -> acc
+  ForAllTy b t ->
+    occsTy (IntSet.insert (tyNameRaw (tyNameOf b)) bound) t (occsTy bound (tyBinderKind b) acc)
+  AppTy t1 t2 -> occsTy bound t2 (occsTy bound t1 acc)
+  LitTy {} -> acc
+  AnnType _ t -> occsTy bound t acc
+
+-- | Add the free variables of a term, given the raw names of the variables
+-- bound on the path to it
+occsTm :: HasCallStack => IntSet -> Term x -> Occs n -> Occs n
+occsTm bound tm acc@(Occs seenTy seenTm tys tms) = case tm of
+  Var occ ty nm
+    | let r = tmNameRaw nm
+    , not (IntSet.member r bound) && not (IntSet.member r seenTm)
+    -> if mentions bound ty
+         then error ("freeVarOccs: the type of variable " <> show occ
+                     <> " mentions a type variable bound in the term")
+         -- Trusted: a free occurrence, see the module header
+         else occsTy bound ty (Occs seenTy (IntSet.insert r seenTm) tys (unsafeCoerce tm : tms))
+    | otherwise -> occsTy bound ty acc
+  GlobalVar {} -> acc
+  Data {} -> acc
+  Literal {} -> acc
+  Prim {} -> acc
+  Lam b e -> occsTm (bind (tmNameRaw (tmNameOf b))) e (occsTy bound (idBinderType b) acc)
+  TyLam b e -> occsTm (bind (tyNameRaw (tyNameOf b))) e (occsTy bound (tyBinderKind b) acc)
+  App e1 e2 -> occsTm bound e2 (occsTm bound e1 acc)
+  TyApp e ty -> occsTy bound ty (occsTm bound e acc)
+  Let (NonRec b x) e ->
+    occsTm (bind (tmNameRaw (tmNameOf b))) e
+      (occsTm bound x (occsTy bound (idBinderType b) acc))
+  Let (Rec bs xs) e ->
+    -- The type of a binder is in the scope of the binders before it, the
+    -- right-hand sides and the body are in the scope of all of them
+    let (bounds, boundAll) = teleBounds bound bs
+        step a (bnd, (SomeType ty, x)) = occsTm boundAll x (occsTy bnd ty a)
+    in occsTm boundAll e (List.foldl' step acc (zip bounds (zip (teleTypes bs) xs)))
+  Case e ty alts ->
+    List.foldl' (flip (occsAlt bound)) (occsTy bound ty (occsTm bound e acc)) alts
+  Cast e t1 t2 -> occsTy bound t2 (occsTy bound t1 (occsTm bound e acc))
+  Tick t e -> occsTm bound e (occsTick bound t acc)
+ where
+  bind r = IntSet.insert r bound
+
+-- | Add the free variables of a case alternative
+occsAlt :: HasCallStack => IntSet -> Alt x -> Occs n -> Occs n
+occsAlt bound (Alt p e) acc = case p of
+  DataPat _ tvs ids ->
+    let (acc1, bound1) = occsTyTele bound tvs acc
+        (idBounds, boundAll) = teleBounds bound1 ids
+        step a (bnd, SomeType ty) = occsTy bnd ty a
+    in occsTm boundAll e (List.foldl' step acc1 (zip idBounds (teleTypes ids)))
+  LitPat _ -> occsTm bound e acc
+  DefaultPat -> occsTm bound e acc
+ where
+  occsTyTele :: IntSet -> Tele TyBinder x' y' -> Occs n' -> (Occs n', IntSet)
+  occsTyTele bnd TNil a = (a, bnd)
+  occsTyTele bnd (TCons b bs) a =
+    occsTyTele (IntSet.insert (tyNameRaw (tyNameOf b)) bnd) bs (occsTy bnd (tyBinderKind b) a)
+
+-- | Add the free variables of a tick
+occsTick :: HasCallStack => IntSet -> TickInfo x -> Occs n -> Occs n
+occsTick bound t acc = case t of
+  NameMod _ ty -> occsTy bound ty acc
+  Attributes ty e -> occsTm bound e (occsTy bound ty acc)
+  _ -> acc
+
+-- | For every binder of a telescope of term variable binders, the raw names
+-- bound on the path to its type; and those bound on the path to the scope of
+-- the telescope
+teleBounds :: IntSet -> Tele IdBinder x y -> ([IntSet], IntSet)
+teleBounds bound TNil = ([], bound)
+teleBounds bound (TCons b bs) =
+  let (rest, boundAll) = teleBounds (IntSet.insert (tmNameRaw (tmNameOf b)) bound) bs
+  in (bound : rest, boundAll)
+
+-- | The types of the binders of a telescope, each in its own scope
+teleTypes :: Tele IdBinder x y -> [SomeType]
+teleTypes TNil = []
+teleTypes (TCons b bs) = SomeType (idBinderType b) : teleTypes bs
+
+-- | A type in some scope
+data SomeType where
+  SomeType :: Type x -> SomeType
+
+-- | Moving values of scope @n@ that only mention some of its variables into
+-- the scope @l@ that binds just those variables, see 'closeOver'
+data Closure (n :: S) (l :: S) = Closure
+  { closureType :: Type n -> Maybe (Type l)
+  -- ^ Move a type into scope @l@, if its free type variables are among the
+  -- variables of @l@
+  , closureTerm :: Term n -> Maybe (Term l)
+  -- ^ Move a term into scope @l@, if its free variables (including those of
+  -- its types) are among the variables of @l@
+  }
+
+-- | Bind some of the variables of scope @n@ in the empty scope, e.g. to
+-- abstract a term over its free variables. Gives a telescope of type variable
+-- binders, followed by a telescope of term variable binders, that bind the
+-- given variables with their human readable names, raw names, and the kinds
+-- and types of the given occurrences; the scope @l@ these extend the empty
+-- scope to; and a 'Closure' that moves values of @n@ that only mention these
+-- variables into @l@. E.g. abstracting a term over its free variables, given
+-- in an order 'closeOver' accepts:
+--
+-- @
+-- 'closeOver' tvs ids $ \\_ tvTele idTele cl ->
+--   'Clash.Core.Scoped.Term.mkTyLams' ('Clash.Core.Scoped.Term.mkLams' ('closureTerm' cl e) idTele) tvTele
+-- @
+--
+-- 'Nothing' if an occurrence is not a variable, if a variable is given twice,
+-- if the kind of a type variable mentions a type variable that is not before
+-- it in the list, or if the type of a term variable mentions a type variable
+-- that is not in the list.
+closeOver
+  :: [Type n]
+  -- ^ Occurrences ('VarTy') of the type variables to bind
+  -> [Term n]
+  -- ^ Occurrences ('Var') of the term variables to bind
+  -> (forall i l. (DExt 'VoidS i, DExt i l)
+        => Scope l -> Tele TyBinder 'VoidS i -> Tele IdBinder i l -> Closure n l -> r)
+  -> Maybe r
+closeOver tvs ids cont = do
+  tvOccs <- traverse tyOcc tvs
+  idOccs <- traverse tmOcc ids
+  let tvRaws = [r | (_, _, r) <- tvOccs]
+      idRaws = [r | (_, _, r) <- idOccs]
+      tvSet = IntSet.fromList tvRaws
+      idSet = IntSet.fromList idRaws
+      allRaws = tvRaws ++ idRaws
+      within s = all ((`IntSet.member` s) . tyNameRaw) . nameSetToList
+      kindsOk =
+        and (zipWith (\(_, k, _) before -> within before (freeTyVarsOfType k))
+                     tvOccs
+                     (scanl (flip IntSet.insert) IntSet.empty tvRaws))
+      typesOk = all (\(_, ty, _) -> within tvSet (freeTyVarsOfType ty)) idOccs
+  if IntSet.size (IntSet.union tvSet idSet) /= length allRaws || not kindsOk || not typesOk
+    then Nothing
+    else
+      -- Trusted: see the module header. The scopes are instantiated at
+      -- 'VoidS, which the continuation can't observe.
+      let tyTele :: Tele TyBinder 'VoidS 'VoidS
+          tyTele = foldr
+            (\(occ, k, r) rest -> TCons
+               (TyBinder occ (unsafeCoerce k) (UnsafeTyNameBinder (UnsafeNameBinder (UnsafeName r))))
+               rest)
+            TNil tvOccs
+          idTele :: Tele IdBinder 'VoidS 'VoidS
+          idTele = foldr
+            (\(occ, ty, r) rest -> TCons
+               (IdBinder occ (unsafeCoerce ty) (UnsafeTmNameBinder (UnsafeNameBinder (UnsafeName r))))
+               rest)
+            TNil idOccs
+          closure = Closure
+            { closureType = \ty ->
+                if within tvSet (freeTyVarsOfType ty) then Just (unsafeCoerce ty) else Nothing
+            , closureTerm = \tm ->
+                if within tvSet (freeTyVars tm)
+                     && all ((`IntSet.member` idSet) . tmNameRaw) (nameSetToList (freeTmVars tm))
+                  then Just (unsafeCoerce tm)
+                  else Nothing
+            }
+          sc :: Scope 'VoidS
+          sc = UnsafeScope (List.foldl' max 0 allRaws)
+      in Just (cont sc tyTele idTele closure)
+ where
+  tyOcc :: Type n -> Maybe (C.Name C.Type, Kind n, Int)
+  tyOcc = \case
+    VarTy occ k nm -> Just (occ, k, tyNameRaw nm)
+    _ -> Nothing
+
+  tmOcc :: Term n -> Maybe (C.Name C.Term, Type n, Int)
+  tmOcc = \case
+    Var occ ty nm -> Just (occ, ty, tmNameRaw nm)
+    _ -> Nothing
