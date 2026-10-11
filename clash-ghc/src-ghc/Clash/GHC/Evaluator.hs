@@ -91,17 +91,17 @@ evaluate these special primitives.
 
 stepVar :: Id -> Step
 stepVar i m _
-  | Just e <- heapLookup LocalId i m
-  = go LocalId e
-
-  | Just e <- heapLookup GlobalId i m
-  , isGlobalId i
-  = go GlobalId e
+  | Just e <- heapLookup s i m
+  = go e
 
   | otherwise
   = Nothing
  where
-  go s e =
+  -- A global and a local variable can share a unique, so look in the heap of
+  -- the variable's scope only
+  s = idScope i
+
+  go e =
     let term = deShadowTerm (mScopeNames m) (tickExpr e)
      in Just . setTerm term . stackPush (Update s i) $ heapDelete s i m
 
@@ -290,6 +290,7 @@ newLetBinding
   -> (Machine, Id)
 newLetBinding tcm m e
   | Var v <- e
+  , isLocalId v
   , heapContains LocalId v m
   = (m, v)
 
