@@ -437,6 +437,802 @@ primitives =
       _ -> Nothing
 
 
+--------
+-- Int8#
+--------
+  , primStepEntry $(textNameLit 'GHC.Prim.intToInt8#) $ \case
+      PrimStepContext{..} | [i] <- intLiterals' args
+        -> let !(I# a)  = fromInteger i
+               b = narrow8Int# a
+           in  reduce . Literal . Int8Literal . toInteger $ I# b
+      _ -> Nothing
+
+  , liftLit1 $(textNameLit 'GHC.Prim.int8ToInt#) int8Literal (\i -> Literal $ IntLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt8#) $ \case
+      PrimStepContext{..} | [i] <- int8Literals' args
+        -> let !(I8# a) = fromInteger i
+            in reduce (Literal (Int8Literal (toInteger (I8# (negateInt8# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8 plusInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8 subInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8 timesInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotInt8#) int8Literal (\i j -> Literal (Int8Literal (toInteger (fromInteger i `quot` fromInteger j :: Int8))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remInt8#) int8Literal (\i j -> Literal (Int8Literal (toInteger (fromInteger i `rem` fromInteger j :: Int8))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.quotRemInt8#) $ \case
+      PrimStepContext{..}
+        | [i, j] <- int8Literals' args
+        -> let (q,r) = quotRem (fromInteger i :: Int8) (fromInteger j)
+           in reduce $ mkResultCon te sc ty tys
+                      [ catchDivByZero (Literal (Int8Literal (toInteger q)))
+                      , catchDivByZero (Literal (Int8Literal (toInteger r)))]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftLInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8I uncheckedShiftLInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRAInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8I uncheckedShiftRAInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRLInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8I uncheckedShiftRLInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.int8ToWord8#) $ \case
+      PrimStepContext{..} | [i] <- int8Literals' args
+        -> let !(I8# a) = fromInteger i
+            in reduce (Literal (Word8Literal (toInteger (W8# (int8ToWord8# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8RI eqInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8RI geInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8RI gtInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8RI leInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8RI ltInt8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neInt8#) $ \case
+      PrimStepContext{..} | Just r <- liftI8RI neInt8# args
+        -> reduce r
+      _ -> Nothing
+
+
+---------
+-- Int16#
+---------
+  , primStepEntry $(textNameLit 'GHC.Prim.intToInt16#) $ \case
+      PrimStepContext{..} | [i] <- intLiterals' args
+        -> let !(I# a)  = fromInteger i
+               b = narrow16Int# a
+           in  reduce . Literal . Int16Literal . toInteger $ I# b
+      _ -> Nothing
+
+  , liftLit1 $(textNameLit 'GHC.Prim.int16ToInt#) int16Literal (\i -> Literal $ IntLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt16#) $ \case
+      PrimStepContext{..} | [i] <- int16Literals' args
+        -> let !(I16# a) = fromInteger i
+            in reduce (Literal (Int16Literal (toInteger (I16# (negateInt16# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16 plusInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16 subInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16 timesInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotInt16#) int16Literal (\i j -> Literal (Int16Literal (toInteger (fromInteger i `quot` fromInteger j :: Int16))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remInt16#) int16Literal (\i j -> Literal (Int16Literal (toInteger (fromInteger i `rem` fromInteger j :: Int16))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.quotRemInt16#) $ \case
+      PrimStepContext{..}
+        | [i, j] <- int16Literals' args
+        -> let (q,r) = quotRem (fromInteger i :: Int16) (fromInteger j)
+           in reduce $ mkResultCon te sc ty tys
+                      [ catchDivByZero (Literal (Int16Literal (toInteger q)))
+                      , catchDivByZero (Literal (Int16Literal (toInteger r)))]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftLInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16I uncheckedShiftLInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRAInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16I uncheckedShiftRAInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRLInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16I uncheckedShiftRLInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.int16ToWord16#) $ \case
+      PrimStepContext{..} | [i] <- int16Literals' args
+        -> let !(I16# a) = fromInteger i
+            in reduce (Literal (Word16Literal (toInteger (W16# (int16ToWord16# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16RI eqInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16RI geInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16RI gtInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16RI leInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16RI ltInt16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neInt16#) $ \case
+      PrimStepContext{..} | Just r <- liftI16RI neInt16# args
+        -> reduce r
+      _ -> Nothing
+
+
+---------
+-- Int32#
+---------
+  , primStepEntry $(textNameLit 'GHC.Prim.intToInt32#) $ \case
+      PrimStepContext{..} | [i] <- intLiterals' args
+        -> let !(I# a)  = fromInteger i
+               b = narrow32Int# a
+           in  reduce . Literal . Int32Literal . toInteger $ I# b
+      _ -> Nothing
+
+  , liftLit1 $(textNameLit 'GHC.Prim.int32ToInt#) int32Literal (\i -> Literal $ IntLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt32#) $ \case
+      PrimStepContext{..} | [i] <- int32Literals' args
+        -> let !(I32# a) = fromInteger i
+            in reduce (Literal (Int32Literal (toInteger (I32# (negateInt32# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32 plusInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32 subInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32 timesInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotInt32#) int32Literal (\i j -> Literal (Int32Literal (toInteger (fromInteger i `quot` fromInteger j :: Int32))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remInt32#) int32Literal (\i j -> Literal (Int32Literal (toInteger (fromInteger i `rem` fromInteger j :: Int32))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.quotRemInt32#) $ \case
+      PrimStepContext{..}
+        | [i, j] <- int32Literals' args
+        -> let (q,r) = quotRem (fromInteger i :: Int32) (fromInteger j)
+           in reduce $ mkResultCon te sc ty tys
+                      [ catchDivByZero (Literal (Int32Literal (toInteger q)))
+                      , catchDivByZero (Literal (Int32Literal (toInteger r)))]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftLInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32I uncheckedShiftLInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRAInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32I uncheckedShiftRAInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRLInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32I uncheckedShiftRLInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.int32ToWord32#) $ \case
+      PrimStepContext{..} | [i] <- int32Literals' args
+        -> let !(I32# a) = fromInteger i
+            in reduce (Literal (Word32Literal (toInteger (W32# (int32ToWord32# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32RI eqInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32RI geInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32RI gtInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32RI leInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32RI ltInt32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neInt32#) $ \case
+      PrimStepContext{..} | Just r <- liftI32RI neInt32# args
+        -> reduce r
+      _ -> Nothing
+
+
+---------
+-- Int64#
+---------
+  , liftLit1 $(textNameLit 'GHC.Prim.intToInt64#) intLiteral (\i -> Literal (Int64Literal i))
+
+  , liftLit1 $(textNameLit 'GHC.Prim.int64ToInt#) int64Literal (\i -> Literal $ IntLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.negateInt64#) $ \case
+      PrimStepContext{..} | [i] <- int64Literals' args
+        -> let !(I64# a) = fromInteger i
+            in reduce (Literal (Int64Literal (toInteger (I64# (negateInt64# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64 plusInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64 subInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64 timesInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotInt64#) int64Literal (\i j -> Literal (Int64Literal (toInteger (fromInteger i `quot` fromInteger j :: Int64))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remInt64#) int64Literal (\i j -> Literal (Int64Literal (toInteger (fromInteger i `rem` fromInteger j :: Int64))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedIShiftL64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64I uncheckedIShiftL64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedIShiftRA64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64I uncheckedIShiftRA64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedIShiftRL64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64I uncheckedIShiftRL64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.int64ToWord64#) $ \case
+      PrimStepContext{..} | [i] <- int64Literals' args
+        -> let !(I64# a) = fromInteger i
+            in reduce (Literal (Word64Literal (toInteger (W64# (int64ToWord64# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64RI eqInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64RI geInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64RI gtInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64RI leInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64RI ltInt64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neInt64#) $ \case
+      PrimStepContext{..} | Just r <- liftI64RI neInt64# args
+        -> reduce r
+      _ -> Nothing
+
+
+---------
+-- Word8#
+---------
+  , primStepEntry $(textNameLit 'GHC.Prim.wordToWord8#) $ \case
+      PrimStepContext{..} | [i] <- wordLiterals' args
+        -> let !(W# a)  = fromInteger i
+               b = narrow8Word# a
+           in  reduce . Literal . Word8Literal . toInteger $ W# b
+      _ -> Nothing
+
+  , liftLit1 $(textNameLit 'GHC.Prim.word8ToWord#) word8Literal (\i -> Literal $ WordLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8 plusWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8 subWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8 timesWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotWord8#) word8Literal (\i j -> Literal (Word8Literal (toInteger (fromInteger i `quot` fromInteger j :: Word8))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remWord8#) word8Literal (\i j -> Literal (Word8Literal (toInteger (fromInteger i `rem` fromInteger j :: Word8))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.quotRemWord8#) $ \case
+      PrimStepContext{..}
+        | [i, j] <- word8Literals' args
+        -> let (q,r) = quotRem (fromInteger i :: Word8) (fromInteger j)
+           in reduce $ mkResultCon te sc ty tys
+                      [ catchDivByZero (Literal (Word8Literal (toInteger q)))
+                      , catchDivByZero (Literal (Word8Literal (toInteger r)))]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.andWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8 andWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.orWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8 orWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.xorWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8 xorWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.notWord8#) $ \case
+      PrimStepContext{..} | [i] <- word8Literals' args
+        -> let !(W8# a) = fromInteger i
+            in reduce (Literal (Word8Literal (toInteger (W8# (notWord8# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftLWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8I uncheckedShiftLWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRLWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8I uncheckedShiftRLWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.word8ToInt8#) $ \case
+      PrimStepContext{..} | [i] <- word8Literals' args
+        -> let !(W8# a) = fromInteger i
+            in reduce (Literal (Int8Literal (toInteger (I8# (word8ToInt8# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8RI eqWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8RI geWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8RI gtWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8RI leWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8RI ltWord8# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neWord8#) $ \case
+      PrimStepContext{..} | Just r <- liftW8RI neWord8# args
+        -> reduce r
+      _ -> Nothing
+
+
+----------
+-- Word16#
+----------
+  , primStepEntry $(textNameLit 'GHC.Prim.wordToWord16#) $ \case
+      PrimStepContext{..} | [i] <- wordLiterals' args
+        -> let !(W# a)  = fromInteger i
+               b = narrow16Word# a
+           in  reduce . Literal . Word16Literal . toInteger $ W# b
+      _ -> Nothing
+
+  , liftLit1 $(textNameLit 'GHC.Prim.word16ToWord#) word16Literal (\i -> Literal $ WordLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16 plusWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16 subWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16 timesWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotWord16#) word16Literal (\i j -> Literal (Word16Literal (toInteger (fromInteger i `quot` fromInteger j :: Word16))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remWord16#) word16Literal (\i j -> Literal (Word16Literal (toInteger (fromInteger i `rem` fromInteger j :: Word16))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.quotRemWord16#) $ \case
+      PrimStepContext{..}
+        | [i, j] <- word16Literals' args
+        -> let (q,r) = quotRem (fromInteger i :: Word16) (fromInteger j)
+           in reduce $ mkResultCon te sc ty tys
+                      [ catchDivByZero (Literal (Word16Literal (toInteger q)))
+                      , catchDivByZero (Literal (Word16Literal (toInteger r)))]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.andWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16 andWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.orWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16 orWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.xorWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16 xorWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.notWord16#) $ \case
+      PrimStepContext{..} | [i] <- word16Literals' args
+        -> let !(W16# a) = fromInteger i
+            in reduce (Literal (Word16Literal (toInteger (W16# (notWord16# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftLWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16I uncheckedShiftLWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRLWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16I uncheckedShiftRLWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.word16ToInt16#) $ \case
+      PrimStepContext{..} | [i] <- word16Literals' args
+        -> let !(W16# a) = fromInteger i
+            in reduce (Literal (Int16Literal (toInteger (I16# (word16ToInt16# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16RI eqWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16RI geWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16RI gtWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16RI leWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16RI ltWord16# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neWord16#) $ \case
+      PrimStepContext{..} | Just r <- liftW16RI neWord16# args
+        -> reduce r
+      _ -> Nothing
+
+
+----------
+-- Word32#
+----------
+  , primStepEntry $(textNameLit 'GHC.Prim.wordToWord32#) $ \case
+      PrimStepContext{..} | [i] <- wordLiterals' args
+        -> let !(W# a)  = fromInteger i
+               b = narrow32Word# a
+           in  reduce . Literal . Word32Literal . toInteger $ W# b
+      _ -> Nothing
+
+  , liftLit1 $(textNameLit 'GHC.Prim.word32ToWord#) word32Literal (\i -> Literal $ WordLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32 plusWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32 subWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32 timesWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotWord32#) word32Literal (\i j -> Literal (Word32Literal (toInteger (fromInteger i `quot` fromInteger j :: Word32))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remWord32#) word32Literal (\i j -> Literal (Word32Literal (toInteger (fromInteger i `rem` fromInteger j :: Word32))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.quotRemWord32#) $ \case
+      PrimStepContext{..}
+        | [i, j] <- word32Literals' args
+        -> let (q,r) = quotRem (fromInteger i :: Word32) (fromInteger j)
+           in reduce $ mkResultCon te sc ty tys
+                      [ catchDivByZero (Literal (Word32Literal (toInteger q)))
+                      , catchDivByZero (Literal (Word32Literal (toInteger r)))]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.andWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32 andWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.orWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32 orWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.xorWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32 xorWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.notWord32#) $ \case
+      PrimStepContext{..} | [i] <- word32Literals' args
+        -> let !(W32# a) = fromInteger i
+            in reduce (Literal (Word32Literal (toInteger (W32# (notWord32# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftLWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32I uncheckedShiftLWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRLWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32I uncheckedShiftRLWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.word32ToInt32#) $ \case
+      PrimStepContext{..} | [i] <- word32Literals' args
+        -> let !(W32# a) = fromInteger i
+            in reduce (Literal (Int32Literal (toInteger (I32# (word32ToInt32# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32RI eqWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32RI geWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32RI gtWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32RI leWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32RI ltWord32# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neWord32#) $ \case
+      PrimStepContext{..} | Just r <- liftW32RI neWord32# args
+        -> reduce r
+      _ -> Nothing
+
+
+----------
+-- Word64#
+----------
+  , liftLit1 $(textNameLit 'GHC.Prim.wordToWord64#) wordLiteral (\i -> Literal (Word64Literal i))
+
+  , liftLit1 $(textNameLit 'GHC.Prim.word64ToWord#) word64Literal (\i -> Literal $ WordLiteral i)
+
+  , primStepEntry $(textNameLit 'GHC.Prim.plusWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64 plusWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.subWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64 subWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.timesWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64 timesWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , liftLit2 $(textNameLit 'GHC.Prim.quotWord64#) word64Literal (\i j -> Literal (Word64Literal (toInteger (fromInteger i `quot` fromInteger j :: Word64))))
+
+  , liftLit2 $(textNameLit 'GHC.Prim.remWord64#) word64Literal (\i j -> Literal (Word64Literal (toInteger (fromInteger i `rem` fromInteger j :: Word64))))
+
+  , primStepEntry $(textNameLit 'GHC.Prim.and64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64 and64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.or64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64 or64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.xor64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64 xor64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.not64#) $ \case
+      PrimStepContext{..} | [i] <- word64Literals' args
+        -> let !(W64# a) = fromInteger i
+            in reduce (Literal (Word64Literal (toInteger (W64# (not64# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftL64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64I uncheckedShiftL64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.uncheckedShiftRL64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64I uncheckedShiftRL64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.word64ToInt64#) $ \case
+      PrimStepContext{..} | [i] <- word64Literals' args
+        -> let !(W64# a) = fromInteger i
+            in reduce (Literal (Int64Literal (toInteger (I64# (word64ToInt64# a)))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.eqWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64RI eqWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.geWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64RI geWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.gtWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64RI gtWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.leWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64RI leWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.ltWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64RI ltWord64# args
+        -> reduce r
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.neWord64#) $ \case
+      PrimStepContext{..} | Just r <- liftW64RI neWord64# args
+        -> reduce r
+      _ -> Nothing
+
+
 -------------------
 -- GHC.Prim.Double#
 -------------------
