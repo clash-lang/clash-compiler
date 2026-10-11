@@ -9,7 +9,10 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Tests.Normalize.Transformations.Specialize (tests) where
+module Clash.Tests.Normalize.Transformations.Specialize
+  ( tests
+  , specializeTests
+  ) where
 
 import qualified Control.Lens as Lens
 import Data.Default (def)
@@ -299,14 +302,15 @@ gId = globalId User "g" 11 (intFunTy 2)
 -- | Specialize @f@ on @g x y@. Returns the result, the body of the specialized
 -- function, and the final state.
 specializeF
-  :: RewriteState NormalizeState
+  :: NormRewrite
+  -> RewriteState NormalizeState
   -> Id
   -> Id
   -> IO (Term, Maybe Term, RewriteState NormalizeState)
-specializeF st x y = do
+specializeF specR st x y = do
   let tm = App (Var fId) (mkApps (Var gId) [Left (Var x), Left (Var y)])
   (res, st1, _) <-
-    runRewriteTest def st (runRewrite "specialize" (inScopeOf [x, y]) specialize tm)
+    runRewriteTest def st (runRewrite "specialize" (inScopeOf [x, y]) specR tm)
   let newBody = case collectArgs res of
         (Var fSpec, _) -> bindingTerm <$> lookupVarEnv fSpec (_bindings st1)
         _ -> Nothing
@@ -320,14 +324,14 @@ specializeF st x y = do
 -- global binders into a let-expression.
 --
 -- https://github.com/clash-lang/clash-compiler/pull/712
-specializeLocalShadowingGlobal :: Assertion
-specializeLocalShadowingGlobal = do
+specializeLocalShadowingGlobal :: NormRewrite -> Assertion
+specializeLocalShadowingGlobal specR = do
   supply <- newSupply
   let xGlobal = globalId User "x" 12 intTy
       xLocal = intId User "x" 12
       yLocal = intId User "y" 13
       bs = mkBindingMap [fBinding, (xGlobal, intLit 1)]
-  (res, newBody, _) <- specializeF def{_bindings = bs, _uniqSupply = supply} xLocal yLocal
+  (res, newBody, _) <- specializeF specR def{_bindings = bs, _uniqSupply = supply} xLocal yLocal
   case (collectArgs res, newBody) of
     ((Var fSpec, args), Just body) -> do
       assertBool ("Expected a new specialized function, but got:\n" <> showPprU res)
@@ -348,8 +352,8 @@ specializeLocalShadowingGlobal = do
 -- in which @a@ is free. 'argCastSpec' passes applications with type arguments
 -- to 'specialize', for example under a case alternative binding an
 -- existential type variable.
-specializeArgBinderTypes :: Assertion
-specializeArgBinderTypes = do
+specializeArgBinderTypes :: NormRewrite -> Assertion
+specializeArgBinderTypes specR = do
   supply <- newSupply
   let a = Rewrite.tyVar User "a" 50
       b = Rewrite.tyVar User "b" 51
@@ -365,7 +369,7 @@ specializeArgBinderTypes = do
       st0 = def{_bindings = mkBindingMap [(fPoly, fPolyBody)], _uniqSupply = supply}
       is = VarEnv.extendInScopeSet (inScopeOf [x, u, v]) a
   (res, st1, _) <-
-    runRewriteTest def st0 (runRewrite "specialize" is specialize tm)
+    runRewriteTest def st0 (runRewrite "specialize" is specR tm)
   case collectArgs res of
     (Var fSpec, _) | Just body <- bindingTerm <$> lookupVarEnv fSpec (_bindings st1) ->
       Rewrite.assertNoFreeTyVars body
@@ -377,16 +381,16 @@ specializeArgBinderTypes = do
 -- second specialization missed the specialization cache.
 --
 -- https://github.com/clash-lang/clash-compiler/pull/1087
-specializeCacheFreeVarOrder :: Assertion
-specializeCacheFreeVarOrder = do
+specializeCacheFreeVarOrder :: NormRewrite -> Assertion
+specializeCacheFreeVarOrder specR = do
   supply <- newSupply
   let st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
       x123 = intId User "x" 123
       y456 = intId User "y" 456
       x456 = intId User "x" 456
       y123 = intId User "y" 123
-  (res1, _, st1) <- specializeF st0 x123 y456
-  (res2, _, st2) <- specializeF st1 x456 y123
+  (res1, _, st1) <- specializeF specR st0 x123 y456
+  (res2, _, st2) <- specializeF specR st1 x456 y123
   let cacheSize = Map.size (Lens.view (extra . specialisationCache) st2)
   assertEqual "Number of specializations" 1 cacheSize
   case (collectArgs res1, collectArgs res2) of
@@ -407,8 +411,8 @@ specializeCacheFreeVarOrder = do
 -- > f_spec = /\(a :: k) -> /\k -> \(x :: a) -> f (case x of {})
 --
 -- in which the @k@ in the kind of @a@ is free.
-specializeTyVarKindOrder :: Assertion
-specializeTyVarKindOrder = do
+specializeTyVarKindOrder :: NormRewrite -> Assertion
+specializeTyVarKindOrder specR = do
   supply <- newSupply
   let k = Rewrite.tyVar User "k" 51
       a = Rewrite.kindedTyVar User "a" 50 (Type.VarTy k)
@@ -417,7 +421,7 @@ specializeTyVarKindOrder = do
       st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
       is = VarEnv.extendInScopeSetList (inScopeOf [x]) [k, a]
   (res, st1, _) <-
-    runRewriteTest def st0 (runRewrite "specialize" is specialize tm)
+    runRewriteTest def st0 (runRewrite "specialize" is specR tm)
   case collectArgs res of
     (Var fSpec, _) | Just body <- bindingTerm <$> lookupVarEnv fSpec (_bindings st1) ->
       Rewrite.assertNoFreeTyVars body
@@ -428,8 +432,8 @@ specializeTyVarKindOrder = do
 -- binder with that unique already exists, overwriting it.
 --
 -- https://github.com/clash-lang/clash-compiler/pull/790
-specializeDoesNotOverwriteBinders :: Assertion
-specializeDoesNotOverwriteBinders = do
+specializeDoesNotOverwriteBinders :: NormRewrite -> Assertion
+specializeDoesNotOverwriteBinders specR = do
   supply <- newSupply
   let -- Global binders occupying the uniques the supply hands out first
       victims =
@@ -438,7 +442,7 @@ specializeDoesNotOverwriteBinders = do
       x = intId User "x" 12
       y = intId User "y" 13
       bs = mkBindingMap (fBinding : victims)
-  (res, _, st1) <- specializeF def{_bindings = bs, _uniqSupply = supply} x y
+  (res, _, st1) <- specializeF specR def{_bindings = bs, _uniqSupply = supply} x y
   case collectArgs res of
     (Var fSpec, _) ->
       assertBool ("Specialized function reuses a unique of an existing binder:\n" <> showPprU res)
@@ -468,15 +472,15 @@ fLocal = localId User "f" 10 (intFunTy 1)
 -- | Specialize a local function that shares its unique with a global function.
 -- There is nothing to specialize, but 'specialize' used to create a new
 -- function from the body of the global.
-specializeLocalHead :: Assertion
-specializeLocalHead = do
+specializeLocalHead :: NormRewrite -> Assertion
+specializeLocalHead specR = do
   supply <- newSupply
   let x = intId User "x" 12
       y = intId User "y" 13
       tm = App (Var fLocal) (mkApps (Var gId) [Left (Var x), Left (Var y)])
       st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
   (res, st1, _) <-
-    runRewriteTest def st0 (runRewrite "specialize" (inScopeOf [fLocal, x, y]) specialize tm)
+    runRewriteTest def st0 (runRewrite "specialize" (inScopeOf [fLocal, x, y]) specR tm)
   assertAlphaEq tm res
   assertEqual "Number of global binders" 1 (length (_bindings st1))
 
@@ -533,12 +537,12 @@ kGlobalBody = Lam (intId User "p" 41) (Lam q (Var q))
 -- errored for applications of type constructors, such as @Maybe a@ in
 --
 -- > h @(Maybe a) f
-specializeTyConAppTypeArg :: Assertion
-specializeTyConAppTypeArg = do
+specializeTyConAppTypeArg :: NormRewrite -> Assertion
+specializeTyConAppTypeArg specR = do
   supply <- newSupply
   let st = def{_bindings = mkBindingMap [fBinding, (hId, hBody)], _uniqSupply = supply}
   (res, st1, _) <-
-    runRewriteTest env st (runRewrite "specialize" (inScopeOf [a]) specialize tm)
+    runRewriteTest env st (runRewrite "specialize" (inScopeOf [a]) specR tm)
   case collectArgs res of
     (Var hSpec, [Right ty]) | Just hSpecB <- lookupVarEnv hSpec (_bindings st1) -> do
       assertAlphaEq (maybeTy (VarTy a)) ty
@@ -559,7 +563,7 @@ specializeTyConAppTypeArg = do
 tests :: TestTree
 tests =
   testGroup
-    "Clash.Tests.Normalize.Transformations.Specialize"
+    "Clash.Tests.Normalize.Transformations.Specialize" $
     [ testCase "appProp deshadows let-bindings in the function part (#492, #1040)" $
         appPropLetCapture >>= assertAlphaEq [parseToTermQQ|
           let { (z_9 :: Int) = (w_3 :: Int) } in (x_1 :: Int)
@@ -583,24 +587,30 @@ tests =
         appPropSubstitutedCase >>= assertAlphaEq appPropCaseCaptureExpected
     , testCase "appProp deshadows substituted arguments after bindConstantVar" $
         bindConstantVarAppPropSubstituted >>= assertAlphaEq appPropSubstitutedLamExpected
-    , testCase "specialize abstracts over locals that shadow a global (#712)"
-        specializeLocalShadowingGlobal
-    , testCase "specialize gives argument binders the types of the parameters"
-        specializeArgBinderTypes
-    , testCase "specialize orders free variables by occurrence (#1087)"
-        specializeCacheFreeVarOrder
-    , testCase "specialize orders type variables after the variables in their kinds"
-        specializeTyVarKindOrder
-    , testCase "specialize does not overwrite existing binders (#790)"
-        specializeDoesNotOverwriteBinders
-    , testCase "specialize does not specialize a local head that shares a unique with a global"
-        specializeLocalHead
-    , testCase "specialize does not inline a global into a local argument head that shares its unique" $
-        specializeOnLocalArgHead specialize User kGlobalBody
-          >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
-    , testCase "nonRepSpec does not inline a global into a local argument head that shares its unique" $
+    ] <> specializeTests specialize <>
+    [ testCase "nonRepSpec does not inline a global into a local argument head that shares its unique" $
         specializeOnLocalArgHead nonRepSpecR Internal kGlobalBody
           >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
-    , testCase "specialize binds a type argument applying a type constructor"
-        specializeTyConAppTypeArg
     ]
+
+-- | The tests of 'specialize', for the given implementation of it
+specializeTests :: NormRewrite -> [TestTree]
+specializeTests specR =
+  [ testCase "specialize abstracts over locals that shadow a global (#712)" $
+      specializeLocalShadowingGlobal specR
+  , testCase "specialize gives argument binders the types of the parameters" $
+      specializeArgBinderTypes specR
+  , testCase "specialize orders free variables by occurrence (#1087)" $
+      specializeCacheFreeVarOrder specR
+  , testCase "specialize orders type variables after the variables in their kinds" $
+      specializeTyVarKindOrder specR
+  , testCase "specialize does not overwrite existing binders (#790)" $
+      specializeDoesNotOverwriteBinders specR
+  , testCase "specialize does not specialize a local head that shares a unique with a global" $
+      specializeLocalHead specR
+  , testCase "specialize does not inline a global into a local argument head that shares its unique" $
+      specializeOnLocalArgHead specR User kGlobalBody
+        >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
+  , testCase "specialize binds a type argument applying a type constructor" $
+      specializeTyConAppTypeArg specR
+  ]

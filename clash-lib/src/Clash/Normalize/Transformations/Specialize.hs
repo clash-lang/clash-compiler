@@ -30,6 +30,10 @@ module Clash.Normalize.Transformations.Specialize
   , typeSpecWorker
   , zeroWidthSpec
   , zeroWidthSpecWorker
+    -- * Helpers of 'specialize'
+  , specCacheKey
+  , preferNoInline
+  , specializeName
   ) where
 
 import Control.Arrow ((***))
@@ -578,19 +582,6 @@ specialize' (TransformContext is0 _) e (fHd@(Var f), args, ticks) specArgIn
     noUserInline :: InlineSpec
     noUserInline = NoUserInlinePrag
 
-    specializeName :: (InlineSpec, Name Term) -> (Maybe InlineSpec, Name Term) -> Name Term
-    specializeName (spec0, n0) (spec1, n1)
-      | (ann0 && ann1) || (not ann0 && not ann1)
-      = n0{nameOcc=nameOcc n0 <> "_" <> stripMods (nameOcc n1)}
-      | ann0 = n0
-      | otherwise = n1
-     where
-      ann0 = isNoInline spec0
-      ann1 = fmap isNoInline spec1 == Just True
-
-    stripMods :: Text.Text -> Text.Text
-    stripMods = Text.takeWhileEnd (/= '.')
-
     collectBndrsMinusApps :: Term -> [Name a]
     collectBndrsMinusApps = reverse . go []
       where
@@ -625,6 +616,22 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   changed newExpr
 
 specialize' _ e _ _ = return e
+
+-- | The name of the function that specializes function @f@ on function @g@,
+-- given their inline specifications (if @g@ has a binding) and names. It
+-- depends on their NOINLINE / OPAQUE annotations, see 'specialize''.
+specializeName :: (InlineSpec, Name Term) -> (Maybe InlineSpec, Name Term) -> Name Term
+specializeName (spec0, n0) (spec1, n1)
+  | (ann0 && ann1) || (not ann0 && not ann1)
+  = n0{nameOcc=nameOcc n0 <> "_" <> stripMods (nameOcc n1)}
+  | ann0 = n0
+  | otherwise = n1
+ where
+  ann0 = isNoInline spec0
+  ann1 = fmap isNoInline spec1 == Just True
+
+  stripMods :: Text.Text -> Text.Text
+  stripMods = Text.takeWhileEnd (/= '.')
 
 -- | Give the binders for the arguments of a function, of the given type, the
 -- types of the corresponding parameters of the function. Type binders replace
