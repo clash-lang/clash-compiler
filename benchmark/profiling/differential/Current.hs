@@ -22,12 +22,15 @@ module Current
   , elimCaseBigNumInternals
   , elimExistentials
   , nonRepANF
+  , reduceConst
+  , reducePrim
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
 import qualified Clash.Normalize.Transformations.Case as Case
 import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
+import qualified Clash.Normalize.Transformations.Reduce as Reduce
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, onCase, onLet, toTransformation)
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
@@ -86,3 +89,13 @@ elimCaseBigNumInternals =
 -- 'Clash.Normalize.Scoped.Transformations.ANF.nonRepANF' replaced
 nonRepANF :: Transformation
 nonRepANF = toTransformation "nonRepANF" (onApp 'ANF.nonRepANFWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Reduce.reduceConst', which
+-- 'Clash.Normalize.Scoped.Transformations.Reduce.reduceConst' replaced
+reduceConst :: Transformation
+reduceConst = toTransformation "reduceConst" (onApp 'Reduce.reduceConstWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Reduce.reducePrim', which
+-- 'Clash.Normalize.Scoped.Transformations.Reduce.reducePrim' replaced
+reducePrim :: Transformation
+reducePrim = toTransformation "reducePrim" (onApp 'Reduce.reducePrimWorker)
