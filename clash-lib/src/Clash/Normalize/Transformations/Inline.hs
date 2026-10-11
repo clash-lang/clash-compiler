@@ -17,6 +17,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
@@ -109,7 +110,12 @@ import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
 
+import Clash.Core.Scoped.Syntax (Distinct)
+import qualified Clash.Core.Scoped.Syntax as Scoped (Term)
 import qualified Clash.Normalize.Scoped.Transformations.Inline as Scoped
+import Clash.Rewrite.Scoped (ScopedTransform (..))
+import qualified Clash.Rewrite.Scoped as Scoped (TransformContext)
+import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 
 {- [Note] join points and void wrappers
 Join points are functions that only occur in tail-call positions within an
@@ -702,8 +708,37 @@ isPartOfVarAppSpine cc e = isSpineCtx cc && isSpineNode e
 inlineSmall :: Transformation
 inlineSmall =
   toTransformation "inlineSmall"
-    (onVarNode 'inlineSmallWorker <> onAppNode 'inlineSmallWorker
-      <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)
+    (onVarNode 'inlineSmallViaFoil <> onAppNode 'inlineSmallViaFoil
+      <> onTyAppNode 'inlineSmallViaFoil <> onTickNode 'inlineSmallViaFoil)
+
+-- | Run the port of 'inlineSmall' ('Scoped.inlineSmall') through 'viaFoil',
+-- at the nodes where it can fire, see 'viaFoilAtGlobalApp'
+inlineSmallViaFoil :: HasCallStack => NormRewrite
+inlineSmallViaFoil = viaFoilAtGlobalApp "inlineSmall" Scoped.inlineSmallWorker
+
+-- | Run a port of a transformation of application spines ('inlineSmall',
+-- 'inlineWorkFree') through 'viaFoil', only at the nodes where it can fire:
+-- the outermost node of an application spine headed by a global. Converting
+-- every variable and application of a term to scoped Clash Core, and the
+-- let-bindings of its context, makes normalization several times slower.
+--
+-- This only exists during the port: once the normalizer runs on scoped Clash
+-- Core (phase 4), these transformations are 'Scoped.inlineSmall' and
+-- 'Scoped.inlineWorkFree'.
+viaFoilAtGlobalApp
+  :: HasCallStack
+  => String
+  -> (forall n. Distinct n => Scoped.TransformContext n -> Scoped.Term n -> NormalizeSession (Scoped.Term n))
+  -> NormRewrite
+viaFoilAtGlobalApp nm worker ctx@(TransformContext _ ccs) e
+  | cc : _ <- ccs
+  , isPartOfVarAppSpine cc e
+  = return e
+  | (Var f, _, _) <- collectArgsTicks e
+  , isGlobalId f
+  = viaFoil nm (ScopedTransform worker) ctx e
+  | otherwise
+  = return e
 
 -- | The application-spine handler of 'inlineSmall'.
 inlineSmallWorker :: HasCallStack => NormRewrite
@@ -749,8 +784,13 @@ inlineSmallWorker _ e = return e
 inlineWorkFree :: Transformation
 inlineWorkFree =
   toTransformation "inlineWorkFree"
-    (onVarNode 'inlineWorkFreeWorker <> onAppNode 'inlineWorkFreeWorker
-      <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)
+    (onVarNode 'inlineWorkFreeViaFoil <> onAppNode 'inlineWorkFreeViaFoil
+      <> onTyAppNode 'inlineWorkFreeViaFoil <> onTickNode 'inlineWorkFreeViaFoil)
+
+-- | Run the port of 'inlineWorkFree' ('Scoped.inlineWorkFree') through
+-- 'viaFoil', at the nodes where it can fire, see 'viaFoilAtGlobalApp'
+inlineWorkFreeViaFoil :: HasCallStack => NormRewrite
+inlineWorkFreeViaFoil = viaFoilAtGlobalApp "inlineWorkFree" Scoped.inlineWorkFreeWorker
 
 -- | The application-spine handler of 'inlineWorkFree'.
 inlineWorkFreeWorker :: HasCallStack => NormRewrite

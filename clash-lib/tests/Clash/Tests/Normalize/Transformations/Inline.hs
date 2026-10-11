@@ -35,9 +35,11 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline
-  (collapseRHSNoopsWorker, inlineCleanupWorker, inlineSmall, inlineWorkFree)
+  ( collapseRHSNoopsWorker, inlineCleanupWorker, inlineSmallWorker
+  , inlineWorkFreeWorker )
 import Clash.Normalize.Types (NormRewrite)
-import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
+import Clash.Rewrite.StrategyDSL
+  (onAppNode, onLet, onTickNode, onTyAppNode, onVarNode, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 
@@ -49,6 +51,8 @@ import Test.Clash.Rewrite
 -- | The implementations of the transformations that the tests run
 data InlineRewrites = InlineRewrites
   { irInlineCleanup :: NormRewrite
+  , irInlineSmall :: NormRewrite
+  , irInlineWorkFree :: NormRewrite
   , irCollapseRHSNoops :: NormRewrite
   }
 
@@ -59,6 +63,14 @@ currentRewrites :: InlineRewrites
 currentRewrites = InlineRewrites
   { irInlineCleanup =
       $(asRewriteQ (toTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)))
+  , irInlineSmall =
+      $(asRewriteQ (toTransformation "inlineSmall"
+          (onVarNode 'inlineSmallWorker <> onAppNode 'inlineSmallWorker
+            <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)))
+  , irInlineWorkFree =
+      $(asRewriteQ (toTransformation "inlineWorkFree"
+          (onVarNode 'inlineWorkFreeWorker <> onAppNode 'inlineWorkFreeWorker
+            <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)))
   , irCollapseRHSNoops =
       $(asRewriteQ (toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)))
   }
@@ -174,18 +186,17 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.Inline"
-    (inlineTests currentRewrites <>
-      [ testCase "inlineSmall does not inline a local variable (#405)" $
-          inlineLocalVar $(asRewriteQ inlineSmall) >>= assertStructurallyEqual (Var fLocal)
-      , testCase "inlineWorkFree does not inline a local variable (#405)" $
-          inlineLocalVar $(asRewriteQ inlineWorkFree) >>= assertStructurallyEqual (Var fLocal)
-      ])
+    (inlineTests currentRewrites)
 
 -- | The regression tests, on the given implementation of the transformations
 inlineTests :: InlineRewrites -> [TestTree]
 inlineTests rws =
     [ testCase "inlineCleanup keeps binders that inlined binders refer to" $
         inlineCleanupNestedCycles (irInlineCleanup rws) >>= assertNoFreeLocals
+    , testCase "inlineSmall does not inline a local variable (#405)" $
+        inlineLocalVar (irInlineSmall rws) >>= assertStructurallyEqual (Var fLocal)
+    , testCase "inlineWorkFree does not inline a local variable (#405)" $
+        inlineLocalVar (irInlineWorkFree rws) >>= assertStructurallyEqual (Var fLocal)
     , testCase "collapseRHSNoops collapses a global no-op" $
         runCollapseRHSNoops (irCollapseRHSNoops rws) fGlobal >>= assertAlphaEq
           (Let

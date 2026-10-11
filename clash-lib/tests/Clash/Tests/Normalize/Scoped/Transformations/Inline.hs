@@ -56,6 +56,8 @@ import Test.Clash.Scoped (assertScopedAlphaEq, withFreeVarsOf)
 scopedRewrites :: InlineRewrites
 scopedRewrites = InlineRewrites
   { irInlineCleanup = $(asRewriteQ S.inlineCleanup)
+  , irInlineSmall = $(asRewriteQ S.inlineSmall)
+  , irInlineWorkFree = $(asRewriteQ S.inlineWorkFree)
   , irCollapseRHSNoops = $(asRewriteQ S.collapseRHSNoops)
   }
 

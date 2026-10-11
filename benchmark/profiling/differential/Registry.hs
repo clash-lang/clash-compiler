@@ -63,6 +63,9 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["collapseRHSNoops"], $(asRewriteQ Current.collapseRHSNoops), [])
     , (["bindOrLiftNonRep"], $(asRewriteQ Current.inlineOrLiftNonRep), [letrecOrder, globalUniques])
     , (["bindSimIO"], $(asRewriteQ Current.inlineSimIO), [])
+    , (["inlineSmall"], $(asRewriteQ Current.inlineSmall), [])
+    , (["inlineWorkFree"], $(asRewriteQ Current.inlineWorkFree), [])
+    , (["inlineNonRep"], Current.inlineNonRep, [])
     ]
 
   unported =
@@ -84,10 +87,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["separateArguments"], $(asRewriteQ separateArguments))
     , (["etaExpandSyn"], $(asRewriteQ etaExpandSyn))
     , (["etaTL"], etaExpansionTL)
-    -- Inline
-    , (["inlineSmall"], $(asRewriteQ inlineSmall))
-    , (["inlineWorkFree"], $(asRewriteQ inlineWorkFree))
-    , (["inlineNonRep"], inlineNonRep)
     ]
 
 -- | The current transformation captured under a name

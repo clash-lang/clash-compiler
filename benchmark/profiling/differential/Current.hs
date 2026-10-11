@@ -36,6 +36,9 @@ module Current
   , collapseRHSNoops
   , inlineOrLiftNonRep
   , inlineSimIO
+  , inlineSmall
+  , inlineWorkFree
+  , inlineNonRep
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -47,7 +50,7 @@ import qualified Clash.Normalize.Transformations.Reduce as Reduce
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLet, onLetNode
-  , onPrimNode, onTickNode, onTyAppNode, toTransformation )
+  , onPrimNode, onTickNode, onTyAppNode, onVarNode, toTransformation )
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.deadCode' replaced
@@ -172,3 +175,23 @@ inlineOrLiftNonRep =
 -- | The current 'Clash.Normalize.Transformations.Inline.inlineSimIO'
 inlineSimIO :: Transformation
 inlineSimIO = toTransformation "bindSimIO" (onLet 'Inline.inlineSimIOWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.inlineSmall'
+inlineSmall :: Transformation
+inlineSmall =
+  toTransformation "inlineSmall"
+    (onVarNode 'Inline.inlineSmallWorker <> onAppNode 'Inline.inlineSmallWorker
+      <> onTyAppNode 'Inline.inlineSmallWorker <> onTickNode 'Inline.inlineSmallWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.inlineWorkFree'
+inlineWorkFree :: Transformation
+inlineWorkFree =
+  toTransformation "inlineWorkFree"
+    (onVarNode 'Inline.inlineWorkFreeWorker <> onAppNode 'Inline.inlineWorkFreeWorker
+      <> onTyAppNode 'Inline.inlineWorkFreeWorker <> onTickNode 'Inline.inlineWorkFreeWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.inlineNonRep', a
+-- whole-term pass, which the strategy replaced by
+-- 'Clash.Normalize.Scoped.Transformations.Inline.inlineNonRep'
+inlineNonRep :: NormRewrite
+inlineNonRep = Inline.inlineNonRep

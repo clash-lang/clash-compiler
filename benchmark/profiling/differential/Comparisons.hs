@@ -21,9 +21,9 @@ import qualified Clash.Normalize.Scoped.Transformations.Case as SC
 import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Inline as SI
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
+import qualified Clash.Normalize.Scoped.Transformations.Reduce as SReduce
 import Clash.Normalize.Transformations.ANF (makeANF)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import qualified Clash.Normalize.Scoped.Transformations.Reduce as SReduce
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
@@ -328,6 +328,12 @@ siteComparisons =
       $(asRewriteQ Current.inlineOrLiftNonRep) $(asScopedRewriteQ SI.inlineOrLiftNonRep)
   , inlineSites "inlineSimIO" ["bindSimIO"]
       $(asRewriteQ Current.inlineSimIO) $(asScopedRewriteQ SI.inlineSimIO)
+  , inlineSites "inlineSmall" ["inlineSmall"]
+      $(asRewriteQ Current.inlineSmall) $(asScopedRewriteQ SI.inlineSmall)
+  , inlineSites "inlineWorkFree" ["inlineWorkFree"]
+      $(asRewriteQ Current.inlineWorkFree) $(asScopedRewriteQ SI.inlineWorkFree)
+  , inlineSites "inlineNonRep" ["inlineNonRep"]
+      Current.inlineNonRep (ScopedTransform SI.inlineNonRep)
   ]
 
  where
