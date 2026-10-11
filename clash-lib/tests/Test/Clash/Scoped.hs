@@ -32,6 +32,7 @@ module Test.Clash.Scoped
   , sunkVar
   , withFreeTyVarsOf
   , withTypeScopes
+  , withTermScopes
     -- * Assertions
   , assertScopedAlphaEq
   , assertScopedTyAlphaEq
@@ -61,6 +62,7 @@ module Test.Clash.Scoped
   , maybeTy
   , nothingDataCon
   , justDataCon
+  , tupleTy
   , nTy
   , pTy
   , wTy
@@ -159,6 +161,18 @@ withTypeScopes ty k = withFreeTyVarsOf [ty] $ \env -> do
   let ty' = fromClashType env ty
   k (convScope env) ty'
   extendSunk env [] [] $ \env' -> k (convScope env') (sink ty')
+
+-- | 'withTypeScopes' for terms: run an assertion on a Clash term converted to
+-- scoped Core, in the scope of its free variables, and sunk into a larger
+-- scope where all of its binders clash with the scope
+withTermScopes
+  :: C.Term
+  -> (forall n. Distinct n => Scope n -> Term n -> Assertion)
+  -> Assertion
+withTermScopes tm k = withFreeVarsOf [tm] $ \env -> do
+  let tm' = fromClashTerm env tm
+  k (convScope env) tm'
+  extendSunk env [] [] $ \env' -> k (convScope env') (sink tm')
 
 -- | Convert a Clash term to scoped Core and back, in the scope of its free
 -- variables
@@ -809,6 +823,11 @@ nothingDataCon, justDataCon :: C.DataCon
 nothingDataCon = mkDataCon "Nothing" 3020 [fxA] [] [] (maybeTy (C.VarTy fxA))
 justDataCon =
   (mkDataCon "Just" 3021 [fxA] [] [C.VarTy fxA] (maybeTy (C.VarTy fxA))) {C.dcTag = 2}
+
+-- | A tuple type, which 'C.isTupleTyConLike' recognises, but which is not in
+-- 'fixtureTyConMap'
+tupleTy :: [C.Type] -> C.Type
+tupleTy = tcApp (mkTyConName "GHC.Tuple.(,)" 3036)
 
 -- | @newtype N a = MkN (Maybe a)@
 nTy :: C.Type -> C.Type
