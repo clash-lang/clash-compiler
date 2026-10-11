@@ -41,6 +41,7 @@ import GHC.Generics
 
 import Clash.Core.PartialEval as PE          (Evaluator)
 import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
+import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Clash.Core.Term           (Term, Context)
 import Clash.Core.Type           (Type)
@@ -122,6 +123,11 @@ data RewriteEnv
   -- ^ Hardcoded evaluator for WHNF (old evaluator)
   , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
+  , _scopedTypeEnv  :: TypeEnv
+  -- ^ The type constructors of 'tcCache', and the globals of the bindings at
+  -- the start of the session, for scoped Clash Core. It caches their
+  -- signatures as scoped types, see "Clash.Core.Scoped.TypeEnv": make it once
+  -- per session.
   }
 
 Lens.makeLenses ''RewriteEnv

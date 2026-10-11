@@ -46,7 +46,7 @@ import Clash.Util.Supply (Supply, newSupply)
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoShadowing, globalId, inScopeOf, intFunTy, intId
   , intTy, letBinders, localId, mkDataCon, nameToUnique, pairDataCon, pairTy
-  , parseTyConTy, runSingleTransformation, showPprU, tyVar )
+  , parseTyConTy, runSingleTransformation, showPprU, tyVar, withTyConMap )
 
 xOptimizeR :: NormRewrite
 xOptimizeR = $(asRewriteQ xOptimize)
@@ -71,16 +71,16 @@ errPrim = Prim (PrimInfo "err" intTy WorkNever SingleResult NoUnfolding)
 -- | The default rewrite environment, with aggressive X-optimization enabled,
 -- extended with the primitive of 'errPrim', and the data types @T@ and @Pair@
 envXOpt :: RewriteEnv
-envXOpt = def{_clashEnv = env}
+envXOpt = withTyConMap tcm def{_clashEnv = env}
  where
   env0 = _clashEnv def
   env = env0
     { envOpts = (envOpts env0){opt_aggressiveXOpt = True}
-    , envTyConMap =
-        foldr (\tc -> UniqMap.insert (tyConName tc) tc) (envTyConMap env0)
-          [mkTc "T" mkTDc, mkTc "Pair" pairDataCon]
     , envPrimitives = HashMap.singleton "err" (HasBlackBox [] errBB)
     }
+  tcm =
+    foldr (\tc -> UniqMap.insert (tyConName tc) tc) (envTyConMap env0)
+      [mkTc "T" mkTDc, mkTc "Pair" pairDataCon]
   mkTc nm dc = AlgTyCon
     { tyConUniq = nameToUnique nm
     , tyConName = mkUnsafeName User (Text.pack nm) (nameToUnique nm)

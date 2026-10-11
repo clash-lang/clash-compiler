@@ -25,7 +25,6 @@ import Clash.Core.Term
 import Clash.Core.Type (LitTy (..), Type (..), mkFunTy)
 import Clash.Core.Var (Var (..))
 import Clash.Core.VarEnv (extendInScopeSet)
-import Clash.Driver.Types (ClashEnv (..))
 import Clash.Normalize.PrimitiveReductions
   (mkVecNil, reduceFold, reduceMap, reduceReplace_int, reduceReverse)
 import Clash.Normalize.Types (NormalizeSession)
@@ -37,11 +36,11 @@ import Clash.Util.Supply (freshId, newSupply)
 import Test.Clash.Rewrite
   ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intTy
   , localId, nilDc, runRewriteTest, runSingleTransformation, showPprU
-  , testTyConMap, tyVar, vecA, vecM, vecN, vecTy )
+  , testTyConMap, tyVar, vecA, vecM, vecN, vecTy, withTyConMap )
 
 -- | The default rewrite environment, extended with @Vec@
 envVec :: RewriteEnv
-envVec = def { _clashEnv = (_clashEnv def) { envTyConMap = testTyConMap } }
+envVec = withTyConMap testTyConMap def
 
 -- | Run 'reduceMap' on @map f v@, with @v :: Vec 1 a@ and @f :: a -> a@ free,
 -- where the type variable @a@ has unique 0. Then substitute @Int@ for @a@,

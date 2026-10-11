@@ -24,6 +24,7 @@ import System.IO (hFlush, hPutStrLn, stderr, stdout)
 import Text.Read (readMaybe)
 
 import Clash.Core.Name (nameOcc)
+import Clash.Core.Scoped.TypeEnv (addGlobalTypes, mkTypeEnv)
 import Clash.Core.Var (varName)
 import Clash.Core.VarEnv (mapMaybeVarEnv, mkVarSet)
 import Clash.Driver.Types
@@ -135,6 +136,7 @@ loadDesign opts f = do
         , _peEvaluator = ghcEvaluator
         , _evaluator = evaluator
         , _topEntities = mkVarSet tops
+        , _scopedTypeEnv = addGlobalTypes (fmap bindingId bindings) (mkTypeEnv tcm)
         }
       selected = case optBinding opts of
         Nothing -> bindings
