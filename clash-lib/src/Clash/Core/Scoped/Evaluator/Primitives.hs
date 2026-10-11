@@ -145,6 +145,26 @@
 
   Registering the entry is adding it to the list of its module; from then on
   the scoped evaluator uses it instead of the adapter.
+
+  = Testing a reduction
+
+  * Unit tests check reductions on fixed inputs against expected results, see
+    "Clash.Tests.Core.Scoped.Evaluator.Primitives" in the unit tests of
+    @clash-lib@. They can't use the reductions of Clash Core, which live in
+    @clash-ghc@.
+
+  * @clash-differential prims DESIGN.bin...@ compares every ported reduction
+    with the reduction of Clash Core, through the adapter, on calls generated
+    from the types of the primitives in the designs (see
+    @Test.Clash.Scoped.Evaluator.genPrimCall@). It reports the primitives that
+    occur in none of the designs, or whose arguments it can't generate.
+
+  * @clash-differential whnf --prims DESIGN.bin DUMP@ replays real calls of
+    the evaluator, and reports per primitive how often a ported reduction and
+    the adapter reduced it. With @--check-prims@, it also runs the adapter on
+    every call of a ported reduction, and compares the results.
+
+  See the README of @clash-differential@.
 -}
 
 module Clash.Core.Scoped.Evaluator.Primitives

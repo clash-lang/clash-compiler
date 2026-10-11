@@ -43,6 +43,16 @@
     scoped primitive reductions build are applications of @_CO_@ to their
     type (see 'Clash.Core.Scoped.Util.primCo'), those of Clash Core have the
     type in the primitive.
+
+  = Primitives
+
+  With @--prims@, it reports per primitive how often the scoped evaluator
+  reduced it with a ported reduction ("Clash.Core.Scoped.Evaluator.Primitives")
+  and through the adapter, and how many calls used the adapter at all. With
+  @--call N@, it also lists the reductions of that call in order. With
+  @--check-prims@, it also runs the adapter on every call of a ported
+  reduction, and compares the results ("Test.Clash.Scoped.Evaluator"): that
+  checks the ported reductions on the arguments they get in real designs.
 -}
 
 {-# LANGUAGE BangPatterns #-}
@@ -55,7 +65,7 @@
 -- Repeated runs of a workload must not share work
 {-# OPTIONS_GHC -fno-full-laziness -fno-cse #-}
 
-module WhnfReplay (whnfReplay) where
+module WhnfReplay (ReplayOptions (..), whnfReplay) where
 
 import Control.DeepSeq (NFData (..), force)
 import Control.Exception (SomeException, evaluate, try)
@@ -65,10 +75,13 @@ import Control.Monad.State.Strict (runState)
 import Data.Binary (decode)
 import Data.Binary.Get (getInt64be, runGetOrFail)
 import qualified Data.ByteString.Lazy as B
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import Data.Text (Text)
+import qualified Data.Text as Text
 import GHC.Clock (getMonotonicTime)
 import GHC.Conc (getAllocationCounter)
 import GHC.Stats (RTSStats (allocated_bytes), getRTSStats, getRTSStatsEnabled)
@@ -104,6 +117,7 @@ import Clash.Rewrite.Scoped.Types (TransformContext, rootContext, tfHeap, tfScop
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
 import Test.Clash.Scoped.Evaluator (canonicalCoercions, readback, termSize)
+import qualified Test.Clash.Scoped.Evaluator as P
 
 -- | A dumped 'whnfRW' call
 data Call = Call
@@ -247,48 +261,70 @@ compareCall tcm bm sup env c = case toScopedCall c of
        else if aeqTm (backS canonicalCoercions) (backC canonicalCoercions) then (AgreeKnown, Nothing)
        else (Differ, Just (C.showPpr (readback 2 rC), C.showPpr (readback 2 rSC)))
 
+-- | The options of 'whnfReplay'
+data ReplayOptions = ReplayOptions
+  { roReps :: Int
+  -- ^ Repetitions of the measurements
+  , roShow :: Int
+  -- ^ Number of differences to show
+  , roTop :: Int
+  -- ^ Number of calls with the most extra allocation to show
+  , roOnly :: Maybe Int
+  -- ^ Only replay the call with this index
+  , roPrims :: Bool
+  -- ^ Report the reductions of primitives, see the module header
+  , roCheckPrims :: Bool
+  -- ^ Compare every call of a ported reduction with the adapter
+  }
+
 -- | Replay the calls of a dump, see the module header
 whnfReplay
-  :: Int
-  -- ^ Repetitions of the measurements
-  -> Int
-  -- ^ Number of differences to show
-  -> Int
-  -- ^ Number of calls with the most extra allocation to show
-  -> Maybe Int
-  -- ^ Only replay the call with this index
+  :: ReplayOptions
   -> C.TyConMap
   -> BindingMap
   -> FilePath
   -- ^ The dump
   -> IO ()
-whnfReplay reps nShow nTop only tcm bm dumpFile = do
+whnfReplay opts tcm bm dumpFile = do
+  let reps = roReps opts
+      nShow = roShow opts
+      nTop = roTop opts
+      recording = roPrims opts || roCheckPrims opts
   sup <- Supply.newSupply
   calls0 <- readCalls dumpFile
-  let calls = maybe calls0 (\k -> [calls0 !! k]) only
+  let calls = maybe calls0 (\k -> [calls0 !! k]) (roOnly opts)
   printf "%s: %d calls (%d as case subject)\n" dumpFile (length calls)
     (length (filter callSubj calls))
   hFlush stdout
-  let env = evaluatorEnv (addGlobalTypes (fmap bindingId bm) (mkTypeEnv tcm)) evaluator
+  let te = addGlobalTypes (fmap bindingId bm) (mkTypeEnv tcm)
+      env = evaluatorEnv te evaluator
+  eventsRef <- newIORef []
+  let checkEnv
+        | recording = P.recordingEnv eventsRef (roCheckPrims opts) te evaluator
+        | otherwise = env
 
   -- Correctness
   results <- forM (zip [0 :: Int ..] calls) $ \(i, c) -> do
-    r <- try $ timeout 20000000 $ evaluate $ force $ compareCall tcm bm sup env c
+    writeIORef eventsRef []
+    r <- try $ timeout 20000000 $ evaluate $ force $ compareCall tcm bm sup checkEnv c
+    events <- readIORef eventsRef >>= mapM forceEvent . reverse
     pure $ case r of
-      Left (ex :: SomeException) -> (i, Failed (takeWhile (/= '\n') (show ex)), Nothing)
-      Right Nothing -> (i, Failed "timeout", Nothing)
-      Right (Just (o, d)) -> (i, o, d)
-  let byOutcome = Map.fromListWith (+) [(outcomeKey o, 1 :: Int) | (_, o, _) <- results]
+      Left (ex :: SomeException) -> (i, Failed (takeWhile (/= '\n') (show ex)), Nothing, events)
+      Right Nothing -> (i, Failed "timeout", Nothing, events)
+      Right (Just (o, d)) -> (i, o, d, events)
+  let byOutcome = Map.fromListWith (+) [(outcomeKey o, 1 :: Int) | (_, o, _, _) <- results]
   forM_ (Map.toList byOutcome) $ \(k, cnt) -> printf "  %-50s %7d\n" k cnt
-  forM_ (take nShow [(i, d) | (i, Differ, Just d) <- results]) $ \(i, (cur, sco)) ->
+  forM_ (take nShow [(i, d) | (i, Differ, Just d, _) <- results]) $ \(i, (cur, sco)) ->
     printf "  -- call %d differs\n  current: %s\n  scoped:  %s\n" i
       (take 1500 (unwords (words cur))) (take 1500 (unwords (words sco)))
+  when recording $
+    reportPrims opts [(i, events) | (i, _, _, events) <- results]
   hFlush stdout
 
   -- Allocation, on the calls on which both succeeded
   statsOn <- getRTSStatsEnabled
   when statsOn $ do
-    let okCalls = [c | ((_, o, _), c) <- zip results calls, o `elem` [Agree, AgreeKnown, Differ]]
+    let okCalls = [c | ((_, o, _, _), c) <- zip results calls, o `elem` [Agree, AgreeKnown, Differ]]
         cis = map curInput okCalls
         scs = map toScopedCall okCalls
     _ <- evaluate (sum [termSize t | CurInput _ _ _ t <- cis])
@@ -344,3 +380,100 @@ measure reps label act = do
   printf "  %-40s %14d bytes %10.3f ms (indicative)\n" label alloc
     ((t1 - t0) * 1000 / fromIntegral reps)
   pure alloc
+
+-- * Primitives
+
+-- | A call of the reduction of a primitive, with its comparison with the
+-- adapter forced
+data PrimCall = PrimCall
+  { pcName :: Text
+  , pcVia :: P.PrimVia
+  , pcReduced :: Bool
+  , pcCheck :: Maybe (Either String P.PrimOutcome)
+  -- ^ The comparison, or the exception it threw
+  }
+
+forceEvent :: P.PrimEvent -> IO PrimCall
+forceEvent (P.PrimEvent nm via reduced check) = PrimCall nm via reduced <$> case check of
+  Nothing -> pure Nothing
+  Just o -> do
+    r <- try (timeout 20000000 (evaluate (forceOutcome o)))
+    pure $ Just $ case r of
+      Left (ex :: SomeException) -> Left (takeWhile (/= '\n') (show ex))
+      Right Nothing -> Left "timeout"
+      Right (Just o') -> Right o'
+ where
+  forceOutcome o = case o of
+    P.Differ a b -> length a `seq` length b `seq` o
+    P.OnlyPorted a -> length a `seq` o
+    P.OnlyReference a -> length a `seq` o
+    _ -> o
+
+-- | Counts of the calls of the reductions of a primitive
+data PrimCounts = PrimCounts
+  { pcPortedReduced :: !Int
+  , pcPortedStuck :: !Int
+  , pcAdaptedReduced :: !Int
+  , pcAdaptedStuck :: !Int
+  , pcCalls :: !Int
+  -- ^ The number of replayed calls of the evaluator in which it occurs
+  , pcChecks :: !(Map.Map String Int)
+  }
+
+instance Semigroup PrimCounts where
+  PrimCounts a b c d e f <> PrimCounts a' b' c' d' e' f' =
+    PrimCounts (a + a') (b + b') (c + c') (d + d') (e + e') (Map.unionWith (+) f f')
+
+primCounts :: PrimCall -> PrimCounts
+primCounts pc = PrimCounts
+  { pcPortedReduced = n (pcVia pc == P.Ported && pcReduced pc)
+  , pcPortedStuck = n (pcVia pc == P.Ported && not (pcReduced pc))
+  , pcAdaptedReduced = n (pcVia pc == P.Adapted && pcReduced pc)
+  , pcAdaptedStuck = n (pcVia pc == P.Adapted && not (pcReduced pc))
+  , pcCalls = 0
+  , pcChecks = maybe Map.empty (\c -> Map.singleton (checkKey c) 1) (pcCheck pc)
+  }
+ where
+  n b = if b then 1 else 0
+
+checkKey :: Either String P.PrimOutcome -> String
+checkKey = either (\e -> "check failed: " <> take 60 e) P.outcomeKey
+
+-- | Report the reductions of primitives, see the module header
+reportPrims :: ReplayOptions -> [(Int, [PrimCall])] -> IO ()
+reportPrims opts results = do
+  let usesAdapter = any ((== P.Adapted) . pcVia)
+      noPrims = length [() | (_, []) <- results]
+      adapted = length [() | (_, evs) <- results, usesAdapter evs]
+      ported = length results - noPrims - adapted
+  printf "  calls without primitives: %d, only ported reductions: %d, with the adapter: %d\n"
+    noPrims ported adapted
+  let perPrim = Map.fromListWith (flip (<>))
+        [ (pcName e, (primCounts e) {pcCalls = 0})
+        | (_, evs) <- results, e <- evs ]
+      callsPerPrim = Map.fromListWith (+)
+        [ (nm, 1 :: Int) | (_, evs) <- results, nm <- List.nub (map pcName evs) ]
+      rows = List.sortOn (\(nm, c) -> (negate (total c), nm))
+        [ (nm, c {pcCalls = Map.findWithDefault 0 nm callsPerPrim}) | (nm, c) <- Map.toList perPrim ]
+      total c = pcPortedReduced c + pcPortedStuck c + pcAdaptedReduced c + pcAdaptedStuck c
+  printf "  %-60s %17s %17s %8s\n" ("primitive" :: String) ("ported red/stuck" :: String)
+    ("adapter red/stuck" :: String) ("calls" :: String)
+  forM_ rows $ \(nm, c) -> do
+    printf "  %-60s %8d/%-8d %8d/%-8d %8d\n" (Text.unpack nm)
+      (pcPortedReduced c) (pcPortedStuck c) (pcAdaptedReduced c) (pcAdaptedStuck c) (pcCalls c)
+    forM_ (Map.toList (pcChecks c)) $ \(k, cnt) ->
+      printf "      check %-40s %8d\n" k cnt
+  when (roCheckPrims opts) $
+    forM_ (take (roShow opts) [ (i, pcName e, a, b)
+                              | (i, evs) <- results, e <- evs
+                              , Just (Right (P.Differ a b)) <- [pcCheck e] ]) $ \(i, nm, a, b) ->
+      printf "  -- call %d: %s differs from the adapter\n  ported:  %s\n  adapter: %s\n" i
+        (Text.unpack nm) (take 1500 (unwords (words a))) (take 1500 (unwords (words b)))
+  case (roOnly opts, results) of
+    (Just _, [(_, evs)]) -> do
+      printf "  reductions of the call, in order:\n"
+      forM_ evs $ \e ->
+        printf "    %-60s %-8s %s%s\n" (Text.unpack (pcName e)) (show (pcVia e))
+          (if pcReduced e then "reduced" else "stuck" :: String)
+          (maybe "" ((", check: " <>) . checkKey) (pcCheck e))
+    _ -> pure ()

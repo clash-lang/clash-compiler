@@ -277,3 +277,53 @@ index N.
 
 Measure allocation with `clash-lib -debug` (see above): the debug checks of
 the two evaluators differ.
+
+### Which primitives the calls reduce
+
+```
+clash-differential whnf --prims [--check-prims] [--call N] DESIGN.bin DUMP...
+```
+
+With `--prims`, the replay also reports, per primitive, how often the scoped
+evaluator reduced it with a ported reduction
+(`Clash.Core.Scoped.Evaluator.Primitives`) and through the adapter
+(`Clash.Core.Scoped.Evaluator.Adapter`), how often each of those reduced and
+how often it got stuck, and in how many calls the primitive occurs. It also
+counts the calls without primitives, those that only used ported reductions,
+and those that used the adapter. With `--call N`, it lists the reductions of
+that call in order.
+
+With `--check-prims`, every call of a ported reduction is also run through the
+adapter, on the same arguments and machine, and the results are compared
+(`Test.Clash.Scoped.Evaluator.compareReductions`). That checks the ported
+reductions on the arguments they get in real designs. It prints the outcomes
+per primitive, and the first `--show` differences.
+
+## Comparing ported reductions of primitives
+
+```
+clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] DESIGN.bin...
+```
+
+compares every ported reduction of a primitive with the reduction of Clash
+Core, through the adapter, on `--count` (default 100) calls generated from the
+type of the primitive (`Test.Clash.Scoped.Evaluator.genPrimCall`), each
+evaluated as the subject of a case-expression and not. The types of the
+primitives, and the type constructors, come from the designs: a ported
+primitive that occurs in none of them is reported as `not in the designs`, one
+whose arguments can't be generated (e.g. byte arrays) as such. Test those with
+unit tests, see `clash-lib/tests/Clash/Tests/Core/Scoped/Evaluator/Primitives.hs`,
+or with `whnf --check-prims`. `--prim NAME` only compares the primitives whose
+name contains `NAME`. It exits with 1 if a reduction disagrees with the
+reference.
+
+```
+clash-differential prims inputs/*.bin
+...
+  GHC.Prim.+#                          agree: 200
+  Clash.Sized.Vector.map               agree: 100, both stuck: 100
+  GHC.Prim.gtChar#                     not in the designs
+```
+
+`both stuck` means that neither side reduced the call, e.g. because the
+reduction only reduces as the subject of a case-expression.

@@ -19,6 +19,7 @@ executable clash-differential
   other-modules:       Comparisons
                        Current
                        Demo
+                       Prims
                        Registry
                        Test.Clash.Differential
                        Test.Clash.Differential.Sites
@@ -36,6 +37,7 @@ executable clash-differential
                        lens,
                        mtl,
                        process,
+                       QuickCheck,
                        tasty-quickcheck,
                        text,
                        transformers,
