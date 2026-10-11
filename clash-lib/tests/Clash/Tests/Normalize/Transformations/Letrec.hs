@@ -3,13 +3,18 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Transformations.Letrec"
+  Tests for "Clash.Normalize.Transformations.Letrec". The normalizer runs the
+  ports of its transformations to scoped Clash Core
+  ("Clash.Normalize.Scoped.Transformations.Letrec"): 'letrecTests' runs the
+  same tests on both.
 -}
 
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Tests.Normalize.Transformations.Letrec (tests) where
+module Clash.Tests.Normalize.Transformations.Letrec
+  ( tests
+  , letrecTests
+  ) where
 
 import Data.Default (def)
 
@@ -21,11 +26,10 @@ import Clash.Core.Term (Bind (..), Term (..), mkApps)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..), debugNone)
-import Clash.Normalize.Transformations.Letrec (flattenLet, topLet)
+import Clash.Normalize.Transformations.Letrec (flattenLetWorker, topLetWorker)
 import Clash.Normalize.Types (NormRewrite)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
-import Clash.Rewrite.Util (runRewrite)
+import Clash.Rewrite.Util (apply, runRewrite)
 
 import Clash.Unique (Unique)
 import Clash.Util.Supply (freshId, newSupply)
@@ -35,9 +39,11 @@ import Test.Clash.Rewrite
   , intFunTy, intId, intLit, letBinders, parseToTermQQ, runRewriteTest
   , runSingleTransformation, runSingleTransformationDef, showPprU )
 
-flattenLetR, topLetR :: NormRewrite
-flattenLetR = $(asRewriteQ flattenLet)
-topLetR = $(asRewriteQ topLet)
+-- | The current 'Clash.Normalize.Transformations.Letrec.flattenLet' and
+-- 'Clash.Normalize.Transformations.Letrec.topLet', which their ports replaced
+flattenLetCurrentR, topLetCurrentR :: NormRewrite
+flattenLetCurrentR = apply "flattenLet" flattenLetWorker
+topLetCurrentR = apply "topLet" topLetWorker
 
 -- * topLet (#490)
 
@@ -54,8 +60,10 @@ topLetR = $(asRewriteQ topLet)
 -- tests 'topLet' itself.
 --
 -- https://github.com/clash-lang/clash-compiler/pull/490
-topLetFreshBinder :: Assertion
-topLetFreshBinder = do
+--
+-- A port may rename @x@, so this checks that the binders of the result differ.
+topLetFreshBinder :: NormRewrite -> Assertion
+topLetFreshBinder topLetR = do
   supply <- newSupply
   let x = intId User "x" (fst (freshId supply))
   actual <-
@@ -63,10 +71,10 @@ topLetFreshBinder = do
       emptyInScopeSet topLetR (Let (Rec [(x, intLit 1)]) (intLit 2))
   case actual of
     Let (Rec [(x1, l1), (r, l2)]) (Var res)
-      | x1 == x, l1 == intLit 1, l2 == intLit 2, res == r ->
+      | l1 == intLit 1, l2 == intLit 2, res == r ->
           assertBool
             ("topLet reused the unique of an existing let-binder:\n" <> showPprU actual)
-            (varUniq r /= varUniq x)
+            (varUniq r /= varUniq x1)
     _ -> assertFailure ("Unexpected result of topLet:\n" <> showPprU actual)
  where
   env = _clashEnv def
@@ -95,8 +103,8 @@ nonRecApp f u args =
 --
 -- must become @letrec x' = g x; y = h x' in y@, not @letrec x = g x; y = h x
 -- in y@.
-flattenLetNonRecBody :: Assertion
-flattenLetNonRecBody = do
+flattenLetNonRecBody :: NormRewrite -> Assertion
+flattenLetNonRecBody flattenLetR = do
   actual <- runSingleTransformation def def (inScopeOf [x]) flattenLetR
     (Let (NonRec x (nonRecApp "g" 10 [Var x]))
       (Let (NonRec y (nonRecApp "h" 11 [Var x])) (Var y)))
@@ -118,8 +126,8 @@ flattenLetNonRecBody = do
 --
 -- must become @letrec y = h x; z = k y; x' = z in f x' x'@, where @h x@ still
 -- refers to the outer @x@.
-flattenLetNonRecRhs :: Assertion
-flattenLetNonRecRhs = do
+flattenLetNonRecRhs :: NormRewrite -> Assertion
+flattenLetNonRecRhs flattenLetR = do
   actual <- runSingleTransformation def def (inScopeOf [x]) flattenLetR
     (Let (NonRec x (Let (Rec [(y, h x), (z, k y)]) (Var z))) (f x x))
   assertAlphaEq
@@ -142,12 +150,14 @@ flattenLetNonRecRhs = do
 -- @
 --
 -- must become @letrec x' = g x; result = f x' in result@.
-topLetNonRec :: Assertion
-topLetNonRec = do
+topLetNonRec :: NormRewrite -> Assertion
+topLetNonRec topLetR = do
   actual <- runSingleTransformation def def (inScopeOf [x]) topLetR
     (Let (NonRec x (nonRecApp "g" 10 [Var x])) (nonRecApp "f" 11 [Var x]))
   case actual of
     Let (Rec [_, (result, _)]) _ ->
+      -- A unique that differs from the one of the new binder
+      let x' = intId User "x'" (varUniq result + 1) in
       assertAlphaEq
         (Let (Rec [ (x', nonRecApp "g" 10 [Var x])
                   , (result, nonRecApp "f" 11 [Var x'])])
@@ -156,14 +166,20 @@ topLetNonRec = do
     _ -> assertFailure ("Unexpected result of topLet:\n" <> showPprU actual)
  where
   x = nonRecX
-  x' = intId User "x'" 1
 
 tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.Letrec"
-    [ testCase "topLet does not reuse the unique of a let-binder (#490)"
-        topLetFreshBinder
+    (letrecTests flattenLetCurrentR topLetCurrentR)
+
+-- | The tests of 'Clash.Normalize.Transformations.Letrec.flattenLet' and
+-- 'Clash.Normalize.Transformations.Letrec.topLet', for the given
+-- implementations of them
+letrecTests :: NormRewrite -> NormRewrite -> [TestTree]
+letrecTests flattenLetR topLetR =
+    [ testCase "topLet does not reuse the unique of a let-binder (#490)" $
+        topLetFreshBinder topLetR
 
     -- #1766 / #1837: 'flattenLet' did not flatten a let-expression whose body
     -- is another let-expression. Doing so requires deshadowing the inner
@@ -282,9 +298,10 @@ tests =
         assertNoShadowing actual
         assertBool "The free variable x_9 is captured" (x `notElem` letBinders actual)
 
-    , testCase "flattenLet merges a let into a shadowing NonRec let"
-        flattenLetNonRecBody
-    , testCase "flattenLet merges a let into a shadowing NonRec binding"
-        flattenLetNonRecRhs
-    , testCase "topLet adds its binder to a shadowing NonRec let" topLetNonRec
+    , testCase "flattenLet merges a let into a shadowing NonRec let" $
+        flattenLetNonRecBody flattenLetR
+    , testCase "flattenLet merges a let into a shadowing NonRec binding" $
+        flattenLetNonRecRhs flattenLetR
+    , testCase "topLet adds its binder to a shadowing NonRec let" $
+        topLetNonRec topLetR
     ]

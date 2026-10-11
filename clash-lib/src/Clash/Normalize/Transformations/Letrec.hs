@@ -80,7 +80,7 @@ import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.StrategyDSL
-  (Transformation, anyConstructor, onLet, onLetNode, toTransformation)
+  (Transformation, anyConstructor, onLet, toTransformation)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
@@ -246,7 +246,7 @@ deshadowNonRec _ bind body = (bind, body)
 --
 -- NB: must only be called in the cleaning up phase.
 flattenLet :: Transformation
-flattenLet = toTransformation "flattenLet" (onLetNode 'flattenLetWorker)
+flattenLet = Scoped.flattenLet
 
 -- | The 'Let' handler of 'flattenLet'; recurses on the rebuilt let-expression
 -- after merging nested bindings.

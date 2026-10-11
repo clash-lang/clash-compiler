@@ -8,6 +8,25 @@
 
   Transformations on let-expressions of scoped Clash Core: the ported
   counterparts of "Clash.Normalize.Transformations.Letrec".
+
+  = Merging let-bindings
+
+  'flattenLet', 'topLet' and 'recToLetRec' merge let-bindings into a single
+  recursive let-binding. In scoped Core, the right-hand side of a 'NonRec'
+  binding lives outside the scope of its binder, so it has to be moved into
+  that scope ('sink') before it can join a 'Rec' telescope, which needs the
+  binder to be opened first ('openLetBindings'). Opening renames the binder if
+  it clashes with the scope. So a binder that shadows a variable its
+  right-hand side refers to, as in @\\x -> let x = g x in x@, can't be merged
+  into the loop @letrec x = g x@: the bug that the Clash Core versions fix by
+  deshadowing ('Clash.Normalize.Transformations.Letrec.deshadowNonRec') is a
+  type error here.
+
+  = Order of let-bindings
+
+  'flattenLet' keeps the order of the Clash Core version: the bindings of a
+  let-expression in a right-hand side come right before the binding whose
+  right-hand side it was.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -21,6 +40,8 @@
 module Clash.Normalize.Scoped.Transformations.Letrec
   ( deadCode
   , deadCodeWorker
+  , flattenLet
+  , flattenLetWorker
   , removeUnusedExpr
   , removeUnusedExprCase
   , removeUnusedExprSpine
@@ -30,8 +51,10 @@ import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad.Trans.Except (runExcept)
 import Control.Monad.Writer (listen)
+import Data.Bifunctor (second)
 import qualified Data.Either as Either
 import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.IntMap.Strict as IntMap
 import Data.List ((\\))
 import Data.Maybe (fromMaybe)
 import qualified Data.Monoid as Monoid (Any (..))
@@ -54,20 +77,27 @@ import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, onAppNode, onCase, onLet, onPrimNode, onTickNode
+  ( Transformation, onAppNode, onCase, onLet, onLetNode, onPrimNode, onTickNode
   , onTyAppNode, toScopedTransformation )
 import Clash.Rewrite.Types (primitives, scopedTypeEnv)
 
+import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences, teleNameBinders, tmNameOccursIn)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Subst (unsinkAlt)
+import Clash.Core.Scoped.NameMap (lookupNameMap, singletonNameMap)
+import Clash.Core.Scoped.Subst (unsinkAlt, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, mkTicks)
+import Clash.Core.Scoped.Term
+  ( appendTele, collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks
+  , partitionTicks )
 import Clash.Core.Scoped.TermInfo (isCon)
 import Clash.Core.Scoped.Type (TypeView (..), tyNatSize, tyView)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
-import Clash.Core.Scoped.Util (mkVec)
-import Clash.Rewrite.Scoped (FrameKind (..), TransformContext, changed, ctxFrames, tfScope)
-import Clash.Rewrite.Scoped.Util (isFromInt, removeUnusedBinders)
+import Clash.Core.Scoped.Util (LetGroup (..), mkLets, mkVec, regroupLetBindings)
+import Clash.Rewrite.Scoped
+  (FrameKind (..), TransformContext, changed, ctxFrames, setChanged, tfScope)
+import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
+import Clash.Rewrite.Scoped.Util
+  ( LetBinding (..), isFromInt, openLetBindings, removeUnusedBinders, substVars )
 
 -- | Remove unused let-bindings
 deadCode :: Transformation
@@ -217,3 +247,165 @@ removeUnusedPrimArgs sc e p pInfo args ticks = do
         if n < arity && n `notElem` used
            then changed (Left p' : args'')
            else return  (Left tm : args'')
+
+-- * Merging let-bindings
+
+-- | Merge directly nested let-expressions, @let bs1 in let bs2 in ... in e@,
+-- into a single telescope of binders, @bs1 ++ bs2 ++ ...@, and their
+-- right-hand sides, in the scope of all of them. Also gives the number of
+-- let-expressions merged.
+collectLets
+  :: Distinct n
+  => Scope n
+  -> Bind n l
+  -> Term l
+  -> (forall o. DExt n o => Scope o -> Tele IdBinder n o -> [Term o] -> Term o -> Int -> r)
+  -> r
+collectLets sc bind body k = openLetBindings sc bind body $ \sc1 bs1 lbs1 body1 ->
+  case body1 of
+    Let bind2 body2 -> collectLets sc1 bind2 body2 $ \sc2 bs2 xs2 body3 levels ->
+      k sc2 (appendTele bs1 bs2) (map (sink . lbRhs) lbs1 ++ xs2) body3 (levels + 1)
+    _ -> k sc1 bs1 (map lbRhs lbs1) body1 1
+
+-- | The number of free occurrences of a term variable in a term
+occurrences :: TmName n -> Term n -> Int
+occurrences x e = fromMaybe 0 (lookupNameMap x (freeTmVarOccurrences e))
+
+-- * flattenLet
+
+-- | Flatten's letrecs after `inlineCleanup`
+--
+-- `inlineCleanup` sometimes exposes additional possibilities for `caseCon`,
+-- which then introduces let-bindings in what should be ANF. This transformation
+-- flattens those nested let-bindings again.
+--
+-- NB: must only be called in the cleaning up phase.
+--
+-- See 'Clash.Normalize.Transformations.Letrec.flattenLet'. Unlike that one, it
+-- never makes a 'NonRec' binding recursive: its right-hand side doesn't refer
+-- to the binder by construction. So a let-expression @let x = g x in e@ in a
+-- right-hand side, where @g x@ refers to a variable @x@ that the binder
+-- shadows, is inlined (if the other conditions hold), where Clash Core merged
+-- it as the loop @x' = g x'@.
+flattenLet :: Transformation
+flattenLet = toScopedTransformation "flattenLet" (onLetNode 'flattenLetWorker)
+
+-- | The 'Let' handler of 'flattenLet'
+flattenLetWorker
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> NormalizeSession (Term n)
+flattenLetWorker ctx e = case e of
+  Let bind body -> collectLets sc bind body $ \scO bs xs body1 levels -> do
+    -- Merging a let-expression in the body is a change too, see #1837
+    Monad.when (levels > 1) setChanged
+    let nonRec = levels == 1 && case bind of { NonRec {} -> True; Rec {} -> False }
+    mergeLetRhss scO xs body1 $ \scY ext out bodyY merged ->
+      let anyChange = levels > 1 || merged in
+      case (bs, ext, out) of
+        (TCons b TNil, TNil, [(_, e1)]) -> flattenSingle scY b e1 bodyY nonRec anyChange
+        _ | not anyChange -> return e
+          | otherwise ->
+              -- The bindings in their new order: the bindings of a merged
+              -- let-expression right before the binding it was the right-hand
+              -- side of
+              let tele = appendTele bs ext
+                  xsY = IntMap.elems (IntMap.fromList out)
+              in  regroupLetBindings sc tele xsY bodyY [RecGroup (map fst out)] $
+                    \_ binds body' -> return (mkLets binds body')
+  _ -> return e
+ where
+  sc = tfScope ctx
+
+  -- Inline a single binding into the body when it doesn't perform any work or
+  -- is used only once, unless it's recursive
+  flattenSingle
+    :: (Distinct o, DExt n o)
+    => Scope o -> IdBinder n o -> Term o -> Term o -> Bool -> Bool
+    -> NormalizeSession (Term n)
+  flattenSingle scO b e1 body nonRec anyChange = do
+    let x = tmNameOf b
+        occ = occurrences x body
+    inline <- if | occ == 0 -> pure False
+                 | occ < 2 -> pure True
+                 | otherwise -> isWorkFreeTerm e1
+    if inline && not (x `tmNameOccursIn` e1)
+      then case unsinkIdBinder b (substVars scO (singletonNameMap x e1) body) of
+        Just body1 -> changed body1
+        Nothing -> error "flattenLet: an inlined binder remains"
+      else if | not anyChange -> return e
+              | nonRec, Just e1' <- unsinkIdBinder b e1 -> return (Let (NonRec b e1') body)
+              | otherwise -> return (Let (Rec (TCons b TNil) [e1]) body)
+{-# SCC flattenLetWorker #-}
+
+-- | Merge the let-expressions in the right-hand sides of let-bindings into
+-- the bindings, see 'flattenLet'. Gives the binders of the merged
+-- let-expressions, as an extension of the given scope, and the right-hand
+-- sides in their new order, by their positions in the binders: first the
+-- given bindings, then those of the telescope. Also says whether anything was
+-- merged.
+mergeLetRhss
+  :: forall o r
+   . Distinct o
+  => Scope o
+  -> [Term o]
+  -- ^ The right-hand sides of the bindings
+  -> Term o
+  -- ^ The body
+  -> (forall y. DExt o y => Scope y -> Tele IdBinder o y -> [(Int, Term y)] -> Term y -> Bool -> NormalizeSession r)
+  -> NormalizeSession r
+mergeLetRhss sc0 xs0 body0 k = go sc0 TNil (length xs0) [] (zip [0..] xs0) body0 False
+ where
+  -- The scope, the merged binders, the next position, the right-hand sides
+  -- done (in reverse order), the right-hand sides to do, the body, and whether
+  -- anything was merged
+  go
+    :: DExt o x
+    => Scope x
+    -> Tele IdBinder o x
+    -> Int
+    -> [(Int, Term x)]
+    -> [(Int, Term x)]
+    -> Term x
+    -> Bool
+    -> NormalizeSession r
+  go sc ext _ done [] body merged = k sc ext (reverse done) body merged
+  go sc ext next done ((pos, rhs) : todo) body merged = case collectTicks rhs of
+    (Let ibind ibody, ticks) ->
+      let (srcTicks, nmTicks) = partitionTicks ticks in
+      openLetBindings sc ibind ibody $ \sc1 ibs ilbs ibody1 -> do
+        let nm t = mkTicks t (map sink nmTicks)
+            -- Merge the bindings, followed by the binding of the right-hand
+            -- side, distributing the name ticks of the let-expression over
+            -- all of them
+            mergeAll parentRhs = do
+              setChanged
+              let inner = zip [next ..] [nm (lbRhs lb) | lb <- ilbs]
+                  done1 = (pos, nm parentRhs) : reverse inner ++ map (second sink) done
+              go sc1 (appendTele ext ibs) (next + length ilbs) done1
+                 (map (second sink) todo) (sink body) True
+        case ilbs of
+          -- Inline a single binding into the body of the let-expression when
+          -- it doesn't perform any work or is used only once
+          [lb2] -> do
+            let x2 = lbName lb2
+                e2 = lbRhs lb2
+                occ = occurrences x2 ibody1
+            inline <- if | occ == 0 -> pure False
+                         | occ < 2 -> pure True
+                         | otherwise -> isWorkFreeTerm e2
+            if | not inline -> mergeAll (mkTicks ibody1 (map sink srcTicks))
+                 -- Except when the binding is recursive!
+               | x2 `tmNameOccursIn` e2 -> mergeAll ibody1
+               | otherwise ->
+                   case unsinkTerm (teleNameBinders ibs) (substVars sc1 (singletonNameMap x2 e2) ibody1) of
+                     Just ibody2 -> do
+                       setChanged
+                       -- Only apply srcTicks to the body
+                       let rhs1 = mkTicks (mkTicks ibody2 srcTicks) nmTicks
+                       go sc ext next ((pos, rhs1) : done) todo body True
+                     Nothing -> error "flattenLet: an inlined binder remains"
+          _ -> mergeAll (mkTicks ibody1 (map sink srcTicks))
+    _ -> go sc ext next ((pos, rhs) : done) todo body merged
