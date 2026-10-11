@@ -710,6 +710,33 @@ mkDataCon nm uniq univTvs extTvs argTys resTy = C.MkData
   , C.dcFieldLabels = []
   }
 
+-- | A type constructor name with the given human readable name and unique
+mkTyConName :: String -> Unique -> C.TyConName
+mkTyConName nm = C.mkUnsafeName C.User (Text.pack nm)
+
+-- | The kind @Type -> .. -> Type@ of a type constructor with the given type
+-- variables, which must be of kind 'C.liftedTypeKind'
+tyConKindFor :: [C.TyVar] -> C.Kind
+tyConKindFor tvs = foldr (C.mkFunTy . C.varType) C.liftedTypeKind tvs
+
+-- | A data type with the given name, type variables (of kind
+-- 'C.liftedTypeKind'), and data constructors
+mkAlgTyCon :: C.TyConName -> [C.TyVar] -> [C.DataCon] -> C.TyCon
+mkAlgTyCon nm tvs dcs =
+  C.AlgTyCon (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.DataTyCon dcs) False
+
+-- | A newtype with the given name, type variables (of kind
+-- 'C.liftedTypeKind'), data constructor, and eta-reduced representation type,
+-- see 'C.ntEtadRhs'
+mkNewTyCon :: C.TyConName -> [C.TyVar] -> C.DataCon -> ([C.TyVar], C.Type) -> C.TyCon
+mkNewTyCon nm tvs dc rhs =
+  C.AlgTyCon (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.NewTyCon dc rhs) False
+
+-- | A type family with the given name, kind, arity, and equations, see
+-- 'C.tyConSubst'
+mkFunTyCon :: C.TyConName -> C.Kind -> Int -> [([C.Type], C.Type)] -> C.TyCon
+mkFunTyCon nm = C.FunTyCon (C.nameUniq nm) nm
+
 -- | @Pair@, a data type with a single constructor 'pairDataCon'
 pairTy :: C.Type
 pairTy = parseTyConTy "Pair"

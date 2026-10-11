@@ -14,6 +14,7 @@ import qualified Clash.Tests.Core.Scoped.FreeVars
 import qualified Clash.Tests.Core.Scoped.NameMap
 import qualified Clash.Tests.Core.Scoped.Scope
 import qualified Clash.Tests.Core.Scoped.Subst
+import qualified Clash.Tests.Core.Scoped.TyCon
 import qualified Clash.Tests.Core.StructuralEquivalence
 import qualified Clash.Tests.Core.Subst
 import qualified Clash.Tests.Core.TermLiteral
@@ -64,6 +65,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Scoped.NameMap.tests
   , Clash.Tests.Core.Scoped.Scope.tests
   , Clash.Tests.Core.Scoped.Subst.tests
+  , Clash.Tests.Core.Scoped.TyCon.tests
   , Clash.Tests.Core.StructuralEquivalence.tests
   , Clash.Tests.Core.Subst.tests
   , Clash.Tests.Core.TermLiteral.tests
