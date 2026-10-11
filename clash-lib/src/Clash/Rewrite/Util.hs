@@ -56,7 +56,7 @@ import           GHC.Types.Basic             (InlineSpec (..))
 
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
-  (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn)
+  (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn, dependencySortTyVars)
 import           Clash.Core.HasFreeVars      (elemFreeVars, notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.Name
@@ -626,7 +626,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
 
       (boundFTVsSet,boundFVsSet) =
         getConst (Lens.foldMapOf (termFreeVars' interesting) unitFV e)
-      boundFTVs = UniqMap.elems boundFTVsSet
+      boundFTVs = dependencySortTyVars (UniqMap.elems boundFTVsSet)
       boundFVs  = UniqMap.elems boundFVsSet
 
   -- Make a new global ID
@@ -646,7 +646,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
                   (mkTyApps (Var newBodyId)
                             (map VarTy boundFTVs))
                   (map Var boundFVs)
-      inScope0 = mkInScopeSet (coerce boundFVsSet)
+      inScope0 = extendInScopeSetList (mkInScopeSet (coerce boundFVsSet)) boundFTVs
       inScope1 = extendInScopeSetList inScope0 [var,newBodyId]
   let subst    = extendIdSubst (mkSubst inScope1) var newExpr
       -- Substitute the recursive calls by the new expression

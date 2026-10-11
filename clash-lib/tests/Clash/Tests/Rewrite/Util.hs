@@ -8,13 +8,17 @@
 
 module Clash.Tests.Rewrite.Util (tests) where
 
+import qualified Control.Lens as Lens
 import Data.Default (def)
+import Data.Either (rights)
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Clash.Core.FreeVars (termFreeTyVars)
 import Clash.Core.Name (NameSort (User), noSrcSpan)
 import Clash.Core.Term (Bind (..), Term (..), collectArgs, mkApps)
+import Clash.Core.Type (Type (VarTy))
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet, lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
@@ -27,6 +31,7 @@ import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals
   , firstUniques, globalId, inScopeOf, intFunTy, intId, intLit, localId, runRewriteTest
   , runSingleTransformation, showPprU )
+import Test.Clash.Rewrite (kindedTyVar, tyVar)
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
 
@@ -74,6 +79,76 @@ replaceBy name inScope before new = do
   rw _ctx _e = changed (Var new)
 
 -- * liftBinding
+
+-- | 'liftBinding' abstracts the lifted function over the free type variables
+-- of the binding, and replaces the recursive occurrences by the new function
+-- applied to them. That substitution must know these type variables are in
+-- scope, or it doesn't rename a type binder that would capture them. Lifting
+--
+-- > r = \z -> k (/\a -> r z) x    where x :: a, and a is free
+--
+-- must not give
+--
+-- > top_r = /\a -> \x z -> k (/\a -> top_r @a x z) x
+liftBindingTyVarCapture :: Assertion
+liftBindingTyVarCapture = do
+  supply <- newSupply
+  let a = tyVar User "a" 50
+      r = localId User "r" 40 (intFunTy 1)
+      z = intId User "z" 41
+      x = localId User "x" 31 (VarTy a)
+      k = globalId User "k" 33 (intFunTy 2)
+      cf = globalId User "top" 42 (intFunTy 1)
+      e = Lam z (mkApps (Var k) [Left (TyLam a (App (Var r) (Var z))), Left (Var x)])
+      st :: RewriteState NormalizeState
+      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+  ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
+  case collectArgs newExpr of
+    (Var rLifted, _) ->
+      case lookupVarEnv rLifted (_bindings st1) of
+        Nothing -> assertFailure "Lifted function not found in global bindings"
+        Just b -> do
+          let b' = tyVar User "b" 51
+              rApp = mkApps (Var rLifted) [Right (VarTy a), Left (Var x), Left (Var z)]
+          assertAlphaEq
+            (TyLam a (Lam x (Lam z (mkApps (Var k)
+              [Left (TyLam b' rApp), Left (Var x)]))))
+            (bindingTerm b)
+    _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
+
+-- | 'liftBinding' must abstract over a free type variable before abstracting
+-- over the type variables in its kind. Lifting
+--
+-- > r = \z -> k (r z) x    where x :: a, a :: kk, and kk is free
+--
+-- must give @/\\kk a -> ..@, not @/\\a kk -> ..@, even though the unique of @a@
+-- is smaller than the unique of @kk@.
+liftBindingTyVarOrder :: Assertion
+liftBindingTyVarOrder = do
+  supply <- newSupply
+  let kk = tyVar User "kk" 51
+      a = kindedTyVar User "a" 50 (VarTy kk)
+      r = localId User "r" 40 (intFunTy 1)
+      z = intId User "z" 41
+      x = localId User "x" 31 (VarTy a)
+      k = globalId User "k" 33 (intFunTy 2)
+      cf = globalId User "top" 42 (intFunTy 1)
+      e = Lam z (mkApps (Var k) [Left (App (Var r) (Var z)), Left (Var x)])
+      st :: RewriteState NormalizeState
+      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+  ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
+  case collectArgs newExpr of
+    (Var rLifted, args) -> do
+      assertEqual ("Type arguments of the lifted function in:\n" <> showPprU newExpr)
+        [VarTy kk, VarTy a] (rights args)
+      case lookupVarEnv rLifted (_bindings st1) of
+        Nothing -> assertFailure "Lifted function not found in global bindings"
+        Just b -> case Lens.toListOf termFreeTyVars (bindingTerm b) of
+          [] -> pure ()
+          tvs -> assertFailure
+            ("Unexpected free type variables " <> showPprU tvs <> " in:\n"
+              <> showPprU (bindingTerm b))
+    _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
 
 -- | 'liftBinding' lifts a (recursive) let-binding to a global function,
 -- abstracting over the free variables of the binding. It must replace the
@@ -169,6 +244,10 @@ tests =
             assertErrorContainsIO "It introduces free variables" $
               replaceBy "caseCase" [x, y] (Var x) y
         ]
+    , testCase "liftBinding avoids capturing free type variables"
+        liftBindingTyVarCapture
+    , testCase "liftBinding abstracts over type variables in dependency order"
+        liftBindingTyVarOrder
     , testCase "liftBinding substitutes before abstracting"
         liftBindingSubstitutesBeforeAbstracting
     , testCase "liftBinding keeps a local that shares a unique with the lifted function"
