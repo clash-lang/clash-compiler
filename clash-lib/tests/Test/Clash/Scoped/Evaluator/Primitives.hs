@@ -39,6 +39,9 @@ module Test.Clash.Scoped.Evaluator.Primitives
   , bvTy
   , bit
   , bv
+  , indexTcNm
+  , indexTy
+  , index
     -- * Boxed numbers
   , boxedIntTy
   , boxedInt
@@ -56,12 +59,13 @@ import Clash.Core.TysPrim (liftedTypeKind, typeNatKind)
 import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Convert (toClashTerm)
-import Clash.Core.Scoped.Evaluator.Primitives.Util (bConPrim, bvConPrim)
+import Clash.Core.Scoped.Evaluator.Primitives.Util (bConPrim, bvConPrim, indexConPrim)
 import Clash.Core.Scoped.Syntax (S (VoidS), Term)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Test.Clash.Rewrite
-  (hIntTy, heapLookupEvaluator, iHashDc, knownNatTy, mkTyConName, numTy, tcApp)
+  ( hIntTy, heapLookupEvaluator, iHashDc, indexTcNm, indexTy, knownNatTy, mkTyConName
+  , numTy, tcApp )
 import Test.Clash.Scoped (testTypeEnv)
 import Test.Clash.Scoped.Evaluator (portedEnv, scopedWhnf)
 
@@ -138,6 +142,12 @@ bv :: Integer -> Integer -> Integer -> C.Term
 bv n msk val =
   C.mkApps (closedPrimTerm (bvConPrim bvTcNm))
     [Right (numTy n), Left (natLit n), Left (natLit msk), Left (integerLit val)]
+
+-- | An 'Clash.Sized.Internal.Index.Index' with the given size and value
+index :: Integer -> Integer -> C.Term
+index n val =
+  C.mkApps (closedPrimTerm (indexConPrim indexTcNm))
+    [Right (numTy n), Left (natLit n), Left (integerLit val)]
 
 -- * Boxed numbers
 
