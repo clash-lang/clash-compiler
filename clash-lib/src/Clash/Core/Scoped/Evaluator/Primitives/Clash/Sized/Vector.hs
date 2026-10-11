@@ -29,6 +29,7 @@ module Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector
   ) where
 
 import Control.Monad.Trans.Except (runExcept)
+import Data.Bits (bit, shiftR, (.&.))
 import qualified Data.Either as Either
 import Data.Text (Text)
 import Data.Text.Extra (showt)
@@ -879,6 +880,78 @@ primitives =
                                     , Left (valToTerm apDict)
                                     , Left (valToTerm f)
                                     , Left (Either.lefts vArgs !! 2) ]) ]
+                _ -> Nothing
+      _ -> Nothing
+
+-- BitPack
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.concatBitVector#) $ \case
+      PrimStepContext{..}
+        -- :: (KnownNat n, KnownNat m) => Vec n (BitVector m) -> BitVector (n * m)
+        | isSubj
+        , nTy : mTy : _ <- tys
+        , _ : km : v : _ <- args
+        , DC _ vArgs <- v
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        -> case n of
+             0 -> reduce (mkBitVectorLit' (extractTySizeInfo te sc ty tys) 0 0)
+             n' | Right m <- runExcept (tyNatSize te sc mTy)
+                , Just bvTcNm <- tyConNameOf (snd (primArgResTys pInfo))
+                -> reduceWHNF $
+                   mkApps (bvAppendPrim bvTcNm)
+                     [ Right (mkTyConApp typeNatMul [numTy (n' - 1), mTy])
+                     , Right mTy
+                     , Left (natLit ((n' - 1) * m))
+                     , Left (Either.lefts vArgs !! 1)
+                     , Left (mkApps (Prim pInfo)
+                               [ Right (numTy (n' - 1))
+                               , Right mTy
+                               , Left (natLit (n' - 1))
+                               , Left (valToTerm km)
+                               , Left (Either.lefts vArgs !! 2) ]) ]
+             _ -> Nothing
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.unconcatBitVector#) $ \case
+      PrimStepContext{..}
+        -- :: (KnownNat n, KnownNat m) => BitVector (n * m) -> Vec n (BitVector m)
+        | isSubj
+        , nTy : mTy : _ <- tys
+        , _ : km : bv : _ <- args
+        , C.TyConApp vecTcNm [_, bvMTy] <- C.tyView (snd (primArgResTys pInfo))
+        , Just bvTcNm <- tyConNameOf bvMTy
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        , Just (nilCon, consCon) <- vecDataCons te vecTcNm
+        -> let mBVTy = mkTyConApp bvTcNm [mTy]
+           in case n of
+                0 -> reduce (mkVecNil te sc nilCon mBVTy)
+                n' | Right m <- runExcept (tyNatSize te sc mTy)
+                   , let n1MTy = mkTyConApp typeNatMul [numTy (n' - 1), mTy]
+                         n1BVTy = mkTyConApp bvTcNm [n1MTy]
+                   , Just (hd, tl) <- case bitVectorLiteral bv of
+                       -- Fast path for literals
+                       Just (mski, i) ->
+                         let sh = fromInteger ((n' - 1) * m)
+                             loMask = bit sh - 1
+                         in Just
+                              ( mkBitVectorLit mBVTy mTy m (mski `shiftR` sh) (i `shiftR` sh)
+                              , mkBitVectorLit n1BVTy n1MTy ((n' - 1) * m)
+                                  (mski .&. loMask) (i .&. loMask) )
+                       Nothing -> do
+                         tupDc <- pairDataCon te
+                         let splitCall =
+                               mkApps (bvSplitPrim bvTcNm)
+                                 [ Right n1MTy, Right mTy, Left (natLit ((n' - 1) * m))
+                                 , Left (valToTerm bv) ]
+                             sel first = selectPair sc tupDc ("x", mBVTy) ("bv'", n1BVTy) first splitCall
+                         pure (sel True, sel False)
+                   -> reduce $
+                      mkVecCons te sc consCon mBVTy n' hd
+                        (mkApps (Prim pInfo)
+                           [ Right (numTy (n' - 1))
+                           , Right mTy
+                           , Left (natLit (n' - 1))
+                           , Left (valToTerm km)
+                           , Left tl ])
                 _ -> Nothing
       _ -> Nothing
   ]
