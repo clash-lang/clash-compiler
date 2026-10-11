@@ -27,6 +27,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Scoped.Util
   ( -- * Constant arguments of primitives
@@ -39,6 +40,10 @@ module Clash.Normalize.Scoped.Util
     -- * Recursive globals
   , isRecursiveBndr
   , isNonRecursiveGlobalVar
+    -- * Constant specialization
+  , ConstantSpecInfo (..)
+  , csrFoundConstant
+  , constantSpecInfo
     -- * Call graphs
   , CallGraph
   , callGraph
@@ -54,9 +59,11 @@ module Clash.Normalize.Scoped.Util
 import           Control.Lens                ((&), (+~), (%=))
 import qualified Control.Lens                as Lens
 import           Control.Monad.Extra         (anyM)
+import           Data.Bifunctor              (bimap)
 import qualified Data.IntMap.Strict          as IntMap
 import qualified Data.List                   as List
 import qualified Data.Text                   as Text
+import qualified Data.Text.Extra             as Text
 import           GHC.Builtin.Names           (eqTyConKey)
 import           GHC.Stack                   (HasCallStack)
 
@@ -72,17 +79,20 @@ import           Clash.Driver.Types          (Binding (..))
 import           Clash.Normalize.Primitives  (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util        (isConstantArg)
-import           Clash.Rewrite.Types         (bindings, extra)
+import           Clash.Rewrite.Types         (bindings, curFun, extra, scopedTypeEnv)
 import           Clash.Unique                (fromGhcUnique)
 
 import           Clash.Core.Scoped.FreeVars  (teleNameBinders)
+import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
+import           Clash.Core.Scoped.TermInfo  (isClosed)
 import           Clash.Core.Scoped.Type
-  (PiTele (..), TypeView (..), mkFunTy, piTeleNameBinders, tyView)
-import           Clash.Rewrite.Scoped.Types  (FrameKind (..), TransformContext, ctxFrames)
+  (PiTele (..), TypeView (..), isClockOrReset, mkFunTy, piTeleNameBinders, tyView)
+import           Clash.Rewrite.Scoped.Types
+  (FrameKind (..), TransformContext, ctxFrames, mkDerivedName, tfScope)
 
 -- * Constant arguments of primitives
 
@@ -160,6 +170,160 @@ isRecursiveBndr g = do
           pure isR
  where
   f = globalIdVar g
+
+-- * Constant specialization
+
+-- | The constant parts of a term in scope @n@, see 'constantSpecInfo' and
+-- 'Clash.Normalize.Util.ConstantSpecInfo'
+data ConstantSpecInfo n where
+  ConstantSpecInfo
+    :: DExt n l
+    => !(Scope l)
+    -- ^ The scope of the new let-bindings
+    -> !(Tele Bind n l)
+    -- ^ New non-recursive let-bindings, binding the non-constant parts.
+    -- Their right-hand sides don't refer to one another.
+    -> !(Term l)
+    -- ^ The term, with its non-constant parts replaced by the variables of
+    -- the new let-bindings
+    -> !Bool
+    -- ^ Whether any constant part was found. If not, the new let-bindings are
+    -- of no use.
+    -> ConstantSpecInfo n
+
+-- | Whether 'constantSpecInfo' found a constant part
+csrFoundConstant :: ConstantSpecInfo n -> Bool
+csrFoundConstant (ConstantSpecInfo _ _ _ found) = found
+
+-- | Split a term in its constant parts, and let-bindings for its non-constant
+-- parts, for constant specialization on partially constant arguments. See
+-- 'Clash.Normalize.Util.constantSpecInfo'.
+constantSpecInfo
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> NormalizeSession (ConstantSpecInfo n)
+constantSpecInfo ctx = constantSpecInfoIn (mkDerivedName ctx) (tfScope ctx)
+
+-- | 'constantSpecInfo' in a scope that may extend that of the context,
+-- with the context's way of naming new binders
+constantSpecInfoIn
+  :: (HasCallStack, Distinct n)
+  => (C.OccName -> C.Name C.Term)
+  -> Scope n
+  -> Term n
+  -> NormalizeSession (ConstantSpecInfo n)
+constantSpecInfoIn mkNm sc e = do
+  te <- Lens.view scopedTypeEnv
+  -- Don't constant spec clocks or resets, they're either:
+  --
+  --  * A simple wire (Var), therefore not interesting to spec
+  --  * A clock/reset generator, and speccing a generator weirds out HDL simulators.
+  if isClockOrReset te sc (inferCoreTypeOf te sc e) then
+    case collectArgs e of
+      (Prim p, _)
+        | C.primName p == Text.showt 'removedArg ->
+          pure (constantCsr sc e)
+      _ -> bindCsr mkNm sc e
+  else
+    case collectArgsTicks e of
+      (dc@(Data _), args, ticks) ->
+        mergeCsrs mkNm sc ticks e dc args
+
+      (prim@(Prim _), args, ticks) ->
+        mergeCsrs mkNm sc ticks e prim args >>= \case
+          csr@(ConstantSpecInfo _ TNil _ _) -> pure csr
+          _ -> bindCsr mkNm sc e
+
+      (Lam _ _, _, _) ->
+        if not (isClosed e) then
+          bindCsr mkNm sc e
+        else
+          pure (constantCsr sc e)
+
+      (var@(GlobalVar f), args, ticks) -> do
+        (curF, _) <- Lens.use curFun
+        isNonRecGlobVar <- isNonRecursiveGlobalVar e
+        if isNonRecGlobVar && globalIdUniq f /= C.varUniq curF then
+          mergeCsrs mkNm sc ticks e var args >>= \case
+            csr@(ConstantSpecInfo _ TNil _ _) -> pure csr
+            _ -> bindCsr mkNm sc e
+        else
+          bindCsr mkNm sc e
+
+      (Literal _, _, _) ->
+        pure (constantCsr sc e)
+
+      _ ->
+        bindCsr mkNm sc e
+
+-- | A fully constant term: binds nothing
+constantCsr :: Distinct n => Scope n -> Term n -> ConstantSpecInfo n
+constantCsr sc e = ConstantSpecInfo sc TNil e True
+
+-- | Bind a term to a new variable: it is fully non-constant
+bindCsr
+  :: Distinct n
+  => (C.OccName -> C.Name C.Term)
+  -> Scope n
+  -> Term n
+  -> NormalizeSession (ConstantSpecInfo n)
+bindCsr mkNm sc oldTerm = do
+  te <- Lens.view scopedTypeEnv
+  pure $ withFreshIdBinder sc (mkNm "bindCsr") (inferCoreTypeOf te sc oldTerm) $ \sc' b ->
+    ConstantSpecInfo sc' (TCons (NonRec b oldTerm) TNil) (idBinderVar b) False
+
+-- | Combine the constant parts of the arguments of a data constructor,
+-- primitive or global. The new let-bindings of an argument are in scope of
+-- those of the next one, so that their binders are fresh with respect to one
+-- another.
+mergeCsrs
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => (C.OccName -> C.Name C.Term)
+  -> Scope n
+  -> [TickInfo n]
+  -- ^ Ticks to wrap around proposed new term
+  -> Term n
+  -- ^ \"Old\" term
+  -> Term n
+  -- ^ The head of the application
+  -> [Either (Term n) (Type n)]
+  -- ^ Arguments
+  -> NormalizeSession (ConstantSpecInfo n)
+mergeCsrs mkNm sc ticks oldTerm hd = go sc TNil [] []
+ where
+  go
+    :: DExt n x
+    => Scope x
+    -> Tele Bind n x
+    -> [Either (Term x) (Type x)]
+    -- ^ The arguments so far, in reverse order
+    -> [Bool]
+    -- ^ Whether constant parts were found in the term arguments so far
+    -> [Either (Term n) (Type n)]
+    -> NormalizeSession (ConstantSpecInfo n)
+  go scx binds accRev founds = \case
+    Right ty : rest -> go scx binds (Right (sink ty) : accRev) founds rest
+    Left t : rest -> constantSpecInfoIn mkNm scx (sink t) >>= \case
+      ConstantSpecInfo scy binds' t' found ->
+        go scy (appendTele binds binds') (Left t' : map (bimap sink sink) accRev)
+           (found : founds) rest
+    []
+      -- If any arguments are constant (and hence can be constant specced), a
+      -- new term is created with these constants left in, but variable parts
+      -- let-bound. There's one edge case: whenever a term has _no_ arguments.
+      -- This happens for constructors without fields, or -depending on their
+      -- WorkInfo- primitives without args. We still set 'csrFoundConstant',
+      -- because we know the newly proposed term will be fully constant.
+      | null founds || or founds ->
+          let newTerm = mkApps (sink hd) (reverse accRev)
+          in  pure (ConstantSpecInfo scx binds (mkTicks newTerm (sink1 ticks)) True)
+      | otherwise ->
+          -- No constructs were found to be constant, so we might as well refer
+          -- to the whole thing with a new let-binding (instead of creating a
+          -- number of "smaller" let-bindings)
+          bindCsr mkNm sc oldTerm
 
 -- * Call graphs
 

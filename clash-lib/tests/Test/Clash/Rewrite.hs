@@ -202,6 +202,10 @@ rewriteEnvWithDebug opts = def{_clashEnv = clashEnv0{envOpts = opts0{opt_debug =
   clashEnv0 = _clashEnv def
   opts0 = envOpts clashEnv0
 
+-- | The default 'RewriteEnv', with the type constructors of 'testTyConMap'
+rewriteEnvWithTyCons :: RewriteEnv
+rewriteEnvWithTyCons = withTyConMap testTyConMap def
+
 -- | Run a rewrite, under the given transformation name and in the given
 -- context, that replaces the term it is offered by another term and signals a
 -- change. The invariant checks of 'Clash.Rewrite.Util.applyDebug' then check

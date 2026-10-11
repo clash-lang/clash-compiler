@@ -16,12 +16,15 @@
 
 module Clash.Tests.Normalize.Scoped.Util (tests) where
 
+import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (evalState)
 import Data.Default (def)
 import qualified Data.List as List
+import GHC.Types.SrcLoc (noSrcSpan)
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import qualified Clash.Core.FreeVars as C (freeLocalIds)
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (NameSort (..))
 import qualified Clash.Core.Term as C
@@ -30,7 +33,7 @@ import qualified Clash.Core.Var as C
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.Types (NormalizeState (..))
 import qualified Clash.Normalize.Util as Current
-import Clash.Rewrite.Types (RewriteState (..))
+import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Convert
@@ -38,12 +41,14 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkTicks)
 import Clash.Core.Scoped.TermInfo (isClosed)
+import Clash.Core.Scoped.Util (mkLets)
 import qualified Clash.Normalize.Scoped.Util as Scoped
 import Clash.Rewrite.Scoped.Types (Frame (..), pushFrame, rootContext)
 
 import Test.Clash.Rewrite
-  ( globalId, intFunTy, intId, intLit, intTy, liftedEqTy, localId
-  , mkBindingMap, nameToUnique, runRewriteTest, signalTy, systemDomTy, tyVar )
+  ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intLit, intTy
+  , liftedEqTy, localId, mkBindingMap, nameToUnique, pairDataCon
+  , rewriteEnvWithTyCons, runRewriteTest, signalTy, systemDomTy, tyVar )
 import Test.Clash.Scoped
 
 -- * Type equality constraints
@@ -248,6 +253,53 @@ shouldReduceTests =
  where
   argCtx nm i = pushFrame (AppArg (Just (nm, 0, i))) (rootContext emptyScope)
 
+-- * Constant specialization
+
+-- | Assert that 'Scoped.constantSpecInfo' agrees with
+-- 'Current.constantSpecInfo', comparing the new term in the scope of its new
+-- let-bindings
+agreesConstantSpec :: C.Term -> Assertion
+agreesConstantSpec tm = do
+  ((cTm, cFound), _, _) <- runRewriteTest rewriteEnvWithTyCons st $ do
+    csr <- Current.constantSpecInfo
+             (TransformContext (inScopeOf (Lens.toListOf C.freeLocalIds tm)) []) tm
+    let lets = foldr (\(i, x) e -> C.Let (C.NonRec i x) e)
+                 (Current.csrNewTerm csr) (Current.csrNewBindings csr)
+    pure (lets, Current.csrFoundConstant csr)
+  withFreeVarsOf [tm] $ \env -> do
+    ((sTm, sFound), _, _) <- runRewriteTest rewriteEnvWithTyCons st $
+      Scoped.constantSpecInfo (rootContext (convScope env)) (fromClashTerm env tm) >>= \case
+        csr@(Scoped.ConstantSpecInfo _ binds t _) ->
+          pure (toClashTerm (mkLets binds t), Scoped.csrFoundConstant csr)
+    sFound @?= cFound
+    assertAlphaEq cTm sTm
+ where
+  st :: RewriteState NormalizeState
+  st = def{_curFun = (globalId User "cur" 50 intTy, noSrcSpan)}
+
+constantSpecTests :: [TestTree]
+constantSpecTests =
+  [ testCase "a literal is constant" $ agreesConstantSpec (intLit 3)
+  , testCase "a variable is bound" $ agreesConstantSpec (C.Var x1)
+  , testCase "a constructor with a constant field" $
+      agreesConstantSpec (mkPair (intLit 1) (C.Var x1))
+  , testCase "a constructor without constant fields is bound as a whole" $
+      agreesConstantSpec (mkPair (C.Var x1) (C.Var y2))
+  , testCase "a primitive with a non-constant argument is bound as a whole" $
+      agreesConstantSpec (mkPair (C.App (C.Prim incPrim) (C.Var x1)) (intLit 2))
+  , testCase "a primitive with constant arguments is constant" $
+      agreesConstantSpec (mkPair (C.App (C.Prim incPrim) (intLit 1)) (C.Var y2))
+  , testCase "a closed lambda is constant" $
+      agreesConstantSpec (C.Lam y2 (C.Var y2))
+  , testCase "an open lambda is bound" $
+      agreesConstantSpec (C.Lam y2 (C.Var x1))
+  ]
+ where
+  x1 = intId User "x" 1
+  y2 = intId User "y" 2
+  mkPair a b = C.mkApps (C.Data pairDataCon) [Left a, Left b]
+  incPrim = somePrim{C.primName = "incPrim", C.primType = intFunTy 1}
+
 -- * Call graphs
 
 callGraphTests :: [TestTree]
@@ -317,6 +369,7 @@ tests =
     , testGroup "recursion" recursionTests
     , testGroup "inlining" inliningTests
     , testGroup "shouldReduce" shouldReduceTests
+    , testGroup "constantSpecInfo" constantSpecTests
     , testGroup "callGraph" callGraphTests
     , testGroup "classifyFunction" classifyTests
     ]
