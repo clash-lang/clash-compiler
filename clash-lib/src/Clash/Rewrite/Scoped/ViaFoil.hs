@@ -23,7 +23,9 @@
 
   The root scope also has the free variables of the let-bindings of the
   context that the evaluator may use for the subterm (see 'rootVars'), so
-  that the result of 'whnfRW' is in scope.
+  that the result of the evaluator is in scope. Those let-bindings are the
+  heap of the root of the context ('legacyHeap'), converted into the root
+  scope when the evaluator looks them up.
 
   __Uniques.__ Converting from scoped Core uses raw names as uniques, and raw
   names of binders are just above those in scope: small numbers, like the ones
@@ -84,13 +86,15 @@ import           Clash.Rewrite.Types
   (Rewrite, RewriteMonad, debugOpts, tcCache, uniqSupply)
 import qualified Clash.Rewrite.Types         as C
 import           Clash.Rewrite.Util
-  (cleanupHeapBindings, heapLetBindings, whnfHeap)
+  (cleanupHeapBindings, contextLetBindings, heapLetBindings, whnfHeap)
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (curLoc)
 import           Clash.Util.Supply           (Supply, freshId, splitSupply)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm)
 import           Clash.Core.Scoped.Convert
+import           Clash.Core.Scoped.NameMap (NameMap, nameMapFromList)
+import qualified Clash.Data.UniqMap          as UniqMap
 import           Clash.Core.Scoped.FreeVars  (bindNameBinders)
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
@@ -109,15 +113,17 @@ viaFoil
   -> Rewrite extra
 viaFoil name (ScopedTransform rw) ctx e =
   withConvEnv tvs ids $ \env ->
-    let root = LegacyRoot
+    let idsS = [(i, fromClashTerm env (C.Var i)) | i <- ids]
+        root = LegacyRoot
           { legacyContext = ctx
           , legacyTyVars = [(tv, fromClashType env (C.VarTy tv)) | tv <- tvs]
-          , legacyIds = [(i, fromClashTerm env (C.Var i)) | i <- ids]
+          , legacyIds = idsS
+          , legacyHeap = rootHeap env idsS (C.tfContext ctx) e
           }
         e0 = fromClashTerm env e
     in do
       (e1, Monoid.getAny -> changed) <-
-        Writer.listen (rw (TransformContext (convScope env) (PLegacy root)) e0)
+        Writer.listen (rw (legacyRootContext (convScope env) root) e0)
       if changed
         then withSupply (toClashFresh (rootInScope root) (rootBackEnv root) e1)
         else do
@@ -172,6 +178,28 @@ rootVars frames e =
   freeVarsOf t =
     ( mkVarEnv [(tv, tv) | tv <- Lens.toListOf C.termFreeTyVars t]
     , mkVarEnv [(i, i) | i <- Lens.toListOf C.freeLocalIds t] )
+
+-- | The let-bindings of the context of the root that are valid at the
+-- subterm (see 'Clash.Rewrite.Util.contextLetBindings'), of the variables of
+-- the root scope. A binding is converted into the root scope when it is
+-- looked up: 'fmap' of a 'NameMap' is lazy.
+rootHeap
+  :: Distinct n
+  => ConvEnv n
+  -> [(C.Id, Term n)]
+  -> C.Context
+  -> C.Term
+  -> NameMap TmName n (Term n)
+rootHeap env ids frames e =
+  fmap (\(Lazy t) -> t) $ nameMapFromList
+    [ (x, Lazy (fromClashTerm env rhs))
+    | (u, rhs) <- UniqMap.toList (contextLetBindings frames e)
+    , Just x <- [IntMap.lookup (fromIntegral u) names] ]
+ where
+  names = IntMap.fromList [ (fromIntegral (C.varUniq i), x) | (i, Var _ _ x) <- ids ]
+
+-- | A box, so that a strict map doesn't evaluate its contents
+data Lazy a = Lazy a
 
 -- * Converting back
 
