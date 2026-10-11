@@ -492,3 +492,4 @@ test-suite unittests
 
                  Test.Clash.Rewrite
                  Test.Clash.Scoped
+                 Test.Clash.Scoped.Gen
