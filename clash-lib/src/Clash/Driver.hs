@@ -487,7 +487,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         let seen = State.execState (Id.addRaw (Data.Text.pack modName1)) seen0
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
-          genNetlist env peEval isTb transformedBindings topEntityMap compNames
+          genNetlist env eval isTb transformedBindings topEntityMap compNames
             typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
         pure (seen', (topComponent, netlist))
