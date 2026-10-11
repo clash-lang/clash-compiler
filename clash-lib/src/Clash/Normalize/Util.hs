@@ -406,11 +406,9 @@ normalizeTopLvlBndr
 normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extra.normalized) $ do
   tcm <- Lens.view tcCache
   let nmS = showPpr (varName nm)
-  -- We deshadow the term because sometimes GHC gives us
-  -- code where a local binder has the same unique as a
-  -- global binder, sometimes causing the inliner to go
-  -- into a loop. Deshadowing freshens all the bindings
-  -- to avoid this.
+  -- We deshadow the term, so that no binder shadows another binder. Note
+  -- that we start from an empty InScopeSet, so this does not rename a local
+  -- binder that has the same unique as a global binder.
   let tm1 = deShadowTerm emptyInScopeSet tm
       tm2 = if isTop then substWithTyEq tm1 else tm1
   old <- Lens.use curFun
