@@ -69,6 +69,7 @@ module Test.Clash.Scoped
   , runViaFoil
   , runScopedOn
   , assertLetHandlerAgrees
+  , assertRewritesAgree
   , assertNewBindingsAgree
   , Step (..)
   , atPath
@@ -123,7 +124,7 @@ import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
 import Clash.Core.Scoped.Evaluator.Types (Env, Machine (..), initMachine)
 import Clash.Rewrite.Types
-  (RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
+  (Rewrite, RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
 import qualified Clash.Rewrite.Types as C
 
 import Clash.Driver.Types (Binding (..), BindingMap)
@@ -932,6 +933,34 @@ assertLetHandlerAgrees env st old new tm = case tm of
       (changed1 == changed2)
     assertNewBindingsAgree st st1 st2
   _ -> assertFailure "assertLetHandlerAgrees: not a let-expression"
+
+-- | Assert that a rewrite of Clash Core and its port agree on a term, in the
+-- given context: the results are alpha-equivalent (comparing types too, see
+-- 'aeqTermTyped'), both signal a change or neither does, and they add the same
+-- global bindings (see 'assertNewBindingsAgree'). Give the port as the
+-- normalizer runs it: e.g. a scoped transformation compiled with
+-- 'Clash.Rewrite.StrategyDSL.TH.asRewriteQ', which runs it through
+-- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'.
+assertRewritesAgree
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> TransformContext
+  -> Rewrite extra
+  -- ^ The rewrite of Clash Core
+  -> Rewrite extra
+  -- ^ Its port
+  -> C.Term
+  -> Assertion
+assertRewritesAgree env st ctx old new tm = do
+  (expected, st1, changed1) <- runRewriteTest env st (old ctx tm)
+  (actual, st2, changed2) <- runRewriteTest env st (new ctx tm)
+  assertBool
+    ("Clash Core:\n" <> showTerm expected <> "\nport:\n" <> showTerm actual)
+    (aeqTermTyped (globalsByName expected) (globalsByName actual))
+  assertBool ("change signaled: Clash Core " <> show changed1 <> ", port " <> show changed2)
+    (changed1 == changed2)
+  assertNewBindingsAgree st st1 st2
 
 -- | Assert that two runs from the first state added global bindings with the
 -- same names, whose bodies are alpha-equivalent, up to the uniques of the
