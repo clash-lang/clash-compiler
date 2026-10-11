@@ -221,6 +221,7 @@ Library
                       Clash.Core.Scoped.DataCon
                       Clash.Core.Scoped.EqSolver
                       Clash.Core.Scoped.Evaluator
+                      Clash.Core.Scoped.Evaluator.Adapter
                       Clash.Core.Scoped.Evaluator.Primitives
                       Clash.Core.Scoped.Evaluator.Types
                       Clash.Core.Scoped.FreeVars
