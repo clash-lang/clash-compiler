@@ -144,6 +144,17 @@ data DebugOpts = DebugOpts
   -- invariants for rewriting (e.g. no accidental shadowing, or type changes).
   --
   -- Command line flag: -fclash-debug-invariants
+  , dbg_invariantsShadowing :: Bool
+  -- ^ When checking invariants, additionally run the scope lint of
+  -- "Clash.Core.Lint" on the input of normalization and on the result of every
+  -- transformation. It checks that every local variable, including the type
+  -- variables in types, is bound, that every global variable exists, that no
+  -- binder shadows a variable in scope, and that no local binder has the
+  -- unique of a global binder. Clash does not maintain these invariants yet,
+  -- so these checks fail for most designs. They are meant for developing
+  -- transformations.
+  --
+  -- Command line flag: -fclash-debug-invariants-shadowing
   , dbg_transformationInfo :: TransformationInfo
   -- ^ The information to show when debugging a transformation. See the
   -- 'TransformationInfo' type for different configurations.
@@ -182,6 +193,7 @@ instance Hashable DebugOpts where
   hashWithSalt s DebugOpts{..} =
     s `hashWithSalt`
     dbg_invariants `hashWithSalt`
+    dbg_invariantsShadowing `hashWithSalt`
     dbg_transformationInfo `hashSet`
     dbg_transformations `hashWithSalt`
     dbg_countTransformations `hashWithSalt`
@@ -248,6 +260,7 @@ hasTransformationInfo info opts =
 debugNone :: DebugOpts
 debugNone = DebugOpts
   { dbg_invariants = False
+  , dbg_invariantsShadowing = False
   , dbg_transformationInfo = None
   , dbg_transformations = Set.empty
   , dbg_countTransformations = False

@@ -35,6 +35,7 @@ import qualified Control.Monad.Trans.RWS.CPS as RWS
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (second)
 import           Data.Coerce                 (coerce)
+import           Data.Default                (def)
 import           Data.Functor.Const          (Const (..))
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
@@ -60,8 +61,11 @@ import           Clash.Core.FreeVars
   (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn, dependencySortTyVars)
 import           Clash.Core.HasFreeVars      (elemFreeVars, notElemFreeVars)
 import           Clash.Core.HasType
+import           Clash.Core.Lint
+  (LintCheck (..), LintError (..), lintTerm, mkLintEnv, newLintErrors,
+   showLintError)
 import           Clash.Core.Name
-import           Clash.Core.Pretty           (showPpr)
+import           Clash.Core.Pretty           (PrettyOptions (..), PrettyPrec, showPpr, showPpr')
 import           Clash.Core.Subst
   (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
 import           Clash.Core.Term
@@ -70,7 +74,7 @@ import           Clash.Core.Type             (Type (..), normalizeType)
 import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
+  (InScopeSet, emptyInScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet,
    differenceVarEnv, extendVarSet)
@@ -267,6 +271,11 @@ applyDebug ctx name exprOld hasChanged exprNew = do
                        , "substitution."
                        ])
 
+      -- The scope lint does not run with just -fclash-debug-invariants yet:
+      -- 'substWithTyEq' leaves type variables unbound (Basic/TyEqConstraints)
+      Monad.when (dbg_invariantsShadowing opts) $
+        lintRewrite ctx name exprOld exprNew
+
       -- TODO This check should be an error instead of a trace, however this is
       -- currently very fragile as Clash doesn't keep casts in core. This should
       -- be changed when #1064 is merged.
@@ -294,6 +303,96 @@ applyDebug ctx name exprOld hasChanged exprNew = do
    where
     before = showPpr exprOld
     after  = showPpr exprNew
+
+-- | Check that the result of a transformation is well-scoped in the context
+-- it appears in, see "Clash.Core.Lint". Only violations that were not already
+-- present in the input of the transformation are reported: the transformation
+-- that introduced them is to blame.
+lintRewrite
+  :: TransformContext
+  -> String
+  -- ^ Name of the transformation
+  -> Term
+  -- ^ Original expression
+  -> Term
+  -- ^ New expression
+  -> RewriteMonad extra ()
+lintRewrite (TransformContext is ctx) name exprOld exprNew = do
+  bndrs <- Lens.use bindings
+  checks <- lintChecks
+  let env = mkLintEnv checks (`UniqMap.elem` bndrs) is ctx
+      errs0 = case lintTerm env exprNew of
+        [] -> []
+        errs -> newLintErrors (lintTerm env exprOld) errs
+  -- The binder currently being normalized need not be in the binding map
+  errs1 <- if any isUnknownGlobal errs0
+    then do
+      (cf, _) <- Lens.use curFun
+      pure (filter (not . isCurFun cf) errs0)
+    else pure errs0
+  Monad.unless (null errs1) $
+    error ( concat [ $(curLoc)
+                   , "Error when applying rewrite ", name
+                   , " to:\n" , truncateLines (showPprU exprOld)
+                   , "\nResult:\n" ++ truncateLines (showPprU exprNew) ++ "\n"
+                   , "It violates the scoping rules of Clash Core:\n"
+                   , unlines (map ((" " ++) . showLintError) errs1)
+                   ])
+ where
+  isUnknownGlobal UnknownGlobal{} = True
+  isUnknownGlobal _ = False
+
+-- | Check that a term to be normalized is well-scoped, see "Clash.Core.Lint".
+-- Used once per binder, on the input of normalization, after which
+-- 'lintRewrite' checks the result of every transformation.
+lintInput
+  :: String
+  -- ^ Name of the rewrite strategy that is about to run
+  -> String
+  -- ^ Name of the binder
+  -> Term
+  -> RewriteMonad extra ()
+lintInput strategy bndr expr = do
+  bndrs <- Lens.use bindings
+  (cf, _) <- Lens.use curFun
+  checks <- lintChecks
+  let env = mkLintEnv checks (`UniqMap.elem` bndrs) emptyInScopeSet []
+      errs = filter (not . isCurFun cf) (lintTerm env expr)
+  Monad.unless (null errs) $
+    error ( concat [ $(curLoc)
+                   , "Error in the input of ", strategy, " of ", bndr, ":\n"
+                   , truncateLines (showPprU expr), "\n"
+                   , "It violates the scoping rules of Clash Core:\n"
+                   , unlines (map ((" " ++) . showLintError) errs)
+                   ])
+
+-- | The checks of "Clash.Core.Lint" enabled by the debug options. Note that
+-- the lint itself only runs with 'dbg_invariantsShadowing' for now, see
+-- 'applyDebug'.
+lintChecks :: RewriteMonad extra (LintCheck -> Bool)
+lintChecks = do
+  opts <- Lens.view debugOpts
+  pure $ \case
+    ScopeCheck -> True
+    ShadowCheck -> dbg_invariantsShadowing opts
+    LocalGlobalCheck -> dbg_invariantsShadowing opts
+
+-- | Pretty print, always showing uniques: scoping is about uniques
+showPprU :: PrettyPrec p => p -> String
+showPprU = showPpr' def{displayUniques = True}
+
+-- | Is the violation an occurrence of the given global, which is not in the
+-- binding map? The binder currently being normalized need not be in it.
+isCurFun :: Id -> LintError -> Bool
+isCurFun cf (UnknownGlobal v) = varUniq v == varUniq cf
+isCurFun _ _ = False
+
+-- | Keep at most the first 100 lines of a string, used to show terms in
+-- error messages
+truncateLines :: String -> String
+truncateLines s = case splitAt 100 (lines s) of
+  (ls, []) -> unlines ls
+  (ls, rest) -> unlines ls ++ "<" ++ show (length rest) ++ " more lines>\n"
 
 -- NOTE [Filter free variables]
 -- Since [Give evaluator access to in-scope let-bindings #2571](https://github.com/clash-lang/clash-compiler/pull/2571)

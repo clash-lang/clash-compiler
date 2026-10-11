@@ -449,6 +449,7 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
       -- 1. Debug
       opt_debug = opt_debug
         { dbg_invariants = False
+        , dbg_invariantsShadowing = False
         , dbg_transformations = Set.empty
         , dbg_historyFile = Nothing
         }
