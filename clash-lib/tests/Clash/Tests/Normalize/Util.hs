@@ -11,6 +11,7 @@
 
 module Clash.Tests.Normalize.Util (tests) where
 
+import Data.Default (def)
 import GHC.Builtin.Names (eqTyConKey)
 
 import Test.Tasty
@@ -19,16 +20,22 @@ import Test.Tasty.HUnit
 import Clash.Core.HasFreeVars (freeVarsOf)
 import Clash.Core.Name (NameSort (..), mkUnsafeName)
 import Clash.Core.Term (Term (..))
+import Clash.Core.Var (Id)
 import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), mkFunTy, mkTyConApp, tyView)
 import Clash.Core.TyCon (TyConName)
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Var (TyVar)
+import Clash.Normalize.Types (NormalizeState)
 import Clash.Core.VarEnv (nullVarSet)
-import Clash.Normalize.Util (substWithTyEq, tvSubstWithTyEq)
+import Clash.Normalize.Util
+  (isNonRecursiveGlobalVar, substWithTyEq, tvSubstWithTyEq)
+import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Unique (fromGhcUnique)
 
-import Test.Clash.Rewrite (assertAlphaEq, localId, showPprU, tyVar)
+import Test.Clash.Rewrite
+  ( assertAlphaEq, globalId, intFunTy, localId, mkBindingMap, runRewriteTest
+  , showPprU, tyVar )
 
 -- | @a ~ b@, recognized by 'substWithTyEq' and 'tvSubstWithTyEq'
 eqTy :: Type -> Type -> Type
@@ -112,6 +119,30 @@ tvSubstWithTyEqNoCapture =
       eqTy (VarTy dom) (VarTy a2) `mkFunTy`
         ForAllTy a2 (VarTy dom `mkFunTy` VarTy a2)
 
+-- | 'isNonRecursiveGlobalVar' caches whether a global binder is recursive by
+-- its unique. Asking it about a local variable must not affect the answer for a
+-- global binder with the same unique. It used to check whether the local
+-- variable occurred in the body of the global binder, which it never does, and
+-- cached the global binder as non-recursive. The inlining transformations then
+-- kept inlining the recursive binder.
+isNonRecursiveGlobalVarLocal :: Assertion
+isNonRecursiveGlobalVarLocal = do
+  ((localRes, globalRes), _, _) <- runRewriteTest def st $
+    (,) <$> isNonRecursiveGlobalVar (Var gLocal)
+        <*> isNonRecursiveGlobalVar (Var gGlobal)
+  assertBool "local variable is a non-recursive global" (not localRes)
+  assertBool "recursive global is non-recursive" (not globalRes)
+ where
+  gGlobal, gLocal, x :: Id
+  gGlobal = globalId User "g" 7 (intFunTy 1)
+  gLocal = localId User "g" 7 (intFunTy 1)
+  x = localId User "x" 8 (intFunTy 0)
+
+  -- g = \x -> g x
+  st :: RewriteState NormalizeState
+  st = def
+    { _bindings = mkBindingMap [(gGlobal, Lam x (App (Var gGlobal) (Var x)))] }
+
 tests :: TestTree
 tests =
   testGroup
@@ -124,4 +155,6 @@ tests =
         substWithTyEqOrder
     , testCase "tvSubstWithTyEq avoids capture (#1868)"
         tvSubstWithTyEqNoCapture
+    , testCase "isNonRecursiveGlobalVar doesn't confuse a local with a global"
+        isNonRecursiveGlobalVarLocal
     ]
