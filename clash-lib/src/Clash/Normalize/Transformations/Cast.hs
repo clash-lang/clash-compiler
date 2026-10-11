@@ -32,10 +32,12 @@ import Clash.Core.Type (Type, normalizeType)
 import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList)
 import Clash.Driver.Warning (warnAboutM)
+import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onCast, onLet, toTransformation)
+import Clash.Rewrite.Scoped.ViaFoil (scopedAppWorker, viaFoilWhen)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
@@ -61,7 +63,24 @@ import Clash.Warning (ClashWarning(WarnCastSpecialization))
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'elimCastCast'.
 argCastSpec :: Transformation
-argCastSpec = toTransformation "argCastSpec" (onApp 'argCastSpecWorker)
+argCastSpec = toTransformation "argCastSpec" (onApp 'argCastSpecViaFoil)
+
+-- | 'Scoped.argCastSpec', which replaced 'argCastSpecWorker', through
+-- 'viaFoilWhen' at the applications at which it can fire, see
+-- 'argCastSpecWorker'
+argCastSpecViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
+argCastSpecViaFoil ctx node f arg =
+  viaFoilWhen "argCastSpec" (\_ _ -> pure fires)
+    (scopedAppWorker Scoped.argCastSpecWorker) ctx node
+ where
+  fires
+    | Cast e' _ _ <- stripTicks arg
+    , not (isCast e')
+    , (Var g, _) <- collectArgs f
+    = isGlobalId g
+    | otherwise = False
 
 -- | The 'App' handler of 'argCastSpec'.
 argCastSpecWorker

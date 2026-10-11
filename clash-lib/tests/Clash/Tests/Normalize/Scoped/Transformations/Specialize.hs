@@ -3,11 +3,11 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Specialize": the
-  regression tests of "Clash.Normalize.Transformations.Specialize", run on
-  the scoped transformations through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement with the
-  transformations of Clash Core.
+  Tests for "Clash.Normalize.Scoped.Transformations.Specialize" and
+  "Clash.Normalize.Scoped.Transformations.Cast": the regression tests of
+  "Clash.Normalize.Transformations.Specialize", run on the scoped
+  transformations through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and
+  agreement with the transformations of Clash Core.
 -}
 
 {-# LANGUAGE TemplateHaskell #-}
@@ -25,7 +25,9 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (extendInScopeSetList)
+import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
+import qualified Clash.Normalize.Transformations.Cast as C
 import qualified Clash.Normalize.Transformations.Specialize as C
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
@@ -64,6 +66,8 @@ typeSpecS :: NormRewrite
 typeSpecS = $(asRewriteQ Scoped.typeSpec)
 zeroWidthSpecS :: NormRewrite
 zeroWidthSpecS = $(asRewriteQ Scoped.zeroWidthSpec)
+argCastSpecS :: NormRewrite
+argCastSpecS = $(asRewriteQ Scoped.argCastSpec)
 
 -- | The transformations of Clash Core
 appPropC :: NormRewrite
@@ -77,6 +81,8 @@ typeSpecC :: NormRewrite
 typeSpecC = $(asRewriteQ (toTransformation "typeSpec" (onTyApp 'C.typeSpecWorker)))
 zeroWidthSpecC :: NormRewrite
 zeroWidthSpecC = $(asRewriteQ (toTransformation "zeroWidthSpec" (onLam 'C.zeroWidthSpecWorker)))
+argCastSpecC :: NormRewrite
+argCastSpecC = $(asRewriteQ (toTransformation "argCastSpec" (onApp 'C.argCastSpecWorker)))
 
 -- * Fixtures
 
@@ -288,6 +294,27 @@ tests =
         , testCase "a constructor with an existential type variable" $ zwDoesNotFire exZwTy
         , testCase "a recursive type" $ zwDoesNotFire (streamTy (bitVectorTy 0))
         ]
+    , testGroup "argCastSpec agrees with Clash Core"
+        [ testCase "fPair (cast x)" $
+            assertFiresAndAgreesIn tcEnv argCastSpecC argCastSpecS [] [x]
+              (C.App (C.Var fPair) (C.Cast (C.Var x) intTy pairTy))
+        , testCase "fPair (cast (fl x)): a cast that isn't work free" $
+            assertFiresAndAgreesIn tcEnv argCastSpecC argCastSpecS [] [x, fl]
+              (C.App (C.Var fPair) (C.Cast (C.App (C.Var fl) (C.Var x)) intTy pairTy))
+        , testCase "fPair <tick> (cast x)" $
+            assertFiresAndAgreesIn tcEnv argCastSpecC argCastSpecS [] [x]
+              (C.App (C.Var fPair) (C.Tick (C.SrcSpan noSrcSpan) (C.Cast (C.Var x) intTy pairTy)))
+        , testCase "fPoly @Pair y (cast x): type arguments" $
+            assertFiresAndAgreesIn tcEnv argCastSpecC argCastSpecS [] [x, yp]
+              (C.App (C.mkApps (C.Var fPoly) [Right pairTy, Left (C.Var yp)])
+                     (C.Cast (C.Var x) pairTy intTy))
+        , testCase "fPair (cast (cast x)): a cast of a cast" $
+            assertDoesNotFireIn tcEnv argCastSpecS [] [x]
+              (C.App (C.Var fPair) (C.Cast (C.Cast (C.Var x) intTy intTy) intTy pairTy))
+        , testCase "pl (cast x): a local function" $
+            assertDoesNotFireIn tcEnv argCastSpecS [] [x, pl]
+              (C.App (C.Var pl) (C.Cast (C.Var x) intTy pairTy))
+        ]
     ]
  where
   x = intId User "x" 12
@@ -301,6 +328,8 @@ tests =
   pb = intId User "b" 30
   fl = localId User "fl" 31 (intFunTy 1)
   hl = localId User "hl" 32 (intFunTy 1)
+  pl = localId User "pl" 33 (C.mkFunTy pairTy intTy)
+  yp = localId User "yp" 34 pairTy
   a = tyVar User "a" 50
   xa = localId User "x" 12 (C.VarTy a)
   kk = tyVar User "kk" 52
