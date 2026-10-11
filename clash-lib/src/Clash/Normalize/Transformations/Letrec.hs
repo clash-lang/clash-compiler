@@ -75,6 +75,7 @@ import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
+import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
@@ -96,7 +97,7 @@ not the complete names. So we use mkUnsafeSystemName to recreate the same Name.
 
 -- | Remove unused let-bindings
 deadCode :: Transformation
-deadCode = toTransformation "deadCode" (onLet 'deadCodeWorker)
+deadCode = Scoped.deadCode
 
 -- | The 'Let' handler of 'deadCode'.
 deadCodeWorker

@@ -284,6 +284,7 @@ Library
                       Clash.Normalize
                       Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Primitives
+                      Clash.Normalize.Scoped.Transformations.Letrec
                       Clash.Normalize.Strategy
                       Clash.Normalize.Strategy.Spec
                       Clash.Normalize.Transformations
@@ -492,6 +493,7 @@ test-suite unittests
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize
                  Clash.Tests.Normalize.PrimitiveReductions
+                 Clash.Tests.Normalize.Scoped.Transformations.Letrec
                  Clash.Tests.Normalize.Transformations
                  Clash.Tests.Normalize.Transformations.ANF
                  Clash.Tests.Normalize.Transformations.Case
