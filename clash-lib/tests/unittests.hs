@@ -11,6 +11,7 @@ import qualified Clash.Tests.Core.TermLiteral
 import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist
 import qualified Clash.Tests.Netlist.Id
+import qualified Clash.Tests.Netlist.Util
 import qualified Clash.Tests.Normalize
 import qualified Clash.Tests.Normalize.Transformations
 import qualified Clash.Tests.Normalize.Transformations.ANF
@@ -42,6 +43,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Driver.Manifest.tests
   , Clash.Tests.Netlist.tests
   , Clash.Tests.Netlist.Id.tests
+  , Clash.Tests.Netlist.Util.tests
   , Clash.Tests.Normalize.tests
   , Clash.Tests.Normalize.Transformations.tests
   , Clash.Tests.Normalize.Transformations.ANF.tests

@@ -37,7 +37,7 @@ import           Control.Monad.Trans.Except
   (ExceptT (..), runExcept, runExceptT, throwE)
 import           Data.Bifunctor          (second)
 import           Data.Char               (ord)
-import           Data.Either             (partitionEithers)
+import           Data.Either             (lefts, partitionEithers)
 import           Data.Foldable           (Foldable(toList))
 import           Data.Functor            (($>))
 import           Data.Hashable           (Hashable)
@@ -82,7 +82,7 @@ import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTyp
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
-import           Clash.Core.HasFreeVars  (elemFreeVars, isClosed)
+import           Clash.Core.HasFreeVars  (elemFreeVars, freeVarsOf, isClosed)
 import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
@@ -90,11 +90,11 @@ import           Clash.Core.Name
 import           Clash.Core.PartialEval
 import           Clash.Core.Pretty       (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Subst
-  (Subst (..), extendIdSubst, extendIdSubstList, extendInScopeId,
-   extendInScopeIdList, mkSubst, substTm)
+  (Subst (..), deshadowLetExpr, extendIdSubst, extendIdSubstList,
+   extendInScopeId, extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
-  (primMultiResult, MultiPrimInfo(..), Alt, LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   IsMultiPrim (..), collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
+  (primMultiResult, MultiPrimInfo(..), Alt, Bind (..), LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
+   IsMultiPrim (..), bindToList, collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.TermLiteral (termToDataError)
 import           Clash.Core.TyCon
@@ -107,7 +107,8 @@ import           Clash.Core.Util
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
-  (InScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv, emptyInScopeSet)
+  (InScopeSet, elemInScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv,
+   emptyInScopeSet, mkInScopeSet, unionInScope)
 import qualified Clash.Data.UniqMap as UniqMap
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
@@ -168,10 +169,29 @@ isVoid _       = False
 isFilteredVoid :: FilteredHWType -> Bool
 isFilteredVoid = isVoid . stripFiltered
 
-squashLets :: Term -> Term
-squashLets (Letrec xs (Letrec ys e)) =
-  squashLets (Letrec (xs <> ys) e)
-squashLets e = e
+-- | Merge nested let-expressions into a single group of bindings. Their
+-- binders are then in scope of all bindings, so a binder is renamed when that
+-- would capture a variable: when it shadows a variable that is in scope, or
+-- when the right-hand side of its 'NonRec' binding refers to a variable it
+-- shadows, as in:
+--
+-- > \x -> let x = g x in x
+--
+-- Merging as is would turn this into the loop @x = g x@.
+squashLets :: InScopeSet -> Term -> Term
+squashLets is0 (Let bind0 body0) =
+  case squashLets (extendInScopeSetList is0 (fmap fst binds1)) body1 of
+    Letrec binds2 body2 -> Letrec (binds1 <> binds2) body2
+    body2 -> Letrec binds1 body2
+ where
+  (bindToList -> binds1, body1)
+    | captures = deshadowLetExpr is1 bind0 body0
+    | otherwise = (bind0, body0)
+  captures = case bind0 of
+    NonRec x e -> x `elemInScopeSet` is0 || x `elemFreeVars` e
+    Rec xes -> any ((`elemInScopeSet` is0) . fst) xes
+  is1 = unionInScope is0 (mkInScopeSet (freeVarsOf (Let bind0 body0)))
+squashLets _ e = e
 
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a
@@ -181,7 +201,7 @@ splitNormalized
   -> Term
   -> (Either String ([Id],[LetBinding],Id))
 splitNormalized tcm expr = case collectBndrs expr of
-  (args, collectTicks -> (squashLets -> Letrec xes e, ticks))
+  (args, collectTicks -> (squashLets (inScopeArgs args) -> Letrec xes e, ticks))
     | (tmArgs,[]) <- partitionEithers args -> case stripTicks e of
         Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
         t     -> Left ($(curLoc) ++ "Not in normal form: res not simple var: " ++ showPpr t)
@@ -191,6 +211,7 @@ splitNormalized tcm expr = case collectBndrs expr of
           "\n\nWhich has type:\n\n" ++ showPpr ty)
  where
   ty = inferCoreTypeOf tcm expr
+  inScopeArgs = extendInScopeSetList emptyInScopeSet . lefts
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
