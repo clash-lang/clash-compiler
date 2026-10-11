@@ -122,13 +122,11 @@ import Clash.Rewrite.Scoped
   , underAlt, underLam, underLet, underLetRec, underTyLam)
 import qualified Clash.Rewrite.Scoped as Scoped
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
-import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
-import Clash.Core.Scoped.Evaluator.Types (Env, Machine (..), initMachine)
 import Clash.Rewrite.Types
   (Rewrite, RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
 import qualified Clash.Rewrite.Types as C
 
-import Clash.Driver.Types (Binding (..), BindingMap)
+import Clash.Driver.Types (Binding (..))
 import qualified Clash.Data.UniqMap as UniqMap
 
 import Test.Clash.Differential (KnownDifference, Outcome (..))
@@ -136,6 +134,7 @@ import Test.Clash.Differential.Sites (compareAtSite)
 import Test.Clash.Rewrite
   ( assertAlphaEq, globalsByName, inScopeOf, intId, mkBinding, runRewriteTest
   , testTyConMap)
+import Test.Clash.Scoped.Evaluator (scopedWhnf)
 import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
 
 -- | A conversion environment with the free variables of the given Clash terms
@@ -1056,14 +1055,3 @@ atPath (st : sts) ctx e k = case (st, e) of
   (AppFunStep, App f _) -> atPath sts (pushFrame Scoped.AppFun ctx) f k
   (AppArgStep, App f a) -> atPath sts (pushFrame (Scoped.appArgFrame f) ctx) a k
   _ -> error ("atPath: " <> show st <> " doesn't fit the term:\n" <> showTerm (toClashTerm e))
-
--- * Evaluating
-
--- | Evaluate a Clash term to WHNF with the evaluator of scoped Clash Core, in
--- the scope of its free variables, with the given environment and global
--- bindings. Gives the result, bound by the bindings the evaluator allocated,
--- as Clash Core: its free variables keep their uniques.
-scopedWhnf :: Env -> BindingMap -> Bool -> C.Term -> C.Term
-scopedWhnf env bm isSubj t = withFreeVarsOf [t] $ \cenv ->
-  let m0 = initMachine (convScope cenv) emptyNameMap bm (IntMap.empty, 0) (fromClashTerm cenv t)
-  in whnf env isSubj m0 $ \m -> toClashTerm (bindAllocated m (mTerm m))

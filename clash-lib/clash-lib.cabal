@@ -571,4 +571,5 @@ test-suite unittests
                  Test.Clash.Differential.Sites
                  Test.Clash.Rewrite
                  Test.Clash.Scoped
+                 Test.Clash.Scoped.Evaluator
                  Test.Clash.Scoped.Gen

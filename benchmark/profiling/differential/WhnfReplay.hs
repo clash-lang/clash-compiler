@@ -80,7 +80,6 @@ import Text.Printf (printf)
 import qualified Clash.Core.Evaluator.Types as C
 import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Pretty as C (showPpr)
-import qualified Clash.Core.Subst as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Type as C
@@ -103,6 +102,8 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (addGlobalTypes, mkTypeEnv)
 import Clash.Rewrite.Scoped.Types (TransformContext, rootContext, tfHeap, tfScope, underLetRec)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
+
+import Test.Clash.Scoped.Evaluator (canonicalCoercions, readback, termSize)
 
 -- | A dumped 'whnfRW' call
 data Call = Call
@@ -203,60 +204,6 @@ runScoped env bm isSubj ctx e =
     bindAllocated m (mTerm m)
 
 -- * Comparing
-
--- | Unfold the top-level @letrec@ of a result a number of times, and replace
--- the variables it binds that remain by a placeholder, see the module header
-readback :: Int -> C.Term -> C.Term
-readback depth t0 = case t0 of
-  C.Letrec bs body ->
-    let env = C.mkVarEnv bs
-        fvs = C.mkInScopeSet (Lens.foldMapOf C.freeLocalVars C.unitVarSet t0 <> C.mkVarSet (map fst bs))
-        unfold = C.substTm "readback" (C.extendIdSubstList (C.mkSubst fvs) bs)
-        cut = C.substTm "readback" (C.extendIdSubstList (C.mkSubst fvs) [(v, cutPrim) | (v, _) <- bs])
-        go 0 e = cut e
-        go i e
-          | not (any (`C.elemVarEnv` env) (Lens.toListOf C.freeLocalIds e)) = e
-          | termSize e > 200000 = cut e
-          | otherwise = go (i - 1 :: Int) (unfold e)
-    in go depth body
-  _ -> t0
- where
-  cutPrim = C.Prim (C.PrimInfo "<heap>" (C.ConstTy C.Arrow) C.WorkNever C.SingleResult C.NoUnfolding)
-
--- | Make coercion arguments the same on both sides, see the module header
-canonicalCoercions :: C.Term -> C.Term
-canonicalCoercions = go
- where
-  go = \case
-    C.TyApp (C.Prim p) _ | C.primName p == "_CO_" -> coPrim
-    C.Prim p | C.primName p == "_CO_" -> coPrim
-    C.Lam v e -> C.Lam v (go e)
-    C.TyLam v e -> C.TyLam v (go e)
-    C.App e1 e2 -> C.App (go e1) (go e2)
-    C.TyApp e ty -> C.TyApp (go e) ty
-    C.Let (C.NonRec v x) e -> C.Let (C.NonRec v (go x)) (go e)
-    C.Let (C.Rec xs) e -> C.Let (C.Rec [(v, go x) | (v, x) <- xs]) (go e)
-    C.Case e ty alts -> C.Case (go e) ty [(p, go a) | (p, a) <- alts]
-    C.Cast e t1 t2 -> C.Cast (go e) t1 t2
-    C.Tick t e -> C.Tick t (go e)
-    e -> e
-  coPrim = C.Prim (C.PrimInfo "_CO_" (C.ConstTy C.Arrow) C.WorkNever C.SingleResult C.NoUnfolding)
-
--- | Number of term nodes (forces the term, not the types)
-termSize :: C.Term -> Int
-termSize = go 0
- where
-  go !acc = \case
-    C.Lam _ e -> go (acc + 1) e
-    C.TyLam _ e -> go (acc + 1) e
-    C.App e1 e2 -> go (go (acc + 1) e1) e2
-    C.TyApp e _ -> go (acc + 1) e
-    C.Let (C.NonRec _ x) e -> go (go (acc + 1) x) e
-    C.Let (C.Rec xs) e -> go (List.foldl' go (acc + 1) (map snd xs)) e
-    C.Case e _ alts -> List.foldl' go (go (acc + 1) e) (map snd alts)
-    C.Cast e _ _ -> go (acc + 1) e
-    C.Tick _ e -> go (acc + 1) e
-    _ -> acc + 1
 
 -- | Number of term nodes of a scoped term
 scopedSize :: Term n -> Int
