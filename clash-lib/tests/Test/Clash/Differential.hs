@@ -35,6 +35,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Clash.Differential
   ( -- * Designs
@@ -54,6 +55,7 @@ module Test.Clash.Differential
   , letrecOrder
   , coercionForm
   , globalUniques
+  , nonRecLetOrder
   , everywhereTm
   , everywhereScopedTm
     -- * Running transformations
@@ -111,10 +113,12 @@ import Clash.Util.Supply (Supply, newSupply)
 
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm, toClashType)
+import Clash.Core.Scoped.FreeVars (teleNameBinders)
 import Clash.Core.Scoped.Subst
-  (openAlt, openBind, openIdBinder, openTyBinder, unsinkIdBinder)
+  (freshen, openAlt, openBind, openIdBinder, openTyBinder, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Term (walkTerm)
-import Clash.Core.Scoped.Util (LetGroup (RecGroup), mkLets, regroupLetBindings)
+import Clash.Core.Scoped.Util
+  (LetGroup (NonRecGroup, RecGroup), mkLets, regroupLetBindings)
 import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped
   (ScopedRewrite, bottomupR, repeatR, rootContext, runScopedTransform)
@@ -339,6 +343,71 @@ coercionForm = KnownDifference
   go = \case
     TyApp e@(Prim p) _ | C.primName p == Text.pack "_CO_" -> e
     e -> e
+
+-- | Consecutive non-recursive let-bindings that don't refer to one another
+-- are sorted: by the name of their binder, and then by their right-hand
+-- side, rendered after giving its binders canonical names ('freshen'). The
+-- whole term is first given canonical names, so that the free variables of
+-- the right-hand sides have the same names in both results.
+--
+-- The current transformations bind such let-bindings with
+-- 'Clash.Core.Util.listToLets', which orders them by unique, through
+-- 'Clash.Core.Util.sccLetBindings': e.g.
+-- 'Clash.Normalize.Transformations.Specialize.appProp' for the arguments it
+-- let-binds outside a case-expression, and
+-- 'Clash.Normalize.Transformations.Specialize.constantSpec' for the
+-- non-constant parts of an argument. Their ports bind them in the order in
+-- which they create them.
+nonRecLetOrder :: KnownDifference
+nonRecLetOrder = KnownDifference
+  { kdName = "nonrec-let-order"
+  , kdDescription =
+      "consecutive non-recursive let-bindings that don't refer to one another are \
+      \in the order in which they are created"
+  , kdNormalize = \sc -> everywhereScopedTm go sc . freshen sc
+  }
+ where
+  go :: Distinct x => Scope x -> Term x -> Term x
+  go sc = \case
+    e@(Let NonRec {} _) -> gather sc e $ \bs xs keyed body ->
+      let perm = map snd (List.sortOn fst (zip keyed [0 :: Int ..]))
+      in  if perm == [0 .. length xs - 1]
+            then e
+            else regroupLetBindings sc bs xs body (map NonRecGroup perm)
+                   (\_ binds body' -> mkLets binds body')
+    e -> e
+
+  -- The longest chain of non-recursive let-bindings at the root of a term of
+  -- which no right-hand side refers to the binders before it: their binders,
+  -- their right-hand sides in the scope of the body, the sort keys of the
+  -- right-hand sides, and the body
+  gather
+    :: forall x r
+     . Distinct x
+    => Scope x
+    -> Term x
+    -> (forall l. DExt x l => Tele IdBinder x l -> [Term l] -> [(Text.Text, String)] -> Term l -> r)
+    -> r
+  gather sc0 e0 k = goG sc0 id [] [] e0
+   where
+    goG
+      :: forall y
+       . (Distinct y, DExt x y)
+      => Scope y
+      -> (forall z. Tele IdBinder y z -> Tele IdBinder x z)
+      -> [Term y]
+      -> [(Text.Text, String)]
+      -> Term y
+      -> r
+    goG sc pre xs keys e = case e of
+      Let (NonRec b x) body
+        | Just x0 <- unsinkTerm (teleNameBinders (pre TNil)) x ->
+            openIdBinder sc b body $ \(sc1 :: Scope y1) b1 body1 ->
+              withExtTrans @x @y @y1 $
+                goG sc1 (\t -> pre (TCons b1 t)) (map sink (xs ++ [x]))
+                  (keys ++ [(nameOcc (idBinderOcc b), show (toClashTerm (freshen sc0 x0)))])
+                  body1
+      _ -> k (pre TNil) xs keys e
 
 -- | Apply a function at every node of a term, bottom-up, like
 -- 'everywhereTm', giving it the scope of the node: goes under binders by
