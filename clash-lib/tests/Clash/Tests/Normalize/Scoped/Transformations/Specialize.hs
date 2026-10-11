@@ -4,10 +4,13 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Normalize.Scoped.Transformations.Specialize": the
-  regression tests of 'Clash.Normalize.Transformations.Specialize.specialize',
-  run on the scoped 'specialize' through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement with it.
+  regression tests of "Clash.Normalize.Transformations.Specialize", run on
+  the scoped transformations through
+  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement with the
+  transformations of Clash Core.
 -}
+
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Scoped.Transformations.Specialize (tests) where
 
@@ -17,7 +20,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (IntLiteral))
-import Clash.Core.Name (NameSort (User), noSrcSpan)
+import Clash.Core.Name (NameSort (Internal, User), noSrcSpan)
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import Clash.Core.Var (Id)
@@ -27,31 +30,53 @@ import qualified Clash.Normalize.Transformations.Specialize as C
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
-import Clash.Rewrite.Types (RewriteState (..))
+import Clash.Rewrite.StrategyDSL
+  (onAppNode, onTyAppNode, toTransformation)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (Supply, newSupply)
 
-import Clash.Tests.Normalize.Transformations.Specialize (specializeTests)
+import Clash.Tests.Normalize.Transformations.Specialize
+  (appPropTests, specializeTests)
 import Test.Clash.Rewrite
   ( assertAlphaEq, globalId, globalsByName, inScopeOf, intFunTy, intId, intTy
-  , kindedTyVar, localId, mkBindingMap, runRewriteTest, tyVar )
+  , kindedTyVar, localId, mkBindingMap, pairDataCon, pairTy, runRewriteTest, tyVar
+  , withTyConMap, zeroWidthTyConMap )
 import Test.Clash.Scoped (assertNewBindingsAgree)
+
+-- * The transformations
 
 -- | The scoped 'Scoped.specialize', as a rewrite of Clash Core
 specializeViaFoil :: NormRewrite
 specializeViaFoil = viaFoil "specialize" (ScopedTransform Scoped.specialize)
 
+-- | The scoped transformations, through 'viaFoil', as the normalizer runs
+-- them
+appPropS :: NormRewrite
+appPropS = $(asRewriteQ Scoped.appProp)
+
+-- | The transformations of Clash Core
+appPropC :: NormRewrite
+appPropC = $(asRewriteQ (toTransformation "applicationPropagation"
+  (onAppNode 'C.appPropWorker <> onTyAppNode 'C.appPropWorker)))
+
+-- * Fixtures
+
 -- | Global functions with bindings: @f :: Int -> Int@, @fPoly :: forall b. b
--- -> Int -> Int@, @fT :: forall b. b -> b@, and @fHo :: (Int -> Int) -> Int@;
--- and global functions @g, k :: Int -> Int -> Int@, of which only @k@ has a
--- binding
-f, fPoly, fT, fHo, g, k :: Id
+-- -> Int -> Int@, @fT :: forall b. b -> b@, @fHo :: (Int -> Int) -> Int@,
+-- @fPair :: Pair -> Int@; and global functions @g, k :: Int -> Int -> Int@,
+-- of which only @k@ has a binding, and @kInt@, which is like @k@ but is an
+-- internal function (one Clash created)
+f, fPoly, fT, fHo, fPair, g, k, kInt :: Id
 f = globalId User "f" 10 (intFunTy 1)
 fPoly = globalId User "fPoly" 14 (C.ForAllTy b (C.mkFunTy (C.VarTy b) (intFunTy 1)))
 fT = globalId User "fT" 16 (C.ForAllTy b (C.mkFunTy (C.VarTy b) (C.VarTy b)))
 fHo = globalId User "fHo" 17 (C.mkFunTy (intFunTy 1) intTy)
+fPair = globalId User "fPair" 24 (C.mkFunTy pairTy intTy)
 g = globalId User "g" 11 (intFunTy 2)
 k = globalId User "k" 18 (intFunTy 2)
+kInt = globalId Internal "kInt" 25 (intFunTy 2)
 
 b :: C.TyVar
 b = tyVar User "b" 51
@@ -63,45 +88,67 @@ bindings =
   , (fPoly, C.TyLam b (C.Lam (localId User "y" 21 (C.VarTy b)) (C.Lam p (C.Var p))))
   , (fT, C.TyLam b (C.Lam (localId User "y" 21 (C.VarTy b)) (C.Var (localId User "y" 21 (C.VarTy b)))))
   , (fHo, C.Lam h (C.App (C.Var h) (C.Literal (IntLiteral 1))))
+  , (fPair, C.Lam pr (C.Case (C.Var pr) intTy [(C.DataPat pairDataCon [] [p, q], C.Var q)]))
   , (k, C.Lam p (C.Lam q (C.Var q)))
+  , (kInt, C.Lam p (C.Lam q (C.Var q)))
   ]
  where
   p = intId User "p" 20
   q = intId User "q" 22
   h = localId User "h" 23 (intFunTy 1)
+  pr = localId User "pr" 26 pairTy
 
 -- | Run a rewrite on a term, with the given type and term variables in scope
-runSpecialize
-  :: Supply -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term
-  -> IO (C.Term, RewriteState NormalizeState, RewriteState NormalizeState)
-runSpecialize supply rw tvs ids tm = do
+runRw
+  :: RewriteEnv -> Supply -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term
+  -> IO (C.Term, RewriteState NormalizeState, RewriteState NormalizeState, Bool)
+runRw env supply rw tvs ids tm = do
   let st0 :: RewriteState NormalizeState
       st0 = def
         { _bindings = mkBindingMap bindings
         , _uniqSupply = supply
         , _curFun = (globalId User "top" 42 (intFunTy 1), noSrcSpan) }
       is = extendInScopeSetList (inScopeOf ids) tvs
-  (res, st1, _) <- runRewriteTest def st0 (runRewrite "specialize" is rw tm)
-  pure (res, st0, st1)
+  (res, st1, ch) <- runRewriteTest env st0 (runRewrite "test" is rw tm)
+  pure (res, st0, st1, ch)
 
--- | The scoped 'Scoped.specialize' agrees with
--- 'Clash.Normalize.Transformations.Specialize.specialize': the results are
+-- | Two implementations of a rewrite agree on a term: the results are
 -- alpha-equivalent, up to the uniques of new functions, which are created
--- with alpha-equivalent bodies
-specializeAgrees :: [C.TyVar] -> [Id] -> C.Term -> Assertion
-specializeAgrees tvs ids tm = do
+-- with alpha-equivalent bodies, and both signal a change or neither does
+assertAgreesIn :: RewriteEnv -> NormRewrite -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term -> Assertion
+assertAgreesIn env current scoped tvs ids tm = do
   supply <- newSupply
-  (expected, st0, st1) <- runSpecialize supply C.specialize tvs ids tm
-  (actual, _, st2) <- runSpecialize supply specializeViaFoil tvs ids tm
+  (expected, st0, st1, ch1) <- runRw env supply current tvs ids tm
+  (actual, _, st2, ch2) <- runRw env supply scoped tvs ids tm
   assertAlphaEq (globalsByName expected) (globalsByName actual)
   assertNewBindingsAgree st0 st1 st2
+  assertEqual "change signaled" ch1 ch2
+
+-- | 'assertAgreesIn' in the environment of the test types
+assertAgrees :: NormRewrite -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term -> Assertion
+assertAgrees = assertAgreesIn tcEnv
+
+-- | Assert that a rewrite doesn't fire on a term, and leaves it as it is
+assertDoesNotFireIn :: RewriteEnv -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term -> Assertion
+assertDoesNotFireIn env rw tvs ids tm = do
+  supply <- newSupply
+  (res, _, _, ch) <- runRw env supply rw tvs ids tm
+  assertBool "the transformation fires" (not ch)
+  assertAlphaEq tm res
+
+-- | The environment of the test types, including the zero-width types (see
+-- 'zeroWidthTyConMap')
+tcEnv :: RewriteEnv
+tcEnv = withTyConMap zeroWidthTyConMap def
 
 tests :: TestTree
 tests =
   testGroup "Clash.Tests.Normalize.Scoped.Transformations.Specialize"
     [ testGroup "regression tests of Clash Core, through viaFoil"
-        (specializeTests specializeViaFoil)
-    , testGroup "agrees with Clash Core"
+        [ testGroup "appProp" (appPropTests appPropS)
+        , testGroup "specialize" (specializeTests specializeViaFoil)
+        ]
+    , testGroup "specialize agrees with Clash Core"
         [ testCase "f (g x y)" $
             specializeAgrees [] [x, y] (C.App (C.Var f) (app g [C.Var x, C.Var y]))
         , testCase "fPoly @a (x :: a) (g u v)" $
@@ -120,13 +167,46 @@ tests =
             specializeAgrees [] [x, y]
               (C.App (C.Lam z (C.Var z)) (app g [C.Var x, C.Var y]))
         ]
+    , testGroup "appProp agrees with Clash Core"
+        [ testCase "lambdas, work-free and not work-free arguments" $
+            assertAgrees appPropC appPropS [] [x, y, fl]
+              (C.mkApps (C.Lam z (C.Lam w (app g [C.Var z, C.Var w])))
+                 [Left (C.Var x), Left (C.App (C.Var fl) (C.Var y))])
+        , testCase "type lambda" $
+            assertAgrees appPropC appPropS [] [x]
+              (C.mkApps (C.TyLam a (C.Lam xa (C.Var xa))) [Right intTy, Left (C.Var x)])
+        , testCase "let-expression" $
+            assertAgrees appPropC appPropS [] [x, y, fl]
+              (C.App (C.Let (C.NonRec z (C.App (C.Var fl) (C.Var x))) (C.Lam w (app g [C.Var z, C.Var w])))
+                     (C.Var y))
+        , testCase "ticks" $
+            assertAgrees appPropC appPropS [] [x]
+              (C.App (C.Tick (C.SrcSpan noSrcSpan) (C.Lam z (C.Var z))) (C.Var x))
+        , testCase "case-expression, an argument that isn't work free" $
+            assertAgrees appPropC appPropS [] [s, x, fl]
+              (C.App (C.Case (C.Var s) (intFunTy 1)
+                        [(C.DataPat pairDataCon [] [pa, pb], C.Lam z (app g [C.Var pa, C.Var z]))])
+                     (C.App (C.Var fl) (C.Var x)))
+        , testCase "case-expression, a type argument and a work-free argument" $
+            assertAgrees appPropC appPropS [] [s, x]
+              (C.mkApps (C.Case (C.Var s) (C.ForAllTy a (C.mkFunTy (C.VarTy a) (C.VarTy a)))
+                          [(C.DataPat pairDataCon [] [pa, pb], C.TyLam a (C.Lam xa (C.Var xa)))])
+                 [Right intTy, Left (C.Var x)])
+        , testCase "doesn't fire on a variable applied to arguments" $
+            assertDoesNotFireIn tcEnv appPropS [] [x, fl] (C.App (C.Var fl) (C.Var x))
+        ]
     ]
  where
   x = intId User "x" 12
   y = intId User "y" 13
   z = intId User "z" 19
+  w = intId User "w" 27
   u = intId User "u" 15
   v = intId User "v" 16
+  s = localId User "s" 28 pairTy
+  pa = intId User "a" 29
+  pb = intId User "b" 30
+  fl = localId User "fl" 31 (intFunTy 1)
   a = tyVar User "a" 50
   xa = localId User "x" 12 (C.VarTy a)
   kk = tyVar User "kk" 52
@@ -134,3 +214,5 @@ tests =
   xak = localId User "x" 12 (C.VarTy ak)
 
   app hd = C.mkApps (C.Var hd) . map Left
+
+  specializeAgrees = assertAgrees C.specialize specializeViaFoil

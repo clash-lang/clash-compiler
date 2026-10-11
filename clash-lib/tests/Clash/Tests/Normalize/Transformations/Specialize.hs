@@ -11,6 +11,7 @@
 
 module Clash.Tests.Normalize.Transformations.Specialize
   ( tests
+  , appPropTests
   , specializeTests
   ) where
 
@@ -30,12 +31,12 @@ import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVarWorker)
-import Clash.Normalize.Transformations.Specialize (appProp, nonRepSpec, specialize)
+import Clash.Normalize.Transformations.Specialize (appPropWorker, nonRepSpec, specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
 import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), extra)
-import Clash.Rewrite.Util (runRewrite)
+import Clash.Rewrite.Util (apply, runRewrite)
 import Clash.Util.Supply (newSupply)
 import qualified Clash.Core.Type as Type
 import qualified Clash.Core.VarEnv as VarEnv
@@ -47,8 +48,9 @@ import Test.Clash.Rewrite
   , pairTy, parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
   , showPprU, testTyConMap, tyVar, withTyConMap )
 
+-- | The 'appProp' of Clash Core
 appPropR :: NormRewrite
-appPropR = $(asRewriteQ appProp)
+appPropR = apply "appProp" appPropWorker
 
 -- | The 'bindConstantVar' of Clash Core, which can introduce shadowing (#1035).
 -- The normalizer runs its port to scoped Clash Core, which can't: it renames
@@ -61,17 +63,18 @@ bindConstantVarR =
 nonRepSpecR :: NormRewrite
 nonRepSpecR = $(asRewriteQ nonRepSpec)
 
--- | Run 'appProp' on a term, with the given variables in scope
-runAppProp :: [Id] -> Term -> IO Term
-runAppProp inScope = runSingleTransformation def def (inScopeOf inScope) appPropR
+-- | Run an implementation of 'appProp' on a term, with the given variables in
+-- scope
+runAppProp :: NormRewrite -> [Id] -> Term -> IO Term
+runAppProp appPropRw inScope = runSingleTransformation def def (inScopeOf inScope) appPropRw
 
--- | Run 'bindConstantVar' on @let a = .. in \\x -> e@, and 'appProp' on the
--- body of the resulting lambda
-bindConstantVarThenAppProp :: [Id] -> Term -> IO Term
-bindConstantVarThenAppProp inScope term = do
+-- | Run 'bindConstantVar' on @let a = .. in \\x -> e@, and an implementation
+-- of 'appProp' on the body of the resulting lambda
+bindConstantVarThenAppProp :: NormRewrite -> [Id] -> Term -> IO Term
+bindConstantVarThenAppProp appPropRw inScope term = do
   inlined <- runSingleTransformation def st (inScopeOf inScope) bindConstantVarR term
   case inlined of
-    Lam x body -> runAppProp (x : inScope) body
+    Lam x body -> runAppProp appPropRw (x : inScope) body
     _ -> assertFailure ("Unexpected result of bindConstantVar: " <> showPprU inlined)
  where
   -- 'bindConstantVar' looks at the function being normalized
@@ -95,8 +98,8 @@ bindConstantVarThenAppProp inScope term = do
 -- Without deshadowing, the let-binding captures the argument: @let x = w in x@.
 -- https://github.com/clash-lang/clash-compiler/pull/492
 -- https://github.com/clash-lang/clash-compiler/pull/1040
-appPropLetCapture :: IO Term
-appPropLetCapture = runAppProp [intId User "x" 1, intId User "w" 3] [parseToTermQQ|
+appPropLetCapture :: NormRewrite -> IO Term
+appPropLetCapture rw = runAppProp rw [intId User "x" 1, intId User "w" 3] [parseToTermQQ|
   (let { (x_1 :: Int) = (w_3 :: Int) } in \(y_4 :: Int) -> y_4) (x_1 :: Int)
 |]
 
@@ -107,8 +110,8 @@ appPropLetCapture = runAppProp [intId User "x" 1, intId User "w" 3] [parseToTerm
 -- > (\x -> \y -> y) (f x) (f x)  ==>  let x' = f x in let y = f x in y
 --
 -- https://github.com/clash-lang/clash-compiler/pull/1040
-appPropLamCapture :: IO Term
-appPropLamCapture = runAppProp [x, f] (mkApps fun [Left fx, Left fx])
+appPropLamCapture :: NormRewrite -> IO Term
+appPropLamCapture rw = runAppProp rw [x, f] (mkApps fun [Left fx, Left fx])
  where
   x = intId User "x" 1
   y = intId User "y" 2
@@ -131,8 +134,8 @@ appPropLamCaptureExpected = Let (NonRec x9 fx) (Let (NonRec y fx) (Var y))
 -- > (case s of MkPair a b -> \k -> k) b  ==>  case s of MkPair a b' -> b
 --
 -- https://github.com/clash-lang/clash-compiler/pull/1040
-appPropCaseCapture :: IO Term
-appPropCaseCapture = runAppProp [s, b] (App fun (Var b))
+appPropCaseCapture :: NormRewrite -> IO Term
+appPropCaseCapture rw = runAppProp rw [s, b] (App fun (Var b))
  where
   s = localId User "s" 5 pairTy
   a = intId User "a" 1
@@ -160,8 +163,8 @@ appPropCaseCaptureExpected =
 -- body of the resulting lambda to the outer @x@, not to @p@.
 --
 -- https://github.com/clash-lang/clash-compiler/issues/1035
-bindConstantVarAppProp :: IO Term
-bindConstantVarAppProp = bindConstantVarThenAppProp [p] term
+bindConstantVarAppProp :: NormRewrite -> IO Term
+bindConstantVarAppProp rw = bindConstantVarThenAppProp rw [p] term
  where
   k = intId User "k" 6
   x = intId User "x" 1
@@ -184,8 +187,8 @@ bindConstantVarAppProp = bindConstantVarThenAppProp [p] term
 --
 -- https://github.com/clash-lang/clash-compiler/issues/990
 -- https://github.com/clash-lang/clash-compiler/pull/991
-bindConstantVarAppPropLet :: IO Term
-bindConstantVarAppPropLet = bindConstantVarThenAppProp [f] term
+bindConstantVarAppPropLet :: NormRewrite -> IO Term
+bindConstantVarAppPropLet rw = bindConstantVarThenAppProp rw [f] term
  where
   x = intId User "x" 1
   y = intId User "y" 2
@@ -204,8 +207,8 @@ bindConstantVarAppPropLet = bindConstantVarThenAppProp [f] term
 -- the binder @x_2@.
 --
 -- https://github.com/clash-lang/clash-compiler/pull/3479
-appPropCapture :: IO Term
-appPropCapture = runAppProp [intId User "x" 2, intId User "y" 5] [parseToTermQQ|
+appPropCapture :: NormRewrite -> IO Term
+appPropCapture rw = runAppProp rw [intId User "x" 2, intId User "y" 5] [parseToTermQQ|
   (\(f_1 :: Int) -> f_1) (\(k_4 :: Int) (x_2 :: Int) -> k_4) (x_2 :: Int) (y_5 :: Int)
 |]
 
@@ -219,9 +222,9 @@ appPropCapture = runAppProp [intId User "x" 2, intId User "y" 5] [parseToTermQQ|
 -- of arguments that binds @x@, followed by arguments in which @x@ is free.
 --
 -- https://github.com/clash-lang/clash-compiler/pull/3479
-appPropSubstitutedArg :: [Id] -> Int -> Term -> [Term] -> IO Term
-appPropSubstitutedArg inScope arity arg args =
-  runAppProp inScope (mkApps (Lam f (Var f)) (map Left (arg : args)))
+appPropSubstitutedArg :: NormRewrite -> [Id] -> Int -> Term -> [Term] -> IO Term
+appPropSubstitutedArg rw inScope arity arg args =
+  runAppProp rw inScope (mkApps (Lam f (Var f)) (map Left (arg : args)))
  where
   f = localId User "f" 20 (intFunTy arity)
 
@@ -229,9 +232,9 @@ appPropSubstitutedArg inScope arity arg args =
 -- argument @g x@, which performs work:
 --
 -- > (\f -> f) (\x k -> k) (g x) x  ==>  let x' = g x in x
-appPropSubstitutedLam :: IO Term
-appPropSubstitutedLam =
-  appPropSubstitutedArg [g, x] 2 (Lam x (Lam k (Var k))) [App (Var g) (Var x), Var x]
+appPropSubstitutedLam :: NormRewrite -> IO Term
+appPropSubstitutedLam rw =
+  appPropSubstitutedArg rw [g, x] 2 (Lam x (Lam k (Var k))) [App (Var g) (Var x), Var x]
  where
   g = localId User "g" 4 (intFunTy 1)
   k = intId User "k" 6
@@ -240,9 +243,9 @@ appPropSubstitutedLam =
 -- | Let path:
 --
 -- > (\f -> f) (let x = w in \k -> k) x  ==>  let x' = w in x
-appPropSubstitutedLet :: IO Term
-appPropSubstitutedLet =
-  appPropSubstitutedArg [w, x] 1 (Let (NonRec x (Var w)) (Lam k (Var k))) [Var x]
+appPropSubstitutedLet :: NormRewrite -> IO Term
+appPropSubstitutedLet rw =
+  appPropSubstitutedArg rw [w, x] 1 (Let (NonRec x (Var w)) (Lam k (Var k))) [Var x]
  where
   k = intId User "k" 6
   x = intId User "x" 7
@@ -251,9 +254,9 @@ appPropSubstitutedLet =
 -- | Case path:
 --
 -- > (\f -> f) (case s of MkPair a b -> \k -> k) b  ==>  case s of MkPair a b' -> b
-appPropSubstitutedCase :: IO Term
-appPropSubstitutedCase =
-  appPropSubstitutedArg [s, b] 1 fun [Var b]
+appPropSubstitutedCase :: NormRewrite -> IO Term
+appPropSubstitutedCase rw =
+  appPropSubstitutedArg rw [s, b] 1 fun [Var b]
  where
   s = localId User "s" 5 pairTy
   a = intId User "a" 1
@@ -267,8 +270,8 @@ appPropSubstitutedCase =
 -- > let a = \x k -> k in \x -> (\f -> f) a (g x) x
 -- >   ==> (bindConstantVar)  \x -> (\f -> f) (\x k -> k) (g x) x
 -- >   ==> (appProp)          \x -> let x' = g x in x
-bindConstantVarAppPropSubstituted :: IO Term
-bindConstantVarAppPropSubstituted = bindConstantVarThenAppProp [g] term
+bindConstantVarAppPropSubstituted :: NormRewrite -> IO Term
+bindConstantVarAppPropSubstituted rw = bindConstantVarThenAppProp rw [g] term
  where
   g = localId User "g" 4 (intFunTy 1)
   k = intId User "k" 6
@@ -570,34 +573,43 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.Specialize" $
-    [ testCase "appProp deshadows let-bindings in the function part (#492, #1040)" $
-        appPropLetCapture >>= assertAlphaEq [parseToTermQQ|
-          let { (z_9 :: Int) = (w_3 :: Int) } in (x_1 :: Int)
-        |]
-    , testCase "appProp let-binds lambda arguments without capture (#1040)" $
-        appPropLamCapture >>= assertAlphaEq appPropLamCaptureExpected
-    , testCase "appProp pushes arguments into alternatives without capture (#1040)" $
-        appPropCaseCapture >>= assertAlphaEq appPropCaseCaptureExpected
-    , testCase "appProp handles shadowing introduced by bindConstantVar (#1035)" $
-        bindConstantVarAppProp >>= assertAlphaEq (parseToTerm "x_1 :: Int")
-    , testCase "appProp does not let-bind a captured argument after inlining (#991)" $
-        bindConstantVarAppPropLet >>= assertAlphaEq appPropLamCaptureExpected
-    , testCase "appProp does not capture free variables (#3479)" $
-        appPropCapture >>= assertAlphaEq (parseToTerm "x_2 :: Int")
-    , testCase "appProp deshadows substituted arguments, lambda" $
-        appPropSubstitutedLam >>= assertAlphaEq appPropSubstitutedLamExpected
-    , testCase "appProp deshadows substituted arguments, let" $
-        appPropSubstitutedLet >>= assertAlphaEq
-          (Let (NonRec (intId User "x" 9) (Var (intId User "w" 8))) (Var (intId User "x" 7)))
-    , testCase "appProp deshadows substituted arguments, case" $
-        appPropSubstitutedCase >>= assertAlphaEq appPropCaseCaptureExpected
-    , testCase "appProp deshadows substituted arguments after bindConstantVar" $
-        bindConstantVarAppPropSubstituted >>= assertAlphaEq appPropSubstitutedLamExpected
-    ] <> specializeTests specialize <>
-    [ testCase "nonRepSpec does not inline a global into a local argument head that shares its unique" $
-        specializeOnLocalArgHead nonRepSpecR Internal kGlobalBody
-          >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
-    ]
+    appPropTests appPropR <> specializeTests specialize <> nonRepSpecTests nonRepSpecR
+
+-- | The tests of 'appProp', for the given implementation of it
+appPropTests :: NormRewrite -> [TestTree]
+appPropTests rw =
+  [ testCase "appProp deshadows let-bindings in the function part (#492, #1040)" $
+      appPropLetCapture rw >>= assertAlphaEq [parseToTermQQ|
+        let { (z_9 :: Int) = (w_3 :: Int) } in (x_1 :: Int)
+      |]
+  , testCase "appProp let-binds lambda arguments without capture (#1040)" $
+      appPropLamCapture rw >>= assertAlphaEq appPropLamCaptureExpected
+  , testCase "appProp pushes arguments into alternatives without capture (#1040)" $
+      appPropCaseCapture rw >>= assertAlphaEq appPropCaseCaptureExpected
+  , testCase "appProp handles shadowing introduced by bindConstantVar (#1035)" $
+      bindConstantVarAppProp rw >>= assertAlphaEq (parseToTerm "x_1 :: Int")
+  , testCase "appProp does not let-bind a captured argument after inlining (#991)" $
+      bindConstantVarAppPropLet rw >>= assertAlphaEq appPropLamCaptureExpected
+  , testCase "appProp does not capture free variables (#3479)" $
+      appPropCapture rw >>= assertAlphaEq (parseToTerm "x_2 :: Int")
+  , testCase "appProp deshadows substituted arguments, lambda" $
+      appPropSubstitutedLam rw >>= assertAlphaEq appPropSubstitutedLamExpected
+  , testCase "appProp deshadows substituted arguments, let" $
+      appPropSubstitutedLet rw >>= assertAlphaEq
+        (Let (NonRec (intId User "x" 9) (Var (intId User "w" 8))) (Var (intId User "x" 7)))
+  , testCase "appProp deshadows substituted arguments, case" $
+      appPropSubstitutedCase rw >>= assertAlphaEq appPropCaseCaptureExpected
+  , testCase "appProp deshadows substituted arguments after bindConstantVar" $
+      bindConstantVarAppPropSubstituted rw >>= assertAlphaEq appPropSubstitutedLamExpected
+  ]
+
+-- | The tests of 'nonRepSpec', for the given implementation of it
+nonRepSpecTests :: NormRewrite -> [TestTree]
+nonRepSpecTests rw =
+  [ testCase "nonRepSpec does not inline a global into a local argument head that shares its unique" $
+      specializeOnLocalArgHead rw Internal kGlobalBody
+        >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
+  ]
 
 -- | The tests of 'specialize', for the given implementation of it
 specializeTests :: NormRewrite -> [TestTree]

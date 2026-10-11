@@ -39,6 +39,8 @@ module Current
   , inlineSmall
   , inlineWorkFree
   , inlineNonRep
+    -- * Specialize
+  , appProp
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -47,6 +49,7 @@ import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Inline as Inline
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
 import qualified Clash.Normalize.Transformations.Reduce as Reduce
+import qualified Clash.Normalize.Transformations.Specialize as Specialize
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLet, onLetNode
@@ -195,3 +198,9 @@ inlineWorkFree =
 -- 'Clash.Normalize.Scoped.Transformations.Inline.inlineNonRep'
 inlineNonRep :: NormRewrite
 inlineNonRep = Inline.inlineNonRep
+
+-- | The current 'Clash.Normalize.Transformations.Specialize.appProp', which
+-- 'Clash.Normalize.Scoped.Transformations.Specialize.appProp' replaced
+appProp :: Transformation
+appProp = toTransformation "applicationPropagation"
+  (onAppNode 'Specialize.appPropWorker <> onTyAppNode 'Specialize.appPropWorker)

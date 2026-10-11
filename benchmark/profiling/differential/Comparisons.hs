@@ -22,6 +22,7 @@ import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Inline as SI
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as SReduce
+import qualified Clash.Normalize.Scoped.Transformations.Specialize as S
 import Clash.Normalize.Transformations.ANF (makeANF)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 
@@ -334,6 +335,18 @@ siteComparisons =
       $(asRewriteQ Current.inlineWorkFree) $(asScopedRewriteQ SI.inlineWorkFree)
   , inlineSites "inlineNonRep" ["inlineNonRep"]
       Current.inlineNonRep (ScopedTransform SI.inlineNonRep)
+
+  -- Specialize
+  , SiteComparison
+      { scName = "appProp"
+      , scDescription =
+          "The current appProp (Clash.Normalize.Transformations.Specialize.appPropWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Specialize.appProp)"
+      , scTransformations = ["applicationPropagation", "appProp", "appPropCS"]
+      , scCurrent = $(asRewriteQ Current.appProp)
+      , scScoped = Just $(asScopedRewriteQ S.appProp)
+      , scKnownDifferences = [nonRecLetOrder]
+      }
   ]
 
  where

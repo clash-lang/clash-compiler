@@ -91,6 +91,8 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Rewrite.Combinators (topdownR)
+import Clash.Rewrite.Scoped (ScopedTransform (..))
+import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode
   , toTransformation
@@ -104,6 +106,7 @@ import Clash.Rewrite.Util
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Scoped.Transformations.Specialize
   (preferNoInline, specCacheKey, specializeName)
+import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
@@ -196,7 +199,22 @@ import Clash.Util (ClashException(..))
 -- the current InScopeSet.
 appProp :: Transformation
 appProp = toTransformation "applicationPropagation"
-  (onAppNode 'appPropWorker <> onTyAppNode 'appPropWorker)
+  (onAppNode 'appPropViaFoil <> onTyAppNode 'appPropViaFoil)
+
+-- | 'Scoped.appProp', which replaced 'appPropWorker', through 'viaFoilWhen'
+-- at the applications at which it can fire: those of a lambda to a term, of a
+-- type lambda to a type, and of a let- or case-expression
+appPropViaFoil :: HasCallStack => NormRewrite
+appPropViaFoil =
+  viaFoilWhen "applicationPropagation" (\_ e -> pure (fires e))
+    (ScopedTransform Scoped.appPropWorker)
+ where
+  fires e = case collectArgsTicks e of
+    (Lam {}, Left _ : _, _) -> True
+    (TyLam {}, Right _ : _, _) -> True
+    (Let {}, _ : _, _) -> True
+    (Case {}, _ : _, _) -> True
+    _ -> False
 
 -- | The application-spine handler of 'appProp'. Matches the constructors it
 -- is registered for itself, so it can also be used as a plain uninstrumented

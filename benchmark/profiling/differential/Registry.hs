@@ -22,7 +22,8 @@ module Registry
 import Data.Text (Text)
 
 import Test.Clash.Differential
-  ( KnownDifference, coercionForm, globalUniques, letrecOrder, recToNonRec )
+  ( KnownDifference, coercionForm, globalUniques, letrecOrder, nonRecLetOrder
+  , recToNonRec )
 
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types (NormRewrite)
@@ -66,6 +67,9 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["inlineSmall"], $(asRewriteQ Current.inlineSmall), [])
     , (["inlineWorkFree"], $(asRewriteQ Current.inlineWorkFree), [])
     , (["inlineNonRep"], Current.inlineNonRep, [])
+    -- Specialize
+    , ( ["applicationPropagation", "appProp", "appPropCS"]
+      , $(asRewriteQ Current.appProp), [nonRecLetOrder] )
     ]
 
   unported =
@@ -76,7 +80,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["letCast"], $(asRewriteQ letCast))
     , (["splitCastWork"], $(asRewriteQ splitCastWork))
     -- Specialize
-    , (["applicationPropagation", "appProp", "appPropCS"], $(asRewriteQ appProp))
     , (["constantSpec"], $(asRewriteQ constantSpec))
     , (["nonRepSpec"], $(asRewriteQ nonRepSpec))
     , (["typeSpec"], $(asRewriteQ typeSpec))
