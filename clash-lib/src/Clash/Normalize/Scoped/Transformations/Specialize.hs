@@ -42,6 +42,8 @@ module Clash.Normalize.Scoped.Transformations.Specialize
   , specialize
   , specialize'
   , specializeIn
+  , nonRepSpec
+  , nonRepSpecWorker
   , specArgBndrsAndVars
     -- * Helpers of 'specialize'
   , specCacheKey
@@ -81,7 +83,7 @@ import           Clash.Normalize.Types
 import           Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onAppNode, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
-  (curFun, debugOpts, extra, scopedTypeEnv, specializationLimit)
+  (censor, curFun, debugOpts, extra, scopedTypeEnv, specializationLimit)
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
@@ -95,19 +97,20 @@ import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
   ( AbsBinder (..), collectArgs, collectArgsTicks, mkAbstraction, mkApps, mkLams, mkTicks
   , mkTyLams )
-import           Clash.Core.Scoped.TermInfo  (isPolyFun, isVar)
+import           Clash.Core.Scoped.TermInfo  (isLocalVar, isPolyFun, isVar)
 import           Clash.Core.Scoped.Type
   (TypeView (..), applyFunTy, coreView1, normalizeType, tyView)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 import           Clash.Core.Scoped.Util      (mkLets)
 import           Clash.Normalize.Scoped.Util (ConstantSpecInfo (..), constantSpecInfo)
+import           Clash.Rewrite.Scoped.Combinators (topdownR)
 import           Clash.Rewrite.Scoped.Globals
   (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
 import           Clash.Rewrite.Scoped.Types
-  (TransformContext, mkDerivedName, tfScope)
+  (ScopedTransform (..), TransformContext, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Util
-  ( abstractOver, changed, dependencySortTyVars, mkTmBinderFor, normalizeTermTypes
-  , setChanged )
+  ( abstractOver, changed, dependencySortTyVars, isUntranslatableType, mkTmBinderFor
+  , normalizeTermTypes, setChanged )
 import           Clash.Rewrite.Scoped.Whnf   (whnfRW)
 
 -- | Propagate the arguments of an application inwards, see
@@ -560,6 +563,50 @@ specializeName (spec0, n0) (spec1, n1)
 
   stripMods :: Text.Text -> Text.Text
   stripMods = Text.takeWhileEnd (/= '.')
+
+-- | Specialize functions on their non-representable argument, see
+-- 'Clash.Normalize.Transformations.Specialize.nonRepSpec'
+nonRepSpec :: Transformation
+nonRepSpec = toScopedTransformation "nonRepSpec" (onApp 'nonRepSpecWorker)
+
+-- | The 'App' handler of 'nonRepSpec'
+nonRepSpecWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> Term n
+  -> Term n
+  -> NormalizeSession (Term n)
+nonRepSpecWorker ctx e e1 e2
+  | (hd, args) <- collectArgs e1
+  , isVar hd
+  , null (rights args)
+  , nullNameSet (freeTyVars e2)
+  = do te <- Lens.view scopedTypeEnv
+       nonRepE2 <- isUntranslatableType False (inferCoreTypeOf te (tfScope ctx) e2)
+       if nonRepE2 && not (isLocalVar e2)
+         then do
+           e2' <- inlineInternalSpecialisationArgument e2
+           specialize ctx (App e1 e2')
+         else return e
+  | otherwise = return e
+ where
+  -- If the argument on which we're specializing is an internal function, one
+  -- created by the compiler, then inline that function before we specialize.
+  --
+  -- We need to do this because otherwise the specialization history won't
+  -- recognize the new specialization argument as something the function has
+  -- already been specialized on
+  inlineInternalSpecialisationArgument app = case collectArgsTicks app of
+    (GlobalVar f, fArgs, ticks) -> lookupBinding f >>= \case
+      Just b
+        | C.nameSort (C.varName (bindingId b)) == C.Internal
+        -> censor (const mempty)
+             (runScopedTransform (topdownR (ScopedTransform appPropWorker)) ctx
+               (mkApps (mkTicks (sinkClosed (bindingTerm b)) ticks) fArgs))
+      _ -> return app
+    _ -> return app
+{-# SCC nonRepSpecWorker #-}
 
 -- | The body of the specialized function: the body of the function applied
 -- to its arguments, and to the argument specialized on, abstracted over the

@@ -647,7 +647,26 @@ specArgBndrsAndVars specArg =
 
 -- | Specialize functions on their non-representable argument
 nonRepSpec :: Transformation
-nonRepSpec = toTransformation "nonRepSpec" (onApp 'nonRepSpecWorker)
+nonRepSpec = toTransformation "nonRepSpec" (onApp 'nonRepSpecViaFoil)
+
+-- | 'Scoped.nonRepSpec', which replaced 'nonRepSpecWorker', through
+-- 'viaFoilWhen' at the applications at which it can fire, see
+-- 'nonRepSpecWorker'
+nonRepSpecViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
+nonRepSpecViaFoil ctx e e1 e2 =
+  viaFoilWhen "nonRepSpec" (\_ _ -> fires)
+    (scopedAppWorker Scoped.nonRepSpecWorker) ctx e
+ where
+  fires
+    | (Var {}, args) <- collectArgs e1
+    , (_, []) <- Either.partitionEithers args
+    , null (Lens.toListOf termFreeTyVars e2)
+    , not (isLocalVar e2)
+    = do tcm <- Lens.view tcCache
+         isUntranslatableType False (inferCoreTypeOf tcm e2)
+    | otherwise = pure False
 
 -- | The 'App' handler of 'nonRepSpec'.
 nonRepSpecWorker
