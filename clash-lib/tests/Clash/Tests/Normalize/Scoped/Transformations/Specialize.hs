@@ -31,7 +31,7 @@ import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.StrategyDSL
-  (onApp, onAppNode, onTyApp, onTyAppNode, toTransformation)
+  (onApp, onAppNode, onLam, onTyApp, onTyAppNode, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Rewrite.Util (runRewrite)
@@ -40,9 +40,10 @@ import Clash.Util.Supply (Supply, newSupply)
 import Clash.Tests.Normalize.Transformations.Specialize
   (appPropTests, nonRepSpecTests, specializeTests)
 import Test.Clash.Rewrite
-  ( assertAlphaEq, globalId, globalsByName, inScopeOf, intFunTy, intId, intTy
-  , kindedTyVar, localId, mkBindingMap, pairDataCon, pairTy, runRewriteTest, tyVar
-  , withTyConMap, zeroWidthTyConMap )
+  ( assertAlphaEq, bitVectorTy, exZwTy, globalId, globalsByName, inScopeOf
+  , indexTy, intFunTy, intId, intTy, kindedTyVar, localId, mkBindingMap, pairDataCon
+  , pairTy, proxyTy, runRewriteTest, signedTy, streamTy, tProxyTy, tyVar, unsignedTy
+  , withTyConMap, zeroWidthTyConMap, zwTy )
 import Test.Clash.Scoped (assertNewBindingsAgree)
 
 -- * The transformations
@@ -61,6 +62,8 @@ nonRepSpecS :: NormRewrite
 nonRepSpecS = $(asRewriteQ Scoped.nonRepSpec)
 typeSpecS :: NormRewrite
 typeSpecS = $(asRewriteQ Scoped.typeSpec)
+zeroWidthSpecS :: NormRewrite
+zeroWidthSpecS = $(asRewriteQ Scoped.zeroWidthSpec)
 
 -- | The transformations of Clash Core
 appPropC :: NormRewrite
@@ -72,6 +75,8 @@ nonRepSpecC :: NormRewrite
 nonRepSpecC = $(asRewriteQ (toTransformation "nonRepSpec" (onApp 'C.nonRepSpecWorker)))
 typeSpecC :: NormRewrite
 typeSpecC = $(asRewriteQ (toTransformation "typeSpec" (onTyApp 'C.typeSpecWorker)))
+zeroWidthSpecC :: NormRewrite
+zeroWidthSpecC = $(asRewriteQ (toTransformation "zeroWidthSpec" (onLam 'C.zeroWidthSpecWorker)))
 
 -- * Fixtures
 
@@ -163,6 +168,23 @@ assertDoesNotFireIn env rw tvs ids tm = do
 tcEnv :: RewriteEnv
 tcEnv = withTyConMap zeroWidthTyConMap def
 
+-- | @\\(x :: ty) -> h x@, with @h :: ty -> Int@ a free local function
+zwLam :: C.Type -> (C.Term, Id)
+zwLam ty = (C.Lam x (C.App (C.Var h) (C.Var x)), h)
+ where
+  x = localId User "x" 60 ty
+  h = localId User "h" 61 (C.mkFunTy ty intTy)
+
+-- | 'zeroWidthSpec' agrees with that of Clash Core on 'zwLam', and fires
+zwFires :: C.Type -> Assertion
+zwFires ty = case zwLam ty of
+  (tm, h) -> assertFiresAndAgreesIn tcEnv zeroWidthSpecC zeroWidthSpecS [] [h] tm
+
+-- | 'zeroWidthSpec' doesn't fire on 'zwLam'
+zwDoesNotFire :: C.Type -> Assertion
+zwDoesNotFire ty = case zwLam ty of
+  (tm, h) -> assertDoesNotFireIn tcEnv zeroWidthSpecS [] [h] tm
+
 tests :: TestTree
 tests =
   testGroup "Clash.Tests.Normalize.Scoped.Transformations.Specialize"
@@ -252,6 +274,20 @@ tests =
         , testCase "f x: a representable argument" $
             assertDoesNotFireIn tcEnv nonRepSpecS [] [x] (C.App (C.Var f) (C.Var x))
         ]
+    , testGroup "zeroWidthSpec agrees with Clash Core"
+        [ testCase "BitVector 0" $ zwFires (bitVectorTy 0)
+        , testCase "Unsigned 0" $ zwFires (unsignedTy 0)
+        , testCase "Signed 0" $ zwFires (signedTy 0)
+        , testCase "Index 1" $ zwFires (indexTy (numTy 1))
+        , testCase "a product of zero-width types" $ zwFires zwTy
+        , testCase "a field type that mentions a type argument" $ zwFires (tProxyTy (numTy 3))
+        , testCase "a type argument" $ zwFires (proxyTy (numTy 3))
+        , testCase "BitVector 1" $ zwDoesNotFire (bitVectorTy 1)
+        , testCase "Index 2" $ zwDoesNotFire (indexTy (numTy 2))
+        , testCase "Int" $ zwDoesNotFire intTy
+        , testCase "a constructor with an existential type variable" $ zwDoesNotFire exZwTy
+        , testCase "a recursive type" $ zwDoesNotFire (streamTy (bitVectorTy 0))
+        ]
     ]
  where
   x = intId User "x" 12
@@ -273,5 +309,7 @@ tests =
 
   app hd = C.mkApps (C.Var hd) . map Left
   lit = C.Literal . IntLiteral
+
+  numTy = C.LitTy . C.NumTy
 
   specializeAgrees = assertAgrees C.specialize specializeViaFoil

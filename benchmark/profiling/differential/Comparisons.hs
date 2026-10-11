@@ -377,6 +377,16 @@ siteComparisons =
       , scScoped = Just $(asScopedRewriteQ S.typeSpec)
       , scKnownDifferences = []
       }
+  , SiteComparison
+      { scName = "zeroWidthSpec"
+      , scDescription =
+          "The current zeroWidthSpec (Clash.Normalize.Transformations.Specialize.zeroWidthSpecWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Specialize.zeroWidthSpec)"
+      , scTransformations = ["zeroWidthSpec"]
+      , scCurrent = $(asRewriteQ Current.zeroWidthSpec)
+      , scScoped = Just $(asScopedRewriteQ S.zeroWidthSpec)
+      , scKnownDifferences = []
+      }
   ]
 
  where
