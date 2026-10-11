@@ -65,7 +65,7 @@ import           Clash.Core.Type
    splitTyConAppM, mkPolyFunTy)
 import           Clash.Core.Util
   (isClockOrReset)
-import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId, mkGlobalId)
+import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId, isLocalId, mkGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
@@ -156,16 +156,19 @@ addNewInline f cf =
 isNonRecursiveGlobalVar
   :: Term
   -> NormalizeSession Bool
-isNonRecursiveGlobalVar (collectArgs -> (Var i, _args)) = do
-  let eIsGlobal = isGlobalId i
-  eIsRec    <- isRecursiveBndr i
-  return (eIsGlobal && not eIsRec)
+isNonRecursiveGlobalVar (collectArgs -> (Var i, _args))
+  | isGlobalId i = not <$> isRecursiveBndr i
 isNonRecursiveGlobalVar _ = return False
 
--- | Assert whether a name is a reference to a recursive binder.
+-- | Assert whether a name is a reference to a recursive global binder.
 isRecursiveBndr
   :: Id
   -> NormalizeSession Bool
+isRecursiveBndr f
+  -- A local variable can have the same unique as a global binder. Don't look it
+  -- up in the global binders, and don't cache an answer for it:
+  -- 'recursiveComponents' is keyed by unique.
+  | isLocalId f = return False
 isRecursiveBndr f = do
   cg <- Lens.use (extra.recursiveComponents)
   case lookupVarEnv f cg of
