@@ -27,6 +27,7 @@ module Clash.Normalize.Strategy.Spec
 import Language.Haskell.TH.Syntax (Name)
 
 import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
+import qualified Clash.Normalize.Scoped.Transformations.Inline as ScopedInline
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
 import Clash.Normalize.Transformations
 import Clash.Rewrite.StrategyDSL
@@ -150,7 +151,7 @@ constantPropagationSpec =
     inlineNR :: Strat
     inlineNR =
           bottomup deadCode
-      >-! pass "inlineNonRep" 'inlineNonRep
+      >-! scopedPass "inlineNonRep" 'ScopedInline.inlineNonRep
 
     specTransformations :: Step
     specTransformations = chain

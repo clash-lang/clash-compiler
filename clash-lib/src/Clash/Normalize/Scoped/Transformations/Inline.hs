@@ -34,9 +34,12 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -50,19 +53,27 @@ module Clash.Normalize.Scoped.Transformations.Inline
   , inlineCleanupWorker
   , collapseRHSNoops
   , collapseRHSNoopsWorker
+  , inlineNonRep
+  , inlineNonRepWorker
   , inlineOrLiftNonRep
   , inlineOrLiftNonRepWorker
   , inlineSimIO
   , inlineSimIOWorker
+  , inlineSmall
+  , inlineSmallWorker
+  , inlineWorkFree
+  , inlineWorkFreeWorker
   ) where
 
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad ((>=>))
+import Control.Monad.Extra (anyM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import qualified Control.Monad.Writer as Writer
-import Data.Either (lefts)
+import Data.Default (Default (..))
+import Data.Either (lefts, rights)
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
@@ -78,27 +89,45 @@ import qualified Clash.Sized.Internal.BitVector as BV (Bit (Bit), BitVector (BV)
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Name as C
+import Clash.Core.Pretty (PrettyOptions (..), showPpr, showPpr')
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.Var as C
+import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
 import Clash.Primitives.Types (CompiledPrimMap, Primitive (..), TemplateKind (..))
-import Clash.Rewrite.StrategyDSL (Transformation, onLet, toScopedTransformation)
-import Clash.Rewrite.Types (curFun, inlineConstantLimit, primitives, scopedTypeEnv)
+import Clash.Rewrite.StrategyDSL
+  ( Transformation, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
+  , toScopedTransformation )
+import Clash.Rewrite.Types
+  ( curFun, inlineConstantLimit, inlineFunctionLimit, inlineLimit
+  , inlineWFCacheLimit, primitives, scopedTypeEnv )
 import Clash.Normalize.Types (NormalizeSession)
+import Clash.Util (curLoc)
+import qualified Clash.Util.Interpolate as I
 
-import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences, freeTmVars, tmNameOccursIn)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
+import Clash.Core.Scoped.FreeVars
+  (freeTmVarOccurrences, freeTmVars, hasFreeVarsType, tmNameOccursIn)
+import Clash.Core.Scoped.HasType (globalIdType, inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap
+import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs, stripTicks)
-import Clash.Core.Scoped.TermInfo (isLocalVar, termSizeSmallerThan)
-import Clash.Core.Scoped.Type (TypeView (..), tyView)
+import Clash.Core.Scoped.Term
+  (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
+import Clash.Core.Scoped.TermInfo (isClosed, isLocalVar, termSizeSmallerThan)
+import Clash.Core.Scoped.Type
+  (TypeView (..), isClassTy, isPolyFunCoreTy, isSignalType, tyView)
 import Clash.Core.Scoped.Util (primUCo)
-import Clash.Normalize.Scoped.Util (isRecursiveBndr)
-import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
-import Clash.Rewrite.Scoped.Globals (lookupBinding)
+import Clash.Normalize.Scoped.Util
+  ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
+  , normalizeTopLvlBndr, normalizeWorkFreeApp )
+import Clash.Rewrite.Scoped
+  ( Frame (CaseScrut), FrameKind (..), ScopedTransform (..), TransformContext, allR
+  , changed, ctxFrames, pushFrame, tfScope, underAlt )
+import Clash.Rewrite.Scoped.Globals (isTopEntity, lookupBinding)
 import Clash.Rewrite.Scoped.Util
   ( LetBinding (..), inlineBinders, inlineOrLiftBinders, isJoinPointIn
-  , isUntranslatableType, isVoidWrapper, keepBindings, openLetBindings, substVars )
+  , isUntranslatable, isUntranslatableType, isVoidWrapper, keepBindings
+  , openLetBindings, substVars, zoomExtra )
 import Clash.Rewrite.Scoped.WorkFree (isWorkFreeIsh)
 
 -- | The function being normalized, see 'Clash.Rewrite.Types.curFun'. It is
@@ -573,3 +602,261 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
       isNoopApp x (collectArgs arg)
     _ -> return False
 {-# SCC collapseRHSNoopsWorker #-}
+
+-- * inlineNonRep
+
+-- | Inline function with a non-representable result if it's the subject
+-- of a Case-decomposition. It's a custom topdown traversal that -for efficiency
+-- reasons- does not explore alternative of cases whose subject triggered an
+-- 'inlineNonRepWorker'. See
+-- 'Clash.Normalize.Transformations.Inline.inlineNonRep'.
+inlineNonRep
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> NormalizeSession (Term n)
+inlineNonRep ctx e0 = case e0 of
+  Case {} -> do
+    r <- Writer.listen (inlineNonRepWorker ctx e0)
+    case r of
+      (e1, Monoid.getAny -> True) ->
+        return e1
+      (e1, _) -> case e1 of
+        -- If a term _in_ the subject triggers 'inlineNonRepWorker', inline and
+        -- propagate might eliminate this case. We therefore don't explore the
+        -- alternatives. Note that this makes it substantially different from
+        -- a 'topdownSucR' transformation.
+        Case subj0 ty alts ->
+          Writer.listen (inlineNonRep (pushFrame CaseScrut ctx) subj0) >>= \case
+            (subj1, Monoid.getAny -> True) ->
+              return (Case subj1 ty alts)
+            (subj1, _) -> do
+              alts1 <- mapM (\alt -> underAlt ctx alt $ \ctxA p rhs ->
+                                       Alt p <$> inlineNonRep ctxA rhs) alts
+              pure (Case subj1 ty alts1)
+        _ -> error ("internal error, inlineNonRep triggered on a non-Case:" <> showPpr e1)
+  -- All non-case statements are simply traversed. TODO: are there other special
+  -- cases like 'Case' that would warrant an optimization like ^ ?
+  _ -> runScopedTransform (allR (ScopedTransform inlineNonRep)) ctx e0
+{-# SCC inlineNonRep #-}
+
+-- | Inline function with a non-representable result if it's the subject
+-- of a Case-decomposition. This worker function only tries the given term
+-- (i.e., it does not traverse it). See
+-- 'Clash.Normalize.Transformations.Inline.inlineNonRepWorker'.
+--
+-- It sets the changed flag in the NormalizeSession if it successfully inlines
+-- a binder.
+inlineNonRepWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> NormalizeSession (Term n)
+inlineNonRepWorker ctx e = case e of
+  Case scrut altsTy alts
+    | (GlobalVar f, args, ticks) <- collectArgsTicks scrut -> do
+      cf <- curFunGlobal
+      isInlined <- zoomExtra (alreadyInlined f cf)
+      limit <- Lens.view inlineLimit
+      te <- Lens.view scopedTypeEnv
+      let
+        scrutTy = inferCoreTypeOf te (tfScope ctx) scrut
+
+        -- Constraint dictionary inlining always terminates, so we ignore the
+        -- usual inline safeguards.
+        notClassTy = not (isClassTy te scrutTy)
+        overLimit = notClassTy && Maybe.fromMaybe 0 isInlined > limit
+
+      bodyMaybe <- lookupBinding f
+      nonRepScrut <- isUntranslatableType False scrutTy
+      case (nonRepScrut, bodyMaybe) of
+        (True, Just b) ->
+          if overLimit then
+            trace ($(curLoc) ++ [I.i|
+              InlineNonRep: #{showPpr (C.varName (globalIdVar f))} already inlined
+              #{limit} times in: #{showPpr (C.varName (globalIdVar cf))}. The type of the subject
+              is:
+
+                #{showPpr' def{displayTypes=True\} scrutTy}
+
+              Function #{showPpr (C.varName (globalIdVar cf))} will not reach a normal form and
+              compilation might fail.
+
+              Run with '-fclash-inline-limit=N' to increase the inline limit to N.
+            |]) (return e)
+          else do
+            Monad.when notClassTy (zoomExtra (addNewInline f cf))
+
+            let scrutBody0 = mkTicks (sinkClosed (bindingTerm b)) (mkInlineTick f : ticks)
+                scrutBody1 = mkApps scrutBody0 args
+
+            changed (Case scrutBody1 altsTy alts)
+        _ ->
+          return e
+  _ -> return e
+{-# SCC inlineNonRepWorker #-}
+
+-- * inlineSmall and inlineWorkFree
+
+-- | True when @e@, appearing in context @ctx@, is an inner (partial) position
+-- of a variable-headed application spine. See
+-- 'Clash.Normalize.Transformations.Inline.isPartOfVarAppSpine'.
+isPartOfVarAppSpine :: TransformContext n -> Term n -> Bool
+isPartOfVarAppSpine ctx e = case ctxFrames ctx of
+  k : _ -> isSpineKind k && isSpineNode e
+  [] -> False
+ where
+  isSpineKind = \case
+    KAppFun -> True
+    KTyAppC -> True
+    KTickC -> True
+    _ -> False
+
+  isSpineNode = \case
+    Var {} -> True
+    GlobalVar {} -> True
+    App {} -> True
+    TyApp {} -> True
+    Tick {} -> True
+    _ -> False
+
+-- | Inline small functions. See
+-- 'Clash.Normalize.Transformations.Inline.inlineSmall'.
+inlineSmall :: Transformation
+inlineSmall =
+  toScopedTransformation "inlineSmall"
+    (onVarNode 'inlineSmallWorker <> onAppNode 'inlineSmallWorker
+      <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)
+
+-- | The application-spine handler of 'inlineSmall'
+inlineSmallWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> NormalizeSession (Term n)
+inlineSmallWorker ctx e
+  | isPartOfVarAppSpine ctx e
+  = return e
+  | (GlobalVar f, args, ticks) <- collectArgsTicks e
+  = do
+      -- XXX: This is deeply nested to short-circuit expensive checks
+      topEnt <- isTopEntity f
+      if topEnt
+        then return e
+        else do
+          sizeLimit <- Lens.view inlineFunctionLimit
+          lookupBinding f >>= \case
+            Just b
+              | not (isNoInline (bindingSpec b))
+              , termSizeSmallerThan sizeLimit (bindingTerm b)
+              -> do
+                -- Don't inline recursive expressions
+                isRecBndr <- isRecursiveBndr f
+                if isRecBndr
+                   then return e
+                   else do
+                     untranslatable <- isUntranslatable True (tfScope ctx) e
+                     if untranslatable
+                        then return e
+                        else do
+                          let tm = mkTicks (sinkClosed (bindingTerm b)) (mkInlineTick f : ticks)
+                          changed (mkApps tm args)
+            _ -> return e
+  | otherwise
+  = return e
+{-# SCC inlineSmallWorker #-}
+
+-- | Inline work-free functions, i.e. fully applied functions that evaluate to
+-- a constant. Applications to closed arguments are normalized before they're
+-- inlined, see 'normalizeWorkFreeApp'. See
+-- 'Clash.Normalize.Transformations.Inline.inlineWorkFree'.
+inlineWorkFree :: Transformation
+inlineWorkFree =
+  toScopedTransformation "inlineWorkFree"
+    (onVarNode 'inlineWorkFreeWorker <> onAppNode 'inlineWorkFreeWorker
+      <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)
+
+-- | The application-spine handler of 'inlineWorkFree'
+inlineWorkFreeWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> NormalizeSession (Term n)
+inlineWorkFreeWorker ctx e
+  | isPartOfVarAppSpine ctx e
+  = return e
+
+  | (GlobalVar f, args@(_:_), ticks) <- collectArgsTicks e
+  = do
+    -- XXX: This is deeply nested to short-circuit expensive checks
+    topEnt <- isTopEntity f
+    if topEnt
+      then return e
+      else do
+        lookupBinding f >>= \case
+          Just b -> do
+            te <- Lens.view scopedTypeEnv
+            let eTy = inferCoreTypeOf te sc e
+            if isSignalType te sc eTy
+              then return e
+              else do
+                untranslatable <- isUntranslatableType True eTy
+                argsHaveWork <- anyM (either expressionHasWork (const (pure False))) args
+                if untranslatable || argsHaveWork
+                  then return e
+                  else do
+                    -- Don't inline recursive expressions
+                    isRecBndr <- isRecursiveBndr f
+                    if | isRecBndr -> return e
+                       -- Type arguments can still mention type variables bound
+                       -- in the context, which rules out caching. Note that
+                       -- closedness for the term is already checked in
+                       -- 'expressionHasWork'.
+                       | not (any hasFreeVarsType (rights args)) -> do
+                         tm <- normalizeWorkFreeApp f b args
+                         changed (mkTicks tm (mkInlineTick f : ticks))
+                       | otherwise -> do
+                         let tm = mkTicks (sinkClosed (bindingTerm b)) (mkInlineTick f : ticks)
+                         changed (mkApps tm args)
+
+          _ -> return e
+
+  | (GlobalVar f, ticks) <- collectTicks e
+  = do
+      topEnt <- isTopEntity f
+      te <- Lens.view scopedTypeEnv
+      let fTy = globalIdType te sc f
+          closed = not (isPolyFunCoreTy te sc fTy)
+      if topEnt || not closed || isSignalType te sc fTy
+        then return e
+        else do
+          untranslatable <- isUntranslatableType True fTy
+          if untranslatable
+            then return e
+            else do
+              lookupBinding f >>= \case
+                -- Don't inline recursive expressions
+                Just top -> do
+                  isRecBndr <- isRecursiveBndr f
+                  if isRecBndr
+                     then return e
+                     else do
+                      let topB = bindingTerm top
+                      sizeLimit <- Lens.view inlineWFCacheLimit
+                      -- caching only worth it from a certain size onwards, otherwise
+                      -- the caching mechanism itself brings more of an overhead.
+                      if termSizeSmallerThan sizeLimit topB then
+                        changed (mkTicks (sinkClosed topB) ticks)
+                      else do
+                        b <- normalizeTopLvlBndr False f top
+                        changed (mkTicks (sinkClosed (bindingTerm b)) ticks)
+                _ -> return e
+
+  | otherwise
+  = return e
+ where
+  sc = tfScope ctx
+
+  -- an expression has work when it contains free local variables,
+  -- or has a Signal type, i.e. it does not evaluate to a work-free
+  -- constant. The free-variable check runs first: it is cheaper than
+  -- inferring the expression's type.
+  expressionHasWork e' =
+    if not (isClosed e')
+      then return True
+      else do
+        te <- Lens.view scopedTypeEnv
+        return (isSignalType te sc (inferCoreTypeOf te sc e'))
+{-# SCC inlineWorkFreeWorker #-}
