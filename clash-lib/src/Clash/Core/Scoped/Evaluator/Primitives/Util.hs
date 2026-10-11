@@ -149,6 +149,9 @@ module Clash.Core.Scoped.Evaluator.Primitives.Util
   , extractTySizeInfo
   , tyNatSize
   , numTy
+  , primArgResTys
+  , funArgTys
+  , tyConNameOf
     -- * Lifting operations on sized types
   , liftUnsigned2
   , liftSigned2
@@ -1027,6 +1030,26 @@ extractTySizeInfo tenv scope primTy tyArgs = case tyView resTy of
 -- | A natural number as a type
 numTy :: Integer -> Type n
 numTy = LitTy . C.NumTy
+
+-- | The argument types and the result type of the type of a primitive, as
+-- types of Clash Core. These are closed: a reduction that only needs the names
+-- of the type constructors in the type of its primitive (e.g. that of @Vec@)
+-- can take them from here, rather than from the scoped type 'ty', which is
+-- converted on every call that uses it.
+primArgResTys :: C.PrimInfo -> ([C.Type], C.Type)
+primArgResTys p = case C.splitFunForallTy (C.primType p) of
+  (args, res) -> (Either.rights args, res)
+
+-- | The argument types of a function type of Clash Core, e.g. of an argument
+-- type from 'primArgResTys'
+funArgTys :: C.Type -> [C.Type]
+funArgTys = Either.rights . fst . C.splitFunForallTy
+
+-- | The name of the type constructor at the head of a type of Clash Core
+tyConNameOf :: C.Type -> Maybe TyConName
+tyConNameOf t = case C.tyView t of
+  C.TyConApp nm _ -> Just nm
+  _ -> Nothing
 
 -- * Lifting operations on sized types
 
