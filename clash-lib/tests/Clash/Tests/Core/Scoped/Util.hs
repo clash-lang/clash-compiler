@@ -27,9 +27,8 @@ import qualified Clash.Core.Util as C
 import qualified Clash.Core.Var as C
 import qualified Clash.Unique as C (Unique)
 import Clash.Core.VarEnv (extendInScopeSet)
-import Clash.Driver.Types (ClashEnv (..))
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Types (RewriteEnv (..), RewriteMonad, RewriteState)
+import Clash.Rewrite.Types (RewriteMonad, RewriteState)
 import Clash.Util.Supply (newSupply)
 
 import Clash.Core.Scoped.Convert
@@ -42,7 +41,7 @@ import Clash.Core.Scoped.Util
 import Test.Clash.Rewrite
   ( addTy, brDc, clkPairTy, clockTy, consDc, enableTy, inScopeOf, intId, intTy
   , localId, lrDc, nilDc, numTy, pairTy, resetTy, rtreeTy, runRewriteTest
-  , signalTy, systemDomTy, testTyConMap, tyVar, vecTy )
+  , signalTy, systemDomTy, testTyConMap, tyVar, vecTy, withTyConMap )
 import Test.Clash.Scoped
   ( assertAgreesTm, assertScopedAlphaEq, assertScopedTyAlphaEq, extendSunk
   , sunkVar, testTypeEnv, withFreeVarsOf )
@@ -293,7 +292,7 @@ vecTests = testGroup "Vectors and trees"
 runTest :: RewriteMonad NormalizeState a -> IO a
 runTest m = (\(a', _, _) -> a') <$> runRewriteTest env (def :: RewriteState NormalizeState) m
  where
-  env = def {_clashEnv = (_clashEnv def) {envTyConMap = testTyConMap}}
+  env = withTyConMap testTyConMap def
 
 -- | Assert that 'mkSelectorCase' agrees with 'C.mkSelectorCase'
 assertSelectorAgrees :: C.Term -> Int -> Int -> Assertion

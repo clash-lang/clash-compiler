@@ -41,8 +41,7 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoShadowing, globalId, inScopeOf, intFunTy, intId
   , intLit, intTy, letBinders, localId, mkBindingMap, mkDataCon, nameToUnique
   , pairDataCon, pairTy, parseTyConName, parseTyConTy, runSingleTransformation
-  , showPprU, tyVar
-  )
+  , showPprU, tyVar, withTyConMap )
 
 decR :: NormRewrite
 decR = $(asRewriteQ disjointExpressionConsolidation)
@@ -59,7 +58,7 @@ exTy = parseTyConTy "Ex"
 
 -- | The default 'RewriteEnv', extended with the type constructor of 'mkEx'
 exEnv :: RewriteEnv
-exEnv = def{_clashEnv = env{envTyConMap = UniqMap.insert exNm exTc (envTyConMap env)}}
+exEnv = withTyConMap (UniqMap.insert exNm exTc (envTyConMap env)) def
  where
   env = _clashEnv def
   exNm = parseTyConName "Ex"
@@ -173,7 +172,7 @@ mkTDc = mkDataCon "MkT" 101 [] [tN] [VarTy tN] tTy
 
 -- | The default rewrite environment, extended with @T@ and @Pair@
 envT :: RewriteEnv
-envT = def{_clashEnv = env{envTyConMap = tcm}}
+envT = withTyConMap tcm def
  where
   env = _clashEnv def
   tcm = foldr (\tc -> UniqMap.insert (tyConName tc) tc) (envTyConMap env)

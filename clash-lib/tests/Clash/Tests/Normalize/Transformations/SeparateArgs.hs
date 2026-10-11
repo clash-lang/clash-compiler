@@ -35,7 +35,7 @@ import Clash.Rewrite.Types (RewriteEnv (..))
 
 import Test.Clash.Rewrite
   ( globalId, inScopeOf, intFunTy, intId, intTy, localId, mkDataCon
-  , runSingleTransformation, showPprU, tyVar )
+  , runSingleTransformation, showPprU, tyVar, withTyConMap )
 
 separateArgumentsR :: NormRewrite
 separateArgumentsR = $(asRewriteQ separateArguments)
@@ -60,7 +60,7 @@ clkPairDc = mkDataCon "MkClkPair" 2022 [] [] [clockTy, intTy] clkPairTy
 
 -- | The default 'RewriteEnv', extended with @Clock@ and @ClkPair@
 env :: RewriteEnv
-env = def{_clashEnv = cEnv{envTyConMap = tcm}}
+env = withTyConMap tcm def
  where
   cEnv = _clashEnv def
   tcm = foldr (\tc -> UniqMap.insert (tyConName tc) tc) (envTyConMap cEnv)

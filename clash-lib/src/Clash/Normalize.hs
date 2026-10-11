@@ -58,6 +58,7 @@ import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term                  (Term (..), collectArgsTicks
                                                   ,mkApps, mkTicks)
+import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
@@ -125,6 +126,7 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   peEval
                   eval
                   (mkVarSet topEnts)
+                  (addGlobalTypes (fmap bindingId globals) (mkTypeEnv (envTyConMap env)))
 
     rwState   = RewriteState
                   0

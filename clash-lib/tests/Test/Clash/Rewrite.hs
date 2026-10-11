@@ -39,6 +39,7 @@ import Clash.Driver.Types
 import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (apply, changed, runRewrite)
+import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
@@ -93,10 +94,10 @@ lookupTM u tm = case HashMap.lookup u tm of
     |]
 
 instance Default RewriteEnv where
-  def = RewriteEnv
+  def = withTyConMap (UniqMap.singletonUnique intTyCon) RewriteEnv
     { _clashEnv = ClashEnv
         { envOpts = defClashOpts { opt_debug = debugSilent }
-        , envTyConMap = UniqMap.singletonUnique intTyCon
+        , envTyConMap = UniqMap.empty
         , envTupleTyCons = IntMap.empty
         , envPrimitives = HashMap.empty
         , envCustomReprs = buildCustomReprs []
@@ -106,7 +107,17 @@ instance Default RewriteEnv where
     , _peEvaluator=error "_peEvaluator: NYI"
     , _evaluator=error "_evaluator: NYI"
     , _topEntities=emptyVarSet
+    , _scopedTypeEnv=mkTypeEnv UniqMap.empty
     }
+
+-- | A 'RewriteEnv' with the given type constructors, in both 'envTyConMap' and
+-- '_scopedTypeEnv'. Use this rather than setting 'envTyConMap', which would
+-- leave '_scopedTypeEnv' with the old ones.
+withTyConMap :: C.TyConMap -> RewriteEnv -> RewriteEnv
+withTyConMap tcm env = env
+  { _clashEnv = (_clashEnv env) {envTyConMap = tcm}
+  , _scopedTypeEnv = mkTypeEnv tcm
+  }
 
 -- | The type translator of the default 'RewriteEnv': function types are not
 -- representable, all other types are, as a 64-bit signed number. Clash's own

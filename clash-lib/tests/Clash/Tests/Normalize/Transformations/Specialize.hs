@@ -25,12 +25,12 @@ import Clash.Core.Type (Type (ForAllTy, VarTy), mkFunTy)
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (lookupVarEnv)
-import Clash.Driver.Types (Binding (..), ClashEnv (..))
+import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVar)
 import Clash.Normalize.Transformations.Specialize (appProp, nonRepSpec, specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..), extra)
+import Clash.Rewrite.Types (RewriteState (..), extra)
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (newSupply)
 import qualified Clash.Core.Type as Type
@@ -41,7 +41,7 @@ import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
   , intFunTy, intId, intLit, intTy, localId, maybeTy, mkBindingMap, pairDataCon
   , pairTy, parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
-  , showPprU, testTyConMap, tyVar )
+  , showPprU, testTyConMap, tyVar, withTyConMap )
 
 appPropR :: NormRewrite
 appPropR = $(asRewriteQ appProp)
@@ -554,7 +554,7 @@ specializeTyConAppTypeArg = do
   hId = globalId User "h" 33 (ForAllTy b (mkFunTy (intFunTy 1) intTy))
   hBody = TyLam b (Lam k (App (Var k) (intLit 1)))
   tm = App (TyApp (Var hId) (maybeTy (VarTy a))) (Var fId)
-  env = def{_clashEnv = (_clashEnv def){envTyConMap = testTyConMap}}
+  env = withTyConMap testTyConMap def
 
 tests :: TestTree
 tests =
