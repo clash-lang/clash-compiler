@@ -180,6 +180,7 @@ import Clash.Core.Scoped.Evaluator.Types (PrimReduction)
 
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal as Clash.Class.BitPack.Internal
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector as Clash.Sized.Internal.BitVector
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index as Clash.Sized.Internal.Index
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Unsigned as Clash.Sized.Internal.Unsigned
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree as Clash.Sized.RTree
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector as Clash.Sized.Vector
@@ -206,6 +207,7 @@ scopedPrimitives :: [(Text, PrimReduction)]
 scopedPrimitives = concat
   [ Clash.Class.BitPack.Internal.primitives
   , Clash.Sized.Internal.BitVector.primitives
+  , Clash.Sized.Internal.Index.primitives
   , Clash.Sized.Internal.Unsigned.primitives
   , Clash.Sized.RTree.primitives
   , Clash.Sized.Vector.primitives
