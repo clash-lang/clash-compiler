@@ -445,8 +445,8 @@ reduceImap n argElTy resElTy _kn fun arg (TransformContext is0 ctx) = do
       , nameOcc vecTcNm == showt ''Vec
       , [nilCon,consCon] <- tyConDataCons vecTc
       = if n == 0 then changed (mkVecNil nilCon resElTy) else do
-        uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        uniqs0 <- Lens.use uniqSupply
         let is1 = extendInScopeSetList is0 (collectTermIds fun1)
             (uniqs1,nTv) = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
             (uniqs2,(vars,elems)) = second (second sconcat . NE.unzip)
@@ -552,8 +552,8 @@ reduceTraverse n aTy fTy bTy dict fun arg (TransformContext is0 ctx) = do
       , nameOcc vecTcNm == showt ''Vec
       , [nilCon,consCon] <- tyConDataCons vecTc
       = fmap (Maybe.fromMaybe (error "reduceTraverse: failed to build")) $ runMaybeT $ do
-          uniqs0 <- Lens.use uniqSupply
           fun1 <- lift (constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun)
+          uniqs0 <- Lens.use uniqSupply
           let is1 = extendInScopeSetList is0 (collectTermIds fun1)
           apDictTc <- hoistMaybe (UniqMap.lookup apDictTcNm tcm)
           apDictCon <- hoistMaybe (Maybe.listToMaybe (tyConDataCons apDictTc))
@@ -741,8 +741,8 @@ reduceFold n aTy fun arg (TransformContext is0 ctx) = do
       , nameOcc vecTcNm == showt ''Vec
       , [_,consCon]  <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
+        uniqs0 <- Lens.use uniqSupply
         let is1 = extendInScopeSetList is0 (collectTermIds fun1)
             (uniqs1,(vars,elems)) = second (second sconcat . NE.unzip)
                                   $ extractElems uniqs0 is1 consCon aTy 'F' n arg
