@@ -20,7 +20,7 @@ module Clash.Rewrite.WorkFree
   , isConstantNotClockReset
   ) where
 
-import Control.Lens (Lens')
+import Control.Lens (Lens', (%=))
 import Control.Monad.Extra (allM, andM, eitherM)
 import Control.Monad.State.Class (MonadState)
 import qualified Data.Text.Extra as Text
@@ -35,7 +35,7 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (isPolyFunTy)
 import Clash.Core.Util
 import Clash.Core.Var (Id, isLocalId)
-import Clash.Core.VarEnv (VarEnv, lookupVarEnv)
+import Clash.Core.VarEnv (VarEnv, extendVarEnv, lookupVarEnv)
 import Clash.Driver.Types (BindingMap, Binding(..))
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Util (makeCachedU)
@@ -55,7 +55,12 @@ isWorkFreeBinder cache bndrs bndr =
       Just (bindingTerm -> t) ->
         if bndr `globalIdOccursIn` t
         then pure False
-        else isWorkFree cache bndrs t
+        else do
+          -- Recursive binders are not work free. Mark the binder as such while
+          -- analysing its body, so that mutually recursive binders find this
+          -- entry instead of analysing the body again (and again..).
+          cache %= extendVarEnv bndr False
+          isWorkFree cache bndrs t
 
 {-# INLINABLE isWorkFree #-}
 -- | Determine whether a term does any work, i.e. adds to the size of the
