@@ -13,12 +13,21 @@
 
 module Current
   ( deadCode
+  , disjointExpressionConsolidation
   ) where
 
+import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
-import Clash.Rewrite.StrategyDSL (Transformation, onLet, toTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onCase, onLet, toTransformation)
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.deadCode' replaced
 deadCode :: Transformation
 deadCode = toTransformation "deadCode" (onLet 'Letrec.deadCodeWorker)
+
+-- | The current 'Clash.Normalize.Transformations.DEC.disjointExpressionConsolidation',
+-- which 'Clash.Normalize.Scoped.Transformations.DEC.disjointExpressionConsolidation'
+-- replaced
+disjointExpressionConsolidation :: Transformation
+disjointExpressionConsolidation =
+  toTransformation "DEC" (onCase 'DEC.disjointExpressionConsolidationWorker)
