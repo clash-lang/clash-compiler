@@ -39,6 +39,10 @@ module Test.Clash.Scoped.Evaluator.Primitives
   , bvTy
   , bit
   , bv
+    -- * Boxed numbers
+  , boxedIntTy
+  , boxedInt
+  , sizedTypeEnv
   ) where
 
 import Data.Text (Text)
@@ -57,7 +61,7 @@ import Clash.Core.Scoped.Syntax (S (VoidS), Term)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Test.Clash.Rewrite
-  ( heapLookupEvaluator, knownNatTy, mkTyConName, numTy, tcApp )
+  (hIntTy, heapLookupEvaluator, iHashDc, knownNatTy, mkTyConName, numTy, tcApp)
 import Test.Clash.Scoped (testTypeEnv)
 import Test.Clash.Scoped.Evaluator (portedEnv, scopedWhnf)
 
@@ -134,3 +138,17 @@ bv :: Integer -> Integer -> Integer -> C.Term
 bv n msk val =
   C.mkApps (closedPrimTerm (bvConPrim bvTcNm))
     [Right (numTy n), Left (natLit n), Left (natLit msk), Left (integerLit val)]
+
+-- * Boxed numbers
+
+-- | GHC's boxed 'Int', 'hIntTy', unlike the @Int@ of 'intTy'
+boxedIntTy :: C.Type
+boxedIntTy = hIntTy
+
+-- | An 'Int'
+boxedInt :: Integer -> C.Term
+boxedInt = C.App (C.Data iHashDc) . intLit
+
+-- | The types of 'testTyConMap', which has 'boxedIntTy'
+sizedTypeEnv :: TypeEnv
+sizedTypeEnv = testTypeEnv

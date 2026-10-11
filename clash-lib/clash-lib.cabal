@@ -503,6 +503,7 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.EqSolver
                  Clash.Tests.Core.Scoped.Evaluator
                  Clash.Tests.Core.Scoped.Evaluator.Primitives
+                 Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector
                  Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree
                  Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector
                  Clash.Tests.Core.Scoped.Evaluator.Primitives.GHC.Prim
