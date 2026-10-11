@@ -92,10 +92,11 @@ import Clash.Core.VarEnv
   , unionVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP
+import qualified Clash.Normalize.Scoped.Transformations.DEC as Scoped
 import Clash.Normalize.Transformations.Letrec (deadCode)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.Combinators (bottomupR)
-import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (changed, isFromInt, isUntranslatableType)
@@ -155,8 +156,7 @@ import qualified GHC.Prim
 -- bits of the subject expression to the bits needed to make the selection in the
 -- multiplexer.
 disjointExpressionConsolidation :: Transformation
-disjointExpressionConsolidation =
-  toTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)
+disjointExpressionConsolidation = Scoped.disjointExpressionConsolidation
 
 -- | The 'Case' handler of 'disjointExpressionConsolidation'.
 disjointExpressionConsolidationWorker
