@@ -29,27 +29,57 @@ import Clash.Core.Term (Bind(..), CoreContext(..), Term(..), collectArgs, mkLams
 import Clash.Core.TermInfo (isFun, isLocalVar)
 import Clash.Core.Type (splitFunTy)
 import Clash.Core.Util (mkInternalVar)
-import Clash.Core.Var (Id)
+import Clash.Core.Var (Id, isGlobalId)
 import Clash.Core.Subst (deShadowTerm)
 import Clash.Core.VarEnv
   ( InScopeSet, elemInScopeSet, elemVarSet, extendInScopeSet
   , extendInScopeSetList)
-import Clash.Normalize.Types (NormRewrite)
+import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
+import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onTickNode, onTyAppNode, onVarNode
   , toTransformation
   )
+import Clash.Rewrite.Scoped (ScopedTransform (..))
+import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, topEntities)
 import Clash.Rewrite.Util (changed)
 import Clash.Util (curLoc)
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
 -- functions to appear as arguments to higher-order primitives.
+--
+-- This is the port 'Scoped.etaExpandSyn', which only converts the
+-- application spines at which it can fire, see 'etaExpandSynViaFoil'.
 etaExpandSyn :: Transformation
 etaExpandSyn =
   toTransformation "etaExpandSyn"
-    (onVarNode 'etaExpandSynWorker <> onAppNode 'etaExpandSynWorker
-      <> onTyAppNode 'etaExpandSynWorker <> onTickNode 'etaExpandSynWorker)
+    (onVarNode 'etaExpandSynViaFoil <> onAppNode 'etaExpandSynViaFoil
+      <> onTyAppNode 'etaExpandSynViaFoil <> onTickNode 'etaExpandSynViaFoil)
+
+-- | The application-spine handler of 'etaExpandSyn':
+-- 'Scoped.etaExpandSynWorker' at the root of an application spine of a top
+-- entity.
+--
+-- The strategy compiler runs a scoped transformation through 'viaFoil' at
+-- every node it is offered at, which converts the whole subterm to scoped
+-- Core: for 'etaExpandSyn', every node of every application spine. This goes
+-- away together with 'viaFoil'.
+etaExpandSynViaFoil :: HasCallStack => NormRewrite
+etaExpandSynViaFoil =
+  viaFoilWhen "etaExpandSyn" canFire (ScopedTransform Scoped.etaExpandSynWorker)
+ where
+  canFire :: TransformContext -> Term -> NormalizeSession Bool
+  canFire (TransformContext _ frames) e
+    | (Var f, _) <- collectArgs e
+    , isGlobalId f
+    , not (isAppFunCtx frames) = elemVarSet f <$> Lens.view topEntities
+    | otherwise = return False
+  isAppFunCtx =
+    \case
+      AppFun:_ -> True
+      TickC _:c -> isAppFunCtx c
+      _ -> False
 
 -- | The application-spine handler of 'etaExpandSyn'.
 etaExpandSynWorker :: HasCallStack => NormRewrite

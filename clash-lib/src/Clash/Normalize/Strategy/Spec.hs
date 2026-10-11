@@ -27,6 +27,7 @@ module Clash.Normalize.Strategy.Spec
 import Language.Haskell.TH.Syntax (Name)
 
 import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
+import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as EtaExpand
 import qualified Clash.Normalize.Scoped.Transformations.Inline as ScopedInline
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
 import Clash.Normalize.Transformations
@@ -91,7 +92,7 @@ constantPropagationSpec =
   dec >->
   conSpec
   where
-    etaTL              = pass "etaTL" 'etaExpansionTL !-> topdown appProp
+    etaTL              = scopedPass "etaTL" 'EtaExpand.etaExpansionTL !-> topdown appProp
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down chain from the
     -- new root.

@@ -80,6 +80,8 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["elimCastCast"], $(asRewriteQ Current.elimCastCast), [])
     , (["letCast"], $(asRewriteQ Current.letCast), [])
     , (["splitCastWork"], $(asRewriteQ Current.splitCastWork), [])
+    , (["etaExpandSyn"], $(asRewriteQ Current.etaExpandSyn), [])
+    , (["etaTL"], Current.etaExpansionTL, [])
     ]
 
   unported =
@@ -87,8 +89,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     [ (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
     , (["xOptimize"], $(asRewriteQ xOptimize))
     , (["separateArguments"], $(asRewriteQ separateArguments))
-    , (["etaExpandSyn"], $(asRewriteQ etaExpandSyn))
-    , (["etaTL"], etaExpansionTL)
     ]
 
 -- | The current transformation captured under a name
