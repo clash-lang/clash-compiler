@@ -611,6 +611,22 @@ intTyCon = C.PrimTyCon (C.nameUniq nm) nm C.liftedTypeKind 0
  where
   nm = parseTyConName "Int"
 
+-- | The type constructor @Maybe :: Type -> Type@
+maybeTyCon :: C.TyCon
+maybeTyCon = C.PrimTyCon (C.nameUniq nm) nm (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
+ where
+  nm = C.Name C.User (Text.pack "Maybe") 101 C.noSrcSpan
+
+-- | A 'C.TyConMap' with the primitive type constructors, 'intTyCon', and
+-- 'maybeTyCon'
+maybeTyConMap :: C.TyConMap
+maybeTyConMap =
+  UniqMap.insertUnique maybeTyCon (UniqMap.insertUnique intTyCon C.tysPrimMap)
+
+-- | The type @Maybe a@, see 'maybeTyCon'
+maybeTy :: C.Type -> C.Type
+maybeTy a = C.mkTyConApp (C.tyConName maybeTyCon) [a]
+
 -- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
 mkId :: C.IdScope -> C.NameSort -> String -> Unique -> C.Type -> C.Id
