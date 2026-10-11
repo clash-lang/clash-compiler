@@ -28,6 +28,8 @@ module Clash.Core.Scoped.FreeVars
   , freeTyVars
   , freeTyVarsOfType
   , termGlobalIds
+  , hasFreeVars
+  , hasFreeVarsType
     -- * Occurrences
   , tmNameOccursIn
   , tyNameOccursIn
@@ -230,6 +232,74 @@ termGlobalIds = go emptyGlobalSet
     Cast e _ _ -> go acc e
     Tick (Attributes _ e') e -> go (go acc e') e
     Tick _ e -> go acc e
+
+-- | Whether a term has free local variables, of either sort: whether
+-- 'freeTmVars' or 'freeTyVars' is not empty. Global variables don't count.
+-- Unlike those, this doesn't build sets.
+hasFreeVars :: Term n -> Bool
+hasFreeVars = goTm IntSet.empty
+ where
+  -- The set has the names of the binders the traversal went under
+  goTy :: IntSet -> Type x -> Bool
+  goTy = hasFreeVarsTypeIn
+
+  bind :: HasNameBinder b => b x y -> IntSet -> IntSet
+  bind b = IntSet.insert (binderRaw b)
+  {-# INLINE bind #-}
+
+  goTm :: IntSet -> Term x -> Bool
+  goTm bs = \case
+    Var _ ty n -> not (IntSet.member (tmNameRaw n) bs) || goTy bs ty
+    GlobalVar {} -> False
+    Data {} -> False
+    Literal {} -> False
+    Prim {} -> False
+    Lam b e -> goTy bs (idBinderType b) || goTm (bind b bs) e
+    TyLam b e -> goTy bs (tyBinderKind b) || goTm (bind b bs) e
+    App e1 e2 -> goTm bs e1 || goTm bs e2
+    TyApp e ty -> goTm bs e || goTy bs ty
+    Let (NonRec b x) e -> goTy bs (idBinderType b) || goTm bs x || goTm (bind b bs) e
+    Let (Rec ids xs) e -> goTele idBinderType bs ids (\bs' -> any (goTm bs') (e:xs))
+    Case e ty alts -> goTm bs e || goTy bs ty || any (goAlt bs) alts
+    Cast e t1 t2 -> goTm bs e || goTy bs t1 || goTy bs t2
+    Tick t e -> goTick bs t || goTm bs e
+
+  goAlt :: IntSet -> Alt x -> Bool
+  goAlt bs (Alt p e) = case p of
+    DataPat _ tvs ids ->
+      goTele tyBinderKind bs tvs (\bs1 -> goTele idBinderType bs1 ids (\bs2 -> goTm bs2 e))
+    _ -> goTm bs e
+
+  goTick :: IntSet -> TickInfo x -> Bool
+  goTick bs = \case
+    NameMod _ ty -> goTy bs ty
+    Attributes ty e -> goTy bs ty || goTm bs e
+    _ -> False
+
+  goTele
+    :: HasNameBinder b
+    => (forall x' y'. b x' y' -> Type x') -> IntSet -> Tele b x y -> (IntSet -> Bool) -> Bool
+  goTele _ bs TNil k = k bs
+  goTele payload bs (TCons b rest) k =
+    goTy bs (payload b) || goTele payload (bind b bs) rest k
+
+-- | Whether a type has free type variables: whether 'freeTyVarsOfType' is not
+-- empty
+hasFreeVarsType :: Type n -> Bool
+hasFreeVarsType = hasFreeVarsTypeIn IntSet.empty
+
+-- | Whether a type has free type variables other than the given ones
+hasFreeVarsTypeIn :: IntSet -> Type n -> Bool
+hasFreeVarsTypeIn = go
+ where
+  go :: IntSet -> Type x -> Bool
+  go bs = \case
+    VarTy _ k n -> not (IntSet.member (tyNameRaw n) bs) || go bs k
+    ConstTy {} -> False
+    ForAllTy b t -> go bs (tyBinderKind b) || go (IntSet.insert (binderRaw b) bs) t
+    AppTy t1 t2 -> go bs t1 || go bs t2
+    LitTy {} -> False
+    AnnType _ t -> go bs t
 
 -- * Occurrences
 

@@ -48,9 +48,8 @@ import GHC.Stack (HasCallStack)
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TermInfo as C
 
-import Clash.Core.Scoped.FreeVars (freeTmVars, freeTyVars)
+import Clash.Core.Scoped.FreeVars (hasFreeVars)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.NameMap (nullNameSet)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type (isFunTy, isPolyFunCoreTy)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
@@ -163,7 +162,7 @@ isCast _ = False
 -- | Does a term have no free local variables, neither term nor type
 -- variables? Global variables don't count.
 isClosed :: Term n -> Bool
-isClosed e = nullNameSet (freeTmVars e) && nullNameSet (freeTyVars e)
+isClosed = not . hasFreeVars
 
 -- * Multi-result primitives
 
