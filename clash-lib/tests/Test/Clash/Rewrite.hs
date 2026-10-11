@@ -82,6 +82,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.Text as Text
+import qualified Data.Hashable as Hashable
 
 type TypeMap = HashMap.HashMap Unique C.Type
 
@@ -1170,6 +1171,27 @@ assertAlphaEq expected actual =
     ("Expected (up to alpha equivalence):\n" <> showPprU expected
       <> "\nbut got:\n" <> showPprU actual)
     (expected == actual)
+
+-- | Give every global variable the unique of its name, a hash of its
+-- occurrence name, so that terms that refer to new globals created by
+-- different runs, which get different uniques, can be compared
+globalsByName :: C.Term -> C.Term
+globalsByName = go
+ where
+  go = \case
+    C.Var v | C.isGlobalId v ->
+      let u = fromIntegral (Hashable.hash (C.nameOcc (C.varName v)))
+      in  C.Var v{C.varUniq = u, C.varName = (C.varName v){C.nameUniq = u}}
+    C.Lam v e -> C.Lam v (go e)
+    C.TyLam v e -> C.TyLam v (go e)
+    C.App e1 e2 -> C.App (go e1) (go e2)
+    C.TyApp e t -> C.TyApp (go e) t
+    C.Let (C.NonRec v x) e -> C.Let (C.NonRec v (go x)) (go e)
+    C.Let (C.Rec bs) e -> C.Let (C.Rec [(v, go x) | (v, x) <- bs]) (go e)
+    C.Case e t alts -> C.Case (go e) t [(p, go a) | (p, a) <- alts]
+    C.Cast e t1 t2 -> C.Cast (go e) t1 t2
+    C.Tick t e -> C.Tick t (go e)
+    e -> e
 
 -- | The uniques of the arguments of an application (see 'C.collectArgs') that
 -- are variable references

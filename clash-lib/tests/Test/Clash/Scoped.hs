@@ -65,6 +65,11 @@ module Test.Clash.Scoped
   , runScopedClosed
   , runScopedOpen
   , runViaFoil
+  , runScopedOn
+  , assertLetHandlerAgrees
+  , assertNewBindingsAgree
+  , Step (..)
+  , atPath
   , somePrim
     -- * Evaluating
   , scopedWhnf
@@ -84,7 +89,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Stack (HasCallStack)
 import Test.Tasty (TestTree, adjustOption)
-import Test.Tasty.HUnit (Assertion, assertFailure)
+import Test.Tasty.HUnit (Assertion, assertBool, assertFailure)
 import Test.Tasty.QuickCheck
   (Gen, Property, QuickCheckTests (..), Testable, choose, forAllShow, frequency)
 
@@ -94,6 +99,7 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
+import Clash.Core.VarEnv (unionInScope)
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Convert
@@ -107,17 +113,23 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
-import Clash.Rewrite.Scoped (ScopedRewrite, rootContext, runScopedTransform)
+import Clash.Rewrite.Scoped
+  ( ScopedRewrite, Frame (LetBinding), pushFrame, rootContext, runScopedTransform
+  , underAlt, underLam, underLet, underLetRec, underTyLam)
+import qualified Clash.Rewrite.Scoped as Scoped
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
 import Clash.Core.Scoped.Evaluator.Types (Env, Machine (..), initMachine)
 import Clash.Rewrite.Types
-  (RewriteEnv, RewriteState (..), TransformContext)
+  (RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
+import qualified Clash.Rewrite.Types as C
 
-import Clash.Driver.Types (Binding, BindingMap)
+import Clash.Driver.Types (Binding (..), BindingMap)
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Test.Clash.Rewrite
-  (assertAlphaEq, intId, mkBinding, runRewriteTest, testTyConMap)
+  ( assertAlphaEq, globalsByName, inScopeOf, intId, mkBinding, runRewriteTest
+  , testTyConMap)
 import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
 
 -- | A conversion environment with the free variables of the given Clash terms
@@ -823,10 +835,8 @@ runScopedOpen
   -> ScopedRewrite extra
   -> C.Term
   -> IO (C.Term, RewriteState extra, Bool)
-runScopedOpen env st t e = withFreeVarsOf [e] $ \cenv -> do
-  (e', st', ch) <- runRewriteTest env st
-    (runScopedTransform t (rootContext (convScope cenv)) (fromClashTerm cenv e))
-  pure (toClashTerm e', st', ch)
+runScopedOpen env st t e =
+  runScopedOn env st e (\sc e' -> toClashTerm <$> runScopedTransform t (rootContext sc) e')
 
 -- | Run a scoped transformation on a Clash term through
 -- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', in the given context. Gives the
@@ -849,6 +859,112 @@ somePrim = C.PrimInfo
   , C.primMultiResult = C.SingleResult
   , C.primUnfolding = C.NoUnfolding
   }
+
+-- | Run an action on a Clash term converted to scoped Core, in the scope of
+-- its free variables. Gives the result, the final state, and whether a change
+-- was signaled.
+runScopedOn
+  :: RewriteEnv
+  -> RewriteState extra
+  -> C.Term
+  -> (forall n. Distinct n => Scope n -> Term n -> RewriteMonad extra a)
+  -> IO (a, RewriteState extra, Bool)
+runScopedOn env st tm k =
+  runRewriteTest env st (withFreeVarsOf [tm] (\cenv -> k (convScope cenv) (fromClashTerm cenv tm)))
+
+-- | Assert that a scoped 'Clash.Rewrite.StrategyDSL.onLet' handler agrees
+-- with one of Clash Core on a let-expression, run in the root context of the
+-- scope of its free variables: the results are alpha-equivalent (comparing
+-- types too, see 'aeqTermTyped'), and both signal a change or neither does.
+assertLetHandlerAgrees
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> (C.TransformContext -> C.Term -> C.Bind C.Term -> C.Term -> RewriteMonad extra C.Term)
+  -- ^ The handler of Clash Core
+  -> (forall n l. Distinct n => Scoped.TransformContext n -> Term n -> Bind n l -> Term l -> RewriteMonad extra (Term n))
+  -- ^ The scoped handler
+  -> C.Term
+  -- ^ A let-expression
+  -> Assertion
+assertLetHandlerAgrees env st old new tm = case tm of
+  C.Let bind body -> do
+    let is = inScopeOf (Lens.toListOf C.freeLocalIds tm) `unionInScope` inScopeOf (Lens.toListOf C.termFreeTyVars tm)
+    (expected, st1, changed1) <-
+      runRewriteTest env st (old (C.TransformContext is []) tm bind body)
+    (actual, st2, changed2) <- runScopedOn env st tm $ \sc -> \case
+      e@(Let bind' body') -> toClashTerm <$> new (rootContext sc) e bind' body'
+      _ -> error "assertLetHandlerAgrees: not a let-expression"
+    assertBool
+      ("Clash Core:\n" <> showTerm expected <> "\nscoped:\n" <> showTerm actual)
+      (aeqTermTyped (globalsByName expected) (globalsByName actual))
+    assertBool ("change signaled: Clash Core " <> show changed1 <> ", scoped " <> show changed2)
+      (changed1 == changed2)
+    assertNewBindingsAgree st st1 st2
+  _ -> assertFailure "assertLetHandlerAgrees: not a let-expression"
+
+-- | Assert that two runs from the first state added global bindings with the
+-- same names, whose bodies are alpha-equivalent, up to the uniques of the
+-- globals they refer to (see 'globalsByName')
+assertNewBindingsAgree
+  :: HasCallStack => RewriteState extra -> RewriteState extra -> RewriteState extra -> Assertion
+assertNewBindingsAgree st0 st1 st2 = do
+  let new st = Map.fromList
+        [ (C.nameOcc (C.varName (bindingId b)), bindingTerm b)
+        | b <- UniqMap.elems (_bindings st)
+        , not (UniqMap.elem (C.varUniq (bindingId b)) (_bindings st0)) ]
+      new1 = new st1
+      new2 = new st2
+  assertBool ("new global bindings: Clash Core " <> show (Map.keys new1) <> ", scoped " <> show (Map.keys new2))
+    (Map.keys new1 == Map.keys new2)
+  sequence_
+    [ assertBool
+        ("global binding " <> show nm <> ", Clash Core:\n" <> showTerm b1 <> "\nscoped:\n" <> showTerm b2)
+        (aeqTermTyped (globalsByName b1) (globalsByName b2))
+    | (nm, (b1, b2)) <- Map.toList (Map.intersectionWith (,) new1 new2) ]
+
+-- | A step down a term, to one of its subterms, see 'atPath'
+data Step
+  = LamStep
+  -- ^ The body of a lambda
+  | TyLamStep
+  -- ^ The body of a type lambda
+  | LetBodyStep
+  -- ^ The body of a let-expression
+  | LetRhsStep Int
+  -- ^ The right-hand side with the given index of a let-expression
+  | AltStep Int
+  -- ^ The right-hand side of the alternative with the given index
+  | AppFunStep
+  -- ^ The function of an application
+  | AppArgStep
+  -- ^ The argument of an application
+  deriving (Show)
+
+-- | Go down a term along a path, opening the binders on the way, and continue
+-- with the context of the subterm, and the subterm. Errors if the path doesn't
+-- fit the term.
+atPath
+  :: HasCallStack
+  => Distinct n
+  => [Step]
+  -> Scoped.TransformContext n
+  -> Term n
+  -> (forall l. Distinct l => Scoped.TransformContext l -> Term l -> r)
+  -> r
+atPath [] ctx e k = k ctx e
+atPath (st : sts) ctx e k = case (st, e) of
+  (LamStep, Lam b body) -> underLam ctx b body $ \ctx' _ body' -> atPath sts ctx' body' k
+  (TyLamStep, TyLam b body) -> underTyLam ctx b body $ \ctx' _ body' -> atPath sts ctx' body' k
+  (LetBodyStep, Let bind body) -> underLet ctx bind body $ \ctx' _ body' -> atPath sts ctx' body' k
+  (LetRhsStep 0, Let (NonRec b x) _) -> atPath sts (pushFrame (LetBinding b) ctx) x k
+  (LetRhsStep i, Let (Rec bs xs) body) | i < length xs ->
+    underLetRec ctx bs xs body $ \_ ctxRhs _ xs' _ -> atPath sts (ctxRhs i) (xs' !! i) k
+  (AltStep i, Case _ _ alts) | i < length alts ->
+    underAlt ctx (alts !! i) $ \ctx' _ e' -> atPath sts ctx' e' k
+  (AppFunStep, App f _) -> atPath sts (pushFrame Scoped.AppFun ctx) f k
+  (AppArgStep, App f a) -> atPath sts (pushFrame (Scoped.appArgFrame f) ctx) a k
+  _ -> error ("atPath: " <> show st <> " doesn't fit the term:\n" <> showTerm (toClashTerm e))
 
 -- * Evaluating
 
