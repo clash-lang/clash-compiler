@@ -49,6 +49,7 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["nonRepANF"], $(asRewriteQ Current.nonRepANF), [])
     , (["ANF"], makeANF, [])
     , (["reduceConst"], $(asRewriteQ Current.reduceConst), [])
+    , (["reducePrim"], $(asRewriteQ Current.reducePrim), [coercionForm])
     ]
 
   unported =
@@ -70,8 +71,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["nonRepSpec"], $(asRewriteQ nonRepSpec))
     , (["typeSpec"], $(asRewriteQ typeSpec))
     , (["zeroWidthSpec"], $(asRewriteQ zeroWidthSpec))
-    -- Reduce
-    , (["reducePrim"], $(asRewriteQ reducePrim))
     -- Others
     , (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
     , (["xOptimize"], $(asRewriteQ xOptimize))

@@ -52,7 +52,7 @@ import Clash.Normalize.Primitives (removedArg)
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
-import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, normalizeUltra)
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
 import qualified Clash.Sized.Internal.BitVector
@@ -159,8 +159,7 @@ reduceConstWorker _ e _ _ = return e
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
 reducePrim :: Transformation
-reducePrim =
-  toTransformation "reducePrim" (onApp 'reducePrimWorker)
+reducePrim = Scoped.reducePrim
 
 -- | The 'Clash.Core.Term.App' handler of 'reducePrim'.
 reducePrimWorker
