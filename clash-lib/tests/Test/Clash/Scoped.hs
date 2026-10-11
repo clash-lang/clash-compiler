@@ -121,11 +121,12 @@ import Test.Clash.Rewrite
 import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
 
 -- | A conversion environment with the free variables of the given Clash terms
--- (both type and term variables), which keep their uniques
+-- (both type and term variables), which keep their uniques. The type
+-- variables come after the type variables in their kinds.
 withFreeVarsOf :: [C.Term] -> (forall n. Distinct n => ConvEnv n -> r) -> r
 withFreeVarsOf tms = withConvEnv tvs ids
  where
-  tvs = List.nubBy sameUniq (concatMap (Lens.toListOf C.termFreeTyVars) tms)
+  tvs = C.dependencySortTyVars (List.nubBy sameUniq (concatMap (Lens.toListOf C.termFreeTyVars) tms))
   ids = List.nubBy sameUniq (concatMap (Lens.toListOf C.freeLocalIds) tms)
 
   sameUniq :: C.Var a -> C.Var a -> Bool
