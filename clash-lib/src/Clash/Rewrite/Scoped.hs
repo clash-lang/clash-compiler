@@ -12,6 +12,7 @@ module Clash.Rewrite.Scoped
   ( module Clash.Rewrite.Scoped.Types
   , module Clash.Rewrite.Scoped.Combinators
   , module Clash.Rewrite.Scoped.Apply
+  , whnfRW
   , changed
   , setChanged
   ) where
@@ -19,4 +20,5 @@ module Clash.Rewrite.Scoped
 import Clash.Rewrite.Scoped.Apply
 import Clash.Rewrite.Scoped.Combinators
 import Clash.Rewrite.Scoped.Types
+import Clash.Rewrite.Scoped.ViaFoil (whnfRW)
 import Clash.Rewrite.Util (changed, setChanged)

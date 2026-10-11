@@ -60,6 +60,7 @@ module Test.Clash.Scoped
   , withTests
     -- * Running scoped transformations
   , runScopedClosed
+  , runViaFoil
   , somePrim
   ) where
 
@@ -100,7 +101,9 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped (ScopedRewrite, rootContext, runScopedTransform)
-import Clash.Rewrite.Types (RewriteState (..))
+import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Clash.Rewrite.Types
+  (RewriteEnv, RewriteState (..), TransformContext)
 
 import Clash.Driver.Types (Binding)
 
@@ -783,6 +786,18 @@ runScopedClosed :: ScopedRewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Boo
 runScopedClosed t e = do
   (e', st, changed) <- runRewriteTest def def (runScopedTransform t (rootContext emptyScope) e)
   pure (e', _transformCounter st, changed)
+
+-- | Run a scoped transformation on a Clash term through
+-- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', in the given context. Gives the
+-- result, the final state, and whether a change was signaled.
+runViaFoil
+  :: RewriteEnv
+  -> RewriteState extra
+  -> TransformContext
+  -> ScopedRewrite extra
+  -> C.Term
+  -> IO (C.Term, RewriteState extra, Bool)
+runViaFoil env st ctx t e = runRewriteTest env st (viaFoil "test" t ctx e)
 
 -- | A primitive @somePrim :: T@, with no special meaning
 somePrim :: C.PrimInfo
