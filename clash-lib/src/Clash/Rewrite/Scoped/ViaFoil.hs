@@ -10,8 +10,9 @@
     so that transformations can be ported one at a time. Phase 4 of the port
     deletes it, when the normalizer runs on scoped Core.
 
-  * 'whnfRW' evaluates a scoped term with the evaluator of Clash Core. Phase 6
-    replaces it with the ported evaluator.
+  * 'whnfRWViaClash' evaluates a scoped term with the evaluator of Clash
+    Core. The ported evaluator replaced it
+    ('Clash.Rewrite.Scoped.Whnf.whnfRW'); it is kept to compare the two.
 
   = 'viaFoil'
 
@@ -37,9 +38,9 @@
   'Clash.Rewrite.Util.mkTmBinderFor' does. Its free variables are the
   variables of the original subterm and its context.
 
-  = 'whnfRW'
+  = 'whnfRWViaClash'
 
-  'whnfRW' converts the subterm and the frames of its context to Clash Core,
+  'whnfRWViaClash' converts the subterm and the frames of its context to Clash Core,
   on top of the Clash Core context of the 'LegacyRoot', and evaluates it with
   'Clash.Rewrite.Util.whnfHeap'. The evaluator uses the let-bindings of the
   context that are not shadowed on the path to the subterm, so this includes
@@ -56,7 +57,7 @@
 
 module Clash.Rewrite.Scoped.ViaFoil
   ( viaFoil
-  , whnfRW
+  , whnfRWViaClash
     -- * Internals, exported for testing
   , rootVars
   ) where
@@ -113,10 +114,11 @@ viaFoil
   -> Rewrite extra
 viaFoil name (ScopedTransform rw) ctx e =
   withConvEnv tvs ids $ \env ->
-    let idsS = [(i, fromClashTerm env (C.Var i)) | i <- ids]
+    let tvsS = [(tv, fromClashType env (C.VarTy tv)) | tv <- tvs]
+        idsS = [(i, fromClashTerm env (C.Var i)) | i <- ids]
         root = LegacyRoot
           { legacyContext = ctx
-          , legacyTyVars = [(tv, fromClashType env (C.VarTy tv)) | tv <- tvs]
+          , legacyTyVars = tvsS
           , legacyIds = idsS
           , legacyHeap = rootHeap env idsS (C.tfContext ctx) e
           }
@@ -438,16 +440,18 @@ legacyView = go . tfPath
     lv { lvEnv = env, lvInScope = is, lvFrames = frames
        , lvTyVarsRev = reverse new ++ lvTyVarsRev lv }
 
--- | Evaluate a term to weak-head normal form, and apply a transformation to
--- the result, in the context extended with the bindings the evaluator
--- allocated. See 'Clash.Rewrite.Util.whnfRW', and the module header.
+-- | Evaluate a term to weak-head normal form with the evaluator of Clash
+-- Core, and apply a transformation to the result, in the context extended
+-- with the bindings the evaluator allocated. See 'Clash.Rewrite.Util.whnfRW',
+-- and the module header. Kept to compare the scoped evaluator with
+-- ('Clash.Rewrite.Scoped.Whnf.whnfRW').
 --
 -- If the transformation signals a change, the result is bound by those
 -- bindings, of which the work-free ones are inlined, and the unused ones
 -- removed, like 'Clash.Rewrite.Util.bindPureHeap' does. Otherwise the result
 -- is the one of the transformation, which must not mention them: return
 -- (the 'sink' of) the original term when nothing changes.
-whnfRW
+whnfRWViaClash
   :: (HasCallStack, Distinct n)
   => Bool
   -- ^ Whether the term is the subject of a case-expression
@@ -455,7 +459,7 @@ whnfRW
   -> Term n
   -> (forall l. DExt n l => TransformContext l -> Term l -> RewriteMonad extra (Term l))
   -> RewriteMonad extra (Term n)
-whnfRW isSubj ctx e k = do
+whnfRWViaClash isSubj ctx e k = do
   (lv, e') <- withSupply $ do
     lv <- legacyView ctx
     e' <- toClashFresh (lvInScope lv) (lvEnv lv) e

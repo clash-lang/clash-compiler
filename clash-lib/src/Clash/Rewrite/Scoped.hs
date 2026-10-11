@@ -85,11 +85,11 @@
     _ -> pure (sink e)  -- doesn't fire: return the original node
   @
 
-  Until the evaluator is ported (phase 6 of the port), 'whnfRW' converts to
-  Clash Core and back, see "Clash.Rewrite.Scoped.ViaFoil". It needs to know
-  the Clash Core variables of the root of the context: use it under
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', or in a context whose root
-  ('rootContext') is a closed term.
+  The evaluator is that of scoped Clash Core ("Clash.Core.Scoped.Evaluator"),
+  which reduces the primitives that are not ported yet with the evaluator of
+  Clash Core. The let-bindings of the context are those of the scoped frames,
+  and, under 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', those of the Clash Core
+  context of the root.
 
   = Porting a transformation: a worked example
 
@@ -176,5 +176,5 @@ module Clash.Rewrite.Scoped
 import Clash.Rewrite.Scoped.Apply
 import Clash.Rewrite.Scoped.Combinators
 import Clash.Rewrite.Scoped.Types
-import Clash.Rewrite.Scoped.ViaFoil (whnfRW)
+import Clash.Rewrite.Scoped.Whnf (whnfRW)
 import Clash.Rewrite.Util (changed, setChanged)

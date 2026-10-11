@@ -325,6 +325,7 @@ Library
                       Clash.Rewrite.Scoped.Combinators
                       Clash.Rewrite.Scoped.Types
                       Clash.Rewrite.Scoped.ViaFoil
+                      Clash.Rewrite.Scoped.Whnf
                       Clash.Rewrite.Scoped.WorkFree
                       Clash.Rewrite.StrategyDSL
                       Clash.Rewrite.StrategyDSL.TH
@@ -516,6 +517,7 @@ test-suite unittests
                  Clash.Tests.Rewrite.Scoped.StrategyDSL
                  Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
                  Clash.Tests.Rewrite.Scoped.ViaFoil
+                 Clash.Tests.Rewrite.Scoped.Whnf
                  Clash.Tests.Rewrite.Scoped.WorkFree
                  Clash.Tests.Rewrite.StrategyDSL
                  Clash.Tests.Rewrite.StrategyDSL.Stubs

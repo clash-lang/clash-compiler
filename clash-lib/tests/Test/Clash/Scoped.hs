@@ -63,6 +63,7 @@ module Test.Clash.Scoped
   , withTests
     -- * Running scoped transformations
   , runScopedClosed
+  , runScopedOpen
   , runViaFoil
   , somePrim
     -- * Evaluating
@@ -810,6 +811,21 @@ runScopedClosed :: ScopedRewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Boo
 runScopedClosed t e = do
   (e', st, changed) <- runRewriteTest def def (runScopedTransform t (rootContext emptyScope) e)
   pure (e', _transformCounter st, changed)
+
+-- | Run a scoped transformation on a Clash term converted to scoped Core, in
+-- the root context of the scope of its free variables. Gives the result,
+-- converted back (its free variables keep their uniques), the final state,
+-- and whether a change was signaled.
+runScopedOpen
+  :: RewriteEnv
+  -> RewriteState extra
+  -> ScopedRewrite extra
+  -> C.Term
+  -> IO (C.Term, RewriteState extra, Bool)
+runScopedOpen env st t e = withFreeVarsOf [e] $ \cenv -> do
+  (e', st', ch) <- runRewriteTest env st
+    (runScopedTransform t (rootContext (convScope cenv)) (fromClashTerm cenv e))
+  pure (toClashTerm e', st', ch)
 
 -- | Run a scoped transformation on a Clash term through
 -- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', in the given context. Gives the
