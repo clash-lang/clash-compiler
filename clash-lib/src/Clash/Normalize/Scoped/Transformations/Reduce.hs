@@ -34,6 +34,9 @@ module Clash.Normalize.Scoped.Transformations.Reduce
   , reduceConstWorker
   , reducePrim
   , reducePrimWorker
+    -- * Primitive reductions
+  , PrimReduction (..)
+  , runPrimReduction
   ) where
 
 import qualified Control.Lens as Lens
