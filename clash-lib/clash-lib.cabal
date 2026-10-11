@@ -466,6 +466,7 @@ test-suite unittests
                  Clash.Tests.Rewrite.StrategyDSL
                  Clash.Tests.Rewrite.StrategyDSL.Stubs
                  Clash.Tests.Rewrite.Util
+                 Clash.Tests.Rewrite.WorkFree
                  Clash.Tests.Warning
 
                  Test.Clash.Rewrite
