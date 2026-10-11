@@ -54,7 +54,8 @@ import Comparisons (comparisons, siteComparisons)
 import Registry (currentRewrites, lookupCurrent)
 import Test.Clash.Differential
 import Test.Clash.Differential.Sites
-import WhnfReplay (whnfReplay)
+import Prims (PrimsOptions (..), defPrimsOptions, comparePrims)
+import WhnfReplay (ReplayOptions (..), whnfReplay)
 
 data Options = Options
   { optShow :: Int
@@ -76,7 +77,9 @@ usage = unlines
   , "       clash-differential --replay [OPTIONS] CORPUS..."
   , "       clash-differential --corpus-stats CORPUS..."
   , "       clash-differential --list"
-  , "       clash-differential whnf [--reps N] [--show N] [--top N] [--call N] DESIGN.bin DUMP..."
+  , "       clash-differential whnf [--reps N] [--show N] [--top N] [--call N]"
+  , "                               [--prims] [--check-prims] DESIGN.bin DUMP..."
+  , "       clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] DESIGN.bin..."
   , ""
   , "Runs COMPARISON on every binding of the serialized designs FILE..., which"
   , "are *.bin files written by clash-profile-normalization-prepare, or"
@@ -104,15 +107,30 @@ usage = unlines
   , "DESIGN.bin, compares their results and, with +RTS -T, measures their"
   , "allocation (--reps runs, default 3), and shows the --top N calls with the"
   , "most extra allocation in the scoped evaluator. --call N only replays the"
-  , "call with index N. See WhnfReplay.hs."
+  , "call with index N. --prims reports how often every primitive was reduced"
+  , "by a ported reduction and through the adapter; --check-prims also compares"
+  , "every call of a ported reduction with the adapter. See WhnfReplay.hs."
+  , ""
+  , "The prims command compares every ported reduction of a primitive with the"
+  , "reduction of Clash Core, through the adapter, on --count N (default 100)"
+  , "calls generated from the type of the primitive in the designs. See"
+  , "Prims.hs."
   ]
 
 main :: IO ()
 main = getArgs >>= \case
-  "whnf" : args -> case parseWhnfArgs (WhnfOptions 3 3 0 Nothing) args of
-    Just (WhnfOptions reps nShow nTop only, design : dumps@(_:_)) -> do
+  "whnf" : args -> case parseWhnfArgs (ReplayOptions 3 3 0 Nothing False False) args of
+    Just (opts, design : dumps@(_:_)) -> do
       (bm, tcm, _, _, _, _, _, _) <- decode <$> B.readFile design :: IO NormalizationInputs
-      forM_ dumps (whnfReplay reps nShow nTop only tcm bm)
+      forM_ dumps (whnfReplay opts tcm bm)
+    _ -> die usage
+  "prims" : args -> case parsePrimsArgs defPrimsOptions args of
+    Just (opts, designs@(_:_)) -> do
+      inputs <- forM designs $ \design -> do
+        (bm, tcm, _, _, _, _, _, _) <- decode <$> B.readFile design :: IO NormalizationInputs
+        pure (design, bm, tcm)
+      ok <- comparePrims opts inputs
+      unless ok exitFailure
     _ -> die usage
   ["--list"] -> do
     putStrLn "Comparisons on bindings:"
@@ -145,23 +163,30 @@ die :: String -> IO a
 die msg = hPutStrLn stderr msg >> exitWith (ExitFailure 2)
 
 -- | The options of the whnf command, and the other arguments
-data WhnfOptions = WhnfOptions
-  { whnfReps :: Int
-  , whnfShow :: Int
-  , whnfTop :: Int
-  , whnfOnly :: Maybe Int
-  }
-
-parseWhnfArgs :: WhnfOptions -> [String] -> Maybe (WhnfOptions, [String])
+parseWhnfArgs :: ReplayOptions -> [String] -> Maybe (ReplayOptions, [String])
 parseWhnfArgs opts = \case
   [] -> Just (opts, [])
-  "--reps" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfReps = k} rest
-  "--show" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfShow = k} rest
-  "--top" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfTop = k} rest
-  "--call" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfOnly = Just k} rest
+  "--reps" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {roReps = k} rest
+  "--show" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {roShow = k} rest
+  "--top" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {roTop = k} rest
+  "--call" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {roOnly = Just k} rest
+  "--prims" : rest -> parseWhnfArgs opts {roPrims = True} rest
+  "--check-prims" : rest -> parseWhnfArgs opts {roCheckPrims = True} rest
   a : rest
     | "--" `List.isPrefixOf` a -> Nothing
     | otherwise -> fmap (a :) <$> parseWhnfArgs opts rest
+
+-- | The options of the prims command, and the other arguments
+parsePrimsArgs :: PrimsOptions -> [String] -> Maybe (PrimsOptions, [String])
+parsePrimsArgs opts = \case
+  [] -> Just (opts, [])
+  "--count" : n : rest -> readMaybe n >>= \k -> parsePrimsArgs opts {poCount = k} rest
+  "--seed" : n : rest -> readMaybe n >>= \k -> parsePrimsArgs opts {poSeed = k} rest
+  "--show" : n : rest -> readMaybe n >>= \k -> parsePrimsArgs opts {poShow = k} rest
+  "--prim" : nm : rest -> parsePrimsArgs opts {poPrim = Just nm} rest
+  a : rest
+    | "--" `List.isPrefixOf` a -> Nothing
+    | otherwise -> fmap (a :) <$> parsePrimsArgs opts rest
 
 -- | Options, which can be anywhere, and the other arguments
 parseArgs :: Options -> [String] -> Maybe (Options, [String])
