@@ -415,8 +415,9 @@ substBind s bs cont = case bs of
       cont s' (Rec bndrs' (map (substTm s') es))
 
 -- | Rename every binder in a value to the name just above the watermark of
--- the scope at the binder, i.e. as conversion from Clash Core would name them.
--- A binder that doesn't clash with the scope may keep its name.
+-- the scope at the binder. Unlike conversion from Clash Core, which numbers
+-- the binders of a term depth-first, this gives binders in different subterms
+-- the same name: e.g. both binders in @f (\x -> x) (\y -> y)@.
 freshen :: (Distinct n, HasSubst e) => Scope n -> e n -> e n
 freshen sc = subst (UnsafeSubst sc IntMap.empty IntMap.empty True)
 
