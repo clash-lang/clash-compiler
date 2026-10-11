@@ -52,6 +52,7 @@ package clash-benchmark
 
 optional-packages:
   ./benchmark
+  ./benchmark/profiling/differential
   ./benchmark/profiling/prepare
   ./benchmark/profiling/run
 
