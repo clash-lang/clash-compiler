@@ -58,12 +58,16 @@ module Test.Clash.Scoped
   , aeqTermTyped
     -- * Properties
   , withTests
+    -- * Running scoped transformations
+  , runScopedClosed
+  , somePrim
   ) where
 
 import qualified Control.Lens as Lens
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, state)
 import Control.Monad.Trans.Writer.Strict (Writer, runWriter, tell)
+import Data.Default (def)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
@@ -95,10 +99,12 @@ import Clash.Core.Scoped.Internal.Scope
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Rewrite.Scoped (ScopedRewrite, rootContext, runScopedTransform)
+import Clash.Rewrite.Types (RewriteState (..))
 
 import Clash.Driver.Types (Binding)
 
-import Test.Clash.Rewrite (assertAlphaEq, intId, mkBinding)
+import Test.Clash.Rewrite (assertAlphaEq, intId, mkBinding, runRewriteTest)
 import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
 
 -- | A conversion environment with the free variables of the given Clash terms
@@ -769,3 +775,21 @@ aeqTermTyped = goTm (Levels 0 Map.empty Map.empty Map.empty Map.empty)
 withTests :: Int -> TestTree -> TestTree
 withTests n = adjustOption $ \(QuickCheckTests k) ->
   QuickCheckTests (if k == 10000 then n else k)
+
+-- | Run a scoped transformation on a closed term, in the root context, in the
+-- default (silent) environment. Gives the result, the number of
+-- transformations applied, and whether a change was signaled.
+runScopedClosed :: ScopedRewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Bool)
+runScopedClosed t e = do
+  (e', st, changed) <- runRewriteTest def def (runScopedTransform t (rootContext emptyScope) e)
+  pure (e', _transformCounter st, changed)
+
+-- | A primitive @somePrim :: T@, with no special meaning
+somePrim :: C.PrimInfo
+somePrim = C.PrimInfo
+  { C.primName = "somePrim"
+  , C.primType = C.ConstTy (C.TyCon (C.mkUnsafeSystemName "T" 0))
+  , C.primWorkInfo = C.WorkConstant
+  , C.primMultiResult = C.SingleResult
+  , C.primUnfolding = C.NoUnfolding
+  }

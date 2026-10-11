@@ -50,7 +50,6 @@ module Clash.Core.Scoped.Term
   ) where
 
 import qualified Data.DList as DList
-import Data.Either (lefts, rights)
 import qualified Data.List as List
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
@@ -99,9 +98,15 @@ collectArgsTicks = go [] []
 -- | If the term is an application of a primitive: its name, the number of
 -- type arguments, and the number of term arguments
 primArg :: Term n -> Maybe (Text, Int, Int)
-primArg (collectArgs -> t) = case t of
-  (Prim p, args) -> Just (C.primName p, length (rights args), length (lefts args))
-  _ -> Nothing
+primArg = go 0 0
+ where
+  go :: Int -> Int -> Term x -> Maybe (Text, Int, Int)
+  go !tys !tms = \case
+    App f _ -> go tys (tms + 1) f
+    TyApp f _ -> go (tys + 1) tms f
+    Tick _ e -> go tys tms e
+    Prim p -> Just (C.primName p, tys, tms)
+    _ -> Nothing
 
 -- * Abstractions
 

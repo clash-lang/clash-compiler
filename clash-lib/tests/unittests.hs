@@ -46,6 +46,7 @@ import qualified Clash.Tests.Normalize.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Transformations.XOptimize
 import qualified Clash.Tests.Normalize.Util
 import qualified Clash.Tests.Rewrite.Combinators
+import qualified Clash.Tests.Rewrite.Scoped.Combinators
 import qualified Clash.Tests.Rewrite.Scoped.WorkFree
 import qualified Clash.Tests.Rewrite.StrategyDSL
 import qualified Clash.Tests.Rewrite.Util
@@ -105,6 +106,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Transformations.XOptimize.tests
   , Clash.Tests.Normalize.Util.tests
   , Clash.Tests.Rewrite.Combinators.tests
+  , Clash.Tests.Rewrite.Scoped.Combinators.tests
   , Clash.Tests.Rewrite.Scoped.WorkFree.tests
   , Clash.Tests.Rewrite.StrategyDSL.tests
   , Clash.Tests.Rewrite.Util.tests
