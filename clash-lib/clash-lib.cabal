@@ -296,6 +296,7 @@ Library
                       Clash.Normalize.Scoped.Transformations.Reduce
                       Clash.Normalize.Scoped.Transformations.SeparateArgs
                       Clash.Normalize.Scoped.Transformations.Specialize
+                      Clash.Normalize.Scoped.Transformations.XOptimize
                       Clash.Normalize.Scoped.Util
                       Clash.Normalize.Strategy
                       Clash.Normalize.Strategy.Spec
@@ -526,6 +527,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Scoped.Transformations.Reduce
                  Clash.Tests.Normalize.Scoped.Transformations.SeparateArgs
                  Clash.Tests.Normalize.Scoped.Transformations.Specialize
+                 Clash.Tests.Normalize.Scoped.Transformations.XOptimize
                  Clash.Tests.Normalize.Scoped.Util
                  Clash.Tests.Normalize.Transformations
                  Clash.Tests.Normalize.Transformations.ANF
