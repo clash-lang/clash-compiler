@@ -605,6 +605,9 @@ runClashTest = defaultMain
         [ runTest "AndOrHeapBindings" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "EmptyCaseFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "FreeVarHeapBinding" def{hdlTargets=[Verilog], hdlSim=[]}
+        -- GlobalLocalHeapLookup builds a binding, which needs the 'InlineSpec' of
+        -- the GHC API
+        , clashLibTest "GlobalLocalHeapLookup" def{hdlTargets=[Verilog], ghcFlags=["-package", "ghc"]}
         , runTest "SplitAtFoldFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
         ]
       , clashTestGroup "Feedback"
