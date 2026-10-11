@@ -49,6 +49,7 @@ import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid (getAny)
 import qualified Data.Set.Ordered as OSet
 import qualified Data.Set.Ordered.Extra as OSet
@@ -92,7 +93,8 @@ import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (scopedAppWorker, scopedTyAppWorker, viaFoilWhen)
+import Clash.Rewrite.Scoped.ViaFoil
+  (scopedAppWorker, scopedLamWorker, scopedTyAppWorker, viaFoilWhen)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode
   , toTransformation
@@ -755,7 +757,21 @@ typeSpecWorker _ e _ _ = return e
 -- variable with a zero-width type with the only value of that type.
 --
 zeroWidthSpec :: Transformation
-zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecWorker)
+zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecViaFoil)
+
+-- | 'Scoped.zeroWidthSpec', which replaced 'zeroWidthSpecWorker', through
+-- 'viaFoilWhen' at the lambdas at which it can fire: those whose binder has a
+-- zero-width type
+zeroWidthSpecViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Id -> Term -> NormalizeSession Term
+zeroWidthSpecViaFoil ctx e i _ =
+  viaFoilWhen "zeroWidthSpec" (\_ _ -> fires)
+    (scopedLamWorker Scoped.zeroWidthSpecWorker) ctx e
+ where
+  fires = do
+    tcm <- Lens.view tcCache
+    pure (Maybe.isJust (zeroWidthTypeElem tcm (normalizeType tcm (coreTypeOf i))))
 
 -- | The 'Lam' handler of 'zeroWidthSpec'.
 zeroWidthSpecWorker

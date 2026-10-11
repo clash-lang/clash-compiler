@@ -29,6 +29,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
@@ -46,6 +48,8 @@ module Clash.Normalize.Scoped.Transformations.Specialize
   , nonRepSpecWorker
   , typeSpec
   , typeSpecWorker
+  , zeroWidthSpec
+  , zeroWidthSpecWorker
   , specArgBndrsAndVars
     -- * Helpers of 'specialize'
   , specCacheKey
@@ -56,6 +60,7 @@ module Clash.Normalize.Scoped.Transformations.Specialize
 import           Control.Exception           (throw)
 import           Control.Lens                ((%=))
 import qualified Control.Lens                as Lens
+import qualified Control.Monad               as Monad
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
@@ -70,11 +75,19 @@ import           GHC.Num.Natural             (Natural (NS))
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.Basic             (InlineSpec (..))
 
+import qualified Clash.Sized.Internal.BitVector as BV (BitVector, fromInteger#)
+import qualified Clash.Sized.Internal.Index  as I (Index, fromInteger#)
+import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
+import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
+
+import           Clash.Core.DataCon          (DataCon (dcExtTyVars))
 import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
+import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
+import           Clash.Core.TysPrim          (integerPrimTy, naturalPrimTy, typeNatKind)
 import qualified Clash.Core.Var              as C
 import qualified Clash.Data.UniqMap          as UniqMap
 import           Clash.Debug                 (traceIf, traceM)
@@ -83,16 +96,17 @@ import           Clash.Driver.Types
 import           Clash.Normalize.Types
   (NormalizeSession, specialisationCache, specialisationHistory)
 import           Clash.Rewrite.StrategyDSL
-  (Transformation, onApp, onAppNode, onTyApp, onTyAppNode, toScopedTransformation)
+  (Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
   (censor, curFun, debugOpts, extra, scopedTypeEnv, specializationLimit)
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
 import           Clash.Core.Scoped.Convert   (toClashTerm, toClashType)
+import           Clash.Core.Scoped.DataCon   (dataConInstArgTys)
 import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
 import           Clash.Core.Scoped.HasType   (globalIdType, inferCoreTypeOf, piResultTy)
-import           Clash.Core.Scoped.NameMap   (nullNameSet)
+import           Clash.Core.Scoped.NameMap   (nullNameSet, singletonNameMap)
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
@@ -101,8 +115,8 @@ import           Clash.Core.Scoped.Term
   , mkTyLams )
 import           Clash.Core.Scoped.TermInfo  (isLocalVar, isPolyFun, isVar)
 import           Clash.Core.Scoped.Type
-  (TypeView (..), applyFunTy, coreView1, normalizeType, tyView)
-import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
+  (TypeView (..), applyFunTy, coreView1, normalizeType, splitTyConAppM, tyView)
+import           Clash.Core.Scoped.TypeEnv   (TypeEnv, lookupTyCon)
 import           Clash.Core.Scoped.Util      (mkLets)
 import           Clash.Normalize.Scoped.Util (ConstantSpecInfo (..), constantSpecInfo)
 import           Clash.Rewrite.Scoped.Combinators (topdownR)
@@ -631,6 +645,110 @@ typeSpecWorker ctx e e1 ty
   = specialize ctx e
   | otherwise = return e
 {-# SCC typeSpecWorker #-}
+
+-- | Specialize functions on arguments which are zero-width, see
+-- 'Clash.Normalize.Transformations.Specialize.zeroWidthSpec'. Substitutes
+-- the only value of the zero-width type of a lambda-bound variable for the
+-- variable.
+zeroWidthSpec :: Transformation
+zeroWidthSpec = toScopedTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecWorker)
+
+-- | The 'Lam' handler of 'zeroWidthSpec'
+zeroWidthSpecWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> IdBinder n l
+  -> Term l
+  -> NormalizeSession (Term n)
+zeroWidthSpecWorker ctx e b body = do
+  te <- Lens.view scopedTypeEnv
+  let sc = tfScope ctx
+  case zeroWidthTypeElem te sc (normalizeType te sc (idBinderType b)) of
+    Just tm ->
+      openIdBinder sc b body $ \sc1 b1 body1 ->
+        let s = tmVarsSubst sc1 (singletonNameMap (tmNameOf b1) (sink tm))
+        in  changed (Lam b1 (substTm s body1))
+    Nothing ->
+      return e
+{-# SCC zeroWidthSpecWorker #-}
+
+-- | The only element of a type, if it is zero-width
+zeroWidthTypeElem :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Term n)
+zeroWidthTypeElem te sc = zeroWidthTypeElemIn te sc []
+
+-- | 'zeroWidthTypeElem' for a type that is the type of a field of types with
+-- the given type constructors. We do not look into the fields of a type with
+-- a type constructor we are already looking into: recursive types, such as
+-- 'Clash.Signal.Internal.Signal', would make us loop.
+zeroWidthTypeElemIn
+  :: Distinct n => TypeEnv -> Scope n -> [C.TyConName] -> Type n -> Maybe (Term n)
+zeroWidthTypeElemIn te sc enclosing ty = do
+  (tcNm, args) <- splitTyConAppM ty
+
+  if | C.nameOcc tcNm == Text.showt ''BV.BitVector
+     , [LitTy (C.NumTy 0)] <- args
+     -> return (zeroWidthNum (bitVectorFromIntegerPrim tcNm) args
+                  [NaturalLiteral 0, NaturalLiteral 0, IntegerLiteral 0])
+
+     | C.nameOcc tcNm == Text.showt ''I.Index
+     , [LitTy (C.NumTy 1)] <- args
+     -> return (zeroWidthNum (sizedNumFromIntegerPrim tcNm (Text.showt 'I.fromInteger#)) args
+                  [NaturalLiteral 1, IntegerLiteral 0])
+
+     | C.nameOcc tcNm == Text.showt ''S.Signed
+     , [LitTy (C.NumTy 0)] <- args
+     -> return (zeroWidthNum (sizedNumFromIntegerPrim tcNm (Text.showt 'S.fromInteger#)) args
+                  [NaturalLiteral 0, IntegerLiteral 0])
+
+     | C.nameOcc tcNm == Text.showt ''U.Unsigned
+     , [LitTy (C.NumTy 0)] <- args
+     -> return (zeroWidthNum (sizedNumFromIntegerPrim tcNm (Text.showt 'U.fromInteger#)) args
+                  [NaturalLiteral 0, IntegerLiteral 0])
+
+     -- Any other zero-width type should only have a single data constructor
+     -- where all fields are also zero-width. We don't handle constructors with
+     -- existential type variables, as we don't know which types to apply them
+     -- to.
+     | otherwise
+     -> do
+       Monad.guard (tcNm `notElem` enclosing)
+       tc <- lookupTyCon te tcNm
+
+       case C.tyConDataCons tc of
+         [dc] | null (dcExtTyVars dc) -> do
+           argTys <- dataConInstArgTys te sc dc args
+           zwArgs <- traverse (zeroWidthTypeElemIn te sc (tcNm : enclosing)) argTys
+           return (mkApps (Data dc) (fmap Right args <> fmap Left zwArgs))
+
+         _ ->
+           Nothing
+ where
+  zeroWidthNum pr tyArgs lits =
+    mkApps (Prim pr) (fmap Right tyArgs <> fmap (Left . Literal) lits)
+
+-- | @BitVector.fromInteger# :: forall n. Natural -> Natural -> Integer ->
+-- BitVector n@, for the given type constructor of 'BV.BitVector'
+bitVectorFromIntegerPrim :: C.TyConName -> C.PrimInfo
+bitVectorFromIntegerPrim tcNm =
+  C.PrimInfo (Text.showt 'BV.fromInteger#) prTy C.WorkNever C.SingleResult C.NoUnfolding
+ where
+  prTy = C.mkPolyFunTy (C.mkTyConApp tcNm [C.VarTy zeroWidthNTv])
+           [Left zeroWidthNTv, Right naturalPrimTy, Right naturalPrimTy, Right integerPrimTy]
+
+-- | The primitive with the given name, of type @forall n. Natural -> Integer
+-- -> T n@, for the given type constructor @T@: @fromInteger#@ of 'I.Index',
+-- 'S.Signed' or 'U.Unsigned'
+sizedNumFromIntegerPrim :: C.TyConName -> Text.Text -> C.PrimInfo
+sizedNumFromIntegerPrim tcNm nm =
+  C.PrimInfo nm prTy C.WorkNever C.SingleResult C.NoUnfolding
+ where
+  prTy = C.mkPolyFunTy (C.mkTyConApp tcNm [C.VarTy zeroWidthNTv])
+           [Left zeroWidthNTv, Right naturalPrimTy, Right integerPrimTy]
+
+-- | The type variable @n@ of the types of the primitives of 'zeroWidthSpec'
+zeroWidthNTv :: C.TyVar
+zeroWidthNTv = C.mkTyVar typeNatKind (C.mkUnsafeSystemName "n" 0)
 
 -- | The body of the specialized function: the body of the function applied
 -- to its arguments, and to the argument specialized on, abstracted over the

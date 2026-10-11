@@ -44,6 +44,7 @@ module Current
   , constantSpec
   , nonRepSpec
   , typeSpec
+  , zeroWidthSpec
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -55,7 +56,7 @@ import qualified Clash.Normalize.Transformations.Reduce as Reduce
 import qualified Clash.Normalize.Transformations.Specialize as Specialize
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLet, onLetNode
+  ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLam, onLet, onLetNode
   , onPrimNode, onTickNode, onTyApp, onTyAppNode, onVarNode, toTransformation )
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
@@ -224,3 +225,9 @@ nonRepSpec = toTransformation "nonRepSpec" (onApp 'Specialize.nonRepSpecWorker)
 -- 'Clash.Normalize.Scoped.Transformations.Specialize.typeSpec' replaced
 typeSpec :: Transformation
 typeSpec = toTransformation "typeSpec" (onTyApp 'Specialize.typeSpecWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Specialize.zeroWidthSpec',
+-- which 'Clash.Normalize.Scoped.Transformations.Specialize.zeroWidthSpec'
+-- replaced
+zeroWidthSpec :: Transformation
+zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'Specialize.zeroWidthSpecWorker)
