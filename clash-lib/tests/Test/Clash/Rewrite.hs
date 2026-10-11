@@ -1220,6 +1220,88 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
   -- forall b. a -> b
   pRhs = C.ForAllTy fxB (C.mkFunTy (C.VarTy fxA) (C.VarTy fxB))
 
+-- * Zero-width types
+--
+-- Types of which a value has no bits, for 'Clash.Normalize.Transformations.Specialize.zeroWidthSpec'.
+
+-- | The sized number types of @clash-prelude@, which 'zeroWidthTyConMap'
+-- knows, besides 'indexTcNm'. Only their names matter.
+bitVectorTyConName, unsignedTyConName, signedTyConName :: C.TyConName
+bitVectorTyConName = mkTyConName "Clash.Sized.Internal.BitVector.BitVector" 3100
+unsignedTyConName = mkTyConName "Clash.Sized.Internal.Unsigned.Unsigned" 3101
+signedTyConName = mkTyConName "Clash.Sized.Internal.Signed.Signed" 3102
+
+-- | @BitVector n@, @Unsigned n@ and @Signed n@. See 'indexTy' for @Index n@.
+bitVectorTy, unsignedTy, signedTy :: Integer -> C.Type
+bitVectorTy n = tcApp bitVectorTyConName [numTy n]
+unsignedTy n = tcApp unsignedTyConName [numTy n]
+signedTy n = tcApp signedTyConName [numTy n]
+
+zwTyConName, proxyTyConName, tProxyTyConName, exZwTyConName, streamTyConName :: C.TyConName
+zwTyConName = mkTyConName "ZW" 3104
+proxyTyConName = mkTyConName "Proxy" 3105
+tProxyTyConName = mkTyConName "TProxy" 3106
+exZwTyConName = mkTyConName "ExZW" 3107
+streamTyConName = mkTyConName "Stream" 3108
+
+-- | @data ZW = MkZW (BitVector 0) (Unsigned 0)@
+zwTy :: C.Type
+zwTy = tcTy zwTyConName
+
+zwDataCon :: C.DataCon
+zwDataCon = mkDataCon "MkZW" 3110 [] [] [bitVectorTy 0, unsignedTy 0] zwTy
+
+-- | @data Proxy (n :: Nat) = Proxy@
+proxyTy :: C.Type -> C.Type
+proxyTy n = tcApp proxyTyConName [n]
+
+proxyDataCon :: C.DataCon
+proxyDataCon = mkDataCon "Proxy" 3111 [zwN] [] [] (proxyTy (C.VarTy zwN))
+
+-- | @data TProxy (n :: Nat) = MkTProxy (Proxy n)@: a field type that mentions
+-- a type variable
+tProxyTy :: C.Type -> C.Type
+tProxyTy n = tcApp tProxyTyConName [n]
+
+tProxyDataCon :: C.DataCon
+tProxyDataCon =
+  mkDataCon "MkTProxy" 3112 [zwN] [] [proxyTy (C.VarTy zwN)] (tProxyTy (C.VarTy zwN))
+
+-- | @data ExZW = forall b. MkExZW (BitVector 0)@: a constructor with an
+-- existentially quantified type variable
+exZwTy :: C.Type
+exZwTy = tcTy exZwTyConName
+
+exZwDataCon :: C.DataCon
+exZwDataCon = mkDataCon "MkExZW" 3113 [] [zwB] [bitVectorTy 0] exZwTy
+
+-- | @data Stream a = a :> Stream a@: a recursive type, like @Signal@
+streamTy :: C.Type -> C.Type
+streamTy a = tcApp streamTyConName [a]
+
+streamDataCon :: C.DataCon
+streamDataCon =
+  mkDataCon ":>" 3114 [zwA] [] [C.VarTy zwA, streamTy (C.VarTy zwA)] (streamTy (C.VarTy zwA))
+
+-- | Type variables of the zero-width types
+zwN, zwA, zwB :: C.TyVar
+zwN = kindedTyVar C.User "n" 3115 C.typeNatKind
+zwA = tyVar C.User "a" 3116
+zwB = tyVar C.User "b" 3117
+
+-- | 'testTyConMap', with the zero-width types
+zeroWidthTyConMap :: C.TyConMap
+zeroWidthTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
+ where
+  tcs = UniqMap.elems testTyConMap <>
+    [ mkAlgTyCon nm [zwN] [] | nm <- [bitVectorTyConName, unsignedTyConName, signedTyConName, indexTcNm] ] <>
+    [ mkAlgTyCon zwTyConName [] [zwDataCon]
+    , mkAlgTyCon proxyTyConName [zwN] [proxyDataCon]
+    , mkAlgTyCon tProxyTyConName [zwN] [tProxyDataCon]
+    , mkAlgTyCon exZwTyConName [] [exZwDataCon]
+    , mkAlgTyCon streamTyConName [zwA] [streamDataCon]
+    ]
+
 -- | A 'C.TyVar' with the given name sort, human readable name, unique, and
 -- kind
 kindedTyVar :: C.NameSort -> String -> Unique -> C.Kind -> C.TyVar
