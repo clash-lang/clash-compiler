@@ -15,7 +15,7 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.DataCon (DataCon)
+import Clash.Core.DataCon (DataCon (dcTag))
 import Clash.Core.Name (NameSort (User))
 import Clash.Core.Subst (aeqType)
 import Clash.Core.Term (Bind (..), Pat (..), Term (..), mkApps)
@@ -166,6 +166,23 @@ caseLetCaptureExpected =
   x = intId User "x" 2
   x1 = intId User "x" 3
 
+-- | @case MkU w of {MkT y -> z; MkU z' -> z'}@, where the pattern binder @z'@
+-- has the same unique as the free variable @z@ (it shadows it), but a different
+-- name. The alternatives are alpha equivalent, but only the first returns @z@.
+-- 'caseCon' should reduce this to @w@.
+caseConOneAltShadowed :: IO Term
+caseConOneAltShadowed =
+  runSingleTransformation def def (inScopeOf [w, z]) caseConR $
+    Case (App (Data mkU) (Var w)) intTy
+      [ (DataPat mkT [] [intId User "y" 6], Var z)
+      , (DataPat mkU [] [z'], Var z') ]
+ where
+  w = intId User "w" 7
+  z = intId User "z" 5
+  z' = intId User "z'" 5
+  -- @MkU :: Int -> T@, the second constructor of @T@
+  mkU = (mkDataCon "MkU" 1003 [] [] [intTy] tTy) { dcTag = 2 }
+
 tests :: TestTree
 tests =
   testGroup
@@ -195,4 +212,10 @@ tests =
     -- alternatives. https://github.com/clash-lang/clash-compiler/pull/1071
     , testCase "caseLet deshadows let-bindings (#1071)" $
         caseLetCapture >>= assertAlphaEq caseLetCaptureExpected
+
+    -- 'caseOneAlt' replaced a case-expression whose alternatives are all
+    -- equal by its first alternative, only checking whether the variables
+    -- bound by the first pattern occur in it
+    , testCase "caseOneAlt checks the pattern of every alternative" $
+        caseConOneAltShadowed >>= assertAlphaEq (Var (intId User "w" 7))
     ]
