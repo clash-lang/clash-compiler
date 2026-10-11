@@ -33,6 +33,7 @@ import GHC.TypeLits (KnownNat)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Term as C
 import qualified Clash.Sized.Internal.BitVector as BitVector
+import Clash.Sized.Internal.BitVector (Bit (..), BitVector (..))
 import Clash.Util (textNameLit)
 import Clash.XException (isX)
 
@@ -78,6 +79,13 @@ primitives =
            in  reduce (mkBitVectorLit' resTyInfo m i)
       _ -> Nothing
 
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.Bit) $ \case
+      PrimStepContext{..}
+        | Just (m,i) <- integerLiterals args
+        -> reduce (mkBitLit ty m i)
+      _ -> Nothing
+
+
 -- Initialization
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.size#) $ \case
       PrimStepContext{..}
@@ -85,21 +93,93 @@ primitives =
         -> reduce (mkIntCLit te IntLiteral kn ty)
       _ -> Nothing
 
+
+-- Construction
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.high) $ \case
+      PrimStepContext{..}
+        -> reduce (mkBitLit ty 0 1)
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.low) $ \case
+      PrimStepContext{..}
+        -> reduce (mkBitLit ty 0 0)
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.undefined##) $ \case
+      PrimStepContext{..}
+        -> reduce (mkBitLit ty 1 0)
+
+
 -- Eq
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.eq##) $ \case
       PrimStepContext{..} | [(0,i),(0,j)] <- bitLiterals args
         -> reduce (boolToBoolLiteral te ty (i == j))
       _ -> Nothing
 
-  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.eq#) $ \case
-      PrimStepContext{..}
-        | nTy : _ <- tys
-        , Right 0 <- runExcept (tyNatSize te sc nTy)
-        -> reduce (boolToBoolLiteral te ty True)
-        | Just (_, kn) <- extractKnownNat te sc tys
-        , Just val <- reifyNat kn (liftBitVector2Bool BitVector.eq# ty te args)
-        -> reduce val
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.neq##) $ \case
+      PrimStepContext{..} | [(0,i),(0,j)] <- bitLiterals args
+        -> reduce (boolToBoolLiteral te ty (i /= j))
       _ -> Nothing
+
+
+-- Ord
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.lt##) $ \case
+      PrimStepContext{..} | [(0,i),(0,j)] <- bitLiterals args
+        -> reduce (boolToBoolLiteral te ty (i <  j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.ge##) $ \case
+      PrimStepContext{..} | [(0,i),(0,j)] <- bitLiterals args
+        -> reduce (boolToBoolLiteral te ty (i >= j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.gt##) $ \case
+      PrimStepContext{..} | [(0,i),(0,j)] <- bitLiterals args
+        -> reduce (boolToBoolLiteral te ty (i >  j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.le##) $ \case
+      PrimStepContext{..} | [(0,i),(0,j)] <- bitLiterals args
+        -> reduce (boolToBoolLiteral te ty (i <= j))
+      _ -> Nothing
+
+
+-- Enum
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.toEnum##) $ \case
+      PrimStepContext{..}
+        | [i] <- intCLiterals' args
+        -> let Bit msk val = BitVector.toEnum## (fromInteger i)
+           in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      _ -> Nothing
+
+
+-- Bits
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.and##) $ \case
+      PrimStepContext{..}
+        | [i,j] <- bitLiterals args
+        -> let Bit msk val = BitVector.and## (toBit i) (toBit j)
+           in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.or##) $ \case
+      PrimStepContext{..}
+        | [i,j] <- bitLiterals args
+        -> let Bit msk val = BitVector.or## (toBit i) (toBit j)
+           in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.xor##) $ \case
+      PrimStepContext{..}
+        | [i,j] <- bitLiterals args
+        -> let Bit msk val = BitVector.xor## (toBit i) (toBit j)
+           in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.complement##) $ \case
+      PrimStepContext{..}
+        | [i] <- bitLiterals args
+        -> let Bit msk val = BitVector.complement## (toBit i)
+           in reduce (mkBitLit ty (toInteger msk) (toInteger val))
+      _ -> Nothing
+
 
 -- Pack
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.pack#) $ \case
@@ -108,6 +188,13 @@ primitives =
         -> let resTyInfo = extractTySizeInfo te sc ty tys
            in  reduce (mkBitVectorLit' resTyInfo msk i)
       _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.unpack#) $ \case
+      PrimStepContext{..}
+        | [(msk,i)] <- bitVectorLiterals' args
+        -> reduce (mkBitLit ty msk i)
+      _ -> Nothing
+
 
 -- Concatenation
   , primStepEntry $(textNameLit '(Clash.Sized.Internal.BitVector.++#)) $ \case
@@ -120,6 +207,7 @@ primitives =
            in reduce (mkBitVectorLit' resTyInfo msk val)
       _ -> Nothing
 
+
 -- Reduction
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.reduceAnd#) $ \case
       PrimStepContext{..} -- :: KnownNat n => BitVector n -> Bit
@@ -129,9 +217,24 @@ primitives =
                val = reifyNat kn (op (toBV i))
            in reduce (mkBitLit resTy 0 val)
         where
-          op :: KnownNat n => BitVector.BitVector n -> Proxy n -> Integer
+          op :: KnownNat n => BitVector n -> Proxy n -> Integer
           op u _ = toInteger (BitVector.reduceAnd# u)
       _ -> Nothing
+
+
+
+-- Eq
+  -- eq#, neq# :: KnownNat n => BitVector n -> BitVector n -> Bool
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.eq#) $ \case
+      PrimStepContext{..}
+        | nTy : _ <- tys
+        , Right 0 <- runExcept (tyNatSize te sc nTy)
+        -> reduce (boolToBoolLiteral te ty True)
+        | Just (_, kn) <- extractKnownNat te sc tys
+        , Just val <- reifyNat kn (liftBitVector2Bool BitVector.eq# ty te args)
+        -> reduce val
+      _ -> Nothing
+
 
 -- Num
   , primStepEntry $(textNameLit '(Clash.Sized.Internal.BitVector.+#)) $ \case
