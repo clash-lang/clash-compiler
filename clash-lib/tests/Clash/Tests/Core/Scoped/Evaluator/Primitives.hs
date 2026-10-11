@@ -23,7 +23,6 @@ module Clash.Tests.Core.Scoped.Evaluator.Primitives (tests) where
 import Control.Exception (evaluate)
 import qualified Data.HashMap.Strict as HashMap
 import Data.IORef (newIORef, readIORef)
-import Data.Text (Text)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Maybe (isJust)
@@ -33,87 +32,24 @@ import qualified Clash.Core.Evaluator.Types as CE
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (NameSort (..), mkUnsafeSystemName)
 import qualified Clash.Core.Term as C
-import Clash.Core.TyCon (TyConName)
 import qualified Clash.Core.Type as C
 import Clash.Core.TysPrim
-  (intPrimTy, integerPrimTy, liftedTypeKind, typeNatKind, wordPrimTy)
+  ( integerPrimTy, intPrimTy, liftedTypeKind, wordPrimTy )
 import qualified Clash.Core.Util as C (mkVec)
 import qualified Clash.Core.Var as C
 import qualified Clash.Normalize.Primitives as NP
 
-import Clash.Core.Scoped.Convert (toClashTerm)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import Clash.Core.Scoped.Evaluator.Primitives.Util
-  (bConPrim, bvConPrim, intLiteral, integerToIntLiteral, liftLit2)
+  (bvConPrim, intLiteral, integerToIntLiteral, liftLit2)
 import Clash.Core.Scoped.Evaluator.Types (Env, PrimReduction)
-import Clash.Core.Scoped.Syntax (S (VoidS), Term)
 
 import Test.Clash.Rewrite
   ( addTy, assertAlphaEq, consDc, ghcBoolTy, ghcTrueDataCon, heapLookupEvaluator
   , intId, mkTyConName, nilDc, numTy, pairDataCon, pairTy, rtreeTy, tcApp, testTyConMap, vecTy )
 import Test.Clash.Scoped (testTypeEnv)
 import Test.Clash.Scoped.Evaluator
-
--- | The ported reductions, and nothing for the other primitives
-eval :: C.Term -> C.Term
-eval = scopedWhnf (portedEnv testTypeEnv heapLookupEvaluator) mempty False
-
--- | 'eval', as the subject of a case-expression
-evalSubj :: C.Term -> C.Term
-evalSubj = scopedWhnf (portedEnv testTypeEnv heapLookupEvaluator) mempty True
-
--- | The body of the bindings the evaluator allocated
-allocatedBody :: C.Term -> C.Term
-allocatedBody = \case
-  C.Letrec _ e -> e
-  e -> e
-
--- | A primitive with the given name and type
-prim :: Text -> C.Type -> C.Term
-prim nm ty = C.Prim (C.PrimInfo nm ty C.WorkNever C.SingleResult C.NoUnfolding)
-
--- | A closed scoped primitive, as Clash Core
-closedPrimTerm :: Term 'VoidS -> C.Term
-closedPrimTerm = toClashTerm
-
-intLit, natLit, integerLit :: Integer -> C.Term
-intLit = C.Literal . IntLiteral
-natLit = C.Literal . NaturalLiteral
-integerLit = C.Literal . IntegerLiteral
-
-binTy :: C.Type -> C.Type -> C.Type
-binTy a r = C.mkFunTy a (C.mkFunTy a r)
-
--- * Sized types, with type constructors of their own
-
-bitTcNm, bvTcNm :: TyConName
-bitTcNm = mkTyConName "Clash.Sized.Internal.BitVector.Bit" 4000
-bvTcNm = mkTyConName "Clash.Sized.Internal.BitVector.BitVector" 4001
-
-bitTy :: C.Type
-bitTy = tcApp bitTcNm []
-
-bvTy :: C.Type -> C.Type
-bvTy n = tcApp bvTcNm [n]
-
-bit :: Integer -> Integer -> C.Term
-bit msk val =
-  C.mkApps (closedPrimTerm (bConPrim bitTcNm))
-    [Left (C.Literal (WordLiteral msk)), Left (integerLit val)]
-
-bv :: Integer -> Integer -> Integer -> C.Term
-bv n msk val =
-  C.mkApps (closedPrimTerm (bvConPrim bvTcNm))
-    [Right (numTy n), Left (natLit n), Left (natLit msk), Left (integerLit val)]
-
-tvN, tvM, tvA :: C.TyVar
-tvN = C.mkTyVar typeNatKind (mkUnsafeSystemName "n" 9001)
-tvM = C.mkTyVar typeNatKind (mkUnsafeSystemName "m" 9002)
-tvA = C.mkTyVar liftedTypeKind (mkUnsafeSystemName "a" 9003)
-
--- | A @KnownNat@ dictionary type; the reductions only look at its value
-knownNatTy :: C.Type -> C.Type
-knownNatTy n = tcApp (mkTyConName "GHC.TypeNats.KnownNat" 4002) [n]
+import Test.Clash.Scoped.Evaluator.Primitives
 
 portedTests :: [TestTree]
 portedTests =
