@@ -47,20 +47,40 @@ module Current
   , zeroWidthSpec
     -- * Cast
   , argCastSpec
+    -- * Cast
+  , caseCast
+  , elimCastCast
+  , letCast
+  , splitCastWork
+    -- * EtaExpand
+  , etaExpandSyn
+  , etaExpansionTL
+    -- * MultiPrim
+  , setupMultiResultPrim
+    -- * SeparateArgs
+  , separateArguments
+    -- * XOptimize
+  , xOptimize
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
 import qualified Clash.Normalize.Transformations.Case as Case
 import qualified Clash.Normalize.Transformations.Cast as Cast
 import qualified Clash.Normalize.Transformations.DEC as DEC
+import Clash.Normalize.Transformations.EtaExpand (etaExpansionTL)
+import qualified Clash.Normalize.Transformations.EtaExpand as EtaExpand
 import qualified Clash.Normalize.Transformations.Inline as Inline
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
+import qualified Clash.Normalize.Transformations.MultiPrim as MultiPrim
 import qualified Clash.Normalize.Transformations.Reduce as Reduce
+import qualified Clash.Normalize.Transformations.SeparateArgs as SeparateArgs
 import qualified Clash.Normalize.Transformations.Specialize as Specialize
+import qualified Clash.Normalize.Transformations.XOptimize as XOptimize
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, anyConstructor, onApp, onAppNode, onCase, onLam, onLet, onLetNode
-  , onPrimNode, onTickNode, onTyApp, onTyAppNode, onVarNode, toTransformation )
+  ( Transformation, anyConstructor, onApp, onAppNode, onCase, onCast, onLam, onLet
+  , onLetNode, onPrim, onPrimNode, onTickNode, onTyApp, onTyAppNode, onVarNode
+  , toTransformation )
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.deadCode' replaced
@@ -239,3 +259,44 @@ zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'Specialize.zeroWidthSpe
 -- 'Clash.Normalize.Scoped.Transformations.Cast.argCastSpec' replaced
 argCastSpec :: Transformation
 argCastSpec = toTransformation "argCastSpec" (onApp 'Cast.argCastSpecWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Cast.caseCast'
+caseCast :: Transformation
+caseCast = toTransformation "caseCast" (onCast 'Cast.caseCastWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Cast.elimCastCast'
+elimCastCast :: Transformation
+elimCastCast = toTransformation "elimCastCast" (onCast 'Cast.elimCastCastWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Cast.letCast'
+letCast :: Transformation
+letCast = toTransformation "letCast" (onCast 'Cast.letCastWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Cast.splitCastWork'
+splitCastWork :: Transformation
+splitCastWork = toTransformation "splitCastWork" (onLet 'Cast.splitCastWorkWorker)
+
+-- | The current 'Clash.Normalize.Transformations.EtaExpand.etaExpandSyn'
+etaExpandSyn :: Transformation
+etaExpandSyn =
+  toTransformation "etaExpandSyn"
+    (onVarNode 'EtaExpand.etaExpandSynWorker <> onAppNode 'EtaExpand.etaExpandSynWorker
+      <> onTyAppNode 'EtaExpand.etaExpandSynWorker <> onTickNode 'EtaExpand.etaExpandSynWorker)
+
+-- | The current 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
+setupMultiResultPrim :: Transformation
+setupMultiResultPrim =
+  toTransformation "setupMultiResultPrim" (onPrim 'MultiPrim.setupMultiResultPrimWorker)
+
+-- | The current 'Clash.Normalize.Transformations.SeparateArgs.separateArguments'
+separateArguments :: Transformation
+separateArguments = toTransformation "separateArguments"
+  (  onLam 'SeparateArgs.separateArgumentsLambdaWorker
+  <> onVarNode 'SeparateArgs.separateArgumentsSpineWorker
+  <> onAppNode 'SeparateArgs.separateArgumentsSpineWorker
+  <> onTyAppNode 'SeparateArgs.separateArgumentsSpineWorker
+  <> onTickNode 'SeparateArgs.separateArgumentsSpineWorker)
+
+-- | The current 'Clash.Normalize.Transformations.XOptimize.xOptimize'
+xOptimize :: Transformation
+xOptimize = toTransformation "xOptimize" (onCase 'XOptimize.xOptimizeWorker)

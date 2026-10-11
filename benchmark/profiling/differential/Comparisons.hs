@@ -20,10 +20,14 @@ import qualified Clash.Normalize.Scoped.Transformations.ANF as S
 import qualified Clash.Normalize.Scoped.Transformations.Case as SC
 import qualified Clash.Normalize.Scoped.Transformations.Cast as S
 import qualified Clash.Normalize.Scoped.Transformations.DEC as S
+import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as S
 import qualified Clash.Normalize.Scoped.Transformations.Inline as SI
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
+import qualified Clash.Normalize.Scoped.Transformations.MultiPrim as S
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as SReduce
+import qualified Clash.Normalize.Scoped.Transformations.SeparateArgs as S
 import qualified Clash.Normalize.Scoped.Transformations.Specialize as S
+import qualified Clash.Normalize.Scoped.Transformations.XOptimize as S
 import Clash.Normalize.Transformations.ANF (makeANF)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 
@@ -399,6 +403,85 @@ siteComparisons =
       , scCurrent = $(asRewriteQ Current.argCastSpec)
       , scScoped = Just $(asScopedRewriteQ S.argCastSpec)
       , scKnownDifferences = []
+      }
+    -- Clash.Normalize.Transformations.Cast
+  , SiteComparison
+      { scName = "caseCast"
+      , scDescription = "The current caseCast against its port"
+      , scTransformations = ["caseCast"]
+      , scCurrent = $(asRewriteQ Current.caseCast)
+      , scScoped = Just $(asScopedRewriteQ S.caseCast)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "elimCastCast"
+      , scDescription = "The current elimCastCast against its port"
+      , scTransformations = ["elimCastCast"]
+      , scCurrent = $(asRewriteQ Current.elimCastCast)
+      , scScoped = Just $(asScopedRewriteQ S.elimCastCast)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "letCast"
+      , scDescription = "The current letCast against its port"
+      , scTransformations = ["letCast"]
+      , scCurrent = $(asRewriteQ Current.letCast)
+      , scScoped = Just $(asScopedRewriteQ S.letCast)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "splitCastWork"
+      , scDescription = "The current splitCastWork against its port"
+      , scTransformations = ["splitCastWork"]
+      , scCurrent = $(asRewriteQ Current.splitCastWork)
+      , scScoped = Just $(asScopedRewriteQ S.splitCastWork)
+      , scKnownDifferences = []
+      }
+  -- Clash.Normalize.Transformations.EtaExpand
+  , SiteComparison
+      { scName = "etaExpandSyn"
+      , scDescription = "The current etaExpandSyn against its port"
+      , scTransformations = ["etaExpandSyn"]
+      , scCurrent = $(asRewriteQ Current.etaExpandSyn)
+      , scScoped = Just $(asScopedRewriteQ S.etaExpandSyn)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "etaTL"
+      , scDescription =
+          "The current etaExpansionTL (Clash.Normalize.Transformations.EtaExpand) \
+          \against its port (Clash.Normalize.Scoped.Transformations.EtaExpand)"
+      , scTransformations = ["etaTL"]
+      , scCurrent = Current.etaExpansionTL
+      , scScoped = Just (ScopedTransform S.etaExpansionTL)
+      , scKnownDifferences = []
+      }
+  -- Clash.Normalize.Transformations.MultiPrim
+  , SiteComparison
+      { scName = "setupMultiResultPrim"
+      , scDescription = "The current setupMultiResultPrim against its port"
+      , scTransformations = ["setupMultiResultPrim"]
+      , scCurrent = $(asRewriteQ Current.setupMultiResultPrim)
+      , scScoped = Just $(asScopedRewriteQ S.setupMultiResultPrim)
+      , scKnownDifferences = [letrecOrder]
+      }
+  -- Clash.Normalize.Transformations.SeparateArgs
+  , SiteComparison
+      { scName = "separateArguments"
+      , scDescription = "The current separateArguments against its port"
+      , scTransformations = ["separateArguments"]
+      , scCurrent = $(asRewriteQ Current.separateArguments)
+      , scScoped = Just $(asScopedRewriteQ S.separateArguments)
+      , scKnownDifferences = [coercionForm]
+      }
+  -- Clash.Normalize.Transformations.XOptimize
+  , SiteComparison
+      { scName = "xOptimize"
+      , scDescription = "The current xOptimize against its port"
+      , scTransformations = ["xOptimize"]
+      , scCurrent = $(asRewriteQ Current.xOptimize)
+      , scScoped = Just $(asScopedRewriteQ S.xOptimize)
+      , scKnownDifferences = [primTypeForm]
       }
   ]
 
