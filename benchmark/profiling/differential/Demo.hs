@@ -37,8 +37,9 @@ import Clash.Rewrite.Util (changed)
 import Clash.Core.Scoped.Alpha (commonAltBody)
 import Clash.Core.Scoped.Subst (unsinkAlt)
 import Clash.Core.Scoped.Syntax
+import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 
-import Test.Clash.Differential (KnownDifference (..), ScopedRewrite, everywhereTm)
+import Test.Clash.Differential (KnownDifference (..), everywhereTm)
 
 -- | 'caseOneAlt' as a transformation of its own. The normalizer only runs it
 -- as part of 'Clash.Normalize.Transformations.Case.caseCon'.
@@ -54,7 +55,7 @@ caseOneAltWorker _ node _ _ _ = caseOneAlt node
 -- alternatives are all the same, is that alternative, if it doesn't mention
 -- the variables its pattern binds
 caseOneAltS :: ScopedRewrite extra
-caseOneAltS _ = \case
+caseOneAltS = ScopedTransform $ \_ -> \case
   e@(Case _ _ [Alt p a]) -> maybe (pure e) changed (unsinkAlt p a)
   e@(Case _ _ alts@(_:_:_)) -> maybe (pure e) changed (commonAltBody alts)
   e -> pure e
@@ -63,12 +64,12 @@ caseOneAltS _ = \case
 -- alternatives, it keeps the first one that doesn't mention the variables its
 -- pattern binds, without checking that the others are the same
 caseOneAltBrokenS :: ScopedRewrite extra
-caseOneAltBrokenS sc = \case
+caseOneAltBrokenS = ScopedTransform $ \ctx -> \case
   e@(Case _ _ alts@(_:_:_)) ->
     case mapMaybe (\(Alt p a) -> unsinkAlt p a) alts of
       a : _ -> changed a
       [] -> pure e
-  e -> caseOneAltS sc e
+  e -> runScopedTransform caseOneAltS ctx e
 
 -- | Remove all ticks
 dropTicks :: Term n -> Term n

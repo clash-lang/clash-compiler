@@ -29,6 +29,7 @@ import Clash.Rewrite.Util (changed)
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax
+import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 
 import Test.Clash.Differential
 import Test.Clash.Rewrite
@@ -187,7 +188,7 @@ tests = testGroup "Clash.Tests.Differential"
     e -> pure e
 
   decrS :: ScopedRewrite extra
-  decrS _ = \case
+  decrS = ScopedTransform $ \_ -> \case
     Literal (IntLiteral n) | n > 0 -> changed (Literal (IntLiteral (n - 1)))
     e -> pure e
 
