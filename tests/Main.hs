@@ -654,6 +654,7 @@ runClashTest t3105Env = defaultMain
         -- the GHC API
         , clashLibTest "GlobalLocalHeapLookup" def{hdlTargets=[Verilog], ghcFlags=["-package", "ghc"]}
         , runTest "SplitAtFoldFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
+        , clashLibTest "LetAllocationFreshness" def{hdlTargets=[Verilog]}
         ]
       , clashTestGroup "Feedback"
         [ runTest "Fib" def

@@ -483,7 +483,7 @@ allocate xes e m =
  where
   xNms      = fmap fst xes
   is1       = extendInScopeSetList (mScopeNames m) xNms
-  (ids', s) = mapAccumL (letSubst (mHeapLocal m)) (mSupply m) xNms
+  (ids', s) = mapAccumL (letSubst (mHeapLocal m) is1) (mSupply m) xNms
   (nms, s') = unzip s
   isN       = extendInScopeSetList is1 nms
   subst     = extendIdSubstList subst0 s'
@@ -491,19 +491,23 @@ allocate xes e m =
   xes'      = zip nms (fmap (substTm "Evaluator.allocate0" subst . snd) xes)
   e'        = substTm "Evaluator.allocate1" subst e
 
--- | Create a unique name and substitution for a let-binder
+-- | Create a unique name and substitution for a let-binder. The name is fresh
+-- with respect to both the heap and the variables in scope: not every unique
+-- in scope comes from the unique supply.
 letSubst
   :: PureHeap
+  -> InScopeSet
   -> Supply
   -> Id
   -> (Supply, (Id, (Id, Term)))
-letSubst h acc id0 =
-  let (acc',id1) = mkUniqueHeapId h acc id0
+letSubst h is acc id0 =
+  let (acc',id1) = mkUniqueHeapId acc id0
   in  (acc',(id1,(id0,Var id1)))
  where
-  mkUniqueHeapId :: PureHeap -> Supply -> Id -> (Supply, Id)
-  mkUniqueHeapId h' ids x =
-    maybe (ids', x') (const $ mkUniqueHeapId h' ids' x) (lookupVarEnv x' h')
+  mkUniqueHeapId :: Supply -> Id -> (Supply, Id)
+  mkUniqueHeapId ids x
+    | x' `elemVarEnv` h || x' `elemInScopeSet` is = mkUniqueHeapId ids' x
+    | otherwise = (ids', x')
    where
     (i,ids') = freshId ids
     x'       = modifyVarName (`setUnique` i) x
