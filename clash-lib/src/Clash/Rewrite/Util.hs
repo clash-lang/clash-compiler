@@ -919,7 +919,23 @@ whnfRW
   -> Term
   -> Rewrite extra
   -> RewriteMonad extra Term
-whnfRW isSubj ctx@(TransformContext is0 hist) e rw = do
+whnfRW isSubj ctx e rw = do
+  tcm <- Lens.view tcCache
+  (heap, v) <- whnfHeap isSubj ctx e
+  bindPureHeap tcm heap rw ctx v
+{-# SCC whnfRW #-}
+
+-- | Evaluate an expression to weak-head normal form (WHNF), using the
+-- let-bindings of its context. Gives the bindings the evaluator allocated, and
+-- the expression in WHNF, which may refer to them.
+whnfHeap
+  :: Bool
+  -- ^ Whether the expression we're reducing to WHNF is the subject of a
+  -- case expression.
+  -> TransformContext
+  -> Term
+  -> RewriteMonad extra (PureHeap, Term)
+whnfHeap isSubj (TransformContext is0 hist) e = do
   tcm <- Lens.view tcCache
   bndrs <- Lens.use bindings
   eval <- Lens.view evaluator
@@ -932,7 +948,7 @@ whnfRW isSubj ctx@(TransformContext is0 hist) e rw = do
   case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
-      bindPureHeap tcm (ph `differenceVarEnv` lh) rw ctx v
+      pure (ph `differenceVarEnv` lh, v)
  where
   -- The let-bindings of the context, walking it from the term outwards.
   -- 'bound' holds the variables bound between the term and the current point
@@ -972,8 +988,7 @@ whnfRW isSubj ctx@(TransformContext is0 hist) e rw = do
 
   bindVars :: [Var a] -> [[Var Any]] -> [[Var Any]]
   bindVars vs bound = coerce vs : bound
-
-{-# SCC whnfRW #-}
+{-# SCC whnfHeap #-}
 
 -- | Binds variables on the PureHeap over the result of the rewrite
 --
@@ -985,7 +1000,39 @@ bindPureHeap
   -> Rewrite extra
 bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
   (e1, Monoid.getAny -> hasChanged) <- Writer.listen $ rw ctx e
-  if hasChanged && not (null bndrs) then do
+  if hasChanged && not (null bndrs) then
+    cleanupHeapBindings ctx0 bndrs e1
+  else
+    return e1
+  where
+    heapIds = map fst bndrs
+    is1 = extendInScopeSetList is0 heapIds
+    ctx = TransformContext is1 (LetBody bndrs : hist)
+
+    bndrs = heapLetBindings tcm heap
+
+-- | The bindings of a 'PureHeap', as let-bindings
+heapLetBindings :: TyConMap -> PureHeap -> [LetBinding]
+heapLetBindings tcm heap = map toLetBinding $ UniqMap.toList heap
+ where
+  toLetBinding :: (Unique,Term) -> LetBinding
+  toLetBinding (uniq,term) = (nm, term)
+    where
+      ty = inferCoreTypeOf tcm term
+      nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
+
+-- | Bind the bindings the evaluator allocated over the result of a rewrite of
+-- the evaluated expression (see 'bindPureHeap'), inlining the work-free ones
+-- and removing the unused ones.
+cleanupHeapBindings
+  :: TransformContext
+  -- ^ The context of the evaluated expression
+  -> [LetBinding]
+  -- ^ The bindings the evaluator allocated
+  -> Term
+  -- ^ The result of the rewrite, which may refer to the bindings
+  -> RewriteMonad extra Term
+cleanupHeapBindings ctx0 bndrs e1 = do
     -- The evaluator results are post-processed with two operations:
     --
     --   1. Inline work free binders. We've seen cases in the wild† where the
@@ -1016,21 +1063,7 @@ bindPureHeap tcm heap rw ctx0@(TransformContext is0 hist) e = do
         pure (fromMaybe e2 (removeUnusedBinders bnders1 e3))
       e2 ->
         pure e2
-  else
-    return e1
   where
-    heapIds = map fst bndrs
-    is1 = extendInScopeSetList is0 heapIds
-    ctx = TransformContext is1 (LetBody bndrs : hist)
-
-    bndrs = map toLetBinding $ UniqMap.toList heap
-
-    toLetBinding :: (Unique,Term) -> LetBinding
-    toLetBinding (uniq,term) = (nm, term)
-      where
-        ty = inferCoreTypeOf tcm term
-        nm = mkLocalId ty (mkUnsafeSystemName "x" uniq) -- See [Note: Name re-creation]
-
     inlineTest bs _ (_, stripTicks -> e_) = isWorkFree workFreeBinders bs e_
 
 -- | Remove unused binders in given let-binding. Returns /Nothing/ if no unused
