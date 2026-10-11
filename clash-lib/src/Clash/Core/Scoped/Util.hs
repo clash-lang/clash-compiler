@@ -25,7 +25,9 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Scoped.Util
   ( -- * Let-bindings
@@ -35,25 +37,65 @@ module Clash.Core.Scoped.Util
   , inverseTopSortLetBindings
   , LetGroup (..)
   , regroupLetBindings
+    -- * Vectors and trees
+  , mkVec
+  , appendToVec
+  , extractElems
+  , mkRTree
+  , extractTElems
+    -- * Names
+  , systemName
+  , internalName
+    -- * Data constructors
+  , mkSelectorCase
+  , substArgTys
+    -- * Primitives
+  , primCo
+  , primUCo
+  , C.undefinedPrims
+  , C.undefinedXPrims
+    -- * Types
+  , SplitInfo (..)
+  , shouldSplit
+  , splitShouldSplit
   ) where
 
+import Control.Monad (join)
+import Control.Monad.Trans.Except (runExcept)
 import qualified Data.Graph as Graph
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntSet as IntSet
 import qualified Data.List as List
+import Data.Maybe (isJust)
 import qualified Data.Set as Set
+import Data.Text (Text)
+import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.DataCon (DataCon)
 import qualified Clash.Core.Name as C
+import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.TyCon as C
+import qualified Clash.Core.Type as C
+import qualified Clash.Core.Util as C
+import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Util (curLoc, indexNote)
 
+import Clash.Core.Scoped.DataCon (dataConInstArgTys, dataConInstExtTyVars)
+import Clash.Core.Scoped.EqSolver (dataConInstArgTysE)
 import Clash.Core.Scoped.FreeVars (freeTmVars, teleNameBinders)
+import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap
-  (NameBinders, appendNameBinders, emptyNameBinders, idBinderNameBinders, nameSetToList)
+  ( NameBinders, appendNameBinders, emptyNameBinders, idBinderNameBinders
+  , nameSetToList )
+import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (splitTele)
+import Clash.Core.Scoped.Term (appendTele, mkApps, splitTele)
+import Clash.Core.Scoped.Type
+import Clash.Core.Scoped.TysPrim (typeNatKind)
 
 -- * Let-bindings
 
@@ -287,3 +329,456 @@ stableSccs deps = go initial readyInit
     let n = counts IntMap.! d - 1
         counts' = IntMap.insert d n counts
     in if n == 0 then (counts', Set.insert (key d) ready) else (counts', ready)
+
+-- * Vectors and trees
+
+-- | A natural number as a type
+numTy :: Integer -> Type n
+numTy = LitTy . C.NumTy
+
+-- | The first field type of a data constructor instantiated at the given
+-- types: the type of its coercion, for the constructors of @Vec@ and @RTree@
+coercionTy :: (HasCallStack, Distinct n) => Scope n -> DataCon -> [Type n] -> Type n
+coercionTy sc dc tys = case dataConInstArgTys sc dc tys of
+  Just (ty:_) -> ty
+  _ -> error ("coercionTy: can't instantiate " <> show dc)
+
+-- | Create a vector of the given elements, see 'C.mkVec'
+mkVec
+  :: (HasCallStack, Distinct n)
+  => Scope n
+  -> DataCon
+  -- ^ The @Nil@ constructor
+  -> DataCon
+  -- ^ The @Cons@ constructor
+  -> Type n
+  -- ^ Element type
+  -> Integer
+  -- ^ Length of the vector
+  -> [Term n]
+  -- ^ Elements
+  -> Term n
+mkVec sc nilCon consCon resTy n0 xs0 = appendVec sc consCon resTy nil n0 xs0
+ where
+  nil = mkApps (Data nilCon)
+    [ Right (numTy 0)
+    , Right resTy
+    , Left (primCo (coercionTy sc nilCon [numTy 0, resTy])) ]
+
+-- | Prepend the given elements to a vector, see 'C.appendToVec'
+appendToVec
+  :: (HasCallStack, Distinct n)
+  => Scope n
+  -> DataCon
+  -- ^ The @Cons@ constructor
+  -> Type n
+  -- ^ Element type
+  -> Term n
+  -- ^ The vector
+  -> Integer
+  -- ^ Length of the result
+  -> [Term n]
+  -- ^ Elements
+  -> Term n
+appendToVec = appendVec
+
+appendVec
+  :: (HasCallStack, Distinct n)
+  => Scope n -> DataCon -> Type n -> Term n -> Integer -> [Term n] -> Term n
+appendVec sc consCon resTy vec = go
+ where
+  go _ [] = vec
+  go n (x:xs) = mkApps (Data consCon)
+    [ Right (numTy n)
+    , Right resTy
+    , Right (numTy (n - 1))
+    , Left (primCo (coercionTy sc consCon [numTy n, resTy, numTy (n - 1)]))
+    , Left x
+    , Left (go (n - 1) xs) ]
+
+-- | A case-expression that selects a field of the given constructor of
+-- @Vec@ or @RTree@, instantiated at the given types. Its existentially
+-- quantified type variable, if any, is bound with the given kind, but the
+-- field types are those of the instantiation.
+selectField
+  :: (HasCallStack, Distinct n)
+  => Scope n
+  -> DataCon
+  -> [Type n]
+  -- ^ Types for the universally and existentially quantified variables
+  -> Int
+  -- ^ Number of existentially quantified variables
+  -> [Text]
+  -- ^ Names of the fields
+  -> Term n
+  -- ^ Subject
+  -> Int
+  -- ^ Field to select
+  -> Term n
+selectField sc dc tys nExts fieldNms subj fieldI = case dataConInstArgTys sc dc tys of
+  Nothing -> error ("selectField: can't instantiate " <> show dc)
+  Just argTys -> bindExts sc nExts $ \sc1 exts ->
+    withFreshIdBinders sc1 (zip (map systemName fieldNms) (sink1 argTys)) $ \_ fields vars ->
+      Case subj (indexNote "selectField" argTys fieldI)
+        [Alt (DataPat dc exts fields) (indexNote "selectField" vars fieldI)]
+ where
+  bindExts
+    :: Distinct x
+    => Scope x -> Int -> (forall l. DExt x l => Scope l -> Tele TyBinder x l -> r) -> r
+  bindExts scx 0 cont = cont scx TNil
+  bindExts scx k cont =
+    withFreshTyBinder scx (systemName "m") typeNatKind $ \scx1 b ->
+      bindExts scx1 (k - 1) $ \scx2 bs -> cont scx2 (TCons b bs)
+
+-- | A human readable name of sort 'C.System', for a fresh binder: its unique
+-- is not used, see e.g. 'withFreshIdBinder'
+systemName :: Text -> C.Name a
+systemName nm = C.mkUnsafeSystemName nm 0
+
+-- | A human readable name of sort 'C.Internal', for a fresh binder, like
+-- those of 'C.mkInternalVar'. Its unique is not used, see e.g.
+-- 'withFreshIdBinder'.
+internalName :: Text -> C.Name a
+internalName nm = C.mkUnsafeInternalName nm 0
+
+-- | Create let-bindings with case-expressions that select the first elements
+-- of a vector, see 'C.extractElems'. For the @i@-th element, it binds
+-- @el<c><i>@ to the element, and @rest<c><i>@ to the vector after it, except
+-- for the last element. Gives:
+--
+-- * the binders,
+-- * their right-hand sides, in the scope of the binders, so that they form a
+--   recursive let-binding,
+-- * the variables of the elements, and
+-- * a case-expression that selects the vector after the last element.
+--
+-- Note that 'C.extractElems' binds the vector after the last element as well,
+-- and always extracts all elements.
+extractElems
+  :: forall n r
+   . (HasCallStack, Distinct n)
+  => Scope n
+  -> DataCon
+  -- ^ The @Cons@ constructor
+  -> Type n
+  -- ^ Element type
+  -> Char
+  -- ^ Appended to the names of the binders
+  -> Integer
+  -- ^ Length of the vector
+  -> Integer
+  -- ^ Number of elements to extract, at least 1 and at most the length
+  -> Term n
+  -- ^ The vector
+  -> (forall l. DExt n l => Scope l -> Tele IdBinder n l -> [Term l] -> [Term l] -> Term l -> r)
+  -> r
+extractElems sc0 consCon resTy0 s maxN count vec0 cont
+  | count < 1 || count > maxN =
+      error ("extractElems: can't extract " <> show count <> " elements of a vector of "
+        <> show maxN)
+  | otherwise = go sc0 resTy0 0 vec0 cont
+ where
+  go
+    :: Distinct x
+    => Scope x -> Type x -> Integer -> Term x
+    -> (forall l. DExt x l => Scope l -> Tele IdBinder x l -> [Term l] -> [Term l] -> Term l -> r)
+    -> r
+  go sc resTy i vec k =
+    withFreshIdBinder sc (elName i) resTy $ \sc1 elB ->
+      if i == count - 1 then
+        k sc1 (TCons elB TNil) [sink elRhs] [idBinderVar elB] (sink restRhs)
+      else
+        withFreshIdBinder sc1 (restName i) (sink restTy) $ \sc2 restB ->
+          go sc2 (sink resTy) (i + 1) (idBinderVar restB) $ \sc3 bs rhss vars tl ->
+            k sc3
+              (TCons elB (TCons restB bs))
+              (sink elRhs : sink restRhs : rhss)
+              (sink (idBinderVar elB) : vars)
+              tl
+   where
+    n = maxN - i
+    tys = [numTy n, resTy, numTy (n - 1)]
+    restTy = case dataConInstArgTys sc consCon tys of
+      Just [_, _, ty] -> ty
+      _ -> error "extractElems: can't instantiate Cons"
+    sel = selectField sc consCon tys 1 ["_co_", "el", "rest"] vec
+    elRhs = sel 1
+    restRhs = sel 2
+
+  suffix i = Text.cons s (Text.pack (show i))
+  elName i = systemName ("el" <> suffix i)
+  restName i = systemName ("rest" <> suffix i)
+
+-- | Create a tree of the given elements, see 'C.mkRTree'
+mkRTree
+  :: (HasCallStack, Distinct n)
+  => Scope n
+  -> DataCon
+  -- ^ The @LR@ constructor
+  -> DataCon
+  -- ^ The @BR@ constructor
+  -> Type n
+  -- ^ Element type
+  -> Integer
+  -- ^ Depth of the tree
+  -> [Term n]
+  -- ^ Elements
+  -> Term n
+mkRTree sc lrCon brCon resTy = go
+ where
+  go _ [x] = mkApps (Data lrCon)
+    [ Right (numTy 0)
+    , Right resTy
+    , Left (primCo (coercionTy sc lrCon [numTy 0, resTy]))
+    , Left x ]
+  go n xs =
+    let (xsL, xsR) = splitAt (length xs `div` 2) xs
+    in mkApps (Data brCon)
+         [ Right (numTy n)
+         , Right resTy
+         , Right (numTy (n - 1))
+         , Left (primCo (coercionTy sc brCon [numTy n, resTy, numTy (n - 1)]))
+         , Left (go (n - 1) xsL)
+         , Left (go (n - 1) xsR) ]
+
+-- | Create let-bindings with case-expressions that select the elements of a
+-- tree, see 'C.extractTElems'. Gives the binders, their right-hand sides in
+-- the scope of the binders (so that they form a recursive let-binding), and
+-- the variables of the elements.
+extractTElems
+  :: forall n r
+   . (HasCallStack, Distinct n)
+  => Scope n
+  -> DataCon
+  -- ^ The @LR@ constructor
+  -> DataCon
+  -- ^ The @BR@ constructor
+  -> Type n
+  -- ^ Element type
+  -> Char
+  -- ^ Appended to the names of the binders
+  -> Integer
+  -- ^ Depth of the tree
+  -> Term n
+  -- ^ The tree
+  -> (forall l. DExt n l => Scope l -> Tele IdBinder n l -> [Term l] -> [Term l] -> r)
+  -> r
+extractTElems sc0 lrCon brCon resTy0 s maxN tree0 =
+  go sc0 resTy0 maxN [0 .. (2 ^ (maxN + 1)) - 2] [0 .. (2 ^ maxN) - 1] tree0
+ where
+  go
+    :: Distinct x
+    => Scope x -> Type x -> Integer -> [Int] -> [Int] -> Term x
+    -> (forall l. DExt x l => Scope l -> Tele IdBinder x l -> [Term l] -> [Term l] -> r)
+    -> r
+  go sc resTy 0 _ ks tree k = case ks of
+    kIx:_ ->
+      withFreshIdBinder sc (systemName ("el" <> suffix kIx)) resTy $ \sc1 elB ->
+        k sc1 (TCons elB TNil)
+          [sink (selectField sc lrCon [numTy 0, resTy] 0 ["_co_", "el"] tree 1)]
+          [idBinderVar elB]
+    [] -> error "extractTElems: no name for an element"
+  go sc resTy n bs ks tree k = case splitAt (length bs `div` 2) bs of
+    (b0:bL, b1:bR) ->
+      let tys = [numTy n, resTy, numTy (n - 1)]
+          brTy = case dataConInstArgTys sc brCon tys of
+            Just [_, ty, _] -> ty
+            _ -> error "extractTElems: can't instantiate BR"
+          sel = selectField sc brCon tys 1 ["_co_", "lt", "rt"] tree
+          (kL, kR) = splitAt (length ks `div` 2) ks
+      in withFreshIdBinder sc (systemName ("lt" <> suffix b0)) brTy $ \sc1 ltB ->
+           withFreshIdBinder sc1 (systemName ("rt" <> suffix b1)) (sink brTy) $ \sc2 rtB ->
+             go sc2 (sink resTy) (n - 1) bL kL (sink (idBinderVar ltB)) $ \sc3 lbs lrhss lvars ->
+               go sc3 (sink resTy) (n - 1) bR kR (sink (idBinderVar rtB)) $ \sc4 rbs rrhss rvars ->
+                 k sc4
+                   (TCons ltB (TCons rtB (appendTele lbs rbs)))
+                   (sink (sel 1) : sink (sel 2) : sink1 lrhss ++ rrhss)
+                   (sink1 lvars ++ rvars)
+    _ -> error "extractTElems: no names for the subtrees"
+
+  suffix :: Int -> Text
+  suffix i = Text.cons s (Text.pack (show i))
+
+-- * Data constructors
+
+-- | The types of the fields of a data constructor, given types for its
+-- universally quantified type variables, see 'C.substArgTys'. 'Nothing' if
+-- there are more or fewer types than universally quantified type variables,
+-- or if a field type mentions an existentially quantified type variable,
+-- which 'C.substArgTys' leaves free.
+substArgTys :: (HasCallStack, Distinct n) => Scope n -> DataCon -> [Type n] -> Maybe [Type n]
+substArgTys sc dc tys = join $
+  dataConInstExtTyVars sc dc tys $ \_ exts argTys ->
+    traverse (unsinkType (teleNameBinders exts)) argTys
+
+-- | Make a case-expression that selects a field of a data constructor, see
+-- 'C.mkSelectorCase'. The binders of the pattern get fresh names. Errors if
+-- the type of the field mentions an existentially quantified type variable
+-- that the type equations among the field types don't solve.
+mkSelectorCase
+  :: (HasCallStack, Distinct n)
+  => String
+  -- ^ Name of the caller
+  -> Scope n
+  -> C.TyConMap
+  -> Term n
+  -- ^ Subject
+  -> Int
+  -- ^ The @n@-th data constructor, from 1
+  -> Int
+  -- ^ The @n@-th field, from 0
+  -> Term n
+mkSelectorCase caller sc tcm scrut dcI fieldI = go (inferCoreTypeOf tcm sc scrut)
+ where
+  go scrutTy
+    | Just ty' <- coreView1 tcm sc scrutTy = go ty'
+    | TyConApp tc args <- tyView scrutTy =
+        case C.tyConDataCons (UniqMap.find tc tcm) of
+          [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc) scrutTy
+          dcs
+            | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
+            | otherwise ->
+                let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI - 1)) dcs (dcI - 1)
+                    res = dataConInstArgTysE tcm sc dc args $ \sc1 exts fieldTys ->
+                      if fieldI >= length fieldTys then
+                        cantCreate $(curLoc) "Field index exceed max" scrutTy
+                      else
+                        case unsinkType (teleNameBinders exts) (fieldTys !! fieldI) of
+                          Nothing ->
+                            cantCreate $(curLoc) "Field type mentions an existential" scrutTy
+                          Just ty ->
+                            let nms = [ internalName (if i == fieldI then "sel" else "wild")
+                                      | i <- [0 .. length fieldTys - 1] ]
+                            in withFreshIdBinders sc1 (zip nms fieldTys) $ \_ fields vars ->
+                                 Case scrut ty [Alt (DataPat dc exts fields) (vars !! fieldI)]
+                in case res of
+                     Just e -> e
+                     Nothing -> cantCreate $(curLoc) "Cannot instantiate dataCon" scrutTy
+    | otherwise =
+        cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy
+
+  cantCreate :: String -> String -> Type n -> a
+  cantCreate loc info scrutTy = error $
+    loc ++ "Can't create selector " ++ show (caller, dcI, fieldI) ++ " for: ("
+      ++ showPpr scrut ++ " :: " ++ showPpr scrutTy ++ ")\nAdditional info: " ++ info
+
+-- * Primitives
+
+-- | A coercion of the given type. Unlike 'C.primCo', the type is a type
+-- argument of the primitive, as "Clash.GHC.GHC2Core" makes them: the type of
+-- a primitive is closed.
+primCo :: Type n -> Term n
+primCo = TyApp (Prim (C.PrimInfo "_CO_" C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
+
+-- | An unsafe coercion, see 'C.primUCo'
+primUCo :: Term n
+primUCo = case C.primUCo of
+  C.Prim p -> Prim p
+  _ -> error "primUCo: not a primitive"
+
+-- * Types
+
+-- | How to split values of a product type, see 'shouldSplit'
+data SplitInfo n = SplitInfo
+  { splitConstruct :: forall x. DExt n x => Scope x -> [Term x] -> Term x
+  -- ^ Creates a value of the product type out of values of the types of
+  -- 'splitArgTys'
+  , splitProject :: forall x. DExt n x => Scope x -> Term x -> [Term x]
+  -- ^ Given a value of the product type, creates projections of it for all
+  -- the types of 'splitArgTys'
+  , splitArgTys :: [Type n]
+  -- ^ The types of the fields of the product type
+  }
+
+-- | Whether to split values of a product type, i.e. one that contains
+-- clocks, resets, enables or file handles, see 'C.shouldSplit'. Only splits
+-- one level at a time.
+--
+-- Unlike 'C.shouldSplit', doesn't split product types of which the type of a
+-- field mentions an existentially quantified type variable, see
+-- 'substArgTys'.
+shouldSplit :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> Type n -> Maybe (SplitInfo n)
+shouldSplit tcm sc ty = case tyView ty of
+  -- Look through SimIO to find things like Files
+  TyConApp tcNm [tyArg] | C.nameOcc tcNm == "Clash.Explicit.SimIO.SimIO" -> shouldSplit tcm sc tyArg
+  _ -> shouldSplit0 tcm sc (tyView (coreView tcm sc ty))
+
+-- | Worker of 'shouldSplit', on a 'TypeView'
+shouldSplit0
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => C.TyConMap -> Scope n -> TypeView n -> Maybe (SplitInfo n)
+shouldSplit0 tcm sc = \case
+  TyConApp tcNm tyArgs
+    | Just tc <- UniqMap.lookup tcNm tcm
+    , [dc] <- C.tyConDataCons tc
+    , Just dcArgs <- substArgTys sc dc tyArgs
+    , let dcArgsLen = length dcArgs
+    , dcArgsLen > 1
+    -> if any (shouldSplitTy . tyView . coreView tcm sc) dcArgs && not (isHidden tcNm tyArgs) then
+         Just SplitInfo
+           { splitConstruct = \_ args ->
+               mkApps (Data dc) (map Right (sink1 tyArgs) ++ map Left args)
+           , splitProject = \scx subj ->
+               map (mkSelectorCase ($(curLoc) ++ "splitArg") scx tcm subj 1) [0 .. dcArgsLen - 1]
+           , splitArgTys = dcArgs
+           }
+       else
+         Nothing
+    | C.nameOcc tcNm == "Clash.Sized.Vector.Vec"
+    , [nTy, argTy] <- tyArgs
+    , Right n <- runExcept (tyNatSize tcm sc nTy)
+    , n > 1
+    , Just tc <- UniqMap.lookup tcNm tcm
+    , [nil, cons] <- C.tyConDataCons tc
+    -> if shouldSplitTy (tyView (coreView tcm sc argTy)) then
+         Just SplitInfo
+           { splitConstruct = \scx -> mkVec scx nil cons (sink argTy) n
+           , splitProject = \scx subj -> map (mkVecSelector scx subj) [0 .. n - 1]
+           , splitArgTys = replicate (fromInteger n) argTy
+           }
+       else
+         Nothing
+  _ -> Nothing
+ where
+  -- Project the n'th element out of a vector
+  mkVecSelector :: Distinct x => Scope x -> Term x -> Integer -> Term x
+  mkVecSelector scx subj 0 = mkSelectorCase ($(curLoc) ++ "mkVecSelector") scx tcm subj 2 1
+  mkVecSelector scx subj i =
+    mkVecSelector scx (mkSelectorCase ($(curLoc) ++ "mkVecSelector") scx tcm subj 2 2) (i - 1)
+
+  shouldSplitTy :: TypeView n -> Bool
+  shouldSplitTy ty = isJust (shouldSplit0 tcm sc ty) || splitTy ty
+
+  -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split,
+  -- see 'C.shouldSplit'
+  isHidden :: C.TyConName -> [Type n] -> Bool
+  isHidden nm [a1, a2]
+    | TyConApp a2Nm _ <- tyView a2 =
+        C.nameOcc nm `elem`
+          [ "GHC.Classes.(%,%)", "GHC.Internal.Classes.(%,%)"
+          , "GHC.Classes.CTuple2", "GHC.Internal.Classes.CTuple2" ]
+          && splitTy (tyView (stripIP a1))
+          && C.nameOcc a2Nm == "Clash.Signal.Internal.KnownDomain"
+  isHidden _ _ = False
+
+  splitTy :: TypeView n -> Bool
+  splitTy = \case
+    TyConApp tcNm0 _ -> C.nameOcc tcNm0 `elem`
+      [ "Clash.Signal.Internal.Clock"
+      , "Clash.Signal.Internal.ClockN"
+      , "Clash.Signal.Internal.Reset"
+      , "Clash.Signal.Internal.Enable"
+      , "Clash.Explicit.SimIO.File"
+      , "GHC.IO.Handle.Types.Handle"
+      , "GHC.Internal.IO.Handle.Types.Handle" ]
+    _ -> False
+
+-- | Split the types of the arguments of a function that 'shouldSplit' splits,
+-- recursively, see 'C.splitShouldSplit'
+splitShouldSplit :: (HasCallStack, Distinct n) => C.TyConMap -> Scope n -> [Type n] -> [Type n]
+splitShouldSplit tcm sc = foldr go []
+ where
+  go ty rest = case shouldSplit tcm sc ty of
+    Just info -> splitShouldSplit tcm sc (splitArgTys info) ++ rest
+    Nothing -> ty : rest

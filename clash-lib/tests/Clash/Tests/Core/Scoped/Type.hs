@@ -43,9 +43,9 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type
 
 import Test.Clash.Rewrite
-  ( addTy, boolTy, cmpNatTy, fTy, intTy, kTy, maxTy, maybeTy, mkFunTyCon
-  , mkTyConName, nTy, pTy, qTy, signalTy, testTyConMap, tyVar, unconsSymbolTy
-  , wTy )
+  ( addTy, boolTy, clkPairTy, clockTy, cmpNatTy, enableTy, fTy, intTy, kTy
+  , maxTy, maybeTy, mkFunTyCon, mkTyConName, nTy, pairTy, pTy, qTy, resetTy
+  , signalTy, testTyConMap, tyVar, unconsSymbolTy, vecTy, wTy )
 import Test.Clash.Scoped
 
 tcm :: C.TyConMap
@@ -95,6 +95,8 @@ corpus =
   , C.mkFunTy intTy (C.ForAllTy aTv (C.mkFunTy (C.VarTy aTv) wTy))
   , C.AnnType [] (nTy intTy), nTy (C.AnnType [] intTy)
   , lit 5, sym "s", C.liftedTypeKind
+  , pairTy, clockTy, resetTy, enableTy, clkPairTy, vecTy (lit 2) clockTy
+  , vecTy (lit 2) intTy
   ]
 
 -- | Assert that a function on scoped types agrees with a function on Clash
