@@ -53,6 +53,7 @@ module Test.Clash.Differential
   , recToNonRec
   , letrecOrder
   , coercionForm
+  , globalUniques
   , everywhereTm
   , everywhereScopedTm
     -- * Running transformations
@@ -90,11 +91,13 @@ import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
+import qualified Data.Hashable as Hashable
 
-import Clash.Core.Name (nameOcc)
+import Clash.Core.Name (nameOcc, nameUniq)
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
 import Clash.Core.Var (Id, varName)
+import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (emptyInScopeSet, emptyVarEnv, eltsVarEnv)
 import Clash.Driver.Types (Binding (..), BindingMap)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
@@ -230,6 +233,32 @@ recToNonRec = KnownDifference
       Just x' -> Let (NonRec b x') body
       Nothing -> e
     e -> e
+
+-- | Global variables are compared by their names rather than their uniques.
+--
+-- A port can create new globals at other points of the supply of uniques
+-- than the current code: e.g. 'Clash.Rewrite.Scoped.Globals.addGlobalBind'
+-- draws uniques for the binders of the body of a new global, so that the next
+-- new global gets another unique than in the current code. The bodies of new
+-- globals are not compared.
+globalUniques :: KnownDifference
+globalUniques = KnownDifference
+  { kdName = "global-uniques"
+  , kdDescription =
+      "global variables are compared by their names, as new globals can get \
+      \other uniques"
+  , kdNormalize = \_ -> everywhereTm go
+  }
+ where
+  go :: Term x -> Term x
+  go = \case
+    GlobalVar g -> GlobalVar (byName g)
+    e -> e
+
+  byName g =
+    let v = globalIdVar g
+        u = fromIntegral (Hashable.hash (nameOcc (varName v)))
+    in  mkGlobalId v {C.varUniq = u, C.varName = (varName v) {nameUniq = u}}
 
 -- | Apply a function at every node of a term, bottom-up: at a node, after
 -- applying it to the node's subterms. Binders are kept as they are. Doesn't
