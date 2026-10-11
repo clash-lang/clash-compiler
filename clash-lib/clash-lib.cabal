@@ -458,6 +458,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Transformations.Inline
                  Clash.Tests.Normalize.Transformations.Letrec
                  Clash.Tests.Normalize.Transformations.Specialize
+                 Clash.Tests.Normalize.Transformations.XOptimize
                  Clash.Tests.Normalize.Util
                  Clash.Tests.Rewrite.Combinators
                  Clash.Tests.Rewrite.StrategyDSL
