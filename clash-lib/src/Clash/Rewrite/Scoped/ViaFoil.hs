@@ -58,6 +58,7 @@
 module Clash.Rewrite.Scoped.ViaFoil
   ( viaFoil
   , whnfRWViaClash
+  , toClashTermFresh
     -- * Internals, exported for testing
   , rootVars
   ) where
@@ -349,6 +350,14 @@ toClashTickFresh is env = \case
   DeDup -> pure C.DeDup
   NoDeDup -> pure C.NoDeDup
   Attributes ty e -> C.Attributes <$> toClashTypeFresh is env ty <*> toClashFresh is env e
+
+-- | Convert a closed term to Clash Core, giving every binder a fresh unique
+-- from the unique supply, see the module header. E.g. for the body of a new
+-- global binding, whose binders would otherwise get the small uniques of their
+-- raw names.
+toClashTermFresh :: HasCallStack => Term 'VoidS -> RewriteMonad extra C.Term
+toClashTermFresh e =
+  withSupply (toClashFresh emptyInScopeSet (BackEnv IntMap.empty IntMap.empty) e)
 
 -- * whnfRW
 
