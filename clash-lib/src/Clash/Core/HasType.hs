@@ -114,7 +114,7 @@ instance InferType Type where
         liftedTypeKind
 
       TyConApp tc args ->
-        piResultTys tcm (tyConKind (UniqMap.find tc tcm)) args
+        piResultKinds tcm (tyConKind (UniqMap.find tc tcm)) args
 
       OtherType{} ->
         case ty of
@@ -128,7 +128,7 @@ instance InferType Type where
           AppTy a b -> go a [b]
            where
             go (AppTy c d) args = go c (d : args)
-            go c args = piResultTys tcm (inferCoreTypeOf tcm c) args
+            go c args = piResultKinds tcm (inferCoreTypeOf tcm c) args
 
 instance InferType Term where
   inferCoreTypeOf tcm = go
@@ -219,22 +219,45 @@ piResultTy m ty arg =
 -- more type args than foralls in 'undefined's type.
 --
 -- For efficiency reasons, when there are no foralls, we simply drop arrows from
--- a function type/kind.
+-- a function type, given the types of the arguments applied to it. With the
+-- @debug@ flag, these must match the argument types of the function type.
 piResultTys
   :: HasCallStack
   => TyConMap
   -> Type
   -> [Type]
   -> Type
-piResultTys _ ty [] = ty
-piResultTys m ty origArgs@(arg:args)
+piResultTys = piResultTysWith True
+
+-- | Like 'piResultTys', but applies a kind to types. The arrows of the kind
+-- are dropped without checking the kinds of the types against them.
+piResultKinds
+  :: HasCallStack
+  => TyConMap
+  -> Kind
+  -> [Type]
+  -> Kind
+piResultKinds = piResultTysWith False
+
+-- | See 'piResultTys' and 'piResultKinds'
+piResultTysWith
+  :: HasCallStack
+  => Bool
+  -- ^ Check (with the @debug@ flag) that the types dropping an arrow match its
+  -- argument type
+  -> TyConMap
+  -> Type
+  -> [Type]
+  -> Type
+piResultTysWith _ _ ty [] = ty
+piResultTysWith checkArgs m ty origArgs@(arg:args)
   | Just ty' <- coreView1 m ty
-  = piResultTys m ty' origArgs
+  = piResultTysWith checkArgs m ty' origArgs
   | FunTy a res <- tyView ty
   -- TODO coreView is used here because the partial evaluator will sometimes
   -- encounter / not encounter a Signal as an argument unexpectedly. When PR
   -- #1064 is merged the coreView calls should be removed again.
-  = if debugIsOn && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
+  = if debugIsOn && checkArgs && not (aeqType (coreView m a) (coreView m arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
@@ -244,7 +267,7 @@ piResultTys m ty origArgs@(arg:args)
         #{showPpr arg}
     |]
     else
-      piResultTys m res args
+      piResultTysWith checkArgs m res args
   | ForAllTy tv res <- ty
   = go (extendVarEnv tv arg emptyVarEnv) res args
   | otherwise
@@ -263,6 +286,6 @@ piResultTys m ty origArgs@(arg:args)
     | VarTy tv <- ty'
     , Just ty'' <- lookupVarEnv tv env
       -- Deals with (piResultTys  (forall a.a) [forall b.b, Int])
-    = piResultTys m ty'' allArgs
+    = piResultTysWith checkArgs m ty'' allArgs
     | otherwise
     = pprPanic "piResultTys2" (ppr ty' <> line <> ppr origArgs <> line <> ppr allArgs)

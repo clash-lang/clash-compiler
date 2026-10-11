@@ -18,17 +18,19 @@ import qualified Data.Map.Strict as Map
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Clash.Core.HasType (coreKindOf)
 import Clash.Core.Name (NameSort (Internal, User), noSrcSpan)
 import Clash.Core.Term (Bind (..), Pat (..), Term (..), collectArgs, mkApps)
-import Clash.Core.Type (mkFunTy)
+import Clash.Core.Type (Type (ForAllTy, VarTy), mkFunTy)
+import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (lookupVarEnv)
-import Clash.Driver.Types (Binding (..))
+import Clash.Driver.Types (Binding (..), ClashEnv (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVar)
 import Clash.Normalize.Transformations.Specialize (appProp, nonRepSpec, specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..), extra)
+import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..), extra)
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (newSupply)
 import qualified Clash.Core.Type as Type
@@ -37,9 +39,9 @@ import qualified Clash.Core.VarEnv as VarEnv
 import qualified Test.Clash.Rewrite as Rewrite
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
-  , intFunTy, intId, intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy
-  , parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
-  , showPprU )
+  , intFunTy, intId, intLit, intTy, localId, maybeTy, maybeTyConMap, mkBindingMap
+  , pairDataCon, pairTy, parseToTerm, parseToTermQQ, runRewriteTest
+  , runSingleTransformation, showPprU, tyVar )
 
 appPropR :: NormRewrite
 appPropR = $(asRewriteQ appProp)
@@ -525,6 +527,35 @@ kGlobalBody = Lam (intId User "p" 41) (Lam q (Var q))
  where
   q = intId User "q" 42
 
+-- | 'specialize' creates a binder for every argument before the one it
+-- specializes on, and infers the kind of a type argument with
+-- 'Clash.Core.HasType.inferCoreKindOf' to do so. With the @debug@ flag, that
+-- errored for applications of type constructors, such as @Maybe a@ in
+--
+-- > h @(Maybe a) f
+specializeTyConAppTypeArg :: Assertion
+specializeTyConAppTypeArg = do
+  supply <- newSupply
+  let st = def{_bindings = mkBindingMap [fBinding, (hId, hBody)], _uniqSupply = supply}
+  (res, st1, _) <-
+    runRewriteTest env st (runRewrite "specialize" (inScopeOf [a]) specialize tm)
+  case collectArgs res of
+    (Var hSpec, [Right ty]) | Just hSpecB <- lookupVarEnv hSpec (_bindings st1) -> do
+      assertAlphaEq (maybeTy (VarTy a)) ty
+      case bindingTerm hSpecB of
+        TyLam tv _ -> assertAlphaEq liftedTypeKind (coreKindOf tv)
+        body -> assertFailure ("Expected a type abstraction, but got:\n" <> showPprU body)
+    _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
+ where
+  a = tyVar User "a" 30
+  b = tyVar User "b" 31
+  k = localId User "k" 32 (intFunTy 1)
+  -- h :: forall b. (Int -> Int) -> Int
+  hId = globalId User "h" 33 (ForAllTy b (mkFunTy (intFunTy 1) intTy))
+  hBody = TyLam b (Lam k (App (Var k) (intLit 1)))
+  tm = App (TyApp (Var hId) (maybeTy (VarTy a))) (Var fId)
+  env = def{_clashEnv = (_clashEnv def){envTyConMap = maybeTyConMap}}
+
 tests :: TestTree
 tests =
   testGroup
@@ -570,4 +601,6 @@ tests =
     , testCase "nonRepSpec does not inline a global into a local argument head that shares its unique" $
         specializeOnLocalArgHead nonRepSpecR Internal kGlobalBody
           >>= maybe (assertFailure "No specialized function") (assertAlphaEq specializeOnLocalArgHeadExpected)
+    , testCase "specialize binds a type argument applying a type constructor"
+        specializeTyConAppTypeArg
     ]
