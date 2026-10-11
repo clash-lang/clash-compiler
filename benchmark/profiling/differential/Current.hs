@@ -21,12 +21,14 @@ module Current
   , disjointExpressionConsolidation
   , elimCaseBigNumInternals
   , elimExistentials
+  , nonRepANF
   ) where
 
+import qualified Clash.Normalize.Transformations.ANF as ANF
 import qualified Clash.Normalize.Transformations.Case as Case
 import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
-import Clash.Rewrite.StrategyDSL (Transformation, onCase, onLet, toTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onApp, onCase, onLet, toTransformation)
 
 -- | The current 'Clash.Normalize.Transformations.Letrec.deadCode', which
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.deadCode' replaced
@@ -79,3 +81,8 @@ elimExistentials =
 elimCaseBigNumInternals :: Transformation
 elimCaseBigNumInternals =
   toTransformation "elimCaseBigNum" (onCase 'Case.elimCaseBigNumInternalsWorker)
+
+-- | The current 'Clash.Normalize.Transformations.ANF.nonRepANF', which
+-- 'Clash.Normalize.Scoped.Transformations.ANF.nonRepANF' replaced
+nonRepANF :: Transformation
+nonRepANF = toTransformation "nonRepANF" (onApp 'ANF.nonRepANFWorker)

@@ -9,7 +9,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Tests.Normalize.Transformations.ANF (tests) where
+module Clash.Tests.Normalize.Transformations.ANF
+  ( tests
+  , anfTests
+  ) where
 
 import Data.Default (def)
 
@@ -17,12 +20,12 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon)
-import Clash.Core.Name (NameSort (User), noSrcSpan)
+import Clash.Core.Name (NameSort (User), nameOcc, noSrcSpan)
 import Clash.Core.Term
   ( Bind (..), IsMultiPrim (SingleResult), Pat (..), PrimInfo (..)
   , PrimUnfolding (NoUnfolding), Term (..), WorkInfo (WorkVariable), mkApps )
 import Clash.Core.Type (Type (VarTy), mkFunTy)
-import Clash.Core.Var (Id, Var (varUniq))
+import Clash.Core.Var (Id, Var (varName, varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Normalize.Transformations.ANF (makeANF, nonRepANF)
 import Clash.Normalize.Types (NormRewrite)
@@ -46,9 +49,9 @@ mkP = mkDataCon "MkP" 1001 [] [] [intTy, intFunTy 1] (parseTyConTy "P")
 
 -- | @MkP x (let x = u in \\y -> x)@, with the first @x@ free. 'nonRepANF'
 -- must not move the first argument under the let-binder @x@.
-nonRepANFCapture :: IO Term
-nonRepANFCapture =
-  runSingleTransformation def def (inScopeOf [u, x]) nonRepANFR $
+nonRepANFCapture :: NormRewrite -> IO Term
+nonRepANFCapture nonRepANFR' =
+  runSingleTransformation def def (inScopeOf [u, x]) nonRepANFR' $
     mkApps (Data mkP)
       [ Left (Var x)
       , Left (Let (NonRec x (Var u)) (Lam y (Var x))) ]
@@ -92,9 +95,9 @@ anfTerm bUniq =
   b = intId User "b" bUniq
 
 -- | Run 'makeANF' on a term, with the given unique supply
-runANF :: Supply -> Term -> IO Term
-runANF supply =
-  runSingleTransformation def def{_uniqSupply = supply} (inScopeOf [xId]) makeANF
+runANF :: NormRewrite -> Supply -> Term -> IO Term
+runANF anf supply =
+  runSingleTransformation def def{_uniqSupply = supply} (inScopeOf [xId]) anf
 
 -- | ANF creates new let-binders and moves all existing let-binders into a
 -- single let-expression. It used to pick uniques for the new binders that only
@@ -103,17 +106,21 @@ runANF supply =
 --
 -- To provoke this, we first run ANF to find out which unique the binder for
 -- @h x@ gets, and then run it again, with the same unique supply, on a term in
--- which the existing let-binder has exactly that unique.
+-- which the existing let-binder has exactly that unique. The binder of @h x@
+-- is found by its name, as the scoped 'makeANF' (through
+-- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil') gives every binder of its result a
+-- new unique. Scoped Core can't express this bug: the binders it creates are
+-- fresh by construction.
 --
 -- https://github.com/clash-lang/clash-compiler/commit/63827c31fff4ab27005f25cb027969f8805d646d
-anfDoesNotDuplicateBinders :: Assertion
-anfDoesNotDuplicateBinders = do
+anfDoesNotDuplicateBinders :: NormRewrite -> Assertion
+anfDoesNotDuplicateBinders anf = do
   supply <- newSupply
-  res1 <- runANF supply (anfTerm 1000)
-  appArg <- case filter ((/= 1000) . varUniq) (letBinders res1) of
+  res1 <- runANF anf supply (anfTerm 1000)
+  appArg <- case filter ((/= "b") . nameOcc . varName) (letBinders res1) of
     [i] -> pure i
     _ -> assertFailure ("ANF did not let-bind h x:\n" <> showPprU res1)
-  res2 <- runANF supply (anfTerm (varUniq appArg))
+  res2 <- runANF anf supply (anfTerm (varUniq appArg))
   assertEqual ("Number of let-binders in:\n" <> showPprU res2)
     2 (length (letBinders res2))
   assertNoShadowing res2
@@ -127,8 +134,8 @@ anfDoesNotDuplicateBinders = do
 -- @p (\\z -> k (h z) z)@ outside of the lambda binding @z@.
 --
 -- https://github.com/clash-lang/clash-compiler/commit/36d60f54bf90f03b0cbf2d291f6411252c86dc7f
-anfDoesNotLiftOutOfLambdas :: Assertion
-anfDoesNotLiftOutOfLambdas = do
+anfDoesNotLiftOutOfLambdas :: NormRewrite -> NormRewrite -> Assertion
+anfDoesNotLiftOutOfLambdas anf nonRepANFR' = do
   supply <- newSupply
   let p = PrimInfo
         { primName = "p"
@@ -140,7 +147,7 @@ anfDoesNotLiftOutOfLambdas = do
       cf = globalId User "top" 42 (intFunTy 1)
       tm = App (Prim p) (Lam z (mkApps (Var kId) [Left (App (Var hId) (Var z)), Left (Var z)]))
       st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
-  runSingleTransformation def st emptyInScopeSet (nonRepANFR >-> makeANF) tm
+  runSingleTransformation def st emptyInScopeSet (nonRepANFR' >-> anf) tm
     >>= assertNoFreeLocals
 
 -- | A stand-in for @Signal@, see 'signalCons'
@@ -159,10 +166,10 @@ signalCons =
 -- alternative binding @x@:
 --
 -- > \s -> case s of x :- xs -> k (h x) x
-anfSignalCons :: Assertion
-anfSignalCons = do
+anfSignalCons :: NormRewrite -> Assertion
+anfSignalCons anf = do
   supply <- newSupply
-  runSingleTransformation def def{_uniqSupply = supply} emptyInScopeSet makeANF
+  runSingleTransformation def def{_uniqSupply = supply} emptyInScopeSet anf
     (Lam s (Case (Var s) intTy
       [ (DataPat signalCons [] [x, xs]
         , mkApps (Var kId) [Left (App (Var hId) (Var x)), Left (Var x)]) ]))
@@ -177,10 +184,10 @@ anfSignalCons = do
 -- them. Here, it let-bound @h y@ outside of the alternative binding @y@:
 --
 -- > \e -> case e of MkE @m (x :: m) (y :: Int) -> k (h y) y
-anfExistential :: Assertion
-anfExistential = do
+anfExistential :: NormRewrite -> Assertion
+anfExistential anf = do
   supply <- newSupply
-  runSingleTransformation def def{_uniqSupply = supply} emptyInScopeSet makeANF
+  runSingleTransformation def def{_uniqSupply = supply} emptyInScopeSet anf
     (Lam e (Case (Var e) intTy
       [ (DataPat mkE [m] [x, y]
         , mkApps (Var kId) [Left (App (Var hId) (Var y)), Left (Var y)]) ]))
@@ -197,18 +204,29 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.ANF"
+    (anfTests makeANF nonRepANFR)
+
+-- | The tests of 'makeANF' and 'nonRepANF', for the given implementations of
+-- them
+anfTests
+  :: NormRewrite
+  -- ^ 'makeANF'
+  -> NormRewrite
+  -- ^ 'nonRepANF'
+  -> [TestTree]
+anfTests anf nonRepANFR' =
     -- 'nonRepANF' moved the let-bindings out of a non-representable argument
     -- of a data constructor without renaming them. They could then capture
     -- free variables of the other arguments.
     -- https://github.com/clash-lang/clash-compiler/pull/1071
     [ testCase "nonRepANF deshadows let-bindings (#1071)" $
-        nonRepANFCapture >>= assertAlphaEq nonRepANFCaptureExpected
-    , testCase "ANF does not duplicate binders"
-        anfDoesNotDuplicateBinders
-    , testCase "ANF does not lift expressions out of lambdas"
-        anfDoesNotLiftOutOfLambdas
-    , testCase "ANF does not lift expressions out of Signal (:-) alternatives"
-        anfSignalCons
-    , testCase "ANF does not lift expressions out of existential alternatives"
-        anfExistential
+        nonRepANFCapture nonRepANFR' >>= assertAlphaEq nonRepANFCaptureExpected
+    , testCase "ANF does not duplicate binders" $
+        anfDoesNotDuplicateBinders anf
+    , testCase "ANF does not lift expressions out of lambdas" $
+        anfDoesNotLiftOutOfLambdas anf nonRepANFR'
+    , testCase "ANF does not lift expressions out of Signal (:-) alternatives" $
+        anfSignalCons anf
+    , testCase "ANF does not lift expressions out of existential alternatives" $
+        anfExistential anf
     ]

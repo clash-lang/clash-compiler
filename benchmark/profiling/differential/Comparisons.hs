@@ -16,9 +16,12 @@ module Comparisons (comparisons, siteComparisons) where
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Util as Current
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrategy)
+import qualified Clash.Normalize.Scoped.Transformations.ANF as S
 import qualified Clash.Normalize.Scoped.Transformations.Case as SC
 import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
+import Clash.Normalize.Transformations.ANF (makeANF)
+import Clash.Rewrite.Scoped (ScopedTransform (..))
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
@@ -217,6 +220,26 @@ siteComparisons =
       , scTransformations = ["elimCaseBigNum"]
       , scCurrent = $(asRewriteQ Current.elimCaseBigNumInternals)
       , scScoped = Just $(asScopedRewriteQ SC.elimCaseBigNumInternals)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "nonRepANF"
+      , scDescription =
+          "The current nonRepANF (Clash.Normalize.Transformations.ANF.nonRepANFWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.ANF.nonRepANF)"
+      , scTransformations = ["nonRepANF"]
+      , scCurrent = $(asRewriteQ Current.nonRepANF)
+      , scScoped = Just $(asScopedRewriteQ S.nonRepANF)
+      , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "ANF"
+      , scDescription =
+          "The current makeANF (Clash.Normalize.Transformations.ANF.makeANF) \
+          \against its port (Clash.Normalize.Scoped.Transformations.ANF.makeANF)"
+      , scTransformations = ["ANF"]
+      , scCurrent = makeANF
+      , scScoped = Just (ScopedTransform S.makeANF)
       , scKnownDifferences = []
       }
   ]
