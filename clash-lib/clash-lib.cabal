@@ -224,7 +224,9 @@ Library
                       Clash.Core.Scoped.Evaluator
                       Clash.Core.Scoped.Evaluator.Adapter
                       Clash.Core.Scoped.Evaluator.Primitives
+                      Clash.Core.Scoped.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal
+                      Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.Exp
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Promoted.Nat
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index
