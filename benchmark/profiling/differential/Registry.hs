@@ -23,7 +23,7 @@ import Data.Text (Text)
 
 import Test.Clash.Differential
   ( KnownDifference, coercionForm, globalUniques, letrecOrder, nonRecLetOrder
-  , recToNonRec )
+  , primTypeForm, recToNonRec )
 
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types (NormRewrite)
@@ -83,12 +83,12 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["etaExpandSyn"], $(asRewriteQ Current.etaExpandSyn), [])
     , (["etaTL"], Current.etaExpansionTL, [])
     , (["separateArguments"], $(asRewriteQ Current.separateArguments), [coercionForm])
+    , (["xOptimize"], $(asRewriteQ Current.xOptimize), [primTypeForm])
     ]
 
   unported =
     -- Others
     [ (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
-    , (["xOptimize"], $(asRewriteQ xOptimize))
     ]
 
 -- | The current transformation captured under a name
