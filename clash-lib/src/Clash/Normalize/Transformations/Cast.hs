@@ -18,6 +18,7 @@ module Clash.Normalize.Transformations.Cast
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
 import Control.Monad.Writer (listen)
+import qualified Data.List.Extra as List
 import qualified Data.Monoid as Monoid (Any(..))
 import GHC.Stack (HasCallStack)
 
@@ -28,7 +29,7 @@ import Clash.Core.Term
 import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (Type, normalizeType)
 import Clash.Core.Var (isGlobalId, varName)
-import Clash.Core.VarEnv (InScopeSet)
+import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList)
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormalizeSession)
@@ -165,7 +166,7 @@ splitCastWorkWorker
   => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 splitCastWorkWorker ctx@(TransformContext is0 _) node bind body = do
   (vss', Monoid.getAny -> hasChanged) <-
-    listen (mapM (splitCastLetBinding is0) (bindToList bind))
+    listen (snd <$> List.mapAccumLM splitCastLetBinding is1 (bindToList bind))
   let vs' = concat vss'
   if hasChanged then changed (rebuild vs')
                 else return node
@@ -179,15 +180,20 @@ splitCastWorkWorker ctx@(TransformContext is0 _) node bind body = do
   splitCastLetBinding
     :: InScopeSet
     -> LetBinding
-    -> NormalizeSession [LetBinding]
+    -> NormalizeSession (InScopeSet, [LetBinding])
   splitCastLetBinding isN x@(nm, e) = case stripTicks e of
-    Cast (Var {}) _ _  -> return [x]  -- already work-free
-    Cast (Cast {}) _ _ -> return [x]  -- casts will be eliminated
+    Cast (Var {}) _ _  -> return (isN, [x])  -- already work-free
+    Cast (Cast {}) _ _ -> return (isN, [x])  -- casts will be eliminated
     Cast e0 ty1 ty2 -> do
       tcm <- Lens.view tcCache
       nm' <- mkTmBinderFor isN tcm (mkDerivedName ctx (nameOcc $ varName nm)) e0
-      changed [(nm',e0)
-              ,(nm, Cast (Var nm') ty1 ty2)
-              ]
-    _ -> return [x]
+      changed ( extendInScopeSet isN nm'
+              , [(nm',e0)
+                ,(nm, Cast (Var nm') ty1 ty2)
+                ] )
+    _ -> return (isN, [x])
+
+  -- The new binders end up next to the let's binders, so they have to be
+  -- fresh with respect to them, and to each other.
+  is1 = extendInScopeSetList is0 (map fst (bindToList bind))
 {-# SCC splitCastWorkWorker #-}
