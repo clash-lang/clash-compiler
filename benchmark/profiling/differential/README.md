@@ -116,6 +116,9 @@ Available:
 * `coercionForm`: a coercion is the primitive `_CO_` without a type argument.
   The primitive reductions of the scoped evaluator apply `_CO_` to its type,
   as GHC2Core does.
+* `primTypeForm`: `errorX` at an open type has that type, without a type
+  argument. The type of a primitive is closed in scoped Core, so the port of
+  `xOptimize` applies it to an open type.
 
 Add new ones to `Test.Clash.Differential`, next to `recToNonRec`, and make them
 as narrow as possible. A known difference gets the scope of the results.

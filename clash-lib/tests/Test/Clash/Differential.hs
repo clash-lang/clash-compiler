@@ -56,6 +56,7 @@ module Test.Clash.Differential
   , coercionForm
   , globalUniques
   , nonRecLetOrder
+  , primTypeForm
   , everywhereTm
   , everywhereScopedTm
     -- * Running transformations
@@ -408,6 +409,28 @@ nonRecLetOrder = KnownDifference
                   (keys ++ [(nameOcc (idBinderOcc b), show (toClashTerm (freshen sc0 x0)))])
                   body1
       _ -> k (pre TNil) xs keys e
+
+-- | A primitive that stands for a term of an open type, @errorX@, has that
+-- type, rather than being applied to it.
+--
+-- The type of a primitive is closed in scoped Core, so the port of
+-- @xOptimize@ makes that primitive with 'Clash.Core.Scoped.Util.primAtType',
+-- which applies the primitive to an open type, where the transformation of
+-- Clash Core gives the primitive the open type.
+primTypeForm :: KnownDifference
+primTypeForm = KnownDifference
+  { kdName = "prim-type-form"
+  , kdDescription =
+      "errorX at an open type has that type, without a type argument"
+  , kdNormalize = \_ -> everywhereTm go
+  }
+ where
+  go :: Term x -> Term x
+  go = \case
+    TyApp e@(Prim p) _
+      | C.primName p == Text.pack "Clash.XException.errorX"
+      -> e
+    e -> e
 
 -- | Apply a function at every node of a term, bottom-up, like
 -- 'everywhereTm', giving it the scope of the node: goes under binders by
