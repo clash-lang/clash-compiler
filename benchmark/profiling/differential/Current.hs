@@ -41,6 +41,7 @@ module Current
   , inlineNonRep
     -- * Specialize
   , appProp
+  , constantSpec
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -204,3 +205,9 @@ inlineNonRep = Inline.inlineNonRep
 appProp :: Transformation
 appProp = toTransformation "applicationPropagation"
   (onAppNode 'Specialize.appPropWorker <> onTyAppNode 'Specialize.appPropWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Specialize.constantSpec',
+-- which 'Clash.Normalize.Scoped.Transformations.Specialize.constantSpec'
+-- replaced
+constantSpec :: Transformation
+constantSpec = toTransformation "constantSpec" (onApp 'Specialize.constantSpecWorker)

@@ -37,8 +37,11 @@
 module Clash.Normalize.Scoped.Transformations.Specialize
   ( appProp
   , appPropWorker
+  , constantSpec
+  , constantSpecWorker
   , specialize
   , specialize'
+  , specializeIn
   , specArgBndrsAndVars
     -- * Helpers of 'specialize'
   , specCacheKey
@@ -52,6 +55,7 @@ import qualified Control.Lens                as Lens
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
+import           Data.Either                 (rights)
 import qualified Data.Map.Strict             as Map
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Text                   as Text
@@ -75,25 +79,28 @@ import           Clash.Driver.Types
 import           Clash.Normalize.Types
   (NormalizeSession, specialisationCache, specialisationHistory)
 import           Clash.Rewrite.StrategyDSL
-  (Transformation, onAppNode, onTyAppNode, toScopedTransformation)
+  (Transformation, onApp, onAppNode, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
   (curFun, debugOpts, extra, scopedTypeEnv, specializationLimit)
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
 import           Clash.Core.Scoped.Convert   (toClashTerm, toClashType)
-import           Clash.Core.Scoped.FreeVars  (freeTyVarsOfType)
+import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
 import           Clash.Core.Scoped.HasType   (globalIdType, inferCoreTypeOf, piResultTy)
 import           Clash.Core.Scoped.NameMap   (nullNameSet)
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
-  (AbsBinder (..), collectArgsTicks, mkAbstraction, mkApps, mkLams, mkTicks, mkTyLams)
+  ( AbsBinder (..), collectArgs, collectArgsTicks, mkAbstraction, mkApps, mkLams, mkTicks
+  , mkTyLams )
 import           Clash.Core.Scoped.TermInfo  (isPolyFun, isVar)
 import           Clash.Core.Scoped.Type
   (TypeView (..), applyFunTy, coreView1, normalizeType, tyView)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
+import           Clash.Core.Scoped.Util      (mkLets)
+import           Clash.Normalize.Scoped.Util (ConstantSpecInfo (..), constantSpecInfo)
 import           Clash.Rewrite.Scoped.Globals
   (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
 import           Clash.Rewrite.Scoped.Types
@@ -101,6 +108,7 @@ import           Clash.Rewrite.Scoped.Types
 import           Clash.Rewrite.Scoped.Util
   ( abstractOver, changed, dependencySortTyVars, mkTmBinderFor, normalizeTermTypes
   , setChanged )
+import           Clash.Rewrite.Scoped.Whnf   (whnfRW)
 
 -- | Propagate the arguments of an application inwards, see
 -- 'Clash.Normalize.Transformations.Specialize.appProp'.
@@ -223,6 +231,49 @@ appPropWorker ctx node = case node of
 sinkArgs :: DExt n l => [Either (Term n) (Type n)] -> [Either (Term l) (Type l)]
 sinkArgs = map (bimap sink sink)
 
+-- | Specialize functions on arguments which are constant, except when they
+-- are clock, reset generators. See
+-- 'Clash.Normalize.Transformations.Specialize.constantSpec'.
+constantSpec :: Transformation
+constantSpec = toScopedTransformation "constantSpec" (onApp 'constantSpecWorker)
+
+-- | The 'App' handler of 'constantSpec'
+constantSpecWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> Term n
+  -> Term n
+  -> NormalizeSession (Term n)
+constantSpecWorker ctx e e1 e2
+  | (hd, args) <- collectArgs e1
+  , isVar hd
+  , null (rights args)
+  , nullNameSet (freeTyVars e2)
+  = constantSpecInfo ctx e2 >>= \case
+      -- e2 has no constant parts
+      ConstantSpecInfo _ _ _ False -> return e
+      -- Whole of e2 is constant, we reduce it here eagerly before
+      -- specialization because we have observed long running compile times
+      -- when having recursively defined constants, see:
+      -- https://github.com/clash-lang/clash-compiler/issues/3129
+      ConstantSpecInfo _ TNil _ True -> do
+        e2Red <- case collectArgs e2 of
+          (Prim p0, _) -> whnfRW False ctx e2 $ \_ctx1 e2Red -> case collectArgs e2Red of
+            (Prim p1, _) | C.primName p0 == C.primName p1 -> return (sink e2)
+            _ -> changed e2Red
+          _ -> return e2
+        specialize ctx (App e1 e2Red)
+      -- Parts of e2 are constant: specialize under let-bindings of the
+      -- other parts
+      ConstantSpecInfo sc1 binds newTerm True -> do
+        (body, isSpec) <- Writer.listen (specializeIn sc1 (App (sink e1) newTerm))
+        if Monoid.getAny isSpec
+          then changed (mkLets binds body)
+          else return e
+  | otherwise = return e
+{-# SCC constantSpecWorker #-}
+
 -- | Specialize an application on its argument, see
 -- 'Clash.Normalize.Transformations.Specialize.specialize'
 specialize
@@ -230,9 +281,18 @@ specialize
   => TransformContext n
   -> Term n
   -> NormalizeSession (Term n)
-specialize ctx e = case e of
-  TyApp e1 ty -> specialize' ctx e (collectArgsTicks e1) (Right ty)
-  App e1 e2 -> specialize' ctx e (collectArgsTicks e1) (Left e2)
+specialize ctx = specializeIn (tfScope ctx)
+
+-- | 'specialize' in a scope: specialization only needs the scope of the
+-- context, e.g. to specialize under new let-bindings ('constantSpec')
+specializeIn
+  :: (HasCallStack, Distinct n)
+  => Scope n
+  -> Term n
+  -> NormalizeSession (Term n)
+specializeIn sc e = case e of
+  TyApp e1 ty -> specializeArgIn sc e (collectArgsTicks e1) (Right ty)
+  App e1 e2 -> specializeArgIn sc e (collectArgsTicks e1) (Left e2)
   _ -> return e
 
 -- | Specialize an application on its argument, see
@@ -248,10 +308,20 @@ specialize'
   -> Either (Term n) (Type n)
   -- ^ Argument to specialize on
   -> NormalizeSession (Term n)
-specialize' ctx e (fHd, args, ticks) specArgIn = case fHd of
+specialize' ctx = specializeArgIn (tfScope ctx)
+
+-- | 'specialize'' in a scope, see 'specializeIn'
+specializeArgIn
+  :: (HasCallStack, Distinct n)
+  => Scope n
+  -> Term n
+  -> (Term n, [Either (Term n) (Type n)], [TickInfo n])
+  -> Either (Term n) (Type n)
+  -> NormalizeSession (Term n)
+specializeArgIn sc e (fHd, args, ticks) specArgIn = case fHd of
   -- Only global functions have a binding to specialize
   Var {} -> return e
-  GlobalVar f -> specializeGlobal ctx e f args ticks specArgIn
+  GlobalVar f -> specializeGlobal sc e f args ticks specArgIn
   -- Specializing non Var's is used by nonRepANF
   _ | Left specArg <- specArgIn -> do
         let (specTvs, specIds) = specArgBndrsAndVars (Left specArg)
@@ -274,14 +344,14 @@ specialize' ctx e (fHd, args, ticks) specArgIn = case fHd of
 -- | 'specialize'' for an application of a global function
 specializeGlobal
   :: (HasCallStack, Distinct n)
-  => TransformContext n
+  => Scope n
   -> Term n
   -> GlobalId
   -> [Either (Term n) (Type n)]
   -> [TickInfo n]
   -> Either (Term n) (Type n)
   -> NormalizeSession (Term n)
-specializeGlobal ctx e f args ticks specArgIn = do
+specializeGlobal sc e f args ticks specArgIn = do
   opts <- Lens.view debugOpts
   te <- Lens.view scopedTypeEnv
   topEnt <- isTopEntity f
@@ -315,7 +385,7 @@ specializeGlobal ctx e f args ticks specArgIn = do
         specVars = specVarArgs specTvs specIds
         argLen = length args
         -- See Note [ticks and specialization] and Note [bignum literals and
-        -- specialization] in "Clash.Normalize.Transformations.Specialize"
+        -- specialization]
         specAbs :: Either C.Term C.Type
         specAbs = case specArg of
           Left tm -> Left (specCacheKey (toClashTerm (abstractOver "specialize" specTvs specIdBndrs tm)))
@@ -388,7 +458,6 @@ specializeGlobal ctx e f args ticks specArgIn = do
                   -- Use specialized function
                   changed (mkApps (mkTicks (GlobalVar newf) ticks) (args ++ specVars))
  where
-  sc = tfScope ctx
   fV = globalIdVar f
 
   varName :: Term x -> Maybe (C.Name C.Term)
