@@ -9,7 +9,6 @@ import Clash.Driver.Types
 import Clash.GHC.Evaluator
 import Clash.GHC.GenerateBindings
 import Clash.GHC.NetlistTypes
-import Clash.GHC.PartialEval
 import Clash.Backend
 import Clash.Backend.SystemVerilog
 import Clash.Backend.VHDL
@@ -58,7 +57,7 @@ doHDL Proxy opts src = do
   putStrLn $ "Loading dependencies took " ++ prepStartDiff
 
   generateHDL clashEnv clashDesign (Just backend)
-    (ghcTypeToHWType (opt_intWidth opts)) ghcEvaluator evaluator Nothing startTime
+    (ghcTypeToHWType (opt_intWidth opts)) evaluator Nothing startTime
 
 main :: IO ()
 main =

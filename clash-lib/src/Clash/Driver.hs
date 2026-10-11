@@ -96,7 +96,6 @@ import           Clash.Annotations.TopEntity
   (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
-import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.HasType
 import           Clash.Core.Name                  (Name (..))
@@ -308,16 +307,14 @@ generateHDL
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> PE.Evaluator
-  -- ^ Hardcoded evaluator for partial evaluation
   -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF (old evaluator)
+  -- ^ Hardcoded evaluator for WHNF
   -> Maybe (TopEntityT, [TopEntityT])
   -- ^ Main top entity to compile. If Nothing, all top entities in the
   -- 'ClashDesign' argument will be compiled.
   -> Clock.UTCTime
   -> IO ()
-generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = do
+generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
     let bindingsMap = designBindings design
     let tcm = envTyConMap env
     let topEntities0 = designEntities design
@@ -472,7 +469,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       -- 3. Normalize topEntity
       supplyN <- Supply.newSupply
-      transformedBindings <- normalizeEntity env bindingsMap typeTrans peEval
+      transformedBindings <- normalizeEntity env bindingsMap typeTrans
                                eval topEntityNames supplyN topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
@@ -1180,10 +1177,8 @@ normalizeEntity
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> PE.Evaluator
-  -- ^ Hardcoded evaluator for partial evaluation
   -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF (old evaluator)
+  -- ^ Hardcoded evaluator for WHNF
   -> [Id]
   -- ^ TopEntities
   -> Supply.Supply
@@ -1191,14 +1186,14 @@ normalizeEntity
   -> Id
   -- ^ root of the hierarchy
   -> IO BindingMap
-normalizeEntity env bindingsMap typeTrans peEval eval topEntities supply tm = transformedBindings
+normalizeEntity env bindingsMap typeTrans eval topEntities supply tm = transformedBindings
   where
     doNorm = do norm <- normalize [tm]
                 let normChecked = checkNonRecursive norm
                 cleaned <- cleanupGraph tm normChecked
                 return cleaned
     transformedBindings = runNormalization env supply bindingsMap
-                            typeTrans peEval eval emptyVarEnv
+                            typeTrans eval emptyVarEnv
                             topEntities doNorm
 
 -- | Reverse topologically sort given top entities. Also returns a mapping that

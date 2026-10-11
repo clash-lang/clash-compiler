@@ -4,7 +4,6 @@ import           Clash.Driver
 import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWidth))
 import qualified Clash.Util.Supply            as Supply
 
-import           Clash.GHC.PartialEval
 import           Clash.GHC.Evaluator
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
@@ -46,7 +45,6 @@ benchFile idirs src = do
 
   res <- normalizeEntity clashEnv bindingsMap
                    (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
-                   ghcEvaluator
                    evaluator
                    topEntityNames supplyN topEntity
   res `deepseq` putStrLn ".. done\n"

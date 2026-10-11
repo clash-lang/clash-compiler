@@ -36,7 +36,6 @@ import Clash.Rewrite.Types (RewriteEnv (..))
 
 import Clash.GHC.Evaluator (evaluator)
 import Clash.GHC.NetlistTypes (ghcTypeToHWType)
-import Clash.GHC.PartialEval (ghcEvaluator)
 
 import SerialiseInstances (NetlistInputs, NormalizationInputs, unremoveBBfunc)
 
@@ -133,7 +132,6 @@ loadDesign opts f = do
       env = RewriteEnv
         { _clashEnv = clashEnv
         , _typeTranslator = ghcTypeToHWType (opt_intWidth (envOpts clashEnv))
-        , _peEvaluator = ghcEvaluator
         , _evaluator = evaluator
         , _topEntities = mkVarSet tops
         , _scopedTypeEnv = addGlobalTypes (fmap bindingId bindings) (mkTypeEnv tcm)
