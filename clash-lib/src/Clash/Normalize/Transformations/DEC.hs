@@ -27,6 +27,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -77,16 +78,18 @@ import Clash.Core.Name (OccName, nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term
   ( Alt, LetBinding, Pat(..), PrimInfo(..), Term(..), TickInfo(..)
-  , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds, stripTicks)
+  , collectArgs, collectArgsTicks, mkApps, mkTicks, patIds, patVars
+  , stripTicks)
 import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type
   ( Type, TypeView (..), coreView, isPolyFunTy, mkTyConApp, splitFunForallTy
   , tyView)
 import Clash.Core.Util (mkInternalVar, mkSelectorCase, sccLetBindings)
-import Clash.Core.Var (Id, isGlobalId, isLocalId, varName)
+import Clash.Core.Var (Id, isGlobalId, varName)
 import Clash.Core.VarEnv
-  ( InScopeSet, elemInScopeSet, extendInScopeSet, extendInScopeSetList
-  , notElemInScopeSet, unionInScope)
+  ( InScopeSet, VarSet, elemInScopeSet, elemVarSet, emptyVarSet
+  , extendInScopeSet, extendInScopeSetList, mkVarSet, unionInScope
+  , unionVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP
 import Clash.Normalize.Transformations.Letrec (deadCode)
@@ -163,8 +166,11 @@ disjointExpressionConsolidationWorker ctx@(TransformContext isCtx _) e _scrut _t
     -- Collect all (the applications of) global binders (and certain primitives)
     -- that would be interesting to share out of the case-alternatives.
     (_,isCollected,collected) <- collectGlobals isCtx [] [] e
-    -- Filter those that are used at most once in every (nested) branch.
-    let disJoint = filter (isDisjoint . snd . snd) collected
+    -- Filter those that are used at most once in every (nested) branch, and
+    -- whose function and type arguments don't refer to variables bound inside
+    -- the alternatives: we can't lift those out of the alternatives.
+    let disJoint = filter (\(fun,(_,ct)) -> isDisjoint ct && isLiftable fun ct)
+                          collected
     if null disJoint
        then return e
        else do
@@ -177,10 +183,6 @@ disjointExpressionConsolidationWorker ctx@(TransformContext isCtx _) e _scrut _t
          --
          -- if an argument is non-representable, the case-expression is inlined,
          -- and no let-binding will be created for it.
-         --
-         -- NB: mkDisJointGroup needs the context InScopeSet, isCtx, to determine
-         -- whether expressions reference variables from the context, or
-         -- variables inside a let-expression inside one of the alternatives.
          lifted <- mapM (mkDisjointGroup isCtx) disJoint
          tcm    <- Lens.view tcCache
          -- Create let-binders for all of the lifted expressions
@@ -300,6 +302,32 @@ isDisjoint ct = go ct
     go (Branch _ [])        = False
     go (Branch _ [(_,x)])   = go x
     go b@(Branch _ (_:_:_)) = allEqual (map Either.rights (Foldable.toList b))
+
+-- | The variables bound inside the alternatives a 'CaseTree' was collected
+-- from: by their patterns, and by let-expressions on the path to its leaves.
+--
+-- NB: we can't use an 'InScopeSet' to tell whether a variable is bound inside
+-- the alternatives, as a binder inside the alternatives might shadow a variable
+-- in scope of the case-expression.
+caseTreeBinders :: CaseTree a -> VarSet
+caseTreeBinders = \case
+  Leaf _ -> emptyVarSet
+  LB lbs ct -> mkVarSet (map fst lbs) `unionVarSet` caseTreeBinders ct
+  Branch _ alts ->
+    mconcat
+      [mkVarSet (patVars p) `unionVarSet` caseTreeBinders ct | (p,ct) <- alts]
+
+-- | Test whether an application can be lifted out of the alternatives it was
+-- collected from: neither the function, nor the type arguments, may refer to
+-- variables bound inside those alternatives.
+isLiftable :: Term -> CaseTree [Either Term Type] -> Bool
+isLiftable fun ct =
+  getAll (Lens.foldMapOf (termFreeVars' isBound) (const (All False)) fun) &&
+  all (getAll . Lens.foldMapOf (typeFreeVars' isBound mempty) (const (All False)))
+      (concatMap Either.rights (Foldable.toList ct))
+ where
+  bound = caseTreeBinders ct
+  isBound v = v `elemVarSet` bound
 
 -- | Test if all elements in a list are equal to each other.
 allEqual :: Eq a => [a] -> Bool
@@ -499,6 +527,8 @@ mkDisjointGroup
 mkDisjointGroup inScope (fun,(seen,cs)) = do
     tcm <- Lens.view tcCache
     let funName = decFunName fun
+        -- Variables bound inside the alternatives
+        bound = caseTreeBinders cs
         argLen = case Foldable.toList cs of
                    [] -> error "mkDisjointGroup: no disjoint groups"
                    l:_ -> length l
@@ -506,7 +536,7 @@ mkDisjointGroup inScope (fun,(seen,cs)) = do
         csT = map (\i -> fmap (!!i) cs) [0..(argLen-1)] -- sequenceA does the wrong thing
     (lbs,newArgs) <- List.mapAccumRM (\lbs (c,pos) -> do
       let cL = Foldable.toList c
-      case (cL, areShared tcm inScope (fmap (first stripTicks) cL)) of
+      case (cL, areShared tcm bound (fmap (first stripTicks) cL)) of
         (Right ty:_, True) ->
           return (lbs,Right ty)
         (Right _:_, False) ->
@@ -575,7 +605,7 @@ disJointSelProj inScope argTy cs funName argN = do
 
 -- | Arguments are shared between invocations if:
 --
--- * They contain _no_ references to locally-bound variables
+-- * They contain _no_ references to variables bound inside the alternatives
 -- * Are either:
 --     1. All equal
 --     2. A proof of an equality: we don't care about the shape of a proof.
@@ -586,9 +616,14 @@ disJointSelProj inScope argTy cs funName argN = do
 --        Since DEC only fires for applications where all the type arguments
 --        are equal, we can deduce that all equality arguments witness the same
 --        equality, hence we don't have to care about the shape of the proof.
-areShared :: TyConMap -> InScopeSet -> [Either Term Type] -> Bool
-areShared _   _       []       = True
-areShared tcm inScope xs@(x:_) = noFV1 && (isProof x || allEqual xs)
+areShared
+  :: TyConMap
+  -> VarSet
+  -- ^ Variables bound inside the alternatives, see 'caseTreeBinders'
+  -> [Either Term Type]
+  -> Bool
+areShared _   _     []       = True
+areShared tcm bound xs@(x:_) = noFV1 && (isProof x || allEqual xs)
  where
   noFV1 = case x of
     Right ty -> getAll (Lens.foldMapOf (typeFreeVars' isLocallyBound mempty)
@@ -596,7 +631,7 @@ areShared tcm inScope xs@(x:_) = noFV1 && (isProof x || allEqual xs)
     Left tm  -> getAll (Lens.foldMapOf (termFreeVars' isLocallyBound)
                                        (const (All False)) tm)
 
-  isLocallyBound v = isLocalId v && v `notElemInScopeSet` inScope
+  isLocallyBound v = v `elemVarSet` bound
 
   isProof (Left co) = case tyView (inferCoreTypeOf tcm co) of
     TyConApp (nameOcc -> nm) _ ->  nm == fromTHName ''(~)
