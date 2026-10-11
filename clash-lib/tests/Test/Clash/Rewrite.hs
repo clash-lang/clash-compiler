@@ -1152,6 +1152,53 @@ pairA, pairB :: C.TyVar
 pairA = tyVar C.User "a" 2052
 pairB = tyVar C.User "b" 2053
 
+-- | @Ordering@, which reductions of comparisons of numbers return
+orderingTcNm :: C.TyConName
+orderingTcNm = mkTyConName "GHC.Types.Ordering" 2060
+
+orderingTy :: C.Type
+orderingTy = tcTy orderingTcNm
+
+ltDc, eqDc, gtDc :: C.DataCon
+ltDc = mkDataCon "GHC.Types.LT" 2061 [] [] [] orderingTy
+eqDc = (mkDataCon "GHC.Types.EQ" 2062 [] [] [] orderingTy) { C.dcTag = 2 }
+gtDc = (mkDataCon "GHC.Types.GT" 2063 [] [] [] orderingTy) { C.dcTag = 3 }
+
+-- | The boxed @Double@
+doubleTcNm :: C.TyConName
+doubleTcNm = mkTyConName "GHC.Types.Double" 2064
+
+doubleTy :: C.Type
+doubleTy = tcTy doubleTcNm
+
+-- | @D# :: Double# -> Double@
+doubleDc :: C.DataCon
+doubleDc = mkDataCon "GHC.Types.D#" 2065 [] [] [C.doublePrimTy] doubleTy
+
+-- | @T3@, a product of three types, like an unboxed triple
+t3TyConName :: C.TyConName
+t3TyConName = mkTyConName "T3" 2066
+
+t3Ty :: C.Type -> C.Type -> C.Type -> C.Type
+t3Ty a b c = tcApp t3TyConName [a, b, c]
+
+-- | @MkT3 :: a -> b -> c -> T3 a b c@
+t3DataCon :: C.DataCon
+t3DataCon = mkDataCon "MkT3" 2067 [fxA, fxB, t3C] [] [C.VarTy fxA, C.VarTy fxB, C.VarTy t3C]
+  (t3Ty (C.VarTy fxA) (C.VarTy fxB) (C.VarTy t3C))
+
+t3C :: C.TyVar
+t3C = tyVar C.User "c" 2068
+
+-- | @T2@ applied to two types
+t2Ty :: C.Type -> C.Type -> C.Type
+t2Ty a b = tcApp t2TyConName [a, b]
+
+-- | @MkT2 :: a -> b -> T2 a b@
+t2DataCon :: C.DataCon
+t2DataCon = mkDataCon "MkT2" 3033 [fxA, fxB] [] [C.VarTy fxA, C.VarTy fxB]
+  (t2Ty (C.VarTy fxA) (C.VarTy fxB))
+
 -- | The names of the types of clock, reset and enable lines. Clash recognizes
 -- them by their names.
 clockTcNm, resetTcNm, enableTcNm :: C.TyConName
@@ -1223,9 +1270,7 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     , mkFunTyCon unconsSymbolTyConName
         (C.mkFunTy C.typeSymbolKind (maybeTy (tcApp t2TyConName [C.charPrimTy, C.typeSymbolKind])))
         1 []
-    , mkAlgTyCon t2TyConName [fxA, fxB]
-        [mkDataCon "MkT2" 3033 [fxA, fxB] [] [C.VarTy fxA, C.VarTy fxB]
-          (tcApp t2TyConName [C.VarTy fxA, C.VarTy fxB])]
+    , mkAlgTyCon t2TyConName [fxA, fxB] [t2DataCon]
     , (mkAlgTyCon vTyConName [] [vNilDataCon, vConsDataCon])
         {C.tyConKind = C.mkFunTy C.typeNatKind C.liftedTypeKind, C.tyConArity = 1}
     , mkAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
@@ -1241,6 +1286,9 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     , C.PrimTyCon (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
     , C.PrimTyCon (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
     , mkAlgTyCon clkPairTcNm [] [clkPairDc]
+    , mkAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
+    , mkAlgTyCon doubleTcNm [] [doubleDc]
+    , mkAlgTyCon t3TyConName [fxA, fxB, t3C] [t3DataCon]
     ] <>
     -- Promoted data constructors that type families return. Their kinds don't
     -- matter here.

@@ -46,7 +46,8 @@ import Clash.Core.Scoped.Evaluator.Types (Env, PrimReduction)
 
 import Test.Clash.Rewrite
   ( addTy, assertAlphaEq, consDc, ghcBoolTy, ghcTrueDataCon, heapLookupEvaluator
-  , intId, mkTyConName, nilDc, numTy, pairDataCon, pairTy, rtreeTy, tcApp, testTyConMap, vecTy )
+  , intId, mkTyConName, nilDc, numTy, pairDataCon, pairTy, rtreeTy, snatTy, tcApp
+  , testTyConMap, vecTy )
 import Test.Clash.Scoped (testTypeEnv)
 import Test.Clash.Scoped.Evaluator
 import Test.Clash.Scoped.Evaluator.Primitives
@@ -118,8 +119,7 @@ portedTests =
 
   , testCase "replicate shares its argument" $
       -- replicate :: SNat n -> a -> Vec n a, lazy in its second argument
-      let snatTy n = tcApp (mkTyConName "Clash.Promoted.Nat.SNat" 4003) [n]
-          replicateTy =
+      let replicateTy =
             C.ForAllTy tvN $ C.ForAllTy tvA $
               C.mkFunTy (snatTy (C.VarTy tvN)) $ C.mkFunTy (C.VarTy tvA) (vecTy (C.VarTy tvN) (C.VarTy tvA))
           expected = C.mkVec nilDc consDc integerPrimTy 2 [integerLit 7, integerLit 7]
