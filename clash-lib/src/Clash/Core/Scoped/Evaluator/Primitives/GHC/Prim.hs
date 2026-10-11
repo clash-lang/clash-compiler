@@ -9,6 +9,13 @@
   Reductions of the primitives of "GHC.Prim" in the scoped evaluator: ports
   of @Clash.GHC.Evaluator.Primitives.GHC.Prim@. See
   "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+
+  Byte arrays live on the primitive heap of the machine. A mutable byte array
+  is the primitive @MutableByteArray#@ applied to its number on that heap. The
+  reductions of Clash Core give that primitive the type @Int# ->
+  MutableByteArray# s@, with the @s@ of the type of @newByteArray#@, which is
+  free. Here it has the closed type @forall s. Int# -> MutableByteArray# s@,
+  and is applied to the instantiated @s@ as well, see 'mutableByteArray'.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -32,21 +39,39 @@ module Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim
   ) where
 
 import Data.Bits
+import qualified Data.ByteString.Internal as BS
 import Data.Char (chr, ord)
+import qualified Data.List as List
 import qualified Data.Primitive.ByteArray as BA
 import Data.Text (Text)
+import Data.Text.Extra (showt)
+import GHC.Exts (IsList (..))
 import GHC.Float
+import GHC.ForeignPtr
 import GHC.Int
 import GHC.Prim
+import GHC.Stack (HasCallStack)
+import GHC.Types (IO (..))
 import GHC.Word
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
+import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Literal (Literal (..))
-import Clash.Util (textNameLit)
+import Clash.Core.Name (mkUnsafeSystemName)
+import Clash.Core.Pretty (showPpr)
+import qualified Clash.Core.Term as C
+import Clash.Core.TyCon (tyConDataCons)
+import qualified Clash.Core.Type as C
+import Clash.Core.TysPrim (intPrimTy, liftedTypeKind)
+import qualified Clash.Core.Var as C
+import Clash.Util (curLoc, textNameLit)
 
 import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (mkApps)
+import Clash.Core.Scoped.Type (TypeView (..), tyView)
+import Clash.Core.Scoped.TypeEnv (lookupTyCon)
 
 primitives :: [(Text, PrimReduction)]
 primitives =
@@ -1588,6 +1613,20 @@ primitives =
 ----------------------
 -- GHC.Prim.ByteArray#
 ----------------------
+  , primStepEntry $(textNameLit 'GHC.Prim.newByteArray#) $ \case
+      PrimStepContext{..}
+        | [iV,PrimVal rwTy _ _] <- args
+        , [i] <- intLiterals' [iV]
+        -> let (tupDc, tyArgs) = resultDataCon te sc ty tys
+               p = primCount mach
+               lit = Literal (ByteArrayLiteral (fromList (List.genericReplicate i 0)))
+               newE = mkApps (Data tupDc) (map Right tyArgs ++
+                        [Left (Prim rwTy)
+                        ,Left (mutableByteArray (last tyArgs) p)
+                        ])
+           in Just . stay . setTerm newE $ primInsert p lit mach
+      _ -> Nothing
+
   , primStepEntry $(textNameLit 'GHC.Prim.setByteArray#) $ \case
       PrimStepContext{..}
         | [PrimVal _mbaTy _ [baV]
@@ -1608,6 +1647,26 @@ primitives =
            in Just . stay . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
       _ -> Nothing
 
+  , primStepEntry $(textNameLit 'GHC.Prim.writeWordArray#) $ \case
+      PrimStepContext{..}
+        | [PrimVal _mbaTy _  [baV]
+          ,iV,wV
+          ,PrimVal rwTy _ _
+          ] <- args
+        , [ba,i] <- intLiterals' [baV,iV]
+        , [w] <- wordLiterals' [wV]
+        -> let Just (Literal (ByteArrayLiteral ba1)) =
+                  primLookup (fromInteger ba) mach
+               !(I# i') = fromInteger i
+               !(W# w') = fromIntegral w
+               ba2 = unsafeDupablePerformIO $ do
+                      BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                      svoid (writeWordArray# mba i' w')
+                      BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+               ba3 = Literal (ByteArrayLiteral ba2)
+           in Just . stay . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
+      _ -> Nothing
+
   , primStepEntry $(textNameLit 'GHC.Prim.unsafeFreezeByteArray#) $ \case
       PrimStepContext{..}
         | [PrimVal _mbaTy _ [baV]
@@ -1623,4 +1682,184 @@ primitives =
         | [Lit (ByteArrayLiteral ba)] <- args
         -> reduce (Literal (IntLiteral (toInteger (BA.sizeofByteArray ba))))
       _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.indexWordArray#) $ \case
+      PrimStepContext{..}
+        | [Lit (ByteArrayLiteral (BA.ByteArray ba)),iV] <- args
+        , [i] <- intLiterals' [iV]
+        -> let !(I# i') = fromInteger i
+               !w       = indexWordArray# ba i'
+           in  reduce (Literal (WordLiteral (toInteger (W# w))))
+      _ -> Nothing
+
+
+  -- XXX: Primitive does not exist?
+#if !MIN_VERSION_ghc(9,14,0)
+  -- 'getSizeofMutBigNat#' was removed from GHC.Prim in GHC 9.14.
+  , primStepEntry "GHC.Prim.getSizeofMutBigNat#" $ \case
+      PrimStepContext{..}
+        | [PrimVal _mbaTy _ [baV]
+          ,PrimVal rwTy _ _
+          ] <- args
+        , [ba] <- intLiterals' [baV]
+        -> let Just (Literal (ByteArrayLiteral ba')) = primLookup (fromInteger ba) mach
+               lit = Literal (IntLiteral (toInteger (BA.sizeofByteArray ba')))
+           in  reduce $ mkResultCon te sc ty tys [Prim rwTy, lit]
+      _ -> Nothing
+#endif
+
+  , primStepEntry $(textNameLit 'GHC.Prim.resizeMutableByteArray#) $ \case
+      PrimStepContext{..}
+        | [PrimVal mbaTy mbaTys [baV]
+          ,iV
+          ,PrimVal rwTy _ _
+          ] <- args
+        , [ba,i] <- intLiterals' [baV,iV]
+        -> let p = primCount mach
+               Just (Literal (ByteArrayLiteral ba1))
+                = primLookup (fromInteger ba) mach
+               !(I# i') = fromInteger i
+               ba2 = unsafeDupablePerformIO $ do
+                       BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                       mba' <- IO (\s -> case resizeMutableByteArray# mba i' s of
+                                     (# s', mba' #) -> (# s', BA.MutableByteArray mba' #))
+                       BA.unsafeFreezeByteArray mba'
+               ba3 = Literal (ByteArrayLiteral ba2)
+               -- The primitive of the argument, applied to its types (see
+               -- 'mutableByteArray') and the new number
+               newE = mkResultCon te sc ty tys
+                        [Prim rwTy
+                        ,mkApps (Prim mbaTy)
+                           (map Right mbaTys ++ [Left (Literal . IntLiteral $ toInteger p)])
+                        ]
+           in Just . stay . setTerm newE $ primInsert p ba3 mach
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.shrinkMutableByteArray#) $ \case
+      PrimStepContext{..}
+        | [PrimVal _mbaTy _ [baV]
+          ,lenV
+          ,PrimVal rwTy _ _
+          ] <- args
+        , [ba,len] <- intLiterals' [baV,lenV]
+        -> let Just (Literal (ByteArrayLiteral ba1)) =
+                  primLookup (fromInteger ba) mach
+               !(I# len') = fromInteger len
+               ba2 = unsafeDupablePerformIO $ do
+                      BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                      svoid (shrinkMutableByteArray# mba len')
+                      BA.unsafeFreezeByteArray (BA.MutableByteArray mba)
+               ba3 = Literal (ByteArrayLiteral ba2)
+           in Just . stay . setTerm (Prim rwTy) $ primUpdate (fromInteger ba) ba3 mach
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.copyByteArray#) $ \case
+      PrimStepContext{..}
+        | [Lit (ByteArrayLiteral (BA.ByteArray src_ba))
+          ,src_offV
+          ,PrimVal _mbaTy _ [dst_mbaV]
+          ,dst_offV, nV
+          ,PrimVal rwTy _ _
+          ] <- args
+        , [src_off,dst_mba,dst_off,n] <- intLiterals' [src_offV,dst_mbaV,dst_offV,nV]
+        -> let Just (Literal (ByteArrayLiteral dst_ba)) =
+                  primLookup (fromInteger dst_mba) mach
+               !(I# src_off') = fromInteger src_off
+               !(I# dst_off') = fromInteger dst_off
+               !(I# n')       = fromInteger n
+               ba2 = unsafeDupablePerformIO $ do
+                      BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
+                      svoid (copyByteArray# src_ba src_off' dst_mba1 dst_off' n')
+                      BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
+               ba3 = Literal (ByteArrayLiteral ba2)
+           in Just . stay . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.readWordArray#) $ \case
+      PrimStepContext{..}
+        | [PrimVal _mbaTy _  [baV]
+          ,offV
+          ,PrimVal rwTy _ _
+          ] <- args
+        , [ba,off] <- intLiterals' [baV,offV]
+        -> let Just (Literal (ByteArrayLiteral ba1)) =
+                  primLookup (fromInteger ba) mach
+               !(I# off') = fromInteger off
+               w = unsafeDupablePerformIO $ do
+                      BA.MutableByteArray mba <- BA.unsafeThawByteArray ba1
+                      IO (\s -> case readWordArray# mba off' s of
+                            (# s', w' #) -> (# s',  W# w' #))
+           in reduce $ mkResultCon te sc ty tys
+                [Prim rwTy, Literal (WordLiteral (toInteger w))]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.copyAddrToByteArray#) $ \case
+      PrimStepContext{..}
+        | [ Lit (StringLiteral addr)
+          , PrimVal _mbaTy _ [dst_mbaV]
+          , offV, lenV
+          , PrimVal rwTy _ _
+          ] <- args
+        , [off,len,dst_mba] <- intLiterals' [offV, lenV, dst_mbaV]
+        -> let Just (Literal (ByteArrayLiteral dst_ba)) =
+                  primLookup (fromInteger dst_mba) mach
+               !(I# off') = fromInteger off
+               !(I# len') = fromInteger len
+               !(BS.PS (ForeignPtr addr' _) _ _) = BS.packChars addr
+               ba2 = unsafeDupablePerformIO $ do
+                        BA.MutableByteArray dst_mba1 <- BA.unsafeThawByteArray dst_ba
+                        svoid (copyAddrToByteArray# addr' dst_mba1 off' len')
+                        BA.unsafeFreezeByteArray (BA.MutableByteArray dst_mba1)
+               ba3 = Literal (ByteArrayLiteral ba2)
+            in Just . stay . setTerm (Prim rwTy) $ primUpdate (fromInteger dst_mba) ba3 mach
+      _ -> Nothing
+
+-------
+-- Tags
+-------
+  , primStepEntry $(textNameLit 'GHC.Prim.tagToEnum#) $ \case
+      PrimStepContext{..}
+        | [ConstTy (C.TyCon tcN)] <- tys
+        , [Lit (IntLiteral i)]  <- args
+        -> let dc = do { tc <- lookupTyCon te tcN
+                       ; let dcs = tyConDataCons tc
+                       ; List.find ((== (i+1)) . toInteger . dcTag) dcs
+                       }
+           in (\e -> stay (setTerm (Data e) mach)) <$> dc
+      _ -> Nothing
+
+#if MIN_VERSION_ghc(9,10,0)
+  , primStepEntry $(textNameLit 'GHC.Prim.dataToTagSmall#) $ \case
+      PrimStepContext{..}
+        | [DC dc _] <- args
+        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Prim.dataToTagLarge#) $ \case
+      PrimStepContext{..}
+        | [DC dc _] <- args
+        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      _ -> Nothing
+
+#else
+  , primStepEntry $(textNameLit 'GHC.Prim.dataToTag#) $ \case
+      PrimStepContext{..}
+        | [DC dc _] <- args
+        -> reduce (Literal (IntLiteral (toInteger (dcTag dc - 1))))
+      _ -> Nothing
+
+#endif
   ]
+
+-- | The mutable byte array with the given number on the primitive heap, given
+-- its type @MutableByteArray# s@: the primitive @MutableByteArray#@, of type
+-- @forall s. Int# -> MutableByteArray# s@, applied to @s@ and the number. See
+-- the module header.
+mutableByteArray :: HasCallStack => Type n -> Int -> Term n
+mutableByteArray mbaTy p = case tyView mbaTy of
+  TyConApp mbaTcNm [sTy] ->
+    let sTv = C.mkTyVar liftedTypeKind (mkUnsafeSystemName "s" 0)
+        primTy = C.ForAllTy sTv (C.mkFunTy intPrimTy (C.mkTyConApp mbaTcNm [C.VarTy sTv]))
+        mbaPrim = C.PrimInfo (showt ''MutableByteArray#) primTy C.WorkNever C.SingleResult C.NoUnfolding
+    in mkApps (Prim mbaPrim) [Right sTy, Left (Literal (IntLiteral (toInteger p)))]
+  _ -> error ($(curLoc) ++ "not a MutableByteArray#: " ++ showPpr mbaTy)
