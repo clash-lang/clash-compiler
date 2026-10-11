@@ -288,6 +288,7 @@ Library
                       Clash.Normalize.Scoped.PrimitiveReductions
                       Clash.Normalize.Scoped.Transformations.ANF
                       Clash.Normalize.Scoped.Transformations.Case
+                      Clash.Normalize.Scoped.Transformations.Cast
                       Clash.Normalize.Scoped.Transformations.DEC
                       Clash.Normalize.Scoped.Transformations.Inline
                       Clash.Normalize.Scoped.Transformations.Letrec

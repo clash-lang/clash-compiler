@@ -45,10 +45,13 @@ module Current
   , nonRepSpec
   , typeSpec
   , zeroWidthSpec
+    -- * Cast
+  , argCastSpec
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
 import qualified Clash.Normalize.Transformations.Case as Case
+import qualified Clash.Normalize.Transformations.Cast as Cast
 import qualified Clash.Normalize.Transformations.DEC as DEC
 import qualified Clash.Normalize.Transformations.Inline as Inline
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
@@ -231,3 +234,8 @@ typeSpec = toTransformation "typeSpec" (onTyApp 'Specialize.typeSpecWorker)
 -- replaced
 zeroWidthSpec :: Transformation
 zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'Specialize.zeroWidthSpecWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Cast.argCastSpec', which
+-- 'Clash.Normalize.Scoped.Transformations.Cast.argCastSpec' replaced
+argCastSpec :: Transformation
+argCastSpec = toTransformation "argCastSpec" (onApp 'Cast.argCastSpecWorker)

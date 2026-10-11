@@ -67,6 +67,8 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["inlineSmall"], $(asRewriteQ Current.inlineSmall), [])
     , (["inlineWorkFree"], $(asRewriteQ Current.inlineWorkFree), [])
     , (["inlineNonRep"], Current.inlineNonRep, [])
+    -- Cast
+    , (["argCastSpec"], $(asRewriteQ Current.argCastSpec), [])
     -- Specialize
     , ( ["applicationPropagation", "appProp", "appPropCS"]
       , $(asRewriteQ Current.appProp), [nonRecLetOrder] )
@@ -78,8 +80,7 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
 
   unported =
     -- Cast
-    [ (["argCastSpec"], $(asRewriteQ argCastSpec))
-    , (["caseCast"], $(asRewriteQ caseCast))
+    [ (["caseCast"], $(asRewriteQ caseCast))
     , (["elimCastCast"], $(asRewriteQ elimCastCast))
     , (["letCast"], $(asRewriteQ letCast))
     , (["splitCastWork"], $(asRewriteQ splitCastWork))

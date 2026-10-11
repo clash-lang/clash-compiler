@@ -18,6 +18,7 @@ import qualified Clash.Normalize.Util as Current
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrategy)
 import qualified Clash.Normalize.Scoped.Transformations.ANF as S
 import qualified Clash.Normalize.Scoped.Transformations.Case as SC
+import qualified Clash.Normalize.Scoped.Transformations.Cast as S
 import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Inline as SI
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
@@ -385,6 +386,18 @@ siteComparisons =
       , scTransformations = ["zeroWidthSpec"]
       , scCurrent = $(asRewriteQ Current.zeroWidthSpec)
       , scScoped = Just $(asScopedRewriteQ S.zeroWidthSpec)
+      , scKnownDifferences = []
+      }
+
+  -- Cast
+  , SiteComparison
+      { scName = "argCastSpec"
+      , scDescription =
+          "The current argCastSpec (Clash.Normalize.Transformations.Cast.argCastSpecWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Cast.argCastSpec)"
+      , scTransformations = ["argCastSpec"]
+      , scCurrent = $(asRewriteQ Current.argCastSpec)
+      , scScoped = Just $(asScopedRewriteQ S.argCastSpec)
       , scKnownDifferences = []
       }
   ]
