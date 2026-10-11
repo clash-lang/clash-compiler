@@ -602,7 +602,8 @@ runClashTest = defaultMain
         , runTest "DelayN" def
         ]
       , clashTestGroup "Evaluator"
-        [ runTest "EmptyCaseFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
+        [ runTest "AndOrHeapBindings" def{hdlTargets=[Verilog], hdlSim=[]}
+        , runTest "EmptyCaseFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "FreeVarHeapBinding" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "SplitAtFoldFreeTyVars" def{hdlTargets=[Verilog], hdlSim=[]}
         ]
