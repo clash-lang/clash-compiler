@@ -458,6 +458,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Transformations.DEC
                  Clash.Tests.Normalize.Transformations.EtaExpand
                  Clash.Tests.Normalize.Transformations.Inline
+                 Clash.Tests.Normalize.Transformations.MultiPrim
                  Clash.Tests.Normalize.Transformations.Letrec
                  Clash.Tests.Normalize.Transformations.Specialize
                  Clash.Tests.Normalize.Transformations.XOptimize
