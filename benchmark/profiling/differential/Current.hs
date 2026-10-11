@@ -42,6 +42,7 @@ module Current
     -- * Specialize
   , appProp
   , constantSpec
+  , nonRepSpec
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
@@ -211,3 +212,9 @@ appProp = toTransformation "applicationPropagation"
 -- replaced
 constantSpec :: Transformation
 constantSpec = toTransformation "constantSpec" (onApp 'Specialize.constantSpecWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Specialize.nonRepSpec',
+-- which 'Clash.Normalize.Scoped.Transformations.Specialize.nonRepSpec'
+-- replaced
+nonRepSpec :: Transformation
+nonRepSpec = toTransformation "nonRepSpec" (onApp 'Specialize.nonRepSpecWorker)

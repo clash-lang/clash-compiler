@@ -13,6 +13,7 @@ module Clash.Tests.Normalize.Transformations.Specialize
   ( tests
   , appPropTests
   , specializeTests
+  , nonRepSpecTests
   ) where
 
 import qualified Control.Lens as Lens
@@ -31,7 +32,8 @@ import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVarWorker)
-import Clash.Normalize.Transformations.Specialize (appPropWorker, nonRepSpec, specialize)
+import Clash.Normalize.Transformations.Specialize
+  ( appPropWorker, nonRepSpecWorker, specialize )
 import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
 import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -60,8 +62,11 @@ bindConstantVarR :: NormRewrite
 bindConstantVarR =
   $(asRewriteQ (toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)))
 
+-- | The 'nonRepSpec' of Clash Core
 nonRepSpecR :: NormRewrite
-nonRepSpecR = $(asRewriteQ nonRepSpec)
+nonRepSpecR = apply "nonRepSpec" $ \ctx e -> case e of
+  App e1 e2 -> nonRepSpecWorker ctx e e1 e2
+  _ -> return e
 
 -- | Run an implementation of 'appProp' on a term, with the given variables in
 -- scope

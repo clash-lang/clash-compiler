@@ -38,7 +38,7 @@ import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (Supply, newSupply)
 
 import Clash.Tests.Normalize.Transformations.Specialize
-  (appPropTests, specializeTests)
+  (appPropTests, nonRepSpecTests, specializeTests)
 import Test.Clash.Rewrite
   ( assertAlphaEq, globalId, globalsByName, inScopeOf, intFunTy, intId, intTy
   , kindedTyVar, localId, mkBindingMap, pairDataCon, pairTy, runRewriteTest, tyVar
@@ -57,6 +57,8 @@ appPropS :: NormRewrite
 appPropS = $(asRewriteQ Scoped.appProp)
 constantSpecS :: NormRewrite
 constantSpecS = $(asRewriteQ Scoped.constantSpec)
+nonRepSpecS :: NormRewrite
+nonRepSpecS = $(asRewriteQ Scoped.nonRepSpec)
 
 -- | The transformations of Clash Core
 appPropC :: NormRewrite
@@ -64,6 +66,8 @@ appPropC = $(asRewriteQ (toTransformation "applicationPropagation"
   (onAppNode 'C.appPropWorker <> onTyAppNode 'C.appPropWorker)))
 constantSpecC :: NormRewrite
 constantSpecC = $(asRewriteQ (toTransformation "constantSpec" (onApp 'C.constantSpecWorker)))
+nonRepSpecC :: NormRewrite
+nonRepSpecC = $(asRewriteQ (toTransformation "nonRepSpec" (onApp 'C.nonRepSpecWorker)))
 
 -- * Fixtures
 
@@ -161,6 +165,7 @@ tests =
     [ testGroup "regression tests of Clash Core, through viaFoil"
         [ testGroup "appProp" (appPropTests appPropS)
         , testGroup "specialize" (specializeTests specializeViaFoil)
+        , testGroup "nonRepSpec" (nonRepSpecTests nonRepSpecS)
         ]
     , testGroup "specialize agrees with Clash Core"
         [ testCase "f (g x y)" $
@@ -225,6 +230,16 @@ tests =
             assertDoesNotFireIn tcEnv constantSpecS [] []
               (C.mkApps (C.Var fPoly) [Right intTy, Left (lit 3), Left (lit 4)])
         ]
+    , testGroup "nonRepSpec agrees with Clash Core"
+        [ testCase "fHo (g x)" $
+            assertFiresAndAgreesIn tcEnv nonRepSpecC nonRepSpecS [] [x] (C.App (C.Var fHo) (app g [C.Var x]))
+        , testCase "fHo (kInt x): an internal function is inlined" $
+            assertFiresAndAgreesIn tcEnv nonRepSpecC nonRepSpecS [] [x] (C.App (C.Var fHo) (app kInt [C.Var x]))
+        , testCase "fHo h: a local variable" $
+            assertDoesNotFireIn tcEnv nonRepSpecS [] [hl] (C.App (C.Var fHo) (C.Var hl))
+        , testCase "f x: a representable argument" $
+            assertDoesNotFireIn tcEnv nonRepSpecS [] [x] (C.App (C.Var f) (C.Var x))
+        ]
     ]
  where
   x = intId User "x" 12
@@ -237,6 +252,7 @@ tests =
   pa = intId User "a" 29
   pb = intId User "b" 30
   fl = localId User "fl" 31 (intFunTy 1)
+  hl = localId User "hl" 32 (intFunTy 1)
   a = tyVar User "a" 50
   xa = localId User "x" 12 (C.VarTy a)
   kk = tyVar User "kk" 52
