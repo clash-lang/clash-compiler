@@ -191,6 +191,17 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
         assertAlphaEq (toClashTerm tm1) (toClashTerm tm2)
         assertBool "all binders renamed" (all (> fromIntegral sunkRaw) (lamBinders (toClashTerm tm2)))
 
+    -- 'freshen' gives binders in different subterms the same name,
+    -- 'freshenDistinct' doesn't
+  , testCase "freshenDistinct gives sibling binders different names" $ do
+      let tm = [parseToTermQQ| (\(x :: Int) -> x) ((\(y :: Int) -> y) 1) |]
+      extendSunk emptyConvEnv [] [] $ \env -> do
+        let sc = convScope env
+            tm1 = sinkClosed (fromClashTermClosed tm)
+            w = scopeWatermark sc
+        binderRaws (freshen sc tm1) @?= [w + 1, w + 1]
+        binderRaws (freshenDistinct sc tm1) @?= [w + 1, w + 2]
+
   , testCase "substitution keeps binders that don't clash" $ do
       let tm = [parseToTermQQ| (\(y :: Int) (z :: Int) -> y) (x_1 :: Int) |]
       withConvEnv [] [intId C.User "x" 1] $ \env ->
@@ -413,6 +424,30 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
                     counterexample "binders just above the watermark"
                       (bindersNot (\w k -> k == w + 1) (scopeWatermark sc) tm2 === []) .&&.
                     lintTerm (lintScopeOf env1 (fvs0 <> fvs1)) tm2 === []
+
+        -- Every binder gets a different name, numbered like conversion does
+      , testProperty "freshenDistinct is alpha-equivalent and numbers binders like conversion" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0 = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                    w = scopeWatermark sc
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 -> do
+                  let tm2 = freshenDistinct sc tm1
+                  counterexample ("freshened:\n" <> showTerm (toClashTerm tm2)) $
+                    counterexample "aeqTm" (aeqTm tm1 tm2) .&&.
+                    counterexample "aeqTerm" (C.aeqTerm tm (toClashTerm tm2)) .&&.
+                    counterexample "binders numbered from the watermark"
+                      (binderRaws tm2 === [w + 1 .. w + length (binderRaws tm1)]) .&&.
+                    lintTerm (lintScopeOf env1 (fvs0 <> fvs1)) tm2 === []
+
+        -- Conversion numbers binders like 'freshenDistinct' does
+      , testProperty "freshenDistinct keeps a converted term as it is" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            withFreeVars fvs $ \env -> do
+              let tm1 = fromClashTerm env tm
+              show (freshenDistinct (convScope env) tm1) === show tm1
 
       , testProperty "opening binders is alpha-equivalent and renames binders that clash" $
           forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->

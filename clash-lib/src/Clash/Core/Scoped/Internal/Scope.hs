@@ -65,9 +65,10 @@
     watermark of a @'Scope' n@. 'emptyScope' has no names. 'extendScope' takes
     the maximum of the watermark and the new name. 'withFresh',
     'withRefreshed', 'withFreshRaw' and 'withFreshRaws' only extend a scope
-    with names above its watermark, and raise it to them. A 'Scope' can't be
-    sunk ('sink' needs a 'Sinkable' instance, and there is none for 'Scope'),
-    so no other values of type @'Scope' n@ exist.
+    with names above its watermark, and raise it to them. 'raiseWatermark'
+    only raises the watermark of a scope, without changing its names. A
+    'Scope' can't be sunk ('sink' needs a 'Sinkable' instance, and there is
+    none for 'Scope'), so no other values of type @'Scope' n@ exist.
 
   * __'withFresh', 'withRefreshed'__ ('unsafeAssertFresh'): a name above the
     watermark of the scope is not in the scope, by the 'Scope' invariant. So
@@ -125,6 +126,7 @@ module Clash.Core.Scoped.Internal.Scope
   , scopeWatermark
   , emptyScope
   , extendScope
+  , raiseWatermark
   , withFresh
   , withRefreshed
   , withFreshRaw
@@ -223,6 +225,12 @@ emptyScope = UnsafeScope 0
 extendScope :: NameBinder n l -> Scope n -> Scope l
 extendScope b (UnsafeScope w) = UnsafeScope (max w (nameId (nameOf b)))
 {-# INLINE extendScope #-}
+
+-- | Raise the watermark of a scope to at least the given name, keeping its
+-- names. A binder with a fresh name ('withFresh') is then above that name too.
+raiseWatermark :: Int -> Scope n -> Scope n
+raiseWatermark k (UnsafeScope w) = UnsafeScope (max w k)
+{-# INLINE raiseWatermark #-}
 
 -- | A binder with a fresh name: the name just above the watermark
 withFresh
