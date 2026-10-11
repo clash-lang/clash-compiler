@@ -29,7 +29,7 @@ import Clash.Core.Scoped.NameMap (nameSetToList)
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Normalize.Types (NormalizeSession)
-import Clash.Rewrite.Scoped (TransformContext (..), changed)
+import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
 import Clash.Rewrite.StrategyDSL
   (Transformation, onLet, toScopedTransformation)
 

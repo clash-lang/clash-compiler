@@ -10,9 +10,10 @@
   = The context
 
   A @'TransformContext' n@ is the context of a subterm in scope @n@: the
-  'Scope' itself, to create fresh binders, and the 'Path' from the root of the
-  term to the subterm. It mirrors 'Clash.Rewrite.Types.TransformContext' and
-  its 'Clash.Core.Term.CoreContext' frames, except that frames that bind
+  'Scope' itself, to create fresh binders, the 'Path' from the root of the
+  term to the subterm, and the let-bindings of the path, for the evaluator
+  ('tfHeap'). It mirrors 'Clash.Rewrite.Types.TransformContext' and its
+  'Clash.Core.Term.CoreContext' frames, except that frames that bind
   variables are scoped: the path is a snoc-list in which every frame lives in
   the scope of the subterms below it, and a frame that goes under binders
   ('Under') extends the scope. So, unlike in Clash Core, the binders on the
@@ -21,12 +22,24 @@
 
   Only traversals extend the context, and they do so while opening the binder
   they go under: see 'underLam', 'underTyLam', 'underAlt', 'underLet' and
-  'underLetRec'.
+  'underLetRec', which all go through 'pushUnder'. The constructor of the
+  context is not exported.
 
-  The context is minimal (decision D6 of the port): the evaluator port decides
-  how it carries let-bindings for the evaluator. Until then, the root of a
-  context may be a 'LegacyRoot': the context of a Clash Core subterm that
-  "Clash.Rewrite.Scoped.ViaFoil" converted.
+  The root of a context may be a 'LegacyRoot': the context of a Clash Core
+  subterm that "Clash.Rewrite.Scoped.ViaFoil" converted.
+
+  = Let-bindings
+
+  'Clash.Rewrite.Scoped.Whnf.whnfRW' evaluates a subterm with the
+  let-bindings of its context on the heap of the evaluator (decision D6 of the
+  port: the context carries them). The context keeps that heap, 'tfHeap', as
+  it is extended: 'pushUnder' adds the bindings of a 'LetBody', and sinks it
+  under every other binder. Its keys are the names of the scope @n@ of the
+  subterm, which is t'Distinct'. So a binder between a let-binding and the
+  subterm can't shadow the let-binder, nor a free variable of its right-hand
+  side, as it can in Clash Core (#2571): it has a different name. And the
+  heap is built as the context is, instead of from all frames at every
+  evaluation. It is lazy, so it is only built when it is used.
 
   = Inspecting the context
 
@@ -51,12 +64,16 @@ module Clash.Rewrite.Scoped.Types
     ScopedTransform (..)
   , ScopedRewrite
     -- * The context
-  , TransformContext (..)
+  , TransformContext
+  , tfScope
+  , tfPath
+  , tfHeap
   , Path (..)
   , Frame (..)
   , Under (..)
   , LegacyRoot (..)
   , rootContext
+  , legacyRootContext
   , pushFrame
   , pushUnder
   , appArgFrame
@@ -75,6 +92,7 @@ module Clash.Rewrite.Scoped.Types
   , mkDerivedName
   ) where
 
+import qualified Data.List as List
 import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
@@ -84,7 +102,9 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Var as C
 import qualified Clash.Rewrite.Types as C
 
-import Clash.Core.Scoped.Subst (openAlt, openBind, openIdBinder, openTyBinder)
+import Clash.Core.Scoped.NameMap (NameMap, emptyNameMap, insertNameMap, sinkNameMap)
+import Clash.Core.Scoped.Subst
+  (openAlt, openBind, openIdBinder, openTyBinder, teleIdVars)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (primArg)
 import Clash.Rewrite.Types (RewriteMonad)
@@ -105,13 +125,31 @@ type ScopedRewrite extra = ScopedTransform (RewriteMonad extra)
 -- * The context
 
 -- | The context of a subterm in scope @n@, see the module header
+--
+-- The fields are not record fields, so that they can't be updated: only the
+-- functions below extend a context, keeping its heap consistent with its path.
 data TransformContext (n :: S) = TransformContext
-  { tfScope :: !(Scope n)
-  -- ^ The scope of the subterm
-  , tfPath :: !(Path n)
-  -- ^ The path from the root to the subterm
-  }
+  !(Scope n)
+  !(Path n)
+  (NameMap TmName n (Term n))
 type role TransformContext nominal
+
+-- | The scope of the subterm
+tfScope :: TransformContext n -> Scope n
+tfScope (TransformContext sc _ _) = sc
+{-# INLINE tfScope #-}
+
+-- | The path from the root to the subterm
+tfPath :: TransformContext n -> Path n
+tfPath (TransformContext _ p _) = p
+{-# INLINE tfPath #-}
+
+-- | The let-bindings of the path, valid at the subterm: right-hand sides by
+-- the names of their binders. See the module header. Lazy: only built when
+-- it is used.
+tfHeap :: TransformContext n -> NameMap TmName n (Term n)
+tfHeap (TransformContext _ _ h) = h
+{-# INLINE tfHeap #-}
 
 -- | The path from the root of a term to a subterm in scope @n@, innermost
 -- frame first
@@ -180,24 +218,51 @@ data LegacyRoot (n :: S) = LegacyRoot
   -- variables before it.
   , legacyIds :: [(C.Id, Term n)]
   -- ^ The term variables of scope @n@, with their Clash variables
+  , legacyHeap :: NameMap TmName n (Term n)
+  -- ^ The let-bindings of the Clash Core context that are valid at the
+  -- subterm, of the variables of scope @n@. See
+  -- 'Clash.Rewrite.Util.contextLetBindings'.
   }
 type role LegacyRoot nominal
 
 -- | The context of the root of a term in scope @n@
 rootContext :: Scope n -> TransformContext n
-rootContext sc = TransformContext sc PRoot
+rootContext sc = TransformContext sc PRoot emptyNameMap
+
+-- | The context of a Clash Core subterm that was converted into scope @n@
+legacyRootContext :: Scope n -> LegacyRoot n -> TransformContext n
+legacyRootContext sc root = TransformContext sc (PLegacy root) (legacyHeap root)
 
 -- | Push a frame that doesn't bind variables
 pushFrame :: Frame n -> TransformContext n -> TransformContext n
-pushFrame f (TransformContext sc p) = TransformContext sc (PFrame f p)
+pushFrame f (TransformContext sc p h) = TransformContext sc (PFrame f p) h
 {-# INLINE pushFrame #-}
 
 -- | Push a frame that goes under binders. The scope is the one that opening
--- the binders gave, e.g. by 'Clash.Core.Scoped.Subst.openIdBinder'.
+-- the binders gave, e.g. by 'Clash.Core.Scoped.Subst.openIdBinder'. This is
+-- the only way to extend the scope of a context.
+--
+-- The let-bindings of a 'LetBody' are added to the heap ('tfHeap'), as they
+-- were before their right-hand sides were transformed, like in Clash Core.
+-- The other bindings of a recursive let-binding are not, while transforming
+-- one of its right-hand sides ('LetBindingRec'), also like in Clash Core.
 pushUnder
   :: (Distinct i, DExt i n)
   => Scope n -> Under i n -> TransformContext i -> TransformContext n
-pushUnder sc u (TransformContext _ p) = TransformContext sc (PUnder u p)
+pushUnder sc u (TransformContext _ p h) = TransformContext sc (PUnder u p) h'
+ where
+  h0 = sink1 (sinkNameMap h)
+  h' = case u of
+    LetBody (NonRec b x) -> insertNameMap (tmNameOf b) (sink x) h0
+    LetBody (Rec bs xs) ->
+      List.foldl' (\acc (v, x) -> case v of
+                      Var _ _ nm -> insertNameMap nm x acc
+                      _ -> acc)
+                  h0 (zip (teleIdVars bs) xs)
+    LetBindingRec {} -> h0
+    LamBody {} -> h0
+    TyLamBody {} -> h0
+    CaseAlt {} -> h0
 {-# INLINE pushUnder #-}
 
 -- | The frame of the argument of an application, given the (already
