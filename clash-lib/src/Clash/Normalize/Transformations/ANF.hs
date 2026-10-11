@@ -212,7 +212,7 @@ isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
 --
 -- The InScopeSet contains:
 --
---    1. All the free variables of the expression we are traversing
+--    1. All the free local variables of the expression we are traversing
 --
 --    2. All the bound variables of the expression we are traversing
 --
@@ -224,17 +224,13 @@ isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
 --    * Are not shadowed
 --    * Nor conflict with each other (i.e. have the same unique)
 --
--- Initially we start with the local InScopeSet and add the global variables:
+-- Initially we start with the InScopeSet of the transformation context, which
+-- contains (a superset of) the free local variables of the expression. Note
+-- that it does not contain the global variables, so a new binder can get the
+-- same unique as a global variable. Then we call 'freshenTm'
 --
 -- @
--- is1 <- unionInScope is0 <$> Lens.use globalInScope
--- @
---
--- Which will gives us the (superset of) free variables of the expression. Then
--- we call  'freshenTm'
---
--- @
--- let (is2,e1) = freshenTm is1 e0
+-- let (is2,e1) = freshenTm is0 e0
 -- @
 --
 -- Which extends the InScopeSet with all the bound variables in 'e1', the
