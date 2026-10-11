@@ -163,9 +163,9 @@ collectValueTicks = go []
 
 -- * Heap variables
 
--- | A variable bound in the local heap: its human readable name, type and
--- name
-data HeapVar (n :: S) = HeapVar !(C.Name C.Term) !(Type n) !(TmName n)
+-- | A variable bound in the local heap: its human readable name, type (lazy,
+-- like that of its binder) and name
+data HeapVar (n :: S) = HeapVar !(C.Name C.Term) (Type n) !(TmName n)
   deriving (Show)
 type role HeapVar nominal
 
