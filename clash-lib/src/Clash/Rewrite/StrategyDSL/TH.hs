@@ -29,7 +29,7 @@ import Data.List (tails)
 import Language.Haskell.TH hiding (Prim)
 
 import Clash.Core.Term
-  (Bind (..), CoreContext (..), Term (..), bindToList, patIds, primArg)
+  (CoreContext (..), Term (..), bindToList, patIds, primArg)
 import Clash.Core.VarEnv (extendInScopeSet, extendInScopeSetList)
 import Clash.Rewrite.StrategyDSL
   ( Constructor (..), Step (..), Strat (..), Transformation (..)
@@ -356,18 +356,6 @@ guardExp
 guardExp wrap transformation =
   nodeCaseExp $ \con -> wrap <$> invokeAt con transformation
 
-{-
-Note [NonRec erasure during descent]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-'Clash.Rewrite.Combinators.allR' matches let-expressions through the 'Letrec'
-pattern synonym and rebuilds them with 'Rec' bindings, so any 'NonRec' let a
-traversal descends into comes back as a 'Rec' let. The generated descent
-replicates that behavior deliberately: preserving 'NonRec' is a real behavior
-change (downstream code branches on 'Rec'/'NonRec', and netlist rendering
-order can shift) that must be validated on its own, separately from this
-dispatch machinery.
--}
-
 -- | The one-level descent for one constructor, replicating
 -- 'Clash.Rewrite.Combinators.allR' exactly: same 'CoreContext' pushes, same
 -- 'InScopeSet' extensions, and the argument's context computed from the
@@ -424,30 +412,33 @@ genDescend con go (isE, cE) nodeE fieldEs continue = case (con, fieldEs) of
       ]
 
   (CLet, [bnd, body]) -> do
-    -- See Note [NonRec erasure during descent]
     bs <- newName "bs"
     bndrs <- newName "bndrs"
     is' <- newName "is'"
+    isRhs <- newName "isRhs"
     bs' <- newName "bs'"
+    bnd' <- newName "bnd'"
     body' <- newName "body'"
     doE
       [ letS
           [ valD (varP bs) (normalB [| bindToList $bnd |]) []
           , valD (varP bndrs) (normalB [| map fst $(varE bs) |]) []
           , valD (varP is') (normalB [| extendInScopeSetList $isE $(varE bndrs) |]) []
+          , valD (varP isRhs) (normalB [| Comb.letRhsInScope $isE $(varE is') $bnd |]) []
           ]
       , bindS (varP bs')
           [| traverse
                (\(b, rhs) ->
                   fmap ((,) b)
-                    ($go (TransformContext $(varE is')
+                    ($go (TransformContext $(varE isRhs)
                             (LetBinding b $(varE bndrs) : $cE))
                          rhs))
                $(varE bs) |]
       , bindS (varP body')
           [| $go (TransformContext $(varE is') (LetBody $(varE bs) : $cE)) $body |]
-      , continueWith [[| Rec $(varE bs') |], varE body']
-          [| Let (Rec $(varE bs')) $(varE body') |]
+      , letS [valD (varP bnd') (normalB [| Comb.rebuildBind $bnd $(varE bs') |]) []]
+      , continueWith [varE bnd', varE body']
+          [| Let $(varE bnd') $(varE body') |]
       ]
 
   (CCase, [subj, altsTy, alts]) -> do

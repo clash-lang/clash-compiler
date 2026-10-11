@@ -883,8 +883,11 @@ freshenTm is0 = go (mkSubst is0) where
 
   goBind subst0 (NonRec i x) =
     let (subst1, i') = substIdBndr subst0 i
-        (is2, x') = go subst0 x
-     in (subst1 { substInScope = extendInScopeSet is2 i' }, NonRec i' x')
+        -- The binder is not in scope of its right-hand side, so the right-hand
+        -- side is substituted with 'subst0'. Its binders must still be renamed
+        -- away from the binder, hence the in-scope set of 'subst1'.
+        (is2, x') = go subst0 { substInScope = substInScope subst1 } x
+     in (subst1 { substInScope = is2 }, NonRec i' x')
 
   goBind subst0 (Rec xs) =
     let (bndrs,rhss)    = unzip xs
