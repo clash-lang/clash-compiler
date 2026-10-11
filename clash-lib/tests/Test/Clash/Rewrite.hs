@@ -67,7 +67,8 @@ import Test.Tasty.HUnit
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 import GHC.Builtin.Names
-  ( ordEQDataConKey, ordGTDataConKey, ordLTDataConKey, typeNatAddTyFamNameKey
+  ( boolTyConKey, falseDataConKey, ordEQDataConKey, ordGTDataConKey
+  , ordLTDataConKey, trueDataConKey, typeNatAddTyFamNameKey
   , typeNatCmpTyFamNameKey, typeUnconsSymbolTyFamNameKey )
 
 import qualified Text.Show.Pretty as Pretty
@@ -794,6 +795,20 @@ vTyConName = mkTyConName "V" 3025
 boolTy :: C.Type
 boolTy = tcTy boolTyConName
 
+-- | @GHC.Types.Bool@, with the uniques GHC gives it and its constructors.
+-- The evaluator recognizes these constructors by their uniques, e.g. in
+-- @(&&)@.
+ghcBoolTyConName :: C.TyConName
+ghcBoolTyConName = mkTyConName "GHC.Types.Bool" (fromGhcUnique boolTyConKey)
+
+ghcBoolTy :: C.Type
+ghcBoolTy = tcTy ghcBoolTyConName
+
+ghcFalseDataCon, ghcTrueDataCon :: C.DataCon
+ghcFalseDataCon = mkDataCon "GHC.Types.False" (fromGhcUnique falseDataConKey) [] [] [] ghcBoolTy
+ghcTrueDataCon =
+  (mkDataCon "GHC.Types.True" (fromGhcUnique trueDataConKey) [] [] [] ghcBoolTy) {C.dcTag = 2}
+
 -- | @data Maybe a = Nothing | Just a@
 maybeTy :: C.Type -> C.Type
 maybeTy a = tcApp maybeTyConName [a]
@@ -1006,6 +1021,7 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     [ intTyCon
     , mkAlgTyCon (parseTyConName "Pair") [] [pairDataCon]
     , mkAlgTyCon boolTyConName [] [falseDc, trueDc]
+    , mkAlgTyCon ghcBoolTyConName [] [ghcFalseDataCon, ghcTrueDataCon]
     , mkAlgTyCon maybeTyConName [fxA] [nothingDataCon, justDataCon]
     , mkNewTyCon nTyConName [fxA]
         (mkDataCon "MkN" 3030 [fxA] [] [maybeTy (C.VarTy fxA)] (nTy (C.VarTy fxA)))
