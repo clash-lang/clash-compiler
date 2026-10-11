@@ -59,3 +59,10 @@ lookupLocal = lookupNameMap
 -- N9
 strengthenPat :: Pat n l -> Type l -> Maybe (Type n)
 strengthenPat = strengthenTyPat
+
+-- N10
+nonRecToRec :: Distinct n => Scope n -> Term n -> Term n
+nonRecToRec sc (Let bind body) = openBind sc bind body $ \_ bind1 body1 -> case bind1 of
+  NonRec b rhs -> Let (Rec (TCons b TNil) [sink rhs]) body1
+  Rec {} -> Let bind1 body1
+nonRecToRec _ e = e
