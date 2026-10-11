@@ -24,6 +24,8 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
+import Clash.Core.Evaluator.Types
+  ( Evaluator (..), Machine (..), heapDelete, heapLookup, setTerm )
 import Clash.Core.FreeVars (freeLocalIds)
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Core.VarEnv
@@ -709,6 +711,21 @@ firstUniques :: Int -> Supply -> [Unique]
 firstUniques n = take n . go
  where
   go s0 = let (u, s1) = freshId s0 in u : go s1
+
+-- | An 'Evaluator' that only replaces a local variable by its heap binding.
+-- Unlike Clash's evaluator, which lives in @clash-ghc@, it doesn't reduce
+-- anything else, which is enough to test which bindings reach the heap.
+heapLookupEvaluator :: Evaluator
+heapLookupEvaluator = Evaluator
+  { step = \m _tcm -> case mTerm m of
+      C.Var i | Just e <- heapLookup C.LocalId i m ->
+        -- Delete the binding, so 'let x = x in x' doesn't loop
+        Just (setTerm e (heapDelete C.LocalId i m))
+      _ -> Nothing
+  , unwind = \_v _m _tcm -> Nothing
+  , primStep = \_tcm _forcePrims _p _tys _vs _m -> Nothing
+  , primUnwind = \_tcm _p _tys _vs _v _tms _m -> Nothing
+  }
 
 -- | Pretty print, always showing uniques (regardless of @CLASH_PPR_UNIQUES@)
 -- but no types. Tests on scoping are about binders that share a name but not a

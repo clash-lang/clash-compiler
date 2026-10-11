@@ -11,27 +11,31 @@ module Clash.Tests.Rewrite.Util (tests) where
 import qualified Control.Lens as Lens
 import Data.Default (def)
 import Data.Either (rights)
+import qualified Data.IntMap as IntMap
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.FreeVars (termFreeTyVars)
 import Clash.Core.Name (NameSort (User), noSrcSpan)
-import Clash.Core.Term (Bind (..), Term (..), collectArgs, mkApps)
+import Clash.Core.Term
+  ( Bind (..), Context, CoreContext (..), Pat (..), Term (..), collectArgs
+  , mkApps )
 import Clash.Core.Type (Type (VarTy))
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet, lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.Types (RewriteState (..))
-import Clash.Rewrite.Util (changed, liftBinding, runRewrite)
+import Clash.Rewrite.Types
+  (RewriteEnv (..), RewriteState (..), TransformContext (..))
+import Clash.Rewrite.Util (changed, liftBinding, runRewrite, whnfRW)
 import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals
-  , firstUniques, globalId, inScopeOf, intFunTy, intId, intLit, localId, runRewriteTest
-  , runSingleTransformation, showPprU )
-import Test.Clash.Rewrite (kindedTyVar, tyVar)
+  , firstUniques, globalId, heapLookupEvaluator, inScopeOf, intFunTy, intId
+  , intLit, kindedTyVar, localId, pairDataCon, runRewriteTest
+  , runSingleTransformation, showPprU, tyVar )
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
 
@@ -212,6 +216,22 @@ liftBindingLocalSharesUniqueWithGlobal = do
             (bindingTerm b)
     _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
 
+-- * whnfRW
+
+-- | Reduce a term to WHNF with 'whnfRW', in a context given innermost frame
+-- first, with the given variables in scope. 'heapLookupEvaluator' only
+-- replaces variables by their heap bindings, so the result shows which
+-- let-bindings of the context 'whnfRW' put on the heap.
+whnfInContext :: [Id] -> Context -> Term -> IO Term
+whnfInContext inScope ctx e = do
+  (t, _, _) <- runRewriteTest env st $
+    whnfRW False (TransformContext (inScopeOf inScope) ctx) e (\_ t -> changed t)
+  pure t
+ where
+  env = def{_evaluator = heapLookupEvaluator}
+  st :: RewriteState NormalizeState
+  st = def{_globalHeap = (IntMap.empty, 0)}
+
 tests :: TestTree
 tests =
   testGroup
@@ -252,7 +272,50 @@ tests =
         liftBindingSubstitutesBeforeAbstracting
     , testCase "liftBinding keeps a local that shares a unique with the lifted function"
         liftBindingLocalSharesUniqueWithGlobal
+
+    -- Since #2571, 'whnfRW' puts the let-bindings of the context on the heap
+    -- of the evaluator. Binders between such a let-binding and the term can
+    -- shadow its binder, or the free variables of its right-hand side, in
+    -- which case it must not be used.
+    , testGroup "whnfRW uses the context's let-bindings (#2571)"
+        [ testCase "let x = 3 in \\y -> x" $
+            whnfInContext [x, y] [LamBody y, LetBody [(x, intLit 3)]] (Var x)
+              >>= assertAlphaEq (intLit 3)
+        , testCase "let x = 3 in \\x -> x" $
+            whnfInContext [x] [LamBody x, LetBody [(x, intLit 3)]] (Var x)
+              >>= assertAlphaEq (Var x)
+        , testCase "let x = y in \\y -> x" $
+            whnfInContext [x, y] [LamBody y, LetBody [(x, Var y)]] (Var x)
+              >>= assertAlphaEq (Var x)
+        , testCase "let x = y in case s of MkPair y z -> x" $
+            whnfInContext [x, y, z, s]
+              [ CaseAlt (DataPat pairDataCon [] [y, z])
+              , LetBody [(x, Var y)] ]
+              (Var x)
+              >>= assertAlphaEq (Var x)
+        , testCase "let x = 3 in letrec { x = 4; w = x } in .." $
+            whnfInContext [x, w]
+              [LetBinding w [x, w], LetBody [(x, intLit 3)]] (Var x)
+              >>= assertAlphaEq (Var x)
+        , testCase "let x = y in let y = 5 in x" $
+            whnfInContext [x, y]
+              [LetBody [(y, intLit 5)], LetBody [(x, Var y)]] (Var x)
+              >>= assertAlphaEq (Var x)
+        , testCase "let x = (v :: a) in /\\a -> x" $
+            whnfInContext [x, v]
+              [TyLamBody a, LetBody [(x, Var v)]] (Var x)
+              >>= assertAlphaEq (Var x)
+        , testCase "let x = 3 in let w = x in \\y -> w" $
+            whnfInContext [x, w, y]
+              [LamBody y, LetBody [(w, Var x)], LetBody [(x, intLit 3)]] (Var w)
+              >>= assertAlphaEq (intLit 3)
+        ]
     ]
  where
   x = intId User "x" 1
   y = intId User "y" 2
+  z = intId User "z" 3
+  s = intId User "s" 4
+  w = intId User "w" 5
+  a = tyVar User "a" 6
+  v = localId User "v" 7 (VarTy a)
