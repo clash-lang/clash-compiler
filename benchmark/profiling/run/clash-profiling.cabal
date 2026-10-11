@@ -12,11 +12,15 @@ cabal-version:       >=1.10
 executable clash-profile-normalization-run
   main-is:             profile-normalization-run.hs
   default-language:    Haskell2010
-  ghc-options:         -O2 -Wall -Wcompat
+  ghc-options:         -O2 -Wall -Wcompat -rtsopts
   build-depends:       base,
                        binary,
                        bytestring,
                        deepseq,
+                       directory,
+                       filepath,
+                       process,
+                       time,
 
                        clash-benchmark,
                        clash-ghc,

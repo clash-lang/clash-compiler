@@ -16,6 +16,7 @@ library
   Exposed-Modules:     SerialiseInstances
   build-depends:       base,
                        binary,
+                       bytestring,
                        containers,
                        hashable,
                        unordered-containers,
