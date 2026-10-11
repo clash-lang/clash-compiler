@@ -263,5 +263,15 @@ siteComparisons =
       , scScoped = Just $(asScopedRewriteQ SReduce.reducePrim)
       , scKnownDifferences = [coercionForm]
       }
+  , SiteComparison
+      { scName = "removeUnusedExpr"
+      , scDescription =
+          "The current removeUnusedExpr (Clash.Normalize.Transformations.Letrec) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Letrec.removeUnusedExpr)"
+      , scTransformations = ["removeUnusedExpr"]
+      , scCurrent = $(asRewriteQ Current.removeUnusedExpr)
+      , scScoped = Just $(asScopedRewriteQ S.removeUnusedExpr)
+      , scKnownDifferences = [coercionForm]
+      }
   ]
 
