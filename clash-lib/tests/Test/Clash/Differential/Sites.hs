@@ -46,6 +46,7 @@ module Test.Clash.Differential.Sites
   , SiteComparison (..)
   , Replay (..)
   , SiteOutcome (..)
+  , SiteAlloc (..)
   , compareSite
   , compareAtSite
     -- * Summaries
@@ -65,9 +66,11 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import Data.Int (Int64)
 import qualified Data.Monoid as Monoid
 import Data.Text (Text)
 import qualified Data.Text as Text
+import System.Mem (getAllocationCounter)
 import System.Timeout (timeout)
 
 import Clash.Core.FreeVars (dependencySortTyVars, freeLocalIds, termFreeTyVars)
@@ -90,7 +93,7 @@ import Clash.Util.Supply (newSupply, reserveUniques, resumeSupply, supplyRange)
 import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, withConvEnv)
-import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 
 import Test.Clash.Differential
@@ -259,7 +262,28 @@ data SiteOutcome = SiteOutcome
   , soScoped :: Maybe Outcome
   -- ^ The result of the scoped transformation compared with the one of the
   -- current transformation, if it has one and the current one didn't crash
+  , soAlloc :: SiteAlloc
   }
+
+-- | The bytes that running the sides at a site allocated, including setting
+-- up the state of the site and forcing the result. Zero for a side that
+-- crashed or didn't run.
+data SiteAlloc = SiteAlloc
+  { saCurrent :: !Int64
+  -- ^ The current side
+  , saScoped :: !Int64
+  -- ^ The scoped side, through 'viaFoil': converting into scoped Core,
+  -- running the scoped transformation, and converting the result back
+  , saConvert :: !Int64
+  -- ^ Running the identity through 'viaFoil' at the site: converting into
+  -- scoped Core, but not back, as the identity doesn't change anything
+  }
+
+instance Semigroup SiteAlloc where
+  SiteAlloc a1 b1 c1 <> SiteAlloc a2 b2 c2 = SiteAlloc (a1 + a2) (b1 + b2) (c1 + c2)
+
+instance Monoid SiteAlloc where
+  mempty = SiteAlloc 0 0 0
 
 -- | Run a transformation at a site, giving its result and whether it fired
 runRewriteAt :: Corpus -> Capture -> NormRewrite -> IO (C.Term, Bool)
@@ -269,13 +293,26 @@ runRewriteAt c cap rw = do
   t' <- evaluate (force t)
   pure (t', ch)
 
+-- | Run an action, giving the bytes that it allocated in this thread
+allocated :: IO a -> IO (a, Int64)
+allocated act = do
+  before <- getAllocationCounter
+  r <- act
+  after <- getAllocationCounter
+  pure (r, before - after)
+
+-- | The allocation of a side that may have crashed
+allocOf :: Either Mismatch (a, Int64) -> Int64
+allocOf = either (const 0) snd
+
 -- | Run a comparison at a site. Running a side takes at most the given number
 -- of microseconds.
 compareSite :: Int -> SiteComparison -> Corpus -> Capture -> IO SiteOutcome
 compareSite limit sc c cap = do
-  rc <- timed "current side" $ runRewriteAt c cap (scCurrent sc)
-  case rc of
-    Left m -> pure (SiteOutcome (NotReproduced m) Nothing)
+  rc <- timed "current side" $ allocated $ runRewriteAt c cap (scCurrent sc)
+  let alloc0 = mempty {saCurrent = allocOf rc}
+  case fst <$> rc of
+    Left m -> pure (SiteOutcome (NotReproduced m) Nothing alloc0)
     Right (cur, fired) -> do
       replay <-
         if not fired
@@ -286,16 +323,20 @@ compareSite limit sc c cap = do
             Right Equal -> pure Reproduced
             Right (KnownDifferent kds) -> pure (ReproducedKnown kds)
             Right (Different m) -> pure (NotReproduced m)
-      scoped <- case scScoped sc of
-        Nothing -> pure Nothing
-        Just srw -> fmap (Just . either Different id) $ do
-          rs <- timed "scoped side" $
+      (scoped, alloc) <- case scScoped sc of
+        Nothing -> pure (Nothing, alloc0)
+        Just srw -> do
+          rs <- timed "scoped side" $ allocated $
             runRewriteAt c cap (viaFoil (scName sc) srw)
-          case rs of
+          rconv <- timed "converting" $ allocated $
+            runRewriteAt c cap (viaFoil "identity" (ScopedTransform (\_ e -> pure e)))
+          o <- case fst <$> rs of
             Left m -> pure (Left m)
             Right (s, _) -> timed "comparing" $
               evaluate (compareAtSite (scKnownDifferences sc) cur s)
-      pure (SiteOutcome replay scoped)
+          pure ( Just (either Different id o)
+               , alloc0 {saScoped = allocOf rs, saConvert = allocOf rconv} )
+      pure (SiteOutcome replay scoped alloc)
  where
   timed :: String -> IO a -> IO (Either Mismatch a)
   timed stage act = timeout limit (attempt stage act) >>= \case
@@ -330,14 +371,16 @@ data SiteSummary = SiteSummary
   , ssMismatches :: [(Capture, Either Replay Mismatch)]
   -- ^ The first sites that the current side didn't reproduce ('Left'), or
   -- where the scoped side differs ('Right')
+  , ssAlloc :: !SiteAlloc
+  -- ^ The allocation of the sides, over all sites
   }
 
 instance Semigroup SiteSummary where
-  SiteSummary a1 b1 k1 c1 d1 e1 s1 m1 <> SiteSummary a2 b2 k2 c2 d2 e2 s2 m2 =
-    SiteSummary (a1 + a2) (b1 + b2) (k1 + k2) (c1 + c2) (d1 + d2) (e1 + e2) (s1 <> s2) (m1 <> m2)
+  SiteSummary a1 b1 k1 c1 d1 e1 s1 m1 l1 <> SiteSummary a2 b2 k2 c2 d2 e2 s2 m2 l2 =
+    SiteSummary (a1 + a2) (b1 + b2) (k1 + k2) (c1 + c2) (d1 + d2) (e1 + e2) (s1 <> s2) (m1 <> m2) (l1 <> l2)
 
 instance Monoid SiteSummary where
-  mempty = SiteSummary 0 0 0 0 0 0 mempty []
+  mempty = SiteSummary 0 0 0 0 0 0 mempty [] mempty
 
 -- | Run a comparison at the captured sites of its transformation, of which
 -- the given predicate holds. Keeps the first @n@ mismatches of either kind.
@@ -367,9 +410,9 @@ compareCorpus limit n p sc c = go mempty
 -- | Add the outcome at a site to a summary, keeping the first @n@ mismatches.
 -- Mismatches are kept in reverse.
 addOutcome :: Int -> Capture -> SiteOutcome -> SiteSummary -> SiteSummary
-addOutcome n cap (SiteOutcome replay scoped) s = s3
+addOutcome n cap (SiteOutcome replay scoped alloc) s = s3
  where
-  s1 = s {ssSites = ssSites s + 1}
+  s1 = s {ssSites = ssSites s + 1, ssAlloc = ssAlloc s <> alloc}
   keep m s' = if length (ssMismatches s') < n then s' {ssMismatches = (cap, m) : ssMismatches s'} else s'
   s2 = case replay of
     Reproduced -> s1 {ssReproduced = ssReproduced s1 + 1}
@@ -414,6 +457,12 @@ renderSiteSummary nm s =
           <> known
           <> ", " <> show (sumDifferent sc) <> " different"
           <> (if sumCrashed sc > 0 then " (" <> show (sumCrashed sc) <> " crashed)" else "")
+          <> "\n  allocation: current side " <> mb (saCurrent al)
+          <> ", scoped side " <> mb (saScoped al)
+          <> " (converting into scoped Core: " <> mb (saConvert al) <> ")"
+  al = ssAlloc s
+  mb :: Int64 -> String
+  mb bytes = show (bytes `div` (1024 * 1024)) <> " MiB"
   known
     | Map.null (sumKnownDifferent sc) = ""
     | otherwise = " (" <> List.intercalate ", "
