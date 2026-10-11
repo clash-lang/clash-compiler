@@ -50,7 +50,7 @@ import Clash.Core.Scoped.Syntax (S (VoidS), Term)
 
 import Test.Clash.Rewrite
   ( addTy, assertAlphaEq, consDc, ghcBoolTy, ghcTrueDataCon, heapLookupEvaluator
-  , intId, mkTyConName, nilDc, numTy, pairDataCon, pairTy, tcApp, testTyConMap, vecTy )
+  , intId, mkTyConName, nilDc, numTy, pairDataCon, pairTy, rtreeTy, tcApp, testTyConMap, vecTy )
 import Test.Clash.Scoped (testTypeEnv)
 import Test.Clash.Scoped.Evaluator
 
@@ -274,6 +274,7 @@ harnessTests =
 
   , testProperty "generated calls have an argument for every argument type" prop_genArity
   , testProperty "calls over sized types, vectors and data types can be generated" prop_genTypes
+  , testProperty "open calls have values for the arguments that can't be generated" prop_genOpen
   ]
 
 -- | Generated calls of @Int# -> Integer -> Int#@ have two literals of the
@@ -291,7 +292,7 @@ prop_genArity =
 -- can be generated
 prop_genTypes :: Property
 prop_genTypes =
-  forAll (mapM (genPrimCall testTyConMap . mkPrim) [vecHeadTy, sizedTy, boolTy]) $ \calls ->
+  forAll (mapM (genPrimCall testTyConMap . mkPrim) [vecHeadTy, sizedTy, boolTy, treeTy]) $ \calls ->
     counterexample (show calls) (all isJust calls)
  where
   mkPrim t = C.PrimInfo "p" t C.WorkNever C.SingleResult C.NoUnfolding
@@ -302,6 +303,26 @@ prop_genTypes =
   sizedTy = C.ForAllTy tvN $ C.mkFunTy (knownNatTy (C.VarTy tvN)) $
     binTy (bvTy (C.VarTy tvN)) (bvTy (C.VarTy tvN))
   boolTy = C.mkFunTy wordPrimTy (C.mkFunTy ghcBoolTy (C.mkFunTy bitTy ghcBoolTy))
+  -- textract :: forall a. RTree 0 a -> a
+  treeTy = C.ForAllTy tvA $ C.mkFunTy (rtreeTy (numTy 0) (C.VarTy tvA)) (C.VarTy tvA)
+
+-- | Open calls of a primitive with a dictionary, a polymorphic function and a
+-- type variable of another kind than @Nat@ and @Type@ have values for them:
+-- the opaque value of a type without constructors, a function, and a free
+-- type variable
+prop_genOpen :: Property
+prop_genOpen =
+  forAll (genOpenPrimCall testTyConMap prim') $ \call ->
+    counterexample (show call) $ case C.collectArgs call of
+      (_, [Right (C.VarTy _), Left (C.TyApp (C.Prim _) _), Left (C.TyLam _ (C.Lam _ _))]) -> True
+      _ -> False
+ where
+  prim' = C.PrimInfo "p" ty C.WorkNever C.SingleResult C.NoUnfolding
+  -- p :: forall (f :: Type -> Type). Sig f -> (forall a. a -> a) -> Int#
+  tvF = C.mkTyVar (C.mkFunTy liftedTypeKind liftedTypeKind) (mkUnsafeSystemName "f" 9004)
+  ty = C.ForAllTy tvF $
+         C.mkFunTy (tcApp (mkTyConName "Sig" 4004) [C.VarTy tvF]) $
+           C.mkFunTy (C.ForAllTy tvA (C.mkFunTy (C.VarTy tvA) (C.VarTy tvA))) intPrimTy
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Evaluator.Primitives"

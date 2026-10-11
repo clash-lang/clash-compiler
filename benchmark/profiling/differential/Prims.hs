@@ -12,7 +12,8 @@
   occurs in the bindings of a design, with the type constructors of that
   design. A ported primitive that occurs in none of the designs, or whose
   arguments can't be generated, is reported, but not compared: test it with
-  unit tests, or with @clash-differential whnf --check-prims@.
+  unit tests, with @clash-differential whnf --check-prims@, or with opaque
+  arguments ('poOpen').
 
   Every call is evaluated both as the subject of a case-expression and not,
   because many reductions only reduce as a subject.
@@ -51,7 +52,8 @@ import Clash.GHC.Evaluator (evaluator)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimitives)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 
-import Test.Clash.Scoped.Evaluator (PrimOutcome (..), comparePrimCall, genPrimCall, outcomeKey)
+import Test.Clash.Scoped.Evaluator
+  (PrimOutcome (..), comparePrimCall, genOpenPrimCall, genPrimCall, outcomeKey)
 
 -- | The options of the prims command
 data PrimsOptions = PrimsOptions
@@ -62,10 +64,13 @@ data PrimsOptions = PrimsOptions
   -- ^ Number of differences to show per primitive
   , poPrim :: Maybe String
   -- ^ Only compare the primitives whose name contains this
+  , poOpen :: Bool
+  -- ^ Generate opaque values for the arguments it can't generate otherwise,
+  -- see 'genOpenPrimCall'
   }
 
 defPrimsOptions :: PrimsOptions
-defPrimsOptions = PrimsOptions 100 42 3 Nothing
+defPrimsOptions = PrimsOptions 100 42 3 Nothing False
 
 -- | The result of comparing a primitive
 data Result
@@ -90,7 +95,10 @@ comparePrims opts designs = do
   results <- forM ported $ \(nm, r) -> case HashMap.lookup nm found of
     Nothing -> pure (nm, NotFound)
     Just (p, tcm) ->
-      let gen = replicateM (poCount opts) (genPrimCall tcm p)
+      let genCall
+            | poOpen opts = Just <$> genOpenPrimCall tcm p
+            | otherwise = genPrimCall tcm p
+          gen = replicateM (poCount opts) genCall
       in case sequence (unGen gen (mkQCGen (poSeed opts)) 30) of
            Nothing -> pure (nm, CantGenerate (showPpr (C.primType p)))
            Just calls -> do
