@@ -215,10 +215,6 @@ Library
                       Clash.Core.HasFreeVars
                       Clash.Core.Literal
                       Clash.Core.Name
-                      Clash.Core.PartialEval
-                      Clash.Core.PartialEval.AsTerm
-                      Clash.Core.PartialEval.Monad
-                      Clash.Core.PartialEval.NormalForm
                       Clash.Core.Pretty
                       Clash.Core.Subst
                       Clash.Core.Term

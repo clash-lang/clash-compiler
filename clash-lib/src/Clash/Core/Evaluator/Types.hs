@@ -125,7 +125,7 @@ whnf eval tcm isSubj m
 
 
 -- | An evaluator is a collection of basic building blocks which are used to
--- define partial evaluation. In this implementation, it consists of two types
+-- define evaluation. In this implementation, it consists of two types
 -- of function:
 --
 --   * steps, which applies the reduction relation to the current term
@@ -198,7 +198,7 @@ unwindStack m
           let term = Tick sp (getTerm m')
            in unwindStack (setTerm term m')
 
--- | A single step in the partial evaluator. The result is the new heap and
+-- | A single step in the evaluator. The result is the new heap and
 -- stack, and the next expression to be reduced.
 --
 type Step = Machine -> TyConMap -> Maybe Machine

@@ -217,10 +217,6 @@ library
                       Clash.GHC.LoadModules
                       Clash.GHC.NetlistTypes
 
-                      Clash.GHC.PartialEval
-                      Clash.GHC.PartialEval.Eval
-                      Clash.GHC.PartialEval.Quote
-                      Clash.GHC.PartialEval.Primitive
 
                       Clash.GHCi.Common
 
