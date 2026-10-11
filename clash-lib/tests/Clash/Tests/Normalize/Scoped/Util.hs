@@ -19,6 +19,7 @@ module Clash.Tests.Normalize.Scoped.Util (tests) where
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (evalState)
 import Data.Default (def)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import GHC.Types.SrcLoc (noSrcSpan)
 import Test.Tasty
@@ -30,10 +31,14 @@ import Clash.Core.Name (NameSort (..))
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
+import Clash.Core.VarEnv (lookupVarEnv, nullVarEnv)
 import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeState (..))
 import qualified Clash.Normalize.Util as Current
-import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
+import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.Types (Rewrite, RewriteState (..), TransformContext (..))
+import qualified Clash.Rewrite.Util as Current (changed)
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Convert
@@ -47,7 +52,7 @@ import Clash.Rewrite.Scoped.Types (Frame (..), pushFrame, rootContext)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intLit, intTy
-  , liftedEqTy, localId, mkBindingMap, nameToUnique, pairDataCon
+  , liftedEqTy, localId, mkBinding, mkBindingMap, nameToUnique, pairDataCon
   , rewriteEnvWithTyCons, runRewriteTest, signalTy, systemDomTy, tyVar )
 import Test.Clash.Scoped
 
@@ -360,6 +365,104 @@ classifyTests =
     , C.Let (C.Rec [(y, C.App p (C.Var y))]) (C.App p (C.App (C.Var f) (C.Var y)))
     , C.Tick C.DeDup (C.App p (C.Var x))
     ]
+
+-- * Normalizing global binders
+
+-- | A rewrite of Clash Core that increments every literal
+incLits :: Rewrite NormalizeState
+incLits = bottomupR $ \_ -> \case
+  C.Literal (IntLiteral i) -> Current.changed (C.Literal (IntLiteral (i + 1)))
+  e -> pure e
+
+-- | A state with the given bindings, normalized by 'incLits'
+normState :: [(C.Id, C.Term)] -> RewriteState NormalizeState
+normState bs = st{_extra = (_extra st){_normalizationStrategy = incLits}}
+ where
+  st = def{_bindings = mkBindingMap bs, _curFun = (curF, noSrcSpan)}
+  curF = case bs of
+    (i, _) : _ -> i
+    [] -> error "normState: no bindings"
+
+normalizeTests :: [TestTree]
+normalizeTests =
+  [ testCase "normalizeTopLvlBndr agrees, and caches its result" $ do
+      let st = normState [(f, fTm)]
+      (cur, _, _) <- runRewriteTest def st $
+        Current.normalizeTopLvlBndr False f (mkBinding f fTm)
+      ((sco, sco2), st1, _) <- runRewriteTest def st $ do
+        b1 <- Scoped.normalizeTopLvlBndr False (mkGlobalId f) (fromClashTermClosed <$> mkBinding f fTm)
+        -- From the cache, so it doesn't matter what the binding is
+        b2 <- Scoped.normalizeTopLvlBndr False (mkGlobalId f) (fromClashTermClosed <$> mkBinding f (intLit 0))
+        pure (b1, b2)
+      assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
+      assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco2)
+      bindingRecursive sco @?= bindingRecursive cur
+      assertAlphaEq (C.varType (bindingId cur)) (C.varType (bindingId sco))
+      -- The cache is that of Clash Core
+      case lookupVarEnv f (_normalized (_extra st1)) of
+        Just b -> assertAlphaEq (bindingTerm cur) (bindingTerm b)
+        Nothing -> assertFailure "not cached"
+      -- The strategy ran once
+      _transformCounter st1 @?= 1
+
+  , testCase "normalizeTopLvlBndr of a recursive binder" $ do
+      let rec = C.Lam x1 (C.App (C.Var f) (intLit 1))
+          st = normState [(f, rec)]
+      (cur, _, _) <- runRewriteTest def st $
+        Current.normalizeTopLvlBndr False f (mkBinding f rec)
+      (sco, _, _) <- runRewriteTest def st $
+        Scoped.normalizeTopLvlBndr False (mkGlobalId f) (fromClashTermClosed <$> mkBinding f rec)
+      assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
+      bindingRecursive sco @?= True
+
+  , testCase "normalizeTopLvlBndr substitutes equality constraints of top entities" $ do
+      let eq = localId User "eq" 3 (eqTy (C.VarTy dom) systemDomTy)
+          x = localId User "x" 4 (signalTy (C.VarTy dom) intTy)
+          topTy = C.ForAllTy dom (eqTy (C.VarTy dom) systemDomTy `C.mkFunTy`
+                    (signalTy (C.VarTy dom) intTy `C.mkFunTy` signalTy (C.VarTy dom) intTy))
+          top = globalId User "top" 30 topTy
+          topTm = C.TyLam dom (C.Lam eq (C.Lam x (C.Var x)))
+          st = normState [(top, topTm)]
+      (cur, _, _) <- runRewriteTest def st $
+        Current.normalizeTopLvlBndr True top (mkBinding top topTm)
+      (sco, _, _) <- runRewriteTest def st $
+        Scoped.normalizeTopLvlBndr True (mkGlobalId top) (fromClashTermClosed <$> mkBinding top topTm)
+      assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
+      assertAlphaEq (C.varType (bindingId cur)) (C.varType (bindingId sco))
+
+  , testCase "normalizeWorkFreeApp agrees, and caches its result" $ do
+      -- f = \x -> \y -> x + 1, applied to 1
+      let st = normState [(f2, f2Tm)]
+          args = [Left (intLit 1)]
+      (cur, _, _) <- runRewriteTest def st $
+        Current.normalizeWorkFreeApp f2 (mkBinding f2 f2Tm) args
+      ((sco, sco2), st1, _) <- runRewriteTest def st $ do
+        let b = fromClashTermClosed <$> mkBinding f2 f2Tm
+            sArgs = [Left (Literal (IntLiteral 1))] :: [Either (Term 'VoidS) (Type 'VoidS)]
+        r1 <- Scoped.normalizeWorkFreeApp (mkGlobalId f2) b sArgs
+        r2 <- Scoped.normalizeWorkFreeApp (mkGlobalId f2) b sArgs
+        pure (r1, r2)
+      assertScopedAlphaEq cur sco
+      assertScopedAlphaEq cur sco2
+      -- The cache is that of Clash Core
+      case HashMap.lookup (C.App (C.Var f2) (intLit 1)) (_workFreeAppCache (_extra st1)) of
+        Just t -> assertAlphaEq cur t
+        Nothing -> assertFailure "not cached"
+      _transformCounter st1 @?= 1
+      -- The application was normalized as the body of a binder of its own,
+      -- which isn't added to the normalized binders
+      assertBool "normalized binders" (nullVarEnv (_normalized (_extra st1)))
+  ]
+ where
+  f = globalId User "f" 10 (intFunTy 1)
+  f2 = globalId User "f2" 11 (intFunTy 2)
+  x1 = intId User "x" 1
+  y2 = intId User "y" 2
+  -- \x -> let y = 1 in y
+  fTm = C.Lam x1 (C.Let (C.NonRec y2 (intLit 1)) (C.Var y2))
+  -- \x -> \y -> f x 1
+  f2Tm = C.Lam x1 (C.Lam y2 (C.mkApps (C.Var f) [Left (C.Var x1), Left (intLit 1)]))
+
 tests :: TestTree
 tests =
   testGroup
@@ -372,4 +475,5 @@ tests =
     , testGroup "constantSpecInfo" constantSpecTests
     , testGroup "callGraph" callGraphTests
     , testGroup "classifyFunction" classifyTests
+    , testGroup "normalizing" normalizeTests
     ]
