@@ -36,7 +36,32 @@ import Clash.Core.Scoped.Syntax
 
 primitives :: [(Text, PrimReduction)]
 primitives =
-  [ primStepEntry $(textNameLit 'GHC.Classes.gtInt) $ \case
+  [ primStepEntry $(textNameLit 'GHC.Classes.eqInt) $ \case
+      PrimStepContext{..} | Just (i,j) <- intCLiterals args
+        -> reduce (boolToBoolLiteral te ty (i == j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Classes.neInt) $ \case
+      PrimStepContext{..} | Just (i,j) <- intCLiterals args
+        -> reduce (boolToBoolLiteral te ty (i /= j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Classes.leInt) $ \case
+      PrimStepContext{..} | Just (i,j) <- intCLiterals args
+        -> reduce (boolToBoolLiteral te ty (i <= j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Classes.ltInt) $ \case
+      PrimStepContext{..} | Just (i,j) <- intCLiterals args
+        -> reduce (boolToBoolLiteral te ty (i < j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Classes.geInt) $ \case
+      PrimStepContext{..} | Just (i,j) <- intCLiterals args
+        -> reduce (boolToBoolLiteral te ty (i >= j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Classes.gtInt) $ \case
       PrimStepContext{..} | Just (i,j) <- intCLiterals args
         -> reduce (boolToBoolLiteral te ty (i > j))
       _ -> Nothing
@@ -47,6 +72,11 @@ primitives =
   , primStepEntry $(textNameLit '(GHC.Classes.&&)) (andOr True)
 
   , primStepEntry $(textNameLit '(GHC.Classes.||)) (andOr False)
+
+  , primStepEntry $(textNameLit 'GHC.Classes.divInt#) $ \case
+      PrimStepContext{..} | Just (i,j) <- intLiterals args
+        -> reduce (catchDivByZero (integerToIntLiteral (i `div` j)))
+      _ -> Nothing
 
   -- modInt# :: Int# -> Int# -> Int#
   , primStepEntry $(textNameLit 'GHC.Classes.modInt#) $ \case
