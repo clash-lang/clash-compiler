@@ -21,7 +21,8 @@ module Registry
 
 import Data.Text (Text)
 
-import Test.Clash.Differential (KnownDifference, coercionForm, letrecOrder, recToNonRec)
+import Test.Clash.Differential
+  ( KnownDifference, coercionForm, globalUniques, letrecOrder, recToNonRec )
 
 import Clash.Normalize.Transformations
 import Clash.Normalize.Types (NormRewrite)
@@ -55,6 +56,11 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["CSE"], $(asRewriteQ Current.simpleCSE), [letrecOrder])
     , (["topLet"], $(asRewriteQ Current.topLet), [])
     , (["recToLetRec"], Current.recToLetRec, [])
+    -- Inline
+    , (["bindConstantVar"], $(asRewriteQ Current.bindConstantVar), [])
+    , (["inlineCast"], $(asRewriteQ Current.inlineCast), [])
+    , (["bindOrLiftNonRep"], $(asRewriteQ Current.inlineOrLiftNonRep), [letrecOrder, globalUniques])
+    , (["bindSimIO"], $(asRewriteQ Current.inlineSimIO), [])
     ]
 
   unported =
@@ -77,12 +83,8 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["etaExpandSyn"], $(asRewriteQ etaExpandSyn))
     , (["etaTL"], etaExpansionTL)
     -- Inline
-    , (["bindConstantVar"], $(asRewriteQ bindConstantVar))
-    , (["inlineCast"], $(asRewriteQ inlineCast))
     , (["inlineCleanup"], $(asRewriteQ inlineCleanup))
     , (["collapseRHSNoops"], $(asRewriteQ collapseRHSNoops))
-    , (["bindOrLiftNonRep"], $(asRewriteQ inlineOrLiftNonRep))
-    , (["bindSimIO"], $(asRewriteQ inlineSimIO))
     , (["inlineSmall"], $(asRewriteQ inlineSmall))
     , (["inlineWorkFree"], $(asRewriteQ inlineWorkFree))
     , (["inlineNonRep"], inlineNonRep)

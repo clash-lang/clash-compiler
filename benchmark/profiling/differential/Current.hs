@@ -29,11 +29,17 @@ module Current
   , removeUnusedExpr
   , simpleCSE
   , topLet
+    -- * Inline
+  , bindConstantVar
+  , inlineCast
+  , inlineOrLiftNonRep
+  , inlineSimIO
   ) where
 
 import qualified Clash.Normalize.Transformations.ANF as ANF
 import qualified Clash.Normalize.Transformations.Case as Case
 import qualified Clash.Normalize.Transformations.DEC as DEC
+import qualified Clash.Normalize.Transformations.Inline as Inline
 import qualified Clash.Normalize.Transformations.Letrec as Letrec
 import qualified Clash.Normalize.Transformations.Reduce as Reduce
 import Clash.Normalize.Types (NormRewrite)
@@ -139,3 +145,20 @@ simpleCSE = toTransformation "CSE" (onLet 'Letrec.simpleCSEWorker)
 -- normalization strategy
 recToLetRec :: NormRewrite
 recToLetRec = Letrec.recToLetRec
+
+-- | The current 'Clash.Normalize.Transformations.Inline.bindConstantVar'
+bindConstantVar :: Transformation
+bindConstantVar = toTransformation "bindConstantVar" (onLet 'Inline.bindConstantVarWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.inlineCast'
+inlineCast :: Transformation
+inlineCast = toTransformation "inlineCast" (onLet 'Inline.inlineCastWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.inlineOrLiftNonRep'
+inlineOrLiftNonRep :: Transformation
+inlineOrLiftNonRep =
+  toTransformation "bindOrLiftNonRep" (onLet 'Inline.inlineOrLiftNonRepWorker)
+
+-- | The current 'Clash.Normalize.Transformations.Inline.inlineSimIO'
+inlineSimIO :: Transformation
+inlineSimIO = toTransformation "bindSimIO" (onLet 'Inline.inlineSimIOWorker)

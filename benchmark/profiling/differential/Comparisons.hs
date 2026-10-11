@@ -19,6 +19,7 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrate
 import qualified Clash.Normalize.Scoped.Transformations.ANF as S
 import qualified Clash.Normalize.Scoped.Transformations.Case as SC
 import qualified Clash.Normalize.Scoped.Transformations.DEC as S
+import qualified Clash.Normalize.Scoped.Transformations.Inline as SI
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 import Clash.Normalize.Transformations.ANF (makeANF)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
@@ -313,5 +314,26 @@ siteComparisons =
       , scScoped = Just (ScopedTransform S.recToLetRec)
       , scKnownDifferences = []
       }
+
+  -- Clash.Normalize.Scoped.Transformations.Inline
+  , inlineSites "bindConstantVar" ["bindConstantVar"]
+      $(asRewriteQ Current.bindConstantVar) $(asScopedRewriteQ SI.bindConstantVar)
+  , inlineSites "inlineCast" ["inlineCast"]
+      $(asRewriteQ Current.inlineCast) $(asScopedRewriteQ SI.inlineCast)
+  , inlineSites "inlineOrLiftNonRep" ["bindOrLiftNonRep"]
+      $(asRewriteQ Current.inlineOrLiftNonRep) $(asScopedRewriteQ SI.inlineOrLiftNonRep)
+  , inlineSites "inlineSimIO" ["bindSimIO"]
+      $(asRewriteQ Current.inlineSimIO) $(asScopedRewriteQ SI.inlineSimIO)
   ]
 
+ where
+  inlineSites nm capNames cur scoped = SiteComparison
+    { scName = nm
+    , scDescription =
+        "The current " <> nm <> " (Clash.Normalize.Transformations.Inline) against its port \
+        \(Clash.Normalize.Scoped.Transformations.Inline)"
+    , scTransformations = capNames
+    , scCurrent = cur
+    , scScoped = Just scoped
+    , scKnownDifferences = [letrecOrder, globalUniques]
+    }
