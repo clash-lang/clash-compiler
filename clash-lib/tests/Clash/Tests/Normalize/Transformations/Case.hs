@@ -17,19 +17,24 @@ import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Name (NameSort (User))
+import Clash.Core.Subst (aeqType)
 import Clash.Core.Term (Bind (..), Pat (..), Term (..), mkApps)
-import Clash.Core.Type (Type)
-import Clash.Core.Var (Id)
+import Clash.Core.Type (Type (VarTy))
+import Clash.Core.Var (Id, TyVar)
+import Clash.Core.VarEnv (extendInScopeSet)
 import Clash.Normalize.Transformations.Case (caseCase, caseCon, caseLet)
+import Clash.Normalize.Transformations.Cast (caseCast)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertStructurallyEqual, inScopeOf, intFunTy, intId, intTy
-  , localId, mkDataCon, pairDataCon, parseTyConTy, runSingleTransformation )
+  , localId, mkDataCon, pairDataCon, parseTyConTy, runSingleTransformation
+  , showPprU, tyVar )
 
-caseCaseR, caseConR, caseLetR :: NormRewrite
+caseCaseR, caseCastR, caseConR, caseLetR :: NormRewrite
 caseCaseR = $(asRewriteQ caseCase)
+caseCastR = $(asRewriteQ caseCast)
 caseConR = $(asRewriteQ caseCon)
 caseLetR = $(asRewriteQ caseLet)
 
@@ -40,6 +45,53 @@ tTy = parseTyConTy "T"
 -- | @MkT :: Int -> T@
 mkT :: DataCon
 mkT = mkDataCon "MkT" 1000 [] [] [intTy] tTy
+
+-- | @cast (case s of {MkE \@a' x -> y}) :: a -> Int@, where the existential
+-- type variable @a'@ bound by the pattern has the same unique as the free type
+-- variable @a@ of the cast (it shadows it). 'caseCast' pushes the cast into
+-- the alternative, which must not capture @a@:
+--
+-- @
+-- case s of {MkE \@b x -> cast y :: a -> Int} :: Int
+-- @
+caseCastExistential :: IO Term
+caseCastExistential =
+  runSingleTransformation def def is caseCastR $
+    Cast
+      (Case (Var s) (VarTy a) [(DataPat mkE [a'] [mkEField a'], Var y)])
+      (VarTy a) intTy
+ where
+  is = extendInScopeSet (inScopeOf [s, y]) a
+  a = tyVar User "a" 10
+  a' = tyVar User "a'" 10
+  s = localId User "s" 12 eTy
+  y = localId User "y" 13 (VarTy a)
+
+-- | The expected result of 'caseCastExistential'
+caseCastExistentialExpected :: Term
+caseCastExistentialExpected =
+  Case (Var s) intTy
+    [(DataPat mkE [b] [mkEField b], Cast (Var y) (VarTy a) intTy)]
+ where
+  a = tyVar User "a" 10
+  b = tyVar User "b" 14
+  s = localId User "s" 12 eTy
+  y = localId User "y" 13 (VarTy a)
+
+-- | @E@, a data type with a single constructor 'mkE'
+eTy :: Type
+eTy = parseTyConTy "E"
+
+-- | @MkE :: forall b. b -> E@, a data constructor with an existential type
+-- variable
+mkE :: DataCon
+mkE = mkDataCon "MkE" 1001 [] [b] [VarTy b] eTy
+ where
+  b = tyVar User "b" 1002
+
+-- | The field of 'mkE', of the given type
+mkEField :: TyVar -> Id
+mkEField a = localId User "x" 11 (VarTy a)
 
 -- | @case MkPair c a of MkPair a' b -> b@, where the pattern binder @a'@ has
 -- the same unique as the free variable @a@ in the subject (it shadows it), but
@@ -127,6 +179,16 @@ tests =
     -- https://github.com/clash-lang/clash-compiler/pull/1067
     , testCase "caseCase deshadows alternatives (#1067)" $
         caseCaseCapture >>= assertAlphaEq caseCaseCaptureExpected
+
+    -- 'caseCast' pushed a cast into the alternatives of a case-expression
+    -- without renaming the type variables bound by their patterns, and kept
+    -- the type of the alternatives as it was before the cast
+    , testCase "caseCast deshadows existentials and sets the type" $ do
+        result <- caseCastExistential
+        assertAlphaEq caseCastExistentialExpected result
+        case result of
+          Case _ ty _ -> assertBool ("type: " <> showPprU ty) (ty `aeqType` intTy)
+          _ -> pure ()
 
     -- 'caseLet' moved the let-bindings out of the subject of a case-expression
     -- without renaming them. They could then capture free variables of the

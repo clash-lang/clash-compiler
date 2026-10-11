@@ -24,6 +24,7 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
+import Clash.Core.Subst (deShadowAlt)
 import Clash.Core.Term
   (Bind(..), LetBinding, Term(..), bindToList, collectArgs, stripTicks)
 import Clash.Core.TermInfo (isCast)
@@ -100,9 +101,11 @@ caseCast = toTransformation "caseCast" (onCast 'caseCastWorker)
 caseCastWorker
   :: HasCallStack
   => TransformContext -> Term -> Term -> Type -> Type -> NormalizeSession Term
-caseCastWorker _ctx _node (stripTicks -> Case subj ty alts) ty1 ty2 = do
-  let alts' = map (\(p,e) -> (p, Cast e ty1 ty2)) alts
-  changed (Case subj ty alts')
+caseCastWorker (TransformContext is0 _) _node (stripTicks -> Case subj _ alts) ty1 ty2 = do
+  -- The cast moves under the binders of the patterns, so these must not
+  -- capture the free type variables of its types.
+  let alts' = map ((\(p,e) -> (p, Cast e ty1 ty2)) . deShadowAlt is0) alts
+  changed (Case subj ty2 alts')
 caseCastWorker _ctx node _body _fromType _toType = return node
 {-# SCC caseCastWorker #-}
 
