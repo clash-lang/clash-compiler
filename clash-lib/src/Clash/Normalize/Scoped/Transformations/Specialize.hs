@@ -35,7 +35,9 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Clash.Normalize.Scoped.Transformations.Specialize
-  ( specialize
+  ( appProp
+  , appPropWorker
+  , specialize
   , specialize'
   , specArgBndrsAndVars
     -- * Helpers of 'specialize'
@@ -47,9 +49,11 @@ module Clash.Normalize.Scoped.Transformations.Specialize
 import           Control.Exception           (throw)
 import           Control.Lens                ((%=))
 import qualified Control.Lens                as Lens
+import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import qualified Data.Map.Strict             as Map
+import qualified Data.Monoid                 as Monoid
 import qualified Data.Text                   as Text
 import qualified Data.Text.Extra             as Text
 import           GHC.BasicTypes.Extra        (isNoInline)
@@ -70,6 +74,8 @@ import           Clash.Driver.Types
   (Binding (..), TransformationInfo (..), hasTransformationInfo)
 import           Clash.Normalize.Types
   (NormalizeSession, specialisationCache, specialisationHistory)
+import           Clash.Rewrite.StrategyDSL
+  (Transformation, onAppNode, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
   (curFun, debugOpts, extra, scopedTypeEnv, specializationLimit)
 import           Clash.Unique                (Unique)
@@ -77,21 +83,145 @@ import           Clash.Util                  (ClashException (..))
 
 import           Clash.Core.Scoped.Convert   (toClashTerm, toClashType)
 import           Clash.Core.Scoped.FreeVars  (freeTyVarsOfType)
-import           Clash.Core.Scoped.HasType   (globalIdType, piResultTy)
+import           Clash.Core.Scoped.HasType   (globalIdType, inferCoreTypeOf, piResultTy)
 import           Clash.Core.Scoped.NameMap   (nullNameSet)
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
   (AbsBinder (..), collectArgsTicks, mkAbstraction, mkApps, mkLams, mkTicks, mkTyLams)
-import           Clash.Core.Scoped.TermInfo  (isPolyFun)
-import           Clash.Core.Scoped.Type      (TypeView (..), coreView1, normalizeType, tyView)
+import           Clash.Core.Scoped.TermInfo  (isPolyFun, isVar)
+import           Clash.Core.Scoped.Type
+  (TypeView (..), applyFunTy, coreView1, normalizeType, tyView)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 import           Clash.Rewrite.Scoped.Globals
-  (findAlphaEqBinding, isTopEntity, lookupBinding, mkFunction)
-import           Clash.Rewrite.Scoped.Types  (TransformContext, tfScope)
+  (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
+import           Clash.Rewrite.Scoped.Types
+  (TransformContext, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Util
-  (abstractOver, changed, dependencySortTyVars, normalizeTermTypes)
+  ( abstractOver, changed, dependencySortTyVars, mkTmBinderFor, normalizeTermTypes
+  , setChanged )
+
+-- | Propagate the arguments of an application inwards, see
+-- 'Clash.Normalize.Transformations.Specialize.appProp'.
+--
+-- Unlike the original, nothing needs to be deshadowed (see Note [AppProp no
+-- shadowing] in "Clash.Normalize.Transformations.Specialize"): the
+-- arguments are only moved under a binder after it is opened, which renames
+-- it if it clashes with the scope of the arguments. That holds for the
+-- binders of the function part, and for those of arguments that end up as
+-- the function part after substitution alike.
+appProp :: Transformation
+appProp = toScopedTransformation "applicationPropagation"
+  (onAppNode 'appPropWorker <> onTyAppNode 'appPropWorker)
+
+-- | The application-spine handler of 'appProp'. Matches the constructors it
+-- is registered for itself, so it can also be used as a plain uninstrumented
+-- rewrite, as 'Clash.Normalize.Transformations.Specialize.nonRepSpec' does.
+appPropWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> NormalizeSession (Term n)
+appPropWorker ctx node = case node of
+  App {} -> propagate
+  TyApp {} -> propagate
+  _ -> return node
+ where
+  propagate = do
+    let (fun, args, ticks) = collectArgsTicks node
+    (eN, hasChanged) <- Writer.listen (go (tfScope ctx) fun args ticks)
+    if Monoid.getAny hasChanged
+      then return eN
+      else return node
+
+  go
+    :: Distinct m
+    => Scope m
+    -> Term m
+    -> [Either (Term m) (Type m)]
+    -> [TickInfo m]
+    -> NormalizeSession (Term m)
+  go sc (collectArgsTicks -> (fun, args0@(_:_), ticks0)) args1 ticks1 =
+    go sc fun (args0 ++ args1) (ticks0 ++ ticks1)
+
+  go sc (Lam b e) (Left arg : args) ticks = do
+    setChanged
+    isVarOrWorkFree arg >>= \case
+      True ->
+        (`mkTicks` ticks) <$> go sc (substTm (extendTmSubst (idSubst sc) b arg) e) args []
+      False ->
+        openIdBinder sc b e $ \sc1 b1 e1 ->
+          Let (NonRec b1 arg) <$> go sc1 e1 (sinkArgs args) (map sink ticks)
+
+  go sc (Let bind e) args@(_:_) ticks = do
+    setChanged
+    openBind sc bind e $ \sc1 bind1 e1 ->
+      Let bind1 <$> go sc1 e1 (sinkArgs args) (map sink ticks)
+
+  go sc (TyLam b e) (Right t : args) ticks = do
+    setChanged
+    (`mkTicks` ticks) <$> go sc (substTm (extendTySubst (idSubst sc) b t) e) args []
+
+  go sc (Case scrut ty0 alts) args0@(_:_) ticks = do
+    setChanged
+    te <- Lens.view scopedTypeEnv
+    letBindCaseArgs te sc ty0 args0 $ \sc1 wrapLets ty1 args1 -> do
+      alts1 <- mapM (goAlt sc1 args1) (map sink alts)
+      pure (wrapLets (mkTicks (Case (sink scrut) ty1 alts1) (map sink ticks)))
+
+  go sc (Tick sp e) args ticks = do
+    setChanged
+    go sc e args (sp : ticks)
+
+  go _ fun args ticks = return (mkApps (mkTicks fun ticks) args)
+
+  goAlt
+    :: Distinct m
+    => Scope m
+    -> [Either (Term m) (Type m)]
+    -> Alt m
+    -> NormalizeSession (Alt m)
+  goAlt sc args alt =
+    openAlt sc alt $ \sc1 p e -> Alt p <$> go sc1 e (sinkArgs args) []
+
+  -- Let-bind the arguments that aren't variables or work free, so that they
+  -- aren't duplicated in every alternative. Also gives the type of the
+  -- case-expression applied to the arguments. The arguments are bound in
+  -- order, with non-recursive let-bindings.
+  letBindCaseArgs
+    :: Distinct m
+    => TypeEnv
+    -> Scope m
+    -> Type m
+    -> [Either (Term m) (Type m)]
+    -> (forall l. DExt m l => Scope l -> (Term l -> Term m) -> Type l -> [Either (Term l) (Type l)] -> NormalizeSession r)
+    -> NormalizeSession r
+  letBindCaseArgs te sc ty args0 k = case args0 of
+    [] -> k sc id ty []
+    Right t : args ->
+      letBindCaseArgs te sc (piResultTy te sc ty t) args $ \sc1 wrapLets ty1 args1 ->
+        k sc1 wrapLets ty1 (Right (sink t) : args1)
+    Left arg : args -> do
+      let ty1 = applyFunTy te sc ty (inferCoreTypeOf te sc arg)
+      isVarOrWorkFree arg >>= \case
+        True ->
+          letBindCaseArgs te sc ty1 args $ \sc1 wrapLets ty2 args1 ->
+            k sc1 wrapLets ty2 (Left (sink arg) : args1)
+        False ->
+          mkTmBinderFor te sc (mkDerivedName ctx "app_arg") arg $ \sc1 b ->
+            letBindCaseArgs te sc1 (sink ty1) (sinkArgs args) $ \sc2 wrapLets ty2 args1 ->
+              k sc2 (Let (NonRec b arg) . wrapLets) ty2 (Left (sink (idBinderVar b)) : args1)
+
+  isVarOrWorkFree :: Term m -> NormalizeSession Bool
+  isVarOrWorkFree arg
+    | isVar arg = pure True
+    | otherwise = isWorkFreeTerm arg
+{-# SCC appPropWorker #-}
+
+-- | Move the arguments of an application into an extension of their scope
+sinkArgs :: DExt n l => [Either (Term n) (Type n)] -> [Either (Term l) (Type l)]
+sinkArgs = map (bimap sink sink)
 
 -- | Specialize an application on its argument, see
 -- 'Clash.Normalize.Transformations.Specialize.specialize'
