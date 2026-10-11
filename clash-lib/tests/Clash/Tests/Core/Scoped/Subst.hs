@@ -387,6 +387,23 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
       [ testProperty "substitution agrees with Clash" $
           forAllShrink genRedex shrinkRedex betaAgrees
 
+      , testProperty "substitution for variables of the scope agrees with Clash" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) -> case fvIds fvs0 of
+            [] -> property True
+            x : _ ->
+              let lit = C.Literal (IntLiteral 1)
+                  s0 = C.mkSubst (inScopeOf (fvs0 <> fvs1))
+                  expected = C.substTm "tmVarsSubst" (C.extendIdSubst s0 x lit) tm
+              in  withFreeVars fvs0 $ \env0 -> do
+                    let tm0 = fromClashTerm env0 tm
+                    extendFreeVars env0 fvs1 $ \env1 -> do
+                      let sc = convScope env1
+                      forAllScrambled sc (sinkInto sc tm0) $ \tm1 -> case fromClashTerm env1 (C.Var x) of
+                        Var _ _ xn ->
+                          resultAgrees expected (lintScopeOf env1 (fvs0 <> fvs1)) sc
+                            (substTm (tmVarsSubst sc (singletonNameMap xn (Literal (IntLiteral 1)))) tm1)
+                        _ -> counterexample "not a variable" False
+
       , testProperty "substitution for the variables of a pattern agrees with Clash" $
           forAllShrink genKnownCon shrinkKnownCon knownConAgrees
 
