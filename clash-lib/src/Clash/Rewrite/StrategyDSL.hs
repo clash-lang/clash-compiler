@@ -18,6 +18,27 @@
   * 'Strat': a complete strategy. Fused traversals over a 'Step', whole-term
     passes, and the usual combinators ('>->', '!->', '>-!', '>-!->',
     'repeatR') between them.
+
+  = Scoped Core
+
+  The same DSL describes strategies of transformations of Clash Core and of
+  scoped Clash Core ("Clash.Rewrite.Scoped"). A transformation says which Core
+  its workers are written for ('WorkerCore'): declare one with
+  'toTransformation' or 'toScopedTransformation', and a whole-term pass with
+  'pass' or 'scopedPass'. 'Clash.Rewrite.StrategyDSL.TH.compileStrategy'
+  compiles a strategy for Clash Core, running the scoped transformations in it
+  through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and
+  'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy' compiles one for scoped
+  Core, which must only contain scoped transformations.
+
+  So a ported transformation replaces the one of Clash Core by changing a
+  single definition, see "Clash.Rewrite.Scoped":
+
+  @
+  caseCon = 'toTransformation' \"caseCon\" ('onCase' 'caseConWorker)
+  -- becomes, with caseCon = 'toScopedTransformation' ... in the scoped module
+  caseCon = Scoped.caseCon
+  @
 -}
 
 {-# LANGUAGE DisambiguateRecordFields #-}
@@ -30,9 +51,12 @@ module Clash.Rewrite.StrategyDSL
   ( -- * Transformation metadata
     Constructor (..)
   , TransformationWorker (..)
+  , WorkerCore (..)
   , Transformation (..)
   , toTransformation
+  , toScopedTransformation
   , anyConstructor
+  , scopedAnyConstructor
   , named
     -- ** Worker builders: workers receiving the constructor's fields
   , onVar
@@ -67,6 +91,7 @@ module Clash.Rewrite.StrategyDSL
   , topdownSuc
   , innerMost
   , pass
+  , scopedPass
   , callStrategy
   , repeatR
     -- * Combinators
@@ -113,6 +138,19 @@ data TransformationWorker
   -- (@topLet@).
   deriving (Eq, Show)
 
+-- | The Core that the workers of a transformation are written for
+data WorkerCore
+  = CurrentCore
+  -- ^ Clash Core ("Clash.Core.Term"): workers take a
+  -- 'Clash.Rewrite.Types.TransformContext' and 'Clash.Core.Term.Term's
+  | ScopedCore
+  -- ^ Scoped Clash Core ("Clash.Core.Scoped.Syntax"): workers take a
+  -- 'Clash.Rewrite.Scoped.Types.TransformContext' and terms of any scope,
+  -- see "Clash.Rewrite.Scoped". A 'FieldWorker' of 'CVar' is not supported,
+  -- as scoped Core has separate constructors for local and global variables:
+  -- use a 'Worker', which fires at both.
+  deriving (Eq, Show)
+
 -- | Single, named transformation. Can consist of multiple workers (see
 -- 'TransformationWorker').
 data Transformation = Transformation
@@ -120,17 +158,27 @@ data Transformation = Transformation
   -- ^ Canonical name, used for debug tracing, transformation counters, and
   -- the rewrite history.
   , workers :: ![TransformationWorker]
+  , core :: !WorkerCore
+  -- ^ The Core the workers are written for
   } deriving (Eq, Show)
 
 -- | Declare a transformation's workers: at most one per constructor, and
 -- either an 'AnyWorker' or per-constructor workers, never both. Checked when
 -- the transformation is compiled.
 toTransformation :: String -> [TransformationWorker] -> Transformation
-toTransformation = Transformation
+toTransformation name workers = Transformation name workers CurrentCore
+
+-- | Like 'toTransformation', for workers on scoped Core. See 'ScopedCore'.
+toScopedTransformation :: String -> [TransformationWorker] -> Transformation
+toScopedTransformation name workers = Transformation name workers ScopedCore
 
 -- | Declare a transformation that fires at any constructor. See 'AnyWorker'.
 anyConstructor :: String -> Name -> Transformation
-anyConstructor name worker = Transformation name [AnyWorker worker]
+anyConstructor name worker = Transformation name [AnyWorker worker] CurrentCore
+
+-- | Like 'anyConstructor', for a worker on scoped Core
+scopedAnyConstructor :: String -> Name -> Transformation
+scopedAnyConstructor name worker = Transformation name [AnyWorker worker] ScopedCore
 
 -- | Give a transformation a different name; used for deliberate debug
 -- aliases of a transformation that runs at several strategy positions (the
@@ -198,9 +246,10 @@ data Strat
   | InnerMost Step
   -- ^ Fused 'Clash.Rewrite.Combinators.innerMost': bottom-up; when the step
   -- fires, re-traverse the result until the innermost fixpoint is reached.
-  | Pass String Name
+  | Pass WorkerCore String Name
   -- ^ A whole-term pass: @apply \<name\> \<rewrite\>@, for transformations
-  -- that traverse the term themselves (@makeANF@, @etaExpansionTL@, …).
+  -- that traverse the term themselves (@makeANF@, @etaExpansionTL@, …). The
+  -- rewrite is written for the given Core.
   | CallStrategy Name
   -- ^ Reference to another compiled strategy binding.
   | Seq Strat Strat            -- ^ '>->'
@@ -243,7 +292,13 @@ innerMost  = InnerMost . toStep
 
 -- | A whole-term pass, run as @apply \<name\> \<rewrite\>@.
 pass :: String -> Name -> Strat
-pass = Pass
+pass = Pass CurrentCore
+
+-- | A whole-term pass of a rewrite of scoped Core, i.e. a function of type
+-- @forall n. Distinct n => TransformContext n -> Term n -> RewriteMonad extra
+-- (Term n)@, see "Clash.Rewrite.Scoped".
+scopedPass :: String -> Name -> Strat
+scopedPass = Pass ScopedCore
 
 -- | Reference another compiled strategy by the name of its binding.
 callStrategy :: Name -> Strat
