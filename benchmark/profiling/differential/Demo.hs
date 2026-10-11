@@ -82,5 +82,5 @@ ticksKnownDifference :: KnownDifference
 ticksKnownDifference = KnownDifference
   { kdName = "ticks"
   , kdDescription = "ticks are left out"
-  , kdNormalize = dropTicks
+  , kdNormalize = \_ -> dropTicks
   }

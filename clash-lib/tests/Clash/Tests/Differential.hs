@@ -84,12 +84,23 @@ tests = testGroup "Clash.Tests.Differential"
               nonRec = closed (C.Lam x (C.Let (C.NonRec y (C.Var x)) (C.Var y)))
               rec_ = closed (C.Lam x (C.Let (C.Rec [(y, C.Var x)]) (C.Var y)))
           assertBool "different before" (not (aeqTm nonRec rec_))
-          assertBool "equal after" (aeqTm nonRec (kdNormalize recToNonRec rec_))
+          assertBool "equal after" (aeqTm nonRec (kdNormalize recToNonRec emptyScope rec_))
+
+      , testCase "letrec-order orders bindings by their first reference" $ do
+          let x = intId C.User "x" 1
+              y = intId C.User "y" 2
+              z = intId C.User "z" 3
+              -- letrec y = x; z = y in z, in two orders
+              t1 = closed (C.Lam x (C.Let (C.Rec [(y, C.Var x), (z, C.Var y)]) (C.Var z)))
+              t2 = closed (C.Lam x (C.Let (C.Rec [(z, C.Var y), (y, C.Var x)]) (C.Var z)))
+          assertBool "different before" (not (aeqTm t1 t2))
+          assertBool "equal after"
+            (aeqTm (kdNormalize letrecOrder emptyScope t1) (kdNormalize letrecOrder emptyScope t2))
 
       , testCase "rec-to-nonrec keeps a recursive Rec" $ do
           let y = intId C.User "y" 2
               rec_ = closed (C.Let (C.Rec [(y, C.Var y)]) (C.Var y))
-          case kdNormalize recToNonRec rec_ of
+          case kdNormalize recToNonRec emptyScope rec_ of
             Let (Rec _ _) _ -> pure ()
             _ -> assertFailure "not a Rec"
       ]
@@ -176,7 +187,7 @@ tests = testGroup "Clash.Tests.Differential"
       e -> e
 
   -- The scoped side turns non-recursive Recs into NonRecs
-  nonRecCmp = Comparison "nonrec" "" (pureSide id) (pureSide (kdNormalize recToNonRec))
+  nonRecCmp = Comparison "nonrec" "" (pureSide id) (pureSide (kdNormalize recToNonRec emptyScope))
 
   roundTripCmp = Comparison "round trip" ""
     (pureSide (toClashTerm . fromClashTermClosed))
