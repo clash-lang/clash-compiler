@@ -27,7 +27,9 @@ module Test.Clash.Scoped
     withFreeVarsOf
   , withFreeVars
   , extendFreeVars
+  , abstractFreeVars
   , sinkInto
+  , atScope
   , roundTrip
   , extendSunk
   , sunkVar
@@ -168,6 +170,12 @@ roundTrip tm = withFreeVarsOf [tm] $ \env -> toClashTerm (fromClashTerm env tm)
 testTypeEnv :: TypeEnv
 testTypeEnv = mkTypeEnv testTyConMap
 
+-- | Abstract a term over free variables: type lambdas for the type variables,
+-- and lambdas for the term variables inside those. So the result has no free
+-- variables if the term only has the given ones.
+abstractFreeVars :: FreeVars -> C.Term -> C.Term
+abstractFreeVars (FreeVars tvs ids) tm = foldr C.TyLam (foldr C.Lam tm ids) tvs
+
 -- | Global bindings of the given closed terms, converted to scoped Core. See
 -- 'Test.Clash.Rewrite.mkBindingMap'.
 mkScopedBindingMap :: HasCallStack => [(C.Id, C.Term)] -> GlobalEnv (Binding (Term 'VoidS))
@@ -260,6 +268,11 @@ extendFreeVars env (FreeVars tvs ids) = extendConvEnv env tvs ids
 -- | 'sink' into the given scope
 sinkInto :: (Sinkable e, DExt n l) => Scope l -> e n -> e l
 sinkInto _ = sink
+
+-- | A value in the scope of the given scope, e.g. to fix the scope of
+-- 'sinkClosed'
+atScope :: Scope n -> e n -> e n
+atScope _ e = e
 
 -- * Invariants
 

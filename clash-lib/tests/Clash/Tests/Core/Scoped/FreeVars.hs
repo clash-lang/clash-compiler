@@ -25,6 +25,7 @@ import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Convert
@@ -38,12 +39,12 @@ import Test.Clash.Rewrite
   ( globalId, intId, intTy, kindedTyVar, localId, pairDataCon, pairTy
   , parseToTermQQ, tyVar)
 import Test.Clash.Scoped
-  ( extendFreeVars, extendSunk, forAllScrambled, nameSetRaws, sinkInto, withFreeVars
-  , withFreeVarsOf, withTests)
+  ( abstractFreeVars, extendFreeVars, extendSunk, forAllScrambled, nameSetRaws, sinkInto
+  , withFreeVars, withFreeVarsOf, withTests)
 import Test.Clash.Scoped.Gen
-  ( FreeVars (..), InScope (..), Redex (..), Sunk (..), genInScope, genRedex
-  , genSameRhsCase, genSunk, patBindersFreeIn, shrinkInScope, shrinkRedex, shrinkSunk
-  , showTerm)
+  ( FreeVars (..), InScope (..), Redex (..), Sunk (..), ctxOf, genFreeVars, genInScope
+  , genRedex, genSameRhsCase, genSunk, genType, patBindersFreeIn, runG, shrinkInScope
+  , shrinkRedex, shrinkSunk, showTerm, showType)
 
 -- | The uniques of the free local term variables of a Clash term, as raw
 -- names, in ascending order
@@ -208,6 +209,35 @@ tests = testGroup "Clash.Tests.Core.Scoped.FreeVars"
                 let sc = convScope env1
                 forAllScrambled sc (sinkInto sc tm0) $ \tm1 ->
                   conjoin (freeVarsAgree tm tm1 : unsinkChecks tm1)
+
+        -- Abstracting over the free variables of the scope it is converted in
+        -- gives terms without free variables
+      , testProperty "hasFreeVars agrees with free variables" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) -> forAll arbitrary $ \abstract ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0
+                    | abstract = sinkClosed (fromClashTermClosed (abstractFreeVars fvs0 tm))
+                    | otherwise = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 -> do
+                  let free = not (nullNameSet (freeTmVars tm1) && nullNameSet (freeTyVars tm1))
+                  cover 20 (not free) "no free variables" $
+                    cover 20 free "free variables" $
+                      hasFreeVars tm1 === free
+
+      , testProperty "hasFreeVarsType agrees with free variables" $
+          forAllBlind genFreeVars $ \fvs ->
+            forAllShow (runG 30 (genType (ctxOf fvs) C.liftedTypeKind 3)) showType $ \ty ->
+              forAll arbitrary $ \abstract ->
+                withFreeVars fvs $ \env -> do
+                  let ty1
+                        | abstract = fromClashTypeClosed (convScope env) (foldr C.ForAllTy ty (fvTyVars fvs))
+                        | otherwise = fromClashType env ty
+                      free = not (nullNameSet (freeTyVarsOfType ty1))
+                  cover 20 (not free) "no free variables" $
+                    cover 10 free "free variables" $
+                      hasFreeVarsType ty1 === free
 
       , testProperty "unsinking an alternative agrees with Clash's free variables" $
           forAllShrink genSameRhsCase shrinkInScope $ \(InScope fvs tm) ->

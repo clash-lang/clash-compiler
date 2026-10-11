@@ -47,13 +47,14 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, existentialDataCon, existentialTy, existentialTyVar, intId
   , intTy, localId, parseToTermQQ, tyVar)
 import Test.Clash.Scoped
-  ( LintScope, aeqTermTyped, assertScopedAlphaEq, assertScopedTyAlphaEq, betaTm
-  , betaTy, binderRaws, bindersNot, extendFreeVars, extendSunk, forAllScrambled
-  , lintScopeOf, lintTerm, reopenTerm, sinkInto, sunkVar, withFreeVars, withTests)
+  ( LintScope, abstractFreeVars, aeqTermTyped, assertScopedAlphaEq, assertScopedTyAlphaEq
+  , atScope, betaTm, betaTy, binderRaws, bindersNot, extendFreeVars, extendSunk
+  , forAllScrambled, lintScopeOf, lintTerm, reopenTerm, sinkInto, sunkVar, withFreeVars
+  , withTests)
 import Test.Clash.Scoped.Gen
-  ( InScope (..), KnownCon (..), Redex (..), Sunk (..), genInScope, genKnownCon
-  , genRedex, genSunk, inScopeOf, shrinkInScope, shrinkKnownCon, shrinkRedex
-  , shrinkSunk, showTerm)
+  ( FreeVars (..), InScope (..), KnownCon (..), Redex (..), Sunk (..), ctxOf, genFreeVars
+  , genInScope, genKnownCon, genRedex, genSunk, genType, inScopeOf, runG, shrinkInScope
+  , shrinkKnownCon, shrinkRedex, shrinkSunk, showTerm, showType)
 
 -- | Beta-reduce a redex with Clash's 'C.substTm', and with scoped Core
 -- (converted to Clash Core), and check that the results agree. The function of
@@ -448,6 +449,37 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
             withFreeVars fvs $ \env -> do
               let tm1 = fromClashTerm env tm
               show (freshenDistinct (convScope env) tm1) === show tm1
+
+        -- See "hasFreeVars agrees with free variables"
+      , testProperty "closeTerm succeeds exactly when a term has no free variables" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) -> forAll arbitrary $ \abstract ->
+            withFreeVars fvs0 $ \env0 -> do
+              let tm0
+                    | abstract = sinkClosed (fromClashTermClosed (abstractFreeVars fvs0 tm))
+                    | otherwise = fromClashTerm env0 tm
+              extendFreeVars env0 fvs1 $ \env1 -> do
+                let sc = convScope env1
+                forAllScrambled sc (sinkInto sc tm0) $ \tm1 -> do
+                  let closed = nullNameSet (freeTmVars tm1) && nullNameSet (freeTyVars tm1)
+                  cover 20 closed "no free variables" $ case closeTerm tm1 of
+                    Nothing -> counterexample "closeTerm failed" (not closed)
+                    Just tm2 -> counterexample "closeTerm succeeded" closed .&&.
+                      show (atScope sc (sinkClosed tm2)) === show tm1 .&&.
+                      lintTerm (lintScopeOf emptyConvEnv (FreeVars [] [])) tm2 === []
+
+      , testProperty "closeType succeeds exactly when a type has no free variables" $
+          forAllBlind genFreeVars $ \fvs ->
+            forAllShow (runG 30 (genType (ctxOf fvs) C.liftedTypeKind 3)) showType $ \ty ->
+              forAll arbitrary $ \abstract ->
+                withFreeVars fvs $ \env -> do
+                  let ty1
+                        | abstract = fromClashTypeClosed (convScope env) (foldr C.ForAllTy ty (fvTyVars fvs))
+                        | otherwise = fromClashType env ty
+                      closed = nullNameSet (freeTyVarsOfType ty1)
+                  cover 20 closed "no free variables" $ case closeType ty1 of
+                    Nothing -> counterexample "closeType failed" (not closed)
+                    Just ty2 -> counterexample "closeType succeeded" closed .&&.
+                      show (atScope (convScope env) (sinkClosed ty2)) === show ty1
 
       , testProperty "opening binders is alpha-equivalent and renames binders that clash" $
           forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->

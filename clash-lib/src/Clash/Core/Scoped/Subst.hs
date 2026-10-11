@@ -80,6 +80,12 @@
     including the types of variable occurrences and the kinds of type variable
     occurrences.
 
+  * __Closing__ ('unsafeCoerce' in 'closeTerm' and 'closeType'): a value
+    without free local variables mentions no names at all, so it is a value in
+    the empty scope 'VoidS'. 'Clash.Core.Scoped.FreeVars.hasFreeVars' and
+    'Clash.Core.Scoped.FreeVars.hasFreeVarsType' check this, including the
+    types of variable occurrences and the kinds of type variable occurrences.
+
   * __Strengthening__ ('unsafeCoerce' in 'strengthenTyId',
     'strengthenTyIds' and 'teleIdBinderTypes'): a type only mentions type
     variables. A term variable binder binds no type variable, and the type
@@ -145,6 +151,8 @@ module Clash.Core.Scoped.Subst
   , strengthenTyIds
   , strengthenTyPat
   , teleIdBinderTypes
+  , closeTerm
+  , closeType
     -- * Variables of binders
   , teleIdVars
   , patVars
@@ -825,6 +833,23 @@ teleIdBinderTypes = go
   go TNil = []
   -- Trusted: see the module header
   go (TCons b bs) = unsafeCoerce (idBinderType b) : go bs
+
+-- | Move a term into the empty scope, if it has no free local variables of
+-- either sort, e.g. to make it the body of a global binding. 'sinkClosed'
+-- moves it back.
+closeTerm :: Term n -> Maybe (Term 'VoidS)
+closeTerm e
+  | hasFreeVars e = Nothing
+  -- Trusted: see the module header
+  | otherwise = Just (unsafeCoerce e)
+
+-- | Move a type into the empty scope, if it has no free type variables. See
+-- 'closeTerm'.
+closeType :: Type n -> Maybe (Type 'VoidS)
+closeType ty
+  | hasFreeVarsType ty = Nothing
+  -- Trusted: see the module header
+  | otherwise = Just (unsafeCoerce ty)
 
 -- * Variables of binders
 
