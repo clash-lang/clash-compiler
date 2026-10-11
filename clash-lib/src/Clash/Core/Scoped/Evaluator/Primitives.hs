@@ -34,6 +34,11 @@
   'Clash.Rewrite.Scoped.Whnf.evaluatorEnv' builds its environment from this
   module and the adapter. Once every primitive is ported, the adapter goes, and
   with it the scoped evaluator's dependency on the reductions of @clash-ghc@.
+
+  A ported reduction doesn't declare what it uses of the machine: it gets the
+  whole machine, heap included. The adapter gives every reduction of Clash
+  Core the heap bindings its arguments reach, see
+  "Clash.Core.Scoped.Evaluator.Adapter".
 -}
 
 module Clash.Core.Scoped.Evaluator.Primitives

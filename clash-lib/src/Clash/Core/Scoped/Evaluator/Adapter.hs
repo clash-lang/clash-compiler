@@ -20,10 +20,12 @@
     as uniques, and the result is converted back with the same variables.
   * Use the primitive heap, which is shared.
   * Evaluate an argument with a nested machine, which looks up variables in
-    the local heap. So for the primitives that do ('heapPrims'), the adapter
-    converts the bindings of the local heap that the arguments can reach,
-    transitively. Evaluated globals are not converted, but re-evaluated from
-    their global bindings if needed; the set of globals under evaluation is.
+    the local heap. So the adapter converts the bindings of the local heap
+    that the arguments can reach, transitively, for every reduction: it can't
+    tell which reductions look at the heap. Most reductions get arguments
+    without free variables, for which that is no work. Evaluated globals are
+    not converted, but re-evaluated from their global bindings if needed; the
+    set of globals under evaluation is.
   * Allocate heap bindings: those that the result refers to become bindings
     the scoped machine allocated, with fresh binders. They are converted back
     together with the result, as one @letrec@.
@@ -67,13 +69,9 @@ module Clash.Core.Scoped.Evaluator.Adapter
 
 import Control.Monad.State.Strict (State, get, modify', runState)
 import Data.IntMap.Strict (IntMap)
-import qualified Data.HashSet as HashSet
-import Data.HashSet (HashSet)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.List as List
-import Data.Text (Text)
-import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -113,9 +111,7 @@ adaptPrim eval = PrimReduction $ \pc ->
       ((tys, args, heap), vars) = flip runState emptyClashVars $ do
         tys0 <- mapM toClashTypeWith (pcTys pc)
         args0 <- mapM toClashValueWith (pcArgs pc)
-        heap0 <- if C.primName (pcInfo pc) `HashSet.member` heapPrims
-                   then reachableHeap (mHeapLocal m)
-                   else pure []
+        heap0 <- reachableHeap (mHeapLocal m)
         pure (tys0, args0, heap0)
       tvs = clashVarsTyVars vars
       ids = clashVarsIds vars
@@ -143,42 +139,6 @@ adaptPrim eval = PrimReduction $ \pc ->
                                   , not (IntSet.member (fromIntegral u) reached) ]
                  m1 = m {mHeapPrim = C.mHeapPrim cm'}
              in Just (bindNew tcm sc tvs ids new (C.mTerm cm') m1)
-
--- | The primitives whose reductions of Clash Core evaluate an argument with
--- a nested machine, or allocate heap bindings: only these get the bindings
--- of the local heap that their arguments reach. The others only inspect
--- their arguments, or embed them in their result. Found by searching the
--- reductions in @Clash.GHC.Evaluator.Primitives@ for nested evaluation
--- (@whnf@, @reduceWHNF@), allocation (@newLetBinding@), and fresh names.
-heapPrims :: HashSet Text
-heapPrims = HashSet.fromList $ concatMap withInternal
-  -- Nested evaluation
-  [ "GHC.Classes.&&", "GHC.Classes.||", "Clash.Sized.RTree.textract"
-  , "Clash.Sized.RTree.tdfold", "Clash.Sized.Vector.index_int"
-  , "Clash.Sized.Vector.head", "Clash.Sized.Vector.last", "Clash.Sized.Vector.tail"
-  , "Clash.Sized.Vector.init", "Clash.Sized.Vector.concat", "Clash.Sized.Vector.reverse"
-  , "Clash.Sized.Vector.transpose", "Clash.Sized.Vector.rotateLeftS"
-  , "Clash.Sized.Vector.rotateRightS", "Clash.Sized.Vector.imap"
-  , "Clash.Sized.Vector.imap_go", "Clash.Sized.Vector.foldr"
-  , "Clash.Sized.Vector.concatBitVector#", "Clash.Sized.Internal.BitVector.xToBV"
-  , "Clash.Class.BitPack.Internal.packInt8#", "Clash.Class.BitPack.Internal.packInt16#"
-  , "Clash.Class.BitPack.Internal.packInt32#", "Clash.Class.BitPack.Internal.packInt64#"
-  , "Clash.Class.BitPack.Internal.packWord#", "Clash.Class.BitPack.Internal.packWord8#"
-  , "Clash.Class.BitPack.Internal.packWord16#", "Clash.Class.BitPack.Internal.packWord32#"
-  , "Clash.Class.BitPack.Internal.packWord64#", "Clash.Class.BitPack.Internal.packDouble#"
-  , "Clash.Class.BitPack.Internal.packFloat#", "Clash.Class.BitPack.Internal.packCUShort#"
-  , "Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL"
-  -- Allocation and fresh names
-  , "Clash.Sized.Vector.select", "Clash.Sized.Vector.splitAt"
-  , "Clash.Sized.Vector.unconcat", "Clash.Sized.Vector.zipWith"
-  , "Clash.Sized.Vector.fold", "Clash.Sized.Vector.fold_split"
-  , "Clash.Sized.Vector.dfold", "Clash.Sized.Vector.dtfold"
-  , "Clash.Sized.Vector.traverse#", "Clash.Sized.Vector.unconcatBitVector#" ]
- where
-  -- Names in @base@ moved to @GHC.Internal@ modules in GHC 9.10
-  withInternal nm = case Text.stripPrefix "GHC." nm of
-    Just rest -> [nm, "GHC.Internal." <> rest]
-    Nothing -> [nm]
 
 -- | A unique supply for the machine of Clash Core. Every reduction starts
 -- with the same one: the uniques it hands out are made unique in the in-scope
