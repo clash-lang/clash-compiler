@@ -31,12 +31,17 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Clash.Normalize.Scoped.Transformations.Specialize
   ( specialize
   , specialize'
   , specArgBndrsAndVars
+    -- * Helpers of 'specialize'
+  , specCacheKey
+  , preferNoInline
+  , specializeName
   ) where
 
 import           Control.Exception           (throw)
@@ -46,9 +51,14 @@ import           Data.Bifunctor              (bimap)
 import           Data.Coerce                 (coerce)
 import qualified Data.Map.Strict             as Map
 import qualified Data.Text                   as Text
+import qualified Data.Text.Extra             as Text
+import           GHC.BasicTypes.Extra        (isNoInline)
+import           GHC.Num.Integer             (Integer (IS))
+import           GHC.Num.Natural             (Natural (NS))
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.Basic             (InlineSpec (..))
 
+import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
@@ -58,8 +68,6 @@ import qualified Clash.Data.UniqMap          as UniqMap
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (..), hasTransformationInfo)
-import           Clash.Normalize.Transformations.Specialize
-  (preferNoInline, specCacheKey, specializeName)
 import           Clash.Normalize.Types
   (NormalizeSession, specialisationCache, specialisationHistory)
 import           Clash.Rewrite.Types
@@ -258,6 +266,101 @@ specializeGlobal ctx e f args ticks specArgIn = do
     Var occ _ _ -> Just occ
     GlobalVar g -> Just (C.varName (globalIdVar g))
     _ -> Nothing
+
+{-
+Note [ticks and specialization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As Clash now distinguishes between ticks in expressions when comparing for
+alpha equality, this has a knock-on effect when accessing the specialization
+cache. Consider these applications which differ only by ticks:
+
+    f[GlobalId] (\x -> ... x[LocalId])
+    f[GlobalId] <tick>(\x -> ... x[LocalId])
+    f[GlobalId] (\x -> ... <tick>x[LocalId])
+
+If one of these had been specialized, the other two would hit that term in the
+specialization cache, saving Clash from having to re-do work which is in effect
+the same. To preserve this behavior, we strip all ticks from the keys for the
+specialization cache, see 'specCacheKey'.
+
+TODO While this preserves the old behavior, the old behavior is likely not
+quite what we want. Using a value from the specialization cache may change the
+ticks present, which can affect naming / debugging information in generated HDL.
+We may also not want to look at ticks, as then the specialization cache will
+miss on virtually every lookup which could add to normalization time.
+-}
+
+{-
+Note [bignum literals and specialization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC represents a small 'Natural' or 'Integer' constant as a constructor applied
+to a literal, e.g. @NS 8000##@. The evaluator reads such a constant back as a
+plain literal, @8000@, so a constant that went through 'reduceConst' looks
+different from one that didn't, even though they're the same value. Both forms
+reach 'specialize', for example when a 'KnownDomain' dictionary built by GHC is
+passed to a function at one call site, while at another call site the same
+dictionary is the result of normalizing an application of a work-free function
+(see 'Clash.Normalize.Util.normalizeWorkFreeApp'). To prevent creating two
+identical specializations, we use the literal form in the keys of the
+specialization cache.
+-}
+
+-- | Prepare a term for use as a key in the specialization cache: strip all
+-- ticks (see Note [ticks and specialization]) and replace small bignum
+-- constants by literals (see Note [bignum literals and specialization]).
+specCacheKey :: C.Term -> C.Term
+specCacheKey = go
+ where
+  go (C.Lam i x) = C.Lam i (go x)
+  go (C.TyLam i x) = C.TyLam i (go x)
+  go (C.App f x) = case (go f, go x) of
+    (C.Prim p, C.Literal (WordLiteral w))
+      | C.primName p == Text.showt 'NS -> C.Literal (NaturalLiteral w)
+    (C.Prim p, C.Literal (IntLiteral i))
+      | C.primName p == Text.showt 'IS -> C.Literal (IntegerLiteral i)
+    (f', x') -> C.App f' x'
+  go (C.TyApp f a) = C.TyApp (go f) a
+  go (C.Let bs x) = C.Let (goBinds bs) (go x)
+  go (C.Case x ty alts) = C.Case (go x) ty (fmap go <$> alts)
+  go (C.Cast x a b) = C.Cast (go x) a b
+  go (C.Tick _ x) = go x
+  go x = x
+
+  goBinds (C.NonRec i x) = C.NonRec i (go x)
+  goBinds (C.Rec ixs) = C.Rec (fmap go <$> ixs)
+
+-- | Given two 'InlineSpec's, return the \"strongest\" one. I.e., the one that's
+-- closest to @NoInline@ (or @Opaque@ for newer GHCs).
+preferNoInline :: InlineSpec -> InlineSpec -> InlineSpec
+preferNoInline is0 is1
+  | enumInlineSpec is0 >= enumInlineSpec is1 = is0
+  | otherwise                                = is1
+ where
+  enumInlineSpec :: InlineSpec -> Int
+  enumInlineSpec = \case
+    NoUserInlinePrag {} -> -1
+    Inline {} -> 0
+    Inlinable {} -> 1
+    NoInline {} -> 2
+    Opaque {} -> 3
+
+-- | The name of the function that specializes function @f@ on function @g@,
+-- given their inline specifications (if @g@ has a binding) and names. It
+-- depends on their NOINLINE / OPAQUE annotations, see
+-- 'Clash.Normalize.Transformations.Specialize.specialize''.
+specializeName
+  :: (InlineSpec, C.Name C.Term) -> (Maybe InlineSpec, C.Name C.Term) -> C.Name C.Term
+specializeName (spec0, n0) (spec1, n1)
+  | (ann0 && ann1) || (not ann0 && not ann1)
+  = n0{C.nameOcc = C.nameOcc n0 <> "_" <> stripMods (C.nameOcc n1)}
+  | ann0 = n0
+  | otherwise = n1
+ where
+  ann0 = isNoInline spec0
+  ann1 = fmap isNoInline spec1 == Just True
+
+  stripMods :: Text.Text -> Text.Text
+  stripMods = Text.takeWhileEnd (/= '.')
 
 -- | The body of the specialized function: the body of the function applied
 -- to its arguments, and to the argument specialized on, abstracted over the
