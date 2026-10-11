@@ -47,7 +47,7 @@ import Test.Clash.Rewrite
   , localId, runRewriteTest, showPprU, tcApp, testTyConMap, tyVar, vecTy
   , withTyConMap )
 import qualified Test.Clash.Rewrite as T
-import Test.Clash.Scoped (aeqTermTyped, runScopedOn, runViaFoil)
+import Test.Clash.Scoped (aeqTermTyped, runScopedOn, runViaFoil, stripCoercionTypes)
 
 -- | The default environment, with the type constructors of 'testTyConMap'
 -- (among which @Vec@), and an evaluator that only looks up variables on the
@@ -79,23 +79,6 @@ onAppS w = ScopedTransform $ \ctx e -> case e of
 ctxOf :: [Id] -> C.Context -> TransformContext
 ctxOf ids = TransformContext (inScopeOf ids)
 
--- | Drop the type argument of coercions: scoped Core applies @_CO_@ to its
--- type, where Clash Core keeps it in the 'C.PrimInfo', see
--- 'Test.Clash.Differential.coercionForm'. The type of a primitive isn't
--- compared by 'aeqTermTyped'.
-coercionForm :: C.Term -> C.Term
-coercionForm = \case
-  C.TyApp e@(C.Prim p) _ | C.primName p == "_CO_" -> e
-  C.Lam v e -> C.Lam v (coercionForm e)
-  C.TyLam v e -> C.TyLam v (coercionForm e)
-  C.App e1 e2 -> C.App (coercionForm e1) (coercionForm e2)
-  C.TyApp e ty -> C.TyApp (coercionForm e) ty
-  C.Let bind e -> C.Let (coercionForm <$> bind) (coercionForm e)
-  C.Case e ty alts -> C.Case (coercionForm e) ty [(p, coercionForm a) | (p, a) <- alts]
-  C.Cast e t1 t2 -> C.Cast (coercionForm e) t1 t2
-  C.Tick t e -> C.Tick t (coercionForm e)
-  e -> e
-
 -- | Run the current and the scoped 'reducePrim' at the root of a term, in the
 -- given context, and assert that they agree: alpha-equivalent results
 -- (comparing types too, up to the form of coercions), and both signal a
@@ -109,7 +92,7 @@ assertReducePrimAgrees ctx e = do
     runViaFoil env st ctx (onAppS Scoped.reducePrimWorker) e
   assertBool
     ("Clash Core:\n" <> showPprU expected <> "\nscoped:\n" <> showPprU actual)
-    (aeqTermTyped (coercionForm expected) (coercionForm actual))
+    (aeqTermTyped (stripCoercionTypes expected) (stripCoercionTypes actual))
   assertEqual "change signaled (Clash Core, scoped)" changed1 changed2
   pure (actual, changed2)
 

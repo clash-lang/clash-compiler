@@ -60,6 +60,7 @@ module Test.Clash.Scoped
   , forAllScrambled
     -- * Comparing Clash Core
   , aeqTermTyped
+  , stripCoercionTypes
     -- * Properties
   , withTests
     -- * Running scoped transformations
@@ -732,6 +733,23 @@ forAllScrambled sc tm =
 type Scramble = StateT Int Gen
 
 -- * Comparing Clash Core
+
+-- | Drop the type argument of coercions: scoped Core applies @_CO_@ to its
+-- type, where Clash Core keeps it in the 'C.PrimInfo', see
+-- 'Test.Clash.Differential.coercionForm'. 'aeqTermTyped' doesn't compare the
+-- types of primitives, so it compares coercions after this.
+stripCoercionTypes :: C.Term -> C.Term
+stripCoercionTypes = \case
+  C.TyApp e@(C.Prim p) _ | C.primName p == "_CO_" -> e
+  C.Lam v e -> C.Lam v (stripCoercionTypes e)
+  C.TyLam v e -> C.TyLam v (stripCoercionTypes e)
+  C.App e1 e2 -> C.App (stripCoercionTypes e1) (stripCoercionTypes e2)
+  C.TyApp e ty -> C.TyApp (stripCoercionTypes e) ty
+  C.Let bind e -> C.Let (stripCoercionTypes <$> bind) (stripCoercionTypes e)
+  C.Case e ty alts -> C.Case (stripCoercionTypes e) ty [(p, stripCoercionTypes a) | (p, a) <- alts]
+  C.Cast e t1 t2 -> C.Cast (stripCoercionTypes e) t1 t2
+  C.Tick t e -> C.Tick t (stripCoercionTypes e)
+  e -> e
 
 -- | Levels of the binders on both sides, see 'aeqTermTyped'
 data Levels = Levels !Int !(Map Unique Int) !(Map Unique Int) !(Map Unique Int) !(Map Unique Int)
