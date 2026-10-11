@@ -385,10 +385,29 @@ assertShouldSplitAgrees ty = case C.shouldSplit testTyConMap ty of
           length projs @?= length projected
           sequence_ (zipWith assertScopedAlphaEq projected projs)
 
+-- * Primitives
+
+primTests :: TestTree
+primTests = testGroup "Primitives"
+  [ testCase "primAtType gives a primitive the type if it is closed" $
+      withConvEnv [] [] $ \env -> case primAtType errPrim (fromClashType env intTy) of
+        Prim p -> C.primType p @?= intTy
+        _ -> assertFailure "not a primitive"
+  , testCase "primAtType applies a primitive to its type if it is open" $
+      withConvEnv [aTv] [] $ \env -> case primAtType errPrim (fromClashType env aTy) of
+        TyApp (Prim p) ty -> do
+          C.primType p @?= C.undefinedTy
+          assertScopedTyAlphaEq aTy ty
+        _ -> assertFailure "not a type application of a primitive"
+  ]
+ where
+  errPrim = C.PrimInfo "err" intTy C.WorkNever C.SingleResult C.NoUnfolding
+
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Util"
   [ letTests
   , vecTests
   , dataConTests
   , typeTests
+  , primTests
   ]

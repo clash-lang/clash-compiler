@@ -54,6 +54,7 @@ module Clash.Core.Scoped.Util
     -- * Primitives
   , primCo
   , primUCo
+  , primAtType
   , C.undefinedPrims
   , C.undefinedXPrims
     -- * Types
@@ -84,6 +85,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Util as C
 import Clash.Util (curLoc, indexNote)
 
+import Clash.Core.Scoped.Convert (toClashType)
 import Clash.Core.Scoped.DataCon (dataConInstArgTys, dataConInstExtTyVars)
 import Clash.Core.Scoped.EqSolver (dataConInstArgTysE)
 import Clash.Core.Scoped.FreeVars (freeTmVars, teleNameBinders)
@@ -687,6 +689,16 @@ mkSelectorCase caller sc tenv scrut dcI fieldI = go (inferCoreTypeOf tenv sc scr
 -- a primitive is closed.
 primCo :: Type n -> Term n
 primCo = TyApp (Prim (C.PrimInfo "_CO_" C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
+
+-- | A primitive whose type is that of a term it replaces, e.g. @errorX@ for a
+-- case-expression without defined alternatives. The type of a primitive is
+-- closed: if the given type mentions type variables, this is the primitive,
+-- of type @forall a. a@, applied to the type, like 'primCo'. Otherwise, it is
+-- the primitive with the given type, as Clash Core makes it.
+primAtType :: C.PrimInfo -> Type n -> Term n
+primAtType p ty = case closeType ty of
+  Just closed -> Prim p {C.primType = toClashType closed}
+  Nothing -> TyApp (Prim p {C.primType = C.undefinedTy}) ty
 
 -- | An unsafe coercion, see 'C.primUCo'
 primUCo :: Term n
