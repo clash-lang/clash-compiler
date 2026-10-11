@@ -225,6 +225,7 @@ Library
                       Clash.Core.Scoped.Evaluator.Adapter
                       Clash.Core.Scoped.Evaluator.Primitives
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal
+                      Clash.Core.Scoped.Evaluator.Primitives.Clash.Promoted.Nat
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Signed
@@ -247,6 +248,8 @@ Library
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.PrimopWrappers
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Real
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeLits
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeNats
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Types
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Word
                       Clash.Core.Scoped.Evaluator.Primitives.Util
