@@ -11,12 +11,14 @@
 
 module Comparisons (comparisons) where
 
+import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Util as Current
 import Clash.Rewrite.StrategyDSL.TH (compileStrategy)
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
-import Clash.Core.Scoped.Syntax (emptyScope)
+import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
 import qualified Clash.Normalize.Scoped.Util as Scoped
+import Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh)
 
 import Test.Clash.Differential
 
@@ -42,6 +44,23 @@ comparisons =
       , cmpDescription = "substWithTyEq, on every binding rather than only on top entities"
       , cmpCurrent = pureSide Current.substWithTyEq
       , cmpScoped = pureSide (Scoped.substWithTyEq emptyScope)
+      , cmpKnownDifferences = []
+      }
+    -- Normalization depends on the uniques of the binders of its input, e.g.
+    -- through the order of free variables, and on the uniques that the supply
+    -- hands out. The scoped side converts its input to Clash Core with uniques
+    -- from the supply ('viaLegacy'), so the current side does the same, to
+    -- normalize the same input from the same supply.
+  , Comparison
+      { cmpName = "normalizeTopLvlBndr"
+      , cmpDescription =
+          "normalizeTopLvlBndr: normalize a binding. The scoped side runs the \
+          \normalization strategy through viaLegacy."
+      , cmpCurrent = normalizeSide $ \b tm -> do
+          tm' <- toClashTermFresh (fromClashTermClosed tm)
+          bindingTerm <$> Current.normalizeTopLvlBndr False (bindingId b) b{bindingTerm = tm'}
+      , cmpScoped = normalizeSide $ \b tm ->
+          bindingTerm <$> Scoped.normalizeTopLvlBndr False (mkGlobalId (bindingId b)) (tm <$ b)
       , cmpKnownDifferences = []
       }
 

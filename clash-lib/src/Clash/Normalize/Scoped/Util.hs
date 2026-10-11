@@ -11,15 +11,21 @@
   = Globals
 
   Tables of the normalizer that are keyed by global binders (the recursive
-  components and the inline history) are looked up by 'GlobalId', so that a
-  local variable can never hit an entry of a global with the same unique.
-  The tables themselves are still those of Clash Core, in 'NormalizeState'.
+  components, the inline history, the normalized binders) are looked up by
+  'GlobalId', so that a local variable can never hit an entry of a global with
+  the same unique. The tables themselves are still those of Clash Core, in
+  'NormalizeState'.
 
   = The boundary with Clash Core
 
-  During the port, the global bindings ('Clash.Rewrite.Types.bindings') are
-  those of Clash Core. Phase 4 of the port, which runs the normalizer on
-  scoped Core, changes that.
+  During the port, the global bindings ('Clash.Rewrite.Types.bindings'), the
+  normalized binders ('normalized'), the work-free application cache
+  ('workFreeAppCache') and the normalization strategy are those of Clash Core.
+  The functions here convert at that boundary: bodies of global bindings are
+  converted into closed scoped terms ('fromClashTermClosed') when they are
+  read, and back ('toClashTermFresh') when they are stored. The normalization
+  strategy runs through 'viaLegacy', see 'scopedNormalization'. Phase 4 of the
+  port, which runs the normalizer on scoped Core, removes these conversions.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -51,48 +57,66 @@ module Clash.Normalize.Scoped.Util
     -- * Classifying functions
   , classifyFunction
   , isCheapFunction
+    -- * Normalizing global binders
+  , normalizeTopLvlBndr
+  , normalizeWorkFreeApp
+  , rewriteExpr
+  , scopedNormalization
     -- * Type equality constraints
   , substWithTyEq
   , tvSubstWithTyEq
   ) where
 
-import           Control.Lens                ((&), (+~), (%=))
+import           Control.Lens                ((&), (+~), (.=), (%=))
 import qualified Control.Lens                as Lens
 import           Control.Monad.Extra         (anyM)
 import           Data.Bifunctor              (bimap)
+import qualified Data.HashMap.Strict         as HashMap
 import qualified Data.IntMap.Strict          as IntMap
 import qualified Data.List                   as List
+import           Data.Maybe                  (fromMaybe)
 import qualified Data.Text                   as Text
 import qualified Data.Text.Extra             as Text
 import           GHC.Builtin.Names           (eqTyConKey)
 import           GHC.Stack                   (HasCallStack)
+import           GHC.Types.SrcLoc            (SrcSpan)
 
 import qualified Clash.Core.FreeVars         as C (globalIdOccursIn)
 import qualified Clash.Core.Name             as C
+import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C (TyConName)
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Var              as C
 import           Clash.Core.VarEnv
   (extendVarEnv, extendVarEnvWith, lookupVarEnv, unitVarEnv)
-import           Clash.Driver.Types          (Binding (..))
+import           Clash.Debug                 (traceIf)
+import           Clash.Driver.Types
+  (Binding (..), TransformationInfo (FinalTerm), hasTransformationInfo)
 import           Clash.Normalize.Primitives  (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util        (isConstantArg)
-import           Clash.Rewrite.Types         (bindings, curFun, extra, scopedTypeEnv)
+import           Clash.Rewrite.Types
+  (bindings, curFun, debugOpts, extra, scopedTypeEnv)
 import           Clash.Unique                (fromGhcUnique)
 
-import           Clash.Core.Scoped.FreeVars  (teleNameBinders)
+import           Clash.Core.Scoped.Convert
+  (fromClashTermClosed, toClashTerm, toClashType)
+import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
+import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
 import           Clash.Core.Scoped.TermInfo  (isClosed)
 import           Clash.Core.Scoped.Type
   (PiTele (..), TypeView (..), isClockOrReset, mkFunTy, piTeleNameBinders, tyView)
+import           Clash.Rewrite.Scoped.Apply  (runRewrite)
 import           Clash.Rewrite.Scoped.Types
-  (FrameKind (..), TransformContext, ctxFrames, mkDerivedName, tfScope)
+  (FrameKind (..), ScopedRewrite, TransformContext, ctxFrames, mkDerivedName, tfScope)
+import           Clash.Rewrite.Scoped.Globals (freshGlobalId)
+import           Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh, viaLegacy)
 
 -- * Constant arguments of primitives
 
@@ -407,6 +431,120 @@ isCheapFunction tm = case classifyFunction tm of
     | _primitive <= 1 -> _function  <= 0 && _selection <= 0
     | _selection <= 1 -> _function  <= 0 && _primitive <= 0
     | otherwise       -> False
+
+-- * Normalizing global binders
+
+-- | The normalization strategy, as a scoped transformation. During the port,
+-- this is the strategy of Clash Core ('normalizationStrategy') run through
+-- 'viaLegacy'. Phase 4 of the port replaces it by the scoped strategy.
+scopedNormalization :: NormalizeSession (ScopedRewrite NormalizeState)
+scopedNormalization = viaLegacy <$> Lens.use (extra.normalizationStrategy)
+
+-- | Normalize a global binder, caching the result in 'normalized'. See
+-- 'Clash.Normalize.Util.normalizeTopLvlBndr'.
+--
+-- Unlike that function, it doesn't deshadow the body: the body of a global is
+-- closed, and binders are fresh once they are opened.
+normalizeTopLvlBndr
+  :: HasCallStack
+  => Bool
+  -- ^ Whether the binder is a top entity, whose type equality constraints are
+  -- substituted (see 'substWithTyEq')
+  -> GlobalId
+  -> Binding (Term 'VoidS)
+  -> NormalizeSession (Binding (Term 'VoidS))
+normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
+  cached <- lookupVarEnv (globalIdVar nm) <$> Lens.use (extra.normalized)
+  case cached of
+    -- Normalized binders are still those of Clash Core, see the module header
+    Just b -> pure (fromClashTermClosed <$> b)
+    Nothing -> do
+      te <- Lens.view scopedTypeEnv
+      let nmS = showPpr (C.varName (globalIdVar nm))
+          tm1 = if isTop then substWithTyEq emptyScope tm else tm
+      old <- Lens.use curFun
+      normalization <- scopedNormalization
+      tm2 <- rewriteExpr ("normalization", normalization) (nmS, tm1) (mkGlobalId nm', sp)
+      curFun .= old
+      let ty' = toClashType (inferCoreTypeOf te emptyScope tm2)
+          r' = mkGlobalId nm' `memberGlobalSet` termGlobalIds tm2
+          b = Binding nm'{C.varType = ty'} sp inl pr tm2 r'
+      tmC <- toClashTermFresh tm2
+      (extra.normalized) %= extendVarEnv (globalIdVar nm) b{bindingTerm = tmC}
+      pure b
+
+-- | Normalize a global function applied to closed arguments, i.e. a work-free
+-- application such as @f \@7 dict@. Results are cached in 'workFreeAppCache'.
+-- See 'Clash.Normalize.Util.normalizeWorkFreeApp'.
+--
+-- The arguments must be closed. Unlike
+-- 'Clash.Normalize.Util.normalizeWorkFreeApp', it doesn't deshadow the
+-- application: its parts are closed.
+normalizeWorkFreeApp
+  :: (HasCallStack, Distinct n)
+  => GlobalId
+  -- ^ Global function
+  -> Binding (Term 'VoidS)
+  -- ^ Binding of the global function. Only used if the application isn't
+  -- cached yet.
+  -> [Either (Term n) (Type n)]
+  -- ^ Closed arguments
+  -> NormalizeSession (Term n)
+normalizeWorkFreeApp f b args = do
+  -- The cache is that of Clash Core, see the module header. Its keys are
+  -- compared up to alpha-equivalence, so the converted application finds the
+  -- normalized one of Clash Core too.
+  cache <- Lens.use (extra.workFreeAppCache)
+  case HashMap.lookup appC cache of
+    Just tm -> pure (sinkClosed (fromClashTermClosed tm))
+    Nothing -> do
+      te <- Lens.view scopedTypeEnv
+      -- The application is normalized as if it were the body of a binder of
+      -- its own, see 'Clash.Normalize.Util.normalizeWorkFreeApp'
+      g <- freshGlobalId (C.varName (globalIdVar f))
+             (inferCoreTypeOf te emptyScope (mkApps (GlobalVar f) closedArgs))
+      let -- Normalize the beta-redex rather than the application: normalizing
+          -- that would bring us right back here
+          redex = mkApps (bindingTerm b) closedArgs
+      old <- Lens.use curFun
+      normalization <- scopedNormalization
+      tm <- rewriteExpr ("normalization", normalization)
+                        (showPpr (C.varName (globalIdVar f)), redex) (g, bindingLoc b)
+      curFun .= old
+      tmC <- toClashTermFresh tm
+      (extra.workFreeAppCache) %= HashMap.insert appC tmC
+      pure (sinkClosed tm)
+ where
+  appC = C.mkApps (C.Var (globalIdVar f)) (map (bimap toClashTerm toClashType) args)
+  closedArgs = map (bimap (notClosed . closeTerm) (notClosed . closeType)) args
+  notClosed :: Maybe a -> a
+  notClosed = fromMaybe (error "normalizeWorkFreeApp: an argument is not closed")
+
+-- | Rewrite the closed body of a global binder with a transformation. See
+-- 'Clash.Normalize.Util.rewriteExpr'.
+--
+-- Unlike that function, it doesn't lint its input with
+-- @-fclash-debug-invariants-shadowing@: in scoped Core, binders never shadow
+-- one another, and every variable is in scope.
+rewriteExpr
+  :: (String, ScopedRewrite NormalizeState)
+  -- ^ Transformation to apply
+  -> (String, Term 'VoidS)
+  -- ^ Term to transform
+  -> (GlobalId, SrcSpan)
+  -- ^ Renew current function being rewritten
+  -> NormalizeSession (Term 'VoidS)
+rewriteExpr (nrwS, nrw) (bndrS, expr) (nm, sp) = do
+  curFun .= (globalIdVar nm, sp)
+  opts <- Lens.view debugOpts
+  let traceFinal = hasTransformationInfo FinalTerm opts
+      expr' = traceIf traceFinal
+                (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ showPpr expr ++ "\n")
+                expr
+  rewritten <- runRewrite nrwS emptyScope nrw expr'
+  traceIf traceFinal
+    (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ showPpr rewritten ++ "\n") $
+    pure rewritten
 
 -- * Type equality constraints
 
