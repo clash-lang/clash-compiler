@@ -283,5 +283,15 @@ siteComparisons =
       , scScoped = Just $(asScopedRewriteQ S.flattenLet)
       , scKnownDifferences = []
       }
+  , SiteComparison
+      { scName = "topLet"
+      , scDescription =
+          "The current topLet (Clash.Normalize.Transformations.Letrec.topLetWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Letrec.topLet)"
+      , scTransformations = ["topLet"]
+      , scCurrent = $(asRewriteQ Current.topLet)
+      , scScoped = Just $(asScopedRewriteQ S.topLet)
+      , scKnownDifferences = []
+      }
   ]
 
