@@ -1051,6 +1051,7 @@ runClashTest = defaultMain
             , clashFlags = ["-package", "clash-testsuite", "-main-is", "topEntity"]
             }
         , runTest "T1139" def{hdlSim=[]}
+        , runTest "ZeroWidthPorts" def{hdlSim=[]}
         , let _opts = def { hdlTargets=[Verilog]
                           , buildTargets=BuildSpecific ["PortNames_testBench"]
                           }
