@@ -8,9 +8,12 @@
 
   Reductions of the primitives of "GHC.Num.Integer" in the scoped evaluator:
   ports of @Clash.GHC.Evaluator.Primitives.GHC.Num.Integer@. See
-  "Clash.Core.Scoped.Evaluator.Primitives".
+  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
 -}
 
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer
@@ -18,31 +21,46 @@ module Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer
   ) where
 
 import Data.Text (Text)
-import Data.Text.Extra (showt)
 
-import Clash.Core.Literal (Literal (..))
+import Clash.Util (textNameLit)
 
 import qualified GHC.Num.Integer
 
-import Clash.Core.Scoped.Evaluator (integerLiteral, reduce)
-import Clash.Core.Scoped.Evaluator.Primitives.Util (boolToBoolLiteral, pairOf)
+import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
-import Clash.Core.Scoped.HasType (primInfoType)
-import Clash.Core.Scoped.Syntax
 
 primitives :: [(Text, PrimReduction)]
 primitives =
-  [ (showt 'GHC.Num.Integer.integerAdd, integerOp (+))
-  , (showt 'GHC.Num.Integer.integerSub, integerOp (-))
-  , (showt 'GHC.Num.Integer.integerMul, integerOp (*))
-  , ( showt 'GHC.Num.Integer.integerEq
-    , PrimReduction $ \pc -> case pairOf integerLiteral (pcArgs pc) of
-        Just (i, j) ->
-          reduce pc (boolToBoolLiteral (envTypeEnv (pcEnv pc))
-                       (primInfoType (mScope (pcMachine pc)) (pcInfo pc)) (i == j))
-        Nothing -> Nothing )
+  [ primStepEntry $(textNameLit 'GHC.Num.Integer.integerQuotRem#) $ \case
+      PrimStepContext{..} -- :: Integer -> Integer -> (#Integer, Integer#)
+        | [i, j] <- integerLiterals' args
+        -> let (q,r) = quotRem i j
+        in reduce $ mkResultCon te sc ty tys
+             [ catchDivByZero (integerToIntegerLiteral q)
+             , catchDivByZero (integerToIntegerLiteral r) ]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Num.Integer.integerAdd) $ \case
+      PrimStepContext{..}
+        | Just (i,j) <- integerLiterals args
+        -> reduce (integerToIntegerLiteral (i+j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Num.Integer.integerSub) $ \case
+      PrimStepContext{..}
+        | Just (i,j) <- integerLiterals args
+        -> reduce (integerToIntegerLiteral (i-j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Num.Integer.integerMul) $ \case
+      PrimStepContext{..}
+        | Just (i,j) <- integerLiterals args
+        -> reduce (integerToIntegerLiteral (i*j))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Num.Integer.integerEq) $ \case
+      PrimStepContext{..}
+        | Just (i,j) <- integerLiterals args
+        -> reduce (boolToBoolLiteral te ty (i == j))
+      _ -> Nothing
   ]
- where
-  integerOp f = PrimReduction $ \pc -> case pairOf integerLiteral (pcArgs pc) of
-    Just (i, j) -> reduce pc (Literal (IntegerLiteral (f i j)))
-    Nothing -> Nothing

@@ -8,10 +8,14 @@
 
   Reductions of the primitives of "GHC.Classes" in the scoped evaluator:
   ports of @Clash.GHC.Evaluator.Primitives.GHC.Classes@. See
-  "Clash.Core.Scoped.Evaluator.Primitives".
+  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes
@@ -19,50 +23,73 @@ module Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes
   ) where
 
 import Data.Text (Text)
-import Data.Text.Extra (showt)
+
+import Clash.Core.Literal (Literal (..))
+import qualified Clash.Normalize.Primitives as NP
+import Clash.Util (textNameLit)
 
 import qualified GHC.Classes
 
-import Clash.Core.Scoped.Evaluator (reduceIn, whnf)
-import Clash.Core.Scoped.Evaluator.Primitives.Util (boolToBoolLiteral, isFalseDC, isTrueDC)
+import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
-import Clash.Core.Scoped.HasType (primInfoType)
 import Clash.Core.Scoped.Syntax
 
 primitives :: [(Text, PrimReduction)]
 primitives =
-  [ (showt '(GHC.Classes.&&), PrimReduction (andOr True))
-  , (showt '(GHC.Classes.||), PrimReduction (andOr False))
+  [ primStepEntry $(textNameLit 'GHC.Classes.gtInt) $ \case
+      PrimStepContext{..} | Just (i,j) <- intCLiterals args
+        -> reduce (boolToBoolLiteral te ty (i > j))
+      _ -> Nothing
+
+  -- Lazy in both arguments: evaluates both with nested machines. The second
+  -- one runs in the machine of the first, and the result continues in the
+  -- second.
+  , primStepEntry $(textNameLit '(GHC.Classes.&&)) (andOr True)
+
+  , primStepEntry $(textNameLit '(GHC.Classes.||)) (andOr False)
+
+  -- modInt# :: Int# -> Int# -> Int#
+  , primStepEntry $(textNameLit 'GHC.Classes.modInt#) $ \case
+      PrimStepContext{..}
+        | [dividend, divisor] <- intLiterals' args
+        ->
+          if divisor == 0 then
+            let iTy = getResultTy te sc ty tys in
+            reduce (TyApp (Prim NP.undefined) iTy)
+          else
+            reduce (Literal (IntLiteral (dividend `mod` divisor)))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'GHC.Classes.not) $ \case
+      PrimStepContext{..}
+        | [boolLiteral -> Just b] <- args
+        -> reduce (boolToBoolLiteral te ty (not b))
+      _ -> Nothing
   ]
 
--- | @(&&)@ and @(||)@, lazy in both arguments: evaluates both with a nested
--- 'whnf'. The nested machines live in extensions of the primitive's scope, so
--- the result continues in the last one, with the original stack sunk into it.
--- See @Clash.GHC.Evaluator.Primitives.GHC.Classes@.
-andOr :: Distinct n => Bool -> PrimContext o n -> Maybe (Next o n)
-andOr isAnd pc
-  | [lArg, rArg] <- pcArgs pc
-  = whnf env True m {mStack = [], mTerm = valToTerm lArg} $ \m1 ->
-      whnf env True m1 {mStack = [], mTerm = sink (valToTerm rArg)} $ \m2 ->
-        let lW = sink (mTerm m1)
-            rW = mTerm m2
-            m2' = m2 {mStack = sink1 (mStack m)}
-            lit = boolToBoolLiteral (envTypeEnv env) (primInfoType (mScope m) (pcInfo pc))
+-- | @(&&)@ and @(||)@
+andOr :: Distinct n => Bool -> PrimStepContext o n -> Maybe (Next o n)
+andOr isAnd PrimStepContext{..}
+  | [lArg, rArg] <- args
+  = whnfArg (valToTerm lArg) $ \mach1 lArgWHNF ->
+      whnfIn mach1 (sink (valToTerm rArg)) $ \mach2 rW ->
+        let lW = sink lArgWHNF
+            -- Continue in the machine that evaluated the arguments: their
+            -- WHNFs can refer to heap bindings made there
+            continue = reduceWith mach2
+            lit = boolToBoolLiteral te ty
             -- The constructor that decides the result on its own
             absorbing con = if isAnd then isFalseDC con else isTrueDC con
             combine l r = if isAnd then l && r else l || r
         in case (lW, rW) of
              (Data lCon, Data rCon) ->
-               Just (Next m2' {mTerm = lit (combine (isTrueDC lCon) (isTrueDC rCon))})
+               continue (lit (combine (isTrueDC lCon) (isTrueDC rCon)))
              (Data lCon, _)
-               | absorbing lCon -> reduceIn pc m2' (lit (not isAnd))
-               | otherwise -> reduceIn pc m2' rW
+               | absorbing lCon -> continue (lit (not isAnd))
+               | otherwise -> continue rW
              (_, Data rCon)
-               | absorbing rCon -> reduceIn pc m2' (lit (not isAnd))
-               | otherwise -> reduceIn pc m2' lW
+               | absorbing rCon -> continue (lit (not isAnd))
+               | otherwise -> continue lW
              _ -> Nothing
-  | otherwise = Nothing
- where
-  m = pcMachine pc
-  env = pcEnv pc
-
+  | otherwise
+  = Nothing
