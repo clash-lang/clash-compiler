@@ -109,6 +109,8 @@ import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
 
+import qualified Clash.Normalize.Scoped.Transformations.Inline as Scoped
+
 {- [Note] join points and void wrappers
 Join points are functions that only occur in tail-call positions within an
 expression, and only when they occur in a tail-call position more than once.
@@ -127,8 +129,7 @@ as they'd need to be.
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
 bindConstantVar :: Transformation
-bindConstantVar =
-  toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
+bindConstantVar = Scoped.bindConstantVar
 
 -- | The 'Let' handler of 'bindConstantVar'.
 bindConstantVarWorker
@@ -310,7 +311,7 @@ inlineBndrsCleanup isN origInl = go
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
 inlineCast :: Transformation
-inlineCast = toTransformation "inlineCast" (onLet 'inlineCastWorker)
+inlineCast = Scoped.inlineCast
 
 -- | The 'Let' handler of 'inlineCast'.
 inlineCastWorker
@@ -618,8 +619,7 @@ inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
 
 inlineOrLiftNonRep :: Transformation
-inlineOrLiftNonRep =
-  toTransformation "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepWorker)
+inlineOrLiftNonRep = Scoped.inlineOrLiftNonRep
 
 -- | The 'Let' handler of 'inlineOrLiftNonRep'.
 inlineOrLiftNonRepWorker
@@ -652,7 +652,7 @@ inlineOrLiftNonRepWorker ctx eLet bind body =
 
 -- | Inline anything of type `SimIO`: IO actions cannot be shared
 inlineSimIO :: Transformation
-inlineSimIO = toTransformation "bindSimIO" (onLet 'inlineSimIOWorker)
+inlineSimIO = Scoped.inlineSimIO
 
 -- | The 'Let' handler of 'inlineSimIO'.
 inlineSimIOWorker

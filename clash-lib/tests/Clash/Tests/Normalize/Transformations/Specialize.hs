@@ -29,9 +29,10 @@ import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (lookupVarEnv)
 import Clash.Driver.Types (Binding (..))
-import Clash.Normalize.Transformations.Inline (bindConstantVar)
+import Clash.Normalize.Transformations.Inline (bindConstantVarWorker)
 import Clash.Normalize.Transformations.Specialize (appProp, nonRepSpec, specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
+import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), extra)
 import Clash.Rewrite.Util (runRewrite)
@@ -49,8 +50,13 @@ import Test.Clash.Rewrite
 appPropR :: NormRewrite
 appPropR = $(asRewriteQ appProp)
 
+-- | The 'bindConstantVar' of Clash Core, which can introduce shadowing (#1035).
+-- The normalizer runs its port to scoped Clash Core, which can't: it renames
+-- the binders of the result, so the tests below wouldn't reproduce the
+-- shadowing with it.
 bindConstantVarR :: NormRewrite
-bindConstantVarR = $(asRewriteQ bindConstantVar)
+bindConstantVarR =
+  $(asRewriteQ (toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)))
 
 nonRepSpecR :: NormRewrite
 nonRepSpecR = $(asRewriteQ nonRepSpec)
