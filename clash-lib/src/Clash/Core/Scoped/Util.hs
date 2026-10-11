@@ -43,6 +43,7 @@ module Clash.Core.Scoped.Util
   , extractElems
   , mkRTree
   , extractTElems
+  , selectField
     -- * Names
   , systemName
   , internalName
