@@ -19,7 +19,6 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrate
 import qualified Clash.Normalize.Scoped.Transformations.Case as SC
 import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
-import qualified Clash.Normalize.Transformations.Case as Case
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
@@ -153,7 +152,7 @@ siteComparisons =
           "The current caseCase (Clash.Normalize.Transformations.Case.caseCaseWorker) \
           \against its port (Clash.Normalize.Scoped.Transformations.Case.caseCase)"
       , scTransformations = ["caseCase"]
-      , scCurrent = $(asRewriteQ Case.caseCase)
+      , scCurrent = $(asRewriteQ Current.caseCase)
       , scScoped = Just $(asScopedRewriteQ SC.caseCase)
       , scKnownDifferences = []
       }
@@ -163,7 +162,7 @@ siteComparisons =
           "The current caseCon (Clash.Normalize.Transformations.Case.caseConWorker) \
           \against its port (Clash.Normalize.Scoped.Transformations.Case.caseCon)"
       , scTransformations = ["caseCon"]
-      , scCurrent = $(asRewriteQ Case.caseCon)
+      , scCurrent = $(asRewriteQ Current.caseCon)
       , scScoped = Just $(asScopedRewriteQ SC.caseCon)
       , scKnownDifferences = [coercionForm]
       }
@@ -174,7 +173,7 @@ siteComparisons =
           \(Clash.Normalize.Transformations.Case.caseEliminateNonReachableWorker) \
           \against its port (Clash.Normalize.Scoped.Transformations.Case.caseEliminateNonReachable)"
       , scTransformations = ["caseEliminateNonReachable"]
-      , scCurrent = $(asRewriteQ Case.caseEliminateNonReachable)
+      , scCurrent = $(asRewriteQ Current.caseEliminateNonReachable)
       , scScoped = Just $(asScopedRewriteQ SC.caseEliminateNonReachable)
       , scKnownDifferences = []
       }
@@ -184,7 +183,7 @@ siteComparisons =
           "The current caseFlat (Clash.Normalize.Transformations.Case.caseFlatWorker) \
           \against its port (Clash.Normalize.Scoped.Transformations.Case.caseFlat)"
       , scTransformations = ["caseFlat"]
-      , scCurrent = $(asRewriteQ Case.caseFlat)
+      , scCurrent = $(asRewriteQ Current.caseFlat)
       , scScoped = Just $(asScopedRewriteQ SC.caseFlat)
       , scKnownDifferences = []
       }
@@ -194,7 +193,7 @@ siteComparisons =
           "The current caseLet (Clash.Normalize.Transformations.Case.caseLetWorker) \
           \against its port (Clash.Normalize.Scoped.Transformations.Case.caseLet)"
       , scTransformations = ["caseLet"]
-      , scCurrent = $(asRewriteQ Case.caseLet)
+      , scCurrent = $(asRewriteQ Current.caseLet)
       , scScoped = Just $(asScopedRewriteQ SC.caseLet)
       , scKnownDifferences = []
       }
@@ -205,7 +204,7 @@ siteComparisons =
           \(Clash.Normalize.Transformations.Case.elimExistentialsWorker) \
           \against its port (Clash.Normalize.Scoped.Transformations.Case.elimExistentials)"
       , scTransformations = ["elimExistentials"]
-      , scCurrent = $(asRewriteQ Case.elimExistentials)
+      , scCurrent = $(asRewriteQ Current.elimExistentials)
       , scScoped = Just $(asScopedRewriteQ SC.elimExistentials)
       , scKnownDifferences = []
       }
@@ -216,7 +215,7 @@ siteComparisons =
           \(Clash.Normalize.Transformations.Case.elimCaseBigNumInternalsWorker) \
           \against its port (Clash.Normalize.Scoped.Transformations.Case.elimCaseBigNumInternals)"
       , scTransformations = ["elimCaseBigNum"]
-      , scCurrent = $(asRewriteQ Case.elimCaseBigNumInternals)
+      , scCurrent = $(asRewriteQ Current.elimCaseBigNumInternals)
       , scScoped = Just $(asScopedRewriteQ SC.elimCaseBigNumInternals)
       , scKnownDifferences = []
       }
