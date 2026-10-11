@@ -26,7 +26,7 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.HasType
 import Clash.Core.Term (Bind(..), CoreContext(..), Term(..), collectArgs, mkLams)
-import Clash.Core.TermInfo (isFun)
+import Clash.Core.TermInfo (isFun, isLocalVar)
 import Clash.Core.Type (splitFunTy)
 import Clash.Core.Util (mkInternalVar)
 import Clash.Core.Var (Id)
@@ -53,10 +53,12 @@ etaExpandSyn =
 
 -- | The application-spine handler of 'etaExpandSyn'.
 etaExpandSynWorker :: HasCallStack => NormRewrite
-etaExpandSynWorker (TransformContext is0 ctx) e@(collectArgs -> (Var f, _)) = do
+etaExpandSynWorker (TransformContext is0 ctx) e@(collectArgs -> (fHd@(Var f), _)) = do
   topEnts <- Lens.view topEntities
   tcm <- Lens.view tcCache
-  let isTopEnt = f `elemVarSet` topEnts
+  -- 'topEntities' is keyed on uniques alone, and a local variable can share
+  -- its unique with a global binder
+  let isTopEnt = not (isLocalVar fHd) && f `elemVarSet` topEnts
       isAppFunCtx =
         \case
           AppFun:_ -> True
