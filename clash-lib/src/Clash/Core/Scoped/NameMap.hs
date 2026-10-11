@@ -61,6 +61,7 @@ module Clash.Core.Scoped.NameMap
   , NameBinders
   , emptyNameBinders
   , snocNameBinders
+  , appendNameBinders
   , tyBinderNameBinders
   , idBinderNameBinders
     -- * Sets of global names
