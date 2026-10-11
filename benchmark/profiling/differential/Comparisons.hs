@@ -22,6 +22,7 @@ import qualified Clash.Normalize.Scoped.Transformations.DEC as S
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 import Clash.Normalize.Transformations.ANF (makeANF)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
+import qualified Clash.Normalize.Scoped.Transformations.Reduce as SReduce
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
@@ -241,6 +242,26 @@ siteComparisons =
       , scCurrent = makeANF
       , scScoped = Just (ScopedTransform S.makeANF)
       , scKnownDifferences = []
+      }
+  , SiteComparison
+      { scName = "reduceConst"
+      , scDescription =
+          "The current reduceConst (Clash.Normalize.Transformations.Reduce.reduceConstWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Reduce.reduceConst)"
+      , scTransformations = ["reduceConst"]
+      , scCurrent = $(asRewriteQ Current.reduceConst)
+      , scScoped = Just $(asScopedRewriteQ SReduce.reduceConst)
+      , scKnownDifferences = [coercionForm]
+      }
+  , SiteComparison
+      { scName = "reducePrim"
+      , scDescription =
+          "The current reducePrim (Clash.Normalize.Transformations.Reduce.reducePrimWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Reduce.reducePrim)"
+      , scTransformations = ["reducePrim"]
+      , scCurrent = $(asRewriteQ Current.reducePrim)
+      , scScoped = Just $(asScopedRewriteQ SReduce.reducePrim)
+      , scKnownDifferences = [coercionForm]
       }
   ]
 
