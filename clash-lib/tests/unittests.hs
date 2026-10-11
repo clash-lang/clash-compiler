@@ -15,6 +15,7 @@ import qualified Clash.Tests.Core.Scoped.Evaluator
 import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives
 import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal
 import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector
+import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index
 import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree
 import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector
 import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.GHC.Prim
@@ -104,6 +105,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Scoped.Evaluator.Primitives.tests
   , Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal.tests
   , Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector.tests
+  , Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index.tests
   , Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree.tests
   , Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector.tests
   , Clash.Tests.Core.Scoped.Evaluator.Primitives.GHC.Prim.tests
