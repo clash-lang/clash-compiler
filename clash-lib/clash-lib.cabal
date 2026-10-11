@@ -318,6 +318,7 @@ Library
                       Clash.Primitives.Xilinx.ClockGen
 
                       Clash.Rewrite.Combinators
+                      Clash.Rewrite.Scoped.WorkFree
                       Clash.Rewrite.StrategyDSL
                       Clash.Rewrite.StrategyDSL.TH
                       Clash.Rewrite.Types
@@ -499,6 +500,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Transformations.XOptimize
                  Clash.Tests.Normalize.Util
                  Clash.Tests.Rewrite.Combinators
+                 Clash.Tests.Rewrite.Scoped.WorkFree
                  Clash.Tests.Rewrite.StrategyDSL
                  Clash.Tests.Rewrite.StrategyDSL.Stubs
                  Clash.Tests.Rewrite.Util
