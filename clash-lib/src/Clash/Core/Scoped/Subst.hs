@@ -82,6 +82,14 @@
     variables in scope @l@ are those of @n@, so a type in @l@ is a type in
     @n@. This relies on binders being sorted, see
     "Clash.Core.Scoped.Internal.Names".
+
+  * __Variables of binders__ ('unsafeCoerce' in @unsafeTeleIdVars@ and
+    @unsafeTeleTyVars@, which 'teleIdVars' and 'patVars' apply to the
+    telescopes that extend a scope to @l@): every binder of a telescope or
+    pattern that extends a scope to
+    @l@ binds a name of @l@, and as @l@ is t'Distinct', no binder after it
+    shadows that name. Its type or kind lives in the scope extended by the
+    binders before it, all of whose names are names of @l@ too.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -132,6 +140,9 @@ module Clash.Core.Scoped.Subst
   , strengthenTyIds
   , strengthenTyPat
   , teleIdBinderTypes
+    -- * Variables of binders
+  , teleIdVars
+  , patVars
   ) where
 
 import qualified Data.IntMap.Strict as IntMap
@@ -655,3 +666,34 @@ teleIdBinderTypes = go
   go TNil = []
   -- Trusted: see the module header
   go (TCons b bs) = unsafeCoerce (idBinderType b) : go bs
+
+-- * Variables of binders
+
+-- | The variables that a telescope binds, as terms in the scope it extends
+-- to. See 'idBinderVar' for a single binder.
+teleIdVars :: Distinct l => Tele IdBinder n l -> [Term l]
+teleIdVars = unsafeTeleIdVars
+
+-- | The type variables and the term variables that a pattern binds, as types
+-- and terms in the scope of its alternative
+patVars :: Distinct l => Pat n l -> ([Type l], [Term l])
+patVars = \case
+  DataPat _ tvs ids -> (unsafeTeleTyVars tvs, unsafeTeleIdVars ids)
+  LitPat _ -> ([], [])
+  DefaultPat -> ([], [])
+
+-- | The variables of the binders of a telescope, in scope @l@. Trusted: only
+-- use it when @l@ is the scope the telescope extends to, or extends that one,
+-- see the module header.
+unsafeTeleIdVars :: Tele IdBinder x y -> [Term l]
+unsafeTeleIdVars TNil = []
+unsafeTeleIdVars (TCons b bs) =
+  Var (idBinderOcc b) (unsafeCoerce (idBinderType b)) (unsafeCoerce (tmNameOf b))
+    : unsafeTeleIdVars bs
+
+-- | Like 'unsafeTeleIdVars', for type variables
+unsafeTeleTyVars :: Tele TyBinder x y -> [Type l]
+unsafeTeleTyVars TNil = []
+unsafeTeleTyVars (TCons b bs) =
+  VarTy (tyBinderOcc b) (unsafeCoerce (tyBinderKind b)) (unsafeCoerce (tyNameOf b))
+    : unsafeTeleTyVars bs

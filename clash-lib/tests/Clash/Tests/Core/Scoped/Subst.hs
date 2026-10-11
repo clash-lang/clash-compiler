@@ -437,4 +437,33 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
               problems === [] .&&. binderRaws tm2 === binderRaws tm1 .&&.
                 property (aeqTm tm1 tm2)
       ]
+  , testCase "teleIdVars gives the variables of a telescope in its scope" $ do
+      let tm = [parseToTermQQ| let { (x :: Int) = y; (y :: Int) = x } in x |]
+      case fromClashTermClosed tm of
+        Let bind@(Rec _ _) body -> openBind emptyScope bind body $ \_ bind1 body1 -> case bind1 of
+          Rec bs xs -> case teleIdVars bs of
+            -- The variables are those the right-hand sides and the body refer
+            -- to
+            [xVar, yVar] -> do
+              assertBool "x" (aeqTm xVar body1)
+              assertBool "x and y" (and (zipWith aeqTm [yVar, xVar] xs))
+            _ -> assertFailure "unexpected variables"
+          NonRec {} -> assertFailure "unexpected shape"
+        _ -> assertFailure "unexpected shape"
+
+  , testCase "patVars gives the variables of a pattern in its scope" $ do
+      -- @case v of MkE \@b (y :: b) -> y@
+      let v = localId C.User "v" 1 existentialTy
+          y = localId C.User "y" 2 (C.VarTy existentialTyVar)
+          tm = C.Case (C.Var v) existentialTy [(C.DataPat existentialDataCon [existentialTyVar] [y], C.Var y)]
+      withConvEnv [] [v] $ \env -> case fromClashTerm env tm of
+        Case _ _ [alt] -> openAlt (convScope env) alt $ \_ p e -> case patVars p of
+          ([VarTy _ _ tn], [yVar@(Var _ yTy _)]) -> do
+            assertBool "the variable of the field" (aeqTm yVar e)
+            -- The type of the field is the existential type variable
+            case yTy of
+              VarTy _ _ tn' -> tyNameRaw tn' @?= tyNameRaw tn
+              _ -> assertFailure "unexpected type"
+          _ -> assertFailure "unexpected variables"
+        _ -> assertFailure "unexpected shape"
   ]
