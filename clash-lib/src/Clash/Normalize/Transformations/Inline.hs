@@ -328,7 +328,7 @@ inlineCleanup = toTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
 inlineCleanupWorker
   :: HasCallStack
   => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
-inlineCleanupWorker (TransformContext is0 _) _node (bindToList -> binds) body = do
+inlineCleanupWorker (TransformContext is0 _) node (bindToList -> binds) body = do
   prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
@@ -343,7 +343,7 @@ inlineCleanupWorker (TransformContext is0 _) _node (bindToList -> binds) body = 
       keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
                 $ map snd keep
 
-  if | null il -> return  (Letrec binds body)
+  if | null il -> return node
      | null keep' -> changed body
      | otherwise -> changed (Letrec keep' body)
   where
