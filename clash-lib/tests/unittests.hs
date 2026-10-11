@@ -13,6 +13,7 @@ import qualified Clash.Tests.Core.Scoped.DataCon
 import qualified Clash.Tests.Core.Scoped.EqSolver
 import qualified Clash.Tests.Core.Scoped.Evaluator
 import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives
+import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.GHC.Prim
 import qualified Clash.Tests.Core.Scoped.FreeVars
 import qualified Clash.Tests.Core.Scoped.HasType
 import qualified Clash.Tests.Core.Scoped.NameMap
@@ -97,6 +98,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Scoped.EqSolver.tests
   , Clash.Tests.Core.Scoped.Evaluator.tests
   , Clash.Tests.Core.Scoped.Evaluator.Primitives.tests
+  , Clash.Tests.Core.Scoped.Evaluator.Primitives.GHC.Prim.tests
   , Clash.Tests.Core.Scoped.FreeVars.tests
   , Clash.Tests.Core.Scoped.HasType.tests
   , Clash.Tests.Core.Scoped.NameMap.tests

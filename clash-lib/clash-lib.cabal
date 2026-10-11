@@ -500,6 +500,7 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.EqSolver
                  Clash.Tests.Core.Scoped.Evaluator
                  Clash.Tests.Core.Scoped.Evaluator.Primitives
+                 Clash.Tests.Core.Scoped.Evaluator.Primitives.GHC.Prim
                  Clash.Tests.Core.Scoped.FreeVars
                  Clash.Tests.Core.Scoped.HasType
                  Clash.Tests.Core.Scoped.NameMap
