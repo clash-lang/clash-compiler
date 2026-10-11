@@ -57,7 +57,6 @@ module Clash.Rewrite.Scoped.ViaFoil
   , whnfRW
     -- * Internals, exported for testing
   , rootVars
-  , fromClashTermIn
   ) where
 
 import           Control.Lens                ((.=))
@@ -321,39 +320,6 @@ toClashTickFresh is env = \case
   NoDeDup -> pure C.NoDeDup
   Attributes ty e -> C.Attributes <$> toClashTypeFresh is env ty <*> toClashFresh is env e
 
--- * Converting into an existing scope
-
--- | Convert a Clash term into scope @n@, given the scoped counterparts of its
--- free variables. Errors if it has other free variables.
---
--- The term is abstracted over the free variables, converted as a closed term,
--- and then applied to the scoped variables by substitution.
-fromClashTermIn
-  :: forall n
-   . (HasCallStack, Distinct n)
-  => Scope n
-  -> [(C.TyVar, Type n)]
-  -- ^ Type variables in scope, ordered such that the kind of a type variable
-  -- only mentions the ones before it
-  -> [(C.Id, Term n)]
-  -- ^ Term variables in scope
-  -> C.Term
-  -> Term n
-fromClashTermIn sc tvs ids tm =
-  peelTy (closedSubst sc) (fromClashTermClosed closed) tvs
- where
-  closed = foldr (C.TyLam . fst) (foldr (C.Lam . fst) tm ids) tvs
-
-  peelTy :: Subst i n -> Term i -> [(C.TyVar, Type n)] -> Term n
-  peelTy s (TyLam b e) ((_, ty) : rest) = peelTy (extendTySubst s b ty) e rest
-  peelTy s e [] = peelId s e ids
-  peelTy _ _ _ = error ($(curLoc) ++ "expected a type lambda")
-
-  peelId :: Subst i n -> Term i -> [(C.Id, Term n)] -> Term n
-  peelId s (Lam b e) ((_, x) : rest) = peelId (extendTmSubst s b x) e rest
-  peelId s e [] = substTm s e
-  peelId _ _ _ = error ($(curLoc) ++ "expected a lambda")
-
 -- * whnfRW
 
 -- | A Clash Core view of the context of a subterm in scope @n@
@@ -470,7 +436,7 @@ whnfRW isSubj ctx e k = do
       sc = tfScope ctx
       tvs = reverse (lvTyVarsRev lv)
       ids = reverse (lvIdsRev lv)
-      back = fromClashTermIn sc tvs ids
+      back = fromClashTermWith sc tvs ids
   (heap, v) <- whnfHeap isSubj ctxC e'
   tcm <- Lens.view tcCache
   case heapLetBindings tcm heap of

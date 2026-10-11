@@ -4,7 +4,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Core.Scoped.Evaluator": the whnf evaluator of scoped Clash
-  Core, and its ported primitive reductions.
+  Core, its ported primitive reductions, and the adapter that reduces the
+  other primitives with the evaluator of Clash Core.
 -}
 
 {-# LANGUAGE LambdaCase #-}
@@ -16,35 +17,41 @@ import Data.Text (Text)
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import qualified Clash.Core.Evaluator.Types as CE
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (NameSort (..), mkUnsafeSystemName)
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import Clash.Core.TysPrim (intPrimTy, integerPrimTy, typeNatKind)
 import qualified Clash.Core.Var as C
+import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Driver.Types (BindingMap)
+import Clash.Util.Supply (freshId)
 
+import Clash.Core.Scoped.Evaluator.Adapter (adaptPrim)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, consDc, ghcBoolTy, ghcFalseDataCon, ghcTrueDataCon
-  , globalId, intId, intLit, intTy, justDataCon
-  , maybeTy, mkBindingMap, nilDc, numTy, pairDataCon, tyVar
+  , globalId, heapLookupEvaluator, intId, intLit, intTy, justDataCon
+  , maybeTy, mkBindingMap, nilDc, numTy, pairDataCon, pairTy, tyVar
   , vecTy )
 import Test.Clash.Scoped (scopedWhnf, testTypeEnv)
 
 -- | Evaluate with the test types, no globals, and no primitives of Clash Core
 eval :: C.Term -> C.Term
-eval = evalWith mempty False
+eval = evalWith heapLookupEvaluator mempty False
 
 -- | Evaluate as the subject of a case-expression
 evalSubj :: C.Term -> C.Term
-evalSubj = evalWith mempty True
+evalSubj = evalWith heapLookupEvaluator mempty True
 
--- | Evaluate with the ported primitive reductions
-evalWith :: BindingMap -> Bool -> C.Term -> C.Term
-evalWith = scopedWhnf (Env testTypeEnv (PrimReductions scopedPrimReductions Nothing))
+-- | Evaluate with the ported primitive reductions, and the given evaluator of
+-- Clash Core for the other primitives
+evalWith :: CE.Evaluator -> BindingMap -> Bool -> C.Term -> C.Term
+evalWith clashEval = scopedWhnf
+  (Env testTypeEnv (PrimReductions scopedPrimReductions (Just (adaptPrim clashEval))))
 
 -- | The body of the bindings the evaluator allocated
 allocatedBody :: C.Term -> C.Term
@@ -96,12 +103,12 @@ machineTests =
 
   , testCase "globals are looked up in the global heap" $
       assertAlphaEq (intLit 42)
-        (evalWith (mkBindingMap [(g, intLit 42)]) False (C.Var g))
+        (evalWith heapLookupEvaluator (mkBindingMap [(g, intLit 42)]) False (C.Var g))
 
     -- A local and a global with the same unique (decision D5 of the port)
   , testCase "locals are not looked up in the global heap" $
       assertAlphaEq (C.Var xG)
-        (evalWith (mkBindingMap [(g, intLit 42)]) False (C.Var xG))
+        (evalWith heapLookupEvaluator (mkBindingMap [(g, intLit 42)]) False (C.Var xG))
 
     -- Like the machine of Clash Core, it doesn't expand a partial
     -- application at the top: there is nothing to apply the abstraction to.
@@ -147,13 +154,13 @@ shouldworkTests =
   [ testCase "a global is not looked up in the local heap" $
       -- let fLocal = 2 in f, where f = 1
       assertAlphaEq (intLit 1)
-        (allocatedBody (evalWith (mkBindingMap [(fG, intLit 1)]) False
+        (allocatedBody (evalWith heapLookupEvaluator (mkBindingMap [(fG, intLit 1)]) False
           (C.Let (C.NonRec fL (intLit 2)) (C.Var fG))))
 
   , testCase "a global argument is not the local with its unique" $
       -- let fLocal = 2 in h f
       assertAlphaEq (C.App (C.Var hL) (C.Var fG))
-        (allocatedBody (evalWith (mkBindingMap [(fG, intLit 1)]) False
+        (allocatedBody (evalWith heapLookupEvaluator (mkBindingMap [(fG, intLit 1)]) False
           (C.Let (C.NonRec fL (intLit 2)) (C.App (C.Var hL) (C.Var fG)))))
 
     -- LetAllocationFreshness: a let-binding must not capture a free variable
@@ -268,9 +275,72 @@ nativeTests =
     [Right (numTy k), Right intTy, Right (numTy (k - 1)), Left coercion, Left e, Left t]
   coercion = C.Prim (C.PrimInfo "_CO_" intTy C.WorkNever C.SingleResult C.NoUnfolding)
 
+-- * The adapter
+
+-- | An evaluator of Clash Core with primitive reductions for the adapter:
+--
+-- * @plus@ adds two @Int@ literals;
+-- * @alloc@ allocates its argument on the heap, and applies @f@ to it;
+-- * @fstField@ evaluates the first field of a pair, with the machine of
+--   Clash Core.
+adapterEvaluator :: CE.Evaluator
+adapterEvaluator = heapLookupEvaluator
+  { CE.primStep = \tcm _isSubj p _tys args m -> case (C.primName p, args) of
+      ("plus", [CE.Lit (IntLiteral i), CE.Lit (IntLiteral j)]) ->
+        Just (CE.setTerm (intLit (i + j)) m)
+      ("alloc", [a]) ->
+        let (u, sup) = freshId (CE.mSupply m)
+            hv = uniqAway (CE.mScopeNames m) (intId System "h" u)
+            m1 = m {CE.mSupply = sup, CE.mScopeNames = extendInScopeSet (CE.mScopeNames m) hv}
+        in Just (CE.setTerm (C.App (C.Var fG) (C.Var hv))
+                   (CE.heapInsert C.LocalId hv (CE.valToTerm a) m1))
+      ("fstField", [CE.DC _ (Left a : _)]) ->
+        let m1 = CE.whnf heapLookupEvaluator tcm False (CE.setTerm a (CE.stackClear m))
+        in Just m1
+      _ -> Nothing
+  }
+ where
+  fG = globalId User "f" 5 (C.mkFunTy intTy intTy)
+
+adapterTests :: [TestTree]
+adapterTests =
+  [ testCase "a primitive that inspects literals" $
+      assertAlphaEq (intLit 5)
+        (evalWith adapterEvaluator mempty False
+          (C.mkApps (prim "plus" intBinTy) [Left (intLit 2), Left (intLit 3)]))
+
+  , testCase "bindings the reduction allocates become allocated bindings" $
+      -- alloc (MkPair x x): its argument is bound by a new binding, which f
+      -- is applied to
+      case evalWith adapterEvaluator mempty False
+             (C.App (prim "alloc" (C.mkFunTy pairTy intTy))
+                    (C.mkApps (C.Data pairDataCon) [Left (C.Var x), Left (C.Var x)])) of
+        -- Unwinding the stack replaces the argument of f by its binding, like
+        -- the machine of Clash Core does
+        r@(C.Letrec [(h, rhs)] (C.App (C.Var fV) arg))
+          | C.varUniq fV == 5
+          -> do
+            assertAlphaEq (C.mkApps (C.Data pairDataCon) [Left (C.Var x), Left (C.Var x)]) rhs
+            assertAlphaEq rhs arg
+            assertBool ("allocated binder clashes with x: " <> show r) (C.varUniq h /= C.varUniq x)
+        r -> assertFailure ("unexpected result: " <> show r)
+
+  , testCase "a nested evaluation sees the heap bindings the arguments reach" $
+      -- let y = 7 in fstField (MkPair y y): the machine of Clash Core gets
+      -- the binding of y
+      assertAlphaEq (intLit 7)
+        (allocatedBody (evalWith adapterEvaluator mempty False
+          (C.Let (C.NonRec y (intLit 7))
+            (C.App (prim "fstField" (C.mkFunTy pairTy intTy))
+                   (C.mkApps (C.Data pairDataCon) [Left (C.Var y), Left (C.Var y)])))))
+  ]
+ where
+  intBinTy = C.mkFunTy intTy (C.mkFunTy intTy intTy)
+
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Evaluator"
   [ testGroup "machine" machineTests
   , testGroup "tests/shouldwork/Evaluator" shouldworkTests
   , testGroup "ported primitives" nativeTests
+  , testGroup "adapter" adapterTests
   ]
