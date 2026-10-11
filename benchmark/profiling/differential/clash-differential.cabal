@@ -36,7 +36,9 @@ executable clash-differential
                        lens,
                        mtl,
                        process,
+                       tasty-quickcheck,
                        text,
+                       transformers,
                        unordered-containers,
 
                        clash-ghc,
