@@ -323,6 +323,7 @@ Library
                       Clash.Rewrite.Scoped
                       Clash.Rewrite.Scoped.Apply
                       Clash.Rewrite.Scoped.Combinators
+                      Clash.Rewrite.Scoped.Globals
                       Clash.Rewrite.Scoped.Types
                       Clash.Rewrite.Scoped.ViaFoil
                       Clash.Rewrite.Scoped.Whnf
