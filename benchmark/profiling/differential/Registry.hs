@@ -51,12 +51,12 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["reduceConst"], $(asRewriteQ Current.reduceConst), [])
     , (["reducePrim"], $(asRewriteQ Current.reducePrim), [coercionForm])
     , (["removeUnusedExpr"], $(asRewriteQ Current.removeUnusedExpr), [coercionForm])
+    , (["flattenLet", "letFlat"], $(asRewriteQ Current.flattenLet), [])
     ]
 
   unported =
     -- Letrec
-    [ (["flattenLet", "letFlat"], $(asRewriteQ flattenLet))
-    , (["CSE"], $(asRewriteQ simpleCSE))
+    [ (["CSE"], $(asRewriteQ simpleCSE))
     , (["topLet"], $(asRewriteQ topLet))
     , (["recToLetRec"], recToLetRec)
     -- Cast

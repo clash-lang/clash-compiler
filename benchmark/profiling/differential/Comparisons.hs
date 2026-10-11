@@ -273,5 +273,15 @@ siteComparisons =
       , scScoped = Just $(asScopedRewriteQ S.removeUnusedExpr)
       , scKnownDifferences = [coercionForm]
       }
+  , SiteComparison
+      { scName = "flattenLet"
+      , scDescription =
+          "The current flattenLet (Clash.Normalize.Transformations.Letrec.flattenLetWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Letrec.flattenLet)"
+      , scTransformations = ["flattenLet", "letFlat"]
+      , scCurrent = $(asRewriteQ Current.flattenLet)
+      , scScoped = Just $(asScopedRewriteQ S.flattenLet)
+      , scKnownDifferences = []
+      }
   ]
 
