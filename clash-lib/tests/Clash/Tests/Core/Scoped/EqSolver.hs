@@ -39,11 +39,13 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.DataCon (withDataConPat)
 import Clash.Core.Scoped.Type (mkFunTy)
 
-import Test.Clash.Rewrite (intTy, kindedTyVar, localId)
+import Test.Clash.Rewrite
+  ( addTy, boolTy, eqTy, fTy, intTy, kindedTyVar, localId, maybeTy, nTy
+  , testTyConMap, vConsDataCon, vNilDataCon, vTy )
 import Test.Clash.Scoped
 
 tcm :: C.TyConMap
-tcm = fixtureTyConMap
+tcm = testTyConMap
 
 mTv, n0Tv, xTv :: C.TyVar
 mTv = kindedTyVar C.User "m" 5000 C.typeNatKind
