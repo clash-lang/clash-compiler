@@ -5,6 +5,7 @@ import Test.Tasty.QuickCheck
 
 import qualified Clash.Tests.Core.AlphaEquivalence
 import qualified Clash.Tests.Core.FreeVars
+import qualified Clash.Tests.Core.HasType
 import qualified Clash.Tests.Core.StructuralEquivalence
 import qualified Clash.Tests.Core.Subst
 import qualified Clash.Tests.Core.TermLiteral
@@ -39,6 +40,7 @@ tests :: TestTree
 tests = testGroup "Unittests"
   [ Clash.Tests.Core.AlphaEquivalence.tests
   , Clash.Tests.Core.FreeVars.tests
+  , Clash.Tests.Core.HasType.tests
   , Clash.Tests.Core.StructuralEquivalence.tests
   , Clash.Tests.Core.Subst.tests
   , Clash.Tests.Core.TermLiteral.tests
