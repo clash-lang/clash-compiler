@@ -9,11 +9,14 @@
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module Comparisons (comparisons) where
+{-# LANGUAGE OverloadedStrings #-}
+
+module Comparisons (comparisons, siteComparisons) where
 
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Util as Current
-import Clash.Rewrite.StrategyDSL.TH (compileStrategy)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrategy)
+import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
@@ -21,7 +24,9 @@ import qualified Clash.Normalize.Scoped.Util as Scoped
 import Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh)
 
 import Test.Clash.Differential
+import Test.Clash.Differential.Sites
 
+import qualified Current
 import Demo
 
 -- | All comparisons, by name
@@ -110,5 +115,20 @@ comparisons =
       , cmpCurrent = currentRewrite "caseOneAlt" $(compileStrategy (strategyFor Fixpoint caseOneAltT))
       , cmpScoped = pureSide id
       , cmpKnownDifferences = []
+      }
+  ]
+
+-- | All comparisons at captured sites, by name, see "Test.Clash.Differential.Sites"
+siteComparisons :: [SiteComparison]
+siteComparisons =
+  [ SiteComparison
+      { scName = "deadCode"
+      , scDescription =
+          "The current deadCode (Clash.Normalize.Transformations.Letrec.deadCodeWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Letrec.deadCode)"
+      , scTransformations = ["deadCode", "deadcode"]
+      , scCurrent = $(asRewriteQ Current.deadCode)
+      , scScoped = Just $(asScopedRewriteQ S.deadCode)
+      , scKnownDifferences = [letrecOrder]
       }
   ]

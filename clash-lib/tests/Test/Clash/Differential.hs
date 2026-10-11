@@ -63,6 +63,8 @@ module Test.Clash.Differential
   , Outcome (..)
   , Mismatch (..)
   , compareBinding
+  , compareResults
+  , attempt
   , Summary (..)
   , compareDesign
     -- * Differences
