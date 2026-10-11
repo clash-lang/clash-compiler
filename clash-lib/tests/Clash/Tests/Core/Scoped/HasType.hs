@@ -124,6 +124,8 @@ terms =
   , C.App (C.App (C.TyApp wPrim intTy) x) x
   , C.Prim mrPrim
   , C.TyLam aTv (C.App (C.TyApp (C.Prim mrPrim) a) v)
+    -- A coercion with an open type, see "Clash.Core.Scoped.Convert"
+  , C.TyLam aTv (C.primCo (nTy a))
   ]
 
 tests :: TestTree

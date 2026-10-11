@@ -16,6 +16,18 @@
 
   Converting /from/ scoped Core uses the raw names as uniques.
 
+  = Coercions
+
+  The types of primitives are closed in scoped Core (see
+  "Clash.Core.Scoped.Syntax"). Clash Core's 'Clash.Core.Util.primCo' however
+  makes coercion primitives (@_CO_@) whose type is that of the coercion, which
+  may mention type variables in scope. Conversion turns such a coercion with
+  an open type @ty@ into @'TyApp' ('Prim' _CO_) ty@, where @_CO_@ has type
+  @forall a. a@: the shape in which "Clash.GHC.GHC2Core" makes coercions,
+  and 'Clash.Core.Scoped.Util.primCo' too. Converting back keeps that shape,
+  which Clash Core handles as it does the coercions of "Clash.GHC.GHC2Core".
+  So the round trip of a term with such a coercion is not the same term.
+
   = Trusted code
 
   This module is part of the trusted core of "Clash.Core.Scoped". Its unsafe
@@ -42,6 +54,7 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 
@@ -65,6 +78,7 @@ module Clash.Core.Scoped.Convert
   , toClashIdBinder
   ) where
 
+import qualified Control.Lens as Lens
 import Control.Monad.ST (ST, runST)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -72,12 +86,15 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Primitive.ByteArray
   (MutableByteArray, newByteArray, readByteArray, writeByteArray)
+import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.Util as C (undefinedTy)
 import qualified Clash.Core.Var as C
+import qualified Clash.Core.FreeVars as C
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Internal.Names
@@ -304,7 +321,12 @@ goTmS sup env@(ConvEnv _ _ tms _) = go
           Nothing -> error ("fromClashTerm: variable not in scope: " ++ show (C.varName v))
     C.Data dc -> pure (Data dc)
     C.Literal l -> pure (Literal l)
-    C.Prim p -> pure (Prim p)
+    C.Prim p
+      -- A coercion with an open type, see the module header
+      | C.primName p == coercionPrimName
+      , Lens.notNullOf C.typeFreeVars (C.primType p)
+      -> TyApp (Prim p {C.primType = C.undefinedTy}) <$> goT (C.primType p)
+      | otherwise -> pure (Prim p)
     C.Lam v e -> convIdBinder sup Binder env v $ \env' b -> Lam b <$> goTmS sup env' e
     C.TyLam tv e -> convTyBinder sup Binder env tv $ \env' b -> TyLam b <$> goTmS sup env' e
     C.App e1 e2 -> App <$> go e1 <*> go e2
@@ -334,6 +356,10 @@ goTmS sup env@(ConvEnv _ _ tms _) = go
     C.DeDup -> pure DeDup
     C.NoDeDup -> pure NoDeDup
     C.Attributes ty e -> Attributes <$> goT ty <*> go e
+
+-- | The name of coercion primitives, see the module header
+coercionPrimName :: Text
+coercionPrimName = "_CO_"
 
 -- | Convert Clash type variables into a telescope of binders, e.g. those of a
 -- data constructor. Their kinds may mention the ones before them.
