@@ -51,7 +51,9 @@ module Test.Clash.Differential
   , KnownDifference (..)
   , applyKnownDifferences
   , recToNonRec
+  , letrecOrder
   , everywhereTm
+  , everywhereScopedTm
     -- * Running transformations
   , Mode (..)
   , strategyFor
@@ -80,6 +82,7 @@ import Data.Functor.Identity (Identity (..))
 import qualified Data.HashMap.Strict as HashMap
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -102,7 +105,10 @@ import Clash.Util.Supply (Supply, newSupply)
 
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm, toClashType)
-import Clash.Core.Scoped.Subst (unsinkIdBinder)
+import Clash.Core.Scoped.Subst
+  (openAlt, openBind, openIdBinder, openTyBinder, unsinkIdBinder)
+import Clash.Core.Scoped.Term (walkTerm)
+import Clash.Core.Scoped.Util (LetGroup (RecGroup), mkLets, regroupLetBindings)
 import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped
   (ScopedRewrite, bottomupR, repeatR, rootContext, runScopedTransform)
@@ -190,16 +196,17 @@ data Comparison = forall mc ms. Comparison
 -- | An intended difference between the current function and its port: a
 -- normalization applied to the results of both sides, so that results that
 -- only differ in this way compare equal. Results that are only equal after
--- normalization are reported as known-different, not as equal.
+-- normalization are reported as known-different, not as equal. It gets the
+-- scope of the results.
 data KnownDifference = KnownDifference
   { kdName :: String
   , kdDescription :: String
-  , kdNormalize :: forall n. Term n -> Term n
+  , kdNormalize :: forall n. Distinct n => Scope n -> Term n -> Term n
   }
 
 -- | Apply known differences, in order
-applyKnownDifferences :: [KnownDifference] -> Term n -> Term n
-applyKnownDifferences kds t = List.foldl' (\acc kd -> kdNormalize kd acc) t kds
+applyKnownDifferences :: Distinct n => [KnownDifference] -> Scope n -> Term n -> Term n
+applyKnownDifferences kds sc t = List.foldl' (\acc kd -> kdNormalize kd sc acc) t kds
 
 -- | A recursive let-binding of a single binder that doesn't refer to itself
 -- is a non-recursive one.
@@ -211,7 +218,7 @@ recToNonRec :: KnownDifference
 recToNonRec = KnownDifference
   { kdName = "rec-to-nonrec"
   , kdDescription = "a Rec of one binding that doesn't refer to itself is a NonRec"
-  , kdNormalize = everywhereTm go
+  , kdNormalize = \_ -> everywhereTm go
   }
  where
   go :: Term x -> Term x
@@ -238,6 +245,75 @@ everywhereTm f = go
     Case e ty alts -> Case (go e) ty [Alt p (go a) | Alt p a <- alts]
     Cast e t1 t2 -> Cast (go e) t1 t2
     Tick t e -> Tick t (go e)
+    e -> e
+
+-- | The bindings of a recursive let-expression are in the order in which the
+-- body refers to them, and then the bindings it refers to, and so on
+-- (breadth-first, each term in the order of 'walkTerm'). Bindings that are
+-- not referred to keep their order, at the end.
+--
+-- The current transformations order recursive let-bindings by unique in
+-- places (e.g. 'Clash.Rewrite.Util.removeUnusedBinders'), where their ports
+-- keep the order of the bindings.
+letrecOrder :: KnownDifference
+letrecOrder = KnownDifference
+  { kdName = "letrec-order"
+  , kdDescription =
+      "the bindings of a letrec are in the order in which the body and the \
+      \bindings refer to them"
+  , kdNormalize = everywhereScopedTm go
+  }
+ where
+  go :: Distinct x => Scope x -> Term x -> Term x
+  go sc = \case
+    e@(Let (Rec bs xs) body)
+      | perm /= [0 .. length xs - 1] ->
+          regroupLetBindings sc bs xs body [RecGroup perm] (\_ binds body' -> mkLets binds body')
+      | otherwise -> e
+     where
+      positions = IntMap.fromList (zip (teleRaws bs) [0 ..])
+      refs :: Term y -> [Int]
+      refs = walkTerm $ \case
+        Var _ _ n -> IntMap.lookup (tmNameRaw n) positions
+        _ -> Nothing
+      rhss = IntMap.fromList (zip [0 ..] xs)
+      reached = visit [] IntSet.empty (refs body)
+      visit acc _ [] = reverse acc
+      visit acc seen (i : is)
+        | i `IntSet.member` seen = visit acc seen is
+        | otherwise = visit (i : acc) (IntSet.insert i seen) (is ++ maybe [] refs (IntMap.lookup i rhss))
+      perm = reached ++ [i | i <- [0 .. length xs - 1], i `notElem` reached]
+    e -> e
+
+  teleRaws :: Tele IdBinder a b -> [Int]
+  teleRaws = \case
+    TNil -> []
+    TCons b rest -> tmNameRaw (tmNameOf b) : teleRaws rest
+
+-- | Apply a function at every node of a term, bottom-up, like
+-- 'everywhereTm', giving it the scope of the node: goes under binders by
+-- opening them.
+everywhereScopedTm
+  :: Distinct n
+  => (forall x. Distinct x => Scope x -> Term x -> Term x)
+  -> Scope n
+  -> Term n
+  -> Term n
+everywhereScopedTm f = go
+ where
+  go :: Distinct y => Scope y -> Term y -> Term y
+  go sc e0 = f sc $ case e0 of
+    Lam b e -> openIdBinder sc b e $ \sc' b' e' -> Lam b' (go sc' e')
+    TyLam b e -> openTyBinder sc b e $ \sc' b' e' -> TyLam b' (go sc' e')
+    App e1 e2 -> App (go sc e1) (go sc e2)
+    TyApp e ty -> TyApp (go sc e) ty
+    Let bind e -> openBind sc bind e $ \sc' bind' e' -> case bind' of
+      NonRec b x -> Let (NonRec b (go sc x)) (go sc' e')
+      Rec bs xs -> Let (Rec bs (map (go sc') xs)) (go sc' e')
+    Case e ty alts ->
+      Case (go sc e) ty [openAlt sc a (\sc' p e' -> Alt p (go sc' e')) | a <- alts]
+    Cast e t1 t2 -> Cast (go sc e) t1 t2
+    Tick t e -> Tick t (go sc e)
     e -> e
 
 -- * Running transformations
@@ -338,23 +414,23 @@ compareBinding (Comparison _ _ cur sco kds) d b = either Different id <$> do
         forceTm (fromClashTermClosed c)
       case sc of
         Left m -> pure (Left m)
-        Right c' -> attempt "comparing" (evaluate (compareResults kds c' s))
+        Right c' -> attempt "comparing" (evaluate (compareResults kds emptyScope c' s))
 
--- | Compare the results of both sides
-compareResults :: [KnownDifference] -> Term n -> Term n -> Outcome
-compareResults kds c s
+-- | Compare the results of both sides, in the given scope
+compareResults :: Distinct n => [KnownDifference] -> Scope n -> Term n -> Term n -> Outcome
+compareResults kds sc c s
   | aeqTm c s = Equal
   | aeqTm c' s' = KnownDifferent (explaining 1)
   | otherwise = Different (Mismatch (firstDiff c' s') (toClashTerm c') (toClashTerm s'))
  where
-  c' = applyKnownDifferences kds c
-  s' = applyKnownDifferences kds s
+  c' = applyKnownDifferences kds sc c
+  s' = applyKnownDifferences kds sc s
 
   -- The shortest prefix of the known differences that explains the
   -- difference
   explaining k
     | k >= length kds = map kdName kds
-    | aeqTm (applyKnownDifferences (take k kds) c) (applyKnownDifferences (take k kds) s) =
+    | aeqTm (applyKnownDifferences (take k kds) sc c) (applyKnownDifferences (take k kds) sc s) =
         map kdName (take k kds)
     | otherwise = explaining (k + 1)
 

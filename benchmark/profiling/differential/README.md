@@ -105,9 +105,14 @@ Available:
 
 * `recToNonRec`: a `Rec` of one binding that doesn't refer to itself is a
   `NonRec`.
+* `letrecOrder`: the bindings of a `Rec` are in the order in which the body,
+  and then the bindings, refer to them. The current code orders bindings by
+  unique in places (e.g. `removeUnusedBinders`), where ports keep their order.
 
 Add new ones to `Test.Clash.Differential`, next to `recToNonRec`, and make them
-as narrow as possible. `everywhereTm` applies a function at every node.
+as narrow as possible. A known difference gets the scope of the results.
+`everywhereTm` applies a function at every node, and `everywhereScopedTm` also
+gives it the scope of the node, e.g. to create fresh binders.
 
 ## Unit tests
 
