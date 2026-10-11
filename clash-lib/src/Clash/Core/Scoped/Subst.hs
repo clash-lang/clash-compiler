@@ -43,11 +43,15 @@
     scope @o@. 'idSubst' has no entries and @i = o@. 'closedSubst' has no
     entries and @i@ has no variables. 'extendTySubst' and 'extendTmSubst' add
     an entry for the new variable. 'extendSubstScope' extends @o@.
-    'substTyBinder' and 'substIdBinder' extend @o@ with a fresh binder, and add
-    an entry for the old one unless it keeps its name and its type or kind
-    (when there are no type entries); then the variable of @i'@ is the new
-    binder of @o'@. When the old binder shadows a variable that has an entry,
+    'substTyBinder' and 'substIdBinder' (through 'substTyBinderK' and
+    'substIdBinderK', which get the substituted kind or type) extend @o@ with
+    a fresh binder, and add an entry for the old one unless it keeps its name
+    and there are no type entries; then the variable of @i'@ is the new binder
+    of @o'@. (Without type entries its kind or type is unchanged, except in
+    'freshenDistinct', where it is alpha-equivalent.) When the old binder shadows a variable that has an entry,
     that entry is removed or overwritten. 'freshen' only sets a flag.
+    'freshenDistinct' only raises the watermark of the output scope (with
+    'raiseWatermark'), which keeps its names.
 
   * __Substitution__ (@coerceTy@, @coerceTm@, @coerceTyName@,
     @coerceTmName@): a variable without an entry is kept as it is, which by the
@@ -121,6 +125,7 @@ module Clash.Core.Scoped.Subst
   , substPat
   , substBind
   , freshen
+  , freshenDistinct
     -- * Going under binders
   , openTyBinder
   , openIdBinder
@@ -336,10 +341,21 @@ substTyBinder
   -> TyBinder i i'
   -> (forall o'. DExt o o' => Subst i' o' -> TyBinder o o' -> r)
   -> r
-substTyBinder s@(UnsafeSubst sc tys tms fr) (TyBinder occ k b) cont =
-  refresh sc (unsortTyNameBinder b) fr $ \b' ->
+substTyBinder s@(UnsafeSubst _ _ _ fr) b = substTyBinderK fr s b (substTy s (tyBinderKind b))
+
+-- | 'substTyBinder', given the kind of the binder, substituted. Renames the
+-- binder if it clashes with the output scope, or always when asked to.
+substTyBinderK
+  :: Distinct o
+  => Bool
+  -> Subst i o
+  -> TyBinder i i'
+  -> Kind o
+  -> (forall o'. DExt o o' => Subst i' o' -> TyBinder o o' -> r)
+  -> r
+substTyBinderK always (UnsafeSubst sc tys tms fr) (TyBinder occ _ b) k' cont =
+  refresh sc (unsortTyNameBinder b) always $ \b' ->
     let new = nameId (nameOf b')
-        k' = substTy s k
         -- Trusted: b' is fresh, see the module header
         bndr' = TyBinder occ k' (UnsafeTyNameBinder b')
         sc' = extendScope b' sc
@@ -363,10 +379,21 @@ substIdBinder
   -> IdBinder i i'
   -> (forall o'. DExt o o' => Subst i' o' -> IdBinder o o' -> r)
   -> r
-substIdBinder s@(UnsafeSubst sc tys tms fr) (IdBinder occ ty b) cont =
-  refresh sc (unsortTmNameBinder b) fr $ \b' ->
+substIdBinder s@(UnsafeSubst _ _ _ fr) b = substIdBinderK fr s b (substTy s (idBinderType b))
+
+-- | 'substIdBinder', given the type of the binder, substituted. Renames the
+-- binder if it clashes with the output scope, or always when asked to.
+substIdBinderK
+  :: Distinct o
+  => Bool
+  -> Subst i o
+  -> IdBinder i i'
+  -> Type o
+  -> (forall o'. DExt o o' => Subst i' o' -> IdBinder o o' -> r)
+  -> r
+substIdBinderK always (UnsafeSubst sc tys tms fr) (IdBinder occ _ b) ty' cont =
+  refresh sc (unsortTmNameBinder b) always $ \b' ->
     let new = nameId (nameOf b')
-        ty' = substTy s ty
         -- Trusted: b' is fresh, see the module header
         bndr' = IdBinder occ ty' (UnsafeTmNameBinder b')
         sc' = extendScope b' sc
@@ -430,9 +457,141 @@ substBind s bs cont = case bs of
 -- | Rename every binder in a value to the name just above the watermark of
 -- the scope at the binder. Unlike conversion from Clash Core, which numbers
 -- the binders of a term depth-first, this gives binders in different subterms
--- the same name: e.g. both binders in @f (\x -> x) (\y -> y)@.
+-- the same name: e.g. both binders in @f (\x -> x) (\y -> y)@. See
+-- 'freshenDistinct' to give every binder a different name.
 freshen :: (Distinct n, HasSubst e) => Scope n -> e n -> e n
 freshen sc = subst (UnsafeSubst sc IntMap.empty IntMap.empty True)
+
+-- | Rename every binder in a term to a distinct fresh name, like conversion
+-- from Clash Core does ("Clash.Core.Scoped.Convert"): it numbers the binders
+-- in depth-first order, from just above the watermark of the scope. So no two
+-- binders in the result have the same name, and none clashes with the scope.
+-- E.g. the binders in @f (\x -> x) (\y -> y)@ get two different names, whereas
+-- 'freshen' gives them the same one.
+--
+-- This includes the binders of the types in the term, except those of the
+-- types of variable occurrences, which are those of their binders (or of the
+-- free variables of the term). The order is the one of conversion: a binder
+-- after the binders in its type or kind, a non-recursive let-binding after its
+-- right-hand side, and the binders of a recursive let-binding before their
+-- right-hand sides. So a term converted from Clash Core keeps its names.
+freshenDistinct :: Distinct n => Scope n -> Term n -> Term n
+freshenDistinct sc tm = case distinctTm (idSubst sc) tm of
+  Distinctly tm' _ -> tm'
+
+-- | A value with distinct binders, and the watermark to continue with to its
+-- right: the largest name it binds, or the watermark it started from if it
+-- binds none. See 'freshenDistinct'.
+data Distinctly a = Distinctly a !Int
+
+-- Raise the watermark of the output scope to the largest name bound so far
+raiseSubst :: Int -> Subst i o -> Subst i o
+raiseSubst w (UnsafeSubst sc tys tms fr) = UnsafeSubst (raiseWatermark w sc) tys tms fr
+{-# INLINE raiseSubst #-}
+
+-- The largest name bound so far, see 'raiseSubst'
+watermarkOf :: Subst i o -> Int
+watermarkOf = scopeWatermark . substScope
+{-# INLINE watermarkOf #-}
+
+-- Freshen two values in order: the second continues above the names of the
+-- first
+distinctly2
+  :: Subst i o
+  -> (Subst i o -> Distinctly a)
+  -> (Subst i o -> Distinctly b)
+  -> (a -> b -> c)
+  -> Distinctly c
+distinctly2 s f g k = case f s of
+  Distinctly a w1 -> case g (raiseSubst w1 s) of
+    Distinctly b w2 -> Distinctly (k a b) w2
+{-# INLINE distinctly2 #-}
+
+-- Freshen values in order, see 'distinctly2'
+distinctlyList :: Subst i o -> (Subst i o -> x -> Distinctly a) -> [x] -> Distinctly [a]
+distinctlyList s0 f = go s0
+ where
+  go s [] = Distinctly [] (watermarkOf s)
+  go s (x:xs) = distinctly2 s (`f` x) (`go` xs) (:)
+
+distinctTy :: Distinct o => Subst i o -> Type i -> Distinctly (Type o)
+distinctTy s ty = case ty of
+  VarTy {} -> Distinctly (substTy s ty) (watermarkOf s)
+  ConstTy c -> Distinctly (ConstTy c) (watermarkOf s)
+  ForAllTy b t -> distinctTyBinder s b $ \s' b' -> case distinctTy s' t of
+    Distinctly t' w -> Distinctly (ForAllTy b' t') w
+  AppTy t1 t2 -> distinctly2 s (`distinctTy` t1) (`distinctTy` t2) AppTy
+  LitTy l -> Distinctly (LitTy l) (watermarkOf s)
+  AnnType a t -> case distinctTy s t of
+    Distinctly t' w -> Distinctly (AnnType a t') w
+
+distinctTyBinder
+  :: Distinct o
+  => Subst i o
+  -> TyBinder i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> TyBinder o o' -> r)
+  -> r
+distinctTyBinder s b cont = case distinctTy s (tyBinderKind b) of
+  Distinctly k' w -> substTyBinderK True (raiseSubst w s) b k' cont
+
+distinctIdBinder
+  :: Distinct o
+  => Subst i o
+  -> IdBinder i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> IdBinder o o' -> r)
+  -> r
+distinctIdBinder s b cont = case distinctTy s (idBinderType b) of
+  Distinctly ty' w -> substIdBinderK True (raiseSubst w s) b ty' cont
+
+distinctTm :: Distinct o => Subst i o -> Term i -> Distinctly (Term o)
+distinctTm s tm = case tm of
+  Var {} -> Distinctly (substTm s tm) w0
+  GlobalVar g -> Distinctly (GlobalVar g) w0
+  Data dc -> Distinctly (Data dc) w0
+  Literal l -> Distinctly (Literal l) w0
+  Prim p -> Distinctly (Prim p) w0
+  Lam b e -> distinctIdBinder s b $ \s' b' -> case distinctTm s' e of
+    Distinctly e' w -> Distinctly (Lam b' e') w
+  TyLam b e -> distinctTyBinder s b $ \s' b' -> case distinctTm s' e of
+    Distinctly e' w -> Distinctly (TyLam b' e') w
+  App e1 e2 -> distinctly2 s (`distinctTm` e1) (`distinctTm` e2) App
+  TyApp e ty -> distinctly2 s (`distinctTm` e) (`distinctTy` ty) TyApp
+  Let (NonRec b x) e -> case distinctTm s x of
+    Distinctly x' w1 -> distinctIdBinder (raiseSubst w1 s) b $ \s' b' ->
+      case distinctTm s' e of
+        Distinctly e' w2 -> Distinctly (Let (NonRec b' x') e') w2
+  Let (Rec bs xs) e -> substTele distinctIdBinder s bs $ \s' bs' ->
+    distinctly2 s' (\s1 -> distinctlyList s1 distinctTm xs) (`distinctTm` e) $ \xs' e' ->
+      Let (Rec bs' xs') e'
+  Case e ty alts ->
+    distinctly2 s (`distinctTm` e) (\s1 -> distinctly2 s1 (`distinctTy` ty) (\s2 -> distinctlyList s2 distinctAlt alts) (,)) $
+      \e' (ty', alts') -> Case e' ty' alts'
+  Cast e t1 t2 ->
+    distinctly2 s (`distinctTm` e) (\s1 -> distinctly2 s1 (`distinctTy` t1) (`distinctTy` t2) (,)) $
+      \e' (t1', t2') -> Cast e' t1' t2'
+  Tick t e -> distinctly2 s (`distinctTick` t) (`distinctTm` e) Tick
+ where
+  w0 = watermarkOf s
+
+distinctAlt :: Distinct o => Subst i o -> Alt i -> Distinctly (Alt o)
+distinctAlt s (Alt p e) = case p of
+  DataPat dc tvs ids ->
+    substTele distinctTyBinder s tvs $ \s1 tvs' ->
+      substTele distinctIdBinder s1 ids $ \s2 ids' -> case distinctTm s2 e of
+        Distinctly e' w -> Distinctly (Alt (DataPat dc tvs' ids') e') w
+  LitPat l -> case distinctTm s e of
+    Distinctly e' w -> Distinctly (Alt (LitPat l) e') w
+  DefaultPat -> case distinctTm s e of
+    Distinctly e' w -> Distinctly (Alt DefaultPat e') w
+
+distinctTick :: Distinct o => Subst i o -> TickInfo i -> Distinctly (TickInfo o)
+distinctTick s = \case
+  SrcSpan sp -> Distinctly (SrcSpan sp) (watermarkOf s)
+  NameMod m ty -> case distinctTy s ty of
+    Distinctly ty' w -> Distinctly (NameMod m ty') w
+  DeDup -> Distinctly DeDup (watermarkOf s)
+  NoDeDup -> Distinctly NoDeDup (watermarkOf s)
+  Attributes ty e -> distinctly2 s (`distinctTy` ty) (`distinctTm` e) Attributes
 
 -- * Going under binders
 --
