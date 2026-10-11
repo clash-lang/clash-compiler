@@ -55,6 +55,12 @@
   * __Occurrences carry their type__, like Clash's @'C.Var' 'C.Id'@ does, so
     that analyses don't need a typing environment.
 
+  * __The types of term variables are lazy__, in t'IdBinder' and 'Var', like
+    'C.varType': a type that nothing asks for is never computed. E.g. the
+    evaluator ("Clash.Core.Scoped.Evaluator") let-binds the arguments it
+    applies functions to, with the type of the argument, which often nothing
+    needs. Everything else is strict.
+
   * __Globals are not scoped__: 'GlobalVar' holds a 'GlobalId', i.e. a
     'C.Id' with a closed type. The same holds for data constructors and
     primitives, whose types are closed too. Local variables ('TmName') and
@@ -203,7 +209,8 @@ type role TyBinder nominal nominal
 data IdBinder (n :: S) (l :: S) = IdBinder
   { idBinderOcc  :: !(C.Name C.Term)
   -- ^ Human readable name. Its unique is /not/ used.
-  , idBinderType :: !(Type n)
+  , idBinderType :: Type n
+  -- ^ Lazy, see the module header
   , idBinderName :: !(TmNameBinder n l)
   }
   deriving (Show)
@@ -270,9 +277,9 @@ type Kind = Type
 
 -- | Clash's 'C.Term', with scoped local variables
 data Term (n :: S) where
-  -- | Local variable occurrence: human readable name, type, and the name
-  -- itself
-  Var       :: !(C.Name C.Term) -> !(Type n) -> !(TmName n) -> Term n
+  -- | Local variable occurrence: human readable name, type (lazy, see the
+  -- module header), and the name itself
+  Var       :: !(C.Name C.Term) -> Type n -> !(TmName n) -> Term n
   -- | Global variable. Globals are not scoped, and have closed types.
   GlobalVar :: !GlobalId -> Term n
   Data      :: !DataCon -> Term n
