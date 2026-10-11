@@ -47,7 +47,7 @@
     are adapted accordingly, and 'withFreshRaw' and 'withFreshRaws' are new.
     @member@ is left out: a watermark can only tell whether a name may be in
     scope.
-  * 'sinkClosed' is new.
+  * 'sinkClosed' and 'withExtTrans' are new.
   * Every scope-indexed type has a @nominal@ role annotation, so that
     'Data.Coerce.coerce' can't change the scope of a value.
   * Only the parts used by "Clash.Core.Scoped" are included: there are no
@@ -96,6 +96,12 @@
   * __'sinkClosed'__ ('unsafeExt'): every scope extends the empty scope
     'VoidS', as it has no names.
 
+  * __'withExtTrans'__ ('unsafeExt'): t'Ext' is transitive: if every name of
+    @n@ is a name of @i@, and every name of @i@ is a name of @l@, then every
+    name of @n@ is a name of @l@. GHC can derive this from the superclass of
+    t'Ext' too; asserting it only avoids building that evidence out of the
+    evidence of the two steps.
+
   * __'extendRenamingNameBinder'__ ('unsafeCoerce'): going under a binder in a
     sinkability proof keeps the binder as it is. This is justified in appendix
     A of the paper: a binder may shadow a name of the extended scope, but that
@@ -141,6 +147,7 @@ module Clash.Core.Scoped.Internal.Scope
   , unsafeDistinct
   , unsafeExt
   , unsafeAssertFresh
+  , withExtTrans
     -- * Sinking
   , Sinkable (..)
   , sink
@@ -370,6 +377,17 @@ unsafeAssertFresh binder cont =
     Distinct -> case unsafeExt @n' @l' of
       Ext -> cont (unsafeCoerce binder)
 {-# INLINE unsafeAssertFresh #-}
+
+-- | Transitivity of t'Ext'. Trusted, see the module header.
+--
+-- GHC derives @'Ext' n l@ from @'Ext' n i@ and @'Ext' i l@ by itself, but the
+-- evidence it builds refers to the evidence of both steps. A loop that moves
+-- into a new extension at every iteration, such as the evaluator's, would
+-- then build a chain of evidence as long as the number of iterations. The
+-- evidence carries no information, so this asserts it instead.
+withExtTrans :: forall n i l r. (Ext n i, Ext i l) => (Ext n l => r) -> r
+withExtTrans r = case unsafeExt @n @l of Ext -> r
+{-# INLINE withExtTrans #-}
 
 -- * Sinking
 
