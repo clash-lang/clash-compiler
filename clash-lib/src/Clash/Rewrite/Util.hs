@@ -87,6 +87,7 @@ import           Clash.Driver.Types
 import           Clash.Netlist.Types         (HWMap)
 import           Clash.Netlist.Util          (representableTypeState)
 import           Clash.Pretty                (clashPretty, showDoc)
+import           Clash.Rewrite.Capture       (captureEnabled, recordCapture)
 import           Clash.Rewrite.Types
 import           Clash.Rewrite.WorkFree
 import           Clash.Unique
@@ -172,13 +173,34 @@ applyWith
   -> RewriteMonad extra Term
   -- ^ The transformation, applied to that node
   -> RewriteMonad extra (Term, Bool)
-applyWith = \s ctx expr0 action -> do
+applyWith = applyWithCapture True
+{-# INLINE applyWith #-}
+
+-- | 'applyWith', which records the transformation in the captures of
+-- "Clash.Rewrite.Capture" if the first argument is set and capturing is on
+applyWithCapture
+  :: Bool
+  -- ^ Whether to capture
+  -> String
+  -- ^ Name of the transformation
+  -> TransformContext
+  -> Term
+  -- ^ The node the transformation was offered
+  -> RewriteMonad extra Term
+  -- ^ The transformation, applied to that node
+  -> RewriteMonad extra (Term, Bool)
+applyWithCapture = \capture s ctx expr0 action -> do
   opts <- Lens.view debugOpts
   traceIf (hasDebugInfo TryName s opts) ("Trying: " <> s) (pure ())
 
+  stateBefore <- if capture && captureEnabled then Just <$> State.get else pure Nothing
   (!expr1,anyChanged) <- Writer.listen action
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged (transformCounter += 1)
+
+  case stateBefore of
+    Just st | hasChanged -> liftIO (recordCapture s ctx expr0 expr1 st)
+    _ -> pure ()
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
   let rewriteHistFile = dbg_historyFile opts
@@ -198,7 +220,7 @@ applyWith = \s ctx expr0 action -> do
   if isDebugging opts
     then (, hasChanged) <$> applyDebug ctx s expr0 hasChanged expr1
     else return (expr1, hasChanged)
-{-# INLINE applyWith #-}
+{-# INLINE applyWithCapture #-}
 
 applyDebug
   :: TransformContext
@@ -414,7 +436,11 @@ runRewrite
   -> Term
   -- ^ Term to transform
   -> RewriteMonad extra Term
-runRewrite name is rewrite expr = apply name rewrite (TransformContext is []) expr
+runRewrite name is rewrite expr =
+  -- Not captured: this runs whole strategies on whole bindings, see
+  -- "Clash.Rewrite.Capture"
+  let ctx = TransformContext is []
+  in fst <$> applyWithCapture False name ctx expr (rewrite ctx expr)
 
 -- | Evaluate a RewriteSession to its inner monad.
 runRewriteSession :: RewriteEnv

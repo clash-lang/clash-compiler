@@ -51,6 +51,7 @@ import qualified Clash.Tests.Normalize.Transformations.SeparateArgs
 import qualified Clash.Tests.Normalize.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Transformations.XOptimize
 import qualified Clash.Tests.Normalize.Util
+import qualified Clash.Tests.Rewrite.Capture
 import qualified Clash.Tests.Rewrite.Combinators
 import qualified Clash.Tests.Rewrite.Scoped.Combinators
 import qualified Clash.Tests.Rewrite.Scoped.StrategyDSL
@@ -121,6 +122,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Transformations.Specialize.tests
   , Clash.Tests.Normalize.Transformations.XOptimize.tests
   , Clash.Tests.Normalize.Util.tests
+  , Clash.Tests.Rewrite.Capture.tests
   , Clash.Tests.Rewrite.Combinators.tests
   , Clash.Tests.Rewrite.Scoped.Combinators.tests
   , Clash.Tests.Rewrite.Scoped.StrategyDSL.tests

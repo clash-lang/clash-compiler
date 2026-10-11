@@ -77,6 +77,8 @@ import           Clash.Normalize.Strategy         (constantPropagation, normaliz
 import           Clash.Normalize.Strategy.Spec    (flattenSpec)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util
+import           Clash.Rewrite.Capture
+  (FinalState (..), captureEnabled, captureOpts, recordFinalState)
 import           Clash.Rewrite.StrategyDSL.TH     (compileStrategy)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
@@ -85,7 +87,7 @@ import           Clash.Rewrite.Util
   (isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
-import           Clash.Util.Supply                (Supply)
+import           Clash.Util.Supply                (Supply, supplyBound)
 
 import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS
@@ -113,8 +115,8 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> IO a
-runNormalization env supply globals typeTrans eval rcsMap topEnts =
-  runRewriteSession rwEnv rwState
+runNormalization env supply globals typeTrans eval rcsMap topEnts m =
+  runRewriteSession rwEnv rwState (if captureEnabled then m <* captureFinalState topEnts else m)
   where
     -- TODO The RewriteEnv should just take ClashOpts.
     rwEnv     = RewriteEnv
@@ -147,6 +149,29 @@ runNormalization env supply globals typeTrans eval rcsMap topEnts =
                   normalization
                   constantPropagation
                   HashMap.empty -- workFreeAppCache
+
+-- | Record the state at the end of a session, for the captures of
+-- "Clash.Rewrite.Capture"
+captureFinalState :: [Id] -> NormalizeSession ()
+captureFinalState topEnts = do
+  st <- Lens.use id
+  env <- Lens.view id
+  let ns = _extra st
+  bound <- liftIO supplyBound
+  liftIO $ recordFinalState FinalState
+    { fsBindings = _bindings st
+    , fsWorkFreeBinders = _workFreeBinders st
+    , fsNormalized = _normalized ns
+    , fsSpecialisationCache = _specialisationCache ns
+    , fsSpecialisationHistory = _specialisationHistory ns
+    , fsInlineHistory = _inlineHistory ns
+    , fsPrimitiveArgs = _primitiveArgs ns
+    , fsRecursiveComponents = _recursiveComponents ns
+    , fsWorkFreeAppCache = HashMap.toList (_workFreeAppCache ns)
+    , fsTopEntities = topEnts
+    , fsOpts = captureOpts (envOpts (_clashEnv env))
+    , fsUniqueBound = bound
+    }
 
 normalize
   :: [Id]
