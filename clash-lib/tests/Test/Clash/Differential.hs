@@ -52,6 +52,7 @@ module Test.Clash.Differential
   , applyKnownDifferences
   , recToNonRec
   , letrecOrder
+  , coercionForm
   , everywhereTm
   , everywhereScopedTm
     -- * Running transformations
@@ -291,6 +292,24 @@ letrecOrder = KnownDifference
   teleRaws = \case
     TNil -> []
     TCons b rest -> tmNameRaw (tmNameOf b) : teleRaws rest
+
+-- | A coercion is the primitive @_CO_@, without its type as a type argument.
+--
+-- The primitive reductions of the scoped evaluator build vectors with
+-- 'Clash.Core.Scoped.Util.primCo', which applies @_CO_@ to its type, as
+-- "Clash.GHC.GHC2Core" does, where those of Clash Core use
+-- 'Clash.Core.Util.primCo', which keeps the type in the 'C.PrimInfo'.
+coercionForm :: KnownDifference
+coercionForm = KnownDifference
+  { kdName = "coercion-form"
+  , kdDescription = "a coercion is the primitive _CO_, without a type argument"
+  , kdNormalize = \_ -> everywhereTm go
+  }
+ where
+  go :: Term x -> Term x
+  go = \case
+    TyApp e@(Prim p) _ | C.primName p == Text.pack "_CO_" -> e
+    e -> e
 
 -- | Apply a function at every node of a term, bottom-up, like
 -- 'everywhereTm', giving it the scope of the node: goes under binders by
