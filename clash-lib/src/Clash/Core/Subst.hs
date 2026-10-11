@@ -722,13 +722,12 @@ lookupIdSubst doc (Subst inScope tmS _ genv) v
   | Just e <- lookupVarEnv v tmS = e
   -- Vital! See 'IdSubstEnv' Note [Extending the Subst]
   --
-  -- TODO: We match on Id here to workaround an issue where type variables
-  -- TODO: "shadow" term variables. Omitting the check would make 'lookupIdSubst'
-  -- TODO: potentially replace an "Id" with a TyVar. For more information:
-  -- TODO:
-  -- TODO:   https://github.com/clash-lang/clash-compiler/issues/1046
-  -- TODO:
-  | Just v'@(Id {}) <- lookupInScope inScope v = Var (coerce v')
+  -- Note that 'lookupInScope' only finds a local term variable, not a type
+  -- variable or a global with the same unique. For more information:
+  --
+  --   https://github.com/clash-lang/clash-compiler/issues/1046
+  --
+  | Just v' <- lookupInScope inScope v = Var (coerce v')
   | otherwise = WARN(True, "Subst.lookupIdSubst" <+> doc <+> fromPpr v)
                 Var v
 

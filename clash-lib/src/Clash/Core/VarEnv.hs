@@ -432,11 +432,17 @@ varSetInScope vars (InScopeSet s1 _)
 
 -- | Look up a variable in the 'InScopeSet'. This gives you the canonical
 -- version of the variable
+--
+-- The 'InScopeSet' is keyed on uniques alone, but a type variable and a term
+-- variable, or a local and a global variable, can share a unique. This only
+-- returns a variable of the same sort as the given variable.
 lookupInScope
   :: InScopeSet
   -> Var a
   -> Maybe (Var Any)
-lookupInScope (InScopeSet s _) v = lookupVarSet v s
+lookupInScope (InScopeSet s _) v = case lookupVarSet v s of
+  Just v' | varKey v' == varKey v -> Just v'
+  _ -> Nothing
 
 -- | Is the variable in scope
 elemInScopeSet
