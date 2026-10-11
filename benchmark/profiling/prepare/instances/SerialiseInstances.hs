@@ -20,6 +20,11 @@ import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Core.Var (Id)
 import           Clash.Core.TyCon (TyConMap,TyConName)
 import           Clash.Driver.Types (BindingMap, DomainMap)
+import           Clash.Rewrite.Capture (CaptureLog)
+import           Clash.Rewrite.Capture.Encoding (decodeCaptureLog, hPutCaptureLog)
+import           System.IO (Handle)
+import           Data.Binary.Get (runGetOrFail)
+import qualified Data.ByteString.Lazy as BL
 import           Data.IntMap.Strict (IntMap)
 
 
@@ -66,3 +71,17 @@ type NetlistInputs =
   , Id
   , DomainMap
   )
+
+-- | Write the captured sites at which transformations fired while
+-- normalizing a design, see "Clash.Rewrite.Capture": the inputs of
+-- normalization, without their bindings, followed by the captures, which
+-- have the bindings at the end of normalization.
+hPutCorpus :: Handle -> NormalizationInputs -> CaptureLog -> IO ()
+hPutCorpus h inputs cl = BL.hPut h (encode inputs) >> hPutCaptureLog h cl
+
+-- | Decode a corpus written by 'hPutCorpus'. Decodes the captures lazily, see
+-- 'decodeCaptureLog'.
+decodeCorpus :: BL.ByteString -> (NormalizationInputs, CaptureLog)
+decodeCorpus bs = case runGetOrFail get bs of
+  Left (_, _, err) -> error ("decodeCorpus: " <> err)
+  Right (rest, _, inputs) -> (inputs, decodeCaptureLog rest)
