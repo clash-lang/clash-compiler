@@ -25,7 +25,7 @@ import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
 import Data.List                               (mapAccumR, uncons)
-import Data.List.Extra                         (zipEqual)
+import Data.List.Extra                         (mapAccumLM, zipEqual)
 import Data.List.NonEmpty                      (NonEmpty (..), toList)
 import Data.Maybe
   (fromMaybe, isJust, mapMaybe, catMaybes)
@@ -748,14 +748,20 @@ mkSelectorCase caller inScope tcm scrut dcI fieldI = go (inferCoreTypeOf tcm scr
           if fieldI >= length fieldTys
             then cantCreate $(curLoc) "Field index exceed max" scrutTy
             else do
-              wildBndrs <- mapM (mkWildValBinder inScope) fieldTys
+              -- Each binder must also be fresh with respect to the binders
+              -- made before it, so they have to be added to the in-scope set
+              (inScope1, wildBndrs) <- mapAccumLM mkWild inScope fieldTys
               let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
-              selBndr <- mkInternalVar inScope "sel" ty
+              selBndr <- mkInternalVar inScope1 "sel" ty
               let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
                   pat    = DataPat dc (dcExtTyVars dc) bndrs
                   retVal = Case scrut ty [ (pat, Var selBndr) ]
               return retVal
     go scrutTy = cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showPpr scrutTy) scrutTy
+
+    mkWild isN fieldTy = do
+      wild <- mkWildValBinder isN fieldTy
+      return (extendInScopeSet isN wild, wild)
 
     cantCreate :: String -> String -> Type -> a
     cantCreate loc info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showPpr scrut ++ " :: " ++ showPpr scrutTy ++ ")\nAdditional info: " ++ info
