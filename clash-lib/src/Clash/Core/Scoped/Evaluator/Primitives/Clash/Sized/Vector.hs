@@ -18,6 +18,7 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -30,6 +31,7 @@ module Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector
 import Control.Monad.Trans.Except (runExcept)
 import qualified Data.Either as Either
 import Data.Text (Text)
+import Data.Text.Extra (showt)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal (..))
@@ -40,20 +42,24 @@ import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Normalize.Primitives as NP
 import Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, vecHeadPrim, vecInitPrim, vecLastPrim, vecTailPrim)
-import Clash.Util (textNameLit)
+import Clash.Util (curLoc, textNameLit)
 
+import qualified Clash.Sized.Internal.Index
 import qualified Clash.Sized.Vector
 
 import Clash.Core.Scoped.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.Evaluator (newLetBinding, whnf)
 import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
+import Clash.Core.Scoped.HasType (piResultTy, piResultTys)
 import Clash.Core.Scoped.Subst (withFreshIdBinder, withFreshIdBinders)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkApps)
-import Clash.Core.Scoped.Type (TypeView (..), mkTyConApp, tyView)
+import Clash.Core.Scoped.Type
+  ( PiTele (..), SplitFunForall (..), TypeView (..), mkFunTy, mkTyConApp, normalizeType
+  , splitFunForallTy, tyView )
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
-import Clash.Core.Scoped.Util (primCo)
+import Clash.Core.Scoped.Util (mkSelectorCase, primCo)
 
 primitives :: [(Text, PrimReduction)]
 primitives =
@@ -510,6 +516,91 @@ primitives =
                                           ,Left (Either.lefts vArgs !! 2)])
       _ -> Nothing
 
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.imap) $ \case
+      PrimStepContext{..}
+        -- :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
+        | isSubj
+        , nTy : aTy : bTy : _ <- tys
+        , (_ : fTy : _, resTy) <- primArgResTys pInfo
+        , Just vecTcNm <- tyConNameOf resTy
+        , indexTy : _ <- funArgTys fTy
+        , Just indexTcNm <- tyConNameOf indexTy
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        -> reduceWHNF $
+           mkApps (Prim (CT.PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm)
+                           CT.WorkNever CT.SingleResult CT.NoUnfolding))
+             [ Right nTy
+             , Right nTy
+             , Right aTy
+             , Right bTy
+             , Left (valToTerm (args !! 1))
+             , Left (valToTerm (args !! 2))
+             , Left (mkIndexLit (mkTyConApp indexTcNm [nTy]) nTy n 0) ]
+      _ -> Nothing
+
+  , primStepEntry "Clash.Sized.Vector.imap_go" $ \case
+      PrimStepContext{..}
+        -- :: forall n m a b. (Index n -> a -> b) -> Vec m a -> Index n -> Vec m b
+        | isSubj
+        , nTy : mTy : aTy : bTy : _ <- tys
+        , f : xs : Suspend nArg : _ <- args
+        , DC dc vArgs <- xs
+        , Right n' <- runExcept (tyNatSize te sc nTy)
+        , Right m <- runExcept (tyNatSize te sc mTy)
+        -> case m of
+             0 -> reduce (mkVecNil te sc dc bTy)
+             m' | (_ : _ : indexTy : _, _) <- primArgResTys pInfo
+                , Just indexTcNm <- tyConNameOf indexTy
+                , _ : x : xs' : _ <- Either.lefts vArgs
+                -> whnfArg nArg $ \mach1 n ->
+                     let nTy1 = sink nTy
+                         bTy1 = sink bTy
+                         f1 = sink (valToTerm f)
+                         indexAdd =
+                           Prim (CT.PrimInfo (showt '(Clash.Sized.Internal.Index.+#))
+                                   (indexAddTy indexTcNm) CT.WorkVariable CT.SingleResult
+                                   CT.NoUnfolding)
+                     in Just $ Next mach1
+                          { mTerm =
+                              mkVecCons te (mScope mach1) dc bTy1 m'
+                                (mkApps f1 [Left n, Left (sink x)])
+                                (mkApps (Prim pInfo)
+                                   [ Right nTy1
+                                   , Right (numTy (m' - 1))
+                                   , Right (sink aTy)
+                                   , Right bTy1
+                                   , Left f1
+                                   , Left (sink xs')
+                                   , Left (mkApps indexAdd
+                                             [ Right nTy1
+                                             , Left (natLit n')
+                                             , Left n
+                                             , Left (mkIndexLit (mkTyConApp indexTcNm [nTy1]) nTy1 n' 1) ]) ]) }
+             _ -> Nothing
+      _ -> Nothing
+
+  -- :: forall n a. KnownNat n => (a -> a) -> a -> Vec n a
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.iterateI) $ \case
+      PrimStepContext{..}
+        | isSubj
+        , [nTy, aTy] <- tys
+        , [_n, f, a] <- args
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        , Just vecTcNm <- tyConNameOf (snd (primArgResTys pInfo))
+        , Just (nilCon, consCon) <- vecDataCons te vecTcNm
+        -> case n of
+             0 -> reduce (mkVecNil te sc nilCon aTy)
+             _ -> reduce $
+                  mkVecCons te sc consCon aTy n
+                    (valToTerm a)
+                    (mkApps (Prim pInfo)
+                       [ Right (numTy (n - 1))
+                       , Right aTy
+                       , Left (natLit (n - 1))
+                       , Left (valToTerm f)
+                       , Left (mkApps (valToTerm f) [Left (valToTerm a)]) ])
+      _ -> Nothing
+
 -- - Zipping
   -- A reduction that allocates: @zipWith@ shares the function and the second
   -- vector by let-binding them on the heap (see #3308), so its result lives
@@ -544,6 +635,189 @@ primitives =
                | otherwise -> Nothing
       _ -> Nothing
 
+-- Folding
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.foldr) $ \case
+      PrimStepContext{..} -- :: (a -> b -> b) -> b -> Vec n a -> b
+        | isSubj
+        , aTy : bTy : nTy : _ <- tys
+        , f : z : xs : _ <- args
+        , DC _ vArgs <- xs
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        -> case n of
+             0 -> reduce (valToTerm z)
+             _ -> reduceWHNF $
+                  mkApps (valToTerm f)
+                    [ Left (Either.lefts vArgs !! 1)
+                    , Left (mkApps (Prim pInfo)
+                              [ Right aTy
+                              , Right bTy
+                              , Right (numTy (n - 1))
+                              , Left (valToTerm f)
+                              , Left (valToTerm z)
+                              , Left (Either.lefts vArgs !! 2) ]) ]
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.fold) $ \case
+      PrimStepContext{..} -- :: (a -> a -> a) -> Vec (n + 1) a -> a
+        | isSubj
+        , nTy : aTy : _ <- tys
+        , f : vs : _ <- args
+        , DC _ vArgs <- vs
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        -> case n of
+             0 -> reduceWHNF (Either.lefts vArgs !! 1)
+             _ | (_ : vecTy : _, _) <- primArgResTys pInfo
+               , Just vecTcNm <- tyConNameOf vecTy
+               , Just tupDc <- pairDataCon te
+               -> let n' = n + 1
+                      m = n' `div` 2
+                      n1 = n' - m
+                      mVecTy = mkTyConApp vecTcNm [numTy m, aTy]
+                      n1VecTy = mkTyConApp vecTcNm [numTy n1, aTy]
+                      splitAtCall =
+                        mkApps (Prim (CT.PrimInfo "Clash.Sized.Vector.fold_split"
+                                        (foldSplitAtTy vecTcNm) CT.WorkNever CT.SingleResult
+                                        CT.NoUnfolding))
+                          [ Right (numTy m), Right (numTy n1), Right aTy
+                          , Left (natLit m), Left (valToTerm vs) ]
+                      sel first = selectPair sc tupDc ("as", mVecTy) ("bs", n1VecTy) first splitAtCall
+                      -- @fold@ of one half
+                      foldHalf len half =
+                        mkApps (Prim pInfo)
+                          [Right (numTy (len - 1)), Right aTy, Left (valToTerm f), Left half]
+                  in reduceWHNF $
+                     mkApps (valToTerm f)
+                       [Left (foldHalf m (sel True)), Left (foldHalf n1 (sel False))]
+             _ -> Nothing
+      _ -> Nothing
+
+  , primStepEntry "Clash.Sized.Vector.fold_split" $ \case
+      PrimStepContext{..} -- :: Natural -> Vec (m + n) a -> (Vec m a, Vec n a)
+        | isSubj
+        , mTy : nTy : aTy : _ <- tys
+        , Right m <- runExcept (tyNatSize te sc mTy)
+        , (_ : vecTy : _, _) <- primArgResTys pInfo
+        , Just vecTcNm <- tyConNameOf vecTy
+        , Just (nilCon, consCon) <- vecDataCons te vecTcNm
+        , Just tupDc <- pairDataCon te
+        -> let -- The type arguments of the result type, instantiated
+               tyArgs = [mkTyConApp vecTcNm [mTy, aTy], mkTyConApp vecTcNm [nTy, aTy]]
+               m1VecTy = mkTyConApp vecTcNm [numTy (m - 1), aTy]
+               nVecTy = mkTyConApp vecTcNm [nTy, aTy]
+               -- A field of the recursive call
+               sel first v =
+                 selectPair sc tupDc ("l", m1VecTy) ("r", nVecTy) first $
+                   mkApps (Prim pInfo)
+                     [ Right (numTy (m - 1)), Right nTy, Right aTy
+                     , Left (natLit (m - 1)), Left v ]
+           in case m of
+                -- (Nil, v)
+                0 -> reduce $ mkApps (Data tupDc) $ map Right tyArgs ++
+                       [ Left (mkVecNil te sc nilCon aTy)
+                       , Left (valToTerm (last args)) ]
+                -- (x : fst (fold_split (m-1) xs), snd (fold_split (m-1) xs))
+                m' | DC _ vArgs <- last args
+                   -> reduce $ mkApps (Data tupDc) $ map Right tyArgs ++
+                        [ Left (mkVecCons te sc consCon aTy m' (Either.lefts vArgs !! 1)
+                                  (sel True (Either.lefts vArgs !! 2)))
+                        , Left (sel False (Either.lefts vArgs !! 2)) ]
+                -- The vector doesn't reduce to a data constructor
+                _ -> Nothing
+      _ -> Nothing
+
+-- - Specialised folds
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.dfold) $ \case
+      PrimStepContext{..}
+        -- :: KnownNat k => Proxy p -> (forall l . l + 1 <= k => SNat l -> a -> (p @@ l) -> (p @@ (l + 1)))
+        --    -> (p @@ 0) -> Vec k a -> (p @@ k)
+        | isSubj
+        , pTy : kTy : aTy : _ <- tys
+        , _ : p : f : z : xs : _ <- args
+        , DC _ vArgs <- xs
+        , Right k' <- runExcept (tyNatSize te sc kTy)
+        -> case k' of
+             0 -> reduce (valToTerm z)
+             _ | -- The type of @f@ of this call, and the constraint of its
+                 -- instance at @k-1@. The data constructor of the latter is
+                 -- its evidence.
+                 SplitFunForall (PiArg _ (PiArg _ (PiArg fTy _))) _ <-
+                   splitFunForallTy (piResultTys te sc ty tys)
+               , FunTy witnessTy _ <- tyView (piResultTy te sc fTy (numTy (k' - 1)))
+               , TyConApp witnessTcNm _ <- tyView (normalizeType te sc witnessTy)
+               , Just witnessTc <- lookupTyCon te witnessTcNm
+               , ubp : _ <- tyConDataCons witnessTc
+               , (_ : _ : fClashTy : _, _) <- primArgResTys pInfo
+               , _ : snatTy : _ <- funArgTys fClashTy
+               , Just snatTcNm <- tyConNameOf snatTy
+               , Just snatTc <- lookupTyCon te snatTcNm
+               , [snatDc] <- tyConDataCons snatTc
+               -> reduceWHNF $
+                  mkApps (valToTerm f)
+                    [ Right (numTy (k' - 1))
+                    , Left (Data ubp)
+                    , Left (snatTerm snatDc (k' - 1))
+                    , Left (Either.lefts vArgs !! 1)
+                    , Left (mkApps (Prim pInfo)
+                              [ Right pTy
+                              , Right (numTy (k' - 1))
+                              , Right aTy
+                              , Left (natLit (k' - 1))
+                              , Left (valToTerm p)
+                              , Left (valToTerm f)
+                              , Left (valToTerm z)
+                              , Left (Either.lefts vArgs !! 2) ]) ]
+             _ -> Nothing
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.dtfold) $ \case
+      PrimStepContext{..}
+        -- :: KnownNat k => Proxy p -> (a -> (p @@ 0))
+        --    -> (forall l . SNat l -> (p @@ l) -> (p @@ l) -> (p @@ (l + 1)))
+        --    -> Vec (2^k) a -> (p @@ k)
+        | isSubj
+        , pTy : kTy : aTy : _ <- tys
+        , _ : p : f : g : xs : _ <- args
+        , DC _ vArgs <- xs
+        , Right k' <- runExcept (tyNatSize te sc kTy)
+        -> case k' of
+             0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts vArgs !! 1)])
+             _ | (_ : _ : _ : gTy : vecTy : _, _) <- primArgResTys pInfo
+               , Just vecTcNm <- tyConNameOf vecTy
+               , snatTy : _ <- funArgTys gTy
+               , Just snatTcNm <- tyConNameOf snatTy
+               , Just snatTc <- lookupTyCon te snatTcNm
+               , [snatDc] <- tyConDataCons snatTc
+               , Just tupDc <- pairDataCon te
+               -> let k1 = k' - 1
+                      k2 = 2 ^ k1
+                      halfVecTy = mkTyConApp vecTcNm [numTy k2, aTy]
+                      splitAtCall =
+                        mkApps (splitAtPrim snatTcNm vecTcNm)
+                          [ Right (numTy k2), Right (numTy k2), Right aTy
+                          , Left (snatTerm snatDc k2), Left (valToTerm xs) ]
+                      -- @dtfold@ of one half. The binders of the pattern have
+                      -- the type of the halves, where the reduction of Clash
+                      -- Core gives them the type @2^(k-1)@ itself.
+                      dtfoldHalf first =
+                        mkApps (Prim pInfo)
+                          [ Right pTy
+                          , Right (numTy k1)
+                          , Right aTy
+                          , Left (natLit k1)
+                          , Left (valToTerm p)
+                          , Left (valToTerm f)
+                          , Left (valToTerm g)
+                          , Left (selectPair sc tupDc ("xsL", halfVecTy) ("xsR", halfVecTy) first
+                                    splitAtCall) ]
+                  in reduceWHNF $
+                     mkApps (valToTerm g)
+                       [ Right (numTy k1)
+                       , Left (snatTerm snatDc k1)
+                       , Left (dtfoldHalf True)
+                       , Left (dtfoldHalf False) ]
+             _ -> Nothing
+      _ -> Nothing
+
 -- Misc
   , primStepEntry $(textNameLit 'Clash.Sized.Vector.lazyV) $ \case
       PrimStepContext{..} -- :: KnownNat n => Vec n a -> Vec n a
@@ -565,6 +839,47 @@ primitives =
                         , Left (natLit (n' - 1))
                         , Left (mkApps (closedPrim (vecTailPrim vecTcNm))
                                   [Right (numTy (n' - 1)), Right aTy, Left (valToTerm xs)]) ])
+      _ -> Nothing
+
+-- Traversable
+  , primStepEntry $(textNameLit 'Clash.Sized.Vector.traverse#) $ \case
+      PrimStepContext{..} -- :: Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
+        | isSubj
+        , aTy : fTy : bTy : nTy : _ <- tys
+        , apDict : f : xs : _ <- args
+        , DC dc vArgs <- xs
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        , (_ : _ : vecTy : _, _) <- primArgResTys pInfo
+        , Just vecTcNm <- tyConNameOf vecTy
+        -> let apSel = mkSelectorCase $(curLoc) sc te
+           in case n of
+                0 -> reduceWHNF $
+                     mkApps (apSel (valToTerm apDict) 1 1)
+                       [Right (mkTyConApp vecTcNm [nTy, bTy]), Left (mkVecNil te sc dc bTy)]
+                _ | let n'ty = numTy (n - 1)
+                  , Just (consCoTy : _) <- dataConInstArgTys te sc dc [nTy, bTy, n'ty]
+                  -> let fmapF = apSel (apSel (valToTerm apDict) 1 0) 1 0
+                         apF = apSel (valToTerm apDict) 1 2
+                     in reduceWHNF $
+                        mkApps apF
+                          [ Right (mkTyConApp vecTcNm [n'ty, bTy])
+                          , Right (mkTyConApp vecTcNm [nTy, bTy])
+                          , Left (mkApps fmapF
+                                    [ Right bTy
+                                    , Right (mkFunTy (mkTyConApp vecTcNm [n'ty, bTy])
+                                                     (mkTyConApp vecTcNm [nTy, bTy]))
+                                    , Left (mkApps (Data dc)
+                                              [Right nTy, Right bTy, Right n'ty, Left (primCo consCoTy)])
+                                    , Left (mkApps (valToTerm f) [Left (Either.lefts vArgs !! 1)]) ])
+                          , Left (mkApps (Prim pInfo)
+                                    [ Right aTy
+                                    , Right fTy
+                                    , Right bTy
+                                    , Right n'ty
+                                    , Left (valToTerm apDict)
+                                    , Left (valToTerm f)
+                                    , Left (Either.lefts vArgs !! 2) ]) ]
+                _ -> Nothing
       _ -> Nothing
   ]
 
