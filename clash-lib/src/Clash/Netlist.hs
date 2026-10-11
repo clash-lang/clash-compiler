@@ -83,13 +83,14 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
-import Clash.Core.PartialEval (Evaluator)
+import Clash.Core.Evaluator.Types (Evaluator)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
 genNetlist
   :: ClashEnv
   -> Evaluator
+  -- ^ The whnf evaluator, to evaluate the attributes of 'Attributes' ticks
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> BindingMap

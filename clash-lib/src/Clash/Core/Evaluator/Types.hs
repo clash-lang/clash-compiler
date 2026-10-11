@@ -7,15 +7,17 @@
   License       : BSD2 (see the file LICENSE)
   Maintainer    : QBayLogic B.V. <devops@qbaylogic.com>
 
-  Types for the Partial Evaluator
+  Types for the whnf evaluator
 -}
 module Clash.Core.Evaluator.Types where
 
+import qualified Control.Lens as Lens
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap (insert, lookup)
 #if !MIN_VERSION_base(4,20,0)
 import Data.List (foldl')
 #endif
+import Data.List (mapAccumL)
 import Data.Maybe (fromMaybe, isJust)
 
 #if MIN_VERSION_prettyprinter(1,7,0)
@@ -25,15 +27,20 @@ import Data.Text.Prettyprint.Doc (hsep)
 #endif
 
 import Clash.Core.DataCon (DataCon, dcType)
+import Clash.Core.FreeVars (freeLocalIds)
 import Clash.Core.HasType
 import Clash.Core.Literal (Literal(CharLiteral))
+import Clash.Core.Name (mkUnsafeSystemName)
 import Clash.Core.Pretty (fromPpr, ppr, showPpr)
-import Clash.Core.Term (Term(..), PrimInfo(..), TickInfo, Alt, mkApps)
+import Clash.Core.Term
+  (Term(..), PrimInfo(..), TickInfo, Alt, Bind(..), collectArgs, mkApps,
+   stripTicks)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Type (Type (..), mkFunTy)
-import Clash.Core.Var (Id, IdScope(..), TyVar)
+import Clash.Core.Var (Id, IdScope(..), TyVar, mkLocalId)
 import Clash.Core.VarEnv
 import Clash.Driver.Types (BindingMap, bindingTerm)
+import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Pretty (ClashPretty(..), fromPretty, showDoc)
 import Clash.Unique (getUnique)
 import Clash.Util.Supply (Supply)
@@ -55,6 +62,47 @@ whnf' eval bm lh tcm ph ids is isSubj e =
   toResult x = (mHeapPrim x, mHeapLocal x, mTerm x)
 
   m  = Machine ph bm emptyVarEnv emptyVarSet lh [] ids is e
+
+-- | Evaluate a closed term as far as it is data: to WHNF, and then the fields
+-- of a constructor application, recursively. Subterms that don't evaluate to a
+-- constructor application, such as literals, functions and primitives that are
+-- values (e.g. @unpackCString#@), are left in WHNF. The result is closed: if it
+-- refers to bindings the evaluator allocated, they are bound around it.
+--
+-- Primitives are forced, like for the subject of a case-expression.
+nfData
+  :: Evaluator
+  -> BindingMap
+  -> TyConMap
+  -> PrimHeap
+  -> Supply
+  -> Term
+  -> Term
+nfData eval bm tcm ph ids e0 =
+  let (m1, e1) = go m0 e0
+      heap = mHeapLocal m1
+      usesHeap = any (`elemVarEnv` heap) (Lens.toListOf freeLocalIds e1)
+  in if usesHeap then Let (Rec (heapBindings heap)) e1 else e1
+ where
+  m0 = Machine ph bm emptyVarEnv emptyVarSet emptyVarEnv [] ids emptyInScopeSet e0
+
+  -- Evaluate the fields in the machine the evaluation of the term ends in, so
+  -- that they can refer to its heap, and its unique supply is not reused
+  go m e =
+    let m1 = whnf eval tcm True (m {mStack = [], mTerm = e})
+    in case collectArgs (stripTicks (mTerm m1)) of
+         (Data dc, args) ->
+           let (m2, args') = mapAccumL goArg m1 args
+           in (m2, mkApps (Data dc) args')
+         _ -> (m1, mTerm m1)
+
+  goArg m = \case
+    Left e -> Left <$> go m e
+    Right ty -> (m, Right ty)
+
+  heapBindings heap =
+    [ (mkLocalId (inferCoreTypeOf tcm rhs) (mkUnsafeSystemName "x" u), rhs)
+    | (u, rhs) <- UniqMap.toList heap ]
 
 -- | Evaluate to WHNF given an existing Heap and Stack
 whnf
