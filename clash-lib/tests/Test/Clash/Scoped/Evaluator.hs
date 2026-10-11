@@ -27,7 +27,9 @@
 
   'genPrimCall' generates calls of a primitive from its type: literals for
   the primitive types, numbers for the type-level naturals, values of the
-  sized types and of vectors, and constructors of other data types.
+  sized types, of vectors and of trees, and constructors of other data types.
+  'genOpenPrimCall' also generates calls whose arguments it can't generate
+  otherwise, such as class dictionaries, with opaque values.
 -}
 
 {-# LANGUAGE BangPatterns #-}
@@ -65,6 +67,7 @@ module Test.Clash.Scoped.Evaluator
   , recordingEnv
     -- * Generating calls
   , genPrimCall
+  , genOpenPrimCall
   , genArg
   ) where
 
@@ -97,6 +100,7 @@ import qualified Clash.Core.Util as C
 import qualified Clash.Core.Var as C
 import qualified Clash.Core.VarEnv as C
 import qualified Clash.Data.UniqMap as UniqMap
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Driver.Types (BindingMap)
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, toClashTerm, withConvEnv)
@@ -370,21 +374,95 @@ record ref name via check r = PrimReduction $ \pc ->
 -- 'genArg'. Quantified type variables of kind @Nat@ get small numbers, those
 -- of kind @Type@ get @Integer@. 'Nothing' if it can't generate an argument.
 genPrimCall :: C.TyConMap -> C.PrimInfo -> Gen (Maybe C.Term)
-genPrimCall tcm p = go (C.mkSubst C.emptyInScopeSet) [] (fst (C.splitFunForallTy (C.primType p)))
+genPrimCall = genPrimCallWith False
+
+-- | 'genPrimCall', but with an opaque value for every argument it can't
+-- generate ('opaqueArg'), e.g. a class dictionary or a polymorphic function,
+-- and a free type variable for every quantified type variable of another kind
+-- than @Nat@ and @Type@. A reduction can't look into those, but it can build
+-- its result with them, which the reductions of e.g. @dfold@ and @traverse#@
+-- do.
+genOpenPrimCall :: C.TyConMap -> C.PrimInfo -> Gen C.Term
+genOpenPrimCall tcm p = genPrimCallWith True tcm p >>= \case
+  Just call -> pure call
+  Nothing -> error "genOpenPrimCall: generated no call"
+
+-- | 'genPrimCall', or 'genOpenPrimCall'
+genPrimCallWith :: Bool -> C.TyConMap -> C.PrimInfo -> Gen (Maybe C.Term)
+genPrimCallWith open tcm p =
+  go (0 :: Int) (C.mkSubst C.emptyInScopeSet) [] (fst (C.splitFunForallTy (C.primType p)))
  where
-  go _ acc [] = pure (Just (C.mkApps (C.Prim p) (reverse acc)))
-  go subst acc (Left tv : rest)
+  go _ _ acc [] = pure (Just (C.mkApps (C.Prim p) (reverse acc)))
+  go i subst acc (Left tv : rest)
     | C.aeqType (C.varType tv) C.typeNatKind = do
         n <- frequency [(6, chooseInteger (0, 8)), (1, elements [16, 32, 64, 65])]
         let ty = C.LitTy (C.NumTy n)
-        go (C.extendTvSubst subst tv ty) (Right ty : acc) rest
+        go (i + 1) (C.extendTvSubst subst tv ty) (Right ty : acc) rest
     | isLiftedTypeKind (C.varType tv) =
-        go (C.extendTvSubst subst tv C.integerPrimTy) (Right C.integerPrimTy : acc) rest
+        go (i + 1) (C.extendTvSubst subst tv C.integerPrimTy) (Right C.integerPrimTy : acc) rest
+    | open =
+        let tv' = C.mkTyVar (C.substTy subst (C.varType tv)) (freeName "t" i)
+            subst' = C.extendTvSubst (extendInScopeTv subst tv') tv (C.VarTy tv')
+        in go (i + 1) subst' (Right (C.VarTy tv') : acc) rest
     | otherwise = pure Nothing
-  go subst acc (Right argTy : rest) =
-    genArg tcm (C.substTy subst argTy) >>= \case
-      Just a -> go subst (Left a : acc) rest
-      Nothing -> pure Nothing
+  go i subst acc (Right argTy : rest) = do
+    let argTy' = C.substTy subst argTy
+    genArg tcm argTy' >>= \case
+      Just a -> go (i + 1) subst (Left a : acc) rest
+      Nothing
+        | open -> go (i + 1) subst (Left (opaqueArg tcm i argTy') : acc) rest
+        | otherwise -> pure Nothing
+
+  -- Free variables get uniques of their own: those of the binders of the
+  -- generated arguments are small
+  freeName :: Text -> Int -> C.Name a
+  freeName nm i = C.mkUnsafeSystemName (nm <> Text.pack (show i)) (7000000 + fromIntegral i)
+
+  extendInScopeTv (C.Subst is env tenv genv) tv = C.Subst (C.extendInScopeSet is tv) env tenv genv
+
+-- | An opaque value of the given type, the argument with the given index of a
+-- generated call: a function (or a type abstraction) that applies a free
+-- variable to its arguments; the only constructor of a data type, e.g. of a
+-- class dictionary, applied to opaque values; or 'NP.removedArg'. Arguments
+-- of primitives are evaluated, so they must be values: a free variable itself
+-- would make the call stuck.
+opaqueArg :: C.TyConMap -> Int -> C.Type -> C.Term
+opaqueArg tcm i = opaque (3 :: Int) (fromIntegral i)
+ where
+  -- Every opaque value has a number of its own, from which the uniques of its
+  -- variables follow: the fields of the value with number @k@ get the numbers
+  -- @32 * k + 1@ and up.
+  opaque depth k ty
+    | isFun ty = eta k 0 ty (C.Var (C.mkLocalId ty (name "arg" k 0)))
+    | depth > 0
+    , C.TyConApp tc tyArgs <- C.tyView ty
+    , Just tyCon <- UniqMap.lookup tc tcm
+    , not (C.isNewTypeTc tyCon)
+    , [dc] <- C.tyConDataCons tyCon
+    , null (dcExtTyVars dc)
+    , Just fieldTys <- C.dataConInstArgTys dc tyArgs
+    = C.mkApps (C.Data dc) $ map Right tyArgs ++
+        [ Left (opaque (depth - 1) (32 * k + j) fieldTy) | (j, fieldTy) <- zip [1 ..] fieldTys ]
+    | otherwise = C.TyApp (C.Prim NP.removedArg) ty
+
+  isFun = \case
+    C.ForAllTy {} -> True
+    (C.tyView -> C.FunTy {}) -> True
+    _ -> False
+
+  -- Abstract over the arguments of a function type, and apply the term to them
+  eta :: Integer -> Integer -> C.Type -> C.Term -> C.Term
+  eta k j ty e = case ty of
+    C.ForAllTy tv res -> C.TyLam tv (eta k j res (C.TyApp e (C.VarTy tv)))
+    (C.tyView -> C.FunTy a r) ->
+      let x = C.mkLocalId a (name "x" k (j + 1))
+      in C.Lam x (eta k (j + 1) r (C.App e (C.Var x)))
+    _ -> e
+
+  -- The @j@-th variable of the opaque value with number @k@
+  name :: Text -> Integer -> Integer -> C.Name a
+  name nm k j =
+    C.mkUnsafeSystemName (nm <> Text.pack (show k)) (fromInteger (7000000000 + 64 * k + j))
 
 -- | Whether a kind is that of lifted types: @Type@, or @TYPE (BoxedRep
 -- Lifted)@ as "Clash.GHC.GHC2Core" gives it
@@ -397,9 +475,10 @@ isLiftedTypeKind k = C.aeqType k C.liftedTypeKind || case C.tyView k of
   occ = snd . Text.breakOnEnd "." . C.nameOcc
 
 -- | A value of a type: a literal of a primitive type, a dictionary of
--- @KnownNat@, a value of a sized type, a vector, a constructor of another
--- data type with fields it can generate, or a function that ignores its
--- argument or returns it. 'Nothing' otherwise.
+-- @KnownNat@, a value of a sized type, a vector (of at most 4096 elements), a
+-- tree ('Clash.Sized.RTree' of depth at most 6), a constructor of another data type with fields it can
+-- generate, or a function that ignores its argument or returns it. 'Nothing'
+-- otherwise.
 genArg :: C.TyConMap -> C.Type -> Gen (Maybe C.Term)
 genArg tcm = go (3 :: Int)
  where
@@ -415,10 +494,14 @@ genArg tcm = go (3 :: Int)
       | Just g <- sized tc tyArgs -> Just <$> g
       | suffix ".KnownNat" tc, [nTy] <- tyArgs, Just n <- natSize nTy ->
           pure (Just (C.Literal (NaturalLiteral n)))
-      | suffix ".Vec" tc, [nTy, elTy] <- tyArgs, Just n <- natSize nTy
+      | suffix ".Vec" tc, [nTy, elTy] <- tyArgs, Just n <- natSize nTy, n <= 4096
       , Just vecTc <- UniqMap.lookup tc tcm, [nilDc, consDc] <- C.tyConDataCons vecTc ->
           fmap (C.mkVec nilDc consDc elTy n) . sequence
             <$> replicateM (fromInteger n) (go (depth - 1) elTy)
+      | suffix ".RTree" tc, [dTy, elTy] <- tyArgs, Just d <- natSize dTy, d <= 6
+      , Just treeTc <- UniqMap.lookup tc tcm, [lrDc, brDc] <- C.tyConDataCons treeTc ->
+          fmap (C.mkRTree lrDc brDc elTy d) . sequence
+            <$> replicateM (2 ^ d) (go (depth - 1) elTy)
       | depth > 0
       , Just tyCon <- UniqMap.lookup tc tcm
       , not (C.isNewTypeTc tyCon)

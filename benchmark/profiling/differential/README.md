@@ -302,7 +302,7 @@ per primitive, and the first `--show` differences.
 ## Comparing ported reductions of primitives
 
 ```
-clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] DESIGN.bin...
+clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] [--open] DESIGN.bin...
 ```
 
 compares every ported reduction of a primitive with the reduction of Clash
@@ -316,6 +316,14 @@ unit tests, see `clash-lib/tests/Clash/Tests/Core/Scoped/Evaluator/Primitives.hs
 or with `whnf --check-prims`. `--prim NAME` only compares the primitives whose
 name contains `NAME`. It exits with 1 if a reduction disagrees with the
 reference.
+
+With `--open`, the arguments it can't generate are opaque values (functions
+that apply a free variable to their arguments, or `removedArg`), and the
+quantified type variables of kinds other than `Nat` and `Type` are free type
+variables
+(`Test.Clash.Scoped.Evaluator.genOpenPrimCall`). That compares reductions
+that only pass such arguments on, e.g. a class dictionary or a polymorphic
+function, such as those of `traverse#` and `dfold`.
 
 ```
 clash-differential prims inputs/*.bin

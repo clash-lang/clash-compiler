@@ -79,7 +79,7 @@ usage = unlines
   , "       clash-differential --list"
   , "       clash-differential whnf [--reps N] [--show N] [--top N] [--call N]"
   , "                               [--prims] [--check-prims] DESIGN.bin DUMP..."
-  , "       clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] DESIGN.bin..."
+  , "       clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] [--open] DESIGN.bin..."
   , ""
   , "Runs COMPARISON on every binding of the serialized designs FILE..., which"
   , "are *.bin files written by clash-profile-normalization-prepare, or"
@@ -113,8 +113,8 @@ usage = unlines
   , ""
   , "The prims command compares every ported reduction of a primitive with the"
   , "reduction of Clash Core, through the adapter, on --count N (default 100)"
-  , "calls generated from the type of the primitive in the designs. See"
-  , "Prims.hs."
+  , "calls generated from the type of the primitive in the designs. With"
+  , "--open, arguments it can't generate are opaque values. See Prims.hs."
   ]
 
 main :: IO ()
@@ -184,6 +184,7 @@ parsePrimsArgs opts = \case
   "--seed" : n : rest -> readMaybe n >>= \k -> parsePrimsArgs opts {poSeed = k} rest
   "--show" : n : rest -> readMaybe n >>= \k -> parsePrimsArgs opts {poShow = k} rest
   "--prim" : nm : rest -> parsePrimsArgs opts {poPrim = Just nm} rest
+  "--open" : rest -> parsePrimsArgs opts {poOpen = True} rest
   a : rest
     | "--" `List.isPrefixOf` a -> Nothing
     | otherwise -> fmap (a :) <$> parsePrimsArgs opts rest
