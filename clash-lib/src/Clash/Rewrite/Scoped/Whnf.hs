@@ -12,15 +12,13 @@
   bindings it allocated, so the transformation continues in the context
   extended with those bindings, and its result is bound by them.
 
-  Inlining the work-free ones among those bindings and removing the unused
-  ones ('Clash.Rewrite.Util.cleanupHeapBindings') is not ported yet: it runs
-  on Clash Core, converting the result of the transformation there and back.
-  That only happens when the transformation changed something.
+  When the transformation changed something, the work-free ones among those
+  bindings are inlined and the unused ones removed, see
+  'Clash.Rewrite.Scoped.Util.bindPureHeap'.
 -}
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Rewrite.Scoped.Whnf
   ( whnfRW
@@ -28,31 +26,20 @@ module Clash.Rewrite.Scoped.Whnf
   ) where
 
 import qualified Control.Lens as Lens
-import Control.Monad.State.Strict (runState)
-import qualified Control.Monad.Writer as Writer
-import qualified Data.Monoid as Monoid
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Evaluator.Types as C
-import qualified Clash.Core.Term as C
-import Clash.Core.VarEnv (emptyInScopeSet, extendInScopeSetList)
-import qualified Clash.Rewrite.Types as C
 import Clash.Rewrite.Types
   (RewriteMonad, bindings, evaluator, globalHeap, scopedTypeEnv)
-import Clash.Rewrite.Util (cleanupHeapBindings)
-import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.Evaluator (allocatedBind, whnf)
-import Clash.Core.Scoped.Convert (fromClashTermWith)
-import Clash.Core.Scoped.Evaluator.Adapter
-  (adaptPrim, clashVarsIds, clashVarsTyVars, emptyClashVars, toClashTermWith)
+import Clash.Core.Scoped.Evaluator.Adapter (adaptPrim)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import Clash.Core.Scoped.Evaluator.Types
-import Clash.Core.Scoped.FreeVars (bindNameBinders)
-import Clash.Core.Scoped.Subst (unsinkTerm)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import Clash.Rewrite.Scoped.Types
+import Clash.Rewrite.Scoped.Util (bindPureHeap)
 
 -- | The environment of the scoped evaluator: the ported primitive reductions,
 -- and the others with the evaluator of Clash Core, see
@@ -67,7 +54,7 @@ evaluatorEnv te eval =
 --
 -- If the transformation signals a change, its result is bound by those
 -- bindings, of which the work-free ones are inlined, and the unused ones
--- removed, like 'Clash.Rewrite.Util.bindPureHeap' does. Otherwise the result
+-- removed ('Clash.Rewrite.Scoped.Util.bindPureHeap'). Otherwise the result
 -- is the one of the transformation, bound by those bindings only if it
 -- mentions them: return (the 'sink' of) the original term when nothing
 -- changes.
@@ -90,27 +77,4 @@ whnfRW isSubj ctx e k = do
     globalHeap Lens..= mHeapPrim m
     case mAlloc m of
       ANil -> k ctx (mTerm m)
-      ASnoc {} -> do
-        let bind = allocatedBind m
-            ctx1 = pushUnder (mScope m) (LetBody bind) ctx
-        (r, Monoid.getAny -> changed) <- Writer.listen (k ctx1 (mTerm m))
-        if changed
-          then cleanupAllocated sc (Let bind r)
-          else case unsinkTerm (bindNameBinders bind) r of
-            Just r' -> pure r'
-            Nothing -> pure (Let bind r)
-
--- | Inline the work-free ones among the bindings the evaluator allocated,
--- and remove the unused ones, see 'Clash.Rewrite.Util.cleanupHeapBindings'.
--- On Clash Core: see the module header.
-cleanupAllocated
-  :: (HasCallStack, Distinct n) => Scope n -> Term n -> RewriteMonad extra (Term n)
-cleanupAllocated sc t = case tC of
-  C.Let (C.Rec bs) r ->
-    fromClashTermWith sc tvs ids <$> cleanupHeapBindings (C.TransformContext is []) bs r
-  _ -> error ($(curLoc) ++ "expected a recursive let-binding")
- where
-  (tC, vars) = runState (toClashTermWith t) emptyClashVars
-  tvs = clashVarsTyVars vars
-  ids = clashVarsIds vars
-  is = extendInScopeSetList (extendInScopeSetList emptyInScopeSet (map fst tvs)) (map fst ids)
+      ASnoc {} -> bindPureHeap ctx (allocatedBind m) (mTerm m) k

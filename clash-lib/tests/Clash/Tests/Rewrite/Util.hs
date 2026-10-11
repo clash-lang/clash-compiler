@@ -6,7 +6,10 @@
   Tests for "Clash.Rewrite.Util"
 -}
 
-module Clash.Tests.Rewrite.Util (tests) where
+module Clash.Tests.Rewrite.Util
+  ( tests
+  , whnfContextTests
+  ) where
 
 import qualified Control.Lens as Lens
 import Data.Default (def)
@@ -442,39 +445,49 @@ tests =
     -- shadow its binder, or the free variables of its right-hand side, in
     -- which case it must not be used.
     , testGroup "whnfRW uses the context's let-bindings (#2571)"
-        [ testCase "let x = 3 in \\y -> x" $
-            whnfInContext [x, y] [LamBody y, LetBody [(x, intLit 3)]] (Var x)
-              >>= assertAlphaEq (intLit 3)
-        , testCase "let x = 3 in \\x -> x" $
-            whnfInContext [x] [LamBody x, LetBody [(x, intLit 3)]] (Var x)
-              >>= assertAlphaEq (Var x)
-        , testCase "let x = y in \\y -> x" $
-            whnfInContext [x, y] [LamBody y, LetBody [(x, Var y)]] (Var x)
-              >>= assertAlphaEq (Var x)
-        , testCase "let x = y in case s of MkPair y z -> x" $
-            whnfInContext [x, y, z, s]
-              [ CaseAlt (DataPat pairDataCon [] [y, z])
-              , LetBody [(x, Var y)] ]
-              (Var x)
-              >>= assertAlphaEq (Var x)
-        , testCase "let x = 3 in letrec { x = 4; w = x } in .." $
-            whnfInContext [x, w]
-              [LetBinding w [x, w], LetBody [(x, intLit 3)]] (Var x)
-              >>= assertAlphaEq (Var x)
-        , testCase "let x = y in let y = 5 in x" $
-            whnfInContext [x, y]
-              [LetBody [(y, intLit 5)], LetBody [(x, Var y)]] (Var x)
-              >>= assertAlphaEq (Var x)
-        , testCase "let x = (v :: a) in /\\a -> x" $
-            whnfInContext [x, v]
-              [TyLamBody a, LetBody [(x, Var v)]] (Var x)
-              >>= assertAlphaEq (Var x)
-        , testCase "let x = 3 in let w = x in \\y -> w" $
-            whnfInContext [x, w, y]
-              [LamBody y, LetBody [(w, Var x)], LetBody [(x, intLit 3)]] (Var w)
-              >>= assertAlphaEq (intLit 3)
-        ]
+        (whnfContextTests whnfInContext)
     ]
+ where
+  x = intId User "x" 1
+  y = intId User "y" 2
+
+-- | The tests of the let-bindings of the context that 'whnfRW' uses, given a
+-- function that reduces a term to WHNF in a context, given innermost frame
+-- first, with the given variables in scope (see 'whnfInContext')
+whnfContextTests :: ([Id] -> Context -> Term -> IO Term) -> [TestTree]
+whnfContextTests whnfIn =
+  [ testCase "let x = 3 in \\y -> x" $
+      whnfIn [x, y] [LamBody y, LetBody [(x, intLit 3)]] (Var x)
+        >>= assertAlphaEq (intLit 3)
+  , testCase "let x = 3 in \\x -> x" $
+      whnfIn [x] [LamBody x, LetBody [(x, intLit 3)]] (Var x)
+        >>= assertAlphaEq (Var x)
+  , testCase "let x = y in \\y -> x" $
+      whnfIn [x, y] [LamBody y, LetBody [(x, Var y)]] (Var x)
+        >>= assertAlphaEq (Var x)
+  , testCase "let x = y in case s of MkPair y z -> x" $
+      whnfIn [x, y, z, s]
+        [ CaseAlt (DataPat pairDataCon [] [y, z])
+        , LetBody [(x, Var y)] ]
+        (Var x)
+        >>= assertAlphaEq (Var x)
+  , testCase "let x = 3 in letrec { x = 4; w = x } in .." $
+      whnfIn [x, w]
+        [LetBinding w [x, w], LetBody [(x, intLit 3)]] (Var x)
+        >>= assertAlphaEq (Var x)
+  , testCase "let x = y in let y = 5 in x" $
+      whnfIn [x, y]
+        [LetBody [(y, intLit 5)], LetBody [(x, Var y)]] (Var x)
+        >>= assertAlphaEq (Var x)
+  , testCase "let x = (v :: a) in /\\a -> x" $
+      whnfIn [x, v]
+        [TyLamBody a, LetBody [(x, Var v)]] (Var x)
+        >>= assertAlphaEq (Var x)
+  , testCase "let x = 3 in let w = x in \\y -> w" $
+      whnfIn [x, w, y]
+        [LamBody y, LetBody [(w, Var x)], LetBody [(x, intLit 3)]] (Var w)
+        >>= assertAlphaEq (intLit 3)
+  ]
  where
   x = intId User "x" 1
   y = intId User "y" 2
