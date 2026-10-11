@@ -115,6 +115,7 @@ module Clash.Core.Scoped.Evaluator.Primitives.Util
     -- * Building literals and values
   , boolToIntLiteral
   , boolToBoolLiteral
+  , orderingToOrderingLiteral
   , charToCharLiteral
   , integerToIntLiteral
   , integerToWordLiteral
@@ -754,6 +755,24 @@ boolToBoolLiteral tenv primTy b = case resultTyConName primTy of
     , [falseDc, trueDc] <- tyConDataCons boolTc
     -> Data (if b then trueDc else falseDc)
   _ -> error ($(curLoc) ++ "the result type is not Bool: " ++ showPpr primTy)
+
+-- | A constructor of 'Ordering', the result type of the given type of a
+-- primitive, like 'boolToBoolLiteral'. Replaces
+--
+-- @
+-- let (_, tyView -> TyConApp ordTcNm []) = splitFunForallTy ty
+--     (Just ordTc) = UniqMap.lookup ordTcNm tcm
+--     [ltDc, eqDc, gtDc] = tyConDataCons ordTc
+-- @
+--
+-- of the reductions of Clash Core.
+orderingToOrderingLiteral :: HasCallStack => TypeEnv -> Type m -> Ordering -> Term n
+orderingToOrderingLiteral tenv primTy o = case resultTyConName primTy of
+  Just ordTcNm
+    | Just ordTc <- lookupTyCon tenv ordTcNm
+    , [ltDc, eqDc, gtDc] <- tyConDataCons ordTc
+    -> Data (case o of LT -> ltDc; EQ -> eqDc; GT -> gtDc)
+  _ -> error ($(curLoc) ++ "the result type is not Ordering: " ++ showPpr primTy)
 
 charToCharLiteral :: Char -> Term n
 charToCharLiteral = Literal . CharLiteral
