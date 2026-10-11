@@ -1,0 +1,978 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente,
+                    2016-2017, Myrtle Software Ltd,
+                    2017-2018, Google Inc.,
+                    2021-2026, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Transformations for compile-time reduction of expressions / primitives, on
+  scoped Clash Core: the ported counterparts of
+  "Clash.Normalize.Transformations.Reduce".
+
+  = Primitive reductions
+
+  'reducePrim' decides, per primitive, whether to replace an application of
+  it by its unrolled definition. The definitions are those of
+  "Clash.Normalize.PrimitiveReductions", which is not ported yet: they run on
+  Clash Core, through 'Clash.Rewrite.Scoped.ViaFoil.viaLegacy'. The
+  boundary is 'runPrimReduction', and only that: the handlers describe the
+  reduction they want as a 'PrimReduction', and 'reduceWith' abstracts over
+  missing arguments on scoped Core, so the port of
+  "Clash.Normalize.PrimitiveReductions" only changes 'runPrimReduction'.
+-}
+
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+module Clash.Normalize.Scoped.Transformations.Reduce
+  ( reduceBinders
+  , reduceConst
+  , reduceConstWorker
+  , reducePrim
+  , reducePrimWorker
+  ) where
+
+import qualified Control.Lens as Lens
+import Control.Monad.Trans.Except (runExcept)
+import qualified Data.Either as Either
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.List.Extra as List
+import qualified Data.Maybe as Maybe
+import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Text (Text)
+import GHC.Stack (HasCallStack)
+
+import qualified Clash.Core.HasType as C
+import qualified Clash.Core.Name as C
+import Clash.Core.Name (nameOcc)
+import Clash.Core.Pretty (showPpr)
+import Clash.Core.Term (PrimInfo (..), WorkInfo (..))
+import qualified Clash.Core.Term as C
+import Clash.Core.TyCon (TyCon (..), tyConDataCons)
+import qualified Clash.Core.Type as C
+import Clash.Normalize.PrimitiveReductions
+import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Types (NormalizeSession)
+import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
+import qualified Clash.Rewrite.Types as C
+import Clash.Rewrite.Types (normalizeUltra, scopedTypeEnv, tcCache)
+import qualified Clash.Sized.Internal.BitVector
+import qualified Clash.Sized.RTree
+import qualified Clash.Sized.Vector
+import Clash.Util (textNameLit)
+
+import Clash.Core.Scoped.Alpha (aeqTm)
+import Clash.Core.Scoped.FreeVars (hasFreeVarsType)
+import Clash.Core.Scoped.HasType (inferCoreTypeOf, piResultTys, primInfoType)
+import Clash.Core.Scoped.NameMap (NameMap, insertNameMap)
+import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Scoped.Subst (unsinkType, withFreshIdBinder)
+import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)
+import Clash.Core.Scoped.Type
+  ( PiTele (..), SplitFunForall (..), TypeView (..), coreView, mkTyConApp
+  , piTeleNameBinders, splitFunForallTy, tyNatSize, tyView )
+import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
+import Clash.Core.Scoped.Util (mkVec, shouldSplit)
+import Clash.Normalize.Scoped.Util (shouldReduce)
+import Clash.Rewrite.Scoped
+  ( FrameKind (..), ScopedTransform (..), TransformContext, Under (LamBody)
+  , changed, ctxFrames, pushUnder, setChanged, tfScope, whnfRW )
+import Clash.Rewrite.Scoped.Util
+  (LetBinding (..), isUntranslatableType, letBindingVar, substVars)
+import Clash.Rewrite.Scoped.ViaFoil (viaLegacy)
+
+-- | Remove the bindings whose right-hand side is alpha-equivalent to that of
+-- a binding before it, substituting the variable of the earlier binding for
+-- theirs. See 'Clash.Normalize.Transformations.Reduce.reduceBinders'.
+--
+-- Is given the bindings of a let-expression in inverse topological order,
+-- e.g. opened with 'Clash.Rewrite.Scoped.Util.openLetBindings', and returns
+-- the remaining ones in topological order, with the substitution applied to
+-- their right-hand sides, together with the substitution, which the caller
+-- applies to the body (and to the right-hand sides, if the bindings were not
+-- in inverse topological order because they are recursive). Doesn't touch
+-- bindings marked 'NoDeDup'.
+reduceBinders
+  :: Distinct l
+  => Scope l
+  -> NameMap TmName l (Term l)
+  -- ^ The substitution so far
+  -> [LetBinding l]
+  -- ^ The processed bindings, in reverse order
+  -> [LetBinding l]
+  -- ^ The bindings to process
+  -> NormalizeSession (NameMap TmName l (Term l), [LetBinding l])
+reduceBinders _ !subst processed [] = return (subst, processed)
+reduceBinders sc !subst processed (lb : rest)
+  | (_, _, ticks) <- collectArgsTicks e
+  , not (any isNoDeDup ticks)
+  , Just lb1 <- List.find (aeqTm e . lbRhs) processed
+  = do
+    setChanged
+    reduceBinders sc (insertNameMap (lbName lb) (letBindingVar lb1) subst) processed rest
+  | otherwise
+  = reduceBinders sc subst (lb {lbRhs = e} : processed) rest
+ where
+  e = substVars sc subst (lbRhs lb)
+
+  isNoDeDup = \case
+    NoDeDup -> True
+    _ -> False
+{-# SCC reduceBinders #-}
+
+-- | Evaluate applied primitives to WHNF with the evaluator, see
+-- 'Clash.Normalize.Transformations.Reduce.reduceConst'
+reduceConst :: Transformation
+reduceConst = toScopedTransformation "reduceConst" (onApp 'reduceConstWorker)
+
+-- | The 'App' handler of 'reduceConst'
+reduceConstWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> Term n -> Term n -> NormalizeSession (Term n)
+reduceConstWorker ctx e _appFunction _appArgument = case ctxFrames ctx of
+  -- An 'App' in an 'AppFun' context is an inner node of an application spine,
+  -- e.g. the @f a@ inside @f a b c@. Only evaluate at the root (@f a b c@):
+  -- an under-applied primitive cannot fold, and if @f@ is itself an
+  -- application (@(g x) a b c@) the evaluator reduces the whole thing to WHNF
+  -- anyway, so it folds @g x@ as part of folding the root. Skip the evaluator
+  -- call here.
+  KAppFun : _ -> return e
+  _ | (Prim p0, _) <- collectArgs e ->
+      whnfRW False ctx e $ \_ctx1 e1 -> case collectArgs e1 of
+        (Prim p1, _) | primName p0 == primName p1 -> return (sink e)
+        _ -> changed e1
+    | otherwise -> return e
+{-# SCC reduceConstWorker #-}
+
+-- | Replace primitives by their "definition", see
+-- 'Clash.Normalize.Transformations.Reduce.reducePrim', and the module header
+reducePrim :: Transformation
+reducePrim = toScopedTransformation "reducePrim" (onApp 'reducePrimWorker)
+
+-- | The 'App' handler of 'reducePrim'
+reducePrimWorker
+  :: (HasCallStack, Distinct n)
+  => TransformContext n -> Term n -> Term n -> Term n -> NormalizeSession (Term n)
+reducePrimWorker ctx e _appFunction _appArgument = case ctxFrames ctx of
+  -- Only consider the root of an application spine (see 'reduceConst'): the
+  -- root sees all arguments, and the @Vec 0@-to-@Nil@ rewrite below is only
+  -- type-correct at the root, where no more arguments follow.
+  KAppFun : _ -> return e
+  _ | (Prim p, args, ticks) <- collectArgsTicks e -> do
+      te <- Lens.view scopedTypeEnv
+      let handlerM = HashMap.lookup (primName p) reducePrimImpls
+          sc = tfScope ctx
+      -- Every primitive whose result type is @Vec 0 a@ reduces to @Nil@, not
+      -- just the ones with a handler. That takes the type of the applied
+      -- primitive, which is expensive to infer, so for a primitive without a
+      -- handler it is only inferred when the primitive's declared type shows a
+      -- @Vec@ result is possible at all. That rules out the vast majority of
+      -- them.
+      if Maybe.isNothing handlerM && not (mayReturnVec te (primType p))
+      then return e
+      else do
+        let eTy = inferCoreTypeOf te sc e
+        case splitFunForallTy eTy of
+          SplitFunForall remaining resTyL ->
+            -- The result type mentions a type variable that is not
+            -- instantiated yet: the primitive lacks type arguments, so it is
+            -- not saturated, and none of the handlers apply.
+            case unsinkType (piTeleNameBinders remaining) resTyL of
+              Nothing -> return e
+              Just resTy -> do
+                let tv = tyView (coreView te sc resTy)
+                case zeroLengthVecTerm te sc tv of
+                  -- Only replace the whole application by @Nil@ if the
+                  -- primitive is fully applied (a partially applied primitive
+                  -- has a function type, so replacing it by @Nil@ would change
+                  -- its arity) and if it does not always perform work (e.g.
+                  -- blackboxes like an VIO must be rendered even if their
+                  -- result is zero-width).
+                  Just nilE
+                    | PiNil <- remaining
+                    , primWorkInfo p /= WorkAlways
+                    -> changed (mkTicks nilE ticks)
+                  _ -> case handlerM of
+                    Nothing -> return e
+                    Just handler -> do
+                      ultraArg <- Lens.view normalizeUltra
+                      runReducePrimHandler handler ReducePrimContext
+                        { transformContext = ctx
+                        , originalTerm = e
+                        , primInfo = p
+                        , primArguments = args
+                        , primTicks = ticks
+                        , typeEnv = te
+                        , ultra = ultraArg
+                        , termType = eTy
+                        , resultType = resTy
+                        , resultTypeView = tv
+                        }
+    | otherwise -> return e
+{-# SCC reducePrimWorker #-}
+
+-- | The name of the 'Clash.Sized.Vector.Vec' type constructor.
+vecTcName :: Text
+vecTcName = $(textNameLit ''Clash.Sized.Vector.Vec)
+
+-- | If the given type view is @Vec 0 a@, return the corresponding @Nil@ term.
+zeroLengthVecTerm :: Distinct n => TypeEnv -> Scope n -> TypeView n -> Maybe (Term n)
+zeroLengthVecTerm te sc tv
+  | TyConApp vecTcNm [nTy, aTy] <- tv
+  , nameOcc vecTcNm == vecTcName
+  , Right 0 <- runExcept (tyNatSize te sc nTy)
+  = Just $ fromMaybe (error "reducePrim: unable to create Vec DCs") $ do
+      vecTc <- lookupTyCon te vecTcNm
+      [nilCon, consCon] <- pure (tyConDataCons vecTc)
+      return (mkVec te sc nilCon consCon aTy 0 [])
+  | otherwise
+  = Nothing
+
+-- | Can applying the primitive produce a value whose type has
+-- 'Clash.Sized.Vector.Vec' at its head? See
+-- 'Clash.Normalize.Transformations.Reduce.mayReturnVec'.
+--
+-- This looks at the declared type of the primitive, which is a closed type of
+-- Clash Core in its t'PrimInfo', without converting it: this check is there
+-- to avoid work for the vast majority of primitives.
+mayReturnVec :: TypeEnv -> C.Type -> Bool
+mayReturnVec te ty = case C.tyView (snd (C.splitFunForallTy ty)) of
+  C.TyConApp tcNm _
+    | nameOcc tcNm == vecTcName -> True
+    | otherwise -> case lookupTyCon te tcNm of
+        -- Type families might reduce to a 'Vec'
+        Just FunTyCon{} -> True
+        Just _ -> False
+        Nothing -> True
+  _ -> True
+
+-- | Everything the handlers in 'reducePrimImpls' receive from the dispatch
+-- site in 'reducePrim'
+data ReducePrimContext n = ReducePrimContext
+  { transformContext :: TransformContext n
+  , originalTerm :: Term n
+    -- ^ The primitive applied to its arguments
+  , primInfo :: PrimInfo
+  , primArguments :: [Either (Term n) (Type n)]
+  , primTicks :: [TickInfo n]
+  , typeEnv :: TypeEnv
+  , ultra :: Bool
+    -- ^ Whether @-fclash-ultra@ is enabled
+  , termType :: Type n
+    -- ^ The type of 'originalTerm'
+  , resultType :: Type n
+    -- ^ 'termType' stripped of its quantifiers and function arguments
+  , resultTypeView :: TypeView n
+    -- ^ 'tyView' of the 'coreView' of 'resultType'
+  }
+
+-- | The scope of the primitive application
+rpcScope :: ReducePrimContext n -> Scope n
+rpcScope = tfScope . transformContext
+
+-- | A handler for a specific primitive in 'reducePrimImpls'
+newtype ReducePrimHandler = ReducePrimHandler
+  { runReducePrimHandler
+      :: forall n. Distinct n => ReducePrimContext n -> NormalizeSession (Term n) }
+
+-- | The primitives 'reducePrim' can reduce, keyed on primitive name. A
+-- handler whose guards do not apply returns 'originalTerm' unchanged.
+reducePrimImpls :: HashMap Text ReducePrimHandler
+reducePrimImpls = HashMap.fromList
+  [ ($(textNameLit 'Clash.Sized.Vector.zipWith), ReducePrimHandler reduceZipWithHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.map), ReducePrimHandler reduceMapHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.traverse#), ReducePrimHandler reduceTraverseHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.fold), ReducePrimHandler reduceFoldHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.foldr), ReducePrimHandler reduceFoldrHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.dfold), ReducePrimHandler reduceDFoldHandler)
+  , ($(textNameLit '(Clash.Sized.Vector.++)), ReducePrimHandler reduceAppendHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.head), ReducePrimHandler reduceHeadHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.tail), ReducePrimHandler reduceTailHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.last), ReducePrimHandler reduceLastHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.init), ReducePrimHandler reduceInitHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.unconcat), ReducePrimHandler reduceUnconcatHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.transpose), ReducePrimHandler reduceTransposeHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.replicate), ReducePrimHandler reduceReplicateHandler)
+  -- replace_int and index_int are not exported from Clash.Sized.Vector, so
+  -- their names cannot be quoted
+  , ("Clash.Sized.Vector.replace_int", ReducePrimHandler reduceReplaceIntHandler)
+  , ("Clash.Sized.Vector.index_int", ReducePrimHandler reduceIndexIntHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.imap), ReducePrimHandler reduceImapHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.iterateI), ReducePrimHandler reduceIterateIHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.dtfold), ReducePrimHandler reduceDTFoldHandler)
+  , ($(textNameLit 'Clash.Sized.Vector.reverse), ReducePrimHandler reduceReverseHandler)
+  , ($(textNameLit 'Clash.Sized.RTree.tdfold), ReducePrimHandler reduceTDFoldHandler)
+  , ($(textNameLit 'Clash.Sized.RTree.treplicate), ReducePrimHandler reduceTReplicateHandler)
+  , ($(textNameLit 'Clash.Sized.Internal.BitVector.split#), ReducePrimHandler reduceSplitHandler)
+  , ($(textNameLit 'Clash.Sized.Internal.BitVector.eq#), ReducePrimHandler reduceEqHandler)
+  ]
+
+-- | 'tyNatSize' in the scope of the primitive application
+natSize :: Distinct n => ReducePrimContext n -> Type n -> Either String Integer
+natSize rpc = runExcept . tyNatSize (typeEnv rpc) (rpcScope rpc)
+
+-- | Whether to unroll a primitive with this argument or result type, see
+-- Note [Unroll shouldSplit types] in "Clash.Normalize.Transformations.Reduce"
+isSplit :: Distinct n => ReducePrimContext n -> Type n -> Bool
+isSplit rpc = Maybe.isJust . shouldSplit (typeEnv rpc) (rpcScope rpc)
+
+-- | The leading argument types of the primitive, instantiated with the given
+-- type arguments. See the uses of 'C.piResultTys' in
+-- "Clash.Normalize.Transformations.Reduce"; those patterns also fail on an
+-- argument that is a quantified type variable.
+primArgTys :: Distinct n => ReducePrimContext n -> [Type n] -> [Type n]
+primArgTys rpc tys =
+  case splitFunForallTy (piResultTys te sc (primInfoType sc (primInfo rpc)) tys) of
+    SplitFunForall tele _ -> leadingArgs tele
+ where
+  te = typeEnv rpc
+  sc = rpcScope rpc
+
+  leadingArgs :: PiTele n l -> [Type n]
+  leadingArgs = \case
+    PiArg a rest -> a : leadingArgs rest
+    _ -> []
+
+-- | 'shouldReduce' in the context of the primitive application
+shouldReduceHere :: ReducePrimContext n -> NormalizeSession Bool
+shouldReduceHere = shouldReduce . transformContext
+
+-- | The error for a primitive applied to unexpected arguments
+badArgs :: Distinct n => String -> ReducePrimContext n -> a
+badArgs nm rpc = error ("reducePrim: " <> nm <> " bad args" <> showPpr (originalTerm rpc))
+
+reduceZipWithHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceZipWithHandler rpc@ReducePrimContext{..}
+  | (_,[lhsElTy,rhsElty,resElTy,nTy]) <- Either.partitionEithers primArguments
+  , TyConApp vecTcNm _ <- resultTypeView
+  , let lhsTy = mkTyConApp vecTcNm [nTy,lhsElTy]
+  , let rhsTy = mkTyConApp vecTcNm [nTy,rhsElty]
+  = case natSize rpc nTy of
+      Right n -> do
+        lhsNonRep <- isUntranslatableType_not_poly lhsElTy
+        rhsNonRep <- isUntranslatableType_not_poly rhsElty
+        resNonRep <- isUntranslatableType_not_poly resElTy
+        shouldReduce1 <- List.orM [ pure (ultra || n < 2)
+                             , shouldReduceHere rpc
+                             , pure (lhsNonRep || rhsNonRep || resNonRep)
+                             -- Note [Unroll shouldSplit types]
+                             , pure (any (isSplit rpc) [lhsTy,rhsTy,resultType]) ]
+        if shouldReduce1
+           then reduceWith rpc (ReduceZipWith n (not lhsNonRep) (not rhsNonRep))
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 4
+  = badArgs "zipWith" rpc
+  | otherwise
+  = return originalTerm
+
+reduceMapHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceMapHandler rpc@ReducePrimContext{..}
+  | (_,[argElTy,resElTy,nTy]) <- Either.partitionEithers primArguments
+  , TyConApp vecTcNm _ <- resultTypeView
+  , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
+  = case natSize rpc nTy of
+      Right n -> do
+        argNonRep <- isUntranslatableType_not_poly argElTy
+        resNonRep <- isUntranslatableType_not_poly resElTy
+        shouldReduce1 <- List.orM [ pure (ultra || n < 2 )
+                             , shouldReduceHere rpc
+                             , pure (argNonRep || resNonRep)
+                             -- Note [Unroll shouldSplit types]
+                             , pure (any (isSplit rpc) [argTy,resultType]) ]
+        if shouldReduce1
+           then reduceWith rpc (ReduceMap n (not argNonRep))
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "map" rpc
+  | otherwise
+  = return originalTerm
+
+reduceTraverseHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceTraverseHandler rpc@ReducePrimContext{..}
+  | (_,[_aTy,_fTy,_bTy,nTy]) <- Either.partitionEithers primArguments
+  = case natSize rpc nTy of
+      Right n -> reduceWith rpc (ReduceTraverse n)
+      _ -> return originalTerm
+  | length primArguments >= 4
+  = badArgs "traverse#" rpc
+  | otherwise
+  = return originalTerm
+
+reduceFoldHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceFoldHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy]) <- Either.partitionEithers primArguments
+  , (_:argTy:_) <- primArgTys rpc [nTy,aTy]
+  = case natSize rpc nTy of
+      Right n -> do
+        shouldReduce1 <- List.orM [ pure (ultra || n == 0)
+                             , shouldReduceHere rpc
+                             , isUntranslatableType_not_poly aTy
+                             -- Note [Unroll shouldSplit types]
+                             , pure (isSplit rpc argTy)]
+        if shouldReduce1
+          then reduceWith rpc (ReduceFold (n + 1))
+          else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 2
+  = badArgs "fold" rpc
+  | otherwise
+  = return originalTerm
+
+reduceFoldrHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceFoldrHandler rpc@ReducePrimContext{..}
+  | (_,[aTy,bTy,nTy]) <- Either.partitionEithers primArguments
+  , (_:_:argTy:_) <- primArgTys rpc [aTy,bTy,nTy]
+  = case natSize rpc nTy of
+      Right n -> do
+        aNonRep <- isUntranslatableType_not_poly aTy
+        bNonRep <- isUntranslatableType_not_poly bTy
+        shouldReduce1 <- List.orM [ pure ultra
+                             , shouldReduceHere rpc
+                             , pure (aNonRep || bNonRep)
+                             -- Note [Unroll shouldSplit types]
+                             , pure (isSplit rpc argTy) ]
+        if shouldReduce1
+          then reduceWith rpc (ReduceFoldr n (not aNonRep))
+          else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "foldr" rpc
+  | otherwise
+  = return originalTerm
+
+reduceDFoldHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceDFoldHandler rpc@ReducePrimContext{..}
+  | (_,[_mTy,nTy,_aTy]) <- Either.partitionEithers primArguments
+  = case natSize rpc nTy of
+      Right n -> reduceWith rpc (ReduceDFold n)
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "dfold" rpc
+  | otherwise
+  = return originalTerm
+
+reduceAppendHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceAppendHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy,mTy]) <- Either.partitionEithers primArguments
+  = case (natSize rpc nTy, natSize rpc mTy) of
+      (Right n, Right m) -> do
+            shouldReduce1 <- List.orM [ pure (n==0)
+                                 , pure (m==0)
+                                 , shouldReduceHere rpc
+                                 , isUntranslatableType_not_poly aTy
+                                 -- Note [Unroll shouldSplit types]
+                                 , pure (isSplit rpc resultType) ]
+            if shouldReduce1
+               then reduceWith rpc (ReduceAppend n m)
+               else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "++" rpc
+  | otherwise
+  = return originalTerm
+
+-- | The handler of @head@, @tail@ and @last@: primitives of type @forall n
+-- a. Vec (n + 1) a -> ...@
+reduceVecPrimHandler
+  :: Distinct n
+  => String
+  -> (Integer -> PrimReduction)
+  -- ^ The reduction, given the length of the vector argument
+  -> ReducePrimContext n
+  -> NormalizeSession (Term n)
+reduceVecPrimHandler nm red rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy]) <- Either.partitionEithers primArguments
+  , (argTy:_) <- primArgTys rpc [nTy,aTy]
+  = case natSize rpc nTy of
+      Right n -> do
+        shouldReduce1 <- List.orM [ shouldReduceHere rpc
+                             , isUntranslatableType_not_poly aTy
+                             -- Note [Unroll shouldSplit types]
+                             , pure (isSplit rpc argTy) ]
+        if shouldReduce1
+           then reduceWith rpc (red (n+1))
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 2
+  = badArgs nm rpc
+  | otherwise
+  = return originalTerm
+
+reduceHeadHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceHeadHandler = reduceVecPrimHandler "head" ReduceHead
+
+reduceTailHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceTailHandler = reduceVecPrimHandler "tail" ReduceTail
+
+reduceLastHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceLastHandler = reduceVecPrimHandler "last" ReduceLast
+
+reduceInitHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceInitHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy]) <- Either.partitionEithers primArguments
+  , (argTy:_) <- primArgTys rpc [nTy,aTy]
+  = case natSize rpc nTy of
+      Right n -> do
+        aNonRep <- isUntranslatableType_not_poly aTy
+        shouldReduce1 <- List.orM [ shouldReduceHere rpc
+                             , pure aNonRep
+                             -- Note [Unroll shouldSplit types]
+                             , pure (isSplit rpc argTy) ]
+        if shouldReduce1
+           then reduceWith rpc (ReduceInit n (not aNonRep))
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 2
+  = badArgs "init" rpc
+  | otherwise
+  = return originalTerm
+
+reduceUnconcatHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceUnconcatHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,mTy,aTy]) <- Either.partitionEithers primArguments
+  , (_:_:argTy:_) <- primArgTys rpc [nTy,mTy,aTy]
+  = case (natSize rpc nTy, natSize rpc mTy) of
+      (Right n, Right m) -> do
+        shouldReduce1 <- List.orM [ pure (m==0)
+                                  , shouldReduceHere rpc
+                                  , isUntranslatableType_not_poly aTy
+                                  --  Note [Unroll shouldSplit types]
+                                  , pure (isSplit rpc argTy)
+                                  ]
+        if shouldReduce1
+          then reduceWith rpc (ReduceUnconcat n m)
+          else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "unconcat" rpc
+  | otherwise
+  = return originalTerm
+
+reduceTransposeHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceTransposeHandler rpc@ReducePrimContext{..}
+  -- TODO(transpose): the type arguments of @transpose :: KnownNat n => Vec m
+  -- (Vec n a) -> Vec n (Vec m a)@ are @n@, @m@ and @a@, in that order, so
+  -- @mTy@ and @nTy@ are swapped here. This is the behaviour of
+  -- 'Clash.Normalize.Transformations.Reduce.reducePrim', which the port keeps.
+  | (_,[mTy,nTy,_aTy]) <- Either.partitionEithers primArguments
+  = case (natSize rpc nTy, natSize rpc mTy) of
+      (Right n, Right 0) -> reduceWith rpc (ReduceTranspose n)
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "transpose" rpc
+  | otherwise
+  = return originalTerm
+
+-- | The handler of @replicate@ and @replace_int@, of type @forall n a. ... ->
+-- Vec n a@
+reduceByResultHandler
+  :: Distinct n
+  => String
+  -> Bool
+  -- ^ Whether to unroll under @-fclash-ultra@
+  -> (Integer -> PrimReduction)
+  -> ReducePrimContext n
+  -> NormalizeSession (Term n)
+reduceByResultHandler nm whenUltra red rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy]) <- Either.partitionEithers primArguments
+  = case natSize rpc nTy of
+      Right n -> do
+        shouldReduce1 <- List.orM [ pure (whenUltra && ultra)
+                             , shouldReduceHere rpc
+                             , isUntranslatableType_not_poly aTy
+                             -- Note [Unroll shouldSplit types]
+                             , pure (isSplit rpc resultType)
+                             ]
+        if shouldReduce1
+           then reduceWith rpc (red n)
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 2
+  = badArgs nm rpc
+  | otherwise
+  = return originalTerm
+
+reduceReplicateHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceReplicateHandler = reduceByResultHandler "replicate" False ReduceReplicate
+
+-- replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
+reduceReplaceIntHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceReplaceIntHandler = reduceByResultHandler "replace_int" True ReduceReplaceInt
+
+reduceIndexIntHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceIndexIntHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy]) <- Either.partitionEithers primArguments
+  , (_:argTy:_) <- primArgTys rpc [nTy,aTy]
+  = case natSize rpc nTy of
+      Right n -> do
+        shouldReduce1 <- List.orM [ pure ultra
+                             , shouldReduceHere rpc
+                             , isUntranslatableType_not_poly aTy
+                             -- Note [Unroll shouldSplit types]
+                             , pure (isSplit rpc argTy) ]
+        if shouldReduce1
+           then reduceWith rpc (ReduceIndexInt n)
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 2
+  = badArgs "index_int" rpc
+  | otherwise
+  = return originalTerm
+
+reduceImapHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceImapHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,argElTy,resElTy]) <- Either.partitionEithers primArguments
+  , TyConApp vecTcNm _ <- resultTypeView
+  , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
+  = case natSize rpc nTy of
+      Right n -> do
+        shouldReduce1 <- List.orM [ pure (ultra || n < 2)
+                             , shouldReduceHere rpc
+                             , List.anyM isUntranslatableType_not_poly [argElTy,resElTy]
+                             -- Note [Unroll shouldSplit types]
+                             , pure (any (isSplit rpc) [argTy,resultType]) ]
+        if shouldReduce1
+           then reduceWith rpc (ReduceImap n)
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "imap" rpc
+  | otherwise
+  = return originalTerm
+
+reduceIterateIHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceIterateIHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy]) <- Either.partitionEithers primArguments
+  = case natSize rpc nTy of
+      Right n -> do
+        shouldReduce1 <- List.orM
+          [ pure (ultra || n < 2)
+          , shouldReduceHere rpc
+          , isUntranslatableType_not_poly aTy
+          -- Note [Unroll shouldSplit types]
+          , pure (isSplit rpc resultType) ]
+
+        if shouldReduce1
+          then reduceWith rpc (ReduceIterateI n)
+          else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 2
+  = badArgs "iterateI" rpc
+  | otherwise
+  = return originalTerm
+
+reduceDTFoldHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceDTFoldHandler rpc@ReducePrimContext{..}
+  | (_,[_mTy,nTy,_aTy]) <- Either.partitionEithers primArguments
+  = case natSize rpc nTy of
+      Right n -> reduceWith rpc (ReduceDTFold n)
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "dtfold" rpc
+  | otherwise
+  = return originalTerm
+
+reduceReverseHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceReverseHandler rpc@ReducePrimContext{..}
+  | ultra
+  , (_,[nTy,_aTy]) <- Either.partitionEithers primArguments
+  , Right n <- natSize rpc nTy
+  = reduceWith rpc (ReduceReverse n)
+  | otherwise
+  = return originalTerm
+
+reduceTDFoldHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceTDFoldHandler rpc@ReducePrimContext{..}
+  | (_,[_mTy,nTy,_aTy]) <- Either.partitionEithers primArguments
+  = case natSize rpc nTy of
+      Right n -> reduceWith rpc (ReduceTDFold n)
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "tdfold" rpc
+  | otherwise
+  = return originalTerm
+
+reduceTReplicateHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceTReplicateHandler rpc@ReducePrimContext{..}
+  | (_,[nTy,aTy]) <- Either.partitionEithers primArguments
+  = case natSize rpc nTy of
+      Right n -> do
+        shouldReduce1 <- List.orM [ shouldReduceHere rpc
+                             , isUntranslatableType False aTy ]
+        if shouldReduce1
+           then reduceWith rpc (ReduceTReplicate n)
+           else return originalTerm
+      _ -> return originalTerm
+  | length primArguments >= 2
+  = badArgs "treplicate" rpc
+  | otherwise
+  = return originalTerm
+
+reduceSplitHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceSplitHandler rpc@ReducePrimContext{..}
+  | (tmArgs,[nTy,mTy]) <- Either.partitionEithers primArguments
+  = case (natSize rpc nTy, natSize rpc mTy, resultTypeView) of
+      (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
+        | n == 0 -> abstractOverMissingArgs 2 primTicks tmArgs termType transformContext $
+            \_ctx args -> case args of
+              [_kn, bvArg] -> do
+                let tup = mkApps (Data tupDc)
+                             [Right (sink lTy)
+                             ,Right (sink rTy)
+                             ,Left  bvArg
+                             ,Left  (TyApp (Prim removedArg) (sink rTy))
+                             ]
+                changed (mkTicks tup (map sink primTicks))
+              _ -> error "reducePrim: split# arity"
+        | m == 0 -> abstractOverMissingArgs 2 primTicks tmArgs termType transformContext $
+            \_ctx args -> case args of
+              [_kn, bvArg] -> do
+                let tup = mkApps (Data tupDc)
+                             [Right (sink lTy)
+                             ,Right (sink rTy)
+                             ,Left  (TyApp (Prim removedArg) (sink lTy))
+                             ,Left  bvArg
+                             ]
+                changed (mkTicks tup (map sink primTicks))
+              _ -> error "reducePrim: split# arity"
+       where
+        tupDc = fromMaybe (error "reducePrim: faield to create tup DC") $ do
+                tupTc <- lookupTyCon typeEnv tupTcNm
+                listToMaybe (tyConDataCons tupTc)
+      _ -> return originalTerm
+  | length primArguments >= 3
+  = badArgs "split#" rpc
+  | otherwise
+  = return originalTerm
+
+reduceEqHandler :: Distinct n => ReducePrimContext n -> NormalizeSession (Term n)
+reduceEqHandler rpc@ReducePrimContext{..}
+  | (tmArgs,[nTy]) <- Either.partitionEithers primArguments
+  , Right 0 <- natSize rpc nTy
+  , TyConApp boolTcNm [] <- resultTypeView
+  = abstractOverMissingArgs 3 primTicks tmArgs termType transformContext $ \_ctx _args ->
+      let trueDc = fromMaybe (error "reducePrim: failed to create True DC") $ do
+            boolTc <- lookupTyCon typeEnv boolTcNm
+            [_falseDc,dc] <- pure (tyConDataCons boolTc)
+            return dc
+      in changed (Data trueDc)
+  | otherwise
+  = return originalTerm
+
+isUntranslatableType_not_poly :: Type n -> NormalizeSession Bool
+isUntranslatableType_not_poly t = do
+  u <- isUntranslatableType False t
+  if u
+     then return (not (hasFreeVarsType t))
+     else return False
+
+-- | Abstract over a primitive until it is saturated: give the continuation
+-- the given number of term arguments, abstracting over the ones that are
+-- missing, and apply its result to the remaining ones. See
+-- 'Clash.Normalize.Transformations.Reduce.abstractOverMissingArgs'.
+--
+-- The ticks of the primitive are put around the result of the continuation,
+-- which lives in the scope extended with the missing arguments. Like in Clash
+-- Core, they are not sunk into that scope by the continuation: it gets them
+-- in the outer scope, and has to 'sink' them if it uses them.
+abstractOverMissingArgs
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => Int
+  -- ^ The number of term arguments the continuation takes
+  -> [TickInfo n]
+  -- ^ Ticks originally tagged to the applied primitive
+  -> [Term n]
+  -- ^ Available arguments
+  -> Type n
+  -- ^ The type of the expression containing the applied primitive
+  -> TransformContext n
+  -- ^ The context in which reducePrim was called
+  -> (forall l. (Distinct l, DExt n l) => TransformContext l -> [Term l] -> NormalizeSession (Term l))
+  -> NormalizeSession (Term n)
+abstractOverMissingArgs arity ticks args0 ty0 ctx0 f
+  | length args0 >= arity =
+      let (now, rest) = splitAt arity args0
+      in (`mkTmApps` rest) . (`mkTicks` ticks) <$> f ctx0 now
+  | otherwise = go ctx0 (arity - length args0) (reverse args0) ty0
+ where
+  -- The arguments gathered so far, in reverse order
+  go
+    :: forall x
+     . (Distinct x, DExt n x)
+    => TransformContext x -> Int -> [Term x] -> Type x -> NormalizeSession (Term x)
+  go ctx 0 argsRev _ = (`mkTicks` map sink ticks) <$> f ctx (reverse argsRev)
+  go ctx missing argsRev ty = case tyView ty of
+    FunTy argTy resTy ->
+      withFreshIdBinder (tfScope ctx) (C.mkUnsafeInternalName "arg" 0) argTy $ \(sc :: Scope l) b ->
+        withExtTrans @n @x @l $
+          let ctx1 = pushUnder sc (LamBody b) ctx
+          in Lam b <$> go ctx1 (missing - 1) (idBinderVar b : map sink argsRev) (sink resTy)
+    _ -> error ("not a funty: " <> showPpr ty)
+
+-- * The boundary to "Clash.Normalize.PrimitiveReductions"
+
+-- | A reduction of "Clash.Normalize.PrimitiveReductions", with the parameters
+-- that the handlers in 'reducePrimImpls' decided on. The type arguments of the
+-- reduction are those of the primitive, and the type of its result, so they
+-- are not part of it. See 'runPrimReduction'.
+data PrimReduction
+  = ReduceZipWith !Integer !Bool !Bool
+  -- ^ Length, whether the elements of the left and of the right argument are
+  -- representable
+  | ReduceMap !Integer !Bool
+  -- ^ Length, whether the elements of the argument are representable
+  | ReduceTraverse !Integer
+  | ReduceFold !Integer
+  | ReduceFoldr !Integer !Bool
+  -- ^ Length, whether the elements are representable
+  | ReduceDFold !Integer
+  | ReduceAppend !Integer !Integer
+  | ReduceHead !Integer
+  | ReduceTail !Integer
+  | ReduceLast !Integer
+  | ReduceInit !Integer !Bool
+  -- ^ Length, whether the elements are representable
+  | ReduceUnconcat !Integer !Integer
+  | ReduceTranspose !Integer
+  | ReduceReplicate !Integer
+  | ReduceReplaceInt !Integer
+  | ReduceIndexInt !Integer
+  | ReduceImap !Integer
+  | ReduceIterateI !Integer
+  | ReduceDTFold !Integer
+  | ReduceReverse !Integer
+  | ReduceTDFold !Integer
+  | ReduceTReplicate !Integer
+  deriving (Show)
+
+-- | The number of term arguments of a reduction
+primReductionArity :: PrimReduction -> Int
+primReductionArity = \case
+  ReduceZipWith {} -> 3
+  ReduceMap {} -> 2
+  ReduceTraverse {} -> 3
+  ReduceFold {} -> 2
+  ReduceFoldr {} -> 3
+  ReduceDFold {} -> 5
+  ReduceAppend {} -> 2
+  ReduceHead {} -> 1
+  ReduceTail {} -> 1
+  ReduceLast {} -> 1
+  ReduceInit {} -> 1
+  ReduceUnconcat {} -> 3
+  ReduceTranspose {} -> 2
+  ReduceReplicate {} -> 2
+  ReduceReplaceInt {} -> 4
+  ReduceIndexInt {} -> 3
+  ReduceImap {} -> 3
+  ReduceIterateI {} -> 3
+  ReduceDTFold {} -> 5
+  ReduceReverse {} -> 1
+  ReduceTDFold {} -> 5
+  ReduceTReplicate {} -> 2
+
+-- | Replace the primitive application of the context by a reduction,
+-- abstracting over its missing arguments
+reduceWith :: Distinct n => ReducePrimContext n -> PrimReduction -> NormalizeSession (Term n)
+reduceWith ReducePrimContext{..} red =
+  abstractOverMissingArgs (primReductionArity red) primTicks tmArgs termType transformContext $
+    \ctx args -> runPrimReduction ctx red primInfo (map sink tyArgs) args
+ where
+  (tmArgs, tyArgs) = Either.partitionEithers primArguments
+
+-- | Run a reduction on a primitive, given its type arguments and as many term
+-- arguments as the reduction takes ('primReductionArity'). This is the
+-- boundary to "Clash.Normalize.PrimitiveReductions", which is not ported yet:
+-- it runs the reduction on Clash Core, on the saturated application of the
+-- primitive, through 'viaLegacy'.
+runPrimReduction
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> PrimReduction
+  -> PrimInfo
+  -> [Type n]
+  -- ^ Type arguments
+  -> [Term n]
+  -- ^ Term arguments
+  -> NormalizeSession (Term n)
+runPrimReduction ctx red p tys tms =
+  runScopedTransform (viaLegacy legacy) ctx (mkApps (Prim p) (map Right tys <> map Left tms))
+ where
+  legacy ctxC eC = case C.collectArgs eC of
+    (C.Prim pC, argsC) -> do
+      tcm <- Lens.view tcCache
+      let (tmsC, tysC) = Either.partitionEithers argsC
+      legacyPrimReduction red pC tysC tmsC (C.inferCoreTypeOf tcm eC) ctxC
+    _ -> error ("runPrimReduction: not a primitive application: " <> showPpr eC)
+
+-- | Run a reduction of "Clash.Normalize.PrimitiveReductions" on Clash Core,
+-- given the type and term arguments of the primitive, and the type of the
+-- saturated application. See 'runPrimReduction'.
+legacyPrimReduction
+  :: HasCallStack
+  => PrimReduction
+  -> PrimInfo
+  -> [C.Type]
+  -> [C.Term]
+  -> C.Type
+  -> C.TransformContext
+  -> NormalizeSession C.Term
+legacyPrimReduction red p tys tms resTy ctx = case (red, tys, tms) of
+  (ReduceZipWith n lRep rRep, [lhsElTy, rhsElTy, resElTy, _], [f, xs, ys]) ->
+    reduceZipWith p n lhsElTy rhsElTy resElTy lRep rRep f xs ys ctx
+  (ReduceMap n argRep, [argElTy, resElTy, _], [f, xs]) ->
+    reduceMap p n argElTy resElTy argRep f xs ctx
+  (ReduceTraverse n, [aTy, fTy, bTy, _], [dict, f, xs]) ->
+    reduceTraverse n aTy fTy bTy dict f xs ctx
+  (ReduceFold n, [_, aTy], [f, xs]) ->
+    reduceFold n aTy f xs ctx
+  (ReduceFoldr n aRep, [aTy, _, _], [f, z, xs]) ->
+    reduceFoldr p n aTy aRep f z xs ctx
+  (ReduceDFold n, [_, _, aTy], [kn, proxy, f, z, xs]) ->
+    reduceDFold n aTy kn proxy f z xs ctx
+  (ReduceAppend n m, [_, aTy, _], [xs, ys]) ->
+    reduceAppend n m aTy xs ys ctx
+  (ReduceHead n, [_, aTy], [xs]) ->
+    reduceHead n aTy xs ctx
+  (ReduceTail n, [_, aTy], [xs]) ->
+    reduceTail n aTy xs ctx
+  (ReduceLast n, [_, aTy], [xs]) ->
+    reduceLast n aTy xs ctx
+  (ReduceInit n aRep, [_, aTy], [xs]) ->
+    reduceInit p n aTy aRep xs ctx
+  (ReduceUnconcat n m, [_, _, aTy], [kn, sm, xs]) ->
+    reduceUnconcat p n m aTy kn sm xs ctx
+  (ReduceTranspose n, [_, _, aTy], [kn, xss]) ->
+    reduceTranspose n 0 aTy kn xss ctx
+  (ReduceReplicate n, [_, aTy], [sn, x]) ->
+    reduceReplicate n aTy resTy sn x ctx
+  (ReduceReplaceInt n, [_, aTy], [kn, xs, i, x]) ->
+    reduceReplace_int n aTy resTy kn xs i x ctx
+  (ReduceIndexInt n, [_, aTy], [kn, xs, i]) ->
+    reduceIndex_int n aTy kn xs i ctx
+  (ReduceImap n, [_, argElTy, resElTy], [kn, f, xs]) ->
+    reduceImap n argElTy resElTy kn f xs ctx
+  (ReduceIterateI n, [_, aTy], [kn, f, x]) ->
+    reduceIterateI n aTy resTy kn f x ctx
+  (ReduceDTFold n, [_, _, aTy], [kn, proxy, lrFun, brFun, xs]) ->
+    reduceDTFold n aTy kn proxy lrFun brFun xs ctx
+  (ReduceReverse n, [_, aTy], [xs]) ->
+    reduceReverse n aTy xs ctx
+  (ReduceTDFold n, [_, _, aTy], [kn, proxy, lrFun, brFun, t]) ->
+    reduceTFold n aTy kn proxy lrFun brFun t ctx
+  (ReduceTReplicate n, [_, aTy], [sn, x]) ->
+    reduceTReplicate n aTy resTy sn x ctx
+  _ ->
+    error ("legacyPrimReduction: unexpected arguments for " <> show red <> ": "
+           <> showPpr (C.mkApps (C.Prim p) (map Right tys <> map Left tms)))
