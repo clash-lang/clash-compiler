@@ -29,6 +29,8 @@ import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 import qualified Clash.Normalize.Transformations.Letrec as Current
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.Scoped (ScopedTransform (..))
+import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
 import Clash.Rewrite.Util (apply)
@@ -80,6 +82,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Letrec"
   , topLetTests
   , regressionTests
   , simpleCSETests
+  , recToLetRecTests
   ]
 
 -- * deadCode
@@ -326,4 +329,80 @@ simpleCSETests = testGroup "simpleCSE"
       , testCase "doesn't fire on a non-recursive let-expression" $
           agrees def (rootCtx [x]) cseC cseS
             (C.Let (C.NonRec a (app "g" 10 [C.Var x])) (C.Var a))
+      ]
+
+-- * recToLetRec
+
+-- | The function being normalized in the 'recToLetRec' tests,
+-- @rec :: Int -> Int -> Int@, applied
+recApp :: [C.Term] -> C.Term
+recApp = app "rec" 300
+
+-- | A state in which the function being normalized is @rec@, see 'recApp'
+recState :: C.Type -> RewriteState NormalizeState
+recState ty = def { _curFun = (globalId User "rec" 300 ty, noSrcSpan) }
+
+recToLetRecC, recToLetRecS :: NormRewrite
+recToLetRecC = apply "recToLetRec" Current.recToLetRec
+recToLetRecS = apply "recToLetRec" (viaFoil "recToLetRec" (ScopedTransform S.recToLetRec))
+
+recToLetRecTests :: TestTree
+recToLetRecTests = testGroup "recToLetRec"
+      [ testCase "replaces recursive calls with the original arguments by the result" $ do
+          -- \x y -> letrec a = rec x y; b = g a; r = k b a in r
+          let e = C.Lam x (C.Lam y
+                    (C.Letrec [ (a, recApp [C.Var x, C.Var y]), (b, app "g" 10 [C.Var a])
+                              , (r, app "k" 12 [C.Var b, C.Var a]) ]
+                      (C.Var r)))
+          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS e
+          (t, _) <- runIn (recState (intFunTy 2)) (rootCtx []) recToLetRecS e
+          assertAlphaEq
+            (C.Lam x (C.Lam y
+              (C.Letrec [(b, app "g" 10 [C.Var r]), (r, app "k" 12 [C.Var b, C.Var r])] (C.Var r))))
+            t
+      , testCase "keeps recursive calls with other arguments" $
+          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
+            (C.Lam x (C.Lam y
+              (C.Letrec [ (a, recApp [C.Var y, C.Var x]), (r, app "k" 12 [C.Var a, C.Var a]) ]
+                (C.Var r))))
+      , testCase "recognizes an argument rebuilt from its fields" $
+          -- \p -> letrec a = rec (MkPair (case p of MkPair c d -> c)
+          --                              (case p of MkPair c d -> d));
+          --              r = k a a
+          --       in r
+          let p = localId User "p" 30 pairTy
+              field i = C.Case (C.Var p) intTy [(C.DataPat pairDataCon [] [c, d], C.Var ([c, d] !! i))]
+              recP = C.App (C.Var (globalId User "rec" 300 (C.mkFunTy pairTy intTy)))
+              e = C.Lam p
+                    (C.Letrec [ (a, recP (C.mkApps (C.Data pairDataCon) [Left (field 0), Left (field 1)]))
+                              , (r, app "k" 12 [C.Var a, C.Var a]) ]
+                      (C.Var r))
+          in  agrees (recState (C.mkFunTy pairTy intTy)) (rootCtx []) recToLetRecC recToLetRecS e
+      , testCase "merges nested let-expressions, and moves their ticks to the bindings" $
+          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
+            (C.Lam x (C.Lam y (C.Tick srcTick
+              (C.Let (C.NonRec a (recApp [C.Var x, C.Var y]))
+                (C.Letrec [(b, app "g" 10 [C.Var a]), (r, app "k" 12 [C.Var b, C.Var a])]
+                  (C.Var r))))))
+      , testCase "doesn't fire without other bindings" $
+          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
+            (C.Lam x (C.Lam y (C.Letrec [(r, recApp [C.Var x, C.Var y])] (C.Var r))))
+      , testCase "doesn't fire on a term that is not in normal form" $
+          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
+            (C.Lam x (C.Lam y (app "k" 12 [recApp [C.Var x, C.Var y], C.Var x])))
+      , testCase "doesn't fire outside the root" $
+          agrees (recState (intFunTy 2)) (TransformContext (inScopeOf [x, y]) [C.LamBody y])
+            recToLetRecC recToLetRecS
+            (C.Letrec [ (a, recApp [C.Var x, C.Var y]), (b, app "g" 10 [C.Var a])
+                      , (r, app "k" 12 [C.Var b, C.Var a]) ]
+              (C.Var r))
+        -- The Clash Core version would replace @r@ by itself, leaving it
+        -- unbound
+      , testCase "doesn't fire when the result is a recursive call" $ do
+          let e = C.Lam x (C.Lam y
+                    (C.Letrec [(r, recApp [C.Var x, C.Var y]), (b, app "g" 10 [C.Var r])]
+                      (C.Var r)))
+          (t, ch) <- runIn (recState (intFunTy 2)) (rootCtx []) recToLetRecS e
+          assertAlphaEq e t
+          ch @?= False
       ]

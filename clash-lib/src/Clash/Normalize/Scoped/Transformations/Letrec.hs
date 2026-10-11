@@ -46,6 +46,7 @@ module Clash.Normalize.Scoped.Transformations.Letrec
   , deadCodeWorker
   , flattenLet
   , flattenLetWorker
+  , recToLetRec
   , removeUnusedExpr
   , removeUnusedExprCase
   , removeUnusedExprSpine
@@ -64,8 +65,11 @@ import qualified Data.Either as Either
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.IntMap.Strict as IntMap
 import Data.List ((\\))
+import qualified Data.List as List
+import qualified Data.List.Extra as List
 import Data.Maybe (fromMaybe)
 import qualified Data.Monoid as Monoid (Any (..))
+import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
@@ -79,6 +83,7 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (tyConDataCons)
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.Var as C (Id)
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Normalize.Primitives (removedArg)
@@ -88,20 +93,23 @@ import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onCase, onLet, onLetNode, onPrimNode, onTickNode
   , onTyAppNode, scopedAnyConstructor, toScopedTransformation )
-import Clash.Rewrite.Types (primitives, scopedTypeEnv)
+import Clash.Rewrite.Types (curFun, primitives, scopedTypeEnv)
 
-import Clash.Core.Scoped.Alpha ()
-import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences, teleNameBinders, tmNameOccursIn)
+import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
+import Clash.Core.Scoped.FreeVars
+  (freeTmVarOccurrences, teleNameBinders, tmNameOccursIn)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap
-  (emptyNameMap, lookupNameMap, singletonNameMap)
-import Clash.Core.Scoped.Subst (unsinkAlt, unsinkIdBinder, unsinkTerm)
+  (emptyNameMap, lookupNameMap, nameMapFromList, singletonNameMap)
+import Clash.Core.Scoped.Subst
+  (openAlt, teleIdVars, unsinkAlt, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
-  ( appendTele, collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks
-  , partitionTicks )
+  ( AbsBinder (..), appendTele, collectArgs, collectArgsTicks, collectTicks
+  , mkApps, mkLams, mkTicks, openBndrs, partitionTicks, stripAllTicks, stripTicks )
 import Clash.Core.Scoped.TermInfo (isCon, isLocalVar)
-import Clash.Core.Scoped.Type (TypeView (..), tyNatSize, tyView)
+import Clash.Core.Scoped.Type
+  (TypeView (..), isClassTy, normalizeType, tyNatSize, tyView)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Scoped.Util
   (LetGroup (..), inverseTopSortOrder, mkLets, mkVec, regroupLetBindings)
@@ -423,6 +431,164 @@ mergeLetRhss sc0 xs0 body0 k = go sc0 TNil (length xs0) [] (zip [0..] xs0) body0
                      Nothing -> error "flattenLet: an inlined binder remains"
           _ -> mergeAll (mkTicks ibody1 (map sink srcTicks))
     _ -> go sc ext next ((pos, rhs) : done) todo body merged
+
+-- * recToLetRec
+
+-- | Turn a  normalized recursive function, where the recursive calls only pass
+-- along the unchanged original arguments, into let-recursive function. This
+-- means that all recursive calls are replaced by the same variable reference as
+-- found in the body of the top-level let-expression.
+--
+-- See 'Clash.Normalize.Transformations.Letrec.recToLetRec'. It only applies to
+-- a term in normal form ('Clash.Netlist.Util.splitNormalized'): lambdas
+-- around let-expressions whose body is a variable. It doesn't fire if the
+-- variable is one of the bindings that it would replace by the variable,
+-- where the Clash Core version would leave it unbound.
+recToLetRec
+  :: (HasCallStack, Distinct n)
+  => TransformContext n
+  -> Term n
+  -> NormalizeSession (Term n)
+recToLetRec ctx e
+  | not (null (ctxFrames ctx)) = return e
+  | otherwise = do
+      (fn, _) <- Lens.use curFun
+      te <- Lens.view scopedTypeEnv
+      openBndrs (tfScope ctx) e $ \scA absBs body0 -> case idTele absBs of
+        -- Not in normal form: type arguments
+        Nothing -> return e
+        Just idBs -> case collectTicks body0 of
+          (Let bind body1, ticks) -> collectLets scA bind body1 $ \scL bs xs0 res _ ->
+            let args = map sink (teleIdVars idBs)
+                -- The ticks of the let-expression go to its bindings, see
+                -- 'Clash.Netlist.Util.splitNormalized'
+                xs = map (`mkTicks` map sink ticks) xs0
+                lbs = zipWith letBinding (teleIdVars bs) xs
+                (toInline, others) = List.partition (eqApp te scL fn args . lbRhs) lbs
+                resV = stripTicks res
+                resInlined = case resV of
+                  Var _ _ r -> any ((== r) . lbName) toInline
+                  _ -> False
+            in  case (toInline, others) of
+                  (_:_, _:_)
+                    | isVarTerm resV && not resInlined ->
+                        let m = nameMapFromList [(lbName lb, resV) | lb <- toInline]
+                            others1 = [lb {lbRhs = substVars scL m (lbRhs lb)} | lb <- others]
+                        in  case keepBindings scA bs others1 resV of
+                              Just body2 -> changed (mkLams body2 idBs)
+                              Nothing -> error "recToLetRec: an inlined binder remains"
+                  _ -> return e
+          _ -> return e
+ where
+  letBinding v x = case v of
+    Var occ ty nm -> LetBinding occ ty nm x
+    _ -> error "recToLetRec: not a variable"
+
+  isVarTerm = \case
+    Var {} -> True
+    GlobalVar {} -> True
+    _ -> False
+
+  -- This checks whether things are semantically equal. For example, say we
+  -- have:
+  --
+  --   x :: (a, (b, c))
+  --
+  -- and
+  --
+  --   y :: (a, (b, c))
+  --
+  -- If we can determine that 'y' is constructed solely using the
+  -- corresponding fields in 'x', then we can say they are semantically
+  -- equal. The algorithm below keeps track of what (sub)field it is
+  -- constructing, and checks if the field-expression projects the
+  -- corresponding (sub)field from the target variable.
+  --
+  -- TODO: See [Note: Breaks on constants and predetermined equality] in
+  -- "Clash.Normalize.Transformations.Letrec"
+  --
+  -- Since 'aeqTm' looks at ticks when determining equality, all ticks are
+  -- removed with 'stripAllTicks'.
+  eqApp :: Distinct l => TypeEnv -> Scope l -> C.Id -> [Term l] -> Term l -> Bool
+  eqApp te sc fn args (collectArgs . stripAllTicks -> (GlobalVar g, args'))
+    | globalIdVar g == fn
+    , let args2 = Either.lefts args'
+    , length args == length args2
+    = and (zipWith (eqArg te sc) args args2)
+  eqApp _ _ _ _ _ = False
+
+  eqArg :: Distinct l => TypeEnv -> Scope l -> Term l -> Term l -> Bool
+  eqArg _ _ v1 v2@Var{}
+    = aeqTm v1 v2
+  eqArg te sc v1 v2@(collectArgs -> (Data _, args'))
+    | let t1 = normalizeType te sc (inferCoreTypeOf te sc v1)
+    , let t2 = normalizeType te sc (inferCoreTypeOf te sc v2)
+    , aeqTy t1 t2
+    = if isClassConstraint t1 then
+        -- Class constraints are equal if their types are equal, so we can
+        -- take a shortcut here.
+        True
+      else
+        -- Check whether all arguments to the data constructor are projections
+        and (zipWith (eqDat te sc v1) (map pure [0..]) (Either.lefts args'))
+  eqArg _ _ _ _
+    = False
+
+  -- Recursively check whether a term /e/ is semantically equal to some
+  -- variable /v/, see 'Clash.Normalize.Transformations.Letrec.recToLetRec'
+  eqDat :: Distinct l => TypeEnv -> Scope l -> Term l -> [Int] -> Term l -> Bool
+  eqDat te sc v fTrace (collectArgs -> (Data _, args)) =
+    and (zipWith (eqDat te sc v) (map (:fTrace) [0..]) (Either.lefts args))
+  eqDat te sc v1 fTrace v2 =
+    case stripProjection sc (reverse fTrace) v1 v2 of
+      Just [] -> True
+      -- A class dictionary subfield is uniquely determined by its type, so we
+      -- don't require it to be projected from the exact corresponding field.
+      -- GHC routinely shares such dictionaries (e.g. the @KnownDomain@ inside
+      -- a @HiddenClockResetEnable@) via CSE, projecting them from a different
+      -- but type-equal field of the target than the one being reconstructed.
+      _ -> isClassTy te (inferCoreTypeOf te sc v2)
+
+  stripProjection :: Distinct l => Scope l -> [Int] -> Term l -> Term l -> Maybe [Int]
+  stripProjection sc fTrace0 vTarget0 (Case v _ [alt]) = do
+    -- Get projection made in subject of case:
+    fTrace1 <- stripProjection sc fTrace0 vTarget0 v
+    -- Extract projection of this case statement. Subsequent calls to
+    -- 'stripProjection' will check if new target is actually used.
+    (n, fTrace2) <- List.uncons fTrace1
+    openAlt sc alt $ \sc1 p r -> case p of
+      DataPat _ _ ids -> do
+        vTarget1 <- List.indexMaybe (teleIdVars ids) n
+        stripProjection sc1 fTrace2 vTarget1 r
+      _ -> Nothing
+  stripProjection _ fTrace vTarget@Var{} v@Var{} =
+    if aeqTm vTarget v then Just fTrace else Nothing
+  stripProjection _ _fTrace _vTarget _v =
+    Nothing
+{-# SCC recToLetRec #-}
+
+-- | The telescope of term binders of a telescope of abstractions, if it binds
+-- no type variables
+idTele :: Tele AbsBinder n l -> Maybe (Tele IdBinder n l)
+idTele = \case
+  TNil -> Just TNil
+  TCons (AbsId b) bs -> TCons b <$> idTele bs
+  TCons (AbsTy _) _ -> Nothing
+
+-- | Whether a type is a class constraint, see
+-- 'Clash.Normalize.Transformations.Letrec.isClassConstraint'
+isClassConstraint :: Type n -> Bool
+isClassConstraint (tyView -> TyConApp nm0 _) =
+  if -- Constraint tuple. The host module is 'GHC.Classes' on GHC <= 9.12 and
+     -- 'GHC.Internal.Classes' on GHC >= 9.14; both end in '.Classes.(%'.
+     | ".Classes.(%" `Text.isInfixOf` nm1 -> True
+     -- Constraint class:
+     | "C:" `Text.isInfixOf` nm2 -> True
+     | otherwise -> False
+ where
+  nm1 = C.nameOcc nm0
+  nm2 = snd (Text.breakOnEnd "." nm1)
+isClassConstraint _ = False
 
 -- * simpleCSE
 
