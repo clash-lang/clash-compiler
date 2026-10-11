@@ -229,8 +229,10 @@ Library
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Unsigned
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.Magic
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer
                       Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim
+                      Clash.Core.Scoped.Evaluator.Primitives.GHC.PrimopWrappers
                       Clash.Core.Scoped.Evaluator.Primitives.Util
                       Clash.Core.Scoped.Evaluator.Types
                       Clash.Core.Scoped.FreeVars
