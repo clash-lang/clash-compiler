@@ -92,7 +92,7 @@ import Clash.Primitives.Types
   (CompiledPrimMap, Primitive(..), TemplateKind(..))
 import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, onAppNode, onTickNode, onTyAppNode, onVarNode
+  ( Transformation, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
   , toTransformation)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, curFun, tcCache, topEntities
@@ -111,11 +111,34 @@ import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
 
 import Clash.Core.Scoped.Syntax (Distinct)
-import qualified Clash.Core.Scoped.Syntax as Scoped (Term)
+import qualified Clash.Core.Scoped.Syntax as Scoped (Bind, Term (Let))
 import qualified Clash.Normalize.Scoped.Transformations.Inline as Scoped
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 import qualified Clash.Rewrite.Scoped as Scoped (TransformContext)
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
+
+-- | Run the 'Let' handler of a port of a transformation through 'viaFoil',
+-- only if one of the bindings of the let-expression has the given property:
+-- a cheap check on Clash Core that holds for every binding the port can
+-- change. Otherwise, the let-expression and its context would be converted
+-- to scoped Clash Core at every let-expression of every traversal, which
+-- makes normalization several times slower.
+--
+-- This only exists during the port: once the normalizer runs on scoped Clash
+-- Core (phase 4), these transformations are the ports.
+viaFoilLetIf
+  :: HasCallStack
+  => String
+  -> (forall n l. Distinct n => Scoped.TransformContext n -> Scoped.Term n -> Scoped.Bind n l -> Scoped.Term l -> NormalizeSession (Scoped.Term n))
+  -> ((Id, Term) -> NormalizeSession Bool)
+  -> TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+viaFoilLetIf nm worker p ctx e bind _ =
+  viaFoilWhen nm (\_ _ -> anyM p (bindToList bind)) (ScopedTransform letWorker) ctx e
+ where
+  letWorker :: Distinct n => Scoped.TransformContext n -> Scoped.Term n -> NormalizeSession (Scoped.Term n)
+  letWorker ctx1 e1 = case e1 of
+    Scoped.Let bind1 body1 -> worker ctx1 e1 bind1 body1
+    _ -> return e1
 
 {- [Note] join points and void wrappers
 Join points are functions that only occur in tail-call positions within an
@@ -135,7 +158,17 @@ as they'd need to be.
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
 bindConstantVar :: Transformation
-bindConstantVar = Scoped.bindConstantVar
+bindConstantVar =
+  toTransformation "bindConstantVar" (onLet 'bindConstantVarViaFoil)
+
+-- | Run the port of 'bindConstantVar' through 'viaFoil', if a binding can be
+-- inlined, see 'viaFoilLetIf'
+bindConstantVarViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+bindConstantVarViaFoil = viaFoilLetIf "bindConstantVar" Scoped.bindConstantVarWorker $ \(_, stripTicks -> e) -> do
+  tcm <- Lens.view tcCache
+  pure (isLocalVar e || isWorkFreeIsh tcm e)
 
 -- | The 'Let' handler of 'bindConstantVar'.
 bindConstantVarWorker
@@ -317,7 +350,16 @@ inlineBndrsCleanup isN origInl = go
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
 inlineCast :: Transformation
-inlineCast = Scoped.inlineCast
+inlineCast = toTransformation "inlineCast" (onLet 'inlineCastViaFoil)
+
+-- | Run the port of 'inlineCast' through 'viaFoil', if a binding can be
+-- inlined, see 'viaFoilLetIf'
+inlineCastViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineCastViaFoil = viaFoilLetIf "inlineCast" Scoped.inlineCastWorker $ \case
+  (_, Cast (stripTicks -> Var {}) _ _) -> pure True
+  _ -> pure False
 
 -- | The 'Let' handler of 'inlineCast'.
 inlineCastWorker
@@ -339,7 +381,19 @@ inlineCastWorker = inlineBinders test
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: Transformation
-inlineCleanup = Scoped.inlineCleanup
+inlineCleanup = toTransformation "inlineCleanup" (onLet 'inlineCleanupViaFoil)
+
+-- | Run the port of 'inlineCleanup' through 'viaFoil', if a binding binds a
+-- primitive, a data constructor or a case-expression, see 'viaFoilLetIf'
+inlineCleanupViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineCleanupViaFoil = viaFoilLetIf "inlineCleanup" Scoped.inlineCleanupWorker $ \(_, e) ->
+  pure $ case fst (collectArgs e) of
+    Prim {} -> True
+    Data {} -> True
+    Case {} -> True
+    _ -> False
 
 -- | The 'Let' handler of 'inlineCleanup'.
 inlineCleanupWorker
@@ -450,7 +504,19 @@ simply a variable reference. See issue #779 -}
 -- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
 -- on functions that might be inlined later. See #3036.
 collapseRHSNoops :: Transformation
-collapseRHSNoops = Scoped.collapseRHSNoops
+collapseRHSNoops =
+  toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsViaFoil)
+
+-- | Run the port of 'collapseRHSNoops' through 'viaFoil', if a binding binds
+-- an application of a primitive that is the identity on one of its
+-- arguments, see 'viaFoilLetIf'
+collapseRHSNoopsViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+collapseRHSNoopsViaFoil = viaFoilLetIf "collapseRHSNoops" Scoped.collapseRHSNoopsWorker $ \(_, e) ->
+  pure $ case collectArgs e of
+    (Prim PrimInfo{primWorkInfo = WorkIdentity {}}, _) -> True
+    _ -> False
 
 -- | The 'Let' handler of 'collapseRHSNoops'.
 collapseRHSNoopsWorker
@@ -624,7 +690,16 @@ inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
 
 inlineOrLiftNonRep :: Transformation
-inlineOrLiftNonRep = Scoped.inlineOrLiftNonRep
+inlineOrLiftNonRep =
+  toTransformation "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepViaFoil)
+
+-- | Run the port of 'inlineOrLiftNonRep' through 'viaFoil', if a binding has
+-- a non-representable type, see 'viaFoilLetIf'
+inlineOrLiftNonRepViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineOrLiftNonRepViaFoil = viaFoilLetIf "bindOrLiftNonRep" Scoped.inlineOrLiftNonRepWorker $ \(i, _) ->
+  isUntranslatableType False (coreTypeOf i)
 
 -- | The 'Let' handler of 'inlineOrLiftNonRep'.
 inlineOrLiftNonRepWorker
@@ -657,7 +732,17 @@ inlineOrLiftNonRepWorker ctx eLet bind body =
 
 -- | Inline anything of type `SimIO`: IO actions cannot be shared
 inlineSimIO :: Transformation
-inlineSimIO = Scoped.inlineSimIO
+inlineSimIO = toTransformation "bindSimIO" (onLet 'inlineSimIOViaFoil)
+
+-- | Run the port of 'inlineSimIO' through 'viaFoil', if a binding has type
+-- @SimIO@, see 'viaFoilLetIf'
+inlineSimIOViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineSimIOViaFoil = viaFoilLetIf "bindSimIO" Scoped.inlineSimIOWorker $ \(i, _) ->
+  pure $ case tyView (coreTypeOf i) of
+    TyConApp tc _ -> nameOcc tc == Text.showt ''SimIO.SimIO
+    _ -> False
 
 -- | The 'Let' handler of 'inlineSimIO'.
 inlineSimIOWorker
@@ -730,15 +815,16 @@ viaFoilAtGlobalApp
   => String
   -> (forall n. Distinct n => Scoped.TransformContext n -> Scoped.Term n -> NormalizeSession (Scoped.Term n))
   -> NormRewrite
-viaFoilAtGlobalApp nm worker ctx@(TransformContext _ ccs) e
-  | cc : _ <- ccs
-  , isPartOfVarAppSpine cc e
-  = return e
-  | (Var f, _, _) <- collectArgsTicks e
-  , isGlobalId f
-  = viaFoil nm (ScopedTransform worker) ctx e
-  | otherwise
-  = return e
+viaFoilAtGlobalApp nm worker = viaFoilWhen nm canFire (ScopedTransform worker)
+ where
+  canFire (TransformContext _ ccs) e
+    | cc : _ <- ccs
+    , isPartOfVarAppSpine cc e
+    = return False
+    | (Var f, _, _) <- collectArgsTicks e
+    = return (isGlobalId f)
+    | otherwise
+    = return False
 
 -- | The application-spine handler of 'inlineSmall'.
 inlineSmallWorker :: HasCallStack => NormRewrite
