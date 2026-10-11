@@ -31,11 +31,11 @@ import Clash.Core.VarEnv
   ( InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet
   , mkVarEnv, mkVarSet )
 import Clash.Driver.Types
-  ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), IsPrim (IsFun)
-  , defClashOpts, debugSilent )
+  ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), DebugOpts
+  , IsPrim (IsFun), defClashOpts, debugSilent )
 import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
-import Clash.Rewrite.Util (runRewrite)
+import Clash.Rewrite.Util (apply, changed, runRewrite)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
@@ -175,6 +175,36 @@ runRewriteTest
 runRewriteTest rwEnv rwState m = do
   (a, rwState1, anyChanged) <- runR m rwEnv rwState
   pure (a, rwState1, getAny anyChanged)
+
+-- | The default 'RewriteEnv', with the given debug options instead of
+-- 'debugSilent'
+rewriteEnvWithDebug :: DebugOpts -> RewriteEnv
+rewriteEnvWithDebug opts = def{_clashEnv = clashEnv0{envOpts = opts0{opt_debug = opts}}}
+ where
+  clashEnv0 = _clashEnv def
+  opts0 = envOpts clashEnv0
+
+-- | Run a rewrite, under the given transformation name and in the given
+-- context, that replaces the term it is offered by another term and signals a
+-- change. The invariant checks of 'Clash.Rewrite.Util.applyDebug' then check
+-- the replacement, which makes this a way to test those checks.
+replaceTerm
+  :: RewriteEnv
+  -> RewriteState NormalizeState
+  -> String
+  -- ^ Name of the transformation
+  -> TransformContext
+  -> C.Term
+  -- ^ Term offered to the transformation
+  -> C.Term
+  -- ^ Replacement
+  -> IO C.Term
+replaceTerm rwEnv rwState name ctx before after = do
+  (t, _, _) <- runRewriteTest rwEnv rwState (apply name rw ctx before)
+  pure t
+ where
+  rw :: Rewrite NormalizeState
+  rw _ _ = changed after
 
 -- | Lint a term with all checks of "Clash.Core.Lint" enabled. The term appears
 -- in a context with the given in-scope set and binders, and the given global

@@ -14,19 +14,23 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Name (NameSort (User), noSrcSpan)
-import Clash.Core.Term (Bind (..), Term (..), collectArgs, mkApps)
+import Clash.Core.Term
+  (Bind (..), CoreContext (..), Term (..), collectArgs, mkApps)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet, lookupVarEnv)
 import Clash.Driver.Types
-  ( Binding (..), ClashEnv (..), ClashOpts (..), DebugOpts (..), debugNone )
+  ( Binding (..), ClashEnv (..), ClashOpts (..), DebugOpts (..), debugNone
+  , debugSilent )
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
-import Clash.Rewrite.Util (changed, liftBinding, runRewrite)
+import Clash.Rewrite.Types
+  (RewriteEnv (..), RewriteState (..), TransformContext (..))
+import Clash.Rewrite.Util (changed, liftBinding, lintInput)
 import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals
-  , globalId, inScopeOf, intFunTy, intId, intLit, localId, runRewriteTest
+  , globalId, inScopeOf, intFunTy, intId, intLit, intTy, localId
+  , mkBindingMap, replaceTerm, rewriteEnvWithDebug, runRewriteTest
   , runSingleTransformation, showPprU )
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
@@ -67,12 +71,82 @@ applyUnsignalledChange =
 -- transformation name, with the given variables in scope. The free variable
 -- check of 'Clash.Rewrite.Util.applyDebug' then checks the result.
 replaceBy :: String -> [Id] -> Term -> Id -> IO Term
-replaceBy name inScope before new = do
-  (t, _, _) <- runRewriteTest def def (runRewrite name (inScopeOf inScope) rw before)
-  pure t
+replaceBy name inScope before new =
+  replaceTerm def def name (TransformContext (inScopeOf inScope) []) before (Var new)
+
+-- * Scope lint of 'Clash.Rewrite.Util.applyDebug'
+
+-- | Local variables of type @Int@
+xInt, yInt :: Id
+xInt = intId User "x" 1
+yInt = intId User "y" 2
+
+-- | Replace a term in an empty context, see 'replaceTerm'
+replaceClosed :: RewriteEnv -> Term -> Term -> IO Term
+replaceClosed env = replaceTerm env def "someTransformation" (TransformContext emptyInScopeSet [])
+
+-- | Debug options that enable the scope lint, including the checks for
+-- shadowing
+shadowEnv :: RewriteEnv
+shadowEnv = rewriteEnvWithDebug debugSilent{dbg_invariantsShadowing = True}
+
+-- | The free variable check only looks at local variables, so it misses a
+-- reference to a global that does not exist, but the scope lint does not
+lintUnknownGlobal :: Assertion
+lintUnknownGlobal =
+  assertErrorContainsIO "Global variable g[5] is not in the binding map" $
+    replaceTerm shadowEnv st "someTransformation"
+      (TransformContext emptyInScopeSet []) (intLit 0) (Var g5)
  where
-  rw :: NormRewrite
-  rw _ctx _e = changed (Var new)
+  g5 = globalId User "g" 5 intTy
+  -- The binder being normalized need not be in the binding map
+  st :: RewriteState NormalizeState
+  st = def{_curFun = (globalId User "top" 6 intTy, noSrcSpan)}
+
+-- | The check for accidental shadowing used to only look at the binders of
+-- let-expressions that are not in the right-hand side of a let-binding
+lintDuplicateInLetRhs :: Assertion
+lintDuplicateInLetRhs =
+  assertErrorContainsIO "is bound more than once" $
+    replaceClosed shadowEnv (intLit 0)
+      (Let (Rec [(xInt, Let (Rec [(yInt, intLit 1), (yInt, intLit 2)]) (Var yInt))]) (Var xInt))
+
+-- | Shadowing is only reported with @-fclash-debug-invariants-shadowing@
+lintShadowing :: [TestTree]
+lintShadowing =
+  [ testCase "is not reported by default" $
+      replaceClosed def (intLit 0) shadowing >>= assertAlphaEq shadowing
+  , testCase "is reported with -fclash-debug-invariants-shadowing" $
+      assertErrorContainsIO "Binder x[1] shadows x[1]" $
+        replaceClosed shadowEnv (intLit 0) shadowing
+  , testCase "of a binder in the context is reported" $
+      assertErrorContainsIO "bound in the context of the term" $
+        replaceTerm shadowEnv def "someTransformation"
+          (TransformContext (inScopeOf [xInt]) [LamBody xInt]) (intLit 0) (Lam xInt (Var xInt))
+  , testCase "is not blamed on a transformation that did not introduce it" $
+      replaceClosed shadowEnv shadowing shadowing1 >>= assertAlphaEq shadowing1
+  , testCase "of a global by a local binder is reported" $
+      assertErrorContainsIO "has the unique of a global binder" $
+        replaceTerm shadowEnv def{_bindings = mkBindingMap [(fGlobal, intLit 0)]}
+          "someTransformation" (TransformContext emptyInScopeSet [])
+          (intLit 0) (Lam fLocal (Var fLocal))
+  ]
+ where
+  shadowing = Lam xInt (Lam xInt (Var xInt))
+  shadowing1 = Lam xInt (Lam xInt (intLit 1))
+  fGlobal = globalId User "f" 6 intTy
+  fLocal = intId User "f" 6
+
+-- | 'lintInput' checks the input of normalization
+lintInputReported :: Assertion
+lintInputReported =
+  assertErrorContainsIO "Error in the input of normalization of f" $ do
+    (t, _, _) <- runRewriteTest def st (lintInput "normalization" "f" tm >> pure tm)
+    pure t
+ where
+  tm = Lam xInt (Var yInt)
+  st :: RewriteState NormalizeState
+  st = def{_curFun = (globalId User "f" 6 (intFunTy 1), noSrcSpan)}
 
 -- | Run a transformation that signals a change, with the given number of
 -- transformations applied before it, under
@@ -156,6 +230,15 @@ tests =
         , testCase "other transformations may not introduce variables bound in the context" $
             assertErrorContainsIO "It introduces free variables" $
               replaceBy "caseCase" [x, y] (Var x) y
+        ]
+    , testGroup "applyDebug scope lint"
+        [ testCase "reports globals that are not in the binding map"
+            lintUnknownGlobal
+        , testCase "reports duplicate binders in the right-hand side of a let-binding"
+            lintDuplicateInLetRhs
+        , testGroup "shadowing" lintShadowing
+        , testCase "lintInput reports violations in the input of normalization"
+            lintInputReported
         ]
 
     -- @-fclash-debug-transformations-limit@ counts from

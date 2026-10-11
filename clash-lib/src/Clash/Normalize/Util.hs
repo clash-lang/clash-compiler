@@ -35,6 +35,7 @@ module Clash.Normalize.Util
  where
 
 import           Control.Lens            ((&),(+~),(%=),(.=))
+import           Control.Monad           (when)
 import qualified Control.Lens            as Lens
 import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts,rights)
@@ -72,7 +73,8 @@ import           Clash.Core.VarEnv
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Debug             (traceIf)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
+  (BindingMap, Binding(..), DebugOpts(dbg_invariantsShadowing), TransformationInfo(FinalTerm),
+   hasTransformationInfo)
 import           Clash.Normalize.Primitives (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
@@ -80,7 +82,7 @@ import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
    tcCache, primitives)
 import           Clash.Rewrite.Util
-  (cloneNameWithBindingMap, runRewrite, mkTmBinderFor, mkDerivedName)
+  (cloneNameWithBindingMap, runRewrite, mkTmBinderFor, mkDerivedName, lintInput)
 import           Clash.Unique
 import           Clash.Util              (SrcSpan, makeCached, makeCachedU)
 
@@ -549,6 +551,7 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
   let expr' = traceIf (hasTransformationInfo FinalTerm opts)
                 (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
                 expr
+  when (dbg_invariantsShadowing opts) (lintInput nrwS bndrS expr)
   rewritten <- runRewrite nrwS emptyInScopeSet nrw expr'
   let after = showPpr rewritten
   traceIf (hasTransformationInfo FinalTerm opts)
