@@ -943,12 +943,20 @@ whnfHeap isSubj (TransformContext is0 hist) e = do
   let (ids1,ids2) = splitSupply ids
   uniqSupply Lens..= ids2
   gh <- Lens.use globalHeap
-  let lh = localBinders [] [] hist
+  let lh = contextLetBindings hist e
 
   case whnf' eval bndrs lh tcm gh ids1 is0 isSubj e of
     (!gh1,ph,v) -> do
       globalHeap Lens..= gh1
       pure (ph `differenceVarEnv` lh, v)
+{-# SCC whnfHeap #-}
+
+-- | The let-bindings of a context that are valid at the term in it, for the
+-- heap of the evaluator: those whose binder and the free variables of whose
+-- right-hand side are not bound again between the let-binding and the term.
+-- Only the let-bindings the evaluator can reach from the term are included.
+contextLetBindings :: Context -> Term -> PureHeap
+contextLetBindings hist e = localBinders [] [] hist
  where
   -- The let-bindings of the context, walking it from the term outwards.
   -- 'bound' holds the variables bound between the term and the current point
@@ -988,7 +996,6 @@ whnfHeap isSubj (TransformContext is0 hist) e = do
 
   bindVars :: [Var a] -> [[Var Any]] -> [[Var Any]]
   bindVars vs bound = coerce vs : bound
-{-# SCC whnfHeap #-}
 
 -- | Binds variables on the PureHeap over the result of the rewrite
 --
