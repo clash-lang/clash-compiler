@@ -3,12 +3,20 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Transformations.Cast"
+  Tests for "Clash.Normalize.Transformations.Cast". The tests are
+  parameterised over the implementation of the transformations
+  ('CastRewrites'), so that they also run on their ports to scoped Clash
+  Core, see "Clash.Tests.Normalize.Scoped.Transformations.Cast".
 -}
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Tests.Normalize.Transformations.Cast (tests) where
+module Clash.Tests.Normalize.Transformations.Cast
+  ( tests
+  , CastRewrites (..)
+  , currentRewrites
+  , castTests
+  ) where
 
 import Data.Default (def)
 
@@ -17,16 +25,34 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Name (NameSort (User))
 import Clash.Core.Term (Bind (..), Term (..))
-import Clash.Normalize.Transformations.Cast (splitCastWork)
+import Clash.Normalize.Transformations.Cast
+  (caseCastWorker, elimCastCastWorker, letCastWorker, splitCastWorkWorker)
 import Clash.Normalize.Types (NormRewrite)
+import Clash.Rewrite.StrategyDSL (onCast, onLet, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intTy
   , runSingleTransformation )
 
-splitCastWorkR :: NormRewrite
-splitCastWorkR = $(asRewriteQ splitCastWork)
+-- | The transformations of "Clash.Normalize.Transformations.Cast"
+data CastRewrites = CastRewrites
+  { crCaseCast :: NormRewrite
+  , crElimCastCast :: NormRewrite
+  , crLetCast :: NormRewrite
+  , crSplitCastWork :: NormRewrite
+  }
+
+-- | The transformations of Clash Core. They are made from their workers: the
+-- transformations of "Clash.Normalize.Transformations.Cast" are the ports to
+-- scoped Clash Core once the normalizer runs those.
+currentRewrites :: CastRewrites
+currentRewrites = CastRewrites
+  { crCaseCast = $(asRewriteQ (toTransformation "caseCast" (onCast 'caseCastWorker)))
+  , crElimCastCast = $(asRewriteQ (toTransformation "elimCastCast" (onCast 'elimCastCastWorker)))
+  , crLetCast = $(asRewriteQ (toTransformation "letCast" (onCast 'letCastWorker)))
+  , crSplitCastWork = $(asRewriteQ (toTransformation "splitCastWork" (onLet 'splitCastWorkWorker)))
+  }
 
 -- | @let x = cast (g x) in x@, with the outer @x@ on the right-hand side.
 -- 'splitCastWork' must keep the binding non-recursive:
@@ -37,8 +63,8 @@ splitCastWorkR = $(asRewriteQ splitCastWork)
 --
 -- It used to rebuild it as @letrec x' = g x; x = cast x' in x@, where @g x@
 -- refers to the cast itself.
-splitCastWorkNonRec :: Assertion
-splitCastWorkNonRec = do
+splitCastWorkNonRec :: NormRewrite -> Assertion
+splitCastWorkNonRec splitCastWorkR = do
   result <- runSingleTransformation def def (inScopeOf [x]) splitCastWorkR term
   assertAlphaEq expected result
  where
@@ -50,8 +76,12 @@ splitCastWorkNonRec = do
     Let (NonRec x' (App g (Var x)))
       (Let (NonRec x (Cast (Var x') intTy intTy)) (Var x))
 
-tests :: TestTree
-tests = testGroup "Clash.Tests.Normalize.Transformations.Cast"
+-- | The tests of the transformations, given their implementation
+castTests :: CastRewrites -> [TestTree]
+castTests rws =
   [ testCase "splitCastWork keeps a NonRec let non-recursive"
-      splitCastWorkNonRec
+      (splitCastWorkNonRec (crSplitCastWork rws))
   ]
+
+tests :: TestTree
+tests = testGroup "Clash.Tests.Normalize.Transformations.Cast" (castTests currentRewrites)

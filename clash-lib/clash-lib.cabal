@@ -515,6 +515,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Scoped.PrimitiveReductions
                  Clash.Tests.Normalize.Scoped.Transformations.ANF
                  Clash.Tests.Normalize.Scoped.Transformations.Case
+                 Clash.Tests.Normalize.Scoped.Transformations.Cast
                  Clash.Tests.Normalize.Scoped.Transformations.DEC
                  Clash.Tests.Normalize.Scoped.Transformations.Inline
                  Clash.Tests.Normalize.Scoped.Transformations.Letrec
