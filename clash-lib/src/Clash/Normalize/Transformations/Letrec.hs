@@ -295,9 +295,9 @@ flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
     _ -> return (Letrec binds1 body)
   where
     go :: InScopeSet -> LetBinding -> NormalizeSession (InScopeSet,[LetBinding])
-    go isN (id1,collectTicks -> (Letrec binds1 body1,ticks)) = do
-      let bs1 = map fst binds1
-      let (binds2,body2,isN1) =
+    go isN (id1,collectTicks -> (Let bind1 body1,ticks)) = do
+      let bs1 = map fst (bindToList bind1)
+      let (bind2,body2,isN1) =
             -- We need to deshadow because we're merging nested let-expressions
             -- into a single let-expression: and within a let-expression, the
             -- bindings are not allowed to shadow each-other. Of course, we
@@ -306,13 +306,19 @@ flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
             --
             -- This is much better than blindly calling freshenTm, and saves
             -- almost 30% run-time of the normalization phase on some examples.
+            --
+            -- We deshadow a 'NonRec' binding as such: its right-hand side can
+            -- refer to a variable its binder shadows, which must not be
+            -- renamed along with the binder.
             if any (`elemInScopeSet` isN) bs1 then
-              case deShadowTerm isN (Letrec binds1 body1) of
-                Letrec bindsN bodyN ->
-                  (bindsN,bodyN,extendInScopeSetList isN (map fst bindsN))
-                _ -> error "internal error"
+              let (bindN,bodyN) = deshadowLetExpr isN bind1 body1
+              in  (bindN,bodyN,extendInScopeSetList isN (map fst (bindToList bindN)))
             else
-              (binds1,body1,extendInScopeSetList isN bs1)
+              (bind1,body1,extendInScopeSetList isN bs1)
+          binds2 = bindToList bind2
+          isRecursive id2 e2 = case bind2 of
+            NonRec{} -> False
+            Rec{} -> id2 `elemFreeVars` e2
       let bodyOccs = Lens.foldMapByOf
                        freeLocalIds (unionVarEnvWith (+))
                        emptyVarEnv (`unitVarEnv` (1 :: Int))
@@ -329,7 +335,7 @@ flattenLetWorker (TransformContext is0 _) (Letrec binds body) = do
         -- only if that binder doesn't perform any work or is only used once in
         -- the body
         [(id2,e2)] | Just occ <- lookupVarEnv id2 bodyOccs, e2WorkFree || occ < 2 ->
-          if id2 `elemFreeVars` e2
+          if isRecursive id2 e2
              -- Except when the binder is recursive!
              then changed ([(id2,e2),(id1, body2)])
              else let subst = extendIdSubst (mkSubst isN1) id2 e2
