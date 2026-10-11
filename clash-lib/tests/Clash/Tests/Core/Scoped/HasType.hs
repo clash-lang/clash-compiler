@@ -25,6 +25,7 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Util as C
 import qualified Clash.Core.Var as C
 
@@ -33,8 +34,8 @@ import Clash.Core.Scoped.HasType
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite
-  ( boolTy, globalId, intTy, justDataCon, localId, nTy, pTy, signalTy
-  , testTyConMap, tupleTy, tyVar, wTy )
+  ( boolTy, globalId, intTy, justDataCon, localId, maybeTy, nTy, pTy
+  , signalTy, testTyConMap, tupleTy, tyVar, wTy )
 import Test.Clash.Scoped
 
 tcm :: C.TyConMap
@@ -168,6 +169,19 @@ tests = testGroup "Clash.Tests.Core.Scoped.HasType"
   , testCase "inferCoreKindOf agrees with Clash.Core.HasType" $
       forM_ kindCases $ \ty -> withTypeScopes ty $ \sc ty' ->
         assertScopedTyAlphaEq (C.inferCoreKindOf tcm ty) (inferCoreKindOf tcm sc ty')
+
+    -- With the @debug@ flag, 'piResultTys' checks that the types it drops the
+    -- arrows of a function type with match the argument types of the
+    -- function type. 'inferCoreKindOf' used it to apply the kind of a type
+    -- constructor to its arguments, such as @Type -> Type@ of @Maybe@ to
+    -- @Int@. The check then compared @Type@ against @Int@, so
+    -- 'inferCoreKindOf' errored.
+  , testCase "inferCoreKindOf of a type constructor applied to a type" $
+      withTypeScopes (maybeTy intTy) $ \sc ty ->
+        assertScopedTyAlphaEq C.liftedTypeKind (inferCoreKindOf tcm sc ty)
+  , testCase "inferCoreKindOf of a type constructor applied to a type variable" $
+      withTypeScopes (maybeTy a) $ \sc ty ->
+        assertScopedTyAlphaEq C.liftedTypeKind (inferCoreKindOf tcm sc ty)
   ]
 
 literals :: [C.Literal]

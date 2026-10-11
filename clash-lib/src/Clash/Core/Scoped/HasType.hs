@@ -227,23 +227,49 @@ piResultTy tcm sc ty arg = piResultTys tcm sc ty [arg]
 -- The function type may have more or fewer foralls than there are arguments:
 -- e.g. @piResultTys (forall a. a) [forall b. b -> b, Int]@ is @Int -> Int@.
 --
--- When there are no foralls, this simply drops arrows from a function type or
--- kind.
+-- When there are no foralls, this simply drops arrows from a function type,
+-- given the types of the arguments applied to it. With the @debug@ flag, these
+-- must match the argument types of the function type.
 piResultTys
-  :: forall n
-   . (HasCallStack, Distinct n)
+  :: (HasCallStack, Distinct n)
   => TyConMap
   -> Scope n
   -> Type n
   -> [Type n]
   -> Type n
-piResultTys _ _ ty [] = ty
-piResultTys tcm sc ty origArgs@(arg:args)
+piResultTys = piResultTysWith True
+
+-- | Like 'piResultTys', but applies a kind to types. The arrows of the kind are
+-- dropped without checking the kinds of the types against them. See
+-- @piResultKinds@ in "Clash.Core.HasType".
+piResultKinds
+  :: (HasCallStack, Distinct n)
+  => TyConMap
+  -> Scope n
+  -> Kind n
+  -> [Type n]
+  -> Kind n
+piResultKinds = piResultTysWith False
+
+-- | See 'piResultTys' and 'piResultKinds'
+piResultTysWith
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => Bool
+  -- ^ Check (with the @debug@ flag) that the types dropping an arrow match its
+  -- argument type
+  -> TyConMap
+  -> Scope n
+  -> Type n
+  -> [Type n]
+  -> Type n
+piResultTysWith _ _ _ ty [] = ty
+piResultTysWith checkArgs tcm sc ty origArgs@(arg:args)
   | Just ty' <- coreView1 tcm sc ty
-  = piResultTys tcm sc ty' origArgs
+  = piResultTysWith checkArgs tcm sc ty' origArgs
   | FunTy a res <- tyView ty
   -- See 'C.piResultTys' for why this uses 'coreView'
-  = if debugIsOn && not (aeqTy (coreView tcm sc a) (coreView tcm sc arg)) then error [I.i|
+  = if debugIsOn && checkArgs && not (aeqTy (coreView tcm sc a) (coreView tcm sc arg)) then error [I.i|
       Unexpected application. A function with type:
 
         #{showPpr ty}
@@ -253,7 +279,7 @@ piResultTys tcm sc ty origArgs@(arg:args)
         #{showPpr arg}
     |]
     else
-      piResultTys tcm sc res args
+      piResultTysWith checkArgs tcm sc res args
   | ForAllTy b res <- ty
   = go (extendTySubst (idSubst sc) b arg) res args
   | otherwise
@@ -274,7 +300,7 @@ piResultTys tcm sc ty origArgs@(arg:args)
     = let ty'' = substTy s ty' in
       case coreView1 tcm sc ty'' of
         Just ty3 -> go (idSubst sc) ty3 allArgs
-        Nothing -> piResultTys tcm sc ty'' allArgs
+        Nothing -> piResultTysWith checkArgs tcm sc ty'' allArgs
 
 -- * Kinds of types
 
@@ -285,7 +311,7 @@ inferCoreKindOf tcm sc ty = case tyView ty of
     liftedTypeKind
 
   TyConApp tc args ->
-    piResultTys tcm sc (tyConKindOf sc (UniqMap.find tc tcm)) args
+    piResultKinds tcm sc (tyConKindOf sc (UniqMap.find tc tcm)) args
 
   OtherType {} ->
     case ty of
@@ -303,4 +329,4 @@ inferCoreKindOf tcm sc ty = case tyView ty of
       AppTy a b -> goApp a [b]
  where
   goApp (AppTy c d) args = goApp c (d : args)
-  goApp c args = piResultTys tcm sc (inferCoreKindOf tcm sc c) args
+  goApp c args = piResultKinds tcm sc (inferCoreKindOf tcm sc c) args
