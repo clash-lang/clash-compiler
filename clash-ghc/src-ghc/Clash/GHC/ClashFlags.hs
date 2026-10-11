@@ -53,6 +53,7 @@ flagsClash r = [
     defFlag "fclash-debug"                       $ SepArg (setDebugLevel r)
   , defFlag "fclash-debug-info"                  $ SepArg (setDebugInfo r)
   , defFlag "fclash-debug-invariants"            $ NoArg (liftEwM (setDebugInvariants r))
+  , defFlag "fclash-debug-invariants-shadowing"  $ NoArg (liftEwM (setDebugInvariantsShadowing r))
   , defFlag "fclash-debug-count-transformations" $ NoArg (liftEwM (setDebugCountTransformations r))
   , defFlag "fclash-debug-transformations"       $ SepArg (setDebugTransformations r)
   , defFlag "fclash-debug-transformations-from"  $ IntSuffix (setDebugTransformationsFrom r)
@@ -164,6 +165,12 @@ setDebugInvariants :: IORef ClashOpts -> IO ()
 setDebugInvariants r =
   modifyIORef r $ \c ->
     c { opt_debug = (opt_debug c) { dbg_invariants = True } }
+
+setDebugInvariantsShadowing :: IORef ClashOpts -> IO ()
+setDebugInvariantsShadowing r =
+  modifyIORef r $ \c ->
+    c { opt_debug = (opt_debug c) { dbg_invariants = True
+                                  , dbg_invariantsShadowing = True } }
 
 setDebugCountTransformations :: IORef ClashOpts -> IO ()
 setDebugCountTransformations r =
