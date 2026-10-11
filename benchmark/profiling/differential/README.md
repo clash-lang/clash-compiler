@@ -119,3 +119,32 @@ outcome <- compareBinding cmp d (mkBinding f tm)
 ```
 
 See `clash-lib/tests/Clash/Tests/Differential.hs`.
+
+## Replaying calls of the evaluator
+
+`clash-differential whnf` compares the whnf evaluator of scoped Clash Core
+(`Clash.Core.Scoped.Evaluator`) with that of Clash Core, on calls of
+`Clash.Rewrite.Util.whnfRW` dumped during normalization:
+
+```
+clash-differential whnf [--reps N] [--show N] [--top N] [--call N] DESIGN.bin DUMP... +RTS -T
+```
+
+`DESIGN.bin` gives the global bindings and types: the normalization inputs of
+the design the calls were dumped from. A dump holds the inputs of the calls:
+whether the term is the subject of a case-expression, the let-bindings of its
+context, and the term. The instrumented `whnfRW` of the evaluator spike
+(branch `eval-spike`, commit `b8bd16587`) writes them with
+`WHNF_DUMP=FILE:N`; see `WhnfReplay.hs` for the format.
+
+For every call, both evaluators evaluate the term with the let-bindings of the
+context on the heap, and their results are compared up to alpha-equivalence,
+after unfolding the bindings the evaluators allocated a few times. It prints
+how many agree, and the first `--show` (default 3) differences. With
+`+RTS -T`, it also measures the allocation of both evaluators (`--reps` runs,
+default 3), and with `--top N`, it lists the N calls on which the scoped
+evaluator allocates the most extra. `--call N` replays only the call with
+index N.
+
+Measure allocation with `clash-lib -debug` (see above): the debug checks of
+the two evaluators differ.

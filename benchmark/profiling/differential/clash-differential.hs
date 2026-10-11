@@ -41,6 +41,7 @@ import SerialiseInstances (NetlistInputs, NormalizationInputs, unremoveBBfunc)
 
 import Comparisons (comparisons)
 import Test.Clash.Differential
+import WhnfReplay (whnfReplay)
 
 data Options = Options
   { optShow :: Int
@@ -56,6 +57,7 @@ usage :: String
 usage = unlines
   [ "Usage: clash-differential [OPTIONS] COMPARISON FILE..."
   , "       clash-differential --list"
+  , "       clash-differential whnf [--reps N] [--show N] [--top N] [--call N] DESIGN.bin DUMP..."
   , ""
   , "Runs COMPARISON on every binding of the serialized designs FILE..., which"
   , "are *.bin files written by clash-profile-normalization-prepare, or"
@@ -66,10 +68,22 @@ usage = unlines
   , "  --lines N       print at most N lines of a term (default 30)"
   , "  --width N       print at most N characters of a line (default 200)"
   , "  --binding NAME  only compare the bindings whose name contains NAME"
+  , ""
+  , "The whnf command replays the whnfRW calls in DUMP with the evaluators of"
+  , "Clash Core and of scoped Clash Core, with the global bindings of"
+  , "DESIGN.bin, compares their results and, with +RTS -T, measures their"
+  , "allocation (--reps runs, default 3), and shows the --top N calls with the"
+  , "most extra allocation in the scoped evaluator. --call N only replays the"
+  , "call with index N. See WhnfReplay.hs."
   ]
 
 main :: IO ()
 main = getArgs >>= \case
+  "whnf" : args -> case parseWhnfArgs (WhnfOptions 3 3 0 Nothing) args of
+    Just (WhnfOptions reps nShow nTop only, design : dumps@(_:_)) -> do
+      (bm, tcm, _, _, _, _, _, _) <- decode <$> B.readFile design :: IO NormalizationInputs
+      forM_ dumps (whnfReplay reps nShow nTop only tcm bm)
+    _ -> die usage
   ["--list"] -> forM_ comparisons $ \(Comparison nm desc _ _ kds) -> do
     putStrLn (nm <> ": " <> desc)
     forM_ kds $ \kd -> putStrLn ("  known difference " <> kdName kd <> ": " <> kdDescription kd)
@@ -81,6 +95,25 @@ main = getArgs >>= \case
  where
   name (Comparison nm _ _ _ _) = nm
   die msg = hPutStrLn stderr msg >> exitWith (ExitFailure 2)
+
+-- | The options of the whnf command, and the other arguments
+data WhnfOptions = WhnfOptions
+  { whnfReps :: Int
+  , whnfShow :: Int
+  , whnfTop :: Int
+  , whnfOnly :: Maybe Int
+  }
+
+parseWhnfArgs :: WhnfOptions -> [String] -> Maybe (WhnfOptions, [String])
+parseWhnfArgs opts = \case
+  [] -> Just (opts, [])
+  "--reps" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfReps = k} rest
+  "--show" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfShow = k} rest
+  "--top" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfTop = k} rest
+  "--call" : n : rest -> readMaybe n >>= \k -> parseWhnfArgs opts {whnfOnly = Just k} rest
+  a : rest
+    | "--" `List.isPrefixOf` a -> Nothing
+    | otherwise -> fmap (a :) <$> parseWhnfArgs opts rest
 
 -- | Options, which can be anywhere, and the other arguments
 parseArgs :: Options -> [String] -> Maybe (Options, [String])
