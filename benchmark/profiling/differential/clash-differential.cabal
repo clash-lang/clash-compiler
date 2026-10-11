@@ -19,6 +19,7 @@ executable clash-differential
   other-modules:       Comparisons
                        Demo
                        Test.Clash.Differential
+                       WhnfReplay
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wcompat -rtsopts "-with-rtsopts=-A64m"
   build-depends:       base,
