@@ -451,6 +451,7 @@ test-suite unittests
       haskell-src-exts,
       ghc,
       lens,
+      mtl,
       pretty-show,
       quickcheck-text,
       tasty         >= 1.2      && < 1.6,
@@ -486,6 +487,7 @@ test-suite unittests
                  Clash.Tests.Core.TermLiteral
                  Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Core.Util
+                 Clash.Tests.Differential
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist
                  Clash.Tests.Netlist.Id
@@ -519,6 +521,7 @@ test-suite unittests
                  Clash.Tests.Rewrite.WorkFree
                  Clash.Tests.Warning
 
+                 Test.Clash.Differential
                  Test.Clash.Rewrite
                  Test.Clash.Scoped
                  Test.Clash.Scoped.Gen

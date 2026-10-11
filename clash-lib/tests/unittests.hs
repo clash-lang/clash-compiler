@@ -26,6 +26,7 @@ import qualified Clash.Tests.Core.StructuralEquivalence
 import qualified Clash.Tests.Core.Subst
 import qualified Clash.Tests.Core.TermLiteral
 import qualified Clash.Tests.Core.Util
+import qualified Clash.Tests.Differential
 import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist
 import qualified Clash.Tests.Netlist.Id
@@ -89,6 +90,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Subst.tests
   , Clash.Tests.Core.TermLiteral.tests
   , Clash.Tests.Core.Util.tests
+  , Clash.Tests.Differential.tests
   , Clash.Tests.Driver.Manifest.tests
   , Clash.Tests.Netlist.tests
   , Clash.Tests.Netlist.Id.tests
