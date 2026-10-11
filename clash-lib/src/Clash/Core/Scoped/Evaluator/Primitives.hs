@@ -178,6 +178,7 @@ import Data.Text (Text)
 
 import Clash.Core.Scoped.Evaluator.Types (PrimReduction)
 
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal as Clash.Class.BitPack.Internal
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector as Clash.Sized.Internal.BitVector
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Unsigned as Clash.Sized.Internal.Unsigned
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree as Clash.Sized.RTree
@@ -203,7 +204,8 @@ scopedPrimReductions
 -- | The ported reductions, in the order of their modules
 scopedPrimitives :: [(Text, PrimReduction)]
 scopedPrimitives = concat
-  [ Clash.Sized.Internal.BitVector.primitives
+  [ Clash.Class.BitPack.Internal.primitives
+  , Clash.Sized.Internal.BitVector.primitives
   , Clash.Sized.Internal.Unsigned.primitives
   , Clash.Sized.RTree.primitives
   , Clash.Sized.Vector.primitives
