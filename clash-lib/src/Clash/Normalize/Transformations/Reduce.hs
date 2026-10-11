@@ -49,6 +49,7 @@ import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
+import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
@@ -89,7 +90,7 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
 {-# SCC reduceBinders #-}
 
 reduceConst :: Transformation
-reduceConst = toTransformation "reduceConst" (onApp 'reduceConstWorker)
+reduceConst = Scoped.reduceConst
 
 -- | The 'App' handler of 'reduceConst'.
 reduceConstWorker

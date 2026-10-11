@@ -48,6 +48,7 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["elimCaseBigNum"], $(asRewriteQ Current.elimCaseBigNumInternals), [])
     , (["nonRepANF"], $(asRewriteQ Current.nonRepANF), [])
     , (["ANF"], makeANF, [])
+    , (["reduceConst"], $(asRewriteQ Current.reduceConst), [])
     ]
 
   unported =
@@ -70,7 +71,6 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["typeSpec"], $(asRewriteQ typeSpec))
     , (["zeroWidthSpec"], $(asRewriteQ zeroWidthSpec))
     -- Reduce
-    , (["reduceConst"], $(asRewriteQ reduceConst))
     , (["reducePrim"], $(asRewriteQ reducePrim))
     -- Others
     , (["setupMultiResultPrim"], $(asRewriteQ setupMultiResultPrim))
