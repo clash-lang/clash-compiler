@@ -1,0 +1,36 @@
+cabal-version:       2.2
+name:                clash-differential
+version:             0.0.0
+synopsis:            Differential tests of ports to scoped Clash Core on serialized designs
+description:
+  Runs a current Clash function and its port to scoped Clash Core on the
+  bindings of serialized designs, and compares their results up to
+  alpha-equivalence. See README.md.
+homepage:            https://clash-lang.org/
+license:             BSD-2-Clause
+author:              QBayLogic B.V.
+category:            Testing
+build-type:          Simple
+
+executable clash-differential
+  main-is:             clash-differential.hs
+  -- The harness itself is shared with clash-lib's unit tests
+  hs-source-dirs:      ., ../../../clash-lib/tests
+  other-modules:       Comparisons
+                       Demo
+                       Test.Clash.Differential
+  default-language:    Haskell2010
+  ghc-options:         -O2 -Wall -Wcompat -rtsopts "-with-rtsopts=-A64m"
+  build-depends:       base,
+                       binary,
+                       bytestring,
+                       containers,
+                       deepseq,
+                       lens,
+                       mtl,
+                       text,
+                       unordered-containers,
+
+                       clash-ghc,
+                       clash-lib,
+                       clash-profiling-prepare
