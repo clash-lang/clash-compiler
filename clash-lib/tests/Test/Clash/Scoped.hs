@@ -16,6 +16,7 @@
   binders must handle: they have to rename them.
 -}
 
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -33,6 +34,7 @@ module Test.Clash.Scoped
   , withFreeTyVarsOf
   , withTypeScopes
   , withTermScopes
+  , mkScopedBindingMap
     -- * Assertions
   , assertScopedAlphaEq
   , assertAgreesTm
@@ -94,7 +96,9 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 
-import Test.Clash.Rewrite (assertAlphaEq, intId)
+import Clash.Driver.Types (Binding)
+
+import Test.Clash.Rewrite (assertAlphaEq, intId, mkBinding)
 import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
 
 -- | A conversion environment with the free variables of the given Clash terms
@@ -147,6 +151,12 @@ withTermScopes tm k = withFreeVarsOf [tm] $ \env -> do
 -- variables
 roundTrip :: HasCallStack => C.Term -> C.Term
 roundTrip tm = withFreeVarsOf [tm] $ \env -> toClashTerm (fromClashTerm env tm)
+
+-- | Global bindings of the given closed terms, converted to scoped Core. See
+-- 'Test.Clash.Rewrite.mkBindingMap'.
+mkScopedBindingMap :: HasCallStack => [(C.Id, C.Term)] -> GlobalEnv (Binding (Term 'VoidS))
+mkScopedBindingMap bs =
+  globalEnvFromList [(mkGlobalId i, fromClashTermClosed <$> mkBinding i t) | (i, t) <- bs]
 
 -- | A variable whose unique is above the names conversion gives the binders of
 -- the inputs of the tests, see 'extendSunk'
