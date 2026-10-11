@@ -32,7 +32,7 @@ module Clash.Normalize.Transformations.Specialize
   , zeroWidthSpecWorker
   ) where
 
-import Control.Arrow ((***), (&&&))
+import Control.Arrow ((***))
 import Control.DeepSeq (deepseq)
 import Control.Exception (throw)
 import Control.Lens ((%=))
@@ -78,6 +78,7 @@ import Clash.Core.TyCon (TyConMap, TyConName, tyConDataCons)
 import Clash.Core.Type
   (LitTy(NumTy), Type(LitTy,VarTy), applyFunTy, splitTyConAppM, normalizeType
   , mkPolyFunTy, mkTyConApp)
+import qualified Clash.Core.Type as Type
 import Clash.Core.TysPrim
 import Clash.Core.Util (dataConInstArgTys, listToLets)
 import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
@@ -509,12 +510,15 @@ specialize' (TransformContext is0 _) e (fHd@(Var f), args, ticks) specArgIn
                   newNames      = [ mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
                                   | n <- [(0::Unique)..]
                                   ]
-              -- Make new binders for existing arguments
-              (boundArgs,argVars) <- fmap (unzip . map (either (Left &&& Left . Var) (Right &&& Right . VarTy))) $
-                                     Monad.zipWithM
-                                       (mkBinderFor is0 tcm)
-                                       (existingNames ++ newNames)
-                                       args
+              -- Make new binders for existing arguments. Their types are
+              -- those of the parameters of 'f', as the types of the arguments
+              -- can mention type variables bound at the call site.
+              boundArgs <- fmap (instArgBndrs tcm (coreTypeOf f)) $
+                             Monad.zipWithM
+                               (mkBinderFor is0 tcm)
+                               (existingNames ++ newNames)
+                               args
+              let argVars = map (bimap Var VarTy) boundArgs
               -- Determine name the resulting specialized function, and the
               -- form of the specialized-on argument
               (newName, inl', specArg') <- case specArg of
@@ -620,6 +624,25 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   changed newExpr
 
 specialize' _ e _ _ = return e
+
+-- | Give the binders for the arguments of a function, of the given type, the
+-- types of the corresponding parameters of the function. Type binders replace
+-- the type parameters they bind, and get their kinds.
+instArgBndrs :: TyConMap -> Type -> [Either Id TyVar] -> [Either Id TyVar]
+instArgBndrs tcm ty0 bndrs0 = go ty0 bndrs0
+ where
+  is = mkInScopeSet (mkVarSet [tv | Right tv <- bndrs0])
+
+  go _ [] = []
+  go ty bndrs@(bndr:bndrs1) = case (ty, bndr) of
+    (Type.ForAllTy tv res, Right tvNew) ->
+      let tvNew1 = tvNew {varType = varType tv}
+          subst = extendTvSubst (mkSubst is) tv (VarTy tvNew1)
+      in  Right tvNew1 : go (substTy subst res) bndrs1
+    (Type.tyView -> Type.FunTy argTy res, Left i) ->
+      Left i {varType = argTy} : go res bndrs1
+    _ | Just ty1 <- Type.coreView1 tcm ty -> go ty1 bndrs
+      | otherwise -> bndrs
 
 -- Note [Collect free-variables in an insertion-ordered set]
 --
