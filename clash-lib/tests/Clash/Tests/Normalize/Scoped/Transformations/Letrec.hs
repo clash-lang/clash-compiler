@@ -79,6 +79,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Letrec"
   , flattenLetTests
   , topLetTests
   , regressionTests
+  , simpleCSETests
   ]
 
 -- * deadCode
@@ -291,3 +292,38 @@ topLetTests = testGroup "topLet"
 -- | The regression tests of the Clash Core versions
 regressionTests :: TestTree
 regressionTests = testGroup "regression tests" (letrecTests flattenLetS topLetS)
+
+-- * simpleCSE
+
+cseC, cseS :: NormRewrite
+cseC = apply "CSE" $ \ctx -> \case
+  e@(C.Let bind body) -> Current.simpleCSEWorker ctx e bind body
+  e -> pure e
+cseS = $(asRewriteQ S.simpleCSE)
+
+simpleCSETests :: TestTree
+simpleCSETests = testGroup "simpleCSE"
+      [ testCase "replaces a binding by an equal one" $ do
+          let e = C.Letrec [ (a, app "g" 10 [C.Var x]), (b, app "g" 10 [C.Var x])
+                           , (c, app "k" 12 [C.Var a, C.Var b]) ]
+                    (C.Var c)
+          agrees def (rootCtx [x]) cseC cseS e
+          (t, _) <- runIn def (rootCtx [x]) cseS e
+          assertAlphaEq
+            (C.Letrec [(c, app "k" 12 [C.Var a, C.Var a]), (a, app "g" 10 [C.Var x])] (C.Var c))
+            t
+      , testCase "replaces bindings in a recursive group" $
+          agrees def (rootCtx [x]) cseC cseS
+            (C.Letrec [ (a, app "k" 12 [C.Var x, C.Var b]), (b, app "k" 12 [C.Var x, C.Var a])
+                      , (c, app "k" 12 [C.Var x, C.Var a]), (d, app "k" 12 [C.Var c, C.Var b]) ]
+              (C.Var d))
+      , testCase "doesn't replace a binding with a NoDeDup tick" $
+          agrees def (rootCtx [x]) cseC cseS
+            (C.Letrec [ (a, C.Tick C.NoDeDup (app "g" 10 [C.Var x]))
+                      , (b, C.Tick C.NoDeDup (app "g" 10 [C.Var x]))
+                      , (c, app "k" 12 [C.Var a, C.Var b]) ]
+              (C.Var c))
+      , testCase "doesn't fire on a non-recursive let-expression" $
+          agrees def (rootCtx [x]) cseC cseS
+            (C.Let (C.NonRec a (app "g" 10 [C.Var x])) (C.Var a))
+      ]

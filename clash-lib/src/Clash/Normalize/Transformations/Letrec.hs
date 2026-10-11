@@ -79,8 +79,7 @@ import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
-import Clash.Rewrite.StrategyDSL
-  (Transformation, onLet, toTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
@@ -501,7 +500,7 @@ isClassConstraint _ = False
 -- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
 -- version of CSE removed the same amount of let-binders.
 simpleCSE :: Transformation
-simpleCSE = toTransformation "CSE" (onLet 'simpleCSEWorker)
+simpleCSE = Scoped.simpleCSE
 
 -- | The 'Let' handler of 'simpleCSE'.
 simpleCSEWorker

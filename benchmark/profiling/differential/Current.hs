@@ -26,6 +26,7 @@ module Current
   , reduceConst
   , reducePrim
   , removeUnusedExpr
+  , simpleCSE
   , topLet
   ) where
 
@@ -126,3 +127,8 @@ flattenLet = toTransformation "flattenLet" (onLetNode 'Letrec.flattenLetWorker)
 -- 'Clash.Normalize.Scoped.Transformations.Letrec.topLet' replaced
 topLet :: Transformation
 topLet = anyConstructor "topLet" 'Letrec.topLetWorker
+
+-- | The current 'Clash.Normalize.Transformations.Letrec.simpleCSE', which
+-- 'Clash.Normalize.Scoped.Transformations.Letrec.simpleCSE' replaced
+simpleCSE :: Transformation
+simpleCSE = toTransformation "CSE" (onLet 'Letrec.simpleCSEWorker)
