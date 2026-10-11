@@ -19,6 +19,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector
   ( primitives
   ) where
@@ -28,10 +30,12 @@ import Data.Bits
 import Data.Proxy (Proxy)
 import Data.Reflection (reifyNat)
 import Data.Text (Text)
+import Data.Text.Extra (showt)
 import GHC.TypeLits (KnownNat)
 
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Term as C
+import Clash.Promoted.Nat.Unsafe (unsafeSNat)
 import qualified Clash.Sized.Internal.BitVector as BitVector
 import Clash.Sized.Internal.BitVector (Bit (..), BitVector (..))
 import Clash.Util (textNameLit)
@@ -42,7 +46,7 @@ import qualified Clash.Sized.Internal.BitVector
 import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs)
+import Clash.Core.Scoped.Term (collectArgs, mkApps)
 import Clash.Core.Scoped.Util (undefinedXPrims)
 
 primitives :: [(Text, PrimReduction)]
@@ -93,6 +97,12 @@ primitives =
         -> reduce (mkIntCLit te IntLiteral kn ty)
       _ -> Nothing
 
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.maxIndex#) $ \case
+      PrimStepContext{..}
+        | Just (_, kn) <- extractKnownNat te sc tys
+        -> reduce (mkIntCLit te IntLiteral (kn-1) ty)
+      _ -> Nothing
+
 
 -- Construction
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.high) $ \case
@@ -106,6 +116,14 @@ primitives =
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.undefined##) $ \case
       PrimStepContext{..}
         -> reduce (mkBitLit ty 1 0)
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.undefined#) $ \case
+      PrimStepContext{..}
+        | Just (_, kn) <- extractKnownNat te sc tys
+        -> let resTyInfo = extractTySizeInfo te sc ty tys
+               mask = bit (fromInteger kn) - 1
+           in reduce (mkBitVectorLit' resTyInfo mask 0)
+      _ -> Nothing
 
 
 -- Eq
@@ -219,6 +237,132 @@ primitives =
         where
           op :: KnownNat n => BitVector n -> Proxy n -> Integer
           op u _ = toInteger (BitVector.reduceAnd# u)
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.reduceOr#) $ \case
+      PrimStepContext{..} -- :: KnownNat n => BitVector n -> Bit
+        | [i] <- bitVectorLiterals' args
+        , Just (_, kn) <- extractKnownNat te sc tys
+        -> let resTy = getResultTy te sc ty tys
+               val = reifyNat kn (op (toBV i))
+           in reduce (mkBitLit resTy 0 val)
+        where
+          op :: KnownNat n => BitVector n -> Proxy n -> Integer
+          op u _ = toInteger (BitVector.reduceOr# u)
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.reduceXor#) $ \case
+      PrimStepContext{..} -- :: KnownNat n => BitVector n -> Bit
+        | [i] <- bitVectorLiterals' args
+        , Just (_, kn) <- extractKnownNat te sc tys
+        -> let resTy = getResultTy te sc ty tys
+               val = reifyNat kn (op (toBV i))
+           in reduce (mkBitLit resTy 0 val)
+        where
+          op :: KnownNat n => BitVector n -> Proxy n -> Integer
+          op u _ = toInteger (BitVector.reduceXor# u)
+      _ -> Nothing
+
+
+
+-- Indexing
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.index#) $ \case
+      PrimStepContext{..} -- :: KnownNat n => BitVector n -> Int -> Bit
+        | Just (_,kn,i,j) <- bitVectorLitIntLit te sc tys args
+          -> let resTy = getResultTy te sc ty tys
+                 (msk,val) = reifyNat kn (op (toBV i) (fromInteger j))
+             in reduce (mkBitLit resTy msk val)
+          where
+            op :: KnownNat n => BitVector n -> Int -> Proxy n -> (Integer,Integer)
+            op u i _ = (toInteger m, toInteger v)
+              where Bit m v = (BitVector.index# u i)
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.replaceBit#) $ \case
+      PrimStepContext{..} -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
+        | Just (_, n) <- extractKnownNat te sc tys
+        , [ _
+          , PrimVal bvP _ [_, Lit (NaturalLiteral mskBv), Lit (IntegerLiteral bv)]
+          , valArgs -> Just [Literal (IntLiteral i)]
+          , PrimVal bP _ [Lit (WordLiteral mskB), Lit (IntegerLiteral b)]
+          ] <- args
+        , C.primName bvP == showt 'Clash.Sized.Internal.BitVector.fromInteger#
+        , C.primName bP  == showt 'Clash.Sized.Internal.BitVector.fromInteger##
+          -> let resTyInfo = extractTySizeInfo te sc ty tys
+                 (mskVal,val) = reifyNat n (op (BV (fromInteger mskBv) (fromInteger bv))
+                                               (fromInteger i)
+                                               (Bit (fromInteger mskB) (fromInteger b)))
+          in reduce (mkBitVectorLit' resTyInfo mskVal val)
+          where
+            op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> (Integer,Integer)
+            -- op bv i b _ = (BitVector.unsafeMask res, BitVector.unsafeToInteger res)
+            op bv i b _ = splitBV (BitVector.replaceBit# bv i b)
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.setSlice#) $ \case
+      PrimStepContext{..}
+      -- :: SNat (m+1+i) -> BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n) -> BitVector (m + 1 + i)
+        | mTy : iTy : nTy : _ <- tys
+        , Right m <- runExcept (tyNatSize te sc mTy)
+        , Right iN <- runExcept (tyNatSize te sc iTy)
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        , [i,j] <- bitVectorLiterals' args
+        -> let BV msk val = BitVector.setSlice# (unsafeSNat (m+1+iN)) (toBV i) (unsafeSNat m) (unsafeSNat n) (toBV j)
+               resTyInfo = extractTySizeInfo te sc ty tys
+           in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.slice#) $ \case
+      PrimStepContext{..}
+      -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
+        | mTy : _ : nTy : _ <- tys
+        , Right m <- runExcept (tyNatSize te sc mTy)
+        , Right n <- runExcept (tyNatSize te sc nTy)
+        , [i] <- bitVectorLiterals' args
+        -> let BV msk val = BitVector.slice# (toBV i) (unsafeSNat m) (unsafeSNat n)
+               resTyInfo = extractTySizeInfo te sc ty tys
+           in  reduce (mkBitVectorLit' resTyInfo (toInteger msk) (toInteger val))
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.split#) $ \case
+      PrimStepContext{..} -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
+        | nTy : mTy : _ <- tys
+        , Right n <-  runExcept (tyNatSize te sc nTy)
+        , Right m <-  runExcept (tyNatSize te sc mTy)
+        , [(mski,i)] <- bitVectorLiterals' args
+        -> let (tupDc, tyArgs) = resultDataCon te sc ty tys
+               bvTy : _ = tyArgs
+               valM = i `shiftR` fromInteger n
+               mskM = mski `shiftR` fromInteger n
+               valN = i .&. mask
+               mskN = mski .&. mask
+               mask = bit (fromInteger n) - 1
+        in reduce $
+           mkApps (Data tupDc) (map Right tyArgs ++
+                    [ Left (mkBitVectorLit bvTy mTy m mskM valM)
+                    , Left (mkBitVectorLit bvTy nTy n mskN valN)])
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.msb#) $ \case
+      PrimStepContext{..} -- :: forall n. KnownNat n => BitVector n -> Bit
+        | [i] <- bitVectorLiterals' args
+        , Just (_, kn) <- extractKnownNat te sc tys
+        -> let resTy = getResultTy te sc ty tys
+               (msk,val) = reifyNat kn (op (toBV i))
+           in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
+        where
+          op :: KnownNat n => BitVector n -> Proxy n -> (Word,Word)
+          op u _ = (unsafeMask# res, BitVector.unsafeToInteger# res)
+            where
+              res = BitVector.msb# u
+      _ -> Nothing
+
+  , primStepEntry $(textNameLit 'Clash.Sized.Internal.BitVector.lsb#) $ \case
+      PrimStepContext{..} -- :: BitVector n -> Bit
+        | [i] <- bitVectorLiterals' args
+        -> let resTy = getResultTy te sc ty tys
+               Bit msk val = BitVector.lsb# (toBV i)
+        in reduce (mkBitLit resTy (toInteger msk) (toInteger val))
       _ -> Nothing
 
 
