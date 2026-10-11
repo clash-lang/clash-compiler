@@ -39,6 +39,7 @@ import Clash.Driver.Types
 import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (apply, changed, runRewrite)
+import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
@@ -1126,6 +1127,31 @@ applicativeDc =
   a = C.VarTy dictA
   b = C.VarTy dictB
 
+-- | @KnownNat n@. The reductions of primitives only look at its value, a
+-- @Natural@.
+knownNatTy :: C.Type -> C.Type
+knownNatTy n = tcApp (mkTyConName "GHC.TypeNats.KnownNat" 2050) [n]
+
+-- | GHC's boxed pairs, by the name under which "Clash.GHC.GHC2Core" gives
+-- them, and the reductions of primitives look them up
+-- ('Clash.Core.Scoped.Evaluator.Primitives.Util.tupleTyConName')
+ghcPairTcNm :: C.TyConName
+ghcPairTcNm = tupleTyConName 2
+
+-- | @(a, b)@
+ghcPairTy :: C.Type -> C.Type -> C.Type
+ghcPairTy a b = tcApp ghcPairTcNm [a, b]
+
+-- | @(,) :: forall a b. a -> b -> (a, b)@
+ghcPairDc :: C.DataCon
+ghcPairDc =
+  mkDataCon "GHC.Tuple.(,)" 2051 [pairA, pairB] [] [C.VarTy pairA, C.VarTy pairB]
+    (ghcPairTy (C.VarTy pairA) (C.VarTy pairB))
+
+pairA, pairB :: C.TyVar
+pairA = tyVar C.User "a" 2052
+pairB = tyVar C.User "b" 2053
+
 -- | The names of the types of clock, reset and enable lines. Clash recognizes
 -- them by their names.
 clockTcNm, resetTcNm, enableTcNm :: C.TyConName
@@ -1210,6 +1236,7 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     , C.PrimTyCon (C.nameUniq indexTcNm) indexTcNm (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
     , mkAlgTyCon functorTcNm [dictF] [functorDc]
     , mkAlgTyCon applicativeTcNm [dictF] [applicativeDc]
+    , mkAlgTyCon ghcPairTcNm [pairA, pairB] [ghcPairDc]
     , C.PrimTyCon (C.nameUniq clockTcNm) clockTcNm C.liftedTypeKind 1
     , C.PrimTyCon (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
     , C.PrimTyCon (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
