@@ -44,6 +44,7 @@ import qualified Clash.Tests.Normalize.Scoped.Transformations.EtaExpand
 import qualified Clash.Tests.Normalize.Scoped.Transformations.Inline
 import qualified Clash.Tests.Normalize.Scoped.Transformations.Letrec
 import qualified Clash.Tests.Normalize.Scoped.PrimitiveReductions
+import qualified Clash.Tests.Normalize.Scoped.Transformations.MultiPrim
 import qualified Clash.Tests.Normalize.Scoped.Transformations.Reduce
 import qualified Clash.Tests.Normalize.Scoped.Transformations.SeparateArgs
 import qualified Clash.Tests.Normalize.Scoped.Transformations.Specialize
@@ -126,6 +127,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Scoped.Transformations.Inline.tests
   , Clash.Tests.Normalize.Scoped.Transformations.Letrec.tests
   , Clash.Tests.Normalize.Scoped.PrimitiveReductions.tests
+  , Clash.Tests.Normalize.Scoped.Transformations.MultiPrim.tests
   , Clash.Tests.Normalize.Scoped.Transformations.Reduce.tests
   , Clash.Tests.Normalize.Scoped.Transformations.SeparateArgs.tests
   , Clash.Tests.Normalize.Scoped.Transformations.Specialize.tests
