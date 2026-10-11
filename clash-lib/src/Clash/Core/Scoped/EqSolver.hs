@@ -236,7 +236,7 @@ withPatEqs tcm sc pat k = case pat of
     openTyVars IntMap.empty (idSubst sc) tvs $ \s _ names ->
       let sc' = substScope s
       in k sc' (nameSetFromList names)
-           (mapMaybe (typeEq tcm sc' . substTy s) (teleFieldTys ids))
+           (mapMaybe (typeEq tcm sc' . substTy s) (teleIdBinderTypes ids))
   LitPat _ -> k sc emptyNameSet []
   DefaultPat -> k sc emptyNameSet []
 
@@ -269,7 +269,7 @@ solvePatExistentials tcm sc pat k = case pat of
   DataPat dc tvs ids ->
     openTyVars IntMap.empty (idSubst sc) tvs $ \s0 _ names ->
       let sc0 = substScope s0
-          eqs = mapMaybe (typeEq tcm sc0 . substTy s0) (teleFieldTys ids)
+          eqs = mapMaybe (typeEq tcm sc0 . substTy s0) (teleIdBinderTypes ids)
       in case solveNonAbsurds tcm sc0 (nameSetFromList names) eqs of
            [] -> Nothing
            sols -> Just $
@@ -360,12 +360,3 @@ openTyVars sols = go 0 []
             Just sol -> extendTySubst (extendSubstScope (substScope s1) s) b (sinkClosed sol)
       in go (pos + 1) (tyNameOf b' : sink1 acc) s2 bs $ \s' bs' names ->
            k s' (TCons b' bs') names
-
--- | The types of the fields a telescope binds, moved out of the scope of the
--- fields before them: a type only mentions type variables
-teleFieldTys :: Tele IdBinder i l -> [Type i]
-teleFieldTys = go id
- where
-  go :: (Type x -> Type i) -> Tele IdBinder x l -> [Type i]
-  go _ TNil = []
-  go f (TCons b bs) = f (idBinderType b) : go (f . strengthenTyId b) bs
