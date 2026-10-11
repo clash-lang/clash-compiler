@@ -17,6 +17,7 @@ module Test.Clash.Rewrite where
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
 import qualified Clash.Core.DataCon as C
+import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
@@ -803,6 +804,14 @@ assertNoFreeLocals tm = case Lens.toListOf freeLocalIds tm of
   [] -> pure ()
   fvs -> assertFailure
     ("Unexpected free variables " <> showPprU fvs <> " in:\n" <> showPprU tm)
+
+-- | Assert that a term has no free type variables, including in the kinds of
+-- the type variables it binds
+assertNoFreeTyVars :: HasCallStack => C.Term -> Assertion
+assertNoFreeTyVars tm = case Lens.toListOf C.termFreeTyVars tm of
+  [] -> pure ()
+  tvs -> assertFailure
+    ("Unexpected free type variables " <> showPprU tvs <> " in:\n" <> showPprU tm)
 
 -- | Assert that a term has no free local variables, and no binders that shadow
 -- each other. See 'assertNoFreeLocals' and 'assertNoShadowing'.
