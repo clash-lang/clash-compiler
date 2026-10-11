@@ -92,7 +92,7 @@ import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (scopedAppWorker, viaFoilWhen)
+import Clash.Rewrite.Scoped.ViaFoil (scopedAppWorker, scopedTyAppWorker, viaFoilWhen)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode
   , toTransformation
@@ -715,7 +715,23 @@ nonRepSpecWorker _ e _ _ = return e
 
 -- | Specialize functions on their type
 typeSpec :: Transformation
-typeSpec = toTransformation "typeSpec" (onTyApp 'typeSpecWorker)
+typeSpec = toTransformation "typeSpec" (onTyApp 'typeSpecViaFoil)
+
+-- | 'Scoped.typeSpec', which replaced 'typeSpecWorker', through
+-- 'viaFoilWhen' at the type applications at which it can fire, see
+-- 'typeSpecWorker'
+typeSpecViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Type -> NormalizeSession Term
+typeSpecViaFoil ctx e e1 ty =
+  viaFoilWhen "typeSpec" (\_ _ -> pure fires)
+    (scopedTyAppWorker Scoped.typeSpecWorker) ctx e
+ where
+  fires
+    | (Var {}, args) <- collectArgs e1
+    , (_, []) <- Either.partitionEithers args
+    = null (Lens.toListOf typeFreeVars ty)
+    | otherwise = False
 
 -- | The 'TyApp' handler of 'typeSpec'.
 typeSpecWorker

@@ -367,6 +367,16 @@ siteComparisons =
       , scScoped = Just $(asScopedRewriteQ S.nonRepSpec)
       , scKnownDifferences = []
       }
+  , SiteComparison
+      { scName = "typeSpec"
+      , scDescription =
+          "The current typeSpec (Clash.Normalize.Transformations.Specialize.typeSpecWorker) \
+          \against its port (Clash.Normalize.Scoped.Transformations.Specialize.typeSpec)"
+      , scTransformations = ["typeSpec"]
+      , scCurrent = $(asRewriteQ Current.typeSpec)
+      , scScoped = Just $(asScopedRewriteQ S.typeSpec)
+      , scKnownDifferences = []
+      }
   ]
 
  where

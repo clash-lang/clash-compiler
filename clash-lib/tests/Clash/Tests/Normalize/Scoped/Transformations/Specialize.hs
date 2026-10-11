@@ -31,7 +31,7 @@ import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.StrategyDSL
-  (onApp, onAppNode, onTyAppNode, toTransformation)
+  (onApp, onAppNode, onTyApp, onTyAppNode, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Rewrite.Util (runRewrite)
@@ -59,6 +59,8 @@ constantSpecS :: NormRewrite
 constantSpecS = $(asRewriteQ Scoped.constantSpec)
 nonRepSpecS :: NormRewrite
 nonRepSpecS = $(asRewriteQ Scoped.nonRepSpec)
+typeSpecS :: NormRewrite
+typeSpecS = $(asRewriteQ Scoped.typeSpec)
 
 -- | The transformations of Clash Core
 appPropC :: NormRewrite
@@ -68,6 +70,8 @@ constantSpecC :: NormRewrite
 constantSpecC = $(asRewriteQ (toTransformation "constantSpec" (onApp 'C.constantSpecWorker)))
 nonRepSpecC :: NormRewrite
 nonRepSpecC = $(asRewriteQ (toTransformation "nonRepSpec" (onApp 'C.nonRepSpecWorker)))
+typeSpecC :: NormRewrite
+typeSpecC = $(asRewriteQ (toTransformation "typeSpec" (onTyApp 'C.typeSpecWorker)))
 
 -- * Fixtures
 
@@ -229,6 +233,14 @@ tests =
         , testCase "fPoly @Int 3 4: a type argument" $
             assertDoesNotFireIn tcEnv constantSpecS [] []
               (C.mkApps (C.Var fPoly) [Right intTy, Left (lit 3), Left (lit 4)])
+        ]
+    , testGroup "typeSpec agrees with Clash Core"
+        [ testCase "fT @Int" $
+            assertFiresAndAgreesIn tcEnv typeSpecC typeSpecS [] [] (C.TyApp (C.Var fT) intTy)
+        , testCase "fT @a: a free type variable" $
+            assertDoesNotFireIn tcEnv typeSpecS [a] [] (C.TyApp (C.Var fT) (C.VarTy a))
+        , testCase "fT @Pair" $
+            assertFiresAndAgreesIn tcEnv typeSpecC typeSpecS [] [] (C.TyApp (C.Var fT) pairTy)
         ]
     , testGroup "nonRepSpec agrees with Clash Core"
         [ testCase "fHo (g x)" $
