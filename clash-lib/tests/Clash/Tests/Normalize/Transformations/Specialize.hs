@@ -31,7 +31,10 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), extra)
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (newSupply)
+import qualified Clash.Core.Type as Type
+import qualified Clash.Core.VarEnv as VarEnv
 
+import qualified Test.Clash.Rewrite as Rewrite
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
   , intFunTy, intId, intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy
@@ -333,6 +336,39 @@ specializeLocalShadowingGlobal = do
       assertNoFreeLocals body
     _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
 
+-- | 'specialize' creates binders for the arguments that precede the one it
+-- specializes on. It used to give them the types of those arguments, which
+-- can mention type variables bound at the call site. Specializing
+-- @f \@a (x :: a) (g u v)@, with @f :: forall b. b -> Int -> Int@, created:
+--
+-- > f_g = /\b' -> \(x' :: a) (u' :: Int) (v' :: Int) -> f b' x' (g u' v')
+--
+-- in which @a@ is free. 'argCastSpec' passes applications with type arguments
+-- to 'specialize', for example under a case alternative binding an
+-- existential type variable.
+specializeArgBinderTypes :: Assertion
+specializeArgBinderTypes = do
+  supply <- newSupply
+  let a = Rewrite.tyVar User "a" 50
+      b = Rewrite.tyVar User "b" 51
+      fPoly = globalId User "fPoly" 14 (Type.ForAllTy b (Type.mkFunTy (Type.VarTy b) (intFunTy 1)))
+      fPolyBody = TyLam b (Lam (localId User "y" 21 (Type.VarTy b)) (Lam z (Var z)))
+      z = intId User "z" 22
+      x = localId User "x" 12 (Type.VarTy a)
+      u = intId User "u" 15
+      v = intId User "v" 16
+      tm = App
+             (mkApps (Var fPoly) [Right (Type.VarTy a), Left (Var x)])
+             (mkApps (Var gId) [Left (Var u), Left (Var v)])
+      st0 = def{_bindings = mkBindingMap [(fPoly, fPolyBody)], _uniqSupply = supply}
+      is = VarEnv.extendInScopeSet (inScopeOf [x, u, v]) a
+  (res, st1, _) <-
+    runRewriteTest def st0 (runRewrite "specialize" is specialize tm)
+  case collectArgs res of
+    (Var fSpec, _) | Just body <- bindingTerm <$> lookupVarEnv fSpec (_bindings st1) ->
+      Rewrite.assertNoFreeTyVars body
+    _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
+
 -- | 'specArgBndrsAndVars' used to collect the free variables of the argument
 -- specialized on in a set ordered by unique. Specializing @f (g x_123 y_456)@
 -- and @f (g x_456 y_123)@ then yielded the binders @[x, y]@ and @[y, x]@, so the
@@ -494,6 +530,8 @@ tests =
         bindConstantVarAppPropSubstituted >>= assertAlphaEq appPropSubstitutedLamExpected
     , testCase "specialize abstracts over locals that shadow a global (#712)"
         specializeLocalShadowingGlobal
+    , testCase "specialize gives argument binders the types of the parameters"
+        specializeArgBinderTypes
     , testCase "specialize orders free variables by occurrence (#1087)"
         specializeCacheFreeVarOrder
     , testCase "specialize does not overwrite existing binders (#790)"
