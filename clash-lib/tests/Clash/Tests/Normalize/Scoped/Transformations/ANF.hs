@@ -29,10 +29,11 @@ import Clash.Core.TysPrim (typeNatKind)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (emptyInScopeSet)
 import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
-import Clash.Normalize.Transformations.ANF (makeANF, nonRepANF)
+import Clash.Normalize.Transformations.ANF (makeANF, nonRepANFWorker)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Clash.Rewrite.StrategyDSL (onApp, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Util.Supply (newSupply)
@@ -52,9 +53,9 @@ makeANFViaFoil = viaFoil "ANF" (ScopedTransform Scoped.makeANF)
 nonRepANFViaFoil :: NormRewrite
 nonRepANFViaFoil = $(asRewriteQ Scoped.nonRepANF)
 
--- | The current 'nonRepANF', as a rewrite
+-- | The current 'Clash.Normalize.Transformations.ANF.nonRepANF', as a rewrite
 nonRepANFR :: NormRewrite
-nonRepANFR = $(asRewriteQ nonRepANF)
+nonRepANFR = $(asRewriteQ (toTransformation "nonRepANF" (onApp 'nonRepANFWorker)))
 
 -- | Global functions @k :: Int -> Int -> Int@ and @h :: Int -> Int@
 kId, hId :: Id

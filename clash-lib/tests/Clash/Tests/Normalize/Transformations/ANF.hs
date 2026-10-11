@@ -27,9 +27,10 @@ import Clash.Core.Term
 import Clash.Core.Type (Type (VarTy), mkFunTy)
 import Clash.Core.Var (Id, Var (varName, varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
-import Clash.Normalize.Transformations.ANF (makeANF, nonRepANF)
+import Clash.Normalize.Transformations.ANF (makeANF, nonRepANFWorker)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.Combinators ((>->))
+import Clash.Rewrite.StrategyDSL (onApp, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Unique (Unique)
@@ -40,8 +41,10 @@ import Test.Clash.Rewrite
   , globalId, inScopeOf, intFunTy, intId, intLit, intTy, letBinders, localId
   , mkDataCon, parseTyConTy, runSingleTransformation, showPprU, tyVar )
 
+-- | The current 'Clash.Normalize.Transformations.ANF.nonRepANF', which the
+-- normalizer replaced by its scoped port
 nonRepANFR :: NormRewrite
-nonRepANFR = $(asRewriteQ nonRepANF)
+nonRepANFR = $(asRewriteQ (toTransformation "nonRepANF" (onApp 'nonRepANFWorker)))
 
 -- | @MkP :: Int -> (Int -> Int) -> P@
 mkP :: DataCon

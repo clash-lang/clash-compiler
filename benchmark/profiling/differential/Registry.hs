@@ -46,14 +46,13 @@ currentRewrites = map (\(nms, rw) -> (nms, rw, [])) unported <> ported
     , (["caseLet"], $(asRewriteQ Current.caseLet), [])
     , (["elimExistentials"], $(asRewriteQ Current.elimExistentials), [])
     , (["elimCaseBigNum"], $(asRewriteQ Current.elimCaseBigNumInternals), [])
+    , (["nonRepANF"], $(asRewriteQ Current.nonRepANF), [])
+    , (["ANF"], makeANF, [])
     ]
 
   unported =
-    -- ANF
-    [ (["nonRepANF"], $(asRewriteQ nonRepANF))
-    , (["ANF"], makeANF)
     -- Letrec
-    , (["removeUnusedExpr"], $(asRewriteQ removeUnusedExpr))
+    [ (["removeUnusedExpr"], $(asRewriteQ removeUnusedExpr))
     , (["flattenLet", "letFlat"], $(asRewriteQ flattenLet))
     , (["CSE"], $(asRewriteQ simpleCSE))
     , (["topLet"], $(asRewriteQ topLet))
