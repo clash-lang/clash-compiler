@@ -19,6 +19,10 @@
   'substTm' ('extendTmSubst' ('idSubst' sc) b arg) e
   @
 
+  The exception is a substitution from a scope to itself ('tmVarsSubst'),
+  which may substitute for any of its variables, as the result stays in that
+  scope: e.g. to inline the bindings of a let-expression, after opening it.
+
   Like Clash's 'Clash.Core.Subst.Subst', substitution renames a binder only if
   it may clash with the output scope: if it is at or below the watermark of the
   scope (see 'Scope'). When a binder's type changes or the binder is renamed,
@@ -43,6 +47,7 @@
     scope @o@. 'idSubst' has no entries and @i = o@. 'closedSubst' has no
     entries and @i@ has no variables. 'extendTySubst' and 'extendTmSubst' add
     an entry for the new variable. 'extendSubstScope' extends @o@.
+    'tmVarsSubst' has @i = o@, and entries in @o@.
     'substTyBinder' and 'substIdBinder' (through 'substTyBinderK' and
     'substIdBinderK', which get the substituted kind or type) extend @o@ with
     a fresh binder, and add an entry for the old one unless it keeps its name
@@ -141,6 +146,7 @@ module Clash.Core.Scoped.Subst
   , extendTySubstTele
   , extendTmSubstTele
   , extendSubstScope
+  , tmVarsSubst
     -- * Applying substitutions
   , HasSubst (..)
   , substTy
@@ -254,6 +260,13 @@ extendTmSubstTele :: Subst i o -> Tele IdBinder i i' -> [Term o] -> Maybe (Subst
 extendTmSubstTele s TNil [] = Just s
 extendTmSubstTele s (TCons b bs) (t:ts) = extendTmSubstTele (extendTmSubst s b t) bs ts
 extendTmSubstTele _ _ _ = Nothing
+
+-- | Substitute terms for variables of a scope, keeping the result in that
+-- scope: e.g. for the variables of a let-expression that was opened
+-- ('openBind'), to inline some of them.
+tmVarsSubst :: Scope n -> NameMap TmName n (Term n) -> Subst n n
+tmVarsSubst sc m =
+  UnsafeSubst sc IntMap.empty (IntMap.fromList [(tmNameRaw x, e) | (x, e) <- nameMapToList m]) False
 
 -- | Move the output of a substitution into an extended scope
 extendSubstScope :: DExt o o' => Scope o' -> Subst i o -> Subst i o'
