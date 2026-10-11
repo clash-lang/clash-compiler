@@ -25,7 +25,7 @@ import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals
-  , globalId, inScopeOf, intFunTy, intId, intLit, localId, runRewriteTest
+  , firstUniques, globalId, inScopeOf, intFunTy, intId, intLit, localId, runRewriteTest
   , runSingleTransformation, showPprU )
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
@@ -105,6 +105,38 @@ liftBindingSubstitutesBeforeAbstracting = do
         Just b -> assertNoFreeLocals (bindingTerm b)
     _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
 
+-- | 'liftBinding' gives the new global function a fresh unique, which only
+-- avoids the uniques of the other global functions. It can therefore be the
+-- unique of a free local variable of the lifted binding. The substitution of
+-- the recursive occurrences used to replace that local variable by the new
+-- global function, as it found the global function in its in-scope set.
+liftBindingLocalSharesUniqueWithGlobal :: Assertion
+liftBindingLocalSharesUniqueWithGlobal = do
+  supply <- newSupply
+  u : _ <- pure (firstUniques 1 supply)
+  let r = localId User "r" 40 (intFunTy 1)
+      z = intId User "z" 41
+      x = intId User "x" u
+      k = globalId User "k" 33 (intFunTy 2)
+      cf = globalId User "top" 42 (intFunTy 1)
+      -- r = \z -> k (r z) x
+      e = Lam z (mkApps (Var k) [Left (App (Var r) (Var z)), Left (Var x)])
+      st :: RewriteState NormalizeState
+      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+  ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
+  case collectArgs newExpr of
+    (Var rLifted, _) ->
+      case lookupVarEnv rLifted (_bindings st1) of
+        Nothing -> assertFailure "Lifted function not found in global bindings"
+        Just b ->
+          -- \x z -> k (rLifted x z) x
+          assertAlphaEq
+            (Lam x (Lam z (mkApps (Var k)
+              [ Left (mkApps (Var rLifted) [Left (Var x), Left (Var z)])
+              , Left (Var x) ])))
+            (bindingTerm b)
+    _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
+
 tests :: TestTree
 tests =
   testGroup
@@ -139,6 +171,8 @@ tests =
         ]
     , testCase "liftBinding substitutes before abstracting"
         liftBindingSubstitutesBeforeAbstracting
+    , testCase "liftBinding keeps a local that shares a unique with the lifted function"
+        liftBindingLocalSharesUniqueWithGlobal
     ]
  where
   x = intId User "x" 1

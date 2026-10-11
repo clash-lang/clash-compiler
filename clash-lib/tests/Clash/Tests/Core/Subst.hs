@@ -159,6 +159,17 @@ tests =
     [ testCase "deShadow type/term (#1048)" $
         term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet typeVar) term1
 
+    -- Likewise, a local and a global variable can share a unique. 'substTm'
+    -- may not replace the local by the global it finds in the in-scope set.
+    -- Like the test above, this triggers a "Subst.lookupIdSubst" warning on
+    -- debug builds of clash-lib.
+    , testCase "substTm does not replace a local by a global with the same unique" $
+        let
+          globalX = mkTestId GlobalId "gx" (varUniq localX)
+          subst = mkSubst (extendInScopeSet emptyInScopeSet globalX)
+        in
+          Var localX @=? substTm "lookupIdSubst test" subst (Var localX)
+
     , testCase "unsafeSubstTm substitutes a local variable" $
         App payload (Var localZ) @=?
           unsafeSubstTm emptyVarEnv (unitVarEnv localX payload)
