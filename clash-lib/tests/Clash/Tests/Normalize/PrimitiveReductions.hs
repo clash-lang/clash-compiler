@@ -11,6 +11,7 @@
 module Clash.Tests.Normalize.PrimitiveReductions (tests) where
 
 import Data.Default (def)
+import GHC.Types.SrcLoc (noSrcSpan)
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -30,13 +31,16 @@ import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Normalize.PrimitiveReductions
-  (mkVecNil, reduceMap, reduceReplace_int, reduceReverse)
+  (mkVecNil, reduceFold, reduceMap, reduceReplace_int, reduceReverse)
 import Clash.Normalize.Types (NormalizeSession)
-import Clash.Rewrite.Types (RewriteEnv (..), TransformContext)
+import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..), TransformContext)
+import Clash.Rewrite.Util (runRewrite)
+import Clash.Unique (Unique)
+import Clash.Util.Supply (freshId, newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, inScopeOf, intId, intTy, localId, mkDataCon
-  , runSingleTransformation, showPprU, tyVar )
+  ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intTy, localId
+  , mkDataCon, runRewriteTest, runSingleTransformation, showPprU, tyVar )
 
 -- | The name of @Vec@. The primitive reductions recognize vectors by this name.
 vecTcNm :: TyConName
@@ -133,6 +137,30 @@ reduceEmptyVec reduction =
  where
   v = localId User "v" 1 (vecTy (LitTy (NumTy 0)) intTy)
 
+-- | Run 'reduceFold' on @fold f v@, with @v :: Vec 2 a@ free, @f :: a -> a ->
+-- a@ a global function, and @a@ a function type of many arguments. Returns the
+-- result, and the next unique the unique supply hands out afterwards.
+--
+-- 'reduceFold' applies 'constantPropagation' to @f@, which eta-expands it
+-- using a fresh unique per argument: @\x1 .. xn -> f x1 .. xn@. That's more
+-- uniques than 'reduceFold' uses itself to bind the elements of @v@.
+reduceFoldNextUnique :: IO (Term, Unique)
+reduceFoldNextUnique = do
+  supply <- newSupply
+  let
+    aTy = intFunTy 16
+    v = localId User "v" 1 (vecTy (LitTy (NumTy 2)) aTy)
+    f = globalId User "f" 2 (mkFunTy aTy (mkFunTy aTy aTy))
+    is0 = inScopeOf [v]
+    -- Some transformations of 'constantPropagation' look at the function being
+    -- normalized
+    st0 = def{_uniqSupply = supply, _curFun = (globalId User "top" 3 intTy, noSrcSpan)}
+  (res, st, _) <-
+    runRewriteTest envVec st0
+      (runRewrite "reduceFold" is0
+        (\ctx _ -> reduceFold 2 aTy (Var f) (Var v) ctx) (Var v))
+  pure (res, fst (freshId (_uniqSupply st)))
+
 tests :: TestTree
 tests =
   testGroup
@@ -160,6 +188,16 @@ tests =
              ("Element " <> showPprU el <> " is not of type Int in:\n" <> showPprU actual)
              (varType el == intTy))
           els
+
+    -- 'reduceFold' read the unique supply before applying 'constantPropagation'
+    -- to the function, and wrote back a supply derived from that afterwards.
+    -- This rewound the supply, so it would hand out the uniques
+    -- 'constantPropagation' used once more.
+    , testCase "reduceFold does not rewind the unique supply" $ do
+        (actual, next) <- reduceFoldNextUnique
+        assertBool
+          ("Next unique " <> show next <> " is already used in:\n" <> showPprU actual)
+          (next `notElem` map varUniq (collectTermIds actual))
     ]
  where
   i = intId User "i" 2
