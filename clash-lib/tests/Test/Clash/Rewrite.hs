@@ -953,6 +953,40 @@ brDc =
     (rtreeTy (C.VarTy rtreeD) (C.VarTy rtreeA)))
   { C.dcTag = 2 }
 
+-- | The names of the types of clock, reset and enable lines. Clash recognizes
+-- them by their names.
+clockTcNm, resetTcNm, enableTcNm :: C.TyConName
+clockTcNm = mkTyConName "Clash.Signal.Internal.Clock" 2020
+resetTcNm = mkTyConName "Clash.Signal.Internal.Reset" 2021
+enableTcNm = mkTyConName "Clash.Signal.Internal.Enable" 2022
+
+-- | The domain @System@
+systemDomTy :: C.Type
+systemDomTy = C.LitTy (C.SymTy "System")
+
+-- | @Clock System@
+clockTy :: C.Type
+clockTy = tcApp clockTcNm [systemDomTy]
+
+-- | @Reset System@
+resetTy :: C.Type
+resetTy = tcApp resetTcNm [systemDomTy]
+
+-- | @Enable System@
+enableTy :: C.Type
+enableTy = tcApp enableTcNm [systemDomTy]
+
+-- | @ClkPair@, a product type with a clock, which Clash splits
+clkPairTcNm :: C.TyConName
+clkPairTcNm = mkTyConName "ClkPair" 2024
+
+clkPairTy :: C.Type
+clkPairTy = tcTy clkPairTcNm
+
+-- | @MkClkPair :: Clock System -> Int -> ClkPair@
+clkPairDc :: C.DataCon
+clkPairDc = mkDataCon "MkClkPair" 2025 [] [] [clockTy, intTy] clkPairTy
+
 -- | The type constructors of the types above, and those of 'C.tysPrimMap',
 -- 'intTyCon' and 'pairTy'
 testTyConMap :: C.TyConMap
@@ -996,6 +1030,10 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
         {C.tyConKind = C.mkFunTy C.typeNatKind C.liftedTypeKind, C.tyConArity = 1}
     , mkAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
     , mkAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
+    , C.PrimTyCon (C.nameUniq clockTcNm) clockTcNm C.liftedTypeKind 1
+    , C.PrimTyCon (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
+    , C.PrimTyCon (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
+    , mkAlgTyCon clkPairTcNm [] [clkPairDc]
     ] <>
     -- Promoted data constructors that type families return. Their kinds don't
     -- matter here.
