@@ -506,6 +506,8 @@ test-suite unittests
                  Clash.Tests.Normalize.Util
                  Clash.Tests.Rewrite.Combinators
                  Clash.Tests.Rewrite.Scoped.Combinators
+                 Clash.Tests.Rewrite.Scoped.StrategyDSL
+                 Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
                  Clash.Tests.Rewrite.Scoped.ViaFoil
                  Clash.Tests.Rewrite.Scoped.WorkFree
                  Clash.Tests.Rewrite.StrategyDSL
