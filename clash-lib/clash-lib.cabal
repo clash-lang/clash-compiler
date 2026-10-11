@@ -233,6 +233,7 @@ Library
                       Clash.Core.Scoped.Pretty
                       Clash.Core.Scoped.Subst
                       Clash.Core.Scoped.Syntax
+                      Clash.Core.Scoped.Term
                       Clash.Core.Scoped.TyCon
                       Clash.Core.Scoped.Type
                       Clash.Core.Scoped.TysPrim
@@ -465,6 +466,7 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.NameMap
                  Clash.Tests.Core.Scoped.Scope
                  Clash.Tests.Core.Scoped.Subst
+                 Clash.Tests.Core.Scoped.Term
                  Clash.Tests.Core.Scoped.TyCon
                  Clash.Tests.Core.Scoped.Type
                  Clash.Tests.Core.Scoped.TysPrim
