@@ -35,6 +35,7 @@ module Clash.Core.Scoped.Util
   , listToLets
   , sccLetBindings
   , inverseTopSortLetBindings
+  , inverseTopSortOrder
   , LetGroup (..)
   , regroupLetBindings
     -- * Vectors and trees
@@ -154,14 +155,23 @@ inverseTopSortLetBindings
   -> (forall o. DExt n o => Scope o -> Tele IdBinder n o -> [Term o] -> Term o -> r)
   -> r
 inverseTopSortLetBindings sc bs xs body cont =
-  regroupLetBindings sc bs xs body [RecGroup order] $ \sc' binds body' ->
+  regroupLetBindings sc bs xs body [RecGroup (inverseTopSortOrder bs xs)] $ \sc' binds body' ->
     case binds of
       TCons (Rec bs' xs') TNil -> cont sc' bs' xs' body'
       _ -> error "inverseTopSortLetBindings: expected a single recursive group"
+
+-- | The order of 'inverseTopSortLetBindings', as the positions of the
+-- bindings, without reordering them: e.g. to visit the bindings of an opened
+-- let-expression in that order.
+inverseTopSortOrder
+  :: Tele IdBinder n l
+  -> [Term l]
+  -- ^ Right-hand sides
+  -> [Int]
+inverseTopSortOrder bs xs = postorderF (Graph.dff graph) []
  where
   deps = letDependencies bs xs
   graph = Graph.buildG (0, length deps - 1) [(i, d) | (i, ds) <- zip [0..] deps, d <- ds]
-  order = postorderF (Graph.dff graph) []
 
   postorderF ts acc = foldr postorder acc ts
   postorder (Graph.Node a ts) acc = postorderF ts (a : acc)
