@@ -96,7 +96,7 @@ typeFreeVars'
 #else
   -> IntSet.IntSet
 #endif
-  -- ^ Uniques of the variables in scope, used by 'termFreeVars''
+  -- ^ Uniques of the type variables in scope, used by 'termFreeVars''
   -> (Var a -> f (Var a))
   -> Type
   -> f Type
@@ -235,21 +235,25 @@ termFreeVarsWorker
   -> (Var a -> f (Var a))
   -> Term
   -> f Term
-termFreeVarsWorker descendIntoTypes interesting f = go IntSet.empty where
+termFreeVarsWorker descendIntoTypes interesting f = go IntSet.empty IntSet.empty where
+  -- Type variables and term variables can share a unique, so we keep track of
+  -- the type variables and the term variables in scope separately: a type
+  -- binder doesn't bind a term variable with the same unique, or vice versa.
+
   -- Fold over a type only when descending into types; otherwise leave it as-is.
-  onType inScope ty
-    | descendIntoTypes = typeFreeVars' interesting inScope f ty
+  onType tvScope ty
+    | descendIntoTypes = typeFreeVars' interesting tvScope f ty
     | otherwise        = pure ty
 
-  go inLocalScope = \case
+  go tvScope tmScope = \case
     Var v
-      | descendIntoTypes -> v1 <* typeFreeVars' interesting inLocalScope1 f (varType v)
+      | descendIntoTypes -> v1 <* typeFreeVars' interesting tvScope1 f (varType v)
       | otherwise        -> v1
       where
         isInteresting = interesting v
-        vInScope      = isLocalId v && varUniq v `IntSet.member` inLocalScope
-        inLocalScope1
-          | vInScope  = inLocalScope
+        vInScope      = isLocalId v && varUniq v `IntSet.member` tmScope
+        tvScope1
+          | vInScope  = tvScope
           | otherwise = IntSet.empty -- See Note [Closing over type variables]
 
         v1 | isInteresting
@@ -259,67 +263,67 @@ termFreeVarsWorker descendIntoTypes interesting f = go IntSet.empty where
            = pure (Var v)
 
     Lam id_ tm ->
-      Lam <$> goBndr inLocalScope id_
-          <*> go (IntSet.insert (varUniq id_) inLocalScope) tm
+      Lam <$> goBndr tvScope id_
+          <*> go tvScope (IntSet.insert (varUniq id_) tmScope) tm
     TyLam tv tm ->
-      TyLam <$> goBndr inLocalScope tv
-            <*> go (IntSet.insert (varUniq tv) inLocalScope) tm
+      TyLam <$> goBndr tvScope tv
+            <*> go (IntSet.insert (varUniq tv) tvScope) tmScope tm
 
     App l r ->
-      App <$> go inLocalScope l <*> go inLocalScope r
+      App <$> go tvScope tmScope l <*> go tvScope tmScope r
 
     TyApp l r ->
-      TyApp <$> go inLocalScope l
-            <*> onType inLocalScope r
+      TyApp <$> go tvScope tmScope l
+            <*> onType tvScope r
 
     Let (NonRec i x) e ->
-      Let <$> (NonRec <$> goBndr inLocalScope i <*> go inLocalScope x)
-          <*> go (IntSet.insert (varUniq i) inLocalScope) e
+      Let <$> (NonRec <$> goBndr tvScope i <*> go tvScope tmScope x)
+          <*> go tvScope (IntSet.insert (varUniq i) tmScope) e
 
     Let (Rec bs) e ->
-      Let <$> (Rec <$> traverse (goBind inLocalScope') bs)
-          <*> go inLocalScope' e
+      Let <$> (Rec <$> traverse (goBind tvScope tmScope') bs)
+          <*> go tvScope tmScope' e
      where
-      inLocalScope' = foldr (IntSet.insert . varUniq . fst) inLocalScope bs
+      tmScope' = foldr (IntSet.insert . varUniq . fst) tmScope bs
 
     Case subj ty alts ->
-      Case <$> go inLocalScope subj
-           <*> onType inLocalScope ty
-           <*> traverse (goAlt inLocalScope) alts
+      Case <$> go tvScope tmScope subj
+           <*> onType tvScope ty
+           <*> traverse (goAlt tvScope tmScope) alts
 
     Cast tm t1 t2 ->
-      Cast <$> go inLocalScope tm
-           <*> onType inLocalScope t1
-           <*> onType inLocalScope t2
+      Cast <$> go tvScope tmScope tm
+           <*> onType tvScope t1
+           <*> onType tvScope t2
 
     Tick tick tm ->
-      Tick <$> goTick inLocalScope tick
-      <*> go inLocalScope tm
+      Tick <$> goTick tvScope tmScope tick
+      <*> go tvScope tmScope tm
 
     tm -> pure tm
 
   -- Fold over a binder's type only when descending; otherwise leave it as-is.
-  goBndr inLocalScope v
-    | descendIntoTypes = (\t -> v {varType = t}) <$> onType inLocalScope (varType v)
+  goBndr tvScope v
+    | descendIntoTypes = (\t -> v {varType = t}) <$> onType tvScope (varType v)
     | otherwise        = pure v
 
-  goBind inLocalScope (l,r) = (,) <$> goBndr inLocalScope l <*> go inLocalScope r
+  goBind tvScope tmScope (l,r) =
+    (,) <$> goBndr tvScope l <*> go tvScope tmScope r
 
-  goAlt inLocalScope (pat,alt) = case pat of
+  goAlt tvScope tmScope (pat,alt) = case pat of
     DataPat dc tvs ids -> (,) <$> (DataPat dc
-                                     <$> traverse (goBndr inLocalScope') tvs
-                                     <*> traverse (goBndr inLocalScope') ids)
-                              <*> go inLocalScope' alt
+                                     <$> traverse (goBndr tvScope') tvs
+                                     <*> traverse (goBndr tvScope') ids)
+                              <*> go tvScope' tmScope' alt
       where
-        inLocalScope' = foldr IntSet.insert
-                         (foldr IntSet.insert inLocalScope (map varUniq tvs))
-                         (map varUniq ids)
-    _ -> (,) pat <$> go inLocalScope alt
+        tvScope' = foldr (IntSet.insert . varUniq) tvScope tvs
+        tmScope' = foldr (IntSet.insert . varUniq) tmScope ids
+    _ -> (,) pat <$> go tvScope tmScope alt
 
-  goTick inLocalScope = \case
-    NameMod m ty -> NameMod m <$> onType inLocalScope ty
-    Attributes ty tm -> Attributes <$> onType inLocalScope ty
-                                   <*> go inLocalScope tm
+  goTick tvScope tmScope = \case
+    NameMod m ty -> NameMod m <$> onType tvScope ty
+    Attributes ty tm -> Attributes <$> onType tvScope ty
+                                   <*> go tvScope tmScope tm
     tick         -> pure tick
 {-# INLINE termFreeVarsWorker #-}
 

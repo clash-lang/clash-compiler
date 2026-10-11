@@ -10,13 +10,14 @@ import qualified Data.List               as List
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-import           Clash.Core.FreeVars     (freeLocalVars, globalIds, typeFreeVars)
+import           Clash.Core.FreeVars
+  (freeLocalIds, freeLocalVars, globalIds, termFreeTyVars, typeFreeVars)
 import           Clash.Core.Name         (Name(..), NameSort(..))
-import           Clash.Core.Term         (Term(Var, App, Lam, TyLam))
+import           Clash.Core.Term         (Term(Var, App, Lam, TyLam, TyApp))
 import           Clash.Core.Type         (ConstTy(..), Type(ConstTy, ForAllTy, VarTy))
 import           Clash.Core.Var          (IdScope(..), Var(..))
 
-import           Test.Clash.Rewrite      (kindedTyVar, localId, tyVar)
+import           Test.Clash.Rewrite      (globalId, intId, kindedTyVar, localId, tyVar)
 
 -- TODO: We need tooling to create these mock constructs
 fakeName :: Name a
@@ -83,6 +84,29 @@ termFreeVarsClosesOverTypes =
   a = localId User "a" 2 (VarTy k)
   tm = TyLam k (Var a)
 
+-- | A type variable and a term variable can share a unique. In @/\\a -> x@,
+-- where @a@ and @x@ share a unique, @x@ is free: the type binder doesn't bind
+-- a term variable.
+termFreeVarsTyLamDoesNotBindId :: Assertion
+termFreeVarsTyLamDoesNotBindId = do
+  [x] @=? Lens.toListOf freeLocalIds tm
+  [varUniq x] @=? map varUniq (Lens.toListOf freeLocalVars tm :: [Var ()])
+ where
+  a = tyVar User "a" 5
+  x = intId User "x" 5
+  tm = TyLam a (Var x)
+
+-- | The other way around: in @\\x -> g \@a@, where @x@ and @a@ share a
+-- unique, @a@ is free: the term binder doesn't bind a type variable.
+termFreeVarsLamDoesNotBindTyVar :: Assertion
+termFreeVarsLamDoesNotBindTyVar =
+  [a] @=? Lens.toListOf termFreeTyVars tm
+ where
+  a = tyVar User "a" 5
+  x = intId User "x" 5
+  g = globalId User "g" 6 (ForAllTy a (VarTy a))
+  tm = Lam x (TyApp (Var g) (VarTy a))
+
 tests :: TestTree
 tests =
   let globs1 = Lens.toListOf globalIds term1 in
@@ -97,4 +121,8 @@ tests =
         typeFreeVarsClosesOverKinds
     , testCase "termFreeVars closes over types with an empty scope (#446)"
         termFreeVarsClosesOverTypes
+    , testCase "a type binder does not bind a term variable with the same unique"
+        termFreeVarsTyLamDoesNotBindId
+    , testCase "a term binder does not bind a type variable with the same unique"
+        termFreeVarsLamDoesNotBindTyVar
     ]
