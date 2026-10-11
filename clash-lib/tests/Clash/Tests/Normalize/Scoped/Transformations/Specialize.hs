@@ -31,7 +31,7 @@ import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.StrategyDSL
-  (onAppNode, onTyAppNode, toTransformation)
+  (onApp, onAppNode, onTyAppNode, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Rewrite.Util (runRewrite)
@@ -55,11 +55,15 @@ specializeViaFoil = viaFoil "specialize" (ScopedTransform Scoped.specialize)
 -- them
 appPropS :: NormRewrite
 appPropS = $(asRewriteQ Scoped.appProp)
+constantSpecS :: NormRewrite
+constantSpecS = $(asRewriteQ Scoped.constantSpec)
 
 -- | The transformations of Clash Core
 appPropC :: NormRewrite
 appPropC = $(asRewriteQ (toTransformation "applicationPropagation"
   (onAppNode 'C.appPropWorker <> onTyAppNode 'C.appPropWorker)))
+constantSpecC :: NormRewrite
+constantSpecC = $(asRewriteQ (toTransformation "constantSpec" (onApp 'C.constantSpecWorker)))
 
 -- * Fixtures
 
@@ -128,6 +132,16 @@ assertAgreesIn env current scoped tvs ids tm = do
 assertAgrees :: NormRewrite -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term -> Assertion
 assertAgrees = assertAgreesIn tcEnv
 
+-- | Assert that a rewrite fires on a term (signals a change), and that it
+-- agrees with the one of Clash Core
+assertFiresAndAgreesIn
+  :: RewriteEnv -> NormRewrite -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term -> Assertion
+assertFiresAndAgreesIn env current scoped tvs ids tm = do
+  supply <- newSupply
+  (_, _, _, ch) <- runRw env supply scoped tvs ids tm
+  assertBool "the scoped transformation doesn't fire" ch
+  assertAgreesIn env current scoped tvs ids tm
+
 -- | Assert that a rewrite doesn't fire on a term, and leaves it as it is
 assertDoesNotFireIn :: RewriteEnv -> NormRewrite -> [C.TyVar] -> [Id] -> C.Term -> Assertion
 assertDoesNotFireIn env rw tvs ids tm = do
@@ -195,6 +209,22 @@ tests =
         , testCase "doesn't fire on a variable applied to arguments" $
             assertDoesNotFireIn tcEnv appPropS [] [x, fl] (C.App (C.Var fl) (C.Var x))
         ]
+    , testGroup "constantSpec agrees with Clash Core"
+        [ testCase "f 3: a constant argument" $
+            assertFiresAndAgreesIn tcEnv constantSpecC constantSpecS [] [] (C.App (C.Var f) (lit 3))
+        , testCase "fPair (MkPair x 2): a partially constant argument" $
+            assertFiresAndAgreesIn tcEnv constantSpecC constantSpecS [] [x]
+              (C.App (C.Var fPair) (C.mkApps (C.Data pairDataCon) [Left (C.Var x), Left (lit 2)]))
+        , testCase "fPair (MkPair (fl x) (fl y)): no constant parts" $
+            assertAgrees constantSpecC constantSpecS [] [x, y, fl]
+              (C.App (C.Var fPair)
+                (C.mkApps (C.Data pairDataCon) [Left (C.App (C.Var fl) (C.Var x)), Left (C.App (C.Var fl) (C.Var y))]))
+        , testCase "fl 3: a local function" $
+            assertAgrees constantSpecC constantSpecS [] [fl] (C.App (C.Var fl) (lit 3))
+        , testCase "fPoly @Int 3 4: a type argument" $
+            assertDoesNotFireIn tcEnv constantSpecS [] []
+              (C.mkApps (C.Var fPoly) [Right intTy, Left (lit 3), Left (lit 4)])
+        ]
     ]
  where
   x = intId User "x" 12
@@ -214,5 +244,6 @@ tests =
   xak = localId User "x" 12 (C.VarTy ak)
 
   app hd = C.mkApps (C.Var hd) . map Left
+  lit = C.Literal . IntLiteral
 
   specializeAgrees = assertAgrees C.specialize specializeViaFoil

@@ -92,7 +92,7 @@ import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
+import Clash.Rewrite.Scoped.ViaFoil (scopedAppWorker, viaFoilWhen)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode
   , toTransformation
@@ -323,7 +323,23 @@ appPropWorker ctx@(TransformContext is _) node = case node of
 -- | Specialize functions on arguments which are constant, except when they
 -- are clock, reset generators.
 constantSpec :: Transformation
-constantSpec = toTransformation "constantSpec" (onApp 'constantSpecWorker)
+constantSpec = toTransformation "constantSpec" (onApp 'constantSpecViaFoil)
+
+-- | 'Scoped.constantSpec', which replaced 'constantSpecWorker', through
+-- 'viaFoilWhen' at the applications at which it can fire, see
+-- 'constantSpecWorker'
+constantSpecViaFoil
+  :: HasCallStack
+  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
+constantSpecViaFoil ctx e e1 e2 =
+  viaFoilWhen "constantSpec" (\_ _ -> pure fires)
+    (scopedAppWorker Scoped.constantSpecWorker) ctx e
+ where
+  fires
+    | (Var {}, args) <- collectArgs e1
+    , (_, []) <- Either.partitionEithers args
+    = null (Lens.toListOf termFreeTyVars e2)
+    | otherwise = False
 
 -- | The 'App' handler of 'constantSpec'.
 constantSpecWorker
