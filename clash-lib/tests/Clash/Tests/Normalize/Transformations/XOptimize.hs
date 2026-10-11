@@ -3,13 +3,26 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Transformations.XOptimize"
+  Tests for "Clash.Normalize.Transformations.XOptimize". The tests are
+  parameterised over the implementation of 'xOptimize' ('xOptimizeTests'), so
+  that they also run on its port to scoped Clash Core, see
+  "Clash.Tests.Normalize.Scoped.Transformations.XOptimize".
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Tests.Normalize.Transformations.XOptimize (tests) where
+module Clash.Tests.Normalize.Transformations.XOptimize
+  ( tests
+  , xOptimizeCurrent
+  , xOptimizeTests
+  , envXOpt
+  , errPrim
+  , fId
+  , mkTDc
+  , tTy
+  , tN
+  ) where
 
 import qualified Control.Lens as Lens
 import Data.Default (def)
@@ -36,9 +49,10 @@ import Clash.Driver.Types (ClashEnv (..), ClashOpts (..))
 import Clash.Netlist.BlackBox.Types
   (Element (Err), RenderVoid (NoRenderVoid), TemplateKind (TExpr))
 import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
-import Clash.Normalize.Transformations.XOptimize (xOptimize)
+import Clash.Normalize.Transformations.XOptimize (xOptimizeWorker)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Primitives.Types (Primitive (..))
+import Clash.Rewrite.StrategyDSL (onCase, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 import Clash.Util.Supply (Supply, newSupply)
@@ -48,8 +62,11 @@ import Test.Clash.Rewrite
   , intTy, letBinders, localId, mkDataCon, nameToUnique, pairDataCon, pairTy
   , parseTyConTy, runSingleTransformation, showPprU, tyVar, withTyConMap )
 
-xOptimizeR :: NormRewrite
-xOptimizeR = $(asRewriteQ xOptimize)
+-- | 'Clash.Normalize.Transformations.XOptimize.xOptimize' of Clash Core. It is
+-- made from its worker: 'Clash.Normalize.Transformations.XOptimize.xOptimize'
+-- is the port to scoped Clash Core once the normalizer runs that.
+xOptimizeCurrent :: NormRewrite
+xOptimizeCurrent = $(asRewriteQ (toTransformation "xOptimize" (onCase 'xOptimizeWorker)))
 
 -- | @T@, a data type with a single constructor 'mkTDc'
 tTy :: Type
@@ -108,8 +125,8 @@ envXOpt = withTyConMap tcm def{_clashEnv = env}
 
 -- | Run 'xOptimize' on a term, with the given unique supply and variables in
 -- scope
-runXOpt :: Supply -> [Id] -> Term -> IO Term
-runXOpt supply inScope =
+runXOpt :: NormRewrite -> Supply -> [Id] -> Term -> IO Term
+runXOpt xOptimizeR supply inScope =
   runSingleTransformation envXOpt def{_uniqSupply = supply} (inScopeOf inScope)
     xOptimizeR
 
@@ -126,10 +143,10 @@ fId = globalId User "f" 10 (intFunTy 1)
 -- could capture the free variables of the subject:
 --
 -- > letrec subj = p; p = case subj of MkPair a _ -> a; ... in f p
-xOptimizeSubjectCapture :: Assertion
-xOptimizeSubjectCapture = do
+xOptimizeSubjectCapture :: NormRewrite -> Assertion
+xOptimizeSubjectCapture xOpt = do
   supply <- newSupply
-  res <- runXOpt supply [pId] term
+  res <- runXOpt xOpt supply [pId] term
   let subj = localId User "subj" 50 pairTy
       a = intId User "a" 51
       b = intId User "b" 52
@@ -157,14 +174,14 @@ xOptimizeSubjectCapture = do
 -- 'xOptimize' picks for the let-binder of the subject. It used to pick that
 -- unique avoiding only the variables in scope of the case-expression, not the
 -- pattern binders, which it let-binds alongside it.
-xOptimizeSubjectDuplicate :: Assertion
-xOptimizeSubjectDuplicate = do
+xOptimizeSubjectDuplicate :: NormRewrite -> Assertion
+xOptimizeSubjectDuplicate xOpt = do
   supply <- newSupply
-  res1 <- runXOpt supply [sId] (term 1000)
+  res1 <- runXOpt xOpt supply [sId] (term 1000)
   subj <- case find (Text.isSuffixOf "subj" . nameOcc . varName) (letBinders res1) of
     Just i -> pure i
     Nothing -> assertFailure ("xOptimize did not let-bind the subject:\n" <> showPprU res1)
-  runXOpt supply [sId] (term (varUniq subj)) >>= assertNoShadowing
+  runXOpt xOpt supply [sId] (term (varUniq subj)) >>= assertNoShadowing
  where
   sId = localId User "s" 30 pairTy
   term aUniq =
@@ -180,10 +197,10 @@ xOptimizeSubjectDuplicate = do
 --
 -- 'xOptimize' used to let-bind @v@ outside of the case-expression, leaving the
 -- existential type variable @n@ free.
-xOptimizeExistential :: Assertion
-xOptimizeExistential = do
+xOptimizeExistential :: NormRewrite -> Assertion
+xOptimizeExistential xOpt = do
   supply <- newSupply
-  res <- runXOpt supply [tId] term
+  res <- runXOpt xOpt supply [tId] term
   case filter ((/= varUniq tId) . varUniq) (Lens.toListOf freeLocalVars res) of
     [] -> pure ()
     vs -> assertFailure
@@ -201,14 +218,19 @@ xOptimizeExistential = do
       , (DataPat mkTDc [tN] [v], App (TyApp (Var h) (VarTy tN)) (Var v))
       ]
 
+-- | The tests of 'Clash.Normalize.Transformations.XOptimize.xOptimize',
+-- given its implementation
+xOptimizeTests :: NormRewrite -> [TestTree]
+xOptimizeTests xOpt =
+  [ testCase "xOptimize: pattern binders do not capture the subject"
+      (xOptimizeSubjectCapture xOpt)
+  , testCase "xOptimize: subject binder is not a pattern binder"
+      (xOptimizeSubjectDuplicate xOpt)
+  , testCase "xOptimize: existential type variables stay bound"
+      (xOptimizeExistential xOpt)
+  ]
+
 tests :: TestTree
 tests =
-  testGroup
-    "Clash.Tests.Normalize.Transformations.XOptimize"
-    [ testCase "xOptimize: pattern binders do not capture the subject"
-        xOptimizeSubjectCapture
-    , testCase "xOptimize: subject binder is not a pattern binder"
-        xOptimizeSubjectDuplicate
-    , testCase "xOptimize: existential type variables stay bound"
-        xOptimizeExistential
-    ]
+  testGroup "Clash.Tests.Normalize.Transformations.XOptimize"
+    (xOptimizeTests xOptimizeCurrent)
