@@ -14,6 +14,7 @@
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
@@ -23,11 +24,15 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
+import qualified Control.Lens as Lens
+
+import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Subst as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
+import qualified Clash.Core.Util as C
 import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Alpha (aeqTm)
@@ -155,6 +160,27 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
       withFreeVarsOf [tm] $ \env ->
         assertStructurallyEqual tm (toClashTerm (fromClashTerm env tm))
 
+    -- The type of a coercion that 'C.primCo' makes may mention type variables
+    -- in scope, whereas the types of primitives are closed in scoped Core
+  , testCase "an open coercion converts to a type application" $ do
+      let a = tyVar C.User "a" 1
+          tm = C.TyLam a (C.primCo (C.VarTy a))
+      case fromClashTermClosed tm of
+        TyLam b (TyApp (Prim p) (VarTy _ _ n)) -> do
+          C.primName p @?= "_CO_"
+          assertAlphaEq C.undefinedTy (C.primType p)
+          assertBool "the type refers to the binder" (n == tyNameOf b)
+        _ -> assertFailure "unexpected shape"
+      -- The shape in which "Clash.GHC.GHC2Core" makes coercions
+      assertAlphaEq (C.TyLam a (C.TyApp (C.primCo C.undefinedTy) (C.VarTy a))) (roundTrip tm)
+
+  , testCase "a closed coercion converts as it is" $ do
+      let tm = C.primCo intTy
+      case fromClashTermClosed tm of
+        Prim p -> assertAlphaEq intTy (C.primType p)
+        _ -> assertFailure "unexpected shape"
+      assertAlphaEq tm (roundTrip tm)
+
 
   , withTests 500 $ testGroup "properties"
       [ testProperty "generated terms are well-scoped" $
@@ -239,5 +265,24 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
                     counterexample "aeqTerm" (C.aeqTerm tm tm2) .&&.
                     counterexample "aeqTermTyped" (aeqTermTyped tm tm2) .&&.
                     lintTerm (lintScopeOf env1 (fvs0 <> fvs1)) tm1 === []
+
+        -- See "an open coercion converts to a type application"
+      , testProperty "open coercions convert to type applications" $
+          forAllBlind genFreeVars $ \fvs ->
+            forAllShow (runG 30 (genType (ctxOf fvs) C.liftedTypeKind 3)) showType $ \ty ->
+              withFreeVars fvs $ \env -> do
+                let open = Lens.notNullOf C.typeFreeVars ty
+                    tm1 = fromClashTerm env (C.primCo ty)
+                    expected
+                      | open = C.TyApp (C.primCo C.undefinedTy) ty
+                      | otherwise = C.primCo ty
+                classify open "open" $
+                  counterexample ("converted:\n" <> showTerm (toClashTerm tm1)) $
+                    counterexample "shape" (isTyApp tm1 === open) .&&.
+                    counterexample "round trip" (C.aeqTerm expected (toClashTerm tm1))
       ]
   ]
+ where
+  isTyApp = \case
+    TyApp {} -> True
+    _ -> False
