@@ -28,6 +28,7 @@ import           GHC.TypeLits        (KnownNat)
 import           Data.Bifunctor      (first)
 
 import           Clash.Core.Evaluator.Types
+import           Clash.Core.HasType  (piResultTys)
 import           Clash.Core.Literal  (Literal (..))
 import Clash.Core.Name (Name (..))
 import Clash.Core.Term (Term (..), mkApps)
@@ -110,7 +111,7 @@ primitives =
         | _ : Lit (DoubleLiteral d) : _ <- args
         , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
         , nameOcc signedTcNm == showt ''Signed
-        , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy ty
+        , (_, tyView -> TyConApp tupTcNm tyArgs) <- splitFunForallTy (piResultTys tcm ty tys)
         , Just tupTc <- UniqMap.lookup tupTcNm tcm
         , [tupDc] <- tyConDataCons tupTc
         -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
