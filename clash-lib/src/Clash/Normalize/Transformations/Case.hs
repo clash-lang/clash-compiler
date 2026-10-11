@@ -693,11 +693,18 @@ caseOneAlt e@(Case _ _ [(pat,altE)]) =
       | otherwise
       -> return e
 
-caseOneAlt (Case _ _ ((pat,alt):alts@(_:_)))
+caseOneAlt (Case _ _ alts0@((_,alt):alts@(_:_)))
   | all ((== alt) . snd) alts
-  , (tvs,xs) <- patIds pat
-  , (coerce tvs ++ coerce xs) `localVarsDoNotOccurIn` alt
+  -- Alternatives are compared up to alpha equivalence, which compares free
+  -- variables by their unique. So every alternative has to be checked: in
+  -- @case e of {A y -> z; B z' -> z'}@, where @z'@ shadows @z@, the second
+  -- alternative is equal to the first, but returns its own field.
+  , all patVarsDoNotOccur alts0
   = changed alt
+ where
+  patVarsDoNotOccur (pat, altE) =
+    let (tvs,xs) = patIds pat
+     in (coerce tvs ++ coerce xs) `localVarsDoNotOccurIn` altE
 
 caseOneAlt e = return e
 {-# SCC caseOneAlt #-}
