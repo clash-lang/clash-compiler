@@ -30,7 +30,10 @@ import Clash.Core.TermInfo (isFun)
 import Clash.Core.Type (splitFunTy)
 import Clash.Core.Util (mkInternalVar)
 import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (elemVarSet, extendInScopeSet, extendInScopeSetList)
+import Clash.Core.Subst (deShadowTerm)
+import Clash.Core.VarEnv
+  ( InScopeSet, elemInScopeSet, elemVarSet, extendInScopeSet
+  , extendInScopeSetList)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onTickNode, onTyAppNode, onVarNode
@@ -76,6 +79,15 @@ stripLambda (Lam bndr e) =
 
 stripLambda e = ([], e)
 
+-- | Like 'stripLambda', but renames the lambda binders that are in scope, so
+-- the lambdas can be moved out of the let-expression that brings them in scope:
+-- otherwise they could capture free variables of the let-bindings, or the
+-- let-binders could capture references to them.
+stripLambdaFresh :: HasCallStack => InScopeSet -> Term -> ([Id], Term)
+stripLambdaFresh is e = case stripLambda e of
+  (bs, _) | any (`elemInScopeSet` is) bs -> stripLambda (deShadowTerm is e)
+  r -> r
+
 -- | Eta-expand top-level lambda's (DON'T use in a traversal!)
 etaExpansionTL :: HasCallStack => NormRewrite
 etaExpansionTL (TransformContext is0 ctx) (Lam bndr e) = do
@@ -84,9 +96,10 @@ etaExpansionTL (TransformContext is0 ctx) (Lam bndr e) = do
   return $ Lam bndr e'
 
 etaExpansionTL (TransformContext is0 ctx) (Let (NonRec i x) e) = do
-  let ctx' = TransformContext (extendInScopeSet is0 i) (LetBody [(i,x)] : ctx)
+  let is1 = extendInScopeSet is0 i
+      ctx' = TransformContext is1 (LetBody [(i,x)] : ctx)
   e' <- etaExpansionTL ctx' e
-  case stripLambda e' of
+  case stripLambdaFresh is1 e' of
     (bs@(_:_),e2) -> do
       let e3 = Let (NonRec i x) e2
       changed (mkLams e3 bs)
@@ -94,9 +107,10 @@ etaExpansionTL (TransformContext is0 ctx) (Let (NonRec i x) e) = do
 
 etaExpansionTL (TransformContext is0 ctx) (Let (Rec xes) e) = do
   let bndrs = map fst xes
-      ctx' = TransformContext (extendInScopeSetList is0 bndrs) (LetBody xes : ctx)
+      is1 = extendInScopeSetList is0 bndrs
+      ctx' = TransformContext is1 (LetBody xes : ctx)
   e' <- etaExpansionTL ctx' e
-  case stripLambda e' of
+  case stripLambdaFresh is1 e' of
     (bs@(_:_),e2) -> do
       let e3 = Let (Rec xes) e2
       changed (mkLams e3 bs)
