@@ -20,6 +20,7 @@ import qualified Clash.Tests.Normalize.Transformations.DEC
 import qualified Clash.Tests.Normalize.Transformations.Inline
 import qualified Clash.Tests.Normalize.Transformations.Letrec
 import qualified Clash.Tests.Normalize.Transformations.Specialize
+import qualified Clash.Tests.Normalize.Transformations.XOptimize
 import qualified Clash.Tests.Normalize.Util
 import qualified Clash.Tests.Rewrite.StrategyDSL
 import qualified Clash.Tests.Rewrite.Util
@@ -52,6 +53,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Transformations.Inline.tests
   , Clash.Tests.Normalize.Transformations.Letrec.tests
   , Clash.Tests.Normalize.Transformations.Specialize.tests
+  , Clash.Tests.Normalize.Transformations.XOptimize.tests
   , Clash.Tests.Normalize.Util.tests
   , Clash.Tests.Rewrite.StrategyDSL.tests
   , Clash.Tests.Rewrite.Util.tests
