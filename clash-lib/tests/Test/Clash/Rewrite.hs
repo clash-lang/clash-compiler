@@ -43,7 +43,7 @@ import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
 import Clash.Util.Supply (Supply, freshId, newSupply)
-import Clash.Unique (Unique)
+import Clash.Unique (Unique, fromGhcUnique)
 
 import Control.Applicative ((<|>))
 import qualified Control.Lens as Lens
@@ -65,6 +65,9 @@ import Test.Tasty.HUnit
   (Assertion, assertBool, assertEqual, assertFailure, testCase)
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
+import GHC.Builtin.Names
+  ( ordEQDataConKey, ordGTDataConKey, ordLTDataConKey, typeNatAddTyFamNameKey
+  , typeNatCmpTyFamNameKey, typeUnconsSymbolTyFamNameKey )
 
 import qualified Text.Show.Pretty as Pretty
 
@@ -653,22 +656,6 @@ intTyCon = C.PrimTyCon (C.nameUniq nm) nm C.liftedTypeKind 0
  where
   nm = parseTyConName "Int"
 
--- | The type constructor @Maybe :: Type -> Type@
-maybeTyCon :: C.TyCon
-maybeTyCon = C.PrimTyCon (C.nameUniq nm) nm (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
- where
-  nm = C.Name C.User (Text.pack "Maybe") 101 C.noSrcSpan
-
--- | A 'C.TyConMap' with the primitive type constructors, 'intTyCon', and
--- 'maybeTyCon'
-maybeTyConMap :: C.TyConMap
-maybeTyConMap =
-  UniqMap.insertUnique maybeTyCon (UniqMap.insertUnique intTyCon C.tysPrimMap)
-
--- | The type @Maybe a@, see 'maybeTyCon'
-maybeTy :: C.Type -> C.Type
-maybeTy a = C.mkTyConApp (C.tyConName maybeTyCon) [a]
-
 -- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
 mkId :: C.IdScope -> C.NameSort -> String -> Unique -> C.Type -> C.Id
@@ -758,6 +745,278 @@ existentialTyVar = tyVar C.User "b" 50
 existentialDataCon :: C.DataCon
 existentialDataCon =
   mkDataCon "MkE" 1002 [] [existentialTyVar] [C.VarTy existentialTyVar] existentialTy
+
+-- * Type constructors
+--
+-- A type constructor environment ('testTyConMap') with data types, newtypes
+-- and type families, to test functions that look through them.
+
+-- | Type variables of the type constructors
+fxA, fxB :: C.TyVar
+fxA = tyVar C.User "a" 3001
+fxB = tyVar C.User "b" 3002
+
+-- | The type of a type constructor
+tcTy :: C.TyConName -> C.Type
+tcTy = C.ConstTy . C.TyCon
+
+-- | A type constructor applied to types
+tcApp :: C.TyConName -> [C.Type] -> C.Type
+tcApp = C.mkTyConApp
+
+boolTyConName, maybeTyConName, nTyConName, pTyConName, wTyConName, fTyConName,
+  maxTyConName, kTyConName, qTyConName, signalTyConName, t2TyConName,
+  vTyConName :: C.TyConName
+boolTyConName = mkTyConName "Bool" 3010
+maybeTyConName = mkTyConName "Maybe" 3011
+nTyConName = mkTyConName "N" 3012
+pTyConName = mkTyConName "P" 3013
+wTyConName = mkTyConName "W" 3014
+fTyConName = mkTyConName "F" 3015
+maxTyConName = mkTyConName "Max" 3016
+kTyConName = mkTyConName "K" 3017
+qTyConName = mkTyConName "Q" 3018
+signalTyConName = mkTyConName "Clash.Signal.Internal.Signal" 3019
+t2TyConName = mkTyConName "T2" 3024
+vTyConName = mkTyConName "V" 3025
+
+-- | @data Bool = False | True@
+boolTy :: C.Type
+boolTy = tcTy boolTyConName
+
+-- | @data Maybe a = Nothing | Just a@
+maybeTy :: C.Type -> C.Type
+maybeTy a = tcApp maybeTyConName [a]
+
+nothingDataCon, justDataCon :: C.DataCon
+nothingDataCon = mkDataCon "Nothing" 3020 [fxA] [] [] (maybeTy (C.VarTy fxA))
+justDataCon =
+  (mkDataCon "Just" 3021 [fxA] [] [C.VarTy fxA] (maybeTy (C.VarTy fxA))) {C.dcTag = 2}
+
+-- | A tuple type, which 'C.isTupleTyConLike' recognises, but which is not in
+-- 'testTyConMap'
+tupleTy :: [C.Type] -> C.Type
+tupleTy = tcApp (mkTyConName "GHC.Tuple.(,)" 3036)
+
+-- | @newtype N a = MkN (Maybe a)@
+nTy :: C.Type -> C.Type
+nTy a = tcApp nTyConName [a]
+
+-- | @newtype P a = MkP (forall b. a -> b)@, whose representation type binds a
+-- type variable
+pTy :: C.Type -> C.Type
+pTy a = tcApp pTyConName [a]
+
+-- | @newtype W = MkW (Int -> Int)@
+wTy :: C.Type
+wTy = tcTy wTyConName
+
+-- | @type family F a where F Int = Bool; F (Maybe a) = a; F a = N a@
+fTy :: C.Type -> C.Type
+fTy a = tcApp fTyConName [a]
+
+-- | @type family Max a b where Max a a = a; Max a b = Maybe b@
+maxTy :: C.Type -> C.Type -> C.Type
+maxTy a b = tcApp maxTyConName [a, b]
+
+-- | @type family K :: Type -> Type where K = Maybe@, which returns a type
+-- constructor that is applied to the remaining arguments
+kTy :: C.Type
+kTy = tcTy kTyConName
+
+-- | @type family Q a where Q a = forall b. a -> b@, whose right-hand side
+-- binds a type variable
+qTy :: C.Type -> C.Type
+qTy a = tcApp qTyConName [a]
+
+-- | @Signal dom a@
+signalTy :: C.Type -> C.Type -> C.Type
+signalTy dom a = tcApp signalTyConName [dom, a]
+
+-- | A natural number as a type
+numTy :: Integer -> C.Type
+numTy = C.LitTy . C.NumTy
+
+-- | GHC's @+@ on type-level naturals, which 'C.reduceTypeFamily' and
+-- "Clash.Core.EqSolver" recognize by its unique
+addTy :: C.Type -> C.Type -> C.Type
+addTy a b = tcApp addTyConName [a, b]
+
+addTyConName :: C.TyConName
+addTyConName = mkTyConName "GHC.TypeNats.+" (fromGhcUnique typeNatAddTyFamNameKey)
+
+-- | GHC's @CmpNat@
+cmpNatTy :: C.Type -> C.Type -> C.Type
+cmpNatTy a b = tcApp cmpNatTyConName [a, b]
+
+cmpNatTyConName :: C.TyConName
+cmpNatTyConName = mkTyConName "GHC.TypeNats.CmpNat" (fromGhcUnique typeNatCmpTyFamNameKey)
+
+-- | GHC's @UnconsSymbol :: Symbol -> Maybe (T2 Char Symbol)@, with tuple type
+-- @T2@
+unconsSymbolTy :: C.Type -> C.Type
+unconsSymbolTy s = tcApp unconsSymbolTyConName [s]
+
+unconsSymbolTyConName :: C.TyConName
+unconsSymbolTyConName =
+  mkTyConName "GHC.TypeLits.UnconsSymbol" (fromGhcUnique typeUnconsSymbolTyFamNameKey)
+
+-- | Unlifted equality, @a ~# b@, of types of kind @k@, the type of the
+-- equality coercions that "Clash.Core.EqSolver" recognizes
+eqTy :: C.Kind -> C.Type -> C.Type -> C.Type
+eqTy k a b = foldl C.AppTy C.eqPrimTy [k, k, a, b]
+
+-- | @data V n where VNil :: (n ~ 0) => V n; VCons :: forall m. (n ~ m + 1) =>
+-- Int -> V m -> V n@, a data type with equality constraints and an
+-- existentially quantified type variable, like @Vec@
+vTy :: C.Type -> C.Type
+vTy n = tcApp vTyConName [n]
+
+fxN, fxM :: C.TyVar
+fxN = kindedTyVar C.User "n" 3026 C.typeNatKind
+fxM = kindedTyVar C.User "m" 3027 C.typeNatKind
+
+vNilDataCon, vConsDataCon :: C.DataCon
+vNilDataCon =
+  mkDataCon "VNil" 3028 [fxN] [] [eqTy C.typeNatKind (C.VarTy fxN) (numTy 0)]
+    (vTy (C.VarTy fxN))
+vConsDataCon =
+  (mkDataCon "VCons" 3029 [fxN] [fxM]
+    [ eqTy C.typeNatKind (C.VarTy fxN) (addTy (C.VarTy fxM) (numTy 1))
+    , intTy
+    , vTy (C.VarTy fxM) ]
+    (vTy (C.VarTy fxN))) {C.dcTag = 2}
+
+-- | The name of @Vec@. The primitive reductions recognize vectors by this name.
+vecTcNm :: C.TyConName
+vecTcNm = mkTyConName "Clash.Sized.Vector.Vec" 2000
+
+-- | @Vec n a@
+vecTy :: C.Type -> C.Type -> C.Type
+vecTy n a = tcApp vecTcNm [n, a]
+
+-- | The universally quantified type variables of the constructors of @Vec@,
+-- and the existentially quantified one of 'consDc'
+vecN, vecA, vecM :: C.TyVar
+vecN = tyVar C.User "n" 2001
+vecA = tyVar C.User "a" 2002
+vecM = tyVar C.User "m" 2003
+
+-- | @Nil :: forall n a. (n ~ 0) => Vec n a@
+nilDc :: C.DataCon
+nilDc =
+  mkDataCon "Nil" 2005 [vecN, vecA] []
+    [eqTy C.typeNatKind (C.VarTy vecN) (numTy 0)]
+    (vecTy (C.VarTy vecN) (C.VarTy vecA))
+
+-- | @Cons :: forall n a. forall m. (n ~ m + 1) => a -> Vec m a -> Vec n a@
+consDc :: C.DataCon
+consDc =
+  (mkDataCon "Cons" 2006 [vecN, vecA] [vecM]
+    [ eqTy C.typeNatKind (C.VarTy vecN) (addTy (C.VarTy vecM) (numTy 1))
+    , C.VarTy vecA
+    , vecTy (C.VarTy vecM) (C.VarTy vecA) ]
+    (vecTy (C.VarTy vecN) (C.VarTy vecA)))
+  { C.dcTag = 2 }
+
+-- | The name of @RTree@. The primitive reductions recognize trees by this
+-- name.
+rtreeTcNm :: C.TyConName
+rtreeTcNm = mkTyConName "Clash.Sized.RTree.RTree" 2010
+
+-- | @RTree d a@
+rtreeTy :: C.Type -> C.Type -> C.Type
+rtreeTy d a = tcApp rtreeTcNm [d, a]
+
+-- | The universally quantified type variables of the constructors of @RTree@,
+-- and the existentially quantified one of 'brDc'
+rtreeD, rtreeA, rtreeD1 :: C.TyVar
+rtreeD = tyVar C.User "d" 2011
+rtreeA = tyVar C.User "a" 2012
+rtreeD1 = tyVar C.User "d1" 2013
+
+-- | @LR :: forall d a. (d ~ 0) => a -> RTree d a@
+lrDc :: C.DataCon
+lrDc =
+  mkDataCon "LR" 2014 [rtreeD, rtreeA] []
+    [eqTy C.typeNatKind (C.VarTy rtreeD) (numTy 0), C.VarTy rtreeA]
+    (rtreeTy (C.VarTy rtreeD) (C.VarTy rtreeA))
+
+-- | @BR :: forall d a. forall d1. (d ~ d1 + 1) => RTree d1 a -> RTree d1 a ->
+-- RTree d a@
+brDc :: C.DataCon
+brDc =
+  (mkDataCon "BR" 2015 [rtreeD, rtreeA] [rtreeD1]
+    [ eqTy C.typeNatKind (C.VarTy rtreeD) (addTy (C.VarTy rtreeD1) (numTy 1))
+    , rtreeTy (C.VarTy rtreeD1) (C.VarTy rtreeA)
+    , rtreeTy (C.VarTy rtreeD1) (C.VarTy rtreeA) ]
+    (rtreeTy (C.VarTy rtreeD) (C.VarTy rtreeA)))
+  { C.dcTag = 2 }
+
+-- | The type constructors of the types above, and those of 'C.tysPrimMap',
+-- 'intTyCon' and 'pairTy'
+testTyConMap :: C.TyConMap
+testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
+ where
+  tcs = UniqMap.elems C.tysPrimMap <>
+    [ intTyCon
+    , mkAlgTyCon (parseTyConName "Pair") [] [pairDataCon]
+    , mkAlgTyCon boolTyConName [] [falseDc, trueDc]
+    , mkAlgTyCon maybeTyConName [fxA] [nothingDataCon, justDataCon]
+    , mkNewTyCon nTyConName [fxA]
+        (mkDataCon "MkN" 3030 [fxA] [] [maybeTy (C.VarTy fxA)] (nTy (C.VarTy fxA)))
+        ([fxA], maybeTy (C.VarTy fxA))
+    , mkNewTyCon pTyConName [fxA]
+        (mkDataCon "MkP" 3031 [fxA] [] [pRhs] (pTy (C.VarTy fxA)))
+        ([fxA], pRhs)
+    , mkNewTyCon wTyConName []
+        (mkDataCon "MkW" 3032 [] [] [C.mkFunTy intTy intTy] wTy)
+        ([], C.mkFunTy intTy intTy)
+    , mkFunTyCon fTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
+        [ ([intTy], boolTy)
+        , ([maybeTy (C.VarTy fxA)], C.VarTy fxA)
+        , ([C.VarTy fxA], nTy (C.VarTy fxA)) ]
+    , mkFunTyCon maxTyConName (C.mkFunTy C.liftedTypeKind (C.mkFunTy C.liftedTypeKind C.liftedTypeKind)) 2
+        [ ([C.VarTy fxA, C.VarTy fxA], C.VarTy fxA)
+        , ([C.VarTy fxA, C.VarTy fxB], maybeTy (C.VarTy fxB)) ]
+    , mkFunTyCon kTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 0
+        [ ([], tcTy maybeTyConName) ]
+    , mkFunTyCon qTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
+        [ ([C.VarTy fxA], pRhs) ]
+    , mkAlgTyCon signalTyConName [fxA, fxB] []
+    , mkFunTyCon addTyConName natNatNat 2 []
+    , mkFunTyCon cmpNatTyConName natNatNat 2 []
+    , mkFunTyCon unconsSymbolTyConName
+        (C.mkFunTy C.typeSymbolKind (maybeTy (tcApp t2TyConName [C.charPrimTy, C.typeSymbolKind])))
+        1 []
+    , mkAlgTyCon t2TyConName [fxA, fxB]
+        [mkDataCon "MkT2" 3033 [fxA, fxB] [] [C.VarTy fxA, C.VarTy fxB]
+          (tcApp t2TyConName [C.VarTy fxA, C.VarTy fxB])]
+    , (mkAlgTyCon vTyConName [] [vNilDataCon, vConsDataCon])
+        {C.tyConKind = C.mkFunTy C.typeNatKind C.liftedTypeKind, C.tyConArity = 1}
+    , mkAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
+    , mkAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
+    ] <>
+    -- Promoted data constructors that type families return. Their kinds don't
+    -- matter here.
+    [ C.PrimTyCon (C.nameUniq nm) nm C.liftedTypeKind 0
+    | nm <-
+        [ mkTyConName "GHC.Types.LT" (fromGhcUnique ordLTDataConKey)
+        , mkTyConName "GHC.Types.EQ" (fromGhcUnique ordEQDataConKey)
+        , mkTyConName "GHC.Types.GT" (fromGhcUnique ordGTDataConKey)
+        , mkTyConName "Nothing" 3020
+        , mkTyConName "Just" 3021
+        , mkTyConName "MkT2" 3033
+        ]
+    ]
+
+  natNatNat = C.mkFunTy C.typeNatKind (C.mkFunTy C.typeNatKind C.typeNatKind)
+
+  falseDc = mkDataCon "False" 3034 [] [] [] boolTy
+  trueDc = (mkDataCon "True" 3035 [] [] [] boolTy) {C.dcTag = 2}
+
+  -- forall b. a -> b
+  pRhs = C.ForAllTy fxB (C.mkFunTy (C.VarTy fxA) (C.VarTy fxB))
 
 -- | A 'C.TyVar' with the given name sort, human readable name, unique, and
 -- kind

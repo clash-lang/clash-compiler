@@ -39,9 +39,9 @@ import qualified Clash.Core.VarEnv as VarEnv
 import qualified Test.Clash.Rewrite as Rewrite
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
-  , intFunTy, intId, intLit, intTy, localId, maybeTy, maybeTyConMap, mkBindingMap
-  , pairDataCon, pairTy, parseToTerm, parseToTermQQ, runRewriteTest
-  , runSingleTransformation, showPprU, tyVar )
+  , intFunTy, intId, intLit, intTy, localId, maybeTy, mkBindingMap, pairDataCon
+  , pairTy, parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
+  , showPprU, testTyConMap, tyVar )
 
 appPropR :: NormRewrite
 appPropR = $(asRewriteQ appProp)
@@ -554,7 +554,7 @@ specializeTyConAppTypeArg = do
   hId = globalId User "h" 33 (ForAllTy b (mkFunTy (intFunTy 1) intTy))
   hBody = TyLam b (Lam k (App (Var k) (intLit 1)))
   tm = App (TyApp (Var hId) (maybeTy (VarTy a))) (Var fId)
-  env = def{_clashEnv = (_clashEnv def){envTyConMap = maybeTyConMap}}
+  env = def{_clashEnv = (_clashEnv def){envTyConMap = testTyConMap}}
 
 tests :: TestTree
 tests =

@@ -17,7 +17,7 @@ import Clash.Core.Type (Type (VarTy))
 import Clash.Core.TysPrim (liftedTypeKind)
 
 import Test.Clash.Rewrite
-  (assertAlphaEq, intTy, maybeTy, maybeTyConMap, tyVar)
+  (assertAlphaEq, intTy, maybeTy, testTyConMap, tyVar)
 
 -- | With the @debug@ flag, 'Clash.Core.HasType.piResultTys' checks that the
 -- types it drops the arrows of a function type with match the argument types
@@ -26,12 +26,12 @@ import Test.Clash.Rewrite
 -- check then compared @Type@ against @Int@, so 'inferCoreKindOf' errored.
 inferKindOfTyConApp :: Assertion
 inferKindOfTyConApp =
-  assertAlphaEq liftedTypeKind (inferCoreKindOf maybeTyConMap (maybeTy intTy))
+  assertAlphaEq liftedTypeKind (inferCoreKindOf testTyConMap (maybeTy intTy))
 
 -- | As 'inferKindOfTyConApp', but applied to a type variable
 inferKindOfTyConAppVar :: Assertion
 inferKindOfTyConAppVar =
-  assertAlphaEq liftedTypeKind (inferCoreKindOf maybeTyConMap (maybeTy (VarTy a)))
+  assertAlphaEq liftedTypeKind (inferCoreKindOf testTyConMap (maybeTy (VarTy a)))
  where
   a = tyVar User "a" 1
 

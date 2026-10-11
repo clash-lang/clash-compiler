@@ -42,11 +42,14 @@ import Clash.Core.Scoped.Subst (unsinkType)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type
 
-import Test.Clash.Rewrite (intTy, mkFunTyCon, mkTyConName, tyVar)
+import Test.Clash.Rewrite
+  ( addTy, boolTy, cmpNatTy, fTy, intTy, kTy, maxTy, maybeTy, mkFunTyCon
+  , mkTyConName, nTy, pTy, qTy, signalTy, testTyConMap, tyVar, unconsSymbolTy
+  , wTy )
 import Test.Clash.Scoped
 
 tcm :: C.TyConMap
-tcm = fixtureTyConMap
+tcm = testTyConMap
 
 xTv, cTv, aTv, bTv :: C.TyVar
 xTv = tyVar C.User "x" 3100

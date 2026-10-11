@@ -32,11 +32,13 @@ import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.HasType
 import Clash.Core.Scoped.Syntax
 
-import Test.Clash.Rewrite (globalId, intTy, localId, tyVar)
+import Test.Clash.Rewrite
+  ( boolTy, globalId, intTy, justDataCon, localId, nTy, pTy, signalTy
+  , testTyConMap, tupleTy, tyVar, wTy )
 import Test.Clash.Scoped
 
 tcm :: C.TyConMap
-tcm = fixtureTyConMap
+tcm = testTyConMap
 
 aTv, bTv, cTv :: C.TyVar
 aTv = tyVar C.User "a" 4000

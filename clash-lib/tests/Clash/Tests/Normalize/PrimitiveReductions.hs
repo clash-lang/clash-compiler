@@ -16,19 +16,15 @@ import GHC.Types.SrcLoc (noSrcSpan)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.DataCon (DataCon (..))
-import Clash.Core.Name (Name (..), NameSort (..), mkUnsafeName, nameUniq)
+import Clash.Core.Name (Name (..), NameSort (..))
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Subst (extendTvSubst, mkSubst, substTm)
 import Clash.Core.Term
   ( IsMultiPrim (..), PrimInfo (..), PrimUnfolding (..), Term (..)
   , WorkInfo (..), collectTermIds, mkApps )
-import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..), TyConName)
-import Clash.Core.Type (LitTy (..), Type (..), mkFunTy, mkTyConApp)
-import Clash.Core.TysPrim (liftedTypeKind)
-import Clash.Core.Var (TyVar, Var (..))
+import Clash.Core.Type (LitTy (..), Type (..), mkFunTy)
+import Clash.Core.Var (Var (..))
 import Clash.Core.VarEnv (extendInScopeSet)
-import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Normalize.PrimitiveReductions
   (mkVecNil, reduceFold, reduceMap, reduceReplace_int, reduceReverse)
@@ -39,60 +35,13 @@ import Clash.Unique (Unique)
 import Clash.Util.Supply (freshId, newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intTy, localId
-  , mkDataCon, runRewriteTest, runSingleTransformation, showPprU, tyVar )
-
--- | The name of @Vec@. The primitive reductions recognize vectors by this name.
-vecTcNm :: TyConName
-vecTcNm = mkUnsafeName User "Clash.Sized.Vector.Vec" 2000
-
--- | @Vec n a@
-vecTy :: Type -> Type -> Type
-vecTy n a = mkTyConApp vecTcNm [n, a]
-
--- | The universally quantified type variables of the constructors of @Vec@,
--- and the existentially quantified one of 'consDc'
-vecN, vecA, vecM :: TyVar
-vecN = tyVar User "n" 2001
-vecA = tyVar User "a" 2002
-vecM = tyVar User "m" 2003
-
--- | A stand-in for the type of the equality coercions of the constructors of
--- @Vec@. Nothing looks at it.
-coTy :: Type -> Type -> Type
-coTy n m = mkTyConApp (mkUnsafeName User "~#" 2004) [n, m]
-
--- | @Nil :: forall n a. (n ~ 0) => Vec n a@
-nilDc :: DataCon
-nilDc =
-  mkDataCon "Nil" 2005 [vecN, vecA] []
-    [coTy (VarTy vecN) (LitTy (NumTy 0))]
-    (vecTy (VarTy vecN) (VarTy vecA))
-
--- | @Cons :: forall n a m. (n ~ m + 1) => a -> Vec m a -> Vec n a@
-consDc :: DataCon
-consDc =
-  (mkDataCon "Cons" 2006 [vecN, vecA] [vecM]
-    [ coTy (VarTy vecN) (VarTy vecM)
-    , VarTy vecA
-    , vecTy (VarTy vecM) (VarTy vecA) ]
-    (vecTy (VarTy vecN) (VarTy vecA)))
-  { dcTag = 2 }
+  ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intTy
+  , localId, nilDc, runRewriteTest, runSingleTransformation, showPprU
+  , testTyConMap, tyVar, vecA, vecM, vecN, vecTy )
 
 -- | The default rewrite environment, extended with @Vec@
 envVec :: RewriteEnv
-envVec = def { _clashEnv = env { envTyConMap = tcm } }
- where
-  env = _clashEnv def
-  tcm = UniqMap.insert vecTcNm vecTc (envTyConMap env)
-  vecTc = AlgTyCon
-    { tyConUniq = nameUniq vecTcNm
-    , tyConName = vecTcNm
-    , tyConKind = liftedTypeKind
-    , tyConArity = 2
-    , algTcRhs = DataTyCon [nilDc, consDc]
-    , isClassTc = False
-    }
+envVec = def { _clashEnv = (_clashEnv def) { envTyConMap = testTyConMap } }
 
 -- | Run 'reduceMap' on @map f v@, with @v :: Vec 1 a@ and @f :: a -> a@ free,
 -- where the type variable @a@ has unique 0. Then substitute @Int@ for @a@,
