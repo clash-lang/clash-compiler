@@ -56,7 +56,7 @@ import qualified Clash.Normalize.Scoped.Transformations.Case as S
       { cmpName = "caseCase"
       , cmpDescription = "caseCase, to a fixpoint"
       , cmpCurrent = currentRewrite "caseCase" $(compileStrategy (strategyFor Fixpoint caseCase))
-      , cmpScoped = scopedRewrite Fixpoint S.caseCase
+      , cmpScoped = scopedRewrite Fixpoint $(asScopedRewriteQ S.caseCase)
       , cmpKnownDifferences = [recToNonRec]
       }
 ```
@@ -79,12 +79,14 @@ clash-differential caseCase inputs/*.bin inputs/*.net.bin
   where it fires. If it doesn't fire, also run the comparison on the normalized
   inputs (`*.net.bin`), or compare a chain that includes the transformations
   that create its input.
-* `scopedRewrite` runs a `ScopedRewrite`: a function of the scope and a term in
-  the normalizer's monad, which signals that it fired with `changed`. It is a
-  stand-in until the scoped rewrite machinery and its strategies are there.
-  Once they are, use `normalizeSide` with whatever runs a scoped strategy on
-  the body of a binding: a side is just a function of a binding and its body,
-  and how to run its monad.
+* `scopedRewrite` runs a `ScopedRewrite` (`Clash.Rewrite.Scoped`): a scoped
+  transformation in the normalizer's monad, which gets the context of a node
+  and signals that it fired with `changed`. It runs it in the same modes as
+  `strategyFor`, with the scoped `bottomupR` and `repeatR`.
+  `asScopedRewriteQ` turns a ported `Transformation` into one. For other
+  strategies, use `normalizeSide` with `runScopedTransform` of a strategy
+  compiled with `compileScopedStrategy`: a side is just a function of a
+  binding and its body, and how to run its monad.
 * Both sides map the body of a binding to a term, in any monad: define a `Side`
   for another monad, e.g. the evaluator's. Ports whose results are not terms
   (Netlist) need the harness extended with another way to compare results.

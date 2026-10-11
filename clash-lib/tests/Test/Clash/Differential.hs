@@ -56,12 +56,7 @@ module Test.Clash.Differential
   , Mode (..)
   , strategyFor
   , currentRewrite
-  , ScopedRewrite
   , scopedRewrite
-  , thenS
-  , allS
-  , bottomupS
-  , repeatS
     -- * Comparing
   , Outcome (..)
   , Mismatch (..)
@@ -81,8 +76,6 @@ import Control.DeepSeq (force, rnf)
 import Control.Exception
   (SomeAsyncException, SomeException, evaluate, fromException, throwIO, try)
 import qualified Control.Lens as Lens
-import Control.Monad ((>=>))
-import qualified Control.Monad.Writer.Class as Writer
 import Data.Functor.Identity (Identity (..))
 import qualified Data.HashMap.Strict as HashMap
 import Data.IntMap.Strict (IntMap)
@@ -90,7 +83,6 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Monoid (Any (..))
 import qualified Data.Text as Text
 
 import Clash.Core.Name (nameOcc)
@@ -104,16 +96,16 @@ import Clash.Normalize.Types
   (NormRewrite, NormalizeSession, NormalizeState (..))
 import Clash.Rewrite.StrategyDSL (Strat, ToStep, bottomup)
 import qualified Clash.Rewrite.StrategyDSL as DSL
-import Clash.Rewrite.Types
-  (RewriteEnv, RewriteMonad, RewriteState (..), curFun, runR)
+import Clash.Rewrite.Types (RewriteEnv, RewriteState (..), curFun, runR)
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (Supply, newSupply)
 
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm, toClashType)
-import Clash.Core.Scoped.Subst
-  (openAlt, openBind, openIdBinder, openTyBinder, unsinkIdBinder)
+import Clash.Core.Scoped.Subst (unsinkIdBinder)
 import Clash.Core.Scoped.Syntax
+import Clash.Rewrite.Scoped
+  (ScopedRewrite, bottomupR, repeatR, rootContext, runScopedTransform)
 
 -- * Designs
 
@@ -280,70 +272,18 @@ currentRewrite nm rw = normalizeSide $ \b tm -> do
   curFun Lens..= (bindingId b, bindingLoc b)
   runRewrite nm emptyInScopeSet rw tm
 
--- | A scoped transformation at a single node. It signals that it fired with
--- 'Clash.Rewrite.Util.changed', like a current one.
---
--- This only gets the scope, not the context that the current transformations
--- get: it is a stand-in until the scoped rewrite machinery is there.
-type ScopedRewrite extra =
-  forall n. Distinct n => Scope n -> Term n -> RewriteMonad extra (Term n)
-
 -- | Rewrite the body of a binding with a scoped transformation, in the given
--- mode
+-- mode: bottom-up once at every node ('Clash.Rewrite.Scoped.bottomupR'), or
+-- until it no longer fires ('Clash.Rewrite.Scoped.repeatR'). The scoped
+-- counterpart of 'currentRewrite' with 'strategyFor'.
 scopedRewrite :: Mode -> ScopedRewrite NormalizeState -> Side NormalizeSession (Term 'VoidS)
 scopedRewrite mode r = normalizeSide $ \b tm -> do
   curFun Lens..= (bindingId b, bindingLoc b)
-  case mode of
-    Once -> bottomupS r emptyScope tm
-    Fixpoint -> repeatS (bottomupS r) emptyScope tm
-
--- | Apply a scoped transformation to the immediate subterms of a term, in the
--- same order as 'Clash.Rewrite.Combinators.allR'. Opens the binders it goes
--- under.
-allS :: ScopedRewrite extra -> ScopedRewrite extra
-allS r sc = \case
-  Lam b e -> openIdBinder sc b e $ \sc1 b1 e1 -> Lam b1 <$> r sc1 e1
-  TyLam b e -> openTyBinder sc b e $ \sc1 b1 e1 -> TyLam b1 <$> r sc1 e1
-  App e1 e2 -> App <$> r sc e1 <*> r sc e2
-  TyApp e ty -> (`TyApp` ty) <$> r sc e
-  Cast e t1 t2 -> (\e' -> Cast e' t1 t2) <$> r sc e
-  Let bs e -> openBind sc bs e $ \sc1 bs1 e1 -> case bs1 of
-    NonRec b x -> do
-      x' <- r sc x
-      Let (NonRec b x') <$> r sc1 e1
-    Rec bndrs xs -> do
-      xs' <- mapM (r sc1) xs
-      Let (Rec bndrs xs') <$> r sc1 e1
-  Case e ty alts ->
-    Case <$> r sc e
-         <*> pure ty
-         <*> mapM (\alt -> openAlt sc alt $ \sc1 p a -> Alt p <$> r sc1 a) alts
-  Tick t e -> Tick t <$> r sc e
-  e -> pure e
-
--- | Apply two scoped transformations at a node in succession, like
--- 'Clash.Rewrite.Combinators.>->' and a 'Clash.Rewrite.StrategyDSL.chain'
-thenS :: ScopedRewrite extra -> ScopedRewrite extra -> ScopedRewrite extra
-thenS r1 r2 sc = r1 sc >=> r2 sc
-
--- | Apply a scoped transformation bottom-up, once at every node, like
--- 'Clash.Rewrite.Combinators.bottomupR'
-bottomupS :: forall extra. ScopedRewrite extra -> ScopedRewrite extra
-bottomupS r = go
+  runScopedTransform strategy (rootContext emptyScope) tm
  where
-  go :: ScopedRewrite extra
-  go sc = allS go sc >=> r sc
-
--- | Apply a scoped transformation until it no longer fires, like
--- 'Clash.Rewrite.Combinators.repeatR'. Errors after 1000 rounds, so that a
--- transformation that always signals change doesn't hang the harness.
-repeatS :: ScopedRewrite extra -> ScopedRewrite extra
-repeatS r = go (1000 :: Int)
- where
-  go 0 _ _ = error "repeatS: no fixpoint after 1000 rounds"
-  go k sc e = do
-    (e', Any ch) <- Writer.listen (r sc e)
-    if ch then go (k - 1) sc e' else pure e'
+  strategy = case mode of
+    Once -> bottomupR r
+    Fixpoint -> repeatR (bottomupR r)
 
 -- * Comparing
 
