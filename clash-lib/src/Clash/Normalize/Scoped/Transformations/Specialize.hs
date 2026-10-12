@@ -631,7 +631,7 @@ nonRepSpecWorker ctx e e1 e2
   , null (rights args)
   , nullNameSet (freeTyVars e2)
   = do te <- Lens.view scopedTypeEnv
-       nonRepE2 <- isUntranslatableType False (inferCoreTypeOf te (tfScope ctx) e2)
+       nonRepE2 <- isUntranslatableType False (tfScope ctx) (inferCoreTypeOf te (tfScope ctx) e2)
        if nonRepE2 && not (isLocalVar e2)
          then do
            e2' <- inlineInternalSpecialisationArgument e2

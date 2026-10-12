@@ -382,7 +382,7 @@ collectTm env nbs repl sc seen e = case e of
 
   (collectArgsTicks -> (fun, args@(_:_), ticks))
     | not (isConstant e) -> do
-      untran <- isUntranslatableType False (inferCoreTypeOf te sc e)
+      untran <- isUntranslatableType False sc (inferCoreTypeOf te sc e)
       if untran then
         -- Don't lift out non-representable values, because they cannot be
         -- let-bound in our desired normal form.
@@ -745,7 +745,7 @@ mkDisjointGroup env sc g = do
           Nothing -> return Nothing
           Just ty -> do
             let sel = mapLeaves (\(Args args) -> Terms [termArg i args]) (gTree g)
-            untran <- isUntranslatableType False ty
+            untran <- isUntranslatableType False sc ty
             return $ Just $ if untran then
               -- Non-representable arguments are not let-bound
               Left (Shared (Left (genCase te tupTcs sc ty [ty] sel)))

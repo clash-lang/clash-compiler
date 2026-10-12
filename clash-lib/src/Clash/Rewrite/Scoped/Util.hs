@@ -95,12 +95,12 @@ import           GHC.Types.Basic             (InlineSpec (..))
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.Var              as C
-import           Clash.Rewrite.Types         (RewriteMonad, curFun, scopedTypeEnv)
+import           Clash.Netlist.Util          (representableTypeState)
+import           Clash.Rewrite.Types
+  (RewriteMonad, curFun, customReprs, scopedTypeEnv, typeTranslator)
 import           Clash.Rewrite.Util
   (changed, isFromInt, runWithHWTypeCache, setChanged, zoomExtra)
-import qualified Clash.Rewrite.Util          as C
 
-import           Clash.Core.Scoped.Convert   (toClashType)
 import           Clash.Core.Scoped.FreeVars
   (bindNameBinders, freeTmVars, teleNameBinders, tmNameOccursIn)
 import           Clash.Core.Scoped.HasType   (inferCoreKindOf, inferCoreTypeOf)
@@ -164,19 +164,22 @@ isUntranslatable
   -> RewriteMonad extra Bool
 isUntranslatable stringRepresentable sc tm = do
   te <- Lens.view scopedTypeEnv
-  isUntranslatableType stringRepresentable (inferCoreTypeOf te sc tm)
+  isUntranslatableType stringRepresentable sc (inferCoreTypeOf te sc tm)
 
 -- | Determine if a type cannot be represented in hardware, see
--- 'Clash.Rewrite.Util.isUntranslatableType'. Converts the type to Clash Core
--- for the type translator, until that works on scoped types (phase 5 of the
--- port).
+-- 'Clash.Rewrite.Util.isUntranslatableType'
 isUntranslatableType
-  :: Bool
+  :: Distinct n
+  => Bool
   -- ^ String representable
+  -> Scope n
   -> Type n
   -> RewriteMonad extra Bool
-isUntranslatableType stringRepresentable ty =
-  C.isUntranslatableType stringRepresentable (toClashType ty)
+isUntranslatableType stringRepresentable sc ty = do
+  tt <- Lens.view typeTranslator
+  reprs <- Lens.view customReprs
+  te <- Lens.view scopedTypeEnv
+  not <$> runWithHWTypeCache (representableTypeState tt reprs stringRepresentable te sc ty)
 {-# INLINE isUntranslatableType #-}
 
 -- | Normalize the types of a cast, or of a variable occurrence, see
