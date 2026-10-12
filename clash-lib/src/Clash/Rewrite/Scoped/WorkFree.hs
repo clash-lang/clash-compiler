@@ -60,7 +60,7 @@ isWorkFreeBinder cache bndrs g = do
     Just b -> pure b
     Nothing -> do
       b <- case lookupGlobalEnv g bndrs of
-        Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ show (C.varName (globalIdVar g)))
+        Nothing -> error ("isWorkFreeBinder: couldn't find binder: " ++ show (globalIdName g))
         Just (bindingTerm -> t)
           | g `memberGlobalSet` termGlobalIds t -> pure False
           | otherwise -> isWorkFree cache bndrs t
@@ -91,7 +91,7 @@ isWorkFree cache bndrs = go True
       | isPolyFunTy ty -> pure (isOutermost && null args)
       | otherwise -> pure True
     GlobalVar g
-      | C.isPolyFunTy (C.varType (globalIdVar g)) -> pure False
+      | C.isPolyFunTy (C.varType (globalIdLegacy g)) -> pure False
       | otherwise -> andM [isWorkFreeBinder cache bndrs g, allM goArg args]
     Data _ -> allM goArg args
     Literal _ -> pure True

@@ -135,6 +135,7 @@ import Data.Maybe (fromMaybe)
 import Clash.Core.Scoped.Util
   (LetGroup (NonRecGroup, RecGroup), mkLets, regroupLetBindings)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Rewrite.Scoped
   (ScopedRewrite, bottomupR, repeatR, rootContext, runScopedTransform)
 
@@ -285,9 +286,9 @@ globalUniques = KnownDifference
     e -> e
 
   byName g =
-    let v = globalIdVar g
+    let v = globalIdLegacy g
         u = fromIntegral (Hashable.hash (nameOcc (varName v)))
-    in  mkGlobalId v {C.varUniq = u, C.varName = (varName v) {nameUniq = u}}
+    in  mkGlobalIdFromClash v {C.varUniq = u, C.varName = (varName v) {nameUniq = u}}
 
 -- | Apply a function at every node of a term, bottom-up: at a node, after
 -- applying it to the node's subterms. Binders are kept as they are. Doesn't

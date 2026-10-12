@@ -116,7 +116,7 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.Type (TypeView(..), coreView1, tyView)
-import Clash.Core.Scoped.TypeEnv (TypeEnv, globalIdType)
+import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import Clash.Core.Scoped.Util (internalName)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope, whnfRW)
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
@@ -325,7 +325,7 @@ caseCon' ctx e subj ty alts = do
   -- 'caseCon' with that.
   (Var _ vTy _, [], _) | isNum0 te vTy ->
     caseConOn ctx (Literal (IntegerLiteral 0)) ty alts
-  (GlobalVar g, [], _) | isNum0 te (globalIdType te sc g) ->
+  (GlobalVar g, [], _) | isNum0 te (sinkClosed (globalIdType g)) ->
     caseConOn ctx (Literal (IntegerLiteral 0)) ty alts
 
   -- Otherwise check whether the entire case-expression has a single

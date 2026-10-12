@@ -23,7 +23,7 @@ import Clash.Backend.VHDL (VHDLState)
 import Clash.Core.Name (NameSort (User))
 import Clash.Core.Term (Term (..))
 import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
-import Clash.Core.Scoped.Syntax (mkGlobalId)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Netlist (mkFunApp, runNetlistMonad)
 import Clash.Netlist.BlackBox (mkBlackBoxContext)
@@ -91,7 +91,7 @@ mkFunInputLocalShadowingGlobal = do
       env = def :: RewriteEnv
       ids = Id.emptyIdentifierSet False PreserveCase VHDL
       be = SomeBackend (initBackend (envOpts (_clashEnv env)) :: VHDLState)
-      compNames = singletonGlobalEnv (mkGlobalId fGlobal) (Id.unsafeMake "f")
+      compNames = singletonGlobalEnv (mkGlobalIdFromClash fGlobal) (Id.unsafeMake "f")
   result <- try $
     runNetlistMonad
       (_clashEnv env) False (fromClashBindings bs) mempty

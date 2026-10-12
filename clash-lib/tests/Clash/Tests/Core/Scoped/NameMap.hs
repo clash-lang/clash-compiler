@@ -27,8 +27,8 @@ import Test.Clash.Rewrite (assertErrorContains, globalId, intId, intTy)
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.NameMap"
   [ testCase "GlobalEnv" $ do
-      let f = mkGlobalId (globalId C.User "f" 3 intTy)
-          g = mkGlobalId (globalId C.User "g" 2 intTy)
+      let f = mkGlobalIdFromClash (globalId C.User "f" 3 intTy)
+          g = mkGlobalIdFromClash (globalId C.User "g" 2 intTy)
           env = insertGlobalEnv f 'f' (singletonGlobalEnv g 'g')
       lookupGlobalEnv f env @?= Just 'f'
       lookupGlobalEnv g (deleteGlobalEnv g env) @?= Nothing
@@ -38,9 +38,9 @@ tests = testGroup "Clash.Tests.Core.Scoped.NameMap"
       globalSetToList (globalEnvKeysSet env) @?= [g, f]
       globalEnvKeys (withoutGlobalEnv env (singletonGlobalSet g)) @?= [f]
 
-  , testCase "mkGlobalId errors on local variables" $
+  , testCase "mkGlobalIdFromClash errors on local variables" $
       assertErrorContains "not a global variable"
-        (C.Var (globalIdVar (mkGlobalId (intId C.User "x" 1))))
+        (C.Var (globalIdLegacy (mkGlobalIdFromClash (intId C.User "x" 1))))
 
   , testCase "NameSet and NameMap" $
       case fromClashTermClosed (C.Lam (intId C.User "x" 1) (C.Var (intId C.User "x" 1))) of

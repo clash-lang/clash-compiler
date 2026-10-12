@@ -47,6 +47,7 @@ import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Subst
   (extendSubstScope, extendTmSubst, idSubst, substTm, withFreshIdBinders)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.Term (collectArgsTicks, mkApps, mkLams, mkTicks)
 import Clash.Core.Scoped.Util (SplitInfo (..), shouldSplit)
 import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
@@ -101,7 +102,7 @@ separateArgumentsSpineWorker
   -> NormalizeSession (Term n)
 separateArgumentsSpineWorker ctx e
   | (GlobalVar g, args, ticks) <- collectArgsTicks e = do
-      let gv = globalIdVar g
+      let gv = globalIdLegacy g
           (argTys0, resTy) = C.splitFunForallTy (coreTypeOf gv)
       (concat -> args1, Monoid.getAny -> hasChanged)
         <- listen (mapM (uncurry splitArg) (zip argTys0 args))
@@ -109,7 +110,7 @@ separateArgumentsSpineWorker ctx e
         let (argTys1, args2) = unzip args1
             gTy = C.mkPolyFunTy resTy (argTys1 ++ drop (length args) argTys0)
             args3 = args2 ++ drop (length argTys0) args
-            g' = mkGlobalId gv{C.varType = gTy}
+            g' = mkGlobalIdFromClash gv{C.varType = gTy}
         in  return (mkApps (mkTicks (GlobalVar g') ticks) args3)
       else
         return e

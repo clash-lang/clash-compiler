@@ -76,7 +76,8 @@ import           Clash.Core.VarEnv
   ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
 import           Clash.Core.Scoped.Convert (fromClashTermClosed)
 import           Clash.Core.Scoped.NameMap (globalEnvFromList)
-import           Clash.Core.Scoped.Syntax (S (VoidS), mkGlobalId)
+import           Clash.Core.Scoped.Syntax (S (VoidS))
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import qualified Clash.Core.Scoped.Syntax as S (Term)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver            (compilePrimitives)
@@ -234,7 +235,7 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
         { designEntities = topEntities''
         , designBindings =
             globalEnvFromList
-              [ (mkGlobalId (bindingId b), b) | b <- UniqMap.elems allBindings' ]
+              [ (mkGlobalIdFromClash (bindingId b), b) | b <- UniqMap.elems allBindings' ]
         }
     )
 

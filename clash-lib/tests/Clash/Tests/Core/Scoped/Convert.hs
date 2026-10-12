@@ -122,7 +122,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
       assertAlphaEq tm (toClashTerm tm1)
       case tm1 of
         Let (Rec (TCons b TNil) [GlobalVar g]) (Var _ _ n) -> do
-          globalIdVar g @?= fG
+          globalIdLegacy g @?= fG
           assertBool "the body refers to the local binder" (tmNameOf b == n)
         _ -> assertFailure "unexpected shape"
 
@@ -280,6 +280,30 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
                   counterexample ("converted:\n" <> showTerm (toClashTerm tm1)) $
                     counterexample "shape" (isTyApp tm1 === open) .&&.
                     counterexample "round trip" (C.aeqTerm expected (toClashTerm tm1))
+      ]
+
+  , testGroup "constructors"
+      [ testCase "mkGlobalIdFromClash keeps the variable, and converts its type" $ do
+          let f = globalId C.User "f" 4301 (C.mkFunTy intTy intTy)
+              g = mkGlobalIdFromClash f
+          assertStructurallyEqual (C.Var f) (C.Var (globalIdLegacy g))
+          globalIdUniq g @?= C.varUniq f
+          assertBool "type" (C.aeqType (C.varType f) (toClashType (globalIdType g)))
+      , testCase "an occurrence of a global variable keeps its own type" $ do
+          -- E.g. normalization reduces the type families in the type of a
+          -- binding, but not in those of its occurrences
+          let f = globalId C.User "f" 4301 (C.mkFunTy intTy intTy)
+              g1 = mkGlobalIdFromClash f
+              g2 = mkGlobalIdFromClash f {C.varType = intTy}
+          g1 @?= g2
+          assertBool "type" (C.aeqType intTy (toClashType (globalIdType g2)))
+      , testCase "mkGlobalId derives the variable of Clash Core" $ do
+          let ty = fromClashTypeClosed emptyScope C.undefinedTy
+              nm = C.mkUnsafeName C.User "g" 4302
+              g = mkGlobalId nm ty
+          assertBool "global" (C.isGlobalId (globalIdLegacy g))
+          C.varUniq (globalIdLegacy g) @?= 4302
+          assertBool "type" (C.aeqType C.undefinedTy (C.varType (globalIdLegacy g)))
       ]
   ]
  where

@@ -34,7 +34,7 @@ import Text.Read (readMaybe)
 
 import Clash.Core.Name (nameOcc)
 import Clash.Core.TyCon (TyConMap)
-import Clash.Core.Scoped.TypeEnv (addGlobalTypes, mkTypeEnv)
+import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Core.TermInfo (termSizeSmallerThan)
 import Clash.Core.Var (varName)
 import Clash.Core.VarEnv (mapMaybeVarEnv, mkVarSet)
@@ -262,7 +262,7 @@ loadDesign opts f = do
         , _typeTranslator = ghcTypeToHWType (opt_intWidth (envOpts clashEnv))
         , _evaluator = evaluator
         , _topEntities = mkVarSet tops
-        , _scopedTypeEnv = addGlobalTypes (fmap bindingId bindings) (mkTypeEnv tcm)
+        , _scopedTypeEnv = mkTypeEnv tcm
         }
       selected = case optBinding opts of
         Nothing -> bindings
@@ -285,7 +285,7 @@ loadCorpus f = do
         (_, Just h, _, _) <- createProcess (proc "zstd" ["-q", "-d", "-c", f]) {std_out = CreatePipe}
         B.hGetContents h
       else B.readFile f
-  let ((bm, tcm, tupTcm, primMap, reprs, _, _, domains), cl) = decodeCorpus bytes
+  let ((_, tcm, tupTcm, primMap, reprs, _, _, domains), cl) = decodeCorpus bytes
       fs = clFinal cl
       clashEnv = ClashEnv
         { envOpts = applyCaptureOpts (fsOpts fs) defClashOpts
@@ -300,7 +300,7 @@ loadCorpus f = do
         , _typeTranslator = ghcTypeToHWType (opt_intWidth (envOpts clashEnv))
         , _evaluator = evaluator
         , _topEntities = mkVarSet (fsTopEntities fs)
-        , _scopedTypeEnv = addGlobalTypes (fmap bindingId bm) (mkTypeEnv tcm)
+        , _scopedTypeEnv = mkTypeEnv tcm
         }
   c <- mkCorpus env fs (clBindingEpochs cl)
   pure (c, cl)

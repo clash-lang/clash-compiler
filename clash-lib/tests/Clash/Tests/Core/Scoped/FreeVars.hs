@@ -73,7 +73,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.FreeVars"
       let fL = intId C.User "f" 20
           fG = globalId C.User "f" 20 intTy
           tm = fromClashTermClosed (C.Lam fL (C.App (C.Var fG) (C.Var fL)))
-      globalSetToList (termGlobalIds tm) @?= [mkGlobalId fG]
+      globalSetToList (termGlobalIds tm) @?= [mkGlobalIdFromClash fG]
       assertBool "no free local variables" (nullNameSet (freeTmVars tm))
 
     -- In @forall k. b@ with @b :: k@, the @k@ in the kind of the free @b@ is

@@ -84,13 +84,13 @@ import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 import           Clash.Core.Scoped.NameMap
-  (GlobalEnv, emptyGlobalEnv, globalEnvElems, globalEnvFromList, globalEnvKeys,
+  (GlobalEnv, emptyGlobalEnv, globalEnvFromList, globalEnvKeys,
    insertGlobalEnv, lookupGlobalEnv)
-import           Clash.Core.Scoped.Syntax         (globalIdVar, mkGlobalId)
+import           Clash.Core.Scoped.Syntax         (globalIdLegacy)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.Pretty         ()
 import {-# SOURCE #-} qualified Clash.Netlist.Scoped as Scoped
-import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
-import qualified Clash.Data.UniqMap               as UniqMap
+import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
@@ -121,10 +121,7 @@ runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_ ac
     . flip runStateT s'
     $ runNetlist act
   where
-    tenv =
-      addGlobalTypes
-        (UniqMap.fromList [ (v, v) | b <- globalEnvElems s, let v = bindingId b ])
-        (mkTypeEnv (envTyConMap env))
+    tenv = mkTypeEnv (envTyConMap env)
     s' =
       NetlistState
         { _bindings=s
@@ -165,12 +162,12 @@ genNames newInlineStrat prefixM is env bndrs =
     case lookupGlobalEnv g env_ of
       Just _ -> pure env_
       Nothing -> do
-        nm <- Id.makeBasic (genComponentName newInlineStrat prefixM (globalIdVar g))
+        nm <- Id.makeBasic (genComponentName newInlineStrat prefixM (globalIdLegacy g))
         pure (insertGlobalEnv g nm env_)
 
 -- | The top entities, by their 'Clash.Core.Scoped.Syntax.GlobalId'
 topEntityEnv :: [TopEntityT] -> GlobalEnv TopEntityT
-topEntityEnv tops = globalEnvFromList [ (mkGlobalId (topId t), t) | t <- tops ]
+topEntityEnv tops = globalEnvFromList [ (mkGlobalIdFromClash (topId t), t) | t <- tops ]
 
 -- | Generate names for top entities. Should be executed at the very start of
 -- the synthesis process and shared between all passes.
@@ -196,11 +193,11 @@ genTopNames opts hdl tops =
 
   goFixed env (topId, ann) = do
     topNm <- genTopName prefixM ann
-    pure (insertGlobalEnv (mkGlobalId topId) topNm env)
+    pure (insertGlobalEnv (mkGlobalIdFromClash topId) topNm env)
 
   goNonFixed env id_ = do
     topNm <- Id.makeBasic (genComponentName True prefixM id_)
-    pure (insertGlobalEnv (mkGlobalId id_) topNm env)
+    pure (insertGlobalEnv (mkGlobalIdFromClash id_) topNm env)
 
 -- | Generate a component for a given function (caching), on scoped Clash
 -- Core, see 'Clash.Netlist.Scoped.genComponent'
@@ -209,7 +206,7 @@ genComponent
   => Id
   -- ^ Name of the function
   -> NetlistMonad (ComponentMeta, Component)
-genComponent compName = Scoped.genComponent (mkGlobalId compName)
+genComponent compName = Scoped.genComponent (mkGlobalIdFromClash compName)
 
 -- | Generate a component for a given function
 genComponentT
@@ -223,13 +220,13 @@ genComponentT compName0 componentExpr = do
   tcm <- Lens.view tcCache
   compName1 <-
     fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show compName0))
-      . lookupGlobalEnv (mkGlobalId compName0) <$> Lens.use componentNames
+      . lookupGlobalEnv (mkGlobalIdFromClash compName0) <$> Lens.use componentNames
   sp <- maybe (error ($(curLoc) ++ "No normalized expression found for: " ++ show compName0)) bindingLoc
-          . lookupGlobalEnv (mkGlobalId compName0) <$> Lens.use bindings
+          . lookupGlobalEnv (mkGlobalIdFromClash compName0) <$> Lens.use bindings
   curCompNm .= (compName1, sp)
   usages .= mempty
 
-  topEntityTM <- lookupGlobalEnv (mkGlobalId compName0) <$> Lens.use topEntityAnns
+  topEntityTM <- lookupGlobalEnv (mkGlobalIdFromClash compName0) <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
       topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
@@ -635,7 +632,7 @@ mkFunApp declType dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.view tcCache
   let topAnnM
-        | isGlobalId fun = lookupGlobalEnv (mkGlobalId fun) topAnns
+        | isGlobalId fun = lookupGlobalEnv (mkGlobalIdFromClash fun) topAnns
         | otherwise = Nothing
   case (isGlobalId fun, topAnnM) of
     (True, Just topEntity)
@@ -700,7 +697,7 @@ mkFunApp declType dstId fun args tickDecls = do
 
         instDecls <-
           mkTopUnWrapper
-            (mkGlobalId fun) expandedTopEntity (dstId, dstHWty)
+            (mkGlobalIdFromClash fun) expandedTopEntity (dstId, dstHWty)
             filteredTypeExprs tickDecls
 
         return (argDecls ++ instDecls)
@@ -708,7 +705,7 @@ mkFunApp declType dstId fun args tickDecls = do
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
     (True, Nothing) -> do
       normalized <- Lens.use bindings
-      case lookupGlobalEnv (mkGlobalId fun) normalized of
+      case lookupGlobalEnv (mkGlobalIdFromClash fun) normalized of
         Nothing -> error [I.i|
           Internal error: unknown normalized binder:
 

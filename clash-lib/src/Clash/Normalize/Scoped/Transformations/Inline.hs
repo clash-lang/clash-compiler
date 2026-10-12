@@ -91,7 +91,6 @@ import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (PrettyOptions (..), showPpr, showPpr')
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.Var as C
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
 import Clash.Primitives.Types (CompiledPrimMap, Primitive (..), TemplateKind (..))
@@ -107,10 +106,11 @@ import qualified Clash.Util.Interpolate as I
 
 import Clash.Core.Scoped.FreeVars
   (freeTmVarOccurrences, freeTmVars, hasFreeVarsType, tmNameOccursIn)
-import Clash.Core.Scoped.HasType (globalIdType, inferCoreTypeOf)
+import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.TermInfo (isClosed, isLocalVar, termSizeSmallerThan)
@@ -133,7 +133,7 @@ import Clash.Rewrite.Scoped.WorkFree (isWorkFreeIsh)
 -- | The function being normalized, see 'Clash.Rewrite.Types.curFun'. It is
 -- always a global, but need not have a binding.
 curFunGlobal :: NormalizeSession GlobalId
-curFunGlobal = mkGlobalId . fst <$> Lens.use curFun
+curFunGlobal = mkGlobalIdFromClash . fst <$> Lens.use curFun
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators). See
@@ -669,13 +669,13 @@ inlineNonRepWorker ctx e = case e of
         (True, Just b) ->
           if overLimit then
             trace ($(curLoc) ++ [I.i|
-              InlineNonRep: #{showPpr (C.varName (globalIdVar f))} already inlined
-              #{limit} times in: #{showPpr (C.varName (globalIdVar cf))}. The type of the subject
+              InlineNonRep: #{showPpr (globalIdName f)} already inlined
+              #{limit} times in: #{showPpr (globalIdName cf)}. The type of the subject
               is:
 
                 #{showPpr' def{displayTypes=True\} scrutTy}
 
-              Function #{showPpr (C.varName (globalIdVar cf))} will not reach a normal form and
+              Function #{showPpr (globalIdName cf)} will not reach a normal form and
               compilation might fail.
 
               Run with '-fclash-inline-limit=N' to increase the inline limit to N.
@@ -817,7 +817,7 @@ inlineWorkFreeWorker ctx e
   = do
       topEnt <- isTopEntity f
       te <- Lens.view scopedTypeEnv
-      let fTy = globalIdType te sc f
+      let fTy = sinkClosed (globalIdType f)
           closed = not (isPolyFunCoreTy te sc fTy)
       if topEnt || not closed || isSignalType te sc fTy
         then return e

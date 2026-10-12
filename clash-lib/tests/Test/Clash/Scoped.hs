@@ -207,7 +207,7 @@ abstractFreeVars (FreeVars tvs ids) tm = foldr C.TyLam (foldr C.Lam tm ids) tvs
 -- 'Test.Clash.Rewrite.mkBindingMap'.
 mkScopedBindingMap :: HasCallStack => [(C.Id, C.Term)] -> GlobalEnv (Binding (Term 'VoidS))
 mkScopedBindingMap bs =
-  globalEnvFromList [(mkGlobalId i, fromClashTermClosed <$> mkBinding i t) | (i, t) <- bs]
+  globalEnvFromList [(mkGlobalIdFromClash i, fromClashTermClosed <$> mkBinding i t) | (i, t) <- bs]
 
 -- | A variable whose unique is above the names conversion gives the binders of
 -- the inputs of the tests, see 'extendSunk'

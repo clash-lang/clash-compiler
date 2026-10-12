@@ -106,8 +106,8 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.WorkFree"
           (_, cache) = runState
             (check (C.App (prim C.WorkNever) (C.Var litG)) >> check (C.Var workG))
             emptyGlobalEnv
-      lookupGlobalEnv (mkGlobalId workG) cache @?= Just False
-      lookupGlobalEnv (mkGlobalId litG) cache @?= Just True
+      lookupGlobalEnv (mkGlobalIdFromClash workG) cache @?= Just False
+      lookupGlobalEnv (mkGlobalIdFromClash litG) cache @?= Just True
   , testCase "isConstant" $
       assertAgreesOnExamples C.isConstant (const isConstant)
   , testCase "isConstantNotClockReset" $

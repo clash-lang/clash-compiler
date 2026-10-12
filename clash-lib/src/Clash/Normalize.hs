@@ -67,7 +67,6 @@ import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (elemVarSet, emptyVarEnv, mkVarSet)
-import qualified Clash.Data.UniqMap               as UniqMap
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (Binding(..), DebugOpts(..), ClashEnv(..), GlobalBindings)
@@ -105,7 +104,7 @@ import qualified Clash.Core.Scoped.Syntax         as S
 import           Clash.Core.Scoped.Term
   (AbsBinder (..), collectArgsTicks, collectTicks, mkApps, mkTicks, openBndrs,
    stripTicks)
-import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
+import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
@@ -134,7 +133,7 @@ runNormalization env supply globals typeTrans rcsMap topEnts m =
                   -- of Clash Core, which the normalizer doesn't run
                   (error $ $(curLoc) ++ "Report as bug: no evaluator of Clash Core")
                   (mkVarSet topEnts)
-                  (addGlobalTypes globalVars (mkTypeEnv (envTyConMap env)))
+                  (mkTypeEnv (envTyConMap env))
 
     rwState   = RewriteState
                   { _transformCounter = 0
@@ -153,8 +152,6 @@ runNormalization env supply globals typeTrans rcsMap topEnts m =
                   , _hwTypeCache = Map.empty
                   , _extra = normState
                   }
-
-    globalVars = UniqMap.fromList [(globalIdVar g, globalIdVar g) | g <- globalEnvKeys globals]
 
     normState = NormalizeState
                   { _normalized = emptyVarEnv
@@ -213,12 +210,12 @@ normalize'
   -> NormalizeSession ([GlobalId], (GlobalId, Binding (Term 'VoidS)))
 normalize' nm = do
   exprM <- lookupGlobalEnv nm <$> Lens.use scopedBindings
-  let nmS = showPpr (varName (globalIdVar nm))
+  let nmS = showPpr (varName (globalIdLegacy nm))
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
-      let isTop = globalIdVar nm `elemVarSet` topEnts
+      let isTop = globalIdLegacy nm `elemVarSet` topEnts
           ty0 = coreTypeOf nm'
           ty1 = if isTop then tvSubstWithTyEq ty0 else ty0
 
@@ -250,7 +247,7 @@ normalize' nm = do
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
             prevNorm <- Lens.use (extra.scopedNormalized)
-            let toNormalize = filter (\g -> not (globalIdVar g `elemVarSet` topEnts))
+            let toNormalize = filter (\g -> not (globalIdLegacy g `elemVarSet` topEnts))
                             $ filter (\g -> g /= nm && not (memberGlobalEnv g prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
          else
@@ -452,7 +449,7 @@ flattenNode
   -> NormalizeSession (Either CallTree ((GlobalId, Term 'VoidS), [CallTree]))
 flattenNode c@(CLeaf (_,(Binding _ _ spec _ _ _))) | isNoInline spec = return (Left c)
 flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
-  isTopEntity <- elemVarSet (globalIdVar nm) <$> Lens.view topEntities
+  isTopEntity <- elemVarSet (globalIdLegacy nm) <$> Lens.view topEntities
   if isTopEntity then return (Left c) else
     case etaReduceWrapper e of
       Single (Just e') -> return (Right ((nm,e'),[]))
@@ -460,7 +457,7 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
 flattenNode b@(CBranch (_,(Binding _ _ spec _ _ _)) _) | isNoInline spec =
   return (Left b)
 flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
-  isTopEntity <- elemVarSet (globalIdVar nm) <$> Lens.view topEntities
+  isTopEntity <- elemVarSet (globalIdLegacy nm) <$> Lens.view topEntities
   if isTopEntity then return (Left b) else
     case etaReduceWrapper e of
       Single (Just e') -> return (Right ((nm,e'),us))

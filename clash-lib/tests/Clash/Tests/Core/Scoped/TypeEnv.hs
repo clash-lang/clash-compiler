@@ -20,12 +20,8 @@ import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
 import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.Name as C
 import qualified Clash.Core.Subst as C
 import qualified Clash.Core.TyCon as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Util as C (undefinedTy)
-import qualified Clash.Core.Var as C
 import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Convert
@@ -34,7 +30,7 @@ import Clash.Core.Scoped.TyCon
 import Clash.Core.Scoped.TypeEnv
 
 import Test.Clash.Rewrite
-  (assertErrorContains, globalId, intTy, mkDataCon, nTyConName, testTyConMap)
+  (assertErrorContains, intTy, mkDataCon, nTyConName, testTyConMap)
 import Test.Clash.Scoped (assertScopedTyAlphaEq, testTypeEnv, withFreeVars, withTests)
 import qualified Test.Clash.Scoped.Gen as Gen
 
@@ -55,21 +51,6 @@ dataCons = concatMap C.tyConDataCons tyCons
 -- | A data constructor that is not in 'testTyConMap'
 otherDataCon :: C.DataCon
 otherDataCon = mkDataCon "Other" 4300 [] [] [intTy] intTy
-
--- | @f :: Int -> Int@
-fId :: C.Id
-fId = globalId C.User "f" 4301 (C.mkFunTy intTy intTy)
-
--- | 'fId', with another type
-fIdOtherType :: C.Id
-fIdOtherType = fId {C.varType = intTy}
-
--- | @g :: forall a. a@, whose type 'withGlobals' doesn't cache
-gId :: C.Id
-gId = globalId C.User "g" 4302 C.undefinedTy
-
-withGlobals :: TypeEnv
-withGlobals = addGlobalTypes (UniqMap.fromList [(fId, fId)]) testTypeEnv
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
@@ -99,21 +80,6 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
         assertBool "dataConSigOf" (sameObject (dataConSigOf testTypeEnv dc) (dataConSigOf testTypeEnv dc))
         assertBool "dataConType"
           (sameObject (dataConType testTypeEnv emptyScope dc) (dataConType testTypeEnv emptyScope dc))
-      let g = mkGlobalId fId
-      assertBool "globalIdType"
-        (sameObject (globalIdType withGlobals emptyScope g) (globalIdType withGlobals emptyScope g))
-
-  , testCase "globalIdType" $ do
-      assertScopedTyAlphaEq (C.varType fId) (globalIdType withGlobals emptyScope (mkGlobalId fId))
-      -- Not cached: converted for every use
-      assertScopedTyAlphaEq (C.varType gId) (globalIdType withGlobals emptyScope (mkGlobalId gId))
-
-    -- A global variable is looked up by its unique, but an occurrence need
-    -- not have the type of the binding
-  , testCase "globalIdType of a global variable with another type" $
-      assertScopedTyAlphaEq (C.varType fIdOtherType)
-        (globalIdType withGlobals emptyScope (mkGlobalId fIdOtherType))
-
   , testCase "findTyCon errors on unknown type constructors" $
       assertErrorContains "is not in the UniqMap"
         (C.tyConName (findTyCon (mkTypeEnv UniqMap.empty) nTyConName))
@@ -123,15 +89,13 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
       [ testProperty "the types of a TypeEnv are those of conversion, in any scope" $
           forAllBlind Gen.genFreeVars $ \fvs -> withFreeVars fvs $ \env -> do
             let sc = convScope env
-                tenv = addGlobalTypes (UniqMap.fromList [(g, g) | g <- Gen.globals])
-                         (mkTypeEnv Gen.tyConMap)
+                tenv = mkTypeEnv Gen.tyConMap
                 agrees expected actual =
                   counterexample (show expected) (C.aeqType expected (toClashType actual))
             conjoin $
               [ agrees (C.tyConKind tc) (tyConKindOf tenv (C.tyConName tc) `asScopeOf` sc)
               | tc <- UniqMap.elems Gen.tyConMap ] <>
-              [ agrees (C.dcType dc) (dataConType tenv sc dc) | dc <- Gen.dataCons ] <>
-              [ agrees (C.varType g) (globalIdType tenv sc (mkGlobalId g)) | g <- Gen.globals ]
+              [ agrees (C.dcType dc) (dataConType tenv sc dc) | dc <- Gen.dataCons ]
       ]
   ]
  where

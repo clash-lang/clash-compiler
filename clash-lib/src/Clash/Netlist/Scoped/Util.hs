@@ -69,7 +69,6 @@ import           GHC.Stack                   (HasCallStack)
 
 import           Clash.Annotations.TopEntity (TopEntity)
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Var              as C (varName)
 import           Clash.Core.Pretty           (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Scoped.Pretty    ()
 import qualified Clash.Core.Term             as C
@@ -486,7 +485,7 @@ localIdText ctx i =
 -- | The HDL identifier of a global variable used as an expression: its
 -- occurrence name
 globalIdentifier :: GlobalId -> Identifier
-globalIdentifier = Id.unsafeMake . C.nameOcc . C.varName . globalIdVar
+globalIdentifier = Id.unsafeMake . C.nameOcc . globalIdName
 
 -- | The new human readable name of the binder of a let-binding, if its
 -- right-hand side is a blackbox that requests a specific name for its result.

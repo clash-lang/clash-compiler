@@ -123,7 +123,7 @@ import           Clash.Normalize                  (checkNonRecursive, cleanupGra
                                                    normalize, runNormalization)
 import           Clash.Core.Scoped.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
-import           Clash.Core.Scoped.Syntax         (mkGlobalId)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
 import           Clash.Normalize.Scoped.Util      (callGraph)
 import           Clash.Normalize.Util             (tvSubstWithTyEq)
@@ -230,7 +230,7 @@ splitTopEntityT
   -> TopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
-  case lookupGlobalEnv (mkGlobalId id_) bindingsMap of
+  case lookupGlobalEnv (mkGlobalIdFromClash id_) bindingsMap of
     Just (Binding _id sp _ _ _ _) ->
       tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf id_) t)}
     Nothing ->
@@ -393,7 +393,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
 
   let topNm = fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show topEntity))
-                (lookupGlobalEnv (mkGlobalId topEntity) compNames)
+                (lookupGlobalEnv (mkGlobalIdFromClash topEntity) compNames)
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
       hdlState' = setDomainConfigurations domainConfs
@@ -1197,7 +1197,7 @@ normalizeEntity
   -> IO GlobalBindings
 normalizeEntity env bindingsMap typeTrans topEntities supply tm = transformedBindings
   where
-    doNorm = do let top = mkGlobalId tm
+    doNorm = do let top = mkGlobalIdFromClash tm
                 norm <- normalize [top]
                 let normChecked = checkNonRecursive norm
                 cleanupGraph top normChecked
@@ -1227,8 +1227,8 @@ sortTop bindingsMap topEntities =
       (getTransitiveRefs topE)
 
   getTransitiveRefs top =
-    let allDeps = callGraph bindingsMap (mkGlobalId top)
-    in  filter (\t -> topId t /= top && mkGlobalId (topId t) `memberGlobalEnv` allDeps) topEntities
+    let allDeps = callGraph bindingsMap (mkGlobalIdFromClash top)
+    in  filter (\t -> topId t /= top && mkGlobalIdFromClash (topId t) `memberGlobalEnv` allDeps) topEntities
 
   topToUnique = varUniq . topId
 

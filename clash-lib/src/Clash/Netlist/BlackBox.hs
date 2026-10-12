@@ -97,7 +97,7 @@ import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Types           as N
 import           Clash.Netlist.Util            as N
 import           Clash.Core.Scoped.NameMap     (lookupGlobalEnv)
-import           Clash.Core.Scoped.Syntax      (mkGlobalId)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
@@ -1225,12 +1225,12 @@ mkFunInput parentName declType resId e =
             -- check it's a global before looking it up by its unique
             C.Var fun | isGlobalId fun -> do
               topAnns <- Lens.use topEntityAnns
-              case lookupGlobalEnv (mkGlobalId fun) topAnns of
+              case lookupGlobalEnv (mkGlobalIdFromClash fun) topAnns of
                 Just _ ->
                   error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr e
                 _ -> do
                   normalized <- Lens.use bindings
-                  case lookupGlobalEnv (mkGlobalId fun) normalized of
+                  case lookupGlobalEnv (mkGlobalIdFromClash fun) normalized of
                     Just _ -> do
                       (meta,N.Component compName compInps compOutps _) <-
                         preserveVarEnv $ genComponent fun

@@ -4,8 +4,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The environment of the types of scoped Clash Core: the type constructors
-  that types refer to, and the signatures of type constructors, data
-  constructors and global variables as scoped types.
+  that types refer to, and the signatures of type constructors and data
+  constructors as scoped types.
 
   The functions on types that look up type constructors ("Clash.Core.Scoped.Type",
   "Clash.Core.Scoped.HasType", ...) take a t'TypeEnv' where their Clash
@@ -14,7 +14,7 @@
 
   = Transition
 
-  Clash's 'TyCon', 'DataCon' and 'C.Id' store closed Clash 'C.Type's, which
+  Clash's 'TyCon' and 'DataCon' store closed Clash 'C.Type's, which
   scoped code needs as scoped types. A t'TypeEnv' caches their conversion, so
   that every signature is converted at most once per t'TypeEnv':
 
@@ -22,19 +22,9 @@
     newtype ('NewTyConSig') and the equations of a type family ('TyFamEqn');
 
   * for every data constructor of a type constructor of the 'TyConMap': its
-    signature ('DataConSig') and its type;
+    signature ('DataConSig') and its type.
 
-  * for every global variable given to 'addGlobalTypes', such as those that
-    have a binding at the start of normalization: its type. The types of
-    other global variables are converted for every use.
-
-    A global variable is looked up by its unique, but an occurrence of a
-    global variable need not have the type of its binding: e.g. normalization
-    reduces the type families in the type of a binding, but not in those of
-    its occurrences. So 'globalIdType' only uses the cached type if the Clash
-    type of the occurrence is alpha-equivalent to the one it was converted
-    from, which is cheaper than converting it. Otherwise it converts the type
-    of the occurrence.
+  Global variables carry their scoped types ('globalIdType').
 
   The caches are built lazily: making a t'TypeEnv' is cheap, and a signature
   is only converted when it is first needed.
@@ -46,7 +36,7 @@
   = Migration
 
   TODO(D4): once 'TyCon' and 'DataCon' store scoped types (decision D4 of the
-  port), and global variables carry theirs, the lookups below read them, and
+  port), the lookups below read them, and
   a t'TypeEnv' is just the 'TyConMap'. Their users keep working.
 -}
 
@@ -56,7 +46,6 @@
 module Clash.Core.Scoped.TypeEnv
   ( TypeEnv
   , mkTypeEnv
-  , addGlobalTypes
   , typeEnvTyConMap
     -- * Type constructors
   , lookupTyCon
@@ -67,17 +56,12 @@ module Clash.Core.Scoped.TypeEnv
     -- * Data constructors
   , dataConSigOf
   , dataConType
-    -- * Global variables
-  , globalIdType
   ) where
 
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon (dcType))
-import Clash.Core.Subst (aeqType)
 import Clash.Core.TyCon (TyCon (tyConKind), TyConMap, TyConName, tyConDataCons)
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 
@@ -95,9 +79,6 @@ data TypeEnv = TypeEnv
   , _teDataCons :: UniqMap DataConInfo
   -- ^ The data constructors of the type constructors, with their converted
   -- signatures. Lazy, like the elements.
-  , _teGlobals :: UniqMap GlobalInfo
-  -- ^ The global variables given to 'addGlobalTypes', with their converted
-  -- types. The elements are lazy.
   }
 
 -- | A type constructor, and its converted signatures
@@ -114,15 +95,8 @@ data DataConInfo = DataConInfo
   , dciType :: Type 'VoidS
   }
 
--- | The type of a global variable, and that type converted
-data GlobalInfo = GlobalInfo
-  { _giClashType :: !C.Type
-  , giType :: Type 'VoidS
-  }
-
 -- | The environment of the given type constructors, with the signatures of
--- them and of their data constructors, but no types of global variables. See
--- 'addGlobalTypes'.
+-- them and of their data constructors
 mkTypeEnv :: TyConMap -> TypeEnv
 mkTypeEnv tcm = TypeEnv
   { typeEnvTyConMap = tcm
@@ -130,7 +104,6 @@ mkTypeEnv tcm = TypeEnv
   , _teDataCons =
       UniqMap.fromList
         [ (dc, dataConInfo dc) | tc <- UniqMap.elems tcm, dc <- tyConDataCons tc ]
-  , _teGlobals = UniqMap.empty
   }
  where
   tyConInfo tc = TyConInfo
@@ -138,17 +111,6 @@ mkTypeEnv tcm = TypeEnv
     , tciKind = fromClashTypeClosed emptyScope (tyConKind tc)
     , tciNewTyConSig = newTyConSig tc
     , tciTyFamEqns = tyFamEqns tc
-    }
-
--- | Cache the types of the given global variables, keyed by their uniques: e.g.
--- the variables of the bindings at the start of normalization. Replaces the
--- types of global variables cached before.
-addGlobalTypes :: UniqMap C.Id -> TypeEnv -> TypeEnv
-addGlobalTypes gs env = env {_teGlobals = fmap globalInfo gs}
- where
-  globalInfo v = GlobalInfo
-    { _giClashType = C.varType v
-    , giType = fromClashTypeClosed emptyScope (C.varType v)
     }
 
 dataConInfo :: HasCallStack => DataCon -> DataConInfo
@@ -204,13 +166,3 @@ dataConType env sc dc = case UniqMap.lookup dc (_teDataCons env) of
   Just dci -> sinkClosed (dciType dci)
   Nothing -> fromClashTypeClosed sc (dcType dc)
 
--- * Global variables
-
--- | The type of a global variable, in any scope. See the module header for
--- when it is cached.
-globalIdType :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> GlobalId -> Type n
-globalIdType env sc g = case UniqMap.lookup (globalIdUniq g) (_teGlobals env) of
-  Just (GlobalInfo cty ty) | aeqType cty gty -> sinkClosed ty
-  _ -> fromClashTypeClosed sc gty
- where
-  gty = C.varType (globalIdVar g)

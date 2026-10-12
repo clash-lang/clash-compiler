@@ -215,15 +215,15 @@ recursionTests =
       ((localRes, globalRes, recRes), _, _) <- runRewriteTest def recState $
         withConvEnv [] [gLocal] $ \env -> do
           l <- Scoped.isNonRecursiveGlobalVar (fromClashTerm env (C.Var gLocal))
-          g <- Scoped.isNonRecursiveGlobalVar (GlobalVar (mkGlobalId gGlobal) :: Term 'VoidS)
-          r <- Scoped.isRecursiveBndr (mkGlobalId gGlobal)
+          g <- Scoped.isNonRecursiveGlobalVar (GlobalVar (mkGlobalIdFromClash gGlobal) :: Term 'VoidS)
+          r <- Scoped.isRecursiveBndr (mkGlobalIdFromClash gGlobal)
           pure (l, g, r)
       assertBool "local variable is a non-recursive global" (not localRes)
       assertBool "recursive global is non-recursive" (not globalRes)
       assertBool "recursive global is non-recursive" recRes
   , testCase "isRecursiveBndr of a global without a binding" $ do
       (r, _, _) <- runRewriteTest def (def :: RewriteState NormalizeState) $
-        Scoped.isRecursiveBndr (mkGlobalId gGlobal)
+        Scoped.isRecursiveBndr (mkGlobalIdFromClash gGlobal)
       r @?= False
   ]
 
@@ -232,8 +232,8 @@ recursionTests =
 inliningTests :: [TestTree]
 inliningTests =
   [ testCase "addNewInline counts inlinings per function" $ do
-      let f = mkGlobalId (globalId User "f" 10 intTy)
-          cf = mkGlobalId (globalId User "cf" 11 intTy)
+      let f = mkGlobalIdFromClash (globalId User "f" 10 intTy)
+          cf = mkGlobalIdFromClash (globalId User "cf" 11 intTy)
           res = flip evalState def $ do
             Scoped.addNewInline f cf
             Scoped.addNewInline f cf
@@ -243,7 +243,7 @@ inliningTests =
       let f = globalId User "Some.Module.f" 10 intTy
       assertScopedAlphaEq
         (C.mkTicks (intLit 1) [Current.mkInlineTick f])
-        (mkTicks (Literal (IntLiteral 1)) [Scoped.mkInlineTick (mkGlobalId f)] :: Term 'VoidS)
+        (mkTicks (Literal (IntLiteral 1)) [Scoped.mkInlineTick (mkGlobalIdFromClash f)] :: Term 'VoidS)
   ]
 
 -- * Constant arguments
@@ -316,7 +316,7 @@ callGraphTests :: [TestTree]
 callGraphTests =
   [ testCase "callGraph agrees" $ do
       let cur = Current.callGraph (mkBindingMap bs) f
-          sco = Scoped.callGraph (mkScopedBindingMap bs) (mkGlobalId f)
+          sco = Scoped.callGraph (mkScopedBindingMap bs) (mkGlobalIdFromClash f)
       flatten cur @?= flattenS sco
       List.sort (foldr (:) [] (Current.collectCallGraphUniques cur))
         @?= List.sort (map globalIdUniq (globalSetToList (Scoped.callGraphGlobals sco)))
@@ -405,15 +405,15 @@ normalizeTests =
       (cur, _, _) <- runRewriteTest def st $
         Current.normalizeTopLvlBndr False f (mkBinding f fTm)
       ((sco, sco2), st1, _) <- runRewriteTest def st $ do
-        b1 <- Scoped.normalizeTopLvlBndr False (mkGlobalId f) (fromClashTermClosed <$> mkBinding f fTm)
+        b1 <- Scoped.normalizeTopLvlBndr False (mkGlobalIdFromClash f) (fromClashTermClosed <$> mkBinding f fTm)
         -- From the cache, so it doesn't matter what the binding is
-        b2 <- Scoped.normalizeTopLvlBndr False (mkGlobalId f) (fromClashTermClosed <$> mkBinding f (intLit 0))
+        b2 <- Scoped.normalizeTopLvlBndr False (mkGlobalIdFromClash f) (fromClashTermClosed <$> mkBinding f (intLit 0))
         pure (b1, b2)
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco2)
       bindingRecursive sco @?= bindingRecursive cur
       assertAlphaEq (C.varType (bindingId cur)) (C.varType (bindingId sco))
-      case lookupGlobalEnv (mkGlobalId f) (_scopedNormalized (_extra st1)) of
+      case lookupGlobalEnv (mkGlobalIdFromClash f) (_scopedNormalized (_extra st1)) of
         Just b -> assertScopedAlphaEq (bindingTerm cur) (bindingTerm b)
         Nothing -> assertFailure "not cached"
       -- The strategy ran once
@@ -425,7 +425,7 @@ normalizeTests =
       (cur, _, _) <- runRewriteTest def st $
         Current.normalizeTopLvlBndr False f (mkBinding f rec)
       (sco, _, _) <- runRewriteTest def st $
-        Scoped.normalizeTopLvlBndr False (mkGlobalId f) (fromClashTermClosed <$> mkBinding f rec)
+        Scoped.normalizeTopLvlBndr False (mkGlobalIdFromClash f) (fromClashTermClosed <$> mkBinding f rec)
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
       bindingRecursive sco @?= True
 
@@ -440,7 +440,7 @@ normalizeTests =
       (cur, _, _) <- runRewriteTest def st $
         Current.normalizeTopLvlBndr True top (mkBinding top topTm)
       (sco, _, _) <- runRewriteTest def st $
-        Scoped.normalizeTopLvlBndr True (mkGlobalId top) (fromClashTermClosed <$> mkBinding top topTm)
+        Scoped.normalizeTopLvlBndr True (mkGlobalIdFromClash top) (fromClashTermClosed <$> mkBinding top topTm)
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
       assertAlphaEq (C.varType (bindingId cur)) (C.varType (bindingId sco))
 
@@ -453,8 +453,8 @@ normalizeTests =
       ((sco, sco2), st1, _) <- runRewriteTest def st $ do
         let b = fromClashTermClosed <$> mkBinding f2 f2Tm
             sArgs = [Left (Literal (IntLiteral 1))] :: [Either (Term 'VoidS) (Type 'VoidS)]
-        r1 <- Scoped.normalizeWorkFreeApp (mkGlobalId f2) b sArgs
-        r2 <- Scoped.normalizeWorkFreeApp (mkGlobalId f2) b sArgs
+        r1 <- Scoped.normalizeWorkFreeApp (mkGlobalIdFromClash f2) b sArgs
+        r2 <- Scoped.normalizeWorkFreeApp (mkGlobalIdFromClash f2) b sArgs
         pure (r1, r2)
       assertScopedAlphaEq cur sco
       assertScopedAlphaEq cur sco2

@@ -129,7 +129,7 @@ toClashFresh is env@(BackEnv _ ids) = \case
   Var occ _ n -> case IntMap.lookup (tmNameRaw n) ids of
     Just v -> pure (C.Var v)
     Nothing -> error ($(curLoc) ++ "variable not in scope: " ++ show occ)
-  GlobalVar g -> pure (C.Var (globalIdVar g))
+  GlobalVar g -> pure (C.Var (globalIdLegacy g))
   Data dc -> pure (C.Data dc)
   Literal l -> pure (C.Literal l)
   Prim p -> pure (C.Prim p)

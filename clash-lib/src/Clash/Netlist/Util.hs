@@ -103,7 +103,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, uniqAway,
    emptyInScopeSet, mkInScopeSet, unionInScope)
 import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
-import           Clash.Core.Scoped.Syntax (GlobalId, globalIdVar)
+import           Clash.Core.Scoped.Syntax (GlobalId, globalIdLegacy)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Core.Scoped.Alpha (AlphaType (..))
 import           Clash.Core.Scoped.Convert
@@ -1720,7 +1720,7 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
     topName = Id.toText topIdentifier
     topIdentifier = flip fromMaybe compNameM (error [I.i|
      Internal error in 'mkTopUnWrapper': tried to lookup (netlist) name
-     of #{showPpr (varName (globalIdVar topEntity))}, but couldn't find it in NetlistState's
+     of #{showPpr (varName (globalIdLegacy topEntity))}, but couldn't find it in NetlistState's
      'componentNames'. This should have been put there by 'runNetlistMonad' /
      'genNames'. |])
 

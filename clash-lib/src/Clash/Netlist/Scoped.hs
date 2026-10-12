@@ -104,6 +104,7 @@ import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNam
 import           Clash.Core.Scoped.Subst
   (openAlt, openBind, patVars, teleIdBinderTypes, teleIdVars)
 import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.TermInfo       (multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
@@ -149,7 +150,7 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
         genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
   ((_meta, topComponent), s) <-
     runNetlistMonad env isTb globals tops typeTrans ite be seen1 dir componentNames_
-      $ genComponent (mkGlobalId topEntity)
+      $ genComponent (mkGlobalIdFromClash topEntity)
   return (topComponent, _components s, seen1)
 
 -- | Generate a component for a given function (caching)
@@ -163,9 +164,9 @@ genComponent compName = do
   case compExprM of
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
-      throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show (globalIdVar compName)) Nothing)
+      throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show (globalIdLegacy compName)) Nothing)
     Just b -> do
-      makeCachedO (globalIdVar compName) components $ genComponentT compName (bindingTerm b)
+      makeCachedO (globalIdLegacy compName) components $ genComponentT compName (bindingTerm b)
 
 -- | Generate a component for a given function
 genComponentT
@@ -178,7 +179,7 @@ genComponentT
 genComponentT compName0 componentExpr = do
   tcm <- Lens.view tcCache
   tenv <- Lens.view typeEnv
-  let compVar = globalIdVar compName0
+  let compVar = globalIdLegacy compName0
   compName1 <-
     fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show compVar))
       . lookupGlobalEnv compName0 <$> Lens.use componentNames
@@ -576,14 +577,14 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
 
         return (argDecls ++ instDecls)
 
-      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr (globalIdVar fun)
+      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr (globalIdLegacy fun)
     Nothing -> do
       normalized <- Lens.use bindings
       case lookupGlobalEnv fun normalized of
         Nothing -> error [I.i|
           Internal error: unknown normalized binder:
 
-            #{showPpr (globalIdVar fun)}
+            #{showPpr (globalIdLegacy fun)}
         |]
         Just (Binding{bindingTerm}) -> do
           (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
@@ -622,7 +623,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
               in error [I.i|
               Under-applied normalized function at component #{compName}:
 
-              #{showPpr (globalIdVar fun)}
+              #{showPpr (globalIdLegacy fun)}
 
               Core:
 
