@@ -33,6 +33,7 @@ import System.Process (StdStream (CreatePipe), createProcess, proc, std_out)
 import Text.Read (readMaybe)
 
 import Clash.Core.Name (nameOcc)
+import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Scoped.TypeEnv (addGlobalTypes, mkTypeEnv)
 import Clash.Core.TermInfo (termSizeSmallerThan)
 import Clash.Core.Var (varName)
@@ -436,6 +437,7 @@ dropBinSuffix f
 
 -- | The known differences between the normalized bindings of the normalizer
 -- of Clash Core and those of scoped Clash Core, see the README
-normalizedKnownDifferences :: [KnownDifference]
-normalizedKnownDifferences =
-  [coercionForm, primTypeForm, recToNonRec, nonRecLetOrder, letrecOrder, deadLetBindings]
+normalizedKnownDifferences :: TyConMap -> [KnownDifference]
+normalizedKnownDifferences tcm =
+  [ coercionForm, primTypeForm, patternTypeForms tcm, literalNameTicks, sharedSelectors
+  , recToNonRec, nonRecLetOrder, letrecOrder, deadLetBindings ]

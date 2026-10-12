@@ -261,8 +261,10 @@ clash-differential normalized [--show N] DIR_A DIR_B DESIGN.bin...
 compares the normalized bindings of two runs, e.g. of the normalizer of Clash
 Core at one commit and that of scoped Clash Core at another, binding by
 binding, up to alpha-equivalence and the known differences between the two
-normalizers (`coercionForm`, `primTypeForm`, `recToNonRec`, `nonRecLetOrder`,
-`letrecOrder` and `deadLetBindings`). The globals that normalization creates get different
+normalizers (`coercionForm`, `primTypeForm`, `patternTypeForms`,
+`literalNameTicks`, `sharedSelectors`, `recToNonRec`, `nonRecLetOrder`,
+`letrecOrder` and `deadLetBindings`; see their documentation in
+`Test.Clash.Differential`). It reports the ones a binding needs. The globals that normalization creates get different
 uniques in both runs, so globals are matched by where they are used: from the
 top entity on, the globals that two matched bindings refer to are matched by
 the order in which they occur (see `Normalized.hs`). It reports the bindings
