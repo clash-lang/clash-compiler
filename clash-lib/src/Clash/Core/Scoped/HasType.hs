@@ -96,6 +96,7 @@ literalType = \case
 -- primitive returns its results as separate arguments, see Note [MultiResult
 -- type] in "Clash.Normalize.Transformations.MultiPrim".
 primInfoType :: (HasCallStack, Distinct n) => Scope n -> PrimInfo -> Type n
+-- TODO(D4): the type of a 'PrimInfo' is a Clash Core type
 primInfoType sc p = fromClashTypeClosed sc (C.coreTypeOf p)
 
 -- | The type of a term. See 'C.inferCoreTypeOf', and the module header.

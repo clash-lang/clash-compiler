@@ -217,6 +217,8 @@ mkUniqueNormalized
   -> NetlistMonad UniqueNormalized
 mkUniqueNormalized tenv topMM resTyM (SplitNormalized sc args binds res0) = do
   let res = case resTyM of
+        -- TODO(D4): the type of a top entity is a Clash Core type until
+        -- 'GlobalId' carries a scoped one
         Just ty -> res0 {localIdType = fromClashTypeClosed sc ty}
         Nothing -> res0
   -- Generate port names and add them to set of seen identifiers

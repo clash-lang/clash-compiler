@@ -275,7 +275,8 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
           NetDecl' srcNote (termIdentifier ctx i) typ resInit
 
       -- Like the type of the primitive, these are Clash Core types, which can
-      -- mention its quantified type variables
+      -- mention its quantified type variables. TODO(D4): translate scoped
+      -- types once 'C.PrimInfo' carries one.
       hwTys <- mapM (Legacy.unsafeCoreTypeToHWTypeM' $(curLoc)) (C.mpi_resultTypes mpInfo)
       pure (zipWith3 netdecl res hwTys resInits1)
 
@@ -538,6 +539,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
       -- The type of a top entity is a type of Clash Core, whose quantified
       -- type variables have been removed: so it can mention type variables
       -- that are not in scope, and its HWTypes come from Clash Core types.
+      -- TODO(D4): use the scoped type once 'GlobalId' carries one.
       | let ty = coreTypeOf (topId topEntity)
       , let (fArgTys0,fResTy) = C.splitFunForallTy ty
       -- Take into account that clocks and stuff are split off from any product

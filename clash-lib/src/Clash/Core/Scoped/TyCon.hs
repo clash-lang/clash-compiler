@@ -14,7 +14,8 @@
   closed Clash 'C.Type's. Scoped terms refer to data constructors with Clash's
   'DataCon', whose types are closed Clash types too. This module gives the
   parts of a 'TyCon' and a 'DataCon' that mention type variables as scoped
-  types, by converting them:
+  types, by converting them (TODO(D4): read them once 'TyCon' and 'DataCon'
+  store scoped types):
 
   * The /signature of a newtype/ (t'NewTyConSig'): a telescope of the type
     variables of the newtype, in the empty scope, and its eta-reduced

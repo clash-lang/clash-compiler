@@ -81,6 +81,7 @@ freshGlobalId :: C.Name C.Term -> Type 'VoidS -> RewriteMonad extra GlobalId
 freshGlobalId nm ty = do
   bndrs <- Lens.use scopedBindings
   u <- getUniqueM
+  -- TODO(D4): the type of a 'GlobalId' is a Clash Core type
   let tyC = toClashType ty
       global nm' = mkGlobalId (C.mkGlobalId tyC nm')
       taken u' = memberGlobalEnv (global (setUnique nm u')) bndrs

@@ -389,6 +389,7 @@ specializeGlobal sc e f args ticks specArgIn = do
         -- 'Clash.Normalize.Util.substWithTyEq'. So we drop the TyApp
         -- ("specializing" on it) and change the type of the variable to match.
         -- A global has a closed type, so this needs a closed type argument.
+        -- TODO(D4): the type of a 'GlobalId' is a Clash Core type.
         | let newTy = piResultTy te sc (globalIdType te sc f) tyArg
         , nullNameSet (freeTyVarsOfType newTy) ->
             traceIf (hasTransformationInfo AppliedTerm opts)

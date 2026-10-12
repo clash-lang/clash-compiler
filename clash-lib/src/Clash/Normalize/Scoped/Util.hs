@@ -445,6 +445,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
       normalization <- scopedNormalization
       tm2 <- rewriteExpr ("normalization", normalization) (nmS, tm1) (mkGlobalId nm', sp)
       curFun .= old
+      -- TODO(D4): the type of a 'GlobalId' is a Clash Core type
       let ty' = toClashType (inferCoreTypeOf te emptyScope tm2)
           r' = mkGlobalId nm' `memberGlobalSet` termGlobalIds tm2
           b = Binding nm'{C.varType = ty'} sp inl pr tm2 r'

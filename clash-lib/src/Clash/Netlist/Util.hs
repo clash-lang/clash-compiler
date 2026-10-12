@@ -239,7 +239,9 @@ unsafeCoreTypeToHWType sp loc builtInTranslation reprs te sc ty =
 -- | Run a function on scoped types on a type of Clash Core: its free type
 -- variables become the variables of the scope.
 --
--- TODO(Phase 7): remove, together with the functions on Clash Core that use it.
+-- TODO(D4): remove, together with the functions on Clash Core that use it.
+-- Netlist generation and normalization only use them on the types that
+-- 'GlobalId' and 'PrimInfo' still give as Clash Core types.
 withLegacyType
   :: HasCallStack
   => Type
@@ -2114,6 +2116,8 @@ checkTopEntityPorts
   -> ()
 checkTopEntityPorts typeTrans reprs te topId topM =
   let
+    -- TODO(D4): use the scoped type of the top entity once 'GlobalId' carries
+    -- one
     hwtysE =
       flip evalState mempty $ fmap sequence $
         withLegacyType (coreTypeOf topId) (\sc ty -> portTypes sc ty ty)
