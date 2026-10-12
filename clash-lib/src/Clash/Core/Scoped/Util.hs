@@ -720,6 +720,7 @@ primCo = TyApp (Prim (C.PrimInfo "_CO_" C.undefinedTy C.WorkNever C.SingleResult
 -- the primitive with the given type, as Clash Core makes it.
 primAtType :: C.PrimInfo -> Type n -> Term n
 primAtType p ty = case closeType ty of
+  -- TODO(D4): the type of a 'C.PrimInfo' is a Clash Core type
   Just closed -> Prim p {C.primType = toClashType closed}
   Nothing -> TyApp (Prim p {C.primType = C.undefinedTy}) ty
 

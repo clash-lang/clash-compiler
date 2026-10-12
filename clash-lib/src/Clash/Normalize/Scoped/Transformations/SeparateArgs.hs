@@ -129,6 +129,7 @@ separateArgumentsSpineWorker ctx e
       te <- Lens.view scopedTypeEnv
       case shouldSplit te sc (inferCoreTypeOf te sc tmArg) of
         Just info ->
+          -- TODO(D4): Clash Core types, for the type of the global ('GlobalId')
           changed (zip (map (Right . toClashType) (splitArgTys info))
                        (map Left (splitProject info sc tmArg)))
         Nothing -> return [(ty, arg)]

@@ -45,9 +45,9 @@
 
   = Migration
 
-  Once 'TyCon' and 'DataCon' store scoped types (decision D4 of the port), and
-  global variables carry theirs, the lookups below read them, and a
-  t'TypeEnv' is just the 'TyConMap'. Their users keep working.
+  TODO(D4): once 'TyCon' and 'DataCon' store scoped types (decision D4 of the
+  port), and global variables carry theirs, the lookups below read them, and
+  a t'TypeEnv' is just the 'TyConMap'. Their users keep working.
 -}
 
 {-# LANGUAGE DataKinds #-}

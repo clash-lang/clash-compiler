@@ -249,7 +249,8 @@ eqIntWith te iTy i elIndex =
   mkApps (Prim eqInt) [Left i, Left (mkApps (Data iDc) [Left (Literal (IntLiteral elIndex))])]
  where
   iDc = fromMaybe (error "reducePrim: failed to build the Int DC") (firstDataConOf te iTy)
-  -- The type of a primitive is closed
+  -- The type of a primitive is closed. TODO(D4): a scoped type once
+  -- 'PrimInfo' carries one.
   iTyC = maybe (error ("reducePrim: open Int type: " <> showPpr iTy)) toClashType (closeType iTy)
   eqInt = PrimInfo
     (showt 'GHC.Classes.eqInt)
