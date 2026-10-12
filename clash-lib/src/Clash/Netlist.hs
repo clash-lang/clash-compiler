@@ -87,13 +87,16 @@ import qualified Clash.Util.Interpolate           as I
 import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Scoped.Convert.Fresh  (toClashTermFreshClosed)
 import           Clash.Core.Scoped.NameMap        (globalEnvElems, globalEnvKeys, globalEnvToList)
-import           Clash.Core.Scoped.Syntax         (globalIdVar)
+import           Clash.Core.Scoped.Syntax         (globalIdVar, mkGlobalId)
+import {-# SOURCE #-} qualified Clash.Netlist.Scoped as Scoped
 import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
 import qualified Clash.Data.UniqMap               as UniqMap
 import Clash.Core.Evaluator.Types (Evaluator)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
--- @topEntity@ at the top.
+-- @topEntity@ at the top, on Clash Core. 'Clash.Netlist.Scoped.genNetlist'
+-- does so on scoped Clash Core.
+-- TODO(Phase 7): remove.
 genNetlist
   :: ClashEnv
   -> Evaluator
@@ -126,7 +129,7 @@ genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefix
   let (componentNames_, seen1) =
         genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
   ((_meta, topComponent), s) <-
-    runNetlistMonad env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
+    runNetlistMonad' True env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
       $ genComponent topEntity
   return (topComponent, _components s, seen1)
 
@@ -156,9 +159,40 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_ act = do
+runNetlistMonad = runNetlistMonad' False
+
+-- | Run a NetlistMonad action in a given environment, generating components
+-- on Clash Core or on scoped Clash Core, see 'genComponent'
+runNetlistMonad'
+  :: Bool
+  -- ^ Whether to generate components on Clash Core
+  -> ClashEnv
+  -> Evaluator
+  -> Bool
+  -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
+  -> GlobalBindings
+  -- ^ Global binders
+  -> VarEnv TopEntityT
+  -- ^ TopEntity annotations
+  -> (CustomReprs -> TyConMap -> Type ->
+      State HWMap (Maybe (Either String FilteredHWType)))
+  -- ^ Hardcode Type -> HWType translator
+  -> Bool
+  -- ^ Whether the backend supports ifThenElse expressions
+  -> SomeBackend
+  -- ^ The current HDL backend
+  -> IdentifierSet
+  -- ^ Seen components
+  -> FilePath
+  -- ^ HDL dir
+  -> VarEnv Identifier
+  -- ^ Seen components
+  -> NetlistMonad a
+  -- ^ Action to run
+  -> IO (a, NetlistState)
+runNetlistMonad' legacy env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_ act = do
   supply <- Supply.newSupply
-  flip runReaderT (NetlistEnv env "" "" Nothing [] eval tenv)
+  flip runReaderT (NetlistEnv env "" "" Nothing [] eval tenv legacy)
     . flip runStateT (s' supply)
     $ runNetlist act
   where
@@ -253,13 +287,26 @@ genTopNames opts hdl tops =
     topNm <- Id.makeBasic (genComponentName True prefixM id_)
     pure (extendVarEnv id_ topNm env)
 
--- | Generate a component for a given function (caching)
+-- | Generate a component for a given function (caching). On scoped Clash
+-- Core, see 'Clash.Netlist.Scoped.genComponent', unless 'legacyNetlist' is
+-- set.
 genComponent
   :: HasCallStack
   => Id
   -- ^ Name of the function
   -> NetlistMonad (ComponentMeta, Component)
 genComponent compName = do
+  legacy <- Lens.view legacyNetlist
+  if legacy then genComponentLegacy compName else Scoped.genComponent (mkGlobalId compName)
+
+-- | Generate a component for a given function (caching), on Clash Core
+-- TODO(Phase 7): remove.
+genComponentLegacy
+  :: HasCallStack
+  => Id
+  -- ^ Name of the function
+  -> NetlistMonad (ComponentMeta, Component)
+genComponentLegacy compName = do
   compExprM <- lookupVarEnv compName <$> Lens.use legacyBindings
   case compExprM of
     Nothing -> do

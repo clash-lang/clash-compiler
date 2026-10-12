@@ -289,6 +289,9 @@ data NetlistEnv
   -- 'Clash.Core.Evaluator.Types.nfData'
   , _typeEnv :: TypeEnv
   -- ^ The type environment of scoped Clash Core, made once per run
+  , _legacyNetlist :: Bool
+  -- ^ Whether to generate components on Clash Core, see
+  -- 'Clash.Netlist.genComponent'. TODO(Phase 7): remove.
   }
 
 data ComponentMeta = ComponentMeta
