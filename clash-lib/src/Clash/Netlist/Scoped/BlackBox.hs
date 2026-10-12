@@ -1432,9 +1432,9 @@ openLams ctx0 e0 k = go ctx0 [] e0
     Lam b body -> openIdBinder (compScope ctx) b body $ \(sc' :: Scope y) b' body' ->
       withExtTrans @n @x @y $
         go (extendCompCtx sc' [] ctx) (binderLocalId b' : map sink accRev) body'
-    TyLam b body -> openTyBinder (compScope ctx) b body $ \(sc' :: Scope y) b' body' ->
+    TyLam b body -> openTyBinder (compScope ctx) b body $ \(sc' :: Scope y) _ body' ->
       withExtTrans @n @x @y $
-        go (extendCompCtxTy sc' [(tyBinderOcc b', sink (tyBinderKind b'), tyNameOf b')] ctx)
+        go (extendCompCtx sc' [] ctx)
            (map sink accRev) body'
     body -> k ctx (reverse accRev) body
 

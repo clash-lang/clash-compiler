@@ -18,13 +18,12 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
-import Clash.Util.Supply (newSupply)
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, fromClashType)
 import Clash.Core.Scoped.Syntax
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Scoped.Types
-  ( LocalId (..), SomeBlackBoxFunction (..), compCtxFromList, legacyCompCtx )
+  ( LocalId (..), SomeBlackBoxFunction (..), compCtxFromList )
 import Clash.Netlist.Types (Declaration (Assignment, NetDecl))
 import Clash.Primitives.Types
   ( BlackBoxFunctionName (..), CompiledPrimitive, Primitive (BlackBoxHaskell)
@@ -34,7 +33,7 @@ import Clash.Primitives.Sized.Vector (foldBBF, iterateBBF)
 import Clash.Primitives.Verification (bindMaybe)
 
 import Test.Clash.Rewrite
-  (addTy, intId, intTy, mkBindingMap, numTy, runNetlistTest, tyVar)
+  (addTy, intId, mkBindingMap, numTy, runNetlistTest, tyVar)
 import Test.Clash.Scoped (testTypeEnv, withFreeVarsOf)
 
 -- | A primitive with the given blackbox function
@@ -50,12 +49,9 @@ bbfPrim f =
 -- scope.
 functionPlurality :: Assertion
 functionPlurality = do
-  sup <- newSupply
   sequence_
     [ withFreeVarsOf [C.TyApp (C.Literal (C.IntLiteral 0)) resTy] $ \env -> do
-        let -- The Clash Core counterpart of @a@ is @a@ itself
-            ctx = legacyCompCtx (convScope env) testTypeEnv sup
-                    [ (n, a) | VarTy _ _ n <- [fromClashType env resTy] ] []
+        let ctx = compCtxFromList (convScope env) testTypeEnv []
             conv = either (Left . fromClashTerm env) (Right . fromClashType env)
             resTys = [fromClashType env resTy]
         plurality <- runNetlistTest (mkBindingMap []) $
@@ -78,13 +74,12 @@ functionPlurality = do
 -- context, and binds other terms to a new signal
 bindMaybeTest :: Assertion
 bindMaybeTest = do
-  sup <- newSupply
   let x = intId C.User "x" 70
   withFreeVarsOf [C.Var x] $ \env -> case fromClashTerm env (C.Var x) of
     xVar@(Var o ty nm) -> do
       let ctx =
-            compCtxFromList (convScope env) testTypeEnv sup
-              [(LocalId o ty nm, Id.unsafeMake "x_hdl", intTy)]
+            compCtxFromList (convScope env) testTypeEnv
+              [(LocalId o ty nm, Id.unsafeMake "x_hdl")]
       (i0, decls0) <- runNetlistTest (mkBindingMap []) (bindMaybe ctx (Just "p") xVar)
       assertEqual "identifier of a variable" "x_hdl" (Id.toText i0)
       assertEqual "declarations of a variable" 0 (length decls0)
