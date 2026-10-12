@@ -22,9 +22,8 @@
   that Netlist generation made up. Internally, a result is therefore given by
   its HDL identifier and its type ('ResId').
 
-  Types are still translated to 'HWType's on Clash Core ('hwTypeOf'), TODO(Phase
-  5, Util), and the plurality of function arguments is determined on Clash
-  Core, TODO(Phase 5, Primitives).
+  The plurality of function arguments is still determined on Clash Core,
+  TODO(Phase 5, Primitives).
 -}
 
 {-# LANGUAGE CPP #-}
@@ -99,9 +98,9 @@ import           Clash.Netlist.Types           as N
   hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
 import qualified Clash.Netlist.Types           as N (Expr (Literal))
 import           Clash.Netlist.Util
-  (affixName, condAssign, contAssign, coreTypeToHWTypeM, declareUse, flattenFiltered,
-   isVoid, mkInit, mkLiteral, originalIndices, preserveVarEnv, primWarnContext,
-   procAssign, stripFiltered, stripVoid, unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
+  (affixName, condAssign, contAssign, declareUse, flattenFiltered, isVoid, mkInit,
+   mkLiteral, originalIndices, preserveVarEnv, primWarnContext, procAssign,
+   stripFiltered, stripVoid)
 import           Clash.Normalize.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
@@ -129,7 +128,8 @@ import {-# SOURCE #-} Clash.Netlist.Scoped
    mkFunApp, mkNetDecl, mkProjection, mkSelection)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
-  (idToOutPort, renameBinder, uniqueIdentifier, withTicks)
+  (coreTypeToHWTypeM, idToOutPort, renameBinder, uniqueIdentifier,
+   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | The result of a blackbox: its HDL identifier and its type. See the module
 -- header.
@@ -145,11 +145,6 @@ rawIdentifier = Id.unsafeMake . Id.toText
 -- | The result of a blackbox that is a local variable
 localResId :: HasCallStack => CompCtx n -> LocalId n -> ResId n
 localResId ctx v = (localIdentifier ctx (localIdName v), localIdType v)
-
--- | The 'HWType' of a type of a component. TODO(Phase 5, Util): translate
--- scoped types.
-hwTypeOf :: CompCtx n -> Type n -> NetlistMonad HWType
-hwTypeOf ctx = unsafeCoreTypeToHWTypeM' $(curLoc) . toLegacyType ctx
 
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext
@@ -185,7 +180,7 @@ mkBlackBoxContextRes ctx bbName declType resIds args@(lefts -> termArgs) = do
     let
       resNms = map fst resIds
       resNm = fromMaybe (error "mkBlackBoxContext: head") (listToMaybe resNms)
-    resTys <- mapM (hwTypeOf ctx . snd) resIds
+    resTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) . snd) resIds
     (imps,impDecls) <- unzip <$> zipWithM (mkArgument ctx bbName resNm declType) [0..] termArgs
     (funs,funDecls) <-
       mapAccumLM
@@ -256,7 +251,7 @@ mkArgument
 mkArgument ctx bbName bndr declType nArg e = do
     let ty = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) e
     iw    <- Lens.view intWidth
-    hwTyM <- fmap stripFiltered <$> coreTypeToHWTypeM (toLegacyType ctx ty)
+    hwTyM <- fmap stripFiltered <$> coreTypeToHWTypeM (compScope ctx) ty
     let eTyMsg = "(" ++ showPpr (toLegacy ctx e) ++ " :: " ++ showPpr (toLegacyType ctx ty) ++ ")"
     ((e',t,l),d) <- case hwTyM of
       Nothing
@@ -457,7 +452,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                     Nothing -> return (Identifier (Id.unsafeMake "__VOID__") Nothing,[])
         P.Primitive pNm _ _
           | pNm == showt 'GHC.Prim.tagToEnum# -> do
-              hwTy <- hwTypeOf ctx ty
+              hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) ty
               case args of
                 [Right (ConstTy (C.TyCon tcN)), Left (Literal (IntLiteral i))] -> do
                   tcm <- Lens.view tcCache
@@ -475,7 +470,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                     _ | isVoid hwTy -> return (Noop,scrutDecls)
                     Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                     _ -> do
-                      scrutHTy <- hwTypeOf ctx scrutTy
+                      scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) scrutTy
                       tmpRhs <- Id.make "c$tte_rhs"
                       netDecl <- mkInit declType assignTy tmpRhs scrutHTy scrutExpr
                       return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
@@ -655,7 +650,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
       -- Nothing when the binder would have type `Void`
     resBndr mkDec dst' = do
       resHwTy <- case tys of
-        (ty1:_) -> hwTypeOf ctx ty1
+        (ty1:_) -> unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) ty1
         _ -> error "internal error: insufficient types"
       if isVoid resHwTy then
         pure Nothing
@@ -718,7 +713,7 @@ mkDataToTag
   -> NetlistMonad (Expr, [Declaration])
 mkDataToTag ctx declType assignTy scrut = do
   let scrutTy = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) scrut
-  scrutHTy <- hwTypeOf ctx scrutTy
+  scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) scrutTy
   (scrutExpr, scrutDecls) <-
     mkExpr ctx False declType (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
   (scrutId, scrutDecls') <- case scrutExpr of
@@ -825,7 +820,7 @@ mkFunInput ctx parentName declType resId e =
               let eTy = inferCoreTypeOf tenv sc e
                   (_,resTy) = splitFunTys tenv sc eTy
 
-              resHTyM0 <- coreTypeToHWTypeM (toLegacyType ctx resTy)
+              resHTyM0 <- coreTypeToHWTypeM sc resTy
               let resHTyM1 = (\fHwty -> (stripFiltered fHwty, flattenFiltered fHwty)) <$> resHTyM0
 
               case resHTyM1 of
@@ -997,7 +992,7 @@ mkFunInput ctx parentName declType resId e =
       -> NetlistMonad ((Identifier, [Declaration]), Usage)
     goExpr c app@(collectArgsTicks -> (appF,args@(_:_),ticks))
       | Just fun <- funOf appF = do
-      resTy <- hwTypeOf c (inferCoreTypeOf (compTypeEnv c) (compScope c) app)
+      resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope c) (inferCoreTypeOf (compTypeEnv c) (compScope c) app)
       let (tmArgs,tyArgs) = partitionEithers args
       if null tyArgs
         then
@@ -1060,7 +1055,7 @@ mkFunInput ctx parentName declType resId e =
 
     go c _ (Case scrut ty (alt:alts@(_:_))) = do
       resNm <- Id.make "result"
-      resTy <- hwTypeOf c ty
+      resTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope c) ty
       let resId'  = NetlistId resNm ty
       selectionDecls <- mkSelection c declType resId' scrut ty (alt :| alts) []
       let assn = [ NetDecl' Nothing resNm resTy Nothing
@@ -1283,7 +1278,7 @@ collectMealy ctx dstNm dst (kd:clk:mealyFun:mealyInit:mealyIn:_) =
         -- because we're basically clocked logic; so we need to have our outputs
         -- ready before the ambient system starts sampling them. The clockGen code
         -- ensures that the "opposite" edge always comes first.
-        kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (toLegacyType ctx (inferCoreTypeOf tenv sc kd))
+        kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) sc (inferCoreTypeOf tenv sc kd)
         let edge = case stripVoid (stripFiltered kdTy) of
                      KnownDomain _ _ Rising _ _ _  -> Falling
                      KnownDomain _ _ Falling _ _ _ -> Rising
@@ -1521,7 +1516,7 @@ mkUniqueLets
   -> NetlistMonad r
 mkUniqueLets ctx binds res k = do
   -- Translating the type of the result fails if it is not translatable
-  _ <- unsafeCoreTypeToHWTypeM $(curLoc) (toLegacyType ctx (localIdType res))
+  _ <- unsafeCoreTypeToHWTypeM $(curLoc) (compScope ctx) (localIdType res)
   res1Name <- uniqueIdentifier (localIdOcc res)
   portM <- idToOutPort (compScope ctx) res1Name (localIdType res)
   case portM of
