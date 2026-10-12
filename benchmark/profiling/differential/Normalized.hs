@@ -45,6 +45,7 @@ import System.IO (hFlush, stdout)
 
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
+import Clash.Core.TyCon (TyConMap)
 import qualified Clash.Core.Subst as C (aeqType)
 import qualified Clash.Core.Type as C (Type)
 import qualified Clash.Core.Var as C
@@ -84,7 +85,8 @@ data Result
 -- they agree up to the known differences.
 compareNormalized
   :: NormOptions
-  -> [KnownDifference]
+  -> (TyConMap -> [KnownDifference])
+  -- ^ The known differences, given the type constructors of the design
   -> FilePath
   -- ^ The normalization inputs of the design (@\<design\>.bin@)
   -> FilePath
@@ -92,8 +94,14 @@ compareNormalized
   -> FilePath
   -- ^ The normalized bindings of the second run
   -> IO Bool
-compareNormalized opts kds design fileA fileB = do
-  (_, _, _, _, _, _, top, _) <- decode <$> B.readFile design :: IO NormalizationInputs
+compareNormalized opts kdsFor design fileA fileB = do
+  (_, tcm, _, _, _, _, top, _) <- decode <$> B.readFile design :: IO NormalizationInputs
+  compareNormalizedWith opts (kdsFor tcm) design top fileA fileB
+
+-- | 'compareNormalized', given the known differences and the top entity
+compareNormalizedWith
+  :: NormOptions -> [KnownDifference] -> FilePath -> C.Id -> FilePath -> FilePath -> IO Bool
+compareNormalizedWith opts kds design top fileA fileB = do
   bmA <- decode <$> B.readFile fileA :: IO BindingMap
   bmB <- decode <$> B.readFile fileB :: IO BindingMap
   results <- go bmA bmB [(C.varUniq top, top, top)] Set.empty Map.empty []

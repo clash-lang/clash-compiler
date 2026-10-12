@@ -58,6 +58,9 @@ module Test.Clash.Differential
   , globalUniques
   , nonRecLetOrder
   , primTypeForm
+  , sharedSelectors
+  , patternTypeForms
+  , literalNameTicks
   , everywhereTm
   , everywhereScopedTm
     -- * Running transformations
@@ -100,12 +103,16 @@ import qualified Data.Hashable as Hashable
 import Clash.Core.Name (nameOcc, nameUniq)
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.TyCon as C (TyConMap)
+import qualified Clash.Core.Type as C (normalizeType)
 import Clash.Core.Var (Id, varName)
 import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (emptyInScopeSet, emptyVarEnv, eltsVarEnv)
 import Clash.Driver.Types (Binding (..), BindingMap)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
-import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
+import Clash.Core.Scoped.NameMap
+  (emptyGlobalEnv, emptyNameMap, insertNameMap, memberNameMap, memberNameSet,
+   nameMapFromList, nameMapToList, nameSetToList)
 import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
@@ -118,11 +125,12 @@ import Clash.Util.Supply (Supply, newSupply)
 
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm, toClashType)
-import Clash.Core.Scoped.FreeVars (teleNameBinders)
+import Clash.Core.Scoped.FreeVars (freeTmVars, teleNameBinders)
 import Clash.Core.Scoped.Subst
-  (freshen, openAlt, openBind, openIdBinder, openTyBinder, unsinkIdBinder, unsinkTerm)
+  (closeTerm, freshen, openAlt, openBind, openIdBinder, openTyBinder, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Term (walkTerm)
-import Clash.Rewrite.Scoped.Util (removeUnusedBinders)
+import Clash.Rewrite.Scoped.Util
+  (LetBinding (..), keepBindings, openLetBindings, removeUnusedBinders, substVars)
 import Data.Maybe (fromMaybe)
 import Clash.Core.Scoped.Util
   (LetGroup (NonRecGroup, RecGroup), mkLets, regroupLetBindings)
@@ -443,6 +451,112 @@ nonRecLetOrder = KnownDifference
                   (keys ++ [(nameOcc (idBinderOcc b), show (toClashTerm (freshen sc0 x0)))])
                   body1
       _ -> k (pre TNil) xs keys e
+
+-- | A let-bound selector, a case-expression with a single alternative that
+-- gives a variable, of a variable or of such a selector, is inlined at its
+-- uses.
+--
+-- 'Clash.Normalize.Transformations.Letrec.simpleCSE' keeps the first of
+-- alpha-equivalent let-bindings in the order of their uniques
+-- ('Clash.Core.Util.inverseTopSortLetBindings'), where its port keeps the
+-- first in the order of the bindings (see 'letrecOrder'): binders that Clash
+-- makes have smaller uniques than the binders of GHC, so the former keeps
+-- e.g. @c$ds4_app_arg@ and replaces the user's @strobe@ by it, where the
+-- port keeps @strobe@. Which of them later transformations inline then
+-- differs: a selector is shared by a let-binding in one result, and inlined
+-- at its uses in the other.
+sharedSelectors :: KnownDifference
+sharedSelectors = KnownDifference
+  { kdName = "shared-selectors"
+  , kdDescription = "let-bound selectors are inlined at their uses"
+  , kdNormalize = everywhereScopedTm go
+  }
+ where
+  go :: Distinct x => Scope x -> Term x -> Term x
+  go sc = \case
+    e@(Let bind body) -> openLetBindings sc bind body $ \scL bs lbs body1 ->
+      let
+        sels =
+          [ lb | lb <- lbs, isSelector (lbRhs lb)
+               , not (lbName lb `memberNameSet` freeTmVars (lbRhs lb)) ]
+        m0 = List.foldl' (\m lb -> insertNameMap (lbName lb) (lbRhs lb) m) emptyNameMap sels
+        -- Inline selectors of selectors, in at most as many rounds as there
+        -- are selectors
+        resolve k m
+          | k <= 0 || not (any mentionsSel (map snd (nameMapToList m))) = m
+          | otherwise = resolve (k - 1) (nameMapFromList [(nm, substVars scL m x) | (nm, x) <- nameMapToList m])
+         where
+          mentionsSel x = any (`memberNameMap` m) (nameSetToList (freeTmVars x))
+        m1 = resolve (length sels) m0
+        kept = [ lb {lbRhs = substVars scL m1 (lbRhs lb)}
+               | lb <- lbs, not (lbName lb `memberNameMap` m1) ]
+      in if null sels then e else fromMaybe e (keepBindings sc bs kept (substVars scL m1 body1))
+    e -> e
+
+  isSelector :: Term y -> Bool
+  isSelector = \case
+    Case subj _ [Alt DataPat {} Var {}] -> case subj of
+      Var {} -> True
+      _ -> isSelector subj
+    _ -> False
+
+-- | The types of the variables of patterns are normalized
+-- ('Clash.Core.Type.normalizeType'): type families reduced, newtypes looked
+-- through. Only applies to closed terms, such as normalized bindings.
+--
+-- Clash Core keeps the type of a variable per occurrence, which can have
+-- another form than that of its binder, e.g. @BitVector 23@ where the binder
+-- has @BitVector (- 24 1)@. Projections of fields ('Clash.Core.Util.mkSelectorCase')
+-- instantiate the types of their pattern variables at the type of the
+-- occurrence of their subject. Scoped Core gives every occurrence the type
+-- of its binder. As the netlist only sees normalized types, the forms of
+-- these types make no difference to the HDL.
+patternTypeForms :: C.TyConMap -> KnownDifference
+patternTypeForms tcm = KnownDifference
+  { kdName = "pattern-type-forms"
+  , kdDescription = "the types of pattern variables are normalized"
+  , kdNormalize = \_ e -> case closeTerm e of
+      Just e0 -> sinkClosed (fromClashTermClosed (go (toClashTerm e0)))
+      Nothing -> e
+  }
+ where
+  go :: C.Term -> C.Term
+  go = \case
+    C.Lam v e -> C.Lam v (go e)
+    C.TyLam v e -> C.TyLam v (go e)
+    C.App e1 e2 -> C.App (go e1) (go e2)
+    C.TyApp e ty -> C.TyApp (go e) ty
+    C.Let b e -> C.Let (fmap go b) (go e)
+    C.Case e ty alts -> C.Case (go e) ty (map goAlt alts)
+    C.Cast e t1 t2 -> C.Cast (go e) t1 t2
+    C.Tick t e -> C.Tick t (go e)
+    e -> e
+
+  goAlt = \case
+    (C.DataPat dc tvs ids, e) ->
+      (C.DataPat dc tvs (map (\i -> i {C.varType = C.normalizeType tcm (C.varType i)}) ids), go e)
+    (p, e) -> (p, go e)
+
+-- | Name modifiers on literals are removed: they name nothing in the HDL.
+--
+-- Inlining a global ticks its body with the name of the global
+-- ('Clash.Normalize.Util.mkInlineTick'), e.g. a @KnownNat@ dictionary that GHC
+-- floated out to a global of its own. Alpha-equivalent dictionaries can be
+-- floated out to several globals, and the specialization cache ignores
+-- ticks ('Clash.Normalize.Transformations.Specialize.specCacheKey'), so the
+-- name on the literal of a specialized function is that of the call that was
+-- specialized first, which can differ between the two normalizers.
+literalNameTicks :: KnownDifference
+literalNameTicks = KnownDifference
+  { kdName = "literal-name-ticks"
+  , kdDescription = "name modifiers on literals are removed"
+  , kdNormalize = \_ -> everywhereTm go
+  }
+ where
+  go :: Term x -> Term x
+  go = \case
+    Tick (NameMod {}) e@(Literal {}) -> e
+    e -> e
 
 -- | A primitive that stands for a term of an open type, @errorX@, has that
 -- type, rather than being applied to it.

@@ -22,6 +22,7 @@ import Clash.Core.Literal (Literal (IntLiteral))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.Type as Type
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.Combinators (bottomupR, repeatR)
 import Clash.Rewrite.Util (changed)
@@ -33,7 +34,8 @@ import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 
 import Test.Clash.Differential
 import Test.Clash.Rewrite
-  (globalId, intId, intLit, intTy, mkBinding, mkBindingMap, parseToTermQQ)
+  ( fTy, globalId, intFunTy, intId, intLit, intTy, justDataCon, localId, maybeTy, mkBinding
+  , mkBindingMap, pairDataCon, pairTy, parseToTermQQ, testTyConMap)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Differential"
@@ -96,6 +98,59 @@ tests = testGroup "Clash.Tests.Differential"
           assertBool "different before" (not (aeqTm t1 t2))
           assertBool "equal after"
             (aeqTm (kdNormalize letrecOrder emptyScope t1) (kdNormalize letrecOrder emptyScope t2))
+
+      , testCase "shared-selectors inlines a let-bound selector at its uses" $ do
+          let p = localId C.User "p" 1 pairTy
+              s = intId C.User "s" 4
+              f = globalId C.User "f" 5 (intFunTy 2)
+              shared = closed (C.Lam p (C.Let (C.NonRec s (sel1 p)) (C.mkApps (C.Var f) [Left (C.Var s), Left (C.Var s)])))
+              inlined = closed (C.Lam p (C.mkApps (C.Var f) [Left (sel1 p), Left (sel1 p)]))
+          assertBool "different before" (not (aeqTm shared inlined))
+          assertBool "equal after" (aeqTm (kdNormalize sharedSelectors emptyScope shared) inlined)
+
+      , testCase "shared-selectors inlines selectors of selectors, and keeps other bindings" $ do
+          let p = localId C.User "p" 1 pairTy
+              q = localId C.User "q" 6 pairTy
+              s = intId C.User "s" 4
+              f = globalId C.User "f" 5 (intFunTy 2)
+              g = globalId C.User "g" 8 (Type.mkFunTy intTy pairTy)
+              u = intId C.User "u" 7
+              -- letrec q = g s; s = case p of MkPair a b -> a; u = f s (case q of ..) in u
+              shared = closed (C.Lam p (C.Let (C.Rec
+                [ (q, C.App (C.Var g) (C.Var s))
+                , (s, sel1 p)
+                , (u, C.mkApps (C.Var f) [Left (C.Var s), Left (sel1 q)]) ]) (C.Var u)))
+              inlined = closed (C.Lam p (C.Let (C.Rec
+                [ (q, C.App (C.Var g) (sel1 p))
+                , (u, C.mkApps (C.Var f) [Left (sel1 p), Left (sel1 q)]) ]) (C.Var u)))
+          assertBool "equal after" (aeqTm (kdNormalize sharedSelectors emptyScope shared) inlined)
+
+      , testCase "pattern-type-forms normalizes the types of pattern variables" $ do
+          let m = localId C.User "m" 1 (maybeTy (fTy (maybeTy intTy)))
+              withTy ty = localId C.User "a" 2 ty
+              -- \m -> case m of Just (a :: ty) -> a
+              sel ty = closed (C.Lam m (C.Case (C.Var m) intTy
+                [(C.DataPat justDataCon [] [withTy ty], C.Var (withTy ty))]))
+              reduced = sel intTy
+              unreduced = sel (fTy (maybeTy intTy))
+              kd = patternTypeForms testTyConMap
+          assertBool "different before" (not (aeqTm reduced unreduced))
+          assertBool "equal after"
+            (aeqTm (kdNormalize kd emptyScope reduced) (kdNormalize kd emptyScope unreduced))
+
+      , testCase "literal-name-ticks removes name modifiers on literals only" $ do
+          let x = intId C.User "x" 1
+              named nm = C.Tick (C.NameMod C.PrefixName (Type.LitTy (Type.SymTy nm)))
+              t1 = closed (C.Lam x (C.mkApps (C.Var (globalId C.User "f" 5 (intFunTy 2)))
+                     [Left (named "a" (intLit 4)), Left (named "c" (C.Var x))]))
+              t2 = closed (C.Lam x (C.mkApps (C.Var (globalId C.User "f" 5 (intFunTy 2)))
+                     [Left (named "b" (named "d" (intLit 4))), Left (named "c" (C.Var x))]))
+              t3 = closed (C.Lam x (C.mkApps (C.Var (globalId C.User "f" 5 (intFunTy 2)))
+                     [Left (intLit 4), Left (named "e" (C.Var x))]))
+              norm = kdNormalize literalNameTicks emptyScope
+          assertBool "different before" (not (aeqTm t1 t2))
+          assertBool "equal after" (aeqTm (norm t1) (norm t2))
+          assertBool "a name modifier on a variable stays" (not (aeqTm (norm t1) (norm t3)))
 
       , testCase "rec-to-nonrec keeps a recursive Rec" $ do
           let y = intId C.User "y" 2
@@ -169,6 +224,12 @@ tests = testGroup "Clash.Tests.Differential"
   ]
  where
   closed = fromClashTermClosed
+
+  -- The first field of a pair: case p of MkPair a b -> a
+  sel1 p =
+    let a = intId C.User "a" 2
+        b = intId C.User "b" 3
+    in C.Case (C.Var p) intTy [(C.DataPat pairDataCon [] [a, b], C.Var a)]
 
   letTerm = [parseToTermQQ|
     \(x_1 :: Int) -> let { (y_2 :: Int) = x_1; (z_3 :: Int) = 3 } in (\(w_4 :: Int) -> w_4) y_2
