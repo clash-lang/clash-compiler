@@ -71,7 +71,7 @@ import Clash.Core.DataCon (DataCon, dcArgTys, dcExtTyVars)
 import Clash.Core.EqSolver (typeEq)
 import Clash.Core.Evaluator.Types  (whnf')
 import Clash.Core.FreeVars
-  (termFreeVars', typeFreeVars', localVarsDoNotOccurIn)
+  (termFreeVars', typeFreeVars, typeFreeVars', localVarsDoNotOccurIn)
 import Clash.Core.HasType
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Name (OccName, nameOcc)
@@ -545,7 +545,7 @@ mkDisjointGroup inScope (fun,(seen,cs)) = do
         (Left tm:_, True) ->
           return (lbs,Left tm)
         (Left tm:_, False) -> do
-          let ty = inferCoreTypeOf tcm tm
+          let ty = argType tcm tm pos
           let err = error ("mkDisjointGroup: mixed type and term arguments: " <> show cL)
           (lbM,arg) <- disJointSelProj inScope ty (Either.fromLeft err <$> c) funName pos
           case lbM of
@@ -576,6 +576,30 @@ mkDisjointGroup inScope (fun,(seen,cs)) = do
             (v,) <$> mkBigTupSelector inScope tcm tupTcm (Var tupIn) tys n)
             vs [0..]
         return (Letrec ((tupIn,ct):projections) funApp, seen)
+  where
+    -- The type of the term argument at position @pos@: that of the argument
+    -- of the first application, unless it mentions type variables bound by
+    -- patterns inside the alternatives, and otherwise that of the parameter of
+    -- the function. Clash drops casts, so after matching on a GADT, an
+    -- argument can have a type that mentions an existential type variable
+    -- where the function expects another type.
+    argType tcm tm pos
+      | Lens.anyOf typeFreeVars (`elem` patTyVars cs) tmTy
+      , l:_ <- Foldable.toList cs
+      , let funTy = inferCoreTypeOf tcm fun
+      , (Right paramTy:_,_) <-
+          splitFunForallTy (applyTypeToArgs fun tcm funTy (take (fromIntegral pos) l))
+      = paramTy
+      | otherwise
+      = tmTy
+     where
+      tmTy = inferCoreTypeOf tcm tm
+
+    -- The type variables bound by the patterns of a case-tree
+    patTyVars (Leaf _) = []
+    patTyVars (LB _ ct) = patTyVars ct
+    patTyVars (Branch _ alts) =
+      concatMap (\(p,ct) -> fst (patIds p) ++ patTyVars ct) alts
 
 -- | Create a selector for the case-tree of the argument. If the argument is
 -- representable create a let-binding for the created selector, and return
