@@ -512,7 +512,7 @@ mkExpr ctx bbEasD declType bndr app =
   sink1Args :: DExt x y => [Either (Term x) (Type x)] -> [Either (Term y) (Type y)]
   sink1Args = map (either (Left . sink) (Right . sink))
 
--- * Adapters
+-- * Handlers
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a
 -- function application

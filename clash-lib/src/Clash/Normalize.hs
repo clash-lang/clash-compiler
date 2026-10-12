@@ -9,12 +9,8 @@
   Turn CoreHW terms into normalized CoreHW Terms
 
   The normalizer runs on scoped Clash Core ("Clash.Core.Scoped.Syntax"): the
-  global bindings are closed terms. Until GHC2Core and Netlist are ported
-  (Phase 5 of the port), 'Clash.GHC.GenerateBindings.generateBindings'
-  converts the bindings of Clash Core that GHC2Core produces
-  ('Clash.Rewrite.Scoped.Globals.fromClashBindings'), and
-  'Clash.Netlist.genNetlist' converts the normalized ones back
-  ('Clash.Rewrite.Scoped.Globals.toClashBindings').
+  global bindings are closed terms, which GHC2Core produces and Netlist
+  generation consumes.
 -}
 
 {-# LANGUAGE CPP #-}
