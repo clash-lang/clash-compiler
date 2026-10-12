@@ -49,7 +49,7 @@ import qualified Clash.Normalize.Primitives as NP
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import Clash.Core.Scoped.Evaluator.Primitives.Util
   (bvConPrim, intLiteral, integerToIntLiteral, liftLit2, signedConPrim)
-import Clash.Core.Scoped.Evaluator.Adapter (adaptPrim)
+import Test.Clash.Scoped.Evaluator.Adapter (adaptPrim)
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving as PDeriving
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Promoted.Nat as PNat
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Data.Text.Show as PShow

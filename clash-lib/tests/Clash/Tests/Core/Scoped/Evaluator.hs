@@ -28,7 +28,7 @@ import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Driver.Types (BindingMap)
 import Clash.Util.Supply (freshId)
 
-import Clash.Core.Scoped.Evaluator.Adapter (adaptPrim)
+import Test.Clash.Scoped.Evaluator.Adapter (adaptPrim)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
 

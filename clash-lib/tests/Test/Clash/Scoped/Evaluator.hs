@@ -11,7 +11,7 @@
   = Comparing a reduction with the adapter
 
   A ported reduction is compared with the reduction of Clash Core through the
-  adapter ("Clash.Core.Scoped.Evaluator.Adapter"):
+  adapter ("Test.Clash.Scoped.Evaluator.Adapter"):
 
   * 'comparePrimCall' evaluates a call of a primitive, given as a Clash Core
     term, once with the ported reduction and once with the adapter.
@@ -105,7 +105,7 @@ import Clash.Driver.Types (BindingMap)
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, toClashTerm, withConvEnv)
 import Clash.Core.Scoped.Evaluator (bindAllocated, unwindStack, whnf)
-import Clash.Core.Scoped.Evaluator.Adapter (adaptPrim)
+import Test.Clash.Scoped.Evaluator.Adapter (adaptPrim)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Util as U
 import Clash.Core.Scoped.Evaluator.Types

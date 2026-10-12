@@ -28,12 +28,9 @@ module Clash.Rewrite.Scoped.Whnf
 import qualified Control.Lens as Lens
 import GHC.Stack (HasCallStack)
 
-import qualified Clash.Core.Evaluator.Types as C
-import Clash.Rewrite.Types
-  (RewriteMonad, bindings, evaluator, globalHeap, scopedTypeEnv)
+import Clash.Rewrite.Types (RewriteMonad, bindings, globalHeap, scopedTypeEnv)
 
 import Clash.Core.Scoped.Evaluator (allocatedBind, whnf)
-import Clash.Core.Scoped.Evaluator.Adapter (adaptPrim)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
@@ -41,12 +38,11 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import Clash.Rewrite.Scoped.Types
 import Clash.Rewrite.Scoped.Util (bindPureHeap)
 
--- | The environment of the scoped evaluator: the ported primitive reductions,
--- and the others with the evaluator of Clash Core, see
--- "Clash.Core.Scoped.Evaluator.Adapter"
-evaluatorEnv :: TypeEnv -> C.Evaluator -> Env
-evaluatorEnv te eval =
-  Env te (PrimReductions scopedPrimReductions (Just (adaptPrim eval)))
+-- | The environment of the scoped evaluator: the primitive reductions of
+-- "Clash.Core.Scoped.Evaluator.Primitives". A primitive without one doesn't
+-- reduce.
+evaluatorEnv :: TypeEnv -> Env
+evaluatorEnv te = Env te (PrimReductions scopedPrimReductions Nothing)
 
 -- | Evaluate a term to weak-head normal form, and apply a transformation to
 -- the result, in the context extended with the bindings the evaluator
@@ -68,12 +64,11 @@ whnfRW
   -> RewriteMonad extra (Term n)
 whnfRW isSubj ctx e k = do
   te <- Lens.view scopedTypeEnv
-  eval <- Lens.view evaluator
   bm <- Lens.use bindings
   ph <- Lens.use globalHeap
   let sc = tfScope ctx
       m0 = initMachine sc (tfHeap ctx) bm ph e
-  whnf (evaluatorEnv te eval) isSubj m0 $ \m -> do
+  whnf (evaluatorEnv te) isSubj m0 $ \m -> do
     globalHeap Lens..= mHeapPrim m
     case mAlloc m of
       ANil -> k ctx (mTerm m)
