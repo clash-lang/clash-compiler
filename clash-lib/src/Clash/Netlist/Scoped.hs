@@ -15,9 +15,6 @@
   handlers. Handlers that go under binders, e.g. those of case alternatives
   ('withAlt'), extend the context. Their signatures are fixed in
   @Clash.Netlist.Scoped.hs-boot@.
-
-  The HWTypes of scoped types still go through Clash Core types ('hwTypeOf').
-  TODO(Phase 5, Util): translate scoped types.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -89,9 +86,11 @@ import qualified Clash.Netlist.Types              as HW (Expr (Literal), Literal
 import           Clash.Netlist.Types              as HW
   hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
 import           Clash.Netlist.Util
-  (affixName, condAssign, contAssign, coreTypeToHWTypeM', dcToLiteral, declareInstUses,
-   expandTopEntityOrErrM, isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
-   primWarnContext, procAssign, unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
+  (affixName, condAssign, contAssign, dcToLiteral, declareInstUses, expandTopEntityOrErrM,
+   isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv, primWarnContext,
+   procAssign)
+import qualified Clash.Netlist.Util               as Legacy
+  (unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
 import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
@@ -99,7 +98,6 @@ import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Evaluator.Types       (Evaluator)
 
 import           Clash.Core.Scoped.Alpha          (aeqTy)
-import           Clash.Core.Scoped.Convert        (toClashType)
 import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
 import           Clash.Core.Scoped.Type           (coreView)
 import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
@@ -118,7 +116,8 @@ import           Clash.Netlist.Scoped.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
-  (UniqueNormalized (..), mkUniqueNormalized, splitNormalized, withTicks)
+  (UniqueNormalized (..), coreTypeToHWTypeM', mkUniqueNormalized, splitNormalized,
+   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
@@ -246,7 +245,7 @@ mkNetDecl :: Distinct n => CompCtx n -> (LocalId n, Term n) -> NetlistMonad [Dec
 mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ withTicks ctx ticks $ \_ -> do
 
   lAttrs <- Lens.view localAttrs
-  hwTy0 <- hwTypeOf $(curLoc) (localIdType id_)
+  hwTy0 <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) (localIdType id_)
   let hwTy = case hwTy0 of
         Annotated attrs hty0 -> Annotated (attrs ++ lAttrs) hty0
         hty0 -> annotated lAttrs hty0
@@ -282,7 +281,7 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
 
       -- Like the type of the primitive, these are Clash Core types, which can
       -- mention its quantified type variables
-      hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (C.mpi_resultTypes mpInfo)
+      hwTys <- mapM (Legacy.unsafeCoreTypeToHWTypeM' $(curLoc)) (C.mpi_resultTypes mpInfo)
       pure (zipWith3 netdecl res hwTys resInits1)
 
     singleDecl srcNote hwTy = do
@@ -451,7 +450,7 @@ mkExpr ctx bbEasD declType bndr app =
  let (appF,args,ticks) = collectArgsTicks app
      (tmArgs,tyArgs) = partitionEithers args
  in  withTicks ctx ticks $ \tickDecls -> do
-  hwTys  <- mapM (hwTypeOf $(curLoc)) (netlistTypes bndr)
+  hwTys  <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx)) (netlistTypes bndr)
   (_,sp) <- Lens.use curCompNm
   let hwTyA = case hwTys of
         hwTy:_ -> hwTy
@@ -552,7 +551,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
       , let fArgTys1 = C.splitShouldSplit tcm $ rights fArgTys0
       , length fArgTys1 == length args
       -> do
-        argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
+        argHWTys <- mapM (Legacy.unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
         (argExprs, concat -> argDecls) <- unzip <$>
           mapM (\e -> mkExpr ctx False declType (NetlistId dstId (argTyOf e)) e) args
 
@@ -560,14 +559,14 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
         let
           filteredTypeExprs = filter (not . isVoid . snd) (zip argExprs argHWTys)
 
-        dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
+        dstHWty  <- Legacy.unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
 
         -- TODO: The port names of the component are not available, see
         -- 'Clash.Netlist.mkFunApp'. The current workaround is to not rely on
         -- named arguments, using positional ones instead when instantiating a
         -- top entity.
-        argTys <- mapM (filteredHWTypeOf $(curLoc) . argTyOf) args
-        resTy <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
+        argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) sc . argTyOf) args
+        resTy <- Legacy.unsafeCoreTypeToHWTypeM $(curLoc) fResTy
         let
           ettArgs = (Nothing,) <$> argTys
           ettRes = (Nothing, resTy)
@@ -593,7 +592,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
         Just (Binding{bindingTerm}) -> do
           (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
           let argTys = map argTyOf args
-          argHWTys <- mapM hwTypeOfMaybe argTys
+          argHWTys <- mapM (coreTypeToHWTypeM' sc) argTys
 
           (argExprs, concat -> argDecls) <- unzip <$>
             mapM (\(e,t) -> mkExpr ctx False declType (NetlistId dstId t) e)
@@ -607,7 +606,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
           let compOutp = (\(_,x,_) -> x) <$> listToMaybe co
           if length filteredTypeExprs == length compInps
             then do
-              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar declType dstId) filteredTypeExprs
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar sc declType dstId) filteredTypeExprs
               let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = case compOutp of
                     Nothing -> []
@@ -675,14 +674,16 @@ mkFunApp ctx _declType dstId (Left fun) args _tickDecls =
 -- | Assign an argument of a component instance to a signal, unless it is one
 -- already
 toSimpleVar
-  :: DeclarationType
+  :: Distinct n
+  => Scope n
+  -> DeclarationType
   -> Identifier
   -> (Expr, Type n)
   -> NetlistMonad (Expr,[Declaration])
-toSimpleVar _ _ (e@(Identifier _ Nothing),_) = return (e,[])
-toSimpleVar declType dstId (e,ty) = do
+toSimpleVar _ _ _ (e@(Identifier _ Nothing),_) = return (e,[])
+toSimpleVar sc declType dstId (e,ty) = do
   argNm <- Id.suffix dstId "fun_arg"
-  hTy <- hwTypeOf $(curLoc) ty
+  hTy <- unsafeCoreTypeToHWTypeM' $(curLoc) sc ty
   let assignTy = declTypeUsage declType
   argDecl <- mkInit declType assignTy argNm hTy e
   return (Identifier argNm Nothing, argDecl)
@@ -703,11 +704,11 @@ mkSelection
 mkSelection ctx declType bndr scrut altTy alts0 tickDecls = do
   let dstId = netlistIdentifier ctx bndr
       scrutTy = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) scrut
-  scrutHTy <- hwTypeOf $(curLoc) scrutTy
+  scrutHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) scrutTy
   scrutId  <- Id.suffix dstId "selection"
   (_,sp) <- Lens.use curCompNm
   ite <- Lens.use backEndITE
-  altHTy <- hwTypeOf $(curLoc) altTy
+  altHTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) altTy
   let e = Case scrut altTy (NE.toList alts0)
   case iteAlts scrutHTy alts0 of
     Just (altT,altF)
@@ -920,8 +921,8 @@ mkProjection ctx declType mkDec bndr scrut altTy alt = do
       _ -> throw (ClashException sp ($(curLoc) ++
                   "Not in normal form: RHS of case-projection is not a variable:\n\n"
                    ++ showPpr e) Nothing)
-    sHwTy <- hwTypeOf $(curLoc) scrutTy
-    vHwTy <- hwTypeOf $(curLoc) altTy
+    sHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) scrutTy
+    vHwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) altTy
     scrutRendered <- do
       scrutNm <-
         netlistId1
@@ -961,7 +962,7 @@ mkProjection ctx declType mkDec bndr scrut altTy alt = do
                     ++ showPpr e) Nothing)
                 else
                   fields
-            argHWTys <- mapM (hwTypeOfMaybe . snd) fields
+            argHWTys <- mapM (coreTypeToHWTypeM' (compScope ctxAlt) . snd) fields
             let tmsBundled   = zip argHWTys fields'
                 tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
                 tmsFiltered' = map (fst . snd) tmsFiltered
@@ -1016,7 +1017,7 @@ mkDcApplication ctx declType [dstHType] bndr dc args = do
   let dcNm = C.nameOcc (dcName dc)
       argTys = map (inferCoreTypeOf (compTypeEnv ctx) (compScope ctx)) args
   argNm <- netlistId1 return (\b -> Id.suffix (localIdentifier ctx (localIdName b)) "dc_arg") bndr
-  argHWTys <- mapM hwTypeOfMaybe argTys
+  argHWTys <- mapM (coreTypeToHWTypeM' (compScope ctx)) argTys
 
   (argExprs, concat -> argDecls) <- unzip <$>
     mapM (\(e,t) -> mkExpr ctx False declType (NetlistId argNm t) e) (zip args argTys)
@@ -1135,7 +1136,7 @@ mkDcApplication ctx declType [dstHType] bndr dc args = do
 -- Handle MultiId assignment
 mkDcApplication ctx declType dstHTypes (MultiId argNms) _ args = do
   let argTys = map (inferCoreTypeOf (compTypeEnv ctx) (compScope ctx)) args
-  argHWTys            <- mapM hwTypeOfMaybe argTys
+  argHWTys            <- mapM (coreTypeToHWTypeM' (compScope ctx)) argTys
   -- Filter out the arguments of hwtype `Void` and only translate
   -- them to the intermediate HDL afterwards
   let argsBundled   = zip argHWTys (zipEqual (map CoreId argNms) args)
@@ -1193,15 +1194,3 @@ termLocalId :: HasCallStack => Term n -> LocalId n
 termLocalId = \case
   Var o ty n -> LocalId o ty n
   _ -> error ($(curLoc) ++ "not a local variable")
-
--- | The HWType of a type. TODO(Phase 5, Util): translate types of scoped Core.
-hwTypeOf :: String -> Type n -> NetlistMonad HWType
-hwTypeOf loc = unsafeCoreTypeToHWTypeM' loc . toClashType
-
--- | The HWType of a type, with its void filter, see 'hwTypeOf'
-filteredHWTypeOf :: String -> Type n -> NetlistMonad FilteredHWType
-filteredHWTypeOf loc = unsafeCoreTypeToHWTypeM loc . toClashType
-
--- | The HWType of a type, if it has one, see 'hwTypeOf'
-hwTypeOfMaybe :: Type n -> NetlistMonad (Maybe HWType)
-hwTypeOfMaybe = coreTypeToHWTypeM' . toClashType
