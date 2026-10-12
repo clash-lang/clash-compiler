@@ -18,8 +18,8 @@ module Test.Clash.Rewrite where
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Scoped.Convert as C
-  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash, mkNewTyConRhsFromClash,
-   mkPrimTyConFromClash)
+  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash, mkGlobalIdFromClash,
+   mkNewTyConRhsFromClash, mkPrimTyConFromClash)
 import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
@@ -1476,7 +1476,7 @@ tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
 -- | A global binding of the given term, of a function without an inline pragma
 mkBinding :: C.Id -> C.Term -> Binding C.Term
 mkBinding i t = Binding
-  { bindingId = i
+  { bindingId = C.mkGlobalIdFromClash i
   , bindingLoc = C.noSrcSpan
   , bindingSpec = NoUserInlinePrag
   , bindingIsPrim = IsFun

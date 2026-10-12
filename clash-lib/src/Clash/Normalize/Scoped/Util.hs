@@ -87,14 +87,13 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (fromGhcUnique)
 
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
-import           Clash.Core.Scoped.Convert   (toClashType, mkPrimInfoFromClash)
+import           Clash.Core.Scoped.Convert   (mkPrimInfoFromClash, mkGlobalId)
 import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.Term
 import           Clash.Core.Scoped.TermInfo  (isClosed)
 import           Clash.Core.Scoped.Type
@@ -444,12 +443,11 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
           tm1 = if isTop then substWithTyEq emptyScope tm else tm
       old <- Lens.use curFun
       normalization <- scopedNormalization
-      tm2 <- rewriteExpr ("normalization", normalization) (nmS, tm1) (mkGlobalIdFromClash nm', sp)
+      tm2 <- rewriteExpr ("normalization", normalization) (nmS, tm1) (nm', sp)
       curFun .= old
-      -- TODO(D4): the type of a 'GlobalId' is a Clash Core type
-      let ty' = toClashType (inferCoreTypeOf te emptyScope tm2)
-          r' = mkGlobalIdFromClash nm' `memberGlobalSet` termGlobalIds tm2
-          b = Binding nm'{C.varType = ty'} sp inl pr tm2 r'
+      let ty' = inferCoreTypeOf te emptyScope tm2
+          r' = nm' `memberGlobalSet` termGlobalIds tm2
+          b = Binding (mkGlobalId (globalIdName nm') ty') sp inl pr tm2 r'
       (extra.scopedNormalized) %= insertGlobalEnv nm b
       pure b
 

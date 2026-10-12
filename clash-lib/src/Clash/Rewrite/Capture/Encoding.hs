@@ -64,7 +64,8 @@ import           GHC.SrcLoc.Extra         ()
 
 import           Clash.Core.DataCon
   (DataCon (..), dcArgTys, dcExtTyVars, dcLegacyType, dcUnivTyVars)
-import           Clash.Core.Scoped.Convert (mkDataConFromClash)
+import           Clash.Core.Scoped.Convert (mkDataConFromClash, mkGlobalIdFromClash)
+import           Clash.Core.Scoped.Syntax (globalIdLegacy, globalIdUniq)
 import           Clash.Core.Term
 import           Clash.Core.Type          (Type (..))
 import           Clash.Core.Var           (Var (..))
@@ -204,7 +205,7 @@ frame e = \case
 
 binding :: Enc -> Binding Term -> IO ()
 binding e (Binding v loc spec isPrim x r) =
-  var e v >> bin e loc >> bin e spec >> bin e isPrim >> term e x >> bin e r
+  var e (globalIdLegacy v) >> bin e loc >> bin e spec >> bin e isPrim >> term e x >> bin e r
 
 bindingMap :: Enc -> BindingMap -> IO ()
 bindingMap e bm = list e (binding e) (UniqMap.elems bm)
@@ -384,10 +385,10 @@ dFrame = dTag >>= \case
   _ -> TickC <$> dTick
 
 dBinding :: D (Binding Term)
-dBinding = Binding <$> dVar <*> dBin <*> dBin <*> dBin <*> dTerm <*> dBin
+dBinding = Binding <$> (mkGlobalIdFromClash <$> dVar) <*> dBin <*> dBin <*> dBin <*> dTerm <*> dBin
 
 dBindingMap :: D BindingMap
-dBindingMap = UniqMap.fromList . map (\b -> (varUniq (bindingId b), b)) <$> dList dBinding
+dBindingMap = UniqMap.fromList . map (\b -> (globalIdUniq (bindingId b), b)) <$> dList dBinding
 
 dCapture :: D Capture
 dCapture = do

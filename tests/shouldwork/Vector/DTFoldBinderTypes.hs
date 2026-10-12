@@ -16,10 +16,11 @@ import Data.Proxy (Proxy (..))
 import Data.Singletons (Apply, TyFun, type (@@))
 
 import Clash.Backend
-import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.DataCon (DataCon (..), dcExtTyVars)
 import Clash.Core.Evaluator.Types (whnf')
 import Clash.Core.HasType (inferCoreTypeOf)
 import Clash.Core.Name (nameOcc)
+import Clash.Core.Scoped.Syntax (globalIdName)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term (Pat (..), Term (..), collectBndrs, walkTerm)
 import Clash.Core.Type (TypeView (..), coreView, tyView)
@@ -60,7 +61,7 @@ mainCommon hdl = do
   let tcm = envTyConMap env
       -- The evaluator of Clash Core, on Clash Core
       bm = toClashBindings convSupply (designBindings design)
-  te <- case List.find ((== "DTFoldBinderTypes.topEntity") . nameOcc . varName . bindingId) (eltsVarEnv bm) of
+  te <- case List.find ((== "DTFoldBinderTypes.topEntity") . nameOcc . globalIdName . bindingId) (eltsVarEnv bm) of
     Just b -> pure (bindingTerm b)
     Nothing -> error "Could not find topEntity"
   let (bndrs, body) = collectBndrs te

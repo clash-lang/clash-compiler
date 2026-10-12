@@ -108,6 +108,7 @@ import Clash.Normalize.Util
 import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
+import Clash.Core.Scoped.Syntax (globalIdLegacy)
 
 {- [Note] join points and void wrappers
 Join points are functions that only occur in tail-call positions within an
@@ -494,7 +495,7 @@ collapseRHSNoopsWorker _ letrec letBind body = do
     -- unique as a global binder, see #405.
     isNoop (Var i) | isGlobalId i = do
       binding     <- MaybeT $ lookupVarEnv i <$> Lens.use bindings
-      isRecursive <- lift $ isRecursiveBndr $ bindingId binding
+      isRecursive <- lift $ isRecursiveBndr $ globalIdLegacy (bindingId binding)
       Monad.guard $ not isRecursive
       isNoop $ bindingTerm binding
     isNoop (Prim PrimInfo{primWorkInfo=WorkIdentity _ []}) = return True

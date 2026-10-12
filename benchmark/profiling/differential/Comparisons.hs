@@ -32,8 +32,7 @@ import Clash.Normalize.Transformations.ANF (makeANF)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
-import Clash.Core.Scoped.Syntax (emptyScope)
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+import Clash.Core.Scoped.Syntax (emptyScope, globalIdLegacy)
 import qualified Clash.Normalize.Scoped.Util as Scoped
 import Clash.Rewrite.Scoped.Globals (toClashTermFresh)
 
@@ -77,9 +76,9 @@ comparisons =
           \normalization strategy through viaLegacy."
       , cmpCurrent = normalizeSide $ \b tm -> do
           tm' <- toClashTermFresh (fromClashTermClosed tm)
-          bindingTerm <$> Current.normalizeTopLvlBndr False (bindingId b) b{bindingTerm = tm'}
+          bindingTerm <$> Current.normalizeTopLvlBndr False (globalIdLegacy (bindingId b)) b{bindingTerm = tm'}
       , cmpScoped = normalizeSide $ \b tm ->
-          bindingTerm <$> Scoped.normalizeTopLvlBndr False (mkGlobalIdFromClash (bindingId b)) (tm <$ b)
+          bindingTerm <$> Scoped.normalizeTopLvlBndr False (bindingId b) (tm <$ b)
       , cmpKnownDifferences = []
       }
 

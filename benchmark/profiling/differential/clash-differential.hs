@@ -35,6 +35,7 @@ import Text.Read (readMaybe)
 import Clash.Core.Name (nameOcc)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
+import Clash.Core.Scoped.Syntax (globalIdName)
 import Clash.Core.TermInfo (termSizeSmallerThan)
 import Clash.Core.Var (varName)
 import Clash.Core.VarEnv (mapMaybeVarEnv, mkVarSet)
@@ -267,7 +268,7 @@ loadDesign opts f = do
       selected = case optBinding opts of
         Nothing -> bindings
         Just nm -> mapMaybeVarEnv
-          (\b -> if Text.pack nm `Text.isInfixOf` nameOcc (varName (bindingId b))
+          (\b -> if Text.pack nm `Text.isInfixOf` nameOcc (globalIdName (bindingId b))
                    then Just b else Nothing)
           bindings
   mkDesign env selected

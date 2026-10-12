@@ -19,6 +19,7 @@ import Clash.Core.Evaluator.Types (whnf')
 import Clash.Core.Literal (Literal (IntLiteral))
 import Clash.Core.Name (mkUnsafeSystemName, noSrcSpan)
 import Clash.Core.Pretty (showPpr)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Term (Term (..), stripTicks)
 import Clash.Core.Type (mkFunTy)
 import Clash.Core.TysPrim (intPrimTy)
@@ -42,7 +43,7 @@ mainVerilog = do
   lit = Literal . IntLiteral
 
   globals = mkVarEnv
-    [ (f, Binding f noSrcSpan NoUserInlinePrag IsFun (lit 1) False) ]
+    [ (f, Binding (mkGlobalIdFromClash f) noSrcSpan NoUserInlinePrag IsFun (lit 1) False) ]
   locals = mkVarEnv [(fLocal, lit 2)]
 
   check e expected = do

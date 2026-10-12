@@ -650,7 +650,7 @@ nonRepSpecWorker ctx e e1 e2
   inlineInternalSpecialisationArgument app = case collectArgsTicks app of
     (GlobalVar f, fArgs, ticks) -> lookupBinding f >>= \case
       Just b
-        | C.nameSort (C.varName (bindingId b)) == C.Internal
+        | C.nameSort (globalIdName (bindingId b)) == C.Internal
         -> censor (const mempty)
              (runScopedTransform (topdownR (ScopedTransform appPropWorker)) ctx
                (mkApps (mkTicks (sinkClosed (bindingTerm b)) ticks) fArgs))

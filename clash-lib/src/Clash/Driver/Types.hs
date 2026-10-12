@@ -52,10 +52,10 @@ import           Clash.Signal.Internal
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
 import           Clash.Core.Scoped.NameMap      (GlobalEnv)
+import           Clash.Core.Scoped.Binary       ()
 import qualified Clash.Core.Scoped.Syntax       as Scoped
 import           Clash.Core.Term                (Term)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
-import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Driver.Bool              (OverridingBool(..))
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
@@ -101,7 +101,7 @@ data IsPrim
 -- A function binder in the global environment.
 --
 data Binding a = Binding
-  { bindingId :: Id
+  { bindingId :: Scoped.GlobalId
     -- ^ The core identifier for this binding.
   , bindingLoc :: SrcSpan
     -- ^ The source location of this binding in the original source code.

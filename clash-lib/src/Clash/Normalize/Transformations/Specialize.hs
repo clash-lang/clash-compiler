@@ -110,6 +110,7 @@ import Clash.Normalize.Util
   (constantSpecInfo, csrFoundConstant, csrNewBindings, csrNewTerm)
 import Clash.Unique (Unique)
 import Clash.Util (ClashException(..))
+import Clash.Core.Scoped.Syntax (globalIdLegacy, globalIdName)
 
 -- | Propagate arguments of application inwards; except for 'Lam' where the
 -- argument becomes let-bound. 'appProp' tries to propagate as many arguments
@@ -531,7 +532,7 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   newf <- case UniqMap.elems existing of
     [] -> do (cf,sp) <- Lens.use curFun
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInlinePrag newBody
-    (b:_) -> return (bindingId b)
+    (b:_) -> return (globalIdLegacy (bindingId b))
   -- Create specialized argument
   let newArg  = Left $ mkApps (Var newf) specVars
   -- Use specialized argument
@@ -650,7 +651,7 @@ nonRepSpecWorker ctx e e1 e2
         fTmM <- lookupVarEnv f <$> Lens.use bindings
         case fTmM of
           Just b
-            | nameSort (varName (bindingId b)) == Internal
+            | nameSort (globalIdName (bindingId b)) == Internal
             -> censor (const mempty)
                       (topdownR appPropWorker ctx
                         (mkApps (mkTicks (bindingTerm b) ticks) fArgs))
