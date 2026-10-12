@@ -1199,6 +1199,39 @@ t2DataCon :: C.DataCon
 t2DataCon = mkDataCon "MkT2" 3033 [fxA, fxB] [] [C.VarTy fxA, C.VarTy fxB]
   (t2Ty (C.VarTy fxA) (C.VarTy fxB))
 
+-- | @SomeNat@, a type-level natural hidden behind an existential
+someNatTcNm :: C.TyConName
+someNatTcNm = mkTyConName "GHC.TypeNats.SomeNat" 2069
+
+someNatTy :: C.Type
+someNatTy = tcTy someNatTcNm
+
+-- | @SomeNat :: forall n. KnownNat n => Proxy n -> SomeNat@
+someNatDc :: C.DataCon
+someNatDc =
+  mkDataCon "GHC.TypeNats.SomeNat" 2070 [] [someNatN]
+    [C.naturalPrimTy, kindedProxyTy C.typeNatKind (C.VarTy someNatN)] someNatTy
+
+someNatN :: C.TyVar
+someNatN = kindedTyVar C.User "n" 2071 C.typeNatKind
+
+-- | @Proxy@, poly-kinded
+proxyTcNm :: C.TyConName
+proxyTcNm = mkTyConName "Data.Proxy.Proxy" 2072
+
+kindedProxyTy :: C.Kind -> C.Type -> C.Type
+kindedProxyTy k a = tcApp proxyTcNm [k, a]
+
+-- | @Proxy :: forall k (a :: k). Proxy a@. The kind of @a@ is @Type@ here,
+-- rather than @k@, because the kind of a type constructor can't mention its
+-- type variables.
+proxyDc :: C.DataCon
+proxyDc = mkDataCon "Data.Proxy.Proxy" 2073 [proxyK, proxyA] [] [] (kindedProxyTy (C.VarTy proxyK) (C.VarTy proxyA))
+
+proxyK, proxyA :: C.TyVar
+proxyK = tyVar C.User "k" 2074
+proxyA = tyVar C.User "a" 2075
+
 -- | The names of the types of clock, reset and enable lines. Clash recognizes
 -- them by their names.
 clockTcNm, resetTcNm, enableTcNm :: C.TyConName
@@ -1289,6 +1322,8 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     , mkAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
     , mkAlgTyCon doubleTcNm [] [doubleDc]
     , mkAlgTyCon t3TyConName [fxA, fxB, t3C] [t3DataCon]
+    , mkAlgTyCon someNatTcNm [] [someNatDc]
+    , mkAlgTyCon proxyTcNm [proxyK, proxyA] [proxyDc]
     ] <>
     -- Promoted data constructors that type families return. Their kinds don't
     -- matter here.
