@@ -529,6 +529,7 @@ test-suite unittests
                  Clash.Tests.Core.HasType
                  Clash.Tests.Core.Lint
                  Clash.Tests.Core.Scoped.Alpha
+                 Clash.Tests.Core.Scoped.Builder
                  Clash.Tests.Core.Scoped.Convert
                  Clash.Tests.Core.Scoped.DataCon
                  Clash.Tests.Core.Scoped.EqSolver

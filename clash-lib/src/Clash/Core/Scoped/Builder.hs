@@ -4,16 +4,18 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Builders of closed terms and types of scoped Clash Core
-  ("Clash.Core.Scoped.Syntax"), for "Clash.GHC.Scoped.GHC2Core".
+  ("Clash.Core.Scoped.Syntax"). They build scoped Core from a representation
+  that refers to variables by name, such as GHC Core
+  ("Clash.GHC.Scoped.GHC2Core"), and add nothing to the trusted core.
 
   = Two phases
 
-  "Clash.GHC.Scoped.GHC2Core" converts GHC Core in two phases:
+  E.g. "Clash.GHC.Scoped.GHC2Core" converts GHC Core in two phases:
 
   1. In the 'Clash.GHC.GHC2Core.C2C' monad, it converts a GHC term into a
      builder ('TmB'), and a GHC type into a 'TyB'. This phase does all the
      work that needs GHC: names, data constructors, type families, primitives.
-     The builders refer to variables by their GHC 'Key's.
+     The builders refer to variables by their 'Key's.
 
   2. 'runClosedTerm' builds the scoped term. It gives the binders fresh names
      in depth-first order, from a supply, like
@@ -36,15 +38,22 @@
 
   A 'TyB' of a closed type without binders holds the scoped type itself
   ('TyClosed'), which every use shares. Other types are built per use, as the
-  names of their binders depend on where they occur.
+  names of their binders depend on where they occur. Types are built natively
+  ('varTyB', 'forAllTyB', ...), or from types of Clash Core ('clashTyB').
 
   = Variables
 
-  The environment of phase 2 maps the keys of the variables in scope to their
-  occurrences, where an inner binder shadows an outer one with the same key,
-  as in GHC Core. The builders of "Clash.GHC.Scoped.GHC2Core" that don't come
-  from GHC Core, such as those of the signal primitives, are closed: their
-  bodies only refer to their own binders, so any keys work for them.
+  A 'Key' is any 'Int' that identifies a variable, chosen by the user of the
+  builders: GHC2Core uses the uniques of GHC's variables ('uniqueKey'), and
+  'clashTyB' the uniques of Clash's type variables. The environment of phase 2
+  maps the keys of the variables in scope to their occurrences, where an inner
+  binder shadows an outer one with the same key, as in GHC Core. So the keys
+  of different variables need only differ where one is in the scope of the
+  other. The builders of "Clash.GHC.Scoped.GHC2Core" that don't come from GHC
+  Core, such as those of the signal primitives, are closed: their bodies only
+  refer to their own binders, so any keys work for them.
+
+  Building errors on a variable whose key is not in scope.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -58,6 +67,12 @@ module Clash.Core.Scoped.Builder
   , uniqueKey
     -- * Types
   , TyB
+  , varTyB
+  , constTyB
+  , forAllTyB
+  , appTyB
+  , litTyB
+  , annTyB
   , clashTyB
     -- * Terms
   , TmB
@@ -91,6 +106,7 @@ module Clash.Core.Scoped.Builder
   , attributesTickB
     -- * Building
   , runClosedTerm
+  , runClosedType
   ) where
 
 import Control.DeepSeq (NFData (..))
@@ -99,8 +115,11 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Primitive.ByteArray
   (MutableByteArray, newByteArray, readByteArray, writeByteArray)
+import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 import GHC.Types.SrcLoc (SrcSpan)
+
+import Clash.Annotations.SynthesisAttributes (Attr)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
@@ -115,11 +134,11 @@ import Clash.Core.Scoped.Syntax
 
 -- * Keys
 
--- | The key of a variable: the unique of its GHC variable, see 'uniqueKey'
+-- | The key of a variable, see the module header
 type Key = Int
 
--- | The key of a variable with the given unique. Clash's uniques of the
--- variables that GHC2Core converts are those of GHC.
+-- | The key of a variable with the given unique, such as a Clash variable.
+-- Clash's uniques of the variables that GHC2Core converts are those of GHC.
 uniqueKey :: Unique -> Key
 uniqueKey = fromIntegral
 {-# INLINE uniqueKey #-}
@@ -195,6 +214,14 @@ runClosedTerm tm = runST $ do
   writeByteArray a 0 (1 :: Int)
   run (tmbRun tm) (BEnv emptyScope IntMap.empty IntMap.empty (Supply a))
 
+-- | Build a closed type. Errors on type variables that are not in scope.
+runClosedType :: HasCallStack => TyB -> Type 'VoidS
+runClosedType (TyClosed t) = t
+runClosedType (TyOpen r) = runST $ do
+  a <- newByteArray 8
+  writeByteArray a 0 (1 :: Int)
+  run r (BEnv emptyScope IntMap.empty IntMap.empty (Supply a))
+
 -- * Types
 
 -- | A type under construction, see the module header
@@ -210,6 +237,33 @@ runTyB :: Distinct n => TyB -> BEnv s n -> ST s (Type n)
 runTyB (TyClosed t) _ = pure (sinkClosed t)
 runTyB (TyOpen r) env = run r env
 {-# INLINE runTyB #-}
+
+-- | A type variable occurrence, by key
+varTyB :: HasCallStack => Key -> TyB
+varTyB !key = TyOpen $ Run $ \(BEnv _ tys _ _) -> case IntMap.lookup key tys of
+  Just ty -> pure ty
+  Nothing -> error ("Clash.Core.Scoped.Builder: type variable not in scope: " ++ show key)
+
+constTyB :: C.ConstTy -> TyB
+constTyB !c = TyClosed (ConstTy c)
+
+-- | A forall-type: key, name and kind of the type variable, and the body
+forAllTyB :: Key -> C.Name C.Type -> TyB -> TyB -> TyB
+forAllTyB !key !occ !k !t = TyOpen $ Run $ \env -> do
+  k' <- runTyB k env
+  withTyBinder env key occ k' $ \env' b -> ForAllTy b <$> runTyB t env'
+
+appTyB :: TyB -> TyB -> TyB
+appTyB (TyClosed t1) (TyClosed t2) = TyClosed (AppTy t1 t2)
+appTyB !t1 !t2 = TyOpen $ Run $ \env -> AppTy <$> runTyB t1 env <*> runTyB t2 env
+
+litTyB :: C.LitTy -> TyB
+litTyB !l = TyClosed (LitTy l)
+
+annTyB :: [Attr Text] -> TyB -> TyB
+annTyB attrs t0 = rnf attrs `seq` case t0 of
+  TyClosed t -> TyClosed (AnnType attrs t)
+  TyOpen _ -> TyOpen $ Run $ \env -> AnnType attrs <$> runTyB t0 env
 
 -- | A type of Clash Core, whose type variables are bound by the builders
 -- around it, by their uniques. Unless it is closed and without binders, it
