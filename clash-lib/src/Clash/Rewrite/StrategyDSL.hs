@@ -26,19 +26,10 @@
   its workers are written for ('WorkerCore'): declare one with
   'toTransformation' or 'toScopedTransformation', and a whole-term pass with
   'pass' or 'scopedPass'. 'Clash.Rewrite.StrategyDSL.TH.compileStrategy'
-  compiles a strategy for Clash Core, running the scoped transformations in it
-  through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and
-  'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy' compiles one for scoped
-  Core, which must only contain scoped transformations.
-
-  So a ported transformation replaces the one of Clash Core by changing a
-  single definition, see "Clash.Rewrite.Scoped":
-
-  @
-  caseCon = 'toTransformation' \"caseCon\" ('onCase' 'caseConWorker)
-  -- becomes, with caseCon = 'toScopedTransformation' ... in the scoped module
-  caseCon = Scoped.caseCon
-  @
+  compiles a strategy of transformations of Clash Core, and
+  'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy' one of transformations
+  of scoped Core. The normalizer runs scoped Core; the transformations of Clash
+  Core remain until Phase 7 of the port, to compare the ports with.
 -}
 
 {-# LANGUAGE DisambiguateRecordFields #-}

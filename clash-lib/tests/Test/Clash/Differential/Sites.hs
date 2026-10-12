@@ -20,7 +20,7 @@
     depends on: see "Clash.Rewrite.Capture" for what a capture has.
 
   * __Scoped.__ It runs the scoped transformation through
-    'Clash.Rewrite.Scoped.ViaFoil.viaFoil', which converts the term at the
+    'Test.Clash.Scoped.ViaFoil.viaFoil', which converts the term at the
     site and the let-bindings of its context, as the normalizer does for a
     ported transformation. It compares the result with the one of the current
     transformation, as 'Test.Clash.Differential.compareBinding' does.
@@ -96,7 +96,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, withConvEnv)
 import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
 import Test.Clash.Differential
   (KnownDifference, Mismatch (..), Outcome (..), Summary (..), attempt,

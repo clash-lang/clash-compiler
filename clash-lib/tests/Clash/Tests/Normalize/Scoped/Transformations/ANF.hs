@@ -5,7 +5,7 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.ANF": the regression tests
   of "Clash.Normalize.Transformations.ANF", run on the scoped 'Scoped.makeANF'
-  and 'Scoped.nonRepANF' through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and
+  and 'Scoped.nonRepANF' through 'Test.Clash.Scoped.ViaFoil.viaFoil', and
   agreement with the current ones.
 -}
 
@@ -32,9 +32,9 @@ import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
 import Clash.Normalize.Transformations.ANF (makeANF, nonRepANFWorker)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.StrategyDSL (onApp, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Util.Supply (newSupply)
 
@@ -51,7 +51,7 @@ makeANFViaFoil = viaFoil "ANF" (ScopedTransform Scoped.makeANF)
 
 -- | The scoped 'Scoped.nonRepANF', as a rewrite of Clash Core
 nonRepANFViaFoil :: NormRewrite
-nonRepANFViaFoil = $(asRewriteQ Scoped.nonRepANF)
+nonRepANFViaFoil = (viaFoil "nonRepANF" $(asScopedRewriteQ Scoped.nonRepANF))
 
 -- | The current 'Clash.Normalize.Transformations.ANF.nonRepANF', as a rewrite
 nonRepANFR :: NormRewrite

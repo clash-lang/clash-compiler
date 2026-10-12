@@ -111,7 +111,7 @@ runANF anf supply =
 -- @h x@ gets, and then run it again, with the same unique supply, on a term in
 -- which the existing let-binder has exactly that unique. The binder of @h x@
 -- is found by its name, as the scoped 'makeANF' (through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil') gives every binder of its result a
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil') gives every binder of its result a
 -- new unique. Scoped Core can't express this bug: the binders it creates are
 -- fresh by construction.
 --

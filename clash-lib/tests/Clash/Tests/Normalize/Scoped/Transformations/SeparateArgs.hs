@@ -32,7 +32,7 @@ import Clash.Normalize.Transformations.SeparateArgs
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.StrategyDSL
   (onAppNode, onLam, onTickNode, onTyAppNode, onVarNode, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..), TransformContext (..))
 import Clash.Util.Supply (newSupply)
 
@@ -42,6 +42,7 @@ import Test.Clash.Rewrite
   , vecTy )
 import Test.Clash.Differential (Outcome (..), coercionForm)
 import Test.Clash.Scoped (assertRewritesAgree, assertRewritesAgreeUpTo)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
 -- | 'separateArguments' of Clash Core
 separateArgumentsCurrent :: NormRewrite
@@ -52,10 +53,10 @@ separateArgumentsCurrent = $(asRewriteQ (toTransformation "separateArguments"
   <> onTyAppNode 'separateArgumentsSpineWorker
   <> onTickNode 'separateArgumentsSpineWorker)))
 
--- | The port, as the normalizer runs it: through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- | The port, on terms of Clash Core: through
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'
 separateArgumentsScoped :: NormRewrite
-separateArgumentsScoped = $(asRewriteQ Scoped.separateArguments)
+separateArgumentsScoped = (viaFoil "separateArguments" $(asScopedRewriteQ Scoped.separateArguments))
 
 -- | Assert that 'separateArguments' and its port agree on a term, with the
 -- given variables in scope, in the given context

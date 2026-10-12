@@ -6,7 +6,7 @@
   Tests for "Clash.Normalize.Scoped.Transformations.Letrec". Most compare a
   port with its Clash Core counterpart in
   "Clash.Normalize.Transformations.Letrec", running the port through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', as the normalizer does.
+  'Test.Clash.Scoped.ViaFoil.viaFoil', as the normalizer does.
 -}
 
 {-# LANGUAGE LambdaCase #-}
@@ -30,8 +30,8 @@ import qualified Clash.Normalize.Transformations.Letrec as Current
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
 import Clash.Rewrite.Util (apply)
 
@@ -99,14 +99,14 @@ deadCodeAt e = do
   st = def
 
 -- | 'deadCode' in a bottom-up traversal of Clash Core, as the normalizer runs
--- it: through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- it: through 'Test.Clash.Scoped.ViaFoil.viaFoil'
 deadCodeBottomup :: C.Term -> IO C.Term
 deadCodeBottomup e = do
   (t, _, _) <- runRewriteTest def st (rw (TransformContext emptyInScopeSet []) e)
   pure t
  where
   rw :: NormRewrite
-  rw = bottomupR (apply "deadCode" $(asRewriteQ S.deadCode))
+  rw = bottomupR (apply "deadCode" (viaFoil "deadCode" $(asScopedRewriteQ S.deadCode)))
   st :: RewriteState NormalizeState
   st = def
 
@@ -153,7 +153,7 @@ removeUnusedExprC, removeUnusedExprS :: NormRewrite
 removeUnusedExprC = apply "removeUnusedExpr" $ \ctx -> \case
   e@(C.Case subj ty alts) -> Current.removeUnusedExprCase ctx e subj ty alts
   e -> Current.removeUnusedExprSpine ctx e
-removeUnusedExprS = $(asRewriteQ S.removeUnusedExpr)
+removeUnusedExprS = (viaFoil "removeUnusedExpr" $(asScopedRewriteQ S.removeUnusedExpr))
 
 removeUnusedExprTests :: TestTree
 removeUnusedExprTests = testGroup "removeUnusedExpr"
@@ -201,7 +201,7 @@ srcTick = C.SrcSpan noSrcSpan
 
 flattenLetC, flattenLetS :: NormRewrite
 flattenLetC = apply "flattenLet" Current.flattenLetWorker
-flattenLetS = $(asRewriteQ S.flattenLet)
+flattenLetS = (viaFoil "flattenLet" $(asScopedRewriteQ S.flattenLet))
 
 flattenLetTests :: TestTree
 flattenLetTests = testGroup "flattenLet"
@@ -268,7 +268,7 @@ lamBodyCtx vs = TransformContext (inScopeOf vs) (map C.LamBody (reverse vs))
 
 topLetC, topLetS :: NormRewrite
 topLetC = apply "topLet" Current.topLetWorker
-topLetS = $(asRewriteQ S.topLet)
+topLetS = (viaFoil "topLet" $(asScopedRewriteQ S.topLet))
 
 topLetTests :: TestTree
 topLetTests = testGroup "topLet"
@@ -302,7 +302,7 @@ cseC, cseS :: NormRewrite
 cseC = apply "CSE" $ \ctx -> \case
   e@(C.Let bind body) -> Current.simpleCSEWorker ctx e bind body
   e -> pure e
-cseS = $(asRewriteQ S.simpleCSE)
+cseS = (viaFoil "simpleCSE" $(asScopedRewriteQ S.simpleCSE))
 
 simpleCSETests :: TestTree
 simpleCSETests = testGroup "simpleCSE"

@@ -37,7 +37,7 @@ import Clash.Normalize.Transformations.MultiPrim (setupMultiResultPrimWorker)
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite.StrategyDSL (onPrim, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..))
 import Clash.Util.Supply (newSupply)
@@ -47,16 +47,17 @@ import Test.Clash.Rewrite
   ( assertFires, inScopeOf, intTy, mkAlgTyCon, mkDataCon, mkTyConName, testTyConMap
   , tupleTy, tyVar, withTyConMap )
 import Test.Clash.Scoped (assertRewritesAgreeUpTo)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
 -- | 'setupMultiResultPrim' of Clash Core
 setupCurrent :: NormRewrite
 setupCurrent =
   $(asRewriteQ (toTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)))
 
--- | The port, as the normalizer runs it: through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- | The port, on terms of Clash Core: through
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'
 setupScoped :: NormRewrite
-setupScoped = $(asRewriteQ Scoped.setupMultiResultPrim)
+setupScoped = (viaFoil "setupMultiResultPrim" $(asScopedRewriteQ Scoped.setupMultiResultPrim))
 
 -- | The pair type constructor, as 'tupleTy' names it
 pairTc :: TyCon

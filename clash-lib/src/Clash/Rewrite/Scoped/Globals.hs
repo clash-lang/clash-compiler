@@ -37,6 +37,7 @@ module Clash.Rewrite.Scoped.Globals
   , fromClashBindings
   , toClashBindings
   , toClashBindingsM
+  , toClashTermFresh
   ) where
 
 import           Control.Lens                ((%=))
@@ -66,7 +67,7 @@ import           Clash.Core.Scoped.FreeVars  (termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Syntax
-import           Clash.Rewrite.Scoped.ViaFoil (toClashTermFreshWith)
+import           Clash.Core.Scoped.Convert.Fresh (toClashTermFreshClosed)
 import qualified Clash.Rewrite.Scoped.WorkFree as WorkFree
 
 -- | The binding of a global, as a closed term
@@ -145,13 +146,13 @@ fromClashBindings bm =
 -- | Global bindings of scoped Clash Core as bindings of Clash Core. Every
 -- binder gets a fresh unique from the supply, so that a local binder never
 -- shares its unique with a global one, see
--- 'Clash.Rewrite.Scoped.ViaFoil.toClashTermFresh'.
+-- "Clash.Core.Scoped.Convert.Fresh".
 toClashBindings :: HasCallStack => Supply -> GlobalEnv (Binding (Term 'VoidS)) -> BindingMap
 toClashBindings sup bndrs =
   UniqMap.fromList [ (globalIdVar g, b') | (g, b') <- State.evalState (mapM conv (globalEnvToList bndrs)) sup ]
  where
   conv (g, b) = do
-    tm <- toClashTermFreshWith (bindingTerm b)
+    tm <- toClashTermFreshClosed (bindingTerm b)
     pure (g, b {bindingTerm = tm})
 
 -- | 'toClashBindings' with a split of the unique supply of the rewrite state
@@ -159,8 +160,17 @@ toClashBindingsM
   :: HasCallStack
   => GlobalEnv (Binding (Term 'VoidS))
   -> RewriteMonad extra BindingMap
-toClashBindingsM bndrs = do
+toClashBindingsM bndrs = (`toClashBindings` bndrs) <$> splitUniqSupply
+
+-- | A closed term as a term of Clash Core whose binders get fresh uniques
+-- from the unique supply of the rewrite state, see "Clash.Core.Scoped.Convert.Fresh"
+toClashTermFresh :: HasCallStack => Term 'VoidS -> RewriteMonad extra C.Term
+toClashTermFresh e = State.evalState (toClashTermFreshClosed e) <$> splitUniqSupply
+
+-- | A split of the unique supply of the rewrite state
+splitUniqSupply :: RewriteMonad extra Supply
+splitUniqSupply = do
   sup <- Lens.use uniqSupply
   let (sup1, sup2) = splitSupply sup
   uniqSupply Lens..= sup2
-  pure (toClashBindings sup1 bndrs)
+  pure sup1

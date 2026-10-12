@@ -121,7 +121,7 @@ import Clash.Rewrite.Scoped
   ( ScopedRewrite, Frame (LetBinding), pushFrame, rootContext, runScopedTransform
   , underAlt, underLam, underLet, underLetRec, underTyLam)
 import qualified Clash.Rewrite.Scoped as Scoped
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil, withGlobalBindings)
+import Test.Clash.Scoped.ViaFoil (viaFoil, withGlobalBindings)
 import Clash.Rewrite.Types
   (Rewrite, RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
 import qualified Clash.Rewrite.Types as C
@@ -872,7 +872,7 @@ runScopedOpen env st t e =
   runScopedOn env st e (\sc e' -> toClashTerm <$> runScopedTransform t (rootContext sc) e')
 
 -- | Run a scoped transformation on a Clash term through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', in the given context. Gives the
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil', in the given context. Gives the
 -- result, the final state, and whether a change was signaled.
 runViaFoil
   :: RewriteEnv
@@ -943,7 +943,7 @@ assertLetHandlerAgrees env st old new tm = case tm of
 -- global bindings (see 'assertNewBindingsAgree'). Give the port as the
 -- normalizer runs it: e.g. a scoped transformation compiled with
 -- 'Clash.Rewrite.StrategyDSL.TH.asRewriteQ', which runs it through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'.
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'.
 assertRewritesAgree
   :: HasCallStack
   => RewriteEnv

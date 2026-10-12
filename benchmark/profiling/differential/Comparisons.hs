@@ -34,7 +34,7 @@ import Clash.Rewrite.Scoped (ScopedTransform (..))
 import Clash.Core.Scoped.Convert (fromClashTermClosed, toClashTerm)
 import Clash.Core.Scoped.Syntax (emptyScope, mkGlobalId)
 import qualified Clash.Normalize.Scoped.Util as Scoped
-import Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh)
+import Clash.Rewrite.Scoped.Globals (toClashTermFresh)
 
 import Test.Clash.Differential
 import Test.Clash.Differential.Sites

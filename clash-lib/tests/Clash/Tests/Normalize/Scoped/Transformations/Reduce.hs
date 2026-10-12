@@ -6,7 +6,7 @@
   Tests for "Clash.Normalize.Scoped.Transformations.Reduce": the scoped
   'Scoped.reducePrim' agrees with
   'Clash.Normalize.Transformations.Reduce.reducePrimWorker' when run through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', the scoped 'Scoped.reduceConst'
+  'Test.Clash.Scoped.ViaFoil.viaFoil', the scoped 'Scoped.reduceConst'
   evaluates with the let-bindings of its context, and 'Scoped.reduceBinders'
   removes duplicate bindings.
 -}
@@ -215,7 +215,7 @@ reducePrimTests = testGroup "reducePrim"
   ]
 
 -- | Run the scoped 'reduceConst' at the root of a term, in the given context,
--- through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'. Gives the result, and
+-- through 'Test.Clash.Scoped.ViaFoil.viaFoil'. Gives the result, and
 -- whether it changed.
 reduceConstAt :: TransformContext -> C.Term -> IO (C.Term, Bool)
 reduceConstAt ctx e = do

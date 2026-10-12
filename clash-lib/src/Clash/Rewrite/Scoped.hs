@@ -91,11 +91,9 @@
     _ -> pure (sink e)  -- doesn't fire: return the original node
   @
 
-  The evaluator is that of scoped Clash Core ("Clash.Core.Scoped.Evaluator"),
-  which reduces the primitives that are not ported yet with the evaluator of
-  Clash Core. The let-bindings of the context are those of the scoped frames,
-  and, under 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', those of the Clash Core
-  context of the root.
+  The evaluator is that of scoped Clash Core ("Clash.Core.Scoped.Evaluator").
+  The let-bindings of the context are those of its frames, and those given to
+  'embeddedRootContext'.
 
   = Porting a transformation: a worked example
 
@@ -124,35 +122,15 @@
   and opens a recursive let-binding ('Clash.Core.Scoped.Subst.openBind')
   before it looks at its variables.
 
-  The swap is then a single line in the module of Clash Core, which keeps the
-  name every strategy refers to:
-
-  @
-  import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
-
-  deadCode :: Transformation
-  deadCode = Scoped.deadCode
-  @
-
-  The strategy compiler ("Clash.Rewrite.StrategyDSL.TH") runs a scoped
-  transformation in a strategy of Clash Core through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', which converts the subterm at the
-  nodes it fires at, and converts the result back if it changed. Counters,
-  the rewrite history and the checks of 'Clash.Rewrite.Util.applyDebug' work
-  as before, on the converted result. A rewrite that isn't in the strategy
-  DSL (e.g. a whole-term pass called from Haskell) is swapped with
-  @'Clash.Rewrite.Scoped.ViaFoil.viaFoil' \"name\" ('ScopedTransform' f)@.
-
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil' converts the subterm at every node
-  the transformation is offered at, which makes the normalizer slower until
-  it runs on scoped Core (phase 4 of the port). Converting back renames every
-  binder of the result, so the output may differ in names, but not in
-  structure.
+  The strategies ("Clash.Normalize.Strategy.Spec") refer to the scoped
+  transformations, and the strategy compiler
+  ("Clash.Rewrite.StrategyDSL.TH", 'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy')
+  compiles them into fused traversals that open the binders they go under.
 
   Tests: "Test.Clash.Scoped" has @runViaFoil@ (run a scoped transformation
-  on a Clash Core term, in a Clash Core context) and @runScopedClosed@. Port
-  the existing unit tests of the transformation; they then test it through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil' too.
+  on a Clash Core term, in a Clash Core context, through the adapter
+  "Test.Clash.Scoped.ViaFoil") and @runScopedClosed@. The unit tests of the
+  transformations of Clash Core run on the ports through that adapter too.
 
   = Common type errors
 

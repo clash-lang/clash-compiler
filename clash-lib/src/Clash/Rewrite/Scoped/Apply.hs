@@ -38,14 +38,13 @@ import qualified Data.Monoid                 as Monoid
 import           Clash.Core.HasType          (inferCoreTypeOf)
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst            (aeqType)
-import qualified Clash.Core.Term             as C
 import           Clash.Core.Type             (normalizeType)
 import           Clash.Core.Var              (Var (..))
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (DebugOpts (..), TransformationInfo (..), hasDebugInfo, isDebugging)
 import           Clash.Rewrite.Types
-  (RewriteMonad, RewriteStep (..), curFun, debugOpts, tcCache, tfContext,
+  (RewriteMonad, RewriteStep (..), curFun, debugOpts, tcCache,
    transformAppliedCounters, transformCounter, transformTriedCounters)
 import           Clash.Rewrite.Util          (bumpCounter)
 import           Clash.Util                  (curLoc)
@@ -81,7 +80,7 @@ applyWith
   -> RewriteMonad extra (Term n)
   -- ^ The transformation, applied to that node
   -> RewriteMonad extra (Term n, Bool)
-applyWith = \s ctx expr0 action -> do
+applyWith = \s _ctx expr0 action -> do
   opts <- Lens.view debugOpts
   traceIf (hasDebugInfo TryName s opts) ("Trying: " <> s) (pure ())
 
@@ -91,8 +90,7 @@ applyWith = \s ctx expr0 action -> do
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the
   -- recorded rewrite steps. The terms are converted to Clash Core, with the
-  -- raw names of their variables as uniques. Only the Clash Core part of the
-  -- context is recorded: the frames of a 'LegacyRoot'.
+  -- raw names of their variables as uniques. The context is not recorded.
   let rewriteHistFile = dbg_historyFile opts
   Monad.when (isJust rewriteHistFile && hasChanged) $ do
     (curBndr, _) <- Lens.use curFun
@@ -100,7 +98,7 @@ applyWith = \s ctx expr0 action -> do
       $ BS.appendFile (fromJust rewriteHistFile)
       $ BL.toStrict
       $ encode RewriteStep
-          { t_ctx    = legacyFrames ctx
+          { t_ctx    = []
           , t_name   = s
           , t_bndrS  = showPpr (varName curBndr)
           , t_before = toClashTerm expr0
@@ -111,17 +109,6 @@ applyWith = \s ctx expr0 action -> do
     then (, hasChanged) <$> applyDebug s expr0 hasChanged expr1
     else return (expr1, hasChanged)
 {-# INLINE applyWith #-}
-
--- | The Clash Core frames of the root of a context, if it is a 'LegacyRoot'
-legacyFrames :: TransformContext n -> C.Context
-legacyFrames = go . tfPath
- where
-  go :: Path x -> C.Context
-  go = \case
-    PRoot -> []
-    PLegacy root -> tfContext (legacyContext root)
-    PFrame _ p -> go p
-    PUnder _ p -> go p
 
 -- | The debug checks and traces of a transformation, see
 -- 'Clash.Rewrite.Util.applyDebug'. Of its invariant checks, these remain:
