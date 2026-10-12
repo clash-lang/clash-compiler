@@ -120,9 +120,9 @@ import qualified Clash.Core.Type as C (ConstTy (..))
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
-  (bbResultNames, BlackBoxMeta(BlackBoxMeta))
+  (BlackBoxFunction, bbResultNames, BlackBoxMeta(BlackBoxMeta))
 import qualified Clash.Netlist.Id as Id
-import           Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
+import           Clash.Netlist.Scoped.Types (SomeBlackBoxFunction)
 import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
 import           Clash.Util
@@ -977,6 +977,16 @@ primWarnContext binds dst args =
   -- Longest rendering of a single argument
   maxArgLen = 160
 
+-- | Blackbox functions are on scoped Clash Core (see
+-- 'Clash.Netlist.Scoped.Types.BlackBoxFunction'), so Netlist generation on
+-- Clash Core can't call them.
+--
+-- TODO(Phase 7): remove, together with Netlist generation on Clash Core.
+unsupportedBlackBoxFunction :: HasCallStack => SomeBlackBoxFunction -> BlackBoxFunction
+unsupportedBlackBoxFunction _ _ nm _ _ =
+  error ($(curLoc) ++ "Netlist generation on Clash Core can't call the blackbox function of "
+         ++ Text.unpack nm ++ ": blackbox functions run on scoped Clash Core")
+
 -- | Set the name of the binder if the given term is a blackbox requesting
 -- a specific name for the result binder. It might return multiple names in
 -- case of a multi result primitive.
@@ -999,7 +1009,7 @@ renameBinder binds (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $
     tcm <- Lens.view tcCache
     let mpInfo@MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
     let (args1, resIds) = splitMultiPrimArgs mpInfo args
-    funRes <- preserveVarEnv (legacyBlackBoxFunction function False (primName pInfo) args1 mpi_resultTypes)
+    funRes <- preserveVarEnv (unsupportedBlackBoxFunction function False (primName pInfo) args1 mpi_resultTypes)
     let BlackBoxMeta{bbResultNames} = either error fst funRes
     go (primName pInfo) resIds args1 bbResultNames
   goMulti _ _ = pure []
@@ -1007,7 +1017,7 @@ renameBinder binds (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $
   -- Routine for single result primitives (the default kind of primitive)
   goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
   goSingle pInfo (BlackBoxHaskell{function=(_, function)}) = do
-    funRes <- preserveVarEnv (legacyBlackBoxFunction function False (primName pInfo) args [coreTypeOf i])
+    funRes <- preserveVarEnv (unsupportedBlackBoxFunction function False (primName pInfo) args [coreTypeOf i])
     case either error fst funRes of
       BlackBoxMeta{bbResultNames=[bbResultName]} ->
         go (primName pInfo) [i] args [bbResultName]

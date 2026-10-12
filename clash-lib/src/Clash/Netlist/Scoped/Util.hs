@@ -526,12 +526,11 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
     let MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
         (args1, resArgs) = splitAt (length args - length mpi_resultTypes) args
         resIds = [ LocalId o ty n | Left (Var o ty n) <- resArgs ]
-    funRes <- preserveVarEnv $ case function of
-      LegacyBBF f -> f False (C.primName pInfo) (toLegacyArgs ctx args1) mpi_resultTypes
-      -- The result types of 'MultiPrimInfo' are those of the type of the
-      -- primitive, whose type variables are not in scope: those of the result
-      -- variables are instantiated
-      ScopedBBF f -> f ctx False (C.primName pInfo) args1 (map localIdType resIds)
+    -- The result types of 'MultiPrimInfo' are those of the type of the
+    -- primitive, whose type variables are not in scope: those of the result
+    -- variables are instantiated
+    funRes <- preserveVarEnv $
+      callBlackBoxFunction ctx function False (C.primName pInfo) args1 (map localIdType resIds)
     let BlackBoxMeta{bbResultNames} = either error fst funRes
     go (C.primName pInfo) resIds args1 bbResultNames
   goMulti _ _ = pure []
