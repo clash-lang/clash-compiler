@@ -268,6 +268,8 @@ Library
                       Clash.Core.Scoped.Syntax
                       Clash.Core.Scoped.Term
                       Clash.Core.Scoped.TermInfo
+                      Clash.Core.Scoped.TermLiteral
+                      Clash.Core.Scoped.TermLiteral.TH
                       Clash.Core.Scoped.TyCon
                       Clash.Core.Scoped.Type
                       Clash.Core.Scoped.TysPrim
