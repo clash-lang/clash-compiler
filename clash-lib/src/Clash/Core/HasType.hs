@@ -36,7 +36,7 @@ import Clash.Core.Literal (Literal(..))
 import Clash.Core.Pretty
 import Clash.Core.Subst
 import Clash.Core.Term (Term(..), IsMultiPrim(..), PrimInfo(..), collectArgs)
-import Clash.Core.TyCon (TyCon(tyConKind), TyConMap, isTupleTyConLike)
+import Clash.Core.TyCon (TyCon(tyConLegacyKind), TyConMap, isTupleTyConLike)
 import Clash.Core.Type
 import Clash.Core.TysPrim
 import Clash.Core.Var (Var(varType))
@@ -92,7 +92,7 @@ instance HasType PrimInfo where
         -> error "PrimInfo.coreTypeOf: MultiResult primitive without tuple type"
 
 instance HasType TyCon where
-  coreTypeOf = tyConKind
+  coreTypeOf = tyConLegacyKind
 
 instance HasType Type where
   coreTypeOf = id
@@ -114,7 +114,7 @@ instance InferType Type where
         liftedTypeKind
 
       TyConApp tc args ->
-        piResultKinds tcm (tyConKind (UniqMap.find tc tcm)) args
+        piResultKinds tcm (tyConLegacyKind (UniqMap.find tc tcm)) args
 
       OtherType{} ->
         case ty of

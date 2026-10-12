@@ -152,7 +152,9 @@ import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
-import qualified Clash.Core.Scoped.Convert   as C (mkDataConFromClash)
+import qualified Clash.Core.Scoped.Convert   as C
+  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash, mkNewTyConRhsFromClash,
+   mkPrimTyConFromClash, mkPromotedDataConFromClash)
 import qualified Clash.Data.UniqMap          as C
 import           Clash.Driver.Types          (ClashOpts, HasClashOpts(..))
 import           Clash.Driver.Warning        (CanWarn(..), PendingWarning)
@@ -329,16 +331,15 @@ makeTyCon tc = tycon
           tcRhsM <- makeAlgTyConRhs tc $ algTyConRhs tc
           case tcRhsM of
             Just tcRhs ->
-              return
-                C.AlgTyCon
-                { C.tyConUniq   = C.nameUniq tcName
-                , C.tyConName   = tcName
-                , C.tyConKind   = tcKind
-                , C.tyConArity  = tcArity
-                , C.algTcRhs    = tcRhs
-                , C.isClassTc   = isClassTyCon tc
-                }
-            Nothing -> return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
+              return $
+                C.mkAlgTyConFromClash
+                  (C.nameUniq tcName)
+                  tcName
+                  tcKind
+                  tcArity
+                  tcRhs
+                  (isClassTyCon tc)
+            Nothing -> return (C.mkPrimTyConFromClash (C.nameUniq tcName) tcName tcKind tcArity)
 
         mkFunTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
@@ -351,14 +352,13 @@ makeTyCon tc = tycon
                        in  mapM (\b -> (,) <$> mapM coreToType (cab_lhs b)
                                            <*> coreToType (cab_rhs b))
                                 bx
-          return
-            C.FunTyCon
-            { C.tyConUniq  = C.nameUniq tcName
-            , C.tyConName  = tcName
-            , C.tyConKind  = tcKind
-            , C.tyConArity = tcArity
-            , C.tyConSubst = substs
-            }
+          return $
+            C.mkFunTyConFromClash
+              (C.nameUniq tcName)
+              tcName
+              tcKind
+              tcArity
+              substs
 
         mkTupleTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
@@ -366,46 +366,43 @@ makeTyCon tc = tycon
           case tyConDataCons tc of
             dc:_ -> do
               tcDc   <- fmap (C.DataTyCon . (:[])) (coreToDataCon dc)
-              return
-                C.AlgTyCon
-                { C.tyConUniq   = C.nameUniq tcName
-                , C.tyConName   = tcName
-                , C.tyConKind   = tcKind
-                , C.tyConArity  = tcArity
-                , C.algTcRhs    = tcDc
-                , C.isClassTc   = isClassTyCon tc
-                }
+              return $
+                C.mkAlgTyConFromClash
+                  (C.nameUniq tcName)
+                  tcName
+                  tcKind
+                  tcArity
+                  tcDc
+                  (isClassTyCon tc)
             _ -> error "impossible"
 
         mkPrimTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          return
-            C.PrimTyCon
-            { C.tyConUniq    = C.nameUniq tcName
-            , C.tyConName    = tcName
-            , C.tyConKind    = tcKind
-            , C.tyConArity   = tcArity
-            }
+          return $
+            C.mkPrimTyConFromClash
+              (C.nameUniq tcName)
+              tcName
+              tcKind
+              tcArity
 
         mkPromotedDataCon dc = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           tcData <- coreToDataCon dc
 
-          return
-            C.PromotedDataCon
-            { C.tyConUniq   = C.nameUniq tcName
-            , C.tyConName   = tcName
-            , C.tyConKind   = tcKind
-            , C.tyConArity  = tcArity
-            , C.tyConData   = tcData
-            }
+          return $
+            C.mkPromotedDataConFromClash
+              (C.nameUniq tcName)
+              tcName
+              tcKind
+              tcArity
+              tcData
 
         mkVoidTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
+          return (C.mkPrimTyConFromClash (C.nameUniq tcName) tcName tcKind tcArity)
 
         famInstToSubst :: FamInst -> C2C ([C.Type],C.Type)
         famInstToSubst fi = do
@@ -435,7 +432,7 @@ makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
               Data constructor: #{showPprUnsafe dc}
               Representation argument types (#{length args}): #{showPprUnsafe args}
             |]
-    Just <$> (C.NewTyCon <$> coreToDataCon dc
+    Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataCon dc
                          <*> ((,) <$> mapM coreToTyVar tvs
                                   <*> coreToType rhsEtad))
 #endif
@@ -443,7 +440,7 @@ makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
   SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
 
   NewTyCon dc _ (rhsTvs,rhsEtad) _ _ ->
-                                      Just <$> (C.NewTyCon <$> coreToDataCon dc
+                                      Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataCon dc
                                                            <*> ((,) <$> mapM coreToTyVar rhsTvs
                                                                     <*> coreToType rhsEtad
                                                                )

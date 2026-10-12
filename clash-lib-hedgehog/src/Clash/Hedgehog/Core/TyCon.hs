@@ -23,6 +23,8 @@ import Clash.Core.HasType
 import Clash.Core.Name (nameUniq)
 import Clash.Core.Subst
 import Clash.Core.TyCon
+import Clash.Core.Scoped.Convert
+  (mkAlgTyConFromClash, mkFunTyConFromClash, mkPromotedDataConFromClash)
 import Clash.Core.Type (Kind, Type(VarTy), mkTyConApp, splitFunForallTy)
 import Clash.Core.TysPrim (liftedTypeKind, tysPrimMap)
 import Clash.Core.Var
@@ -138,7 +140,7 @@ genAlgTyConFrom range tcm = do
              -- TODO Generate NewTyCon
            ]
 
-  let tc = AlgTyCon (nameUniq name) name kn arity rhs False
+  let tc = mkAlgTyConFromClash (nameUniq name) name kn arity rhs False
 
   canGenDataKinds >>= \case
     True ->
@@ -152,7 +154,7 @@ genAlgTyConFrom range tcm = do
    promoteDataCon dc =
      let tcn = coerce (dcName dc)
          arity = arityOf (dcLegacyType dc)
-      in (tcn, PromotedDataCon (dcUniq dc) tcn (dcLegacyType dc) arity dc)
+      in (tcn, mkPromotedDataConFromClash (dcUniq dc) tcn (dcLegacyType dc) arity dc)
 
 -- TODO In the future we may want to also generate indirectly recursive type
 -- families. For example:
@@ -177,7 +179,7 @@ genFunTyConFrom tcm = do
   let (argKns, resKn) = splitFunForallTy kn
   substs <- genSubsts name (rights argKns) resKn
 
-  let tc = FunTyCon (nameUniq name) name kn arity substs
+  let tc = mkFunTyConFromClash (nameUniq name) name kn arity substs
   pure (UniqMap.singleton name tc)
  where
   genSubsts :: TyConName -> [Kind] -> Kind -> CoreGenT m [([Type], Type)]

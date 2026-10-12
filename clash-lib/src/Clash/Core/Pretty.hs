@@ -262,7 +262,7 @@ instance ClashPretty Type where
 
 instance PrettyPrec TyCon where
   pprPrec prec t = case t of
-    AlgTyCon _ nm kn _ (DataTyCon dcs) _ -> do
+    AlgTyCon _ nm _ _ (DataTyCon dcs) _ kn -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
@@ -276,7 +276,7 @@ instance PrettyPrec TyCon where
 
         pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> ty))
 
-    AlgTyCon _ nm kn _ (NewTyCon dc _) _ -> do
+    AlgTyCon _ nm _ _ (NewTyCon dc _ _) _ kn -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
@@ -286,10 +286,10 @@ instance PrettyPrec TyCon where
 
       pure (vsep [newtype_ <+> decl, conName <> annotate (AnnSyntax Type) (space <> dcolon <+> conType)])
 
-    PromotedDataCon _ _ _ _ dc ->
+    PromotedDataCon _ _ _ _ dc _ ->
       fmap ("promoted" <+>) (pprPrec prec dc)
 
-    FunTyCon _ nm kn _ ss -> do
+    FunTyCon _ nm _ _ _ kn ss -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
@@ -303,7 +303,7 @@ instance PrettyPrec TyCon where
 
         pure (type_ <+> instance_ <+> lhs <+> "=" <+> rhs)
 
-    PrimTyCon _ nm kn _ -> do
+    PrimTyCon _ nm _ _ kn -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
 

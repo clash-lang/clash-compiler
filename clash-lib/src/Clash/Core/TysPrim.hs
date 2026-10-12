@@ -47,7 +47,8 @@ import           GHC.Base hiding (Type, TyCon)
 import           Data.Text.Extra (showt)
 
 import           Clash.Core.DataCon (DataCon, DcStrictness(..))
-import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkDataConFromClash)
+import {-# SOURCE #-} Clash.Core.Scoped.Convert
+  (mkAlgTyConFromClash, mkDataConFromClash, mkPrimTyConFromClash)
 import           GHC.Num.Integer (Integer(..))
 import           GHC.Num.Natural (Natural(..))
 
@@ -124,7 +125,7 @@ word32PrimTyConName = mkUnsafeSystemName (showt ''Word32#)
 
 liftedPrimTC :: TyConName
              -> TyCon
-liftedPrimTC name = PrimTyCon (nameUniq name) name liftedTypeKind 0
+liftedPrimTC name = mkPrimTyConFromClash (nameUniq name) name liftedTypeKind 0
 
 -- | Builtin Type
 intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, wordPrimTc,
@@ -184,7 +185,7 @@ integerPrimTc =
       []
     rhs = DataTyCon [isDc,ipDc,inDc]
   in
-    AlgTyCon uniq name liftedTypeKind 0 rhs False
+    mkAlgTyConFromClash uniq name liftedTypeKind 0 rhs False
 
 naturalNsDc = nsDc
   where
@@ -218,7 +219,7 @@ naturalPrimTc =
       []
     rhs = DataTyCon [nsDc,nbDc]
    in
-    AlgTyCon uniq name liftedTypeKind 0 rhs False
+    mkAlgTyConFromClash uniq name liftedTypeKind 0 rhs False
 charPrimTc    = liftedPrimTC charPrimTyConName
 stringPrimTc  = liftedPrimTC stringPrimTyConName
 wordPrimTc    = liftedPrimTC wordPrimTyConName
@@ -239,7 +240,7 @@ word16PrimTc  = liftedPrimTC word16PrimTyConName
 word32PrimTc  = liftedPrimTC word32PrimTyConName
 
 eqPrimTc :: TyCon
-eqPrimTc = PrimTyCon (nameUniq eqPrimTyConName) eqPrimTyConName ty 4
+eqPrimTc = mkPrimTyConFromClash (nameUniq eqPrimTyConName) eqPrimTyConName ty 4
  where
   -- forall (a :: Type). forall (b :: Type). a -> b -> Type
   --

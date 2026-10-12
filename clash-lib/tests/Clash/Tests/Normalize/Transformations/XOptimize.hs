@@ -40,6 +40,7 @@ import Clash.Core.Name (Name (..), NameSort (User), mkUnsafeName)
 import Clash.Core.Term
   ( IsMultiPrim (SingleResult), Pat (..), PrimInfo (..)
   , PrimUnfolding (NoUnfolding), Term (..), WorkInfo (WorkNever) )
+import Clash.Core.Scoped.Convert (mkAlgTyConFromClash)
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..))
 import Clash.Core.Type (Type (ForAllTy, VarTy), mkFunTy)
 import Clash.Core.TysPrim (liftedTypeKind)
@@ -98,14 +99,13 @@ envXOpt = withTyConMap tcm def{_clashEnv = env}
   tcm =
     foldr (\tc -> UniqMap.insert (tyConName tc) tc) (envTyConMap env0)
       [mkTc "T" mkTDc, mkTc "Pair" pairDataCon]
-  mkTc nm dc = AlgTyCon
-    { tyConUniq = nameToUnique nm
-    , tyConName = mkUnsafeName User (Text.pack nm) (nameToUnique nm)
-    , tyConKind = liftedTypeKind
-    , tyConArity = 0
-    , algTcRhs = DataTyCon [dc]
-    , isClassTc = False
-    }
+  mkTc nm dc = mkAlgTyConFromClash
+    (nameToUnique nm)
+    (mkUnsafeName User (Text.pack nm) (nameToUnique nm))
+    liftedTypeKind
+    0
+    (DataTyCon [dc])
+    False
   errBB = BlackBox
     { name = "err"
     , workInfo = WorkNever

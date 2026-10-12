@@ -245,7 +245,7 @@ coreView1 tcMap ty = case tyView ty of
     -> Just elTy
     | otherwise
     -> case UniqMap.find tcNm tcMap of
-         AlgTyCon {algTcRhs = (NewTyCon _ nt)}
+         AlgTyCon {algTcRhs = NewTyCon {ntLegacyEtadRhs = nt}}
            -> newTyConInstRhs nt args
          _ -> reduceTypeFamily tcMap ty
   OtherType (AnnType _ ty') -> coreView1 tcMap ty'
@@ -561,7 +561,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   | nameUniq tc == fromGhcUnique typeUnconsSymbolTyFamNameKey -- UnconsSymbol
   , [s1] <- mapMaybe (symLitView tcm) tys
   = fromMaybe (error "reduceTypeFamily: cannot construct UnconsSymbol result") $ do
-      FunTyCon {tyConKind = tck} <- UniqMap.lookup tc tcm
+      FunTyCon {tyConLegacyKind = tck} <- UniqMap.lookup tc tcm
       TyConApp maybeTcNm [tupTcApp] <- pure (tyView (snd (splitFunTys tcm tck)))
       maybeTc <- UniqMap.lookup maybeTcNm tcm
       [nothingTc,justTc] <- pure (map (coerce . dcName) (tyConDataCons maybeTc))
@@ -659,7 +659,7 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
         -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
 
-  | Just (FunTyCon {tyConSubst = tcSubst}) <- UniqMap.lookup tc tcm
+  | Just (FunTyCon {tyConLegacySubst = tcSubst}) <- UniqMap.lookup tc tcm
   = let -- See [Note: Eager type families]
         tysR = map (argView tcm) tys
      in findFunSubst tcm tcSubst tysR
@@ -714,7 +714,7 @@ normalizeType tcMap = go
       -> mkTyConApp tcNm (map go args)
       | otherwise
       -> case UniqMap.find tcNm tcMap of
-          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
+          AlgTyCon {algTcRhs = NewTyCon {ntLegacyEtadRhs = nt}}
              -> case newTyConInstRhs nt args of
                   Just ty' -> go ty'
                   Nothing  -> ty

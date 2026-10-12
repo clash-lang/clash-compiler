@@ -31,6 +31,7 @@ import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars)
 import Clash.Core.Literal (Literal (IntLiteral))
 import Clash.Core.Name (Name (..), NameSort (User), mkUnsafeName)
 import Clash.Core.Term (Pat (..), Term (..), mkApps)
+import Clash.Core.Scoped.Convert (mkAlgTyConFromClash)
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..))
 import Clash.Core.Type (Type (ForAllTy, VarTy), mkFunTy)
 import Clash.Core.TysPrim (liftedTypeKind)
@@ -73,14 +74,13 @@ exEnv = withTyConMap (UniqMap.insert exNm exTc (envTyConMap env)) def
  where
   env = _clashEnv def
   exNm = parseTyConName "Ex"
-  exTc = AlgTyCon
-    { tyConUniq = nameUniq exNm
-    , tyConName = exNm
-    , tyConKind = liftedTypeKind
-    , tyConArity = 0
-    , algTcRhs = DataTyCon [mkEx]
-    , isClassTc = False
-    }
+  exTc = mkAlgTyConFromClash
+    (nameUniq exNm)
+    exNm
+    liftedTypeKind
+    0
+    (DataTyCon [mkEx])
+    False
 
 -- | @case s of { DEFAULT -> case e of { MkEx \@n v -> f v }; 1 -> f x }@
 --
@@ -188,14 +188,13 @@ envT = withTyConMap tcm def
   env = _clashEnv def
   tcm = foldr (\tc -> UniqMap.insert (tyConName tc) tc) (envTyConMap env)
           [mkTc "T" mkTDc, mkTc "Pair" pairDataCon]
-  mkTc nm dc = AlgTyCon
-    { tyConUniq = nameToUnique nm
-    , tyConName = mkUnsafeName User (Text.pack nm) (nameToUnique nm)
-    , tyConKind = liftedTypeKind
-    , tyConArity = 0
-    , algTcRhs = DataTyCon [dc]
-    , isClassTc = False
-    }
+  mkTc nm dc = mkAlgTyConFromClash
+    (nameToUnique nm)
+    (mkUnsafeName User (Text.pack nm) (nameToUnique nm))
+    liftedTypeKind
+    0
+    (DataTyCon [dc])
+    False
 
 -- | Assert that the free local (type and term) variables of a term are amongst
 -- the given ones

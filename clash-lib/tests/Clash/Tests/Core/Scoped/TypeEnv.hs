@@ -57,7 +57,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
   [ testCase "the signatures of type constructors are those of conversion" $
       forM_ tyCons $ \tc -> do
         let nm = C.tyConName tc
-        assertScopedTyAlphaEq (C.tyConKind tc) (tyConKindOf testTypeEnv nm :: Kind 'VoidS)
+        assertScopedTyAlphaEq (C.tyConLegacyKind tc) (tyConKindOf testTypeEnv nm :: Kind 'VoidS)
         show (newTyConSigOf testTypeEnv nm) @?= show (newTyConSig tc)
         show (tyFamEqnsOf testTypeEnv nm) @?= show (tyFamEqns tc)
         assertBool "lookupTyCon" (isJust (lookupTyCon testTypeEnv nm))
@@ -93,7 +93,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
                 agrees expected actual =
                   counterexample (show expected) (C.aeqType expected (toClashType actual))
             conjoin $
-              [ agrees (C.tyConKind tc) (tyConKindOf tenv (C.tyConName tc) `asScopeOf` sc)
+              [ agrees (C.tyConLegacyKind tc) (tyConKindOf tenv (C.tyConName tc) `asScopeOf` sc)
               | tc <- UniqMap.elems Gen.tyConMap ] <>
               [ agrees (C.dcLegacyType dc) (dataConType tenv sc dc) | dc <- Gen.dataCons ]
       ]

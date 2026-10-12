@@ -17,7 +17,9 @@ module Test.Clash.Rewrite where
 
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.Scoped.Convert as C (mkDataConFromClash)
+import qualified Clash.Core.Scoped.Convert as C
+  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash, mkNewTyConRhsFromClash,
+   mkPrimTyConFromClash)
 import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
@@ -718,7 +720,7 @@ intTy = parseTyConTy "Int"
 
 -- | The type constructor of 'intTy'. The default 'RewriteEnv' knows it.
 intTyCon :: C.TyCon
-intTyCon = C.PrimTyCon (C.nameUniq nm) nm C.liftedTypeKind 0
+intTyCon = C.mkPrimTyConFromClash (C.nameUniq nm) nm C.liftedTypeKind 0
  where
   nm = parseTyConName "Int"
 
@@ -774,19 +776,19 @@ tyConKindFor tvs = foldr (C.mkFunTy . C.varType) C.liftedTypeKind tvs
 -- 'C.liftedTypeKind'), and data constructors
 mkAlgTyCon :: C.TyConName -> [C.TyVar] -> [C.DataCon] -> C.TyCon
 mkAlgTyCon nm tvs dcs =
-  C.AlgTyCon (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.DataTyCon dcs) False
+  C.mkAlgTyConFromClash (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.DataTyCon dcs) False
 
 -- | A newtype with the given name, type variables (of kind
 -- 'C.liftedTypeKind'), data constructor, and eta-reduced representation type,
--- see 'C.ntEtadRhs'
+-- see 'C.ntLegacyEtadRhs'
 mkNewTyCon :: C.TyConName -> [C.TyVar] -> C.DataCon -> ([C.TyVar], C.Type) -> C.TyCon
 mkNewTyCon nm tvs dc rhs =
-  C.AlgTyCon (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.NewTyCon dc rhs) False
+  C.mkAlgTyConFromClash (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.mkNewTyConRhsFromClash dc rhs) False
 
 -- | A type family with the given name, kind, arity, and equations, see
--- 'C.tyConSubst'
+-- 'C.tyConLegacySubst'
 mkFunTyCon :: C.TyConName -> C.Kind -> Int -> [([C.Type], C.Type)] -> C.TyCon
-mkFunTyCon nm = C.FunTyCon (C.nameUniq nm) nm
+mkFunTyCon nm = C.mkFunTyConFromClash (C.nameUniq nm) nm
 
 -- | @Pair@, a data type with a single constructor 'pairDataCon'
 pairTy :: C.Type
@@ -1335,20 +1337,21 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
         (C.mkFunTy C.typeSymbolKind (maybeTy (tcApp t2TyConName [C.charPrimTy, C.typeSymbolKind])))
         1 []
     , mkAlgTyCon t2TyConName [fxA, fxB] [t2DataCon]
-    , (mkAlgTyCon vTyConName [] [vNilDataCon, vConsDataCon])
-        {C.tyConKind = C.mkFunTy C.typeNatKind C.liftedTypeKind, C.tyConArity = 1}
+    , C.mkAlgTyConFromClash (C.nameUniq vTyConName) vTyConName
+        (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
+        (C.DataTyCon [vNilDataCon, vConsDataCon]) False
     , mkAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
     , mkAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
     , mkAlgTyCon snatTcNm [snatN] [snatDc]
     , mkAlgTyCon hIntTcNm [] [iHashDc]
     , mkAlgTyCon ubpTcNm [ubpL, ubpN] [ubpDc]
-    , C.PrimTyCon (C.nameUniq indexTcNm) indexTcNm (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
+    , C.mkPrimTyConFromClash (C.nameUniq indexTcNm) indexTcNm (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
     , mkAlgTyCon functorTcNm [dictF] [functorDc]
     , mkAlgTyCon applicativeTcNm [dictF] [applicativeDc]
     , mkAlgTyCon ghcPairTcNm [pairA, pairB] [ghcPairDc]
-    , C.PrimTyCon (C.nameUniq clockTcNm) clockTcNm C.liftedTypeKind 1
-    , C.PrimTyCon (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
-    , C.PrimTyCon (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
+    , C.mkPrimTyConFromClash (C.nameUniq clockTcNm) clockTcNm C.liftedTypeKind 1
+    , C.mkPrimTyConFromClash (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
+    , C.mkPrimTyConFromClash (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
     , mkAlgTyCon clkPairTcNm [] [clkPairDc]
     , mkAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
     , mkAlgTyCon doubleTcNm [] [doubleDc]
@@ -1358,7 +1361,7 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     ] <>
     -- Promoted data constructors that type families return. Their kinds don't
     -- matter here.
-    [ C.PrimTyCon (C.nameUniq nm) nm C.liftedTypeKind 0
+    [ C.mkPrimTyConFromClash (C.nameUniq nm) nm C.liftedTypeKind 0
     | nm <-
         [ mkTyConName "GHC.Types.LT" (fromGhcUnique ordLTDataConKey)
         , mkTyConName "GHC.Types.EQ" (fromGhcUnique ordEQDataConKey)

@@ -14,7 +14,8 @@ import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 
 import {-# SOURCE #-} Clash.Core.DataCon (ConTag, DataCon, DcName, DcStrictness)
-import {-# SOURCE #-} Clash.Core.Type (Type)
+import {-# SOURCE #-} Clash.Core.TyCon (AlgTyConRhs, TyCon, TyConName)
+import {-# SOURCE #-} Clash.Core.Type (Kind, Type)
 import Clash.Core.Var (TyVar)
 import Clash.Unique (Unique)
 
@@ -22,3 +23,16 @@ mkDataConFromClash
   :: HasCallStack
   => DcName -> Unique -> ConTag -> Type -> [TyVar] -> [TyVar] -> [Type]
   -> [DcStrictness] -> [Text] -> DataCon
+
+mkAlgTyConFromClash
+  :: HasCallStack => Unique -> TyConName -> Kind -> Int -> AlgTyConRhs -> Bool -> TyCon
+
+mkPromotedDataConFromClash
+  :: HasCallStack => Unique -> TyConName -> Kind -> Int -> DataCon -> TyCon
+
+mkFunTyConFromClash
+  :: HasCallStack => Unique -> TyConName -> Kind -> Int -> [([Type], Type)] -> TyCon
+
+mkPrimTyConFromClash :: HasCallStack => Unique -> TyConName -> Kind -> Int -> TyCon
+
+mkNewTyConRhsFromClash :: HasCallStack => DataCon -> ([TyVar], Type) -> AlgTyConRhs

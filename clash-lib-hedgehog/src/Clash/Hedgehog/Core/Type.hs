@@ -77,7 +77,7 @@ classify isKind tcm = go
 
       TyConApp tcn args ->
         let tc = UniqMap.find tcn tcm
-            isPoly = isPolyTy (piResultTys tcm (tyConKind tc) args)
+            isPoly = isPolyTy (piResultTys tcm (tyConLegacyKind tc) args)
          in case UniqMap.find tcn tcm of
               AlgTyCon{} ->
                 -- If the constructor is algebraic then we have -XDataKinds if
