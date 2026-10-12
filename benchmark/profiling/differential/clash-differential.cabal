@@ -19,6 +19,7 @@ executable clash-differential
   other-modules:       Comparisons
                        Current
                        Demo
+                       NetlistDiff
                        Normalized
                        Prims
                        Registry
@@ -40,6 +41,7 @@ executable clash-differential
                        filepath,
                        lens,
                        mtl,
+                       ordered-containers,
                        process,
                        QuickCheck,
                        tasty-quickcheck,
@@ -49,4 +51,5 @@ executable clash-differential
 
                        clash-ghc,
                        clash-lib,
+                       clash-prelude,
                        clash-profiling-prepare
