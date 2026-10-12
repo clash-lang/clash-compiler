@@ -13,12 +13,14 @@ library
   HS-Source-Dirs:      instances
   default-language:    Haskell2010
   ghc-options:         -Wall -Wcompat
-  Exposed-Modules:     SerialiseInstances
+  Exposed-Modules:     RestorePrimitives
+                       SerialiseInstances
   build-depends:       base,
                        binary,
                        bytestring,
                        containers,
                        hashable,
+                       text,
                        unordered-containers,
 
                        clash-lib,

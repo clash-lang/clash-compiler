@@ -26,6 +26,7 @@ import           System.FilePath              ((</>))
 
 import qualified Data.ByteString.Lazy as B
 
+import           RestorePrimitives            (restorePrimMap)
 import           SerialiseInstances
 import           BenchmarkCommon
 
@@ -43,13 +44,14 @@ main = do
 benchFile :: [FilePath] -> FilePath -> IO ()
 benchFile idirs src = do
   (transformedBindings, topEntities, primMap, tcm, reprs, topEntity, domains) <- setupEnv src
+  (prims, _) <- restorePrimMap primMap
   putStrLn $ "Doing netlist generation of " ++ src
 
   let env = ClashEnv
                    { envOpts = opts idirs
                    , envTyConMap = tcm
                    , envTupleTyCons = mempty
-                   , envPrimitives = fmap (fmap unremoveBBfunc) primMap
+                   , envPrimitives = prims
                    , envCustomReprs = reprs
                    , envDomains = domains
                    }
