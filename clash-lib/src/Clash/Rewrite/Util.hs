@@ -438,44 +438,72 @@ inlineBinders condition (TransformContext inScope0 _) expr (Rec xes) res = do
 isJoinPointIn :: Id   -- ^ 'Id' of the local binder
               -> Term -- ^ Expression in which the binder is bound
               -> Bool
-isJoinPointIn id_ e = case tailCalls id_ e of
+isJoinPointIn id_ e = case tlCalls of
                       Just n | n > 1 -> True
                       _              -> False
+ where
+  tlCalls = case e of
+    -- The let-expression that binds the binder: its right-hand sides and its
+    -- body are in its scope, except for the right-hand side of a
+    -- non-recursive binding.
+    Let (NonRec i _) body | i == id_ -> tailCalls id_ body
+    Let (Rec bs) body | id_ `elem` map fst bs -> letTailCalls id_ bs body
+    _ -> tailCalls id_ e
 
 -- | Count the number of (only) tail calls of a function in an expression.
 -- 'Nothing' indicates that the function was used in a non-tail call position.
+--
+-- A binder of a variable with the same unique as the function hides it in
+-- its scope.
 tailCalls :: Id   -- ^ Function to check
           -> Term -- ^ Expression to check it in
           -> Maybe Int
 tailCalls id_ = \case
   Var nm | id_ == nm -> Just 1
          | otherwise -> Just 0
-  Lam _ e -> tailCalls id_ e
+  Lam x e -> under x e
   TyLam _ e -> tailCalls id_ e
   App l r  -> case tailCalls id_ r of
                 Just 0 -> tailCalls id_ l
                 _      -> Nothing
   TyApp l _ -> tailCalls id_ l
-  Letrec bs e ->
-    let (bsIds,bsExprs) = unzip bs
-        bsTls           = map (tailCalls id_) bsExprs
-        bsIdsUsed       = mapMaybe (\(l,r) -> pure l <* r) (zip bsIds bsTls)
-        bsIdsTls        = map (`tailCalls` e) bsIdsUsed
-        bsCount         = pure . sum $ catMaybes bsTls
-    in  case (all isJust bsTls) of
-          False -> Nothing
-          True  -> case (all (==0) $ catMaybes bsTls) of
-            False  -> case all isJust bsIdsTls of
-              False -> Nothing
-              True  -> (+) <$> bsCount <*> tailCalls id_ e
-            True -> tailCalls id_ e
+  Let (NonRec x b) e ->
+    letTailCallsWith id_ [(x, tailCalls id_ b)] e (under x e)
+  Let (Rec bs) e
+    | id_ `elem` map fst bs -> Just 0
+    | otherwise -> letTailCalls id_ bs e
   Case scrut _ alts ->
     let scrutTl = tailCalls id_ scrut
-        altsTl  = map (tailCalls id_ . snd) alts
+        altsTl  = map (\(p, a) -> if id_ `elem` snd (patIds p) then Just 0 else tailCalls id_ a) alts
     in  case scrutTl of
           Just 0 | all (/= Nothing) altsTl -> Just (sum (catMaybes altsTl))
           _ -> Nothing
   _ -> Just 0
+ where
+  under x e = if x == id_ then Just 0 else tailCalls id_ e
+
+-- | Count the number of (only) tail calls of a function in a recursive
+-- let-expression, given its bindings and body. See 'tailCalls'.
+letTailCalls :: Id -> [LetBinding] -> Term -> Maybe Int
+letTailCalls id_ bs e =
+  letTailCallsWith id_ [(x, tailCalls id_ b) | (x, b) <- bs] e (tailCalls id_ e)
+
+-- | Count the number of (only) tail calls of a function in a let-expression,
+-- given its binders with the tail calls of the function in their right-hand
+-- sides, its body, and the tail calls of the function in its body
+letTailCallsWith :: Id -> [(Id, Maybe Int)] -> Term -> Maybe Int -> Maybe Int
+letTailCallsWith _ bs e eTls =
+  let bsTls           = map snd bs
+      bsIdsUsed       = mapMaybe (\(l,r) -> pure l <* r) bs
+      bsIdsTls        = map (`tailCalls` e) bsIdsUsed
+      bsCount         = pure . sum $ catMaybes bsTls
+  in  case (all isJust bsTls) of
+        False -> Nothing
+        True  -> case (all (==0) $ catMaybes bsTls) of
+          False  -> case all isJust bsIdsTls of
+            False -> Nothing
+            True  -> (+) <$> bsCount <*> eTls
+          True -> eTls
 
 -- | Determines whether a function has the following shape:
 --
