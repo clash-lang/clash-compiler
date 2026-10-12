@@ -8,6 +8,7 @@ import qualified Clash.Tests.Core.FreeVars
 import qualified Clash.Tests.Core.HasType
 import qualified Clash.Tests.Core.Lint
 import qualified Clash.Tests.Core.Scoped.Alpha
+import qualified Clash.Tests.Core.Scoped.Builder
 import qualified Clash.Tests.Core.Scoped.Convert
 import qualified Clash.Tests.Core.Scoped.DataCon
 import qualified Clash.Tests.Core.Scoped.EqSolver
@@ -102,6 +103,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.HasType.tests
   , Clash.Tests.Core.Lint.tests
   , Clash.Tests.Core.Scoped.Alpha.tests
+  , Clash.Tests.Core.Scoped.Builder.tests
   , Clash.Tests.Core.Scoped.Convert.tests
   , Clash.Tests.Core.Scoped.DataCon.tests
   , Clash.Tests.Core.Scoped.EqSolver.tests
