@@ -35,7 +35,7 @@ import Text.Read (readMaybe)
 import Clash.Core.Name (nameOcc)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
-import Clash.Core.Scoped.Syntax (globalIdName)
+import Clash.Core.Scoped.Syntax (globalIdName, globalIdLegacy)
 import Clash.Core.TermInfo (termSizeSmallerThan)
 import Clash.Core.Var (varName)
 import Clash.Core.VarEnv (mapMaybeVarEnv, mkVarSet)
@@ -245,7 +245,7 @@ loadDesign opts f = do
       then do
         (bm, topEnts, prims, tcm0, reprs0, _top, domains0) <-
           decode <$> B.readFile f :: IO NetlistInputs
-        pure (bm, tcm0, mempty, prims, reprs0, map topId topEnts, domains0)
+        pure (bm, tcm0, mempty, prims, reprs0, map (globalIdLegacy . topId) topEnts, domains0)
       else do
         (bm, tcm0, tupTcm0, prims, reprs0, tops0, _top, domains0) <-
           decode <$> B.readFile f :: IO NormalizationInputs

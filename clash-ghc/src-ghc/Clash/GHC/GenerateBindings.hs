@@ -199,7 +199,7 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
       topEntities'' =
         map (\(topEnt, annM, isTb) ->
                 case UniqMap.lookup topEnt allBindings of
-                  Just b -> TopEntityT (globalIdLegacy (bindingId b)) annM isTb
+                  Just b -> TopEntityT (bindingId b) annM isTb
                   Nothing -> GHC.pgmError [I.i|
                     No top entity called '#{topEnt}' found. Make sure you are
                     compiling with the '-fexpose-all-unfoldings' flag.
@@ -246,7 +246,7 @@ setNoInlineTopEntities
 setNoInlineTopEntities bm tes =
   fmap go bm
  where
-  ids = mkVarSet (fmap topId tes)
+  ids = mkVarSet (fmap (globalIdLegacy . topId) tes)
 
   go b@Binding{bindingId}
     | globalIdLegacy bindingId `elemVarSet` ids

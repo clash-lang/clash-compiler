@@ -101,7 +101,7 @@ import           Clash.Core.Type
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
-  (Id, varName, varUniq, varType)
+  (varName, varUniq, varType)
 import           Clash.Debug                      (debugIsOn)
 import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
 import           Clash.Driver.Types
@@ -123,6 +123,7 @@ import           Clash.Normalize                  (checkNonRecursive, cleanupGra
                                                    normalize, runNormalization)
 import           Clash.Core.Scoped.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
+import           Clash.Core.Scoped.Syntax (globalIdLegacy, globalIdUniq, GlobalId)
 import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
 import           Clash.Normalize.Scoped.Util      (callGraph)
@@ -230,17 +231,19 @@ splitTopEntityT
   -> TopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
-  case lookupGlobalEnv (mkGlobalIdFromClash id_) bindingsMap of
+  case lookupGlobalEnv id_ bindingsMap of
     Just (Binding _id sp _ _ _ _) ->
-      tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf id_) t)}
+      tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf (globalIdLegacy id_)) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
 splitTopEntityT _ _ t = t
 
 -- | Remove constraints such as 'a ~ 3'.
 removeForAll :: TopEntityT -> TopEntityT
-removeForAll (TopEntityT var annM isTb) =
-  TopEntityT var{varType=tvSubstWithTyEq (coreTypeOf var)} annM isTb
+removeForAll (TopEntityT g annM isTb) =
+  TopEntityT (mkGlobalIdFromClash var{varType=tvSubstWithTyEq (coreTypeOf var)}) annM isTb
+ where
+  var = globalIdLegacy g
 
 -- | Given a list of all found top entities and _maybe_ a top entity (+dependencies)
 -- passed in by '-main-is', return the list of top entities Clash needs to
@@ -378,7 +381,8 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
     -- 'Id.IdentifierSet'
     -> TopEntityT
     -> IO ()
-  go compNames seenV edamFilesV ioLockV deps topEntityMap waitTurn (TopEntityT topEntity annM isTb) = do
+  go compNames seenV edamFilesV ioLockV deps topEntityMap waitTurn (TopEntityT topEntityG annM isTb) = do
+  let topEntity = globalIdLegacy topEntityG
   let domainConfs = envDomains env
   let bindingsMap = designBindings design
   let primMap = envPrimitives env
@@ -393,7 +397,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
 
   let topNm = fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show topEntity))
-                (lookupGlobalEnv (mkGlobalIdFromClash topEntity) compNames)
+                (lookupGlobalEnv topEntityG compNames)
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
       hdlState' = setDomainConfigurations domainConfs
@@ -469,7 +473,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
       -- 3. Normalize topEntity
       supplyN <- Supply.newSupply
       transformedBindings <- normalizeEntity env bindingsMap typeTrans
-                               topEntityNames supplyN topEntity
+                               topEntityNames supplyN topEntityG
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
@@ -484,7 +488,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
           genNetlist env isTb transformedBindings topEntityMap compNames
-            typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+            typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntityG
 
         pure (seen', (topComponent, netlist))
 
@@ -522,7 +526,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
         depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
         depIds =
           mapMaybe
-            (\u -> List.find ((== u) . varUniq) (map topId (globalEnvElems topEntityMap)))
+            (\u -> List.find ((== u) . varUniq) (map (globalIdLegacy . topId) (globalEnvElems topEntityMap)))
             depUniques
 
         manifest =
@@ -1188,22 +1192,21 @@ normalizeEntity
   -- ^ All bindings
   -> HWTypeTranslator
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> [Id]
+  -> [GlobalId]
   -- ^ TopEntities
   -> Supply.Supply
   -- ^ Unique supply
-  -> Id
+  -> GlobalId
   -- ^ root of the hierarchy
   -> IO GlobalBindings
-normalizeEntity env bindingsMap typeTrans topEntities supply tm = transformedBindings
+normalizeEntity env bindingsMap typeTrans topEntities supply top = transformedBindings
   where
-    doNorm = do let top = mkGlobalIdFromClash tm
-                norm <- normalize [top]
+    doNorm = do norm <- normalize [top]
                 let normChecked = checkNonRecursive norm
                 cleanupGraph top normChecked
     transformedBindings = runNormalization env supply bindingsMap
                             typeTrans emptyGlobalEnv
-                            topEntities doNorm
+                            (map globalIdLegacy topEntities) doNorm
 
 -- | Reverse topologically sort given top entities. Also returns a mapping that
 -- maps a top entity to its reverse topologically sorted transitive dependencies.
@@ -1218,19 +1221,19 @@ sortTop bindingsMap topEntities =
     Left msg   -> error msg
     Right tops -> (tops, mapFrom tops)
  where
-  nodes = [(varUniq topE, t) | t@(TopEntityT topE _ _) <- topEntities]
+  nodes = [(globalIdUniq topE, t) | t@(TopEntityT topE _ _) <- topEntities]
   edges = concatMap getEdges topEntities
 
   getEdges (TopEntityT topE _ _) =
     map
-      (\top -> (varUniq topE, topToUnique top))
+      (\top -> (globalIdUniq topE, topToUnique top))
       (getTransitiveRefs topE)
 
   getTransitiveRefs top =
-    let allDeps = callGraph bindingsMap (mkGlobalIdFromClash top)
-    in  filter (\t -> topId t /= top && mkGlobalIdFromClash (topId t) `memberGlobalEnv` allDeps) topEntities
+    let allDeps = callGraph bindingsMap top
+    in  filter (\t -> topId t /= top && topId t `memberGlobalEnv` allDeps) topEntities
 
-  topToUnique = varUniq . topId
+  topToUnique = globalIdUniq . topId
 
   mapFrom tops =
     let

@@ -4,6 +4,7 @@
 import           Clash.Driver
 import           Clash.Rewrite.Capture        (takeCaptureLog)
 import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWidth), GlobalBindings)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Rewrite.Scoped.Globals (fromClashBindings, toClashBindings)
 import qualified Clash.Util.Supply            as Supply
 
@@ -56,7 +57,7 @@ benchFile idirs src = do
   -- The bindings are serialized as bindings of Clash Core
   res <- normalizeEntity clashEnv (fromClashBindings bindingsMap)
                    (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
-                   topEntityNames supplyN topEntity
+                   (map mkGlobalIdFromClash topEntityNames) supplyN (mkGlobalIdFromClash topEntity)
   res `deepseq` putStrLn ".. done\n"
   writeNormalized src res
   writeCorpus src inputs

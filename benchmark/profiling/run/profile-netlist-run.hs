@@ -10,6 +10,7 @@ import           Clash.Driver.Types
 import           Clash.Netlist
 import           Clash.Netlist.Scoped (genNetlist)
 import           Clash.Netlist.Types          hiding (backend, hdlDir)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
@@ -68,7 +69,7 @@ benchFile idirs src = do
     -- The bindings are serialized as bindings of Clash Core
     genNetlist env False (fromClashBindings transformedBindings) topEntityMap compNames
                (ghcTypeToHWType (opt_intWidth (envOpts env)))
-               ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
+               ite (SomeBackend hdlState') seen hdlDir prefixM (mkGlobalIdFromClash topEntity)
   netlist `deepseq` putStrLn ".. done\n"
 
 setupEnv

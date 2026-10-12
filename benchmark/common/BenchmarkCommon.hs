@@ -6,6 +6,7 @@ import Clash.Annotations.Primitive (HDL(VHDL))
 import Clash.Backend
 import Clash.Backend.VHDL
 import Clash.Core.Var
+import Clash.Core.Scoped.Syntax (globalIdLegacy)
 import Clash.Driver
 import Clash.Driver.Types
 import Clash.Netlist.Types (TopEntityT(topId))
@@ -62,5 +63,5 @@ runNormalisationStage idirs src = do
             normalizeEntity env (designBindings design)
               (ghcTypeToHWType (opt_intWidth (opts idirs)))
               topEntityNames supplyN topEntity
-      return (env, design{designBindings=transformedBindings},topEntity)
+      return (env, design{designBindings=transformedBindings}, globalIdLegacy topEntity)
     _ -> error "no top entities"

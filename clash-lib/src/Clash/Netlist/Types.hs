@@ -71,7 +71,7 @@ import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
 import Clash.Core.Scoped.Alpha              (AlphaType)
-import Clash.Core.Scoped.Syntax             (Distinct, Scope)
+import Clash.Core.Scoped.Syntax             (Distinct, GlobalId, Scope)
 import qualified Clash.Core.Scoped.Syntax   as S (Type)
 import Clash.Core.Scoped.TypeEnv            (TypeEnv)
 import Clash.Core.Type                      (Type)
@@ -94,7 +94,7 @@ import {-# SOURCE #-} qualified Clash.Netlist.Id as Id (toText)
 
 -- | Structure describing a top entity: it's id and its port annotations.
 data TopEntityT = TopEntityT
-  { topId :: Id
+  { topId :: GlobalId
   -- ^ Id of top entity
   , topAnnotation :: Maybe TopEntity
   -- ^ (Maybe) a topentity annotation

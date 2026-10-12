@@ -44,6 +44,7 @@ import qualified Data.Text as Text
 import           System.FilePath ((</>))
 
 import           Test.Tasty.Clash
+import           Clash.Core.Scoped.Syntax (globalIdName)
 
 mkClashOpts :: ClashOpts
 mkClashOpts = defClashOpts
@@ -96,7 +97,7 @@ runToNetlistStage target f src = do
     genNetlist env False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
       ite (SomeBackend hdlSt) seen hdlDir Nothing te
    where
-    teS     = Text.unpack . nameOcc $ varName te
+    teS     = Text.unpack . nameOcc $ globalIdName te
     modN    = takeWhile (/= '.') teS
     hdlSt   = setDomainConfigurations (envDomains env)
             $ setModName (Text.pack modN) backend
