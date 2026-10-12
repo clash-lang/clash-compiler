@@ -2026,7 +2026,7 @@ affixName
   :: Text
   -> NetlistMonad Text
 affixName nm0 = do
-  NetlistEnv _ pre suf _ _ _ _ <- ask
+  NetlistEnv _ pre suf _ _ _ _ _ <- ask
   let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
       nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2

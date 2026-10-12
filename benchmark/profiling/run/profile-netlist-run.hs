@@ -8,7 +8,8 @@ import           Clash.Core.Name
 import           Clash.Core.Var
 import           Clash.Core.VarEnv (mkVarEnv)
 import           Clash.Driver.Types
-import           Clash.Netlist
+import           Clash.Netlist hiding (genNetlist)
+import           Clash.Netlist.Scoped (genNetlist)
 import           Clash.Netlist.Types          hiding (backend, hdlDir)
 import           Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
