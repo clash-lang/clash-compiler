@@ -179,16 +179,35 @@ import Data.Text (Text)
 import Clash.Core.Scoped.Evaluator.Types (PrimReduction)
 
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal as Clash.Class.BitPack.Internal
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving as Clash.Annotations.BitRepresentation.Deriving
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.Exp as Clash.Class.Exp
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Promoted.Nat as Clash.Promoted.Nat
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector as Clash.Sized.Internal.BitVector
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index as Clash.Sized.Internal.Index
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Signed as Clash.Sized.Internal.Signed
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Unsigned as Clash.Sized.Internal.Unsigned
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree as Clash.Sized.RTree
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector as Clash.Sized.Vector
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Data.Singletons.TypeLits.Internal as Data.Singletons.TypeLits.Internal
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Data.Text.Show as Data.Text.Show
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Base as GHC.Base
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes as GHC.Classes
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Magic as GHC.Magic
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Float as GHC.Float
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Int as GHC.Int
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Float as GHC.Internal.Float
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Real as GHC.Internal.Real
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Num as GHC.Num
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.BigNat as GHC.Num.BigNat
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer as GHC.Num.Integer
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Natural as GHC.Num.Natural
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim as GHC.Prim
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.PrimopWrappers as GHC.PrimopWrappers
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Real as GHC.Real
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeLits as GHC.TypeLits
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeNats as GHC.TypeNats
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Types as GHC.Types
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Word as GHC.Word
 
 -- | The ported reductions, by the name of their primitive. See the module
 -- header.
@@ -205,15 +224,34 @@ scopedPrimReductions
 -- | The ported reductions, in the order of their modules
 scopedPrimitives :: [(Text, PrimReduction)]
 scopedPrimitives = concat
-  [ Clash.Class.BitPack.Internal.primitives
+  [ Clash.Annotations.BitRepresentation.Deriving.primitives
+  , Clash.Class.BitPack.Internal.primitives
+  , Clash.Class.Exp.primitives
+  , Clash.Promoted.Nat.primitives
   , Clash.Sized.Internal.BitVector.primitives
   , Clash.Sized.Internal.Index.primitives
+  , Clash.Sized.Internal.Signed.primitives
   , Clash.Sized.Internal.Unsigned.primitives
   , Clash.Sized.RTree.primitives
   , Clash.Sized.Vector.primitives
+  , Data.Singletons.TypeLits.Internal.primitives
+  , Data.Text.Show.primitives
+  , GHC.Base.primitives
   , GHC.Classes.primitives
+  , GHC.Float.primitives
+  , GHC.Int.primitives
+  , GHC.Internal.Float.primitives
+  , GHC.Internal.Real.primitives
   , GHC.Magic.primitives
+  , GHC.Num.primitives
+  , GHC.Num.BigNat.primitives
   , GHC.Num.Integer.primitives
+  , GHC.Num.Natural.primitives
   , GHC.Prim.primitives
   , GHC.PrimopWrappers.primitives
+  , GHC.Real.primitives
+  , GHC.TypeLits.primitives
+  , GHC.TypeNats.primitives
+  , GHC.Types.primitives
+  , GHC.Word.primitives
   ]
