@@ -7,6 +7,10 @@
   component into a single scope ('splitNormalized'), and giving its variables
   their HDL identifiers ('mkUniqueNormalized').
 
+  The translation of the types of scoped Core to HWTypes
+  ('unsafeCoreTypeToHWTypeM', ...) takes the scope of the type, to look
+  through newtypes and type families.
+
   The other utilities are adapters that run their counterparts in
   "Clash.Netlist.Util" on Clash Core, see
   'Clash.Netlist.Scoped.Types.toLegacy'. TODO(Phase 5, Util): port.
@@ -33,10 +37,15 @@ module Clash.Netlist.Scoped.Util
   , idToPort
   , idToInPort
   , idToOutPort
-    -- * Adapters
-  , withTicks
+    -- * Types
   , unsafeCoreTypeToHWTypeM
   , unsafeCoreTypeToHWTypeM'
+  , coreTypeToHWTypeM
+  , coreTypeToHWTypeM'
+  , termHWType
+  , termHWTypeM
+    -- * Adapters
+  , withTicks
   ) where
 
 import           Control.Applicative         ((<|>))
@@ -45,6 +54,7 @@ import qualified Control.Lens                as Lens
 import           Control.Monad               (when, zipWithM)
 import           Control.Monad.Extra         (concatMapM)
 import qualified Data.Map.Strict             as Map
+import           Control.Monad.State.Strict  (runState)
 import           Data.Maybe                  (catMaybes, isNothing)
 import           Data.Text                   (Text)
 import           GHC.Stack                   (HasCallStack)
@@ -66,6 +76,7 @@ import           Clash.Core.Scoped.FreeVars  (tmNameOccursIn)
 import           Clash.Core.Scoped.Subst
   (openBind, openIdBinder, teleIdVars, withFreshIdBinder)
 import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.Term      (collectArgsTicks, collectTicks, mkTicks, stripTicks)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv, typeEnvTyConMap)
 
@@ -76,10 +87,11 @@ import           Clash.Netlist.Scoped.BlackBox
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Types
   (BlackBox, Declaration, DeclarationType (..), ExpandedPortName, ExpandedTopEntity (..),
-   FilteredHWType (..), HWType, Identifier, NetlistMonad, backend, curCompNm, tcCache)
+   FilteredHWType (..), HWType, Identifier, NetlistMonad, backend, curCompNm, customReprs,
+   htyCache, tcCache, typeEnv, typeTranslator)
 import           Clash.Netlist.Util
   (containsBiSignalIn, evalBlackBox, expandTopEntityOrErrM, isBiSignalIn, isVoid,
-   mkTopInput, mkTopOutput, preserveVarEnv, primWarnContext)
+   mkTopInput, mkTopOutput, preserveVarEnv, primWarnContext, stripFiltered)
 import qualified Clash.Netlist.Util          as Legacy
 import           Clash.Primitives.Types      (CompiledPrimitive, Primitive (..))
 
@@ -196,8 +208,8 @@ mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0
         Nothing -> res0
       (supply1, supply2) = splitSupply supply0
   -- Generate port names and add them to set of seen identifiers
-  argHwtys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) . toClashType . localIdType) args
-  resHwty <- unsafeCoreTypeToHWTypeM $(curLoc) (toClashType (localIdType res))
+  argHwtys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) sc . localIdType) args
+  resHwty <- unsafeCoreTypeToHWTypeM $(curLoc) sc (localIdType res)
   etopM <-
     mapM
       (expandTopEntityOrErrM
@@ -206,12 +218,12 @@ mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0
       topMM
 
   -- Make arguments unique
-  (wereVoids, iports, iwrappers, argNames) <- mkUniqueArguments etopM args
+  (wereVoids, iports, iwrappers, argNames) <- mkUniqueArguments sc etopM args
 
   -- Make result unique. This might yield 'Nothing' in which case the result
   -- was a single BiSignalOut. This is superfluous in the HDL, as the argument
   -- will already contain a bidirectional signal complementing the BiSignalOut.
-  resM <- mkUniqueResult etopM res
+  resM <- mkUniqueResult sc etopM res
   case resM of
     Just (oports, owrappers, res1Name) -> do
       -- Collect new names, see 'renameBinder' for more information. The
@@ -307,7 +319,9 @@ mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0
 -- | Give the arguments of a component unique HDL identifiers, or those of
 -- the ports of the top entity
 mkUniqueArguments
-  :: Maybe (ExpandedTopEntity Identifier)
+  :: Distinct l
+  => Scope l
+  -> Maybe (ExpandedTopEntity Identifier)
   -- ^ Top entity annotation where:
   --
   --     * Nothing: term is not a top entity
@@ -319,12 +333,12 @@ mkUniqueArguments
        , [Declaration]             -- Extra declarations
        , [(LocalId l, Identifier)] -- The HDL identifiers of the arguments
        )
-mkUniqueArguments Nothing args = do
+mkUniqueArguments sc Nothing args = do
   names <- mapM (\a -> (a,) <$> uniqueIdentifier (localIdOcc a)) args
-  ports <- mapM (uncurry idToInPort) names
+  ports <- mapM (uncurry (idToInPort sc)) names
   return (map isNothing ports, catMaybes ports, [], names)
 
-mkUniqueArguments (Just (ExpandedTopEntity{..})) args = do
+mkUniqueArguments _sc (Just (ExpandedTopEntity{..})) args = do
   (ports, decls, names) <- (unzip3 . catMaybes) <$> zipWithM go et_inputs args
   return ( map isNothing et_inputs
          , concat ports
@@ -343,25 +357,27 @@ mkUniqueArguments (Just (ExpandedTopEntity{..})) args = do
 -- | Give the result of a component a unique HDL identifier, or that of the
 -- output port of the top entity. Gives 'Nothing' if it has no output port.
 mkUniqueResult
-  :: Maybe (ExpandedTopEntity Identifier)
+  :: Distinct l
+  => Scope l
+  -> Maybe (ExpandedTopEntity Identifier)
   -- ^ Top entity annotation where:
   --
   --     * Nothing: term is not a top entity
   --     * Just ..: term is a top entity
   -> LocalId l
   -> NetlistMonad (Maybe ([(Identifier,HWType)], [Declaration], Identifier))
-mkUniqueResult Nothing res = do
+mkUniqueResult sc Nothing res = do
   i <- uniqueIdentifier (localIdOcc res)
-  portM <- idToOutPort i (localIdType res)
+  portM <- idToOutPort sc i (localIdType res)
   case portM of
     Just port -> return (Just ([port], [], i))
     _         -> return Nothing
 
-mkUniqueResult (Just (ExpandedTopEntity{et_output=Nothing})) _res =
+mkUniqueResult _sc (Just (ExpandedTopEntity{et_output=Nothing})) _res =
   pure Nothing
-mkUniqueResult (Just (ExpandedTopEntity{et_output=Just iPort})) res = do
+mkUniqueResult sc (Just (ExpandedTopEntity{et_output=Just iPort})) res = do
   (_, sp) <- Lens.use curCompNm
-  (FilteredHWType hwty _) <- unsafeCoreTypeToHWTypeM $(curLoc) (toClashType (localIdType res))
+  (FilteredHWType hwty _) <- unsafeCoreTypeToHWTypeM $(curLoc) sc (localIdType res)
   when (containsBiSignalIn hwty)
     (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
   (ports, decls, portI) <- mkTopOutput iPort
@@ -376,10 +392,11 @@ uniqueIdentifier occ = Id.unsafeMake . Id.toText <$> Id.make (C.nameOcc occ)
 
 -- | Same as 'idToPort', but throws an error if the port is a composite type
 -- with a BiSignalIn
-idToInPort :: LocalId n -> Identifier -> NetlistMonad (Maybe (Identifier, HWType))
-idToInPort var i = do
+idToInPort
+  :: Distinct n => Scope n -> LocalId n -> Identifier -> NetlistMonad (Maybe (Identifier, HWType))
+idToInPort sc var i = do
   (_, sp) <- Lens.use curCompNm
-  portM <- idToPort i (localIdType var)
+  portM <- idToPort sc i (localIdType var)
   case portM of
     Just (_,hty) -> do
       when (containsBiSignalIn hty && not (isBiSignalIn hty))
@@ -388,10 +405,11 @@ idToInPort var i = do
     _ -> return Nothing
 
 -- | Same as 'idToPort', but throws an error if the port is of type BiSignalIn
-idToOutPort :: Identifier -> Type n -> NetlistMonad (Maybe (Identifier,HWType))
-idToOutPort i ty = do
+idToOutPort
+  :: Distinct n => Scope n -> Identifier -> Type n -> NetlistMonad (Maybe (Identifier,HWType))
+idToOutPort sc i ty = do
   (_, srcspan) <- Lens.use curCompNm
-  portM <- idToPort i ty
+  portM <- idToPort sc i ty
   case portM of
     Just (_,hty) -> do
       when (containsBiSignalIn hty)
@@ -399,11 +417,11 @@ idToOutPort i ty = do
       return portM
     _ -> return Nothing
 
--- | The port of a variable, given its HDL identifier and type. 'Nothing' if
--- the variable is void.
-idToPort :: Identifier -> Type n -> NetlistMonad (Maybe (Identifier, HWType))
-idToPort i ty = do
-  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (toClashType ty)
+-- | The port of a variable, given its HDL identifier, and its type in the
+-- given scope. 'Nothing' if the variable is void.
+idToPort :: Distinct n => Scope n -> Identifier -> Type n -> NetlistMonad (Maybe (Identifier, HWType))
+idToPort sc i ty = do
+  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) sc ty
   if isVoid hwTy
     then return Nothing
     else return (Just (i, hwTy))
@@ -480,6 +498,60 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
     -- redirections in 'mkUniqueNormalized'.
     pure (zipWith modName is0 newNames)
 
+-- * Types
+
+-- | Converts a type, in the given scope, to a HWType; errors on failure. See
+-- 'Clash.Netlist.Util.unsafeCoreTypeToHWType'.
+unsafeCoreTypeToHWTypeM
+  :: Distinct n
+  => String
+  -> Scope n
+  -> Type n
+  -> NetlistMonad FilteredHWType
+unsafeCoreTypeToHWTypeM loc sc ty = do
+  (_,cmpNm) <- Lens.use curCompNm
+  tt <- Lens.use typeTranslator
+  reprs <- Lens.view customReprs
+  te <- Lens.view typeEnv
+  htm0 <- Lens.use htyCache
+  let (hty, htm1) = runState (Legacy.unsafeCoreTypeToHWType cmpNm loc tt reprs te sc ty) htm0
+  htyCache Lens..= htm1
+  return hty
+
+-- | Same as 'unsafeCoreTypeToHWTypeM', but discards void filter information
+unsafeCoreTypeToHWTypeM' :: Distinct n => String -> Scope n -> Type n -> NetlistMonad HWType
+unsafeCoreTypeToHWTypeM' loc sc ty = stripFiltered <$> unsafeCoreTypeToHWTypeM loc sc ty
+
+-- | Converts a type, in the given scope, to a HWType; 'Nothing' on failure.
+-- See 'Clash.Netlist.Util.coreTypeToHWType'.
+coreTypeToHWTypeM :: Distinct n => Scope n -> Type n -> NetlistMonad (Maybe FilteredHWType)
+coreTypeToHWTypeM sc ty = do
+  tt <- Lens.use typeTranslator
+  reprs <- Lens.view customReprs
+  te <- Lens.view typeEnv
+  htm0 <- Lens.use htyCache
+  let (hty, htm1) = runState (Legacy.coreTypeToHWType tt reprs te sc ty) htm0
+  htyCache Lens..= htm1
+  return (either (const Nothing) Just hty)
+
+-- | Same as 'coreTypeToHWTypeM', but discards void filter information
+coreTypeToHWTypeM' :: Distinct n => Scope n -> Type n -> NetlistMonad (Maybe HWType)
+coreTypeToHWTypeM' sc ty = fmap stripFiltered <$> coreTypeToHWTypeM sc ty
+
+-- | The HWType of a term, in the given scope. Errors if its type is not
+-- translatable to a HWType.
+termHWType :: (HasCallStack, Distinct n) => String -> Scope n -> Term n -> NetlistMonad HWType
+termHWType loc sc e = do
+  te <- Lens.view typeEnv
+  unsafeCoreTypeToHWTypeM' loc sc (inferCoreTypeOf te sc e)
+
+-- | The HWType of a term, in the given scope. 'Nothing' if its type is not
+-- translatable to a HWType.
+termHWTypeM :: (HasCallStack, Distinct n) => Scope n -> Term n -> NetlistMonad (Maybe FilteredHWType)
+termHWTypeM sc e = do
+  te <- Lens.view typeEnv
+  coreTypeToHWTypeM sc (inferCoreTypeOf te sc e)
+
 -- * Adapters
 
 -- | Run an action in the context of the ticks of a term: see
@@ -493,10 +565,3 @@ withTicks
   -> NetlistMonad a
 withTicks ctx ticks = Legacy.withTicks (map (toLegacyTick ctx) ticks)
 
--- | Converts a type to a HWType: see 'Clash.Netlist.Util.unsafeCoreTypeToHWTypeM'
-unsafeCoreTypeToHWTypeM :: String -> C.Type -> NetlistMonad FilteredHWType
-unsafeCoreTypeToHWTypeM = Legacy.unsafeCoreTypeToHWTypeM
-
--- | Converts a type to a HWType: see 'Clash.Netlist.Util.unsafeCoreTypeToHWTypeM''
-unsafeCoreTypeToHWTypeM' :: String -> C.Type -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM' = Legacy.unsafeCoreTypeToHWTypeM'
