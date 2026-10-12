@@ -18,7 +18,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -43,6 +42,7 @@ import Clash.Rewrite.StrategyDSL
   , toScopedTransformation )
 import Clash.Rewrite.Types (scopedTypeEnv)
 
+import Clash.Core.Scoped.Convert (toClashType)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Subst
   (extendSubstScope, extendTmSubst, idSubst, substTm, withFreshIdBinders)
@@ -89,7 +89,10 @@ separateArgumentsLambdaWorker ctx node b eb = do
 --
 -- It updates the type of the global variable to take the split arguments into
 -- account as 'Clash.Normalize.Transformations.SeparateArgs.separateArgumentsSpineWorker'
--- does: on its closed Clash Core type.
+-- does: on its closed Clash Core type. The global can be applied to fewer
+-- arguments than it has parameters, whose types are kept, or to more, when its
+-- result type is a type variable instantiated with a function type, which stay
+-- applied.
 separateArgumentsSpineWorker
   :: forall n
    . (HasCallStack, Distinct n)
@@ -104,8 +107,10 @@ separateArgumentsSpineWorker ctx e
         <- listen (mapM (uncurry splitArg) (zip argTys0 args))
       if hasChanged then
         let (argTys1, args2) = unzip args1
-            g' = mkGlobalId gv{C.varType = C.mkPolyFunTy resTy argTys1}
-        in  return (mkApps (mkTicks (GlobalVar g') ticks) args2)
+            gTy = C.mkPolyFunTy resTy (argTys1 ++ drop (length args) argTys0)
+            args3 = args2 ++ drop (length argTys0) args
+            g' = mkGlobalId gv{C.varType = gTy}
+        in  return (mkApps (mkTicks (GlobalVar g') ticks) args3)
       else
         return e
   | otherwise = return e
@@ -123,6 +128,8 @@ separateArgumentsSpineWorker ctx e
     Left tmArg -> do
       te <- Lens.view scopedTypeEnv
       case shouldSplit te sc (inferCoreTypeOf te sc tmArg) of
-        Just info -> changed (map ((ty,) . Left) (splitProject info sc tmArg))
+        Just info ->
+          changed (zip (map (Right . toClashType) (splitArgTys info))
+                       (map Left (splitProject info sc tmArg)))
         Nothing -> return [(ty, arg)]
 {-# SCC separateArgumentsSpineWorker #-}
