@@ -265,6 +265,7 @@ Library
                       Clash.Core.Scoped.Internal.Scope
                       Clash.Core.Scoped.NameMap
                       Clash.Core.Scoped.Pretty
+                      Clash.Core.Scoped.Sig
                       Clash.Core.Scoped.Subst
                       Clash.Core.Scoped.Syntax
                       Clash.Core.Scoped.Term
