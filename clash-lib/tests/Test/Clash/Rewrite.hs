@@ -36,7 +36,15 @@ import Clash.Core.VarEnv
 import Clash.Driver.Types
   ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), DebugOpts
   , IsPrim (IsFun), defClashOpts, debugSilent )
-import Clash.Netlist.Types (FilteredHWType (..), HWTypeTranslator (..), HWType (Signed))
+import Clash.Annotations.Primitive (HDL (VHDL))
+import Clash.Backend (initBackend)
+import Clash.Backend.VHDL (VHDLState)
+import Clash.Netlist (runNetlistMonad)
+import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+  ( FilteredHWType (..), HWType (Signed), HWTypeTranslator (..), NetlistMonad
+  , PreserveCase (PreserveCase), SomeBackend (..) )
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (apply, changed, runRewrite)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
@@ -133,6 +141,21 @@ testTypeTranslator = HWTypeTranslator $ \_reprs _tenv _sc ty -> pure $ Just $
   case S.tyView ty of
     S.FunTy {} -> Left "function types are not representable"
     _ -> Right (FilteredHWType (Signed 64) [])
+
+-- | Run a 'NetlistMonad' action for VHDL, with the given global bindings, in
+-- the environment of the default 'RewriteEnv' (e.g. its type translator) with
+-- the type constructors of 'testTyConMap'
+runNetlistTest :: BindingMap -> NetlistMonad a -> IO a
+runNetlistTest bs act =
+  fst <$>
+    runNetlistMonad
+      (_clashEnv env) (error "runNetlistTest: evaluator") False
+      (fromClashBindings bs) mempty (_typeTranslator env) True be ids "" mempty
+      act
+ where
+  env = withTyConMap testTyConMap def
+  ids = Id.emptyIdentifierSet False PreserveCase VHDL
+  be = SomeBackend (initBackend (envOpts (_clashEnv env)) :: VHDLState)
 
 instance Default extra => Default (RewriteState extra) where
   def = RewriteState
