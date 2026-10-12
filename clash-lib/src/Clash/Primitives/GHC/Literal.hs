@@ -6,6 +6,7 @@
   Blackbox generation for literal data constructors. (System)Verilog only!
 -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Clash.Primitives.GHC.Literal
  ( assign
@@ -25,11 +26,10 @@ import           Data.Text
 import           Data.Text.Extra              (showtl)
 import           Text.Read                    (readMaybe)
 
-import           Clash.Core.Term              (Term)
-import           Clash.Core.Type              (Type)
+import           Clash.Core.Scoped.Syntax     (Term, Type)
 import           Clash.Netlist.Types          (BlackBox)
-import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, Element(Text), BlackBoxMeta)
+import           Clash.Netlist.BlackBox.Types (Element(Text), BlackBoxMeta)
+import           Clash.Netlist.Scoped.Types   (BlackBoxFunction)
 
 unsigned :: Element -> [Element]
 unsigned el = [Text "$unsigned(", el, Text ")"]
@@ -74,10 +74,10 @@ literalTF
   -- ^ Base names of constructors (for example: @"GHC.Word.W" :| ["GHC.Internal.Word.W"]@).
   -- The 'GHC.Internal.*' variant is needed for GHC >= 9.14, which moved the
   -- constructors into 'ghc-internal'; 'base' re-exports them.
-  -> (Bool -> [Either Term Type] -> Int -> (BlackBoxMeta, BlackBox))
+  -> (forall n. Bool -> [Either (Term n) (Type n)] -> Int -> (BlackBoxMeta, BlackBox))
   -- ^ Functions processing
   -> BlackBoxFunction
-literalTF baseNames tf isDecl primName args _resTy = return $
+literalTF baseNames tf _env isDecl primName args _resTy = return $
   case readSize baseNames primName of
     Nothing ->
       Left (concat ["Can only make blackboxes for '", unpack (NE.head baseNames), "X#'"])

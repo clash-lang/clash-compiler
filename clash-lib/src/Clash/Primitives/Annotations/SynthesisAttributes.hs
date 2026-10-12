@@ -16,14 +16,16 @@ import GHC.TypeLits (someNatVal)
 import GHC.TypeNats (KnownNat, SomeNat(..))
 import Text.Show.Pretty (ppShow)
 
-import qualified Control.Lens as Lens
 import qualified Data.Text as T
 
 import Clash.Annotations.SynthesisAttributes
 import Clash.Backend (Backend)
-import Clash.Core.TermLiteral (termToDataError)
-import Clash.Core.Type (Type(LitTy), LitTy(NumTy), coreView)
-import Clash.Netlist.BlackBox.Types
+import Clash.Core.Scoped.Syntax (Type(LitTy))
+import Clash.Core.Scoped.TermLiteral (termToDataError)
+import Clash.Core.Scoped.Type (coreView)
+import Clash.Core.Type (LitTy(NumTy))
+import Clash.Netlist.BlackBox.Types hiding (BlackBoxFunction)
+import Clash.Netlist.Scoped.Types (BlackBoxFunction, bbScope, bbTypeEnv)
 import Clash.Netlist.Types
 import Clash.Sized.Vector (Vec, toList)
 
@@ -35,16 +37,16 @@ usedArguments = [attrs, signal]
   attrs :< signal :< _ = (0...)
 
 annotateBBF :: HasCallStack => BlackBoxFunction
-annotateBBF _isD _primName args _resTys = Lens.view tcCache >>= go
+annotateBBF env _isD _primName args _resTys
+  | ((coreView (bbTypeEnv env) (bbScope env) -> LitTy (NumTy n)) : _) <- rights args
+  , Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
+  , (attrs0 : _) <- lefts args
+  = case termToDataError attrs0 of
+      Left msg -> error msg
+      Right attrs1 -> pure $ Right (bbMeta, bb @n (fmap T.pack <$> attrs1))
+  | otherwise
+  = error $ "Unexpected args:\n " <> ppShow args
  where
-  go tcm
-    | ((coreView tcm -> LitTy (NumTy n)) : _) <- rights args
-    , Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
-    , (attrs0 : _) <- lefts args
-    = case termToDataError attrs0 of
-        Left msg -> error msg
-        Right attrs1 -> pure $ Right (bbMeta, bb @n (fmap T.pack <$> attrs1))
-  go _ = error $ "Unexpected args:\n " <> ppShow args
 
   bbMeta :: BlackBoxMeta
   bbMeta = emptyBlackBoxMeta{bbKind = TDecl}
