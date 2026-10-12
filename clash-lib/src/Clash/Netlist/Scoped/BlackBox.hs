@@ -14,8 +14,9 @@
   The handlers get the t'CompCtx' of the terms they are given, which gives
   the HDL identifiers of their local variables. Where Clash Core renamed the
   binders of a term it went under, e.g. those of the lambdas of a function
-  argument of a blackbox ('mkFunInput'), these handlers open the binders, and
-  extend the context with the HDL identifiers of the variables they bind.
+  argument of a blackbox ('mkFunInput') or the let-bindings of a 'mealyIO'
+  machine, these handlers open the binders, and extend the context with the
+  HDL identifiers of the variables they bind.
 
   The result of a blackbox is not always a local variable: it can be a signal
   that Netlist generation made up. Internally, a result is therefore given by
@@ -37,6 +38,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -62,7 +64,7 @@ import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
 import           Data.List.Extra               (countEq, mapAccumLM)
 import           Data.List.NonEmpty            (NonEmpty (..))
-import           Data.List                     (elemIndex)
+import           Data.List                     (elemIndex, partition)
 import qualified Data.Map.Strict               as Map
 import           Data.Maybe                    (fromJust, fromMaybe, listToMaybe)
 import           Data.Monoid                   (Ap (getAp))
@@ -87,7 +89,6 @@ import qualified Clash.Core.Type               as C (ConstTy (..))
 import qualified Clash.Core.Var                as C (varName)
 import qualified Clash.Data.UniqMap            as UniqMap
 import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail, prepareBlackBox)
-import qualified Clash.Netlist.BlackBox        as Legacy
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxMeta (..), BlackBoxTemplate, Element (Text), RenderVoid (..),
    TemplateKind (..))
@@ -100,10 +101,11 @@ import qualified Clash.Netlist.Types           as N (Expr (Literal))
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, coreTypeToHWTypeM, declareUse, flattenFiltered,
    isVoid, mkInit, mkLiteral, originalIndices, preserveVarEnv, primWarnContext,
-   procAssign, stripFiltered, unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
+   procAssign, stripFiltered, stripVoid, unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
 import           Clash.Normalize.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
+import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Util                    (ClashException (..), curLoc, indexNote)
 import qualified Clash.Util.Interpolate        as I
 
@@ -111,18 +113,20 @@ import           Clash.Core.Scoped.FreeVars    (tmNameOccursIn)
 import           Clash.Core.Scoped.HasType     (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap     (lookupGlobalEnv)
 import           Clash.Core.Scoped.Subst
-  (openBind, openIdBinder, teleIdVars, withFreshIdBinder)
+  (extendTmSubst, idSubst, openBind, openIdBinder, openTyBinder, substTm,
+   teleIdVars, withFreshIdBinder)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import           Clash.Core.Scoped.TermInfo
   (isFun, isLiteral, multiPrimInfo', splitMultiPrimArgs)
-import           Clash.Core.Scoped.Type        (splitFunTys)
+import           Clash.Core.Scoped.Type        (TypeView (..), mkFunTy, splitFunTys, tyView)
+import           Clash.Core.Scoped.Util
+  (inverseTopSortOrderOf, primAtType, splitShouldSplit)
 
 import {-# SOURCE #-} Clash.Netlist.Scoped
-  (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkFunApp, mkNetDecl,
-   mkProjection, mkSelection)
-import           Clash.Netlist.Scoped.Legacy   (toLegacyNetlistId)
+  (genComponent, mkDcApplication, mkDeclarations, mkDeclarations', mkExpr,
+   mkFunApp, mkNetDecl, mkProjection, mkSelection)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
   (idToOutPort, renameBinder, uniqueIdentifier, withTicks)
@@ -499,10 +503,83 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) (toLegacyArgs ctx args))
 #endif
 
-          | "Clash.Explicit.SimIO." `TextS.isPrefixOf` pNm ->
-              -- TODO(Phase 5, BlackBox): port
-              Legacy.mkPrimitive bbEParen bbEasD declType (toLegacyNetlistId ctx dst) pInfo
-                (toLegacyArgs ctx args) tickDecls
+          | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
+              resM <- resBndr1 True dst
+              case resM of
+                Just (_,dstNm,dstDecl) -> do
+                  mealyDecls <- collectMealy ctx dstNm dst (lefts args)
+                  return (Noop, dstDecl ++ mealyDecls)
+                Nothing -> return (Noop,[])
+
+          | pNm == "Clash.Explicit.SimIO.bindSimIO#" -> do
+              (expr,decls) <- collectBindIO ctx dst (lefts args)
+              resM <- resBndr True dst
+              case resM of
+                Just (_,dstNms,dstDecl) -> case expr of
+                  Noop ->
+                    return (Noop,decls)
+                  _ -> case dstNms of
+                    [dstNm] -> do
+                      declareUse (Proc Blocking) dstNm
+                      assn <- procAssign Blocking dstNm expr
+                      return ( Identifier dstNm Nothing
+                             , dstDecl ++ decls ++ [assn])
+                    _ -> error $ $(curLoc) ++ "bindSimIO: " ++ show dstNms
+                _ ->
+                  return (Noop,decls)
+
+          | pNm == "Clash.Explicit.SimIO.apSimIO#" -> do
+              collectAppIO ctx dst (lefts args) []
+
+          | pNm == "Clash.Explicit.SimIO.fmapSimIO#" -> do
+              resM <- resBndr1 True dst
+              case resM of
+                Just (_,dstNm,dstDecl) -> case lefts args of
+                  (fun0:arg0:_) -> do
+                    let arg1 = unSimIO ctx arg0
+                        fun1 = case fun0 of
+                          -- Beta reduction
+                          Lam b bE -> substTm (extendTmSubst (idSubst sc) b arg1) bE
+                          _ -> mkApps fun0 [Left arg1]
+                    (expr,bindDecls) <- mkExpr ctx False Sequential dst fun1
+                    assn <- case expr of
+                              Noop -> pure []
+                              _ -> do declareUse (Proc Blocking) dstNm
+                                      assn <- procAssign Blocking dstNm expr
+                                      pure [assn]
+                    return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
+                  args1 -> error ("internal error: fmapSimIO# has insufficient arguments"
+                                  <> showPpr (map (toLegacy ctx) args1))
+                Nothing -> case lefts args of
+                  (_:arg0:_) -> do
+                    (_,bindDecls) <- mkExpr ctx True Sequential dst arg0
+                    return (Noop, bindDecls)
+                  args1 -> error ("internal error: fmapSimIO# has insufficient arguments"
+                                  <> showPpr (map (toLegacy ctx) args1))
+
+          | pNm == "Clash.Explicit.SimIO.unSimIO#" ->
+              case lefts args of
+                (arg:_) -> mkExpr ctx False Sequential dst arg
+                _ -> error "internal error: insufficient arguments"
+
+          | pNm == "Clash.Explicit.SimIO.pureSimIO#" -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr ctx False Sequential dst arg
+                _ -> error "internal error: insufficient arguments"
+              resM <- resBndr True dst
+              case resM of
+                Just (_,dstNms,dstDecl) -> case expr of
+                  Noop ->
+                    return (Noop,decls)
+                  _ -> case dstNms of
+                    [dstNm] -> do
+                      declareUse (Proc Blocking) dstNm
+                      assn <- procAssign Blocking dstNm expr
+                      return ( Identifier dstNm Nothing
+                             , dstDecl ++ decls ++ [assn])
+                    _ -> error "internal error"
+                _ ->
+                  return (Noop,decls)
 
           | pNm == showt 'IS -> do
               (expr,decls) <- case lefts args of
@@ -1026,7 +1103,362 @@ mkFunInput ctx parentName declType resId e =
     go c _ e'@(TyLam {}) =
       error $ $(curLoc) ++ "Cannot make function input for TyLam: " ++ showPpr (toLegacy c e')
 
+-- * SimIO
+
+-- | Turn a 'mealyIO' expression into a two sequential processes, one "initial"
+-- process for the starting state, and one clocked sequential process.
+--
+-- The arguments of the mealy function and the let-bindings of its body are
+-- opened into an extension of the scope of the context, and become the
+-- let-bindings of the processes. The let-bindings are visited in the order of
+-- 'inverseTopSortOrderOf', which, unlike Clash Core's
+-- 'Clash.Core.Util.inverseTopSortLetBindings', doesn't depend on the uniques
+-- of their binders.
+collectMealy
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => CompCtx n
+  -> Identifier
+  -- ^ Identifier to assign the final result to
+  -> NetlistId n
+  -- ^ Id to assign the final result to
+  -> [Term n]
+  -- ^ The arguments to 'mealyIO'
+  -> NetlistMonad [Declaration]
+collectMealy ctx dstNm dst (kd:clk:mealyFun:mealyInit:mealyIn:_) =
+  openLams ctx mealyFun $ \(ctx1 :: CompCtx l1) args0 res0 ->
+    case res0 of
+      Let bind body -> openBind (compScope ctx1) bind body $ \(sc2 :: Scope l2) bind' body' ->
+        withExtTrans @n @l1 @l2 $
+          let ctx2 = extendCompCtx sc2 [] ctx1
+              -- Given that we're creating a sequential list of statements from
+              -- the let-bindings, make sure that everything is inverse
+              -- topologically sorted
+              bs = inverseTopSortBinds $ case bind' of
+                NonRec b x -> [(binderLocalId b, sink x)]
+                Rec tele xs -> zip [ LocalId o t v | Var o t v <- teleIdVars tele ] xs
+          in case body' of
+               Var o t v -> withBindings ctx2 (map sink args0) bs (LocalId o t v) True
+               e -> withResult ctx2 (map sink args0) bs e
+      e -> withResult ctx1 args0 [] e
+ where
+  tenv = compTypeEnv ctx
+  sc = compScope ctx
+
+  -- The body of the mealy function is not a variable: bind it to a new
+  -- variable, or to the binder of the 'mealyIO' expression
+  withResult
+    :: forall x
+     . DExt n x
+    => CompCtx x
+    -> [LocalId x]
+    -> [(LocalId x, Term x)]
+    -> Term x
+    -> NetlistMonad [Declaration]
+  withResult c args bs e =
+    let (occ, ty) = case dst of
+          CoreId u0 ->
+            -- It has the HDL identifier of the binder as its name, see
+            -- 'withBindings' for how the binder replaces it
+            ( (localIdOcc u0) {C.nameOcc = Id.toText (localIdentifier ctx (localIdName u0))}
+            , sink (localIdType u0) )
+          _ ->
+            ( C.mkUnsafeSystemName "mealyres" 0
+            , inferCoreTypeOf tenv (compScope c) e )
+    in withFreshIdBinder (compScope c) occ ty $ \(sc' :: Scope y) b ->
+         withExtTrans @n @x @y $
+           let u = binderLocalId b
+           in withBindings (extendCompCtx sc' [] c) (map sink args)
+                (sinkBinds bs ++ [(u, sink e)]) u False
+
+  withBindings
+    :: forall x
+     . DExt n x
+    => CompCtx x
+    -> [LocalId x]
+    -- ^ The arguments of the mealy function
+    -> [(LocalId x, Term x)]
+    -- ^ The let-bindings of its body
+    -> LocalId x
+    -- ^ The result
+    -> Bool
+    -- ^ Whether the body of the mealy function is a let-expression whose body
+    -- is a variable
+    -> NetlistMonad [Declaration]
+  withBindings c args1 bs res isVarBody = do
+    let
+      -- Take into account that the state argument is split over multiple
+      -- binders because it contained types that are not allowed to occur in
+      -- a HDL aggregate type
+      mealyInitLength = length (splitShouldSplit tenv sc [inferCoreTypeOf tenv sc mealyInit])
+      (sArgs,iArgs) = splitAt mealyInitLength args1
+      -- Give all binders a unique name
+      sBindings = map (,sink mealyInit) sArgs ++ map (,sink mealyIn) iArgs ++ bs
+    mkUniqueLets c sBindings res $ \(ctxU :: CompCtx o) binders0 resultM ->
+     withExtTrans @n @x @o $
+     case resultM of
+      Just result -> do
+        let (sBinders,binders1) = splitAt (length sArgs) binders0
+            (iBinders,binders2) = splitAt (length iArgs) binders1
+            -- Get all the "original" let-bindings, without the above "mealyres".
+            -- We don't want to make a NetDecl for it.
+            bindersN = if isVarBody then binders2 else init binders2
+            dstU = sink dst
+
+        -- Create new net declarations for state-binders, input-binders, and all
+        -- the "original" let-bindings in 'mealyFun'
+        --
+        -- The first set is only assigned in the always block, so they must be
+        -- 'reg' in Verilog terminology
+        netDeclsSeq <- concatMapM (mkNetDecl ctxU) (sBinders ++ bindersN)
+        -- The second set is assigned using concurrent assignment, so don't need
+        -- to be 'reg'
+        netDeclsInp <- concatMapM (mkNetDecl ctxU) iBinders
+
+        -- If the 'mealyFun' was not a let-expression with a variable reference
+        -- as a body then we used the LHS of the entire 'mealyIO' expression as
+        -- a new let-binding; otherwise 'mkUniqueLets' would not work.
+        --
+        -- However, 'mkUniqueLets' made a new unique name for that LHS, which is
+        -- not what we want. We want to assign the last expression to the LHS
+        -- of 'mealyIO'.
+        let bindersE = if isVarBody then binders2 else case dst of
+              -- See above why we do this.
+              CoreId u0 -> init binders2 ++ [(sink u0, snd (last binders2))]
+              _ -> binders2
+        seqDecls <- concat <$> mapM (uncurry (mkDeclarations' ctxU Sequential)) bindersE
+
+        -- When the body the let-expression of 'mealyFun' was variable reference,
+        -- or in case we had to create a new identifier because the original LHS
+        -- was not available: then we need to assign
+        (resExpr,resDecls) <-
+          if isVarBody then mkExpr ctxU False Concurrent dstU (localIdVar result)
+          else case dst of
+            CoreId {} -> pure (Noop,[])
+            _ -> mkExpr ctxU False Sequential dstU (localIdVar result)
+
+        resAssn <- case resExpr of
+              Noop -> pure []
+              _ -> do
+                assign <- SeqDecl <$> procAssign Blocking dstNm resExpr
+                pure [Seq [AlwaysComb [assign]]]
+
+        -- Create the declarations for the "initial state" block
+        let sDst = case sBinders of
+                     [] -> error "internal error: insufficient sBinders"
+                     [(b,_)] -> CoreId b
+                     _       -> MultiId (map fst sBinders)
+
+        (exprInit,initDecls) <- mkExpr ctxU False Sequential sDst (sink mealyInit)
+
+        initAssign <- case exprInit of
+          Identifier _ Nothing -> pure []
+          Noop -> pure []
+          _ -> case sBinders of
+            ((b,_):_) -> do assn <- procAssign Blocking (localIdentifier ctxU (localIdName b)) exprInit
+                            pure [assn]
+            _ -> error "internal error: insufficient sBinders"
+
+        -- Create the declarations that corresponding to the input
+        let iDst = case iBinders of
+                     []      -> error "internal error: insufficient iBinders"
+                     [(b,_)] -> CoreId b
+                     _       -> MultiId (map fst iBinders)
+
+        (exprArg,inpDeclsMisc) <- mkExpr ctxU False Concurrent iDst (sink mealyIn)
+
+        argAssign <- case iBinders of
+          ((i,_):_) -> do assn <- contAssign (localIdentifier ctxU (localIdName i)) exprArg
+                          pure [assn]
+          _ -> error "internal error: insufficient iBinders"
+
+        -- Split netdecl declarations and other declarations
+        let (netDeclsSeqMisc,seqDeclsOther) = partition isNet (seqDecls ++ resDecls)
+            (netDeclsInit,initDeclsOther)   = partition isNet initDecls
+        -- All assignments happens within a sequential block, so the nets need to
+        -- be of type 'reg' in Verilog nomenclature
+        let netDeclsSeq1 = netDeclsSeq ++ netDeclsSeqMisc ++ netDeclsInit
+
+        -- We run mealy block in the opposite clock edge of the the ambient system
+        -- because we're basically clocked logic; so we need to have our outputs
+        -- ready before the ambient system starts sampling them. The clockGen code
+        -- ensures that the "opposite" edge always comes first.
+        kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (toLegacyType ctx (inferCoreTypeOf tenv sc kd))
+        let edge = case stripVoid (stripFiltered kdTy) of
+                     KnownDomain _ _ Rising _ _ _  -> Falling
+                     KnownDomain _ _ Falling _ _ _ -> Rising
+                     _ -> error "internal error"
+        (clkExpr,clkDecls) <-
+          mkExpr ctx False Concurrent (NetlistId (Id.unsafeMake "__MEALY_CLK__") (inferCoreTypeOf tenv sc clk)) clk
+
+        -- collect the declarations related to the input
+        let netDeclsInp1 = netDeclsInp ++ inpDeclsMisc
+
+        -- Collate everything
+        return (clkDecls ++ netDeclsSeq1 ++ netDeclsInp1 ++ argAssign ++
+                  [ Seq [Initial (map SeqDecl (initDeclsOther ++ initAssign))]
+                  , Seq [AlwaysClocked edge clkExpr (map SeqDecl seqDeclsOther)]
+                  ] ++ resAssn)
+      _ -> error "internal error"
+
+  isNet NetDecl' {} = True
+  isNet _ = False
+
+collectMealy _ _ _ _ = error "internal error"
+
+-- | Collect the sequential declarations for 'bindIO'
+collectBindIO
+  :: forall n
+   . (HasCallStack, Distinct n)
+  => CompCtx n
+  -> NetlistId n
+  -> [Term n]
+  -> NetlistMonad (Expr,[Declaration])
+collectBindIO ctx dst (m:Lam x q:_) =
+  openIdBinder (compScope ctx) x q $ \(sc1 :: Scope l1) x' q' ->
+    collectAction (extendCompCtx sc1 [] ctx) (binderLocalId x') (sink m) $ \(ctx2 :: CompCtx l2) ds0 ->
+      withExtTrans @n @l1 @l2 $
+        let qS = sink q'
+        in fromMaybe (notSplit ctx2 ds0 qS) $
+           splitLets ctx2 qS $ \ctx3 bs0 res ->
+           mkUniqueLets ctx3 (inverseTopSortBinds bs0) res $ \ctxU binders resultM ->
+           case resultM of
+             Just result -> do
+               ds1 <- concatMapM (uncurry (mkDeclarations' ctxU Sequential)) binders
+               netDecls <- concatMapM (mkNetDecl ctxU) binders
+               return ( Identifier (localIdentifier ctxU (localIdName result)) Nothing
+                      , netDecls ++ ds0 ++ ds1)
+             Nothing -> error "internal error"
+ where
+  notSplit
+    :: DExt n y
+    => CompCtx y
+    -> [Declaration]
+    -> Term y
+    -> NetlistMonad (Expr,[Declaration])
+  notSplit c ds0 = \case
+    Let {} -> error "internal error"
+    (collectArgs -> (Prim p,args))
+      | C.primName p == "Clash.Explicit.SimIO.bindSimIO#" -> do
+          (expr,ds1) <- collectBindIO c (sink dst) (lefts args)
+          return (expr, ds0 ++ ds1)
+    eS -> do
+      (expr,ds1) <- mkExpr c False Sequential (sink dst) eS
+      return (expr, ds0 ++ ds1)
+
+  -- The declarations of the action, which binds the variable of the lambda
+  collectAction
+    :: forall x r
+     . Distinct x
+    => CompCtx x
+    -> LocalId x
+    -- ^ The variable bound to the result of the action, without an HDL
+    -- identifier in the context
+    -> Term x
+    -- ^ The action
+    -> (forall y. DExt x y => CompCtx y -> [Declaration] -> NetlistMonad r)
+    -> NetlistMonad r
+  collectAction c xv mS k =
+    fromMaybe notLet $
+    splitLets c mS $ \(c2 :: CompCtx y) bs0 res ->
+    mkUniqueLets c2 ((sink xv, sink mS) : inverseTopSortBinds bs0) res $ \(cU :: CompCtx z) binders resultM ->
+    withExtTrans @x @y @z $
+    case (binders, resultM) of
+      (b:_, Just result) -> do
+        -- The variable is assigned the result of the action
+        let binders1 = drop 1 binders ++ [(fst b, localIdVar result)]
+        ds1 <- concatMapM (uncurry (mkDeclarations' cU Sequential)) binders1
+        netDecls <- concatMapM (mkNetDecl cU) binders
+        k cU (netDecls ++ ds1)
+      _ -> error "internal error"
+   where
+    notLet = do
+      i <- uniqueIdentifier (localIdOcc xv)
+      let c' = extendCompCtx (compScope c) [(xv, i)] c
+      netDecls <- concatMapM (mkNetDecl c') [(xv,mS)]
+      ds1 <- mkDeclarations' c' Sequential xv mS
+      k c' (netDecls ++ ds1)
+
+collectBindIO ctx _ es = error ("internal error:\n" ++ showPpr (map (toLegacy ctx) es))
+
+-- | Collect the sequential declarations for 'appIO'
+collectAppIO
+  :: (HasCallStack, Distinct n)
+  => CompCtx n
+  -> NetlistId n
+  -> [Term n]
+  -> [Term n]
+  -> NetlistMonad (Expr,[Declaration])
+collectAppIO ctx dst (fun1:arg1:_) rest = case collectArgs fun1 of
+  (Prim p,(lefts -> (fun0:arg0:_)))
+    | C.primName p == "Clash.Explicit.SimIO.fmapSimIO#" -> do
+        let argN = map (Left . unSimIO ctx) (arg0:arg1:rest)
+        mkExpr ctx False Sequential dst (mkApps fun0 argN)
+  (Prim p,(lefts -> args))
+    | C.primName p == "Clash.Explicit.SimIO.apSimIO#" ->
+        collectAppIO ctx dst args (arg1:rest)
+  _ -> error ("internal error:\n" ++ showPpr (map (toLegacy ctx) (fun1:arg1:rest)))
+
+collectAppIO ctx _ es _ = error ("internal error:\n" ++ showPpr (map (toLegacy ctx) es))
+
+-- | Unwrap the new-type wrapper for things of type SimIO, this is needed to
+-- allow applications of the `State# World` token to the underlying IO type.
+--
+-- XXX: this is most likely needed because Ghc2Core that threw away the cast
+-- that this unwrapping; we should really start to support casts.
+unSimIO
+  :: Distinct n
+  => CompCtx n
+  -> Term n
+  -> Term n
+unSimIO ctx arg =
+  let argTy = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) arg
+  in  case tyView argTy of
+        TyConApp _ [tcArg] ->
+          mkApps (primAtType
+                    (C.PrimInfo
+                       "Clash.Explicit.SimIO.unSimIO#"
+                       (error "unSimIO: the type is given by primAtType")
+                       C.WorkNever
+                       C.SingleResult
+                       C.NoUnfolding)
+                    (mkFunTy argTy tcArg))
+                 [Left arg]
+        _ -> error ("internal error:\n" ++ showPpr (toLegacy ctx arg))
+
 -- * Let-expressions
+
+-- | Open the lambdas and type lambdas at the head of a term into an extension
+-- of the scope of a context. The context gets the type variables, but no HDL
+-- identifiers for the term variables. Gives the variables of the lambdas.
+openLams
+  :: forall n r
+   . Distinct n
+  => CompCtx n
+  -> Term n
+  -> (forall l. DExt n l => CompCtx l -> [LocalId l] -> Term l -> r)
+  -> r
+openLams ctx0 e0 k = go ctx0 [] e0
+ where
+  go :: forall x. DExt n x => CompCtx x -> [LocalId x] -> Term x -> r
+  go ctx accRev = \case
+    Lam b body -> openIdBinder (compScope ctx) b body $ \(sc' :: Scope y) b' body' ->
+      withExtTrans @n @x @y $
+        go (extendCompCtx sc' [] ctx) (binderLocalId b' : map sink accRev) body'
+    TyLam b body -> openTyBinder (compScope ctx) b body $ \(sc' :: Scope y) b' body' ->
+      withExtTrans @n @x @y $
+        go (extendCompCtxTy sc' [(tyBinderOcc b', sink (tyBinderKind b'), tyNameOf b')] ctx)
+           (map sink accRev) body'
+    body -> k ctx (reverse accRev) body
+
+-- | Order let-bindings such that bindings come after the ones they refer to,
+-- unless they are part of a cycle, see 'inverseTopSortOrderOf'
+inverseTopSortBinds :: [(LocalId l, Term l)] -> [(LocalId l, Term l)]
+inverseTopSortBinds bs =
+  map (indexed IntMap.!) (inverseTopSortOrderOf (map (localIdName . fst) bs) (map snd bs))
+ where
+  indexed = IntMap.fromList (zip [0..] bs)
+
 
 -- | Open a let-expression into an extension of the scope of a context: its
 -- let-bindings and its result, a variable. Nested let-expressions in its body
