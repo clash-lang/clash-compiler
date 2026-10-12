@@ -41,6 +41,7 @@ import qualified Clash.Tests.Differential.Sites
 import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist
 import qualified Clash.Tests.Netlist.Id
+import qualified Clash.Tests.Netlist.Scoped
 import qualified Clash.Tests.Netlist.Util
 import qualified Clash.Tests.Normalize
 import qualified Clash.Tests.Normalize.PrimitiveReductions
@@ -132,6 +133,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Driver.Manifest.tests
   , Clash.Tests.Netlist.tests
   , Clash.Tests.Netlist.Id.tests
+  , Clash.Tests.Netlist.Scoped.tests
   , Clash.Tests.Netlist.Util.tests
   , Clash.Tests.Normalize.tests
   , Clash.Tests.Normalize.PrimitiveReductions.tests

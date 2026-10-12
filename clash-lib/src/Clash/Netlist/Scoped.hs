@@ -20,7 +20,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -50,13 +52,13 @@ import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Bifunctor                   (first, second)
-import           Data.Either                      (lefts, partitionEithers)
+import           Data.Either                      (partitionEithers, rights)
 import           Data.Char                        (ord)
 import           Data.List                        (elemIndex, partition)
 import           Data.List.Extra                  (zipEqual)
 import           Data.List.NonEmpty               (NonEmpty (..))
 import qualified Data.List.NonEmpty.Extra         as NE
-import           Data.Maybe                       (fromMaybe)
+import           Data.Maybe                       (fromMaybe, listToMaybe)
 import qualified Data.Text                        as StrictText
 import           Data.Text.Extra                  (showt)
 import           GHC.Num.Integer                  (Integer (..))
@@ -73,6 +75,7 @@ import           Clash.Core.Pretty                (showPpr)
 import qualified Clash.Core.Name                  as C (nameOcc)
 import qualified Clash.Core.Term                  as C
 import qualified Clash.Core.Type                  as C
+import qualified Clash.Core.Util                  as C (splitShouldSplit)
 import           Clash.Core.TyCon                 (TyConMap)
 import qualified Clash.Core.Var                   as C
 import           Clash.Driver.Types
@@ -84,14 +87,16 @@ import qualified Clash.Netlist.Types              as HW (Expr (Literal), Literal
 import           Clash.Netlist.Types              as HW
   hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
 import           Clash.Netlist.Util
-  (condAssign, contAssign, coreTypeToHWTypeM', dcToLiteral, isVoid, isVoidMaybe, mkInit, mkLiteral,
+  (affixName, condAssign, contAssign, coreTypeToHWTypeM', dcToLiteral, declareInstUses,
+   expandTopEntityOrErrM, isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
    procAssign)
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
+import qualified Clash.Util.Interpolate           as I
 import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Evaluator.Types       (Evaluator)
 
 import           Clash.Core.Scoped.Alpha          (aeqTy)
-import           Clash.Core.Scoped.Convert        (toClashType)
+import           Clash.Core.Scoped.Convert        (toClashTerm, toClashType)
 import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
 import           Clash.Core.Scoped.Type           (coreView)
 import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
@@ -107,7 +112,7 @@ import           Clash.Netlist.Scoped.BlackBox    (mkPrimitive)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
   (UniqueNormalized (..), mkUniqueNormalized, splitNormalized,
-   unsafeCoreTypeToHWTypeM', withTicks)
+   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
@@ -412,7 +417,7 @@ mkExpr ctx bbEasD declType bndr app =
 -- * Adapters
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a
--- function application: see 'Clash.Netlist.mkFunApp'
+-- function application
 mkFunApp
   :: (HasCallStack, Distinct n)
   => CompCtx n
@@ -426,10 +431,157 @@ mkFunApp
   -> [Declaration]
   -- ^ Tick declarations
   -> NetlistMonad [Declaration]
-mkFunApp ctx declType dstId fun args =
-  Legacy.mkFunApp declType dstId
-    (either (toLegacyLocalId ctx) globalIdVar fun)
-    (lefts (toLegacyArgs ctx (map Left args)))
+mkFunApp ctx declType dstId (Right fun) args tickDecls = do
+  topAnns <- Lens.use topEntityAnns
+  tcm     <- Lens.view tcCache
+  let sc = compScope ctx
+      argTyOf = inferCoreTypeOf (compTypeEnv ctx) sc
+  case lookupGlobalEnv fun topAnns of
+    Just topEntity
+      -- The type of a top entity is a type of Clash Core, whose quantified
+      -- type variables have been removed: so it can mention type variables
+      -- that are not in scope, and its HWTypes come from Clash Core types.
+      | let ty = coreTypeOf (topId topEntity)
+      , let (fArgTys0,fResTy) = C.splitFunForallTy ty
+      -- Take into account that clocks and stuff are split off from any product
+      -- types containing them
+      , let fArgTys1 = C.splitShouldSplit tcm $ rights fArgTys0
+      , length fArgTys1 == length args
+      -> do
+        argHWTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
+        (argExprs, concat -> argDecls) <- unzip <$>
+          mapM (\e -> mkExpr ctx False declType (NetlistId dstId (argTyOf e)) e) args
+
+        -- Filter void arguments, but make sure to render their declarations:
+        let
+          filteredTypeExprs = filter (not . isVoid . snd) (zip argExprs argHWTys)
+
+        dstHWty  <- unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
+
+        -- TODO: The port names of the component are not available, see
+        -- 'Clash.Netlist.mkFunApp'. The current workaround is to not rely on
+        -- named arguments, using positional ones instead when instantiating a
+        -- top entity.
+        argTys <- mapM (filteredHWTypeOf $(curLoc) . argTyOf) args
+        resTy <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
+        let
+          ettArgs = (Nothing,) <$> argTys
+          ettRes = (Nothing, resTy)
+        expandedTopEntity <-
+            expandTopEntityOrErrM ettArgs ettRes (topAnnotation topEntity)
+
+        instDecls <-
+          mkTopUnWrapper
+            (globalIdVar fun) expandedTopEntity (dstId, dstHWty)
+            filteredTypeExprs tickDecls
+
+        return (argDecls ++ instDecls)
+
+      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr (globalIdVar fun)
+    Nothing -> do
+      normalized <- Lens.use bindings
+      case lookupGlobalEnv fun normalized of
+        Nothing -> error [I.i|
+          Internal error: unknown normalized binder:
+
+            #{showPpr (globalIdVar fun)}
+        |]
+        Just (Binding{bindingTerm}) -> do
+          (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
+          let argTys = map argTyOf args
+          argHWTys <- mapM hwTypeOfMaybe argTys
+
+          (argExprs, concat -> argDecls) <- unzip <$>
+            mapM (\(e,t) -> mkExpr ctx False declType (NetlistId dstId t) e)
+                 (zip args argTys)
+
+          -- Filter void arguments, but make sure to render their declarations:
+          let
+            argTypeExprs = zip argHWTys (zip argExprs argTys)
+            filteredTypeExprs = fmap snd $ filter (not . isVoidMaybe True . fst) argTypeExprs
+
+          let compOutp = (\(_,x,_) -> x) <$> listToMaybe co
+          if length filteredTypeExprs == length compInps
+            then do
+              (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar declType dstId) filteredTypeExprs
+              let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
+                  outpAssign    = case compOutp of
+                    Nothing -> []
+                    Just (id_,hwtype) -> [(Identifier id_ Nothing,Out,hwtype,Identifier dstId Nothing)]
+              let instLabel0 = StrictText.concat [Id.toText compName, "_", Id.toText dstId]
+              instLabel1 <- fromMaybe instLabel0 <$> Lens.view setName
+              instLabel2 <- affixName instLabel1
+              instLabel3 <- Id.makeBasic instLabel2
+              let portMap = NamedPortMap (outpAssign ++ inpAssigns)
+                  instDecl = InstDecl Entity Nothing [] compName instLabel3 [] portMap
+              declareInstUses outpAssign
+              return (argDecls ++ argDecls' ++ tickDecls ++ [instDecl])
+            else
+              let
+                argsFiltered :: [Expr]
+                argsFiltered = map fst filteredTypeExprs
+              in error [I.i|
+              Under-applied normalized function at component #{compName}:
+
+              #{showPpr (globalIdVar fun)}
+
+              Core:
+
+              #{showPpr (toClashTerm bindingTerm)}
+
+              Applied to arguments:
+              #{showPpr (map (toLegacy ctx) args)}
+
+              Applied to filtered arguments:
+              #{argsFiltered}
+
+              Component inputs:
+              #{compInps}
+            |]
+
+mkFunApp ctx _declType dstId (Left fun) args _tickDecls =
+  case args of
+    [] -> do
+      -- TODO: Figure out what to do with zero-width constructs
+      assn <- contAssign dstId (Identifier (localIdentifier ctx (localIdName fun)) Nothing)
+      pure [assn]
+    _ -> error [I.i|
+      Netlist generation encountered a local function. This should not
+      happen. Function:
+
+        #{showPpr (toLegacy ctx (localIdVar fun))}
+
+      Arguments:
+
+        #{showPpr (map (toLegacy ctx) args)}
+
+      Posssible user issues:
+
+        * A top entity has an higher-order argument, e.g (Int -> Int) or
+        Maybe (Int -> Int)
+
+      Possible internal compiler issues:
+
+        * 'bindOrLiftNonRep' failed to fire
+
+        * 'caseCon' failed to eliminate something of a type such as
+        "Maybe (Int -> Int)"
+      |]
+
+-- | Assign an argument of a component instance to a signal, unless it is one
+-- already
+toSimpleVar
+  :: DeclarationType
+  -> Identifier
+  -> (Expr, Type n)
+  -> NetlistMonad (Expr,[Declaration])
+toSimpleVar _ _ (e@(Identifier _ Nothing),_) = return (e,[])
+toSimpleVar declType dstId (e,ty) = do
+  argNm <- Id.suffix dstId "fun_arg"
+  hTy <- hwTypeOf $(curLoc) ty
+  let assignTy = declTypeUsage declType
+  argDecl <- mkInit declType assignTy argNm hTy e
+  return (Identifier argNm Nothing, argDecl)
 
 -- | Generate a declaration that selects an alternative based on the value of
 -- the scrutinee
@@ -931,6 +1083,10 @@ netlistIdentifier ctx = netlistId1 id (localIdentifier ctx . localIdName)
 -- | The HWType of a type. TODO(Phase 5, Util): translate types of scoped Core.
 hwTypeOf :: String -> Type n -> NetlistMonad HWType
 hwTypeOf loc = unsafeCoreTypeToHWTypeM' loc . toClashType
+
+-- | The HWType of a type, with its void filter, see 'hwTypeOf'
+filteredHWTypeOf :: String -> Type n -> NetlistMonad FilteredHWType
+filteredHWTypeOf loc = unsafeCoreTypeToHWTypeM loc . toClashType
 
 -- | The HWType of a type, if it has one, see 'hwTypeOf'
 hwTypeOfMaybe :: Type n -> NetlistMonad (Maybe HWType)
