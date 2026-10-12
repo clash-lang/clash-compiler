@@ -79,10 +79,10 @@ import           Clash.Core.DataCon            (dcTag)
 import           Clash.Core.Literal            (Literal (IntLiteral))
 import qualified Clash.Core.Name               as C
 import           Clash.Core.Pretty             (showPpr)
+import           Clash.Core.Scoped.Pretty      ()
 import qualified Clash.Core.Term               as C
 import           Clash.Core.TyCon              (tyConDataCons)
 import qualified Clash.Core.Type               as C (ConstTy (..))
-import qualified Clash.Core.Var                as C (varName)
 import qualified Clash.Data.UniqMap            as UniqMap
 import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail, prepareBlackBox)
 import           Clash.Netlist.BlackBox.Types
@@ -96,7 +96,7 @@ import           Clash.Netlist.Types           as N
 import qualified Clash.Netlist.Types           as N (Expr (Literal))
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, declareUse, flattenFiltered, isVoid, mkInit,
-   mkLiteral, originalIndices, preserveVarEnv, primWarnContext, procAssign,
+   mkLiteral, originalIndices, preserveVarEnv, procAssign,
    stripFiltered, stripVoid)
 import           Clash.Normalize.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
@@ -125,7 +125,7 @@ import {-# SOURCE #-} Clash.Netlist.Scoped
    mkFunApp, mkNetDecl, mkProjection, mkSelection)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
-  (coreTypeToHWTypeM, idToOutPort, renameBinder, uniqueIdentifier,
+  (coreTypeToHWTypeM, idToOutPort, localIdText, primWarnContext, renameBinder, uniqueIdentifier,
    unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | The result of a blackbox: its HDL identifier and its type. See the module
@@ -245,7 +245,7 @@ mkArgument ctx bbName bndr declType nArg e = do
     let ty = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) e
     iw    <- Lens.view intWidth
     hwTyM <- fmap stripFiltered <$> coreTypeToHWTypeM (compScope ctx) ty
-    let eTyMsg = "(" ++ showPpr (toLegacy ctx e) ++ " :: " ++ showPpr (toLegacyType ctx ty) ++ ")"
+    let eTyMsg = "(" ++ showPpr e ++ " :: " ++ showPpr ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
       Nothing
         | (Prim p,_) <- collectArgs e
@@ -314,12 +314,12 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
   where
     tenv = compTypeEnv ctx
     sc = compScope ctx
-    context = primWarnContext [] dstName (toLegacyArgs ctx args)
+    context = primWarnContext [] dstName args
     dstName =
       case dst of
         NetlistId i _ -> unpack (Id.toText i)
-        CoreId i -> showPpr (C.varName (toLegacyLocalId ctx i))
-        MultiId is -> unwords (map (showPpr . C.varName . toLegacyLocalId ctx) is)
+        CoreId i -> localIdText ctx i
+        MultiId is -> unwords (map (localIdText ctx) is)
     tys = netlistTypes dst
     ty = fromMaybe (error "mkPrimitive") (listToMaybe tys)
     assignTy = declTypeUsage declType
@@ -467,7 +467,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                       tmpRhs <- Id.make "c$tte_rhs"
                       netDecl <- mkInit declType assignTy tmpRhs scrutHTy scrutExpr
                       return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
-                _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) (toLegacyArgs ctx args))
+                _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) args)
           -- 'dataToTag#' was removed from GHC.Prim in favor of
           -- 'dataToTagSmall#' / 'dataToTagLarge#'. Kept as a literal for
           -- compatibility with older GHCs where it may still appear.
@@ -476,7 +476,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                 iw <- Lens.view intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _,Left scrut] -> mkDataToTag ctx declType assignTy scrut
-              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) (toLegacyArgs ctx args))
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 
 #if MIN_VERSION_ghc(9,10,0)
           -- 'dataToTagSmall#' / 'dataToTagLarge#' only exist on GHC >= 9.10;
@@ -488,7 +488,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                 iw <- Lens.view intWidth
                 return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
               [Right _, Right _,Left scrut] -> mkDataToTag ctx declType assignTy scrut
-              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) (toLegacyArgs ctx args))
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 #endif
 
           | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
@@ -537,13 +537,13 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                                       pure [assn]
                     return (Identifier dstNm Nothing, dstDecl ++ bindDecls ++ assn)
                   args1 -> error ("internal error: fmapSimIO# has insufficient arguments"
-                                  <> showPpr (map (toLegacy ctx) args1))
+                                  <> showPpr args1)
                 Nothing -> case lefts args of
                   (_:arg0:_) -> do
                     (_,bindDecls) <- mkExpr ctx True Sequential dst arg0
                     return (Noop, bindDecls)
                   args1 -> error ("internal error: fmapSimIO# has insufficient arguments"
-                                  <> showPpr (map (toLegacy ctx) args1))
+                                  <> showPpr args1)
 
           | pNm == "Clash.Explicit.SimIO.unSimIO#" ->
               case lefts args of
@@ -775,8 +775,7 @@ mkFunInput ctx parentName declType resId e =
   templ <- case appE of
             Prim p -> do
               bb  <- extractPrimWarnOrFail
-                       (primWarnContext [] (unpack (Id.toText (fst resId)))
-                          (toLegacyArgs ctx args)
+                       (primWarnContext [] (unpack (Id.toText (fst resId))) args
                           <> ", as an argument of: " <> unpack parentName)
                        (C.primName p)
               case bb of
@@ -888,12 +887,12 @@ mkFunInput ctx parentName declType resId e =
                   return (error $ $(curLoc) ++ "Encountered Void in mkFunInput."
                                             ++ " This is a bug in Clash.")
 
-                _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr (toLegacy ctx e)
+                _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             GlobalVar fun -> do
               topAnns <- Lens.use topEntityAnns
               case lookupGlobalEnv fun topAnns of
                 Just _ ->
-                  error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr (toLegacy ctx e)
+                  error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr e
                 _ -> do
                   normalized <- Lens.use bindings
                   case lookupGlobalEnv fun normalized of
@@ -933,10 +932,10 @@ mkFunInput ctx parentName declType resId e =
                         portMap = NamedPortMap (outpAssigns ++ inpAssigns)
                         instDecl = InstDecl Entity Nothing [] compName instLabel [] portMap
                       return (Right ((Id.unsafeMake "",tickDecls ++ [instDecl]), Cont))
-                    Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr (toLegacy ctx e)
+                    Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
             Lam {} -> do
               Right . first (second (tickDecls ++)) <$> go ctx 0 appE
-            _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr (toLegacy ctx e)
+            _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   let pNm = case appE of
               Prim p -> C.primName p
               _ -> "__INTERNAL__"
@@ -998,7 +997,7 @@ mkFunInput ctx parentName declType resId e =
             return ((nm,assn++appDecls), assignTy)
         else do
           (_,sp) <- Lens.use curCompNm
-          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr (toLegacy c app)) Nothing)
+          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
     goExpr c e' = do
       let eType = inferCoreTypeOf (compTypeEnv c) (compScope c) e'
       (appExpr,appDecls) <- mkExpr c False declType (NetlistId (Id.unsafeMake "c$bb_res") eType) e'
@@ -1057,7 +1056,7 @@ mkFunInput ctx parentName declType resId e =
       return ((nm,assn++selectionDecls), assignTy)
 
     go c _ e'@(Let {}) =
-      fromMaybe (error ($(curLoc) ++ "Not in normal form: " ++ showPpr (toLegacy c e'))) $
+      fromMaybe (error ($(curLoc) ++ "Not in normal form: " ++ showPpr e')) $
       splitLets c e' $ \c1 binds0 res0 ->
       mkUniqueLets c1 binds0 res0 $ \c2 binders resultM ->
       case resultM of
@@ -1085,11 +1084,11 @@ mkFunInput ctx parentName declType resId e =
     go c _ e'@(Prim {}) = goExpr c e'
     go c _ e'@(TyApp {}) = goExpr c e'
 
-    go c _ e'@(Case _ _ []) =
-      error $ $(curLoc) ++ "Cannot make function input for case without alternatives: " ++ showPpr (toLegacy c e')
+    go _ _ e'@(Case _ _ []) =
+      error $ $(curLoc) ++ "Cannot make function input for case without alternatives: " ++ showPpr e'
 
-    go c _ e'@(TyLam {}) =
-      error $ $(curLoc) ++ "Cannot make function input for TyLam: " ++ showPpr (toLegacy c e')
+    go _ _ e'@(TyLam {}) =
+      error $ $(curLoc) ++ "Cannot make function input for TyLam: " ++ showPpr e'
 
 -- * SimIO
 
@@ -1367,7 +1366,7 @@ collectBindIO ctx dst (m:Lam x q:_) =
       ds1 <- mkDeclarations' c' Sequential xv mS
       k c' (netDecls ++ ds1)
 
-collectBindIO ctx _ es = error ("internal error:\n" ++ showPpr (map (toLegacy ctx) es))
+collectBindIO _ _ es = error ("internal error:\n" ++ showPpr es)
 
 -- | Collect the sequential declarations for 'appIO'
 collectAppIO
@@ -1385,9 +1384,9 @@ collectAppIO ctx dst (fun1:arg1:_) rest = case collectArgs fun1 of
   (Prim p,(lefts -> args))
     | C.primName p == "Clash.Explicit.SimIO.apSimIO#" ->
         collectAppIO ctx dst args (arg1:rest)
-  _ -> error ("internal error:\n" ++ showPpr (map (toLegacy ctx) (fun1:arg1:rest)))
+  _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
 
-collectAppIO ctx _ es _ = error ("internal error:\n" ++ showPpr (map (toLegacy ctx) es))
+collectAppIO _ _ es _ = error ("internal error:\n" ++ showPpr es)
 
 -- | Unwrap the new-type wrapper for things of type SimIO, this is needed to
 -- allow applications of the `State# World` token to the underlying IO type.
@@ -1412,7 +1411,7 @@ unSimIO ctx arg =
                        C.NoUnfolding)
                     (mkFunTy argTy tcArg))
                  [Left arg]
-        _ -> error ("internal error:\n" ++ showPpr (toLegacy ctx arg))
+        _ -> error ("internal error:\n" ++ showPpr arg)
 
 -- * Let-expressions
 
