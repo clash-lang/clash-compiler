@@ -35,7 +35,7 @@ import           Control.Monad.Extra              (whenM, ifM, unlessM)
 import           Control.Monad.State              (evalState, get)
 import qualified Control.Monad.State.Strict       as State
 import qualified Crypto.Hash.SHA256               as Sha256
-import           Data.Bifunctor                   (bimap, first, second)
+import           Data.Bifunctor                   (first, second)
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Lazy             as ByteStringLazy
@@ -733,22 +733,22 @@ interpretFunctions idirs pkgDbs topDir reqs = do
 --  improves Clash startup times.
 knownBlackBoxFunctions :: HashMap String SomeBlackBoxFunction
 knownBlackBoxFunctions =
-  HashMap.fromList $ map (bimap show LegacyBBF) $
-    [ ('P.checkBBF, P.checkBBF)
-    , ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
-    , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
-    , ('P.clashCompileErrorBBF, P.clashCompileErrorBBF)
-    , ('P.foldBBF, P.foldBBF)
-    , ('P.indexIntVerilog, P.indexIntVerilog)
-    , ('P.indexToIntegerVerilog, P.indexToIntegerVerilog)
-    , ('P.indexToIntegerVHDL, P.indexToIntegerVHDL)
-    , ('P.intTF, P.intTF)
-    , ('P.iterateBBF, P.iterateBBF)
-    , ('P.signedToIntegerVerilog, P.signedToIntegerVerilog)
-    , ('P.signedToIntegerVHDL, P.signedToIntegerVHDL)
-    , ('P.unsignedToIntegerVerilog, P.unsignedToIntegerVerilog)
-    , ('P.unsignedToIntegerVHDL, P.unsignedToIntegerVHDL)
-    , ('P.wordTF, P.wordTF)
+  HashMap.fromList $ map (first show) $
+    [ ('P.checkBBF, LegacyBBF P.checkBBF)
+    , ('P.bvToIntegerVHDL, ScopedBBF P.bvToIntegerVHDL)
+    , ('P.bvToIntegerVerilog, ScopedBBF P.bvToIntegerVerilog)
+    , ('P.clashCompileErrorBBF, ScopedBBF P.clashCompileErrorBBF)
+    , ('P.foldBBF, ScopedBBF P.foldBBF)
+    , ('P.indexIntVerilog, ScopedBBF P.indexIntVerilog)
+    , ('P.indexToIntegerVerilog, ScopedBBF P.indexToIntegerVerilog)
+    , ('P.indexToIntegerVHDL, ScopedBBF P.indexToIntegerVHDL)
+    , ('P.intTF, ScopedBBF P.intTF)
+    , ('P.iterateBBF, ScopedBBF P.iterateBBF)
+    , ('P.signedToIntegerVerilog, ScopedBBF P.signedToIntegerVerilog)
+    , ('P.signedToIntegerVHDL, ScopedBBF P.signedToIntegerVHDL)
+    , ('P.unsignedToIntegerVerilog, ScopedBBF P.unsignedToIntegerVerilog)
+    , ('P.unsignedToIntegerVHDL, ScopedBBF P.unsignedToIntegerVHDL)
+    , ('P.wordTF, ScopedBBF P.wordTF)
     ]
 
 -- | List of known TemplateFunctions used to prevent Hint from firing. This

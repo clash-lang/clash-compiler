@@ -17,12 +17,12 @@ import Data.Either (lefts)
 import GHC.Stack (HasCallStack)
 import Text.Show.Pretty
 
-import Clash.Core.TermLiteral (termToDataError)
-import Clash.Netlist.BlackBox.Types (BlackBoxFunction)
+import Clash.Core.Scoped.TermLiteral (termToDataError)
+import Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Netlist.Types ()
 
 clashCompileErrorBBF :: HasCallStack => BlackBoxFunction
-clashCompileErrorBBF _isD _primName args _ty
+clashCompileErrorBBF _env _isD _primName args _ty
   |   _hasCallstack
     : (either error id . termToDataError -> msg)
     : _ <- lefts args

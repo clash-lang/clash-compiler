@@ -15,13 +15,13 @@ module Clash.Primitives.GHC.Int (intTF) where
 import           Data.List.NonEmpty           (NonEmpty(..))
 
 import           Clash.Core.Literal           (Literal(..))
-import           Clash.Core.Term              (Term(Literal))
-import           Clash.Core.Type              (Type)
+import           Clash.Core.Scoped.Syntax     (Term(Literal), Type)
 import           Clash.Primitives.GHC.Literal
   (literalTF, signed, signedLiteral, assign)
 import           Clash.Netlist.Types          (BlackBox(BBTemplate))
+import           Clash.Netlist.Scoped.Types   (BlackBoxFunction)
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, Element(Arg, Result), emptyBlackBoxMeta
+  (Element(Arg, Result), emptyBlackBoxMeta
   ,BlackBoxMeta, bbKind, TemplateKind(TDecl))
 
 getIntLit
@@ -45,7 +45,7 @@ intTF = literalTF ("GHC.Int.I" :| ["GHC.Internal.Int.I"]) intTF'
 intTF'
   :: Bool
   -- ^ Is declaration
-  -> [Either Term Type]
+  -> [Either (Term n) (Type n)]
   -- ^ Arguments
   -> Int
   -- ^ Word size

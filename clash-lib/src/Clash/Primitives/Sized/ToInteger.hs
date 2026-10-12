@@ -6,6 +6,7 @@
   Blackbox implementations for "Clash.Sized.Internal.*.toInteger#".
 -}
 
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
 module Clash.Primitives.Sized.ToInteger
   ( bvToIntegerVerilog
@@ -30,12 +31,13 @@ import qualified GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc (isGoodSrcSpan)
 
 import Clash.Annotations.Primitive (HDL (Verilog,VHDL))
-import Clash.Core.Type (Type (LitTy), LitTy (NumTy))
+import Clash.Core.Scoped.Syntax (Type (LitTy))
+import Clash.Core.Type (LitTy (NumTy))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.BlackBox.Parser (runParse)
 import Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, BlackBoxMeta (bbKind), TemplateKind (TExpr),
-   emptyBlackBoxMeta)
+  (BlackBoxMeta (bbKind), TemplateKind (TExpr), emptyBlackBoxMeta)
+import Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Netlist.Types
   (BlackBox (BBTemplate), HWType (..), curCompNm, intWidth)
 import Clash.Util (clogBase)
@@ -55,7 +57,7 @@ unsignedToIntegerVerilog = toIntegerBB Verilog (Unsigned 0)
 unsignedToIntegerVHDL = toIntegerBB VHDL (Unsigned 0)
 
 toIntegerBB :: HDL -> HWType -> BlackBoxFunction
-toIntegerBB hdl hty _isD _primName args _ty = do
+toIntegerBB hdl hty _env _isD _primName args _ty = do
   case args of
     (Right (LitTy (NumTy i)):_) -> do
       iw <- Lens.view intWidth

@@ -16,7 +16,6 @@ module Clash.Primitives.Sized.Vector where
 
 import           Control.Monad                      (replicateM, zipWithM)
 import           Control.Monad.State                (State)
-import qualified Control.Lens                       as Lens
 import           Data.Either                        (rights)
 import           Data.List.Extra                    (iterateNM)
 import           Data.Maybe                         (fromMaybe, listToMaybe)
@@ -32,21 +31,23 @@ import           GHC.Stack                          (HasCallStack)
 
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, blockDecl)
-import           Clash.Core.TermInfo                (isVar)
-import           Clash.Core.Type
-  (Type(LitTy), LitTy(NumTy), coreView)
-import           Clash.Netlist.BlackBox             (isLiteral)
+import           Clash.Core.Scoped.Syntax           (Type(LitTy))
+import           Clash.Core.Scoped.TermInfo         (isLiteral, isVar)
+import           Clash.Core.Scoped.Type             (coreView)
+import           Clash.Core.Type                    (LitTy(NumTy))
 import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
+  (BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
    Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
+import           Clash.Netlist.Scoped.Types
+  (BlackBoxFunction, bbScope, bbTypeEnv)
 import           Clash.Netlist.Types
   (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector), Usage(Cont),
    Declaration(..), Expr(Literal,Identifier,DataCon,BlackBoxE), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
    Modifier(Indexed, Nested, DC), HWType(..), BlackBoxContext(..),
-   emptyBBContext, tcCache)
+   emptyBBContext)
 import qualified Clash.Netlist.Id                   as Id
 import           Clash.Netlist.Util                 (typeSize)
 import qualified Clash.Primitives.DSL               as Prim
@@ -57,19 +58,18 @@ import           Clash.Util                         (curLoc)
 
 -- | Blackbox function for 'Clash.Sized.Vector.iterateI'
 iterateBBF :: HasCallStack => BlackBoxFunction
-iterateBBF _isD _primName args _resTy = do
-  tcm <- Lens.view tcCache
-  pure (Right (meta tcm, bb))
+iterateBBF env _isD _primName args _resTy =
+  pure (Right (meta, bb))
  where
   bb = BBFunction "Clash.Primitives.Sized.Vector.iterateBBF" 0 iterateTF
-  vecLength tcm =
-    case coreView tcm <$> rights args of
+  vecLength =
+    case coreView (bbTypeEnv env) (bbScope env) <$> rights args of
       (LitTy (NumTy 0)):_ -> error "Unexpected empty vector in 'iterateBBF'"
       (LitTy (NumTy n)):_ -> fromInteger (n - 1)
       vl -> error $ "Unexpected vector length: " ++ show (listToMaybe vl)
-  meta tcm = emptyBlackBoxMeta {
+  meta = emptyBlackBoxMeta {
       bbKind=TDecl
-    , bbFunctionPlurality=[(1, vecLength tcm)]
+    , bbFunctionPlurality=[(1, vecLength)]
     }
 
 -- | Type signature of function we're generating netlist for:
@@ -114,15 +114,14 @@ foldFunctionPlurality n
 
 -- | Blackbox function for 'Clash.Sized.Vector.fold'
 foldBBF :: HasCallStack => BlackBoxFunction
-foldBBF _isD _primName args _resTy = do
-  tcm <- Lens.view tcCache
+foldBBF env _isD _primName args _resTy = do
   let
     bb = BBFunction "Clash.Primitives.Sized.Vector.foldTF" 0 foldTF
     vecLengthMinusOne = case rights args of
       (l:_) -> l
       _ -> error ("foldBBF: bad Vec: " <> show args)
     vecLength =
-      case coreView tcm vecLengthMinusOne of
+      case coreView (bbTypeEnv env) (bbScope env) vecLengthMinusOne of
         (LitTy (NumTy n)) -> n + 1
         vl -> error $ "Unexpected vector length: " ++ show vl
     funcPlural = foldFunctionPlurality (fromInteger vecLength)
@@ -240,7 +239,7 @@ foldTF' args =
   error $ "Unexpected number of arguments: " ++ show (length (bbInputs args))
 
 indexIntVerilog ::  BlackBoxFunction
-indexIntVerilog _isD _primName args _ty = return bb
+indexIntVerilog _env _isD _primName args _ty = return bb
  where
   meta bbKi = emptyBlackBoxMeta{bbKind=bbKi}
 
