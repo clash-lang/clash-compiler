@@ -49,7 +49,6 @@ import           Control.Lens                     ((.=), (<~))
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
-import           Control.Monad.IO.Class           (liftIO)
 import           Data.Bifunctor                   (first, second)
 import           Data.Either                      (partitionEithers, rights)
 import           Data.Char                        (ord)
@@ -94,7 +93,6 @@ import qualified Clash.Netlist.Util               as Legacy
 import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
-import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Evaluator.Types       (Evaluator)
 
 import           Clash.Core.Scoped.Alpha          (aeqTy)
@@ -197,14 +195,13 @@ genComponentT compName0 componentExpr = do
       topVarTypeM = snd . C.splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
   seenIds <~ Lens.use seenComps
-  supply <- liftIO Supply.newSupply
   UniqueNormalized ctx wereVoids compInps argWrappers compOutps resUnwrappers binders resultM <-
     case splitNormalized tenv componentExpr of
       Right split ->
         -- HACK: Determine resulttype of this function by looking at its definition
         -- instead of looking at its last binder (which obscures any attributes
         -- [see: Clash.Annotations.SynthesisAttributes]).
-        mkUniqueNormalized tenv supply topAnnMM topVarTypeM split
+        mkUniqueNormalized tenv topAnnMM topVarTypeM split
       Left err ->
         throw (ClashException sp ($curLoc ++ err) Nothing)
 
@@ -1174,11 +1171,10 @@ withAlt
   -> (forall l. DExt n l => CompCtx l -> Pat n l -> Term l -> r)
   -> r
 withAlt ctx alt k = openAlt (compScope ctx) alt $ \sc pat e ->
-  let (tvs, ids) = patVars pat
-      ctxTy = extendCompCtxTy sc [ (o, kd, nm) | VarTy o kd nm <- tvs ] ctx
+  let (_, ids) = patVars pat
       ctx' = extendCompCtx sc
                [ (LocalId o ty nm, Id.unsafeMake (C.nameOcc o)) | Var o ty nm <- ids ]
-               ctxTy
+               ctx
   in k ctx' pat e
 
 -- | The HDL identifier of a 'NetlistId', fails on 'MultiId'

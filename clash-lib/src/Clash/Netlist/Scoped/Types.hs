@@ -15,7 +15,7 @@
   local variable of that scope, its HDL identifier: the name it has in the
   HDL. Handlers that go under further binders, e.g. those of a case
   alternative, extend the context with the HDL identifiers of the variables
-  they bind ('extendCompCtx', 'extendCompCtxTy').
+  they bind ('extendCompCtx').
 
   Clash Core put the HDL identifier of a variable in its occurrence name
   ('Clash.Netlist.Util.mkUnique'), and Netlist read it back with
@@ -29,17 +29,6 @@
   which it needs to e.g. look through type synonyms with
   'Clash.Core.Scoped.Type.coreView', the type environment, and the HDL
   identifiers of the local variables its arguments mention.
-
-  = The boundary with Clash Core
-
-  During the port, Netlist handlers that are not ported yet run on Clash Core.
-  'toLegacy' converts a term of a component into Clash Core for them: every
-  local variable becomes a 'C.Id' whose occurrence name is its HDL identifier,
-  which is what 'Clash.Netlist.Id.unsafeFromCoreId' reads. The variables of the
-  context get uniques from a unique supply when they are added, and the
-  binders in a converted term get them from the rest of that supply, see
-  "Clash.Core.Scoped.Convert.Fresh". So a local never shares its unique with a
-  global variable. TODO(Phase 7): remove the conversions.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -55,25 +44,16 @@ module Clash.Netlist.Scoped.Types
   , localIdentifier
   , localIdentifierMaybe
   , extendCompCtx
-  , extendCompCtxTy
+  , compCtxFromList
     -- ** The view of blackbox functions
   , BlackBoxEnv
   , bbScope
   , bbTypeEnv
   , bbLocalIdentifier
-    -- ** Clash Core counterparts of the context
-  , compCtxFromList
-  , legacyCompCtx
-  , toLegacy
-  , toLegacyArgs
-  , toLegacyType
-  , toLegacyTick
-  , toLegacyVar
     -- * Local variables
   , LocalId (..)
   , localIdVar
   , binderLocalId
-  , toLegacyLocalId
   , NetlistId (..)
   , netlistId1
   , netlistTypes
@@ -85,29 +65,18 @@ module Clash.Netlist.Scoped.Types
   ) where
 
 import           Control.DeepSeq             (NFData (..), rwhnf)
-import           Control.Monad.State.Strict  (evalState)
-import qualified Data.IntMap.Strict          as IntMap
-import           Data.List                   (mapAccumL)
 import           Data.Text                   (Text)
 import           GHC.Stack                   (HasCallStack)
 
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Type             as C
-import qualified Clash.Core.Var              as C
-import           Clash.Core.VarEnv           (InScopeSet, emptyInScopeSet, extendInScopeSet)
-import           Clash.Unique                (Unique)
-import           Clash.Util.Supply           (Supply, freshId)
 
-import           Clash.Core.Scoped.Convert.Fresh
-  (BackEnv (..), emptyBackEnv, toClashFresh, toClashTickFresh, toClashTypeFresh)
 import           Clash.Core.Scoped.NameMap
   (NameMap, emptyNameMap, insertNameMap, lookupNameMap, sinkNameMap)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta)
-import {-# SOURCE #-} qualified Clash.Netlist.Id as Id (toText)
 import {-# SOURCE #-} Clash.Netlist.Types    (BlackBox, Identifier, NetlistMonad)
 
 -- * Component contexts
@@ -119,19 +88,11 @@ data CompCtx (n :: S) = CompCtx
   , _ccTypeEnv :: !TypeEnv
   , _ccNames :: !(NameMap TmName n Identifier)
   -- ^ The HDL identifiers of the local variables
-  , _ccBackEnv :: !BackEnv
-  -- ^ The Clash Core counterparts of the local variables, see 'toLegacy'
-  , _ccInScope :: !InScopeSet
-  -- ^ The Clash Core counterparts of the local variables
-  , _ccSupply :: !Supply
-  -- ^ Uniques for the binders of 'toLegacy'
   }
 
--- | The context of closed terms. The supply gives the uniques of the Clash
--- Core counterparts of the variables, see 'toLegacy'.
-emptyCompCtx :: TypeEnv -> Supply -> CompCtx 'VoidS
-emptyCompCtx tenv =
-  CompCtx emptyScope tenv emptyNameMap emptyBackEnv emptyInScopeSet
+-- | The context of closed terms
+emptyCompCtx :: TypeEnv -> CompCtx 'VoidS
+emptyCompCtx tenv = CompCtx emptyScope tenv emptyNameMap
 
 -- | The scope of a context
 compScope :: CompCtx n -> Scope n
@@ -153,38 +114,18 @@ localIdentifier ctx nm = case localIdentifierMaybe ctx nm of
 localIdentifierMaybe :: CompCtx n -> TmName n -> Maybe Identifier
 localIdentifierMaybe ctx nm = lookupNameMap nm (_ccNames ctx)
 
--- | Extend a context with local variables of an extended scope, e.g. those
--- bound by let-bindings, and their HDL identifiers. Their Clash Core
--- counterparts (see 'toLegacy') get the converted types of the 'LocalId's.
+-- | Extend a context to an extended scope, e.g. one with the variables bound
+-- by let-bindings, with the HDL identifiers of the given variables of that
+-- scope
 extendCompCtx :: DExt n l => Scope l -> [(LocalId l, Identifier)] -> CompCtx n -> CompCtx l
-extendCompCtx sc vs (CompCtx _ tenv names0 env0@(BackEnv tvs ids0) is0 sup0) =
-  go (sinkNameMap names0) ids0 is0 sup0 vs
- where
-  go names ids is sup [] = CompCtx sc tenv names (BackEnv tvs ids) is sup
-  go names ids is sup ((v, i) : rest) =
-    let (u, sup') = freshId sup
-        ty = evalState (toClashTypeFresh is0 env0 (localIdType v)) sup0
-        cv = C.mkLocalId ty (legacyName (localIdOcc v) i u)
-    in go (insertNameMap (localIdName v) i names)
-          (IntMap.insert (tmNameRaw (localIdName v)) cv ids)
-          (extendInScopeSet is cv) sup' rest
+extendCompCtx sc vs (CompCtx _ tenv names) =
+  CompCtx sc tenv (foldl (\m (v, i) -> insertNameMap (localIdName v) i m) (sinkNameMap names) vs)
 
--- | Extend a context with type variables of an extended scope, e.g. those
--- bound by a pattern: their human readable names, kinds and names. Type
--- variables have no HDL identifiers, but their Clash Core counterparts (see
--- 'toLegacy') keep their human readable names.
-extendCompCtxTy
-  :: DExt n l => Scope l -> [(C.Name C.Type, Kind l, TyName l)] -> CompCtx n -> CompCtx l
-extendCompCtxTy sc vs (CompCtx _ tenv names (BackEnv tvs0 ids) is0 sup0) =
-  go tvs0 is0 sup0 vs
- where
-  go tvs is sup [] = CompCtx sc tenv (sinkNameMap names) (BackEnv tvs ids) is sup
-  go tvs is sup ((occ, k, nm) : rest) =
-    let (u, sup') = freshId sup
-        -- The kinds of later variables may mention earlier ones
-        k' = evalState (toClashTypeFresh is (BackEnv tvs ids) k) sup0
-        tv = C.mkTyVar k' occ {C.nameUniq = u}
-    in go (IntMap.insert (tyNameRaw nm) tv tvs) (extendInScopeSet is tv) sup' rest
+-- | The context of the given local variables, with their HDL identifiers. The
+-- first identifier of a variable wins.
+compCtxFromList :: Scope n -> TypeEnv -> [(LocalId n, Identifier)] -> CompCtx n
+compCtxFromList sc tenv vs =
+  CompCtx sc tenv (foldr (\(v, i) -> insertNameMap (localIdName v) i) emptyNameMap vs)
 
 -- * The view of blackbox functions
 
@@ -203,81 +144,6 @@ bbTypeEnv = compTypeEnv
 -- | The HDL identifier of a local variable, see 'localIdentifier'
 bbLocalIdentifier :: HasCallStack => BlackBoxEnv n -> TmName n -> Identifier
 bbLocalIdentifier = localIdentifier
-
--- * Clash Core counterparts
-
--- | The context of the given local variables, with their HDL identifiers and
--- the types of their Clash Core counterparts (see 'toLegacy'), which get
--- fresh uniques from the supply
-compCtxFromList
-  :: Scope n
-  -> TypeEnv
-  -> Supply
-  -> [(LocalId n, Identifier, C.Type)]
-  -- ^ The variables, their HDL identifiers, and the types of their Clash Core
-  -- counterparts
-  -> CompCtx n
-compCtxFromList sc tenv sup0 vs = legacyCompCtx sc tenv sup1 [] ids
- where
-  (sup1, ids) = mapAccumL mk sup0 vs
-  mk sup (v, i, ty) =
-    let (u, sup') = freshId sup
-    in (sup', (localIdName v, C.mkLocalId ty (legacyName (localIdOcc v) i u), i))
-
--- | The name of the Clash Core counterpart of a local variable: its
--- occurrence name is its HDL identifier. Keeps the sort and the source
--- location of the human readable name.
-legacyName :: C.Name C.Term -> Identifier -> Unique -> C.Name C.Term
-legacyName occ i u = occ {C.nameOcc = Id.toText i, C.nameUniq = u}
-
--- | A context for Clash Core terms whose free variables are given by their
--- scoped counterparts: e.g. the arguments of a blackbox function on Clash
--- Core, converted to scoped Core to call a blackbox function on scoped Core.
--- 'toLegacy' gives back the given Clash Core variables.
-legacyCompCtx
-  :: Scope n
-  -> TypeEnv
-  -> Supply
-  -> [(TyName n, C.TyVar)]
-  -> [(TmName n, C.Id, Identifier)]
-  -> CompCtx n
-legacyCompCtx sc tenv sup tvs ids =
-  CompCtx sc tenv
-    (foldr (\(nm, _, i) -> insertNameMap nm i) emptyNameMap ids)
-    (BackEnv (IntMap.fromList [(tyNameRaw nm, tv) | (nm, tv) <- tvs])
-             (IntMap.fromList [(tmNameRaw nm, v) | (nm, v, _) <- ids]))
-    is1
-    sup
- where
-  is0 = foldl (\is (_, v, _) -> extendInScopeSet is v) emptyInScopeSet ids
-  is1 = foldl (\is (_, tv) -> extendInScopeSet is tv) is0 tvs
-
--- | Convert a term of a component to Clash Core, for a handler that runs on
--- Clash Core: see the module header.
-toLegacy :: HasCallStack => CompCtx n -> Term n -> C.Term
-toLegacy (CompCtx _ _ _ env is sup) e = evalState (toClashFresh is env e) sup
-
--- | Convert the arguments of a primitive or function to Clash Core, like
--- 'toLegacy'. Their binders get distinct uniques.
-toLegacyArgs :: HasCallStack => CompCtx n -> [Either (Term n) (Type n)] -> [Either C.Term C.Type]
-toLegacyArgs (CompCtx _ _ _ env is sup) args =
-  evalState (mapM (either (fmap Left . toClashFresh is env) (fmap Right . toClashTypeFresh is env)) args) sup
-
--- | Convert a type to Clash Core
-toLegacyType :: CompCtx n -> Type n -> C.Type
-toLegacyType (CompCtx _ _ _ env is sup) ty = evalState (toClashTypeFresh is env ty) sup
-
--- | Convert a tick to Clash Core
-toLegacyTick :: CompCtx n -> TickInfo n -> C.TickInfo
-toLegacyTick (CompCtx _ _ _ env is sup) t = evalState (toClashTickFresh is env t) sup
-
--- | The Clash Core counterpart of a local variable. Errors if it is not in the
--- context.
-toLegacyVar :: HasCallStack => CompCtx n -> TmName n -> C.Id
-toLegacyVar (CompCtx _ _ _ (BackEnv _ ids) _ _) nm =
-  case IntMap.lookup (tmNameRaw nm) ids of
-    Just v -> v
-    Nothing -> error ("toLegacyVar: local variable not in the context: " <> show (tmNameRaw nm))
 
 -- * Local variables
 
@@ -304,11 +170,6 @@ localIdVar (LocalId o ty n) = Var o ty n
 -- | The variable that a binder binds
 binderLocalId :: DExt n l => IdBinder n l -> LocalId l
 binderLocalId b = LocalId (idBinderOcc b) (sink (idBinderType b)) (tmNameOf b)
-
--- | The Clash Core counterpart of a local variable. Its type is that of the
--- variable when it was added to the context.
-toLegacyLocalId :: HasCallStack => CompCtx n -> LocalId n -> C.Id
-toLegacyLocalId ctx i = toLegacyVar ctx (localIdName i)
 
 -- | Netlist-level identifier, see 'Clash.Netlist.Types.NetlistId'
 data NetlistId (n :: S)

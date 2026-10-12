@@ -10,10 +10,6 @@
   The translation of the types of scoped Core to HWTypes
   ('unsafeCoreTypeToHWTypeM', ...) takes the scope of the type, to look
   through newtypes and type families.
-
-  Blackbox functions on Clash Core, and the Netlist handlers that still run on
-  Clash Core, get their arguments converted to Clash Core, see
-  'Clash.Netlist.Scoped.Types.toLegacy'.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -81,10 +77,9 @@ import qualified Clash.Core.Type             as C (LitTy (..), Type)
 import           Clash.Core.Term             (MultiPrimInfo (..))
 import           Clash.Core.TermInfo         (multiPrimInfo')
 import           Clash.Util                  (ClashException (..), curLoc)
-import           Clash.Util.Supply           (Supply, splitSupply)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
-import           Clash.Core.Scoped.Convert   (fromClashTypeClosed, toClashType)
+import           Clash.Core.Scoped.Convert   (fromClashTypeClosed)
 import           Clash.Core.Scoped.Evaluator (nfData)
 import           Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import           Clash.Core.Scoped.Evaluator.Types
@@ -210,8 +205,6 @@ data UniqueNormalized where
 mkUniqueNormalized
   :: HasCallStack
   => TypeEnv
-  -> Supply
-  -- ^ Uniques for the Clash Core counterparts of the variables
   -> Maybe (Maybe TopEntity)
   -- ^ Top entity annotation where:
   --
@@ -222,11 +215,10 @@ mkUniqueNormalized
   -- ^ The type of the result, if not that of the result variable
   -> SplitNormalized
   -> NetlistMonad UniqueNormalized
-mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0) = do
+mkUniqueNormalized tenv topMM resTyM (SplitNormalized sc args binds res0) = do
   let res = case resTyM of
         Just ty -> res0 {localIdType = fromClashTypeClosed sc ty}
         Nothing -> res0
-      (supply1, supply2) = splitSupply supply0
   -- Generate port names and add them to set of seen identifiers
   argHwtys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) sc . localIdType) args
   resHwty <- unsafeCoreTypeToHWTypeM $(curLoc) sc (localIdType res)
@@ -248,9 +240,8 @@ mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0
     Just (oports, owrappers, res1Name) -> do
       -- Collect new names, see 'renameBinder' for more information. The
       -- blackboxes see the original names.
-      let ctx0 = compCtxFromList sc tenv supply1
-                   [ (v, Id.unsafeMake (C.nameOcc (localIdOcc v)), toClashType (localIdType v))
-                   | v <- args ++ map fst binds ]
+      let ctx0 = compCtxFromList sc tenv
+                   [ (v, Id.unsafeMake (C.nameOcc (localIdOcc v))) | v <- args ++ map fst binds ]
       renames <- concatMapM (renameBinder ctx0 binds) binds
       let
         isRes = (== localIdName res)
@@ -307,23 +298,22 @@ mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0
           pure (UniqueNormalized ctx wereVoids iports iwrappers oports owrappers bs (Just r))
       case resRenameM1 of
         Nothing ->
-          result (mkCtx sc supply2 names) binds1 (fst resN)
+          result (mkCtx sc names) binds1 (fst resN)
         Just _ ->
           -- Assign the internal signal to the output port
           withFreshIdBinder sc (localIdOcc res) (localIdType res) $ \sc' b ->
             let res1 = binderLocalId b
                 extraBind = (res1, sink (localIdVar (fst resN)))
-            in result (mkCtx sc' supply2 (sink1Names names ++ [(res1, res1Name)]))
+            in result (mkCtx sc' (sink1Names names ++ [(res1, res1Name)]))
                  (sink1Binds binds1 ++ [extraBind]) res1
 
     Nothing -> do
       names <- mapM (\(b, _) -> (b,) <$> uniqueIdentifier (localIdOcc b)) binds
-      pure (UniqueNormalized (mkCtx sc supply2 (argNames ++ names))
+      pure (UniqueNormalized (mkCtx sc (argNames ++ names))
               wereVoids iports iwrappers [] [] binds Nothing)
  where
-  mkCtx :: Scope x -> Supply -> [(LocalId x, Identifier)] -> CompCtx x
-  mkCtx sc' sup names = compCtxFromList sc' tenv sup
-    [ (v, i, toClashType (localIdType v)) | (v, i) <- names ]
+  mkCtx :: Scope x -> [(LocalId x, Identifier)] -> CompCtx x
+  mkCtx sc' = compCtxFromList sc' tenv
 
   sink1Names :: DExt x y => [(LocalId x, Identifier)] -> [(LocalId y, Identifier)]
   sink1Names = map (\(v, i) -> (sink v, i))

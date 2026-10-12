@@ -25,7 +25,6 @@ import Clash.Netlist.Types
   ( Declaration (Assignment, InstDecl), DeclarationType (Concurrent), EntityOrComponent (Entity)
   , Expr (Identifier), Identifier, NetlistMonad, PortDirection (..), PortMap (NamedPortMap)
   , componentNames )
-import qualified Clash.Util.Supply as Supply
 
 import Clash.Core.Scoped.Convert (fromClashTypeClosed)
 import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
@@ -45,14 +44,13 @@ withLocal
   -> [(C.Id, Identifier)]
   -> (forall n. Distinct n => CompCtx n -> LocalId n -> NetlistMonad a)
   -> IO a
-withLocal bs compNames act = do
-  supply <- Supply.newSupply
+withLocal bs compNames act =
   runNetlistTest (mkBindingMap bs) $ do
     componentNames .= mconcat [ singletonGlobalEnv (mkGlobalId g) i | (g, i) <- compNames ]
     withFreshIdBinder emptyScope (C.mkUnsafeSystemName "y" 0)
       (fromClashTypeClosed emptyScope intTy) $ \sc b ->
         let y = binderLocalId b
-            ctx = compCtxFromList sc testTypeEnv supply [(y, Id.unsafeMake "y", intTy)]
+            ctx = compCtxFromList sc testTypeEnv [(y, Id.unsafeMake "y")]
         in act ctx y
 
 -- | A local variable can't be mistaken for a global binder (#1087), even one

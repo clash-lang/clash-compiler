@@ -120,8 +120,7 @@ import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Netlist.Id as Id
-import Clash.Netlist.Scoped.Types (CompCtx, legacyCompCtx)
-import qualified Clash.Util.Supply as Supply
+import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), compCtxFromList)
 import Clash.Rewrite.Scoped
   ( ScopedRewrite, Frame (LetBinding), pushFrame, rootContext, runScopedTransform
   , underAlt, underLam, underLet, underLetRec, underTyLam)
@@ -1072,15 +1071,11 @@ withCompCtxOf
   :: [C.Term]
   -> (forall n. Distinct n => CompCtx n -> [Term n] -> IO r)
   -> IO r
-withCompCtxOf tms k = do
-  supply <- Supply.newSupply
+withCompCtxOf tms k =
   withFreeVarsOf tms $ \cenv ->
-    let tvs = List.nubBy (\a b -> C.varUniq a == C.varUniq b)
-                (concatMap (Lens.toListOf C.termFreeTyVars) tms)
-        ids = List.nubBy (\a b -> C.varUniq a == C.varUniq b)
+    let ids = List.nubBy (\a b -> C.varUniq a == C.varUniq b)
                 (concatMap (Lens.toListOf C.freeLocalIds) tms)
-        tvNames = [ (n, tv) | tv <- tvs, VarTy _ _ n <- [fromClashType cenv (C.VarTy tv)] ]
-        idNames = [ (n, v, Id.unsafeFromCoreId v)
-                  | v <- ids, Var _ _ n <- [fromClashTerm cenv (C.Var v)] ]
-        ctx = legacyCompCtx (convScope cenv) testTypeEnv supply tvNames idNames
+        idNames = [ (LocalId o ty n, Id.unsafeFromCoreId v)
+                  | v <- ids, Var o ty n <- [fromClashTerm cenv (C.Var v)] ]
+        ctx = compCtxFromList (convScope cenv) testTypeEnv idNames
     in k ctx (map (fromClashTerm cenv) tms)
