@@ -107,8 +107,10 @@ import           Clash.Core.Util
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
-  (InScopeSet, elemInScopeSet, extendInScopeSetList, uniqAway, lookupVarEnv,
+  (InScopeSet, elemInScopeSet, extendInScopeSetList, uniqAway,
    emptyInScopeSet, mkInScopeSet, unionInScope)
+import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
+import           Clash.Core.Scoped.Syntax (mkGlobalId)
 import qualified Clash.Data.UniqMap as UniqMap
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
@@ -1657,7 +1659,7 @@ mkTopUnWrapper
   -> NetlistMonad [Declaration]
 mkTopUnWrapper topEntity annM dstId args tickDecls = do
   -- component name
-  compNameM <- lookupVarEnv topEntity <$> Lens.use componentNames
+  compNameM <- lookupGlobalEnv (mkGlobalId topEntity) <$> Lens.use componentNames
   let
     topName = Id.toText topIdentifier
     topIdentifier = flip fromMaybe compNameM (error [I.i|

@@ -27,7 +27,6 @@ import           Clash.Backend.VHDL
 import           Clash.Backend.Verilog
 import           Clash.Core.Name
 import           Clash.Core.Var
-import           Clash.Core.VarEnv
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
 
@@ -77,7 +76,7 @@ runToNetlistStage target f src = do
       te      = case designEntities design of
                   x:_ -> topId x
                   _ -> error "no design entities"
-      tes2    = mkVarEnv (P.zip (P.map topId (designEntities design)) (designEntities design))
+      tes2    = topEntityEnv (designEntities design)
 
   supplyN <- Supply.newSupply
 
