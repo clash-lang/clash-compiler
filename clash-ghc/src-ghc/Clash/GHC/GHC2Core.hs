@@ -34,6 +34,21 @@ module Clash.GHC.GHC2Core
   , makeAllTyCons
   , emptyGHC2CoreState
   , pendingWarnings
+    -- * For "Clash.GHC.Scoped.GHC2Core"
+  , StructuralType (..)
+  , SrcSpanRB (..)
+  , scopedTypeCache
+  , coreToType
+  , coreToVar
+  , coreToVarType
+  , coreToPrimVar
+  , coreToDataCon
+  , coreToLiteral
+  , addUsefull
+  , addUsefullR
+  , hasPrimCo
+  , isSizedCast
+  , isDataConWrapId
   )
 where
 
@@ -145,6 +160,7 @@ import           Clash.Primitives.Types      hiding (name)
 import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util
 import           Clash.GHC.Util
+import           Clash.GHC.Scoped.Builder    (TyB)
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
@@ -231,6 +247,9 @@ data GHC2CoreState
   -- 'coreToVarType'.
   , _convertedTypeCache :: HashMap StructuralType C.Type
   -- ^ Cache for converted types, keyed on the GHC type. See 'coreToType'.
+  , _scopedTypeCache :: HashMap StructuralType TyB
+  -- ^ Cache for types converted to scoped Core, keyed on the GHC type. See
+  -- 'Clash.GHC.Scoped.GHC2Core.coreToTypeB'.
   , _pendingWarnings :: Seq PendingWarning
   -- ^ Warnings collected while converting, in the order they were reported.
   -- 'C2C' is pure, so it cannot print them itself; the driver reports these
@@ -258,7 +277,7 @@ instance CanWarn C2C where
 
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState =
-  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty Seq.empty
+  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty HashMap.empty Seq.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -751,33 +770,33 @@ coreToTerm primMap unlocs = term
                            <*> mapM (coreToIdSP sp1) tmvs)
             <*> pure e'
 
-    coreToLiteral :: Literal
-                  -> C.Literal
-    coreToLiteral l = case l of
-      LitString  fs  -> C.StringLiteral (Char8.unpack fs)
-      LitChar    c   -> C.CharLiteral c
-      LitRubbish{}   ->
-        error $ "coreToTerm: Encountered LibRubbish. This is a bug in Clash. "
-             ++ "Report on https://github.com/clash-lang/clash-compiler/issues."
-      LitNumber lt i -> case lt of
-        LitNumBigNat  -> C.ByteArrayLiteral (ByteArray (integerToBigNatClamp# i))
-        LitNumInt     -> C.IntLiteral i
-        LitNumInt64   -> C.Int64Literal i
-        LitNumWord    -> C.WordLiteral i
-        LitNumWord64  -> C.Word64Literal i
-        LitNumInt8    -> C.Int8Literal i
-        LitNumInt16   -> C.Int16Literal i
-        LitNumInt32   -> C.Int32Literal i
-        LitNumWord8   -> C.Word8Literal i
-        LitNumWord16  -> C.Word16Literal i
-        LitNumWord32  -> C.Word32Literal i
-      LitFloat r    -> C.FloatLiteral . castFloatToWord32 $ fromRational r
-      LitDouble r   -> C.DoubleLiteral . castDoubleToWord64 $ fromRational r
-      LitNullAddr   -> C.StringLiteral []
+coreToLiteral :: Literal
+              -> C.Literal
+coreToLiteral l = case l of
+  LitString  fs  -> C.StringLiteral (Char8.unpack fs)
+  LitChar    c   -> C.CharLiteral c
+  LitRubbish{}   ->
+    error $ "coreToTerm: Encountered LibRubbish. This is a bug in Clash. "
+         ++ "Report on https://github.com/clash-lang/clash-compiler/issues."
+  LitNumber lt i -> case lt of
+    LitNumBigNat  -> C.ByteArrayLiteral (ByteArray (integerToBigNatClamp# i))
+    LitNumInt     -> C.IntLiteral i
+    LitNumInt64   -> C.Int64Literal i
+    LitNumWord    -> C.WordLiteral i
+    LitNumWord64  -> C.Word64Literal i
+    LitNumInt8    -> C.Int8Literal i
+    LitNumInt16   -> C.Int16Literal i
+    LitNumInt32   -> C.Int32Literal i
+    LitNumWord8   -> C.Word8Literal i
+    LitNumWord16  -> C.Word16Literal i
+    LitNumWord32  -> C.Word32Literal i
+  LitFloat r    -> C.FloatLiteral . castFloatToWord32 $ fromRational r
+  LitDouble r   -> C.DoubleLiteral . castDoubleToWord64 $ fromRational r
+  LitNullAddr   -> C.StringLiteral []
 #if MIN_VERSION_ghc(9,12,0)
-      LitLabel fs _ -> C.StringLiteral (unpackFS fs)
+  LitLabel fs _ -> C.StringLiteral (unpackFS fs)
 #else
-      LitLabel fs _ _ -> C.StringLiteral (unpackFS fs)
+  LitLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 #endif
 
 addUsefull :: SrcSpan
