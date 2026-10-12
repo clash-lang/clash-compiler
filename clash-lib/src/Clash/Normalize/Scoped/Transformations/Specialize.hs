@@ -80,7 +80,7 @@ import qualified Clash.Sized.Internal.Index  as I (Index, fromInteger#)
 import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
 import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 
-import           Clash.Core.DataCon          (DataCon (dcExtTyVars))
+import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)

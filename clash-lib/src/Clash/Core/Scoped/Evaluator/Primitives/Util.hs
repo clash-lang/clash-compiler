@@ -265,7 +265,7 @@ import GHC.Types.Basic (Boxity (..))
 import GHC.Types.Name (getSrcSpan, nameModule_maybe, nameOccName, occNameString)
 import GHC.Unit.Module (moduleName, moduleNameString)
 
-import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.DataCon (DataCon (..), dcLegacyType)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
@@ -829,7 +829,7 @@ mkSomeNat tenv lit resTy = case tyView resTy of
     | Just someNatTc <- lookupTyCon tenv someNatTcNm
     , [someNatDc] <- tyConDataCons someNatTc
     , (_ : _ : Right (C.tyView -> C.TyConApp proxyTcNm [natTy, _]) : _, _)
-        <- C.splitFunForallTy (dcType someNatDc)
+        <- C.splitFunForallTy (dcLegacyType someNatDc)
     , Just proxyTc <- lookupTyCon tenv proxyTcNm
     , [proxyDc] <- tyConDataCons proxyTc
     -> mkApps (Data someNatDc)

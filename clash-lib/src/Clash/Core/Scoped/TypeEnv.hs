@@ -14,25 +14,21 @@
 
   = Transition
 
-  Clash's 'TyCon' and 'DataCon' store closed Clash 'C.Type's, which
-  scoped code needs as scoped types. A t'TypeEnv' caches their conversion, so
-  that every signature is converted at most once per t'TypeEnv':
+  Clash's 'TyCon' stores closed Clash 'C.Type's, which scoped code needs as
+  scoped types. A t'TypeEnv' caches their conversion, so that every signature
+  is converted at most once per t'TypeEnv': for every type constructor of the
+  'TyConMap', its kind, the signature of a newtype ('NewTyConSig') and the
+  equations of a type family ('TyFamEqn').
 
-  * for every type constructor of the 'TyConMap': its kind, the signature of a
-    newtype ('NewTyConSig') and the equations of a type family ('TyFamEqn');
+  The cache is built lazily: making a t'TypeEnv' is cheap, and a signature is
+  only converted when it is first needed.
 
-  * for every data constructor of a type constructor of the 'TyConMap': its
-    signature ('DataConSig') and its type.
-
-  The caches are built lazily: making a t'TypeEnv' is cheap, and a signature
-  is only converted when it is first needed.
-
-  Global variables and primitives carry their scoped types ('globalIdType',
-  'primType').
+  Global variables, primitives and data constructors carry their scoped
+  types ('globalIdType', 'primType', 'dcType' and 'dcSig').
 
   = Migration
 
-  TODO(D4): once 'TyCon' and 'DataCon' store scoped types (decision D4 of the
+  TODO(D4): once 'TyCon' stores scoped types (decision D4 of the
   port), the lookups below read them, and
   a t'TypeEnv' is just the 'TyConMap'. Their users keep working.
 -}
@@ -57,8 +53,8 @@ module Clash.Core.Scoped.TypeEnv
 
 import GHC.Stack (HasCallStack)
 
-import Clash.Core.DataCon (DataCon (dcType))
-import Clash.Core.TyCon (TyCon (tyConKind), TyConMap, TyConName, tyConDataCons)
+import Clash.Core.DataCon (DataCon (dcSig, dcType))
+import Clash.Core.TyCon (TyCon (tyConKind), TyConMap, TyConName)
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 
@@ -73,9 +69,6 @@ data TypeEnv = TypeEnv
   , _teTyCons :: UniqMap TyConInfo
   -- ^ The type constructors, with their converted signatures. Lazy, like the
   -- elements, see the module header.
-  , _teDataCons :: UniqMap DataConInfo
-  -- ^ The data constructors of the type constructors, with their converted
-  -- signatures. Lazy, like the elements.
   }
 
 -- | A type constructor, and its converted signatures
@@ -86,21 +79,11 @@ data TyConInfo = TyConInfo
   , tciTyFamEqns :: Maybe [TyFamEqn]
   }
 
--- | The converted signature and type of a data constructor
-data DataConInfo = DataConInfo
-  { dciSig :: DataConSig
-  , dciType :: Type 'VoidS
-  }
-
--- | The environment of the given type constructors, with the signatures of
--- them and of their data constructors
+-- | The environment of the given type constructors, with their signatures
 mkTypeEnv :: TyConMap -> TypeEnv
 mkTypeEnv tcm = TypeEnv
   { typeEnvTyConMap = tcm
   , _teTyCons = fmap tyConInfo tcm
-  , _teDataCons =
-      UniqMap.fromList
-        [ (dc, dataConInfo dc) | tc <- UniqMap.elems tcm, dc <- tyConDataCons tc ]
   }
  where
   tyConInfo tc = TyConInfo
@@ -109,12 +92,6 @@ mkTypeEnv tcm = TypeEnv
     , tciNewTyConSig = newTyConSig tc
     , tciTyFamEqns = tyFamEqns tc
     }
-
-dataConInfo :: HasCallStack => DataCon -> DataConInfo
-dataConInfo dc = DataConInfo
-  { dciSig = dataConSig dc
-  , dciType = fromClashTypeClosed emptyScope (dcType dc)
-  }
 
 lookupTyConInfo :: TypeEnv -> TyConName -> Maybe TyConInfo
 lookupTyConInfo env tc = UniqMap.lookup tc (_teTyCons env)
@@ -151,15 +128,10 @@ tyFamEqnsOf env tc = lookupTyConInfo env tc >>= tciTyFamEqns
 
 -- * Data constructors
 
--- | The signature of a data constructor, see 'dataConSig'
-dataConSigOf :: HasCallStack => TypeEnv -> DataCon -> DataConSig
-dataConSigOf env dc = case UniqMap.lookup dc (_teDataCons env) of
-  Just dci -> dciSig dci
-  Nothing -> dataConSig dc
+-- | The signature of a data constructor
+dataConSigOf :: TypeEnv -> DataCon -> DataConSig
+dataConSigOf _ = dcSig
 
 -- | The type of a data constructor, in any scope
-dataConType :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> DataCon -> Type n
-dataConType env sc dc = case UniqMap.lookup dc (_teDataCons env) of
-  Just dci -> sinkClosed (dciType dci)
-  Nothing -> fromClashTypeClosed sc (dcType dc)
-
+dataConType :: Distinct n => TypeEnv -> Scope n -> DataCon -> Type n
+dataConType _ _ dc = sinkClosed (dcType dc)

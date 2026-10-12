@@ -24,7 +24,7 @@ import qualified Clash.Core.Subst as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Convert hiding (mkDataCon)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
 import Clash.Core.Scoped.TypeEnv
@@ -64,8 +64,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
 
   , testCase "the signatures of data constructors are those of conversion" $
       forM_ (otherDataCon : dataCons) $ \dc -> do
-        show (dataConSigOf testTypeEnv dc) @?= show (dataConSig dc)
-        assertScopedTyAlphaEq (C.dcType dc) (dataConType testTypeEnv emptyScope dc)
+        show (dataConSigOf testTypeEnv dc) @?= show (C.dcSig dc)
+        assertScopedTyAlphaEq (C.dcLegacyType dc) (dataConType testTypeEnv emptyScope dc)
 
   , testCase "signatures are converted once" $ do
       assertBool "newTyConSigOf"
@@ -95,7 +95,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
             conjoin $
               [ agrees (C.tyConKind tc) (tyConKindOf tenv (C.tyConName tc) `asScopeOf` sc)
               | tc <- UniqMap.elems Gen.tyConMap ] <>
-              [ agrees (C.dcType dc) (dataConType tenv sc dc) | dc <- Gen.dataCons ]
+              [ agrees (C.dcLegacyType dc) (dataConType tenv sc dc) | dc <- Gen.dataCons ]
       ]
   ]
  where

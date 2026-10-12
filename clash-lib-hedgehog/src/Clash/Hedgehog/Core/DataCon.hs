@@ -21,6 +21,7 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Gen.Faker as Gen
 
 import Clash.Core.DataCon
+import Clash.Core.Scoped.Convert (mkDataConFromClash)
 import Clash.Core.Name
 import Clash.Core.TyCon
 import Clash.Core.Type
@@ -83,17 +84,16 @@ genSimpleDataCons tcn univTvs =
   pure . zipWith go [1..]
  where
   go :: ConTag -> DcName -> DataCon
-  go tag name = MkData
-    { dcName = name
-    , dcUniq = nameUniq name
-    , dcTag = tag
-    , dcType = mkTyConApp tcn (fmap VarTy univTvs)
-    , dcUnivTyVars = univTvs
-    , dcExtTyVars = []
-    , dcArgTys = []
-    , dcArgStrict = []
-    , dcFieldLabels = []
-    }
+  go tag name = mkDataConFromClash
+    name
+    (nameUniq name)
+    tag
+    (mkTyConApp tcn (fmap VarTy univTvs))
+    univTvs
+    []
+    []
+    []
+    []
 
 -- | Generate data constructors for a type
 --
@@ -129,17 +129,16 @@ genRecordDataCons tcm tcn univTvs =
     bangs <- traverse (genStrictness tcm) argTys
     fields <- replicateM (length argTys) genFieldLabel
 
-    pure MkData
-      { dcName = name
-      , dcUniq = nameUniq name
-      , dcTag = tag
-      , dcType = ty
-      , dcUnivTyVars = univTvs
-      , dcExtTyVars = []
-      , dcArgTys = argTys
-      , dcArgStrict = bangs
-      , dcFieldLabels = fields
-      }
+    pure $ mkDataConFromClash
+      name
+      (nameUniq name)
+      tag
+      ty
+      univTvs
+      []
+      argTys
+      bangs
+      fields
 
 -- | Generate data constructors for a type which does not match any common
 -- idiom. Since this can generate any possible data constructor, it can
@@ -167,17 +166,16 @@ genAnyDataCons tcm tcn univTvs =
     let (extTvs, argTys) = partitionEithers $ fst (splitFunForallTy ty)
     bangs <- traverse (genStrictness tcm) argTys
 
-    pure MkData
-      { dcName = name
-      , dcUniq = nameUniq name
-      , dcTag = tag
-      , dcType = ty
-      , dcUnivTyVars = univTvs
-      , dcExtTyVars = extTvs
-      , dcArgTys = argTys
-      , dcArgStrict = bangs
-      , dcFieldLabels = []
-      }
+    pure $ mkDataConFromClash
+      name
+      (nameUniq name)
+      tag
+      ty
+      univTvs
+      extTvs
+      argTys
+      bangs
+      []
 
 -- TODO genGadt, which can insert ~# arguments after the existential type
 -- variables are introduced. I may also want a `genConstraints` in

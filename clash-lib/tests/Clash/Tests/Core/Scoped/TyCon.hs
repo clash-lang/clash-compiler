@@ -19,7 +19,7 @@ import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Convert hiding (mkDataCon)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
 

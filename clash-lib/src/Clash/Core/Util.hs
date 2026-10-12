@@ -418,18 +418,18 @@ dataConInstArgTysE
   -> DataCon
   -> [Type]
   -> Maybe [Type]
-dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst_tys = do
+dataConInstArgTysE is0 tcm dc inst_tys = do
   -- TODO: Check if all existentials were solved (they should be, or the wouldn't have
   -- TODO: been solved in the caseElemExistentials transformation)
-  let is1   = extendInScopeSetList is0 dcExtTyVars
+  let is1   = extendInScopeSetList is0 dcExtTyVars'
       is2   = unionInScope is1 (mkInScopeSet (freeVarsOf inst_tys))
-      subst = extendTvSubstList (mkSubst is2) (zipEqual dcUnivTyVars inst_tys)
+      subst = extendTvSubstList (mkSubst is2) (zipEqual dcUnivTyVars' inst_tys)
   go
-    (substGlobalsInExistentials is0 dcExtTyVars (zipEqual dcUnivTyVars inst_tys))
-    (map (substTy subst) dcArgTys)
+    (substGlobalsInExistentials is0 dcExtTyVars' (zipEqual dcUnivTyVars' inst_tys))
+    (map (substTy subst) dcArgTys')
 
  where
-  exts = mkVarSet dcExtTyVars
+  exts = mkVarSet dcExtTyVars'
   go
     :: [TyVar]
     -- ^ Existentials
@@ -450,6 +450,10 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
           subst = extendTvSubstList (mkSubst is2) sols
           args1 = map (substTy subst) args0
 
+  dcUnivTyVars' = dcUnivTyVars dc
+  dcExtTyVars' = dcExtTyVars dc
+  dcArgTys' = dcArgTys dc
+
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
 -- type are substituted for the list of types. The argument types are returned.
@@ -457,12 +461,12 @@ dataConInstArgTysE is0 tcm (MkData { dcArgTys, dcExtTyVars, dcUnivTyVars }) inst
 -- The list of types should be equal to the number of type variables, otherwise
 -- @Nothing@ is returned.
 dataConInstArgTys :: DataCon -> [Type] -> Maybe [Type]
-dataConInstArgTys (MkData { dcArgTys, dcUnivTyVars, dcExtTyVars }) inst_tys =
+dataConInstArgTys dc inst_tys =
   -- TODO: Check if inst_tys do not contain any free variables on call sites. If
   -- TODO: they do, this function is unsafe to use.
-  let tyvars = dcUnivTyVars ++ dcExtTyVars in
+  let tyvars = dcUnivTyVars dc ++ dcExtTyVars dc in
   if length tyvars == length inst_tys then
-    Just (map (substTyWith tyvars inst_tys) dcArgTys)
+    Just (map (substTyWith tyvars inst_tys) (dcArgTys dc))
   else
     Nothing
 

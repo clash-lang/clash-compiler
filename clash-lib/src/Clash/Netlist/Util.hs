@@ -74,7 +74,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Annotations.Primitive (HDL(VHDL))
 import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
-import           Clash.Core.DataCon      (DataCon (..))
+import           Clash.Core.DataCon      (DataCon (..), dcArgTys, dcExtTyVars, dcUnivTyVars)
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (dependencySortTyVars, typeFreeVars, typeFreeVars')
 import           Clash.Core.HasFreeVars  (elemFreeVars, freeVarsOf)

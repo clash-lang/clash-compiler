@@ -25,7 +25,7 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 
 import Clash.Core.Scoped.Alpha
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Convert hiding (mkDataCon)
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 

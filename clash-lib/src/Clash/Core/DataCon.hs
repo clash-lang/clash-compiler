@@ -8,7 +8,7 @@
   Data Constructors in CoreHW
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -18,22 +18,41 @@ module Clash.Core.DataCon
   , DcName
   , ConTag
   , DcStrictness(..)
+    -- * Transition
+  , LegacyDataCon (..)
+  , dcLegacyType
+  , dcUnivTyVars
+  , dcExtTyVars
+  , dcArgTys
   )
 where
 
 import Control.DeepSeq                        (NFData(..))
-import Data.Binary                            (Binary)
+import Data.Binary                            (Binary (..))
 import Data.Function                          (on)
 import Data.Hashable                          (Hashable (hashWithSalt))
 import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
 import Clash.Core.Name                        (Name (..))
+import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkDataConFromClash)
+import Clash.Core.Scoped.Sig                  (DataConSig)
+import qualified Clash.Core.Scoped.Syntax     as Scoped
 import {-# SOURCE #-} Clash.Core.Type         (Type)
 import Clash.Core.Var                         (TyVar)
 import Clash.Unique
 
 -- | Data Constructor
+--
+-- = Transition
+--
+-- The scoped fields, 'dcType' and 'dcSig', are the truth. 'dcLegacy' holds
+-- the types of the data constructor as Clash Core's types, for the code that
+-- still uses Clash Core. It is derived lazily, and is deleted with Clash Core
+-- (package B of the port). Make data constructors with
+-- 'Clash.Core.Scoped.Convert.mkDataCon' or
+-- 'Clash.Core.Scoped.Convert.mkDataConFromClash', which derive the side they
+-- are not given.
 data DataCon
   = MkData
   { dcName :: !DcName
@@ -42,24 +61,80 @@ data DataCon
   -- ^ Invariant: forall x . dcUniq x ~ nameUniq (dcName x)
   , dcTag :: !ConTag
   -- ^ Syntactical position in the type definition
-  , dcType :: !Type
-  -- ^ Type of the 'DataCon
-  , dcUnivTyVars :: [TyVar]
-  -- ^ Universally quantified type-variables, these type variables are also part
-  -- of the result type of the DataCon
-  , dcExtTyVars :: [TyVar]
-  -- ^ Existentially quantified type-variables, these type variables are not
-  -- part of the result of the DataCon, but only of the arguments.
-  , dcArgTys :: [Type]
-  -- ^ Argument types
+  , dcType :: Scoped.Type 'Scoped.VoidS
+  -- ^ Type of the 'DataCon', which is closed. Lazy.
+  , dcSig :: DataConSig
+  -- ^ Its universally and existentially quantified type variables, and the
+  -- types of its fields, see "Clash.Core.Scoped.Sig". The universally
+  -- quantified type variables are also part of the result type of the
+  -- 'DataCon', the existentially quantified ones are not. Lazy.
   , dcArgStrict :: [DcStrictness]
   -- ^ Argument strictness
   , dcFieldLabels :: [Text.Text]
   -- ^ Names of fields. Used when data constructor is referring to a record type.
-  } deriving (Generic,NFData,Binary)
+  , dcLegacy :: LegacyDataCon
+  -- ^ Transitional, see above. Lazy.
+  }
+
+-- | The types of a data constructor as Clash Core's types. Transitional, see
+-- 'DataCon'.
+data LegacyDataCon
+  = LegacyDataCon
+  { ldcType :: !Type
+  -- ^ Type of the 'DataCon'
+  , ldcUnivTyVars :: [TyVar]
+  -- ^ Universally quantified type-variables, these type variables are also part
+  -- of the result type of the DataCon
+  , ldcExtTyVars :: [TyVar]
+  -- ^ Existentially quantified type-variables, these type variables are not
+  -- part of the result of the DataCon, but only of the arguments.
+  , ldcArgTys :: [Type]
+  -- ^ Argument types
+  }
+
+-- | The type of a data constructor, as a type of Clash Core. Transitional, see
+-- 'DataCon'.
+dcLegacyType :: DataCon -> Type
+dcLegacyType = ldcType . dcLegacy
+
+-- | Transitional, see 'DataCon' and 'ldcUnivTyVars'
+dcUnivTyVars :: DataCon -> [TyVar]
+dcUnivTyVars = ldcUnivTyVars . dcLegacy
+
+-- | Transitional, see 'DataCon' and 'ldcExtTyVars'
+dcExtTyVars :: DataCon -> [TyVar]
+dcExtTyVars = ldcExtTyVars . dcLegacy
+
+-- | Transitional, see 'DataCon' and 'ldcArgTys'
+dcArgTys :: DataCon -> [Type]
+dcArgTys = ldcArgTys . dcLegacy
 
 instance Show DataCon where
   show = show . dcName
+
+-- | Doesn't force the types, which are derived lazily (see 'DataCon')
+instance NFData DataCon where
+  rnf dc =
+    rnf (dcName dc) `seq` rnf (dcTag dc) `seq` rnf (dcArgStrict dc)
+      `seq` rnf (dcFieldLabels dc)
+
+-- | Transitional: through the types of Clash Core, in the format of the
+-- derived instance of the data constructors of Clash Core, so that the
+-- serialized inputs and the hashes of the manifest stay the same
+instance Binary DataCon where
+  put dc = do
+    put (dcName dc)
+    put (dcUniq dc)
+    put (dcTag dc)
+    put (dcLegacyType dc)
+    put (dcUnivTyVars dc)
+    put (dcExtTyVars dc)
+    put (dcArgTys dc)
+    put (dcArgStrict dc)
+    put (dcFieldLabels dc)
+  get =
+    mkDataConFromClash
+      <$> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get
 
 instance Eq DataCon where
   (==) = (==) `on` dcUniq

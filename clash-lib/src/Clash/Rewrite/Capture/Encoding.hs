@@ -62,7 +62,9 @@ import           Unsafe.Coerce            (unsafeCoerce)
 
 import           GHC.SrcLoc.Extra         ()
 
-import           Clash.Core.DataCon       (DataCon (..))
+import           Clash.Core.DataCon
+  (DataCon (..), dcArgTys, dcExtTyVars, dcLegacyType, dcUnivTyVars)
+import           Clash.Core.Scoped.Convert (mkDataConFromClash)
 import           Clash.Core.Term
 import           Clash.Core.Type          (Type (..))
 import           Clash.Core.Var           (Var (..))
@@ -151,10 +153,11 @@ var e v0 = shared e encVars enc (unsafeCoerce v0)
     Id nm u t sc -> tag e 1 >> bin e nm >> bin e u >> ty e t >> bin e sc
 
 dataCon :: Enc -> DataCon -> IO ()
-dataCon e = shared e encDataCons $ \(MkData nm u t dcTy univ ext args strict labels) -> do
-  bin e nm >> bin e u >> bin e t >> ty e dcTy
-  list e (var e) univ >> list e (var e) ext >> list e (ty e) args
-  bin e strict >> bin e labels
+dataCon e = shared e encDataCons $ \dc -> do
+  bin e (dcName dc) >> bin e (dcUniq dc) >> bin e (dcTag dc) >> ty e (dcLegacyType dc)
+  list e (var e) (dcUnivTyVars dc) >> list e (var e) (dcExtTyVars dc)
+  list e (ty e) (dcArgTys dc)
+  bin e (dcArgStrict dc) >> bin e (dcFieldLabels dc)
 
 prim :: Enc -> PrimInfo -> IO ()
 prim e = shared e encPrims $ \(PrimInfo nm t wi multi unf) -> do
@@ -337,7 +340,7 @@ dVar = unsafeCoerce <$> dShared decVars (\s t -> s {decVars = t}) (dTag >>= \cas
 
 dDataCon :: D DataCon
 dDataCon = dShared decDataCons (\s t -> s {decDataCons = t}) $
-  MkData <$> dBin <*> dBin <*> dBin <*> dType
+  mkDataConFromClash <$> dBin <*> dBin <*> dBin <*> dType
          <*> dList dVar <*> dList dVar <*> dList dType
          <*> dBin <*> dBin
 

@@ -26,7 +26,7 @@ import Prettyprinter (hsep)
 import Data.Text.Prettyprint.Doc (hsep)
 #endif
 
-import Clash.Core.DataCon (DataCon, dcType)
+import Clash.Core.DataCon (DataCon, dcLegacyType)
 import Clash.Core.FreeVars (freeLocalIds)
 import Clash.Core.HasType
 import Clash.Core.Literal (Literal(CharLiteral))
@@ -332,7 +332,7 @@ instance InferType Value where
     go = \case
       Lambda i t -> mkFunTy (coreTypeOf i) (inferCoreTypeOf tcm t)
       TyLambda v t -> ForAllTy v (inferCoreTypeOf tcm t)
-      DC dc args -> applyTypeToArgs (mkApps (Data dc) args) tcm (dcType dc) args
+      DC dc args -> applyTypeToArgs (mkApps (Data dc) args) tcm (dcLegacyType dc) args
       Lit l -> coreTypeOf l
       PrimVal p tys vals ->
         let args = map Right tys ++ map (Left . valToTerm) vals

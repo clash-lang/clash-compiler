@@ -41,7 +41,7 @@ import qualified GHC.Stack.Types
 import GHC.Word                         (Word8, Word16, Word32, Word64)
 import Language.Haskell.TH.Syntax       (showName)
 
-import Clash.Core.DataCon               (DataCon (..))
+import Clash.Core.DataCon               (dcArgTys)
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (tyConDataCons)

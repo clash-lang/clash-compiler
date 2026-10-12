@@ -49,7 +49,7 @@ import           GHC.Builtin.Names   (trueDataConKey, falseDataConKey)
 import qualified GHC.Core.TyCon      as TyCon
 import           GHC.Builtin.Types   (tupleTyCon)
 
-import           Clash.Core.DataCon  (DataCon (..))
+import           Clash.Core.DataCon  (DataCon (..), dcLegacyType)
 import           Clash.Core.Evaluator.Types
 import Clash.Core.HasType (piResultTys)
 import           Clash.Core.Literal  (Literal (..))
@@ -535,7 +535,7 @@ mkSomeNat tcm lit resTy =
 
   -- Get the Proxy data constructor
   (_:_:Right (tyView -> TyConApp proxyTcNm [natTy,_]):_,_) =
-    splitFunForallTy (dcType someNatDc)
+    splitFunForallTy (dcLegacyType someNatDc)
   (Just proxyTc) = UniqMap.lookup proxyTcNm tcm
   [proxyDc] = tyConDataCons proxyTc
 
