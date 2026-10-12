@@ -75,14 +75,18 @@ separateArgumentsSpineWorker (TransformContext is0 _) e@(collectArgsTicks -> (Va
   | isGlobalId g = do
   -- We ensure that both the type of the global variable reference is updated
   -- to take into account the changed arguments, and that we apply the global
-  -- function with the split apart arguments.
+  -- function with the split apart arguments. The global can be applied to
+  -- fewer arguments than it has parameters, whose types we keep, or to more,
+  -- when its result type is a type variable instantiated with a function
+  -- type, which we keep applied.
   let (argTys0,resTy) = splitFunForallTy (coreTypeOf g)
   (concat -> args1, Monoid.getAny -> hasChanged)
     <- listen (mapM (uncurry splitArg) (zip argTys0 args))
   if hasChanged then
     let (argTys1,args2) = unzip args1
-        gTy = mkPolyFunTy resTy argTys1
-    in  return (mkApps (mkTicks (Var g {varType = gTy}) ticks) args2)
+        gTy = mkPolyFunTy resTy (argTys1 ++ drop (length args) argTys0)
+        args3 = args2 ++ drop (length argTys0) args
+    in  return (mkApps (mkTicks (Var g {varType = gTy}) ticks) args3)
   else
     return e
 
@@ -99,9 +103,9 @@ separateArgumentsSpineWorker (TransformContext is0 _) e@(collectArgsTicks -> (Va
     tcm <- Lens.view tcCache
     let argTy = inferCoreTypeOf tcm tmArg
     case shouldSplit tcm argTy of
-      Just (_,Projections projections,_) -> do
+      Just (_,Projections projections,fieldTys) -> do
         tmArgs <- projections is0 tmArg
-        changed (map ((ty,) . Left) tmArgs)
+        changed (zip (map Right fieldTys) (map Left tmArgs))
       _ ->
         return [(ty,arg)]
 
