@@ -62,7 +62,7 @@ mkExpr
   -> Term n
   -> NetlistMonad (Expr, [Declaration])
 
-mkNetDecl :: CompCtx n -> (LocalId n, Term n) -> NetlistMonad [Declaration]
+mkNetDecl :: Distinct n => CompCtx n -> (LocalId n, Term n) -> NetlistMonad [Declaration]
 
 mkFunApp
   :: (HasCallStack, Distinct n)
