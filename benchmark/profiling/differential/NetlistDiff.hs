@@ -24,6 +24,7 @@ module NetlistDiff
 import           Control.Exception            (SomeException, displayException, evaluate, try)
 import           Control.Monad                (unless)
 import           Data.Binary                  (decode)
+import           Data.Char                    (isAlphaNum, isDigit)
 import qualified Data.ByteString.Lazy         as B
 import qualified Data.Map.Ordered             as OMap
 import           Data.Maybe                   (fromMaybe)
@@ -143,7 +144,9 @@ compareComponentMaps cmA cmB = align (OMap.assocs cmA) (OMap.assocs cmB)
 
 -- | Render a value, up to the first exception. Netlists contain thunks that
 -- error when forced, e.g. the expressions of function arguments of blackboxes
--- (see 'Clash.Netlist.BlackBox.mkArgument'), that are never rendered.
+-- (see 'Clash.Netlist.BlackBox.mkArgument'), that are never rendered. The
+-- source location at the start of an error message ('Clash.Util.curLoc') is
+-- left out, as it differs between the two implementations.
 safeShow :: Show a => a -> String
 safeShow = go . show
  where
@@ -151,12 +154,17 @@ safeShow = go . show
     r <- try (evaluate (forceHead s))
     pure $ case r of
       Left (e :: SomeException) ->
-        "<exception: " <> takeWhile (/= '\n') (displayException e) <> ">"
+        "<exception: " <> dropCurLoc (takeWhile (/= '\n') (displayException e)) <> ">"
       Right [] -> []
       Right (c : cs) -> c : go cs
   forceHead xs = case xs of
     c : _ -> c `seq` xs
     [] -> xs
+
+  -- Drops a prefix "Module.Name(123): "
+  dropCurLoc msg = case span (\c -> isAlphaNum c || c == '.' || c == '_') msg of
+    (_ : _, '(' : rest) | (_ : _, ')' : ':' : ' ' : msg') <- span isDigit rest -> msg'
+    _ -> msg
 
 -- | A difference between two renderings: the context around the first
 -- character at which they differ
