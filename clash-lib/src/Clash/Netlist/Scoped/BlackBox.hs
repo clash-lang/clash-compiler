@@ -21,9 +21,6 @@
   The result of a blackbox is not always a local variable: it can be a signal
   that Netlist generation made up. Internally, a result is therefore given by
   its HDL identifier and its type ('ResId').
-
-  The plurality of function arguments is still determined on Clash Core,
-  TODO(Phase 5, Primitives).
 -}
 
 {-# LANGUAGE CPP #-}
@@ -103,7 +100,7 @@ import           Clash.Netlist.Util
    stripFiltered, stripVoid)
 import           Clash.Normalize.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
-import qualified Clash.Primitives.Util         as P
+import           Clash.Primitives.Scoped.Util  (getFunctionPlurality)
 import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Util                    (ClashException (..), curLoc, indexNote)
 import qualified Clash.Util.Interpolate        as I
@@ -213,11 +210,7 @@ mkBlackBoxContextRes ctx bbName declType resIds args@(lefts -> termArgs) = do
         funcPlurality <-
           case extractPrim <$> prim of
             Just (Just p) ->
-              -- TODO(Phase 5, Primitives): use the scoped
-              -- 'Clash.Primitives.Scoped.Util.getFunctionPlurality' of the
-              -- Primitives port
-              P.getFunctionPlurality p (toLegacyArgs ctx args)
-                (map (toLegacyType ctx) resTys) i
+              getFunctionPlurality ctx p args resTys i
             _ ->
               pure 1
 
