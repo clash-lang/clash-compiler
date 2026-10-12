@@ -6,17 +6,30 @@
   Tests for "Clash.Netlist.Util"
 -}
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module Clash.Tests.Netlist.Util (tests) where
 
+import Control.Monad.State.Strict (runState)
+import qualified Data.Map.Strict as Map
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User))
+import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+import Clash.Core.Name (NameSort (User), nameOcc)
 import Clash.Core.Term (Bind (..), Term (..), mkApps, mkLams)
-import Clash.Netlist.Util (splitNormalized)
+import qualified Clash.Core.Type as C
+import Clash.Core.Scoped.Type (TypeView (..), tyView)
+import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
+import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Netlist.Types
+  (FilteredHWType (..), HWMap, HWType (..), HWTypeTranslator (..))
+import Clash.Netlist.Util (coreTypeToHWType, splitNormalized, withLegacyType)
 import Clash.Unique (Unique)
 
-import Test.Clash.Rewrite (assertAlphaEq, globalId, intFunTy, intId)
+import Test.Clash.Rewrite
+  ( assertAlphaEq, existentialDataCon, existentialTy, globalId, intFunTy, intId
+  , intTy, intTyCon, maybeTy, mkAlgTyCon, parseTyConName, testTyConMap, tyVar )
 
 -- | Apply the global function with the given name and unique to the given
 -- arguments
@@ -72,6 +85,51 @@ splitNormalizedNestedNonRec = do
   y = intId User "y" 1
   y' = intId User "y'" 2
 
+-- | Translates @Int@ to a 64-bit signed number, and nothing else
+intTranslator :: HWTypeTranslator
+intTranslator = HWTypeTranslator $ \_reprs _te _sc ty -> pure $ case tyView ty of
+  TyConApp tc [] | nameOcc tc == "Int" -> Just (Right (FilteredHWType (Signed 64) []))
+  _ -> Nothing
+
+-- | The test types, and @E@ with its constructor @MkE :: forall b. b -> E@
+translationTypeEnv :: TypeEnv
+translationTypeEnv = mkTypeEnv $
+  UniqMap.insert (parseTyConName "E") (mkAlgTyCon (parseTyConName "E") [] [existentialDataCon]) $
+  UniqMap.insert (parseTyConName "Int") intTyCon testTyConMap
+
+-- | Translate types of Clash Core in turn, starting from an empty cache
+translate :: [C.Type] -> ([Either String FilteredHWType], HWMap)
+translate tys = flip runState mempty $
+  mapM (\ty -> withLegacyType ty (coreTypeToHWType intTranslator (buildCustomReprs []) translationTypeEnv)) tys
+
+translationTests :: [TestTree]
+translationTests =
+  [ testCase "an algebraic data type is a sum of products" $
+      case translate [maybeTy intTy] of
+        ([Right (FilteredHWType (SP _ [(_, []), (_, [Signed 64])]) _)], _) -> pure ()
+        r -> assertFailure ("unexpected translation: " <> show (fst r))
+
+  , testCase "the field types of a constructor with an existential are not cached" $
+      -- The field of MkE has the type of the existentially quantified type
+      -- variable, which can't be translated
+      case translate [existentialTy] of
+        ([Left _], cache) -> Map.size cache @?= 1
+        r -> assertFailure ("unexpected translation: " <> show (fst r))
+
+  , testCase "open types are not cached" $
+      let a = tyVar User "a" 70
+      in case translate [maybeTy (C.VarTy a)] of
+           ([Left _], cache) -> Map.size cache @?= 0
+           r -> assertFailure ("unexpected translation: " <> show (fst r))
+
+  , testCase "alpha-equivalent types share their cache entry" $
+      let a = tyVar User "a" 70
+          b = tyVar User "b" 71
+      in case translate [C.ForAllTy a (maybeTy (C.VarTy a)), C.ForAllTy b (maybeTy (C.VarTy b))] of
+           ([Left _, Left _], cache) -> Map.size cache @?= 1
+           r -> assertFailure ("unexpected translation: " <> show (fst r))
+  ]
+
 tests :: TestTree
 tests =
   testGroup
@@ -80,4 +138,5 @@ tests =
         splitNormalizedNonRec
     , testCase "splitNormalized renames a nested NonRec binder its right-hand side refers to"
         splitNormalizedNestedNonRec
+    , testGroup "coreTypeToHWType" translationTests
     ]

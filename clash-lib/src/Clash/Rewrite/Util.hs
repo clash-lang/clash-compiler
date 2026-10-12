@@ -85,7 +85,7 @@ import           Clash.Driver.Types
   (TransformationInfo(..), DebugOpts(..), BindingMap, Binding(..), IsPrim(..),
   ClashEnv(..), ClashOpts(..), hasDebugInfo, isDebugging)
 import           Clash.Netlist.Types         (HWMap)
-import           Clash.Netlist.Util          (representableTypeState)
+import           Clash.Netlist.Util          (representableTypeState, withLegacyType)
 import           Clash.Pretty                (clashPretty, showDoc)
 import           Clash.Rewrite.Capture       (captureEnabled, recordCapture)
 import           Clash.Rewrite.Types
@@ -921,8 +921,9 @@ isUntranslatableType
 isUntranslatableType stringRepresentable ty = do
   tt <- Lens.view typeTranslator
   reprs <- Lens.view customReprs
-  tcm <- Lens.view tcCache
-  not <$> runWithHWTypeCache (representableTypeState tt reprs stringRepresentable tcm ty)
+  te <- Lens.view scopedTypeEnv
+  not <$> runWithHWTypeCache
+    (withLegacyType ty (representableTypeState tt reprs stringRepresentable te))
 
 normalizeTermTypes :: TyConMap -> Term -> Term
 normalizeTermTypes tcm e = case e of

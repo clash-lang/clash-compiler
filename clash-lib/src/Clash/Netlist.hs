@@ -31,7 +31,7 @@ import           GHC.Num.Integer                  (Integer(..))
 import           GHC.Num.Natural                  (Natural(..))
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.Reader             (runReaderT)
-import           Control.Monad.State.Strict       (State, evalState, runStateT, runState)
+import           Control.Monad.State.Strict       (evalState, runStateT, runState)
 import           Data.Bifunctor                   (first, second)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
@@ -110,8 +110,7 @@ genNetlist
   -- ^ TopEntity annotations
   -> GlobalEnv Identifier
   -- ^ Top entity names
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -- ^ Hardcoded Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
@@ -144,8 +143,7 @@ runNetlistMonad
   -- ^ Global binders
   -> GlobalEnv TopEntityT
   -- ^ TopEntity annotations
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -- ^ Hardcode Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
@@ -175,8 +173,7 @@ runNetlistMonad'
   -- ^ Global binders
   -> GlobalEnv TopEntityT
   -- ^ TopEntity annotations
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -- ^ Hardcode Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions

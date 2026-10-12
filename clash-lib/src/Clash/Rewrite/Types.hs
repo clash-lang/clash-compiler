@@ -27,7 +27,6 @@ import Control.Lens                          (use, (.=))
 import qualified Control.Lens as Lens
 import Control.Monad.Fix                     (MonadFix)
 import Control.Monad.IO.Class                (MonadIO)
-import Control.Monad.State.Strict            (State)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Trans.RWS.CPS           (RWST)
@@ -44,7 +43,6 @@ import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Clash.Core.Term           (Term, Context)
-import Clash.Core.Type           (Type)
 import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
@@ -53,7 +51,7 @@ import Clash.Driver.Types
 import Clash.Core.Scoped.NameMap (GlobalEnv)
 import qualified Clash.Core.Scoped.Syntax as S
 import Clash.Driver.Warning      (CanWarn)
-import Clash.Netlist.Types       (FilteredHWType, HWMap)
+import Clash.Netlist.Types       (HWMap, HWTypeTranslator)
 import Clash.Primitives.Types    (CompiledPrimMap)
 import Clash.Util
 import Clash.Util.Supply         (Supply, freshId)
@@ -122,10 +120,7 @@ data RewriteEnv
   = RewriteEnv
   { _clashEnv       :: ClashEnv
   -- ^ The global environment of the compiler
-  , _typeTranslator :: CustomReprs
-                    -> TyConMap
-                    -> Type
-                    -> State HWMap (Maybe (Either String FilteredHWType))
+  , _typeTranslator :: HWTypeTranslator
   -- ^ Hardcode Type -> FilteredHWType translator
   , _evaluator      :: WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF

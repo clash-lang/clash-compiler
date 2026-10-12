@@ -82,12 +82,12 @@ import Clash.Core.VarEnv
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
-import Clash.Netlist.Util (coreTypeToHWType)
+import Clash.Netlist.Util (coreTypeToHWType, withLegacyType)
 import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, customReprs, debugOpts, tcCache
+  ( TransformContext(..), bindings, curFun, customReprs, debugOpts, scopedTypeEnv, tcCache
   , typeTranslator, workFreeBinders)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatableType, runWithHWTypeCache, whnfRW)
@@ -342,7 +342,9 @@ caseCon' ctx@(TransformContext is0 _) e subj ty alts = do
         let subjTy = inferCoreTypeOf tcm subj
         tran <- Lens.view typeTranslator
         reprs <- Lens.view customReprs
-        subjHwty <- runWithHWTypeCache (coreTypeToHWType tran reprs tcm subjTy)
+        te <- Lens.view scopedTypeEnv
+        subjHwty <- runWithHWTypeCache
+          (withLegacyType subjTy (coreTypeToHWType tran reprs te))
         case subjHwty of
           Right (FilteredHWType (Void (Just hty)) _areVoids)
             | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]

@@ -33,7 +33,6 @@ import           Control.Monad                    (unless, foldM, forM)
 import           Control.Monad.Catch              (MonadThrow (throwM), try)
 import           Control.Monad.Extra              (whenM, ifM, unlessM)
 import           Control.Monad.State              (evalState, get)
-import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
 import qualified Crypto.Hash.SHA256               as Sha256
 import           Data.Bifunctor                   (bimap, first, second)
@@ -90,8 +89,6 @@ import           GHC.BasicTypes.Extra             ()
 
 import           Clash.Annotations.Primitive
   (HDL (..), extractPrim)
-import           Clash.Annotations.BitRepresentation.Internal
-  (CustomReprs)
 import           Clash.Annotations.TopEntity
   (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
@@ -120,7 +117,7 @@ import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           Clash.Netlist.Scoped.Types       (SomeBlackBoxFunction (..))
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
-  (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
+  (IdentifierText, BlackBox (..), Component (..), HWTypeTranslator, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
@@ -128,6 +125,7 @@ import           Clash.Normalize                  (checkNonRecursive, cleanupGra
 import           Clash.Core.Scoped.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
 import           Clash.Core.Scoped.Syntax         (mkGlobalId)
+import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
 import           Clash.Normalize.Scoped.Util      (callGraph)
 import           Clash.Normalize.Util             (tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
@@ -308,8 +306,7 @@ generateHDL
   => ClashEnv
   -> ClashDesign
   -> Maybe backend
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF
@@ -469,8 +466,8 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
       -- XXX: Because the types are split to match, reported errors may refer to
       --      ports the user didn't directly write.
       evaluate
-        (checkTopEntityPorts typeTrans (envCustomReprs env) (envTyConMap env)
-           topEntity annM)
+        (checkTopEntityPorts typeTrans (envCustomReprs env)
+           (mkTypeEnv (envTyConMap env)) topEntity annM)
 
       -- 3. Normalize topEntity
       supplyN <- Supply.newSupply
@@ -1195,8 +1192,7 @@ normalizeEntity
   :: ClashEnv
   -> GlobalBindings
   -- ^ All bindings
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF

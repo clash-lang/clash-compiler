@@ -98,14 +98,13 @@ import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
 import Clash.Rewrite.Types
-  ( curFun, customReprs, debugOpts, scopedTypeEnv, tcCache, typeTranslator)
+  ( curFun, customReprs, debugOpts, scopedTypeEnv, typeTranslator)
 import Clash.Util (curLoc)
 import Clash.Warning (ClashWarning(WarnUnmatchableConstant))
 
 import Clash.XException (errorX)
 
 import Clash.Core.Scoped.Alpha (aeqTm, commonAltBody)
-import Clash.Core.Scoped.Convert (toClashType)
 import Clash.Core.Scoped.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.EqSolver (isAbsurdPat, solvePatExistentials)
 import Clash.Core.Scoped.FreeVars (freeTmVars)
@@ -295,11 +294,10 @@ caseCon' ctx e subj ty alts = do
       -- or a primitive for which the evaluator doesn't have any evaluation
       -- rules.
       _ -> do
-        let subjTy = toClashType (inferCoreTypeOf te sc subj)
-        tcm <- Lens.view tcCache
+        let subjTy = inferCoreTypeOf te sc subj
         tran <- Lens.view typeTranslator
         reprs <- Lens.view customReprs
-        subjHwty <- runWithHWTypeCache (coreTypeToHWType tran reprs tcm subjTy)
+        subjHwty <- runWithHWTypeCache (coreTypeToHWType tran reprs te sc subjTy)
         case subjHwty of
           Right (FilteredHWType (Void (Just hty)) _areVoids)
             | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]

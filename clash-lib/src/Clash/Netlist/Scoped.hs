@@ -53,7 +53,6 @@ import qualified Control.Lens                     as Lens
 import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.State.Strict       (State)
 import           Data.Bifunctor                   (first, second)
 import           Data.Either                      (partitionEithers, rights)
 import           Data.Char                        (ord)
@@ -81,7 +80,6 @@ import qualified Clash.Core.Name                  as C (nameLoc, nameOcc)
 import qualified Clash.Core.Term                  as C
 import qualified Clash.Core.Type                  as C
 import qualified Clash.Core.Util                  as C (splitShouldSplit)
-import           Clash.Core.TyCon                 (TyConMap)
 import qualified Clash.Core.Var                   as C
 import           Clash.Driver.Types
   (Binding (..), ClashEnv (..), ClashOpts (..), GlobalBindings)
@@ -137,8 +135,7 @@ genNetlist
   -- ^ TopEntity annotations
   -> GlobalEnv Identifier
   -- ^ Top entity names
-  -> (CustomReprs -> TyConMap -> C.Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -- ^ Hardcoded Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
