@@ -544,6 +544,7 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.Subst
                  Clash.Tests.Core.Scoped.Term
                  Clash.Tests.Core.Scoped.TermInfo
+                 Clash.Tests.Core.Scoped.TermLiteral
                  Clash.Tests.Core.Scoped.TyCon
                  Clash.Tests.Core.Scoped.Type
                  Clash.Tests.Core.Scoped.TypeEnv
