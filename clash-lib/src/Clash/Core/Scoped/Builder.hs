@@ -52,7 +52,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Clash.GHC.Scoped.Builder
+module Clash.Core.Scoped.Builder
   ( -- * Keys
     Key
   , uniqueKey
@@ -235,13 +235,13 @@ clashTyB ty0
     C.AppTy t1 t2 -> AppTy (goClosed t1) (goClosed t2)
     C.LitTy l -> LitTy l
     C.AnnType attrs t -> AnnType attrs (goClosed t)
-    ty -> error ("Clash.GHC.Scoped.Builder.clashTyB: not closed: " ++ show ty)
+    ty -> error ("Clash.Core.Scoped.Builder.clashTyB: not closed: " ++ show ty)
 
   go :: Distinct n => BEnv s n -> C.Type -> ST s (Type n)
   go env@(BEnv _ tys _ _) = \case
     C.VarTy tv -> case IntMap.lookup (uniqueKey (C.varUniq tv)) tys of
       Just ty -> pure ty
-      Nothing -> error ("Clash.GHC.Scoped.Builder: type variable not in scope: " ++ show (C.varName tv))
+      Nothing -> error ("Clash.Core.Scoped.Builder: type variable not in scope: " ++ show (C.varName tv))
     C.ConstTy c -> pure (ConstTy c)
     C.ForAllTy tv t -> do
       k <- go env (C.varType tv)
@@ -276,7 +276,7 @@ term = TmB Nothing
 varB :: HasCallStack => Key -> TmB
 varB !key = term $ Run $ \(BEnv _ _ tms _) -> case IntMap.lookup key tms of
   Just tm -> pure tm
-  Nothing -> error ("Clash.GHC.Scoped.Builder: variable not in scope: " ++ show key)
+  Nothing -> error ("Clash.Core.Scoped.Builder: variable not in scope: " ++ show key)
 
 globalB :: GlobalId -> TmB
 globalB !g = term (Run (\_ -> pure (GlobalVar g)))

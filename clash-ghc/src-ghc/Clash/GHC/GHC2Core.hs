@@ -160,7 +160,7 @@ import           Clash.Primitives.Types      hiding (name)
 import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util
 import           Clash.GHC.Util
-import           Clash.GHC.Scoped.Builder    (TyB)
+import           Clash.Core.Scoped.Builder    (TyB)
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique

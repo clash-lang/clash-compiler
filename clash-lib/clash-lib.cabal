@@ -219,6 +219,7 @@ Library
                       Clash.Core.Pretty
                       Clash.Core.Scoped.Alpha
                       Clash.Core.Scoped.Binary
+                      Clash.Core.Scoped.Builder
                       Clash.Core.Scoped.Convert
                       Clash.Core.Scoped.Convert.Fresh
                       Clash.Core.Scoped.DataCon

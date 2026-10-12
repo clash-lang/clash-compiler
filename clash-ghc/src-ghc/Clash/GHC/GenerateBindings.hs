@@ -88,7 +88,7 @@ import           Clash.GHC.GHC2Core
    makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
-import           Clash.GHC.Scoped.Builder
+import           Clash.Core.Scoped.Builder
   (TmB, caseB, clashTyB, dataAltB, lamB, letrecB, runClosedTerm, tyLamClashB, varB)
 import           Clash.GHC.Scoped.Check  (Outcome (..), compareTerms, primAtTypeShape)
 import           Clash.GHC.Scoped.GHC2Core (coreToTermB, coreToTypeB, varKey)
@@ -259,7 +259,7 @@ mkBindings convBind bindings clsOps = do
 -- Core. See 'mkBindings' for how these conversions are run in parallel.
 --
 -- The bindings hold the builders of their bodies, see
--- "Clash.GHC.Scoped.Builder": 'mkBindings' runs the conversion of GHC Core in
+-- "Clash.Core.Scoped.Builder": 'mkBindings' runs the conversion of GHC Core in
 -- parallel, and 'generateBindings' builds the bodies lazily.
 processBind
   :: CompiledPrimMap
