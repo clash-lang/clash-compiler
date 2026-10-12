@@ -354,9 +354,9 @@ reduceZipWithHandler rpc@ReducePrimContext{..}
   , let rhsTy = mkTyConApp vecTcNm [nTy,rhsElty]
   = case natSize rpc nTy of
       Right n -> do
-        lhsNonRep <- isUntranslatableType_not_poly lhsElTy
-        rhsNonRep <- isUntranslatableType_not_poly rhsElty
-        resNonRep <- isUntranslatableType_not_poly resElTy
+        lhsNonRep <- isUntranslatableType_not_poly (rpcScope rpc) lhsElTy
+        rhsNonRep <- isUntranslatableType_not_poly (rpcScope rpc) rhsElty
+        resNonRep <- isUntranslatableType_not_poly (rpcScope rpc) resElTy
         shouldReduce1 <- List.orM [ pure (ultra || n < 2)
                              , shouldReduceHere rpc
                              , pure (lhsNonRep || rhsNonRep || resNonRep)
@@ -378,8 +378,8 @@ reduceMapHandler rpc@ReducePrimContext{..}
   , let argTy = mkTyConApp vecTcNm [nTy,argElTy]
   = case natSize rpc nTy of
       Right n -> do
-        argNonRep <- isUntranslatableType_not_poly argElTy
-        resNonRep <- isUntranslatableType_not_poly resElTy
+        argNonRep <- isUntranslatableType_not_poly (rpcScope rpc) argElTy
+        resNonRep <- isUntranslatableType_not_poly (rpcScope rpc) resElTy
         shouldReduce1 <- List.orM [ pure (ultra || n < 2 )
                              , shouldReduceHere rpc
                              , pure (argNonRep || resNonRep)
@@ -413,7 +413,7 @@ reduceFoldHandler rpc@ReducePrimContext{..}
       Right n -> do
         shouldReduce1 <- List.orM [ pure (ultra || n == 0)
                              , shouldReduceHere rpc
-                             , isUntranslatableType_not_poly aTy
+                             , isUntranslatableType_not_poly (rpcScope rpc) aTy
                              -- Note [Unroll shouldSplit types]
                              , pure (isSplit rpc argTy)]
         if shouldReduce1
@@ -431,8 +431,8 @@ reduceFoldrHandler rpc@ReducePrimContext{..}
   , (_:_:argTy:_) <- primArgTys rpc [aTy,bTy,nTy]
   = case natSize rpc nTy of
       Right n -> do
-        aNonRep <- isUntranslatableType_not_poly aTy
-        bNonRep <- isUntranslatableType_not_poly bTy
+        aNonRep <- isUntranslatableType_not_poly (rpcScope rpc) aTy
+        bNonRep <- isUntranslatableType_not_poly (rpcScope rpc) bTy
         shouldReduce1 <- List.orM [ pure ultra
                              , shouldReduceHere rpc
                              , pure (aNonRep || bNonRep)
@@ -466,7 +466,7 @@ reduceAppendHandler rpc@ReducePrimContext{..}
             shouldReduce1 <- List.orM [ pure (n==0)
                                  , pure (m==0)
                                  , shouldReduceHere rpc
-                                 , isUntranslatableType_not_poly aTy
+                                 , isUntranslatableType_not_poly (rpcScope rpc) aTy
                                  -- Note [Unroll shouldSplit types]
                                  , pure (isSplit rpc resultType) ]
             if shouldReduce1
@@ -493,7 +493,7 @@ reduceVecPrimHandler nm red rpc@ReducePrimContext{..}
   = case natSize rpc nTy of
       Right n -> do
         shouldReduce1 <- List.orM [ shouldReduceHere rpc
-                             , isUntranslatableType_not_poly aTy
+                             , isUntranslatableType_not_poly (rpcScope rpc) aTy
                              -- Note [Unroll shouldSplit types]
                              , pure (isSplit rpc argTy) ]
         if shouldReduce1
@@ -520,7 +520,7 @@ reduceInitHandler rpc@ReducePrimContext{..}
   , (argTy:_) <- primArgTys rpc [nTy,aTy]
   = case natSize rpc nTy of
       Right n -> do
-        aNonRep <- isUntranslatableType_not_poly aTy
+        aNonRep <- isUntranslatableType_not_poly (rpcScope rpc) aTy
         shouldReduce1 <- List.orM [ shouldReduceHere rpc
                              , pure aNonRep
                              -- Note [Unroll shouldSplit types]
@@ -542,7 +542,7 @@ reduceUnconcatHandler rpc@ReducePrimContext{..}
       (Right n, Right m) -> do
         shouldReduce1 <- List.orM [ pure (m==0)
                                   , shouldReduceHere rpc
-                                  , isUntranslatableType_not_poly aTy
+                                  , isUntranslatableType_not_poly (rpcScope rpc) aTy
                                   --  Note [Unroll shouldSplit types]
                                   , pure (isSplit rpc argTy)
                                   ]
@@ -586,7 +586,7 @@ reduceByResultHandler nm whenUltra red rpc@ReducePrimContext{..}
       Right n -> do
         shouldReduce1 <- List.orM [ pure (whenUltra && ultra)
                              , shouldReduceHere rpc
-                             , isUntranslatableType_not_poly aTy
+                             , isUntranslatableType_not_poly (rpcScope rpc) aTy
                              -- Note [Unroll shouldSplit types]
                              , pure (isSplit rpc resultType)
                              ]
@@ -614,7 +614,7 @@ reduceIndexIntHandler rpc@ReducePrimContext{..}
       Right n -> do
         shouldReduce1 <- List.orM [ pure ultra
                              , shouldReduceHere rpc
-                             , isUntranslatableType_not_poly aTy
+                             , isUntranslatableType_not_poly (rpcScope rpc) aTy
                              -- Note [Unroll shouldSplit types]
                              , pure (isSplit rpc argTy) ]
         if shouldReduce1
@@ -635,7 +635,7 @@ reduceImapHandler rpc@ReducePrimContext{..}
       Right n -> do
         shouldReduce1 <- List.orM [ pure (ultra || n < 2)
                              , shouldReduceHere rpc
-                             , List.anyM isUntranslatableType_not_poly [argElTy,resElTy]
+                             , List.anyM (isUntranslatableType_not_poly (rpcScope rpc)) [argElTy,resElTy]
                              -- Note [Unroll shouldSplit types]
                              , pure (any (isSplit rpc) [argTy,resultType]) ]
         if shouldReduce1
@@ -655,7 +655,7 @@ reduceIterateIHandler rpc@ReducePrimContext{..}
         shouldReduce1 <- List.orM
           [ pure (ultra || n < 2)
           , shouldReduceHere rpc
-          , isUntranslatableType_not_poly aTy
+          , isUntranslatableType_not_poly (rpcScope rpc) aTy
           -- Note [Unroll shouldSplit types]
           , pure (isSplit rpc resultType) ]
 
@@ -705,7 +705,7 @@ reduceTReplicateHandler rpc@ReducePrimContext{..}
   = case natSize rpc nTy of
       Right n -> do
         shouldReduce1 <- List.orM [ shouldReduceHere rpc
-                             , isUntranslatableType False aTy ]
+                             , isUntranslatableType False (rpcScope rpc) aTy ]
         if shouldReduce1
            then reduceWith rpc (ReduceTReplicate n)
            else return originalTerm
@@ -766,9 +766,9 @@ reduceEqHandler rpc@ReducePrimContext{..}
   | otherwise
   = return originalTerm
 
-isUntranslatableType_not_poly :: Type n -> NormalizeSession Bool
-isUntranslatableType_not_poly t = do
-  u <- isUntranslatableType False t
+isUntranslatableType_not_poly :: Distinct n => Scope n -> Type n -> NormalizeSession Bool
+isUntranslatableType_not_poly sc t = do
+  u <- isUntranslatableType False sc t
   if u
      then return (not (hasFreeVarsType t))
      else return False

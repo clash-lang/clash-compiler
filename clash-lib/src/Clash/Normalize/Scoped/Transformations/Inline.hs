@@ -218,8 +218,8 @@ inlineOrLiftNonRepWorker
   => TransformContext n -> Term n -> Bind n l -> Term l -> NormalizeSession (Term n)
 inlineOrLiftNonRepWorker = inlineOrLiftBinders nonRepTest inlineTest
  where
-  nonRepTest :: Scope o -> LetBinding o -> NormalizeSession Bool
-  nonRepTest _ lb = isUntranslatableType False (lbType lb)
+  nonRepTest :: Distinct o => Scope o -> LetBinding o -> NormalizeSession Bool
+  nonRepTest sc lb = isUntranslatableType False sc (lbType lb)
 
   inlineTest :: [LetBinding o] -> Term o -> LetBinding o -> Bool
   inlineTest lbs body = \lb ->
@@ -664,7 +664,7 @@ inlineNonRepWorker ctx e = case e of
         overLimit = notClassTy && Maybe.fromMaybe 0 isInlined > limit
 
       bodyMaybe <- lookupBinding f
-      nonRepScrut <- isUntranslatableType False scrutTy
+      nonRepScrut <- isUntranslatableType False (tfScope ctx) scrutTy
       case (nonRepScrut, bodyMaybe) of
         (True, Just b) ->
           if overLimit then
@@ -792,7 +792,7 @@ inlineWorkFreeWorker ctx e
             if isSignalType te sc eTy
               then return e
               else do
-                untranslatable <- isUntranslatableType True eTy
+                untranslatable <- isUntranslatableType True sc eTy
                 argsHaveWork <- anyM (either expressionHasWork (const (pure False))) args
                 if untranslatable || argsHaveWork
                   then return e
@@ -822,7 +822,7 @@ inlineWorkFreeWorker ctx e
       if topEnt || not closed || isSignalType te sc fTy
         then return e
         else do
-          untranslatable <- isUntranslatableType True fTy
+          untranslatable <- isUntranslatableType True sc fTy
           if untranslatable
             then return e
             else do

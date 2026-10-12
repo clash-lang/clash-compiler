@@ -144,7 +144,7 @@ caseCaseWorker
   -> [Alt n]
   -> NormalizeSession (Term n)
 caseCaseWorker ctx e (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2 = do
-  ty1Rep <- not <$> isUntranslatableType False alts1Ty
+  ty1Rep <- not <$> isUntranslatableType False (tfScope ctx) alts1Ty
 
   -- This is only worth doing if the inner case-expression has a
   -- non-representable alternative type.
