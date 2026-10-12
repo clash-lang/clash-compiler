@@ -104,6 +104,8 @@ import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (emptyInScopeSet, emptyVarEnv, eltsVarEnv)
 import Clash.Driver.Types (Binding (..), BindingMap)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
+import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
   (NormRewrite, NormalizeSession, NormalizeState (..))
@@ -156,6 +158,8 @@ initialState d = RewriteState
   , _nameCounter = 0
   , _globalHeap = (IntMap.empty, 0)
   , _workFreeBinders = emptyVarEnv
+  , _scopedBindings = fromClashBindings (designBindings d)
+  , _scopedWorkFreeBinders = emptyGlobalEnv
   , _hwTypeCache = Map.empty
   , _extra = NormalizeState
       { _normalized = emptyVarEnv
@@ -169,6 +173,12 @@ initialState d = RewriteState
       , _scopedNormalizationStrategy = normalization
       , _scopedConstantPropagationStrategy = constantPropagation
       , _workFreeAppCache = HashMap.empty
+      , _scopedNormalized = emptyGlobalEnv
+      , _scopedSpecialisationCache = Map.empty
+      , _scopedSpecialisationHistory = emptyGlobalEnv
+      , _scopedInlineHistory = emptyGlobalEnv
+      , _scopedRecursiveComponents = emptyGlobalEnv
+      , _scopedWorkFreeAppCache = Map.empty
       }
   }
 

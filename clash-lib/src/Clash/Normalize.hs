@@ -7,35 +7,54 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Turn CoreHW terms into normalized CoreHW Terms
+
+  The normalizer runs on scoped Clash Core ("Clash.Core.Scoped.Syntax"): the
+  global bindings are closed terms. Until GHC2Core and Netlist are ported
+  (Phase 5 of the port), 'runNormalization' converts the bindings of Clash
+  Core it is given ('Clash.Rewrite.Scoped.Globals.fromClashBindings'), and
+  'Clash.Rewrite.Scoped.Globals.toClashBindingsM' converts the normalized ones
+  back.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 --{-# OPTIONS_GHC -ddump-splices #-}
 
-module Clash.Normalize where
+module Clash.Normalize
+  ( runNormalization
+  , normalize
+  , normalize'
+  , checkNonRecursive
+  , cleanupGraph
+  , CallTree (..)
+  , mkCallTree
+  , flattenNode
+  , flattenCallTree
+  , callTreeToList
+  , etaReduceWrapper
+  ) where
 
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    ((>=>), when)
+import qualified Control.Monad                    as Monad
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
-import           Data.Either                      (lefts,partitionEithers)
+import           Data.Either                      (lefts, partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import qualified Data.IORef                       as IORef
-import           Clash.Data.UniqMap               (UniqMap)
-import qualified Clash.Data.UniqMap               as UniqMap
-import           Data.List
-  (intercalate, intersect, mapAccumL)
+import           Data.List                        (intercalate, mapAccumL)
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
-import qualified Data.Set                         as Set
-import qualified Data.Set.Lens                    as Lens
 
 #if MIN_VERSION_prettyprinter(1,7,0)
 import           Prettyprinter                    (vcat)
@@ -48,47 +67,34 @@ import           GHC.BasicTypes.Extra             (isNoInline)
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
-import           Clash.Core.FreeVars
-  (freeLocalIds, globalIds)
-import           Clash.Core.HasFreeVars           (notElemFreeVars)
 import           Clash.Core.HasType
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
-import           Clash.Core.Subst
-  (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term                  (Term (..), collectArgsTicks
-                                                  ,mkApps, mkTicks)
-import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
-import           Clash.Core.TyCon (TyConMap)
+import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
-   extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
-   mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
+  (elemVarSet, emptyVarEnv, mkVarSet)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
 import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
-import           Clash.Netlist.Util
-  (splitNormalized)
 import           Clash.Normalize.Strategy         (constantPropagation, normalization)
 import           Clash.Normalize.Strategy.Spec    (flattenSpec)
 import           Clash.Normalize.Types
-import           Clash.Normalize.Util
-import           Clash.Rewrite.Capture
-  (FinalState (..), captureEnabled, captureOpts, recordFinalState)
-import           Clash.Rewrite.Scoped.ViaFoil     (viaFoil)
+import           Clash.Normalize.Util             (tvSubstWithTyEq)
+import           Clash.Normalize.Scoped.Util
+  (isCheapFunction, normalizeTopLvlBndr, rewriteExpr)
 import           Clash.Rewrite.StrategyDSL.TH     (compileScopedStrategy)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
-   tcCache, topEntities, newInlineStrategy)
+  (RewriteEnv (..), RewriteState (..), debugOpts, extra, scopedBindings, tcCache,
+   topEntities, newInlineStrategy)
 import           Clash.Rewrite.Util
   (isUntranslatableType, runRewriteSession)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
-import           Clash.Util.Supply                (Supply, supplyBound)
+import           Clash.Util.Supply                (Supply)
 
 import           Data.Binary                      (encode)
 import qualified Data.ByteString                  as BS
@@ -96,6 +102,18 @@ import qualified Data.ByteString.Lazy             as BL
 
 import           Clash.Rewrite.Types (RewriteStep(..))
 
+import           Clash.Core.Scoped.Convert        (toClashTerm)
+import           Clash.Core.Scoped.FreeVars       (termGlobalIds, teleNameBinders)
+import           Clash.Core.Scoped.NameMap
+import           Clash.Core.Scoped.Pretty         ()
+import           Clash.Core.Scoped.Subst          (substGlobals, unsinkTerm)
+import           Clash.Core.Scoped.Syntax         hiding (Type)
+import qualified Clash.Core.Scoped.Syntax         as S
+import           Clash.Core.Scoped.Term
+  (AbsBinder (..), collectArgsTicks, collectTicks, mkApps, mkTicks, openBndrs,
+   stripTicks)
+import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
+import           Clash.Rewrite.Scoped.Globals     (fromClashBindings)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
@@ -103,13 +121,13 @@ runNormalization
   -> Supply
   -- ^ UniqueSupply
   -> BindingMap
-  -- ^ Global Binders
+  -- ^ Global Binders, converted to scoped Clash Core, see the module header
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF
-  -> VarEnv Bool
+  -> GlobalEnv Bool
   -- ^ Map telling whether a components is part of a recursive group
   -> [Id]
   -- ^ topEntities
@@ -117,7 +135,7 @@ runNormalization
   -- ^ NormalizeSession to run
   -> IO a
 runNormalization env supply globals typeTrans eval rcsMap topEnts m =
-  runRewriteSession rwEnv rwState (if captureEnabled then m <* captureFinalState topEnts else m)
+  runRewriteSession rwEnv rwState m
   where
     -- TODO The RewriteEnv should just take ClashOpts.
     rwEnv     = RewriteEnv
@@ -128,86 +146,86 @@ runNormalization env supply globals typeTrans eval rcsMap topEnts m =
                   (addGlobalTypes (fmap bindingId globals) (mkTypeEnv (envTyConMap env)))
 
     rwState   = RewriteState
-                  0
-                  mempty       -- transformAppliedCounters Map
-                  mempty       -- transformTriedCounters Map
-                  globals
-                  supply
-                  (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
-                  0
-                  (IntMap.empty, 0)
-                  emptyVarEnv
-                  Map.empty    -- hwTypeCache
-                  normState
+                  { _transformCounter = 0
+                  , _transformAppliedCounters = mempty
+                  , _transformTriedCounters = mempty
+                  -- The bindings of Clash Core are those of the transformations
+                  -- of Clash Core, which the normalizer doesn't run
+                  , _bindings = emptyVarEnv
+                  , _uniqSupply = supply
+                  , _curFun = (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
+                  , _nameCounter = 0
+                  , _globalHeap = (IntMap.empty, 0)
+                  , _workFreeBinders = emptyVarEnv
+                  , _scopedBindings = fromClashBindings globals
+                  , _scopedWorkFreeBinders = emptyGlobalEnv
+                  , _hwTypeCache = Map.empty
+                  , _extra = normState
+                  }
 
     normState = NormalizeState
-                  emptyVarEnv
-                  Map.empty
-                  emptyVarEnv
-                  emptyVarEnv
-                  Map.empty
-                  rcsMap
-                  -- The strategies of scoped Core, as rewrites of Clash Core
-                  (viaFoil "normalization" normalization)
-                  (viaFoil "constantPropagation" constantPropagation)
-                  normalization
-                  constantPropagation
-                  HashMap.empty -- workFreeAppCache
+                  { _normalized = emptyVarEnv
+                  , _specialisationCache = Map.empty
+                  , _specialisationHistory = emptyVarEnv
+                  , _inlineHistory = emptyVarEnv
+                  , _primitiveArgs = Map.empty
+                  , _recursiveComponents = emptyVarEnv
+                  , _normalizationStrategy = noStrategy "normalization"
+                  , _constantPropagationStrategy = noStrategy "constantPropagation"
+                  , _scopedNormalizationStrategy = normalization
+                  , _scopedConstantPropagationStrategy = constantPropagation
+                  , _workFreeAppCache = HashMap.empty
+                  , _scopedNormalized = emptyGlobalEnv
+                  , _scopedSpecialisationCache = Map.empty
+                  , _scopedSpecialisationHistory = emptyGlobalEnv
+                  , _scopedInlineHistory = emptyGlobalEnv
+                  , _scopedRecursiveComponents = rcsMap
+                  , _scopedWorkFreeAppCache = Map.empty
+                  }
 
--- | Record the state at the end of a session, for the captures of
--- "Clash.Rewrite.Capture"
-captureFinalState :: [Id] -> NormalizeSession ()
-captureFinalState topEnts = do
-  st <- Lens.use id
-  env <- Lens.view id
-  let ns = _extra st
-  bound <- liftIO supplyBound
-  liftIO $ recordFinalState FinalState
-    { fsBindings = _bindings st
-    , fsWorkFreeBinders = _workFreeBinders st
-    , fsNormalized = _normalized ns
-    , fsSpecialisationCache = _specialisationCache ns
-    , fsSpecialisationHistory = _specialisationHistory ns
-    , fsInlineHistory = _inlineHistory ns
-    , fsPrimitiveArgs = _primitiveArgs ns
-    , fsRecursiveComponents = _recursiveComponents ns
-    , fsWorkFreeAppCache = HashMap.toList (_workFreeAppCache ns)
-    , fsTopEntities = topEnts
-    , fsOpts = captureOpts (envOpts (_clashEnv env))
-    , fsUniqueBound = bound
-    }
+    -- The strategies of Clash Core are those of the transformations of Clash
+    -- Core, which the normalizer doesn't run
+    noStrategy nm _ _ =
+      error ($(curLoc) ++ "The normalizer has no " ++ nm ++ " strategy of Clash Core")
 
+-- | Normalize the given global binders, and the ones they refer to
 normalize
-  :: [Id]
-  -> NormalizeSession BindingMap
+  :: [GlobalId]
+  -> NormalizeSession (GlobalEnv (Binding (Term 'VoidS)))
 normalize = go >=> unionWithCache
  where
-  go []  = return emptyVarEnv
+  go []  = return emptyGlobalEnv
   go top = do
     (new,topNormalized) <- unzip <$> mapM normalize' top
     newNormalized <- normalize (concat new)
-    return (unionVarEnv (mkVarEnv topNormalized) newNormalized)
+    return (unionGlobalEnv (globalEnvFromList topNormalized) newNormalized)
 
-  unionWithCache :: BindingMap -> NormalizeSession BindingMap
+  unionWithCache
+    :: GlobalEnv (Binding (Term 'VoidS))
+    -> NormalizeSession (GlobalEnv (Binding (Term 'VoidS)))
   unionWithCache env = do
-    cache <- Lens.use (extra.normalized)
+    cache <- Lens.use (extra.scopedNormalized)
     -- We need to include the cache in our final result, forgetting to do so
     -- leads to https://github.com/clash-lang/clash-compiler/issues/3109
     --
     -- On the other hand, just returning the cache as our final result could
     -- not be enough, because normalize' might return a non-normalized binder
     -- that is later picked up and cleaned up by flattenCallTree.
-    return (unionVarEnv cache env)
+    return (unionGlobalEnv cache env)
 
-normalize' :: Id -> NormalizeSession ([Id], (Id, Binding Term))
+-- | Normalize a global binder. Gives the globals it refers to that still need
+-- normalizing, and the normalized binding.
+normalize'
+  :: GlobalId
+  -> NormalizeSession ([GlobalId], (GlobalId, Binding (Term 'VoidS)))
 normalize' nm = do
-  exprM <- lookupVarEnv nm <$> Lens.use bindings
-  let nmS = showPpr (varName nm)
+  exprM <- lookupGlobalEnv nm <$> Lens.use scopedBindings
+  let nmS = showPpr (varName (globalIdVar nm))
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
-      let isTop = nm `elemVarSet` topEnts
+      let isTop = globalIdVar nm `elemVarSet` topEnts
           ty0 = coreTypeOf nm'
           ty1 = if isTop then tvSubstWithTyEq ty0 else ty0
 
@@ -226,27 +244,26 @@ normalize' nm = do
 
       -- check for unrepresentable result type
       let (args,resTy) = splitCoreFunForallTy tcm ty1
-          isTopEnt = nm `elemVarSet` topEnts
           isFunction = not $ null $ lefts args
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            tmNorm <- normalizeTopLvlBndr isTopEnt nm (Binding nm' sp inl pr tm r)
-            let usedBndrs = Lens.toListOf globalIds (bindingTerm tmNorm)
+            tmNorm <- normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm r)
+            let usedBndrs = globalsInOrder (bindingTerm tmNorm)
             traceIf (bindingRecursive tmNorm)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
                             , showPpr (coreTypeOf (bindingId tmNorm))
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
-            prevNorm <- mapVarEnv bindingId <$> Lens.use (extra.normalized)
-            let toNormalize = filter (`notElemVarSet` topEnts)
-                            $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
+            prevNorm <- Lens.use (extra.scopedNormalized)
+            let toNormalize = filter (\g -> not (globalIdVar g `elemVarSet` topEnts))
+                            $ filter (\g -> g /= nm && not (memberGlobalEnv g prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
          else
            do
             -- Throw an error for unrepresentable topEntities and functions
-            when (isTopEnt || isFunction) $
+            when (isTop || isFunction) $
               let msg = $(curLoc) ++ [i|
                     This bndr has a non-representable return type and can't be normalized:
                     #{showPpr' def{displayUniques=False\} nm'}
@@ -265,10 +282,10 @@ normalize' nm = do
             referers <-
               if dbg_invariants opts
                  then do
-                   prevNorm <- Lens.use (extra.normalized)
+                   prevNorm <- Lens.use (extra.scopedNormalized)
                    pure [ showPpr (varName (bindingId b))
-                        | b <- eltsVarEnv prevNorm
-                        , nm `elem` Lens.toListOf globalIds (bindingTerm b)
+                        | b <- globalEnvElems prevNorm
+                        , nm `memberGlobalSet` termGlobalIds (bindingTerm b)
                         ]
                  else pure []
             traceIf (dbg_invariants opts)
@@ -285,146 +302,210 @@ normalize' nm = do
 
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
+-- | The globals a term refers to, in the order in which they first occur,
+-- in the order of 'Clash.Core.FreeVars.globalIds': the right-hand sides of a
+-- let-expression before its body, and the term of a tick before the term it
+-- is attached to. It determines the order in which 'normalize' normalizes
+-- them, and with that, the uniques of the globals that normalization creates.
+globalsInOrder :: Term n -> [GlobalId]
+globalsInOrder = dedup emptyGlobalSet . ($ []) . go
+ where
+  dedup _ [] = []
+  dedup seen (g : gs)
+    | g `memberGlobalSet` seen = dedup seen gs
+    | otherwise = g : dedup (insertGlobalSet g seen) gs
+
+  go :: Term x -> [GlobalId] -> [GlobalId]
+  go = \case
+    GlobalVar g -> (g :)
+    Var {} -> id
+    Data {} -> id
+    Literal {} -> id
+    Prim {} -> id
+    Lam _ e -> go e
+    TyLam _ e -> go e
+    App e1 e2 -> go e1 . go e2
+    TyApp e _ -> go e
+    Let (NonRec _ x) e -> go x . go e
+    Let (Rec _ xs) e -> foldr ((.) . go) id xs . go e
+    Case e _ alts -> go e . foldr (\(Alt _ x) -> (go x .)) id alts
+    Cast e _ _ -> go e
+    Tick (Attributes _ a) e -> go a . go e
+    Tick _ e -> go e
+
 -- | Check whether the normalized bindings are non-recursive. Errors when one
 -- of the components is recursive.
 checkNonRecursive
-  :: BindingMap
+  :: GlobalEnv (Binding (Term 'VoidS))
   -- ^ List of normalized binders
-  -> BindingMap
-checkNonRecursive norm = case mapMaybeVarEnv go norm of
-  rcs | nullVarEnv rcs  -> norm
+  -> GlobalEnv (Binding (Term 'VoidS))
+checkNonRecursive norm = case filterGlobalEnv bindingRecursive norm of
+  rcs | nullGlobalEnv rcs  -> norm
   rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
-                   ++ show (vcat [ ppr a <> ppr b
-                                 | (a,b) <- eltsVarEnv rcs
+                   ++ show (vcat [ ppr (bindingId b) <> ppr (bindingTerm b)
+                                 | b <- globalEnvElems rcs
                                  ])
- where
-  go (Binding nm _ _ _ tm r) =
-    if r then Just (nm,tm) else Nothing
 
 -- | Perform general \"clean up\" of the normalized (non-recursive) function
 -- hierarchy. This includes:
 --
 --   * Inlining functions that simply \"wrap\" another function
 cleanupGraph
-  :: Id
-  -> BindingMap
-  -> NormalizeSession BindingMap
+  :: GlobalId
+  -> GlobalEnv (Binding (Term 'VoidS))
+  -> NormalizeSession (GlobalEnv (Binding (Term 'VoidS)))
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
-  = do cache <- liftIO (IORef.newIORef UniqMap.empty)
+  = do cache <- liftIO (IORef.newIORef emptyGlobalEnv)
        ctFlat <- flattenCallTree cache ct
-       return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
+       return (globalEnvFromList $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
 -- | A tree of identifiers and their bindings, with branches containing
 -- additional bindings which are used. See "Clash.Driver.Types.Binding".
 --
 data CallTree
-  = CLeaf   (Id, Binding Term)
-  | CBranch (Id, Binding Term) [CallTree]
+  = CLeaf   (GlobalId, Binding (Term 'VoidS))
+  | CBranch (GlobalId, Binding (Term 'VoidS)) [CallTree]
 
 mkCallTree
-  :: [Id]
+  :: [GlobalId]
   -- ^ Visited
-  -> BindingMap
+  -> GlobalEnv (Binding (Term 'VoidS))
   -- ^ Global binders
-  -> Id
+  -> GlobalId
   -- ^ Root of the call graph
   -> Maybe CallTree
 mkCallTree visited bindingMap root
-  | Just rootTm <- lookupVarEnv root bindingMap
-  = let used   = Set.toList $ Lens.setOf globalIds $ (bindingTerm rootTm)
+  | Just rootTm <- lookupGlobalEnv root bindingMap
+  = let used   = globalSetToList $ termGlobalIds $ bindingTerm rootTm
         other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
     in  case used of
           [] -> Just (CLeaf   (root,rootTm))
           _  -> Just (CBranch (root,rootTm) other)
 mkCallTree _ _ _ = Nothing
 
-stripArgs
-  :: [Id]
-  -> [Id]
-  -> [Either Term Type]
-  -> Maybe [Either Term Type]
-stripArgs _      (_:_) []   = Nothing
-stripArgs allIds []    args = if any mentionsId args
-                                then Nothing
-                                else Just args
-  where
-    mentionsId t = not $ null (either (Lens.toListOf freeLocalIds) (const []) t
-                              `intersect`
-                              allIds)
+-- | The shape of a normalized function whose body binds a single variable,
+-- see 'etaReduceWrapper'
+data SingleBinding
+  = NotSingle
+  -- ^ Not in normal form, or binds more than one variable
+  | Single (Maybe (Term 'VoidS))
+  -- ^ Binds a single variable. If the function only applies another function
+  -- to its own arguments, in order, the eta-reduced function.
 
-stripArgs allIds (id_:ids) (Left (Var nm):args)
-      | id_ == nm = stripArgs allIds ids args
-      | otherwise = Nothing
-stripArgs _ _ _ = Nothing
+-- | Whether a normalized function, which has the shape @\\x1 .. xn -> let y =
+-- e in y@ (see 'Clash.Netlist.Util.splitNormalized'), binds a single variable,
+-- and if so, whether it is a wrapper @\\x1 .. xn -> let y = f a1 .. am x1 .. xn
+-- in y@ that eta-reduces to @f a1 .. am@: when @f@ and the @ai@ mention none of
+-- the @xi@, nor @y@. The ticks around the let-expression and around the
+-- application are kept.
+--
+-- Unlike the function of Clash Core that 'flattenNode' replaces, it only
+-- eta-reduces a wrapper whose result is its let-bound variable.
+etaReduceWrapper :: Term 'VoidS -> SingleBinding
+etaReduceWrapper e = openBndrs emptyScope e $ \_ bs body ->
+  case (termBinders bs, collectTicks body) of
+    (Just ids, (Let bind res, ticks))
+      | not (isLet res) -> case bind of
+          NonRec b x -> single ids bs ticks (isResult b res) (Just x)
+          Rec (TCons b TNil) [x] ->
+            single ids bs ticks (isResult b res) (unsinkTerm (teleNameBinders (TCons b TNil)) x)
+          _ -> NotSingle
+    _ -> NotSingle
+ where
+  single
+    :: [Int] -> Tele AbsBinder 'VoidS l -> [TickInfo l] -> Bool -> Maybe (Term l)
+    -> SingleBinding
+  single ids bs ticks isRes rhsM = Single $ do
+    rhs <- rhsM
+    Monad.guard isRes
+    let (fun, args, ticks') = collectArgsTicks (mkTicks rhs ticks)
+        nArgs = length args
+        nIds = length ids
+    Monad.guard (nArgs >= nIds)
+    let (remainder, idArgs) = splitAt (nArgs - nIds) args
+    Monad.guard (map argVar idArgs == map Just ids)
+    unsinkTerm (teleNameBinders bs) (mkApps (mkTicks fun ticks') remainder)
+
+  -- The raw names of the variables of the term binders, if there are no type
+  -- binders
+  termBinders :: Tele AbsBinder x y -> Maybe [Int]
+  termBinders = \case
+    TNil -> Just []
+    TCons (AbsId b) rest -> (binderRaw b :) <$> termBinders rest
+    TCons (AbsTy _) _ -> Nothing
+
+  binderRaw :: IdBinder x y -> Int
+  binderRaw = tmNameRaw . tmNameOf
+
+  argVar :: Either (Term x) (S.Type x) -> Maybe Int
+  argVar = \case
+    Left (Var _ _ n) -> Just (tmNameRaw n)
+    _ -> Nothing
+
+  isResult :: IdBinder x y -> Term y -> Bool
+  isResult b res = case stripTicks res of
+    Var _ _ n -> tmNameRaw n == binderRaw b
+    _ -> False
+
+  isLet :: Term x -> Bool
+  isLet = \case
+    Let {} -> True
+    _ -> False
 
 flattenNode
   :: CallTree
-  -> NormalizeSession (Either CallTree ((Id,Term),[CallTree]))
+  -> NormalizeSession (Either CallTree ((GlobalId, Term 'VoidS), [CallTree]))
 flattenNode c@(CLeaf (_,(Binding _ _ spec _ _ _))) | isNoInline spec = return (Left c)
 flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
-  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
-  if isTopEntity then return (Left c) else do
-    tcm  <- Lens.view tcCache
-    let norm = splitNormalized tcm e
-    case norm of
-      Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args,ticks) = collectArgsTicks bExpr
-        case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `notElemFreeVars` bExpr ->
-               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),[]))
-          _ -> return (Right ((nm,e),[]))
+  isTopEntity <- elemVarSet (globalIdVar nm) <$> Lens.view topEntities
+  if isTopEntity then return (Left c) else
+    case etaReduceWrapper e of
+      Single (Just e') -> return (Right ((nm,e'),[]))
       _ -> return (Right ((nm,e),[]))
 flattenNode b@(CBranch (_,(Binding _ _ spec _ _ _)) _) | isNoInline spec =
   return (Left b)
 flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
-  isTopEntity <- elemVarSet nm <$> Lens.view topEntities
-  if isTopEntity then return (Left b) else do
-    tcm  <- Lens.view tcCache
-    let norm = splitNormalized tcm e
-    case norm of
-      Right (ids,[(bId,bExpr)],_) -> do
-        let (fun,args,ticks) = collectArgsTicks bExpr
-        case stripArgs ids (reverse ids) (reverse args) of
-          Just remainder | bId `notElemFreeVars` bExpr ->
-               return (Right ((nm,mkApps (mkTicks fun ticks) (reverse remainder)),us))
-          _ -> return (Right ((nm,e),us))
-      _ -> do
+  isTopEntity <- elemVarSet (globalIdVar nm) <$> Lens.view topEntities
+  if isTopEntity then return (Left b) else
+    case etaReduceWrapper e of
+      Single (Just e') -> return (Right ((nm,e'),us))
+      Single Nothing -> return (Right ((nm,e),us))
+      NotSingle -> do
         newInlineStrat <- Lens.view newInlineStrategy
         if newInlineStrat || isCheapFunction e
            then return (Right ((nm,e),us))
            else return (Left b)
 
--- | Flatten a 'CallTree', memoizing results by binder Id within one cleanup
+-- | Flatten a 'CallTree', memoizing results by binder within one cleanup
 -- pass. Without the cache, every binder reachable from the root is flattened
 -- as many times as it appears in the (un-deduplicated) call tree.
 flattenCallTree
-  :: IORef.IORef (UniqMap CallTree)
-  -- ^ Memo cache, keyed by binder Id. Local to one 'cleanupGraph' call.
+  :: IORef.IORef (GlobalEnv CallTree)
+  -- ^ Memo cache, keyed by binder. Local to one 'cleanupGraph' call.
   -> CallTree
   -> NormalizeSession CallTree
 flattenCallTree _ c@(CLeaf _) = return c
 flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   -- XXX: Careful! If you ever add concurrency, this will have to be changed to
   --      account for multiple workers.
-  cached <- liftIO (UniqMap.lookup nm <$> IORef.readIORef cache)
+  cached <- liftIO (lookupGlobalEnv nm <$> IORef.readIORef cache)
   case cached of
     Just ct -> pure ct
     Nothing -> do
       ct <- doFlatten
-      liftIO (IORef.modifyIORef' cache (UniqMap.insert nm ct))
+      liftIO (IORef.modifyIORef' cache (insertGlobalEnv nm ct))
       pure ct
  where
   doFlatten = do
    flattenedUsed   <- mapM (flattenCallTree cache) used
    (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
    let (toInline,il_used) = unzip il_ct
-       subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
    newExpr <- case toInline of
      [] -> return tm
      _  -> do
-       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
+       let tm1 = substGlobals (globalEnvFromList toInline) tm
 
        -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
        opts <- Lens.view debugOpts
@@ -437,10 +518,10 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
                { t_ctx    = []
                , t_name   = "INLINE"
                , t_bndrS  = showPpr (varName nm')
-               , t_before = tm
-               , t_after  = tm1
+               , t_before = toClashTerm tm
+               , t_after  = toClashTerm tm1
                }
-       rewriteExpr ("flattenExpr",flatten) (showPpr nm, tm1) (nm', sp)
+       rewriteExpr ("flattenExpr",flatten) (showPpr (varName nm'), tm1) (nm, sp)
    let allUsed = newUsed ++ concat il_used
    -- inline all components when the resulting expression after flattening
    -- is still considered "cheap". This happens often at the topEntity which
@@ -448,16 +529,13 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
    if not (isNoInline inl) && isCheapFunction newExpr
       then do
          let (toInline',allUsed') = unzip (map goCheap allUsed)
-             subst' = extendGblSubstList (mkSubst emptyInScopeSet)
-                                         (Maybe.catMaybes toInline')
-         let tm1 = substTm "flattenCallTree.flattenCheap" subst' newExpr
-         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr nm, tm1) (nm', sp)
+             tm1 = substGlobals (globalEnvFromList (Maybe.catMaybes toInline')) newExpr
+         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr (varName nm'), tm1) (nm, sp)
          return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   -- The flattening strategy is described in Clash.Normalize.Strategy.Spec.
-  -- It is one of scoped Core.
-  flatten = viaFoil "flatten" $(compileScopedStrategy flattenSpec)
+  flatten = $(compileScopedStrategy flattenSpec)
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
     | isNoInline inl2  = (Nothing     ,[c])
@@ -466,7 +544,8 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
     | isNoInline inl2  = (Nothing, [c])
     | otherwise        = (Just (nm2,e),us)
 
-callTreeToList :: [Id] -> CallTree -> ([Id], [(Id, Binding Term)])
+callTreeToList
+  :: [GlobalId] -> CallTree -> ([GlobalId], [(GlobalId, Binding (Term 'VoidS))])
 callTreeToList visited (CLeaf (nm,bndr))
   | nm `elem` visited = (visited,[])
   | otherwise         = (nm:visited,[(nm,bndr)])

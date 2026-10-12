@@ -102,7 +102,7 @@ import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Supply as Supply
 
-import Clash.Core.Scoped.Convert (fromClashTermWith)
+import Clash.Core.Scoped.Convert (fromClashTermWith, toClashTerm)
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
@@ -127,7 +127,12 @@ adaptPrim eval = PrimReduction $ \pc ->
       ids = clashVarsIds vars
       cm = C.Machine
         { C.mHeapPrim = mHeapPrim m
-        , C.mHeapGlobalBase = mHeapGlobalBase m
+        -- The global bindings of Clash Core, converted when they are looked
+        -- up
+        , C.mHeapGlobalBase =
+            UniqMap.fromList
+              [ (globalIdVar g, toClashTerm <$> b)
+              | (g, b) <- globalEnvToList (mHeapGlobalBase m) ]
         , C.mHeapGlobalOverlay = emptyVarEnv
         , C.mHeapGlobalDeleted =
             mkVarSet (map globalIdVar (globalSetToList (mHeapGlobalDeleted m)))

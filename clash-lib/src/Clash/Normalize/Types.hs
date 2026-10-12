@@ -8,6 +8,7 @@
   Types used in Normalize modules
 -}
 
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.Types where
@@ -23,9 +24,12 @@ import Clash.Core.Term        (Term)
 import Clash.Core.Type        (Type)
 import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
-import Clash.Driver.Types     (BindingMap)
+import Clash.Driver.Types     (Binding, BindingMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
 import Clash.Rewrite.Scoped.Types (ScopedRewrite)
+import Clash.Core.Scoped.Alpha (AlphaTerm, AlphaType)
+import Clash.Core.Scoped.NameMap (GlobalEnv)
+import qualified Clash.Core.Scoped.Syntax as S
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState
@@ -80,6 +84,25 @@ data NormalizeState
   -- * Elem: the normalized body of @f@ applied to the arguments
   --
   -- See 'Clash.Normalize.Util.normalizeWorkFreeApp'.
+  , _scopedNormalized :: GlobalEnv (Binding (S.Term 'S.VoidS))
+  -- ^ The normalized global binders. The fields from here on are the
+  -- counterparts of the ones above for scoped Clash Core, which the
+  -- normalizer uses. The ones above are those of the transformations of Clash
+  -- Core, until Phase 7 of the port deletes them.
+  , _scopedSpecialisationCache
+      :: Map (S.GlobalId, Int, Either AlphaTerm AlphaType) S.GlobalId
+  -- ^ See '_specialisationCache'. The specialized-on argument is a closed
+  -- term or type, compared up to alpha-equivalence.
+  , _scopedSpecialisationHistory :: GlobalEnv Int
+  -- ^ See '_specialisationHistory'
+  , _scopedInlineHistory :: GlobalEnv (GlobalEnv Int)
+  -- ^ See '_inlineHistory'
+  , _scopedRecursiveComponents :: GlobalEnv Bool
+  -- ^ See '_recursiveComponents'
+  , _scopedWorkFreeAppCache
+      :: Map (S.GlobalId, [Either AlphaTerm AlphaType]) (S.Term 'S.VoidS)
+  -- ^ See '_workFreeAppCache': keyed by the global function and its closed
+  -- arguments, compared up to alpha-equivalence
   }
 
 Lens.makeLenses ''NormalizeState

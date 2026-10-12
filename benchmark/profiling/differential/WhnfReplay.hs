@@ -56,6 +56,7 @@
 -}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -110,6 +111,8 @@ import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
 import Test.Clash.Scoped.Evaluator.Adapter
   (clashVarsIds, clashVarsTyVars, emptyClashVars, toClashTermWith)
 import Clash.Core.Scoped.Evaluator.Types
+import Clash.Core.Scoped.NameMap (GlobalEnv)
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Core.Scoped.Subst (teleIdVars)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (addGlobalTypes, mkTypeEnv)
@@ -212,9 +215,10 @@ toScopedCall c = withConvEnv tvs ids $ \env ->
 -- | The result of the scoped evaluator, with the bindings it allocated bound
 -- around it
 runScoped
-  :: Distinct n => Env -> BindingMap -> Bool -> TransformContext n -> Term n -> Term n
-runScoped env bm isSubj ctx e =
-  whnf env isSubj (initMachine (tfScope ctx) (tfHeap ctx) bm (IntMap.empty, 0) e) $ \m ->
+  :: Distinct n
+  => Env -> GlobalEnv (Binding (Term 'VoidS)) -> Bool -> TransformContext n -> Term n -> Term n
+runScoped env gbm isSubj ctx e =
+  whnf env isSubj (initMachine (tfScope ctx) (tfHeap ctx) gbm (IntMap.empty, 0) e) $ \m ->
     bindAllocated m (mTerm m)
 
 -- * Comparing
@@ -247,12 +251,12 @@ instance NFData Outcome where
 -- | Compare the results of a call. Gives both results, normalized, if they
 -- differ.
 compareCall
-  :: C.TyConMap -> BindingMap -> Supply.Supply -> Env -> Call
-  -> (Outcome, Maybe (String, String))
-compareCall tcm bm sup env c = case toScopedCall c of
+  :: C.TyConMap -> BindingMap -> GlobalEnv (Binding (Term 'VoidS)) -> Supply.Supply -> Env
+  -> Call -> (Outcome, Maybe (String, String))
+compareCall tcm bm gbm sup env c = case toScopedCall c of
   ScopedCall isSubj ctx e tvs ids ->
     let sc = tfScope ctx
-        rS = runScoped env bm isSubj ctx e
+        rS = runScoped env gbm isSubj ctx e
         (rSC, vars) = runState (toClashTermWith rS) emptyClashVars
         rC = runCurrent tcm bm sup (curInput c)
         backS f = fromClashTermWith sc (clashVarsTyVars vars) (clashVarsIds vars) (f (readback 2 rSC))
@@ -298,6 +302,8 @@ whnfReplay opts tcm bm dumpFile = do
   hFlush stdout
   let te = addGlobalTypes (fmap bindingId bm) (mkTypeEnv tcm)
       env = evaluatorEnv te
+      -- Converted once, when they are first looked up
+      gbm = fromClashBindings bm
   eventsRef <- newIORef []
   let checkEnv
         | recording = P.recordingEnv eventsRef (roCheckPrims opts) te evaluator
@@ -306,7 +312,7 @@ whnfReplay opts tcm bm dumpFile = do
   -- Correctness
   results <- forM (zip [0 :: Int ..] calls) $ \(i, c) -> do
     writeIORef eventsRef []
-    r <- try $ timeout 20000000 $ evaluate $ force $ compareCall tcm bm sup checkEnv c
+    r <- try $ timeout 20000000 $ evaluate $ force $ compareCall tcm bm gbm sup checkEnv c
     events <- readIORef eventsRef >>= mapM forceEvent . reverse
     pure $ case r of
       Left (ex :: SomeException) -> (i, Failed (takeWhile (/= '\n') (show ex)), Nothing, events)
@@ -334,7 +340,7 @@ whnfReplay opts tcm bm dumpFile = do
     cur <- measure reps "current evaluator" $ \j ->
       evaluate (j + sum [termSize (runCurrent tcm bm sup ci) | ci <- cis])
     sco <- measure reps "scoped evaluator" $ \j ->
-      evaluate (j + sum [ scopedSize (runScoped env bm isSubj ctx e)
+      evaluate (j + sum [ scopedSize (runScoped env gbm isSubj ctx e)
                         | ScopedCall isSubj ctx e _ _ <- scs ])
     printf "  allocation ratio scoped/current: %.3f\n"
       (fromIntegral sco / fromIntegral cur :: Double)
@@ -342,7 +348,7 @@ whnfReplay opts tcm bm dumpFile = do
       perCall <- forM (zip3 [0 :: Int ..] cis scs) $ \(i, ci, sc) -> do
         aC <- allocation (evaluate (termSize (runCurrent tcm bm sup ci)))
         aS <- allocation $ case sc of
-          ScopedCall isSubj ctx e _ _ -> evaluate (scopedSize (runScoped env bm isSubj ctx e))
+          ScopedCall isSubj ctx e _ _ -> evaluate (scopedSize (runScoped env gbm isSubj ctx e))
         pure (aS - aC, i, aC, aS)
       printf "  calls with the most extra allocation (scoped - current):\n"
       forM_ (take nTop (List.sortOn (\(d, _, _, _) -> negate d) perCall)) $ \(d, i, aC, aS) ->

@@ -11,20 +11,10 @@
   = Globals
 
   Tables of the normalizer that are keyed by global binders (the recursive
-  components, the inline history, the normalized binders) are looked up by
-  'GlobalId', so that a local variable can never hit an entry of a global with
-  the same unique. The tables themselves are still those of Clash Core, in
-  'NormalizeState'.
-
-  = The boundary with Clash Core
-
-  During the port, the global bindings ('Clash.Rewrite.Types.bindings'), the
-  normalized binders ('normalized'), the work-free application cache
-  ('workFreeAppCache') are those of Clash Core.
-  The functions here convert at that boundary: bodies of global bindings are
-  converted into closed scoped terms ('fromClashTermClosed') when they are
-  read, and back ('toClashTermFresh') when they are stored. Phase 4 of the
-  port, which runs the normalizer on scoped Core, removes these conversions.
+  components, the inline history, the normalized binders) are t'GlobalEnv's,
+  so that a local variable can never hit an entry of a global with the same
+  unique. The global bindings ('Clash.Rewrite.Types.scopedBindings') and the
+  normalized ones ('scopedNormalized') are closed terms.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -70,7 +60,7 @@ import           Control.Lens                ((&), (+~), (.=), (%=))
 import qualified Control.Lens                as Lens
 import           Control.Monad.Extra         (anyM)
 import           Data.Bifunctor              (bimap)
-import qualified Data.HashMap.Strict         as HashMap
+import qualified Data.Map.Strict             as Map
 import qualified Data.IntMap.Strict          as IntMap
 import qualified Data.List                   as List
 import           Data.Maybe                  (fromMaybe)
@@ -80,15 +70,12 @@ import           GHC.Builtin.Names           (eqTyConKey)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.SrcLoc            (SrcSpan)
 
-import qualified Clash.Core.FreeVars         as C (globalIdOccursIn)
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C (TyConName)
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Var              as C
-import           Clash.Core.VarEnv
-  (extendVarEnv, extendVarEnvWith, lookupVarEnv, unitVarEnv)
 import           Clash.Debug                 (traceIf)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (FinalTerm), hasTransformationInfo)
@@ -96,11 +83,11 @@ import           Clash.Normalize.Primitives  (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util        (isConstantArg)
 import           Clash.Rewrite.Types
-  (bindings, curFun, debugOpts, extra, scopedTypeEnv)
+  (curFun, debugOpts, extra, scopedBindings, scopedTypeEnv)
 import           Clash.Unique                (fromGhcUnique)
 
-import           Clash.Core.Scoped.Convert
-  (fromClashTermClosed, toClashTerm, toClashType)
+import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
+import           Clash.Core.Scoped.Convert   (toClashType)
 import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
@@ -115,7 +102,6 @@ import           Clash.Rewrite.Scoped.Apply  (runRewrite)
 import           Clash.Rewrite.Scoped.Types
   (FrameKind (..), ScopedRewrite, TransformContext, ctxFrames, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Globals (freshGlobalId)
-import           Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh)
 
 -- * Constant arguments of primitives
 
@@ -139,8 +125,8 @@ alreadyInlined
   -- ^ Function in which we want to perform the inlining
   -> NormalizeMonad (Maybe Int)
 alreadyInlined f cf = do
-  inlinedHM <- Lens.use inlineHistory
-  pure (lookupVarEnv (globalIdVar f) =<< lookupVarEnv (globalIdVar cf) inlinedHM)
+  inlinedHM <- Lens.use scopedInlineHistory
+  pure (lookupGlobalEnv f =<< lookupGlobalEnv cf inlinedHM)
 
 -- | Record a new inlining in the 'inlineHistory'. See
 -- 'Clash.Normalize.Util.addNewInline'.
@@ -150,11 +136,11 @@ addNewInline
   -> GlobalId
   -- ^ Function in which we're inlining it
   -> NormalizeMonad ()
-addNewInline (globalIdVar -> f) (globalIdVar -> cf) =
-  inlineHistory %= extendVarEnvWith
-                     cf
-                     (unitVarEnv f 1)
-                     (\_ hm -> extendVarEnvWith f 1 (+) hm)
+addNewInline f cf =
+  scopedInlineHistory %= insertWithGlobalEnv
+                           (\_ hm -> insertWithGlobalEnv (+) f 1 hm)
+                           cf
+                           (singletonGlobalEnv f 1)
 
 -- | A tick to prefix an inlined expression with the name of the global it
 -- came from, see 'Clash.Normalize.Util.mkInlineTick'
@@ -176,23 +162,20 @@ isNonRecursiveGlobalVar _ = pure False
 -- 'recursiveComponents'. See 'Clash.Normalize.Util.isRecursiveBndr'.
 isRecursiveBndr :: GlobalId -> NormalizeSession Bool
 isRecursiveBndr g = do
-  cg <- Lens.use (extra.recursiveComponents)
-  case lookupVarEnv f cg of
+  cg <- Lens.use (extra.scopedRecursiveComponents)
+  case lookupGlobalEnv g cg of
     Just isR -> pure isR
     Nothing -> do
-      fBodyM <- lookupVarEnv f <$> Lens.use bindings
+      fBodyM <- lookupGlobalEnv g <$> Lens.use scopedBindings
       case fBodyM of
         Nothing -> pure False
         Just b -> do
           -- There are no global mutually-recursive functions, only
           -- self-recursive ones, so checking whether 'f' occurs in its body is
-          -- sufficient. The bindings are still those of Clash Core, see the
-          -- module header.
-          let isR = f `C.globalIdOccursIn` bindingTerm b
-          (extra.recursiveComponents) %= extendVarEnv f isR
+          -- sufficient.
+          let isR = g `memberGlobalSet` termGlobalIds (bindingTerm b)
+          (extra.scopedRecursiveComponents) %= insertGlobalEnv g isR
           pure isR
- where
-  f = globalIdVar g
 
 -- * Constant specialization
 
@@ -451,10 +434,9 @@ normalizeTopLvlBndr
   -> Binding (Term 'VoidS)
   -> NormalizeSession (Binding (Term 'VoidS))
 normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
-  cached <- lookupVarEnv (globalIdVar nm) <$> Lens.use (extra.normalized)
+  cached <- lookupGlobalEnv nm <$> Lens.use (extra.scopedNormalized)
   case cached of
-    -- Normalized binders are still those of Clash Core, see the module header
-    Just b -> pure (fromClashTermClosed <$> b)
+    Just b -> pure b
     Nothing -> do
       te <- Lens.view scopedTypeEnv
       let nmS = showPpr (C.varName (globalIdVar nm))
@@ -466,8 +448,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
       let ty' = toClashType (inferCoreTypeOf te emptyScope tm2)
           r' = mkGlobalId nm' `memberGlobalSet` termGlobalIds tm2
           b = Binding nm'{C.varType = ty'} sp inl pr tm2 r'
-      tmC <- toClashTermFresh tm2
-      (extra.normalized) %= extendVarEnv (globalIdVar nm) b{bindingTerm = tmC}
+      (extra.scopedNormalized) %= insertGlobalEnv nm b
       pure b
 
 -- | Normalize a global function applied to closed arguments, i.e. a work-free
@@ -488,12 +469,12 @@ normalizeWorkFreeApp
   -- ^ Closed arguments
   -> NormalizeSession (Term n)
 normalizeWorkFreeApp f b args = do
-  -- The cache is that of Clash Core, see the module header. Its keys are
-  -- compared up to alpha-equivalence, so the converted application finds the
-  -- normalized one of Clash Core too.
-  cache <- Lens.use (extra.workFreeAppCache)
-  case HashMap.lookup appC cache of
-    Just tm -> pure (sinkClosed (fromClashTermClosed tm))
+  -- Caching is sound because the application is closed, see
+  -- 'Clash.Normalize.Util.normalizeWorkFreeApp'. The keys are compared up to
+  -- alpha-equivalence.
+  cache <- Lens.use (extra.scopedWorkFreeAppCache)
+  case Map.lookup key cache of
+    Just tm -> pure (sinkClosed tm)
     Nothing -> do
       te <- Lens.view scopedTypeEnv
       -- The application is normalized as if it were the body of a binder of
@@ -508,11 +489,10 @@ normalizeWorkFreeApp f b args = do
       tm <- rewriteExpr ("normalization", normalization)
                         (showPpr (C.varName (globalIdVar f)), redex) (g, bindingLoc b)
       curFun .= old
-      tmC <- toClashTermFresh tm
-      (extra.workFreeAppCache) %= HashMap.insert appC tmC
+      (extra.scopedWorkFreeAppCache) %= Map.insert key tm
       pure (sinkClosed tm)
  where
-  appC = C.mkApps (C.Var (globalIdVar f)) (map (bimap toClashTerm toClashType) args)
+  key = (f, map (bimap AlphaTerm AlphaType) closedArgs)
   closedArgs = map (bimap (notClosed . closeTerm) (notClosed . closeType)) args
   notClosed :: Maybe a -> a
   notClosed = fromMaybe (error "normalizeWorkFreeApp: an argument is not closed")

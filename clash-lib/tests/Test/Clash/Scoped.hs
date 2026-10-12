@@ -121,7 +121,7 @@ import Clash.Rewrite.Scoped
   ( ScopedRewrite, Frame (LetBinding), pushFrame, rootContext, runScopedTransform
   , underAlt, underLam, underLet, underLetRec, underTyLam)
 import qualified Clash.Rewrite.Scoped as Scoped
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Clash.Rewrite.Scoped.ViaFoil (viaFoil, withGlobalBindings)
 import Clash.Rewrite.Types
   (Rewrite, RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
 import qualified Clash.Rewrite.Types as C
@@ -903,7 +903,8 @@ runScopedOn
   -> (forall n. Distinct n => Scope n -> Term n -> RewriteMonad extra a)
   -> IO (a, RewriteState extra, Bool)
 runScopedOn env st tm k =
-  runRewriteTest env st (withFreeVarsOf [tm] (\cenv -> k (convScope cenv) (fromClashTerm cenv tm)))
+  runRewriteTest env st $ withGlobalBindings $
+    withFreeVarsOf [tm] (\cenv -> k (convScope cenv) (fromClashTerm cenv tm))
 
 -- | Assert that a scoped 'Clash.Rewrite.StrategyDSL.onLet' handler agrees
 -- with one of Clash Core on a let-expression, run in the root context of the

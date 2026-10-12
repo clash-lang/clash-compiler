@@ -19,7 +19,7 @@ module Clash.Tests.Normalize.Scoped.Util (tests) where
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (evalState)
 import Data.Default (def)
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map.Strict as Map
 import qualified Data.List as List
 import GHC.Types.SrcLoc (noSrcSpan)
 import Test.Tasty
@@ -31,7 +31,6 @@ import Clash.Core.Name (NameSort (..))
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (lookupVarEnv, nullVarEnv)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeState (..))
@@ -49,6 +48,7 @@ import Clash.Core.Scoped.Term (mkTicks)
 import Clash.Core.Scoped.TermInfo (isClosed)
 import Clash.Core.Scoped.Util (mkLets)
 import qualified Clash.Normalize.Scoped.Util as Scoped
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Rewrite.Scoped.Types
   (Frame (..), ScopedRewrite, ScopedTransform (..), pushFrame, rootContext)
 import qualified Clash.Rewrite.Scoped.Combinators as Scoped (bottomupR)
@@ -204,7 +204,9 @@ xRec = localId User "x" 8 (intFunTy 0)
 -- | @g = \\x -> g x@
 recState :: RewriteState NormalizeState
 recState = def
-  { _bindings = mkBindingMap [(gGlobal, C.Lam xRec (C.App (C.Var gGlobal) (C.Var xRec)))] }
+  { _bindings = bm, _scopedBindings = fromClashBindings bm }
+ where
+  bm = mkBindingMap [(gGlobal, C.Lam xRec (C.App (C.Var gGlobal) (C.Var xRec)))]
 
 recursionTests :: [TestTree]
 recursionTests =
@@ -390,7 +392,8 @@ normState bs = st
       { _normalizationStrategy = incLits
       , _scopedNormalizationStrategy = incLitsScoped } }
  where
-  st = def{_bindings = mkBindingMap bs, _curFun = (curF, noSrcSpan)}
+  bm = mkBindingMap bs
+  st = def{_bindings = bm, _scopedBindings = fromClashBindings bm, _curFun = (curF, noSrcSpan)}
   curF = case bs of
     (i, _) : _ -> i
     [] -> error "normState: no bindings"
@@ -410,9 +413,8 @@ normalizeTests =
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco2)
       bindingRecursive sco @?= bindingRecursive cur
       assertAlphaEq (C.varType (bindingId cur)) (C.varType (bindingId sco))
-      -- The cache is that of Clash Core
-      case lookupVarEnv f (_normalized (_extra st1)) of
-        Just b -> assertAlphaEq (bindingTerm cur) (bindingTerm b)
+      case lookupGlobalEnv (mkGlobalId f) (_scopedNormalized (_extra st1)) of
+        Just b -> assertScopedAlphaEq (bindingTerm cur) (bindingTerm b)
         Nothing -> assertFailure "not cached"
       -- The strategy ran once
       _transformCounter st1 @?= 1
@@ -456,14 +458,13 @@ normalizeTests =
         pure (r1, r2)
       assertScopedAlphaEq cur sco
       assertScopedAlphaEq cur sco2
-      -- The cache is that of Clash Core
-      case HashMap.lookup (C.App (C.Var f2) (intLit 1)) (_workFreeAppCache (_extra st1)) of
-        Just t -> assertAlphaEq cur t
-        Nothing -> assertFailure "not cached"
+      case Map.elems (_scopedWorkFreeAppCache (_extra st1)) of
+        [t] -> assertScopedAlphaEq cur t
+        _ -> assertFailure "not cached"
       _transformCounter st1 @?= 1
       -- The application was normalized as the body of a binder of its own,
       -- which isn't added to the normalized binders
-      assertBool "normalized binders" (nullVarEnv (_normalized (_extra st1)))
+      assertBool "normalized binders" (nullGlobalEnv (_scopedNormalized (_extra st1)))
   ]
  where
   f = globalId User "f" 10 (intFunTy 1)

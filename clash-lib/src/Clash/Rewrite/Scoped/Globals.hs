@@ -3,23 +3,24 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The global bindings of the rewrite state, for scoped Clash Core.
-
-  During the port, the binding map of the rewrite state
-  ('Clash.Rewrite.Types.bindings') holds Clash Core, while scoped
-  transformations read and create global bindings as closed scoped terms
-  (@'Term' ''VoidS'@). This module is the boundary between the two: it
-  converts closed terms when they are read from or written to the binding
-  map. Closed terms convert cheaply, and 'sinkClosed' moves them into any
-  scope for free. Phase 4 of the port, which switches the binding map to
-  scoped Core, only changes this module.
+  The global bindings of the rewrite state, for scoped Clash Core: closed
+  terms (@'Term' ''VoidS'@) in 'Clash.Rewrite.Types.scopedBindings'. They
+  move into any scope for free, with 'sinkClosed'.
 
   Globals are looked up by 'GlobalId', so a local variable never finds the
   binding of a global with the same unique. New globals get a unique from the
   unique supply that no global binding has, never one derived from a local
   variable (decision D5 of the port). Note that a 'GlobalId' doesn't imply
   that there is a binding for it: e.g. 'Clash.Rewrite.Types.curFun' is a
-  global without a binding during 'Clash.Normalize.Util.normalizeWorkFreeApp'.
+  global without a binding during
+  'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp'.
+
+  = The boundary with Clash Core
+
+  Until Phase 5 of the port, GHC2Core produces bindings of Clash Core, and
+  Netlist consumes them. 'fromClashBindings' converts them into closed terms
+  when the normalizer starts, and 'toClashBindingsM' converts the normalized
+  ones back. These are the only conversions of the normalizer.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -32,62 +33,69 @@ module Clash.Rewrite.Scoped.Globals
   , findAlphaEqBinding
   , isTopEntity
   , isWorkFreeTerm
+    -- * The boundary with Clash Core
+  , fromClashBindings
+  , toClashBindings
+  , toClashBindingsM
   ) where
 
-import           Control.DeepSeq             (deepseq)
 import           Control.Lens                ((%=))
 import qualified Control.Lens                as Lens
-import           Data.Maybe                  (listToMaybe)
+import qualified Control.Monad.State.Strict  as State
+import           Data.List                   (find)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.Basic             (InlineSpec)
 import           GHC.Types.SrcLoc            (SrcSpan)
 
 import qualified Clash.Core.Name             as C
-import           Clash.Core.Subst            (aeqTerm)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.Var              as C
-import           Clash.Core.VarEnv           (elemVarSet)
+import           Clash.Core.VarEnv           (elemVarSet, uniqAway')
 import qualified Clash.Data.UniqMap          as UniqMap
-import           Clash.Driver.Types          (Binding (..), IsPrim (IsFun))
+import           Clash.Driver.Types          (Binding (..), BindingMap, IsPrim (IsFun))
 import           Clash.Rewrite.Types
-  (RewriteMonad, bindings, scopedTypeEnv, topEntities, workFreeBinders)
-import           Clash.Rewrite.Util          (cloneNameWithBindingMap)
-import qualified Clash.Rewrite.WorkFree      as C
+  (RewriteMonad, scopedBindings, scopedTypeEnv, scopedWorkFreeBinders, topEntities,
+   uniqSupply)
+import           Clash.Unique                (setUnique)
+import           Clash.Util                  (MonadUnique (..))
+import           Clash.Util.Supply           (Supply, splitSupply)
 
-import           Clash.Core.Scoped.Convert   (fromClashTermClosed, toClashTerm, toClashType)
+import           Clash.Core.Scoped.Alpha     (aeqTm)
+import           Clash.Core.Scoped.Convert   (fromClashTermClosed, toClashType)
 import           Clash.Core.Scoped.FreeVars  (termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
-import           Clash.Core.Scoped.NameMap   (memberGlobalSet)
+import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Syntax
-import           Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh)
+import           Clash.Rewrite.Scoped.ViaFoil (toClashTermFreshWith)
+import qualified Clash.Rewrite.Scoped.WorkFree as WorkFree
 
 -- | The binding of a global, as a closed term
-lookupBinding :: HasCallStack => GlobalId -> RewriteMonad extra (Maybe (Binding (Term 'VoidS)))
-lookupBinding g =
-  fmap (fmap fromClashTermClosed) . UniqMap.lookup (globalIdVar g) <$> Lens.use bindings
+lookupBinding :: GlobalId -> RewriteMonad extra (Maybe (Binding (Term 'VoidS)))
+lookupBinding g = lookupGlobalEnv g <$> Lens.use scopedBindings
 
 -- | A new global variable with the given name and closed type. It gets a
 -- unique from the unique supply that no global binding has, see
 -- 'Clash.Rewrite.Util.cloneNameWithBindingMap'.
 freshGlobalId :: C.Name C.Term -> Type 'VoidS -> RewriteMonad extra GlobalId
 freshGlobalId nm ty = do
-  bndrs <- Lens.use bindings
-  nm' <- cloneNameWithBindingMap bndrs nm
-  pure (mkGlobalId (C.mkGlobalId (toClashType ty) nm'))
+  bndrs <- Lens.use scopedBindings
+  u <- getUniqueM
+  let tyC = toClashType ty
+      global nm' = mkGlobalId (C.mkGlobalId tyC nm')
+      taken u' = memberGlobalEnv (global (setUnique nm u')) bndrs
+  pure (global (uniqAway' taken u (setUnique nm u)))
 
 -- | Add a global binding, see 'Clash.Rewrite.Util.addGlobalBind'
 addGlobalBind
-  :: HasCallStack
-  => GlobalId
+  :: GlobalId
   -> SrcSpan
   -> InlineSpec
   -> Term 'VoidS
   -> RewriteMonad extra ()
-addGlobalBind g sp inl body = do
-  body' <- toClashTermFresh body
-  let v = globalIdVar g
-      r = g `memberGlobalSet` termGlobalIds body
-  body' `deepseq` bindings %= UniqMap.insert v (Binding v sp inl IsFun body' r)
+addGlobalBind g sp inl body =
+  scopedBindings %= insertGlobalEnv g (Binding (globalIdVar g) sp inl IsFun body r)
+ where
+  r = g `memberGlobalSet` termGlobalIds body
 
 -- | Make a global function of a closed term, and give its variable. See
 -- 'Clash.Rewrite.Util.mkFunction'.
@@ -106,24 +114,53 @@ mkFunction nm sp inl body = do
   pure g
 
 -- | A global binding whose body is alpha-equivalent to the given closed
--- term, if there is one
-findAlphaEqBinding :: HasCallStack => Term 'VoidS -> RewriteMonad extra (Maybe GlobalId)
+-- term, if there is one. The first in the order of the uniques of the
+-- globals.
+findAlphaEqBinding :: Term 'VoidS -> RewriteMonad extra (Maybe GlobalId)
 findAlphaEqBinding body = do
-  bndrs <- Lens.use bindings
-  let body' = toClashTerm body
-  pure (mkGlobalId . bindingId <$>
-          listToMaybe (UniqMap.elems (UniqMap.filter ((`aeqTerm` body') . bindingTerm) bndrs)))
+  bndrs <- Lens.use scopedBindings
+  pure (fst <$> find (aeqTm body . bindingTerm . snd) (globalEnvToList bndrs))
 
 -- | Whether a global is a top entity
 isTopEntity :: GlobalId -> RewriteMonad extra Bool
 isTopEntity g = (globalIdVar g `elemVarSet`) <$> Lens.view topEntities
 
--- | Whether a term is work free, see 'Clash.Rewrite.WorkFree.isWorkFree'.
+-- | Whether a term is work free, see 'Clash.Rewrite.Scoped.WorkFree.isWorkFree'.
 -- Caches the work-freeness of global binders in the rewrite state.
---
--- This converts the term, rather than the bindings of the globals it refers
--- to, as 'Clash.Rewrite.Scoped.WorkFree.isWorkFree' needs all of them.
 isWorkFreeTerm :: HasCallStack => Term n -> RewriteMonad extra Bool
 isWorkFreeTerm e = do
-  bndrs <- Lens.use bindings
-  C.isWorkFree workFreeBinders bndrs (toClashTerm e)
+  bndrs <- Lens.use scopedBindings
+  WorkFree.isWorkFree scopedWorkFreeBinders bndrs e
+
+-- * The boundary with Clash Core
+
+-- | The global bindings of Clash Core as closed terms of scoped Clash Core.
+-- A body is converted when it is first used: most bindings that GHC2Core
+-- produces are never looked at.
+fromClashBindings :: HasCallStack => BindingMap -> GlobalEnv (Binding (Term 'VoidS))
+fromClashBindings bm =
+  globalEnvFromList
+    [ (mkGlobalId (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
+
+-- | Global bindings of scoped Clash Core as bindings of Clash Core. Every
+-- binder gets a fresh unique from the supply, so that a local binder never
+-- shares its unique with a global one, see
+-- 'Clash.Rewrite.Scoped.ViaFoil.toClashTermFresh'.
+toClashBindings :: HasCallStack => Supply -> GlobalEnv (Binding (Term 'VoidS)) -> BindingMap
+toClashBindings sup bndrs =
+  UniqMap.fromList [ (globalIdVar g, b') | (g, b') <- State.evalState (mapM conv (globalEnvToList bndrs)) sup ]
+ where
+  conv (g, b) = do
+    tm <- toClashTermFreshWith (bindingTerm b)
+    pure (g, b {bindingTerm = tm})
+
+-- | 'toClashBindings' with a split of the unique supply of the rewrite state
+toClashBindingsM
+  :: HasCallStack
+  => GlobalEnv (Binding (Term 'VoidS))
+  -> RewriteMonad extra BindingMap
+toClashBindingsM bndrs = do
+  sup <- Lens.use uniqSupply
+  let (sup1, sup2) = splitSupply sup
+  uniqSupply Lens..= sup2
+  pure (toClashBindings sup1 bndrs)

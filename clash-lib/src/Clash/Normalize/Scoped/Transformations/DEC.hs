@@ -68,6 +68,7 @@
     doesn't collect applications of a type that isn't representable.
 -}
 
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
@@ -113,13 +114,13 @@ import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import qualified Clash.Data.UniqMap as UniqMap
-import Clash.Driver.Types (BindingMap)
+import Clash.Driver.Types (Binding)
 import qualified Clash.Normalize.Primitives as NP
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types
-  (bindings, globalHeap, scopedTypeEnv, tupleTcCache)
+  (globalHeap, scopedBindings, scopedTypeEnv, tupleTcCache)
 import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
@@ -131,7 +132,7 @@ import Clash.Core.Scoped.FreeVars
   (bindNameBinders, freeTmVars, patNameBinders, teleNameBinders)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf, piResultTy)
 import Clash.Core.Scoped.NameMap
-  ( NameBinders, appendNameBinders, emptyNameBinders, emptyNameMap
+  ( GlobalEnv, NameBinders, appendNameBinders, emptyNameBinders, emptyNameMap
   , memberNameSet )
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
@@ -233,7 +234,7 @@ data DecEnv = DecEnv
   , deTupleTcs :: IntMap TyConName
   -- ^ The tuple type constructors, by arity
   , deEvalEnv :: Env
-  , deBindings :: BindingMap
+  , deBindings :: GlobalEnv (Binding (Term 'VoidS))
   , dePrimHeap :: PrimHeap
   }
 
@@ -241,7 +242,7 @@ decEnv :: NormalizeSession DecEnv
 decEnv = do
   te <- Lens.view scopedTypeEnv
   tupTcs <- Lens.view tupleTcCache
-  bm <- Lens.use bindings
+  bm <- Lens.use scopedBindings
   ph <- Lens.use globalHeap
   pure (DecEnv te tupTcs (evaluatorEnv te) bm ph)
 

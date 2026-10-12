@@ -10,6 +10,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -48,7 +49,9 @@ import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Core.Var            (Id)
 import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
 import Clash.Driver.Types
-  (ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts, HasClashOpts(..))
+  (Binding, ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts, HasClashOpts(..))
+import Clash.Core.Scoped.NameMap (GlobalEnv)
+import qualified Clash.Core.Scoped.Syntax as S
 import Clash.Driver.Warning      (CanWarn)
 import Clash.Netlist.Types       (FilteredHWType, HWMap)
 import Clash.Primitives.Types    (CompiledPrimMap)
@@ -84,7 +87,8 @@ data RewriteState extra
   , _transformTriedCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation has been tried
   , _bindings         :: !BindingMap
-  -- ^ Global binders
+  -- ^ Global binders, for the transformations of Clash Core. See
+  -- '_scopedBindings'.
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
   , _curFun           :: (Id,SrcSpan) -- Initially set to undefined: no strictness annotation
@@ -95,6 +99,13 @@ data RewriteState extra
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
   , _workFreeBinders  :: VarEnv Bool
   -- ^ Map telling whether a binder's definition is work-free
+  , _scopedBindings   :: GlobalEnv (Binding (S.Term 'S.VoidS))
+  -- ^ Global binders, as closed terms of scoped Clash Core. The normalizer
+  -- uses these; '_bindings' are those of the transformations of Clash Core,
+  -- until Phase 7 of the port deletes them.
+  , _scopedWorkFreeBinders :: GlobalEnv Bool
+  -- ^ Map telling whether the definition of a global binder in
+  -- '_scopedBindings' is work-free
   , _hwTypeCache      :: HWMap
   -- ^ Cache for the Core-type to HWType translation. The translation only
   -- depends on environment that is constant for the whole rewrite session

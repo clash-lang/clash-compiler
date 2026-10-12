@@ -113,6 +113,7 @@ import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax (Distinct, S (VoidS), Term)
 import Clash.Core.Scoped.NameMap (emptyNameMap)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
 -- * Evaluating
 
@@ -122,7 +123,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv)
 -- as Clash Core: its free variables keep their uniques.
 scopedWhnf :: Env -> BindingMap -> Bool -> C.Term -> C.Term
 scopedWhnf env bm isSubj t = withConvEnv tvs ids $ \cenv ->
-  let m0 = initMachine (convScope cenv) emptyNameMap bm (IntMap.empty, 0) (fromClashTerm cenv t)
+  let m0 = initMachine (convScope cenv) emptyNameMap (fromClashBindings bm) (IntMap.empty, 0) (fromClashTerm cenv t)
   in whnf env isSubj m0 $ \m -> toClashTerm (bindAllocated m (mTerm m))
  where
   tvs = C.dependencySortTyVars (List.nubBy sameUniq (Lens.toListOf C.termFreeTyVars t))

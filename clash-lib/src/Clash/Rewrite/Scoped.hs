@@ -76,9 +76,8 @@
   = Utilities
 
   The counterparts of the utilities in "Clash.Rewrite.Util" are in
-  "Clash.Rewrite.Scoped.Util". Read and create global bindings with
-  "Clash.Rewrite.Scoped.Globals", which converts them while the binding map
-  holds Clash Core.
+  "Clash.Rewrite.Scoped.Util". Read and create global bindings, which are
+  closed terms, with "Clash.Rewrite.Scoped.Globals".
 
   = Evaluation
 

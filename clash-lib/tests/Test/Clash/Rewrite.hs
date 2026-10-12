@@ -40,6 +40,7 @@ import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (apply, changed, runRewrite)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
+import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
@@ -146,6 +147,8 @@ instance Default extra => Default (RewriteState extra) where
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
     , _workFreeBinders=emptyVarEnv
+    , _scopedBindings=emptyGlobalEnv
+    , _scopedWorkFreeBinders=emptyGlobalEnv
     , _hwTypeCache=mempty
     , _globalHeap=error "_globalHeap: NYI"
     , _extra=def
@@ -164,6 +167,12 @@ instance Default NormalizeState where
     , _scopedNormalizationStrategy=normalization
     , _scopedConstantPropagationStrategy=constantPropagation
     , _workFreeAppCache=HashMap.empty
+    , _scopedNormalized=emptyGlobalEnv
+    , _scopedSpecialisationCache=Map.empty
+    , _scopedSpecialisationHistory=emptyGlobalEnv
+    , _scopedInlineHistory=emptyGlobalEnv
+    , _scopedRecursiveComponents=emptyGlobalEnv
+    , _scopedWorkFreeAppCache=Map.empty
     }
 
 instance Default InScopeSet where

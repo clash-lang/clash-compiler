@@ -107,7 +107,7 @@ import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (elemVarEnv, emptyVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
+  (elemVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
 import           Clash.Debug                      (debugIsOn)
 import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
 import           Clash.Driver.Types
@@ -125,6 +125,9 @@ import           Clash.Netlist.Types
 import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
+import           Clash.Core.Scoped.NameMap        (emptyGlobalEnv)
+import           Clash.Core.Scoped.Syntax         (mkGlobalId)
+import           Clash.Rewrite.Scoped.Globals     (toClashBindingsM)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
@@ -1183,12 +1186,16 @@ normalizeEntity
   -> IO BindingMap
 normalizeEntity env bindingsMap typeTrans eval topEntities supply tm = transformedBindings
   where
-    doNorm = do norm <- normalize [tm]
+    -- The normalizer runs on scoped Clash Core: 'runNormalization' converts
+    -- the bindings, and 'toClashBindingsM' converts the normalized ones back,
+    -- see "Clash.Normalize"
+    doNorm = do let top = mkGlobalId tm
+                norm <- normalize [top]
                 let normChecked = checkNonRecursive norm
-                cleaned <- cleanupGraph tm normChecked
-                return cleaned
+                cleaned <- cleanupGraph top normChecked
+                toClashBindingsM cleaned
     transformedBindings = runNormalization env supply bindingsMap
-                            typeTrans eval emptyVarEnv
+                            typeTrans eval emptyGlobalEnv
                             topEntities doNorm
 
 -- | Reverse topologically sort given top entities. Also returns a mapping that
