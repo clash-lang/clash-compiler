@@ -13,11 +13,12 @@ import Clash.Annotations.Primitive (Primitive(InlineYamlPrimitive))
 import Clash.Netlist.Id (Identifier)
 import qualified Clash.Netlist.Id as Id
 import qualified Clash.Netlist.Types as N
-import qualified Clash.Netlist.BlackBox.Types as N
+import qualified Clash.Netlist.BlackBox.Types as N hiding (BlackBoxFunction)
+import qualified Clash.Netlist.Scoped.Types as N (BlackBoxFunction)
 import Data.String.Interpolate (i)
 
 funcBBF :: N.BlackBoxFunction
-funcBBF _ _ _ _ =
+funcBBF _ _ _ _ _ =
   pure $ Right
     ( N.emptyBlackBoxMeta{N.bbKind = N.TDecl}
     , N.BBFunction (show 'funcTF) 0 funcTF )

@@ -12,7 +12,8 @@ import Clash.Explicit.Testbench
 import qualified Clash.Netlist.Types as N
 import qualified Clash.Netlist.BlackBox.Types as N
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, BlackBoxMeta (..), TemplateKind (TDecl), emptyBlackBoxMeta)
+  (BlackBoxMeta (..), TemplateKind (TDecl), emptyBlackBoxMeta)
+import           Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Primitives.DSL
 
 import Data.List (isInfixOf)
@@ -26,7 +27,7 @@ tieOffShDdr !_clk !_rst !_ = (undefined, undefined)
 {-# ANN tieOffShDdr (blackBoxHaskell 'tieOffShDdr 'tieOffShDdrBBF def{bo_multiResult=True}) #-}
 
 tieOffShDdrBBF :: BlackBoxFunction
-tieOffShDdrBBF _isD _primName _args _ty = pure (Right (meta, bb))
+tieOffShDdrBBF _env _isD _primName _args _ty = pure (Right (meta, bb))
   where
     bb = N.BBFunction (show 'tieOffShDdr) 0 tieOffShDdrTF
     meta = emptyBlackBoxMeta

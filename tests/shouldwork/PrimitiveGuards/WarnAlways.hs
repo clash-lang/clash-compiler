@@ -7,11 +7,12 @@ module WarnAlways where
 import Clash.Prelude hiding (Text)
 import Clash.Annotations.Primitive (warnAlways)
 import Clash.Netlist.Types (BlackBox(BBTemplate))
-import Clash.Netlist.BlackBox.Types (BlackBoxFunction, emptyBlackBoxMeta, Element(ArgGen,Text))
+import Clash.Netlist.BlackBox.Types (emptyBlackBoxMeta, Element(ArgGen,Text))
+import Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Annotations.Primitive (Primitive(InlinePrimitive), HDL(VHDL))
 
 primitiveTF :: BlackBoxFunction
-primitiveTF isD primName args ty = pure $
+primitiveTF _env isD primName args ty = pure $
   Right ( emptyBlackBoxMeta, BBTemplate [Text "5 + ", ArgGen 0 0])
 
 primitive
