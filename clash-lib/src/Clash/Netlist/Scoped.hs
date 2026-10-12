@@ -91,7 +91,7 @@ import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, coreTypeToHWTypeM', dcToLiteral, declareInstUses,
    expandTopEntityOrErrM, isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
-   primWarnContext, procAssign)
+   primWarnContext, procAssign, unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
 import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
@@ -118,8 +118,7 @@ import           Clash.Netlist.Scoped.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
-  (UniqueNormalized (..), mkUniqueNormalized, splitNormalized,
-   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
+  (UniqueNormalized (..), mkUniqueNormalized, splitNormalized, withTicks)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
