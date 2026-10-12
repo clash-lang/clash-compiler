@@ -70,6 +70,9 @@ import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
+import Clash.Core.Scoped.Alpha              (AlphaType)
+import Clash.Core.Scoped.Syntax             (Distinct, Scope)
+import qualified Clash.Core.Scoped.Syntax   as S (Type)
 import Clash.Core.Scoped.TypeEnv            (TypeEnv)
 import Clash.Core.Evaluator.Types           (Evaluator)
 import Clash.Core.Type                      (Type)
@@ -131,7 +134,30 @@ newtype NetlistMonad a =
   deriving newtype (Functor, Monad, Applicative, MonadReader NetlistEnv,
                     Strict.MonadState NetlistState, Strict.MonadIO, MonadFail)
 
-type HWMap = Map Type (Either String FilteredHWType)
+-- | Cache of the translation of types to HWTypes ('HWTypeTranslator'). It
+-- only holds closed types: a type with free type variables, e.g. one that
+-- mentions the existentially quantified type variables of a data constructor,
+-- is translated again for every use.
+type HWMap = Map AlphaType (Either String FilteredHWType)
+
+-- | Translates the types that the type translation of
+-- "Clash.Netlist.Util" ('Clash.Netlist.Util.coreTypeToHWType') can't translate
+-- by looking at their data constructors: numbers, vectors, clocks, ... See
+-- 'Clash.GHC.NetlistTypes.ghcTypeToHWType'. Gives 'Nothing' for types it
+-- doesn't know.
+--
+-- The type is in scope @n@, which functions that look through newtypes and
+-- type families need ('Clash.Core.Scoped.Type.coreView').
+newtype HWTypeTranslator = HWTypeTranslator
+  { runHWTypeTranslator
+      :: forall n
+       . Distinct n
+      => CustomReprs
+      -> TypeEnv
+      -> Scope n
+      -> S.Type n
+      -> Strict.State HWMap (Maybe (Either String FilteredHWType))
+  }
 
 -- | See 'is_freshCache'
 type FreshCache = HashMap Text (IntMap Word)
@@ -315,8 +341,7 @@ data NetlistState
   , _components     :: ComponentMap
   -- ^ Cached components. Is an insertion ordered map to preserve a topologically
   -- sorted component list for the manifest file.
-  , _typeTranslator :: CustomReprs -> TyConMap -> Type
-                    -> Strict.State HWMap (Maybe (Either String FilteredHWType))
+  , _typeTranslator :: HWTypeTranslator
   -- ^ Hardcoded Type -> HWType translator
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _seenIds        :: IdentifierSet

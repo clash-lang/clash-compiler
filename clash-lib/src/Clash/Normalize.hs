@@ -47,7 +47,6 @@ import qualified Control.Lens                     as Lens
 import           Control.Monad                    ((>=>), when)
 import qualified Control.Monad                    as Monad
 import           Control.Monad.IO.Class           (liftIO)
-import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts, partitionEithers)
 import qualified Data.IntMap                      as IntMap
@@ -65,13 +64,10 @@ import           Data.Text.Prettyprint.Doc        (vcat)
 
 import           GHC.BasicTypes.Extra             (isNoInline)
 
-import           Clash.Annotations.BitRepresentation.Internal
-  (CustomReprs)
 import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.HasType
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
-import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
-import           Clash.Core.TyCon                 (TyConMap)
+import           Clash.Core.Type                  (splitCoreFunForallTy)
 import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
@@ -81,7 +77,7 @@ import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (Binding(..), DebugOpts(..), ClashEnv(..), GlobalBindings)
 import           Clash.Netlist.Types
-  (HWMap, FilteredHWType(..))
+  (HWTypeTranslator)
 import           Clash.Normalize.Strategy         (constantPropagation, normalization)
 import           Clash.Normalize.Strategy.Spec    (flattenSpec)
 import           Clash.Normalize.Types
@@ -123,8 +119,7 @@ runNormalization
   -- ^ UniqueSupply
   -> GlobalBindings
   -- ^ Global Binders
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -- ^ Hardcoded Type -> HWType translator
   -> WHNF.Evaluator
   -- ^ Hardcoded evaluator for WHNF

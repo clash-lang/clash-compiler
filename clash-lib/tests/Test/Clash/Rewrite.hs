@@ -15,7 +15,7 @@
 
 module Test.Clash.Rewrite where
 
-import Clash.Annotations.BitRepresentation.Internal (CustomReprs, buildCustomReprs)
+import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
@@ -36,12 +36,13 @@ import Clash.Core.VarEnv
 import Clash.Driver.Types
   ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), DebugOpts
   , IsPrim (IsFun), defClashOpts, debugSilent )
-import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
+import Clash.Netlist.Types (FilteredHWType (..), HWTypeTranslator (..), HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (apply, changed, runRewrite)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
+import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
@@ -51,7 +52,6 @@ import Clash.Unique (Unique, fromGhcUnique)
 
 import Control.Applicative ((<|>))
 import qualified Control.Lens as Lens
-import Control.Monad.Trans.State.Strict (State)
 import Control.DeepSeq (NFData, force)
 import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
@@ -128,14 +128,11 @@ withTyConMap tcm env = env
 -- translator is a lot more refined, but this suffices for transformations that
 -- only look at /whether/ a type is representable, such as 'caseCase' and
 -- 'nonRepANF'.
-testTypeTranslator
-  :: CustomReprs
-  -> C.TyConMap
-  -> C.Type
-  -> State HWMap (Maybe (Either String FilteredHWType))
-testTypeTranslator _reprs _tcm ty = pure $ Just $ case C.tyView ty of
-  C.FunTy {} -> Left "function types are not representable"
-  _ -> Right (FilteredHWType (Signed 64) [])
+testTypeTranslator :: HWTypeTranslator
+testTypeTranslator = HWTypeTranslator $ \_reprs _tenv _sc ty -> pure $ Just $
+  case S.tyView ty of
+    S.FunTy {} -> Left "function types are not representable"
+    _ -> Right (FilteredHWType (Signed 64) [])
 
 instance Default extra => Default (RewriteState extra) where
   def = RewriteState

@@ -18,6 +18,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -49,7 +50,6 @@ import           Data.List               (unzip4, partition)
 import qualified Data.List               as List
 import           Data.List.NonEmpty      (NonEmpty((:|)))
 import qualified Data.Map                as Map
-import           Data.Map                (Map)
 import           Data.Maybe
   (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
 import           Text.Printf             (printf)
@@ -71,17 +71,15 @@ import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
 
 import           Clash.Annotations.TopEntity
   (TopEntity(..), PortName(..), defSyn)
-import           Clash.Annotations.BitRepresentation.ClashLib
-  (coreToType')
 import           Clash.Annotations.BitRepresentation.Internal
-  (CustomReprs, ConstrRepr'(..), DataRepr'(..), getDataRepr,
+  (CustomReprs, ConstrRepr'(..), DataRepr'(..), Type'(..), getDataRepr,
    uncheckedGetConstrRepr)
 import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Annotations.Primitive (HDL(VHDL))
 import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
-import           Clash.Core.FreeVars     (typeFreeVars, typeFreeVars')
+import           Clash.Core.FreeVars     (dependencySortTyVars, typeFreeVars, typeFreeVars')
 import           Clash.Core.HasFreeVars  (elemFreeVars, freeVarsOf, isClosed)
 import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
@@ -100,10 +98,10 @@ import           Clash.Core.TermLiteral (termToDataError)
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, normalizeType,
+  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, normalizeType,
    splitCoreFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
-  (splitShouldSplit, substArgTys, tyLitShow)
+  (splitShouldSplit, tyLitShow)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
@@ -112,6 +110,17 @@ import           Clash.Core.VarEnv
 import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax (mkGlobalId)
 import qualified Clash.Data.UniqMap as UniqMap
+import           Clash.Core.Scoped.Alpha (AlphaType (..))
+import           Clash.Core.Scoped.Convert
+  (convScope, fromClashType, fromClashTypeClosed, withConvEnv)
+import           Clash.Core.Scoped.DataCon (dataConInstExtTyVars)
+import           Clash.Core.Scoped.Pretty ()
+import           Clash.Core.Scoped.Subst (closeType)
+import           Clash.Core.Scoped.Syntax (Distinct)
+import qualified Clash.Core.Scoped.Syntax as S
+import qualified Clash.Core.Scoped.Type as S (TypeView (..), coreView1, tyView)
+import           Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, typeEnvTyConMap)
+import qualified Clash.Core.Type as C (ConstTy (..))
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
@@ -217,21 +226,36 @@ splitNormalized tcm expr = case collectBndrs expr of
   ty = inferCoreTypeOf tcm expr
   inScopeArgs = extendInScopeSetList emptyInScopeSet . lefts
 
--- | Converts a Core type to a HWType given a function that translates certain
--- builtin types. Errors if the Core type is not translatable.
+-- | Converts a type to a HWType given a function that translates certain
+-- builtin types. Errors if the type is not translatable.
 unsafeCoreTypeToHWType
-  :: SrcSpan
+  :: Distinct n
+  => SrcSpan
   -- ^ Approximate location in original source file
   -> String
-  -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  -> HWTypeTranslator
   -> CustomReprs
-  -> TyConMap
-  -> Type
+  -> TypeEnv
+  -> S.Scope n
+  -> S.Type n
   -> State HWMap FilteredHWType
-unsafeCoreTypeToHWType sp loc builtInTranslation reprs m ty =
+unsafeCoreTypeToHWType sp loc builtInTranslation reprs te sc ty =
   either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id <$>
-    coreTypeToHWType builtInTranslation reprs m ty
+    coreTypeToHWType builtInTranslation reprs te sc ty
+
+-- | Run a function on scoped types on a type of Clash Core: its free type
+-- variables become the variables of the scope.
+--
+-- TODO(Phase 7): remove, together with the functions on Clash Core that use it.
+withLegacyType
+  :: HasCallStack
+  => Type
+  -> (forall n. Distinct n => S.Scope n -> S.Type n -> r)
+  -> r
+withLegacyType ty k =
+  case List.nubBy (\a b -> varUniq a == varUniq b) (Lens.toListOf typeFreeVars ty) of
+    [] -> k S.emptyScope (fromClashTypeClosed S.emptyScope ty)
+    tvs -> withConvEnv (dependencySortTyVars tvs) [] (\env -> k (convScope env) (fromClashType env ty))
 
 -- | Same as @unsafeCoreTypeToHWTypeM@, but discards void filter information
 unsafeCoreTypeToHWTypeM'
@@ -249,9 +273,10 @@ unsafeCoreTypeToHWTypeM loc ty = do
   (_,cmpNm) <- Lens.use curCompNm
   tt        <- Lens.use typeTranslator
   reprs     <- Lens.view customReprs
-  tcm       <- Lens.view tcCache
+  te        <- Lens.view typeEnv
   htm0      <- Lens.use htyCache
-  let (hty,htm1) = runState (unsafeCoreTypeToHWType cmpNm loc tt reprs tcm ty) htm0
+  let (hty,htm1) =
+        runState (withLegacyType ty (unsafeCoreTypeToHWType cmpNm loc tt reprs te)) htm0
   htyCache Lens..= htm1
   return hty
 
@@ -272,9 +297,9 @@ coreTypeToHWTypeM
 coreTypeToHWTypeM ty = do
   tt    <- Lens.use typeTranslator
   reprs <- Lens.view customReprs
-  tcm   <- Lens.view tcCache
+  te    <- Lens.view typeEnv
   htm0  <- Lens.use htyCache
-  let (hty,htm1) = runState (coreTypeToHWType tt reprs tcm ty) htm0
+  let (hty,htm1) = runState (withLegacyType ty (coreTypeToHWType tt reprs te)) htm0
   htyCache Lens..= htm1
   return (either (const Nothing) Just hty)
 
@@ -364,13 +389,13 @@ convertToCustomRepr reprs dRepr@(DataRepr' name' size constrs) hwTy =
 maybeConvertToCustomRepr
   :: CustomReprs
   -- ^ Map containing all custom representations index on its type
-  -> Type
+  -> S.Type n
   -- ^ Custom reprs are index on type, so we need the clash core type to look
   -- it up.
   -> FilteredHWType
   -- ^ Type of previous argument represented as a HWType
   -> FilteredHWType
-maybeConvertToCustomRepr reprs (coreToType' -> Right tyName) (FilteredHWType hwTy filtered)
+maybeConvertToCustomRepr reprs (typeToType' -> Right tyName) (FilteredHWType hwTy filtered)
   | Just dRepr <- getDataRepr tyName reprs =
     FilteredHWType
       (convertToCustomRepr reprs dRepr hwTy)
@@ -378,55 +403,72 @@ maybeConvertToCustomRepr reprs (coreToType' -> Right tyName) (FilteredHWType hwT
                                 | (fields, constr) <- zip filtered (drConstrs dRepr)]
 maybeConvertToCustomRepr _reprs _ty hwTy = hwTy
 
+-- | Convert a type to a bit representation type, see
+-- 'Clash.Annotations.BitRepresentation.ClashLib.coreToType''
+typeToType' :: S.Type n -> Either String Type'
+typeToType' = \case
+  S.AppTy t1 t2 -> AppTy' <$> typeToType' t1 <*> typeToType' t2
+  S.ConstTy (C.TyCon name) -> return (ConstTy' (nameOcc name))
+  S.LitTy (NumTy n) -> return (LitTy' n)
+  S.LitTy (SymTy lit) -> return (SymLitTy' (Text.pack lit))
+  e -> Left ($(curLoc) ++ "Unexpected type: " ++ show e)
+
 -- | Same as @coreTypeToHWType@, but discards void filter information
 coreTypeToHWType'
-  :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  :: Distinct n
+  => HWTypeTranslator
   -> CustomReprs
-  -> TyConMap
-  -> Type
+  -> TypeEnv
+  -> S.Scope n
+  -> S.Type n
   -- ^ Type to convert to HWType
   -> State HWMap (Either String HWType)
-coreTypeToHWType' builtInTranslation reprs m ty =
-  fmap stripFiltered <$> coreTypeToHWType builtInTranslation reprs m ty
+coreTypeToHWType' builtInTranslation reprs te sc ty =
+  fmap stripFiltered <$> coreTypeToHWType builtInTranslation reprs te sc ty
 
 
--- | Converts a Core type to a HWType given a function that translates certain
--- builtin types. Returns a string containing the error message when the Core
--- type is not translatable.
+-- | Converts a type to a HWType given a function that translates certain
+-- builtin types. Returns a string containing the error message when the type
+-- is not translatable.
+--
+-- Caches the translation of closed types, see 'HWMap'.
 coreTypeToHWType
-  :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  :: Distinct n
+  => HWTypeTranslator
   -> CustomReprs
-  -> TyConMap
-  -> Type
+  -> TypeEnv
+  -> S.Scope n
+  -> S.Type n
   -- ^ Type to convert to HWType
   -> State HWMap (Either String FilteredHWType)
-coreTypeToHWType builtInTranslation reprs m ty = do
-  htyM <- Map.lookup ty <$> get
-  case htyM of
-    Just hty -> return hty
-    _ -> do
-      hty0M <- builtInTranslation reprs m ty
-      hty1  <- go hty0M ty
-      modify (Map.insert ty hty1)
-      return hty1
+coreTypeToHWType builtInTranslation reprs te sc ty = case closeType ty of
+  Just tyC -> do
+    htyM <- Map.lookup (AlphaType tyC) <$> get
+    case htyM of
+      Just hty -> return hty
+      _ -> do
+        hty <- translate S.emptyScope tyC
+        modify (Map.insert (AlphaType tyC) hty)
+        return hty
+  Nothing -> translate sc ty
  where
-  -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
-  go :: Maybe (Either String FilteredHWType)
-     -> Type
-     -> State (Map Type (Either String FilteredHWType))
-              (Either String FilteredHWType)
-  go (Just hwtyE) _ = pure $ maybeConvertToCustomRepr reprs ty <$> hwtyE
-  -- Strip transparant types:
-  go _ (coreView1 m -> Just ty') =
-    coreTypeToHWType builtInTranslation reprs m ty'
-  -- Try to create hwtype based on AST:
-  go _ (tyView -> TyConApp tc args) = runExceptT $ do
-    hwty <- mkADT builtInTranslation reprs m (showPpr ty) tc args
-    return (maybeConvertToCustomRepr reprs ty hwty)
-  -- All methods failed:
-  go _ _ = return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty
+  translate
+    :: Distinct m => S.Scope m -> S.Type m -> State HWMap (Either String FilteredHWType)
+  translate sc1 ty1 = do
+    -- Try builtin translation; for now this is hardcoded to be the one in ghcTypeToHWType
+    hty0M <- runHWTypeTranslator builtInTranslation reprs te sc1 ty1
+    case hty0M of
+      Just hwtyE -> pure (maybeConvertToCustomRepr reprs ty1 <$> hwtyE)
+      Nothing -> case S.coreView1 te sc1 ty1 of
+        -- Strip transparant types:
+        Just ty2 -> coreTypeToHWType builtInTranslation reprs te sc1 ty2
+        Nothing -> case S.tyView ty1 of
+          -- Try to create hwtype based on AST:
+          S.TyConApp tc args -> runExceptT $ do
+            hwty <- mkADT builtInTranslation reprs te sc1 (showPpr ty1) tc args
+            return (maybeConvertToCustomRepr reprs ty1 hwty)
+          -- All methods failed:
+          _ -> return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty1
 
 -- | Generates original indices in list before filtering, given a list of
 -- removed indices.
@@ -443,31 +485,36 @@ originalIndices wereVoids =
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT
-  :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  :: Distinct n
+  => HWTypeTranslator
   -- ^ Hardcoded Type -> HWType translator
   -> CustomReprs
-  -> TyConMap
-  -- ^ TyCon cache
+  -> TypeEnv
+  -> S.Scope n
   -> String
   -- ^ String representation of the Core type for error messages
   -> TyConName
   -- ^ The TyCon
-  -> [Type]
+  -> [S.Type n]
   -- ^ Its applied arguments
   -> ExceptT String (State HWMap) FilteredHWType
   -- ^ An error string or a tuple with the type and possibly a list of
   -- removed arguments.
-mkADT _ _ m tyString tc _
-  | isRecursiveTy m tc
+mkADT _ _ te _ tyString tc _
+  | isRecursiveTy (typeEnvTyConMap te) tc
   = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.find tc m) of
+mkADT builtInTranslation reprs te sc tyString tc args = case tyConDataCons (findTyCon te tc) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
-        substArgTyss     = map (`substArgTys` args) dcs
-    argHTyss0           <- mapM (mapM (ExceptT . coreTypeToHWType builtInTranslation reprs m)) substArgTyss
+        m                = typeEnvTyConMap te
+        -- The types of the fields, in the scope of the existentially
+        -- quantified type variables of the data constructor
+        fieldHWTys dc    = fromMaybe (error ($(curLoc) ++ "Wrong number of type arguments for: " ++ tyString)) $
+          dataConInstExtTyVars te sc dc args $ \sc1 _exts argTys ->
+            mapM (ExceptT . coreTypeToHWType builtInTranslation reprs te sc1) argTys
+    argHTyss0           <- mapM fieldHWTys dcs
     let argHTyss1        = map (\tys -> zip (map isFilteredVoid tys) tys) argHTyss0
     let areVoids         = map (map fst) argHTyss1
     let filteredArgHTyss = map (map snd . filter (not . fst)) argHTyss1
@@ -666,35 +713,37 @@ isRecursiveTy m tc = case tyConDataCons (UniqMap.find tc m) of
                                argTyss
            in tc `elem` argTycons
 
--- | Determines if a Core type is translatable to a HWType given a function that
+-- | Determines if a type is translatable to a HWType given a function that
 -- translates certain builtin types.
 representableType
-  :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  :: Distinct n
+  => HWTypeTranslator
   -> CustomReprs
   -> Bool
   -- ^ String considered representable
-  -> TyConMap
-  -> Type
+  -> TypeEnv
+  -> S.Scope n
+  -> S.Type n
   -> Bool
-representableType builtInTranslation reprs stringRepresentable m =
+representableType builtInTranslation reprs stringRepresentable te sc =
     flip evalState mempty .
-    representableTypeState builtInTranslation reprs stringRepresentable m
+    representableTypeState builtInTranslation reprs stringRepresentable te sc
 
--- | Like 'representableType', but memoizes the Core-type to HWType
--- translation in the given state.
+-- | Like 'representableType', but memoizes the type to HWType translation in
+-- the given state.
 representableTypeState
-  :: (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  :: Distinct n
+  => HWTypeTranslator
   -> CustomReprs
   -> Bool
   -- ^ String considered representable
-  -> TyConMap
-  -> Type
+  -> TypeEnv
+  -> S.Scope n
+  -> S.Type n
   -> State HWMap Bool
-representableTypeState builtInTranslation reprs stringRepresentable m =
+representableTypeState builtInTranslation reprs stringRepresentable te sc =
     fmap (either (const False) isRepresentable) .
-    coreTypeToHWType' builtInTranslation reprs m
+    coreTypeToHWType' builtInTranslation reprs te sc
   where
     isRepresentable hty = case hty of
       String            -> stringRepresentable
@@ -2085,24 +2134,24 @@ expandTopEntityOrErr ihwtys ohwty topM =
 -- checking.
 checkTopEntityPorts
   :: HasCallStack
-  => (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+  => HWTypeTranslator
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> CustomReprs
-  -> TyConMap
+  -> TypeEnv
   -> Id
   -- ^ Top entity binder
   -> Maybe TopEntity
   -- ^ Top entity annotation, if any. Expected to be already split, see above.
   -> ()
-checkTopEntityPorts typeTrans reprs tcm topId topM =
+checkTopEntityPorts typeTrans reprs te topId topM =
   let
     (argTys, resTy) = splitCoreFunForallTy tcm (coreTypeOf topId)
     -- Only value arguments carry ports; type/dictionary arguments are skipped.
     -- 'splitShouldSplit' mirrors 'separateArguments', so the resulting types
     -- align with the (already split) ports in the annotation.
     valArgTys = splitShouldSplit tcm [ty | Right ty <- argTys]
-    convert = coreTypeToHWType typeTrans reprs tcm
+    tcm = typeEnvTyConMap te
+    convert ty = withLegacyType ty (coreTypeToHWType typeTrans reprs te)
     hwtysE =
       flip evalState mempty $
         sequence <$> mapM convert (valArgTys ++ [resTy])
