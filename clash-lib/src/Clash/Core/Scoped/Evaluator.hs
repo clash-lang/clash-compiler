@@ -50,6 +50,7 @@
 module Clash.Core.Scoped.Evaluator
   ( -- * Running the machine
     whnf
+  , nfData
   , step
   , unwind
   , unwindStack
@@ -116,7 +117,7 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgsTicks)
+import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, stripTicks)
 import Clash.Core.Scoped.Type (TypeView (..), tyView)
 
 -- * Running the machine
@@ -146,6 +147,58 @@ whnf env isSubj m0 k
   go m = case step env m of
     Just (Next (m' :: Machine o l')) -> withExtTrans @n @l @l' (go m')
     Nothing -> k (unwindStack m)
+
+-- | Evaluate the term of a machine as far as it is data: to WHNF, and then the
+-- fields of a constructor application, recursively. Subterms that don't
+-- evaluate to a constructor application, such as literals, functions and
+-- primitives that are values (e.g. @unpackCString#@), are left in WHNF. Gives
+-- the machine with the result, which may mention the bindings the machine
+-- allocated (see 'bindAllocated'). See 'Clash.Core.Evaluator.Types.nfData'.
+--
+-- Primitives are forced, like for the subject of a case-expression.
+nfData
+  :: forall o n r
+   . Distinct n
+  => Env
+  -> Machine o n
+  -> (forall l. DExt n l => Machine o l -> r)
+  -> r
+nfData env m0 k = go m0 (mTerm m0) (\m e -> k (m {mTerm = e}))
+ where
+  -- Evaluate the fields in the machine the evaluation of the term ends in, so
+  -- that they can refer to its heap
+  go
+    :: forall x r1
+     . Distinct x
+    => Machine o x
+    -> Term x
+    -> (forall l. DExt x l => Machine o l -> Term l -> r1)
+    -> r1
+  go m e k1 = whnf env True (m {mStack = [], mTerm = e}) $ \(m1 :: Machine o l) ->
+    case collectArgs (stripTicks (mTerm m1)) of
+      (Data dc, args) ->
+        goArgs m1 [] args $ \(m2 :: Machine o l2) args' ->
+          withExtTrans @x @l @l2 (k1 m2 (mkApps (Data dc) args'))
+      _ -> k1 m1 (mTerm m1)
+
+  -- The fields to evaluate, and those evaluated already (in reverse)
+  goArgs
+    :: forall x r1
+     . Distinct x
+    => Machine o x
+    -> [Either (Term x) (Type x)]
+    -> [Either (Term x) (Type x)]
+    -> (forall l. DExt x l => Machine o l -> [Either (Term l) (Type l)] -> r1)
+    -> r1
+  goArgs m doneRev [] k1 = k1 m (reverse doneRev)
+  goArgs m doneRev (Right ty : rest) k1 = goArgs m (Right ty : doneRev) rest k1
+  goArgs m doneRev (Left e : rest) k1 =
+    go m e $ \(m1 :: Machine o l) e' ->
+      goArgs m1 (Left e' : sinkArgs doneRev) (sinkArgs rest) $ \(m2 :: Machine o l2) args ->
+        withExtTrans @x @l @l2 (k1 m2 args)
+
+  sinkArgs :: DExt x l => [Either (Term x) (Type x)] -> [Either (Term l) (Type l)]
+  sinkArgs = map (either (Left . sink) (Right . sink))
 
 -- | Pop all frames, rebuilding the term. See
 -- 'Clash.Core.Evaluator.Types.unwindStack'.
