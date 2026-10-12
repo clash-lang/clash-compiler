@@ -37,7 +37,8 @@ import {-# SOURCE #-} Clash.Netlist.Types (BlackBox, Usage(..))
 import           Clash.Annotations.Primitive  (PrimitiveGuard)
 import           Clash.Core.Term (WorkInfo (..))
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, BlackBoxTemplate, TemplateKind (..), RenderVoid(..))
+  (BlackBoxTemplate, TemplateKind (..), RenderVoid(..))
+import           Clash.Netlist.Scoped.Types   (SomeBlackBoxFunction)
 import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
 import           Control.Monad                (when)
@@ -73,7 +74,7 @@ type ResolvedPrimMap          = PrimMap GuardedResolvedPrimitive
 -- | A compiled primitive has compiled all templates and functions from its
 -- @ResolvedPrimitive@ counterpart. The Int in the tuple is a hash of the
 -- (uncompiled) BlackBoxFunction.
-type CompiledPrimitive        = Primitive BlackBoxTemplate BlackBox () (Int, BlackBoxFunction)
+type CompiledPrimitive        = Primitive BlackBoxTemplate BlackBox () (Int, SomeBlackBoxFunction)
 type GuardedCompiledPrimitive = PrimitiveGuard CompiledPrimitive
 type CompiledPrimMap          = PrimMap GuardedCompiledPrimitive
 
