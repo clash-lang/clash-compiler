@@ -181,6 +181,8 @@ module Clash.Core.Scoped.Subst
   , teleIdBinderTypes
   , closeTerm
   , closeType
+    -- * Global variables
+  , substGlobals
     -- * Variables of binders
   , teleIdVars
   , patVars
@@ -205,6 +207,7 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 
 import Clash.Core.Scoped.FreeVars
+import Clash.Core.Scoped.NameMap (GlobalEnv, lookupGlobalEnv, nullGlobalEnv)
 import Clash.Core.Scoped.Internal.Names
 import Clash.Core.Scoped.Internal.Scope
 import Clash.Core.Scoped.Syntax
@@ -1149,3 +1152,35 @@ closeOver tvs ids cont = do
   tmOcc = \case
     Var occ ty nm -> Just (occ, ty, tmNameRaw nm)
     _ -> Nothing
+
+-- * Global variables
+
+-- | Replace global variables by the closed terms of a t'GlobalEnv', see
+-- 'Clash.Core.Subst.extendGblSubstList'. It doesn't go under binders, as a
+-- closed term can't capture variables, nor mention any.
+--
+-- Trusted: a closed term is a term in every scope, so it is coerced into the
+-- scope of the occurrence it replaces ('sinkClosed' without the need for a
+-- t'Distinct' scope, which unopened binders don't have).
+substGlobals :: GlobalEnv (Term 'VoidS) -> Term n -> Term n
+substGlobals env e0
+  | nullGlobalEnv env = e0
+  | otherwise = go e0
+ where
+  go :: Term x -> Term x
+  go = \case
+    e@(GlobalVar g) -> maybe e coerceTm (lookupGlobalEnv g env)
+    e@Var {} -> e
+    e@Data {} -> e
+    e@Literal {} -> e
+    e@Prim {} -> e
+    Lam b e -> Lam b (go e)
+    TyLam b e -> TyLam b (go e)
+    App e1 e2 -> App (go e1) (go e2)
+    TyApp e ty -> TyApp (go e) ty
+    Let (NonRec b x) e -> Let (NonRec b (go x)) (go e)
+    Let (Rec bs xs) e -> Let (Rec bs (map go xs)) (go e)
+    Case e ty alts -> Case (go e) ty [Alt p (go x) | Alt p x <- alts]
+    Cast e ty1 ty2 -> Cast (go e) ty1 ty2
+    Tick (Attributes ty a) e -> Tick (Attributes ty (go a)) (go e)
+    Tick t e -> Tick t (go e)
