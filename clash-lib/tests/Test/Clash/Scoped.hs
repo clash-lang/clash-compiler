@@ -77,6 +77,8 @@ module Test.Clash.Scoped
   , somePrim
     -- * Evaluating
   , scopedWhnf
+    -- * Netlist generation
+  , withCompCtxOf
   ) where
 
 import qualified Control.Lens as Lens
@@ -117,6 +119,9 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
+import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Scoped.Types (CompCtx, legacyCompCtx)
+import qualified Clash.Util.Supply as Supply
 import Clash.Rewrite.Scoped
   ( ScopedRewrite, Frame (LetBinding), pushFrame, rootContext, runScopedTransform
   , underAlt, underLam, underLet, underLetRec, underTyLam)
@@ -1056,3 +1061,26 @@ atPath (st : sts) ctx e k = case (st, e) of
   (AppFunStep, App f _) -> atPath sts (pushFrame Scoped.AppFun ctx) f k
   (AppArgStep, App f a) -> atPath sts (pushFrame (Scoped.appArgFrame f) ctx) a k
   _ -> error ("atPath: " <> show st <> " doesn't fit the term:\n" <> showTerm (toClashTerm e))
+
+-- * Netlist generation
+
+-- | The context of a component whose local variables are the free variables
+-- of the given Clash terms, with their occurrence names as their HDL
+-- identifiers, and the terms in its scope. The context has the type
+-- environment 'testTypeEnv', like 'Test.Clash.Rewrite.runNetlistTest'.
+withCompCtxOf
+  :: [C.Term]
+  -> (forall n. Distinct n => CompCtx n -> [Term n] -> IO r)
+  -> IO r
+withCompCtxOf tms k = do
+  supply <- Supply.newSupply
+  withFreeVarsOf tms $ \cenv ->
+    let tvs = List.nubBy (\a b -> C.varUniq a == C.varUniq b)
+                (concatMap (Lens.toListOf C.termFreeTyVars) tms)
+        ids = List.nubBy (\a b -> C.varUniq a == C.varUniq b)
+                (concatMap (Lens.toListOf C.freeLocalIds) tms)
+        tvNames = [ (n, tv) | tv <- tvs, VarTy _ _ n <- [fromClashType cenv (C.VarTy tv)] ]
+        idNames = [ (n, v, Id.unsafeFromCoreId v)
+                  | v <- ids, Var _ _ n <- [fromClashTerm cenv (C.Var v)] ]
+        ctx = legacyCompCtx (convScope cenv) testTypeEnv supply tvNames idNames
+    in k ctx (map (fromClashTerm cenv) tms)
