@@ -53,6 +53,7 @@ module Test.Clash.Differential
   , applyKnownDifferences
   , recToNonRec
   , letrecOrder
+  , deadLetBindings
   , coercionForm
   , globalUniques
   , nonRecLetOrder
@@ -121,6 +122,8 @@ import Clash.Core.Scoped.FreeVars (teleNameBinders)
 import Clash.Core.Scoped.Subst
   (freshen, openAlt, openBind, openIdBinder, openTyBinder, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Term (walkTerm)
+import Clash.Rewrite.Scoped.Util (removeUnusedBinders)
+import Data.Maybe (fromMaybe)
 import Clash.Core.Scoped.Util
   (LetGroup (NonRecGroup, RecGroup), mkLets, regroupLetBindings)
 import Clash.Core.Scoped.Syntax
@@ -339,6 +342,24 @@ letrecOrder = KnownDifference
   teleRaws = \case
     TNil -> []
     TCons b rest -> tmNameRaw (tmNameOf b) : teleRaws rest
+
+-- | Let-bindings that the body doesn't use, directly or through other
+-- bindings, are removed: dead code.
+--
+-- The normalizer of Clash Core and that of scoped Clash Core both leave some
+-- dead let-bindings in place, which 'letrecOrder' keeps in the order they
+-- have, and that order differs.
+deadLetBindings :: KnownDifference
+deadLetBindings = KnownDifference
+  { kdName = "dead-let-bindings"
+  , kdDescription = "let-bindings that the body doesn't use are removed"
+  , kdNormalize = everywhereScopedTm go
+  }
+ where
+  go :: Distinct x => Scope x -> Term x -> Term x
+  go sc = \case
+    e@(Let bind body) -> fromMaybe e (removeUnusedBinders sc bind body)
+    e -> e
 
 -- | A coercion is the primitive @_CO_@, without its type as a type argument.
 --

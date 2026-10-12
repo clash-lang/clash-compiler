@@ -19,6 +19,7 @@ executable clash-differential
   other-modules:       Comparisons
                        Current
                        Demo
+                       Normalized
                        Prims
                        Registry
                        Test.Clash.Differential
@@ -36,6 +37,7 @@ executable clash-differential
                        deepseq,
                        hashable,
                        directory,
+                       filepath,
                        lens,
                        mtl,
                        process,

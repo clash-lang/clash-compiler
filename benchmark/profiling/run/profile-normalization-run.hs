@@ -3,14 +3,14 @@
 
 import           Clash.Driver
 import           Clash.Rewrite.Capture        (takeCaptureLog)
-import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWidth))
+import           Clash.Driver.Types           (BindingMap, ClashEnv(..), ClashOpts(opt_intWidth))
 import qualified Clash.Util.Supply            as Supply
 
 import           Clash.GHC.Evaluator
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import           Control.DeepSeq              (deepseq)
-import           Data.Binary                  (decode)
+import           Data.Binary                  (decode, encode)
 import           Data.List                    (partition)
 import           System.Directory             (createDirectoryIfMissing)
 import           System.Environment           (getArgs, lookupEnv)
@@ -58,7 +58,20 @@ benchFile idirs src = do
                    evaluator
                    topEntityNames supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
+  writeNormalized src res
   writeCorpus src inputs
+
+-- | Write the normalized bindings, if CLASH_NORMALIZED_OUT is set: to
+-- @<dir>/<design>.norm.bin@, for @clash-differential normalized@
+writeNormalized :: FilePath -> BindingMap -> IO ()
+writeNormalized src res =
+  lookupEnv "CLASH_NORMALIZED_OUT" >>= \case
+    Just dir@(_:_) -> do
+      createDirectoryIfMissing True dir
+      let out = dir </> takeFileName src ++ ".norm.bin"
+      B.writeFile out (encode res)
+      putStrLn ("Wrote the normalized bindings to " ++ out)
+    _ -> pure ()
 
 -- | Write the captured sites at which transformations fired, if
 -- CLASH_CAPTURE_REWRITES is set: see "Clash.Rewrite.Capture"

@@ -249,6 +249,25 @@ outcome <- compareBinding cmp d (mkBinding f tm)
 
 See `clash-lib/tests/Clash/Tests/Differential.hs`.
 
+## Comparing whole normalizations
+
+`clash-profile-normalization-run` writes the normalized bindings of every
+design to `DIR/<design>.norm.bin` when `CLASH_NORMALIZED_OUT=DIR` is set.
+
+```
+clash-differential normalized [--show N] DIR_A DIR_B DESIGN.bin...
+```
+
+compares the normalized bindings of two runs, e.g. of the normalizer of Clash
+Core at one commit and that of scoped Clash Core at another, binding by
+binding, up to alpha-equivalence and the known differences between the two
+normalizers (`coercionForm`, `primTypeForm`, `recToNonRec`, `nonRecLetOrder`,
+`letrecOrder` and `deadLetBindings`). The globals that normalization creates get different
+uniques in both runs, so globals are matched by where they are used: from the
+top entity on, the globals that two matched bindings refer to are matched by
+the order in which they occur (see `Normalized.hs`). It reports the bindings
+that differ, and the globals that have a normalized binding in one run only.
+
 ## Replaying calls of the evaluator
 
 `clash-differential whnf` compares the whnf evaluator of scoped Clash Core
