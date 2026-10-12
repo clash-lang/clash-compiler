@@ -62,7 +62,7 @@ import           Clash.Util                  (MonadUnique (..))
 import           Clash.Util.Supply           (Supply, splitSupply)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm)
-import           Clash.Core.Scoped.Convert   (fromClashTermClosed, toClashType)
+import           Clash.Core.Scoped.Convert   (fromClashTermClosed, mkGlobalIdFromClash, toClashType)
 import           Clash.Core.Scoped.FreeVars  (termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
@@ -83,7 +83,7 @@ freshGlobalId nm ty = do
   u <- getUniqueM
   -- TODO(D4): the type of a 'GlobalId' is a Clash Core type
   let tyC = toClashType ty
-      global nm' = mkGlobalId (C.mkGlobalId tyC nm')
+      global nm' = mkGlobalIdFromClash (C.mkGlobalId tyC nm')
       taken u' = memberGlobalEnv (global (setUnique nm u')) bndrs
   pure (global (uniqAway' taken u (setUnique nm u)))
 
@@ -95,7 +95,7 @@ addGlobalBind
   -> Term 'VoidS
   -> RewriteMonad extra ()
 addGlobalBind g sp inl body =
-  scopedBindings %= insertGlobalEnv g (Binding (globalIdVar g) sp inl IsFun body r)
+  scopedBindings %= insertGlobalEnv g (Binding (globalIdLegacy g) sp inl IsFun body r)
  where
   r = g `memberGlobalSet` termGlobalIds body
 
@@ -125,7 +125,7 @@ findAlphaEqBinding body = do
 
 -- | Whether a global is a top entity
 isTopEntity :: GlobalId -> RewriteMonad extra Bool
-isTopEntity g = (globalIdVar g `elemVarSet`) <$> Lens.view topEntities
+isTopEntity g = (globalIdLegacy g `elemVarSet`) <$> Lens.view topEntities
 
 -- | Whether a term is work free, see 'Clash.Rewrite.Scoped.WorkFree.isWorkFree'.
 -- Caches the work-freeness of global binders in the rewrite state.
@@ -142,7 +142,7 @@ isWorkFreeTerm e = do
 fromClashBindings :: HasCallStack => BindingMap -> GlobalEnv (Binding (Term 'VoidS))
 fromClashBindings bm =
   globalEnvFromList
-    [ (mkGlobalId (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
+    [ (mkGlobalIdFromClash (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
 
 -- | Global bindings of scoped Clash Core as bindings of Clash Core. Every
 -- binder gets a fresh unique from the supply, so that a local binder never
@@ -150,7 +150,7 @@ fromClashBindings bm =
 -- "Clash.Core.Scoped.Convert.Fresh".
 toClashBindings :: HasCallStack => Supply -> GlobalEnv (Binding (Term 'VoidS)) -> BindingMap
 toClashBindings sup bndrs =
-  UniqMap.fromList [ (globalIdVar g, b') | (g, b') <- State.evalState (mapM conv (globalEnvToList bndrs)) sup ]
+  UniqMap.fromList [ (globalIdLegacy g, b') | (g, b') <- State.evalState (mapM conv (globalEnvToList bndrs)) sup ]
  where
   conv (g, b) = do
     tm <- toClashTermFreshClosed (bindingTerm b)

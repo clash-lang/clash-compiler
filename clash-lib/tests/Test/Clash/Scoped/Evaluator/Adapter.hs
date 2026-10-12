@@ -131,11 +131,11 @@ adaptPrim eval = PrimReduction $ \pc ->
         -- up
         , C.mHeapGlobalBase =
             UniqMap.fromList
-              [ (globalIdVar g, toClashTerm <$> b)
+              [ (globalIdLegacy g, toClashTerm <$> b)
               | (g, b) <- globalEnvToList (mHeapGlobalBase m) ]
         , C.mHeapGlobalOverlay = emptyVarEnv
         , C.mHeapGlobalDeleted =
-            mkVarSet (map globalIdVar (globalSetToList (mHeapGlobalDeleted m)))
+            mkVarSet (map globalIdLegacy (globalSetToList (mHeapGlobalDeleted m)))
         , C.mHeapLocal = UniqMap.fromList heap
         , C.mStack = []
         , C.mSupply = adapterSupply
@@ -368,7 +368,7 @@ goTm env@(UEnv bs _ ids) = \case
   Var occ ty x -> case IntMap.lookup (tmNameRaw x) ids of
     Just i -> pure (C.Var i)
     Nothing -> C.Var <$> freeId bs occ ty x
-  GlobalVar g -> pure (C.Var (globalIdVar g))
+  GlobalVar g -> pure (C.Var (globalIdLegacy g))
   Data dc -> pure (C.Data dc)
   Literal l -> pure (C.Literal l)
   Prim p -> pure (C.Prim p)

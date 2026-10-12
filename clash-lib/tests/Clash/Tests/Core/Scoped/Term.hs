@@ -79,8 +79,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.Term"
           fBody = C.Lam x (C.Lam y (C.Var x))
           gBody = C.Literal (C.IntLiteral 7)
           substC = C.substTm "test" (C.extendGblSubstList (C.mkSubst C.emptyInScopeSet) [(f, fBody), (g, gBody)])
-          genv = insertGlobalEnv (mkGlobalId f) (fromClashTermClosed fBody)
-                   (insertGlobalEnv (mkGlobalId g) (fromClashTermClosed gBody) emptyGlobalEnv)
+          genv = insertGlobalEnv (mkGlobalIdFromClash f) (fromClashTermClosed fBody)
+                   (insertGlobalEnv (mkGlobalIdFromClash g) (fromClashTermClosed gBody) emptyGlobalEnv)
       assertAgreesTm substC (const (substGlobals genv)) tm
 
   , testCase "collectArgs and mkApps" $

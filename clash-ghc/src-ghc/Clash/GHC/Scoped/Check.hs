@@ -152,8 +152,8 @@ cmpTm e1 e2 = case (e1, e2) of
     check "variable" (==) (tmNameRaw n1) (tmNameRaw n2) <+> cmpName o1 o2
   (GlobalVar g1, GlobalVar g2) ->
     check "global" (==) g1 g2
-      <+> cmpName (C.varName (globalIdVar g1)) (C.varName (globalIdVar g2))
-      <+> check "global type" (==) (C.varType (globalIdVar g1)) (C.varType (globalIdVar g2))
+      <+> cmpName (globalIdName g1) (globalIdName g2)
+      <+> check "global type" (==) (C.varType (globalIdLegacy g1)) (C.varType (globalIdLegacy g2))
   (Data dc1, Data dc2) -> check "data constructor" (==) (C.dcUniq dc1) (C.dcUniq dc2)
   (Literal l1, Literal l2) -> check "literal" (==) l1 l2
   (Prim p1, Prim p2) -> cmpPrim p1 p2

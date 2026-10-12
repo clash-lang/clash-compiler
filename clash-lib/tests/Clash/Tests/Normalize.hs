@@ -33,7 +33,7 @@ import Clash.Rewrite.Types (RewriteState (..))
 
 import Clash.Core.Scoped.Convert (toClashTerm)
 import Clash.Core.Scoped.NameMap (lookupGlobalEnv)
-import Clash.Core.Scoped.Syntax (mkGlobalId)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
 import Test.Clash.Rewrite
@@ -56,8 +56,8 @@ withTypes globals = unsafeSubstTm (mkVarEnv [(i, Var i) | i <- globals]) emptyVa
 cleanup :: [Id] -> Id -> [(Id, Term)] -> IO Term
 cleanup globals top bndrs = do
   let bm = fromClashBindings (mkBindingMap [(i, withTypes globals tm) | (i, tm) <- bndrs])
-  (bm1, _, _) <- runRewriteTest def def{_scopedBindings = bm} (cleanupGraph (mkGlobalId top) bm)
-  case lookupGlobalEnv (mkGlobalId top) bm1 of
+  (bm1, _, _) <- runRewriteTest def def{_scopedBindings = bm} (cleanupGraph (mkGlobalIdFromClash top) bm)
+  case lookupGlobalEnv (mkGlobalIdFromClash top) bm1 of
     Just b -> pure (toClashTerm (bindingTerm b))
     Nothing -> assertFailure ("cleanupGraph dropped " <> showPprU top)
 

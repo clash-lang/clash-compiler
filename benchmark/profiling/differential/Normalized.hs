@@ -57,6 +57,7 @@ import Clash.Core.Scoped.Convert (fromClashTermClosed)
 import Clash.Core.Scoped.NameMap (globalEnvFromList)
 import Clash.Core.Scoped.Subst (substGlobals)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.Term (walkTerm)
 
 
@@ -159,11 +160,11 @@ compareNormalizedWith opts kds design top fileA fileB = do
                 | length gsA == length gsB = zip gsA gsB
                 | otherwise = []
               ren' = List.foldl'
-                       (\m (ga, gb) -> Map.insertWith (\_ old -> old) (globalIdUniq gb) (globalIdVar ga) m)
+                       (\m (ga, gb) -> Map.insertWith (\_ old -> old) (globalIdUniq gb) (globalIdLegacy ga) m)
                        ren pairs
               tB' = substGlobals
                       (globalEnvFromList
-                         [ (gb, GlobalVar (mkGlobalId a'))
+                         [ (gb, GlobalVar (mkGlobalIdFromClash a'))
                          | gb <- List.nub gsB
                          , Just a' <- [Map.lookup (globalIdUniq gb) ren'] ])
                       tB
@@ -187,7 +188,7 @@ compareNormalizedWith opts kds design top fileA fileB = do
                   in if null onlyA && null onlyB then m
                      else Mismatch (fmap (\x -> x {diffPath = diffPath x <> [note]}) d) c s
                 _ -> m
-              new = [ (globalIdUniq ga, globalIdVar ga, globalIdVar gb)
+              new = [ (globalIdUniq ga, globalIdLegacy ga, globalIdLegacy gb)
                     | (ga, gb) <- pairs
                     , not (globalIdUniq ga `Set.member` seen) ]
               -- The types of the binders, which normalization gives the

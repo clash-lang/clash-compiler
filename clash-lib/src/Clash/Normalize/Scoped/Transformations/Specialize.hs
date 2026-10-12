@@ -104,13 +104,14 @@ import           Clash.Util                  (ClashException (..))
 import           Clash.Core.Scoped.Convert   (toClashType)
 import           Clash.Core.Scoped.DataCon   (dataConInstArgTys)
 import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
-import           Clash.Core.Scoped.HasType   (globalIdType, inferCoreTypeOf, piResultTy)
+import           Clash.Core.Scoped.HasType   (inferCoreTypeOf, piResultTy)
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
 import           Clash.Core.Scoped.NameMap
   (insertWithGlobalEnv, lookupGlobalEnv, nullNameSet, singletonNameMap)
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.Term
   ( AbsBinder (..), collectArgs, collectArgsTicks, mkAbstraction, mkApps, mkLams, mkTicks
   , mkTyLams )
@@ -390,12 +391,12 @@ specializeGlobal sc e f args ticks specArgIn = do
         -- ("specializing" on it) and change the type of the variable to match.
         -- A global has a closed type, so this needs a closed type argument.
         -- TODO(D4): the type of a 'GlobalId' is a Clash Core type.
-        | let newTy = piResultTy te sc (globalIdType te sc f) tyArg
+        | let newTy = piResultTy te sc (sinkClosed (globalIdType f)) tyArg
         , nullNameSet (freeTyVarsOfType newTy) ->
             traceIf (hasTransformationInfo AppliedTerm opts)
               ("Dropping type application on TopEntity: " ++ showPpr (C.varName fV)
                  ++ "\ntype:\n" ++ showPpr tyArg) $
-              changed (mkApps (mkTicks (GlobalVar (mkGlobalId fV {C.varType = toClashType newTy})) ticks) args)
+              changed (mkApps (mkTicks (GlobalVar (mkGlobalIdFromClash fV {C.varType = toClashType newTy})) ticks) args)
         | otherwise -> return e
   else do
     let specArg = bimap (normalizeTermTypes te sc) (normalizeType te sc) specArgIn
@@ -427,7 +428,7 @@ specializeGlobal sc e f args ticks specArgIn = do
       Just f' ->
         traceIf (hasTransformationInfo AppliedTerm opts)
           ("Using previous specialization of " ++ showPpr (C.varName fV) ++ " on " ++
-            maybe "" showSpecAbs specAbs ++ ": " ++ showPpr (C.varName (globalIdVar f'))) $
+            maybe "" showSpecAbs specAbs ++ ": " ++ showPpr (globalIdName f')) $
           changed (mkApps (mkTicks (GlobalVar f') ticks) (args ++ specVars))
       -- Create new specialized function
       Nothing -> lookupBinding f >>= \case
@@ -475,7 +476,7 @@ specializeGlobal sc e f args ticks specArgIn = do
               let names = collectBndrsMinusApps bodyTm ++
                     [ C.mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
                     | n <- [(0::Unique)..] ]
-              case specBody te (globalIdType te emptyScope f) names args specTvs specIdBndrs bodyTm specArg' of
+              case specBody te (sinkClosed (globalIdType f)) names args specTvs specIdBndrs bodyTm specArg' of
                 -- The type of 'f' doesn't have the parameters for the
                 -- arguments
                 Nothing -> return e
@@ -488,12 +489,12 @@ specializeGlobal sc e f args ticks specArgIn = do
                   -- Use specialized function
                   changed (mkApps (mkTicks (GlobalVar newf) ticks) (args ++ specVars))
  where
-  fV = globalIdVar f
+  fV = globalIdLegacy f
 
   varName :: Term x -> Maybe (C.Name C.Term)
   varName = \case
     Var occ _ _ -> Just occ
-    GlobalVar g -> Just (C.varName (globalIdVar g))
+    GlobalVar g -> Just (globalIdName g)
     _ -> Nothing
 
 {-

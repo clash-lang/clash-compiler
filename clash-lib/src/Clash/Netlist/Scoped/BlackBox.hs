@@ -921,7 +921,7 @@ mkFunInput ctx parentName declType resId e =
 
                               Primitive: #{parentName}
 
-                              Argument: #{showPpr (globalIdVar fun)}
+                              Argument: #{showPpr (globalIdLegacy fun)}
 
                               Outputs: #{show (map (\(_,x,_) -> x) outps)}
 

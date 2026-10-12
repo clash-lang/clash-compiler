@@ -28,7 +28,8 @@ import Clash.Netlist.Types
   ( BlackBoxContext (..), Declaration (Assignment, InstDecl), DeclarationType (Concurrent)
   , Expr (Identifier), componentNames )
 import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
-import Clash.Core.Scoped.Syntax (Term (..), globalIdVar, mkGlobalId)
+import Clash.Core.Scoped.Syntax (Term (..), globalIdLegacy)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 import Test.Clash.Rewrite (globalId, intFunTy, intId, localId, mkBindingMap, runNetlistTest)
 import Test.Clash.Scoped (withCompCtxOf)
@@ -53,7 +54,7 @@ mkFunInputLocalShadowingGlobal = do
       res = intId User "res" 62
       -- The global binder is in normal form, so it can become a component
       bs = mkBindingMap [(fGlobal, C.Lam a (C.Letrec [(r, C.Var a)] (C.Var r)))]
-      compNames = singletonGlobalEnv (mkGlobalId fGlobal) (Id.unsafeMake "f")
+      compNames = singletonGlobalEnv (mkGlobalIdFromClash fGlobal) (Id.unsafeMake "f")
   result <- try $ withCompCtxOf [C.Var fLocal, C.Var res] $ \ctx tms -> case tms of
     [f, Var o ty n] ->
       runNetlistTest bs $ do
@@ -74,8 +75,8 @@ mkFunInputGlobal = do
       r = intId User "r" 63
       res = intId User "res" 62
       bs = mkBindingMap [(fGlobal, C.Lam a (C.Letrec [(r, C.Var a)] (C.Var r)))]
-      compNames = singletonGlobalEnv (mkGlobalId fGlobal) (Id.unsafeMake "f")
-      g = mkGlobalId fGlobal
+      compNames = singletonGlobalEnv (mkGlobalIdFromClash fGlobal) (Id.unsafeMake "f")
+      g = mkGlobalIdFromClash fGlobal
   bbCtx <- withCompCtxOf [C.Var res] $ \ctx tms -> case tms of
     [Var o ty n] ->
       fmap fst $ runNetlistTest bs $ do
@@ -86,7 +87,7 @@ mkFunInputGlobal = do
     [InstDecl _ _ _ compName _ _ _] ->
       assertEqual "Instantiated component" "f" (Id.toText compName)
     decls -> assertFailure ("Expected an instance of f, but got: " <> show decls
-                              <> " for " <> show (globalIdVar g))
+                              <> " for " <> show (globalIdLegacy g))
 
 -- | The variables of the lambdas of a function argument get the HDL
 -- identifiers of the arguments of the function in the template, and those of

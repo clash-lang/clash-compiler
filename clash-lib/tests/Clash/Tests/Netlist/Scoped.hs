@@ -30,6 +30,7 @@ import Clash.Core.Scoped.Convert (fromClashTypeClosed)
 import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
 import Clash.Core.Scoped.Subst (withFreshIdBinder)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Netlist.Scoped (mkFunApp)
 import Clash.Netlist.Scoped.Types (CompCtx, LocalId, binderLocalId, compCtxFromList, localIdVar)
 
@@ -46,7 +47,7 @@ withLocal
   -> IO a
 withLocal bs compNames act =
   runNetlistTest (mkBindingMap bs) $ do
-    componentNames .= mconcat [ singletonGlobalEnv (mkGlobalId g) i | (g, i) <- compNames ]
+    componentNames .= mconcat [ singletonGlobalEnv (mkGlobalIdFromClash g) i | (g, i) <- compNames ]
     withFreshIdBinder emptyScope (C.mkUnsafeSystemName "y" 0)
       (fromClashTypeClosed emptyScope intTy) $ \sc b ->
         let y = binderLocalId b
@@ -78,7 +79,7 @@ mkFunAppGlobal = do
       r = intId C.User "r" 62
   decls <- withLocal [(f, C.Lam a (C.Letrec [(r, C.Var a)] (C.Var r)))] [(f, Id.unsafeMake "f")] $
     \ctx y ->
-      mkFunApp ctx Concurrent (Id.unsafeMake "result") (Right (mkGlobalId f)) [localIdVar y] []
+      mkFunApp ctx Concurrent (Id.unsafeMake "result") (Right (mkGlobalIdFromClash f)) [localIdVar y] []
   case decls of
     [InstDecl Entity Nothing [] compName _ [] (NamedPortMap ports)] -> do
       assertEqual "Component" "f" (Id.toText compName)

@@ -94,6 +94,7 @@ import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.Term
 import           Clash.Core.Scoped.TermInfo  (isClosed)
 import           Clash.Core.Scoped.Type
@@ -147,7 +148,7 @@ addNewInline f cf =
 mkInlineTick :: GlobalId -> TickInfo n
 mkInlineTick n = NameMod C.PrefixName (LitTy (C.SymTy (toStr n)))
  where
-  toStr = Text.unpack . snd . Text.breakOnEnd "." . C.nameOcc . C.varName . globalIdVar
+  toStr = Text.unpack . snd . Text.breakOnEnd "." . C.nameOcc . globalIdName
 
 -- * Recursive globals
 
@@ -439,15 +440,15 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
     Just b -> pure b
     Nothing -> do
       te <- Lens.view scopedTypeEnv
-      let nmS = showPpr (C.varName (globalIdVar nm))
+      let nmS = showPpr (globalIdName nm)
           tm1 = if isTop then substWithTyEq emptyScope tm else tm
       old <- Lens.use curFun
       normalization <- scopedNormalization
-      tm2 <- rewriteExpr ("normalization", normalization) (nmS, tm1) (mkGlobalId nm', sp)
+      tm2 <- rewriteExpr ("normalization", normalization) (nmS, tm1) (mkGlobalIdFromClash nm', sp)
       curFun .= old
       -- TODO(D4): the type of a 'GlobalId' is a Clash Core type
       let ty' = toClashType (inferCoreTypeOf te emptyScope tm2)
-          r' = mkGlobalId nm' `memberGlobalSet` termGlobalIds tm2
+          r' = mkGlobalIdFromClash nm' `memberGlobalSet` termGlobalIds tm2
           b = Binding nm'{C.varType = ty'} sp inl pr tm2 r'
       (extra.scopedNormalized) %= insertGlobalEnv nm b
       pure b
@@ -480,7 +481,7 @@ normalizeWorkFreeApp f b args = do
       te <- Lens.view scopedTypeEnv
       -- The application is normalized as if it were the body of a binder of
       -- its own, see 'Clash.Normalize.Util.normalizeWorkFreeApp'
-      g <- freshGlobalId (C.varName (globalIdVar f))
+      g <- freshGlobalId (globalIdName f)
              (inferCoreTypeOf te emptyScope (mkApps (GlobalVar f) closedArgs))
       let -- Normalize the beta-redex rather than the application: normalizing
           -- that would bring us right back here
@@ -488,7 +489,7 @@ normalizeWorkFreeApp f b args = do
       old <- Lens.use curFun
       normalization <- scopedNormalization
       tm <- rewriteExpr ("normalization", normalization)
-                        (showPpr (C.varName (globalIdVar f)), redex) (g, bindingLoc b)
+                        (showPpr (globalIdName f), redex) (g, bindingLoc b)
       curFun .= old
       (extra.scopedWorkFreeAppCache) %= Map.insert key tm
       pure (sinkClosed tm)
@@ -513,7 +514,7 @@ rewriteExpr
   -- ^ Renew current function being rewritten
   -> NormalizeSession (Term 'VoidS)
 rewriteExpr (nrwS, nrw) (bndrS, expr) (nm, sp) = do
-  curFun .= (globalIdVar nm, sp)
+  curFun .= (globalIdLegacy nm, sp)
   opts <- Lens.view debugOpts
   let traceFinal = hasTransformationInfo FinalTerm opts
       expr' = traceIf traceFinal

@@ -511,7 +511,7 @@ recToLetRec ctx e
   -- removed with 'stripAllTicks'.
   eqApp :: Distinct l => TypeEnv -> Scope l -> C.Id -> [Term l] -> Term l -> Bool
   eqApp te sc fn args (collectArgs . stripAllTicks -> (GlobalVar g, args'))
-    | globalIdVar g == fn
+    | globalIdLegacy g == fn
     , let args2 = Either.lefts args'
     , length args == length args2
     = and (zipWith (eqArg te sc) args args2)

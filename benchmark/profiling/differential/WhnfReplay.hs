@@ -115,7 +115,7 @@ import Clash.Core.Scoped.NameMap (GlobalEnv)
 import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Core.Scoped.Subst (teleIdVars)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TypeEnv (addGlobalTypes, mkTypeEnv)
+import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Rewrite.Scoped.Types (TransformContext, rootContext, tfHeap, tfScope, underLetRec)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
@@ -300,7 +300,7 @@ whnfReplay opts tcm bm dumpFile = do
   printf "%s: %d calls (%d as case subject)\n" dumpFile (length calls)
     (length (filter callSubj calls))
   hFlush stdout
-  let te = addGlobalTypes (fmap bindingId bm) (mkTypeEnv tcm)
+  let te = mkTypeEnv tcm
       env = evaluatorEnv te
       -- Converted once, when they are first looked up
       gbm = fromClashBindings bm

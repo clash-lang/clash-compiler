@@ -102,7 +102,6 @@ import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 import Clash.Core.Util (undefinedPrims, undefinedXPrims)
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
@@ -353,7 +352,7 @@ step env m = case mTerm m of
       { mHeapGlobalOverlay = deleteGlobalEnv g (mHeapGlobalOverlay m)
       , mHeapGlobalDeleted = insertGlobalSet g (mHeapGlobalDeleted m)
       , mStack = UpdateGlobal g : mStack m
-      , mTerm = Tick (nameModTick (C.varName (globalIdVar g))) e
+      , mTerm = Tick (nameModTick (globalIdName g)) e
       }
 
 -- | The tick that names the result of evaluating a variable after it. See

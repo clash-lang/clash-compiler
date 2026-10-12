@@ -27,7 +27,7 @@ import qualified GHC
 import           Clash.Core.Name        (nameOcc)
 import           Clash.Core.Var         (varName)
 import           Clash.Core.Scoped.NameMap (memberGlobalSet)
-import           Clash.Core.Scoped.Syntax (mkGlobalId)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Normalize.Scoped.Util (callGraph, callGraphGlobals)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Util             (ClashException(..), noSrcSpan)
@@ -60,8 +60,8 @@ getMainTopEntity modName design nm =
     [t] ->
       let
         bindingMap = designBindings design
-        closure = callGraphGlobals (callGraph bindingMap (mkGlobalId (topId t)))
-        inClosure t' = topId t' /= topId t && mkGlobalId (topId t') `memberGlobalSet` closure
+        closure = callGraphGlobals (callGraph bindingMap (mkGlobalIdFromClash (topId t)))
+        inClosure t' = topId t' /= topId t && mkGlobalIdFromClash (topId t') `memberGlobalSet` closure
       in
         pure (t, filter inClosure (designEntities design))
     ts ->

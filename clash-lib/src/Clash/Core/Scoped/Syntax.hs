@@ -62,7 +62,7 @@
     needs. Everything else is strict.
 
   * __Globals are not scoped__: 'GlobalVar' holds a 'GlobalId', i.e. a
-    'C.Id' with a closed type. The same holds for data constructors and
+    name with a closed type. The same holds for data constructors and
     primitives, whose types are closed too. Local variables ('TmName') and
     global ones ('GlobalId') are different types, and so are the maps keyed by
     them (see "Clash.Core.Scoped.NameMap"), so they can't be confused.
@@ -112,9 +112,7 @@ module Clash.Core.Scoped.Syntax
   , tyNameBinderName
   , tmNameBinderName
     -- * Global names
-  , GlobalId
-  , mkGlobalId
-  , globalIdVar
+  , GlobalId (..)
   , globalIdUniq
     -- * Binders
   , TyBinder (..)
@@ -146,7 +144,6 @@ import Control.DeepSeq (NFData (..))
 import Data.Hashable (Hashable (..))
 import qualified Data.Kind as K
 import Data.Text (Text)
-import GHC.Stack (HasCallStack)
 import GHC.Types.SrcLoc (SrcSpan)
 
 import Clash.Annotations.SynthesisAttributes (Attr)
@@ -163,10 +160,34 @@ import Clash.Core.Scoped.Internal.Scope
 
 -- * Global names
 
--- | A global variable: a 'C.Id' that refers to a top-level binding, whose type
--- is closed. See 'mkGlobalId'.
-newtype GlobalId = MkGlobalId C.Id
-  deriving (Show)
+-- | A global variable: one that refers to a top-level binding. Its type is
+-- closed.
+--
+-- = Transition
+--
+-- The scoped fields, 'globalIdName' and 'globalIdType', are the truth.
+-- 'globalIdLegacy' is the global variable as Clash Core's 'C.Id', for the
+-- code that still uses Clash Core. It is derived lazily, and is deleted with
+-- Clash Core (package B of the port). Make global variables with
+-- 'Clash.Core.Scoped.Convert.mkGlobalId' or
+-- 'Clash.Core.Scoped.Convert.mkGlobalIdFromClash', which derive the side they
+-- are not given.
+data GlobalId = GlobalId
+  { globalIdName :: !(C.Name C.Term)
+  -- ^ Its name, whose unique identifies it
+  , globalIdType :: Type 'VoidS
+  -- ^ Its type. Lazy, like the types of local variables (see the module
+  -- header).
+  , globalIdLegacy :: C.Id
+  -- ^ Transitional, see above. Lazy.
+  }
+
+-- | Shows the name and the type
+instance Show GlobalId where
+  showsPrec d g =
+    showParen (d > 10) $
+      showString "GlobalId " . showsPrec 11 (globalIdName g)
+        . showString " " . showsPrec 11 (globalIdType g)
 
 -- | By unique
 instance Eq GlobalId where
@@ -179,23 +200,14 @@ instance Ord GlobalId where
 instance Hashable GlobalId where
   hashWithSalt salt = hashWithSalt salt . globalIdUniq
 
+-- | Doesn't force the type, like the instances of terms don't force the types
+-- of local variables (see the module header)
 instance NFData GlobalId where
-  rnf (MkGlobalId v) = rnf v
-
--- | A global variable. Errors on a local 'C.Id', or on a type variable.
-mkGlobalId :: HasCallStack => C.Id -> GlobalId
-mkGlobalId v
-  | C.isGlobalId v = MkGlobalId v
-  | otherwise = error ("mkGlobalId: not a global variable: " <> show (C.varName v))
-
--- | The Clash variable of a global variable
-globalIdVar :: GlobalId -> C.Id
-globalIdVar (MkGlobalId v) = v
-{-# INLINE globalIdVar #-}
+  rnf g = rnf (globalIdName g)
 
 -- | The unique of a global variable
 globalIdUniq :: GlobalId -> Unique
-globalIdUniq (MkGlobalId v) = C.varUniq v
+globalIdUniq = C.nameUniq . globalIdName
 {-# INLINE globalIdUniq #-}
 
 -- * Binders

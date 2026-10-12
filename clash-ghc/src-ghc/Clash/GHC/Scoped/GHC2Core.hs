@@ -108,7 +108,7 @@ import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
-import           Clash.Core.Scoped.Syntax    (mkGlobalId)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Driver.Types          (HasClashOpts(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreEnv (..), SrcSpanRB (..), StructuralType (..), addUsefull,
@@ -400,7 +400,7 @@ coreToTermB primMap unlocs recLocals = term
               | x `elem` unlocs ->
                   return (primB (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding))
               | isGlobalId x, not (x `elemVarSet` recLocals)
-              -> globalB . mkGlobalId <$> coreToId x
+              -> globalB . mkGlobalIdFromClash <$> coreToId x
               | otherwise
               -> return (varB (varKey x))
       where

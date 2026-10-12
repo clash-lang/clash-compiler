@@ -112,7 +112,6 @@ import qualified Clash.Core.Name as C
 import Clash.Core.Term (PrimInfo (..))
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding)
 import qualified Clash.Normalize.Primitives as NP
@@ -270,7 +269,7 @@ data Head (n :: S) = Head
 -- 'Clash.Normalize.Transformations.DEC.decFunName'
 decFunName :: Term n -> C.OccName
 decFunName fun = last . Text.splitOn "." $ case fun of
-  GlobalVar g -> C.nameOcc (C.varName (globalIdVar g))
+  GlobalVar g -> C.nameOcc (globalIdName g)
   Var occ _ _ -> C.nameOcc occ
   Prim p -> primName p
   _ -> "complex_expression"

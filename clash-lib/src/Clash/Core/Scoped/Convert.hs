@@ -81,6 +81,10 @@ module Clash.Core.Scoped.Convert
   , toClashTerm
   , toClashTyBinder
   , toClashIdBinder
+    -- * Constructors
+    -- $constructors
+  , mkGlobalId
+  , mkGlobalIdFromClash
   ) where
 
 import qualified Control.Lens as Lens
@@ -350,7 +354,7 @@ goTmS sup env@(ConvEnv _ _ tms _) = go
   goT = goTyS sup env
   go = \case
     C.Var v
-      | C.isGlobalId v -> pure (GlobalVar (mkGlobalId v))
+      | C.isGlobalId v -> pure (GlobalVar (mkGlobalIdFromClash v))
       | otherwise -> case IntMap.lookup (uniqToRaw (C.varUniq v)) tms of
           Just tm -> pure tm
           Nothing -> error ("fromClashTerm: variable not in scope: " ++ show (C.varName v))
@@ -496,7 +500,7 @@ toClashTermEnv env@(ToEnv _ ids) = go
       Nothing ->
         let u = tmNameRaw n
         in C.Var (C.Id (setUniq occ u) (rawToUniq u) (goTy ty) C.LocalId)
-    GlobalVar v -> C.Var (globalIdVar v)
+    GlobalVar v -> C.Var (globalIdLegacy v)
     Data dc -> C.Data dc
     Literal l -> C.Literal l
     Prim p -> C.Prim p
@@ -533,3 +537,33 @@ toClashTermEnv env@(ToEnv _ ids) = go
     DeDup -> C.DeDup
     NoDeDup -> C.NoDeDup
     Attributes ty e -> C.Attributes (goTy ty) (go e)
+
+-- * Constructors
+
+{- $constructors
+The types of scoped Core that Clash Core shares, such as 'GlobalId', hold
+both their scoped parts, which are the truth, and the parts that Clash Core
+needs. The constructors below take one side and derive the other one lazily,
+by conversion. They are transitional: once Clash Core is gone, so are the
+legacy parts.
+-}
+
+-- | A global variable with the given name and closed type
+mkGlobalId :: C.Name C.Term -> Type 'VoidS -> GlobalId
+mkGlobalId nm ty = GlobalId
+  { globalIdName = nm
+  , globalIdType = ty
+  , globalIdLegacy = C.Id nm (C.nameUniq nm) (toClashType ty) C.GlobalId
+  }
+
+-- | A global variable of Clash Core. Errors on a local 'C.Id', or on a type
+-- variable. Its type is converted lazily, and errors if it isn't closed.
+mkGlobalIdFromClash :: HasCallStack => C.Id -> GlobalId
+mkGlobalIdFromClash v
+  | C.isGlobalId v = GlobalId
+      { globalIdName = (C.varName v) {C.nameUniq = C.varUniq v}
+      , globalIdType = fromClashTypeClosed emptyScope (C.varType v)
+      , globalIdLegacy = v
+      }
+  | otherwise =
+      error ("mkGlobalIdFromClash: not a global variable: " <> show (C.varName v))

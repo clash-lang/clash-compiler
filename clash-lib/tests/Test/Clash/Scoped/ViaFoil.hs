@@ -132,7 +132,7 @@ withGlobalBindings m = do
   bm <- Lens.use bindings
   scopedBindings %= \sb ->
     globalEnvFromList
-      [ (mkGlobalId (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
+      [ (mkGlobalIdFromClash (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
       <> sb
   a <- m
   sb <- Lens.use scopedBindings
