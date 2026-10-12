@@ -596,19 +596,19 @@ compareBinding (Comparison _ _ cur sco kds) d b = either Different id <$> do
 compareResults :: Distinct n => [KnownDifference] -> Scope n -> Term n -> Term n -> Outcome
 compareResults kds sc c s
   | aeqTm c s = Equal
-  | aeqTm c' s' = KnownDifferent (explaining 1)
+  | aeqTm c' s' = KnownDifferent (map kdName (List.foldl' needed kds kds))
   | otherwise = Different (Mismatch (firstDiff c' s') (toClashTerm c') (toClashTerm s'))
  where
   c' = applyKnownDifferences kds sc c
   s' = applyKnownDifferences kds sc s
 
-  -- The shortest prefix of the known differences that explains the
-  -- difference
-  explaining k
-    | k >= length kds = map kdName kds
-    | aeqTm (applyKnownDifferences (take k kds) sc c) (applyKnownDifferences (take k kds) sc s) =
-        map kdName (take k kds)
-    | otherwise = explaining (k + 1)
+  -- The known differences that explain the difference: one by one, those
+  -- without which the others still do are left out
+  needed acc kd =
+    let acc' = filter ((/= kdName kd) . kdName) acc
+    in  if aeqTm (applyKnownDifferences acc' sc c) (applyKnownDifferences acc' sc s)
+          then acc'
+          else acc
 
 -- | The results of comparing on all bindings of a design
 data Summary = Summary
