@@ -70,13 +70,14 @@ import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import Clash.Core.HasType
+import Clash.Core.Scoped.TypeEnv            (TypeEnv)
 import Clash.Core.Evaluator.Types           (Evaluator)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.VarEnv                    (VarEnv)
 import Clash.Driver.Types
-  (BindingMap, ClashEnv(..), ClashOpts(..), HasClashOpts(..))
+  (BindingMap, ClashEnv(..), ClashOpts(..), GlobalBindings, HasClashOpts(..))
 import Clash.Driver.Warning                 (CanWarn)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
@@ -286,6 +287,8 @@ data NetlistEnv
   , _whnfEvaluator :: Evaluator
   -- ^ Evaluator for evaluating the attributes of 'Attributes' ticks, see
   -- 'Clash.Core.Evaluator.Types.nfData'
+  , _typeEnv :: TypeEnv
+  -- ^ The type environment of scoped Clash Core, made once per run
   }
 
 data ComponentMeta = ComponentMeta
@@ -300,8 +303,12 @@ type ComponentMap = OMap Unique (ComponentMeta, Component)
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: BindingMap
+  { _bindings       :: GlobalBindings
   -- ^ Global binders
+  , _legacyBindings :: BindingMap
+  -- ^ The global binders as bindings of Clash Core, for the parts of Netlist
+  -- generation that still run on Clash Core. Converted lazily, per binding.
+  -- TODO(Phase 7): remove.
   , _components     :: ComponentMap
   -- ^ Cached components. Is an insertion ordered map to preserve a topologically
   -- sorted component list for the manifest file.

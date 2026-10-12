@@ -1977,7 +1977,7 @@ withTicks ticks0 k = do
         | Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
         -> if isClosed attrs0 then do
             -- Step 1. Evaluate to normal form
-            nm <- Lens.use bindings
+            nm <- Lens.use legacyBindings
             ids <- State.liftIO newSupply
             eval <- Lens.view whnfEvaluator
             -- Force attributes term to Normal Form so that it is a simple literal
@@ -2025,7 +2025,7 @@ affixName
   :: Text
   -> NetlistMonad Text
 affixName nm0 = do
-  NetlistEnv _ pre suf _ _ _ <- ask
+  NetlistEnv _ pre suf _ _ _ _ <- ask
   let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
       nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2
