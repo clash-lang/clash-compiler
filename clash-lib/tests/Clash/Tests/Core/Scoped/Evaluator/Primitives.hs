@@ -15,14 +15,19 @@
 
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Tests.Core.Scoped.Evaluator.Primitives (tests) where
 
 import Control.Exception (evaluate)
 import qualified Data.HashMap.Strict as HashMap
 import Data.IORef (newIORef, readIORef)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import GHC.Float (castDoubleToWord64)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Data.Maybe (isJust)
@@ -32,25 +37,47 @@ import qualified Clash.Core.Evaluator.Types as CE
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (NameSort (..), mkUnsafeSystemName)
 import qualified Clash.Core.Term as C
+import Clash.Core.TyCon (TyConName)
 import qualified Clash.Core.Type as C
 import Clash.Core.TysPrim
-  ( integerPrimTy, intPrimTy, liftedTypeKind, wordPrimTy )
+  ( byteArrayPrimTy, charPrimTy, doublePrimTy, integerPrimTy, intPrimTy, naturalPrimTy
+  , liftedTypeKind, stringPrimTy, typeNatKind, wordPrimTy )
 import qualified Clash.Core.Util as C (mkVec)
 import qualified Clash.Core.Var as C
 import qualified Clash.Normalize.Primitives as NP
 
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import Clash.Core.Scoped.Evaluator.Primitives.Util
-  (bvConPrim, intLiteral, integerToIntLiteral, liftLit2)
-import Clash.Core.Scoped.Evaluator.Types (Env, PrimReduction)
+  (bvConPrim, intLiteral, integerToIntLiteral, liftLit2, signedConPrim)
+import Clash.Core.Scoped.Evaluator.Adapter (adaptPrim)
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving as PDeriving
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Promoted.Nat as PNat
+import qualified Clash.Core.Scoped.Evaluator.Primitives.Data.Text.Show as PShow
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Base as PBase
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Float as PFloat
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Float as PInternalFloat
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer as PInteger
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim as PPrim
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeLits as PTypeLits
+import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeNats as PTypeNats
+import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReduction, PrimReductions (..))
 
 import Test.Clash.Rewrite
-  ( addTy, assertAlphaEq, consDc, ghcBoolTy, ghcTrueDataCon, heapLookupEvaluator
-  , intId, mkTyConName, nilDc, numTy, pairDataCon, pairTy, rtreeTy, snatTy, tcApp
-  , testTyConMap, vecTy )
+  ( addTy, assertAlphaEq, consDc, doubleDc, doubleTy, eqDc, ghcBoolTy, ghcFalseDataCon
+  , ghcTrueDataCon, gtDc, heapLookupEvaluator, intId, ltDc, mkTyConName, nilDc, numTy
+  , orderingTy, pairDataCon, pairTy, proxyDc, rtreeTy, signedTyConName, snatDc, snatTy
+  , someNatDc, someNatTy, t2DataCon, t2Ty, t3DataCon, t3Ty, tcApp, testTyConMap, vecTy )
 import Test.Clash.Scoped (testTypeEnv)
 import Test.Clash.Scoped.Evaluator
 import Test.Clash.Scoped.Evaluator.Primitives
+
+import qualified Clash.Annotations.BitRepresentation.Deriving
+import qualified Clash.Promoted.Nat
+import qualified GHC.Base
+import qualified GHC.Num.Integer
+import qualified GHC.TypeLits
+import qualified GHC.TypeNats
+import qualified Language.Haskell.TH as TH
 
 portedTests :: [TestTree]
 portedTests =
@@ -127,6 +154,145 @@ portedTests =
                 -- The reduction doesn't look at the SNat, but it must be a value
                 [Right (numTy 2), Right integerPrimTy, Left (natLit 2), Left (integerLit 7)])
       in assertBool ("unexpected result: " <> show r) (sameResult expected r)
+  ]
+
+-- * Results built from types
+
+signedTcNm :: TyConName
+signedTcNm = signedTyConName
+
+signedTy :: C.Type -> C.Type
+signedTy n = tcApp signedTcNm [n]
+
+signed :: Integer -> Integer -> C.Term
+signed n val =
+  C.mkApps (closedPrimTerm (signedConPrim signedTcNm))
+    [Right (numTy n), Left (natLit n), Left (integerLit val)]
+
+snat :: Integer -> C.Term
+snat n = C.mkApps (C.Data snatDc) [Right (numTy n), Left (natLit n)]
+
+doubleLit :: Double -> C.Term
+doubleLit = C.Literal . DoubleLiteral . castDoubleToWord64
+
+-- | The name of a primitive, as Clash names it
+nameText :: TH.Name -> Text
+nameText = Text.pack . show
+
+-- | The given reductions, and nothing for the other primitives
+evalReductions :: [(Text, PrimReduction)] -> Bool -> C.Term -> C.Term
+evalReductions rs =
+  scopedWhnf (Env testTypeEnv (PrimReductions (HashMap.fromList rs) (Just (adaptPrim heapLookupEvaluator)))) mempty
+
+-- | Reductions whose results are built from the type of their primitive, or
+-- from the types of its arguments
+resultTypeTests :: [TestTree]
+resultTypeTests =
+  [ testCase "$wproperFractionDouble builds its result from the instantiated type" $
+      -- forall b. Integral b => Double# -> (# b, Double #)
+      let integralTy b = tcApp (mkTyConName "GHC.Real.Integral" 4005) [b]
+          pfTy = C.ForAllTy tvA $
+            C.mkFunTy (integralTy (C.VarTy tvA)) $
+              C.mkFunTy doublePrimTy (t2Ty (C.VarTy tvA) doubleTy)
+          call nm = C.mkApps (prim nm pfTy)
+            [Right (signedTy (numTy 8)), Left (natLit 0), Left (doubleLit (-2.5))]
+          -- The reduction of Clash Core gives the type arguments of the type of
+          -- the primitive, @b@ and @Double@
+          expected = C.mkApps (C.Data t2DataCon)
+            [ Right (signedTy (numTy 8)), Right doubleTy
+            , Left (signed 8 (-2)), Left (C.App (C.Data doubleDc) (doubleLit (-0.5))) ]
+          floatPrims = PFloat.primitives ++ PInternalFloat.primitives
+      in mapM_ (\nm -> assertAlphaEq expected (evalReductions floatPrims False (call nm)))
+           ["GHC.Float.$wproperFractionDouble", "GHC.Internal.Float.$wproperFractionDouble"]
+
+  , testCase "integerDecodeDouble# builds the constructor of its result type" $
+      assertAlphaEq
+        (C.mkApps (C.Data t2DataCon)
+          [ Right integerPrimTy, Right intPrimTy
+          , Left (integerLit 4503599627370496), Left (intLit (-53)) ])
+        (evalReductions PInteger.primitives False (C.App (prim (nameText 'GHC.Num.Integer.integerDecodeDouble#)
+                        (C.mkFunTy doublePrimTy (t2Ty integerPrimTy intPrimTy)))
+                     (doubleLit 0.5)))
+
+  , testCase "$wunpackCStringAscii# builds the constructor of its result type" $
+      let r = evalReductions PShow.primitives False (C.App (prim "Data.Text.Show.$wunpackCStringAscii#"
+                            (C.mkFunTy stringPrimTy (t3Ty byteArrayPrimTy intPrimTy intPrimTy)))
+                         (C.Literal (StringLiteral "abc")))
+      in case C.collectArgs r of
+           ( C.Data dc
+             , [ Right a, Right b, Right c
+               , Left (C.Literal (ByteArrayLiteral _)), Left off, Left len ] )
+             | dc == t3DataCon
+             -> do mapM_ (uncurry assertAlphaEq)
+                     [(byteArrayPrimTy, a), (intPrimTy, b), (intPrimTy, c)]
+                   assertAlphaEq (intLit 0) off
+                   assertAlphaEq (intLit 3) len
+           _ -> assertFailure ("unexpected result: " <> show r)
+
+  , testCase "integerCompare gives a constructor of Ordering" $ do
+      let cmp i j = evalReductions PInteger.primitives False (C.mkApps (prim (nameText 'GHC.Num.Integer.integerCompare)
+                                     (binTy integerPrimTy orderingTy))
+                                [Left (integerLit i), Left (integerLit j)])
+      assertAlphaEq (C.Data gtDc) (cmp 3 2)
+      assertAlphaEq (C.Data eqDc) (cmp 2 2)
+      assertAlphaEq (C.Data ltDc) (cmp (-1) 2)
+
+  , testCase "powSNat gives an SNat of the power" $
+      -- powSNat :: forall a b. SNat a -> SNat b -> SNat (a^b)
+      let tvB = C.mkTyVar typeNatKind (mkUnsafeSystemName "b" 9004)
+          powTy = C.ForAllTy tvN $ C.ForAllTy tvB $
+            C.mkFunTy (snatTy (C.VarTy tvN)) $
+              C.mkFunTy (snatTy (C.VarTy tvB)) (snatTy (C.VarTy tvN))
+      in assertAlphaEq (snat 81)
+           (evalReductions PNat.primitives False (C.mkApps (prim (nameText 'Clash.Promoted.Nat.powSNat) powTy)
+                    [Right (numTy 3), Right (numTy 4), Left (snat 3), Left (snat 4)]))
+
+  , testCase "withSomeSNat applies its function to an SNat" $
+      -- withSomeSNat :: forall r. Natural -> (forall n. SNat n -> r) -> r
+      let s = C.mkLocalId (snatTy (C.VarTy tvN)) (mkUnsafeSystemName "s" 10)
+          withTy = C.ForAllTy tvA $
+            C.mkFunTy naturalPrimTy $
+              C.mkFunTy (C.ForAllTy tvN (C.mkFunTy (snatTy (C.VarTy tvN)) (C.VarTy tvA)))
+                (C.VarTy tvA)
+          -- /\n. \(s :: SNat n) -> case s of SNat k -> integerFromNatural k,
+          -- written as a constructor of a pair that keeps the SNat
+          fun = C.TyLam tvN (C.Lam s (C.mkApps (C.Data pairDataCon) [Left (C.Var s), Left (C.Var s)]))
+      -- 'GHC.TypeNats.SNat' is a newtype over 'Natural', so the SNat is the
+      -- literal it wraps
+      in assertBool "expected the function applied to SNat 5" $
+           sameResult (C.mkApps (C.Data pairDataCon) [Left (natLit 5), Left (natLit 5)])
+             (evalReductions PTypeNats.primitives False (C.mkApps (prim (nameText 'GHC.TypeNats.withSomeSNat) withTy)
+                      [Right pairTy, Left (natLit 5), Left fun]))
+
+  , testCase "someNatVal hides a natural in SomeNat" $
+      let expected = C.mkApps (C.Data someNatDc)
+            [ Right (numTy 5), Left (natLit 5)
+            , Left (C.mkApps (C.Data proxyDc) [Right typeNatKind, Right (numTy 5)]) ]
+          call nm = C.App (prim nm (C.mkFunTy naturalPrimTy someNatTy)) (natLit 5)
+      in do assertAlphaEq expected
+              (evalReductions PTypeNats.primitives False (call (nameText 'GHC.TypeNats.someNatVal)))
+            assertAlphaEq expected
+              (evalReductions PTypeLits.primitives False (call (nameText 'GHC.TypeLits.someNatVal)))
+
+  , testCase "dontApplyInHDL applies its function as the subject of a case" $
+      let x = C.mkLocalId intPrimTy (mkUnsafeSystemName "x" 11)
+          applyTy = C.ForAllTy tvA $ C.ForAllTy tvN $
+            C.mkFunTy (C.mkFunTy intPrimTy intPrimTy) (C.mkFunTy intPrimTy intPrimTy)
+          call = C.mkApps (prim (nameText 'Clash.Annotations.BitRepresentation.Deriving.dontApplyInHDL) applyTy)
+            [ Right intPrimTy, Right intPrimTy
+            , Left (C.Lam x (C.mkApps (prim "GHC.Prim.+#" (binTy intPrimTy intPrimTy))
+                                [Left (C.Var x), Left (intLit 1)]))
+            , Left (intLit 5) ]
+      in assertAlphaEq (intLit 6) (allocatedBody (evalReductions (PDeriving.primitives ++ PPrim.primitives) True call))
+
+  , testCase "eqString compares string literals" $
+      let str = C.App (prim "GHC.CString.unpackCString#" (C.mkFunTy stringPrimTy stringTy))
+                      . C.Literal . StringLiteral
+          stringTy = tcApp (mkTyConName "GHC.Types.List" 4006) [charPrimTy]
+          eqStr a b = evalReductions PBase.primitives False (C.mkApps (prim (nameText 'GHC.Base.eqString) (binTy stringTy ghcBoolTy))
+                              [Left (str a), Left (str b)])
+      in do assertAlphaEq (C.Data ghcTrueDataCon) (eqStr "ab" "ab")
+            assertAlphaEq (C.Data ghcFalseDataCon) (eqStr "ab" "ba")
   ]
 
 -- * The adapter
@@ -265,6 +431,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Evaluator.Primitives"
   [ testCase "no primitive has two reductions" $
       () <$ evaluate (HashMap.size scopedPrimReductions)
   , testGroup "ported reductions" portedTests
+  , testGroup "results built from types" resultTypeTests
   , testGroup "adapter" adapterTests
   , testGroup "harness" harnessTests
   ]
