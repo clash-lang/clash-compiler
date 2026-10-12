@@ -40,12 +40,13 @@
   binding can't be found under a variable that merely has the same name as
   its binder.
 
-  The global bindings are those of Clash Core ('BindingMap'), which are
-  closed; the machine converts them into its scope when it looks them up.
+  The global bindings are closed terms; the machine moves them into its
+  scope ('sinkClosed') when it looks them up.
   Evaluated globals ('mHeapGlobalOverlay') can mention heap variables, so
   they are scoped.
 -}
 
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
@@ -95,7 +96,7 @@ import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
-import Clash.Driver.Types (BindingMap)
+import Clash.Driver.Types (Binding)
 
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Syntax
@@ -263,9 +264,9 @@ data Machine (o :: S) (n :: S) = Machine
   , mAlloc :: !(Alloc o n)
   -- ^ The binders the machine allocated
   , mHeapPrim :: !PrimHeap
-  , mHeapGlobalBase :: BindingMap
-  -- ^ The global bindings, closed, converted into the machine's scope when
-  -- they are looked up
+  , mHeapGlobalBase :: GlobalEnv (Binding (Term 'VoidS))
+  -- ^ The global bindings, closed, moved into the machine's scope when they
+  -- are looked up
   , mHeapGlobalOverlay :: !(GlobalEnv (Term n))
   -- ^ Global bindings added or updated during evaluation; shadows
   -- 'mHeapGlobalBase'
@@ -281,7 +282,8 @@ type role Machine nominal nominal
 -- | A machine that evaluates a term in scope @n@, with a local heap of
 -- bindings in that scope, e.g. those of the rewrite context
 initMachine
-  :: Scope n -> PureHeap n -> BindingMap -> PrimHeap -> Term n -> Machine n n
+  :: Scope n -> PureHeap n -> GlobalEnv (Binding (Term 'VoidS)) -> PrimHeap -> Term n
+  -> Machine n n
 initMachine sc h bm ph e = Machine
   { mScope = sc
   , mAlloc = ANil

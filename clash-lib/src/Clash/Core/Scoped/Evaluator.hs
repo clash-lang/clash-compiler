@@ -103,14 +103,12 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Core.Util (undefinedPrims, undefinedXPrims)
-import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Primitives as NP
 import Clash.Util (curLoc)
 import Clash.XException (isX)
 
-import Clash.Core.Scoped.Convert (fromClashTermClosedIn)
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.HasType
   (applyTypeToArgs, inferCoreTypeOf, piResultTys, primInfoType)
@@ -290,11 +288,12 @@ step env m = case mTerm m of
   stepGlobal g
     | memberGlobalSet g (mHeapGlobalDeleted m) = Nothing
     | Just e <- lookupGlobalEnv g (mHeapGlobalOverlay m) = force e
-    | Just b <- UniqMap.lookup (globalIdUniq g) (mHeapGlobalBase m) =
-        -- Globals are closed: converting one into the machine's scope numbers
-        -- its binders above the scope. Like the deshadowing the machine of
-        -- Clash Core does here, this copies the term.
-        force (fromClashTermClosedIn (mScope m) (bindingTerm b))
+    | Just b <- lookupGlobalEnv g (mHeapGlobalBase m) =
+        -- Globals are closed, so they move into the machine's scope for free.
+        -- Unlike the machine of Clash Core, which deshadows a global here,
+        -- this doesn't copy the term: its binders are opened when the machine
+        -- goes under them.
+        force (sinkClosed (bindingTerm b))
     | otherwise = Nothing
    where
     force e = Just $ stay m

@@ -26,10 +26,15 @@ import Clash.Core.Name (NameSort (User))
 import Clash.Core.Subst (unsafeSubstTm)
 import Clash.Core.Term (Term (..))
 import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (emptyVarEnv, lookupVarEnv, mkVarEnv)
+import Clash.Core.VarEnv (emptyVarEnv, mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize (cleanupGraph)
 import Clash.Rewrite.Types (RewriteState (..))
+
+import Clash.Core.Scoped.Convert (toClashTerm)
+import Clash.Core.Scoped.NameMap (lookupGlobalEnv)
+import Clash.Core.Scoped.Syntax (mkGlobalId)
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
 import Test.Clash.Rewrite
   ( assertWellScoped, globalId, intFunTy, mkBindingMap, nameToUnique
@@ -50,10 +55,10 @@ withTypes globals = unsafeSubstTm (mkVarEnv [(i, Var i) | i <- globals]) emptyVa
 -- binders' terms get the types of the given globals.
 cleanup :: [Id] -> Id -> [(Id, Term)] -> IO Term
 cleanup globals top bndrs = do
-  let bm = mkBindingMap [(i, withTypes globals tm) | (i, tm) <- bndrs]
-  (bm1, _, _) <- runRewriteTest def def{_bindings = bm} (cleanupGraph top bm)
-  case lookupVarEnv top bm1 of
-    Just b -> pure (bindingTerm b)
+  let bm = fromClashBindings (mkBindingMap [(i, withTypes globals tm) | (i, tm) <- bndrs])
+  (bm1, _, _) <- runRewriteTest def def{_scopedBindings = bm} (cleanupGraph (mkGlobalId top) bm)
+  case lookupGlobalEnv (mkGlobalId top) bm1 of
+    Just b -> pure (toClashTerm (bindingTerm b))
     Nothing -> assertFailure ("cleanupGraph dropped " <> showPprU top)
 
 tests :: TestTree

@@ -89,12 +89,11 @@ import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
 import           Clash.Core.TysPrim          (integerPrimTy, naturalPrimTy, typeNatKind)
 import qualified Clash.Core.Var              as C
-import qualified Clash.Data.UniqMap          as UniqMap
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (..), hasTransformationInfo)
 import           Clash.Normalize.Types
-  (NormalizeSession, specialisationCache, specialisationHistory)
+  (NormalizeSession, scopedSpecialisationCache, scopedSpecialisationHistory)
 import           Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
@@ -102,11 +101,13 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
-import           Clash.Core.Scoped.Convert   (toClashTerm, toClashType)
+import           Clash.Core.Scoped.Convert   (toClashType)
 import           Clash.Core.Scoped.DataCon   (dataConInstArgTys)
 import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
 import           Clash.Core.Scoped.HasType   (globalIdType, inferCoreTypeOf, piResultTy)
-import           Clash.Core.Scoped.NameMap   (nullNameSet, singletonNameMap)
+import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
+import           Clash.Core.Scoped.NameMap
+  (insertWithGlobalEnv, lookupGlobalEnv, nullNameSet, singletonNameMap)
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
@@ -405,20 +406,28 @@ specializeGlobal sc e f args ticks specArgIn = do
         argLen = length args
         -- See Note [ticks and specialization] and Note [bignum literals and
         -- specialization]
-        specAbs :: Either C.Term C.Type
+        -- The key of the specialisation cache: closed, as 'abstractOver'
+        -- abstracts the term over its free variables. A type with free type
+        -- variables isn't cached.
+        specAbs :: Maybe (Either AlphaTerm AlphaType)
         specAbs = case specArg of
-          Left tm -> Left (specCacheKey (toClashTerm (abstractOver "specialize" specTvs specIdBndrs tm)))
-          Right ty -> Right (toClashType ty)
+          Left tm ->
+            Left . AlphaTerm <$>
+              closeTerm (scopedSpecCacheKey (abstractOver "specialize" specTvs specIdBndrs tm))
+          Right ty -> Right . AlphaType <$> closeType ty
+        showSpecAbs = either (\(AlphaTerm t) -> showPpr t) (\(AlphaType t) -> showPpr t)
     -- Determine if 'f' has already been specialized on (a type-normalized)
     -- 'specArg'
-    specM <- Map.lookup (fV, argLen, specAbs) <$> Lens.use (extra . specialisationCache)
+    specM <- case specAbs of
+      Just k -> Map.lookup (f, argLen, k) <$> Lens.use (extra . scopedSpecialisationCache)
+      Nothing -> pure Nothing
     case specM of
       -- Use previously specialized function
       Just f' ->
         traceIf (hasTransformationInfo AppliedTerm opts)
           ("Using previous specialization of " ++ showPpr (C.varName fV) ++ " on " ++
-            either showPpr showPpr specAbs ++ ": " ++ showPpr (C.varName f')) $
-          changed (mkApps (mkTicks (GlobalVar (mkGlobalId f')) ticks) (args ++ specVars))
+            maybe "" showSpecAbs specAbs ++ ": " ++ showPpr (C.varName (globalIdVar f'))) $
+          changed (mkApps (mkTicks (GlobalVar f') ticks) (args ++ specVars))
       -- Create new specialized function
       Nothing -> lookupBinding f >>= \case
         -- Determine if we can specialize f
@@ -426,7 +435,7 @@ specializeGlobal sc e f args ticks specArgIn = do
         Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specializations on a growing
           -- argument
-          specHistM <- UniqMap.lookup fV <$> Lens.use (extra . specialisationHistory)
+          specHistM <- lookupGlobalEnv f <$> Lens.use (extra . scopedSpecialisationHistory)
           specLim <- Lens.view specializationLimit
           if maybe False (> specLim) specHistM
             then throw (ClashException
@@ -472,8 +481,9 @@ specializeGlobal sc e f args ticks specArgIn = do
                 Just newBody -> do
                   newf <- mkFunction newName sp inl' newBody
                   -- Remember specialization
-                  (extra . specialisationHistory) %= UniqMap.insertWith (+) fV 1
-                  (extra . specialisationCache) %= Map.insert (fV, argLen, specAbs) (globalIdVar newf)
+                  (extra . scopedSpecialisationHistory) %= insertWithGlobalEnv (+) f 1
+                  Monad.forM_ specAbs $ \k ->
+                    (extra . scopedSpecialisationCache) %= Map.insert (f, argLen, k) newf
                   -- Use specialized function
                   changed (mkApps (mkTicks (GlobalVar newf) ticks) (args ++ specVars))
  where
@@ -546,6 +556,28 @@ specCacheKey = go
 
   goBinds (C.NonRec i x) = C.NonRec i (go x)
   goBinds (C.Rec ixs) = C.Rec (fmap go <$> ixs)
+
+-- | 'specCacheKey' on scoped Clash Core
+scopedSpecCacheKey :: Term n -> Term n
+scopedSpecCacheKey = go
+ where
+  go :: Term x -> Term x
+  go = \case
+    Lam b x -> Lam b (go x)
+    TyLam b x -> TyLam b (go x)
+    App f x -> case (go f, go x) of
+      (Prim p, Literal (WordLiteral w))
+        | C.primName p == Text.showt 'NS -> Literal (NaturalLiteral w)
+      (Prim p, Literal (IntLiteral i))
+        | C.primName p == Text.showt 'IS -> Literal (IntegerLiteral i)
+      (f', x') -> App f' x'
+    TyApp f a -> TyApp (go f) a
+    Let (NonRec b x) e -> Let (NonRec b (go x)) (go e)
+    Let (Rec bs xs) e -> Let (Rec bs (map go xs)) (go e)
+    Case x ty alts -> Case (go x) ty [Alt p (go e) | Alt p e <- alts]
+    Cast x a b -> Cast (go x) a b
+    Tick _ x -> go x
+    x -> x
 
 -- | Given two 'InlineSpec's, return the \"strongest\" one. I.e., the one that's
 -- closest to @NoInline@ (or @Opaque@ for newer GHCs).

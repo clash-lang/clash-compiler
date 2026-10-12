@@ -34,7 +34,8 @@ import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline (bindConstantVarWorker)
 import Clash.Normalize.Transformations.Specialize
   ( appPropWorker, nonRepSpecWorker, specialize )
-import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
+import Clash.Normalize.Types
+  (NormRewrite, NormalizeState, scopedSpecialisationCache, specialisationCache)
 import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), extra)
@@ -405,7 +406,9 @@ specializeCacheFreeVarOrder specR = do
       y123 = intId User "y" 123
   (res1, _, st1) <- specializeF specR st0 x123 y456
   (res2, _, st2) <- specializeF specR st1 x456 y123
+  -- One of the caches of Clash Core and of scoped Clash Core is used
   let cacheSize = Map.size (Lens.view (extra . specialisationCache) st2)
+                + Map.size (Lens.view (extra . scopedSpecialisationCache) st2)
   assertEqual "Number of specializations" 1 cacheSize
   case (collectArgs res1, collectArgs res2) of
     ((Var f1, _), (Var f2, args2)) -> do

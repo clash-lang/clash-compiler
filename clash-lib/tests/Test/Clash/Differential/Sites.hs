@@ -82,6 +82,8 @@ import Clash.Core.VarEnv
   (eltsVarEnv, emptyVarEnv, mkVarEnv, restrictInScopeSet)
 import Clash.Driver.Types (BindingMap, ClashEnv (..))
 import Clash.Normalize.Strategy (constantPropagation, normalization)
+import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Normalize.Types
   (NormRewrite, NormalizeSession, NormalizeState (..))
 import Clash.Rewrite.Capture
@@ -141,6 +143,8 @@ mkCorpus env fs epochs = do
         , _nameCounter = 0
         , _globalHeap = (IntMap.empty, 0)
         , _workFreeBinders = fsWorkFreeBinders fs
+        , _scopedBindings = fromClashBindings (fsBindings fs)
+        , _scopedWorkFreeBinders = emptyGlobalEnv
         , _hwTypeCache = Map.empty
         , _extra = NormalizeState
             { _normalized = fsNormalized fs
@@ -154,6 +158,12 @@ mkCorpus env fs epochs = do
             , _scopedNormalizationStrategy = normalization
             , _scopedConstantPropagationStrategy = constantPropagation
             , _workFreeAppCache = HashMap.fromList (fsWorkFreeAppCache fs)
+            , _scopedNormalized = emptyGlobalEnv
+            , _scopedSpecialisationCache = Map.empty
+            , _scopedSpecialisationHistory = emptyGlobalEnv
+            , _scopedInlineHistory = emptyGlobalEnv
+            , _scopedRecursiveComponents = emptyGlobalEnv
+            , _scopedWorkFreeAppCache = Map.empty
             }
         }
     }
@@ -163,9 +173,11 @@ mkCorpus env fs epochs = do
 runAtSite :: Corpus -> Capture -> NormalizeSession a -> IO a
 runAtSite c cap m = do
   sup <- resumeSupply (capSupply cap)
-  let st = (corpusState c)
-        { _bindings = maybe (_bindings (corpusState c)) snd
-            (IntMap.lookupLE (capBindingsEpoch cap) (corpusBindings c))
+  let bm = maybe (_bindings (corpusState c)) snd
+             (IntMap.lookupLE (capBindingsEpoch cap) (corpusBindings c))
+      st = (corpusState c)
+        { _bindings = bm
+        , _scopedBindings = fromClashBindings bm
         , _transformCounter = capTransformCounter cap
         , _uniqSupply = sup
         , _curFun = capCurFun cap

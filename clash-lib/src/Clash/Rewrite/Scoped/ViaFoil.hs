@@ -16,6 +16,11 @@
 
   = 'viaFoil'
 
+  'viaFoil' first converts the global bindings of Clash Core
+  ('Clash.Rewrite.Types.bindings') into those of scoped Core
+  ('Clash.Rewrite.Types.scopedBindings'), which the scoped transformations
+  read, and afterwards converts the new global bindings back.
+
   'viaFoil' converts the subterm it is offered into scoped Core, in a scope
   with its free variables, runs the scoped transformation in a context whose
   root is a 'LegacyRoot', and converts the result back if the transformation
@@ -58,7 +63,9 @@
 module Clash.Rewrite.Scoped.ViaFoil
   ( viaFoil
   , whnfRWViaClash
+  , withGlobalBindings
   , toClashTermFresh
+  , toClashTermFreshWith
     -- * Internals, exported for testing
   , rootVars
   ) where
@@ -83,9 +90,10 @@ import qualified Clash.Core.Var              as C
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, eltsVarEnv, elemVarEnv, emptyInScopeSet,
    extendInScopeSet, extendInScopeSetList, lookupVarEnv, mkVarEnv, uniqAway)
-import           Clash.Driver.Types          (DebugOpts (..))
+import           Control.Lens                ((%=))
+import           Clash.Driver.Types          (Binding (..), DebugOpts (..))
 import           Clash.Rewrite.Types
-  (Rewrite, RewriteMonad, debugOpts, tcCache, uniqSupply)
+  (Rewrite, RewriteMonad, bindings, debugOpts, scopedBindings, tcCache, uniqSupply)
 import qualified Clash.Rewrite.Types         as C
 import           Clash.Rewrite.Util
   (cleanupHeapBindings, contextLetBindings, heapLetBindings, whnfHeap)
@@ -95,7 +103,8 @@ import           Clash.Util.Supply           (Supply, freshId, splitSupply)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm)
 import           Clash.Core.Scoped.Convert
-import           Clash.Core.Scoped.NameMap (NameMap, nameMapFromList)
+import           Clash.Core.Scoped.NameMap
+  (NameMap, globalEnvElems, globalEnvFromList, nameMapFromList)
 import qualified Clash.Data.UniqMap          as UniqMap
 import           Clash.Core.Scoped.FreeVars  (bindNameBinders)
 import           Clash.Core.Scoped.Subst
@@ -113,7 +122,16 @@ viaFoil
   -- ^ Name of the transformation, for error messages
   -> ScopedRewrite extra
   -> Rewrite extra
-viaFoil name (ScopedTransform rw) ctx e =
+viaFoil name rw ctx e =
+  withGlobalBindings (viaFoilWith name rw ctx e)
+
+-- | 'viaFoil', without synchronizing the global bindings
+viaFoilWith
+  :: HasCallStack
+  => String
+  -> ScopedRewrite extra
+  -> Rewrite extra
+viaFoilWith name (ScopedTransform rw) ctx e =
   withConvEnv tvs ids $ \env ->
     let tvsS = [(tv, fromClashType env (C.VarTy tv)) | tv <- tvs]
         idsS = [(i, fromClashTerm env (C.Var i)) | i <- ids]
@@ -137,6 +155,26 @@ viaFoil name (ScopedTransform rw) ctx e =
           pure e
  where
   (tvs, ids) = rootVars (C.tfContext ctx) e
+
+-- | Run a computation of scoped Core with the global bindings of Clash Core
+-- ('Clash.Rewrite.Types.bindings'): convert them into those of scoped Core
+-- ('Clash.Rewrite.Types.scopedBindings') before, and convert the global
+-- bindings that it adds back after, see the module header.
+withGlobalBindings :: HasCallStack => RewriteMonad extra a -> RewriteMonad extra a
+withGlobalBindings m = do
+  bm <- Lens.use bindings
+  scopedBindings %= \sb ->
+    globalEnvFromList
+      [ (mkGlobalId (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
+      <> sb
+  a <- m
+  sb <- Lens.use scopedBindings
+  new <- withSupply $ sequence
+    [ (\tm -> (bindingId b, b {bindingTerm = tm})) <$> toClashTermFreshWith (bindingTerm b)
+    | b <- globalEnvElems sb
+    , not (bindingId b `UniqMap.elem` bm) ]
+  bindings %= UniqMap.insertMany new
+  pure a
 
 -- | The variables of the root scope of 'viaFoil': the free variables of the
 -- subterm, and those of the right-hand sides of the let-bindings of its
@@ -356,8 +394,11 @@ toClashTickFresh is env = \case
 -- global binding, whose binders would otherwise get the small uniques of their
 -- raw names.
 toClashTermFresh :: HasCallStack => Term 'VoidS -> RewriteMonad extra C.Term
-toClashTermFresh e =
-  withSupply (toClashFresh emptyInScopeSet (BackEnv IntMap.empty IntMap.empty) e)
+toClashTermFresh e = withSupply (toClashTermFreshWith e)
+
+-- | 'toClashTermFresh', with a given unique supply
+toClashTermFreshWith :: HasCallStack => Term 'VoidS -> State Supply C.Term
+toClashTermFreshWith = toClashFresh emptyInScopeSet (BackEnv IntMap.empty IntMap.empty)
 
 -- * whnfRW
 
