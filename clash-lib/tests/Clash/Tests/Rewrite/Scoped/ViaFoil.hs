@@ -30,12 +30,11 @@ import Clash.Core.Name (NameSort (..))
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as CT
 import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (elemInScopeSet, extendInScopeSet, uniqAway)
+import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Driver.Types (DebugOpts (..), debugSilent)
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types
-  (Rewrite, RewriteEnv (..), RewriteState (..), TransformContext (..))
-import qualified Clash.Rewrite.Util as C (changed)
+  (RewriteEnv (..), RewriteState (..), TransformContext (..))
 import Clash.Unique (Unique)
 import Clash.Util.Supply (freshId)
 
@@ -46,7 +45,7 @@ import Clash.Rewrite.Scoped
   (ScopedRewrite, ScopedTransform (..), changed, tfScope)
 import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.Scoped.ViaFoil
-  (rootVars, toClashTermFresh, viaLegacy, whnfRWViaClash)
+  (rootVars, toClashTermFresh, whnfRWViaClash)
 import Clash.Rewrite.Types (RewriteMonad)
 
 import Clash.Tests.Rewrite.Util (whnfContextTests)
@@ -150,51 +149,11 @@ viaFoilTests =
       List.sort (map C.varUniq ids) @?= List.sort (map C.varUniq [x1, y2])
   ]
 
--- * viaLegacy
+-- * toClashTermFresh
 
--- | Replaces a variable that is in scope by the number of frames of its
--- context
-countFrames :: Rewrite extra
-countFrames ctx = \case
-  C.Var v | v `elemInScopeSet` tfInScope ctx ->
-    C.changed (intLit (toInteger (length (tfContext ctx))))
-  e -> pure e
-
-viaLegacyTests :: [TestTree]
-viaLegacyTests =
-  [ testCase "a rewrite that changes nothing gives the original term" $ do
-      (res, _, ch) <- runViaFoil invariantsEnv (def :: RewriteState NormalizeState) termCtx
-        (viaLegacy (\_ e -> pure e)) term
-      ch @?= False
-      show res @?= show term
-
-  , testCase "a rewrite sees the context and the variables in scope" $ do
-      -- Under viaFoil, the scoped traversal goes under the lambda, the let and
-      -- the alternatives, so the context has Clash Core frames below the
-      -- scoped ones
-      (res, _, ch) <- runViaFoil invariantsEnv (def :: RewriteState NormalizeState) termCtx
-        (S.topdownR (viaLegacy countFrames)) term
-      ch @?= True
-      -- The frames of every occurrence are the Clash Core one ('LamBody' z)
-      -- and the scoped ones: 'LamBody', 'LetBinding', 'AppFun' and 'AppArg'
-      -- for x in the right-hand side, so
-      -- \x -> let y = f 5 4 in case 4 of { 1 -> 4; _ -> 4 }
-      let expected =
-            C.Lam x1
-              (C.Let (C.NonRec y2 (C.mkApps (globalIntVar User "f" 4) [Left (intLit 5), Left (intLit 4)]))
-                (C.Case (intLit 4) intTy
-                  [(C.LitPat (IntLiteral 1), intLit 4), (C.DefaultPat, intLit 4)]))
-      assertAlphaEq expected res
-
-  , testCase "a rewrite can refer to the free variables of the term" $ do
-      let wrap _ e = C.changed (C.App (C.Lam w6 (C.Var z3)) e)
-          w6 = intId User "w" 6
-      (res, _, ch) <- runViaFoil invariantsEnv (def :: RewriteState NormalizeState) termCtx
-        (viaLegacy wrap) term
-      ch @?= True
-      assertAlphaEq (C.App (C.Lam w6 (C.Var z3)) term) res
-
-  , testCase "toClashTermFresh gives binders fresh uniques" $ do
+toClashTermFreshTests :: [TestTree]
+toClashTermFreshTests =
+  [ testCase "toClashTermFresh gives binders fresh uniques" $ do
       let closed = C.Lam y2 (C.Lam x1 (C.Var x1))
       (res, st, _) <- runRewriteTest def (def :: RewriteState NormalizeState)
         (toClashTermFresh (fromClashTermClosed closed))
@@ -341,6 +300,6 @@ allocEvaluator = heapLookupEvaluator
 tests :: TestTree
 tests = testGroup "Clash.Tests.Rewrite.Scoped.ViaFoil"
   [ testGroup "viaFoil" viaFoilTests
-  , testGroup "viaLegacy" viaLegacyTests
+  , testGroup "toClashTermFresh" toClashTermFreshTests
   , testGroup "whnfRW" whnfTests
   ]

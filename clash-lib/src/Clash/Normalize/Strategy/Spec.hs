@@ -4,7 +4,9 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The normalization strategies, as pure "Clash.Rewrite.StrategyDSL" values.
+  The normalization strategies, as pure "Clash.Rewrite.StrategyDSL" values,
+  of the transformations of scoped Clash Core
+  ("Clash.Normalize.Scoped.Transformations").
   "Clash.Normalize.Strategy" compiles 'normalizationSpec' and
   'constantPropagationSpec' into the executable 'Clash.Normalize.Strategy.normalization'
   and 'Clash.Normalize.Strategy.constantPropagation'; "Clash.Normalize"
@@ -26,11 +28,7 @@ module Clash.Normalize.Strategy.Spec
 
 import Language.Haskell.TH.Syntax (Name)
 
-import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
-import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as EtaExpand
-import qualified Clash.Normalize.Scoped.Transformations.Inline as ScopedInline
-import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
-import Clash.Normalize.Transformations
+import Clash.Normalize.Scoped.Transformations
 import Clash.Rewrite.StrategyDSL
 
 -- [Note: bottomup traversal reduceConst]
@@ -59,9 +57,9 @@ normalizationSpec constantPropagationName =
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
     multPrim   = topdown setupMultiResultPrim
-    anf        = topdown nonRepANF >-> scopedPass "ANF" 'Scoped.makeANF >-> topdown caseCon
+    anf        = topdown nonRepANF >-> scopedPass "ANF" 'makeANF >-> topdown caseCon
     letTL      = topdownSuc topLet
-    recLetRec  = scopedPass "recToLetRec" 'Scoped.recToLetRec
+    recLetRec  = scopedPass "recToLetRec" 'recToLetRec
     rmUnusedExpr = bottomup removeUnusedExpr
     rmDeadcode = bottomup (named "deadcode" deadCode)
     bindConst  = topdown bindConstantVar
@@ -92,7 +90,7 @@ constantPropagationSpec =
   dec >->
   conSpec
   where
-    etaTL              = scopedPass "etaTL" 'EtaExpand.etaExpansionTL !-> topdown appProp
+    etaTL              = scopedPass "etaTL" 'etaExpansionTL !-> topdown appProp
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down chain from the
     -- new root.
@@ -152,7 +150,7 @@ constantPropagationSpec =
     inlineNR :: Strat
     inlineNR =
           bottomup deadCode
-      >-! scopedPass "inlineNonRep" 'ScopedInline.inlineNonRep
+      >-! scopedPass "inlineNonRep" 'inlineNonRep
 
     specTransformations :: Step
     specTransformations = chain

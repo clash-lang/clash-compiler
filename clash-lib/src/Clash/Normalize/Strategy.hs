@@ -4,8 +4,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformation process for normalization. The strategies themselves are
-  described in "Clash.Normalize.Strategy.Spec".
+  Transformation process for normalization, on scoped Clash Core. The
+  strategies themselves are described in "Clash.Normalize.Strategy.Spec".
 -}
 
 {-# LANGUAGE TemplateHaskell #-}
@@ -18,15 +18,16 @@ module Clash.Normalize.Strategy
   ) where
 
 import Clash.Normalize.Strategy.Spec
-import Clash.Normalize.Types (NormRewrite)
-import Clash.Rewrite.StrategyDSL.TH (compileStrategy)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Rewrite.Scoped.Types (ScopedRewrite)
+import Clash.Rewrite.StrategyDSL.TH (compileScopedStrategy)
 
-constantPropagation :: NormRewrite
-constantPropagation = $(compileStrategy constantPropagationSpec)
+constantPropagation :: ScopedRewrite NormalizeState
+constantPropagation = $(compileScopedStrategy constantPropagationSpec)
 
 -- constantPropagation is defined first: the splice below quotes its name,
 -- and a top-level splice can only see the declarations above it.
 
 -- | Normalisation transformation
-normalization :: NormRewrite
-normalization = $(compileStrategy (normalizationSpec 'constantPropagation))
+normalization :: ScopedRewrite NormalizeState
+normalization = $(compileScopedStrategy (normalizationSpec 'constantPropagation))

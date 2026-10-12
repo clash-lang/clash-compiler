@@ -79,7 +79,8 @@ import           Clash.Normalize.Types
 import           Clash.Normalize.Util
 import           Clash.Rewrite.Capture
   (FinalState (..), captureEnabled, captureOpts, recordFinalState)
-import           Clash.Rewrite.StrategyDSL.TH     (compileStrategy)
+import           Clash.Rewrite.Scoped.ViaFoil     (viaFoil)
+import           Clash.Rewrite.StrategyDSL.TH     (compileScopedStrategy)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, debugOpts, extra,
    tcCache, topEntities, newInlineStrategy)
@@ -146,6 +147,9 @@ runNormalization env supply globals typeTrans eval rcsMap topEnts m =
                   emptyVarEnv
                   Map.empty
                   rcsMap
+                  -- The strategies of scoped Core, as rewrites of Clash Core
+                  (viaFoil "normalization" normalization)
+                  (viaFoil "constantPropagation" constantPropagation)
                   normalization
                   constantPropagation
                   HashMap.empty -- workFreeAppCache
@@ -452,7 +456,8 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   -- The flattening strategy is described in Clash.Normalize.Strategy.Spec.
-  flatten = $(compileStrategy flattenSpec)
+  -- It is one of scoped Core.
+  flatten = viaFoil "flatten" $(compileScopedStrategy flattenSpec)
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
     | isNoInline inl2  = (Nothing     ,[c])

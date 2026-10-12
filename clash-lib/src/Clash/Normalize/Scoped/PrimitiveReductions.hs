@@ -18,9 +18,7 @@
 
   The reductions of @fold@, @imap@, @iterateI@ and @traverse#@ first run the
   'Clash.Normalize.Strategy.constantPropagation' strategy on their function
-  argument. That strategy runs on Clash Core, through
-  'Clash.Rewrite.Scoped.ViaFoil.viaLegacy', until the normalizer runs on
-  scoped Core.
+  argument.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -79,7 +77,7 @@ import qualified Clash.Core.TysPrim as C (integerPrimTy, typeNatKind)
 import qualified Clash.Core.Var as C (mkTyVar)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Primitives as NP (undefined)
-import Clash.Normalize.Types (NormalizeSession, constantPropagationStrategy)
+import Clash.Normalize.Types (NormalizeSession, scopedConstantPropagationStrategy)
 import Clash.Rewrite.Types (extra, scopedTypeEnv)
 import Clash.Sized.RTree (RTree)
 import Clash.Sized.Vector (Vec)
@@ -102,7 +100,6 @@ import Clash.Core.Scoped.Util
   , selectField, systemName )
 import Clash.Rewrite.Scoped
   (Frame (AppArg), ScopedTransform (..), TransformContext, changed, pushFrame, tfScope)
-import Clash.Rewrite.Scoped.ViaFoil (viaLegacy)
 
 -- * Helpers
 
@@ -116,13 +113,12 @@ scopeAndTypeEnv ctx = (tfScope ctx,) <$> Lens.view scopedTypeEnv
 
 -- | Run the 'Clash.Normalize.Strategy.constantPropagation' strategy on the
 -- function argument of a primitive, see
--- 'Clash.Normalize.PrimitiveReductions.constantPropagation'. It runs on Clash
--- Core, through 'viaLegacy'.
+-- 'Clash.Normalize.PrimitiveReductions.constantPropagation'
 constantPropagation
   :: (HasCallStack, Distinct n) => TransformContext n -> Term n -> NormalizeSession (Term n)
 constantPropagation ctx fun = do
-  strategy <- Lens.use (extra . constantPropagationStrategy)
-  runScopedTransform (viaLegacy strategy) (pushFrame (AppArg Nothing) ctx) fun
+  strategy <- Lens.use (extra . scopedConstantPropagationStrategy)
+  runScopedTransform strategy (pushFrame (AppArg Nothing) ctx) fun
 
 -- | The type constructor of @Vec@, and its @Nil@ and @Cons@ constructors, if
 -- the type is a vector under 'coreView'. Errors otherwise.

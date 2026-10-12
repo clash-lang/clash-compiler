@@ -25,6 +25,7 @@ import Clash.Core.Var         (Id)
 import Clash.Core.VarEnv      (VarEnv)
 import Clash.Driver.Types     (BindingMap)
 import Clash.Rewrite.Types    (Rewrite, RewriteMonad)
+import Clash.Rewrite.Scoped.Types (ScopedRewrite)
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState
@@ -53,14 +54,23 @@ data NormalizeState
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
   , _normalizationStrategy :: Rewrite NormalizeState
+  -- ^ The normalization strategy as a rewrite of Clash Core, for
+  -- 'Clash.Normalize.Util.normalizeTopLvlBndr'. See
+  -- '_scopedNormalizationStrategy'.
+  , _constantPropagationStrategy :: Rewrite NormalizeState
+  -- ^ The constant propagation strategy as a rewrite of Clash Core, for
+  -- "Clash.Normalize.PrimitiveReductions". See
+  -- '_scopedNormalizationStrategy'.
+  , _scopedNormalizationStrategy :: ScopedRewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.normalization' strategy. Carried
   -- in the state so transformations can normalize other binders
-  -- ('Clash.Normalize.Util.normalizeTopLvlBndr') without importing the
+  -- ('Clash.Normalize.Scoped.Util.normalizeTopLvlBndr') without importing the
   -- strategy module. Breaking that import cycle would need an hs-boot file,
   -- and GHC rejects Template Haskell splices in a module cycle.
-  , _constantPropagationStrategy :: Rewrite NormalizeState
+  , _scopedConstantPropagationStrategy :: ScopedRewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
-  -- for "Clash.Normalize.PrimitiveReductions". See '_normalizationStrategy'.
+  -- for "Clash.Normalize.Scoped.PrimitiveReductions". See
+  -- '_scopedNormalizationStrategy'.
   , _workFreeAppCache :: HashMap Term Term
   -- ^ Cache of normalized work-free applications, i.e. global functions
   -- applied to closed arguments:

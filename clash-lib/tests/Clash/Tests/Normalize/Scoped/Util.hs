@@ -36,6 +36,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeState (..))
 import qualified Clash.Normalize.Util as Current
+import qualified Clash.Rewrite.Scoped as Scoped (changed)
 import Clash.Rewrite.Combinators (bottomupR)
 import Clash.Rewrite.Types (Rewrite, RewriteState (..), TransformContext (..))
 import qualified Clash.Rewrite.Util as Current (changed)
@@ -48,7 +49,9 @@ import Clash.Core.Scoped.Term (mkTicks)
 import Clash.Core.Scoped.TermInfo (isClosed)
 import Clash.Core.Scoped.Util (mkLets)
 import qualified Clash.Normalize.Scoped.Util as Scoped
-import Clash.Rewrite.Scoped.Types (Frame (..), pushFrame, rootContext)
+import Clash.Rewrite.Scoped.Types
+  (Frame (..), ScopedRewrite, ScopedTransform (..), pushFrame, rootContext)
+import qualified Clash.Rewrite.Scoped.Combinators as Scoped (bottomupR)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intLit, intTy
@@ -374,9 +377,18 @@ incLits = bottomupR $ \_ -> \case
   C.Literal (IntLiteral i) -> Current.changed (C.Literal (IntLiteral (i + 1)))
   e -> pure e
 
+-- | 'incLits' on scoped Core
+incLitsScoped :: ScopedRewrite NormalizeState
+incLitsScoped = Scoped.bottomupR $ ScopedTransform $ \_ -> \case
+  Literal (IntLiteral i) -> Scoped.changed (Literal (IntLiteral (i + 1)))
+  e -> pure e
+
 -- | A state with the given bindings, normalized by 'incLits'
 normState :: [(C.Id, C.Term)] -> RewriteState NormalizeState
-normState bs = st{_extra = (_extra st){_normalizationStrategy = incLits}}
+normState bs = st
+  { _extra = (_extra st)
+      { _normalizationStrategy = incLits
+      , _scopedNormalizationStrategy = incLitsScoped } }
  where
   st = def{_bindings = mkBindingMap bs, _curFun = (curF, noSrcSpan)}
   curF = case bs of

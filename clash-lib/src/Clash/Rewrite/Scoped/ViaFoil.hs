@@ -14,11 +14,6 @@
     Core. The ported evaluator replaced it
     ('Clash.Rewrite.Scoped.Whnf.whnfRW'); it is kept to compare the two.
 
-  * 'viaLegacy' is the reverse of 'viaFoil': it runs a rewrite of Clash Core
-    as a scoped transformation, so that ported code can call rewrites that
-    aren't ported yet, such as the normalization strategy. It goes away
-    together with 'viaFoil'.
-
   = 'viaFoil'
 
   'viaFoil' converts the subterm it is offered into scoped Core, in a scope
@@ -67,7 +62,6 @@ module Clash.Rewrite.Scoped.ViaFoil
   , scopedTyAppWorker
   , scopedLamWorker
   , whnfRWViaClash
-  , viaLegacy
   , toClashTermFresh
     -- * Internals, exported for testing
   , rootVars
@@ -421,29 +415,6 @@ toClashTickFresh is env = \case
 toClashTermFresh :: HasCallStack => Term 'VoidS -> RewriteMonad extra C.Term
 toClashTermFresh e =
   withSupply (toClashFresh emptyInScopeSet (BackEnv IntMap.empty IntMap.empty) e)
-
--- * viaLegacy
-
--- | Run a rewrite of Clash Core as a scoped transformation, the reverse of
--- 'viaFoil'. Converts the subterm and the frames of its context to Clash Core,
--- giving their binders fresh uniques like 'whnfRWViaClash' does, runs the
--- rewrite, and converts the result back into the scope of the subterm if the
--- rewrite signaled a change. Otherwise, it returns the original subterm.
---
--- Uninstrumented, like 'viaFoil': the rewrite's own 'Clash.Rewrite.Util.apply'
--- calls count and check it.
-viaLegacy :: HasCallStack => Rewrite extra -> ScopedRewrite extra
-viaLegacy rw = ScopedTransform $ \ctx e -> do
-  (lv, e') <- withSupply $ do
-    lv <- legacyView ctx
-    e' <- toClashFresh (lvInScope lv) (lvEnv lv) e
-    pure (lv, e')
-  (r, Monoid.getAny -> changed) <-
-    Writer.listen (rw (C.TransformContext (lvInScope lv) (lvFrames lv)) e')
-  pure $
-    if changed
-      then fromClashTermWith (tfScope ctx) (reverse (lvTyVarsRev lv)) (reverse (lvIdsRev lv)) r
-      else e
 
 -- * whnfRW
 
