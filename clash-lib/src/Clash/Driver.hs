@@ -680,23 +680,15 @@ interpretFunctions idirs interpreterArgs topDir reqs = do
     -> Hint.InterpreterT IO (Either Hint.InterpreterError InterpretFunctionResult)
   tryInterp = try
 
-  -- A blackbox function on scoped Clash Core, or else one on Clash Core.
-  -- TODO(Phase 7): remove the fallback.
+  -- A blackbox function on scoped Clash Core
   interpret req = case ifrType req of
-    InterpretBlackBoxFunction -> do
-      let f = "(" ++ ifrFuncName req ++ ")"
-          someBBF = "ClashNetlistScopedTypes.SomeBlackBoxFunction"
-      scoped <- tryInterp1 (Hint.unsafeInterpret ("ClashNetlistScopedTypes.ScopedBBF " ++ f) someBBF)
-      InterpretBBF <$> case scoped of
-        Right bbf -> pure bbf
-        Left _ -> Hint.unsafeInterpret ("ClashNetlistScopedTypes.LegacyBBF " ++ f) someBBF
+    InterpretBlackBoxFunction ->
+      InterpretBBF <$>
+        Hint.unsafeInterpret
+          ("ClashNetlistScopedTypes.ScopedBBF (" ++ ifrFuncName req ++ ")")
+          "ClashNetlistScopedTypes.SomeBlackBoxFunction"
     InterpretTemplateFunction ->
       InterpretTF <$> Hint.unsafeInterpret (ifrFuncName req) "TemplateFunction"
-
-  tryInterp1
-    :: Hint.InterpreterT IO SomeBlackBoxFunction
-    -> Hint.InterpreterT IO (Either Hint.InterpreterError SomeBlackBoxFunction)
-  tryInterp1 = try
 
   -- The modules in scope when interpreting a function. The module that
   -- defines 'SomeBlackBoxFunction' is imported qualified, so that its names

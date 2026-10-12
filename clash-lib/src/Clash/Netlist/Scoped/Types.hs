@@ -30,9 +30,6 @@
   'Clash.Core.Scoped.Type.coreView', the type environment, and the HDL
   identifiers of the local variables its arguments mention.
 
-  Primitives refer to blackbox functions on Clash Core too, which
-  'SomeBlackBoxFunction' tells apart from those on scoped Core.
-
   = The boundary with Clash Core
 
   During the port, Netlist handlers that are not ported yet run on Clash Core.
@@ -109,7 +106,6 @@ import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 
-import qualified Clash.Netlist.BlackBox.Types as Legacy (BlackBoxFunction)
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta)
 import {-# SOURCE #-} qualified Clash.Netlist.Id as Id (toText)
 import {-# SOURCE #-} Clash.Netlist.Types    (BlackBox, Identifier, NetlistMonad)
@@ -355,8 +351,7 @@ netlistTypes1 = \case
 
 -- * Blackbox functions
 
--- | Call a blackbox function: one on Clash Core gets its arguments and result
--- types converted with 'toLegacy'
+-- | Call a blackbox function
 callBlackBoxFunction
   :: (HasCallStack, Distinct n)
   => BlackBoxEnv n
@@ -366,14 +361,11 @@ callBlackBoxFunction
   -> [Either (Term n) (Type n)]
   -> [Type n]
   -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
-callBlackBoxFunction ctx bbf isD nm args resTys = case bbf of
-  ScopedBBF f -> f ctx isD nm args resTys
-  LegacyBBF f -> f isD nm (toLegacyArgs ctx args) (map (toLegacyType ctx) resTys)
+callBlackBoxFunction ctx (ScopedBBF f) = f ctx
 
 -- | A blackbox function on scoped Clash Core: given the arguments and result
 -- types of the primitive it should provide a blackbox for, it generates the
--- blackbox. See "Clash.Netlist.BlackBox.Types" for its counterpart on Clash
--- Core.
+-- blackbox.
 type BlackBoxFunction =
      forall n
    . Distinct n
@@ -391,15 +383,11 @@ type BlackBoxFunction =
   -- ^ Result types
   -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
 
--- | A blackbox function on scoped Clash Core or on Clash Core. A newtype-like
--- wrapper, because the rank-2 'BlackBoxFunction' can't instantiate a type
--- parameter (e.g. of 'Clash.Primitives.Types.Primitive'), nor be the result
--- of interpreting a function with Hint.
---
--- TODO(Phase 7): remove 'LegacyBBF'.
-data SomeBlackBoxFunction
-  = ScopedBBF BlackBoxFunction
-  | LegacyBBF Legacy.BlackBoxFunction
+-- | A blackbox function. A wrapper, because the rank-2 'BlackBoxFunction'
+-- can't instantiate a type parameter (e.g. of
+-- 'Clash.Primitives.Types.Primitive'), nor be the result of interpreting a
+-- function with Hint.
+newtype SomeBlackBoxFunction = ScopedBBF BlackBoxFunction
 
 -- | To weak head normal form, like functions
 instance NFData SomeBlackBoxFunction where

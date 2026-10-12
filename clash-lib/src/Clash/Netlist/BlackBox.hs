@@ -95,7 +95,6 @@ import           Clash.Driver.Warning          (warnAboutM)
 import           Clash.Netlist.BlackBox.Types  as B
 import           Clash.Netlist.BlackBox.Util   as B
 import           Clash.Netlist.Types           as N
-import           Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
 import           Clash.Netlist.Util            as N
 import           Clash.Core.Scoped.NameMap     (lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax      (mkGlobalId)
@@ -416,7 +415,7 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
     go =
       \case
         P.BlackBoxHaskell bbName wf _usedArgs multiResult funcName (_fHash, func) -> do
-          bbFunRes <- legacyBlackBoxFunction func bbEasD (primName pInfo) args tys
+          bbFunRes <- unsupportedBlackBoxFunction func bbEasD (primName pInfo) args tys
           case bbFunRes of
             Left err -> do
               -- Blackbox template function returned an error:
@@ -1133,7 +1132,7 @@ mkFunInput parentName declType resId e =
                   -- Determine result type of this blackbox. If it's not a
                   -- function, simply use its term type.
                   let (_, resTy) = splitFunTys tcm (inferCoreTypeOf tcm e)
-                  bbhRes <- legacyBlackBoxFunction func True pName args [resTy]
+                  bbhRes <- unsupportedBlackBoxFunction func True pName args [resTy]
                   case bbhRes of
                     Left err ->
                       error $ $(curLoc) ++ show fName ++ " yielded an error: "

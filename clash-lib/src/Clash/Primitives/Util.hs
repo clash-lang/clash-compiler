@@ -56,9 +56,8 @@ import           Clash.Primitives.Types
   , UnresolvedPrimitive, UnresolvedPrimitiveEntry(..)
   , CompiledPrimMap, GuardedResolvedPrimitive)
 import           Clash.Netlist.Types    (BlackBox(..), NetlistMonad)
-import           Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
 import           Clash.Netlist.Scoped.Types  (SomeBlackBoxFunction)
-import           Clash.Netlist.Util     (preserveState)
+import           Clash.Netlist.Util     (preserveState, unsupportedBlackBoxFunction)
 import           Clash.Netlist.BlackBox.Util
   (walkElement)
 import           Clash.Netlist.BlackBox.Types
@@ -271,7 +270,7 @@ getFunctionPlurality
   -- a function in the first place. State of monad will not be modified.
 getFunctionPlurality p args resTys =
   getFunctionPluralityWith
-    (\f nm -> legacyBlackBoxFunction f False nm args resTys) p
+    (\f nm -> unsupportedBlackBoxFunction f False nm args resTys) p
 
 -- | Looks up the plurality of a function's function argument, like
 -- 'getFunctionPlurality', given a way to call the blackbox function of a

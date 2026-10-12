@@ -23,16 +23,14 @@ import Clash.Util.Supply (newSupply)
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, fromClashType)
 import Clash.Core.Scoped.Syntax
 import qualified Clash.Netlist.Id as Id
-import Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
 import Clash.Netlist.Scoped.Types
   ( LocalId (..), SomeBlackBoxFunction (..), compCtxFromList, legacyCompCtx )
 import Clash.Netlist.Types (Declaration (Assignment, NetDecl))
 import Clash.Primitives.Types
   ( BlackBoxFunctionName (..), CompiledPrimitive, Primitive (BlackBoxHaskell)
   , UsedArguments (UsedArguments) )
-import qualified Clash.Primitives.Scoped.Util as Scoped (getFunctionPlurality)
+import Clash.Primitives.Scoped.Util (getFunctionPlurality)
 import Clash.Primitives.Sized.Vector (foldBBF, iterateBBF)
-import qualified Clash.Primitives.Util as Legacy (getFunctionPlurality)
 import Clash.Primitives.Verification (bindMaybe)
 
 import Test.Clash.Rewrite
@@ -46,11 +44,10 @@ bbfPrim f =
     (BlackBoxFunctionName ["M"] "f") (0, f)
 
 -- | The function plurality that the blackbox functions of @fold@ and
--- @iterateI@ give, through 'Scoped.getFunctionPlurality' and its counterpart on
--- Clash Core, called as a blackbox function on scoped Core and as one on Clash
--- Core. The arguments are in a scope with a type variable, and the length of
--- the vector is a type family application, so the blackbox functions have to
--- look through it in that scope.
+-- @iterateI@ give, through 'getFunctionPlurality'. The arguments are in a
+-- scope with a type variable, and the length of the vector is a type family
+-- application, so the blackbox functions have to look through it in that
+-- scope.
 functionPlurality :: Assertion
 functionPlurality = do
   sup <- newSupply
@@ -61,13 +58,9 @@ functionPlurality = do
                     [ (n, a) | VarTy _ _ n <- [fromClashType env resTy] ] []
             conv = either (Left . fromClashTerm env) (Right . fromClashType env)
             resTys = [fromClashType env resTy]
-        pluralities <- runNetlistTest (mkBindingMap []) $ sequence
-          [ Scoped.getFunctionPlurality ctx (bbfPrim f) (map conv args) resTys i
-          , Scoped.getFunctionPlurality ctx
-              (bbfPrim (LegacyBBF (legacyBlackBoxFunction f))) (map conv args) resTys i
-          , Legacy.getFunctionPlurality (bbfPrim f) args [resTy] i
-          ]
-        assertEqual nm [expected, expected, expected] pluralities
+        plurality <- runNetlistTest (mkBindingMap []) $
+          getFunctionPlurality ctx (bbfPrim f) (map conv args) resTys i
+        assertEqual nm expected plurality
     | (nm, f, args, i, expected) <- cases ]
  where
   a = tyVar C.User "a" 70
