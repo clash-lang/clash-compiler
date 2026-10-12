@@ -23,10 +23,11 @@
 
 module Clash.Driver where
 
-import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
+import           Control.Concurrent
+  (MVar, modifyMVar, modifyMVar_, newEmptyMVar, newMVar, readMVar, tryPutMVar, withMVar)
 import           Control.Concurrent.Async         (mapConcurrently_)
 import           Control.DeepSeq
-import           Control.Exception                (evaluate, throw, Exception)
+import           Control.Exception                (evaluate, finally, throw, Exception)
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM)
 import           Control.Monad.Catch              (MonadThrow (throwM), try)
@@ -352,7 +353,19 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         | opt_concurrentTopEntities opts = mapConcurrently_
         | otherwise = mapM_
 
-    maybeMapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes
+    -- Top entities claim names in 'idSet' one by one, in the order of 'tes', so
+    -- that the names do not depend on which top entity finishes normalization
+    -- first. A top entity waits for its predecessor to finish ('waitTurn')
+    -- before claiming any name; normalization still happens concurrently.
+    -- Signaling with 'finally' makes sure successors never wait forever.
+    turnsDone <- mapM (const newEmptyMVar) tes
+    let
+      waitTurns = pure () : map readMVar turnsDone
+      compileInTurn (te, waitTurn, turnDone) =
+        go compNames idSet edamFiles ioLock deps topEntityMap waitTurn te
+          `finally` tryPutMVar turnDone ()
+
+    maybeMapConcurrently_ compileInTurn (zip3 tes waitTurns turnsDone)
 
     time <- Clock.getCurrentTime
     let diff = reportTimeDiff time startTime
@@ -365,9 +378,12 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     -> MVar ()
     -> HashMap Unique [Unique]
     -> VarEnv TopEntityT
+    -> IO ()
+    -- ^ Wait until it is this top entity's turn to claim names in the
+    -- 'Id.IdentifierSet'
     -> TopEntityT
     -> IO ()
-  go compNames seenV edamFilesV ioLockV deps topEntityMap (TopEntityT topEntity annM isTb) = do
+  go compNames seenV edamFilesV ioLockV deps topEntityMap waitTurn (TopEntityT topEntity annM isTb) = do
   let domainConfs = envDomains env
   let bindingsMap = designBindings design
   let primMap = envPrimitives env
@@ -380,9 +396,6 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
     putStrLn ("Clash: Compiling " ++ topEntityS)
 
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
-
-  modifyMVar_ seenV $ \seen ->
-    pure $! State.execState (Id.addRaw (Data.Text.pack modName1)) seen
 
   let topNm = lookupVarEnv' compNames topEntity
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
@@ -411,8 +424,11 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Using cached result for: " ++ topEntityS)
 
+      waitTurn
       modifyMVar_ seenV $ \seen ->
-        pure $! State.execState (mapM_ Id.addRaw (componentNames manifest0)) seen
+        pure $! State.execState
+          (mapM_ Id.addRaw (Data.Text.pack modName1 : componentNames manifest0))
+          seen
 
       fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
@@ -466,7 +482,9 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
       -- 4. Generate netlist for topEntity
-      (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
+      waitTurn
+      (topComponent, netlist) <- modifyMVar seenV $ \seen0 -> do
+        let seen = State.execState (Id.addRaw (Data.Text.pack modName1)) seen0
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
           genNetlist env peEval isTb transformedBindings topEntityMap compNames
