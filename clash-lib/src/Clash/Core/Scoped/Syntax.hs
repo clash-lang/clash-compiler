@@ -87,6 +87,7 @@ module Clash.Core.Scoped.Syntax
     S (..)
   , Scope
   , emptyScope
+  , raiseWatermark
   , Distinct
   , Ext
   , DExt
