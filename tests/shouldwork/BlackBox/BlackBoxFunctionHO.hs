@@ -13,12 +13,13 @@ import System.FilePath ((</>))
 
 import Clash.Prelude hiding (Text)
 import Clash.Netlist.Types
-import Clash.Netlist.BlackBox.Types
+import Clash.Netlist.BlackBox.Types hiding (BlackBoxFunction)
+import Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 import Clash.Explicit.Testbench
 
 myMultiplyTF :: BlackBoxFunction
-myMultiplyTF isD primName args ty = pure $
+myMultiplyTF _env isD primName args ty = pure $
   Right ( emptyBlackBoxMeta
         , BBTemplate
            [ Text "resize("

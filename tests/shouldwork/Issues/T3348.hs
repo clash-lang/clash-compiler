@@ -14,7 +14,8 @@ import Clash.Annotations.Primitive (Primitive (InlineYamlPrimitive))
 import GHC.Magic (lazy)
 import Clash.Netlist.Types (BlackBox (BBTemplate))
 
-import qualified Clash.Netlist.BlackBox.Types as BB
+import qualified Clash.Netlist.BlackBox.Types as BB hiding (BlackBoxFunction)
+import qualified Clash.Netlist.Scoped.Types as BB (BlackBoxFunction)
 
 class Vio (dom :: Domain) a res | a -> res where
   vioX :: a
@@ -56,7 +57,7 @@ vioProbe# !_inputNames !_outputNames !_initialOutputProbeValues clk =
   ]) #-}
 
 myTF :: BB.BlackBoxFunction
-myTF _isD _primName _args _ty =
+myTF _env _isD _primName _args _ty =
   pure (Right (BB.emptyBlackBoxMeta, BBTemplate [BB.Text "0"]))
 
 topEntity ::
