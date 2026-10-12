@@ -339,6 +339,14 @@ clash-differential prims inputs/*.bin
 `both stuck` means that neither side reduced the call, e.g. because the
 reduction only reduces as the subject of a case-expression. `both fail`
 means that evaluating the call throws the same exception on either side, e.g.
-`Clash.Sized.Internal.Signed.minBound#` on `Signed 0`; that counts as
-agreement too. `failed` means that the comparison threw an exception
-otherwise.
+`Clash.Sized.Internal.Signed.minBound#` on `Signed 0`, or that both sides
+take longer than 10 seconds (`both fail: timeout`), e.g. on `x ^ n` for a
+large `n`; that counts as agreement too. `failed` means that the comparison
+threw an exception, or timed out, otherwise.
+
+The generator doesn't make calls outside of the domain of a primitive
+(`Test.Clash.Scoped.Evaluator.outOfDomain`): calls with a type that mentions
+a negative number, such as `slice#` with an `n` larger than its `m + 1`,
+calls of `quotRemWord2#` whose quotient doesn't fit a word, which make GHC's
+implementation raise `SIGFPE`, and calls of `decodeDouble_2Int#` on zero,
+whose sign GHC's implementation leaves undefined.
