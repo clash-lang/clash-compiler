@@ -76,7 +76,7 @@ import           Clash.Core.VarEnv
   ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
 import           Clash.Core.Scoped.Convert (fromClashTermClosed)
 import           Clash.Core.Scoped.NameMap (globalEnvFromList)
-import           Clash.Core.Scoped.Syntax (S (VoidS))
+import           Clash.Core.Scoped.Syntax (S (VoidS), globalIdLegacy, globalIdName)
 import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import qualified Clash.Core.Scoped.Syntax as S (Term)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -151,7 +151,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                                     -- selectors, no need to check free vars.
       clsMap =
         fmap (\(v,i) ->
-               (Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
+               (Binding (mkGlobalIdFromClash v) GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
                   (mkClassSelector allTcCache (varType v) i) False))
              clsVMap
       -- Build the bodies lazily: most bindings are never looked at
@@ -164,7 +164,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
       topEntities'' =
         map (\(topEnt, annM, isTb) ->
                 case UniqMap.lookup topEnt allBindings of
-                  Just b -> TopEntityT (bindingId b) annM isTb
+                  Just b -> TopEntityT (globalIdLegacy (bindingId b)) annM isTb
                   Nothing -> GHC.pgmError [I.i|
                     No top entity called '#{topEnt}' found. Make sure you are
                     compiling with the '-fexpose-all-unfoldings' flag.
@@ -200,7 +200,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
         { designEntities = topEntities''
         , designBindings =
             globalEnvFromList
-              [ (mkGlobalIdFromClash (bindingId b), b) | b <- UniqMap.elems allBindings' ]
+              [ (bindingId b, b) | b <- UniqMap.elems allBindings' ]
         }
     )
 
@@ -214,7 +214,7 @@ setNoInlineTopEntities bm tes =
   ids = mkVarSet (fmap topId tes)
 
   go b@Binding{bindingId}
-    | bindingId `elemVarSet` ids
+    | globalIdLegacy bindingId `elemVarSet` ids
     = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
     | otherwise = b
 
@@ -270,20 +270,20 @@ processBind
 processBind primMap unlocatable = \case
   GHC.NonRec v e -> do
     b <- convBinding GHC.emptyVarSet False v e
-    return [(bindingId b, b)]
+    return [(globalIdLegacy (bindingId b), b)]
   GHC.Rec [(v, e)] -> do
     b <- convBinding GHC.emptyVarSet True v e
-    return [(bindingId b, b)]
+    return [(globalIdLegacy (bindingId b), b)]
   -- A group of more than one binder refers to its binders as local variables,
   -- see NOTE [bindings in recursive groups]
   GHC.Rec bes -> do
     let locals = GHC.mkVarSet (map fst bes)
     bs <- forM bes (\(v, e) -> convBinding locals True v e)
     tys <- forM bes (coreToTypeB . GHC.varType . fst)
-    let lbs = [ (varKey v, varName (bindingId b), ty, bindingTerm b)
+    let lbs = [ (varKey v, globalIdName (bindingId b), ty, bindingTerm b)
               | ((v, _), b, ty) <- zip3 bes bs tys ]
     return
-      [ (bindingId b, b { bindingTerm = letrecB lbs (varB (varKey v))
+      [ (globalIdLegacy (bindingId b), b { bindingTerm = letrecB lbs (varB (varKey v))
                         , bindingRecursive = False })
       | ((v, _), b) <- zip bes bs ]
  where
@@ -295,7 +295,7 @@ processBind primMap unlocatable = \case
     nm <- qualifiedNameString (GHC.varName v)
     let pr = if HashMap.member nm primMap then IsPrim else IsFun
     checkPrimitive primMap v
-    return (Binding v' sp inl pr tm r)
+    return (Binding (mkGlobalIdFromClash v') sp inl pr tm r)
 
 -- | Convert a single (possibly recursive) binder group to Clash Core bindings,
 -- for 'checkGHC2Core'.
@@ -313,7 +313,7 @@ processBindClash primMap unlocatable = \case
     nm <- qualifiedNameString (GHC.varName v)
     let pr = if HashMap.member nm primMap then IsPrim else IsFun
     checkPrimitive primMap v
-    return [(v', (Binding v' sp inl pr tm False))]
+    return [(v', (Binding (mkGlobalIdFromClash v') sp inl pr tm False))]
   GHC.Rec bs -> do
     tms <- forM bs $ \(v,e) -> do
       let sp  = GHC.getSrcSpan v
@@ -323,17 +323,17 @@ processBindClash primMap unlocatable = \case
       nm <- qualifiedNameString (GHC.varName v)
       let pr = if HashMap.member nm primMap then IsPrim else IsFun
       checkPrimitive primMap v
-      return (Binding v' sp inl pr tm True)
+      return (Binding (mkGlobalIdFromClash v') sp inl pr tm True)
     case tms of
-      [Binding v sp inl pr tm r] -> return [(v, Binding v sp inl pr tm r)]
+      [b] -> return [(globalIdLegacy (bindingId b), b)]
 
       -- Rewrite the bindings to avoid triggering the recursion check.
       -- See NOTE [bindings in recursive groups]
-      _ -> let vsL   = map (setIdScope LocalId . bindingId) tms
+      _ -> let vsL   = map (setIdScope LocalId . globalIdLegacy . bindingId) tms
                vsV   = map Var vsL
                subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
                lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-               tms1  = zipWith (\b (i, _) -> (bindingId b, b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
+               tms1  = zipWith (\b (i, _) -> (globalIdLegacy (bindingId b), b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
            in  return tms1
 
 -- | Convert a single class operation. See 'processBind'.
@@ -368,11 +368,11 @@ checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm st new
       RWS.runRWS (mkBindings (processBindClash primMap unlocatable) bindings clsOps)
                  env emptyGHC2CoreState
     inScope0 = mkInScopeSet (
-                    (fmap (coerce . bindingId) bindingsMap) <>
-                    (fmap (coerce . bindingId) clsMap))
+                    (fmap (coerce . globalIdLegacy . bindingId) bindingsMap) <>
+                    (fmap (coerce . globalIdLegacy . bindingId) clsMap))
     clsMap =
       fmap (\(v,i) ->
-             (Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
+             (Binding (mkGlobalIdFromClash v) GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
                 (mkClassSelectorClash inScope0 tcm (varType v) i) False))
            clsVMap
     old = bindingsMap `unionVarEnv` clsMap
@@ -388,9 +388,9 @@ checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm st new
       = compareTerms (fromClashTermClosed (primAtTypeShape (bindingTerm b1))) (bindingTerm b2)
 
     outcomes =
-      [ (nameOcc (varName (bindingId b1)), o)
+      [ (nameOcc (globalIdName (bindingId b1)), o)
       | b1 <- UniqMap.elems old
-      , let o = maybe (Different "missing") (outcome b1) (UniqMap.lookup (bindingId b1) new)
+      , let o = maybe (Different "missing") (outcome b1) (UniqMap.lookup (globalIdLegacy (bindingId b1)) new)
       ]
     missing = length (UniqMap.keys new) - length (UniqMap.keys old)
     identical = length [ () | (_, Identical) <- outcomes ]

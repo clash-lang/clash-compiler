@@ -212,7 +212,8 @@ normalize' nm = do
   exprM <- lookupGlobalEnv nm <$> Lens.use scopedBindings
   let nmS = showPpr (varName (globalIdLegacy nm))
   case exprM of
-    Just (Binding nm' sp inl pr tm r) -> do
+    Just (Binding nmG sp inl pr tm r) -> do
+      let nm' = globalIdLegacy nmG
       tcm <- Lens.view tcCache
       topEnts <- Lens.view topEntities
       let isTop = globalIdLegacy nm `elemVarSet` topEnts
@@ -238,11 +239,11 @@ normalize' nm = do
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
-            tmNorm <- normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm r)
+            tmNorm <- normalizeTopLvlBndr isTop nm (Binding nmG sp inl pr tm r)
             let usedBndrs = globalsInOrder (bindingTerm tmNorm)
             traceIf (bindingRecursive tmNorm)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
-                            , showPpr (coreTypeOf (bindingId tmNorm))
+                            , showPpr (coreTypeOf (globalIdLegacy (bindingId tmNorm)))
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
@@ -273,7 +274,7 @@ normalize' nm = do
               if dbg_invariants opts
                  then do
                    prevNorm <- Lens.use (extra.scopedNormalized)
-                   pure [ showPpr (varName (bindingId b))
+                   pure [ showPpr (globalIdName (bindingId b))
                         | b <- globalEnvElems prevNorm
                         , nm `memberGlobalSet` termGlobalIds (bindingTerm b)
                         ]
@@ -287,7 +288,7 @@ normalize' nm = do
                                  then "nothing normalized so far"
                                  else intercalate ", " referers
                             , ". Not normalizing:\n", showPpr tm] )
-                    (return ([],(nm,(Binding nm' sp inl pr tm r))))
+                    (return ([],(nm,(Binding nmG sp inl pr tm r))))
 
 
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
@@ -332,7 +333,7 @@ checkNonRecursive
 checkNonRecursive norm = case filterGlobalEnv bindingRecursive norm of
   rcs | nullGlobalEnv rcs  -> norm
   rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
-                   ++ show (vcat [ ppr (bindingId b) <> ppr (bindingTerm b)
+                   ++ show (vcat [ ppr (globalIdLegacy (bindingId b)) <> ppr (bindingTerm b)
                                  | b <- globalEnvElems rcs
                                  ])
 
@@ -507,11 +508,11 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
            $ encode RewriteStep
                { t_ctx    = []
                , t_name   = "INLINE"
-               , t_bndrS  = showPpr (varName nm')
+               , t_bndrS  = showPpr (globalIdName nm')
                , t_before = toClashTerm tm
                , t_after  = toClashTerm tm1
                }
-       rewriteExpr ("flattenExpr",flatten) (showPpr (varName nm'), tm1) (nm, sp)
+       rewriteExpr ("flattenExpr",flatten) (showPpr (globalIdName nm'), tm1) (nm, sp)
    let allUsed = newUsed ++ concat il_used
    -- inline all components when the resulting expression after flattening
    -- is still considered "cheap". This happens often at the topEntity which
@@ -520,7 +521,7 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       then do
          let (toInline',allUsed') = unzip (map goCheap allUsed)
              tm1 = substGlobals (globalEnvFromList (Maybe.catMaybes toInline')) newExpr
-         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr (varName nm'), tm1) (nm, sp)
+         newExpr' <- rewriteExpr ("flattenCheap",flatten) (showPpr (globalIdName nm'), tm1) (nm, sp)
          return (CBranch (nm,(Binding nm' sp inl pr newExpr' r)) (concat allUsed'))
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 

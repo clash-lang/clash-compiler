@@ -95,7 +95,7 @@ addGlobalBind
   -> Term 'VoidS
   -> RewriteMonad extra ()
 addGlobalBind g sp inl body =
-  scopedBindings %= insertGlobalEnv g (Binding (globalIdLegacy g) sp inl IsFun body r)
+  scopedBindings %= insertGlobalEnv g (Binding g sp inl IsFun body r)
  where
   r = g `memberGlobalSet` termGlobalIds body
 
@@ -142,7 +142,7 @@ isWorkFreeTerm e = do
 fromClashBindings :: HasCallStack => BindingMap -> GlobalEnv (Binding (Term 'VoidS))
 fromClashBindings bm =
   globalEnvFromList
-    [ (mkGlobalIdFromClash (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
+    [ (bindingId b, fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
 
 -- | Global bindings of scoped Clash Core as bindings of Clash Core. Every
 -- binder gets a fresh unique from the supply, so that a local binder never

@@ -412,7 +412,7 @@ normalizeTests =
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco2)
       bindingRecursive sco @?= bindingRecursive cur
-      assertAlphaEq (C.varType (bindingId cur)) (C.varType (bindingId sco))
+      assertAlphaEq (C.varType (globalIdLegacy (bindingId cur))) (C.varType (globalIdLegacy (bindingId sco)))
       case lookupGlobalEnv (mkGlobalIdFromClash f) (_scopedNormalized (_extra st1)) of
         Just b -> assertScopedAlphaEq (bindingTerm cur) (bindingTerm b)
         Nothing -> assertFailure "not cached"
@@ -442,7 +442,7 @@ normalizeTests =
       (sco, _, _) <- runRewriteTest def st $
         Scoped.normalizeTopLvlBndr True (mkGlobalIdFromClash top) (fromClashTermClosed <$> mkBinding top topTm)
       assertScopedAlphaEq (bindingTerm cur) (bindingTerm sco)
-      assertAlphaEq (C.varType (bindingId cur)) (C.varType (bindingId sco))
+      assertAlphaEq (C.varType (globalIdLegacy (bindingId cur))) (C.varType (globalIdLegacy (bindingId sco)))
 
   , testCase "normalizeWorkFreeApp agrees, and caches its result" $ do
       -- f = \x -> \y -> x + 1, applied to 1

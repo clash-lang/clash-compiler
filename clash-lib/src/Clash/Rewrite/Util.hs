@@ -65,6 +65,8 @@ import           Clash.Core.Lint
   (LintCheck (..), LintError (..), lintTerm, mkLintEnv, newLintErrors,
    showLintError)
 import           Clash.Core.Name
+import           Clash.Core.Scoped.Convert   (mkGlobalIdFromClash)
+import           Clash.Core.Scoped.Syntax    (globalIdLegacy)
 import           Clash.Core.Pretty           (PrettyOptions (..), PrettyPrec, showPpr, showPpr')
 import           Clash.Core.Subst
   (substTmEnv, aeqTerm, aeqType, extendIdSubst, mkSubst, substTm, eqTerm)
@@ -825,13 +827,13 @@ liftBinding (var@Id {varName = idName} ,e) = do
                                     -- function at this moment for a reason!
                                     -- (termination, CSE and DEC oppertunities,
                                     -- ,etc.)
-                                    (Binding newBodyId sp NoUserInlinePrag IsFun newBody r)
+                                    (Binding (mkGlobalIdFromClash newBodyId) sp NoUserInlinePrag IsFun newBody r)
              -- Return the new binder
              return (var, newExpr)
     -- If it does, use the existing binder
     (b:_) ->
       let newExpr' = mkTmApps
-                      (mkTyApps (Var $ bindingId b)
+                      (mkTyApps (Var $ globalIdLegacy (bindingId b))
                                 (map VarTy boundFTVs))
                       (map Var boundFVs)
       in  return (var, newExpr')
@@ -867,7 +869,7 @@ addGlobalBind
 addGlobalBind vNm ty sp inl body = do
   let vId = mkGlobalId ty vNm
       r = vId `globalIdOccursIn` body
-  (ty,body) `deepseq` bindings %= UniqMap.insert vNm (Binding vId sp inl IsFun body r)
+  (ty,body) `deepseq` bindings %= UniqMap.insert vNm (Binding (mkGlobalIdFromClash vId) sp inl IsFun body r)
 
 -- | Create a new name out of the given name, but with another unique. Resulting
 -- unique is guaranteed to not be in the given InScopeSet.

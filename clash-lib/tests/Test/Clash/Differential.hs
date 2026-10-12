@@ -636,7 +636,7 @@ strategyFor Fixpoint t = DSL.repeatR (bottomup t)
 -- 'strategyFor'
 currentRewrite :: String -> NormRewrite -> Side NormalizeSession C.Term
 currentRewrite nm rw = normalizeSide $ \b tm -> do
-  curFun Lens..= (bindingId b, bindingLoc b)
+  curFun Lens..= (globalIdLegacy (bindingId b), bindingLoc b)
   runRewrite nm emptyInScopeSet rw tm
 
 -- | Rewrite the body of a binding with a scoped transformation, in the given
@@ -645,7 +645,7 @@ currentRewrite nm rw = normalizeSide $ \b tm -> do
 -- counterpart of 'currentRewrite' with 'strategyFor'.
 scopedRewrite :: Mode -> ScopedRewrite NormalizeState -> Side NormalizeSession (Term 'VoidS)
 scopedRewrite mode r = normalizeSide $ \b tm -> do
-  curFun Lens..= (bindingId b, bindingLoc b)
+  curFun Lens..= (globalIdLegacy (bindingId b), bindingLoc b)
   runScopedTransform strategy (rootContext emptyScope) tm
  where
   strategy = case mode of
@@ -761,7 +761,7 @@ compareDesign n cmp d = go mempty (designBindingList d)
             { sumDifferent = sumDifferent s + 1
             , sumCrashed = sumCrashed s + (case m of Crash {} -> 1; Mismatch {} -> 0)
             , sumMismatches =
-                if sumDifferent s < n then (bindingId b, m) : sumMismatches s else sumMismatches s
+                if sumDifferent s < n then (globalIdLegacy (bindingId b), m) : sumMismatches s else sumMismatches s
             })
        bs
 

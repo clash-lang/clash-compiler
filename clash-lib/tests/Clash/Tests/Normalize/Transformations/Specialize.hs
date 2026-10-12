@@ -50,6 +50,7 @@ import Test.Clash.Rewrite
   , intFunTy, intId, intLit, intTy, localId, maybeTy, mkBindingMap, pairDataCon
   , pairTy, parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
   , showPprU, testTyConMap, tyVar, withTyConMap )
+import Clash.Core.Scoped.Syntax (globalIdLegacy)
 
 -- | The 'appProp' of Clash Core
 appPropR :: NormRewrite
@@ -467,9 +468,9 @@ specializeDoesNotOverwriteBinders specR = do
     _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU res)
   mapM_
     (\(v, t) -> case lookupVarEnv v (_bindings st1) of
-        Just b | showPprU (bindingId b) == showPprU v, bindingTerm b == t -> pure ()
+        Just b | showPprU (globalIdLegacy (bindingId b)) == showPprU v, bindingTerm b == t -> pure ()
         b -> assertFailure
-          ("Binder " <> showPprU v <> " was overwritten by: " <> maybe "nothing" (showPprU . bindingId) b))
+          ("Binder " <> showPprU v <> " was overwritten by: " <> maybe "nothing" (showPprU . globalIdLegacy . bindingId) b))
     victims
 
 -- * Local heads that share a unique with a global binder

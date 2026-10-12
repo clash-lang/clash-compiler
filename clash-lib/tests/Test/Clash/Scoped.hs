@@ -1005,9 +1005,9 @@ assertNewBindingsAgree
   :: HasCallStack => RewriteState extra -> RewriteState extra -> RewriteState extra -> Assertion
 assertNewBindingsAgree st0 st1 st2 = do
   let new st = Map.fromList
-        [ (C.nameOcc (C.varName (bindingId b)), bindingTerm b)
+        [ (C.nameOcc (globalIdName (bindingId b)), bindingTerm b)
         | b <- UniqMap.elems (_bindings st)
-        , not (UniqMap.elem (C.varUniq (bindingId b)) (_bindings st0)) ]
+        , not (UniqMap.elem (globalIdUniq (bindingId b)) (_bindings st0)) ]
       new1 = new st1
       new2 = new st2
   assertBool ("new global bindings: Clash Core " <> show (Map.keys new1) <> ", scoped " <> show (Map.keys new2))

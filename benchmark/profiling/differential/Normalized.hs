@@ -194,9 +194,9 @@ compareNormalizedWith opts kds design top fileA fileB = do
               -- The types of the binders, which normalization gives the
               -- binders it normalizes
               tyRes
-                | C.aeqType (C.varType (bindingId ba)) (C.varType (bindingId bb)) = []
+                | C.aeqType (C.varType (globalIdLegacy (bindingId ba))) (C.varType (globalIdLegacy (bindingId bb))) = []
                 | otherwise =
-                    [RTypeDifferent a (C.varType (bindingId ba)) (C.varType (bindingId bb))]
+                    [RTypeDifferent a (C.varType (globalIdLegacy (bindingId ba))) (C.varType (globalIdLegacy (bindingId bb)))]
           go bmA bmB (rest ++ new) (Set.insert u seen) ren' (tyRes ++ res : acc)
         (Nothing, Nothing) -> go bmA bmB rest (Set.insert u seen) ren acc
         (Nothing, Just _) ->

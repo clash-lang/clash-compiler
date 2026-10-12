@@ -85,6 +85,8 @@ import           Clash.Rewrite.Util
   (cloneNameWithBindingMap, runRewrite, mkTmBinderFor, mkDerivedName, lintInput)
 import           Clash.Unique
 import           Clash.Util              (SrcSpan, makeCached, makeCachedU)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+import           Clash.Core.Scoped.Syntax (globalIdLegacy)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -408,7 +410,8 @@ normalizeTopLvlBndr
   -> Id
   -> Binding Term
   -> NormalizeSession (Binding Term)
-normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extra.normalized) $ do
+normalizeTopLvlBndr isTop nm (Binding nmG sp inl pr tm _) = makeCachedU nm (extra.normalized) $ do
+  let nm' = globalIdLegacy nmG
   tcm <- Lens.view tcCache
   let nmS = showPpr (varName nm)
   -- We deshadow the term, so that no binder shadows another binder. Note
@@ -424,7 +427,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extr
   curFun .= old
   let ty' = inferCoreTypeOf tcm tm3
   let r' = nm' `globalIdOccursIn` tm3
-  return (Binding nm'{varType = ty'} sp inl pr tm3 r')
+  return (Binding (mkGlobalIdFromClash nm'{varType = ty'}) sp inl pr tm3 r')
 
 -- | Normalize a global function applied to closed arguments, i.e. a work-free
 -- application such as @f \@7 dict@. 'inlineWorkFree' inlines the result at

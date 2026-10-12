@@ -132,14 +132,14 @@ withGlobalBindings m = do
   bm <- Lens.use bindings
   scopedBindings %= \sb ->
     globalEnvFromList
-      [ (mkGlobalIdFromClash (bindingId b), fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
+      [ (bindingId b, fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
       <> sb
   a <- m
   sb <- Lens.use scopedBindings
   new <- withSupply $ sequence
-    [ (\tm -> (bindingId b, b {bindingTerm = tm})) <$> toClashTermFreshClosed (bindingTerm b)
+    [ (\tm -> (globalIdLegacy (bindingId b), b {bindingTerm = tm})) <$> toClashTermFreshClosed (bindingTerm b)
     | b <- globalEnvElems sb
-    , not (bindingId b `UniqMap.elem` bm) ]
+    , not (globalIdLegacy (bindingId b) `UniqMap.elem` bm) ]
   bindings %= UniqMap.insertMany new
   pure a
 
