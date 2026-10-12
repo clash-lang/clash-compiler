@@ -21,6 +21,7 @@ module Clash.Primitives.Util
   , decodeOrErrJson
   , decodeOrErrYaml
   , getFunctionPlurality
+  , getFunctionPluralityWith
   ) where
 
 import           Control.DeepSeq        (force)
@@ -56,6 +57,7 @@ import           Clash.Primitives.Types
   , CompiledPrimMap, GuardedResolvedPrimitive)
 import           Clash.Netlist.Types    (BlackBox(..), NetlistMonad)
 import           Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
+import           Clash.Netlist.Scoped.Types  (SomeBlackBoxFunction)
 import           Clash.Netlist.Util     (preserveState)
 import           Clash.Netlist.BlackBox.Util
   (walkElement)
@@ -267,9 +269,27 @@ getFunctionPlurality
   -> NetlistMonad Int
   -- ^ Plurality of function. Defaults to 1. Does not err if argument isn't
   -- a function in the first place. State of monad will not be modified.
-getFunctionPlurality (Primitive {}) _args _resTys _n = pure 1
-getFunctionPlurality (BlackBoxHaskell {name, function, functionName}) args resTys n = do
-  errOrMeta <- preserveState (legacyBlackBoxFunction (snd function) False name args resTys)
+getFunctionPlurality p args resTys =
+  getFunctionPluralityWith
+    (\f nm -> legacyBlackBoxFunction f False nm args resTys) p
+
+-- | Looks up the plurality of a function's function argument, like
+-- 'getFunctionPlurality', given a way to call the blackbox function of a
+-- primitive: on the name of the primitive, with the arguments and result types
+-- passed to the blackbox.
+getFunctionPluralityWith
+  :: HasCallStack
+  => (SomeBlackBoxFunction -> TS.Text -> NetlistMonad (Either String (BlackBoxMeta, BlackBox)))
+  -- ^ Call a blackbox function
+  -> CompiledPrimitive
+  -> Int
+  -- ^ Argument number holding the function of interest
+  -> NetlistMonad Int
+  -- ^ Plurality of function. Defaults to 1. Does not err if argument isn't
+  -- a function in the first place. State of monad will not be modified.
+getFunctionPluralityWith _call (Primitive {}) _n = pure 1
+getFunctionPluralityWith call (BlackBoxHaskell {name, function, functionName}) n = do
+  errOrMeta <- preserveState (call (snd function) name)
   case errOrMeta of
     Left err ->
       error $ concat [ "Tried to determine function plurality for "
@@ -278,5 +298,5 @@ getFunctionPlurality (BlackBoxHaskell {name, function, functionName}) args resTy
                      , err ]
     Right (BlackBoxMeta {bbFunctionPlurality}, _bb) ->
       pure (getFunctionPlurality' bbFunctionPlurality n)
-getFunctionPlurality (BlackBox {functionPlurality}) _args _resTy n =
+getFunctionPluralityWith _call (BlackBox {functionPlurality}) n =
   pure (getFunctionPlurality' functionPlurality n)

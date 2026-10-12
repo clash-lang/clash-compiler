@@ -17,17 +17,69 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.Type as C
 import Clash.Util.Supply (newSupply)
 
-import Clash.Core.Scoped.Convert (convScope, fromClashTerm)
+import Clash.Core.Scoped.Convert (convScope, fromClashTerm, fromClashType)
 import Clash.Core.Scoped.Syntax
 import qualified Clash.Netlist.Id as Id
-import Clash.Netlist.Scoped.Types (LocalId (..), compCtxFromList)
+import Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
+import Clash.Netlist.Scoped.Types
+  ( LocalId (..), SomeBlackBoxFunction (..), compCtxFromList, legacyCompCtx )
 import Clash.Netlist.Types (Declaration (Assignment, NetDecl))
+import Clash.Primitives.Types
+  ( BlackBoxFunctionName (..), CompiledPrimitive, Primitive (BlackBoxHaskell)
+  , UsedArguments (UsedArguments) )
+import qualified Clash.Primitives.Scoped.Util as Scoped (getFunctionPlurality)
+import Clash.Primitives.Sized.Vector (foldBBF, iterateBBF)
+import qualified Clash.Primitives.Util as Legacy (getFunctionPlurality)
 import Clash.Primitives.Verification (bindMaybe)
 
-import Test.Clash.Rewrite (intId, intTy, mkBindingMap, runNetlistTest)
+import Test.Clash.Rewrite
+  (addTy, intId, intTy, mkBindingMap, numTy, runNetlistTest, tyVar)
 import Test.Clash.Scoped (testTypeEnv, withFreeVarsOf)
+
+-- | A primitive with the given blackbox function
+bbfPrim :: SomeBlackBoxFunction -> CompiledPrimitive
+bbfPrim f =
+  BlackBoxHaskell "prim" C.WorkVariable (UsedArguments []) False
+    (BlackBoxFunctionName ["M"] "f") (0, f)
+
+-- | The function plurality that the blackbox functions of @fold@ and
+-- @iterateI@ give, through 'Scoped.getFunctionPlurality' and its counterpart on
+-- Clash Core, called as a blackbox function on scoped Core and as one on Clash
+-- Core. The arguments are in a scope with a type variable, and the length of
+-- the vector is a type family application, so the blackbox functions have to
+-- look through it in that scope.
+functionPlurality :: Assertion
+functionPlurality = do
+  sup <- newSupply
+  sequence_
+    [ withFreeVarsOf [C.TyApp (C.Literal (C.IntLiteral 0)) resTy] $ \env -> do
+        let -- The Clash Core counterpart of @a@ is @a@ itself
+            ctx = legacyCompCtx (convScope env) testTypeEnv sup
+                    [ (n, a) | VarTy _ _ n <- [fromClashType env resTy] ] []
+            conv = either (Left . fromClashTerm env) (Right . fromClashType env)
+            resTys = [fromClashType env resTy]
+        pluralities <- runNetlistTest (mkBindingMap []) $ sequence
+          [ Scoped.getFunctionPlurality ctx (bbfPrim f) (map conv args) resTys i
+          , Scoped.getFunctionPlurality ctx
+              (bbfPrim (LegacyBBF (legacyBlackBoxFunction f))) (map conv args) resTys i
+          , Legacy.getFunctionPlurality (bbfPrim f) args [resTy] i
+          ]
+        assertEqual nm [expected, expected, expected] pluralities
+    | (nm, f, args, i, expected) <- cases ]
+ where
+  a = tyVar C.User "a" 70
+  resTy = C.VarTy a
+  cases =
+    [ -- fold :: (a -> a -> a) -> Vec (n + 1) a -> a, with n + 1 = 8
+      ( "fold", ScopedBBF foldBBF
+      , [Right (addTy (numTy 6) (numTy 1)), Right resTy], 0, 7 )
+      -- iterateI :: KnownNat n => (a -> a) -> a -> Vec n a, with n = 5
+    , ( "iterateI", ScopedBBF iterateBBF
+      , [Right (addTy (numTy 4) (numTy 1)), Right resTy], 1, 4 )
+    ]
 
 -- | 'bindMaybe' refers to a local variable by its HDL identifier in the
 -- context, and binds other terms to a new signal
@@ -55,5 +107,6 @@ bindMaybeTest = do
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Primitives"
-  [ testCase "bindMaybe" bindMaybeTest
+  [ testCase "getFunctionPlurality of fold and iterateI" functionPlurality
+  , testCase "bindMaybe" bindMaybeTest
   ]
