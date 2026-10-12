@@ -106,8 +106,6 @@ import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
-import           Clash.Core.VarEnv
-  (lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
 import           Clash.Debug                      (debugIsOn)
 import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
 import           Clash.Driver.Types
@@ -115,7 +113,7 @@ import           Clash.Driver.Manifest
   (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
    mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
-import           Clash.Netlist                    (genTopNames)
+import           Clash.Netlist                    (genTopNames, topEntityEnv)
 import           Clash.Netlist.Scoped             (genNetlist)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
@@ -127,7 +125,8 @@ import           Clash.Netlist.Types
 import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
-import           Clash.Core.Scoped.NameMap        (emptyGlobalEnv, lookupGlobalEnv, memberGlobalEnv)
+import           Clash.Core.Scoped.NameMap
+  (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
 import           Clash.Core.Scoped.Syntax         (mkGlobalId)
 import           Clash.Normalize.Scoped.Util      (callGraph)
 import           Clash.Normalize.Util             (tvSubstWithTyEq)
@@ -342,7 +341,7 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
     -- TODO This is here because of some minimal effort refactoring. At some
     -- point generateHDL should be better laid out so this can be closer to
     -- the few places it is needed.
-    let topEntityMap = mkVarEnv (fmap (\x -> (topId x, x)) topEntities1)
+    let topEntityMap = topEntityEnv topEntities1
 
     -- Data which is updated and used when updating the different top entities
     -- is kept in an MVar.
@@ -374,12 +373,12 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
     putStrLn $ "Clash: Total compilation took " ++ diff
  where
   go
-    :: VarEnv Id.Identifier
+    :: GlobalEnv Id.Identifier
     -> MVar Id.IdentifierSet
     -> MVar (HashMap Unique [EdamFile])
     -> MVar ()
     -> HashMap Unique [Unique]
-    -> VarEnv TopEntityT
+    -> GlobalEnv TopEntityT
     -> IO ()
     -- ^ Wait until it is this top entity's turn to claim names in the
     -- 'Id.IdentifierSet'
@@ -399,7 +398,8 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
 
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
 
-  let topNm = lookupVarEnv' compNames topEntity
+  let topNm = fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show topEntity))
+                (lookupGlobalEnv (mkGlobalId topEntity) compNames)
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
       hdlState' = setDomainConfigurations domainConfs
@@ -417,7 +417,7 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
   (userModifications, maybeManifest, topHashWithSubHashes) <-
     readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
 
-  let topEntityNames = map topId (eltsVarEnv topEntityMap)
+  let topEntityNames = map topId (globalEnvElems topEntityMap)
 
   case maybeManifest of
     Just manifest0@Manifest{fileNames} | Just [] <- userModifications -> do
@@ -526,7 +526,10 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
 
       let
         depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
-        depIds = mapMaybe (fmap topId . flip lookupVarEnvDirectly topEntityMap) depUniques
+        depIds =
+          mapMaybe
+            (\u -> List.find ((== u) . varUniq) (map topId (globalEnvElems topEntityMap)))
+            depUniques
 
         manifest =
           mkManifest

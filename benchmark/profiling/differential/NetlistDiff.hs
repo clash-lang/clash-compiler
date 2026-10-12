@@ -40,7 +40,6 @@ import           Clash.Backend.Verilog        (VerilogState)
 import           Clash.Backend.VHDL           (VHDLState)
 import           Clash.Core.Name              (nameOcc)
 import           Clash.Core.Var               (varName)
-import           Clash.Core.VarEnv            (mkVarEnv)
 import           Clash.Driver.Types
   (ClashEnv (..), ClashOpts (..), defClashOpts)
 -- For the orphan 'Binary' instance of 'TopEntityT'
@@ -50,7 +49,7 @@ import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 import qualified Clash.Netlist                as Legacy
 import qualified Clash.Netlist.Scoped         as Scoped
 import           Clash.Netlist.Types
-  (Component (..), ComponentMap, SomeBackend (..), TopEntityT (..))
+  (Component (..), ComponentMap, SomeBackend (..))
 import           Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
 import           RestorePrimitives            (restorePrimMap)
@@ -77,7 +76,7 @@ compareNetlists ctxLen design = do
         , envDomains = domains
         }
       globals = fromClashBindings bm
-      topEntityMap = mkVarEnv (zip (map topId topEntities) topEntities)
+      topEntityMap = Legacy.topEntityEnv topEntities
       topEntityS = Text.unpack (nameOcc (varName topEntity))
       modName = takeWhile (/= '.') topEntityS
 

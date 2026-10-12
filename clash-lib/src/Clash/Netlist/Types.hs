@@ -75,7 +75,7 @@ import Clash.Core.Evaluator.Types           (Evaluator)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
-import Clash.Core.VarEnv                    (VarEnv)
+import Clash.Core.Scoped.NameMap            (GlobalEnv)
 import Clash.Driver.Types
   (BindingMap, ClashEnv(..), ClashOpts(..), GlobalBindings, HasClashOpts(..))
 import Clash.Driver.Warning                 (CanWarn)
@@ -344,10 +344,10 @@ data NetlistState
   -- ^ Keeps track of invocations of ´mkPrimitive´. It is currently used to
   -- filter duplicate warning invocations for dubious blackbox instantiations,
   -- see GitHub pull request #286.
-  , _componentNames :: VarEnv Identifier
+  , _componentNames :: GlobalEnv Identifier
   -- ^ Names of components (to be) generated during this netlist run. Includes
   -- top entity names.
-  , _topEntityAnns  :: VarEnv TopEntityT
+  , _topEntityAnns  :: GlobalEnv TopEntityT
   , _hdlDir         :: FilePath
   , _curBBlvl       :: Int
   -- ^ The current scoping level assigned to black box contexts

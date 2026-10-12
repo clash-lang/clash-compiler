@@ -62,7 +62,6 @@ import qualified Clash.Core.Term                  as C
 import qualified Clash.Core.Type                  as C
 import           Clash.Core.TyCon                 (TyConMap)
 import qualified Clash.Core.Var                   as C
-import           Clash.Core.VarEnv                (VarEnv, lookupVarEnv, lookupVarEnv')
 import           Clash.Driver.Types
   (Binding (..), ClashEnv (..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist                    (genNames, runNetlistMonad)
@@ -75,7 +74,7 @@ import           Clash.Util                       (ClashException (..), curLoc, 
 import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Evaluator.Types       (Evaluator)
 
-import           Clash.Core.Scoped.NameMap        (lookupGlobalEnv)
+import           Clash.Core.Scoped.NameMap        (GlobalEnv, lookupGlobalEnv)
 import           Clash.Core.Scoped.Subst          (openBind, teleIdVars)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
@@ -98,9 +97,9 @@ genNetlist
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> GlobalBindings
   -- ^ Global binders
-  -> VarEnv TopEntityT
+  -> GlobalEnv TopEntityT
   -- ^ TopEntity annotations
-  -> VarEnv Identifier
+  -> GlobalEnv Identifier
   -- ^ Top entity names
   -> (CustomReprs -> TyConMap -> C.Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -153,13 +152,15 @@ genComponentT compName0 componentExpr = do
   tcm <- Lens.view tcCache
   tenv <- Lens.view typeEnv
   let compVar = globalIdVar compName0
-  compName1 <- (`lookupVarEnv'` compVar) <$> Lens.use componentNames
+  compName1 <-
+    fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show compVar))
+      . lookupGlobalEnv compName0 <$> Lens.use componentNames
   sp <- maybe (error ($(curLoc) ++ "No normalized expression found for: " ++ show compVar)) bindingLoc
           . lookupGlobalEnv compName0 <$> Lens.use bindings
   curCompNm .= (compName1, sp)
   usages .= mempty
 
-  topEntityTM <- lookupVarEnv compVar <$> Lens.use topEntityAnns
+  topEntityTM <- lookupGlobalEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
       topVarTypeM = snd . C.splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 

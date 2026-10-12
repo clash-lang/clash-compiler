@@ -73,8 +73,7 @@ import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
-  (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
-   lookupVarEnv')
+  (emptyInScopeSet, lookupVarEnv, lookupVarEnv')
 import           Clash.Driver.Types
   (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist.BlackBox
@@ -86,7 +85,9 @@ import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Scoped.Convert.Fresh  (toClashTermFreshClosed)
-import           Clash.Core.Scoped.NameMap        (globalEnvElems, globalEnvKeys, globalEnvToList)
+import           Clash.Core.Scoped.NameMap
+  (GlobalEnv, emptyGlobalEnv, globalEnvElems, globalEnvFromList, globalEnvKeys, globalEnvToList,
+   insertGlobalEnv, lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax         (globalIdVar, mkGlobalId)
 import {-# SOURCE #-} qualified Clash.Netlist.Scoped as Scoped
 import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
@@ -105,9 +106,9 @@ genNetlist
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> GlobalBindings
   -- ^ Global binders
-  -> VarEnv TopEntityT
+  -> GlobalEnv TopEntityT
   -- ^ TopEntity annotations
-  -> VarEnv Identifier
+  -> GlobalEnv Identifier
   -- ^ Top entity names
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -141,7 +142,7 @@ runNetlistMonad
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> GlobalBindings
   -- ^ Global binders
-  -> VarEnv TopEntityT
+  -> GlobalEnv TopEntityT
   -- ^ TopEntity annotations
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -154,7 +155,7 @@ runNetlistMonad
   -- ^ Seen components
   -> FilePath
   -- ^ HDL dir
-  -> VarEnv Identifier
+  -> GlobalEnv Identifier
   -- ^ Seen components
   -> NetlistMonad a
   -- ^ Action to run
@@ -172,7 +173,7 @@ runNetlistMonad'
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> GlobalBindings
   -- ^ Global binders
-  -> VarEnv TopEntityT
+  -> GlobalEnv TopEntityT
   -- ^ TopEntity annotations
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -185,7 +186,7 @@ runNetlistMonad'
   -- ^ Seen components
   -> FilePath
   -- ^ HDL dir
-  -> VarEnv Identifier
+  -> GlobalEnv Identifier
   -- ^ Seen components
   -> NetlistMonad a
   -- ^ Action to run
@@ -243,19 +244,23 @@ genNames
   -- ^ Prefix
   -> IdentifierSet
   -- ^ Identifier set to extend
-  -> VarEnv Identifier
+  -> GlobalEnv Identifier
   -- ^ Pre-generated names
   -> GlobalBindings
-  -> (VarEnv Identifier, IdentifierSet)
+  -> (GlobalEnv Identifier, IdentifierSet)
 genNames newInlineStrat prefixM is env bndrs =
   runState (foldlM go env (globalEnvKeys bndrs)) is
  where
-  go env_ (globalIdVar -> id_) =
-    case lookupVarEnv id_ env_ of
+  go env_ g =
+    case lookupGlobalEnv g env_ of
       Just _ -> pure env_
       Nothing -> do
-        nm <- Id.makeBasic (genComponentName newInlineStrat prefixM id_)
-        pure (extendVarEnv id_ nm env_)
+        nm <- Id.makeBasic (genComponentName newInlineStrat prefixM (globalIdVar g))
+        pure (insertGlobalEnv g nm env_)
+
+-- | The top entities, by their 'Clash.Core.Scoped.Syntax.GlobalId'
+topEntityEnv :: [TopEntityT] -> GlobalEnv TopEntityT
+topEntityEnv tops = globalEnvFromList [ (mkGlobalId (topId t), t) | t <- tops ]
 
 -- | Generate names for top entities. Should be executed at the very start of
 -- the synthesis process and shared between all passes.
@@ -264,11 +269,11 @@ genTopNames
   -> HDL
   -- ^ HDL to generate identifiers for
   -> [TopEntityT]
-  -> (VarEnv Identifier, IdentifierSet)
+  -> (GlobalEnv Identifier, IdentifierSet)
 genTopNames opts hdl tops =
   -- TODO: Report error if fixed top entities have conflicting names
   flip runState (Id.emptyIdentifierSet esc lw hdl) $ do
-    env0 <- foldlM goFixed emptyVarEnv fixedTops
+    env0 <- foldlM goFixed emptyGlobalEnv fixedTops
     env1 <- foldlM goNonFixed env0 nonFixedTops
     pure env1
  where
@@ -281,11 +286,11 @@ genTopNames opts hdl tops =
 
   goFixed env (topId, ann) = do
     topNm <- genTopName prefixM ann
-    pure (extendVarEnv topId topNm env)
+    pure (insertGlobalEnv (mkGlobalId topId) topNm env)
 
   goNonFixed env id_ = do
     topNm <- Id.makeBasic (genComponentName True prefixM id_)
-    pure (extendVarEnv id_ topNm env)
+    pure (insertGlobalEnv (mkGlobalId id_) topNm env)
 
 -- | Generate a component for a given function (caching). On scoped Clash
 -- Core, see 'Clash.Netlist.Scoped.genComponent', unless 'legacyNetlist' is
@@ -325,12 +330,14 @@ genComponentT
   -> NetlistMonad (ComponentMeta, Component)
 genComponentT compName0 componentExpr = do
   tcm <- Lens.view tcCache
-  compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
+  compName1 <-
+    fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show compName0))
+      . lookupGlobalEnv (mkGlobalId compName0) <$> Lens.use componentNames
   sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use legacyBindings
   curCompNm .= (compName1, sp)
   usages .= mempty
 
-  topEntityTM <- lookupVarEnv compName0 <$> Lens.use topEntityAnns
+  topEntityTM <- lookupGlobalEnv (mkGlobalId compName0) <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
       topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
 
@@ -735,7 +742,10 @@ mkFunApp
 mkFunApp declType dstId fun args tickDecls = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.view tcCache
-  case (isGlobalId fun, lookupVarEnv fun topAnns) of
+  let topAnnM
+        | isGlobalId fun = lookupGlobalEnv (mkGlobalId fun) topAnns
+        | otherwise = Nothing
+  case (isGlobalId fun, topAnnM) of
     (True, Just topEntity)
       | let ty = coreTypeOf (topId topEntity)
       , let (fArgTys0,fResTy) = splitFunForallTy ty
