@@ -11,10 +11,13 @@
   ('Clash.Netlist.Scoped.Util.mkUniqueNormalized'). The handlers below get
   that context.
 
-  'mkDeclarations'' and 'mkExpr' dispatch on the form of a term. The other
-  handlers are adapters that run their counterparts in "Clash.Netlist" on
-  Clash Core, see 'Clash.Netlist.Scoped.Types.toLegacy'. TODO(Phase 5,
-  Netlist): port them. Their signatures are fixed in @Clash.Netlist.Scoped.hs-boot@.
+  'mkDeclarations'' and 'mkExpr' dispatch on the form of a term to the other
+  handlers. Handlers that go under binders, e.g. those of case alternatives
+  ('withAlt'), extend the context. Their signatures are fixed in
+  @Clash.Netlist.Scoped.hs-boot@.
+
+  The HWTypes of scoped types still go through Clash Core types ('hwTypeOf').
+  TODO(Phase 5, Util): translate scoped types.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -64,7 +67,9 @@ import           Data.Text.Extra                  (showt)
 import           GHC.Num.Integer                  (Integer (..))
 import           GHC.Num.Natural                  (Natural (..))
 import           GHC.Stack                        (HasCallStack)
+import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
 import qualified GHC.Types.SrcLoc                 as GHC (SrcSpan)
+import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
 
 import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr' (..), CustomReprs, DataRepr' (..), Type' (..), getConstrRepr, getDataRepr)
@@ -72,7 +77,7 @@ import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType               (coreTypeOf)
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
-import qualified Clash.Core.Name                  as C (nameOcc)
+import qualified Clash.Core.Name                  as C (nameLoc, nameOcc)
 import qualified Clash.Core.Term                  as C
 import qualified Clash.Core.Type                  as C
 import qualified Clash.Core.Util                  as C (splitShouldSplit)
@@ -81,7 +86,6 @@ import qualified Clash.Core.Var                   as C
 import           Clash.Driver.Types
   (Binding (..), ClashEnv (..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist                    (genNames, runNetlistMonad)
-import qualified Clash.Netlist                    as Legacy
 import qualified Clash.Netlist.Id                 as Id
 import qualified Clash.Netlist.Types              as HW (Expr (Literal), Literal)
 import           Clash.Netlist.Types              as HW
@@ -89,7 +93,8 @@ import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, coreTypeToHWTypeM', dcToLiteral, declareInstUses,
    expandTopEntityOrErrM, isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
-   procAssign)
+   primWarnContext, procAssign)
+import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
 import qualified Clash.Util.Supply                as Supply
@@ -105,10 +110,13 @@ import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNam
 import           Clash.Core.Scoped.Subst
   (openAlt, openBind, patVars, teleIdBinderTypes, teleIdVars)
 import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Scoped.TermInfo       (multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Scoped.Term
-  (collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
+  (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 
-import           Clash.Netlist.Scoped.BlackBox    (mkPrimitive)
+import           Clash.Netlist.BlackBox           (prepareBlackBox)
+import           Clash.Netlist.Scoped.BlackBox
+  (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
   (UniqueNormalized (..), mkUniqueNormalized, splitNormalized,
@@ -236,10 +244,109 @@ genComponentT compName0 componentExpr = do
       u <- Lens.use usages
       return (ComponentMeta wereVoids sp ids u, component)
 
--- | Generate the declaration of the signal of a let-binder: see
--- 'Clash.Netlist.mkNetDecl'
+-- | Generate the declaration of the signal of a let-binder
 mkNetDecl :: Distinct n => CompCtx n -> (LocalId n, Term n) -> NetlistMonad [Declaration]
-mkNetDecl ctx (b, e) = Legacy.mkNetDecl (toLegacyLocalId ctx b, toLegacy ctx e)
+mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ withTicks ctx ticks $ \_ -> do
+
+  lAttrs <- Lens.view localAttrs
+  hwTy0 <- hwTypeOf $(curLoc) (localIdType id_)
+  let hwTy = case hwTy0 of
+        Annotated attrs hty0 -> Annotated (attrs ++ lAttrs) hty0
+        hty0 -> annotated lAttrs hty0
+
+  -- GHC starts including sources notes on any debug level greater than 0
+  -- we copy this behaviour here.
+  emitLocs <- (>0) . opt_ghcDebugLevel <$> Lens.view clashOpts
+  let
+    srcNote =
+      if emitLocs then
+        addSrcNote $ case tm of
+          Tick (SrcSpan s) _ -> s
+          _ -> C.nameLoc (localIdOcc id_)
+      else
+        Nothing
+
+  if | not (shouldRenderDecl hwTy tm) -> return []
+     | (Prim pInfo@C.PrimInfo{C.primMultiResult=C.MultiResult}, args) <- collectArgs tm ->
+          multiDecls srcNote pInfo args
+     | otherwise -> pure <$> singleDecl srcNote hwTy
+
+  where
+    multiDecls srcNote pInfo args0 = do
+      tcm <- Lens.view tcCache
+      resInits0 <- getResInits
+      let
+        resInits1 = map Just resInits0 <> repeat Nothing
+        mpInfo = multiPrimInfo' tcm pInfo
+        (_, res) = splitMultiPrimArgs mpInfo args0
+
+        netdecl i typ resInit =
+          NetDecl' srcNote (termIdentifier ctx i) typ resInit
+
+      -- Like the type of the primitive, these are Clash Core types, which can
+      -- mention its quantified type variables
+      hwTys <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc)) (C.mpi_resultTypes mpInfo)
+      pure (zipWith3 netdecl res hwTys resInits1)
+
+    singleDecl srcNote hwTy = do
+      rIM <- listToMaybe <$> getResInits
+      return (NetDecl' srcNote (localIdentifier ctx (localIdName id_)) hwTy rIM)
+
+    addSrcNote loc
+      | isGoodSrcSpan loc = Just (StrictText.pack (showSDocUnsafe (ppr loc)))
+      | otherwise = Nothing
+
+    isMultiPrimSelect :: Term n -> Bool
+    isMultiPrimSelect t = case collectArgs t of
+      (Prim (C.primName -> "c$multiPrimSelect"), _) -> True
+      _ -> False
+
+    shouldRenderDecl :: HWType -> Term n -> Bool
+    shouldRenderDecl ty t
+      | isVoid ty = False
+      | isMultiPrimSelect t = False
+      | otherwise = True
+
+    -- Set the initialization value of a signal when a primitive wants to set it
+    getResInits :: NetlistMonad [Expr]
+    getResInits = case collectArgs tm of
+      (Prim p, args0) ->
+        let context =
+              primWarnContext [] (showPpr (C.varName (toLegacyLocalId ctx id_)))
+                (toLegacyArgs ctx args0)
+         in extractPrimWarnOrFail context (C.primName p) >>= go p args0
+      _ -> return []
+     where
+      go pInfo args0 (BlackBox {resultInits=nmDs, multiResult=True}) = do
+        tcm <- Lens.view tcCache
+        let (args1, res) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args0
+        (bbCtx, _) <- mkBlackBoxContext ctx (C.primName pInfo) Concurrent (map termLocalId res) args1
+        mapM (go' (C.primName pInfo) bbCtx) nmDs
+      go pInfo args0 (BlackBox {resultInits=nmDs}) = do
+        (bbCtx, _) <- mkBlackBoxContext ctx (C.primName pInfo) Concurrent [id_] args0
+        mapM (go' (C.primName pInfo) bbCtx) nmDs
+      go _ _ _ = pure []
+
+      go' pNm bbCtx nmD = do
+        (bbTempl, templDecl) <- prepareBlackBox pNm nmD bbCtx
+        case templDecl of
+          [] ->
+            return (BlackBoxE pNm [] [] [] bbTempl bbCtx False)
+          _  -> do
+            (_,sloc) <- Lens.use curCompNm
+            throw (ClashException sloc [I.i|
+              Initial values cannot produce declarations, but saw:
+
+                #{templDecl}
+
+              after rendering initial values for blackbox:
+
+                #{pNm}
+
+              Given template:
+
+                #{nmD}
+            |] Nothing)
 
 -- | Generate a list of concurrent Declarations for a let-binder, return an
 -- empty list if the bound expression is represented by 0 bits
@@ -1079,6 +1186,16 @@ withAlt ctx alt k = openAlt (compScope ctx) alt $ \sc pat e ->
 -- | The HDL identifier of a 'NetlistId', fails on 'MultiId'
 netlistIdentifier :: HasCallStack => CompCtx n -> NetlistId n -> Identifier
 netlistIdentifier ctx = netlistId1 id (localIdentifier ctx . localIdName)
+
+-- | The HDL identifier of a local variable, given as a term
+termIdentifier :: HasCallStack => CompCtx n -> Term n -> Identifier
+termIdentifier ctx = localIdentifier ctx . localIdName . termLocalId
+
+-- | A local variable, given as a term
+termLocalId :: HasCallStack => Term n -> LocalId n
+termLocalId = \case
+  Var o ty n -> LocalId o ty n
+  _ -> error ($(curLoc) ++ "not a local variable")
 
 -- | The HWType of a type. TODO(Phase 5, Util): translate types of scoped Core.
 hwTypeOf :: String -> Type n -> NetlistMonad HWType
