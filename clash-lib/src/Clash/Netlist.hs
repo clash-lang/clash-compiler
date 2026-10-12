@@ -31,7 +31,7 @@ import           GHC.Num.Integer                  (Integer(..))
 import           GHC.Num.Natural                  (Natural(..))
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.Reader             (runReaderT)
-import           Control.Monad.State.Strict       (evalState, runStateT, runState)
+import           Control.Monad.State.Strict       (runStateT, runState)
 import           Data.Bifunctor                   (first, second)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
@@ -73,9 +73,9 @@ import           Clash.Core.TysPrim               (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Util                  (splitShouldSplit)
 import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
-  (emptyInScopeSet, lookupVarEnv, lookupVarEnv')
+  (emptyInScopeSet)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..), GlobalBindings)
+  (Binding(..), ClashEnv(..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
@@ -83,55 +83,15 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
-import qualified Clash.Util.Supply                as Supply
-import           Clash.Core.Scoped.Convert.Fresh  (toClashTermFreshClosed)
 import           Clash.Core.Scoped.NameMap
-  (GlobalEnv, emptyGlobalEnv, globalEnvElems, globalEnvFromList, globalEnvKeys, globalEnvToList,
+  (GlobalEnv, emptyGlobalEnv, globalEnvElems, globalEnvFromList, globalEnvKeys,
    insertGlobalEnv, lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax         (globalIdVar, mkGlobalId)
+import           Clash.Core.Scoped.Pretty         ()
 import {-# SOURCE #-} qualified Clash.Netlist.Scoped as Scoped
 import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
 import qualified Clash.Data.UniqMap               as UniqMap
 import Clash.Core.Evaluator.Types (Evaluator)
-
--- | Generate a hierarchical netlist out of a set of global binders with
--- @topEntity@ at the top, on Clash Core. 'Clash.Netlist.Scoped.genNetlist'
--- does so on scoped Clash Core.
--- TODO(Phase 7): remove.
-genNetlist
-  :: ClashEnv
-  -> Evaluator
-  -- ^ The whnf evaluator, to evaluate the attributes of 'Attributes' ticks
-  -> Bool
-  -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> GlobalBindings
-  -- ^ Global binders
-  -> GlobalEnv TopEntityT
-  -- ^ TopEntity annotations
-  -> GlobalEnv Identifier
-  -- ^ Top entity names
-  -> HWTypeTranslator
-  -- ^ Hardcoded Type -> HWType translator
-  -> Bool
-  -- ^ Whether the backend supports ifThenElse expressions
-  -> SomeBackend
-  -- ^ The current HDL backend
-  -> IdentifierSet
-  -- ^ Seen components
-  -> FilePath
-  -- ^ HDL dir
-  -> Maybe StrictText.Text
-  -- ^ Component name prefix
-  -> Id
-  -- ^ Name of the @topEntity@
-  -> IO (Component, ComponentMap, IdentifierSet)
-genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
-  let (componentNames_, seen1) =
-        genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
-  ((_meta, topComponent), s) <-
-    runNetlistMonad' True env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
-      $ genComponent topEntity
-  return (topComponent, _components s, seen1)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
@@ -158,50 +118,18 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad = runNetlistMonad' False
-
--- | Run a NetlistMonad action in a given environment, generating components
--- on Clash Core or on scoped Clash Core, see 'genComponent'
-runNetlistMonad'
-  :: Bool
-  -- ^ Whether to generate components on Clash Core
-  -> ClashEnv
-  -> Evaluator
-  -> Bool
-  -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> GlobalBindings
-  -- ^ Global binders
-  -> GlobalEnv TopEntityT
-  -- ^ TopEntity annotations
-  -> HWTypeTranslator
-  -- ^ Hardcode Type -> HWType translator
-  -> Bool
-  -- ^ Whether the backend supports ifThenElse expressions
-  -> SomeBackend
-  -- ^ The current HDL backend
-  -> IdentifierSet
-  -- ^ Seen components
-  -> FilePath
-  -- ^ HDL dir
-  -> GlobalEnv Identifier
-  -- ^ Seen components
-  -> NetlistMonad a
-  -- ^ Action to run
-  -> IO (a, NetlistState)
-runNetlistMonad' legacy env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_ act = do
-  supply <- Supply.newSupply
-  flip runReaderT (NetlistEnv env "" "" Nothing [] eval tenv legacy)
-    . flip runStateT (s' supply)
+runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_ act =
+  flip runReaderT (NetlistEnv env "" "" Nothing [] eval tenv)
+    . flip runStateT s'
     $ runNetlist act
   where
     tenv =
       addGlobalTypes
         (UniqMap.fromList [ (v, v) | b <- globalEnvElems s, let v = bindingId b ])
         (mkTypeEnv (envTyConMap env))
-    s' supply =
+    s' =
       NetlistState
         { _bindings=s
-        , _legacyBindings=legacyBindingsOf supply s
         , _components=OMap.empty
         , _typeTranslator=typeTrans
         , _curCompNm=(error "genComponent should have set _curCompNm", noSrcSpan)
@@ -218,19 +146,6 @@ runNetlistMonad' legacy env eval isTb s tops typeTrans ite be seenIds_ dir compo
         , _htyCache=mempty
         , _usages=mempty
         }
-
--- | The global bindings as bindings of Clash Core, converted lazily, per
--- binding: most of them are never looked at. Every binder gets a fresh
--- unique, see "Clash.Core.Scoped.Convert.Fresh".
--- TODO(Phase 7): remove.
-legacyBindingsOf :: Supply.Supply -> GlobalBindings -> BindingMap
-legacyBindingsOf supply0 globals = UniqMap.fromList (go supply0 (globalEnvToList globals))
- where
-  go _ [] = []
-  go supply ((g, b) : rest) =
-    let (supply1, supply2) = Supply.splitSupply supply
-        tm = evalState (toClashTermFreshClosed (bindingTerm b)) supply1
-    in (globalIdVar g, b {bindingTerm = tm}) : go supply2 rest
 
 -- | Generate names for all binders in "BindingMap", except for the ones already
 -- present in given identifier varenv.
@@ -289,33 +204,14 @@ genTopNames opts hdl tops =
     topNm <- Id.makeBasic (genComponentName True prefixM id_)
     pure (insertGlobalEnv (mkGlobalId id_) topNm env)
 
--- | Generate a component for a given function (caching). On scoped Clash
--- Core, see 'Clash.Netlist.Scoped.genComponent', unless 'legacyNetlist' is
--- set.
+-- | Generate a component for a given function (caching), on scoped Clash
+-- Core, see 'Clash.Netlist.Scoped.genComponent'
 genComponent
   :: HasCallStack
   => Id
   -- ^ Name of the function
   -> NetlistMonad (ComponentMeta, Component)
-genComponent compName = do
-  legacy <- Lens.view legacyNetlist
-  if legacy then genComponentLegacy compName else Scoped.genComponent (mkGlobalId compName)
-
--- | Generate a component for a given function (caching), on Clash Core
--- TODO(Phase 7): remove.
-genComponentLegacy
-  :: HasCallStack
-  => Id
-  -- ^ Name of the function
-  -> NetlistMonad (ComponentMeta, Component)
-genComponentLegacy compName = do
-  compExprM <- lookupVarEnv compName <$> Lens.use legacyBindings
-  case compExprM of
-    Nothing -> do
-      (_,sp) <- Lens.use curCompNm
-      throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
-    Just b -> do
-      makeCachedO compName components $ genComponentT compName (bindingTerm b)
+genComponent compName = Scoped.genComponent (mkGlobalId compName)
 
 -- | Generate a component for a given function
 genComponentT
@@ -330,7 +226,8 @@ genComponentT compName0 componentExpr = do
   compName1 <-
     fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show compName0))
       . lookupGlobalEnv (mkGlobalId compName0) <$> Lens.use componentNames
-  sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use legacyBindings
+  sp <- maybe (error ($(curLoc) ++ "No normalized expression found for: " ++ show compName0)) bindingLoc
+          . lookupGlobalEnv (mkGlobalId compName0) <$> Lens.use bindings
   curCompNm .= (compName1, sp)
   usages .= mempty
 
@@ -812,8 +709,8 @@ mkFunApp declType dstId fun args tickDecls = do
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
     (True, Nothing) -> do
-      normalized <- Lens.use legacyBindings
-      case lookupVarEnv fun normalized of
+      normalized <- Lens.use bindings
+      case lookupGlobalEnv (mkGlobalId fun) normalized of
         Nothing -> error [I.i|
           Internal error: unknown normalized binder:
 

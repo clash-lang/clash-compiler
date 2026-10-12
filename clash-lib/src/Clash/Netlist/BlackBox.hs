@@ -84,7 +84,7 @@ import           Clash.Core.Util
 import           Clash.Core.Var                as V
   (Id, isGlobalId, mkLocalId, modifyVarName, varName, varType)
 import           Clash.Core.VarEnv
-  (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
+  (extendInScopeSet, mkInScopeSet, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
    mkProjection, mkSelection, mkFunApp, mkDeclarations')
@@ -1230,8 +1230,8 @@ mkFunInput parentName declType resId e =
                 Just _ ->
                   error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr e
                 _ -> do
-                  normalized <- Lens.use legacyBindings
-                  case lookupVarEnv fun normalized of
+                  normalized <- Lens.use bindings
+                  case lookupGlobalEnv (mkGlobalId fun) normalized of
                     Just _ -> do
                       (meta,N.Component compName compInps compOutps _) <-
                         preserveVarEnv $ genComponent fun
