@@ -73,6 +73,7 @@ module Test.Clash.Scoped.Evaluator
 
 import Control.Monad (forM, replicateM)
 import qualified Control.Lens as Lens
+import qualified Data.Either as Either
 import qualified Data.HashMap.Strict as HashMap
 import Data.IORef (IORef, modifyIORef')
 import qualified Data.IntMap.Strict as IntMap
@@ -80,7 +81,7 @@ import qualified Data.List as List
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import GHC.Float (castDoubleToWord64, castFloatToWord32)
+import GHC.Float (castDoubleToWord64, castFloatToWord32, castWord64ToDouble)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty.QuickCheck (Gen, choose, chooseInteger, elements, frequency, oneof)
 
@@ -387,12 +388,23 @@ genOpenPrimCall tcm p = genPrimCallWith True tcm p >>= \case
   Just call -> pure call
   Nothing -> error "genOpenPrimCall: generated no call"
 
--- | 'genPrimCall', or 'genOpenPrimCall'
+-- | 'genPrimCall', or 'genOpenPrimCall'. Generates a new call, up to a
+-- number of times, as long as the call is outside of the domain of the
+-- primitive ('outOfDomain').
 genPrimCallWith :: Bool -> C.TyConMap -> C.PrimInfo -> Gen (Maybe C.Term)
-genPrimCallWith open tcm p =
-  go (0 :: Int) (C.mkSubst C.emptyInScopeSet) [] (fst (C.splitFunForallTy (C.primType p)))
+genPrimCallWith open tcm p = attempt (100 :: Int)
  where
-  go _ _ acc [] = pure (Just (C.mkApps (C.Prim p) (reverse acc)))
+  attempt k = gen >>= \case
+    Just (call, tys) | k > 0, outOfDomain tcm call tys -> attempt (k - 1)
+    res -> pure (fst <$> res)
+
+  (piTele, resTy) = C.splitFunForallTy (C.primType p)
+  gen = go (0 :: Int) (C.mkSubst C.emptyInScopeSet) [] piTele
+
+  -- The call, and the instantiated types of its arguments and of its result
+  go _ subst acc [] =
+    pure (Just ( C.mkApps (C.Prim p) (reverse acc)
+               , map (C.substTy subst) (resTy : Either.rights piTele) ))
   go i subst acc (Left tv : rest)
     | C.aeqType (C.varType tv) C.typeNatKind = do
         n <- frequency [(6, chooseInteger (0, 8)), (1, elements [16, 32, 64, 65])]
@@ -419,6 +431,47 @@ genPrimCallWith open tcm p =
   freeName nm i = C.mkUnsafeSystemName (nm <> Text.pack (show i)) (7000000 + fromIntegral i)
 
   extendInScopeTv (C.Subst is env tenv genv) tv = C.Subst (C.extendInScopeSet is tv) env tenv genv
+
+-- | Whether a generated call, with the given instantiated types of its
+-- arguments and result, is outside of the domain of its primitive, where its
+-- reduction may legitimately behave differently or not at all:
+--
+-- * a type mentions a negative number, e.g. @slice#@ applied to @SNat n@ for
+--   a larger @n@ than its @m + 1@, which gives a @BitVector (m + 1 - n)@;
+-- * @quotRemWord2#@ with a high word that is not smaller than the divisor,
+--   whose quotient doesn't fit a word: GHC's implementation raises @SIGFPE@,
+--   which kills the process;
+-- * @decodeDouble_2Int#@ of zero, whose sign GHC's implementation leaves
+--   undefined: it differs between runs.
+outOfDomain :: C.TyConMap -> C.Term -> [C.Type] -> Bool
+outOfDomain tcm call tys = any negative tys || badQuotRemWord2 || zeroDecodeDouble
+ where
+  negative ty = case C.tyView ty of
+    C.TyConApp tc args
+      | snd (Text.breakOnEnd "." (C.nameOcc tc)) == "-"
+      , either (const True) (< 0) (runExcept (C.tyNatSize tcm ty))
+      -> True
+      | otherwise -> any negative args
+    C.FunTy a r -> negative a || negative r
+    C.OtherType t -> case t of
+      C.ForAllTy _ t1 -> negative t1
+      C.AppTy a b -> negative a || negative b
+      C.AnnType _ t1 -> negative t1
+      _ -> False
+
+  badQuotRemWord2 = case C.collectArgs call of
+    (C.Prim p, [Left hi, Left _lo, Left d])
+      | C.primName p == "GHC.Prim.quotRemWord2#"
+      , C.Literal (WordLiteral h) <- hi
+      , C.Literal (WordLiteral dv) <- d
+      -> h >= dv
+    _ -> False
+
+  zeroDecodeDouble = case C.collectArgs call of
+    (C.Prim p, [Left (C.Literal (DoubleLiteral w))])
+      | C.primName p == "GHC.Prim.decodeDouble_2Int#"
+      -> castWord64ToDouble w == 0
+    _ -> False
 
 -- | An opaque value of the given type, the argument with the given index of a
 -- generated call: a function (or a type abstraction) that applies a free

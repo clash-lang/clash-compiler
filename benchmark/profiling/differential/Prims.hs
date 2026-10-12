@@ -110,7 +110,7 @@ comparePrims opts designs = do
                       (comparePrimCall te evaluator mempty nm r isSubj c))))
                (,,) isSubj c <$> case o of
                  Left (ex :: SomeException) -> Left <$> failure te nm r isSubj c ex
-                 Right Nothing -> pure (Left "timeout")
+                 Right Nothing -> Left <$> timedOut te nm r isSubj c
                  Right (Just o') -> pure (Right o')
              pure (nm, Compared outcomes)
   report opts results
@@ -150,6 +150,22 @@ failure te nm r isSubj c ex = do
       Right _ -> Nothing
   firstLine :: SomeException -> String
   firstLine = takeWhile (/= '\n') . show
+
+-- | Why the comparison of a call timed out. If the ported reduction and the
+-- reference both time out on their own, they agree: e.g. on @x ^ n@ for a
+-- large @n@, which the reduction of Clash Core can't compute in time either.
+timedOut :: TypeEnv -> Text -> PrimReduction -> Bool -> C.Term -> IO String
+timedOut te nm r isSubj c = do
+  ported <- timesOut (onlyPortedEnv te evaluator nm r)
+  reference <- timesOut (adapterEnv te evaluator)
+  pure (if ported && reference then bothFailPrefix <> "timeout" else "timeout")
+ where
+  timesOut env = do
+    res <- try (timeout 10000000 (evaluate (length (showPpr (scopedWhnf env mempty isSubj c)))))
+    pure $ case res of
+      Right Nothing -> True
+      Right (Just _) -> False
+      Left (_ :: SomeException) -> False
 
 -- | The prefix of the failure of a call on which the ported reduction and the
 -- reference fail alike
