@@ -14,6 +14,7 @@ import qualified Data.IntMap as IntMap
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Clash.Core.Literal (Literal (IntLiteral))
 import Clash.Core.Name (NameSort (User), noSrcSpan)
 import Clash.Core.Term
   ( Bind (..), Context, CoreContext (..), Pat (..), Term (..), collectArgs
@@ -25,14 +26,15 @@ import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..))
-import Clash.Rewrite.Util (changed, liftBinding, runRewrite, whnfRW)
+import Clash.Rewrite.Util
+  (changed, isJoinPointIn, liftBinding, runRewrite, whnfRW)
 import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
   ( argUniques, assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals
   , globalId, heapLookupEvaluator, inScopeOf, intFunTy, intId, intLit
-  , localId, pairDataCon, runRewriteTest, runSingleTransformation, showPprU
-  , tyVar )
+  , intTy, localId, pairDataCon, runRewriteTest, runSingleTransformation
+  , showPprU, tyVar )
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
 
@@ -78,6 +80,47 @@ replaceBy name inScope before new = do
  where
   rw :: NormRewrite
   rw _ctx _e = changed (Var new)
+
+-- * Join points
+
+-- | The binder of the let-expressions in 'joinPointInputs'
+joinPointJ :: Id
+joinPointJ = localId User "j" 20 (intFunTy 1)
+
+-- | Let-expressions binding 'joinPointJ', and whether it is a join point in
+-- them.
+-- 'isJoinPointIn' counted the occurrences of a variable bound by a binder
+-- that shadows @j@ as tail calls of @j@. 'Clash.Normalize.Transformations.Inline.inlineOrLiftNonRep'
+-- then lifted @j@ instead of inlining it.
+joinPointInputs :: [(String, Term, Bool)]
+joinPointInputs =
+  [ ( "let j = \\z -> f z in case s of { 1 -> j 1; _ -> j 2 }"
+    , Let (NonRec j jRhs) (caseS (app j [intLit 1]) (app j [intLit 2]))
+    , True )
+  , ( "let j = (\\j -> j) f in j 1"
+    , Let (NonRec j (App (Lam j (Var j)) (Var f))) (app j [intLit 1])
+    , False )
+  , ( "letrec { j = (\\j -> j) f } in j 1"
+    , Let (Rec [(j, App (Lam j (Var j)) (Var f))]) (app j [intLit 1])
+    , False )
+  , ( "let j = \\z -> f z in case s of { 1 -> j 1; _ -> let j = f in j 2 }"
+    , Let (NonRec j jRhs)
+        (caseS (app j [intLit 1]) (Let (NonRec j (Var f)) (app j [intLit 2])))
+    , False )
+  , ( "let j = \\z -> f z in case s of { 1 -> j 1; _ -> (\\j -> j 2) f }"
+    , Let (NonRec j jRhs)
+        (caseS (app j [intLit 1]) (App (Lam j (app j [intLit 2])) (Var f)))
+    , False )
+  ]
+ where
+  j = joinPointJ
+  f = localId User "f" 21 (intFunTy 1)
+  s = intId User "s" 22
+  z = intId User "z" 23
+  jRhs = Lam z (app f [Var z])
+  app g args = mkApps (Var g) (map Left args)
+  caseS alt1 alt2 =
+    Case (Var s) intTy [(LitPat (IntLiteral 1), alt1), (DefaultPat, alt2)]
 
 -- * liftBinding
 
@@ -135,6 +178,11 @@ tests =
         applyShadowCheck
     , testCase "apply errors on unsignalled change (#1837)"
         applyUnsignalledChange
+    , testGroup "isJoinPointIn accounts for shadowing binders"
+        [ testCase name $
+            assertEqual "isJoinPointIn" expected (isJoinPointIn joinPointJ tm)
+        | (name, tm, expected) <- joinPointInputs
+        ]
 
     -- Since #2571, the evaluator uses the let-bindings in the context of the
     -- term it rewrites. Transformations using 'whnfRW' can therefore introduce
