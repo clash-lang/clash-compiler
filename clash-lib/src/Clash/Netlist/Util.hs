@@ -99,9 +99,9 @@ import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
   (LitTy (..), Type (..), TyVar, TypeView (..), coreView, normalizeType,
-   splitCoreFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
+   splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
-  (splitShouldSplit, tyLitShow)
+  (tyLitShow)
 import           Clash.Core.Var
   (Id, Var (..), mkLocalId, modifyVarName)
 import           Clash.Core.VarEnv
@@ -115,10 +115,11 @@ import           Clash.Core.Scoped.Convert
   (convScope, fromClashType, fromClashTypeClosed, withConvEnv)
 import           Clash.Core.Scoped.DataCon (dataConInstExtTyVars)
 import           Clash.Core.Scoped.Pretty ()
-import           Clash.Core.Scoped.Subst (closeType)
+import           Clash.Core.Scoped.Subst (closeType, openTyBinder)
 import           Clash.Core.Scoped.Syntax (Distinct)
 import qualified Clash.Core.Scoped.Syntax as S
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), coreView1, tyView)
+import qualified Clash.Core.Scoped.Util as S (splitShouldSplit)
 import           Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, typeEnvTyConMap)
 import qualified Clash.Core.Type as C (ConstTy (..))
 import {-# SOURCE #-} Clash.Netlist.BlackBox
@@ -2149,16 +2150,9 @@ checkTopEntityPorts
   -> ()
 checkTopEntityPorts typeTrans reprs te topId topM =
   let
-    (argTys, resTy) = splitCoreFunForallTy tcm (coreTypeOf topId)
-    -- Only value arguments carry ports; type/dictionary arguments are skipped.
-    -- 'splitShouldSplit' mirrors 'separateArguments', so the resulting types
-    -- align with the (already split) ports in the annotation.
-    valArgTys = splitShouldSplit tcm [ty | Right ty <- argTys]
-    tcm = typeEnvTyConMap te
-    convert ty = withLegacyType ty (coreTypeToHWType typeTrans reprs te)
     hwtysE =
-      flip evalState mempty $
-        sequence <$> mapM convert (valArgTys ++ [resTy])
+      flip evalState mempty $ fmap sequence $
+        withLegacyType (coreTypeOf topId) (\sc ty -> portTypes sc ty ty)
   in
     case hwtysE of
       -- A port type is polymorphic or otherwise untranslatable. Skip the check
@@ -2170,6 +2164,27 @@ checkTopEntityPorts typeTrans reprs te topId topM =
         -- Force the expansion, which throws on an invalid annotation.
         in expandTopEntityOrErr (map (Nothing,) argHwtys) (Nothing, resHwty) topM
              `seq` ()
+ where
+  -- The HWTypes of the arguments and of the result of a function type, split
+  -- like 'S.splitCoreFunForallTy' does. Only value arguments carry ports;
+  -- type/dictionary arguments are skipped. 'S.splitShouldSplit' mirrors
+  -- 'separateArguments', so the resulting types align with the (already
+  -- split) ports in the annotation.
+  portTypes
+    :: Distinct n
+    => S.Scope n
+    -> S.Type n
+    -- ^ The type, as it was before looking through it with 'S.coreView1'
+    -> S.Type n
+    -> State HWMap [Either String FilteredHWType]
+  portTypes sc origTy ty
+    | Just ty1 <- S.coreView1 te sc ty = portTypes sc origTy ty1
+    | S.ForAllTy b res <- ty =
+        openTyBinder sc b res (\sc1 _ res1 -> portTypes sc1 res1 res1)
+    | S.FunTy arg res <- S.tyView ty =
+        (++) <$> mapM (coreTypeToHWType typeTrans reprs te sc) (S.splitShouldSplit te sc [arg])
+             <*> portTypes sc res res
+    | otherwise = (:[]) <$> coreTypeToHWType typeTrans reprs te sc origTy
 
 -- | Same as 'expandTopEntity', but also adds identifiers to the identifier
 -- set of the monad.
