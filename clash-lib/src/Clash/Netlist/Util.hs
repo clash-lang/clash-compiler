@@ -108,7 +108,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, uniqAway,
    emptyInScopeSet, mkInScopeSet, unionInScope)
 import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
-import           Clash.Core.Scoped.Syntax (mkGlobalId)
+import           Clash.Core.Scoped.Syntax (GlobalId, globalIdVar)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Core.Scoped.Alpha (AlphaType (..))
 import           Clash.Core.Scoped.Convert
@@ -1698,7 +1698,7 @@ mkTopCompDecl lib attrs name instName params inputs outputs =
 
 -- | Instantiate a TopEntity, and add the proper type-conversions where needed
 mkTopUnWrapper
-  :: Id
+  :: GlobalId
   -- ^ Name of the TopEntity component
   -> ExpandedTopEntity Identifier
   -- ^ A corresponding @TopEntity@ annotation
@@ -1711,12 +1711,12 @@ mkTopUnWrapper
   -> NetlistMonad [Declaration]
 mkTopUnWrapper topEntity annM dstId args tickDecls = do
   -- component name
-  compNameM <- lookupGlobalEnv (mkGlobalId topEntity) <$> Lens.use componentNames
+  compNameM <- lookupGlobalEnv topEntity <$> Lens.use componentNames
   let
     topName = Id.toText topIdentifier
     topIdentifier = flip fromMaybe compNameM (error [I.i|
      Internal error in 'mkTopUnWrapper': tried to lookup (netlist) name
-     of #{showPpr (varName topEntity)}, but couldn't find it in NetlistState's
+     of #{showPpr (varName (globalIdVar topEntity))}, but couldn't find it in NetlistState's
      'componentNames'. This should have been put there by 'runNetlistMonad' /
      'genNames'. |])
 

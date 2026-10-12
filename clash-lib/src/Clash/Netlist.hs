@@ -805,7 +805,7 @@ mkFunApp declType dstId fun args tickDecls = do
 
         instDecls <-
           mkTopUnWrapper
-            fun expandedTopEntity (dstId, dstHWty)
+            (mkGlobalId fun) expandedTopEntity (dstId, dstHWty)
             filteredTypeExprs tickDecls
 
         return (argDecls ++ instDecls)
