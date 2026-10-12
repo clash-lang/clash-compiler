@@ -511,6 +511,7 @@ test-suite unittests
       lens,
       mtl,
       pretty-show,
+      primitive,
       quickcheck-text,
       tasty         >= 1.2      && < 1.6,
       tasty-hunit,
@@ -615,3 +616,4 @@ test-suite unittests
                  Test.Clash.Scoped.ViaFoil
                  Test.Clash.Scoped.Evaluator.Primitives
                  Test.Clash.Scoped.Gen
+                 Test.Clash.TermLiteral
