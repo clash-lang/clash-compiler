@@ -99,8 +99,8 @@ import           Clash.Core.Scoped.TypeEnv   (TypeEnv, typeEnvTyConMap)
 
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta (..))
 import qualified Clash.Netlist.Id            as Id
-import           Clash.Netlist.Scoped.BlackBox
-  (extractPrimWarnOrFail, mkBlackBoxContext)
+import           Clash.Netlist.BlackBox      (extractPrimWarnOrFail)
+import {-# SOURCE #-} Clash.Netlist.Scoped.BlackBox (mkBlackBoxContext)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Types
   (BlackBox, CommentOrDirective (..), Declaration (..), DeclarationType (..), ExpandedPortName,

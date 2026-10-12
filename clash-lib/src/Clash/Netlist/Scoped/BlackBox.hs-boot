@@ -1,0 +1,28 @@
+{-|
+  Copyright  :  (C) 2026, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  For "Clash.Netlist.Scoped.Util", which "Clash.Netlist.Scoped.BlackBox"
+  imports.
+-}
+
+module Clash.Netlist.Scoped.BlackBox
+  ( mkBlackBoxContext
+  ) where
+
+import Data.Text (Text)
+import GHC.Stack (HasCallStack)
+
+import Clash.Core.Scoped.Syntax (Distinct, Term, Type)
+import Clash.Netlist.Scoped.Types (CompCtx, LocalId)
+import Clash.Netlist.Types (BlackBoxContext, Declaration, DeclarationType, NetlistMonad)
+
+mkBlackBoxContext
+  :: (HasCallStack, Distinct n)
+  => CompCtx n
+  -> Text
+  -> DeclarationType
+  -> [LocalId n]
+  -> [Either (Term n) (Type n)]
+  -> NetlistMonad (BlackBoxContext, [Declaration])
