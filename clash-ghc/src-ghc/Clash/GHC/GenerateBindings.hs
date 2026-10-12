@@ -84,6 +84,7 @@ import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
+import           Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import           Clash.Unique            (Unique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
@@ -215,7 +216,9 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
         }
     , ClashDesign
         { designEntities = topEntities''
-        , designBindings = allBindings'
+          -- GHC2Core produces Clash Core: convert it to scoped Clash Core,
+          -- lazily per body. TODO(Phase 5, GHC2Core): remove the conversion.
+        , designBindings = fromClashBindings allBindings'
         }
     )
 

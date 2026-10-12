@@ -19,8 +19,9 @@
 
   Until Phase 5 of the port, GHC2Core produces bindings of Clash Core, and
   Netlist consumes them. 'fromClashBindings' converts them into closed terms
-  when the normalizer starts, and 'toClashBindingsM' converts the normalized
-  ones back. These are the only conversions of the normalizer.
+  at the end of 'Clash.GHC.GenerateBindings.generateBindings', and
+  'toClashBindings' converts the normalized ones back at the start of
+  'Clash.Netlist.genNetlist'. The normalizer itself converts no bindings.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -36,7 +37,6 @@ module Clash.Rewrite.Scoped.Globals
     -- * The boundary with Clash Core
   , fromClashBindings
   , toClashBindings
-  , toClashBindingsM
   , toClashTermFresh
   ) where
 
@@ -154,13 +154,6 @@ toClashBindings sup bndrs =
   conv (g, b) = do
     tm <- toClashTermFreshClosed (bindingTerm b)
     pure (g, b {bindingTerm = tm})
-
--- | 'toClashBindings' with a split of the unique supply of the rewrite state
-toClashBindingsM
-  :: HasCallStack
-  => GlobalEnv (Binding (Term 'VoidS))
-  -> RewriteMonad extra BindingMap
-toClashBindingsM bndrs = (`toClashBindings` bndrs) <$> splitUniqSupply
 
 -- | A closed term as a term of Clash Core whose binders get fresh uniques
 -- from the unique supply of the rewrite state, see "Clash.Core.Scoped.Convert.Fresh"
