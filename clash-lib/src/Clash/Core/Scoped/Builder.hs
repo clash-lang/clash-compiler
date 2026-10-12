@@ -107,6 +107,9 @@ module Clash.Core.Scoped.Builder
     -- * Building
   , runClosedTerm
   , runClosedType
+  , runDataConSig
+  , runNewTyConSig
+  , runTyFamEqn
   ) where
 
 import Control.DeepSeq (NFData (..))
@@ -129,6 +132,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Unique (Unique)
 
+import Clash.Core.Scoped.Sig (DataConSig (..), NewTyConSig (..), TyFamEqn (..))
 import Clash.Core.Scoped.Subst (withFreshIdBinder, withFreshTyBinder)
 import Clash.Core.Scoped.Syntax
 
@@ -209,18 +213,64 @@ withIdBinder (BEnv sc tys tms sup) key occ ty cont = do
 
 -- | Build a closed term. Errors on variables that are not in scope.
 runClosedTerm :: HasCallStack => TmB -> Term 'VoidS
-runClosedTerm tm = runST $ do
-  a <- newByteArray 8
-  writeByteArray a 0 (1 :: Int)
-  run (tmbRun tm) (BEnv emptyScope IntMap.empty IntMap.empty (Supply a))
+runClosedTerm tm = runClosed (run (tmbRun tm))
 
 -- | Build a closed type. Errors on type variables that are not in scope.
 runClosedType :: HasCallStack => TyB -> Type 'VoidS
 runClosedType (TyClosed t) = t
-runClosedType (TyOpen r) = runST $ do
+runClosedType (TyOpen r) = runClosed (run r)
+
+-- | Run phase 2 in the empty scope
+runClosed :: (forall s. BEnv s 'VoidS -> ST s r) -> r
+runClosed f = runST $ do
   a <- newByteArray 8
   writeByteArray a 0 (1 :: Int)
-  run r (BEnv emptyScope IntMap.empty IntMap.empty (Supply a))
+  f (BEnv emptyScope IntMap.empty IntMap.empty (Supply a))
+
+-- | Build the signature of a data constructor (see "Clash.Core.Scoped.Sig"):
+-- the keys, names and kinds of its universally quantified type variables, of
+-- its existentially quantified ones, and the types of its fields. Errors on
+-- type variables that are not in scope.
+runDataConSig
+  :: HasCallStack
+  => [(Key, C.Name C.Type, TyB)]
+  -> [(Key, C.Name C.Type, TyB)]
+  -> [TyB]
+  -> DataConSig
+runDataConSig univ ext args = runClosed $ \env0 ->
+  withTyBinders env0 univ $ \env1 univ' ->
+    withTyBinders env1 ext $ \env2 ext' ->
+      DataConSig univ' ext' <$> mapM (`runTyB` env2) args
+
+-- | Build the signature of a newtype (see "Clash.Core.Scoped.Sig"): the keys,
+-- names and kinds of its type variables, and its eta-reduced representation
+-- type. Errors on type variables that are not in scope.
+runNewTyConSig :: HasCallStack => [(Key, C.Name C.Type, TyB)] -> TyB -> NewTyConSig
+runNewTyConSig tvs rhs = runClosed $ \env0 ->
+  withTyBinders env0 tvs $ \env1 tvs' -> NewTyConSig tvs' <$> runTyB rhs env1
+
+-- | Build an equation of a type family (see "Clash.Core.Scoped.Sig"): the
+-- keys, names and kinds of its pattern variables, the patterns of its
+-- left-hand side, and its right-hand side. Errors on type variables that are
+-- not in scope.
+runTyFamEqn :: HasCallStack => [(Key, C.Name C.Type, TyB)] -> [TyB] -> TyB -> TyFamEqn
+runTyFamEqn tvs lhs rhs = runClosed $ \env0 ->
+  withTyBinders env0 tvs $ \env1 tvs' ->
+    TyFamEqn tvs' <$> mapM (`runTyB` env1) lhs <*> runTyB rhs env1
+
+-- | Bind type variables, in order: the kind of each may mention the ones
+-- before it
+withTyBinders
+  :: Distinct x
+  => BEnv s x
+  -> [(Key, C.Name C.Type, TyB)]
+  -> (forall l. DExt x l => BEnv s l -> Tele TyBinder x l -> ST s r)
+  -> ST s r
+withTyBinders env [] k = k env TNil
+withTyBinders env ((key, occ, ki):bs) k = do
+  ki' <- runTyB ki env
+  withTyBinder env key occ ki' $ \env1 b ->
+    withTyBinders env1 bs $ \env2 bs' -> k env2 (TCons b bs')
 
 -- * Types
 
@@ -440,21 +490,9 @@ dataAltB !dc !tvs0 !ids0 !e =
  where
   go0 :: Distinct n => BEnv s n -> ST s (Alt n)
   go0 env =
-    tyBinders env tvs0 $ \env1 tvs ->
+    withTyBinders env tvs0 $ \env1 tvs ->
       idBinders env1 ids0 $ \env2 ids ->
         Alt (DataPat dc tvs ids) <$> runTmB e env2
-
-  tyBinders
-    :: Distinct x
-    => BEnv s x
-    -> [(Key, C.Name C.Type, TyB)]
-    -> (forall l. DExt x l => BEnv s l -> Tele TyBinder x l -> ST s r)
-    -> ST s r
-  tyBinders env [] k = k env TNil
-  tyBinders env ((key, occ, ki):bs) k = do
-    ki' <- runTyB ki env
-    withTyBinder env key occ ki' $ \env1 b ->
-      tyBinders env1 bs $ \env2 bs' -> k env2 (TCons b bs')
 
   idBinders
     :: Distinct x
