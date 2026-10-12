@@ -29,7 +29,8 @@ import Clash.Core.Var (Var (..))
 import Clash.Core.VarEnv (eltsVarEnv, mkInScopeSet, mkVarSet)
 import Clash.Driver.Types
 import Clash.GHC.Evaluator (evaluator)
-import Clash.Util.Supply (newSupply)
+import Clash.Rewrite.Scoped.Globals (toClashBindings)
+import Clash.Util.Supply (newSupply, splitSupply)
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.CoreTest
@@ -55,9 +56,10 @@ mainCommon
   -> IO ()
 mainCommon hdl = do
   (env, design, _) <- runToCoreStage hdl id testPath
-  supply <- newSupply
+  (convSupply, supply) <- splitSupply <$> newSupply
   let tcm = envTyConMap env
-      bm = designBindings design
+      -- The evaluator of Clash Core, on Clash Core
+      bm = toClashBindings convSupply (designBindings design)
   te <- case List.find ((== "DTFoldBinderTypes.topEntity") . nameOcc . varName . bindingId) (eltsVarEnv bm) of
     Just b -> pure (bindingTerm b)
     Nothing -> error "Could not find topEntity"

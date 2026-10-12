@@ -75,7 +75,8 @@ import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv')
-import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
+import           Clash.Driver.Types
+  (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
@@ -83,6 +84,8 @@ import           Clash.Netlist.Util
 import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
+import qualified Clash.Util.Supply                as Supply
+import           Clash.Rewrite.Scoped.Globals     (toClashBindings)
 import Clash.Core.Evaluator.Types (Evaluator)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
@@ -93,7 +96,7 @@ genNetlist
   -- ^ The whnf evaluator, to evaluate the attributes of 'Attributes' ticks
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> BindingMap
+  -> GlobalBindings
   -- ^ Global binders
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
@@ -116,13 +119,16 @@ genNetlist
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
 genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
+  -- Netlist generation runs on Clash Core: convert the bindings of scoped
+  -- Clash Core. TODO(Phase 5, Netlist): remove the conversion.
+  supply <- Supply.newSupply
+  let globalsC = toClashBindings supply globals
+      (componentNames_, seen1) =
+        genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globalsC
   ((_meta, topComponent), s) <-
-    runNetlistMonad env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
+    runNetlistMonad env eval isTb globalsC tops typeTrans ite be seen1 dir componentNames_
       $ genComponent topEntity
   return (topComponent, _components s, seen1)
- where
-  (componentNames_, seen1) =
-    genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad

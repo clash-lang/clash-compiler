@@ -26,14 +26,14 @@ import qualified GHC
   (DynFlags, ModSummary (..), extensionFlags, moduleName, moduleNameString)
 import           Clash.Core.Name        (nameOcc)
 import           Clash.Core.Var         (varName)
-import           Clash.Normalize.Util   (collectCallGraphUniques, callGraph)
+import           Clash.Core.Scoped.NameMap (memberGlobalSet)
+import           Clash.Core.Scoped.Syntax (mkGlobalId)
+import           Clash.Normalize.Scoped.Util (callGraph, callGraphGlobals)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Util             (ClashException(..), noSrcSpan)
-import           Clash.Unique           (getUnique)
 import           Control.Exception      (throw)
 import           Data.List              (isSuffixOf)
 import qualified Data.Text              as Text
-import qualified Data.HashSet           as HashSet
 import qualified GHC.LanguageExtensions as LangExt (Extension (..))
 import           GHC.Stack              (HasCallStack)
 
@@ -60,10 +60,10 @@ getMainTopEntity modName design nm =
     [t] ->
       let
         bindingMap = designBindings design
-        closure0 = collectCallGraphUniques (callGraph bindingMap (topId t))
-        closure1 = HashSet.delete (getUnique (topId t)) closure0
+        closure = callGraphGlobals (callGraph bindingMap (mkGlobalId (topId t)))
+        inClosure t' = topId t' /= topId t && mkGlobalId (topId t') `memberGlobalSet` closure
       in
-        pure (t, filter ((`HashSet.member` closure1) . getUnique . topId) (designEntities design))
+        pure (t, filter inClosure (designEntities design))
     ts ->
       error $ [I.i|
         Internal error: multiple top entities called #{nm} (#{map topId ts})

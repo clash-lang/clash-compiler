@@ -11,6 +11,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -22,7 +23,7 @@ module Clash.Driver.Types where
 -- For Int/Word size
 #include "MachDeps.h"
 
-import           Control.DeepSeq                (NFData(rnf), deepseq)
+import           Control.DeepSeq                (NFData(rnf))
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
@@ -50,6 +51,8 @@ import           Clash.Signal.Internal
 
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
+import           Clash.Core.Scoped.NameMap      (GlobalEnv)
+import qualified Clash.Core.Scoped.Syntax       as Scoped
 import           Clash.Core.Term                (Term)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
@@ -71,14 +74,22 @@ data ClashEnv = ClashEnv
 
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
-  , designBindings :: BindingMap
+  , designBindings :: GlobalBindings
   }
 
+-- | Forces the bindings, but not their bodies: GHC2Core produces bindings of
+-- Clash Core, which 'Clash.GHC.GenerateBindings.generateBindings' converts to
+-- scoped Clash Core when a body is first used, see
+-- 'Clash.Rewrite.Scoped.Globals.fromClashBindings'. Forcing the bindings
+-- forces GHC2Core's conversion of the bodies, as forcing the bodies of Clash
+-- Core used to.
+--
+-- TODO(Phase 5, GHC2Core): force the bodies too, once GHC2Core produces
+-- scoped Clash Core.
 instance NFData ClashDesign where
   rnf design =
     designEntities design `seq`
-    designBindings design `deepseq`
-    ()
+    rnf (fmap (() <$) (designBindings design))
 
 data IsPrim
   = IsPrim
@@ -115,6 +126,12 @@ data Binding a = Binding
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
 type BindingMap = VarEnv (Binding Term)
+
+-- | Global function binders of scoped Clash Core ("Clash.Core.Scoped.Syntax"):
+-- closed terms, keyed by their 'Clash.Core.Scoped.Syntax.GlobalId'.
+--
+-- Global functions cannot be mutually recursive, only self-recursive.
+type GlobalBindings = GlobalEnv (Binding (Scoped.Term 'Scoped.VoidS))
 type DomainMap = HashMap Text VDomainConfiguration
 
 -- | Information to show about transformations during compilation.

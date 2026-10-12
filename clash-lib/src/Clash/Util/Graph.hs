@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 
 module Clash.Util.Graph
   ( topSort
@@ -30,11 +31,10 @@ import           Data.IntSet           (IntSet)
 import qualified Data.IntSet           as IntSet
 #endif
 
-import           Clash.Core.Var (Id)
-import           Clash.Core.Term (Term)
-import qualified Clash.Data.UniqMap as UniqMap
-import           Clash.Driver.Types (BindingMap, Binding (bindingTerm))
-import           Clash.Normalize.Util (callGraph)
+import           Clash.Core.Scoped.NameMap (globalEnvKeys, lookupGlobalEnv)
+import           Clash.Core.Scoped.Syntax (GlobalId, S (VoidS), Term)
+import           Clash.Driver.Types (Binding (bindingTerm), GlobalBindings)
+import           Clash.Normalize.Scoped.Util (callGraph)
 import           Clash.Unique (Unique)
 
 #ifdef UNIQUE_IS_WORD64
@@ -158,12 +158,13 @@ reverseTopSort nodes edges =
 
 -- | Get all the terms corresponding to a call graph
 callGraphBindings
-  :: BindingMap
+  :: GlobalBindings
   -- ^ All bindings
-  -> Id
+  -> GlobalId
   -- ^ Root of the call graph
-  -> [Term]
+  -> [Term 'VoidS]
+  -- ^ In the order of the uniques of their globals
 callGraphBindings bindingsMap tm =
-  map (bindingTerm . (`UniqMap.find` bindingsMap)) (UniqMap.keys cg)
+  [ bindingTerm b | g <- globalEnvKeys cg, Just b <- [lookupGlobalEnv g bindingsMap] ]
   where
     cg = callGraph bindingsMap tm

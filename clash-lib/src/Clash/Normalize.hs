@@ -10,10 +10,11 @@
 
   The normalizer runs on scoped Clash Core ("Clash.Core.Scoped.Syntax"): the
   global bindings are closed terms. Until GHC2Core and Netlist are ported
-  (Phase 5 of the port), 'runNormalization' converts the bindings of Clash
-  Core it is given ('Clash.Rewrite.Scoped.Globals.fromClashBindings'), and
-  'Clash.Rewrite.Scoped.Globals.toClashBindingsM' converts the normalized ones
-  back.
+  (Phase 5 of the port), 'Clash.GHC.GenerateBindings.generateBindings'
+  converts the bindings of Clash Core that GHC2Core produces
+  ('Clash.Rewrite.Scoped.Globals.fromClashBindings'), and
+  'Clash.Netlist.genNetlist' converts the normalized ones back
+  ('Clash.Rewrite.Scoped.Globals.toClashBindings').
 -}
 
 {-# LANGUAGE CPP #-}
@@ -75,9 +76,10 @@ import           Clash.Core.Type                  (isPolyTy)
 import           Clash.Core.Var                   (Id, varName, varType)
 import           Clash.Core.VarEnv
   (elemVarSet, emptyVarEnv, mkVarSet)
+import qualified Clash.Data.UniqMap               as UniqMap
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
-  (BindingMap, Binding(..), DebugOpts(..), ClashEnv(..))
+  (Binding(..), DebugOpts(..), ClashEnv(..), GlobalBindings)
 import           Clash.Netlist.Types
   (HWMap, FilteredHWType(..))
 import           Clash.Normalize.Strategy         (constantPropagation, normalization)
@@ -113,15 +115,14 @@ import           Clash.Core.Scoped.Term
   (AbsBinder (..), collectArgsTicks, collectTicks, mkApps, mkTicks, openBndrs,
    stripTicks)
 import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
-import           Clash.Rewrite.Scoped.Globals     (fromClashBindings)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
   :: ClashEnv
   -> Supply
   -- ^ UniqueSupply
-  -> BindingMap
-  -- ^ Global Binders, converted to scoped Clash Core, see the module header
+  -> GlobalBindings
+  -- ^ Global Binders
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
@@ -143,7 +144,7 @@ runNormalization env supply globals typeTrans eval rcsMap topEnts m =
                   typeTrans
                   eval
                   (mkVarSet topEnts)
-                  (addGlobalTypes (fmap bindingId globals) (mkTypeEnv (envTyConMap env)))
+                  (addGlobalTypes globalVars (mkTypeEnv (envTyConMap env)))
 
     rwState   = RewriteState
                   { _transformCounter = 0
@@ -157,11 +158,13 @@ runNormalization env supply globals typeTrans eval rcsMap topEnts m =
                   , _nameCounter = 0
                   , _globalHeap = (IntMap.empty, 0)
                   , _workFreeBinders = emptyVarEnv
-                  , _scopedBindings = fromClashBindings globals
+                  , _scopedBindings = globals
                   , _scopedWorkFreeBinders = emptyGlobalEnv
                   , _hwTypeCache = Map.empty
                   , _extra = normState
                   }
+
+    globalVars = UniqMap.fromList [(globalIdVar g, globalIdVar g) | g <- globalEnvKeys globals]
 
     normState = NormalizeState
                   { _normalized = emptyVarEnv

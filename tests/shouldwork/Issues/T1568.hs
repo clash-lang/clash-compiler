@@ -8,8 +8,8 @@ import Clash.Prelude
 
 import Clash.Backend
 import Clash.Core.Name
+import Clash.Core.Scoped.NameMap (globalEnvElems)
 import Clash.Core.Var
-import Clash.Core.VarEnv
 import Clash.Driver.Types
 import GHC.BasicTypes.Extra
 
@@ -44,7 +44,7 @@ mainCommon hdl = do
   checkTE "T1568.f" bm
   checkTE "T1568.topEntity" bm
  where
-  findBinding n = List.find (withName n) . eltsVarEnv
+  findBinding n = List.find (withName n) . globalEnvElems
   withName n b = nameOcc (varName (bindingId b)) == n
 
   checkTE n bm =

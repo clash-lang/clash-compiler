@@ -54,6 +54,8 @@ import           Text.Read (readMaybe)
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Core.Name (nameOcc)
+import           Clash.Core.Scoped.Binary ()
+import           Clash.Core.Scoped.Syntax (mkGlobalId)
 import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
@@ -419,7 +421,7 @@ readFreshManifest ::
   [TopEntityT] ->
   -- | Core expressions and entry point. Any changes in the call graph will
   -- trigger a recompile.
-  (BindingMap, Id) ->
+  (GlobalBindings, Id) ->
   -- | Any changes in any primitive will trigger a recompile.
   CompiledPrimMap ->
   -- | Certain options will trigger recompiles if changed
@@ -496,7 +498,7 @@ readFreshManifest tops (bindingsMap, topId) primMap opts@(ClashOpts{..}) clashMo
     { dshTops = Sha256.hashlazy (Binary.encode tops)
     , dshPrimMap = Sha256.hashlazy (Binary.encode (hashCompiledPrimMap primMap))
     , dshClashModDate = Sha256.hashlazy (Binary.encode (show clashModDate))
-    , dshCallGraph = Sha256.hashlazy (Binary.encode (callGraphBindings bindingsMap topId))
+    , dshCallGraph = Sha256.hashlazy (Binary.encode (callGraphBindings bindingsMap (mkGlobalId topId)))
     , dshOpts = Sha256.hashlazy (Binary.encode optsHash)
     }
 

@@ -107,7 +107,7 @@ import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
   (Id, varName, varUniq, varType)
 import           Clash.Core.VarEnv
-  (elemVarEnv, lookupVarEnv, lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
+  (lookupVarEnv', mkVarEnv, lookupVarEnvDirectly, eltsVarEnv, VarEnv)
 import           Clash.Debug                      (debugIsOn)
 import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
 import           Clash.Driver.Types
@@ -125,10 +125,10 @@ import           Clash.Netlist.Types
 import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
-import           Clash.Core.Scoped.NameMap        (emptyGlobalEnv)
+import           Clash.Core.Scoped.NameMap        (emptyGlobalEnv, lookupGlobalEnv, memberGlobalEnv)
 import           Clash.Core.Scoped.Syntax         (mkGlobalId)
-import           Clash.Rewrite.Scoped.Globals     (toClashBindingsM)
-import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
+import           Clash.Normalize.Scoped.Util      (callGraph)
+import           Clash.Normalize.Util             (tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
 import qualified Clash.Primitives.Sized.Vector    as P
@@ -228,11 +228,11 @@ splitTopAnn _tcm _sp _typ t = t
 splitTopEntityT
   :: HasCallStack
   => TyConMap
-  -> BindingMap
+  -> GlobalBindings
   -> TopEntityT
   -> TopEntityT
 splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
-  case lookupVarEnv id_ bindingsMap of
+  case lookupGlobalEnv (mkGlobalId id_) bindingsMap of
     Just (Binding _id sp _ _ _ _) ->
       tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf id_) t)}
     Nothing ->
@@ -524,8 +524,7 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
 
       let
         depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
-        depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
-        depIds = map bindingId depBindings
+        depIds = mapMaybe (fmap topId . flip lookupVarEnvDirectly topEntityMap) depUniques
 
         manifest =
           mkManifest
@@ -1170,7 +1169,7 @@ copyDataFiles targetDir = mapM copyDataFile
 -- | Normalize a complete hierarchy
 normalizeEntity
   :: ClashEnv
-  -> BindingMap
+  -> GlobalBindings
   -- ^ All bindings
   -> (CustomReprs -> TyConMap -> Type ->
       State HWMap (Maybe (Either String FilteredHWType)))
@@ -1183,17 +1182,13 @@ normalizeEntity
   -- ^ Unique supply
   -> Id
   -- ^ root of the hierarchy
-  -> IO BindingMap
+  -> IO GlobalBindings
 normalizeEntity env bindingsMap typeTrans eval topEntities supply tm = transformedBindings
   where
-    -- The normalizer runs on scoped Clash Core: 'runNormalization' converts
-    -- the bindings, and 'toClashBindingsM' converts the normalized ones back,
-    -- see "Clash.Normalize"
     doNorm = do let top = mkGlobalId tm
                 norm <- normalize [top]
                 let normChecked = checkNonRecursive norm
-                cleaned <- cleanupGraph top normChecked
-                toClashBindingsM cleaned
+                cleanupGraph top normChecked
     transformedBindings = runNormalization env supply bindingsMap
                             typeTrans eval emptyGlobalEnv
                             topEntities doNorm
@@ -1201,7 +1196,7 @@ normalizeEntity env bindingsMap typeTrans eval topEntities supply tm = transform
 -- | Reverse topologically sort given top entities. Also returns a mapping that
 -- maps a top entity to its reverse topologically sorted transitive dependencies.
 sortTop ::
-  BindingMap ->
+  GlobalBindings ->
   [TopEntityT] ->
   ( [TopEntityT]
   , HashMap Unique [Unique]
@@ -1220,8 +1215,8 @@ sortTop bindingsMap topEntities =
       (getTransitiveRefs topE)
 
   getTransitiveRefs top =
-    let allDeps = callGraph bindingsMap top
-    in  filter (\t -> topId t /= top && topId t `elemVarEnv` allDeps) topEntities
+    let allDeps = callGraph bindingsMap (mkGlobalId top)
+    in  filter (\t -> topId t /= top && mkGlobalId (topId t) `memberGlobalEnv` allDeps) topEntities
 
   topToUnique = varUniq . topId
 
