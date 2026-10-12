@@ -48,6 +48,7 @@ import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Bifunctor                   (second)
 import           Data.Either                      (lefts, partitionEithers)
+import           Data.List                        (elemIndex)
 import           Data.List.Extra                  (zipEqual)
 import           Data.List.NonEmpty               (NonEmpty (..))
 import qualified Data.List.NonEmpty               as NE
@@ -76,7 +77,7 @@ import qualified Clash.Netlist.Types              as HW (Expr (Literal))
 import           Clash.Netlist.Types              as HW
   hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
 import           Clash.Netlist.Util
-  (contAssign, coreTypeToHWTypeM', isVoid, isVoidMaybe, mkLiteral, procAssign)
+  (contAssign, coreTypeToHWTypeM', isVoid, isVoidMaybe, mkInit, mkLiteral, procAssign)
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Evaluator.Types       (Evaluator)
@@ -84,7 +85,9 @@ import           Clash.Core.Evaluator.Types       (Evaluator)
 import           Clash.Core.Scoped.Convert        (toClashType)
 import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap        (GlobalEnv, lookupGlobalEnv)
-import           Clash.Core.Scoped.Subst          (openBind, teleIdVars)
+import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNameBinders)
+import           Clash.Core.Scoped.Subst
+  (openAlt, openBind, patVars, teleIdBinderTypes, teleIdVars)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
   (collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
@@ -437,8 +440,9 @@ mkSelection ctx declType bndr scrut altTy alts tickDecls =
         (alt' :| alts') tickDecls
     _ -> error ($(curLoc) ++ "impossible")
 
--- | Generate an expression that projects a field out of a data-constructor:
--- see 'Clash.Netlist.mkProjection'
+-- | Generate an expression that projects a field out of a data-constructor.
+--
+-- Works for both product types, as sum-of-product types.
 mkProjection
   :: Distinct n
   => CompCtx n
@@ -454,11 +458,92 @@ mkProjection
   -> Alt n
   -- ^ The field to be projected
   -> NetlistMonad (Expr, [Declaration])
-mkProjection ctx declType mkDec bndr scrut altTy alt =
-  case toLegacy ctx (Case scrut altTy [alt]) of
-    C.Case scrut' altTy' [alt'] ->
-      Legacy.mkProjection declType mkDec (toLegacyNetlistId ctx bndr) scrut' altTy' alt'
-    _ -> error ($(curLoc) ++ "impossible")
+mkProjection ctx declType mkDec bndr scrut altTy alt = do
+  let assignTy = declTypeUsage declType
+      scrutTy = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) scrut
+      e = Case scrut scrutTy [alt]
+  (_,sp) <- Lens.use curCompNm
+  withAlt ctx alt $ \ctxAlt pat v -> do
+    varTm <- case v of
+      Var _ _ n -> return n
+      _ -> throw (ClashException sp ($(curLoc) ++
+                  "Not in normal form: RHS of case-projection is not a variable:\n\n"
+                   ++ showPpr (toLegacy ctx e)) Nothing)
+    sHwTy <- hwTypeOf $(curLoc) scrutTy
+    vHwTy <- hwTypeOf $(curLoc) altTy
+    scrutRendered <- do
+      scrutNm <-
+        netlistId1
+          Id.next
+          (\b -> Id.suffix (localIdentifier ctx (localIdName b)) "projection")
+          bndr
+      (scrutExpr,newDecls) <- mkExpr ctx False declType (NetlistId scrutNm scrutTy) scrut
+      case scrutExpr of
+        Identifier newId modM ->
+          pure (Right (newId, modM, newDecls))
+        Noop ->
+          -- Scrutinee was a zero-width / void construct. We need to render its
+          -- declarations, but it's no use assigning it to a new variable.
+          -- TODO: Figure out whether we need to render alternatives too.
+          -- TODO: seems useless?
+          pure (Left newDecls)
+        _ -> do
+          scrutDecl <- mkInit declType assignTy scrutNm sHwTy scrutExpr
+          pure (Right (scrutNm, Nothing, newDecls ++ scrutDecl))
+
+    case scrutRendered of
+      Left newDecls -> pure (Noop, newDecls)
+      -- The projected field is zero-width / void, so it is filtered out of the
+      -- subject's fields below and there is nothing to select. Rendering it
+      -- anyway would reference the pattern's binder, which is never declared.
+      Right (_, _, decls) | isVoid vHwTy -> pure (Noop, decls)
+      Right (selId, modM, decls) -> do
+        let altVarId = localIdentifier ctxAlt varTm
+        modifier <- case pat of
+          DataPat dc exts tms -> do
+            let
+              fields = [ (n, ty) | Var _ ty n <- snd (patVars pat) ]
+              fields' =
+                if bindsExistentials exts tms then
+                  throw (ClashException sp ($(curLoc)
+                    ++ "Not in normal form: Pattern binds existential variables:\n\n"
+                    ++ showPpr (toLegacy ctx e)) Nothing)
+                else
+                  fields
+            argHWTys <- mapM (hwTypeOfMaybe . snd) fields
+            let tmsBundled   = zip argHWTys fields'
+                tmsFiltered  = filter (maybe False (not . isVoid) . fst) tmsBundled
+                tmsFiltered' = map (fst . snd) tmsFiltered
+            case elemIndex varTm tmsFiltered' of
+              Nothing -> pure Nothing
+              Just fI
+                | sHwTy /= vHwTy ->
+                  pure $ nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
+                -- When element and subject have the same HW-type,
+                -- then the projections is just the identity
+                | otherwise ->
+                  pure $ nestModifier modM (Just (DC (Void Nothing,0)))
+          _ -> throw (ClashException sp ($(curLoc)
+                 ++ "Not in normal form: Unexpected pattern in case-projection:\n\n"
+                 ++ showPpr (toLegacy ctx e)) Nothing)
+        let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+        case bndr of
+          NetlistId scrutNm _ | mkDec -> do
+            scrutNm' <- Id.next scrutNm
+            scrutDecl <- mkInit declType assignTy scrutNm' vHwTy extractExpr
+            return (Identifier scrutNm' Nothing, scrutDecl ++ decls)
+          MultiId {} -> error "mkProjection: MultiId"
+          _ -> return (extractExpr,decls)
+  where
+    nestModifier Nothing  m          = m
+    nestModifier m Nothing           = m
+    nestModifier (Just m1) (Just m2) = Just (Nested m1 m2)
+
+-- | Whether the types of the fields of a pattern mention its existential type
+-- variables, see 'Clash.Netlist.Util.bindsExistentials'
+bindsExistentials :: Tele TyBinder n i -> Tele IdBinder i l -> Bool
+bindsExistentials exts tms =
+  any (anyBoundOccursInType (teleNameBinders exts)) (teleIdBinderTypes tms)
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication
@@ -625,6 +710,24 @@ mkDcApplication ctx declType dstHTypes (MultiId argNms) _ args = do
 mkDcApplication _ _ _ _ _ _ = error "internal error"
 
 -- * Utilities
+
+-- | Open a case alternative, and give the variables its pattern binds their
+-- human readable names as HDL identifiers: those of Clash Core, see
+-- 'Clash.Netlist.Id.unsafeFromCoreId'. Netlist only refers to the field
+-- binders of projections ('mkProjection').
+withAlt
+  :: Distinct n
+  => CompCtx n
+  -> Alt n
+  -> (forall l. DExt n l => CompCtx l -> Pat n l -> Term l -> r)
+  -> r
+withAlt ctx alt k = openAlt (compScope ctx) alt $ \sc pat e ->
+  let (tvs, ids) = patVars pat
+      ctxTy = extendCompCtxTy sc [ (o, kd, nm) | VarTy o kd nm <- tvs ] ctx
+      ctx' = extendCompCtx sc
+               [ (LocalId o ty nm, Id.unsafeMake (C.nameOcc o)) | Var o ty nm <- ids ]
+               ctxTy
+  in k ctx' pat e
 
 -- | The HDL identifier of a 'NetlistId', fails on 'MultiId'
 netlistIdentifier :: HasCallStack => CompCtx n -> NetlistId n -> Identifier
