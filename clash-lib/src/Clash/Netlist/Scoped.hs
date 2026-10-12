@@ -19,8 +19,10 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -43,25 +45,30 @@ module Clash.Netlist.Scoped
 import           Control.Exception                (throw)
 import           Control.Lens                     ((.=), (<~))
 import qualified Control.Lens                     as Lens
+import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
-import           Data.Bifunctor                   (second)
+import           Data.Bifunctor                   (first, second)
 import           Data.Either                      (lefts, partitionEithers)
-import           Data.List                        (elemIndex)
+import           Data.Char                        (ord)
+import           Data.List                        (elemIndex, partition)
 import           Data.List.Extra                  (zipEqual)
 import           Data.List.NonEmpty               (NonEmpty (..))
-import qualified Data.List.NonEmpty               as NE
+import qualified Data.List.NonEmpty.Extra         as NE
 import           Data.Maybe                       (fromMaybe)
 import qualified Data.Text                        as StrictText
 import           Data.Text.Extra                  (showt)
 import           GHC.Num.Integer                  (Integer (..))
 import           GHC.Num.Natural                  (Natural (..))
 import           GHC.Stack                        (HasCallStack)
+import qualified GHC.Types.SrcLoc                 as GHC (SrcSpan)
 
-import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+import           Clash.Annotations.BitRepresentation.Internal
+  (ConstrRepr' (..), CustomReprs, DataRepr' (..), Type' (..), getConstrRepr, getDataRepr)
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType               (coreTypeOf)
+import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
 import qualified Clash.Core.Name                  as C (nameOcc)
 import qualified Clash.Core.Term                  as C
@@ -73,17 +80,21 @@ import           Clash.Driver.Types
 import           Clash.Netlist                    (genNames, runNetlistMonad)
 import qualified Clash.Netlist                    as Legacy
 import qualified Clash.Netlist.Id                 as Id
-import qualified Clash.Netlist.Types              as HW (Expr (Literal))
+import qualified Clash.Netlist.Types              as HW (Expr (Literal), Literal)
 import           Clash.Netlist.Types              as HW
   hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
 import           Clash.Netlist.Util
-  (contAssign, coreTypeToHWTypeM', isVoid, isVoidMaybe, mkInit, mkLiteral, procAssign)
+  (condAssign, contAssign, coreTypeToHWTypeM', dcToLiteral, isVoid, isVoidMaybe, mkInit, mkLiteral,
+   procAssign)
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Evaluator.Types       (Evaluator)
 
+import           Clash.Core.Scoped.Alpha          (aeqTy)
 import           Clash.Core.Scoped.Convert        (toClashType)
 import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
+import           Clash.Core.Scoped.Type           (coreView)
+import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Scoped.NameMap        (GlobalEnv, lookupGlobalEnv)
 import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNameBinders)
 import           Clash.Core.Scoped.Subst
@@ -93,7 +104,6 @@ import           Clash.Core.Scoped.Term
   (collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 
 import           Clash.Netlist.Scoped.BlackBox    (mkPrimitive)
-import           Clash.Netlist.Scoped.Legacy      (toLegacyNetlistId)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
   (UniqueNormalized (..), mkUniqueNormalized, splitNormalized,
@@ -422,9 +432,10 @@ mkFunApp ctx declType dstId fun args =
     (lefts (toLegacyArgs ctx (map Left args)))
 
 -- | Generate a declaration that selects an alternative based on the value of
--- the scrutinee: see 'Clash.Netlist.mkSelection'
+-- the scrutinee
 mkSelection
-  :: Distinct n
+  :: forall n
+   . Distinct n
   => CompCtx n
   -> DeclarationType
   -> NetlistId n
@@ -433,12 +444,196 @@ mkSelection
   -> NonEmpty (Alt n)
   -> [Declaration]
   -> NetlistMonad [Declaration]
-mkSelection ctx declType bndr scrut altTy alts tickDecls =
-  case toLegacy ctx (Case scrut altTy (NE.toList alts)) of
-    C.Case scrut' altTy' (alt':alts') ->
-      Legacy.mkSelection declType (toLegacyNetlistId ctx bndr) scrut' altTy'
-        (alt' :| alts') tickDecls
-    _ -> error ($(curLoc) ++ "impossible")
+mkSelection ctx declType bndr scrut altTy alts0 tickDecls = do
+  let dstId = netlistIdentifier ctx bndr
+      scrutTy = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) scrut
+  scrutHTy <- hwTypeOf $(curLoc) scrutTy
+  scrutId  <- Id.suffix dstId "selection"
+  (_,sp) <- Lens.use curCompNm
+  ite <- Lens.use backEndITE
+  altHTy <- hwTypeOf $(curLoc) altTy
+  let e = Case scrut altTy (NE.toList alts0)
+  case iteAlts scrutHTy alts0 of
+    Just (altT,altF)
+      | ite
+      , Concurrent <- declType
+      -> do
+      (scrutExpr,scrutDecls) <- case scrutHTy of
+        SP {} -> first (mkScrutExpr sp scrutHTy (NE.last alts0)) <$>
+                   mkExpr ctx True declType (NetlistId scrutId scrutTy) scrut
+        _ -> mkExpr ctx False declType (NetlistId scrutId scrutTy) scrut
+      altTId <- Id.suffix dstId "sel_alt_t"
+      altFId <- Id.suffix dstId "sel_alt_f"
+      (altTExpr,altTDecls) <- mkAltExpr altTId altT
+      (altFExpr,altFDecls) <- mkAltExpr altFId altF
+      -- This logic (and the same logic a few lines below) is faulty in the
+      -- sense that it won't generate "void decls" if the alternatives' type
+      -- is void, but the type of the scrut isn't. Ideally, we'd like to pass
+      -- a boolean to 'mkExpr' indicating that it should only render "void decls"
+      -- but that it should skip any others.
+      --
+      -- TODO: Fix ^
+      if | isVoid altHTy && isVoid scrutHTy
+          -> return $! scrutDecls ++ altTDecls ++ altFDecls
+         | isVoid altHTy
+          -> return $! altTDecls ++ altFDecls
+         | otherwise
+          -> do dstAssign <- contAssign dstId (IfThenElse scrutExpr altTExpr altFExpr)
+                return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++ [dstAssign]
+    _ | aeqTy scrutTy integerPrimTy
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Integer) of ...") (Just $ showPpr (toLegacy ctx e)))
+    _ | aeqTy scrutTy naturalPrimTy
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Natural) of ...") (Just $ showPpr (toLegacy ctx e)))
+    _ -> do
+      reprs <- Lens.view customReprs
+      let alts1 = (reorderDefault . reorderCustom ctx reprs scrutTy) alts0
+      (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (NE.head alts1)) <$>
+                                  mkExpr ctx True declType (NetlistId scrutId scrutTy) scrut
+      (exprs,altsDecls)      <- unzip <$> mapM (mkCondExpr scrutHTy) (NE.toList alts1)
+      case declType of
+        Sequential -> do
+          -- Assign to the result in every branch
+          (altNets,exprAlts) <- fmap unzip (zipWithM (altAssign dstId) exprs altsDecls)
+          return $! scrutDecls ++ tickDecls ++ concat altNets ++
+                    [Seq [Branch scrutExpr scrutHTy exprAlts]]
+        Concurrent ->
+          if | isVoid altHTy && isVoid scrutHTy
+              -> return $! concat altsDecls ++ scrutDecls
+             | isVoid altHTy
+              -> return $! concat altsDecls
+             | otherwise
+              -> do assign <- condAssign dstId altHTy scrutExpr scrutHTy exprs
+                    return $! scrutDecls ++ concat altsDecls ++ tickDecls ++ [assign]
+ where
+  -- The expression of the right-hand side of an alternative
+  mkAltExpr :: Identifier -> Alt n -> NetlistMonad (Expr, [Declaration])
+  mkAltExpr altId alt = withAlt ctx alt $ \ctx' _ e ->
+    mkExpr ctx' False declType (NetlistId altId (sink altTy)) e
+
+  mkCondExpr :: HWType -> Alt n -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
+  mkCondExpr scrutHTy alt@(Alt pat _) = do
+    altId <- Id.suffix (netlistIdentifier ctx bndr) "sel_alt"
+    (altExpr,altDecls) <- mkAltExpr altId alt
+    (,altDecls) <$> case pat of
+      DefaultPat           -> return (Nothing,altExpr)
+      DataPat dc _ _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
+      LitPat  (IntegerLiteral i) -> return (Just (NumLit i),altExpr)
+      LitPat  (IntLiteral i) -> return (Just (NumLit i), altExpr)
+      LitPat  (WordLiteral w) -> return (Just (NumLit w), altExpr)
+      LitPat  (CharLiteral c) -> return (Just (NumLit . toInteger $ ord c), altExpr)
+      LitPat  (Int64Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Word64Literal w) -> return (Just (NumLit w), altExpr)
+      LitPat  (Int8Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Int16Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Int32Literal i) -> return (Just (NumLit i), altExpr)
+      LitPat  (Word8Literal w) -> return (Just (NumLit w), altExpr)
+      LitPat  (Word16Literal w) -> return (Just (NumLit w), altExpr)
+      LitPat  (Word32Literal w) -> return (Just (NumLit w), altExpr)
+      LitPat  (NaturalLiteral n) -> return (Just (NumLit n), altExpr)
+      LitPat l -> do
+        (_,sp) <- Lens.use curCompNm
+        throw (ClashException sp ($(curLoc) ++ "Not an integer literal in LitPat:\n\n" ++ showPpr (C.LitPat l)) Nothing)
+
+  mkScrutExpr :: GHC.SrcSpan -> HWType -> Alt n -> Expr -> Expr
+  mkScrutExpr sp scrutHTy (Alt pat _) scrutE = case pat of
+    DataPat dc _ _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
+                      in case scrutE of
+                          Identifier scrutId Nothing -> Identifier scrutId modifier
+                          _ -> throw (ClashException sp ($(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement:\n\n" ++ show scrutE) Nothing)
+    _ -> scrutE
+
+  altAssign
+    :: Identifier
+    -> (Maybe HW.Literal,Expr)
+    -> [Declaration]
+    -> NetlistMonad ([Declaration],(Maybe HW.Literal,[Seq]))
+  altAssign i (m,expr) ds = do
+    let (nets,rest) = partition isNet ds
+    assn <- case expr of
+              Noop -> pure []
+              _ -> do assn <- procAssign Blocking i expr
+                      pure [assn]
+    pure (nets,(m,map SeqDecl (rest ++ assn)))
+   where
+    isNet NetDecl' {} = True
+    isNet _ = False
+
+-- | Attempt to make an if-then-else construction out of this Case, see
+-- 'Clash.Netlist.Util.iteAlts'. Gives the alternatives for 'True' and 'False'.
+iteAlts :: HWType -> NonEmpty (Alt n) -> Maybe (Alt n, Alt n)
+iteAlts sHTy (alt0@(Alt pat0 _) :| [alt1@(Alt pat1 _)]) | validIteSTy sHTy = case pat0 of
+  DataPat dc _ _ -> case dcTag dc of
+    2 -> Just (alt0,alt1)
+    _ -> Just (alt1,alt0)
+  LitPat (IntegerLiteral l) -> case l of
+    1 -> Just (alt0,alt1)
+    _ -> Just (alt1,alt0)
+  DefaultPat -> case pat1 of
+    DataPat dc _ _ -> case dcTag dc of
+      2 -> Just (alt1,alt0)
+      _ -> Just (alt0,alt1)
+    LitPat (IntegerLiteral l) -> case l of
+      1 -> Just (alt1,alt0)
+      _ -> Just (alt0,alt1)
+    _ -> Nothing
+  _ -> Nothing
+ where
+  validIteSTy Bool          = True
+  validIteSTy Bit           = True
+  validIteSTy (Sum _ [_,_]) = True
+  validIteSTy (SP _ [_,_])  = True
+  validIteSTy (Unsigned 1)  = True
+  validIteSTy (Index 2)     = True
+  validIteSTy _             = False
+
+iteAlts _ _ = Nothing
+
+-- GHC puts default patterns in the first position, we want them in the
+-- last position.
+reorderDefault :: NonEmpty (Alt n) -> NonEmpty (Alt n)
+reorderDefault (alt@(Alt DefaultPat _) :| alts') =
+  case alts' of
+    [] -> alt :| []
+    x:xs -> x :| (xs <> [alt])
+reorderDefault alts' = alts'
+
+-- | Order the alternatives of a type with a custom bit representation by the
+-- syntactical order of their constructors
+reorderCustom
+  :: Distinct n
+  => CompCtx n
+  -> CustomReprs
+  -> Type n
+  -> NonEmpty (Alt n)
+  -> NonEmpty (Alt n)
+reorderCustom ctx reprs ty alts =
+  case typeName (coreView (compTypeEnv ctx) (compScope ctx) ty) of
+    Right nm | Just DataRepr' {} <- getDataRepr nm reprs ->
+      NE.sortOn (patPos reprs) alts
+    _ -> alts
+ where
+  -- See 'Clash.Annotations.BitRepresentation.ClashLib.coreToType''
+  typeName :: Type n -> Either String Type'
+  typeName = \case
+    AppTy t1 t2 -> AppTy' <$> typeName t1 <*> typeName t2
+    ConstTy (C.TyCon nm) -> Right (ConstTy' (C.nameOcc nm))
+    LitTy (C.NumTy n) -> Right (LitTy' n)
+    LitTy (C.SymTy lit) -> Right (SymLitTy' (StrictText.pack lit))
+    t -> Left ($(curLoc) ++ "Unexpected type: " ++ show t)
+
+patPos :: CustomReprs -> Alt n -> Int
+patPos reprs (Alt pat _) = case pat of
+  DefaultPat -> -1
+  LitPat _ -> 0
+  DataPat dataCon _ _ ->
+    -- We sort data patterns by their syntactical order
+    let name = C.nameOcc $ dcName dataCon in
+    case getConstrRepr name reprs of
+      Nothing ->
+        -- TODO: err
+        error $ $(curLoc) ++ show pat
+      Just (ConstrRepr' _name n _mask _value _anns) ->
+        n
 
 -- | Generate an expression that projects a field out of a data-constructor.
 --
