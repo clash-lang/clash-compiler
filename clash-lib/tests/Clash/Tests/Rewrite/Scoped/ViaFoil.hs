@@ -24,19 +24,17 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.FreeVars as CF
 import Clash.Core.Evaluator.Types
-  (Evaluator (..), Machine (..), heapInsert, setTerm)
+  (Evaluator (..))
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (NameSort (..))
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as CT
 import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
 import Clash.Driver.Types (DebugOpts (..), debugSilent)
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..))
 import Clash.Unique (Unique)
-import Clash.Util.Supply (freshId)
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed)
 import Clash.Core.Scoped.Subst (freshen)
@@ -44,9 +42,8 @@ import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped
   (ScopedRewrite, ScopedTransform (..), changed, tfScope)
 import qualified Clash.Rewrite.Scoped as S
-import Clash.Rewrite.Scoped.ViaFoil
-  (rootVars, toClashTermFresh, whnfRWViaClash)
-import Clash.Rewrite.Types (RewriteMonad)
+import Clash.Rewrite.Scoped.Globals (toClashTermFresh)
+import Test.Clash.Scoped.ViaFoil (rootVars)
 
 import Clash.Tests.Rewrite.Util (whnfContextTests)
 import Test.Clash.Rewrite
@@ -167,32 +164,18 @@ toClashTermFreshTests =
 
 -- * whnfRW
 
--- | The scoped evaluator ('S.whnfRW'), or the evaluator of Clash Core through
--- the adapter ('whnfRWViaClash')
-data Which = Scoped | ViaClash
-  deriving (Show)
-
-whnfRWWith
-  :: Distinct n
-  => Which -> Bool -> S.TransformContext n -> Term n
-  -> (forall l. DExt n l => S.TransformContext l -> Term l -> RewriteMonad extra (Term l))
-  -> RewriteMonad extra (Term n)
-whnfRWWith = \case
-  Scoped -> S.whnfRW
-  ViaClash -> whnfRWViaClash
-
 -- | Reduce a term to WHNF, in a Clash Core context given innermost frame
 -- first, with the given variables in scope. See @whnfInContext@ in
 -- "Clash.Tests.Rewrite.Util".
-whnfInContext :: Which -> Evaluator -> [C.Id] -> C.Context -> C.Term -> IO C.Term
-whnfInContext which eval inScope ctx e = do
+whnfInContext :: Evaluator -> [C.Id] -> C.Context -> C.Term -> IO C.Term
+whnfInContext eval inScope ctx e = do
   (t, _, _) <- runViaFoil env st (TransformContext (inScopeOf inScope) ctx) rw e
   pure t
  where
   env = invariantsEnv{_evaluator = eval}
   st :: RewriteState NormalizeState
   st = def{_globalHeap = (IntMap.empty, 0)}
-  rw = ScopedTransform $ \ctx' t -> whnfRWWith which False ctx' t (\_ v -> changed v)
+  rw = ScopedTransform $ \ctx' t -> S.whnfRW False ctx' t (\_ v -> changed v)
 
 -- | A primitive that is never work-free
 workPrim :: C.PrimInfo
@@ -209,17 +192,17 @@ allocTerm =
 
 -- | The cases of "whnfRW uses the context's let-bindings (#2571)" in
 -- "Clash.Tests.Rewrite.Util", in a Clash Core context
-contextTests :: Which -> [TestTree]
-contextTests which = whnfContextTests (whnfInContext which heapLookupEvaluator)
+contextTests :: [TestTree]
+contextTests = whnfContextTests (whnfInContext heapLookupEvaluator)
 
 whnfTests :: [TestTree]
 whnfTests =
-  [ testGroup "the scoped evaluator" $ contextTests Scoped <>
+  [ testGroup "the scoped evaluator" $ contextTests <>
       -- The result mentions a variable that is not free in the term. Like the
       -- evaluator of Clash Core, the scoped one names the result after the
       -- variable it looked up.
       [ testCase "\\y -> let x = y in x" $
-          whnfInContext Scoped heapLookupEvaluator [x, y]
+          whnfInContext heapLookupEvaluator [x, y]
             [C.LetBody [(x, C.Var y)], C.LamBody y] (C.Var x)
             >>= assertAlphaEq
                   (C.Tick (C.NameMod C.PrefixName (CT.LitTy (CT.SymTy "x_"))) (C.Var y))
@@ -241,7 +224,7 @@ whnfTests =
           assertAlphaEq (C.Let (C.NonRec x (intLit 3)) (C.Lam y (intLit 3))) res
 
       , testCase "the bindings the evaluator allocates are bound around the result" $ do
-          res <- whnfInContext Scoped heapLookupEvaluator [x, y] [] allocTerm
+          res <- whnfInContext heapLookupEvaluator [x, y] [] allocTerm
           case res of
             C.Letrec [(h, C.Prim p)] (C.App (C.App (C.Data dc) (C.Var h1)) (C.Var h2))
               | h == h1, h == h2, C.primName p == C.primName workPrim, dc == pairDataCon
@@ -258,44 +241,10 @@ whnfTests =
           ch @?= False
           show res @?= show allocTerm
       ]
-  , testGroup "the evaluator of Clash Core, through the adapter" $ contextTests ViaClash <>
-      [ testCase "\\y -> let x = y in x" $
-          whnfInContext ViaClash heapLookupEvaluator [x, y]
-            [C.LetBody [(x, C.Var y)], C.LamBody y] (C.Var x)
-            >>= assertAlphaEq (C.Var y)
-
-      , testCase "the bindings the evaluator allocates are bound around the result" $ do
-          let e = C.App (C.Var allocG) (C.Prim workPrim)
-          res <- whnfInContext ViaClash allocEvaluator [] [] e
-          case res of
-            C.Let (C.Rec [(h, C.Prim p)]) (C.App _ (C.Var h'))
-              | h == h', C.primName p == C.primName workPrim -> pure ()
-            _ -> assertFailure ("unexpected result: " <> show res)
-      ]
   ]
  where
   x = intId User "x" 1
   y = intId User "y" 2
-
--- | A global that the evaluator of 'allocEvaluator' allocates its argument
--- for
-allocG :: C.Id
-allocG = C.mkGlobalId intTy (C.varName (intId User "alloc" 20))
-
--- | Like 'heapLookupEvaluator', but steps @alloc e@ to @f h@, where @h@ is a
--- new heap binding of @e@. The scoped evaluator has its own steps, so this
--- only affects the evaluator of Clash Core.
-allocEvaluator :: Evaluator
-allocEvaluator = heapLookupEvaluator
-  { step = \m tcm -> case mTerm m of
-      C.App (C.Var g) arg | C.varUniq g == C.varUniq allocG ->
-        let (u, sup) = freshId (mSupply m)
-            h = uniqAway (mScopeNames m) (intId System "h" u)
-            m1 = m{mSupply = sup, mScopeNames = extendInScopeSet (mScopeNames m) h}
-        in Just (setTerm (C.App (globalIntVar User "f" 4) (C.Var h))
-                   (heapInsert C.LocalId h arg m1))
-      _ -> step heapLookupEvaluator m tcm
-  }
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Rewrite.Scoped.ViaFoil"

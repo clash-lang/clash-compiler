@@ -5,7 +5,7 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.DEC": the regression tests
   of DEC of Clash Core, run on the port through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement of the port with DEC of
+  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of the port with DEC of
   Clash Core on inputs that cover its cases.
 
   The regression tests are about binders in the alternatives that shadow, or
@@ -45,7 +45,7 @@ import qualified Clash.Normalize.Scoped.Transformations.DEC as Scoped
 import Clash.Normalize.Transformations.DEC (disjointExpressionConsolidationWorker)
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.StrategyDSL (onCase, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (newSupply)
@@ -58,16 +58,17 @@ import Test.Clash.Rewrite
   , justDataCon, localId, maybeTy, mkAlgTyCon, mkBindingMap, nothingDataCon
   , pairDataCon, pairTy, parseTyConName, runRewriteTest, showPprU, testTyConMap, tyVar, withTupleTyCons
   , withTyConMap )
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
 -- | DEC of Clash Core
 decCurrent :: NormRewrite
 decCurrent =
   $(asRewriteQ (toTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)))
 
--- | The port of DEC, as the normalizer runs it: through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- | The port of DEC, on terms of Clash Core: through
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'
 decScoped :: NormRewrite
-decScoped = $(asRewriteQ Scoped.disjointExpressionConsolidation)
+decScoped = (viaFoil "disjointExpressionConsolidation" $(asScopedRewriteQ Scoped.disjointExpressionConsolidation))
 
 -- | The known differences of the port, see
 -- "Clash.Normalize.Scoped.Transformations.DEC"

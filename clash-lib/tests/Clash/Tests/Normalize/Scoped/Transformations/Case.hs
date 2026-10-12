@@ -5,13 +5,13 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.Case": the tests of
   "Clash.Normalize.Transformations.Case", run on the ports through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and tests of the ports on terms
+  'Test.Clash.Scoped.ViaFoil.viaFoil', and tests of the ports on terms
   whose binders clash with the scope.
 
   The capture bugs that the regression tests of
   "Clash.Normalize.Transformations.Case" guard against can't be written in
   scoped Core: they are type errors. Through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', conversion gives the binders of
+  'Test.Clash.Scoped.ViaFoil.viaFoil', conversion gives the binders of
   their inputs fresh names, so the ports don't even see binders that shadow
   free variables. The tests in a sunk scope ('runSunk') give the ports such
   binders: they have to rename them.
@@ -36,7 +36,7 @@ import qualified Clash.Core.Var as C
 import qualified Clash.Normalize.Scoped.Transformations.Case as S
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..), rootContext)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, toClashTerm)
@@ -47,16 +47,17 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, intFunTy, intId, intTy, localId, mkDataCon, pairDataCon
   , parseTyConTy, runRewriteTest )
 import Test.Clash.Scoped (binderRaws, extendSunk, sunkVar, withFreeVarsOf)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
 -- | The ports, as rewrites of Clash Core: they run through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'
 scopedRewrites :: CaseRewrites
 scopedRewrites = CaseRewrites
-  { crCaseCase = $(asRewriteQ S.caseCase)
-  , crCaseCon = $(asRewriteQ S.caseCon)
-  , crCaseFlat = $(asRewriteQ S.caseFlat)
-  , crCaseLet = $(asRewriteQ S.caseLet)
-  , crElimCaseBigNum = $(asRewriteQ S.elimCaseBigNumInternals)
+  { crCaseCase = (viaFoil "caseCase" $(asScopedRewriteQ S.caseCase))
+  , crCaseCon = (viaFoil "caseCon" $(asScopedRewriteQ S.caseCon))
+  , crCaseFlat = (viaFoil "caseFlat" $(asScopedRewriteQ S.caseFlat))
+  , crCaseLet = (viaFoil "caseLet" $(asScopedRewriteQ S.caseLet))
+  , crElimCaseBigNum = (viaFoil "elimCaseBigNumInternals" $(asScopedRewriteQ S.elimCaseBigNumInternals))
   }
 
 -- | Run a scoped rewrite at the root of a term, converted to scoped Core and

@@ -25,6 +25,7 @@ executable clash-differential
                        Test.Clash.Differential.Sites
                        Test.Clash.Scoped.Evaluator
                        Test.Clash.Scoped.Evaluator.Adapter
+                       Test.Clash.Scoped.ViaFoil
                        WhnfReplay
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wcompat -rtsopts "-with-rtsopts=-A64m"

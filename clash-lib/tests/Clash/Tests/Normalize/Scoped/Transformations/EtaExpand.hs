@@ -5,7 +5,7 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.EtaExpand": the tests of
   the transformations of Clash Core, run on the ports through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement of the ports with the
+  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of the ports with the
   transformations of Clash Core.
 
   The regression tests of 'Clash.Normalize.Transformations.EtaExpand.etaExpansionTL'
@@ -34,8 +34,8 @@ import Clash.Core.VarEnv (mkVarSet)
 import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..))
 import Clash.Util.Supply (newSupply)
@@ -47,12 +47,12 @@ import Test.Clash.Rewrite
   , parseToTermQQ, parseTyConTy )
 import Test.Clash.Scoped (assertRewritesAgree)
 
--- | The ports, as the normalizer runs them: through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- | The ports, on terms of Clash Core: through
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'
 scopedRewrites :: EtaRewrites
 scopedRewrites = EtaRewrites
   { erEtaExpansionTL = viaFoil "etaTL" (ScopedTransform Scoped.etaExpansionTL)
-  , erEtaExpandSyn = $(asRewriteQ Scoped.etaExpandSyn)
+  , erEtaExpandSyn = (viaFoil "etaExpandSyn" $(asScopedRewriteQ Scoped.etaExpandSyn))
   }
 
 -- | Assert that a transformation and its port agree on a term, in an

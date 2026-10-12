@@ -5,7 +5,7 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.Cast": the tests of the
   transformations of Clash Core, run on the ports through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement of the ports with the
+  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of the ports with the
   transformations of Clash Core.
 
   The transformations on casts never fired while capturing the corpus of the
@@ -39,7 +39,7 @@ import Clash.Core.Var (Id, TyVar)
 import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
 import Clash.Util (ClashException, noSrcSpan)
 import Clash.Util.Supply (freshId, newSupply)
@@ -50,15 +50,16 @@ import Test.Clash.Rewrite
   ( assertFires, globalId, inScopeOf, intFunTy, intId, intLit, intTy, localId, mkDataCon
   , pairDataCon, pairTy, parseTyConTy, runRewriteTest, tyVar )
 import Test.Clash.Scoped (assertRewritesAgree)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
--- | The ports, as the normalizer runs them: through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- | The ports, on terms of Clash Core: through
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'
 scopedRewrites :: CastRewrites
 scopedRewrites = CastRewrites
-  { crCaseCast = $(asRewriteQ Scoped.caseCast)
-  , crElimCastCast = $(asRewriteQ Scoped.elimCastCast)
-  , crLetCast = $(asRewriteQ Scoped.letCast)
-  , crSplitCastWork = $(asRewriteQ Scoped.splitCastWork)
+  { crCaseCast = (viaFoil "caseCast" $(asScopedRewriteQ Scoped.caseCast))
+  , crElimCastCast = (viaFoil "elimCastCast" $(asScopedRewriteQ Scoped.elimCastCast))
+  , crLetCast = (viaFoil "letCast" $(asScopedRewriteQ Scoped.letCast))
+  , crSplitCastWork = (viaFoil "splitCastWork" $(asScopedRewriteQ Scoped.splitCastWork))
   }
 
 -- | Assert that a transformation and its port agree on a term, with the given

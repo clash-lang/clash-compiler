@@ -43,7 +43,7 @@ import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
 import Clash.Util.Supply (Supply, freshId, newSupply)

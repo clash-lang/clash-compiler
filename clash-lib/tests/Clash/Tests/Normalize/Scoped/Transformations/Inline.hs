@@ -5,7 +5,7 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.Inline": the regression
   tests of "Clash.Normalize.Transformations.Inline", run on the ports through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and tests of the ports that have
+  'Test.Clash.Scoped.ViaFoil.viaFoil', and tests of the ports that have
   no captured sites in the differential corpus.
 -}
 
@@ -37,7 +37,7 @@ import Clash.Normalize.Transformations.Inline
   , inlineSimIOWorker )
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm)
@@ -51,14 +51,15 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intLit, intTy, localId, mkBinding
   , parseToTermQQ, runSingleTransformation, testTyConMap, withTyConMap )
 import Test.Clash.Scoped (assertScopedAlphaEq, withFreeVarsOf)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
--- | The ports, through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- | The ports, through 'Test.Clash.Scoped.ViaFoil.viaFoil'
 scopedRewrites :: InlineRewrites
 scopedRewrites = InlineRewrites
-  { irInlineCleanup = $(asRewriteQ S.inlineCleanup)
-  , irInlineSmall = $(asRewriteQ S.inlineSmall)
-  , irInlineWorkFree = $(asRewriteQ S.inlineWorkFree)
-  , irCollapseRHSNoops = $(asRewriteQ S.collapseRHSNoops)
+  { irInlineCleanup = (viaFoil "inlineCleanup" $(asScopedRewriteQ S.inlineCleanup))
+  , irInlineSmall = (viaFoil "inlineSmall" $(asScopedRewriteQ S.inlineSmall))
+  , irInlineWorkFree = (viaFoil "inlineWorkFree" $(asScopedRewriteQ S.inlineWorkFree))
+  , irCollapseRHSNoops = (viaFoil "collapseRHSNoops" $(asScopedRewriteQ S.collapseRHSNoops))
   }
 
 -- * inlineBndrsCleanup
@@ -216,7 +217,7 @@ tests =
           ]
         | (nm, rw) <- bothImpls
             $(asRewriteQ (toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)))
-            $(asRewriteQ S.bindConstantVar)
+            (viaFoil "bindConstantVar" $(asScopedRewriteQ S.bindConstantVar))
         ]
     , testGroup "inlineCast" $ concat
         [ [ testCase ("inlines a cast of a variable, " <> nm) $ do
@@ -234,7 +235,7 @@ tests =
           ]
         | (nm, rw) <- bothImpls
             $(asRewriteQ (toTransformation "inlineCast" (onLet 'inlineCastWorker)))
-            $(asRewriteQ S.inlineCast)
+            (viaFoil "inlineCast" $(asScopedRewriteQ S.inlineCast))
         ]
     , testGroup "inlineSimIO" $ concat
         [ [ testCase ("doesn't inline a binding of another type, " <> nm) $ do
@@ -248,7 +249,7 @@ tests =
           ]
         | (nm, rw) <- bothImpls
             $(asRewriteQ (toTransformation "bindSimIO" (onLet 'inlineSimIOWorker)))
-            $(asRewriteQ S.inlineSimIO)
+            (viaFoil "inlineSimIO" $(asScopedRewriteQ S.inlineSimIO))
         ]
     , testGroup "collapseRHSNoops" $ concat
         [ [ testCase ("doesn't fire in a function without a binding, " <> nm) $ do
@@ -264,7 +265,7 @@ tests =
           ]
         | (nm, rw) <- bothImpls
             $(asRewriteQ (toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)))
-            $(asRewriteQ S.collapseRHSNoops)
+            (viaFoil "collapseRHSNoops" $(asScopedRewriteQ S.collapseRHSNoops))
         ]
     ]
  where

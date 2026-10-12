@@ -6,7 +6,7 @@
   Tests for "Clash.Rewrite.StrategyDSL.TH" compiling strategies of scoped
   transformations: the scoped counterparts of the tests in
   "Clash.Tests.Rewrite.StrategyDSL", and strategies of Clash Core that run
-  scoped transformations through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'.
+  scoped transformations through 'Test.Clash.Scoped.ViaFoil.viaFoil'.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -14,30 +14,22 @@
 
 module Clash.Tests.Rewrite.Scoped.StrategyDSL (tests) where
 
-import Data.Default (def)
 import qualified Data.List as List
-import qualified Data.Monoid as Monoid
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Term as C
-import Clash.Core.VarEnv (emptyInScopeSet)
 
 import Clash.Core.Scoped.Convert (fromClashTermClosed)
 import Clash.Core.Scoped.Syntax
-import qualified Clash.Rewrite.Combinators as Comb
 import Clash.Rewrite.Scoped (ScopedRewrite)
 import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
-import Clash.Rewrite.Types (Rewrite, RewriteState (..), TransformContext (..), runR)
-import Clash.Rewrite.Util (apply)
 
-import qualified Clash.Tests.Rewrite.StrategyDSL.Stubs as Current
 import Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
-import Test.Clash.Rewrite (assertAlphaEq)
 import Test.Clash.Scoped (runScopedClosed)
 
 -- | Assert that two scoped rewrites agree on a closed term: same result
@@ -47,23 +39,6 @@ assertAgree candidate reference term = do
   (candidateTerm, candidateCount, candidateChanged) <- runScopedClosed candidate term
   (referenceTerm, referenceCount, referenceChanged) <- runScopedClosed reference term
   assertEqual "result" (show referenceTerm) (show candidateTerm)
-  assertEqual "transformation count" referenceCount candidateCount
-  assertEqual "change flag" referenceChanged candidateChanged
-
--- | Run a rewrite of Clash Core on a closed term in the default environment
-runCurrent :: Rewrite () -> C.Term -> IO (C.Term, Word, Bool)
-runCurrent rewrite term = do
-  (result, state, anyChanged) <-
-    runR (rewrite (TransformContext emptyInScopeSet []) term) def def
-  pure (result, _transformCounter state, Monoid.getAny anyChanged)
-
--- | Assert that two rewrites of Clash Core agree on a term, up to the names
--- of binders: 'Clash.Rewrite.Scoped.ViaFoil.viaFoil' renames them
-assertAgreeCurrent :: Rewrite () -> Rewrite () -> C.Term -> Assertion
-assertAgreeCurrent candidate reference term = do
-  (candidateTerm, candidateCount, candidateChanged) <- runCurrent candidate term
-  (referenceTerm, referenceCount, referenceChanged) <- runCurrent reference term
-  assertAlphaEq referenceTerm candidateTerm
   assertEqual "transformation count" referenceCount candidateCount
   assertEqual "change flag" referenceChanged candidateChanged
 
@@ -253,43 +228,6 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
           assertEqual "result" (show (integer 5 :: Term 'VoidS)) (show result)
           assertEqual "count" 0 count
           assertEqual "changed" True changedFlag
-      ]
-
-    -- A strategy of Clash Core that contains scoped transformations agrees
-    -- with the same strategy of their Clash Core counterparts
-  , testGroup "scoped transformations in strategies of Clash Core"
-      [ testCase "topdown chain" $
-          assertAgreeCurrent
-            $(compileStrategy (topdown (chain
-                [collapseApplication, Current.incrementBoth, inlineTrivialLet])))
-            $(compileStrategy (topdown Current.constructorChangingStep))
-            Current.nestedTerm
-      , testCase "bottomup, with a scoped transformation at every constructor" $
-          assertAgreeCurrent
-            $(compileStrategy (bottomup (chain [incrementOddAny, Current.collapseApplication])))
-            $(compileStrategy (bottomup (chain [Current.incrementOddAny, Current.collapseApplication])))
-            Current.nestedTerm
-      , testCase "unfused reference" $
-          assertAgreeCurrent
-            $(compileStrategyReference (topdown (chain
-                [collapseApplication, Current.incrementBoth, inlineTrivialLet])))
-            $(compileStrategyReference (topdown Current.constructorChangingStep))
-            Current.nestedTerm
-      , testCase "whole-term pass" $
-          assertAgreeCurrent
-            $(compileStrategy (scopedPass "incrementOddAny" 'incrementOddAnyWorker))
-            $(compileStrategy (pass "incrementOddAny" 'Current.incrementOddAnyWorker))
-            (C.Literal (IntLiteral 3))
-      , testCase "asRewriteQ" $
-          assertAgreeCurrent
-            $(asRewriteQ inlineTrivialLet)
-            $(asRewriteQ Current.inlineTrivialLet)
-            (C.Let (C.NonRec (someId 0) (cInteger 5)) (C.Var (someId 0)))
-      , testCase "hand-written composition" $
-          assertAgreeCurrent
-            $(compileStrategy (topdown collapseApplication))
-            (Comb.topdownR (apply "collapseApplication" Current.collapseApplicationRewrite))
-            Current.nestedTerm
       ]
   ]
  where

@@ -17,10 +17,7 @@
   combinators, and how a traversal descends into a node. A scoped traversal
   opens the binders it goes under (decision D7 of the port).
 
-  In a strategy for Clash Core, a transformation of scoped Core
-  ('Clash.Rewrite.StrategyDSL.ScopedCore') runs through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', at the nodes it has a worker for.
-  A strategy for scoped Core must only contain transformations of scoped Core.
+  A strategy only contains transformations of the Core it is compiled for.
 -}
 
 {-# LANGUAGE DisambiguateRecordFields #-}
@@ -63,7 +60,6 @@ import qualified Clash.Rewrite.Combinators as Comb
 import qualified Clash.Rewrite.Scoped.Apply as SApply
 import qualified Clash.Rewrite.Scoped.Combinators as SComb
 import qualified Clash.Rewrite.Scoped.Types as S
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Writer as Writer
 import qualified Data.Monoid as Monoid
@@ -101,8 +97,6 @@ data Target = Target
   -- 'Comb.allR'
   , passE :: WorkerCore -> String -> Name -> Q Exp
   -- ^ A whole-term pass of a rewrite of the given Core
-  , foreignInvoke :: Transformation -> Q Exp -> Q Exp -> Q Exp
-  -- ^ Invoke a transformation of the other Core on a context and a node
   }
 
 -- | Call a transformation on a context and a term
@@ -133,11 +127,8 @@ currentTarget = Target
   , passE = \core name rewriteName -> case core of
       CurrentCore -> [| apply $(stringE name) $(varE rewriteName) |]
       ScopedCore ->
-        [| apply $(stringE name)
-             (viaFoil $(stringE name) (S.ScopedTransform $(varE rewriteName))) |]
-  , foreignInvoke = \transformation ctxE nodeE ->
-      [| viaFoil $(stringE transformation.name)
-           $(guardExp scopedTarget invokeE transformation) $ctxE $nodeE |]
+        fail ("compileStrategy: pass " <> show name
+              <> " is a rewrite of scoped Core, not of Clash Core")
   }
 
 -- | The target of scoped Clash Core
@@ -167,9 +158,6 @@ scopedTarget = Target
       CurrentCore ->
         fail ("compileScopedStrategy: pass " <> show name
               <> " is a rewrite of Clash Core, not of scoped Core")
-  , foreignInvoke = \transformation _ _ ->
-      fail ("compileScopedStrategy: transformation " <> show transformation.name
-            <> " is a transformation of Clash Core, not of scoped Core")
   }
 
 -- | The term constructor of Clash Core belonging to a 'Constructor'.
@@ -243,16 +231,11 @@ isLeafConstructor con = con `elem` [CVar, CData, CLiteral, CPrim]
 data Invoke
   = InvokeFields Name -- ^ worker applied to ctx, node, and the node's fields
   | InvokeNode Name   -- ^ worker applied to ctx and the node only
-  | InvokeForeign Transformation
-  -- ^ a transformation of the other Core, see 'foreignInvoke'
 
 -- | The member's invocation at this constructor, if it is in the
 -- constructor's bucket.
 invokeAt :: Target -> Constructor -> Transformation -> Maybe Invoke
-invokeAt target con transformation
-  | transformation.core /= target.core =
-      InvokeForeign transformation <$ go transformation.workers
-  | otherwise = go transformation.workers
+invokeAt _target con transformation = go transformation.workers
  where
   go [] = Nothing
   go (FieldWorker con' worker : rest)
@@ -268,8 +251,6 @@ invokeE _ (InvokeFields worker) ctxE nodeE fieldEs =
   foldl appE (varE worker) (ctxE : nodeE : fieldEs)
 invokeE _ (InvokeNode worker) ctxE nodeE _fieldEs =
   [| $(varE worker) $ctxE $nodeE |]
-invokeE target (InvokeForeign transformation) ctxE nodeE _fieldEs =
-  target.foreignInvoke transformation ctxE nodeE
 
 validateChain :: Target -> [Transformation] -> Q ()
 validateChain target members = do
@@ -296,8 +277,9 @@ validateTransformation target transformation
   | con : _ <- duplicateConstructors = failWith ("has two workers for " <> show con)
   | transformation.core == ScopedCore, any isVarFieldWorker workers
   = failWith "is a transformation of scoped Core with a FieldWorker for CVar; use a Worker"
-  | target.core == ScopedCore, transformation.core /= ScopedCore
-  = failWith "is a transformation of Clash Core, not of scoped Core"
+  | target.core /= transformation.core
+  = failWith ("is a transformation of " <> showCore transformation.core
+              <> ", not of " <> showCore target.core)
   | otherwise = pure ()
  where
   workers = transformation.workers
@@ -311,6 +293,9 @@ validateTransformation target transformation
 
   isVarFieldWorker (FieldWorker CVar _) = True
   isVarFieldWorker _ = False
+
+  showCore CurrentCore = "Clash Core"
+  showCore ScopedCore = "scoped Core"
 
   duplicateConstructors =
     [ con

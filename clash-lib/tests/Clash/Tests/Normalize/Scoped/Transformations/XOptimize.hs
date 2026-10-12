@@ -5,7 +5,7 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.XOptimize": the tests of
   'Clash.Normalize.Transformations.XOptimize.xOptimize' of Clash Core, run on
-  the port through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement of
+  the port through 'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of
   the port with 'xOptimize' of Clash Core.
 
   The regression tests are about pattern binders that capture the free
@@ -39,7 +39,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..))
 import qualified Clash.Normalize.Scoped.Transformations.XOptimize as Scoped
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..))
 import Clash.Util.Supply (newSupply)
@@ -52,11 +52,12 @@ import Test.Clash.Rewrite
   , maybeTy, nothingDataCon, pairDataCon, pairTy, testTyConMap, tyVar
   , withTyConMap )
 import Test.Clash.Scoped (assertRewritesAgreeUpTo)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
--- | The port, as the normalizer runs it: through
--- 'Clash.Rewrite.Scoped.ViaFoil.viaFoil'
+-- | The port, on terms of Clash Core: through
+-- 'Test.Clash.Scoped.ViaFoil.viaFoil'
 xOptimizeScoped :: NormRewrite
-xOptimizeScoped = $(asRewriteQ Scoped.xOptimize)
+xOptimizeScoped = (viaFoil "xOptimize" $(asScopedRewriteQ Scoped.xOptimize))
 
 -- | 'envXOpt', with the type constructors of 'testTyConMap' too
 env :: RewriteEnv

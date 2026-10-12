@@ -5,7 +5,7 @@
 
   Tests for "Clash.Normalize.Scoped.PrimitiveReductions": the tests of
   "Clash.Normalize.PrimitiveReductions", run on the scoped reductions through
-  'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and agreement with the reductions of
+  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement with the reductions of
   Clash Core.
 -}
 
@@ -38,7 +38,7 @@ import Clash.Rewrite.Types
 import Clash.Core.Scoped.Syntax (Term (Prim))
 import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 
 import Clash.Tests.Normalize.PrimitiveReductions
   (PrimReductionImpl, currentPrimReduction, envVec, prim, primitiveReductionTests)

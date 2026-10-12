@@ -25,8 +25,8 @@
   'underLetRec', which all go through 'pushUnder'. The constructor of the
   context is not exported.
 
-  The root of a context may be a 'LegacyRoot': the context of a Clash Core
-  subterm that "Clash.Rewrite.Scoped.ViaFoil" converted.
+  The root of a context may be that of a subterm of a term outside of scoped
+  Core ('embeddedRootContext'), with the kinds of the frames of its context.
 
   = Let-bindings
 
@@ -44,8 +44,9 @@
   = Inspecting the context
 
   Transformations inspect the context through 'ctxFrames', which lists the
-  kinds of its frames from the subterm outwards, including those of a
-  'LegacyRoot'. E.g. whether a subterm is the function of an application:
+  kinds of its frames from the subterm outwards, including those of the root
+  ('embeddedRootContext'). E.g. whether a subterm is the function of an
+  application:
 
   @
   case 'ctxFrames' ctx of
@@ -71,9 +72,8 @@ module Clash.Rewrite.Scoped.Types
   , Path (..)
   , Frame (..)
   , Under (..)
-  , LegacyRoot (..)
   , rootContext
-  , legacyRootContext
+  , embeddedRootContext
   , pushFrame
   , pushUnder
   , appArgFrame
@@ -99,8 +99,6 @@ import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.Var as C
-import qualified Clash.Rewrite.Types as C
 
 import Clash.Core.Scoped.NameMap (NameMap, emptyNameMap, insertNameMap, sinkNameMap)
 import Clash.Core.Scoped.Subst
@@ -156,9 +154,10 @@ tfHeap (TransformContext _ _ h) = h
 data Path (n :: S) where
   -- | The root of a term
   PRoot :: Path n
-  -- | The root of a Clash Core subterm converted by
-  -- "Clash.Rewrite.Scoped.ViaFoil", see 'LegacyRoot'
-  PLegacy :: !(LegacyRoot n) -> Path n
+  -- | The root of a subterm of a term outside of scoped Core, with the kinds
+  -- of the frames of its context there, from the subterm outwards. See
+  -- 'embeddedRootContext'.
+  PEmbedded :: [FrameKind] -> Path n
   -- | A frame that doesn't bind variables
   PFrame :: !(Frame n) -> !(Path n) -> Path n
   -- | A frame that goes under binders, extending scope @i@ to @n@
@@ -203,35 +202,17 @@ data Under (i :: S) (n :: S) where
   LetBindingRec :: !(Tele IdBinder i n) -> !Int -> Under i n
 type role Under nominal nominal
 
--- | The root of the context of a Clash Core subterm that
--- "Clash.Rewrite.Scoped.ViaFoil" converted into scope @n@. Scope @n@ has the
--- free variables of the subterm, and those of the let-bindings of its context
--- that the evaluator may use (see 'Clash.Rewrite.Scoped.ViaFoil.whnfRW').
---
--- This only exists during the port, see "Clash.Rewrite.Scoped.ViaFoil".
-data LegacyRoot (n :: S) = LegacyRoot
-  { legacyContext :: C.TransformContext
-  -- ^ The Clash Core context of the subterm
-  , legacyTyVars :: [(C.TyVar, Type n)]
-  -- ^ The type variables of scope @n@, with their Clash type variables.
-  -- Ordered such that the kind of a type variable only mentions the type
-  -- variables before it.
-  , legacyIds :: [(C.Id, Term n)]
-  -- ^ The term variables of scope @n@, with their Clash variables
-  , legacyHeap :: NameMap TmName n (Term n)
-  -- ^ The let-bindings of the Clash Core context that are valid at the
-  -- subterm, of the variables of scope @n@. See
-  -- 'Clash.Rewrite.Util.contextLetBindings'.
-  }
-type role LegacyRoot nominal
-
 -- | The context of the root of a term in scope @n@
 rootContext :: Scope n -> TransformContext n
 rootContext sc = TransformContext sc PRoot emptyNameMap
 
--- | The context of a Clash Core subterm that was converted into scope @n@
-legacyRootContext :: Scope n -> LegacyRoot n -> TransformContext n
-legacyRootContext sc root = TransformContext sc (PLegacy root) (legacyHeap root)
+-- | The context of the root of a subterm of a term outside of scoped Core,
+-- given the kinds of the frames of its context there, from the subterm
+-- outwards, and the let-bindings of those frames that are valid at the
+-- subterm. During the port, the tests run scoped transformations at subterms
+-- of Clash Core this way.
+embeddedRootContext :: Scope n -> [FrameKind] -> NameMap TmName n (Term n) -> TransformContext n
+embeddedRootContext sc ks h = TransformContext sc (PEmbedded ks) h
 
 -- | Push a frame that doesn't bind variables
 pushFrame :: Frame n -> TransformContext n -> TransformContext n
@@ -380,7 +361,7 @@ ctxFrames = go . tfPath
   go :: Path x -> [FrameKind]
   go = \case
     PRoot -> []
-    PLegacy root -> map legacyKind (C.tfContext (legacyContext root))
+    PEmbedded ks -> ks
     PFrame f p -> frameKind f : go p
     PUnder u p -> underKind u : go p
 
@@ -407,20 +388,6 @@ ctxFrames = go . tfPath
   teleOcc (TCons b bs) i
     | i <= 0 = idBinderOcc b
     | otherwise = teleOcc bs (i - 1)
-
-  legacyKind :: C.CoreContext -> FrameKind
-  legacyKind = \case
-    C.AppFun -> KAppFun
-    C.AppArg a -> KAppArg a
-    C.TyAppC -> KTyAppC
-    C.LetBinding b _ -> KLetBinding (C.varName b)
-    C.LetBody _ -> KLetBody
-    C.LamBody _ -> KLamBody
-    C.TyLamBody _ -> KTyLamBody
-    C.CaseAlt _ -> KCaseAlt
-    C.CaseScrut -> KCaseScrut
-    C.CastBody -> KCastBody
-    C.TickC _ -> KTickC
 
 -- | See 'Clash.Core.Term.isLambdaBodyCtx'
 isLambdaBodyKind :: FrameKind -> Bool

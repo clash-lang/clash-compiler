@@ -6,7 +6,7 @@
   Tests for "Clash.Normalize.Scoped.Transformations.Specialize" and
   "Clash.Normalize.Scoped.Transformations.Cast": the regression tests of
   "Clash.Normalize.Transformations.Specialize", run on the scoped
-  transformations through 'Clash.Rewrite.Scoped.ViaFoil.viaFoil', and
+  transformations through 'Test.Clash.Scoped.ViaFoil.viaFoil', and
   agreement with the transformations of Clash Core.
 -}
 
@@ -31,10 +31,10 @@ import qualified Clash.Normalize.Transformations.Cast as C
 import qualified Clash.Normalize.Transformations.Specialize as C
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.StrategyDSL
   (onApp, onAppNode, onLam, onTyApp, onTyAppNode, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Util.Supply (Supply, newSupply)
@@ -54,20 +54,19 @@ import Test.Clash.Scoped (assertNewBindingsAgree)
 specializeViaFoil :: NormRewrite
 specializeViaFoil = viaFoil "specialize" (ScopedTransform Scoped.specialize)
 
--- | The scoped transformations, through 'viaFoil', as the normalizer runs
--- them
+-- | The scoped transformations, through 'viaFoil', on terms of Clash Core
 appPropS :: NormRewrite
-appPropS = $(asRewriteQ Scoped.appProp)
+appPropS = (viaFoil "appProp" $(asScopedRewriteQ Scoped.appProp))
 constantSpecS :: NormRewrite
-constantSpecS = $(asRewriteQ Scoped.constantSpec)
+constantSpecS = (viaFoil "constantSpec" $(asScopedRewriteQ Scoped.constantSpec))
 nonRepSpecS :: NormRewrite
-nonRepSpecS = $(asRewriteQ Scoped.nonRepSpec)
+nonRepSpecS = (viaFoil "nonRepSpec" $(asScopedRewriteQ Scoped.nonRepSpec))
 typeSpecS :: NormRewrite
-typeSpecS = $(asRewriteQ Scoped.typeSpec)
+typeSpecS = (viaFoil "typeSpec" $(asScopedRewriteQ Scoped.typeSpec))
 zeroWidthSpecS :: NormRewrite
-zeroWidthSpecS = $(asRewriteQ Scoped.zeroWidthSpec)
+zeroWidthSpecS = (viaFoil "zeroWidthSpec" $(asScopedRewriteQ Scoped.zeroWidthSpec))
 argCastSpecS :: NormRewrite
-argCastSpecS = $(asRewriteQ Scoped.argCastSpec)
+argCastSpecS = (viaFoil "argCastSpec" $(asScopedRewriteQ Scoped.argCastSpec))
 
 -- | The transformations of Clash Core
 appPropC :: NormRewrite

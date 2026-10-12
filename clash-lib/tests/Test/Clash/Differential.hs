@@ -106,7 +106,7 @@ import Clash.Driver.Types (Binding (..), BindingMap)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
 import Clash.Rewrite.Scoped.Globals (fromClashBindings)
-import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
+import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
   (NormRewrite, NormalizeSession, NormalizeState (..))
 import Clash.Rewrite.StrategyDSL (Strat, ToStep, bottomup)
