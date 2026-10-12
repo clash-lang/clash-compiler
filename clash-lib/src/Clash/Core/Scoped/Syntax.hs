@@ -141,6 +141,7 @@ module Clash.Core.Scoped.Syntax
   , sinkBind
   ) where
 
+import Control.DeepSeq (NFData (..))
 import Data.Hashable (Hashable (..))
 import qualified Data.Kind as K
 import Data.Text (Text)
@@ -176,6 +177,9 @@ instance Ord GlobalId where
 
 instance Hashable GlobalId where
   hashWithSalt salt = hashWithSalt salt . globalIdUniq
+
+instance NFData GlobalId where
+  rnf (MkGlobalId v) = rnf v
 
 -- | A global variable. Errors on a local 'C.Id', or on a type variable.
 mkGlobalId :: HasCallStack => C.Id -> GlobalId
@@ -338,6 +342,75 @@ data TickInfo (n :: S)
   | Attributes !(Type n) !(Term n)
   deriving (Show)
 type role TickInfo nominal
+
+-- * Normal forms
+--
+-- These instances don't force the lazy types of term variables, in
+-- t'IdBinder' and 'Var' (see the module header): forcing them would compute
+-- types that nothing asks for.
+
+instance NFData (TyBinder n l) where
+  rnf (TyBinder o k b) = rnf o `seq` rnf k `seq` rnf b
+
+-- | Doesn't force the type of the variable
+instance NFData (IdBinder n l) where
+  rnf (IdBinder o _ty b) = rnf o `seq` rnf b
+
+instance NFData (Tele TyBinder n l) where
+  rnf TNil = ()
+  rnf (TCons b bs) = rnf b `seq` rnf bs
+
+instance NFData (Tele IdBinder n l) where
+  rnf TNil = ()
+  rnf (TCons b bs) = rnf b `seq` rnf bs
+
+instance NFData (Type n) where
+  rnf = \case
+    VarTy o k n -> rnf o `seq` rnf k `seq` rnf n
+    ConstTy c -> rnf c
+    ForAllTy b t -> rnf b `seq` rnf t
+    AppTy t1 t2 -> rnf t1 `seq` rnf t2
+    LitTy l -> rnf l
+    AnnType a t -> rnf a `seq` rnf t
+
+-- | Doesn't force the types of term variables
+instance NFData (Term n) where
+  rnf = \case
+    Var o _ty n -> rnf o `seq` rnf n
+    GlobalVar g -> rnf g
+    Data dc -> rnf dc
+    Literal l -> rnf l
+    Prim p -> rnf p
+    Lam b e -> rnf b `seq` rnf e
+    TyLam b e -> rnf b `seq` rnf e
+    App e1 e2 -> rnf e1 `seq` rnf e2
+    TyApp e ty -> rnf e `seq` rnf ty
+    Let bs e -> rnf bs `seq` rnf e
+    Case e ty alts -> rnf e `seq` rnf ty `seq` rnf alts
+    Cast e t1 t2 -> rnf e `seq` rnf t1 `seq` rnf t2
+    Tick t e -> rnf t `seq` rnf e
+
+instance NFData (Bind n l) where
+  rnf = \case
+    NonRec b e -> rnf b `seq` rnf e
+    Rec bs es -> rnf bs `seq` rnf es
+
+instance NFData (Alt n) where
+  rnf (Alt p e) = rnf p `seq` rnf e
+
+instance NFData (Pat n l) where
+  rnf = \case
+    DataPat dc tvs ids -> rnf dc `seq` rnf tvs `seq` rnf ids
+    LitPat l -> rnf l
+    DefaultPat -> ()
+
+instance NFData (TickInfo n) where
+  rnf = \case
+    SrcSpan s -> rnf s
+    NameMod m ty -> rnf m `seq` rnf ty
+    DeDup -> ()
+    NoDeDup -> ()
+    Attributes ty e -> rnf ty `seq` rnf e
 
 -- * Sinkability
 --

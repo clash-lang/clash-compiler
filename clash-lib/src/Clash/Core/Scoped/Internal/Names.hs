@@ -126,6 +126,7 @@ module Clash.Core.Scoped.Internal.Names
   , nameBindersRaw
   ) where
 
+import Control.DeepSeq (NFData (..), rwhnf)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
@@ -147,6 +148,14 @@ type role TyName nominal
 newtype TmName (n :: S) = UnsafeTmName (Name n)
   deriving (Eq, Ord, Show)
 type role TmName nominal
+
+-- | A name is a strict 'Int'
+instance NFData (TyName n) where
+  rnf = rwhnf
+
+-- | A name is a strict 'Int'
+instance NFData (TmName n) where
+  rnf = rwhnf
 
 instance Sinkable TyName where
   sinkabilityProof r (UnsafeTyName n) = UnsafeTyName (r n)
@@ -175,6 +184,14 @@ type role TyNameBinder nominal nominal
 newtype TmNameBinder (n :: S) (l :: S) = UnsafeTmNameBinder (NameBinder n l)
   deriving (Eq, Ord, Show)
 type role TmNameBinder nominal nominal
+
+-- | A binder is a strict 'Int'
+instance NFData (TyNameBinder n l) where
+  rnf = rwhnf
+
+-- | A binder is a strict 'Int'
+instance NFData (TmNameBinder n l) where
+  rnf = rwhnf
 
 -- | The type variable a binder binds
 tyNameBinderName :: TyNameBinder n l -> TyName l
