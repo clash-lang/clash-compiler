@@ -201,8 +201,8 @@ mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0
   etopM <-
     mapM
       (expandTopEntityOrErrM
-         (zip (map (Just . legacyOccId) args) argHwtys)
-         (Just (legacyOccId res), resHwty))
+         (zip (map (Just . C.nameOcc . localIdOcc) args) argHwtys)
+         (Just (C.nameOcc (localIdOcc res)), resHwty))
       topMM
 
   -- Make arguments unique
@@ -289,10 +289,6 @@ mkUniqueNormalized tenv supply0 topMM resTyM (SplitNormalized sc args binds res0
       pure (UniqueNormalized (mkCtx sc supply2 (argNames ++ names))
               wereVoids iports iwrappers [] [] binds Nothing)
  where
-  -- A Clash Core variable with the human readable name of a variable, as a
-  -- name hint
-  legacyOccId v = C.mkLocalId (toClashType (localIdType v)) (localIdOcc v)
-
   mkCtx :: Scope x -> Supply -> [(LocalId x, Identifier)] -> CompCtx x
   mkCtx sc' sup names = compCtxFromList sc' tenv sup
     [ (v, i, toClashType (localIdType v)) | (v, i) <- names ]
