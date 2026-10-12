@@ -108,6 +108,7 @@ module Clash.Core.Scoped.NameMap
   , globalEnvElems
   ) where
 
+import Control.DeepSeq (NFData (..))
 import qualified Data.List as List
 
 import Clash.Data.UniqMap (UniqMap)
@@ -209,6 +210,9 @@ newtype GlobalEnv a = GlobalEnv (UniqMap (GlobalId, a))
 instance Show a => Show (GlobalEnv a) where
   showsPrec d m = showParen (d > 10) $
     showString "globalEnvFromList " . shows (globalEnvToList m)
+
+instance NFData a => NFData (GlobalEnv a) where
+  rnf (GlobalEnv m) = rnf m
 
 instance Functor GlobalEnv where
   fmap f (GlobalEnv m) = GlobalEnv (fmap (fmap f) m)
