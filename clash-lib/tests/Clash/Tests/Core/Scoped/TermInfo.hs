@@ -18,17 +18,20 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.HasFreeVars as C (isClosed)
+import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TermInfo as C
 import qualified Clash.Core.Type as C
+import qualified Clash.Netlist.BlackBox as C (isLiteral)
 
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TermInfo
 
 import Test.Clash.Rewrite
-  ( globalId, intId, intTy, localId, parseToTermQQ, testTyConMap, tyVar )
+  ( globalId, intId, intTy, justDataCon, localId, pairDataCon, parseToTermQQ
+  , testTyConMap, tyVar )
 import Test.Clash.Scoped (assertScopedAlphaEq, testTypeEnv, withFreeVarsOf)
 
 -- | Terms of all shapes
@@ -51,15 +54,40 @@ examples =
   x = intId C.User "x" 52
   g = globalId C.User "g" 53 (C.mkFunTy intTy intTy)
 
+-- | Literals, and data constructors applied to literals or not
+literalExamples :: [C.Term]
+literalExamples =
+  [ lit 3
+  , C.Tick C.DeDup (lit 3)
+  , C.mkApps (C.Data pairDataCon) [Left (lit 1), Left (lit 2)]
+  , C.mkApps (C.Data pairDataCon) [Left (lit 1), Left (C.Var x)]
+  , C.mkApps (C.Data justDataCon) [Right intTy, Left (lit 1)]
+  , C.mkApps (C.Data justDataCon)
+      [Right intTy, Left (C.mkApps (C.Data justDataCon) [Right intTy, Left (lit 1)])]
+  , C.App (C.Var g) (lit 1)
+  ]
+ where
+  lit = C.Literal . C.IntLiteral
+  x = intId C.User "x" 52
+  g = globalId C.User "g" 53 (C.mkFunTy intTy intTy)
+
 -- | Assert that a function on scoped terms agrees with one on Clash terms on
 -- all 'examples'
 assertAgreesOnExamples
   :: (Eq a, Show a)
   => (C.Term -> a) -> (forall n. Distinct n => Scope n -> Term n -> a) -> Assertion
-assertAgreesOnExamples f g =
+assertAgreesOnExamples = assertAgreesOn examples
+
+-- | Assert that a function on scoped terms agrees with one on Clash terms on
+-- the given terms
+assertAgreesOn
+  :: (Eq a, Show a)
+  => [C.Term]
+  -> (C.Term -> a) -> (forall n. Distinct n => Scope n -> Term n -> a) -> Assertion
+assertAgreesOn tms f g =
   sequence_
     [ withFreeVarsOf [tm] $ \env -> g (convScope env) (fromClashTerm env tm) @?= f tm
-    | tm <- examples ]
+    | tm <- tms ]
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.TermInfo"
@@ -84,6 +112,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.TermInfo"
       assertAgreesOnExamples C.isPrim (const isPrim)
       assertAgreesOnExamples C.isTick (const isTick)
       assertAgreesOnExamples C.isCast (const isCast)
+  , testCase "isLiteral" $
+      assertAgreesOn (examples <> literalExamples) C.isLiteral (const isLiteral)
   , testCase "isClosed" $
       assertAgreesOnExamples C.isClosed (const isClosed)
   , testCase "splitMultiPrimArgs" $ do

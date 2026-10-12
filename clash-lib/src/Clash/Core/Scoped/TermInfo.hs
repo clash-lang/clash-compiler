@@ -32,6 +32,7 @@ module Clash.Core.Scoped.TermInfo
   , isGlobalVar
   , isCon
   , isPrim
+  , isLiteral
   , isTick
   , isCast
   , isClosed
@@ -51,6 +52,7 @@ import qualified Clash.Core.TermInfo as C
 import Clash.Core.Scoped.FreeVars (hasFreeVars)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Core.Scoped.Type (isFunTy, isPolyFunCoreTy)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
@@ -148,6 +150,15 @@ isCon _ = False
 isPrim :: Term n -> Bool
 isPrim Prim {} = True
 isPrim _ = False
+
+-- | Is a term a literal, or a data constructor or primitive applied to
+-- literals and types? See 'Clash.Netlist.BlackBox.isLiteral'.
+isLiteral :: Term n -> Bool
+isLiteral e = case collectArgs e of
+  (Data _, args) -> all (either isLiteral (const True)) args
+  (Prim _, args) -> all (either isLiteral (const True)) args
+  (Literal _, _) -> True
+  _ -> False
 
 -- | Is a term a tick?
 isTick :: Term n -> Bool
