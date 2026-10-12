@@ -167,7 +167,7 @@ genNames newInlineStrat prefixM is env bndrs =
 
 -- | The top entities, by their 'Clash.Core.Scoped.Syntax.GlobalId'
 topEntityEnv :: [TopEntityT] -> GlobalEnv TopEntityT
-topEntityEnv tops = globalEnvFromList [ (mkGlobalIdFromClash (topId t), t) | t <- tops ]
+topEntityEnv tops = globalEnvFromList [ (topId t, t) | t <- tops ]
 
 -- | Generate names for top entities. Should be executed at the very start of
 -- the synthesis process and shared between all passes.
@@ -193,11 +193,11 @@ genTopNames opts hdl tops =
 
   goFixed env (topId, ann) = do
     topNm <- genTopName prefixM ann
-    pure (insertGlobalEnv (mkGlobalIdFromClash topId) topNm env)
+    pure (insertGlobalEnv topId topNm env)
 
   goNonFixed env id_ = do
-    topNm <- Id.makeBasic (genComponentName True prefixM id_)
-    pure (insertGlobalEnv (mkGlobalIdFromClash id_) topNm env)
+    topNm <- Id.makeBasic (genComponentName True prefixM (globalIdLegacy id_))
+    pure (insertGlobalEnv id_ topNm env)
 
 -- | Generate a component for a given function (caching), on scoped Clash
 -- Core, see 'Clash.Netlist.Scoped.genComponent'
@@ -228,7 +228,7 @@ genComponentT compName0 componentExpr = do
 
   topEntityTM <- lookupGlobalEnv (mkGlobalIdFromClash compName0) <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
-      topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
+      topVarTypeM = snd . splitCoreFunForallTy tcm . coreTypeOf . globalIdLegacy . topId <$> topEntityTM
 
   seenIds <~ Lens.use seenComps
   (wereVoids,compInps,argWrappers,compOutps,resUnwrappers,binders,resultM) <-
@@ -636,7 +636,7 @@ mkFunApp declType dstId fun args tickDecls = do
         | otherwise = Nothing
   case (isGlobalId fun, topAnnM) of
     (True, Just topEntity)
-      | let ty = coreTypeOf (topId topEntity)
+      | let ty = coreTypeOf (globalIdLegacy (topId topEntity))
       , let (fArgTys0,fResTy) = splitFunForallTy ty
       -- Take into account that clocks and stuff are split off from any product
       -- types containing them

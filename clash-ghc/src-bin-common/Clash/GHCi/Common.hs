@@ -25,9 +25,8 @@ import           GHC.Utils.Panic        (GhcException (..), throwGhcException)
 import qualified GHC
   (DynFlags, ModSummary (..), extensionFlags, moduleName, moduleNameString)
 import           Clash.Core.Name        (nameOcc)
-import           Clash.Core.Var         (varName)
 import           Clash.Core.Scoped.NameMap (memberGlobalSet)
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+import           Clash.Core.Scoped.Syntax (globalIdName)
 import           Clash.Normalize.Scoped.Util (callGraph, callGraphGlobals)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Util             (ClashException(..), noSrcSpan)
@@ -60,8 +59,8 @@ getMainTopEntity modName design nm =
     [t] ->
       let
         bindingMap = designBindings design
-        closure = callGraphGlobals (callGraph bindingMap (mkGlobalIdFromClash (topId t)))
-        inClosure t' = topId t' /= topId t && mkGlobalIdFromClash (topId t') `memberGlobalSet` closure
+        closure = callGraphGlobals (callGraph bindingMap (topId t))
+        inClosure t' = topId t' /= topId t && topId t' `memberGlobalSet` closure
       in
         pure (t, filter inClosure (designEntities design))
     ts ->
@@ -71,7 +70,7 @@ getMainTopEntity modName design nm =
       |]
  where
   isNm (TopEntityT{topId}) =
-    let topIdNm = Text.unpack (nameOcc (varName topId)) in
+    let topIdNm = Text.unpack (nameOcc (globalIdName topId)) in
     topIdNm == nm || ('.':nm) `isSuffixOf` topIdNm
 
 -- | Checks whether MonoLocalBinds and MonomorphismRestricton language extensions

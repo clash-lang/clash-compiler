@@ -76,7 +76,6 @@ import qualified Clash.Core.Name                  as C (nameLoc, nameOcc)
 import qualified Clash.Core.Term                  as C
 import qualified Clash.Core.Type                  as C
 import qualified Clash.Core.Util                  as C (splitShouldSplit)
-import qualified Clash.Core.Var                   as C
 import           Clash.Driver.Types
   (Binding (..), ClashEnv (..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist                    (genNames, runNetlistMonad)
@@ -104,7 +103,6 @@ import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNam
 import           Clash.Core.Scoped.Subst
   (openAlt, openBind, patVars, teleIdBinderTypes, teleIdVars)
 import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.TermInfo       (multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
@@ -142,7 +140,7 @@ genNetlist
   -- ^ HDL dir
   -> Maybe StrictText.Text
   -- ^ Component name prefix
-  -> C.Id
+  -> GlobalId
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
 genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
@@ -150,7 +148,7 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
         genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
   ((_meta, topComponent), s) <-
     runNetlistMonad env isTb globals tops typeTrans ite be seen1 dir componentNames_
-      $ genComponent (mkGlobalIdFromClash topEntity)
+      $ genComponent topEntity
   return (topComponent, _components s, seen1)
 
 -- | Generate a component for a given function (caching)
@@ -190,7 +188,7 @@ genComponentT compName0 componentExpr = do
 
   topEntityTM <- lookupGlobalEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
-      topVarTypeM = snd . C.splitCoreFunForallTy tcm . coreTypeOf . topId <$> topEntityTM
+      topVarTypeM = snd . C.splitCoreFunForallTy tcm . coreTypeOf . globalIdLegacy . topId <$> topEntityTM
 
   seenIds <~ Lens.use seenComps
   UniqueNormalized ctx wereVoids compInps argWrappers compOutps resUnwrappers binders resultM <-
@@ -541,7 +539,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
       -- type variables have been removed: so it can mention type variables
       -- that are not in scope, and its HWTypes come from Clash Core types.
       -- TODO(D4): use the scoped type once 'GlobalId' carries one.
-      | let ty = coreTypeOf (topId topEntity)
+      | let ty = coreTypeOf (globalIdLegacy (topId topEntity))
       , let (fArgTys0,fResTy) = C.splitFunForallTy ty
       -- Take into account that clocks and stuff are split off from any product
       -- types containing them
