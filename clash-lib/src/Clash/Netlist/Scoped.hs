@@ -116,7 +116,7 @@ import           Clash.Netlist.Scoped.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
-  (UniqueNormalized (..), coreTypeToHWTypeM', localIdText, mkUniqueNormalized, primWarnContext,
+  (UniqueNormalized (..), coreTypeToHWTypeM', globalIdentifier, localIdText, mkUniqueNormalized, primWarnContext,
    splitNormalized,
    unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
@@ -477,7 +477,7 @@ mkExpr ctx bbEasD declType bndr app =
     Data dc -> mkDcApplication ctx declType hwTys bndr dc tmArgs
     Prim pInfo -> mkPrimitive ctx False bbEasD declType bndr pInfo args tickDecls
     Var o ty f -> funApp (Left (LocalId o ty f)) (localIdentifier ctx f)
-    GlobalVar g -> funApp (Right g) (Id.unsafeFromCoreId (globalIdVar g))
+    GlobalVar g -> funApp (Right g) (globalIdentifier g)
     Case scrut ty' [alt] -> mkProjection ctx declType bbEasD bndr scrut ty' alt
     Case scrut tyA (alt:alts) -> do
       argNm <- Id.suffix bndrIdentifier "sel_arg"
@@ -575,7 +575,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
 
         instDecls <-
           mkTopUnWrapper
-            (globalIdVar fun) expandedTopEntity (dstId, dstHWty)
+            fun expandedTopEntity (dstId, dstHWty)
             filteredTypeExprs tickDecls
 
         return (argDecls ++ instDecls)

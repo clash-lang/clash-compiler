@@ -125,7 +125,7 @@ import {-# SOURCE #-} Clash.Netlist.Scoped
    mkFunApp, mkNetDecl, mkProjection, mkSelection)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
-  (coreTypeToHWTypeM, idToOutPort, localIdText, primWarnContext, renameBinder, uniqueIdentifier,
+  (coreTypeToHWTypeM, globalIdentifier, idToOutPort, localIdText, primWarnContext, renameBinder, uniqueIdentifier,
    unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | The result of a blackbox: its HDL identifier and its type. See the module
@@ -257,7 +257,7 @@ mkArgument ctx bbName bndr declType nArg e = do
         (Var _ _ v,[],_) -> do
           return ((Identifier (localIdentifier ctx v) Nothing,hwTy,False),[])
         (GlobalVar g,[],_) -> do
-          return ((Identifier (Id.unsafeFromCoreId (globalIdVar g)) Nothing,hwTy,False),[])
+          return ((Identifier (globalIdentifier g) Nothing,hwTy,False),[])
         (Literal lit,[],_) ->
           return ((mkLiteral iw lit,hwTy,True),[])
 
@@ -1033,7 +1033,7 @@ mkFunInput ctx parentName declType resId e =
 
     go _ _ (GlobalVar g) = do
       let assn = Assignment (Id.unsafeMake "~RESULT") assignTy
-                   (Identifier (Id.unsafeFromCoreId (globalIdVar g)) Nothing)
+                   (Identifier (globalIdentifier g) Nothing)
       return ((Id.unsafeMake "",[assn]), assignTy)
 
     go c _ (Case scrut ty [alt]) = do
