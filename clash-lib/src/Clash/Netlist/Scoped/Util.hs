@@ -11,9 +11,9 @@
   ('unsafeCoreTypeToHWTypeM', ...) takes the scope of the type, to look
   through newtypes and type families.
 
-  The other utilities are adapters that run their counterparts in
-  "Clash.Netlist.Util" on Clash Core, see
-  'Clash.Netlist.Scoped.Types.toLegacy'. TODO(Phase 5, Util): port.
+  Blackbox functions on Clash Core, and the Netlist handlers that still run on
+  Clash Core, get their arguments converted to Clash Core, see
+  'Clash.Netlist.Scoped.Types.toLegacy'.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -44,7 +44,7 @@ module Clash.Netlist.Scoped.Util
   , coreTypeToHWTypeM'
   , termHWType
   , termHWTypeM
-    -- * Adapters
+    -- * Ticks
   , withTicks
   ) where
 
@@ -53,6 +53,15 @@ import           Control.Exception           (throw)
 import qualified Control.Lens                as Lens
 import           Control.Monad               (when, zipWithM)
 import           Control.Monad.Extra         (concatMapM)
+import           Control.Monad.Reader        (local)
+import           Control.Monad.Trans.Except  (runExcept)
+import qualified Data.IntMap.Strict          as IntMap
+import qualified Data.List                   as List
+import           Data.Proxy                  (Proxy (..))
+import qualified Data.Text                   as Text
+import           GHC.TypeLits                (someNatVal)
+import           GHC.TypeNats                (SomeNat (..))
+import           GHC.Utils.Outputable        (ppr, showSDocUnsafe)
 import qualified Data.Map.Strict             as Map
 import           Control.Monad.State.Strict  (runState)
 import           Data.Maybe                  (catMaybes, isNothing)
@@ -64,17 +73,25 @@ import qualified Clash.Core.HasType          as C (inferCoreTypeOf)
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Type             as C (Type)
+import qualified Clash.Core.Type             as C (LitTy (..), Type)
 import           Clash.Core.Term             (MultiPrimInfo (..))
 import           Clash.Core.TermInfo         (multiPrimInfo')
 import qualified Clash.Core.Var              as C
 import           Clash.Util                  (ClashException (..), curLoc)
 import           Clash.Util.Supply           (Supply, splitSupply)
 
+import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
 import           Clash.Core.Scoped.Convert   (fromClashTypeClosed, toClashTerm, toClashType)
+import           Clash.Core.Scoped.Evaluator (nfData)
+import           Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
+import           Clash.Core.Scoped.Evaluator.Types
+  (Env (..), Machine (..), PrimReductions (..), initMachine)
+import           Clash.Core.Scoped.NameMap   (emptyNameMap)
+import           Clash.Core.Scoped.TermLiteral (termToDataError)
+import           Clash.Core.Scoped.Type      (coreView, tyLitShow)
 import           Clash.Core.Scoped.FreeVars  (tmNameOccursIn)
 import           Clash.Core.Scoped.Subst
-  (openBind, openIdBinder, teleIdVars, withFreshIdBinder)
+  (closeTerm, openBind, openIdBinder, teleIdVars, withFreshIdBinder)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.Term      (collectArgsTicks, collectTicks, mkTicks, stripTicks)
@@ -86,13 +103,15 @@ import           Clash.Netlist.Scoped.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Types
-  (BlackBox, Declaration, DeclarationType (..), ExpandedPortName, ExpandedTopEntity (..),
-   FilteredHWType (..), HWType, Identifier, NetlistMonad, backend, curCompNm, customReprs,
-   htyCache, tcCache, typeEnv, typeTranslator)
+  (BlackBox, CommentOrDirective (..), Declaration (..), DeclarationType (..), ExpandedPortName,
+   ExpandedTopEntity (..),
+   FilteredHWType (..), HWType, Identifier, NetlistEnv (..), NetlistMonad, backend, bindings,
+   curCompNm, customReprs, htyCache, tcCache, typeEnv, typeTranslator)
 import           Clash.Netlist.Util
-  (containsBiSignalIn, evalBlackBox, expandTopEntityOrErrM, isBiSignalIn, isVoid,
-   mkTopInput, mkTopOutput, preserveVarEnv, primWarnContext, stripFiltered)
-import qualified Clash.Netlist.Util          as Legacy
+  (containsBiSignalIn, coreTypeToHWType, evalBlackBox, expandTopEntityOrErrM, isBiSignalIn,
+   applyNameMod, isVoid, mkTopInput, mkTopOutput, preserveVarEnv, primWarnContext, stripFiltered,
+   unsafeCoreTypeToHWType)
+import qualified Clash.Sized.Vector          as V
 import           Clash.Primitives.Types      (CompiledPrimitive, Primitive (..))
 
 -- * Components
@@ -514,7 +533,7 @@ unsafeCoreTypeToHWTypeM loc sc ty = do
   reprs <- Lens.view customReprs
   te <- Lens.view typeEnv
   htm0 <- Lens.use htyCache
-  let (hty, htm1) = runState (Legacy.unsafeCoreTypeToHWType cmpNm loc tt reprs te sc ty) htm0
+  let (hty, htm1) = runState (unsafeCoreTypeToHWType cmpNm loc tt reprs te sc ty) htm0
   htyCache Lens..= htm1
   return hty
 
@@ -530,7 +549,7 @@ coreTypeToHWTypeM sc ty = do
   reprs <- Lens.view customReprs
   te <- Lens.view typeEnv
   htm0 <- Lens.use htyCache
-  let (hty, htm1) = runState (Legacy.coreTypeToHWType tt reprs te sc ty) htm0
+  let (hty, htm1) = runState (coreTypeToHWType tt reprs te sc ty) htm0
   htyCache Lens..= htm1
   return (either (const Nothing) Just hty)
 
@@ -552,16 +571,78 @@ termHWTypeM sc e = do
   te <- Lens.view typeEnv
   coreTypeToHWTypeM sc (inferCoreTypeOf te sc e)
 
--- * Adapters
+-- * Ticks
 
--- | Run an action in the context of the ticks of a term: see
--- 'Clash.Netlist.Util.withTicks'
+-- | Run an action in the context of the given source ticks and name modifier
+-- ticks. See 'Clash.Netlist.Util.withTicks'.
+--
+-- The attributes of an 'Attributes' tick are evaluated with the evaluator of
+-- scoped Clash Core ('nfData').
 withTicks
-  :: CompCtx n
+  :: (HasCallStack, Distinct n)
+  => CompCtx n
   -> [TickInfo n]
   -> ([Declaration] -> NetlistMonad a)
   -- ^ The source ticks are turned into 'TickDecl's and are passed as an
-  -- argument to the action
+  -- argument to the action. Name modifier ticks will change the local
+  -- environment for the action.
   -> NetlistMonad a
-withTicks ctx ticks = Legacy.withTicks (map (toLegacyTick ctx) ticks)
+withTicks ctx ticks0 k = go [] (reverse (List.nubBy eqTick ticks0))
+ where
+  sc = compScope ctx
+  te = compTypeEnv ctx
 
+  go decls [] = k (reverse decls)
+
+  go decls (DeDup:ticks) = go decls ticks
+
+  go decls (NoDeDup:ticks) = go decls ticks
+
+  go decls (SrcSpan sp:ticks) =
+    go (TickDecl (Comment (Text.pack (showSDocUnsafe (ppr sp)))):decls) ticks
+
+  go decls (Attributes ty attrs0:ticks) =
+    -- The term `attrs0` represents a value of type `Vec n (Attr String)`,
+    -- which 'termToDataError' decodes. It only decodes literals, so the term
+    -- is evaluated as far as it is data ('nfData') first: it might not be
+    -- beta-reduced, e.g. `(/\b.Nil 0 b (0~0)) Bool`.
+    case coreView te sc ty of
+      LitTy (C.NumTy n)
+        | Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
+        -> case closeTerm attrs0 of
+            Just attrsC -> do
+              globals <- Lens.use bindings
+              let
+                m0 = initMachine emptyScope emptyNameMap globals (IntMap.empty, 0) attrsC
+                -- See 'Clash.Rewrite.Scoped.Whnf.evaluatorEnv'
+                env0 = Env te (PrimReductions scopedPrimReductions Nothing)
+                attrsE = nfData env0 m0 (termToDataError . mTerm)
+              case attrsE of
+                Left msg -> error msg
+                Right attrs1 ->
+                  let attrs2 = fmap (fmap Text.pack) attrs1
+                  in local (\env -> env {_localAttrs = V.toList @n attrs2}) (go decls ticks)
+            Nothing -> error errFV
+      _ -> error errNoNum
+   where
+    errHeader = "ERROR: cannot add attribues: " <> showPpr attrs0
+    errNoNum  = unlines [errHeader
+                        ,"REASON: Internal length is not a literal" <> showPpr ty]
+    errFV     = unlines [errHeader
+                        ,"REASON: attributes mentions variables" <> showPpr attrs0
+                        ]
+
+  go decls (NameMod m nm0:ticks) =
+    case runExcept (tyLitShow te sc nm0) of
+      Right nm1 -> local (applyNameMod m (Text.pack nm1)) (go decls ticks)
+      _ -> go decls ticks
+
+  -- See the 'Eq' instance of 'C.TickInfo'
+  eqTick :: TickInfo n -> TickInfo n -> Bool
+  eqTick t1 t2 = case (t1, t2) of
+    (SrcSpan sp1, SrcSpan sp2) -> sp1 == sp2
+    (NameMod m1 ty1, NameMod m2 ty2) -> m1 == m2 && aeqTy ty1 ty2
+    (DeDup, DeDup) -> True
+    (NoDeDup, NoDeDup) -> True
+    (Attributes ty1 e1, Attributes ty2 e2) -> aeqTy ty1 ty2 && aeqTm e1 e2
+    _ -> False

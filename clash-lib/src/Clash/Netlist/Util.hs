@@ -2059,19 +2059,21 @@ withTicks ticks0 k = do
   go decls (NameMod m nm0:ticks) = do
     tcm <- Lens.view tcCache
     case runExcept (tyLitShow tcm nm0) of
-      Right nm1 -> local (modName m nm1) (go decls ticks)
+      Right nm1 -> local (applyNameMod m (Text.pack nm1)) (go decls ticks)
       _ -> go decls ticks
 
-  modName PrefixName (Text.pack -> s2) env@(NetlistEnv {_prefixName = s1})
-    | Text.null s1 = env {_prefixName = s2}
-    | otherwise    = env {_prefixName = s1 <> "_" <> s2}
-  modName SuffixName (Text.pack -> s2) env@(NetlistEnv {_suffixName = s1})
-    | Text.null s1 = env {_suffixName = s2}
-    | otherwise    = env {_suffixName = s2 <> "_" <> s1}
-  modName SuffixNameP (Text.pack -> s2) env@(NetlistEnv {_suffixName = s1})
-    | Text.null s1 = env {_suffixName = s2}
-    | otherwise    = env {_suffixName = s1 <> "_" <> s2}
-  modName SetName (Text.pack -> s) env = env {_setName = Just s}
+-- | Apply a name modifier to the names of the environment, see 'withTicks'
+applyNameMod :: NameMod -> Text -> NetlistEnv -> NetlistEnv
+applyNameMod PrefixName s2 env@(NetlistEnv {_prefixName = s1})
+  | Text.null s1 = env {_prefixName = s2}
+  | otherwise    = env {_prefixName = s1 <> "_" <> s2}
+applyNameMod SuffixName s2 env@(NetlistEnv {_suffixName = s1})
+  | Text.null s1 = env {_suffixName = s2}
+  | otherwise    = env {_suffixName = s2 <> "_" <> s1}
+applyNameMod SuffixNameP s2 env@(NetlistEnv {_suffixName = s1})
+  | Text.null s1 = env {_suffixName = s2}
+  | otherwise    = env {_suffixName = s1 <> "_" <> s2}
+applyNameMod SetName s env = env {_setName = Just s}
 
 -- | Add the pre- and suffix names in the current environment to the given
 -- identifier
