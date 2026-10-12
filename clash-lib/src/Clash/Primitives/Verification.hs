@@ -6,14 +6,16 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
-module Clash.Primitives.Verification (checkBBF) where
+module Clash.Primitives.Verification (checkBBF, bindMaybe) where
 
 import Data.Either
 
 
-import qualified Control.Lens                    as Lens
 import           Control.Monad.State             (State)
 import           Data.List.Infinite              (Infinite(..), (...))
 import           Data.Maybe                      (listToMaybe)
@@ -25,32 +27,35 @@ import           GHC.Stack                       (HasCallStack)
 import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
-import           Clash.Core.HasType
-import           Clash.Core.Term                 (Term(Var))
-import           Clash.Core.TermLiteral          (termToDataError)
+import           Clash.Core.Scoped.HasType       (inferCoreTypeOf)
+import           Clash.Core.Scoped.Syntax        (Distinct, Term(Var))
+import           Clash.Core.Scoped.TermLiteral
+  (liftTermToData#, termToDataError, termToDataErrorWith)
 import           Clash.Util                      (indexNote)
-import           Clash.Netlist                   (mkExpr)
+import           Clash.Netlist.Scoped            (mkExpr)
+import           Clash.Netlist.Scoped.Types
+  (BlackBoxEnv, BlackBoxFunction, NetlistId(..), bbLocalIdentifier, bbScope,
+   bbTypeEnv)
 import           Clash.Netlist.Util              (stripVoid, contAssign)
 import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
   (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(NetDecl),
-   HWType(Bool, KnownDomain), NetlistId(..),
-   DeclarationType(Concurrent), tcCache, bbInputs, Expr(Identifier))
+   HWType(Bool, KnownDomain),
+   DeclarationType(Concurrent), bbInputs, Expr(Identifier))
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
-   emptyBlackBoxMeta)
+  (BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..), emptyBlackBoxMeta)
 
 import           Clash.Verification.Internal
 import           Clash.Verification.Pretty
 
 checkBBF :: BlackBoxFunction
-checkBBF _isD _primName args _ty =
+checkBBF env _isD _primName args _ty =
   case litArgs of
     Left err -> pure (Left err)
     Right (propName, renderAs, cvProperty0) -> do
-      clkBind <- bindMaybe (Just "clk") (indexNote "clk" (lefts args) clkArg)
-      cvProperty1 <- mapM (uncurry bindMaybe) cvProperty0
+      clkBind <- bindMaybe env (Just "clk") (indexNote "clk" (lefts args) clkArg)
+      cvProperty1 <- mapM (uncurry (bindMaybe env)) cvProperty0
       let decls = concatMap snd cvProperty1
           cvProperty2 = fmap fst cvProperty1
       pure (Right (meta, bb (checkTF decls clkBind propName renderAs cvProperty2)))
@@ -68,33 +73,41 @@ checkBBF _isD _primName args _ty =
   litArgs = do
     propName <- termToDataError (indexNote "propName" (lefts args) propNameArg)
     renderAs <- termToDataError (indexNote "renderAs" (lefts args) renderAsArg)
-    cvProperty <- termToDataError (indexNote "propArg" (lefts args) propArg)
+    -- The leaves of the property are terms, bound by 'bindMaybe'
+    cvProperty <-
+      termToDataErrorWith "Property' (Maybe Text, Term)"
+        (liftTermToData# (liftTermToData# Right))
+        (indexNote "propArg" (lefts args) propArg)
     Right (propName, renderAs, cvProperty)
 
   bb = BBFunction "Clash.Primitives.Verification.checkTF" 0
   meta = emptyBlackBoxMeta {bbKind=TDecl, bbRenderVoid=RenderVoid}
 
-  bindMaybe
-    :: Maybe Text
-    -- ^ Hint for new identifier
-    -> Term
-    -- ^ Term to bind. Does not bind if it's already a reference to a signal
-    -> NetlistMonad (Identifier, [Declaration])
-    -- ^ ([new] reference to signal, [declarations need to get it in scope])
-  bindMaybe _ (Var vId) = pure (Id.unsafeFromCoreId vId, [])
-  bindMaybe Nothing t = bindMaybe (Just "s") t
-  bindMaybe (Just nm) t = do
-    tcm <- Lens.view tcCache
-    newId <- Id.make nm
-    (expr0, decls) <- mkExpr False Concurrent (NetlistId newId (inferCoreTypeOf tcm t)) t
-    assn <- contAssign newId expr0
-    pure
-      ( newId
-      , decls ++ [sigDecl Bool newId, assn] )
-
+-- | Bind a term to a signal, unless it is a reference to a signal already
+bindMaybe
+  :: (HasCallStack, Distinct n)
+  => BlackBoxEnv n
+  -- ^ The context of the term
+  -> Maybe Text
+  -- ^ Hint for new identifier
+  -> Term n
+  -- ^ Term to bind. Does not bind if it's already a reference to a signal
+  -> NetlistMonad (Identifier, [Declaration])
+  -- ^ ([new] reference to signal, [declarations need to get it in scope])
+bindMaybe env _ (Var _ _ nm) = pure (bbLocalIdentifier env nm, [])
+bindMaybe env Nothing t = bindMaybe env (Just "s") t
+bindMaybe env (Just nm) t = do
+  newId <- Id.make nm
+  let ty = inferCoreTypeOf (bbTypeEnv env) (bbScope env) t
+  (expr0, decls) <- mkExpr env False Concurrent (NetlistId newId ty) t
+  assn <- contAssign newId expr0
+  pure
+    ( newId
+    , decls ++ [sigDecl Bool newId, assn] )
+ where
   -- Simple wire without comment
   sigDecl :: HWType -> Identifier -> Declaration
-  sigDecl typ nm = NetDecl Nothing nm typ
+  sigDecl typ nm1 = NetDecl Nothing nm1 typ
 
 checkTF
   :: [Declaration]

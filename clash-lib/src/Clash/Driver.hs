@@ -734,7 +734,7 @@ interpretFunctions idirs pkgDbs topDir reqs = do
 knownBlackBoxFunctions :: HashMap String SomeBlackBoxFunction
 knownBlackBoxFunctions =
   HashMap.fromList $ map (first show) $
-    [ ('P.checkBBF, LegacyBBF P.checkBBF)
+    [ ('P.checkBBF, ScopedBBF P.checkBBF)
     , ('P.bvToIntegerVHDL, ScopedBBF P.bvToIntegerVHDL)
     , ('P.bvToIntegerVerilog, ScopedBBF P.bvToIntegerVerilog)
     , ('P.clashCompileErrorBBF, ScopedBBF P.clashCompileErrorBBF)
