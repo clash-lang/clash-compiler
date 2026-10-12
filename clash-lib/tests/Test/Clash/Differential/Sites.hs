@@ -149,8 +149,10 @@ mkCorpus env fs epochs = do
             , _inlineHistory = fsInlineHistory fs
             , _primitiveArgs = fsPrimitiveArgs fs
             , _recursiveComponents = fsRecursiveComponents fs
-            , _normalizationStrategy = normalization
-            , _constantPropagationStrategy = constantPropagation
+            , _normalizationStrategy = viaFoil "normalization" normalization
+            , _constantPropagationStrategy = viaFoil "constantPropagation" constantPropagation
+            , _scopedNormalizationStrategy = normalization
+            , _scopedConstantPropagationStrategy = constantPropagation
             , _workFreeAppCache = HashMap.fromList (fsWorkFreeAppCache fs)
             }
         }

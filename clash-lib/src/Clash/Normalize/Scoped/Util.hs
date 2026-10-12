@@ -20,11 +20,10 @@
 
   During the port, the global bindings ('Clash.Rewrite.Types.bindings'), the
   normalized binders ('normalized'), the work-free application cache
-  ('workFreeAppCache') and the normalization strategy are those of Clash Core.
+  ('workFreeAppCache') are those of Clash Core.
   The functions here convert at that boundary: bodies of global bindings are
   converted into closed scoped terms ('fromClashTermClosed') when they are
-  read, and back ('toClashTermFresh') when they are stored. The normalization
-  strategy runs through 'viaLegacy', see 'scopedNormalization'. Phase 4 of the
+  read, and back ('toClashTermFresh') when they are stored. Phase 4 of the
   port, which runs the normalizer on scoped Core, removes these conversions.
 -}
 
@@ -116,7 +115,7 @@ import           Clash.Rewrite.Scoped.Apply  (runRewrite)
 import           Clash.Rewrite.Scoped.Types
   (FrameKind (..), ScopedRewrite, TransformContext, ctxFrames, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Globals (freshGlobalId)
-import           Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh, viaLegacy)
+import           Clash.Rewrite.Scoped.ViaFoil (toClashTermFresh)
 
 -- * Constant arguments of primitives
 
@@ -434,11 +433,9 @@ isCheapFunction tm = case classifyFunction tm of
 
 -- * Normalizing global binders
 
--- | The normalization strategy, as a scoped transformation. During the port,
--- this is the strategy of Clash Core ('normalizationStrategy') run through
--- 'viaLegacy'. Phase 4 of the port replaces it by the scoped strategy.
+-- | The normalization strategy ('scopedNormalizationStrategy')
 scopedNormalization :: NormalizeSession (ScopedRewrite NormalizeState)
-scopedNormalization = viaLegacy <$> Lens.use (extra.normalizationStrategy)
+scopedNormalization = Lens.use (extra.scopedNormalizationStrategy)
 
 -- | Normalize a global binder, caching the result in 'normalized'. See
 -- 'Clash.Normalize.Util.normalizeTopLvlBndr'.

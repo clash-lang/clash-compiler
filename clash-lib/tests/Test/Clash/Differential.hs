@@ -104,6 +104,7 @@ import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (emptyInScopeSet, emptyVarEnv, eltsVarEnv)
 import Clash.Driver.Types (Binding (..), BindingMap)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
+import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
   (NormRewrite, NormalizeSession, NormalizeState (..))
 import Clash.Rewrite.StrategyDSL (Strat, ToStep, bottomup)
@@ -163,8 +164,10 @@ initialState d = RewriteState
       , _inlineHistory = emptyVarEnv
       , _primitiveArgs = Map.empty
       , _recursiveComponents = emptyVarEnv
-      , _normalizationStrategy = normalization
-      , _constantPropagationStrategy = constantPropagation
+      , _normalizationStrategy = viaFoil "normalization" normalization
+      , _constantPropagationStrategy = viaFoil "constantPropagation" constantPropagation
+      , _scopedNormalizationStrategy = normalization
+      , _scopedConstantPropagationStrategy = constantPropagation
       , _workFreeAppCache = HashMap.empty
       }
   }

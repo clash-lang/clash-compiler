@@ -42,6 +42,7 @@ import Clash.Rewrite.Util (apply, changed, runRewrite)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
+import Clash.Rewrite.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
 import Clash.Util.Supply (Supply, freshId, newSupply)
@@ -158,8 +159,10 @@ instance Default NormalizeState where
     , _inlineHistory=emptyVarEnv
     , _primitiveArgs=Map.empty
     , _recursiveComponents=emptyVarEnv
-    , _normalizationStrategy=normalization
-    , _constantPropagationStrategy=constantPropagation
+    , _normalizationStrategy=viaFoil "normalization" normalization
+    , _constantPropagationStrategy=viaFoil "constantPropagation" constantPropagation
+    , _scopedNormalizationStrategy=normalization
+    , _scopedConstantPropagationStrategy=constantPropagation
     , _workFreeAppCache=HashMap.empty
     }
 
