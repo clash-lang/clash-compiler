@@ -10,3 +10,4 @@ import Clash.Core.Name (Name)
 
 data TyCon
 type TyConName = Name TyCon
+data AlgTyConRhs

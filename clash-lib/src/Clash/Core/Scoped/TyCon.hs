@@ -3,34 +3,16 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The signatures of type constructors and data constructors in scoped Clash
-  Core ("Clash.Core.Scoped.Sig"), converted from Clash Core.
-
-  = Transition
-
-  Scoped types refer to type constructors by name (in a 'C.ConstTy'), and
-  look them up in Clash's 'Clash.Core.TyCon.TyConMap', whose 'TyCon's have
-  closed Clash 'C.Type's. This module gives the parts of a 'TyCon' that
-  mention type variables as scoped types, by converting them (TODO(D4): read
-  them once 'TyCon' stores scoped types). Data constructors store their
-  signatures ('Clash.Core.DataCon.dcSig').
-
-  Clash stores the equations of a type family without their pattern
-  variables, so these are the free type variables of the equation, ordered so
-  that every variable comes after the variables in its kind.
-
-  The functions below convert for every call. Use the ones of
-  "Clash.Core.Scoped.TypeEnv", which convert every signature at most once.
-
-  = Migration
-
-  Once 'TyCon' stores scoped types (in place of 'ntEtadRhs' and
-  'tyConSubst'), the functions below become field selectors.
+  The signatures of type constructors in scoped Clash Core
+  ("Clash.Core.Scoped.Sig"): the signature of a newtype ('newTyConSig') and the
+  equations of a type family ('tyFamEqns'), and the instantiation of a newtype
+  ('newTyConInstRhs').
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Clash.Core.Scoped.TyCon
@@ -45,16 +27,10 @@ module Clash.Core.Scoped.TyCon
   , DataConSig (..)
   ) where
 
-import qualified Control.Lens as Lens
 import qualified Data.List as List
-import GHC.Stack (HasCallStack)
 
-import Clash.Core.FreeVars (dependencySortTyVars, typeFreeVars)
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..))
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 
-import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Sig
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
@@ -62,13 +38,10 @@ import Clash.Core.Scoped.Syntax
 -- * Newtypes
 
 -- | The signature of a newtype. 'Nothing' if the type constructor is not a
--- newtype. Errors if the representation type mentions type variables other
--- than those of the newtype.
-newTyConSig :: HasCallStack => TyCon -> Maybe NewTyConSig
+-- newtype.
+newTyConSig :: TyCon -> Maybe NewTyConSig
 newTyConSig = \case
-  AlgTyCon {algTcRhs = NewTyCon {ntEtadRhs = (tvs, rhs)}} ->
-    Just $ fromClashTyVars emptyConvEnv tvs $ \env tele ->
-      NewTyConSig tele (fromClashType env rhs)
+  AlgTyCon {algTcRhs = NewTyCon {ntSig}} -> Just ntSig
   _ -> Nothing
 
 -- | The representation type of a newtype applied to the given types: the types
@@ -92,20 +65,7 @@ instTele _ TCons {} _ [] = Nothing
 
 -- | The equations of a type family, in order. 'Nothing' if the type
 -- constructor is not a type family.
-tyFamEqns :: HasCallStack => TyCon -> Maybe [TyFamEqn]
+tyFamEqns :: TyCon -> Maybe [TyFamEqn]
 tyFamEqns = \case
-  FunTyCon {tyConSubst = eqns} -> Just (map tyFamEqn eqns)
+  FunTyCon {tyConEqns} -> Just tyConEqns
   _ -> Nothing
-
-tyFamEqn :: HasCallStack => ([C.Type], C.Type) -> TyFamEqn
-tyFamEqn (lhs, rhs) =
-  fromClashTyVars emptyConvEnv tvs $ \env tele ->
-    TyFamEqn tele (map (fromClashType env) lhs) (fromClashType env rhs)
- where
-  -- The free type variables, closed over kinds, see the module header
-  tvs =
-    dependencySortTyVars
-      (List.nubBy sameUniq (concatMap (Lens.toListOf typeFreeVars) (lhs ++ [rhs])))
-
-  sameUniq :: C.TyVar -> C.TyVar -> Bool
-  sameUniq v1 v2 = C.varUniq v1 == C.varUniq v2

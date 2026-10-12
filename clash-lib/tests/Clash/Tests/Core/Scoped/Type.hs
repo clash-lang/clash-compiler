@@ -35,7 +35,7 @@ import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Util as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Convert hiding (mkFunTyCon)
 import Clash.Core.Scoped.FreeVars (freeTyVarsOfType)
 import Clash.Core.Scoped.NameMap (nullNameSet)
 import Clash.Core.Scoped.Subst (unsinkType)

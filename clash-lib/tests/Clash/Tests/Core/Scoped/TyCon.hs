@@ -7,10 +7,14 @@
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Tests.Core.Scoped.TyCon (tests) where
 
+import Control.Monad (forM_)
+import qualified Data.Char as Char
+import qualified Data.List as List
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -18,14 +22,16 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
+import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert hiding (mkDataCon)
+import Clash.Core.Scoped.Convert hiding (mkDataCon, mkFunTyCon)
+import qualified Clash.Core.Scoped.Convert as Convert (mkFunTyCon)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
 
 import Test.Clash.Rewrite
   ( intTy, intTyCon, kindedTyVar, mkDataCon, mkFunTyCon, mkNewTyCon, mkTyConName
-  , tyVar )
+  , testTyConMap, tyVar )
 import Test.Clash.Scoped (assertScopedTyAlphaEq)
 
 aTv, bTv, cTv, kTv :: C.TyVar
@@ -112,4 +118,47 @@ tests = testGroup "Clash.Tests.Core.Scoped.TyCon"
 
   , testCase "tyFamEqns of a type that is not a type family" $
       assertBool "not a type family" (null (tyFamEqns nTyCon))
+
+    -- The native constructors derive the types of Clash Core, from which the
+    -- constructors of Clash Core derive the same scoped types, up to the
+    -- uniques of the names of binders, which scoped Core doesn't use
+  , testCase "native constructors round trip through Clash Core" $
+      forM_ (fTyCon : UniqMap.elems testTyConMap) $ \tc ->
+        sigs (fromLegacy (native tc)) @?= sigs tc
   ]
+ where
+  sigs tc = map withoutUniqs
+    [show (C.tyConKind tc), show (newTyConSig tc), show (tyFamEqns tc)]
+
+  -- Drops the uniques of 'C.Name's from 'show'
+  withoutUniqs = \case
+    [] -> []
+    str@(c:cs)
+      | Just rest <- List.stripPrefix "nameUniq = " str ->
+          withoutUniqs (dropWhile Char.isDigit rest)
+      | otherwise -> c : withoutUniqs cs
+
+  native tc = case tc of
+    C.AlgTyCon {} -> mkAlgTyCon nm k ar (nativeRhs (C.algTcRhs tc)) (C.isClassTc tc)
+    C.PromotedDataCon {} -> mkPromotedDataCon nm k ar (C.tyConData tc)
+    C.FunTyCon {} -> Convert.mkFunTyCon nm k ar (C.tyConEqns tc)
+    C.PrimTyCon {} -> mkPrimTyCon nm k ar
+   where
+    (nm, k, ar) = (C.tyConName tc, C.tyConKind tc, C.tyConArity tc)
+
+  nativeRhs = \case
+    C.NewTyCon dc sig _ -> mkNewTyConRhs dc sig
+    rhs -> rhs
+
+  fromLegacy tc = case tc of
+    C.AlgTyCon {} ->
+      mkAlgTyConFromClash u nm k ar (legacyRhs (C.algTcRhs tc)) (C.isClassTc tc)
+    C.PromotedDataCon {} -> mkPromotedDataConFromClash u nm k ar (C.tyConData tc)
+    C.FunTyCon {} -> mkFunTyConFromClash u nm k ar (C.tyConLegacySubst tc)
+    C.PrimTyCon {} -> mkPrimTyConFromClash u nm k ar
+   where
+    (u, nm, k, ar) = (C.tyConUniq tc, C.tyConName tc, C.tyConLegacyKind tc, C.tyConArity tc)
+
+  legacyRhs = \case
+    C.NewTyCon dc _ etad -> mkNewTyConRhsFromClash dc etad
+    rhs -> rhs

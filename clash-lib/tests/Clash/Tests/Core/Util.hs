@@ -15,7 +15,8 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Name (Name (nameUniq), NameSort (User))
 import Clash.Core.Term (Pat (..), Term (..))
-import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..), TyConMap)
+import Clash.Core.Scoped.Convert (mkAlgTyConFromClash)
+import Clash.Core.TyCon (AlgTyConRhs (..), TyConMap)
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Util (mkSelectorCase)
 import Clash.Unique (Unique)
@@ -32,14 +33,13 @@ pairTcm = UniqMap.fromList [(nameUniq intNm, intTyCon), (nameUniq pairNm, pairTc
  where
   intNm = parseTyConName "Int"
   pairNm = parseTyConName "Pair"
-  pairTc = AlgTyCon
-    { tyConUniq = nameUniq pairNm
-    , tyConName = pairNm
-    , tyConKind = liftedTypeKind
-    , tyConArity = 0
-    , algTcRhs = DataTyCon [pairDataCon]
-    , isClassTc = False
-    }
+  pairTc = mkAlgTyConFromClash
+    (nameUniq pairNm)
+    pairNm
+    liftedTypeKind
+    0
+    (DataTyCon [pairDataCon])
+    False
 
 -- | 'mkSelectorCase' for the second field of a @Pair@, while the first two
 -- uniques it gets, 50 and 51, are in scope. It makes a binder for every field,

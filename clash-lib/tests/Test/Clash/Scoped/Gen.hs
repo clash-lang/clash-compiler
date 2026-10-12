@@ -121,6 +121,7 @@ import qualified Clash.Core.Subst as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TyCon as C
+import qualified Clash.Core.Scoped.Convert as C (mkAlgTyConFromClash, mkPrimTyConFromClash)
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (InScopeSet, emptyInScopeSet, extendInScopeSetList)
@@ -224,11 +225,11 @@ tyConMap = foldr UniqMap.insertUnique C.tysPrimMap tcs
 
   alg ty kind arity dcs =
     let nm = tyConName ty
-    in  C.AlgTyCon (C.nameUniq nm) nm kind arity (C.DataTyCon dcs) False
+    in  C.mkAlgTyConFromClash (C.nameUniq nm) nm kind arity (C.DataTyCon dcs) False
 
   prim ty kind arity =
     let nm = tyConName ty
-    in  C.PrimTyCon (C.nameUniq nm) nm kind arity
+    in  C.mkPrimTyConFromClash (C.nameUniq nm) nm kind arity
 
 -- | The global variables that generated terms use. Their uniques are small, so
 -- that they clash with those of local variables (D5).
@@ -451,7 +452,7 @@ genType ctx k n
 kindOf :: C.Type -> Maybe C.Kind
 kindOf = \case
   C.VarTy tv -> Just (C.varType tv)
-  C.ConstTy (C.TyCon nm) -> C.tyConKind <$> UniqMap.lookup nm tyConMap
+  C.ConstTy (C.TyCon nm) -> C.tyConLegacyKind <$> UniqMap.lookup nm tyConMap
   C.ConstTy C.Arrow -> Just (C.mkFunTy C.liftedTypeKind arrKind)
   C.ForAllTy _ t -> kindOf t
   C.LitTy (C.NumTy _) -> Just C.typeNatKind

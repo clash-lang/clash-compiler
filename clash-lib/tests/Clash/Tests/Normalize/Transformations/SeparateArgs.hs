@@ -21,6 +21,7 @@ import Clash.Core.HasType (inferCoreTypeOf)
 import Clash.Core.Name (Name (..), NameSort (User), mkUnsafeName)
 import Clash.Core.Subst (aeqType)
 import Clash.Core.Term (Term (..), collectArgs, mkApps)
+import Clash.Core.Scoped.Convert (mkAlgTyConFromClash)
 import Clash.Core.TyCon (AlgTyConRhs (DataTyCon), TyCon (..), TyConName)
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Type
@@ -65,14 +66,13 @@ env = withTyConMap tcm def
   cEnv = _clashEnv def
   tcm = foldr (\tc -> UniqMap.insert (tyConName tc) tc) (envTyConMap cEnv)
           [mkTc clockTcNm [], mkTc clkPairTcNm [clkPairDc]]
-  mkTc nm dcs = AlgTyCon
-    { tyConUniq = nameUniq nm
-    , tyConName = nm
-    , tyConKind = liftedTypeKind
-    , tyConArity = 0
-    , algTcRhs = DataTyCon dcs
-    , isClassTc = False
-    }
+  mkTc nm dcs = mkAlgTyConFromClash
+    (nameUniq nm)
+    nm
+    liftedTypeKind
+    0
+    (DataTyCon dcs)
+    False
 
 p, x, h :: Id
 p = localId User "p" 30 clkPairTy

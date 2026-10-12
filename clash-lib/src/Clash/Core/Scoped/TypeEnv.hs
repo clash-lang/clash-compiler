@@ -58,7 +58,6 @@ import Clash.Core.TyCon (TyCon (tyConKind), TyConMap, TyConName)
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert (fromClashTypeClosed)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
 
@@ -88,7 +87,7 @@ mkTypeEnv tcm = TypeEnv
  where
   tyConInfo tc = TyConInfo
     { tciTyCon = tc
-    , tciKind = fromClashTypeClosed emptyScope (tyConKind tc)
+    , tciKind = tyConKind tc
     , tciNewTyConSig = newTyConSig tc
     , tciTyFamEqns = tyFamEqns tc
     }

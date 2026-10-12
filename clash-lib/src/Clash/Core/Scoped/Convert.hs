@@ -89,9 +89,20 @@ module Clash.Core.Scoped.Convert
   , mkPrimInfoFromClash
   , mkDataCon
   , mkDataConFromClash
+  , mkAlgTyCon
+  , mkAlgTyConFromClash
+  , mkPromotedDataCon
+  , mkPromotedDataConFromClash
+  , mkFunTyCon
+  , mkFunTyConFromClash
+  , mkPrimTyCon
+  , mkPrimTyConFromClash
+  , mkNewTyConRhs
+  , mkNewTyConRhsFromClash
   ) where
 
 import qualified Control.Lens as Lens
+import qualified Data.List as List
 import Control.Monad.ST (ST, runST)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -105,6 +116,7 @@ import GHC.Stack (HasCallStack)
 import Clash.Core.DataCon
   (ConTag, DataCon (..), DcName, DcStrictness, LegacyDataCon (..))
 import qualified Clash.Core.Name as C
+import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..), TyConName)
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Util as C (undefinedTy)
@@ -658,3 +670,88 @@ mkDataConFromClash nm u tag ty univ ext args strict labels = MkData
   , dcFieldLabels = labels
   , dcLegacy = LegacyDataCon ty univ ext args
   }
+
+-- | An algebraic data type: name, closed kind, arity, data constructors, and
+-- whether it is a class dictionary
+mkAlgTyCon :: TyConName -> Kind 'VoidS -> Int -> AlgTyConRhs -> Bool -> TyCon
+mkAlgTyCon nm k ar rhs cls = AlgTyCon (C.nameUniq nm) nm k ar rhs cls (toClashType k)
+
+-- | An algebraic data type of Clash Core: unique, name, kind, arity, data
+-- constructors, and whether it is a class dictionary. Its kind is converted
+-- lazily, and errors if it isn't closed.
+mkAlgTyConFromClash
+  :: HasCallStack => Unique -> TyConName -> C.Kind -> Int -> AlgTyConRhs -> Bool -> TyCon
+mkAlgTyConFromClash u nm k ar rhs cls =
+  AlgTyCon u nm (fromClashTypeClosed emptyScope k) ar rhs cls k
+
+-- | A promoted data constructor: name, closed kind, arity, and the data
+-- constructor
+mkPromotedDataCon :: TyConName -> Kind 'VoidS -> Int -> DataCon -> TyCon
+mkPromotedDataCon nm k ar dc = PromotedDataCon (C.nameUniq nm) nm k ar dc (toClashType k)
+
+-- | A promoted data constructor of Clash Core, see 'mkAlgTyConFromClash'
+mkPromotedDataConFromClash
+  :: HasCallStack => Unique -> TyConName -> C.Kind -> Int -> DataCon -> TyCon
+mkPromotedDataConFromClash u nm k ar dc =
+  PromotedDataCon u nm (fromClashTypeClosed emptyScope k) ar dc k
+
+-- | A type family: name, closed kind, arity, and equations. The types of
+-- Clash Core use the raw names of the pattern variables as uniques.
+mkFunTyCon :: TyConName -> Kind 'VoidS -> Int -> [TyFamEqn] -> TyCon
+mkFunTyCon nm k ar eqns =
+  FunTyCon (C.nameUniq nm) nm k ar eqns (toClashType k) (map toEqn eqns)
+ where
+  toEqn (TyFamEqn tvs lhs rhs) =
+    toTele toTyBinder (ToEnv IntMap.empty IntMap.empty) tvs $ \env _ ->
+      (map (toClashTypeEnv env) lhs, toClashTypeEnv env rhs)
+
+-- | A type family of Clash Core: unique, name, kind, arity, and equations, as
+-- a list of the types of the left-hand side and the right-hand side. Its kind
+-- and equations are converted lazily. Clash Core stores the equations without
+-- their pattern variables, so these are the free type variables of the
+-- equation, ordered so that every variable comes after the variables in its
+-- kind. Errors if the kind isn't closed.
+mkFunTyConFromClash
+  :: HasCallStack => Unique -> TyConName -> C.Kind -> Int -> [([C.Type], C.Type)] -> TyCon
+mkFunTyConFromClash u nm k ar eqns =
+  FunTyCon u nm (fromClashTypeClosed emptyScope k) ar (map tyFamEqn eqns) k eqns
+ where
+  tyFamEqn (lhs, rhs) =
+    fromClashTyVars emptyConvEnv (eqnTyVars lhs rhs) $ \env tele ->
+      TyFamEqn tele (map (fromClashType env) lhs) (fromClashType env rhs)
+
+  -- The free type variables, closed over kinds
+  eqnTyVars lhs rhs =
+    C.dependencySortTyVars
+      (List.nubBy sameUniq (concatMap (Lens.toListOf C.typeFreeVars) (lhs ++ [rhs])))
+
+  sameUniq :: C.TyVar -> C.TyVar -> Bool
+  sameUniq v1 v2 = C.varUniq v1 == C.varUniq v2
+
+-- | A primitive type constructor: name, closed kind, and arity
+mkPrimTyCon :: TyConName -> Kind 'VoidS -> Int -> TyCon
+mkPrimTyCon nm k ar = PrimTyCon (C.nameUniq nm) nm k ar (toClashType k)
+
+-- | A primitive type constructor of Clash Core, see 'mkAlgTyConFromClash'
+mkPrimTyConFromClash :: HasCallStack => Unique -> TyConName -> C.Kind -> Int -> TyCon
+mkPrimTyConFromClash u nm k ar = PrimTyCon u nm (fromClashTypeClosed emptyScope k) ar k
+
+-- | The right-hand side of a newtype: its data constructor and signature. The
+-- types of Clash Core use the raw names of the type variables as uniques.
+mkNewTyConRhs :: DataCon -> NewTyConSig -> AlgTyConRhs
+mkNewTyConRhs dc sig = NewTyCon dc sig legacy
+ where
+  legacy = case sig of
+    NewTyConSig tvs rhs ->
+      toTele toTyBinder (ToEnv IntMap.empty IntMap.empty) tvs $ \env tvs' ->
+        (tvs', toClashTypeEnv env rhs)
+
+-- | The right-hand side of a newtype of Clash Core: its data constructor, and
+-- the type variables of the newtype and its eta-reduced representation type.
+-- Its signature is converted lazily, and errors if the representation type
+-- mentions type variables other than those of the newtype.
+mkNewTyConRhsFromClash :: HasCallStack => DataCon -> ([C.TyVar], C.Type) -> AlgTyConRhs
+mkNewTyConRhsFromClash dc (tvs, rhs) = NewTyCon dc sig (tvs, rhs)
+ where
+  sig = fromClashTyVars emptyConvEnv tvs $ \env tele ->
+    NewTyConSig tele (fromClashType env rhs)
