@@ -20,6 +20,7 @@ import Data.Text (Text)
 
 data IdentifierType
 data Identifier
+instance Show Identifier
 data IdentifierSet
 data HWType
 data Declaration

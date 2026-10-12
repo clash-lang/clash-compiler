@@ -312,6 +312,7 @@ Library
                       Clash.Netlist.Id.SystemVerilog
                       Clash.Netlist.Id.Verilog
                       Clash.Netlist.Id.VHDL
+                      Clash.Netlist.Scoped.Legacy
                       Clash.Netlist.Scoped.Types
                       Clash.Netlist.Types
                       Clash.Netlist.Util

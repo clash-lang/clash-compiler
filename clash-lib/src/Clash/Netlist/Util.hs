@@ -115,6 +115,7 @@ import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
   (bbResultNames, BlackBoxMeta(BlackBoxMeta))
 import qualified Clash.Netlist.Id as Id
+import           Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
 import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
 import qualified Clash.Sized.Vector as V
@@ -952,7 +953,7 @@ renameBinder binds (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $
     tcm <- Lens.view tcCache
     let mpInfo@MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
     let (args1, resIds) = splitMultiPrimArgs mpInfo args
-    funRes <- preserveVarEnv (function False (primName pInfo) args1 mpi_resultTypes)
+    funRes <- preserveVarEnv (legacyBlackBoxFunction function False (primName pInfo) args1 mpi_resultTypes)
     let BlackBoxMeta{bbResultNames} = either error fst funRes
     go (primName pInfo) resIds args1 bbResultNames
   goMulti _ _ = pure []
@@ -960,7 +961,7 @@ renameBinder binds (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $
   -- Routine for single result primitives (the default kind of primitive)
   goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
   goSingle pInfo (BlackBoxHaskell{function=(_, function)}) = do
-    funRes <- preserveVarEnv (function False (primName pInfo) args [coreTypeOf i])
+    funRes <- preserveVarEnv (legacyBlackBoxFunction function False (primName pInfo) args [coreTypeOf i])
     case either error fst funRes of
       BlackBoxMeta{bbResultNames=[bbResultName]} ->
         go (primName pInfo) [i] args [bbResultName]

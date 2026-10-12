@@ -55,6 +55,7 @@ import           Clash.Primitives.Types
   , UnresolvedPrimitive, UnresolvedPrimitiveEntry(..)
   , CompiledPrimMap, GuardedResolvedPrimitive)
 import           Clash.Netlist.Types    (BlackBox(..), NetlistMonad)
+import           Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
 import           Clash.Netlist.Util     (preserveState)
 import           Clash.Netlist.BlackBox.Util
   (walkElement)
@@ -268,7 +269,7 @@ getFunctionPlurality
   -- a function in the first place. State of monad will not be modified.
 getFunctionPlurality (Primitive {}) _args _resTys _n = pure 1
 getFunctionPlurality (BlackBoxHaskell {name, function, functionName}) args resTys n = do
-  errOrMeta <- preserveState ((snd function) False name args resTys)
+  errOrMeta <- preserveState (legacyBlackBoxFunction (snd function) False name args resTys)
   case errOrMeta of
     Left err ->
       error $ concat [ "Tried to determine function plurality for "

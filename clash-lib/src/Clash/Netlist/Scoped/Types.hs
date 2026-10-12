@@ -111,8 +111,8 @@ import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 
 import qualified Clash.Netlist.BlackBox.Types as Legacy (BlackBoxFunction)
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta)
-import qualified Clash.Netlist.Id             as Id (toText)
-import           Clash.Netlist.Types         (BlackBox, Identifier, NetlistMonad)
+import {-# SOURCE #-} qualified Clash.Netlist.Id as Id (toText)
+import {-# SOURCE #-} Clash.Netlist.Types    (BlackBox, Identifier, NetlistMonad)
 
 -- * Component contexts
 

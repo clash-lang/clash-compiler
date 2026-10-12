@@ -36,7 +36,7 @@ import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
 import qualified Crypto.Hash.SHA256               as Sha256
-import           Data.Bifunctor                   (first, second)
+import           Data.Bifunctor                   (bimap, first, second)
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
 import qualified Data.ByteString.Lazy             as ByteStringLazy
@@ -117,7 +117,8 @@ import           Clash.Driver.Manifest
 import           Clash.Edalize.Edam
 import           Clash.Netlist                    (genNetlist, genTopNames)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
-import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate, BlackBoxFunction)
+import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
+import           Clash.Netlist.Scoped.Types       (SomeBlackBoxFunction (..))
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
@@ -567,7 +568,7 @@ interpretFunctionRequestToModuleName = intercalate "." . ifrModNames
 
 -- | The result of interpreting an 'InterpretFunctionRequest'
 data InterpretFunctionResult
-  = InterpretBBF BlackBoxFunction
+  = InterpretBBF SomeBlackBoxFunction
   | InterpretTF TemplateFunction
 
 type InterpretResults =
@@ -678,22 +679,41 @@ interpretFunctions idirs interpreterArgs topDir reqs = do
     -> Hint.InterpreterT IO (Either Hint.InterpreterError InterpretFunctionResult)
   tryInterp = try
 
+  -- A blackbox function on scoped Clash Core, or else one on Clash Core.
+  -- TODO(Phase 7): remove the fallback.
   interpret req = case ifrType req of
-    InterpretBlackBoxFunction ->
-      InterpretBBF <$> Hint.unsafeInterpret (ifrFuncName req) "BlackBoxFunction"
+    InterpretBlackBoxFunction -> do
+      let f = "(" ++ ifrFuncName req ++ ")"
+          someBBF = "ClashNetlistScopedTypes.SomeBlackBoxFunction"
+      scoped <- tryInterp1 (Hint.unsafeInterpret ("ClashNetlistScopedTypes.ScopedBBF " ++ f) someBBF)
+      InterpretBBF <$> case scoped of
+        Right bbf -> pure bbf
+        Left _ -> Hint.unsafeInterpret ("ClashNetlistScopedTypes.LegacyBBF " ++ f) someBBF
     InterpretTemplateFunction ->
       InterpretTF <$> Hint.unsafeInterpret (ifrFuncName req) "TemplateFunction"
 
+  tryInterp1
+    :: Hint.InterpreterT IO SomeBlackBoxFunction
+    -> Hint.InterpreterT IO (Either Hint.InterpreterError SomeBlackBoxFunction)
+  tryInterp1 = try
+
+  -- The modules in scope when interpreting a function. The module that
+  -- defines 'SomeBlackBoxFunction' is imported qualified, so that its names
+  -- don't clash with those of the function's module.
+  setImports req = Hint.setImportsQ
+    [ ("Clash.Netlist.Types", Nothing)
+    , ("Clash.Netlist.BlackBox.Types", Nothing)
+    , ("Clash.Netlist.Scoped.Types", Just "ClashNetlistScopedTypes")
+    , (interpretFunctionRequestToModuleName req, Nothing) ]
+
   interpretGlobal req = do
-    Hint.setImports
-      ["Clash.Netlist.Types", "Clash.Netlist.BlackBox.Types", interpretFunctionRequestToModuleName req]
+    setImports req
     interpret req
 
   interpretLocal defaultPath req = withSourceDir $ \extraDirs -> do
     Hint.set [Hint.searchPath Hint.:= (extraDirs ++ idirs ++ defaultPath)]
     Hint.loadModules [interpretFunctionRequestToModuleName req]
-    Hint.setImports
-      ["Clash.Netlist.BlackBox.Types", "Clash.Netlist.Types", interpretFunctionRequestToModuleName req]
+    setImports req
     interpret req
    where
     -- Write the inline source (if any) of a request to a temporary
@@ -711,9 +731,9 @@ interpretFunctions idirs interpreterArgs topDir reqs = do
 
 -- | List of known BlackBoxFunctions used to prevent Hint from firing. This
 --  improves Clash startup times.
-knownBlackBoxFunctions :: HashMap String BlackBoxFunction
+knownBlackBoxFunctions :: HashMap String SomeBlackBoxFunction
 knownBlackBoxFunctions =
-  HashMap.fromList $ map (first show) $
+  HashMap.fromList $ map (bimap show LegacyBBF) $
     [ ('P.checkBBF, P.checkBBF)
     , ('P.bvToIntegerVHDL, P.bvToIntegerVHDL)
     , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
@@ -831,7 +851,7 @@ compilePrimitiveWith lookupInterp (BlackBoxHaskell bbName wf usedArgs multiRes b
     qualMod = intercalate "." modNames
     BlackBoxFunctionName modNames funcName = bbGenName
 
-    expectBBF :: InterpretFunctionResult -> IO BlackBoxFunction
+    expectBBF :: InterpretFunctionResult -> IO SomeBlackBoxFunction
     expectBBF (InterpretBBF f) = pure f
     expectBBF _ = error ($(curLoc) ++ "Internal error: expected a BlackBoxFunction for "
                                 ++ fullName)
