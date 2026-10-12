@@ -60,7 +60,7 @@ mkFunAppLocalShadowingGlobal = do
       dst = Id.unsafeMake "result"
   (decls, _) <-
     runNetlistMonad
-      (_clashEnv env) (error "evaluator") False (fromClashBindings bs) mempty
+      (_clashEnv env) False (fromClashBindings bs) mempty
       (_typeTranslator env) True be ids "" mempty
       (mkFunApp Concurrent dst xLocal [] [])
   case decls of
@@ -94,7 +94,7 @@ mkFunInputLocalShadowingGlobal = do
       compNames = singletonGlobalEnv (mkGlobalId fGlobal) (Id.unsafeMake "f")
   result <- try $
     runNetlistMonad
-      (_clashEnv env) (error "evaluator") False (fromClashBindings bs) mempty
+      (_clashEnv env) False (fromClashBindings bs) mempty
       (_typeTranslator env) True be ids "" compNames
       (mkBlackBoxContext "prim" Concurrent [res] [Left (Var fLocal)])
   case result of

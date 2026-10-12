@@ -64,7 +64,6 @@ import           Data.Text.Prettyprint.Doc        (vcat)
 
 import           GHC.BasicTypes.Extra             (isNoInline)
 
-import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.HasType
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Type                  (splitCoreFunForallTy)
@@ -121,8 +120,6 @@ runNormalization
   -- ^ Global Binders
   -> HWTypeTranslator
   -- ^ Hardcoded Type -> HWType translator
-  -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF
   -> GlobalEnv Bool
   -- ^ Map telling whether a components is part of a recursive group
   -> [Id]
@@ -130,14 +127,16 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> IO a
-runNormalization env supply globals typeTrans eval rcsMap topEnts m =
+runNormalization env supply globals typeTrans rcsMap topEnts m =
   runRewriteSession rwEnv rwState m
   where
     -- TODO The RewriteEnv should just take ClashOpts.
     rwEnv     = RewriteEnv
                   env
                   typeTrans
-                  eval
+                  -- The evaluator of Clash Core is that of the transformations
+                  -- of Clash Core, which the normalizer doesn't run
+                  (error $ $(curLoc) ++ "Report as bug: no evaluator of Clash Core")
                   (mkVarSet topEnts)
                   (addGlobalTypes globalVars (mkTypeEnv (envTyConMap env)))
 

@@ -7,7 +7,6 @@ import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWi
 import           Clash.Rewrite.Scoped.Globals (fromClashBindings, toClashBindings)
 import qualified Clash.Util.Supply            as Supply
 
-import           Clash.GHC.Evaluator
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import           Control.DeepSeq              (deepseq)
@@ -57,7 +56,6 @@ benchFile idirs src = do
   -- The bindings are serialized as bindings of Clash Core
   res <- normalizeEntity clashEnv (fromClashBindings bindingsMap)
                    (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
-                   evaluator
                    topEntityNames supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
   writeNormalized src res

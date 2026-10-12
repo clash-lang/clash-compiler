@@ -13,7 +13,6 @@ import           Clash.Netlist.Types          hiding (backend, hdlDir)
 import           Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
-import           Clash.GHC.Evaluator          (evaluator)
 
 import           Control.DeepSeq              (deepseq)
 import           Data.Binary                  (decode)
@@ -67,7 +66,7 @@ benchFile idirs src = do
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
     -- The bindings are serialized as bindings of Clash Core
-    genNetlist env evaluator False (fromClashBindings transformedBindings) topEntityMap compNames
+    genNetlist env False (fromClashBindings transformedBindings) topEntityMap compNames
                (ghcTypeToHWType (opt_intWidth (envOpts env)))
                ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"

@@ -91,12 +91,10 @@ import           Clash.Core.Scoped.Pretty         ()
 import {-# SOURCE #-} qualified Clash.Netlist.Scoped as Scoped
 import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
 import qualified Clash.Data.UniqMap               as UniqMap
-import Clash.Core.Evaluator.Types (Evaluator)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad
   :: ClashEnv
-  -> Evaluator
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> GlobalBindings
@@ -118,8 +116,8 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_ act =
-  flip runReaderT (NetlistEnv env "" "" Nothing [] eval tenv)
+runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_ act =
+  flip runReaderT (NetlistEnv env "" "" Nothing [] tenv)
     . flip runStateT s'
     $ runNetlist act
   where

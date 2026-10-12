@@ -123,7 +123,9 @@ data RewriteEnv
   , _typeTranslator :: HWTypeTranslator
   -- ^ Hardcode Type -> FilteredHWType translator
   , _evaluator      :: WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF
+  -- ^ Hardcoded evaluator for WHNF, of the transformations on Clash Core. The
+  -- normalizer, on scoped Clash Core, uses "Clash.Core.Scoped.Evaluator".
+  -- TODO(Phase 7): remove.
   , _topEntities    :: VarSet
   -- ^ Functions that are considered TopEntities
   , _scopedTypeEnv  :: TypeEnv
