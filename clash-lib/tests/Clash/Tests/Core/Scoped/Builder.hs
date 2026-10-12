@@ -13,16 +13,20 @@ module Clash.Tests.Core.Scoped.Builder (tests) where
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Name as C
+import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Builder
-import Clash.Core.Scoped.Convert (fromClashTypeClosed, toClashType)
+import Clash.Core.Scoped.Convert
+  (fromClashTypeClosed, mkFunTyConFromClash, mkNewTyConRhsFromClash, toClashType)
 import Clash.Core.Scoped.Syntax
 
-import Test.Clash.Rewrite (kindedTyVar, mkTyConName, tyVar)
+import Test.Clash.Rewrite
+  (existentialDataCon, existentialTyVar, kindedTyVar, mkTyConName, tyVar)
 
 kTv, aTv :: C.TyVar
 kTv = tyVar C.User "k" 60
@@ -56,6 +60,21 @@ tests = testGroup "Clash.Tests.Core.Scoped.Builder"
       sameType (runClosedType nativeTy) (fromClashTypeClosed emptyScope clashTy)
   , testCase "clashTyB numbers binders like conversion" $
       sameType (runClosedType (clashTyB clashTy)) (fromClashTypeClosed emptyScope clashTy)
+  , testCase "runDataConSig numbers binders like conversion" $
+      show (runDataConSig [] [(1, C.varName existentialTyVar, clashTyB C.liftedTypeKind)] [varTyB 1])
+        @?= show (C.dcSig existentialDataCon)
+  , testCase "runNewTyConSig numbers binders like conversion" $ do
+      let a = tyVar C.User "a" 62
+          rhs = mkNewTyConRhsFromClash existentialDataCon ([a], C.AppTy (C.ConstTy maybeTc) (C.VarTy a))
+      show (runNewTyConSig [(1, C.varName a, clashTyB C.liftedTypeKind)] (appTyB (constTyB maybeTc) (varTyB 1)))
+        @?= show (C.ntSig rhs)
+  , testCase "runTyFamEqn numbers binders like conversion" $ do
+      let tc = mkFunTyConFromClash 4400 (mkTyConName "F" 4400) C.liftedTypeKind 1
+                 [([C.VarTy aTv], C.VarTy kTv)]
+      show [runTyFamEqn
+              [(1, C.varName kTv, clashTyB C.liftedTypeKind), (2, C.varName aTv, varTyB 1)]
+              [varTyB 2] (varTyB 1)]
+        @?= show (C.tyConEqns tc)
   , testCase "closed types without binders are shared" $
       case appTyB (constTyB maybeTc) (litTyB (C.NumTy 3)) of
         b -> sameType (runClosedType b) (AppTy (ConstTy maybeTc) (LitTy (C.NumTy 3)))
