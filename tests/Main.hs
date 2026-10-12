@@ -1097,6 +1097,7 @@ runClashTest t3105Env = defaultMain
             { hdlTargets = [VHDL]
             , clashFlags = ["-main-is", "topEntity3"]
             }
+        , outputTest "ConcurrentNames" def{hdlSim=[]}
         , -- Regression test for #3297: with -main-is, a magically named
           -- 'testBench' living outside 'topEntity's closure must not be pruned
           -- before it is loaded. 'T3297a' is compiled into the clash-testsuite
