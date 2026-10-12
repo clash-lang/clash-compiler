@@ -146,7 +146,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.HasType"
       -- forall a. a -> a -> Int -> (a, Int)
       assertScopedTyAlphaEq
         (C.ForAllTy aTv (C.mkFunTy a (C.mkFunTy a (C.mkFunTy intTy (tupleTy [a, intTy])))))
-        (primInfoType emptyScope mrPrim)
+        (primInfoType emptyScope (mkPrimInfoFromClash mrPrim))
 
   , testCase "piResultTys agrees with Clash.Core.HasType" $
       forM_ piCases $ \(ty, args) ->

@@ -114,6 +114,9 @@ module Clash.Core.Scoped.Syntax
     -- * Global names
   , GlobalId (..)
   , globalIdUniq
+    -- * Primitives
+  , PrimInfo (..)
+  , PrimUnfolding (..)
     -- * Binders
   , TyBinder (..)
   , IdBinder (..)
@@ -210,6 +213,58 @@ globalIdUniq :: GlobalId -> Unique
 globalIdUniq = C.nameUniq . globalIdName
 {-# INLINE globalIdUniq #-}
 
+-- * Primitives
+
+-- | A primitive: Clash's 'C.PrimInfo', with a closed scoped type.
+--
+-- = Transition
+--
+-- The scoped fields are the truth. 'primLegacy' is the primitive as Clash
+-- Core's 'C.PrimInfo', for the code that still uses Clash Core. It is derived
+-- lazily, and is deleted with Clash Core (package B of the port). Make
+-- primitives with 'Clash.Core.Scoped.Convert.mkPrimInfo' or
+-- 'Clash.Core.Scoped.Convert.mkPrimInfoFromClash', which derive the side they
+-- are not given.
+data PrimInfo = PrimInfo
+  { primName :: !Text
+  , primType :: Type 'VoidS
+  -- ^ Lazy, like the types of global variables. The type of a multi-result
+  -- primitive is the type of the primitive that returns a tuple, see
+  -- 'Clash.Core.Scoped.HasType.primInfoType'.
+  , primWorkInfo :: !C.WorkInfo
+  , primMultiResult :: !C.IsMultiPrim
+  , primUnfolding :: !PrimUnfolding
+  , primLegacy :: C.PrimInfo
+  -- ^ Transitional, see above. Lazy.
+  }
+
+-- | Doesn't show the legacy part
+instance Show PrimInfo where
+  showsPrec d p =
+    showParen (d > 10) $
+      showString "PrimInfo " . showsPrec 11 (primName p)
+        . showString " " . showsPrec 11 (primType p)
+        . showString " " . showsPrec 11 (primWorkInfo p)
+        . showString " " . showsPrec 11 (primMultiResult p)
+        . showString " " . showsPrec 11 (primUnfolding p)
+
+-- | Doesn't force the type, like the instance of 'GlobalId'
+instance NFData PrimInfo where
+  rnf p =
+    rnf (primName p) `seq` rnf (primWorkInfo p) `seq` rnf (primMultiResult p)
+      `seq` rnf (primUnfolding p)
+
+-- | The binding that implements a primitive, if any
+data PrimUnfolding
+  = NoUnfolding
+  | Unfolding !GlobalId
+  deriving (Show, Eq)
+
+instance NFData PrimUnfolding where
+  rnf = \case
+    NoUnfolding -> ()
+    Unfolding g -> rnf g
+
 -- * Binders
 
 -- | A type variable binder, extending scope @n@ to @l@. Its kind lives in @n@.
@@ -301,7 +356,7 @@ data Term (n :: S) where
   GlobalVar :: !GlobalId -> Term n
   Data      :: !DataCon -> Term n
   Literal   :: !Literal -> Term n
-  Prim      :: !C.PrimInfo -> Term n
+  Prim      :: !PrimInfo -> Term n
   Lam       :: !(IdBinder n l) -> !(Term l) -> Term n
   TyLam     :: !(TyBinder n l) -> !(Term l) -> Term n
   App       :: !(Term n) -> !(Term n) -> Term n

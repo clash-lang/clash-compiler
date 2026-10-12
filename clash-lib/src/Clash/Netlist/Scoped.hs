@@ -259,7 +259,7 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
         Nothing
 
   if | not (shouldRenderDecl hwTy tm) -> return []
-     | (Prim pInfo@C.PrimInfo{C.primMultiResult=C.MultiResult}, args) <- collectArgs tm ->
+     | (Prim pInfo@PrimInfo{primMultiResult=C.MultiResult}, args) <- collectArgs tm ->
           multiDecls srcNote pInfo args
      | otherwise -> pure <$> singleDecl srcNote hwTy
 
@@ -291,7 +291,7 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
 
     isMultiPrimSelect :: Term n -> Bool
     isMultiPrimSelect t = case collectArgs t of
-      (Prim (C.primName -> "c$multiPrimSelect"), _) -> True
+      (Prim (primName -> "c$multiPrimSelect"), _) -> True
       _ -> False
 
     shouldRenderDecl :: HWType -> Term n -> Bool
@@ -306,17 +306,17 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
       (Prim p, args0) ->
         let context =
               primWarnContext [] (localIdText ctx id_) args0
-         in extractPrimWarnOrFail context (C.primName p) >>= go p args0
+         in extractPrimWarnOrFail context (primName p) >>= go p args0
       _ -> return []
      where
       go pInfo args0 (BlackBox {resultInits=nmDs, multiResult=True}) = do
         tcm <- Lens.view tcCache
         let (args1, res) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args0
-        (bbCtx, _) <- mkBlackBoxContext ctx (C.primName pInfo) Concurrent (map termLocalId res) args1
-        mapM (go' (C.primName pInfo) bbCtx) nmDs
+        (bbCtx, _) <- mkBlackBoxContext ctx (primName pInfo) Concurrent (map termLocalId res) args1
+        mapM (go' (primName pInfo) bbCtx) nmDs
       go pInfo args0 (BlackBox {resultInits=nmDs}) = do
-        (bbCtx, _) <- mkBlackBoxContext ctx (C.primName pInfo) Concurrent [id_] args0
-        mapM (go' (C.primName pInfo) bbCtx) nmDs
+        (bbCtx, _) <- mkBlackBoxContext ctx (primName pInfo) Concurrent [id_] args0
+        mapM (go' (primName pInfo) bbCtx) nmDs
       go _ _ _ = pure []
 
       go' pNm bbCtx nmD = do

@@ -53,7 +53,8 @@ import GHC.Stack (HasCallStack)
 import qualified Clash.Core.Name as C
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (PrimInfo (..), WorkInfo (..))
+import Clash.Core.Term (WorkInfo (..))
+import qualified Clash.Core.Term as C (PrimInfo (..))
 import Clash.Core.TyCon (TyCon (..), tyConDataCons)
 import qualified Clash.Core.Type as C
 import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
@@ -73,6 +74,7 @@ import Clash.Core.Scoped.NameMap (NameMap, insertNameMap)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (unsinkType, withFreshIdBinder)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)
 import Clash.Core.Scoped.Type
   ( PiTele (..), SplitFunForall (..), TypeView (..), coreView, mkTyConApp
@@ -173,7 +175,7 @@ reducePrimWorker ctx e _appFunction _appArgument = case ctxFrames ctx of
       -- handler it is only inferred when the primitive's declared type shows a
       -- @Vec@ result is possible at all. That rules out the vast majority of
       -- them.
-      if Maybe.isNothing handlerM && not (mayReturnVec te (primType p))
+      if Maybe.isNothing handlerM && not (mayReturnVec te (C.primType (primLegacy p)))
       then return e
       else do
         let eTy = inferCoreTypeOf te sc e
@@ -727,7 +729,7 @@ reduceSplitHandler rpc@ReducePrimContext{..}
                              [Right (sink lTy)
                              ,Right (sink rTy)
                              ,Left  bvArg
-                             ,Left  (TyApp (Prim removedArg) (sink rTy))
+                             ,Left  (TyApp (Prim (mkPrimInfoFromClash removedArg)) (sink rTy))
                              ]
                 changed (mkTicks tup (map sink primTicks))
               _ -> error "reducePrim: split# arity"
@@ -737,7 +739,7 @@ reduceSplitHandler rpc@ReducePrimContext{..}
                 let tup = mkApps (Data tupDc)
                              [Right (sink lTy)
                              ,Right (sink rTy)
-                             ,Left  (TyApp (Prim removedArg) (sink lTy))
+                             ,Left  (TyApp (Prim (mkPrimInfoFromClash removedArg)) (sink lTy))
                              ,Left  bvArg
                              ]
                 changed (mkTicks tup (map sink primTicks))

@@ -309,7 +309,7 @@ clashTyB ty0
 
 -- | A term under construction, see the module header
 data TmB = TmB
-  { tmbHead :: !(Maybe C.PrimInfo)
+  { tmbHead :: !(Maybe PrimInfo)
   -- ^ The primitive at the head of the term, under applications and ticks,
   -- like 'C.collectArgs'
   , tmbRun :: !(Run Term)
@@ -342,7 +342,7 @@ literalB :: Literal -> TmB
 literalB !l = term (Run (\_ -> pure (Literal l)))
 
 -- | A primitive, whose type must be closed
-primB :: C.PrimInfo -> TmB
+primB :: PrimInfo -> TmB
 primB !p = TmB (Just p) (Run (\_ -> pure (Prim p)))
 
 appB :: TmB -> TmB -> TmB

@@ -54,7 +54,6 @@ import qualified Data.List as List
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 
-import qualified Clash.Core.Term as C
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
 import Clash.Core.Scoped.FreeVars (HasNameBinder (..))
@@ -105,7 +104,7 @@ primArg = go 0 0
     App f _ -> go tys (tms + 1) f
     TyApp f _ -> go (tys + 1) tms f
     Tick _ e -> go tys tms e
-    Prim p -> Just (C.primName p, tys, tms)
+    Prim p -> Just (primName p, tys, tms)
     _ -> Nothing
 
 -- * Abstractions

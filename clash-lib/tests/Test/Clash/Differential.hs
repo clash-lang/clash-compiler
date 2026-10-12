@@ -385,7 +385,7 @@ coercionForm = KnownDifference
  where
   go :: Term x -> Term x
   go = \case
-    TyApp e@(Prim p) _ | C.primName p == Text.pack "_CO_" -> e
+    TyApp e@(Prim p) _ | primName p == Text.pack "_CO_" -> e
     e -> e
 
 -- | Consecutive non-recursive let-bindings that don't refer to one another
@@ -577,7 +577,7 @@ primTypeForm = KnownDifference
   go :: Term x -> Term x
   go = \case
     TyApp e@(Prim p) _
-      | C.primName p == Text.pack "Clash.XException.errorX"
+      | primName p == Text.pack "Clash.XException.errorX"
       -> e
     e -> e
 
@@ -840,7 +840,7 @@ diffTm lv path t1 t2 = case (t1, t2) of
   (GlobalVar g1, GlobalVar g2) | g1 == g2 -> Nothing
   (Data dc1, Data dc2) | dc1 == dc2 -> Nothing
   (Literal l1, Literal l2) | l1 == l2 -> Nothing
-  (Prim p1, Prim p2) | C.primName p1 == C.primName p2 -> Nothing
+  (Prim p1, Prim p2) | primName p1 == primName p2 -> Nothing
   (Lam b1 e1, Lam b2 e2) -> firstJust
     [ diffTy lv ("Lam.type" : path) (idBinderType b1) (idBinderType b2)
     , diffTm (underId b1 b2 lv) ("Lam.body" : path) e1 e2 ]

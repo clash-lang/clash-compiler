@@ -156,7 +156,7 @@ cmpTm e1 e2 = case (e1, e2) of
       <+> check "global type" (==) (C.varType (globalIdLegacy g1)) (C.varType (globalIdLegacy g2))
   (Data dc1, Data dc2) -> check "data constructor" (==) (C.dcUniq dc1) (C.dcUniq dc2)
   (Literal l1, Literal l2) -> check "literal" (==) l1 l2
-  (Prim p1, Prim p2) -> cmpPrim p1 p2
+  (Prim p1, Prim p2) -> cmpPrim (primLegacy p1) (primLegacy p2)
   (Lam b1 x1, Lam b2 x2) -> cmpIdBinder b1 b2 <+> cmpTm x1 x2
   (TyLam b1 x1, TyLam b2 x2) -> cmpTyBinder b1 b2 <+> cmpTm x1 x2
   (App f1 a1, App f2 a2) -> cmpTm f1 f2 <+> cmpTm a1 a2

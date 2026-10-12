@@ -111,7 +111,7 @@ import Test.Clash.Scoped.Evaluator.Adapter (adaptPrim)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Util as U
 import Clash.Core.Scoped.Evaluator.Types
-import Clash.Core.Scoped.Syntax (DExt, Distinct, S (VoidS), Term)
+import Clash.Core.Scoped.Syntax (DExt, Distinct, PrimInfo (..), S (VoidS), Term)
 import Clash.Core.Scoped.NameMap (emptyNameMap)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import Clash.Rewrite.Scoped.Globals (fromClashBindings)
@@ -363,8 +363,8 @@ recordingEnv ref check te eval =
   adapter = adaptPrim eval
   ported nm r =
     record ref (const nm) Ported (if check then Just (compareReductions r adapter) else Nothing) r
-  adapted = record ref (C.primName . pcInfo') Adapted Nothing adapter
-  pcInfo' :: PrimContext o n -> C.PrimInfo
+  adapted = record ref (primName . pcInfo') Adapted Nothing adapter
+  pcInfo' :: PrimContext o n -> PrimInfo
   pcInfo' = pcInfo
 
 -- | Record the calls of a reduction

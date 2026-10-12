@@ -47,6 +47,7 @@ import Clash.Core.Scoped.HasType (primInfoType)
 import Clash.Core.Scoped.Subst
   (Subst, idSubst, substScope, substTy, substTyBinder, withFreshIdBinders)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (mkApps, mkLams, mkTmApps, mkTyApps, mkTyLams)
 import Clash.Core.Scoped.TermInfo (MultiPrimInfo (..), multiPrimInfo')
 import Clash.Core.Scoped.Type
@@ -65,11 +66,11 @@ setupMultiResultPrimWorker
   :: (HasCallStack, Distinct n)
   => TransformContext n
   -> Term n
-  -> C.PrimInfo
+  -> PrimInfo
   -> NormalizeSession (Term n)
-setupMultiResultPrimWorker ctx node pInfo@C.PrimInfo{C.primMultiResult = C.SingleResult} = do
+setupMultiResultPrimWorker ctx node pInfo@PrimInfo{primMultiResult = C.SingleResult} = do
   tcm <- Lens.view tcCache
-  prim <- Lens.view (primitives . Lens.at (C.primName pInfo))
+  prim <- Lens.view (primitives . Lens.at (primName pInfo))
 
   case prim >>= extractPrim of
     Just (BlackBoxHaskell{multiResult=True}) ->
@@ -92,14 +93,14 @@ setupMultiResultPrimWorker _ctx node _primInfo = return node
 --     in
 --       (r2, r3)
 -- @
-setupMultiResultPrim' :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> C.PrimInfo -> Term n
-setupMultiResultPrim' tcm sc pInfo@C.PrimInfo{C.primType} =
+setupMultiResultPrim' :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> PrimInfo -> Term n
+setupMultiResultPrim' tcm sc pInfo =
   case splitFunForallTy (primInfoType sc pInfo) of
     SplitFunForall tele res -> openPi (idSubst sc) tele res $ \scT tvs tyVars argTys resTy ->
       let
         resTypes = case tyView resTy of
           TyConApp _ tys -> tys
-          _ -> error ($(curLoc) ++ "not a tuple: " ++ show primType)
+          _ -> error ($(curLoc) ++ "not a tuple: " ++ show (primType pInfo))
         nArgs = length argTys
         argNms = [internalName ("a" <> showt i) | i <- [1 .. nArgs]]
         resNms = [internalName ("r" <> showt i) | i <- [nArgs + 1 .. nArgs + length resTypes]]
@@ -113,7 +114,7 @@ setupMultiResultPrim' tcm sc pInfo@C.PrimInfo{C.primType} =
                   resTypesL = map sink resTypes
                   multiPrimBind =
                     mkApps
-                      (Prim pInfo{C.primMultiResult = C.MultiResult})
+                      (Prim (mkPrimInfoFromClash (primLegacy pInfo) {C.primMultiResult = C.MultiResult}))
                       (map (Right . sink) tyVars ++ map Left (map sink argVs ++ resVs))
                   multiPrimSelect r t =
                     mkApps (Prim multiPrimSelectInfo) [Right t, Right resTyL, Left r, Left resV]
@@ -128,7 +129,7 @@ setupMultiResultPrim' tcm sc pInfo@C.PrimInfo{C.primType} =
  where
   MultiPrimInfo{mpi_resultDc = tupDc} = multiPrimInfo' tcm pInfo
 
-  multiPrimSelectInfo = C.PrimInfo
+  multiPrimSelectInfo = mkPrimInfoFromClash C.PrimInfo
     { C.primName = "c$multiPrimSelect"
     , C.primType =
         C.ForAllTy selA (C.ForAllTy selB

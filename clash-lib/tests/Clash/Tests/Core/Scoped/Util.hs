@@ -390,13 +390,13 @@ assertShouldSplitAgrees ty = case C.shouldSplit testTyConMap ty of
 primTests :: TestTree
 primTests = testGroup "Primitives"
   [ testCase "primAtType gives a primitive the type if it is closed" $
-      withConvEnv [] [] $ \env -> case primAtType errPrim (fromClashType env intTy) of
-        Prim p -> C.primType p @?= intTy
+      withConvEnv [] [] $ \env -> case primAtType (mkPrimInfoFromClash errPrim) (fromClashType env intTy) of
+        Prim p -> C.primType (primLegacy p) @?= intTy
         _ -> assertFailure "not a primitive"
   , testCase "primAtType applies a primitive to its type if it is open" $
-      withConvEnv [aTv] [] $ \env -> case primAtType errPrim (fromClashType env aTy) of
+      withConvEnv [aTv] [] $ \env -> case primAtType (mkPrimInfoFromClash errPrim) (fromClashType env aTy) of
         TyApp (Prim p) ty -> do
-          C.primType p @?= C.undefinedTy
+          C.primType (primLegacy p) @?= C.undefinedTy
           assertScopedTyAlphaEq aTy ty
         _ -> assertFailure "not a type application of a primitive"
   ]

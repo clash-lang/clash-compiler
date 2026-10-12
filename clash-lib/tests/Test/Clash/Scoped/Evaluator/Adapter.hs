@@ -143,7 +143,7 @@ adaptPrim eval = PrimReduction $ \pc ->
             extendInScopeSetList (extendInScopeSetList emptyInScopeSet (map fst tvs)) (map fst ids)
         , C.mTerm = C.Literal (CharLiteral '_')
         }
-  in case C.primStep eval tcm (pcIsSubj pc) (pcInfo pc) tys args cm of
+  in case C.primStep eval tcm (pcIsSubj pc) (primLegacy (pcInfo pc)) tys args cm of
        Nothing -> Nothing
        Just cm'
          | not (null (C.mStack cm')) ->
@@ -276,7 +276,7 @@ toClashValueWith = \case
   DC dc args ->
     C.DC dc <$> mapM (either (fmap Left . toClashTermWith) (fmap Right . toClashTypeWith)) args
   Lit l -> pure (C.Lit l)
-  PrimVal p tys vs -> C.PrimVal p <$> mapM toClashTypeWith tys <*> mapM toClashValueWith vs
+  PrimVal p tys vs -> C.PrimVal (primLegacy p) <$> mapM toClashTypeWith tys <*> mapM toClashValueWith vs
   Suspend e -> C.Suspend <$> toClashTermWith e
   TickValue t v -> C.TickValue <$> goTick emptyUEnv t <*> toClashValueWith v
   CastValue v t1 t2 ->
@@ -371,7 +371,7 @@ goTm env@(UEnv bs _ ids) = \case
   GlobalVar g -> pure (C.Var (globalIdLegacy g))
   Data dc -> pure (C.Data dc)
   Literal l -> pure (C.Literal l)
-  Prim p -> pure (C.Prim p)
+  Prim p -> pure (C.Prim (primLegacy p))
   Lam b e -> idBinder env b $ \env' i -> C.Lam i <$> goTm env' e
   TyLam b e -> tyBinder env b $ \env' tv -> C.TyLam tv <$> goTm env' e
   App e1 e2 -> C.App <$> goTm env e1 <*> goTm env e2

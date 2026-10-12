@@ -101,7 +101,7 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
-import           Clash.Core.Scoped.Convert   (toClashType)
+import           Clash.Core.Scoped.Convert   (toClashType, mkPrimInfoFromClash)
 import           Clash.Core.Scoped.DataCon   (dataConInstArgTys)
 import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf, piResultTy)
@@ -281,7 +281,7 @@ constantSpecWorker ctx e e1 e2
       ConstantSpecInfo _ TNil _ True -> do
         e2Red <- case collectArgs e2 of
           (Prim p0, _) -> whnfRW False ctx e2 $ \_ctx1 e2Red -> case collectArgs e2Red of
-            (Prim p1, _) | C.primName p0 == C.primName p1 -> return (sink e2)
+            (Prim p1, _) | primName p0 == primName p1 -> return (sink e2)
             _ -> changed e2Red
           _ -> return e2
         specialize ctx (App e1 e2Red)
@@ -569,9 +569,9 @@ scopedSpecCacheKey = go
     TyLam b x -> TyLam b (go x)
     App f x -> case (go f, go x) of
       (Prim p, Literal (WordLiteral w))
-        | C.primName p == Text.showt 'NS -> Literal (NaturalLiteral w)
+        | primName p == Text.showt 'NS -> Literal (NaturalLiteral w)
       (Prim p, Literal (IntLiteral i))
-        | C.primName p == Text.showt 'IS -> Literal (IntegerLiteral i)
+        | primName p == Text.showt 'IS -> Literal (IntegerLiteral i)
       (f', x') -> App f' x'
     TyApp f a -> TyApp (go f) a
     Let (NonRec b x) e -> Let (NonRec b (go x)) (go e)
@@ -763,9 +763,9 @@ zeroWidthTypeElemIn te sc enclosing ty = do
 
 -- | @BitVector.fromInteger# :: forall n. Natural -> Natural -> Integer ->
 -- BitVector n@, for the given type constructor of 'BV.BitVector'
-bitVectorFromIntegerPrim :: C.TyConName -> C.PrimInfo
+bitVectorFromIntegerPrim :: C.TyConName -> PrimInfo
 bitVectorFromIntegerPrim tcNm =
-  C.PrimInfo (Text.showt 'BV.fromInteger#) prTy C.WorkNever C.SingleResult C.NoUnfolding
+  mkPrimInfoFromClash (C.PrimInfo (Text.showt 'BV.fromInteger#) prTy C.WorkNever C.SingleResult C.NoUnfolding)
  where
   prTy = C.mkPolyFunTy (C.mkTyConApp tcNm [C.VarTy zeroWidthNTv])
            [Left zeroWidthNTv, Right naturalPrimTy, Right naturalPrimTy, Right integerPrimTy]
@@ -773,9 +773,9 @@ bitVectorFromIntegerPrim tcNm =
 -- | The primitive with the given name, of type @forall n. Natural -> Integer
 -- -> T n@, for the given type constructor @T@: @fromInteger#@ of 'I.Index',
 -- 'S.Signed' or 'U.Unsigned'
-sizedNumFromIntegerPrim :: C.TyConName -> Text.Text -> C.PrimInfo
+sizedNumFromIntegerPrim :: C.TyConName -> Text.Text -> PrimInfo
 sizedNumFromIntegerPrim tcNm nm =
-  C.PrimInfo nm prTy C.WorkNever C.SingleResult C.NoUnfolding
+  mkPrimInfoFromClash (C.PrimInfo nm prTy C.WorkNever C.SingleResult C.NoUnfolding)
  where
   prTy = C.mkPolyFunTy (C.mkTyConApp tcNm [C.VarTy zeroWidthNTv])
            [Left zeroWidthNTv, Right naturalPrimTy, Right integerPrimTy]

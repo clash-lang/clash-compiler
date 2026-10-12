@@ -24,14 +24,11 @@
   * for every data constructor of a type constructor of the 'TyConMap': its
     signature ('DataConSig') and its type.
 
-  Global variables carry their scoped types ('globalIdType').
-
   The caches are built lazily: making a t'TypeEnv' is cheap, and a signature
   is only converted when it is first needed.
 
-  The types of primitives are not cached: 'C.PrimInfo' has no unique, and
-  primitives with the same name can have different types, e.g. coercions.
-  See 'Clash.Core.Scoped.HasType.primInfoType'.
+  Global variables and primitives carry their scoped types ('globalIdType',
+  'primType').
 
   = Migration
 

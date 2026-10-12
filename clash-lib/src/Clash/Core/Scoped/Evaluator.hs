@@ -116,6 +116,7 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, stripTicks)
 import Clash.Core.Scoped.Type (TypeView (..), tyView)
 
@@ -367,10 +368,10 @@ nameModTick occ = NameMod C.PrefixName (LitTy (C.SymTy (toStr occ)))
 closedArity :: C.Type -> Int
 closedArity = length . fst . C.splitFunForallTy
 
-stepPrim :: Distinct n => Env -> C.PrimInfo -> Machine o n -> Maybe (Next o n)
+stepPrim :: Distinct n => Env -> PrimInfo -> Machine o n -> Maybe (Next o n)
 stepPrim env p m
-  | C.primName p == showt 'GHC.Prim.realWorld# = unwind env (PrimVal p [] []) m
-  | closedArity (C.primType p) == 0 = primStep env (forcePrims m) p [] [] m
+  | primName p == showt 'GHC.Prim.realWorld# = unwind env (PrimVal p [] []) m
+  | closedArity (C.primType (primLegacy p)) == 0 = primStep env (forcePrims m) p [] [] m
   | otherwise = newBinder env m (Prim p)
 
 stepApp
@@ -381,19 +382,19 @@ stepApp env x y m = case collectArgsTicks (App x y) of
     EQ -> unwind env (DC dc args) m
     LT -> newBinder env m (App x y)
     GT -> error "Overapplied DC"
-  (Prim p, args, _) -> case compare (length args) (closedArity (C.primType p)) of
+  (Prim p, args, _) -> case compare (length args) (closedArity (C.primType (primLegacy p))) of
     EQ -> case Either.lefts args of
       -- We make boolean conjunction and disjunction extra lazy by deferring
       -- the evaluation of the arguments during the evaluation of the primop
       -- rule. See 'Clash.GHC.Evaluator.stepApp'.
-      [a0, a1] | C.primName p `elem` [andName, orName] ->
+      [a0, a1] | primName p `elem` [andName, orName] ->
         newLetBinding env m a0 $ \m0 i ->
           newLetBinding env m0 (sink a1) $ \m1 j ->
             nextFrom <$>
               primStep env (forcePrims m) p (sink1 (Either.rights args))
                 [Suspend (sink (heapVarTerm i)), Suspend (heapVarTerm j)] m1
       e' : es
-        | C.primName p `elem` (undefinedXPrims ++ undefinedPrims)
+        | primName p `elem` (undefinedXPrims ++ undefinedPrims)
         -- These primitives are (bottoming) values, whose arguments are never
         -- used anywhere in the rest of the compiler. So instead of pushing a
         -- PrimApply frame on the stack to evaluate those arguments, we just
@@ -418,10 +419,10 @@ stepTyApp env x ty m = case collectArgsTicks (TyApp x ty) of
     EQ -> unwind env (DC dc args) m
     LT -> newBinder env m (TyApp x ty)
     GT -> error "Overapplied DC"
-  (Prim p, args, _) -> case compare (length args) (closedArity (C.primType p)) of
+  (Prim p, args, _) -> case compare (length args) (closedArity (C.primType (primLegacy p))) of
     EQ -> case Either.lefts args of
       []
-        | C.primName p `elem` map C.primName [NP.removedArg, NP.undefined, NP.undefinedX]
+        | primName p `elem` map C.primName [NP.removedArg, NP.undefined, NP.undefinedX]
         -> unwind env (PrimVal p (Either.rights args) []) m
         | otherwise
         -> primStep env (forcePrims m) p (Either.rights args) [] m
@@ -481,8 +482,8 @@ apply :: Distinct n => Env -> Value n -> HeapVar n -> Machine o n -> Machine o n
 apply env v hv@(HeapVar _ hvTy _) m = case v of
   Lambda b e -> m {mTerm = substTm (extendTmSubst (idSubst sc) b (heapVarTerm hv)) e}
   PrimVal p tys vs
-    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim NP.undefinedX) (resTy p tys vs)}
-    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim NP.undefined) (resTy p tys vs)}
+    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefinedX)) (resTy p tys vs)}
+    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (resTy p tys vs)}
   _ -> error ($(curLoc) ++ "Not a lambda: " ++ show v)
  where
   sc = mScope m
@@ -499,8 +500,8 @@ instantiate env v ty m = case v of
   -- anything of type 'forall a . ty' must be a ty-lambda. However, sometimes
   -- we evaluate to an error /value/, see 'Clash.GHC.Evaluator.instantiate'.
   PrimVal p tys es
-    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim NP.undefinedX) (resTy p tys es)}
-    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim NP.undefined) (resTy p tys es)}
+    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefinedX)) (resTy p tys es)}
+    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (resTy p tys es)}
   _ -> error ($(curLoc) ++ "Not a tylambda: " ++ show v)
  where
   sc = mScope m
@@ -534,8 +535,8 @@ scrutinise sc (DC dc xs) _ alts
              ++ [ altE | Alt DefaultPat altE <- alts ]
   = altE
 scrutinise _ v@(PrimVal p _ vs) altTy alts
-  | isUndefinedXPrimVal v = TyApp (Prim NP.undefinedX) altTy
-  | isUndefinedPrimVal v = TyApp (Prim NP.undefined) altTy
+  | isUndefinedXPrimVal v = TyApp (Prim (mkPrimInfoFromClash NP.undefinedX)) altTy
+  | isUndefinedPrimVal v = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) altTy
   | any isLitAlt alts = case alts of
       Alt DefaultPat e : alts1 -> go e alts1
       _ -> go (error ($(curLoc) ++ "no match")) alts
@@ -545,7 +546,7 @@ scrutinise _ v@(PrimVal p _ vs) altTy alts
   go def [] = def
   go _ (Alt (LitPat l1) e : _) | l1 == l = e
   go def (_ : rest) = go def rest
-  l = case C.primName p of
+  l = case primName p of
     "Clash.Sized.Internal.BitVector.fromInteger##"
       | [Lit (WordLiteral 0), Lit l0] <- vs -> l0
     "Clash.Sized.Internal.BitVector.fromInteger#"
@@ -556,7 +557,7 @@ scrutinise _ v@(PrimVal p _ vs) altTy alts
       | [_, Lit l0] <- vs -> l0
     "Clash.Sized.Internal.Unsigned.fromInteger#"
       | [_, Lit l0] <- vs -> l0
-    _ -> error ($(curLoc) ++ "scrutinise: " ++ show (C.primName p))
+    _ -> error ($(curLoc) ++ "scrutinise: " ++ show (primName p))
 scrutinise _ v _ _ = error ($(curLoc) ++ "scrutinise: " ++ show v)
 
 -- | The field of the constructor of 'Integer' or 'Natural' with the given
@@ -592,10 +593,10 @@ substInAlt sc dc tvs xs args e =
 -- | Reduce a fully applied primitive, see 'PrimReductions'
 primStep
   :: Distinct n
-  => Env -> Bool -> C.PrimInfo -> [Type n] -> [Value n] -> Machine o n
+  => Env -> Bool -> PrimInfo -> [Type n] -> [Value n] -> Machine o n
   -> Maybe (Next o n)
 primStep env isSubj p tys vs m =
-  case HashMap.lookup (C.primName p) (primReductions prims) of
+  case HashMap.lookup (primName p) (primReductions prims) of
     Just r -> runPrimReduction r ctx
     Nothing -> case primFallback prims of
       Just r -> runPrimReduction r ctx
@@ -608,7 +609,7 @@ primStep env isSubj p tys vs m =
 -- 'Clash.GHC.Evaluator.Primitive.ghcPrimUnwind'.
 primUnwind
   :: Distinct n
-  => Env -> C.PrimInfo -> [Type n] -> [Value n] -> Value n -> [Term n] -> Machine o n
+  => Env -> PrimInfo -> [Type n] -> [Value n] -> Value n -> [Term n] -> Machine o n
   -> Maybe (Next o n)
 primUnwind env p tys vs v [] m
   -- These primitives are actually values, and not operations
@@ -634,12 +635,12 @@ primUnwind env p tys vs v [] m
   | isUndefinedXPrimVal v = undefinedResult NP.undefinedX env p tys (vs ++ [v]) [] m
   | otherwise = primStep env (forcePrims m) p tys (vs ++ [v]) m
  where
-  nm = C.primName p
+  nm = primName p
   internalError = error ($(curLoc) ++ "Internal error" ++ show (vs, v))
 -- Note [Lazy primitives] in "Clash.GHC.Evaluator.Primitive": some primitives
 -- are lazy in their last argument
 primUnwind env p tys vs v [e] m
-  | C.primName p `elem` lazyPrims
+  | primName p `elem` lazyPrims
   = if isUndefinedPrimVal v
       then undefinedResult NP.undefined env p tys (vs ++ [v]) [e] m
       else newLetBinding env m e $ \m1 i ->
@@ -656,13 +657,13 @@ primUnwind env p tys vs (collectValueTicks -> (v, ts)) (e : es) m
 -- primitive
 undefinedResult
   :: Distinct n
-  => C.PrimInfo -> Env -> C.PrimInfo -> [Type n] -> [Value n] -> [Term n]
+  => C.PrimInfo -> Env -> PrimInfo -> [Type n] -> [Value n] -> [Term n]
   -> Machine o n -> Maybe (Next o n)
 undefinedResult undef env p tys vs es m =
   let sc = mScope m
       args = map Right tys ++ map (Left . valToTerm) vs ++ map Left es
       ty = applyTypeToArgs (Prim p) (envTypeEnv env) sc (primInfoType sc p) args
-  in Just (stay m {mTerm = TyApp (Prim undef) ty})
+  in Just (stay m {mTerm = TyApp (Prim (mkPrimInfoFromClash undef)) ty})
 
 -- | Primitives that are values, not operations
 valuePrims :: [Text]
@@ -690,16 +691,16 @@ lazyPrims =
 
 -- | Whether a value is an undefined primitive
 isUndefinedPrimVal :: Value n -> Bool
-isUndefinedPrimVal (PrimVal p _ _) = C.primName p `elem` undefinedPrims
+isUndefinedPrimVal (PrimVal p _ _) = primName p `elem` undefinedPrims
 isUndefinedPrimVal _ = False
 
 -- | Whether a value is an undefined primitive that throws an 'XException'
 isUndefinedXPrimVal :: Value n -> Bool
-isUndefinedXPrimVal (PrimVal p _ _) = C.primName p `elem` undefinedXPrims
+isUndefinedXPrimVal (PrimVal p _ _) = primName p `elem` undefinedXPrims
 isUndefinedXPrimVal _ = False
 
 -- | The result type of a fully applied primitive
-primResultType :: Distinct n => Env -> Scope n -> C.PrimInfo -> [Type n] -> Type n
+primResultType :: Distinct n => Env -> Scope n -> PrimInfo -> [Type n] -> Type n
 primResultType env sc p tys =
   dropFuns (piResultTys (envTypeEnv env) sc (primInfoType sc p) tys)
  where
@@ -720,7 +721,7 @@ reduceIn pc m e = case isX e of
   Left msg ->
     let sc = mScope m
         resTy = primResultType (pcEnv pc) sc (pcInfo pc) (sink1 (pcTys pc))
-    in trace (warning msg) (Just (Next m {mTerm = TyApp (Prim NP.undefined) resTy}))
+    in trace (warning msg) (Just (Next m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) resTy}))
   Right e' -> Just (Next m {mTerm = e'})
  where
   warning msg = unlines

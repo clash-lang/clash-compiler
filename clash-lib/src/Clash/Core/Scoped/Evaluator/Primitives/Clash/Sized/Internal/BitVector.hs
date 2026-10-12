@@ -34,7 +34,6 @@ import Data.Text.Extra (showt)
 import GHC.TypeLits (KnownNat)
 
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Core.Term as C
 import Clash.Promoted.Nat.Unsafe (unsafeSNat)
 import qualified Clash.Sized.Internal.BitVector as BitVector
 import Clash.Sized.Internal.BitVector (Bit (..), BitVector (..))
@@ -67,7 +66,7 @@ primitives =
              in case isX argWHNF of
                   Left _ -> undefBitVector
                   _ -> case collectArgs argWHNF of
-                    (Prim p,_) | C.primName p `elem` undefinedXPrims -> undefBitVector
+                    (Prim p,_) | primName p `elem` undefinedXPrims -> undefBitVector
                     _ -> Just $ Next mach1 { mTerm = argWHNF }
       _ -> Nothing
 
@@ -286,8 +285,8 @@ primitives =
           , valArgs -> Just [Literal (IntLiteral i)]
           , PrimVal bP _ [Lit (WordLiteral mskB), Lit (IntegerLiteral b)]
           ] <- args
-        , C.primName bvP == showt 'Clash.Sized.Internal.BitVector.fromInteger#
-        , C.primName bP  == showt 'Clash.Sized.Internal.BitVector.fromInteger##
+        , primName bvP == showt 'Clash.Sized.Internal.BitVector.fromInteger#
+        , primName bP  == showt 'Clash.Sized.Internal.BitVector.fromInteger##
           -> let resTyInfo = extractTySizeInfo te sc ty tys
                  (mskVal,val) = reifyNat n (op (BV (fromInteger mskBv) (fromInteger bv))
                                                (fromInteger i)

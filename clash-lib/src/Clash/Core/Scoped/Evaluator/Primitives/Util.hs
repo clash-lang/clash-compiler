@@ -289,7 +289,7 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified Clash.Sized.Vector
 
-import Clash.Core.Scoped.Convert (fromClashTermClosedIn, toClashTerm)
+import Clash.Core.Scoped.Convert (fromClashTermClosedIn, toClashTerm, mkPrimInfoFromClash)
 import Clash.Core.Scoped.Evaluator
   (integerLiteral, naturalLiteral, reduceIn, whnf, wrapSigned, wrapUnsigned)
 import qualified Clash.Core.Scoped.Evaluator as E
@@ -318,7 +318,7 @@ data PrimStepContext o n = PrimStepContext
   , isSubj :: Bool
   -- ^ Whether the primitive is the subject of a case-expression, or an
   -- argument of a primitive, see 'forcePrims'
-  , pInfo :: C.PrimInfo
+  , pInfo :: PrimInfo
   , tys :: [Type n]
   , args :: [Value n]
   , mach :: Machine o n
@@ -380,7 +380,7 @@ mkPrimStepContext pc = PrimStepContext{..}
       (\case [i', j'] -> naturalToNaturalLiteral (f i' j'); _ -> unreachable)
 
   checkNaturalRange nTy natsAsInts f
-    | any (< 0) natsAsInts = TyApp (Prim NP.undefined) nTy
+    | any (< 0) natsAsInts = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) nTy
     | otherwise = f (map fromInteger natsAsInts)
 
   unreachable :: a
@@ -413,7 +413,7 @@ mkPrimStepContext pc = PrimStepContext{..}
   makeUndefinedIf wantToHandle tm =
     case unsafeDupablePerformIO $ tryJust selectException (evaluate $ force $ toClashTerm tm) of
       Right _ -> tm
-      Left e -> trace (msg e) (TyApp (Prim NP.undefined) (getResultTy te sc ty tys))
+      Left e -> trace (msg e) (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (getResultTy te sc ty tys))
    where
     selectException e
       | wantToHandle e = Just e
@@ -634,7 +634,7 @@ boolLiteral = \case
 sizedLiteral :: Text -> Value n -> Maybe Integer
 sizedLiteral szCon = \case
   PrimVal p _ [_, Lit (IntegerLiteral i)]
-    | C.primName p == szCon -> Just i
+    | primName p == szCon -> Just i
   _ -> Nothing
 
 sizedLiterals :: Text -> [Value n] -> Maybe (Integer, Integer)
@@ -650,7 +650,7 @@ bitLiterals = map normalizeBit . mapMaybe go
   normalizeBit (msk, v) = (msk .&. 1, v .&. 1)
   go = \case
     PrimVal p _ [Lit (WordLiteral m), Lit (IntegerLiteral i)]
-      | C.primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger##
+      | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger##
       -> Just (m, i)
     _ -> Nothing
 
@@ -668,7 +668,7 @@ unsignedLiterals' = sizedLiterals' (showt 'Clash.Sized.Internal.Unsigned.fromInt
 bitVectorLiteral :: Value n -> Maybe (Integer, Integer)
 bitVectorLiteral = \case
   PrimVal p _ [_, Lit (NaturalLiteral m), Lit (IntegerLiteral i)]
-    | C.primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger# -> Just (m, i)
+    | primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger# -> Just (m, i)
   _ -> Nothing
 
 bitVectorLiterals' :: [Value n] -> [(Integer, Integer)]
@@ -704,7 +704,7 @@ sizedLitIntLit szCon tenv scope tyArgs vals
     , PrimVal p _ [_, Lit (IntegerLiteral i)]
     , valArgs -> Just [Literal (IntLiteral j)]
     ] <- vals
-  , C.primName p == szCon
+  , primName p == szCon
   = Just (nTy, kn, i, j)
   | otherwise
   = Nothing
@@ -726,7 +726,7 @@ bitVectorLitIntLit tenv scope tyArgs vals
     , PrimVal p _ [_, Lit (NaturalLiteral m), Lit (IntegerLiteral i)]
     , valArgs -> Just [Literal (IntLiteral j)]
     ] <- vals
-  , C.primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger#
+  , primName p == showt 'Clash.Sized.Internal.BitVector.fromInteger#
   = Just (nTy, kn, (m, i), j)
   | otherwise
   = Nothing
@@ -934,7 +934,7 @@ mkIndexLitE primTy nTy kn val
   , val < kn
   = Right (mkSizedLit indexConPrim primTy nTy kn val)
   | otherwise
-  = Left (TyApp (Prim NP.undefined) (mkTyConApp (resultTyCon primTy) [nTy]))
+  = Left (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (mkTyConApp (resultTyCon primTy) [nTy]))
 
 mkIndexLit :: HasCallStack => Type n -> Type n -> Integer -> Integer -> Term n
 mkIndexLit primTy nTy kn val = either id id (mkIndexLitE primTy nTy kn val)
@@ -1055,8 +1055,8 @@ numTy = LitTy . C.NumTy
 -- of the type constructors in the type of its primitive (e.g. that of @Vec@)
 -- can take them from here, rather than from the scoped type 'ty', which is
 -- converted on every call that uses it.
-primArgResTys :: C.PrimInfo -> ([C.Type], C.Type)
-primArgResTys p = case C.splitFunForallTy (C.primType p) of
+primArgResTys :: PrimInfo -> ([C.Type], C.Type)
+primArgResTys p = case C.splitFunForallTy (C.primType (primLegacy p)) of
   (args, res) -> (Either.rights args, res)
 
 -- | The argument types of a function type of Clash Core, e.g. of an argument
@@ -1432,14 +1432,14 @@ powImplWorker PrimStepContext{..}
 -- | A primitive of Clash Core, which is closed
 closedPrim :: HasCallStack => C.Term -> Term n
 closedPrim = \case
-  C.Prim p -> Prim p
+  C.Prim p -> Prim (mkPrimInfoFromClash p)
   _ -> error ($(curLoc) ++ "not a primitive")
 
 -- | 'Clash.Sized.Internal.BitVector.fromInteger##', given the type
 -- constructor of 'Bit'
 bConPrim :: TyConName -> Term n
 bConPrim bTcNm =
-  Prim (C.PrimInfo (showt 'Clash.Sized.Internal.BitVector.fromInteger##) funTy C.WorkNever
+  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Internal.BitVector.fromInteger##) funTy C.WorkNever
           C.SingleResult C.NoUnfolding)
  where
   funTy = foldr1 C.mkFunTy [C.wordPrimTy, C.integerPrimTy, C.mkTyConApp bTcNm []]
@@ -1468,7 +1468,7 @@ unsignedConPrim = sizedConPrim (showt 'Clash.Sized.Internal.Unsigned.fromInteger
 -- extra args -> Integer -> sized n@
 sizedConPrim :: Text -> [C.Type] -> TyConName -> Term n
 sizedConPrim nm extraArgs tcNm =
-  Prim (C.PrimInfo nm (C.ForAllTy nTV funTy) C.WorkNever C.SingleResult C.NoUnfolding)
+  Prim (mkPrimInfoFromClash $ C.PrimInfo nm (C.ForAllTy nTV funTy) C.WorkNever C.SingleResult C.NoUnfolding)
  where
   funTy = foldr1 C.mkFunTy
     ([C.naturalPrimTy] ++ extraArgs ++ [C.integerPrimTy, C.mkTyConApp tcNm [C.VarTy nTV]])
@@ -1482,7 +1482,7 @@ splitAtPrim
   -- ^ Vec TyCon name
   -> Term n
 splitAtPrim snatTcNm vecTcNm =
-  Prim (C.PrimInfo (showt 'Clash.Sized.Vector.splitAt) (splitAtTy snatTcNm vecTcNm)
+  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Vector.splitAt) (splitAtTy snatTcNm vecTcNm)
           C.WorkNever C.SingleResult C.NoUnfolding)
 
 splitAtTy
@@ -1523,7 +1523,7 @@ vecAppendPrim
   -- ^ Vec TyCon name
   -> Term n
 vecAppendPrim vecNm =
-  Prim (C.PrimInfo (showt '(Clash.Sized.Vector.++)) (vecAppendTy vecNm) C.WorkNever
+  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt '(Clash.Sized.Vector.++)) (vecAppendTy vecNm) C.WorkNever
           C.SingleResult C.NoUnfolding)
 
 vecAppendTy
@@ -1546,7 +1546,7 @@ vecZipWithPrim
   -- ^ Vec TyCon name
   -> Term n
 vecZipWithPrim vecNm =
-  Prim (C.PrimInfo (showt 'Clash.Sized.Vector.zipWith) (vecZipWithTy vecNm) C.WorkNever
+  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Vector.zipWith) (vecZipWithTy vecNm) C.WorkNever
           C.SingleResult C.NoUnfolding)
 
 vecZipWithTy
@@ -1605,7 +1605,7 @@ bvAppendPrim
   -- ^ BitVector TyCon name
   -> Term n
 bvAppendPrim bvTcNm =
-  Prim (C.PrimInfo (showt '(Clash.Sized.Internal.BitVector.++#)) (bvAppendTy bvTcNm)
+  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt '(Clash.Sized.Internal.BitVector.++#)) (bvAppendTy bvTcNm)
           C.WorkNever C.SingleResult C.NoUnfolding)
 
 bvAppendTy
@@ -1628,7 +1628,7 @@ bvSplitPrim
   -- ^ BitVector TyCon name
   -> Term n
 bvSplitPrim bvTcNm =
-  Prim (C.PrimInfo (showt 'Clash.Sized.Internal.BitVector.split#) (bvSplitTy bvTcNm)
+  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Internal.BitVector.split#) (bvSplitTy bvTcNm)
           C.WorkNever C.SingleResult C.NoUnfolding)
 
 bvSplitTy

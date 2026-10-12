@@ -30,7 +30,7 @@ import Data.Text.Extra (showt)
 import GHC.TypeLits (KnownNat)
 
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Core.Term as C
+import Clash.Core.Scoped.Syntax (PrimInfo (..))
 import Clash.Sized.Internal.BitVector (BitVector (..))
 import qualified Clash.Sized.Internal.Unsigned as Unsigned
 import Clash.Sized.Internal.Unsigned (Unsigned (..))
@@ -225,7 +225,7 @@ primitives =
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.Unsigned.toInteger#) $ \case
       PrimStepContext{..}
         | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
-        , C.primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
+        , primName p == showt 'Clash.Sized.Internal.Unsigned.fromInteger#
         -> reduce (integerToIntegerLiteral i)
       _ -> Nothing
 

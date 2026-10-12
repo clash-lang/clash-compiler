@@ -51,7 +51,6 @@ import GHC.Stack (HasCallStack)
 import qualified Clash.Core.HasType as C
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (PrimInfo)
 import qualified Clash.Core.Type as C
 import Clash.Debug (debugIsOn)
 import Clash.Util (curLoc)
@@ -96,7 +95,7 @@ literalType = \case
 -- type] in "Clash.Normalize.Transformations.MultiPrim".
 primInfoType :: (HasCallStack, Distinct n) => Scope n -> PrimInfo -> Type n
 -- TODO(D4): the type of a 'PrimInfo' is a Clash Core type
-primInfoType sc p = fromClashTypeClosed sc (C.coreTypeOf p)
+primInfoType sc p = fromClashTypeClosed sc (C.coreTypeOf (primLegacy p))
 
 -- | The type of a term. See 'C.inferCoreTypeOf', and the module header.
 inferCoreTypeOf :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Type n
