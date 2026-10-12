@@ -20,7 +20,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon)
-import Clash.Core.FreeVars (freeLocalVars)
+import Clash.Core.FreeVars (freeLocalVars, termFreeTyVars)
 import Clash.Core.Literal (Literal (IntLiteral))
 import Clash.Core.Name (Name (..), NameSort (User), mkUnsafeName)
 import Clash.Core.Term (Pat (..), Term (..), mkApps)
@@ -40,11 +40,64 @@ import Clash.Util.Supply (Supply, newSupply)
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoShadowing, globalId, inScopeOf, intFunTy, intId
   , intLit, intTy, letBinders, localId, mkBindingMap, mkDataCon, nameToUnique
-  , pairDataCon, pairTy, parseTyConTy, runSingleTransformation, showPprU, tyVar
+  , pairDataCon, pairTy, parseTyConName, parseTyConTy, runSingleTransformation
+  , showPprU, tyVar
   )
 
 decR :: NormRewrite
 decR = $(asRewriteQ disjointExpressionConsolidation)
+
+-- | @MkEx :: forall n. n -> Ex@, a constructor with an existential type variable
+mkEx :: DataCon
+mkEx = mkDataCon "MkEx" 1001 [] [exN] [VarTy exN] exTy
+
+exN :: TyVar
+exN = tyVar User "n" 34
+
+exTy :: Type
+exTy = parseTyConTy "Ex"
+
+-- | The default 'RewriteEnv', extended with the type constructor of 'mkEx'
+exEnv :: RewriteEnv
+exEnv = def{_clashEnv = env{envTyConMap = UniqMap.insert exNm exTc (envTyConMap env)}}
+ where
+  env = _clashEnv def
+  exNm = parseTyConName "Ex"
+  exTc = AlgTyCon
+    { tyConUniq = nameUniq exNm
+    , tyConName = exNm
+    , tyConKind = liftedTypeKind
+    , tyConArity = 0
+    , algTcRhs = DataTyCon [mkEx]
+    , isClassTc = False
+    }
+
+-- | @case s of { DEFAULT -> case e of { MkEx \@n v -> f v }; 1 -> f x }@
+--
+-- Clash drops casts, so after matching on a GADT, an argument can have a type
+-- that mentions an existential type variable where the function expects
+-- another type: here @v :: n@ for @f :: Int -> Int@. DEC used to give the
+-- let-binder of the lifted argument of @f@ the type of the argument of the
+-- first application, @n@, which leaves @n@ free outside of the pattern that
+-- binds it.
+decExistentialArgType :: Assertion
+decExistentialArgType = do
+  supply <- newSupply
+  let st = def{_bindings = mkBindingMap [(fId, Lam a (Var a))], _uniqSupply = supply}
+  res <- runSingleTransformation exEnv st (inScopeOf [sId, eId, xId]) decR term
+  case Lens.toListOf termFreeTyVars res of
+    [] -> pure ()
+    tvs -> assertFailure
+      ("Unexpected free type variables " <> showPprU tvs <> " in:\n" <> showPprU res)
+ where
+  a = intId User "a" 20
+  eId = localId User "e" 35 exTy
+  v = localId User "v" 36 (VarTy exN)
+  term =
+    Case (Var sId) intTy
+      [ (DefaultPat, Case (Var eId) intTy [(DataPat mkEx [exN] [v], App (Var fId) (Var v))])
+      , (LitPat (IntLiteral 1), App (Var fId) (Var xId))
+      ]
 
 sId, xId, yId :: Id
 sId = intId User "s" 30
@@ -241,7 +294,8 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.DEC"
-    [ testCase "DEC does not capture lifted expressions (#1317)"
+    [ testCase "DEC gives lifted arguments a type in scope" decExistentialArgType
+    , testCase "DEC does not capture lifted expressions (#1317)"
         decDoesNotCaptureLiftedExpression
     , testCase "DEC does not lift local functions bound in the alternatives"
         decLocalFunctionBoundInAlts
