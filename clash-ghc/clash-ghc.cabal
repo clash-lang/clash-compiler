@@ -216,7 +216,6 @@ library
                       Clash.GHC.GenerateBindings
                       Clash.GHC.LoadModules
                       Clash.GHC.NetlistTypes
-                      Clash.GHC.Scoped.Builder
                       Clash.GHC.Scoped.GHC2Core
 
 

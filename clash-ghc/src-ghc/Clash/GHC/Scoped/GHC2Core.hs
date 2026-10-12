@@ -14,7 +14,7 @@
   'Clash.GHC.GHC2Core.coreToTerm' with
   'Clash.Core.Scoped.Convert.fromClashTermClosed', with the same raw names,
   except for primitives of open types, see "Primitives" below. It converts in
-  two phases, see "Clash.GHC.Scoped.Builder".
+  two phases, see "Clash.Core.Scoped.Builder".
 
   = Types
 
@@ -116,7 +116,7 @@ import           Clash.GHC.GHC2Core
    coreToPrimVar, coreToVar, coreToVarType, emptyGHC2CoreState, hasPrimCo,
    isDataConWrapId, isSizedCast, pendingWarnings, qualifiedNameString,
    scopedTypeCache, srcSpan)
-import           Clash.GHC.Scoped.Builder
+import           Clash.Core.Scoped.Builder
 import qualified Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types      hiding (name)
 import           Clash.Unique                (fromGhcUnique)
@@ -448,7 +448,7 @@ coreToTyVarB tv = (,) <$> coreToTypeB (varType tv) <*> coreToVar tv
 -- the names the same as those of the conversion through Clash Core.
 --
 -- Memoized on the GHC type, like 'Clash.GHC.GHC2Core.coreToType', which
--- shares the closed types without binders, see "Clash.GHC.Scoped.Builder".
+-- shares the closed types without binders, see "Clash.Core.Scoped.Builder".
 coreToTypeB :: Type -> C2C TyB
 coreToTypeB ty = do
   cache <- use scopedTypeCache
@@ -463,7 +463,7 @@ coreToTypeB ty = do
 --
 -- Closed terms for primitives that GHC2Core replaces, given the (closed) type
 -- of the primitive. Their bodies only refer to their own binders, so the keys
--- of their term variables are arbitrary, see "Clash.GHC.Scoped.Builder".
+-- of their term variables are arbitrary, see "Clash.Core.Scoped.Builder".
 
 -- | See 'Clash.GHC.GHC2Core.bundleUnbundleTerm'
 bundleUnbundleB :: Int -> C.Type -> TmB
