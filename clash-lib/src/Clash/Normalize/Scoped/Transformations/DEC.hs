@@ -109,9 +109,9 @@ import GHC.Settings.Constants (mAX_TUPLE_SIZE)
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
-import Clash.Core.Term (PrimInfo (..))
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Core.Type as C
+import qualified Clash.Core.Term as C (PrimInfo (..))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding)
 import qualified Clash.Normalize.Primitives as NP
@@ -135,6 +135,7 @@ import Clash.Core.Scoped.NameMap
   , memberNameSet )
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.Type
@@ -579,7 +580,7 @@ interestingPrim env sc pInfo args ticks =
   case List.lookup (primName pInfo) interestingPrims of
     Just t | t || anyArgNotConstant -> True
     _ | any isDeDup ticks -> True
-    _ -> isHOTy (primType pInfo) && any (isInterestingApp env sc) lArgs
+    _ -> isHOTy (C.primType (primLegacy pInfo)) && any (isInterestingApp env sc) lArgs
  where
   lArgs = Either.lefts args
   anyArgNotConstant = any (not . isConstant) lArgs
@@ -883,7 +884,7 @@ addDefault te sc scrut ty alts
   | otherwise
   = alts
  where
-  defaultAlt = Alt DefaultPat (TyApp (Prim NP.undefined) ty)
+  defaultAlt = Alt DefaultPat (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) ty)
 
   isDefaultAlt (Alt DefaultPat _) = True
   isDefaultAlt _ = False

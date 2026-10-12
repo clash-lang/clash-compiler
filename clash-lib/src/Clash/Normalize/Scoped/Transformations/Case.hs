@@ -86,7 +86,6 @@ import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.Literal (Literal(..))
 import qualified Clash.Core.Name as C (nameOcc)
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (PrimInfo(..))
 import qualified Clash.Core.Type as C (LitTy(..))
 import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
 import qualified Clash.Core.Var as C (varName)
@@ -113,6 +112,7 @@ import Clash.Core.Scoped.NameMap (NameSet, memberNameSet)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.Type (TypeView(..), coreView1, tyView)
@@ -235,7 +235,7 @@ caseCon' ctx e subj ty alts = do
       -- that if there is one, and we couldn't match with any of the data
       -- patterns.
       (Alt DefaultPat altE : _) -> changed altE
-      _ -> changed (TyApp (Prim NP.undefined) ty)
+      _ -> changed (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) ty)
 
   -- The subject is a literal
   (Literal l, _, _) -> case findAlt equalLit alts of

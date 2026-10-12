@@ -132,7 +132,7 @@ toClashFresh is env@(BackEnv _ ids) = \case
   GlobalVar g -> pure (C.Var (globalIdLegacy g))
   Data dc -> pure (C.Data dc)
   Literal l -> pure (C.Literal l)
-  Prim p -> pure (C.Prim p)
+  Prim p -> pure (C.Prim (primLegacy p))
   Lam b e -> do
     (is', env', v) <- freshIdBinder is env b
     C.Lam v <$> toClashFresh is' env' e

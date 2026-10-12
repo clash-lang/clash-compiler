@@ -26,7 +26,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Unique (Unique)
 
-import Clash.Core.Scoped.Convert (fromClashTermClosed)
+import Clash.Core.Scoped.Convert (fromClashTermClosed, mkPrimInfoFromClash)
 import Clash.Core.Scoped.FreeVars (teleNameBinders)
 import Clash.Core.Scoped.Subst (unsinkTerm)
 import Clash.Core.Scoped.Syntax hiding (Name)
@@ -161,7 +161,7 @@ reifyContext = toScopedTransformation "reifyContext" (onVarNode 'reifyContextWor
 -- from an already rewritten function
 functionToPrimWorker :: TransformContext n -> Term n -> RewriteMonad () (Term n)
 functionToPrimWorker _ctx = \case
-  GlobalVar g | globalIdUniq g == C.varUniq fGlobal -> changed (Prim somePrim)
+  GlobalVar g | globalIdUniq g == C.varUniq fGlobal -> changed (Prim (mkPrimInfoFromClash somePrim))
   node -> pure node
 
 functionToPrim :: Transformation

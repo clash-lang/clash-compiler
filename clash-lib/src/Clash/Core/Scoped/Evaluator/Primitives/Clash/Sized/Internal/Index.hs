@@ -25,7 +25,7 @@ import Data.Text (Text)
 import Data.Text.Extra (showt)
 
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Core.Term as C
+import Clash.Core.Scoped.Syntax (PrimInfo (..))
 import Clash.Util (textNameLit)
 
 import qualified Clash.Sized.Internal.Index
@@ -191,7 +191,7 @@ primitives =
   , primStepEntry $(textNameLit 'Clash.Sized.Internal.Index.toInteger#) $ \case
       PrimStepContext{..}
         | [PrimVal p _ [_, Lit (IntegerLiteral i)]] <- args
-        , C.primName p == showt 'Clash.Sized.Internal.Index.fromInteger#
+        , primName p == showt 'Clash.Sized.Internal.Index.fromInteger#
         -> reduce (integerToIntegerLiteral i)
       _ -> Nothing
 

@@ -167,8 +167,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
           tm = C.TyLam a (C.primCo (C.VarTy a))
       case fromClashTermClosed tm of
         TyLam b (TyApp (Prim p) (VarTy _ _ n)) -> do
-          C.primName p @?= "_CO_"
-          assertAlphaEq C.undefinedTy (C.primType p)
+          primName p @?= "_CO_"
+          assertAlphaEq C.undefinedTy (C.primType (primLegacy p))
           assertBool "the type refers to the binder" (n == tyNameOf b)
         _ -> assertFailure "unexpected shape"
       -- The shape in which "Clash.GHC.GHC2Core" makes coercions
@@ -177,7 +177,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
   , testCase "a closed coercion converts as it is" $ do
       let tm = C.primCo intTy
       case fromClashTermClosed tm of
-        Prim p -> assertAlphaEq intTy (C.primType p)
+        Prim p -> assertAlphaEq intTy (C.primType (primLegacy p))
         _ -> assertFailure "unexpected shape"
       assertAlphaEq tm (roundTrip tm)
 

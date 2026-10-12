@@ -57,6 +57,7 @@ import Clash.Core.Scoped.Subst
   ( extendSubstScope, idSubst, substIdBinder, substScope, substTele, substTm
   , teleIdBinderTypes, withFreshIdBinder, withFreshIdBinders )
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Core.Scoped.Util (internalName, primAtType)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
@@ -96,7 +97,7 @@ xOptimizeWorker ctx node subj ty alts = do
 -- | @errorX@ at a type, see the module header
 errorXOf :: Type n -> Term n
 errorXOf = primAtType
-  (C.PrimInfo (Text.showt 'errorX) C.undefinedTy C.WorkConstant C.SingleResult C.NoUnfolding)
+  (mkPrimInfoFromClash (C.PrimInfo (Text.showt 'errorX) C.undefinedTy C.WorkConstant C.SingleResult C.NoUnfolding))
 
 -- | An expression equivalent to the alternative given. When only one
 -- alternative is defined, this replaces the case-expression.
@@ -167,7 +168,7 @@ mkFieldSelector sc subj dc fieldTys index =
 isPrimError :: Term l -> NormalizeSession Bool
 isPrimError e = case collectArgs e of
   (Prim pInfo, _) -> do
-    prim <- Lens.view (primitives . Lens.at (C.primName pInfo))
+    prim <- Lens.view (primitives . Lens.at (primName pInfo))
     case prim >>= extractPrim of
       Just p -> return (isErr p)
       Nothing -> return False

@@ -69,6 +69,7 @@ import Clash.Util (curLoc, textNameLit)
 import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (mkApps)
 import Clash.Core.Scoped.Type (TypeView (..), tyView)
 import Clash.Core.Scoped.TypeEnv (lookupTyCon)
@@ -1860,6 +1861,6 @@ mutableByteArray mbaTy p = case tyView mbaTy of
   TyConApp mbaTcNm [sTy] ->
     let sTv = C.mkTyVar liftedTypeKind (mkUnsafeSystemName "s" 0)
         primTy = C.ForAllTy sTv (C.mkFunTy intPrimTy (C.mkTyConApp mbaTcNm [C.VarTy sTv]))
-        mbaPrim = C.PrimInfo (showt ''MutableByteArray#) primTy C.WorkNever C.SingleResult C.NoUnfolding
+        mbaPrim = mkPrimInfoFromClash $ C.PrimInfo (showt ''MutableByteArray#) primTy C.WorkNever C.SingleResult C.NoUnfolding
     in mkApps (Prim mbaPrim) [Right sTy, Left (Literal (IntLiteral (toInteger p)))]
   _ -> error ($(curLoc) ++ "not a MutableByteArray#: " ++ showPpr mbaTy)

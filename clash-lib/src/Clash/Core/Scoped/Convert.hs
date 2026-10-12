@@ -85,6 +85,8 @@ module Clash.Core.Scoped.Convert
     -- $constructors
   , mkGlobalId
   , mkGlobalIdFromClash
+  , mkPrimInfo
+  , mkPrimInfoFromClash
   ) where
 
 import qualified Control.Lens as Lens
@@ -364,8 +366,8 @@ goTmS sup env@(ConvEnv _ _ tms _) = go
       -- A coercion with an open type, see the module header
       | C.primName p == coercionPrimName
       , Lens.notNullOf C.typeFreeVars (C.primType p)
-      -> TyApp (Prim p {C.primType = C.undefinedTy}) <$> goT (C.primType p)
-      | otherwise -> pure (Prim p)
+      -> TyApp (Prim (mkPrimInfoFromClash p {C.primType = C.undefinedTy})) <$> goT (C.primType p)
+      | otherwise -> pure (Prim (mkPrimInfoFromClash p))
     C.Lam v e -> convIdBinder sup Binder env v $ \env' b -> Lam b <$> goTmS sup env' e
     C.TyLam tv e -> convTyBinder sup Binder env tv $ \env' b -> TyLam b <$> goTmS sup env' e
     C.App e1 e2 -> App <$> go e1 <*> go e2
@@ -503,7 +505,7 @@ toClashTermEnv env@(ToEnv _ ids) = go
     GlobalVar v -> C.Var (globalIdLegacy v)
     Data dc -> C.Data dc
     Literal l -> C.Literal l
-    Prim p -> C.Prim p
+    Prim p -> C.Prim (primLegacy p)
     Lam b e -> toIdBinder env b $ \env' v -> C.Lam v (toClashTermEnv env' e)
     TyLam b e -> toTyBinder env b $ \env' tv -> C.TyLam tv (toClashTermEnv env' e)
     App e1 e2 -> C.App (go e1) (go e2)
@@ -560,10 +562,47 @@ mkGlobalId nm ty = GlobalId
 -- variable. Its type is converted lazily, and errors if it isn't closed.
 mkGlobalIdFromClash :: HasCallStack => C.Id -> GlobalId
 mkGlobalIdFromClash v
-  | C.isGlobalId v = GlobalId
-      { globalIdName = (C.varName v) {C.nameUniq = C.varUniq v}
-      , globalIdType = fromClashTypeClosed emptyScope (C.varType v)
-      , globalIdLegacy = v
-      }
+  | C.isGlobalId v = globalIdFromClashUnchecked v
   | otherwise =
       error ("mkGlobalIdFromClash: not a global variable: " <> show (C.varName v))
+
+globalIdFromClashUnchecked :: HasCallStack => C.Id -> GlobalId
+globalIdFromClashUnchecked v = GlobalId
+  { globalIdName = (C.varName v) {C.nameUniq = C.varUniq v}
+  , globalIdType = fromClashTypeClosed emptyScope (C.varType v)
+  , globalIdLegacy = v
+  }
+
+-- | A primitive with the given name, closed type, work info, whether it has
+-- multiple results, and unfolding
+mkPrimInfo :: Text -> Type 'VoidS -> C.WorkInfo -> C.IsMultiPrim -> PrimUnfolding -> PrimInfo
+mkPrimInfo nm ty wi mr unf = PrimInfo
+  { primName = nm
+  , primType = ty
+  , primWorkInfo = wi
+  , primMultiResult = mr
+  , primUnfolding = unf
+  , primLegacy = C.PrimInfo nm (toClashType ty) wi mr unfLegacy
+  }
+ where
+  unfLegacy = case unf of
+    NoUnfolding -> C.NoUnfolding
+    Unfolding g -> C.Unfolding (globalIdLegacy g)
+
+-- | A primitive of Clash Core. Its type is converted lazily, and errors if it
+-- isn't closed. See the module header for the coercions of Clash Core, whose
+-- types need not be closed.
+mkPrimInfoFromClash :: HasCallStack => C.PrimInfo -> PrimInfo
+mkPrimInfoFromClash p = PrimInfo
+  { primName = C.primName p
+  , primType = fromClashTypeClosed emptyScope (C.primType p)
+  , primWorkInfo = C.primWorkInfo p
+  , primMultiResult = C.primMultiResult p
+  , primUnfolding = case C.primUnfolding p of
+      C.NoUnfolding -> NoUnfolding
+      -- Not checked with 'C.isGlobalId': the binder of the unfolding is a
+      -- top-level binding, but GHC2Core gives it the scope of GHC's
+      -- variable, which need not be global
+      C.Unfolding v -> Unfolding (globalIdFromClashUnchecked v)
+  , primLegacy = p
+  }

@@ -95,7 +95,7 @@ isWorkFree cache bndrs = go True
       | otherwise -> andM [isWorkFreeBinder cache bndrs g, allM goArg args]
     Data _ -> allM goArg args
     Literal _ -> pure True
-    Prim pr -> case C.primWorkInfo pr of
+    Prim pr -> case primWorkInfo pr of
       -- The primitive outputs a constant, whatever its arguments
       C.WorkConstant -> pure True
       C.WorkNever -> allM goArg args
@@ -136,7 +136,7 @@ isConstantNotClockReset
 isConstantNotClockReset tenv sc e
   | isClockOrReset tenv sc (inferCoreTypeOf tenv sc e) =
       case fst (collectArgs e) of
-        Prim pr -> C.primName pr == Text.showt 'removedArg
+        Prim pr -> primName pr == Text.showt 'removedArg
         _ -> False
   | otherwise = isConstant e
 
@@ -149,7 +149,7 @@ isWorkFreeClockOrResetOrEnable tenv sc e =
   let eTy = inferCoreTypeOf tenv sc e in
   if isClockOrReset tenv sc eTy || isEnable tenv sc eTy then
     case collectArgs e of
-      (Prim p, _) -> Just (C.primName p == Text.showt 'removedArg)
+      (Prim p, _) -> Just (primName p == Text.showt 'removedArg)
       -- Only local variables with a clock type are work-free. A global
       -- variable is probably backed by a clock generator, see #2845.
       (Var {}, []) -> Just True
@@ -169,7 +169,7 @@ isWorkFreeIsh tenv sc e =
     Just b -> b
     Nothing -> case collectArgs e of
       (Data _, args) -> all isWorkFreeIshArg args
-      (Prim pInfo, args) -> case C.primWorkInfo pInfo of
+      (Prim pInfo, args) -> case primWorkInfo pInfo of
         -- Things like clock or reset generators always perform work
         C.WorkAlways -> False
         C.WorkVariable -> all isConstantArg args

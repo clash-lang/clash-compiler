@@ -83,6 +83,7 @@ import           Clash.Core.Scoped.Pretty      ()
 import qualified Clash.Core.Term               as C
 import           Clash.Core.TyCon              (tyConDataCons)
 import qualified Clash.Core.Type               as C (ConstTy (..))
+import qualified Clash.Core.Util               as C (undefinedTy)
 import qualified Clash.Data.UniqMap            as UniqMap
 import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail, prepareBlackBox)
 import           Clash.Netlist.BlackBox.Types
@@ -112,6 +113,7 @@ import           Clash.Core.Scoped.Subst
   (extendTmSubst, idSubst, openBind, openIdBinder, openTyBinder, substTm,
    teleIdVars, withFreshIdBinder)
 import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import           Clash.Core.Scoped.TermInfo
@@ -249,7 +251,7 @@ mkArgument ctx bbName bndr declType nArg e = do
     ((e',t,l),d) <- case hwTyM of
       Nothing
         | (Prim p,_) <- collectArgs e
-        , C.primName p == showt 'removedArg
+        , primName p == showt 'removedArg
         -> return ((Identifier (Id.unsafeMake (showt 'removedArg)) Nothing, Void Nothing, False), [])
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
@@ -302,7 +304,7 @@ mkPrimitive
   -- ^ Are the declarations concurrent or sequential?
   -> NetlistId n
   -- ^ Id to assign the result to
-  -> C.PrimInfo
+  -> PrimInfo
   -- ^ Primitive info
   -> [Either (Term n) (Type n)]
   -- ^ Arguments
@@ -310,7 +312,7 @@ mkPrimitive
   -- ^ Tick declarations
   -> NetlistMonad (Expr, [Declaration])
 mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
-  go =<< extractPrimWarnOrFail context (C.primName pInfo)
+  go =<< extractPrimWarnOrFail context (primName pInfo)
   where
     tenv = compTypeEnv ctx
     sc = compScope ctx
@@ -330,7 +332,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
     go =
       \case
         P.BlackBoxHaskell bbName wf _usedArgs multiResult funcName (_fHash, func) -> do
-          bbFunRes <- callBlackBoxFunction ctx func bbEasD (C.primName pInfo) args tys
+          bbFunRes <- callBlackBoxFunction ctx func bbEasD (primName pInfo) args tys
           case bbFunRes of
             Left err -> do
               -- Blackbox template function returned an error:
@@ -357,7 +359,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
           tcm <- Lens.view tcCache
           let (args1, resArgs) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args
               resIds = [ LocalId o t v | Var o t v <- resArgs ]
-          (bbCtx, ctxDcls) <- mkBlackBoxContext ctx (C.primName pInfo) declType resIds args1
+          (bbCtx, ctxDcls) <- mkBlackBoxContext ctx (primName pInfo) declType resIds args1
           (templ, templDecl) <- prepareBlackBox name template bbCtx
           let bbDecl = N.BlackBoxD name (P.libraries p) (P.imports p) (P.includes p) templ bbCtx
           return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
@@ -367,7 +369,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
               resM <- resBndr1 True dst
               case resM of
                 Just (dst',dstNm,dstDecl) -> do
-                  (bbCtx,ctxDcls)   <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst'] args
+                  (bbCtx,ctxDcls)   <- mkBlackBoxContextRes ctx (primName pInfo) declType [dst'] args
                   (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
                                            (P.includes p) templ bbCtx
@@ -378,7 +380,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                 Nothing | RenderVoid <- P.renderVoid p -> do
                   -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                   let dst1 = (Id.unsafeMake "__VOID_TDECL_NOOP__", ty)
-                  (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst1] args
+                  (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (primName pInfo) declType [dst1] args
                   (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                   let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
                                            (P.includes p) templ bbCtx
@@ -392,7 +394,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                   resM <- resBndr1 True dst
                   case resM of
                     Just (dst',dstNm,dstDecl) -> do
-                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst'] args
+                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (primName pInfo) declType [dst'] args
                       (bbTempl,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbE =  BlackBoxE pNm (P.libraries p) (P.imports p) (P.includes p) bbTempl bbCtx bbEParen
                       tmpAssgn <- case declType of
@@ -404,7 +406,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                     Nothing | RenderVoid <- P.renderVoid p -> do
                       -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                       let dst1 = (Id.unsafeMake "__VOID_TEXPRD_NOOP__", ty)
-                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst1] args
+                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (primName pInfo) declType [dst1] args
                       (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
                                                (P.includes p) templ bbCtx
@@ -416,9 +418,9 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                   resM <- resBndr1 False dst
                   case resM of
                     Just (dst',_,_) -> do
-                      (bbCtx,ctxDcls)      <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst'] args
+                      (bbCtx,ctxDcls)      <- mkBlackBoxContextRes ctx (primName pInfo) declType [dst'] args
                       (bbTempl,templDecl0) <- prepareBlackBox pNm template bbCtx
-                      let templDecl1 = case C.primName pInfo of
+                      let templDecl1 = case primName pInfo of
                             "Clash.Sized.Internal.BitVector.fromInteger#"
                               | [N.Literal _ (NumLit _), N.Literal _ _, N.Literal _ _] <- extractLiterals bbCtx -> []
                             "Clash.Sized.Internal.BitVector.fromInteger##"
@@ -435,7 +437,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                     Nothing | RenderVoid <- P.renderVoid p -> do
                       -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
                       let dst1 = (Id.unsafeMake "__VOID_TEXPRE_NOOP__", ty)
-                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst1] args
+                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (primName pInfo) declType [dst1] args
                       (templ,templDecl) <- prepareBlackBox pNm template bbCtx
                       let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
                                                (P.includes p) templ bbCtx
@@ -777,10 +779,10 @@ mkFunInput ctx parentName declType resId e =
               bb  <- extractPrimWarnOrFail
                        (primWarnContext [] (unpack (Id.toText (fst resId))) args
                           <> ", as an argument of: " <> unpack parentName)
-                       (C.primName p)
+                       (primName p)
               case bb of
                 P.BlackBox {..} ->
-                  pure (Left (kind,outputUsage,libraries,imports,includes,C.primName p,template))
+                  pure (Left (kind,outputUsage,libraries,imports,includes,primName p,template))
                 P.Primitive pn _ pt ->
                   error $ $(curLoc) ++ "Unexpected blackbox type: "
                                     ++ "Primitive " ++ show pn
@@ -937,7 +939,7 @@ mkFunInput ctx parentName declType resId e =
               Right . first (second (tickDecls ++)) <$> go ctx 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
   let pNm = case appE of
-              Prim p -> C.primName p
+              Prim p -> primName p
               _ -> "__INTERNAL__"
   (bbCtx,dcls) <- mkBlackBoxContextRes ctx pNm declType [resId] args
   case templ of
@@ -1326,7 +1328,7 @@ collectBindIO ctx dst (m:Lam x q:_) =
   notSplit c ds0 = \case
     Let {} -> error "internal error"
     (collectArgs -> (Prim p,args))
-      | C.primName p == "Clash.Explicit.SimIO.bindSimIO#" -> do
+      | primName p == "Clash.Explicit.SimIO.bindSimIO#" -> do
           (expr,ds1) <- collectBindIO c (sink dst) (lefts args)
           return (expr, ds0 ++ ds1)
     eS -> do
@@ -1378,11 +1380,11 @@ collectAppIO
   -> NetlistMonad (Expr,[Declaration])
 collectAppIO ctx dst (fun1:arg1:_) rest = case collectArgs fun1 of
   (Prim p,(lefts -> (fun0:arg0:_)))
-    | C.primName p == "Clash.Explicit.SimIO.fmapSimIO#" -> do
+    | primName p == "Clash.Explicit.SimIO.fmapSimIO#" -> do
         let argN = map (Left . unSimIO ctx) (arg0:arg1:rest)
         mkExpr ctx False Sequential dst (mkApps fun0 argN)
   (Prim p,(lefts -> args))
-    | C.primName p == "Clash.Explicit.SimIO.apSimIO#" ->
+    | primName p == "Clash.Explicit.SimIO.apSimIO#" ->
         collectAppIO ctx dst args (arg1:rest)
   _ -> error ("internal error:\n" ++ showPpr (fun1:arg1:rest))
 
@@ -1403,9 +1405,10 @@ unSimIO ctx arg =
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
           mkApps (primAtType
-                    (C.PrimInfo
+                    (mkPrimInfoFromClash $ C.PrimInfo
                        "Clash.Explicit.SimIO.unSimIO#"
-                       (error "unSimIO: the type is given by primAtType")
+                       -- primAtType sets the type
+                       C.undefinedTy
                        C.WorkNever
                        C.SingleResult
                        C.NoUnfolding)

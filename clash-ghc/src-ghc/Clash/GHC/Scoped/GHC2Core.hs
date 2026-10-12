@@ -108,7 +108,8 @@ import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash, mkPrimInfoFromClash)
+import           Clash.Core.Scoped.Syntax (PrimInfo (..))
 import           Clash.Driver.Types          (HasClashOpts(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreEnv (..), SrcSpanRB (..), StructuralType (..), addUsefull,
@@ -250,7 +251,7 @@ coreToTermB primMap unlocs recLocals = term
 
     term' (Var x)                 = var x
     term' (Lit l@LitRubbish{}) = do
-      let rubbish ty = C.PrimInfo (pack "_RUBBISH_") ty C.WorkNever C.SingleResult C.NoUnfolding
+      let rubbish ty = mkPrimInfoFromClash $ C.PrimInfo (pack "_RUBBISH_") ty C.WorkNever C.SingleResult C.NoUnfolding
       ty <- coreToType (literalType l)
       -- The shape of 'Clash.Core.Scoped.Util.primAtType', see the module header
       if Lens.notNullOf C.typeFreeVars ty
@@ -289,11 +290,11 @@ coreToTermB primMap unlocs recLocals = term
       s'  <- term' s
       ty' <- coreToTypeB ty
       case tmbHead s' of
-        Just p | C.primName p `elem` C.undefinedXPrims ->
+        Just p | primName p `elem` C.undefinedXPrims ->
           -- See 'Clash.GHC.GHC2Core.coreToTerm'
-          return (tyAppB (primB C.undefinedX) ty')
+          return (tyAppB (primB (mkPrimInfoFromClash C.undefinedX)) ty')
         _ ->
-          return (tyAppB (primB C.undefined) ty')
+          return (tyAppB (primB (mkPrimInfoFromClash C.undefined)) ty')
 
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
@@ -322,10 +323,10 @@ coreToTermB primMap unlocs recLocals = term
              addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
     term' (Tick _ e) = term e
     term' (Type t) =
-      tyAppB (primB (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
+      tyAppB (primB (mkPrimInfoFromClash $ C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
         <$> coreToTypeB t
     term' (Coercion co) =
-      tyAppB (primB (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
+      tyAppB (primB (mkPrimInfoFromClash $ C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
         <$> coreToTypeB (coercionType co)
 
     termSP sp = fmap (second unSrcSpanRB) . RWS.listen . addUsefullR sp . term
@@ -346,7 +347,7 @@ coreToTermB primMap unlocs recLocals = term
             Just p  ->
               -- Primitive will be marked MultiResult in Transformations if it
               -- is a multi result primitive.
-              return $ primB (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p) C.SingleResult C.NoUnfolding)
+              return $ primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p) C.SingleResult C.NoUnfolding)
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -395,10 +396,10 @@ coreToTermB primMap unlocs recLocals = term
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ primB (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding)
+              return $ primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding)
             Nothing
               | x `elem` unlocs ->
-                  return (primB (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding))
+                  return (primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding))
               | isGlobalId x, not (x `elemVarSet` recLocals)
               -> globalB . mkGlobalIdFromClash <$> coreToId x
               | otherwise
@@ -406,10 +407,10 @@ coreToTermB primMap unlocs recLocals = term
       where
         primVar xNameS xType wi =
           if x `elem` unlocs
-            then return (primB (C.PrimInfo xNameS xType wi C.SingleResult C.NoUnfolding))
+            then return (primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType wi C.SingleResult C.NoUnfolding))
             else do
               bndr <- coreToId x
-              return (primB (C.PrimInfo xNameS xType wi C.SingleResult (C.Unfolding bndr)))
+              return (primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType wi C.SingleResult (C.Unfolding bndr)))
 
     alt _   (Alt DEFAULT      _  e) = defaultAltB <$> term e
     alt _   (Alt (LitAlt l)   _  e) = litAltB (coreToLiteral l) <$> term e
@@ -580,7 +581,7 @@ runRWB (C.ForAllTy rTV (C.ForAllTy oTV funTy))
   = tyLamClashB rTV $ tyLamClashB oTV $
     lamB 0 (C.mkUnsafeSystemName "f" 0) (clashTyB fTy) $
     appB (varB 0)
-         (primB (C.PrimInfo (showt 'GHC.Prim.realWorld#) rwTy C.WorkNever C.SingleResult C.NoUnfolding))
+         (primB (mkPrimInfoFromClash $ C.PrimInfo (showt 'GHC.Prim.realWorld#) rwTy C.WorkNever C.SingleResult C.NoUnfolding))
 runRWB ty = error $ $(curLoc) ++ show ty
 
 -- | See 'Clash.GHC.GHC2Core.checkUnpackUndefTerm'

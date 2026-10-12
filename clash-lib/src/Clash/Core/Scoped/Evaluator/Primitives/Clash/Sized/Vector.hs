@@ -55,6 +55,7 @@ import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.HasType (piResultTy, piResultTys)
 import Clash.Core.Scoped.Subst (withFreshIdBinder, withFreshIdBinders)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (mkApps)
 import Clash.Core.Scoped.Type
   ( PiTele (..), SplitFunForall (..), TypeView (..), mkFunTy, mkTyConApp, normalizeType
@@ -252,7 +253,7 @@ primitives =
                         -- The vector reduces to Nil and not Cons, which only
                         -- happens when 'n' would be negative. See
                         -- https://github.com/clash-lang/clash-compiler/issues/2831
-                        reduce (TyApp (Prim NP.undefined) (getResultTy te sc ty tys))
+                        reduce (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (getResultTy te sc ty tys))
                   -- The vector doesn't reduce to a data constructor
                   | otherwise -> Nothing
       _ -> Nothing
@@ -528,7 +529,7 @@ primitives =
         , Just indexTcNm <- tyConNameOf indexTy
         , Right n <- runExcept (tyNatSize te sc nTy)
         -> reduceWHNF $
-           mkApps (Prim (CT.PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm)
+           mkApps (Prim (mkPrimInfoFromClash $ CT.PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm)
                            CT.WorkNever CT.SingleResult CT.NoUnfolding))
              [ Right nTy
              , Right nTy
@@ -558,7 +559,7 @@ primitives =
                          bTy1 = sink bTy
                          f1 = sink (valToTerm f)
                          indexAdd =
-                           Prim (CT.PrimInfo (showt '(Clash.Sized.Internal.Index.+#))
+                           Prim (mkPrimInfoFromClash $ CT.PrimInfo (showt '(Clash.Sized.Internal.Index.+#))
                                    (indexAddTy indexTcNm) CT.WorkVariable CT.SingleResult
                                    CT.NoUnfolding)
                      in Just $ Next mach1
@@ -612,7 +613,7 @@ primitives =
         | isSubj
         , aTy : bTy : cTy : nTy : _ <- tys
         , [f, DC dc vArgs, ys] <- args
-        , (_, C.tyView -> C.TyConApp vecTcNm _) <- C.splitFunForallTy (CT.primType pInfo)
+        , (_, C.tyView -> C.TyConApp vecTcNm _) <- C.splitFunForallTy (CT.primType (primLegacy pInfo))
         , Right n <- runExcept (tyNatSize te sc nTy)
         -> case n of
              0 -> reduce (mkVecNil te sc dc cTy)
@@ -676,7 +677,7 @@ primitives =
                       mVecTy = mkTyConApp vecTcNm [numTy m, aTy]
                       n1VecTy = mkTyConApp vecTcNm [numTy n1, aTy]
                       splitAtCall =
-                        mkApps (Prim (CT.PrimInfo "Clash.Sized.Vector.fold_split"
+                        mkApps (Prim (mkPrimInfoFromClash $ CT.PrimInfo "Clash.Sized.Vector.fold_split"
                                         (foldSplitAtTy vecTcNm) CT.WorkNever CT.SingleResult
                                         CT.NoUnfolding))
                           [ Right (numTy m), Right (numTy n1), Right aTy

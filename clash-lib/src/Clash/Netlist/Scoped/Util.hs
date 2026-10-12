@@ -74,7 +74,7 @@ import           Clash.Core.Scoped.Pretty    ()
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.Type             as C (LitTy (..), Type)
 import           Clash.Core.Term             (MultiPrimInfo (..))
-import           Clash.Core.TermInfo         (multiPrimInfo')
+import           Clash.Core.Scoped.TermInfo  (multiPrimInfo')
 import           Clash.Util                  (ClashException (..), curLoc)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
@@ -502,16 +502,16 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
   withTicks ctx ticks $ \_ -> do
     case k of
       Prim p ->
-        case C.primMultiResult p of
-          C.SingleResult -> extractPrimWarnOrFail context (C.primName p) >>= goSingle p
-          C.MultiResult -> extractPrimWarnOrFail context (C.primName p) >>= goMulti p
+        case primMultiResult p of
+          C.SingleResult -> extractPrimWarnOrFail context (primName p) >>= goSingle p
+          C.MultiResult -> extractPrimWarnOrFail context (primName p) >>= goMulti p
       _ -> pure []
  where
   context = primWarnContext binds (localIdText ctx i) args
 
   -- Routine for multi result primitives. For more info:
   -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
-  goMulti :: C.PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name C.Term)]
+  goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name C.Term)]
   goMulti pInfo (BlackBoxHaskell{function=(_, function)}) = do
     tcm <- Lens.view tcCache
     let MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
@@ -521,22 +521,22 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
     -- primitive, whose type variables are not in scope: those of the result
     -- variables are instantiated
     funRes <- preserveVarEnv $
-      callBlackBoxFunction ctx function False (C.primName pInfo) args1 (map localIdType resIds)
+      callBlackBoxFunction ctx function False (primName pInfo) args1 (map localIdType resIds)
     let BlackBoxMeta{bbResultNames} = either error fst funRes
-    go (C.primName pInfo) resIds args1 bbResultNames
+    go (primName pInfo) resIds args1 bbResultNames
   goMulti _ _ = pure []
 
   -- Routine for single result primitives (the default kind of primitive)
-  goSingle :: C.PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name C.Term)]
+  goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name C.Term)]
   goSingle pInfo (BlackBoxHaskell{function=(_, function)}) = do
     funRes <- preserveVarEnv $
-      callBlackBoxFunction ctx function False (C.primName pInfo) args [localIdType i]
+      callBlackBoxFunction ctx function False (primName pInfo) args [localIdType i]
     case either error fst funRes of
       BlackBoxMeta{bbResultNames=[bbResultName]} ->
-        go (C.primName pInfo) [i] args [bbResultName]
+        go (primName pInfo) [i] args [bbResultName]
       _ -> pure []
   goSingle pInfo (BlackBox{resultNames=[resultName]}) = do
-    go (C.primName pInfo) [i] args [resultName]
+    go (primName pInfo) [i] args [resultName]
   goSingle _ _ = pure []
 
   go

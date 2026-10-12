@@ -117,7 +117,7 @@ data Value (n :: S) where
   Lit :: !Literal -> Value n
   -- | Clash's number types are represented by their @fromInteger#@ primitive
   -- function. So some primitives are values.
-  PrimVal :: !C.PrimInfo -> [Type n] -> [Value n] -> Value n
+  PrimVal :: !PrimInfo -> [Type n] -> [Value n] -> Value n
   -- | Used by lazy primitives
   Suspend :: !(Term n) -> Value n
   -- | Preserve ticks from terms in values
@@ -196,7 +196,7 @@ data StackFrame (n :: S)
   -- ^ Update the global heap binding of the variable with the value
   | Apply !(HeapVar n)
   | Instantiate !(Type n)
-  | PrimApply !C.PrimInfo [Type n] [Value n] [Term n]
+  | PrimApply !PrimInfo [Type n] [Value n] [Term n]
   | Scrutinise (Type n) [Alt n]
   -- ^ The type of the alternatives is lazy: 'Clash.Core.Scoped.Evaluator.whnf'
   -- pushes a frame without alternatives, whose type is never used
@@ -388,7 +388,7 @@ data PrimContext (o :: S) (n :: S) = PrimContext
   { pcEnv :: Env
   , pcIsSubj :: Bool
   -- ^ Whether special primitives must be forced, see 'forcePrims'
-  , pcInfo :: C.PrimInfo
+  , pcInfo :: PrimInfo
   , pcTys :: [Type n]
   , pcArgs :: [Value n]
   , pcMachine :: Machine o n

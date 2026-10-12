@@ -458,14 +458,14 @@ inlineCleanupWorker ctx node bind body0 = do
     | C.nameSort (lbOcc lb) /= C.User
     = case tm of
         Prim pInfo
-          | let nm = C.primName pInfo
+          | let nm = primName pInfo
           , Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims
           , TExpr <- kind p
           , Just occ <- lookupNameMap (lbName lb) allOccs
           , occ < 2
           -> True
           | otherwise
-          -> C.primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+          -> primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
         Case _ _ [_] -> True
         Data _ -> True
         Case _ aTy (_:_:_)
@@ -476,7 +476,7 @@ inlineCleanupWorker ctx node bind body0 = do
     | otherwise
     = case tm of
         Prim pInfo
-          | C.primName pInfo `elem`
+          | primName pInfo `elem`
                       [ Text.showt 'SimIO.openFile
                       , Text.showt 'SimIO.getChar
                       , Text.showt 'SimIO.isEOF
@@ -485,7 +485,7 @@ inlineCleanupWorker ctx node bind body0 = do
           , occ < 2
           -> True
           | otherwise
-          -> C.primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+          -> primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
         Case _ _ [Alt (DataPat dcE _ _) _]
           -> let nm = C.nameOcc (dcName dcE)
              in -- Inlines WW projection that exposes internals of the BitVector types
@@ -552,9 +552,9 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
     let aTy = inferCoreTypeOf te scX identity
     return (primUCo `TyApp` aTy `TyApp` bTy `App` identity)
 
-  getIdentity :: C.PrimInfo -> [Term x] -> MaybeT NormalizeSession (Term x)
+  getIdentity :: PrimInfo -> [Term x] -> MaybeT NormalizeSession (Term x)
   getIdentity primInfo termArgs = do
-    C.WorkIdentity idIdx noopIdxs <- return (C.primWorkInfo primInfo)
+    C.WorkIdentity idIdx noopIdxs <- return (primWorkInfo primInfo)
     mapM_ (getTermArg termArgs >=> isNoop >=> Monad.guard) noopIdxs
     getTermArg termArgs idIdx
 
@@ -572,7 +572,7 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
       isRecursive <- lift (isRecursiveBndr g)
       Monad.guard (not isRecursive)
       isNoop (bindingTerm binding)
-    Prim C.PrimInfo {C.primWorkInfo = C.WorkIdentity _ []} -> return True
+    Prim PrimInfo {primWorkInfo = C.WorkIdentity _ []} -> return True
     Lam x e -> isNoopApp (tmNameOf x) (collectArgs e)
     _ -> return False
 
@@ -589,10 +589,10 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
   isNoopApp :: TmName x -> (Term x, [Either (Term x) (Type x)]) -> MaybeT NormalizeSession Bool
   isNoopApp x = \case
     (Var _ _ y, []) -> return (tmNameRaw x == tmNameRaw y)
-    (Prim C.PrimInfo {C.primWorkInfo = C.WorkIdentity i []}, args) -> do
+    (Prim PrimInfo {primWorkInfo = C.WorkIdentity i []}, args) -> do
       arg <- getTermArg (lefts args) i
       isNoopApp x (collectArgs arg)
-    (Prim C.PrimInfo {C.primName}, args)
+    (Prim PrimInfo {primName}, args)
       | primName == Text.showt 'BV.xToBV -> do
       -- We don't make 'xToBV' something of 'WorkIdentity 1 []' because we don't
       -- want 'getIdentity' to replace "naked" occurances of 'xToBV' by

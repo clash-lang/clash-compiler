@@ -80,7 +80,6 @@ import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.HasType as C (coreTypeOf)
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (tyConDataCons)
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C (Id)
@@ -104,6 +103,7 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
   (openAlt, teleIdVars, unsinkAlt, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term
   ( AbsBinder (..), appendTele, collectArgs, collectArgsTicks, collectTicks
   , mkApps, mkLams, mkTicks, openBndrs, partitionTicks, stripAllTicks, stripTicks )
@@ -212,12 +212,12 @@ removeUnusedPrimArgs
   -- ^ The application
   -> Term n
   -- ^ The primitive
-  -> C.PrimInfo
+  -> PrimInfo
   -> [Either (Term n) (Type n)]
   -> [TickInfo n]
   -> NormalizeSession (Term n)
 removeUnusedPrimArgs sc e p pInfo args ticks = do
-  bbM <- HashMap.lookup (C.primName pInfo) <$> Lens.view primitives
+  bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
   let
     usedArgs0 =
       case Monad.join (extractPrim <$> bbM) of
@@ -227,7 +227,7 @@ removeUnusedPrimArgs sc e p pInfo args ticks = do
             IgnoredArguments ignored -> Just ([0..length args - 1] \\ ignored)
         Just (BlackBox pNm _ _ _ _ _ _ _ _ _ inc r ri templ) -> Just $
           if | isFromInt pNm -> [0,1,2]
-             | C.primName pInfo `elem` [ Text.showt 'dontApplyInHDL
+             | primName pInfo `elem` [ Text.showt 'dontApplyInHDL
                                        , Text.showt 'Vec.splitAt
                                        ] -> [0,1]
              | otherwise -> concat [ concatMap getUsedArguments r
@@ -249,7 +249,7 @@ removeUnusedPrimArgs sc e p pInfo args ticks = do
         return e
  where
   -- The type of a primitive is closed, so this uses the one of Clash Core
-  arity = length . Either.rights . fst $ C.splitFunForallTy (C.coreTypeOf pInfo)
+  arity = length . Either.rights . fst $ C.splitFunForallTy (C.coreTypeOf (primLegacy pInfo))
 
   go :: TypeEnv -> Int -> [Int] -> [Either (Term n) (Type n)]
      -> NormalizeSession [Either (Term n) (Type n)]
@@ -261,11 +261,11 @@ removeUnusedPrimArgs sc e p pInfo args ticks = do
     args'' <- go te (n+1) used args'
     case tm of
       TyApp (Prim p0) _
-        | C.primName p0 == Text.showt 'removedArg
+        | primName p0 == Text.showt 'removedArg
         -> return (Left tm : args'')
       _ -> do
         let ty = inferCoreTypeOf te sc tm
-            p' = TyApp (Prim removedArg) ty
+            p' = TyApp (Prim (mkPrimInfoFromClash removedArg)) ty
         if n < arity && n `notElem` used
            then changed (Left p' : args'')
            else return  (Left tm : args'')

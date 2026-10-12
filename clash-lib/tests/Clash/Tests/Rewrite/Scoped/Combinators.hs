@@ -142,7 +142,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
       -- 'Clash.Core.Term.primArg' of the function)
       let tm = fromClashTermClosed (C.App f (intLit 3))
           toPrim = ScopedTransform $ \ctx e -> case (ctxFrames ctx, e) of
-            (KAppFun : _, GlobalVar _) -> pure (Prim somePrim)
+            (KAppFun : _, GlobalVar _) -> pure (Prim (mkPrimInfoFromClash somePrim))
             (KAppArg a : _, _) -> tell [a] >> pure e
             _ -> pure e
       snd (runWriter (runClosed (allR toPrim) tm)) @?= [Just ("somePrim", 0, 0)]

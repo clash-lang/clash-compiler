@@ -69,8 +69,8 @@ import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (nameOcc)
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term
-  (IsMultiPrim (..), PrimInfo (..), PrimUnfolding (..), WorkInfo (..))
+import qualified Clash.Core.Term as C
+import Clash.Core.Term (IsMultiPrim (..), WorkInfo (..))
 import Clash.Core.TyCon (TyConName, tyConDataCons, tyConName)
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C (integerPrimTy, typeNatKind)
@@ -83,7 +83,7 @@ import Clash.Sized.RTree (RTree)
 import Clash.Sized.Vector (Vec)
 import Clash.Unique (fromGhcUnique)
 
-import Clash.Core.Scoped.Convert (toClashType)
+import Clash.Core.Scoped.Convert (toClashType, mkPrimInfoFromClash)
 import Clash.Core.Scoped.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Pretty ()
@@ -252,12 +252,12 @@ eqIntWith te iTy i elIndex =
   -- The type of a primitive is closed. TODO(D4): a scoped type once
   -- 'PrimInfo' carries one.
   iTyC = maybe (error ("reducePrim: open Int type: " <> showPpr iTy)) toClashType (closeType iTy)
-  eqInt = PrimInfo
+  eqInt = mkPrimInfoFromClash $ C.PrimInfo
     (showt 'GHC.Classes.eqInt)
     (C.mkFunTy iTyC (C.mkFunTy iTyC (snd (boolTrue te))))
     WorkVariable
     SingleResult
-    NoUnfolding
+    C.NoUnfolding
 
 -- * Reductions
 
@@ -389,7 +389,7 @@ reduceImap n argElTy resElTy _kn fun arg ctx = do
           C.ForAllTy nTv
             (foldr C.mkFunTy (C.mkTyConApp idxTcNm [C.VarTy nTv]) [C.integerPrimTy, C.integerPrimTy])
         idxFromInteger =
-          PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever SingleResult NoUnfolding
+          mkPrimInfoFromClash $ C.PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever SingleResult C.NoUnfolding
       changed $ extractElems te sc consCon argElTy 'I' n n arg $ \sc1 bs rhss vars _ ->
         let
           idxs = map (App (App (TyApp (Prim idxFromInteger) (numTy n)) (Literal (IntegerLiteral n)))
@@ -754,7 +754,7 @@ reduceLast n aTy vArg ctx = do
   (sc, te) <- scopeAndTypeEnv ctx
   withVec "reduceLast" te sc (inferCoreTypeOf te sc vArg) $ \_ _ consCon ->
     changed $
-      if n == 0 then TyApp (Prim NP.undefined) aTy else
+      if n == 0 then TyApp (Prim (mkPrimInfoFromClash NP.undefined)) aTy else
       extractElems te sc consCon aTy 'L' n n vArg $ \_ bs rhss vars _ ->
         recLet bs rhss (last vars)
 
@@ -945,7 +945,7 @@ reduceIndex_int n aTy _kn v i ctx = do
   withVec "reduceIndex_int" te sc (inferCoreTypeOf te sc v) $ \_ _ consCon ->
     changed $
       -- Every index is out of bounds
-      if n == 0 then TyApp (Prim NP.undefined) aTy else
+      if n == 0 then TyApp (Prim (mkPrimInfoFromClash NP.undefined)) aTy else
       extractElems te sc consCon aTy 'I' n n v $ \_ bs rhss vars _ ->
         let
           iTy = inferCoreTypeOf te sc i
@@ -958,7 +958,7 @@ reduceIndex_int n aTy _kn v i ctx = do
               [ Alt DefaultPat next
               , Alt (DataPat trueDc TNil TNil) cur ]
           -- A right-biased tree of case-expressions
-          indexed = foldr indexElement (TyApp (Prim NP.undefined) (sink aTy)) (zip vars [0..])
+          indexed = foldr indexElement (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (sink aTy)) (zip vars [0..])
         in recLet bs rhss indexed
 
 -- | Replace an application of the @Clash.Sized.Vector.dtfold@ primitive on

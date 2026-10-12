@@ -539,7 +539,7 @@ collectApp env rg e = case e of
         else pure (Grown rg e)
   _ -> pure (Grown rg e)
  where
-  isSimBind (Prim p) = C.primName p == "Clash.Explicit.SimIO.bindSimIO#"
+  isSimBind (Prim p) = primName p == "Clash.Explicit.SimIO.bindSimIO#"
   isSimBind _ = False
 
 -- | Lift the bindings of a let-expression into the region, and let-bind its

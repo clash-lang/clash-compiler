@@ -32,7 +32,6 @@ import Data.Maybe (isJust)
 import Data.Ord (comparing)
 import GHC.Types.SrcLoc (leftmost_smallest)
 
-import qualified Clash.Core.Term as C
 
 import Clash.Core.Scoped.FreeVars (HasNameBinder (..))
 import Clash.Core.Scoped.Internal.Scope (nameId, nameOf)
@@ -124,7 +123,7 @@ aeqTmLevels env = go
   go (GlobalVar g1) (GlobalVar g2) = g1 == g2
   go (Data dc1) (Data dc2) = dc1 == dc2
   go (Literal l1) (Literal l2) = l1 == l2
-  go (Prim p1) (Prim p2) = C.primName p1 == C.primName p2
+  go (Prim p1) (Prim p2) = primName p1 == primName p2
   go (Lam b1 e1) (Lam b2 e2) =
     goTy (idBinderType b1) (idBinderType b2) && aeqTmLevels (underB b1 b2 env) e1 e2
   go (TyLam b1 e1) (TyLam b2 e2) =
@@ -260,7 +259,7 @@ acmpTmLevels env = go
   go (GlobalVar g1) (GlobalVar g2) = compare g1 g2
   go (Data dc1) (Data dc2) = compare dc1 dc2
   go (Literal l1) (Literal l2) = compare l1 l2
-  go (Prim p1) (Prim p2) = comparing C.primName p1 p2
+  go (Prim p1) (Prim p2) = comparing primName p1 p2
   go (Lam b1 e1) (Lam b2 e2) =
     goTy (idBinderType b1) (idBinderType b2) <> acmpTmLevels (underB b1 b2 env) e1 e2
   go (TyLam b1 e1) (TyLam b2 e2) =

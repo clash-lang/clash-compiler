@@ -87,7 +87,7 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (fromGhcUnique)
 
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
-import           Clash.Core.Scoped.Convert   (toClashType)
+import           Clash.Core.Scoped.Convert   (toClashType, mkPrimInfoFromClash)
 import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
@@ -229,7 +229,7 @@ constantSpecInfoIn mkNm sc e = do
   if isClockOrReset te sc (inferCoreTypeOf te sc e) then
     case collectArgs e of
       (Prim p, _)
-        | C.primName p == Text.showt 'removedArg ->
+        | primName p == Text.showt 'removedArg ->
           pure (constantCsr sc e)
       _ -> bindCsr mkNm sc e
   else
@@ -744,7 +744,7 @@ replaceEqAt sc0 i e0 = case underBndrs sc0 i replace e0 of
   replace :: Distinct x => Scope x -> Term x -> Maybe (Term x)
   replace sc = \case
     Lam b body -> openIdBinder sc b body $ \sc' b' body' ->
-      let removed = TyApp (Prim removedArg) (sink (idBinderType b'))
+      let removed = TyApp (Prim (mkPrimInfoFromClash removedArg)) (sink (idBinderType b'))
           s = extendTmSubst (extendSubstScope sc' (idSubst sc)) b' removed
       in  Just (Lam b' (substTm s body'))
     _ -> Nothing

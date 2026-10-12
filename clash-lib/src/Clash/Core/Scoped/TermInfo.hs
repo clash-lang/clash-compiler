@@ -10,9 +10,8 @@
   counterpart on Clash Core, while 'isLocalVar' and 'isGlobalVar' tell them
   apart.
 
-  The functions on multi-result primitives that only look at a
-  'C.PrimInfo' are the ones of "Clash.Core.TermInfo": primitives are not
-  scoped.
+  The functions on multi-result primitives that only look at a 'PrimInfo'
+  are the ones of "Clash.Core.TermInfo", on its 'primLegacy' (TODO(D4)).
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -38,8 +37,8 @@ module Clash.Core.Scoped.TermInfo
   , isClosed
     -- * Multi-result primitives
   , C.MultiPrimInfo (..)
-  , C.multiPrimInfo
-  , C.multiPrimInfo'
+  , multiPrimInfo
+  , multiPrimInfo'
   , splitMultiPrimArgs
   ) where
 
@@ -47,6 +46,7 @@ import Data.Maybe (isJust)
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Term as C
+import Clash.Core.TyCon (TyConMap)
 import qualified Clash.Core.TermInfo as C
 
 import Clash.Core.Scoped.FreeVars (hasFreeVars)
@@ -55,6 +55,16 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Core.Scoped.Type (isFunTy, isPolyFunCoreTy)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
+
+-- * Multi-result primitives
+
+-- | See 'C.multiPrimInfo'
+multiPrimInfo :: TyConMap -> PrimInfo -> Maybe C.MultiPrimInfo
+multiPrimInfo tcm = C.multiPrimInfo tcm . primLegacy
+
+-- | See 'C.multiPrimInfo''
+multiPrimInfo' :: HasCallStack => TyConMap -> PrimInfo -> C.MultiPrimInfo
+multiPrimInfo' tcm = C.multiPrimInfo' tcm . primLegacy
 
 -- * Measures
 
