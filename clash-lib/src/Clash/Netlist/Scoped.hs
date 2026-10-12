@@ -211,7 +211,7 @@ genComponentT compName0 componentExpr = do
 
 -- | Generate the declaration of the signal of a let-binder: see
 -- 'Clash.Netlist.mkNetDecl'
-mkNetDecl :: CompCtx n -> (LocalId n, Term n) -> NetlistMonad [Declaration]
+mkNetDecl :: Distinct n => CompCtx n -> (LocalId n, Term n) -> NetlistMonad [Declaration]
 mkNetDecl ctx (b, e) = Legacy.mkNetDecl (toLegacyLocalId ctx b, toLegacy ctx e)
 
 -- | Generate a list of concurrent Declarations for a let-binder, return an
