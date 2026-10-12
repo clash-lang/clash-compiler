@@ -93,7 +93,6 @@ import           Clash.Annotations.TopEntity
   (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
-import           Clash.Core.Evaluator.Types as WHNF (Evaluator)
 import           Clash.Core.HasType
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
@@ -308,14 +307,12 @@ generateHDL
   -> Maybe backend
   -> HWTypeTranslator
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF
   -> Maybe (TopEntityT, [TopEntityT])
   -- ^ Main top entity to compile. If Nothing, all top entities in the
   -- 'ClashDesign' argument will be compiled.
   -> Clock.UTCTime
   -> IO ()
-generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
+generateHDL env design hdlState typeTrans mainTopEntity startTime = do
     let bindingsMap = designBindings design
     let tcm = envTyConMap env
     let topEntities0 = designEntities design
@@ -472,7 +469,7 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
       -- 3. Normalize topEntity
       supplyN <- Supply.newSupply
       transformedBindings <- normalizeEntity env bindingsMap typeTrans
-                               eval topEntityNames supplyN topEntity
+                               topEntityNames supplyN topEntity
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = reportTimeDiff normTime prevTime
@@ -486,7 +483,7 @@ generateHDL env design hdlState typeTrans eval mainTopEntity startTime = do
         let seen = State.execState (Id.addRaw (Data.Text.pack modName1)) seen0
         (topComponent, netlist, seen') <-
           -- TODO My word, this has far too many arguments.
-          genNetlist env eval isTb transformedBindings topEntityMap compNames
+          genNetlist env isTb transformedBindings topEntityMap compNames
             typeTrans ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
 
         pure (seen', (topComponent, netlist))
@@ -1191,8 +1188,6 @@ normalizeEntity
   -- ^ All bindings
   -> HWTypeTranslator
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF
   -> [Id]
   -- ^ TopEntities
   -> Supply.Supply
@@ -1200,14 +1195,14 @@ normalizeEntity
   -> Id
   -- ^ root of the hierarchy
   -> IO GlobalBindings
-normalizeEntity env bindingsMap typeTrans eval topEntities supply tm = transformedBindings
+normalizeEntity env bindingsMap typeTrans topEntities supply tm = transformedBindings
   where
     doNorm = do let top = mkGlobalId tm
                 norm <- normalize [top]
                 let normChecked = checkNonRecursive norm
                 cleanupGraph top normChecked
     transformedBindings = runNormalization env supply bindingsMap
-                            typeTrans eval emptyGlobalEnv
+                            typeTrans emptyGlobalEnv
                             topEntities doNorm
 
 -- | Reverse topologically sort given top entities. Also returns a mapping that

@@ -149,7 +149,7 @@ runNetlistTest :: BindingMap -> NetlistMonad a -> IO a
 runNetlistTest bs act =
   fst <$>
     runNetlistMonad
-      (_clashEnv env) (error "runNetlistTest: evaluator") False
+      (_clashEnv env) False
       (fromClashBindings bs) mempty (_typeTranslator env) True be ids "" mempty
       act
  where

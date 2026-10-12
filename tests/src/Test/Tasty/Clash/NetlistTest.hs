@@ -30,7 +30,6 @@ import           Clash.Core.Var
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
 
-import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.Netlist
@@ -83,7 +82,6 @@ runToNetlistStage target f src = do
   transformedBindings <-
     normalizeEntity env (designBindings design)
       (ghcTypeToHWType (opt_intWidth opts))
-      evaluator
       teNames supplyN te
 
   fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
@@ -95,7 +93,7 @@ runToNetlistStage target f src = do
   hdl = buildTargetToHdl target
 
   netlistFrom (env, bm, tes, compNames, te, seen) =
-    genNetlist env evaluator False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
+    genNetlist env False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
       ite (SomeBackend hdlSt) seen hdlDir Nothing te
    where
     teS     = Text.unpack . nameOcc $ varName te

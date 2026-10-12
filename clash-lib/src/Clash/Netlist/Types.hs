@@ -74,7 +74,6 @@ import Clash.Core.Scoped.Alpha              (AlphaType)
 import Clash.Core.Scoped.Syntax             (Distinct, Scope)
 import qualified Clash.Core.Scoped.Syntax   as S (Type)
 import Clash.Core.Scoped.TypeEnv            (TypeEnv)
-import Clash.Core.Evaluator.Types           (Evaluator)
 import Clash.Core.Type                      (Type)
 import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
@@ -310,9 +309,6 @@ data NetlistEnv
   , _localAttrs :: [Attr Text]
   -- ^ Synthesis attributes brough into scope by
   -- 'Clash.Annotations.SynthesisAttributes.annotateReg'
-  , _whnfEvaluator :: Evaluator
-  -- ^ Evaluator for evaluating the attributes of 'Attributes' ticks, see
-  -- 'Clash.Core.Evaluator.Types.nfData'
   , _typeEnv :: TypeEnv
   -- ^ The type environment of scoped Clash Core, made once per run
   }

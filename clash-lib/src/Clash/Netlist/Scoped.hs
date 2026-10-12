@@ -93,7 +93,6 @@ import qualified Clash.Netlist.Util               as Legacy
 import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
-import           Clash.Core.Evaluator.Types       (Evaluator)
 
 import           Clash.Core.Scoped.Alpha          (aeqTy)
 import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
@@ -122,8 +121,6 @@ import           Clash.Netlist.Scoped.Util
 -- @topEntity@ at the top.
 genNetlist
   :: ClashEnv
-  -> Evaluator
-  -- ^ The whnf evaluator, to evaluate the attributes of 'Attributes' ticks
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
   -> GlobalBindings
@@ -147,11 +144,11 @@ genNetlist
   -> C.Id
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
-genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
+genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
   let (componentNames_, seen1) =
         genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
   ((_meta, topComponent), s) <-
-    runNetlistMonad env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
+    runNetlistMonad env isTb globals tops typeTrans ite be seen1 dir componentNames_
       $ genComponent (mkGlobalId topEntity)
   return (topComponent, _components s, seen1)
 

@@ -178,7 +178,6 @@ import           Clash.Backend.Verilog (VerilogState)
 import qualified Clash.Driver
 import           Clash.Driver.Bool (fromGhcOverridingBool)
 import           Clash.Driver.Types (ClashOpts(..), ClashEnv(..), ClashDesign(..))
-import           Clash.GHC.Evaluator
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
 import           Clash.GHCi.Common
@@ -2451,7 +2450,6 @@ makeHDL Proxy startAction optsRef srcs = do
                   clashDesign
                   (Just backend)
                   (ghcTypeToHWType iw)
-                  evaluator
                   mainTopEntity
                   startTime
 
