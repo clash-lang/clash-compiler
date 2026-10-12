@@ -12,7 +12,7 @@
   ones the unique supply hands out. A converted binder could then share its
   unique with a variable that the supply hands out later, e.g. a new global
   binder, whose freshness is only checked against the global bindings. This
-  conversion avoids that, e.g. for the normalized bindings that Netlist gets
+  conversion avoids that, e.g. for normalized bindings converted to Clash Core
   ('Clash.Rewrite.Scoped.Globals.toClashBindings').
 -}
 

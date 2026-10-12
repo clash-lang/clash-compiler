@@ -17,11 +17,11 @@
 
   = The boundary with Clash Core
 
-  Until Phase 5 of the port, GHC2Core produces bindings of Clash Core, and
-  Netlist consumes them. 'fromClashBindings' converts them into closed terms
-  at the end of 'Clash.GHC.GenerateBindings.generateBindings', and
-  'toClashBindings' converts the normalized ones back at the start of
-  'Clash.Netlist.genNetlist'. The normalizer itself converts no bindings.
+  The pipeline converts no bindings: GHC2Core produces scoped Clash Core, and
+  Netlist generation consumes it. 'fromClashBindings' and 'toClashBindings'
+  convert bindings of Clash Core, e.g. the serialized inputs of the profiling
+  and differential tools, and those of tests. TODO(Phase 7): remove, with
+  Clash Core.
 -}
 
 {-# LANGUAGE DataKinds #-}
