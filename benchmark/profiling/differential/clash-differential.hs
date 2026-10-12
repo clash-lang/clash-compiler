@@ -25,6 +25,7 @@ import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Directory (getFileSize)
+import System.FilePath ((</>), takeFileName)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitWith, ExitCode (..))
 import System.IO (hFlush, hPutStrLn, stderr, stdout)
@@ -56,6 +57,7 @@ import Test.Clash.Differential
 import Test.Clash.Differential.Sites
 import Prims (PrimsOptions (..), defPrimsOptions, comparePrims)
 import WhnfReplay (ReplayOptions (..), whnfReplay)
+import Normalized (NormOptions (..), compareNormalized)
 
 data Options = Options
   { optShow :: Int
@@ -80,6 +82,7 @@ usage = unlines
   , "       clash-differential whnf [--reps N] [--show N] [--top N] [--call N]"
   , "                               [--prims] [--check-prims] DESIGN.bin DUMP..."
   , "       clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] [--open] DESIGN.bin..."
+  , "       clash-differential normalized [--show N] DIR_A DIR_B DESIGN.bin..."
   , ""
   , "Runs COMPARISON on every binding of the serialized designs FILE..., which"
   , "are *.bin files written by clash-profile-normalization-prepare, or"
@@ -111,6 +114,12 @@ usage = unlines
   , "by a ported reduction and through the adapter; --check-prims also compares"
   , "every call of a ported reduction with the adapter. See WhnfReplay.hs."
   , ""
+  , "The normalized command compares the normalized bindings of DESIGN.bin...,"
+  , "that clash-profile-normalization-run writes with CLASH_NORMALIZED_OUT set,"
+  , "in DIR_A and DIR_B (DIR/<design>.norm.bin), e.g. of the normalizer of"
+  , "Clash Core and that of scoped Clash Core. Globals are matched by where"
+  , "they are used, from the top entity on. See Normalized.hs."
+  , ""
   , "The prims command compares every ported reduction of a primitive with the"
   , "reduction of Clash Core, through the adapter, on --count N (default 100)"
   , "calls generated from the type of the primitive in the designs. With"
@@ -131,6 +140,15 @@ main = getArgs >>= \case
         pure (design, bm, tcm)
       ok <- comparePrims opts inputs
       unless ok exitFailure
+    _ -> die usage
+  "normalized" : args -> case parseArgs defOptions args of
+    Just (opts, dirA : dirB : designs@(_:_)) -> do
+      oks <- forM designs $ \design -> do
+        let base = takeFileName (dropBinSuffix design)
+            nopts = NormOptions (optShow opts) (optLines opts) (optWidth opts)
+        compareNormalized nopts normalizedKnownDifferences design
+          (dirA </> base <> ".norm.bin") (dirB </> base <> ".norm.bin")
+      unless (and oks) exitFailure
     _ -> die usage
   ["--list"] -> do
     putStrLn "Comparisons on bindings:"
@@ -396,3 +414,16 @@ corpusStats files = do
 -- | A number of bytes, in MiB
 mib :: Integral a => a -> String
 mib n = show (fromIntegral (round (fromIntegral n / (1024 * 1024 / 10 :: Double)) :: Int) / 10 :: Double) <> " MiB"
+
+-- | The name of a design without the @.bin@ suffix of its normalization
+-- inputs
+dropBinSuffix :: FilePath -> FilePath
+dropBinSuffix f
+  | ".bin" `List.isSuffixOf` f = take (length f - 4) f
+  | otherwise = f
+
+-- | The known differences between the normalized bindings of the normalizer
+-- of Clash Core and those of scoped Clash Core, see the README
+normalizedKnownDifferences :: [KnownDifference]
+normalizedKnownDifferences =
+  [coercionForm, primTypeForm, recToNonRec, nonRecLetOrder, letrecOrder, deadLetBindings]
