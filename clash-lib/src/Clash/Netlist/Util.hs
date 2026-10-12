@@ -53,7 +53,6 @@ import qualified Data.Map                as Map
 import           Data.Maybe
   (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
 import           Text.Printf             (printf)
-import           Data.Proxy
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import           Data.Text.Extra         (showt)
@@ -63,8 +62,6 @@ import           Data.Text.Prettyprint.Doc.Extra
 import           GHC.Num.Integer                  (Integer (..))
 
 import           GHC.Stack               (HasCallStack)
-import           GHC.TypeLits (someNatVal)
-import           GHC.TypeNats (SomeNat(..))
 
 import           GHC.Utils.Monad         (zipWith3M)
 import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
@@ -80,12 +77,11 @@ import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTyp
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.EqSolver     (typeEq)
 import           Clash.Core.FreeVars     (dependencySortTyVars, typeFreeVars, typeFreeVars')
-import           Clash.Core.HasFreeVars  (elemFreeVars, freeVarsOf, isClosed)
+import           Clash.Core.HasFreeVars  (elemFreeVars, freeVarsOf)
 import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
   (Name (..), appendToName, nameOcc)
-import           Clash.Core.Evaluator.Types (nfData)
 import           Clash.Core.Pretty       (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Subst
   (Subst (..), deshadowLetExpr, extendIdSubst, extendIdSubstList,
@@ -94,11 +90,10 @@ import           Clash.Core.Term
   (primMultiResult, MultiPrimInfo(..), Alt, Bind (..), LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
    IsMultiPrim (..), bindToList, collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
 import           Clash.Core.TermInfo
-import           Clash.Core.TermLiteral (termToDataError)
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, normalizeType,
+  (LitTy (..), Type (..), TyVar, TypeView (..), normalizeType,
    splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
   (tyLitShow)
@@ -130,11 +125,8 @@ import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Scoped.Legacy (legacyBlackBoxFunction)
 import           Clash.Netlist.Types     as HW
 import           Clash.Primitives.Types
-import qualified Clash.Sized.Vector as V
 import           Clash.Util
 import qualified Clash.Util.Interpolate  as I
-import Clash.Util.Supply
-import qualified Data.IntMap.Strict as IntMap
 
 hmFindWithDefault :: (Eq k, Hashable k) => v -> k -> HashMap k v -> v
 hmFindWithDefault = HashMap.findWithDefault
@@ -2014,48 +2006,10 @@ withTicks ticks0 k = do
   go decls (SrcSpan sp:ticks) =
     go (TickDecl (Comment (Text.pack (showSDocUnsafe (ppr sp)))):decls) ticks
 
-  go decls (Attributes ty attrs0:ticks) = do
-    -- We have 'Term', `attrs0`, that represents a value of type `Vec n (Attr String)`.
-    -- We want to convert this to an actual value of type `Vec n (Attr String)`, for
-    -- which we will use `termToDataError`.
-    --
-    -- The `termToDataError` only works well for completely evaluated literals.
-    -- Sometimes we end up with a term which hasn't been complete beta-reduced, e.g.
-    -- `(/\b.Nil 0 b (0~0)) Bool` which represents a value of type `Vec 0 Bool`, for
-    -- which `termToDataError` would create an error-value.
-    --
-    -- To ensure that we only pass literals to `termToDataError` we first evaluate
-    -- `attrs0` to Normal Form (NF) using the whnf evaluator, see 'nfData'.
-    tcm <- Lens.view tcCache
-    case coreView tcm ty of
-      LitTy (NumTy n)
-        | Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
-        -> if isClosed attrs0 then do
-            -- Step 1. Evaluate to normal form
-            nm <- Lens.use legacyBindings
-            ids <- State.liftIO newSupply
-            eval <- Lens.view whnfEvaluator
-            -- Force attributes term to Normal Form so that it is a simple literal
-            -- that is understood by `termToDataError`.
-            let attrs1 = nfData eval nm tcm (IntMap.empty, 0) ids attrs0
-
-            -- Step 2. Create data from the term
-            case termToDataError attrs1 of
-              Left msg -> error msg
-              Right attrs2 ->
-                -- Step 3. Finally add the attributes to the environment.
-                let attrs3 = fmap (fmap Text.pack) attrs2
-                in local (\env -> env {_localAttrs = V.toList @n attrs3}) (go decls ticks)
-           else
-            error errFV
-      _ -> error errNoNum
-   where
-    errHeader = "ERROR: cannot add attribues: " <> showPpr attrs0
-    errNoNum  = unlines [errHeader
-                         ,"REASON: Internal length is not a literal" <> showPpr ty]
-    errFV     = unlines [errHeader
-                         ,"REASON: attributes mentions variables" <> showPpr attrs0
-                         ]
+  go _ (Attributes _ _:_) =
+    -- TODO(Phase 7): remove, together with Netlist generation on Clash Core
+    error ($(curLoc) ++ "Attributes ticks are only supported on scoped Clash Core, see "
+           ++ "'Clash.Netlist.Scoped.Util.withTicks'")
 
   go decls (NameMod m nm0:ticks) = do
     tcm <- Lens.view tcCache
@@ -2082,7 +2036,7 @@ affixName
   :: Text
   -> NetlistMonad Text
 affixName nm0 = do
-  NetlistEnv _ pre suf _ _ _ _ _ <- ask
+  NetlistEnv{_prefixName=pre, _suffixName=suf} <- ask
   let nm1 = if Text.null pre then nm0 else pre <> "_" <> nm0
       nm2 = if Text.null suf then nm1 else nm1 <> "_" <> suf
   return nm2

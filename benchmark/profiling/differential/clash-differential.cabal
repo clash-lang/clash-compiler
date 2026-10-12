@@ -19,7 +19,6 @@ executable clash-differential
   other-modules:       Comparisons
                        Current
                        Demo
-                       NetlistDiff
                        Normalized
                        Prims
                        Registry

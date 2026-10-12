@@ -80,7 +80,7 @@ import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.Scoped.NameMap            (GlobalEnv)
 import Clash.Driver.Types
-  (BindingMap, ClashEnv(..), ClashOpts(..), GlobalBindings, HasClashOpts(..))
+  (ClashEnv(..), ClashOpts(..), GlobalBindings, HasClashOpts(..))
 import Clash.Driver.Warning                 (CanWarn)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
@@ -315,9 +315,6 @@ data NetlistEnv
   -- 'Clash.Core.Evaluator.Types.nfData'
   , _typeEnv :: TypeEnv
   -- ^ The type environment of scoped Clash Core, made once per run
-  , _legacyNetlist :: Bool
-  -- ^ Whether to generate components on Clash Core, see
-  -- 'Clash.Netlist.genComponent'. TODO(Phase 7): remove.
   }
 
 data ComponentMeta = ComponentMeta
@@ -334,10 +331,6 @@ data NetlistState
   = NetlistState
   { _bindings       :: GlobalBindings
   -- ^ Global binders
-  , _legacyBindings :: BindingMap
-  -- ^ The global binders as bindings of Clash Core, for the parts of Netlist
-  -- generation that still run on Clash Core. Converted lazily, per binding.
-  -- TODO(Phase 7): remove.
   , _components     :: ComponentMap
   -- ^ Cached components. Is an insertion ordered map to preserve a topologically
   -- sorted component list for the manifest file.

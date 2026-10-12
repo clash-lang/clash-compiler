@@ -270,21 +270,6 @@ top entity on, the globals that two matched bindings refer to are matched by
 the order in which they occur (see `Normalized.hs`). It reports the bindings
 that differ, and the globals that have a normalized binding in one run only.
 
-## Comparing netlists
-
-```
-clash_lib_datadir=$PWD/clash-lib clash-differential netlist [--width N] DESIGN.net.bin... +RTS -M16g
-```
-
-generates the netlists of the normalized bindings of every design on Clash
-Core (`Clash.Netlist.genNetlist`) and on scoped Clash Core
-(`Clash.Netlist.Scoped.genNetlist`), for VHDL, Verilog and SystemVerilog, in
-one process, and compares their components and identifier sets through their
-`Show` instances. It prints the first difference of the first three components
-that differ (see `NetlistDiff.hs`). The serialized primitives lose their
-functions; those that Clash knows without interpreting them are restored from
-the primitive definitions of Clash, which `clash_lib_datadir` points to.
-
 ## Replaying calls of the evaluator
 
 `clash-differential whnf` compares the whnf evaluator of scoped Clash Core
