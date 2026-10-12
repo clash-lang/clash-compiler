@@ -211,10 +211,10 @@ Add a `SiteComparison` to `siteComparisons` in `Comparisons.hs`:
       }
 ```
 
-Once the port replaced the transformation in the strategies, `caseCase` in
-`Clash.Normalize.Transformations` is the port: refer to the current
-implementation in `Current.hs`, as `deadCode` does, and move its entry in
-`Registry.hs` to the ported ones, with its known differences. Then run it:
+The strategies run the ports (see `Clash.Normalize.Strategy.Spec`), so list
+the current implementation in `Current.hs`, as `deadCode` is, and move its
+entry in `Registry.hs` to the ported ones, with its known differences. Then
+run it:
 
 ```
 clash-differential --sites [--show N] [--binding NAME] [--timeout S] caseCase corpus/*.corpus.zst

@@ -8,8 +8,6 @@
   The separating arguments transformation
 -}
 
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
@@ -22,7 +20,6 @@ module Clash.Normalize.Transformations.SeparateArgs
 import qualified Control.Lens as Lens
 import Control.Monad.Writer (listen)
 import qualified Data.List as List
-import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid
 import GHC.Stack (HasCallStack)
 
@@ -35,15 +32,10 @@ import Clash.Core.TyCon (TyConMap)
 import Clash.Core.Util (Projections (..), shouldSplit)
 import Clash.Core.Var (Id, TyVar, Var (..), isGlobalId, mkLocalId)
 import Clash.Core.VarEnv (extendInScopeSet, uniqAway)
-import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Normalize.Scoped.Transformations.SeparateArgs as Scoped
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onLam, onTickNode, onTyAppNode, onVarNode
   , toTransformation)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import qualified Clash.Rewrite.Scoped as Scoped (TransformContext)
-import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
 import Clash.Rewrite.Types (TransformContext(..), tcCache)
 import Clash.Rewrite.Util (changed, mkDerivedName)
 
@@ -57,64 +49,13 @@ import Clash.Rewrite.Util (changed, mkDerivedName)
 -- into
 --
 -- > f :: Clock System -> Reset System -> Signal System Int
---
--- This is the port 'Scoped.separateArguments', which only converts the
--- lambdas and application spines at which it can fire, see
--- 'separateArgumentsLambdaViaFoil' and 'separateArgumentsSpineViaFoil'.
 separateArguments :: Transformation
 separateArguments = toTransformation "separateArguments"
-  (  onLam 'separateArgumentsLambdaViaFoil
-  <> onVarNode 'separateArgumentsSpineViaFoil
-  <> onAppNode 'separateArgumentsSpineViaFoil
-  <> onTyAppNode 'separateArgumentsSpineViaFoil
-  <> onTickNode 'separateArgumentsSpineViaFoil)
-
--- | The 'Lam' handler of 'separateArguments':
--- 'Scoped.separateArgumentsLambdaWorker' at the lambdas whose binder it
--- splits.
---
--- The strategy compiler runs a scoped transformation through 'viaFoil' at
--- every node it is offered at, which converts the whole subterm to scoped
--- Core: for 'separateArguments', every lambda and every node of every
--- application spine. This goes away together with 'viaFoil'.
-separateArgumentsLambdaViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Id -> Term -> NormalizeSession Term
-separateArgumentsLambdaViaFoil ctx node b _ =
-  viaFoilWhen "separateArguments" (\_ _ -> splits)
-    (ScopedTransform separateArgumentsLam) ctx node
- where
-  splits :: NormalizeSession Bool
-  splits = do
-    tcm <- Lens.view tcCache
-    pure (Maybe.isJust (shouldSplit tcm (coreTypeOf b)))
-
--- | 'Scoped.separateArgumentsLambdaWorker' at a lambda
-separateArgumentsLam
-  :: (HasCallStack, S.Distinct n)
-  => Scoped.TransformContext n -> S.Term n -> NormalizeSession (S.Term n)
-separateArgumentsLam ctx e = case e of
-  S.Lam b body -> Scoped.separateArgumentsLambdaWorker ctx e b body
-  _ -> return e
-
--- | The application spine handler of 'separateArguments':
--- 'Scoped.separateArgumentsSpineWorker' at the application spines of global
--- functions with an argument that it splits, see
--- 'separateArgumentsLambdaViaFoil'
-separateArgumentsSpineViaFoil :: HasCallStack => NormRewrite
-separateArgumentsSpineViaFoil =
-  viaFoilWhen "separateArguments" canFire
-    (ScopedTransform Scoped.separateArgumentsSpineWorker)
- where
-  canFire :: TransformContext -> Term -> NormalizeSession Bool
-  canFire _ (collectArgsTicks -> (Var g, args, _))
-    | isGlobalId g = do
-        tcm <- Lens.view tcCache
-        let splits = \case
-              (_, Left tmArg) -> Maybe.isJust (shouldSplit tcm (inferCoreTypeOf tcm tmArg))
-              _ -> False
-        pure (any splits (zip (fst (splitFunForallTy (coreTypeOf g))) args))
-  canFire _ _ = pure False
+  (  onLam 'separateArgumentsLambdaWorker
+  <> onVarNode 'separateArgumentsSpineWorker
+  <> onAppNode 'separateArgumentsSpineWorker
+  <> onTyAppNode 'separateArgumentsSpineWorker
+  <> onTickNode 'separateArgumentsSpineWorker)
 
 -- | The 'Lam' handler of 'separateArguments'.
 separateArgumentsLambdaWorker

@@ -51,11 +51,10 @@ import Clash.Core.Util (mkInternalVar, mkSelectorCase)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList, mkVarSet)
 import Clash.Netlist.Util (bindsExistentials)
-import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Rewrite.Combinators (allR, (>->))
-import Clash.Rewrite.StrategyDSL (Transformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
 import Clash.Rewrite.Util
@@ -442,7 +441,7 @@ mkSignalConsSelector is subj dc xs i = do
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
 nonRepANF :: Transformation
-nonRepANF = Scoped.nonRepANF
+nonRepANF = toTransformation "nonRepANF" (onApp 'nonRepANFWorker)
 
 -- | The 'App' handler of 'nonRepANF'.
 nonRepANFWorker

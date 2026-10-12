@@ -39,16 +39,11 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList)
 import Clash.Netlist.BlackBox.Types (Element(Err))
 import Clash.Netlist.Types (BlackBox(..))
-import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Normalize.Scoped.Transformations.XOptimize as Scoped
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.Types
   (TransformContext(..), aggressiveXOpt, tcCache, primitives)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import qualified Clash.Rewrite.Scoped as Scoped (TransformContext)
-import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
 import Clash.Rewrite.Util (changed)
 import Clash.Util (MonadUnique, curLoc)
 
@@ -75,32 +70,8 @@ import Clash.Util (MonadUnique, curLoc)
 -- where fieldN is an internal variable referring to the nth argument of a
 -- data constructor.
 --
--- This is the port 'Scoped.xOptimize', which only converts case-expressions
--- with aggressive X-optimization, see 'xOptimizeViaFoil'.
 xOptimize :: Transformation
-xOptimize = toTransformation "xOptimize" (onCase 'xOptimizeViaFoil)
-
--- | The 'Case' handler of 'xOptimize': 'Scoped.xOptimizeWorker' with
--- aggressive X-optimization.
---
--- The strategy compiler runs a scoped transformation through 'viaFoil' at
--- every node it is offered at, which converts the whole subterm to scoped
--- Core: for 'xOptimize', every case-expression. This goes away together with
--- 'viaFoil'.
-xOptimizeViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
-xOptimizeViaFoil ctx node _ _ _ =
-  viaFoilWhen "xOptimize" (\_ _ -> Lens.view aggressiveXOpt)
-    (ScopedTransform xOptimizeCase) ctx node
-
--- | 'Scoped.xOptimizeWorker' at a case-expression
-xOptimizeCase
-  :: (HasCallStack, S.Distinct n)
-  => Scoped.TransformContext n -> S.Term n -> NormalizeSession (S.Term n)
-xOptimizeCase ctx e = case e of
-  S.Case subj ty alts -> Scoped.xOptimizeWorker ctx e subj ty alts
-  _ -> return e
+xOptimize = toTransformation "xOptimize" (onCase 'xOptimizeWorker)
 
 -- | The 'Case' handler of 'xOptimize'.
 xOptimizeWorker

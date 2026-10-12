@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
@@ -32,18 +31,13 @@ import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (Type, normalizeType)
 import Clash.Core.Var (isGlobalId, varName)
 import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList)
-import qualified Clash.Core.Scoped.Syntax as S
 import Clash.Driver.Warning (warnAboutM)
-import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
-  (Transformation, onApp, onLet, toTransformation)
-import Clash.Rewrite.Scoped.ViaFoil (scopedAppWorker, viaFoilWhen)
+  (Transformation, onApp, onCast, onLet, toTransformation)
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import qualified Clash.Rewrite.Scoped as Scoped (TransformContext)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Util (ClashException(..), curLoc)
@@ -67,24 +61,7 @@ import Clash.Warning (ClashWarning(WarnCastSpecialization))
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'elimCastCast'.
 argCastSpec :: Transformation
-argCastSpec = toTransformation "argCastSpec" (onApp 'argCastSpecViaFoil)
-
--- | 'Scoped.argCastSpec', which replaced 'argCastSpecWorker', through
--- 'viaFoilWhen' at the applications at which it can fire, see
--- 'argCastSpecWorker'
-argCastSpecViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
-argCastSpecViaFoil ctx node f arg =
-  viaFoilWhen "argCastSpec" (\_ _ -> pure fires)
-    (scopedAppWorker Scoped.argCastSpecWorker) ctx node
- where
-  fires
-    | Cast e' _ _ <- stripTicks arg
-    , not (isCast e')
-    , (Var g, _) <- collectArgs f
-    = isGlobalId g
-    | otherwise = False
+argCastSpec = toTransformation "argCastSpec" (onApp 'argCastSpecWorker)
 
 -- | The 'App' handler of 'argCastSpec'.
 argCastSpecWorker
@@ -118,7 +95,7 @@ argCastSpecWorker _ctx node _function _argument = return node
 
 -- | Push a cast over a case into it's alternatives.
 caseCast :: Transformation
-caseCast = Scoped.caseCast
+caseCast = toTransformation "caseCast" (onCast 'caseCastWorker)
 
 -- | The 'Cast' handler of 'caseCast'.
 caseCastWorker
@@ -138,7 +115,7 @@ caseCastWorker _ctx node _body _fromType _toType = return node
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
 elimCastCast :: Transformation
-elimCastCast = Scoped.elimCastCast
+elimCastCast = toTransformation "elimCastCast" (onCast 'elimCastCastWorker)
 
 -- | The 'Cast' handler of 'elimCastCast'.
 elimCastCastWorker
@@ -164,7 +141,7 @@ elimCastCastWorker _ctx node _body _fromType _toType = return node
 
 -- | Push a cast over a Let into it's body
 letCast :: Transformation
-letCast = Scoped.letCast
+letCast = toTransformation "letCast" (onCast 'letCastWorker)
 
 -- | The 'Cast' handler of 'letCast'.
 letCastWorker
@@ -183,39 +160,8 @@ letCastWorker _ctx node _body _fromType _toType = return node
 -- let x  = cast x'
 --     x' = f a b
 -- @
---
--- This is the port 'Scoped.splitCastWork', which only converts the
--- let-expressions at which it can fire, see 'splitCastWorkViaFoil'.
 splitCastWork :: Transformation
-splitCastWork = toTransformation "splitCastWork" (onLet 'splitCastWorkViaFoil)
-
--- | The 'Let' handler of 'splitCastWork': 'Scoped.splitCastWorkWorker' at the
--- let-expressions with a binding that it splits.
---
--- The strategy compiler runs a scoped transformation through 'viaFoil' at
--- every node it is offered at, which converts the whole subterm to scoped
--- Core: for 'splitCastWork', every let-expression. This goes away together
--- with 'viaFoil'.
-splitCastWorkViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
-splitCastWorkViaFoil ctx node bind _ =
-  viaFoilWhen "splitCastWork" (\_ _ -> pure (any (splits . snd) (bindToList bind)))
-    (ScopedTransform splitCastWorkLet) ctx node
- where
-  splits e = case stripTicks e of
-    Cast (Var {}) _ _ -> False
-    Cast (Cast {}) _ _ -> False
-    Cast {} -> True
-    _ -> False
-
--- | 'Scoped.splitCastWorkWorker' at a let-expression
-splitCastWorkLet
-  :: (HasCallStack, S.Distinct n)
-  => Scoped.TransformContext n -> S.Term n -> NormalizeSession (S.Term n)
-splitCastWorkLet ctx e = case e of
-  S.Let bind body -> Scoped.splitCastWorkWorker ctx e bind body
-  _ -> return e
+splitCastWork = toTransformation "splitCastWork" (onLet 'splitCastWorkWorker)
 
 -- | The 'Let' handler of 'splitCastWork'.
 splitCastWorkWorker
