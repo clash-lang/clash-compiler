@@ -152,6 +152,7 @@ import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
+import qualified Clash.Core.Scoped.Convert   as C (mkDataConFromClash)
 import qualified Clash.Data.UniqMap          as C
 import           Clash.Driver.Types          (ClashOpts, HasClashOpts(..))
 import           Clash.Driver.Warning        (CanWarn(..), PendingWarning)
@@ -922,17 +923,16 @@ coreToDataCon dc = do
       nm   <- coreToName dataConName getUnique qualifiedNameString dc
       uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
       eTvs <- mapM coreToTyVar (dataConExTyCoVars dc)
-      return $ C.MkData
-             { C.dcName        = nm
-             , C.dcUniq        = C.nameUniq nm
-             , C.dcTag         = dataConTag dc
-             , C.dcType        = dcTy
-             , C.dcArgTys      = repTys
-             , C.dcArgStrict   = repBangs
-             , C.dcUnivTyVars  = uTvs
-             , C.dcExtTyVars   = eTvs
-             , C.dcFieldLabels = fLabels
-             }
+      return $ C.mkDataConFromClash
+        nm
+        (C.nameUniq nm)
+        (dataConTag dc)
+        dcTy
+        uTvs
+        eTvs
+        repTys
+        repBangs
+        fLabels
 
 hsImplBangToBool :: HsImplBang -> C.DcStrictness
 hsImplBangToBool HsLazy = C.Lazy

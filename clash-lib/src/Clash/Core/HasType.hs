@@ -30,7 +30,7 @@ import Data.Text.Prettyprint.Doc (line)
 
 import GHC.Stack (HasCallStack)
 
-import Clash.Core.DataCon (DataCon(dcType))
+import Clash.Core.DataCon (DataCon, dcLegacyType)
 import Clash.Core.HasFreeVars
 import Clash.Core.Literal (Literal(..))
 import Clash.Core.Pretty
@@ -54,7 +54,7 @@ coreKindOf = coreTypeOf
 {-# INLINE coreKindOf #-}
 
 instance HasType DataCon where
-  coreTypeOf = dcType
+  coreTypeOf = dcLegacyType
 
 instance HasType Literal where
   coreTypeOf = \case

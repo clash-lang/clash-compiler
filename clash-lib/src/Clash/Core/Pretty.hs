@@ -54,7 +54,7 @@ import System.Environment               (lookupEnv)
 import System.IO.Unsafe                 (unsafePerformIO)
 import Text.Read                        (readMaybe)
 
-import Clash.Core.DataCon               (DataCon (..))
+import Clash.Core.DataCon               (DataCon (..), dcLegacyType)
 import Clash.Core.Literal               (Literal (..))
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Term
@@ -272,7 +272,7 @@ instance PrettyPrec TyCon where
      where
       pprDataCon dc = do
         name <- pprPrec prec dc
-        ty <- pprType (dcType dc)
+        ty <- pprType (dcLegacyType dc)
 
         pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> ty))
 
@@ -282,7 +282,7 @@ instance PrettyPrec TyCon where
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
 
       conName <- pprPrec prec (dcName dc)
-      conType <- pprType (dcType dc)
+      conType <- pprType (dcLegacyType dc)
 
       pure (vsep [newtype_ <+> decl, conName <> annotate (AnnSyntax Type) (space <> dcolon <+> conType)])
 

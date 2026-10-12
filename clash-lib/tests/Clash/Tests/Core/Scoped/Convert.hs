@@ -26,6 +26,7 @@ import Test.Tasty.QuickCheck
 
 import qualified Control.Lens as Lens
 
+import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Subst as C
@@ -304,6 +305,20 @@ tests = testGroup "Clash.Tests.Core.Scoped.Convert"
           assertBool "global" (C.isGlobalId (globalIdLegacy g))
           C.varUniq (globalIdLegacy g) @?= 4302
           assertBool "type" (C.aeqType C.undefinedTy (C.varType (globalIdLegacy g)))
+      , testCase "mkDataCon derives the types of Clash Core" $ do
+          let dc0 = existentialDataCon
+              dc = mkDataCon (C.dcName dc0) (C.dcTag dc0) (C.dcType dc0) (C.dcSig dc0)
+                     (C.dcArgStrict dc0) (C.dcFieldLabels dc0)
+              -- Instantiated alike, the types of the fields agree
+              inst d = C.dataConInstArgTys d
+                (map (const intTy) (C.dcUnivTyVars d <> C.dcExtTyVars d))
+          C.dcUniq dc @?= C.dcUniq dc0
+          assertBool "type" (C.aeqType (C.dcLegacyType dc0) (C.dcLegacyType dc))
+          length (C.dcUnivTyVars dc) @?= length (C.dcUnivTyVars dc0)
+          length (C.dcExtTyVars dc) @?= length (C.dcExtTyVars dc0)
+          assertBool "fields" $ case (inst dc0, inst dc) of
+            (Just tys0, Just tys) -> and (zipWith C.aeqType tys0 tys) && length tys0 == length tys
+            _ -> False
       ]
   ]
  where

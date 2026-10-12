@@ -60,7 +60,7 @@ import Clash.Sized.Internal.Index as I (Index, eq#)
 import Clash.Sized.Internal.Signed as S (Signed, eq#)
 import Clash.Sized.Internal.Unsigned as U (Unsigned, eq#)
 
-import Clash.Core.DataCon (DataCon(..))
+import Clash.Core.DataCon (DataCon(..), dcArgTys, dcUnivTyVars)
 import Clash.Core.EqSolver
 import Clash.Core.FreeVars (freeLocalIds, localVarsDoNotOccurIn)
 import Clash.Core.HasType

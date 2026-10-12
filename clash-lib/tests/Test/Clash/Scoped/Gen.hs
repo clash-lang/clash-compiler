@@ -759,7 +759,7 @@ data DataConInst = DataConInst FreeVars C.DataCon [C.Type] [C.Type]
 
 instance Show DataConInst where
   show (DataConInst fvs dc univTys extTys) =
-    showFreeVars fvs <> "\ndata constructor: " <> showType (C.dcType dc) <>
+    showFreeVars fvs <> "\ndata constructor: " <> showType (C.dcLegacyType dc) <>
       "\nuniversal types: " <> List.intercalate ", " (map showType univTys) <>
       "\nexistential types: " <> List.intercalate ", " (map showType extTys)
 

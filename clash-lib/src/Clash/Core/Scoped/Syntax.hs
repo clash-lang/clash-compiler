@@ -150,11 +150,13 @@ import Data.Text (Text)
 import GHC.Types.SrcLoc (SrcSpan)
 
 import Clash.Annotations.SynthesisAttributes (Attr)
-import Clash.Core.DataCon (DataCon)
+-- Through boot files: data constructors store scoped types, and so will type
+-- constructors, which the types of Clash Core refer to
+import {-# SOURCE #-} Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
+import {-# SOURCE #-} qualified Clash.Core.Term as C
+import {-# SOURCE #-} qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Unique (Unique)
 

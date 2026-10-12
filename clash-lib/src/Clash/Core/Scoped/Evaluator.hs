@@ -96,7 +96,7 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified Clash.Sized.Vector
 
-import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.DataCon (DataCon (..), dcLegacyType, dcUnivTyVars)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
@@ -378,7 +378,7 @@ stepApp
   :: forall o n. Distinct n
   => Env -> Term n -> Term n -> Machine o n -> Maybe (Next o n)
 stepApp env x y m = case collectArgsTicks (App x y) of
-  (Data dc, args, _) -> case compare (length args) (closedArity (dcType dc)) of
+  (Data dc, args, _) -> case compare (length args) (closedArity (dcLegacyType dc)) of
     EQ -> unwind env (DC dc args) m
     LT -> newBinder env m (App x y)
     GT -> error "Overapplied DC"
@@ -415,7 +415,7 @@ stepApp env x y m = case collectArgsTicks (App x y) of
 stepTyApp
   :: Distinct n => Env -> Term n -> Type n -> Machine o n -> Maybe (Next o n)
 stepTyApp env x ty m = case collectArgsTicks (TyApp x ty) of
-  (Data dc, args, _) -> case compare (length args) (closedArity (dcType dc)) of
+  (Data dc, args, _) -> case compare (length args) (closedArity (dcLegacyType dc)) of
     EQ -> unwind env (DC dc args) m
     LT -> newBinder env m (TyApp x ty)
     GT -> error "Overapplied DC"

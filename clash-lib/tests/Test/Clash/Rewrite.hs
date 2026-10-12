@@ -17,6 +17,7 @@ module Test.Clash.Rewrite where
 
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
+import qualified Clash.Core.Scoped.Convert as C (mkDataConFromClash)
 import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
@@ -749,18 +750,16 @@ intFunTy n = foldr C.mkFunTy intTy (replicate n intTy)
 mkDataCon
   :: String -> Unique -> [C.TyVar] -> [C.TyVar] -> [C.Type] -> C.Type
   -> C.DataCon
-mkDataCon nm uniq univTvs extTvs argTys resTy = C.MkData
-  { C.dcName = C.mkUnsafeName C.User (Text.pack nm) uniq
-  , C.dcUniq = uniq
-  , C.dcTag = 1
-  , C.dcType =
-      foldr C.ForAllTy (foldr C.mkFunTy resTy argTys) (univTvs <> extTvs)
-  , C.dcUnivTyVars = univTvs
-  , C.dcExtTyVars = extTvs
-  , C.dcArgTys = argTys
-  , C.dcArgStrict = map (const C.Lazy) argTys
-  , C.dcFieldLabels = []
-  }
+mkDataCon nm uniq univTvs extTvs argTys resTy = C.mkDataConFromClash
+  (C.mkUnsafeName C.User (Text.pack nm) uniq)
+  uniq
+  1
+  (foldr C.ForAllTy (foldr C.mkFunTy resTy argTys) (univTvs <> extTvs))
+  univTvs
+  extTvs
+  argTys
+  (map (const C.Lazy) argTys)
+  []
 
 -- | A type constructor name with the given human readable name and unique
 mkTyConName :: String -> Unique -> C.TyConName

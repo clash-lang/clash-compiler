@@ -5,15 +5,13 @@
 
   Data constructors in scoped Clash Core, and their instantiation.
 
-  Scoped Core refers to data constructors ('Data', 'DataPat') with Clash's
-  'DataCon', whose types are closed Clash 'C.Type's. Instantiating a data
-  constructor substitutes types for the type variables of its /signature/
-  (t'DataConSig', see "Clash.Core.Scoped.TyCon"), which renames binders where
-  needed. Contrast this with 'Clash.Core.Util.dataConInstArgTys', which may
-  capture free variables of the types it substitutes.
-
-  The functions below look up the signature of a data constructor in a
-  t'TypeEnv', which converts it at most once.
+  Scoped Core refers to data constructors ('Data', 'DataPat') with
+  'DataCon', which stores its closed type ('Clash.Core.DataCon.dcType') and
+  its /signature/ (t'DataConSig', see "Clash.Core.Scoped.Sig") as scoped
+  types. Instantiating a data constructor substitutes types for the type
+  variables of its signature, which renames binders where needed. Contrast
+  this with 'Clash.Core.Util.dataConInstArgTys', which may capture free
+  variables of the types it substitutes.
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
@@ -37,7 +35,7 @@ import qualified Clash.Core.Term as C
 
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TyCon (DataConSig (..))
+import Clash.Core.Scoped.Sig (DataConSig (..))
 import Clash.Core.Scoped.TypeEnv (TypeEnv, dataConSigOf, dataConType)
 
 -- | The types of the fields of a data constructor, given types for its

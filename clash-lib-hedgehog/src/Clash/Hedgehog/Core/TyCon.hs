@@ -151,8 +151,8 @@ genAlgTyConFrom range tcm = do
  where
    promoteDataCon dc =
      let tcn = coerce (dcName dc)
-         arity = arityOf (dcType dc)
-      in (tcn, PromotedDataCon (dcUniq dc) tcn (dcType dc) arity dc)
+         arity = arityOf (dcLegacyType dc)
+      in (tcn, PromotedDataCon (dcUniq dc) tcn (dcLegacyType dc) arity dc)
 
 -- TODO In the future we may want to also generate indirectly recursive type
 -- families. For example:

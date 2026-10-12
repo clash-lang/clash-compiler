@@ -26,11 +26,10 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Util as C (dataConInstArgTys)
 import qualified Clash.Core.Var as C
 
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Convert hiding (mkDataCon)
 import Clash.Core.Scoped.DataCon
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TyCon (dataConSig)
 
 import Test.Clash.Rewrite
   (intId, intTy, localId, mkDataCon, pairDataCon, pairTy, parseTyConTy, tyVar)
@@ -93,7 +92,7 @@ mkF = mkDataCon "MkF" 1003 [aTv] [bTv] [C.VarTy aTv, C.VarTy bTv] (C.AppTy fTyCo
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
   [ testCase "dataConSig" $
-      case dataConSig mkF of
+      case C.dcSig mkF of
         DataConSig (TCons ua TNil) (TCons eb TNil) [t1, t2] -> do
           -- The field types refer to the binders of the telescopes
           case (t1, t2) of
@@ -149,7 +148,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
               tm
             Nothing -> assertFailure "withDataConPat failed"
   , testCase "dataConType" $
-      assertScopedTyAlphaEq (C.dcType mkF) (dataConType testTypeEnv emptyScope mkF)
+      assertScopedTyAlphaEq (C.dcLegacyType mkF) (dataConType testTypeEnv emptyScope mkF)
 
   , withTests 1000 $ testGroup "properties"
       [ testProperty "dataConInstArgTys agrees with Clash" $

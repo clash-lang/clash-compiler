@@ -46,7 +46,8 @@ import           GHC.Builtin.Names
 import           GHC.Base hiding (Type, TyCon)
 import           Data.Text.Extra (showt)
 
-import           Clash.Core.DataCon (DataCon(..), DcStrictness(..))
+import           Clash.Core.DataCon (DataCon, DcStrictness(..))
+import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkDataConFromClash)
 import           GHC.Num.Integer (Integer(..))
 import           GHC.Num.Natural (Natural(..))
 
@@ -143,17 +144,16 @@ integerIsDc, naturalNsDc :: DataCon
 integerIsDc = isDc
   where
     isDcNm = mkUnsafeSystemName (showt 'IS) (fromGhcUnique integerISDataConKey)
-    isDc = MkData
-      { dcName = isDcNm
-      , dcUniq = nameUniq isDcNm
-      , dcTag  = 1
-      , dcType = mkPolyFunTy integerPrimTy [Right intPrimTy]
-      , dcUnivTyVars = []
-      , dcExtTyVars = []
-      , dcArgTys = [intPrimTy]
-      , dcArgStrict = [Strict]
-      , dcFieldLabels = []
-      }
+    isDc = mkDataConFromClash
+      isDcNm
+      (nameUniq isDcNm)
+      1
+      (mkPolyFunTy integerPrimTy [Right intPrimTy])
+      []
+      []
+      [intPrimTy]
+      [Strict]
+      []
 
 integerPrimTc =
   let
@@ -161,29 +161,27 @@ integerPrimTc =
     uniq = nameUniq name
     isDc = integerIsDc
     ipDcNm = mkUnsafeSystemName (showt 'IP) (fromGhcUnique integerIPDataConKey)
-    ipDc = MkData
-      { dcName = ipDcNm
-      , dcUniq = nameUniq ipDcNm
-      , dcTag  = 2
-      , dcType = mkPolyFunTy integerPrimTy [Right byteArrayPrimTy]
-      , dcUnivTyVars = []
-      , dcExtTyVars = []
-      , dcArgTys = [byteArrayPrimTy]
-      , dcArgStrict = [Strict]
-      , dcFieldLabels = []
-      }
+    ipDc = mkDataConFromClash
+      ipDcNm
+      (nameUniq ipDcNm)
+      2
+      (mkPolyFunTy integerPrimTy [Right byteArrayPrimTy])
+      []
+      []
+      [byteArrayPrimTy]
+      [Strict]
+      []
     inDcNm = mkUnsafeSystemName (showt 'IN) (fromGhcUnique integerINDataConKey)
-    inDc = MkData
-      { dcName = inDcNm
-      , dcUniq = nameUniq inDcNm
-      , dcTag  = 3
-      , dcType = mkPolyFunTy integerPrimTy [Right byteArrayPrimTy]
-      , dcUnivTyVars = []
-      , dcExtTyVars = []
-      , dcArgTys = [byteArrayPrimTy]
-      , dcArgStrict = [Strict]
-      , dcFieldLabels = []
-      }
+    inDc = mkDataConFromClash
+      inDcNm
+      (nameUniq inDcNm)
+      3
+      (mkPolyFunTy integerPrimTy [Right byteArrayPrimTy])
+      []
+      []
+      [byteArrayPrimTy]
+      [Strict]
+      []
     rhs = DataTyCon [isDc,ipDc,inDc]
   in
     AlgTyCon uniq name liftedTypeKind 0 rhs False
@@ -191,17 +189,16 @@ integerPrimTc =
 naturalNsDc = nsDc
   where
     nsDcNm = mkUnsafeSystemName (showt 'NS) (fromGhcUnique naturalNSDataConKey)
-    nsDc = MkData
-      { dcName = nsDcNm
-      , dcUniq = nameUniq nsDcNm
-      , dcTag  = 1
-      , dcType = mkPolyFunTy naturalPrimTy [Right wordPrimTy]
-      , dcUnivTyVars = []
-      , dcExtTyVars = []
-      , dcArgTys = [wordPrimTy]
-      , dcArgStrict = [Strict]
-      , dcFieldLabels = []
-      }
+    nsDc = mkDataConFromClash
+      nsDcNm
+      (nameUniq nsDcNm)
+      1
+      (mkPolyFunTy naturalPrimTy [Right wordPrimTy])
+      []
+      []
+      [wordPrimTy]
+      [Strict]
+      []
 
 naturalPrimTc =
   let
@@ -209,17 +206,16 @@ naturalPrimTc =
     uniq = nameUniq name
     nsDc = naturalNsDc
     nbDcNm = mkUnsafeSystemName (showt 'NB) (fromGhcUnique naturalNBDataConKey)
-    nbDc = MkData
-      { dcName = nbDcNm
-      , dcUniq = nameUniq nbDcNm
-      , dcTag  = 2
-      , dcType = mkPolyFunTy naturalPrimTy [Right byteArrayPrimTy]
-      , dcUnivTyVars = []
-      , dcExtTyVars = []
-      , dcArgTys = [byteArrayPrimTy]
-      , dcArgStrict = [Strict]
-      , dcFieldLabels = []
-      }
+    nbDc = mkDataConFromClash
+      nbDcNm
+      (nameUniq nbDcNm)
+      2
+      (mkPolyFunTy naturalPrimTy [Right byteArrayPrimTy])
+      []
+      []
+      [byteArrayPrimTy]
+      [Strict]
+      []
     rhs = DataTyCon [nsDc,nbDc]
    in
     AlgTyCon uniq name liftedTypeKind 0 rhs False

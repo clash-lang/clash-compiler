@@ -88,7 +88,7 @@ import Test.Tasty.QuickCheck (Gen, choose, chooseInteger, elements, frequency, o
 
 import Control.Monad.Trans.Except (runExcept)
 import qualified Clash.Core.Evaluator.Types as CE
-import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.DataCon (dcExtTyVars)
 import qualified Clash.Core.FreeVars as C
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C

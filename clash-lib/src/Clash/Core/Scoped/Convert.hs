@@ -87,6 +87,8 @@ module Clash.Core.Scoped.Convert
   , mkGlobalIdFromClash
   , mkPrimInfo
   , mkPrimInfoFromClash
+  , mkDataCon
+  , mkDataConFromClash
   ) where
 
 import qualified Control.Lens as Lens
@@ -100,6 +102,8 @@ import Data.Primitive.ByteArray
 import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.DataCon
+  (ConTag, DataCon (..), DcName, DcStrictness, LegacyDataCon (..))
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
@@ -110,6 +114,7 @@ import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Internal.Names
 import Clash.Core.Scoped.Internal.Scope
+import Clash.Core.Scoped.Sig
 import Clash.Core.Scoped.Syntax
 
 -- * Conversion environments
@@ -605,4 +610,51 @@ mkPrimInfoFromClash p = PrimInfo
       -- variable, which need not be global
       C.Unfolding v -> Unfolding (globalIdFromClashUnchecked v)
   , primLegacy = p
+  }
+
+-- | A data constructor with the given name, tag, closed type, signature (see
+-- "Clash.Core.Scoped.Sig"), strictness of its fields, and labels of its
+-- fields. The types of Clash Core use the raw names of the binders as
+-- uniques.
+mkDataCon
+  :: DcName -> ConTag -> Type 'VoidS -> DataConSig -> [DcStrictness] -> [Text]
+  -> DataCon
+mkDataCon nm tag ty sig strict labels = MkData
+  { dcName = nm
+  , dcUniq = C.nameUniq nm
+  , dcTag = tag
+  , dcType = ty
+  , dcSig = sig
+  , dcArgStrict = strict
+  , dcFieldLabels = labels
+  , dcLegacy = legacy
+  }
+ where
+  legacy = case sig of
+    DataConSig univ ext args ->
+      toTele toTyBinder (ToEnv IntMap.empty IntMap.empty) univ $ \env1 univ' ->
+        toTele toTyBinder env1 ext $ \env2 ext' ->
+          LegacyDataCon (toClashType ty) univ' ext' (map (toClashTypeEnv env2) args)
+
+-- | A data constructor of Clash Core: its name, unique, tag, type,
+-- universally and existentially quantified type variables, the types and
+-- strictness of its fields, and the labels of its fields. Its scoped type and
+-- signature are converted lazily, and error if the type isn't closed, or the
+-- types of the fields mention other type variables than the quantified ones.
+mkDataConFromClash
+  :: HasCallStack
+  => DcName -> Unique -> ConTag -> C.Type -> [C.TyVar] -> [C.TyVar] -> [C.Type]
+  -> [DcStrictness] -> [Text] -> DataCon
+mkDataConFromClash nm u tag ty univ ext args strict labels = MkData
+  { dcName = nm
+  , dcUniq = u
+  , dcTag = tag
+  , dcType = fromClashTypeClosed emptyScope ty
+  , dcSig =
+      fromClashTyVars emptyConvEnv univ $ \env1 univ' ->
+        fromClashTyVars env1 ext $ \env2 ext' ->
+          DataConSig univ' ext' (map (fromClashType env2) args)
+  , dcArgStrict = strict
+  , dcFieldLabels = labels
+  , dcLegacy = LegacyDataCon ty univ ext args
   }

@@ -10,11 +10,10 @@
 
   Scoped types refer to type constructors by name (in a 'C.ConstTy'), and
   look them up in Clash's 'Clash.Core.TyCon.TyConMap', whose 'TyCon's have
-  closed Clash 'C.Type's. Scoped terms refer to data constructors with Clash's
-  'DataCon', whose types are closed Clash types too. This module gives the
-  parts of a 'TyCon' and a 'DataCon' that mention type variables as scoped
-  types, by converting them (TODO(D4): read them once 'TyCon' and 'DataCon'
-  store scoped types).
+  closed Clash 'C.Type's. This module gives the parts of a 'TyCon' that
+  mention type variables as scoped types, by converting them (TODO(D4): read
+  them once 'TyCon' stores scoped types). Data constructors store their
+  signatures ('Clash.Core.DataCon.dcSig').
 
   Clash stores the equations of a type family without their pattern
   variables, so these are the free type variables of the equation, ordered so
@@ -25,9 +24,8 @@
 
   = Migration
 
-  Once 'TyCon' and 'DataCon' store scoped types (in place of 'ntEtadRhs',
-  'tyConSubst', 'dcUnivTyVars', 'dcExtTyVars' and 'dcArgTys'), the functions
-  below become field selectors.
+  Once 'TyCon' stores scoped types (in place of 'ntEtadRhs' and
+  'tyConSubst'), the functions below become field selectors.
 -}
 
 {-# LANGUAGE FlexibleContexts #-}
@@ -45,14 +43,12 @@ module Clash.Core.Scoped.TyCon
   , tyFamEqns
     -- * Data constructors
   , DataConSig (..)
-  , dataConSig
   ) where
 
 import qualified Control.Lens as Lens
 import qualified Data.List as List
 import GHC.Stack (HasCallStack)
 
-import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.FreeVars (dependencySortTyVars, typeFreeVars)
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..))
 import qualified Clash.Core.Type as C
@@ -113,14 +109,3 @@ tyFamEqn (lhs, rhs) =
 
   sameUniq :: C.TyVar -> C.TyVar -> Bool
   sameUniq v1 v2 = C.varUniq v1 == C.varUniq v2
-
--- * Data constructors
-
--- | The signature of a data constructor. Errors if the types of its fields
--- mention type variables other than its universally and existentially
--- quantified ones.
-dataConSig :: HasCallStack => DataCon -> DataConSig
-dataConSig dc =
-  fromClashTyVars emptyConvEnv (dcUnivTyVars dc) $ \env1 univ ->
-    fromClashTyVars env1 (dcExtTyVars dc) $ \env2 ext ->
-      DataConSig univ ext (map (fromClashType env2) (dcArgTys dc))

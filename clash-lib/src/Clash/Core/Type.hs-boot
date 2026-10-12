@@ -20,6 +20,14 @@ import {-# SOURCE #-} Clash.Core.TyCon
 
 data Type
 
+data ConstTy
+instance Show ConstTy
+instance NFData ConstTy
+
+data LitTy
+instance Show LitTy
+instance NFData LitTy
+
 type Kind   = Type
 type TyName = Name Type
 type KiName = Name Kind

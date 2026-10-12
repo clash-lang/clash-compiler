@@ -137,7 +137,7 @@ stepApp :: Term -> Term -> Step
 stepApp x y m tcm =
   case term of
     Data dc ->
-      let tys = fst $ splitFunForallTy (dcType dc)
+      let tys = fst $ splitFunForallTy (dcLegacyType dc)
        in case compare (length args) (length tys) of
             EQ -> ghcUnwind (DC dc args) m tcm
             LT -> newBinder tys' (App x y) m tcm
@@ -195,7 +195,7 @@ stepTyApp :: Term -> Type -> Step
 stepTyApp x ty m tcm =
   case term of
     Data dc ->
-      let tys = fst $ splitFunForallTy (dcType dc)
+      let tys = fst $ splitFunForallTy (dcLegacyType dc)
        in case compare (length args) (length tys) of
             EQ -> ghcUnwind (DC dc args) m tcm
             LT -> newBinder tys' (TyApp x ty) m tcm
