@@ -4,9 +4,15 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reducing primitives of the scoped machine ("Clash.Core.Scoped.Evaluator")
-  with the evaluator of Clash Core, until they are ported (phase 6.2 of the
-  port). And the conversion of open scoped terms to Clash Core and back that
-  it needs.
+  with the evaluator of Clash Core. And the conversion of open scoped terms to
+  Clash Core and back that it needs.
+
+  Every primitive reduction of the evaluator of Clash Core is ported to
+  scoped Core ("Clash.Core.Scoped.Evaluator.Primitives"), so the scoped
+  evaluator doesn't use the adapter. The tests of the ported reductions
+  compare them with the reductions of Clash Core through it
+  ("Test.Clash.Scoped.Evaluator", @clash-differential prims@ and
+  @clash-differential whnf --check-prims@).
 
   = The adapter
 
@@ -48,13 +54,17 @@
   that only mentions those free variables back into scope @n@.
 -}
 
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Core.Scoped.Evaluator.Adapter
+module Test.Clash.Scoped.Evaluator.Adapter
   ( -- * The adapter
     adaptPrim
     -- * Converting open terms

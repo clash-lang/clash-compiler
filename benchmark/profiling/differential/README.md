@@ -286,9 +286,12 @@ clash-differential whnf --prims [--check-prims] [--call N] DESIGN.bin DUMP...
 
 With `--prims`, the replay also reports, per primitive, how often the scoped
 evaluator reduced it with a ported reduction
-(`Clash.Core.Scoped.Evaluator.Primitives`) and through the adapter
-(`Clash.Core.Scoped.Evaluator.Adapter`), how often each of those reduced and
-how often it got stuck, and in how many calls the primitive occurs. It also
+(`Clash.Core.Scoped.Evaluator.Primitives`), and how often a primitive without
+one reaches the reduction of Clash Core through the adapter
+(`Test.Clash.Scoped.Evaluator.Adapter`), how often each of those reduced and
+how often it got stuck, and in how many calls the primitive occurs. The
+scoped evaluator of the normalizer doesn't use the adapter: an adapted
+primitive that reduces is one that the scoped evaluator leaves stuck. It also
 counts the calls without primitives, those that only used ported reductions,
 and those that used the adapter. With `--call N`, it lists the reductions of
 that call in order.

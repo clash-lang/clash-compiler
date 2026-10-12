@@ -36,9 +36,8 @@
     in the original one with a term from the nested one is a type error. See
     @(&&)@ in "Clash.Core.Scoped.Evaluator.Primitives".
 
-  Primitives are reduced by the 'PrimReductions' of the 'Env': those ported to
-  scoped Core ("Clash.Core.Scoped.Evaluator.Primitives"), and the others with
-  the evaluator of Clash Core ("Clash.Core.Scoped.Evaluator.Adapter").
+  Primitives are reduced by the 'PrimReductions' of the 'Env', those of
+  "Clash.Core.Scoped.Evaluator.Primitives".
 -}
 
 {-# LANGUAGE GADTs #-}

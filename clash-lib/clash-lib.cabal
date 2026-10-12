@@ -222,7 +222,6 @@ Library
                       Clash.Core.Scoped.DataCon
                       Clash.Core.Scoped.EqSolver
                       Clash.Core.Scoped.Evaluator
-                      Clash.Core.Scoped.Evaluator.Adapter
                       Clash.Core.Scoped.Evaluator.Primitives
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving
                       Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal
@@ -602,5 +601,6 @@ test-suite unittests
                  Test.Clash.Rewrite
                  Test.Clash.Scoped
                  Test.Clash.Scoped.Evaluator
+                 Test.Clash.Scoped.Evaluator.Adapter
                  Test.Clash.Scoped.Evaluator.Primitives
                  Test.Clash.Scoped.Gen

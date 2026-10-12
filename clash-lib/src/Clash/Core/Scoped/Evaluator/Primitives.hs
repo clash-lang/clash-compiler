@@ -21,24 +21,21 @@
   @
 
   and 'scopedPrimReductions' combines those lists. It errors if a primitive
-  has two reductions. A primitive without a reduction here is reduced by the
-  reduction of Clash Core, through the adapter
-  ("Clash.Core.Scoped.Evaluator.Adapter"). So porting a primitive is adding an
-  entry to the list of its module: nothing else changes, and modules ported by
-  different people don't share any lines. To add a module, create it, and add
-  its import and its list here, sorted.
+  has two reductions. A primitive without a reduction here doesn't reduce. So
+  adding a reduction is adding an entry to the list of its module: nothing
+  else changes. To add a module, create it, and add its import and its list
+  here, sorted.
 
   They live in @clash-lib@, next to the machine, rather than in @clash-ghc@:
   the scoped machine doesn't go through the frontend's
   'Clash.Core.Evaluator.Types.Evaluator' record, and
   'Clash.Rewrite.Scoped.Whnf.evaluatorEnv' builds its environment from this
-  module and the adapter. Once every primitive is ported, the adapter goes, and
-  with it the scoped evaluator's dependency on the reductions of @clash-ghc@.
+  module. Every reduction of @clash-ghc@ is ported, so the scoped evaluator
+  doesn't depend on them. The tests compare the reductions here with those of
+  @clash-ghc@, through "Test.Clash.Scoped.Evaluator.Adapter".
 
-  A ported reduction doesn't declare what it uses of the machine: it gets the
-  whole machine, heap included. The adapter gives every reduction of Clash
-  Core the heap bindings its arguments reach, see
-  "Clash.Core.Scoped.Evaluator.Adapter".
+  A reduction doesn't declare what it uses of the machine: it gets the
+  whole machine, heap included.
 
   = Porting a reduction
 
@@ -144,7 +141,7 @@
       @
 
   Registering the entry is adding it to the list of its module; from then on
-  the scoped evaluator uses it instead of the adapter.
+  the scoped evaluator uses it.
 
   = Testing a reduction
 
@@ -154,15 +151,17 @@
     @clash-ghc@.
 
   * @clash-differential prims DESIGN.bin...@ compares every ported reduction
-    with the reduction of Clash Core, through the adapter, on calls generated
+    with the reduction of Clash Core, through the adapter of the tests
+    ("Test.Clash.Scoped.Evaluator.Adapter"), on calls generated
     from the types of the primitives in the designs (see
     @Test.Clash.Scoped.Evaluator.genPrimCall@). It reports the primitives that
     occur in none of the designs, or whose arguments it can't generate.
 
   * @clash-differential whnf --prims DESIGN.bin DUMP@ replays real calls of
-    the evaluator, and reports per primitive how often a ported reduction and
-    the adapter reduced it. With @--check-prims@, it also runs the adapter on
-    every call of a ported reduction, and compares the results.
+    the evaluator, and reports per primitive how often a ported reduction
+    reduced it, and how often a primitive without one was offered to the
+    adapter. With @--check-prims@, it also runs the adapter on every call of
+    a ported reduction, and compares the results.
 
   See the README of @clash-differential@.
 -}

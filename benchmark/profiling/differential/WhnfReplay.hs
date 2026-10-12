@@ -107,7 +107,7 @@ import Clash.GHC.Evaluator (evaluator)
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
-import Clash.Core.Scoped.Evaluator.Adapter
+import Test.Clash.Scoped.Evaluator.Adapter
   (clashVarsIds, clashVarsTyVars, emptyClashVars, toClashTermWith)
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Subst (teleIdVars)
@@ -297,7 +297,7 @@ whnfReplay opts tcm bm dumpFile = do
     (length (filter callSubj calls))
   hFlush stdout
   let te = addGlobalTypes (fmap bindingId bm) (mkTypeEnv tcm)
-      env = evaluatorEnv te evaluator
+      env = evaluatorEnv te
   eventsRef <- newIORef []
   let checkEnv
         | recording = P.recordingEnv eventsRef (roCheckPrims opts) te evaluator
