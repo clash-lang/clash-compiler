@@ -318,6 +318,17 @@ joinPointInputs =
   , ("letrec { j = \\z -> f z; k = f (j 1) } in case s of { 1 -> j k; _ -> j 2 }",
       C.Let (C.Rec [(j, jRhs), (k, app vf [app j [intLit 1]])])
         (caseS (app j [C.Var k]) (app j [intLit 2])))
+    -- A binder with the unique of the join point hides it
+  , ("let j = (\\j -> j) f in j 1",
+      C.Let (C.NonRec j (C.App (C.Lam j (C.Var j)) (C.Var vf))) (app j [intLit 1]))
+  , ("letrec { j = (\\j -> j) f } in j 1",
+      C.Let (C.Rec [(j, C.App (C.Lam j (C.Var j)) (C.Var vf))]) (app j [intLit 1]))
+  , ("let j = \\z -> f z in case s of { 1 -> j 1; _ -> let j = f in j 2 }",
+      C.Let (C.NonRec j jRhs)
+        (caseS (app j [intLit 1]) (C.Let (C.NonRec j (C.Var vf)) (app j [intLit 2]))))
+  , ("let j = \\z -> f z in case s of { 1 -> j 1; _ -> (\\j -> j 2) f }",
+      C.Let (C.NonRec j jRhs)
+        (caseS (app j [intLit 1]) (C.App (C.Lam j (app j [intLit 2])) (C.Var vf))))
   ]
  where
   j = localId User "j" 20 (intFunTy 1)
