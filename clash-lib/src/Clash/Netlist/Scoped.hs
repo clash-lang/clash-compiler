@@ -87,7 +87,7 @@ import           Clash.Netlist.Types              as HW
   hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, dcToLiteral, declareInstUses, expandTopEntityOrErrM,
-   isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv, primWarnContext,
+   isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
    procAssign)
 import qualified Clash.Netlist.Util               as Legacy
   (unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
@@ -116,7 +116,8 @@ import           Clash.Netlist.Scoped.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
-  (UniqueNormalized (..), coreTypeToHWTypeM', mkUniqueNormalized, splitNormalized,
+  (UniqueNormalized (..), coreTypeToHWTypeM', localIdText, mkUniqueNormalized, primWarnContext,
+   splitNormalized,
    unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
@@ -308,8 +309,7 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
     getResInits = case collectArgs tm of
       (Prim p, args0) ->
         let context =
-              primWarnContext [] (showPpr (C.varName (toLegacyLocalId ctx id_)))
-                (toLegacyArgs ctx args0)
+              primWarnContext [] (localIdText ctx id_) args0
          in extractPrimWarnOrFail context (C.primName p) >>= go p args0
       _ -> return []
      where

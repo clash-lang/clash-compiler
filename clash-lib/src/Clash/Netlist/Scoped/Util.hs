@@ -34,6 +34,8 @@ module Clash.Netlist.Scoped.Util
   , mkUniqueNormalized
   , renameBinder
   , uniqueIdentifier
+  , primWarnContext
+  , localIdText
   , idToPort
   , idToInPort
   , idToOutPort
@@ -69,19 +71,18 @@ import           Data.Text                   (Text)
 import           GHC.Stack                   (HasCallStack)
 
 import           Clash.Annotations.TopEntity (TopEntity)
-import qualified Clash.Core.HasType          as C (inferCoreTypeOf)
 import qualified Clash.Core.Name             as C
-import           Clash.Core.Pretty           (showPpr)
+import           Clash.Core.Pretty           (PrettyPrec, showPpr, showPprDiag)
+import           Clash.Core.Scoped.Pretty    ()
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.Type             as C (LitTy (..), Type)
 import           Clash.Core.Term             (MultiPrimInfo (..))
 import           Clash.Core.TermInfo         (multiPrimInfo')
-import qualified Clash.Core.Var              as C
 import           Clash.Util                  (ClashException (..), curLoc)
 import           Clash.Util.Supply           (Supply, splitSupply)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
-import           Clash.Core.Scoped.Convert   (fromClashTypeClosed, toClashTerm, toClashType)
+import           Clash.Core.Scoped.Convert   (fromClashTypeClosed, toClashType)
 import           Clash.Core.Scoped.Evaluator (nfData)
 import           Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import           Clash.Core.Scoped.Evaluator.Types
@@ -95,7 +96,7 @@ import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.Term      (collectArgsTicks, collectTicks, mkTicks, stripTicks)
-import           Clash.Core.Scoped.TypeEnv   (TypeEnv, typeEnvTyConMap)
+import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta (..))
 import qualified Clash.Netlist.Id            as Id
@@ -109,7 +110,7 @@ import           Clash.Netlist.Types
    curCompNm, customReprs, htyCache, tcCache, typeEnv, typeTranslator)
 import           Clash.Netlist.Util
   (containsBiSignalIn, coreTypeToHWType, evalBlackBox, expandTopEntityOrErrM, isBiSignalIn,
-   applyNameMod, isVoid, mkTopInput, mkTopOutput, preserveVarEnv, primWarnContext, stripFiltered,
+   applyNameMod, isVoid, mkTopInput, mkTopOutput, preserveVarEnv, stripFiltered,
    unsafeCoreTypeToHWType)
 import qualified Clash.Sized.Vector          as V
 import           Clash.Primitives.Types      (CompiledPrimitive, Primitive (..))
@@ -155,8 +156,8 @@ splitNormalized tenv expr = lams emptyScope [] expr
     TyLam {} -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
     e -> case collectTicks e of
       (e1@Let {}, ticks) -> lets sc (reverse argsRev) ticks [] e1
-      _ -> Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr exprC ++
-                 "\n\nWhich has type:\n\n" ++ showPpr (C.inferCoreTypeOf (typeEnvTyConMap tenv) exprC))
+      _ -> Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++
+                 "\n\nWhich has type:\n\n" ++ showPpr (inferCoreTypeOf tenv emptyScope expr))
 
   lets
     :: Distinct n => Scope n -> [LocalId n] -> [TickInfo n] -> [LetBinding n] -> Term n
@@ -172,12 +173,10 @@ splitNormalized tenv expr = lams emptyScope [] expr
         Right (SplitNormalized sc args
                  [ (i, mkTicks x ticks) | LetBinding i x <- reverse accRev ]
                  (LocalId o ty n))
-      t -> Left ($(curLoc) ++ "Not in normal form: res not simple var: " ++ showPpr (toClashTerm t))
+      t -> Left ($(curLoc) ++ "Not in normal form: res not simple var: " ++ showPpr t)
 
   teleLocalIds :: Distinct l => Tele IdBinder n l -> [LocalId l]
   teleLocalIds bs = [ LocalId o ty n | Var o ty n <- teleIdVars bs ]
-
-  exprC = toClashTerm expr
 
 -- | A component whose variables have their HDL identifiers, see
 -- 'mkUniqueNormalized'
@@ -445,6 +444,51 @@ idToPort sc i ty = do
     then return Nothing
     else return (Just (i, hwTy))
 
+-- | The context that the warnings of a guarded primitive mention (see
+-- 'Clash.Netlist.BlackBox.extractPrimWarnOrFail'): the variable its result is
+-- assigned to, and the arguments it is applied to. Variables among the
+-- arguments are resolved into the given sibling let-bindings, a few levels
+-- deep.
+primWarnContext
+  :: forall n
+   . [(LocalId n, Term n)]
+  -- ^ Sibling bindings, used to resolve variable references. Pass @[]@ if they
+  -- are not available.
+  -> String
+  -- ^ Name of the binder the primitive's result is assigned to
+  -> [Either (Term n) (Type n)]
+  -- ^ Arguments the primitive is applied to
+  -> String
+primWarnContext binds dst args =
+  "result assigned to: " <> dst <> ", applied to: "
+    <> unwords (map (either (showArg maxResolveDepth) showDiag) args)
+ where
+  showArg :: Int -> Term n -> String
+  showArg depth (stripTicks -> v@(Var _ _ nm))
+    | depth > 0
+    , Just rhs <- List.lookup nm [ (localIdName b, e) | (b, e) <- binds ]
+    , (h, rhsArgs, _) <- collectArgsTicks rhs
+    = "(" <> showPpr v <> " = "
+        <> unwords (showDiag h : map (either (showArg (depth - 1)) showDiag) rhsArgs)
+        <> ")"
+  showArg _ tm = showDiag tm
+
+  showDiag :: PrettyPrec p => p -> String
+  showDiag = showPprDiag maxArgLen
+
+  -- How deep to resolve variable references into sibling bindings
+  maxResolveDepth = 5
+
+  -- Longest rendering of a single argument
+  maxArgLen = 160
+
+-- | A local variable in messages: its HDL identifier, or its human readable
+-- name if the context doesn't give it one
+localIdText :: CompCtx n -> LocalId n -> String
+localIdText ctx i =
+  maybe (showPpr (localIdOcc i)) (Text.unpack . Id.toText)
+    (localIdentifierMaybe ctx (localIdName i))
+
 -- | The new human readable name of the binder of a let-binding, if its
 -- right-hand side is a blackbox that requests a specific name for its result.
 -- It might give multiple names in case of a multi result primitive.
@@ -465,11 +509,7 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
           C.MultiResult -> extractPrimWarnOrFail context (C.primName p) >>= goMulti p
       _ -> pure []
  where
-  context =
-    primWarnContext
-      [ (toLegacyLocalId ctx b, toLegacy ctx e) | (b, e) <- binds ]
-      (showPpr (C.varName (toLegacyLocalId ctx i)))
-      (toLegacyArgs ctx args)
+  context = primWarnContext binds (localIdText ctx i) args
 
   -- Routine for multi result primitives. For more info:
   -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
