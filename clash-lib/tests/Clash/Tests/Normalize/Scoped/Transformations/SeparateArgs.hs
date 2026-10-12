@@ -18,11 +18,14 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Clash.Core.HasType (inferCoreTypeOf)
 import Clash.Core.Name (NameSort (User))
+import Clash.Core.Subst (aeqType)
 import Clash.Core.Term
-  (CoreContext (..), NameMod (..), Term (..), TickInfo (..))
+  (CoreContext (..), NameMod (..), Term (..), TickInfo (..), collectArgs, mkApps)
 import Clash.Core.Type (Type (ForAllTy, VarTy), mkFunTy, mkPolyFunTy)
-import Clash.Core.Var (Id)
+import Clash.Core.Var (Id, Var (..))
+import Clash.Driver.Types (ClashEnv (..))
 import qualified Clash.Normalize.Scoped.Transformations.SeparateArgs as Scoped
 import Clash.Normalize.Transformations.SeparateArgs
   (separateArgumentsLambdaWorker, separateArgumentsSpineWorker)
@@ -30,12 +33,13 @@ import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.StrategyDSL
   (onAppNode, onLam, onTickNode, onTyAppNode, onVarNode, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
+import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..), TransformContext (..))
 import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Rewrite
-  ( assertFires, clkPairTy, clockTy, globalId, inScopeOf, intId, intTy, localId, numTy
-  , parseTyConTy, rewriteEnvWithTyCons, tyVar, vecTy )
+  ( assertFires, clkPairTy, clockTy, globalId, inScopeOf, intFunTy, intId, intTy, localId
+  , numTy, parseTyConTy, rewriteEnvWithTyCons, runSingleTransformation, showPprU, tyVar
+  , vecTy )
 import Test.Clash.Differential (Outcome (..), coercionForm)
 import Test.Clash.Scoped (assertRewritesAgree, assertRewritesAgreeUpTo)
 
@@ -136,8 +140,56 @@ spineTests = testGroup "Application spines"
       agree False [h, p] (App (Var h) (Var p))
   ]
 
+-- | Run the port on an application of a global function, with the given
+-- variables in scope, and assert that it gives the global function the
+-- expected type, and that the type of the application doesn't change. See
+-- "Clash.Tests.Normalize.Transformations.SeparateArgs" for 'separateArguments'
+-- of Clash Core.
+assertGlobalType :: [Id] -> Type -> Term -> Assertion
+assertGlobalType ids expected tm = do
+  supply <- newSupply
+  let st = def{_uniqSupply = supply} :: RewriteState NormalizeState
+  res <- runSingleTransformation rewriteEnvWithTyCons st (inScopeOf ids)
+           separateArgumentsScoped tm
+  let tcm = envTyConMap (_clashEnv rewriteEnvWithTyCons)
+  case collectArgs res of
+    (Var g, _) ->
+      assertBool
+        ("Expected the type\n" <> showPprU expected <> "\nfor the global in:\n"
+          <> showPprU res <> "\nbut got:\n" <> showPprU (varType g))
+        (aeqType expected (varType g))
+    _ -> assertFailure ("Expected an application of a global:\n" <> showPprU res)
+  assertBool
+    ("The type of\n" <> showPprU tm <> "\nchanged to that of\n" <> showPprU res)
+    (aeqType (inferCoreTypeOf tcm tm) (inferCoreTypeOf tcm res))
+
+globalTypeTests :: TestTree
+globalTypeTests = testGroup "The types of globals"
+  [ -- @gp :: Int -> ClkPair -> Int@ becomes @gp :: Int -> Clock -> Int -> Int@,
+    -- not @gp :: Int -> ClkPair -> ClkPair -> Int@
+    testCase "gives the global the types of the fields" $
+      assertGlobalType [x, p] (mkPolyFunTy intTy [Right intTy, Right clockTy, Right intTy])
+        (App (App (Var gp) (Var x)) (Var p))
+    -- @gq :: ClkPair -> Int -> Int@ becomes @gq :: Clock -> Int -> Int -> Int@,
+    -- also when it isn't applied to all of its arguments
+  , testCase "keeps the parameters that aren't applied" $
+      assertGlobalType [p] (mkPolyFunTy intTy [Right clockTy, Right intTy, Right intTy])
+        (App (Var gq) (Var p))
+    -- @g \@(Int -> Int) p f x@ for @g :: forall a. ClkPair -> a -> a@ keeps
+    -- the argument @x@, which is applied to the result of @g@
+  , testCase "keeps the arguments applied to the result" $ do
+      let a = tyVar User "a" 46
+          g = globalId User "g" 47
+                (ForAllTy a (mkPolyFunTy (VarTy a) [Right clkPairTy, Right (VarTy a)]))
+          f = localId User "f" 48 (intFunTy 1)
+      assertGlobalType [p, f, x]
+        (ForAllTy a (mkPolyFunTy (VarTy a) [Right clockTy, Right intTy, Right (VarTy a)]))
+        (mkApps (Var g) [Right (intFunTy 1), Left (Var p), Left (Var f), Left (Var x)])
+  ]
+
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.SeparateArgs"
   [ lambdaTests
   , spineTests
+  , globalTypeTests
   ]
