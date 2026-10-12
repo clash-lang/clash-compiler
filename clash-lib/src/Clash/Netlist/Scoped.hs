@@ -101,10 +101,11 @@ import qualified Clash.Util.Supply                as Supply
 import           Clash.Core.Evaluator.Types       (Evaluator)
 
 import           Clash.Core.Scoped.Alpha          (aeqTy)
-import           Clash.Core.Scoped.Convert        (toClashTerm, toClashType)
+import           Clash.Core.Scoped.Convert        (toClashType)
 import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
 import           Clash.Core.Scoped.Type           (coreView)
 import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
+import           Clash.Core.Scoped.Pretty         ()
 import           Clash.Core.Scoped.NameMap        (GlobalEnv, lookupGlobalEnv)
 import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNameBinders)
 import           Clash.Core.Scoped.Subst
@@ -378,14 +379,14 @@ mkDeclarations' ctx declType bndr (collectTicks -> (Var o ty v,ticks)) =
 mkDeclarations' ctx declType bndr (collectTicks -> (GlobalVar g,ticks)) =
   withTicks ctx ticks (mkFunApp ctx declType (localIdentifier ctx (localIdName bndr)) (Right g) [])
 
-mkDeclarations' ctx _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
+mkDeclarations' _ctx _declType _bndr e@(collectTicks -> (Case _ _ [],_)) = do
   (_,sp) <- Lens.use curCompNm
   throw $ ClashException
           sp
           ( unwords [ $(curLoc)
                     , "Not in normal form: Case-decompositions with an"
                     , "empty list of alternatives not supported:\n\n"
-                    , showPpr (toLegacy ctx e)
+                    , showPpr e
                     ])
           Nothing
 
@@ -401,7 +402,7 @@ mkDeclarations' ctx declType bndr app = do
           withTicks ctx ticks (mkFunApp ctx declType dstId f args)
         | otherwise = do
           (_,sp) <- Lens.use curCompNm
-          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr (toLegacy ctx app)) Nothing)
+          throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showPpr app) Nothing)
   case appF of
     Var o ty f -> funApp (Left (LocalId o ty f))
     GlobalVar g -> funApp (Right g)
@@ -459,7 +460,7 @@ mkExpr ctx bbEasD declType bndr app =
   let hwTyA = case hwTys of
         hwTy:_ -> hwTy
         _ -> error ("internal error: unable to extract sufficient hwTys from: " <> show bndr)
-  let invalid kind = throw (ClashException sp ($(curLoc) ++ "Not in normal form: " ++ kind ++ "\n\n" ++ showPpr (toLegacy ctx app)) Nothing)
+  let invalid kind = throw (ClashException sp ($(curLoc) ++ "Not in normal form: " ++ kind ++ "\n\n" ++ showPpr app) Nothing)
       bndrIdentifier = netlistId1 id (localIdentifier ctx . localIdName) bndr
       funApp f fIdentifier
         | null tmArgs =
@@ -634,10 +635,10 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
 
               Core:
 
-              #{showPpr (toClashTerm bindingTerm)}
+              #{showPpr bindingTerm}
 
               Applied to arguments:
-              #{showPpr (map (toLegacy ctx) args)}
+              #{showPpr args}
 
               Applied to filtered arguments:
               #{argsFiltered}
@@ -656,11 +657,11 @@ mkFunApp ctx _declType dstId (Left fun) args _tickDecls =
       Netlist generation encountered a local function. This should not
       happen. Function:
 
-        #{showPpr (toLegacy ctx (localIdVar fun))}
+        #{showPpr (localIdVar fun)}
 
       Arguments:
 
-        #{showPpr (map (toLegacy ctx) args)}
+        #{showPpr args}
 
       Posssible user issues:
 
@@ -740,9 +741,9 @@ mkSelection ctx declType bndr scrut altTy alts0 tickDecls = do
           -> do dstAssign <- contAssign dstId (IfThenElse scrutExpr altTExpr altFExpr)
                 return $! scrutDecls ++ altTDecls ++ altFDecls ++ tickDecls ++ [dstAssign]
     _ | aeqTy scrutTy integerPrimTy
-      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Integer) of ...") (Just $ showPpr (toLegacy ctx e)))
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Integer) of ...") (Just $ showPpr e))
     _ | aeqTy scrutTy naturalPrimTy
-      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Natural) of ...") (Just $ showPpr (toLegacy ctx e)))
+      -> throw (ClashException sp ($(curLoc) ++ "Can't create netlist for:  case (_ :: Natural) of ...") (Just $ showPpr e))
     _ -> do
       reprs <- Lens.view customReprs
       let alts1 = (reorderDefault . reorderCustom ctx reprs scrutTy) alts0
@@ -922,7 +923,7 @@ mkProjection ctx declType mkDec bndr scrut altTy alt = do
       Var _ _ n -> return n
       _ -> throw (ClashException sp ($(curLoc) ++
                   "Not in normal form: RHS of case-projection is not a variable:\n\n"
-                   ++ showPpr (toLegacy ctx e)) Nothing)
+                   ++ showPpr e) Nothing)
     sHwTy <- hwTypeOf $(curLoc) scrutTy
     vHwTy <- hwTypeOf $(curLoc) altTy
     scrutRendered <- do
@@ -961,7 +962,7 @@ mkProjection ctx declType mkDec bndr scrut altTy alt = do
                 if bindsExistentials exts tms then
                   throw (ClashException sp ($(curLoc)
                     ++ "Not in normal form: Pattern binds existential variables:\n\n"
-                    ++ showPpr (toLegacy ctx e)) Nothing)
+                    ++ showPpr e) Nothing)
                 else
                   fields
             argHWTys <- mapM (hwTypeOfMaybe . snd) fields
@@ -979,7 +980,7 @@ mkProjection ctx declType mkDec bndr scrut altTy alt = do
                   pure $ nestModifier modM (Just (DC (Void Nothing,0)))
           _ -> throw (ClashException sp ($(curLoc)
                  ++ "Not in normal form: Unexpected pattern in case-projection:\n\n"
-                 ++ showPpr (toLegacy ctx e)) Nothing)
+                 ++ showPpr e) Nothing)
         let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
         case bndr of
           NetlistId scrutNm _ | mkDec -> do
@@ -1033,7 +1034,7 @@ mkDcApplication ctx declType [dstHType] bndr dc args = do
 
     (hWTysFiltered, argExprsFiltered) = unzip filteredTypeExprDecls
 
-    showArgs = showPpr (map (toLegacy ctx) args)
+    showArgs = showPpr args
 
   fmap (,argDecls) $! case (hWTysFiltered,argExprsFiltered) of
     -- Is the DC just a newtype wrapper?
