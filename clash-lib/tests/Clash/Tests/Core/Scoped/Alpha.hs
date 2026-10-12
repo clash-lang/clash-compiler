@@ -12,6 +12,7 @@
 
 module Clash.Tests.Core.Scoped.Alpha (tests) where
 
+import qualified Data.List as List
 import Data.Maybe (isJust, isNothing)
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -138,6 +139,16 @@ tests = testGroup "Clash.Tests.Core.Scoped.Alpha"
               _ -> assertFailure "unexpected shape"
       ]
 
+  , testCase "acmpTy" $ do
+      let a = tyVar C.User "a" 1
+          b = tyVar C.User "b" 2
+          conv = fromClashTypeClosed emptyScope
+          idTy v = C.ForAllTy v (C.mkFunTy (C.VarTy v) (C.VarTy v))
+          constTy v = C.ForAllTy v (C.mkFunTy (C.VarTy v) intTy)
+      acmpTy (conv (idTy a)) (conv (idTy b)) @?= EQ
+      acmpTy (conv (idTy a)) (conv (constTy a)) @?= invert (acmpTy (conv (constTy b)) (conv (idTy b)))
+      assertBool "different" (acmpTy (conv (idTy a)) (conv (constTy a)) /= EQ)
+
   , testCase "aeqTy" $ do
       let a = tyVar C.User "a" 1
           b = tyVar C.User "b" 2
@@ -193,6 +204,35 @@ tests = testGroup "Clash.Tests.Core.Scoped.Alpha"
                     tm2 = fromClashTerm env1 tm
                 aeqTm tm1 tm2 .&&. aeqTm tm2 tm1
 
+      , testProperty "acmpTm agrees with aeqTm on changed terms with scrambled binders" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
+            forAll (genPerturbed fvs0 tm) $ \tm2 ->
+              counterexample ("changed:\n" <> showTerm tm2) $
+                withFreeVars fvs0 $ \env0 -> do
+                  let c1 = fromClashTerm env0 tm
+                      c2 = fromClashTerm env0 tm2
+                  extendFreeVars env0 fvs1 $ \env1 -> do
+                    let sc = convScope env1
+                    forAllScrambled sc (sinkInto sc c1) $ \s1 ->
+                      forAllScrambled sc (sinkInto sc c2) $ \s2 ->
+                        let expected = aeqTm s1 s2
+                        in  classify expected "alpha-equivalent" $
+                              (acmpTm s1 s2 == EQ) === expected .&&.
+                              acmpTm s1 s2 === invert (acmpTm s2 s1)
+
+      , testProperty "acmpTm is transitive" $
+          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
+            forAll (genPerturbed fvs tm) $ \tm2 ->
+              forAll (genPerturbed fvs tm) $ \tm3 ->
+                withFreeVars fvs $ \env -> do
+                  let c1 = fromClashTerm env tm
+                      c2 = fromClashTerm env tm2
+                      c3 = fromClashTerm env tm3
+                      sorted = List.sortBy acmpTm [c1, c2, c3]
+                  -- With an intransitive order, some sorting of the three
+                  -- would have a pair in the wrong order
+                  conjoin [ acmpTm a b =/= GT | (a : bs) <- List.tails sorted, b <- bs ]
+
         -- The right-hand sides are a common right-hand side if they are
         -- alpha-equivalent, and the patterns bind none of their free variables
       , testProperty "commonAltBody agrees with Clash" $
@@ -213,3 +253,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Alpha"
                   _ -> property False
       ]
   ]
+
+-- | The reverse of an ordering
+invert :: Ordering -> Ordering
+invert o = compare EQ o
