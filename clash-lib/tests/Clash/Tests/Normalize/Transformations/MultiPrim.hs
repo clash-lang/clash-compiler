@@ -23,14 +23,13 @@ import Test.Tasty.HUnit
 import Clash.Annotations.Primitive (PrimitiveGuard (HasBlackBox))
 import Clash.Core.FreeVars (typeFreeVars)
 import Clash.Core.HasType (coreTypeOf, inferCoreTypeOf)
-import Clash.Core.Name (NameSort (User), mkUnsafeName, nameUniq)
+import Clash.Core.Name (NameSort (User), mkUnsafeName)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term
   ( Bind (..), IsMultiPrim (..), PrimInfo (..), PrimUnfolding (..), Term (..)
   , WorkInfo (..), collectArgs, collectBndrs )
-import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..), TyConMap, TyConName)
+import Clash.Core.TyCon (TyConMap, TyConName)
 import Clash.Core.Type (Type (..), mkFunTy, mkTyConApp)
-import Clash.Core.TysPrim (liftedTypeKind)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Netlist.BlackBox.Types (RenderVoid (..), TemplateKind (..))
@@ -42,7 +41,8 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..))
 
 import Test.Clash.Rewrite
-  ( inScopeOf, mkDataCon, runSingleTransformation, tyVar )
+  ( inScopeOf, mkAlgTyCon, mkDataCon, runSingleTransformation
+  , testTyConMap, tyVar, withTyConMap )
 
 setupMultiResultPrimR :: NormRewrite
 setupMultiResultPrimR = $(asRewriteQ setupMultiResultPrim)
@@ -66,7 +66,7 @@ mrPrim = PrimInfo
 -- | The default environment, with pairs, and 'mrPrim' as a multi-result
 -- primitive
 env :: RewriteEnv
-env = def {_clashEnv = env0 {envTyConMap = tcm, envPrimitives = HashMap.singleton "mr" (HasBlackBox [] bb)}}
+env = withTyConMap tcm def {_clashEnv = env0 {envPrimitives = HashMap.singleton "mr" (HasBlackBox [] bb)}}
  where
   env0 = _clashEnv def
   bb = BlackBox
@@ -86,18 +86,10 @@ env = def {_clashEnv = env0 {envTyConMap = tcm, envPrimitives = HashMap.singleto
     , template = BBTemplate []
     }
 
--- | The type constructors of the default environment, with pairs
+-- | The type constructors of the tests, with pairs
 tcm :: TyConMap
-tcm = UniqMap.insert tupNm tupTc (envTyConMap (_clashEnv def))
+tcm = UniqMap.insert tupNm (mkAlgTyCon tupNm [b, c] [tupDc]) testTyConMap
  where
-  tupTc = AlgTyCon
-    { tyConUniq = nameUniq tupNm
-    , tyConName = tupNm
-    , tyConKind = mkFunTy liftedTypeKind (mkFunTy liftedTypeKind liftedTypeKind)
-    , tyConArity = 2
-    , algTcRhs = DataTyCon [tupDc]
-    , isClassTc = False
-    }
   b = tyVar User "b" 31
   c = tyVar User "c" 32
   tupDc =
