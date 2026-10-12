@@ -21,12 +21,18 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 
+import qualified Clash.Core.Literal as C
+import qualified Clash.Core.Subst as C
+import qualified Clash.Core.VarEnv as C
+
 import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.NameMap (emptyGlobalEnv, insertGlobalEnv)
+import Clash.Core.Scoped.Subst (substGlobals)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
 
 import Test.Clash.Rewrite
-  (assertAlphaEq, intId, intTy, localId, parseToTermQQ, tyVar)
+  (assertAlphaEq, globalId, intId, intTy, localId, parseToTermQQ, tyVar)
 import Test.Clash.Scoped
   (assertAgreesTm, assertScopedAlphaEq, extendSunk, sunkVar, withFreeVarsOf)
 
@@ -58,7 +64,26 @@ absTerm = C.TyLam a (C.Lam x (C.TyLam b (C.Lam y (C.Var x))))
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Term"
-  [ testCase "collectArgs and mkApps" $
+  [ testCase "substGlobals agrees with substituting globals in Clash Core" $ do
+      -- @\(x :: Int) -> f x (let (y :: Int) = g in \(x :: Int) -> y)@, with
+      -- @f := \(x :: Int) (y :: Int) -> x@ and @g := 7@: their binders have
+      -- the names of the binders they end up under
+      let x = intId C.User "x" 1
+          y = intId C.User "y" 2
+          intFun = C.mkFunTy intTy intTy
+          f = globalId C.User "f" 10 (C.mkFunTy intTy intFun)
+          g = globalId C.User "g" 11 intTy
+          tm = C.Lam x (C.mkApps (C.Var f)
+                 [ Left (C.Var x)
+                 , Left (C.Let (C.NonRec y (C.Var g)) (C.Lam x (C.Var y))) ])
+          fBody = C.Lam x (C.Lam y (C.Var x))
+          gBody = C.Literal (C.IntLiteral 7)
+          substC = C.substTm "test" (C.extendGblSubstList (C.mkSubst C.emptyInScopeSet) [(f, fBody), (g, gBody)])
+          genv = insertGlobalEnv (mkGlobalId f) (fromClashTermClosed fBody)
+                   (insertGlobalEnv (mkGlobalId g) (fromClashTermClosed gBody) emptyGlobalEnv)
+      assertAgreesTm substC (const (substGlobals genv)) tm
+
+  , testCase "collectArgs and mkApps" $
       assertAgreesTm
         (\tm -> uncurry C.mkApps (C.collectArgs tm))
         (\_ tm -> uncurry mkApps (collectArgs tm))
