@@ -563,6 +563,7 @@ test-suite unittests
                  Clash.Tests.Netlist
                  Clash.Tests.Netlist.Id
                  Clash.Tests.Netlist.Scoped
+                 Clash.Tests.Netlist.Scoped.BlackBox
                  Clash.Tests.Netlist.Util
                  Clash.Tests.Primitives
                  Clash.Tests.Util.Interpolate

@@ -42,6 +42,7 @@ import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist
 import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Netlist.Scoped
+import qualified Clash.Tests.Netlist.Scoped.BlackBox
 import qualified Clash.Tests.Netlist.Util
 import qualified Clash.Tests.Primitives
 import qualified Clash.Tests.Normalize
@@ -135,6 +136,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Netlist.tests
   , Clash.Tests.Netlist.Id.tests
   , Clash.Tests.Netlist.Scoped.tests
+  , Clash.Tests.Netlist.Scoped.BlackBox.tests
   , Clash.Tests.Netlist.Util.tests
   , Clash.Tests.Primitives.tests
   , Clash.Tests.Normalize.tests
