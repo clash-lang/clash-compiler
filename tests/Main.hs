@@ -1137,6 +1137,7 @@ runClashTest = defaultMain
           in runTest "DFold" _opts
         , runTest "DFold2" def
         , runTest "DTFold" def
+        , clashLibTest "DTFoldBinderTypes" def{hdlTargets=[Verilog]}
         ,
           -- vivado segfaults
           runTest "FindIndex" def{hdlSim=hdlSim def \\ [Vivado]}

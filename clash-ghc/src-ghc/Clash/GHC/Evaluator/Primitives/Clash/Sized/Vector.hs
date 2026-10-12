@@ -999,8 +999,8 @@ primitives =
                       -- Guaranteed no capture, so okay to use unsafe name generation
                       xsLNm    = mkUnsafeSystemName "xsL" 0
                       xsRNm    = mkUnsafeSystemName "xsR" 1
-                      xsLId    = mkLocalId k2ty xsLNm
-                      xsRId    = mkLocalId k2ty xsRNm
+                      xsLId    = mkLocalId xsSVecTy xsLNm
+                      xsRId    = mkLocalId xsSVecTy xsRNm
                       tupPat   = DataPat tupDc [] [xsLId,xsRId]
                       asAlt    = (tupPat, (Var xsLId))
                       bsAlt    = (tupPat, (Var xsRId))
