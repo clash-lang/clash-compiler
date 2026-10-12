@@ -4,7 +4,8 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for the environment of the types of scoped Clash Core: its lookups
-  agree with converting the signatures, and convert every signature only once.
+  agree with converting the signatures of Clash Core, which the type and data
+  constructors store, so that every signature is converted only once.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -42,6 +43,12 @@ sameObject a b = unsafePerformIO $ do
   pure (na == nb)
 {-# NOINLINE sameObject #-}
 
+-- | Whether two optional values are the same heap object, see 'sameObject'
+sameContents :: Maybe a -> Maybe a -> Bool
+sameContents (Just a) (Just b) = sameObject a b
+sameContents Nothing Nothing = True
+sameContents _ _ = False
+
 tyCons :: [C.TyCon]
 tyCons = UniqMap.elems testTyConMap
 
@@ -69,13 +76,13 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
 
   , testCase "signatures are converted once" $ do
       assertBool "newTyConSigOf"
-        (sameObject (newTyConSigOf testTypeEnv nTyConName) (newTyConSigOf testTypeEnv nTyConName))
+        (sameContents (newTyConSigOf testTypeEnv nTyConName) (newTyConSigOf testTypeEnv nTyConName))
       forM_ tyCons $ \tc -> do
         let nm = C.tyConName tc
         assertBool "tyConKindOf"
           (sameObject (tyConKindOf testTypeEnv nm :: Kind 'VoidS) (tyConKindOf testTypeEnv nm))
         assertBool "tyFamEqnsOf"
-          (sameObject (tyFamEqnsOf testTypeEnv nm) (tyFamEqnsOf testTypeEnv nm))
+          (sameContents (tyFamEqnsOf testTypeEnv nm) (tyFamEqnsOf testTypeEnv nm))
       forM_ dataCons $ \dc -> do
         assertBool "dataConSigOf" (sameObject (dataConSigOf testTypeEnv dc) (dataConSigOf testTypeEnv dc))
         assertBool "dataConType"
