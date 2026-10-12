@@ -26,6 +26,7 @@
   Core, TODO(Phase 5, Primitives).
 -}
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
@@ -38,6 +39,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+
+-- 'dataToTagSmall#' and 'dataToTagLarge#' (used below in TH name quotes so that
+-- Clash can match the primops by their canonical names across GHC versions) are
+-- deprecated as of GHC 9.14 in favor of @dataToTag#@ from @GHC.Magic@.
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 module Clash.Netlist.Scoped.BlackBox
   ( mkBlackBoxContext
@@ -64,26 +70,37 @@ import           Data.Text                     (Text, unpack)
 import qualified Data.Text                     as TextS
 import qualified Data.Text.Lazy                as Text
 import           Data.Text.Extra               (showt)
+import           GHC.Num.Integer               (Integer (..))
+import           GHC.Num.Natural               (Natural (..))
+import qualified GHC.Prim
 import           GHC.Stack                     (HasCallStack)
 
 import           Clash.Annotations.Primitive   (extractPrim)
 import qualified Clash.Backend                 as Backend
 import           Clash.Core.DataCon            (dcTag)
+import           Clash.Core.Literal            (Literal (IntLiteral))
 import qualified Clash.Core.Name               as C
 import           Clash.Core.Pretty             (showPpr)
 import qualified Clash.Core.Term               as C
-import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail)
+import           Clash.Core.TyCon              (tyConDataCons)
+import qualified Clash.Core.Type               as C (ConstTy (..))
+import qualified Clash.Core.Var                as C (varName)
+import qualified Clash.Data.UniqMap            as UniqMap
+import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail, prepareBlackBox)
 import qualified Clash.Netlist.BlackBox        as Legacy
 import           Clash.Netlist.BlackBox.Types
-  (BlackBoxMeta (..), BlackBoxTemplate, TemplateKind (..))
-import           Clash.Netlist.BlackBox.Util   (onBlackBox, prettyBlackBox, setSym)
+  (BlackBoxMeta (..), BlackBoxTemplate, Element (Text), RenderVoid (..),
+   TemplateKind (..))
+import           Clash.Netlist.BlackBox.Util
+  (extractLiterals, onBlackBox, prettyBlackBox, setSym)
 import qualified Clash.Netlist.Id              as Id
 import           Clash.Netlist.Types           as N
   hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
+import qualified Clash.Netlist.Types           as N (Expr (Literal))
 import           Clash.Netlist.Util
-  (affixName, coreTypeToHWTypeM, flattenFiltered, mkLiteral, originalIndices,
-   preserveVarEnv, primWarnContext, stripFiltered, unsafeCoreTypeToHWTypeM,
-   unsafeCoreTypeToHWTypeM')
+  (affixName, condAssign, contAssign, coreTypeToHWTypeM, declareUse, flattenFiltered,
+   isVoid, mkInit, mkLiteral, originalIndices, preserveVarEnv, primWarnContext,
+   procAssign, stripFiltered, unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
 import           Clash.Normalize.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
@@ -97,8 +114,9 @@ import           Clash.Core.Scoped.Subst
   (openBind, openIdBinder, teleIdVars, withFreshIdBinder)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term
-  (collectArgs, collectArgsTicks, collectTicks, mkTicks, stripTicks)
-import           Clash.Core.Scoped.TermInfo    (isFun, isLiteral)
+  (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
+import           Clash.Core.Scoped.TermInfo
+  (isFun, isLiteral, multiPrimInfo', splitMultiPrimArgs)
 import           Clash.Core.Scoped.Type        (splitFunTys)
 
 import {-# SOURCE #-} Clash.Netlist.Scoped
@@ -112,6 +130,13 @@ import           Clash.Netlist.Scoped.Util
 -- | The result of a blackbox: its HDL identifier and its type. See the module
 -- header.
 type ResId n = (Identifier, Type n)
+
+-- | An identifier as the identifier of a result ('ResId'), or of a local
+-- variable. Clash Core passed these identifiers through the occurrence names
+-- of variables ('Clash.Netlist.Id.unsafeFromCoreId'), so that they lost their
+-- structure, which e.g. 'Id.suffix' uses to make new identifiers.
+rawIdentifier :: Identifier -> Identifier
+rawIdentifier = Id.unsafeMake . Id.toText
 
 -- | The result of a blackbox that is a local variable
 localResId :: HasCallStack => CompCtx n -> LocalId n -> ResId n
@@ -274,7 +299,8 @@ mkArgument ctx bbName bndr declType nArg e = do
 -- | Turn a primitive application into an expression and declarations: see
 -- 'Clash.Netlist.BlackBox.mkPrimitive'
 mkPrimitive
-  :: (HasCallStack, Distinct n)
+  :: forall n
+   . (HasCallStack, Distinct n)
   => CompCtx n
   -> Bool
   -- ^ Put BlackBox expression in parenthesis
@@ -292,8 +318,364 @@ mkPrimitive
   -- ^ Tick declarations
   -> NetlistMonad (Expr, [Declaration])
 mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
-  Legacy.mkPrimitive bbEParen bbEasD declType (toLegacyNetlistId ctx dst) pInfo
-    (toLegacyArgs ctx args) tickDecls
+  go =<< extractPrimWarnOrFail context (C.primName pInfo)
+  where
+    tenv = compTypeEnv ctx
+    sc = compScope ctx
+    context = primWarnContext [] dstName (toLegacyArgs ctx args)
+    dstName =
+      case dst of
+        NetlistId i _ -> unpack (Id.toText i)
+        CoreId i -> showPpr (C.varName (toLegacyLocalId ctx i))
+        MultiId is -> unwords (map (showPpr . C.varName . toLegacyLocalId ctx) is)
+    tys = netlistTypes dst
+    ty = fromMaybe (error "mkPrimitive") (listToMaybe tys)
+    assignTy = declTypeUsage declType
+
+    go
+      :: P.CompiledPrimitive
+      -> NetlistMonad (Expr, [Declaration])
+    go =
+      \case
+        P.BlackBoxHaskell bbName wf _usedArgs multiResult funcName (_fHash, func) -> do
+          bbFunRes <- callBlackBoxFunction ctx func bbEasD (C.primName pInfo) args tys
+          case bbFunRes of
+            Left err -> do
+              -- Blackbox template function returned an error:
+              let err' = unwords [ $(curLoc) ++ "Could not create blackbox"
+                                 , "template using", show funcName, "for"
+                                 , show bbName ++ ".", "Function reported: \n\n"
+                                 , err ]
+              (_,sp) <- Lens.use curCompNm
+              throw (ClashException sp err' Nothing)
+            Right (BlackBoxMeta {..}, bbTemplate) ->
+              -- Blackbox template generation successful. Rerun 'go', but this time
+              -- around with a 'normal' @BlackBox@
+              go (P.BlackBox
+                    bbName wf bbRenderVoid multiResult bbKind () bbOutputUsage
+                    bbLibrary bbImports bbFunctionPlurality bbIncludes
+                    bbResultNames bbResultInits bbTemplate)
+        -- See 'setupMultiResultPrim' in "Clash.Normalize.Transformations":
+        P.BlackBox {name="c$multiPrimSelect"} ->
+          pure (Noop, [])
+        p@P.BlackBox {multiResult=True, name, template} -> do
+          -- Multi result primitives assign their results to signals
+          -- provided as arguments. Hence, we ignore any declarations
+          -- from 'resBndr1'.
+          tcm <- Lens.view tcCache
+          let (args1, resArgs) = splitMultiPrimArgs (multiPrimInfo' tcm pInfo) args
+              resIds = [ LocalId o t v | Var o t v <- resArgs ]
+          (bbCtx, ctxDcls) <- mkBlackBoxContext ctx (C.primName pInfo) declType resIds args1
+          (templ, templDecl) <- prepareBlackBox name template bbCtx
+          let bbDecl = N.BlackBoxD name (P.libraries p) (P.imports p) (P.includes p) templ bbCtx
+          return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+        p@(P.BlackBox {template, name=pNm, kind,outputUsage}) ->
+          case kind of
+            TDecl -> do
+              resM <- resBndr1 True dst
+              case resM of
+                Just (dst',dstNm,dstDecl) -> do
+                  (bbCtx,ctxDcls)   <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst'] args
+                  (templ,templDecl) <- prepareBlackBox pNm template bbCtx
+                  let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
+                                           (P.includes p) templ bbCtx
+                  declareUse outputUsage dstNm
+                  return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+
+                -- Render declarations as a Noop when requested
+                Nothing | RenderVoid <- P.renderVoid p -> do
+                  -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
+                  let dst1 = (Id.unsafeMake "__VOID_TDECL_NOOP__", ty)
+                  (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst1] args
+                  (templ,templDecl) <- prepareBlackBox pNm template bbCtx
+                  let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
+                                           (P.includes p) templ bbCtx
+                  return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+
+                -- Otherwise don't render them
+                Nothing -> return (Noop,[])
+            TExpr -> do
+              if bbEasD
+                then do
+                  resM <- resBndr1 True dst
+                  case resM of
+                    Just (dst',dstNm,dstDecl) -> do
+                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst'] args
+                      (bbTempl,templDecl) <- prepareBlackBox pNm template bbCtx
+                      let bbE =  BlackBoxE pNm (P.libraries p) (P.imports p) (P.includes p) bbTempl bbCtx bbEParen
+                      tmpAssgn <- case declType of
+                        Concurrent -> contAssign dstNm bbE
+                        Sequential -> procAssign Blocking dstNm bbE
+                      return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
+
+                    -- Render expression as a Noop when requested
+                    Nothing | RenderVoid <- P.renderVoid p -> do
+                      -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
+                      let dst1 = (Id.unsafeMake "__VOID_TEXPRD_NOOP__", ty)
+                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst1] args
+                      (templ,templDecl) <- prepareBlackBox pNm template bbCtx
+                      let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
+                                               (P.includes p) templ bbCtx
+                      return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+
+                    -- Otherwise don't render them
+                    Nothing -> return (Identifier (Id.unsafeMake "__VOID_TEXPRD__") Nothing,[])
+                else do
+                  resM <- resBndr1 False dst
+                  case resM of
+                    Just (dst',_,_) -> do
+                      (bbCtx,ctxDcls)      <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst'] args
+                      (bbTempl,templDecl0) <- prepareBlackBox pNm template bbCtx
+                      let templDecl1 = case C.primName pInfo of
+                            "Clash.Sized.Internal.BitVector.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _, N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.BitVector.fromInteger##"
+                              | [N.Literal _ _, N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.Index.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.Signed.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _] <- extractLiterals bbCtx -> []
+                            "Clash.Sized.Internal.Unsigned.fromInteger#"
+                              | [N.Literal _ (NumLit _), N.Literal _ _] <- extractLiterals bbCtx -> []
+                            _ -> templDecl0
+                      return (BlackBoxE pNm (P.libraries p) (P.imports p) (P.includes p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl1)
+                    -- Render expression as a Noop when requested
+                    Nothing | RenderVoid <- P.renderVoid p -> do
+                      -- TODO: We should probably 'mkBlackBoxContext' to accept empty lists
+                      let dst1 = (Id.unsafeMake "__VOID_TEXPRE_NOOP__", ty)
+                      (bbCtx,ctxDcls) <- mkBlackBoxContextRes ctx (C.primName pInfo) declType [dst1] args
+                      (templ,templDecl) <- prepareBlackBox pNm template bbCtx
+                      let bbDecl = N.BlackBoxD pNm (P.libraries p) (P.imports p)
+                                               (P.includes p) templ bbCtx
+                      return (Noop, ctxDcls ++ templDecl ++ tickDecls ++ [bbDecl])
+
+                    -- Otherwise don't render them
+                    Nothing -> return (Identifier (Id.unsafeMake "__VOID__") Nothing,[])
+        P.Primitive pNm _ _
+          | pNm == showt 'GHC.Prim.tagToEnum# -> do
+              hwTy <- hwTypeOf ctx ty
+              case args of
+                [Right (ConstTy (C.TyCon tcN)), Left (Literal (IntLiteral i))] -> do
+                  tcm <- Lens.view tcCache
+                  let dcs = tyConDataCons (UniqMap.find tcN tcm)
+                      dc  = dcs !! fromInteger i
+                  (exprN,dcDecls) <- mkDcApplication ctx declType [hwTy] dst dc []
+                  return (exprN,dcDecls)
+                [Right _, Left scrut] -> do
+                  let scrutTy = inferCoreTypeOf tenv sc scrut
+                  (scrutExpr,scrutDecls) <-
+                    mkExpr ctx False declType (NetlistId (Id.unsafeMake "c$tte_rhs") scrutTy) scrut
+                  case scrutExpr of
+                    -- Singleton enumerations have no hardware representation,
+                    -- just like their constructor applications.
+                    _ | isVoid hwTy -> return (Noop,scrutDecls)
+                    Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
+                    _ -> do
+                      scrutHTy <- hwTypeOf ctx scrutTy
+                      tmpRhs <- Id.make "c$tte_rhs"
+                      netDecl <- mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+                      return (DataTag hwTy (Left tmpRhs), netDecl ++ scrutDecls)
+                _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showPpr showPpr) (toLegacyArgs ctx args))
+          -- 'dataToTag#' was removed from GHC.Prim in favor of
+          -- 'dataToTagSmall#' / 'dataToTagLarge#'. Kept as a literal for
+          -- compatibility with older GHCs where it may still appear.
+          | pNm == "GHC.Prim.dataToTag#" -> case args of
+              [Right _,Left (Data dc)] -> do
+                iw <- Lens.view intWidth
+                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
+              [Right _,Left scrut] -> mkDataToTag ctx declType assignTy scrut
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) (toLegacyArgs ctx args))
+
+#if MIN_VERSION_ghc(9,10,0)
+          -- 'dataToTagSmall#' / 'dataToTagLarge#' only exist on GHC >= 9.10;
+          -- TH-quoting them requires the symbols to be in scope at compile
+          -- time, so this clause is CPP-gated.
+          | pNm `elem`
+            [showt 'GHC.Prim.dataToTagSmall#, showt 'GHC.Prim.dataToTagLarge#] -> case args of
+              [Right _, Right _,Left (Data dc)] -> do
+                iw <- Lens.view intWidth
+                return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
+              [Right _, Right _,Left scrut] -> mkDataToTag ctx declType assignTy scrut
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) (toLegacyArgs ctx args))
+#endif
+
+          | "Clash.Explicit.SimIO." `TextS.isPrefixOf` pNm ->
+              -- TODO(Phase 5, BlackBox): port
+              Legacy.mkPrimitive bbEParen bbEasD declType (toLegacyNetlistId ctx dst) pInfo
+                (toLegacyArgs ctx args) tickDecls
+
+          | pNm == showt 'IS -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr ctx False declType dst arg
+                _ -> error "internal error: insufficient arguments"
+              iw <- Lens.view intWidth
+              return (N.DataCon (Signed iw) (DC (Void Nothing,-1)) [expr],decls)
+
+          | pNm == showt 'IP -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr ctx False declType dst arg
+                _ -> error "internal error: insufficient arguments"
+              case expr of
+                N.Literal Nothing (NumLit _) -> return (expr,decls)
+                _ -> error "non-constant ByteArray# not supported"
+
+          | pNm == showt 'IN -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr ctx False declType dst arg
+                _ -> error "internal error: insufficient arguments"
+              case expr of
+                N.Literal Nothing (NumLit i) ->
+                  return (N.Literal Nothing (NumLit (negate i)),decls)
+                _ -> error "non-constant ByteArray# not supported"
+
+          | pNm == showt 'NS -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr ctx False declType dst arg
+                _ -> error "internal error: insufficient arguments"
+              iw <- Lens.view intWidth
+              return (N.DataCon (Unsigned iw) (DC (Void Nothing,-1)) [expr],decls)
+
+          | pNm == showt 'NB -> do
+              (expr,decls) <- case lefts args of
+                (arg:_) -> mkExpr ctx False declType dst arg
+                _ -> error "internal error: insufficient arguments"
+              case expr of
+                N.Literal Nothing (NumLit _) -> return (expr,decls)
+                _ -> error "non-constant ByteArray# not supported"
+
+          | otherwise ->
+              return (BlackBoxE "" [] [] []
+                        (BBTemplate [Text $ mconcat ["NO_TRANSLATION_FOR:",Text.fromStrict pNm]])
+                        (emptyBBContext pNm) False,[])
+
+    -- Do we need to create a new identifier to assign the result?
+    --
+    -- CoreId: No, this is an original LHS of a let-binder, and already has a
+    --         corresponding NetDecl; unlike NetlistIds, it is not already
+    --         assigned, it will be assigned by the BlackBox/Primitive.
+    --
+    -- NetlistId: This is a derived (either from an CoreId or other NetlistId)
+    --            identifier created in the NetlistMonad that's already being
+    --            used in an assignment, i.e. we cannot assign it again.
+    --
+    --            So if it is a declaration BlackBox (indicated by 'mkDec'),
+    --            we will have to create a new NetlistId, create a NetDecl for
+    --            it, and use this new NetlistId for the assignment inside the
+    --            declaration BlackBox
+    --
+    -- MultiId: This is like a CoreId, but it's split over multiple identifiers
+    --          because it was originally of a product type where the element
+    --          types should not be part of an aggregate type in the generated
+    --          HDL (e.g. Clocks should not be part of an aggregate, because
+    --          tools like verilator don't like it)
+    resBndr
+      :: Bool
+      -- Do we need to create and declare a new identifier in case we're given
+      -- a NetlistId?
+      -> NetlistId n
+      -- CoreId/NetlistId/MultiId
+      -> NetlistMonad (Maybe ([ResId n],[Identifier],[Declaration]))
+      -- Nothing when the binder would have type `Void`
+    resBndr mkDec dst' = do
+      resHwTy <- case tys of
+        (ty1:_) -> hwTypeOf ctx ty1
+        _ -> error "internal error: insufficient types"
+      if isVoid resHwTy then
+        pure Nothing
+      else
+        case dst' of
+          NetlistId dstL ty' -> case mkDec of
+            False ->
+              return (Just ([(rawIdentifier dstL, ty')],[dstL],[]))
+            True -> do
+              nm2 <- Id.suffix dstL "res"
+              -- The new identifier is a local variable of an extension of
+              -- the scope, so that 'mkNetDecl' can declare it
+              idDeclM <-
+                withFreshIdBinder sc (C.mkUnsafeSystemName (Id.toText nm2) 0) ty $ \sc' b ->
+                  let ctx' = extendCompCtx sc' [(binderLocalId b, rawIdentifier nm2)] ctx
+                  in mkNetDecl ctx' (binderLocalId b, sink (mkApps (Prim pInfo) args))
+              case idDeclM of
+                [] -> return Nothing
+                [idDecl] -> return (Just ([(rawIdentifier nm2, ty)],[nm2],[idDecl]))
+                ids -> error [I.i|
+                  Unexpected nested use of multi result primitive. Ids:
+
+                    #{show ids}
+
+                  Multi primitive should only appear on the RHS of a
+                  let-binding. Please report this as a bug.
+                |]
+
+          CoreId dstR ->
+            let r = localResId ctx dstR
+            in return (Just ([r], [fst r], []))
+          MultiId ids ->
+            let rs = map (localResId ctx) ids
+            in return (Just (rs, map fst rs, []))
+
+    -- Like resBndr, but fails on MultiId
+    resBndr1
+      :: HasCallStack
+      => Bool
+      -> NetlistId n
+      -> NetlistMonad (Maybe (ResId n,Identifier,[Declaration]))
+    resBndr1 mkDec dst' = resBndr mkDec dst' >>= \case
+      Nothing -> pure Nothing
+      Just ([id_],[nm_],decls) -> pure (Just (id_,nm_,decls))
+      _ -> error "internal error"
+
+-- | Lower a non-constant @dataToTag# scrut@ to netlist. For plain @Sum@/@SP@
+-- types, the bits stored in @scrut@ /are/ the GHC tag, so a 'DataTag' netlist
+-- expression that the backend renders as a bit-extract is sufficient. For
+-- types with a user-defined bit representation (@CustomSum@, @CustomSP@,
+-- @CustomProduct@) the stored bits are arbitrary, so we lower to a
+-- 'CondAssignment' that maps each constructor's custom bit pattern back to
+-- its GHC tag (@dcTag - 1@). See issue #2724.
+mkDataToTag
+  :: (HasCallStack, Distinct n)
+  => CompCtx n
+  -> DeclarationType
+  -> Usage
+  -> Term n
+  -> NetlistMonad (Expr, [Declaration])
+mkDataToTag ctx declType assignTy scrut = do
+  let scrutTy = inferCoreTypeOf (compTypeEnv ctx) (compScope ctx) scrut
+  scrutHTy <- hwTypeOf ctx scrutTy
+  (scrutExpr, scrutDecls) <-
+    mkExpr ctx False declType (NetlistId (Id.unsafeMake "c$dtt_rhs") scrutTy) scrut
+  (scrutId, scrutDecls') <- case scrutExpr of
+    Identifier id_ Nothing -> pure (id_, scrutDecls)
+    _ -> do
+      tmpRhs <- Id.make "c$dtt_rhs"
+      netDecl <- mkInit declType assignTy tmpRhs scrutHTy scrutExpr
+      pure (tmpRhs, netDecl ++ scrutDecls)
+  let nReprs = case scrutHTy of
+        CustomSum _ _ _ reprs -> Just (length reprs)
+        CustomSP  _ _ _ reprs -> Just (length reprs)
+        CustomProduct {}      -> Just 1
+        _                     -> Nothing
+  case nReprs of
+    Nothing -> pure (DataTag scrutHTy (Right scrutId), scrutDecls')
+    Just k -> do
+      iw <- Lens.view intWidth
+      let sIw = Signed iw
+      if k <= 1
+        then pure ( N.Literal (Just (sIw, iw)) (NumLit 0)
+                  , scrutDecls' )
+        else do
+          tag <- Id.make "c$dtt_tag"
+          let alts = [ ( Just (NumLit (toInteger i))
+                       , N.Literal (Just (sIw, iw)) (NumLit (toInteger i)))
+                     | i <- [0 .. k - 1] ]
+              tagDecl = NetDecl' Nothing tag sIw Nothing
+          assn <- condAssign tag sIw (Identifier scrutId Nothing) scrutHTy alts
+          -- Wrap the tag identifier in an identity 'DataCon' so the caller's
+          -- catch-all assignment fires (an 'Identifier _ Nothing' would be
+          -- skipped, leaving the destination unassigned). All backends render
+          -- 'DataCon _ (DC (Void {}, -1)) [e]' as 'e' verbatim.
+          pure ( N.DataCon sIw (DC (Void Nothing, -1)) [Identifier tag Nothing]
+               , tagDecl : assn : scrutDecls' )
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
