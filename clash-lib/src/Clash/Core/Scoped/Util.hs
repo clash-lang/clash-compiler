@@ -36,6 +36,7 @@ module Clash.Core.Scoped.Util
   , sccLetBindings
   , inverseTopSortLetBindings
   , inverseTopSortOrder
+  , inverseTopSortOrderOf
   , LetGroup (..)
   , regroupLetBindings
     -- * Vectors and trees
@@ -170,9 +171,25 @@ inverseTopSortOrder
   -> [Term l]
   -- ^ Right-hand sides
   -> [Int]
-inverseTopSortOrder bs xs = postorderF (Graph.dff graph) []
+inverseTopSortOrder bs = inverseTopSortOrderRaw (teleRaws bs)
+
+-- | The order of 'inverseTopSortLetBindings', as the positions of the
+-- bindings, for let-bindings given by the names they bind and their
+-- right-hand sides: e.g. those of several let-expressions opened into one
+-- scope.
+inverseTopSortOrderOf
+  :: [TmName l]
+  -- ^ The names bound by the bindings
+  -> [Term l]
+  -- ^ Right-hand sides
+  -> [Int]
+inverseTopSortOrderOf nms = inverseTopSortOrderRaw (map tmNameRaw nms)
+
+-- | 'inverseTopSortOrder' of bindings given by the raw names they bind
+inverseTopSortOrderRaw :: [Int] -> [Term l] -> [Int]
+inverseTopSortOrderRaw raws xs = postorderF (Graph.dff graph) []
  where
-  deps = letDependencies bs xs
+  deps = letDependenciesRaw raws xs
   graph = Graph.buildG (0, length deps - 1) [(i, d) | (i, ds) <- zip [0..] deps, d <- ds]
 
   postorderF ts acc = foldr postorder acc ts
@@ -277,18 +294,24 @@ teleOccs (TCons b bs) = idBinderOcc b : teleOccs bs
 
 -- | For every right-hand side, the positions of the bindings it refers to
 letDependencies :: Tele IdBinder n l -> [Term l] -> [[Int]]
-letDependencies bs = map deps
+letDependencies bs = letDependenciesRaw (teleRaws bs)
+
+-- | 'letDependencies' of bindings given by the raw names they bind
+letDependenciesRaw :: [Int] -> [Term l] -> [[Int]]
+letDependenciesRaw raws = map deps
  where
-  positions = IntMap.fromList (zip (raws bs) [0..])
+  positions = IntMap.fromList (zip raws [0..])
 
   deps x =
     [ i
     | v <- nameSetToList (freeTmVars x)
     , Just i <- [IntMap.lookup (tmNameRaw v) positions] ]
 
-  raws :: Tele IdBinder x y -> [Int]
-  raws TNil = []
-  raws (TCons b rest) = tmNameRaw (tmNameOf b) : raws rest
+-- | The raw names bound by a telescope
+teleRaws :: Tele IdBinder n l -> [Int]
+teleRaws = \case
+  TNil -> []
+  TCons b rest -> tmNameRaw (tmNameOf b) : teleRaws rest
 
 -- | The strongly connected components of the bindings, given their
 -- dependencies, in dependency order. Components that don't depend on each
