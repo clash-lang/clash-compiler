@@ -13,6 +13,7 @@
 
 module Clash.Netlist.Scoped.Legacy
   ( legacyBlackBoxFunction
+  , toLegacyNetlistId
   ) where
 
 import qualified Control.Lens                 as Lens
@@ -35,7 +36,9 @@ import           Clash.Core.Scoped.Syntax
 import qualified Clash.Netlist.BlackBox.Types as Legacy (BlackBoxFunction)
 import qualified Clash.Netlist.Id             as Id
 import           Clash.Netlist.Scoped.Types
+import qualified Clash.Netlist.Types          as Legacy (NetlistId (..))
 import           Clash.Netlist.Types          (typeEnv)
+import           GHC.Stack                    (HasCallStack)
 
 -- | A blackbox function as one on Clash Core, for the callers that still run
 -- on Clash Core. A blackbox function on scoped Core gets its arguments
@@ -63,3 +66,11 @@ legacyBlackBoxFunction = \case
       in f ctx isD nm
            (map (bimap (fromClashTerm env) (fromClashType env)) args)
            (map (fromClashType env) resTys)
+
+-- | The Clash Core counterpart of a 'NetlistId', see
+-- 'Clash.Netlist.Scoped.Types.toLegacy'
+toLegacyNetlistId :: HasCallStack => CompCtx n -> NetlistId n -> Legacy.NetlistId
+toLegacyNetlistId ctx = \case
+  NetlistId i t -> Legacy.NetlistId i (toLegacyType ctx t)
+  CoreId i -> Legacy.CoreId (toLegacyLocalId ctx i)
+  MultiId is -> Legacy.MultiId (map (toLegacyLocalId ctx) is)
