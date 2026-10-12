@@ -30,6 +30,7 @@ import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
   ( Declaration (Assignment), DeclarationType (Concurrent), Expr (Identifier)
   , PreserveCase (PreserveCase), SomeBackend (..) )
+import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Rewrite.Types (RewriteEnv (..))
 
 import Test.Clash.Rewrite (globalId, intFunTy, intId, localId, mkBindingMap)
@@ -58,7 +59,7 @@ mkFunAppLocalShadowingGlobal = do
       dst = Id.unsafeMake "result"
   (decls, _) <-
     runNetlistMonad
-      (_clashEnv env) (error "evaluator") False bs mempty
+      (_clashEnv env) (error "evaluator") False (fromClashBindings bs) mempty
       (_typeTranslator env) True be ids "" mempty
       (mkFunApp Concurrent dst xLocal [] [])
   case decls of
@@ -92,7 +93,7 @@ mkFunInputLocalShadowingGlobal = do
       compNames = unitVarEnv fGlobal (Id.unsafeMake "f")
   result <- try $
     runNetlistMonad
-      (_clashEnv env) (error "evaluator") False bs mempty
+      (_clashEnv env) (error "evaluator") False (fromClashBindings bs) mempty
       (_typeTranslator env) True be ids "" compNames
       (mkBlackBoxContext "prim" Concurrent [res] [Left (Var fLocal)])
   case result of

@@ -31,7 +31,7 @@ import           GHC.Num.Integer                  (Integer(..))
 import           GHC.Num.Natural                  (Natural(..))
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Control.Monad.Reader             (runReaderT)
-import           Control.Monad.State.Strict       (State, runStateT, runState)
+import           Control.Monad.State.Strict       (State, evalState, runStateT, runState)
 import           Data.Bifunctor                   (first, second)
 import           Data.Char                        (ord)
 import           Data.Either                      (partitionEithers, rights)
@@ -85,7 +85,11 @@ import           Clash.Primitives.Types           as P
 import           Clash.Util
 import qualified Clash.Util.Interpolate           as I
 import qualified Clash.Util.Supply                as Supply
-import           Clash.Rewrite.Scoped.Globals     (toClashBindings)
+import           Clash.Core.Scoped.Convert.Fresh  (toClashTermFreshClosed)
+import           Clash.Core.Scoped.NameMap        (globalEnvElems, globalEnvKeys, globalEnvToList)
+import           Clash.Core.Scoped.Syntax         (globalIdVar)
+import           Clash.Core.Scoped.TypeEnv        (addGlobalTypes, mkTypeEnv)
+import qualified Clash.Data.UniqMap               as UniqMap
 import Clash.Core.Evaluator.Types (Evaluator)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
@@ -119,14 +123,10 @@ genNetlist
   -- ^ Name of the @topEntity@
   -> IO (Component, ComponentMap, IdentifierSet)
 genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
-  -- Netlist generation runs on Clash Core: convert the bindings of scoped
-  -- Clash Core. TODO(Phase 5, Netlist): remove the conversion.
-  supply <- Supply.newSupply
-  let globalsC = toClashBindings supply globals
-      (componentNames_, seen1) =
-        genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globalsC
+  let (componentNames_, seen1) =
+        genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
   ((_meta, topComponent), s) <-
-    runNetlistMonad env eval isTb globalsC tops typeTrans ite be seen1 dir componentNames_
+    runNetlistMonad env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
       $ genComponent topEntity
   return (topComponent, _components s, seen1)
 
@@ -136,7 +136,7 @@ runNetlistMonad
   -> Evaluator
   -> Bool
   -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
-  -> BindingMap
+  -> GlobalBindings
   -- ^ Global binders
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
@@ -156,14 +156,20 @@ runNetlistMonad
   -> NetlistMonad a
   -- ^ Action to run
   -> IO (a, NetlistState)
-runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_
-  = flip runReaderT (NetlistEnv env "" "" Nothing [] eval)
-  . flip runStateT s'
-  . runNetlist
+runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentNames_ act = do
+  supply <- Supply.newSupply
+  flip runReaderT (NetlistEnv env "" "" Nothing [] eval tenv)
+    . flip runStateT (s' supply)
+    $ runNetlist act
   where
-    s' =
+    tenv =
+      addGlobalTypes
+        (UniqMap.fromList [ (v, v) | b <- globalEnvElems s, let v = bindingId b ])
+        (mkTypeEnv (envTyConMap env))
+    s' supply =
       NetlistState
         { _bindings=s
+        , _legacyBindings=legacyBindingsOf supply s
         , _components=OMap.empty
         , _typeTranslator=typeTrans
         , _curCompNm=(error "genComponent should have set _curCompNm", noSrcSpan)
@@ -181,6 +187,19 @@ runNetlistMonad env eval isTb s tops typeTrans ite be seenIds_ dir componentName
         , _usages=mempty
         }
 
+-- | The global bindings as bindings of Clash Core, converted lazily, per
+-- binding: most of them are never looked at. Every binder gets a fresh
+-- unique, see "Clash.Core.Scoped.Convert.Fresh".
+-- TODO(Phase 7): remove.
+legacyBindingsOf :: Supply.Supply -> GlobalBindings -> BindingMap
+legacyBindingsOf supply0 globals = UniqMap.fromList (go supply0 (globalEnvToList globals))
+ where
+  go _ [] = []
+  go supply ((g, b) : rest) =
+    let (supply1, supply2) = Supply.splitSupply supply
+        tm = evalState (toClashTermFreshClosed (bindingTerm b)) supply1
+    in (globalIdVar g, b {bindingTerm = tm}) : go supply2 rest
+
 -- | Generate names for all binders in "BindingMap", except for the ones already
 -- present in given identifier varenv.
 genNames
@@ -192,12 +211,12 @@ genNames
   -- ^ Identifier set to extend
   -> VarEnv Identifier
   -- ^ Pre-generated names
-  -> BindingMap
+  -> GlobalBindings
   -> (VarEnv Identifier, IdentifierSet)
 genNames newInlineStrat prefixM is env bndrs =
-  runState (foldlM go env bndrs) is
+  runState (foldlM go env (globalEnvKeys bndrs)) is
  where
-  go env_ (bindingId -> id_) =
+  go env_ (globalIdVar -> id_) =
     case lookupVarEnv id_ env_ of
       Just _ -> pure env_
       Nothing -> do
@@ -241,7 +260,7 @@ genComponent
   -- ^ Name of the function
   -> NetlistMonad (ComponentMeta, Component)
 genComponent compName = do
-  compExprM <- lookupVarEnv compName <$> Lens.use bindings
+  compExprM <- lookupVarEnv compName <$> Lens.use legacyBindings
   case compExprM of
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
@@ -260,7 +279,7 @@ genComponentT
 genComponentT compName0 componentExpr = do
   tcm <- Lens.view tcCache
   compName1 <- (`lookupVarEnv'` compName0) <$> Lens.use componentNames
-  sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use bindings
+  sp <- (bindingLoc . (`lookupVarEnv'` compName0)) <$> Lens.use legacyBindings
   curCompNm .= (compName1, sp)
   usages .= mempty
 
@@ -739,7 +758,7 @@ mkFunApp declType dstId fun args tickDecls = do
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
     (True, Nothing) -> do
-      normalized <- Lens.use bindings
+      normalized <- Lens.use legacyBindings
       case lookupVarEnv fun normalized of
         Nothing -> error [I.i|
           Internal error: unknown normalized binder:

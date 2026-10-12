@@ -1227,7 +1227,7 @@ mkFunInput parentName declType resId e =
                 Just _ ->
                   error $ $(curLoc) ++ "Cannot make function input for partially applied Synthesize-annotated: " ++ showPpr e
                 _ -> do
-                  normalized <- Lens.use bindings
+                  normalized <- Lens.use legacyBindings
                   case lookupVarEnv fun normalized of
                     Just _ -> do
                       (meta,N.Component compName compInps compOutps _) <-
