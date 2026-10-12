@@ -57,10 +57,6 @@
 
 module Clash.Rewrite.Scoped.ViaFoil
   ( viaFoil
-  , viaFoilWhen
-  , scopedAppWorker
-  , scopedTyAppWorker
-  , scopedLamWorker
   , whnfRWViaClash
   , toClashTermFresh
     -- * Internals, exported for testing
@@ -141,59 +137,6 @@ viaFoil name (ScopedTransform rw) ctx e =
           pure e
  where
   (tvs, ids) = rootVars (C.tfContext ctx) e
-
--- | 'viaFoil' at the nodes at which a check on Clash Core holds, and the
--- identity elsewhere.
---
--- The strategy compiler runs a scoped transformation through 'viaFoil' at
--- every node it is offered at, which converts the whole subterm to scoped
--- Core. For a transformation of applications in a traversal, that is every
--- application, so an application spine of @n@ arguments is converted @n@
--- times. A transformation that is swapped in with 'viaFoilWhen' and a check
--- of whether it can fire at a node only converts the nodes at which it can.
--- The check must hold wherever the scoped transformation can fire. This goes
--- away together with 'viaFoil'.
-viaFoilWhen
-  :: HasCallStack
-  => String
-  -- ^ Name of the transformation, for error messages
-  -> (C.TransformContext -> C.Term -> RewriteMonad extra Bool)
-  -- ^ Whether the transformation can fire at a node
-  -> ScopedRewrite extra
-  -> Rewrite extra
-viaFoilWhen name canFire rw ctx e = do
-  fires <- canFire ctx e
-  if fires then viaFoil name rw ctx e else pure e
-
--- | The scoped transformation of an 'Clash.Rewrite.StrategyDSL.onApp' worker:
--- the identity at other nodes. E.g. to run it with 'viaFoilWhen'.
-scopedAppWorker
-  :: Applicative m
-  => (forall n. Distinct n => TransformContext n -> Term n -> Term n -> Term n -> m (Term n))
-  -> ScopedTransform m
-scopedAppWorker w = ScopedTransform $ \ctx e -> case e of
-  App fun arg -> w ctx e fun arg
-  _ -> pure e
-
--- | The scoped transformation of an 'Clash.Rewrite.StrategyDSL.onTyApp'
--- worker, see 'scopedAppWorker'
-scopedTyAppWorker
-  :: Applicative m
-  => (forall n. Distinct n => TransformContext n -> Term n -> Term n -> Type n -> m (Term n))
-  -> ScopedTransform m
-scopedTyAppWorker w = ScopedTransform $ \ctx e -> case e of
-  TyApp fun ty -> w ctx e fun ty
-  _ -> pure e
-
--- | The scoped transformation of an 'Clash.Rewrite.StrategyDSL.onLam'
--- worker, see 'scopedAppWorker'
-scopedLamWorker
-  :: Applicative m
-  => (forall n l. Distinct n => TransformContext n -> Term n -> IdBinder n l -> Term l -> m (Term n))
-  -> ScopedTransform m
-scopedLamWorker w = ScopedTransform $ \ctx e -> case e of
-  Lam b body -> w ctx e b body
-  _ -> pure e
 
 -- | The variables of the root scope of 'viaFoil': the free variables of the
 -- subterm, and those of the right-hand sides of the let-bindings of its

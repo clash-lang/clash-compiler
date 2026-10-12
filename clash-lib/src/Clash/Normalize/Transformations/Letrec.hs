@@ -9,8 +9,6 @@
   Transformations on letrec expressions.
 -}
 
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -38,7 +36,6 @@ import Control.Monad.Writer (listen)
 import Data.Bifunctor (second)
 import qualified Data.Either as Either
 import qualified Data.HashMap.Lazy as HashMap
-import qualified Data.Map.Strict as Map
 import Data.List ((\\))
 import qualified Data.List as List
 import qualified Data.List.Extra as List
@@ -59,7 +56,7 @@ import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
 import Clash.Core.Subst
 import Clash.Core.Term
-  ( Alt, CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..), TickInfo(..)
+  ( Alt, CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
   , bindToList, collectArgs, collectArgsTicks, collectTicks, isLambdaBodyCtx
   , isTickCtx, mkApps, mkLams, mkTicks, Bind(..), partitionTicks
   , stripAllTicks)
@@ -69,7 +66,7 @@ import Clash.Core.Type
   (Type(..), TypeView(..), isClassTy, normalizeType
   , splitFunForallTy, tyView)
 import Clash.Core.Util (inverseTopSortLetBindings, mkVec, tyNatSize)
-import Clash.Core.Var (isGlobalId, varUniq)
+import Clash.Core.Var (isGlobalId)
 import Clash.Core.VarEnv
   ( InScopeSet, elemInScopeSet, emptyVarEnv, extendInScopeSetList, lookupVarEnv
   , unionVarEnvWith, unitVarEnv, mkVarSet)
@@ -78,22 +75,18 @@ import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
-import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Normalize.Scoped.Transformations.Letrec as Scoped
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
 import Clash.Rewrite.StrategyDSL
-  ( Transformation, anyConstructor, onAppNode, onCase, onLetNode, onPrimNode
-  , onTickNode, onTyAppNode, toTransformation )
+  ( Transformation, anyConstructor, onAppNode, onCase, onLet, onLetNode
+  , onPrimNode, onTickNode, onTyAppNode, toTransformation
+  )
 import Clash.Rewrite.Types
   (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders, setChanged)
 import Clash.Rewrite.WorkFree
-import Clash.Unique (Unique)
 
 {- [Note: Name re-creation]
 The names of heap bound variables are safely generate with mkUniqSystemId in
@@ -103,7 +96,7 @@ not the complete names. So we use mkUnsafeSystemName to recreate the same Name.
 
 -- | Remove unused let-bindings
 deadCode :: Transformation
-deadCode = Scoped.deadCode
+deadCode = toTransformation "deadCode" (onLet 'deadCodeWorker)
 
 -- | The 'Let' handler of 'deadCode'.
 deadCodeWorker
@@ -115,81 +108,13 @@ deadCodeWorker _ e binds body =
     Nothing -> return e
 {-# SCC deadCodeWorker #-}
 
--- | Replace unused arguments of primitives by 'removedArg'. This is the port
--- 'Scoped.removeUnusedExpr', which only converts the nodes at which it can
--- fire, see Note [Converting only where a port can fire].
 removeUnusedExpr :: Transformation
 removeUnusedExpr = toTransformation "removeUnusedExpr"
-  (  onPrimNode 'removeUnusedExprViaFoil
-  <> onAppNode 'removeUnusedExprViaFoil
-  <> onTyAppNode 'removeUnusedExprViaFoil
-  <> onTickNode 'removeUnusedExprViaFoil
-  <> onCase 'removeUnusedExprCaseViaFoil)
-
-{- Note [Converting only where a port can fire]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The strategy compiler runs a scoped transformation through 'viaFoil' at every
-node it is offered at, which converts the whole subterm to scoped Core. For a
-transformation that is offered at most nodes, such as 'removeUnusedExpr' at
-every application and 'topLet' at every node, that makes normalization
-quadratic in the size of a function. So the handlers below check on Clash Core
-whether the port can fire at a node, and only then run it through 'viaFoil',
-with 'viaFoilWhen'.
-They go away together with 'viaFoil'.
--}
-
--- | The application-spine handler of 'removeUnusedExpr': the port at the root
--- of an application of a primitive or of 'Vec.Cons'
-removeUnusedExprViaFoil :: NormRewrite
-removeUnusedExprViaFoil =
-  viaFoilWhen "removeUnusedExpr" removeUnusedExprCanFire
-    (ScopedTransform Scoped.removeUnusedExprSpine)
-
--- | Whether 'Scoped.removeUnusedExprSpine' can fire at a node: the root of an
--- application of a primitive to an unused argument that is not 'removedArg'
--- yet, or of a 'Vec.Cons' of a non-constructor vector of length zero
-removeUnusedExprCanFire :: TransformContext -> Term -> NormalizeSession Bool
-removeUnusedExprCanFire (TransformContext _ cs) e
-  | c:_ <- cs, isSpineCtx c = return False
-  | otherwise = case collectArgsTicks e of
-      (Prim pInfo, args, _) -> primUsedArgs pInfo (length args) >>= \case
-        Just used
-          | let arity = length . Either.rights . fst $ splitFunForallTy (coreTypeOf pInfo)
-          , or [ n < arity && n `notElem` used && not (isRemovedArg tm)
-               | (n, tm) <- zip [0..] (Either.lefts args) ]
-          -> return True
-        _ -> return False
-      (Data dc, [_,_,Right nTy,_,Left _,Left nil], _)
-        | nameOcc (dcName dc) == Text.showt 'Vec.Cons
-        , (con, _) <- collectArgs nil
-        , not (isCon con) -> do
-            tcm <- Lens.view tcCache
-            case runExcept (tyNatSize tcm nTy) of
-              Right 0 -> return True
-              _ -> return False
-      _ -> return False
- where
-  isRemovedArg = \case
-    TyApp (Prim p0) _ -> primName p0 == Text.showt 'removedArg
-    _ -> False
-  isSpineCtx = \case
-    AppFun -> True
-    TyAppC -> True
-    TickC _ -> True
-    _ -> False
-
--- | The 'Case' handler of 'removeUnusedExpr': the port at a case-expression
--- with a single alternative without existentials
-removeUnusedExprCaseViaFoil
-  :: TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
-removeUnusedExprCaseViaFoil ctx e _ _ alts0 =
-  viaFoilWhen "removeUnusedExpr" (\_ _ -> pure canFire) (ScopedTransform (\sctx -> \case
-    t@(S.Case subj ty alts) -> Scoped.removeUnusedExprCase sctx t subj ty alts
-    t -> return t)) ctx e
- where
-  canFire = case alts0 of
-    [(DataPat _ [] _, _)] -> True
-    _ -> False
+  (  onPrimNode 'removeUnusedExprSpine
+  <> onAppNode 'removeUnusedExprSpine
+  <> onTyAppNode 'removeUnusedExprSpine
+  <> onTickNode 'removeUnusedExprSpine
+  <> onCase 'removeUnusedExprCase)
 
 -- | The 'Case' handler of 'removeUnusedExpr': a single-alternative case whose
 -- pattern binds no used variables is replaced by the alternative.
@@ -232,7 +157,26 @@ removeUnusedExprSpine (TransformContext _ (cc:_)) e
   isSpineCtx _ = False
 
 removeUnusedExprSpine _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
-  usedArgs0 <- primUsedArgs pInfo (length args)
+  bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
+  let
+    usedArgs0 =
+      case Monad.join (extractPrim <$> bbM) of
+        Just (BlackBoxHaskell{usedArguments}) ->
+          case usedArguments of
+            UsedArguments used -> Just used
+            IgnoredArguments ignored -> Just ([0..length args - 1] \\ ignored)
+        Just (BlackBox pNm _ _ _ _ _ _ _ _ _ inc r ri templ) -> Just $
+          if | isFromInt pNm -> [0,1,2]
+             | primName pInfo `elem` [ Text.showt 'dontApplyInHDL
+                                     , Text.showt 'Vec.splitAt
+                                     ] -> [0,1]
+             | otherwise -> concat [ concatMap getUsedArguments r
+                                   , concatMap getUsedArguments ri
+                                   , getUsedArguments templ
+                                   , concatMap (getUsedArguments . snd) inc ]
+        _ ->
+          Nothing
+
   case usedArgs0 of
     Nothing ->
       return e
@@ -286,28 +230,6 @@ removeUnusedExprSpine _ e@(collectArgsTicks -> (Data dc, [_,Right aTy,Right nTy,
 removeUnusedExprSpine _ e = return e
 {-# SCC removeUnusedExprSpine #-}
 
--- | The arguments of a primitive that its blackbox uses, given the number of
--- arguments it is applied to. 'Nothing' if it has no blackbox.
-primUsedArgs :: PrimInfo -> Int -> NormalizeSession (Maybe [Int])
-primUsedArgs pInfo nArgs = do
-  bbM <- HashMap.lookup (primName pInfo) <$> Lens.view primitives
-  pure $ case Monad.join (extractPrim <$> bbM) of
-    Just (BlackBoxHaskell{usedArguments}) ->
-      case usedArguments of
-        UsedArguments used -> Just used
-        IgnoredArguments ignored -> Just ([0..nArgs - 1] \\ ignored)
-    Just (BlackBox pNm _ _ _ _ _ _ _ _ _ inc r ri templ) -> Just $
-      if | isFromInt pNm -> [0,1,2]
-         | primName pInfo `elem` [ Text.showt 'dontApplyInHDL
-                                 , Text.showt 'Vec.splitAt
-                                 ] -> [0,1]
-         | otherwise -> concat [ concatMap getUsedArguments r
-                               , concatMap getUsedArguments ri
-                               , getUsedArguments templ
-                               , concatMap (getUsedArguments . snd) inc ]
-    _ ->
-      Nothing
-
 -- | Prepare a let-expression for merging its bindings into a recursive group.
 -- The binder of a 'NonRec' binding is not in scope of its right-hand side,
 -- which can therefore refer to a variable that the binder shadows:
@@ -330,37 +252,7 @@ deshadowNonRec _ bind body = (bind, body)
 --
 -- NB: must only be called in the cleaning up phase.
 flattenLet :: Transformation
-flattenLet = toTransformation "flattenLet" (onLetNode 'flattenLetViaFoil)
-
--- | The 'Let' handler of 'flattenLet': the port 'Scoped.flattenLet' at a
--- let-expression with a let-expression in its body or in a right-hand side,
--- or with a single binding that it inlines, see Note [Converting only where a
--- port can fire]
-flattenLetViaFoil :: NormRewrite
-flattenLetViaFoil =
-  viaFoilWhen "flattenLet" flattenLetCanFire (ScopedTransform Scoped.flattenLetWorker)
-
--- | Whether 'Scoped.flattenLetWorker' can fire at a node, see
--- 'flattenLetViaFoil'
-flattenLetCanFire :: TransformContext -> Term -> NormalizeSession Bool
-flattenLetCanFire _ e = case e of
-  Let bind body
-    | Let {} <- body -> return True
-    | any (isLet . fst . collectTicks . snd) (bindToList bind) -> return True
-    | [(x, rhs)] <- bindToList bind -> do
-        let occ = Lens.lengthOf (freeLocalIds . Lens.filtered (== x)) body
-        inline <-
-          if | occ == 0 -> pure False
-             | occ < 2 -> pure True
-             | otherwise -> do
-                 bndrs <- Lens.use bindings
-                 isWorkFree workFreeBinders bndrs rhs
-        -- The right-hand side of a 'NonRec' binding doesn't refer to its binder
-        let recursive = case bind of
-              Rec {} -> x `elemFreeVars` rhs
-              NonRec {} -> False
-        return (inline && not recursive)
-  _ -> return False
+flattenLet = toTransformation "flattenLet" (onLetNode 'flattenLetWorker)
 
 -- | The 'Let' handler of 'flattenLet'; recurses on the rebuilt let-expression
 -- after merging nested bindings.
@@ -615,20 +507,7 @@ isClassConstraint _ = False
 -- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
 -- version of CSE removed the same amount of let-binders.
 simpleCSE :: Transformation
-simpleCSE = toTransformation "CSE" (onLetNode 'simpleCSEViaFoil)
-
--- | The 'Let' handler of 'simpleCSE': the port 'Scoped.simpleCSE' at a
--- recursive let-expression with more than one binding, see Note [Converting
--- only where a port can fire]
-simpleCSEViaFoil :: NormRewrite
-simpleCSEViaFoil =
-  viaFoilWhen "CSE" (\_ e -> pure (canFire e)) (ScopedTransform (\sctx -> \case
-    t@(S.Let bind body) -> Scoped.simpleCSEWorker sctx t bind body
-    t -> return t))
- where
-  canFire = \case
-    Let (Rec bs@(_:_:_)) _ -> hasEqualRhss (map snd bs)
-    _ -> False
+simpleCSE = toTransformation "CSE" (onLet 'simpleCSEWorker)
 
 -- | The 'Let' handler of 'simpleCSE'.
 simpleCSEWorker
@@ -656,56 +535,10 @@ simpleCSEWorker (TransformContext is0 _) term (bindToList -> bndrsX) body = do
        return term
 {-# SCC simpleCSEWorker #-}
 
--- | Whether two of the given right-hand sides of let-bindings are
--- alpha-equivalent and not marked 'NoDeDup': the condition for 'simpleCSE' to
--- replace one of them. Only compares right-hand sides that apply the same head
--- to the same number of arguments.
-hasEqualRhss :: [Term] -> Bool
-hasEqualRhss rhss = any pairwise (Map.elems groups)
- where
-  groups = Map.fromListWith (<>)
-    [ (key hd (length args), [rhs])
-    | rhs <- rhss
-    , let (hd, args, ticks) = collectArgsTicks rhs
-    , NoDeDup `notElem` ticks ]
-
-  pairwise (t:ts) = any (== t) ts || pairwise ts
-  pairwise [] = False
-
-  key :: Term -> Int -> (Int, Unique, Text.Text, Int)
-  key hd n = case hd of
-    Var v -> (0, varUniq v, mempty, n)
-    Data dc -> (1, dcUniq dc, mempty, n)
-    Prim p -> (2, 0, primName p, n)
-    Literal {} -> (3, 0, mempty, n)
-    _ -> (4, 0, mempty, n)
-
 -- | Ensure that top-level lambda's eventually bind a let-expression of which
 -- the body is a variable-reference.
 topLet :: Transformation
-topLet = anyConstructor "topLet" 'topLetViaFoil
-
--- | The worker of 'topLet': the port 'Scoped.topLet' in the body of a
--- function, at a term that is not a tick, and whose result (the body, if it is
--- a let-expression) is translatable and not a local variable, see Note
--- [Converting only where a port can fire]
-topLetViaFoil :: NormRewrite
-topLetViaFoil =
-  viaFoilWhen "topLet" topLetCanFire (ScopedTransform Scoped.topLetWorker)
-
--- | Whether 'Scoped.topLetWorker' can fire at a node, see 'topLetViaFoil'
-topLetCanFire :: TransformContext -> Term -> NormalizeSession Bool
-topLetCanFire (TransformContext _ cs) e
-  | all (\c -> isLambdaBodyCtx c || isTickCtx c) cs
-  , not (isTick e)
-  = case e of
-      Let _ body
-        | isLocalVar body -> return False
-        | otherwise -> translatable body
-      _ -> translatable e
-  | otherwise = return False
- where
-  translatable t = not <$> isUntranslatable False t
+topLet = anyConstructor "topLet" 'topLetWorker
 
 -- | The worker of 'topLet': a plain rewrite, offered at every node.
 topLetWorker :: HasCallStack => NormRewrite

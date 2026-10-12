@@ -49,10 +49,8 @@ import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
 import Clash.Normalize.Primitives (removedArg)
-import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
-import Clash.Rewrite.Scoped.ViaFoil (scopedAppWorker, viaFoilWhen)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types (TransformContext(..), tcCache, normalizeUltra)
 import Clash.Rewrite.Util (changed, isUntranslatableType, setChanged, whnfRW)
@@ -90,21 +88,8 @@ reduceBinders !subst processed ((i,substTm "reduceBinders" subst -> e):rest)
   = reduceBinders subst ((i,e):processed) rest
 {-# SCC reduceBinders #-}
 
--- | Evaluate applied primitives with the evaluator. This is the port
--- 'Scoped.reduceConst', which only converts the applications at which it can
--- fire, see 'primAppRoot'.
 reduceConst :: Transformation
-reduceConst = toTransformation "reduceConst" (onApp 'reduceConstViaFoil)
-
--- | The 'App' handler of 'reduceConst': 'Scoped.reduceConstWorker' at the
--- root of an application spine of a primitive, see 'primAppRoot'
-reduceConstViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
-reduceConstViaFoil ctx e _ _ =
-  viaFoilWhen "reduceConst" canFire (scopedAppWorker Scoped.reduceConstWorker) ctx e
- where
-  canFire ctx1 e1 = pure (Maybe.isJust (primAppRoot ctx1 e1))
+reduceConst = toTransformation "reduceConst" (onApp 'reduceConstWorker)
 
 -- | The 'App' handler of 'reduceConst'.
 reduceConstWorker
@@ -173,42 +158,8 @@ reduceConstWorker _ e _ _ = return e
 --
 -- See https://github.com/clash-lang/clash-compiler/issues/1606
 reducePrim :: Transformation
-reducePrim = toTransformation "reducePrim" (onApp 'reducePrimViaFoil)
-
--- | The 'App' handler of 'reducePrim': 'Scoped.reducePrimWorker' at the root
--- of an application spine of a primitive that it might reduce, see
--- 'primAppRoot'
-reducePrimViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
-reducePrimViaFoil ctx e _ _ =
-  viaFoilWhen "reducePrim" canFire (scopedAppWorker Scoped.reducePrimWorker) ctx e
- where
-  canFire :: TransformContext -> Term -> NormalizeSession Bool
-  canFire ctx1 e1 = case primAppRoot ctx1 e1 of
-    Nothing -> pure False
-    Just p -> do
-      tcm <- Lens.view tcCache
-      pure (Maybe.isJust (HashMap.lookup (primName p) reducePrimImpls)
-              || mayReturnVec tcm (primType p))
-
--- | The primitive at the root of an application spine, if the node is one.
---
--- The strategy compiler runs a scoped transformation through 'viaFoil' at
--- every node it is offered at, which converts the whole subterm to scoped
--- Core. For a transformation of applications in a bottom-up traversal, that
--- is every application, and an application spine of @n@ arguments is
--- converted @n@ times. The ports of 'reduceConst' and 'reducePrim' only fire
--- at the root of an application spine of a primitive, so their handlers check
--- that on Clash Core first with 'viaFoilWhen', and only convert the
--- applications at which they can fire. On the AES benchmark design, this cuts
--- the allocation of normalization with both ports from 13 times to 1.3 times
--- that with the transformations of Clash Core. It goes away together with
--- 'viaFoil'.
-primAppRoot :: TransformContext -> Term -> Maybe PrimInfo
-primAppRoot (TransformContext _ (AppFun:_)) _ = Nothing
-primAppRoot _ (collectArgs -> (Prim p, _)) = Just p
-primAppRoot _ _ = Nothing
+reducePrim =
+  toTransformation "reducePrim" (onApp 'reducePrimWorker)
 
 -- | The 'Clash.Core.Term.App' handler of 'reducePrim'.
 reducePrimWorker

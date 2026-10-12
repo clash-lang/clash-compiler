@@ -34,14 +34,9 @@ import Clash.Core.Type (Type(..), mkFunTy, splitFunForallTy)
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Util (listToLets)
 import Clash.Core.Var (mkLocalId, mkTyVar)
-import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Normalize.Scoped.Transformations.MultiPrim as Scoped
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive(..))
 import Clash.Rewrite.StrategyDSL (Transformation, onPrim, toTransformation)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import qualified Clash.Rewrite.Scoped as Scoped (TransformContext)
-import Clash.Rewrite.Scoped.ViaFoil (viaFoilWhen)
 import Clash.Rewrite.Types (TransformContext, tcCache, primitives)
 import Clash.Rewrite.Util (changed)
 
@@ -87,42 +82,9 @@ import Clash.Rewrite.Util (changed)
 -- types, not any product type. It will error if it sees a multi result primitive
 -- with a non-tuple return type.
 --
--- This is the port 'Scoped.setupMultiResultPrim', which only converts the
--- primitives at which it fires, see 'setupMultiResultPrimViaFoil'.
 setupMultiResultPrim :: Transformation
 setupMultiResultPrim =
-  toTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimViaFoil)
-
--- | The 'Prim' handler of 'setupMultiResultPrim':
--- 'Scoped.setupMultiResultPrimWorker' at the multi-result primitives that
--- aren't set up yet.
---
--- The strategy compiler runs a scoped transformation through 'viaFoil' at
--- every node it is offered at: for 'setupMultiResultPrim', every primitive.
--- This goes away together with 'viaFoil'.
-setupMultiResultPrimViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> PrimInfo -> NormalizeSession Term
-setupMultiResultPrimViaFoil ctx node pInfo =
-  viaFoilWhen "setupMultiResultPrim" (\_ _ -> canFire)
-    (ScopedTransform setupMultiResultPrimAt) ctx node
- where
-  canFire = case pInfo of
-    PrimInfo{primMultiResult=SingleResult} -> do
-      prim <- Lens.view (primitives . Lens.at (primName pInfo))
-      pure $ case prim >>= extractPrim of
-        Just (BlackBoxHaskell{multiResult=True}) -> True
-        Just (BlackBox{multiResult=True}) -> True
-        _ -> False
-    _ -> pure False
-
--- | 'Scoped.setupMultiResultPrimWorker' at a primitive
-setupMultiResultPrimAt
-  :: (HasCallStack, S.Distinct n)
-  => Scoped.TransformContext n -> S.Term n -> NormalizeSession (S.Term n)
-setupMultiResultPrimAt ctx e = case e of
-  S.Prim p -> Scoped.setupMultiResultPrimWorker ctx e p
-  _ -> return e
+  toTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)
 
 -- | The 'Prim' handler of 'setupMultiResultPrim'.
 setupMultiResultPrimWorker

@@ -49,7 +49,6 @@ import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Monoid as Monoid (getAny)
 import qualified Data.Set.Ordered as OSet
 import qualified Data.Set.Ordered.Extra as OSet
@@ -92,9 +91,6 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Debug (traceIf, traceM)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Rewrite.Combinators (topdownR)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Clash.Rewrite.Scoped.ViaFoil
-  (scopedAppWorker, scopedLamWorker, scopedTyAppWorker, viaFoilWhen)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode
   , toTransformation
@@ -108,7 +104,6 @@ import Clash.Rewrite.Util
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Normalize.Scoped.Transformations.Specialize
   (preferNoInline, specCacheKey, specializeName)
-import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
 import Clash.Normalize.Types
   ( NormRewrite, NormalizeSession, specialisationCache, specialisationHistory)
 import Clash.Normalize.Util
@@ -201,22 +196,7 @@ import Clash.Util (ClashException(..))
 -- the current InScopeSet.
 appProp :: Transformation
 appProp = toTransformation "applicationPropagation"
-  (onAppNode 'appPropViaFoil <> onTyAppNode 'appPropViaFoil)
-
--- | 'Scoped.appProp', which replaced 'appPropWorker', through 'viaFoilWhen'
--- at the applications at which it can fire: those of a lambda to a term, of a
--- type lambda to a type, and of a let- or case-expression
-appPropViaFoil :: HasCallStack => NormRewrite
-appPropViaFoil =
-  viaFoilWhen "applicationPropagation" (\_ e -> pure (fires e))
-    (ScopedTransform Scoped.appPropWorker)
- where
-  fires e = case collectArgsTicks e of
-    (Lam {}, Left _ : _, _) -> True
-    (TyLam {}, Right _ : _, _) -> True
-    (Let {}, _ : _, _) -> True
-    (Case {}, _ : _, _) -> True
-    _ -> False
+  (onAppNode 'appPropWorker <> onTyAppNode 'appPropWorker)
 
 -- | The application-spine handler of 'appProp'. Matches the constructors it
 -- is registered for itself, so it can also be used as a plain uninstrumented
@@ -325,23 +305,7 @@ appPropWorker ctx@(TransformContext is _) node = case node of
 -- | Specialize functions on arguments which are constant, except when they
 -- are clock, reset generators.
 constantSpec :: Transformation
-constantSpec = toTransformation "constantSpec" (onApp 'constantSpecViaFoil)
-
--- | 'Scoped.constantSpec', which replaced 'constantSpecWorker', through
--- 'viaFoilWhen' at the applications at which it can fire, see
--- 'constantSpecWorker'
-constantSpecViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
-constantSpecViaFoil ctx e e1 e2 =
-  viaFoilWhen "constantSpec" (\_ _ -> pure fires)
-    (scopedAppWorker Scoped.constantSpecWorker) ctx e
- where
-  fires
-    | (Var {}, args) <- collectArgs e1
-    , (_, []) <- Either.partitionEithers args
-    = null (Lens.toListOf termFreeTyVars e2)
-    | otherwise = False
+constantSpec = toTransformation "constantSpec" (onApp 'constantSpecWorker)
 
 -- | The 'App' handler of 'constantSpec'.
 constantSpecWorker
@@ -649,26 +613,7 @@ specArgBndrsAndVars specArg =
 
 -- | Specialize functions on their non-representable argument
 nonRepSpec :: Transformation
-nonRepSpec = toTransformation "nonRepSpec" (onApp 'nonRepSpecViaFoil)
-
--- | 'Scoped.nonRepSpec', which replaced 'nonRepSpecWorker', through
--- 'viaFoilWhen' at the applications at which it can fire, see
--- 'nonRepSpecWorker'
-nonRepSpecViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Term -> Term -> NormalizeSession Term
-nonRepSpecViaFoil ctx e e1 e2 =
-  viaFoilWhen "nonRepSpec" (\_ _ -> fires)
-    (scopedAppWorker Scoped.nonRepSpecWorker) ctx e
- where
-  fires
-    | (Var {}, args) <- collectArgs e1
-    , (_, []) <- Either.partitionEithers args
-    , null (Lens.toListOf termFreeTyVars e2)
-    , not (isLocalVar e2)
-    = do tcm <- Lens.view tcCache
-         isUntranslatableType False (inferCoreTypeOf tcm e2)
-    | otherwise = pure False
+nonRepSpec = toTransformation "nonRepSpec" (onApp 'nonRepSpecWorker)
 
 -- | The 'App' handler of 'nonRepSpec'.
 nonRepSpecWorker
@@ -717,23 +662,7 @@ nonRepSpecWorker _ e _ _ = return e
 
 -- | Specialize functions on their type
 typeSpec :: Transformation
-typeSpec = toTransformation "typeSpec" (onTyApp 'typeSpecViaFoil)
-
--- | 'Scoped.typeSpec', which replaced 'typeSpecWorker', through
--- 'viaFoilWhen' at the type applications at which it can fire, see
--- 'typeSpecWorker'
-typeSpecViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Term -> Type -> NormalizeSession Term
-typeSpecViaFoil ctx e e1 ty =
-  viaFoilWhen "typeSpec" (\_ _ -> pure fires)
-    (scopedTyAppWorker Scoped.typeSpecWorker) ctx e
- where
-  fires
-    | (Var {}, args) <- collectArgs e1
-    , (_, []) <- Either.partitionEithers args
-    = null (Lens.toListOf typeFreeVars ty)
-    | otherwise = False
+typeSpec = toTransformation "typeSpec" (onTyApp 'typeSpecWorker)
 
 -- | The 'TyApp' handler of 'typeSpec'.
 typeSpecWorker
@@ -757,21 +686,7 @@ typeSpecWorker _ e _ _ = return e
 -- variable with a zero-width type with the only value of that type.
 --
 zeroWidthSpec :: Transformation
-zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecViaFoil)
-
--- | 'Scoped.zeroWidthSpec', which replaced 'zeroWidthSpecWorker', through
--- 'viaFoilWhen' at the lambdas at which it can fire: those whose binder has a
--- zero-width type
-zeroWidthSpecViaFoil
-  :: HasCallStack
-  => TransformContext -> Term -> Id -> Term -> NormalizeSession Term
-zeroWidthSpecViaFoil ctx e i _ =
-  viaFoilWhen "zeroWidthSpec" (\_ _ -> fires)
-    (scopedLamWorker Scoped.zeroWidthSpecWorker) ctx e
- where
-  fires = do
-    tcm <- Lens.view tcCache
-    pure (Maybe.isJust (zeroWidthTypeElem tcm (normalizeType tcm (coreTypeOf i))))
+zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecWorker)
 
 -- | The 'Lam' handler of 'zeroWidthSpec'.
 zeroWidthSpecWorker
