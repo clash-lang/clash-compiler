@@ -38,6 +38,7 @@ import Test.Clash.Rewrite
   , maybeTy, mkBindingMap, nilDc, numTy, pairDataCon, pairTy, tyVar
   , vecTy )
 import Test.Clash.Scoped (scopedWhnf, testTypeEnv)
+import Test.Clash.Scoped.Evaluator (scopedNfData)
 
 -- | Evaluate with the test types, no globals, and no primitives of Clash Core
 eval :: C.Term -> C.Term
@@ -337,9 +338,38 @@ adapterTests =
  where
   intBinTy = C.mkFunTy intTy (C.mkFunTy intTy intTy)
 
+-- | 'Clash.Core.Scoped.Evaluator.nfData'
+nfDataTests :: [TestTree]
+nfDataTests =
+  [ testCase "the fields of a constructor are evaluated" $
+      -- MkPair ((\x -> x) 1) (let y = 2 in y)
+      assertAlphaEq (C.mkApps (C.Data pairDataCon) [Left (intLit 1), Left (intLit 2)])
+        (allocatedBody (nf (C.mkApps (C.Data pairDataCon)
+           [ Left (C.App (C.Lam x (C.Var x)) (intLit 1))
+           , Left (C.Let (C.NonRec y (intLit 2)) (C.Var y)) ])))
+
+  , testCase "nested constructors are evaluated" $
+      -- Just (MkPair 1 ((\x -> x) 2))
+      assertAlphaEq
+        (C.mkApps (C.Data justDataCon)
+           [Right (pairTy), Left (C.mkApps (C.Data pairDataCon) [Left (intLit 1), Left (intLit 2)])])
+        (allocatedBody (nf (C.mkApps (C.Data justDataCon)
+           [ Right (pairTy)
+           , Left (C.mkApps (C.Data pairDataCon)
+                     [Left (intLit 1), Left (C.App (C.Lam x (C.Var x)) (intLit 2))]) ])))
+
+  , testCase "a term that isn't a constructor application is evaluated to WHNF" $
+      assertAlphaEq (intLit 3) (allocatedBody (nf (C.App (C.Lam x (C.Var x)) (intLit 3))))
+  ]
+ where
+  nf = scopedNfData
+    (Env testTypeEnv (PrimReductions scopedPrimReductions (Just (adaptPrim heapLookupEvaluator))))
+    mempty
+
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Evaluator"
   [ testGroup "machine" machineTests
+  , testGroup "nfData" nfDataTests
   , testGroup "tests/shouldwork/Evaluator" shouldworkTests
   , testGroup "ported primitives" nativeTests
   , testGroup "adapter" adapterTests

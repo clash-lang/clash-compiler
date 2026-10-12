@@ -46,6 +46,7 @@
 module Test.Clash.Scoped.Evaluator
   ( -- * Evaluating
     scopedWhnf
+  , scopedNfData
     -- * Environments
   , portedEnv
   , adapterEnv
@@ -105,12 +106,12 @@ import qualified Clash.Normalize.Primitives as NP
 import Clash.Driver.Types (BindingMap)
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, toClashTerm, withConvEnv)
-import Clash.Core.Scoped.Evaluator (bindAllocated, unwindStack, whnf)
+import Clash.Core.Scoped.Evaluator (bindAllocated, nfData, unwindStack, whnf)
 import Test.Clash.Scoped.Evaluator.Adapter (adaptPrim)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Util as U
 import Clash.Core.Scoped.Evaluator.Types
-import Clash.Core.Scoped.Syntax (Distinct, S (VoidS), Term)
+import Clash.Core.Scoped.Syntax (DExt, Distinct, S (VoidS), Term)
 import Clash.Core.Scoped.NameMap (emptyNameMap)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import Clash.Rewrite.Scoped.Globals (fromClashBindings)
@@ -122,9 +123,21 @@ import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 -- bindings. Gives the result, bound by the bindings the evaluator allocated,
 -- as Clash Core: its free variables keep their uniques.
 scopedWhnf :: Env -> BindingMap -> Bool -> C.Term -> C.Term
-scopedWhnf env bm isSubj t = withConvEnv tvs ids $ \cenv ->
+scopedWhnf env bm isSubj = scopedEval (\m0 k -> whnf env isSubj m0 k) bm
+
+-- | Evaluate a Clash term as far as it is data ('nfData'), like 'scopedWhnf'
+scopedNfData :: Env -> BindingMap -> C.Term -> C.Term
+scopedNfData env = scopedEval (nfData env)
+
+-- | Run the evaluator of scoped Clash Core on a Clash term, see 'scopedWhnf'
+scopedEval
+  :: (forall n r. Distinct n => Machine n n -> (forall l. DExt n l => Machine n l -> r) -> r)
+  -> BindingMap
+  -> C.Term
+  -> C.Term
+scopedEval eval bm t = withConvEnv tvs ids $ \cenv ->
   let m0 = initMachine (convScope cenv) emptyNameMap (fromClashBindings bm) (IntMap.empty, 0) (fromClashTerm cenv t)
-  in whnf env isSubj m0 $ \m -> toClashTerm (bindAllocated m (mTerm m))
+  in eval m0 $ \m -> toClashTerm (bindAllocated m (mTerm m))
  where
   tvs = C.dependencySortTyVars (List.nubBy sameUniq (Lens.toListOf C.termFreeTyVars t))
   ids = List.nubBy sameUniq (Lens.toListOf C.freeLocalIds t)
