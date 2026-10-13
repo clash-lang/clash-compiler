@@ -28,7 +28,7 @@ import Test.Clash.Rewrite
   ( addTy, brDc, ghcPairDc, ghcPairTy, heapLookupEvaluator, kindedTyVar, lrDc, numTy
   , rtreeTy, snatTy )
 import Test.Clash.Scoped (testTypeEnv)
-import Test.Clash.Scoped.Evaluator (portedEnv, sameResult, scopedWhnf)
+import Test.Clash.Scoped.Evaluator.Differential (portedEnv, sameResult, scopedWhnf)
 
 -- | Evaluate with the ported reductions, as the subject of a case-expression
 evalSubj :: C.Term -> C.Term

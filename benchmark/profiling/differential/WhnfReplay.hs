@@ -51,8 +51,9 @@
   and through the adapter, and how many calls used the adapter at all. With
   @--call N@, it also lists the reductions of that call in order. With
   @--check-prims@, it also runs the adapter on every call of a ported
-  reduction, and compares the results ("Test.Clash.Scoped.Evaluator"): that
-  checks the ported reductions on the arguments they get in real designs.
+  reduction, and compares the results
+  ("Test.Clash.Scoped.Evaluator.Differential"): that checks the ported
+  reductions on the arguments they get in real designs.
 -}
 
 {-# LANGUAGE BangPatterns #-}
@@ -121,8 +122,8 @@ import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
 import Legacy (getLegacyTerm)
 
-import Test.Clash.Scoped.Evaluator (canonicalCoercions, readback, termSize)
-import qualified Test.Clash.Scoped.Evaluator as P
+import Test.Clash.Scoped.Evaluator.Differential (canonicalCoercions, readback, termSize)
+import qualified Test.Clash.Scoped.Evaluator.Differential as P
 
 -- | A dumped 'whnfRW' call
 data Call = Call

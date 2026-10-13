@@ -67,7 +67,7 @@ import Test.Clash.Rewrite
   ( hIntTy, heapLookupEvaluator, iHashDc, indexTcNm, indexTy, knownNatTy, mkTyConName
   , numTy, tcApp )
 import Test.Clash.Scoped (testTypeEnv)
-import Test.Clash.Scoped.Evaluator (portedEnv, scopedWhnf)
+import Test.Clash.Scoped.Evaluator.Differential (portedEnv, scopedWhnf)
 
 -- * Evaluating
 

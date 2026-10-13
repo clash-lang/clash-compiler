@@ -38,7 +38,7 @@ import Test.Clash.Rewrite
   , maybeTy, mkBindingMap, nilDc, numTy, pairDataCon, pairTy, tyVar
   , vecTy )
 import Test.Clash.Scoped (scopedWhnf, testTypeEnv)
-import Test.Clash.Scoped.Evaluator (scopedNfData)
+import Test.Clash.Scoped.Evaluator.Differential (scopedNfData)
 
 -- | Evaluate with the test types, no globals, and no primitives of Clash Core
 eval :: C.Term -> C.Term
