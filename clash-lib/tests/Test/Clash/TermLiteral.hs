@@ -3,11 +3,12 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Helpers for testing "Clash.Core.TermLiteral" and
-  "Clash.Core.Scoped.TermLiteral": encoding Haskell values as the Clash Core
-  terms the decoders expect, and generating values.
+  Helpers for testing "Clash.Core.Scoped.TermLiteral": encoding Haskell
+  values as the terms of scoped Clash Core that the decoders expect, and
+  generating values.
 -}
 
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -17,10 +18,10 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Clash.TermLiteral
-  ( ToCoreTerm (..)
-  , deriveToCoreTerm
+  ( ToScopedTerm (..)
+  , deriveToScopedTerm
   , deriveArbitrary
-  , coreDataCon
+  , scopedDataCon
   , textByteArrayTerm
   ) where
 
@@ -42,108 +43,114 @@ import Clash.Sized.Vector (Vec (Cons, Nil))
 
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Literal as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
+import qualified Clash.Core.Name as C
+import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
+import qualified Clash.Core.Type as C (LitTy (NumTy))
 
-import Test.Clash.Rewrite (intTy, mkTestDataCon)
+import Clash.Core.Scoped.Builder (runDataConSig)
+import Clash.Core.Scoped.Convert (mkDataCon, mkPrimInfo)
+import qualified Clash.Core.Scoped.Syntax as S
 
--- | Encode a value as a Clash Core term of the shape "Clash.GHC.GHC2Core"
--- makes for it, as far as the decoders of 'Clash.Core.TermLiteral.TermLiteral'
--- look. Type arguments and data constructor types are placeholders.
-class ToCoreTerm a where
-  toCoreTerm :: a -> C.Term
+import Test.Clash.Scoped (closedType)
+
+-- | Encode a value as a closed term of scoped Clash Core, of the shape
+-- "Clash.GHC.GHC2Core" makes for it, as far as the decoders of
+-- 'Clash.Core.Scoped.TermLiteral.TermLiteral' look. Type arguments and data
+-- constructor types are placeholders.
+class ToScopedTerm a where
+  toScopedTerm :: a -> S.Term 'S.VoidS
+
+-- | The placeholder type
+intTy :: S.Type 'S.VoidS
+intTy = closedType "Int"
 
 -- | A data constructor with the given fully qualified name, as the derived
--- decoders match on (see 'Clash.Core.TermLiteral.TH.deriveTermToData')
-coreDataCon :: String -> C.DataCon
-coreDataCon nm = mkTestDataCon nm (fromIntegral (Hashable.hash nm)) [] [] [] intTy
+-- decoders match on (see 'Clash.Core.Scoped.TermLiteral.TH')
+scopedDataCon :: String -> C.DataCon
+scopedDataCon nm =
+  mkDataCon (C.mkUnsafeName C.User (Text.pack nm) (fromIntegral (Hashable.hash nm))) 1 intTy
+    (runDataConSig [] [] []) [] []
+
+-- | A primitive with the given name and the placeholder type
+primInfo :: Text -> S.PrimInfo
+primInfo nm = mkPrimInfo nm intTy C.WorkNever C.SingleResult S.NoUnfolding
 
 -- | A data constructor application with type arguments and fields
-dataApp :: String -> Int -> [C.Term] -> C.Term
+dataApp :: String -> Int -> [S.Term 'S.VoidS] -> S.Term 'S.VoidS
 dataApp nm nTys fields =
-  C.mkApps
-    (C.Data (coreDataCon nm))
-    (replicate nTys (Right intTy) <> map Left fields)
+  foldl S.App (foldl S.TyApp (S.Data (scopedDataCon nm)) (replicate nTys intTy)) fields
 
 -- | A boxed literal, like @I# 3#@
-boxed :: String -> C.Literal -> C.Term
-boxed nm l = dataApp nm 0 [C.Literal l]
+boxed :: String -> C.Literal -> S.Term 'S.VoidS
+boxed nm l = dataApp nm 0 [S.Literal l]
 
 -- | A coercion, as "Clash.GHC.GHC2Core" makes for GADT equalities
-coercion :: C.Term
-coercion =
-  C.Prim (C.PrimInfo "_CO_" (C.ConstTy C.Arrow) C.WorkNever C.SingleResult C.NoUnfolding)
+coercion :: S.Term 'S.VoidS
+coercion = S.Prim (primInfo "_CO_")
 
-instance ToCoreTerm Int where
-  toCoreTerm = boxed "GHC.Types.I#" . C.IntLiteral . toInteger
+instance ToScopedTerm Int where
+  toScopedTerm = boxed "GHC.Types.I#" . C.IntLiteral . toInteger
 
-instance ToCoreTerm Word where
-  toCoreTerm = boxed "GHC.Types.W#" . C.WordLiteral . toInteger
+instance ToScopedTerm Word where
+  toScopedTerm = boxed "GHC.Types.W#" . C.WordLiteral . toInteger
 
-instance ToCoreTerm Char where
-  toCoreTerm = boxed "GHC.Types.C#" . C.CharLiteral
+instance ToScopedTerm Char where
+  toScopedTerm = boxed "GHC.Types.C#" . C.CharLiteral
 
-instance ToCoreTerm Integer where
-  toCoreTerm = C.Literal . C.IntegerLiteral
+instance ToScopedTerm Integer where
+  toScopedTerm = S.Literal . C.IntegerLiteral
 
-instance ToCoreTerm Natural where
-  toCoreTerm = C.Literal . C.NaturalLiteral . toInteger
+instance ToScopedTerm Natural where
+  toScopedTerm = S.Literal . C.NaturalLiteral . toInteger
 
-instance ToCoreTerm String where
-  toCoreTerm = C.App (C.Prim unpackCString) . C.Literal . C.StringLiteral
-   where
-    unpackCString =
-      C.PrimInfo "GHC.CString.unpackCString#" intTy C.WorkNever C.SingleResult C.NoUnfolding
+instance ToScopedTerm String where
+  toScopedTerm = S.App (S.Prim (primInfo "GHC.CString.unpackCString#")) . S.Literal . C.StringLiteral
 
 -- | @Text@ as an unpacked string literal; see 'textByteArrayTerm' for its
 -- other encoding
-instance ToCoreTerm Text where
-  toCoreTerm = toCoreTerm . Text.unpack
+instance ToScopedTerm Text where
+  toScopedTerm = toScopedTerm . Text.unpack
 
 -- | @Text@ as its internal byte array, offset, and length
-textByteArrayTerm :: Text -> C.Term
+textByteArrayTerm :: Text -> S.Term 'S.VoidS
 textByteArrayTerm (Text.Text (Text.ByteArray ba) off len) =
-  dataApp "Data.Text.Internal.Text" 0
-    [ C.Literal (C.ByteArrayLiteral (BA.ByteArray ba))
-    , C.Literal (C.IntLiteral (toInteger off))
-    , C.Literal (C.IntLiteral (toInteger len)) ]
+  dataApp "S.Data.Text.Internal.Text" 0
+    [ S.Literal (C.ByteArrayLiteral (BA.ByteArray ba))
+    , S.Literal (C.IntLiteral (toInteger off))
+    , S.Literal (C.IntLiteral (toInteger len)) ]
 
-instance KnownNat n => ToCoreTerm (Index n) where
-  toCoreTerm i =
-    C.mkApps
-      (C.Prim fromIntegerPrim)
-      [ Right (C.LitTy (C.NumTy (natToInteger @n)))
-      , Left (C.Literal (C.NaturalLiteral (natToInteger @n)))
-      , Left (C.Literal (C.IntegerLiteral (toInteger i))) ]
-   where
-    fromIntegerPrim =
-      C.PrimInfo "Clash.Sized.Internal.Index.fromInteger#" intTy C.WorkNever
-        C.SingleResult C.NoUnfolding
+instance KnownNat n => ToScopedTerm (Index n) where
+  toScopedTerm i =
+    S.App
+      (S.App
+        (S.TyApp (S.Prim (primInfo "Clash.Sized.Internal.Index.fromInteger#")) (S.LitTy (C.NumTy (natToInteger @n))))
+        (S.Literal (C.NaturalLiteral (natToInteger @n))))
+      (S.Literal (C.IntegerLiteral (toInteger i)))
 
-instance (ToCoreTerm a, ToCoreTerm b) => ToCoreTerm (a, b) where
-  toCoreTerm (a, b) = dataApp "GHC.Tuple.(,)" 2 [toCoreTerm a, toCoreTerm b]
+instance (ToScopedTerm a, ToScopedTerm b) => ToScopedTerm (a, b) where
+  toScopedTerm (a, b) = dataApp "GHC.Tuple.(,)" 2 [toScopedTerm a, toScopedTerm b]
 
-instance ToCoreTerm a => ToCoreTerm (Vec n a) where
-  toCoreTerm = \case
+instance ToScopedTerm a => ToScopedTerm (Vec n a) where
+  toScopedTerm = \case
     Nil -> dataApp (show 'Nil) 2 [coercion]
-    Cons x xs -> dataApp (show 'Cons) 3 [coercion, toCoreTerm x, toCoreTerm xs]
+    Cons x xs -> dataApp (show 'Cons) 3 [coercion, toScopedTerm x, toScopedTerm xs]
 
--- | Derive a 'ToCoreTerm' instance for a data type: a constructor @C@ with
+-- | Derive a 'ToScopedTerm' instance for a data type: a constructor @C@ with
 -- fields @x1 .. xk@ of a type with @m@ parameters becomes the application of
 -- the data constructor named @show 'C@ to @m@ type arguments and the
 -- encoded fields.
-deriveToCoreTerm :: Name -> Q [Dec]
-deriveToCoreTerm typName = do
+deriveToScopedTerm :: Name -> Q [Dec]
+deriveToScopedTerm typName = do
   (typeVars, constrs) <- reifyData typName
   clauses <- mapM (mkClause (length typeVars)) constrs
   let
     ty = foldl AppT (ConT typName) (map VarT typeVars)
-    ctxt = [ConT ''ToCoreTerm `AppT` VarT tv | tv <- typeVars]
-  pure [InstanceD Nothing ctxt (ConT ''ToCoreTerm `AppT` ty) [FunD 'toCoreTerm clauses]]
+    ctxt = [ConT ''ToScopedTerm `AppT` VarT tv | tv <- typeVars]
+  pure [InstanceD Nothing ctxt (ConT ''ToScopedTerm `AppT` ty) [FunD 'toScopedTerm clauses]]
  where
   mkClause nTys (cName, nFields) = do
     xs <- mapM (\i -> newName ("x" <> show i)) [1 .. nFields]
-    body <- [| dataApp $(lift (show cName)) nTys $(listE [ [| toCoreTerm $(varE x) |] | x <- xs ]) |]
+    body <- [| dataApp $(lift (show cName)) nTys $(listE [ [| toScopedTerm $(varE x) |] | x <- xs ]) |]
     pure (Clause [ConP cName [] (map VarP xs)] (NormalB body) [])
 
 -- | Derive an 'Arbitrary' instance for a data type, choosing a constructor
