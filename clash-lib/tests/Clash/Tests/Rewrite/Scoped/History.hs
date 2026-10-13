@@ -14,6 +14,7 @@
 module Clash.Tests.Rewrite.Scoped.History (tests) where
 
 import Data.Binary (decode, encode)
+import Data.Binary.Put (runPut)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
@@ -26,7 +27,8 @@ import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars (freeTmVars, freeTyVars, hasFreeVars)
 import Clash.Core.Scoped.NameMap (nameSetToList)
 import Clash.Core.Scoped.Syntax
-import Clash.Rewrite.Scoped.History (closeRewriteStep)
+import Clash.Core.Scoped.Binary (putHeader)
+import Clash.Rewrite.Scoped.History (closeRewriteStep, decodeRewriteHistory)
 import Clash.Rewrite.Types (RewriteStep (..))
 
 import Test.Clash.Rewrite (intId)
@@ -51,6 +53,14 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.History"
         t_free st @?= 2
         assertBool "before" (aeqTm (t_before st) (fromClashTermClosed (C.Lam x (C.Lam y (C.Var x)))))
         assertBool "after" (aeqTm (t_after st) (fromClashTermClosed (C.Lam x (C.Lam y (C.Var y)))))
+
+  , testCase "a history is the header followed by steps" $ do
+      let x = intId C.User "x" 1
+          st1 = closeRewriteStep "t1" "f" (fromClashTermClosed (C.Lam x (C.Var x))) (fromClashTermClosed (C.Lam x (C.Var x)))
+          st2 = st1 {t_name = "t2", t_free = 3}
+          hist = decodeRewriteHistory (runPut putHeader <> encode st1 <> encode st2)
+      map t_name hist @?= ["t1", "t2"]
+      map t_free hist @?= [0, 3]
 
   , withTests 300 $ testProperty "closes over the free variables of a term" $
       forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->

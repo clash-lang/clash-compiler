@@ -4,7 +4,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The rewrite history of @-fclash-debug-history@: a file of 'RewriteStep's,
-  which @clash-term@ shows.
+  which @clash-term@ shows. It starts with the header of the files of scoped
+  Clash Core ('Clash.Core.Scoped.Binary.putHeader').
 
   A transformation rewrites a subterm, which may mention variables bound
   around it. A step stores closed terms: the term before and the term after
@@ -19,8 +20,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Clash.Rewrite.Scoped.History
-  ( recordRewriteStep
+  ( startRewriteHistory
+  , recordRewriteStep
   , closeRewriteStep
+  , decodeRewriteHistory
   ) where
 
 import           Control.Concurrent.MVar     (MVar, newMVar, withMVar)
@@ -28,7 +31,9 @@ import           Control.Exception           (evaluate)
 import qualified Control.Lens                as Lens
 import           Control.Monad               (forM_)
 import           Control.Monad.IO.Class      (liftIO)
-import           Data.Binary                 (encode)
+import           Data.Binary                 (encode, get)
+import           Data.Binary.Get             (runGetOrFail)
+import           Data.Binary.Put             (runPut)
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Lazy        as BL
 import           GHC.Stack                   (HasCallStack)
@@ -37,10 +42,28 @@ import           System.IO.Unsafe            (unsafePerformIO)
 import           Clash.Driver.Types          (DebugOpts (..))
 import           Clash.Rewrite.Types         (RewriteMonad, RewriteStep (..), debugOpts)
 
+import           Clash.Core.Scoped.Binary    (getHeader, putHeader)
 import           Clash.Core.Scoped.Subst     (Closure (..), closeOver, freeVarOccs)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term      (mkLams, mkTyLams)
 import           Clash.Rewrite.Scoped.Util   (dependencySortTyVars)
+
+-- | Start a rewrite history: a file with just the header
+startRewriteHistory :: FilePath -> IO ()
+startRewriteHistory file = BL.writeFile file (runPut putHeader)
+
+-- | The steps of a rewrite history. Errors if it doesn't start with the
+-- header, or if a step can't be decoded.
+decodeRewriteHistory :: HasCallStack => BL.ByteString -> [RewriteStep]
+decodeRewriteHistory bs0 = case runGetOrFail getHeader bs0 of
+  Left (_, _, err) -> error ("decodeRewriteHistory: " <> err)
+  Right (bs1, _, ()) -> go bs1
+ where
+  go bs
+    | BL.null bs = []
+    | otherwise = case runGetOrFail get bs of
+        Left (_, off, err) -> error ("decodeRewriteHistory: " <> err <> ", at byte " <> show off)
+        Right (rest, _, st) -> st : go rest
 
 -- | Append a step to the rewrite history, if @-fclash-debug-history@ is on
 recordRewriteStep

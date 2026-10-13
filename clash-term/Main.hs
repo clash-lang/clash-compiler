@@ -12,7 +12,6 @@
 
 module Main (main) where
 
-import Data.Binary (Binary, decodeOrFail)
 import Data.List   (find)
 import Data.Maybe  (fromJust)
 import qualified Data.ByteString.Lazy as BL
@@ -20,6 +19,7 @@ import qualified Data.ByteString.Lazy as BL
 import Clash.Core.Scoped.Syntax  (S (VoidS))
 import qualified Clash.Core.Scoped.Syntax as S
 import Clash.Core.Scoped.Pretty ()
+import Clash.Rewrite.Scoped.History (decodeRewriteHistory)
 import Clash.Rewrite.Types (RewriteStep (..))
 import Clash.Core.Pretty   ( ClashDoc, ClashAnnotation (..), SyntaxElement (..)
                            , PrettyOptions (..), SubtermPos )
@@ -37,20 +37,6 @@ main = RW.runTerminal @Term "clash-term/theme.ini"
 
 -------------------------------
 -- Clash instance for Diff.
-decodeList :: forall a. Binary a => FilePath -> IO [a]
-decodeList fn = do
-  bytes <- BL.readFile fn
-  return (go bytes)
-  where
-    go :: BL.ByteString -> [a]
-    go s
-      | BL.null s
-      = []
-      | otherwise
-      = case decodeOrFail @a s of
-          Right (s', _, x) -> x : go s'
-          Left  _          -> error "malformed history"
-
 -- | The steps record no context: every step shows the closed term before and
 -- after the transformation, abstracted over its free variables. The printer
 -- of scoped Clash Core marks subterms by their position ('SubtermPos').
@@ -60,7 +46,7 @@ instance Diff Term where
   type Ctx     Term = SubtermPos
 
   readHistory :: FilePath -> IO (History Term SubtermPos)
-  readHistory fname = map go <$> decodeList @RewriteStep fname
+  readHistory fname = map go . decodeRewriteHistory <$> BL.readFile fname
     where
       go :: RewriteStep -> HStep Term SubtermPos
       go st@(RewriteStep {}) = HStep { _ctx    = []
