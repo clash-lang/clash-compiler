@@ -33,9 +33,6 @@ import GHC.Stack (HasCallStack)
 import Clash.Annotations.Primitive (extractPrim)
 import qualified Clash.Core.Name as C (mkUnsafeSystemName)
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C (Type (..), mkFunTy)
-import Clash.Core.TysPrim (liftedTypeKind)
-import qualified Clash.Core.Var as C (mkTyVar)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..))
@@ -45,13 +42,14 @@ import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.HasType (primInfoType)
 import Clash.Core.Scoped.Subst
-  (Subst, idSubst, substScope, substTy, substTyBinder, withFreshIdBinders)
+  (Subst, idSubst, substScope, substTy, substTyBinder, withFreshIdBinders, withFreshTyBinder)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
+import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.Term (mkApps, mkLams, mkTmApps, mkTyApps, mkTyLams)
 import Clash.Core.Scoped.TermInfo (MultiPrimInfo (..), multiPrimInfo')
 import Clash.Core.Scoped.Type
-  (PiTele (..), SplitFunForall (..), TypeView (..), splitFunForallTy, tyView)
+  (PiTele (..), SplitFunForall (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
+import Clash.Core.Scoped.TysPrim (liftedTypeKind)
 import Clash.Core.Scoped.Util (internalName, listToLets)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
 
@@ -95,7 +93,7 @@ setupMultiResultPrimWorker _ctx node _primInfo = return node
 -- @
 setupMultiResultPrim' :: (HasCallStack, Distinct n) => TyConMap -> Scope n -> PrimInfo -> Term n
 setupMultiResultPrim' tcm sc pInfo =
-  case splitFunForallTy (primInfoType sc pInfo) of
+  case splitFunForallTy (primInfoType pInfo) of
     SplitFunForall tele res -> openPi (idSubst sc) tele res $ \scT tvs tyVars argTys resTy ->
       let
         resTypes = case tyView resTy of
@@ -114,7 +112,7 @@ setupMultiResultPrim' tcm sc pInfo =
                   resTypesL = map sink resTypes
                   multiPrimBind =
                     mkApps
-                      (Prim (mkPrimInfoFromClash (primLegacy pInfo) {C.primMultiResult = C.MultiResult}))
+                      (Prim (multiResultPrimInfo pInfo))
                       (map (Right . sink) tyVars ++ map Left (map sink argVs ++ resVs))
                   multiPrimSelect r t =
                     mkApps (Prim multiPrimSelectInfo) [Right t, Right resTyL, Left r, Left resV]
@@ -129,20 +127,23 @@ setupMultiResultPrim' tcm sc pInfo =
  where
   MultiPrimInfo{mpi_resultDc = tupDc} = multiPrimInfo' tcm pInfo
 
-  multiPrimSelectInfo = mkPrimInfoFromClash C.PrimInfo
-    { C.primName = "c$multiPrimSelect"
-    , C.primType =
-        C.ForAllTy selA (C.ForAllTy selB
-          (C.mkFunTy (C.VarTy selA) (C.mkFunTy (C.VarTy selB) (C.VarTy selA))))
-    , C.primWorkInfo = C.WorkAlways
-    , C.primMultiResult = C.SingleResult
-    , C.primUnfolding = C.NoUnfolding
-    }
+-- | The primitive with multiple results
+multiResultPrimInfo :: PrimInfo -> PrimInfo
+multiResultPrimInfo p =
+  mkPrimInfo (primName p) (primType p) (primWorkInfo p) C.MultiResult (primUnfolding p)
 
-  -- forall a b. a -> b -> a, see
-  -- 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
-  selA = C.mkTyVar liftedTypeKind (C.mkUnsafeSystemName "a" 0)
-  selB = C.mkTyVar liftedTypeKind (C.mkUnsafeSystemName "b" 1)
+-- | The primitive that selects a result of a multi-result primitive, of type
+-- @forall a b. a -> b -> a@, see
+-- 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
+multiPrimSelectInfo :: PrimInfo
+multiPrimSelectInfo =
+  mkPrimInfo "c$multiPrimSelect" selTy C.WorkAlways C.SingleResult NoUnfolding
+ where
+  selTy =
+    withFreshTyBinder emptyScope (C.mkUnsafeSystemName "a" 0) liftedTypeKind $ \sc1 a ->
+      withFreshTyBinder sc1 (C.mkUnsafeSystemName "b" 1) liftedTypeKind $ \_ b ->
+        ForAllTy a (ForAllTy b
+          (mkFunTy (sink (tyBinderVar a)) (mkFunTy (tyBinderVar b) (sink (tyBinderVar a)))))
 
 -- | Go under the quantified type variables of a polymorphic function type.
 -- Gives their binders, the type variables, the argument types and the

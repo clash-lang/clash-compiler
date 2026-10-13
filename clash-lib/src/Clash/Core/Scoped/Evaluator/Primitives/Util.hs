@@ -370,7 +370,7 @@ mkPrimStepContext pc = PrimStepContext{..}
   pInfo = pcInfo pc
   tys = pcTys pc
   args = pcArgs pc
-  ty = primInfoType sc pInfo
+  ty = primInfoType pInfo
 
   checkNaturalRange1 nTy i f =
     checkNaturalRange nTy [i] (\case [i'] -> naturalToNaturalLiteral (f i'); _ -> unreachable)

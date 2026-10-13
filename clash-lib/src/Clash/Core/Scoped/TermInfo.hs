@@ -9,14 +9,13 @@
   Note that 'isVar' holds for local and global variables alike, like its
   counterpart on Clash Core, while 'isLocalVar' and 'isGlobalVar' tell them
   apart.
-
-  The functions on multi-result primitives that only look at a 'PrimInfo'
-  are the ones of "Clash.Core.TermInfo", on its 'primLegacy' (TODO(D4)).
 -}
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Clash.Core.Scoped.TermInfo
   ( -- * Measures
@@ -36,39 +35,85 @@ module Clash.Core.Scoped.TermInfo
   , isCast
   , isClosed
     -- * Multi-result primitives
-  , C.MultiPrimInfo (..)
+  , MultiPrimInfo (..)
   , multiPrimInfo
   , multiPrimInfo'
+  , withMultiPrimResultTypes
   , splitMultiPrimArgs
   ) where
 
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import GHC.Stack (HasCallStack)
 
-import qualified Clash.Core.Term as C
-import Clash.Core.TyCon (TyConMap)
-import qualified Clash.Core.TermInfo as C
+import Clash.Core.DataCon (DataCon)
+import Clash.Core.TyCon (TyConMap, isTupleTyConLike, tyConDataCons)
+import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.FreeVars (hasFreeVars)
+import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Scoped.Subst (openTyBinder)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs)
-import Clash.Core.Scoped.Type (isFunTy, isPolyFunCoreTy)
+import Clash.Core.Scoped.Type
+  (SplitFunForall (..), TypeView (..), isFunTy, isPolyFunCoreTy, splitFunForallTy, tyView)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 -- * Multi-result primitives
 
--- | See 'C.multiPrimInfo'
-multiPrimInfo :: TyConMap -> PrimInfo -> Maybe C.MultiPrimInfo
-multiPrimInfo tcm = C.multiPrimInfo tcm . primLegacy
+-- | A multi-result primitive, see 'Clash.Core.TermInfo.multiPrimInfo'
+data MultiPrimInfo = MultiPrimInfo
+  { mpi_primInfo :: PrimInfo
+  , mpi_resultDc :: DataCon
+  -- ^ The data constructor of the tuple that the primitive returns
+  , mpi_resultCount :: Int
+  -- ^ The number of its results
+  }
 
--- | See 'C.multiPrimInfo''
-multiPrimInfo' :: HasCallStack => TyConMap -> PrimInfo -> C.MultiPrimInfo
-multiPrimInfo' tcm = C.multiPrimInfo' tcm . primLegacy
+-- | The multi-result primitive, if the result type of the type of the
+-- primitive (its 'primType') is a tuple. See
+-- 'Clash.Core.TermInfo.multiPrimInfo'.
+multiPrimInfo :: TyConMap -> PrimInfo -> Maybe MultiPrimInfo
+multiPrimInfo tcm p
+  | SplitFunForall _ res <- splitFunForallTy (primType p)
+  , TyConApp tupTcNm tupEls <- tyView res
+    -- XXX: Hardcoded for tuples
+  , isTupleTyConLike tupTcNm
+  , Just tupTc <- UniqMap.lookup tupTcNm tcm
+  , [tupDc] <- tyConDataCons tupTc
+  = Just (MultiPrimInfo p tupDc (length tupEls))
+  | otherwise
+  = Nothing
+
+-- | Same as 'multiPrimInfo', but errors if the primitive has no tuple result
+multiPrimInfo' :: HasCallStack => TyConMap -> PrimInfo -> MultiPrimInfo
+multiPrimInfo' tcm p = fromMaybe (error msg) (multiPrimInfo tcm p)
+ where
+  msg =
+    "Internal error in multiPrimInfo': could not produce MultiPrimInfo. This "
+      <> "probably means a multi result blackbox's result type was not a tuple. "
+      <> "PrimInfo:\n\n" <> show p
+
+-- | The types of the results of a multi-result primitive: the types of the
+-- tuple that its 'primType' returns, in the scope of its quantified type
+-- variables
+withMultiPrimResultTypes
+  :: forall r. HasCallStack
+  => PrimInfo
+  -> (forall l. Distinct l => Scope l -> [Type l] -> r)
+  -> r
+withMultiPrimResultTypes p k = go emptyScope (primType p)
+ where
+  go :: Distinct x => Scope x -> Type x -> r
+  go sc ty = case ty of
+    ForAllTy b res -> openTyBinder sc b res $ \sc' _ res' -> go sc' res'
+    (tyView -> FunTy _ res) -> go sc res
+    (tyView -> TyConApp _ tys) -> k sc tys
+    _ -> error ("withMultiPrimResultTypes: not a tuple: " <> show (primType p))
 
 -- * Measures
 
--- | The size of a term, see 'C.termSize'
+-- | The size of a term, see 'Clash.Core.TermInfo.termSize'
 termSize :: Term n -> Word
 termSize = \case
   Var {} -> 1
@@ -91,7 +136,7 @@ data SomeTerm where
   SomeTerm :: Term n -> SomeTerm
 
 -- | @termSizeSmallerThan n t@ is @'termSize' t < n@, but stops traversing @t@
--- as soon as the size reaches @n@, see 'C.termSizeSmallerThan'
+-- as soon as the size reaches @n@, see 'Clash.Core.TermInfo.termSizeSmallerThan'
 termSizeSmallerThan :: Word -> Term n -> Bool
 termSizeSmallerThan n t0
   | n == 0 = False
@@ -188,12 +233,12 @@ isClosed = not . hasFreeVars
 -- * Multi-result primitives
 
 -- | Split the arguments of a multi-result primitive in its normal arguments,
--- and the variables it assigns its results to, see 'C.splitMultiPrimArgs'.
+-- and the variables it assigns its results to, see 'Clash.Core.TermInfo.splitMultiPrimArgs'.
 -- The latter are the arguments that are local variables ('Var').
 splitMultiPrimArgs
-  :: C.MultiPrimInfo
+  :: MultiPrimInfo
   -> [Either (Term n) (Type n)]
   -> ([Either (Term n) (Type n)], [Term n])
 splitMultiPrimArgs mpi args0 = (args1, [v | Left v@Var {} <- resArgs])
  where
-  (args1, resArgs) = splitAt (length args0 - length (C.mpi_resultTypes mpi)) args0
+  (args1, resArgs) = splitAt (length args0 - mpi_resultCount mpi) args0

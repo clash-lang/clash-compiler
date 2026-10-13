@@ -103,7 +103,8 @@ import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNam
 import           Clash.Core.Scoped.Subst
   (openAlt, openBind, patVars, teleIdBinderTypes, teleIdVars)
 import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.TermInfo       (multiPrimInfo', splitMultiPrimArgs)
+import           Clash.Core.Scoped.TermInfo
+  (multiPrimInfo', splitMultiPrimArgs, withMultiPrimResultTypes)
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 
@@ -273,10 +274,10 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
         netdecl i typ resInit =
           NetDecl' srcNote (termIdentifier ctx i) typ resInit
 
-      -- Like the type of the primitive, these are Clash Core types, which can
-      -- mention its quantified type variables. TODO(D4): translate scoped
-      -- types once 'C.PrimInfo' carries one.
-      hwTys <- mapM (Legacy.unsafeCoreTypeToHWTypeM' $(curLoc)) (C.mpi_resultTypes mpInfo)
+      -- The result types of the type of the primitive, which can mention its
+      -- quantified type variables
+      hwTys <- withMultiPrimResultTypes pInfo $ \sc tys ->
+        mapM (unsafeCoreTypeToHWTypeM' $(curLoc) sc) tys
       pure (zipWith3 netdecl res hwTys resInits1)
 
     singleDecl srcNote hwTy = do

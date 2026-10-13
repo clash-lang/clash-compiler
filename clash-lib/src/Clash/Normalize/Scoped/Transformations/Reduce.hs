@@ -54,9 +54,7 @@ import qualified Clash.Core.Name as C
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Term (WorkInfo (..))
-import qualified Clash.Core.Term as C (PrimInfo (..))
 import Clash.Core.TyCon (TyCon (..), tyConDataCons)
-import qualified Clash.Core.Type as C
 import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
 import Clash.Normalize.Scoped.Primitives (removedArg)
 import Clash.Normalize.Types (NormalizeSession)
@@ -174,7 +172,7 @@ reducePrimWorker ctx e _appFunction _appArgument = case ctxFrames ctx of
       -- handler it is only inferred when the primitive's declared type shows a
       -- @Vec@ result is possible at all. That rules out the vast majority of
       -- them.
-      if Maybe.isNothing handlerM && not (mayReturnVec te (C.primType (primLegacy p)))
+      if Maybe.isNothing handlerM && not (mayReturnVec te (primType p))
       then return e
       else do
         let eTy = inferCoreTypeOf te sc e
@@ -238,19 +236,19 @@ zeroLengthVecTerm te sc tv
 -- 'Clash.Sized.Vector.Vec' at its head? See
 -- 'Clash.Normalize.Transformations.Reduce.mayReturnVec'.
 --
--- This looks at the declared type of the primitive, which is a closed type of
--- Clash Core in its t'PrimInfo', without converting it: this check is there
--- to avoid work for the vast majority of primitives.
-mayReturnVec :: TypeEnv -> C.Type -> Bool
-mayReturnVec te ty = case C.tyView (snd (C.splitFunForallTy ty)) of
-  C.TyConApp tcNm _
-    | nameOcc tcNm == vecTcName -> True
-    | otherwise -> case lookupTyCon te tcNm of
-        -- Type families might reduce to a 'Vec'
-        Just FunTyCon{} -> True
-        Just _ -> False
-        Nothing -> True
-  _ -> True
+-- This looks at the declared type of the primitive, its 'primType': this check
+-- is there to avoid work for the vast majority of primitives.
+mayReturnVec :: TypeEnv -> Type n -> Bool
+mayReturnVec te ty = case splitFunForallTy ty of
+  SplitFunForall _ res -> case tyView res of
+    TyConApp tcNm _
+      | nameOcc tcNm == vecTcName -> True
+      | otherwise -> case lookupTyCon te tcNm of
+          -- Type families might reduce to a 'Vec'
+          Just FunTyCon{} -> True
+          Just _ -> False
+          Nothing -> True
+    _ -> True
 
 -- | Everything the handlers in 'reducePrimImpls' receive from the dispatch
 -- site in 'reducePrim'
@@ -328,7 +326,7 @@ isSplit rpc = Maybe.isJust . shouldSplit (typeEnv rpc) (rpcScope rpc)
 -- argument that is a quantified type variable.
 primArgTys :: Distinct n => ReducePrimContext n -> [Type n] -> [Type n]
 primArgTys rpc tys =
-  case splitFunForallTy (piResultTys te sc (primInfoType sc (primInfo rpc)) tys) of
+  case splitFunForallTy (piResultTys te sc (primInfoType (primInfo rpc)) tys) of
     SplitFunForall tele _ -> leadingArgs tele
  where
   te = typeEnv rpc

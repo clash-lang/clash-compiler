@@ -110,8 +110,6 @@ import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Term as C (PrimInfo (..))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding)
 import qualified Clash.Normalize.Scoped.Primitives as NP
@@ -138,7 +136,7 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.Type
-  (TypeView (..), coreView, mkTyConApp, splitFunTy, tyView)
+  (TypeView (..), coreView, mkTyConApp, splitFunTy, tyView, SplitFunForall (..), anyPiArg, isPolyFunTy, splitFunForallTy)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, dataConSigOf, typeEnvTyConMap)
 import Clash.Core.Scoped.Util (internalName, mkSelectorCase)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Letrec
@@ -579,7 +577,7 @@ interestingPrim env sc pInfo args ticks =
   case List.lookup (primName pInfo) interestingPrims of
     Just t | t || anyArgNotConstant -> True
     _ | any isDeDup ticks -> True
-    _ -> isHOTy (C.primType (primLegacy pInfo)) && any (isInterestingApp env sc) lArgs
+    _ -> isHOTy (primType pInfo) && any (isInterestingApp env sc) lArgs
  where
   lArgs = Either.lefts args
   anyArgNotConstant = any (not . isConstant) lArgs
@@ -633,8 +631,8 @@ interestingPrim env sc pInfo args ticks =
       [a,b] -> not (termIsPow2 env sc a) && not (termIsPow2 env sc b)
       (_:rest) -> go rest
 
-  isHOTy t = case C.splitFunForallTy t of
-    (args', _) -> any C.isPolyFunTy (Either.rights args')
+  isHOTy t = case splitFunForallTy t of
+    SplitFunForall tele _ -> anyPiArg isPolyFunTy tele
 
 -- | Whether a term evaluates to a power of two (or zero), see
 -- 'Clash.Normalize.Transformations.DEC.interestingToLift'. Evaluates without

@@ -117,12 +117,13 @@ tests = testGroup "Clash.Tests.Core.Scoped.TermInfo"
   , testCase "isClosed" $
       assertAgreesOnExamples C.isClosed (const isClosed)
   , testCase "splitMultiPrimArgs" $ do
-      let mpi = C.MultiPrimInfo undefined undefined [intTy, intTy]
+      let mpiC = C.MultiPrimInfo undefined undefined [intTy, intTy]
+          mpi = MultiPrimInfo undefined undefined 2
           r1 = intId C.User "r1" 1
           r2 = intId C.User "r2" 2
           i = intId C.User "i" 3
           args = [Right intTy, Left (C.Var i), Left (C.Var r1), Left (C.Var r2)]
-          (argsC, resC) = C.splitMultiPrimArgs mpi args
+          (argsC, resC) = C.splitMultiPrimArgs mpiC args
       withFreeVarsOf [C.Var r1, C.Var r2, C.Var i] $ \env -> do
         let (args1, res) =
               splitMultiPrimArgs mpi
