@@ -68,7 +68,7 @@ import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.DataCon      (dcExtTyVars)
-import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc, tyConDataCons)
+import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc, tyConDataCons, tyConName)
 import           Clash.Core.Scoped.TysPrim (tysPrimMap)
 import           Clash.Core.Util         (dataConInstArgTys, mkInternalVar, mkSelectorCase)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
@@ -87,12 +87,13 @@ import           Clash.Driver.Types      (Binding(..), IsPrim(..), ClashEnv(..),
 import           Clash.Driver.Warning    (warnAbout, warnAboutM)
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToGlobalIdB, coreToId, coreToName, coreToTerm,
-   makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
+   makeAllTyCons, makeAllTyConsClash, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Core.Scoped.Builder
   (TmB, caseB, clashTyB, dataAltB, lamB, letrecB, runClosedTerm, tyLamClashB, varB)
-import           Clash.GHC.Scoped.Check  (Outcome (..), compareTerms, compareTypes, primAtTypeShape)
+import           Clash.GHC.Scoped.Check
+  (Outcome (..), compareTerms, compareTyCons, compareTypes, primAtTypeShape)
 import           Clash.GHC.Scoped.GHC2Core (coreToTermB, coreToTypeB, varKey)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
@@ -186,7 +187,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   checkLog <- lookupEnv "CLASH_DEBUG_CHECK_GHC2CORE"
   forM_ checkLog $ \logFile ->
     checkGHC2Core logFile modName c2cEnv primMapC bindings clsOps unlocatable
-      allTcCache tcMap allBindings
+      allTcCache tcCache tcMap allBindings
 
   return
     ( ClashEnv
@@ -356,10 +357,11 @@ checkGHC2Core
   -> [(GHC.CoreBndr,Int)]
   -> [GHC.CoreBndr]
   -> TyConMap
+  -> TyConMap
   -> GHC2CoreState
   -> VarEnv (Binding (S.Term 'VoidS))
   -> IO ()
-checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm st new = do
+checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm tcCache st new = do
   let
     ((bindingsMap, clsVMap), stClash, _) =
       RWS.runRWS (mkBindings (processBindClash primMap unlocatable) bindings clsOps)
@@ -398,8 +400,16 @@ checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm st new
     tcsClash = UniqMap.keys (stClash ^. tyConMap)
     tcs = UniqMap.keys (st ^. tyConMap)
     tyConsSame = IS.fromList (map fromIntegral tcsClash) == IS.fromList (map fromIntegral tcs)
+    GHC2CoreEnv _ fiEnvs opts = env
+    tcCacheClash = makeAllTyConsClash opts (fst (mkTupTyCons opts stClash)) fiEnvs
+    tyConDiffs =
+      [ Text.unpack (nameOcc (tyConName tc)) <> ": " <> d
+      | tc <- UniqMap.elems tcCacheClash
+      , Just d <- [maybe (Just "missing") (compareTyCons tc) (UniqMap.lookup (tyConName tc) tcCache)] ]
+      <> [ Text.unpack (nameOcc (tyConName tc)) <> ": extra"
+         | tc <- UniqMap.elems tcCache, not (UniqMap.elem (tyConName tc) tcCacheClash) ]
     warnings = (length (stClash ^. pendingWarnings), length (st ^. pendingWarnings))
-    ok = null different && tyConsSame && missing == 0 && uncurry (==) warnings
+    ok = null different && tyConsSame && null tyConDiffs && missing == 0 && uncurry (==) warnings
     detail kind (nm, d) = kind <> " " <> Text.unpack nm <> ": " <> d
     report = unlines $
       [ modName <> ": " <> show (length outcomes) <> " bindings, "
@@ -407,8 +417,11 @@ checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm st new
           <> show (length alpha) <> " alpha-equivalent, "
           <> show (length different) <> " different, "
           <> show missing <> " extra; type constructors "
-          <> (if tyConsSame then "equal" else "DIFFERENT") <> "; warnings "
+          <> (if tyConsSame then "equal" else "DIFFERENT") <> ", "
+          <> show (length (UniqMap.elems tcCacheClash)) <> " converted, "
+          <> show (length tyConDiffs) <> " different; warnings "
           <> show warnings ]
+      <> map ("  TYCON " <>) (take 20 tyConDiffs)
       <> map (detail "  ALPHA") (take 5 alpha)
       <> map (detail "  DIFFERENT") (take 20 different)
   appendFile logFile report

@@ -35,6 +35,7 @@ module Clash.GHC.GHC2Core
   , qualifiedNameString
   , qualifiedNameString'
   , makeAllTyCons
+  , makeAllTyConsClash
   , emptyGHC2CoreState
   , pendingWarnings
     -- * Types of scoped Core
@@ -74,7 +75,10 @@ import           Data.Char                   (isDigit)
 import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
-import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
+#if !MIN_VERSION_base(4,20,0)
+import           Data.List                   (foldl')
+#endif
+import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe,mapMaybe)
 import           Data.Sequence               (Seq, (|>))
 import qualified Data.Sequence               as Seq
 import           Data.Text                   (Text, pack)
@@ -147,6 +151,7 @@ import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
 import GHC.Types.Var
   (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
    varUnique, idInfo, isGlobalId)
+import GHC.Types.Var.Env (lookupVarEnv, mkVarEnv)
 import GHC.Types.Var.Set (elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet)
 
 -- Local imports
@@ -162,8 +167,9 @@ import qualified Clash.Core.Type             as C
 import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
 import qualified Clash.Core.Var              as C
 import qualified Clash.Core.Scoped.Convert   as C
-  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash, mkNewTyConRhsFromClash,
-   mkPrimTyConFromClash, mkPromotedDataConFromClash)
+  (mkAlgTyCon, mkAlgTyConFromClash, mkDataConFromClash, mkFunTyCon,
+   mkFunTyConFromClash, mkNewTyConRhs, mkNewTyConRhsFromClash, mkPrimTyCon,
+   mkPrimTyConFromClash, mkPromotedDataCon, mkPromotedDataConFromClash)
 import qualified Clash.Data.UniqMap          as C
 import           Clash.Driver.Types          (ClashOpts, HasClashOpts(..))
 import           Clash.Driver.Warning        (CanWarn(..), PendingWarning)
@@ -174,8 +180,9 @@ import           Clash.Util
 import           Clash.GHC.Util
 import           Clash.Core.Scoped.Builder
   (Key, TyB, annTyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, runClosedType,
-   runDataConSig, uniqueKey, varTyB)
+   runDataConSig, runNewTyConSig, runTyFamEqn, uniqueKey, varTyB)
 import           Clash.Core.Scoped.Convert   (mkDataCon, mkGlobalId)
+import           Clash.Core.Scoped.Sig       (TyFamEqn)
 import qualified Clash.Core.Scoped.Syntax    as S
 
 instance Hashable Name where
@@ -314,6 +321,9 @@ instance Monoid SrcSpanRB where
 
 type C2C = RWS GHC2CoreEnv SrcSpanRB GHC2CoreState
 
+-- | Convert the type constructors that the conversion of terms found, and
+-- those that converting these finds, and so on. Their types are built from
+-- GHC's types ('coreToTypeB').
 makeAllTyCons
   :: ClashOpts
   -> GHC2CoreState
@@ -330,9 +340,146 @@ makeAllTyCons opts hm fiEnvs = go hm hm
                                    old
         tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
 
+-- | Convert a type constructor. Like 'makeTyConClash', which converts through
+-- the types of Clash Core, and looks up the same names in the same order.
 makeTyCon :: TyCon
           -> C2C C.TyCon
 makeTyCon tc = tycon
+  where
+    tycon
+      | isFamilyTyCon tc    = mkFunTyCon
+      | isTupleTyCon tc     = mkTupleTyCon
+      | isAlgTyCon tc       = mkAlgTyCon
+      | isPrimTyCon tc      = mkPrimTyCon
+      | Just dc <- isPromotedDataCon_maybe tc = mkPromotedDataCon dc
+      | otherwise           = mkPrimTyCon
+      where
+        tcArity = tyConArity tc
+        tcName = coreToName tyConName tyConUnique qualifiedNameString tc
+        tcKind = runClosedType <$> coreToTypeB (tyConKind tc)
+
+        mkAlgTyCon = do
+          nm <- tcName
+          k <- tcKind
+          tcRhsM <- makeAlgTyConRhs tc $ algTyConRhs tc
+          case tcRhsM of
+            Just tcRhs -> return (C.mkAlgTyCon nm k tcArity tcRhs (isClassTyCon tc))
+            Nothing -> return (C.mkPrimTyCon nm k tcArity)
+
+        mkFunTyCon = do
+          nm <- tcName
+          k <- tcKind
+          envs <- view famInstEnvs
+          eqns <- case isClosedSynFamilyTyConWithAxiom_maybe tc of
+            Nothing -> mapM (\fi -> tyFamEqnB envs (fi_tys fi) (fi_rhs fi))
+                            (familyInstances envs tc)
+            Just cx -> mapM (\b -> tyFamEqnB envs (cab_lhs b) (cab_rhs b))
+                            (fromBranches (co_ax_branches cx))
+          return (C.mkFunTyCon nm k tcArity eqns)
+
+        mkTupleTyCon = do
+          nm <- tcName
+          k <- tcKind
+          case tyConDataCons tc of
+            dc:_ -> do
+              tcDc <- coreToDataCon dc
+              return (C.mkAlgTyCon nm k tcArity (C.DataTyCon [tcDc]) (isClassTyCon tc))
+            _ -> error "impossible"
+
+        mkPrimTyCon = do
+          nm <- tcName
+          k <- tcKind
+          return (C.mkPrimTyCon nm k tcArity)
+
+        mkPromotedDataCon dc = do
+          nm <- tcName
+          k <- tcKind
+          tcData <- coreToDataCon dc
+          return (C.mkPromotedDataCon nm k tcArity tcData)
+
+-- | An equation of a type family, given its left-hand side and right-hand
+-- side. Its pattern variables are the free type variables of the converted
+-- types, ordered like 'C.mkFunTyConFromClash' orders them.
+tyFamEqnB :: FamInstEnvs -> [Type] -> Type -> C2C TyFamEqn
+tyFamEqnB envs lhs rhs = do
+  lhs' <- mapM coreToTypeB lhs
+  rhs' <- coreToTypeB rhs
+  tvs <- withoutSrcSpan (mapM coreToTyVarB (dependencySort (nubVars allTvs)))
+  pure (runTyFamEqn tvs lhs' rhs')
+ where
+  allTvs = concatMap (convertedTyVars envs) (lhs ++ [rhs])
+
+  nubVars = go emptyVarSet
+   where
+    go _ [] = []
+    go seen (v:vs)
+      | v `elemVarSet` seen = go seen vs
+      | otherwise = v : go (extendVarSet seen v) vs
+
+  -- See 'C.dependencySortTyVars': every variable after those in its kind
+  dependencySort tvs = reverse (snd (foldl' visit (emptyVarSet, []) tvs))
+   where
+    tvEnv = mkVarEnv [ (tv, tv) | tv <- tvs ]
+    visit (seen, acc) tv
+      | tv `elemVarSet` seen = (seen, acc)
+      | otherwise =
+          let kindTvs = mapMaybe (lookupVarEnv tvEnv) (convertedTyVars envs (varType tv))
+              (seen1, acc1) = foldl' visit (extendVarSet seen tv, acc) kindTvs
+          in  (seen1, tv : acc1)
+
+-- | Convert the right-hand side of an algebraic data type. See
+-- 'makeAlgTyConRhsClash'.
+makeAlgTyConRhs :: TyCon
+                -> AlgTyConRhs
+                -> C2C (Maybe C.AlgTyConRhs)
+makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
+#if MIN_VERSION_ghc(9,14,0)
+  -- See 'makeAlgTyConRhsClash'
+  UnaryClassTyCon {data_con = dc} -> do
+    let tvs = tyConTyVars _tc
+        rhsEtad = case dataConRepArgTys dc of
+          [scaled] -> scaledThing scaled
+          args -> error [__i|
+            makeAlgTyConRhs: UnaryClassTyCon DataCon does not have one field
+              Type constructor: #{showPprUnsafe _tc}
+              Data constructor: #{showPprUnsafe dc}
+              Representation argument types (#{length args}): #{showPprUnsafe args}
+            |]
+    Just <$> newTyConRhs dc tvs rhsEtad
+#endif
+  DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+  SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+  NewTyCon dc _ (rhsTvs,rhsEtad) _ _ -> Just <$> newTyConRhs dc rhsTvs rhsEtad
+  AbstractTyCon {} -> return Nothing
+  TupleTyCon {}    -> error "Cannot handle tuple tycons"
+ where
+  newTyConRhs dc tvs rhsEtad =
+    C.mkNewTyConRhs <$> coreToDataCon dc
+                    <*> (runNewTyConSig <$> mapM coreToTyVarB tvs <*> coreToTypeB rhsEtad)
+
+-- | 'makeAllTyCons' through the types of Clash Core: the type constructors
+-- of the conversion through Clash Core, which "Clash.GHC.Scoped.Check"
+-- compares with.
+makeAllTyConsClash
+  :: ClashOpts
+  -> GHC2CoreState
+  -> FamInstEnvs
+  -> C.UniqMap C.TyCon
+makeAllTyConsClash opts hm fiEnvs = go hm hm
+  where
+    go old new
+        | C.null (new ^. tyConMap) = mempty
+        | otherwise                = tcm <> tcm'
+      where
+        (tcm,old', _) = RWS.runRWS (T.mapM makeTyConClash (new ^. tyConMap))
+                                   (GHC2CoreEnv noSrcSpan fiEnvs opts)
+                                   old
+        tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
+
+-- | See 'makeAllTyConsClash'
+makeTyConClash :: TyCon
+          -> C2C C.TyCon
+makeTyConClash tc = tycon
   where
     tycon
       | isFamilyTyCon tc    = mkFunTyCon
@@ -347,7 +494,7 @@ makeTyCon tc = tycon
         mkAlgTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          tcRhsM <- makeAlgTyConRhs tc $ algTyConRhs tc
+          tcRhsM <- makeAlgTyConRhsClash tc $ algTyConRhs tc
           case tcRhsM of
             Just tcRhs ->
               return $
@@ -384,7 +531,7 @@ makeTyCon tc = tycon
           tcKind <- coreToType (tyConKind tc)
           case tyConDataCons tc of
             dc:_ -> do
-              tcDc   <- fmap (C.DataTyCon . (:[])) (coreToDataCon dc)
+              tcDc   <- fmap (C.DataTyCon . (:[])) (coreToDataConClash dc)
               return $
                 C.mkAlgTyConFromClash
                   (C.nameUniq tcName)
@@ -408,7 +555,7 @@ makeTyCon tc = tycon
         mkPromotedDataCon dc = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          tcData <- coreToDataCon dc
+          tcData <- coreToDataConClash dc
 
           return $
             C.mkPromotedDataConFromClash
@@ -429,10 +576,11 @@ makeTyCon tc = tycon
           ty  <- coreToType (fi_rhs fi)
           return (tys,ty)
 
-makeAlgTyConRhs :: TyCon
+-- | See 'makeAllTyConsClash'
+makeAlgTyConRhsClash :: TyCon
                 -> AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
-makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
+makeAlgTyConRhsClash _tc algTcRhs = case algTcRhs of
 #if MIN_VERSION_ghc(9,14,0)
   -- GHC 9.14 represents unary classes (a class with a single method or a single
   -- superclass) with their own AlgTyConRhs constructor instead of as a newtype.
@@ -446,20 +594,20 @@ makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
         rhsEtad = case dataConRepArgTys dc of
           [scaled] -> scaledThing scaled
           args -> error [__i|
-            makeAlgTyConRhs: UnaryClassTyCon DataCon does not have one field
+            makeAlgTyConRhsClash: UnaryClassTyCon DataCon does not have one field
               Type constructor: #{showPprUnsafe _tc}
               Data constructor: #{showPprUnsafe dc}
               Representation argument types (#{length args}): #{showPprUnsafe args}
             |]
-    Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataCon dc
+    Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataConClash dc
                          <*> ((,) <$> mapM coreToTyVar tvs
                                   <*> coreToType rhsEtad))
 #endif
-  DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
-  SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+  DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataConClash dcs
+  SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataConClash dcs
 
   NewTyCon dc _ (rhsTvs,rhsEtad) _ _ ->
-                                      Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataCon dc
+                                      Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataConClash dc
                                                            <*> ((,) <$> mapM coreToTyVar rhsTvs
                                                                     <*> coreToType rhsEtad
                                                                )
