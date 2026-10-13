@@ -76,7 +76,7 @@ import           Clash.Util                  (ClashException (..), curLoc)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
 import           Clash.Core.Scoped.Evaluator (nfData)
-import           Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
+import           Clash.Core.Scoped.Evaluator.Primitives (primReductionMap)
 import           Clash.Core.Scoped.Evaluator.Types
   (Env (..), Machine (..), PrimReductions (..), initMachine)
 import           Clash.Core.Scoped.NameMap   (emptyNameMap)
@@ -626,7 +626,7 @@ withTicks ctx ticks0 k = go [] (reverse (List.nubBy eqTick ticks0))
               let
                 m0 = initMachine emptyScope emptyNameMap globals (IntMap.empty, 0) attrsC
                 -- See 'Clash.Rewrite.Scoped.Whnf.evaluatorEnv'
-                env0 = Env te (PrimReductions scopedPrimReductions Nothing)
+                env0 = Env te (PrimReductions primReductionMap Nothing)
                 attrsE = nfData env0 m0 (termToDataError . mTerm)
               case attrsE of
                 Left msg -> error msg

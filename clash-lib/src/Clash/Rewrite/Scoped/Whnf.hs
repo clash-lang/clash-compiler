@@ -30,7 +30,7 @@ import GHC.Stack (HasCallStack)
 import Clash.Rewrite.Types (RewriteMonad, globalHeap, bindings, typeEnv)
 
 import Clash.Core.Scoped.Evaluator (allocatedBind, whnf)
-import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
+import Clash.Core.Scoped.Evaluator.Primitives (primReductionMap)
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
@@ -41,7 +41,7 @@ import Clash.Rewrite.Scoped.Util (bindPureHeap)
 -- "Clash.Core.Scoped.Evaluator.Primitives". A primitive without one doesn't
 -- reduce.
 evaluatorEnv :: TypeEnv -> Env
-evaluatorEnv te = Env te (PrimReductions scopedPrimReductions Nothing)
+evaluatorEnv te = Env te (PrimReductions primReductionMap Nothing)
 
 -- | Evaluate a term to weak-head normal form, and apply a transformation to
 -- the result, in the context extended with the bindings the evaluator
