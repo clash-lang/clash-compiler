@@ -138,14 +138,14 @@ runNormalization env supply globals typeTrans rcsMap topEnts m =
 
     normState = NormalizeState
                   { _primitiveArgs = Map.empty
-                  , _scopedNormalizationStrategy = normalization
-                  , _scopedConstantPropagationStrategy = constantPropagation
-                  , _scopedNormalized = emptyGlobalEnv
-                  , _scopedSpecialisationCache = Map.empty
-                  , _scopedSpecialisationHistory = emptyGlobalEnv
-                  , _scopedInlineHistory = emptyGlobalEnv
-                  , _scopedRecursiveComponents = rcsMap
-                  , _scopedWorkFreeAppCache = Map.empty
+                  , _normalizationStrategy = normalization
+                  , _constantPropagationStrategy = constantPropagation
+                  , _normalized = emptyGlobalEnv
+                  , _specialisationCache = Map.empty
+                  , _specialisationHistory = emptyGlobalEnv
+                  , _inlineHistory = emptyGlobalEnv
+                  , _recursiveComponents = rcsMap
+                  , _workFreeAppCache = Map.empty
                   }
 
 -- | Normalize the given global binders, and the ones they refer to
@@ -164,7 +164,7 @@ normalize = go >=> unionWithCache
     :: GlobalEnv (Binding (Term 'VoidS))
     -> NormalizeSession (GlobalEnv (Binding (Term 'VoidS)))
   unionWithCache env = do
-    cache <- Lens.use (extra.scopedNormalized)
+    cache <- Lens.use (extra.normalized)
     -- We need to include the cache in our final result, forgetting to do so
     -- leads to https://github.com/clash-lang/clash-compiler/issues/3109
     --
@@ -218,7 +218,7 @@ normalize' nm = do
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
-            prevNorm <- Lens.use (extra.scopedNormalized)
+            prevNorm <- Lens.use (extra.normalized)
             let toNormalize = filter (\g -> not (g `memberGlobalSet` topEnts))
                             $ filter (\g -> g /= nm && not (memberGlobalEnv g prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
@@ -244,7 +244,7 @@ normalize' nm = do
             referers <-
               if dbg_invariants opts
                  then do
-                   prevNorm <- Lens.use (extra.scopedNormalized)
+                   prevNorm <- Lens.use (extra.normalized)
                    pure [ showPpr (globalIdName (bindingId b))
                         | b <- globalEnvElems prevNorm
                         , nm `memberGlobalSet` termGlobalIds (bindingTerm b)

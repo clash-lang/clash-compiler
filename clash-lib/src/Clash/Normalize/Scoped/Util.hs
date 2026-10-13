@@ -13,7 +13,7 @@
   components, the inline history, the normalized binders) are t'GlobalEnv's,
   so that a local variable can never hit an entry of a global with the same
   unique. The global bindings ('Clash.Rewrite.Types.bindings') and the
-  normalized ones ('scopedNormalized') are closed terms.
+  normalized ones ('normalized') are closed terms.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -49,7 +49,7 @@ module Clash.Normalize.Scoped.Util
   , normalizeTopLvlBndr
   , normalizeWorkFreeApp
   , rewriteExpr
-  , scopedNormalization
+  , getNormalization
     -- * Type equality constraints
   , substWithTyEq
   , tvSubstWithTyEq
@@ -112,7 +112,7 @@ shouldReduce = anyM isConstantArg' . ctxFrames
 -- * Inlining
 
 -- | How often a global was already inlined into another one, according to
--- the 'scopedInlineHistory'
+-- the 'inlineHistory'
 alreadyInlined
   :: GlobalId
   -- ^ Function we want to inline
@@ -120,10 +120,10 @@ alreadyInlined
   -- ^ Function in which we want to perform the inlining
   -> NormalizeMonad (Maybe Int)
 alreadyInlined f cf = do
-  inlinedHM <- Lens.use scopedInlineHistory
+  inlinedHM <- Lens.use inlineHistory
   pure (lookupGlobalEnv f =<< lookupGlobalEnv cf inlinedHM)
 
--- | Record a new inlining in the 'scopedInlineHistory'
+-- | Record a new inlining in the 'inlineHistory'
 addNewInline
   :: GlobalId
   -- ^ Function we're inlining
@@ -131,7 +131,7 @@ addNewInline
   -- ^ Function in which we're inlining it
   -> NormalizeMonad ()
 addNewInline f cf =
-  scopedInlineHistory %= insertWithGlobalEnv
+  inlineHistory %= insertWithGlobalEnv
                            (\_ hm -> insertWithGlobalEnv (+) f 1 hm)
                            cf
                            (singletonGlobalEnv f 1)
@@ -160,10 +160,10 @@ isNonRecursiveGlobalVar (collectArgs -> (GlobalVar g, _)) = not <$> isRecursiveB
 isNonRecursiveGlobalVar _ = pure False
 
 -- | Whether a global binder is recursive. Caches its answer in
--- 'scopedRecursiveComponents'.
+-- 'recursiveComponents'.
 isRecursiveBndr :: GlobalId -> NormalizeSession Bool
 isRecursiveBndr g = do
-  cg <- Lens.use (extra.scopedRecursiveComponents)
+  cg <- Lens.use (extra.recursiveComponents)
   case lookupGlobalEnv g cg of
     Just isR -> pure isR
     Nothing -> do
@@ -175,7 +175,7 @@ isRecursiveBndr g = do
           -- self-recursive ones, so checking whether 'f' occurs in its body is
           -- sufficient.
           let isR = g `memberGlobalSet` termGlobalIds (bindingTerm b)
-          (extra.scopedRecursiveComponents) %= insertGlobalEnv g isR
+          (extra.recursiveComponents) %= insertGlobalEnv g isR
           pure isR
 
 -- * Constant specialization
@@ -434,11 +434,11 @@ isCheapFunction tm = case classifyFunction tm of
 
 -- * Normalizing global binders
 
--- | The normalization strategy ('scopedNormalizationStrategy')
-scopedNormalization :: NormalizeSession (ScopedRewrite NormalizeState)
-scopedNormalization = Lens.use (extra.scopedNormalizationStrategy)
+-- | The normalization strategy ('normalizationStrategy')
+getNormalization :: NormalizeSession (ScopedRewrite NormalizeState)
+getNormalization = Lens.use (extra.normalizationStrategy)
 
--- | Normalize a global binder, caching the result in 'scopedNormalized'. If
+-- | Normalize a global binder, caching the result in 'normalized'. If
 -- the binder is a top entity, its type equality constraints are substituted
 -- first.
 --
@@ -453,7 +453,7 @@ normalizeTopLvlBndr
   -> Binding (Term 'VoidS)
   -> NormalizeSession (Binding (Term 'VoidS))
 normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
-  cached <- lookupGlobalEnv nm <$> Lens.use (extra.scopedNormalized)
+  cached <- lookupGlobalEnv nm <$> Lens.use (extra.normalized)
   case cached of
     Just b -> pure b
     Nothing -> do
@@ -461,20 +461,20 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
       let nmS = showPpr (globalIdName nm)
           tm1 = if isTop then substWithTyEq emptyScope tm else tm
       old <- Lens.use curFun
-      normalization <- scopedNormalization
+      normalization <- getNormalization
       tm2 <- rewriteExpr ("normalization", normalization) (nmS, tm1) (nm', sp)
       curFun .= old
       let ty' = inferCoreTypeOf te emptyScope tm2
           r' = nm' `memberGlobalSet` termGlobalIds tm2
           b = Binding (mkGlobalId (globalIdName nm') ty') sp inl pr tm2 r'
-      (extra.scopedNormalized) %= insertGlobalEnv nm b
+      (extra.normalized) %= insertGlobalEnv nm b
       pure b
 
 -- | Normalize a global function applied to closed arguments, i.e. a work-free
 -- application such as @f \@7 dict@.
 -- 'Clash.Normalize.Scoped.Transformations.Inline.inlineWorkFree' inlines the
 -- result at every occurrence of the application. Results are cached in
--- 'scopedWorkFreeAppCache'.
+-- 'workFreeAppCache'.
 --
 -- Unlike unapplied work-free binders (see
 -- 'Clash.Rewrite.Types.inlineWFCacheLimit'), applications are cached
@@ -506,7 +506,7 @@ normalizeWorkFreeApp f b args = do
   -- occurrence still gets its own copy, so the circuit doesn't change. Only
   -- names in the HDL can: binders lifted out of the application are named
   -- after @f@, not after the function the application occurs in.
-  cache <- Lens.use (extra.scopedWorkFreeAppCache)
+  cache <- Lens.use (extra.workFreeAppCache)
   case Map.lookup key cache of
     Just tm -> pure (sinkClosed tm)
     Nothing -> do
@@ -521,11 +521,11 @@ normalizeWorkFreeApp f b args = do
           -- that would bring us right back here
           redex = mkApps (bindingTerm b) closedArgs
       old <- Lens.use curFun
-      normalization <- scopedNormalization
+      normalization <- getNormalization
       tm <- rewriteExpr ("normalization", normalization)
                         (showPpr (globalIdName f), redex) (g, bindingLoc b)
       curFun .= old
-      (extra.scopedWorkFreeAppCache) %= Map.insert key tm
+      (extra.workFreeAppCache) %= Map.insert key tm
       pure (sinkClosed tm)
  where
   key = (f, map (bimap AlphaTerm AlphaType) closedArgs)

@@ -319,7 +319,7 @@ incLitsScoped = Scoped.bottomupR $ ScopedTransform $ \_ -> \case
 -- the first of them is the function being normalized
 normState :: [(GlobalId, Term 'VoidS)] -> RewriteState NormalizeState
 normState bs = st
-  { _extra = (_extra st) { _scopedNormalizationStrategy = incLitsScoped } }
+  { _extra = (_extra st) { _normalizationStrategy = incLitsScoped } }
  where
   st = withCurFun curF def
     {_bindings = globalEnvFromList [(g, mkGlobalBinding g t) | (g, t) <- bs]}
@@ -341,7 +341,7 @@ normalizeTests =
       assertTermIs emptyTestScope expected (bindingTerm sco2)
       bindingRecursive sco @?= False
       assertBool "type" (aeqTy (closedType "Int -> Int") (globalIdType (bindingId sco)))
-      case lookupGlobalEnv f (_scopedNormalized (_extra st1)) of
+      case lookupGlobalEnv f (_normalized (_extra st1)) of
         Just b -> assertTermIs emptyTestScope expected (bindingTerm b)
         Nothing -> assertFailure "not cached"
       -- The strategy ran once
@@ -382,13 +382,13 @@ normalizeTests =
       let expected = tm "(\\(x :: Int) (y :: Int) -> (f_G10 :: Int -> Int -> Int) x 2) 2"
       assertTermIs emptyTestScope expected sco
       assertTermIs emptyTestScope expected sco2
-      case Map.elems (_scopedWorkFreeAppCache (_extra st1)) of
+      case Map.elems (_workFreeAppCache (_extra st1)) of
         [t] -> assertTermIs emptyTestScope expected t
         _ -> assertFailure "not cached"
       _transformCounter st1 @?= 1
       -- The application was normalized as the body of a binder of its own,
       -- which isn't added to the normalized binders
-      assertBool "normalized binders" (nullGlobalEnv (_scopedNormalized (_extra st1)))
+      assertBool "normalized binders" (nullGlobalEnv (_normalized (_extra st1)))
   ]
  where
   f = testGlobalId "f_G10" "Int -> Int"

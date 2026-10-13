@@ -90,7 +90,7 @@ import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (..), hasTransformationInfo)
 import           Clash.Normalize.Types
-  (NormalizeSession, scopedSpecialisationCache, scopedSpecialisationHistory)
+  (NormalizeSession, specialisationCache, specialisationHistory)
 import           Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
@@ -407,7 +407,7 @@ specializeGlobal sc e f args ticks specArgIn = do
     -- Determine if 'f' has already been specialized on (a type-normalized)
     -- 'specArg'
     specM <- case specAbs of
-      Just k -> Map.lookup (f, argLen, k) <$> Lens.use (extra . scopedSpecialisationCache)
+      Just k -> Map.lookup (f, argLen, k) <$> Lens.use (extra . specialisationCache)
       Nothing -> pure Nothing
     case specM of
       -- Use previously specialized function
@@ -423,7 +423,7 @@ specializeGlobal sc e f args ticks specArgIn = do
         Just (Binding _ sp inl _ bodyTm _) -> do
           -- Determine if we see a sequence of specializations on a growing
           -- argument
-          specHistM <- lookupGlobalEnv f <$> Lens.use (extra . scopedSpecialisationHistory)
+          specHistM <- lookupGlobalEnv f <$> Lens.use (extra . specialisationHistory)
           specLim <- Lens.view specializationLimit
           if maybe False (> specLim) specHistM
             then throw (ClashException
@@ -480,9 +480,9 @@ specializeGlobal sc e f args ticks specArgIn = do
                 Just newBody -> do
                   newf <- mkFunction newName sp inl' newBody
                   -- Remember specialization
-                  (extra . scopedSpecialisationHistory) %= insertWithGlobalEnv (+) f 1
+                  (extra . specialisationHistory) %= insertWithGlobalEnv (+) f 1
                   Monad.forM_ specAbs $ \k ->
-                    (extra . scopedSpecialisationCache) %= Map.insert (f, argLen, k) newf
+                    (extra . specialisationCache) %= Map.insert (f, argLen, k) newf
                   -- Use specialized function
                   changed (mkApps (mkTicks (GlobalVar newf) ticks) (args ++ specVars))
  where

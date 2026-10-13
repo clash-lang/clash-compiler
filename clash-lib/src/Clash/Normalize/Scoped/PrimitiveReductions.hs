@@ -101,7 +101,7 @@ import Clash.Core.Scoped.TysPrim (integerPrimTyConName, typeNatKindTyConName)
 
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Scoped.Primitives as NP (undefined)
-import Clash.Normalize.Types (NormalizeSession, scopedConstantPropagationStrategy)
+import Clash.Normalize.Types (NormalizeSession, constantPropagationStrategy)
 import Clash.Rewrite.Types (extra, typeEnv)
 import Clash.Sized.RTree (RTree)
 import Clash.Sized.Vector (Vec)
@@ -138,12 +138,12 @@ scopeAndTypeEnv ctx = (tfScope ctx,) <$> Lens.view typeEnv
 -- | Run the 'Clash.Normalize.Strategy.constantPropagation' strategy on the
 -- function argument of a primitive. The compiled strategy is taken from the
 -- normalization state, see the documentation of
--- 'Clash.Normalize.Types._scopedNormalizationStrategy' for why it is not
+-- 'Clash.Normalize.Types._normalizationStrategy' for why it is not
 -- simply imported.
 constantPropagation
   :: (HasCallStack, Distinct n) => TransformContext n -> Term n -> NormalizeSession (Term n)
 constantPropagation ctx fun = do
-  strategy <- Lens.use (extra . scopedConstantPropagationStrategy)
+  strategy <- Lens.use (extra . constantPropagationStrategy)
   runScopedTransform strategy (pushFrame (AppArg Nothing) ctx) fun
 
 -- | The type constructor of @Vec@, and its @Nil@ and @Cons@ constructors, if
