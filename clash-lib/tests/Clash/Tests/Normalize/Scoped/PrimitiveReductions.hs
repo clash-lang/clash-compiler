@@ -3,264 +3,573 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.PrimitiveReductions": the tests of
-  "Clash.Normalize.PrimitiveReductions", run on the scoped reductions through
-  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement with the reductions of
-  Clash Core.
+  Tests for the primitive reductions of
+  "Clash.Normalize.Scoped.Transformations.Reduce": the regression tests of the
+  reductions of Clash Core ("Clash.Normalize.PrimitiveReductions"), and tests
+  of the reductions whose expected results are those of the scoped
+  reductions, which agreed with the reductions of Clash Core up to the form of
+  coercions. 'assertRewritesTo' runs every test in the scope of the free
+  variables of its input, and in a scope that the binders of the input clash
+  with.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Tests.Normalize.Scoped.PrimitiveReductions (tests) where
 
 import qualified Data.Either as Either
 import Data.Default (def)
 import qualified Data.IntMap.Strict as IntMap
-import Data.Text (Text)
-import GHC.Types.SrcLoc (noSrcSpan)
+import qualified Data.List as List
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Literal (Literal (..))
-import Clash.Core.Name (NameSort (User))
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import Clash.Core.Var (Id, TyVar)
-import Clash.Core.TysPrim (liftedTypeKind, naturalPrimTy, typeNatKind)
-import Clash.Normalize.PrimitiveReductions (mkVecNil)
+import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
+import Clash.Core.Scoped.Convert (mkPrimInfo)
+import Clash.Core.Scoped.Syntax (PrimInfo, PrimUnfolding (NoUnfolding), Term (Prim))
+import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Normalize.Scoped.Transformations.Reduce (PrimReduction (..))
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), TransformContext (..))
+import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 
-import Clash.Core.Scoped.Syntax (Term (Prim))
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
-import Clash.Core.Scoped.Term (collectArgs)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Test.Clash.Scoped.ViaFoil (viaFoil)
-
-import Clash.Tests.Normalize.PrimitiveReductions
-  (PrimReductionImpl, currentPrimReduction, envVec, prim, primitiveReductionTests)
 import Test.Clash.Rewrite
-  ( addTy, applicativeTy, boolTy, globalId, hIntTy, heapLookupEvaluator, inScopeOf, indexTy
-  , intFunTy, intId, intTy, kindedTyVar, localId, maybeTyConName, nilDc, numTy
-  , rtreeTy, runRewriteTest, showPprU, snatDc, snatTy, tcTy, ubpTy, vecTy )
-import Test.Clash.Scoped (aeqTermTyped, stripCoercionTypes)
+  ( TestDefs (..), TestTerm, heapLookupEvaluator, kindedTyVarD, parseTestTermWith
+  , parseTestType, strQQ, testGlobalId, testTyConMap, withTyConMap )
+import Test.Clash.Scoped (ScopeDecl, assertRewritesTo, closedType, varD, withCurFun)
 
--- | The scoped primitive reductions, as a rewrite of Clash Core of the
--- saturated application of the primitive
-scopedPrimReduction :: PrimReductionImpl
-scopedPrimReduction red = viaFoil "reducePrim" $ ScopedTransform $ \ctx e ->
+-- | The scoped primitive reduction, as a transformation of the saturated
+-- application of the primitive
+reductionS :: PrimReduction -> ScopedRewrite NormalizeState
+reductionS red = ScopedTransform $ \ctx e ->
   case collectArgs e of
     (Prim p, args) ->
       let (tms, tys) = Either.partitionEithers args
       in Scoped.runPrimReduction ctx red p tys tms
-    _ -> error "scopedPrimReduction: not a primitive application"
+    _ -> error "reductionS: not a primitive application"
 
--- | The environment of the reductions: 'envVec', with an evaluator for the
+-- | The primitives of the tests, which do no work. Their type is @Int@, unless
+-- a test annotates them with another one.
+prims :: [PrimInfo]
+prims =
+  [ mkPrimInfo ("Clash.Sized." <> nm) (closedType "Int") C.WorkNever C.SingleResult NoUnfolding
+  | nm <-
+      [ "Vector.zipWith", "Vector.map", "Vector.traverse#", "Vector.fold", "Vector.foldr"
+      , "Vector.dfold", "Vector.++", "Vector.head", "Vector.tail", "Vector.last", "Vector.init"
+      , "Vector.unconcat", "Vector.transpose", "Vector.replicate", "Vector.replace_int"
+      , "Vector.index_int", "Vector.imap", "Vector.iterateI", "Vector.dtfold", "Vector.reverse"
+      , "RTree.tdfold", "RTree.treplicate" ] ]
+
+-- | Terms that mention the primitives of the tests, and a global function
+-- @f :: a -> a -> a@, where @a@ is a function type of many arguments
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [] prims [testGlobalId "f_G2" (parseTestType (a <> " -> " <> a <> " -> " <> a))])
+ where
+  a = "(" <> List.intercalate " -> " (replicate 17 "Int") <> ")"
+
+-- | The environment of the reductions: the type constructors of
+-- 'testTyConMap', with an evaluator for the
 -- 'Clash.Normalize.Strategy.constantPropagation' strategy that some
 -- reductions run on their function argument
 env :: RewriteEnv
-env = envVec {_evaluator = heapLookupEvaluator}
+env = (withTyConMap testTyConMap def) {_evaluator = heapLookupEvaluator}
 
 st :: RewriteState NormalizeState
-st = def
-  { _globalHeap = (IntMap.empty, 0)
-  , _curFun = (mkGlobalIdFromClash (globalId User "top" 100 intTy), noSrcSpan) }
+st = withCurFun (testGlobalId "top_G100" "Int") def {_globalHeap = (IntMap.empty, 0)}
 
--- | Run a reduction of Clash Core and the scoped one on the saturated
--- application of a primitive with free variables, and assert that they agree:
--- alpha-equivalent results (comparing types too, up to the form of
--- coercions), and both signal a change or neither does.
-assertAgrees :: [Id] -> PrimReduction -> C.PrimInfo -> [C.Type] -> [C.Term] -> Assertion
-assertAgrees ids red p tys tms = do
-  let
-    e = C.mkApps (C.Prim p) (map Right tys <> map Left tms)
-    ctx = TransformContext (inScopeOf ids) []
-  (expected, _, changed1) <- runRewriteTest env st (currentPrimReduction red ctx e)
-  (actual, _, changed2) <- runRewriteTest env st (scopedPrimReduction red ctx e)
-  assertBool
-    ("Clash Core:\n" <> showPprU expected <> "\nscoped:\n" <> showPprU actual)
-    (aeqTermTyped (stripCoercionTypes expected) (stripCoercionTypes actual))
-  assertEqual "change signaled (Clash Core, scoped)" changed1 changed2
-
--- | Type variables of the types of the primitives and functions
-tvN, tvA, tvL :: TyVar
-tvN = kindedTyVar User "n" 60 typeNatKind
-tvA = kindedTyVar User "a" 61 liftedTypeKind
-tvL = kindedTyVar User "l" 62 typeNatKind
-
--- | A primitive whose type the reductions don't look at
-untypedPrim :: Text -> C.PrimInfo
-untypedPrim nm = prim nm intTy
-
--- | A primitive @forall n a. ts -> r@, of which the reductions infer the
--- result type
-typedPrim :: Text -> ([C.Type] -> C.Type -> C.Type -> C.Type) -> C.PrimInfo
-typedPrim nm mk = prim nm $ C.ForAllTy tvN $ C.ForAllTy tvA $ mk [] (C.VarTy tvN) (C.VarTy tvA)
-
-funTys :: [C.Type] -> C.Type -> C.Type
-funTys args res = foldr C.mkFunTy res args
-
--- | A natural number literal, for @KnownNat@ arguments
-natLit :: Integer -> C.Term
-natLit = C.Literal . NaturalLiteral
-
--- | An @SNat@
-snat :: Integer -> C.Term
-snat n = C.mkApps (C.Data snatDc) [Right (numTy n), Left (natLit n)]
-
--- | Free variables of the applications
-f, g, mkV, dict, h, df, br, imapF, motive, tree, xss :: Id
-f = localId User "f" 1 (intFunTy 1)
-g = localId User "g" 2 (intFunTy 2)
--- | A function creating vectors, to apply primitives to vectors that aren't
--- variables, which the reductions let-bind
-mkV = localId User "mkV" 3 (C.mkFunTy intTy (vecTy (numTy 2) intTy))
-dict = localId User "dict" 4 (applicativeTy (tcTy maybeTyConName))
-h = localId User "h" 5 (C.mkFunTy intTy (C.mkTyConApp maybeTyConName [intTy]))
--- | The function of @dfold@: @forall l. UBP (l + 1) 2 -> SNat l -> Int -> Int
--- -> Int@
-df = localId User "df" 6 $ C.ForAllTy tvL $
-  funTys [ubpTy (addTy (C.VarTy tvL) (numTy 1)) (numTy 2), snatTy (C.VarTy tvL), intTy, intTy] intTy
--- | The function combining branches of @dtfold@ and @tdfold@: @forall l. SNat l
--- -> Int -> Int -> Int@
-br = localId User "br" 7 $ C.ForAllTy tvL $ funTys [snatTy (C.VarTy tvL), intTy, intTy] intTy
-imapF = localId User "im" 8 (C.mkFunTy (indexTy (numTy 2)) (intFunTy 1))
--- | Stands in for the motives of @dfold@, @dtfold@ and @tdfold@
-motive = intId User "p" 9
-tree = localId User "t" 10 (rtreeTy (numTy 1) intTy)
-xss = localId User "xss" 11 (vecTy (numTy 0) (vecTy (numTy 2) intTy))
-
--- | @v<n> :: Vec n Int@
-v :: Integer -> Id
-v n = localId User ("v" <> show n) (20 + fromInteger n) (vecTy (numTy n) intTy)
-
-k, z, i :: Id
-k = intId User "k" 30
-z = intId User "z" 31
-i = localId User "i" 32 hIntTy
-
-var :: Id -> C.Term
-var = C.Var
-
--- | The cases of the agreement tests: a name, the reduction, the primitive,
--- its type and term arguments, and the free variables
-agreementTests :: [TestTree]
-agreementTests =
-  [ agrees "zipWith, let-binding a vector" (ReduceZipWith 2 True True)
-      (untypedPrim "Clash.Sized.Vector.zipWith") [intTy, intTy, intTy, numTy 2]
-      [var g, var (v 2), C.App (var mkV) (var k)]
-  , agrees "zipWith of non-representable vectors" (ReduceZipWith 2 False False)
-      (untypedPrim "Clash.Sized.Vector.zipWith") [intTy, intTy, intTy, numTy 2]
-      [var g, C.App (var mkV) (var k), C.App (var mkV) (var z)]
-  , agrees "zipWith on empty vectors" (ReduceZipWith 0 True True)
-      (untypedPrim "Clash.Sized.Vector.zipWith") [intTy, intTy, intTy, numTy 0]
-      [var g, var (v 0), var (v 0)]
-  , agrees "map, let-binding the vector" (ReduceMap 2 True)
-      (untypedPrim "Clash.Sized.Vector.map") [intTy, intTy, numTy 2]
-      [var f, C.App (var mkV) (var k)]
-  , agrees "map on an empty vector" (ReduceMap 0 True)
-      (untypedPrim "Clash.Sized.Vector.map") [intTy, intTy, numTy 0] [var f, var (v 0)]
-  , agrees "traverse#" (ReduceTraverse 2)
-      (untypedPrim "Clash.Sized.Vector.traverse#") [intTy, tcTy maybeTyConName, intTy, numTy 2]
-      [var dict, var h, var (v 2)]
-  , agrees "traverse# on an empty vector" (ReduceTraverse 0)
-      (untypedPrim "Clash.Sized.Vector.traverse#") [intTy, tcTy maybeTyConName, intTy, numTy 0]
-      [var dict, var h, var (v 0)]
-  , agrees "fold" (ReduceFold 3)
-      (untypedPrim "Clash.Sized.Vector.fold") [numTy 2, intTy] [var g, var (v 3)]
-  , agrees "foldr, let-binding the vector" (ReduceFoldr 2 True)
-      (untypedPrim "Clash.Sized.Vector.foldr") [intTy, intTy, numTy 2]
-      [var g, var z, C.App (var mkV) (var k)]
-  , agrees "foldr on an empty vector" (ReduceFoldr 0 True)
-      (untypedPrim "Clash.Sized.Vector.foldr") [intTy, intTy, numTy 0] [var g, var z, var (v 0)]
-  , agrees "dfold" (ReduceDFold 2)
-      (untypedPrim "Clash.Sized.Vector.dfold") [intTy, numTy 2, intTy]
-      [natLit 2, var motive, var df, var z, var (v 2)]
-  , agrees "++" (ReduceAppend 2 1)
-      (untypedPrim "Clash.Sized.Vector.++") [numTy 2, intTy, numTy 1] [var (v 2), var (v 1)]
-  , agrees "head" (ReduceHead 2)
-      (untypedPrim "Clash.Sized.Vector.head") [numTy 1, intTy] [var (v 2)]
-  , agrees "tail" (ReduceTail 2)
-      (untypedPrim "Clash.Sized.Vector.tail") [numTy 1, intTy] [var (v 2)]
-  , agrees "last" (ReduceLast 3)
-      (untypedPrim "Clash.Sized.Vector.last") [numTy 2, intTy] [var (v 3)]
-  , agrees "init" (ReduceInit 2 True)
-      (untypedPrim "Clash.Sized.Vector.init") [numTy 2, intTy] [var (v 3)]
-  , agrees "init to an empty vector" (ReduceInit 0 True)
-      (untypedPrim "Clash.Sized.Vector.init") [numTy 0, intTy] [var (v 1)]
-  , agrees "unconcat" (ReduceUnconcat 2 2)
-      (untypedPrim "Clash.Sized.Vector.unconcat") [numTy 2, numTy 2, intTy]
-      [natLit 2, snat 2, var (v 4)]
-  , agrees "unconcat into empty vectors" (ReduceUnconcat 2 0)
-      (untypedPrim "Clash.Sized.Vector.unconcat") [numTy 2, numTy 0, intTy]
-      [natLit 2, snat 0, var (v 0)]
-  , agrees "unconcat into an empty vector" (ReduceUnconcat 0 2)
-      (untypedPrim "Clash.Sized.Vector.unconcat") [numTy 0, numTy 2, intTy]
-      [natLit 0, snat 2, var (v 0)]
-  , agrees "transpose" (ReduceTranspose 2)
-      (untypedPrim "Clash.Sized.Vector.transpose") [numTy 2, numTy 0, intTy] [natLit 2, var xss]
-  , agrees "replicate" (ReduceReplicate 3)
-      (typedPrim "Clash.Sized.Vector.replicate" $ \_ n a -> funTys [snatTy n, a] (vecTy n a))
-      [numTy 3, intTy] [snat 3, var k]
-  , agrees "replace_int" (ReduceReplaceInt 2)
-      (typedPrim "Clash.Sized.Vector.replace_int" $ \_ n a ->
-         funTys [naturalPrimTy, vecTy n a, hIntTy, a] (vecTy n a))
-      [numTy 2, intTy] [natLit 2, var (v 2), var i, var k]
-  , agrees "index_int" (ReduceIndexInt 2)
-      (untypedPrim "Clash.Sized.Vector.index_int") [numTy 2, intTy] [natLit 2, var (v 2), var i]
-  , agrees "index_int on an empty vector" (ReduceIndexInt 0)
-      (untypedPrim "Clash.Sized.Vector.index_int") [numTy 0, intTy] [natLit 0, var (v 0), var i]
-  , agrees "imap" (ReduceImap 2)
-      (untypedPrim "Clash.Sized.Vector.imap") [numTy 2, intTy, intTy]
-      [natLit 2, var imapF, var (v 2)]
-  , agrees "iterateI" (ReduceIterateI 3)
-      (typedPrim "Clash.Sized.Vector.iterateI" $ \_ n a ->
-         funTys [naturalPrimTy, C.mkFunTy a a, a] (vecTy n a))
-      [numTy 3, intTy] [natLit 3, var f, var k]
-  , agrees "iterateI of an empty vector" (ReduceIterateI 0)
-      (typedPrim "Clash.Sized.Vector.iterateI" $ \_ n a ->
-         funTys [naturalPrimTy, C.mkFunTy a a, a] (vecTy n a))
-      [numTy 0, intTy] [natLit 0, var f, var k]
-  , agrees "dtfold" (ReduceDTFold 2)
-      (untypedPrim "Clash.Sized.Vector.dtfold") [intTy, numTy 2, intTy]
-      [natLit 2, var motive, var f, var br, var (v 4)]
-  , agrees "reverse" (ReduceReverse 3)
-      (untypedPrim "Clash.Sized.Vector.reverse") [numTy 3, intTy] [var (v 3)]
-  , agrees "tdfold" (ReduceTDFold 1)
-      (untypedPrim "Clash.Sized.RTree.tdfold") [intTy, numTy 1, intTy]
-      [natLit 1, var motive, var f, var br, var tree]
-  , agrees "treplicate" (ReduceTReplicate 2)
-      (typedPrim "Clash.Sized.RTree.treplicate" $ \_ d a -> funTys [snatTy d, a] (rtreeTy d a))
-      [numTy 2, intTy] [snat 2, var k]
-  ]
- where
-  agrees nm red pr tys tms =
-    testCase nm (assertAgrees ([f, g, mkV, dict, h, df, br, imapF, motive, tree, xss, k, z, i] <> map v [0 .. 4]) red pr tys tms)
-
--- | The reduction of @map f v@ on an empty vector @v :: Vec 0 Int@, with @f
--- :: Int -> Bool@, gives an empty vector of @Bool@s.
---
--- The reduction of Clash Core gave an empty vector of @Int@s, of the
--- argument element type, so its result was ill-typed.
-mapEmptyResultElemTy :: Assertion
-mapEmptyResultElemTy = do
-  let
-    fb = localId User "fb" 40 (C.mkFunTy intTy boolTy)
-    e = C.mkApps (C.Prim (untypedPrim "Clash.Sized.Vector.map"))
-          [Right intTy, Right boolTy, Right (numTy 0), Left (var fb), Left (var (v 0))]
-  (actual, _, _) <-
-    runRewriteTest env st (scopedPrimReduction (ReduceMap 0 True) (TransformContext (inScopeOf [fb, v 0]) []) e)
-  assertBool ("Expected Nil @Bool, got:\n" <> showPprU actual)
-    (aeqTermTyped (stripCoercionTypes (mkVecNil nilDc boolTy)) (stripCoercionTypes actual))
+-- | Assert that a reduction rewrites the saturated application of a primitive
+-- to the expected term
+reduces :: PrimReduction -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+reduces red = assertRewritesTo env st (reductionS red)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.PrimitiveReductions"
-  [ testGroup "tests of the reductions of Clash Core" (primitiveReductionTests scopedPrimReduction)
-  , testGroup "agrees with the reductions of Clash Core" agreementTests
-  , testCase "map on an empty vector gives an empty vector of the result element type"
-      mapEmptyResultElemTy
+  [ testGroup "regression tests"
+      [ testCase "reduceReverse on an empty vector" $
+          reduces (ReduceReverse 0) [varD "v_1" "Clash.Sized.Vector.Vec 0 Int"]
+            (tm "Clash.Sized.Vector.reverse @0 @Int v_1")
+            (tm "Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))")
+      , testCase "reduceReplace_int on an empty vector" $
+          reduces (ReduceReplaceInt 0) [varD "v_1" "Clash.Sized.Vector.Vec 0 Int", varD "i_2" "Int", varD "a_3" "Int"]
+            (tm [strQQ|
+              (Clash.Sized.Vector.replace_int :: forall (n :: Nat) (a :: Type). Nat -> Clash.Sized.Vector.Vec n a -> Int -> a -> Clash.Sized.Vector.Vec n a) @0 @Int (0 :: Natural) v_1 i_2 a_3
+            |])
+            (tm "Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))")
+      , testCase "reduceMap binds the elements of a vector at their type" $
+          reduces (ReduceMap 1 False) [kindedTyVarD "a_0" "Type", varD "v_1000" "Clash.Sized.Vector.Vec 1 a_0", varD "f_1001" "a_0 -> a_0"]
+            (tm [strQQ|
+              (Clash.Sized.Vector.map :: forall (a :: Type) (b :: Type) (n :: Nat). (a -> b) -> Clash.Sized.Vector.Vec n a -> Clash.Sized.Vector.Vec n b) @a_0 @a_0 @1 f_1001 v_1000
+            |])
+            (tm [strQQ|
+              Cons @1 @a_0 @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) (f_1001 ((case v_1000 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: a_0) (res_S :: Clash.Sized.Vector.Vec 0 a_0) -> el_S
+                }) :: a_0)) ((Clash.Sized.Vector.map :: forall (a :: Type) (b :: Type) (n :: Nat). (a -> b) -> Clash.Sized.Vector.Vec n a -> Clash.Sized.Vector.Vec n b) @a_0 @a_0 @0 f_1001 ((case v_1000 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: a_0) (res_S :: Clash.Sized.Vector.Vec 0 a_0) -> res_S
+                }) :: Clash.Sized.Vector.Vec 0 a_0))
+            |])
+      , testCase "reduceFold does not rewind the unique supply" $
+          reduces (ReduceFold 2) [varD "v_1" "Clash.Sized.Vector.Vec 2 (Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int)"]
+            (tm [strQQ|
+              Clash.Sized.Vector.fold @1 @(Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) f_G2 v_1
+            |])
+            (tm [strQQ|
+              let
+                { (elF0_S :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) = (case v_1 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) (rest_S :: Clash.Sized.Vector.Vec 1 (Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int)) -> el_S
+                    }) :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+                ; (restF0_S3 :: Clash.Sized.Vector.Vec 1 (Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int)) = (case v_1 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) (rest_S :: Clash.Sized.Vector.Vec 1 (Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int)) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 (Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int)
+                ; (elF1_S :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) = (case restF0_S3 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) (rest_S :: Clash.Sized.Vector.Vec 0 (Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int)) -> el_S
+                    }) :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+                } in (\(carg_I :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) (carg_I1000003 :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int) (carg_I4 :: Int) (carg_I5 :: Int) (carg_I6 :: Int) (carg_I7 :: Int) (carg_I8 :: Int) (carg_I9 :: Int) (carg_I10 :: Int) (carg_I11 :: Int) (carg_I12 :: Int) (carg_I13 :: Int) (carg_I14 :: Int) (carg_I15 :: Int) (carg_I16 :: Int) (carg_I17 :: Int) (carg_I18 :: Int) (carg_I19 :: Int) -> f_G2 carg_I carg_I1000003 carg_I4 carg_I5 carg_I6 carg_I7 carg_I8 carg_I9 carg_I10 carg_I11 carg_I12 carg_I13 carg_I14 carg_I15 carg_I16 carg_I17 carg_I18 carg_I19) elF0_S elF1_S
+            |])
+      , testCase "reduceMap on an empty vector gives an empty vector of the result element type" $
+          reduces (ReduceMap 0 True) [varD "v_1" "Clash.Sized.Vector.Vec 0 Int", varD "f_4" "Int -> Int -> Int"]
+            (tm [strQQ|
+              (Clash.Sized.Vector.map :: forall (a :: Type) (b :: Type) (n :: Nat). (a -> b) -> Clash.Sized.Vector.Vec n a -> Clash.Sized.Vector.Vec n b) @Int @(Int -> Int) @0 f_4 v_1
+            |])
+            (tm [strQQ|
+              Nil @0 @(Int -> Int) (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))
+            |])
+      ]
+  , testGroup "reductions"
+      [ testCase "zipWith, let-binding a vector" $
+          reduces (ReduceZipWith 2 True True) [varD "g_2" "Int -> Int -> Int", varD "mkV_3" "Int -> Clash.Sized.Vector.Vec 2 Int", varD "v2_22" "Clash.Sized.Vector.Vec 2 Int", varD "k_30" "Int"]
+            (tm "Clash.Sized.Vector.zipWith @Int @Int @Int @2 g_2 v2_22 (mkV_3 k_30)")
+            (tm [strQQ|
+              let { !(cvec_I :: Clash.Sized.Vector.Vec 2 Int) = mkV_3 k_30 } in Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) (g_2 ((case v2_22 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                }) :: Int) ((case cvec_I of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                }) :: Int)) (Clash.Sized.Vector.zipWith @Int @Int @Int @1 g_2 ((case v2_22 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> res_S
+                }) :: Clash.Sized.Vector.Vec 1 Int) ((case cvec_I of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> res_S
+                }) :: Clash.Sized.Vector.Vec 1 Int))
+            |])
+      , testCase "zipWith of non-representable vectors" $
+          reduces (ReduceZipWith 2 False False) [varD "g_2" "Int -> Int -> Int", varD "mkV_3" "Int -> Clash.Sized.Vector.Vec 2 Int", varD "k_30" "Int", varD "z_31" "Int"]
+            (tm "Clash.Sized.Vector.zipWith @Int @Int @Int @2 g_2 (mkV_3 k_30) (mkV_3 z_31)")
+            (tm [strQQ|
+              Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) (g_2 ((case mkV_3 k_30 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                }) :: Int) ((case mkV_3 z_31 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                }) :: Int)) (Clash.Sized.Vector.zipWith @Int @Int @Int @1 g_2 ((case mkV_3 k_30 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> res_S
+                }) :: Clash.Sized.Vector.Vec 1 Int) ((case mkV_3 z_31 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> res_S
+                }) :: Clash.Sized.Vector.Vec 1 Int))
+            |])
+      , testCase "zipWith on empty vectors" $
+          reduces (ReduceZipWith 0 True True) [varD "g_2" "Int -> Int -> Int", varD "v0_20" "Clash.Sized.Vector.Vec 0 Int"]
+            (tm "Clash.Sized.Vector.zipWith @Int @Int @Int @0 g_2 v0_20 v0_20")
+            (tm "Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))")
+      , testCase "map, let-binding the vector" $
+          reduces (ReduceMap 2 True) [varD "f_1" "Int -> Int", varD "mkV_3" "Int -> Clash.Sized.Vector.Vec 2 Int", varD "k_30" "Int"]
+            (tm "Clash.Sized.Vector.map @Int @Int @2 f_1 (mkV_3 k_30)")
+            (tm [strQQ|
+              let { !(cvec_I :: Clash.Sized.Vector.Vec 2 Int) = mkV_3 k_30 } in Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) (f_1 ((case cvec_I of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                }) :: Int)) (Clash.Sized.Vector.map @Int @Int @1 f_1 ((case cvec_I of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> res_S
+                }) :: Clash.Sized.Vector.Vec 1 Int))
+            |])
+      , testCase "map on an empty vector" $
+          reduces (ReduceMap 0 True) [varD "f_1" "Int -> Int", varD "v0_20" "Clash.Sized.Vector.Vec 0 Int"]
+            (tm "Clash.Sized.Vector.map @Int @Int @0 f_1 v0_20")
+            (tm "Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))")
+      , testCase "traverse#" $
+          reduces (ReduceTraverse 2) [varD "dict_4" "GHC.Base.Applicative Maybe", varD "h_5" "Int -> Maybe Int", varD "v2_22" "Clash.Sized.Vector.Vec 2 Int"]
+            (tm "Clash.Sized.Vector.traverse# @Int @Maybe @Int @2 dict_4 h_5 v2_22")
+            (tm [strQQ|
+              let
+                { (cfunctorDict_I23 :: GHC.Base.Functor Maybe) = (case dict_4 of
+                    { CApplicative (functorDict_S27 :: GHC.Base.Functor Maybe) (pure_S :: forall (a :: Type). a -> Maybe a) (ap_S :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) (liftA2_S30 :: Int) (apConstL_S31 :: Int) (apConstR_S32 :: Int) -> functorDict_S27
+                    }) :: GHC.Base.Functor Maybe
+                ; (cpure_I24 :: forall (a :: Type). a -> Maybe a) = (case dict_4 of
+                    { CApplicative (functorDict_S27 :: GHC.Base.Functor Maybe) (pure_S :: forall (a :: Type). a -> Maybe a) (ap_S :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) (liftA2_S30 :: Int) (apConstL_S31 :: Int) (apConstR_S32 :: Int) -> pure_S
+                    }) :: forall (a :: Type). a -> Maybe a
+                ; (cap_I :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) = (case dict_4 of
+                    { CApplicative (functorDict_S27 :: GHC.Base.Functor Maybe) (pure_S :: forall (a :: Type). a -> Maybe a) (ap_S :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) (liftA2_S30 :: Int) (apConstL_S31 :: Int) (apConstR_S32 :: Int) -> ap_S
+                    }) :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b
+                ; (cfmap_I26 :: forall (a :: Type) (b :: Type). (a -> b) -> Maybe a -> Maybe b) = (case cfunctorDict_I23 of
+                    { CFunctor (fmap_S :: forall (a :: Type) (b :: Type). (a -> b) -> Maybe a -> Maybe b) (fmapConst_S1000028 :: Int) -> fmap_S
+                    }) :: forall (a :: Type) (b :: Type). (a -> b) -> Maybe a -> Maybe b
+                ; (elT0_S :: Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restT0_S28 :: Clash.Sized.Vector.Vec 1 Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elT1_S :: Int) = (case restT0_S28 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in cap_I @(Clash.Sized.Vector.Vec 1 Int) @(Clash.Sized.Vector.Vec 2 Int) (cfmap_I26 @Int @(Clash.Sized.Vector.Vec 1 Int -> Clash.Sized.Vector.Vec 2 Int) (Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)))) ((\(carg_I :: Int) -> h_5 carg_I) elT0_S)) (cap_I @(Clash.Sized.Vector.Vec 0 Int) @(Clash.Sized.Vector.Vec 1 Int) (cfmap_I26 @Int @(Clash.Sized.Vector.Vec 0 Int -> Clash.Sized.Vector.Vec 1 Int) (Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)))) ((\(carg_I :: Int) -> h_5 carg_I) elT1_S)) (cpure_I24 @(Clash.Sized.Vector.Vec 0 Int) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)))))
+            |])
+      , testCase "traverse# on an empty vector" $
+          reduces (ReduceTraverse 0) [varD "dict_4" "GHC.Base.Applicative Maybe", varD "h_5" "Int -> Maybe Int", varD "v0_20" "Clash.Sized.Vector.Vec 0 Int"]
+            (tm "Clash.Sized.Vector.traverse# @Int @Maybe @Int @0 dict_4 h_5 v0_20")
+            (tm [strQQ|
+              let
+                { (cfunctorDict_I21 :: GHC.Base.Functor Maybe) = (case dict_4 of
+                    { CApplicative (functorDict_S25 :: GHC.Base.Functor Maybe) (pure_S :: forall (a :: Type). a -> Maybe a) (ap_S :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) (liftA2_S28 :: Int) (apConstL_S29 :: Int) (apConstR_S30 :: Int) -> functorDict_S25
+                    }) :: GHC.Base.Functor Maybe
+                ; (cpure_I22 :: forall (a :: Type). a -> Maybe a) = (case dict_4 of
+                    { CApplicative (functorDict_S25 :: GHC.Base.Functor Maybe) (pure_S :: forall (a :: Type). a -> Maybe a) (ap_S :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) (liftA2_S28 :: Int) (apConstL_S29 :: Int) (apConstR_S30 :: Int) -> pure_S
+                    }) :: forall (a :: Type). a -> Maybe a
+                ; (cap_I :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) = (case dict_4 of
+                    { CApplicative (functorDict_S25 :: GHC.Base.Functor Maybe) (pure_S :: forall (a :: Type). a -> Maybe a) (ap_S :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b) (liftA2_S28 :: Int) (apConstL_S29 :: Int) (apConstR_S30 :: Int) -> ap_S
+                    }) :: forall (a :: Type) (b :: Type). Maybe (a -> b) -> Maybe a -> Maybe b
+                ; (cfmap_I24 :: forall (a :: Type) (b :: Type). (a -> b) -> Maybe a -> Maybe b) = (case cfunctorDict_I21 of
+                    { CFunctor (fmap_S :: forall (a :: Type) (b :: Type). (a -> b) -> Maybe a -> Maybe b) (fmapConst_S26 :: Int) -> fmap_S
+                    }) :: forall (a :: Type) (b :: Type). (a -> b) -> Maybe a -> Maybe b
+                } in cpure_I22 @(Clash.Sized.Vector.Vec 0 Int) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)))
+            |])
+      , testCase "fold" $
+          reduces (ReduceFold 3) [varD "g_2" "Int -> Int -> Int", varD "v3_23" "Clash.Sized.Vector.Vec 3 Int"]
+            (tm "Clash.Sized.Vector.fold @2 @Int g_2 v3_23")
+            (tm [strQQ|
+              let
+                { (elF0_S :: Int) = (case v3_23 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> el_S
+                    }) :: Int
+                ; (restF0_S25 :: Clash.Sized.Vector.Vec 2 Int) = (case v3_23 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 2 Int
+                ; (elF1_S :: Int) = (case restF0_S25 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restF1_S27 :: Clash.Sized.Vector.Vec 1 Int) = (case restF0_S25 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elF2_S :: Int) = (case restF1_S27 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in (\(carg_I :: Int) (carg_I1000025 :: Int) -> g_2 carg_I carg_I1000025) elF0_S ((\(carg_I :: Int) (carg_I1000025 :: Int) -> g_2 carg_I carg_I1000025) elF1_S elF2_S)
+            |])
+      , testCase "foldr, let-binding the vector" $
+          reduces (ReduceFoldr 2 True) [varD "g_2" "Int -> Int -> Int", varD "mkV_3" "Int -> Clash.Sized.Vector.Vec 2 Int", varD "k_30" "Int", varD "z_31" "Int"]
+            (tm "Clash.Sized.Vector.foldr @Int @Int @2 g_2 z_31 (mkV_3 k_30)")
+            (tm [strQQ|
+              let { !(cvec_I :: Clash.Sized.Vector.Vec 2 Int) = mkV_3 k_30 } in g_2 ((case cvec_I of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                }) :: Int) (Clash.Sized.Vector.foldr @Int @Int @1 g_2 z_31 ((case cvec_I of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 1 Int) -> res_S
+                }) :: Clash.Sized.Vector.Vec 1 Int))
+            |])
+      , testCase "foldr on an empty vector" $
+          reduces (ReduceFoldr 0 True) [varD "g_2" "Int -> Int -> Int", varD "v0_20" "Clash.Sized.Vector.Vec 0 Int", varD "z_31" "Int"]
+            (tm "Clash.Sized.Vector.foldr @Int @Int @0 g_2 z_31 v0_20")
+            (tm "z_31")
+      , testCase "dfold" $
+          reduces (ReduceDFold 2) [varD "df_6" "forall (l :: Nat). UBP_2035 ((GHC.TypeNats.+) l 1) 2 -> Clash.Promoted.Nat.SNat l -> Int -> Int -> Int", varD "p_9" "Int", varD "v2_22" "Clash.Sized.Vector.Vec 2 Int", varD "z_31" "Int"]
+            (tm "Clash.Sized.Vector.dfold @Int @2 @Int (2 :: Natural) p_9 df_6 z_31 v2_22")
+            (tm [strQQ|
+              let
+                { (elD0_S :: Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restD0_S33 :: Clash.Sized.Vector.Vec 1 Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elD1_S :: Int) = (case restD0_S33 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in df_6 @1 MkUBP (SNat @1 (1 :: Natural)) elD0_S (df_6 @0 MkUBP (SNat @0 (0 :: Natural)) elD1_S z_31)
+            |])
+      , testCase "++" $
+          reduces (ReduceAppend 2 1) [varD "v1_21" "Clash.Sized.Vector.Vec 1 Int", varD "v2_22" "Clash.Sized.Vector.Vec 2 Int"]
+            (tm "(Clash.Sized.Vector.++) @2 @Int @1 v2_22 v1_21")
+            (tm [strQQ|
+              let
+                { (elC0_S :: Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restC0_S24 :: Clash.Sized.Vector.Vec 1 Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elC1_S :: Int) = (case restC0_S24 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in Cons @3 @Int @2 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1))) elC0_S (Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) elC1_S v1_21)
+            |])
+      , testCase "head" $
+          reduces (ReduceHead 2) [varD "v2_22" "Clash.Sized.Vector.Vec 2 Int"]
+            (tm "Clash.Sized.Vector.head @1 @Int v2_22")
+            (tm [strQQ|
+              let
+                { (elH0_S :: Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                } in elH0_S
+            |])
+      , testCase "tail" $
+          reduces (ReduceTail 2) [varD "v2_22" "Clash.Sized.Vector.Vec 2 Int"]
+            (tm "Clash.Sized.Vector.tail @1 @Int v2_22")
+            (tm [strQQ|
+              let
+                { (restL0_S23 :: Clash.Sized.Vector.Vec 1 Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                } in restL0_S23
+            |])
+      , testCase "last" $
+          reduces (ReduceLast 3) [varD "v3_23" "Clash.Sized.Vector.Vec 3 Int"]
+            (tm "Clash.Sized.Vector.last @2 @Int v3_23")
+            (tm [strQQ|
+              let
+                { (elL0_S :: Int) = (case v3_23 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> el_S
+                    }) :: Int
+                ; (restL0_S25 :: Clash.Sized.Vector.Vec 2 Int) = (case v3_23 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 2 Int
+                ; (elL1_S :: Int) = (case restL0_S25 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restL1_S27 :: Clash.Sized.Vector.Vec 1 Int) = (case restL0_S25 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elL2_S :: Int) = (case restL1_S27 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in elL2_S
+            |])
+      , testCase "init" $
+          reduces (ReduceInit 2 True) [varD "v3_23" "Clash.Sized.Vector.Vec 3 Int"]
+            (tm "Clash.Sized.Vector.init @2 @Int v3_23")
+            (tm [strQQ|
+              Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) ((case v3_23 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 2 Int) -> el_S
+                }) :: Int) (Clash.Sized.Vector.init @1 @Int ((case v3_23 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (res_S :: Clash.Sized.Vector.Vec 2 Int) -> res_S
+                }) :: Clash.Sized.Vector.Vec 2 Int))
+            |])
+      , testCase "init to an empty vector" $
+          reduces (ReduceInit 0 True) [varD "v1_21" "Clash.Sized.Vector.Vec 1 Int"]
+            (tm "Clash.Sized.Vector.init @0 @Int v1_21")
+            (tm "Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))")
+      , testCase "unconcat" $
+          reduces (ReduceUnconcat 2 2) [varD "v4_24" "Clash.Sized.Vector.Vec 4 Int"]
+            (tm [strQQ|
+              Clash.Sized.Vector.unconcat @2 @2 @Int (2 :: Natural) (SNat @2 (2 :: Natural)) v4_24
+            |])
+            (tm [strQQ|
+              let
+                { (elU0_S :: Int) = (case v4_24 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 4 ((GHC.TypeNats.+) 3 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 3 Int) -> el_S
+                    }) :: Int
+                ; (restU0_S26 :: Clash.Sized.Vector.Vec 3 Int) = (case v4_24 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 4 ((GHC.TypeNats.+) 3 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 3 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 3 Int
+                ; (elU1_S :: Int) = (case restU0_S26 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> el_S
+                    }) :: Int
+                } in Cons @2 @(Clash.Sized.Vector.Vec 2 Int) @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) (Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) elU0_S (Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) elU1_S (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))))) (Clash.Sized.Vector.unconcat @1 @2 @Int (1 :: Natural) (SNat @2 (2 :: Natural)) ((case restU0_S26 of
+                { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> rest_S
+                }) :: Clash.Sized.Vector.Vec 2 Int))
+            |])
+      , testCase "unconcat into empty vectors" $
+          reduces (ReduceUnconcat 2 0) [varD "v0_20" "Clash.Sized.Vector.Vec 0 Int"]
+            (tm [strQQ|
+              Clash.Sized.Vector.unconcat @2 @0 @Int (2 :: Natural) (SNat @0 (0 :: Natural)) v0_20
+            |])
+            (tm [strQQ|
+              Cons @2 @(Clash.Sized.Vector.Vec 0 Int) @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))) (Cons @1 @(Clash.Sized.Vector.Vec 0 Int) @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))) (Nil @0 @(Clash.Sized.Vector.Vec 0 Int) (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))))
+            |])
+      , testCase "unconcat into an empty vector" $
+          reduces (ReduceUnconcat 0 2) [varD "v0_20" "Clash.Sized.Vector.Vec 0 Int"]
+            (tm [strQQ|
+              Clash.Sized.Vector.unconcat @0 @2 @Int (0 :: Natural) (SNat @2 (2 :: Natural)) v0_20
+            |])
+            (tm [strQQ|
+              Nil @0 @(Clash.Sized.Vector.Vec 2 Int) (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))
+            |])
+      , testCase "transpose" $
+          reduces (ReduceTranspose 2) [varD "xss_11" "Clash.Sized.Vector.Vec 0 (Clash.Sized.Vector.Vec 2 Int)"]
+            (tm "Clash.Sized.Vector.transpose @2 @0 @Int (2 :: Natural) xss_11")
+            (tm [strQQ|
+              Cons @2 @(Clash.Sized.Vector.Vec 0 Int) @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))) (Cons @1 @(Clash.Sized.Vector.Vec 0 Int) @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))) (Nil @0 @(Clash.Sized.Vector.Vec 0 Int) (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))))
+            |])
+      , testCase "replicate" $
+          reduces (ReduceReplicate 3) [varD "k_30" "Int"]
+            (tm [strQQ|
+              (Clash.Sized.Vector.replicate :: forall (n :: Nat) (a :: Type). Clash.Promoted.Nat.SNat n -> a -> Clash.Sized.Vector.Vec n a) @3 @Int (SNat @3 (3 :: Natural)) k_30
+            |])
+            (tm [strQQ|
+              Cons @3 @Int @2 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1))) k_30 (Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) k_30 (Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) k_30 (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)))))
+            |])
+      , testCase "replace_int" $
+          reduces (ReduceReplaceInt 2) [varD "v2_22" "Clash.Sized.Vector.Vec 2 Int", varD "k_30" "Int", varD "i_32" "GHC.Types.Int"]
+            (tm [strQQ|
+              (Clash.Sized.Vector.replace_int :: forall (n :: Nat) (a :: Type). Nat -> Clash.Sized.Vector.Vec n a -> GHC.Types.Int -> a -> Clash.Sized.Vector.Vec n a) @2 @Int (2 :: Natural) v2_22 i_32 k_30
+            |])
+            (tm [strQQ|
+              let
+                { (elI0_S :: Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restI0_S34 :: Clash.Sized.Vector.Vec 1 Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elI1_S :: Int) = (case restI0_S34 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) ((case (GHC.Classes.eqInt :: GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Bool) i_32 (GHC.Types.I# 0) of
+                { _ -> elI0_S
+                ; GHC.Types.True -> k_30
+                }) :: Int) (Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) ((case (GHC.Classes.eqInt :: GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Bool) i_32 (GHC.Types.I# 1) of
+                { _ -> elI1_S
+                ; GHC.Types.True -> k_30
+                }) :: Int) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))))
+            |])
+      , testCase "index_int" $
+          reduces (ReduceIndexInt 2) [varD "v2_22" "Clash.Sized.Vector.Vec 2 Int", varD "i_32" "GHC.Types.Int"]
+            (tm "Clash.Sized.Vector.index_int @2 @Int (2 :: Natural) v2_22 i_32")
+            (tm [strQQ|
+              let
+                { (elI0_S :: Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restI0_S34 :: Clash.Sized.Vector.Vec 1 Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elI1_S :: Int) = (case restI0_S34 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in (case (GHC.Classes.eqInt :: GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Bool) i_32 (GHC.Types.I# 0) of
+                { _ -> (case (GHC.Classes.eqInt :: GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Bool) i_32 (GHC.Types.I# 1) of
+                    { _ -> Clash.Normalize.Primitives.undefined @Int
+                    ; GHC.Types.True -> elI1_S
+                    }) :: Int
+                ; GHC.Types.True -> elI0_S
+                }) :: Int
+            |])
+      , testCase "index_int on an empty vector" $
+          reduces (ReduceIndexInt 0) [varD "v0_20" "Clash.Sized.Vector.Vec 0 Int", varD "i_32" "GHC.Types.Int"]
+            (tm "Clash.Sized.Vector.index_int @0 @Int (0 :: Natural) v0_20 i_32")
+            (tm "Clash.Normalize.Primitives.undefined @Int")
+      , testCase "imap" $
+          reduces (ReduceImap 2) [varD "im_8" "Clash.Sized.Internal.Index.Index 2 -> Int -> Int", varD "v2_22" "Clash.Sized.Vector.Vec 2 Int"]
+            (tm "Clash.Sized.Vector.imap @2 @Int @Int (2 :: Natural) im_8 v2_22")
+            (tm [strQQ|
+              let
+                { (elI0_S :: Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restI0_S24 :: Clash.Sized.Vector.Vec 1 Int) = (case v2_22 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elI1_S :: Int) = (case restI0_S24 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) ((\(carg_I :: Clash.Sized.Internal.Index.Index 2) (carg_I1000024 :: Int) -> im_8 carg_I carg_I1000024) ((Clash.Sized.Internal.Index.fromInteger# :: forall (n_S :: Nat). GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer -> Clash.Sized.Internal.Index.Index n_S) @2 (2 :: Integer) (0 :: Integer)) elI0_S) (Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) ((\(carg_I :: Clash.Sized.Internal.Index.Index 2) (carg_I1000024 :: Int) -> im_8 carg_I carg_I1000024) ((Clash.Sized.Internal.Index.fromInteger# :: forall (n_S :: Nat). GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer -> Clash.Sized.Internal.Index.Index n_S) @2 (2 :: Integer) (1 :: Integer)) elI1_S) (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))))
+            |])
+      , testCase "iterateI" $
+          reduces (ReduceIterateI 3) [varD "f_1" "Int -> Int", varD "k_30" "Int"]
+            (tm [strQQ|
+              (Clash.Sized.Vector.iterateI :: forall (n :: Nat) (a :: Type). Nat -> (a -> a) -> a -> Clash.Sized.Vector.Vec n a) @3 @Int (3 :: Natural) f_1 k_30
+            |])
+            (tm [strQQ|
+              let
+                { (cel1_I :: Int) = (\(carg_I :: Int) -> f_1 carg_I) k_30
+                ; (cel2_I :: Int) = (\(carg_I :: Int) -> f_1 carg_I) cel1_I
+                } in Cons @3 @Int @2 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1))) k_30 (Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) cel1_I (Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) cel2_I (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)))))
+            |])
+      , testCase "iterateI of an empty vector" $
+          reduces (ReduceIterateI 0) [varD "f_1" "Int -> Int", varD "k_30" "Int"]
+            (tm [strQQ|
+              (Clash.Sized.Vector.iterateI :: forall (n :: Nat) (a :: Type). Nat -> (a -> a) -> a -> Clash.Sized.Vector.Vec n a) @0 @Int (0 :: Natural) f_1 k_30
+            |])
+            (tm [strQQ|
+              let {  } in Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))
+            |])
+      , testCase "dtfold" $
+          reduces (ReduceDTFold 2) [varD "f_1" "Int -> Int", varD "br_7" "forall (l :: Nat). Clash.Promoted.Nat.SNat l -> Int -> Int -> Int", varD "p_9" "Int", varD "v4_24" "Clash.Sized.Vector.Vec 4 Int"]
+            (tm "Clash.Sized.Vector.dtfold @Int @2 @Int (2 :: Natural) p_9 f_1 br_7 v4_24")
+            (tm [strQQ|
+              let
+                { (elT0_S :: Int) = (case v4_24 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 4 ((GHC.TypeNats.+) 3 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 3 Int) -> el_S
+                    }) :: Int
+                ; (restT0_S26 :: Clash.Sized.Vector.Vec 3 Int) = (case v4_24 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 4 ((GHC.TypeNats.+) 3 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 3 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 3 Int
+                ; (elT1_S :: Int) = (case restT0_S26 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> el_S
+                    }) :: Int
+                ; (restT1_S28 :: Clash.Sized.Vector.Vec 2 Int) = (case restT0_S26 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 2 Int
+                ; (elT2_S :: Int) = (case restT1_S28 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restT2_S30 :: Clash.Sized.Vector.Vec 1 Int) = (case restT1_S28 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elT3_S :: Int) = (case restT2_S30 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in br_7 @1 (SNat @1 (1 :: Natural)) (br_7 @0 (SNat @0 (0 :: Natural)) (f_1 elT0_S) (f_1 elT1_S)) (br_7 @0 (SNat @0 (0 :: Natural)) (f_1 elT2_S) (f_1 elT3_S))
+            |])
+      , testCase "reverse" $
+          reduces (ReduceReverse 3) [varD "v3_23" "Clash.Sized.Vector.Vec 3 Int"]
+            (tm "Clash.Sized.Vector.reverse @3 @Int v3_23")
+            (tm [strQQ|
+              let
+                { (elV0_S :: Int) = (case v3_23 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> el_S
+                    }) :: Int
+                ; (restV0_S25 :: Clash.Sized.Vector.Vec 2 Int) = (case v3_23 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 2 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 2 Int
+                ; (elV1_S :: Int) = (case restV0_S25 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> el_S
+                    }) :: Int
+                ; (restV1_S27 :: Clash.Sized.Vector.Vec 1 Int) = (case restV0_S25 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 1 Int) -> rest_S
+                    }) :: Clash.Sized.Vector.Vec 1 Int
+                ; (elV2_S :: Int) = (case restV1_S27 of
+                    { Cons (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (el_S :: Int) (rest_S :: Clash.Sized.Vector.Vec 0 Int) -> el_S
+                    }) :: Int
+                } in Cons @3 @Int @2 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 3 ((GHC.TypeNats.+) 2 1))) elV2_S (Cons @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) elV1_S (Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) elV0_S (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)))))
+            |])
+      , testCase "tdfold" $
+          reduces (ReduceTDFold 1) [varD "f_1" "Int -> Int", varD "br_7" "forall (l :: Nat). Clash.Promoted.Nat.SNat l -> Int -> Int -> Int", varD "p_9" "Int", varD "t_10" "Clash.Sized.RTree.RTree 1 Int"]
+            (tm "Clash.Sized.RTree.tdfold @Int @1 @Int (1 :: Natural) p_9 f_1 br_7 t_10")
+            (tm [strQQ|
+              let
+                { (ltT0_S :: Clash.Sized.RTree.RTree 0 Int) = (case t_10 of
+                    { BR (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (lt_S :: Clash.Sized.RTree.RTree 0 Int) (rt_S :: Clash.Sized.RTree.RTree 0 Int) -> lt_S
+                    }) :: Clash.Sized.RTree.RTree 0 Int
+                ; (rtT1_S :: Clash.Sized.RTree.RTree 0 Int) = (case t_10 of
+                    { BR (m_S :: Nat) (co_S :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (lt_S :: Clash.Sized.RTree.RTree 0 Int) (rt_S :: Clash.Sized.RTree.RTree 0 Int) -> rt_S
+                    }) :: Clash.Sized.RTree.RTree 0 Int
+                ; (elT0_S :: Int) = (case ltT0_S of
+                    { LR (co_S :: (GHC.Prim.~#) Nat Nat 0 0) (el_S :: Int) -> el_S
+                    }) :: Int
+                ; (elT1_S :: Int) = (case rtT1_S of
+                    { LR (co_S :: (GHC.Prim.~#) Nat Nat 0 0) (el_S :: Int) -> el_S
+                    }) :: Int
+                } in br_7 @0 (SNat @0 (0 :: Natural)) (f_1 elT0_S) (f_1 elT1_S)
+            |])
+      , testCase "treplicate" $
+          reduces (ReduceTReplicate 2) [varD "k_30" "Int"]
+            (tm [strQQ|
+              (Clash.Sized.RTree.treplicate :: forall (n :: Nat) (a :: Type). Clash.Promoted.Nat.SNat n -> a -> Clash.Sized.RTree.RTree n a) @2 @Int (SNat @2 (2 :: Natural)) k_30
+            |])
+            (tm [strQQ|
+              BR @2 @Int @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) (BR @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) (LR @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)) k_30) (LR @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)) k_30)) (BR @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) (LR @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)) k_30) (LR @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)) k_30))
+            |])
+      ]
+  , testCase "map on an empty vector gives an empty vector of the result element type" $
+      reduces (ReduceMap 0 True) [varD "v0_20" "Clash.Sized.Vector.Vec 0 Int", varD "fb_40" "Int -> Bool_3010"]
+        (tm "Clash.Sized.Vector.map @Int @Bool_3010 @0 fb_40 v0_20")
+        (tm "Nil @0 @Bool_3010 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))")
   ]
