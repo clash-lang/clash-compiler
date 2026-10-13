@@ -210,7 +210,6 @@ Library
                       Clash.Core.Basic
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
-                      Clash.Core.Evaluator.Types
                       Clash.Core.FreeVars
                       Clash.Core.HasType
                       Clash.Core.HasFreeVars
@@ -324,7 +323,6 @@ Library
                       Clash.Netlist.Util
 
                       Clash.Normalize
-                      Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Primitives
                       Clash.Normalize.Scoped.Primitives
                       Clash.Normalize.Scoped.PrimitiveReductions

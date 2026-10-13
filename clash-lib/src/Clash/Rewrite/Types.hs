@@ -39,13 +39,13 @@ import Data.Monoid                           (Any)
 import Data.Text                             (Text)
 import GHC.Generics
 
-import Clash.Core.Evaluator.Types as WHNF (PrimHeap)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Driver.Types
   ( Binding, ClashEnv(..), ClashOpts(..), DebugOpts, HasClashOpts(..) )
 import Clash.Core.Scoped.NameMap (GlobalEnv, GlobalSet)
+import Clash.Core.Scoped.Evaluator.Types (PrimHeap)
 import qualified Clash.Core.Scoped.Syntax as S
 import Clash.Driver.Warning      (CanWarn)
 import Clash.Netlist.Types       (HWMap, HWTypeTranslator)
