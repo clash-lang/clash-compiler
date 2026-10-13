@@ -177,7 +177,7 @@ runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_ ac
         , _usages=mempty
         }
 
--- | Generate names for all binders in "BindingMap", except for the ones already
+-- | Generate names for all binders in 'GlobalBindings', except for the ones already
 -- present in given identifier varenv.
 genNames
   :: Bool

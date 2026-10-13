@@ -7,6 +7,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -138,11 +139,7 @@ import           Clash.Annotations.SynthesisAttributes (Annotate, Attr(..))
 import qualified Clash.Core.DataCon          as C
 import qualified Clash.Core.Literal          as C
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
-import qualified Clash.Core.Type             as C
-import qualified Clash.Core.Scoped.Convert   as C
-  ( mkAlgTyCon, mkFunTyCon, mkNewTyConRhs, mkPrimTyCon, mkPromotedDataCon )
 import qualified Clash.Data.UniqMap          as C
 import           Clash.Driver.Types          (ClashOpts, HasClashOpts(..))
 import           Clash.Driver.Warning        (CanWarn(..), PendingWarning)
@@ -152,7 +149,8 @@ import           Clash.GHC.Util
 import           Clash.Core.Scoped.Builder
   (Key, TyB, annTyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, runClosedType,
    runDataConSig, runNewTyConSig, runTyFamEqn, uniqueKey, varTyB)
-import           Clash.Core.Scoped.Convert   (mkDataCon, mkGlobalId)
+import Clash.Core.DataCon (mkDataCon)
+import Clash.Core.Scoped.Syntax (mkGlobalId)
 import           Clash.Core.Scoped.Sig       (TyFamEqn)
 import qualified Clash.Core.Scoped.Syntax    as S
 
@@ -846,14 +844,14 @@ convertedTyVars envs = go emptyVarSet
 
 -- | Convert a type variable binder: its key, name and kind. Like
 -- 'coreToTyVar', it converts the kind first.
-coreToTyVarB :: TyVar -> C2C (Key, C.Name C.Type, TyB)
+coreToTyVarB :: TyVar -> C2C (Key, C.Name S.Type, TyB)
 coreToTyVarB tv = do
   k <- coreToTypeB (varType tv)
   nm <- coreToVar tv
   pure (varKey tv, nm, k)
 
 coreToTyLit :: TyLit
-            -> C.LitTy
+            -> LitTy
 coreToTyLit (NumTyLit i) = NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = SymTy (unpackFS s)
 coreToTyLit (CharTyLit c) = CharTy c
@@ -863,7 +861,7 @@ coreToVar :: Var
 coreToVar = coreToName varName varUnique qualifiedNameStringM
 
 coreToPrimVar :: Var
-              -> C2C (C.Name C.Term)
+              -> C2C (C.Name S.Term)
 coreToPrimVar = coreToName varName varUnique qualifiedNameString
 
 coreToName

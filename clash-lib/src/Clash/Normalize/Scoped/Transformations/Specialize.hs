@@ -53,7 +53,6 @@ module Clash.Normalize.Scoped.Transformations.Specialize
   , zeroWidthSpecWorker
   , specArgBndrsAndVars
     -- * Helpers of 'specialize'
-  , specCacheKey
   , preferNoInline
   , specializeName
   ) where
@@ -86,7 +85,6 @@ import           Clash.Core.DataCon          (dcExtTyVarCount)
 import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
-import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import           Clash.Core.Scoped.TysPrim   (integerPrimTyConName, naturalPrimTyConName, typeNatKindTyConName)
 import           Clash.Debug                 (traceIf, traceM)
@@ -101,7 +99,6 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
-import           Clash.Core.Scoped.Convert   (mkGlobalId, mkPrimInfo)
 import           Clash.Core.Scoped.Builder   (TyB, forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
 import           Clash.Core.Scoped.DataCon   (dataConInstArgTys)
 import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
@@ -502,7 +499,7 @@ specializeGlobal sc e f args ticks specArgIn = do
                   -- Use specialized function
                   changed (mkApps (mkTicks (GlobalVar newf) ticks) (args ++ specVars))
  where
-  varName :: Term x -> Maybe (C.Name C.Term)
+  varName :: Term x -> Maybe (C.Name Term)
   varName = \case
     Var occ _ _ -> Just occ
     GlobalVar g -> Just (globalIdName g)
@@ -522,7 +519,7 @@ cache. Consider these applications which differ only by ticks:
 If one of these had been specialized, the other two would hit that term in the
 specialization cache, saving Clash from having to re-do work which is in effect
 the same. To preserve this behavior, we strip all ticks from the keys for the
-specialization cache, see 'specCacheKey'.
+specialization cache, see 'scopedSpecCacheKey'.
 
 TODO While this preserves the old behavior, the old behavior is likely not
 quite what we want. Using a value from the specialization cache may change the
@@ -549,28 +546,6 @@ specialization cache.
 -- | Prepare a term for use as a key in the specialization cache: strip all
 -- ticks (see Note [ticks and specialization]) and replace small bignum
 -- constants by literals (see Note [bignum literals and specialization]).
-specCacheKey :: C.Term -> C.Term
-specCacheKey = go
- where
-  go (C.Lam i x) = C.Lam i (go x)
-  go (C.TyLam i x) = C.TyLam i (go x)
-  go (C.App f x) = case (go f, go x) of
-    (C.Prim p, C.Literal (WordLiteral w))
-      | C.primName p == Text.showt 'NS -> C.Literal (NaturalLiteral w)
-    (C.Prim p, C.Literal (IntLiteral i))
-      | C.primName p == Text.showt 'IS -> C.Literal (IntegerLiteral i)
-    (f', x') -> C.App f' x'
-  go (C.TyApp f a) = C.TyApp (go f) a
-  go (C.Let bs x) = C.Let (goBinds bs) (go x)
-  go (C.Case x ty alts) = C.Case (go x) ty (fmap go <$> alts)
-  go (C.Cast x a b) = C.Cast (go x) a b
-  go (C.Tick _ x) = go x
-  go x = x
-
-  goBinds (C.NonRec i x) = C.NonRec i (go x)
-  goBinds (C.Rec ixs) = C.Rec (fmap go <$> ixs)
-
--- | 'specCacheKey' on scoped Clash Core
 scopedSpecCacheKey :: Term n -> Term n
 scopedSpecCacheKey = go
  where
@@ -618,7 +593,7 @@ preferNoInline is0 is1
 -- >  g         | g
 -- >  !f and !g | f_g
 specializeName
-  :: (InlineSpec, C.Name C.Term) -> (Maybe InlineSpec, C.Name C.Term) -> C.Name C.Term
+  :: (InlineSpec, C.Name Term) -> (Maybe InlineSpec, C.Name Term) -> C.Name Term
 specializeName (spec0, n0) (spec1, n1)
   | (ann0 && ann1) || (not ann0 && not ann1)
   = n0{C.nameOcc = C.nameOcc n0 <> "_" <> stripMods (C.nameOcc n1)}
@@ -813,7 +788,7 @@ specBody
   => TypeEnv
   -> Type 'VoidS
   -- ^ The type of the function
-  -> [C.Name C.Term]
+  -> [C.Name Term]
   -- ^ Names for the binders of the arguments
   -> [Either (Term n) (Type n)]
   -- ^ The arguments
@@ -867,7 +842,7 @@ withArgBinders
   -> Scope x
   -> Type x
   -- ^ The type of the function, applied to the arguments before
-  -> [C.Name C.Term]
+  -> [C.Name Term]
   -> [Either a b]
   -- ^ The arguments: only whether they are terms or types matters
   -> (forall l. DExt x l => Scope l -> Tele AbsBinder x l -> [Either (Term l) (Type l)] -> r)
@@ -891,10 +866,10 @@ withArgBinders te sc ty names args k = case (args, names) of
 -- | The names of the binders of the leading lambdas of a term, minus the
 -- binders of the lambdas that the term applies to an argument. The binders of
 -- the arguments of a specialized function get these names.
-collectBndrsMinusApps :: Term n -> [C.Name C.Term]
+collectBndrsMinusApps :: Term n -> [C.Name Term]
 collectBndrsMinusApps = reverse . go []
  where
-  go :: [C.Name C.Term] -> Term x -> [C.Name C.Term]
+  go :: [C.Name Term] -> Term x -> [C.Name Term]
   go bs = \case
     Lam b e' -> go (idBinderOcc b : bs) e'
     TyLam b e' -> go (coerce (tyBinderOcc b) : bs) e'

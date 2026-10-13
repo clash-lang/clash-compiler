@@ -22,6 +22,7 @@
     annotated too.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -52,10 +53,10 @@ import Clash.Core.Pretty
 import Clash.Core.Scoped.Sig (TyFamEqn (..))
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (primArg)
-import qualified Clash.Core.Term as C (Term)
+
 import Clash.Core.TyCon
   (AlgTyConRhs (..), TyCon (..), TyConName, isTupleTyConLike)
-import qualified Clash.Core.Type as C (Type)
+
 import Clash.Pretty (ClashPretty (..))
 
 -- * Instances
@@ -97,7 +98,7 @@ instance PrettyPrec TyCon where
 
 -- | The names of the variables bound in the printed term, by raw name, see
 -- the module header
-data Env = Env !(IntMap (C.Name C.Type)) !(IntMap (C.Name C.Term))
+data Env = Env !(IntMap (C.Name Type)) !(IntMap (C.Name Term))
 
 emptyEnv :: Env
 emptyEnv = Env IntMap.empty IntMap.empty
@@ -112,14 +113,14 @@ localName nm raw
   u = fromIntegral raw
 {-# INLINE localName #-}
 
-tyVarName :: Env -> C.Name C.Type -> TyName n -> C.Name C.Type
+tyVarName :: Env -> C.Name Type -> TyName n -> C.Name Type
 tyVarName (Env tys _) occ n =
   let raw = tyNameRaw n
   in case IntMap.lookup raw tys of
        Just nm -> nm
        Nothing -> localName occ raw
 
-tmVarName :: Env -> C.Name C.Term -> TmName n -> C.Name C.Term
+tmVarName :: Env -> C.Name Term -> TmName n -> C.Name Term
 tmVarName (Env _ tms) occ n =
   let raw = tmNameRaw n
   in case IntMap.lookup raw tms of
@@ -127,14 +128,14 @@ tmVarName (Env _ tms) occ n =
        Nothing -> localName occ raw
 
 -- | The name of a type variable binder, and the environment of its scope
-bindTy :: Env -> TyBinder n l -> (C.Name C.Type, Env)
+bindTy :: Env -> TyBinder n l -> (C.Name Type, Env)
 bindTy (Env tys tms) b =
   let raw = tyNameRaw (tyNameOf b)
       nm = localName (tyBinderOcc b) raw
   in (nm, Env (IntMap.insert raw nm tys) tms)
 
 -- | The name of a term variable binder, and the environment of its scope
-bindId :: Env -> IdBinder n l -> (C.Name C.Term, Env)
+bindId :: Env -> IdBinder n l -> (C.Name Term, Env)
 bindId (Env tys tms) b =
   let raw = tmNameRaw (tmNameOf b)
       nm = localName (idBinderOcc b) raw
@@ -359,7 +360,7 @@ pprTyCon :: TyCon -> ClashDoc
 pprTyCon tc = case tc of
   AlgTyCon {algTcRhs = DataTyCon dcs} ->
     vsep (data_ <+> decl : map pprDataCon dcs)
-  AlgTyCon {algTcRhs = NewTyCon dc _ _} ->
+  AlgTyCon {algTcRhs = NewTyCon dc _} ->
     vsep [newtype_ <+> decl, pprDataCon dc]
   PromotedDataCon {tyConData = dc} ->
     "promoted" <+> ppr (dcName dc)

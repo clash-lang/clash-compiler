@@ -203,8 +203,6 @@ import GHC.Stack (HasCallStack)
 import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
 
 import Clash.Core.Scoped.FreeVars
 import Clash.Core.Scoped.NameMap (GlobalEnv, lookupGlobalEnv, nullGlobalEnv)
@@ -752,7 +750,7 @@ teleRawsF raw binder tele step done = go tele
 withFreshTyBinder
   :: Distinct n
   => Scope n
-  -> C.Name C.Type
+  -> C.Name Type
   -- ^ Human readable name. Its unique is not used.
   -> Kind n
   -> (forall l. DExt n l => Scope l -> TyBinder n l -> r)
@@ -767,7 +765,7 @@ withFreshTyBinder sc occ k cont =
 withFreshIdBinder
   :: Distinct n
   => Scope n
-  -> C.Name C.Term
+  -> C.Name Term
   -- ^ Human readable name. Its unique is not used.
   -> Type n
   -> (forall l. DExt n l => Scope l -> IdBinder n l -> r)
@@ -784,7 +782,7 @@ withFreshIdBinders
   :: forall n r
    . Distinct n
   => Scope n
-  -> [(C.Name C.Term, Type n)]
+  -> [(C.Name Term, Type n)]
   -- ^ Human readable names (whose uniques are not used) and types
   -> (forall l. DExt n l => Scope l -> Tele IdBinder n l -> [Term l] -> r)
   -> r
@@ -796,7 +794,7 @@ withFreshIdBinders sc0 bs0 cont = go sc0 [] bs0 cont
     :: DExt n x
     => Scope x
     -> [Term x]
-    -> [(C.Name C.Term, Type n)]
+    -> [(C.Name Term, Type n)]
     -> (forall l. DExt x l => Scope l -> Tele IdBinder x l -> [Term l] -> r')
     -> r'
   go sc vs [] k = k sc TNil (reverse vs)
@@ -1143,12 +1141,12 @@ closeOver tvs ids cont = do
           sc = UnsafeScope (List.foldl' max 0 allRaws)
       in Just (cont sc tyTele idTele closure)
  where
-  tyOcc :: Type n -> Maybe (C.Name C.Type, Kind n, Int)
+  tyOcc :: Type n -> Maybe (C.Name Type, Kind n, Int)
   tyOcc = \case
     VarTy occ k nm -> Just (occ, k, tyNameRaw nm)
     _ -> Nothing
 
-  tmOcc :: Term n -> Maybe (C.Name C.Term, Type n, Int)
+  tmOcc :: Term n -> Maybe (C.Name Term, Type n, Int)
   tmOcc = \case
     Var occ ty nm -> Just (occ, ty, tmNameRaw nm)
     _ -> Nothing

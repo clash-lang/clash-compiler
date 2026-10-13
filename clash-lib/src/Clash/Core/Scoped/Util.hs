@@ -23,6 +23,7 @@
   or use fixed uniques.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -82,11 +83,9 @@ import Clash.Core.Basic
 import Clash.Core.DataCon (DataCon)
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
-import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
 import Clash.Util (curLoc, indexNote)
 
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.DataCon (dataConInstArgTys, dataConInstExtTyVars)
 import Clash.Core.Scoped.EqSolver (dataConInstArgTysE)
 import Clash.Core.Scoped.FreeVars (freeTmVars, teleNameBinders)
@@ -288,7 +287,7 @@ buildLetGroups bs0 shapes0 xs0 = fst (go bs0 shapes0 xs0)
     Nothing -> error "buildLetGroups: a binding refers to a binding of a later group"
 
 -- | The human readable names of the binders of a telescope
-teleOccs :: Tele IdBinder n l -> [C.Name C.Term]
+teleOccs :: Tele IdBinder n l -> [C.Name Term]
 teleOccs TNil = []
 teleOccs (TCons b bs) = idBinderOcc b : teleOccs bs
 

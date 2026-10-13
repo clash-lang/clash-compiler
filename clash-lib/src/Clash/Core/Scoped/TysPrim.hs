@@ -6,8 +6,6 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Builtin types and kinds of scoped Clash Core, and their type constructors.
-  See "Clash.Core.TysPrim", which derives the builtin types of Clash Core from
-  the names here.
 
   Most of them are a single type constructor, which mentions no variables, so
   they are types in any scope: @'Type' n@ for all @n@. Those that bind type
@@ -88,12 +86,10 @@ import GHC.Num.Natural (Natural (..))
 import GHC.Types.SrcLoc (wiredInSrcSpan)
 
 import Clash.Core.Basic (ConstTy (..))
-import Clash.Core.DataCon (DataCon, DcName, DcStrictness (..))
+import Clash.Core.DataCon (DataCon, DcName, DcStrictness (..), mkDataCon)
 import Clash.Core.Name (Name (..), NameSort (User), mkUnsafeSystemName)
--- Through the boot file: the constructors derive the types of Clash Core from
--- the scoped ones, and Clash Core's builtin types are made from the names here
-import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkAlgTyCon, mkDataCon, mkPrimTyCon)
-import Clash.Core.TyCon (AlgTyConRhs (..), TyCon, TyConMap, TyConName)
+import Clash.Core.TyCon
+  (AlgTyConRhs (..), TyCon, TyConMap, TyConName, mkAlgTyCon, mkPrimTyCon)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (fromGhcUnique)
 

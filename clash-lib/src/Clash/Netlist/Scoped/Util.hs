@@ -12,6 +12,7 @@
   through newtypes and type families.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -72,7 +73,6 @@ import           Clash.Annotations.TopEntity (TopEntity)
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Scoped.Pretty    ()
-import qualified Clash.Core.Term             as C
 import           Clash.Core.Scoped.TermInfo  (MultiPrimInfo (..), multiPrimInfo')
 import           Clash.Util                  (ClashException (..), curLoc)
 
@@ -393,7 +393,7 @@ mkUniqueResult sc (Just (ExpandedTopEntity{et_output=Just iPort})) res = do
 -- Like Clash Core's 'Clash.Netlist.Util.mkUnique', which put it in the
 -- occurrence name of the variable, from where
 -- 'Clash.Netlist.Id.unsafeFromCoreId' made it an identifier again.
-uniqueIdentifier :: C.Name C.Term -> NetlistMonad Identifier
+uniqueIdentifier :: C.Name Term -> NetlistMonad Identifier
 uniqueIdentifier occ = Id.unsafeMake . Id.toText <$> Id.make (C.nameOcc occ)
 
 -- | Same as 'idToPort', but throws an error if the port is a composite type
@@ -492,7 +492,7 @@ renameBinder
   -> [(LocalId n, Term n)]
   -- ^ All let-bindings, for warnings
   -> (LocalId n, Term n)
-  -> NetlistMonad [(TmName n, C.Name C.Term)]
+  -> NetlistMonad [(TmName n, C.Name Term)]
 renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
   withTicks ctx ticks $ \_ -> do
     case k of
@@ -506,7 +506,7 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
 
   -- Routine for multi result primitives. For more info:
   -- 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'.
-  goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name C.Term)]
+  goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name Term)]
   goMulti pInfo (BlackBoxHaskell{function=(_, function)}) = do
     tcm <- Lens.view tcCache
     let MultiPrimInfo{mpi_resultCount} = multiPrimInfo' tcm pInfo
@@ -522,7 +522,7 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
   goMulti _ _ = pure []
 
   -- Routine for single result primitives (the default kind of primitive)
-  goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name C.Term)]
+  goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name Term)]
   goSingle pInfo (BlackBoxHaskell{function=(_, function)}) = do
     funRes <- preserveVarEnv $
       callBlackBoxFunction ctx function False (primName pInfo) args [localIdType i]
@@ -536,7 +536,7 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
 
   go
     :: Text -> [LocalId n] -> [Either (Term n) (Type n)] -> [BlackBox]
-    -> NetlistMonad [(TmName n, C.Name C.Term)]
+    -> NetlistMonad [(TmName n, C.Name Term)]
   go nm is0 bbArgs bbResultTemplates = do
     (bbCtx, _) <- preserveVarEnv (mkBlackBoxContext ctx nm Concurrent is0 bbArgs)
     be <- Lens.use backend

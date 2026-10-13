@@ -96,7 +96,6 @@ import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 
 import Clash.Core.Scoped.NameMap (NameMap, emptyNameMap, insertNameMap, sinkNameMap)
 import Clash.Core.Scoped.Subst
@@ -340,7 +339,7 @@ data FrameKind
   | KAppArg !(Maybe (Text, Int, Int))
   -- ^ See 'AppArg'
   | KTyAppC
-  | KLetBinding !(C.Name C.Term)
+  | KLetBinding !(C.Name Term)
   -- ^ Right-hand side of a let-binding, with the name of its binder
   | KLetBody
   | KLamBody
@@ -381,7 +380,7 @@ ctxFrames = go . tfPath
     LetBody _ -> KLetBody
     LetBindingRec bs i -> KLetBinding (teleOcc bs i)
 
-  teleOcc :: Tele IdBinder x y -> Int -> C.Name C.Term
+  teleOcc :: Tele IdBinder x y -> Int -> C.Name Term
   teleOcc TNil _ = error "ctxFrames: LetBindingRec index out of range"
   teleOcc (TCons b bs) i
     | i <= 0 = idBinderOcc b
@@ -399,7 +398,7 @@ isTickKind _ = False
 
 -- | The name of the binder of the closest let-binding whose right-hand side
 -- the subterm is in
-closestLetBinder :: TransformContext n -> Maybe (C.Name C.Term)
+closestLetBinder :: TransformContext n -> Maybe (C.Name Term)
 closestLetBinder ctx = case [nm | KLetBinding nm <- ctxFrames ctx] of
   nm : _ -> Just nm
   [] -> Nothing
@@ -408,7 +407,7 @@ closestLetBinder ctx = case [nm | KLetBinding nm <- ctxFrames ctx] of
 -- of that binder with @_@ and the given suffix appended, or just the suffix
 -- if the subterm isn't in the right-hand side of a let-binding. Its unique
 -- is not used: scoped binders get fresh names from the scope.
-mkDerivedName :: HasCallStack => TransformContext n -> C.OccName -> C.Name C.Term
+mkDerivedName :: HasCallStack => TransformContext n -> C.OccName -> C.Name Term
 mkDerivedName ctx sf = case closestLetBinder ctx of
   Just nm -> C.appendToName nm ('_' `Text.cons` sf)
   Nothing -> C.mkUnsafeInternalName sf 0

@@ -30,6 +30,7 @@
   'genCons', 'globals' and 'prims'.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -106,9 +107,9 @@ import Clash.Annotations.SynthesisAttributes (Attr (..))
 import Clash.Core.DataCon (DataCon, DcStrictness (Lazy))
 import Clash.Core.Literal (Literal (IntLiteral))
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C (NameMod (..))
+import qualified Clash.Core.Basic as C (NameMod (..))
 import Clash.Core.TyCon (AlgTyConRhs (DataTyCon), TyCon, TyConMap, TyConName, tyConName)
-import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (..), Type)
+import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (..))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (Unique)
 import GHC.Types.SrcLoc (noSrcSpan)
@@ -117,7 +118,8 @@ import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Builder
   ( Key, TyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, runClosedType, runDataConSig
   , varTyB )
-import Clash.Core.Scoped.Convert (mkAlgTyCon, mkDataCon, mkPrimTyCon)
+import Clash.Core.TyCon (mkAlgTyCon, mkPrimTyCon)
+import Clash.Core.DataCon (mkDataCon)
 import Clash.Core.Scoped.FreeVars (bindNameBinders, patNameBinders)
 import Clash.Core.Scoped.NameMap (idBinderNameBinders, tyBinderNameBinders)
 import Clash.Core.Scoped.Subst
@@ -182,7 +184,7 @@ data GenCon = GenCon
 -- universally and existentially quantified type variables, field types and
 -- result type
 mkGenDataCon
-  :: Text -> Unique -> [(Key, C.Name C.Type, TyB)] -> [(Key, C.Name C.Type, TyB)]
+  :: Text -> Unique -> [(Key, C.Name Type, TyB)] -> [(Key, C.Name Type, TyB)]
   -> [TyB] -> TyB -> DataCon
 mkGenDataCon nm u univ ext args res =
   mkDataCon (C.mkUnsafeName C.User nm u) 1 (runClosedType ty) (runDataConSig univ ext args)
@@ -191,7 +193,7 @@ mkGenDataCon nm u univ ext args res =
   ty = foldr (\(k, n, ki) -> forAllTyB k n ki) (funTyB args res) (univ <> ext)
 
 -- | A type variable of a signature, with the given key, name and kind
-sigTv :: Key -> Text -> TyB -> (Key, C.Name C.Type, TyB)
+sigTv :: Key -> Text -> TyB -> (Key, C.Name Type, TyB)
 sigTv k nm ki = (k, C.mkUnsafeName C.User nm (fromIntegral k), ki)
 
 typeB, natB :: TyB

@@ -107,7 +107,6 @@ import Clash.Sized.RTree (RTree)
 import Clash.Sized.Vector (Vec)
 import Clash.Unique (fromGhcUnique)
 
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.Builder (forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
 import Clash.Core.Scoped.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)

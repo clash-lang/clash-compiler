@@ -26,9 +26,9 @@ import Test.Tasty.HUnit
 
 import Clash.Annotations.Primitive (PrimitiveGuard (HasBlackBox))
 import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
+import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
 import qualified Clash.Core.TyCon as C
-import Clash.Core.Scoped.Convert (mkPrimInfo)
+import Clash.Core.Scoped.Syntax (mkPrimInfo)
 import Clash.Core.Scoped.Syntax (GlobalId, PrimInfo, PrimUnfolding (NoUnfolding), Term (Case))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..))

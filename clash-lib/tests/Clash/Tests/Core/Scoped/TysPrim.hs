@@ -19,7 +19,7 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.Name as C
 import Clash.Core.DataCon (DataCon (..), DcStrictness (..))
 import Clash.Core.TyCon (TyCon (..), TyConName, tyConDataCons)
-import qualified Clash.Core.Type as C (ConstTy (TyCon))
+import qualified Clash.Core.Basic as C (ConstTy (TyCon))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (Unique, fromGhcUnique)
 import qualified GHC.Builtin.Names as GHC

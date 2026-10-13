@@ -31,7 +31,6 @@ import qualified Control.Lens as Lens
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
@@ -137,7 +136,7 @@ floatLams sc bind e0 = collectLams e0 $ \ys e ->
     NonRec b _ -> strengthenTyId b
     Rec bs _ -> strengthenTyIds bs
 
-  teleOccs :: Tele IdBinder x y -> [C.Name C.Term]
+  teleOccs :: Tele IdBinder x y -> [C.Name Term]
   teleOccs = \case
     TNil -> []
     TCons b rest -> idBinderOcc b : teleOccs rest

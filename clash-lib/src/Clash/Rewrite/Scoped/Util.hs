@@ -36,6 +36,7 @@
   free variables with 'Clash.Core.Scoped.Subst.closeOver'.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -84,7 +85,6 @@ module Clash.Rewrite.Scoped.Util
 import qualified Control.Lens                as Lens
 import           Control.Monad.Extra         (partitionM)
 import qualified Control.Monad.Writer        as Writer
-import           Data.Coerce                 (coerce)
 import qualified Data.IntMap.Strict          as IntMap
 import qualified Data.IntSet                 as IntSet
 import qualified Data.List                   as List
@@ -95,7 +95,6 @@ import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.Basic             (InlineSpec (..))
 
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Term             as C
 import           Clash.Netlist.Util          (representableTypeState)
 import           Clash.Rewrite.Types
   (RewriteMonad, curFun, customReprs, scopedTypeEnv, typeTranslator)
@@ -132,7 +131,7 @@ mkTmBinderFor
   -- ^ The term to bind
   -> (forall l. DExt n l => Scope l -> IdBinder n l -> r)
   -> r
-mkTmBinderFor te sc nm e = withFreshIdBinder sc (coerce nm) (inferCoreTypeOf te sc e)
+mkTmBinderFor te sc nm e = withFreshIdBinder sc (C.castName nm) (inferCoreTypeOf te sc e)
 
 -- | Make a binder with a fresh name for a term or a type, of the type of the
 -- term or the kind of the type.
@@ -149,7 +148,7 @@ mkBinderFor
 mkBinderFor te sc nm arg k = case arg of
   Left e -> mkTmBinderFor te sc nm e (\sc' b -> k sc' (AbsId b))
   Right ty ->
-    withFreshTyBinder sc (coerce nm) (inferCoreKindOf te sc ty) (\sc' b -> k sc' (AbsTy b))
+    withFreshTyBinder sc (C.castName nm) (inferCoreKindOf te sc ty) (\sc' b -> k sc' (AbsTy b))
 
 -- * Types
 
@@ -220,7 +219,7 @@ dependencySortTyVars tvs = reverse (snd (List.foldl' visit (IntSet.empty, []) tv
 -- | A binding of a let-expression, in the scope @l@ of the body of the
 -- let-expression, see 'openLetBindings'
 data LetBinding (l :: S) = LetBinding
-  { lbOcc :: !(C.Name C.Term)
+  { lbOcc :: !(C.Name Term)
   -- ^ The human readable name of the binder
   , lbType :: !(Type l)
   -- ^ The type of the binder

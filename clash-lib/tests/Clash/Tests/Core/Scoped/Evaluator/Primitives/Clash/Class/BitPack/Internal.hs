@@ -26,7 +26,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Builder (TmB, TyB, appB, dataB, literalB)
-import Clash.Core.Scoped.Convert (mkAlgTyCon)
+import Clash.Core.TyCon (mkAlgTyCon)
 import Clash.Core.Scoped.Evaluator.Types (Env)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Core.Scoped.TysPrim (liftedTypeKind)

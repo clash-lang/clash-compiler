@@ -7,6 +7,7 @@
   results are those that "Clash.Core.EqSolver" gave.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -24,7 +25,7 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (NumTy))
+import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 
 import Clash.Core.Scoped.Builder (TyB, appTyB, constTyB, litTyB)

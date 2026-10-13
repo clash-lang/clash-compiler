@@ -219,13 +219,11 @@ import Test.Tasty.QuickCheck
 
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
+import qualified Clash.Core.Basic as C
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
 import Clash.Core.Scoped.Builder
   (appB, primB, runClosedTerm, runClosedType, runTermIn, runTypeIn)
-import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars (HasNameBinder (..), freeTmVars, freeTyVars, freeTyVarsOfType)
 import Clash.Core.Scoped.Internal.Names
   ( TmName (UnsafeTmName), TmNameBinder (UnsafeTmNameBinder), TyName (UnsafeTyName)

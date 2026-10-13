@@ -15,8 +15,8 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.Literal as C
-import qualified Clash.Core.Term as C (WorkInfo (WorkVariable))
-import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (NumTy))
+import qualified Clash.Core.Basic as C (WorkInfo (WorkVariable))
+import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 
 import Clash.Core.Scoped.Builder (TyB, appTyB, constTyB, litTyB)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv)

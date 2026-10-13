@@ -6,6 +6,8 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Random generation of names.
 -}
 
+{-# LANGUAGE PolyKinds #-}
+
 module Clash.Hedgehog.Core.Name
   ( genKindName
   , genTypeName
@@ -26,10 +28,11 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Gen.Faker as Gen
 
 import Clash.Core.DataCon (DcName)
-import qualified Clash.Core.Term as C (Term)
+
 import Clash.Core.TyCon (TyConName)
-import qualified Clash.Core.Type as C (Type)
+
 import Clash.Core.Name
+import Clash.Core.Scoped.Syntax (Term, Type)
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 
@@ -53,18 +56,18 @@ genName genOccName =
     <*> pure noSrcSpan
 
 -- | The human readable name of a kind variable. Its unique is not used.
-genKindName :: forall m. MonadGen m => m (Name C.Type)
+genKindName :: forall m. MonadGen m => m (Name Type)
 genKindName = genName (genOccNameWith Text.toTitle)
 
 -- | The human readable name of a type variable. Its unique is not used.
-genTypeName :: forall m. MonadGen m => m (Name C.Type)
+genTypeName :: forall m. MonadGen m => m (Name Type)
 genTypeName = genName (genOccNameWith Text.toTitle)
 
 genTyConName :: forall m. MonadGen m => m TyConName
 genTyConName = genName (genOccNameWith Text.toTitle)
 
 -- | The human readable name of a term variable. Its unique is not used.
-genTermName :: forall m. MonadGen m => m (Name C.Term)
+genTermName :: forall m. MonadGen m => m (Name Term)
 genTermName = genName (genOccNameWith Text.toLower)
 
 genDataConName :: forall m. MonadGen m => m DcName

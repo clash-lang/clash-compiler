@@ -24,7 +24,7 @@ import Test.Tasty.QuickCheck (Property, testProperty, (===))
 
 import qualified Clash.Core.Literal as C
 import Clash.Core.Name (nameOcc)
-import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (NumTy))
+import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeSession, NormalizeState)

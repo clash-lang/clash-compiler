@@ -95,7 +95,6 @@ import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
 import           Clash.Core.Scoped.Type
   (SplitCoreFunForall (..), isPolyTy, piTeleTyArity, splitCoreFunForallTy)
 import           Clash.Core.Scoped.Alpha          (aeqTy)
-import           Clash.Core.Scoped.Convert        (mkGlobalId)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization

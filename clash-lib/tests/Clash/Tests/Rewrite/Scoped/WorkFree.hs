@@ -16,10 +16,9 @@ import Control.Monad.Trans.State.Strict (evalState, runState)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (..))
+import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (..))
 
 import Clash.Core.Scoped.Builder (TmB, appB, deDupTickB, primB, tickB)
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv, lookupGlobalEnv)
 import Clash.Core.Scoped.Syntax
 import qualified Clash.Core.Scoped.TysPrim as P

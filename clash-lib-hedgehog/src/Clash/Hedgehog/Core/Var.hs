@@ -33,9 +33,8 @@ module Clash.Hedgehog.Core.Var
 import Hedgehog (MonadGen)
 
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C (Term)
-import qualified Clash.Core.Type as C (Type)
-import Clash.Core.Scoped.Convert (mkGlobalId)
+
+
 import Clash.Core.Scoped.Subst (withFreshIdBinder, withFreshIdBinders, withFreshTyBinder)
 import Clash.Core.Scoped.Syntax
 
@@ -67,7 +66,7 @@ genTyVar
    . (MonadGen m, Distinct n)
   => Env n
   -> Kind n
-  -> m (C.Name C.Type)
+  -> m (C.Name Type)
   -> (forall l. DExt n l => Env l -> TyBinder n l -> m r)
   -> m r
 genTyVar env kn genName k = do
@@ -83,7 +82,7 @@ genTyVars
    . (MonadGen m, Distinct n)
   => Env n
   -> [Kind n]
-  -> m (C.Name C.Type)
+  -> m (C.Name Type)
   -> (forall l. DExt n l => Env l -> Tele TyBinder n l -> [Type l] -> m r)
   -> m r
 genTyVars env [] _ k = k env TNil []
@@ -99,7 +98,7 @@ genLocalId
    . (MonadGen m, Distinct n)
   => Env n
   -> Type n
-  -> m (C.Name C.Term)
+  -> m (C.Name Term)
   -> (forall l. DExt n l => Env l -> IdBinder n l -> m r)
   -> m r
 genLocalId env ty genName k = do
@@ -114,7 +113,7 @@ genLocalIds
    . (MonadGen m, Distinct n)
   => Env n
   -> [Type n]
-  -> m (C.Name C.Term)
+  -> m (C.Name Term)
   -> (forall l. DExt n l => Env l -> Tele IdBinder n l -> [Term l] -> m r)
   -> m r
 genLocalIds env tys genName k = do
@@ -123,7 +122,7 @@ genLocalIds env tys genName k = do
     k (extendEnv sc [] vs env) bs vs
 
 -- | Generate a global identifier of the specified (closed) type.
-genGlobalId :: forall m. MonadGen m => Type 'VoidS -> m (C.Name C.Term) -> m GlobalId
+genGlobalId :: forall m. MonadGen m => Type 'VoidS -> m (C.Name Term) -> m GlobalId
 genGlobalId ty genName = do
   name <- genName
   pure (mkGlobalId name ty)

@@ -28,9 +28,6 @@
   * Global variables, primitives and data constructors are encoded in full at
     every occurrence.
 
-  Only the scoped fields are encoded, not the legacy ones (see "Transition" in
-  "Clash.Core.Scoped.Syntax").
-
   = Decoding
 
   Decoding goes through the builders of "Clash.Core.Scoped.Builder", which
@@ -42,9 +39,7 @@
   GHC2Core, gives back the same raw names. Decoding also builds a term lazily,
   as GHC2Core does: the scoped term is built when it is first used.
 
-  An occurrence takes the human readable name and the type of its binder,
-  like the conversion from Clash Core does
-  ('Clash.Core.Scoped.Convert.fromClashTerm').
+  An occurrence takes the human readable name and the type of its binder.
 
   = Files
 
@@ -53,6 +48,7 @@
   'decodeWithHeader' write and read it.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -90,14 +86,12 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C (Term)
+
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon (..))
 import GHC.SrcLoc.Extra ()
 
 import Clash.Core.Scoped.Builder
-import Clash.Core.Scoped.Convert
-  (mkAlgTyCon, mkDataCon, mkFunTyCon, mkGlobalId, mkNewTyConRhs, mkPrimInfo,
-   mkPrimTyCon, mkPromotedDataCon)
+import Clash.Core.DataCon (mkDataCon)
 import Clash.Core.Scoped.NameMap (GlobalEnv, globalEnvFromList, globalEnvToList)
 import Clash.Core.Scoped.Sig (DataConSig (..), NewTyConSig (..), TyFamEqn (..))
 import Clash.Core.Scoped.Syntax
@@ -319,7 +313,7 @@ instance Binary (Term 'VoidS) where
 -- | Its name and its type
 instance Binary GlobalId where
   put g = put (globalIdName g) >> putType (globalIdType g)
-  get = mkGlobalId <$> (get :: Get (C.Name C.Term)) <*> get
+  get = mkGlobalId <$> (get :: Get (C.Name Term)) <*> get
 
 instance Binary PrimUnfolding where
   put = \case
@@ -376,28 +370,26 @@ instance Binary DataCon where
 instance Binary AlgTyConRhs where
   put = \case
     DataTyCon dcs -> putWord8 0 >> put dcs
-    NewTyCon dc sig _ -> putWord8 1 >> put dc >> put sig
+    NewTyCon dc sig -> putWord8 1 >> put dc >> put sig
   get = getWord8 >>= \case
     0 -> DataTyCon <$> get
-    1 -> mkNewTyConRhs <$> get <*> get
+    1 -> NewTyCon <$> get <*> get
     t -> fail ("Binary AlgTyConRhs: unknown tag " <> show t)
 
 -- | Its unique need not be that of its name
 instance Binary TyCon where
   put = \case
-    AlgTyCon u nm k ar rhs cls _ ->
+    AlgTyCon u nm k ar rhs cls ->
       putWord8 0 >> put u >> put nm >> put k >> put ar >> put rhs >> put cls
-    PromotedDataCon u nm k ar dc _ ->
+    PromotedDataCon u nm k ar dc ->
       putWord8 1 >> put u >> put nm >> put k >> put ar >> put dc
-    FunTyCon u nm k ar eqns _ _ ->
+    FunTyCon u nm k ar eqns ->
       putWord8 2 >> put u >> put nm >> put k >> put ar >> put eqns
-    PrimTyCon u nm k ar _ ->
+    PrimTyCon u nm k ar ->
       putWord8 3 >> put u >> put nm >> put k >> put ar
   get = getWord8 >>= \case
-    0 -> withUniq <$> get <*> (mkAlgTyCon <$> get <*> get <*> get <*> get <*> get)
-    1 -> withUniq <$> get <*> (mkPromotedDataCon <$> get <*> get <*> get <*> get)
-    2 -> withUniq <$> get <*> (mkFunTyCon <$> get <*> get <*> get <*> get)
-    3 -> withUniq <$> get <*> (mkPrimTyCon <$> get <*> get <*> get)
+    0 -> AlgTyCon <$> get <*> get <*> get <*> get <*> get <*> get
+    1 -> PromotedDataCon <$> get <*> get <*> get <*> get <*> get
+    2 -> FunTyCon <$> get <*> get <*> get <*> get <*> get
+    3 -> PrimTyCon <$> get <*> get <*> get <*> get
     t -> fail ("Binary TyCon: unknown tag " <> show t)
-   where
-    withUniq u tc = tc {tyConUniq = u}

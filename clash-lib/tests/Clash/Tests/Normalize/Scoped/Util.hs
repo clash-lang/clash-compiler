@@ -28,14 +28,13 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkConstant))
+import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkConstant))
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeState (..), TermClassification (..))
 import qualified Clash.Rewrite.Scoped as Scoped (changed)
 import Clash.Rewrite.Types (RewriteState (..))
 
 import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TermInfo (isClosed)

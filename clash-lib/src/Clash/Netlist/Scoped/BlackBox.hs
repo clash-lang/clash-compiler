@@ -119,7 +119,6 @@ import           Clash.Core.Scoped.Subst
   (extendTmSubst, idSubst, openBind, openIdBinder, openTyBinder, substTm,
    teleIdVars, withFreshIdBinder)
 import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Convert (mkPrimInfo)
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import           Clash.Core.Scoped.TermInfo

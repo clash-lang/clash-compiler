@@ -47,7 +47,8 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), LitTy (NumTy), WorkInfo (WorkNever))
 
 import Clash.Core.Scoped.Builder (runDataConSig)
-import Clash.Core.Scoped.Convert (mkDataCon, mkPrimInfo)
+import Clash.Core.DataCon (mkDataCon)
+import Clash.Core.Scoped.Syntax (mkPrimInfo)
 import qualified Clash.Core.Scoped.Syntax as S
 
 import Test.Clash.Scoped (closedType)

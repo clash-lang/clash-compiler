@@ -52,11 +52,11 @@
     the types of the field binders live in the scope extended with the
     existential type variables.
 
-  * __Occurrences carry their type__, like Clash's @'C.Var' 'C.Id'@ does, so
-    that analyses don't need a typing environment.
+  * __Occurrences carry their type__, so that analyses don't need a typing
+    environment.
 
   * __The types of term variables are lazy__, in t'IdBinder' and 'Var', like
-    'C.varType': a type that nothing asks for is never computed. E.g. the
+    the types of the variables of GHC Core: a type that nothing asks for is never computed. E.g. the
     evaluator ("Clash.Core.Scoped.Evaluator") let-binds the arguments it
     applies functions to, with the type of the argument, which often nothing
     needs. Everything else is strict.
@@ -68,32 +68,10 @@
     them (see "Clash.Core.Scoped.NameMap"), so they can't be confused.
 
   * __Names keep their Clash metadata__ (occurrence name, sort, source
-    location) as a 'C.Name' whose unique is ignored: the scoped name is the
-    raw name of the binder.
+    location) as a 'Clash.Core.Name.Name' whose unique is ignored: the scoped
+    name is the raw name of the binder.
 
   * __A scope is a watermark__, not a set of names, see 'Scope'.
-
-  = Transition
-
-  Global variables ('GlobalId'), primitives ('PrimInfo'), data constructors
-  ('DataCon') and type constructors ('Clash.Core.TyCon.TyCon') are shared with
-  Clash Core while the port lasts. They follow one rule:
-
-  * __The scoped fields are the truth__: e.g. 'globalIdType', 'primType',
-    'Clash.Core.DataCon.dcType' and 'Clash.Core.DataCon.dcSig'.
-
-  * __The legacy fields are derived lazily__ from them, for the code that
-    still uses Clash Core: 'globalIdLegacy', 'primLegacy',
-    'Clash.Core.DataCon.dcLegacy', and the fields of 'Clash.Core.TyCon.TyCon'
-    named @Legacy@. Code that uses scoped Core doesn't read them.
-
-  * __They are made by the constructors of "Clash.Core.Scoped.Convert"__, which
-    take one side and derive the other one lazily: e.g.
-    'Clash.Core.Scoped.Convert.mkGlobalId' takes the scoped side, and
-    'Clash.Core.Scoped.Convert.mkGlobalIdFromClash' the side of Clash Core.
-
-  * __The legacy fields are deleted__ with Clash Core, in package B of the
-    port. What remains are the scoped fields.
 -}
 
 {-# LANGUAGE FlexibleInstances #-}
@@ -135,9 +113,11 @@ module Clash.Core.Scoped.Syntax
   , tmNameBinderName
     -- * Global names
   , GlobalId (..)
+  , mkGlobalId
   , globalIdUniq
     -- * Primitives
   , PrimInfo (..)
+  , mkPrimInfo
   , PrimUnfolding (..)
     -- * Binders
   , TyBinder (..)
@@ -173,14 +153,10 @@ import GHC.Types.SrcLoc (SrcSpan)
 
 import Clash.Annotations.SynthesisAttributes (Attr)
 import Clash.Core.Basic (ConstTy, IsMultiPrim, LitTy, NameMod, WorkInfo)
--- Through boot files: data constructors store scoped types, and so will type
--- constructors, which the types of Clash Core refer to
+-- Through a boot file: data constructors store scoped types
 import {-# SOURCE #-} Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
-import {-# SOURCE #-} qualified Clash.Core.Term as C
-import {-# SOURCE #-} qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 import Clash.Unique (Uniquable (..), Unique)
 
 import Clash.Core.Scoped.Internal.Names
@@ -190,24 +166,12 @@ import Clash.Core.Scoped.Internal.Scope
 
 -- | A global variable: one that refers to a top-level binding. Its type is
 -- closed.
---
--- = Transition
---
--- The scoped fields, 'globalIdName' and 'globalIdType', are the truth.
--- 'globalIdLegacy' is the global variable as Clash Core's 'C.Id', for the
--- code that still uses Clash Core. It is derived lazily, and is deleted with
--- Clash Core (package B of the port). Make global variables with
--- 'Clash.Core.Scoped.Convert.mkGlobalId' or
--- 'Clash.Core.Scoped.Convert.mkGlobalIdFromClash', which derive the side they
--- are not given.
 data GlobalId = GlobalId
-  { globalIdName :: !(C.Name C.Term)
+  { globalIdName :: !(C.Name Term)
   -- ^ Its name, whose unique identifies it
   , globalIdType :: Type 'VoidS
   -- ^ Its type. Lazy, like the types of local variables (see the module
   -- header).
-  , globalIdLegacy :: C.Id
-  -- ^ Transitional, see above. Lazy.
   }
 
 -- | Shows the name and the type
@@ -237,6 +201,10 @@ instance Uniquable GlobalId where
   getUnique = globalIdUniq
   setUnique g u = g {globalIdName = (globalIdName g) {C.nameUniq = u}}
 
+-- | A global variable with the given name and closed type
+mkGlobalId :: C.Name Term -> Type 'VoidS -> GlobalId
+mkGlobalId = GlobalId
+
 -- | The unique of a global variable
 globalIdUniq :: GlobalId -> Unique
 globalIdUniq = C.nameUniq . globalIdName
@@ -244,16 +212,8 @@ globalIdUniq = C.nameUniq . globalIdName
 
 -- * Primitives
 
--- | A primitive: Clash's 'C.PrimInfo', with a closed scoped type.
---
--- = Transition
---
--- The scoped fields are the truth. 'primLegacy' is the primitive as Clash
--- Core's 'C.PrimInfo', for the code that still uses Clash Core. It is derived
--- lazily, and is deleted with Clash Core (package B of the port). Make
--- primitives with 'Clash.Core.Scoped.Convert.mkPrimInfo' or
--- 'Clash.Core.Scoped.Convert.mkPrimInfoFromClash', which derive the side they
--- are not given.
+-- | A primitive: its name, closed type, what work it does, whether it
+-- returns its results as one value, and the binding that implements it
 data PrimInfo = PrimInfo
   { primName :: !Text
   , primType :: Type 'VoidS
@@ -262,12 +222,15 @@ data PrimInfo = PrimInfo
   -- 'Clash.Core.Scoped.HasType.primInfoType'.
   , primWorkInfo :: !WorkInfo
   , primMultiResult :: !IsMultiPrim
+  -- ^ Primitive with multiple return values. Useful for primitives that
+  -- cannot return their results as a single product type, due to limitation
+  -- of synthesis tooling. It will be applied to its normal arguments, followed
+  -- by the variables it should assign its results to.
+  --
+  -- See: 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'
   , primUnfolding :: !PrimUnfolding
-  , primLegacy :: C.PrimInfo
-  -- ^ Transitional, see above. Lazy.
   }
 
--- | Doesn't show the legacy part
 instance Show PrimInfo where
   showsPrec d p =
     showParen (d > 10) $
@@ -282,6 +245,11 @@ instance NFData PrimInfo where
   rnf p =
     rnf (primName p) `seq` rnf (primWorkInfo p) `seq` rnf (primMultiResult p)
       `seq` rnf (primUnfolding p)
+
+-- | A primitive with the given name, closed type, work info, multi-result
+-- info and unfolding
+mkPrimInfo :: Text -> Type 'VoidS -> WorkInfo -> IsMultiPrim -> PrimUnfolding -> PrimInfo
+mkPrimInfo = PrimInfo
 
 -- | The binding that implements a primitive, if any
 data PrimUnfolding
@@ -298,7 +266,7 @@ instance NFData PrimUnfolding where
 
 -- | A type variable binder, extending scope @n@ to @l@. Its kind lives in @n@.
 data TyBinder (n :: S) (l :: S) = TyBinder
-  { tyBinderOcc  :: !(C.Name C.Type)
+  { tyBinderOcc  :: !(C.Name Type)
   -- ^ Human readable name. Its unique is /not/ used.
   , tyBinderKind :: !(Kind n)
   , tyBinderName :: !(TyNameBinder n l)
@@ -308,7 +276,7 @@ type role TyBinder nominal nominal
 
 -- | A term variable binder, extending scope @n@ to @l@. Its type lives in @n@.
 data IdBinder (n :: S) (l :: S) = IdBinder
-  { idBinderOcc  :: !(C.Name C.Term)
+  { idBinderOcc  :: !(C.Name Term)
   -- ^ Human readable name. Its unique is /not/ used.
   , idBinderType :: Type n
   -- ^ Lazy, see the module header
@@ -358,10 +326,10 @@ teleLength = go 0
 
 -- * Types
 
--- | Clash's 'C.Type', with scoped type variables
+-- | Types, with scoped type variables
 data Type (n :: S) where
   -- | Type variable occurrence: human readable name, kind, and the name itself
-  VarTy    :: !(C.Name C.Type) -> !(Kind n) -> !(TyName n) -> Type n
+  VarTy    :: !(C.Name Type) -> !(Kind n) -> !(TyName n) -> Type n
   ConstTy  :: !ConstTy -> Type n
   ForAllTy :: !(TyBinder n l) -> !(Type l) -> Type n
   AppTy    :: !(Type n) -> !(Type n) -> Type n
@@ -376,11 +344,11 @@ type Kind = Type
 
 -- * Terms
 
--- | Clash's 'C.Term', with scoped local variables
+-- | Terms, with scoped local variables
 data Term (n :: S) where
   -- | Local variable occurrence: human readable name, type (lazy, see the
   -- module header), and the name itself
-  Var       :: !(C.Name C.Term) -> Type n -> !(TmName n) -> Term n
+  Var       :: !(C.Name Term) -> Type n -> !(TmName n) -> Term n
   -- | Global variable. Globals are not scoped, and have closed types.
   GlobalVar :: !GlobalId -> Term n
   Data      :: !DataCon -> Term n
@@ -430,7 +398,8 @@ type role Pat nominal nominal
 
 deriving instance Show (Pat n l)
 
--- | Clash's 'C.TickInfo', with scoped types and terms
+-- | Ticks: source locations, name modifiers, deduplication hints and
+-- synthesis attributes, with scoped types and terms
 data TickInfo (n :: S)
   = SrcSpan !SrcSpan
   | NameMod !NameMod !(Type n)

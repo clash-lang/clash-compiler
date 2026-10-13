@@ -291,7 +291,6 @@ import qualified Clash.Sized.Vector
 
 import Clash.Core.Scoped.Builder
   (Key, TyB, forAllTyB, funTyB, litTyB, runClosedType, tyConAppB, varTyB)
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.TysPrim
   (integerPrimTyConName, liftedTypeKindTyConName, naturalPrimTyConName, typeNatAdd,
    typeNatKindTyConName, wordPrimTyConName)

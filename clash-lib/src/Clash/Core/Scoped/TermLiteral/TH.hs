@@ -38,12 +38,6 @@ import           Clash.Core.Name                 (nameOcc)
 import           Clash.Core.Scoped.Syntax        (Term(Data))
 import           Clash.Core.Scoped.Term          (collectArgs)
 
--- Workaround for a strange GHC bug, where it complains about Subst only
--- existing as a boot file:
---
--- module Clash.Core.Subst cannot be linked; it is only available as a boot module
-import Clash.Core.Subst ()
-
 type CompatTyVarBndr = TyVarBndr ()
 
 dcName' :: DataCon -> String

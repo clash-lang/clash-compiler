@@ -71,7 +71,6 @@ import           GHC.Types.SrcLoc            (SrcSpan)
 import Clash.Core.Basic (LitTy (..), NameMod (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
-import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C (TyConName)
 import           Clash.Debug                 (traceIf)
 import           Clash.Driver.Types
@@ -84,7 +83,6 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (fromGhcUnique)
 
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
-import           Clash.Core.Scoped.Convert   (mkGlobalId)
 import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
@@ -229,7 +227,7 @@ constantSpecInfo ctx = constantSpecInfoIn (mkDerivedName ctx) (tfScope ctx)
 -- with the context's way of naming new binders
 constantSpecInfoIn
   :: (HasCallStack, Distinct n)
-  => (C.OccName -> C.Name C.Term)
+  => (C.OccName -> C.Name Term)
   -> Scope n
   -> Term n
   -> NormalizeSession (ConstantSpecInfo n)
@@ -284,7 +282,7 @@ constantCsr sc e = ConstantSpecInfo sc TNil e True
 -- | Bind a term to a new variable: it is fully non-constant
 bindCsr
   :: Distinct n
-  => (C.OccName -> C.Name C.Term)
+  => (C.OccName -> C.Name Term)
   -> Scope n
   -> Term n
   -> NormalizeSession (ConstantSpecInfo n)
@@ -300,7 +298,7 @@ bindCsr mkNm sc oldTerm = do
 mergeCsrs
   :: forall n
    . (HasCallStack, Distinct n)
-  => (C.OccName -> C.Name C.Term)
+  => (C.OccName -> C.Name Term)
   -> Scope n
   -> [TickInfo n]
   -- ^ Ticks to wrap around proposed new term

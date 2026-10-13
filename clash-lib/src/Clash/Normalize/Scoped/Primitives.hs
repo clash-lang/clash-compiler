@@ -21,7 +21,7 @@ import Data.Text (Text)
 import Clash.Core.Basic
   (IsMultiPrim (..), WorkInfo (..), removedArgName, undefinedName, undefinedXName)
 
-import Clash.Core.Scoped.Convert (mkPrimInfo)
+import Clash.Core.Scoped.Syntax (mkPrimInfo)
 import Clash.Core.Scoped.Syntax (PrimInfo, PrimUnfolding (..))
 import Clash.Core.Scoped.TysPrim (undefinedTy)
 

@@ -40,7 +40,6 @@ import Clash.Core.Scoped.HasType (primInfoType)
 import Clash.Core.Scoped.Subst
   (Subst, idSubst, substScope, substTy, substTyBinder, withFreshIdBinders, withFreshTyBinder)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.Term (mkApps, mkLams, mkTmApps, mkTyApps, mkTyLams)
 import Clash.Core.Scoped.TermInfo (MultiPrimInfo (..), multiPrimInfo')
 import Clash.Core.Scoped.Type

@@ -6,6 +6,7 @@
   Tests for data constructors in scoped Clash Core
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}

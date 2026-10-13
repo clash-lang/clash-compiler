@@ -54,9 +54,8 @@ import           Clash.Core.Pretty              (unsafeLookupEnvBool)
 import           Clash.Core.Scoped.NameMap      (GlobalEnv)
 import           Clash.Core.Scoped.Binary       ()
 import qualified Clash.Core.Scoped.Syntax       as Scoped
-import           Clash.Core.Term                (Term)
+
 import           Clash.Core.TyCon               (TyConMap, TyConName)
-import           Clash.Core.VarEnv              (VarEnv)
 import           Clash.Driver.Bool              (OverridingBool(..))
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
@@ -118,14 +117,9 @@ data Binding a = Binding
   , bindingRecursive :: Bool
     -- ^ Whether the binding is recursive.
     --
-    -- TODO Ideally the BindingMap would store recursive and non-recursive
+    -- TODO Ideally the GlobalBindings would store recursive and non-recursive
     -- bindings in a way similar to Let / Letrec. GHC also does this.
   } deriving (Binary, Functor, Generic, NFData, Show)
-
--- | Global function binders
---
--- Global functions cannot be mutually recursive, only self-recursive.
-type BindingMap = VarEnv (Binding Term)
 
 -- | Global function binders of scoped Clash Core ("Clash.Core.Scoped.Syntax"):
 -- closed terms, keyed by their 'Clash.Core.Scoped.Syntax.GlobalId'.

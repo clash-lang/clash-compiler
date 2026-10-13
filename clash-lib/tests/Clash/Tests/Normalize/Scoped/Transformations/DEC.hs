@@ -31,8 +31,8 @@ import qualified Data.List as List
 import Data.String (fromString)
 
 import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkVariable))
-import Clash.Core.Scoped.Convert (mkPrimInfo)
+import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkVariable))
+import Clash.Core.Scoped.Syntax (mkPrimInfo)
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.Scoped.Syntax

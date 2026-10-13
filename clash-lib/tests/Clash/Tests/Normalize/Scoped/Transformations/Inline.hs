@@ -23,7 +23,7 @@ import GHC.Types.SourceText (SourceText (NoSourceText))
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkIdentity))
+import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkIdentity))
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Inline as S
 import Clash.Normalize.Types (NormalizeState)
@@ -31,7 +31,6 @@ import Clash.Rewrite.Scoped (ScopedRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences)
 import Clash.Core.Scoped.NameMap (GlobalEnv, emptyNameMap, globalEnvFromList, nameMapFromList)
 import Clash.Core.Scoped.Syntax

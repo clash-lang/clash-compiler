@@ -25,14 +25,13 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C (IsMultiPrim (MultiResult), WorkInfo (WorkNever))
-import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (CharTy))
+import qualified Clash.Core.Basic as C (IsMultiPrim (MultiResult), WorkInfo (WorkNever))
+import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (CharTy))
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Builder
   ( TmB, TyB, annTyB, appB, appTyB, castB, constTyB, deDupTickB, forAllTyB, funTyB, litTyB, primB
   , runClosedType, tickB, tyAppB, tyLamB, varTyB)
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.HasType
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type (mkFunTy)

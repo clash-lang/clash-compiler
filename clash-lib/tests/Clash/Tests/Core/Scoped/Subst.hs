@@ -13,6 +13,7 @@
   substitution that doesn't rename, on terms whose binders can't capture.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
