@@ -83,7 +83,6 @@ import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Var              as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
@@ -354,7 +353,7 @@ specializeArgIn sc e (fHd, args, ticks) specArgIn = case fHd of
           -- Create a new function if an alpha-equivalent binder doesn't exist
           Nothing -> do
             (cf, sp) <- Lens.use curFun
-            mkFunction (C.appendToName (C.varName cf) "_specF") sp NoUserInlinePrag newBody
+            mkFunction (C.appendToName (globalIdName cf) "_specF") sp NoUserInlinePrag newBody
           Just g -> pure g
         -- Create specialized argument
         let newArg = Left (mkApps (GlobalVar newf) (specVarArgs specTvs specIds))

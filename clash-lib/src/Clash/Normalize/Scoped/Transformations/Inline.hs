@@ -110,7 +110,6 @@ import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.TermInfo (isClosed, isLocalVar, termSizeSmallerThan)
@@ -133,7 +132,7 @@ import Clash.Rewrite.Scoped.WorkFree (isWorkFreeIsh)
 -- | The function being normalized, see 'Clash.Rewrite.Types.curFun'. It is
 -- always a global, but need not have a binding.
 curFunGlobal :: NormalizeSession GlobalId
-curFunGlobal = mkGlobalIdFromClash . fst <$> Lens.use curFun
+curFunGlobal = fst <$> Lens.use curFun
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators). See

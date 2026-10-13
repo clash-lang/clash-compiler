@@ -51,6 +51,7 @@ import Test.Clash.Rewrite
   , pairDataCon, pairTy, parseTyConTy, runRewriteTest, tyVar )
 import Test.Clash.Scoped (assertRewritesAgree)
 import Test.Clash.Scoped.ViaFoil (viaFoil)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- | The ports, on terms of Clash Core: through
 -- 'Test.Clash.Scoped.ViaFoil.viaFoil'
@@ -173,7 +174,7 @@ elimCastCastTests = testGroup "elimCastCast"
       let tm = Cast (Cast (Var x) intTy aTy) intTy intTy
           run rw = do
             supply <- newSupply
-            let st = def{_uniqSupply = supply, _curFun = (globalId User "top" 60 intTy, noSrcSpan)}
+            let st = def{_uniqSupply = supply, _curFun = (mkGlobalIdFromClash (globalId User "top" 60 intTy), noSrcSpan)}
                        :: RewriteState NormalizeState
                 ctx = TransformContext (extendInScopeSet (inScopeOf [x]) a) []
             r <- try (runRewriteTest def st (crElimCastCast rw ctx tm))

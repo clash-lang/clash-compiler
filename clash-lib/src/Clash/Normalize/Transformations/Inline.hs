@@ -94,7 +94,7 @@ import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
   , toTransformation)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, tcCache, topEntities
+  ( TransformContext(..), bindings, curFunLegacy, tcCache, topEntities
   , inlineConstantLimit, inlineFunctionLimit, inlineLimit
   , inlineWFCacheLimit, primitives)
 import Clash.Rewrite.Util
@@ -141,7 +141,7 @@ bindConstantVarWorker = inlineBinders test
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
       True -> return (i `notElemFreeVars` e)
       _    -> do
-        (fn,_) <- Lens.use curFun
+        (fn,_) <- Lens.use curFunLegacy
         -- Don't inline globally recursive calls, it prevents the
         -- recToLetRec transformation from transforming global recursion to
         -- local recursion.
@@ -452,7 +452,7 @@ collapseRHSNoopsWorker
   :: HasCallStack
   => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 collapseRHSNoopsWorker _ letrec letBind body = do
-  (curFunId, _) <- Lens.use curFun
+  (curFunId, _) <- Lens.use curFunLegacy
   curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
   case curBinding of
     Just binding | isNoInline (bindingSpec binding) -> do
@@ -575,7 +575,7 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
   | (Var f, args,ticks) <- collectArgsTicks scrut
   , isGlobalId f
   = do
-    (cf,_)    <- Lens.use curFun
+    (cf,_)    <- Lens.use curFunLegacy
     isInlined <- zoomExtra (alreadyInlined f cf)
     limit     <- Lens.view inlineLimit
     tcm       <- Lens.view tcCache

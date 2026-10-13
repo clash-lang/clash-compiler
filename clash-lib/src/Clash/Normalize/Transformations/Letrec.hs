@@ -83,7 +83,7 @@ import Clash.Rewrite.StrategyDSL
   , onPrimNode, onTickNode, onTyAppNode, toTransformation
   )
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders, primitives)
+  (TransformContext(..), bindings, curFunLegacy, tcCache, workFreeBinders, primitives)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatable, mkTmBinderFor, removeUnusedBinders, setChanged)
 import Clash.Rewrite.WorkFree
@@ -362,7 +362,7 @@ flattenLetWorker _ e = return e
 -- found in the body of the top-level let-expression.
 recToLetRec :: HasCallStack => NormRewrite
 recToLetRec (TransformContext is0 []) e = do
-  (fn,_) <- Lens.use curFun
+  (fn,_) <- Lens.use curFunLegacy
   tcm    <- Lens.view tcCache
   case splitNormalized tcm e of
     Right (args,bndrs,res) -> do

@@ -88,7 +88,6 @@ import qualified Clash.Core.Name as C (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Type as C (LitTy(..))
 import Clash.Core.Scoped.TysPrim (integerIsDc, naturalNsDc)
-import qualified Clash.Core.Var as C (varName)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
@@ -313,7 +312,7 @@ caseCon' ctx e subj ty alts = do
             when (dbg_invariants opts && isConstant subj)
               $ warnAboutM WarnUnmatchableConstant sp
               $ "Unmatchable constant as case subject in " ++
-                  showPpr (C.varName curFunId) ++ ": " ++ showPpr subj ++
+                  showPpr (globalIdName curFunId) ++ ": " ++ showPpr subj ++
                   "\nWHNF is: " ++ showPpr subj1
             -- Otherwise check whether the entire case-expression has a
             -- single alternative, and pick that one.

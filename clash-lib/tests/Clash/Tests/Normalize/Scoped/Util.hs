@@ -285,7 +285,7 @@ agreesConstantSpec tm = do
     assertAlphaEq cTm sTm
  where
   st :: RewriteState NormalizeState
-  st = def{_curFun = (globalId User "cur" 50 intTy, noSrcSpan)}
+  st = def{_curFun = (mkGlobalIdFromClash (globalId User "cur" 50 intTy), noSrcSpan)}
 
 constantSpecTests :: [TestTree]
 constantSpecTests =
@@ -393,7 +393,7 @@ normState bs = st
       , _scopedNormalizationStrategy = incLitsScoped } }
  where
   bm = mkBindingMap bs
-  st = def{_bindings = bm, _scopedBindings = fromClashBindings bm, _curFun = (curF, noSrcSpan)}
+  st = def{_bindings = bm, _scopedBindings = fromClashBindings bm, _curFun = (mkGlobalIdFromClash curF, noSrcSpan)}
   curF = case bs of
     (i, _) : _ -> i
     [] -> error "normState: no bindings"

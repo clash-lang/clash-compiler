@@ -40,7 +40,7 @@ import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 
-import Clash.Core.Scoped.Convert (convScope, fromClashTerm)
+import Clash.Core.Scoped.Convert (convScope, fromClashTerm, mkGlobalIdFromClash)
 import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences)
 import Clash.Core.Scoped.NameMap (emptyNameMap, nameMapFromList)
 import Clash.Core.Scoped.Syntax
@@ -172,7 +172,7 @@ g = globalId User "g" 11 intTy
 -- | A state in which 'top' is being normalized, with the given bindings
 topState :: [(Id, Binding C.Term)] -> RewriteState extra -> RewriteState extra
 topState bs st = st
-  { _curFun = (top, noSrcSpan)
+  { _curFun = (mkGlobalIdFromClash top, noSrcSpan)
   , _bindings = mkVarEnv ((g, mkBinding g (intLit 1)) : bs)
   }
 

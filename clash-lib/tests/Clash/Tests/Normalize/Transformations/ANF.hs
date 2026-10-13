@@ -40,6 +40,7 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, assertWellScoped
   , globalId, inScopeOf, intFunTy, intId, intLit, intTy, letBinders, localId
   , mkTestDataCon, parseTyConTy, runSingleTransformation, showPprU, tyVar )
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- | The current 'Clash.Normalize.Transformations.ANF.nonRepANF', which the
 -- normalizer replaced by its scoped port
@@ -149,7 +150,7 @@ anfDoesNotLiftOutOfLambdas anf nonRepANFR' = do
       z = intId User "z" 71
       cf = globalId User "top" 42 (intFunTy 1)
       tm = App (Prim p) (Lam z (mkApps (Var kId) [Left (App (Var hId) (Var z)), Left (Var z)]))
-      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+      st = def{_curFun = (mkGlobalIdFromClash cf, noSrcSpan), _uniqSupply = supply}
   runSingleTransformation def st emptyInScopeSet (nonRepANFR' >-> anf) tm
     >>= assertNoFreeLocals
 

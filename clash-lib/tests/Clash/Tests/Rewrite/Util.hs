@@ -44,6 +44,7 @@ import Test.Clash.Rewrite
   , intLit, intTy, kindedTyVar, localId, mkBindingMap, pairDataCon, replaceTerm
   , rewriteEnvWithDebug, runRewriteTest, runSingleTransformation, showPprU
   , tyVar )
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- * Invariant checks of 'Clash.Rewrite.Util.apply'
 
@@ -113,7 +114,7 @@ lintUnknownGlobal =
   g5 = globalId User "g" 5 intTy
   -- The binder being normalized need not be in the binding map
   st :: RewriteState NormalizeState
-  st = def{_curFun = (globalId User "top" 6 intTy, noSrcSpan)}
+  st = def{_curFun = (mkGlobalIdFromClash (globalId User "top" 6 intTy), noSrcSpan)}
 
 -- | The check for accidental shadowing used to only look at the binders of
 -- let-expressions that are not in the right-hand side of a let-binding
@@ -158,7 +159,7 @@ lintInputReported =
  where
   tm = Lam xInt (Var yInt)
   st :: RewriteState NormalizeState
-  st = def{_curFun = (globalId User "f" 6 (intFunTy 1), noSrcSpan)}
+  st = def{_curFun = (mkGlobalIdFromClash (globalId User "f" 6 (intFunTy 1)), noSrcSpan)}
 
 -- | Run a transformation that signals a change, with the given number of
 -- transformations applied before it, under
@@ -243,7 +244,7 @@ liftBindingTyVarCapture = do
       cf = globalId User "top" 42 (intFunTy 1)
       e = Lam z (mkApps (Var k) [Left (TyLam a (App (Var r) (Var z))), Left (Var x)])
       st :: RewriteState NormalizeState
-      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+      st = def{_curFun = (mkGlobalIdFromClash cf, noSrcSpan), _uniqSupply = supply}
   ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
   case collectArgs newExpr of
     (Var rLifted, _) ->
@@ -277,7 +278,7 @@ liftBindingTyVarOrder = do
       cf = globalId User "top" 42 (intFunTy 1)
       e = Lam z (mkApps (Var k) [Left (App (Var r) (Var z)), Left (Var x)])
       st :: RewriteState NormalizeState
-      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+      st = def{_curFun = (mkGlobalIdFromClash cf, noSrcSpan), _uniqSupply = supply}
   ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
   case collectArgs newExpr of
     (Var rLifted, args) -> do
@@ -311,7 +312,7 @@ liftBindingSubstitutesBeforeAbstracting = do
       -- r = \z -> k (r z) x
       e = Lam z (mkApps (Var k) [Left (App (Var r) (Var z)), Left (Var x)])
       st :: RewriteState NormalizeState
-      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+      st = def{_curFun = (mkGlobalIdFromClash cf, noSrcSpan), _uniqSupply = supply}
   ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
   case collectArgs newExpr of
     (Var rLifted, args) -> do
@@ -339,7 +340,7 @@ liftBindingLocalSharesUniqueWithGlobal = do
       -- r = \z -> k (r z) x
       e = Lam z (mkApps (Var k) [Left (App (Var r) (Var z)), Left (Var x)])
       st :: RewriteState NormalizeState
-      st = def{_curFun = (cf, noSrcSpan), _uniqSupply = supply}
+      st = def{_curFun = (mkGlobalIdFromClash cf, noSrcSpan), _uniqSupply = supply}
   ((_, newExpr), st1, _) <- runRewriteTest def st (liftBinding (r, e))
   case collectArgs newExpr of
     (Var rLifted, _) ->

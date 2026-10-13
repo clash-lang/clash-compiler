@@ -32,6 +32,7 @@ import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Trans.RWS.CPS           (RWST)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import Control.Monad.Writer                  (MonadWriter (..))
+import Data.Bifunctor                        (first)
 import Data.Binary                           (Binary)
 import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
@@ -40,6 +41,7 @@ import Data.Text                             (Text)
 import GHC.Generics
 
 import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 import Clash.Core.Term           (Term, Context)
@@ -89,8 +91,8 @@ data RewriteState extra
   -- '_scopedBindings'.
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
-  , _curFun           :: (Id,SrcSpan) -- Initially set to undefined: no strictness annotation
-  -- ^ Function which is currently normalized
+  , _curFun           :: (S.GlobalId,SrcSpan) -- Initially set to undefined: no strictness annotation
+  -- ^ Function which is currently normalized. See 'curFunLegacy'.
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
   , _globalHeap       :: PrimHeap
@@ -114,6 +116,11 @@ data RewriteState extra
   }
 
 Lens.makeLenses ''RewriteState
+
+-- | 'curFun', with the function as a variable of Clash Core, for the
+-- transformations of Clash Core
+curFunLegacy :: Lens.Lens' (RewriteState extra) (Id, SrcSpan)
+curFunLegacy = curFun . Lens.iso (first S.globalIdLegacy) (first mkGlobalIdFromClash)
 
 -- | Read-only environment of a rewriting session
 data RewriteEnv

@@ -94,7 +94,6 @@ import           GHC.Types.Basic             (InlineSpec (..))
 
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Var              as C
 import           Clash.Netlist.Util          (representableTypeState)
 import           Clash.Rewrite.Types
   (RewriteMonad, curFun, customReprs, scopedTypeEnv, typeTranslator)
@@ -412,7 +411,7 @@ liftBinding scL (LetBinding occ _ x e) = do
         Just eTy1 ->
           forAlls tvTele (foldr mkFunTy (strengthenTyIds idTele eTy1) (teleIdBinderTypes idTele))
         Nothing -> error "liftBinding: the type of the binding mentions other type variables"
-      nm = (C.appendToName (C.varName cf) ("_" `Text.append` C.nameOcc occ)) {C.nameSort = C.Internal}
+      nm = (C.appendToName (globalIdName cf) ("_" `Text.append` C.nameOcc occ)) {C.nameSort = C.Internal}
   g <- freshGlobalId nm gTy
   let args = map Right tvs ++ map Left ids
       newExpr = mkApps (GlobalVar g) args

@@ -79,7 +79,7 @@ import           Clash.Normalize.Primitives (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
-  (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
+  (RewriteMonad, TransformContext(..), bindings, curFunLegacy, debugOpts, extra,
    tcCache, primitives)
 import           Clash.Rewrite.Util
   (cloneNameWithBindingMap, runRewrite, mkTmBinderFor, mkDerivedName, lintInput)
@@ -325,7 +325,7 @@ constantSpecInfo ctx e = do
           pure (constantCsr e)
 
       (var@(Var f), args, ticks) -> do
-        (curF, _) <- Lens.use curFun
+        (curF, _) <- Lens.use curFunLegacy
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
         if isNonRecGlobVar && f /= curF then do
           csr <- mergeCsrs ctx ticks e (mkApps var) args
@@ -419,12 +419,12 @@ normalizeTopLvlBndr isTop nm (Binding nmG sp inl pr tm _) = makeCachedU nm (extr
   -- binder that has the same unique as a global binder.
   let tm1 = deShadowTerm emptyInScopeSet tm
       tm2 = if isTop then substWithTyEq tm1 else tm1
-  old <- Lens.use curFun
+  old <- Lens.use curFunLegacy
   -- See the documentation of '_normalizationStrategy' for why the strategy
   -- comes out of the state instead of an import.
   normalization <- Lens.use (extra . normalizationStrategy)
   tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
-  curFun .= old
+  curFunLegacy .= old
   let ty' = inferCoreTypeOf tcm tm3
   let r' = nm' `globalIdOccursIn` tm3
   return (Binding (mkGlobalIdFromClash nm'{varType = ty'}) sp inl pr tm3 r')
@@ -471,11 +471,11 @@ normalizeWorkFreeApp f b args =
         --
         -- XXX: This seems outdated? Investigate.
         redex = deShadowTerm emptyInScopeSet (mkApps (bindingTerm b) args)
-    old <- Lens.use curFun
+    old <- Lens.use curFunLegacy
     normalization <- Lens.use (extra . normalizationStrategy)
     tm <- rewriteExpr ("normalization",normalization)
                       (showPpr (varName f),redex) (g,bindingLoc b)
-    curFun .= old
+    curFunLegacy .= old
     return tm
  where
   app = mkApps (Var f) args
@@ -549,7 +549,7 @@ rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
             -> (Id, SrcSpan)        -- ^ Renew current function being rewritten
             -> NormalizeSession Term
 rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
-  curFun .= (nm, sp)
+  curFunLegacy .= (nm, sp)
   opts <- Lens.view debugOpts
   let before = showPpr expr
   let expr' = traceIf (hasTransformationInfo FinalTerm opts)

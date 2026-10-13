@@ -47,6 +47,7 @@ import Test.Clash.Rewrite
   , pairTy, proxyTy, runRewriteTest, signedTy, streamTy, tProxyTy, tyVar, unsignedTy
   , withTyConMap, zeroWidthTyConMap, zwTy )
 import Test.Clash.Scoped (assertNewBindingsAgree)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- * The transformations
 
@@ -129,7 +130,7 @@ runRw env supply rw tvs ids tm = do
       st0 = def
         { _bindings = mkBindingMap bindings
         , _uniqSupply = supply
-        , _curFun = (globalId User "top" 42 (intFunTy 1), noSrcSpan) }
+        , _curFun = (mkGlobalIdFromClash (globalId User "top" 42 (intFunTy 1)), noSrcSpan) }
       is = extendInScopeSetList (inScopeOf ids) tvs
   (res, st1, ch) <- runRewriteTest env st0 (runRewrite "test" is rw tm)
   pure (res, st0, st1, ch)
