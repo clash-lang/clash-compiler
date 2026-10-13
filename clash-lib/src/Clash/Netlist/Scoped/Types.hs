@@ -219,7 +219,7 @@ callBlackBoxFunction
   -> [Either (Term n) (Type n)]
   -> [Type n]
   -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
-callBlackBoxFunction ctx (ScopedBBF f) = f ctx
+callBlackBoxFunction ctx (SomeBlackBoxFunction f) = f ctx
 
 -- | A blackbox function on scoped Clash Core: given the arguments and result
 -- types of the primitive it should provide a blackbox for, it generates the
@@ -245,7 +245,7 @@ type BlackBoxFunction =
 -- can't instantiate a type parameter (e.g. of
 -- 'Clash.Primitives.Types.Primitive'), nor be the result of interpreting a
 -- function with Hint.
-newtype SomeBlackBoxFunction = ScopedBBF BlackBoxFunction
+newtype SomeBlackBoxFunction = SomeBlackBoxFunction BlackBoxFunction
 
 -- | To weak head normal form, like functions
 instance NFData SomeBlackBoxFunction where

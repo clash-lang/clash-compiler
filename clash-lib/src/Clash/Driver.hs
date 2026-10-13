@@ -682,7 +682,7 @@ interpretFunctions idirs interpreterArgs topDir reqs = do
     InterpretBlackBoxFunction ->
       InterpretBBF <$>
         Hint.unsafeInterpret
-          ("ClashNetlistScopedTypes.ScopedBBF (" ++ ifrFuncName req ++ ")")
+          ("ClashNetlistScopedTypes.SomeBlackBoxFunction (" ++ ifrFuncName req ++ ")")
           "ClashNetlistScopedTypes.SomeBlackBoxFunction"
     InterpretTemplateFunction ->
       InterpretTF <$> Hint.unsafeInterpret (ifrFuncName req) "TemplateFunction"
@@ -724,21 +724,21 @@ interpretFunctions idirs interpreterArgs topDir reqs = do
 knownBlackBoxFunctions :: HashMap String SomeBlackBoxFunction
 knownBlackBoxFunctions =
   HashMap.fromList $ map (first show) $
-    [ ('P.checkBBF, ScopedBBF P.checkBBF)
-    , ('P.bvToIntegerVHDL, ScopedBBF P.bvToIntegerVHDL)
-    , ('P.bvToIntegerVerilog, ScopedBBF P.bvToIntegerVerilog)
-    , ('P.clashCompileErrorBBF, ScopedBBF P.clashCompileErrorBBF)
-    , ('P.foldBBF, ScopedBBF P.foldBBF)
-    , ('P.indexIntVerilog, ScopedBBF P.indexIntVerilog)
-    , ('P.indexToIntegerVerilog, ScopedBBF P.indexToIntegerVerilog)
-    , ('P.indexToIntegerVHDL, ScopedBBF P.indexToIntegerVHDL)
-    , ('P.intTF, ScopedBBF P.intTF)
-    , ('P.iterateBBF, ScopedBBF P.iterateBBF)
-    , ('P.signedToIntegerVerilog, ScopedBBF P.signedToIntegerVerilog)
-    , ('P.signedToIntegerVHDL, ScopedBBF P.signedToIntegerVHDL)
-    , ('P.unsignedToIntegerVerilog, ScopedBBF P.unsignedToIntegerVerilog)
-    , ('P.unsignedToIntegerVHDL, ScopedBBF P.unsignedToIntegerVHDL)
-    , ('P.wordTF, ScopedBBF P.wordTF)
+    [ ('P.checkBBF, SomeBlackBoxFunction P.checkBBF)
+    , ('P.bvToIntegerVHDL, SomeBlackBoxFunction P.bvToIntegerVHDL)
+    , ('P.bvToIntegerVerilog, SomeBlackBoxFunction P.bvToIntegerVerilog)
+    , ('P.clashCompileErrorBBF, SomeBlackBoxFunction P.clashCompileErrorBBF)
+    , ('P.foldBBF, SomeBlackBoxFunction P.foldBBF)
+    , ('P.indexIntVerilog, SomeBlackBoxFunction P.indexIntVerilog)
+    , ('P.indexToIntegerVerilog, SomeBlackBoxFunction P.indexToIntegerVerilog)
+    , ('P.indexToIntegerVHDL, SomeBlackBoxFunction P.indexToIntegerVHDL)
+    , ('P.intTF, SomeBlackBoxFunction P.intTF)
+    , ('P.iterateBBF, SomeBlackBoxFunction P.iterateBBF)
+    , ('P.signedToIntegerVerilog, SomeBlackBoxFunction P.signedToIntegerVerilog)
+    , ('P.signedToIntegerVHDL, SomeBlackBoxFunction P.signedToIntegerVHDL)
+    , ('P.unsignedToIntegerVerilog, SomeBlackBoxFunction P.unsignedToIntegerVerilog)
+    , ('P.unsignedToIntegerVHDL, SomeBlackBoxFunction P.unsignedToIntegerVHDL)
+    , ('P.wordTF, SomeBlackBoxFunction P.wordTF)
     ]
 
 -- | List of known TemplateFunctions used to prevent Hint from firing. This

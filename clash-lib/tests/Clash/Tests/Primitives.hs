@@ -68,9 +68,9 @@ functionPlurality = do
 
   cases =
     [ -- fold :: (a -> a -> a) -> Vec (n + 1) a -> a, with n + 1 = 8
-      ( "fold", ScopedBBF foldBBF, [addB 6 1, "a"], 0, 7 )
+      ( "fold", SomeBlackBoxFunction foldBBF, [addB 6 1, "a"], 0, 7 )
       -- iterateI :: KnownNat n => (a -> a) -> a -> Vec n a, with n = 5
-    , ( "iterateI", ScopedBBF iterateBBF, [addB 4 1, "a"], 1, 4 )
+    , ( "iterateI", SomeBlackBoxFunction iterateBBF, [addB 4 1, "a"], 1, 4 )
     ]
 
 -- | 'bindMaybe' refers to a local variable by its HDL identifier in the
