@@ -267,7 +267,10 @@ substVars sc m
 -- body if there are none. 'Nothing' if the binders of the other bindings
 -- occur in the right-hand sides of the given ones, or in the body.
 --
--- The binders get fresh names in the outer scope.
+-- The binders keep their names if they are fresh for the outer scope in the
+-- given order ('Clash.Core.Scoped.Subst.rebindIds'), as they are if the
+-- bindings keep the order of the telescope. Otherwise they get fresh names in
+-- the outer scope, which takes a substitution.
 keepBindings
   :: (Distinct n, Distinct l)
   => Scope n
@@ -278,6 +281,10 @@ keepBindings
   -- ^ The body
   -> Maybe (Term n)
 keepBindings sc bs kept body
+  | not (null kept)
+  , Just e <- rebindIds sc bs [(lbOcc lb, strengthenTyIds bs (lbType lb), lbName lb) | lb <- kept]
+                (body : map lbRhs kept) rebuild
+  = Just e
   | any (`IntSet.member` dropped) used = Nothing
   | null kept = unsinkTerm (teleNameBinders bs) body
   | otherwise =
@@ -295,6 +302,11 @@ keepBindings sc bs kept body
                   Just s -> Just (Let (Rec bs' [substTm s (lbRhs lb) | lb <- kept]) (substTm s body))
                   Nothing -> error "keepBindings: wrong number of variables"
  where
+  rebuild :: Scope l' -> Tele IdBinder n l' -> [Term l'] -> Term n
+  rebuild _ bs' = \case
+    body' : xs' -> Let (Rec bs' xs') body'
+    [] -> error "keepBindings: no body"
+
   keptRaws = map (tmNameRaw . lbName) kept
   dropped =
     IntSet.fromList [tmNameRaw nm | Var _ _ nm <- teleIdVars bs] `IntSet.difference`
