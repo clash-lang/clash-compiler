@@ -36,7 +36,7 @@ import Test.Clash.Rewrite
 import Test.Clash.Scoped
   ( assertScopedAlphaEq, assertScopedTyAlphaEq, lintScopeOf, lintTerm, testTypeEnv
   , withFreeVars, withTests)
-import Test.Clash.Scoped.Gen (DataConInst (..), genDataConInst, showType)
+import Test.Clash.Scoped.Gen.Clash (DataConInst (..), genDataConInst, showType)
 
 -- | Whether two lists of types are pairwise alpha-equivalent
 aeqTypes :: [C.Type] -> [C.Type] -> Property

@@ -33,7 +33,7 @@ import Clash.Rewrite.Types (RewriteStep (..))
 
 import Test.Clash.Rewrite (intId)
 import Test.Clash.Scoped (withFreeVars, withFreeVarsOf, withTests)
-import Test.Clash.Scoped.Gen (InScope (..), genInScope, shrinkInScope)
+import Test.Clash.Scoped.Gen.Clash (InScope (..), genInScope, shrinkInScope)
 
 -- | The number of leading type lambdas and lambdas of a term
 leadingBinders :: Term n -> Int

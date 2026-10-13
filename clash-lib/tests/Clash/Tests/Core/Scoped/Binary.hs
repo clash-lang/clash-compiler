@@ -4,8 +4,9 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests of the 'Data.Binary.Binary' instances of scoped Clash Core
-  ("Clash.Core.Scoped.Binary"), on generated terms ("Test.Clash.Scoped.Gen"),
-  with the number of tests that 'withTests' gives.
+  ("Clash.Core.Scoped.Binary"), on generated terms
+  ("Test.Clash.Scoped.Gen.Clash"), with the number of tests that 'withTests'
+  gives.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -34,7 +35,7 @@ import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Scoped (abstractFreeVars, binderRaws, forAllScrambled, withTests)
-import Test.Clash.Scoped.Gen
+import Test.Clash.Scoped.Gen.Clash
   (InScope (..), dataCons, genInScope, globals, prims, renameBinders, shrinkInScope,
    showTerm, tyConMap)
 
