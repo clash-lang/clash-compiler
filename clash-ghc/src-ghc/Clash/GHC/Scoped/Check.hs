@@ -30,6 +30,7 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Util as C (undefinedTy)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
+import Clash.Core.Scoped.Sig (DataConSig (..))
 import Clash.Core.Scoped.Syntax
 
 -- | How two terms compare
@@ -171,7 +172,7 @@ cmpTm e1 e2 = case (e1, e2) of
   (Var o1 _ n1, Var o2 _ n2) ->
     check "variable" (==) (tmNameRaw n1) (tmNameRaw n2) <+> cmpName o1 o2
   (GlobalVar g1, GlobalVar g2) -> cmpGlobal g1 g2
-  (Data dc1, Data dc2) -> check "data constructor" (==) (C.dcUniq dc1) (C.dcUniq dc2)
+  (Data dc1, Data dc2) -> cmpDataCon dc1 dc2
   (Literal l1, Literal l2) -> check "literal" (==) l1 l2
   (Prim p1, Prim p2) -> cmpPrim p1 p2
   (Lam b1 x1, Lam b2 x2) -> cmpIdBinder b1 b2 <+> cmpTm x1 x2
@@ -188,6 +189,24 @@ cmpTm e1 e2 = case (e1, e2) of
   (Tick t1 x1, Tick t2 x2) -> cmpTick t1 t2 <+> cmpTm x1 x2
   _ -> diff "term" e1 e2
 
+-- | Compare data constructors, with their types and signatures
+cmpDataCon :: C.DataCon -> C.DataCon -> Cmp
+cmpDataCon dc1 dc2 =
+  check "data constructor" (==) (C.dcUniq dc1) (C.dcUniq dc2)
+    <+> cmpName (C.dcName dc1) (C.dcName dc2)
+    <+> check "data constructor tag" (==) (C.dcTag dc1) (C.dcTag dc2)
+    <+> cmpTy (C.dcType dc1) (C.dcType dc2)
+    <+> cmpDataConSig (C.dcSig dc1) (C.dcSig dc2)
+    <+> check "strictness" (==) (strict dc1) (strict dc2)
+    <+> check "field labels" (==) (C.dcFieldLabels dc1) (C.dcFieldLabels dc2)
+
+ where
+  strict = map (== C.Strict) . C.dcArgStrict
+
+cmpDataConSig :: DataConSig -> DataConSig -> Cmp
+cmpDataConSig (DataConSig u1 e1 a1) (DataConSig u2 e2 a2) =
+  cmpTele cmpTyBinder u1 u2 <+> cmpTele cmpTyBinder e1 e2 <+> cmpList cmpTy a1 a2
+
 cmpList :: (a -> b -> Cmp) -> [a] -> [b] -> Cmp
 cmpList f xs ys
   | length xs == length ys = foldr (<+>) Nothing (zipWith f xs ys)
@@ -196,7 +215,7 @@ cmpList f xs ys
 cmpAlt :: Alt n -> Alt m -> Cmp
 cmpAlt (Alt p1 x1) (Alt p2 x2) = case (p1, p2) of
   (DataPat dc1 tvs1 ids1, DataPat dc2 tvs2 ids2) ->
-    check "pattern" (==) (C.dcUniq dc1) (C.dcUniq dc2)
+    cmpDataCon dc1 dc2
       <+> cmpTele cmpTyBinder tvs1 tvs2
       <+> cmpTele cmpIdBinder ids1 ids2
       <+> cmpTm x1 x2
