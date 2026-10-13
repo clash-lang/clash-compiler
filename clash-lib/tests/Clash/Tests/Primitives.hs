@@ -28,7 +28,7 @@ import Clash.Netlist.Types (Declaration (Assignment, NetDecl))
 import Clash.Primitives.Types
   ( BlackBoxFunctionName (..), CompiledPrimitive, Primitive (BlackBoxHaskell)
   , UsedArguments (UsedArguments) )
-import Clash.Primitives.Scoped.Util (getFunctionPlurality)
+import Clash.Primitives.Util (getFunctionPlurality)
 import Clash.Primitives.Sized.Vector (foldBBF, iterateBBF)
 import Clash.Primitives.Verification (bindMaybe)
 

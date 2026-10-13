@@ -100,7 +100,7 @@ import           Clash.Netlist.Util
    stripFiltered, stripVoid)
 import           Clash.Normalize.Scoped.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
-import           Clash.Primitives.Scoped.Util  (getFunctionPlurality)
+import           Clash.Primitives.Util  (getFunctionPlurality)
 import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Util                    (ClashException (..), curLoc, indexNote)
 import qualified Clash.Util.Interpolate        as I
