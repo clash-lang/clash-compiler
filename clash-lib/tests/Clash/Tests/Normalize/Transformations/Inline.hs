@@ -25,18 +25,19 @@ import GHC.Types.SourceText (SourceText (NoSourceText))
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (System, User), noSrcSpan)
+import Clash.Core.Name (NameSort (System, User), mkUnsafeName, noSrcSpan)
 import Clash.Core.Term
   ( Bind (..), IsMultiPrim (..), PrimInfo (..), PrimUnfolding (..), Term (..)
   , WorkInfo (..), mkApps )
+import qualified Clash.Core.Type as C
 import Clash.Core.Type (mkFunTy)
 import Clash.Core.Util (primUCo)
 import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Transformations.Inline
-  ( collapseRHSNoopsWorker, inlineCleanupWorker, inlineSmallWorker
-  , inlineWorkFreeWorker )
+  ( bindConstantVarWorker, collapseRHSNoopsWorker, inlineCastWorker, inlineCleanupWorker
+  , inlineSimIOWorker, inlineSmallWorker, inlineWorkFreeWorker )
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL
   (onAppNode, onLet, onTickNode, onTyAppNode, onVarNode, toTransformation)
@@ -46,7 +47,7 @@ import Clash.Rewrite.Types (RewriteState (..))
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoFreeLocals, assertStructurallyEqual, globalId
   , inScopeOf, intFunTy, intId, intLit, intTy, localId, mkBinding, mkBindingMap
-  , pairDataCon, pairTy, runSingleTransformation )
+  , pairDataCon, pairTy, runSingleTransformation, testTyConMap, withTyConMap )
 import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- | The implementations of the transformations that the tests run
@@ -187,7 +188,95 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.Inline"
-    (inlineTests currentRewrites)
+    (inlineTests currentRewrites <> letBindingTests)
+
+-- * Transformations of let-bindings
+
+-- | Tests of 'bindConstantVarWorker', 'inlineCastWorker', 'inlineSimIOWorker'
+-- and 'collapseRHSNoopsWorker'
+letBindingTests :: [TestTree]
+letBindingTests =
+    [ testGroup "bindConstantVar"
+        [ testCase "doesn't inline the function being normalized (#2839)" $
+            runInTop [] bindConstantVarR (Let (NonRec y (Var top)) (Var y))
+              >>= assertAlphaEq (Let (NonRec y (Var top)) (Var y))
+        , testCase "doesn't inline another global, which isn't work-free-ish" $
+            runInTop [] bindConstantVarR (Let (NonRec y (Var g)) (Var y))
+              >>= assertAlphaEq (Let (NonRec y (Var g)) (Var y))
+        , testCase "inlines a constant" $
+            runInTop [] bindConstantVarR (Let (NonRec y (intLit 3)) (Var y))
+              >>= assertAlphaEq (intLit 3)
+        , testCase "inlines a local variable" $
+            runInTop [] bindConstantVarR (Let (NonRec y (Var x)) (Var y))
+              >>= assertAlphaEq (Var x)
+        ]
+    , testGroup "inlineCast"
+        [ testCase "inlines a cast of a variable" $ do
+            let e = Cast (Var x) intTy intTy
+            runInTop [] inlineCastR (Let (NonRec y e) (App (Var fun) (Var y)))
+              >>= assertAlphaEq (App (Var fun) e)
+        , testCase "inlines a cast of a global" $ do
+            let e = Cast (Var g) intTy intTy
+            runInTop [] inlineCastR (Let (NonRec y e) (App (Var fun) (Var y)))
+              >>= assertAlphaEq (App (Var fun) e)
+        , testCase "doesn't inline a cast of an application" $ do
+            let e = Let (NonRec y (Cast (App (Var fun) (Var x)) intTy intTy)) (Var y)
+            runInTop [] inlineCastR e >>= assertAlphaEq e
+        ]
+    , testGroup "inlineSimIO"
+        [ testCase "doesn't inline a binding of another type" $ do
+            let e = Let (NonRec y (App (Var fun) (Var x))) (Var y)
+            runInTop [] inlineSimIOR e >>= assertAlphaEq e
+        , testCase "inlines a SimIO action at every occurrence" $ do
+            let act = App (Var simIOFun) (Var x)
+            runInTop [] inlineSimIOR
+              (Let (NonRec io act) (mkApps (Var bindIO) [Left (Var io), Left (Var io)]))
+              >>= assertAlphaEq (mkApps (Var bindIO) [Left act, Left act])
+        ]
+    , testGroup "collapseRHSNoops"
+        [ testCase "doesn't fire in a function without a binding" $ do
+            -- E.g. the fake global of 'normalizeWorkFreeApp'
+            let e = Let (NonRec y (mkApps idPrim [Left (Var x)])) (Var y)
+            runInTop [] collapseRHSNoopsR e >>= assertAlphaEq e
+        , testCase "collapses an identity primitive in an OPAQUE function" $ do
+            let e = Let (NonRec y (mkApps idPrim [Left (Var x)])) (Var y)
+                topB = (mkBinding top (intLit 0)) {bindingSpec = Opaque NoSourceText}
+            runInTop [(top, topB)] collapseRHSNoopsR e >>= assertAlphaEq
+              (Let (NonRec y (mkApps primUCo [Right intTy, Right intTy, Left (Var x)]))
+                   (Var y))
+        ]
+    ]
+ where
+  -- The function being normalized, and a global with a binding
+  top = globalId User "top" 10 intTy
+  g = globalId User "g" 11 intTy
+
+  -- A state in which 'top' is being normalized, with the given bindings
+  topState :: [(Id, Binding Term)] -> RewriteState extra -> RewriteState extra
+  topState bs st = st
+    { _curFun = (mkGlobalIdFromClash top, noSrcSpan)
+    , _bindings = mkVarEnv ((g, mkBinding g (intLit 1)) : bs)
+    }
+
+  -- Run a rewrite on a term in which @x@ is free, in a state set up with
+  -- 'topState'
+  runInTop :: [(Id, Binding Term)] -> NormRewrite -> Term -> IO Term
+  runInTop bs rw =
+    runSingleTransformation (withTyConMap testTyConMap def) (topState bs def) (inScopeOf [x]) rw
+
+  x = intId User "x" 20
+  y = intId User "y" 21
+  bindConstantVarR = $(asRewriteQ (toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)))
+  inlineCastR = $(asRewriteQ (toTransformation "inlineCast" (onLet 'inlineCastWorker)))
+  inlineSimIOR = $(asRewriteQ (toTransformation "bindSimIO" (onLet 'inlineSimIOWorker)))
+  collapseRHSNoopsR = $(asRewriteQ (toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)))
+  fun = globalId User "fun" 12 (intFunTy 1)
+  -- @SimIO Int@, and functions producing and combining actions
+  simIOTy = C.AppTy (C.ConstTy (C.TyCon (mkUnsafeName User "Clash.Explicit.SimIO.SimIO" 300))) intTy
+  simIOFun = globalId User "act" 13 (mkFunTy intTy simIOTy)
+  bindIO = globalId User "both" 14 (mkFunTy simIOTy (mkFunTy simIOTy simIOTy))
+  io = localId User "io" 22 simIOTy
+  idPrim = Prim (PrimInfo "idPrim" (intFunTy 1) (WorkIdentity 0 []) SingleResult NoUnfolding)
 
 -- | The regression tests, on the given implementation of the transformations
 inlineTests :: InlineRewrites -> [TestTree]

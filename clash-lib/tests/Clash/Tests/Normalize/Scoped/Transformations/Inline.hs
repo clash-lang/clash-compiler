@@ -32,12 +32,8 @@ import Clash.Core.Var (Id)
 import Clash.Core.VarEnv (mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Inline as S
-import Clash.Normalize.Transformations.Inline
-  ( bindConstantVarWorker, collapseRHSNoopsWorker, inlineCastWorker
-  , inlineSimIOWorker )
 import Clash.Normalize.Types (NormRewrite)
-import Clash.Rewrite.StrategyDSL (onLet, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 
 import Clash.Core.Scoped.Convert (convScope, fromClashTerm, mkGlobalIdFromClash)
@@ -186,10 +182,11 @@ x, y :: Id
 x = intId User "x" 20
 y = intId User "y" 21
 
--- | Both implementations of a transformation of let-bindings, by the name of
--- the test, with the given implementation of Clash Core
-bothImpls :: NormRewrite -> NormRewrite -> [(String, NormRewrite)]
-bothImpls cur scoped = [("Clash Core", cur), ("scoped", scoped)]
+-- | The implementation of a transformation of let-bindings, by the name of
+-- the test. The tests of the transformations of Clash Core are in
+-- "Clash.Tests.Normalize.Transformations.Inline".
+bothImpls :: NormRewrite -> [(String, NormRewrite)]
+bothImpls scoped = [("scoped", scoped)]
 
 tests :: TestTree
 tests =
@@ -216,7 +213,6 @@ tests =
                 >>= assertAlphaEq (C.Var x)
           ]
         | (nm, rw) <- bothImpls
-            $(asRewriteQ (toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)))
             (viaFoil "bindConstantVar" $(asScopedRewriteQ S.bindConstantVar))
         ]
     , testGroup "inlineCast" $ concat
@@ -234,7 +230,6 @@ tests =
               runInTop [] rw e >>= assertAlphaEq e
           ]
         | (nm, rw) <- bothImpls
-            $(asRewriteQ (toTransformation "inlineCast" (onLet 'inlineCastWorker)))
             (viaFoil "inlineCast" $(asScopedRewriteQ S.inlineCast))
         ]
     , testGroup "inlineSimIO" $ concat
@@ -248,7 +243,6 @@ tests =
                 >>= assertAlphaEq (C.mkApps (C.Var bindIO) [Left act, Left act])
           ]
         | (nm, rw) <- bothImpls
-            $(asRewriteQ (toTransformation "bindSimIO" (onLet 'inlineSimIOWorker)))
             (viaFoil "inlineSimIO" $(asScopedRewriteQ S.inlineSimIO))
         ]
     , testGroup "collapseRHSNoops" $ concat
@@ -264,7 +258,6 @@ tests =
                        (C.Var y))
           ]
         | (nm, rw) <- bothImpls
-            $(asRewriteQ (toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)))
             (viaFoil "collapseRHSNoops" $(asScopedRewriteQ S.collapseRHSNoops))
         ]
     ]
