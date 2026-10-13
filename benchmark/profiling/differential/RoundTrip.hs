@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Check the 'Binary' instances of scoped Clash Core
+  Check the 'Binary' instances of Clash Core
   ("Clash.Core.Binary"): that the round trip through them gives every
   binding of a serialized design back, up to alpha-equivalence.
 -}

@@ -9,11 +9,11 @@
 
   Utilities for converting Core Type/Term to Netlist datatypes
 
-  Utilities of Netlist generation on scoped Clash Core: opening a normalized
+  Utilities of Netlist generation on Clash Core: opening a normalized
   component into a single scope ('splitNormalized'), and giving its variables
   their HDL identifiers ('mkUniqueNormalized').
 
-  The translation of the types of scoped Core to HWTypes
+  The translation of the types of Clash Core to HWTypes
   ('unsafeCoreTypeToHWTypeM', ...) takes the scope of the type, to look
   through newtypes and type families.
 -}
@@ -1874,7 +1874,7 @@ data SplitNormalized where
 -- let-expressions go on every right-hand side. Gives the reason if the term
 -- is not in normal form.
 --
--- Nested let-expressions need no deshadowing: the binders of scoped Core are
+-- Nested let-expressions need no deshadowing: the binders of Clash Core are
 -- distinct.
 splitNormalized :: TypeEnv -> Term 'VoidS -> Either String SplitNormalized
 splitNormalized tenv expr = lams emptyScope [] expr
@@ -2328,7 +2328,7 @@ coreTypeToHWTypeM' sc ty = fmap stripFiltered <$> coreTypeToHWTypeM sc ty
 -- ticks.
 --
 -- The attributes of an 'Attributes' tick are evaluated with the evaluator of
--- scoped Clash Core ('nfData').
+-- Clash Core ('nfData').
 withTicks
   :: (HasCallStack, Distinct n)
   => CompCtx n

@@ -38,7 +38,7 @@ import Test.Clash.Rewrite
   , parseTestType, strQQ, testGlobalId, testTyConMap, withTyConMap )
 import Test.Clash.Core (ScopeDecl, assertRewritesTo, closedType, varD, withCurFun)
 
--- | The scoped primitive reduction, as a transformation of the saturated
+-- | The primitive reduction, as a transformation of the saturated
 -- application of the primitive
 reductionS :: PrimReduction -> Rewrite NormalizeState
 reductionS red = Transform $ \ctx e ->

@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  QuickCheck generators of scoped Clash Core ("Clash.Core"), to test
+  QuickCheck generators of Clash Core ("Clash.Core"), to test
   its trusted core and the functions on it.
 
   A generated term is built in a test scope ('Test.Clash.Core.TestScope')

@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Whether a scoped Clash Core term is work free, i.e. doesn't add to the size
+  Whether a Clash Core term is work free, i.e. doesn't add to the size
   of the circuit. This is used by transformations and evaluation to check
   whether it is possible to perform changes without duplicating work in the
   result, e.g. inlining.

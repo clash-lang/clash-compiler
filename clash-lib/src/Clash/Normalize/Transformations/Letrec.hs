@@ -6,12 +6,12 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on let-expressions of scoped Clash Core.
+  Transformations on let-expressions of Clash Core.
 
   = Merging let-bindings
 
   'flattenLet', 'topLet' and 'recToLetRec' merge let-bindings into a single
-  recursive let-binding. In scoped Core, the right-hand side of a 'NonRec'
+  recursive let-binding. In Clash Core, the right-hand side of a 'NonRec'
   binding lives outside the scope of its binder, so it has to be moved into
   that scope ('sink') before it can join a 'Rec' telescope, which needs the
   binder to be opened first ('openLetBindings'). Opening renames the binder if

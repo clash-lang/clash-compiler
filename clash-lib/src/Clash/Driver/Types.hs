@@ -116,7 +116,7 @@ data Binding a = Binding
     -- bindings in a way similar to Let / Letrec. GHC also does this.
   } deriving (Binary, Functor, Generic, NFData, Show)
 
--- | Global function binders of scoped Clash Core ("Clash.Core.Syntax"):
+-- | Global function binders of Clash Core ("Clash.Core.Syntax"):
 -- closed terms, keyed by their 'Clash.Core.Syntax.GlobalId'.
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
@@ -152,7 +152,7 @@ data DebugOpts = DebugOpts
   -- Command line flag: -fclash-debug-invariants
   , dbg_invariantsShadowing :: Bool
   -- ^ When checking invariants, additionally check the scoping of variables.
-  -- Scoped Clash Core enforces this by construction: binders never shadow one
+  -- Clash Core enforces this by construction: binders never shadow one
   -- another, and every variable is in scope. So this flag has no effect.
   --
   -- Command line flag: -fclash-debug-invariants-shadowing

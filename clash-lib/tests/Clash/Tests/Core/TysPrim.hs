@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the builtin types of scoped Clash Core, and their type
+  Tests for the builtin types of Clash Core, and their type
   constructors
 -}
 

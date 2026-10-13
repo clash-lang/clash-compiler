@@ -53,7 +53,7 @@ env = withTyConMap testTyConMap def
 st :: RewriteState NormalizeState
 st = def {_globalHeap = (IntMap.empty, 0)}
 
--- | The 'App' worker of a scoped transformation, as a scoped rewrite
+-- | The 'App' worker of a transformation, as a rewrite
 onAppS
   :: (forall n. Distinct n => S.TransformContext n -> Term n -> Term n -> Term n -> NormalizeSession (Term n))
   -> Rewrite NormalizeState
@@ -73,7 +73,7 @@ onAppS w = Transform $ \ctx e -> case e of
 -- * @vio :: forall a. Vec 0 Int@, which always performs work, and takes a type
 --   argument so that it is an application
 -- * @GHC.Num.Integer.integerAdd :: Integer -> Integer -> Integer@, which the
---   scoped evaluator reduces itself
+--   evaluator reduces itself
 -- * @somePrim :: Int -> Int@, which has no handler
 prims :: [PrimInfo]
 prims =
@@ -202,7 +202,7 @@ reduceConstTests = testGroup "reduceConst"
         (tm "let { (x :: GHC.Num.Integer.Integer) = (1 :: Integer) } in (3 :: Integer)")
     -- #2571: a binder between a let-binding of the context and the term
     -- shadows it, so the let-binding must not be used for the variable of
-    -- the binder. Scoped, the binders of the context have different names.
+    -- the binder. In Clash Core, the binders of the context have different names.
   , testCase "doesn't use a let-binding of the context that is shadowed" $
       keepsAt reduceConstS [LetBodyStep, LamStep] []
         (tm [strQQ|

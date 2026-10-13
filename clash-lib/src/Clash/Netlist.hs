@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Create netlists out of normalized terms of scoped Clash Core.
+  Create netlists out of normalized terms of Clash Core.
 
   'genComponentT' opens the normalized term of a component into a single scope
   ('Clash.Netlist.Util.splitNormalized'), and records the HDL

@@ -27,7 +27,7 @@ import qualified Clash.Core.Pretty as Pr
 import RewriteInspector (Diff (..), History, HStep (..), Syntax)
 import qualified RewriteInspector as RW
 
--- | The terms of the rewrite history: closed terms of scoped Clash Core, see
+-- | The terms of the rewrite history: closed terms of Clash Core, see
 -- "Clash.Rewrite.History"
 type Term = S.Term 'VoidS
 
@@ -38,7 +38,7 @@ main = RW.runTerminal @Term "clash-term/theme.ini"
 -- Clash instance for Diff.
 -- | The steps record no context: every step shows the closed term before and
 -- after the transformation, abstracted over its free variables. The printer
--- of scoped Clash Core marks subterms by their position ('SubtermPos').
+-- of Clash Core marks subterms by their position ('SubtermPos').
 instance Diff Term where
   type Ann     Term = ClashAnnotation
   type Options Term = PrettyOptions

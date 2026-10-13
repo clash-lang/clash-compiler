@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The eta-expansion transformations of scoped Clash Core.
+  The eta-expansion transformations of Clash Core.
 
   'etaExpansionTL' moves the lambdas in the body of a let-expression out of
   it. It creates new binders for them in the scope of the let-expression, so

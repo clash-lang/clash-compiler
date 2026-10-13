@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Print terms and types of scoped Clash Core in the language of
+  Print terms and types of Clash Core in the language of
   'Test.Clash.Rewrite.parseTestTerm', so that a result can be written into a
   test as the term it expects.
 

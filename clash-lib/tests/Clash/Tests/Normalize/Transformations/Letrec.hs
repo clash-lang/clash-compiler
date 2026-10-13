@@ -175,7 +175,7 @@ removeUnusedExprTests = testGroup "removeUnusedExpr"
 
 -- * flattenLet
 
--- | The scoped 'S.flattenLet'
+-- | 'S.flattenLet'
 flattenLetSc :: Rewrite NormalizeState
 flattenLetSc = $(asRewriteQ S.flattenLet)
 
@@ -230,7 +230,7 @@ flattenLetTests = testGroup "flattenLet"
         (tm "let { (a :: Int) = let { (c :: Int) = h_G11 c } in k_G12 c x_4; (b :: Int) = h_G11 a } in k_G12 a b")
         (tm "let { (c :: Int) = h_G11 c; (a :: Int) = k_G12 c x_4; (b :: Int) = h_G11 a } in k_G12 a b")
     -- Deshadowing the let-expression in the right-hand side as if it were
-    -- recursive would turn @x = g x@ into the loop @x' = g x'@. In scoped
+    -- recursive would turn @x = g x@ into the loop @x' = g x'@. In Clash
     -- Core, the right-hand side of a 'NonRec' binding can't refer to its
     -- binder. The binder of @x@ also clashes with a variable of the scope.
   , testCase "doesn't make a shadowing NonRec binding in a right-hand side recursive" $

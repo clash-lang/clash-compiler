@@ -6,7 +6,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The reductions of primitives of the scoped evaluator
+  The reductions of primitives of the evaluator
   ("Clash.Core.Evaluator"), and a guide to writing them.
 
   = Where reductions live

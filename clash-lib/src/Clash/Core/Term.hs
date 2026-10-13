@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Smart constructors and destructors for scoped Clash Core.
+  Smart constructors and destructors for Clash Core.
 
   Lists of binders become telescopes: e.g. 'mkLams' abstracts a term in scope
   @l@ over a @'Tele' t'IdBinder' n l@, giving a term in scope @n@. Collecting

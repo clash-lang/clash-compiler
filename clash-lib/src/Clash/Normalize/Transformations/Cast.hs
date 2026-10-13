@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on casts of scoped Clash Core.
+  Transformations on casts of Clash Core.
 
   The transformations that move a term under binders, or that create new
   binders, can't capture variables:

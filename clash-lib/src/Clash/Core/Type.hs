@@ -6,7 +6,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Views on, and utilities for, the types of scoped Clash Core.
+  Views on, and utilities for, the types of Clash Core.
 
   = Scopes
 
@@ -280,8 +280,7 @@ splitTyConAppM _ = Nothing
 
 -- | The quantified type variables and argument types of a polymorphic function
 -- type, extending scope @n@ to @l@: the type variables scope over the rest of
--- the telescope. The scoped counterpart of @[Either TyVar Type]@, see
--- 'splitFunForallTy'.
+-- the telescope. See 'splitFunForallTy'.
 data PiTele (n :: S) (l :: S) where
   PiNil :: PiTele n n
   -- | A quantified type variable

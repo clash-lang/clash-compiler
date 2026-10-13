@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The transformations of the normalizer, on scoped Clash Core. They are
+  The transformations of the normalizer, on Clash Core. They are
   grouped into submodules by the kind of term they work on, or by their
   purpose: ANF conversion, case-expressions, casts, disjoint expression
   consolidation, eta-expansion, inlining, let-expressions, multi-result

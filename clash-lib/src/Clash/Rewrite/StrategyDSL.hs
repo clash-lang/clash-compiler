@@ -19,14 +19,14 @@
     passes, and the usual combinators ('>->', '!->', '>-!', '>-!->',
     'repeatR') between them.
 
-  = Scoped Core
+  = Clash Core
 
-  The transformations are those of scoped Clash Core ("Clash.Rewrite"):
+  The transformations are those of Clash Core ("Clash.Rewrite"):
   declare one with 'toTransformation', and a whole-term pass with
   'pass'. 'Clash.Rewrite.StrategyDSL.TH.compileStrategy' compiles
   a strategy. Workers take a 'Clash.Rewrite.Types.TransformContext'
   and terms of any scope. A 'FieldWorker' of 'CVar' is not supported, as
-  scoped Core has separate constructors for local and global variables: use a
+  Clash Core has separate constructors for local and global variables: use a
   'Worker', which fires at both.
 -}
 
@@ -249,7 +249,7 @@ topdownFix = TopDownFix . toStep
 topdownSuc = TopDownSuc . toStep
 innerMost  = InnerMost . toStep
 
--- | A whole-term pass of a rewrite of scoped Core, i.e. a function of type
+-- | A whole-term pass of a rewrite of Clash Core, i.e. a function of type
 -- @forall n. Distinct n => TransformContext n -> Term n -> RewriteMonad extra
 -- (Term n)@, see "Clash.Rewrite".
 pass :: String -> Name -> Strat

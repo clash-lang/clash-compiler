@@ -6,7 +6,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of the primitives of "GHC.Prim" in the scoped evaluator. See
+  Reductions of the primitives of "GHC.Prim" in the evaluator. See
   "Clash.Core.Evaluator.Primitives" for how to write them.
 
   Byte arrays live on the primitive heap of the machine. A mutable byte array

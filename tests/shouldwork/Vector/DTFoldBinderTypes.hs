@@ -11,7 +11,7 @@
 -- @Vec (2^(k-1)) a@.
 --
 -- This test evaluates the subject of the case-expression in @topEntity@ with
--- the scoped evaluator ("Clash.Core.Evaluator"), in the environment
+-- the evaluator ("Clash.Core.Evaluator"), in the environment
 -- Clash uses, and checks the types of the binders of the patterns in the
 -- result, which must have some.
 module DTFoldBinderTypes where

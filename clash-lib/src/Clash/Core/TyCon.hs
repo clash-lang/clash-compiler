@@ -6,7 +6,7 @@
 
   Type Constructors in CoreHW
 
-  The signatures of type constructors in scoped Clash Core
+  The signatures of type constructors in Clash Core
   ("Clash.Core.Sig"): the signature of a newtype ('newTyConSig') and the
   equations of a type family ('tyFamEqns'), and the instantiation of a newtype
   ('newTyConInstRhs').

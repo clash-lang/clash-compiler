@@ -5,7 +5,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of primitives, on scoped Clash Core. They replace an application
+  Reductions of primitives, on Clash Core. They replace an application
   of a primitive on vectors (or trees) of a known length by its unrolled
   definition. 'Clash.Normalize.Transformations.Reduce.reducePrim'
   decides whether to, and calls them on the saturated application.

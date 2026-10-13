@@ -7,7 +7,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Blackboxes of Netlist generation on scoped Clash Core: creating blackbox
+  Blackboxes of Netlist generation on Clash Core: creating blackbox
   contexts, and filling in the templates of primitives.
 
   The handlers get the t'CompCtx' of the terms they are given, which gives

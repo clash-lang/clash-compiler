@@ -3,8 +3,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Helpers to test the scoped evaluator ("Clash.Core.Evaluator") on
-  terms of scoped Clash Core.
+  Helpers to test the evaluator ("Clash.Core.Evaluator") on
+  terms of Clash Core.
 
   = Results
 
@@ -75,7 +75,7 @@ nfDataIn
   => Env -> GlobalEnv (Binding (Term 'VoidS)) -> Scope n -> Term n -> Term n
 nfDataIn env = evalIn (nfData env)
 
--- | Run the evaluator of scoped Clash Core on a term in a scope, see 'whnfIn'
+-- | Run the evaluator of Clash Core on a term in a scope, see 'whnfIn'
 evalIn
   :: Distinct n
   => (forall r. Machine n n -> (forall l. DExt n l => Machine n l -> r) -> r)

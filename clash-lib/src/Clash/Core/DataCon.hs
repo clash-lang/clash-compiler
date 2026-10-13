@@ -7,7 +7,7 @@
 
   Data Constructors in CoreHW
 
-  Scoped Core refers to data constructors ('Data', 'DataPat') with
+  Clash Core refers to data constructors ('Data', 'DataPat') with
   'DataCon', which stores its closed type ('Clash.Core.DataCon.dcType') and
   its /signature/ (t'DataConSig', see "Clash.Core.Sig") as scoped
   types. Instantiating a data constructor substitutes types for the type

@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The global bindings of the rewrite state, for scoped Clash Core: closed
+  The global bindings of the rewrite state, for Clash Core: closed
   terms (@'Term' ''VoidS'@) in 'Clash.Rewrite.Types.bindings'. They
   move into any scope for free, with 'sinkClosed'.
 

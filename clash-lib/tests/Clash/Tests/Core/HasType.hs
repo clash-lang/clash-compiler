@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the types of scoped Clash Core terms. Like
+  Tests for the types of Clash Core terms. Like
   "Clash.Tests.Core.Type", most tests check the expected results in
   the scope of the free variables of their input, and in a larger scope where
   all of its binders clash with the scope.

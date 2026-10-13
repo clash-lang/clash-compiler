@@ -308,7 +308,7 @@ classifyTests =
 
 -- * Normalizing global binders
 
--- | 'incLits' on scoped Core
+-- | 'incLits' on Clash Core
 incLits :: Rewrite NormalizeState
 incLits = N.bottomupR $ Transform $ \_ -> \case
   Literal (IntLiteral i) -> N.changed (Literal (IntLiteral (i + 1)))

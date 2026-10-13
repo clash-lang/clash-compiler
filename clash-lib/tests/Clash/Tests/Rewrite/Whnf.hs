@@ -4,13 +4,13 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Rewrite.Whnf": evaluating subterms with the
-  let-bindings of their scoped context.
+  let-bindings of their context.
 
   The cases of \"whnfRW uses the context's let-bindings (#2571)\": a
   traversal goes under the binders itself, so the context is built by
   'Clash.Rewrite.pushUnder', and evaluates every variable. A binder
   that shadows a let-binder, or a free variable of its right-hand side, in
-  the source of a test has another name in scoped Core, so the binding is
+  the source of a test has another name in Clash Core, so the binding is
   used where it is valid, and nowhere else.
 -}
 

@@ -4,7 +4,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The call-by-need whnf evaluator of scoped Clash Core, based on the
+  The call-by-need whnf evaluator of Clash Core, based on the
   evaluator described in:
 
   Maximilian Bolingbroke, Simon Peyton Jones, "Supercompilation by

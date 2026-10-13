@@ -3,9 +3,9 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Utilities to write unit tests on scoped Clash Core ("Clash.Core").
+  Utilities to write unit tests on Clash Core ("Clash.Core").
 
-  = Inputs in scoped Core
+  = Inputs in Clash Core
 
   Tests write their inputs, and the terms they expect, as strings in the
   language of 'Test.Clash.Rewrite.parseTestTerm' (see its section in
@@ -54,7 +54,7 @@
 
   = Shadowing
 
-  In scoped Core, a term built in a scope has binders with names above the
+  In Clash Core, a term built in a scope has binders with names above the
   names of the scope. A binder can only clash with a name of its scope once
   the term is 'sink'ed into a larger scope: that is the situation in which a
   function that goes under binders must rename them. A test of shadowing:
@@ -81,7 +81,7 @@
   An identifier that is bound again, like @x@ above, refers to the inner
   binder in its scope, as in Haskell. The builder gives the two binders
   different names: shadowing in the source of a test is not shadowing in
-  scoped Core.
+  Clash Core.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -134,7 +134,7 @@ module Test.Clash.Core
   , assertTermAlphaEq
   , assertTermIs
   , assertTypeIs
-    -- * Running scoped transformations in a test scope
+    -- * Running transformations in a test scope
   , runRewriteIn
   , runRewriteAt
   , assertRewritesTo
@@ -175,7 +175,7 @@ module Test.Clash.Core
   , forAllScrambled
     -- * Properties
   , withTests
-    -- * Running scoped transformations
+    -- * Running transformations
   , runRewriteClosed
   , Step (..)
   , atPath
@@ -462,7 +462,7 @@ assertTypeIs ts expected0 actual =
 
 -- * Running transformations
 
--- | Run a scoped transformation on a term, in the root context of its scope.
+-- | Run a transformation on a term, in the root context of its scope.
 -- Gives the result, the final state, and whether a change was signaled.
 runRewriteIn
   :: Distinct n
@@ -475,7 +475,7 @@ runRewriteIn
 runRewriteIn env st ts t e =
   runRewriteTest env st (runTransform t (rootContext (testScope ts)) e)
 
--- | Run a scoped transformation on the subterm at a path (see 'atPath'), in
+-- | Run a transformation on the subterm at a path (see 'atPath'), in
 -- its context, and put the result back. Gives the whole term, the final state,
 -- and whether a change was signaled. The binders on the path are opened, so
 -- they may be renamed. E.g. to run a transformation in the body of a lambda:
@@ -521,7 +521,7 @@ runRewriteAt env st ts path0 t e0 =
   replaceAt :: Int -> a -> [a] -> [a]
   replaceAt i x xs = take i xs <> [x] <> drop (i + 1) xs
 
--- | Assert that a scoped transformation, run at the root of a term in a
+-- | Assert that a transformation, run at the root of a term in a
 -- scope with the given variables, gives the expected term (built in the same
 -- scope), with a lint-clean result, and that it signals a change. Runs it twice:
 -- in that scope, and in the scope extended such that the binders of the term
@@ -565,7 +565,7 @@ assertRewritesAt env st path rw decls input expected =
     assertTermIs ts expected e'
     assertBool "no change signaled" ch
 
--- | Assert that a scoped transformation, run at the root of a term in a
+-- | Assert that a transformation, run at the root of a term in a
 -- scope with the given variables, leaves it as it is and signals no change.
 -- Like 'assertRewritesTo', also in a scope that the binders of the term clash
 -- with.
@@ -661,7 +661,7 @@ withCapture decls part new mk k =
         (any (`IntSet.member` free) (binderRaws e))
       k ts e
 
--- | Assert that a scoped transformation, run at the root of the term of a
+-- | Assert that a transformation, run at the root of the term of a
 -- capture scenario (see 'withCapture'), gives the expected term, built in the
 -- extended scope, with a lint-clean result
 assertCaptureRewritesTo
@@ -689,7 +689,7 @@ newBindings st0 st1 =
   [ b | b <- globalEnvElems (_bindings st1)
       , Maybe.isNothing (lookupGlobalEnv (bindingId b) (_bindings st0)) ]
 
--- | Assert that a scoped transformation, run at the root of a term in a
+-- | Assert that a transformation, run at the root of a term in a
 -- scope with the given variables, creates new global bindings, and gives the
 -- expected term. The expected term refers to the new global functions by
 -- placeholders, given with the expected bodies of their bindings, in the
@@ -1307,7 +1307,7 @@ withTests :: Int -> TestTree -> TestTree
 withTests n = adjustOption $ \(QuickCheckTests k) ->
   QuickCheckTests (if k == 10000 then n else k)
 
--- | Run a scoped transformation on a closed term, in the root context, in the
+-- | Run a transformation on a closed term, in the root context, in the
 -- default (silent) environment. Gives the result, the number of
 -- transformations applied, and whether a change was signaled.
 runRewriteClosed :: Rewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Bool)

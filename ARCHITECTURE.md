@@ -63,7 +63,7 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
     * `Clash.Normalize`
 
-      The specific transformations and the strategy used to normalize terms is defined in these modules. The transformations work on scoped Clash Core, and are split up into submodules of `Clash.Normalize.Transformations`. In addition, these modules also handle performing normalization on binders, and sanity checks for normalization (such as whether the result of normalization has a recursive call-graph).
+      The specific transformations and the strategy used to normalize terms is defined in these modules. The transformations work on Clash Core, and are split up into submodules of `Clash.Normalize.Transformations`. In addition, these modules also handle performing normalization on binders, and sanity checks for normalization (such as whether the result of normalization has a recursive call-graph).
 
     * `Clash.Netlist`
 

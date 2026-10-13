@@ -5,7 +5,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Builtin types and kinds of scoped Clash Core, and their type constructors.
+  Builtin types and kinds of Clash Core, and their type constructors.
 
   Most of them are a single type constructor, which mentions no variables, so
   they are types in any scope: @'Type' n@ for all @n@. Those that bind type

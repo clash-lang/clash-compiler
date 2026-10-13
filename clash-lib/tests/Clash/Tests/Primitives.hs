@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the blackbox functions of "Clash.Primitives" on scoped Clash Core
+  Tests for the blackbox functions of "Clash.Primitives" on Clash Core
 -}
 
 {-# LANGUAGE GADTs #-}

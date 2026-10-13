@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The X-optimization transformation of scoped Clash Core.
+  The X-optimization transformation of Clash Core.
 
   When only one alternative is defined, 'xOptimize' let-binds the subject and
   the pattern binders. It creates new binders for them in the scope of the
@@ -14,7 +14,7 @@
   the subject, and the binder of the subject is fresh with respect to them.
 
   When no alternative is defined, it replaces the case-expression with
-  @errorX@. The type of a primitive is closed in scoped Core, so if the type
+  @errorX@. The type of a primitive is closed in Clash Core, so if the type
   of the case-expression mentions type variables, that is @errorX \@ty@, where
   @errorX@ has type @forall a. a@ (see 'Clash.Core.Util.primAtType').
 -}

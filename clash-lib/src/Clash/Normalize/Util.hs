@@ -6,8 +6,7 @@
 
   Utility functions used by the normalisation transformations.
 
-  Utility functions used by the normalization transformations on scoped Clash
-  Core ("Clash.Core.Syntax").
+  Utility functions used by the normalization transformations on Clash Core ("Clash.Core.Syntax").
 
   = Globals
 
@@ -573,7 +572,7 @@ normalizeWorkFreeApp f b args = do
 -- transformation.
 --
 -- It doesn't lint its input with @-fclash-debug-invariants-shadowing@: in
--- scoped Core, binders never shadow one another, and every variable is in
+-- Clash Core, binders never shadow one another, and every variable is in
 -- scope.
 rewriteExpr
   :: (String, Rewrite NormalizeState)
@@ -615,13 +614,13 @@ rewriteExpr (nrwS, nrw) (bndrS, expr) (nm, sp) = do
 -- revisited: one that couldn't be substituted stays, even if a later
 -- substitution would allow it.
 --
--- Two subtleties, which the types of scoped Core force:
+-- Two subtleties, which the types of Clash Core force:
 --
 -- * It substitutes in everything in scope of @tv@, including the binders
 --   between the type lambda and the lambda of the constraint, e.g. @c@ in
 --   @/\\dom. \\(c :: KnownDomain dom). \\(eq : dom ~ System). ...@.
 --   Substituting only after the lambda of the constraint would leave @dom@
---   free in the type of @c@, which can't be written in scoped Core: the type
+--   free in the type of @c@, which can't be written in Clash Core: the type
 --   of @c@ is in scope of @dom@.
 --
 -- * It only substitutes if that is well-scoped: if @ty@ is in scope at the

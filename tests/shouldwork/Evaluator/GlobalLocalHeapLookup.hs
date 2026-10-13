@@ -8,8 +8,8 @@
 -- The evaluator of Clash Core looked up a global variable in the local heap,
 -- and found the binding of the local one.
 --
--- In scoped Clash Core, locals and globals are separate namespaces: a local
--- has a raw name of its scope, a global a unique. The scoped evaluator
+-- In Clash Core, locals and globals are separate namespaces: a local
+-- has a raw name of its scope, a global a unique. The evaluator
 -- ("Clash.Core.Evaluator") must keep them apart, also when the raw
 -- name of a local is the unique of a global.
 --

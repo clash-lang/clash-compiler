@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the pretty-printer of scoped Clash Core: what it prints for
+  Tests for the pretty-printer of Clash Core: what it prints for
   global variables and type constructors, and that the names it prints for
   local variables only depend on their human readable names and raw names.
 -}

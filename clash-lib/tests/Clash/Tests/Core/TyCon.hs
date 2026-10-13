@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for type constructors in scoped Clash Core
+  Tests for type constructors in Clash Core
 -}
 
 {-# LANGUAGE GADTs #-}

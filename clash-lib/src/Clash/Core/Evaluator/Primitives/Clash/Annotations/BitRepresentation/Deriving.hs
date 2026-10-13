@@ -7,7 +7,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of
-  "Clash.Annotations.BitRepresentation.Deriving" in the scoped evaluator. See
+  "Clash.Annotations.BitRepresentation.Deriving" in the evaluator. See
   "Clash.Core.Evaluator.Primitives" for how to write them.
 -}
 

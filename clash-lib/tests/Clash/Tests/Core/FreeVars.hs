@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the free variables of scoped Clash Core, and tests of occurrence
+  Tests for the free variables of Clash Core, and tests of occurrence
   checks.
 -}
 

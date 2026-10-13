@@ -7,7 +7,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of "Clash.Sized.Internal.Unsigned" in the
-  scoped evaluator. See "Clash.Core.Evaluator.Primitives" for how to
+  evaluator. See "Clash.Core.Evaluator.Primitives" for how to
   write them.
 -}
 

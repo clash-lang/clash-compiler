@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The types of the whnf evaluator of scoped Clash Core: values, stack frames,
+  The types of the whnf evaluator of Clash Core: values, stack frames,
   heaps and the machine. The machine itself is "Clash.Core.Evaluator".
 
   = The scope of the machine

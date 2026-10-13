@@ -9,7 +9,7 @@
 
   Type and instance definitions for Netlist modules
 
-  The types that Netlist generation on scoped Clash Core
+  The types that Netlist generation on Clash Core
   ("Clash.Core.Syntax") shares with its handlers and with blackbox
   functions.
 
@@ -28,7 +28,7 @@
 
   = Blackbox functions
 
-  A blackbox function on scoped Core ('BlackBoxFunction') gets the context of
+  A blackbox function on Clash Core ('BlackBoxFunction') gets the context of
   the component, as a read-only 'BlackBoxEnv': the scope of its arguments,
   which it needs to e.g. look through type synonyms with
   'Clash.Core.Type.coreView', the type environment, and the HDL
@@ -334,7 +334,7 @@ data NetlistEnv
   -- ^ Synthesis attributes brough into scope by
   -- 'Clash.Annotations.SynthesisAttributes.annotateReg'
   , _typeEnv :: TypeEnv
-  -- ^ The type environment of scoped Clash Core, made once per run
+  -- ^ The type environment of Clash Core, made once per run
   }
 
 data ComponentMeta = ComponentMeta
@@ -1199,7 +1199,7 @@ callBlackBoxFunction
   -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
 callBlackBoxFunction ctx (SomeBlackBoxFunction f) = f ctx
 
--- | A blackbox function on scoped Clash Core: given the arguments and result
+-- | A blackbox function on Clash Core: given the arguments and result
 -- types of the primitive it should provide a blackbox for, it generates the
 -- blackbox.
 type BlackBoxFunction =

@@ -129,7 +129,7 @@ liftBindingTyVarCapture = do
 --
 -- > r = \z -> k (r z) x    where x :: a, a :: kk, and kk is free
 --
--- must give @/\\kk a -> ..@. In scoped Core, a type variable has a raw name
+-- must give @/\\kk a -> ..@. In Clash Core, a type variable has a raw name
 -- above those of the type variables in its kind.
 liftBindingTyVarOrder :: Assertion
 liftBindingTyVarOrder = do
@@ -175,8 +175,8 @@ liftBindingLocalSharesUniqueWithGlobal = do
 whnfState :: RewriteState NormalizeState
 whnfState = def{_globalHeap = (IntMap.empty, 0)}
 
--- | Reduce the subterm at a path of a closed term to WHNF with the scoped
--- 'whnfRW', in the scoped context of the subterm. Gives whether the result is
+-- | Reduce the subterm at a path of a closed term to WHNF with
+-- 'whnfRW', in the context of the subterm. Gives whether the result is
 -- the subterm itself, and whether it is the expected term.
 whnfAt :: [Step] -> TestTerm -> TestTerm -> IO (Bool, Bool)
 whnfAt path tm expected = do
@@ -186,7 +186,7 @@ whnfAt path tm expected = do
       pure (aeqTm e1 e, aeqTm (sinkClosed (closedTerm expected)) e1)
   pure res
 
--- | 'whnfRW' uses the let-bindings of scoped contexts, which are never
+-- | 'whnfRW' uses the let-bindings of contexts, which are never
 -- shadowed
 whnfContextTests :: [TestTree]
 whnfContextTests =
@@ -421,7 +421,7 @@ tests =
         , testCase "keeps a local that shares a unique with the lifted function"
             liftBindingLocalSharesUniqueWithGlobal
         ]
-    , testGroup "whnfRW uses the let-bindings of a scoped context" whnfContextTests
+    , testGroup "whnfRW uses the let-bindings of a context" whnfContextTests
 
     -- @-fclash-debug-transformations-limit@ counts from
     -- @-fclash-debug-transformations-from@. 'applyDebug' used to subtract the

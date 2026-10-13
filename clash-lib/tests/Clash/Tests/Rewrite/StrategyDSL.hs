@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Rewrite.StrategyDSL.TH" compiling strategies of scoped
+  Tests for "Clash.Rewrite.StrategyDSL.TH" compiling strategies of
   transformations.
 -}
 
@@ -28,7 +28,7 @@ import Clash.Rewrite.StrategyDSL.TH
 import Clash.Tests.Rewrite.StrategyDSL.Stubs
 import Test.Clash.Core (closedTerm, runRewriteClosed)
 
--- | Assert that two scoped rewrites agree on a closed term: same result
+-- | Assert that two rewrites agree on a closed term: same result
 -- (syntactically), same transformation count, same change flag
 assertAgree :: Rewrite () -> Rewrite () -> Term 'VoidS -> Assertion
 assertAgree candidate reference term = do

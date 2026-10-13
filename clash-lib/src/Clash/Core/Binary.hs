@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  'Binary' instances of closed types and terms of scoped Clash Core
+  'Binary' instances of closed types and terms of Clash Core
   ("Clash.Core.Syntax"), and of the values they refer to: global
   variables, primitives, data constructors and type constructors. E.g.
   the manifest hashes the call graph of a top entity with them
@@ -43,7 +43,7 @@
 
   = Files
 
-  Files of scoped Clash Core start with a header ('putHeader'): a magic number
+  Files of Clash Core start with a header ('putHeader'): a magic number
   and the version of this encoding ('formatVersion'). 'encodeWithHeader' and
   'decodeWithHeader' write and read it.
 -}
@@ -103,16 +103,16 @@ import Clash.Core.Syntax
 formatVersion :: Word16
 formatVersion = 1
 
--- | The magic number that files of scoped Clash Core start with
+-- | The magic number that files of Clash Core start with
 magic :: BS.ByteString
 magic = BS8.pack "CLASHSCC"
 
--- | The header of a file of scoped Clash Core: a magic number, and the
+-- | The header of a file of Clash Core: a magic number, and the
 -- version of the encoding
 putHeader :: Put
 putHeader = putByteString magic >> putWord16be formatVersion
 
--- | Read the header of a file of scoped Clash Core. Fails if it isn't one,
+-- | Read the header of a file of Clash Core. Fails if it isn't one,
 -- or if its version is not 'formatVersion'.
 getHeader :: Get ()
 getHeader = do

@@ -4,7 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Helpers for testing "Clash.Core.TermLiteral": encoding Haskell
-  values as the terms of scoped Clash Core that the decoders expect, and
+  values as the terms of Clash Core that the decoders expect, and
   generating values.
 -}
 
@@ -53,7 +53,7 @@ import qualified Clash.Core.Syntax as S
 
 import Test.Clash.Core (closedType)
 
--- | Encode a value as a closed term of scoped Clash Core, of the shape
+-- | Encode a value as a closed term of Clash Core, of the shape
 -- "Clash.GHC.GHC2Core" makes for it, as far as the decoders of
 -- 'Clash.Core.TermLiteral.TermLiteral' look. Type arguments and data
 -- constructor types are placeholders.

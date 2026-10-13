@@ -5,7 +5,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Disjoint expression consolidation (DEC) for scoped Clash Core. See
+  Disjoint expression consolidation (DEC) for Clash Core. See
   'disjointExpressionConsolidation' for what the transformation does.
 
   = Moving applications out of the alternatives

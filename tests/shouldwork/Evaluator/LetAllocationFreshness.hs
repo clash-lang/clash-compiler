@@ -8,10 +8,10 @@
 --
 -- The evaluator of Clash Core renamed the binder to a unique from its unique
 -- supply, which needn't be fresh for the variables in scope: not all uniques
--- in a term come from the supply. The scoped evaluator
+-- in a term come from the supply. The evaluator
 -- ("Clash.Core.Evaluator") gives the binders it allocates the name
 -- just above the watermark of its scope, which is fresh by construction:
--- capture can't be expressed in scoped Core. The closest check is that the
+-- capture can't be expressed in Clash Core. The closest check is that the
 -- machine allocates above the watermark, not at it.
 --
 -- This test evaluates

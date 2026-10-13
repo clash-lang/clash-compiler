@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Instrumentation of scoped transformations: recording whether a
+  Instrumentation of transformations: recording whether a
   transformation applied ('apply', 'applyWith'), debug tracing, counting and
   invariant checks ('applyDebug'), and running a transformation on a term
   ('runRewrite').
@@ -103,7 +103,7 @@ applyWith = \s _ctx expr0 action -> do
 -- * The transformation didn't change the type of the term (traced rather
 --   than an error).
 --
--- It doesn't check these, because the type checker enforces them for scoped
+-- It doesn't check these, because the type checker enforces them for Clash
 -- Core:
 --
 -- * Free variables that the transformation introduced: a result in scope @n@

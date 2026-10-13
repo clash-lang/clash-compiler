@@ -9,7 +9,7 @@
   Utilities of the rewrite monad: running a rewrite session, signaling
   change, counting transformations, and the caches of the rewrite state.
 
-  Utilities for rewriting scoped Clash Core ("Clash.Core.Syntax"):
+  Utilities for rewriting Clash Core ("Clash.Core.Syntax"):
   creating binders, the representability of terms and types, inlining,
   lifting and removing let-bindings, recognizing join points, and binding
   what the evaluator allocated.
