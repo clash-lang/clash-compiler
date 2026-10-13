@@ -144,7 +144,7 @@ vecTests = testGroup "Vectors and trees"
   , testCase "extractElems of fewer elements" $ withVecs $ \ts -> do
       let ty = typeIn ts "a"
           sc = testScope ts
-      -- The head, as 'Clash.Normalize.Scoped.PrimitiveReductions.reduceHead'
+      -- The head, as 'Clash.Normalize.PrimitiveReductions.reduceHead'
       -- makes it
       assertRenders "extractElemsHead#1"
         (pp (extractElems testTypeEnv sc consDc ty 'V' 3 1 (termIn ts "v_20") $ \_ bs rhss vs _ ->

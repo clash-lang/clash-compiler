@@ -24,7 +24,7 @@ module Clash.Core.Evaluator.Primitives.GHC.Classes
 import Data.Text (Text)
 
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Normalize.Scoped.Primitives as NP
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Util (textNameLit)
 
 import qualified GHC.Classes

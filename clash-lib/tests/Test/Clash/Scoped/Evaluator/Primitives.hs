@@ -255,7 +255,7 @@ conPrim = \case
   Prim p -> primB p
   _ -> error "conPrim: not a primitive"
 
--- | 'Clash.Normalize.Scoped.Primitives.undefined' at a type, as reductions give it
+-- | 'Clash.Normalize.Primitives.undefined' at a type, as reductions give it
 undefinedAt :: TyB -> TmB
 undefinedAt = tyAppB (prim undefinedName (forAll "a_1" typeKind id))
 

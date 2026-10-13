@@ -275,7 +275,7 @@ import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import Clash.Debug (trace)
-import qualified Clash.Normalize.Scoped.Primitives as NP
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Sized.Internal.BitVector (Bit (..), BitVector (..))
 import Clash.Sized.Internal.Signed (Signed (..))
 import Clash.Sized.Internal.Unsigned (Unsigned (..))

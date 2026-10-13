@@ -27,7 +27,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Normalize.Scoped.Transformations.Cast
+module Clash.Normalize.Transformations.Cast
   ( argCastSpec
   , argCastSpecWorker
   , caseCast
@@ -65,7 +65,7 @@ import Clash.Core.Syntax
 import Clash.Core.Term (collectArgs, stripTicks)
 import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (normalizeType)
-import Clash.Normalize.Scoped.Transformations.Specialize (specialize)
+import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Rewrite (TransformContext, changed, mkDerivedName, tfScope)
 import Clash.Rewrite.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Util (mkTmBinderFor)

@@ -6,7 +6,7 @@
 
   The normalization strategies, as pure "Clash.Rewrite.StrategyDSL" values,
   of the transformations of scoped Clash Core
-  ("Clash.Normalize.Scoped.Transformations").
+  ("Clash.Normalize.Transformations").
   "Clash.Normalize.Strategy" compiles 'normalizationSpec' and
   'constantPropagationSpec' into the executable 'Clash.Normalize.Strategy.normalization'
   and 'Clash.Normalize.Strategy.constantPropagation'; "Clash.Normalize"
@@ -28,7 +28,7 @@ module Clash.Normalize.Strategy.Spec
 
 import Language.Haskell.TH.Syntax (Name)
 
-import Clash.Normalize.Scoped.Transformations
+import Clash.Normalize.Transformations
 import Clash.Rewrite.StrategyDSL
 
 -- [Note: bottomup traversal reduceConst]
@@ -207,7 +207,7 @@ flattenSpec =
   bottomup deadCode >-> -- See #3407
   letTL >->
   -- See Note [relation collapseRHSNoops and inlineCleanup] in
-  -- "Clash.Normalize.Scoped.Transformations.Inline".
+  -- "Clash.Normalize.Transformations.Inline".
   -- Note that we do this as the very last step, after all constant propagation
   -- has been done to avoid #3036.
   topdownSuc collapseRHSNoops >->

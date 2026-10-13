@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.MultiPrim".
+  Tests for "Clash.Normalize.Transformations.MultiPrim".
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -29,7 +29,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Netlist.BlackBox.Types (RenderVoid (NoRenderVoid), TemplateKind (TDecl))
 import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
-import qualified Clash.Normalize.Scoped.Transformations.MultiPrim as Scoped
+import qualified Clash.Normalize.Transformations.MultiPrim as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite (Rewrite)

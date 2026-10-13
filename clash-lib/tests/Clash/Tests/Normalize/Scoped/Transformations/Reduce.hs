@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Reduce":
+  Tests for "Clash.Normalize.Transformations.Reduce":
   'Scoped.reducePrim', which unrolls primitives; 'Scoped.reduceConst', which
   evaluates with the let-bindings of its context; and 'Scoped.reduceBinders',
   which removes duplicate bindings. 'assertRewritesTo' runs every test in the
@@ -33,7 +33,7 @@ import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 
 import Clash.Core.NameMap (emptyNameMap, nameMapToList)
 import Clash.Core.Syntax
-import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
+import qualified Clash.Normalize.Transformations.Reduce as Scoped
 import Clash.Rewrite (Rewrite, Transform (..))
 import qualified Clash.Rewrite as S
 import Clash.Rewrite.Util (LetBinding (..), openLetBindings)

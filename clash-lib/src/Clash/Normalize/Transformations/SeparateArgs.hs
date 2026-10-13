@@ -20,7 +20,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Normalize.Scoped.Transformations.SeparateArgs
+module Clash.Normalize.Transformations.SeparateArgs
   ( separateArguments
   , separateArgumentsLambdaWorker
   , separateArgumentsSpineWorker

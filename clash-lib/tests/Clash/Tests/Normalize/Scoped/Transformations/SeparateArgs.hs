@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.SeparateArgs".
+  Tests for "Clash.Normalize.Transformations.SeparateArgs".
   'assertRewritesTo' runs every test in the scope of the free variables of its
   input, and in a scope that the binders of the input clash with.
 -}
@@ -25,7 +25,7 @@ import Clash.Core.Alpha (aeqTy)
 import Clash.Core.HasType (inferCoreTypeOf)
 import Clash.Core.Syntax
 import Clash.Core.Term (collectArgs)
-import qualified Clash.Normalize.Scoped.Transformations.SeparateArgs as Scoped
+import qualified Clash.Normalize.Transformations.SeparateArgs as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)

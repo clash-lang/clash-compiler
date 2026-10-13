@@ -8,7 +8,7 @@
   type @forall a. a@, and is applied to the type of the term it stands for.
 -}
 
-module Clash.Normalize.Scoped.Primitives
+module Clash.Normalize.Primitives
   ( removedArg
   , undefined
   , undefinedX

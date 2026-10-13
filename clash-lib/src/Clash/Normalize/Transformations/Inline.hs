@@ -40,7 +40,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Normalize.Scoped.Transformations.Inline
+module Clash.Normalize.Transformations.Inline
   ( bindConstantVar
   , bindConstantVarWorker
   , inlineBndrsCleanup

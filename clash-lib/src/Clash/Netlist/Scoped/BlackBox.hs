@@ -99,7 +99,7 @@ import           Clash.Netlist.Util
    mkLiteral, originalIndices, preserveVarEnv, procAssign,
    stripFiltered, stripVoid, coreTypeToHWTypeM, globalIdentifier, idToOutPort, localIdText, primWarnContext, renameBinder, uniqueIdentifier,
    unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
-import           Clash.Normalize.Scoped.Primitives    (removedArg)
+import           Clash.Normalize.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
 import           Clash.Primitives.Util  (getFunctionPlurality)
 import           Clash.Signal.Internal         (ActiveEdge (..))
@@ -348,7 +348,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                     bbLibrary bbImports bbFunctionPlurality bbIncludes
                     bbResultNames bbResultInits bbTemplate)
         -- See Note [MultiResult type] in
-        -- "Clash.Normalize.Scoped.Transformations.MultiPrim":
+        -- "Clash.Normalize.Transformations.MultiPrim":
         P.BlackBox {name="c$multiPrimSelect"} ->
           pure (Noop, [])
         p@P.BlackBox {multiResult=True, name, template} -> do

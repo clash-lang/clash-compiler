@@ -36,7 +36,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-module Clash.Normalize.Scoped.Transformations.Letrec
+module Clash.Normalize.Transformations.Letrec
   ( deadCode
   , deadCodeWorker
   , flattenLet
@@ -77,8 +77,8 @@ import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (tyConDataCons)
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
-import Clash.Normalize.Scoped.Primitives (removedArg)
-import Clash.Normalize.Scoped.Transformations.Reduce (reduceBinders)
+import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
 import Clash.Rewrite.StrategyDSL

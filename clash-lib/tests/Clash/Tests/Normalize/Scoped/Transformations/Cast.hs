@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Cast". 'assertRewritesTo'
+  Tests for "Clash.Normalize.Transformations.Cast". 'assertRewritesTo'
   runs every test in the scope of the free variables of its input, and in a
   scope that the binders of the input clash with.
 -}
@@ -23,7 +23,7 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.DataCon as C
 import Clash.Core.Syntax (GlobalId, Term (Cast))
-import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
+import qualified Clash.Normalize.Transformations.Cast as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)

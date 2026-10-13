@@ -13,7 +13,7 @@
 
   'reducePrim' decides, per primitive, whether to replace an application of
   it by its unrolled definition. The definitions are those of
-  "Clash.Normalize.Scoped.PrimitiveReductions". The handlers describe the
+  "Clash.Normalize.PrimitiveReductions". The handlers describe the
   reduction they want as a 'PrimReduction', 'reduceWith' abstracts over
   missing arguments, and 'runPrimReduction' runs the reduction on the
   saturated application.
@@ -27,7 +27,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Normalize.Scoped.Transformations.Reduce
+module Clash.Normalize.Transformations.Reduce
   ( reduceBinders
   , reduceConst
   , reduceConstWorker
@@ -54,8 +54,8 @@ import qualified Clash.Core.Name as C
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon (TyCon (..), tyConDataCons)
-import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
-import Clash.Normalize.Scoped.Primitives (removedArg)
+import qualified Clash.Normalize.PrimitiveReductions as PR
+import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types (normalizeUltra, typeEnv)
@@ -876,7 +876,7 @@ abstractOverMissingArgs arity ticks args0 ty0 ctx0 f
 
 -- * Running the reductions
 
--- | A reduction of "Clash.Normalize.Scoped.PrimitiveReductions", with the parameters
+-- | A reduction of "Clash.Normalize.PrimitiveReductions", with the parameters
 -- that the handlers in 'reducePrimImpls' decided on. The type arguments of the
 -- reduction are those of the primitive, and the type of its result, so they
 -- are not part of it. See 'runPrimReduction'.
@@ -945,7 +945,7 @@ reduceWith ReducePrimContext{..} red =
  where
   (tmArgs, tyArgs) = Either.partitionEithers primArguments
 
--- | Run a reduction of "Clash.Normalize.Scoped.PrimitiveReductions" on a
+-- | Run a reduction of "Clash.Normalize.PrimitiveReductions" on a
 -- primitive, given its type arguments and as many term arguments as the
 -- reduction takes ('primReductionArity').
 runPrimReduction

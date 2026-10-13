@@ -7,7 +7,7 @@
 
   Reductions of primitives, on scoped Clash Core. They replace an application
   of a primitive on vectors (or trees) of a known length by its unrolled
-  definition. 'Clash.Normalize.Scoped.Transformations.Reduce.reducePrim'
+  definition. 'Clash.Normalize.Transformations.Reduce.reducePrim'
   decides whether to, and calls them on the saturated application.
 
   Currently, it contains reductions for:
@@ -56,7 +56,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Clash.Normalize.Scoped.PrimitiveReductions
+module Clash.Normalize.PrimitiveReductions
   ( reduceZipWith
   , reduceMap
   , reduceImap
@@ -100,7 +100,7 @@ import Clash.Core.TyCon (TyConName, tyConDataCons, tyConName)
 import Clash.Core.TysPrim (integerPrimTyConName, typeNatKindTyConName)
 
 import qualified Clash.Data.UniqMap as UniqMap
-import qualified Clash.Normalize.Scoped.Primitives as NP (undefined)
+import qualified Clash.Normalize.Primitives as NP (undefined)
 import Clash.Normalize.Types (NormalizeSession, constantPropagationStrategy)
 import Clash.Rewrite.Types (extra, typeEnv)
 import Clash.Sized.RTree (RTree)
@@ -198,7 +198,7 @@ rtreeTcName = showt ''RTree
 --   https://github.com/clash-lang/clash-compiler/issues/3461
 --
 -- Non-representable vectors are never let-bound:
--- 'Clash.Normalize.Scoped.Transformations.Inline.inlineOrLiftNonRep' would
+-- 'Clash.Normalize.Transformations.Inline.inlineOrLiftNonRep' would
 -- inline or lift such a let-binding, undoing the sharing.
 shareVecs
   :: forall n

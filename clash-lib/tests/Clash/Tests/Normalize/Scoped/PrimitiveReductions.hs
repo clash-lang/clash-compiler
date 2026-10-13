@@ -4,7 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for the primitive reductions of
-  "Clash.Normalize.Scoped.Transformations.Reduce": regression tests, and
+  "Clash.Normalize.Transformations.Reduce": regression tests, and
   tests of the results of the reductions. 'assertRewritesTo'
   runs every test in the scope of the free variables of its input, and in a
   scope that the binders of the input clash with.
@@ -27,8 +27,8 @@ import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (Wo
 import Clash.Core.Syntax (mkPrimInfo)
 import Clash.Core.Syntax (PrimInfo, PrimUnfolding (NoUnfolding), Term (Prim))
 import Clash.Core.Term (collectArgs)
-import Clash.Normalize.Scoped.Transformations.Reduce (PrimReduction (..))
-import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
+import Clash.Normalize.Transformations.Reduce (PrimReduction (..))
+import qualified Clash.Normalize.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))

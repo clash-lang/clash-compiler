@@ -21,7 +21,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-module Clash.Normalize.Scoped.Transformations.EtaExpand
+module Clash.Normalize.Transformations.EtaExpand
   ( etaExpandSyn
   , etaExpandSynWorker
   , etaExpansionTL

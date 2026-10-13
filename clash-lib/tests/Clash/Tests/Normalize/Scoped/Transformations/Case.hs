@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Case".
+  Tests for "Clash.Normalize.Transformations.Case".
 
   The regression tests guard against bugs that the case transformations had.
   The capture bugs among them can't be written in scoped Core: they are type
@@ -31,7 +31,7 @@ import qualified Clash.Core.Basic as C (WorkInfo (WorkAlways), IsMultiPrim (Sing
 import Clash.Core.Syntax (mkPrimInfo)
 import Clash.Core.Syntax
   (Alt (..), Distinct, Pat (DefaultPat), PrimUnfolding (NoUnfolding), PrimInfo, Term (..), sink)
-import qualified Clash.Normalize.Scoped.Transformations.Case as S
+import qualified Clash.Normalize.Transformations.Case as S
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)

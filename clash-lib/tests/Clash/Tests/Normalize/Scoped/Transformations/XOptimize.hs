@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.XOptimize".
+  Tests for "Clash.Normalize.Transformations.XOptimize".
   'assertRewritesTo' runs every test in the scope of the free variables of its
   input, and in a scope that the binders of the input clash with.
 -}
@@ -31,7 +31,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..))
 import Clash.Netlist.BlackBox.Types
 import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
-import qualified Clash.Normalize.Scoped.Transformations.XOptimize as Scoped
+import qualified Clash.Normalize.Transformations.XOptimize as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite (Rewrite)
