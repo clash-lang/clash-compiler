@@ -60,19 +60,21 @@ import Clash.Util.Supply         (Supply, freshId)
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 
--- | State used by the inspection mechanism for recording rewrite steps.
+-- | A step of the rewrite history of @-fclash-debug-history@, see
+-- "Clash.Rewrite.Scoped.History"
 data RewriteStep
   = RewriteStep
-  { t_ctx    :: Context
-  -- ^ current context
-  , t_name   :: String
+  { t_name   :: String
   -- ^ Name of the transformation
   , t_bndrS  :: String
   -- ^ Name of the current binder
-  , t_before :: Term
-  -- ^ Term before `apply`
-  , t_after  :: Term
-  -- ^ Term after `apply`
+  , t_free   :: Int
+  -- ^ The number of free variables of the rewritten term that 't_before' and
+  -- 't_after' are abstracted over: their outermost type lambdas and lambdas
+  , t_before :: S.Term 'S.VoidS
+  -- ^ Term before `apply`, abstracted over the free variables
+  , t_after  :: S.Term 'S.VoidS
+  -- ^ Term after `apply`, abstracted over the free variables
   } deriving (Show, Generic, NFData, Binary)
 
 -- | State of a rewriting session

@@ -5,7 +5,7 @@
 
   Entry point for the @clash-term@ executable.
 -}
-{-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies, InstanceSigs, ExplicitForAll #-}
+{-# LANGUAGE DataKinds, FlexibleInstances, ScopedTypeVariables, TypeApplications, TypeFamilies, InstanceSigs, ExplicitForAll #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
@@ -17,16 +17,20 @@ import Data.List   (find)
 import Data.Maybe  (fromJust)
 import qualified Data.ByteString.Lazy as BL
 
-import Clash.Core.Term     ( Term (..), LetBinding, Pat (..), Alt
-                           , Context, CoreContext (..) )
-import Clash.Core.Var      (Id)
+import Clash.Core.Scoped.Syntax  (S (VoidS))
+import qualified Clash.Core.Scoped.Syntax as S
+import Clash.Core.Scoped.Pretty ()
 import Clash.Rewrite.Types (RewriteStep (..))
 import Clash.Core.Pretty   ( ClashDoc, ClashAnnotation (..), SyntaxElement (..)
-                           , PrettyOptions (..) )
+                           , PrettyOptions (..), SubtermPos )
 import qualified Clash.Core.Pretty as Pr
 
 import RewriteInspector (Diff (..), History, HStep (..), Syntax)
 import qualified RewriteInspector as RW
+
+-- | The terms of the rewrite history: closed terms of scoped Clash Core, see
+-- "Clash.Rewrite.Scoped.History"
+type Term = S.Term 'VoidS
 
 main :: IO ()
 main = RW.runTerminal @Term "clash-term/theme.ini"
@@ -47,31 +51,34 @@ decodeList fn = do
           Right (s', _, x) -> x : go s'
           Left  _          -> error "malformed history"
 
+-- | The steps record no context: every step shows the closed term before and
+-- after the transformation, abstracted over its free variables. The printer
+-- of scoped Clash Core marks subterms by their position ('SubtermPos').
 instance Diff Term where
   type Ann     Term = ClashAnnotation
   type Options Term = PrettyOptions
-  type Ctx     Term = CoreContext
+  type Ctx     Term = SubtermPos
 
-  readHistory :: FilePath -> IO (History Term CoreContext)
+  readHistory :: FilePath -> IO (History Term SubtermPos)
   readHistory fname = map go <$> decodeList @RewriteStep fname
     where
-      go :: RewriteStep -> HStep Term CoreContext
-      go st@(RewriteStep {}) = HStep { _ctx    = reverse (t_ctx st)
+      go :: RewriteStep -> HStep Term SubtermPos
+      go st@(RewriteStep {}) = HStep { _ctx    = []
                                      , _bndrS  = t_bndrS st
                                      , _name   = t_name st
                                      , _before = t_before st
                                      , _after  = t_after st }
 
-  initialExpr :: History Term CoreContext -> Term
+  initialExpr :: History Term SubtermPos -> Term
   initialExpr = _before . fromJust . find ((== "normalization") . _name)
 
   topEntity :: String
   topEntity = "topEntity"
 
-  handleAnn :: ClashAnnotation -> Either Syntax CoreContext
-  handleAnn (AnnContext c) = Right c
-  handleAnn (AnnSubterm _) =
-    error "clash-term: the printer of Clash Core marks no SubtermPos"
+  handleAnn :: ClashAnnotation -> Either Syntax SubtermPos
+  handleAnn (AnnSubterm p) = Right p
+  handleAnn (AnnContext _) =
+    error "clash-term: the printer of scoped Clash Core marks no CoreContext"
   handleAnn (AnnSyntax s)  = Left $ case s of
     Keyword   -> RW.Keyword
     LitS      -> RW.Literal
@@ -94,53 +101,6 @@ instance Diff Term where
     , (displayTicks, \opt b -> opt {displayTicks = b}, "display ticks")
     ]
 
-  patch :: Term -> Context -> Term -> Term
-  patch _ [] t = t
-  patch curE (c:cs) t' =
-    case (curE, c) of
-        (App l r, AppFun) ->
-          App (go l) r
-        (App l r, AppArg _) ->
-          App l (go r)
-        (TyApp e ty, TyAppC) ->
-          TyApp (go e) ty
-        (Letrec bnds body, LetBinding i' _) ->
-          Letrec (mapBindings i' bnds) body
-        (Letrec bnds t, LetBody is) ->
-          if (fst <$> bnds) == (fst <$> is)
-            then Letrec bnds (go t)
-            else error "Ctx.LetBody: different bindings"
-        (Lam i t, LamBody i') ->
-          if i == i'
-            then Lam i (go t)
-            else error $ "Ctx.Lam: different identifiers " ++ show (i, i')
-        (TyLam tyVar t, TyLamBody tyVar') ->
-          if tyVar == tyVar'
-            then TyLam tyVar (go t)
-            else error "Ctx.TyLam: different type variables"
-        (Case scrut ty alts, CaseAlt pat) ->
-          Case scrut ty (mapAlternatives pat alts)
-        (Case t ty alts, CaseScrut) ->
-          Case (go t) ty alts
-        (Cast t ty ty', CastBody) ->
-          Cast (go t) ty ty'
-        (Tick ti x, TickC ti') ->
-          if ti == ti'
-            then Tick ti (go x)
-            else error $ "Ctx.Tick: different ticks " ++ show (ti, ti')
-        _ -> error "patch: context does not agree with term"
-    where
-      go :: Term -> Term
-      go = \t -> patch t cs t'
-
-      mapBindings :: Id -> [LetBinding] -> [LetBinding]
-      mapBindings i ((i', t) : bs)
-        | i == i'   = (i', go t) : bs
-        | otherwise = (i', t)    : mapBindings i bs
-      mapBindings _ [] = error "Ctx.LetBinding: no such binding"
-
-      mapAlternatives :: Pat -> [Alt] -> [Alt]
-      mapAlternatives pat ((pat', t) : alts)
-        | pat == pat' = (pat', go t) : alts
-        | otherwise   = (pat', t)    : mapAlternatives pat alts
-      mapAlternatives _ [] = error "Ctx.Case: no such alternative"
+  -- The steps record no context, so a step replaces the whole term
+  patch :: Term -> [SubtermPos] -> Term -> Term
+  patch _ _ t = t

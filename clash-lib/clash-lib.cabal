@@ -383,6 +383,7 @@ Library
                       Clash.Rewrite.Scoped.Apply
                       Clash.Rewrite.Scoped.Combinators
                       Clash.Rewrite.Scoped.Globals
+                      Clash.Rewrite.Scoped.History
                       Clash.Rewrite.Scoped.Types
                       Clash.Rewrite.Scoped.Util
                       Clash.Rewrite.Scoped.Whnf
@@ -504,6 +505,7 @@ test-suite unittests
       aeson-pretty,
       base,
       base16-bytestring,
+      binary,
       bytestring,
       containers,
       data-default,
@@ -604,6 +606,7 @@ test-suite unittests
                  Clash.Tests.Rewrite.Capture
                  Clash.Tests.Rewrite.Combinators
                  Clash.Tests.Rewrite.Scoped.Combinators
+                 Clash.Tests.Rewrite.Scoped.History
                  Clash.Tests.Rewrite.Scoped.StrategyDSL
                  Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
                  Clash.Tests.Rewrite.Scoped.Util
