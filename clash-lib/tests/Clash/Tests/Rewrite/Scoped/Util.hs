@@ -4,84 +4,108 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Rewrite.Scoped.Util": the scoped twins of the regression
-  tests in "Clash.Tests.Rewrite.Util", and agreement with the functions of
-  "Clash.Rewrite.Util" on converted inputs.
+  tests in "Clash.Tests.Rewrite.Util", and the results that the functions of
+  "Clash.Rewrite.Util" gave on the same inputs.
 -}
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Clash.Tests.Rewrite.Scoped.Util (tests) where
 
 import Data.Default (def)
-import Data.Either (rights)
 import qualified Data.IntMap as IntMap
+import qualified Data.Text as Text
 
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck (Property, testProperty, (===))
 
 import qualified Clash.Core.Literal as C
-import Clash.Core.Name (NameSort (User), noSrcSpan)
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
-import Clash.Core.Var (Id, Var (varName, varType, varUniq))
-import qualified Clash.Core.FreeVars as C
-import Clash.Core.VarEnv (lookupVarEnv)
+import Clash.Core.Name (nameOcc)
+import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (NumTy))
+import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeSession, NormalizeState)
-import Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..))
-import qualified Clash.Rewrite.Util as C
+import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Util.Supply (newSupply)
 
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Convert
-  (convScope, fromClashTerm, fromClashType, toClashTerm, toClashType, withConvEnv, mkGlobalIdFromClash)
+import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
+import Clash.Core.Scoped.Builder (appTyB, constTyB, litTyB)
+import Clash.Core.Scoped.FreeVars (teleNameBinders)
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
+import Clash.Core.Scoped.NameMap (globalEnvElems, lookupGlobalEnv)
+import Clash.Core.Scoped.Subst (unsinkTerm)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (AbsBinder (..))
+import Clash.Core.Scoped.Term (AbsBinder (..), collectArgs)
 import Clash.Rewrite.Scoped (rootContext, whnfRW)
 import qualified Clash.Rewrite.Scoped as Scoped
 import Clash.Rewrite.Scoped.Util
 
-import Test.Clash.Rewrite
-  ( addTy, argUniques, assertAlphaEq, assertNoFreeLocals, assertNoFreeTyVars
-  , firstUniques, globalId, heapLookupEvaluator, intFunTy, intId
-  , intLit, intTy, kindedTyVar, localId, numTy, runRewriteTest, showPprU
-  , testTyConMap, tyVar, vecTy )
+import Test.Clash.Rewrite (addTyConName, firstUniques, runRewriteTest, showPprU, withCurFun)
 import Test.Clash.Scoped
-  ( Step (..), aeqTermTyped, assertLetHandlerAgrees, atPath, forAllScrambled
-  , runScopedOn, testTypeEnv, withFreeVarsOf )
+
+-- | Render a term as text, with types
+pp :: PrettyPrec p => p -> String
+pp = showPpr' (PrettyOptions False True False True)
 
 -- * liftBinding
+
+-- | The function being normalized
+topG :: GlobalId
+topG = testGlobalId "top_G42" "Int -> Int"
 
 -- | The state for 'liftBinding': the function being normalized, and a unique
 -- supply
 liftState :: IO (RewriteState NormalizeState)
 liftState = do
   supply <- newSupply
-  pure def{_curFun = (mkGlobalIdFromClash (globalId User "top" 42 (intFunTy 1)), noSrcSpan), _uniqSupply = supply}
+  pure (withCurFun topG def{_uniqSupply = supply})
 
--- | Lift the first binding of a recursive let-expression with
--- 'liftBinding'. Gives the term that replaces the binder, and the body of the
--- global it applies.
-liftFirst :: RewriteState NormalizeState -> C.Term -> IO (C.Term, Maybe C.Term)
-liftFirst st tm = do
-  (newExpr, st1, _) <- runScopedOn def st tm $ \sc -> \case
-    Let bind body -> openLetBindings sc bind body $ \scL _ lbs _ -> case lbs of
-      lb : _ -> toClashTerm <$> liftBinding scL lb
+-- | Lift the first binding of the let-expression of a term built in a scope,
+-- with 'liftBinding'. Gives the term that replaces the binder (which mustn't
+-- refer to the let-bindings), and the global it applies, with its body.
+liftFirst
+  :: Distinct n
+  => RewriteState NormalizeState
+  -> TestScope n
+  -> Term n
+  -> IO (Term n, GlobalId, Term 'VoidS)
+liftFirst st ts tm = do
+  (newExpr0, st1, _) <- runRewriteTest def st $ case tm of
+    Let bind body -> openLetBindings (testScope ts) bind body $ \scL bs lbs _ -> case lbs of
+      lb : _ -> unsinkTerm (teleNameBinders bs) <$> liftBinding scL lb
       [] -> error "liftFirst: no bindings"
     _ -> error "liftFirst: not a let-expression"
-  case C.collectArgs newExpr of
-    (C.Var g, _) -> pure (newExpr, bindingTerm <$> lookupVarEnv g (_bindings st1))
+  newExpr <- maybe (assertFailure "the new expression refers to a let-binding") pure newExpr0
+  case collectArgs newExpr of
+    (GlobalVar g, _) -> case lookupGlobalEnv g (_scopedBindings st1) of
+      Just b -> pure (newExpr, g, bindingTerm b)
+      Nothing -> assertFailure "Lifted function not found in global bindings"
     _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
 
--- | The let-expression that binds @r = e@, with body @r@
-letrec :: Id -> C.Term -> C.Term
-letrec r e = C.Let (C.Rec [(r, e)]) (C.Var r)
+-- | Replace a global by another one, e.g. a global made by a transformation by
+-- one that a test can write
+renameGlobal :: GlobalId -> GlobalId -> Term n -> Term n
+renameGlobal g g' = go
+ where
+  go :: Term x -> Term x
+  go = \case
+    GlobalVar h | h == g -> GlobalVar g'
+    Lam b e -> Lam b (go e)
+    TyLam b e -> TyLam b (go e)
+    App e1 e2 -> App (go e1) (go e2)
+    TyApp e ty -> TyApp (go e) ty
+    Let (NonRec b x) e -> Let (NonRec b (go x)) (go e)
+    Let (Rec bs xs) e -> Let (Rec bs (map go xs)) (go e)
+    Case e ty alts -> Case (go e) ty [Alt p (go a) | Alt p a <- alts]
+    e -> e
+
+-- | The lifted function, as tests write it
+rL :: GlobalId
+rL = testGlobalId "rL_G99" "Int"
 
 -- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util".
 -- Lifting
@@ -94,45 +118,33 @@ letrec r e = C.Let (C.Rec [(r, e)]) (C.Var r)
 liftBindingTyVarCapture :: Assertion
 liftBindingTyVarCapture = do
   st <- liftState
-  let a = tyVar User "a" 50
-      r = localId User "r" 40 (intFunTy 1)
-      z = intId User "z" 41
-      x = localId User "x" 31 (C.VarTy a)
-      k = globalId User "k" 33 (intFunTy 2)
-      e = C.Lam z (C.mkApps (C.Var k) [Left (C.TyLam a (C.App (C.Var r) (C.Var z))), Left (C.Var x)])
-  liftFirst st (letrec r e) >>= \case
-    (newExpr, Just body) | (C.Var rLifted, _) <- C.collectArgs newExpr -> do
-      let b' = tyVar User "b" 51
-          rApp = C.mkApps (C.Var rLifted) [Right (C.VarTy a), Left (C.Var x), Left (C.Var z)]
-      assertAlphaEq
-        (C.TyLam a (C.Lam x (C.Lam z (C.mkApps (C.Var k)
-          [Left (C.TyLam b' rApp), Left (C.Var x)]))))
-        body
-    _ -> assertFailure "Lifted function not found in global bindings"
+  withTerm "let { (r :: Int -> Int) = \\(z :: Int) -> (k_G33 :: Int -> Int -> Int) (\\(a :: Type) -> r z) (x :: a) } in r" $ \ts tm -> do
+    (_, g, body) <- liftFirst st ts tm
+    assertTermIs emptyTestScope
+      "\\(a :: Type) (x :: a) (z :: Int) -> k_G33 (\\(b :: Type) -> rL_G99 @a x z) x"
+      (renameGlobal g rL body)
 
 -- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util".
 -- Lifting
 --
 -- > r = \z -> k (r z) x    where x :: a, a :: kk, and kk is free
 --
--- must give @/\\kk a -> ..@, not @/\\a kk -> ..@, even though the unique of @a@
--- is smaller than the unique of @kk@.
+-- must give @/\\kk a -> ..@. In Clash Core, the unique of @a@ was smaller
+-- than the unique of @kk@; in scoped Core, a type variable has a raw name
+-- above those of the type variables in its kind.
 liftBindingTyVarOrder :: Assertion
 liftBindingTyVarOrder = do
   st <- liftState
-  let kk = tyVar User "kk" 51
-      a = kindedTyVar User "a" 50 (C.VarTy kk)
-      r = localId User "r" 40 (intFunTy 1)
-      z = intId User "z" 41
-      x = localId User "x" 31 (C.VarTy a)
-      k = globalId User "k" 33 (intFunTy 2)
-      e = C.Lam z (C.mkApps (C.Var k) [Left (C.App (C.Var r) (C.Var z)), Left (C.Var x)])
-  liftFirst st (letrec r e) >>= \case
-    (newExpr, Just body) -> do
-      assertEqual ("Type arguments of the lifted function in:\n" <> showPprU newExpr)
-        [C.VarTy kk, C.VarTy a] (rights (snd (C.collectArgs newExpr)))
-      assertNoFreeTyVars body
-    _ -> assertFailure "Lifted function not found in global bindings"
+  withTestScope [tyVarD "kk", kindedTyVarD "a" "kk", varD "x" "a"] $ \ts -> do
+    let tm = termIn ts "let { (r :: Int -> Int) = \\(z :: Int) -> (k_G33 :: Int -> Int -> Int) (r z) x } in r"
+    (newExpr, _, body) <- liftFirst st ts tm
+    case collectArgs newExpr of
+      (_, [Right t1, Right t2, Left x]) -> do
+        assertTypeIs ts "kk" t1
+        assertTypeIs ts "a" t2
+        assertTermIs ts "x" x
+      (_, args) -> assertFailure ("unexpected arguments: " <> show (length args))
+    assertLintClean emptyTestScope body
 
 -- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util":
 -- 'liftBinding' replaces the recursive occurrences by an application of the
@@ -140,61 +152,41 @@ liftBindingTyVarOrder = do
 liftBindingSubstitutesBeforeAbstracting :: Assertion
 liftBindingSubstitutesBeforeAbstracting = do
   st <- liftState
-  let r = localId User "r" 40 (intFunTy 1)
-      z = intId User "z" 41
-      x = intId User "x" 31
-      k = globalId User "k" 33 (intFunTy 2)
-      -- r = \z -> k (r z) x
-      e = C.Lam z (C.mkApps (C.Var k) [Left (C.App (C.Var r) (C.Var z)), Left (C.Var x)])
-  liftFirst st (letrec r e) >>= \case
-    (newExpr, Just body) -> do
-      assertEqual ("Arguments of the lifted function in:\n" <> showPprU newExpr)
-        [Just (varUniq x)] (argUniques (snd (C.collectArgs newExpr)))
-      assertNoFreeLocals body
-    _ -> assertFailure "Lifted function not found in global bindings"
+  -- r = \z -> k (r z) x
+  withTerm "let { (r :: Int -> Int) = \\(z :: Int) -> (k_G33 :: Int -> Int -> Int) (r z) (x :: Int) } in r" $ \ts tm -> do
+    (newExpr, g, body) <- liftFirst st ts tm
+    assertTermIs ts "rL_G99 x" (renameGlobal g rL newExpr)
+    assertTermIs emptyTestScope "\\(x :: Int) (z :: Int) -> k_G33 (rL_G99 x z) x" (renameGlobal g rL body)
 
 -- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util":
 -- the new global function gets a unique from the supply, which can be the
--- unique of a free local variable of the lifted binding. The two must not be
+-- raw name of a free local variable of the lifted binding. The two must not be
 -- confused.
 liftBindingLocalSharesUniqueWithGlobal :: Assertion
 liftBindingLocalSharesUniqueWithGlobal = do
   st <- liftState
   u : _ <- pure (firstUniques 1 (_uniqSupply st))
-  let r = localId User "r" 40 (intFunTy 1)
-      z = intId User "z" 41
-      x = intId User "x" u
-      k = globalId User "k" 33 (intFunTy 2)
-      -- r = \z -> k (r z) x
-      e = C.Lam z (C.mkApps (C.Var k) [Left (C.App (C.Var r) (C.Var z)), Left (C.Var x)])
-  liftFirst st (letrec r e) >>= \case
-    (newExpr, Just body) | (C.Var rLifted, _) <- C.collectArgs newExpr -> do
-      assertEqual "The lifted function gets the unique of x" u (varUniq rLifted)
-      -- \x z -> k (rLifted x z) x
-      assertAlphaEq
-        (C.Lam x (C.Lam z (C.mkApps (C.Var k)
-          [ Left (C.mkApps (C.Var rLifted) [Left (C.Var x), Left (C.Var z)])
-          , Left (C.Var x) ])))
-        body
-    _ -> assertFailure "Lifted function not found in global bindings"
+  withTestScope [atRaw (fromIntegral u) (varD "x" "Int")] $ \ts -> do
+    -- r = \z -> k (r z) x
+    let tm = termIn ts "let { (r :: Int -> Int) = \\(z :: Int) -> (k_G33 :: Int -> Int -> Int) (r z) x } in r"
+    (_, g, body) <- liftFirst st ts tm
+    assertEqual "The lifted function gets the raw name of x" u (globalIdUniq g)
+    assertTermIs emptyTestScope "\\(x :: Int) (z :: Int) -> k_G33 (rL_G99 x z) x" (renameGlobal g rL body)
 
 -- * whnfRW
-
-whnfEnv :: RewriteEnv
-whnfEnv = def{_evaluator = heapLookupEvaluator}
 
 whnfState :: RewriteState NormalizeState
 whnfState = def{_globalHeap = (IntMap.empty, 0)}
 
 -- | Reduce the subterm at a path of a closed term to WHNF with the scoped
 -- 'whnfRW', in the scoped context of the subterm. Gives whether the result is
--- the subterm itself, and the result.
-whnfAt :: [Step] -> C.Term -> IO (Bool, C.Term)
-whnfAt path tm = do
-  (res, _, _) <- runScopedOn whnfEnv whnfState tm $ \sc e0 ->
-    atPath path (rootContext sc) e0 $ \ctx e -> do
-      e1 <- whnfRW False ctx e (\_ t -> C.changed t)
-      pure (aeqTm e1 e, toClashTerm e1)
+-- the subterm itself, and whether it is the expected term.
+whnfAt :: [Step] -> TestTerm -> TestTerm -> IO (Bool, Bool)
+whnfAt path tm expected = do
+  (res, _, _) <- runRewriteTest def whnfState $
+    atPath path (rootContext emptyScope) (closedTerm tm) $ \ctx e -> do
+      e1 <- whnfRW False ctx e (\_ t -> changed t)
+      pure (aeqTm e1 e, aeqTm (sinkClosed (closedTerm expected)) e1)
   pure res
 
 -- | 'whnfRW' uses the let-bindings of scoped contexts, which are never
@@ -202,49 +194,27 @@ whnfAt path tm = do
 whnfScopedContextTests :: [TestTree]
 whnfScopedContextTests =
   [ testCase "let x = 3 in \\y -> x" $
-      whnfAt [LetBodyStep, LamStep] (C.Let (C.NonRec x (intLit 3)) (C.Lam y (C.Var x)))
-        >>= assertAlphaEq (intLit 3) . snd
+      whnfAt [LetBodyStep, LamStep] "let { !(x :: Int) = 3 } in \\(y :: Int) -> x" "3"
+        >>= assertBool "3" . snd
   , testCase "let x = 3 in \\x -> x" $
-      whnfAt [LetBodyStep, LamStep] (C.Let (C.NonRec x (intLit 3)) (C.Lam x (C.Var x)))
+      whnfAt [LetBodyStep, LamStep] "let { !(x :: Int) = 3 } in \\(x :: Int) -> x" "3"
         >>= assertBool "unchanged" . fst
     -- Like for Clash Core, the bindings of a recursive let-binding are not
     -- used in its right-hand sides
   , testCase "let x = 3 in letrec { x = 4; w = x } in w" $
       whnfAt [LetBodyStep, LetRhsStep 1]
-        (C.Let (C.NonRec x (intLit 3))
-          (C.Let (C.Rec [(x, intLit 4), (w, C.Var x)]) (C.Var w)))
+        "let { !(x :: Int) = 3 } in let { (x :: Int) = 4; (w :: Int) = x } in w" "4"
         >>= assertBool "unchanged" . fst
   , testCase "let x = 3 in let y = x in y" $
-      whnfAt [LetBodyStep, LetBodyStep]
-        (C.Let (C.NonRec x (intLit 3)) (C.Let (C.NonRec y (C.Var x)) (C.Var y)))
-        >>= assertAlphaEq (intLit 3) . snd
+      whnfAt [LetBodyStep, LetBodyStep] "let { !(x :: Int) = 3 } in let { !(y :: Int) = x } in y" "3"
+        >>= assertBool "3" . snd
   ]
- where
-  x = intId User "x" 1
-  y = intId User "y" 2
-  w = intId User "w" 5
 
--- * Agreement with Clash Core
-
--- | Local functions, and local variables of type @Int@
-vf, vg, va, vb, vc, vx, vy, vz, vr, vs :: Id
-vf = localId User "f" 10 (intFunTy 1)
-vg = localId User "g" 11 (intFunTy 2)
-va = intId User "a" 1
-vb = intId User "b" 2
-vc = intId User "c" 3
-vx = intId User "x" 4
-vy = intId User "y" 5
-vz = intId User "z" 6
-vr = localId User "r" 7 (intFunTy 1)
-vs = intId User "s" 8
+-- * The results of the functions of Clash Core
 
 -- | The state for transformations that lift bindings, see 'liftState'
 liftStateFixed :: RewriteState NormalizeState
-liftStateFixed = def{_curFun = (mkGlobalIdFromClash (globalId User "top" 42 (intFunTy 1)), noSrcSpan)}
-
-app :: Id -> [C.Term] -> C.Term
-app h = C.mkApps (C.Var h) . map Left
+liftStateFixed = withCurFun topG def
 
 -- | Whether the right-hand side of a binding is a literal or a variable
 litOrVar :: Term n -> Bool
@@ -253,146 +223,121 @@ litOrVar = \case
   Var {} -> True
   _ -> False
 
-litOrVarC :: C.Term -> Bool
-litOrVarC = \case
-  C.Literal {} -> True
-  C.Var {} -> True
-  _ -> False
+-- | Run a let-handler on a let-expression, in the root context of the scope
+-- of its free variables. Gives the result, rendered as text, whether it
+-- signaled a change, and the global bindings it added, rendered as text.
+runLetHandler
+  :: RewriteState NormalizeState
+  -> (forall n l. Distinct n => Scoped.TransformContext n -> Term n -> Bind n l -> Term l -> NormalizeSession (Term n))
+  -> TestTerm
+  -> IO (String, Bool, [(String, String)])
+runLetHandler st h t = withTerm t $ \ts -> \case
+  e@(Let bind body) -> do
+    (res, st1, ch) <- runRewriteTest def st (h (rootContext (testScope ts)) e bind body)
+    let new = [ (Text.unpack (nameOcc (globalIdName (bindingId b))), pp (bindingTerm b))
+              | b <- globalEnvElems (_scopedBindings st1)
+              , null (lookupGlobalEnv (bindingId b) (_scopedBindings st)) ]
+    pure (pp res, ch, new)
+  _ -> assertFailure "not a let-expression"
 
--- | Let-expressions to inline literals and variables in
-inlineInputs :: [(String, C.Term)]
+-- | Let-expressions to inline literals and variables in. The free variables
+-- have the uniques of those of Clash Core, so they get their order.
+inlineInputs :: [TestTerm]
 inlineInputs =
-  [ ("letrec { x = 1; y = x; z = g y z } in z",
-      C.Let (C.Rec [(vx, intLit 1), (vy, C.Var vx), (vz, app vg [C.Var vy, C.Var vz])]) (C.Var vz))
-  , ("letrec { x = y; y = x } in x",
-      C.Let (C.Rec [(vx, C.Var vy), (vy, C.Var vx)]) (C.Var vx))
-  , ("letrec { a = f b; b = 1; c = f a } in c",
-      C.Let (C.Rec [(va, app vf [C.Var vb]), (vb, intLit 1), (vc, app vf [C.Var va])]) (C.Var vc))
-  , ("letrec { a = 1; b = f a } in g a b",
-      C.Let (C.Rec [(va, intLit 1), (vb, app vf [C.Var va])]) (app vg [C.Var va, C.Var vb]))
-  , ("let x = 1 in f x", C.Let (C.NonRec vx (intLit 1)) (app vf [C.Var vx]))
-  , ("let x = f 2 in x", C.Let (C.NonRec vx (app vf [intLit 2])) (C.Var vx))
-  , ("let x = 1 in 2", C.Let (C.NonRec vx (intLit 1)) (intLit 2))
-  , ("letrec { x = f 1 } in 2", C.Let (C.Rec [(vx, app vf [intLit 1])]) (intLit 2))
+  [ "let { (x_4 :: Int) = 1; (y_5 :: Int) = x_4; (z_6 :: Int) = (g_11 :: Int -> Int -> Int) y_5 z_6 } in z_6"
+  , "let { (x_4 :: Int) = y_5; (y_5 :: Int) = x_4 } in x_4"
+  , "let { (a_1 :: Int) = (f_10 :: Int -> Int) b_2; (b_2 :: Int) = 1; (c_3 :: Int) = f_10 a_1 } in c_3"
+  , "let { (a_1 :: Int) = 1; (b_2 :: Int) = (f_10 :: Int -> Int) a_1 } in (g_11 :: Int -> Int -> Int) a_1 b_2"
+  , "let { !(x_4 :: Int) = 1 } in (f_10 :: Int -> Int) x_4"
+  , "let { !(x_4 :: Int) = (f_10 :: Int -> Int) 2 } in x_4"
+  , "let { !(x_4 :: Int) = 1 } in 2"
+  , "let { (x_4 :: Int) = (f_10 :: Int -> Int) 1 } in 2"
   ]
 
 -- | Let-expressions to remove unused bindings from
-removeInputs :: [(String, C.Term)]
+removeInputs :: [TestTerm]
 removeInputs =
-  [ ("letrec { x = 1; y = f x; z = 2 } in y",
-      C.Let (C.Rec [(vx, intLit 1), (vy, app vf [C.Var vx]), (vz, intLit 2)]) (C.Var vy))
-  , ("letrec { x = 1 } in 2", C.Let (C.Rec [(vx, intLit 1)]) (intLit 2))
-  , ("let x = 1 in x", C.Let (C.NonRec vx (intLit 1)) (C.Var vx))
-  , ("let x = 1 in 2", C.Let (C.NonRec vx (intLit 1)) (intLit 2))
-  , ("letrec { x = f y; y = f x; z = 3 } in z",
-      C.Let (C.Rec [(vx, app vf [C.Var vy]), (vy, app vf [C.Var vx]), (vz, intLit 3)]) (C.Var vz))
-  , ("letrec { x = f y; y = f x } in x",
-      C.Let (C.Rec [(vx, app vf [C.Var vy]), (vy, app vf [C.Var vx])]) (C.Var vx))
+  [ "let { (x_4 :: Int) = 1; (y_5 :: Int) = (f_10 :: Int -> Int) x_4; (z_6 :: Int) = 2 } in y_5"
+  , "let { (x_4 :: Int) = 1 } in 2"
+  , "let { !(x_4 :: Int) = 1 } in x_4"
+  , "let { !(x_4 :: Int) = 1 } in 2"
+  , "let { (x_4 :: Int) = (f_10 :: Int -> Int) y_5; (y_5 :: Int) = f_10 x_4; (z_6 :: Int) = 3 } in z_6"
+  , "let { (x_4 :: Int) = (f_10 :: Int -> Int) y_5; (y_5 :: Int) = f_10 x_4 } in x_4"
   ]
 
 -- | Let-expressions to inline or lift bindings of
-inlineOrLiftInputs :: [(String, C.Term)]
+inlineOrLiftInputs :: [TestTerm]
 inlineOrLiftInputs =
-  [ ("letrec { r = \\z -> g (r z) s; c = 1 } in f (r c)",
-      C.Let (C.Rec [(vr, C.Lam vz (app vg [app vr [C.Var vz], C.Var vs])), (vc, intLit 1)])
-        (app vf [app vr [C.Var vc]]))
-  , ("letrec { r = \\z -> g z c; c = 1; b = r 2 } in f b",
-      C.Let (C.Rec [(vr, C.Lam vz (app vg [C.Var vz, C.Var vc])), (vc, intLit 1), (vb, app vr [intLit 2])])
-        (app vf [C.Var vb]))
-  , ("let r = \\z -> g z s in r 1",
-      C.Let (C.NonRec vr (C.Lam vz (app vg [C.Var vz, C.Var vs]))) (app vr [intLit 1]))
+  [ "let { (r_7 :: Int -> Int) = \\(z_6 :: Int) -> (g_11 :: Int -> Int -> Int) (r_7 z_6) (s_8 :: Int); (c_3 :: Int) = 1 } in (f_10 :: Int -> Int) (r_7 c_3)"
+  , "let { (r_7 :: Int -> Int) = \\(z_6 :: Int) -> (g_11 :: Int -> Int -> Int) z_6 c_3; (c_3 :: Int) = 1; (b_2 :: Int) = r_7 2 } in (f_10 :: Int -> Int) b_2"
+  , "let { !(r_7 :: Int -> Int) = \\(z_6 :: Int) -> (g_11 :: Int -> Int -> Int) z_6 (s_8 :: Int) } in r_7 1"
   ]
 
--- | Join points, and functions that aren't
-joinPointInputs :: [(String, C.Term)]
+-- | Join points, and functions that aren't, and whether the first binder is
+-- one, as 'Clash.Rewrite.Util.isJoinPointIn' found
+joinPointInputs :: [(TestTerm, Bool)]
 joinPointInputs =
-  [ ("let j = \\z -> f z in case s of { 1 -> j 1; _ -> j 2 }",
-      C.Let (C.NonRec j jRhs) (caseS (app j [intLit 1]) (app j [intLit 2])))
-  , ("let j = \\z -> f z in case s of { 1 -> j 1; _ -> 3 }",
-      C.Let (C.NonRec j jRhs) (caseS (app j [intLit 1]) (intLit 3)))
-  , ("let j = \\z -> f z in f (j 1)",
-      C.Let (C.NonRec j jRhs) (app vf [app j [intLit 1]]))
-  , ("letrec { j = \\z -> f z; k = \\z -> j z } in case s of { 1 -> k 1; _ -> j 2 }",
-      C.Let (C.Rec [(j, jRhs), (k, C.Lam vz (app j [C.Var vz]))])
-        (caseS (app k [intLit 1]) (app j [intLit 2])))
-  , ("letrec { j = \\z -> f z; k = f (j 1) } in case s of { 1 -> j k; _ -> j 2 }",
-      C.Let (C.Rec [(j, jRhs), (k, app vf [app j [intLit 1]])])
-        (caseS (app j [C.Var k]) (app j [intLit 2])))
-    -- A binder with the unique of the join point hides it
-  , ("let j = (\\j -> j) f in j 1",
-      C.Let (C.NonRec j (C.App (C.Lam j (C.Var j)) (C.Var vf))) (app j [intLit 1]))
-  , ("letrec { j = (\\j -> j) f } in j 1",
-      C.Let (C.Rec [(j, C.App (C.Lam j (C.Var j)) (C.Var vf))]) (app j [intLit 1]))
-  , ("let j = \\z -> f z in case s of { 1 -> j 1; _ -> let j = f in j 2 }",
-      C.Let (C.NonRec j jRhs)
-        (caseS (app j [intLit 1]) (C.Let (C.NonRec j (C.Var vf)) (app j [intLit 2]))))
-  , ("let j = \\z -> f z in case s of { 1 -> j 1; _ -> (\\j -> j 2) f }",
-      C.Let (C.NonRec j jRhs)
-        (caseS (app j [intLit 1]) (C.App (C.Lam j (app j [intLit 2])) (C.Var vf))))
+  [ ("let { !(j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z } in (case (s :: Int) of { 1 -> j 1; _ -> j 2 }) :: Int", True)
+  , ("let { !(j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z } in (case (s :: Int) of { 1 -> j 1; _ -> 3 }) :: Int", False)
+  , ("let { !(j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z } in f (j 1)", False)
+  , ("let { (j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z; (k :: Int -> Int) = \\(z :: Int) -> j z } in (case (s :: Int) of { 1 -> k 1; _ -> j 2 }) :: Int", True)
+  , ("let { (j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z; (k :: Int) = f (j 1) } in (case (s :: Int) of { 1 -> j k; _ -> j 2 }) :: Int", False)
+    -- A binder with the name of the join point hides it
+  , ("let { !(j :: Int -> Int) = (\\(j :: Int -> Int) -> j) (f :: Int -> Int) } in j 1", False)
+  , ("let { (j :: Int -> Int) = (\\(j :: Int -> Int) -> j) (f :: Int -> Int) } in j 1", False)
+  , ("let { !(j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z } in (case (s :: Int) of { 1 -> j 1; _ -> let { !(j :: Int -> Int) = f } in j 2 }) :: Int", False)
+  , ("let { !(j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z } in (case (s :: Int) of { 1 -> j 1; _ -> (\\(j :: Int -> Int) -> j 2) f }) :: Int", False)
   ]
- where
-  j = localId User "j" 20 (intFunTy 1)
-  k = localId User "k" 21 (intFunTy 1)
-  jRhs = C.Lam vz (app vf [C.Var vz])
-  caseS alt1 alt2 =
-    C.Case (C.Var vs) intTy [(C.LitPat (C.IntLiteral 1), alt1), (C.DefaultPat, alt2)]
 
--- | 'isJoinPointIn' of the first binder agrees with Clash Core
-joinPointAgrees :: C.Term -> Assertion
-joinPointAgrees tm = case tm of
-  C.Letrec ((j, _) : _) _ -> do
-    (actual, _, _) <- runScopedOn def liftStateFixed tm $ \sc -> \case
-      Let bind body -> openLetBindings sc bind body $ \_ _ lbs body1 -> case lbs of
-        lb : _ -> pure (isJoinPointIn (lbName lb) lbs body1)
-        [] -> error "no bindings"
-      _ -> error "not a let-expression"
-    actual @?= C.isJoinPointIn j tm
-  _ -> assertFailure "not a let-expression"
-
--- | The right-hand side of a let-binding
-lbRhsC :: C.LetBinding -> C.Term
-lbRhsC = snd
+-- | 'isJoinPointIn' of the first binder of a let-expression
+isJoinPointFirst :: Distinct n => Scope n -> Term n -> Bool
+isJoinPointFirst sc = \case
+  Let bind body -> openLetBindings sc bind body $ \_ _ lbs body1 -> case lbs of
+    lb : _ -> isJoinPointIn (lbName lb) lbs body1
+    [] -> error "no bindings"
+  _ -> error "not a let-expression"
 
 -- | 'isJoinPointIn' of the first binder doesn't change when the binders of
 -- the let-expression are renamed, e.g. to the name of that binder
-joinPointScrambled :: C.Term -> Property
-joinPointScrambled tm = withFreeVarsOf [tm] $ \env ->
-  let sc = convScope env
-      isJoin = \case
-        Let bind body -> openLetBindings sc bind body $ \_ _ lbs body1 -> case lbs of
-          lb : _ -> isJoinPointIn (lbName lb) lbs body1
-          [] -> error "no bindings"
-        _ -> error "not a let-expression"
-      tm1 = fromClashTerm env tm
-  in  forAllScrambled sc tm1 $ \tm2 -> isJoin tm2 === isJoin tm1
+joinPointScrambled :: TestTerm -> Property
+joinPointScrambled t = withTerm t $ \ts tm ->
+  let sc = testScope ts
+  in  forAllScrambled sc tm $ \tm2 -> isJoinPointFirst sc tm2 === isJoinPointFirst sc tm
 
 -- | Binders for terms and types get their types and kinds, and fresh names
 mkBinderForTests :: [TestTree]
 mkBinderForTests =
-  [ testCase "a term" $ do
-      (res, _, _) <- runScopedOn def liftStateFixed (app vf [C.Var vx]) $ \sc e ->
-        pure $ mkBinderFor te sc (varName vx) (Left e) $ \sc' -> \case
-          AbsId bnd ->
-            Just (toClashType (idBinderType bnd), tmNameRaw (tmNameOf bnd) > scopeWatermark sc
-                 , scopeWatermark sc' == tmNameRaw (tmNameOf bnd))
-          AbsTy _ -> Nothing
-      res @?= Just (intTy, True, True)
+  [ testCase "a term" $ withTerm "(f :: Int -> Int) (x :: Int)" $ \ts e -> do
+      let sc = testScope ts
+          res = mkBinderFor testTypeEnv sc (testOcc "x") (Left e) $ \sc' -> \case
+            AbsId bnd ->
+              Just (aeqTy (sinkClosed (closedType "Int")) (idBinderType bnd), tmNameRaw (tmNameOf bnd) > scopeWatermark sc
+                   , scopeWatermark sc' == tmNameRaw (tmNameOf bnd))
+            AbsTy _ -> Nothing
+      res @?= Just (True, True, True)
   , testCase "a type" $ do
-      (res, _, _) <- runScopedOn def liftStateFixed (C.TyApp (C.Var vf) (C.mkFunTy intTy intTy)) $ \sc -> \case
-        TyApp _ ty -> pure $ mkBinderFor te sc (varName vx) (Right ty) $ \_ -> \case
-          AbsTy bnd -> Just (toClashType (tyBinderKind bnd))
-          AbsId _ -> Nothing
-        _ -> error "not a type application"
-      res @?= Just C.liftedTypeKind
+      let res = mkBinderFor testTypeEnv emptyScope (testOcc "x") (Right (closedType "Int -> Int")) $ \_ -> \case
+            AbsTy bnd -> Just (aeqTy (sinkClosed (closedType "Type")) (tyBinderKind bnd))
+            AbsId _ -> Nothing
+      res @?= Just True
   ]
  where
-  te = testTypeEnv
+  testOcc = \nm -> case termIn emptyTestScope (fromStringTerm ("\\(" <> nm <> " :: Int) -> " <> nm)) of
+    Lam b _ -> idBinderOcc b
+    _ -> error "testOcc"
+  fromStringTerm = parseTestTerm
 
--- | 'dependencySortTyVars' agrees with 'C.dependencySortTyVars'
-dependencySortAgrees :: [C.TyVar] -> Assertion
-dependencySortAgrees tvs = withConvEnv (C.dependencySortTyVars tvs) [] $ \env -> do
-  let occs = map (fromClashType env . C.VarTy) tvs
-  map toClashType (dependencySortTyVars occs) @?= map C.VarTy (C.dependencySortTyVars tvs)
+-- | 'dependencySortTyVars' sorts type variables after the ones in their
+-- kinds, and keeps the order otherwise, as 'Clash.Core.Util.dependencySortTyVars'
+-- did
+dependencySortTests :: [TestTree]
+dependencySortTests =
+  [ testCase name $ withTestScope [tyVarD "kk", kindedTyVarD "a" "kk", tyVarD "b", tyVarD "c"] $ \ts ->
+      [ nameOcc occ | VarTy occ _ _ <- dependencySortTyVars (map (typeIn ts) input) ] @?= expected
+  | (name, input, expected) <-
+      [ ("a :: kk, kk", ["a", "kk"], ["kk", "a"])
+      , ("kk, a :: kk", ["kk", "a"], ["kk", "a"])
+      , ("b, a :: kk, c, kk", ["b", "a", "c", "kk"], ["b", "kk", "a", "c"]) ] ]
 
 -- | 'bindPureHeap' binds the bindings of the heap over the result of a
 -- rewrite that changes the term, inlining the work-free ones and removing the
@@ -400,34 +345,57 @@ dependencySortAgrees tvs = withConvEnv (C.dependencySortTyVars tvs) [] $ \env ->
 bindPureHeapTests :: [TestTree]
 bindPureHeapTests =
   [ testCase "changed" $
-      run (\_ v -> changed v) >>= assertAlphaEq
-        (C.Let (C.Rec [(vy, app vf [intLit 1])]) (C.Var vy)) . fst
-  , testCase "unchanged" $ do
-      (res, ch) <- run (\_ _ -> pure (Literal (C.IntLiteral 2)))
-      assertAlphaEq (intLit 2) res
-      assertBool "no change" (not ch)
+      run (\_ v -> changed v) $ \ts res _ ->
+        assertTermIs ts "let { (y :: Int) = f 1 } in y" res
+  , testCase "unchanged" $
+      run (\_ _ -> pure (Literal (C.IntLiteral 2))) $ \ts res ch -> do
+        assertTermIs ts "2" res
+        assertBool "no change" (not ch)
   ]
  where
   -- The heap: { x = 1; y = f x; z = 2 }, and the value y
-  heap = C.Let (C.Rec [(vx, intLit 1), (vy, app vf [C.Var vx]), (vz, intLit 2)]) (C.Var vy)
+  heap = "let { (x :: Int) = 1; (y :: Int) = (f :: Int -> Int) x; (z :: Int) = 2 } in y"
   run
     :: (forall l. Distinct l => Scoped.TransformContext l -> Term l -> NormalizeSession (Term l))
-    -> IO (C.Term, Bool)
-  run k = do
-    (res, _, ch) <- runScopedOn def liftStateFixed heap $ \sc -> \case
-      Let bind v -> toClashTerm <$> bindPureHeap (rootContext sc) bind v k
-      _ -> error "not a let-expression"
-    pure (res, ch)
+    -> (forall n. Distinct n => TestScope n -> Term n -> Bool -> Assertion)
+    -> Assertion
+  run k check = withTerm heap $ \ts -> \case
+    Let bind v -> do
+      (res, _, ch) <- runRewriteTest def liftStateFixed (bindPureHeap (rootContext (testScope ts)) bind v k)
+      check ts res ch
+    _ -> assertFailure "not a let-expression"
 
--- | 'normalizeTermTypes' agrees with 'C.normalizeTermTypes'
-normalizeTermTypesAgrees :: C.Term -> Assertion
-normalizeTermTypesAgrees tm = withFreeVarsOf [tm] $ \env ->
-  assertAlphaEqTyped (C.normalizeTermTypes testTyConMap tm)
-    (toClashTerm (normalizeTermTypes testTypeEnv (convScope env) (fromClashTerm env tm)))
+-- | 'normalizeTermTypes' normalizes the types of variable occurrences and of
+-- casts, as 'Clash.Core.Util.normalizeTermTypes' did
+normalizeTermTypesTests :: [TestTree]
+normalizeTermTypesTests =
+  [ testCase "x :: Vec (2 + 3) Int" $ withVec $ \ts ->
+      case normalizeTermTypes testTypeEnv (testScope ts) (termIn ts "x") of
+        Var _ ty _ -> assertTypeIs ts "Vec 5 Int" ty
+        e -> assertFailure ("not a variable: " <> showPprU e)
+  , testCase "cast" $ withVec $ \ts -> case termIn ts "x" of
+      x@(Var _ ty _) -> case normalizeTermTypes testTypeEnv (testScope ts) (Cast x ty (typeIn ts "Int")) of
+        Cast (Var _ ty' _) t1 t2 -> do
+          assertTypeIs ts "Vec 5 Int" ty'
+          assertTypeIs ts "Vec 5 Int" t1
+          assertTypeIs ts "Int" t2
+        e -> assertFailure ("not a cast: " <> showPprU e)
+      e -> assertFailure ("not a variable: " <> showPprU e)
+  , testCase "f x" $ withTerm "(f :: Int -> Int) (x :: Int)" $ \ts e ->
+      case normalizeTermTypes testTypeEnv (testScope ts) e of
+        App (Var _ fTy _) (Var _ xTy _) -> do
+          assertTypeIs ts "Int -> Int" fTy
+          assertTypeIs ts "Int" xTy
+        e' -> assertFailure ("unexpected term: " <> showPprU e')
+  ]
  where
-  assertAlphaEqTyped expected actual =
-    assertBool ("Expected:\n" <> showPprU expected <> "\nbut got:\n" <> showPprU actual)
-      (aeqTermTyped expected actual)
+  withVec :: (forall n. Distinct n => TestScope n -> Assertion) -> Assertion
+  withVec = withTestScope [varD "x" vecTy]
+  -- Vec (2 + 3) Int
+  vecTy = builtType
+    (appTyB (appTyB (testTypeB "Vec")
+      (appTyB (appTyB (constTyB (C.TyCon addTyConName)) (litTyB (C.NumTy 2))) (litTyB (C.NumTy 3))))
+      (testTypeB "Int"))
 
 tests :: TestTree
 tests =
@@ -440,74 +408,104 @@ tests =
             liftBindingLocalSharesUniqueWithGlobal
         ]
     , testGroup "whnfRW uses the let-bindings of a scoped context" whnfScopedContextTests
-    , testGroup "inlineBinders agrees with Clash Core"
-        [ testCase name $
-            assertLetHandlerAgrees def liftStateFixed
-              (C.inlineBinders (\_ lb -> pure (litOrVarC (lbRhsC lb))))
-              (inlineBinders (\_ lb -> pure (litOrVar (lbRhs lb))))
-              tm
-        | (name, tm) <- inlineInputs ]
-    , testGroup "removeUnusedBinders agrees with Clash Core"
-        [ testCase name $
-            assertLetHandlerAgrees def liftStateFixed
-              (\_ e bind body -> maybe (pure e) C.changed (C.removeUnusedBinders bind body))
+    , testGroup "inlineBinders"
+        [ testCase (show i) $
+            runLetHandler liftStateFixed (inlineBinders (\_ lb -> pure (litOrVar (lbRhs lb)))) tm
+              >>= (@?= expected)
+        | (i, tm, expected) <- zip3 [0 :: Int ..] inlineInputs expectedInline ]
+    , testGroup "removeUnusedBinders"
+        [ testCase (show i) $
+            runLetHandler liftStateFixed
               (\ctx e bind body -> maybe (pure e) changed (removeUnusedBinders (Scoped.tfScope ctx) bind body))
               tm
-        | (name, tm) <- removeInputs ]
-    , testGroup "inlineOrLiftBinders agrees with Clash Core"
-        [ testCase name $ do
+              >>= (@?= expected)
+        | (i, tm, expected) <- zip3 [0 :: Int ..] removeInputs expectedRemove ]
+    , testGroup "inlineOrLiftBinders"
+        [ testCase (show i) $ do
             supply <- newSupply
-            assertLetHandlerAgrees def liftStateFixed{_uniqSupply = supply}
-              (C.inlineOrLiftBinders (\_ -> pure True) (\_ lb -> litOrVarC (lbRhsC lb)))
+            runLetHandler liftStateFixed{_uniqSupply = supply}
               (inlineOrLiftBinders (\_ _ -> pure True) (\_ _ lb -> litOrVar (lbRhs lb)))
               tm
-        | (name, tm) <- inlineOrLiftInputs ]
-    , testGroup "cleanupHeapBindings agrees with Clash Core"
-        [ testCase name $
-            assertLetHandlerAgrees def liftStateFixed
-              (\ctx _ bind body -> C.cleanupHeapBindings ctx (C.bindToList bind) body)
-              (\ctx _ bind body -> cleanupHeapBindings ctx bind body)
-              tm
+              >>= (@?= expected)
+        | (i, tm, expected) <- zip3 [0 :: Int ..] inlineOrLiftInputs expectedInlineOrLift ]
+    , testGroup "cleanupHeapBindings"
+        [ testCase (show i) $
+            runLetHandler liftStateFixed (\ctx _ bind body -> cleanupHeapBindings ctx bind body) tm
+              >>= (@?= expected)
         -- The evaluator allocates a recursive let-binding
-        | (name, tm@(C.Let C.Rec {} _)) <- inlineInputs ++ removeInputs ]
-    , testGroup "isJoinPointIn agrees with Clash Core"
-        [ testCase name (joinPointAgrees tm) | (name, tm) <- joinPointInputs ]
+        | (i, tm, expected) <- zip3 [0 :: Int ..] recursiveInputs expectedCleanup ]
+    , testGroup "isJoinPointIn"
+        [ testCase (show i) $ withTerm tm $ \ts e -> isJoinPointFirst (testScope ts) e @?= expected
+        | (i, (tm, expected)) <- zip [0 :: Int ..] joinPointInputs ]
     , testGroup "isJoinPointIn doesn't depend on the names of binders"
-        [ testProperty name (joinPointScrambled tm) | (name, tm) <- joinPointInputs ]
+        [ testProperty (show i) (joinPointScrambled tm) | (i, (tm, _)) <- zip [0 :: Int ..] joinPointInputs ]
     , testGroup "mkBinderFor" mkBinderForTests
-    , testGroup "dependencySortTyVars agrees with Clash Core"
-        [ testCase "a :: kk, kk" $ dependencySortAgrees [ak, kk]
-        , testCase "kk, a :: kk" $ dependencySortAgrees [kk, ak]
-        , testCase "b, a :: kk, c, kk" $ dependencySortAgrees [tb, ak, tc, kk]
-        ]
+    , testGroup "dependencySortTyVars" dependencySortTests
     , testGroup "bindPureHeap" bindPureHeapTests
-    , testGroup "normalizeTermTypes agrees with Clash Core"
-        [ testCase "x :: Vec (2 + 3) Int" $ normalizeTermTypesAgrees (C.Var xv)
-        , testCase "cast" $ normalizeTermTypesAgrees (C.Cast (C.Var xv) (varType xv) intTy)
-        , testCase "f x" $ normalizeTermTypesAgrees (C.App (C.Var vf) (C.Var vx))
-        ]
-    , testGroup "isVoidWrapper agrees with Clash Core"
-        [ testCase name $ do
-            (actual, _, _) <- runScopedOn def liftStateFixed tm (\_ e -> pure (isVoidWrapper e))
-            actual @?= C.isVoidWrapper tm
-        | (name, tm) <-
-            [ ("\\x -> f y", C.Lam vx (app vf [C.Var vy]))
-            , ("\\x -> f x", C.Lam vx (app vf [C.Var vx]))
-            , ("\\x -> 1", C.Lam vx (intLit 1))
-            , ("f x", app vf [C.Var vx])
+    , testGroup "normalizeTermTypes" normalizeTermTypesTests
+    , testGroup "isVoidWrapper"
+        [ testCase tm $ withTerm (parseTestTerm tm) $ \_ e -> isVoidWrapper e @?= expected
+        | (tm, expected) <-
+            [ ("\\(x :: Int) -> (f :: Int -> Int) (y :: Int)", True)
+            , ("\\(x :: Int) -> (f :: Int -> Int) x", False)
+            , ("\\(x :: Int) -> 1", False)
+            , ("(f :: Int -> Int) (x :: Int)", False :: Bool)
             ]
         ]
-    , testGroup "isUntranslatable agrees with Clash Core"
-        [ testCase name $ do
-            (expected, _, _) <- runRewriteTest def liftStateFixed (C.isUntranslatable False tm)
-            (actual, _, _) <- runScopedOn def liftStateFixed tm (isUntranslatable False)
+    , testGroup "isUntranslatable"
+        [ testCase tm $ withTerm (parseTestTerm tm) $ \ts e -> do
+            (actual, _, _) <- runRewriteTest def liftStateFixed (isUntranslatable False (testScope ts) e)
             actual @?= expected
-        | (name, tm) <- [("1", intLit 1), ("f", C.Var vf), ("f x", app vf [C.Var vx])]
+        | (tm, expected) <-
+            [("1", False), ("(f :: Int -> Int)", True), ("(f :: Int -> Int) (x :: Int)", False :: Bool)]
         ]
     ]
  where
-  kk = tyVar User "kk" 52
-  ak = kindedTyVar User "a" 50 (C.VarTy kk)
-  tb = tyVar User "b" 53
-  tc = tyVar User "c" 54
-  xv = localId User "x" 60 (vecTy (addTy (numTy 2) (numTy 3)) intTy)
+  -- The inputs with a recursive let-expression, as the evaluator allocates them
+  recursiveInputs = [ t | (i, t) <- zip [0 :: Int ..] (inlineInputs <> removeInputs), i `notElem` [4, 5, 6, 10, 11] ]
+
+-- | The results of the handler of Clash Core on the inputs
+expectedInline :: [(String, Bool, [(String, String)])]
+expectedInline =
+  [ ("letrec\n  z :: Int\n  = g 1# z\nin z",True,[])
+  , ("letrec\n  y :: Int\n  = y\nin y",True,[])
+  , ("letrec\n  a :: Int\n  = f 1#\n  c :: Int\n  = f a\nin c",True,[])
+  , ("letrec\n  b :: Int\n  = f 1#\nin g 1# b",True,[])
+  , ("f 1#",True,[])
+  , ("let\n  x :: Int\n  = f 2#\nin x",False,[])
+  , ("2#",True,[])
+  , ("letrec\n  x :: Int\n  = f 1#\nin 2#",False,[])
+  ]
+
+-- | The results of the handler of Clash Core on the inputs
+expectedRemove :: [(String, Bool, [(String, String)])]
+expectedRemove =
+  [ ("letrec\n  x :: Int\n  = 1#\n  y :: Int\n  = f x\nin y",True,[])
+  , ("2#",True,[])
+  , ("let\n  x :: Int\n  = 1#\nin x",False,[])
+  , ("2#",True,[])
+  , ("letrec\n  z :: Int\n  = 3#\nin z",True,[])
+  , ("letrec\n  x :: Int\n  = f y\n  y :: Int\n  = f x\nin x",False,[])
+  ]
+
+-- | The results of the handler of Clash Core on the inputs
+expectedInlineOrLift :: [(String, Bool, [(String, String)])]
+expectedInlineOrLift =
+  [ ("f (c$top_r s g 1#)",True,[("c$top_r","\955(s :: Int) ->\n\955(g :: Int -> Int -> Int) ->\n\955(z :: Int) ->\ng (c$top_r s g z) s")])
+  , ("f (c$top_b g)",True,[("c$top_r","\955(g :: Int -> Int -> Int) ->\n\955(z :: Int) ->\ng z 1#"),("c$top_b","\955(g :: Int -> Int -> Int) ->\nc$top_r g 2#")])
+  , ("c$top_r s g 1#",True,[("c$top_r","\955(s :: Int) ->\n\955(g :: Int -> Int -> Int) ->\n\955(z :: Int) ->\ng z s")])
+  ]
+
+-- | The results of the handler of Clash Core on the inputs
+expectedCleanup :: [(String, Bool, [(String, String)])]
+expectedCleanup =
+  [ ("letrec\n  z :: Int\n  = g 1# z\nin z",True,[])
+  , ("letrec\n  y :: Int\n  = y\nin y",True,[])
+  , ("letrec\n  a :: Int\n  = f 1#\n  c :: Int\n  = f a\nin c",True,[])
+  , ("letrec\n  b :: Int\n  = f 1#\nin g 1# b",True,[])
+  , ("2#",False,[])
+  , ("letrec\n  y :: Int\n  = f 1#\nin y",True,[])
+  , ("2#",True,[])
+  , ("3#",True,[])
+  , ("letrec\n  x :: Int\n  = f y\n  y :: Int\n  = f x\nin x",False,[])
+  ]
