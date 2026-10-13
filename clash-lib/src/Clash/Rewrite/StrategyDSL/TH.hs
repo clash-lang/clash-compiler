@@ -11,7 +11,7 @@
   = Target
 
   A strategy compiles to a transformation of scoped Clash Core (see
-  "Clash.Rewrite.Scoped"). The 'Target' says how: the term constructors, how a
+  "Clash.Rewrite"). The 'Target' says how: the term constructors, how a
   transformation is called, the instrumentation and combinators, and how a
   traversal descends into a node. A traversal opens the binders it goes
   under.
@@ -42,8 +42,8 @@ import Clash.Rewrite.StrategyDSL
   )
 
 import qualified Clash.Core.Syntax as S
-import qualified Clash.Rewrite.Scoped.Apply as SApply
-import qualified Clash.Rewrite.Scoped.Combinators as SComb
+import qualified Clash.Rewrite.Apply as SApply
+import qualified Clash.Rewrite.Combinators as SComb
 import qualified Clash.Rewrite.Types as S
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Writer as Writer
@@ -422,9 +422,9 @@ guardExp target wrapInvoke transformation =
 -- ** Descent into a node of scoped Core
 
 -- | The one-level descent for one constructor of scoped Core, replicating
--- 'Clash.Rewrite.Scoped.Combinators.allR': it opens the binders it goes under,
+-- 'Clash.Rewrite.Combinators.allR': it opens the binders it goes under,
 -- pushes the same frames, and gives the node itself when no child changed
--- (see Note [sharing unchanged nodes] in "Clash.Rewrite.Scoped.Combinators").
+-- (see Note [sharing unchanged nodes] in "Clash.Rewrite.Combinators").
 -- The continuation runs in the scope of the opened binders, where the
 -- rebuilt fields are in scope. The rebuilt node it gets is evaluated.
 genDescend
@@ -593,13 +593,13 @@ type NodeArm
 -- | Generate a fused traversal: a recursive @go@ whose single constructor
 -- match drives both the node program and the descent. The recursion
 -- structure of each traversal is pinned to its
--- "Clash.Rewrite.Scoped.Combinators" counterpart, with the node program as
+-- "Clash.Rewrite.Combinators" counterpart, with the node program as
 -- @r@:
 --
 -- * 'TopDown': @'SComb.topdownR' r = 'SComb.repeatR' r '>->' 'SComb.allR' …@. On
 --   change, re-enter @go@ at this node (which also re-matches the
 --   constructor); otherwise descend. See Note [topdown repeatR] in
---   "Clash.Rewrite.Scoped.Combinators".
+--   "Clash.Rewrite.Combinators".
 -- * 'BottomUp': descend first, run the program once on the rebuilt node,
 --   whose constructor is already known, so no re-match.
 -- * 'TopDownSuc': run the program once; when it fired, stop, neither
@@ -657,7 +657,7 @@ genTraversal target strat = case strat of
 
 -- | 'SComb.topdownFixR' with the node program as @r@: a local @settle@
 -- (@'SComb.repeatR' r@) plus the tryParent\/childChanged\/parentChanged loop
--- from Note [topdownFixR] in "Clash.Rewrite.Scoped.Combinators", over a
+-- from Note [topdownFixR] in "Clash.Rewrite.Combinators", over a
 -- generated 'SComb.allR' replica.
 genTopDownFix :: Target -> CompiledStep -> Q Exp
 genTopDownFix target cs = do
@@ -771,7 +771,7 @@ compileStrategy :: Strat -> Q Exp
 compileStrategy = compileStrategyFor coreTarget
 
 -- | Compile a strategy into its unfused reference: the same transformations,
--- run as a plain @apply@ chain through the "Clash.Rewrite.Scoped.Combinators"
+-- run as a plain @apply@ chain through the "Clash.Rewrite.Combinators"
 -- traversals
 compileStrategyReference :: Strat -> Q Exp
 compileStrategyReference = compileStrategyReferenceFor coreTarget

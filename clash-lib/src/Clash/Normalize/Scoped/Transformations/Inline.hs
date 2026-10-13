@@ -11,7 +11,7 @@
   = Globals
 
   Only global variables ('GlobalVar') are inlined, looked up in the global
-  bindings ('Clash.Rewrite.Scoped.Globals.lookupBinding'), counted in the
+  bindings ('Clash.Rewrite.Globals.lookupBinding'), counted in the
   inline history, and taken to be no-ops by 'collapseRHSNoops'. A local
   variable with the unique of a global binder is a 'Var', which never matches
   (#405). The body of a global binding is a closed term, which is moved into
@@ -115,15 +115,15 @@ import Clash.Core.Util (primUCo)
 import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
   , normalizeTopLvlBndr, normalizeWorkFreeApp )
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   ( Frame (CaseScrut), FrameKind (..), Transform (..), TransformContext, allR
   , changed, ctxFrames, pushFrame, tfScope, underAlt )
-import Clash.Rewrite.Scoped.Globals (isTopEntity, lookupBinding)
+import Clash.Rewrite.Globals (isTopEntity, lookupBinding)
 import Clash.Rewrite.Util
   ( LetBinding (..), inlineBinders, inlineOrLiftBinders, isJoinPointIn
   , isUntranslatable, isUntranslatableType, isVoidWrapper, keepBindings
   , openLetBindings, substVars, zoomExtra )
-import Clash.Rewrite.Scoped.WorkFree (isWorkFreeIsh)
+import Clash.Rewrite.WorkFree (isWorkFreeIsh)
 
 -- | The function being normalized, see 'Clash.Rewrite.Types.curFun'. It is
 -- always a global, but need not have a binding.

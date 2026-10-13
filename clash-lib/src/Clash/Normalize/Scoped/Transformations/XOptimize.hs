@@ -56,7 +56,7 @@ import Clash.Core.Subst
 import Clash.Core.Syntax
 import Clash.Core.Term (collectArgs)
 import Clash.Core.Util (internalName, primAtType)
-import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
+import Clash.Rewrite (TransformContext, changed, tfScope)
 
 -- | Remove all undefined alternatives from case expressions, replacing them
 -- with the value of another defined alternative. If there is one defined

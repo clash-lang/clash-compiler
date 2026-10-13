@@ -5,7 +5,7 @@
 
   Tests for "Clash.Core.Evaluator": the whnf evaluator of scoped Clash
   Core and its primitive reductions, in the environment Clash uses
-  ('Clash.Rewrite.Scoped.Whnf.evaluatorEnv').
+  ('Clash.Rewrite.Whnf.evaluatorEnv').
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -28,7 +28,7 @@ import Clash.Core.Evaluator.Types (Env)
 import Clash.Core.NameMap (GlobalEnv, emptyGlobalEnv)
 import Clash.Core.Subst (closeTerm)
 import Clash.Core.Syntax
-import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
+import Clash.Rewrite.Whnf (evaluatorEnv)
 
 import Test.Clash.Rewrite (ghcFalseDataCon, ghcTrueDataCon, showPprU)
 import Test.Clash.Scoped

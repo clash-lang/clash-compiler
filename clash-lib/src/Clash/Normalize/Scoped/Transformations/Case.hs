@@ -17,7 +17,7 @@
   don't occur in it ('Clash.Core.Subst.unsinkAlt').
 
   * 'caseCon' evaluates the subject with the evaluator of scoped Clash Core
-    ('Clash.Rewrite.Scoped.Whnf.whnfRW'), which uses the let-bindings of the
+    ('Clash.Rewrite.Whnf.whnfRW'), which uses the let-bindings of the
     context. Its primitive reductions build coercions as @_CO_ \@ty@
     ('Clash.Core.Util.primCo').
 
@@ -108,11 +108,11 @@ import Clash.Core.Term
 import Clash.Core.Type (TypeView(..), coreView1, tyView)
 import Clash.Core.TypeEnv (TypeEnv)
 import Clash.Core.Util (internalName)
-import Clash.Rewrite.Scoped (TransformContext, changed, tfScope, whnfRW)
-import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
+import Clash.Rewrite (TransformContext, changed, tfScope, whnfRW)
+import Clash.Rewrite.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Util
   (isFromInt, isUntranslatableType, runWithHWTypeCache)
-import Clash.Rewrite.Scoped.WorkFree (isConstant)
+import Clash.Rewrite.WorkFree (isConstant)
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the
 -- alternatives

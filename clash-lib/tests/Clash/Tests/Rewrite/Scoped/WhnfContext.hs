@@ -4,7 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The cases of \"whnfRW uses the context's let-bindings (#2571)\":
-  'Clash.Rewrite.Scoped.whnfRW' evaluates a variable with the
+  'Clash.Rewrite.whnfRW' evaluates a variable with the
   let-bindings of its context, which a test builds by going under the binders
   of a term to the variable.
 
@@ -27,8 +27,8 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (Rewrite, Transform (..), changed)
-import qualified Clash.Rewrite.Scoped as S
+import Clash.Rewrite (Rewrite, Transform (..), changed)
+import qualified Clash.Rewrite as S
 import Clash.Rewrite.Types (RewriteState (..))
 
 import Test.Clash.Rewrite (TestTerm)

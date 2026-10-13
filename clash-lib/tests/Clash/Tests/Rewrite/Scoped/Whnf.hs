@@ -3,12 +3,12 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Rewrite.Scoped.Whnf": evaluating subterms with the
+  Tests for "Clash.Rewrite.Whnf": evaluating subterms with the
   let-bindings of their scoped context.
 
   The cases of \"whnfRW uses the context's let-bindings (#2571)\": a
   traversal goes under the binders itself, so the context is built by
-  'Clash.Rewrite.Scoped.pushUnder', and evaluates every variable. A binder
+  'Clash.Rewrite.pushUnder', and evaluates every variable. A binder
   that shadows a let-binder, or a free variable of its right-hand side, in
   the source of a test has another name in scoped Core, so the binding is
   used where it is valid, and nowhere else.
@@ -29,8 +29,8 @@ import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types (RewriteState (..))
 
 import Clash.Core.Syntax
-import Clash.Rewrite.Scoped (Rewrite, Transform (..), changed)
-import qualified Clash.Rewrite.Scoped as S
+import Clash.Rewrite (Rewrite, Transform (..), changed)
+import qualified Clash.Rewrite as S
 
 import Test.Clash.Scoped (TestTerm, assertTermIs, runRewriteIn, withTerm)
 

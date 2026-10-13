@@ -18,7 +18,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Clash.Rewrite.Scoped.Apply
+module Clash.Rewrite.Apply
   ( apply
   , applyWith
   , applyDebug
@@ -46,7 +46,7 @@ import           Clash.Core.Subst     (Closure (..), freeVarOccs)
 import           Clash.Core.Syntax
 import           Clash.Core.Type      (normalizeType)
 import           Clash.Core.TypeEnv   (TypeEnv)
-import           Clash.Rewrite.Scoped.History (recordRewriteStep)
+import           Clash.Rewrite.History (recordRewriteStep)
 import           Clash.Rewrite.Types
 
 -- | Record if a transformation is successfully applied

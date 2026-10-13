@@ -6,7 +6,7 @@
   Helpers for the unit tests of the scoped evaluator and its reductions of
   primitives ("Clash.Core.Evaluator.Primitives"): evaluating terms
   with the reductions, in the environment Clash uses
-  ('Clash.Rewrite.Scoped.Whnf.evaluatorEnv'), and building primitives,
+  ('Clash.Rewrite.Whnf.evaluatorEnv'), and building primitives,
   literals, types and values of the sized types, as builders of scoped Core
   ("Clash.Core.Builder").
 
@@ -126,7 +126,7 @@ import Clash.Core.Sig (DataConSig (..))
 import Clash.Core.Syntax (Distinct, S (VoidS), Tele (TNil), Term (..), emptyScope)
 import Clash.Core.TypeEnv (TypeEnv)
 import Clash.Core.Util (primCo)
-import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
+import Clash.Rewrite.Whnf (evaluatorEnv)
 
 import Test.Clash.Rewrite
   ( consDc, iHashDc, indexTcNm, lrDc, brDc, nameKey, nilDc, parseName

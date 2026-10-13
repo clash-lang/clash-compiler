@@ -34,7 +34,7 @@ import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
 import qualified Clash.Normalize.Scoped.Transformations.XOptimize as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
-import Clash.Rewrite.Scoped (Rewrite)
+import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState)
 

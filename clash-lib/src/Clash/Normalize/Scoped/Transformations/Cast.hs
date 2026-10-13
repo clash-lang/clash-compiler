@@ -66,8 +66,8 @@ import Clash.Core.Term (collectArgs, stripTicks)
 import Clash.Core.TermInfo (isCast)
 import Clash.Core.Type (normalizeType)
 import Clash.Normalize.Scoped.Transformations.Specialize (specialize)
-import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
-import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
+import Clash.Rewrite (TransformContext, changed, mkDerivedName, tfScope)
+import Clash.Rewrite.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Util (mkTmBinderFor)
 
 -- | Push a cast over an argument to a function into that function

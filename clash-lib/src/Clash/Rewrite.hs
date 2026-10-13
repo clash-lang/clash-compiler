@@ -48,7 +48,7 @@
     ('GlobalVar') variables. There is no @onVar@ for scoped Core.
 
   * 'Clash.Rewrite.StrategyDSL.pass' takes a function of that same type,
-    which traverses the term itself (with "Clash.Rewrite.Scoped.Combinators").
+    which traverses the term itself (with "Clash.Rewrite.Combinators").
 
   A worker that doesn't fire returns the node it was given, unchanged. A
   worker that changes the term says so with 'changed'. With
@@ -78,7 +78,7 @@
   The utilities on terms (creating binders, inlining, lifting and removing
   let-bindings, ...) are in "Clash.Rewrite.Util". Read and create
   global bindings, which are closed terms, with
-  "Clash.Rewrite.Scoped.Globals".
+  "Clash.Rewrite.Globals".
 
   = Evaluation
 
@@ -145,9 +145,9 @@
     something in the outer scope, e.g. rebuild the binder around it.
 -}
 
-module Clash.Rewrite.Scoped
-  ( module Clash.Rewrite.Scoped.Combinators
-  , module Clash.Rewrite.Scoped.Apply
+module Clash.Rewrite
+  ( module Clash.Rewrite.Combinators
+  , module Clash.Rewrite.Apply
   , whnfRW
   , changed
   , setChanged
@@ -181,8 +181,8 @@ module Clash.Rewrite.Scoped
   , mkDerivedName
   ) where
 
-import Clash.Rewrite.Scoped.Apply
-import Clash.Rewrite.Scoped.Combinators
+import Clash.Rewrite.Apply
+import Clash.Rewrite.Combinators
 import Clash.Rewrite.Types
-import Clash.Rewrite.Scoped.Whnf (whnfRW)
+import Clash.Rewrite.Whnf (whnfRW)
 import Clash.Rewrite.Util (changed, setChanged)

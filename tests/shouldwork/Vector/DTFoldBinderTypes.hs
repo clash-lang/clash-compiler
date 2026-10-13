@@ -40,7 +40,7 @@ import Clash.Core.Term (stripTicks)
 import Clash.Core.Type (TypeView (..), coreView, tyView)
 import Clash.Core.TypeEnv (TypeEnv, mkTypeEnv)
 import Clash.Driver.Types
-import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
+import Clash.Rewrite.Whnf (evaluatorEnv)
 import qualified Data.IntMap.Strict as IntMap
 
 import Test.Tasty.Clash

@@ -46,7 +46,7 @@ import Clash.Core.Type
   (PiTele (..), SplitFunForall (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Core.Util (internalName, listToLets)
-import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
+import Clash.Rewrite (TransformContext, changed, tfScope)
 
 {- Note [MultiResult type]
 

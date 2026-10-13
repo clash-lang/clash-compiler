@@ -25,7 +25,7 @@ import qualified Clash.Core.DataCon as C
 import Clash.Core.Syntax (GlobalId, Term (Cast))
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (Rewrite)
+import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 import Clash.Util (ClashException)

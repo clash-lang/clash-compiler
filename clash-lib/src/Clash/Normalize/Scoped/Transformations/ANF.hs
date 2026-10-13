@@ -121,10 +121,10 @@ import Clash.Core.TypeEnv (TypeEnv)
 import Clash.Core.Util (internalName, mkSelectorCase, systemName)
 import Clash.Normalize.Scoped.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormalizeSession)
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   (TransformContext, changed, closestLetBinder, tfScope, underLam)
 import Clash.Rewrite.Util (isUntranslatable, mkTmBinderFor, substVars)
-import Clash.Rewrite.Scoped.WorkFree (isConstant, isConstantNotClockReset)
+import Clash.Rewrite.WorkFree (isConstant, isConstantNotClockReset)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types (typeEnv)
 
@@ -230,14 +230,14 @@ makeANF ctx e0 = do
 {-# SCC makeANF #-}
 
 -- | The closest let-binder on the path to a subterm, from which the names of
--- new binders are derived, see 'Clash.Rewrite.Scoped.mkDerivedName'
+-- new binders are derived, see 'Clash.Rewrite.mkDerivedName'
 newtype Env = Env (Maybe (C.Name Term))
 
 -- | The 'Env' of the right-hand side of a let-binding with the given binder
 inLetBinding :: C.Name Term -> Env
 inLetBinding = Env . Just
 
--- | A name for a new binder, see 'Clash.Rewrite.Scoped.mkDerivedName'
+-- | A name for a new binder, see 'Clash.Rewrite.mkDerivedName'
 derivedName :: Env -> C.OccName -> C.Name Term
 derivedName (Env nm) sf = case nm of
   Just nm' -> C.appendToName nm' ('_' `Text.cons` sf)

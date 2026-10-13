@@ -18,7 +18,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-module Clash.Rewrite.Scoped.WorkFree
+module Clash.Rewrite.WorkFree
   ( isWorkFree
   , isWorkFreeClockOrResetOrEnable
   , isWorkFreeIsh

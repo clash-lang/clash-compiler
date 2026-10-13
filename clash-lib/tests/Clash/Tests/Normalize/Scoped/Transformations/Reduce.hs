@@ -34,8 +34,8 @@ import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 import Clash.Core.NameMap (emptyNameMap, nameMapToList)
 import Clash.Core.Syntax
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
-import Clash.Rewrite.Scoped (Rewrite, Transform (..))
-import qualified Clash.Rewrite.Scoped as S
+import Clash.Rewrite (Rewrite, Transform (..))
+import qualified Clash.Rewrite as S
 import Clash.Rewrite.Util (LetBinding (..), openLetBindings)
 
 import Test.Clash.Rewrite

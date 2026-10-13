@@ -25,7 +25,7 @@
   here, sorted.
 
   They live in @clash-lib@, next to the machine:
-  'Clash.Rewrite.Scoped.Whnf.evaluatorEnv' builds the environment of the
+  'Clash.Rewrite.Whnf.evaluatorEnv' builds the environment of the
   machine from this module.
 
   A reduction doesn't declare what it uses of the machine: it gets the

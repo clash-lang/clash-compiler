@@ -19,7 +19,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Clash.Rewrite.Scoped.Whnf
+module Clash.Rewrite.Whnf
   ( whnfRW
   , evaluatorEnv
   ) where

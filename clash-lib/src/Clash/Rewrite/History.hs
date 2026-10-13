@@ -19,7 +19,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Clash.Rewrite.Scoped.History
+module Clash.Rewrite.History
   ( startRewriteHistory
   , recordRewriteStep
   , closeRewriteStep

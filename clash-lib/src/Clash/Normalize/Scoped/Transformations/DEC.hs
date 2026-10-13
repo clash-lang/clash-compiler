@@ -136,11 +136,11 @@ import Clash.Core.Type
 import Clash.Core.TypeEnv (TypeEnv, typeEnvTyConMap)
 import Clash.Core.Util (internalName, mkSelectorCase)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Letrec
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   (Transform (..), TransformContext, bottomupR, changed, tfScope)
 import Clash.Rewrite.Util (isFromInt, isUntranslatableType)
-import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
-import Clash.Rewrite.Scoped.WorkFree (isConstant)
+import Clash.Rewrite.Whnf (evaluatorEnv)
+import Clash.Rewrite.WorkFree (isConstant)
 
 -- primitives
 import qualified Clash.Sized.Internal.BitVector

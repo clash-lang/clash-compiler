@@ -30,7 +30,7 @@ import Clash.Core.Term (collectArgs)
 import Clash.Normalize.Scoped.Transformations.Reduce (PrimReduction (..))
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (Rewrite, Transform (..))
+import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 
 import Test.Clash.Rewrite

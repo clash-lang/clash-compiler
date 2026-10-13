@@ -121,7 +121,7 @@ import Clash.Core.TypeEnv (TypeEnv, lookupTyCon, typeEnvTyConMap)
 import Clash.Core.Util
   ( appendToVec, extractElems, extractTElems, internalName, mkRTree, mkVec, primCo
   , selectField, systemName )
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   (Frame (AppArg), Transform (..), TransformContext, changed, pushFrame, tfScope)
 
 -- * Helpers

@@ -47,7 +47,7 @@ import Clash.Core.Type (mkFunTy)
 import Clash.Core.TypeEnv (mkTypeEnv)
 import Clash.Core.TysPrim (intPrimTy)
 import Clash.Core.Pretty (showPpr)
-import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
+import Clash.Rewrite.Whnf (evaluatorEnv)
 
 mainVerilog :: IO ()
 mainVerilog =

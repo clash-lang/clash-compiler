@@ -116,13 +116,13 @@ import           Clash.Core.Type
 import           Clash.Core.TypeEnv   (TypeEnv, lookupTyCon)
 import           Clash.Core.Util      (mkLets)
 import           Clash.Normalize.Util (ConstantSpecInfo (..), constantSpecInfo)
-import           Clash.Rewrite.Scoped.Combinators (topdownR)
-import           Clash.Rewrite.Scoped.Globals
+import           Clash.Rewrite.Combinators (topdownR)
+import           Clash.Rewrite.Globals
   (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
 import           Clash.Rewrite.Util
   ( abstractOver, changed, dependencySortTyVars, isUntranslatableType, mkTmBinderFor
   , normalizeTermTypes, setChanged )
-import           Clash.Rewrite.Scoped.Whnf   (whnfRW)
+import           Clash.Rewrite.Whnf   (whnfRW)
 
 -- | Propagate arguments of application inwards; except for 'Lam' where the
 -- argument becomes let-bound (or is substituted, if it is a variable or

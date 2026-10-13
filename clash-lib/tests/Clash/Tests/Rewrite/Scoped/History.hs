@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests of the steps of the rewrite history ("Clash.Rewrite.Scoped.History").
+  Tests of the steps of the rewrite history ("Clash.Rewrite.History").
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -25,7 +25,7 @@ import Clash.Core.FreeVars (freeTmVars, freeTyVars, hasFreeVars)
 import Clash.Core.NameMap (nameSetToList)
 import Clash.Core.Syntax
 import Clash.Core.Binary (putHeader)
-import Clash.Rewrite.Scoped.History (closeRewriteStep, decodeRewriteHistory)
+import Clash.Rewrite.History (closeRewriteStep, decodeRewriteHistory)
 import Clash.Rewrite.Types (RewriteStep (..))
 
 import Test.Clash.Rewrite (varD)

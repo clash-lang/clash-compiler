@@ -34,7 +34,7 @@
   = Global bindings
 
   New global bindings are closed terms, created with
-  "Clash.Rewrite.Scoped.Globals". 'liftBinding' abstracts a binding over its
+  "Clash.Rewrite.Globals". 'liftBinding' abstracts a binding over its
   free variables with 'Clash.Core.Subst.closeOver'.
 -}
 
@@ -122,7 +122,7 @@ import           Clash.Driver.Types
   (ClashEnv (..), ClashOpts (..), DebugOpts (..), TransformationInfo (..))
 import           Clash.Netlist.Types         (HWMap)
 import           Clash.Netlist.Util          (representableTypeState)
-import           Clash.Rewrite.Scoped.Globals
+import           Clash.Rewrite.Globals
   (addGlobalBind, findAlphaEqBinding, freshGlobalId, isWorkFreeTerm, mkFunction)
 import           Clash.Rewrite.Types         hiding (LetBinding)
 
@@ -807,8 +807,8 @@ bindPureHeap ctx bind v k = underLet ctx bind v $ \ctxL bind1 v1 -> do
 --      binders that were crucial for eliminating case constructs. If these
 --      case constructs were used in a self-referential (but terminating)
 --      manner, Clash would get stuck in an infinite loop. The proper
---      solution would be to use 'Clash.Rewrite.Scoped.WorkFree.isWorkFree',
---      instead of 'Clash.Rewrite.Scoped.WorkFree.isWorkFreeIsh', in
+--      solution would be to use 'Clash.Rewrite.WorkFree.isWorkFree',
+--      instead of 'Clash.Rewrite.WorkFree.isWorkFreeIsh', in
 --      'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar' such
 --      that these work-free constructs would get inlined again. However,
 --      this incurs a great performance penalty so we opt to prevent the

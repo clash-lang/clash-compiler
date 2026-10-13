@@ -187,7 +187,7 @@ withCurFun :: GlobalId -> RewriteState extra -> RewriteState extra
 withCurFun g st = st{_curFun = (g, C.noSrcSpan)}
 
 -- | Run an action in the rewrite monad, such as a transformation applied
--- with 'Clash.Rewrite.Scoped.Apply.runRewrite'. Returns its result, the
+-- with 'Clash.Rewrite.Apply.runRewrite'. Returns its result, the
 -- final state, and whether any transformation signalled a change.
 runRewriteTest
   :: RewriteEnv

@@ -20,8 +20,8 @@ import Test.Tasty.HUnit
 import Clash.Core.Literal (Literal (..))
 
 import Clash.Core.Syntax
-import Clash.Rewrite.Scoped (Rewrite)
-import qualified Clash.Rewrite.Scoped as S
+import Clash.Rewrite (Rewrite)
+import qualified Clash.Rewrite as S
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
 
