@@ -174,8 +174,8 @@ import           Clash.Util
 import           Clash.GHC.Util
 import           Clash.Core.Scoped.Builder
   (Key, TyB, annTyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, runClosedType,
-   uniqueKey, varTyB)
-import           Clash.Core.Scoped.Convert   (mkGlobalId)
+   runDataConSig, uniqueKey, varTyB)
+import           Clash.Core.Scoped.Convert   (mkDataCon, mkGlobalId)
 import qualified Clash.Core.Scoped.Syntax    as S
 
 instance Hashable Name where
@@ -269,6 +269,8 @@ data GHC2CoreState
   , _scopedVarTypeMap :: HashMap Name (S.Type 'S.VoidS)
   -- ^ Cache for the types of global variables, converted to scoped Core. See
   -- 'coreToVarTypeB'.
+  , _dataConCache :: C.UniqMap C.DataCon
+  -- ^ Cache for converted data constructors, by unique. See 'coreToDataCon'.
   , _pendingWarnings :: Seq PendingWarning
   -- ^ Warnings collected while converting, in the order they were reported.
   -- 'C2C' is pure, so it cannot print them itself; the driver reports these
@@ -297,7 +299,7 @@ instance CanWarn C2C where
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState =
   GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty HashMap.empty
-    HashMap.empty Seq.empty
+    HashMap.empty mempty Seq.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -566,7 +568,7 @@ coreToTerm primMap unlocs = term
           | [_aTy,f] <- args
           = C.Tick C.NoDeDup <$> term f
         go "Clash.Magic.clashSimulation" _
-          = C.Data <$> coreToDataCon falseDataCon
+          = C.Data <$> coreToDataConClash falseDataCon
         go "Clash.XException.xToErrorCtx" args
           -- xToErrorCtx :: forall a. String -> a -> a
           | [_ty, _msg, x] <- args
@@ -715,7 +717,7 @@ coreToTerm primMap unlocs = term
                             RWS.censor (const (SrcSpanRB sp)) (term uf_tmpl)
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPprUnsafe x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPprUnsafe x)
-              else C.Data <$> coreToDataCon dc
+              else C.Data <$> coreToDataConClash dc
           Nothing -> case lookupPrim xNameS of
             Just (Just (Primitive f wi _))
               | Just n <- parseBundle "bundle" f        -> return (bundleUnbundleTerm (n+1) xType)
@@ -780,7 +782,7 @@ coreToTerm primMap unlocs = term
     alt sp0 (Alt (DataAlt dc) xs e) = case span isTyVar xs of
       (tyvs,tmvs) -> do
         (e',sp1) <- termSP sp0 e
-        (,) <$> (C.DataPat <$> coreToDataCon dc
+        (,) <$> (C.DataPat <$> coreToDataConClash dc
                            <*> mapM coreToTyVar tyvs
                            <*> mapM (coreToIdSP sp1) tmvs)
             <*> pure e'
@@ -922,31 +924,58 @@ hasPrimCo (UnivCo {}) = return Nothing
 hasPrimCo (KindCo {}) = return Nothing
 hasPrimCo (HoleCo {}) = return Nothing
 
+-- | Convert a data constructor, building its types from GHC's types
+-- ('coreToTypeB').
+--
+-- Memoized on the data constructor, so that its occurrences share one
+-- 'C.DataCon'. It converts without a source span (see 'withoutSrcSpan'), so
+-- that the names in it don't depend on the occurrence that converts it, and
+-- are those of its type constructor in the 'C.TyConMap' ('makeAllTyCons').
 coreToDataCon :: DataCon
               -> C2C C.DataCon
-coreToDataCon dc = do
+coreToDataCon dc = makeCachedU (fromGhcUnique (getUnique dc)) dataConCache $ withoutSrcSpan $ do
+    repTys <- mapM (coreToTypeB . scaledThing) (dataConRepArgTys dc)
+    dcTy   <- coreToTypeB (varType $ dataConWorkId dc)
+    nm   <- coreToName dataConName getUnique qualifiedNameString dc
+    uTvs <- mapM coreToTyVarB (dataConUnivTyVars dc)
+    eTvs <- mapM coreToTyVarB (dataConExTyCoVars dc)
+    return $ mkDataCon
+      nm
+      (dataConTag dc)
+      (runClosedType dcTy)
+      (runDataConSig uTvs eTvs repTys)
+      (dataConStrictness dc)
+      (dataConLabels dc)
+
+-- | Convert a data constructor through the types of Clash Core, see
+-- 'coreToDataCon'. For the conversion through Clash Core ('coreToTerm'),
+-- which "Clash.GHC.Scoped.Check" compares with.
+coreToDataConClash :: DataCon
+                   -> C2C C.DataCon
+coreToDataConClash dc = withoutSrcSpan $ do
     repTys <- mapM (coreToType . scaledThing) (dataConRepArgTys dc)
     dcTy   <- coreToType (varType $ dataConWorkId dc)
-    mkDc dcTy repTys
-  where
-    mkDc dcTy repTys = do
-      let decLabel = decodeUtf8 . bytesFS . field_label . flLabel
-      let repBangs = fmap hsImplBangToBool (dataConImplBangs dc)
-      let fLabels  = map decLabel (dataConFieldLabels dc)
+    nm   <- coreToName dataConName getUnique qualifiedNameString dc
+    uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
+    eTvs <- mapM coreToTyVar (dataConExTyCoVars dc)
+    return $ C.mkDataConFromClash
+      nm
+      (C.nameUniq nm)
+      (dataConTag dc)
+      dcTy
+      uTvs
+      eTvs
+      repTys
+      (dataConStrictness dc)
+      (dataConLabels dc)
 
-      nm   <- coreToName dataConName getUnique qualifiedNameString dc
-      uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
-      eTvs <- mapM coreToTyVar (dataConExTyCoVars dc)
-      return $ C.mkDataConFromClash
-        nm
-        (C.nameUniq nm)
-        (dataConTag dc)
-        dcTy
-        uTvs
-        eTvs
-        repTys
-        repBangs
-        fLabels
+-- | The strictness of the fields of a data constructor
+dataConStrictness :: DataCon -> [C.DcStrictness]
+dataConStrictness = fmap hsImplBangToBool . dataConImplBangs
+
+-- | The labels of the fields of a data constructor
+dataConLabels :: DataCon -> [Text]
+dataConLabels = map (decodeUtf8 . bytesFS . field_label . flLabel) . dataConFieldLabels
 
 hsImplBangToBool :: HsImplBang -> C.DcStrictness
 hsImplBangToBool HsLazy = C.Lazy

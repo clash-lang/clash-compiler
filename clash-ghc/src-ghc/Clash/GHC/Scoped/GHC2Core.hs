@@ -18,9 +18,9 @@
 
   = Types
 
-  The types in terms, and those of global variables and primitives, are types
-  of scoped Core, which 'Clash.GHC.GHC2Core.coreToTypeB' builds from GHC's
-  types directly. The types of data constructors stay types of Clash Core.
+  The types in terms, and those of global variables, primitives and data
+  constructors, are types of scoped Core, which
+  'Clash.GHC.GHC2Core.coreToTypeB' builds from GHC's types directly.
 
   = Primitives
 
