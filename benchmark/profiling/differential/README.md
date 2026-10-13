@@ -270,6 +270,18 @@ top entity on, the globals that two matched bindings refer to are matched by
 the order in which they occur (see `Normalized.hs`). It reports the bindings
 that differ, and the globals that have a normalized binding in one run only.
 
+## Comparing the pretty-printer
+
+```
+clash-differential pretty [--show N] DESIGN.bin...
+```
+
+compares the pretty-printer of scoped Clash Core (`Clash.Core.Scoped.Pretty`)
+with printing the conversion to Clash Core, on every binding of the designs:
+`*.bin`, `*.net.bin`, or normalized bindings `*.norm.bin`. It compares the
+terms, with the default options and with everything hidden, and the types of
+the binders, and shows the first line that differs (see `Pretty.hs`).
+
 ## Replaying calls of the evaluator
 
 `clash-differential whnf` compares the whnf evaluator of scoped Clash Core
