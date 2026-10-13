@@ -32,23 +32,21 @@ import Control.Monad.Writer (listen)
 import qualified Data.Monoid as Monoid
 import GHC.Stack (HasCallStack)
 
-import Clash.Core.HasType (coreTypeOf)
 import Clash.Core.Name (nameOcc)
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onLam, onTickNode, onTyAppNode, onVarNode
   , toScopedTransformation )
 import Clash.Rewrite.Types (scopedTypeEnv)
 
-import Clash.Core.Scoped.Convert (toClashType)
+import Clash.Core.Scoped.Convert (mkGlobalId)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Subst
-  (extendSubstScope, extendTmSubst, idSubst, substTm, withFreshIdBinders)
+  (closeType, extendSubstScope, extendTmSubst, idSubst, openTyBinder, substTm, withFreshIdBinders)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.Term (collectArgsTicks, mkApps, mkLams, mkTicks)
+import Clash.Core.Scoped.Type
+  (SplitFunForall (..), TypeView (..), mkFunTy, piTeleTmArity, piTeleTyArity, splitFunForallTy, tyView)
 import Clash.Core.Scoped.Util (SplitInfo (..), shouldSplit)
 import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
 
@@ -90,10 +88,10 @@ separateArgumentsLambdaWorker ctx node b eb = do
 --
 -- It updates the type of the global variable to take the split arguments into
 -- account as 'Clash.Normalize.Transformations.SeparateArgs.separateArgumentsSpineWorker'
--- does: on its closed Clash Core type. The global can be applied to fewer
--- arguments than it has parameters, whose types are kept, or to more, when its
--- result type is a type variable instantiated with a function type, which stay
--- applied.
+-- does. The global can be applied to fewer arguments than it has parameters,
+-- whose types are kept, or to more, when its result type is a type variable
+-- instantiated with a function type, which stay applied. The type of a global
+-- is closed, so it only splits an argument whose parts have closed types.
 separateArgumentsSpineWorker
   :: forall n
    . (HasCallStack, Distinct n)
@@ -102,36 +100,48 @@ separateArgumentsSpineWorker
   -> NormalizeSession (Term n)
 separateArgumentsSpineWorker ctx e
   | (GlobalVar g, args, ticks) <- collectArgsTicks e = do
-      let gv = globalIdLegacy g
-          (argTys0, resTy) = C.splitFunForallTy (coreTypeOf gv)
-      (concat -> args1, Monoid.getAny -> hasChanged)
-        <- listen (mapM (uncurry splitArg) (zip argTys0 args))
+      let arity = case splitFunForallTy (globalIdType g) of
+            SplitFunForall tele _ -> piTeleTyArity tele + piTeleTmArity tele
+      (splits, Monoid.getAny -> hasChanged)
+        <- listen (mapM splitArg (take arity args))
       if hasChanged then
-        let (argTys1, args2) = unzip args1
-            gTy = C.mkPolyFunTy resTy (argTys1 ++ drop (length args) argTys0)
-            args3 = args2 ++ drop (length argTys0) args
-            g' = mkGlobalIdFromClash gv{C.varType = gTy}
-        in  return (mkApps (mkTicks (GlobalVar g') ticks) args3)
+        let gTy = splitGlobalType emptyScope (globalIdType g) (map fst splits)
+            args1 = concatMap snd splits ++ drop arity args
+            g' = mkGlobalId (globalIdName g) gTy
+        in  return (mkApps (mkTicks (GlobalVar g') ticks) args1)
       else
         return e
   | otherwise = return e
  where
   sc = tfScope ctx
 
-  -- Split a single argument, given the quantifier or function argument type of
-  -- the global variable
+  -- Split a single argument: the types of its parts, if it is split, and the
+  -- arguments that replace it
   splitArg
-    :: Either C.TyVar C.Type
-    -> Either (Term n) (Type n)
-    -> NormalizeSession [(Either C.TyVar C.Type, Either (Term n) (Type n))]
-  splitArg ty arg = case arg of
-    Right _ -> return [(ty, arg)]
+    :: Either (Term n) (Type n)
+    -> NormalizeSession (Maybe [Type 'VoidS], [Either (Term n) (Type n)])
+  splitArg arg = case arg of
+    Right _ -> return (Nothing, [arg])
     Left tmArg -> do
       te <- Lens.view scopedTypeEnv
       case shouldSplit te sc (inferCoreTypeOf te sc tmArg) of
-        Just info ->
-          -- TODO(D4): Clash Core types, for the type of the global ('GlobalId')
-          changed (zip (map (Right . toClashType) (splitArgTys info))
-                       (map Left (splitProject info sc tmArg)))
-        Nothing -> return [(ty, arg)]
+        Just info
+          | Just tys <- traverse closeType (splitArgTys info) ->
+              changed (Just tys, map Left (splitProject info sc tmArg))
+        _ -> return (Nothing, [arg])
 {-# SCC separateArgumentsSpineWorker #-}
+
+-- | The type of a global whose arguments are split: per quantified type
+-- variable or argument type, the closed types of the parts of the argument,
+-- if it is split
+splitGlobalType :: Distinct x => Scope x -> Type x -> [Maybe [Type 'VoidS]] -> Type x
+splitGlobalType _ ty [] = ty
+splitGlobalType sc ty (split : splits) = case ty of
+  ForAllTy b res ->
+    openTyBinder sc b res $ \sc' b' res' -> ForAllTy b' (splitGlobalType sc' res' splits)
+  (tyView -> FunTy arg res) ->
+    let res' = splitGlobalType sc res splits
+    in case split of
+         Nothing -> mkFunTy arg res'
+         Just tys -> foldr (mkFunTy . sinkClosed) res' tys
+  _ -> ty

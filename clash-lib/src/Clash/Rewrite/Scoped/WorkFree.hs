@@ -30,8 +30,6 @@ import Control.Monad.State.Class (MonadState)
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Scoped.Primitives (removedArg)
 
@@ -90,7 +88,7 @@ isWorkFree cache bndrs = go True
       | isPolyFunTy ty -> pure (isOutermost && null args)
       | otherwise -> pure True
     GlobalVar g
-      | C.isPolyFunTy (C.varType (globalIdLegacy g)) -> pure False
+      | isPolyFunTy (globalIdType g) -> pure False
       | otherwise -> andM [isWorkFreeBinder cache bndrs g, allM goArg args]
     Data _ -> allM goArg args
     Literal _ -> pure True

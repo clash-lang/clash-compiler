@@ -83,12 +83,12 @@ import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 import           Clash.Core.DataCon          (dcExtTyVars)
 import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
+import qualified Clash.Core.Var              as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
-import           Clash.Core.TysPrim          (integerPrimTy, naturalPrimTy, typeNatKind)
-import qualified Clash.Core.Var              as C
+import           Clash.Core.Scoped.TysPrim   (integerPrimTyConName, naturalPrimTyConName, typeNatKindTyConName)
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (..), hasTransformationInfo)
@@ -101,7 +101,8 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
-import           Clash.Core.Scoped.Convert   (toClashType, mkPrimInfoFromClash)
+import           Clash.Core.Scoped.Convert   (mkGlobalId, mkPrimInfo)
+import           Clash.Core.Scoped.Builder   (TyB, forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
 import           Clash.Core.Scoped.DataCon   (dataConInstArgTys)
 import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf, piResultTy)
@@ -111,7 +112,6 @@ import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import           Clash.Core.Scoped.Term
   ( AbsBinder (..), collectArgs, collectArgsTicks, mkAbstraction, mkApps, mkLams, mkTicks
   , mkTyLams )
@@ -380,7 +380,7 @@ specializeGlobal sc e f args ticks specArgIn = do
     -- Don't specialize TopEntities
     case specArgIn of
       Left _ -> do
-        traceM ("Not specializing TopEntity: " ++ showPpr (C.varName fV))
+        traceM ("Not specializing TopEntity: " ++ showPpr (globalIdName f))
         return e
       Right tyArg
         -- TopEntities aren't allowed to be semantically polymorphic. But using
@@ -390,13 +390,11 @@ specializeGlobal sc e f args ticks specArgIn = do
         -- 'Clash.Normalize.Util.substWithTyEq'. So we drop the TyApp
         -- ("specializing" on it) and change the type of the variable to match.
         -- A global has a closed type, so this needs a closed type argument.
-        -- TODO(D4): the type of a 'GlobalId' is a Clash Core type.
-        | let newTy = piResultTy te sc (sinkClosed (globalIdType f)) tyArg
-        , nullNameSet (freeTyVarsOfType newTy) ->
+        | Just newTy <- closeType (piResultTy te sc (sinkClosed (globalIdType f)) tyArg) ->
             traceIf (hasTransformationInfo AppliedTerm opts)
-              ("Dropping type application on TopEntity: " ++ showPpr (C.varName fV)
+              ("Dropping type application on TopEntity: " ++ showPpr (globalIdName f)
                  ++ "\ntype:\n" ++ showPpr tyArg) $
-              changed (mkApps (mkTicks (GlobalVar (mkGlobalIdFromClash fV {C.varType = toClashType newTy})) ticks) args)
+              changed (mkApps (mkTicks (GlobalVar (mkGlobalId (globalIdName f) newTy)) ticks) args)
         | otherwise -> return e
   else do
     let specArg = bimap (normalizeTermTypes te sc) (normalizeType te sc) specArgIn
@@ -427,7 +425,7 @@ specializeGlobal sc e f args ticks specArgIn = do
       -- Use previously specialized function
       Just f' ->
         traceIf (hasTransformationInfo AppliedTerm opts)
-          ("Using previous specialization of " ++ showPpr (C.varName fV) ++ " on " ++
+          ("Using previous specialization of " ++ showPpr (globalIdName f) ++ " on " ++
             maybe "" showSpecAbs specAbs ++ ": " ++ showPpr (globalIdName f')) $
           changed (mkApps (mkTicks (GlobalVar f') ticks) (args ++ specVars))
       -- Create new specialized function
@@ -442,7 +440,7 @@ specializeGlobal sc e f args ticks specArgIn = do
           if maybe False (> specLim) specHistM
             then throw (ClashException
                         sp
-                        (unlines [ "Hit specialization limit " ++ show specLim ++ " on function `" ++ showPpr (C.varName fV) ++ "'.\n"
+                        (unlines [ "Hit specialization limit " ++ show specLim ++ " on function `" ++ showPpr (globalIdName f) ++ "'.\n"
                                  , "The function `" ++ showPpr fV ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
                                  , "Body of `" ++ showPpr fV ++ "':\n" ++ showPpr bodyTm ++ "\n"
                                  , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ either showPpr showPpr specArg
@@ -467,11 +465,11 @@ specializeGlobal sc e f args ticks specArgIn = do
                         _ -> pure False
                       let gBody = if gTop then Nothing else fmap bindingTerm gTmM
                       return
-                        ( specializeName (inl, C.varName fV) (bindingSpec <$> gTmM, gNm)
+                        ( specializeName (inl, globalIdName f) (bindingSpec <$> gTmM, gNm)
                         , preferNoInline inl (maybe NoUserInlinePrag bindingSpec gTmM)
                         , maybe specArg (\b -> Left (mkApps (sinkClosed b) gArgs)) gBody
                         )
-                _ -> return (C.varName fV, inl, specArg)
+                _ -> return (globalIdName f, inl, specArg)
               -- Create the specialized function
               let names = collectBndrsMinusApps bodyTm ++
                     [ C.mkUnsafeInternalName ("pTS" `Text.append` Text.pack (show n)) n
@@ -489,6 +487,7 @@ specializeGlobal sc e f args ticks specArgIn = do
                   -- Use specialized function
                   changed (mkApps (mkTicks (GlobalVar newf) ticks) (args ++ specVars))
  where
+  -- For the messages, which show its type
   fV = globalIdLegacy f
 
   varName :: Term x -> Maybe (C.Name C.Term)
@@ -765,24 +764,25 @@ zeroWidthTypeElemIn te sc enclosing ty = do
 -- BitVector n@, for the given type constructor of 'BV.BitVector'
 bitVectorFromIntegerPrim :: C.TyConName -> PrimInfo
 bitVectorFromIntegerPrim tcNm =
-  mkPrimInfoFromClash (C.PrimInfo (Text.showt 'BV.fromInteger#) prTy C.WorkNever C.SingleResult C.NoUnfolding)
- where
-  prTy = C.mkPolyFunTy (C.mkTyConApp tcNm [C.VarTy zeroWidthNTv])
-           [Left zeroWidthNTv, Right naturalPrimTy, Right naturalPrimTy, Right integerPrimTy]
+  zeroWidthPrim (Text.showt 'BV.fromInteger#) tcNm
+    [tyConAppB naturalPrimTyConName [], tyConAppB naturalPrimTyConName [], tyConAppB integerPrimTyConName []]
 
 -- | The primitive with the given name, of type @forall n. Natural -> Integer
 -- -> T n@, for the given type constructor @T@: @fromInteger#@ of 'I.Index',
 -- 'S.Signed' or 'U.Unsigned'
 sizedNumFromIntegerPrim :: C.TyConName -> Text.Text -> PrimInfo
 sizedNumFromIntegerPrim tcNm nm =
-  mkPrimInfoFromClash (C.PrimInfo nm prTy C.WorkNever C.SingleResult C.NoUnfolding)
- where
-  prTy = C.mkPolyFunTy (C.mkTyConApp tcNm [C.VarTy zeroWidthNTv])
-           [Left zeroWidthNTv, Right naturalPrimTy, Right integerPrimTy]
+  zeroWidthPrim nm tcNm [tyConAppB naturalPrimTyConName [], tyConAppB integerPrimTyConName []]
 
--- | The type variable @n@ of the types of the primitives of 'zeroWidthSpec'
-zeroWidthNTv :: C.TyVar
-zeroWidthNTv = C.mkTyVar typeNatKind (C.mkUnsafeSystemName "n" 0)
+-- | A primitive of 'zeroWidthSpec': its name, and its type @forall n. args ->
+-- T n@, given @T@ and the argument types
+zeroWidthPrim :: Text.Text -> C.TyConName -> [TyB] -> PrimInfo
+zeroWidthPrim nm tcNm args =
+  mkPrimInfo nm (runClosedType prTy) C.WorkNever C.SingleResult NoUnfolding
+ where
+  prTy =
+    forAllTyB 0 (C.mkUnsafeSystemName "n" 0) (tyConAppB typeNatKindTyConName [])
+      (funTyB args (tyConAppB tcNm [varTyB 0]))
 
 -- | The body of the specialized function: the body of the function applied
 -- to its arguments, and to the argument specialized on, abstracted over the
