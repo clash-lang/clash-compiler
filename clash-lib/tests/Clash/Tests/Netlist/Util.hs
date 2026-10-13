@@ -29,7 +29,7 @@ import Clash.Unique (Unique)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, existentialDataCon, existentialTy, globalId, intFunTy, intId
-  , intTy, intTyCon, maybeTy, mkAlgTyCon, parseTyConName, testTyConMap, tyVar )
+  , intTy, intTyCon, maybeTy, mkTestAlgTyCon, parseTyConName, testTyConMap, tyVar )
 
 -- | Apply the global function with the given name and unique to the given
 -- arguments
@@ -94,7 +94,7 @@ intTranslator = HWTypeTranslator $ \_reprs _te _sc ty -> pure $ case tyView ty o
 -- | The test types, and @E@ with its constructor @MkE :: forall b. b -> E@
 translationTypeEnv :: TypeEnv
 translationTypeEnv = mkTypeEnv $
-  UniqMap.insert (parseTyConName "E") (mkAlgTyCon (parseTyConName "E") [] [existentialDataCon]) $
+  UniqMap.insert (parseTyConName "E") (mkTestAlgTyCon (parseTyConName "E") [] [existentialDataCon]) $
   UniqMap.insert (parseTyConName "Int") intTyCon testTyConMap
 
 -- | Translate types of Clash Core in turn, starting from an empty cache

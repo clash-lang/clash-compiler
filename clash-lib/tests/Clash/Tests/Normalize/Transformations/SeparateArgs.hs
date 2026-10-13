@@ -35,7 +35,7 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..))
 
 import Test.Clash.Rewrite
-  ( globalId, inScopeOf, intFunTy, intId, intTy, localId, mkDataCon
+  ( globalId, inScopeOf, intFunTy, intId, intTy, localId, mkTestDataCon
   , runSingleTransformation, showPprU, tyVar, withTyConMap )
 
 separateArgumentsR :: NormRewrite
@@ -57,7 +57,7 @@ clkPairTy = ConstTy (TyCon clkPairTcNm)
 
 -- | @MkClkPair :: Clock -> Int -> ClkPair@
 clkPairDc :: DataCon
-clkPairDc = mkDataCon "MkClkPair" 2022 [] [] [clockTy, intTy] clkPairTy
+clkPairDc = mkTestDataCon "MkClkPair" 2022 [] [] [clockTy, intTy] clkPairTy
 
 -- | The default 'RewriteEnv', extended with @Clock@ and @ClkPair@
 env :: RewriteEnv

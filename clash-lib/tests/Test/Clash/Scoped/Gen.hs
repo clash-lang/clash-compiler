@@ -130,7 +130,7 @@ import Clash.Unique (Unique)
 
 import Test.Clash.Rewrite
   ( existentialDataCon, existentialTy, globalId, intTy, intTyCon, kindedTyVar
-  , localId, mkDataCon, pairDataCon, pairTy, parseTyConTy, tyVar)
+  , localId, mkTestDataCon, pairDataCon, pairTy, parseTyConTy, tyVar)
 
 -- * Signatures
 
@@ -158,7 +158,7 @@ tyConTy nm u = C.ConstTy (C.TyCon (C.mkUnsafeName C.User nm u))
 -- | @MkF :: forall a. forall b. a -> b -> F a@, with an existential type
 -- variable @b@
 fDataCon :: C.DataCon
-fDataCon = mkDataCon "MkF" 1003 [a] [b] [C.VarTy a, C.VarTy b] (C.AppTy fTy (C.VarTy a))
+fDataCon = mkTestDataCon "MkF" 1003 [a] [b] [C.VarTy a, C.VarTy b] (C.AppTy fTy (C.VarTy a))
  where
   a = tyVar C.User "a" 60
   b = tyVar C.User "b" 61
@@ -167,7 +167,7 @@ fDataCon = mkDataCon "MkF" 1003 [a] [b] [C.VarTy a, C.VarTy b] (C.AppTy fTy (C.V
 -- the kind of the existential type variable mentions the universal one
 kDataCon :: C.DataCon
 kDataCon =
-  mkDataCon "MkK" 1004 [k] [x]
+  mkTestDataCon "MkK" 1004 [k] [x]
     [C.AppTy (C.AppTy pTy (C.VarTy k)) (C.VarTy x), C.AppTy signedTy (C.LitTy (C.NumTy 8))]
     (C.AppTy kTy (C.VarTy k))
  where
@@ -176,19 +176,19 @@ kDataCon =
 
 -- | @Just :: forall a. a -> Maybe a@
 justDataCon :: C.DataCon
-justDataCon = mkDataCon "Just" 1005 [a] [] [C.VarTy a] (C.AppTy maybeTy (C.VarTy a))
+justDataCon = mkTestDataCon "Just" 1005 [a] [] [C.VarTy a] (C.AppTy maybeTy (C.VarTy a))
  where
   a = tyVar C.User "a" 64
 
 -- | @Nothing :: forall a. Maybe a@
 nothingDataCon :: C.DataCon
-nothingDataCon = (mkDataCon "Nothing" 1006 [a] [] [] (C.AppTy maybeTy (C.VarTy a))) {C.dcTag = 2}
+nothingDataCon = (mkTestDataCon "Nothing" 1006 [a] [] [] (C.AppTy maybeTy (C.VarTy a))) {C.dcTag = 2}
  where
   a = tyVar C.User "a" 65
 
 -- | @MkN :: forall (n :: Nat). Signed n -> N@
 nDataCon :: C.DataCon
-nDataCon = mkDataCon "MkN" 1007 [] [n] [C.AppTy signedTy (C.VarTy n)] nTy
+nDataCon = mkTestDataCon "MkN" 1007 [] [n] [C.AppTy signedTy (C.VarTy n)] nTy
  where
   n = kindedTyVar C.User "n" 66 C.typeNatKind
 

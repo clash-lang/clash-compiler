@@ -26,13 +26,13 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Util as C (dataConInstArgTys)
 import qualified Clash.Core.Var as C
 
-import Clash.Core.Scoped.Convert hiding (mkDataCon)
+import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.DataCon
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite
-  (intId, intTy, localId, mkDataCon, pairDataCon, pairTy, parseTyConTy, tyVar)
+  (intId, intTy, localId, mkTestDataCon, pairDataCon, pairTy, parseTyConTy, tyVar)
 import Test.Clash.Scoped
   ( assertScopedAlphaEq, assertScopedTyAlphaEq, lintScopeOf, lintTerm, testTypeEnv
   , withFreeVars, withTests)
@@ -87,7 +87,7 @@ aTv = tyVar C.User "a" 50
 bTv = tyVar C.User "b" 51
 
 mkF :: C.DataCon
-mkF = mkDataCon "MkF" 1003 [aTv] [bTv] [C.VarTy aTv, C.VarTy bTv] (C.AppTy fTyCon (C.VarTy aTv))
+mkF = mkTestDataCon "MkF" 1003 [aTv] [bTv] [C.VarTy aTv, C.VarTy bTv] (C.AppTy fTyCon (C.VarTy aTv))
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.DataCon"

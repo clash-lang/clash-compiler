@@ -45,7 +45,7 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertStructurallyEqual, ghcBoolTy, ghcFalseDataCon
-  , ghcTrueDataCon, inScopeOf, intFunTy, intId, intTy, localId, mkDataCon
+  , ghcTrueDataCon, inScopeOf, intFunTy, intId, intTy, localId, mkTestDataCon
   , pairDataCon, parseTyConTy, runSingleTransformation, showPprU, tyVar )
 
 -- | The transformations of "Clash.Normalize.Transformations.Case" that
@@ -80,7 +80,7 @@ tTy = parseTyConTy "T"
 
 -- | @MkT :: Int -> T@
 mkT :: DataCon
-mkT = mkDataCon "MkT" 1000 [] [] [intTy] tTy
+mkT = mkTestDataCon "MkT" 1000 [] [] [intTy] tTy
 
 -- | @cast (case s of {MkE \@a' x -> y}) :: a -> Int@, where the existential
 -- type variable @a'@ bound by the pattern has the same unique as the free type
@@ -121,7 +121,7 @@ eTy = parseTyConTy "E"
 -- | @MkE :: forall b. b -> E@, a data constructor with an existential type
 -- variable
 mkE :: DataCon
-mkE = mkDataCon "MkE" 1001 [] [b] [VarTy b] eTy
+mkE = mkTestDataCon "MkE" 1001 [] [b] [VarTy b] eTy
  where
   b = tyVar User "b" 1002
 
@@ -219,7 +219,7 @@ caseConOneAltShadowed caseConR =
 
 -- | @MkU :: Int -> T@, the second constructor of @T@
 mkU :: DataCon
-mkU = (mkDataCon "MkU" 1003 [] [] [intTy] tTy) { dcTag = 2 }
+mkU = (mkTestDataCon "MkU" 1003 [] [] [intTy] tTy) { dcTag = 2 }
 
 -- | A primitive @work :: Int -> Int@ that is not work free
 workPrim :: Term
@@ -324,7 +324,7 @@ tick = SrcSpan noSrcSpan
 
 -- | @I# :: Int# -> Int@
 intDataCon :: DataCon
-intDataCon = mkDataCon "GHC.Types.I#" 1010 [] [] [intPrimTy] intTy
+intDataCon = mkTestDataCon "GHC.Types.I#" 1010 [] [] [intPrimTy] intTy
 
 -- | @GHC.Classes.eqInt :: Int -> Int -> Bool@
 eqIntPrim :: Term
@@ -415,7 +415,7 @@ elimCaseBigNumUsedExpected =
 
 -- | A second constructor of @Integer@, standing in for @IP@
 integerIpDc :: DataCon
-integerIpDc = (mkDataCon "IP" 1011 [] [] [intPrimTy] integerPrimTy) { dcTag = 2 }
+integerIpDc = (mkTestDataCon "IP" 1011 [] [] [intPrimTy] integerPrimTy) { dcTag = 2 }
 
 tests :: TestTree
 tests =

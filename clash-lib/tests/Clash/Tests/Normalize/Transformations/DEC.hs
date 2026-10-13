@@ -48,7 +48,7 @@ import Clash.Util.Supply (Supply, newSupply)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoShadowing, globalId, inScopeOf, intFunTy, intId
-  , intLit, intTy, letBinders, localId, mkBindingMap, mkDataCon, nameToUnique
+  , intLit, intTy, letBinders, localId, mkBindingMap, mkTestDataCon, nameToUnique
   , pairDataCon, pairTy, parseTyConName, parseTyConTy, runSingleTransformation
   , showPprU, tyVar, withTyConMap )
 
@@ -60,7 +60,7 @@ decR = $(asRewriteQ (toTransformation "DEC" (onCase 'disjointExpressionConsolida
 
 -- | @MkEx :: forall n. n -> Ex@, a constructor with an existential type variable
 mkEx :: DataCon
-mkEx = mkDataCon "MkEx" 1001 [] [exN] [VarTy exN] exTy
+mkEx = mkTestDataCon "MkEx" 1001 [] [exN] [VarTy exN] exTy
 
 exN :: TyVar
 exN = tyVar User "n" 34
@@ -179,7 +179,7 @@ tN = tyVar User "n" 41
 
 -- | @MkT :: forall n. n -> T@
 mkTDc :: DataCon
-mkTDc = mkDataCon "MkT" 101 [] [tN] [VarTy tN] tTy
+mkTDc = mkTestDataCon "MkT" 101 [] [tN] [VarTy tN] tTy
 
 -- | The default rewrite environment, extended with @T@ and @Pair@
 envT :: RewriteEnv

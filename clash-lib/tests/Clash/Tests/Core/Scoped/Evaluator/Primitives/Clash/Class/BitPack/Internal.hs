@@ -31,7 +31,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import Clash.Unique (Unique)
 
 import Test.Clash.Rewrite
-  (assertAlphaEq, localId, mkAlgTyCon, mkDataCon, mkTyConName, numTy, tcApp, testTyConMap)
+  (assertAlphaEq, localId, mkTestAlgTyCon, mkTestDataCon, mkTyConName, numTy, tcApp, testTyConMap)
 import Test.Clash.Scoped.Evaluator.Primitives
 
 -- | A boxed number type: its name, the type of its field, and the literal of
@@ -51,7 +51,7 @@ boxedTy b = tcApp (boxedTyConName b) []
 
 boxedDc :: Boxed -> DataCon
 boxedDc b =
-  mkDataCon (bxName b <> "#") (bxUniq b + 1) [] [] [bxPrimTy b] (boxedTy b)
+  mkTestDataCon (bxName b <> "#") (bxUniq b + 1) [] [] [bxPrimTy b] (boxedTy b)
 
 -- | A boxed number
 boxed :: Boxed -> C.Term -> C.Term
@@ -75,7 +75,7 @@ doubleB = Boxed "GHC.Types.Double" doublePrimTy (DoubleLiteral . fromInteger) 60
 -- | The types of the tests, with the boxed number types
 bitPackTypeEnv :: TypeEnv
 bitPackTypeEnv = mkTypeEnv $ testTyConMap <> UniqMap.fromList
-  [ (boxedTyConName b, mkAlgTyCon (boxedTyConName b) [] [boxedDc b])
+  [ (boxedTyConName b, mkTestAlgTyCon (boxedTyConName b) [] [boxedDc b])
   | b <- [ int8B, int16B, int32B, int64B, wordB, word8B, word16B, word32B
          , word64B, cushortB, floatB, doubleB ] ]
 
