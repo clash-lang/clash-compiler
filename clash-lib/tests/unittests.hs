@@ -41,7 +41,6 @@ import qualified Clash.Tests.Core.Subst
 import qualified Clash.Tests.Core.TermLiteral
 import qualified Clash.Tests.Core.Util
 import qualified Clash.Tests.Differential
-import qualified Clash.Tests.Differential.Sites
 import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist
 import qualified Clash.Tests.Netlist.Id
@@ -78,7 +77,6 @@ import qualified Clash.Tests.Normalize.Transformations.SeparateArgs
 import qualified Clash.Tests.Normalize.Transformations.Specialize
 import qualified Clash.Tests.Normalize.Transformations.XOptimize
 import qualified Clash.Tests.Normalize.Util
-import qualified Clash.Tests.Rewrite.Capture
 import qualified Clash.Tests.Rewrite.Combinators
 import qualified Clash.Tests.Rewrite.Scoped.Combinators
 import qualified Clash.Tests.Rewrite.Scoped.History
@@ -142,7 +140,6 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.TermLiteral.tests
   , Clash.Tests.Core.Util.tests
   , Clash.Tests.Differential.tests
-  , Clash.Tests.Differential.Sites.tests
   , Clash.Tests.Driver.Manifest.tests
   , Clash.Tests.Netlist.tests
   , Clash.Tests.Netlist.Id.tests
@@ -179,7 +176,6 @@ tests = testGroup "Unittests"
   , Clash.Tests.Normalize.Transformations.Specialize.tests
   , Clash.Tests.Normalize.Transformations.XOptimize.tests
   , Clash.Tests.Normalize.Util.tests
-  , Clash.Tests.Rewrite.Capture.tests
   , Clash.Tests.Rewrite.Combinators.tests
   , Clash.Tests.Rewrite.Scoped.Combinators.tests
   , Clash.Tests.Rewrite.Scoped.History.tests

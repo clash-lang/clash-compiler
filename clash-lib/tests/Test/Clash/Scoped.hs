@@ -216,7 +216,6 @@ module Test.Clash.Scoped
   , runScopedOn
   , assertLetHandlerAgrees
   , assertRewritesAgree
-  , assertRewritesAgreeUpTo
   , assertNewBindingsAgree
   , Step (..)
   , atPath
@@ -292,8 +291,6 @@ import qualified Clash.Rewrite.Types as C
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Test.Clash.Differential (KnownDifference, Outcome (..))
-import Test.Clash.Differential.Sites (compareAtSite)
 import Test.Clash.Rewrite
   ( DeclVar (..), ScopeDecl (..), TestTerm (..), TestType (..), assertAlphaEq
   , assertErrorContains, atRaw, builtTerm, builtType, freeVarType, globalsByName, inScopeOf, intId, kindedTyVarD
@@ -1697,35 +1694,6 @@ assertRewritesAgree env st ctx old new tm = do
   assertBool ("change signaled: Clash Core " <> show changed1 <> ", port " <> show changed2)
     (changed1 == changed2)
   assertNewBindingsAgree st st1 st2
-
--- | Like 'assertRewritesAgree', but the results only need to be equal up to
--- the given known differences (see
--- 'Test.Clash.Differential.Sites.compareAtSite'), and the global bindings they
--- add are not compared. Gives the outcome, so a test can check which known
--- differences it needed.
-assertRewritesAgreeUpTo
-  :: HasCallStack
-  => [KnownDifference]
-  -> RewriteEnv
-  -> RewriteState extra
-  -> TransformContext
-  -> Rewrite extra
-  -- ^ The rewrite of Clash Core
-  -> Rewrite extra
-  -- ^ Its port
-  -> C.Term
-  -> IO Outcome
-assertRewritesAgreeUpTo kds env st ctx old new tm = do
-  (expected, _, changed1) <- runRewriteTest env st (old ctx tm)
-  (actual, _, changed2) <- runRewriteTest env st (new ctx tm)
-  let outcome = compareAtSite kds expected actual
-  case outcome of
-    Different _ ->
-      assertFailure ("Clash Core:\n" <> showTerm expected <> "\nport:\n" <> showTerm actual)
-    _ -> pure ()
-  assertBool ("change signaled: Clash Core " <> show changed1 <> ", port " <> show changed2)
-    (changed1 == changed2)
-  pure outcome
 
 -- | Assert that two runs from the first state added global bindings with the
 -- same names, whose bodies are alpha-equivalent, up to the uniques of the

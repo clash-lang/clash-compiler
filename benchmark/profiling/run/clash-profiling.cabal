@@ -19,8 +19,6 @@ executable clash-profile-normalization-run
                        deepseq,
                        directory,
                        filepath,
-                       process,
-                       time,
 
                        clash-benchmark,
                        clash-ghc,
