@@ -380,7 +380,7 @@ renderDecl = \case
       , Text.show varSize
       , Text.pack varIDCode
       , Text.pack varReference ]
-  Scope name subs -> Text.unlines $ -- unlines introduces a trailing newline, but oh well
+  Scope name subs -> Text.intercalate "\n" $
     vcdCommand "scope" ["module", Text.pack name]
     : L.map renderDecl subs
     <> [vcdCommand "upscope" [] ]
@@ -448,7 +448,7 @@ vcdCommand ::
   Text ->
   [Text] ->
   Text
-vcdCommand tag contents = Text.unwords $ ("$"<>tag):(contents<>["$end"])
+vcdCommand tag contents = Text.unwords $ ('$' `Text.cons` tag) : contents <> ["$end"]
 
 -- | Format the time according to iso8601: @<yyyy>-<mm>-<dd>T<hh>:<mm>:<ss>@.
 iso8601Format ::

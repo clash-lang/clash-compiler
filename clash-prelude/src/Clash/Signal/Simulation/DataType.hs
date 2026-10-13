@@ -47,15 +47,15 @@ import Data.List (stripPrefix)
 import Data.Typeable
 import GHC.Generics
 import Type.Reflection
-
+import Data.Char (isAlphaNum)
 
 data DataType = DT String [DataType] deriving (Show,Generic,ToJSON,FromJSON)
 
 -- | Get a @DataType@ representation of a type.
 -- This amounts to the toplevel type, and a list of all its type arguments.
 -- Note that this does not directly specify anything about the data type.
-typeRep :: forall a. Typeable a => DataType
-typeRep = pretty $ Data.Typeable.typeRep $ Proxy @a
+simpleTypeRep :: forall a. Typeable a => DataType
+simpleTypeRep = pretty $ Data.Typeable.typeRep $ Proxy @a
  where
   pretty :: SomeTypeRep -> DataType
   pretty (SomeTypeRep tr) =
@@ -63,25 +63,27 @@ typeRep = pretty $ Data.Typeable.typeRep $ Proxy @a
       (tc, args) ->
         DT (name tc) (map pretty args)
    where
-    name tc = tyConModule tc ++ "$" ++ tyConName tc
+    name tc = tyConModule tc <> "." <>
+      (if isAlphaNum c || c `elem` "'\"" then tcn else "(" <> tcn <> ")")
+     where
+      tcn = tyConName tc
+      c = tcn !! 0
 
--- #define LABEL "Clash.Data.AnonRecord$(:=)"
--- #define JOIN "Clash.Data.AnonRecord$(:&:)"
--- #define UNIT "GHC.Tuple$Unit"
--- #define TUP2 "GHC.Tuple$Tuple2"
--- #define TUP_BASE "GHC.Tuple$Tuple"
+simpleTyConName :: forall a. Typeable a -> String
+simpleTyConName = let DT n _ = simpleTypeRep @a in n
 
-pattern LABEL = "Clash.Data.AnonRecords$:="
-pattern JOIN = "Clash.Data.AnonRecord$:&:"
-pattern UNIT = "GHC.Tuple$Unit"
-pattern TUP2 = "GHC.Tuple$Tuple2"
-pattern TUP_BASE = "GHC.Tuple$Tuple"
-pattern SYMBOL_BASE = "GHC.TypeLits$"
+pattern LABEL       = $(litE $ StringL $              simpleTyConName @(:=)   )
+pattern JOIN        = $(litE $ StringL $              simpleTyConName @(:&:)  )
+pattern UNIT        = $(litE $ StringL $              simpleTyConName @()     )
+pattern TUP2        = $(litE $ StringL $              simpleTyConName @((),()))
+pattern TUP_BASE    = $(litE $ StringL $ init       $ simpleTyConName @((),()))
+pattern SYMBOL_BASE = $(litE $ StringL $ init .init $ simpleTyConName @""     )
 
 -- | Check whether two data types are compatible.
 -- This occurs when both types are the same,
 -- or when they have a compatible tuple/anonymous record structure.
 -- For example, @(a,(b,c)) ~ (a,b,c) ~ (a,(b,(c,()))) ~ (L a :&: L b :&: L c)@.
+-- Records must have the same field labels.
 compatible :: DataType -> DataType -> Bool
 compatible (DT a     ra   ) (DT b     rb    ) | a == b
                                               = and $ zipWith compatible ra rb
@@ -98,8 +100,8 @@ compatible x0               y0                = compatible0 x0 y0 || compatible0
   compatible0 (DT tup (a0:args)) y | Just n0 <- stripPrefix TUP_BASE tup
                                    , n <- read n0
                                    , n>2 =
-    let tupN = TUP_BASE <> show (n - 1 :: Int)
-    in compatible (DT TUP2 [a0, DT tupN args]) y
+    let tupSmaller = TUP_BASE <> show (n - 1 :: Int)
+    in compatible (DT TUP2 [a0, DT tupSmaller args]) y
 
   -- l := a ~ a
   compatible0 (DT LABEL [_,a]) b = compatible a b

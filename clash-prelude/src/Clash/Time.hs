@@ -49,7 +49,11 @@ pattern TimeS t <- (getTimePat 15 -> Just t) where
 
 -- | This is an internal function.
 getTimePat :: Int -> Time -> Maybe Integer
-getTimePat k (TimeFS t) = if t `rem` (10^k) == 0 then Just (t `div` (10^k)) else Nothing
+getTimePat k (TimeFS t) =
+  if t `rem` (10^k) == 0 then
+    Just (t `div` (10^k))
+  else
+    Nothing
 
 -- | Time is shown, and can be read, in a @<value><unit>@ format.
 instance Show Time where
@@ -79,24 +83,24 @@ instance Read Time where
               Ident unitCons <- lexP
               t <- step readPrec
               case unitCons of
-                "TimeFS" -> return (TimeFS t)
-                "TimePS" -> return (TimePS t)
-                "TimeNS" -> return (TimeNS t)
-                "TimeUS" -> return (TimeUS t)
-                "TimeMS" -> return (TimeMS t)
-                "TimeS"  -> return (TimeS  t)
+                "TimeFS" -> pure (TimeFS t)
+                "TimePS" -> pure (TimePS t)
+                "TimeNS" -> pure (TimeNS t)
+                "TimeUS" -> pure (TimeUS t)
+                "TimeMS" -> pure (TimeMS t)
+                "TimeS"  -> pure (TimeS  t)
                 _        -> pfail )
 
       +++ (prec pfix_prec $ do
               t <- step readPrec
               Ident unit <- lexP
               case unit of
-                "fs" -> return (TimeFS t)
-                "ps" -> return (TimePS t)
-                "ns" -> return (TimeNS t)
-                "us" -> return (TimeUS t)
-                "ms" -> return (TimeMS t)
-                "s"  -> return (TimeS  t)
+                "fs" -> pure (TimeFS t)
+                "ps" -> pure (TimePS t)
+                "ns" -> pure (TimeNS t)
+                "us" -> pure (TimeUS t)
+                "ms" -> pure (TimeMS t)
+                "s"  -> pure (TimeS  t)
                 _    -> pfail )
    where
     app_prec = 10
@@ -185,7 +189,7 @@ timeUntil cond sig = clockCycles @dom
   $ Data.Foldable.foldr (:) [] sig
  where
   unsafeTail (_:t) = t
-  unsafeTail [] = error "Empty signal"
+  unsafeTail [] = error "(unreachable) empty signal"
 
 -- | Go from an absolute or relative time and starting point to an absolute time.
 absTime ::

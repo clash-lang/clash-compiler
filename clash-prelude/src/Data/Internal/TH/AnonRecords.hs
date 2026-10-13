@@ -27,15 +27,15 @@ deriveAsTuple minSize maxSize = do
       prodN   =        mkName ":&:"
 
       mkRecordT [(f,a)] = AppT (AppT fieldT f) a
-      mkRecordT (a:b)   = AppT (AppT prodT $ mkRecordT [a]) $ mkRecordT b
+      mkRecordT (a:as)  = AppT (AppT prodT $ mkRecordT [a]) $ mkRecordT as
       mkRecordT []      = error "(unreachable) cannot construct empty record"
 
       mkRecordE [a]     = AppE fieldE a
-      mkRecordE (a:b)   = AppE (AppE prodE $ mkRecordE [a]) $ mkRecordE b
+      mkRecordE (a:as)  = AppE (AppE prodE $ mkRecordE [a]) $ mkRecordE as
       mkRecordE []      = error "(unreachable) cannot construct empty record"
 
       mkRecordP [a]     = ConP fieldN [] [a]
-      mkRecordP (a:b)   = ConP prodN [] [mkRecordP [a], mkRecordP b]
+      mkRecordP (a:as)  = ConP prodN [] [mkRecordP [a], mkRecordP as]
       mkRecordP []      = error "(unreachable) cannot construct empty record"
 
   fieldNames <- replicateM maxSize (newName "f")

@@ -27,7 +27,7 @@ module Data.AnonRecords (
   (:&:)(..),
   (:=)(..),
   pattern (:=), FieldLabelProxy,
-  HasField,
+  FieldExists,
   WithField, WithoutField,
   AccessField(..), InsertField(..), DeleteField(..),
   AsTuple(..),
@@ -108,10 +108,10 @@ instance IsLabel f (FieldLabelProxy f) where
 ----------------------------------------------
 
 -- | Type-level boolean indicating whether a field exists in a record.
-type family HasField f a where
-  HasField x (x:=_) = True
-  HasField x (a:&:b) = HasField x a || HasField x b
-  HasField _ _ = False
+type family FieldExists f a where
+  FieldExists x (x:=_) = True
+  FieldExists x (a:&:b) = FieldExists x a || FieldExists x b
+  FieldExists _ _ = False
 
 -- | Class for getting and setting record fields.
 class AccessField (f::Symbol) a where
@@ -135,10 +135,10 @@ instance
   => GHC.Records.HasField f (f:=b) a where
   getField = getField @f @(f:=b)
 
-instance (AccessField0 f (a:&:b) (HasField f a)) => AccessField f (a:&:b) where
-  type FieldType f (a:&:b) = FieldType0 f (a:&:b) (HasField f a)
-  getField   ab = getField0 @f @(a:&:b) @(HasField f a)   ab
-  setField x ab = setField0 @f @(a:&:b) @(HasField f a) x ab
+instance (AccessField0 f (a:&:b) (FieldExists f a)) => AccessField f (a:&:b) where
+  type FieldType f (a:&:b) = FieldType0 f (a:&:b) (FieldExists f a)
+  getField   ab = getField0 @f @(a:&:b) @(FieldExists f a)   ab
+  setField x ab = setField0 @f @(a:&:b) @(FieldExists f a) x ab
 
 instance
   ( AccessField f (l:&:r)
@@ -151,12 +151,12 @@ class AccessField0 f a left where
   getField0 :: a -> FieldType0 f a left
   setField0 :: FieldType0 f a left -> a -> a
 
-instance (AccessField f a, HasField f a ~ True) => AccessField0 f (a:&:b) True where
+instance (AccessField f a, FieldExists f a ~ True) => AccessField0 f (a:&:b) True where
   type FieldType0 f (a:&:b) True = FieldType f a
   getField0   (a:&:_) = getField @f a
   setField0 x (a:&:b) = setField @f x a :&: b
 
-instance (AccessField f b, HasField f a ~ False) => AccessField0 f (a:&:b) False where
+instance (AccessField f b, FieldExists f a ~ False) => AccessField0 f (a:&:b) False where
   type FieldType0 f (a:&:b) False = FieldType f b
   getField0   (_:&:b) = getField @f b
   setField0 y (a:&:b) = a :&: setField @f y b

@@ -8,7 +8,7 @@
 
 module Clash.Signal.Simulation.Store where
 
-import Control.Monad (foldM)
+import Control.Monad (foldM, when)
 import Data.Aeson (encode,eitherDecode,ToJSON,FromJSON)
 import Data.AnonRecords
 import qualified Data.ByteString.Lazy as B
@@ -40,7 +40,7 @@ The header looking something like:
   "offset": 0,        # optional; note that with an offset of 0, the first value
                       # is the value /before/ the first clock edge
   "width": 17,        # number of bits
-  "undefined": true,  # whether or not the undefined bits mask is stored;
+  "hasMask": true,    # whether or not the undefined bits mask is stored;
                       # usually true for simulation and false for hardware output
   "values": [         # list of "subsignals"; always at least one present
     {
@@ -66,7 +66,7 @@ data FileHeader = FileHeader
   { samples :: Int
   , offset :: Int
   , width :: Int
-  , undefined :: Bool
+  , hasMask :: Bool
   , signals :: [SignalDescr]
   }
  deriving (Show,Generic,ToJSON,FromJSON)
@@ -74,7 +74,7 @@ data FileHeader = FileHeader
 data SignalDescr = SignalDescr
   { name :: String
   , width :: Int
-  , datatype :: DataType
+  , dataType :: DataType
   }
  deriving (Show,Generic,ToJSON,FromJSON)
 
@@ -91,7 +91,7 @@ storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
     { samples = stop-start
     , offset = start
     , width
-    , undefined = True
+    , hasMask = True
     , signals = signals
     }
   header0 = encode header
@@ -99,14 +99,14 @@ storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
   values0 = drop start $ take stop $ values
   rawValues = B.pack $ concatMap valToBytes values0
 
-  k = (width+7) `div` 9
-  valToBytes (m,v) = concatMap natToBytes [v,m]
+  k = (width+7) `div` 8
+  valToBytes (m,v) = concatMap natToBytes [m,v]
   natToBytes n = map (\x -> fromIntegral (n `shiftR` (8*x))) [0..k-1] -- TODO: more efficient implementation?
 
 -- | Store a single trace as a signal dump.
 storeTrace :: String -> (Int,Int) -> Trace -> ByteString
 storeTrace name samples (ty,_period,width,values) =
-  storeTrace0 samples [SignalDescr{name,width,datatype=ty}] values
+  storeTrace0 samples [SignalDescr{name,width,dataType=ty}] values
 
 -- | Store multiple traces in a single binary file.
 -- All traces must have the same clock period.
@@ -118,9 +118,9 @@ storeTraces samples traces = do
     Right ()
   else do
     Left
-    "Attempting to store multiple traces with different periods in one signal dump file."
+      "Attempting to store multiple traces with different periods in one signal dump file."
 
-  let meta = map (\(name,(ty,_,width,_)) -> SignalDescr{name, width, datatype=ty}) traces
+  let meta = map (\(name,(ty,_,width,_)) -> SignalDescr{name, width, dataType=ty}) traces
       widths = map (\(_,(_,_,w,_)) -> w) traces
       ccat vs = foldl
         (\(v,m) (w,(v0,m0)) -> ((v `shiftL` w).|.v0, (m `shiftL` w).|.m0)) (0,0)
@@ -153,7 +153,7 @@ stores names sim@Simulation{simConfig} = do
     [] -> Left "stores called without any trace names"
     (t:_) -> Right t
   let samples = simulationTimeRangeToCycles simConfig period
-  storeTraces samples (zip names traces)
+  storeTraces samples (zip names traces) -- periods are checked here
 
 -- | Store a 'Signal' in binary form.
 storeSignal ::
@@ -196,7 +196,7 @@ instance (KnownSymbol x, BitPack a, Typeable a) => StoreSignals (x := Signal dom
     [ SignalDescr
       { name = symbolVal (Proxy @x)
       , width = fromInteger $ natVal (Proxy @(BitSize a))
-      , datatype = Clash.Signal.Simulation.DataType.typeRep @a } ]
+      , dataType = simpleTypeRep @a } ]
 instance (StoreSignals a, StoreSignals b) => StoreSignals (a :&: b) where
   storeSignalMeta = storeSignalMeta @a <> storeSignalMeta @b
 
@@ -204,6 +204,16 @@ instance (StoreSignals a, StoreSignals b) => StoreSignals (a :&: b) where
 ----------------------------------------------
 --                 LOADING                  --
 ----------------------------------------------
+
+-- | Load only the header of a trace dump file.
+-- This may be used to inspect what signals it has,
+-- which values are defined, etc.
+loadHeader ::
+  ByteString ->
+  Either String FileHeader
+loadHeader = do
+  let (header0,_) = B.span (/=0) bs
+  eitherDecode header0
 
 -- | Read the file but do not finalize the trace yet
 loadTrace0 ::
@@ -213,7 +223,7 @@ loadTrace0 bs = do
   let (header0,rest) = B.span (/=0) bs
       rawValues0 = B.drop 1 rest
 
-  header@FileHeader{width,undefined=storesUndefined,offset} <- eitherDecode header0
+  header@FileHeader{width,hasMask=storesUndefined,offset} <- eitherDecode header0
 
   let k = (width+7) `div` 8
       values =
@@ -224,7 +234,7 @@ loadTrace0 bs = do
 
       undefinedValues = f rawValues
        where
-        f (v:m:r) = (m,v) : f r
+        f (m:v:r) = (m,v) : f r
         f _ = []
       definedValues = map (0,) rawValues
 
@@ -252,7 +262,7 @@ loadTrace ::
 loadTrace period bs = do
   (header, values) <- loadTrace0 bs
   let FileHeader{width, signals} = header
-      ty = constructRecord $ map (\SignalDescr{name,datatype} -> (name,datatype)) signals
+      ty = constructRecord $ map (\SignalDescr{name,dataType} -> (name,dataType)) signals
 
   pure
     ( ty
@@ -271,10 +281,8 @@ loadTraces period bs = do
       cWidths = scanl (+) 0 widths
       ranges = zip cWidths (drop 1 cWidths)
 
-  if width /= last cWidths then do
+  when (width /= last cWidths) $ do
     Left "Subsignal widths do not add up to signal width"
-  else do
-    Right ()
 
   let slice0 (from, to) (m,v) = (go m, go v)
        where
