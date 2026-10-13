@@ -50,7 +50,6 @@ import           GHC.Types.SrcLoc            (SrcSpan)
 
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Var              as C
 import           Clash.Core.VarEnv           (elemVarSet, uniqAway')
 import qualified Clash.Data.UniqMap          as UniqMap
 import           Clash.Driver.Types          (Binding (..), BindingMap, IsPrim (IsFun))
@@ -62,7 +61,7 @@ import           Clash.Util                  (MonadUnique (..))
 import           Clash.Util.Supply           (Supply, splitSupply)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm)
-import           Clash.Core.Scoped.Convert   (fromClashTermClosed, mkGlobalIdFromClash, toClashType)
+import           Clash.Core.Scoped.Convert   (fromClashTermClosed, mkGlobalId)
 import           Clash.Core.Scoped.FreeVars  (termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
@@ -81,9 +80,7 @@ freshGlobalId :: C.Name C.Term -> Type 'VoidS -> RewriteMonad extra GlobalId
 freshGlobalId nm ty = do
   bndrs <- Lens.use scopedBindings
   u <- getUniqueM
-  -- TODO(D4): the type of a 'GlobalId' is a Clash Core type
-  let tyC = toClashType ty
-      global nm' = mkGlobalIdFromClash (C.mkGlobalId tyC nm')
+  let global nm' = mkGlobalId nm' ty
       taken u' = memberGlobalEnv (global (setUnique nm u')) bndrs
   pure (global (uniqAway' taken u (setUnique nm u)))
 
