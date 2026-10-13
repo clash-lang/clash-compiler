@@ -5,7 +5,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Rewriting combinators and traversals for scoped Clash Core. Traversals open
-  the binders they go under (see "Clash.Rewrite.Scoped.Types"), which renames
+  the binders they go under (see "Clash.Rewrite.Types"), which renames
   a binder that clashes with the scope.
 
   See Note [topdown repeatR], Note [combinator inlining], Note
@@ -48,7 +48,7 @@ import qualified Data.Monoid                 as Monoid
 import           GHC.Exts                    (isTrue#, reallyUnsafePtrEquality#)
 
 import           Clash.Core.Scoped.Syntax
-import           Clash.Rewrite.Scoped.Types
+import           Clash.Rewrite.Types
 
 {-
 Note [topdown repeatR]

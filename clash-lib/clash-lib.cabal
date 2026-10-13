@@ -343,7 +343,6 @@ Library
                       Clash.Rewrite.Scoped.Combinators
                       Clash.Rewrite.Scoped.Globals
                       Clash.Rewrite.Scoped.History
-                      Clash.Rewrite.Scoped.Types
                       Clash.Rewrite.Scoped.Util
                       Clash.Rewrite.Scoped.Whnf
                       Clash.Rewrite.Scoped.WorkFree

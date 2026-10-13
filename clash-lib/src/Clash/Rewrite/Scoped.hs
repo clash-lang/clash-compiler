@@ -146,16 +146,43 @@
 -}
 
 module Clash.Rewrite.Scoped
-  ( module Clash.Rewrite.Scoped.Types
-  , module Clash.Rewrite.Scoped.Combinators
+  ( module Clash.Rewrite.Scoped.Combinators
   , module Clash.Rewrite.Scoped.Apply
   , whnfRW
   , changed
   , setChanged
+    -- * Transformations
+  , Transform (..)
+  , Rewrite
+    -- * The context
+  , TransformContext
+  , tfScope
+  , tfPath
+  , tfHeap
+  , Path (..)
+  , Frame (..)
+  , Under (..)
+  , rootContext
+  , pushFrame
+  , pushUnder
+  , appArgFrame
+    -- * Going under binders
+  , underLam
+  , underTyLam
+  , underAlt
+  , underLet
+  , underLetRec
+    -- * Inspecting the context
+  , FrameKind (..)
+  , ctxFrames
+  , isLambdaBodyKind
+  , isTickKind
+  , closestLetBinder
+  , mkDerivedName
   ) where
 
 import Clash.Rewrite.Scoped.Apply
 import Clash.Rewrite.Scoped.Combinators
-import Clash.Rewrite.Scoped.Types
+import Clash.Rewrite.Types
 import Clash.Rewrite.Scoped.Whnf (whnfRW)
 import Clash.Rewrite.Util (changed, setChanged)

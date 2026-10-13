@@ -12,7 +12,7 @@
   scope ('openBndrs'), which is needed to go under them.
 
   The rewrite contexts are not here: they are part of the rewrite system
-  ("Clash.Rewrite.Scoped.Types").
+  ("Clash.Rewrite.Types").
 -}
 
 {-# LANGUAGE GADTs #-}

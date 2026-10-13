@@ -148,7 +148,7 @@ reifyContext :: Transformation
 reifyContext = toTransformation "reifyContext" (onVarNode 'reifyContextWorker)
 
 -- | Rewrites references to 'fGlobal' to a primitive, so the
--- 'Clash.Rewrite.Scoped.Types.AppArg' frame of a sibling argument is computed
+-- 'Clash.Rewrite.Types.AppArg' frame of a sibling argument is computed
 -- from an already rewritten function
 functionToPrimWorker :: TransformContext n -> Term n -> RewriteMonad () (Term n)
 functionToPrimWorker _ctx = \case

@@ -96,7 +96,7 @@ import           GHC.Types.Basic             (InlineSpec (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Netlist.Util          (representableTypeState)
 import           Clash.Rewrite.Types
-  (RewriteMonad, curFun, customReprs, typeEnv, typeTranslator)
+  (RewriteMonad, curFun, customReprs, typeEnv, typeTranslator, TransformContext, mkDerivedName, tfScope, underLet)
 import           Clash.Rewrite.Util
   (changed, isFromInt, runWithHWTypeCache, setChanged, zoomExtra)
 
@@ -114,8 +114,6 @@ import           Clash.Core.Scoped.Type      (mkFunTy, normalizeType)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 import           Clash.Rewrite.Scoped.Globals
   (addGlobalBind, findAlphaEqBinding, freshGlobalId, isWorkFreeTerm, mkFunction)
-import           Clash.Rewrite.Scoped.Types
-  (TransformContext, mkDerivedName, tfScope, underLet)
 
 -- * Binders
 

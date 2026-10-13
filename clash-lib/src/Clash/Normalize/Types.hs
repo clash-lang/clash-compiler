@@ -20,8 +20,7 @@ import Data.Set                   (Set)
 import Data.Text                  (Text)
 
 import Clash.Driver.Types (Binding)
-import Clash.Rewrite.Types (RewriteMonad)
-import Clash.Rewrite.Scoped.Types (Rewrite)
+import Clash.Rewrite.Types (RewriteMonad, Rewrite)
 import Clash.Core.Scoped.Alpha (AlphaTerm, AlphaType)
 import Clash.Core.Scoped.NameMap (GlobalEnv)
 import qualified Clash.Core.Scoped.Syntax as S

@@ -24,7 +24,7 @@
   The transformations are those of scoped Clash Core ("Clash.Rewrite.Scoped"):
   declare one with 'toTransformation', and a whole-term pass with
   'pass'. 'Clash.Rewrite.StrategyDSL.TH.compileStrategy' compiles
-  a strategy. Workers take a 'Clash.Rewrite.Scoped.Types.TransformContext'
+  a strategy. Workers take a 'Clash.Rewrite.Types.TransformContext'
   and terms of any scope. A 'FieldWorker' of 'CVar' is not supported, as
   scoped Core has separate constructors for local and global variables: use a
   'Worker', which fires at both.
@@ -118,7 +118,7 @@ data TransformationWorker
   | AnyWorker !Name
   -- ^ @worker :: TransformContext n -> Term n -> RewriteMonad extra (Term n)@, applied at all constructors. For a
   -- transformation whose firing condition lives in the
-  -- 'Clash.Rewrite.Scoped.Types.TransformContext' rather than the constructor
+  -- 'Clash.Rewrite.Types.TransformContext' rather than the constructor
   -- (@topLet@).
   deriving (Eq, Show)
 
