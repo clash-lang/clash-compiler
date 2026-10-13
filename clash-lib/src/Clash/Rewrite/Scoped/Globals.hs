@@ -12,7 +12,7 @@
   unique supply that no global binding has, never one derived from a local
   variable. Note that a 'GlobalId' doesn't imply that there is a binding for
   it: e.g. 'Clash.Rewrite.Types.curFun' is a global without a binding during
-  'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp'.
+  'Clash.Normalize.Util.normalizeWorkFreeApp'.
 -}
 
 {-# LANGUAGE PolyKinds #-}

@@ -33,7 +33,7 @@ data NormalizeState
   , _normalizationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.normalization' strategy. Carried
   -- in the state so transformations can normalize other binders
-  -- ('Clash.Normalize.Scoped.Util.normalizeTopLvlBndr') without importing the
+  -- ('Clash.Normalize.Util.normalizeTopLvlBndr') without importing the
   -- strategy module. Breaking that import cycle would need an hs-boot file,
   -- and GHC rejects Template Haskell splices in a module cycle.
   , _constantPropagationStrategy :: Rewrite NormalizeState
@@ -74,7 +74,7 @@ data NormalizeState
   --
   -- * Elem: the normalized body of @f@ applied to the arguments
   --
-  -- See 'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp'.
+  -- See 'Clash.Normalize.Util.normalizeWorkFreeApp'.
   }
 
 Lens.makeLenses ''NormalizeState

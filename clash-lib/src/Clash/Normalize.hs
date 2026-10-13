@@ -68,7 +68,7 @@ import           Clash.Netlist.Types
 import           Clash.Normalize.Strategy         (constantPropagation, normalization)
 import           Clash.Normalize.Strategy.Spec    (flattenSpec)
 import           Clash.Normalize.Types
-import           Clash.Normalize.Scoped.Util
+import           Clash.Normalize.Util
   (isCheapFunction, normalizeTopLvlBndr, rewriteExpr, tvSubstWithTyEq)
 import           Clash.Rewrite.StrategyDSL.TH     (compileStrategy)
 import           Clash.Rewrite.Types

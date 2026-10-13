@@ -20,7 +20,7 @@
 
   The function being normalized ('Clash.Rewrite.Types.curFun') is a global,
   which need not have a binding: e.g. the fake global of
-  'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp' doesn't.
+  'Clash.Normalize.Util.normalizeWorkFreeApp' doesn't.
 
   = Let-bindings
 
@@ -112,7 +112,7 @@ import Clash.Core.Scoped.TermInfo (isClosed, isLocalVar, termSizeSmallerThan)
 import Clash.Core.Scoped.Type
   (TypeView (..), isClassTy, isPolyFunCoreTy, isSignalType, tyView)
 import Clash.Core.Scoped.Util (primUCo)
-import Clash.Normalize.Scoped.Util
+import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
   , normalizeTopLvlBndr, normalizeWorkFreeApp )
 import Clash.Rewrite.Scoped

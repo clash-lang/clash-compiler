@@ -76,7 +76,7 @@ import Clash.Core.Scoped.Type
   , piTeleNameBinders, splitFunForallTy, tyNatSize, tyView )
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Scoped.Util (mkVec, shouldSplit)
-import Clash.Normalize.Scoped.Util (shouldReduce)
+import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.Scoped
   ( FrameKind (..), TransformContext, Under (LamBody)
   , changed, ctxFrames, pushUnder, setChanged, tfScope, whnfRW )

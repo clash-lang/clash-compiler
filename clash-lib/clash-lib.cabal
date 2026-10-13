@@ -315,7 +315,6 @@ Library
                       Clash.Normalize.Scoped.Transformations.SeparateArgs
                       Clash.Normalize.Scoped.Transformations.Specialize
                       Clash.Normalize.Scoped.Transformations.XOptimize
-                      Clash.Normalize.Scoped.Util
                       Clash.Normalize.Strategy
                       Clash.Normalize.Strategy.Spec
                       Clash.Normalize.Types

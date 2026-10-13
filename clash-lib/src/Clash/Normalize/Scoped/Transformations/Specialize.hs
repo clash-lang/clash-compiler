@@ -115,7 +115,7 @@ import           Clash.Core.Scoped.Type
   (TypeView (..), applyFunTy, coreView1, normalizeType, splitTyConAppM, tyView)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv, lookupTyCon)
 import           Clash.Core.Scoped.Util      (mkLets)
-import           Clash.Normalize.Scoped.Util (ConstantSpecInfo (..), constantSpecInfo)
+import           Clash.Normalize.Util (ConstantSpecInfo (..), constantSpecInfo)
 import           Clash.Rewrite.Scoped.Combinators (topdownR)
 import           Clash.Rewrite.Scoped.Globals
   (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
@@ -372,7 +372,7 @@ specializeGlobal sc e f args ticks specArgIn = do
         -- type equality constraints they may be syntactically polymorphic.
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by
-        -- 'Clash.Normalize.Scoped.Util.substWithTyEq'. So we drop the TyApp
+        -- 'Clash.Normalize.Util.substWithTyEq'. So we drop the TyApp
         -- ("specializing" on it) and change the type of the variable to match.
         -- A global has a closed type, so this needs a closed type argument.
         | Just newTy <- closeType (piResultTy te sc (sinkClosed (globalIdType f)) tyArg) ->
@@ -522,7 +522,7 @@ different from one that didn't, even though they're the same value. Both forms
 reach 'specialize', for example when a 'KnownDomain' dictionary built by GHC is
 passed to a function at one call site, while at another call site the same
 dictionary is the result of normalizing an application of a work-free function
-(see 'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp'). To prevent creating
+(see 'Clash.Normalize.Util.normalizeWorkFreeApp'). To prevent creating
 two identical specializations, we use the literal form in the keys of the
 specialization cache.
 -}
