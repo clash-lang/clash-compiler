@@ -3,35 +3,31 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for solving type equations in scoped Clash Core. Most tests check
-  agreement with "Clash.Core.EqSolver".
+  Tests for solving type equations in scoped Clash Core. Most expected
+  results are those that "Clash.Core.EqSolver" gave.
 -}
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
 
 module Clash.Tests.Core.Scoped.EqSolver (tests) where
 
 import Control.Monad (forM_)
-import Data.Maybe (fromMaybe, isNothing)
+import Data.Maybe (isNothing)
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.EqSolver as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.TyCon as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
-import qualified Clash.Core.Util as C
-import qualified Clash.Core.Var as C
-import qualified Clash.Core.VarEnv as C
+import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (NumTy))
+import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Builder (TyB, appTyB, constTyB, litTyB)
 import Clash.Core.Scoped.EqSolver
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst (substTm)
@@ -39,191 +35,220 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.DataCon (withDataConPat)
 import Clash.Core.Scoped.Type (mkFunTy)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
+import qualified Clash.Core.Scoped.TysPrim as P
 
-import Test.Clash.Rewrite
-  ( addTy, boolTy, eqTy, fTy, intTy, kindedTyVar, localId, maybeTy, nTy
-  , testTyConMap, vConsDataCon, vNilDataCon, vTy )
+import Test.Clash.Rewrite (addTyConName, vConsDataCon, vNilDataCon)
 import Test.Clash.Scoped
-
-tcm :: C.TyConMap
-tcm = testTyConMap
 
 tenv :: TypeEnv
 tenv = testTypeEnv
 
-mTv, n0Tv, xTv :: C.TyVar
-mTv = kindedTyVar C.User "m" 5000 C.typeNatKind
-n0Tv = kindedTyVar C.User "n" 5001 C.typeNatKind
-xTv = kindedTyVar C.User "x" 5002 C.liftedTypeKind
+-- | The free type variables of the equations: @m@ gets name 1, @n@ name 2 and
+-- @x@ name 3
+decls :: [ScopeDecl]
+decls = [kindedTyVarD "m" "Nat", kindedTyVarD "n" "Nat", tyVarD "x"]
 
-m, n0, x :: C.Type
-m = C.VarTy mTv
-n0 = C.VarTy n0Tv
-x = C.VarTy xTv
+litB :: Integer -> TyB
+litB = litTyB . C.NumTy
 
-lit :: Integer -> C.Type
-lit = C.LitTy . C.NumTy
+-- | @GHC.TypeNats.+@
+addB :: TyB -> TyB -> TyB
+addB a b = appTyB (appTyB (constTyB (C.TyCon addTyConName)) a) b
 
 -- | Equations, to solve for @m@
-equations :: [(C.Type, C.Type)]
+equations :: [(TestType, TestType)]
 equations =
-  [ (lit 5, addTy m (lit 1))
-  , (addTy (lit 2) m, lit 5)
-  , (lit 0, addTy m (lit 1))
-  , (m, intTy)
-  , (intTy, m)
-  , (maybeTy m, maybeTy boolTy)
-  , (maybeTy intTy, boolTy)
-  , (nTy intTy, maybeTy m)
-  , (intTy, boolTy)
-  , (lit 3, lit 4)
-  , (lit 3, lit 3)
-  , (fTy m, intTy)
-  , (x, intTy)
+  [ ("5", builtType (addB (testTypeB "m") (litB 1)))
+  , (builtType (addB (litB 2) (testTypeB "m")), "5")
+  , ("0", builtType (addB (testTypeB "m") (litB 1)))
+  , ("m", "Int")
+  , ("Int", "m")
+  , ("Maybe m", "Maybe Bool")
+  , ("Maybe Int", "Bool")
+  , ("N Int", "Maybe m")
+  , ("Int", "Bool")
+  , ("3", "4")
+  , ("3", "3")
+  , ("F m", "Int")
+  , ("x", "Int")
   ]
 
--- | A solution, comparable between Clash Core and scoped Core
-type Sol = Either String (Integer, C.Type)
+-- | A solution, as the raw name of the variable and the rendered type
+type Sol = Either String (Int, String)
 
-oldSol :: C.TypeEqSolution -> Sol
-oldSol = \case
-  C.Solution (tv, ty) -> Right (toInteger (C.varUniq tv), ty)
-  C.AbsurdSolution -> Left "absurd"
-  C.NoSolution -> Left "none"
-
-newSol :: TypeEqSolution n -> Sol
-newSol = \case
-  Solution tv ty -> Right (toInteger (tyNameRaw tv), toClashType ty)
+sol :: TypeEqSolution n -> Sol
+sol = \case
+  Solution tv ty -> Right (tyNameRaw tv, pp ty)
   AbsurdSolution -> Left "absurd"
   NoSolution -> Left "none"
 
--- | Convert an equation in the scope of the free type variables of the
--- equations, with the set of type variables to solve for: @m@
-withEquation
-  :: (C.Type, C.Type)
-  -> (forall n. Distinct n => Scope n -> NameSet TyName n -> (Type n, Type n) -> Assertion)
+-- | Render a value as text
+pp :: PrettyPrec p => p -> String
+pp = showPpr' (PrettyOptions False False False False)
+
+-- | Run an assertion on each equation, in the scope of 'decls', with the set
+-- of type variables to solve for: @m@
+forEquations
+  :: (forall n. Distinct n => Int -> Scope n -> NameSet TyName n -> (Type n, Type n) -> Assertion)
   -> Assertion
-withEquation (l, r) k = withFreeTyVarsOf [m, n0, x] $ \env ->
-  case fromClashType env m of
-    VarTy _ _ mName ->
-      k (convScope env) (singletonNameSet mName) (fromClashType env l, fromClashType env r)
-    _ -> assertFailure "unexpected conversion"
-
--- | A pattern of a constructor of @V n@, as Clash Core
-oldPat :: C.DataCon -> C.Type -> C.Pat
-oldPat dc inst = C.DataPat dc exts ids
- where
-  exts = C.dcExtTyVars dc
-  argTys = fromMaybe (error "oldPat") (C.dataConInstArgTys dc (inst : map C.VarTy exts))
-  ids = zipWith (\i ty -> localId C.User "f" i ty) [5100..] argTys
-
--- | A telescope of type variable binders and a type, as a Clash type
-forAllTele :: Tele TyBinder n l -> Type l -> C.Type
-forAllTele tele ty = case tele of
-  TNil -> toClashType ty
-  TCons b bs -> C.ForAllTy (toClashTyBinder b) (forAllTele bs ty)
-
--- | The field types, as a single Clash type
-fieldsTy :: [C.Type] -> C.Type
-fieldsTy = foldr C.mkFunTy intTy
+forEquations k = withTestScope decls $ \ts -> case typeIn ts "m" of
+  VarTy _ _ mName ->
+    sequence_
+      [ k i (testScope ts) (singletonNameSet mName) (typeIn ts l, typeIn ts r)
+      | (i, (l, r)) <- zip [0 ..] equations ]
+  _ -> assertFailure "unexpected type"
 
 -- | Instantiations of @V n@
-vInsts :: [C.Type]
-vInsts = [lit 3, lit 0, n0, addTy (lit 1) (lit 1)]
+vInsts :: [TestType]
+vInsts = ["3", "0", "n", builtType (addB (litB 1) (litB 1))]
+
+-- | A telescope of type variable binders and a type, as a type
+forAllTele :: Tele TyBinder n l -> Type l -> Type n
+forAllTele tele ty = case tele of
+  TNil -> ty
+  TCons b bs -> ForAllTy b (forAllTele bs ty)
+
+-- | The names of the fields of patterns
+fieldNames :: Int -> [C.Name a]
+fieldNames k = map (C.mkUnsafeSystemName "f") [1 .. fromIntegral k]
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
-  [ testGroup "agrees with Clash.Core.EqSolver"
-    [ testCase "solveEq" $ forM_ equations $ \eq -> withEquation eq $ \sc set eq' ->
-        map newSol (solveEq tenv sc set eq') @?=
-          map oldSol (C.solveEq tcm (C.mkVarSet [mTv]) eq)
-    , testCase "solveAdd" $ forM_ equations $ \eq -> withEquation eq $ \_ set eq' ->
-        newSol (solveAdd set eq') @?= oldSol (C.solveAdd (C.mkVarSet [mTv]) eq)
-    , testCase "normalizeAdd" $ forM_ equations $ \eq -> withEquation eq $ \_ _ eq' ->
-        fmap (\(a, b, ty) -> (a, b, toClashType ty)) (normalizeAdd eq') @?= C.normalizeAdd eq
+  [ testGroup "the results of Clash.Core.EqSolver"
+    [ testCase "solveEq" $ forEquations $ \i sc set eq ->
+        assertEqual (show i) (expectedSolveEq !! i) (map sol (solveEq tenv sc set eq))
+    , testCase "solveAdd" $ forEquations $ \i _ set eq ->
+        assertEqual (show i) (expectedSolveAdd !! i) (sol (solveAdd set eq))
+    , testCase "normalizeAdd" $ forEquations $ \i _ _ eq ->
+        assertEqual (show i) (expectedNormalizeAdd !! i)
+          (fmap (\(a, b, ty) -> (a, b, pp ty)) (normalizeAdd eq))
     , testCase "solveNonAbsurds" $
-        forM_ [equations, take 2 equations, drop 3 equations] $ \eqs ->
-          withFreeTyVarsOf [m, n0, x] $ \env -> case fromClashType env m of
+        forM_ (zip [equations, take 2 equations, drop 3 equations] expectedSolveNonAbsurds) $ \(eqs, expected) ->
+          withTestScope decls $ \ts -> case typeIn ts "m" of
             VarTy _ _ mName ->
-              map (newSol . uncurry Solution)
-                (solveNonAbsurds tenv (convScope env) (singletonNameSet mName)
-                  [(fromClashType env l, fromClashType env r) | (l, r) <- eqs])
-                @?= map (oldSol . C.Solution) (C.solveNonAbsurds tcm (C.mkVarSet [mTv]) eqs)
-            _ -> assertFailure "unexpected conversion"
-    , testCase "isAbsurdEq" $ forM_ equations $ \eq -> withEquation eq $ \sc set eq' ->
-        isAbsurdEq tenv sc set eq' @?= C.isAbsurdEq tcm (C.mkVarSet [mTv]) eq
+              map (sol . uncurry Solution)
+                (solveNonAbsurds tenv (testScope ts) (singletonNameSet mName)
+                  [(typeIn ts l, typeIn ts r) | (l, r) <- eqs])
+                @?= expected
+            _ -> assertFailure "unexpected type"
+    , testCase "isAbsurdEq" $ forEquations $ \i sc set eq ->
+        assertEqual (show i) (expectedIsAbsurdEq !! i) (isAbsurdEq tenv sc set eq)
     , testCase "typeEq" $
-        forM_ [eqTy C.typeNatKind m (lit 1), intTy, nTy intTy] $ \ty ->
-          withTypeScopes ty $ \sc ty' ->
-            fmap (\(l, r) -> (toClashType l, toClashType r)) (typeEq tenv sc ty')
-              @?= C.typeEq tcm ty
+        forM_ (zip [eqB, "Int", "N Int"] [Just ("m", "1"), Nothing, Nothing]) $ \(ty, expected) ->
+          withTestScope decls $ \ts0 -> do
+            let check :: Distinct n => TestScope n -> Type n -> Assertion
+                check ts ty' = fmap (\(l, r) -> (pp l, pp r)) (typeEq tenv (testScope ts) ty') @?= expected
+            check ts0 (typeIn ts0 ty)
+            withClashing ts0 [sunkD] (typeIn ts0 ty) check
     , testCase "isAbsurdPat" $
-        forM_ [vNilDataCon, vConsDataCon] $ \dc -> forM_ vInsts $ \inst ->
-          withFreeTyVarsOf [inst] $ \env -> do
-            let sc = convScope env
-                names = map fieldName [1 .. fromIntegral (length (C.dcArgTys dc))]
-                r = withDataConPat testTypeEnv sc dc [fromClashType env inst] names $
+        forM_ (zip [(dc, inst) | dc <- [vNilDataCon, vConsDataCon], inst <- vInsts] expectedIsAbsurdPat) $
+          \((dc, inst), expected) -> withTestScope decls $ \ts -> do
+            let sc = testScope ts
+                r = withDataConPat testTypeEnv sc dc [typeIn ts inst] (fieldNames (length (C.dcArgTys dc))) $
                       \_ pat _ -> isAbsurdPat tenv sc pat
-            r @?= Just (C.isAbsurdPat tcm (oldPat dc inst))
+            r @?= Just expected
     , testCase "dataConInstArgTysE" $
-        forM_ [vNilDataCon, vConsDataCon] $ \dc -> forM_ vInsts $ \inst ->
-          withFreeTyVarsOf [inst] $ \env -> do
-            let old = C.dataConInstArgTysE (C.mkInScopeSet (C.mkVarSet [n0Tv])) tcm dc [inst]
-                new = dataConInstArgTysE tenv (convScope env) dc [fromClashType env inst] $
-                        \sc ext tys -> forAllTele ext (foldr mkFunTy (fromClashTypeClosed sc intTy) tys)
-                oldTy = fmap (\tys -> foldr C.ForAllTy (fieldsTy tys) (C.dcExtTyVars dc)) old
-            assertEqual ("instantiated at " <> show inst) oldTy new
+        forM_ (zip [(dc, inst) | dc <- [vNilDataCon, vConsDataCon], inst <- vInsts] expectedDataConInstArgTysE) $
+          \((dc, inst), expected) -> withTestScope decls $ \ts -> do
+            let new = dataConInstArgTysE tenv (testScope ts) dc [typeIn ts inst] $
+                        \_ ext tys -> pp (forAllTele ext (foldr mkFunTy (sinkClosed (closedType "Int")) tys))
+            assertEqual ("instantiated at " <> pp (typeIn ts inst)) (Just expected) new
     ]
 
   , testCase "isAbsurdPat" $
       forM_ [(vNilDataCon, 3, True), (vNilDataCon, 0, False), (vConsDataCon, 0, True), (vConsDataCon, 3, False)] $
         \(dc, i, absurd) -> do
-          let names = map fieldName [1 .. fromIntegral (length (C.dcArgTys dc))]
-              r = withDataConPat testTypeEnv emptyScope dc [LitTy (C.NumTy i)] names $
+          let r = withDataConPat testTypeEnv emptyScope dc [LitTy (C.NumTy i)] (fieldNames (length (C.dcArgTys dc))) $
                     \_ pat _ -> isAbsurdPat tenv emptyScope pat
           assertEqual (show (C.dcName dc) <> " at " <> show i) (Just absurd) r
 
-  , testCase "solvePatExistentials substitutes in the pattern and the alternative" $ do
+  , testCase "solvePatExistentials substitutes in the pattern and the alternative" $
       -- case s of VCons @m (eq :: 3 ~ m + 1) (i :: Int) (xs :: V m) -> xs
-      let pat0 = oldPat vConsDataCon (lit 3)
-          xs = case pat0 of
-            C.DataPat _ _ ids -> last ids
-            _ -> error "unexpected pattern"
-          sId = localId C.User "s" 5200 (vTy (lit 3))
-          tm = C.Case (C.Var sId) intTy [(pat0, C.Var xs)]
-      withFreeVarsOf [tm] $ \env -> case fromClashTerm env tm of
-        Case _ _ [Alt pat body] ->
-          case solvePatExistentials tenv (convScope env) pat $ \s pat' ->
-                 (lastFieldTy pat', varTy (substTm s body)) of
-            Just (Just xsTy, Just ty) -> do
-              assertEqual "field type" (vTy (lit 2)) xsTy
-              assertEqual "type in the alternative" (vTy (lit 2)) ty
-            _ -> assertFailure "not solved"
-        _ -> assertFailure "unexpected conversion"
+      withTestScope [varD "s" "V 3"] $ \ts -> do
+        let sc = testScope ts
+            r = withDataConPat testTypeEnv sc vConsDataCon [LitTy (C.NumTy 3)] (fieldNames 3) $ \_ pat vars ->
+                  case vars of
+                    [_, _, xs] -> Case (termIn ts "s") (sinkClosed (closedType "Int")) [Alt pat xs]
+                    _ -> error "unexpected fields"
+        case r of
+          Just (Case _ _ [Alt pat body]) ->
+            case solvePatExistentials tenv sc pat $ \s pat' ->
+                   (lastFieldTy pat', varTy (substTm s body)) of
+              Just (Just xsTy, Just ty) -> do
+                assertEqual "field type" "V 2" xsTy
+                assertEqual "type in the alternative" "V 2" ty
+              _ -> assertFailure "not solved"
+          _ -> assertFailure "unexpected term"
 
   , testCase "solvePatExistentials without solutions" $
-      withFreeTyVarsOf [n0] $ \env -> do
-        let sc = convScope env
-            r = withDataConPat testTypeEnv sc vConsDataCon [fromClashType env n0] (map fieldName [1..3]) $
+      withTestScope decls $ \ts -> do
+        let sc = testScope ts
+            r = withDataConPat testTypeEnv sc vConsDataCon [typeIn ts "n"] (fieldNames 3) $
                   \_ pat _ -> isNothing (solvePatExistentials tenv sc pat (\_ _ -> ()))
         r @?= Just True
   ]
  where
-  fieldName = C.mkUnsafeSystemName "f"
+  -- m ~# 1, of kind Nat
+  eqB :: TestType
+  eqB = builtType (foldl appTyB eqPrimB [testTypeB "Nat", testTypeB "Nat", testTypeB "m", litB 1])
+  eqPrimB = case P.eqPrimTy @'VoidS of
+    ConstTy c -> constTyB c
+    _ -> error "eqPrimTy: not a type constructor"
 
--- | The type of a variable
-varTy :: Term n -> Maybe C.Type
+-- | The rendered type of a variable
+varTy :: Term n -> Maybe String
 varTy = \case
-  Var _ ty _ -> Just (toClashType ty)
+  Var _ ty _ -> Just (pp ty)
   _ -> Nothing
 
--- | The type of the last field of a pattern
-lastFieldTy :: Pat n l -> Maybe C.Type
+-- | The rendered type of the last field of a pattern
+lastFieldTy :: Pat n l -> Maybe String
 lastFieldTy = \case
   DataPat _ _ ids -> go ids
   _ -> Nothing
  where
-  go :: Tele IdBinder x y -> Maybe C.Type
+  go :: Tele IdBinder x y -> Maybe String
   go TNil = Nothing
-  go (TCons b TNil) = Just (toClashType (idBinderType b))
+  go (TCons b TNil) = Just (pp (idBinderType b))
   go (TCons _ bs) = go bs
+
+-- * The results of "Clash.Core.EqSolver" on 'equations'
+
+expectedSolveEq :: [[Sol]]
+expectedSolveEq =
+  [ [], [], [], [Right (1, "Int")], [Right (1, "Int")], [Right (1, "Bool")], [Left "absurd"]
+  , [Right (1, "Int")], [Left "absurd"], [Left "absurd"], [], [Left "absurd"], [] ]
+
+expectedSolveAdd :: [Sol]
+expectedSolveAdd =
+  [Right (1, "4"), Right (1, "3"), Left "absurd"] <> replicate 10 (Left "none")
+
+expectedNormalizeAdd :: [Maybe (Integer, Integer, String)]
+expectedNormalizeAdd = [Just (5, 1, "m"), Just (5, 2, "m"), Just (0, 1, "m")] <> replicate 10 Nothing
+
+expectedIsAbsurdEq :: [Bool]
+expectedIsAbsurdEq =
+  [False, False, True, False, False, False, True, False, True, True, False, True, False]
+
+expectedSolveNonAbsurds :: [[Sol]]
+expectedSolveNonAbsurds =
+  [ [Right (1, "4"), Right (1, "3"), Right (1, "Int"), Right (1, "Int"), Right (1, "Bool"), Right (1, "Int")]
+  , [Right (1, "4"), Right (1, "3")]
+  , [Right (1, "Int"), Right (1, "Int"), Right (1, "Bool"), Right (1, "Int")] ]
+
+-- | For @VNil@ and @VCons@, at each of 'vInsts'
+expectedIsAbsurdPat :: [Bool]
+expectedIsAbsurdPat = [True, False, False, True, False, True, False, False]
+
+-- | For @VNil@ and @VCons@, at each of 'vInsts'
+expectedDataConInstArgTysE :: [String]
+expectedDataConInstArgTysE =
+  [ "~# Natural Natural 3 0 -> Int"
+  , "~# Natural Natural 0 0 -> Int"
+  , "~# Natural Natural n 0 -> Int"
+  , "~# Natural Natural (+ 1 1) 0 -> Int"
+  , "forall m. ~# Natural Natural 3 (+ 2 1) -> Int -> V 2 -> Int"
+  , "forall m. ~# Natural Natural 0 (+ m 1) -> Int -> V m -> Int"
+  , "forall m. ~# Natural Natural n (+ m 1) -> Int -> V m -> Int"
+  , "forall m. ~# Natural Natural (+ 1 1) (+ 1 1) -> Int -> V 1 -> Int"
+  ]
