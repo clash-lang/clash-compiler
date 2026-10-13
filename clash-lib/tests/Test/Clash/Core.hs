@@ -227,7 +227,7 @@ import Clash.Netlist.Types (CompCtx, LocalId (..), compCtxFromList)
 import Clash.Rewrite
   ( Rewrite, Transform (..), Frame (LetBinding), pushFrame, rootContext
   , underAlt, underLam, underLet, underLetRec, underTyLam)
-import qualified Clash.Rewrite as Scoped
+import qualified Clash.Rewrite as R
 import Clash.Rewrite.Types (RewriteEnv, RewriteMonad, RewriteState (..))
 import qualified Clash.Rewrite.Util as Util (changed)
 import qualified Clash.Rewrite.Types as C
@@ -496,7 +496,7 @@ runRewriteAt
 runRewriteAt env st ts path0 t e0 =
   runRewriteTest env st (go path0 (rootContext (testScope ts)) e0)
  where
-  go :: Distinct x => [Step] -> Scoped.TransformContext x -> Term x -> RewriteMonad extra (Term x)
+  go :: Distinct x => [Step] -> R.TransformContext x -> Term x -> RewriteMonad extra (Term x)
   go [] ctx e = runTransform t ctx e
   go (step : path) ctx e = case (step, e) of
     (LamStep, Lam b body) -> underLam ctx b body $ \ctx' b' body' -> Lam b' <$> go path ctx' body'
@@ -511,11 +511,11 @@ runRewriteAt env st ts path0 t e0 =
     (AltStep i, Case subj ty alts) | i < length alts -> do
       alt' <- underAlt ctx (alts !! i) $ \ctx' p rhs -> Alt p <$> go path ctx' rhs
       pure (Case subj ty (replaceAt i alt' alts))
-    (AppFunStep, App f a) -> (`App` a) <$> go path (pushFrame Scoped.AppFun ctx) f
-    (AppArgStep, App f a) -> App f <$> go path (pushFrame (Scoped.appArgFrame f) ctx) a
-    (TickStep, Tick tk a) -> Tick tk <$> go path (pushFrame (Scoped.TickC tk) ctx) a
-    (CastStep, Cast a t1 t2) -> (\a' -> Cast a' t1 t2) <$> go path (pushFrame Scoped.CastBody ctx) a
-    (SubjStep, Case a ty alts) -> (\a' -> Case a' ty alts) <$> go path (pushFrame Scoped.CaseScrut ctx) a
+    (AppFunStep, App f a) -> (`App` a) <$> go path (pushFrame R.AppFun ctx) f
+    (AppArgStep, App f a) -> App f <$> go path (pushFrame (R.appArgFrame f) ctx) a
+    (TickStep, Tick tk a) -> Tick tk <$> go path (pushFrame (R.TickC tk) ctx) a
+    (CastStep, Cast a t1 t2) -> (\a' -> Cast a' t1 t2) <$> go path (pushFrame R.CastBody ctx) a
+    (SubjStep, Case a ty alts) -> (\a' -> Case a' ty alts) <$> go path (pushFrame R.CaseScrut ctx) a
     _ -> error ("runRewriteAt: " <> show step <> " doesn't fit the term:\n" <> showPprU e)
 
   replaceAt :: Int -> a -> [a] -> [a]
@@ -1346,9 +1346,9 @@ atPath
   :: HasCallStack
   => Distinct n
   => [Step]
-  -> Scoped.TransformContext n
+  -> R.TransformContext n
   -> Term n
-  -> (forall l. Distinct l => Scoped.TransformContext l -> Term l -> r)
+  -> (forall l. Distinct l => R.TransformContext l -> Term l -> r)
   -> r
 atPath [] ctx e k = k ctx e
 atPath (st : sts) ctx e k = case (st, e) of
@@ -1360,8 +1360,8 @@ atPath (st : sts) ctx e k = case (st, e) of
     underLetRec ctx bs xs body $ \_ ctxRhs _ xs' _ -> atPath sts (ctxRhs i) (xs' !! i) k
   (AltStep i, Case _ _ alts) | i < length alts ->
     underAlt ctx (alts !! i) $ \ctx' _ e' -> atPath sts ctx' e' k
-  (AppFunStep, App f _) -> atPath sts (pushFrame Scoped.AppFun ctx) f k
-  (AppArgStep, App f a) -> atPath sts (pushFrame (Scoped.appArgFrame f) ctx) a k
+  (AppFunStep, App f _) -> atPath sts (pushFrame R.AppFun ctx) f k
+  (AppArgStep, App f a) -> atPath sts (pushFrame (R.appArgFrame f) ctx) a k
   _ -> error ("atPath: " <> show st <> " doesn't fit the term:\n" <> showTermT e)
 
 -- * Tests of the test scopes

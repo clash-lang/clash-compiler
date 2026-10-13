@@ -54,7 +54,7 @@ import qualified Clash.Core.Name              as C
 import Clash.Core.Sig                  (DataConSig (..))
 import Clash.Core.Subst
 import Clash.Core.Syntax hiding (Name)
-import qualified Clash.Core.Syntax     as Scoped
+import qualified Clash.Core.Syntax     as S
 import Clash.Core.TypeEnv              (TypeEnv)
 import Clash.Unique
 
@@ -67,7 +67,7 @@ data DataCon
   -- ^ Invariant: forall x . dcUniq x ~ nameUniq (dcName x)
   , dcTag :: !ConTag
   -- ^ Syntactical position in the type definition
-  , dcType :: Scoped.Type 'Scoped.VoidS
+  , dcType :: S.Type 'S.VoidS
   -- ^ Type of the 'DataCon', which is closed. Lazy.
   , dcSig :: DataConSig
   -- ^ Its universally and existentially quantified type variables, and the
@@ -84,7 +84,7 @@ data DataCon
 -- "Clash.Core.Sig"), strictness of its fields, and labels of its
 -- fields
 mkDataCon
-  :: DcName -> ConTag -> Scoped.Type 'Scoped.VoidS -> DataConSig -> [DcStrictness]
+  :: DcName -> ConTag -> S.Type 'S.VoidS -> DataConSig -> [DcStrictness]
   -> [Text.Text] -> DataCon
 mkDataCon nm tag ty sig strict labels = MkData
   { dcName = nm
@@ -99,13 +99,13 @@ mkDataCon nm tag ty sig strict labels = MkData
 -- | The number of universally quantified type variables of a data constructor
 dcUnivTyVarCount :: DataCon -> Int
 dcUnivTyVarCount dc = case dcSig dc of
-  DataConSig univ _ _ -> Scoped.teleLength univ
+  DataConSig univ _ _ -> S.teleLength univ
 
 -- | The number of existentially quantified type variables of a data
 -- constructor
 dcExtTyVarCount :: DataCon -> Int
 dcExtTyVarCount dc = case dcSig dc of
-  DataConSig _ ext _ -> Scoped.teleLength ext
+  DataConSig _ ext _ -> S.teleLength ext
 
 -- | The number of fields of a data constructor
 dcFieldCount :: DataCon -> Int

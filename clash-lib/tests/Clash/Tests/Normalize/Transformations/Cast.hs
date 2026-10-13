@@ -23,7 +23,7 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.DataCon as C
 import Clash.Core.Syntax (GlobalId, Term (Cast))
-import qualified Clash.Normalize.Transformations.Cast as Scoped
+import qualified Clash.Normalize.Transformations.Cast as T
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -58,10 +58,10 @@ st :: RewriteState NormalizeState
 st = def
 
 caseCastS, elimCastCastS, letCastS, splitCastWorkS :: Rewrite NormalizeState
-caseCastS = $(asRewriteQ Scoped.caseCast)
-elimCastCastS = $(asRewriteQ Scoped.elimCastCast)
-letCastS = $(asRewriteQ Scoped.letCast)
-splitCastWorkS = $(asRewriteQ Scoped.splitCastWork)
+caseCastS = $(asRewriteQ T.caseCast)
+elimCastCastS = $(asRewriteQ T.elimCastCast)
+letCastS = $(asRewriteQ T.letCast)
+splitCastWorkS = $(asRewriteQ T.splitCastWork)
 
 -- | Assert that a transformation rewrites a term to the expected one, see
 -- 'assertRewritesTo'

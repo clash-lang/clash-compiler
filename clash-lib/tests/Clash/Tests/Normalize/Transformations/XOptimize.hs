@@ -31,7 +31,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..))
 import Clash.Netlist.BlackBox.Types
 import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
-import qualified Clash.Normalize.Transformations.XOptimize as Scoped
+import qualified Clash.Normalize.Transformations.XOptimize as T
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite (Rewrite)
@@ -100,9 +100,9 @@ st :: RewriteState NormalizeState
 st = def
 
 xOptS :: Rewrite NormalizeState
-xOptS = $(asRewriteQ Scoped.xOptimize)
+xOptS = $(asRewriteQ T.xOptimize)
 
--- | Assert that 'Scoped.xOptimize' rewrites a term to the expected one
+-- | Assert that 'T.xOptimize' rewrites a term to the expected one
 xOptTo :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
 xOptTo = assertRewritesTo env st xOptS
 

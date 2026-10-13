@@ -61,7 +61,7 @@ import Clash.Core.Name
 import Clash.Core.Sig
 import Clash.Core.Subst
 import Clash.Core.Syntax hiding (Name)
-import qualified Clash.Core.Syntax     as Scoped
+import qualified Clash.Core.Syntax     as S
 import Clash.Data.UniqMap (UniqMap)
 import Clash.Unique
 
@@ -72,7 +72,7 @@ data TyCon
   = AlgTyCon
   { tyConUniq   :: {-# UNPACK #-} !Unique
   , tyConName   :: !TyConName   -- ^ Name of the TyCon
-  , tyConKind   :: Scoped.Kind 'Scoped.VoidS
+  , tyConKind   :: S.Kind 'S.VoidS
   -- ^ Kind of the TyCon, which is closed. Lazy.
   , tyConArity  :: !Int         -- ^ Number of type arguments
   , algTcRhs    :: !AlgTyConRhs -- ^ DataCon definitions
@@ -81,7 +81,7 @@ data TyCon
   | PromotedDataCon
   { tyConUniq   :: {-# UNPACK #-} !Unique -- invariant (same as dcUniq)
   , tyConName   :: !TyConName   -- ^ Name of the TyCon
-  , tyConKind   :: Scoped.Kind 'Scoped.VoidS
+  , tyConKind   :: S.Kind 'S.VoidS
   -- ^ Kind of the TyCon, which is closed. Lazy.
   , tyConArity  :: !Int         -- ^ Number of type arguments
   , tyConData   :: !DataCon     -- ^ DataCon which is promoted
@@ -90,7 +90,7 @@ data TyCon
   | FunTyCon
   { tyConUniq   :: {-# UNPACK #-} !Unique
   , tyConName   :: !TyConName      -- ^ Name of the TyCon
-  , tyConKind   :: Scoped.Kind 'Scoped.VoidS
+  , tyConKind   :: S.Kind 'S.VoidS
   -- ^ Kind of the TyCon, which is closed. Lazy.
   , tyConArity  :: !Int            -- ^ Number of type arguments
   , tyConEqns   :: [TyFamEqn]
@@ -100,7 +100,7 @@ data TyCon
   | PrimTyCon
   { tyConUniq    :: {-# UNPACK #-} !Unique
   , tyConName    :: !TyConName  -- ^ Name of the TyCon
-  , tyConKind    :: Scoped.Kind 'Scoped.VoidS
+  , tyConKind    :: S.Kind 'S.VoidS
   -- ^ Kind of the TyCon, which is closed. Lazy.
   , tyConArity   :: !Int        -- ^ Number of type arguments
   }
@@ -148,20 +148,20 @@ instance NFData AlgTyConRhs where
 
 -- | An algebraic data type: name, closed kind, arity, data constructors, and
 -- whether it is a class dictionary
-mkAlgTyCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> AlgTyConRhs -> Bool -> TyCon
+mkAlgTyCon :: TyConName -> S.Kind 'S.VoidS -> Int -> AlgTyConRhs -> Bool -> TyCon
 mkAlgTyCon nm = AlgTyCon (nameUniq nm) nm
 
 -- | A promoted data constructor: name, closed kind, arity, and the data
 -- constructor
-mkPromotedDataCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> DataCon -> TyCon
+mkPromotedDataCon :: TyConName -> S.Kind 'S.VoidS -> Int -> DataCon -> TyCon
 mkPromotedDataCon nm = PromotedDataCon (nameUniq nm) nm
 
 -- | A type family: name, closed kind, arity, and equations
-mkFunTyCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> [TyFamEqn] -> TyCon
+mkFunTyCon :: TyConName -> S.Kind 'S.VoidS -> Int -> [TyFamEqn] -> TyCon
 mkFunTyCon nm = FunTyCon (nameUniq nm) nm
 
 -- | A primitive type constructor: name, closed kind, and arity
-mkPrimTyCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> TyCon
+mkPrimTyCon :: TyConName -> S.Kind 'S.VoidS -> Int -> TyCon
 mkPrimTyCon nm = PrimTyCon (nameUniq nm) nm
 
 -- | The right-hand side of a newtype: its data constructor and signature

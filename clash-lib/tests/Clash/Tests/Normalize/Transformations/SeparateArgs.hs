@@ -25,7 +25,7 @@ import Clash.Core.Alpha (aeqTy)
 import Clash.Core.HasType (inferCoreTypeOf)
 import Clash.Core.Syntax
 import Clash.Core.Term (collectArgs)
-import qualified Clash.Normalize.Transformations.SeparateArgs as Scoped
+import qualified Clash.Normalize.Transformations.SeparateArgs as T
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -55,13 +55,13 @@ st :: RewriteState NormalizeState
 st = def
 
 separateArgumentsS :: Rewrite NormalizeState
-separateArgumentsS = $(asRewriteQ Scoped.separateArguments)
+separateArgumentsS = $(asRewriteQ T.separateArguments)
 
--- | Assert that 'Scoped.separateArguments' rewrites a term to the expected one
+-- | Assert that 'T.separateArguments' rewrites a term to the expected one
 separates :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
 separates = assertRewritesTo rewriteEnvWithTyCons st separateArgumentsS
 
--- | Assert that 'Scoped.separateArguments' leaves a term as it is
+-- | Assert that 'T.separateArguments' leaves a term as it is
 keeps :: [ScopeDecl] -> TestTerm -> Assertion
 keeps = assertNoRewrite rewriteEnvWithTyCons st separateArgumentsS
 
@@ -74,7 +74,7 @@ lamBinderOccs path e = case (path, e) of
   (LetRhsStep 0 : rest, Let (NonRec _ x) _) -> lamBinderOccs rest x
   _ -> []
 
--- | Assert that 'Scoped.separateArguments' names the binders it creates for
+-- | Assert that 'T.separateArguments' names the binders it creates for
 -- the lambda at a path as expected
 assertNames :: [Step] -> [ScopeDecl] -> TestTerm -> [Text.Text] -> Assertion
 assertNames path decls input expected = withTestScope decls $ \ts -> do
@@ -164,7 +164,7 @@ spineTests = testGroup "Application spines"
       keeps [varD "p_30" "ClkPair", varD "h_40" "ClkPair -> Int"] (tm "h_40 p_30")
   ]
 
--- | Run 'Scoped.separateArguments' on an application of a global function,
+-- | Run 'T.separateArguments' on an application of a global function,
 -- with the given variables in scope, and assert that it gives the global function the
 -- expected type, and that the type of the application doesn't change
 assertGlobalType :: [ScopeDecl] -> String -> TestTerm -> Assertion

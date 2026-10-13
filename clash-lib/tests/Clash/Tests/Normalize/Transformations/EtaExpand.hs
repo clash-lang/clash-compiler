@@ -19,7 +19,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Syntax (GlobalId)
-import qualified Clash.Normalize.Transformations.EtaExpand as Scoped
+import qualified Clash.Normalize.Transformations.EtaExpand as T
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -42,18 +42,18 @@ st :: RewriteState NormalizeState
 st = def
 
 etaTLS, etaExpandSynS :: Rewrite NormalizeState
-etaTLS = Transform Scoped.etaExpansionTL
-etaExpandSynS = $(asRewriteQ Scoped.etaExpandSyn)
+etaTLS = Transform T.etaExpansionTL
+etaExpandSynS = $(asRewriteQ T.etaExpandSyn)
 
 -- | An environment in which @f@ and @k@ are top entities
 topsEnv :: RewriteEnv
 topsEnv = withTopEntities [f, k] def
 
--- | Assert that 'Scoped.etaExpansionTL' rewrites a term to the expected one
+-- | Assert that 'T.etaExpansionTL' rewrites a term to the expected one
 etaTLTo :: [ScopeDecl] -> String -> String -> Assertion
 etaTLTo decls input expected = assertRewritesTo def st etaTLS decls (tm input) (tm expected)
 
--- | Assert that 'Scoped.etaExpandSyn' rewrites a term to the expected one
+-- | Assert that 'T.etaExpandSyn' rewrites a term to the expected one
 etaSynTo :: [ScopeDecl] -> String -> String -> Assertion
 etaSynTo decls input expected = assertRewritesTo topsEnv st etaExpandSynS decls (tm input) (tm expected)
 

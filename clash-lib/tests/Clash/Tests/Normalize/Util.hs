@@ -28,7 +28,7 @@ import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkConstant))
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeState (..), TermClassification (..))
-import qualified Clash.Rewrite as Scoped (changed)
+import qualified Clash.Rewrite as N (changed)
 import Clash.Rewrite.Types
   (RewriteState (..), Frame (..), Rewrite, Transform (..), pushFrame, rootContext)
 
@@ -37,8 +37,8 @@ import Clash.Core.NameMap
 import Clash.Core.Syntax
 import Clash.Core.TermInfo (isClosed)
 import Clash.Core.Util (mkLets)
-import qualified Clash.Normalize.Util as Scoped
-import qualified Clash.Rewrite.Combinators as Scoped (bottomupR)
+import qualified Clash.Normalize.Util as N
+import qualified Clash.Rewrite.Combinators as N (bottomupR)
 
 import Test.Clash.Rewrite
   ( TestDefs (..), mkGlobalBinding, parseTestTermWith, rewriteEnvWithTyCons, runRewriteTest )
@@ -47,7 +47,7 @@ import Test.Clash.Core.Print (showTestType)
 
 -- * Type equality constraints
 
--- | Assert that 'Scoped.substWithTyEq' gives the expected term, also in a
+-- | Assert that 'N.substWithTyEq' gives the expected term, also in a
 -- scope where the binders of the term clash with the scope
 substGives :: TestTerm -> TestTerm -> Assertion
 substGives input expected = withTerm input $ \ts e -> do
@@ -56,11 +56,11 @@ substGives input expected = withTerm input $ \ts e -> do
  where
   check :: Distinct n => TestScope n -> Term n -> Assertion
   check ts e = do
-    let e' = Scoped.substWithTyEq (testScope ts) e
+    let e' = N.substWithTyEq (testScope ts) e
     assertLintClean ts e'
     assertTermIs ts expected e'
 
--- | Assert that 'Scoped.tvSubstWithTyEq' gives the expected type, also in a
+-- | Assert that 'N.tvSubstWithTyEq' gives the expected type, also in a
 -- scope where the binders of the type clash with the scope
 tvSubstGives :: TestType -> TestType -> Assertion
 tvSubstGives input expected = withType input $ \ts ty -> do
@@ -68,7 +68,7 @@ tvSubstGives input expected = withType input $ \ts ty -> do
   withClashing ts [tyVarD ("clash_" <> show i) | i <- [900001 .. 900000 + forAlls ty]] ty check
  where
   check :: Distinct n => TestScope n -> Type n -> Assertion
-  check ts ty = assertTypeIs ts expected (Scoped.tvSubstWithTyEq (testScope ts) ty)
+  check ts ty = assertTypeIs ts expected (N.tvSubstWithTyEq (testScope ts) ty)
 
   forAlls :: Type x -> Int
   forAlls = \case
@@ -83,7 +83,7 @@ substWithTyEqTests =
       let input = "\\(dom :: Type) (eq :: dom ~ \"System\") -> eq"
       substGives input
         "\\(eq :: \"System\" ~ \"System\") -> Clash.Normalize.Primitives.removedArg @(\"System\" ~ \"System\")"
-      assertBool "closed" (isClosed (Scoped.substWithTyEq emptyScope (closedTerm input)))
+      assertBool "closed" (isClosed (N.substWithTyEq emptyScope (closedTerm input)))
   , testCase "substWithTyEq avoids capture (#1868)" $
       substGives
         "\\(a :: Type) (dom :: Type) (eq :: dom ~ a) (a :: Type) (x :: dom) -> x"
@@ -108,7 +108,7 @@ substWithTyEqTests =
         "\\(y :: Int) (a :: Type) (eq :: a ~ a) (x :: a) -> x"
 
     -- Substituting only after the constraint would leave @dom@ free in the
-    -- type of @c@, so 'Scoped.substWithTyEq' substitutes in it too: the type
+    -- type of @c@, so 'N.substWithTyEq' substitutes in it too: the type
     -- of @c@ is in scope of @dom@.
   , testCase "substWithTyEq substitutes in the binders before the constraint" $
       substGives
@@ -164,16 +164,16 @@ recursionTests =
       -- The local variable has the unique of the global
       withTestScope [varD "g_7" "Int -> Int"] $ \ts -> do
         ((localRes, globalRes, recRes), _, _) <- runRewriteTest def recState $ do
-          l <- Scoped.isNonRecursiveGlobalVar (termIn ts "g_7")
-          g <- Scoped.isNonRecursiveGlobalVar (GlobalVar gGlobal :: Term 'VoidS)
-          r <- Scoped.isRecursiveBndr gGlobal
+          l <- N.isNonRecursiveGlobalVar (termIn ts "g_7")
+          g <- N.isNonRecursiveGlobalVar (GlobalVar gGlobal :: Term 'VoidS)
+          r <- N.isRecursiveBndr gGlobal
           pure (l, g, r)
         assertBool "local variable is a non-recursive global" (not localRes)
         assertBool "recursive global is non-recursive" (not globalRes)
         assertBool "recursive global is non-recursive" recRes
   , testCase "isRecursiveBndr of a global without a binding" $ do
       (r, _, _) <- runRewriteTest def (def :: RewriteState NormalizeState) $
-        Scoped.isRecursiveBndr gGlobal
+        N.isRecursiveBndr gGlobal
       r @?= False
   ]
 
@@ -185,14 +185,14 @@ inliningTests =
       let f = testGlobalId "f_G10" "Int"
           cf = testGlobalId "cf_G11" "Int"
           res = flip evalState def $ do
-            Scoped.addNewInline f cf
-            Scoped.addNewInline f cf
-            (,) <$> Scoped.alreadyInlined f cf <*> Scoped.alreadyInlined cf f
+            N.addNewInline f cf
+            N.addNewInline f cf
+            (,) <$> N.alreadyInlined f cf <*> N.alreadyInlined cf f
       res @?= (Just 2, Nothing)
     -- The tick names the inlined function after its unqualified name
   , testCase "mkInlineTick" $
       assertTermIs emptyTestScope "Core.prefixName @\"f\" 1"
-        (Tick (Scoped.mkInlineTick (testGlobalId "Some.Module.f_G10" "Int")) (Literal (IntLiteral 1)))
+        (Tick (N.mkInlineTick (testGlobalId "Some.Module.f_G10" "Int")) (Literal (IntLiteral 1)))
   ]
 
 -- * Constant arguments
@@ -201,12 +201,12 @@ shouldReduceTests :: [TestTree]
 shouldReduceTests =
   [ testCase "shouldReduce in an argument a primitive wants constant" $ do
       (r, _, _) <- runRewriteTest def (def :: RewriteState NormalizeState) $
-        Scoped.shouldReduce (argCtx "Clash.Explicit.SimIO.mealyIO" 2)
+        N.shouldReduce (argCtx "Clash.Explicit.SimIO.mealyIO" 2)
       r @?= True
   , testCase "shouldReduce elsewhere" $ do
       (r, _, _) <- runRewriteTest def (def :: RewriteState NormalizeState) $
-        (,) <$> Scoped.shouldReduce (argCtx "unknownPrim" 2)
-            <*> Scoped.shouldReduce (rootContext emptyScope)
+        (,) <$> N.shouldReduce (argCtx "unknownPrim" 2)
+            <*> N.shouldReduce (rootContext emptyScope)
       r @?= (False, False)
   ]
  where
@@ -218,15 +218,15 @@ shouldReduceTests =
 incPrim :: PrimInfo
 incPrim = mkPrimInfo "incPrim" (closedType "Int -> Int") C.WorkConstant C.SingleResult NoUnfolding
 
--- | Assert that 'Scoped.constantSpecInfo' gives the expected term, with its
+-- | Assert that 'N.constantSpecInfo' gives the expected term, with its
 -- new let-bindings, and whether it found a constant
 constantSpecGives :: TestTerm -> TestTerm -> Bool -> Assertion
 constantSpecGives input expected found =
   withTestScope [varD "x_1" "Int", varD "y_2" "Int"] $ \ts -> do
     ((e, f), _, _) <- runRewriteTest rewriteEnvWithTyCons st $
-      Scoped.constantSpecInfo (rootContext (testScope ts)) (termIn ts input) >>= \case
-        csr@(Scoped.ConstantSpecInfo _ binds t _) ->
-          pure (mkLets binds t, Scoped.csrFoundConstant csr)
+      N.constantSpecInfo (rootContext (testScope ts)) (termIn ts input) >>= \case
+        csr@(N.ConstantSpecInfo _ binds t _) ->
+          pure (mkLets binds t, N.csrFoundConstant csr)
     f @?= found
     assertLintClean ts e
     assertTermIs ts expected e
@@ -262,14 +262,14 @@ constantSpecTests =
 callGraphTests :: [TestTree]
 callGraphTests =
   [ testCase "callGraph" $ do
-      let cg = Scoped.callGraph bs f
+      let cg = N.callGraph bs f
       [ (globalIdUniq u, List.sort [(globalIdUniq v, n) | (v, n) <- globalEnvToList m])
         | (u, m) <- List.sortOn (globalIdUniq . fst) (globalEnvToList cg) ]
         @?= List.sortOn fst
               [ (globalIdUniq f, [(globalIdUniq g, 2)])
               , (globalIdUniq g, [(globalIdUniq h, 1)])
               , (globalIdUniq h, []) ]
-      List.sort (map globalIdUniq (globalSetToList (Scoped.callGraphGlobals cg)))
+      List.sort (map globalIdUniq (globalSetToList (N.callGraphGlobals cg)))
         @?= List.sort (map globalIdUniq [f, g, h])
   ]
  where
@@ -290,8 +290,8 @@ callGraphTests =
 classifyTests :: [TestTree]
 classifyTests =
   [ testCase ("classifyFunction of " <> show i) $ withTerm (tmC tm) $ \_ s -> do
-      show (Scoped.classifyFunction s) @?= show expected
-      Scoped.isCheapFunction s @?= cheap
+      show (N.classifyFunction s) @?= show expected
+      N.isCheapFunction s @?= cheap
   | (i, (tm, expected, cheap)) <- zip [0 :: Int ..] terms
   ]
  where
@@ -310,8 +310,8 @@ classifyTests =
 
 -- | 'incLits' on scoped Core
 incLits :: Rewrite NormalizeState
-incLits = Scoped.bottomupR $ Transform $ \_ -> \case
-  Literal (IntLiteral i) -> Scoped.changed (Literal (IntLiteral (i + 1)))
+incLits = N.bottomupR $ Transform $ \_ -> \case
+  Literal (IntLiteral i) -> N.changed (Literal (IntLiteral (i + 1)))
   e -> pure e
 
 -- | A state with the given bindings, normalized by 'incLits', in which
@@ -331,9 +331,9 @@ normalizeTests =
   [ testCase "normalizeTopLvlBndr, and caches its result" $ do
       let st = normState [(f, fTm)]
       ((sco, sco2), st1, _) <- runRewriteTest def st $ do
-        b1 <- Scoped.normalizeTopLvlBndr False f (mkGlobalBinding f fTm)
+        b1 <- N.normalizeTopLvlBndr False f (mkGlobalBinding f fTm)
         -- From the cache, so it doesn't matter what the binding is
-        b2 <- Scoped.normalizeTopLvlBndr False f (mkGlobalBinding f (closedTerm "0"))
+        b2 <- N.normalizeTopLvlBndr False f (mkGlobalBinding f (closedTerm "0"))
         pure (b1, b2)
       let expected = tm "\\(x :: Int) -> let { !(y :: Int) = 2 } in y"
       assertTermIs emptyTestScope expected (bindingTerm sco)
@@ -350,7 +350,7 @@ normalizeTests =
       let rec = closedTerm (tm "\\(x :: Int) -> f_G10 1")
           st = normState [(f, rec)]
       (sco, _, _) <- runRewriteTest def st $
-        Scoped.normalizeTopLvlBndr False f (mkGlobalBinding f rec)
+        N.normalizeTopLvlBndr False f (mkGlobalBinding f rec)
       assertTermIs emptyTestScope (tm "\\(x :: Int) -> f_G10 2") (bindingTerm sco)
       bindingRecursive sco @?= True
 
@@ -360,7 +360,7 @@ normalizeTests =
           topTm = closedTerm "\\(dom :: Type) (eq :: dom ~ \"System\") (x :: Clash.Signal.Internal.Signal dom Int) -> x"
           st = normState [(top, topTm)]
       (sco, _, _) <- runRewriteTest def st $
-        Scoped.normalizeTopLvlBndr True top (mkGlobalBinding top topTm)
+        N.normalizeTopLvlBndr True top (mkGlobalBinding top topTm)
       assertTermIs emptyTestScope
         "\\(eq :: \"System\" ~ \"System\") (x :: Clash.Signal.Internal.Signal \"System\" Int) -> x"
         (bindingTerm sco)
@@ -375,8 +375,8 @@ normalizeTests =
       ((sco, sco2), st1, _) <- runRewriteTest def st $ do
         let b = mkGlobalBinding f2 f2Tm
             sArgs = [Left (Literal (IntLiteral 1))] :: [Either (Term 'VoidS) (Type 'VoidS)]
-        r1 <- Scoped.normalizeWorkFreeApp f2 b sArgs
-        r2 <- Scoped.normalizeWorkFreeApp f2 b sArgs
+        r1 <- N.normalizeWorkFreeApp f2 b sArgs
+        r2 <- N.normalizeWorkFreeApp f2 b sArgs
         pure (r1, r2)
       let expected = tm "(\\(x :: Int) (y :: Int) -> (f_G10 :: Int -> Int -> Int) x 2) 2"
       assertTermIs emptyTestScope expected sco

@@ -53,7 +53,7 @@ import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
 import           Clash.Core.NameMap      (GlobalEnv)
 import           Clash.Core.Binary       ()
-import qualified Clash.Core.Syntax       as Scoped
+import qualified Clash.Core.Syntax       as S
 
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Driver.Bool              (OverridingBool(..))
@@ -95,7 +95,7 @@ data IsPrim
 -- A function binder in the global environment.
 --
 data Binding a = Binding
-  { bindingId :: Scoped.GlobalId
+  { bindingId :: S.GlobalId
     -- ^ The core identifier for this binding.
   , bindingLoc :: SrcSpan
     -- ^ The source location of this binding in the original source code.
@@ -120,7 +120,7 @@ data Binding a = Binding
 -- closed terms, keyed by their 'Clash.Core.Syntax.GlobalId'.
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
-type GlobalBindings = GlobalEnv (Binding (Scoped.Term 'Scoped.VoidS))
+type GlobalBindings = GlobalEnv (Binding (S.Term 'S.VoidS))
 type DomainMap = HashMap Text VDomainConfiguration
 
 -- | Information to show about transformations during compilation.
