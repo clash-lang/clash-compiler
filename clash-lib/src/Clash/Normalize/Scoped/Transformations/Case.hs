@@ -89,7 +89,7 @@ import qualified Clash.Normalize.Scoped.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
 import Clash.Rewrite.Types
-  ( curFun, customReprs, debugOpts, scopedTypeEnv, typeTranslator)
+  ( curFun, customReprs, debugOpts, typeEnv, typeTranslator)
 import Clash.Util (curLoc)
 import Clash.Warning (ClashWarning(WarnUnmatchableConstant))
 
@@ -220,7 +220,7 @@ caseCon'
   -> [Alt n]
   -> NormalizeSession (Term n)
 caseCon' ctx e subj ty alts = do
- te <- Lens.view scopedTypeEnv
+ te <- Lens.view typeEnv
  case collectArgsTicks subj of
   -- The subject is an applied data constructor
   (Data dc, args, ticks) -> case findAlt equalCon alts of
@@ -527,7 +527,7 @@ caseEliminateNonReachableWorker
   -> [Alt n]
   -> NormalizeSession (Term n)
 caseEliminateNonReachableWorker ctx case0 scrut altsTy alts0 = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
 
   let isAbsurdAlt (Alt p _) = isAbsurdPat te (tfScope ctx) p
       (altsAbsurd, altsOther) = List.partition isAbsurdAlt alts0
@@ -591,7 +591,7 @@ caseFlatWorker
 caseFlatWorker ctx e (collectEqArgs -> Just (scrut', val)) ty _ =
   case collectFlat scrut' e of
     Just alts' -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       case collectArgs val of
         -- When we're pattern matching on `Int`, extract the `Int#` first before
         -- we do the Literal matching branches.
@@ -762,7 +762,7 @@ elimExistentialsWorker
   -> [Alt n]
   -> NormalizeSession (Term n)
 elimExistentialsWorker ctx _node scrut altsTy alts0 = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   alts1 <- traverse (go te) alts0
   caseOneAlt (Case scrut altsTy alts1)
  where

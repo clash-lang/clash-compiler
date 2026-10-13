@@ -36,7 +36,7 @@ import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onTickNode, onTyAppNode, onVarNode
   , toScopedTransformation )
-import Clash.Rewrite.Types (scopedTypeEnv)
+import Clash.Rewrite.Types (typeEnv)
 import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
@@ -71,7 +71,7 @@ etaExpandSynWorker ctx e
   | (GlobalVar g, _) <- collectArgs e
   , not (isAppFunCtx (ctxFrames ctx)) = do
       isTopEnt <- isTopEntity g
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       case splitFunTy te sc (inferCoreTypeOf te sc e) of
         Just (argTy, _) | isTopEnt ->
           withFreshIdBinder sc (internalName "arg") argTy $ \_ b ->
@@ -103,7 +103,7 @@ etaExpansionTL ctx = \case
       Lam {} -> changed (floatLams (tfScope ctx) bind' e'')
       _ -> return (Let bind' e'')
   e -> do
-    te <- Lens.view scopedTypeEnv
+    te <- Lens.view typeEnv
     let sc = tfScope ctx
     case splitFunTy te sc (inferCoreTypeOf te sc e) of
       Just (argTy, _) ->

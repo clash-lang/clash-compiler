@@ -102,7 +102,7 @@ import Clash.Core.Scoped.TysPrim (integerPrimTyConName, typeNatKindTyConName)
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Scoped.Primitives as NP (undefined)
 import Clash.Normalize.Types (NormalizeSession, scopedConstantPropagationStrategy)
-import Clash.Rewrite.Types (extra, scopedTypeEnv)
+import Clash.Rewrite.Types (extra, typeEnv)
 import Clash.Sized.RTree (RTree)
 import Clash.Sized.Vector (Vec)
 import Clash.Unique (fromGhcUnique)
@@ -133,7 +133,7 @@ numTy = LitTy . NumTy
 
 -- | The scope and type environment of a reduction
 scopeAndTypeEnv :: TransformContext n -> NormalizeSession (Scope n, TypeEnv)
-scopeAndTypeEnv ctx = (tfScope ctx,) <$> Lens.view scopedTypeEnv
+scopeAndTypeEnv ctx = (tfScope ctx,) <$> Lens.view typeEnv
 
 -- | Run the 'Clash.Normalize.Strategy.constantPropagation' strategy on the
 -- function argument of a primitive. The compiled strategy is taken from the

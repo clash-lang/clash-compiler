@@ -36,7 +36,7 @@ import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onLam, onTickNode, onTyAppNode, onVarNode
   , toScopedTransformation )
-import Clash.Rewrite.Types (scopedTypeEnv)
+import Clash.Rewrite.Types (typeEnv)
 
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Subst
@@ -76,7 +76,7 @@ separateArgumentsLambdaWorker
   -> Term l
   -> NormalizeSession (Term n)
 separateArgumentsLambdaWorker ctx node b eb = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   case shouldSplit te sc (idBinderType b) of
     Just info ->
       let nm = mkDerivedName ctx (nameOcc (idBinderOcc b))
@@ -128,7 +128,7 @@ separateArgumentsSpineWorker ctx e
   splitArg arg = case arg of
     Right _ -> return (Nothing, [arg])
     Left tmArg -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       case shouldSplit te sc (inferCoreTypeOf te sc tmArg) of
         Just info
           | Just tys <- traverse closeType (splitArgTys info) ->

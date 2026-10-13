@@ -4,7 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The global bindings of the rewrite state, for scoped Clash Core: closed
-  terms (@'Term' ''VoidS'@) in 'Clash.Rewrite.Types.scopedBindings'. They
+  terms (@'Term' ''VoidS'@) in 'Clash.Rewrite.Types.bindings'. They
   move into any scope for free, with 'sinkClosed'.
 
   Globals are looked up by 'GlobalId', so a local variable never finds the
@@ -38,7 +38,7 @@ import           GHC.Types.SrcLoc            (SrcSpan)
 import qualified Clash.Core.Name             as C
 import           Clash.Driver.Types (Binding (..), IsPrim (IsFun))
 import           Clash.Rewrite.Types
-  ( RewriteMonad, scopedBindings, scopedTypeEnv, scopedWorkFreeBinders,
+  ( RewriteMonad, bindings, typeEnv, workFreeBinders,
     topEntities )
 import           Clash.Unique                (Unique, getUnique, setUnique)
 import           Clash.Util                  (MonadUnique (..))
@@ -52,13 +52,13 @@ import qualified Clash.Rewrite.Scoped.WorkFree as WorkFree
 
 -- | The binding of a global, as a closed term
 lookupBinding :: GlobalId -> RewriteMonad extra (Maybe (Binding (Term 'VoidS)))
-lookupBinding g = lookupGlobalEnv g <$> Lens.use scopedBindings
+lookupBinding g = lookupGlobalEnv g <$> Lens.use bindings
 
 -- | A new global variable with the given name and closed type. It gets a
 -- unique from the unique supply that no global binding has.
 freshGlobalId :: C.Name Term -> Type 'VoidS -> RewriteMonad extra GlobalId
 freshGlobalId nm ty = do
-  bndrs <- Lens.use scopedBindings
+  bndrs <- Lens.use bindings
   u <- getUniqueM
   let global nm' = mkGlobalId nm' ty
       taken u' = memberGlobalEnv (global (setUnique nm u')) bndrs
@@ -85,7 +85,7 @@ addGlobalBind
   -> Term 'VoidS
   -> RewriteMonad extra ()
 addGlobalBind g sp inl body =
-  scopedBindings %= insertGlobalEnv g (Binding g sp inl IsFun body r)
+  bindings %= insertGlobalEnv g (Binding g sp inl IsFun body r)
  where
   r = g `memberGlobalSet` termGlobalIds body
 
@@ -101,7 +101,7 @@ mkFunction
   -> Term 'VoidS
   -> RewriteMonad extra GlobalId
 mkFunction nm sp inl body = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   g <- freshGlobalId nm (inferCoreTypeOf te emptyScope body)
   addGlobalBind g sp inl body
   pure g
@@ -111,7 +111,7 @@ mkFunction nm sp inl body = do
 -- globals.
 findAlphaEqBinding :: Term 'VoidS -> RewriteMonad extra (Maybe GlobalId)
 findAlphaEqBinding body = do
-  bndrs <- Lens.use scopedBindings
+  bndrs <- Lens.use bindings
   pure (fst <$> find (aeqTm body . bindingTerm . snd) (globalEnvToList bndrs))
 
 -- | Whether a global is a top entity
@@ -122,5 +122,5 @@ isTopEntity g = memberGlobalSet g <$> Lens.view topEntities
 -- Caches the work-freeness of global binders in the rewrite state.
 isWorkFreeTerm :: HasCallStack => Term n -> RewriteMonad extra Bool
 isWorkFreeTerm e = do
-  bndrs <- Lens.use scopedBindings
-  WorkFree.isWorkFree scopedWorkFreeBinders bndrs e
+  bndrs <- Lens.use bindings
+  WorkFree.isWorkFree workFreeBinders bndrs e

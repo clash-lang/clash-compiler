@@ -683,12 +683,12 @@ assertCaptureRewritesTo env st rw decls part new mk expected =
     assertLintClean ts e'
     assertTermIs ts expected e'
 
--- | The global bindings ('Clash.Rewrite.Types.scopedBindings') of the second
+-- | The global bindings ('Clash.Rewrite.Types.bindings') of the second
 -- state that the first doesn't have
 newBindings :: RewriteState extra -> RewriteState extra -> [Binding (Term 'VoidS)]
 newBindings st0 st1 =
-  [ b | b <- globalEnvElems (_scopedBindings st1)
-      , Maybe.isNothing (lookupGlobalEnv (bindingId b) (_scopedBindings st0)) ]
+  [ b | b <- globalEnvElems (_bindings st1)
+      , Maybe.isNothing (lookupGlobalEnv (bindingId b) (_bindings st0)) ]
 
 -- | Assert that a scoped transformation, run at the root of a term in a
 -- scope with the given variables, creates new global bindings, and gives the
@@ -793,7 +793,7 @@ testCompCtx ts =
 testPrim :: HasCallStack => Text -> TestType -> PrimInfo
 testPrim nm ty = mkPrimInfo (ghcName nm) (closedType ty) C.WorkConstant C.SingleResult NoUnfolding
 
--- | Global bindings of closed terms, for 'Clash.Rewrite.Types.scopedBindings'
+-- | Global bindings of closed terms, for 'Clash.Rewrite.Types.bindings'
 mkGlobalBindings :: HasCallStack => [(GlobalId, TestTerm)] -> GlobalEnv (Binding (Term 'VoidS))
 mkGlobalBindings bs = globalEnvFromList [(g, mkGlobalBinding g (closedTerm t)) | (g, t) <- bs]
 

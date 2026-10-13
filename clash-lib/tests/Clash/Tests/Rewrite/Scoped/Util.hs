@@ -83,7 +83,7 @@ liftFirst st ts tm = do
     _ -> error "liftFirst: not a let-expression"
   newExpr <- maybe (assertFailure "the new expression refers to a let-binding") pure newExpr0
   case collectArgs newExpr of
-    (GlobalVar g, _) -> case lookupGlobalEnv g (_scopedBindings st1) of
+    (GlobalVar g, _) -> case lookupGlobalEnv g (_bindings st1) of
       Just b -> pure (newExpr, g, bindingTerm b)
       Nothing -> assertFailure "Lifted function not found in global bindings"
     _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU newExpr)
@@ -232,8 +232,8 @@ runLetHandler st h t = withTerm t $ \ts -> \case
   e@(Let bind body) -> do
     (res, st1, ch) <- runRewriteTest def st (h (rootContext (testScope ts)) e bind body)
     let new = [ (Text.unpack (nameOcc (globalIdName (bindingId b))), pp (bindingTerm b))
-              | b <- globalEnvElems (_scopedBindings st1)
-              , null (lookupGlobalEnv (bindingId b) (_scopedBindings st)) ]
+              | b <- globalEnvElems (_bindings st1)
+              , null (lookupGlobalEnv (bindingId b) (_bindings st)) ]
     pure (pp res, ch, new)
   _ -> assertFailure "not a let-expression"
 

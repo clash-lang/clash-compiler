@@ -96,7 +96,7 @@ import           GHC.Types.Basic             (InlineSpec (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Netlist.Util          (representableTypeState)
 import           Clash.Rewrite.Types
-  (RewriteMonad, curFun, customReprs, scopedTypeEnv, typeTranslator)
+  (RewriteMonad, curFun, customReprs, typeEnv, typeTranslator)
 import           Clash.Rewrite.Util
   (changed, isFromInt, runWithHWTypeCache, setChanged, zoomExtra)
 
@@ -161,7 +161,7 @@ isUntranslatable
   -> Term n
   -> RewriteMonad extra Bool
 isUntranslatable stringRepresentable sc tm = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   isUntranslatableType stringRepresentable sc (inferCoreTypeOf te sc tm)
 
 -- | Determine if a type cannot be represented in hardware
@@ -175,7 +175,7 @@ isUntranslatableType
 isUntranslatableType stringRepresentable sc ty = do
   tt <- Lens.view typeTranslator
   reprs <- Lens.view customReprs
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   not <$> runWithHWTypeCache (representableTypeState tt reprs stringRepresentable te sc ty)
 {-# INLINE isUntranslatableType #-}
 
@@ -406,7 +406,7 @@ liftBinding
   -- ^ The binding to lift
   -> RewriteMonad extra (Term l)
 liftBinding scL (LetBinding occ _ x e) = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   (cf, sp) <- Lens.use curFun
   let (tvs0, ids0) = freeVarOccs e
       tvs = dependencySortTyVars (List.sortOn tyOccRaw tvs0)

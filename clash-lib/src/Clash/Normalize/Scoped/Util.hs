@@ -12,7 +12,7 @@
   Tables of the normalizer that are keyed by global binders (the recursive
   components, the inline history, the normalized binders) are t'GlobalEnv's,
   so that a local variable can never hit an entry of a global with the same
-  unique. The global bindings ('Clash.Rewrite.Types.scopedBindings') and the
+  unique. The global bindings ('Clash.Rewrite.Types.bindings') and the
   normalized ones ('scopedNormalized') are closed terms.
 -}
 
@@ -79,7 +79,7 @@ import           Clash.Normalize.Scoped.Primitives  (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util        (isConstantArg)
 import           Clash.Rewrite.Types
-  (curFun, debugOpts, extra, scopedBindings, scopedTypeEnv)
+  (curFun, debugOpts, extra, bindings, typeEnv)
 import           Clash.Unique                (fromGhcUnique)
 
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
@@ -167,7 +167,7 @@ isRecursiveBndr g = do
   case lookupGlobalEnv g cg of
     Just isR -> pure isR
     Nothing -> do
-      fBodyM <- lookupGlobalEnv g <$> Lens.use scopedBindings
+      fBodyM <- lookupGlobalEnv g <$> Lens.use bindings
       case fBodyM of
         Nothing -> pure False
         Just b -> do
@@ -232,7 +232,7 @@ constantSpecInfoIn
   -> Term n
   -> NormalizeSession (ConstantSpecInfo n)
 constantSpecInfoIn mkNm sc e = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   -- Don't constant spec clocks or resets, they're either:
   --
   --  * A simple wire (Var), therefore not interesting to spec
@@ -287,7 +287,7 @@ bindCsr
   -> Term n
   -> NormalizeSession (ConstantSpecInfo n)
 bindCsr mkNm sc oldTerm = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   pure $ withFreshIdBinder sc (mkNm "bindCsr") (inferCoreTypeOf te sc oldTerm) $ \sc' b ->
     ConstantSpecInfo sc' (TCons (NonRec b oldTerm) TNil) (idBinderVar b) False
 
@@ -457,7 +457,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
   case cached of
     Just b -> pure b
     Nothing -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       let nmS = showPpr (globalIdName nm)
           tm1 = if isTop then substWithTyEq emptyScope tm else tm
       old <- Lens.use curFun
@@ -510,7 +510,7 @@ normalizeWorkFreeApp f b args = do
   case Map.lookup key cache of
     Just tm -> pure (sinkClosed tm)
     Nothing -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       -- The application is normalized as if it were the body of a binder of
       -- its own. That binder is never referenced, so it isn't added to the
       -- global bindings. It is named after 'f', so binders lifted out of the
