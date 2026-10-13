@@ -57,19 +57,18 @@ import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Literal (Literal (..))
-import Clash.Core.Name (mkUnsafeSystemName)
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (tyConDataCons)
 import qualified Clash.Core.Type as C
-import Clash.Core.TysPrim (intPrimTy, liftedTypeKind)
-import qualified Clash.Core.Var as C
+import Clash.Core.Scoped.TysPrim (intPrimTyConName)
+
 import Clash.Util (curLoc, textNameLit)
 
 import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
+import Clash.Core.Scoped.Builder (funTyB, tyConAppB, varTyB)
 import Clash.Core.Scoped.Term (mkApps)
 import Clash.Core.Scoped.Type (TypeView (..), tyView)
 import Clash.Core.Scoped.TypeEnv (lookupTyCon)
@@ -1859,8 +1858,8 @@ primitives =
 mutableByteArray :: HasCallStack => Type n -> Int -> Term n
 mutableByteArray mbaTy p = case tyView mbaTy of
   TyConApp mbaTcNm [sTy] ->
-    let sTv = C.mkTyVar liftedTypeKind (mkUnsafeSystemName "s" 0)
-        primTy = C.ForAllTy sTv (C.mkFunTy intPrimTy (C.mkTyConApp mbaTcNm [C.VarTy sTv]))
-        mbaPrim = mkPrimInfoFromClash $ C.PrimInfo (showt ''MutableByteArray#) primTy C.WorkNever C.SingleResult C.NoUnfolding
-    in mkApps (Prim mbaPrim) [Right sTy, Left (Literal (IntLiteral (toInteger p)))]
+    let primTy =
+          forAllTypeB 0 "s" (funTyB [tyConB intPrimTyConName] (tyConAppB mbaTcNm [varTyB 0]))
+        mbaPrim = closedPrim (showt ''MutableByteArray#) C.WorkNever primTy
+    in mkApps mbaPrim [Right sTy, Left (Literal (IntLiteral (toInteger p)))]
   _ -> error ($(curLoc) ++ "not a MutableByteArray#: " ++ showPpr mbaTy)
