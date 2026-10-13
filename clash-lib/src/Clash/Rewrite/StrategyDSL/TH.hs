@@ -225,12 +225,6 @@ withListen action continue = do
     , noBindS (continue (varE t) [| Monoid.getAny $(varE w) |])
     ]
 
--- | Bind an expression so a continuation can use it more than once.
-bindTo :: String -> Q Exp -> (Q Exp -> Q Exp) -> Q Exp
-bindTo hint bound continue = do
-  x <- newName hint
-  letE [valD (varP x) (normalB bound) []] (continue (varE x))
-
 -- | A fresh name for a generated let-binding, derived from a transformation
 -- name. Underscore-prefixed: not every generated binding ends up used.
 freshBinding :: String -> Q Name
@@ -429,8 +423,10 @@ guardExp target wrapInvoke transformation =
 
 -- | The one-level descent for one constructor of scoped Core, replicating
 -- 'Clash.Rewrite.Scoped.Combinators.allR': it opens the binders it goes under,
--- and pushes the same frames. The continuation runs in the scope of the
--- opened binders, where the rebuilt fields are in scope.
+-- pushes the same frames, and gives the node itself when no child changed
+-- (see Note [sharing unchanged nodes] in "Clash.Rewrite.Scoped.Combinators").
+-- The continuation runs in the scope of the opened binders, where the
+-- rebuilt fields are in scope. The rebuilt node it gets is evaluated.
 genScopedDescend
   :: Constructor
   -> Q Exp            -- ^ recursion: a 'S.ScopedTransform'
@@ -445,9 +441,9 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
   (CLiteral, _) -> leaf
   (CPrim, _) -> leaf
 
-  (CLam, [b, e]) -> under 'S.underLam 'S.Lam b e
+  (CLam, [b, e]) -> under 'S.underLam 'SComb.rebuildLam b e
 
-  (CTyLam, [b, e]) -> under 'S.underTyLam 'S.TyLam b e
+  (CTyLam, [b, e]) -> under 'S.underTyLam 'SComb.rebuildTyLam b e
 
   (CApp, [fun, arg]) -> do
     fun' <- newName "fun'"
@@ -458,14 +454,16 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
         -- function, so the function has to be rewritten first.
       , bindS (varP arg')
           (rec' [| S.pushFrame (S.appArgFrame $(varE fun')) $ctxE |] arg)
-      , noBindS (continue [varE fun', varE arg'] [| S.App $(varE fun') $(varE arg') |])
+      , noBindS $ rebuilt [varE fun', varE arg']
+          [| SComb.rebuildApp $nodeE $fun $arg $(varE fun') $(varE arg') |]
       ]
 
   (CTyApp, [fun, argTy]) -> do
     fun' <- newName "fun'"
     doE
       [ bindS (varP fun') (rec' [| S.pushFrame S.TyAppC $ctxE |] fun)
-      , noBindS (continue [varE fun', argTy] [| S.TyApp $(varE fun') $argTy |])
+      , noBindS $ rebuilt [varE fun', argTy]
+          [| SComb.rebuildTyApp $nodeE $fun $(varE fun') $argTy |]
       ]
 
   (CLet, [bnd, body]) -> do
@@ -473,7 +471,8 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
     body' <- newName "body'"
     [| SComb.descendLet $go $ctxE $bnd $body
          $(lamE [varP bnd', varP body']
-             (continue [varE bnd', varE body'] [| S.Let $(varE bnd') $(varE body') |])) |]
+             (rebuilt [varE bnd', varE body']
+                [| SComb.rebuildLet $nodeE $bnd $body $(varE bnd') $(varE body') |])) |]
 
   (CCase, [subj, altsTy, alts]) -> do
     subj' <- newName "subj'"
@@ -483,24 +482,28 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
       , bindS (varP alts')
           [| traverse
                (\alt -> S.underAlt $ctxE alt
-                  (\ctxAlt p e -> fmap (S.Alt p) (S.runScopedTransform $go ctxAlt e)))
+                  (\ctxAlt p e -> do
+                     e' <- S.runScopedTransform $go ctxAlt e
+                     pure $! SComb.rebuildAlt alt p e'))
                $alts |]
-      , noBindS (continue [varE subj', altsTy, varE alts']
-          [| S.Case $(varE subj') $altsTy $(varE alts') |])
+      , noBindS $ rebuilt [varE subj', altsTy, varE alts']
+          [| SComb.rebuildCase $nodeE $subj $alts $(varE subj') $altsTy $(varE alts') |]
       ]
 
   (CCast, [e, fromTy, toTy]) -> do
     e' <- newName "e'"
     doE
       [ bindS (varP e') (rec' [| S.pushFrame S.CastBody $ctxE |] e)
-      , noBindS (continue [varE e', fromTy, toTy] [| S.Cast $(varE e') $fromTy $toTy |])
+      , noBindS $ rebuilt [varE e', fromTy, toTy]
+          [| SComb.rebuildCast $nodeE $e $(varE e') $fromTy $toTy |]
       ]
 
   (CTick, [tick, e]) -> do
     e' <- newName "e'"
     doE
       [ bindS (varP e') (rec' [| S.pushFrame (S.TickC $tick) $ctxE |] e)
-      , noBindS (continue [tick, varE e'] [| S.Tick $tick $(varE e') |])
+      , noBindS $ rebuilt [tick, varE e']
+          [| SComb.rebuildTick $nodeE $e $tick $(varE e') |]
       ]
 
   _ -> fail ("genScopedDescend: field count mismatch for " <> show con)
@@ -509,9 +512,17 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
 
   rec' ctx' e = [| S.runScopedTransform $go $ctx' $e |]
 
+  -- The node itself when unchanged, a copy otherwise (one of the
+  -- @SComb.rebuild*@ functions); evaluated, so that no thunk is allocated for
+  -- it
+  rebuilt fieldEs' rebuildE = do
+    node' <- newName "node'"
+    letE [valD (bangP (varP node')) (normalB rebuildE) []]
+      (continue fieldEs' (varE node'))
+
   -- Open a binder, transform the body in its context, and continue in its
   -- scope
-  under underFun conName b e = do
+  under underFun rebuildName b e = do
     ctx' <- newName "ctx'"
     b' <- newName "b'"
     e' <- newName "e'"
@@ -520,8 +531,8 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
          $(lamE [varP ctx', varP b', varP e']
              (doE
                [ bindS (varP e'') (rec' (varE ctx') (varE e'))
-               , noBindS (continue [varE b', varE e'']
-                   [| $(conE conName) $(varE b') $(varE e'') |])
+               , noBindS $ rebuilt [varE b', varE e'']
+                   [| $(varE rebuildName) $nodeE $b $e $(varE b') $(varE e'') |]
                ])) |]
 
 -- | A recursive traversal of scoped Core: a 'S.ScopedTransform' of a lambda
@@ -616,14 +627,14 @@ genTraversal target strat = case strat of
     descend $ \fieldEs' rebuiltE ->
       case known of
         Nothing -> [| pure $rebuiltE |]
-        Just ka -> bindTo "tm'" rebuiltE $ \tmE' -> ka ctxE tmE' fieldEs'
+        Just ka -> ka ctxE rebuiltE fieldEs'
 
   InnerMost step -> fused step $ \goE known ctxE _tmE _fieldEs descend ->
     descend $ \fieldEs' rebuiltE ->
       case known of
         Nothing -> [| pure $rebuiltE |]
-        Just ka -> bindTo "tm'" rebuiltE $ \tmE' ->
-          withListen (ka ctxE tmE' fieldEs') $ \tE changedE ->
+        Just ka ->
+          withListen (ka ctxE rebuiltE fieldEs') $ \tE changedE ->
             condE changedE (callE target goE ctxE tE) [| pure $tE |]
 
   TopDownFix step -> do

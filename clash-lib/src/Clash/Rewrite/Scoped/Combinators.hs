@@ -8,12 +8,13 @@
   the binders they go under (see "Clash.Rewrite.Scoped.Types"), which renames
   a binder that clashes with the scope.
 
-  See Note [topdown repeatR], Note [combinator inlining] and Note
-  [topdownFixR] below.
+  See Note [topdown repeatR], Note [combinator inlining], Note
+  [topdownFixR] and Note [sharing unchanged nodes] below.
 -}
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Clash.Rewrite.Scoped.Combinators
@@ -29,11 +30,22 @@ module Clash.Rewrite.Scoped.Combinators
   , topdownR
   , topdownFixR
   , topdownSucR
+    -- * Sharing unchanged nodes
+  , rebuildLam
+  , rebuildTyLam
+  , rebuildApp
+  , rebuildTyApp
+  , rebuildLet
+  , rebuildCase
+  , rebuildAlt
+  , rebuildCast
+  , rebuildTick
   ) where
 
 import           Control.Monad               ((>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
+import           GHC.Exts                    (isTrue#, reallyUnsafePtrEquality#)
 
 import           Clash.Core.Scoped.Syntax
 import           Clash.Rewrite.Scoped.Types
@@ -155,31 +167,45 @@ was ~3% slower on a larger industrial design we've measured too. See #3250.
 -}
 
 -- | Apply a transformation on the subtrees of a term. Opens the binders it
--- goes under.
+-- goes under. Gives the term itself when no subtree changed, see Note [sharing
+-- unchanged nodes].
 allR :: forall m. Monad m => ScopedTransform m -> ScopedTransform m
 allR (ScopedTransform trans) = ScopedTransform go
  where
   go :: Distinct n => TransformContext n -> Term n -> m (Term n)
-  go ctx = \case
-    Lam b e -> underLam ctx b e $ \ctx' b' e' -> Lam b' <$> trans ctx' e'
-    TyLam b e -> underTyLam ctx b e $ \ctx' b' e' -> TyLam b' <$> trans ctx' e'
+  go ctx tm = case tm of
+    Lam b e -> underLam ctx b e $ \ctx' b' e' -> do
+      e'' <- trans ctx' e'
+      pure $! rebuildLam tm b e b' e''
+    TyLam b e -> underTyLam ctx b e $ \ctx' b' e' -> do
+      e'' <- trans ctx' e'
+      pure $! rebuildTyLam tm b e b' e''
     App e1 e2 -> do
       e1' <- trans (pushFrame AppFun ctx) e1
       -- The argument's context is computed from the already rewritten
       -- function, like below
       e2' <- trans (pushFrame (appArgFrame e1') ctx) e2
-      pure (App e1' e2')
-    TyApp e ty -> (`TyApp` ty) <$> trans (pushFrame TyAppC ctx) e
-    Cast e ty1 ty2 -> (\e' -> Cast e' ty1 ty2) <$> trans (pushFrame CastBody ctx) e
-    Let bind e -> descendLet (ScopedTransform trans) ctx bind e $ \bind' e' -> pure (Let bind' e')
-    Case scrut ty alts ->
-      Case <$> trans (pushFrame CaseScrut ctx) scrut
-           <*> pure ty
-           <*> traverse rewriteAlt alts
+      pure $! rebuildApp tm e1 e2 e1' e2'
+    TyApp e ty -> do
+      e' <- trans (pushFrame TyAppC ctx) e
+      pure $! rebuildTyApp tm e e' ty
+    Cast e ty1 ty2 -> do
+      e' <- trans (pushFrame CastBody ctx) e
+      pure $! rebuildCast tm e e' ty1 ty2
+    Let bind e -> descendLet (ScopedTransform trans) ctx bind e $ \bind' e' ->
+      pure $! rebuildLet tm bind e bind' e'
+    Case scrut ty alts -> do
+      scrut' <- trans (pushFrame CaseScrut ctx) scrut
+      alts' <- traverse rewriteAlt alts
+      pure $! rebuildCase tm scrut alts scrut' ty alts'
      where
-      rewriteAlt alt = underAlt ctx alt $ \ctx' p e -> Alt p <$> trans ctx' e
-    Tick t e -> Tick t <$> trans (pushFrame (TickC t) ctx) e
-    tm -> pure tm
+      rewriteAlt alt = underAlt ctx alt $ \ctx' p e -> do
+        e' <- trans ctx' e
+        pure $! rebuildAlt alt p e'
+    Tick t e -> do
+      e' <- trans (pushFrame (TickC t) ctx) e
+      pure $! rebuildTick tm e t e'
+    _ -> pure tm
 {-# INLINABLE allR #-}
 
 -- | Apply a transformation to the right-hand sides and the body of a
@@ -210,6 +236,117 @@ descendLet (ScopedTransform trans) ctx bind e k = case bind of
       e'' <- trans ctxBody e'
       k (Rec bs' xs'') e''
 {-# INLINE descendLet #-}
+
+
+{-
+Note [sharing unchanged nodes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A traversal gives a node itself, rather than a copy, when the transformation
+returned every child of the node unchanged, by pointer equality ('samePtr').
+Most traversals change few nodes, so this saves rebuilding all the others,
+and keeps the unchanged parts of a term shared with the term before the
+traversal.
+
+Going under a binder may rename it (see "Clash.Core.Scoped.Subst"), which
+gives a new binder and a new body. A copy then has the new names, so the
+traversal rebuilds the node, as it did before: sharing never changes the term
+a traversal gives, only whether it is a copy. Without renaming, opening a
+binder gives the binder and the body themselves.
+
+Pointer equality can say that two equal values are different, never the
+reverse. A transformation that returns an equal copy just causes a rebuild.
+
+The functions rebuilding a node ('rebuildApp' and so on) are NOINLINE, so
+that their pointer comparisons happen where they are called, after the
+children were transformed. Inlined, GHC's full laziness floats a comparison
+that only needs values from before a monadic bind (the binders of a lambda,
+the function of an application) out of the monadic lambdas, as a thunk.
+-}
+
+-- | Whether two values are the same object on the heap. 'False' doesn't mean
+-- they differ. See Note [sharing unchanged nodes].
+samePtr :: a -> b -> Bool
+samePtr x y = isTrue# (reallyUnsafePtrEquality# x y)
+{-# INLINE samePtr #-}
+
+-- | Whether two lists have the same elements, by 'samePtr'
+sameElems :: [a] -> [b] -> Bool
+sameElems (x:xs) (y:ys) = samePtr x y && sameElems xs ys
+sameElems [] [] = True
+sameElems _ _ = False
+
+-- | A lambda with the given binder and body, given the original node and its
+-- binder and body: the original node when they are unchanged. See Note
+-- [sharing unchanged nodes].
+rebuildLam :: Term n -> IdBinder n l0 -> Term l0 -> IdBinder n l -> Term l -> Term n
+rebuildLam tm b0 e0 b e
+  | samePtr b0 b && samePtr e0 e = tm
+  | otherwise = Lam b e
+{-# NOINLINE rebuildLam #-}
+
+-- | A type lambda, like 'rebuildLam'
+rebuildTyLam :: Term n -> TyBinder n l0 -> Term l0 -> TyBinder n l -> Term l -> Term n
+rebuildTyLam tm b0 e0 b e
+  | samePtr b0 b && samePtr e0 e = tm
+  | otherwise = TyLam b e
+{-# NOINLINE rebuildTyLam #-}
+
+-- | An application, like 'rebuildLam'
+rebuildApp :: Term n -> Term n -> Term n -> Term n -> Term n -> Term n
+rebuildApp tm f0 a0 f a
+  | samePtr f0 f && samePtr a0 a = tm
+  | otherwise = App f a
+{-# NOINLINE rebuildApp #-}
+
+-- | A type application, like 'rebuildLam'
+rebuildTyApp :: Term n -> Term n -> Term n -> Type n -> Term n
+rebuildTyApp tm f0 f ty
+  | samePtr f0 f = tm
+  | otherwise = TyApp f ty
+{-# NOINLINE rebuildTyApp #-}
+
+-- | A let-expression, like 'rebuildLam'. Its bindings are unchanged when
+-- they have the same binders (so they weren't renamed) and the same
+-- right-hand sides.
+rebuildLet :: Term n -> Bind n l0 -> Term l0 -> Bind n l -> Term l -> Term n
+rebuildLet tm bind0 e0 bind e
+  | sameBind bind0 bind && samePtr e0 e = tm
+  | otherwise = Let bind e
+ where
+  sameBind :: Bind n l0 -> Bind n l -> Bool
+  sameBind (NonRec b0 x0) (NonRec b x) = samePtr b0 b && samePtr x0 x
+  sameBind (Rec bs0 xs0) (Rec bs xs) = samePtr bs0 bs && sameElems xs0 xs
+  sameBind _ _ = False
+{-# NOINLINE rebuildLet #-}
+
+-- | A case-expression, like 'rebuildLam', with alternatives rebuilt by
+-- 'rebuildAlt'
+rebuildCase :: Term n -> Term n -> [Alt n] -> Term n -> Type n -> [Alt n] -> Term n
+rebuildCase tm s0 alts0 s ty alts
+  | samePtr s0 s && sameElems alts0 alts = tm
+  | otherwise = Case s ty alts
+{-# NOINLINE rebuildCase #-}
+
+-- | A case alternative, like 'rebuildLam'
+rebuildAlt :: Alt n -> Pat n l -> Term l -> Alt n
+rebuildAlt alt@(Alt p0 e0) p e
+  | samePtr p0 p && samePtr e0 e = alt
+  | otherwise = Alt p e
+{-# NOINLINE rebuildAlt #-}
+
+-- | A cast, like 'rebuildLam'
+rebuildCast :: Term n -> Term n -> Term n -> Type n -> Type n -> Term n
+rebuildCast tm e0 e ty1 ty2
+  | samePtr e0 e = tm
+  | otherwise = Cast e ty1 ty2
+{-# NOINLINE rebuildCast #-}
+
+-- | A tick, like 'rebuildLam'
+rebuildTick :: Term n -> Term n -> TickInfo n -> Term n -> Term n
+rebuildTick tm e0 t e
+  | samePtr e0 e = tm
+  | otherwise = Tick t e
+{-# NOINLINE rebuildTick #-}
 
 infixr 6 >->
 -- | Apply two transformations in succession
