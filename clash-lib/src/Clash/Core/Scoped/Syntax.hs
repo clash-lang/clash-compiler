@@ -72,6 +72,28 @@
     raw name of the binder.
 
   * __A scope is a watermark__, not a set of names, see 'Scope'.
+
+  = Transition
+
+  Global variables ('GlobalId'), primitives ('PrimInfo'), data constructors
+  ('DataCon') and type constructors ('Clash.Core.TyCon.TyCon') are shared with
+  Clash Core while the port lasts. They follow one rule:
+
+  * __The scoped fields are the truth__: e.g. 'globalIdType', 'primType',
+    'Clash.Core.DataCon.dcType' and 'Clash.Core.DataCon.dcSig'.
+
+  * __The legacy fields are derived lazily__ from them, for the code that
+    still uses Clash Core: 'globalIdLegacy', 'primLegacy',
+    'Clash.Core.DataCon.dcLegacy', and the fields of 'Clash.Core.TyCon.TyCon'
+    named @Legacy@. Code that uses scoped Core doesn't read them.
+
+  * __They are made by the constructors of "Clash.Core.Scoped.Convert"__, which
+    take one side and derive the other one lazily: e.g.
+    'Clash.Core.Scoped.Convert.mkGlobalId' takes the scoped side, and
+    'Clash.Core.Scoped.Convert.mkGlobalIdFromClash' the side of Clash Core.
+
+  * __The legacy fields are deleted__ with Clash Core, in package B of the
+    port. What remains are the scoped fields.
 -}
 
 {-# LANGUAGE FlexibleInstances #-}
