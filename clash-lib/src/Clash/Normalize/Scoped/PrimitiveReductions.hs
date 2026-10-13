@@ -5,16 +5,42 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of primitives, on scoped Clash Core: the ported counterparts of
-  "Clash.Normalize.PrimitiveReductions". They replace an application of a
-  primitive on vectors (or trees) of a known length by its unrolled
+  Reductions of primitives, on scoped Clash Core. They replace an application
+  of a primitive on vectors (or trees) of a known length by its unrolled
   definition. 'Clash.Normalize.Scoped.Transformations.Reduce.reducePrim'
   decides whether to, and calls them on the saturated application.
 
-  Every reduction takes the same arguments as its counterpart, with the
-  context of the application last, and gives the same result, up to the
-  names of binders. The binders it creates get fresh names from the scope of
-  the context, so they can't capture variables of the arguments.
+  Currently, it contains reductions for:
+
+    * Clash.Sized.Vector.map
+    * Clash.Sized.Vector.zipWith
+    * Clash.Sized.Vector.traverse#
+    * Clash.Sized.Vector.foldr
+    * Clash.Sized.Vector.fold
+    * Clash.Sized.Vector.dfold
+    * Clash.Sized.Vector.(++)
+    * Clash.Sized.Vector.head
+    * Clash.Sized.Vector.tail
+    * Clash.Sized.Vector.last
+    * Clash.Sized.Vector.init
+    * Clash.Sized.Vector.replicate
+    * Clash.Sized.Vector.replace_int
+    * Clash.Sized.Vector.index_int
+    * Clash.Sized.Vector.imap
+    * Clash.Sized.Vector.iterateI
+    * Clash.Sized.Vector.dtfold
+    * Clash.Sized.RTree.tdfold
+    * Clash.Sized.RTree.treplicate
+    * Clash.Sized.Vector.reverse
+    * Clash.Sized.Vector.unconcat
+
+  Partially handles:
+
+    * Clash.Sized.Vector.transpose
+
+  Every reduction takes the context of the application as its last argument.
+  The binders it creates get fresh names from the scope of the context, so
+  they can't capture variables of the arguments.
 
   The reductions of @fold@, @imap@, @iterateI@ and @traverse#@ first run the
   'Clash.Normalize.Strategy.constantPropagation' strategy on their function
@@ -111,8 +137,10 @@ scopeAndTypeEnv :: TransformContext n -> NormalizeSession (Scope n, TypeEnv)
 scopeAndTypeEnv ctx = (tfScope ctx,) <$> Lens.view scopedTypeEnv
 
 -- | Run the 'Clash.Normalize.Strategy.constantPropagation' strategy on the
--- function argument of a primitive, see
--- 'Clash.Normalize.PrimitiveReductions.constantPropagation'
+-- function argument of a primitive. The compiled strategy is taken from the
+-- normalization state, see the documentation of
+-- 'Clash.Normalize.Types._scopedNormalizationStrategy' for why it is not
+-- simply imported.
 constantPropagation
   :: (HasCallStack, Distinct n) => TransformContext n -> Term n -> NormalizeSession (Term n)
 constantPropagation ctx fun = do
@@ -158,9 +186,22 @@ vecTcName = showt ''Vec
 rtreeTcName :: Text
 rtreeTcName = showt ''RTree
 
--- | Let-bind vectors, see 'Clash.Normalize.PrimitiveReductions.shareVec':
--- each vector that is representable and isn't a variable already. Gives the
--- continuation the shared vectors, in the scope of the let-bindings.
+-- | Let-bind vectors: each vector that is representable and isn't a variable
+-- already. Gives the continuation the shared vectors, in the scope of the
+-- let-bindings.
+--
+-- This makes sure the head and tail projections of 'extractHeadTail' share
+-- the vector instead of each getting their own copy. Because single-step
+-- reductions feed the tail projection back into the primitive, such copies
+-- pile up: unrolling a vector of length @n@ would otherwise result in @n@
+-- copies of the vector. That is harmless for local variables, but a global
+-- binder gets inlined (and normalized) at every occurrence. See:
+--
+--   https://github.com/clash-lang/clash-compiler/issues/3461
+--
+-- Non-representable vectors are never let-bound:
+-- 'Clash.Normalize.Scoped.Transformations.Inline.inlineOrLiftNonRep' would
+-- inline or lift such a let-binding, undoing the sharing.
 shareVecs
   :: forall n
    . Distinct n
@@ -184,9 +225,9 @@ shareVecs te sc0 vecs0 k = go sc0 [] vecs0
    where
     vec = sink vec0
 
--- | The head and the tail of a non-empty vector, as case-expressions, see
--- 'Clash.Normalize.PrimitiveReductions.extractHeadTail'. Use 'shareVecs' on
--- the vector first to prevent it from being duplicated.
+-- | The head and the tail of a non-empty vector, as two case-expressions: the
+-- first one extracts the head of the vector, the second one its tail. Use
+-- 'shareVecs' on the vector first to prevent it from being duplicated.
 extractHeadTail
   :: (HasCallStack, Distinct n)
   => TypeEnv
@@ -215,8 +256,8 @@ mkVecCons te sc consCon elTy n h t
 mkVecNil :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> DataCon -> DataCon -> Type n -> Term n
 mkVecNil te sc nilCon consCon elTy = mkVec te sc nilCon consCon elTy 0 []
 
--- | Let-bind the element selections of 'extractElems', recursively like
--- 'Clash.Normalize.PrimitiveReductions' does
+-- | Let-bind the element selections of 'extractElems', in a recursive
+-- let-binding
 recLet :: Tele IdBinder n l -> [Term l] -> Term l -> Term n
 recLet bs rhss = Let (Rec bs rhss)
 
@@ -241,8 +282,8 @@ boolTrue te = fromMaybe (error "reducePrim: failed to build the True DC") $ do
   pure (trueDc, mkTyConApp (tyConName boolTc) [])
 
 -- | Equality on lifted @Int@, returning a @Bool@, applied to the index given to
--- @replace_int@ or @index_int@ and the given index. See
--- 'Clash.Normalize.PrimitiveReductions.reduceIndex_int'.
+-- @replace_int@ or @index_int@ and the given index, which is the statically
+-- known index of an element of the vector.
 eqIntWith :: HasCallStack => TypeEnv -> Type n -> Term n -> Integer -> Term n
 eqIntWith te iTy i elIndex =
   mkApps (Prim eqInt) [Left i, Left (mkApps (Data iDc) [Left (Literal (IntLiteral elIndex))])]
@@ -261,8 +302,7 @@ eqIntWith te iTy i elIndex =
 
 -- | Replace an application of the @Clash.Sized.Vector.reverse@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.reverse@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceReverse'.
+-- of @Clash.Sized.Vector.reverse@.
 reduceReverse
   :: (HasCallStack, Distinct n)
   => Integer
@@ -282,8 +322,9 @@ reduceReverse n elTy vArg ctx = do
         recLet bs rhss (mkVec te sc1 nilCon consCon (sink elTy) n (reverse vars))
 
 -- | Replace an application of the @Clash.Sized.Vector.zipWith@ primitive on
--- vectors of a known length @n@, by one step of its recursive "definition".
--- See 'Clash.Normalize.PrimitiveReductions.reduceZipWith'.
+-- vectors of a known length @n@, by one step of its recursive "definition":
+-- the function applied to the heads of the vectors, consed onto @zipWith@
+-- applied to their tails.
 reduceZipWith
   :: (HasCallStack, Distinct n)
   => PrimInfo -- ^ zipWith primitive info
@@ -320,11 +361,10 @@ reduceZipWith zipWithPrimInfo n lhsElTy rhsElTy resElTy lhsRep rhsRep fun lhsArg
       _ -> error "reduceZipWith: shareVecs")
 
 -- | Replace an application of the @Clash.Sized.Vector.map@ primitive on
--- vectors of a known length @n@, by one step of its recursive "definition".
--- See 'Clash.Normalize.PrimitiveReductions.reduceMap'.
---
--- Unlike that one, it gives an empty vector of the result element type for an
--- empty vector, not one of the argument element type.
+-- vectors of a known length @n@, by one step of its recursive "definition":
+-- the function applied to the head of the vector, consed onto @map@ applied to
+-- its tail. For an empty vector, it gives an empty vector of the result
+-- element type.
 reduceMap
   :: (HasCallStack, Distinct n)
   => PrimInfo -- ^ map primitive info
@@ -356,8 +396,7 @@ reduceMap mapPrimInfo n argElTy resElTy argRep fun arg0 ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.imap@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.imap@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceImap'.
+-- of @Clash.Sized.Vector.imap@.
 reduceImap
   :: (HasCallStack, Distinct n)
   => Integer  -- ^ Length of the vector
@@ -395,8 +434,7 @@ reduceImap n argElTy resElTy _kn fun arg ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.iterateI@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.iterateI@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceIterateI'.
+-- of @Clash.Sized.Vector.iterateI@.
 reduceIterateI
   :: (HasCallStack, Distinct n)
   => Integer
@@ -441,13 +479,13 @@ reduceIterateI n aTy vTy _kn f0 a ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.traverse#@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.traverse#@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceTraverse'.
+-- of @Clash.Sized.Vector.traverse#@.
 --
--- That one let-binds fields of the @Applicative@ dictionary to the binders
--- that the case-expressions selecting them bind them to, so the patterns of
--- those case-expressions shadow the let-binders. Here, the patterns have
--- binders of their own.
+-- It let-binds the @Functor@ dictionary, @pure@ and @\<*\>@ fields of the
+-- @Applicative@ dictionary, the @fmap@ field of that @Functor@ dictionary, and
+-- the elements of the vector, and builds the result with 'mkTravVec'. The
+-- case-expressions selecting the fields have pattern binders of their own,
+-- apart from the let-binders.
 reduceTraverse
   :: forall n
    . (HasCallStack, Distinct n)
@@ -532,8 +570,7 @@ extractAllElems te sc consCon elTy c n vec k
   | n == 0 = k sc TNil [] []
   | otherwise = extractElems te sc consCon elTy c n n vec (\sc1 bs rhss vars _ -> k sc1 bs rhss vars)
 
--- | Create the traversable vector, see
--- 'Clash.Normalize.PrimitiveReductions.mkTravVec'
+-- | Create the traversable vector
 --
 -- e.g. for a length '2' input vector, we get
 --
@@ -576,8 +613,9 @@ mkTravVec te sc vecTc nilCon consCon pureTm apTm fmapTm bTy = go
     _ -> error "mkTravVec: failed to instantiate Cons DC"
 
 -- | Replace an application of the @Clash.Sized.Vector.foldr@ primitive on
--- vectors of a known length @n@, by one step of its recursive "definition".
--- See 'Clash.Normalize.PrimitiveReductions.reduceFoldr'.
+-- vectors of a known length @n@, by one step of its recursive "definition":
+-- the function applied to the head of the vector and @foldr@ applied to its
+-- tail. For an empty vector, it gives the starting value.
 reduceFoldr
   :: (HasCallStack, Distinct n)
   => PrimInfo
@@ -616,8 +654,8 @@ reduceFoldr foldrPrimInfo n aTy argRep fun start arg0 ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.fold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.fold@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceFold'.
+-- of @Clash.Sized.Vector.fold@: a balanced tree of applications of the
+-- function.
 reduceFold
   :: (HasCallStack, Distinct n)
   => Integer
@@ -645,12 +683,12 @@ reduceFold n aTy fun arg ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.dfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.dfold@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceDFold'.
+-- of @Clash.Sized.Vector.dfold@. For an empty vector, it gives the starting
+-- value.
 --
--- That one finds the type variable of the upper bound proof as the first free
--- type variable of the type of the proof. Here, it is the type variable the
--- type of the function quantifies over.
+-- It builds the upper bound proof of each step by instantiating the type
+-- variable that the type of the function quantifies over with the index of
+-- the step.
 reduceDFold
   :: (HasCallStack, Distinct n)
   => Integer
@@ -698,7 +736,7 @@ reduceDFold n aTy _kn _motive fun start arg ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.head@ primitive on
 -- vectors of a known length @n@, by a projection of the first element of a
--- vector. See 'Clash.Normalize.PrimitiveReductions.reduceHead'.
+-- vector.
 reduceHead
   :: (HasCallStack, Distinct n)
   => Integer  -- ^ Length of the vector, must be positive
@@ -715,8 +753,7 @@ reduceHead n aTy vArg ctx = do
         _ -> error "reduceHead: extractElems"
 
 -- | Replace an application of the @Clash.Sized.Vector.tail@ primitive on
--- vectors of a known length @n@, by a projection of the tail of a vector. See
--- 'Clash.Normalize.PrimitiveReductions.reduceTail'.
+-- vectors of a known length @n@, by a projection of the tail of a vector.
 reduceTail
   :: (HasCallStack, Distinct n)
   => Integer  -- ^ Length of the vector, must be positive
@@ -738,7 +775,7 @@ reduceTail n aTy vArg ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.last@ primitive on
 -- vectors of a known length @n@, by a projection of the last element of a
--- vector. See 'Clash.Normalize.PrimitiveReductions.reduceLast'.
+-- vector. For an empty vector, it gives @undefined@.
 reduceLast
   :: (HasCallStack, Distinct n)
   => Integer  -- ^ Length of the vector, must be positive
@@ -755,8 +792,8 @@ reduceLast n aTy vArg ctx = do
         recLet bs rhss (last vars)
 
 -- | Replace an application of the @Clash.Sized.Vector.init@ primitive on
--- vectors of a known length @n@, by one step of its recursive "definition".
--- See 'Clash.Normalize.PrimitiveReductions.reduceInit'.
+-- vectors of a known length @n@, by one step of its recursive "definition":
+-- the head of the vector, consed onto @init@ applied to its tail.
 reduceInit
   :: (HasCallStack, Distinct n)
   => PrimInfo -- ^ Primitive info for 'init'
@@ -780,8 +817,8 @@ reduceInit initPrimInfo n aTy vArgRep vArg0 ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.(++)@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.(++)@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceAppend'.
+-- of @Clash.Sized.Vector.(++)@: the elements of the LHS vector, consed onto
+-- the RHS vector. If either vector is empty, it gives the other one.
 reduceAppend
   :: (HasCallStack, Distinct n)
   => Integer  -- ^ Length of the LHS arg
@@ -800,8 +837,9 @@ reduceAppend n m aTy lArg rArg ctx = do
       recLet bs rhss (appendToVec te sc1 consCon (sink aTy) (sink rArg) (n + m) vars)
 
 -- | Replace an application of the @Clash.Sized.Vector.unconcat@ primitive on
--- vectors of a known length @n@, by one step of its recursive "definition".
--- See 'Clash.Normalize.PrimitiveReductions.reduceUnconcat'.
+-- vectors of a known length @n@, by one step of its recursive "definition":
+-- a vector of the first @m@ elements, consed onto @unconcat@ applied to the
+-- vector of the remaining elements.
 reduceUnconcat
   :: (HasCallStack, Distinct n)
   => PrimInfo -- ^ Unconcat primitive info
@@ -842,8 +880,7 @@ reduceUnconcat unconcatPrimInfo n m aTy _kn sm arg ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.transpose@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.transpose@. Only handles elements of length 0. See
--- 'Clash.Normalize.PrimitiveReductions.reduceTranspose'.
+-- of @Clash.Sized.Vector.transpose@. Only handles elements of length 0.
 reduceTranspose
   :: (HasCallStack, Distinct n)
   => Integer  -- ^ Length of the result vector
@@ -863,7 +900,6 @@ reduceTranspose _ _ _ _ _ _ = error "reduceTranspose: unimplemented"
 
 -- | Replace an application of the @Clash.Sized.Vector.replicate@ primitive on
 -- vectors of a known length @n@, by a vector of @n@ copies of the element.
--- See 'Clash.Normalize.PrimitiveReductions.reduceReplicate'.
 reduceReplicate
   :: (HasCallStack, Distinct n)
   => Integer -- ^ Length of the vector
@@ -878,10 +914,27 @@ reduceReplicate n aTy eTy _sn arg ctx = do
   withVec "reduceReplicate" te sc eTy $ \_ nilCon consCon ->
     changed (mkVec te sc nilCon consCon aTy n (replicate (fromInteger n) arg))
 
+-- TODO: Take a shortcut when given index is a literal. Right now, this function
+-- TODO: simply creates a case statement for every element in the vector, which
+-- TODO: Clash will eliminate one-by-one if the index turned out to be literal.
+-- TODO: It would of course be best to not create the cases in the first place!
+
 -- | Replace an application of the @Clash.Sized.Vector.replace_int@ primitive
 -- on vectors of a known length @n@, by a vector of case-expressions that
--- select the new or the old element. See
--- 'Clash.Normalize.PrimitiveReductions.reduceReplace_int'.
+-- select the new or the old element. Every element becomes:
+--
+-- @
+-- case eqInt i0 curI of
+--   True -> newA
+--   _    -> oldA
+-- @
+--
+-- where:
+--
+--   * @curI@ is the index of the current element, which we statically know
+--   * @i0@ is the index given to @replace_int@
+--   * @newA@ is the element given to @replace_int@ as a replacement for..
+--   * @oldA@; an element at index @curI@
 reduceReplace_int
   :: (HasCallStack, Distinct n)
   => Integer
@@ -919,9 +972,29 @@ reduceReplace_int n aTy vTy _kn v i newA ctx = do
           replacedEls = zipWith replaceElement vars [0..]
         in recLet bs rhss (mkVec te sc1 nilCon consCon (sink aTy) n replacedEls)
 
+-- TODO: Take a shortcut when given index is a literal. Right now, this function
+-- TODO: simply creates a case statement for every element in the vector, which
+-- TODO: Clash will eliminate one-by-one if the index turned out to be literal.
+-- TODO: It would of course be best to not create the cases in the first place!
+
 -- | Replace an application of the @Clash.Sized.Vector.index_int@ primitive on
--- vectors of a known length @n@, by a tree of case-expressions that select an
--- element. See 'Clash.Normalize.PrimitiveReductions.reduceIndex_int'.
+-- vectors of a known length @n@, by a right-biased tree of case-expressions
+-- that select an element. Every element adds a node:
+--
+-- @
+-- case eqInt i0 curI of
+--   True -> curA
+--   _    -> next
+-- @
+--
+-- where:
+--
+--   * @curI@ is the index of the current element, which we statically know
+--   * @i0@ is the index given to @index_int@
+--   * @curA@ is the element at index @curI@
+--   * @next@; the value if the current index is not equal to index argument
+--
+-- For an empty vector, every index is out of bounds, so it gives @undefined@.
 reduceIndex_int
   :: (HasCallStack, Distinct n)
   => Integer
@@ -959,8 +1032,7 @@ reduceIndex_int n aTy _kn v i ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.dtfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
--- of @Clash.Sized.Vector.dtfold@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceDTFold'.
+-- of @Clash.Sized.Vector.dtfold@.
 reduceDTFold
   :: (HasCallStack, Distinct n)
   => Integer  -- ^ Length of the vector
@@ -1001,8 +1073,7 @@ snatDataConOfBranch nm te brFunTy =
 
 -- | Replace an application of the @Clash.Sized.RTree.tdfold@ primitive on
 -- trees of a known depth @n@, by the fully unrolled recursive "definition" of
--- @Clash.Sized.RTree.tdfold@. See
--- 'Clash.Normalize.PrimitiveReductions.reduceTFold'.
+-- @Clash.Sized.RTree.tdfold@.
 reduceTFold
   :: (HasCallStack, Distinct n)
   => Integer -- ^ Depth of the tree
@@ -1035,8 +1106,7 @@ reduceTFold n aTy _kn _motive lrFun brFun arg ctx = do
       in recLet bs rhss (doFold (n - 1) vars)
 
 -- | Replace an application of the @Clash.Sized.RTree.treplicate@ primitive on
--- trees of a known depth @n@, by a tree of copies of the element. See
--- 'Clash.Normalize.PrimitiveReductions.reduceTReplicate'.
+-- trees of a known depth @n@, by a tree of @2^n@ copies of the element.
 reduceTReplicate
   :: (HasCallStack, Distinct n)
   => Integer -- ^ Depth of the tree

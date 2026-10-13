@@ -3,9 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Letrec". The expected
-  results of the tests that compared a port with its Clash Core counterpart in
-  "Clash.Normalize.Transformations.Letrec" are the results of the latter.
+  Tests for "Clash.Normalize.Scoped.Transformations.Letrec".
   'assertRewritesTo' runs every test in the scope of the free variables of
   its input, and in a scope that the binders of the input clash with.
 -}
@@ -131,8 +129,8 @@ deadCodeTests = testGroup "deadCode"
             assertTermAlphaEq e t
             ch @?= False
         -- The outer binding is used by the right-hand side of the inner one,
-        -- which shadowed it in Clash Core. Here the binders clash with a
-        -- variable of the scope instead.
+        -- whose binder has the same name. The binders also clash with a
+        -- variable of the scope.
       , testCase "a NonRec binder doesn't keep the binding it shadows alive" $
           withTerm "let { !(x :: Int) = 1 } in let { !(x :: Int) = x } in x" $ \ts0 e0 ->
             withClashing ts0 [varD "z" "Int"] e0 $ \ts e -> do
@@ -231,11 +229,10 @@ flattenLetTests = testGroup "flattenLet"
       rewrites flattenLetSc [varD "x_4" "Int"]
         (tm "let { (a :: Int) = let { (c :: Int) = h_G11 c } in k_G12 c x_4; (b :: Int) = h_G11 a } in k_G12 a b")
         (tm "let { (c :: Int) = h_G11 c; (a :: Int) = k_G12 c x_4; (b :: Int) = h_G11 a } in k_G12 a b")
-    -- The Clash Core version deshadows the let-expression in the
-    -- right-hand side as a recursive one, which turns @x = g x@ into the
-    -- loop @x' = g x'@. In scoped Core, the right-hand side of a 'NonRec'
-    -- binding can't refer to its binder. The binder of @x@ also clashes
-    -- with a variable of the scope.
+    -- Deshadowing the let-expression in the right-hand side as if it were
+    -- recursive would turn @x = g x@ into the loop @x' = g x'@. In scoped
+    -- Core, the right-hand side of a 'NonRec' binding can't refer to its
+    -- binder. The binder of @x@ also clashes with a variable of the scope.
   , testCase "doesn't make a shadowing NonRec binding in a right-hand side recursive" $
       withTerm [termQQ|
         let { !(y :: Int) =
@@ -290,7 +287,7 @@ topLetTests = testGroup "topLet"
       topLetKeeps [LamStep, AppArgStep] [] (tm "\\(x :: Int) -> f_G5 (g_G10 x)")
   ]
 
--- | The regression tests of "Clash.Normalize.Transformations.Letrec"
+-- | Regression tests for bugs in the transformations on let-expressions
 regressionTests :: TestTree
 regressionTests = testGroup "regression tests"
   [ -- 'topLet' turns @letrec x = 1 in 2@ into @letrec x = 1; result = 2 in
@@ -333,8 +330,9 @@ regressionTests = testGroup "regression tests"
         (tm "let { (a :: Int) = f_G102 b; (b :: Int) = f_G102 a } in let { (c :: Int) = g_G103 a b } in h_G104 c c")
         (tm "let { (a :: Int) = f_G102 b; (b :: Int) = f_G102 a; (c :: Int) = g_G103 a b } in h_G104 c c")
 
-    -- #1837 also made 'Clash.Rewrite.Util.apply' report a transformation that
-    -- changes a term without signalling it, when checking invariants
+    -- #1837 also made applying a transformation ('applyDebug') report a
+    -- transformation that changes a term without signalling it, when checking
+    -- invariants
   , testCase "apply reports an unsignalled change (#1837)" $
       withTerm (tm "let { (a :: Int) = f_G102 b; (b :: Int) = f_G102 a } in a") $ \ts e ->
         assertErrorContainsIO "Expression changed without notice" $ do
@@ -362,7 +360,7 @@ regressionTests = testGroup "regression tests"
     -- only when one of its binders is already in scope. That set of in-scope
     -- variables must include the context of the let-expression, the outer
     -- binders, /and/ the binders merged in from earlier right-hand sides.
-    -- Here, in Clash Core:
+    -- Here:
     --
     --   * the binder @x@ in @a@ is also a free variable (bound in the
     --     context), referred to by @b@: not renaming it captures that
@@ -513,7 +511,7 @@ recToLetRecTests = testGroup "recToLetRec"
   , testCase "doesn't fire outside the root" $
       assertNoRewriteAt env (recState "Int -> Int -> Int") [LamStep] recToLetRecS [varD "x_4" "Int"]
         (recTm "\\(y :: Int) -> let { (a :: Int) = rec_G300 x_4 y; (b :: Int) = g_G10 a; (r :: Int) = k_G12 b a } in r")
-    -- The Clash Core version would replace @r@ by itself, leaving it unbound
+    -- Replacing @r@ by itself would leave it unbound
   , testCase "doesn't fire when the result is a recursive call" $
       recKeeps [] (recTm "\\(x :: Int) (y :: Int) -> let { (r :: Int) = rec_G300 x y; (b :: Int) = g_G10 r } in r")
   ]

@@ -7,8 +7,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Transformations for compile-time reduction of expressions / primitives, on
-  scoped Clash Core: the ported counterparts of
-  "Clash.Normalize.Transformations.Reduce".
+  scoped Clash Core.
 
   = Primitive reductions
 
@@ -87,7 +86,7 @@ import Clash.Rewrite.Scoped.Util
 
 -- | Remove the bindings whose right-hand side is alpha-equivalent to that of
 -- a binding before it, substituting the variable of the earlier binding for
--- theirs. See 'Clash.Normalize.Transformations.Reduce.reduceBinders'.
+-- theirs.
 --
 -- Is given the bindings of a let-expression in inverse topological order,
 -- e.g. opened with 'Clash.Rewrite.Scoped.Util.openLetBindings', and returns
@@ -96,6 +95,15 @@ import Clash.Rewrite.Scoped.Util
 -- applies to the body (and to the right-hand sides, if the bindings were not
 -- in inverse topological order because they are recursive). Doesn't touch
 -- bindings marked 'NoDeDup'.
+--
+-- TODO: check further speed improvements:
+--
+-- 1. Store the processed binders in a `Map Expr LetBinding`:
+--    * Trades O(1) `cons` and O(n)*aeqTerm `find` for:
+--    * O(log n)*aeqTerm `insert` and O(log n)*aeqTerm `lookup`
+-- 2. Store the processed binders in a `AEQTrie Expr LetBinding`
+--    * Trades O(1) `cons` and O(n)*aeqTerm `find` for:
+--    * O(e) `insert` and O(e) `lookup`
 reduceBinders
   :: Distinct l
   => Scope l
@@ -124,8 +132,7 @@ reduceBinders sc !subst processed (lb : rest)
     _ -> False
 {-# SCC reduceBinders #-}
 
--- | Evaluate applied primitives to WHNF with the evaluator, see
--- 'Clash.Normalize.Transformations.Reduce.reduceConst'
+-- | Evaluate applied primitives to WHNF with the evaluator
 reduceConst :: Transformation
 reduceConst = toScopedTransformation "reduceConst" (onApp 'reduceConstWorker)
 
@@ -148,8 +155,57 @@ reduceConstWorker ctx e _appFunction _appArgument = case ctxFrames ctx of
     | otherwise -> return e
 {-# SCC reduceConstWorker #-}
 
--- | Replace primitives by their "definition", see
--- 'Clash.Normalize.Transformations.Reduce.reducePrim', and the module header
+{- Note [Unroll shouldSplit types]
+1. Certain higher-order functions over Vec, such as map, have specialized
+code-paths to turn them into generate-for loops in HDL, instead of having to
+having to unroll/inline their recursive definitions, e.g. Clash.Sized.Vector.map
+
+2. Clash, in general, translates Haskell product types to VHDL records. This
+mostly works out fine, there is however one exception: certain synthesis
+tools, and some HDL simulation tools (like verilator), do not like it when
+the clock (and certain other global control signals) is contained in a
+record type; they want them to be separate inputs to the entity/module.
+And Clash actually does some transformations to try to ensure that values of
+type Clock do not end up in a VHDL record type.
+
+The problem is that the transformations in 2. never took into account the
+specialized code-paths in 1. Making the code-paths in 1. aware of the
+transformations in 2. is really not worth the effort for such a niche case.
+It's easier to just unroll the recursive definitions.
+
+See https://github.com/clash-lang/clash-compiler/issues/1606
+-}
+
+-- | Replace primitives by their "definition" if they would lead to
+-- let-bindings with a non-representable type when a function is in ANF. This
+-- happens for example when Clash.Size.Vector.map consumes or produces a vector
+-- of non-representable elements.
+--
+-- This transformation used to be called @reduceNonRepPrim@, but nowadays it
+-- also replaces primitives for other reasons: e.g., because they are applied
+-- to short vectors, because they occur in a context that should be reduced
+-- (see 'shouldReduce'), because their argument or result type should be split
+-- (see Note [Unroll shouldSplit types]), or because @-fclash-ultra@ is
+-- enabled. The conditions differ per primitive, see the handlers in
+-- 'reducePrimImpls'.
+--
+-- Basically what this transformation does is replace a primitive the
+-- completely unrolled recursive definition that it represents. e.g.
+--
+-- > zipWith ($) (xs :: Vec 2 (Int -> Int)) (ys :: Vec 2 Int)
+--
+-- is replaced by:
+--
+-- > let (x0  :: (Int -> Int))       = case xs  of (:>) _ x xr -> x
+-- >     (xr0 :: Vec 1 (Int -> Int)) = case xs  of (:>) _ x xr -> xr
+-- >     (x1  :: (Int -> Int)(       = case xr0 of (:>) _ x xr -> x
+-- >     (y0  :: Int)                = case ys  of (:>) _ y yr -> y
+-- >     (yr0 :: Vec 1 Int)          = case ys  of (:>) _ y yr -> xr
+-- >     (y1  :: Int                 = case yr0 of (:>) _ y yr -> y
+-- > in  (($) x0 y0 :> ($) x1 y1 :> Nil)
+--
+-- Currently, it only handles the functions in 'reducePrimImpls'. See the
+-- module header for how the handlers work.
 reducePrim :: Transformation
 reducePrim = toScopedTransformation "reducePrim" (onApp 'reducePrimWorker)
 
@@ -233,11 +289,16 @@ zeroLengthVecTerm te sc tv
   = Nothing
 
 -- | Can applying the primitive produce a value whose type has
--- 'Clash.Sized.Vector.Vec' at its head? See
--- 'Clash.Normalize.Transformations.Reduce.mayReturnVec'.
+-- 'Clash.Sized.Vector.Vec' at its head? This is decided from the primitive's
+-- declared type ('primType'), which is readily available, rather than from the
+-- type of the applied primitive, which has to be inferred: this check is there
+-- to avoid work for the vast majority of primitives.
 --
--- This looks at the declared type of the primitive, its 'primType': this check
--- is there to avoid work for the vast majority of primitives.
+-- A result headed by a concrete type constructor other than @Vec@ can never
+-- instantiate to a @Vec@. Everything else -- type variables, type families,
+-- type constructors we know nothing about -- might, and yields 'True'.
+-- Over-approximating is sound: a 'True' only makes 'reducePrim' infer
+-- the type of the applied primitive and ask 'zeroLengthVecTerm' for a verdict.
 mayReturnVec :: TypeEnv -> Type n -> Bool
 mayReturnVec te ty = case splitFunForallTy ty of
   SplitFunForall _ res -> case tyView res of
@@ -316,14 +377,13 @@ natSize :: Distinct n => ReducePrimContext n -> Type n -> Either String Integer
 natSize rpc = runExcept . tyNatSize (typeEnv rpc) (rpcScope rpc)
 
 -- | Whether to unroll a primitive with this argument or result type, see
--- Note [Unroll shouldSplit types] in "Clash.Normalize.Transformations.Reduce"
+-- Note [Unroll shouldSplit types]
 isSplit :: Distinct n => ReducePrimContext n -> Type n -> Bool
 isSplit rpc = Maybe.isJust . shouldSplit (typeEnv rpc) (rpcScope rpc)
 
 -- | The leading argument types of the primitive, instantiated with the given
--- type arguments. See the uses of 'C.piResultTys' in
--- "Clash.Normalize.Transformations.Reduce"; those patterns also fail on an
--- argument that is a quantified type variable.
+-- type arguments: the types of its term arguments up to the first remaining
+-- quantified type variable.
 primArgTys :: Distinct n => ReducePrimContext n -> [Type n] -> [Type n]
 primArgTys rpc tys =
   case splitFunForallTy (piResultTys te sc (primInfoType (primInfo rpc)) tys) of
@@ -558,8 +618,8 @@ reduceTransposeHandler :: Distinct n => ReducePrimContext n -> NormalizeSession 
 reduceTransposeHandler rpc@ReducePrimContext{..}
   -- TODO(transpose): the type arguments of @transpose :: KnownNat n => Vec m
   -- (Vec n a) -> Vec n (Vec m a)@ are @n@, @m@ and @a@, in that order, so
-  -- @mTy@ and @nTy@ are swapped here. This is the behaviour of
-  -- 'Clash.Normalize.Transformations.Reduce.reducePrim', which the port keeps.
+  -- @mTy@ and @nTy@ are swapped here. This is long-standing behaviour, which
+  -- is kept as is for now.
   | (_,[mTy,nTy,_aTy]) <- Either.partitionEithers primArguments
   = case (natSize rpc nTy, natSize rpc mTy) of
       (Right n, Right 0) -> reduceWith rpc (ReduceTranspose n)
@@ -774,13 +834,12 @@ isUntranslatableType_not_poly sc t = do
 
 -- | Abstract over a primitive until it is saturated: give the continuation
 -- the given number of term arguments, abstracting over the ones that are
--- missing, and apply its result to the remaining ones. See
--- 'Clash.Normalize.Transformations.Reduce.abstractOverMissingArgs'.
+-- missing, and apply its result to the remaining ones.
 --
 -- The ticks of the primitive are put around the result of the continuation,
--- which lives in the scope extended with the missing arguments. Like in Clash
--- Core, they are not sunk into that scope by the continuation: it gets them
--- in the outer scope, and has to 'sink' them if it uses them.
+-- which lives in the scope extended with the missing arguments. They are not
+-- sunk into that scope for the continuation: it gets them in the outer scope,
+-- and has to 'sink' them if it uses them.
 abstractOverMissingArgs
   :: forall n
    . (HasCallStack, Distinct n)

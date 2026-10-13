@@ -4,13 +4,12 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for the primitive reductions of
-  "Clash.Normalize.Scoped.Transformations.Reduce": the regression tests of the
-  reductions of Clash Core ("Clash.Normalize.PrimitiveReductions"), and tests
-  of the reductions whose expected results are those of the scoped
-  reductions, which agreed with the reductions of Clash Core up to the form of
-  coercions. 'assertRewritesTo' runs every test in the scope of the free
-  variables of its input, and in a scope that the binders of the input clash
-  with.
+  "Clash.Normalize.Scoped.Transformations.Reduce": the regression tests that
+  the reductions of Clash Core had, and tests of the reductions whose expected
+  results are those of the scoped reductions, which agreed with the
+  reductions of Clash Core up to the form of coercions. 'assertRewritesTo'
+  runs every test in the scope of the free variables of its input, and in a
+  scope that the binders of the input clash with.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}

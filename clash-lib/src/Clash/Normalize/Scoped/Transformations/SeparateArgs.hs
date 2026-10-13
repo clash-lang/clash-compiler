@@ -6,12 +6,11 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The separating arguments transformation of scoped Clash Core: the ported
-  counterpart of "Clash.Normalize.Transformations.SeparateArgs".
+  The separating arguments transformation of scoped Clash Core.
 
-  Unlike that of Clash Core, it doesn't split arguments of a product type of
-  which the type of a field mentions an existentially quantified type
-  variable, see 'Clash.Core.Scoped.Util.shouldSplit'.
+  It doesn't split arguments of a product type of which the type of a field
+  mentions an existentially quantified type variable, see
+  'Clash.Core.Scoped.Util.shouldSplit'.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -51,8 +50,15 @@ import Clash.Core.Scoped.Util (SplitInfo (..), shouldSplit)
 import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
 
 -- | Split apart (global) function arguments that contain types that we want
--- to separate off, e.g. Clocks. See
--- 'Clash.Normalize.Transformations.SeparateArgs.separateArguments'.
+-- to separate off, e.g. Clocks. Works on both the definition side (i.e. the
+-- lambda), and the call site (i.e. the application of the global variable).
+-- e.g. turns
+--
+-- > f :: (Clock System, Reset System) -> Signal System Int
+--
+-- into
+--
+-- > f :: Clock System -> Reset System -> Signal System Int
 separateArguments :: Transformation
 separateArguments = toScopedTransformation "separateArguments"
   (  onLam 'separateArgumentsLambdaWorker
@@ -87,9 +93,9 @@ separateArgumentsLambdaWorker ctx node b eb = do
 -- 'separateArguments': splits the arguments of a global function.
 --
 -- It updates the type of the global variable to take the split arguments into
--- account as 'Clash.Normalize.Transformations.SeparateArgs.separateArgumentsSpineWorker'
--- does. The global can be applied to fewer arguments than it has parameters,
--- whose types are kept, or to more, when its result type is a type variable
+-- account, and applies the global function to the split apart arguments. The
+-- global can be applied to fewer arguments than it has parameters, whose
+-- types are kept, or to more, when its result type is a type variable
 -- instantiated with a function type, which stay applied. The type of a global
 -- is closed, so it only splits an argument whose parts have closed types.
 separateArgumentsSpineWorker

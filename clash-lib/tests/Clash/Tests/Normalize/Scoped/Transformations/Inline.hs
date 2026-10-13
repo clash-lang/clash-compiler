@@ -5,7 +5,6 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.Inline".
 
-  The regression tests are those of "Clash.Normalize.Transformations.Inline".
   'assertRewritesTo' runs every test in the scope of the free variables of
   its input, and in a scope that the binders of the input clash with.
 -}
@@ -105,10 +104,9 @@ keepsInTop bs = assertNoRewrite env (topState bs)
 -- * inlineBndrsCleanup
 
 -- | Run the scoped 'S.inlineBndrsCleanup' on a let-expression, keeping its
--- first binding and inlining the others, like the #1337 tests in
--- "Clash.Tests.Normalize.Transformations" do for Clash Core. Asserts that it
--- gives the let-expression with the expected bindings, also in a scope that
--- its binders clash with.
+-- first binding and inlining the others, as in the regression tests of
+-- #1337. Asserts that it gives the let-expression with the expected bindings,
+-- also in a scope that its binders clash with.
 inlineBndrsCleanup1337 :: TestTerm -> TestTerm -> Assertion
 inlineBndrsCleanup1337 expected input =
   withTerm input $ \ts e -> do
@@ -134,7 +132,8 @@ tests =
   testGroup "Clash.Tests.Normalize.Scoped.Transformations.Inline"
     [ testGroup "regression tests" regressionTests
     , testGroup "inlineBndrsCleanup (#1337)"
-        [ -- See @t1337a@ in "Clash.Tests.Normalize.Transformations"
+        [ -- The bindings to inline form the cycle @a -> b -> c -> a@: @b@
+          -- turns out to be recursive, and is kept
           testCase "t1337a" $
             inlineBndrsCleanup1337
               "let { (res :: Int) = b; (b :: Int) = b b } in res"
@@ -147,7 +146,8 @@ tests =
                   ; (c :: Int) = a b
                   } in res
               |]
-          -- See @t1337b@ in "Clash.Tests.Normalize.Transformations"
+          -- The bindings to inline form the cycle @a -> b -> c -> d -> a@:
+          -- @c@ turns out to be recursive, and is kept
         , testCase "t1337b" $
             inlineBndrsCleanup1337
               "let { (res :: Int) = c; (c :: Int) = c c c } in res"
@@ -160,8 +160,8 @@ tests =
                   ; (d :: Int) = a b c
                   } in res
               |]
-          -- See @t1337c@ in "Clash.Tests.Normalize.Transformations": a free
-          -- variable of the let-expression is no let-binding to inline
+          -- Like @t1337a@, but a free variable of the let-expression is no
+          -- let-binding to inline
         , testCase "t1337c" $
             inlineBndrsCleanup1337
               "let { (res :: Int) = b; (b :: Int) = b b (freevar_5 :: Int) } in res"
@@ -224,7 +224,7 @@ tests =
   inlineSimIOS = $(asScopedRewriteQ S.inlineSimIO)
   collapseRHSNoopsS = $(asScopedRewriteQ S.collapseRHSNoops)
 
--- | The regression tests of "Clash.Normalize.Transformations.Inline"
+-- | Regression tests for bugs in the inlining transformations
 regressionTests :: [TestTree]
 regressionTests =
   [ -- 'inlineCleanup' on a let-expression in which the binders that it wants

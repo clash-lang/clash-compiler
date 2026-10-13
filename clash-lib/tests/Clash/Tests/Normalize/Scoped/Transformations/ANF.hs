@@ -5,9 +5,9 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.ANF".
 
-  The regression tests are those of "Clash.Normalize.Transformations.ANF".
-  'assertRewritesTo' runs them in the scope of the free variables of their
-  inputs, and in a scope that the binders of their inputs clash with.
+  'assertRewritesTo' runs the regression tests in the scope of the free
+  variables of their inputs, and in a scope that the binders of their inputs
+  clash with.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -106,13 +106,13 @@ tests =
           "\\(s :: E) -> (case s of { MkE (e :: Type) (y :: Int) -> k_G33 (g_G1306 @e y) y }) :: Int"
     ]
 
--- | The regression tests of "Clash.Normalize.Transformations.ANF"
+-- | Regression tests for bugs in the conversion to ANF
 regressionTests :: [TestTree]
 regressionTests =
   [ -- 'nonRepANF' moved the let-bindings out of a non-representable argument
     -- of a data constructor without renaming them. They could then capture
-    -- free variables of the other arguments: here the binder @x@ the free
-    -- variable @x_2@, which it shadowed in Clash Core.
+    -- free variables of the other arguments: here the binder @x@ would
+    -- capture the free variable @x_2@.
     -- https://github.com/clash-lang/clash-compiler/pull/1071
     testCase "nonRepANF deshadows let-bindings (#1071)" $ do
       assertRewritesTo def st nonRepANFS [varD "u_1" "Int", varD "x_2" "Int"]
@@ -186,7 +186,7 @@ regressionTests =
         (tm "\\(e :: E) -> (case e of { MkE (m :: Type) (x :: m) (y :: Int) -> k_G33 (h_G50 y) y }) :: Int")
   ]
 
--- | Tests of 'Scoped.makeANF', with the results of 'makeANF' of Clash Core
+-- | Tests of the shape of the result of 'Scoped.makeANF'
 makeANFTests :: [TestTree]
 makeANFTests =
   [ testCase "pattern variable used by a let-bound alternative" $

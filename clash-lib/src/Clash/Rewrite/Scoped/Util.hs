@@ -6,8 +6,10 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Utilities for rewriting scoped Clash Core ("Clash.Core.Scoped.Syntax"): the
-  ported counterparts of "Clash.Rewrite.Util".
+  Utilities for rewriting scoped Clash Core ("Clash.Core.Scoped.Syntax"):
+  creating binders, the representability of terms and types, inlining,
+  lifting and removing let-bindings, recognizing join points, and binding
+  what the evaluator allocated.
 
   = Binders
 
@@ -18,8 +20,8 @@
 
   = Let-bindings
 
-  Clash Core passes let-bindings around as lists of binders and right-hand
-  sides, which scoped Core can't: the binders are a telescope. The functions
+  Let-bindings can't be passed around as lists of binders and right-hand
+  sides: the binders are a telescope. The functions
   here work on the bindings of an opened let-expression ('openLetBindings'):
   a telescope of binders, and the bindings as t'LetBinding's in the scope of
   the body. Substituting for some of the binders ('substVars') keeps
@@ -119,8 +121,7 @@ import           Clash.Rewrite.Scoped.Types
 
 -- * Binders
 
--- | Make a binder with a fresh name for a term, of the type of the term. See
--- 'Clash.Rewrite.Util.mkTmBinderFor'.
+-- | Make a binder with a fresh name for a term, of the type of the term.
 mkTmBinderFor
   :: (HasCallStack, Distinct n)
   => TypeEnv
@@ -134,7 +135,7 @@ mkTmBinderFor
 mkTmBinderFor te sc nm e = withFreshIdBinder sc (coerce nm) (inferCoreTypeOf te sc e)
 
 -- | Make a binder with a fresh name for a term or a type, of the type of the
--- term or the kind of the type. See 'Clash.Rewrite.Util.mkBinderFor'.
+-- term or the kind of the type.
 mkBinderFor
   :: (HasCallStack, Distinct n)
   => TypeEnv
@@ -152,8 +153,8 @@ mkBinderFor te sc nm arg k = case arg of
 
 -- * Types
 
--- | Determine if a term cannot be represented in hardware, see
--- 'Clash.Rewrite.Util.isUntranslatable'
+-- | Determine if a term cannot be represented in hardware: whether its type
+-- can't be, see 'isUntranslatableType'
 isUntranslatable
   :: (HasCallStack, Distinct n)
   => Bool
@@ -165,8 +166,7 @@ isUntranslatable stringRepresentable sc tm = do
   te <- Lens.view scopedTypeEnv
   isUntranslatableType stringRepresentable sc (inferCoreTypeOf te sc tm)
 
--- | Determine if a type cannot be represented in hardware, see
--- 'Clash.Rewrite.Util.isUntranslatableType'
+-- | Determine if a type cannot be represented in hardware
 isUntranslatableType
   :: Distinct n
   => Bool
@@ -181,8 +181,7 @@ isUntranslatableType stringRepresentable sc ty = do
   not <$> runWithHWTypeCache (representableTypeState tt reprs stringRepresentable te sc ty)
 {-# INLINE isUntranslatableType #-}
 
--- | Normalize the types of a cast, or of a variable occurrence, see
--- 'Clash.Rewrite.Util.normalizeTermTypes'
+-- | Normalize the types of a cast, or of a variable occurrence
 normalizeTermTypes :: Distinct n => TypeEnv -> Scope n -> Term n -> Term n
 normalizeTermTypes te sc e = case e of
   Cast e' ty1 ty2 ->
@@ -310,8 +309,7 @@ keepBindings sc bs kept body
 -- | Inline the given bindings, of a let-expression opened with
 -- 'openLetBindings', into each other. Gives the substitution for the
 -- binders that could be inlined, and the bindings that could not, as they
--- refer to themselves after inlining the others, in reverse order. See
--- 'Clash.Rewrite.Util.substituteBinders'.
+-- refer to themselves after inlining the others, in reverse order.
 substituteBinders
   :: Distinct l
   => Scope l
@@ -340,8 +338,7 @@ extendSubstitution scL x e m =
 
 -- | Inline the bindings of a let-expression that have a certain property.
 -- This is a 'Clash.Rewrite.StrategyDSL.onLet' handler: it receives the
--- let-expression itself, its bindings, and its body. See
--- 'Clash.Rewrite.Util.inlineBinders'.
+-- let-expression itself, its bindings, and its body.
 --
 -- The property gets the binding in the scope of the body of the
 -- let-expression.
@@ -384,7 +381,6 @@ inlineBinders condition ctx e bind body = case bind of
 -- | Lift a binding of a let-expression opened with 'openLetBindings' to a
 -- global function, abstracted over the free variables of the binding. Gives
 -- the term that replaces the binder: the global applied to those variables.
--- See 'Clash.Rewrite.Util.liftBinding'.
 --
 -- Recursive occurrences of the binder are replaced by that term /before/
 -- abstracting over the free variables. The function abstracts over the free
@@ -479,8 +475,7 @@ abstractOver caller tvs ids e = closeOverOrError caller tvs ids $ \_ tvTele idTe
 
 -- | Lift the given bindings, of a let-expression opened with
 -- 'openLetBindings', to global functions (see 'liftBinding'), and substitute
--- them in each other, the other bindings, and the body. See
--- 'Clash.Rewrite.Util.liftAndSubsituteBinders'.
+-- them in each other, the other bindings, and the body.
 liftAndSubstituteBinders
   :: (HasCallStack, Distinct l)
   => Scope l
@@ -506,8 +501,7 @@ liftAndSubstituteBinders scL toLift toKeep body = do
 
 -- | Inline or lift the bindings of a let-expression that have a certain
 -- property. This is a 'Clash.Rewrite.StrategyDSL.onLet' handler: it receives
--- the let-expression itself, its bindings, and its body. See
--- 'Clash.Rewrite.Util.inlineOrLiftBinders'.
+-- the let-expression itself, its bindings, and its body.
 --
 -- Both tests get the bindings in the scope of the body of the let-expression,
 -- see 'openLetBindings'.
@@ -553,11 +547,10 @@ inlineOrLiftBinders condition inlineOrLift ctx e bind body =
   sc = tfScope ctx
 
 -- | Remove the unused bindings of a let-expression. 'Nothing' if all of them
--- are used. See 'Clash.Rewrite.Util.removeUnusedBinders'.
+-- are used.
 --
--- A binding is used if the body refers to it, or a used binding does. Unlike
--- 'Clash.Rewrite.Util.removeUnusedBinders', the used bindings of a recursive
--- let-binding keep their order, rather than being ordered by unique.
+-- A binding is used if the body refers to it, or a used binding does. The
+-- used bindings of a recursive let-binding keep their order.
 removeUnusedBinders
   :: Distinct n
   => Scope n
@@ -593,8 +586,7 @@ usedBinders raws xs body = go IntSet.empty (rawsOf body)
 
 -- | Determine whether the binder of a binding is a join-point created for a
 -- complex case expression, in the let-expression that binds it, given by its
--- bindings and body (see 'openLetBindings'). See
--- 'Clash.Rewrite.Util.isJoinPointIn'.
+-- bindings and body (see 'openLetBindings').
 --
 -- A join-point is when a local function only occurs in tail-call positions,
 -- and when it does, more than once.
@@ -616,7 +608,7 @@ isJoinPointIn x lbs body =
 
 -- | Count the number of (only) tail calls of a function, given by its raw
 -- name, in an expression. 'Nothing' indicates that the function was used in a
--- non-tail call position. See 'Clash.Rewrite.Util.tailCalls'.
+-- non-tail call position.
 --
 -- A binder with the raw name of the function hides it in its scope.
 tailCalls :: Int -> Term x -> Maybe Int
@@ -662,8 +654,11 @@ tailCalls r = \case
 -- | The tail calls of a function in a let-expression, given the raw names of
 -- its binders, the tail calls of the function in their right-hand sides, the
 -- tail calls of a variable in the body, and those of the function in the
--- body. See the 'Clash.Core.Term.Letrec' case of
--- 'Clash.Rewrite.Util.tailCalls'.
+-- body. The function is used in a non-tail call position if it is in one of
+-- the right-hand sides; if it isn't used in any of them, it is counted in
+-- the body only; otherwise, if every binder whose right-hand side calls it is
+-- only tail-called in the body, the calls in the right-hand sides are added
+-- to those in the body.
 letTailCalls :: [Int] -> [Maybe Int] -> (Int -> Maybe Int) -> Maybe Int -> Maybe Int
 letTailCalls bndrs bsTls inBody fBody
   | not (all isJust bsTls) = Nothing
@@ -677,8 +672,7 @@ letTailCalls bndrs bsTls inBody fBody
 -- > \(w :: Void) -> f a b c
 --
 -- i.e. is a wrapper around a (partially) applied function 'f', where the
--- introduced argument 'w' is not used by 'f'. See
--- 'Clash.Rewrite.Util.isVoidWrapper'.
+-- introduced argument 'w' is not used by 'f'.
 isVoidWrapper :: Term n -> Bool
 isVoidWrapper = \case
   Lam b e@(collectArgs -> (hd, _)) | isVar hd -> not (tmNameOf b `tmNameOccursIn` e)
@@ -692,11 +686,11 @@ isVoidWrapper = \case
 -- * Evaluation
 
 -- | Bind the bindings the evaluator allocated over the result of a rewrite of
--- the evaluated term, see 'Clash.Rewrite.Util.bindPureHeap'. The rewrite runs
--- in the scope of the bindings. If it changed the term, the work-free
--- bindings are inlined and the unused ones removed ('cleanupHeapBindings').
--- Otherwise the result of the rewrite should not mention the bindings: it is
--- only bound by them if it does.
+-- the evaluated term. The rewrite runs in the scope of the bindings. If it
+-- changed the term, the work-free bindings are inlined and the unused ones
+-- removed ('cleanupHeapBindings'). Otherwise the result of the rewrite should
+-- not mention the bindings: it is only bound by them if it does, which
+-- prevents unnecessary rewrites.
 bindPureHeap
   :: Distinct n
   => TransformContext n
@@ -716,7 +710,32 @@ bindPureHeap ctx bind v k = underLet ctx bind v $ \ctxL bind1 v1 -> do
 
 -- | Bind the bindings the evaluator allocated over the result of a rewrite of
 -- the evaluated term (see 'bindPureHeap'), inlining the work-free ones and
--- removing the unused ones. See 'Clash.Rewrite.Util.cleanupHeapBindings'.
+-- removing the unused ones:
+--
+--   1. Inline work-free bindings. We've seen cases in the wild† where the
+--      evaluator (or rather, 'bindPureHeap') would let-bind work-free
+--      binders that were crucial for eliminating case constructs. If these
+--      case constructs were used in a self-referential (but terminating)
+--      manner, Clash would get stuck in an infinite loop. The proper
+--      solution would be to use 'Clash.Rewrite.Scoped.WorkFree.isWorkFree',
+--      instead of 'Clash.Rewrite.Scoped.WorkFree.isWorkFreeIsh', in
+--      'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar' such
+--      that these work-free constructs would get inlined again. However,
+--      this incurs a great performance penalty so we opt to prevent the
+--      evaluator from introducing this situation in the first place.
+--
+--      This is not a proper solution though, as GHC might produce a similar
+--      situation. We plan on properly solving this by eliminating the
+--      current lift\/bind\/eval strategy, instead replacing it by a partial
+--      evaluator‡.
+--
+--   2. Remove any unused let-bindings. Similar to (1), we risk Clash getting
+--      stuck in an infinite loop if we don't remove unused (eliminated by
+--      evaluation!) binders.
+--
+-- † <https://github.com/clash-lang/clash-compiler/pull/1354#issuecomment-635430374>
+--
+-- ‡ <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/supercomp-by-eval.pdf>
 cleanupHeapBindings
   :: Distinct n
   => TransformContext n
@@ -727,7 +746,7 @@ cleanupHeapBindings
   -- ^ The result of the rewrite, which may refer to the bindings
   -> RewriteMonad extra (Term n)
 cleanupHeapBindings ctx bind e1 =
-  -- See 'Clash.Rewrite.Util.cleanupHeapBindings' for why
+  -- See the haddock of this function for why
   inlineBinders inlineTest ctx (Let bind e1) bind e1 >>= \case
     e2@(Let bind1 e3) -> pure (fromMaybe e2 (removeUnusedBinders (tfScope ctx) bind1 e3))
     e2 -> pure e2

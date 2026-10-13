@@ -206,7 +206,8 @@ flattenSpec =
                              ])) !->
   bottomup deadCode >-> -- See #3407
   letTL >->
-  -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
+  -- See Note [relation collapseRHSNoops and inlineCleanup] in
+  -- "Clash.Normalize.Scoped.Transformations.Inline".
   -- Note that we do this as the very last step, after all constant propagation
   -- has been done to avoid #3036.
   topdownSuc collapseRHSNoops >->

@@ -3,8 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Rewrite.Scoped.WorkFree". The expected results are those of
-  the functions of "Clash.Rewrite.WorkFree" that these replace.
+  Tests for "Clash.Rewrite.Scoped.WorkFree".
 -}
 
 {-# LANGUAGE GADTs #-}

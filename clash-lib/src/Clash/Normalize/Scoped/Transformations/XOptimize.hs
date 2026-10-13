@@ -6,20 +6,17 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The X-optimization transformation of scoped Clash Core: the ported
-  counterpart of "Clash.Normalize.Transformations.XOptimize".
+  The X-optimization transformation of scoped Clash Core.
 
   When only one alternative is defined, 'xOptimize' let-binds the subject and
   the pattern binders. It creates new binders for them in the scope of the
   case-expression, so the pattern binders can't capture the free variables of
-  the subject, and the binder of the subject is fresh with respect to them:
-  bugs of the transformation of Clash Core.
+  the subject, and the binder of the subject is fresh with respect to them.
 
   When no alternative is defined, it replaces the case-expression with
   @errorX@. The type of a primitive is closed in scoped Core, so if the type
   of the case-expression mentions type variables, that is @errorX \@ty@, where
-  @errorX@ has type @forall a. a@ (see 'Clash.Core.Scoped.Util.primAtType'),
-  where Clash Core gives @errorX@ the open type.
+  @errorX@ has type @forall a. a@ (see 'Clash.Core.Scoped.Util.primAtType').
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -63,8 +60,31 @@ import Clash.Core.Scoped.Util (internalName, primAtType)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
 
 -- | Remove all undefined alternatives from case expressions, replacing them
--- with the value of another defined alternative, see
--- 'Clash.Normalize.Transformations.XOptimize.xOptimize'
+-- with the value of another defined alternative. If there is one defined
+-- alternative, the entire expression is replaced with that alternative. If
+-- there are no defined alternatives, the entire expression is replaced with
+-- a call to 'errorX'.
+--
+-- e.g. It converts
+--
+-- @
+-- case x of
+--   D1 a -> f a
+--   D2   -> undefined
+--   D3   -> undefined
+-- @
+--
+-- to
+--
+-- @
+-- letrec subj = x
+--        a    = case subj of
+--                 D1 field0 -> field0
+--  in f a
+-- @
+--
+-- where @fieldN@ is an internal variable referring to the nth argument of a
+-- data constructor.
 xOptimize :: Transformation
 xOptimize = toScopedTransformation "xOptimize" (onCase 'xOptimizeWorker)
 

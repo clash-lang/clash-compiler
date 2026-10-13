@@ -6,12 +6,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on primitives with multiple results, of scoped Clash Core:
-  the ported counterparts of "Clash.Normalize.Transformations.MultiPrim". See
-  Note [MultiResult type] there.
-
-  @c$multiPrimSelect@ has the closed type @forall a b. a -> b -> a@, as in
-  Clash Core.
+  Transformations on primitives with multiple results, of scoped Clash Core.
+  See Note [MultiResult type].
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -53,8 +49,50 @@ import Clash.Core.Scoped.TysPrim (liftedTypeKind)
 import Clash.Core.Scoped.Util (internalName, listToLets)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
 
--- | Rewrite primitives that can assign their results to multiple signals,
--- see 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
+{- Note [MultiResult type]
+
+A multi result primitive assigns its results to multiple result variables
+instead of one. Besides producing nicer HDL it works around issues with
+synthesis tooling described in:
+
+  https://github.com/clash-lang/clash-compiler/issues/1555
+
+This transformation rewrites primitives indicating they can assign their
+results to multiple signals, such that netlist can easily render it. This
+involves inserting additional arguments for each of the result values, and
+then using the c$multiPrimSelect primitive to select individual results.
+
+Example:
+
+  prim :: forall a b c. a -> (b, c)
+
+will be rewritten to:
+
+  /\a b c -> \(a1 :: a) ->
+    letrec
+      r  = prim @a @b @c a1 r2 r3 -- With 'MultiResult'
+      r2 = c$multiPrimSelect @b @(b, c) r2 r
+      r3 = c$multiPrimSelect @c @(b, c) r3 r
+    in
+      (r2, r3)
+
+Netlist will not render any c$multiPrimSelect primitives. Similar to
+primitives having a /void/ return type, r is not rendered either.
+
+c$multiPrimSelect has the closed type forall a b. a -> b -> a: a 'PrimInfo'
+isn't indexed by a scope, so the type of a primitive can't mention type
+variables of the term it occurs in.
+
+This transformation is currently hardcoded to recognize tuples as return
+types, not any product type. It will error if it sees a multi result primitive
+with a non-tuple return type.
+-}
+
+-- | Rewrite primitives that can assign their results to multiple signals:
+-- add an argument for each of the results, which the primitive assigns to,
+-- and select the individual results with @c$multiPrimSelect@. Only
+-- primitives with a tuple result type are supported. See Note [MultiResult
+-- type].
 setupMultiResultPrim :: Transformation
 setupMultiResultPrim =
   toScopedTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)
@@ -133,8 +171,7 @@ multiResultPrimInfo p =
   mkPrimInfo (primName p) (primType p) (primWorkInfo p) MultiResult (primUnfolding p)
 
 -- | The primitive that selects a result of a multi-result primitive, of type
--- @forall a b. a -> b -> a@, see
--- 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
+-- @forall a b. a -> b -> a@, see Note [MultiResult type]
 multiPrimSelectInfo :: PrimInfo
 multiPrimSelectInfo =
   mkPrimInfo "c$multiPrimSelect" selTy WorkAlways SingleResult NoUnfolding

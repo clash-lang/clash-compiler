@@ -3,14 +3,12 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Reduce": the scoped
-  'Scoped.reducePrim', whose expected results are its results, which agreed
-  with 'Clash.Normalize.Transformations.Reduce.reducePrimWorker' up to the
-  form of coercions; the scoped 'Scoped.reduceConst', which evaluates with the
-  let-bindings of its context; and 'Scoped.reduceBinders', which removes
-  duplicate bindings. 'assertRewritesTo' runs every test in the scope of the
-  free variables of its input, and in a scope that the binders of the input
-  clash with.
+  Tests for "Clash.Normalize.Scoped.Transformations.Reduce":
+  'Scoped.reducePrim', which unrolls primitives; 'Scoped.reduceConst', which
+  evaluates with the let-bindings of its context; and 'Scoped.reduceBinders',
+  which removes duplicate bindings. 'assertRewritesTo' runs every test in the
+  scope of the free variables of its input, and in a scope that the binders
+  of the input clash with.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -206,8 +204,8 @@ reduceConstTests = testGroup "reduceConst"
         (tm "let { (x :: GHC.Num.Integer.Integer) = (1 :: Integer) } in GHC.Num.Integer.integerAdd x (2 :: Integer)")
         (tm "let { (x :: GHC.Num.Integer.Integer) = (1 :: Integer) } in (3 :: Integer)")
     -- #2571: a binder between a let-binding of the context and the term
-    -- shadows it in Clash Core. Scoped, the binders of the context have
-    -- different names.
+    -- shadows it, so the let-binding must not be used for the variable of
+    -- the binder. Scoped, the binders of the context have different names.
   , testCase "doesn't use a let-binding of the context that is shadowed" $
       keepsAt reduceConstS [LetBodyStep, LamStep] []
         (tm [strQQ|

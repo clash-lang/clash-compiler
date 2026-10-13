@@ -257,7 +257,8 @@ isAbsurdPat tenv sc pat =
 -- solved.
 --
 -- This solves the equations once: a solution may make other equations
--- solvable. See @elimExistentials@ in "Clash.Normalize.Transformations.Case".
+-- solvable. See
+-- 'Clash.Normalize.Scoped.Transformations.Case.elimExistentials'.
 solvePatExistentials
   :: Distinct n
   => TypeEnv

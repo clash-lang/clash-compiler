@@ -6,10 +6,10 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on casts of scoped Clash Core: the ported counterparts of
-  "Clash.Normalize.Transformations.Cast".
+  Transformations on casts of scoped Clash Core.
 
-  Two bugs of the transformations of Clash Core can't be written here:
+  The transformations that move a term under binders, or that create new
+  binders, can't capture variables:
 
   * 'caseCast' moves the cast under the binders of the patterns. Those can't
     capture the free type variables of the cast, as the cast is sunk into the
@@ -72,9 +72,26 @@ import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Scoped.Util (mkTmBinderFor)
 
--- | Push a cast over an argument to a function into that function, by
--- specializing the function on the cast argument. See
--- 'Clash.Normalize.Transformations.Cast.argCastSpec'.
+-- | Push a cast over an argument to a function into that function
+--
+-- This is done by specializing on the casted argument.
+-- Example:
+--
+-- @
+--   y = f (cast a)
+--     where f x = g x
+-- @
+--
+-- transforms to:
+--
+-- @
+--   y = f' a
+--     where f' x' = (\\x -> g x) (cast x')
+-- @
+--
+-- The reason d'etre for this transformation is that we hope to end up with
+-- and expression where two casts are "back-to-back" after which we can
+-- eliminate them in 'elimCastCast'.
 argCastSpec :: Transformation
 argCastSpec = toScopedTransformation "argCastSpec" (onApp 'argCastSpecWorker)
 
@@ -110,8 +127,7 @@ argCastSpecWorker ctx node f arg
       ]
 {-# SCC argCastSpecWorker #-}
 
--- | Push a cast over a case into its alternatives, see
--- 'Clash.Normalize.Transformations.Cast.caseCast'
+-- | Push a cast over a case into its alternatives
 caseCast :: Transformation
 caseCast = toScopedTransformation "caseCast" (onCast 'caseCastWorker)
 
@@ -132,7 +148,11 @@ caseCastWorker ctx node body ty1 ty2 = case stripTicks body of
 {-# SCC caseCastWorker #-}
 
 -- | Eliminate two back to back casts where the type going in and coming out
--- are the same, see 'Clash.Normalize.Transformations.Cast.elimCastCast'
+-- are the same
+--
+-- @
+--   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
+-- @
 elimCastCast :: Transformation
 elimCastCast = toScopedTransformation "elimCastCast" (onCast 'elimCastCastWorker)
 
@@ -160,8 +180,7 @@ elimCastCastWorker ctx node body tyB' tyC = case stripTicks body of
   _ -> return node
 {-# SCC elimCastCastWorker #-}
 
--- | Push a cast over a let-expression into its body, see
--- 'Clash.Normalize.Transformations.Cast.letCast'
+-- | Push a cast over a let-expression into its body
 letCast :: Transformation
 letCast = toScopedTransformation "letCast" (onCast 'letCastWorker)
 
@@ -180,8 +199,7 @@ letCastWorker ctx node body ty1 ty2 = case stripTicks body of
   _ -> return node
 {-# SCC letCastWorker #-}
 
--- | Make a cast work-free by splitting the work off to a separate binding,
--- see 'Clash.Normalize.Transformations.Cast.splitCastWork':
+-- | Make a cast work-free by splitting the work off to a separate binding:
 --
 -- @
 -- let x = cast (f a b)

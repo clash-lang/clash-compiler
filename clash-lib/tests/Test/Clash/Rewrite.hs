@@ -216,9 +216,9 @@ instance Default InScopeSet where
 withCurFun :: GlobalId -> RewriteState extra -> RewriteState extra
 withCurFun g st = st{_curFun = (g, C.noSrcSpan)}
 
--- | Run an action in the rewrite monad, such as a transformation applied with
--- 'Clash.Rewrite.Util.runRewrite'. Returns its result, the final state, and
--- whether any transformation signalled a change.
+-- | Run an action in the rewrite monad, such as a transformation applied
+-- with 'Clash.Rewrite.Scoped.Apply.runRewrite'. Returns its result, the
+-- final state, and whether any transformation signalled a change.
 runRewriteTest
   :: RewriteEnv
   -> RewriteState extra

@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs, RankNTypes, DataKinds, ScopedTypeVariables #-}
 -- EXPECT: rigid type variable
 -- | Capture: move the arguments of an application under the binders of a
--- let-expression in its function part without opening them (case 3 of Note
--- [AppProp no shadowing], the bug in `appProp`)
+-- let-expression in its function part without opening them (the capture
+-- bug in `appProp` that #1040 fixed)
 module N11AppPropLet where
 
 import Clash.Core.Scoped.Syntax

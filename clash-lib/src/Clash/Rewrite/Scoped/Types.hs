@@ -406,9 +406,10 @@ closestLetBinder ctx = case [nm | KLetBinding nm <- ctxFrames ctx] of
   nm : _ -> Just nm
   [] -> Nothing
 
--- | A name for a new binder, derived from the closest let-binder, see
--- 'Clash.Rewrite.Util.mkDerivedName'. Its unique is not used: scoped binders
--- get fresh names from the scope.
+-- | A name for a new binder, derived from the closest let-binder: the name
+-- of that binder with @_@ and the given suffix appended, or just the suffix
+-- if the subterm isn't in the right-hand side of a let-binding. Its unique
+-- is not used: scoped binders get fresh names from the scope.
 mkDerivedName :: HasCallStack => TransformContext n -> C.OccName -> C.Name C.Term
 mkDerivedName ctx sf = case closestLetBinder ctx of
   Just nm -> C.appendToName nm ('_' `Text.cons` sf)

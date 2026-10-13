@@ -3,9 +3,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.DEC": the regression tests
-  of DEC of Clash Core, and tests of the cases of DEC, whose expected results
-  are those of DEC of Clash Core.
+  Tests for "Clash.Normalize.Scoped.Transformations.DEC": regression tests,
+  and tests of the cases of DEC.
 
   The regression tests are about binders in the alternatives that shadow, or
   are captured by, variables outside of them. In scoped Clash Core, binders

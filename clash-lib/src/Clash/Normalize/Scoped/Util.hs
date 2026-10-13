@@ -4,9 +4,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Utility functions of the normalization transformations on scoped Clash Core
-  ("Clash.Core.Scoped.Syntax"): the ported counterparts of
-  "Clash.Normalize.Util".
+  Utility functions used by the normalization transformations on scoped Clash
+  Core ("Clash.Core.Scoped.Syntax").
 
   = Globals
 
@@ -104,8 +103,8 @@ import           Clash.Rewrite.Scoped.Globals (freshGlobalId)
 -- * Constant arguments of primitives
 
 -- | Whether the context of a subterm indicates that it is to be reduced to a
--- constant: whether it is an argument of a primitive that wants that argument
--- to be constant (see 'isConstantArg'). See 'Clash.Normalize.Util.shouldReduce'.
+-- constant / literal: whether it is an argument of a primitive that wants that
+-- argument to be constant (see 'isConstantArg').
 shouldReduce :: TransformContext n -> NormalizeSession Bool
 shouldReduce = anyM isConstantArg' . ctxFrames
  where
@@ -114,8 +113,8 @@ shouldReduce = anyM isConstantArg' . ctxFrames
 
 -- * Inlining
 
--- | How often a global was inlined into another one. See
--- 'Clash.Normalize.Util.alreadyInlined'.
+-- | How often a global was already inlined into another one, according to
+-- the 'scopedInlineHistory'
 alreadyInlined
   :: GlobalId
   -- ^ Function we want to inline
@@ -126,8 +125,7 @@ alreadyInlined f cf = do
   inlinedHM <- Lens.use scopedInlineHistory
   pure (lookupGlobalEnv f =<< lookupGlobalEnv cf inlinedHM)
 
--- | Record a new inlining in the 'inlineHistory'. See
--- 'Clash.Normalize.Util.addNewInline'.
+-- | Record a new inlining in the 'scopedInlineHistory'
 addNewInline
   :: GlobalId
   -- ^ Function we're inlining
@@ -141,7 +139,15 @@ addNewInline f cf =
                            (singletonGlobalEnv f 1)
 
 -- | A tick to prefix an inlined expression with the name of the global it
--- came from, see 'Clash.Normalize.Util.mkInlineTick'
+-- came from. For example, given
+--
+-- > foo = bar  -- ...
+-- > bar = baz  -- ...
+-- > baz = quuz -- ...
+--
+-- if @bar@ is inlined into @foo@, then the name of the component should
+-- contain the name of the inlined component. This tick ensures that the
+-- component in @foo@ is called @bar_baz@ instead of just @baz@.
 mkInlineTick :: GlobalId -> TickInfo n
 mkInlineTick n = NameMod PrefixName (LitTy (SymTy (toStr n)))
  where
@@ -149,15 +155,14 @@ mkInlineTick n = NameMod PrefixName (LitTy (SymTy (toStr n)))
 
 -- * Recursive globals
 
--- | Whether a term is an application of a non-recursive global. See
--- 'Clash.Normalize.Util.isNonRecursiveGlobalVar'. A local variable is not a
--- global: unlike in Clash Core, they can't be confused.
+-- | Whether a term is an application of a non-recursive global. A local
+-- variable is not a global: the two can't be confused.
 isNonRecursiveGlobalVar :: Term n -> NormalizeSession Bool
 isNonRecursiveGlobalVar (collectArgs -> (GlobalVar g, _)) = not <$> isRecursiveBndr g
 isNonRecursiveGlobalVar _ = pure False
 
 -- | Whether a global binder is recursive. Caches its answer in
--- 'recursiveComponents'. See 'Clash.Normalize.Util.isRecursiveBndr'.
+-- 'scopedRecursiveComponents'.
 isRecursiveBndr :: GlobalId -> NormalizeSession Bool
 isRecursiveBndr g = do
   cg <- Lens.use (extra.scopedRecursiveComponents)
@@ -177,8 +182,7 @@ isRecursiveBndr g = do
 
 -- * Constant specialization
 
--- | The constant parts of a term in scope @n@, see 'constantSpecInfo' and
--- 'Clash.Normalize.Util.ConstantSpecInfo'
+-- | The constant parts of a term in scope @n@, see 'constantSpecInfo'
 data ConstantSpecInfo n where
   ConstantSpecInfo
     :: DExt n l
@@ -199,9 +203,21 @@ data ConstantSpecInfo n where
 csrFoundConstant :: ConstantSpecInfo n -> Bool
 csrFoundConstant (ConstantSpecInfo _ _ _ found) = found
 
--- | Split a term in its constant parts, and let-bindings for its non-constant
--- parts, for constant specialization on partially constant arguments. See
--- 'Clash.Normalize.Util.constantSpecInfo'.
+-- | Calculate constant spec info: split a term in its constant parts, and
+-- let-bindings for its non-constant parts. The goal of this function is to
+-- analyze a given term and yield a new term that:
+--
+--  * Leaves all the constant parts as they were.
+--  * Has all /variable/ parts replaced by a newly generated identifier.
+--
+-- The result structure will additionally contain:
+--
+--  * Whether the function found any constant parts at all
+--  * The let-bindings binding the aforementioned identifiers with the term
+--    they replaced.
+--
+-- This can be used in functions wanting to constant specialize over
+-- partially constant data structures.
 constantSpecInfo
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -332,7 +348,7 @@ mergeCsrs mkNm sc ticks oldTerm hd = go sc TNil [] []
 -- * Call graphs
 
 -- | A call graph counts the number of occurrences of every global @g@ in the
--- body of a global @f@. See 'Clash.Normalize.Util.CallGraph'.
+-- body of a global @f@.
 type CallGraph = GlobalEnv (GlobalEnv Word)
 
 -- | All globals mentioned in a call graph
@@ -340,8 +356,8 @@ callGraphGlobals :: CallGraph -> GlobalSet
 callGraphGlobals cg =
   unionsGlobalSet (globalEnvKeysSet cg : map globalEnvKeysSet (globalEnvElems cg))
 
--- | The call graph of the globals reachable from a root. See
--- 'Clash.Normalize.Util.callGraph'.
+-- | Create a call graph for a set of global binders, given a root: the call
+-- graph of the globals reachable from the root.
 callGraph :: GlobalEnv (Binding (Term 'VoidS)) -> GlobalId -> CallGraph
 callGraph bndrs = go emptyGlobalEnv
  where
@@ -379,7 +395,6 @@ globalOccurrences = go emptyGlobalEnv
 -- * Classifying functions
 
 -- | Give a "performance/size" classification of a function in normal form.
--- See 'Clash.Normalize.Util.classifyFunction'.
 classifyFunction :: Term n -> TermClassification
 classifyFunction = go (TermClassification 0 0 0)
  where
@@ -387,7 +402,7 @@ classifyFunction = go (TermClassification 0 0 0)
   go !c = \case
     Lam _ e -> go c e
     TyLam _ e -> go c e
-    -- Only the right-hand sides, like 'Clash.Normalize.Util.classifyFunction'
+    -- Only the right-hand sides of let-bindings are classified, not the body
     Let (NonRec _ x) _ -> go c x
     Let (Rec _ xs) _ -> List.foldl' go c xs
     e@App {} -> case fst (collectArgs e) of
@@ -403,7 +418,14 @@ classifyFunction = go (TermClassification 0 0 0)
 
 -- | Whether a function adds little hardware: it has at most one function, at
 -- most one primitive or at most one selection (multiplexer), and none of the
--- other two. See 'Clash.Normalize.Util.isCheapFunction'.
+-- other two.
+--
+-- It is considered expensive when it has 2 or more of the following
+-- components:
+--
+-- * functions
+-- * primitives
+-- * selections (multiplexers)
 isCheapFunction :: Term n -> Bool
 isCheapFunction tm = case classifyFunction tm of
   TermClassification {..}
@@ -418,11 +440,12 @@ isCheapFunction tm = case classifyFunction tm of
 scopedNormalization :: NormalizeSession (ScopedRewrite NormalizeState)
 scopedNormalization = Lens.use (extra.scopedNormalizationStrategy)
 
--- | Normalize a global binder, caching the result in 'normalized'. See
--- 'Clash.Normalize.Util.normalizeTopLvlBndr'.
+-- | Normalize a global binder, caching the result in 'scopedNormalized'. If
+-- the binder is a top entity, its type equality constraints are substituted
+-- first.
 --
--- Unlike that function, it doesn't deshadow the body: the body of a global is
--- closed, and binders are fresh once they are opened.
+-- The body doesn't need to be deshadowed: the body of a global is closed, and
+-- binders are fresh once they are opened.
 normalizeTopLvlBndr
   :: HasCallStack
   => Bool
@@ -450,12 +473,23 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
       pure b
 
 -- | Normalize a global function applied to closed arguments, i.e. a work-free
--- application such as @f \@7 dict@. Results are cached in 'workFreeAppCache'.
--- See 'Clash.Normalize.Util.normalizeWorkFreeApp'.
+-- application such as @f \@7 dict@.
+-- 'Clash.Normalize.Scoped.Transformations.Inline.inlineWorkFree' inlines the
+-- result at every occurrence of the application. Results are cached in
+-- 'scopedWorkFreeAppCache'.
 --
--- The arguments must be closed. Unlike
--- 'Clash.Normalize.Util.normalizeWorkFreeApp', it doesn't deshadow the
--- application: its parts are closed.
+-- Unlike unapplied work-free binders (see
+-- 'Clash.Rewrite.Types.inlineWFCacheLimit'), applications are cached
+-- regardless of the size of @f@: most of the work is in the arguments and in
+-- the functions @f@ calls, so even tiny functions such as dictionary
+-- selectors benefit.
+--
+-- Note that a normalized constant can look different from its unnormalized
+-- form, see Note [bignum literals and specialization] in
+-- "Clash.Normalize.Scoped.Transformations.Specialize".
+--
+-- The arguments must be closed. The application doesn't need to be
+-- deshadowed: its parts are closed.
 normalizeWorkFreeApp
   :: (HasCallStack, Distinct n)
   => GlobalId
@@ -467,16 +501,22 @@ normalizeWorkFreeApp
   -- ^ Closed arguments
   -> NormalizeSession (Term n)
 normalizeWorkFreeApp f b args = do
-  -- Caching is sound because the application is closed, see
-  -- 'Clash.Normalize.Util.normalizeWorkFreeApp'. The keys are compared up to
-  -- alpha-equivalence.
+  -- Caching is sound because the application is closed: it means the same in
+  -- any context, so its normalized form is a valid replacement anywhere. The
+  -- cache is keyed on the application modulo alpha-equivalence, which suffices
+  -- because the binding of @f@ never changes during normalization. Every
+  -- occurrence still gets its own copy, so the circuit doesn't change. Only
+  -- names in the HDL can: binders lifted out of the application are named
+  -- after @f@, not after the function the application occurs in.
   cache <- Lens.use (extra.scopedWorkFreeAppCache)
   case Map.lookup key cache of
     Just tm -> pure (sinkClosed tm)
     Nothing -> do
       te <- Lens.view scopedTypeEnv
       -- The application is normalized as if it were the body of a binder of
-      -- its own, see 'Clash.Normalize.Util.normalizeWorkFreeApp'
+      -- its own. That binder is never referenced, so it isn't added to the
+      -- global bindings. It is named after 'f', so binders lifted out of the
+      -- application are named after 'f' too.
       g <- freshGlobalId (globalIdName f)
              (inferCoreTypeOf te emptyScope (mkApps (GlobalVar f) closedArgs))
       let -- Normalize the beta-redex rather than the application: normalizing
@@ -495,12 +535,12 @@ normalizeWorkFreeApp f b args = do
   notClosed :: Maybe a -> a
   notClosed = fromMaybe (error "normalizeWorkFreeApp: an argument is not closed")
 
--- | Rewrite the closed body of a global binder with a transformation. See
--- 'Clash.Normalize.Util.rewriteExpr'.
+-- | Rewrite the closed body of a global binder according to the provided
+-- transformation.
 --
--- Unlike that function, it doesn't lint its input with
--- @-fclash-debug-invariants-shadowing@: in scoped Core, binders never shadow
--- one another, and every variable is in scope.
+-- It doesn't lint its input with @-fclash-debug-invariants-shadowing@: in
+-- scoped Core, binders never shadow one another, and every variable is in
+-- scope.
 rewriteExpr
   :: (String, ScopedRewrite NormalizeState)
   -- ^ Transformation to apply
@@ -523,8 +563,8 @@ rewriteExpr (nrwS, nrw) (bndrS, expr) (nm, sp) = do
 
 -- * Type equality constraints
 
--- | Turn type equality constraints into substitutions and apply them. See
--- 'Clash.Normalize.Util.substWithTyEq'. So given:
+-- | Turn type equality constraints into substitutions and apply them. So
+-- given:
 --
 -- > /\dom . \(eq : dom ~ "System") . \(eta : Signal dom Bool) . eta
 --
@@ -534,30 +574,28 @@ rewriteExpr (nrwS, nrw) (bndrS, expr) (nm, sp) = do
 --
 -- Occurrences of @eq@ are replaced by 'removedArg'.
 --
--- Like 'Clash.Normalize.Util.substWithTyEq', it looks at the lambdas and type
--- lambdas at the head of the term, in order. At a lambda whose type is
--- @tv ~ ty@ or @ty ~ tv@, where @tv@ is bound by one of the type lambdas
--- before it, it removes the type lambda of @tv@ and substitutes @ty@ for
--- @tv@ in its scope. Constraints are not revisited: one that couldn't be
--- substituted stays, even if a later substitution would allow it.
+-- It looks at the lambdas and type lambdas at the head of the term, in
+-- order. At a lambda whose type is @tv ~ ty@ or @ty ~ tv@, where @tv@ is
+-- bound by one of the type lambdas before it, it removes the type lambda of
+-- @tv@ and substitutes @ty@ for @tv@ in its scope. Constraints are not
+-- revisited: one that couldn't be substituted stays, even if a later
+-- substitution would allow it.
 --
--- __Differences__ with 'Clash.Normalize.Util.substWithTyEq', which the types
--- of scoped Core force (TODO(substWithTyEq): see the fix of that function):
+-- Two subtleties, which the types of scoped Core force:
 --
 -- * It substitutes in everything in scope of @tv@, including the binders
 --   between the type lambda and the lambda of the constraint, e.g. @c@ in
 --   @/\\dom. \\(c :: KnownDomain dom). \\(eq : dom ~ System). ...@.
---   'Clash.Normalize.Util.substWithTyEq' only substitutes after the lambda of
---   the constraint, which leaves @dom@ free in the type of @c@. That can't be
---   written in scoped Core: the type of @c@ is in scope of @dom@.
+--   Substituting only after the lambda of the constraint would leave @dom@
+--   free in the type of @c@, which can't be written in scoped Core: the type
+--   of @c@ is in scope of @dom@.
 --
 -- * It only substitutes if that is well-scoped: if @ty@ is in scope at the
 --   type lambda of @tv@, after moving that type lambda inwards past the
 --   binders that don't mention @tv@. E.g. in
 --   @/\\dom. \\(x :: dom). /\\a. \\(eq : dom ~ a). ...@ it keeps the
---   constraint: the type of @x@ can't mention @a@.
---   'Clash.Normalize.Util.substWithTyEq' removes the type lambda of @dom@,
---   and leaves it free in the type of @x@.
+--   constraint: the type of @x@ can't mention @a@, and removing the type
+--   lambda of @dom@ would leave it free in the type of @x@.
 --
 -- __NB:__ Users of this function should ensure it's only applied to TopEntities
 substWithTyEq :: (HasCallStack, Distinct n) => Scope n -> Term n -> Term n
@@ -570,17 +608,12 @@ substWithTyEq sc = go 0
       Just e' -> go k (replaceEqAt sc (k - 1) e')
       Nothing -> go (k + 1) e
 
--- | The type equivalent of 'substWithTyEq'. See
--- 'Clash.Normalize.Util.tvSubstWithTyEq'.
---
--- It differs from 'Clash.Normalize.Util.tvSubstWithTyEq' like 'substWithTyEq'
--- differs from 'Clash.Normalize.Util.substWithTyEq' (TODO(substWithTyEq)). In
+-- | The type equivalent of 'substWithTyEq', with the same subtleties. In
 -- particular it substitutes in the constraint itself, e.g.
 -- @forall dom. (dom ~ System) -> Signal dom Bool@ becomes
--- @(System ~ System) -> Signal System Bool@, where
--- 'Clash.Normalize.Util.tvSubstWithTyEq' leaves @dom@ free in the constraint.
--- Also, it only substitutes type variables bound by the type itself, which for
--- closed types are all of them.
+-- @(System ~ System) -> Signal System Bool@, instead of leaving @dom@ free in
+-- the constraint. Also, it only substitutes type variables bound by the type
+-- itself, which for closed types are all of them.
 tvSubstWithTyEq :: (HasCallStack, Distinct n) => Scope n -> Type n -> Type n
 tvSubstWithTyEq sc = go 0
  where

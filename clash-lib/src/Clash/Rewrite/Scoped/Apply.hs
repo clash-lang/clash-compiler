@@ -6,9 +6,10 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Instrumentation of scoped transformations: the counterparts of
-  'Clash.Rewrite.Util.apply', 'Clash.Rewrite.Util.applyWith' and
-  'Clash.Rewrite.Util.applyDebug'.
+  Instrumentation of scoped transformations: recording whether a
+  transformation applied ('apply', 'applyWith'), debug tracing, counting and
+  invariant checks ('applyDebug'), and running a transformation on a term
+  ('runRewrite').
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -52,8 +53,7 @@ import           Clash.Rewrite.Scoped.History (recordRewriteStep)
 import           Clash.Rewrite.Scoped.Types
 import           Clash.Rewrite.Scoped.Util   (closeOverOrError, dependencySortTyVars)
 
--- | Record if a transformation is successfully applied, see
--- 'Clash.Rewrite.Util.apply'
+-- | Record if a transformation is successfully applied
 apply
   :: String
   -- ^ Name of the transformation
@@ -67,7 +67,6 @@ apply = \s (ScopedTransform rewrite) -> ScopedTransform $ \ctx expr0 ->
 -- | The instrumentation core of 'apply' (debug tracing, transformation
 -- counter, rewrite history, invariant checks) around an already-applied
 -- transformation action. Also returns whether the action signaled change.
--- See 'Clash.Rewrite.Util.applyWith'.
 applyWith
   :: Distinct n
   => String
@@ -96,16 +95,20 @@ applyWith = \s _ctx expr0 action -> do
     else return (expr1, hasChanged)
 {-# INLINE applyWith #-}
 
--- | The debug checks and traces of a transformation, see
--- 'Clash.Rewrite.Util.applyDebug'. Of its invariant checks, these remain:
+-- | The debug checks and traces of a transformation: it errors when
+-- @-fclash-debug-transformations-limit@ is exceeded, traces the
+-- transformation according to the debug options, counts it with
+-- @-fclash-debug-count-transformations@, and, with
+-- @-fclash-debug-invariants@, checks that:
 --
--- * The transformation changed the term without signaling it: the result is
---   not alpha-equivalent to the original.
+-- * The transformation didn't change the term without signaling it: the
+--   result is alpha-equivalent to the original.
 --
--- * The transformation changed the type of the term (traced, like in
---   'Clash.Rewrite.Util.applyDebug').
+-- * The transformation didn't change the type of the term (traced rather
+--   than an error).
 --
--- These are left out because the type checker enforces them for scoped Core:
+-- It doesn't check these, because the type checker enforces them for scoped
+-- Core:
 --
 -- * Free variables that the transformation introduced: a result in scope @n@
 --   only mentions variables of @n@.
@@ -151,7 +154,7 @@ applyDebug name exprOld hasChanged exprNew = do
     Monad.when (dbg_invariants opts && hasChanged) $ do
       tenv <- Lens.view scopedTypeEnv
       let (beforeTy, afterTy, sameTy) = compareTypes tenv exprOld exprNew
-      -- Like in 'Clash.Rewrite.Util.applyDebug', a trace rather than an error
+      -- A trace rather than an error
       Monad.when (hasDebugInfo AppliedTerm name opts && not sameTy) $
         traceM ( concat [ $(curLoc)
                         , "Error when applying rewrite ", name
@@ -195,8 +198,7 @@ compareTypes tenv tm1 tm2 =
   -- The free variables of both terms
   (tvs, ids) = freeVarOccs (App tm1 tm2)
 
--- | Perform a transformation on a term in the root of its scope, see
--- 'Clash.Rewrite.Util.runRewrite'
+-- | Perform a transformation on a term in the root of its scope
 runRewrite
   :: Distinct n
   => String

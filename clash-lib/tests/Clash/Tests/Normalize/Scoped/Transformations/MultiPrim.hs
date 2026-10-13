@@ -3,10 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.MultiPrim". The expected
-  results are those of the port, which agreed with
-  'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim' of Clash Core
-  up to the order of let-bindings.
+  Tests for "Clash.Normalize.Scoped.Transformations.MultiPrim".
 -}
 
 {-# LANGUAGE DataKinds #-}

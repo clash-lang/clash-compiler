@@ -3,9 +3,10 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Util": the regression tests of
-  "Clash.Tests.Normalize.Util", and tests whose expected results are those of
-  "Clash.Normalize.Scoped.Util", which agreed with "Clash.Normalize.Util".
+  Tests for "Clash.Normalize.Scoped.Util": the regression tests that the
+  Clash Core implementation had, and tests whose expected results are those of
+  "Clash.Normalize.Scoped.Util", which agreed with the Clash Core
+  implementation.
   The tests of functions on terms and types run in the scope of the free
   variables of their input, and in a scope that the binders of the input
   clash with.
@@ -82,7 +83,7 @@ tvSubstGives input expected = withType input $ \ts ty -> do
 
 substWithTyEqTests :: [TestTree]
 substWithTyEqTests =
-  -- The regression tests of "Clash.Tests.Normalize.Util"
+  -- The regression tests that the Clash Core implementation had
   [ testCase "substWithTyEq doesn't introduce free variables (#1060)" $ do
       let input = "\\(dom :: Type) (eq :: dom ~ \"System\") -> eq"
       substGives input
@@ -111,9 +112,9 @@ substWithTyEqTests =
         "\\(dom :: Type) (y :: Int) (a :: Type) (eq :: dom ~ a) (x :: dom) -> x"
         "\\(y :: Int) (a :: Type) (eq :: a ~ a) (x :: a) -> x"
 
-    -- 'Clash.Normalize.Util.substWithTyEq' leaves @dom@ free in the type of
-    -- @c@. 'Scoped.substWithTyEq' can't: the type of @c@ is in scope of
-    -- @dom@.
+    -- Substituting only after the constraint would leave @dom@ free in the
+    -- type of @c@, so 'Scoped.substWithTyEq' substitutes in it too: the type
+    -- of @c@ is in scope of @dom@.
   , testCase "substWithTyEq substitutes in the binders before the constraint" $
       substGives
         "\\(dom :: Type) (c :: Clash.Signal.Internal.Signal dom Int) (eq :: dom ~ \"System\") -> c"
@@ -127,13 +128,13 @@ substWithTyEqTests =
 
 tvSubstWithTyEqTests :: [TestTree]
 tvSubstWithTyEqTests =
-  -- The regression test of "Clash.Tests.Normalize.Util"
+  -- The regression test that the Clash Core implementation had
   [ testCase "tvSubstWithTyEq avoids capture (#1868)" $
       tvSubstGives
         "forall (a :: Type) (dom :: Type). (dom ~ a) -> forall (a :: Type). dom -> a"
         "forall (a :: Type). (a ~ a) -> forall (c :: Type). a -> c"
 
-    -- 'Clash.Normalize.Util.tvSubstWithTyEq' leaves @dom@ free in the
+    -- Substituting only after the constraint would leave @dom@ free in the
     -- constraint
   , testCase "tvSubstWithTyEq substitutes in the constraint" $
       tvSubstGives

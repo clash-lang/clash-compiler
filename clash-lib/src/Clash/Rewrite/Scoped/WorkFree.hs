@@ -4,7 +4,9 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Whether a scoped Clash Core term is work free, i.e. doesn't add to the size
-  of the circuit: a port of "Clash.Rewrite.WorkFree".
+  of the circuit. This is used by transformations and evaluation to check
+  whether it is possible to perform changes without duplicating work in the
+  result, e.g. inlining.
 
   The work-freeness of global binders is cached in a t'GlobalEnv', keyed by
   'GlobalId', so a local variable can't hit an entry of a global with the same
@@ -65,9 +67,12 @@ isWorkFreeBinder cache bndrs g = do
       pure b
 
 {-# INLINABLE isWorkFree #-}
--- | Whether a term does any work, i.e. adds to the size of the circuit, see
--- 'Clash.Rewrite.WorkFree.isWorkFree'. Caches the work-freeness of global
--- binders.
+-- | Whether a term does any work, i.e. adds to the size of the circuit.
+-- Caches the work-freeness of global binders in the state, at the given lens.
+--
+-- Polymorphic or function-typed variables are only work free if they are
+-- local, and the term is just that variable. A recursive global binder is
+-- not work free.
 isWorkFree
   :: forall s m n
    . (HasCallStack, MonadState s m)
@@ -117,7 +122,8 @@ isWorkFree cache bndrs = go True
   isConstantArg :: Either (Term x) (Type x) -> Bool
   isConstantArg = either isConstant (const True)
 
--- | Whether a term is a constant, see 'Clash.Rewrite.WorkFree.isConstant'
+-- | Whether a term is a constant: a literal, a closed lambda, or a data
+-- constructor or primitive applied to constants
 isConstant :: Term n -> Bool
 isConstant e = case collectArgs e of
   (Data _, args) -> all (either isConstant (const True)) args
@@ -127,7 +133,7 @@ isConstant e = case collectArgs e of
   _ -> False
 
 -- | Like 'isConstant', but a clock or reset is only constant if it is a
--- removed argument, see 'Clash.Rewrite.WorkFree.isConstantNotClockReset'
+-- removed argument
 isConstantNotClockReset
   :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Bool
 isConstantNotClockReset tenv sc e
@@ -137,9 +143,18 @@ isConstantNotClockReset tenv sc e
         _ -> False
   | otherwise = isConstant e
 
--- | Whether a clock, reset or enable is work free, see
--- 'Clash.Rewrite.WorkFree.isWorkFreeClockOrResetOrEnable'. 'Nothing' if the
--- term is not a clock, reset or enable.
+-- | Whether a clock, reset or enable is work free. 'Nothing' if the term is
+-- not a clock, reset or enable.
+--
+-- A removed argument, a local variable, a literal, and an enable that is a
+-- constructor (@Enable True@, @Enable False@) are work free. A global
+-- variable isn't: it is probably backed by a clock generator, which is
+-- definitely not work-free. Inlining let-bindings that refer to such a
+-- global can lead the post-normalization flattening stage to generate code
+-- that violates the invariants of the netlist generation stage, especially
+-- when the global is defined recursively, such as when using @tbClockGen@.
+-- This led to bad Verilog names in
+-- <https://github.com/clash-lang/clash-compiler/issues/2845 #2845>.
 isWorkFreeClockOrResetOrEnable
   :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Maybe Bool
 isWorkFreeClockOrResetOrEnable tenv sc e =
@@ -158,8 +173,19 @@ isWorkFreeClockOrResetOrEnable tenv sc e =
   else
     Nothing
 
--- | A conservative version of 'isWorkFree', which also considers references
--- to clocks and resets constant, see 'Clash.Rewrite.WorkFree.isWorkFreeIsh'
+-- | A conservative version of 'isWorkFree'. Is used in
+-- 'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar' to
+-- determine whether an expression can be \"bound\" (locally inlined). While
+-- binding work-free expressions won't result in extra work for the circuit,
+-- it might very well cause extra work for Clash. In fact, using 'isWorkFree'
+-- in 'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar' makes
+-- Clash two orders of magnitude slower for some of our test cases.
+--
+-- In effect, this function is a version of 'isConstant' that also considers
+-- references to clocks and resets constant. This allows us to bind
+-- @HiddenClock(ResetEnable)@ constructs, allowing Clash to constant spec
+-- subconstants - most notably @KnownDomain@. Doing that enables Clash to
+-- eliminate any case-constructs on it.
 isWorkFreeIsh :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Bool
 isWorkFreeIsh tenv sc e =
   case isWorkFreeClockOrResetOrEnable tenv sc e of

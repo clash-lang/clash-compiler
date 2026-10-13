@@ -6,8 +6,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Specialization for scoped Clash Core: the ported counterparts of
-  "Clash.Normalize.Transformations.Specialize".
+  Transformations for specialization on scoped Clash Core, and application
+  propagation ('appProp').
 
   'specialize' creates a closed global function, which abstracts over the
   arguments before the one it specializes on, and over the free variables of
@@ -15,7 +15,8 @@
 
   * The binders of the arguments get the types of the parameters of the
     function, instantiated with the new type binders before them (see
-    'Clash.Normalize.Transformations.Specialize.instArgBndrs').
+    'withArgBinders'), as the types of the arguments can mention type
+    variables bound at the call site.
 
   * The free variables of the argument are bound with
     'Clash.Core.Scoped.Subst.closeOver', type variables first, every type
@@ -130,22 +131,29 @@ import           Clash.Rewrite.Scoped.Util
   , normalizeTermTypes, setChanged )
 import           Clash.Rewrite.Scoped.Whnf   (whnfRW)
 
--- | Propagate the arguments of an application inwards, see
--- 'Clash.Normalize.Transformations.Specialize.appProp'.
+-- | Propagate arguments of application inwards; except for 'Lam' where the
+-- argument becomes let-bound (or is substituted, if it is a variable or
+-- work-free). 'appProp' tries to propagate as many arguments as possible, down
+-- as many levels as possible; and should be called in a top-down traversal.
+-- Arguments propagated into a case-expression are let-bound first, unless
+-- they are variables or work-free, so that they aren't duplicated in every
+-- alternative.
 --
--- Unlike the original, nothing needs to be deshadowed (see Note [AppProp no
--- shadowing] in "Clash.Normalize.Transformations.Specialize"): the
--- arguments are only moved under a binder after it is opened, which renames
--- it if it clashes with the scope of the arguments. That holds for the
--- binders of the function part, and for those of arguments that end up as
--- the function part after substitution alike.
+-- The idea is that this reduces the number of traversals, which hopefully
+-- leads to shorter compile times.
+--
+-- The arguments are only moved under a binder (of a lambda, a let-expression
+-- or a pattern) after it is opened, which renames it if it clashes with the
+-- scope of the arguments, so the binder can't capture a free variable of an
+-- argument. That holds for the binders of the function part, and for those of
+-- arguments that end up as the function part after substitution alike.
 appProp :: Transformation
 appProp = toScopedTransformation "applicationPropagation"
   (onAppNode 'appPropWorker <> onTyAppNode 'appPropWorker)
 
 -- | The application-spine handler of 'appProp'. Matches the constructors it
 -- is registered for itself, so it can also be used as a plain uninstrumented
--- rewrite, as 'Clash.Normalize.Transformations.Specialize.nonRepSpec' does.
+-- rewrite, as 'nonRepSpec' does.
 appPropWorker
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -252,8 +260,7 @@ sinkArgs :: DExt n l => [Either (Term n) (Type n)] -> [Either (Term l) (Type l)]
 sinkArgs = map (bimap sink sink)
 
 -- | Specialize functions on arguments which are constant, except when they
--- are clock, reset generators. See
--- 'Clash.Normalize.Transformations.Specialize.constantSpec'.
+-- are clock, reset generators.
 constantSpec :: Transformation
 constantSpec = toScopedTransformation "constantSpec" (onApp 'constantSpecWorker)
 
@@ -294,8 +301,7 @@ constantSpecWorker ctx e e1 e2
   | otherwise = return e
 {-# SCC constantSpecWorker #-}
 
--- | Specialize an application on its argument, see
--- 'Clash.Normalize.Transformations.Specialize.specialize'
+-- | Specialize an application on its argument
 specialize
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -315,8 +321,7 @@ specializeIn sc e = case e of
   App e1 e2 -> specializeArgIn sc e (collectArgsTicks e1) (Left e2)
   _ -> return e
 
--- | Specialize an application on its argument, see
--- 'Clash.Normalize.Transformations.Specialize.specialize''
+-- | Specialize an application on its argument
 specialize'
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -386,7 +391,7 @@ specializeGlobal sc e f args ticks specArgIn = do
         -- type equality constraints they may be syntactically polymorphic.
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by
-        -- 'Clash.Normalize.Util.substWithTyEq'. So we drop the TyApp
+        -- 'Clash.Normalize.Scoped.Util.substWithTyEq'. So we drop the TyApp
         -- ("specializing" on it) and change the type of the variable to match.
         -- A global has a closed type, so this needs a closed type argument.
         | Just newTy <- closeType (piResultTy te sc (sinkClosed (globalIdType f)) tyArg) ->
@@ -448,8 +453,19 @@ specializeGlobal sc e f args ticks specArgIn = do
                         Nothing)
             else do
               -- Determine name the resulting specialized function, and the
-              -- form of the specialized-on argument, see
-              -- 'Clash.Normalize.Transformations.Specialize.specialize''
+              -- form of the specialized-on argument.
+              --
+              -- In case we are specializing on an argument that is a global
+              -- function then we use that function's name as part of the name
+              -- of the specialized higher-order function, see
+              -- 'specializeName'. Additionally, we will return the body of the
+              -- global function, instead of a variable reference to the
+              -- global function.
+              --
+              -- This will turn things like @mealy g@ into a new binding where
+              -- both the body of @mealy@ and @g@ are inlined, meaning the
+              -- state-transition-function and the memory element will be in a
+              -- single function.
               (newName, inl', specArg') <- case specArg of
                 Left a@(collectArgsTicks -> (gHd, gArgs, _))
                   | Just gNm <- varName gHd
@@ -528,8 +544,8 @@ different from one that didn't, even though they're the same value. Both forms
 reach 'specialize', for example when a 'KnownDomain' dictionary built by GHC is
 passed to a function at one call site, while at another call site the same
 dictionary is the result of normalizing an application of a work-free function
-(see 'Clash.Normalize.Util.normalizeWorkFreeApp'). To prevent creating two
-identical specializations, we use the literal form in the keys of the
+(see 'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp'). To prevent creating
+two identical specializations, we use the literal form in the keys of the
 specialization cache.
 -}
 
@@ -596,8 +612,14 @@ preferNoInline is0 is1
 
 -- | The name of the function that specializes function @f@ on function @g@,
 -- given their inline specifications (if @g@ has a binding) and names. It
--- depends on their NOINLINE / OPAQUE annotations, see
--- 'Clash.Normalize.Transformations.Specialize.specialize''.
+-- depends on their NOINLINE / OPAQUE annotations:
+--
+-- >  OPAQUE    | Name for f g
+-- > -----------|---------------
+-- >  f and g   | f_g
+-- >  f         | f
+-- >  g         | g
+-- >  !f and !g | f_g
 specializeName
   :: (InlineSpec, C.Name C.Term) -> (Maybe InlineSpec, C.Name C.Term) -> C.Name C.Term
 specializeName (spec0, n0) (spec1, n1)
@@ -612,8 +634,7 @@ specializeName (spec0, n0) (spec1, n1)
   stripMods :: Text.Text -> Text.Text
   stripMods = Text.takeWhileEnd (/= '.')
 
--- | Specialize functions on their non-representable argument, see
--- 'Clash.Normalize.Transformations.Specialize.nonRepSpec'
+-- | Specialize functions on their non-representable argument
 nonRepSpec :: Transformation
 nonRepSpec = toScopedTransformation "nonRepSpec" (onApp 'nonRepSpecWorker)
 
@@ -656,8 +677,7 @@ nonRepSpecWorker ctx e e1 e2
     _ -> return app
 {-# SCC nonRepSpecWorker #-}
 
--- | Specialize functions on their type, see
--- 'Clash.Normalize.Transformations.Specialize.typeSpec'
+-- | Specialize functions on their type
 typeSpec :: Transformation
 typeSpec = toScopedTransformation "typeSpec" (onTyApp 'typeSpecWorker)
 
@@ -678,10 +698,13 @@ typeSpecWorker ctx e e1 ty
   | otherwise = return e
 {-# SCC typeSpecWorker #-}
 
--- | Specialize functions on arguments which are zero-width, see
--- 'Clash.Normalize.Transformations.Specialize.zeroWidthSpec'. Substitutes
--- the only value of the zero-width type of a lambda-bound variable for the
--- variable.
+-- | Specialize functions on arguments which are zero-width. These arguments
+-- can have only one possible value, and specializing on this value may create
+-- additional opportunities for transformations to fire.
+--
+-- As we can't remove zero-width arguments (as transformations cannot change
+-- the type of a term), we instead substitute all occurrences of a lambda-bound
+-- variable with a zero-width type with the only value of that type.
 zeroWidthSpec :: Transformation
 zeroWidthSpec = toScopedTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecWorker)
 
@@ -836,8 +859,11 @@ specBody te fTy names args specTvs specIds bodyTm specArg =
 -- names, and their variables. A type binder gets the kind of the type
 -- parameter it replaces, a term binder the type of its parameter,
 -- instantiated with the type binders before it. 'Nothing' if the type doesn't
--- have parameters for all arguments. See
--- 'Clash.Normalize.Transformations.Specialize.instArgBndrs'.
+-- have parameters for all arguments.
+--
+-- The binders get the types of the parameters of the function, rather than
+-- those of the arguments, as the types of the arguments can mention type
+-- variables bound at the call site.
 withArgBinders
   :: (HasCallStack, Distinct x)
   => TypeEnv
@@ -865,9 +891,9 @@ withArgBinders te sc ty names args k = case (args, names) of
       | otherwise -> Nothing
   (_ : _, []) -> error "withArgBinders: not enough names"
 
--- | The names of the binders of the lambdas of a term, see
--- @collectBndrsMinusApps@ in
--- 'Clash.Normalize.Transformations.Specialize.specialize''
+-- | The names of the binders of the leading lambdas of a term, minus the
+-- binders of the lambdas that the term applies to an argument. The binders of
+-- the arguments of a specialized function get these names.
 collectBndrsMinusApps :: Term n -> [C.Name C.Term]
 collectBndrsMinusApps = reverse . go []
  where
@@ -883,17 +909,38 @@ collectBndrsMinusApps = reverse . go []
       bs' -> init bs' ++ bs
     _ -> bs
 
+{- Note [Collect free-variables in an insertion-ordered set]
+In order for the specialization cache to work, 'specArgBndrsAndVars' should
+yield (alpha equivalent) results for the same specialization. While collecting
+free variables in a given term or type it should therefore keep a stable
+ordering based on the order in which it finds free vars. To see why,
+consider the following two pseudo-code calls to 'specialize':
+
+    specialize {f ('a', x[123], y[456])}
+    specialize {f ('b', x[456], y[123])}
+
+Collecting the binders in a set ordered on their uniques would yield the
+following sets:
+
+    {x[123], y[456]}
+    {y[123], x[456]}
+
+..and therefore breaking specializing caching. So we collect them in the order
+of their first occurrence instead, yielding:
+
+    {x[123], y[456]}
+    {x[456], y[123]}
+-}
+
 -- | The free variables of the argument to specialize on, to abstract over:
 -- the type variables in the order of their first occurrence, but every type
 -- variable after the type variables in its kind; and the term variables in
 -- the order of their first occurrence. See Note [Collect free-variables in an
--- insertion-ordered set] in "Clash.Normalize.Transformations.Specialize".
+-- insertion-ordered set].
 --
--- Unlike 'Clash.Normalize.Transformations.Specialize.specArgBndrsAndVars',
--- this gives the occurrences of the variables, of which
+-- This gives the occurrences of the variables, of which
 -- 'Clash.Core.Scoped.Subst.closeOver' makes the binders. The free type
--- variables of a type are in the order of their first occurrence too, rather
--- than in the order of their uniques.
+-- variables of a type are in the order of their first occurrence too.
 specArgBndrsAndVars
   :: HasCallStack
   => Either (Term n) (Type n)

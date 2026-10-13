@@ -74,8 +74,7 @@ lookupBinding :: GlobalId -> RewriteMonad extra (Maybe (Binding (Term 'VoidS)))
 lookupBinding g = lookupGlobalEnv g <$> Lens.use scopedBindings
 
 -- | A new global variable with the given name and closed type. It gets a
--- unique from the unique supply that no global binding has, see
--- 'Clash.Rewrite.Util.cloneNameWithBindingMap'.
+-- unique from the unique supply that no global binding has.
 freshGlobalId :: C.Name C.Term -> Type 'VoidS -> RewriteMonad extra GlobalId
 freshGlobalId nm ty = do
   bndrs <- Lens.use scopedBindings
@@ -84,7 +83,8 @@ freshGlobalId nm ty = do
       taken u' = memberGlobalEnv (global (setUnique nm u')) bndrs
   pure (global (uniqAway' taken u (setUnique nm u)))
 
--- | Add a global binding, see 'Clash.Rewrite.Util.addGlobalBind'
+-- | Add a function to the global bindings. It is marked recursive when its
+-- body refers to the function itself.
 addGlobalBind
   :: GlobalId
   -> SrcSpan
@@ -96,8 +96,9 @@ addGlobalBind g sp inl body =
  where
   r = g `memberGlobalSet` termGlobalIds body
 
--- | Make a global function of a closed term, and give its variable. See
--- 'Clash.Rewrite.Util.mkFunction'.
+-- | Make a global function of a closed term, and give its variable: a
+-- global variable with the given name, a fresh unique, and the type of the
+-- term.
 mkFunction
   :: HasCallStack
   => C.Name C.Term

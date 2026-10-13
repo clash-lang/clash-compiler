@@ -5,9 +5,9 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.Case".
 
-  The regression tests are those of "Clash.Normalize.Transformations.Case".
-  The capture bugs they guard against can't be written in scoped Core: they
-  are type errors. Instead, 'assertRewritesTo' also runs each test in a scope
+  The regression tests guard against bugs that the case transformations had
+  on Clash Core. The capture bugs among them can't be written in scoped Core:
+  they are type errors. Instead, 'assertRewritesTo' also runs each test in a scope
   whose variables clash with the binders of its input, where a transformation
   that moves a term under one of them has to rename it. The tests in a sunk
   scope ('sunkD') check that the new binders are fresh for that scope.
@@ -134,7 +134,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Case"
       ]
   ]
 
--- | The regression tests of "Clash.Normalize.Transformations.Case"
+-- | Regression tests of the transformations on case-expressions
 regressionTests :: [TestTree]
 regressionTests =
   [ -- 'caseCon' used to first substitute the fields for the pattern binders,

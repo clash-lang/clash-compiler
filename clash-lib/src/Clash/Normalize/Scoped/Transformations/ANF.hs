@@ -6,26 +6,23 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations for converting scoped Clash Core to A-normal form: the
-  ported counterparts of "Clash.Normalize.Transformations.ANF". See
-  Note [ANF in Clash] there for the shape of the result.
+  Transformations for converting scoped Clash Core to A-normal form. See
+  Note [ANF in Clash] for the shape of the result.
 
   = How 'makeANF' moves bindings
 
   'makeANF' turns a term into a single recursive let-expression (after the
   lambdas of a function), whose bindings are the let-bindings of the term, the
   bindings it creates for subterms, and bindings for the variables that
-  patterns bind. Clash Core does this by first making all binders of the term
-  distinct ('Clash.Core.Subst.freshenTm'), so that it can move a binding out
-  from under the binders on its path: these binders become let-binders of the
-  same let-expression, with the same names.
+  patterns bind: the binders on the path to a binding become let-binders of
+  the same let-expression.
 
-  Scoped Core can't move a term out from under binders: the binders scope over
-  the term, so the term lives in an extension of the scope it moves to. So the
-  traversal here lets the scope /grow/ instead: it works in a single scope
-  (@q@ below) that extends the scope of the root (@r@) with every binder of the
-  result's let-expression, in the order in which it meets them. It goes
-  through the original term with a substitution from the scope of the
+  Scoped Core can't simply move a term out from under binders: the binders
+  scope over the term, so the term lives in an extension of the scope it
+  moves to. So the traversal here lets the scope /grow/ instead: it works in a
+  single scope (@q@ below) that extends the scope of the root (@r@) with every
+  binder of the result's let-expression, in the order in which it meets them.
+  It goes through the original term with a substitution from the scope of the
   original subterm into @q@, and
 
   * a let-binder, or a variable bound by the pattern of an alternative, is
@@ -37,7 +34,7 @@
   So every binder is created exactly once, in the scope in which all the
   binders before it are visible, and the bindings never have to be moved: at
   the end ('regionLet'), the binders, a telescope from @r@ to @q@, are rebound
-  in a recursive let-expression in the order of Clash Core. A
+  in a recursive let-expression in the order of the bindings ('Region'). A
   substitution-carrying traversal renames a binder in O(1) (an entry in the
   substitution), unlike opening binders one by one, which would rename a
   binder by substituting in its scope whenever a new binder took its name.
@@ -46,16 +43,13 @@
 
   = Pattern variables
 
-  Clash Core let-binds a variable that an alternative's pattern binds to a
-  projection of the subject ('mkSelectorCase'), but keeps the pattern as it
-  is: the pattern variable then shadows the let-binder of the same name, and
-  the alternative's right-hand side refers to the pattern variable, while the
-  bindings moved out of the alternative refer to the let-binder. In scoped
-  Core, these are two binders by construction: the variable that the
+  A variable that an alternative's pattern binds is let-bound to a projection
+  of the subject ('mkSelectorCase'), so that the bindings moved out of the
+  alternative can refer to it, while the alternative's right-hand side refers
+  to the pattern variable. These are two binders: the variable that the
   traversal renamed into @q@ becomes the let-binder of the projection, and the
   alternative gets a pattern with fresh binders, for which its right-hand side
-  is substituted ('mkAlt'). The result is alpha-equivalent to that of Clash
-  Core.
+  is substituted ('mkAlt').
 
   = Regions
 
@@ -64,16 +58,14 @@
   These are
 
   * the binders of an alternative whose pattern binds existential type
-    variables that occur in the types of its fields, like in Clash Core (see
-    'Clash.Netlist.Util.bindsExistentials');
+    variables that occur in the types of its fields (see
+    'Clash.Netlist.Util.bindsExistentials'): the projections of such fields
+    can't be let-bound;
 
   * the binders of an alternative whose existential type variables occur in
-    its right-hand side, but not in the types of its fields. Clash Core moves
-    the bindings out of their scope;
+    its right-hand side, but not in the types of its fields;
 
-  * lambdas and type lambdas in the term. Clash Core moves the bindings out of
-    them, which goes wrong if they mention the variable the lambda binds; it
-    relies on 'nonRepANF' to remove such lambdas first.
+  * lambdas and type lambdas in the term.
 
   The other existential type variables don't occur in the alternative, and
   are substituted away (see 'anfAlt'). So the variables that the growing
@@ -137,12 +129,83 @@ import Clash.Rewrite.Scoped.WorkFree (isConstant, isConstantNotClockReset)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
 import Clash.Rewrite.Types (scopedTypeEnv)
 
+{- Note [ANF in Clash]
+ANF suitable for use in Clash can be described with the given types:
+
+  data ATerm
+    = ALam !Id ATerm
+    | ATyLam !TyVar ATerm
+    | ALetrec [(Id, CTerm)] !ITerm
+
+  data CTerm
+    = CApp !Id [Either ITerm Type]
+    | CCase !ITerm !Type [(Pat, ITerm)]
+    | CCast !ITerm !Type !Type
+    | CPrim !PrimInfo [Either ITerm Type]
+    | CTick !TickInfo CTerm
+
+  data ITerm
+    = IVar !Id
+    | ILiteral !Literal
+    | IData !DataCon [Either ITerm Type]
+    | IPrim !PrimInfo [Either ITerm Type]
+    | ITick !TickInfo ITerm
+
+where ATerm is a term in A-normal form, CTerm is a compound term (i.e. one
+which can only appear let-bound in ANF) and ITerm is an immediate term (i.e.
+one which represents some simple term).
+
+There are two constructors for primitives, CPrim and IPrim. The difference
+between these are whether the primitive performs work or not. Primitives which
+perform work should be shared, but work-free primitives can be used directly.
+
+These types help codify some invariants that must hold for the result of ANF:
+
+  * terms start with (ty)lambdas, lambdas do not occur in let bindings or the
+    the body of a letrec expression
+
+  * there are no nested letrec expressions, only a single letrec which may
+    occur after all lambdas
+
+  * an ANF term may not have a letrec expression if the definition is already
+    an immediate term, e.g. where there is no benefit in sharing the result
+
+  * only compound terms are let-bound, as there is no benefit from let binding
+    an immediate term (there is no benefit to sharing immediate terms)
+
+  * arguments to functions / data constructors / primitives are not let bound
+    if they correspond are immediate, but are if they are compound (to produce
+    a variable which is an immediate term)
+
+  * the leftmost innermost term in a function application is always an
+    identifier, lambdas should have been removed by application propagation
+
+  * the right-hand side of a case alternative is an immediate term
+
+  * the body of the letrec expression is an immediate term
+
+Some invariants are not captured by these types:
+
+  * non-representable terms and terms in IO are not let-bound, instead they are
+    pushed down as far as possible
+
+  * if a let binding is created for the result, the name of the Id is "result"
+
+TODO: The best way to enforce that Clash implements ANF compatible with these
+types is to implement ANF using these types. However, as currently implemented
+ANF is mostly defined using a bottom-up traversal ('anfTerm') that let-binds
+subterms as it goes back up ('collectApp', 'collectLet', 'collectCase'). This
+would be some amount of effort to replace currently, perhaps it would be better
+to convert the result of partial evaluation to these data types when it is
+implemented more, then use these Anf types directly in the conversion to
+netlist, i.e. Term -> Value -> Normal -> Anf -> Netlist.
+-}
+
 -- * makeANF
 
 -- | Turn an expression into a modified ANF-form. As opposed to standard ANF,
--- constants do not become let-bound. See
--- 'Clash.Normalize.Transformations.ANF.makeANF', and the module header for
--- how this moves bindings.
+-- constants do not become let-bound. See Note [ANF in Clash] for the shape of
+-- the result, and the module header for how this moves bindings.
 makeANF
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -154,9 +217,8 @@ makeANF ctx e0 = do
   let sc = tfScope ctx
   Grown rg e2 <- anfTerm (Env (closestLetBinder ctx)) (idSubst sc) (emptyRegion sc) e0
   case rgBinds rg of
-    -- Like Clash Core, this gives the original term when it created no
-    -- let-bindings: even if it changed a case-expression, or created
-    -- let-bindings in a region.
+    -- This gives the original term when it created no let-bindings: even if
+    -- it changed a case-expression, or created let-bindings in a region.
     [] -> return e0
     _ -> do
       let (e3, ticks) = collectTicks e2
@@ -206,8 +268,7 @@ instance Sinkable Told where
 
 -- | The state of the conversion of a region with root scope @r@, grown to
 -- scope @q@. Every binder of the chain is eventually a binding of the
--- region; this is the order of the let-expression of Clash Core, see
--- 'Clash.Normalize.Transformations.ANF.tellBinders'.
+-- region; 'regionLet' binds them in the order of 'rgBinds'.
 data Region (r :: S) (q :: S) = Region
   { rgScope :: !(Scope q)
   , rgChain :: !(Chain r q)
@@ -228,8 +289,7 @@ growRegion sc' bs (Region _ ch binds) = Region sc' (CSnoc ch bs) (sink1 binds)
 growRegion1 :: DExt q q' => Scope q' -> IdBinder q q' -> Region r q -> Region r q'
 growRegion1 sc' b = growRegion sc' (TCons b TNil)
 
--- | Add bindings, in front of the bindings so far, like
--- 'Clash.Normalize.Transformations.ANF.tellBinders'
+-- | Add bindings, in front of the bindings so far
 tellBinds :: [Told q] -> Region r q -> Region r q
 tellBinds bs rg = rg {rgBinds = bs ++ rgBinds rg}
 
@@ -324,9 +384,11 @@ unsinkTick bs t = case t of
 -- ** The traversal
 
 -- | Convert a subterm to ANF in a region, given the substitution from its
--- scope into the scope of the region. Like 'Clash.Rewrite.Combinators.allR'
--- followed by 'Clash.Normalize.Transformations.ANF.collectANF', bottom-up,
--- except for regions, see 'Clash.Normalize.Transformations.ANF.anfTraverse'.
+-- scope into the scope of the region. Bottom-up: it converts the subterms
+-- first, and then let-binds parts of the term itself ('collectApp',
+-- 'collectLet', 'collectCase'). The subterm under a binder that doesn't become
+-- a let-binder is converted as a region of its own ('anfRegion'), see the
+-- module header.
 anfTerm
   :: (HasCallStack, Distinct q)
   => Env
@@ -417,12 +479,11 @@ instance Sinkable SomeTyTele where
 -- | Convert the right-hand side of an alternative to ANF.
 --
 -- The alternative of a constructor whose existential type variables don't
--- occur in the types of its fields isn't a region, like in Clash Core: e.g.
--- @Cons@ of @Vec@ when its length is known. Its variables become binders of
--- the chain, and its existential type variables are substituted away, as they
--- don't become binders of the let-expression. If its right-hand side
--- mentions them, Clash Core moves bindings out of their scope; here, the
--- alternative is a region then.
+-- occur in the types of its fields isn't a region: e.g. @Cons@ of @Vec@ when
+-- its length is known. Its variables become binders of the chain, and its
+-- existential type variables are substituted away, as they don't become
+-- binders of the let-expression. If its right-hand side mentions them, the
+-- alternative is a region.
 anfAlt
   :: (HasCallStack, Distinct q)
   => Env
@@ -492,8 +553,8 @@ mkAlt sc = \case
 
 -- ** Creating let-bindings
 
--- | Is the given type IO-like, see
--- 'Clash.Normalize.Transformations.ANF.isSimIOTy'
+-- | Is the given type IO-like: 'SimIO', an unboxed pair with a state token
+-- ('State#'), or a function returning one of these
 isSimIOTy :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
 isSimIOTy te sc ty = case tyView (coreView te sc ty) of
   TyConApp tcNm args
@@ -509,13 +570,25 @@ isSimIOTy te sc ty = case tyView (coreView te sc ty) of
     TyConApp tcNm _ -> C.nameOcc tcNm == Text.showt ''State#
     _ -> False
 
--- | Let-bind the argument of an application, see
--- 'Clash.Normalize.Transformations.ANF.collectANF' and Note [ANF no let-bind]
--- there.
+{- Note [ANF no let-bind]
+Do not let-bind:
+
+1. Arguments with an untranslatable type: untranslatable expressions
+   should be propagated down as far as possible
+
+2. Local variables or constants: they don't add any work, so no reason
+   to let-bind to enable sharing
+
+3. IO actions, the translation of IO actions to sequential HDL constructs
+   depends on IO actions to be propagated down as far as possible.
+-}
+
+-- | Let-bind the argument of an application of a constructor, a variable or a
+-- primitive, see Note [ANF no let-bind]. The argument of
+-- @Clash.Explicit.SimIO.bindSimIO#@ isn't let-bound either.
 --
--- Clash Core also lifts the let-bindings out of an untranslatable argument
--- that is a let-expression, which can't occur: the traversal is bottom-up, and
--- converting a let-expression gives its body or a variable.
+-- An untranslatable argument is never a let-expression here: the traversal is
+-- bottom-up, and converting a let-expression gives its body or a variable.
 collectApp
   :: (HasCallStack, Distinct q)
   => Env
@@ -543,8 +616,8 @@ collectApp env rg e = case e of
   isSimBind _ = False
 
 -- | Lift the bindings of a let-expression into the region, and let-bind its
--- body unless it doesn't need to be, see
--- 'Clash.Normalize.Transformations.ANF.collectANF'
+-- body to a binder named @result@, unless it doesn't need to be, see
+-- Note [ANF no let-bind]
 collectLet
   :: (HasCallStack, Distinct q)
   => Region r q
@@ -566,8 +639,10 @@ collectLet rg binds body = do
       in  pure (Grown (tellBinds (sink1 binds) rg1) (idBinderVar b))
 
 -- | Let-bind the subject and the right-hand sides of a case-expression, and
--- let-bind the variables of its patterns to projections of the subject, see
--- 'Clash.Normalize.Transformations.ANF.collectANF'
+-- let-bind the variables of its patterns to projections of the subject,
+-- unless they don't need to be, see Note [ANF no let-bind]. A case-expression
+-- with a single alternative whose pattern variables don't occur in its
+-- right-hand side (or whose type is IO-like) becomes that right-hand side.
 collectCase
   :: forall r q
    . (HasCallStack, Distinct q)
@@ -646,8 +721,14 @@ collectCase env rg subj ty alts = do
       _ -> error ($(curLoc) ++ "doPatBndr: not a variable")
 
 -- | Project the field with the given index out of a 'Signal' constructed with
--- @(:-)@, given the types of its fields, see
--- 'Clash.Normalize.Transformations.ANF.mkSignalConsSelector'
+-- @(:-)@, given the types of its fields.
+--
+-- 'mkSelectorCase' cannot do this: Clash treats 'Signal' as a "transparent"
+-- type, and 'mkSelectorCase' uses 'Clash.Core.Scoped.Type.coreView1' to find
+-- the data constructors of the subject, which looks through 'Signal' and
+-- finds those of the element type instead. See error #24
+-- (https://github.com/christiaanb/clash2/issues/24), where it tried to get the
+-- first field out of the 'Vec's 'Nil' constructor.
 mkSignalConsSelector
   :: Distinct n
   => Scope n
@@ -673,9 +754,10 @@ mkSignalConsSelector sc subj dc tys i =
 nonRepANF :: Transformation
 nonRepANF = toScopedTransformation "nonRepANF" (onApp 'nonRepANFWorker)
 
--- | The 'App' handler of 'nonRepANF'. Clash Core deshadows the binders of the
--- let-expression it moves the application under (#1071); here, opening them
--- does that.
+-- | The 'App' handler of 'nonRepANF'. An untranslatable argument that is a
+-- let-expression is replaced by its body, with the let-expression moved
+-- around the application; on one that is a case-expression or a (type)
+-- lambda, the application is specialized.
 nonRepANFWorker
   :: (HasCallStack, Distinct n)
   => TransformContext n

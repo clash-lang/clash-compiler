@@ -6,10 +6,9 @@
   Tests for "Clash.Rewrite.Scoped.Whnf": evaluating subterms with the
   let-bindings of their scoped context.
 
-  The cases of "whnfRW uses the context's let-bindings (#2571)" in
-  "Clash.Tests.Rewrite.Util", on scoped Core: a traversal goes under the
-  binders itself, so the context is built by 'Clash.Rewrite.Scoped.pushUnder',
-  and evaluates every variable. In Clash Core, a binder that shadows a
+  The cases of \"whnfRW uses the context's let-bindings (#2571)\": a
+  traversal goes under the binders itself, so the context is built by
+  'Clash.Rewrite.Scoped.pushUnder', and evaluates every variable. In Clash Core, a binder that shadows a
   let-binder, or a free variable of its right-hand side, makes the binding
   unusable. In scoped Core, the shadowing binder has another name, so the
   binding is used where it is valid, and nowhere else.

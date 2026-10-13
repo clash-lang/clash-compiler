@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs, RankNTypes, DataKinds, ScopedTypeVariables #-}
 -- EXPECT: rigid type variable
 -- | Capture: let-bind the argument of a lambda with the lambda's own binder,
--- keeping the other arguments as they are (case 2 of Note [AppProp no
--- shadowing], the bug in `appProp`)
+-- keeping the other arguments as they are (the capture bug in `appProp`
+-- that #1040 fixed)
 module N12AppPropLam where
 
 import Clash.Core.Scoped.Syntax

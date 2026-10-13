@@ -58,13 +58,11 @@ data NormalizeState
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
   , _normalizationStrategy :: Rewrite NormalizeState
-  -- ^ The normalization strategy as a rewrite of Clash Core, for
-  -- 'Clash.Normalize.Util.normalizeTopLvlBndr'. See
-  -- '_scopedNormalizationStrategy'.
+  -- ^ The normalization strategy as a rewrite of Clash Core, which nothing
+  -- runs anymore. See '_scopedNormalizationStrategy'.
   , _constantPropagationStrategy :: Rewrite NormalizeState
-  -- ^ The constant propagation strategy as a rewrite of Clash Core, for
-  -- "Clash.Normalize.PrimitiveReductions". See
-  -- '_scopedNormalizationStrategy'.
+  -- ^ The constant propagation strategy as a rewrite of Clash Core, which
+  -- nothing runs anymore. See '_scopedConstantPropagationStrategy'.
   , _scopedNormalizationStrategy :: ScopedRewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.normalization' strategy. Carried
   -- in the state so transformations can normalize other binders
@@ -83,7 +81,8 @@ data NormalizeState
   --
   -- * Elem: the normalized body of @f@ applied to the arguments
   --
-  -- See 'Clash.Normalize.Util.normalizeWorkFreeApp'.
+  -- See 'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp', which uses its
+  -- scoped counterpart '_scopedWorkFreeAppCache'.
   , _scopedNormalized :: GlobalEnv (Binding (S.Term 'S.VoidS))
   -- ^ The normalized global binders. The fields from here on are the
   -- counterparts of the ones above for scoped Clash Core, which the

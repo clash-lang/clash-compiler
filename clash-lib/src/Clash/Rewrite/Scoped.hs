@@ -5,7 +5,7 @@
 
   Writing transformations of scoped Clash Core ("Clash.Core.Scoped.Syntax").
   This module re-exports what a transformation needs from the rewrite
-  machinery; read this header before porting one.
+  machinery; read this header before writing one.
 
   = The transformation type
 
@@ -19,16 +19,16 @@
 
   The rewrite monad, its state ('Clash.Rewrite.Types.bindings',
   'Clash.Rewrite.Types.tcCache', ...) and the change flag ('changed',
-  'setChanged') are those of Clash Core. The unique supply is not needed for
-  local binders: fresh binders come from the scope
-  ('Clash.Core.Scoped.Subst.withFreshIdBinder' and friends).
+  'setChanged') are in "Clash.Rewrite.Types" and "Clash.Rewrite.Util". The
+  unique supply is not needed for local binders: fresh binders come from the
+  scope ('Clash.Core.Scoped.Subst.withFreshIdBinder' and friends).
 
   = Workers
 
   Transformations are declared in the strategy DSL
-  ("Clash.Rewrite.StrategyDSL"), exactly like those of Clash Core, but with
-  'Clash.Rewrite.StrategyDSL.toScopedTransformation'. The workers have the
-  same shapes, on scoped terms:
+  ("Clash.Rewrite.StrategyDSL"), with
+  'Clash.Rewrite.StrategyDSL.toScopedTransformation'. The shapes of the
+  workers:
 
   * @onCase 'w@: @w :: Distinct n => TransformContext n -> Term n -> Term n
     -> Type n -> [Alt n] -> m (Term n)@, getting the node and its fields.
@@ -70,14 +70,15 @@
   @
 
   'mkDerivedName' gives the name of a new binder derived from the closest
-  let-binder, like 'Clash.Rewrite.Util.mkDerivedName'. Its unique is
-  irrelevant: binders get their names from the scope.
+  let-binder. Its unique is irrelevant: binders get their names from the
+  scope.
 
   = Utilities
 
-  The counterparts of the utilities in "Clash.Rewrite.Util" are in
-  "Clash.Rewrite.Scoped.Util". Read and create global bindings, which are
-  closed terms, with "Clash.Rewrite.Scoped.Globals".
+  The utilities on terms (creating binders, inlining, lifting and removing
+  let-bindings, ...) are in "Clash.Rewrite.Scoped.Util". Read and create
+  global bindings, which are closed terms, with
+  "Clash.Rewrite.Scoped.Globals".
 
   = Evaluation
 
@@ -95,13 +96,11 @@
   The let-bindings of the context are those of its frames, and those given to
   'embeddedRootContext'.
 
-  = Porting a transformation: a worked example
+  = A worked example
 
-  'Clash.Normalize.Transformations.Letrec.deadCode' was ported to
-  "Clash.Normalize.Scoped.Transformations.Letrec": the ports of
-  @Clash.Normalize.Transformations.X@ go in
-  @Clash.Normalize.Scoped.Transformations.X@. The scoped module declares the
-  transformation under the same name:
+  'Clash.Normalize.Scoped.Transformations.Letrec.deadCode', in
+  "Clash.Normalize.Scoped.Transformations.Letrec", removes the let-bindings
+  that aren't used:
 
   @
   deadCode :: Transformation
@@ -127,10 +126,9 @@
   ("Clash.Rewrite.StrategyDSL.TH", 'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy')
   compiles them into fused traversals that open the binders they go under.
 
-  Tests: "Test.Clash.Scoped" has @runViaFoil@ (run a scoped transformation
-  on a Clash Core term, in a Clash Core context, through the adapter
-  "Test.Clash.Scoped.ViaFoil") and @runScopedClosed@. The unit tests of the
-  transformations of Clash Core run on the ports through that adapter too.
+  Tests: "Test.Clash.Scoped" has test scopes to write the inputs and the
+  expected results, and runs scoped transformations in them (@runScopedIn@,
+  @runScopedClosed@).
 
   = Common type errors
 
