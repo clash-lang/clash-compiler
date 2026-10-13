@@ -25,7 +25,7 @@
   = Let-bindings
 
   The transformations on let-expressions work on its bindings in the scope of
-  the body ('Clash.Rewrite.Scoped.Util.openLetBindings'), so a right-hand side
+  the body ('Clash.Rewrite.Util.openLetBindings'), so a right-hand side
   of a non-recursive binding can't refer to its own binder.
 -}
 
@@ -119,7 +119,7 @@ import Clash.Rewrite.Scoped
   ( Frame (CaseScrut), FrameKind (..), Transform (..), TransformContext, allR
   , changed, ctxFrames, pushFrame, tfScope, underAlt )
 import Clash.Rewrite.Scoped.Globals (isTopEntity, lookupBinding)
-import Clash.Rewrite.Scoped.Util
+import Clash.Rewrite.Util
   ( LetBinding (..), inlineBinders, inlineOrLiftBinders, isJoinPointIn
   , isUntranslatable, isUntranslatableType, isVoidWrapper, keepBindings
   , openLetBindings, substVars, zoomExtra )

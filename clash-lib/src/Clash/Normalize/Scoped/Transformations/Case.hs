@@ -110,7 +110,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import Clash.Core.Scoped.Util (internalName)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope, whnfRW)
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
-import Clash.Rewrite.Scoped.Util
+import Clash.Rewrite.Util
   (isFromInt, isUntranslatableType, runWithHWTypeCache)
 import Clash.Rewrite.Scoped.WorkFree (isConstant)
 

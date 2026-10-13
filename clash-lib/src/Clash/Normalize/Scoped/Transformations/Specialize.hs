@@ -119,7 +119,7 @@ import           Clash.Normalize.Scoped.Util (ConstantSpecInfo (..), constantSpe
 import           Clash.Rewrite.Scoped.Combinators (topdownR)
 import           Clash.Rewrite.Scoped.Globals
   (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
-import           Clash.Rewrite.Scoped.Util
+import           Clash.Rewrite.Util
   ( abstractOver, changed, dependencySortTyVars, isUntranslatableType, mkTmBinderFor
   , normalizeTermTypes, setChanged )
 import           Clash.Rewrite.Scoped.Whnf   (whnfRW)

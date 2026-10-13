@@ -36,7 +36,7 @@ import Clash.Core.Scoped.Syntax
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import qualified Clash.Rewrite.Scoped as S
-import Clash.Rewrite.Scoped.Util (LetBinding (..), openLetBindings)
+import Clash.Rewrite.Util (LetBinding (..), openLetBindings)
 
 import Test.Clash.Rewrite
   ( TestDefs (..), TestTerm, ghcName, parseTestTermWith, runRewriteTest, strQQ

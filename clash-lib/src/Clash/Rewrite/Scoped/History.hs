@@ -46,7 +46,7 @@ import           Clash.Core.Scoped.Binary    (getHeader, putHeader)
 import           Clash.Core.Scoped.Subst     (Closure (..), closeOver, freeVarOccs)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term      (mkLams, mkTyLams)
-import           Clash.Rewrite.Scoped.Util   (dependencySortTyVars)
+import           Clash.Rewrite.Util   (dependencySortTyVars)
 
 -- | Start a rewrite history: a file with just the header
 startRewriteHistory :: FilePath -> IO ()
