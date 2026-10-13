@@ -5,8 +5,10 @@
 
   For the transitional 'Data.Binary.Binary' instances of "Clash.Core.DataCon"
   and "Clash.Core.TyCon", which decode the types of Clash Core and convert
-  them.
+  them, and for the builtin type constructors of "Clash.Core.Scoped.TysPrim".
 -}
+
+{-# LANGUAGE DataKinds #-}
 
 module Clash.Core.Scoped.Convert where
 
@@ -18,6 +20,9 @@ import {-# SOURCE #-} Clash.Core.TyCon (AlgTyConRhs, TyCon, TyConName)
 import {-# SOURCE #-} Clash.Core.Type (Kind, Type)
 import Clash.Core.Var (TyVar)
 import Clash.Unique (Unique)
+
+import Clash.Core.Scoped.Sig (DataConSig)
+import qualified Clash.Core.Scoped.Syntax as S
 
 mkDataConFromClash
   :: HasCallStack
@@ -36,3 +41,11 @@ mkFunTyConFromClash
 mkPrimTyConFromClash :: HasCallStack => Unique -> TyConName -> Kind -> Int -> TyCon
 
 mkNewTyConRhsFromClash :: HasCallStack => DataCon -> ([TyVar], Type) -> AlgTyConRhs
+
+mkDataCon
+  :: DcName -> ConTag -> S.Type 'S.VoidS -> DataConSig -> [DcStrictness] -> [Text]
+  -> DataCon
+
+mkAlgTyCon :: TyConName -> S.Kind 'S.VoidS -> Int -> AlgTyConRhs -> Bool -> TyCon
+
+mkPrimTyCon :: TyConName -> S.Kind 'S.VoidS -> Int -> TyCon

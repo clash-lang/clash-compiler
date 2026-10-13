@@ -1,22 +1,24 @@
 {-|
-  Copyright   :  (C) 2026, QBayLogic B.V.
+  Copyright   :  (C) 2012-2016, University of Twente,
+                     2016     , Myrtle Software Ltd,
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Builtin types and kinds of scoped Clash Core. See "Clash.Core.TysPrim".
+  Builtin types and kinds of scoped Clash Core, and their type constructors.
+  See "Clash.Core.TysPrim", which derives the builtin types of Clash Core from
+  the names here.
 
   Most of them are a single type constructor, which mentions no variables, so
   they are types in any scope: @'Type' n@ for all @n@. Those that bind type
   variables, such as 'undefinedTy', are closed types (@'Type' ''VoidS'@), which
   'sinkClosed' moves into any scope.
-
-  The type constructors themselves are the 'Clash.Core.TyCon.TyCon's of
-  'Clash.Core.TysPrim.tysPrimMap'.
 -}
 
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Core.Scoped.TysPrim
   ( -- * Kinds
@@ -45,36 +47,126 @@ module Clash.Core.Scoped.TysPrim
     -- * Closed types
   , undefinedTy
   , unsafeCoerceTy
+    -- * Type constructors
+  , tysPrimMap
+  , integerIsDc
+  , naturalNsDc
+    -- * Names of the type constructors
+  , liftedTypeKindTyConName
+  , typeNatKindTyConName
+  , typeSymbolKindTyConName
+  , intPrimTyConName
+  , integerPrimTyConName
+  , charPrimTyConName
+  , stringPrimTyConName
+  , wordPrimTyConName
+  , int64PrimTyConName
+  , word64PrimTyConName
+  , int8PrimTyConName
+  , int16PrimTyConName
+  , int32PrimTyConName
+  , word8PrimTyConName
+  , word16PrimTyConName
+  , word32PrimTyConName
+  , floatPrimTyConName
+  , doublePrimTyConName
+  , naturalPrimTyConName
+  , byteArrayPrimTyConName
+  , eqPrimTyConName
   ) where
 
-import GHC.Stack (HasCallStack)
+import Data.Text.Extra (showt)
+import GHC.Base (ByteArray#, Char#, Double#, Float#, Int#, Int8#, Int16#, Int32#, Int64#,
+  Word#, Word8#, Word16#, Word32#, Word64#, Addr#)
+import GHC.Builtin.Names
+import GHC.Num.Integer (Integer (..))
+import GHC.Num.Natural (Natural (..))
 
-import qualified Clash.Core.Name as C
+import Clash.Core.DataCon (DataCon, DcName, DcStrictness (..))
+import Clash.Core.Name (mkUnsafeSystemName)
+-- Through the boot file: the constructors derive the types of Clash Core from
+-- the scoped ones, and Clash Core's builtin types are made from the names here
+import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkAlgTyCon, mkDataCon, mkPrimTyCon)
+import Clash.Core.TyCon (AlgTyConRhs (..), TyCon, TyConMap, TyConName)
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
+import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Unique (fromGhcUnique)
 
+import Clash.Core.Scoped.Sig (DataConSig (..))
 import Clash.Core.Scoped.Subst (withFreshTyBinder)
 import Clash.Core.Scoped.Syntax
 
+-- * Names
+
+liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
+liftedTypeKindTyConName   = mkUnsafeSystemName "Type"
+                              (fromGhcUnique liftedTypeKindTyConKey)
+typeNatKindTyConName      = naturalPrimTyConName
+typeSymbolKindTyConName   = mkUnsafeSystemName "Symbol"
+                              (fromGhcUnique typeSymbolKindConNameKey)
+
+intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
+  wordPrimTyConName,  int64PrimTyConName, word64PrimTyConName,
+  floatPrimTyConName, doublePrimTyConName,
+  naturalPrimTyConName, byteArrayPrimTyConName, eqPrimTyConName :: TyConName
+intPrimTyConName     = mkUnsafeSystemName (showt ''Int#)
+                                (fromGhcUnique intPrimTyConKey)
+integerPrimTyConName = mkUnsafeSystemName (showt ''Integer)
+                                (fromGhcUnique integerTyConKey)
+stringPrimTyConName  = mkUnsafeSystemName (showt ''Addr#)
+                        (fromGhcUnique addrPrimTyConKey)
+charPrimTyConName    = mkUnsafeSystemName (showt ''Char#)
+                                (fromGhcUnique charPrimTyConKey)
+wordPrimTyConName    = mkUnsafeSystemName (showt ''Word#)
+                                (fromGhcUnique wordPrimTyConKey)
+int64PrimTyConName   = mkUnsafeSystemName (showt ''Int64#)
+                                (fromGhcUnique int64PrimTyConKey)
+word64PrimTyConName  = mkUnsafeSystemName (showt ''Word64#)
+                                (fromGhcUnique word64PrimTyConKey)
+floatPrimTyConName   = mkUnsafeSystemName (showt ''Float#)
+                                (fromGhcUnique floatPrimTyConKey)
+doublePrimTyConName  = mkUnsafeSystemName (showt ''Double#)
+                                (fromGhcUnique doublePrimTyConKey)
+naturalPrimTyConName = mkUnsafeSystemName (showt ''Natural)
+                                (fromGhcUnique naturalTyConKey)
+byteArrayPrimTyConName = mkUnsafeSystemName (showt ''ByteArray#)
+                          (fromGhcUnique byteArrayPrimTyConKey)
+
+eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (fromGhcUnique eqPrimTyConKey)
+
+
+int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, word8PrimTyConName,
+  word16PrimTyConName, word32PrimTyConName :: TyConName
+int8PrimTyConName   = mkUnsafeSystemName (showt ''Int8#)
+                        (fromGhcUnique int8PrimTyConKey)
+int16PrimTyConName  = mkUnsafeSystemName (showt ''Int16#)
+                        (fromGhcUnique int16PrimTyConKey)
+int32PrimTyConName  = mkUnsafeSystemName (showt ''Int32#)
+                        (fromGhcUnique int32PrimTyConKey)
+word8PrimTyConName  = mkUnsafeSystemName (showt ''Word8#)
+                        (fromGhcUnique word8PrimTyConKey)
+word16PrimTyConName = mkUnsafeSystemName (showt ''Word16#)
+                        (fromGhcUnique word16PrimTyConKey)
+word32PrimTyConName = mkUnsafeSystemName (showt ''Word32#)
+                        (fromGhcUnique word32PrimTyConKey)
+
 -- | A builtin type that is a single type constructor, in any scope
-fromConstTy :: HasCallStack => C.Type -> Type n
-fromConstTy = \case
-  C.ConstTy c -> ConstTy c
-  ty -> error ("fromConstTy: not a type constructor: " <> show ty)
+tyConTy :: TyConName -> Type n
+tyConTy tc = ConstTy (C.TyCon tc)
 
 -- * Kinds
 
--- | See 'C.liftedTypeKind'
+-- | See 'Clash.Core.TysPrim.liftedTypeKind'
 liftedTypeKind :: Kind n
-liftedTypeKind = fromConstTy C.liftedTypeKind
+liftedTypeKind = tyConTy liftedTypeKindTyConName
 
--- | See 'C.typeNatKind'
+-- | See 'Clash.Core.TysPrim.typeNatKind'
 typeNatKind :: Kind n
-typeNatKind = fromConstTy C.typeNatKind
+typeNatKind = tyConTy typeNatKindTyConName
 
--- | See 'C.typeSymbolKind'
+-- | See 'Clash.Core.TysPrim.typeSymbolKind'
 typeSymbolKind :: Kind n
-typeSymbolKind = fromConstTy C.typeSymbolKind
+typeSymbolKind = tyConTy typeSymbolKindTyConName
 
 -- * Primitive types
 
@@ -82,39 +174,144 @@ intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, wordPrimTy, int64PrimTy,
   word64PrimTy, int8PrimTy, int16PrimTy, int32PrimTy, word8PrimTy,
   word16PrimTy, word32PrimTy, floatPrimTy, doublePrimTy, naturalPrimTy,
   byteArrayPrimTy, eqPrimTy :: Type n
-intPrimTy = fromConstTy C.intPrimTy
-integerPrimTy = fromConstTy C.integerPrimTy
-charPrimTy = fromConstTy C.charPrimTy
-stringPrimTy = fromConstTy C.stringPrimTy
-wordPrimTy = fromConstTy C.wordPrimTy
-int64PrimTy = fromConstTy C.int64PrimTy
-word64PrimTy = fromConstTy C.word64PrimTy
-int8PrimTy = fromConstTy C.int8PrimTy
-int16PrimTy = fromConstTy C.int16PrimTy
-int32PrimTy = fromConstTy C.int32PrimTy
-word8PrimTy = fromConstTy C.word8PrimTy
-word16PrimTy = fromConstTy C.word16PrimTy
-word32PrimTy = fromConstTy C.word32PrimTy
-floatPrimTy = fromConstTy C.floatPrimTy
-doublePrimTy = fromConstTy C.doublePrimTy
-naturalPrimTy = fromConstTy C.naturalPrimTy
-byteArrayPrimTy = fromConstTy C.byteArrayPrimTy
-eqPrimTy = fromConstTy C.eqPrimTy
+intPrimTy = tyConTy intPrimTyConName
+integerPrimTy = tyConTy integerPrimTyConName
+charPrimTy = tyConTy charPrimTyConName
+stringPrimTy = tyConTy stringPrimTyConName
+wordPrimTy = tyConTy wordPrimTyConName
+int64PrimTy = tyConTy int64PrimTyConName
+word64PrimTy = tyConTy word64PrimTyConName
+int8PrimTy = tyConTy int8PrimTyConName
+int16PrimTy = tyConTy int16PrimTyConName
+int32PrimTy = tyConTy int32PrimTyConName
+word8PrimTy = tyConTy word8PrimTyConName
+word16PrimTy = tyConTy word16PrimTyConName
+word32PrimTy = tyConTy word32PrimTyConName
+floatPrimTy = tyConTy floatPrimTyConName
+doublePrimTy = tyConTy doublePrimTyConName
+naturalPrimTy = tyConTy naturalPrimTyConName
+byteArrayPrimTy = tyConTy byteArrayPrimTyConName
+eqPrimTy = tyConTy eqPrimTyConName
 
 -- * Closed types
 
 -- | The type @forall a. a@. See 'Clash.Core.Util.undefinedTy'.
 undefinedTy :: Type 'VoidS
 undefinedTy =
-  withFreshTyBinder emptyScope (C.mkUnsafeSystemName "a" 0) liftedTypeKind $ \_ a ->
+  withFreshTyBinder emptyScope (mkUnsafeSystemName "a" 0) liftedTypeKind $ \_ a ->
     ForAllTy a (tyBinderVar a)
 
 -- | The type @forall a. forall b. a -> b@. See
 -- 'Clash.Core.Util.unsafeCoerceTy'.
 unsafeCoerceTy :: Type 'VoidS
 unsafeCoerceTy =
-  withFreshTyBinder emptyScope (C.mkUnsafeSystemName "a" 0) liftedTypeKind $ \sc1 a ->
-    withFreshTyBinder sc1 (C.mkUnsafeSystemName "b" 1) liftedTypeKind $ \_ b ->
+  withFreshTyBinder emptyScope (mkUnsafeSystemName "a" 0) liftedTypeKind $ \sc1 a ->
+    withFreshTyBinder sc1 (mkUnsafeSystemName "b" 1) liftedTypeKind $ \_ b ->
       ForAllTy a (ForAllTy b (funTy (sink (tyBinderVar a)) (tyBinderVar b)))
+
+-- | A function type
+funTy :: Type n -> Type n -> Type n
+funTy t1 = AppTy (AppTy (ConstTy C.Arrow) t1)
+
+-- * Type constructors
+
+-- | The builtin type constructors
+tysPrimMap :: TyConMap
+tysPrimMap = UniqMap.fromList
+  [ (liftedTypeKindTyConName, liftedTypeKindTc)
+  , (typeNatKindTyConName, typeNatKindTc)
+  , (typeSymbolKindTyConName, typeSymbolKindTc)
+  , (intPrimTyConName, intPrimTc)
+  , (integerPrimTyConName, integerPrimTc)
+  , (charPrimTyConName, charPrimTc)
+  , (stringPrimTyConName, stringPrimTc)
+  , (wordPrimTyConName, wordPrimTc)
+  , (int64PrimTyConName, int64PrimTc)
+  , (word64PrimTyConName, word64PrimTc)
+  , (int8PrimTyConName, int8PrimTc)
+  , (int16PrimTyConName, int16PrimTc)
+  , (int32PrimTyConName, int32PrimTc)
+  , (word8PrimTyConName, word8PrimTc)
+  , (word16PrimTyConName, word16PrimTc)
+  , (word32PrimTyConName, word32PrimTc)
+  , (floatPrimTyConName, floatPrimTc)
+  , (doublePrimTyConName, doublePrimTc)
+  , (naturalPrimTyConName, naturalPrimTc)
+  , (byteArrayPrimTyConName, byteArrayPrimTc)
+  , (eqPrimTyConName, eqPrimTc)
+  ]
+
+-- | A primitive type constructor of kind 'liftedTypeKind'
+liftedPrimTc :: TyConName -> TyCon
+liftedPrimTc nm = mkPrimTyCon nm liftedTypeKind 0
+
+liftedTypeKindTc, typeNatKindTc, typeSymbolKindTc, intPrimTc, integerPrimTc,
+  charPrimTc, stringPrimTc, wordPrimTc, int64PrimTc, word64PrimTc, int8PrimTc,
+  int16PrimTc, int32PrimTc, word8PrimTc, word16PrimTc, word32PrimTc,
+  floatPrimTc, doublePrimTc, naturalPrimTc, byteArrayPrimTc, eqPrimTc :: TyCon
+liftedTypeKindTc = liftedPrimTc liftedTypeKindTyConName
+typeNatKindTc = liftedPrimTc typeNatKindTyConName
+typeSymbolKindTc = liftedPrimTc typeSymbolKindTyConName
+intPrimTc = liftedPrimTc intPrimTyConName
+charPrimTc = liftedPrimTc charPrimTyConName
+stringPrimTc = liftedPrimTc stringPrimTyConName
+wordPrimTc = liftedPrimTc wordPrimTyConName
+int64PrimTc = liftedPrimTc int64PrimTyConName
+word64PrimTc = liftedPrimTc word64PrimTyConName
+int8PrimTc = liftedPrimTc int8PrimTyConName
+int16PrimTc = liftedPrimTc int16PrimTyConName
+int32PrimTc = liftedPrimTc int32PrimTyConName
+word8PrimTc = liftedPrimTc word8PrimTyConName
+word16PrimTc = liftedPrimTc word16PrimTyConName
+word32PrimTc = liftedPrimTc word32PrimTyConName
+floatPrimTc = liftedPrimTc floatPrimTyConName
+doublePrimTc = liftedPrimTc doublePrimTyConName
+byteArrayPrimTc = liftedPrimTc byteArrayPrimTyConName
+
+-- While GHC might have dropped Integer and Natural literals, in Clash it is
+-- still nice to have them around. However, Integer and Natural are also no
+-- longer primitive types in GHC, but we still want to give the Integer and
+-- Natural type to our Integer and Natural literals.
+--
+-- So instead of recording the primitive types, we record the algebraic types,
+-- i.e. the complete data type for Integer and Natural, data constructors and
+-- all.
+integerPrimTc =
+  mkAlgTyCon integerPrimTyConName liftedTypeKind 0 (DataTyCon [integerIsDc, ipDc, inDc]) False
  where
-  funTy t1 = AppTy (AppTy (ConstTy C.Arrow) t1)
+  ipDc = boxDc (mkUnsafeSystemName (showt 'IP) (fromGhcUnique integerIPDataConKey))
+           2 integerPrimTy byteArrayPrimTy
+  inDc = boxDc (mkUnsafeSystemName (showt 'IN) (fromGhcUnique integerINDataConKey))
+           3 integerPrimTy byteArrayPrimTy
+
+naturalPrimTc =
+  mkAlgTyCon naturalPrimTyConName liftedTypeKind 0 (DataTyCon [naturalNsDc, nbDc]) False
+ where
+  nbDc = boxDc (mkUnsafeSystemName (showt 'NB) (fromGhcUnique naturalNBDataConKey))
+           2 naturalPrimTy byteArrayPrimTy
+
+-- | The data constructors of 'Integer' and 'Natural' that hold a machine word
+integerIsDc, naturalNsDc :: DataCon
+integerIsDc =
+  boxDc (mkUnsafeSystemName (showt 'IS) (fromGhcUnique integerISDataConKey))
+    1 integerPrimTy intPrimTy
+naturalNsDc =
+  boxDc (mkUnsafeSystemName (showt 'NS) (fromGhcUnique naturalNSDataConKey))
+    1 naturalPrimTy wordPrimTy
+
+-- | A data constructor with the given name and tag, of a type with no type
+-- variables, with one strict field of the given type
+boxDc :: DcName -> Int -> Type 'VoidS -> Type 'VoidS -> DataCon
+boxDc nm tag resTy argTy =
+  mkDataCon nm tag (funTy argTy resTy) (DataConSig TNil TNil [argTy]) [Strict] []
+
+-- | The kind @forall (a :: Type). forall (b :: Type). a -> b -> Type@. The
+-- "real" kind of this in GHC has a codomain of @TYPE ('TupleRep '[])@ instead
+-- of the @TYPE 'LiftedRep@ used here.
+eqPrimTc = mkPrimTyCon eqPrimTyConName kind 4
+ where
+  kind =
+    withFreshTyBinder emptyScope (mkUnsafeSystemName "a" 0) liftedTypeKind $ \sc1 a ->
+      withFreshTyBinder sc1 (mkUnsafeSystemName "b" 1) liftedTypeKind $ \_ b ->
+        ForAllTy a (ForAllTy b
+          (funTy (sink (tyBinderVar a)) (funTy (tyBinderVar b) liftedTypeKind)))
