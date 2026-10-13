@@ -18,7 +18,7 @@
   primitives :: [(Text, PrimReduction)]
   @
 
-  and 'scopedPrimReductions' combines those lists. It errors if a primitive
+  and 'primReductionMap' combines those lists. It errors if a primitive
   has two reductions. A primitive without a reduction here doesn't reduce. So
   adding a reduction is adding an entry to the list of its module: nothing
   else changes. To add a module, create it, and add its import and its list
@@ -116,8 +116,8 @@
 -}
 
 module Clash.Core.Scoped.Evaluator.Primitives
-  ( scopedPrimReductions
-  , scopedPrimitives
+  ( primReductionMap
+  , primReductionList
   ) where
 
 import qualified Data.HashMap.Strict as HashMap
@@ -159,19 +159,19 @@ import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Word as GHC.Word
 
 -- | The reductions, by the name of their primitive. See the module
 -- header.
-scopedPrimReductions :: HashMap Text PrimReduction
-scopedPrimReductions
-  | null duplicates = HashMap.fromList scopedPrimitives
+primReductionMap :: HashMap Text PrimReduction
+primReductionMap
+  | null duplicates = HashMap.fromList primReductionList
   | otherwise = error $
-      "scopedPrimReductions: multiple reductions registered for: " <> show duplicates
+      "primReductionMap: multiple reductions registered for: " <> show duplicates
  where
   duplicates =
     HashMap.keys $ HashMap.filter (> 1) $
-      HashMap.fromListWith (+) [(name, 1 :: Int) | (name, _) <- scopedPrimitives]
+      HashMap.fromListWith (+) [(name, 1 :: Int) | (name, _) <- primReductionList]
 
 -- | The reductions, in the order of their modules
-scopedPrimitives :: [(Text, PrimReduction)]
-scopedPrimitives = concat
+primReductionList :: [(Text, PrimReduction)]
+primReductionList = concat
   [ Clash.Annotations.BitRepresentation.Deriving.primitives
   , Clash.Class.BitPack.Internal.primitives
   , Clash.Class.Exp.primitives

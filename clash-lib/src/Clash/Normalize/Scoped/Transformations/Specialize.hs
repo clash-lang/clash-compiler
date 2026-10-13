@@ -401,7 +401,7 @@ specializeGlobal sc e f args ticks specArgIn = do
         specAbs = case specArg of
           Left tm ->
             Left . AlphaTerm <$>
-              closeTerm (scopedSpecCacheKey (abstractOver "specialize" specTvs specIdBndrs tm))
+              closeTerm (specCacheKey (abstractOver "specialize" specTvs specIdBndrs tm))
           Right ty -> Right . AlphaType <$> closeType ty
         showSpecAbs = either (\(AlphaTerm t) -> showPpr t) (\(AlphaType t) -> showPpr t)
     -- Determine if 'f' has already been specialized on (a type-normalized)
@@ -506,7 +506,7 @@ cache. Consider these applications which differ only by ticks:
 If one of these had been specialized, the other two would hit that term in the
 specialization cache, saving Clash from having to re-do work which is in effect
 the same. To preserve this behavior, we strip all ticks from the keys for the
-specialization cache, see 'scopedSpecCacheKey'.
+specialization cache, see 'specCacheKey'.
 
 TODO While this preserves the old behavior, the old behavior is likely not
 quite what we want. Using a value from the specialization cache may change the
@@ -533,8 +533,8 @@ specialization cache.
 -- | Prepare a term for use as a key in the specialization cache: strip all
 -- ticks (see Note [ticks and specialization]) and replace small bignum
 -- constants by literals (see Note [bignum literals and specialization]).
-scopedSpecCacheKey :: Term n -> Term n
-scopedSpecCacheKey = go
+specCacheKey :: Term n -> Term n
+specCacheKey = go
  where
   go :: Term x -> Term x
   go = \case

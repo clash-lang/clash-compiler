@@ -26,7 +26,7 @@ import Clash.Core.Literal (Literal (..))
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Builder (TmB, TyB, appB, dataB, literalB, runClosedType)
-import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
+import Clash.Core.Scoped.Evaluator.Primitives (primReductionMap)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (bvConPrim, signedConPrim)
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving as PDeriving
 import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Promoted.Nat as PNat
@@ -264,7 +264,7 @@ resultTypeTests =
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Evaluator.Primitives"
   [ testCase "no primitive has two reductions" $
-      () <$ evaluate (HashMap.size scopedPrimReductions)
+      () <$ evaluate (HashMap.size primReductionMap)
   , testGroup "ported reductions" portedTests
   , testGroup "results built from types" resultTypeTests
   ]
