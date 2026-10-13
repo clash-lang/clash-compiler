@@ -117,7 +117,7 @@ import Clash.Rewrite.Types
 import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
-import Clash.Core.Scoped.DataCon (DataConSig (..), dataConInstArgTys)
+import Clash.Core.DataCon (DataConSig (..), dataConInstArgTys)
 import Clash.Core.Scoped.EqSolver (typeEq)
 import Clash.Core.Scoped.Evaluator (whnf)
 import Clash.Core.Scoped.Evaluator.Types (Env, Machine (..), PrimHeap, initMachine)

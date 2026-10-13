@@ -32,7 +32,7 @@ import Clash.Core.Scoped.EqSolver
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst (substTm)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.DataCon (withDataConPat)
+import Clash.Core.DataCon (withDataConPat)
 import Clash.Core.Scoped.Type (mkFunTy)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import qualified Clash.Core.Scoped.TysPrim as P

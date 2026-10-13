@@ -45,7 +45,7 @@ import Clash.Util (curLoc, textNameLit)
 import qualified Clash.Sized.Internal.Index
 import qualified Clash.Sized.Vector
 
-import Clash.Core.Scoped.DataCon (dataConInstArgTys)
+import Clash.Core.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.Evaluator (newLetBinding, whnf)
 import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types

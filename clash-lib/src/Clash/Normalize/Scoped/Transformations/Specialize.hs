@@ -99,7 +99,7 @@ import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
 import           Clash.Core.Scoped.Builder   (TyB, forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
-import           Clash.Core.Scoped.DataCon   (dataConInstArgTys)
+import           Clash.Core.DataCon   (dataConInstArgTys)
 import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf, piResultTy)
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))

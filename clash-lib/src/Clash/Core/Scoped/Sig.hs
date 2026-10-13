@@ -25,7 +25,7 @@
     its existentially quantified type variables, in the scope of the universal
     ones; and the types of its fields, in the scope of both. Instantiating a
     data constructor is then substituting types for the variables of these
-    telescopes (see "Clash.Core.Scoped.DataCon").
+    telescopes (see "Clash.Core.DataCon").
 
   This module only depends on "Clash.Core.Scoped.Syntax", so that the modules
   of type constructors and data constructors can store the signatures.
