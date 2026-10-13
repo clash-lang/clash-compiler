@@ -21,12 +21,9 @@ import Language.Haskell.TH (Exp, Name, Q, listE, stringE)
 
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
-import Clash.Unique (Unique)
 
-import Clash.Core.Scoped.Convert (fromClashTermClosed, mkPrimInfoFromClash)
+import Clash.Core.Scoped.Builder
+  (appB, castB, caseB, deDupTickB, defaultAltB, lamB, litAltB, tickB, tyAppB, tyLamB, varB)
 import Clash.Core.Scoped.FreeVars (teleNameBinders)
 import Clash.Core.Scoped.Subst (unsinkTerm)
 import Clash.Core.Scoped.Syntax hiding (Name)
@@ -37,25 +34,20 @@ import Clash.Rewrite.StrategyDSL.TH
   (compileScopedStrategy, compileScopedStrategyReference)
 import Clash.Rewrite.Types (RewriteMonad)
 
-import Test.Clash.Scoped (somePrim)
+import Test.Clash.Scoped (TestTerm (..), TestType (..), builtTerm, closedTerm, testGlobalId, testPrim)
 
 -- * Term construction helpers
 
-someType :: C.Type
-someType = C.ConstTy (C.TyCon (C.mkUnsafeSystemName "T" 0))
+-- | The type of the terms, @T@
+someType :: TestType
+someType = "T"
 
-someId :: Unique -> C.Id
-someId unique = C.mkLocalId someType (C.mkUnsafeSystemName "x" unique)
-
--- | The global @f@, which 'functionToPrim' rewrites to a primitive
-fGlobal :: C.Id
-fGlobal = C.mkGlobalId someType (C.mkUnsafeSystemName "f" 2)
+-- | The global @f :: T@, which 'functionToPrim' rewrites to a primitive
+fGlobal :: GlobalId
+fGlobal = testGlobalId "f_G2" someType
 
 integer :: Integer -> Term n
 integer = Literal . IntLiteral
-
-cInteger :: Integer -> C.Term
-cInteger = C.Literal . IntLiteral
 
 -- * Stub transformations
 
@@ -161,58 +153,39 @@ reifyContext = toScopedTransformation "reifyContext" (onVarNode 'reifyContextWor
 -- from an already rewritten function
 functionToPrimWorker :: TransformContext n -> Term n -> RewriteMonad () (Term n)
 functionToPrimWorker _ctx = \case
-  GlobalVar g | globalIdUniq g == C.varUniq fGlobal -> changed (Prim (mkPrimInfoFromClash somePrim))
+  GlobalVar g | g == fGlobal -> changed (Prim (testPrim "somePrim" someType))
   node -> pure node
 
 functionToPrim :: Transformation
 functionToPrim = toScopedTransformation "functionToPrim" (onVarNode 'functionToPrimWorker)
 
--- * Test terms, as Clash Core
+-- * Test terms
 
 -- | @(let x = f 3 in x) (letrec y = 5 in y)@
-nestedTermC :: C.Term
-nestedTermC =
-  C.App
-    (C.Let (C.NonRec x (C.App (C.Var fGlobal) (cInteger 3))) (C.Var x))
-    (C.Let (C.Rec [(y, cInteger 5)]) (C.Var y))
- where
-  x = someId 0
-  y = someId 1
-
 nestedTerm :: Term 'VoidS
-nestedTerm = fromClashTermClosed nestedTermC
+nestedTerm = closedTerm "(let { !(x_0 :: T) = (f_G2 :: T) 3 } in x_0) (let { (y_1 :: T) = 5 } in y_1)"
 
 -- | A term covering every recursive constructor
-allConstructorsTermC :: C.Term
-allConstructorsTermC =
-  C.Lam lamBinder
-    (C.TyLam tyVariable
-      (C.Tick C.DeDup
-        (C.Case
-          (C.Cast (C.App (C.Var lamBinder) subject) someType someType)
-          someType
-          [ (C.DefaultPat, cInteger 3)
-          , (C.LitPat (IntLiteral 0), C.TyApp (C.Var lamBinder) someType)
-          ])))
- where
-  lamBinder = someId 3
-  tyVariable = C.mkTyVar someType (C.mkUnsafeSystemName "a" 100)
-  subject = C.Let (C.NonRec (someId 5) (cInteger 7)) (C.Var (someId 5))
-
 allConstructorsTerm :: Term 'VoidS
-allConstructorsTerm = fromClashTermClosed allConstructorsTermC
-
-simpleApplicationC :: C.Term
-simpleApplicationC = C.App (C.Var fGlobal) (cInteger 3)
+allConstructorsTerm = closedTerm $ builtTerm $
+  lamB 3 (C.mkUnsafeSystemName "x" 3) tB $
+    tyLamB 100 (C.mkUnsafeSystemName "a" 100) tB $
+      tickB deDupTickB $
+        caseB (castB (appB (varB 3) subject) tB tB) tB
+          [ defaultAltB (testTermB "3")
+          , litAltB (IntLiteral 0) (tyAppB (varB 3) tB)
+          ]
+ where
+  tB = testTypeB someType
+  subject = testTermB "let { !(x_5 :: T) = 7 } in x_5"
 
 simpleApplication :: Term 'VoidS
-simpleApplication = fromClashTermClosed simpleApplicationC
+simpleApplication = closedTerm "(f_G2 :: T) 3"
 
 -- | The function position rewrites to a primitive; the argument's probed
 -- context must show the AppArg frame of that primitive
 appArgProbeTerm :: Term 'VoidS
-appArgProbeTerm = fromClashTermClosed
-  (C.Lam (someId 7) (C.App (C.Var fGlobal) (C.Var (someId 7))))
+appArgProbeTerm = closedTerm "\\(x_7 :: T) -> (f_G2 :: T) x_7"
 
 -- * Strategy fragments compared across all traversals
 

@@ -5,8 +5,7 @@
 
   Tests for "Clash.Rewrite.StrategyDSL.TH" compiling strategies of scoped
   transformations: the scoped counterparts of the tests in
-  "Clash.Tests.Rewrite.StrategyDSL", and strategies of Clash Core that run
-  scoped transformations through 'Test.Clash.Scoped.ViaFoil.viaFoil'.
+  "Clash.Tests.Rewrite.StrategyDSL".
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -20,9 +19,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Core.Term as C
 
-import Clash.Core.Scoped.Convert (fromClashTermClosed)
 import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped (ScopedRewrite)
 import qualified Clash.Rewrite.Scoped as S
@@ -30,7 +27,7 @@ import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
 
 import Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
-import Test.Clash.Scoped (runScopedClosed)
+import Test.Clash.Scoped (closedTerm, runScopedClosed)
 
 -- | Assert that two scoped rewrites agree on a closed term: same result
 -- (syntactically), same transformation count, same change flag
@@ -203,7 +200,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
 
   , testGroup "descent"
       [ testCase "NonRec lets stay NonRec" $ do
-          let term = fromClosed (C.Let (C.NonRec (someId 0) (cInteger 3)) (cInteger 5))
+          let term = closedTerm "let { !(x_0 :: T) = 3 } in 5"
           (result, _, _) <- runScopedClosed
             $(compileScopedStrategy (topdown literalStep)) term
           case result of
@@ -231,5 +228,4 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
       ]
   ]
  where
-  nestedLet = fromClosed (C.Let (C.NonRec (someId 0) (cInteger 5)) (C.Var (someId 0)))
-  fromClosed = fromClashTermClosed
+  nestedLet = closedTerm "let { !(x_0 :: T) = 5 } in x_0"
