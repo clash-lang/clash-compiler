@@ -4,419 +4,788 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Normalize.Scoped.Transformations.DEC": the regression tests
-  of DEC of Clash Core, run on the port through
-  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of the port with DEC of
-  Clash Core on inputs that cover its cases.
+  of DEC of Clash Core, and tests of the cases of DEC, whose expected results
+  are those of DEC of Clash Core.
 
   The regression tests are about binders in the alternatives that shadow, or
   are captured by, variables outside of them. In scoped Clash Core, binders
   don't shadow, and DEC can only move the parts of an application out of the
   alternatives that don't refer to their binders, so these bugs can't be
-  written there. The tests still run on Clash Core terms with such binders,
-  and test the conversion to scoped Core and the port together.
+  written there. 'assertRewritesTo' runs every test in the scope of the free
+  variables of its input, and in a scope that the binders of the input clash
+  with.
 -}
 
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Scoped.Transformations.DEC (tests) where
 
-import qualified Control.Lens as Lens
 import Data.Default (def)
-import qualified Data.Text as Text
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.FreeVars (termFreeTyVars)
-import Clash.Core.Literal (Literal (..))
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term
-  (Bind (..), Pat (..), PrimInfo (..), TickInfo (..), WorkInfo (..), mkApps)
-import qualified Clash.Core.Term as C
-import Clash.Core.TyCon (TyCon (..))
-import Clash.Core.Type (LitTy (..), Type (..), mkFunTy)
-import Clash.Core.TysPrim (integerPrimTy, naturalPrimTy)
-import Clash.Core.Var (Id, TyVar)
-import Clash.Core.VarEnv (extendInScopeSetList)
+import qualified Data.List as List
+import Data.String (fromString)
+
+import qualified Clash.Core.DataCon as C
+import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkVariable))
+import Clash.Core.Scoped.Convert (mkPrimInfo)
+import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Core.Scoped.Syntax
+  (Alt (..), GlobalId, Pat (DefaultPat), PrimInfo, PrimUnfolding (NoUnfolding), Term (Case))
 import qualified Clash.Normalize.Scoped.Transformations.DEC as Scoped
-import Clash.Normalize.Transformations.DEC (disjointExpressionConsolidationWorker)
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.StrategyDSL (onCase, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
-import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
-import Clash.Rewrite.Util (runRewrite)
-import Clash.Util.Supply (newSupply)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
-import Clash.Tests.Normalize.Transformations.DEC (decTests, mkTDc, tN, tTy)
-import Test.Clash.Differential (KnownDifference, Outcome (..), letrecOrder, recToNonRec)
-import Test.Clash.Differential.Sites (compareAtSite)
 import Test.Clash.Rewrite
-  ( globalId, heapLookupEvaluator, inScopeOf, intFunTy, intId, intTy
-  , justDataCon, localId, maybeTy, mkTestAlgTyCon, mkBindingMap, nothingDataCon
-  , pairDataCon, pairTy, parseTyConName, runRewriteTest, showPprU, testTyConMap, tyVar, withTupleTyCons
-  , withTyConMap )
-import Test.Clash.Scoped.ViaFoil (viaFoil)
+  ( TestDefs (..), TestTerm, ghcName, kindedTyVarD, parseTestTermWith, strQQ, testAlgTyCon
+  , testDataCon, testGlobalId, testTyConMap, tupleTyCon, varD, withTupleTyCons, withTyConMap )
+import Test.Clash.Scoped
+  ( ScopeDecl, assertCaptureRewritesTo, assertNoRewrite, assertRewritesTo, closedType
+  , mkGlobalBindings, termIn )
 
--- | DEC of Clash Core
-decCurrent :: NormRewrite
-decCurrent =
-  $(asRewriteQ (toTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)))
+-- * Definitions
 
--- | The port of DEC, on terms of Clash Core: through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil'
-decScoped :: NormRewrite
-decScoped = (viaFoil "disjointExpressionConsolidation" $(asScopedRewriteQ Scoped.disjointExpressionConsolidation))
+-- | @MkEx :: forall n. n -> Ex@ and @MkT :: forall n. n -> T@, constructors
+-- with an existential type variable
+mkEx, mkT :: C.DataCon
+mkEx = testDataCon "MkEx" 1001 1 [] [kindedTyVarD "n" "Type"] ["n"] "Ex"
+mkT = testDataCon "MkT" 101 1 [] [kindedTyVarD "n" "Type"] ["n"] "T"
 
--- | The known differences of the port, see
--- "Clash.Normalize.Scoped.Transformations.DEC"
-knownDifferences :: [KnownDifference]
-knownDifferences = [recToNonRec, letrecOrder]
+-- | The global functions of the tests
+globals :: [GlobalId]
+globals =
+  [ fReg, fAgr
+  , testGlobalId "k_G33" "Int -> Int -> Int"
+  , testGlobalId "h_G46" "forall (a :: Type). a -> Int"
+  , testGlobalId "g_G211" "Int -> Int"
+  , testGlobalId "k_G212" "Int -> Int -> Int"
+  , testGlobalId "h_G213" "forall (a :: Type). a -> Int"
+  , testGlobalId "hof_G215" "(Int -> Int) -> Int -> Int"
+  , testGlobalId "fI_G245" "GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer" ]
 
--- | An environment with the type constructors of 'testTyConMap', @T@, and
--- tuples, and an evaluator that doesn't reduce primitives
+-- | Global functions @f :: Int -> Int@, with body @\\a -> a@: of the
+-- regression tests, and of the others
+fReg, fAgr :: GlobalId
+fReg = testGlobalId "f_G10" "Int -> Int"
+fAgr = testGlobalId "f_G210" "Int -> Int"
+
+-- | The primitives of the tests:
+--
+-- * @integerMul@ and @integerQuot@, interesting unless an argument is a power
+--   of two
+-- * a higher-order primitive @hoPrim :: (Integer -> Integer) -> Integer ->
+--   Integer@, which is interesting if its function argument is
+-- * a primitive @plainPrim :: Integer -> Integer@, which isn't interesting
+-- * @Clash.Sized.Internal.Unsigned.fromInteger# :: forall n. Natural ->
+--   Integer -> Integer@ (with a simplified result type)
+prims :: [PrimInfo]
+prims =
+  [ prim "GHC.Num.Integer.integerMul" (integerFunTy 2)
+  , prim "GHC.Num.Integer.integerQuot" (integerFunTy 2)
+  , prim "hoPrim" ("(" <> integerFunTy 1 <> ") -> " <> integerFunTy 1)
+  , prim "plainPrim" (integerFunTy 1)
+  , prim "Clash.Sized.Internal.Unsigned.fromInteger#"
+      ("forall (n :: Nat). GHC.Num.Natural.Natural -> " <> integerFunTy 1) ]
+ where
+  prim nm ty = mkPrimInfo (ghcName nm) (closedType (fromString ty)) C.WorkVariable C.SingleResult NoUnfolding
+  integerFunTy :: Int -> String
+  integerFunTy n = List.intercalate " -> " (replicate (n + 1) "GHC.Num.Integer.Integer")
+
+tm :: String -> TestTerm
+tm = parseTestTermWith
+  (TestDefs ([mkEx, mkT] <> concatMap (C.tyConDataCons . tupleTyCon) [2, 3]) prims globals)
+
+-- | The type constructors of 'testTyConMap', @T@, @Ex@ and tuples
 env :: RewriteEnv
-env = (withTupleTyCons 3 (withTyConMap tcm def)) {_evaluator = heapLookupEvaluator}
+env = withTupleTyCons 3 (withTyConMap tcm def)
  where
-  tcm = UniqMap.insert (tyConName tTc) tTc testTyConMap
-  tTc = mkTestAlgTyCon (parseTyConName "T") [] [mkTDc]
+  tcm = foldr (\tc -> UniqMap.insert (C.tyConName tc) tc) testTyConMap
+          [testAlgTyCon "T" [] [mkT], testAlgTyCon "Ex" [] [mkEx]]
 
--- | Run DEC at the root of a term, with the given variables in scope. Gives
--- the result, and whether it signaled a change.
-runDEC :: NormRewrite -> [TyVar] -> [Id] -> C.Term -> IO (C.Term, Bool)
-runDEC dec tvs ids tm = do
-  supply <- newSupply
-  let st :: RewriteState NormalizeState
-      st = def
-        { _bindings = mkBindingMap [(f, C.Lam a (C.Var a))]
-        , _uniqSupply = supply
-        , _globalHeap = (mempty, 0) }
-      is = extendInScopeSetList (inScopeOf ids) tvs
-  (res, _, ch) <- runRewriteTest env st (runRewrite "DEC" is dec tm)
-  pure (res, ch)
- where
-  a = intId User "a" 299
+-- | A state with the bindings of the global functions @f@
+st :: RewriteState NormalizeState
+st = def
+  { _scopedBindings = mkGlobalBindings [(f, "\\(a :: Int) -> a") | f <- [fReg, fAgr]]
+  , _globalHeap = (mempty, 0) }
 
--- | Assert that the port agrees with DEC of Clash Core on a term, up to the
--- known differences, and whether both fire
-decAgrees :: Bool -> [TyVar] -> [Id] -> C.Term -> Assertion
-decAgrees fires tvs ids tm = do
-  (expected, ch1) <- runDEC decCurrent tvs ids tm
-  (actual, ch2) <- runDEC decScoped tvs ids tm
-  let shown = "Clash Core:\n" <> showPprU expected <> "\nscoped:\n" <> showPprU actual
-  assertBool ("DEC of Clash Core fired: " <> show ch1 <> "\n" <> shown) (ch1 == fires)
-  assertBool ("the port fired: " <> show ch2 <> "\n" <> shown) (ch2 == fires)
-  case compareAtSite knownDifferences expected actual of
-    Different _ -> assertFailure ("different results\n" <> shown)
-    _ -> pure ()
+-- | Assert that DEC rewrites a term to the expected one, see
+-- 'assertRewritesTo'
+decTo :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+decTo = assertRewritesTo env st decS
 
--- * Variables
+decS :: ScopedRewrite NormalizeState
+decS = $(asScopedRewriteQ Scoped.disjointExpressionConsolidation)
 
-s, t, x, y, z, w :: Id
-s = intId User "s" 200
-t = intId User "t" 201
-x = intId User "x" 202
-y = intId User "y" 203
-z = intId User "z" 204
-w = intId User "w" 205
-
--- | Global functions @f, g :: Int -> Int@ and @k :: Int -> Int -> Int@
-f, g, k :: Id
-f = globalId User "f" 210 (intFunTy 1)
-g = globalId User "g" 211 (intFunTy 1)
-k = globalId User "k" 212 (intFunTy 2)
-
--- | Global function @h :: forall a. a -> Int@
-h :: Id
-h = globalId User "h" 213 (ForAllTy hA (mkFunTy (VarTy hA) intTy))
- where
-  hA = tyVar User "a" 214
-
--- | Global function @hof :: (Int -> Int) -> Int -> Int@
-hof :: Id
-hof = globalId User "hof" 215 (mkFunTy (intFunTy 1) (intFunTy 1))
-
--- | Local function @q :: Int -> Int@
-q :: Id
-q = localId User "q" 216 (intFunTy 1)
-
--- | @p :: Pair@, @m :: Maybe Int@ and @e :: T@
-p, m, e :: Id
-p = localId User "p" 217 pairTy
-m = localId User "m" 218 (maybeTy intTy)
-e = localId User "e" 219 tTy
-
--- | @n@, a type variable in scope of the case-expression
-n :: TyVar
-n = tyVar User "n" 220
-
-app :: Id -> [C.Term] -> C.Term
-app fun = mkApps (C.Var fun) . map Left
-
--- | A case-expression on @s@ with the given alternatives, the first of which
--- is the default one
-caseS :: [C.Term] -> C.Term
-caseS alts = C.Case (C.Var s) intTy
-  (zip (DefaultPat : [LitPat (IntLiteral i) | i <- [1 ..]]) alts)
-
--- * Primitives
-
--- | A primitive of the given name and type
-prim :: Text.Text -> Type -> PrimInfo
-prim nm ty = PrimInfo
-  { primName = nm
-  , primType = ty
-  , primWorkInfo = WorkVariable
-  , primMultiResult = C.SingleResult
-  , primUnfolding = C.NoUnfolding
-  }
-
-integerFunTy :: Int -> Type
-integerFunTy i = foldr mkFunTy integerPrimTy (replicate i integerPrimTy)
-
--- | @integerMul@, an interesting primitive unless an argument is a power of
--- two
-integerMul :: PrimInfo
-integerMul = prim "GHC.Num.Integer.integerMul" (integerFunTy 2)
-
--- | @integerQuot@, an interesting primitive unless its divisor is a power of
--- two
-integerQuot :: PrimInfo
-integerQuot = prim "GHC.Num.Integer.integerQuot" (integerFunTy 2)
-
--- | A higher-order primitive @hoPrim :: (Integer -> Integer) -> Integer ->
--- Integer@, which is interesting if its function argument is
-hoPrim :: PrimInfo
-hoPrim = prim "hoPrim" (mkFunTy (integerFunTy 1) (integerFunTy 1))
-
--- | A primitive @plainPrim :: Integer -> Integer@, which isn't interesting
-plainPrim :: PrimInfo
-plainPrim = prim "plainPrim" (integerFunTy 1)
-
--- | @Clash.Sized.Internal.Unsigned.fromInteger# :: forall n. Natural ->
--- Integer -> Integer@ (with a simplified result type)
-fromIntegerU :: PrimInfo
-fromIntegerU = prim "Clash.Sized.Internal.Unsigned.fromInteger#"
-  (ForAllTy nU (mkFunTy naturalPrimTy (integerFunTy 1)))
- where
-  nU = tyVar User "n" 221
-
-primApp :: PrimInfo -> [C.Term] -> C.Term
-primApp pr = mkApps (C.Prim pr) . map Left
-
-integerLit :: Integer -> C.Term
-integerLit = C.Literal . IntegerLiteral
-
-ix, iy :: Id
-ix = localId User "ix" 230 integerPrimTy
-iy = localId User "iy" 231 integerPrimTy
-
--- | A case-expression on @s@ with alternatives of type @Integer@
-caseSI :: [C.Term] -> C.Term
-caseSI alts = C.Case (C.Var s) integerPrimTy
-  (zip (DefaultPat : [LitPat (IntLiteral i) | i <- [1 ..]]) alts)
-
--- * Tests
+-- | Assert that DEC leaves a term as it is
+decKeeps :: [ScopeDecl] -> TestTerm -> Assertion
+decKeeps = assertNoRewrite env st $(asScopedRewriteQ Scoped.disjointExpressionConsolidation)
 
 tests :: TestTree
 tests =
   testGroup "Clash.Tests.Normalize.Scoped.Transformations.DEC"
-    [ testGroup "regression tests of Clash Core, through viaFoil" (decTests decScoped)
-    , testGroup "agrees with Clash Core"
-        [ testGroup "heads"
-            [ testCase "a global function in two alternatives" $
-                decAgrees True [] [s, x, y]
-                  (caseS [app f [C.Var x], app f [C.Var y], app g [C.Var x]])
-            , testCase "a global function in one alternative" $
-                decAgrees False [] [s, x, y]
-                  (caseS [app f [C.Var x], app g [C.Var y]])
-            , testCase "a local function of the context" $
-                decAgrees True [] [s, q, x, y]
-                  (caseS [app q [C.Var x], app q [C.Var y]])
-            , testCase "several functions, applied to each other" $
-                decAgrees True [] [s, x, y]
-                  (caseS [app f [app g [C.Var x]], app f [app g [C.Var y]], app g [C.Var y]])
-            , testCase "a function applied twice in one alternative" $
-                decAgrees True [] [s, x, y]
-                  (caseS [app f [app f [C.Var x]], app f [C.Var y]])
-            , testCase "NoDeDup" $
-                decAgrees False [] [s, x, y]
-                  (caseS [C.Tick NoDeDup (app f [C.Var x]), C.Tick NoDeDup (app f [C.Var y])])
-            , testCase "a tick around one application" $
-                decAgrees True [] [s, x, y]
-                  (caseS [C.Tick DeDup (app f [C.Var x]), app f [C.Var y]])
-            , testCase "a function in the subject of a nested case-expression" $
-                decAgrees True [] [s, t, x, y]
-                  (caseS [ app f [C.Var x]
-                         , C.Case (app f [C.Var y]) intTy [(DefaultPat, app f [C.Var t])] ])
-            ]
-        , testGroup "arguments"
-            [ testCase "two arguments that differ, through a tuple" $
-                decAgrees True [] [s, x, y]
-                  (caseS [app k [C.Var x, C.Var y], app k [C.Var y, C.Var x]])
-            , testCase "three arguments that differ, through a tuple" $
-                decAgrees True [] [s, x, y, z]
-                  (caseS [ app k [app k [C.Var x, C.Var y], app k [C.Var z, C.Var x]]
-                         , app k [app g [C.Var y], app f [C.Var z]] ])
-            , testCase "a shared argument" $
-                decAgrees True [] [s, x, y, z]
-                  (caseS [app k [C.Var x, C.Var z], app k [C.Var y, C.Var z]])
-            , testCase "all arguments shared" $
-                decAgrees True [] [s, x]
-                  (caseS [app f [C.Var x], app f [C.Var x]])
-            , testCase "a shared argument up to ticks" $
-                decAgrees True [] [s, x]
-                  (caseS [app f [C.Tick DeDup (C.Var x)], app f [C.Var x]])
-            , testCase "a non-representable argument" $
-                decAgrees True [] [s, x, y]
-                  (caseS [ mkApps (C.Var hof) [Left (C.Var f), Left (C.Var x)]
-                         , mkApps (C.Var hof) [Left (C.Var g), Left (C.Var y)] ])
-            , testCase "an argument mentioning a pattern binder" $
-                decAgrees True [] [s, p, x]
-                  (caseS [ app f [C.Var x]
-                         , C.Case (C.Var p) intTy
-                             [(DataPat pairDataCon [] [a, b], app f [C.Var b])] ])
-            , testCase "an argument mentioning a let-binder in an alternative" $
-                decAgrees True [] [s, x, y]
-                  (caseS [ app f [C.Var x]
-                         , C.Let (NonRec a (app g [C.Var y])) (app f [C.Var a]) ])
-            , testCase "an application in the right-hand side of a let-binding" $
-                decAgrees True [] [s, x, y]
-                  (caseS [ app f [C.Var x]
-                         , C.Let (NonRec a (app f [C.Var y])) (app k [C.Var a, C.Var a]) ])
-            , testCase "an argument mentioning a recursive let-binder" $
-                decAgrees True [] [s, x, y]
-                  (caseS [ app f [C.Var x]
-                         , C.Letrec [(a, app g [C.Var y]), (b, app k [C.Var a, C.Var x])]
-                             (app f [C.Var b]) ])
-            , testCase "applications in a recursive group are left alone" $
-                decAgrees False [] [s, x, y]
-                  (caseS [ app f [C.Var x]
-                         , C.Letrec [(a, app f [C.Var b]), (b, app g [C.Var a])]
-                             (C.Var a) ])
-            ]
-        , testGroup "type arguments"
-            [ testCase "shared type arguments" $
-                decAgrees True [] [s, x, y]
-                  (caseS [ mkApps (C.Var h) [Right intTy, Left (C.Var x)]
-                         , mkApps (C.Var h) [Right intTy, Left (C.Var y)] ])
-            , testCase "a type variable of the context" $
-                decAgrees True [n] [s, xn, yn]
-                  (caseS [ mkApps (C.Var h) [Right (VarTy n), Left (C.Var xn)]
-                         , mkApps (C.Var h) [Right (VarTy n), Left (C.Var yn)] ])
-            , testCase "different type arguments" $
-                decAgrees False [] [s, x, p]
-                  (caseS [ mkApps (C.Var h) [Right intTy, Left (C.Var x)]
-                         , mkApps (C.Var h) [Right pairTy, Left (C.Var p)] ])
-            , testCase "an existential type variable" $
-                decAgrees False [] [s, e]
-                  (caseS [ C.Case (C.Var e) intTy
-                             [(DataPat mkTDc [tN] [v], mkApps (C.Var h) [Right (VarTy tN), Left (C.Var v)])]
-                         , C.Case (C.Var e) intTy
-                             [(DataPat mkTDc [tN] [v], mkApps (C.Var h) [Right (VarTy tN), Left (C.Var v)])] ])
-            , testCase "an argument whose type mentions an existential type variable" $ do
-                -- Clash drops casts, so after matching on a GADT, an argument
-                -- can have a type that mentions an existential type variable
-                -- where the function expects another type: here @v :: n@ for
-                -- @f :: Int -> Int@. Both give the let-binder of the argument
-                -- the type of the parameter of @f@, rather than the type of
-                -- the first argument, which mentions @n@ outside of the
-                -- pattern that binds it.
-                let term = caseS [ C.Case (C.Var e) intTy [(DataPat mkTDc [tN] [v], app f [C.Var v])]
-                                 , app f [C.Var x] ]
-                decAgrees True [] [s, e, x] term
-                (scoped, ch) <- runDEC decScoped [] [s, e, x] term
-                ch @?= True
-                assertBool ("expected no free type variables:\n" <> showPprU scoped)
-                  (null (Lens.toListOf termFreeTyVars scoped))
-            ]
-        , testGroup "nested case-expressions"
-            [ testCase "literal patterns" $
-                decAgrees True [] [s, t, x, y]
-                  (caseS [ C.Case (C.Var t) intTy
-                             [(LitPat (IntLiteral 1), app f [C.Var x]), (DefaultPat, app g [C.Var y])]
-                         , app f [C.Var y] ])
-            , testCase "a non-exhaustive data case-expression" $
-                decAgrees True [] [s, m, x]
-                  (caseS [ app f [C.Var x]
-                         , C.Case (C.Var m) intTy
-                             [ (DataPat nothingDataCon [] [], app g [C.Var x])
-                             , (DataPat justDataCon [] [a], app f [C.Var a]) ] ])
-            , testCase "a case-expression in which the pattern binders are not used" $
-                decAgrees True [] [s, p, x, y]
-                  (caseS [ app f [C.Var x]
-                         , C.Case (C.Var p) intTy [(DataPat pairDataCon [] [a, b], app f [C.Var y])] ])
-            , testCase "two levels" $
-                decAgrees True [] [s, t, x, y, z, w]
-                  (caseS [ C.Case (C.Var t) intTy
-                             [ (DefaultPat, app k [C.Var x, C.Var y])
-                             , (LitPat (IntLiteral 1), app k [C.Var y, C.Var z]) ]
-                         , app k [C.Var z, C.Var w]
-                         , C.Case (C.Var t) intTy
-                             [ (DefaultPat, app g [C.Var x])
-                             , (LitPat (IntLiteral 2), app k [C.Var w, C.Var x]) ] ])
-            ]
-        , testGroup "primitives"
-            [ testCase "an interesting primitive" $
-                decAgrees True [] [s, ix, iy]
-                  (caseSI [ primApp integerMul [C.Var ix, integerLit 3]
-                          , primApp integerMul [C.Var iy, integerLit 5] ])
-            , testCase "a primitive that isn't interesting" $
-                decAgrees False [] [s, ix, iy]
-                  (caseSI [primApp plainPrim [C.Var ix], primApp plainPrim [C.Var iy]])
-            , testCase "a primitive with DeDup" $
-                decAgrees True [] [s, ix, iy]
-                  (caseSI [ C.Tick DeDup (primApp plainPrim [C.Var ix])
-                          , C.Tick DeDup (primApp plainPrim [C.Var iy]) ])
-            , testCase "a higher-order primitive, multiplying by a power of two" $
-                decAgrees False [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [primApp integerMul [integerLit 4], opaque ix]
-                          , primApp hoPrim [primApp integerMul [integerLit 4], opaque iy] ])
-            , testCase "a higher-order primitive, multiplying by zero" $
-                decAgrees False [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [primApp integerMul [integerLit 0], opaque ix]
-                          , primApp hoPrim [primApp integerMul [integerLit 0], opaque iy] ])
-            , testCase "a higher-order primitive, multiplying by another number" $
-                decAgrees True [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [primApp integerMul [integerLit 3], opaque ix]
-                          , primApp hoPrim [primApp integerMul [integerLit 3], opaque iy] ])
-            , testCase "a higher-order primitive, multiplying by fromInteger# of a power of two" $
-                decAgrees False [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [primApp integerMul [fromIntegerLit 8], opaque ix]
-                          , primApp hoPrim [primApp integerMul [fromIntegerLit 8], opaque iy] ])
-            , testCase "a higher-order primitive, multiplying by fromInteger# of another number" $
-                decAgrees True [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [primApp integerMul [fromIntegerLit 6], opaque ix]
-                          , primApp hoPrim [primApp integerMul [fromIntegerLit 6], opaque iy] ])
-            , testCase "a higher-order primitive, dividing by a power of two" $
-                decAgrees False [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [primApp integerQuot [integerLit 7, integerLit 2], opaque ix]
-                          , primApp hoPrim [primApp integerQuot [integerLit 7, integerLit 2], opaque iy] ])
-            , testCase "a higher-order primitive, dividing by another number" $
-                decAgrees True [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [primApp integerQuot [integerLit 8, integerLit 3], opaque ix]
-                          , primApp hoPrim [primApp integerQuot [integerLit 8, integerLit 3], opaque iy] ])
-            , testCase "a higher-order primitive, applied to a function" $
-                decAgrees True [] [s, ix, iy]
-                  (caseSI [ primApp hoPrim [C.Var fI, C.Var ix]
-                          , primApp hoPrim [C.Var fI, C.Var iy] ])
-            ]
-        ]
+    [ testGroup "regression tests"
+      [ -- Clash drops casts, so after matching on a GADT, an argument can have
+        -- a type that mentions an existential type variable where the
+        -- function expects another type: here @v :: n@ for @f :: Int -> Int@.
+        -- DEC used to give the let-binder of the lifted argument of @f@ the
+        -- type of the argument of the first application, @n@, which leaves
+        -- @n@ free outside of the pattern that binds it.
+        testCase "DEC gives lifted arguments a type in scope" $
+          decTo [varD "s_30" "Int", varD "x_31" "Int", varD "e_35" "Ex"]
+            (tm [strQQ|
+              (case s_30 of
+                { _ -> (case e_35 of { MkEx (n :: Type) (v :: n) -> f_G10 v }) :: Int
+                ; 1 -> f_G10 x_31
+                }) :: Int
+            |])
+            (tm [strQQ|
+              let
+                { (cfout_1000036 :: Int) = let
+                    { (cfarg0_37 :: Int) = (case s_30 of
+                        { _ -> (case e_35 of { MkEx (n :: Type) (v :: n) -> v }) :: Int
+                        ; 1 -> x_31
+                        }) :: Int
+                    } in f_G10 cfarg0_37
+                } in (case s_30 of
+                { _ -> (case e_35 of { MkEx (n :: Type) (v :: n) -> cfout_1000036 }) :: Int
+                ; 1 -> cfout_1000036
+                }) :: Int
+            |])
+      , -- DEC substitutes a reference to the lifted @f_out@ for every
+        -- application of @f@ in the alternatives, which puts that reference
+        -- under the binders of the alternatives. It used to pick the unique of
+        -- @f_out@ avoiding only the variables in scope of the case-expression,
+        -- not the binders inside the alternatives, so a let-binder in an
+        -- alternative could capture the reference.
+        -- https://github.com/clash-lang/clash-compiler/pull/1317
+        -- https://github.com/clash-lang/clash-compiler/commit/959ee9072fdd0c5deaf91f5e82adc2c23b0f8e16
+        testCase "DEC does not capture lifted expressions (#1317)" $
+          decTo [varD "s_30" "Int", varD "x_31" "Int", varD "y_32" "Int"]
+            (tm "(case s_30 of { _ -> f_G10 y_32; 1 -> let { (b :: Int) = 3 } in k_G33 b (f_G10 x_31) }) :: Int")
+            (tm [strQQ|
+              let
+                { (fout :: Int) = let { (farg :: Int) = (case s_30 of { _ -> y_32; 1 -> x_31 }) :: Int } in f_G10 farg
+                } in (case s_30 of { _ -> fout; 1 -> let { (b :: Int) = 3 } in k_G33 b fout }) :: Int
+            |])
+        -- Both alternatives apply the /local/ function @g@, which they
+        -- let-bind themselves. DEC used to consider every local variable in
+        -- scope of an application interesting to lift, including those bound
+        -- inside the alternatives, and lifted @g@ out of the alternatives that
+        -- bind it.
+      , testCase "DEC does not lift local functions bound in the alternatives" $
+          decKeeps [varD "s_30" "Int", varD "x_31" "Int", varD "y_32" "Int"]
+            (tm [strQQ|
+              (case s_30 of
+                { _ -> let { (g :: Int -> Int) = f_G10 } in g y_32
+                ; 1 -> let { (g :: Int -> Int) = f_G10 } in g x_31
+                }) :: Int
+            |])
+        -- DEC used to consider type arguments shareable as long as they were
+        -- equal, without checking whether they mention type variables bound
+        -- by the patterns of the alternatives. It lifted @h \@n@ out of the
+        -- case-expression that binds @n@.
+      , testCase "DEC does not share type arguments bound in the alternatives" $
+          decKeeps [varD "s_30" "Int", varD "t_42" "T"]
+            (tm [strQQ|
+              (case s_30 of
+                { _ -> (case t_42 of { MkT (n :: Type) (v :: n) -> h_G46 @n v }) :: Int
+                ; 1 -> (case t_42 of { MkT (n :: Type) (w :: n) -> h_G46 @n w }) :: Int
+                }) :: Int
+            |])
+        -- DEC used to consider arguments shareable if all their free variables
+        -- are in scope of the case-expression. The pattern-bound @x@ had the
+        -- same unique as the @x@ in scope in Clash Core, so DEC shared @f x@,
+        -- making the second alternative refer to the wrong @x@.
+      , testCase "DEC does not share arguments bound in the alternatives" $ do
+          decTo [varD "s_30" "Int", varD "x_31" "Int", varD "p_47" "Pair"]
+            (tm [strQQ|
+              (case s_30 of
+                { _ -> f_G10 x_31
+                ; 1 -> (case p_47 of { MkPair (x :: Int) (z :: Int) -> f_G10 x }) :: Int
+                }) :: Int
+            |])
+            (tm [strQQ|
+              let
+                { (cfout_48 :: Int) = let
+                    { (cfarg0_49 :: Int) = (case s_30 of
+                        { _ -> x_31
+                        ; 1 -> (case p_47 of { MkPair (x :: Int) (z :: Int) -> x }) :: Int
+                        }) :: Int
+                    } in f_G10 cfarg0_49
+                } in (case s_30 of
+                { _ -> cfout_48
+                ; 1 -> (case p_47 of { MkPair (x :: Int) (z :: Int) -> cfout_48 }) :: Int
+                }) :: Int
+            |])
+          -- The pattern binder @x@ has the name of the free @x@
+          assertCaptureRewritesTo env st decS [varD "s_30" "Int", varD "p_47" "Pair"]
+            (tm [strQQ|
+              (case s_30 of
+                { _ -> 0
+                ; 1 -> (case p_47 of { MkPair (x :: Int) (z :: Int) -> f_G10 x }) :: Int
+                }) :: Int
+            |])
+            [varD "x_31" "Int"]
+            (\ts -> \case
+              Case subj ty (_ : alts) -> Case subj ty (Alt DefaultPat (termIn ts (tm "f_G10 x_31")) : alts)
+              e -> e)
+            (tm [strQQ|
+              let
+                { (cfout_48 :: Int) = let
+                    { (cfarg0_49 :: Int) = (case s_30 of
+                        { _ -> x_31
+                        ; 1 -> (case p_47 of { MkPair (x :: Int) (z :: Int) -> x }) :: Int
+                        }) :: Int
+                    } in f_G10 cfarg0_49
+                } in (case s_30 of
+                { _ -> cfout_48
+                ; 1 -> (case p_47 of { MkPair (x :: Int) (z :: Int) -> cfout_48 }) :: Int
+                }) :: Int
+            |])
+      ]
+  , testGroup "cases"
+      [ testGroup "heads"
+          [ testCase "a global function in two alternatives" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm "(case s_200 of { _ -> f_G210 x_202; 1 -> f_G210 y_203; 2 -> g_G211 x_202 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of { _ -> cfout_204; 1 -> cfout_204; 2 -> g_G211 x_202 }) :: Int
+                |])
+          , testCase "a global function in one alternative" $
+              decKeeps [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm "(case s_200 of { _ -> f_G210 x_202; 1 -> g_G211 y_203 }) :: Int")
+          , testCase "a local function of the context" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int", varD "q_216" "Int -> Int"]
+                (tm "(case s_200 of { _ -> q_216 x_202; 1 -> q_216 y_203 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (cqout_217 :: Int) = let
+                        { (cqarg0_218 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in q_216 cqarg0_218
+                    } in (case s_200 of { _ -> cqout_217; 1 -> cqout_217 }) :: Int
+                |])
+          , testCase "several functions, applied to each other" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm [strQQ|
+                  (case s_200 of { _ -> f_G210 (g_G211 x_202); 1 -> f_G210 (g_G211 y_203); 2 -> g_G211 y_203 }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_206 :: Int) = (case s_200 of { _ -> cgout_205; 1 -> cgout_205 }) :: Int
+                        } in f_G210 cfarg0_206
+                    ; (cgout_205 :: Int) = let
+                        { (cgarg0_206 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203; 2 -> y_203 }) :: Int
+                        } in g_G211 cgarg0_206
+                    } in (case s_200 of { _ -> cfout_204; 1 -> cfout_204; 2 -> cgout_205 }) :: Int
+                |])
+          , testCase "a function applied twice in one alternative" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm "(case s_200 of { _ -> f_G210 (f_G210 x_202); 1 -> f_G210 y_203 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of { _ -> f_G210 cfout_204; 1 -> cfout_204 }) :: Int
+                |])
+          , testCase "NoDeDup" $
+              decKeeps [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm [strQQ|
+                  (case s_200 of { _ -> Core.noDeDup (f_G210 x_202); 1 -> Core.noDeDup (f_G210 y_203) }) :: Int
+                |])
+          , testCase "a tick around one application" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm "(case s_200 of { _ -> Core.deDup (f_G210 x_202); 1 -> f_G210 y_203 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of { _ -> cfout_204; 1 -> cfout_204 }) :: Int
+                |])
+          , testCase "a function in the subject of a nested case-expression" $
+              decTo [varD "s_200" "Int", varD "t_201" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm [strQQ|
+                  (case s_200 of { _ -> f_G210 x_202; 1 -> (case f_G210 y_203 of { _ -> f_G210 t_201 }) :: Int }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> t_201 }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of
+                    { _ -> cfout_204
+                    ; 1 -> (case f_G210 y_203 of { _ -> cfout_204 }) :: Int
+                    }) :: Int
+                |])
+          ]
+      , testGroup "arguments"
+          [ testCase "two arguments that differ, through a tuple" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm "(case s_200 of { _ -> k_G212 x_202 y_203; 1 -> k_G212 y_203 x_202 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (ckout_204 :: Int) = let
+                        { (cktupIn_205 :: Tup2_3502 Int Int) = (case s_200 of
+                            { _ -> MkTup2 @Int @Int x_202 y_203
+                            ; 1 -> MkTup2 @Int @Int y_203 x_202
+                            }) :: Tup2_3502 Int Int
+                        ; (ckarg0_206 :: Int) = (case cktupIn_205 of { MkTup2 (csel :: Int) (cwild_209 :: Int) -> csel }) :: Int
+                        ; (ckarg1_207 :: Int) = (case cktupIn_205 of { MkTup2 (cwild_208 :: Int) (csel :: Int) -> csel }) :: Int
+                        } in k_G212 ckarg0_206 ckarg1_207
+                    } in (case s_200 of { _ -> ckout_204; 1 -> ckout_204 }) :: Int
+                |])
+          , testCase "three arguments that differ, through a tuple" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int", varD "z_204" "Int"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> k_G212 (k_G212 x_202 y_203) (k_G212 z_204 x_202)
+                    ; 1 -> k_G212 (g_G211 y_203) (f_G210 z_204)
+                    }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (ckout_205 :: Int) = let
+                        { (cktupIn_206 :: Tup2_3502 Int Int) = (case s_200 of
+                            { _ -> MkTup2 @Int @Int x_202 y_203
+                            ; 1 -> MkTup2 @Int @Int (g_G211 y_203) (f_G210 z_204)
+                            }) :: Tup2_3502 Int Int
+                        ; (ckarg0_207 :: Int) = (case cktupIn_206 of { MkTup2 (csel :: Int) (cwild_210 :: Int) -> csel }) :: Int
+                        ; (ckarg1_208 :: Int) = (case cktupIn_206 of { MkTup2 (cwild_209 :: Int) (csel :: Int) -> csel }) :: Int
+                        } in k_G212 ckarg0_207 ckarg1_208
+                    } in (case s_200 of
+                    { _ -> k_G212 ckout_205 (k_G212 z_204 x_202)
+                    ; 1 -> ckout_205
+                    }) :: Int
+                |])
+          , testCase "a shared argument" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int", varD "z_204" "Int"]
+                (tm "(case s_200 of { _ -> k_G212 x_202 z_204; 1 -> k_G212 y_203 z_204 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (ckout_205 :: Int) = let
+                        { (ckarg0_206 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in k_G212 ckarg0_206 z_204
+                    } in (case s_200 of { _ -> ckout_205; 1 -> ckout_205 }) :: Int
+                |])
+          , testCase "all arguments shared" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int"]
+                (tm "(case s_200 of { _ -> f_G210 x_202; 1 -> f_G210 x_202 }) :: Int")
+                (tm [strQQ|
+                  let { (cfout_203 :: Int) = f_G210 x_202 } in (case s_200 of { _ -> cfout_203; 1 -> cfout_203 }) :: Int
+                |])
+          , testCase "a shared argument up to ticks" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int"]
+                (tm "(case s_200 of { _ -> f_G210 (Core.deDup x_202); 1 -> f_G210 x_202 }) :: Int")
+                (tm [strQQ|
+                  let { (cfout_203 :: Int) = f_G210 (Core.deDup x_202) } in (case s_200 of
+                    { _ -> cfout_203
+                    ; 1 -> cfout_203
+                    }) :: Int
+                |])
+          , testCase "a non-representable argument" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm "(case s_200 of { _ -> hof_G215 f_G210 x_202; 1 -> hof_G215 g_G211 y_203 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (chofout_204 :: Int) = let
+                        { (chofarg1_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in hof_G215 ((case s_200 of { _ -> f_G210; 1 -> g_G211 }) :: Int -> Int) chofarg1_205
+                    } in (case s_200 of { _ -> chofout_204; 1 -> chofout_204 }) :: Int
+                |])
+          , testCase "an argument mentioning a pattern binder" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "p_217" "Pair"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> f_G210 x_202
+                    ; 1 -> (case p_217 of { MkPair (a :: Int) (b :: Int) -> f_G210 b }) :: Int
+                    }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_218 :: Int) = let
+                        { (cfarg0_219 :: Int) = (case s_200 of
+                            { _ -> x_202
+                            ; 1 -> (case p_217 of { MkPair (a :: Int) (b :: Int) -> b }) :: Int
+                            }) :: Int
+                        } in f_G210 cfarg0_219
+                    } in (case s_200 of
+                    { _ -> cfout_218
+                    ; 1 -> (case p_217 of { MkPair (a :: Int) (b :: Int) -> cfout_218 }) :: Int
+                    }) :: Int
+                |])
+          , testCase "an argument mentioning a let-binder in an alternative" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm [strQQ|
+                  (case s_200 of { _ -> f_G210 x_202; 1 -> let { !(a :: Int) = g_G211 y_203 } in f_G210 a }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of
+                            { _ -> x_202
+                            ; 1 -> let { !(a :: Int) = g_G211 y_203 } in a
+                            }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of { _ -> cfout_204; 1 -> cfout_204 }) :: Int
+                |])
+          , testCase "an application in the right-hand side of a let-binding" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm [strQQ|
+                  (case s_200 of { _ -> f_G210 x_202; 1 -> let { !(a :: Int) = f_G210 y_203 } in k_G212 a a }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of
+                    { _ -> cfout_204
+                    ; 1 -> let { !(a :: Int) = cfout_204 } in k_G212 a a
+                    }) :: Int
+                |])
+          , testCase "an argument mentioning a recursive let-binder" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> f_G210 x_202
+                    ; 1 -> let { (a :: Int) = g_G211 y_203; (b :: Int) = k_G212 a x_202 } in f_G210 b
+                    }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of
+                            { _ -> x_202
+                            ; 1 -> let { (a :: Int) = g_G211 y_203; (b :: Int) = k_G212 a x_202 } in b
+                            }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of { _ -> cfout_204; 1 -> cfout_204 }) :: Int
+                |])
+          , testCase "applications in a recursive group are left alone" $
+              decKeeps [varD "s_200" "Int", varD "x_202" "Int"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> f_G210 x_202
+                    ; 1 -> let { (a :: Int) = f_G210 b; (b :: Int) = g_G211 a } in a
+                    }) :: Int
+                |])
+          ]
+      , testGroup "type arguments"
+          [ testCase "shared type arguments" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm "(case s_200 of { _ -> h_G213 @Int x_202; 1 -> h_G213 @Int y_203 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (chout_204 :: Int) = let
+                        { (charg1_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in h_G213 @Int charg1_205
+                    } in (case s_200 of { _ -> chout_204; 1 -> chout_204 }) :: Int
+                |])
+          , testCase "a type variable of the context" $
+              decTo [kindedTyVarD "n_220" "Type", varD "s_200" "Int", varD "xn_243" "n_220", varD "yn_244" "n_220"]
+                (tm "(case s_200 of { _ -> h_G213 @n_220 xn_243; 1 -> h_G213 @n_220 yn_244 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (chout_245 :: Int) = let
+                        { (charg1_246 :: n_220) = (case s_200 of { _ -> xn_243; 1 -> yn_244 }) :: n_220
+                        } in h_G213 @n_220 charg1_246
+                    } in (case s_200 of { _ -> chout_245; 1 -> chout_245 }) :: Int
+                |])
+          , testCase "different type arguments" $
+              decKeeps [varD "s_200" "Int", varD "x_202" "Int", varD "p_217" "Pair"]
+                (tm "(case s_200 of { _ -> h_G213 @Int x_202; 1 -> h_G213 @Pair p_217 }) :: Int")
+          , testCase "an existential type variable" $
+              decKeeps [varD "s_200" "Int", varD "e_219" "T"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> (case e_219 of { MkT (n :: Type) (v :: n) -> h_G213 @n v }) :: Int
+                    ; 1 -> (case e_219 of { MkT (n :: Type) (v :: n) -> h_G213 @n v }) :: Int
+                    }) :: Int
+                |])
+          , -- Clash drops casts, so after matching on a GADT, an argument can
+            -- have a type that mentions an existential type variable where the
+            -- function expects another type: here @v :: n@ for @f :: Int ->
+            -- Int@. DEC gives the let-binder of the argument the type of the
+            -- parameter of @f@, rather than the type of the first argument,
+            -- which mentions @n@ outside of the pattern that binds it.
+            -- 'assertRewritesTo' checks that the result is lint-clean, so that
+            -- it has no free type variables.
+            testCase "an argument whose type mentions an existential type variable" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "e_219" "T"]
+                (tm "(case s_200 of { _ -> (case e_219 of { MkT (n :: Type) (v :: n) -> f_G210 v }) :: Int; 1 -> f_G210 x_202 }) :: Int")
+                (tm [strQQ|
+                  let
+                    { (fout :: Int) = let
+                        { (farg :: Int) = (case s_200 of
+                            { _ -> (case e_219 of { MkT (n :: Type) (v :: n) -> v }) :: Int
+                            ; 1 -> x_202
+                            }) :: Int
+                        } in f_G210 farg
+                    } in (case s_200 of
+                      { _ -> (case e_219 of { MkT (n :: Type) (v :: n) -> fout }) :: Int
+                      ; 1 -> fout
+                      }) :: Int
+                |])
+          ]
+      , testGroup "nested case-expressions"
+          [ testCase "literal patterns" $
+              decTo [varD "s_200" "Int", varD "t_201" "Int", varD "x_202" "Int", varD "y_203" "Int"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> (case t_201 of { 1 -> f_G210 x_202; _ -> g_G211 y_203 }) :: Int
+                    ; 1 -> f_G210 y_203
+                    }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_204 :: Int) = let
+                        { (cfarg0_205 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in f_G210 cfarg0_205
+                    } in (case s_200 of
+                    { _ -> (case t_201 of { 1 -> cfout_204; _ -> g_G211 y_203 }) :: Int
+                    ; 1 -> cfout_204
+                    }) :: Int
+                |])
+          , testCase "a non-exhaustive data case-expression" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "m_218" "Maybe Int"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> f_G210 x_202
+                    ; 1 -> (case m_218 of { Nothing -> g_G211 x_202; Just (a :: Int) -> f_G210 a }) :: Int
+                    }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_219 :: Int) = let
+                        { (cfarg0_220 :: Int) = (case s_200 of
+                            { _ -> x_202
+                            ; 1 -> (case m_218 of { _ -> Clash.Normalize.Primitives.undefined @Int; Just (a :: Int) -> a }) :: Int
+                            }) :: Int
+                        } in f_G210 cfarg0_220
+                    } in (case s_200 of
+                    { _ -> cfout_219
+                    ; 1 -> (case m_218 of { Nothing -> g_G211 x_202; Just (a :: Int) -> cfout_219 }) :: Int
+                    }) :: Int
+                |])
+          , testCase "a case-expression in which the pattern binders are not used" $
+              decTo [varD "s_200" "Int", varD "x_202" "Int", varD "y_203" "Int", varD "p_217" "Pair"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> f_G210 x_202
+                    ; 1 -> (case p_217 of { MkPair (a :: Int) (b :: Int) -> f_G210 y_203 }) :: Int
+                    }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (cfout_218 :: Int) = let
+                        { (cfarg0_219 :: Int) = (case s_200 of { _ -> x_202; 1 -> y_203 }) :: Int
+                        } in f_G210 cfarg0_219
+                    } in (case s_200 of
+                    { _ -> cfout_218
+                    ; 1 -> (case p_217 of { MkPair (a :: Int) (b :: Int) -> cfout_218 }) :: Int
+                    }) :: Int
+                |])
+          , testCase "two levels" $
+              decTo [varD "s_200" "Int", varD "t_201" "Int", varD "x_202" "Int", varD "y_203" "Int", varD "z_204" "Int", varD "w_205" "Int"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> (case t_201 of { _ -> k_G212 x_202 y_203; 1 -> k_G212 y_203 z_204 }) :: Int
+                    ; 1 -> k_G212 z_204 w_205
+                    ; 2 -> (case t_201 of { _ -> g_G211 x_202; 2 -> k_G212 w_205 x_202 }) :: Int
+                    }) :: Int
+                |])
+                (tm [strQQ|
+                  let
+                    { (ckout_206 :: Int) = let
+                        { (cktupIn_207 :: Tup2_3502 Int Int) = (case s_200 of
+                            { _ -> (case t_201 of { _ -> MkTup2 @Int @Int x_202 y_203; 1 -> MkTup2 @Int @Int y_203 z_204 }) :: Tup2_3502 Int Int
+                            ; 1 -> MkTup2 @Int @Int z_204 w_205
+                            ; 2 -> MkTup2 @Int @Int w_205 x_202
+                            }) :: Tup2_3502 Int Int
+                        ; (ckarg0_208 :: Int) = (case cktupIn_207 of { MkTup2 (csel :: Int) (cwild_211 :: Int) -> csel }) :: Int
+                        ; (ckarg1_209 :: Int) = (case cktupIn_207 of { MkTup2 (cwild_210 :: Int) (csel :: Int) -> csel }) :: Int
+                        } in k_G212 ckarg0_208 ckarg1_209
+                    } in (case s_200 of
+                    { _ -> (case t_201 of { _ -> ckout_206; 1 -> ckout_206 }) :: Int
+                    ; 1 -> ckout_206
+                    ; 2 -> (case t_201 of { _ -> g_G211 x_202; 2 -> ckout_206 }) :: Int
+                    }) :: Int
+                |])
+          ]
+      , testGroup "primitives"
+          [ testCase "an interesting primitive" $
+              decTo [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> GHC.Num.Integer.integerMul ix_230 (3 :: Integer)
+                    ; 1 -> GHC.Num.Integer.integerMul iy_231 (5 :: Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+                (tm [strQQ|
+                  let
+                    { (cintegerMulout_232 :: GHC.Num.Integer.Integer) = let
+                        { (cintegerMultupIn_233 :: Tup2_3502 GHC.Num.Integer.Integer GHC.Num.Integer.Integer) = (case s_200 of
+                            { _ -> MkTup2 @GHC.Num.Integer.Integer @GHC.Num.Integer.Integer ix_230 (3 :: Integer)
+                            ; 1 -> MkTup2 @GHC.Num.Integer.Integer @GHC.Num.Integer.Integer iy_231 (5 :: Integer)
+                            }) :: Tup2_3502 GHC.Num.Integer.Integer GHC.Num.Integer.Integer
+                        ; (cintegerMularg0_234 :: GHC.Num.Integer.Integer) = (case cintegerMultupIn_233 of
+                            { MkTup2 (csel :: GHC.Num.Integer.Integer) (cwild_237 :: GHC.Num.Integer.Integer) -> csel
+                            }) :: GHC.Num.Integer.Integer
+                        ; (cintegerMularg1_235 :: GHC.Num.Integer.Integer) = (case cintegerMultupIn_233 of
+                            { MkTup2 (cwild_236 :: GHC.Num.Integer.Integer) (csel :: GHC.Num.Integer.Integer) -> csel
+                            }) :: GHC.Num.Integer.Integer
+                        } in GHC.Num.Integer.integerMul cintegerMularg0_234 cintegerMularg1_235
+                    } in (case s_200 of { _ -> cintegerMulout_232; 1 -> cintegerMulout_232 }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a primitive that isn't interesting" $
+              decKeeps [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of { _ -> Prim.plainPrim ix_230; 1 -> Prim.plainPrim iy_231 }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a primitive with DeDup" $
+              decTo [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Core.deDup (Prim.plainPrim ix_230)
+                    ; 1 -> Core.deDup (Prim.plainPrim iy_231)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+                (tm [strQQ|
+                  let
+                    { (cplainPrimout_232 :: GHC.Num.Integer.Integer) = let
+                        { (cplainPrimarg0_233 :: GHC.Num.Integer.Integer) = (case s_200 of { _ -> ix_230; 1 -> iy_231 }) :: GHC.Num.Integer.Integer
+                        } in Prim.plainPrim cplainPrimarg0_233
+                    } in (case s_200 of { _ -> cplainPrimout_232; 1 -> cplainPrimout_232 }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, multiplying by a power of two" $
+              decKeeps [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Prim.hoPrim (GHC.Num.Integer.integerMul (4 :: Integer)) ((case ix_230 of { _ -> ix_230 }) :: GHC.Num.Integer.Integer)
+                    ; 1 -> Prim.hoPrim (GHC.Num.Integer.integerMul (4 :: Integer)) ((case iy_231 of { _ -> iy_231 }) :: GHC.Num.Integer.Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, multiplying by zero" $
+              decKeeps [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Prim.hoPrim (GHC.Num.Integer.integerMul (0 :: Integer)) ((case ix_230 of { _ -> ix_230 }) :: GHC.Num.Integer.Integer)
+                    ; 1 -> Prim.hoPrim (GHC.Num.Integer.integerMul (0 :: Integer)) ((case iy_231 of { _ -> iy_231 }) :: GHC.Num.Integer.Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, multiplying by another number" $
+              decTo [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Prim.hoPrim (GHC.Num.Integer.integerMul (3 :: Integer)) ((case ix_230 of { _ -> ix_230 }) :: GHC.Num.Integer.Integer)
+                    ; 1 -> Prim.hoPrim (GHC.Num.Integer.integerMul (3 :: Integer)) ((case iy_231 of { _ -> iy_231 }) :: GHC.Num.Integer.Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+                (tm [strQQ|
+                  let
+                    { (choPrimout_232 :: GHC.Num.Integer.Integer) = let
+                        { (choPrimarg1_233 :: GHC.Num.Integer.Integer) = (case s_200 of
+                            { _ -> (case ix_230 of { _ -> ix_230 }) :: GHC.Num.Integer.Integer
+                            ; 1 -> (case iy_231 of { _ -> iy_231 }) :: GHC.Num.Integer.Integer
+                            }) :: GHC.Num.Integer.Integer
+                        } in Prim.hoPrim (GHC.Num.Integer.integerMul (3 :: Integer)) choPrimarg1_233
+                    } in (case s_200 of { _ -> choPrimout_232; 1 -> choPrimout_232 }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, multiplying by fromInteger# of a power of two" $
+              decKeeps [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Prim.hoPrim (GHC.Num.Integer.integerMul (Clash.Sized.Internal.Unsigned.fromInteger# @8 (8 :: Natural) (8 :: Integer))) ((case ix_230 of
+                        { _ -> ix_230
+                        }) :: GHC.Num.Integer.Integer)
+                    ; 1 -> Prim.hoPrim (GHC.Num.Integer.integerMul (Clash.Sized.Internal.Unsigned.fromInteger# @8 (8 :: Natural) (8 :: Integer))) ((case iy_231 of
+                        { _ -> iy_231
+                        }) :: GHC.Num.Integer.Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, multiplying by fromInteger# of another number" $
+              decTo [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Prim.hoPrim (GHC.Num.Integer.integerMul (Clash.Sized.Internal.Unsigned.fromInteger# @8 (8 :: Natural) (6 :: Integer))) ((case ix_230 of
+                        { _ -> ix_230
+                        }) :: GHC.Num.Integer.Integer)
+                    ; 1 -> Prim.hoPrim (GHC.Num.Integer.integerMul (Clash.Sized.Internal.Unsigned.fromInteger# @8 (8 :: Natural) (6 :: Integer))) ((case iy_231 of
+                        { _ -> iy_231
+                        }) :: GHC.Num.Integer.Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+                (tm [strQQ|
+                  let
+                    { (choPrimout_232 :: GHC.Num.Integer.Integer) = let
+                        { (choPrimarg1_233 :: GHC.Num.Integer.Integer) = (case s_200 of
+                            { _ -> (case ix_230 of { _ -> ix_230 }) :: GHC.Num.Integer.Integer
+                            ; 1 -> (case iy_231 of { _ -> iy_231 }) :: GHC.Num.Integer.Integer
+                            }) :: GHC.Num.Integer.Integer
+                        } in Prim.hoPrim (GHC.Num.Integer.integerMul (Clash.Sized.Internal.Unsigned.fromInteger# @8 (8 :: Natural) (6 :: Integer))) choPrimarg1_233
+                    } in (case s_200 of { _ -> choPrimout_232; 1 -> choPrimout_232 }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, dividing by a power of two" $
+              decKeeps [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Prim.hoPrim (GHC.Num.Integer.integerQuot (7 :: Integer) (2 :: Integer)) ((case ix_230 of
+                        { _ -> ix_230
+                        }) :: GHC.Num.Integer.Integer)
+                    ; 1 -> Prim.hoPrim (GHC.Num.Integer.integerQuot (7 :: Integer) (2 :: Integer)) ((case iy_231 of
+                        { _ -> iy_231
+                        }) :: GHC.Num.Integer.Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, dividing by another number" $
+              decTo [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of
+                    { _ -> Prim.hoPrim (GHC.Num.Integer.integerQuot (8 :: Integer) (3 :: Integer)) ((case ix_230 of
+                        { _ -> ix_230
+                        }) :: GHC.Num.Integer.Integer)
+                    ; 1 -> Prim.hoPrim (GHC.Num.Integer.integerQuot (8 :: Integer) (3 :: Integer)) ((case iy_231 of
+                        { _ -> iy_231
+                        }) :: GHC.Num.Integer.Integer)
+                    }) :: GHC.Num.Integer.Integer
+                |])
+                (tm [strQQ|
+                  let
+                    { (choPrimout_232 :: GHC.Num.Integer.Integer) = let
+                        { (choPrimarg1_233 :: GHC.Num.Integer.Integer) = (case s_200 of
+                            { _ -> (case ix_230 of { _ -> ix_230 }) :: GHC.Num.Integer.Integer
+                            ; 1 -> (case iy_231 of { _ -> iy_231 }) :: GHC.Num.Integer.Integer
+                            }) :: GHC.Num.Integer.Integer
+                        } in Prim.hoPrim (GHC.Num.Integer.integerQuot (8 :: Integer) (3 :: Integer)) choPrimarg1_233
+                    } in (case s_200 of { _ -> choPrimout_232; 1 -> choPrimout_232 }) :: GHC.Num.Integer.Integer
+                |])
+          , testCase "a higher-order primitive, applied to a function" $
+              decTo [varD "s_200" "Int", varD "ix_230" "GHC.Num.Integer.Integer", varD "iy_231" "GHC.Num.Integer.Integer"]
+                (tm [strQQ|
+                  (case s_200 of { _ -> Prim.hoPrim fI_G245 ix_230; 1 -> Prim.hoPrim fI_G245 iy_231 }) :: GHC.Num.Integer.Integer
+                |])
+                (tm [strQQ|
+                  let
+                    { (choPrimout_232 :: GHC.Num.Integer.Integer) = let
+                        { (choPrimarg1_233 :: GHC.Num.Integer.Integer) = (case s_200 of { _ -> ix_230; 1 -> iy_231 }) :: GHC.Num.Integer.Integer
+                        } in Prim.hoPrim fI_G245 choPrimarg1_233
+                    } in (case s_200 of { _ -> choPrimout_232; 1 -> choPrimout_232 }) :: GHC.Num.Integer.Integer
+                |])
+          ]
+      ]
+
     ]
- where
-  a = intId User "a" 240
-  b = intId User "b" 241
-  v = localId User "v" 242 (VarTy tN)
-  xn = localId User "xn" 243 (VarTy n)
-  yn = localId User "yn" 244 (VarTy n)
-  fI = globalId User "fI" 245 (integerFunTy 1)
-
-  -- @fromInteger# \@8 8 i@
-  fromIntegerLit i =
-    mkApps (C.Prim fromIntegerU)
-      [Right (LitTy (NumTy 8)), Left (C.Literal (NaturalLiteral 8)), Left (integerLit i)]
-
-  -- A term that isn't constant, and whose head isn't interesting
-  opaque i = C.Case (C.Var i) integerPrimTy [(DefaultPat, C.Var i)]
