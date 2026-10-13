@@ -3,7 +3,9 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize"
+  Tests for "Clash.Normalize". The regression tests of 'cleanupGraph' build
+  their binders in scoped Core, and assert that the result only mentions the
+  variables it binds, and is the expected term.
 
   Note that there is no test for #448 ("Use proper InScopeSet in
   flattenCallTree"): since commit
@@ -13,7 +15,7 @@
   matters for correctness.
 -}
 
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Tests.Normalize (tests) where
 
@@ -22,44 +24,30 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Subst (unsafeSubstTm)
-import Clash.Core.Term (Term (..))
-import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (emptyVarEnv, mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize (cleanupGraph)
 import Clash.Rewrite.Types (RewriteState (..))
 
-import Clash.Core.Scoped.Convert (toClashTerm)
 import Clash.Core.Scoped.NameMap (lookupGlobalEnv)
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
-import Clash.Rewrite.Scoped.Globals (fromClashBindings)
+import Clash.Core.Scoped.Syntax (GlobalId)
 
 import Test.Clash.Rewrite
-  ( assertWellScoped, globalId, intFunTy, mkBindingMap, nameToUnique
-  , parseToTermQQ, runRewriteTest, showPprU )
-
--- | A global binder, as parsed from @<nm>_G@, of type @Int -> .. -> Int@ with
--- the given number of arguments
-globalFun :: String -> Int -> Id
-globalFun nm n = globalId User nm (nameToUnique nm) (intFunTy n)
-
--- | Give global variables in a term the types of the given binders.
--- 'Test.Clash.Rewrite.parseToTerm' cannot parse function types.
-withTypes :: [Id] -> Term -> Term
-withTypes globals = unsafeSubstTm (mkVarEnv [(i, Var i) | i <- globals]) emptyVarEnv
+  ( TestDefs (..), parseTestTermWith, runRewriteTest, testGlobalId )
+import Test.Clash.Scoped
+  (assertLintClean, assertTermIs, emptyTestScope, mkGlobalBindings)
 
 -- | Run 'cleanupGraph' with the given top entity and (normalized) binders,
--- return the cleaned up term of the top entity. All global variables in the
--- binders' terms get the types of the given globals.
-cleanup :: [Id] -> Id -> [(Id, Term)] -> IO Term
-cleanup globals top bndrs = do
-  let bm = fromClashBindings (mkBindingMap [(i, withTypes globals tm) | (i, tm) <- bndrs])
-  (bm1, _, _) <- runRewriteTest def def{_scopedBindings = bm} (cleanupGraph (mkGlobalIdFromClash top) bm)
-  case lookupGlobalEnv (mkGlobalIdFromClash top) bm1 of
-    Just b -> pure (toClashTerm (bindingTerm b))
-    Nothing -> assertFailure ("cleanupGraph dropped " <> showPprU top)
+-- and assert that it gives the expected term for the top entity
+cleanupGives :: [GlobalId] -> GlobalId -> [(GlobalId, String)] -> String -> Assertion
+cleanupGives globals top bndrs expected = do
+  let tm = parseTestTermWith (TestDefs [] [] globals)
+      bm = mkGlobalBindings [(i, tm t) | (i, t) <- bndrs]
+  (bm1, _, _) <- runRewriteTest def def{_scopedBindings = bm} (cleanupGraph top bm)
+  case lookupGlobalEnv top bm1 of
+    Just b -> do
+      assertLintClean emptyTestScope (bindingTerm b)
+      assertTermIs emptyTestScope (tm expected) (bindingTerm b)
+    Nothing -> assertFailure "cleanupGraph dropped the top entity"
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize"
@@ -69,26 +57,13 @@ tests = testGroup "Clash.Tests.Normalize"
     -- @f = \x y -> let r0 = g r0 x y in r0@ became @g r0@, with @r0@ free.
     -- https://github.com/clash-lang/clash-compiler/pull/445
     testCase "flattenNode keeps LHS of recursive binders (#445)" $ do
-      let f = globalFun "f" 2
-          g = globalFun "g" 3
-          h = globalFun "h" 2
-      actual <- cleanup [f, g, h] h
-        [ ( h
-          , [parseToTermQQ|
-              \(a_10 :: Int) (b_11 :: Int) ->
-                let r1_12 :: Int
-                    r1_12 = f_G a_10 b_11
-                in r1_12
-            |] )
-        , ( f
-          , [parseToTermQQ|
-              \(x_20 :: Int) (y_21 :: Int) ->
-                let r0_22 :: Int
-                    r0_22 = g_G r0_22 x_20 y_21
-                in r0_22
-            |] )
-        ]
-      assertWellScoped actual
+      let f = testGlobalId "f_G" "Int -> Int -> Int"
+          g = testGlobalId "g_G" "Int -> Int -> Int -> Int"
+          h = testGlobalId "h_G" "Int -> Int -> Int"
+      cleanupGives [f, g, h] h
+        [ (h, "\\(a :: Int) (b :: Int) -> let { (r1 :: Int) = f_G a b } in r1")
+        , (f, "\\(x :: Int) (y :: Int) -> let { (r0 :: Int) = g_G r0 x y } in r0") ]
+        "\\(a :: Int) (b :: Int) -> let { (r0 :: Int) = g_G r0 a b } in r0"
 
     -- 'stripArgs' used to only check whether the remaining (unstripped)
     -- arguments were /equal/ to one of the lambda-bound variables, not whether
@@ -97,25 +72,12 @@ tests = testGroup "Clash.Tests.Normalize"
     -- primitives.
     -- https://github.com/clash-lang/clash-compiler/commit/bb1ea69be69d5497bb9fb01a287adb607844a70d
   , testCase "flattenNode doesn't strip args when they are mentioned" $ do
-      let f = globalFun "f" 1
-          g = globalFun "g" 2
-          h = globalFun "h" 1
-          p = globalFun "p" 1
-      actual <- cleanup [f, g, h, p] h
-        [ ( h
-          , [parseToTermQQ|
-              \(a_10 :: Int) ->
-                let r1_12 :: Int
-                    r1_12 = f_G a_10
-                in r1_12
-            |] )
-        , ( f
-          , [parseToTermQQ|
-              \(x_20 :: Int) ->
-                let r0_22 :: Int
-                    r0_22 = g_G (p_G x_20) x_20
-                in r0_22
-            |] )
-        ]
-      assertWellScoped actual
+      let f = testGlobalId "f_G" "Int -> Int"
+          g = testGlobalId "g_G" "Int -> Int -> Int"
+          h = testGlobalId "h_G" "Int -> Int"
+          p = testGlobalId "p_G" "Int -> Int"
+      cleanupGives [f, g, h, p] h
+        [ (h, "\\(a :: Int) -> let { (r1 :: Int) = f_G a } in r1")
+        , (f, "\\(x :: Int) -> let { (r0 :: Int) = g_G (p_G x) x } in r0") ]
+        "\\(a :: Int) -> let { !(r_S :: Int) = g_G (p_G a) a } in r_S"
   ]
