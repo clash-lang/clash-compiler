@@ -35,23 +35,26 @@ import qualified Data.ByteString.Lazy        as BL
 import           Data.Maybe                  (fromJust, fromMaybe, isJust)
 import qualified Data.Monoid                 as Monoid
 
-import           Clash.Core.HasType          (inferCoreTypeOf)
 import           Clash.Core.Pretty           (showPpr)
-import           Clash.Core.Subst            (aeqType)
-import           Clash.Core.Type             (normalizeType)
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (DebugOpts (..), TransformationInfo (..), hasDebugInfo, isDebugging)
 import           Clash.Rewrite.Types
-  (RewriteMonad, RewriteStep (..), curFun, debugOpts, tcCache,
+  (RewriteMonad, RewriteStep (..), curFun, debugOpts, scopedTypeEnv,
    transformAppliedCounters, transformCounter, transformTriedCounters)
 import           Clash.Rewrite.Util          (bumpCounter)
 import           Clash.Util                  (curLoc)
 
-import           Clash.Core.Scoped.Alpha     (aeqTm)
+import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
 import           Clash.Core.Scoped.Convert   (toClashTerm)
+import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
+import           Clash.Core.Scoped.Pretty    ()
+import           Clash.Core.Scoped.Subst     (Closure (..), freeVarOccs)
 import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Scoped.Type      (normalizeType)
+import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 import           Clash.Rewrite.Scoped.Types
+import           Clash.Rewrite.Scoped.Util   (closeOverOrError, dependencySortTyVars)
 
 -- | Record if a transformation is successfully applied, see
 -- 'Clash.Rewrite.Util.apply'
@@ -162,17 +165,16 @@ applyDebug name exprOld hasChanged exprNew = do
     -- lint are enforced by the type checker, see the haddock of this
     -- function.
     Monad.when (dbg_invariants opts && hasChanged) $ do
-      tcm <- Lens.view tcCache
-      let beforeTy = inferCoreTypeOf tcm (toClashTerm exprOld)
-          afterTy = inferCoreTypeOf tcm (toClashTerm exprNew)
+      tenv <- Lens.view scopedTypeEnv
+      let (beforeTy, afterTy, sameTy) = compareTypes tenv exprOld exprNew
       -- Like in 'Clash.Rewrite.Util.applyDebug', a trace rather than an error
-      Monad.when (hasDebugInfo AppliedTerm name opts && not (normalizeType tcm beforeTy `aeqType` normalizeType tcm afterTy)) $
+      Monad.when (hasDebugInfo AppliedTerm name opts && not sameTy) $
         traceM ( concat [ $(curLoc)
                         , "Error when applying rewrite ", name
                         , " to:\n" , before
                         , "\nResult:\n" ++ after ++ "\n"
-                        , "Changes type from:\n", showPpr beforeTy
-                        , "\nto:\n", showPpr afterTy
+                        , "Changes type from:\n", beforeTy
+                        , "\nto:\n", afterTy
                         ]
                )
 
@@ -187,8 +189,27 @@ applyDebug name exprOld hasChanged exprNew = do
                           ++ name ++ " to:\n" ++ after ++ "\n") $
           return exprNew
    where
-    before = showPpr (toClashTerm exprOld)
-    after  = showPpr (toClashTerm exprNew)
+    before = showPpr exprOld
+    after  = showPpr exprNew
+
+-- | The types of two terms of the same scope, printed, and whether they are
+-- the same after normalization ('normalizeType'). The types are inferred in
+-- the scope of just the free variables of the terms
+-- ('Clash.Core.Scoped.Subst.closeOver'), so that 'applyWith' doesn't need to
+-- keep the scope of the terms: keeping it costs allocation for every
+-- transformation that is tried.
+compareTypes :: TypeEnv -> Term n -> Term n -> (String, String, Bool)
+compareTypes tenv tm1 tm2 =
+  closeOverOrError "applyDebug" (dependencySortTyVars tvs) ids $ \sc _ _ cl ->
+    case (closureTerm cl tm1, closureTerm cl tm2) of
+      (Just tm1', Just tm2') ->
+        let ty1 = inferCoreTypeOf tenv sc tm1'
+            ty2 = inferCoreTypeOf tenv sc tm2'
+        in  (showPpr ty1, showPpr ty2, normalizeType tenv sc ty1 `aeqTy` normalizeType tenv sc ty2)
+      _ -> error "applyDebug: can't close over the free variables of the terms"
+ where
+  -- The free variables of both terms
+  (tvs, ids) = freeVarOccs (App tm1 tm2)
 
 -- | Perform a transformation on a term in the root of its scope, see
 -- 'Clash.Rewrite.Util.runRewrite'
