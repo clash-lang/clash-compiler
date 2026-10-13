@@ -31,7 +31,7 @@ import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import qualified Clash.Normalize.Scoped.Transformations.Inline as InlineS
 import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
-import Clash.Normalize.Types (NormalizeState, scopedSpecialisationCache)
+import Clash.Normalize.Types (NormalizeState, specialisationCache)
 import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..), extra)
@@ -607,7 +607,7 @@ specializeTests =
       withTestScope [varD "y_123" "Int", varD "x_456" "Int"] $ \ts -> do
         (e, st2, _) <- runScopedIn def st1 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_456 y_123)"))
         assertEqual "Number of specializations" 1
-          (Map.size (Lens.view (extra . scopedSpecialisationCache) st2))
+          (Map.size (Lens.view (extra . specialisationCache) st2))
         case r1 of
           Just g1 -> assertTermIs ts (tm (showTestTerm (GlobalVar @'VoidS g1) <> " x_456 y_123")) e
           Nothing -> assertFailure "the first specialization didn't give an application of a global"

@@ -172,14 +172,14 @@ instance Default extra => Default (RewriteState extra) where
 instance Default NormalizeState where
   def = NormalizeState
     { _primitiveArgs=Map.empty
-    , _scopedNormalizationStrategy=normalization
-    , _scopedConstantPropagationStrategy=constantPropagation
-    , _scopedNormalized=emptyGlobalEnv
-    , _scopedSpecialisationCache=Map.empty
-    , _scopedSpecialisationHistory=emptyGlobalEnv
-    , _scopedInlineHistory=emptyGlobalEnv
-    , _scopedRecursiveComponents=emptyGlobalEnv
-    , _scopedWorkFreeAppCache=Map.empty
+    , _normalizationStrategy=normalization
+    , _constantPropagationStrategy=constantPropagation
+    , _normalized=emptyGlobalEnv
+    , _specialisationCache=Map.empty
+    , _specialisationHistory=emptyGlobalEnv
+    , _inlineHistory=emptyGlobalEnv
+    , _recursiveComponents=emptyGlobalEnv
+    , _workFreeAppCache=Map.empty
     }
 
 -- | Set the function that is being normalized ('Clash.Rewrite.Types.curFun')

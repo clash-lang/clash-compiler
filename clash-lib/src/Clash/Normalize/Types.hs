@@ -31,19 +31,19 @@ data NormalizeState
   = NormalizeState
   { _primitiveArgs :: Map Text (Set Int)
   -- ^ Cache for looking up constantness of blackbox arguments
-  , _scopedNormalizationStrategy :: ScopedRewrite NormalizeState
+  , _normalizationStrategy :: ScopedRewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.normalization' strategy. Carried
   -- in the state so transformations can normalize other binders
   -- ('Clash.Normalize.Scoped.Util.normalizeTopLvlBndr') without importing the
   -- strategy module. Breaking that import cycle would need an hs-boot file,
   -- and GHC rejects Template Haskell splices in a module cycle.
-  , _scopedConstantPropagationStrategy :: ScopedRewrite NormalizeState
+  , _constantPropagationStrategy :: ScopedRewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
   -- for "Clash.Normalize.Scoped.PrimitiveReductions". See
-  -- '_scopedNormalizationStrategy'.
-  , _scopedNormalized :: GlobalEnv (Binding (S.Term 'S.VoidS))
+  -- '_normalizationStrategy'.
+  , _normalized :: GlobalEnv (Binding (S.Term 'S.VoidS))
   -- ^ The normalized global binders
-  , _scopedSpecialisationCache
+  , _specialisationCache
       :: Map (S.GlobalId, Int, Either AlphaTerm AlphaType) S.GlobalId
   -- ^ Cache of previously specialized functions:
   --
@@ -52,20 +52,20 @@ data NormalizeState
   --   alpha-equivalence.
   --
   -- * Elem: the specialized function
-  , _scopedSpecialisationHistory :: GlobalEnv Int
+  , _specialisationHistory :: GlobalEnv Int
   -- ^ Cache of how many times a function was specialized
-  , _scopedInlineHistory :: GlobalEnv (GlobalEnv Int)
+  , _inlineHistory :: GlobalEnv (GlobalEnv Int)
   -- ^ Cache of function where inlining took place:
   --
   -- * Key: function where inlining took place
   --
   -- * Elem: (functions which were inlined, number of times inlined)
-  , _scopedRecursiveComponents :: GlobalEnv Bool
+  , _recursiveComponents :: GlobalEnv Bool
   -- ^ Map telling whether a components is recursively defined.
   --
   -- NB: there are only no mutually-recursive component, only self-recursive
   -- ones.
-  , _scopedWorkFreeAppCache
+  , _workFreeAppCache
       :: Map (S.GlobalId, [Either AlphaTerm AlphaType]) (S.Term 'S.VoidS)
   -- ^ Cache of normalized work-free applications, i.e. global functions
   -- applied to closed arguments:
