@@ -25,7 +25,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TyCon
+import Clash.Core.TyCon
 import Clash.Core.Scoped.TypeEnv
 
 import Test.Clash.Rewrite (assertErrorContains, nTyConName, showPprU, testTyConMap)

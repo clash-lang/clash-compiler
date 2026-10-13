@@ -33,7 +33,6 @@ import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.DataCon (withDataConPat)
 import Clash.Core.Scoped.Pretty ()
-import Clash.Core.Scoped.Sig (DataConSig(..))
 import Clash.Core.Scoped.Subst (openTyBinder, patVars)
 import Clash.Core.Scoped.Syntax hiding (Name)
 import Clash.Core.Scoped.Term (mkTmApps)

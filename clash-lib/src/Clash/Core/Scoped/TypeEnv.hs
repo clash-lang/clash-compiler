@@ -35,11 +35,10 @@ module Clash.Core.Scoped.TypeEnv
 
 import GHC.Stack (HasCallStack)
 
-import Clash.Core.TyCon (TyCon (tyConKind), TyConMap, TyConName)
 import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TyCon
+import Clash.Core.TyCon
 
 -- | The environment of the types of scoped Clash Core, see the module header
 newtype TypeEnv = TypeEnv

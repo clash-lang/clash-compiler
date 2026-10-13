@@ -28,7 +28,6 @@ import Clash.Core.DataCon
 import Clash.Core.TyCon
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Sig (DataConSig(..))
 import Clash.Core.Scoped.Subst (openTyBinder)
 import Clash.Core.Scoped.Syntax hiding (Name)
 import Clash.Core.Scoped.Type (TypeView(..), mkTyConApp, tyView)

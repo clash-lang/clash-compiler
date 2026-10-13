@@ -13,7 +13,7 @@
   The functions that look through newtypes and type families ('coreView1' and
   everything built on it) take the 'Scope' of the type: unwrapping a newtype or
   reducing a type family substitutes types for type variables, which may
-  rename binders (see "Clash.Core.Scoped.TyCon"). Closed types, such as the
+  rename binders (see "Clash.Core.TyCon"). Closed types, such as the
   types of globals, are in the empty scope 'emptyScope'.
 
   Rather than a 'Clash.Core.TyCon.TyConMap', these functions take a
@@ -124,7 +124,6 @@ import Clash.Annotations.SynthesisAttributes (Attr)
 import Clash.Core.DataCon (DataCon (dcName))
 import Clash.Core.Name (Name (..), NameSort (User))
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.TyCon (TyCon (..), TyConName, tyConDataCons)
 import Clash.Debug (traceIf)
 import Clash.Unique (fromGhcUnique)
 import Clash.Util (clogBase, curLoc)
@@ -136,7 +135,7 @@ import Clash.Core.Scoped.NameMap (NameBinders, emptyNameBinders, snocNameBinders
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TyCon
+import Clash.Core.TyCon
 import Clash.Core.Scoped.TypeEnv
 
 -- * Views
