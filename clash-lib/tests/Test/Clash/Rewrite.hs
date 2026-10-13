@@ -15,6 +15,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
@@ -63,8 +64,9 @@ import Clash.Core.Scoped.Builder
 import qualified Clash.Core.Scoped.Convert as S (mkGlobalId)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.Sig (DataConSig (..))
-import Clash.Core.Scoped.Syntax (GlobalId, teleLength)
-import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
+import Clash.Core.Scoped.Syntax (GlobalId (..), teleLength)
+import Clash.Core.Scoped.NameMap (GlobalEnv, emptyGlobalEnv)
+import qualified Clash.Core.Scoped.Syntax as ST (S (VoidS), Term)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
@@ -168,11 +170,16 @@ testTypeTranslator = HWTypeTranslator $ \_reprs _tenv _sc ty -> pure $ Just $
 -- the environment of the default 'RewriteEnv' (e.g. its type translator) with
 -- the type constructors of 'testTyConMap'
 runNetlistTest :: BindingMap -> NetlistMonad a -> IO a
-runNetlistTest bs act =
+runNetlistTest bs = runScopedNetlistTest (fromClashBindings bs)
+
+-- | Run a Netlist action with the given global bindings of scoped Core, and
+-- the environment of 'runNetlistTest'
+runScopedNetlistTest :: GlobalEnv (Binding (ST.Term 'ST.VoidS)) -> NetlistMonad a -> IO a
+runScopedNetlistTest bs act =
   fst <$>
     runNetlistMonad
       (_clashEnv env) False
-      (fromClashBindings bs) mempty (_typeTranslator env) True be ids "" mempty
+      bs mempty (_typeTranslator env) True be ids "" mempty
       act
  where
   env = withTyConMap testTyConMap def
@@ -236,6 +243,10 @@ runSingleTransformation
 runSingleTransformation rwEnv rwState is trans term = do
   (t, _, _) <- runRewriteTest rwEnv rwState (runRewrite "" is trans term)
   pure t
+
+-- | Set the function that is being normalized ('Clash.Rewrite.Types.curFun')
+withCurFun :: GlobalId -> RewriteState extra -> RewriteState extra
+withCurFun g st = st{_curFun = (g, C.noSrcSpan)}
 
 -- | Run an action in the rewrite monad, such as a transformation applied with
 -- 'Clash.Rewrite.Util.runRewrite'. Returns its result, the final state, and
