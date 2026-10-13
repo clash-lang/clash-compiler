@@ -42,7 +42,7 @@ import Clash.XException (errorX)
 
 import Clash.Annotations.Primitive (extractPrim)
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.Util as C (undefinedTy)
+import Clash.Core.Scoped.TysPrim (undefinedTy)
 import Clash.Core.DataCon (DataCon)
 import Clash.Netlist.BlackBox.Types (Element (Err))
 import Clash.Netlist.Types (BlackBox (..))
@@ -57,7 +57,7 @@ import Clash.Core.Scoped.Subst
   ( extendSubstScope, idSubst, substIdBinder, substScope, substTele, substTm
   , teleIdBinderTypes, withFreshIdBinder, withFreshIdBinders )
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
+import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Core.Scoped.Util (internalName, primAtType)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
@@ -97,7 +97,7 @@ xOptimizeWorker ctx node subj ty alts = do
 -- | @errorX@ at a type, see the module header
 errorXOf :: Type n -> Term n
 errorXOf = primAtType
-  (mkPrimInfoFromClash (C.PrimInfo (Text.showt 'errorX) C.undefinedTy C.WorkConstant C.SingleResult C.NoUnfolding))
+  (mkPrimInfo (Text.showt 'errorX) undefinedTy C.WorkConstant C.SingleResult NoUnfolding)
 
 -- | An expression equivalent to the alternative given. When only one
 -- alternative is defined, this replaces the case-expression.
