@@ -4,8 +4,8 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for the environment of the types of scoped Clash Core: its lookups
-  agree with converting the signatures of Clash Core, which the type and data
-  constructors store, so that every signature is converted only once.
+  give the signatures that the type and data constructors store, and give
+  them as the same objects every time.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -20,20 +20,17 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.Subst as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
 import Clash.Core.Scoped.TypeEnv
 
-import Test.Clash.Rewrite
-  (assertErrorContains, intTy, mkTestDataCon, nTyConName, testTyConMap)
-import Test.Clash.Scoped (assertScopedTyAlphaEq, testTypeEnv, withFreeVars, withTests)
-import qualified Test.Clash.Scoped.Gen.Clash as Gen
+import Test.Clash.Rewrite (assertErrorContains, nTyConName, showPprU, testTyConMap)
+import Test.Clash.Scoped (TestScope (..), testTypeEnv, withTests)
+import qualified Test.Clash.Scoped.Gen as Gen
 
 -- | Whether two values are the same heap object, after evaluating them
 sameObject :: a -> a -> Bool
@@ -52,26 +49,21 @@ sameContents _ _ = False
 tyCons :: [C.TyCon]
 tyCons = UniqMap.elems testTyConMap
 
-dataCons :: [C.DataCon]
-dataCons = concatMap C.tyConDataCons tyCons
-
--- | A data constructor that is not in 'testTyConMap'
-otherDataCon :: C.DataCon
-otherDataCon = mkTestDataCon "Other" 4300 [] [] [intTy] intTy
+-- | Assert that two types are alpha-equivalent
+assertAeqTy :: String -> Type n -> Type n -> Assertion
+assertAeqTy what expected actual =
+  assertBool (what <> ": expected " <> showPprU expected <> ", got " <> showPprU actual)
+    (aeqTy expected actual)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
-  [ testCase "the signatures of type constructors are those of conversion" $
+  [ testCase "the signatures of type constructors are those they store" $
       forM_ tyCons $ \tc -> do
         let nm = C.tyConName tc
-        assertScopedTyAlphaEq (C.tyConLegacyKind tc) (tyConKindOf testTypeEnv nm :: Kind 'VoidS)
+        assertAeqTy "kind" (C.tyConKind tc) (tyConKindOf testTypeEnv nm)
         show (newTyConSigOf testTypeEnv nm) @?= show (newTyConSig tc)
         show (tyFamEqnsOf testTypeEnv nm) @?= show (tyFamEqns tc)
         assertBool "lookupTyCon" (isJust (lookupTyCon testTypeEnv nm))
-
-  , testCase "the types of data constructors are those of conversion" $
-      forM_ (otherDataCon : dataCons) $ \dc ->
-        assertScopedTyAlphaEq (C.dcLegacyType dc) (C.dcType dc)
 
   , testCase "signatures are converted once" $ do
       assertBool "newTyConSigOf"
@@ -88,16 +80,15 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
 
     -- The signatures are closed, and moved into the scope they're used in
   , withTests 200 $ testGroup "properties"
-      [ testProperty "the types of a TypeEnv are those of conversion, in any scope" $
-          forAllBlind Gen.genFreeVars $ \fvs -> withFreeVars fvs $ \env -> do
-            let sc = convScope env
-                tenv = mkTypeEnv Gen.tyConMap
+      [ testProperty "the types of a TypeEnv are those the constructors store, in any scope" $
+          forAllBlind Gen.genTestScope $ \(Gen.SomeScope ts) -> do
+            let sc = testScope ts
+                tenv = Gen.typeEnv
                 agrees expected actual =
-                  counterexample (show expected) (C.aeqType expected (toClashType actual))
+                  counterexample (showPprU expected) (aeqTy (sinkClosed expected) actual)
             conjoin $
-              [ agrees (C.tyConLegacyKind tc) (tyConKindOf tenv (C.tyConName tc) `asScopeOf` sc)
-              | tc <- UniqMap.elems Gen.tyConMap ] <>
-              [ agrees (C.dcLegacyType dc) (sinkClosed (C.dcType dc) `asScopeOf` sc) | dc <- Gen.dataCons ]
+              [ agrees (C.tyConKind tc) (tyConKindOf tenv (C.tyConName tc) `asScopeOf` sc)
+              | tc <- UniqMap.elems Gen.tyConMap ]
       ]
   ]
  where
