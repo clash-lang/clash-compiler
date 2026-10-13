@@ -6,7 +6,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Pretty printing of scoped Clash Core: the 'PrettyPrec' instances of its
-  types, terms, binders and global variables. A port of the printer of Clash
+  types, terms, binders, global variables and type constructors. A port of the printer of Clash
   Core ("Clash.Core.Pretty"), which prints the same text as printing the
   conversion to Clash Core ('Clash.Core.Scoped.Convert.toClashTerm') does:
 
@@ -48,10 +48,12 @@ import qualified Clash.Core.Name as C
 import Clash.Core.Pretty
   (ClashAnnotation (..), ClashDoc, PrettyPrec (..), SubtermPos (..),
    SyntaxElement (..), fromPpr, ppr)
+import Clash.Core.Scoped.Sig (TyFamEqn (..))
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (primArg)
 import qualified Clash.Core.Term as C (NameMod (..), Term)
-import Clash.Core.TyCon (TyConName, isTupleTyConLike)
+import Clash.Core.TyCon
+  (AlgTyConRhs (..), TyCon (..), TyConName, isTupleTyConLike)
 import qualified Clash.Core.Type as C (ConstTy (..), Type)
 import Clash.Pretty (ClashPretty (..))
 
@@ -83,6 +85,12 @@ instance PrettyPrec (TyBinder n l) where
 
 instance PrettyPrec (TickInfo n) where
   pprPrec prec = pure . pprTick emptyEnv prec
+
+-- | Its declaration: its kind, and its data constructors or equations. Their
+-- types are closed, and the uniques of the variables they bind are their raw
+-- names.
+instance PrettyPrec TyCon where
+  pprPrec _ = pure . pprTyCon
 
 -- * Names
 
@@ -344,9 +352,36 @@ tyView = go []
     AppTy l r -> go (r : args) l
     _ -> OtherTypeView
 
+-- * Type constructors
+
+pprTyCon :: TyCon -> ClashDoc
+pprTyCon tc = case tc of
+  AlgTyCon {algTcRhs = DataTyCon dcs} ->
+    vsep (data_ <+> decl : map pprDataCon dcs)
+  AlgTyCon {algTcRhs = NewTyCon dc _ _} ->
+    vsep [newtype_ <+> decl, pprDataCon dc]
+  PromotedDataCon {tyConData = dc} ->
+    "promoted" <+> ppr (dcName dc)
+  FunTyCon {tyConEqns = eqns} ->
+    vsep (type_ <+> family_ <+> decl : map pprEqn eqns)
+  PrimTyCon {} ->
+    decl
+ where
+  decl = ppr (tyConName tc)
+    <> annotate (AnnSyntax Type) (space <> dcolon <+> pprType emptyEnv (tyConKind tc))
+
+  pprDataCon dc = ppr (dcName dc)
+    <> annotate (AnnSyntax Type) (space <> dcolon <+> pprType emptyEnv (dcType dc))
+
+  pprEqn (TyFamEqn tvs lhs rhs) =
+    let (_, env) = pprTele pprTyBinder emptyEnv tvs
+    in type_ <+> instance_ <+> pprTcApp env TopPrec (tyConName tc) lhs
+         <+> "=" <+> pprType env rhs
+
 -- * Syntax
 
-dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_
+dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_,
+  data_, newtype_, type_, family_, instance_
   :: ClashDoc
 dcolon = annotate (AnnSyntax Keyword) "::"
 rarrow = annotate (AnnSyntax Keyword) "->"
@@ -361,6 +396,11 @@ in_ = annotate (AnnSyntax Keyword) "in"
 case_ = annotate (AnnSyntax Keyword) "case"
 of_ = annotate (AnnSyntax Keyword) "of"
 forall_ = annotate (AnnSyntax Keyword) "forall"
+data_ = annotate (AnnSyntax Keyword) "data"
+newtype_ = annotate (AnnSyntax Keyword) "newtype"
+type_ = annotate (AnnSyntax Keyword) "type"
+family_ = annotate (AnnSyntax Keyword) "family"
+instance_ = annotate (AnnSyntax Keyword) "instance"
 
 parensIf :: Bool -> ClashDoc -> ClashDoc
 parensIf False = id

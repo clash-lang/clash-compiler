@@ -60,14 +60,14 @@ import System.Environment               (lookupEnv)
 import System.IO.Unsafe                 (unsafePerformIO)
 import Text.Read                        (readMaybe)
 
-import Clash.Core.DataCon               (DataCon (..), dcLegacyType)
+import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Term
   (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg, PrimInfo(primName),Bind(..))
-import Clash.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike, AlgTyConRhs(..))
+import Clash.Core.TyCon                 (TyConName, isTupleTyConLike)
 import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
-                                         Type (..), TypeView (..), tyView,mkTyConApp)
+                                         Type (..), TypeView (..), tyView)
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
 import Clash.Debug                      (trace)
 import Clash.Util
@@ -272,8 +272,7 @@ pprTopLevelBndr (bndr,expr) = do
   expr'    <- pprM expr
   return $ bndr' <> line <> hang 2 (sep [(bndrName <+> equals), expr']) <> line
 
-dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_,
-  data_,newtype_,type_,family_,instance_
+dcolon, rarrow, lam, tylam, at, cast, coerce, let_, letrec, in_, case_, of_, forall_
   :: ClashDoc
 dcolon = annotate (AnnSyntax Keyword) "::"
 rarrow = annotate (AnnSyntax Keyword) "->"
@@ -288,11 +287,6 @@ in_ = annotate (AnnSyntax Keyword) "in"
 case_ = annotate (AnnSyntax Keyword) "case"
 of_ = annotate (AnnSyntax Keyword) "of"
 forall_ = annotate (AnnSyntax Keyword) "forall"
-data_ = annotate (AnnSyntax Keyword) "data"
-newtype_ = annotate (AnnSyntax Keyword) "newtype"
-type_ = annotate (AnnSyntax Keyword) "type"
-family_ = annotate (AnnSyntax Keyword) "family"
-instance_ = annotate (AnnSyntax Keyword) "instance"
 
 instance PrettyPrec Text where
   pprPrec _ = pure . pretty
@@ -302,55 +296,6 @@ instance PrettyPrec Type where
 
 instance ClashPretty Type where
   clashPretty = fromPpr
-
-instance PrettyPrec TyCon where
-  pprPrec prec t = case t of
-    AlgTyCon _ nm _ _ (DataTyCon dcs) _ kn -> do
-      name <- pprPrec prec nm
-      kind <- pprKind kn
-      let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
-
-      cons <- traverse pprDataCon dcs
-      pure (vsep (data_ <+> decl : cons))
-     where
-      pprDataCon dc = do
-        name <- pprPrec prec dc
-        ty <- pprType (dcLegacyType dc)
-
-        pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> ty))
-
-    AlgTyCon _ nm _ _ (NewTyCon dc _ _) _ kn -> do
-      name <- pprPrec prec nm
-      kind <- pprKind kn
-      let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
-
-      conName <- pprPrec prec (dcName dc)
-      conType <- pprType (dcLegacyType dc)
-
-      pure (vsep [newtype_ <+> decl, conName <> annotate (AnnSyntax Type) (space <> dcolon <+> conType)])
-
-    PromotedDataCon _ _ _ _ dc _ ->
-      fmap ("promoted" <+>) (pprPrec prec dc)
-
-    FunTyCon _ nm _ _ _ kn ss -> do
-      name <- pprPrec prec nm
-      kind <- pprKind kn
-      let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
-
-      substs <- traverse pprSubst ss
-      pure (vsep (type_ <+> family_ <+> decl : substs))
-     where
-      pprSubst (xs, y) = do
-        lhs <- pprType (mkTyConApp (tyConName t) xs)
-        rhs <- pprType y
-
-        pure (type_ <+> instance_ <+> lhs <+> "=" <+> rhs)
-
-    PrimTyCon _ nm _ _ kn -> do
-      name <- pprPrec prec nm
-      kind <- pprKind kn
-
-      pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind))
 
 instance Pretty LitTy where
   pretty (NumTy i) = pretty i
