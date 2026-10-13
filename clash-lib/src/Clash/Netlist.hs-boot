@@ -4,14 +4,14 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The signatures of the handlers of Netlist generation on scoped Clash Core,
-  for the modules that "Clash.Netlist.Scoped" imports, e.g. those of
+  for the modules that "Clash.Netlist" imports, e.g. those of
   blackboxes. Each handler gets the t'Clash.Netlist.Types.CompCtx' of
   the terms it is given.
 -}
 
 {-# LANGUAGE DataKinds #-}
 
-module Clash.Netlist.Scoped
+module Clash.Netlist
   ( genComponent
   , mkDeclarations
   , mkDeclarations'

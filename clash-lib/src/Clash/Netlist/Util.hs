@@ -126,7 +126,7 @@ import           Clash.Core.HasType   (inferCoreTypeOf)
 import           Clash.Core.Term      (collectArgsTicks, collectTicks, mkTicks, stripTicks)
 
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta (..))
-import {-# SOURCE #-} Clash.Netlist.Scoped.BlackBox (extractPrimWarnOrFail, mkBlackBoxContext)
+import {-# SOURCE #-} Clash.Netlist.BlackBox (extractPrimWarnOrFail, mkBlackBoxContext)
 import qualified Clash.Sized.Vector          as V
 import           Clash.Primitives.Types      (CompiledPrimitive, Primitive (..))
 
@@ -2165,7 +2165,7 @@ idToPort sc i ty = do
     else return (Just (i, hwTy))
 
 -- | The context that the warnings of a guarded primitive mention (see
--- 'Clash.Netlist.Scoped.BlackBox.extractPrimWarnOrFail'): the variable its
+-- 'Clash.Netlist.BlackBox.extractPrimWarnOrFail'): the variable its
 -- result is assigned to, and the arguments it is applied to. Variables among
 -- the arguments are resolved into the given sibling let-bindings, a few
 -- levels deep.

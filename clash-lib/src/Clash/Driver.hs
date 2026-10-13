@@ -103,7 +103,7 @@ import           Clash.Driver.Manifest
   (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
    mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
-import           Clash.Netlist.Scoped             (genNetlist, genTopNames, topEntityEnv)
+import           Clash.Netlist             (genNetlist, genTopNames, topEntityEnv)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import qualified Clash.Netlist.Id                 as Id

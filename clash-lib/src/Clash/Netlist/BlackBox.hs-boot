@@ -3,11 +3,11 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  For "Clash.Netlist.Util", which "Clash.Netlist.Scoped.BlackBox"
+  For "Clash.Netlist.Util", which "Clash.Netlist.BlackBox"
   imports.
 -}
 
-module Clash.Netlist.Scoped.BlackBox
+module Clash.Netlist.BlackBox
   ( mkBlackBoxContext
   , extractPrimWarnOrFail
   ) where

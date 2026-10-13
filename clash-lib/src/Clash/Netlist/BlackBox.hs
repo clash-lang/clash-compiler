@@ -42,7 +42,7 @@
 -- deprecated as of GHC 9.14 in favor of @dataToTag#@ from @GHC.Magic@.
 {-# OPTIONS_GHC -Wno-deprecations #-}
 
-module Clash.Netlist.Scoped.BlackBox
+module Clash.Netlist.BlackBox
   ( mkBlackBoxContext
   , mkPrimitive
   , extractPrimWarnOrFail
@@ -126,7 +126,7 @@ import           Clash.Core.Type        (TypeView (..), mkFunTy, splitFunTys, ty
 import           Clash.Core.Util
   (inverseTopSortOrderOf, primAtType, splitShouldSplit)
 
-import {-# SOURCE #-} Clash.Netlist.Scoped
+import {-# SOURCE #-} Clash.Netlist
   (genComponent, mkDcApplication, mkDeclarations, mkDeclarations', mkExpr,
    mkFunApp, mkNetDecl, mkProjection, mkSelection)
 

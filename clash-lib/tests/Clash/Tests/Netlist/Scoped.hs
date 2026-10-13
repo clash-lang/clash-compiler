@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Netlist.Scoped"
+  Tests for "Clash.Netlist"
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -25,7 +25,7 @@ import Clash.Netlist.Types
 
 import Clash.Core.NameMap (singletonGlobalEnv)
 import Clash.Core.Syntax
-import Clash.Netlist.Scoped (mkFunApp)
+import Clash.Netlist (mkFunApp)
 
 import Test.Clash.Rewrite (runNetlistTest)
 import Test.Clash.Scoped

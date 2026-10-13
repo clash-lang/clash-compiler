@@ -294,8 +294,8 @@ Library
                       Clash.Netlist.Id.SystemVerilog
                       Clash.Netlist.Id.Verilog
                       Clash.Netlist.Id.VHDL
-                      Clash.Netlist.Scoped
-                      Clash.Netlist.Scoped.BlackBox
+                      Clash.Netlist
+                      Clash.Netlist.BlackBox
                       Clash.Netlist.Types
                       Clash.Netlist.Util
 

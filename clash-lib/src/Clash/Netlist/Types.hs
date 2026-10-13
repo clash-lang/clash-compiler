@@ -17,7 +17,7 @@
 
   Netlist generation opens the normalized term of a component into a single
   scope: its arguments and its let-binders (see
-  'Clash.Netlist.Scoped.genComponentT'). A t'CompCtx' records, for every
+  'Clash.Netlist.genComponentT'). A t'CompCtx' records, for every
   local variable of that scope, its HDL identifier: the name it has in the
   HDL. Handlers that go under further binders, e.g. those of a case
   alternative, extend the context with the HDL identifiers of the variables
