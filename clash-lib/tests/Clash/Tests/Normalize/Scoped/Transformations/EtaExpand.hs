@@ -3,20 +3,14 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.EtaExpand": the tests of
-  the transformations of Clash Core, run on the ports through
-  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of the ports with the
-  transformations of Clash Core.
-
-  The regression tests of 'Clash.Normalize.Transformations.EtaExpand.etaExpansionTL'
-  are about lambdas moved out of a let-expression that capture, or are
-  captured by, its bindings. In scoped Clash Core, the moved lambdas get new
-  binders in the scope of the let-expression, so that bug can't be written
-  there. 'etaExpandSyn' never fired while capturing the corpus of the
-  differential harness, so the tests construct its inputs.
+  Tests for "Clash.Normalize.Scoped.Transformations.EtaExpand". The expected
+  results of the tests that compared a port with its Clash Core counterpart
+  are the results of the latter. 'assertRewritesTo' runs every test in the
+  scope of the free variables of its input, and in a scope that the binders of
+  the input clash with.
 -}
 
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Scoped.Transformations.EtaExpand (tests) where
@@ -26,131 +20,121 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term
-  (Bind (..), CoreContext (..), NameMod (..), Term (..), TickInfo (..))
-import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (mkVarSet)
+import Clash.Core.Scoped.Syntax (GlobalId)
 import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
-import Test.Clash.Scoped.ViaFoil (viaFoil)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
-import Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), TransformContext (..))
-import Clash.Util.Supply (newSupply)
+import Clash.Rewrite.Types (RewriteEnv, RewriteState)
 
-import Clash.Tests.Normalize.Transformations.EtaExpand
-  (EtaRewrites (..), currentRewrites, etaTests, fGlobal)
-import Test.Clash.Rewrite
-  ( assertFires, globalId, inScopeOf, intFunTy, intId, intLit, localId
-  , parseToTermQQ, parseTyConTy )
-import Test.Clash.Scoped (assertRewritesAgree)
+import Test.Clash.Rewrite (TestDefs (..), TestTerm, parseTestTermWith, testGlobalId)
+import Test.Clash.Scoped
+  ( ScopeDecl, Step (..), assertNoRewriteAt, assertRewritesTo, varD, withTopEntities )
 
--- | The ports, on terms of Clash Core: through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil'
-scopedRewrites :: EtaRewrites
-scopedRewrites = EtaRewrites
-  { erEtaExpansionTL = viaFoil "etaTL" (ScopedTransform Scoped.etaExpansionTL)
-  , erEtaExpandSyn = (viaFoil "etaExpandSyn" $(asScopedRewriteQ Scoped.etaExpandSyn))
-  }
+-- | Global functions @f, g :: Int -> Int@ and @k :: Int -> Int -> Int@
+f, g, k :: GlobalId
+f = testGlobalId "f_G10" "Int -> Int"
+g = testGlobalId "g_G41" "Int -> Int"
+k = testGlobalId "k_G42" "Int -> Int -> Int"
 
--- | Assert that a transformation and its port agree on a term, in an
--- environment with the given top entities
-agreeIn
-  :: Bool
-  -- ^ Whether they fire
-  -> [Id]
-  -- ^ Top entities
-  -> (EtaRewrites -> NormRewrite)
-  -> TransformContext
-  -> Term
-  -> Assertion
-agreeIn fires tops rw ctx tm = do
-  supply <- newSupply
-  let env = def{_topEntities = mkVarSet tops}
-      st = def{_uniqSupply = supply} :: RewriteState NormalizeState
-  assertFires fires env st ctx (rw currentRewrites) tm
-  assertRewritesAgree env st ctx (rw currentRewrites) (rw scopedRewrites) tm
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [] [] [f, g, k])
 
--- * Variables
+st :: RewriteState NormalizeState
+st = def
 
-x, y, z :: Id
-x = intId User "x" 31
-y = intId User "y" 32
-z = intId User "z" 33
+etaTLS, etaExpandSynS :: ScopedRewrite NormalizeState
+etaTLS = ScopedTransform Scoped.etaExpansionTL
+etaExpandSynS = $(asScopedRewriteQ Scoped.etaExpandSyn)
 
--- | Global functions @g :: Int -> Int@ and @k :: Int -> Int -> Int@
-g, k :: Id
-g = globalId User "g" 41 (intFunTy 1)
-k = globalId User "k" 42 (intFunTy 2)
+-- | An environment in which @f@ and @k@ are top entities
+topsEnv :: RewriteEnv
+topsEnv = withTopEntities [f, k] def
 
--- | A local function @h :: Int -> Int@
-h :: Id
-h = localId User "h" 43 (intFunTy 1)
+-- | Assert that 'Scoped.etaExpansionTL' rewrites a term to the expected one
+etaTLTo :: [ScopeDecl] -> String -> String -> Assertion
+etaTLTo decls input expected = assertRewritesTo def st etaTLS decls (tm input) (tm expected)
 
-srcTick :: TickInfo
-srcTick = NameMod PrefixName (parseTyConTy "Pfx")
+-- | Assert that 'Scoped.etaExpandSyn' rewrites a term to the expected one
+etaSynTo :: [ScopeDecl] -> String -> String -> Assertion
+etaSynTo decls input expected = assertRewritesTo topsEnv st etaExpandSynS decls (tm input) (tm expected)
 
--- * etaExpansionTL
-
-etaTLTests :: TestTree
-etaTLTests = testGroup "etaExpansionTL"
-  [ testCase "eta-expands a function" $
-      agreeTL [] (Var k)
-  , testCase "goes under lambdas" $
-      agreeTL [] (Lam x (App (Var k) (Var x)))
-  , testCase "moves lambdas out of a let" $
-      agreeTL [] [parseToTermQQ|
-        let
-          i_1 :: Int
-          i_1 = 3
-        in
-          \(y_2 :: Int) -> \(z_3 :: Int) -> i_1
-      |]
-  , testCase "moves lambdas out of nested lets" $
-      agreeTL [x] $
-        Let (NonRec y (Var x))
-          (Lam z (Letrec [(x, App (Var g) (Var y))] (Lam y (Var x))))
-  , testCase "eta-expands the body of a let" $
-      agreeTL [] (Letrec [(y, intLit 3), (z, App (Var g) (Var y))] (App (Var k) (Var z)))
-  , testCase "the body of a let is a local function" $
-      agreeTL [h] (Let (NonRec y (intLit 3)) (Var h))
-  , testCase "doesn't fire on a value" $
-      noFireTL [x] (App (Var g) (Var x))
-  ]
- where
-  agreeTL fvs = agreeIn True [] erEtaExpansionTL (TransformContext (inScopeOf fvs) [])
-  noFireTL fvs = agreeIn False [] erEtaExpansionTL (TransformContext (inScopeOf fvs) [])
-
--- * etaExpandSyn
-
-etaExpandSynTests :: TestTree
-etaExpandSynTests = testGroup "etaExpandSyn"
-  [ testCase "eta-expands a top entity" $
-      agreeSyn [] [] (Var fGlobal)
-  , testCase "eta-expands a partially applied top entity" $
-      agreeSyn [x] [] (App (Var k) (Var x))
-  , testCase "looks through ticks" $
-      agreeSyn [x] [] (Tick srcTick (App (Var k) (Var x)))
-  , testCase "doesn't eta-expand the function of an application" $
-      noFireSyn [] [AppFun] (Var k)
-  , testCase "doesn't eta-expand under ticks in the function of an application" $
-      noFireSyn [] [TickC srcTick, AppFun] (Var k)
-  , testCase "doesn't eta-expand a fully applied top entity" $
-      noFireSyn [x, y] [] (App (App (Var k) (Var x)) (Var y))
-  , testCase "doesn't eta-expand a function that isn't a top entity" $
-      noFireSyn [] [] (Var g)
-  ]
- where
-  agreeSyn fvs frames =
-    agreeIn True [fGlobal, k] erEtaExpandSyn (TransformContext (inScopeOf fvs) frames)
-  noFireSyn fvs frames =
-    agreeIn False [fGlobal, k] erEtaExpandSyn (TransformContext (inScopeOf fvs) frames)
+-- | Assert that a transformation, at the given path, leaves a term as it is
+keepsAt :: RewriteEnv -> ScopedRewrite NormalizeState -> [Step] -> [ScopeDecl] -> String -> Assertion
+keepsAt env rw path decls = assertNoRewriteAt env st path rw decls . tm
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.EtaExpand"
-  [ testGroup "Regression tests" (etaTests scopedRewrites)
-  , etaTLTests
-  , etaExpandSynTests
+  [ testGroup "regression tests"
+      [ -- 'etaExpansionTL' moves the lambdas in the body of a let-expression
+        -- out of that let-expression:
+        --
+        -- > let i = x in \y -> e  ==>  \y -> let i = x in e
+        --
+        -- It used to do so without renaming @y@. If @y@ has the same unique
+        -- as @i@, the let-binder captures the references to @y@ in @e@.
+        testCase "etaExpansionTL: let-binder does not capture lambda" $
+          etaTLTo []
+            "let { (i :: Int) = 3 } in \\(i :: Int) -> i"
+            "\\(y :: Int) -> let { (i :: Int) = 3 } in y"
+        -- Like the test above, but now the moved lambda captures a free
+        -- variable of the right-hand side of the let-binding: if @y@ is free in
+        -- @x@, then @\\y -> let i = x in e@ binds it.
+      , testCase "etaExpansionTL: lambda does not capture let-binding" $
+          etaTLTo []
+            "\\(y :: Int) -> let { (i :: Int) = y } in \\(y :: Int) -> i"
+            "\\(y :: Int) (y2 :: Int) -> let { (i :: Int) = y } in i"
+        -- 'etaExpandSyn' eta-expands references to top entities. It shares
+        -- 'topEntities' with 'Clash.Normalize.Transformations.Specialize.specialize',
+        -- and also looked up whether a variable is a top entity by its unique
+        -- alone, so it eta-expanded a local that shares its unique with a top
+        -- entity.
+      , testCase "etaExpandSyn does not expand a local that shares a unique with a top entity" $ do
+          assertRewritesTo (withTopEntities [f] def) st etaExpandSynS []
+            (tm "f_G10") (tm "\\(a :: Int) -> f_G10 a")
+          keepsAt (withTopEntities [f] def) etaExpandSynS [] [varD "f_10" "Int -> Int"] "f_10"
+      ]
+  , testGroup "etaExpansionTL"
+      [ testCase "eta-expands a function" $
+          etaTLTo [] "k_G42" "\\(a :: Int) (b :: Int) -> k_G42 a b"
+      , testCase "goes under lambdas" $
+          etaTLTo [] "\\(x :: Int) -> k_G42 x" "\\(x :: Int) (a :: Int) -> k_G42 x a"
+      , testCase "moves lambdas out of a let" $
+          etaTLTo []
+            "let { (i :: Int) = 3 } in \\(y :: Int) (z :: Int) -> i"
+            "\\(y :: Int) (z :: Int) -> let { (i :: Int) = 3 } in i"
+      , testCase "moves lambdas out of nested lets" $
+          etaTLTo [varD "x_31" "Int"]
+            "let { !(y :: Int) = x_31 } in \\(z :: Int) -> let { (x :: Int) = g_G41 y } in \\(y :: Int) -> x"
+            "\\(z :: Int) (y :: Int) -> let { !(y2 :: Int) = x_31 } in let { (x :: Int) = g_G41 y2 } in x"
+      , testCase "eta-expands the body of a let" $
+          etaTLTo []
+            "let { (y :: Int) = 3; (z :: Int) = g_G41 y } in k_G42 z"
+            "\\(a :: Int) -> let { (y :: Int) = 3; (z :: Int) = g_G41 y } in k_G42 z a"
+      , testCase "the body of a let is a local function" $
+          etaTLTo [varD "h_43" "Int -> Int"]
+            "let { !(y :: Int) = 3 } in h_43"
+            "\\(a :: Int) -> let { !(y :: Int) = 3 } in h_43 a"
+      , testCase "doesn't fire on a value" $
+          keepsAt def etaTLS [] [varD "x_31" "Int"] "g_G41 x_31"
+      ]
+  , testGroup "etaExpandSyn"
+      [ testCase "eta-expands a top entity" $
+          etaSynTo [] "f_G10" "\\(a :: Int) -> f_G10 a"
+      , testCase "eta-expands a partially applied top entity" $
+          etaSynTo [varD "x_31" "Int"] "k_G42 x_31" "\\(a :: Int) -> k_G42 x_31 a"
+      , testCase "looks through ticks" $
+          etaSynTo [varD "x_31" "Int"]
+            "Core.prefixName @Pfx (k_G42 x_31)"
+            "\\(a :: Int) -> Core.prefixName @Pfx (k_G42 x_31) a"
+      , testCase "doesn't eta-expand the function of an application" $
+          keepsAt topsEnv etaExpandSynS [AppFunStep] [varD "x_31" "Int"] "k_G42 x_31"
+      , testCase "doesn't eta-expand under ticks in the function of an application" $
+          keepsAt topsEnv etaExpandSynS [AppFunStep, TickStep] [varD "x_31" "Int"]
+            "(Core.prefixName @Pfx k_G42) x_31"
+      , testCase "doesn't eta-expand a fully applied top entity" $
+          keepsAt topsEnv etaExpandSynS [] [varD "x_31" "Int", varD "y_32" "Int"] "k_G42 x_31 y_32"
+      , testCase "doesn't eta-expand a function that isn't a top entity" $
+          keepsAt topsEnv etaExpandSynS [] [] "g_G41"
+      ]
   ]
