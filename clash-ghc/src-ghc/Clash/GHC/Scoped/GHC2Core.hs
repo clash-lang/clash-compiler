@@ -104,8 +104,7 @@ import GHC.Utils.Outputable (showPprUnsafe)
 import Clash.Core.Basic (IsMultiPrim (..), NameMod (..), WorkInfo (..), undefinedXPrims)
 import           Clash.Annotations.Primitive (extractPrim)
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Term             as C
-import           Clash.Core.Scoped.Convert (mkPrimInfo)
+import           Clash.Core.Scoped.Syntax    (mkPrimInfo)
 import qualified Clash.Core.Scoped.Syntax    as S
 import           Clash.Core.Scoped.TysPrim   (undefinedTy)
 import           Clash.Driver.Types          (HasClashOpts(..))
@@ -420,7 +419,7 @@ coreToTermB primMap unlocs recLocals = term
 -- | Convert a term variable binder: its type and name. Like
 -- 'Clash.GHC.GHC2Core.coreToId', which converts the type of a global through
 -- 'coreToVarType'.
-coreToIdB :: Id -> C2C (TyB, C.Name C.Term)
+coreToIdB :: Id -> C2C (TyB, C.Name S.Term)
 coreToIdB i = (,) <$> coreToTypeB (varType i) <*> coreToVar i
 
 -- | The primitives that stand in for a type and a coercion, see the module

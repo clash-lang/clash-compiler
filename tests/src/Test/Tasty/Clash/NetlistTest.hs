@@ -26,7 +26,6 @@ import           Clash.Backend.SystemVerilog
 import           Clash.Backend.VHDL
 import           Clash.Backend.Verilog
 import           Clash.Core.Name
-import           Clash.Core.Var
 import           Clash.Driver as Driver
 import           Clash.Driver.Types
 

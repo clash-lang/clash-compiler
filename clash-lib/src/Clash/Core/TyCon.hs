@@ -17,7 +17,12 @@ module Clash.Core.TyCon
   , TyConName
   , TyConMap
   , AlgTyConRhs (..)
-  , mkKindTyCon
+    -- * Constructors
+  , mkAlgTyCon
+  , mkPromotedDataCon
+  , mkFunTyCon
+  , mkPrimTyCon
+  , mkNewTyConRhs
   , isTupleTyConLike
   , isPrimTc
   , isNewTypeTc
@@ -34,26 +39,13 @@ import qualified Data.Text as T
 -- Internal Imports
 import Clash.Core.DataCon                     (DataCon)
 import Clash.Core.Name
-import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkPrimTyConFromClash)
 import Clash.Core.Scoped.Sig                  (NewTyConSig, TyFamEqn)
 import qualified Clash.Core.Scoped.Syntax     as Scoped
-import {-# SOURCE #-} Clash.Core.Type         (Kind, Type)
-import Clash.Core.Var                         (TyVar)
 import Clash.Data.UniqMap (UniqMap)
 import Clash.Unique
 
--- | Type Constructor
---
--- = Transition
---
--- The scoped fields, 'tyConKind', 'tyConEqns' and 'ntSig', are the truth.
--- The fields named @Legacy@ hold the same as Clash Core's types, for the
--- code that still uses Clash Core. They are derived lazily, and are deleted
--- with Clash Core (package B of the port). Make type constructors with the
--- constructors of "Clash.Core.Scoped.Convert", such as
--- 'Clash.Core.Scoped.Convert.mkAlgTyCon' and
--- 'Clash.Core.Scoped.Convert.mkAlgTyConFromClash', which derive the side they
--- are not given.
+-- | Type Constructor. Make type constructors with the constructors below,
+-- such as 'mkAlgTyCon', which take the unique from the name.
 data TyCon
   -- | Algorithmic DataCons
   = AlgTyCon
@@ -64,8 +56,6 @@ data TyCon
   , tyConArity  :: !Int         -- ^ Number of type arguments
   , algTcRhs    :: !AlgTyConRhs -- ^ DataCon definitions
   , isClassTc   :: !Bool        -- ^ Is this a class dictionary?
-  , tyConLegacyKind :: Kind
-  -- ^ Transitional, see above. Lazy.
   }
   | PromotedDataCon
   { tyConUniq   :: {-# UNPACK #-} !Unique -- invariant (same as dcUniq)
@@ -74,8 +64,6 @@ data TyCon
   -- ^ Kind of the TyCon, which is closed. Lazy.
   , tyConArity  :: !Int         -- ^ Number of type arguments
   , tyConData   :: !DataCon     -- ^ DataCon which is promoted
-  , tyConLegacyKind :: Kind
-  -- ^ Transitional, see above. Lazy.
   }
   -- | Function TyCons (e.g. type families)
   | FunTyCon
@@ -86,11 +74,6 @@ data TyCon
   , tyConArity  :: !Int            -- ^ Number of type arguments
   , tyConEqns   :: [TyFamEqn]
   -- ^ The equations, in order, see "Clash.Core.Scoped.Sig". Lazy.
-  , tyConLegacyKind :: Kind
-  -- ^ Transitional, see above. Lazy.
-  , tyConLegacySubst :: [([Type],Type)]
-  -- ^ Transitional, see above: the equations as a list of: ([LHS match
-  -- types], RHS type), whose free type variables are the pattern variables
   }
   -- | Primitive TyCons
   | PrimTyCon
@@ -99,26 +82,16 @@ data TyCon
   , tyConKind    :: Scoped.Kind 'Scoped.VoidS
   -- ^ Kind of the TyCon, which is closed. Lazy.
   , tyConArity   :: !Int        -- ^ Number of type arguments
-  , tyConLegacyKind :: Kind
-  -- ^ Transitional, see above. Lazy.
   }
   deriving (Show)
 
--- | Doesn't force the kinds and the equations, which are derived lazily (see
--- 'TyCon')
+-- | Doesn't force the kinds and the equations, which are lazy
 instance NFData TyCon where
   rnf tc = rnf (tyConName tc) `seq` rnf (tyConArity tc) `seq` case tc of
-    AlgTyCon _ _ _ _ rhs cls _ -> rnf rhs `seq` rnf cls
-    PromotedDataCon _ _ _ _ dc _ -> rnf dc
+    AlgTyCon _ _ _ _ rhs cls -> rnf rhs `seq` rnf cls
+    PromotedDataCon _ _ _ _ dc -> rnf dc
     FunTyCon {} -> ()
     PrimTyCon {} -> ()
-
-{-
-instance Show TyCon where
-  show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
-  show (FunTyCon       {tyConName = n}) = "FunTyCon: " ++ show n
-  show (PrimTyCon      {tyConName = n}) = "PrimTyCon: " ++ show n
--}
 
 instance Eq TyCon where
   (==) = (==) `on` tyConUniq
@@ -143,24 +116,36 @@ data AlgTyConRhs
   -- ^ The type variables of the newtype, and the argument type of the
   -- newtype DataCon in eta-reduced form, which is just the representation of
   -- the TyCon, see "Clash.Core.Scoped.Sig". Lazy.
-  , ntLegacyEtadRhs :: ([TyVar],Type)
-  -- ^ Transitional, see 'TyCon': 'ntSig' as types of Clash Core. The
-  -- TyName's are the type-variables from the corresponding TyCon. Lazy.
   }
   deriving (Show)
 
--- | Doesn't force the signature, see 'TyCon'
+-- | Doesn't force the signature, which is lazy
 instance NFData AlgTyConRhs where
   rnf = \case
     DataTyCon dcs -> rnf dcs
-    NewTyCon dc _ _ -> rnf dc
+    NewTyCon dc _ -> rnf dc
 
--- | Create a Kind out of a TyConName
-mkKindTyCon :: TyConName
-            -> Kind
-            -> TyCon
-mkKindTyCon name kind
-  = mkPrimTyConFromClash (nameUniq name) name kind 0
+-- | An algebraic data type: name, closed kind, arity, data constructors, and
+-- whether it is a class dictionary
+mkAlgTyCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> AlgTyConRhs -> Bool -> TyCon
+mkAlgTyCon nm = AlgTyCon (nameUniq nm) nm
+
+-- | A promoted data constructor: name, closed kind, arity, and the data
+-- constructor
+mkPromotedDataCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> DataCon -> TyCon
+mkPromotedDataCon nm = PromotedDataCon (nameUniq nm) nm
+
+-- | A type family: name, closed kind, arity, and equations
+mkFunTyCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> [TyFamEqn] -> TyCon
+mkFunTyCon nm = FunTyCon (nameUniq nm) nm
+
+-- | A primitive type constructor: name, closed kind, and arity
+mkPrimTyCon :: TyConName -> Scoped.Kind 'Scoped.VoidS -> Int -> TyCon
+mkPrimTyCon nm = PrimTyCon (nameUniq nm) nm
+
+-- | The right-hand side of a newtype: its data constructor and signature
+mkNewTyConRhs :: DataCon -> NewTyConSig -> AlgTyConRhs
+mkNewTyConRhs = NewTyCon
 
 -- | Does the TyCon look like a tuple TyCon
 isTupleTyConLike :: TyConName -> Bool

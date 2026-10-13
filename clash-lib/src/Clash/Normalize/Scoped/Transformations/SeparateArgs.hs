@@ -38,7 +38,6 @@ import Clash.Rewrite.StrategyDSL
   , toScopedTransformation )
 import Clash.Rewrite.Types (scopedTypeEnv)
 
-import Clash.Core.Scoped.Convert (mkGlobalId)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Subst
   (closeType, extendSubstScope, extendTmSubst, idSubst, openTyBinder, substTm, withFreshIdBinders)

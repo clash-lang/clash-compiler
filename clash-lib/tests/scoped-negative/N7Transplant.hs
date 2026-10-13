@@ -5,11 +5,10 @@
 module N7Transplant where
 
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 
 import Clash.Core.Scoped.Syntax
 
-occ :: C.Name C.Term
+occ :: C.Name Term
 occ = C.mkUnsafeSystemName (error "occ") 0
 
 transplant :: TyBinder n l -> IdBinder n l

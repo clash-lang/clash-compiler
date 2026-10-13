@@ -14,6 +14,7 @@
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
@@ -25,10 +26,9 @@ module Test.Clash.Rewrite where
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
+import qualified Clash.Core.Basic as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Literal as C
-import qualified Clash.Core.Type as C
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 import Clash.Driver.Types
   ( Binding (..), ClashEnv (..), ClashOpts (..), DebugOpts, IsPrim (IsFun),
@@ -47,15 +47,16 @@ import Clash.Core.Scoped.Builder
   , defaultAltB, forAllTyB, funTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB
   , nameModTickB, noDeDupTickB, primB, runClosedType, runNewTyConSig, runTyFamEqn
   , srcSpanTickB, tickB, tyAppB, tyConAppB, tyLamB, uniqueKey, varB, varTyB )
-import qualified Clash.Core.Scoped.Convert as S
-  ( mkAlgTyCon, mkDataCon, mkFunTyCon, mkGlobalId, mkNewTyConRhs, mkPrimInfo, mkPrimTyCon )
+import qualified Clash.Core.TyCon as S (mkAlgTyCon, mkFunTyCon, mkNewTyConRhs, mkPrimTyCon)
+import qualified Clash.Core.DataCon as S (mkDataCon)
+import qualified Clash.Core.Scoped.Syntax as S (mkGlobalId, mkPrimInfo)
 import qualified Clash.Core.Scoped.TysPrim as P
 import Clash.Core.Scoped.Syntax (PrimInfo (..), PrimUnfolding (NoUnfolding))
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.Sig (DataConSig (..))
 import Clash.Core.Scoped.Syntax (GlobalId (..), teleLength)
 import Clash.Core.Scoped.NameMap (GlobalEnv, emptyGlobalEnv, emptyGlobalSet)
-import qualified Clash.Core.Scoped.Syntax as ST (S (VoidS), Term)
+import qualified Clash.Core.Scoped.Syntax as ST (S (VoidS), Term, Type)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
@@ -436,8 +437,8 @@ data ScopeDecl = ScopeDecl
 -- | A variable of the scope of a test: its key, name, and kind or type. The
 -- type of a term variable is 'freeVarType' if it has none.
 data DeclVar
-  = DeclTyVar !Key !(C.Name C.Type) TestType
-  | DeclId !Key !(C.Name C.Term) !(Maybe TestType)
+  = DeclTyVar !Key !(C.Name ST.Type) TestType
+  | DeclId !Key !(C.Name ST.Term) !(Maybe TestType)
 
 -- | A type variable of kind @Type@, by its identifier (see 'parseNameScope')
 tyVarD :: HasCallStack => String -> ScopeDecl
@@ -580,7 +581,7 @@ bindTmKey k (PEnv tys tms sigs dcs) = PEnv tys (IntSet.insert k tms) sigs dcs
 
 -- | The free variables of a parsed term: the type variables by key, and the
 -- term variables by key, with the type of the first occurrence that has one
-data Free = Free !(IntMap.IntMap (C.Name C.Type)) !(IntMap.IntMap (C.Name C.Term, Maybe TyB))
+data Free = Free !(IntMap.IntMap (C.Name ST.Type)) !(IntMap.IntMap (C.Name ST.Term, Maybe TyB))
 
 instance Semigroup Free where
   Free tys1 tms1 <> Free tys2 tms2 =
@@ -724,7 +725,7 @@ spTy env@(PEnv tvs _ _ _) = \case
 -- | Type variable binders, each in the scope of the ones before it
 spTyVarBinds
   :: (HasCallStack, Show l)
-  => PEnv -> [TyVarBind l] -> (PEnv -> [(Key, C.Name C.Type, TyB)] -> P r) -> P r
+  => PEnv -> [TyVarBind l] -> (PEnv -> [(Key, C.Name ST.Type, TyB)] -> P r) -> P r
 spTyVarBinds env [] k = k env []
 spTyVarBinds env (tvb : tvbs) k = do
   (nm, ki) <- case tvb of
@@ -865,7 +866,7 @@ varRef env@(PEnv _ tms _ defs) nm0 annot = case parseNameScope nm0 of
 -- | A binder of a term variable: its key, name and type. The type is its
 -- annotation, or that of a type signature of an enclosing let-expression, see
 -- 'parsePats'.
-spIdBinder :: (HasCallStack, Show l) => PEnv -> Pat l -> P (Key, C.Name C.Term, TyB)
+spIdBinder :: (HasCallStack, Show l) => PEnv -> Pat l -> P (Key, C.Name ST.Term, TyB)
 spIdBinder env@(PEnv _ _ sigs _) = \case
   PParen _ p -> spIdBinder env p
   PatTypeSig _ (PVar _ nm0) t -> do
@@ -1051,7 +1052,7 @@ intTyCon = S.mkPrimTyCon (parseTyConName "Int") (runClosedType typeB) 0
 -- whose key is its unique.
 
 -- | A type variable of a fixture: its key, name and kind
-type FxTyVar = (Key, C.Name C.Type, TyB)
+type FxTyVar = (Key, C.Name ST.Type, TyB)
 
 -- | A type variable with the given name, unique and kind
 fxTyVar :: String -> Unique -> TyB -> FxTyVar

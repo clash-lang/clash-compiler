@@ -209,19 +209,12 @@ Library
 
                       Clash.Core.Basic
                       Clash.Core.DataCon
-                      Clash.Core.EqSolver
-                      Clash.Core.FreeVars
-                      Clash.Core.HasType
-                      Clash.Core.HasFreeVars
-                      Clash.Core.Lint
                       Clash.Core.Literal
                       Clash.Core.Name
                       Clash.Core.Pretty
                       Clash.Core.Scoped.Alpha
                       Clash.Core.Scoped.Binary
                       Clash.Core.Scoped.Builder
-                      Clash.Core.Scoped.Convert
-                      Clash.Core.Scoped.Convert.Fresh
                       Clash.Core.Scoped.DataCon
                       Clash.Core.Scoped.EqSolver
                       Clash.Core.Scoped.Evaluator
@@ -276,15 +269,7 @@ Library
                       Clash.Core.Scoped.TysPrim
                       Clash.Core.Scoped.TypeEnv
                       Clash.Core.Scoped.Util
-                      Clash.Core.Subst
-                      Clash.Core.Term
-                      Clash.Core.TermInfo
                       Clash.Core.TyCon
-                      Clash.Core.Type
-                      Clash.Core.TysPrim
-                      Clash.Core.Util
-                      Clash.Core.Var
-                      Clash.Core.VarEnv
 
                       Clash.Data.UniqMap
 

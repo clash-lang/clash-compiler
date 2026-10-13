@@ -18,7 +18,7 @@ import GHC.Types.SrcLoc (noSrcSpan)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.Term as C (NameMod (PrefixName))
+import qualified Clash.Core.Basic as C (NameMod (PrefixName))
 
 import Clash.Core.Scoped.Builder
   ( TmB, appB, deDupTickB, nameModTickB, noDeDupTickB, primB, srcSpanTickB, tickB, tyAppB)

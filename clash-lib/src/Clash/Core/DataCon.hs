@@ -18,12 +18,7 @@ module Clash.Core.DataCon
   , DcName
   , ConTag
   , DcStrictness(..)
-    -- * Transition
-  , LegacyDataCon (..)
-  , dcLegacyType
-  , dcUnivTyVars
-  , dcExtTyVars
-  , dcArgTys
+  , mkDataCon
   , dcUnivTyVarCount
   , dcExtTyVarCount
   , dcFieldCount
@@ -40,21 +35,9 @@ import GHC.Generics                           (Generic)
 import Clash.Core.Name                        (Name (..))
 import Clash.Core.Scoped.Sig                  (DataConSig (..))
 import qualified Clash.Core.Scoped.Syntax     as Scoped
-import {-# SOURCE #-} Clash.Core.Type         (Type)
-import Clash.Core.Var                         (TyVar)
 import Clash.Unique
 
 -- | Data Constructor
---
--- = Transition
---
--- The scoped fields, 'dcType' and 'dcSig', are the truth. 'dcLegacy' holds
--- the types of the data constructor as Clash Core's types, for the code that
--- still uses Clash Core. It is derived lazily, and is deleted with Clash Core
--- (package B of the port). Make data constructors with
--- 'Clash.Core.Scoped.Convert.mkDataCon' or
--- 'Clash.Core.Scoped.Convert.mkDataConFromClash', which derive the side they
--- are not given.
 data DataCon
   = MkData
   { dcName :: !DcName
@@ -74,42 +57,23 @@ data DataCon
   -- ^ Argument strictness
   , dcFieldLabels :: [Text.Text]
   -- ^ Names of fields. Used when data constructor is referring to a record type.
-  , dcLegacy :: LegacyDataCon
-  -- ^ Transitional, see above. Lazy.
   }
 
--- | The types of a data constructor as Clash Core's types. Transitional, see
--- 'DataCon'.
-data LegacyDataCon
-  = LegacyDataCon
-  { ldcType :: !Type
-  -- ^ Type of the 'DataCon'
-  , ldcUnivTyVars :: [TyVar]
-  -- ^ Universally quantified type-variables, these type variables are also part
-  -- of the result type of the DataCon
-  , ldcExtTyVars :: [TyVar]
-  -- ^ Existentially quantified type-variables, these type variables are not
-  -- part of the result of the DataCon, but only of the arguments.
-  , ldcArgTys :: [Type]
-  -- ^ Argument types
+-- | A data constructor with the given name, tag, closed type, signature (see
+-- "Clash.Core.Scoped.Sig"), strictness of its fields, and labels of its
+-- fields
+mkDataCon
+  :: DcName -> ConTag -> Scoped.Type 'Scoped.VoidS -> DataConSig -> [DcStrictness]
+  -> [Text.Text] -> DataCon
+mkDataCon nm tag ty sig strict labels = MkData
+  { dcName = nm
+  , dcUniq = nameUniq nm
+  , dcTag = tag
+  , dcType = ty
+  , dcSig = sig
+  , dcArgStrict = strict
+  , dcFieldLabels = labels
   }
-
--- | The type of a data constructor, as a type of Clash Core. Transitional, see
--- 'DataCon'.
-dcLegacyType :: DataCon -> Type
-dcLegacyType = ldcType . dcLegacy
-
--- | Transitional, see 'DataCon' and 'ldcUnivTyVars'
-dcUnivTyVars :: DataCon -> [TyVar]
-dcUnivTyVars = ldcUnivTyVars . dcLegacy
-
--- | Transitional, see 'DataCon' and 'ldcExtTyVars'
-dcExtTyVars :: DataCon -> [TyVar]
-dcExtTyVars = ldcExtTyVars . dcLegacy
-
--- | Transitional, see 'DataCon' and 'ldcArgTys'
-dcArgTys :: DataCon -> [Type]
-dcArgTys = ldcArgTys . dcLegacy
 
 -- | The number of universally quantified type variables of a data constructor
 dcUnivTyVarCount :: DataCon -> Int
@@ -130,7 +94,7 @@ dcFieldCount dc = case dcSig dc of
 instance Show DataCon where
   show = show . dcName
 
--- | Doesn't force the types, which are derived lazily (see 'DataCon')
+-- | Doesn't force the type and the signature, which are lazy
 instance NFData DataCon where
   rnf dc =
     rnf (dcName dc) `seq` rnf (dcTag dc) `seq` rnf (dcArgStrict dc)

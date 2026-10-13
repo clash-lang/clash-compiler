@@ -69,7 +69,6 @@ import           Data.Text                   (Text)
 import           GHC.Stack                   (HasCallStack)
 
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Term             as C
 
 import           Clash.Core.Scoped.NameMap
   (NameMap, emptyNameMap, insertNameMap, lookupNameMap, sinkNameMap)
@@ -149,7 +148,7 @@ bbLocalIdentifier = localIdentifier
 
 -- | A local variable of scope @n@: its human readable name, type and name
 data LocalId (n :: S) = LocalId
-  { localIdOcc :: !(C.Name C.Term)
+  { localIdOcc :: !(C.Name Term)
   -- ^ Human readable name. Its unique is not used.
   , localIdType :: Type n
   , localIdName :: !(TmName n)

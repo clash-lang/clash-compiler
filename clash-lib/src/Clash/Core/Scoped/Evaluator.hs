@@ -45,6 +45,7 @@
   "Clash.Core.Scoped.Evaluator.Primitives".
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
@@ -106,7 +107,6 @@ import Clash.Core.DataCon (DataCon (..), dcUnivTyVarCount)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
-import qualified Clash.Core.Term as C
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Primitives as NP
@@ -323,7 +323,7 @@ newLetBinding env m e k
          (idBinderHeapVar b)
 
 -- | The name of new heap binders, see 'Clash.Core.Util.mkUniqSystemId'
-xName :: C.Name C.Term
+xName :: C.Name Term
 xName = C.mkUnsafeSystemName "x" 0
 
 -- | Allocate let-bindings on the heap, and continue with the body. The

@@ -8,6 +8,7 @@
   local variables only depend on their human readable names and raw names.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -34,7 +35,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import qualified Data.List as List
 
 import Clash.Core.Scoped.Builder (runTyFamEqn, tyConAppB, varTyB)
-import Clash.Core.Scoped.Convert (mkFunTyCon, mkGlobalId)
+import Clash.Core.TyCon (mkFunTyCon)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
 
@@ -136,7 +137,6 @@ annotations = alterAnnotationsS ann . layoutPretty defaultLayoutOptions
       PosCaseAlt _ -> Just (Subterm "CaseAlt" Nothing)
       PosCastBody -> Just (Subterm "CastBody" Nothing)
       PosTickBody -> Just (Subterm "TickBody" Nothing)
-    _ -> Nothing
 
 data Ann
   = Syntax String

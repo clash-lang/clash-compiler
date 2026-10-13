@@ -31,7 +31,7 @@ import GHC.Types.Basic (InlineSpec (NoUserInlinePrag))
 
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Convert (mkGlobalId)
+import Clash.Core.Scoped.Syntax (mkGlobalId)
 import Clash.Core.Scoped.Evaluator (whnf)
 import Clash.Core.Scoped.Evaluator.Types (Machine (..), initMachine)
 import Clash.Core.Scoped.NameMap (emptyNameMap, insertNameMap, singletonGlobalEnv)

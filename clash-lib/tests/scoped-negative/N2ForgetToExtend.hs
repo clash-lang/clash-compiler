@@ -4,12 +4,11 @@
 module N2ForgetToExtend where
 
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 
-occ :: C.Name C.Term
+occ :: C.Name Term
 occ = C.mkUnsafeSystemName (error "occ") 0
 
 forgetToExtend :: Distinct n => Scope n -> Type n -> Term n -> Term n

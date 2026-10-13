@@ -21,6 +21,7 @@
   refer to the variable it binds by its identifier.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -117,7 +118,7 @@ import Clash.Unique (Unique)
 import Clash.Core.Scoped.Builder
   ( Key, TmB, TyB, appB, appTyB, caseB, dataAltB, dataB, forAllTyB, funTyB, lamB, letB
   , literalB, primB, runClosedTerm, runClosedType, tyAppB, tyLamB, varB, varTyB )
-import Clash.Core.Scoped.Convert (mkDataCon)
+import Clash.Core.DataCon (mkDataCon)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (bConPrim, bvConPrim, indexConPrim)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReduction, PrimReductions (..))
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv)

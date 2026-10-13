@@ -24,6 +24,7 @@
   Core.
 -}
 
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 
 module Clash.Rewrite.Scoped.Globals
@@ -45,17 +46,14 @@ import           GHC.Types.Basic             (InlineSpec)
 import           GHC.Types.SrcLoc            (SrcSpan)
 
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Term             as C
-import           Clash.Core.VarEnv (uniqAway')
 import           Clash.Driver.Types (Binding (..), IsPrim (IsFun))
 import           Clash.Rewrite.Types
   ( RewriteMonad, scopedBindings, scopedTypeEnv, scopedWorkFreeBinders,
     topEntities )
-import           Clash.Unique                (setUnique)
+import           Clash.Unique                (Unique, getUnique, setUnique)
 import           Clash.Util                  (MonadUnique (..))
 
 import           Clash.Core.Scoped.Alpha     (aeqTm)
-import           Clash.Core.Scoped.Convert (mkGlobalId)
 import           Clash.Core.Scoped.FreeVars  (termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
@@ -68,13 +66,25 @@ lookupBinding g = lookupGlobalEnv g <$> Lens.use scopedBindings
 
 -- | A new global variable with the given name and closed type. It gets a
 -- unique from the unique supply that no global binding has.
-freshGlobalId :: C.Name C.Term -> Type 'VoidS -> RewriteMonad extra GlobalId
+freshGlobalId :: C.Name Term -> Type 'VoidS -> RewriteMonad extra GlobalId
 freshGlobalId nm ty = do
   bndrs <- Lens.use scopedBindings
   u <- getUniqueM
   let global nm' = mkGlobalId nm' ty
       taken u' = memberGlobalEnv (global (setUnique nm u')) bndrs
-  pure (global (uniqAway' taken u (setUnique nm u)))
+  pure (global (uniqAway taken u (setUnique nm u)))
+
+-- | Change the unique of a name, @u@, to one for which the given test is
+-- false. It tries @u@, then @u + seed@, @u + 2 * seed@, and so on.
+uniqAway :: (Unique -> Bool) -> Unique -> C.Name a -> C.Name a
+uniqAway taken seed nm = go 0
+ where
+  u0 = getUnique nm
+  go k
+    | taken u = go (k + 1)
+    | otherwise = setUnique nm u
+   where
+    u = u0 + seed * k
 
 -- | Add a function to the global bindings. It is marked recursive when its
 -- body refers to the function itself.
@@ -94,7 +104,7 @@ addGlobalBind g sp inl body =
 -- term.
 mkFunction
   :: HasCallStack
-  => C.Name C.Term
+  => C.Name Term
   -- ^ Name of the function. Its unique is replaced by a fresh one.
   -> SrcSpan
   -> InlineSpec

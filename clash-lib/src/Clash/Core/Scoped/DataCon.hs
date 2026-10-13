@@ -32,7 +32,6 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon (dcSig))
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
@@ -84,7 +83,7 @@ withDataConPat
   -> DataCon
   -> [Type n]
   -- ^ Types for the universally quantified type variables
-  -> [C.Name C.Term]
+  -> [C.Name Term]
   -- ^ Human readable names for the fields. Their uniques are not used.
   -> (forall l. DExt n l => Scope l -> Pat n l -> [Term l] -> r)
   -> Maybe r

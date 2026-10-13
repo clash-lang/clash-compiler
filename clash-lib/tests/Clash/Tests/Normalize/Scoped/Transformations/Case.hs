@@ -27,8 +27,8 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.Term as C (WorkInfo (WorkAlways), IsMultiPrim (SingleResult))
-import Clash.Core.Scoped.Convert (mkPrimInfo)
+import qualified Clash.Core.Basic as C (WorkInfo (WorkAlways), IsMultiPrim (SingleResult))
+import Clash.Core.Scoped.Syntax (mkPrimInfo)
 import Clash.Core.Scoped.Syntax
   (Alt (..), Distinct, Pat (DefaultPat), PrimUnfolding (NoUnfolding), PrimInfo, Term (..), sink)
 import qualified Clash.Normalize.Scoped.Transformations.Case as S

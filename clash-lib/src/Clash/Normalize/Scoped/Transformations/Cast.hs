@@ -47,7 +47,6 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.Name (nameOcc)
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 import Clash.Core.Pretty (showPpr)
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Normalize.Types (NormalizeSession)
@@ -265,7 +264,7 @@ splitCastWorkWorker ctx node bind body = do
   sc = tfScope ctx
 
   -- The name of a new binder, derived from that of the binding it splits
-  derivedName :: C.Name C.Term -> C.Name C.Term
+  derivedName :: C.Name Term -> C.Name Term
   derivedName occ = mkDerivedName ctx (nameOcc occ)
 
   -- The variables of the original binders, among those in the new order
@@ -274,7 +273,7 @@ splitCastWorkWorker ctx node bind body = do
   oldVars (Nothing : ws) (v : vs) = v : oldVars ws vs
   oldVars _ _ = []
 
-  teleOccs :: Tele IdBinder x y -> [C.Name C.Term]
+  teleOccs :: Tele IdBinder x y -> [C.Name Term]
   teleOccs = \case
     TNil -> []
     TCons b rest -> idBinderOcc b : teleOccs rest

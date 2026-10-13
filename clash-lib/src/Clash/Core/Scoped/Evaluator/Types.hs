@@ -95,7 +95,6 @@ import Data.Text (Text)
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 import Clash.Driver.Types (Binding)
 
 import Clash.Core.Scoped.NameMap
@@ -165,7 +164,7 @@ collectValueTicks = go []
 
 -- | A variable bound in the local heap: its human readable name, type (lazy,
 -- like that of its binder) and name
-data HeapVar (n :: S) = HeapVar !(C.Name C.Term) (Type n) !(TmName n)
+data HeapVar (n :: S) = HeapVar !(C.Name Term) (Type n) !(TmName n)
   deriving (Show)
 type role HeapVar nominal
 

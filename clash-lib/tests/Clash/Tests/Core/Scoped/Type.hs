@@ -26,12 +26,12 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.TyCon as C
-import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (NumTy))
+import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 
 import Clash.Core.Scoped.Builder (TyB, annTyB, appTyB, constTyB, litTyB, runTyFamEqn)
-import Clash.Core.Scoped.Convert (mkFunTyCon)
+import Clash.Core.TyCon (mkFunTyCon)
 import Clash.Core.Scoped.FreeVars (freeTyVarsOfType)
 import Clash.Core.Scoped.NameMap (nullNameSet)
 import Clash.Core.Scoped.Subst (unsinkType)

@@ -139,9 +139,7 @@ import Clash.Annotations.SynthesisAttributes (Attr)
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (TyConName)
-import qualified Clash.Core.Type as C
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
@@ -205,7 +203,7 @@ withTyBinder
   :: Distinct n
   => BEnv s n
   -> Key
-  -> C.Name C.Type
+  -> C.Name Type
   -> Kind n
   -> (forall l. DExt n l => BEnv s l -> TyBinder n l -> ST s r)
   -> ST s r
@@ -223,7 +221,7 @@ withIdBinder
   :: Distinct n
   => BEnv s n
   -> Key
-  -> C.Name C.Term
+  -> C.Name Term
   -> Type n
   -> (forall l. DExt n l => BEnv s l -> IdBinder n l -> ST s r)
   -> ST s r
@@ -283,8 +281,8 @@ runIn sc tys tms f = runST $ do
 -- see 'typesInScope'. Errors on type variables that are not in scope.
 runDataConSig
   :: HasCallStack
-  => [(Key, C.Name C.Type, TyB)]
-  -> [(Key, C.Name C.Type, TyB)]
+  => [(Key, C.Name Type, TyB)]
+  -> [(Key, C.Name Type, TyB)]
   -> [TyB]
   -> DataConSig
 runDataConSig univ ext args = runClosed $ \env0 ->
@@ -295,7 +293,7 @@ runDataConSig univ ext args = runClosed $ \env0 ->
 -- | Build the signature of a newtype (see "Clash.Core.Scoped.Sig"): the keys,
 -- names and kinds of its type variables, and its eta-reduced representation
 -- type. Errors on type variables that are not in scope.
-runNewTyConSig :: HasCallStack => [(Key, C.Name C.Type, TyB)] -> TyB -> NewTyConSig
+runNewTyConSig :: HasCallStack => [(Key, C.Name Type, TyB)] -> TyB -> NewTyConSig
 runNewTyConSig tvs rhs = runClosed $ \env0 ->
   withTyBinders env0 tvs $ \env1 tvs' -> NewTyConSig tvs' <$> runTyB rhs env1
 
@@ -304,7 +302,7 @@ runNewTyConSig tvs rhs = runClosed $ \env0 ->
 -- left-hand side, and its right-hand side. The binders of each of these types
 -- are numbered from the names of the pattern variables, see
 -- 'typesInScope'. Errors on type variables that are not in scope.
-runTyFamEqn :: HasCallStack => [(Key, C.Name C.Type, TyB)] -> [TyB] -> TyB -> TyFamEqn
+runTyFamEqn :: HasCallStack => [(Key, C.Name Type, TyB)] -> [TyB] -> TyB -> TyFamEqn
 runTyFamEqn tvs lhs rhs = runClosed $ \env0 ->
   withTyBinders env0 tvs $ \env1 tvs' -> do
     build <- typesInScope env1
@@ -315,7 +313,7 @@ runTyFamEqn tvs lhs rhs = runClosed $ \env0 ->
 withTyBinders
   :: Distinct x
   => BEnv s x
-  -> [(Key, C.Name C.Type, TyB)]
+  -> [(Key, C.Name Type, TyB)]
   -> (forall l. DExt x l => BEnv s l -> Tele TyBinder x l -> ST s r)
   -> ST s r
 withTyBinders env [] k = k env TNil
@@ -350,7 +348,7 @@ constTyB :: ConstTy -> TyB
 constTyB !c = TyClosed (ConstTy c)
 
 -- | A forall-type: key, name and kind of the type variable, and the body
-forAllTyB :: Key -> C.Name C.Type -> TyB -> TyB -> TyB
+forAllTyB :: Key -> C.Name Type -> TyB -> TyB -> TyB
 forAllTyB !key !occ !k !t = TyOpen $ Run $ \env -> do
   k' <- runTyB k env
   withTyBinder env key occ k' $ \env' b -> ForAllTy b <$> runTyB t env'
@@ -422,20 +420,20 @@ tyAppB :: TmB -> TyB -> TmB
 tyAppB !f !t = TmB (tmbHead f) $ Run $ \env -> TyApp <$> runTmB f env <*> runTyB t env
 
 -- | A lambda: key, name and type of the variable, and the body
-lamB :: Key -> C.Name C.Term -> TyB -> TmB -> TmB
+lamB :: Key -> C.Name Term -> TyB -> TmB -> TmB
 lamB !key !occ !ty !e = term $ Run $ \env -> do
   ty' <- runTyB ty env
   withIdBinder env key occ ty' $ \env' b -> Lam b <$> runTmB e env'
 
 -- | A type lambda: key, name and kind of the variable, and the body
-tyLamB :: Key -> C.Name C.Type -> TyB -> TmB -> TmB
+tyLamB :: Key -> C.Name Type -> TyB -> TmB -> TmB
 tyLamB !key !occ !k !e = term $ Run $ \env -> do
   k' <- runTyB k env
   withTyBinder env key occ k' $ \env' b -> TyLam b <$> runTmB e env'
 
 -- | A non-recursive let-binding: key, name and type of the variable, its
 -- right-hand side, and the body
-letB :: Key -> C.Name C.Term -> TyB -> TmB -> TmB -> TmB
+letB :: Key -> C.Name Term -> TyB -> TmB -> TmB -> TmB
 letB !key !occ !ty !x !e = term $ Run $ \env -> do
   x' <- runTmB x env
   ty' <- runTyB ty env
@@ -443,7 +441,7 @@ letB !key !occ !ty !x !e = term $ Run $ \env -> do
 
 -- | A recursive let-binding: keys, names, types and right-hand sides of the
 -- variables, and the body
-letrecB :: [(Key, C.Name C.Term, TyB, TmB)] -> TmB -> TmB
+letrecB :: [(Key, C.Name Term, TyB, TmB)] -> TmB -> TmB
 letrecB !bs0 !e = forceList bs0 `seq` term (Run go0)
  where
   go0 :: Distinct n => BEnv s n -> ST s (Term n)
@@ -454,7 +452,7 @@ letrecB !bs0 !e = forceList bs0 `seq` term (Run go0)
   binders
     :: Distinct x
     => BEnv s x
-    -> [(Key, C.Name C.Term, TyB, TmB)]
+    -> [(Key, C.Name Term, TyB, TmB)]
     -> (forall l. DExt x l => BEnv s l -> Tele IdBinder x l -> ST s r)
     -> ST s r
   binders env [] k = k env TNil
@@ -495,8 +493,8 @@ litAltB !l !e = AltB $ Run $ \env -> Alt (LitPat l) <$> runTmB e env
 -- types of the fields, and the right-hand side
 dataAltB
   :: DataCon
-  -> [(Key, C.Name C.Type, TyB)]
-  -> [(Key, C.Name C.Term, TyB)]
+  -> [(Key, C.Name Type, TyB)]
+  -> [(Key, C.Name Term, TyB)]
   -> TmB
   -> AltB
 dataAltB !dc !tvs0 !ids0 !e =
@@ -511,7 +509,7 @@ dataAltB !dc !tvs0 !ids0 !e =
   idBinders
     :: Distinct x
     => BEnv s x
-    -> [(Key, C.Name C.Term, TyB)]
+    -> [(Key, C.Name Term, TyB)]
     -> (forall l. DExt x l => BEnv s l -> Tele IdBinder x l -> ST s r)
     -> ST s r
   idBinders env [] k = k env TNil

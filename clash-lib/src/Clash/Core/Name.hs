@@ -11,6 +11,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PolyKinds #-}
 
 module Clash.Core.Name
   ( module Clash.Core.Name
@@ -39,6 +40,12 @@ data Name a
   , nameLoc  :: !SrcSpan
   }
   deriving (Show,Generic,NFData,Binary)
+
+-- | The same name, for something of another sort, e.g. the name of a term
+-- variable as that of a type variable. Like 'Data.Coerce.coerce', but the
+-- phantom types may be of different kinds.
+castName :: Name a -> Name b
+castName (Name s o u l) = Name s o u l
 
 -- | N.B.: Equality checking only compares uniques, which only identify a name
 -- within one scope. If you want structural equality, use `eqName`.

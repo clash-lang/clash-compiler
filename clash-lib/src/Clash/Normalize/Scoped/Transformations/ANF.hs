@@ -104,7 +104,6 @@ import Clash.Signal.Internal (Signal (..))
 import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
 import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.FreeVars
@@ -232,14 +231,14 @@ makeANF ctx e0 = do
 
 -- | The closest let-binder on the path to a subterm, from which the names of
 -- new binders are derived, see 'Clash.Rewrite.Scoped.mkDerivedName'
-newtype Env = Env (Maybe (C.Name C.Term))
+newtype Env = Env (Maybe (C.Name Term))
 
 -- | The 'Env' of the right-hand side of a let-binding with the given binder
-inLetBinding :: C.Name C.Term -> Env
+inLetBinding :: C.Name Term -> Env
 inLetBinding = Env . Just
 
 -- | A name for a new binder, see 'Clash.Rewrite.Scoped.mkDerivedName'
-derivedName :: Env -> C.OccName -> C.Name C.Term
+derivedName :: Env -> C.OccName -> C.Name Term
 derivedName (Env nm) sf = case nm of
   Just nm' -> C.appendToName nm' ('_' `Text.cons` sf)
   Nothing -> C.mkUnsafeInternalName sf 0
@@ -320,7 +319,7 @@ binderRaw :: IdBinder n l -> Int
 binderRaw = tmNameRaw . tmNameOf
 
 -- | The raw names and human readable names of the binders of a telescope
-teleInfo :: Tele IdBinder n l -> [(Int, C.Name C.Term)]
+teleInfo :: Tele IdBinder n l -> [(Int, C.Name Term)]
 teleInfo TNil = []
 teleInfo (TCons b bs) = (binderRaw b, idBinderOcc b) : teleInfo bs
 

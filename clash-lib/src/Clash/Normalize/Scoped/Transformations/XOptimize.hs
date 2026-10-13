@@ -54,7 +54,6 @@ import Clash.Core.Scoped.Subst
   ( extendSubstScope, idSubst, substIdBinder, substScope, substTele, substTm
   , teleIdBinderTypes, withFreshIdBinder, withFreshIdBinders )
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Core.Scoped.Util (internalName, primAtType)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
