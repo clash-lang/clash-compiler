@@ -45,3 +45,20 @@ myBBF env _isD _primName args _resTys =
   case rights args of
     (coreView (bbTypeEnv env) (bbScope env) -> LitTy (NumTy n)) : _ -> ...
 ```
+
+Scoped Clash Core takes the place of Clash Core, under the same module names where it can. Code that uses the Core modules of Clash 1.10 finds their parts here:
+
+| Clash 1.10 | Now |
+|---|---|
+| `Clash.Core.Term`: `Term`, `Bind`, `Pat`, `Alt`, `TickInfo`, `PrimInfo` | `Clash.Core.Syntax`. The functions on terms stay in `Clash.Core.Term` |
+| `Clash.Core.Term`: `NameMod`, `IsMultiPrim`, `WorkInfo` | `Clash.Core.Basic` |
+| `Clash.Core.Term`: `MultiPrimInfo` | `Clash.Core.TermInfo` |
+| `Clash.Core.Type`: `Type`, `Kind`, `TyName` | `Clash.Core.Syntax`. The functions on types stay in `Clash.Core.Type` |
+| `Clash.Core.Type`: `ConstTy`, `LitTy` | `Clash.Core.Basic` |
+| `Clash.Core.Var`: `Id`, `TyVar`, `Var` | `Clash.Core.Syntax`: binders are `IdBinder` and `TyBinder`, occurrences `TmName` and `TyName`, and global variables `GlobalId` |
+| `Clash.Core.VarEnv` | `Clash.Core.NameMap` |
+| `Clash.Core.HasFreeVars` | `Clash.Core.FreeVars` |
+| `Clash.GHC.Evaluator`, `Clash.GHC.Evaluator.Primitives` | `Clash.Core.Evaluator`, `Clash.Core.Evaluator.Primitives` |
+| `Clash.Core.TyCon`, `Clash.Core.DataCon` | the same modules, which also instantiate newtypes and data constructors (`newTyConInstRhs`, `dataConInstArgTys`) |
+| `Clash.Core.Subst`, `Clash.Core.Util`, `Clash.Core.HasType`, `Clash.Core.TermInfo`, `Clash.Core.TermLiteral`, `Clash.Core.EqSolver`, `Clash.Core.TysPrim`, `Clash.Core.Pretty` | the same modules, on scoped Clash Core |
+| `Clash.Netlist.Types`, `Clash.Netlist.Util`, `Clash.Netlist`, `Clash.Netlist.BlackBox`, `Clash.Rewrite.Types`, `Clash.Rewrite.Util`, `Clash.Normalize.*` | the same modules, on scoped Clash Core |
