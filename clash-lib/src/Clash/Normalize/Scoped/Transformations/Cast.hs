@@ -153,7 +153,7 @@ elimCastCastWorker ctx node body tyB' tyC = case stripTicks body of
       then changed e
       else do
         (nm, sp) <- Lens.use curFun
-        throw (ClashException sp ($(curLoc) ++ showPpr (globalIdLegacy nm)
+        throw (ClashException sp ($(curLoc) ++ showPpr nm
                 ++ ": Found 2 nested casts whose types don't line up:\n"
                 ++ showPpr node)
               Nothing)

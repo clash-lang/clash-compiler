@@ -514,6 +514,7 @@ test-suite unittests
       lens,
       mtl,
       pretty-show,
+      prettyprinter,
       primitive,
       quickcheck-text,
       tasty         >= 1.2      && < 1.6,
@@ -545,6 +546,7 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.FreeVars
                  Clash.Tests.Core.Scoped.HasType
                  Clash.Tests.Core.Scoped.NameMap
+                 Clash.Tests.Core.Scoped.Pretty
                  Clash.Tests.Core.Scoped.Scope
                  Clash.Tests.Core.Scoped.Subst
                  Clash.Tests.Core.Scoped.Term
