@@ -295,7 +295,6 @@ Library
                       Clash.Netlist.Id.VHDL
                       Clash.Netlist.Scoped
                       Clash.Netlist.Scoped.BlackBox
-                      Clash.Netlist.Scoped.Util
                       Clash.Netlist.Types
                       Clash.Netlist.Util
 

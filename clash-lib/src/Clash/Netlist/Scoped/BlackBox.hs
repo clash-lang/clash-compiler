@@ -97,7 +97,8 @@ import qualified Clash.Netlist.Types           as N (Expr (Literal))
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, declareUse, flattenFiltered, isVoid, mkInit,
    mkLiteral, originalIndices, preserveVarEnv, procAssign,
-   stripFiltered, stripVoid)
+   stripFiltered, stripVoid, coreTypeToHWTypeM, globalIdentifier, idToOutPort, localIdText, primWarnContext, renameBinder, uniqueIdentifier,
+   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 import           Clash.Normalize.Scoped.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
 import           Clash.Primitives.Util  (getFunctionPlurality)
@@ -128,9 +129,6 @@ import           Clash.Core.Scoped.Util
 import {-# SOURCE #-} Clash.Netlist.Scoped
   (genComponent, mkDcApplication, mkDeclarations, mkDeclarations', mkExpr,
    mkFunApp, mkNetDecl, mkProjection, mkSelection)
-import           Clash.Netlist.Scoped.Util
-  (coreTypeToHWTypeM, globalIdentifier, idToOutPort, localIdText, primWarnContext, renameBinder, uniqueIdentifier,
-   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | The result of a blackbox: its HDL identifier and its type. See the module
 -- header.
@@ -1455,7 +1453,7 @@ inverseTopSortBinds bs =
 -- side. 'Nothing' if the term is not a let-expression, or if its result is not
 -- a variable.
 --
--- Like 'Clash.Netlist.Scoped.Util.splitNormalized' on a term without
+-- Like 'Clash.Netlist.Util.splitNormalized' on a term without
 -- lambdas. The variables of the bindings don't have HDL
 -- identifiers in the extended context yet, see 'mkUniqueLets'.
 splitLets
@@ -1491,7 +1489,7 @@ sinkBinds = map (\(i, x) -> (sink i, sink x))
 -- let-bindings must be in the scope of the context, without HDL identifiers,
 -- see 'splitLets'.
 --
--- Like 'Clash.Netlist.Scoped.Util.mkUniqueNormalized', on a let-expression
+-- Like 'Clash.Netlist.Util.mkUniqueNormalized', on a let-expression
 -- rather than a component. Like it, it adds a let-binding when the result has
 -- to be redirected, so the continuation gets the let-bindings and the result
 -- in a further extended scope.

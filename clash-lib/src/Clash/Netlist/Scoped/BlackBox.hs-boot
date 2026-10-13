@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  For "Clash.Netlist.Scoped.Util", which "Clash.Netlist.Scoped.BlackBox"
+  For "Clash.Netlist.Util", which "Clash.Netlist.Scoped.BlackBox"
   imports.
 -}
 
