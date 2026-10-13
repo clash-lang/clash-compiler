@@ -54,6 +54,14 @@
   refer to their own binders, so any keys work for them.
 
   Building errors on a variable whose key is not in scope.
+
+  = Open terms
+
+  'runTermIn' and 'runTypeIn' build a term or type in a scope with free
+  variables, which the builders refer to by the keys that the caller gives
+  them. The binders get names from just above the watermark of the scope, as
+  'Clash.Core.Scoped.Convert.fromClashTerm' gives them. The tests build their
+  inputs this way.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -107,6 +115,8 @@ module Clash.Core.Scoped.Builder
     -- * Building
   , runClosedTerm
   , runClosedType
+  , runTermIn
+  , runTypeIn
   , runDataConSig
   , runNewTyConSig
   , runTyFamEqn
@@ -132,6 +142,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Unique (Unique)
 
+import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Sig (DataConSig (..), NewTyConSig (..), TyFamEqn (..))
 import Clash.Core.Scoped.Subst (withFreshIdBinder, withFreshTyBinder)
 import Clash.Core.Scoped.Syntax
@@ -220,12 +231,39 @@ runClosedType :: HasCallStack => TyB -> Type 'VoidS
 runClosedType (TyClosed t) = t
 runClosedType (TyOpen r) = runClosed (run r)
 
+-- | Build a term in a scope, given the variables of the scope that it may
+-- refer to, by key: the type variables and the term variables. Its binders
+-- get names from just above the watermark of the scope, in the order of
+-- 'runClosedTerm'. Errors on other variables.
+--
+-- E.g. the tests build their inputs in a scope with free variables this way.
+runTermIn
+  :: (HasCallStack, Distinct n)
+  => Scope n -> IntMap (Type n) -> IntMap (Term n) -> TmB -> Term n
+runTermIn sc tys tms tm = runIn sc tys tms (run (tmbRun tm))
+
+-- | Build a type in a scope, given the type variables of the scope that it may
+-- refer to, by key, see 'runTermIn'. Errors on other type variables.
+runTypeIn :: (HasCallStack, Distinct n) => Scope n -> IntMap (Type n) -> TyB -> Type n
+runTypeIn _ _ (TyClosed t) = sinkClosed t
+runTypeIn sc tys (TyOpen r) = runIn sc tys IntMap.empty (run r)
+
 -- | Run phase 2 in the empty scope
 runClosed :: (forall s. BEnv s 'VoidS -> ST s r) -> r
 runClosed f = runST $ do
   a <- newByteArray 8
   writeByteArray a 0 (1 :: Int)
   f (BEnv emptyScope IntMap.empty IntMap.empty (Supply a))
+
+-- | Run phase 2 in a scope with the given variables, by key, handing out names
+-- from just above the watermark of the scope, like 'runClosed' does in the
+-- empty scope
+runIn
+  :: Scope n -> IntMap (Type n) -> IntMap (Term n) -> (forall s. BEnv s n -> ST s r) -> r
+runIn sc tys tms f = runST $ do
+  a <- newByteArray 8
+  writeByteArray a 0 (scopeWatermark sc + 1)
+  f (BEnv sc tys tms (Supply a))
 
 -- | Build the signature of a data constructor (see "Clash.Core.Scoped.Sig"):
 -- the keys, names and kinds of its universally quantified type variables, of
