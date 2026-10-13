@@ -81,6 +81,8 @@ module Clash.Core.Scoped.Builder
   , appTyB
   , litTyB
   , annTyB
+  , funTyB
+  , tyConAppB
   , clashTyB
     -- * Terms
   , TmB
@@ -126,6 +128,7 @@ import Control.DeepSeq (NFData (..))
 import Control.Monad.ST (ST, runST)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.List as List
 import Data.Primitive.ByteArray
   (MutableByteArray, newByteArray, readByteArray, writeByteArray)
 import Data.Text (Text)
@@ -138,6 +141,7 @@ import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
+import Clash.Core.TyCon (TyConName)
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Unique (Unique)
@@ -352,6 +356,14 @@ annTyB :: [Attr Text] -> TyB -> TyB
 annTyB attrs t0 = rnf attrs `seq` case t0 of
   TyClosed t -> TyClosed (AnnType attrs t)
   TyOpen _ -> TyOpen $ Run $ \env -> AnnType attrs <$> runTyB t0 env
+
+-- | A function type: the types of the arguments, and of the result
+funTyB :: [TyB] -> TyB -> TyB
+funTyB args res = foldr (\a r -> appTyB (appTyB (constTyB C.Arrow) a) r) res args
+
+-- | A type constructor applied to types
+tyConAppB :: TyConName -> [TyB] -> TyB
+tyConAppB tc = List.foldl' appTyB (constTyB (C.TyCon tc))
 
 -- | A type of Clash Core, whose type variables are bound by the builders
 -- around it, by their uniques. Unless it is closed and without binders, it
