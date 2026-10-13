@@ -254,9 +254,9 @@ import Clash.Driver.Types (Binding (..))
 import Test.Clash.Rewrite
   ( DeclVar (..), ScopeDecl (..), TestTerm (..), TestType (..),
     assertErrorContains, atRaw, builtTerm, builtType, freeVarType, kindedTyVarD,
-    justDataCon, mkGlobalBinding, nothingDataCon, parseTestTerm, parseToTerm,
-    parseTestType, runRewriteTest, showPprU, termQQ, testGlobalId, testTyConMap,
-    tyVarD, typeQQ, varD, vecTcNm, consDc, withCurFun )
+    justDataCon, mkGlobalBinding, nothingDataCon, parseTestTerm, parseTestType,
+    runRewriteTest, showPprU, termQQ, testGlobalId, testTyConMap, tyVarD, typeQQ,
+    varD, vecTcNm, consDc, withCurFun )
 import Test.Clash.Rewrite (ghcName)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
 import Test.Clash.Scoped.Evaluator (whnfIn)
@@ -322,9 +322,7 @@ declare ts@(TestScope sc tys tms) (ScopeDecl raw v) k = case v of
           ("atRaw: the raw name " <> show r <> " is not above the names in scope, up to "
             <> show (scopeWatermark sc))
 
-  freeVarTy = ConstTy (case freeVarType of
-    C.ConstTy c -> c
-    _ -> error "declare: freeVarType is not a type constructor")
+  freeVarTy = ConstTy (C.TyCon freeVarType)
 
 -- | Build a term in a scope. Its free variables must be variables of the
 -- scope; its binders get names from just above the watermark of the scope.
@@ -1353,21 +1351,17 @@ atPath (st : sts) ctx e k = case (st, e) of
 testScopeTests :: TestTree
 testScopeTests = testGroup "Test.Clash.Scoped"
   [ testGroup "parseTestTerm"
-      [ -- The binders of a closed term get the names that conversion from
-        -- Clash Core gives them
-        testCase "numbers binders like conversion" $
+      [ -- The binders of a closed term get names in depth-first order, as
+        -- GHC2Core and the decoder of "Clash.Core.Scoped.Binary" give them
+        testCase "numbers binders depth-first" $
           sequence_
-            [ do
-                let expected = fromClashTermClosed (parseToTerm s)
-                    actual = closedTerm (parseTestTerm s)
-                assertTermAlphaEq expected actual
-                binderRaws actual @?= binderRaws expected
-            | s <-
-                [ "\\(x :: Int) (y :: Int) -> x"
-                , "\\(a :: Type) (x :: a) -> x"
-                , "\\(f :: forall a b. Pair) -> f @Int"
-                , "let { x_0, x_1 :: Int; x_0 = 5; x_1 = x_0 } in x_1"
-                , "(\\(x :: Int) -> x) ((\\(y :: Int) -> y) 1)"
+            [ binderRaws (closedTerm (parseTestTerm s)) @?= raws
+            | (s, raws) <-
+                [ ("\\(x :: Int) (y :: Int) -> x", [1, 2])
+                , ("\\(a :: Type) (x :: a) -> x", [1, 2])
+                , ("\\(f :: forall a b. Pair) -> f @Int", [1, 2, 3])
+                , ("let { x_0, x_1 :: Int; x_0 = 5; x_1 = x_0 } in x_1", [1, 2])
+                , ("(\\(x :: Int) -> x) ((\\(y :: Int) -> y) 1)", [1, 2])
                 ]
             ]
 
@@ -1467,11 +1461,11 @@ testScopeTests = testGroup "Test.Clash.Scoped"
 
       , testCase "a raw name below the watermark is an error" $
           assertErrorContains "is not above the names in scope"
-            (withTestScope [varD "x_1" "Int", atRaw 1 (varD "y_2" "Int")] $ \ts -> toClashTerm (termIn ts "y_2"))
+            (withTestScope [varD "x_1" "Int", atRaw 1 (varD "y_2" "Int")] $ \ts -> closeFreeVars (termIn ts "y_2"))
 
       , testCase "a variable that is not in scope is an error" $
           assertErrorContains "variable not in scope"
-            (withTestScope [varD "x_1" "Int"] $ \ts -> toClashTerm (termIn ts "y_2"))
+            (withTestScope [varD "x_1" "Int"] $ \ts -> closeFreeVars (termIn ts "y_2"))
       ]
 
   , testGroup "running transformations"
