@@ -220,7 +220,6 @@ library
                       Clash.GHCi.Common
 
   Other-Modules:      Clash.GHCi.Leak
-                      Clash.GHC.Scoped.Check
                       Clash.GHCi.UI
                       Clash.GHCi.UI.Info
                       Clash.GHCi.UI.Monad
