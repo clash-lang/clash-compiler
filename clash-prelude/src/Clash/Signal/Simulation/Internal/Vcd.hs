@@ -215,10 +215,9 @@ vcd Simulation
                           | otherwise = (t,u)
 
   timeOffset =
-    if shiftToZero then
-      timeInFS (-start) `div` vcdTimeScaleFS
-    else
-      0 :: VcdTime
+    if shiftToZero
+    then timeInFS (-start) `div` vcdTimeScaleFS
+    else 0 :: VcdTime
 
   vClockStart = timeInFS clockStart `div` vcdTimeScaleFS :: VcdTime
   vStart = timeInFS start `div` vcdTimeScaleFS + timeOffset :: VcdTime
