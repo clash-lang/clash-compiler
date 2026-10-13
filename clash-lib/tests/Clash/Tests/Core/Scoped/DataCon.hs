@@ -147,8 +147,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.DataCon"
                 [(C.DataPat pairDataCon [] [intId C.User "a" 2, intId C.User "b" 3], C.Var (intId C.User "a" 2))])
               tm
             Nothing -> assertFailure "withDataConPat failed"
-  , testCase "dataConType" $
-      assertScopedTyAlphaEq (C.dcLegacyType mkF) (dataConType testTypeEnv emptyScope mkF)
+  , testCase "dcType" $
+      assertScopedTyAlphaEq (C.dcLegacyType mkF) (C.dcType mkF)
 
   , withTests 1000 $ testGroup "properties"
       [ testProperty "dataConInstArgTys agrees with Clash" $

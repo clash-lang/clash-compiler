@@ -69,10 +69,9 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
         show (tyFamEqnsOf testTypeEnv nm) @?= show (tyFamEqns tc)
         assertBool "lookupTyCon" (isJust (lookupTyCon testTypeEnv nm))
 
-  , testCase "the signatures of data constructors are those of conversion" $
-      forM_ (otherDataCon : dataCons) $ \dc -> do
-        show (dataConSigOf testTypeEnv dc) @?= show (C.dcSig dc)
-        assertScopedTyAlphaEq (C.dcLegacyType dc) (dataConType testTypeEnv emptyScope dc)
+  , testCase "the types of data constructors are those of conversion" $
+      forM_ (otherDataCon : dataCons) $ \dc ->
+        assertScopedTyAlphaEq (C.dcLegacyType dc) (C.dcType dc)
 
   , testCase "signatures are converted once" $ do
       assertBool "newTyConSigOf"
@@ -83,10 +82,6 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
           (sameObject (tyConKindOf testTypeEnv nm :: Kind 'VoidS) (tyConKindOf testTypeEnv nm))
         assertBool "tyFamEqnsOf"
           (sameContents (tyFamEqnsOf testTypeEnv nm) (tyFamEqnsOf testTypeEnv nm))
-      forM_ dataCons $ \dc -> do
-        assertBool "dataConSigOf" (sameObject (dataConSigOf testTypeEnv dc) (dataConSigOf testTypeEnv dc))
-        assertBool "dataConType"
-          (sameObject (dataConType testTypeEnv emptyScope dc) (dataConType testTypeEnv emptyScope dc))
   , testCase "findTyCon errors on unknown type constructors" $
       assertErrorContains "is not in the UniqMap"
         (C.tyConName (findTyCon (mkTypeEnv UniqMap.empty) nTyConName))
@@ -102,7 +97,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"
             conjoin $
               [ agrees (C.tyConLegacyKind tc) (tyConKindOf tenv (C.tyConName tc) `asScopeOf` sc)
               | tc <- UniqMap.elems Gen.tyConMap ] <>
-              [ agrees (C.dcLegacyType dc) (dataConType tenv sc dc) | dc <- Gen.dataCons ]
+              [ agrees (C.dcLegacyType dc) (sinkClosed (C.dcType dc) `asScopeOf` sc) | dc <- Gen.dataCons ]
       ]
   ]
  where

@@ -106,7 +106,7 @@ import qualified Language.Haskell.TH as TH
 import GHC.Core.Make (chunkify, mkChunkified)
 import GHC.Settings.Constants (mAX_TUPLE_SIZE)
 
-import Clash.Core.DataCon (DataCon)
+import Clash.Core.DataCon (DataCon, dcSig)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
@@ -137,7 +137,7 @@ import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.Type
   (TypeView (..), coreView, mkTyConApp, splitFunTy, tyView, SplitFunForall (..), anyPiArg, isPolyFunTy, splitFunForallTy)
-import Clash.Core.Scoped.TypeEnv (TypeEnv, dataConSigOf, typeEnvTyConMap)
+import Clash.Core.Scoped.TypeEnv (TypeEnv, typeEnvTyConMap)
 import Clash.Core.Scoped.Util (internalName, mkSelectorCase)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Letrec
 import Clash.Rewrite.Scoped
@@ -893,7 +893,7 @@ addDefault te sc scrut ty alts
   -- tell whether missing constructors can match. We therefore leave those
   -- alone.
   isVanillaDc :: [Type n] -> DataCon -> Bool
-  isVanillaDc tyArgs dc = case dataConSigOf te dc of
+  isVanillaDc tyArgs dc = case dcSig dc of
     DataConSig _ TNil _ ->
       maybe False (all (Maybe.isNothing . typeEq te sc)) (dataConInstArgTys te sc dc tyArgs)
     _ -> False

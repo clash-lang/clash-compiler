@@ -8,10 +8,8 @@
 
   Local variables carry their type ('Var', and 'idBinderType'), and so do
   case-expressions and casts, and global variables ('globalIdType'). Data
-  constructors and primitives have closed Clash types. 'dataConType' looks
-  them up in a t'TypeEnv', which converts them at most once, see
-  "Clash.Core.Scoped.TypeEnv". Primitives have closed types ('primType'), which
-  'primInfoType' moves into any scope.
+  constructors and primitives have closed types ('Clash.Core.DataCon.dcType',
+  'primType'), which 'sinkClosed' and 'primInfoType' move into any scope.
 
   = Inferring types under binders
 
@@ -48,6 +46,7 @@ module Clash.Core.Scoped.HasType
 import Data.Maybe (fromMaybe)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.DataCon (DataCon (dcType))
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C (IsMultiPrim (..))
@@ -64,7 +63,7 @@ import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Core.Scoped.Type
-import Clash.Core.Scoped.TypeEnv (TypeEnv, dataConType, tyConKindOf)
+import Clash.Core.Scoped.TypeEnv (TypeEnv, tyConKindOf)
 import Clash.Core.Scoped.TysPrim
 
 -- * Types of terms
@@ -160,7 +159,7 @@ inferTypeSubst tenv = go
   go s = \case
     Var _ ty _ -> substTy s ty
     GlobalVar g -> sinkClosed (globalIdType g)
-    Data dc -> dataConType tenv (substScope s) dc
+    Data dc -> sinkClosed (dcType dc)
     Literal l -> literalType l
     Prim p -> primInfoType p
     Lam b e -> substIdBinder s b $ \s' b' ->
