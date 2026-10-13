@@ -120,7 +120,6 @@ import           Clash.Core.Scoped.Term
 
 import           Clash.Netlist.Scoped.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive, prepareBlackBox)
-import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
   (UniqueNormalized (..), coreTypeToHWTypeM', globalIdentifier, localIdText, mkUniqueNormalized, primWarnContext,
    splitNormalized,

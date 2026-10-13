@@ -17,8 +17,8 @@ import           Clash.Core.Literal           (Literal(..))
 import           Clash.Core.Scoped.Syntax     (Term(Literal), Type)
 import           Clash.Primitives.GHC.Literal
   (literalTF, unsigned, unsignedLiteral, assign)
-import           Clash.Netlist.Types          (BlackBox(BBTemplate))
-import           Clash.Netlist.Scoped.Types   (BlackBoxFunction)
+import           Clash.Netlist.Types
+  (BlackBox(BBTemplate), BlackBoxFunction)
 import           Clash.Netlist.BlackBox.Types
   (Element(Arg, Result), emptyBlackBoxMeta
   ,BlackBoxMeta, bbKind, TemplateKind(TDecl))

@@ -16,7 +16,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Scoped.Syntax (Term (..), tmNameRaw)
-import Clash.Netlist.Scoped.Types (LocalId (..))
+import Clash.Netlist.Types (LocalId (..))
 import Clash.Netlist.Scoped.Util (SplitNormalized (..), splitNormalized)
 
 import Test.Clash.Rewrite (TestDefs (..), TestTerm, parseTestTermWith)

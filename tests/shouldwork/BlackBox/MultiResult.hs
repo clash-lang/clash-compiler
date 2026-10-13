@@ -13,7 +13,7 @@ import qualified Clash.Netlist.Types as N
 import qualified Clash.Netlist.BlackBox.Types as N
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxMeta (..), TemplateKind (TDecl), emptyBlackBoxMeta)
-import           Clash.Netlist.Scoped.Types (BlackBoxFunction)
+import           Clash.Netlist.Types (BlackBoxFunction)
 import Clash.Primitives.DSL
 
 import Data.List (isInfixOf)

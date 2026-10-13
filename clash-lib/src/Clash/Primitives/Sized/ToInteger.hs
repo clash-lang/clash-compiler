@@ -37,9 +37,8 @@ import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.BlackBox.Parser (runParse)
 import Clash.Netlist.BlackBox.Types
   (BlackBoxMeta (bbKind), TemplateKind (TExpr), emptyBlackBoxMeta)
-import Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Netlist.Types
-  (BlackBox (BBTemplate), HWType (..), curCompNm, intWidth)
+  (BlackBoxFunction, BlackBox (BBTemplate), HWType (..), curCompNm, intWidth)
 import Clash.Util (clogBase)
 import Clash.Warning (ClashWarning(WarnIntegerNarrowing))
 

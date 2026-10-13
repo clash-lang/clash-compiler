@@ -40,10 +40,8 @@ import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxMeta(..), TemplateKind(TExpr, TDecl),
    Element(Component, Typ, TypElem, Text), Decl(Decl), emptyBlackBoxMeta)
-import           Clash.Netlist.Scoped.Types
-  (BlackBoxFunction, bbScope, bbTypeEnv)
 import           Clash.Netlist.Types
-  (Identifier, TemplateFunction, BlackBoxContext, HWType(Vector), Usage(Cont),
+  (BlackBoxFunction, bbScope, bbTypeEnv, Identifier, TemplateFunction, BlackBoxContext, HWType(Vector), Usage(Cont),
    Declaration(..), Expr(Literal,Identifier,DataCon,BlackBoxE), Literal(NumLit),
    BlackBox(BBTemplate, BBFunction), TemplateFunction(..),
    Modifier(Indexed, Nested, DC), HWType(..), BlackBoxContext(..),

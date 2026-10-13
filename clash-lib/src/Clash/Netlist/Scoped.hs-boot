@@ -5,7 +5,7 @@
 
   The signatures of the handlers of Netlist generation on scoped Clash Core,
   for the modules that "Clash.Netlist.Scoped" imports, e.g. those of
-  blackboxes. Each handler gets the t'Clash.Netlist.Scoped.Types.CompCtx' of
+  blackboxes. Each handler gets the t'Clash.Netlist.Types.CompCtx' of
   the terms it is given.
 -}
 
@@ -28,7 +28,7 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Scoped.Syntax (Alt, Distinct, GlobalId, Term, Type)
-import Clash.Netlist.Scoped.Types (CompCtx, LocalId, NetlistId)
+import Clash.Netlist.Types (CompCtx, LocalId, NetlistId)
 import Clash.Netlist.Types
   (Component, ComponentMeta, Declaration, DeclarationType, Expr, HWType, Identifier,
    NetlistMonad)

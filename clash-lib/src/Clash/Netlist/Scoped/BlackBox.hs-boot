@@ -16,7 +16,7 @@ import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.Scoped.Syntax (Distinct, Term, Type)
-import Clash.Netlist.Scoped.Types (CompCtx, LocalId)
+import Clash.Netlist.Types (CompCtx, LocalId)
 import Clash.Netlist.Types (BlackBoxContext, Declaration, DeclarationType, NetlistMonad)
 import Clash.Primitives.Types (CompiledPrimitive)
 

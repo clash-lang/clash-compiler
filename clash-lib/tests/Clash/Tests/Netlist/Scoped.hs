@@ -19,14 +19,13 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
-  ( Declaration (Assignment, InstDecl), DeclarationType (Concurrent), EntityOrComponent (Entity)
+  (Declaration (Assignment, InstDecl), DeclarationType (Concurrent), EntityOrComponent (Entity)
   , Expr (Identifier), Identifier, NetlistMonad, PortDirection (..), PortMap (NamedPortMap)
-  , componentNames )
+  , componentNames, CompCtx, LocalId (..), localIdVar)
 
 import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
 import Clash.Core.Scoped.Syntax
 import Clash.Netlist.Scoped (mkFunApp)
-import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), localIdVar)
 
 import Test.Clash.Rewrite (runNetlistTest)
 import Test.Clash.Scoped

@@ -6,9 +6,8 @@ module WarnAlways where
 
 import Clash.Prelude hiding (Text)
 import Clash.Annotations.Primitive (warnAlways)
-import Clash.Netlist.Types (BlackBox(BBTemplate))
+import Clash.Netlist.Types (BlackBox(BBTemplate), BlackBoxFunction)
 import Clash.Netlist.BlackBox.Types (emptyBlackBoxMeta, Element(ArgGen,Text))
-import Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Annotations.Primitive (Primitive(InlinePrimitive), HDL(VHDL))
 
 primitiveTF :: BlackBoxFunction

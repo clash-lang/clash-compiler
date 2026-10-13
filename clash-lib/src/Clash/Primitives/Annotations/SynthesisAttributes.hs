@@ -25,7 +25,6 @@ import Clash.Core.Scoped.Syntax (Type(LitTy))
 import Clash.Core.Scoped.TermLiteral (termToDataError)
 import Clash.Core.Scoped.Type (coreView)
 import Clash.Netlist.BlackBox.Types
-import Clash.Netlist.Scoped.Types (BlackBoxFunction, bbScope, bbTypeEnv)
 import Clash.Netlist.Types
 import Clash.Sized.Vector (Vec, toList)
 

@@ -128,7 +128,6 @@ import           Clash.Core.Scoped.Util
 import {-# SOURCE #-} Clash.Netlist.Scoped
   (genComponent, mkDcApplication, mkDeclarations, mkDeclarations', mkExpr,
    mkFunApp, mkNetDecl, mkProjection, mkSelection)
-import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
   (coreTypeToHWTypeM, globalIdentifier, idToOutPort, localIdText, primWarnContext, renameBinder, uniqueIdentifier,
    unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)

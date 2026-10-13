@@ -33,16 +33,14 @@ import           Clash.Core.Scoped.TermLiteral
   (liftTermToData#, termToDataError, termToDataErrorWith)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist.Scoped            (mkExpr)
-import           Clash.Netlist.Scoped.Types
-  (BlackBoxEnv, BlackBoxFunction, NetlistId(..), bbLocalIdentifier, bbScope,
-   bbTypeEnv)
-import           Clash.Netlist.Util              (stripVoid, contAssign)
-import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.Types
-  (BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
+  (BlackBoxEnv, BlackBoxFunction, NetlistId(..), bbLocalIdentifier, bbScope,
+   bbTypeEnv, BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,
    NetlistMonad, Declaration(NetDecl),
    HWType(Bool, KnownDomain),
    DeclarationType(Concurrent), bbInputs, Expr(Identifier))
+import           Clash.Netlist.Util              (stripVoid, contAssign)
+import qualified Clash.Netlist.Id                as Id
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..), emptyBlackBoxMeta)
 

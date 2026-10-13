@@ -20,11 +20,10 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Netlist.Scoped.BlackBox (mkBlackBoxContext)
-import Clash.Netlist.Scoped.Types (LocalId (..))
-import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
-  ( BlackBoxContext (..), Declaration (Assignment, InstDecl), DeclarationType (Concurrent)
-  , Expr (Identifier), componentNames )
+  (LocalId (..), BlackBoxContext (..), Declaration (Assignment, InstDecl), DeclarationType (Concurrent)
+  , Expr (Identifier), componentNames)
+import qualified Clash.Netlist.Id as Id
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv, singletonGlobalEnv)
 import Clash.Core.Scoped.Syntax (GlobalId (..), Term (..))
 

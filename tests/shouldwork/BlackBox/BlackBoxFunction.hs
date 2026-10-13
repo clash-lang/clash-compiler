@@ -12,7 +12,6 @@ import System.FilePath ((</>))
 import Clash.Prelude hiding (Text)
 import Clash.Netlist.Types
 import Clash.Netlist.BlackBox.Types
-import Clash.Netlist.Scoped.Types (BlackBoxFunction)
 import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 
 myMultiplyTF :: BlackBoxFunction

@@ -27,9 +27,8 @@ import           Data.Text.Extra              (showtl)
 import           Text.Read                    (readMaybe)
 
 import           Clash.Core.Scoped.Syntax     (Term, Type)
-import           Clash.Netlist.Types          (BlackBox)
+import           Clash.Netlist.Types          (BlackBox, BlackBoxFunction)
 import           Clash.Netlist.BlackBox.Types (Element(Text), BlackBoxMeta)
-import           Clash.Netlist.Scoped.Types   (BlackBoxFunction)
 
 unsigned :: Element -> [Element]
 unsigned el = [Text "$unsigned(", el, Text ")"]
