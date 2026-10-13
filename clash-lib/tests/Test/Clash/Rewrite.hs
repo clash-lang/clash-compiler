@@ -86,8 +86,7 @@ import Language.Haskell.Exts.Parser
   , parseTypeWithMode )
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit
-  (Assertion, assertBool, assertEqual, assertFailure, testCase)
+import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase)
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 import GHC.Builtin.Names
@@ -1362,10 +1361,6 @@ globalId = mkId C.GlobalId
 intId :: C.NameSort -> String -> Unique -> C.Id
 intId nmSort nm uniq = localId nmSort nm uniq intTy
 
--- | The function type @Int -> .. -> Int@ with the given number of arguments
-intFunTy :: Int -> C.Type
-intFunTy n = foldr C.mkFunTy intTy (replicate n intTy)
-
 -- * Fixtures
 --
 -- The data and type constructors of the tests, built with the builders of
@@ -1459,17 +1454,9 @@ fxPrimTyCon nm k = S.mkPrimTyCon nm (runClosedType k)
 mkTyConName :: String -> Unique -> C.TyConName
 mkTyConName nm = C.mkUnsafeName C.User (ghcName (Text.pack nm))
 
--- | @Pair@, a data type with a single constructor 'pairDataCon'
-pairTy :: C.Type
-pairTy = parseTyConTy "Pair"
-
 -- | @MkPair :: Int -> Int -> Pair@
 pairDataCon :: C.DataCon
 pairDataCon = fxDataCon "MkPair" 100 1 [] [] [intB, intB] (tcAppB (parseTyConName "Pair") [])
-
--- | @E@, a data type with a single constructor 'existentialDataCon'
-existentialTy :: C.Type
-existentialTy = parseTyConTy "E"
 
 -- | The existentially quantified type variable @b@ of 'existentialDataCon'
 existentialTyVar :: FxTyVar
@@ -1492,14 +1479,6 @@ fxA, fxB :: FxTyVar
 fxA = fxTyVarT "a" 3001
 fxB = fxTyVarT "b" 3002
 
--- | The type of a type constructor
-tcTy :: C.TyConName -> C.Type
-tcTy = C.ConstTy . C.TyCon
-
--- | A type constructor applied to types
-tcApp :: C.TyConName -> [C.Type] -> C.Type
-tcApp = C.mkTyConApp
-
 boolTyConName, maybeTyConName, nTyConName, pTyConName, wTyConName, fTyConName,
   maxTyConName, kTyConName, qTyConName, signalTyConName, t2TyConName,
   vTyConName :: C.TyConName
@@ -1516,28 +1495,17 @@ signalTyConName = mkTyConName "Clash.Signal.Internal.Signal" 3019
 t2TyConName = mkTyConName "T2" 3024
 vTyConName = mkTyConName "V" 3025
 
--- | @data Bool = False | True@
-boolTy :: C.Type
-boolTy = tcTy boolTyConName
-
 -- | @GHC.Types.Bool@, with the uniques GHC gives it and its constructors.
 -- The evaluator recognizes these constructors by their uniques, e.g. in
 -- @(&&)@.
 ghcBoolTyConName :: C.TyConName
 ghcBoolTyConName = mkTyConName "GHC.Types.Bool" (fromGhcUnique boolTyConKey)
 
-ghcBoolTy :: C.Type
-ghcBoolTy = tcTy ghcBoolTyConName
-
 ghcFalseDataCon, ghcTrueDataCon :: C.DataCon
 ghcFalseDataCon =
   fxDataCon "GHC.Types.False" (fromGhcUnique falseDataConKey) 1 [] [] [] (tcAppB ghcBoolTyConName [])
 ghcTrueDataCon =
   fxDataCon "GHC.Types.True" (fromGhcUnique trueDataConKey) 2 [] [] [] (tcAppB ghcBoolTyConName [])
-
--- | @data Maybe a = Nothing | Just a@
-maybeTy :: C.Type -> C.Type
-maybeTy a = tcApp maybeTyConName [a]
 
 nothingDataCon, justDataCon :: C.DataCon
 nothingDataCon = fxDataCon "Nothing" 3020 1 [fxA] [] [] (tcAppB maybeTyConName [fxVarB fxA])
@@ -1567,28 +1535,6 @@ withTupleTyCons maxN env =
   tups = IntMap.union (IntMap.fromList [(n, C.tyConName tc) | (n, tc) <- tcs])
                       (envTupleTyCons clashEnv0)
 
--- | @newtype N a = MkN (Maybe a)@
-nTy :: C.Type -> C.Type
-nTy a = tcApp nTyConName [a]
-
--- | @newtype P a = MkP (forall b. a -> b)@, whose representation type binds a
--- type variable
-pTy :: C.Type -> C.Type
-pTy a = tcApp pTyConName [a]
-
--- | @newtype W = MkW (Int -> Int)@
-wTy :: C.Type
-wTy = tcTy wTyConName
-
--- | A natural number as a type
-numTy :: Integer -> C.Type
-numTy = C.LitTy . C.NumTy
-
--- | GHC's @+@ on type-level naturals, which 'C.reduceTypeFamily' and
--- "Clash.Core.EqSolver" recognize by its unique
-addTy :: C.Type -> C.Type -> C.Type
-addTy a b = tcApp addTyConName [a, b]
-
 addTyConName :: C.TyConName
 addTyConName = mkTyConName "GHC.TypeNats.+" (fromGhcUnique typeNatAddTyFamNameKey)
 
@@ -1599,21 +1545,10 @@ unconsSymbolTyConName :: C.TyConName
 unconsSymbolTyConName =
   mkTyConName "GHC.TypeLits.UnconsSymbol" (fromGhcUnique typeUnconsSymbolTyFamNameKey)
 
--- | Unlifted equality, @a ~# b@, of types of kind @k@, the type of the
--- equality coercions that "Clash.Core.EqSolver" recognizes
-eqTy :: C.Kind -> C.Type -> C.Type -> C.Type
-eqTy k a b = foldl C.AppTy C.eqPrimTy [k, k, a, b]
-
 -- | The name of the type constructor of 'liftedEqTy'. The parser of scoped
 -- Core parses @a ~ b@ as its application to @Type@, @a@ and @b@.
 liftedEqTyConName :: C.TyConName
 liftedEqTyConName = C.mkUnsafeName C.User (Text.pack "~") (fromGhcUnique eqTyConKey)
-
--- | @data V n where VNil :: (n ~ 0) => V n; VCons :: forall m. (n ~ m + 1) =>
--- Int -> V m -> V n@, a data type with equality constraints and an
--- existentially quantified type variable, like @Vec@
-vTy :: C.Type -> C.Type
-vTy n = tcApp vTyConName [n]
 
 fxN, fxM :: FxTyVar
 fxN = fxTyVar "n" 3026 natB
@@ -1632,10 +1567,6 @@ vConsDataCon =
 -- | The name of @Vec@. The primitive reductions recognize vectors by this name.
 vecTcNm :: C.TyConName
 vecTcNm = mkTyConName "Clash.Sized.Vector.Vec" 2000
-
--- | @Vec n a@
-vecTy :: C.Type -> C.Type -> C.Type
-vecTy n a = tcApp vecTcNm [n, a]
 
 -- | The universally quantified type variables of the constructors of @Vec@,
 -- and the existentially quantified one of 'consDc'
@@ -1664,10 +1595,6 @@ consDc =
 -- name.
 rtreeTcNm :: C.TyConName
 rtreeTcNm = mkTyConName "Clash.Sized.RTree.RTree" 2010
-
--- | @RTree d a@
-rtreeTy :: C.Type -> C.Type -> C.Type
-rtreeTy d a = tcApp rtreeTcNm [d, a]
 
 -- | The universally quantified type variables of the constructors of @RTree@,
 -- and the existentially quantified one of 'brDc'
@@ -1699,9 +1626,6 @@ brDc =
 snatTcNm :: C.TyConName
 snatTcNm = mkTyConName "Clash.Promoted.Nat.SNat" 2030
 
-snatTy :: C.Type -> C.Type
-snatTy n = tcApp snatTcNm [n]
-
 snatN :: FxTyVar
 snatN = fxTyVar "n" 2031 natB
 
@@ -1716,9 +1640,6 @@ snatDc =
 hIntTcNm :: C.TyConName
 hIntTcNm = mkTyConName "GHC.Types.Int" 2033
 
-hIntTy :: C.Type
-hIntTy = tcTy hIntTcNm
-
 iHashDc :: C.DataCon
 iHashDc = fxDataCon "GHC.Types.I#" 2034 1 [] [] [tcAppB P.intPrimTyConName []] (tcAppB hIntTcNm [])
 
@@ -1729,9 +1650,6 @@ ubpTcNm = mkTyConName "UBP" 2035
 ubpL, ubpN :: FxTyVar
 ubpL = fxTyVar "l" 2036 natB
 ubpN = fxTyVar "n" 2037 natB
-
-ubpTy :: C.Type -> C.Type -> C.Type
-ubpTy l n = tcApp ubpTcNm [l, n]
 
 ubpDc :: C.DataCon
 ubpDc = fxDataCon "MkUBP" 2038 1 [ubpL, ubpN] [] [] (tcAppB ubpTcNm [fxVarB ubpL, fxVarB ubpN])
@@ -1757,10 +1675,6 @@ dictF, dictA, dictB :: FxTyVar
 dictF = fxTyVar "f" 2042 (funTyB [typeB] typeB)
 dictA = fxTyVarT "a" 2043
 dictB = fxTyVarT "b" 2044
-
-functorTy, applicativeTy :: C.Type -> C.Type
-functorTy f = tcApp functorTcNm [f]
-applicativeTy f = tcApp applicativeTcNm [f]
 
 functorDc, applicativeDc :: C.DataCon
 functorDc =
@@ -1792,10 +1706,6 @@ applicativeDc =
 ghcPairTcNm :: C.TyConName
 ghcPairTcNm = tupleTyConName 2
 
--- | @(a, b)@
-ghcPairTy :: C.Type -> C.Type -> C.Type
-ghcPairTy a b = tcApp ghcPairTcNm [a, b]
-
 -- | @(,) :: forall a b. a -> b -> (a, b)@
 ghcPairDc :: C.DataCon
 ghcPairDc =
@@ -1810,9 +1720,6 @@ pairB = fxTyVarT "b" 2053
 orderingTcNm :: C.TyConName
 orderingTcNm = mkTyConName "GHC.Types.Ordering" 2060
 
-orderingTy :: C.Type
-orderingTy = tcTy orderingTcNm
-
 ltDc, eqDc, gtDc :: C.DataCon
 ltDc = fxDataCon "GHC.Types.LT" 2061 1 [] [] [] (tcAppB orderingTcNm [])
 eqDc = fxDataCon "GHC.Types.EQ" 2062 2 [] [] [] (tcAppB orderingTcNm [])
@@ -1821,9 +1728,6 @@ gtDc = fxDataCon "GHC.Types.GT" 2063 3 [] [] [] (tcAppB orderingTcNm [])
 -- | The boxed @Double@
 doubleTcNm :: C.TyConName
 doubleTcNm = mkTyConName "GHC.Types.Double" 2064
-
-doubleTy :: C.Type
-doubleTy = tcTy doubleTcNm
 
 -- | @D# :: Double# -> Double@
 doubleDc :: C.DataCon
@@ -1834,9 +1738,6 @@ doubleDc =
 t3TyConName :: C.TyConName
 t3TyConName = mkTyConName "T3" 2066
 
-t3Ty :: C.Type -> C.Type -> C.Type -> C.Type
-t3Ty a b c = tcApp t3TyConName [a, b, c]
-
 -- | @MkT3 :: a -> b -> c -> T3 a b c@
 t3DataCon :: C.DataCon
 t3DataCon = fxDataCon "MkT3" 2067 1 [fxA, fxB, t3C] [] [fxVarB fxA, fxVarB fxB, fxVarB t3C]
@@ -1844,10 +1745,6 @@ t3DataCon = fxDataCon "MkT3" 2067 1 [fxA, fxB, t3C] [] [fxVarB fxA, fxVarB fxB, 
 
 t3C :: FxTyVar
 t3C = fxTyVarT "c" 2068
-
--- | @T2@ applied to two types
-t2Ty :: C.Type -> C.Type -> C.Type
-t2Ty a b = tcApp t2TyConName [a, b]
 
 -- | @MkT2 :: a -> b -> T2 a b@
 t2DataCon :: C.DataCon
@@ -1857,9 +1754,6 @@ t2DataCon = fxDataCon "MkT2" 3033 1 [fxA, fxB] [] [fxVarB fxA, fxVarB fxB]
 -- | @SomeNat@, a type-level natural hidden behind an existential
 someNatTcNm :: C.TyConName
 someNatTcNm = mkTyConName "GHC.TypeNats.SomeNat" 2069
-
-someNatTy :: C.Type
-someNatTy = tcTy someNatTcNm
 
 -- | @SomeNat :: forall n. KnownNat n => Proxy n -> SomeNat@
 someNatDc :: C.DataCon
@@ -1874,9 +1768,6 @@ someNatN = fxTyVar "n" 2071 natB
 -- | @Proxy@, poly-kinded
 proxyTcNm :: C.TyConName
 proxyTcNm = mkTyConName "Data.Proxy.Proxy" 2072
-
-kindedProxyTy :: C.Kind -> C.Type -> C.Type
-kindedProxyTy k a = tcApp proxyTcNm [k, a]
 
 -- | @Proxy :: forall k (a :: k). Proxy a@. The kind of @a@ is @Type@ here,
 -- rather than @k@, because the kind of a type constructor can't mention its
@@ -1897,20 +1788,9 @@ clockTcNm = mkTyConName "Clash.Signal.Internal.Clock" 2020
 resetTcNm = mkTyConName "Clash.Signal.Internal.Reset" 2021
 enableTcNm = mkTyConName "Clash.Signal.Internal.Enable" 2022
 
--- | The domain @System@
-systemDomTy :: C.Type
-systemDomTy = C.LitTy (C.SymTy "System")
-
--- | @Clock System@
-clockTy :: C.Type
-clockTy = tcApp clockTcNm [systemDomTy]
-
 -- | @ClkPair@, a product type with a clock, which Clash splits
 clkPairTcNm :: C.TyConName
 clkPairTcNm = mkTyConName "ClkPair" 2024
-
-clkPairTy :: C.Type
-clkPairTy = tcTy clkPairTcNm
 
 -- | @MkClkPair :: Clock System -> Int -> ClkPair@
 clkPairDc :: C.DataCon
@@ -2009,11 +1889,6 @@ bitVectorTyConName = mkTyConName "Clash.Sized.Internal.BitVector.BitVector" 3100
 unsignedTyConName = mkTyConName "Clash.Sized.Internal.Unsigned.Unsigned" 3101
 signedTyConName = mkTyConName "Clash.Sized.Internal.Signed.Signed" 3102
 
--- | @BitVector n@ and @Unsigned n@
-bitVectorTy, unsignedTy :: Integer -> C.Type
-bitVectorTy n = tcApp bitVectorTyConName [numTy n]
-unsignedTy n = tcApp unsignedTyConName [numTy n]
-
 zwTyConName, proxyTyConName, tProxyTyConName, exZwTyConName, streamTyConName :: C.TyConName
 zwTyConName = mkTyConName "ZW" 3104
 proxyTyConName = mkTyConName "Proxy" 3105
@@ -2021,45 +1896,23 @@ tProxyTyConName = mkTyConName "TProxy" 3106
 exZwTyConName = mkTyConName "ExZW" 3107
 streamTyConName = mkTyConName "Stream" 3108
 
--- | @data ZW = MkZW (BitVector 0) (Unsigned 0)@
-zwTy :: C.Type
-zwTy = tcTy zwTyConName
-
 zwDataCon :: C.DataCon
 zwDataCon =
   fxDataCon "MkZW" 3110 1 [] []
     [tcAppB bitVectorTyConName [numB 0], tcAppB unsignedTyConName [numB 0]]
     (tcAppB zwTyConName [])
 
--- | @data Proxy (n :: Nat) = Proxy@
-proxyTy :: C.Type -> C.Type
-proxyTy n = tcApp proxyTyConName [n]
-
 proxyDataCon :: C.DataCon
 proxyDataCon = fxDataCon "Proxy" 3111 1 [zwN] [] [] (tcAppB proxyTyConName [fxVarB zwN])
-
--- | @data TProxy (n :: Nat) = MkTProxy (Proxy n)@: a field type that mentions
--- a type variable
-tProxyTy :: C.Type -> C.Type
-tProxyTy n = tcApp tProxyTyConName [n]
 
 tProxyDataCon :: C.DataCon
 tProxyDataCon =
   fxDataCon "MkTProxy" 3112 1 [zwN] [] [tcAppB proxyTyConName [fxVarB zwN]]
     (tcAppB tProxyTyConName [fxVarB zwN])
 
--- | @data ExZW = forall b. MkExZW (BitVector 0)@: a constructor with an
--- existentially quantified type variable
-exZwTy :: C.Type
-exZwTy = tcTy exZwTyConName
-
 exZwDataCon :: C.DataCon
 exZwDataCon =
   fxDataCon "MkExZW" 3113 1 [] [zwB] [tcAppB bitVectorTyConName [numB 0]] (tcAppB exZwTyConName [])
-
--- | @data Stream a = a :> Stream a@: a recursive type, like @Signal@
-streamTy :: C.Type -> C.Type
-streamTy a = tcApp streamTyConName [a]
 
 streamDataCon :: C.DataCon
 streamDataCon =
@@ -2137,16 +1990,6 @@ showPprU = showPpr' PrettyOptions
   , displayQualifiers = False
   , displayTicks = False
   }
-
--- | Assert that two terms, or two types, are alpha equivalent: 'Eq' on
--- 'C.Term' and 'C.Type' is alpha equivalence. Shows both, with uniques, if
--- they're not.
-assertAlphaEq :: (HasCallStack, Eq a, PrettyPrec a) => a -> a -> Assertion
-assertAlphaEq expected actual =
-  assertBool
-    ("Expected (up to alpha equivalence):\n" <> showPprU expected
-      <> "\nbut got:\n" <> showPprU actual)
-    (expected == actual)
 
 -- | Assert that two terms are structurally equal, by comparing their 'Show'
 -- output.
