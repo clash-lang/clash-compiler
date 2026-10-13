@@ -5,8 +5,8 @@ License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Tests for 'Clash.Core.Scoped.TermLiteral': the scoped twins of
-"Clash.Tests.Core.TermLiteral", and checks that the old and scoped decoders
-agree on generated values.
+"Clash.Tests.Core.TermLiteral", and checks that the decoders decode the
+encodings of generated values to these values.
 -}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE MagicHash #-}
@@ -17,6 +17,7 @@ agree on generated values.
 module Clash.Tests.Core.Scoped.TermLiteral where
 
 import Data.Bifunctor (bimap)
+import Data.Either (isLeft)
 import Data.Proxy
 import Data.Text (Text)
 import Data.Text.Arbitrary ()
@@ -30,12 +31,9 @@ import Test.Tasty.TH
 import Clash.Annotations.SynthesisAttributes (Attr)
 import qualified Clash.Core.Literal as L
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.Convert (fromClashTermClosed)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax (S (VoidS), Term (App, Literal, Tick), TickInfo (NoDeDup))
 import Clash.Core.Scoped.TermLiteral
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.TermLiteral as Old
 import Clash.Promoted.Nat
 import Clash.Sized.Index (Index)
 import Clash.Sized.Vector (Vec)
@@ -97,128 +95,120 @@ case_termToData_strips_ticks_in_subterm =
     App (Literal (L.IntegerLiteral 0))
         (Tick NoDeDup (Literal (L.StringLiteral "hi")))
 
--- * Agreement of the old and scoped decoders
+-- * Decoding encoded values
 
-deriveToCoreTerm ''Bool
-deriveToCoreTerm ''Maybe
-deriveToCoreTerm ''Either
-deriveToCoreTerm ''Cv.RenderAs
-deriveToCoreTerm ''Cv.Assertion'
-deriveToCoreTerm ''Cv.Property'
-deriveToCoreTerm ''Attr
+deriveToScopedTerm ''Bool
+deriveToScopedTerm ''Maybe
+deriveToScopedTerm ''Either
+deriveToScopedTerm ''Cv.RenderAs
+deriveToScopedTerm ''Cv.Assertion'
+deriveToScopedTerm ''Cv.Property'
+deriveToScopedTerm ''Attr
 
 deriveArbitrary ''Cv.RenderAs
 deriveArbitrary ''Cv.Assertion'
 deriveArbitrary ''Cv.Property'
 deriveArbitrary ''Attr
 
--- | Decoding the encoding of a value at type @b@ with the old decoder gives
--- the same as converting it to scoped Core and decoding it with the scoped
--- decoder: the same value, or the same failing subterm.
-agreeAt
+-- | Decoding the encoding of a value at type @b@ fails
+failsAt
   :: forall b a
-   . (Old.TermLiteral b, TermLiteral b, Show b, ToCoreTerm a)
+   . (TermLiteral b, Show b, ToScopedTerm a)
   => a -> Property
-agreeAt x = agreeOn @b (toCoreTerm x)
-
--- | 'agreeAt' for a given term
-agreeOn
-  :: forall b
-   . (Old.TermLiteral b, TermLiteral b, Show b)
-  => C.Term -> Property
-agreeOn t =
+failsAt x =
   counterexample (showPpr t) $
-    bimap showPpr show (Old.termToData @b t)
-      === bimap showPpr show (termToData @b (fromClashTermClosed t))
+    counterexample (either showPpr show r) (isLeft r)
+ where
+  t = toScopedTerm x
+  r = termToData @b t
 
--- | Both decoders decode the encoding of a value to the value
-agree
+-- | The decoder decodes the encoding of a value to the value
+roundTrip
   :: forall a
-   . (Old.TermLiteral a, TermLiteral a, Show a, ToCoreTerm a)
+   . (TermLiteral a, Show a, ToScopedTerm a)
   => a -> Property
-agree x =
-  agreeAt @a x
-    .&&. bimap showPpr show (termToData @a (fromClashTermClosed (toCoreTerm x)))
-      === Right (show x)
+roundTrip x =
+  bimap showPpr show (termToData @a (toScopedTerm x)) === Right (show x)
 
-prop_agree_bool :: Bool -> Property
-prop_agree_bool = agree
+prop_roundTrip_bool :: Bool -> Property
+prop_roundTrip_bool = roundTrip
 
-prop_agree_maybe :: Maybe Int -> Property
-prop_agree_maybe = agree
+prop_roundTrip_maybe :: Maybe Int -> Property
+prop_roundTrip_maybe = roundTrip
 
-prop_agree_either :: Either Int Word -> Property
-prop_agree_either = agree
+prop_roundTrip_either :: Either Int Word -> Property
+prop_roundTrip_either = roundTrip
 
-prop_agree_renderAs :: Cv.RenderAs -> Property
-prop_agree_renderAs = agree
+prop_roundTrip_renderAs :: Cv.RenderAs -> Property
+prop_roundTrip_renderAs = roundTrip
 
-prop_agree_assertion :: Cv.Assertion' Int -> Property
-prop_agree_assertion = agree
+prop_roundTrip_assertion :: Cv.Assertion' Int -> Property
+prop_roundTrip_assertion = roundTrip
 
-prop_agree_property :: Cv.Property' (Maybe Text, Int) -> Property
-prop_agree_property = agree
+prop_roundTrip_property :: Cv.Property' (Maybe Text, Int) -> Property
+prop_roundTrip_property = roundTrip
 
-prop_agree_attr :: Attr Text -> Property
-prop_agree_attr = agree
+prop_roundTrip_attr :: Attr Text -> Property
+prop_roundTrip_attr = roundTrip
 
-prop_agree_int :: Int -> Property
-prop_agree_int = agree
+prop_roundTrip_int :: Int -> Property
+prop_roundTrip_int = roundTrip
 
-prop_agree_word :: Word -> Property
-prop_agree_word = agree
+prop_roundTrip_word :: Word -> Property
+prop_roundTrip_word = roundTrip
 
-prop_agree_char :: Char -> Property
-prop_agree_char = agree
+prop_roundTrip_char :: Char -> Property
+prop_roundTrip_char = roundTrip
 
-prop_agree_integer :: Integer -> Property
-prop_agree_integer = agree
+prop_roundTrip_integer :: Integer -> Property
+prop_roundTrip_integer = roundTrip
 
 -- | QuickCheck before 2.17 has no 'Arbitrary' instance for 'Natural'
-prop_agree_natural :: NonNegative Integer -> Property
-prop_agree_natural (NonNegative n) = agree (fromInteger @Natural n)
+prop_roundTrip_natural :: NonNegative Integer -> Property
+prop_roundTrip_natural (NonNegative n) = roundTrip (fromInteger @Natural n)
 
-prop_agree_string :: String -> Property
-prop_agree_string = agree
+prop_roundTrip_string :: String -> Property
+prop_roundTrip_string = roundTrip
 
-prop_agree_text :: Text -> Property
-prop_agree_text = agree
+prop_roundTrip_text :: Text -> Property
+prop_roundTrip_text = roundTrip
 
-prop_agree_text_byteArray :: Text -> Property
-prop_agree_text_byteArray x = agreeOn @Text (textByteArrayTerm x)
+prop_roundTrip_text_byteArray :: Text -> Property
+prop_roundTrip_text_byteArray x =
+  bimap showPpr id (termToData @Text (textByteArrayTerm x)) === Right x
 
-prop_agree_index :: Index 10 -> Property
-prop_agree_index = agree
+prop_roundTrip_index :: Index 10 -> Property
+prop_roundTrip_index = roundTrip
 
-prop_agree_tuple :: (Int, Bool) -> Property
-prop_agree_tuple = agree
+prop_roundTrip_tuple :: (Int, Bool) -> Property
+prop_roundTrip_tuple = roundTrip
 
-prop_agree_vec :: Vec 3 (Maybe Int) -> Property
-prop_agree_vec = agree
+prop_roundTrip_vec :: Vec 3 (Maybe Int) -> Property
+prop_roundTrip_vec = roundTrip
 
--- | Decoding at the wrong type fails at the same subterm
-prop_agree_wrong_type :: Maybe Int -> Cv.Property' Int -> Vec 3 Int -> Property
-prop_agree_wrong_type x y z =
-  agreeAt @(Either Int Int) x
-    .&&. agreeAt @(Cv.Assertion' Int) y
-    .&&. agreeAt @(Vec 4 Int) z
-    .&&. agreeAt @Natural x
+-- | Decoding at the wrong type fails
+prop_wrong_type :: Maybe Int -> Cv.Property' Int -> Vec 3 Int -> Property
+prop_wrong_type x y z =
+  failsAt @(Either Int Int) x
+    .&&. failsAt @(Cv.Assertion' Int) y
+    .&&. failsAt @(Vec 4 Int) z
+    .&&. failsAt @Natural x
 
 -- | The explicit leaf decoder that replaces the old @TermLiteral Term@
 -- instance, for "Clash.Primitives.Verification": decoding with subterms as
--- leaves gives the same subterms as the old decoder at
--- @Property' (Maybe Text, Term)@.
-prop_agree_property_term_leaves :: Cv.Property' (Maybe Text, Int) -> Property
-prop_agree_property_term_leaves x =
+-- leaves gives the subterms that decode to the values at the leaves.
+prop_property_term_leaves :: Cv.Property' (Maybe Text, Int) -> Property
+prop_property_term_leaves x =
   counterexample (showPpr t) $
-    bimap showPpr (show . fmap (fmap showPpr))
-      (Old.termToData @(Cv.Property' (Maybe Text, C.Term)) t)
-      === bimap showPpr (show . fmap (fmap showPpr))
-            (termToDataWith @(Cv.Property' (Maybe Text, Term 'VoidS))
-              (liftTermToData# (liftTermToData# Right))
-              (fromClashTermClosed t))
+    bimap showPpr (show . fmap (fmap decodeLeaf))
+      (termToDataWith @(Cv.Property' (Maybe Text, Term 'VoidS))
+        (liftTermToData# (liftTermToData# Right))
+        t)
+      === Right (show (fmap (fmap (Right :: Int -> Either String Int)) x))
  where
-  t = toCoreTerm x
+  t = toScopedTerm x
+  decodeLeaf :: Term 'VoidS -> Either String Int
+  decodeLeaf = bimap showPpr id . termToData @Int
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.TermLiteral" [$(testGroupGenerator)]
