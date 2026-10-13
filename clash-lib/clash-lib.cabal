@@ -333,7 +333,6 @@ Library
                       Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
                       Clash.Primitives.Magic
-                      Clash.Primitives.Scoped.Util
                       Clash.Primitives.Sized.ToInteger
                       Clash.Primitives.Sized.Signed
                       Clash.Primitives.Sized.Vector

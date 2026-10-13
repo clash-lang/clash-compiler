@@ -21,6 +21,7 @@ module Clash.Primitives.Util
   , decodeOrErrJson
   , decodeOrErrYaml
   , getFunctionPluralityWith
+  , getFunctionPlurality
   ) where
 
 import           Control.DeepSeq        (force)
@@ -41,6 +42,7 @@ import qualified System.Directory       as Directory
 import qualified System.FilePath        as FilePath
 import           System.IO.Error        (tryIOError)
 
+import           Clash.Core.Scoped.Syntax (Distinct, Term, Type)
 import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
   , PrimitiveWarning(WarnNonSynthesizable)
@@ -53,7 +55,8 @@ import           Clash.Primitives.Types
   , UnresolvedPrimitive, UnresolvedPrimitiveEntry(..)
   , CompiledPrimMap, GuardedResolvedPrimitive)
 import           Clash.Netlist.Types    (BlackBox(..), NetlistMonad)
-import           Clash.Netlist.Scoped.Types  (SomeBlackBoxFunction)
+import           Clash.Netlist.Scoped.Types
+  (BlackBoxEnv, SomeBlackBoxFunction, callBlackBoxFunction)
 import           Clash.Netlist.Util     (preserveState)
 import           Clash.Netlist.BlackBox.Util
   (walkElement)
@@ -245,13 +248,13 @@ constantArgs nm (BlackBoxHaskell{}) = Set.fromList fromIntForce
     | otherwise = []
 constantArgs _ _ = Set.empty
 
--- | Helper function of 'Clash.Primitives.Scoped.Util.getFunctionPlurality'
+-- | Helper function of 'Clash.Primitives.Util.getFunctionPlurality'
 getFunctionPlurality' :: [(Int, Int)] -> Int -> Int
 getFunctionPlurality' functionPlurality n =
   fromMaybe 1 (snd <$> (find ((== n) . fst) functionPlurality))
 
 -- | Looks up the plurality of a function's function argument, like
--- 'Clash.Primitives.Scoped.Util.getFunctionPlurality', given a way to call
+-- 'Clash.Primitives.Util.getFunctionPlurality', given a way to call
 -- the blackbox function of a primitive: on the name of the primitive, with the
 -- arguments and result types passed to the blackbox.
 getFunctionPluralityWith
@@ -277,3 +280,24 @@ getFunctionPluralityWith call (BlackBoxHaskell {name, function, functionName}) n
       pure (getFunctionPlurality' bbFunctionPlurality n)
 getFunctionPluralityWith _call (BlackBox {functionPlurality}) n =
   pure (getFunctionPlurality' functionPlurality n)
+
+-- | Looks up the plurality of a function's function argument. See
+-- 'Clash.Primitives.Types.functionPlurality' for more information. If not
+-- set, the returned plurality will default to /1/.
+getFunctionPlurality
+  :: (HasCallStack, Distinct n)
+  => BlackBoxEnv n
+  -- ^ The context of the arguments
+  -> CompiledPrimitive
+  -> [Either (Term n) (Type n)]
+  -- ^ Arguments passed to blackbox
+  -> [Type n]
+  -- ^ Result types
+  -> Int
+  -- ^ Argument number holding the function of interest
+  -> NetlistMonad Int
+  -- ^ Plurality of function. Defaults to 1. Does not err if argument isn't
+  -- a function in the first place. State of monad will not be modified.
+getFunctionPlurality env p args resTys =
+  getFunctionPluralityWith
+    (\f nm -> callBlackBoxFunction env f False nm args resTys) p
