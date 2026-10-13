@@ -528,14 +528,9 @@ test-suite unittests
       transformers,
       unordered-containers
 
-  Other-Modules: Clash.Tests.Core.AlphaEquivalence
-                 Clash.Tests.Core.FreeVars
-                 Clash.Tests.Core.HasType
-                 Clash.Tests.Core.Lint
-                 Clash.Tests.Core.Scoped.Alpha
+  Other-Modules: Clash.Tests.Core.Scoped.Alpha
                  Clash.Tests.Core.Scoped.Binary
                  Clash.Tests.Core.Scoped.Builder
-                 Clash.Tests.Core.Scoped.Convert
                  Clash.Tests.Core.Scoped.DataCon
                  Clash.Tests.Core.Scoped.EqSolver
                  Clash.Tests.Core.Scoped.Evaluator
@@ -560,14 +555,8 @@ test-suite unittests
                  Clash.Tests.Core.Scoped.TypeEnv
                  Clash.Tests.Core.Scoped.TysPrim
                  Clash.Tests.Core.Scoped.Util
-                 Clash.Tests.Core.StructuralEquivalence
-                 Clash.Tests.Core.Subst
-                 Clash.Tests.Core.TermLiteral
                  Clash.Tests.Core.TermLiteral.Types
-                 Clash.Tests.Core.Util
-                 Clash.Tests.Differential
                  Clash.Tests.Driver.Manifest
-                 Clash.Tests.Netlist
                  Clash.Tests.Netlist.Id
                  Clash.Tests.Netlist.Scoped
                  Clash.Tests.Netlist.Scoped.BlackBox
@@ -575,7 +564,6 @@ test-suite unittests
                  Clash.Tests.Primitives
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize
-                 Clash.Tests.Normalize.PrimitiveReductions
                  Clash.Tests.Normalize.Scoped.PrimitiveReductions
                  Clash.Tests.Normalize.Scoped.Transformations.ANF
                  Clash.Tests.Normalize.Scoped.Transformations.Case
@@ -590,45 +578,21 @@ test-suite unittests
                  Clash.Tests.Normalize.Scoped.Transformations.Specialize
                  Clash.Tests.Normalize.Scoped.Transformations.XOptimize
                  Clash.Tests.Normalize.Scoped.Util
-                 Clash.Tests.Normalize.Transformations
-                 Clash.Tests.Normalize.Transformations.ANF
-                 Clash.Tests.Normalize.Transformations.Case
-                 Clash.Tests.Normalize.Transformations.Cast
-                 Clash.Tests.Normalize.Transformations.DEC
-                 Clash.Tests.Normalize.Transformations.EtaExpand
-                 Clash.Tests.Normalize.Transformations.Inline
-                 Clash.Tests.Normalize.Transformations.MultiPrim
-                 Clash.Tests.Normalize.Transformations.Letrec
-                 Clash.Tests.Normalize.Transformations.SeparateArgs
-                 Clash.Tests.Normalize.Transformations.Specialize
-                 Clash.Tests.Normalize.Transformations.XOptimize
-                 Clash.Tests.Normalize.Util
-                 Clash.Tests.Rewrite.Combinators
                  Clash.Tests.Rewrite.Scoped.Combinators
                  Clash.Tests.Rewrite.Scoped.History
                  Clash.Tests.Rewrite.Scoped.StrategyDSL
                  Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
                  Clash.Tests.Rewrite.Scoped.Util
-                 Clash.Tests.Rewrite.Scoped.ViaFoil
                  Clash.Tests.Rewrite.Scoped.Whnf
                  Clash.Tests.Rewrite.Scoped.WhnfContext
                  Clash.Tests.Rewrite.Scoped.WorkFree
-                 Clash.Tests.Rewrite.StrategyDSL
-                 Clash.Tests.Rewrite.StrategyDSL.Stubs
-                 Clash.Tests.Rewrite.Util
-                 Clash.Tests.Rewrite.WorkFree
                  Clash.Tests.Warning
 
-                 Test.Clash.Differential
                  Test.Clash.Rewrite
                  Test.Clash.Scoped
                  Test.Clash.Scoped.Evaluator
-                 Test.Clash.Scoped.Evaluator.Differential
-                 Test.Clash.Scoped.Evaluator.Adapter
-                 Test.Clash.Scoped.ViaFoil
                  Test.Clash.Scoped.Evaluator.Primitives
                  Test.Clash.Scoped.Gen
-                 Test.Clash.Scoped.Gen.Clash
                  Test.Clash.Scoped.Print
                  Test.Clash.Scoped.PrintTests
                  Test.Clash.TermLiteral
