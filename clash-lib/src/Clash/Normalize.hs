@@ -44,7 +44,7 @@ import           Control.Monad                    ((>=>), when)
 import qualified Control.Monad                    as Monad
 import           Control.Monad.IO.Class           (liftIO)
 import           Data.Default                     (def)
-import           Data.Either                      (lefts, partitionEithers)
+import           Data.Either                      (partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import qualified Data.IORef                       as IORef
 import           Data.List                        (intercalate, mapAccumL)
@@ -60,11 +60,8 @@ import           Data.Text.Prettyprint.Doc        (vcat)
 
 import           GHC.BasicTypes.Extra             (isNoInline)
 
-import           Clash.Core.HasType
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
-import           Clash.Core.Type                  (splitCoreFunForallTy)
-import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Var                   (Id, varName, varType)
+import           Clash.Core.Var                   (Id)
 import           Clash.Core.VarEnv
   (elemVarSet, emptyVarEnv, mkVarSet)
 import           Clash.Debug                      (traceIf)
@@ -75,15 +72,14 @@ import           Clash.Netlist.Types
 import           Clash.Normalize.Strategy         (constantPropagation, normalization)
 import           Clash.Normalize.Strategy.Spec    (flattenSpec)
 import           Clash.Normalize.Types
-import           Clash.Normalize.Util             (tvSubstWithTyEq)
 import           Clash.Normalize.Scoped.Util
-  (isCheapFunction, normalizeTopLvlBndr, rewriteExpr)
+  (isCheapFunction, normalizeTopLvlBndr, rewriteExpr, tvSubstWithTyEq)
 import           Clash.Rewrite.StrategyDSL.TH     (compileScopedStrategy)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), debugOpts, extra, scopedBindings, tcCache,
-   topEntities, newInlineStrategy)
-import           Clash.Rewrite.Util
-  (isUntranslatableType, runRewriteSession)
+  (RewriteEnv (..), RewriteState (..), debugOpts, extra, scopedBindings,
+   topEntities, newInlineStrategy, scopedTypeEnv)
+import           Clash.Rewrite.Util               (runRewriteSession)
+import           Clash.Rewrite.Scoped.Util        (isUntranslatableType)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)
@@ -105,6 +101,10 @@ import           Clash.Core.Scoped.Term
   (AbsBinder (..), collectArgsTicks, collectTicks, mkApps, mkTicks, openBndrs,
    stripTicks)
 import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
+import           Clash.Core.Scoped.Type
+  (SplitCoreFunForall (..), isPolyTy, piTeleTyArity, splitCoreFunForallTy)
+import           Clash.Core.Scoped.Alpha          (aeqTy)
+import           Clash.Core.Scoped.Convert        (mkGlobalId)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization
@@ -210,15 +210,16 @@ normalize'
   -> NormalizeSession ([GlobalId], (GlobalId, Binding (Term 'VoidS)))
 normalize' nm = do
   exprM <- lookupGlobalEnv nm <$> Lens.use scopedBindings
-  let nmS = showPpr (varName (globalIdLegacy nm))
+  let nmS = showPpr (globalIdName nm)
   case exprM of
     Just (Binding nmG sp inl pr tm r) -> do
+      -- For the messages, which show its type
       let nm' = globalIdLegacy nmG
-      tcm <- Lens.view tcCache
+      te <- Lens.view scopedTypeEnv
       topEnts <- Lens.view topEntities
       let isTop = globalIdLegacy nm `elemVarSet` topEnts
-          ty0 = coreTypeOf nm'
-          ty1 = if isTop then tvSubstWithTyEq ty0 else ty0
+          ty0 = globalIdType nmG
+          ty1 = if isTop then tvSubstWithTyEq emptyScope ty0 else ty0
 
       -- check for polymorphic types
       when (isPolyTy ty1) $
@@ -226,24 +227,27 @@ normalize' nm = do
               Clash can only normalize monomorphic functions, but this is polymorphic:
               #{showPpr' def{displayUniques=False\} nm'}
               |]
-            msgExtra | ty0 == ty1 = Nothing
+            msgExtra | aeqTy ty0 ty1 = Nothing
                      | otherwise = Just $ [i|
               Even after applying type equality constraints it remained polymorphic:
-              #{showPpr' def{displayUniques=False\} nm'{varType=ty1\}}
+              #{showPpr' def{displayUniques=False\} (globalIdLegacy (mkGlobalId (globalIdName nmG) ty1))}
                          |]
         in throw (ClashException sp msg msgExtra)
 
       -- check for unrepresentable result type
-      let (args,resTy) = splitCoreFunForallTy tcm ty1
-          isFunction = not $ null $ lefts args
-      resTyRep <- not <$> isUntranslatableType False resTy
+      (isFunction, resTyRep) <- case splitCoreFunForallTy te emptyScope ty1 of
+        SplitCoreFunForall scR tele resTy -> do
+          resTyRep <- not <$> isUntranslatableType False scR resTy
+          -- Whether it quantifies over type variables, like the code for
+          -- Clash Core does
+          pure (piTeleTyArity tele /= 0, resTyRep)
       if resTyRep
          then do
             tmNorm <- normalizeTopLvlBndr isTop nm (Binding nmG sp inl pr tm r)
             let usedBndrs = globalsInOrder (bindingTerm tmNorm)
             traceIf (bindingRecursive tmNorm)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
-                            , showPpr (coreTypeOf (globalIdLegacy (bindingId tmNorm)))
+                            , showPpr (globalIdType (bindingId tmNorm))
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
@@ -281,7 +285,7 @@ normalize' nm = do
                  else pure []
             traceIf (dbg_invariants opts)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
-                            , showPpr (coreTypeOf nm')
+                            , showPpr (globalIdType nmG)
                             , ") has a non-representable return type."
                             , " Referenced by: "
                             , if null referers
