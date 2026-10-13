@@ -1206,7 +1206,7 @@ normalizeEntity env bindingsMap typeTrans topEntities supply top = transformedBi
                 cleanupGraph top normChecked
     transformedBindings = runNormalization env supply bindingsMap
                             typeTrans emptyGlobalEnv
-                            (map globalIdLegacy topEntities) doNorm
+                            topEntities doNorm
 
 -- | Reverse topologically sort given top entities. Also returns a mapping that
 -- maps a top entity to its reverse topologically sorted transitive dependencies.

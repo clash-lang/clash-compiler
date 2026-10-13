@@ -48,7 +48,6 @@ import           Data.Either                      (partitionEithers)
 import qualified Data.IntMap                      as IntMap
 import qualified Data.IORef                       as IORef
 import           Data.List                        (intercalate, mapAccumL)
-import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 
@@ -61,9 +60,6 @@ import           Data.Text.Prettyprint.Doc        (vcat)
 import           GHC.BasicTypes.Extra             (isNoInline)
 
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
-import           Clash.Core.Var                   (Id)
-import           Clash.Core.VarEnv
-  (elemVarSet, emptyVarEnv, mkVarSet)
 import           Clash.Debug                      (traceIf)
 import           Clash.Driver.Types
   (Binding(..), DebugOpts(..), ClashEnv(..), GlobalBindings)
@@ -112,7 +108,7 @@ runNormalization
   -- ^ Hardcoded Type -> HWType translator
   -> GlobalEnv Bool
   -- ^ Map telling whether a components is part of a recursive group
-  -> [Id]
+  -> [GlobalId]
   -- ^ topEntities
   -> NormalizeSession a
   -- ^ NormalizeSession to run
@@ -124,24 +120,17 @@ runNormalization env supply globals typeTrans rcsMap topEnts m =
     rwEnv     = RewriteEnv
                   env
                   typeTrans
-                  -- The evaluator of Clash Core is that of the transformations
-                  -- of Clash Core, which the normalizer doesn't run
-                  (error $ $(curLoc) ++ "Report as bug: no evaluator of Clash Core")
-                  (mkVarSet topEnts)
+                  (globalSetFromList topEnts)
                   (mkTypeEnv (envTyConMap env))
 
     rwState   = RewriteState
                   { _transformCounter = 0
                   , _transformAppliedCounters = mempty
                   , _transformTriedCounters = mempty
-                  -- The bindings of Clash Core are those of the transformations
-                  -- of Clash Core, which the normalizer doesn't run
-                  , _bindings = emptyVarEnv
                   , _uniqSupply = supply
                   , _curFun = (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   , _nameCounter = 0
                   , _globalHeap = (IntMap.empty, 0)
-                  , _workFreeBinders = emptyVarEnv
                   , _scopedBindings = globals
                   , _scopedWorkFreeBinders = emptyGlobalEnv
                   , _hwTypeCache = Map.empty
@@ -149,17 +138,9 @@ runNormalization env supply globals typeTrans rcsMap topEnts m =
                   }
 
     normState = NormalizeState
-                  { _normalized = emptyVarEnv
-                  , _specialisationCache = Map.empty
-                  , _specialisationHistory = emptyVarEnv
-                  , _inlineHistory = emptyVarEnv
-                  , _primitiveArgs = Map.empty
-                  , _recursiveComponents = emptyVarEnv
-                  , _normalizationStrategy = noStrategy "normalization"
-                  , _constantPropagationStrategy = noStrategy "constantPropagation"
+                  { _primitiveArgs = Map.empty
                   , _scopedNormalizationStrategy = normalization
                   , _scopedConstantPropagationStrategy = constantPropagation
-                  , _workFreeAppCache = HashMap.empty
                   , _scopedNormalized = emptyGlobalEnv
                   , _scopedSpecialisationCache = Map.empty
                   , _scopedSpecialisationHistory = emptyGlobalEnv
@@ -167,11 +148,6 @@ runNormalization env supply globals typeTrans rcsMap topEnts m =
                   , _scopedRecursiveComponents = rcsMap
                   , _scopedWorkFreeAppCache = Map.empty
                   }
-
-    -- The strategies of Clash Core are those of the transformations of Clash
-    -- Core, which the normalizer doesn't run
-    noStrategy nm _ _ =
-      error ($(curLoc) ++ "The normalizer has no " ++ nm ++ " strategy of Clash Core")
 
 -- | Normalize the given global binders, and the ones they refer to
 normalize
@@ -210,7 +186,7 @@ normalize' nm = do
     Just (Binding nmG sp inl pr tm r) -> do
       te <- Lens.view scopedTypeEnv
       topEnts <- Lens.view topEntities
-      let isTop = globalIdLegacy nm `elemVarSet` topEnts
+      let isTop = nm `memberGlobalSet` topEnts
           ty0 = globalIdType nmG
           ty1 = if isTop then tvSubstWithTyEq emptyScope ty0 else ty0
 
@@ -245,7 +221,7 @@ normalize' nm = do
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
             prevNorm <- Lens.use (extra.scopedNormalized)
-            let toNormalize = filter (\g -> not (globalIdLegacy g `elemVarSet` topEnts))
+            let toNormalize = filter (\g -> not (g `memberGlobalSet` topEnts))
                             $ filter (\g -> g /= nm && not (memberGlobalEnv g prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
          else
@@ -447,7 +423,7 @@ flattenNode
   -> NormalizeSession (Either CallTree ((GlobalId, Term 'VoidS), [CallTree]))
 flattenNode c@(CLeaf (_,(Binding _ _ spec _ _ _))) | isNoInline spec = return (Left c)
 flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
-  isTopEntity <- elemVarSet (globalIdLegacy nm) <$> Lens.view topEntities
+  isTopEntity <- memberGlobalSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left c) else
     case etaReduceWrapper e of
       Single (Just e') -> return (Right ((nm,e'),[]))
@@ -455,7 +431,7 @@ flattenNode c@(CLeaf (nm,(Binding _ _ _ _ e _))) = do
 flattenNode b@(CBranch (_,(Binding _ _ spec _ _ _)) _) | isNoInline spec =
   return (Left b)
 flattenNode b@(CBranch (nm,(Binding _ _ _ _ e _)) us) = do
-  isTopEntity <- elemVarSet (globalIdLegacy nm) <$> Lens.view topEntities
+  isTopEntity <- memberGlobalSet nm <$> Lens.view topEntities
   if isTopEntity then return (Left b) else
     case etaReduceWrapper e of
       Single (Just e') -> return (Right ((nm,e'),us))

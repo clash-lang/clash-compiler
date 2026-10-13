@@ -36,7 +36,7 @@ import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 
 import Test.Clash.Rewrite
-  ( TestDefs (..), TestTerm, heapLookupEvaluator, kindedTyVarD, parseTestTermWith
+  ( TestDefs (..), TestTerm, kindedTyVarD, parseTestTermWith
   , parseTestType, strQQ, testGlobalId, testTyConMap, withTyConMap )
 import Test.Clash.Scoped (ScopeDecl, assertRewritesTo, closedType, varD, withCurFun)
 
@@ -70,11 +70,9 @@ tm = parseTestTermWith (TestDefs [] prims [testGlobalId "f_G2" (parseTestType (a
   a = "(" <> List.intercalate " -> " (replicate 17 "Int") <> ")"
 
 -- | The environment of the reductions: the type constructors of
--- 'testTyConMap', with an evaluator for the
--- 'Clash.Normalize.Strategy.constantPropagation' strategy that some
--- reductions run on their function argument
+-- 'testTyConMap'
 env :: RewriteEnv
-env = (withTyConMap testTyConMap def) {_evaluator = heapLookupEvaluator}
+env = withTyConMap testTyConMap def
 
 st :: RewriteState NormalizeState
 st = withCurFun (testGlobalId "top_G100" "Int") def {_globalHeap = (IntMap.empty, 0)}

@@ -12,13 +12,11 @@
   A @'TransformContext' n@ is the context of a subterm in scope @n@: the
   'Scope' itself, to create fresh binders, the 'Path' from the root of the
   term to the subterm, and the let-bindings of the path, for the evaluator
-  ('tfHeap'). It mirrors 'Clash.Rewrite.Types.TransformContext' and its
-  'Clash.Core.Term.CoreContext' frames, except that frames that bind
-  variables are scoped: the path is a snoc-list in which every frame lives in
-  the scope of the subterms below it, and a frame that goes under binders
-  ('Under') extends the scope. So, unlike in Clash Core, the binders on the
-  path never shadow one another, and a let-binding on the path is valid at the
-  subterm as it is (after sinking).
+  ('tfHeap'). Frames that bind variables are scoped: the path is a
+  snoc-list in which every frame lives in the scope of the subterms below it,
+  and a frame that goes under binders ('Under') extends the scope. So the
+  binders on the path never shadow one another, and a let-binding on the path
+  is valid at the subterm as it is (after sinking).
 
   Only traversals extend the context, and they do so while opening the binder
   they go under: see 'underLam', 'underTyLam', 'underAlt', 'underLet' and
