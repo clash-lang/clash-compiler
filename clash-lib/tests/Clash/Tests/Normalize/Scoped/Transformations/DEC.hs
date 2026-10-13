@@ -55,7 +55,7 @@ import Test.Clash.Differential (KnownDifference, Outcome (..), letrecOrder, recT
 import Test.Clash.Differential.Sites (compareAtSite)
 import Test.Clash.Rewrite
   ( globalId, heapLookupEvaluator, inScopeOf, intFunTy, intId, intTy
-  , justDataCon, localId, maybeTy, mkAlgTyCon, mkBindingMap, nothingDataCon
+  , justDataCon, localId, maybeTy, mkTestAlgTyCon, mkBindingMap, nothingDataCon
   , pairDataCon, pairTy, parseTyConName, runRewriteTest, showPprU, testTyConMap, tyVar, withTupleTyCons
   , withTyConMap )
 import Test.Clash.Scoped.ViaFoil (viaFoil)
@@ -81,7 +81,7 @@ env :: RewriteEnv
 env = (withTupleTyCons 3 (withTyConMap tcm def)) {_evaluator = heapLookupEvaluator}
  where
   tcm = UniqMap.insert (tyConName tTc) tTc testTyConMap
-  tTc = mkAlgTyCon (parseTyConName "T") [] [mkTDc]
+  tTc = mkTestAlgTyCon (parseTyConName "T") [] [mkTDc]
 
 -- | Run DEC at the root of a term, with the given variables in scope. Gives
 -- the result, and whether it signaled a change.

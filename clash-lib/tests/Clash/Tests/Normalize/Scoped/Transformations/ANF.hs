@@ -41,7 +41,7 @@ import Clash.Util.Supply (newSupply)
 import Clash.Tests.Normalize.Transformations.ANF (anfTests)
 import Test.Clash.Rewrite
   ( addTy, assertAlphaEq, assertWellScoped, consDc, eqTy, globalId, intFunTy
-  , intId, intLit, intTy, justDataCon, localId, maybeTy, mkDataCon
+  , intId, intLit, intTy, justDataCon, localId, maybeTy, mkTestDataCon
   , nothingDataCon, numTy, pairDataCon, pairTy, parseTyConTy
   , rewriteEnvWithTyCons, runSingleTransformation, tyVar, vecM, vecTy )
 
@@ -167,7 +167,7 @@ anfExistentialInBody =
   e = tyVar User "e" 1301
   -- MkE :: forall e. Int -> E
   mkE :: DataCon
-  mkE = mkDataCon "MkE" 1302 [] [e] [intTy] (parseTyConTy "E")
+  mkE = mkTestDataCon "MkE" 1302 [] [e] [intTy] (parseTyConTy "E")
   s = localId User "s" 1303 (parseTyConTy "E")
   y = intId User "y" 1304
   c = tyVar User "c" 1305
@@ -181,7 +181,7 @@ tests =
     , testGroup "agrees with the current makeANF" agreementTests
     , testCase "nonRepANF agrees with the current nonRepANF" $ do
         -- MkP :: Int -> (Int -> Int) -> P
-        let mkP = mkDataCon "MkP" 1001 [] [] [intTy, intFunTy 1] (parseTyConTy "P")
+        let mkP = mkTestDataCon "MkP" 1001 [] [] [intTy, intFunTy 1] (parseTyConTy "P")
             tm = Lam x (mkApps (Data mkP)
                    [ Left (Var x)
                    , Left (Let (NonRec a (h (Var x))) (Lam z (k (Var a) (Var z)))) ])

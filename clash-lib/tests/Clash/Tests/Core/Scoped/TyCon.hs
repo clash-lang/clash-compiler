@@ -24,13 +24,12 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert hiding (mkDataCon, mkFunTyCon)
-import qualified Clash.Core.Scoped.Convert as Convert (mkFunTyCon)
+import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
 
 import Test.Clash.Rewrite
-  ( intTy, intTyCon, kindedTyVar, mkDataCon, mkFunTyCon, mkNewTyCon, mkTyConName
+  ( intTy, intTyCon, kindedTyVar, mkTestDataCon, mkTestFunTyCon, mkTestNewTyCon, mkTyConName
   , testTyConMap, tyVar )
 import Test.Clash.Scoped (assertScopedTyAlphaEq)
 
@@ -46,23 +45,23 @@ maybeTy = C.AppTy (C.ConstTy (C.TyCon (mkTyConName "Maybe" 2001)))
 
 -- | @newtype N a = MkN (Maybe a)@
 nTyCon :: C.TyCon
-nTyCon = mkNewTyCon nm [aTv] mkN ([aTv], maybeTy (C.VarTy aTv))
+nTyCon = mkTestNewTyCon nm [aTv] mkN ([aTv], maybeTy (C.VarTy aTv))
  where
   nm = mkTyConName "N" 2002
-  mkN = mkDataCon "MkN" 2003 [aTv] [] [maybeTy (C.VarTy aTv)] (C.AppTy (C.ConstTy (C.TyCon nm)) (C.VarTy aTv))
+  mkN = mkTestDataCon "MkN" 2003 [aTv] [] [maybeTy (C.VarTy aTv)] (C.AppTy (C.ConstTy (C.TyCon nm)) (C.VarTy aTv))
 
 -- | @newtype P a = MkP (forall b. a -> b)@
 pTyCon :: C.TyCon
-pTyCon = mkNewTyCon nm [aTv] mkP ([aTv], rhs)
+pTyCon = mkTestNewTyCon nm [aTv] mkP ([aTv], rhs)
  where
   nm = mkTyConName "P" 2004
   rhs = C.ForAllTy bTv (C.mkFunTy (C.VarTy aTv) (C.VarTy bTv))
-  mkP = mkDataCon "MkP" 2005 [aTv] [] [rhs] (C.AppTy (C.ConstTy (C.TyCon nm)) (C.VarTy aTv))
+  mkP = mkTestDataCon "MkP" 2005 [aTv] [] [rhs] (C.AppTy (C.ConstTy (C.TyCon nm)) (C.VarTy aTv))
 
 -- | @type family F (a :: k) :: Type where F (a :: k) = k@, i.e. with a pattern
 -- variable whose kind mentions another one
 fTyCon :: C.TyCon
-fTyCon = mkFunTyCon (mkTyConName "F" 2006) C.liftedTypeKind 1 [([C.VarTy akTv], C.VarTy kTv)]
+fTyCon = mkTestFunTyCon (mkTyConName "F" 2006) C.liftedTypeKind 1 [([C.VarTy akTv], C.VarTy kTv)]
  where
   akTv = kindedTyVar C.User "a" 54 (C.VarTy kTv)
 
@@ -141,7 +140,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.TyCon"
   native tc = case tc of
     C.AlgTyCon {} -> mkAlgTyCon nm k ar (nativeRhs (C.algTcRhs tc)) (C.isClassTc tc)
     C.PromotedDataCon {} -> mkPromotedDataCon nm k ar (C.tyConData tc)
-    C.FunTyCon {} -> Convert.mkFunTyCon nm k ar (C.tyConEqns tc)
+    C.FunTyCon {} -> mkFunTyCon nm k ar (C.tyConEqns tc)
     C.PrimTyCon {} -> mkPrimTyCon nm k ar
    where
     (nm, k, ar) = (C.tyConName tc, C.tyConKind tc, C.tyConArity tc)

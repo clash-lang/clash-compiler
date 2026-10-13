@@ -25,13 +25,13 @@ import qualified Clash.Core.Subst as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert hiding (mkDataCon)
+import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TyCon
 import Clash.Core.Scoped.TypeEnv
 
 import Test.Clash.Rewrite
-  (assertErrorContains, intTy, mkDataCon, nTyConName, testTyConMap)
+  (assertErrorContains, intTy, mkTestDataCon, nTyConName, testTyConMap)
 import Test.Clash.Scoped (assertScopedTyAlphaEq, testTypeEnv, withFreeVars, withTests)
 import qualified Test.Clash.Scoped.Gen as Gen
 
@@ -57,7 +57,7 @@ dataCons = concatMap C.tyConDataCons tyCons
 
 -- | A data constructor that is not in 'testTyConMap'
 otherDataCon :: C.DataCon
-otherDataCon = mkDataCon "Other" 4300 [] [] [intTy] intTy
+otherDataCon = mkTestDataCon "Other" 4300 [] [] [intTy] intTy
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.TypeEnv"

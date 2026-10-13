@@ -47,7 +47,7 @@ import Clash.Util.Supply (freshId, newSupply)
 import Clash.Tests.Normalize.Transformations.Cast
   (CastRewrites (..), castTests, currentRewrites)
 import Test.Clash.Rewrite
-  ( assertFires, globalId, inScopeOf, intFunTy, intId, intLit, intTy, localId, mkDataCon
+  ( assertFires, globalId, inScopeOf, intFunTy, intId, intLit, intTy, localId, mkTestDataCon
   , pairDataCon, pairTy, parseTyConTy, runRewriteTest, tyVar )
 import Test.Clash.Scoped (assertRewritesAgree)
 import Test.Clash.Scoped.ViaFoil (viaFoil)
@@ -99,7 +99,7 @@ eTy = parseTyConTy "E"
 -- | @MkE :: forall b. b -> E@, a data constructor with an existential type
 -- variable
 mkE :: DataCon
-mkE = mkDataCon "MkE" 1001 [] [b] [VarTy b] eTy
+mkE = mkTestDataCon "MkE" 1001 [] [b] [VarTy b] eTy
  where
   b = tyVar User "b" 1002
 

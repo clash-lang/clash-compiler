@@ -25,12 +25,12 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 
 import Clash.Core.Scoped.Alpha
-import Clash.Core.Scoped.Convert hiding (mkDataCon)
+import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite
-  (intId, intTy, localId, mkDataCon, parseToTermQQ, parseTyConTy, tyVar)
+  (intId, intTy, localId, mkTestDataCon, parseToTermQQ, parseTyConTy, tyVar)
 import Test.Clash.Scoped
   ( assertScopedAlphaEq, extendFreeVars, extendSunk, forAllScrambled, sinkInto
   , withFreeVars, withFreeVarsOf, withTests)
@@ -59,7 +59,7 @@ iTy :: C.Type
 iTy = parseTyConTy "I"
 
 mkI :: C.DataCon
-mkI = mkDataCon "MkI" 1001 [] [] [intTy] iTy
+mkI = mkTestDataCon "MkI" 1001 [] [] [intTy] iTy
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Alpha"

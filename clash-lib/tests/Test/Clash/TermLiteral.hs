@@ -45,7 +45,7 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 
-import Test.Clash.Rewrite (intTy, mkDataCon)
+import Test.Clash.Rewrite (intTy, mkTestDataCon)
 
 -- | Encode a value as a Clash Core term of the shape "Clash.GHC.GHC2Core"
 -- makes for it, as far as the decoders of 'Clash.Core.TermLiteral.TermLiteral'
@@ -56,7 +56,7 @@ class ToCoreTerm a where
 -- | A data constructor with the given fully qualified name, as the derived
 -- decoders match on (see 'Clash.Core.TermLiteral.TH.deriveTermToData')
 coreDataCon :: String -> C.DataCon
-coreDataCon nm = mkDataCon nm (fromIntegral (Hashable.hash nm)) [] [] [] intTy
+coreDataCon nm = mkTestDataCon nm (fromIntegral (Hashable.hash nm)) [] [] [] intTy
 
 -- | A data constructor application with type arguments and fields
 dataApp :: String -> Int -> [C.Term] -> C.Term

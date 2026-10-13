@@ -22,7 +22,7 @@ import Clash.Core.VarEnv (emptyInScopeSet)
 
 import Test.Clash.Rewrite
   ( globalId, inScopeOf, intId, intLit, intTy, lintClosed, lintIn, localId
-  , mkDataCon, pairDataCon, parseTyConTy, tyVar )
+  , mkTestDataCon, pairDataCon, parseTyConTy, tyVar )
 
 -- | Term variables of type @Int@
 x, y :: Id
@@ -56,7 +56,7 @@ yb :: Id
 yb = localId User "yb" 8 (VarTy b)
 
 mkT :: Pat
-mkT = DataPat (mkDataCon "MkT" 200 [] [b] [VarTy b] (parseTyConTy "T")) [b] [yb]
+mkT = DataPat (mkTestDataCon "MkT" 200 [] [b] [VarTy b] (parseTyConTy "T")) [b] [yb]
 
 s :: Id
 s = localId User "s" 9 (parseTyConTy "T")

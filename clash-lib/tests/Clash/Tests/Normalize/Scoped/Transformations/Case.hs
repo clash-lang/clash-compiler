@@ -44,7 +44,7 @@ import Clash.Core.Scoped.Syntax (sink)
 
 import Clash.Tests.Normalize.Transformations.Case (CaseRewrites (..), caseTests)
 import Test.Clash.Rewrite
-  ( assertAlphaEq, intFunTy, intId, intTy, localId, mkDataCon, pairDataCon
+  ( assertAlphaEq, intFunTy, intId, intTy, localId, mkTestDataCon, pairDataCon
   , parseTyConTy, runRewriteTest )
 import Test.Clash.Scoped (binderRaws, extendSunk, sunkVar, withFreeVarsOf)
 import Test.Clash.Scoped.ViaFoil (viaFoil)
@@ -90,7 +90,7 @@ tTy = parseTyConTy "T"
 
 -- | @MkT :: Int -> T@
 mkT :: C.DataCon
-mkT = mkDataCon "MkT" 1000 [] [] [intTy] tTy
+mkT = mkTestDataCon "MkT" 1000 [] [] [intTy] tTy
 
 -- | A primitive @work :: Int -> Int@ that is not work free
 workPrim :: C.Term

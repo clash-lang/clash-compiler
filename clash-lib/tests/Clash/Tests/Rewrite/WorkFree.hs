@@ -25,7 +25,7 @@ import Clash.Driver.Types (BindingMap)
 import Clash.Rewrite.WorkFree (isWorkFree)
 
 import Test.Clash.Rewrite
-  (globalId, intLit, intTy, mkBindingMap, mkDataCon, parseTyConTy)
+  (globalId, intLit, intTy, mkBindingMap, mkTestDataCon, parseTyConTy)
 
 -- | @Strm@, a type with a single constructor 'consDataCon'
 streamTy :: Type
@@ -33,7 +33,7 @@ streamTy = parseTyConTy "Strm"
 
 -- | @Cons :: Int -> Strm -> Strm@
 consDataCon :: DataCon
-consDataCon = mkDataCon "Cons" 102 [] [] [intTy, streamTy] streamTy
+consDataCon = mkTestDataCon "Cons" 102 [] [] [intTy, streamTy] streamTy
 
 -- | @xs = Cons 1 ys@ and @ys = Cons 2 xs@
 xs, ys :: Id

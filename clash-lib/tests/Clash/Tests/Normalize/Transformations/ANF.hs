@@ -39,7 +39,7 @@ import Clash.Util.Supply (Supply, newSupply)
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, assertWellScoped
   , globalId, inScopeOf, intFunTy, intId, intLit, intTy, letBinders, localId
-  , mkDataCon, parseTyConTy, runSingleTransformation, showPprU, tyVar )
+  , mkTestDataCon, parseTyConTy, runSingleTransformation, showPprU, tyVar )
 
 -- | The current 'Clash.Normalize.Transformations.ANF.nonRepANF', which the
 -- normalizer replaced by its scoped port
@@ -48,7 +48,7 @@ nonRepANFR = $(asRewriteQ (toTransformation "nonRepANF" (onApp 'nonRepANFWorker)
 
 -- | @MkP :: Int -> (Int -> Int) -> P@
 mkP :: DataCon
-mkP = mkDataCon "MkP" 1001 [] [] [intTy, intFunTy 1] (parseTyConTy "P")
+mkP = mkTestDataCon "MkP" 1001 [] [] [intTy, intFunTy 1] (parseTyConTy "P")
 
 -- | @MkP x (let x = u in \\y -> x)@, with the first @x@ free. 'nonRepANF'
 -- must not move the first argument under the let-binder @x@.
@@ -161,7 +161,7 @@ signalTy = parseTyConTy "Sig"
 -- name.
 signalCons :: DataCon
 signalCons =
-  mkDataCon "Clash.Signal.Internal.:-" 1101 [] [] [intTy, signalTy] signalTy
+  mkTestDataCon "Clash.Signal.Internal.:-" 1101 [] [] [intTy, signalTy] signalTy
 
 -- | ANF used to leave case-expressions with an alternative for the @(:-)@
 -- constructor of @Signal@ in place, but still let-bound the subterms of that
@@ -198,7 +198,7 @@ anfExistential anf = do
  where
   m = tyVar User "m" 1201
   -- MkE :: forall m. m -> Int -> E
-  mkE = mkDataCon "MkE" 1202 [] [m] [VarTy m, intTy] (parseTyConTy "E")
+  mkE = mkTestDataCon "MkE" 1202 [] [m] [VarTy m, intTy] (parseTyConTy "E")
   e = localId User "e" 1203 (parseTyConTy "E")
   x = localId User "x" 1204 (VarTy m)
   y = intId User "y" 1205

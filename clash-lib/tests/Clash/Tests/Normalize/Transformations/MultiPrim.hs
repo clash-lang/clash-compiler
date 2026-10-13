@@ -41,7 +41,7 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..))
 
 import Test.Clash.Rewrite
-  ( inScopeOf, mkAlgTyCon, mkDataCon, runSingleTransformation
+  ( inScopeOf, mkTestAlgTyCon, mkTestDataCon, runSingleTransformation
   , testTyConMap, tyVar, withTyConMap )
 
 setupMultiResultPrimR :: NormRewrite
@@ -88,12 +88,12 @@ env = withTyConMap tcm def {_clashEnv = env0 {envPrimitives = HashMap.singleton 
 
 -- | The type constructors of the tests, with pairs
 tcm :: TyConMap
-tcm = UniqMap.insert tupNm (mkAlgTyCon tupNm [b, c] [tupDc]) testTyConMap
+tcm = UniqMap.insert tupNm (mkTestAlgTyCon tupNm [b, c] [tupDc]) testTyConMap
  where
   b = tyVar User "b" 31
   c = tyVar User "c" 32
   tupDc =
-    mkDataCon "GHC.Tuple.Prim.(,)" 200 [b, c] [] [VarTy b, VarTy c]
+    mkTestDataCon "GHC.Tuple.Prim.(,)" 200 [b, c] [] [VarTy b, VarTy c]
       (mkTyConApp tupNm [VarTy b, VarTy c])
 
 -- | The primitives of a term

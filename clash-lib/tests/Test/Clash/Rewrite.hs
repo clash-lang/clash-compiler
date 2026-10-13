@@ -749,10 +749,10 @@ intFunTy n = foldr C.mkFunTy intTy (replicate n intTy)
 -- | A data constructor with the given name, unique, universally quantified type
 -- variables, existentially quantified type variables, (lazy) field types, and
 -- result type. Its tag is 1, i.e. it is the first constructor of its type.
-mkDataCon
+mkTestDataCon
   :: String -> Unique -> [C.TyVar] -> [C.TyVar] -> [C.Type] -> C.Type
   -> C.DataCon
-mkDataCon nm uniq univTvs extTvs argTys resTy = C.mkDataConFromClash
+mkTestDataCon nm uniq univTvs extTvs argTys resTy = C.mkDataConFromClash
   (C.mkUnsafeName C.User (Text.pack nm) uniq)
   uniq
   1
@@ -774,21 +774,21 @@ tyConKindFor tvs = foldr (C.mkFunTy . C.varType) C.liftedTypeKind tvs
 
 -- | A data type with the given name, type variables (of kind
 -- 'C.liftedTypeKind'), and data constructors
-mkAlgTyCon :: C.TyConName -> [C.TyVar] -> [C.DataCon] -> C.TyCon
-mkAlgTyCon nm tvs dcs =
+mkTestAlgTyCon :: C.TyConName -> [C.TyVar] -> [C.DataCon] -> C.TyCon
+mkTestAlgTyCon nm tvs dcs =
   C.mkAlgTyConFromClash (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.DataTyCon dcs) False
 
 -- | A newtype with the given name, type variables (of kind
 -- 'C.liftedTypeKind'), data constructor, and eta-reduced representation type,
 -- see 'C.ntLegacyEtadRhs'
-mkNewTyCon :: C.TyConName -> [C.TyVar] -> C.DataCon -> ([C.TyVar], C.Type) -> C.TyCon
-mkNewTyCon nm tvs dc rhs =
+mkTestNewTyCon :: C.TyConName -> [C.TyVar] -> C.DataCon -> ([C.TyVar], C.Type) -> C.TyCon
+mkTestNewTyCon nm tvs dc rhs =
   C.mkAlgTyConFromClash (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.mkNewTyConRhsFromClash dc rhs) False
 
 -- | A type family with the given name, kind, arity, and equations, see
 -- 'C.tyConLegacySubst'
-mkFunTyCon :: C.TyConName -> C.Kind -> Int -> [([C.Type], C.Type)] -> C.TyCon
-mkFunTyCon nm = C.mkFunTyConFromClash (C.nameUniq nm) nm
+mkTestFunTyCon :: C.TyConName -> C.Kind -> Int -> [([C.Type], C.Type)] -> C.TyCon
+mkTestFunTyCon nm = C.mkFunTyConFromClash (C.nameUniq nm) nm
 
 -- | @Pair@, a data type with a single constructor 'pairDataCon'
 pairTy :: C.Type
@@ -796,7 +796,7 @@ pairTy = parseTyConTy "Pair"
 
 -- | @MkPair :: Int -> Int -> Pair@
 pairDataCon :: C.DataCon
-pairDataCon = mkDataCon "MkPair" 100 [] [] [intTy, intTy] pairTy
+pairDataCon = mkTestDataCon "MkPair" 100 [] [] [intTy, intTy] pairTy
 
 -- | @E@, a data type with a single constructor 'existentialDataCon'
 existentialTy :: C.Type
@@ -810,7 +810,7 @@ existentialTyVar = tyVar C.User "b" 50
 -- quantified type variable
 existentialDataCon :: C.DataCon
 existentialDataCon =
-  mkDataCon "MkE" 1002 [] [existentialTyVar] [C.VarTy existentialTyVar] existentialTy
+  mkTestDataCon "MkE" 1002 [] [existentialTyVar] [C.VarTy existentialTyVar] existentialTy
 
 -- * Type constructors
 --
@@ -860,18 +860,18 @@ ghcBoolTy :: C.Type
 ghcBoolTy = tcTy ghcBoolTyConName
 
 ghcFalseDataCon, ghcTrueDataCon :: C.DataCon
-ghcFalseDataCon = mkDataCon "GHC.Types.False" (fromGhcUnique falseDataConKey) [] [] [] ghcBoolTy
+ghcFalseDataCon = mkTestDataCon "GHC.Types.False" (fromGhcUnique falseDataConKey) [] [] [] ghcBoolTy
 ghcTrueDataCon =
-  (mkDataCon "GHC.Types.True" (fromGhcUnique trueDataConKey) [] [] [] ghcBoolTy) {C.dcTag = 2}
+  (mkTestDataCon "GHC.Types.True" (fromGhcUnique trueDataConKey) [] [] [] ghcBoolTy) {C.dcTag = 2}
 
 -- | @data Maybe a = Nothing | Just a@
 maybeTy :: C.Type -> C.Type
 maybeTy a = tcApp maybeTyConName [a]
 
 nothingDataCon, justDataCon :: C.DataCon
-nothingDataCon = mkDataCon "Nothing" 3020 [fxA] [] [] (maybeTy (C.VarTy fxA))
+nothingDataCon = mkTestDataCon "Nothing" 3020 [fxA] [] [] (maybeTy (C.VarTy fxA))
 justDataCon =
-  (mkDataCon "Just" 3021 [fxA] [] [C.VarTy fxA] (maybeTy (C.VarTy fxA))) {C.dcTag = 2}
+  (mkTestDataCon "Just" 3021 [fxA] [] [C.VarTy fxA] (maybeTy (C.VarTy fxA))) {C.dcTag = 2}
 
 -- | A tuple type, which 'C.isTupleTyConLike' recognises, but which is not in
 -- 'testTyConMap'
@@ -882,11 +882,11 @@ tupleTy = tcApp (mkTyConName "GHC.Tuple.(,)" 3036)
 -- single data constructor @MkTupN :: forall t1 .. tN. t1 -> .. -> tN -> TupN
 -- t1 .. tN@, for 'Clash.Rewrite.Types.tupleTcCache'
 tupleTyCon :: Int -> C.TyCon
-tupleTyCon n = mkAlgTyCon nm tvs [dc]
+tupleTyCon n = mkTestAlgTyCon nm tvs [dc]
  where
   nm = mkTyConName ("Tup" <> show n) (3500 + fromIntegral n)
   tvs = [tyVar C.User ("t" <> show i) (3600 + 10 * fromIntegral n + fromIntegral i) | i <- [1 .. n]]
-  dc = mkDataCon ("MkTup" <> show n) (3700 + fromIntegral n) tvs []
+  dc = mkTestDataCon ("MkTup" <> show n) (3700 + fromIntegral n) tvs []
          (map C.VarTy tvs) (tcApp nm (map C.VarTy tvs))
 
 -- | Add the tuple type constructors of arity 2 up to the given one
@@ -990,10 +990,10 @@ fxM = kindedTyVar C.User "m" 3027 C.typeNatKind
 
 vNilDataCon, vConsDataCon :: C.DataCon
 vNilDataCon =
-  mkDataCon "VNil" 3028 [fxN] [] [eqTy C.typeNatKind (C.VarTy fxN) (numTy 0)]
+  mkTestDataCon "VNil" 3028 [fxN] [] [eqTy C.typeNatKind (C.VarTy fxN) (numTy 0)]
     (vTy (C.VarTy fxN))
 vConsDataCon =
-  (mkDataCon "VCons" 3029 [fxN] [fxM]
+  (mkTestDataCon "VCons" 3029 [fxN] [fxM]
     [ eqTy C.typeNatKind (C.VarTy fxN) (addTy (C.VarTy fxM) (numTy 1))
     , intTy
     , vTy (C.VarTy fxM) ]
@@ -1017,14 +1017,14 @@ vecM = tyVar C.User "m" 2003
 -- | @Nil :: forall n a. (n ~ 0) => Vec n a@
 nilDc :: C.DataCon
 nilDc =
-  mkDataCon "Nil" 2005 [vecN, vecA] []
+  mkTestDataCon "Nil" 2005 [vecN, vecA] []
     [eqTy C.typeNatKind (C.VarTy vecN) (numTy 0)]
     (vecTy (C.VarTy vecN) (C.VarTy vecA))
 
 -- | @Cons :: forall n a. forall m. (n ~ m + 1) => a -> Vec m a -> Vec n a@
 consDc :: C.DataCon
 consDc =
-  (mkDataCon "Cons" 2006 [vecN, vecA] [vecM]
+  (mkTestDataCon "Cons" 2006 [vecN, vecA] [vecM]
     [ eqTy C.typeNatKind (C.VarTy vecN) (addTy (C.VarTy vecM) (numTy 1))
     , C.VarTy vecA
     , vecTy (C.VarTy vecM) (C.VarTy vecA) ]
@@ -1050,7 +1050,7 @@ rtreeD1 = tyVar C.User "d1" 2013
 -- | @LR :: forall d a. (d ~ 0) => a -> RTree d a@
 lrDc :: C.DataCon
 lrDc =
-  mkDataCon "LR" 2014 [rtreeD, rtreeA] []
+  mkTestDataCon "LR" 2014 [rtreeD, rtreeA] []
     [eqTy C.typeNatKind (C.VarTy rtreeD) (numTy 0), C.VarTy rtreeA]
     (rtreeTy (C.VarTy rtreeD) (C.VarTy rtreeA))
 
@@ -1058,7 +1058,7 @@ lrDc =
 -- RTree d a@
 brDc :: C.DataCon
 brDc =
-  (mkDataCon "BR" 2015 [rtreeD, rtreeA] [rtreeD1]
+  (mkTestDataCon "BR" 2015 [rtreeD, rtreeA] [rtreeD1]
     [ eqTy C.typeNatKind (C.VarTy rtreeD) (addTy (C.VarTy rtreeD1) (numTy 1))
     , rtreeTy (C.VarTy rtreeD1) (C.VarTy rtreeA)
     , rtreeTy (C.VarTy rtreeD1) (C.VarTy rtreeA) ]
@@ -1078,7 +1078,7 @@ snatN :: C.TyVar
 snatN = kindedTyVar C.User "n" 2031 C.typeNatKind
 
 snatDc :: C.DataCon
-snatDc = mkDataCon "SNat" 2032 [snatN] [] [C.naturalPrimTy] (snatTy (C.VarTy snatN))
+snatDc = mkTestDataCon "SNat" 2032 [snatN] [] [C.naturalPrimTy] (snatTy (C.VarTy snatN))
 
 -- | GHC's boxed @Int@: @data Int = I# Int#@, unlike 'intTy'. The primitive
 -- reductions of @replace_int@ and @index_int@ compare the index with boxed
@@ -1090,7 +1090,7 @@ hIntTy :: C.Type
 hIntTy = tcTy hIntTcNm
 
 iHashDc :: C.DataCon
-iHashDc = mkDataCon "GHC.Types.I#" 2034 [] [] [C.intPrimTy] hIntTy
+iHashDc = mkTestDataCon "GHC.Types.I#" 2034 [] [] [C.intPrimTy] hIntTy
 
 -- | A proof of an upper bound, as @dfold@ takes one: @data UBP l n = MkUBP@
 ubpTcNm :: C.TyConName
@@ -1104,7 +1104,7 @@ ubpTy :: C.Type -> C.Type -> C.Type
 ubpTy l n = tcApp ubpTcNm [l, n]
 
 ubpDc :: C.DataCon
-ubpDc = mkDataCon "MkUBP" 2038 [ubpL, ubpN] [] [] (ubpTy (C.VarTy ubpL) (C.VarTy ubpN))
+ubpDc = mkTestDataCon "MkUBP" 2038 [ubpL, ubpN] [] [] (ubpTy (C.VarTy ubpL) (C.VarTy ubpN))
 
 -- | The name of @Index@, as the function @imap@ takes indexes it
 indexTcNm :: C.TyConName
@@ -1138,7 +1138,7 @@ applicativeTy f = tcApp applicativeTcNm [f]
 
 functorDc, applicativeDc :: C.DataCon
 functorDc =
-  mkDataCon "CFunctor" 2045 [dictF] []
+  mkTestDataCon "CFunctor" 2045 [dictF] []
     [ C.ForAllTy dictA (C.ForAllTy dictB
         (C.mkFunTy (C.mkFunTy a b) (C.mkFunTy (C.AppTy f a) (C.AppTy f b))))
     , intTy ]
@@ -1148,7 +1148,7 @@ functorDc =
   a = C.VarTy dictA
   b = C.VarTy dictB
 applicativeDc =
-  mkDataCon "CApplicative" 2046 [dictF] []
+  mkTestDataCon "CApplicative" 2046 [dictF] []
     [ functorTy f
     , C.ForAllTy dictA (C.mkFunTy a (C.AppTy f a))
     , C.ForAllTy dictA (C.ForAllTy dictB
@@ -1178,7 +1178,7 @@ ghcPairTy a b = tcApp ghcPairTcNm [a, b]
 -- | @(,) :: forall a b. a -> b -> (a, b)@
 ghcPairDc :: C.DataCon
 ghcPairDc =
-  mkDataCon "GHC.Tuple.(,)" 2051 [pairA, pairB] [] [C.VarTy pairA, C.VarTy pairB]
+  mkTestDataCon "GHC.Tuple.(,)" 2051 [pairA, pairB] [] [C.VarTy pairA, C.VarTy pairB]
     (ghcPairTy (C.VarTy pairA) (C.VarTy pairB))
 
 pairA, pairB :: C.TyVar
@@ -1193,9 +1193,9 @@ orderingTy :: C.Type
 orderingTy = tcTy orderingTcNm
 
 ltDc, eqDc, gtDc :: C.DataCon
-ltDc = mkDataCon "GHC.Types.LT" 2061 [] [] [] orderingTy
-eqDc = (mkDataCon "GHC.Types.EQ" 2062 [] [] [] orderingTy) { C.dcTag = 2 }
-gtDc = (mkDataCon "GHC.Types.GT" 2063 [] [] [] orderingTy) { C.dcTag = 3 }
+ltDc = mkTestDataCon "GHC.Types.LT" 2061 [] [] [] orderingTy
+eqDc = (mkTestDataCon "GHC.Types.EQ" 2062 [] [] [] orderingTy) { C.dcTag = 2 }
+gtDc = (mkTestDataCon "GHC.Types.GT" 2063 [] [] [] orderingTy) { C.dcTag = 3 }
 
 -- | The boxed @Double@
 doubleTcNm :: C.TyConName
@@ -1206,7 +1206,7 @@ doubleTy = tcTy doubleTcNm
 
 -- | @D# :: Double# -> Double@
 doubleDc :: C.DataCon
-doubleDc = mkDataCon "GHC.Types.D#" 2065 [] [] [C.doublePrimTy] doubleTy
+doubleDc = mkTestDataCon "GHC.Types.D#" 2065 [] [] [C.doublePrimTy] doubleTy
 
 -- | @T3@, a product of three types, like an unboxed triple
 t3TyConName :: C.TyConName
@@ -1217,7 +1217,7 @@ t3Ty a b c = tcApp t3TyConName [a, b, c]
 
 -- | @MkT3 :: a -> b -> c -> T3 a b c@
 t3DataCon :: C.DataCon
-t3DataCon = mkDataCon "MkT3" 2067 [fxA, fxB, t3C] [] [C.VarTy fxA, C.VarTy fxB, C.VarTy t3C]
+t3DataCon = mkTestDataCon "MkT3" 2067 [fxA, fxB, t3C] [] [C.VarTy fxA, C.VarTy fxB, C.VarTy t3C]
   (t3Ty (C.VarTy fxA) (C.VarTy fxB) (C.VarTy t3C))
 
 t3C :: C.TyVar
@@ -1229,7 +1229,7 @@ t2Ty a b = tcApp t2TyConName [a, b]
 
 -- | @MkT2 :: a -> b -> T2 a b@
 t2DataCon :: C.DataCon
-t2DataCon = mkDataCon "MkT2" 3033 [fxA, fxB] [] [C.VarTy fxA, C.VarTy fxB]
+t2DataCon = mkTestDataCon "MkT2" 3033 [fxA, fxB] [] [C.VarTy fxA, C.VarTy fxB]
   (t2Ty (C.VarTy fxA) (C.VarTy fxB))
 
 -- | @SomeNat@, a type-level natural hidden behind an existential
@@ -1242,7 +1242,7 @@ someNatTy = tcTy someNatTcNm
 -- | @SomeNat :: forall n. KnownNat n => Proxy n -> SomeNat@
 someNatDc :: C.DataCon
 someNatDc =
-  mkDataCon "GHC.TypeNats.SomeNat" 2070 [] [someNatN]
+  mkTestDataCon "GHC.TypeNats.SomeNat" 2070 [] [someNatN]
     [C.naturalPrimTy, kindedProxyTy C.typeNatKind (C.VarTy someNatN)] someNatTy
 
 someNatN :: C.TyVar
@@ -1259,7 +1259,7 @@ kindedProxyTy k a = tcApp proxyTcNm [k, a]
 -- rather than @k@, because the kind of a type constructor can't mention its
 -- type variables.
 proxyDc :: C.DataCon
-proxyDc = mkDataCon "Data.Proxy.Proxy" 2073 [proxyK, proxyA] [] [] (kindedProxyTy (C.VarTy proxyK) (C.VarTy proxyA))
+proxyDc = mkTestDataCon "Data.Proxy.Proxy" 2073 [proxyK, proxyA] [] [] (kindedProxyTy (C.VarTy proxyK) (C.VarTy proxyA))
 
 proxyK, proxyA :: C.TyVar
 proxyK = tyVar C.User "k" 2074
@@ -1297,7 +1297,7 @@ clkPairTy = tcTy clkPairTcNm
 
 -- | @MkClkPair :: Clock System -> Int -> ClkPair@
 clkPairDc :: C.DataCon
-clkPairDc = mkDataCon "MkClkPair" 2025 [] [] [clockTy, intTy] clkPairTy
+clkPairDc = mkTestDataCon "MkClkPair" 2025 [] [] [clockTy, intTy] clkPairTy
 
 -- | The type constructors of the types above, and those of 'C.tysPrimMap',
 -- 'intTyCon' and 'pairTy'
@@ -1306,58 +1306,58 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
  where
   tcs = UniqMap.elems C.tysPrimMap <>
     [ intTyCon
-    , mkAlgTyCon (parseTyConName "Pair") [] [pairDataCon]
-    , mkAlgTyCon boolTyConName [] [falseDc, trueDc]
-    , mkAlgTyCon ghcBoolTyConName [] [ghcFalseDataCon, ghcTrueDataCon]
-    , mkAlgTyCon maybeTyConName [fxA] [nothingDataCon, justDataCon]
-    , mkNewTyCon nTyConName [fxA]
-        (mkDataCon "MkN" 3030 [fxA] [] [maybeTy (C.VarTy fxA)] (nTy (C.VarTy fxA)))
+    , mkTestAlgTyCon (parseTyConName "Pair") [] [pairDataCon]
+    , mkTestAlgTyCon boolTyConName [] [falseDc, trueDc]
+    , mkTestAlgTyCon ghcBoolTyConName [] [ghcFalseDataCon, ghcTrueDataCon]
+    , mkTestAlgTyCon maybeTyConName [fxA] [nothingDataCon, justDataCon]
+    , mkTestNewTyCon nTyConName [fxA]
+        (mkTestDataCon "MkN" 3030 [fxA] [] [maybeTy (C.VarTy fxA)] (nTy (C.VarTy fxA)))
         ([fxA], maybeTy (C.VarTy fxA))
-    , mkNewTyCon pTyConName [fxA]
-        (mkDataCon "MkP" 3031 [fxA] [] [pRhs] (pTy (C.VarTy fxA)))
+    , mkTestNewTyCon pTyConName [fxA]
+        (mkTestDataCon "MkP" 3031 [fxA] [] [pRhs] (pTy (C.VarTy fxA)))
         ([fxA], pRhs)
-    , mkNewTyCon wTyConName []
-        (mkDataCon "MkW" 3032 [] [] [C.mkFunTy intTy intTy] wTy)
+    , mkTestNewTyCon wTyConName []
+        (mkTestDataCon "MkW" 3032 [] [] [C.mkFunTy intTy intTy] wTy)
         ([], C.mkFunTy intTy intTy)
-    , mkFunTyCon fTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
+    , mkTestFunTyCon fTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
         [ ([intTy], boolTy)
         , ([maybeTy (C.VarTy fxA)], C.VarTy fxA)
         , ([C.VarTy fxA], nTy (C.VarTy fxA)) ]
-    , mkFunTyCon maxTyConName (C.mkFunTy C.liftedTypeKind (C.mkFunTy C.liftedTypeKind C.liftedTypeKind)) 2
+    , mkTestFunTyCon maxTyConName (C.mkFunTy C.liftedTypeKind (C.mkFunTy C.liftedTypeKind C.liftedTypeKind)) 2
         [ ([C.VarTy fxA, C.VarTy fxA], C.VarTy fxA)
         , ([C.VarTy fxA, C.VarTy fxB], maybeTy (C.VarTy fxB)) ]
-    , mkFunTyCon kTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 0
+    , mkTestFunTyCon kTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 0
         [ ([], tcTy maybeTyConName) ]
-    , mkFunTyCon qTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
+    , mkTestFunTyCon qTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
         [ ([C.VarTy fxA], pRhs) ]
-    , mkAlgTyCon signalTyConName [fxA, fxB] []
-    , mkFunTyCon addTyConName natNatNat 2 []
-    , mkFunTyCon cmpNatTyConName natNatNat 2 []
-    , mkFunTyCon unconsSymbolTyConName
+    , mkTestAlgTyCon signalTyConName [fxA, fxB] []
+    , mkTestFunTyCon addTyConName natNatNat 2 []
+    , mkTestFunTyCon cmpNatTyConName natNatNat 2 []
+    , mkTestFunTyCon unconsSymbolTyConName
         (C.mkFunTy C.typeSymbolKind (maybeTy (tcApp t2TyConName [C.charPrimTy, C.typeSymbolKind])))
         1 []
-    , mkAlgTyCon t2TyConName [fxA, fxB] [t2DataCon]
+    , mkTestAlgTyCon t2TyConName [fxA, fxB] [t2DataCon]
     , C.mkAlgTyConFromClash (C.nameUniq vTyConName) vTyConName
         (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
         (C.DataTyCon [vNilDataCon, vConsDataCon]) False
-    , mkAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
-    , mkAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
-    , mkAlgTyCon snatTcNm [snatN] [snatDc]
-    , mkAlgTyCon hIntTcNm [] [iHashDc]
-    , mkAlgTyCon ubpTcNm [ubpL, ubpN] [ubpDc]
+    , mkTestAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
+    , mkTestAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
+    , mkTestAlgTyCon snatTcNm [snatN] [snatDc]
+    , mkTestAlgTyCon hIntTcNm [] [iHashDc]
+    , mkTestAlgTyCon ubpTcNm [ubpL, ubpN] [ubpDc]
     , C.mkPrimTyConFromClash (C.nameUniq indexTcNm) indexTcNm (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
-    , mkAlgTyCon functorTcNm [dictF] [functorDc]
-    , mkAlgTyCon applicativeTcNm [dictF] [applicativeDc]
-    , mkAlgTyCon ghcPairTcNm [pairA, pairB] [ghcPairDc]
+    , mkTestAlgTyCon functorTcNm [dictF] [functorDc]
+    , mkTestAlgTyCon applicativeTcNm [dictF] [applicativeDc]
+    , mkTestAlgTyCon ghcPairTcNm [pairA, pairB] [ghcPairDc]
     , C.mkPrimTyConFromClash (C.nameUniq clockTcNm) clockTcNm C.liftedTypeKind 1
     , C.mkPrimTyConFromClash (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
     , C.mkPrimTyConFromClash (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
-    , mkAlgTyCon clkPairTcNm [] [clkPairDc]
-    , mkAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
-    , mkAlgTyCon doubleTcNm [] [doubleDc]
-    , mkAlgTyCon t3TyConName [fxA, fxB, t3C] [t3DataCon]
-    , mkAlgTyCon someNatTcNm [] [someNatDc]
-    , mkAlgTyCon proxyTcNm [proxyK, proxyA] [proxyDc]
+    , mkTestAlgTyCon clkPairTcNm [] [clkPairDc]
+    , mkTestAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
+    , mkTestAlgTyCon doubleTcNm [] [doubleDc]
+    , mkTestAlgTyCon t3TyConName [fxA, fxB, t3C] [t3DataCon]
+    , mkTestAlgTyCon someNatTcNm [] [someNatDc]
+    , mkTestAlgTyCon proxyTcNm [proxyK, proxyA] [proxyDc]
     ] <>
     -- Promoted data constructors that type families return. Their kinds don't
     -- matter here.
@@ -1374,8 +1374,8 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
 
   natNatNat = C.mkFunTy C.typeNatKind (C.mkFunTy C.typeNatKind C.typeNatKind)
 
-  falseDc = mkDataCon "False" 3034 [] [] [] boolTy
-  trueDc = (mkDataCon "True" 3035 [] [] [] boolTy) {C.dcTag = 2}
+  falseDc = mkTestDataCon "False" 3034 [] [] [] boolTy
+  trueDc = (mkTestDataCon "True" 3035 [] [] [] boolTy) {C.dcTag = 2}
 
   -- forall b. a -> b
   pRhs = C.ForAllTy fxB (C.mkFunTy (C.VarTy fxA) (C.VarTy fxB))
@@ -1409,14 +1409,14 @@ zwTy :: C.Type
 zwTy = tcTy zwTyConName
 
 zwDataCon :: C.DataCon
-zwDataCon = mkDataCon "MkZW" 3110 [] [] [bitVectorTy 0, unsignedTy 0] zwTy
+zwDataCon = mkTestDataCon "MkZW" 3110 [] [] [bitVectorTy 0, unsignedTy 0] zwTy
 
 -- | @data Proxy (n :: Nat) = Proxy@
 proxyTy :: C.Type -> C.Type
 proxyTy n = tcApp proxyTyConName [n]
 
 proxyDataCon :: C.DataCon
-proxyDataCon = mkDataCon "Proxy" 3111 [zwN] [] [] (proxyTy (C.VarTy zwN))
+proxyDataCon = mkTestDataCon "Proxy" 3111 [zwN] [] [] (proxyTy (C.VarTy zwN))
 
 -- | @data TProxy (n :: Nat) = MkTProxy (Proxy n)@: a field type that mentions
 -- a type variable
@@ -1425,7 +1425,7 @@ tProxyTy n = tcApp tProxyTyConName [n]
 
 tProxyDataCon :: C.DataCon
 tProxyDataCon =
-  mkDataCon "MkTProxy" 3112 [zwN] [] [proxyTy (C.VarTy zwN)] (tProxyTy (C.VarTy zwN))
+  mkTestDataCon "MkTProxy" 3112 [zwN] [] [proxyTy (C.VarTy zwN)] (tProxyTy (C.VarTy zwN))
 
 -- | @data ExZW = forall b. MkExZW (BitVector 0)@: a constructor with an
 -- existentially quantified type variable
@@ -1433,7 +1433,7 @@ exZwTy :: C.Type
 exZwTy = tcTy exZwTyConName
 
 exZwDataCon :: C.DataCon
-exZwDataCon = mkDataCon "MkExZW" 3113 [] [zwB] [bitVectorTy 0] exZwTy
+exZwDataCon = mkTestDataCon "MkExZW" 3113 [] [zwB] [bitVectorTy 0] exZwTy
 
 -- | @data Stream a = a :> Stream a@: a recursive type, like @Signal@
 streamTy :: C.Type -> C.Type
@@ -1441,7 +1441,7 @@ streamTy a = tcApp streamTyConName [a]
 
 streamDataCon :: C.DataCon
 streamDataCon =
-  mkDataCon ":>" 3114 [zwA] [] [C.VarTy zwA, streamTy (C.VarTy zwA)] (streamTy (C.VarTy zwA))
+  mkTestDataCon ":>" 3114 [zwA] [] [C.VarTy zwA, streamTy (C.VarTy zwA)] (streamTy (C.VarTy zwA))
 
 -- | Type variables of the zero-width types
 zwN, zwA, zwB :: C.TyVar
@@ -1454,12 +1454,12 @@ zeroWidthTyConMap :: C.TyConMap
 zeroWidthTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
  where
   tcs = UniqMap.elems testTyConMap <>
-    [ mkAlgTyCon nm [zwN] [] | nm <- [bitVectorTyConName, unsignedTyConName, signedTyConName, indexTcNm] ] <>
-    [ mkAlgTyCon zwTyConName [] [zwDataCon]
-    , mkAlgTyCon proxyTyConName [zwN] [proxyDataCon]
-    , mkAlgTyCon tProxyTyConName [zwN] [tProxyDataCon]
-    , mkAlgTyCon exZwTyConName [] [exZwDataCon]
-    , mkAlgTyCon streamTyConName [zwA] [streamDataCon]
+    [ mkTestAlgTyCon nm [zwN] [] | nm <- [bitVectorTyConName, unsignedTyConName, signedTyConName, indexTcNm] ] <>
+    [ mkTestAlgTyCon zwTyConName [] [zwDataCon]
+    , mkTestAlgTyCon proxyTyConName [zwN] [proxyDataCon]
+    , mkTestAlgTyCon tProxyTyConName [zwN] [tProxyDataCon]
+    , mkTestAlgTyCon exZwTyConName [] [exZwDataCon]
+    , mkTestAlgTyCon streamTyConName [zwA] [streamDataCon]
     ]
 
 -- | A 'C.TyVar' with the given name sort, human readable name, unique, and

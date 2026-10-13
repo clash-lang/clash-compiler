@@ -60,7 +60,7 @@ import Clash.Util.Supply (Supply, newSupply)
 
 import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoShadowing, globalId, inScopeOf, intFunTy, intId
-  , intTy, letBinders, localId, mkDataCon, nameToUnique, pairDataCon, pairTy
+  , intTy, letBinders, localId, mkTestDataCon, nameToUnique, pairDataCon, pairTy
   , parseTyConTy, runSingleTransformation, showPprU, tyVar, withTyConMap )
 
 -- | 'Clash.Normalize.Transformations.XOptimize.xOptimize' of Clash Core. It is
@@ -79,7 +79,7 @@ tN = tyVar User "n" 41
 
 -- | @MkT :: forall n. n -> T@
 mkTDc :: DataCon
-mkTDc = mkDataCon "MkT" 101 [] [tN] [VarTy tN] tTy
+mkTDc = mkTestDataCon "MkT" 101 [] [tN] [VarTy tN] tTy
 
 -- | A primitive that 'xOptimize' considers to be undefined: its template is an
 -- error

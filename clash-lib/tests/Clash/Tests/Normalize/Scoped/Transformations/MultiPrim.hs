@@ -44,7 +44,7 @@ import Clash.Util.Supply (newSupply)
 
 import Test.Clash.Differential (Outcome (..), letrecOrder)
 import Test.Clash.Rewrite
-  ( assertFires, inScopeOf, intTy, mkAlgTyCon, mkDataCon, mkTyConName, testTyConMap
+  ( assertFires, inScopeOf, intTy, mkTestAlgTyCon, mkTestDataCon, mkTyConName, testTyConMap
   , tupleTy, tyVar, withTyConMap )
 import Test.Clash.Scoped (assertRewritesAgreeUpTo)
 import Test.Clash.Scoped.ViaFoil (viaFoil)
@@ -61,12 +61,12 @@ setupScoped = (viaFoil "setupMultiResultPrim" $(asScopedRewriteQ Scoped.setupMul
 
 -- | The pair type constructor, as 'tupleTy' names it
 pairTc :: TyCon
-pairTc = mkAlgTyCon nm [t1, t2] [dc]
+pairTc = mkTestAlgTyCon nm [t1, t2] [dc]
  where
   nm = mkTyConName "GHC.Tuple.(,)" 3036
   t1 = tyVar User "t1" 3040
   t2 = tyVar User "t2" 3041
-  dc = mkDataCon "GHC.Tuple.(,)" 3042 [t1, t2] [] [VarTy t1, VarTy t2]
+  dc = mkTestDataCon "GHC.Tuple.(,)" 3042 [t1, t2] [] [VarTy t1, VarTy t2]
          (tupleTy [VarTy t1, VarTy t2])
 
 -- | An environment with the pair type constructor, and the multi-result

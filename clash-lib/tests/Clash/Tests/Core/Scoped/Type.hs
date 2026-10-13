@@ -35,7 +35,7 @@ import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Util as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert hiding (mkFunTyCon)
+import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars (freeTyVarsOfType)
 import Clash.Core.Scoped.NameMap (nullNameSet)
 import Clash.Core.Scoped.Subst (unsinkType)
@@ -45,7 +45,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 
 import Test.Clash.Rewrite
   ( addTy, boolTy, clkPairTy, clockTy, cmpNatTy, enableTy, fTy, intTy, kTy
-  , maxTy, maybeTy, mkFunTyCon, mkTyConName, nTy, pairTy, pTy, qTy, resetTy
+  , maxTy, maybeTy, mkTestFunTyCon, mkTyConName, nTy, pairTy, pTy, qTy, resetTy
   , signalTy, testTyConMap, tyVar, unconsSymbolTy, vecTy, wTy )
 import Test.Clash.Scoped
 
@@ -258,7 +258,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Type"
     -- Unlike Clash.Core.Type, an equation whose right-hand side mentions a
     -- pattern variable that its left-hand side doesn't bind doesn't reduce
   , testCase "reduceTypeFamily of an equation with an unbound pattern variable" $ do
-      let uTc = mkFunTyCon (mkTyConName "U" 3105) (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
+      let uTc = mkTestFunTyCon (mkTyConName "U" 3105) (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
                   [([intTy], C.VarTy xTv)]
           tenv' = mkTypeEnv (UniqMap.insert (C.tyConName uTc) uTc tcm)
           uInt = C.mkTyConApp (C.tyConName uTc) [intTy]
