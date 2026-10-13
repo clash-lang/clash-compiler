@@ -27,7 +27,7 @@ import Clash.Backend
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.DataCon (dataConInstArgTys)
+import Clash.Core.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
 import Clash.Core.Scoped.Evaluator.Types (Machine (..), initMachine)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)

@@ -23,7 +23,7 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 
 import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.DataCon
+import Clash.Core.DataCon
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Syntax
 

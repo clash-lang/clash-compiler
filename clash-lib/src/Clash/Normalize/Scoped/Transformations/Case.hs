@@ -96,7 +96,7 @@ import Clash.Warning (ClashWarning(WarnUnmatchableConstant))
 import Clash.XException (errorX)
 
 import Clash.Core.Scoped.Alpha (aeqTm, commonAltBody)
-import Clash.Core.Scoped.DataCon (dataConInstArgTys)
+import Clash.Core.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.EqSolver (isAbsurdPat, solvePatExistentials)
 import Clash.Core.Scoped.FreeVars (freeTmVars)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)

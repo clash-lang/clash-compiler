@@ -50,7 +50,7 @@ import Clash.Core.DataCon (DataCon (dcUniq), dcSig)
 import Clash.Core.Name (Name (nameUniq))
 import Clash.Unique (fromGhcUnique)
 
-import Clash.Core.Scoped.DataCon (DataConSig (..))
+import Clash.Core.DataCon (DataConSig (..))
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax

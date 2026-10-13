@@ -129,7 +129,7 @@ import Clash.Unique (fromGhcUnique)
 import Clash.Util (clogBase, curLoc)
 
 import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.DataCon (dataConInstArgTys)
+import Clash.Core.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.FreeVars (HasNameBinder (..))
 import Clash.Core.Scoped.NameMap (NameBinders, emptyNameBinders, snocNameBinders)
 import Clash.Core.Scoped.Pretty ()

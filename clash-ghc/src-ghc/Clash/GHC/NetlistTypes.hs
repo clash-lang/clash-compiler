@@ -46,7 +46,7 @@ import Clash.Core.DataCon               (dcSig)
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (tyConDataCons)
-import Clash.Core.Scoped.DataCon        (DataConSig (..), dataConInstExtTyVars)
+import Clash.Core.DataCon        (DataConSig (..), dataConInstExtTyVars)
 import Clash.Core.Scoped.Pretty         ()
 import Clash.Core.Scoped.Syntax         (Distinct, Scope, Type (..))
 import Clash.Core.Scoped.Type

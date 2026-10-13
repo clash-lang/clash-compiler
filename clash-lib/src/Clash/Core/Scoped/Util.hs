@@ -83,7 +83,7 @@ import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.TyCon as C
 import Clash.Util (curLoc, indexNote)
 
-import Clash.Core.Scoped.DataCon (dataConInstArgTys, dataConInstExtTyVars)
+import Clash.Core.DataCon (dataConInstArgTys, dataConInstExtTyVars)
 import Clash.Core.Scoped.EqSolver (dataConInstArgTysE)
 import Clash.Core.Scoped.FreeVars (freeTmVars, teleNameBinders)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)

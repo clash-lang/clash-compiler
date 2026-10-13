@@ -70,7 +70,7 @@ import           Clash.Core.TyCon (TyCon (FunTyCon), TyConName, tyConDataCons)
 import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax (GlobalId)
 import           Clash.Core.Scoped.Alpha (AlphaType (..))
-import           Clash.Core.Scoped.DataCon (dataConInstExtTyVars, openDataConSig)
+import           Clash.Core.DataCon (dataConInstExtTyVars, openDataConSig)
 import qualified Clash.Core.Scoped.EqSolver as S (typeEq)
 import qualified Data.IntSet as IntSet
 import           Clash.Core.Scoped.Pretty ()

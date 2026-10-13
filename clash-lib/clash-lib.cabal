@@ -215,7 +215,6 @@ Library
                       Clash.Core.Scoped.Alpha
                       Clash.Core.Scoped.Binary
                       Clash.Core.Scoped.Builder
-                      Clash.Core.Scoped.DataCon
                       Clash.Core.Scoped.EqSolver
                       Clash.Core.Scoped.Evaluator
                       Clash.Core.Scoped.Evaluator.Primitives
