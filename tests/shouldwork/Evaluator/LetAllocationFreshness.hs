@@ -40,7 +40,6 @@ import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
 import Clash.Core.Scoped.Evaluator.Types (Machine (..), allocTele, initMachine)
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv, emptyNameMap, memberNameMap)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (teleIdVars, withFreshIdBinder)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkTmApps, stripAllTicks)

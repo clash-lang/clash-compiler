@@ -82,7 +82,6 @@ import           Clash.Core.DataCon            (dcTag)
 import           Clash.Core.Literal            (Literal (IntLiteral))
 import qualified Clash.Core.Name               as C
 import           Clash.Core.Pretty             (showPpr)
-import           Clash.Core.Scoped.Pretty      ()
 import           Clash.Core.TyCon              (tyConDataCons)
 import           Clash.Core.Scoped.TysPrim (undefinedTy)
 import qualified Clash.Data.UniqMap            as UniqMap

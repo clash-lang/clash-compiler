@@ -101,7 +101,6 @@ import Clash.Core.Scoped.EqSolver (isAbsurdPat, solvePatExistentials)
 import Clash.Core.Scoped.FreeVars (freeTmVars)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap (NameSet, memberNameSet)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term

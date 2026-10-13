@@ -132,7 +132,6 @@ import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.FreeVars (HasNameBinder (..))
 import Clash.Core.Scoped.NameMap (NameBinders, emptyNameBinders, snocNameBinders)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.TyCon

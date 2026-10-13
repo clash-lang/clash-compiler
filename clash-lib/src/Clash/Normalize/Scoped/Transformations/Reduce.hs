@@ -68,7 +68,6 @@ import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.FreeVars (hasFreeVarsType)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf, piResultTys, primInfoType)
 import Clash.Core.Scoped.NameMap (NameMap, insertNameMap)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (unsinkType, withFreshIdBinder)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)

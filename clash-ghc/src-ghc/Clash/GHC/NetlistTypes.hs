@@ -47,7 +47,6 @@ import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (tyConDataCons)
 import Clash.Core.DataCon        (DataConSig (..), dataConInstExtTyVars)
-import Clash.Core.Scoped.Pretty         ()
 import Clash.Core.Scoped.Syntax         (Distinct, Scope, Type (..))
 import Clash.Core.Scoped.Type
   (TypeView (..), coreView, coreView1, splitTyConAppM, tyNatSize, tyView)

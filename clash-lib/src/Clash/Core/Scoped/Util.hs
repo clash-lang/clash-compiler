@@ -90,7 +90,6 @@ import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap
   ( NameBinders, appendNameBinders, emptyNameBinders, idBinderNameBinders
   , nameSetToList )
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (appendTele, mkApps, splitTele)

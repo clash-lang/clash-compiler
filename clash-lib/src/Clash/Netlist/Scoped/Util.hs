@@ -70,7 +70,6 @@ import Clash.Core.Basic (IsMultiPrim (..), LitTy (..))
 import           Clash.Annotations.TopEntity (TopEntity)
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (PrettyPrec, showPpr, showPprDiag)
-import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.TermInfo  (MultiPrimInfo (..), multiPrimInfo')
 import           Clash.Util                  (ClashException (..), curLoc)
 

@@ -110,7 +110,6 @@ import Clash.Unique (fromGhcUnique)
 import Clash.Core.Scoped.Builder (forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
 import Clash.Core.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
   (closeType, extendTySubst, idSubst, substTy, withFreshIdBinder, withFreshIdBinders)
 import Clash.Core.Scoped.Syntax

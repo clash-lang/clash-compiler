@@ -58,7 +58,6 @@ import Clash.Warning (ClashWarning (WarnCastSpecialization))
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
   ( extendSubstScope, extendTmSubstTele, idSubst, openAlt, openBind
   , strengthenTyIds, substTm, substTy, teleIdBinderTypes, withFreshIdBinders )

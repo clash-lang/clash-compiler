@@ -73,7 +73,6 @@ import           Clash.Core.Scoped.Alpha (AlphaType (..))
 import           Clash.Core.DataCon (dataConInstExtTyVars, openDataConSig)
 import qualified Clash.Core.Scoped.EqSolver as S (typeEq)
 import qualified Data.IntSet as IntSet
-import           Clash.Core.Scoped.Pretty ()
 import           Clash.Core.Scoped.Subst (closeType, openTyBinder)
 import           Clash.Core.Scoped.Syntax (Distinct)
 import qualified Clash.Core.Scoped.Syntax as S

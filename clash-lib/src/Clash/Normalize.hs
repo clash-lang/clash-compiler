@@ -84,7 +84,6 @@ import           Clash.Rewrite.Scoped.History (recordRewriteStep)
 
 import           Clash.Core.Scoped.FreeVars       (termGlobalIds, teleNameBinders)
 import           Clash.Core.Scoped.NameMap
-import           Clash.Core.Scoped.Pretty         ()
 import           Clash.Core.Scoped.Subst          (substGlobals, unsinkTerm)
 import           Clash.Core.Scoped.Syntax         hiding (Type)
 import qualified Clash.Core.Scoped.Syntax         as S

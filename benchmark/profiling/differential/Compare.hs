@@ -34,7 +34,6 @@ import qualified Data.List as List
 
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
 
 -- * Comparing

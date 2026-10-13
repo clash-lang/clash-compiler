@@ -48,7 +48,7 @@ import Clash.Core.TyCon (TyConMap, isTupleTyConLike, tyConDataCons)
 import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.FreeVars (hasFreeVars)
-import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Pretty ()
 import Clash.Core.Scoped.Subst (openTyBinder)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Syntax
