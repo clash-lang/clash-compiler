@@ -22,17 +22,14 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Var as C
 
 import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped
 
-import Test.Clash.Rewrite (globalIntVar, intId, intLit, intTy)
 import Test.Clash.Scoped
-  (assertScopedAlphaEq, extendSunk, runScopedClosed, somePrim, sunkVar)
+  ( TestScope (..), assertTermAlphaEq, assertTermIs, closedTerm, emptyTestScope
+  , runScopedClosed, sunkD, testPrim, withClashing, withTerm)
 
 -- | A transformation that changes nothing
 idT :: Applicative m => ScopedTransform m
@@ -79,87 +76,73 @@ inlineTrivialLet = ScopedTransform $ \_ -> \case
   Let (NonRec b x) (Var _ _ n) | tmNameRaw n == tmNameRaw (tmNameOf b) -> changed x
   e -> pure e
 
-x0, y1 :: C.Id
-x0 = intId C.User "x" 0
-y1 = intId C.User "y" 1
-
-f :: C.Term
-f = globalIntVar C.User "f" 2
-
 -- | @\\x -> let x = f x in x@, where the right-hand side refers to the
 -- lambda's @x@: the let's binder is not in scope of its own right-hand side.
-shadowingNonRec :: C.Term
-shadowingNonRec =
-  C.Lam x0 (C.Let (C.NonRec x0 (C.App f (C.Var x0))) (C.Var x0))
+shadowingNonRec :: Term 'VoidS
+shadowingNonRec = closedTerm "\\(x_0 :: Int) -> let { !(x_0 :: Int) = (f_G2 :: Int -> Int) x_0 } in x_0"
 
 -- | @f 1 (f 2 3) 4@
-lits :: C.Term
-lits = C.mkApps f [Left (intLit 1), Left (C.mkApps f [Left (intLit 2), Left (intLit 3)]), Left (intLit 4)]
+lits :: Term 'VoidS
+lits = closedTerm "(f_G2 :: Int) 1 (f_G2 2 3) 4"
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
-  [ testCase "allR keeps a NonRec let non-recursive" $ do
-      let tm = fromClashTermClosed shadowingNonRec
-      assertScopedAlphaEq shadowingNonRec
-        (runIdentity (runClosed (allR (allR (idT :: ScopedTransform Identity))) tm))
+  [ testCase "allR keeps a NonRec let non-recursive" $
+      assertTermAlphaEq shadowingNonRec
+        (runIdentity (runClosed (allR (allR (idT :: ScopedTransform Identity))) shadowingNonRec))
 
   , testCase "allR scopes a NonRec binder over the body only" $ do
       -- The right-hand side gets a LetBinding frame, the body a LetBody frame
-      let tm = fromClashTermClosed (C.Let (C.NonRec x0 (intLit 1)) (C.Var x0))
+      let tm = closedTerm "let { !(x_0 :: Int) = 1 } in x_0"
       snd (runWriter (runClosed (allR recordFrames) tm))
-        @?= [[KLetBinding (C.varName x0)], [KLetBody]]
+        @?= [[KLetBinding (C.mkUnsafeName C.User "x" 0)], [KLetBody]]
 
   , testCase "allR gives the frames of every constructor" $ do
       -- @\\y -> case f y of { 1 -> y; _ -> y }@
-      let tm = fromClashTermClosed
-            (C.Lam y1 (C.Case (C.App f (C.Var y1)) intTy
-              [(C.LitPat (IntLiteral 1), C.Var y1), (C.DefaultPat, C.Var y1)]))
+      let tm = closedTerm "\\(y :: Int) -> (case (f_G2 :: Int -> Int) y of { 1 -> y; _ -> y }) :: Int"
       snd (runWriter (runClosed (topdownAny recordFrames) tm)) @?=
         [ [], [KLamBody], [KCaseScrut], [KAppFun], [KAppArg Nothing]
         , [KCaseAlt], [KCaseAlt] ]
 
   , testCase "allR opens binders that clash with the scope" $
-      -- The lambda is converted in the empty scope, so its binder clashes
-      -- with sunkVar, whose unique is larger than its name
-      extendSunk emptyConvEnv [] [] $ \env -> do
-        let lam = C.Lam y1 (C.Var y1)
-            probe = ScopedTransform $ \ctx e -> do
+      -- The lambda is built in the empty scope, so its binder clashes with
+      -- 'sunkD', whose raw name is larger than its name
+      withTerm "\\(y :: Int) -> y" $ \ts0 lam0 -> withClashing ts0 [sunkD] lam0 $ \ts lam -> do
+        let probe = ScopedTransform $ \ctx e -> do
               case tfPath ctx of
                 PUnder (LamBody b) _ -> tell [tmNameRaw (tmNameOf b)]
                 _ -> pure ()
               pure e
-            (res, names) = runWriter
-              (runScopedTransform (allR probe) (rootContext (convScope env))
-                 (sinkClosed (fromClashTermClosed lam)))
+            (res, names) = runWriter (runScopedTransform (allR probe) (rootContext (testScope ts)) lam)
         case names of
-          [n] -> assertBool "renamed" (n > fromIntegral (C.varUniq sunkVar))
+          [n] -> assertBool "renamed" (n > 1000000)
           _ -> assertFailure ("unexpected binders: " <> show names)
-        assertScopedAlphaEq lam res
+        assertTermAlphaEq lam res
 
   , testCase "the argument's context comes from the rewritten function" $ do
       -- The function becomes a primitive; the argument then sees the AppArg
       -- frame of that primitive, applied to no arguments (like
       -- 'Clash.Core.Term.primArg' of the function)
-      let tm = fromClashTermClosed (C.App f (intLit 3))
+      let tm = closedTerm "(f_G2 :: Int -> Int) 3"
           toPrim = ScopedTransform $ \ctx e -> case (ctxFrames ctx, e) of
-            (KAppFun : _, GlobalVar _) -> pure (Prim (mkPrimInfoFromClash somePrim))
+            (KAppFun : _, GlobalVar _) -> pure (Prim (testPrim "somePrim" "Int -> Int"))
             (KAppArg a : _, _) -> tell [a] >> pure e
             _ -> pure e
       snd (runWriter (runClosed (allR toPrim) tm)) @?= [Just ("somePrim", 0, 0)]
 
   , testCase "topdown visits parents before children" $
-      snd (runWriter (runClosed (topdownAny recordLits) (fromClashTermClosed lits)))
+      snd (runWriter (runClosed (topdownAny recordLits) lits))
         @?= [1, 2, 3, 4]
 
   , testCase "bottomupR visits children before parents, left to right" $
-      snd (runWriter (runClosed (bottomupR recordLits) (fromClashTermClosed lits)))
+      snd (runWriter (runClosed (bottomupR recordLits) lits))
         @?= [1, 2, 3, 4]
 
   , testCase "repeatR, !-> and >-! signal change like their Clash Core versions" $ do
-      let one = fromClashTermClosed (intLit 1)
+      let one = closedTerm "1"
           inc = apply "inc" incrementOdd
       (r1, n1, c1) <- runScopedClosed inc one
-      (show r1, n1, c1) @?= (show (fromClashTermClosed (intLit 2)), 1, True)
+      (show r1, n1, c1) @?= (show (closedTerm "2"), 1, True)
       (_, n2, c2) <- runScopedClosed (repeatR inc) one
       (n2, c2) @?= (1, True)
       -- The second transformation runs after a change, but doesn't fire
@@ -171,12 +154,10 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
 
   , testCase "topdownFixR reaches the fixpoint of repeatR topdownR" $ do
       -- @f (case (let x = 1 in x) of { 1 -> 2; _ -> 3 })@
-      let tm = fromClashTermClosed
-            (C.App f (C.Case (C.Let (C.NonRec x0 (intLit 1)) (C.Var x0)) intTy
-              [(C.LitPat (IntLiteral 1), intLit 2), (C.DefaultPat, intLit 3)]))
+      let tm = closedTerm "(f_G2 :: Int -> Int) ((case (let { !(x_0 :: Int) = 1 } in x_0) of { 1 -> 2; _ -> 3 }) :: Int)"
           r = apply "caseLit" caseLit >-> apply "inlineTrivialLet" inlineTrivialLet
       (fixed, _, _) <- runScopedClosed (topdownFixR r) tm
       (reference, _, _) <- runScopedClosed (repeatR (topdownR r)) tm
       assertBool "same result" (aeqTm fixed reference)
-      assertScopedAlphaEq (C.App f (intLit 2)) fixed
+      assertTermIs emptyTestScope "(f_G2 :: Int -> Int) 2" fixed
   ]
