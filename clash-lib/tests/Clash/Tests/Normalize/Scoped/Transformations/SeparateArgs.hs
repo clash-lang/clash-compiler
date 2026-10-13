@@ -3,189 +3,210 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.SeparateArgs": agreement
-  of the port of 'Clash.Normalize.Transformations.SeparateArgs.separateArguments'
-  with that of Clash Core.
+  Tests for "Clash.Normalize.Scoped.Transformations.SeparateArgs". The
+  expected results are those of the port, which agreed with
+  'Clash.Normalize.Transformations.SeparateArgs.separateArguments' of Clash
+  Core, up to the form of coercions. 'assertRewritesTo' runs every test in the
+  scope of the free variables of its input, and in a scope that the binders of
+  the input clash with.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Scoped.Transformations.SeparateArgs (tests) where
 
 import Data.Default (def)
+import qualified Data.Text as Text
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.HasType (inferCoreTypeOf)
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Subst (aeqType)
-import Clash.Core.Term
-  (CoreContext (..), NameMod (..), Term (..), TickInfo (..), collectArgs, mkApps)
-import Clash.Core.Type (Type (ForAllTy, VarTy), mkFunTy, mkPolyFunTy)
-import Clash.Core.Var (Id, Var (..))
-import Clash.Driver.Types (ClashEnv (..))
+import qualified Clash.Core.Name as C (nameOcc)
+import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Scoped.HasType (inferCoreTypeOf)
+import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (collectArgs)
 import qualified Clash.Normalize.Scoped.Transformations.SeparateArgs as Scoped
-import Clash.Normalize.Transformations.SeparateArgs
-  (separateArgumentsLambdaWorker, separateArgumentsSpineWorker)
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.StrategyDSL
-  (onAppNode, onLam, onTickNode, onTyAppNode, onVarNode, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
-import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..), TransformContext (..))
-import Clash.Util.Supply (newSupply)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.Types (RewriteState)
 
 import Test.Clash.Rewrite
-  ( assertFires, clkPairTy, clockTy, globalId, inScopeOf, intFunTy, intId, intTy, localId
-  , numTy, parseTyConTy, rewriteEnvWithTyCons, runSingleTransformation, showPprU, tyVar
-  , vecTy )
-import Test.Clash.Differential (Outcome (..), coercionForm)
-import Test.Clash.Scoped (assertRewritesAgree, assertRewritesAgreeUpTo)
-import Test.Clash.Scoped.ViaFoil (viaFoil)
+  ( TestDefs (..), TestTerm, parseTestTermWith, parseTestType, rewriteEnvWithTyCons, strQQ
+  , testGlobalId )
+import Test.Clash.Scoped
+  ( ScopeDecl, Step (..), TestScope (..), assertNoRewrite, assertRewritesAt, assertRewritesTo
+  , closedType, runScopedAt, runScopedIn, termIn, testTypeEnv, varD, withTestScope )
+import Test.Clash.Scoped.Print (showTestType)
 
--- | 'separateArguments' of Clash Core
-separateArgumentsCurrent :: NormRewrite
-separateArgumentsCurrent = $(asRewriteQ (toTransformation "separateArguments"
-  (  onLam 'separateArgumentsLambdaWorker
-  <> onVarNode 'separateArgumentsSpineWorker
-  <> onAppNode 'separateArgumentsSpineWorker
-  <> onTyAppNode 'separateArgumentsSpineWorker
-  <> onTickNode 'separateArgumentsSpineWorker)))
+-- | Global functions @gp :: Int -> ClkPair -> Int@, @gq :: ClkPair -> Int ->
+-- Int@ and @gv :: forall a. a -> Vec 2 (Clock System) -> a@
+globals :: [GlobalId]
+globals =
+  [ testGlobalId "gp_G41" "Int -> ClkPair -> Int"
+  , testGlobalId "gq_G44" "ClkPair -> Int -> Int"
+  , testGlobalId "gv_G42" "forall (a :: Type). a -> Clash.Sized.Vector.Vec 2 (Clash.Signal.Internal.Clock \"System\") -> a"
+  , testGlobalId "g_G47" "forall (a :: Type). ClkPair -> a -> a" ]
 
--- | The port, on terms of Clash Core: through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil'
-separateArgumentsScoped :: NormRewrite
-separateArgumentsScoped = (viaFoil "separateArguments" $(asScopedRewriteQ Scoped.separateArguments))
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [] [] globals)
 
--- | Assert that 'separateArguments' and its port agree on a term, with the
--- given variables in scope, in the given context
-agreeIn :: Bool -> [Id] -> [CoreContext] -> Term -> Assertion
-agreeIn fires ids frames tm = do
-  supply <- newSupply
-  let st = def{_uniqSupply = supply} :: RewriteState NormalizeState
-      ctx = TransformContext (inScopeOf ids) frames
-  assertFires fires rewriteEnvWithTyCons st ctx separateArgumentsCurrent tm
-  assertRewritesAgree rewriteEnvWithTyCons st ctx
-    separateArgumentsCurrent separateArgumentsScoped tm
+st :: RewriteState NormalizeState
+st = def
 
--- | Assert that 'separateArguments' and its port agree on a term, with the
--- given variables in scope, and whether they fire
-agree :: Bool -> [Id] -> Term -> Assertion
-agree fires ids = agreeIn fires ids []
+separateArgumentsS :: ScopedRewrite NormalizeState
+separateArgumentsS = $(asScopedRewriteQ Scoped.separateArguments)
 
--- | Like 'agree', up to the form of coercions: the port builds vectors with
--- 'Clash.Core.Scoped.Util.primCo', see 'coercionForm'
-agreeUpToCoercions :: [Id] -> Term -> Assertion
-agreeUpToCoercions ids tm = do
-  supply <- newSupply
-  outcome <- assertRewritesAgreeUpTo [coercionForm] rewriteEnvWithTyCons
-    (def{_uniqSupply = supply} :: RewriteState NormalizeState)
-    (TransformContext (inScopeOf ids) [])
-    separateArgumentsCurrent separateArgumentsScoped tm
-  case outcome of
-    KnownDifferent ["coercion-form"] -> pure ()
-    _ -> assertFailure "expected the coercion-form known difference"
+-- | Assert that 'Scoped.separateArguments' rewrites a term to the expected one
+separates :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+separates = assertRewritesTo rewriteEnvWithTyCons st separateArgumentsS
 
--- * Variables
+-- | Assert that 'Scoped.separateArguments' leaves a term as it is
+keeps :: [ScopeDecl] -> TestTerm -> Assertion
+keeps = assertNoRewrite rewriteEnvWithTyCons st separateArgumentsS
 
-p, v, x :: Id
-p = localId User "p" 30 clkPairTy
-v = localId User "v" 31 (vecTy (numTy 2) clockTy)
-x = intId User "x" 32
+-- | The human readable names of the binders of the lambdas a term starts
+-- with, after those at the given path
+lamBinderOccs :: [Step] -> Term n -> [Text.Text]
+lamBinderOccs path e = case (path, e) of
+  ([], Lam b body) -> C.nameOcc (idBinderOcc b) : lamBinderOccs [] body
+  ([], _) -> []
+  (LetRhsStep 0 : rest, Let (NonRec _ x) _) -> lamBinderOccs rest x
+  _ -> []
 
--- | A local function @h :: ClkPair -> Int@
-h :: Id
-h = localId User "h" 40 (mkFunTy clkPairTy intTy)
-
--- | A global function @gp :: Int -> ClkPair -> Int@
-gp :: Id
-gp = globalId User "gp" 41 (mkPolyFunTy intTy [Right intTy, Right clkPairTy])
-
--- | A global function @gq :: ClkPair -> Int -> Int@
-gq :: Id
-gq = globalId User "gq" 44 (mkPolyFunTy intTy [Right clkPairTy, Right intTy])
-
--- | A global function @gv :: forall a. a -> Vec 2 (Clock System) -> a@
-gv :: Id
-gv = globalId User "gv" 42 (ForAllTy a (mkPolyFunTy (VarTy a) [Right (VarTy a), Right (vecTy (numTy 2) clockTy)]))
- where
-  a = tyVar User "a" 43
-
-srcTick :: TickInfo
-srcTick = NameMod PrefixName (parseTyConTy "Pfx")
+-- | Assert that 'Scoped.separateArguments' names the binders it creates for
+-- the lambda at a path as expected
+assertNames :: [Step] -> [ScopeDecl] -> TestTerm -> [Text.Text] -> Assertion
+assertNames path decls input expected = withTestScope decls $ \ts -> do
+  (e, _, _) <- runScopedIn rewriteEnvWithTyCons st ts separateArgumentsS (termIn ts input)
+  assertEqual "the names of the binders" expected (lamBinderOccs path e)
 
 lambdaTests :: TestTree
 lambdaTests = testGroup "Lambdas"
-  [ testCase "splits the binder of a product type" $
-      agree True [h] (Lam p (App (Var h) (Var p)))
+  [ testCase "splits the binder of a product type" $ do
+      separates [varD "h_40" "ClkPair -> Int"]
+        (tm "\\(p :: ClkPair) -> h_40 p")
+        (tm "\\(p1 :: Clash.Signal.Internal.Clock \"System\") (p2 :: Int) -> h_40 (MkClkPair p1 p2)")
+      assertNames [] [varD "h_40" "ClkPair -> Int"] (tm "\\(p :: ClkPair) -> h_40 p") ["c$p", "c$p"]
+    -- The vectors of the port are built with 'Clash.Core.Scoped.Util.primCo',
+    -- unlike those of Clash Core (the known difference "coercion-form")
   , testCase "splits the binder of a vector type" $
-      agreeUpToCoercions [] (Lam v (Var v))
-  , testCase "names the binders after the closest let-binder" $
-      agreeIn True [h] [LetBinding p []] (Lam p (App (Var h) (Var p)))
+      separates []
+        (tm "\\(v :: Clash.Sized.Vector.Vec 2 (Clash.Signal.Internal.Clock \"System\")) -> v")
+        (tm [strQQ|
+          \(v1 :: Clash.Signal.Internal.Clock "System") (v2 :: Clash.Signal.Internal.Clock "System") ->
+            Cons @2 @(Clash.Signal.Internal.Clock "System") @1 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1))) v1
+              (Cons @1 @(Clash.Signal.Internal.Clock "System") @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) v2
+                (Nil @0 @(Clash.Signal.Internal.Clock "System") (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0))))
+        |])
+  , testCase "names the binders after the closest let-binder" $ do
+      let input = tm "let { !(p :: ClkPair -> Int) = \\(p :: ClkPair) -> h_40 p } in p"
+      assertRewritesAt rewriteEnvWithTyCons st [LetRhsStep 0] separateArgumentsS
+        [varD "h_40" "ClkPair -> Int"] input
+        (tm [strQQ|
+          let { !(p :: ClkPair -> Int) =
+            \(p1 :: Clash.Signal.Internal.Clock "System") (p2 :: Int) -> h_40 (MkClkPair p1 p2)
+          } in p
+        |])
+      withTestScope [varD "h_40" "ClkPair -> Int"] $ \ts -> do
+        (e, _, _) <- runScopedAt rewriteEnvWithTyCons st ts [LetRhsStep 0] separateArgumentsS (termIn ts input)
+        assertEqual "the names of the binders" ["c$p_p", "c$p_p"] (lamBinderOccs [LetRhsStep 0] e)
   , testCase "doesn't split another binder" $
-      agree False [] (Lam x (Var x))
+      keeps [] (tm "\\(x :: Int) -> x")
   ]
 
 spineTests :: TestTree
 spineTests = testGroup "Application spines"
   [ testCase "splits the arguments of a global function" $
-      agree True [x, p] (App (App (Var gp) (Var x)) (Var p))
+      separates [varD "p_30" "ClkPair", varD "x_32" "Int"]
+        (tm "gp_G41 x_32 p_30")
+        (tm [strQQ|
+          gp_G41 x_32
+            ((case p_30 of { MkClkPair (s :: Clash.Signal.Internal.Clock "System") (w :: Int) -> s }) :: Clash.Signal.Internal.Clock "System")
+            ((case p_30 of { MkClkPair (w :: Clash.Signal.Internal.Clock "System") (s :: Int) -> s }) :: Int)
+        |])
   , testCase "splits the arguments after type arguments" $
-      agree True [x, v] (App (App (TyApp (Var gv) intTy) (Var x)) (Var v))
+      separates
+        [varD "v_31" "Clash.Sized.Vector.Vec 2 (Clash.Signal.Internal.Clock \"System\")", varD "x_32" "Int"]
+        (tm "gv_G42 @Int x_32 v_31")
+        (tm [strQQ|
+          gv_G42 @Int x_32
+            ((case v_31 of
+              { Cons (m :: Type) (w1 :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (s :: Clash.Signal.Internal.Clock "System")
+                  (w2 :: Clash.Sized.Vector.Vec 1 (Clash.Signal.Internal.Clock "System")) -> s
+              }) :: Clash.Signal.Internal.Clock "System")
+            ((case
+                (case v_31 of
+                  { Cons (m :: Type) (w1 :: (GHC.Prim.~#) Nat Nat 2 ((GHC.TypeNats.+) 1 1)) (w2 :: Clash.Signal.Internal.Clock "System")
+                      (s :: Clash.Sized.Vector.Vec 1 (Clash.Signal.Internal.Clock "System")) -> s
+                  }) :: Clash.Sized.Vector.Vec 1 (Clash.Signal.Internal.Clock "System")
+              of
+              { Cons (m :: Type) (w1 :: (GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1)) (s :: Clash.Signal.Internal.Clock "System")
+                  (w2 :: Clash.Sized.Vector.Vec 0 (Clash.Signal.Internal.Clock "System")) -> s
+              }) :: Clash.Signal.Internal.Clock "System")
+        |])
   , testCase "keeps the ticks of the function" $
-      agree True [x, p] (App (App (Tick srcTick (Var gp)) (Var x)) (Var p))
+      separates [varD "p_30" "ClkPair", varD "x_32" "Int"]
+        (tm "Core.prefixName @Pfx gp_G41 x_32 p_30")
+        (tm [strQQ|
+          Core.prefixName @Pfx gp_G41 x_32
+            ((case p_30 of { MkClkPair (s :: Clash.Signal.Internal.Clock "System") (w :: Int) -> s }) :: Clash.Signal.Internal.Clock "System")
+            ((case p_30 of { MkClkPair (w :: Clash.Signal.Internal.Clock "System") (s :: Int) -> s }) :: Int)
+        |])
   , testCase "splits the arguments of a partial application" $
-      agree True [p] (App (Var gq) (Var p))
+      separates [varD "p_30" "ClkPair"]
+        (tm "gq_G44 p_30")
+        (tm [strQQ|
+          gq_G44
+            ((case p_30 of { MkClkPair (s :: Clash.Signal.Internal.Clock "System") (w :: Int) -> s }) :: Clash.Signal.Internal.Clock "System")
+            ((case p_30 of { MkClkPair (w :: Clash.Signal.Internal.Clock "System") (s :: Int) -> s }) :: Int)
+        |])
   , testCase "doesn't split the arguments of a local function" $
-      agree False [h, p] (App (Var h) (Var p))
+      keeps [varD "p_30" "ClkPair", varD "h_40" "ClkPair -> Int"] (tm "h_40 p_30")
   ]
 
 -- | Run the port on an application of a global function, with the given
 -- variables in scope, and assert that it gives the global function the
--- expected type, and that the type of the application doesn't change. See
--- "Clash.Tests.Normalize.Transformations.SeparateArgs" for 'separateArguments'
--- of Clash Core.
-assertGlobalType :: [Id] -> Type -> Term -> Assertion
-assertGlobalType ids expected tm = do
-  supply <- newSupply
-  let st = def{_uniqSupply = supply} :: RewriteState NormalizeState
-  res <- runSingleTransformation rewriteEnvWithTyCons st (inScopeOf ids)
-           separateArgumentsScoped tm
-  let tcm = envTyConMap (_clashEnv rewriteEnvWithTyCons)
+-- expected type, and that the type of the application doesn't change
+assertGlobalType :: [ScopeDecl] -> String -> TestTerm -> Assertion
+assertGlobalType decls expected input = withTestScope decls $ \ts -> do
+  let e = termIn ts input
+  (res, _, _) <- runScopedIn rewriteEnvWithTyCons st ts separateArgumentsS e
   case collectArgs res of
-    (Var g, _) ->
+    (GlobalVar g, _) ->
       assertBool
-        ("Expected the type\n" <> showPprU expected <> "\nfor the global in:\n"
-          <> showPprU res <> "\nbut got:\n" <> showPprU (varType g))
-        (aeqType expected (varType g))
-    _ -> assertFailure ("Expected an application of a global:\n" <> showPprU res)
+        ("Expected the type\n" <> expected <> "\nfor the global, but got:\n"
+          <> showTestType (globalIdType g))
+        (aeqTy (closedType (parseTestType expected)) (globalIdType g))
+    _ -> assertFailure "Expected an application of a global"
+  let ty = inferCoreTypeOf testTypeEnv (testScope ts)
   assertBool
-    ("The type of\n" <> showPprU tm <> "\nchanged to that of\n" <> showPprU res)
-    (aeqType (inferCoreTypeOf tcm tm) (inferCoreTypeOf tcm res))
+    ("The type\n" <> showTestType (ty e) <> "\nchanged to\n" <> showTestType (ty res))
+    (aeqTy (ty e) (ty res))
 
 globalTypeTests :: TestTree
 globalTypeTests = testGroup "The types of globals"
   [ -- @gp :: Int -> ClkPair -> Int@ becomes @gp :: Int -> Clock -> Int -> Int@,
     -- not @gp :: Int -> ClkPair -> ClkPair -> Int@
     testCase "gives the global the types of the fields" $
-      assertGlobalType [x, p] (mkPolyFunTy intTy [Right intTy, Right clockTy, Right intTy])
-        (App (App (Var gp) (Var x)) (Var p))
+      assertGlobalType [varD "p_30" "ClkPair", varD "x_32" "Int"]
+        "Int -> Clash.Signal.Internal.Clock \"System\" -> Int -> Int"
+        (tm "gp_G41 x_32 p_30")
     -- @gq :: ClkPair -> Int -> Int@ becomes @gq :: Clock -> Int -> Int -> Int@,
     -- also when it isn't applied to all of its arguments
   , testCase "keeps the parameters that aren't applied" $
-      assertGlobalType [p] (mkPolyFunTy intTy [Right clockTy, Right intTy, Right intTy])
-        (App (Var gq) (Var p))
+      assertGlobalType [varD "p_30" "ClkPair"]
+        "Clash.Signal.Internal.Clock \"System\" -> Int -> Int -> Int"
+        (tm "gq_G44 p_30")
     -- @g \@(Int -> Int) p f x@ for @g :: forall a. ClkPair -> a -> a@ keeps
     -- the argument @x@, which is applied to the result of @g@
-  , testCase "keeps the arguments applied to the result" $ do
-      let a = tyVar User "a" 46
-          g = globalId User "g" 47
-                (ForAllTy a (mkPolyFunTy (VarTy a) [Right clkPairTy, Right (VarTy a)]))
-          f = localId User "f" 48 (intFunTy 1)
-      assertGlobalType [p, f, x]
-        (ForAllTy a (mkPolyFunTy (VarTy a) [Right clockTy, Right intTy, Right (VarTy a)]))
-        (mkApps (Var g) [Right (intFunTy 1), Left (Var p), Left (Var f), Left (Var x)])
+  , testCase "keeps the arguments applied to the result" $
+      assertGlobalType [varD "p_30" "ClkPair", varD "x_32" "Int", varD "f_48" "Int -> Int"]
+        "forall (a :: Type). Clash.Signal.Internal.Clock \"System\" -> Int -> a -> a"
+        (tm "g_G47 @(Int -> Int) p_30 f_48 x_32")
   ]
 
 tests :: TestTree
