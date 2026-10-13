@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index"
+  Tests for "Clash.Core.Evaluator.Primitives.Clash.Sized.Internal.Index"
   on fixed inputs, e.g. of the reductions that build their result from the
   type of the primitive, or give an undefined result.
 -}
@@ -17,8 +17,8 @@ import Data.Text (Text)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.Builder (TmB, TyB)
-import Clash.Core.Scoped.Evaluator.Primitives.Util (indexConPrim)
+import Clash.Core.Builder (TmB, TyB)
+import Clash.Core.Evaluator.Primitives.Util (indexConPrim)
 
 import Test.Clash.Rewrite (indexTcNm)
 import Test.Clash.Scoped.Evaluator.Primitives

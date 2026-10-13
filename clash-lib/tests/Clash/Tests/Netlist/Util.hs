@@ -19,8 +19,8 @@ import Test.Tasty.HUnit
 
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import Clash.Core.Name (nameOcc)
-import Clash.Core.Scoped.Syntax (Distinct, Scope, Term (..), Type, emptyScope, tmNameRaw)
-import Clash.Core.Scoped.Type (TypeView (..), tyView)
+import Clash.Core.Syntax (Distinct, Scope, Term (..), Type, emptyScope, tmNameRaw)
+import Clash.Core.Type (TypeView (..), tyView)
 import Clash.Netlist.Types
   (FilteredHWType (..), HWMap, HWType (..), HWTypeTranslator (..), LocalId (..))
 import Clash.Netlist.Util (SplitNormalized (..), coreTypeToHWType, splitNormalized)

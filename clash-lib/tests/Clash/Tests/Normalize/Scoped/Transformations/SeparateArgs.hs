@@ -21,10 +21,10 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.Name as C (nameOcc)
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs)
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.Syntax
+import Clash.Core.Term (collectArgs)
 import qualified Clash.Normalize.Scoped.Transformations.SeparateArgs as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite)
@@ -88,7 +88,7 @@ lambdaTests = testGroup "Lambdas"
         (tm "\\(p :: ClkPair) -> h_40 p")
         (tm "\\(p1 :: Clash.Signal.Internal.Clock \"System\") (p2 :: Int) -> h_40 (MkClkPair p1 p2)")
       assertNames [] [varD "h_40" "ClkPair -> Int"] (tm "\\(p :: ClkPair) -> h_40 p") ["c$p", "c$p"]
-    -- The vectors are built with 'Clash.Core.Scoped.Util.primCo'
+    -- The vectors are built with 'Clash.Core.Util.primCo'
   , testCase "splits the binder of a vector type" $
       separates []
         (tm "\\(v :: Clash.Sized.Vector.Vec 2 (Clash.Signal.Internal.Clock \"System\")) -> v")

@@ -39,15 +39,15 @@ import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.Types (typeEnv)
 import Clash.Util (curLoc)
 
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Subst
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.Subst
   ( extendSubstScope, extendTmSubstTele, idSubst, strengthenTyId
   , strengthenTyIds, substBind, substTm, teleIdBinderTypes, withFreshIdBinder
   , withFreshIdBinders )
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs, mkLams)
-import Clash.Core.Scoped.Type (splitFunTy)
-import Clash.Core.Scoped.Util (internalName)
+import Clash.Core.Syntax
+import Clash.Core.Term (collectArgs, mkLams)
+import Clash.Core.Type (splitFunTy)
+import Clash.Core.Util (internalName)
 import Clash.Rewrite.Scoped
   ( FrameKind (KAppFun), TransformContext, Under (LamBody), changed, ctxFrames
   , isTickKind, pushUnder, tfScope, underLam, underLet )

@@ -21,11 +21,11 @@ import Language.Haskell.TH (Exp, Name, Q, listE, stringE)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 
-import Clash.Core.Scoped.Builder
+import Clash.Core.Builder
   (appB, castB, caseB, deDupTickB, defaultAltB, lamB, litAltB, tickB, tyAppB, tyLamB, varB)
-import Clash.Core.Scoped.FreeVars (teleNameBinders)
-import Clash.Core.Scoped.Subst (unsinkTerm)
-import Clash.Core.Scoped.Syntax hiding (Name)
+import Clash.Core.FreeVars (teleNameBinders)
+import Clash.Core.Subst (unsinkTerm)
+import Clash.Core.Syntax hiding (Name)
 import Clash.Rewrite.Scoped
   (Rewrite, Transform (..), TransformContext, changed, ctxFrames)
 import Clash.Rewrite.StrategyDSL

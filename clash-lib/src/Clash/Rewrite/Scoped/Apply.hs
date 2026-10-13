@@ -40,12 +40,12 @@ import           Clash.Rewrite.Util
   (bumpCounter, closeOverOrError, dependencySortTyVars)
 import           Clash.Util                  (curLoc)
 
-import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
-import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
-import           Clash.Core.Scoped.Subst     (Closure (..), freeVarOccs)
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Type      (normalizeType)
-import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
+import           Clash.Core.Alpha     (aeqTm, aeqTy)
+import           Clash.Core.HasType   (inferCoreTypeOf)
+import           Clash.Core.Subst     (Closure (..), freeVarOccs)
+import           Clash.Core.Syntax
+import           Clash.Core.Type      (normalizeType)
+import           Clash.Core.TypeEnv   (TypeEnv)
 import           Clash.Rewrite.Scoped.History (recordRewriteStep)
 import           Clash.Rewrite.Types
 
@@ -180,7 +180,7 @@ applyDebug name exprOld hasChanged exprNew = do
 -- | The types of two terms of the same scope, printed, and whether they are
 -- the same after normalization ('normalizeType'). The types are inferred in
 -- the scope of just the free variables of the terms
--- ('Clash.Core.Scoped.Subst.closeOver'), so that 'applyWith' doesn't need to
+-- ('Clash.Core.Subst.closeOver'), so that 'applyWith' doesn't need to
 -- keep the scope of the terms: keeping it costs allocation for every
 -- transformation that is tried.
 compareTypes :: TypeEnv -> Term n -> Term n -> (String, String, Bool)

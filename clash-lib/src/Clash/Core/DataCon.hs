@@ -9,7 +9,7 @@
 
   Scoped Core refers to data constructors ('Data', 'DataPat') with
   'DataCon', which stores its closed type ('Clash.Core.DataCon.dcType') and
-  its /signature/ (t'DataConSig', see "Clash.Core.Scoped.Sig") as scoped
+  its /signature/ (t'DataConSig', see "Clash.Core.Sig") as scoped
   types. Instantiating a data constructor substitutes types for the type
   variables of its signature, which renames binders where needed. The
   functions below take a t'TypeEnv', which they don't use: the signature is
@@ -51,11 +51,11 @@ import GHC.Stack                              (HasCallStack)
 
 import Clash.Core.Name                        (Name (..))
 import qualified Clash.Core.Name              as C
-import Clash.Core.Scoped.Sig                  (DataConSig (..))
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax hiding (Name)
-import qualified Clash.Core.Scoped.Syntax     as Scoped
-import Clash.Core.Scoped.TypeEnv              (TypeEnv)
+import Clash.Core.Sig                  (DataConSig (..))
+import Clash.Core.Subst
+import Clash.Core.Syntax hiding (Name)
+import qualified Clash.Core.Syntax     as Scoped
+import Clash.Core.TypeEnv              (TypeEnv)
 import Clash.Unique
 
 -- | Data Constructor
@@ -71,7 +71,7 @@ data DataCon
   -- ^ Type of the 'DataCon', which is closed. Lazy.
   , dcSig :: DataConSig
   -- ^ Its universally and existentially quantified type variables, and the
-  -- types of its fields, see "Clash.Core.Scoped.Sig". The universally
+  -- types of its fields, see "Clash.Core.Sig". The universally
   -- quantified type variables are also part of the result type of the
   -- 'DataCon', the existentially quantified ones are not. Lazy.
   , dcArgStrict :: [DcStrictness]
@@ -81,7 +81,7 @@ data DataCon
   }
 
 -- | A data constructor with the given name, tag, closed type, signature (see
--- "Clash.Core.Scoped.Sig"), strictness of its fields, and labels of its
+-- "Clash.Core.Sig"), strictness of its fields, and labels of its
 -- fields
 mkDataCon
   :: DcName -> ConTag -> Scoped.Type 'Scoped.VoidS -> DataConSig -> [DcStrictness]

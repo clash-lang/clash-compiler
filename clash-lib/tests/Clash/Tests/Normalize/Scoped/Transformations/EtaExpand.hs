@@ -18,7 +18,7 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.Syntax (GlobalId)
+import Clash.Core.Syntax (GlobalId)
 import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))

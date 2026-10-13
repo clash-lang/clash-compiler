@@ -3,13 +3,13 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Helpers to test the scoped evaluator ("Clash.Core.Scoped.Evaluator") on
+  Helpers to test the scoped evaluator ("Clash.Core.Evaluator") on
   terms of scoped Clash Core.
 
   = Results
 
   The evaluator gives its result bound by the bindings it allocated
-  ('Clash.Core.Scoped.Evaluator.bindAllocated'). Tests compare:
+  ('Clash.Core.Evaluator.bindAllocated'). Tests compare:
 
   * the result itself, up to alpha-equivalence;
   * its body, if it doesn't refer to the bindings ('allocatedBody');
@@ -44,14 +44,14 @@ import Test.Tasty.HUnit (Assertion, assertBool)
 
 import Clash.Driver.Types (Binding)
 
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Evaluator (bindAllocated, nfData, whnf)
-import Clash.Core.Scoped.Evaluator.Types
-import Clash.Core.Scoped.FreeVars (anyBoundOccursIn, bindNameBinders)
-import Clash.Core.Scoped.NameMap (GlobalEnv, emptyNameMap, nameMapFromList)
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.Evaluator (bindAllocated, nfData, whnf)
+import Clash.Core.Evaluator.Types
+import Clash.Core.FreeVars (anyBoundOccursIn, bindNameBinders)
+import Clash.Core.NameMap (GlobalEnv, emptyNameMap, nameMapFromList)
 import Clash.Core.Pretty ()
-import Clash.Core.Scoped.Subst (openBind, substTm, teleIdVars, tmVarsSubst, unsinkTerm)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Subst (openBind, substTm, teleIdVars, tmVarsSubst, unsinkTerm)
+import Clash.Core.Syntax
 
 import Test.Clash.Rewrite (showPprU)
 
@@ -117,7 +117,7 @@ unfoldAllocated sc depth = \case
     Rec tele xs -> [(x, rhs) | (Var _ _ x, rhs) <- zip (teleIdVars tele) xs]
 
 -- | Drop the types of the coercion arguments, applications of the primitive
--- @_CO_@ to their type (see 'Clash.Core.Scoped.Util.primCo')
+-- @_CO_@ to their type (see 'Clash.Core.Util.primCo')
 dropCoercionTypes :: Term n -> Term n
 dropCoercionTypes = \case
   TyApp (Prim p) _ | primName p == "_CO_" -> Prim p

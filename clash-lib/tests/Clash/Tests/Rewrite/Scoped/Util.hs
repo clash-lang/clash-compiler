@@ -31,14 +31,14 @@ import Clash.Normalize.Types (NormalizeSession, NormalizeState)
 import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Util.Supply (newSupply)
 
-import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
-import Clash.Core.Scoped.Builder (appTyB, constTyB, litTyB)
-import Clash.Core.Scoped.FreeVars (teleNameBinders)
-import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
-import Clash.Core.Scoped.NameMap (globalEnvElems, lookupGlobalEnv)
-import Clash.Core.Scoped.Subst (unsinkTerm)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (AbsBinder (..), collectArgs)
+import Clash.Core.Alpha (aeqTm, aeqTy)
+import Clash.Core.Builder (appTyB, constTyB, litTyB)
+import Clash.Core.FreeVars (teleNameBinders)
+import Clash.Core.Internal.Scope (scopeWatermark)
+import Clash.Core.NameMap (globalEnvElems, lookupGlobalEnv)
+import Clash.Core.Subst (unsinkTerm)
+import Clash.Core.Syntax
+import Clash.Core.Term (AbsBinder (..), collectArgs)
 import Clash.Rewrite.Scoped (rootContext, whnfRW)
 import Clash.Rewrite.Scoped.Apply (applyDebug)
 import qualified Clash.Rewrite.Scoped as Scoped

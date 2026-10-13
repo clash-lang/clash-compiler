@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  QuickCheck generators of scoped Clash Core ("Clash.Core.Scoped"), to test
+  QuickCheck generators of scoped Clash Core ("Clash.Core"), to test
   its trusted core and the functions on it.
 
   A generated term is built in a test scope ('Test.Clash.Scoped.TestScope')
@@ -14,7 +14,7 @@
   type is generated at a kind, and a type variable is only used at its kind.
 
   Binders get fresh names, just above the watermark of the scope at them, as
-  'Clash.Core.Scoped.Subst.withFreshIdBinder' gives them. Names clash where:
+  'Clash.Core.Subst.withFreshIdBinder' gives them. Names clash where:
 
   * 'Sunk' terms are generated in a scope, and sunk into a larger one, whose
     new variables have the names of the first binders of the term;
@@ -113,21 +113,21 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (Unique)
 import GHC.Types.SrcLoc (noSrcSpan)
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Builder
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Builder
   ( Key, TyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, runClosedType, runDataConSig
   , varTyB )
 import Clash.Core.TyCon (mkAlgTyCon, mkPrimTyCon)
 import Clash.Core.DataCon (mkDataCon)
-import Clash.Core.Scoped.FreeVars (bindNameBinders, patNameBinders)
-import Clash.Core.Scoped.NameMap (idBinderNameBinders, tyBinderNameBinders)
-import Clash.Core.Scoped.Subst
+import Clash.Core.FreeVars (bindNameBinders, patNameBinders)
+import Clash.Core.NameMap (idBinderNameBinders, tyBinderNameBinders)
+import Clash.Core.Subst
   ( openAlt, openBind, openIdBinder, openTyBinder, patVars, teleIdVars, unsinkTerm
   , withFreshIdBinder, withFreshIdBinders, withFreshTyBinder)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Type (mkFunTy)
-import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.Syntax
+import Clash.Core.Type (mkFunTy)
+import Clash.Core.TypeEnv (TypeEnv, mkTypeEnv)
+import qualified Clash.Core.TysPrim as P
 
 import Test.Clash.Rewrite
   ( existentialDataCon, intTyCon, justDataCon, maybeTyConName
@@ -879,12 +879,12 @@ splits xs = [splitAt i xs | i <- [0 .. length xs - 1]]
 -- * Comparing
 
 -- | Whether two terms are the same, with the same raw names, for the parts
--- that 'Clash.Core.Scoped.Alpha.aeqTm' compares: the human readable names of
+-- that 'Clash.Core.Alpha.aeqTm' compares: the human readable names of
 -- binders and variables, the types of variable occurrences, and the result
 -- types of case-expressions don't matter. After
--- 'Clash.Core.Scoped.Subst.freshenDistinct', which names binders by their
+-- 'Clash.Core.Subst.freshenDistinct', which names binders by their
 -- position, two terms in the same scope are the same if and only if they are
--- alpha-equivalent: an oracle for 'Clash.Core.Scoped.Alpha.aeqTm'.
+-- alpha-equivalent: an oracle for 'Clash.Core.Alpha.aeqTm'.
 rawEqTm :: Term n -> Term m -> Bool
 rawEqTm = goTm
  where
@@ -1003,7 +1003,7 @@ renameOccs = goTm
 --
 -- Simple traversals that collect the raw names of variable occurrences that
 -- no enclosing binder of the same sort binds: the specification of the free
--- variables of "Clash.Core.Scoped.FreeVars", for terms in which no occurrence
+-- variables of "Clash.Core.FreeVars", for terms in which no occurrence
 -- refers to a variable that a binder of the other sort made inaccessible, as
 -- the generated and the scrambled terms are.
 

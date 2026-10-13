@@ -42,7 +42,7 @@ import qualified Data.Text as Text
 import           System.FilePath ((</>))
 
 import           Test.Tasty.Clash
-import           Clash.Core.Scoped.Syntax (globalIdName)
+import           Clash.Core.Syntax (globalIdName)
 
 mkClashOpts :: ClashOpts
 mkClashOpts = defClashOpts

@@ -4,7 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Check the 'Binary' instances of scoped Clash Core
-  ("Clash.Core.Scoped.Binary"): that the round trip through them gives every
+  ("Clash.Core.Binary"): that the round trip through them gives every
   binding of a serialized design back, up to alpha-equivalence.
 -}
 
@@ -27,9 +27,9 @@ import qualified Clash.Core.Name as C
 import Clash.Driver.Manifest ()
 import Clash.Driver.Types (Binding (..), GlobalBindings)
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.NameMap (globalEnvElems)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.NameMap (globalEnvElems)
+import Clash.Core.Syntax
 
 import Compare
 import SerialiseInstances (NetlistInputs, NormalizationInputs, readInputs)

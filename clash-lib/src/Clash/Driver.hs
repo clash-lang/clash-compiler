@@ -114,15 +114,15 @@ import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Rewrite.Scoped.History     (startRewriteHistory)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
-import           Clash.Core.Scoped.NameMap
+import           Clash.Core.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
-import           Clash.Core.Scoped.Syntax (globalIdName, globalIdUniq, GlobalId)
-import Clash.Core.Scoped.Syntax (mkGlobalId)
-import qualified Clash.Core.Scoped.Subst          as S (openTyBinder)
-import qualified Clash.Core.Scoped.Syntax         as S
-import qualified Clash.Core.Scoped.Type           as S
-import           Clash.Core.Scoped.TypeEnv        (TypeEnv, mkTypeEnv)
-import qualified Clash.Core.Scoped.Util           as S (SplitInfo (..), shouldSplit)
+import           Clash.Core.Syntax (globalIdName, globalIdUniq, GlobalId)
+import Clash.Core.Syntax (mkGlobalId)
+import qualified Clash.Core.Subst          as S (openTyBinder)
+import qualified Clash.Core.Syntax         as S
+import qualified Clash.Core.Type           as S
+import           Clash.Core.TypeEnv        (TypeEnv, mkTypeEnv)
+import qualified Clash.Core.Util           as S (SplitInfo (..), shouldSplit)
 import           Clash.Normalize.Util      (callGraph, tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P

@@ -19,7 +19,7 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 import Clash.Core.TyCon
 
 import Test.Clash.Rewrite (intTyCon, nTyConName, pTyConName, testTyConMap)

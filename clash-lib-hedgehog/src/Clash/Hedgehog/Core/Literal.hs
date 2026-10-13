@@ -20,13 +20,13 @@ import qualified Hedgehog.Range as Range
 
 import Clash.Core.Literal
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Syntax (Type)
-import Clash.Core.Scoped.TysPrim
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Syntax (Type)
+import Clash.Core.TysPrim
 
 -- | Generate a 'Literal' with the specified core type. If the type does not
 -- correspond to a known @PrimTyCon@ (as defined in
--- @Clash.Core.Scoped.TysPrim@) then an error is returned.
+-- @Clash.Core.TysPrim@) then an error is returned.
 --
 genLiteralFrom
   :: forall m n

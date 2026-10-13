@@ -17,7 +17,7 @@ import Data.Either (lefts)
 import GHC.Stack (HasCallStack)
 import Text.Show.Pretty
 
-import Clash.Core.Scoped.TermLiteral (termToDataError)
+import Clash.Core.TermLiteral (termToDataError)
 import Clash.Netlist.Types (BlackBoxFunction)
 
 clashCompileErrorBBF :: HasCallStack => BlackBoxFunction

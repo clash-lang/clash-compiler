@@ -7,8 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Conversion of GHC Core to closed terms of scoped Clash Core
-  ("Clash.Core.Scoped.Syntax"). It converts in two phases, see
-  "Clash.Core.Scoped.Builder".
+  ("Clash.Core.Syntax"). It converts in two phases, see
+  "Clash.Core.Builder".
 
   = Types
 
@@ -20,7 +20,7 @@
 
   The type of a primitive is closed in scoped Core. Primitives that stand in
   for a term of some type, @_RUBBISH_@, @_TY_@ and @_CO_@, have the shape of
-  'Clash.Core.Scoped.Util.primAtType': if the type is open, they are a
+  'Clash.Core.Util.primAtType': if the type is open, they are a
   primitive of type @forall a. a@ applied to the type.
 
   = Recursive groups
@@ -170,9 +170,9 @@ import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util
 import           Clash.GHC.Util
 import Clash.Core.DataCon (mkDataCon)
-import Clash.Core.Scoped.Syntax (mkGlobalId)
-import           Clash.Core.Scoped.Sig       (TyFamEqn)
-import qualified Clash.Core.Scoped.Syntax    as S
+import Clash.Core.Syntax (mkGlobalId)
+import           Clash.Core.Sig       (TyFamEqn)
+import qualified Clash.Core.Syntax    as S
 
 import           Control.Lens                ((<>=))
 import           Data.Bifunctor              (second)
@@ -210,9 +210,9 @@ import GHC.Types.Var.Set (VarSet, isEmptyVarSet)
 -- Local imports
 import Clash.Core.Basic (IsMultiPrim (..), NameMod (..), WorkInfo (..), undefinedXPrims)
 import           Clash.Annotations.Primitive (extractPrim)
-import           Clash.Core.Scoped.Syntax    (mkPrimInfo)
-import           Clash.Core.Scoped.TysPrim   (undefinedTy)
-import           Clash.Core.Scoped.Builder
+import           Clash.Core.Syntax    (mkPrimInfo)
+import           Clash.Core.TysPrim   (undefinedTy)
+import           Clash.Core.Builder
 import qualified Clash.Normalize.Scoped.Primitives as NP
 import           Clash.Primitives.Types      hiding (name)
 
@@ -801,12 +801,12 @@ coreToAttrs _ =
 -- * Types of scoped Core
 
 -- | The key of a GHC variable in the builders of scoped Core, see
--- "Clash.Core.Scoped.Builder"
+-- "Clash.Core.Builder"
 varKey :: Var -> Key
 varKey = uniqueKey . fromGhcUnique . varUnique
 
 -- | Converts a GHC type to a type of scoped Core, as a builder (see
--- "Clash.Core.Scoped.Builder").
+-- "Clash.Core.Builder").
 --
 -- The order in which it looks up names matters: the names are cached by
 -- unique (see 'qualifiedNameStringM'), and different GHC names can share a
@@ -816,7 +816,7 @@ varKey = uniqueKey . fromGhcUnique . varUnique
 -- kind.
 --
 -- Memoized on the GHC type, which shares the closed types without binders,
--- see "Clash.Core.Scoped.Builder". The conversion runs 'withoutSrcSpan' so
+-- see "Clash.Core.Builder". The conversion runs 'withoutSrcSpan' so
 -- that it depends on the GHC type alone.
 coreToTypeB :: Type -> C2C TyB
 coreToTypeB ty = do
@@ -1140,7 +1140,7 @@ coreToTermB primMap unlocs recLocals = term
       let rubbish ty = mkPrimInfo (pack "_RUBBISH_") ty WorkNever SingleResult S.NoUnfolding
       envs <- view famInstEnvs
       ty <- coreToTypeB (literalType l)
-      -- The shape of 'Clash.Core.Scoped.Util.primAtType', see the module header
+      -- The shape of 'Clash.Core.Util.primAtType', see the module header
       if null (convertedTyVars envs (literalType l))
         then pure (primB (rubbish (runClosedType ty)))
         else pure (tyAppB (primB (rubbish undefinedTy)) ty)
@@ -1340,7 +1340,7 @@ coPrim = mkPrimInfo (pack "_CO_") undefinedTy WorkNever SingleResult S.NoUnfoldi
 --
 -- Closed terms for primitives that GHC2Core replaces, given the GHC type of
 -- the primitive. Their bodies only refer to their own binders, so the keys
--- of their term variables are arbitrary, see "Clash.Core.Scoped.Builder".
+-- of their term variables are arbitrary, see "Clash.Core.Builder".
 --
 -- They split the GHC type as its conversion ('coreToTypeB') would be split,
 -- and convert the parts. These are part of the conversion of the whole type,
@@ -1354,7 +1354,7 @@ forAllView (ForAllTy (Bndr tv _) ty) = Just (tv, ty)
 forAllView _ = Nothing
 
 -- | Split a function type, like matching
--- 'Clash.Core.Scoped.Type.FunTy' of 'Clash.Core.Scoped.Type.tyView' on the
+-- 'Clash.Core.Type.FunTy' of 'Clash.Core.Type.tyView' on the
 -- conversion of the type
 funView :: Type -> Maybe (Type, Type)
 funView ty | Just ty' <- coreView ty = funView ty'

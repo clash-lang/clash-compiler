@@ -9,7 +9,7 @@
 -- The evaluator of Clash Core renamed the binder to a unique from its unique
 -- supply, which needn't be fresh for the variables in scope: not all uniques
 -- in a term come from the supply. The scoped evaluator
--- ("Clash.Core.Scoped.Evaluator") gives the binders it allocates the name
+-- ("Clash.Core.Evaluator") gives the binders it allocates the name
 -- just above the watermark of its scope, which is fresh by construction:
 -- capture can't be expressed in scoped Core. The closest check is that the
 -- machine allocates above the watermark, not at it.
@@ -36,16 +36,16 @@ import Clash.Core.Literal (Literal (IntLiteral))
 import Clash.Core.Name (mkUnsafeSystemName)
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
-import Clash.Core.Scoped.Evaluator.Types (Machine (..), allocTele, initMachine)
-import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
-import Clash.Core.Scoped.NameMap (emptyGlobalEnv, emptyNameMap, memberNameMap)
-import Clash.Core.Scoped.Subst (teleIdVars, withFreshIdBinder)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (mkTmApps, stripAllTicks)
-import Clash.Core.Scoped.Type (mkFunTy)
-import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
-import Clash.Core.Scoped.TysPrim (intPrimTy)
+import Clash.Core.Evaluator (bindAllocated, whnf)
+import Clash.Core.Evaluator.Types (Machine (..), allocTele, initMachine)
+import Clash.Core.Internal.Scope (scopeWatermark)
+import Clash.Core.NameMap (emptyGlobalEnv, emptyNameMap, memberNameMap)
+import Clash.Core.Subst (teleIdVars, withFreshIdBinder)
+import Clash.Core.Syntax
+import Clash.Core.Term (mkTmApps, stripAllTicks)
+import Clash.Core.Type (mkFunTy)
+import Clash.Core.TypeEnv (mkTypeEnv)
+import Clash.Core.TysPrim (intPrimTy)
 import Clash.Core.Pretty (showPpr)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 

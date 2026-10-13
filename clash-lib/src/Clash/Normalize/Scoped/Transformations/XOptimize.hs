@@ -16,7 +16,7 @@
   When no alternative is defined, it replaces the case-expression with
   @errorX@. The type of a primitive is closed in scoped Core, so if the type
   of the case-expression mentions type variables, that is @errorX \@ty@, where
-  @errorX@ has type @forall a. a@ (see 'Clash.Core.Scoped.Util.primAtType').
+  @errorX@ has type @forall a. a@ (see 'Clash.Core.Util.primAtType').
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -39,7 +39,7 @@ import Clash.Core.Basic (IsMultiPrim (..), WorkInfo (..))
 import Clash.XException (errorX)
 
 import Clash.Annotations.Primitive (extractPrim)
-import Clash.Core.Scoped.TysPrim (undefinedTy)
+import Clash.Core.TysPrim (undefinedTy)
 import Clash.Core.DataCon (DataCon)
 import Clash.Netlist.BlackBox.Types (Element (Err))
 import Clash.Netlist.Types (BlackBox (..))
@@ -49,13 +49,13 @@ import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.Types (aggressiveXOpt, primitives, typeEnv)
 import Clash.Util (curLoc)
 
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Subst
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.Subst
   ( extendSubstScope, idSubst, substIdBinder, substScope, substTele, substTm
   , teleIdBinderTypes, withFreshIdBinder, withFreshIdBinders )
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs)
-import Clash.Core.Scoped.Util (internalName, primAtType)
+import Clash.Core.Syntax
+import Clash.Core.Term (collectArgs)
+import Clash.Core.Util (internalName, primAtType)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
 
 -- | Remove all undefined alternatives from case expressions, replacing them

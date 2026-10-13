@@ -97,7 +97,7 @@ import Clash.Core.Name (nameOcc)
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon (TyConName, tyConDataCons, tyConName)
-import Clash.Core.Scoped.TysPrim (integerPrimTyConName, typeNatKindTyConName)
+import Clash.Core.TysPrim (integerPrimTyConName, typeNatKindTyConName)
 
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Scoped.Primitives as NP (undefined)
@@ -107,18 +107,18 @@ import Clash.Sized.RTree (RTree)
 import Clash.Sized.Vector (Vec)
 import Clash.Unique (fromGhcUnique)
 
-import Clash.Core.Scoped.Builder (forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
+import Clash.Core.Builder (forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
 import Clash.Core.DataCon (dataConInstArgTys)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Subst
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.Subst
   (closeType, extendTySubst, idSubst, substTy, withFreshIdBinder, withFreshIdBinders)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (appendTele, mkApps, stripTicks)
-import Clash.Core.Scoped.Type
+import Clash.Core.Syntax
+import Clash.Core.Term (appendTele, mkApps, stripTicks)
+import Clash.Core.Type
   ( PiTele (..), SplitFunForall (..), TypeView (..), coreView, mkFunTy, mkTyConApp
   , normalizeType, splitFunForallTy, tyView )
-import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon, typeEnvTyConMap)
-import Clash.Core.Scoped.Util
+import Clash.Core.TypeEnv (TypeEnv, lookupTyCon, typeEnvTyConMap)
+import Clash.Core.Util
   ( appendToVec, extractElems, extractTElems, internalName, mkRTree, mkVec, primCo
   , selectField, systemName )
 import Clash.Rewrite.Scoped

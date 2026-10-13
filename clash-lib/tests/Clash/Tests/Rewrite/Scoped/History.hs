@@ -20,11 +20,11 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.FreeVars (freeTmVars, freeTyVars, hasFreeVars)
-import Clash.Core.Scoped.NameMap (nameSetToList)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Binary (putHeader)
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.FreeVars (freeTmVars, freeTyVars, hasFreeVars)
+import Clash.Core.NameMap (nameSetToList)
+import Clash.Core.Syntax
+import Clash.Core.Binary (putHeader)
 import Clash.Rewrite.Scoped.History (closeRewriteStep, decodeRewriteHistory)
 import Clash.Rewrite.Types (RewriteStep (..))
 

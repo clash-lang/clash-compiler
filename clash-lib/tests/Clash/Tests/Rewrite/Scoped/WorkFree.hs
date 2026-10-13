@@ -18,10 +18,10 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (..))
 
-import Clash.Core.Scoped.Builder (TmB, appB, deDupTickB, primB, tickB)
-import Clash.Core.Scoped.NameMap (emptyGlobalEnv, lookupGlobalEnv)
-import Clash.Core.Scoped.Syntax
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.Builder (TmB, appB, deDupTickB, primB, tickB)
+import Clash.Core.NameMap (emptyGlobalEnv, lookupGlobalEnv)
+import Clash.Core.Syntax
+import qualified Clash.Core.TysPrim as P
 import Clash.Rewrite.Scoped.WorkFree
 
 import Test.Clash.Scoped

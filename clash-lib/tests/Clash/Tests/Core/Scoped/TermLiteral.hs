@@ -4,7 +4,7 @@ Copyright   :  (C) 2022, Google Inc.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-Tests for "Clash.Core.Scoped.TermLiteral", and checks that the decoders
+Tests for "Clash.Core.TermLiteral", and checks that the decoders
 decode the encodings of generated values to these values.
 -}
 {-# LANGUAGE AllowAmbiguousTypes #-}
@@ -30,8 +30,8 @@ import Test.Tasty.TH
 import Clash.Annotations.SynthesisAttributes (Attr)
 import qualified Clash.Core.Literal as L
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.Syntax (S (VoidS), Term (App, Literal, Tick), TickInfo (NoDeDup))
-import Clash.Core.Scoped.TermLiteral
+import Clash.Core.Syntax (S (VoidS), Term (App, Literal, Tick), TickInfo (NoDeDup))
+import Clash.Core.TermLiteral
 import Clash.Promoted.Nat
 import Clash.Sized.Index (Index)
 import Clash.Sized.Vector (Vec)

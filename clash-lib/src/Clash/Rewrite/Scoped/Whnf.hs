@@ -4,7 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Evaluating a subterm of a scoped rewrite to weak-head normal form, with the
-  evaluator of scoped Clash Core ("Clash.Core.Scoped.Evaluator").
+  evaluator of scoped Clash Core ("Clash.Core.Evaluator").
 
   The evaluator gets the let-bindings of the context ('tfHeap') as its local
   heap. Its result lives in the scope of the subterm extended with the
@@ -28,16 +28,16 @@ import qualified Control.Lens as Lens
 import GHC.Stack (HasCallStack)
 
 
-import Clash.Core.Scoped.Evaluator (allocatedBind, whnf)
-import Clash.Core.Scoped.Evaluator.Primitives (primReductionMap)
-import Clash.Core.Scoped.Evaluator.Types
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TypeEnv (TypeEnv)
+import Clash.Core.Evaluator (allocatedBind, whnf)
+import Clash.Core.Evaluator.Primitives (primReductionMap)
+import Clash.Core.Evaluator.Types
+import Clash.Core.Syntax
+import Clash.Core.TypeEnv (TypeEnv)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (bindPureHeap)
 
 -- | The environment of the scoped evaluator: the primitive reductions of
--- "Clash.Core.Scoped.Evaluator.Primitives". A primitive without one doesn't
+-- "Clash.Core.Evaluator.Primitives". A primitive without one doesn't
 -- reduce.
 evaluatorEnv :: TypeEnv -> Env
 evaluatorEnv te = Env te (PrimReductions primReductionMap Nothing)

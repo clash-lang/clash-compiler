@@ -19,7 +19,7 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (..))
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 import Clash.Rewrite.Scoped (Rewrite)
 import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.StrategyDSL

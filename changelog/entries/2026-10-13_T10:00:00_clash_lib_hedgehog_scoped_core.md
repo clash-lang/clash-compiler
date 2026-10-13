@@ -4,7 +4,7 @@ prs: []
 ---
 
 # CHANGED
-The generators of `clash-lib-hedgehog` generate scoped Clash Core (`Clash.Core.Scoped.Syntax`) instead of Clash Core. Kinds, types and terms are indexed by their scope, and are generated in an environment `Clash.Hedgehog.Core.Var.Env n`, which has the scope and the variables in it that they may mention, instead of a `UniqMap` of free variables. For example:
+The generators of `clash-lib-hedgehog` generate scoped Clash Core (`Clash.Core.Syntax`) instead of Clash Core. Kinds, types and terms are indexed by their scope, and are generated in an environment `Clash.Hedgehog.Core.Var.Env n`, which has the scope and the variables in it that they may mention, instead of a `UniqMap` of free variables. For example:
 
 ```hs
 -- before

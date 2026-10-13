@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Writing transformations of scoped Clash Core ("Clash.Core.Scoped.Syntax").
+  Writing transformations of scoped Clash Core ("Clash.Core.Syntax").
   This module re-exports what a transformation needs from the rewrite
   machinery; read this header before writing one.
 
@@ -21,7 +21,7 @@
   'Clash.Rewrite.Types.tcCache', ...) and the change flag ('changed',
   'setChanged') are in "Clash.Rewrite.Types" and "Clash.Rewrite.Util". The
   unique supply is not needed for local binders: fresh binders come from the
-  scope ('Clash.Core.Scoped.Subst.withFreshIdBinder' and friends).
+  scope ('Clash.Core.Subst.withFreshIdBinder' and friends).
 
   = Workers
 
@@ -35,10 +35,10 @@
     Fields under binders come with their existential scope: for @onLam@,
     @w :: Distinct n => TransformContext n -> Term n -> IdBinder n l -> Term l
     -> m (Term n)@; for @onLet@, @Bind n l -> Term l@, where the right-hand
-    side of a 'Clash.Core.Scoped.Syntax.NonRec' is in @n@ and those of a
-    'Clash.Core.Scoped.Syntax.Rec' are in @l@. A worker that wants to look under such
+    side of a 'Clash.Core.Syntax.NonRec' is in @n@ and those of a
+    'Clash.Core.Syntax.Rec' are in @l@. A worker that wants to look under such
     a binder must open it first ('underLam', 'underLet', 'underAlt', or
-    'Clash.Core.Scoped.Subst.openIdBinder' and friends when the context isn't
+    'Clash.Core.Subst.openIdBinder' and friends when the context isn't
     needed): until then, @l@ is not known to be 'Distinct'.
 
   * @onAppNode 'w@ (and the other @on*Node@ builders, and
@@ -92,7 +92,7 @@
     _ -> pure (sink e)  -- doesn't fire: return the original node
   @
 
-  The evaluator is that of scoped Clash Core ("Clash.Core.Scoped.Evaluator").
+  The evaluator is that of scoped Clash Core ("Clash.Core.Evaluator").
   The let-bindings of the context are those of its frames.
 
   = A worked example
@@ -116,8 +116,8 @@
   @
 
   where 'Clash.Rewrite.Util.removeUnusedBinders' moves the body out of
-  the scope of unused binders with 'Clash.Core.Scoped.Subst.unsinkIdBinder',
-  and opens a recursive let-binding ('Clash.Core.Scoped.Subst.openBind')
+  the scope of unused binders with 'Clash.Core.Subst.unsinkIdBinder',
+  and opens a recursive let-binding ('Clash.Core.Subst.openBind')
   before it looks at its variables.
 
   The strategies ("Clash.Normalize.Strategy.Spec") refer to the scoped
@@ -136,8 +136,8 @@
 
   * __@Couldn't match type l1 with l@ / @l is a rigid type variable@__: a
     term was used in another scope. Move it into an extension with
-    'Clash.Core.Scoped.Syntax.sink', out of the scope of binders with
-    'Clash.Core.Scoped.Subst.unsinkTerm' (which checks that they don't
+    'Clash.Core.Syntax.sink', out of the scope of binders with
+    'Clash.Core.Subst.unsinkTerm' (which checks that they don't
     occur), or into any other scope by substitution.
 
   * __An existential scope escapes__: a continuation such as that of

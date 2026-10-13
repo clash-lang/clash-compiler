@@ -35,15 +35,15 @@ import Clash.Core.Basic (WorkInfo (..))
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Scoped.Primitives (removedArg)
 
-import Clash.Core.Scoped.FreeVars (termGlobalIds)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.NameMap
+import Clash.Core.FreeVars (termGlobalIds)
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.NameMap
   (GlobalEnv, insertGlobalEnv, lookupGlobalEnv, memberGlobalSet)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs, stripTicks)
-import Clash.Core.Scoped.TermInfo (isClosed)
-import Clash.Core.Scoped.Type (isClockOrReset, isEnable, isPolyFunTy)
-import Clash.Core.Scoped.TypeEnv (TypeEnv)
+import Clash.Core.Syntax
+import Clash.Core.Term (collectArgs, stripTicks)
+import Clash.Core.TermInfo (isClosed)
+import Clash.Core.Type (isClockOrReset, isEnable, isPolyFunTy)
+import Clash.Core.TypeEnv (TypeEnv)
 
 -- | Whether a global binder is work free, see 'isWorkFree'. Errors if there is
 -- no binding for it.

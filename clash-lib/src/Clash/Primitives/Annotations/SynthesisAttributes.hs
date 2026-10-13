@@ -21,9 +21,9 @@ import qualified Data.Text as T
 import Clash.Core.Basic (LitTy (..))
 import Clash.Annotations.SynthesisAttributes
 import Clash.Backend (Backend)
-import Clash.Core.Scoped.Syntax (Type(LitTy))
-import Clash.Core.Scoped.TermLiteral (termToDataError)
-import Clash.Core.Scoped.Type (coreView)
+import Clash.Core.Syntax (Type(LitTy))
+import Clash.Core.TermLiteral (termToDataError)
+import Clash.Core.Type (coreView)
 import Clash.Netlist.BlackBox.Types
 import Clash.Netlist.Types
 import Clash.Sized.Vector (Vec, toList)

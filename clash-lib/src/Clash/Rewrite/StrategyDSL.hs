@@ -86,7 +86,7 @@ module Clash.Rewrite.StrategyDSL
 
 import Language.Haskell.TH.Syntax (Name)
 
--- | One 'Clash.Core.Scoped.Syntax.Term' constructor.
+-- | One 'Clash.Core.Syntax.Term' constructor.
 data Constructor
   = CVar | CData | CLiteral | CPrim | CLam | CTyLam
   | CApp | CTyApp | CLet | CCase | CCast | CTick

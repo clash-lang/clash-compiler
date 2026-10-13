@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator": the whnf evaluator of scoped Clash
+  Tests for "Clash.Core.Evaluator": the whnf evaluator of scoped Clash
   Core and its primitive reductions, in the environment Clash uses
   ('Clash.Rewrite.Scoped.Whnf.evaluatorEnv').
 -}
@@ -22,12 +22,12 @@ import Test.Tasty.HUnit
 
 import Clash.Driver.Types (Binding)
 
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Builder (dataB)
-import Clash.Core.Scoped.Evaluator.Types (Env)
-import Clash.Core.Scoped.NameMap (GlobalEnv, emptyGlobalEnv)
-import Clash.Core.Scoped.Subst (closeTerm)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.Builder (dataB)
+import Clash.Core.Evaluator.Types (Env)
+import Clash.Core.NameMap (GlobalEnv, emptyGlobalEnv)
+import Clash.Core.Subst (closeTerm)
+import Clash.Core.Syntax
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
 import Test.Clash.Rewrite (ghcFalseDataCon, ghcTrueDataCon, showPprU)
@@ -228,7 +228,7 @@ nativeTests =
   mapTy = forAll "a_9001" typeKind $ \a -> forAll "b_9002" typeKind $ \b ->
     forAll "n_9003" natKind $ \n -> (a ~> b) ~> vecTy n a ~> vecTy n b
 
--- | 'Clash.Core.Scoped.Evaluator.nfData'
+-- | 'Clash.Core.Evaluator.nfData'
 nfDataTests :: [TestTree]
 nfDataTests =
   [ testCase "the fields of a constructor are evaluated" $

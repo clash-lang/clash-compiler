@@ -31,8 +31,8 @@ import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (..
 import Clash.Normalize.Types (NormalizeSession, NormalizeState)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 
-import Clash.Core.Scoped.NameMap (emptyNameMap, nameMapToList)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.NameMap (emptyNameMap, nameMapToList)
+import Clash.Core.Syntax
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import qualified Clash.Rewrite.Scoped as S

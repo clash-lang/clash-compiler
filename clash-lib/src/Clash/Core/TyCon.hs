@@ -7,7 +7,7 @@
   Type Constructors in CoreHW
 
   The signatures of type constructors in scoped Clash Core
-  ("Clash.Core.Scoped.Sig"): the signature of a newtype ('newTyConSig') and the
+  ("Clash.Core.Sig"): the signature of a newtype ('newTyConSig') and the
   equations of a type family ('tyFamEqns'), and the instantiation of a newtype
   ('newTyConInstRhs').
 -}
@@ -58,10 +58,10 @@ import qualified Data.Text as T
 -- Internal Imports
 import {-# SOURCE #-} Clash.Core.DataCon       (DataCon)
 import Clash.Core.Name
-import Clash.Core.Scoped.Sig
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax hiding (Name)
-import qualified Clash.Core.Scoped.Syntax     as Scoped
+import Clash.Core.Sig
+import Clash.Core.Subst
+import Clash.Core.Syntax hiding (Name)
+import qualified Clash.Core.Syntax     as Scoped
 import Clash.Data.UniqMap (UniqMap)
 import Clash.Unique
 
@@ -94,7 +94,7 @@ data TyCon
   -- ^ Kind of the TyCon, which is closed. Lazy.
   , tyConArity  :: !Int            -- ^ Number of type arguments
   , tyConEqns   :: [TyFamEqn]
-  -- ^ The equations, in order, see "Clash.Core.Scoped.Sig". Lazy.
+  -- ^ The equations, in order, see "Clash.Core.Sig". Lazy.
   }
   -- | Primitive TyCons
   | PrimTyCon
@@ -136,7 +136,7 @@ data AlgTyConRhs
   , ntSig :: NewTyConSig
   -- ^ The type variables of the newtype, and the argument type of the
   -- newtype DataCon in eta-reduced form, which is just the representation of
-  -- the TyCon, see "Clash.Core.Scoped.Sig". Lazy.
+  -- the TyCon, see "Clash.Core.Sig". Lazy.
   }
   deriving (Show)
 
@@ -223,7 +223,7 @@ newTyConSig = \case
 -- ones are applied to the result. 'Nothing' if there are fewer types than
 -- type variables.
 --
--- See 'Clash.Core.Scoped.Type.coreView1'.
+-- See 'Clash.Core.Type.coreView1'.
 newTyConInstRhs :: Distinct n => Scope n -> NewTyConSig -> [Type n] -> Maybe (Type n)
 newTyConInstRhs sc (NewTyConSig tvs rhs) = instTele (closedSubst sc) tvs rhs
 

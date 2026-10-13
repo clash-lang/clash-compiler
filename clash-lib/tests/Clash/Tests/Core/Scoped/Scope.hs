@@ -4,7 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for scopes represented by a watermark, see
-  "Clash.Core.Scoped.Internal.Scope"
+  "Clash.Core.Internal.Scope"
 -}
 
 module Clash.Tests.Core.Scoped.Scope (tests) where
@@ -12,7 +12,7 @@ module Clash.Tests.Core.Scoped.Scope (tests) where
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.Internal.Scope
+import Clash.Core.Internal.Scope
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Scope"

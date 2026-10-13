@@ -34,9 +34,9 @@ import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Data.List as List
 
-import Clash.Core.Scoped.Builder (runTyFamEqn, tyConAppB, varTyB)
+import Clash.Core.Builder (runTyFamEqn, tyConAppB, varTyB)
 import Clash.Core.TyCon (mkFunTyCon)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 
 import Test.Clash.Rewrite (liftedTypeKindB)
 import Test.Clash.Scoped (closedType, forAllScrambled, testScope, withTests)

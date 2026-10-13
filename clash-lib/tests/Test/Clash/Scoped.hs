@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Utilities to write unit tests on scoped Clash Core ("Clash.Core.Scoped").
+  Utilities to write unit tests on scoped Clash Core ("Clash.Core").
 
   = Inputs in scoped Core
 
@@ -48,7 +48,7 @@
   the component context of a scope from 'testCompCtx'.
 
   What the parser can't parse, such as primitives, is built with the builders
-  of "Clash.Core.Scoped.Builder". A parsed term is a builder too:
+  of "Clash.Core.Builder". A parsed term is a builder too:
 
   > termIn ts (builtTerm (appB (primB (testPrim "f" "Int -> Int")) (testTermB "x_2")))
 
@@ -207,21 +207,21 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Basic as C
 
-import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
-import Clash.Core.Scoped.Builder
+import Clash.Core.Alpha (aeqTm, aeqTy)
+import Clash.Core.Builder
   (appB, primB, runClosedTerm, runClosedType, runTermIn, runTypeIn)
-import Clash.Core.Scoped.FreeVars (HasNameBinder (..), freeTmVars, freeTyVars, freeTyVarsOfType)
-import Clash.Core.Scoped.Internal.Names
+import Clash.Core.FreeVars (HasNameBinder (..), freeTmVars, freeTyVars, freeTyVarsOfType)
+import Clash.Core.Internal.Names
   ( TmName (UnsafeTmName), TmNameBinder (UnsafeTmNameBinder), TyName (UnsafeTyName)
   , TyNameBinder (UnsafeTyNameBinder))
-import Clash.Core.Scoped.Internal.Scope
+import Clash.Core.Internal.Scope
   (Name (UnsafeName), NameBinder (UnsafeNameBinder), nameId, nameOf, scopeWatermark)
-import Clash.Core.Scoped.NameMap
+import Clash.Core.NameMap
 import Clash.Core.Pretty (PrettyOptions (..), showPpr')
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (mkLams, mkTyLams)
-import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
+import Clash.Core.Subst
+import Clash.Core.Syntax
+import Clash.Core.Term (mkLams, mkTyLams)
+import Clash.Core.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types (CompCtx, LocalId (..), compCtxFromList)
 import Clash.Rewrite.Scoped
@@ -241,14 +241,14 @@ import Test.Clash.Rewrite
     runRewriteTest, showPprU, termQQ, testGlobalId, testTyConMap, tyVarD, typeQQ,
     varD, vecTcNm, consDc, withCurFun )
 import Test.Clash.Rewrite (ghcName)
-import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
+import Clash.Core.Evaluator.Types (Env (..), PrimReductions (..))
 import Test.Clash.Scoped.Evaluator (whnfIn)
 import Test.Clash.Scoped.Print (globalIdent, showTestTerm)
 
 -- * Test scopes
 
 -- | The scope of a test: a scope with the variables that the test declared
--- ('ScopeDecl'), by key (see 'Clash.Core.Scoped.Builder.Key'), so that terms
+-- ('ScopeDecl'), by key (see 'Clash.Core.Builder.Key'), so that terms
 -- parsed from strings can refer to them, see 'termIn'.
 data TestScope n = TestScope
   { testScope :: !(Scope n)
@@ -424,7 +424,7 @@ assertLintClean ts tm = case lintTerm (testLintScope ts) tm of
   errs -> assertFailure (unlines errs <> "in:\n" <> showPprU tm)
 
 -- | Assert that two terms are alpha-equivalent, see
--- 'Clash.Core.Scoped.Alpha.aeqTm'. Shows both, with their raw names, if they
+-- 'Clash.Core.Alpha.aeqTm'. Shows both, with their raw names, if they
 -- aren't.
 assertTermAlphaEq :: HasCallStack => Term n -> Term n -> Assertion
 assertTermAlphaEq expected actual =
@@ -435,7 +435,7 @@ assertTermAlphaEq expected actual =
     (aeqTm expected actual)
 
 -- | Pretty print a term like 'showPprU', with its ticks, which
--- 'Clash.Core.Scoped.Alpha.aeqTm' compares
+-- 'Clash.Core.Alpha.aeqTm' compares
 showTermT :: Term n -> String
 showTermT = showPpr' PrettyOptions
   { displayUniques = True
@@ -786,7 +786,7 @@ testCompCtx ts =
 
 -- | A primitive with the given name and closed type, which does no work, has
 -- a single result, and no unfolding. The parser doesn't parse primitives, so
--- tests build them with 'Clash.Core.Scoped.Builder.primB':
+-- tests build them with 'Clash.Core.Builder.primB':
 --
 -- > termIn ts (builtTerm (appB (primB (testPrim "f" "Int -> Int")) (testTermB "x_1")))
 testPrim :: HasCallStack => Text -> TestType -> PrimInfo
@@ -921,7 +921,7 @@ lintTerm ls0 = goTm ls0
 -- the types in the term, except those of the types of variable occurrences,
 -- which are those of their binders.
 --
--- Values that the builders of "Clash.Core.Scoped.Builder" build, and
+-- Values that the builders of "Clash.Core.Builder" build, and
 -- 'freshen'ed ones, have no such binders. Others may: e.g. a value 'sink'ed
 -- into a larger scope.
 lowBinders :: Int -> Term n -> [Int]
@@ -983,7 +983,7 @@ bindersNot ok = goTm
     goTy w (payload b) <> check w (binderRaw b) <> goTele payload bs (max w (binderRaw b)) k
 
 -- | The raw names of the binders of a term, in the order in which the builders
--- of "Clash.Core.Scoped.Builder" number them: depth-first, left to right, a
+-- of "Clash.Core.Builder" number them: depth-first, left to right, a
 -- binder after the binders in its type, and a non-recursive let-binding after
 -- its right-hand side. Leaves out the binders of the types of variable
 -- occurrences, which are those of their binders.
@@ -1372,7 +1372,7 @@ testScopeTests :: TestTree
 testScopeTests = testGroup "Test.Clash.Scoped"
   [ testGroup "parseTestTerm"
       [ -- The binders of a closed term get names in depth-first order, as
-        -- GHC2Core and the decoder of "Clash.Core.Scoped.Binary" give them
+        -- GHC2Core and the decoder of "Clash.Core.Binary" give them
         testCase "numbers binders depth-first" $
           sequence_
             [ binderRaws (closedTerm (parseTestTerm s)) @?= raws

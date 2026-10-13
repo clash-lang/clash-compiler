@@ -22,7 +22,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.DataCon as C
-import Clash.Core.Scoped.Syntax (GlobalId, Term (Cast))
+import Clash.Core.Syntax (GlobalId, Term (Cast))
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite)

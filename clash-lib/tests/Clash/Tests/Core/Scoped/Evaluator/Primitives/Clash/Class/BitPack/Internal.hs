@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal"
+  Tests for "Clash.Core.Evaluator.Primitives.Clash.Class.BitPack.Internal"
   on fixed inputs.
 -}
 
@@ -24,11 +24,11 @@ import Clash.Core.TyCon (AlgTyConRhs (DataTyCon), TyConName)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (Unique)
 
-import Clash.Core.Scoped.Builder (TmB, TyB, appB, dataB, literalB)
+import Clash.Core.Builder (TmB, TyB, appB, dataB, literalB)
 import Clash.Core.TyCon (mkAlgTyCon)
-import Clash.Core.Scoped.Evaluator.Types (Env)
-import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
-import Clash.Core.Scoped.TysPrim (liftedTypeKind)
+import Clash.Core.Evaluator.Types (Env)
+import Clash.Core.TypeEnv (mkTypeEnv)
+import Clash.Core.TysPrim (liftedTypeKind)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
 import Test.Clash.Rewrite (mkTyConName, testTyConMap)

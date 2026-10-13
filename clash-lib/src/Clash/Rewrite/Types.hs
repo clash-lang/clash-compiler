@@ -9,7 +9,7 @@
   Type and instance definitions for Rewrite modules
 
   The rewrite context and the transformation type of scoped Clash Core
-  ("Clash.Core.Scoped.Syntax"). See "Clash.Rewrite.Scoped" for how to write a
+  ("Clash.Core.Syntax"). See "Clash.Rewrite.Scoped" for how to write a
   transformation.
 
   = The context
@@ -161,20 +161,20 @@ import GHC.Exts                              (oneShot)
 import GHC.Generics                          (Generic)
 import GHC.Stack                             (HasCallStack)
 
-import Clash.Core.Scoped.TypeEnv (TypeEnv)
+import Clash.Core.TypeEnv (TypeEnv)
 
 import Clash.Core.TyCon          (TyConMap, TyConName)
 import Clash.Driver.Types
   ( Binding, ClashEnv(..), ClashOpts(..), DebugOpts, HasClashOpts(..) )
 import qualified Clash.Core.Name           as C
-import Clash.Core.Scoped.NameMap
+import Clash.Core.NameMap
   (GlobalEnv, GlobalSet, NameMap, emptyNameMap, insertNameMap, sinkNameMap)
-import Clash.Core.Scoped.Evaluator.Types (PrimHeap)
-import Clash.Core.Scoped.Subst
+import Clash.Core.Evaluator.Types (PrimHeap)
+import Clash.Core.Subst
   (openAlt, openBind, openIdBinder, openTyBinder, teleIdVars)
-import Clash.Core.Scoped.Syntax
-import qualified Clash.Core.Scoped.Syntax as S
-import Clash.Core.Scoped.Term   (primArg)
+import Clash.Core.Syntax
+import qualified Clash.Core.Syntax as S
+import Clash.Core.Term   (primArg)
 import Clash.Driver.Warning      (CanWarn)
 import Clash.Netlist.Types       (HWMap, HWTypeTranslator)
 import Clash.Primitives.Types    (CompiledPrimMap)
@@ -247,7 +247,7 @@ data RewriteEnv
   , _typeEnv  :: TypeEnv
   -- ^ The type constructors of 'tcCache', and the globals of the bindings at
   -- the start of the session, for scoped Clash Core. It caches their
-  -- signatures as scoped types, see "Clash.Core.Scoped.TypeEnv": make it once
+  -- signatures as scoped types, see "Clash.Core.TypeEnv": make it once
   -- per session.
   }
 
@@ -528,7 +528,7 @@ pushFrame f (TransformContext sc p h) = TransformContext sc (PFrame f p) h
 {-# INLINE pushFrame #-}
 
 -- | Push a frame that goes under binders. The scope is the one that opening
--- the binders gave, e.g. by 'Clash.Core.Scoped.Subst.openIdBinder'. This is
+-- the binders gave, e.g. by 'Clash.Core.Subst.openIdBinder'. This is
 -- the only way to extend the scope of a context.
 --
 -- The let-bindings of a 'LetBody' are added to the heap ('tfHeap'), as they
@@ -562,7 +562,7 @@ appArgFrame = AppArg . primArg
 -- * Going under binders
 
 -- | Go under the binder of a lambda: open it (see
--- 'Clash.Core.Scoped.Subst.openIdBinder'), and give the context of the body.
+-- 'Clash.Core.Subst.openIdBinder'), and give the context of the body.
 underLam
   :: Distinct n
   => TransformContext n

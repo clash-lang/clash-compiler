@@ -19,9 +19,9 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Basic as C (ConstTy (..), LitTy (..))
 
-import Clash.Core.Scoped.Builder
-import Clash.Core.Scoped.Sig (DataConSig (..), NewTyConSig (..), TyFamEqn (..))
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Builder
+import Clash.Core.Sig (DataConSig (..), NewTyConSig (..), TyFamEqn (..))
+import Clash.Core.Syntax
 
 import Test.Clash.Rewrite (TestType (..), mkTyConName)
 

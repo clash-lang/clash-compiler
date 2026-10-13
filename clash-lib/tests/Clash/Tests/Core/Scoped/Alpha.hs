@@ -18,9 +18,9 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import Clash.Core.Scoped.Alpha
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha
+import Clash.Core.Subst
+import Clash.Core.Syntax
 
 import Test.Clash.Scoped
   ( TestTerm, assertTermIs, closedType, extendTestScope, forAllScrambled, sunkD, termIn

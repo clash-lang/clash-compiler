@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Negative compile tests of scoped Clash Core ("Clash.Core.Scoped").
+# Negative compile tests of scoped Clash Core ("Clash.Core").
 #
 # Every N*.hs is a buggy use of the API, of a kind that caused scoping bugs in
 # Clash, that GHC must reject with the error that its "-- EXPECT:" line gives

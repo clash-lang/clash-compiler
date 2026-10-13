@@ -101,17 +101,17 @@ import Clash.Normalize.Types (NormalizeSession)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
 
-import Clash.Core.Scoped.FreeVars
+import Clash.Core.FreeVars
   (freeTmVarOccurrences, freeTmVars, hasFreeVarsType, tmNameOccursIn)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.NameMap
+import Clash.Core.Syntax
+import Clash.Core.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
-import Clash.Core.Scoped.TermInfo (isClosed, isLocalVar, termSizeSmallerThan)
-import Clash.Core.Scoped.Type
+import Clash.Core.TermInfo (isClosed, isLocalVar, termSizeSmallerThan)
+import Clash.Core.Type
   (TypeView (..), isClassTy, isPolyFunCoreTy, isSignalType, tyView)
-import Clash.Core.Scoped.Util (primUCo)
+import Clash.Core.Util (primUCo)
 import Clash.Normalize.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
   , normalizeTopLvlBndr, normalizeWorkFreeApp )

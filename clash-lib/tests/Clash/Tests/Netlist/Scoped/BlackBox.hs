@@ -24,8 +24,8 @@ import Clash.Netlist.Types
   (LocalId (..), BlackBoxContext (..), Declaration (Assignment, InstDecl), DeclarationType (Concurrent)
   , Expr (Identifier), componentNames)
 import qualified Clash.Netlist.Id as Id
-import Clash.Core.Scoped.NameMap (emptyGlobalEnv, singletonGlobalEnv)
-import Clash.Core.Scoped.Syntax (GlobalId (..), Term (..))
+import Clash.Core.NameMap (emptyGlobalEnv, singletonGlobalEnv)
+import Clash.Core.Syntax (GlobalId (..), Term (..))
 
 import Test.Clash.Rewrite (runNetlistTest)
 import Test.Clash.Scoped

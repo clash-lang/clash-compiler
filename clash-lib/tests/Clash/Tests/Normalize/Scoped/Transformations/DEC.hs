@@ -32,10 +32,10 @@ import Data.String (fromString)
 
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkVariable))
-import Clash.Core.Scoped.Syntax (mkPrimInfo)
+import Clash.Core.Syntax (mkPrimInfo)
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
   (Alt (..), GlobalId, Pat (DefaultPat), PrimInfo, PrimUnfolding (NoUnfolding), Term (Case))
 import qualified Clash.Normalize.Scoped.Transformations.DEC as Scoped
 import Clash.Normalize.Types (NormalizeState)

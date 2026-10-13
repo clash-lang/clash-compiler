@@ -18,9 +18,9 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Basic as C (WorkInfo (WorkVariable))
 import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 
-import Clash.Core.Scoped.Builder (TyB, appTyB, constTyB, litTyB)
-import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Builder (TyB, appTyB, constTyB, litTyB)
+import Clash.Core.NameMap (emptyGlobalEnv)
+import Clash.Core.Syntax
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
   (LocalId (..), SomeBlackBoxFunction (..), compCtxFromList, Declaration (Assignment, NetDecl))

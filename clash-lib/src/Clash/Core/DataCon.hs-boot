@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  For "Clash.Core.Scoped.Syntax", whose terms refer to data constructors,
+  For "Clash.Core.Syntax", whose terms refer to data constructors,
   which store scoped types.
 -}
 

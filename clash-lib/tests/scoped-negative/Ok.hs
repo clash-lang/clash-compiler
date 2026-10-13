@@ -6,10 +6,10 @@ module Ok where
 
 import qualified Clash.Core.Name as C
 
-import Clash.Core.Scoped.Alpha
-import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha
+import Clash.Core.NameMap
+import Clash.Core.Subst
+import Clash.Core.Syntax
 
 occ :: C.Name Term
 occ = C.mkUnsafeSystemName (error "occ") 0

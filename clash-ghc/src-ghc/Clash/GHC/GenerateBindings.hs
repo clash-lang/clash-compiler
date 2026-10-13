@@ -59,16 +59,16 @@ import           Clash.Annotations.Primitive (HDL, extractPrim)
 
 import           Clash.Core.Name (mkUnsafeInternalName)
 import           Clash.Core.TyCon (TyConMap, TyConName, isNewTypeTc)
-import           Clash.Core.Scoped.TysPrim (tysPrimMap)
+import           Clash.Core.TysPrim (tysPrimMap)
 import           Clash.Data.UniqMap (UniqMap)
-import           Clash.Core.Scoped.NameMap (globalEnvFromList)
-import           Clash.Core.Scoped.Syntax
+import           Clash.Core.NameMap (globalEnvFromList)
+import           Clash.Core.Syntax
   ( GlobalId, S (VoidS), globalIdName, globalIdType )
-import           Clash.Core.Scoped.Subst (openTyBinder, withFreshIdBinder)
-import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
-import           Clash.Core.Scoped.TypeEnv (lookupTyCon, mkTypeEnv)
-import qualified Clash.Core.Scoped.Util as S (mkSelectorCase)
+import           Clash.Core.Subst (openTyBinder, withFreshIdBinder)
+import qualified Clash.Core.Syntax as S
+import qualified Clash.Core.Type as S (TypeView (..), tyView)
+import           Clash.Core.TypeEnv (lookupTyCon, mkTypeEnv)
+import qualified Clash.Core.Util as S (mkSelectorCase)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver            (compilePrimitives)
 import           Clash.Driver.Bool       (toGhcOverridingBool)
@@ -79,7 +79,7 @@ import           Clash.GHC.GHC2Core
    makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan, coreToTermB, coreToTypeB, varKey)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
-import           Clash.Core.Scoped.Builder
+import           Clash.Core.Builder
   (TmB, letrecB, runClosedTerm, varB)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
@@ -243,7 +243,7 @@ mkBindings convBind convClsOp bindings clsOps = do
 -- Core. See 'mkBindings' for how these conversions are run in parallel.
 --
 -- The bindings hold the builders of their bodies, see
--- "Clash.Core.Scoped.Builder": 'mkBindings' runs the conversion of GHC Core in
+-- "Clash.Core.Builder": 'mkBindings' runs the conversion of GHC Core in
 -- parallel, and 'generateBindings' builds the bodies lazily.
 processBind
   :: CompiledPrimMap

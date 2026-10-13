@@ -24,9 +24,9 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
-import Clash.Core.Scoped.Syntax (mkPrimInfo)
-import Clash.Core.Scoped.Syntax (PrimInfo, PrimUnfolding (NoUnfolding), Term (Prim))
-import Clash.Core.Scoped.Term (collectArgs)
+import Clash.Core.Syntax (mkPrimInfo)
+import Clash.Core.Syntax (PrimInfo, PrimUnfolding (NoUnfolding), Term (Prim))
+import Clash.Core.Term (collectArgs)
 import Clash.Normalize.Scoped.Transformations.Reduce (PrimReduction (..))
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeState)

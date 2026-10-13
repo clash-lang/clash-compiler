@@ -32,11 +32,11 @@ import qualified Clash.Rewrite.Scoped as Scoped (changed)
 import Clash.Rewrite.Types
   (RewriteState (..), Frame (..), Rewrite, Transform (..), pushFrame, rootContext)
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TermInfo (isClosed)
-import Clash.Core.Scoped.Util (mkLets)
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.NameMap
+import Clash.Core.Syntax
+import Clash.Core.TermInfo (isClosed)
+import Clash.Core.Util (mkLets)
 import qualified Clash.Normalize.Util as Scoped
 import qualified Clash.Rewrite.Scoped.Combinators as Scoped (bottomupR)
 

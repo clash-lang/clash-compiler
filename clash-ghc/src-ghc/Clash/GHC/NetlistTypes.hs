@@ -47,10 +47,10 @@ import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (tyConDataCons)
 import Clash.Core.DataCon        (DataConSig (..), dataConInstExtTyVars)
-import Clash.Core.Scoped.Syntax         (Distinct, Scope, Type (..))
-import Clash.Core.Scoped.Type
+import Clash.Core.Syntax         (Distinct, Scope, Type (..))
+import Clash.Core.Type
   (TypeView (..), coreView, coreView1, splitTyConAppM, tyNatSize, tyView)
-import Clash.Core.Scoped.TypeEnv        (TypeEnv, findTyCon)
+import Clash.Core.TypeEnv        (TypeEnv, findTyCon)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
   (HWType(..), HWMap, HWTypeTranslator (..), FilteredHWType(..), PortDirection (..))

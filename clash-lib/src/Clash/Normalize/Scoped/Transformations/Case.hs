@@ -10,16 +10,16 @@
 
   Moving the alternatives of a case-expression under the binders of a pattern
   or a let-expression ('caseCase', 'caseLet') needs the scope those extend,
-  which only opening them gives ('Clash.Core.Scoped.Subst.openAlt',
-  'Clash.Core.Scoped.Subst.openBind'), so those binders can't capture the
+  which only opening them gives ('Clash.Core.Subst.openAlt',
+  'Clash.Core.Subst.openBind'), so those binders can't capture the
   free variables of the alternatives. Returning the right-hand side of an
   alternative without its pattern needs that the variables the pattern binds
-  don't occur in it ('Clash.Core.Scoped.Subst.unsinkAlt').
+  don't occur in it ('Clash.Core.Subst.unsinkAlt').
 
   * 'caseCon' evaluates the subject with the evaluator of scoped Clash Core
     ('Clash.Rewrite.Scoped.Whnf.whnfRW'), which uses the let-bindings of the
     context. Its primitive reductions build coercions as @_CO_ \@ty@
-    ('Clash.Core.Scoped.Util.primCo').
+    ('Clash.Core.Util.primCo').
 
   * When 'caseCon' let-binds the fields of a data constructor, it gives the
     let-binders fresh names, and binds them in the order of the fields.
@@ -80,7 +80,7 @@ import Clash.Core.DataCon (DataCon(..), dcUnivTyVarCount)
 import Clash.Core.Literal (Literal(..))
 import qualified Clash.Core.Name as C (nameOcc)
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.TysPrim (integerIsDc, naturalNsDc)
+import Clash.Core.TysPrim (integerIsDc, naturalNsDc)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
@@ -95,19 +95,19 @@ import Clash.Warning (ClashWarning(WarnUnmatchableConstant))
 
 import Clash.XException (errorX)
 
-import Clash.Core.Scoped.Alpha (aeqTm, commonAltBody)
+import Clash.Core.Alpha (aeqTm, commonAltBody)
 import Clash.Core.DataCon (dataConInstArgTys)
-import Clash.Core.Scoped.EqSolver (isAbsurdPat, solvePatExistentials)
-import Clash.Core.Scoped.FreeVars (freeTmVars)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.NameMap (NameSet, memberNameSet)
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term
+import Clash.Core.EqSolver (isAbsurdPat, solvePatExistentials)
+import Clash.Core.FreeVars (freeTmVars)
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.NameMap (NameSet, memberNameSet)
+import Clash.Core.Subst
+import Clash.Core.Syntax
+import Clash.Core.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
-import Clash.Core.Scoped.Type (TypeView(..), coreView1, tyView)
-import Clash.Core.Scoped.TypeEnv (TypeEnv)
-import Clash.Core.Scoped.Util (internalName)
+import Clash.Core.Type (TypeView(..), coreView1, tyView)
+import Clash.Core.TypeEnv (TypeEnv)
+import Clash.Core.Util (internalName)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope, whnfRW)
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Util
@@ -750,7 +750,7 @@ elimExistentials =
 -- A solution replaces the occurrences of an existentially quantified type
 -- variable, in the types of the fields and in the right-hand side of the
 -- alternative, but the pattern still binds it (see
--- 'Clash.Core.Scoped.EqSolver.solvePatExistentials'). This repeats until no
+-- 'Clash.Core.EqSolver.solvePatExistentials'). This repeats until no
 -- more equations are solved.
 elimExistentialsWorker
   :: forall n. (HasCallStack, Distinct n)

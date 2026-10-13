@@ -5,7 +5,7 @@ module BenchmarkCommon where
 import Clash.Annotations.Primitive (HDL(VHDL))
 import Clash.Backend
 import Clash.Backend.VHDL
-import Clash.Core.Scoped.Syntax (GlobalId)
+import Clash.Core.Syntax (GlobalId)
 import Clash.Driver
 import Clash.Driver.Types
 import Clash.Netlist.Types (TopEntityT(topId))

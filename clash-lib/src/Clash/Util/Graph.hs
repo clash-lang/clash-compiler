@@ -31,8 +31,8 @@ import           Data.IntSet           (IntSet)
 import qualified Data.IntSet           as IntSet
 #endif
 
-import           Clash.Core.Scoped.NameMap (globalEnvKeys, lookupGlobalEnv)
-import           Clash.Core.Scoped.Syntax (GlobalId, S (VoidS), Term)
+import           Clash.Core.NameMap (globalEnvKeys, lookupGlobalEnv)
+import           Clash.Core.Syntax (GlobalId, S (VoidS), Term)
 import           Clash.Driver.Types (Binding (bindingTerm), GlobalBindings)
 import           Clash.Normalize.Util (callGraph)
 import           Clash.Unique (Unique)

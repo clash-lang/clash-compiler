@@ -16,8 +16,8 @@ import Data.List   (find)
 import Data.Maybe  (fromJust)
 import qualified Data.ByteString.Lazy as BL
 
-import Clash.Core.Scoped.Syntax  (S (VoidS))
-import qualified Clash.Core.Scoped.Syntax as S
+import Clash.Core.Syntax  (S (VoidS))
+import qualified Clash.Core.Syntax as S
 import Clash.Rewrite.Scoped.History (decodeRewriteHistory)
 import Clash.Rewrite.Types (RewriteStep (..))
 import Clash.Core.Pretty   ( ClashDoc, ClashAnnotation (..), SyntaxElement (..)

@@ -8,7 +8,7 @@
 -- and `topLet`).
 module N10NonRecToRec where
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 
 nonRecToRec :: Term n -> Term n
 nonRecToRec (Let (NonRec b rhs) body) = Let (Rec (TCons b TNil) [rhs]) body

@@ -38,7 +38,7 @@
   substitution-carrying traversal renames a binder in O(1) (an entry in the
   substitution), unlike opening binders one by one, which would rename a
   binder by substituting in its scope whenever a new binder took its name.
-  That is also why this doesn't use 'Clash.Core.Scoped.Subst.freshenDistinct':
+  That is also why this doesn't use 'Clash.Core.Subst.freshenDistinct':
   the names come from the growing scope, so they are distinct by construction.
 
   = Pattern variables
@@ -106,19 +106,19 @@ import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
 import Clash.Util (curLoc)
 
-import Clash.Core.Scoped.FreeVars
+import Clash.Core.FreeVars
   (anyBoundOccursInType, freeTmVars, freeTyVars, teleNameBinders)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.NameMap
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.NameMap
   (NameBinders, memberNameSet, nameMapFromList, nameSetToList)
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term
+import Clash.Core.Subst
+import Clash.Core.Syntax
+import Clash.Core.Term
   (appendTele, collectArgs, collectTicks, mkTicks, partitionTicks, stripTicks)
-import Clash.Core.Scoped.TermInfo (isCon, isLocalVar, isPrim, isVar)
-import Clash.Core.Scoped.Type (TypeView (..), coreView, tyView)
-import Clash.Core.Scoped.TypeEnv (TypeEnv)
-import Clash.Core.Scoped.Util (internalName, mkSelectorCase, systemName)
+import Clash.Core.TermInfo (isCon, isLocalVar, isPrim, isVar)
+import Clash.Core.Type (TypeView (..), coreView, tyView)
+import Clash.Core.TypeEnv (TypeEnv)
+import Clash.Core.Util (internalName, mkSelectorCase, systemName)
 import Clash.Normalize.Scoped.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.Scoped
@@ -723,7 +723,7 @@ collectCase env rg subj ty alts = do
 -- @(:-)@, given the types of its fields.
 --
 -- 'mkSelectorCase' cannot do this: Clash treats 'Signal' as a "transparent"
--- type, and 'mkSelectorCase' uses 'Clash.Core.Scoped.Type.coreView1' to find
+-- type, and 'mkSelectorCase' uses 'Clash.Core.Type.coreView1' to find
 -- the data constructors of the subject, which looks through 'Signal' and
 -- finds those of the element type instead. See error #24
 -- (https://github.com/christiaanb/clash2/issues/24), where it tried to get the

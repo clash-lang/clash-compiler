@@ -25,8 +25,8 @@ import qualified Data.Map.Strict as Map
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.NameMap (GlobalEnv, globalEnvFromList, lookupGlobalEnv)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.NameMap (GlobalEnv, globalEnvFromList, lookupGlobalEnv)
+import Clash.Core.Syntax
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import qualified Clash.Normalize.Scoped.Transformations.Inline as InlineS
@@ -670,7 +670,7 @@ specializeTests =
 
     -- 'specialize' creates a binder for every argument before the one it
     -- specializes on, and inferred the kind of a type argument with
-    -- 'Clash.Core.Scoped.HasType.inferCoreKindOf' to do so. With the @debug@
+    -- 'Clash.Core.HasType.inferCoreKindOf' to do so. With the @debug@
     -- flag, that errored for applications of type constructors, such as
     -- @Maybe a@ in
     --

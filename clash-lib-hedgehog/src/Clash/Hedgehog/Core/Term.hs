@@ -31,13 +31,13 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Subst (openTyBinder, patVars)
-import Clash.Core.Scoped.Syntax hiding (Name)
-import Clash.Core.Scoped.Term (mkTmApps)
-import Clash.Core.Scoped.Type (TypeView(..), normalizeType, splitTyConAppM, tyView)
-import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
-import Clash.Core.Scoped.TysPrim (liftedTypeKind, typeSymbolKind)
-import Clash.Core.Scoped.Util (listToLets)
+import Clash.Core.Subst (openTyBinder, patVars)
+import Clash.Core.Syntax hiding (Name)
+import Clash.Core.Term (mkTmApps)
+import Clash.Core.Type (TypeView(..), normalizeType, splitTyConAppM, tyView)
+import Clash.Core.TypeEnv (mkTypeEnv)
+import Clash.Core.TysPrim (liftedTypeKind, typeSymbolKind)
+import Clash.Core.Util (listToLets)
 
 import Clash.Hedgehog.Core.Literal
 import Clash.Hedgehog.Core.Monad

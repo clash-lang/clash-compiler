@@ -41,14 +41,14 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Alpha (aeqTy)
 import Clash.Core.DataCon (dataConInstArgTys)
-import Clash.Core.Scoped.Subst (openTyBinder)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Type
+import Clash.Core.Subst (openTyBinder)
+import Clash.Core.Syntax
+import Clash.Core.Type
   (TypeView(..), isPolyTy, mkFunTy, mkTyConApp, mkTyConTy, tyView)
-import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
-import Clash.Core.Scoped.TysPrim
+import Clash.Core.TypeEnv (mkTypeEnv)
+import Clash.Core.TysPrim
 
 import Clash.Hedgehog.Core.Monad
 import Clash.Hedgehog.Core.Name
@@ -229,7 +229,7 @@ genClosedKindFrom tcm =
 -- for a hole with the given kind.
 --
 -- __N.B.__ Although the kind generated is a fit for the given hole, calling
--- a function like 'Clash.Core.Scoped.HasType.inferCoreKindOf' may return a
+-- a function like 'Clash.Core.HasType.inferCoreKindOf' may return a
 -- different kind. This is because quantifiers are both the introduction rule
 -- for kind arrows and a kind former of their own right, so for the hole
 --

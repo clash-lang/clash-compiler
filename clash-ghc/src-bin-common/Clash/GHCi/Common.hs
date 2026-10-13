@@ -25,8 +25,8 @@ import           GHC.Utils.Panic        (GhcException (..), throwGhcException)
 import qualified GHC
   (DynFlags, ModSummary (..), extensionFlags, moduleName, moduleNameString)
 import           Clash.Core.Name        (nameOcc)
-import           Clash.Core.Scoped.NameMap (memberGlobalSet)
-import           Clash.Core.Scoped.Syntax (globalIdName)
+import           Clash.Core.NameMap (memberGlobalSet)
+import           Clash.Core.Syntax (globalIdName)
 import           Clash.Normalize.Util (callGraph, callGraphGlobals)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Util             (ClashException(..), noSrcSpan)

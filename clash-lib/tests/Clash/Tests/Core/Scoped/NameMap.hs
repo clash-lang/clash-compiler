@@ -15,9 +15,9 @@ module Clash.Tests.Core.Scoped.NameMap (tests) where
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
+import Clash.Core.NameMap
+import Clash.Core.Subst
+import Clash.Core.Syntax
 
 import Test.Clash.Scoped (closedTerm, testGlobalId)
 

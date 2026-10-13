@@ -4,7 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests of the 'Data.Binary.Binary' instances of scoped Clash Core
-  ("Clash.Core.Scoped.Binary"), on generated terms
+  ("Clash.Core.Binary"), on generated terms
   ("Test.Clash.Scoped.Gen"), with the number of tests that 'withTests' gives.
 -}
 
@@ -25,10 +25,10 @@ import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
-import Clash.Core.Scoped.Binary
-import Clash.Core.Scoped.Sig (DataConSig (..))
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha (aeqTm, aeqTy)
+import Clash.Core.Binary
+import Clash.Core.Sig (DataConSig (..))
+import Clash.Core.Syntax
 
 import Test.Clash.Scoped (binderRaws, closeFreeVars, forAllScrambled, withTests)
 import Test.Clash.Scoped.Gen

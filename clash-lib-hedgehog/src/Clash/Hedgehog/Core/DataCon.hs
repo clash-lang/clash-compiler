@@ -28,10 +28,10 @@ import Clash.Core.DataCon
 import Clash.Core.TyCon
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Subst (openTyBinder)
-import Clash.Core.Scoped.Syntax hiding (Name)
-import Clash.Core.Scoped.Type (TypeView(..), mkTyConApp, tyView)
-import Clash.Core.Scoped.TysPrim (liftedTypeKind)
+import Clash.Core.Subst (openTyBinder)
+import Clash.Core.Syntax hiding (Name)
+import Clash.Core.Type (TypeView(..), mkTyConApp, tyView)
+import Clash.Core.TysPrim (liftedTypeKind)
 
 import Clash.Hedgehog.Core.Monad
 import Clash.Hedgehog.Core.Name

@@ -5,7 +5,7 @@
 -- bug in `appProp` that #1040 fixed)
 module N11AppPropLet where
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 
 appPropLet :: Term n -> [Term n] -> Term n
 appPropLet fun args = case fun of

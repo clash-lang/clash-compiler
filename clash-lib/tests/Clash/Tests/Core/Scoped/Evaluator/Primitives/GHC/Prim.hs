@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim" on fixed inputs:
+  Tests for "Clash.Core.Evaluator.Primitives.GHC.Prim" on fixed inputs:
   reductions with unboxed tuples as results, the reductions that combinators
   build, and the byte arrays on the primitive heap.
 
@@ -27,10 +27,10 @@ import Clash.Core.Literal (Literal (..))
 import Clash.Core.TyCon (tyConDataCons)
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Builder (TmB, TyB, dataB, literalB, tyAppB)
-import Clash.Core.Scoped.Syntax (PrimInfo (..), S (VoidS), Term (..))
-import Clash.Core.Scoped.Term (collectArgs)
-import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Builder (TmB, TyB, dataB, literalB, tyAppB)
+import Clash.Core.Syntax (PrimInfo (..), S (VoidS), Term (..))
+import Clash.Core.Term (collectArgs)
+import Clash.Core.Alpha (aeqTy)
 
 import Test.Clash.Rewrite
   (ghcName, ghcTrueDataCon, mkTyConName, showPprU, t2TyConName, testTyConMap)

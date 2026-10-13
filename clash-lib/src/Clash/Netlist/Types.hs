@@ -10,7 +10,7 @@
   Type and instance definitions for Netlist modules
 
   The types that Netlist generation on scoped Clash Core
-  ("Clash.Core.Scoped.Syntax") shares with its handlers and with blackbox
+  ("Clash.Core.Syntax") shares with its handlers and with blackbox
   functions.
 
   = Component contexts
@@ -31,7 +31,7 @@
   A blackbox function on scoped Core ('BlackBoxFunction') gets the context of
   the component, as a read-only 'BlackBoxEnv': the scope of its arguments,
   which it needs to e.g. look through type synonyms with
-  'Clash.Core.Scoped.Type.coreView', the type environment, and the HDL
+  'Clash.Core.Type.coreView', the type environment, and the HDL
   identifiers of the local variables its arguments mention.
 -}
 
@@ -95,12 +95,12 @@ import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
 import qualified Clash.Core.Name            as C
-import Clash.Core.Scoped.Alpha              (AlphaType)
-import Clash.Core.Scoped.Syntax             hiding (Literal)
-import qualified Clash.Core.Scoped.Syntax   as S (Type)
-import Clash.Core.Scoped.TypeEnv            (TypeEnv)
+import Clash.Core.Alpha              (AlphaType)
+import Clash.Core.Syntax             hiding (Literal)
+import qualified Clash.Core.Syntax   as S (Type)
+import Clash.Core.TypeEnv            (TypeEnv)
 import Clash.Core.TyCon                     (TyConMap)
-import Clash.Core.Scoped.NameMap
+import Clash.Core.NameMap
   (GlobalEnv, NameMap, emptyNameMap, insertNameMap, lookupNameMap, sinkNameMap)
 import Clash.Driver.Types
   (ClashEnv(..), ClashOpts(..), GlobalBindings, HasClashOpts(..))
@@ -170,7 +170,7 @@ type HWMap = Map AlphaType (Either String FilteredHWType)
 -- doesn't know.
 --
 -- The type is in scope @n@, which functions that look through newtypes and
--- type families need ('Clash.Core.Scoped.Type.coreView').
+-- type families need ('Clash.Core.Type.coreView').
 newtype HWTypeTranslator = HWTypeTranslator
   { runHWTypeTranslator
       :: forall n

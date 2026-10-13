@@ -36,14 +36,14 @@ import Unsafe.Coerce (unsafeCoerce)
 import qualified Clash.Core.Name as C
 import Clash.Core.Literal (Literal (IntLiteral))
 
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.FreeVars
-import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
-import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (mkLams, mkTyLams)
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.FreeVars
+import Clash.Core.Internal.Scope (scopeWatermark)
+import Clash.Core.NameMap
+import Clash.Core.Subst
+import Clash.Core.Syntax
+import Clash.Core.Term (mkLams, mkTyLams)
+import qualified Clash.Core.TysPrim as P
 
 import Test.Clash.Scoped
   ( TestScope (..), TestType, assertLintClean, assertTermAlphaEq, assertTermIs, assertTypeIs, atRaw
@@ -63,7 +63,7 @@ import Test.Clash.Scoped.Gen
 -- This is substitution if no binder in the term binds a variable that is
 -- substituted, nor a free variable of the values: e.g. if the binders of the
 -- term are 'freshenDistinct'ed in a scope with the free variables of the
--- values. The oracle for the substitution of "Clash.Core.Scoped.Subst".
+-- values. The oracle for the substitution of "Clash.Core.Subst".
 naiveSubst :: IntMap.IntMap (Type n) -> IntMap.IntMap (Term n) -> Term n -> Term n
 naiveSubst tys tms = goTm
  where

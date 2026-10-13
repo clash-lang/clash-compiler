@@ -23,10 +23,10 @@ import Test.Tasty.QuickCheck
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Syntax
 import Clash.Core.TyCon
-import Clash.Core.Scoped.TypeEnv
+import Clash.Core.TypeEnv
 
 import Test.Clash.Rewrite (assertErrorContains, nTyConName, showPprU, testTyConMap)
 import Test.Clash.Scoped (TestScope (..), testTypeEnv, withTests)

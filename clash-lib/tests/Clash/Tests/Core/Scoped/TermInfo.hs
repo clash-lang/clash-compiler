@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.TermInfo"
+  Tests for "Clash.Core.TermInfo"
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -16,9 +16,9 @@ module Clash.Tests.Core.Scoped.TermInfo (tests) where
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.Builder (TmB, castB, deDupTickB, tickB)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TermInfo
+import Clash.Core.Builder (TmB, castB, deDupTickB, tickB)
+import Clash.Core.Syntax
+import Clash.Core.TermInfo
 
 import Test.Clash.Rewrite (TestTerm (..), TestType (..))
 import Test.Clash.Scoped

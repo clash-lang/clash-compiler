@@ -8,7 +8,7 @@
 
   Turn CoreHW terms into normalized CoreHW Terms
 
-  The normalizer runs on scoped Clash Core ("Clash.Core.Scoped.Syntax"): the
+  The normalizer runs on scoped Clash Core ("Clash.Core.Syntax"): the
   global bindings are closed terms, which GHC2Core produces and Netlist
   generation consumes.
 -}
@@ -82,18 +82,18 @@ import           Clash.Util.Supply                (Supply)
 
 import           Clash.Rewrite.Scoped.History (recordRewriteStep)
 
-import           Clash.Core.Scoped.FreeVars       (termGlobalIds, teleNameBinders)
-import           Clash.Core.Scoped.NameMap
-import           Clash.Core.Scoped.Subst          (substGlobals, unsinkTerm)
-import           Clash.Core.Scoped.Syntax         hiding (Type)
-import qualified Clash.Core.Scoped.Syntax         as S
-import           Clash.Core.Scoped.Term
+import           Clash.Core.FreeVars       (termGlobalIds, teleNameBinders)
+import           Clash.Core.NameMap
+import           Clash.Core.Subst          (substGlobals, unsinkTerm)
+import           Clash.Core.Syntax         hiding (Type)
+import qualified Clash.Core.Syntax         as S
+import           Clash.Core.Term
   (AbsBinder (..), collectArgsTicks, collectTicks, mkApps, mkTicks, openBndrs,
    stripTicks)
-import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
-import           Clash.Core.Scoped.Type
+import           Clash.Core.TypeEnv        (mkTypeEnv)
+import           Clash.Core.Type
   (SplitCoreFunForall (..), isPolyTy, piTeleTyArity, splitCoreFunForallTy)
-import           Clash.Core.Scoped.Alpha          (aeqTy)
+import           Clash.Core.Alpha          (aeqTy)
 
 -- | Run a NormalizeSession in a given environment
 runNormalization

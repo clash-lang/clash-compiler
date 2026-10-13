@@ -32,7 +32,7 @@ import Clash.Core.DataCon (DcName)
 import Clash.Core.TyCon (TyConName)
 
 import Clash.Core.Name
-import Clash.Core.Scoped.Syntax (Term, Type)
+import Clash.Core.Syntax (Term, Type)
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 
