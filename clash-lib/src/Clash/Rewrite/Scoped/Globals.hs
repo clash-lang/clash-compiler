@@ -50,7 +50,7 @@ import           GHC.Types.SrcLoc            (SrcSpan)
 
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
-import           Clash.Core.VarEnv           (elemVarSet, uniqAway')
+import           Clash.Core.VarEnv (uniqAway')
 import qualified Clash.Data.UniqMap          as UniqMap
 import           Clash.Driver.Types          (Binding (..), BindingMap, IsPrim (IsFun))
 import           Clash.Rewrite.Types
@@ -123,7 +123,7 @@ findAlphaEqBinding body = do
 
 -- | Whether a global is a top entity
 isTopEntity :: GlobalId -> RewriteMonad extra Bool
-isTopEntity g = (globalIdLegacy g `elemVarSet`) <$> Lens.view topEntities
+isTopEntity g = memberGlobalSet g <$> Lens.view topEntities
 
 -- | Whether a term is work free, see 'Clash.Rewrite.Scoped.WorkFree.isWorkFree'.
 -- Caches the work-freeness of global binders in the rewrite state.

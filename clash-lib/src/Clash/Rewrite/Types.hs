@@ -32,7 +32,6 @@ import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Trans.RWS.CPS           (RWST)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import Control.Monad.Writer                  (MonadWriter (..))
-import Data.Bifunctor                        (first)
 import Data.Binary                           (Binary)
 import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
@@ -40,17 +39,13 @@ import Data.Monoid                           (Any)
 import Data.Text                             (Text)
 import GHC.Generics
 
-import Clash.Core.Evaluator.Types as WHNF    (Evaluator, PrimHeap)
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+import Clash.Core.Evaluator.Types as WHNF (PrimHeap)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
-import Clash.Core.Term           (Term, Context)
 import Clash.Core.TyCon          (TyConMap, TyConName)
-import Clash.Core.Var            (Id)
-import Clash.Core.VarEnv         (InScopeSet, VarSet, VarEnv)
 import Clash.Driver.Types
-  (Binding, ClashEnv(..), ClashOpts(..), BindingMap, DebugOpts, HasClashOpts(..))
-import Clash.Core.Scoped.NameMap (GlobalEnv)
+  ( Binding, ClashEnv(..), ClashOpts(..), DebugOpts, HasClashOpts(..) )
+import Clash.Core.Scoped.NameMap (GlobalEnv, GlobalSet)
 import qualified Clash.Core.Scoped.Syntax as S
 import Clash.Driver.Warning      (CanWarn)
 import Clash.Netlist.Types       (HWMap, HWTypeTranslator)
@@ -88,23 +83,16 @@ data RewriteState extra
   -- ^ Map that tracks how many times each transformation is applied
   , _transformTriedCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation has been tried
-  , _bindings         :: !BindingMap
-  -- ^ Global binders, for the transformations of Clash Core. See
-  -- '_scopedBindings'.
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
   , _curFun           :: (S.GlobalId,SrcSpan) -- Initially set to undefined: no strictness annotation
-  -- ^ Function which is currently normalized. See 'curFunLegacy'.
+  -- ^ Function which is currently normalized
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
   , _globalHeap       :: PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _workFreeBinders  :: VarEnv Bool
-  -- ^ Map telling whether a binder's definition is work-free
   , _scopedBindings   :: GlobalEnv (Binding (S.Term 'S.VoidS))
-  -- ^ Global binders, as closed terms of scoped Clash Core. The normalizer
-  -- uses these; '_bindings' are those of the transformations of Clash Core,
-  -- until Phase 7 of the port deletes them.
+  -- ^ Global binders, as closed terms of scoped Clash Core
   , _scopedWorkFreeBinders :: GlobalEnv Bool
   -- ^ Map telling whether the definition of a global binder in
   -- '_scopedBindings' is work-free
@@ -119,11 +107,6 @@ data RewriteState extra
 
 Lens.makeLenses ''RewriteState
 
--- | 'curFun', with the function as a variable of Clash Core, for the
--- transformations of Clash Core
-curFunLegacy :: Lens.Lens' (RewriteState extra) (Id, SrcSpan)
-curFunLegacy = curFun . Lens.iso (first S.globalIdLegacy) (first mkGlobalIdFromClash)
-
 -- | Read-only environment of a rewriting session
 data RewriteEnv
   = RewriteEnv
@@ -131,11 +114,7 @@ data RewriteEnv
   -- ^ The global environment of the compiler
   , _typeTranslator :: HWTypeTranslator
   -- ^ Hardcode Type -> FilteredHWType translator
-  , _evaluator      :: WHNF.Evaluator
-  -- ^ Hardcoded evaluator for WHNF, of the transformations on Clash Core. The
-  -- normalizer, on scoped Clash Core, uses "Clash.Core.Scoped.Evaluator".
-  -- TODO(Phase 7): remove.
-  , _topEntities    :: VarSet
+  , _topEntities    :: GlobalSet
   -- ^ Functions that are considered TopEntities
   , _scopedTypeEnv  :: TypeEnv
   -- ^ The type constructors of 'tcCache', and the globals of the bindings at
@@ -230,15 +209,3 @@ instance MonadUnique (RewriteMonad extra) where
 censor :: (Any -> Any) -> RewriteMonad extra a -> RewriteMonad extra a
 censor f = R . RWS.censor f . unR
 {-# INLINE censor #-}
-
-data TransformContext
-  = TransformContext
-  { tfInScope :: !InScopeSet
-  , tfContext :: Context
-  }
-
--- | Monadic action that transforms a term given a certain context
-type Transform m = TransformContext -> Term -> m Term
-
--- | A 'Transform' action in the context of the 'RewriteMonad'
-type Rewrite extra = Transform (RewriteMonad extra)

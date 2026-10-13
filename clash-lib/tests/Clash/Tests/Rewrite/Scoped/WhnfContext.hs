@@ -30,9 +30,9 @@ import Test.Tasty.HUnit
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..), changed)
 import qualified Clash.Rewrite.Scoped as S
-import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
+import Clash.Rewrite.Types (RewriteState (..))
 
-import Test.Clash.Rewrite (TestTerm, heapLookupEvaluator)
+import Test.Clash.Rewrite (TestTerm)
 import Test.Clash.Scoped
   ( ScopeDecl, Step (..), assertLintClean, assertTermIs, runScopedAt, termIn, tyVarD, varD
   , withBinderClashes, withTestScope )
@@ -53,7 +53,7 @@ whnfAt path decls input expected = withTestScope decls $ \ts0 -> do
     (e', _, _) <- runScopedAt env st ts path whnfS e
     assertLintClean ts e'
     assertTermIs ts expected e'
-  env = def{_evaluator = heapLookupEvaluator}
+  env = def
   st :: RewriteState NormalizeState
   st = def{_globalHeap = (IntMap.empty, 0)}
 

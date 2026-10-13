@@ -221,7 +221,6 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
-import Clash.Core.VarEnv (mkVarSet)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
 import Clash.Core.Scoped.Builder
@@ -640,7 +639,7 @@ withBinderClashes ts e k
 -- | An environment in which the given globals are the top entities
 -- ('Clash.Rewrite.Types.topEntities')
 withTopEntities :: [GlobalId] -> RewriteEnv -> RewriteEnv
-withTopEntities gs env = env {C._topEntities = mkVarSet (map globalIdLegacy gs)}
+withTopEntities gs env = env {C._topEntities = globalSetFromList gs}
 
 -- | The scenario of a capture bug of Clash Core: a term with a binder that has
 -- the name of a variable that the term mentions outside of the scope of the

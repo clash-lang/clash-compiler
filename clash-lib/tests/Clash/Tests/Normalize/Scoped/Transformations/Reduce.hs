@@ -40,18 +40,16 @@ import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.Scoped.Util (LetBinding (..), openLetBindings)
 
 import Test.Clash.Rewrite
-  ( TestDefs (..), TestTerm, ghcName, heapLookupEvaluator, parseTestTermWith, runRewriteTest, strQQ
+  ( TestDefs (..), TestTerm, ghcName, parseTestTermWith, runRewriteTest, strQQ
   , testTyConMap, withTyConMap )
 import Test.Clash.Scoped
   ( ScopeDecl, Step (..), TestScope (..), assertNoRewriteAt, assertRewritesAt, closedType
   , varD, withTerm )
 
 -- | The default environment, with the type constructors of 'testTyConMap'
--- (among which @Vec@), and an evaluator of Clash Core that only looks up
--- variables on the heap: the scoped evaluator reduces the primitives of the
--- 'reduceConst' tests itself.
+-- (among which @Vec@)
 env :: RewriteEnv
-env = (withTyConMap testTyConMap def) {_evaluator = heapLookupEvaluator}
+env = withTyConMap testTyConMap def
 
 st :: RewriteState NormalizeState
 st = def {_globalHeap = (IntMap.empty, 0)}
