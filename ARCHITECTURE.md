@@ -152,7 +152,7 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
     Convert a single component to a netlist. This corresponds to an individual entity in VHDL, or a module in Verilog/SystemVerilog. For each component the following is performed:
 
-    * `Clash.Netlist.Scoped.Util.mkUniqueNormalized`
+    * `Clash.Netlist.Util.mkUniqueNormalized`
 
       Create wrappers / unwrappers for the arguments and results of top entities. Additionally, this ensures that there are no naming conflicts between the identifiers in the generated HDL.
 

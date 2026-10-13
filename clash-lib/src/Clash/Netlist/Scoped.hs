@@ -6,9 +6,9 @@
   Create netlists out of normalized terms of scoped Clash Core.
 
   'genComponentT' opens the normalized term of a component into a single scope
-  ('Clash.Netlist.Scoped.Util.splitNormalized'), and records the HDL
+  ('Clash.Netlist.Util.splitNormalized'), and records the HDL
   identifiers of its variables in a t'CompCtx'
-  ('Clash.Netlist.Scoped.Util.mkUniqueNormalized'). The handlers below get
+  ('Clash.Netlist.Util.mkUniqueNormalized'). The handlers below get
   that context.
 
   'mkDeclarations'' and 'mkExpr' dispatch on the form of a term to the other
@@ -93,7 +93,9 @@ import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, dcToLiteral, declareInstUses, expandTopEntityOrErrM,
    genComponentName, genTopName,
    isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
-   procAssign, stripFiltered)
+   procAssign, stripFiltered, UniqueNormalized (..), coreTypeToHWTypeM', globalIdentifier, localIdText, mkUniqueNormalized, primWarnContext,
+   splitNormalized,
+   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
@@ -120,10 +122,6 @@ import           Clash.Core.Scoped.Term
 
 import           Clash.Netlist.Scoped.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive, prepareBlackBox)
-import           Clash.Netlist.Scoped.Util
-  (UniqueNormalized (..), coreTypeToHWTypeM', globalIdentifier, localIdText, mkUniqueNormalized, primWarnContext,
-   splitNormalized,
-   unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad

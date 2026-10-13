@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Netlist.Scoped.Util"
+  Tests for "Clash.Netlist.Util"
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -17,7 +17,7 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Scoped.Syntax (Term (..), tmNameRaw)
 import Clash.Netlist.Types (LocalId (..))
-import Clash.Netlist.Scoped.Util (SplitNormalized (..), splitNormalized)
+import Clash.Netlist.Util (SplitNormalized (..), splitNormalized)
 
 import Test.Clash.Rewrite (TestDefs (..), TestTerm, parseTestTermWith)
 import Test.Clash.Scoped (closedTerm, testGlobalId, testTypeEnv)

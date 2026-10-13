@@ -357,7 +357,7 @@ data SingleBinding
 
 -- | Whether a normalized function, which has the shape
 -- @\\x1 .. xn -> let y = e in y@ (see
--- 'Clash.Netlist.Scoped.Util.splitNormalized'), binds a single variable, and
+-- 'Clash.Netlist.Util.splitNormalized'), binds a single variable, and
 -- if so, whether it is a wrapper @\\x1 .. xn -> let y = f a1 .. am x1 .. xn
 -- in y@ that eta-reduces to @f a1 .. am@: when @f@ and the @ai@ mention none
 -- of the @xi@, nor @y@. The ticks around the let-expression and around the
