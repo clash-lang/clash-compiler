@@ -17,6 +17,7 @@
 module Clash.GHC.Scoped.Check
   ( Outcome (..)
   , compareTerms
+  , compareTypes
   , primAtTypeShape
   ) where
 
@@ -27,9 +28,8 @@ import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Util as C (undefinedTy)
-import qualified Clash.Core.Var as C
 
-import Clash.Core.Scoped.Alpha (aeqTm)
+import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
 import Clash.Core.Scoped.Syntax
 
 -- | How two terms compare
@@ -42,6 +42,13 @@ data Outcome
   -- ^ Not alpha-equivalent, with the first difference
   deriving (Show)
 
+-- | The worse of two outcomes
+instance Semigroup Outcome where
+  o@Different{} <> _ = o
+  _ <> o@Different{} = o
+  o@AlphaEquivalent{} <> _ = o
+  _ <> o = o
+
 -- | Compare two closed terms: structurally, with raw names and the
 -- occurrence names, sorts and source locations of names; and if they differ,
 -- up to alpha-equivalence.
@@ -50,6 +57,14 @@ compareTerms t1 t2 = case cmpTm t1 t2 of
   Nothing -> Identical
   Just d
     | aeqTm t1 t2 -> AlphaEquivalent d
+    | otherwise -> Different d
+
+-- | Compare two closed types, like 'compareTerms'
+compareTypes :: Type 'VoidS -> Type 'VoidS -> Outcome
+compareTypes t1 t2 = case cmpTy t1 t2 of
+  Nothing -> Identical
+  Just d
+    | aeqTy t1 t2 -> AlphaEquivalent d
     | otherwise -> Different d
 
 -- | Turn the primitives @_RUBBISH_@ of open types that
@@ -134,29 +149,31 @@ cmpTele cmpB tl1 tl2 = case (tl1, tl2) of
   (TCons b1 bs1, TCons b2 bs2) -> cmpB b1 b2 <+> cmpTele cmpB bs1 bs2
   _ -> Just "telescopes of different lengths"
 
-cmpPrim :: C.PrimInfo -> C.PrimInfo -> Cmp
+cmpPrim :: PrimInfo -> PrimInfo -> Cmp
 cmpPrim p1 p2 =
-  check "primitive" (==) (C.primName p1) (C.primName p2)
-    <+> check "primitive type" (==) (C.primType p1) (C.primType p2)
-    <+> check "primitive work info" (==) (C.primWorkInfo p1) (C.primWorkInfo p2)
-    <+> check "primitive multi result" (==) (C.primMultiResult p1) (C.primMultiResult p2)
-    <+> case (C.primUnfolding p1, C.primUnfolding p2) of
-          (C.NoUnfolding, C.NoUnfolding) -> Nothing
-          (C.Unfolding i1, C.Unfolding i2) ->
-            check "primitive unfolding" (==) (C.varUniq i1) (C.varUniq i2)
-          _ -> diff "primitive unfolding" (C.primUnfolding p1) (C.primUnfolding p2)
+  check "primitive" (==) (primName p1) (primName p2)
+    <+> cmpTy (primType p1) (primType p2)
+    <+> check "primitive work info" (==) (primWorkInfo p1) (primWorkInfo p2)
+    <+> check "primitive multi result" (==) (primMultiResult p1) (primMultiResult p2)
+    <+> case (primUnfolding p1, primUnfolding p2) of
+          (NoUnfolding, NoUnfolding) -> Nothing
+          (Unfolding g1, Unfolding g2) -> cmpGlobal g1 g2
+          _ -> diff "primitive unfolding" (primUnfolding p1) (primUnfolding p2)
+
+cmpGlobal :: GlobalId -> GlobalId -> Cmp
+cmpGlobal g1 g2 =
+  check "global" (==) g1 g2
+    <+> cmpName (globalIdName g1) (globalIdName g2)
+    <+> cmpTy (globalIdType g1) (globalIdType g2)
 
 cmpTm :: Term n -> Term m -> Cmp
 cmpTm e1 e2 = case (e1, e2) of
   (Var o1 _ n1, Var o2 _ n2) ->
     check "variable" (==) (tmNameRaw n1) (tmNameRaw n2) <+> cmpName o1 o2
-  (GlobalVar g1, GlobalVar g2) ->
-    check "global" (==) g1 g2
-      <+> cmpName (globalIdName g1) (globalIdName g2)
-      <+> check "global type" (==) (C.varType (globalIdLegacy g1)) (C.varType (globalIdLegacy g2))
+  (GlobalVar g1, GlobalVar g2) -> cmpGlobal g1 g2
   (Data dc1, Data dc2) -> check "data constructor" (==) (C.dcUniq dc1) (C.dcUniq dc2)
   (Literal l1, Literal l2) -> check "literal" (==) l1 l2
-  (Prim p1, Prim p2) -> cmpPrim (primLegacy p1) (primLegacy p2)
+  (Prim p1, Prim p2) -> cmpPrim p1 p2
   (Lam b1 x1, Lam b2 x2) -> cmpIdBinder b1 b2 <+> cmpTm x1 x2
   (TyLam b1 x1, TyLam b2 x2) -> cmpTyBinder b1 b2 <+> cmpTm x1 x2
   (App f1 a1, App f2 a2) -> cmpTm f1 f2 <+> cmpTm a1 a2
