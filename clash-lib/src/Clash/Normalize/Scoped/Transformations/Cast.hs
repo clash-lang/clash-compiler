@@ -51,7 +51,7 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
-  (Transformation, onApp, onCast, onLet, toScopedTransformation)
+  (Transformation, onApp, onCast, onLet, toTransformation)
 import Clash.Rewrite.Types (curFun, typeEnv)
 import Clash.Util (ClashException (..), curLoc)
 import Clash.Warning (ClashWarning (WarnCastSpecialization))
@@ -92,7 +92,7 @@ import Clash.Rewrite.Scoped.Util (mkTmBinderFor)
 -- and expression where two casts are "back-to-back" after which we can
 -- eliminate them in 'elimCastCast'.
 argCastSpec :: Transformation
-argCastSpec = toScopedTransformation "argCastSpec" (onApp 'argCastSpecWorker)
+argCastSpec = toTransformation "argCastSpec" (onApp 'argCastSpecWorker)
 
 -- | The 'App' handler of 'argCastSpec'
 argCastSpecWorker
@@ -128,7 +128,7 @@ argCastSpecWorker ctx node f arg
 
 -- | Push a cast over a case into its alternatives
 caseCast :: Transformation
-caseCast = toScopedTransformation "caseCast" (onCast 'caseCastWorker)
+caseCast = toTransformation "caseCast" (onCast 'caseCastWorker)
 
 -- | The 'Cast' handler of 'caseCast'
 caseCastWorker
@@ -153,7 +153,7 @@ caseCastWorker ctx node body ty1 ty2 = case stripTicks body of
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
 elimCastCast :: Transformation
-elimCastCast = toScopedTransformation "elimCastCast" (onCast 'elimCastCastWorker)
+elimCastCast = toTransformation "elimCastCast" (onCast 'elimCastCastWorker)
 
 -- | The 'Cast' handler of 'elimCastCast'
 elimCastCastWorker
@@ -181,7 +181,7 @@ elimCastCastWorker ctx node body tyB' tyC = case stripTicks body of
 
 -- | Push a cast over a let-expression into its body
 letCast :: Transformation
-letCast = toScopedTransformation "letCast" (onCast 'letCastWorker)
+letCast = toTransformation "letCast" (onCast 'letCastWorker)
 
 -- | The 'Cast' handler of 'letCast'
 letCastWorker
@@ -207,7 +207,7 @@ letCastWorker ctx node body ty1 ty2 = case stripTicks body of
 --     x  = cast x'
 -- @
 splitCastWork :: Transformation
-splitCastWork = toScopedTransformation "splitCastWork" (onLet 'splitCastWorkWorker)
+splitCastWork = toTransformation "splitCastWork" (onLet 'splitCastWorkWorker)
 
 -- | The 'Let' handler of 'splitCastWork'.
 --

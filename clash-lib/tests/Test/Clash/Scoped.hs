@@ -39,7 +39,7 @@
   bindings compare after 'globalsByOcc'.
 
   > withTerm "let { !(x :: Int) = 1 } in 2" $ \ts e -> do
-  >   (e', _, changed) <- runScopedIn def def ts $(asScopedRewriteQ deadCode) e
+  >   (e', _, changed) <- runScopedIn def def ts $(asRewriteQ deadCode) e
   >   assertTermIs ts "2" e'
   >   changed @?= True
 

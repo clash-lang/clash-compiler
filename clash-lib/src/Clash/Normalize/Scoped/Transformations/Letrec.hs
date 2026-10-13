@@ -83,7 +83,7 @@ import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onCase, onLet, onLetNode, onPrimNode, onTickNode
-  , onTyAppNode, scopedAnyConstructor, toScopedTransformation )
+  , onTyAppNode, anyConstructor, toTransformation )
 import Clash.Rewrite.Types (curFun, primitives, typeEnv)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
@@ -114,7 +114,7 @@ import Clash.Rewrite.Scoped.Util
 
 -- | Remove unused let-bindings
 deadCode :: Transformation
-deadCode = toScopedTransformation "deadCode" (onLet 'deadCodeWorker)
+deadCode = toTransformation "deadCode" (onLet 'deadCodeWorker)
 
 -- | The 'Let' handler of 'deadCode'
 deadCodeWorker
@@ -134,7 +134,7 @@ deadCodeWorker ctx e bind body =
 
 -- | Replace the unused arguments of primitives by 'removedArg'
 removeUnusedExpr :: Transformation
-removeUnusedExpr = toScopedTransformation "removeUnusedExpr"
+removeUnusedExpr = toTransformation "removeUnusedExpr"
   (  onPrimNode 'removeUnusedExprSpine
   <> onAppNode 'removeUnusedExprSpine
   <> onTyAppNode 'removeUnusedExprSpine
@@ -315,7 +315,7 @@ occurrences x e = fromMaybe 0 (lookupNameMap x (freeTmVarOccurrences e))
 -- in a right-hand side, where @g x@ refers to a variable @x@ that the binder
 -- shadows, is inlined (if the other conditions hold).
 flattenLet :: Transformation
-flattenLet = toScopedTransformation "flattenLet" (onLetNode 'flattenLetWorker)
+flattenLet = toTransformation "flattenLet" (onLetNode 'flattenLetWorker)
 
 -- | The 'Let' handler of 'flattenLet'
 flattenLetWorker
@@ -625,7 +625,7 @@ isClassConstraint _ = False
 -- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
 -- version of CSE removed the same amount of let-binders.
 simpleCSE :: Transformation
-simpleCSE = toScopedTransformation "CSE" (onLet 'simpleCSEWorker)
+simpleCSE = toTransformation "CSE" (onLet 'simpleCSEWorker)
 
 -- | The 'Let' handler of 'simpleCSE'
 simpleCSEWorker
@@ -664,7 +664,7 @@ simpleCSEWorker ctx term bind body = case bind of
 -- | Ensure that top-level lambda's eventually bind a let-expression of which
 -- the body is a variable-reference.
 topLet :: Transformation
-topLet = scopedAnyConstructor "topLet" 'topLetWorker
+topLet = anyConstructor "topLet" 'topLetWorker
 
 -- | The worker of 'topLet': a plain rewrite, offered at every node
 topLetWorker

@@ -28,7 +28,7 @@ import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Inline as S
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
 import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences)
@@ -218,10 +218,10 @@ tests =
         ]
     ]
  where
-  bindConstantVarS = $(asScopedRewriteQ S.bindConstantVar)
-  inlineCastS = $(asScopedRewriteQ S.inlineCast)
-  inlineSimIOS = $(asScopedRewriteQ S.inlineSimIO)
-  collapseRHSNoopsS = $(asScopedRewriteQ S.collapseRHSNoops)
+  bindConstantVarS = $(asRewriteQ S.bindConstantVar)
+  inlineCastS = $(asRewriteQ S.inlineCast)
+  inlineSimIOS = $(asRewriteQ S.inlineSimIO)
+  collapseRHSNoopsS = $(asRewriteQ S.collapseRHSNoops)
 
 -- | Regression tests for bugs in the inlining transformations
 regressionTests :: [TestTree]
@@ -234,7 +234,7 @@ regressionTests =
     -- anyway, and only mark @y@ as recursive. Then it inlined @w@ into @k@ and
     -- dropped it, while the copy of @x@ in @k@ still referred to it.
     testCase "inlineCleanup keeps binders that inlined binders refer to" $
-      assertRewritesTo env def $(asScopedRewriteQ S.inlineCleanup) []
+      assertRewritesTo env def $(asRewriteQ S.inlineCleanup) []
         (tm [strQQ|
           let
             { (w_S :: Pair) = MkPair y_S y_S
@@ -256,9 +256,9 @@ regressionTests =
     -- https://github.com/clash-lang/clash-compiler/pull/405
     -- https://github.com/clash-lang/clash-compiler/commit/16e65951c40b36ce64861819ff14e1a5b6cc0486
   , testCase "inlineSmall does not inline a local variable (#405)" $
-      assertNoRewrite env fState $(asScopedRewriteQ S.inlineSmall) [varD "f_7" "Int"] (tm "f_7")
+      assertNoRewrite env fState $(asRewriteQ S.inlineSmall) [varD "f_7" "Int"] (tm "f_7")
   , testCase "inlineWorkFree does not inline a local variable (#405)" $
-      assertNoRewrite env fState $(asScopedRewriteQ S.inlineWorkFree) [varD "f_7" "Int"] (tm "f_7")
+      assertNoRewrite env fState $(asRewriteQ S.inlineWorkFree) [varD "f_7" "Int"] (tm "f_7")
 
     -- 'collapseRHSNoops' on @let r = mapPrim f xs in r@, in a function in
     -- which the global no-op @f = \\x -> x@ is defined
@@ -275,7 +275,7 @@ regressionTests =
         (tm "let { !(r :: Int) = Prim.mapPrim f_7 xs_11 } in r")
   ]
  where
-  collapseRHSNoopsS = $(asScopedRewriteQ S.collapseRHSNoops)
+  collapseRHSNoopsS = $(asRewriteQ S.collapseRHSNoops)
   -- A state with the binding @f = 42@ of the global @f :: Int@, with the same
   -- unique as the local variable @f@
   fState = def {_bindings = mkGlobalBindings [(testGlobalId "f_G7" "Int", "42")]}

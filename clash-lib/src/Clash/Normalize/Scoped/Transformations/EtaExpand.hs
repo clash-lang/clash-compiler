@@ -35,7 +35,7 @@ import qualified Clash.Core.Name as C
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onTickNode, onTyAppNode, onVarNode
-  , toScopedTransformation )
+  , toTransformation )
 import Clash.Rewrite.Types (typeEnv)
 import Clash.Util (curLoc)
 
@@ -57,7 +57,7 @@ import Clash.Rewrite.Scoped.Globals (isTopEntity)
 -- functions to appear as arguments to higher-order primitives.
 etaExpandSyn :: Transformation
 etaExpandSyn =
-  toScopedTransformation "etaExpandSyn"
+  toTransformation "etaExpandSyn"
     (onVarNode 'etaExpandSynWorker <> onAppNode 'etaExpandSynWorker
       <> onTyAppNode 'etaExpandSynWorker <> onTickNode 'etaExpandSynWorker)
 

@@ -27,7 +27,7 @@ import qualified Clash.Rewrite.Scoped.Combinators as SC (bottomupR)
 import Clash.Driver.Types (DebugOpts (..), debugSilent)
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import Clash.Rewrite.Scoped.Apply (applyDebug)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
 import Test.Clash.Rewrite
@@ -92,13 +92,13 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Letrec"
 -- whether a change was signaled.
 deadCodeAt :: Distinct n => TestScope n -> Term n -> IO (Term n, Bool)
 deadCodeAt ts e = do
-  (t, _, ch) <- runScopedIn def st ts $(asScopedRewriteQ S.deadCode) e
+  (t, _, ch) <- runScopedIn def st ts $(asRewriteQ S.deadCode) e
   pure (t, ch)
 
 -- | 'deadCode' in a bottom-up traversal
 deadCodeBottomup :: Distinct n => TestScope n -> Term n -> IO (Term n)
 deadCodeBottomup ts e = do
-  (t, _, _) <- runScopedIn def st ts (SC.bottomupR $(asScopedRewriteQ S.deadCode)) e
+  (t, _, _) <- runScopedIn def st ts (SC.bottomupR $(asRewriteQ S.deadCode)) e
   pure t
 
 deadCodeTests :: TestTree
@@ -152,7 +152,7 @@ deadCodeTests = testGroup "deadCode"
 -- * removeUnusedExpr
 
 removeUnusedExprS :: Rewrite NormalizeState
-removeUnusedExprS = $(asScopedRewriteQ S.removeUnusedExpr)
+removeUnusedExprS = $(asRewriteQ S.removeUnusedExpr)
 
 removeUnusedExprTests :: TestTree
 removeUnusedExprTests = testGroup "removeUnusedExpr"
@@ -177,7 +177,7 @@ removeUnusedExprTests = testGroup "removeUnusedExpr"
 
 -- | The scoped 'S.flattenLet'
 flattenLetSc :: Rewrite NormalizeState
-flattenLetSc = $(asScopedRewriteQ S.flattenLet)
+flattenLetSc = $(asRewriteQ S.flattenLet)
 
 flattenLetTests :: TestTree
 flattenLetTests = testGroup "flattenLet"
@@ -252,7 +252,7 @@ flattenLetTests = testGroup "flattenLet"
 -- * topLet
 
 topLetS :: Rewrite NormalizeState
-topLetS = $(asScopedRewriteQ S.topLet)
+topLetS = $(asRewriteQ S.topLet)
 
 -- | Assert that 'S.topLet', in the body of the outer lambda of a term, gives
 -- the expected term
@@ -418,7 +418,7 @@ regressionTests = testGroup "regression tests"
 -- * simpleCSE
 
 cseS :: Rewrite NormalizeState
-cseS = $(asScopedRewriteQ S.simpleCSE)
+cseS = $(asRewriteQ S.simpleCSE)
 
 simpleCSETests :: TestTree
 simpleCSETests = testGroup "simpleCSE"

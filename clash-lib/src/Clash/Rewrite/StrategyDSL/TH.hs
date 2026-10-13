@@ -4,7 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Compile a "Clash.Rewrite.StrategyDSL" strategy into executable dispatch
-  code. 'compileScopedStrategy' produces the fused fast path: one constructor
+  code. 'compileStrategy' produces the fused fast path: one constructor
   match per node drives both the dispatch of the node program and the descent
   into the node's children.
 
@@ -25,10 +25,10 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Rewrite.StrategyDSL.TH
-  ( compileScopedStrategy
-  , compileScopedStrategyReference
-  , scopedDispatchQ
-  , asScopedRewriteQ
+  ( compileStrategy
+  , compileStrategyReference
+  , dispatchQ
+  , asRewriteQ
   ) where
 
 import Data.Char (isAlphaNum)
@@ -86,9 +86,9 @@ callE :: Target -> Q Exp -> Q Exp -> Q Exp -> Q Exp
 callE target f ctxE tmE = [| $(target.call f ctxE) $tmE |]
 
 -- | The target of scoped Clash Core
-scopedTarget :: Target
-scopedTarget = Target
-  { patterns = scopedPatterns
+coreTarget :: Target
+coreTarget = Target
+  { patterns = corePatterns
   , wrap = \e -> [| S.Transform $e |]
   , call = \f ctxE -> [| S.runTransform $f $ctxE |]
   , applyWithName = 'SApply.applyWith
@@ -103,16 +103,16 @@ scopedTarget = Target
   , topdownFixName = 'SComb.topdownFixR
   , topdownSucName = 'SComb.topdownSucR
   , innerMostName = 'SComb.innerMost
-  , goDec = scopedGoDec
-  , descendDec = scopedDescendDec
+  , goDec = coreGoDec
+  , descendDec = coreDescendDec
   , passE = \name rewriteName ->
       [| SApply.apply $(stringE name) (S.Transform $(varE rewriteName)) |]
   }
 
 -- | The term constructors of scoped Core belonging to a 'Constructor'. A
 -- variable is local ('S.Var') or global ('S.GlobalVar').
-scopedPatterns :: Constructor -> [(Name, [String])]
-scopedPatterns con = case con of
+corePatterns :: Constructor -> [(Name, [String])]
+corePatterns con = case con of
   CVar -> [('S.Var, ["_occ", "_ty", "_nm"]), ('S.GlobalVar, ["_g"])]
   CData -> [('S.Data, ["_dc"])]
   CLiteral -> [('S.Literal, ["_lit"])]
@@ -427,7 +427,7 @@ guardExp target wrapInvoke transformation =
 -- (see Note [sharing unchanged nodes] in "Clash.Rewrite.Scoped.Combinators").
 -- The continuation runs in the scope of the opened binders, where the
 -- rebuilt fields are in scope. The rebuilt node it gets is evaluated.
-genScopedDescend
+genDescend
   :: Constructor
   -> Q Exp            -- ^ recursion: a 'S.Transform'
   -> Q Exp            -- ^ the context
@@ -435,7 +435,7 @@ genScopedDescend
   -> [Q Exp]          -- ^ the node's fields
   -> ([Q Exp] -> Q Exp -> Q Exp)  -- ^ continuation: rebuilt fields, rebuilt node
   -> Q Exp
-genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
+genDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
   (CVar, _) -> leaf
   (CData, _) -> leaf
   (CLiteral, _) -> leaf
@@ -506,7 +506,7 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
           [| SComb.rebuildTick $nodeE $e $tick $(varE e') |]
       ]
 
-  _ -> fail ("genScopedDescend: field count mismatch for " <> show con)
+  _ -> fail ("genDescend: field count mismatch for " <> show con)
  where
   leaf = continue fieldEs nodeE
 
@@ -537,34 +537,34 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
 
 -- | A recursive traversal of scoped Core: a 'S.Transform' of a lambda
 -- with a case-expression on the node
-scopedGoDec
+coreGoDec
   :: Name -> (Constructor -> Q Exp -> Q Exp -> [Q Exp] -> Descend -> Q Exp) -> Q Dec
-scopedGoDec go body = do
+coreGoDec go body = do
   ctx <- newName "_ctx"
   tm <- newName "_tm"
   let arm (con, conName, hints) = do
         fieldNames <- traverse newName hints
         let fieldEs = map varE fieldNames
-            descend = genScopedDescend con (varE go) (varE ctx) (varE tm) fieldEs
+            descend = genDescend con (varE go) (varE ctx) (varE tm) fieldEs
         match (conP conName (map varP fieldNames))
               (normalB (body con (varE ctx) (varE tm) fieldEs descend))
               []
   valD (varP go)
     (normalB [| S.Transform
                   $(lamE [varP ctx, varP tm]
-                      (caseE (varE tm) (map arm (allPatterns scopedTarget)))) |])
+                      (caseE (varE tm) (map arm (allPatterns coreTarget)))) |])
     []
 
 -- | @descendD rec@, see 'descendDec'
-scopedDescendDec :: Name -> Q Dec
-scopedDescendDec descendD = do
+coreDescendDec :: Name -> Q Dec
+coreDescendDec descendD = do
   rec' <- newName "rec'"
   ctx <- newName "_ctx"
   tm <- newName "_tm"
   let arm (con, conName, hints) = do
         fieldNames <- traverse newName hints
         match (conP conName (map varP fieldNames))
-              (normalB (genScopedDescend con (varE rec') (varE ctx) (varE tm)
+              (normalB (genDescend con (varE rec') (varE ctx) (varE tm)
                           (map varE fieldNames)
                           (\_fieldEs' rebuiltE -> [| pure $rebuiltE |])))
               []
@@ -572,7 +572,7 @@ scopedDescendDec descendD = do
     (normalB (lamE [varP rec']
       [| S.Transform
            $(lamE [varP ctx, varP tm]
-               (caseE (varE tm) (map arm (allPatterns scopedTarget)))) |]))
+               (caseE (varE tm) (map arm (allPatterns coreTarget)))) |]))
     []
 
 -- ** Traversals
@@ -693,7 +693,7 @@ genTopDownFix target cs = do
 
 -- * Compiling strategies
 
--- | Compile a strategy for a target, see 'compileScopedStrategy'
+-- | Compile a strategy for a target, see 'compileStrategy'
 compileStrategyFor :: Target -> Strat -> Q Exp
 compileStrategyFor target strat = case strat of
   Seq a b -> binop target.seqName a b
@@ -713,7 +713,7 @@ compileStrategyFor target strat = case strat of
     [| $(varE op) $(compileStrategyFor target a) $(compileStrategyFor target b) |]
 
 -- | Compile a strategy into its unfused reference for a target, see
--- 'compileScopedStrategyReference'
+-- 'compileStrategyReference'
 compileStrategyReferenceFor :: Target -> Strat -> Q Exp
 compileStrategyReferenceFor target = goStrat
  where
@@ -749,13 +749,13 @@ compileStrategyReferenceFor target = goStrat
          $(asRewriteQFor target member) |]
 
 -- | A transformation as a plain uninstrumented rewrite for a target, see
--- 'asScopedRewriteQ'
+-- 'asRewriteQ'
 asRewriteQFor :: Target -> Transformation -> Q Exp
 asRewriteQFor target transformation = do
   validateTransformation transformation
   guardExp target invokeE transformation
 
--- | A node program as a plain rewrite for a target, see 'scopedDispatchQ'
+-- | A node program as a plain rewrite for a target, see 'dispatchQ'
 dispatchQFor :: Target -> Step -> Q Exp
 dispatchQFor target step = do
   cs <- compileStep target step
@@ -767,25 +767,25 @@ dispatchQFor target step = do
 -- dispatch code. The result is an expression of type
 -- @'Clash.Rewrite.Scoped.Types.Rewrite' extra@, with @extra@ fixed by
 -- the workers the spec references.
-compileScopedStrategy :: Strat -> Q Exp
-compileScopedStrategy = compileStrategyFor scopedTarget
+compileStrategy :: Strat -> Q Exp
+compileStrategy = compileStrategyFor coreTarget
 
 -- | Compile a strategy into its unfused reference: the same transformations,
 -- run as a plain @apply@ chain through the "Clash.Rewrite.Scoped.Combinators"
 -- traversals
-compileScopedStrategyReference :: Strat -> Q Exp
-compileScopedStrategyReference = compileStrategyReferenceFor scopedTarget
+compileStrategyReference :: Strat -> Q Exp
+compileStrategyReference = compileStrategyReferenceFor coreTarget
 
 -- | A node program as a plain rewrite: match the constructor once and run
 -- that constructor's program, without traversing. For composing a 'Step'
 -- with plain combinators, and for testing chains in isolation.
-scopedDispatchQ :: Step -> Q Exp
-scopedDispatchQ = dispatchQFor scopedTarget
+dispatchQ :: Step -> Q Exp
+dispatchQ = dispatchQFor coreTarget
 
 -- | A transformation as a plain uninstrumented rewrite, an expression of type
 -- @'Clash.Rewrite.Scoped.Types.Rewrite' extra@: match the term against
 -- the worker table, run the worker on a match, return the term untouched
 -- otherwise. Splice this where a transformation is invoked from inside
 -- another transformation (any instrumentation is the caller's).
-asScopedRewriteQ :: Transformation -> Q Exp
-asScopedRewriteQ = asRewriteQFor scopedTarget
+asRewriteQ :: Transformation -> Q Exp
+asRewriteQ = asRewriteQFor coreTarget

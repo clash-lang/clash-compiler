@@ -33,7 +33,7 @@ import qualified Clash.Normalize.Scoped.Transformations.Inline as InlineS
 import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
 import Clash.Normalize.Types (NormalizeState, specialisationCache)
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..), extra)
 import Clash.Util.Supply (newSupply)
 
@@ -52,12 +52,12 @@ import Test.Clash.Scoped.Print (showTestTerm)
 
 appPropS, constantSpecS, nonRepSpecS, typeSpecS, zeroWidthSpecS, argCastSpecS
   , specializeS :: Rewrite NormalizeState
-appPropS = $(asScopedRewriteQ Scoped.appProp)
-constantSpecS = $(asScopedRewriteQ Scoped.constantSpec)
-nonRepSpecS = $(asScopedRewriteQ Scoped.nonRepSpec)
-typeSpecS = $(asScopedRewriteQ Scoped.typeSpec)
-zeroWidthSpecS = $(asScopedRewriteQ Scoped.zeroWidthSpec)
-argCastSpecS = $(asScopedRewriteQ Scoped.argCastSpec)
+appPropS = $(asRewriteQ Scoped.appProp)
+constantSpecS = $(asRewriteQ Scoped.constantSpec)
+nonRepSpecS = $(asRewriteQ Scoped.nonRepSpec)
+typeSpecS = $(asRewriteQ Scoped.typeSpec)
+zeroWidthSpecS = $(asRewriteQ Scoped.zeroWidthSpec)
+argCastSpecS = $(asRewriteQ Scoped.argCastSpec)
 specializeS = Transform Scoped.specialize
 
 -- * Fixtures
@@ -365,7 +365,7 @@ bindConstantVarThenAppProp decls input expected =
   check ts e = do
     -- 'bindConstantVar' looks at the function being normalized
     let st0 = withCurFun (testGlobalId "top_G200" "Int") def
-    (inlined, _, _) <- runScopedIn def st0 ts $(asScopedRewriteQ InlineS.bindConstantVar) e
+    (inlined, _, _) <- runScopedIn def st0 ts $(asRewriteQ InlineS.bindConstantVar) e
     (e', _, _) <- runScopedAt def st0 ts [LamStep] appPropS inlined
     assertLintClean ts e'
     assertTermIs ts expected e'

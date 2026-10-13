@@ -45,7 +45,7 @@ import Clash.Netlist.BlackBox.Types (Element (Err))
 import Clash.Netlist.Types (BlackBox (..))
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..))
-import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.Types (aggressiveXOpt, primitives, typeEnv)
 import Clash.Util (curLoc)
 
@@ -85,7 +85,7 @@ import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
 -- where @fieldN@ is an internal variable referring to the nth argument of a
 -- data constructor.
 xOptimize :: Transformation
-xOptimize = toScopedTransformation "xOptimize" (onCase 'xOptimizeWorker)
+xOptimize = toTransformation "xOptimize" (onCase 'xOptimizeWorker)
 
 -- | The 'Case' handler of 'xOptimize'
 xOptimizeWorker

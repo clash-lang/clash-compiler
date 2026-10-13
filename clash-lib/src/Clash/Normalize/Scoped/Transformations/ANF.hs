@@ -125,7 +125,7 @@ import Clash.Rewrite.Scoped
   (TransformContext, changed, closestLetBinder, tfScope, underLam)
 import Clash.Rewrite.Scoped.Util (isUntranslatable, mkTmBinderFor, substVars)
 import Clash.Rewrite.Scoped.WorkFree (isConstant, isConstantNotClockReset)
-import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types (typeEnv)
 
 {- Note [ANF in Clash]
@@ -751,7 +751,7 @@ mkSignalConsSelector sc subj dc tys i =
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
 nonRepANF :: Transformation
-nonRepANF = toScopedTransformation "nonRepANF" (onApp 'nonRepANFWorker)
+nonRepANF = toTransformation "nonRepANF" (onApp 'nonRepANFWorker)
 
 -- | The 'App' handler of 'nonRepANF'. An untranslatable argument that is a
 -- let-expression is replaced by its body, with the let-expression moved

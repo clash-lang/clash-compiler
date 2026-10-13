@@ -87,7 +87,7 @@ import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
 import qualified Clash.Normalize.Scoped.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormalizeSession)
-import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.Types
   ( curFun, customReprs, debugOpts, typeEnv, typeTranslator)
 import Clash.Util (curLoc)
@@ -118,7 +118,7 @@ import Clash.Rewrite.Scoped.WorkFree (isConstant)
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the
 -- alternatives
 caseCase :: Transformation
-caseCase = toScopedTransformation "caseCase" (onCase 'caseCaseWorker)
+caseCase = toTransformation "caseCase" (onCase 'caseCaseWorker)
 
 -- | The 'Case' handler of 'caseCase'.
 --
@@ -174,7 +174,7 @@ and use the body of the single alternative.
 --
 -- Tries 'caseOneAlt' first, see Note [caseOneAlt before caseCon'].
 caseCon :: Transformation
-caseCon = toScopedTransformation "caseCon" (onCase 'caseConWorker)
+caseCon = toTransformation "caseCon" (onCase 'caseConWorker)
 
 -- | The 'Case' handler of 'caseCon': tries 'caseOneAlt' first and only when
 -- that did not fire, 'caseCon''.
@@ -514,7 +514,7 @@ bindField x val e = case unsinkIdBinder x e of
 -- https://github.com/clash-lang/clash-compiler/pull/465
 caseEliminateNonReachable :: Transformation
 caseEliminateNonReachable =
-  toScopedTransformation "caseEliminateNonReachable"
+  toTransformation "caseEliminateNonReachable"
     (onCase 'caseEliminateNonReachableWorker)
 
 -- | The 'Case' handler of 'caseEliminateNonReachable'.
@@ -577,7 +577,7 @@ caseEliminateNonReachableWorker ctx case0 scrut altsTy alts0 = do
 --        3 -> fromInteger 0
 -- @
 caseFlat :: Transformation
-caseFlat = toScopedTransformation "caseFlat" (onCase 'caseFlatWorker)
+caseFlat = toTransformation "caseFlat" (onCase 'caseFlatWorker)
 
 -- | The 'Case' handler of 'caseFlat'.
 caseFlatWorker
@@ -679,7 +679,7 @@ collectEqArgs _ = Nothing
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: Transformation
-caseLet = toScopedTransformation "caseLet" (onCase 'caseLetWorker)
+caseLet = toTransformation "caseLet" (onCase 'caseLetWorker)
 
 -- | The 'Case' handler of 'caseLet'.
 --
@@ -744,7 +744,7 @@ caseOneAlt e = case e of
 -- (such as in the example) will be solved.
 elimExistentials :: Transformation
 elimExistentials =
-  toScopedTransformation "elimExistentials" (onCase 'elimExistentialsWorker)
+  toTransformation "elimExistentials" (onCase 'elimExistentialsWorker)
 
 -- | The 'Case' handler of 'elimExistentials'.
 --
@@ -799,7 +799,7 @@ elimExistentialsWorker ctx _node scrut altsTy alts0 = do
 -- does in HDL, because numbers bigger then Word/Int can't exist there anyway.
 elimCaseBigNumInternals :: Transformation
 elimCaseBigNumInternals =
-  toScopedTransformation "elimCaseBigNum" (onCase 'elimCaseBigNumInternalsWorker)
+  toTransformation "elimCaseBigNum" (onCase 'elimCaseBigNumInternalsWorker)
 
 -- | The 'Case' handler of 'elimCaseBigNumInternals'.
 elimCaseBigNumInternalsWorker

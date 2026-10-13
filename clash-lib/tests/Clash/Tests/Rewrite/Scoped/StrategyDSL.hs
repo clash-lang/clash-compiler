@@ -39,36 +39,36 @@ assertAgree candidate reference term = do
   assertEqual "change flag" referenceChanged candidateChanged
 
 calleeFast :: Rewrite ()
-calleeFast = $(compileScopedStrategy (topdown literalStep))
+calleeFast = $(compileStrategy (topdown literalStep))
 
 calleeReference :: Rewrite ()
-calleeReference = $(compileScopedStrategyReference (topdown literalStep))
+calleeReference = $(compileStrategyReference (topdown literalStep))
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
   [ testGroup "singleton dispatch equals apply"
       [ testCase "Let transformation fires" $
           assertAgree
-            $(scopedDispatchQ (one inlineTrivialLet))
+            $(dispatchQ (one inlineTrivialLet))
             (S.apply "inlineTrivialLet" inlineTrivialLetRewrite)
             nestedLet
       , testCase "Let transformation offered a non-Let node" $
           assertAgree
-            $(scopedDispatchQ (one inlineTrivialLet))
+            $(dispatchQ (one inlineTrivialLet))
             (S.apply "inlineTrivialLet" inlineTrivialLetRewrite)
             simpleApplication
       , testCase "App transformation fires" $
           assertAgree
-            $(scopedDispatchQ (one collapseApplication))
+            $(dispatchQ (one collapseApplication))
             (S.apply "collapseApplication" collapseApplicationRewrite)
             simpleApplication
       , testCase "multi-constructor transformation, both constructors" $ do
           assertAgree
-            $(scopedDispatchQ (one incrementBoth))
+            $(dispatchQ (one incrementBoth))
             (S.apply "incrementBoth" incrementBothRewrite)
             simpleApplication
           assertAgree
-            $(scopedDispatchQ (one incrementBoth))
+            $(dispatchQ (one incrementBoth))
             (S.apply "incrementBoth" incrementBothRewrite)
             (integer 3)
       ]
@@ -76,27 +76,27 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
   , testGroup "bucket chain semantics"
       [ testCase "guarded suffix: later same-bucket member fires on changed constructor" $ do
           (result, count, changedFlag) <- runScopedClosed
-            $(scopedDispatchQ (chain [collapseApplication, incrementBoth]))
+            $(dispatchQ (chain [collapseApplication, incrementBoth]))
             simpleApplication
           assertEqual "result" (show (integer 4 :: Term 'VoidS)) (show result)
           assertEqual "count" 2 count
           assertEqual "changed" True changedFlag
       , testCase "guarded suffix includes members of other buckets" $ do
           (result, count, _) <- runScopedClosed
-            $(scopedDispatchQ (chain [collapseApplication, incrementOdd]))
+            $(dispatchQ (chain [collapseApplication, incrementOdd]))
             simpleApplication
           assertEqual "result" (show (integer 4 :: Term 'VoidS)) (show result)
           assertEqual "count" 2 count
       , testCase "no members for the node's constructor: untouched, no change" $ do
           (result, count, changedFlag) <- runScopedClosed
-            $(scopedDispatchQ (one inlineTrivialLet))
+            $(dispatchQ (one inlineTrivialLet))
             simpleApplication
           assertEqual "result" (show simpleApplication) (show result)
           assertEqual "count" 0 count
           assertEqual "changed" False changedFlag
       , testCase "anyConstructor member joins every bucket" $ do
           (result, count, _) <- runScopedClosed
-            $(scopedDispatchQ (chain [collapseApplication, incrementOddAny]))
+            $(dispatchQ (chain [collapseApplication, incrementOddAny]))
             simpleApplication
           assertEqual "result" (show (integer 4 :: Term 'VoidS)) (show result)
           assertEqual "count" 2 count
@@ -152,7 +152,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
   , testGroup "compiled strategies equal hand-written compositions"
       [ testCase "topdown chain vs sequential apply chain" $
           assertAgree
-            $(compileScopedStrategy (topdown constructorChangingStep))
+            $(compileStrategy (topdown constructorChangingStep))
             (S.topdownR
               (S.apply "collapseApplication" collapseApplicationRewrite S.>->
                S.apply "incrementBoth" incrementBothRewrite S.>->
@@ -163,37 +163,37 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
   , testGroup "strategy combinators"
       [ testCase "whole-term pass" $
           assertAgree
-            $(compileScopedStrategy (scopedPass "incrementOddAny" 'incrementOddAnyWorker))
-            $(compileScopedStrategyReference (scopedPass "incrementOddAny" 'incrementOddAnyWorker))
+            $(compileStrategy (pass "incrementOddAny" 'incrementOddAnyWorker))
+            $(compileStrategyReference (pass "incrementOddAny" 'incrementOddAnyWorker))
             nestedTerm
       , testCase "repeatR over sequenced traversals" $
           assertAgree
-            $(compileScopedStrategy
+            $(compileStrategy
                 (repeatR (topdown collapseApplication >-> bottomup incrementOdd)))
-            $(compileScopedStrategyReference
+            $(compileStrategyReference
                 (repeatR (topdown collapseApplication >-> bottomup incrementOdd)))
             nestedTerm
       , testCase "success and failure conditionals between strategies" $ do
           assertAgree
-            $(compileScopedStrategy (topdown collapseApplication !-> bottomup incrementOdd))
-            $(compileScopedStrategyReference
+            $(compileStrategy (topdown collapseApplication !-> bottomup incrementOdd))
+            $(compileStrategyReference
                 (topdown collapseApplication !-> bottomup incrementOdd))
             nestedTerm
           assertAgree
-            $(compileScopedStrategy (topdown inlineTrivialLet >-! bottomup incrementOdd))
-            $(compileScopedStrategyReference
+            $(compileStrategy (topdown inlineTrivialLet >-! bottomup incrementOdd))
+            $(compileStrategyReference
                 (topdown inlineTrivialLet >-! bottomup incrementOdd))
             nestedTerm
       , testCase "deepseq between strategies" $
           assertAgree
-            $(compileScopedStrategy (topdown collapseApplication >-!-> bottomup incrementOdd))
-            $(compileScopedStrategyReference
+            $(compileStrategy (topdown collapseApplication >-!-> bottomup incrementOdd))
+            $(compileStrategyReference
                 (topdown collapseApplication >-!-> bottomup incrementOdd))
             nestedTerm
       , testCase "calling another compiled strategy" $
           assertAgree
-            $(compileScopedStrategy (callStrategyStrat 'calleeFast))
-            $(compileScopedStrategyReference (callStrategyStrat 'calleeReference))
+            $(compileStrategy (callStrategyStrat 'calleeFast))
+            $(compileStrategyReference (callStrategyStrat 'calleeReference))
             nestedTerm
       ]
 
@@ -201,14 +201,14 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
       [ testCase "NonRec lets stay NonRec" $ do
           let term = closedTerm "let { !(x_0 :: T) = 3 } in 5"
           (result, _, _) <- runScopedClosed
-            $(compileScopedStrategy (topdown literalStep)) term
+            $(compileStrategy (topdown literalStep)) term
           case result of
             Let (NonRec _ boundTerm) _body ->
               assertEqual "binder rewritten" (show (integer 4 :: Term 'VoidS)) (show boundTerm)
             _ -> assertFailure ("expected a NonRec let, got: " <> show result)
       , testCase "AppArg context in the probe result mentions the primitive" $ do
           (result, _, _) <- runScopedClosed
-            $(compileScopedStrategy (topdown appArgProbeStep))
+            $(compileStrategy (topdown appArgProbeStep))
             appArgProbeTerm
           case result of
             Lam _ (App _function (Literal (StringLiteral recordedContext))) ->
@@ -217,10 +217,10 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
             _ -> assertFailure ("expected a probed argument, got: " <> show result)
       ]
 
-  , testGroup "asScopedRewriteQ"
+  , testGroup "asRewriteQ"
       [ testCase "fires without instrumentation" $ do
           (result, count, changedFlag) <- runScopedClosed
-            $(asScopedRewriteQ inlineTrivialLet) nestedLet
+            $(asRewriteQ inlineTrivialLet) nestedLet
           assertEqual "result" (show (integer 5 :: Term 'VoidS)) (show result)
           assertEqual "count" 0 count
           assertEqual "changed" True changedFlag

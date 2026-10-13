@@ -28,7 +28,7 @@ import Clash.Core.Scoped.Term (collectArgs)
 import qualified Clash.Normalize.Scoped.Transformations.SeparateArgs as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 
 import Test.Clash.Rewrite
@@ -55,7 +55,7 @@ st :: RewriteState NormalizeState
 st = def
 
 separateArgumentsS :: Rewrite NormalizeState
-separateArgumentsS = $(asScopedRewriteQ Scoped.separateArguments)
+separateArgumentsS = $(asRewriteQ Scoped.separateArguments)
 
 -- | Assert that 'Scoped.separateArguments' rewrites a term to the expected one
 separates :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion

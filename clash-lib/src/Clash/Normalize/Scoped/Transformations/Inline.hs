@@ -93,7 +93,7 @@ import Clash.Driver.Types (Binding (..))
 import Clash.Primitives.Types (CompiledPrimMap, Primitive (..), TemplateKind (..))
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
-  , toScopedTransformation )
+  , toTransformation )
 import Clash.Rewrite.Types
   ( curFun, inlineConstantLimit, inlineFunctionLimit, inlineLimit
   , inlineWFCacheLimit, primitives, typeEnv )
@@ -135,7 +135,7 @@ curFunGlobal = fst <$> Lens.use curFun
 -- is constant (except clock or reset generators)
 bindConstantVar :: Transformation
 bindConstantVar =
-  toScopedTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
+  toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
 
 -- | The 'Let' handler of 'bindConstantVar'
 bindConstantVarWorker
@@ -169,7 +169,7 @@ bindConstantVarWorker = inlineBinders test
 -- guaranteed work-free. These are the result of the 'splitCastWork'
 -- transformation.
 inlineCast :: Transformation
-inlineCast = toScopedTransformation "inlineCast" (onLet 'inlineCastWorker)
+inlineCast = toTransformation "inlineCast" (onLet 'inlineCastWorker)
 
 -- | The 'Let' handler of 'inlineCast'
 inlineCastWorker
@@ -186,7 +186,7 @@ inlineCastWorker = inlineBinders test
 
 -- | Inline anything of type `SimIO`: IO actions cannot be shared
 inlineSimIO :: Transformation
-inlineSimIO = toScopedTransformation "bindSimIO" (onLet 'inlineSimIOWorker)
+inlineSimIO = toTransformation "bindSimIO" (onLet 'inlineSimIOWorker)
 
 -- | The 'Let' handler of 'inlineSimIO'
 inlineSimIOWorker
@@ -204,7 +204,7 @@ inlineSimIOWorker = inlineBinders test
 -- 'inlineOrLiftBinders'
 inlineOrLiftNonRep :: Transformation
 inlineOrLiftNonRep =
-  toScopedTransformation "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepWorker)
+  toTransformation "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepWorker)
 
 -- | The 'Let' handler of 'inlineOrLiftNonRep'
 inlineOrLiftNonRepWorker
@@ -393,7 +393,7 @@ inlineBndrsCleanup scL origInl = go
 --   * a data constructor
 --   * I/O actions
 inlineCleanup :: Transformation
-inlineCleanup = toScopedTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
+inlineCleanup = toTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
 
 -- | The 'Let' handler of 'inlineCleanup'
 inlineCleanupWorker
@@ -512,7 +512,7 @@ reference. See issue #779.
 -- Note [relation collapseRHSNoops and inlineCleanup].
 collapseRHSNoops :: Transformation
 collapseRHSNoops =
-  toScopedTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
+  toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
 
 -- | The 'Let' handler of 'collapseRHSNoops'
 collapseRHSNoopsWorker
@@ -733,7 +733,7 @@ isPartOfVarAppSpine ctx e = case ctxFrames ctx of
 -- | Inline small functions
 inlineSmall :: Transformation
 inlineSmall =
-  toScopedTransformation "inlineSmall"
+  toTransformation "inlineSmall"
     (onVarNode 'inlineSmallWorker <> onAppNode 'inlineSmallWorker
       <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)
 
@@ -778,7 +778,7 @@ inlineSmallWorker ctx e
 -- inlined, see 'normalizeWorkFreeApp'.
 inlineWorkFree :: Transformation
 inlineWorkFree =
-  toScopedTransformation "inlineWorkFree"
+  toTransformation "inlineWorkFree"
     (onVarNode 'inlineWorkFreeWorker <> onAppNode 'inlineWorkFreeWorker
       <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)
 

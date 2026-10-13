@@ -57,9 +57,9 @@ normalizationSpec constantPropagationName =
   cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
   where
     multPrim   = topdown setupMultiResultPrim
-    anf        = topdown nonRepANF >-> scopedPass "ANF" 'makeANF >-> topdown caseCon
+    anf        = topdown nonRepANF >-> pass "ANF" 'makeANF >-> topdown caseCon
     letTL      = topdownSuc topLet
-    recLetRec  = scopedPass "recToLetRec" 'recToLetRec
+    recLetRec  = pass "recToLetRec" 'recToLetRec
     rmUnusedExpr = bottomup removeUnusedExpr
     rmDeadcode = bottomup (named "deadcode" deadCode)
     bindConst  = topdown bindConstantVar
@@ -90,7 +90,7 @@ constantPropagationSpec =
   dec >->
   conSpec
   where
-    etaTL              = scopedPass "etaTL" 'etaExpansionTL !-> topdown appProp
+    etaTL              = pass "etaTL" 'etaExpansionTL !-> topdown appProp
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down chain from the
     -- new root.
@@ -150,7 +150,7 @@ constantPropagationSpec =
     inlineNR :: Strat
     inlineNR =
           bottomup deadCode
-      >-! scopedPass "inlineNonRep" 'inlineNonRep
+      >-! pass "inlineNonRep" 'inlineNonRep
 
     specTransformations :: Step
     specTransformations = chain

@@ -35,7 +35,7 @@ import qualified Clash.Normalize.Scoped.Transformations.XOptimize as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite.Scoped (Rewrite)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState)
 
 import Test.Clash.Rewrite
@@ -100,7 +100,7 @@ st :: RewriteState NormalizeState
 st = def
 
 xOptS :: Rewrite NormalizeState
-xOptS = $(asScopedRewriteQ Scoped.xOptimize)
+xOptS = $(asRewriteQ Scoped.xOptimize)
 
 -- | Assert that 'Scoped.xOptimize' rewrites a term to the expected one
 xOptTo :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion

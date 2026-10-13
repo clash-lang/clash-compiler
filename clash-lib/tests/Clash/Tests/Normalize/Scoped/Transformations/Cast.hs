@@ -26,7 +26,7 @@ import Clash.Core.Scoped.Syntax (GlobalId, Term (Cast))
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 import Clash.Util (ClashException)
 
@@ -58,10 +58,10 @@ st :: RewriteState NormalizeState
 st = def
 
 caseCastS, elimCastCastS, letCastS, splitCastWorkS :: Rewrite NormalizeState
-caseCastS = $(asScopedRewriteQ Scoped.caseCast)
-elimCastCastS = $(asScopedRewriteQ Scoped.elimCastCast)
-letCastS = $(asScopedRewriteQ Scoped.letCast)
-splitCastWorkS = $(asScopedRewriteQ Scoped.splitCastWork)
+caseCastS = $(asRewriteQ Scoped.caseCast)
+elimCastCastS = $(asRewriteQ Scoped.elimCastCast)
+letCastS = $(asRewriteQ Scoped.letCast)
+splitCastWorkS = $(asRewriteQ Scoped.splitCastWork)
 
 -- | Assert that a transformation rewrites a term to the expected one, see
 -- 'assertRewritesTo'
