@@ -275,7 +275,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Debug (trace)
-import qualified Clash.Normalize.Primitives as NP
+import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.PrimitiveReductions (typeNatAdd)
 import Clash.Sized.Internal.BitVector (Bit (..), BitVector (..))
 import Clash.Sized.Internal.Signed (Signed (..))
@@ -380,7 +380,7 @@ mkPrimStepContext pc = PrimStepContext{..}
       (\case [i', j'] -> naturalToNaturalLiteral (f i' j'); _ -> unreachable)
 
   checkNaturalRange nTy natsAsInts f
-    | any (< 0) natsAsInts = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) nTy
+    | any (< 0) natsAsInts = TyApp (Prim NP.undefined) nTy
     | otherwise = f (map fromInteger natsAsInts)
 
   unreachable :: a
@@ -413,7 +413,7 @@ mkPrimStepContext pc = PrimStepContext{..}
   makeUndefinedIf wantToHandle tm =
     case unsafeDupablePerformIO $ tryJust selectException (evaluate $ force $ toClashTerm tm) of
       Right _ -> tm
-      Left e -> trace (msg e) (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (getResultTy te sc ty tys))
+      Left e -> trace (msg e) (TyApp (Prim NP.undefined) (getResultTy te sc ty tys))
    where
     selectException e
       | wantToHandle e = Just e
@@ -934,7 +934,7 @@ mkIndexLitE primTy nTy kn val
   , val < kn
   = Right (mkSizedLit indexConPrim primTy nTy kn val)
   | otherwise
-  = Left (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (mkTyConApp (resultTyCon primTy) [nTy]))
+  = Left (TyApp (Prim NP.undefined) (mkTyConApp (resultTyCon primTy) [nTy]))
 
 mkIndexLit :: HasCallStack => Type n -> Type n -> Integer -> Integer -> Term n
 mkIndexLit primTy nTy kn val = either id id (mkIndexLitE primTy nTy kn val)

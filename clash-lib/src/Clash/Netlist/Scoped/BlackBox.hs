@@ -99,7 +99,7 @@ import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, declareUse, flattenFiltered, isVoid, mkInit,
    mkLiteral, originalIndices, preserveVarEnv, procAssign,
    stripFiltered, stripVoid)
-import           Clash.Normalize.Primitives    (removedArg)
+import           Clash.Normalize.Scoped.Primitives    (removedArg)
 import qualified Clash.Primitives.Types        as P
 import           Clash.Primitives.Scoped.Util  (getFunctionPlurality)
 import           Clash.Signal.Internal         (ActiveEdge (..))
@@ -251,8 +251,8 @@ mkArgument ctx bbName bndr declType nArg e = do
     ((e',t,l),d) <- case hwTyM of
       Nothing
         | (Prim p,_) <- collectArgs e
-        , primName p == showt 'removedArg
-        -> return ((Identifier (Id.unsafeMake (showt 'removedArg)) Nothing, Void Nothing, False), [])
+        , primName p == primName removedArg
+        -> return ((Identifier (Id.unsafeMake (primName removedArg)) Nothing, Void Nothing, False), [])
         | otherwise
         -> return ((error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg), Void Nothing, False), [])
       Just hwTy -> case collectArgsTicks e of

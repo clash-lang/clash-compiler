@@ -85,7 +85,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C (Id)
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
-import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Scoped.Primitives (removedArg)
 import Clash.Normalize.Scoped.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
@@ -103,7 +103,6 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
   (openAlt, teleIdVars, unsinkAlt, unsinkIdBinder, unsinkTerm)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term
   ( AbsBinder (..), appendTele, collectArgs, collectArgsTicks, collectTicks
   , mkApps, mkLams, mkTicks, openBndrs, partitionTicks, stripAllTicks, stripTicks )
@@ -261,11 +260,11 @@ removeUnusedPrimArgs sc e p pInfo args ticks = do
     args'' <- go te (n+1) used args'
     case tm of
       TyApp (Prim p0) _
-        | primName p0 == Text.showt 'removedArg
+        | primName p0 == primName removedArg
         -> return (Left tm : args'')
       _ -> do
         let ty = inferCoreTypeOf te sc tm
-            p' = TyApp (Prim (mkPrimInfoFromClash removedArg)) ty
+            p' = TyApp (Prim removedArg) ty
         if n < arity && n `notElem` used
            then changed (Left p' : args'')
            else return  (Left tm : args'')

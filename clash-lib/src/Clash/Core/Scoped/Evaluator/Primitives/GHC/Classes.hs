@@ -25,7 +25,7 @@ module Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes
 import Data.Text (Text)
 
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Normalize.Primitives as NP
+import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Util (textNameLit)
 
 import qualified GHC.Classes
@@ -33,7 +33,6 @@ import qualified GHC.Classes
 import Clash.Core.Scoped.Evaluator.Primitives.Util
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 
 primitives :: [(Text, PrimReduction)]
 primitives =
@@ -86,7 +85,7 @@ primitives =
         ->
           if divisor == 0 then
             let iTy = getResultTy te sc ty tys in
-            reduce (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) iTy)
+            reduce (TyApp (Prim NP.undefined) iTy)
           else
             reduce (Literal (IntLiteral (dividend `mod` divisor)))
       _ -> Nothing

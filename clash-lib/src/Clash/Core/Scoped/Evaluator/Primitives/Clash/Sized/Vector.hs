@@ -40,7 +40,7 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as CT
 import qualified Clash.Core.Type as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
-import qualified Clash.Normalize.Primitives as NP
+import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.PrimitiveReductions
   (typeNatMul, typeNatSub, vecHeadPrim, vecInitPrim, vecLastPrim, vecTailPrim)
 import Clash.Util (curLoc, textNameLit)
@@ -253,7 +253,7 @@ primitives =
                         -- The vector reduces to Nil and not Cons, which only
                         -- happens when 'n' would be negative. See
                         -- https://github.com/clash-lang/clash-compiler/issues/2831
-                        reduce (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (getResultTy te sc ty tys))
+                        reduce (TyApp (Prim NP.undefined) (getResultTy te sc ty tys))
                   -- The vector doesn't reduce to a data constructor
                   | otherwise -> Nothing
       _ -> Nothing

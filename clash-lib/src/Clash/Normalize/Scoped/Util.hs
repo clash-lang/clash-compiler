@@ -65,7 +65,6 @@ import qualified Data.IntMap.Strict          as IntMap
 import qualified Data.List                   as List
 import           Data.Maybe                  (fromMaybe)
 import qualified Data.Text                   as Text
-import qualified Data.Text.Extra             as Text
 import           GHC.Builtin.Names           (eqTyConKey)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.SrcLoc            (SrcSpan)
@@ -79,7 +78,7 @@ import qualified Clash.Core.Var              as C
 import           Clash.Debug                 (traceIf)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (FinalTerm), hasTransformationInfo)
-import           Clash.Normalize.Primitives  (removedArg)
+import           Clash.Normalize.Scoped.Primitives  (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util        (isConstantArg)
 import           Clash.Rewrite.Types
@@ -87,7 +86,7 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (fromGhcUnique)
 
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
-import           Clash.Core.Scoped.Convert   (mkPrimInfoFromClash, mkGlobalId)
+import           Clash.Core.Scoped.Convert   (mkGlobalId)
 import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
@@ -228,7 +227,7 @@ constantSpecInfoIn mkNm sc e = do
   if isClockOrReset te sc (inferCoreTypeOf te sc e) then
     case collectArgs e of
       (Prim p, _)
-        | primName p == Text.showt 'removedArg ->
+        | primName p == primName removedArg ->
           pure (constantCsr sc e)
       _ -> bindCsr mkNm sc e
   else
@@ -742,7 +741,7 @@ replaceEqAt sc0 i e0 = case underBndrs sc0 i replace e0 of
   replace :: Distinct x => Scope x -> Term x -> Maybe (Term x)
   replace sc = \case
     Lam b body -> openIdBinder sc b body $ \sc' b' body' ->
-      let removed = TyApp (Prim (mkPrimInfoFromClash removedArg)) (sink (idBinderType b'))
+      let removed = TyApp (Prim removedArg) (sink (idBinderType b'))
           s = extendTmSubst (extendSubstScope sc' (idSubst sc)) b' removed
       in  Just (Lam b' (substTm s body'))
     _ -> Nothing

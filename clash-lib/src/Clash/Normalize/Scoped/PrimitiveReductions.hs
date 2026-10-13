@@ -76,7 +76,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C (integerPrimTy, typeNatKind)
 import qualified Clash.Core.Var as C (mkTyVar)
 import qualified Clash.Data.UniqMap as UniqMap
-import qualified Clash.Normalize.Primitives as NP (undefined)
+import qualified Clash.Normalize.Scoped.Primitives as NP (undefined)
 import Clash.Normalize.Types (NormalizeSession, scopedConstantPropagationStrategy)
 import Clash.Rewrite.Types (extra, scopedTypeEnv)
 import Clash.Sized.RTree (RTree)
@@ -754,7 +754,7 @@ reduceLast n aTy vArg ctx = do
   (sc, te) <- scopeAndTypeEnv ctx
   withVec "reduceLast" te sc (inferCoreTypeOf te sc vArg) $ \_ _ consCon ->
     changed $
-      if n == 0 then TyApp (Prim (mkPrimInfoFromClash NP.undefined)) aTy else
+      if n == 0 then TyApp (Prim NP.undefined) aTy else
       extractElems te sc consCon aTy 'L' n n vArg $ \_ bs rhss vars _ ->
         recLet bs rhss (last vars)
 
@@ -945,7 +945,7 @@ reduceIndex_int n aTy _kn v i ctx = do
   withVec "reduceIndex_int" te sc (inferCoreTypeOf te sc v) $ \_ _ consCon ->
     changed $
       -- Every index is out of bounds
-      if n == 0 then TyApp (Prim (mkPrimInfoFromClash NP.undefined)) aTy else
+      if n == 0 then TyApp (Prim NP.undefined) aTy else
       extractElems te sc consCon aTy 'I' n n v $ \_ bs rhss vars _ ->
         let
           iTy = inferCoreTypeOf te sc i
@@ -958,7 +958,7 @@ reduceIndex_int n aTy _kn v i ctx = do
               [ Alt DefaultPat next
               , Alt (DataPat trueDc TNil TNil) cur ]
           -- A right-biased tree of case-expressions
-          indexed = foldr indexElement (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (sink aTy)) (zip vars [0..])
+          indexed = foldr indexElement (TyApp (Prim NP.undefined) (sink aTy)) (zip vars [0..])
         in recLet bs rhss indexed
 
 -- | Replace an application of the @Clash.Sized.Vector.dtfold@ primitive on

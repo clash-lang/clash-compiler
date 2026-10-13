@@ -93,7 +93,7 @@ import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
-import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
+import qualified Clash.Normalize.Scoped.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
 import Clash.Rewrite.Types
@@ -112,7 +112,6 @@ import Clash.Core.Scoped.NameMap (NameSet, memberNameSet)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.Type (TypeView(..), coreView1, tyView)
@@ -235,7 +234,7 @@ caseCon' ctx e subj ty alts = do
       -- that if there is one, and we couldn't match with any of the data
       -- patterns.
       (Alt DefaultPat altE : _) -> changed altE
-      _ -> changed (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) ty)
+      _ -> changed (TyApp (Prim NP.undefined) ty)
 
   -- The subject is a literal
   (Literal l, _, _) -> case findAlt equalLit alts of
@@ -280,8 +279,8 @@ caseCon' ctx e subj ty alts = do
       -- WHNF of subject is _|_, in the form of our internal _|_-values: that
       -- means the entire case-expression is _|_
       (Prim pInfo, [_], ticks1)
-        | primName pInfo `elem` [ Text.showt 'NP.undefined
-                                , Text.showt 'NP.undefinedX ] ->
+        | primName pInfo `elem` [ primName NP.undefined
+                                , primName NP.undefinedX ] ->
         let e1 = mkApps (mkTicks (Prim pInfo) ticks1) [Right (sink ty)]
          in changed e1
       -- WHNF of subject is _|_, in the form of `errorX`: that means that
