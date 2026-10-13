@@ -18,102 +18,84 @@ import Data.Text (Text)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import Clash.Core.TysPrim (integerPrimTy)
-import qualified Clash.Normalize.Primitives as NP
-
+import Clash.Core.Scoped.Builder (TmB, TyB)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (indexConPrim)
 
-import Test.Clash.Rewrite (addTy, assertAlphaEq, numTy)
+import Test.Clash.Rewrite (indexTcNm)
 import Test.Clash.Scoped.Evaluator.Primitives
 
-indexPrim :: Text -> C.Type -> C.Term
+indexPrim :: Text -> TyB -> TmB
 indexPrim nm = prim ("Clash.Sized.Internal.Index." <> nm)
-
--- | Evaluate with 'sizedTypeEnv'
-evalSized :: C.Term -> C.Term
-evalSized = evalWith sizedTypeEnv False
 
 -- | An index with the given size type: results have the size of the result
 -- type of their primitive
-indexOfSize :: C.Type -> Integer -> Integer -> C.Term
+indexOfSize :: TyB -> Integer -> Integer -> TmB
 indexOfSize sz n val =
-  C.mkApps (closedPrimTerm (indexConPrim indexTcNm))
-    [Right sz, Left (natLit n), Left (integerLit val)]
+  apps (conPrim (indexConPrim indexTcNm)) [Right sz, Left (natLit n), Left (integerLit val)]
 
 -- | @forall n. KnownNat n => t n@ at size @n@
-knownNatCall :: Text -> (C.Type -> C.Type) -> Integer -> [C.Term] -> C.Term
+knownNatCall :: Text -> (TyB -> TyB) -> Integer -> [TmB] -> TmB
 knownNatCall nm t n as =
-  C.mkApps (indexPrim nm ty) (Right (numTy n) : Left (natLit n) : map Left as)
+  apps (indexPrim nm ty') (Right (numTy n) : Left (natLit n) : map Left as)
  where
-  ty = C.ForAllTy tvN (C.mkFunTy (knownNatTy (C.VarTy tvN)) (t (C.VarTy tvN)))
+  ty' = forAll "n_9001" natKind (\vn -> knownNatTy vn ~> t vn)
 
 -- | @forall m n. Index m -> Index n -> Index (m + n)@ at sizes @m@ and @n@
-extendingCall :: Text -> Integer -> Integer -> [C.Term] -> C.Term
+extendingCall :: Text -> Integer -> Integer -> [TmB] -> TmB
 extendingCall nm m n as =
-  C.mkApps (indexPrim nm ty) ([Right (numTy m), Right (numTy n)] ++ map Left as)
+  apps (indexPrim nm ty') ([Right (numTy m), Right (numTy n)] ++ map Left as)
  where
-  vm = C.VarTy tvM
-  vn = C.VarTy tvN
-  ty = C.ForAllTy tvM $ C.ForAllTy tvN $
-    C.mkFunTy (indexTy vm) $ C.mkFunTy (indexTy vn) (indexTy (addTy vm vn))
+  ty' = forAll "m_9002" natKind $ \vm -> forAll "n_9001" natKind $ \vn ->
+    indexTy vm ~> indexTy vn ~> indexTy (addTy vm vn)
 
 -- | @forall n. Index n -> Index n -> Index n@ at size @n@
-binCall :: Text -> Integer -> [C.Term] -> C.Term
+binCall :: Text -> Integer -> [TmB] -> TmB
 binCall nm n as =
-  C.mkApps (indexPrim nm ty) (Right (numTy n) : map Left as)
+  apps (indexPrim nm ty') (Right (numTy n) : map Left as)
  where
-  ty = C.ForAllTy tvN (binTy (indexTy (C.VarTy tvN)) (indexTy (C.VarTy tvN)))
-
-undefinedIndex :: C.Type -> C.Term
-undefinedIndex sz = C.TyApp (C.Prim NP.undefined) (indexTy sz)
+  ty' = forAll "n_9001" natKind (\vn -> binTy (indexTy vn) (indexTy vn))
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.Index"
   [ testCase "unpack# of a bit vector" $
-      assertAlphaEq (index 5 3)
-        (eval (knownNatCall "unpack#" (\n -> C.mkFunTy (bvTy (numTy 3)) (indexTy n)) 5 [bv 3 0 3]))
+      assertEvalsTo (index 5 3)
+        (knownNatCall "unpack#" (\n -> bvTy (numTy 3) ~> indexTy n) 5 [bv 3 0 3])
 
   , testCase "unpack# out of bounds is undefined" $
-      assertAlphaEq (undefinedIndex (numTy 5))
-        (eval (knownNatCall "unpack#" (\n -> C.mkFunTy (bvTy (numTy 3)) (indexTy n)) 5 [bv 3 0 6]))
+      assertEvalsTo (undefinedAt (indexTy (numTy 5)))
+        (knownNatCall "unpack#" (\n -> bvTy (numTy 3) ~> indexTy n) 5 [bv 3 0 6])
 
   , testCase "toEnum# of an Int" $
-      assertAlphaEq (index 5 4)
-        (evalSized (knownNatCall "toEnum#" (C.mkFunTy boxedIntTy . indexTy) 5 [boxedInt 4]))
+      assertEvalsTo (index 5 4)
+        (knownNatCall "toEnum#" (\n -> boxedIntTy ~> indexTy n) 5 [boxedInt 4])
 
   , testCase "fromEnum# is an Int" $
-      assertAlphaEq (boxedInt 4)
-        (evalSized (knownNatCall "fromEnum#" (\n -> C.mkFunTy (indexTy n) boxedIntTy) 5 [index 5 4]))
+      assertEvalsTo (boxedInt 4)
+        (knownNatCall "fromEnum#" (\n -> indexTy n ~> boxedIntTy) 5 [index 5 4])
 
   , testCase "plus# has the size of its result type" $
-      assertAlphaEq (indexOfSize (addTy (numTy 4) (numTy 3)) 7 5)
-        (eval (extendingCall "plus#" 4 3 [index 4 3, index 3 2]))
+      assertEvalsTo (indexOfSize (addTy (numTy 4) (numTy 3)) 7 5)
+        (extendingCall "plus#" 4 3 [index 4 3, index 3 2])
 
   , testCase "minus# below zero is undefined" $
-      assertAlphaEq (undefinedIndex (addTy (numTy 4) (numTy 3)))
-        (eval (extendingCall "minus#" 4 3 [index 4 1, index 3 2]))
+      assertEvalsTo (undefinedAt (indexTy (addTy (numTy 4) (numTy 3))))
+        (extendingCall "minus#" 4 3 [index 4 1, index 3 2])
 
   , testCase "times#" $
-      assertAlphaEq (indexOfSize (addTy (numTy 4) (numTy 3)) 7 6)
-        (eval (extendingCall "times#" 4 3 [index 4 3, index 3 2]))
+      assertEvalsTo (indexOfSize (addTy (numTy 4) (numTy 3)) 7 6)
+        (extendingCall "times#" 4 3 [index 4 3, index 3 2])
 
   , testCase "quot#" $
-      assertAlphaEq (index 8 3)
-        (eval (binCall "quot#" 8 [index 8 7, index 8 2]))
+      assertEvalsTo (index 8 3) (binCall "quot#" 8 [index 8 7, index 8 2])
 
   , testCase "rem#" $
-      assertAlphaEq (index 8 1)
-        (eval (binCall "rem#" 8 [index 8 7, index 8 2]))
+      assertEvalsTo (index 8 1) (binCall "rem#" 8 [index 8 7, index 8 2])
 
   , testCase "rem# by zero is undefined" $
-      assertAlphaEq (undefinedIndex (numTy 8))
-        (eval (binCall "rem#" 8 [index 8 7, index 8 0]))
+      assertEvalsTo (undefinedAt (indexTy (numTy 8))) (binCall "rem#" 8 [index 8 7, index 8 0])
 
   , testCase "toInteger#" $
-      assertAlphaEq (integerLit 6)
-        (eval (C.mkApps (indexPrim "toInteger#"
-                           (C.ForAllTy tvN (C.mkFunTy (indexTy (C.VarTy tvN)) integerPrimTy)))
-                 [Right (numTy 8), Left (index 8 6)]))
+      assertEvalsTo (integerLit 6)
+        (apps (indexPrim "toInteger#" (forAll "n_9001" natKind (\vn -> indexTy vn ~> integerPrimTy)))
+           [Right (numTy 8), Left (index 8 6)])
   ]
