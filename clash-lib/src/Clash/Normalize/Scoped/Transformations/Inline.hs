@@ -105,7 +105,6 @@ import Clash.Core.Scoped.FreeVars
   (freeTmVarOccurrences, freeTmVars, hasFreeVarsType, tmNameOccursIn)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)

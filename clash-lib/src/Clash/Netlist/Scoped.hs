@@ -106,7 +106,6 @@ import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
 import           Clash.Core.Scoped.TypeEnv        (TypeEnv, mkTypeEnv)
 import           Clash.Core.Scoped.Subst          (closeType, openTyBinder)
 import           Clash.Core.Scoped.Util           (splitShouldSplit)
-import           Clash.Core.Scoped.Pretty         ()
 import           Clash.Core.Scoped.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvFromList, globalEnvKeys, insertGlobalEnv,
    lookupGlobalEnv)

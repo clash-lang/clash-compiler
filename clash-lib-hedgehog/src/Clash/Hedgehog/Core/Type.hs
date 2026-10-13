@@ -43,7 +43,6 @@ import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.DataCon (dataConInstArgTys)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (openTyBinder)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Type

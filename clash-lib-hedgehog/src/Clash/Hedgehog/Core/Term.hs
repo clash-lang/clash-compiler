@@ -31,7 +31,6 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (openTyBinder, patVars)
 import Clash.Core.Scoped.Syntax hiding (Name)
 import Clash.Core.Scoped.Term (mkTmApps)

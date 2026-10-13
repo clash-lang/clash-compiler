@@ -35,7 +35,6 @@ import Clash.Core.Scoped.Syntax (mkGlobalId)
 import Clash.Core.Scoped.Evaluator (whnf)
 import Clash.Core.Scoped.Evaluator.Types (Machine (..), initMachine)
 import Clash.Core.Scoped.NameMap (emptyNameMap, insertNameMap, singletonGlobalEnv)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (withFreshIdBinder)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (stripAllTicks)

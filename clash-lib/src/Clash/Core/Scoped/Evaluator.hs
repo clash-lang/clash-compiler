@@ -117,7 +117,6 @@ import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.HasType
   (applyTypeToArgs, inferCoreTypeOf, piResultTys, primInfoType)
 import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, stripTicks)

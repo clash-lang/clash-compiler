@@ -119,7 +119,6 @@ import           Clash.Core.Scoped.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
 import           Clash.Core.Scoped.Syntax (globalIdName, globalIdUniq, GlobalId)
 import Clash.Core.Scoped.Syntax (mkGlobalId)
-import           Clash.Core.Scoped.Pretty         ()
 import qualified Clash.Core.Scoped.Subst          as S (openTyBinder)
 import qualified Clash.Core.Scoped.Syntax         as S
 import qualified Clash.Core.Scoped.Type           as S

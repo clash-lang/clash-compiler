@@ -86,7 +86,6 @@ import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
 import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
-import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term

@@ -21,7 +21,6 @@ import qualified Hedgehog.Range as Range
 import Clash.Core.Literal
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax (Type)
 import Clash.Core.Scoped.TysPrim
 

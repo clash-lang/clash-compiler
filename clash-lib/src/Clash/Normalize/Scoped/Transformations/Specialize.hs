@@ -105,7 +105,6 @@ import           Clash.Core.Scoped.HasType   (inferCoreTypeOf, piResultTy)
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
 import           Clash.Core.Scoped.NameMap
   (insertWithGlobalEnv, lookupGlobalEnv, nullNameSet, singletonNameMap)
-import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Term

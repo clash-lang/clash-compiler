@@ -56,7 +56,6 @@ import qualified Clash.Util.Interpolate as I
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.NameMap (tyBinderNameBinders)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs)

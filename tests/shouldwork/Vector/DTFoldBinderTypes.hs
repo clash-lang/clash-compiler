@@ -32,7 +32,6 @@ import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
 import Clash.Core.Scoped.Evaluator.Types (Machine (..), initMachine)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.NameMap (emptyNameMap, foldrWithGlobalEnv)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (openAlt, openBind, openIdBinder, openTyBinder, teleIdBinderTypes)
 import Clash.Core.Scoped.Syntax (Distinct, Scope)
 import qualified Clash.Core.Scoped.Syntax as S

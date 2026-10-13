@@ -49,7 +49,7 @@ import Clash.Core.Scoped.Evaluator (bindAllocated, nfData, whnf)
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.FreeVars (anyBoundOccursIn, bindNameBinders)
 import Clash.Core.Scoped.NameMap (GlobalEnv, emptyNameMap, nameMapFromList)
-import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Pretty ()
 import Clash.Core.Scoped.Subst (openBind, substTm, teleIdVars, tmVarsSubst, unsinkTerm)
 import Clash.Core.Scoped.Syntax
 

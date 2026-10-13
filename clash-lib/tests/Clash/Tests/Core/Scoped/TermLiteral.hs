@@ -30,7 +30,6 @@ import Test.Tasty.TH
 import Clash.Annotations.SynthesisAttributes (Attr)
 import qualified Clash.Core.Literal as L
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax (S (VoidS), Term (App, Literal, Tick), TickInfo (NoDeDup))
 import Clash.Core.Scoped.TermLiteral
 import Clash.Promoted.Nat

@@ -36,7 +36,6 @@ import qualified Data.List as List
 
 import Clash.Core.Scoped.Builder (runTyFamEqn, tyConAppB, varTyB)
 import Clash.Core.TyCon (mkFunTyCon)
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite (liftedTypeKindB)

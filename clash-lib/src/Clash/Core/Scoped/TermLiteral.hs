@@ -63,7 +63,6 @@ import           Clash.Core.DataCon              (DataCon(..))
 import           Clash.Core.Literal
 import           Clash.Core.Name                 (Name(..))
 import           Clash.Core.Pretty               (showPpr)
-import           Clash.Core.Scoped.Pretty        ()
 import           Clash.Core.Scoped.Syntax        (Term(Literal, Data))
 import           Clash.Core.Scoped.Term          (collectArgs, stripAllTicks)
 import           Clash.Promoted.Nat

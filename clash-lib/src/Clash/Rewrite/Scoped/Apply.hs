@@ -44,7 +44,6 @@ import           Clash.Util                  (curLoc)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
-import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst     (Closure (..), freeVarOccs)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Type      (normalizeType)

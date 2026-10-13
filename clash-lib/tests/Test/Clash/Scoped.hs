@@ -218,7 +218,6 @@ import Clash.Core.Scoped.Internal.Scope
   (Name (UnsafeName), NameBinder (UnsafeNameBinder), nameId, nameOf, scopeWatermark)
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Pretty (PrettyOptions (..), showPpr')
-import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkLams, mkTyLams)
