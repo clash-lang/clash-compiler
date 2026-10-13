@@ -11,7 +11,7 @@
 module Clash.Signal.Simulation where
 
 import Control.Exception (evaluate)
-import Control.Monad (foldM)
+import Control.Monad (foldM, when)
 import Data.Bifunctor (second)
 import Data.Default (Default(..))
 import Data.Either.Extra (maybeToEither)
@@ -28,18 +28,17 @@ import System.IO (hPutStrLn, stderr)
 import System.IO.Unsafe (unsafePerformIO)
 
 import Clash.Class.BitPack (BitPack(..), BitSize)
-import Clash.Explicit.Prelude.Safe (undefined)
 import Clash.XException (NFDataX(rnfX), deepseqX)
 import Clash.Signal
   (KnownDomain, SDomainConfiguration(..), knownDomain,
-  Signal, sample, fromList,
+  Signal, sample, sampleN_lazy, fromList,
   Clock, Reset, Enable, fromEnable, unsafeFromReset,
   unbundle)
 import Clash.Sized.Internal.BitVector (BitVector(BV))
 import Clash.Sized.Vector (Vec, toList)
 import Clash.Time (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
 
-import Clash.Signal.Simulation.DataType (DataType, compatible, typeRep)
+import Clash.Signal.Simulation.DataType (DataType, compatible, simpleTypeRep)
 
 type Period = Time
 type Width = Int
@@ -97,16 +96,6 @@ instance Default Config where
       , warnZeroWidth = True
       }
 
-instance Default GlobalData where
-  def =
-    GlobalData
-      { globTraces = Map.empty
-      , globFound = []
-      , globMessages = []
-      , globFirstRun = True
-      }
-
-
 ----------------------------------------------
 --                SIMULATION                --
 ----------------------------------------------
@@ -122,7 +111,14 @@ emptySim config = do
     }
 
 globalDataRef :: IORef GlobalData
-globalDataRef = unsafePerformIO (newIORef def)
+globalDataRef = unsafePerformIO (newIORef gd)
+ where
+  gd = GlobalData
+    { globTraces = Map.empty
+    , globFound = []
+    , globMessages = []
+    , globFirstRun = True
+    }
 {-# OPAQUE globalDataRef #-}
 
 -- | Simulate a design by forcefully evaluating an output signal.
@@ -174,19 +170,17 @@ simulate0 ref simConfig@Config{..} clockWaves signals sig = do
   firstRun <- atomicModifyIORef' ref
     (\glob@GlobalData{globFirstRun} -> (glob{globFirstRun=False},globFirstRun))
 
-  if not firstRun && statusMsgs then do
+  when (not firstRun && statusMsgs) $ do
     hPutStrLn stderr "Warning: `simulate` can only be safely called once"
-  else do
-    pure ()
 
   -- evaluate signal
-  let (cStart,cStop) = simulationTimeRangeToCycles simConfig (clockPeriodTime @dom)
-  evalResult <- forceEvaluateSignal ref sig signals (cStart, cStop) statusMsgs
+  let cycRange = simulationTimeRangeToCycles simConfig (clockPeriodTime @dom)
+  evalResult <- forceEvaluateSignal ref sig signals cycRange statusMsgs
 
   -- create Simulation
   GlobalData{globTraces} <- readIORef ref
   let simTraces = Map.union (Map.fromList $ L.map (second clockTrace) clockWaves) globTraces
-  pure $ evalResult >>= const (Right Simulation{simConfig, simTraces, simTimestamp})
+  pure $ Simulation{simConfig, simTraces, simTimestamp} <$ evalResult
 
 simulationTimeRangeToCycles :: Config -> Time -> (Int,Int)
 simulationTimeRangeToCycles Config{start,stop,clockStart} period =
@@ -208,6 +202,7 @@ simulationTimeRangeToCycles Config{start,stop,clockStart} period =
 -- signals have been found.
 forceEvaluateSignal ::
   forall dom a.
+  KnownDomain dom =>
   NFDataX a =>
   IORef GlobalData ->
   Signal dom a ->
@@ -217,15 +212,14 @@ forceEvaluateSignal ::
   IO (Either String ())
 forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   case (waitFor, statusMsgs) of
-    ([],False) -> pure $ Right $ deepseqX values0 ()
+    ([],False) -> pure $ Right $ deepseqX values ()
     ([],True)  -> do
-      mapM_ printFound values0
+      mapM_ printMessages values0
       pure $ Right ()
-    (_,False) -> lookFor values  waitFor
-    (_,True)  -> lookFor values0 waitFor
+    _          -> lookFor values0 waitFor
  where
   values :: [a]
-  values = drop (fromIntegral start) $ take (fromIntegral stop) $ foldr (:) [] sig
+  values = drop (fromIntegral start) $ sampleN_lazy (fromIntegral stop) sig
 
   values0 :: [a]
   values0 =
@@ -250,8 +244,8 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
     (glob{globFound = [], globMessages = []}, (globFound,globMessages))
 
   -- Evaluate a value and print messages that have popped up.
-  printFound :: a -> IO ()
-  printFound x = do
+  printMessages :: a -> IO ()
+  printMessages x = do
     evaluate $ rnfX x
     (_,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
     mapM_ (hPutStrLn stderr) newMsgs
@@ -261,25 +255,23 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   -- For implementation simplicity, does not check for signals that appear after
   -- evalutating the last value.
   lookFor :: [a] -> [String] -> IO (Either String ())
-  lookFor xs0 ss0 = lookFor0 (xs0 <> [Clash.Explicit.Prelude.Safe.undefined]) ss0 [] True
+  lookFor xs0 ss0 = lookFor0 (xs0 <> [undefined]) ss0 [] True
    where
     lookFor0 :: [a] -> [String] -> [String] -> Bool -> IO (Either String ())
     lookFor0 _ [] _ _ = pure $ Right ()
     lookFor0 [] (s:_) _ _ = pure $ Left ("Did not find signal " <> s)
-    lookFor0 xss@(x:xs) sss@(s:ss) found firstTime = do
+    lookFor0 xs@(x:xs0) sss@(s:ss) found firstTime = do
       (newFound,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
 
-      if statusMsgs then do
+      when statusMsgs $ do
         mapM_ (hPutStrLn stderr) newMsgs
-      else do
-        pure ()
 
       let found0 = newFound <> found
       if s `elem` (if firstTime then found0 else newFound) then do
-        lookFor0 xss ss found0 True
+        lookFor0 xs ss found0 True
       else do
         evaluate $ rnfX x
-        lookFor0 xs sss found0 False
+        lookFor0 xs0 sss found0 False
 
 
 
@@ -391,7 +383,7 @@ traceVec0 name sig =
  where
   traces = toList $ toTrace <$> unbundle sig
   fullName = replaceDollar (domainName @dom) name
-  names = map (\i -> name <> "." <> show i) [0..length traces-1]
+  names = map (\i -> name <> '.' : show i) [0..length traces-1]
   fullNames = map (\i -> fullName <> "." <> show i) [0..length traces-1]
   found = if fullName == name then name:names else [name, fullName]<>names<>fullNames
   registerTraces g = right $ foldM (flip ($)) g $ zipWith registerTrace fullNames traces
@@ -437,10 +429,10 @@ traceClock name clk =
 
 -- Create a trace from a clock period. The period *must* be an even number of fs.
 clockTrace :: Time -> Trace
-clockTrace t
-  | fs <- timeInFS t, even fs =
-    ( typeRep @Bool
-    , TimeFS (fs `div` 2)
+clockTrace (TimeFS t)
+  | (halfPeriod,0) <- t `divMod` 2 =
+    ( simpleTypeRep @Bit
+    , TimeFS halfPeriod
     , 1
     , L.cycle $ L.map (unsafeToTup . pack) [False,True] )
   | otherwise = error "Cannot create clock trace for odd periods (in fs)"
@@ -460,7 +452,7 @@ toTrace ::
   Signal dom a ->
   Trace
 toTrace sig =
-  ( typeRep @a
+  ( simpleTypeRep @a
   , clockPeriodTime @dom
   , fromInteger $ natVal (Proxy @(BitSize a))
   , sample (unsafeToTup . pack <$> sig) )
@@ -475,7 +467,7 @@ fromTrace ::
   Trace ->
   Either String (Signal dom a)
 fromTrace (ty,_period,_width,values)
-  | compatible ty (typeRep @a) = Right $ fromList $ L.map (unpack . uncurry BV) values
+  | compatible ty (simpleTypeRep @a) = Right $ fromList $ L.map (unpack . uncurry BV) values
   | otherwise = Left "Trace did not match target type"
 
 -- | Add a 'Trace' to a 'Simulation'
