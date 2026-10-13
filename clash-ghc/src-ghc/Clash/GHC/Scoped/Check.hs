@@ -4,9 +4,10 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Checks that "Clash.GHC.Scoped.GHC2Core" gives the same terms as converting
-  the terms of 'Clash.GHC.GHC2Core.coreToTerm' to scoped Core. Temporary:
-  Phase 7 of the port to scoped Core deletes 'Clash.GHC.GHC2Core.coreToTerm',
-  and this with it.
+  the terms of 'Clash.GHC.GHC2Core.coreToTerm' to scoped Core, and that
+  'Clash.GHC.GHC2Core.makeAllTyCons' gives the same type constructors as
+  'Clash.GHC.GHC2Core.makeAllTyConsClash'. Temporary: Phase 7 of the port to
+  scoped Core deletes 'Clash.GHC.GHC2Core.coreToTerm', and this with it.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -18,6 +19,7 @@ module Clash.GHC.Scoped.Check
   ( Outcome (..)
   , compareTerms
   , compareTypes
+  , compareTyCons
   , primAtTypeShape
   ) where
 
@@ -30,7 +32,8 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Util as C (undefinedTy)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
-import Clash.Core.Scoped.Sig (DataConSig (..))
+import qualified Clash.Core.TyCon as C
+import Clash.Core.Scoped.Sig (DataConSig (..), NewTyConSig (..), TyFamEqn (..))
 import Clash.Core.Scoped.Syntax
 
 -- | How two terms compare
@@ -67,6 +70,38 @@ compareTypes t1 t2 = case cmpTy t1 t2 of
   Just d
     | aeqTy t1 t2 -> AlphaEquivalent d
     | otherwise -> Different d
+
+-- | Compare two type constructors: structurally, with raw names and the
+-- occurrence names, sorts and source locations of names. The first
+-- difference, if any.
+compareTyCons :: C.TyCon -> C.TyCon -> Maybe String
+compareTyCons tc1 tc2 = common <+> case (tc1, tc2) of
+  (C.AlgTyCon {}, C.AlgTyCon {}) ->
+    check "class" (==) (C.isClassTc tc1) (C.isClassTc tc2)
+      <+> case (C.algTcRhs tc1, C.algTcRhs tc2) of
+            (C.DataTyCon dcs1, C.DataTyCon dcs2) -> cmpList cmpDataCon dcs1 dcs2
+            (C.NewTyCon dc1 sig1 _, C.NewTyCon dc2 sig2 _) ->
+              cmpDataCon dc1 dc2 <+> cmpNewTyConSig sig1 sig2
+            _ -> Just "different kinds of right-hand sides"
+  (C.PromotedDataCon {}, C.PromotedDataCon {}) ->
+    cmpDataCon (C.tyConData tc1) (C.tyConData tc2)
+  (C.FunTyCon {}, C.FunTyCon {}) -> cmpList cmpTyFamEqn (C.tyConEqns tc1) (C.tyConEqns tc2)
+  (C.PrimTyCon {}, C.PrimTyCon {}) -> Nothing
+  _ -> Just "different kinds of type constructors"
+ where
+  common =
+    check "type constructor" (==) (C.tyConUniq tc1) (C.tyConUniq tc2)
+      <+> cmpName (C.tyConName tc1) (C.tyConName tc2)
+      <+> check "arity" (==) (C.tyConArity tc1) (C.tyConArity tc2)
+      <+> cmpTy (C.tyConKind tc1) (C.tyConKind tc2)
+
+cmpNewTyConSig :: NewTyConSig -> NewTyConSig -> Cmp
+cmpNewTyConSig (NewTyConSig tvs1 rhs1) (NewTyConSig tvs2 rhs2) =
+  cmpTele cmpTyBinder tvs1 tvs2 <+> cmpTy rhs1 rhs2
+
+cmpTyFamEqn :: TyFamEqn -> TyFamEqn -> Cmp
+cmpTyFamEqn (TyFamEqn tvs1 lhs1 rhs1) (TyFamEqn tvs2 lhs2 rhs2) =
+  cmpTele cmpTyBinder tvs1 tvs2 <+> cmpList cmpTy lhs1 lhs2 <+> cmpTy rhs1 rhs2
 
 -- | Turn the primitives @_RUBBISH_@ of open types that
 -- 'Clash.GHC.GHC2Core.coreToTerm' makes into the shape of
