@@ -6,6 +6,9 @@
   Tests for the builders of scoped Clash Core
 -}
 
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Tests.Core.Scoped.Builder (tests) where
@@ -13,69 +16,65 @@ module Clash.Tests.Core.Scoped.Builder (tests) where
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.TyCon as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
-import qualified Clash.Core.Var as C
+import qualified Clash.Core.Type as C (ConstTy (..), LitTy (..))
 
 import Clash.Core.Scoped.Builder
-import Clash.Core.Scoped.Convert
-  (fromClashTypeClosed, mkFunTyConFromClash, mkNewTyConRhsFromClash, toClashType)
+import Clash.Core.Scoped.Sig (DataConSig (..), NewTyConSig (..), TyFamEqn (..))
 import Clash.Core.Scoped.Syntax
 
-import Test.Clash.Rewrite
-  (existentialDataCon, existentialTyVar, kindedTyVar, mkTyConName, tyVar)
-
-kTv, aTv :: C.TyVar
-kTv = tyVar C.User "k" 60
-aTv = kindedTyVar C.User "a" 61 (C.VarTy kTv)
+import Test.Clash.Rewrite (TestType (..), mkTyConName)
 
 maybeTc :: C.ConstTy
 maybeTc = C.TyCon (mkTyConName "Maybe" 2001)
 
--- | @forall k (a :: k). a -> Maybe a@
-clashTy :: C.Type
-clashTy =
-  C.ForAllTy kTv $ C.ForAllTy aTv $
-    C.mkFunTy (C.VarTy aTv) (C.AppTy (C.ConstTy maybeTc) (C.VarTy aTv))
+typeB :: TyB
+typeB = testTypeB "Type"
 
--- | The same type, built natively. The keys differ from the uniques of the
--- Clash type variables.
+-- | @forall k (a :: k). a -> Maybe a@. The keys differ from the raw names
+-- the binders get.
 nativeTy :: TyB
 nativeTy =
-  forAllTyB 1 (C.varName kTv) (clashTyB C.liftedTypeKind) $
-    forAllTyB 2 (C.varName aTv) (varTyB 1) $
-      appTyB (appTyB (constTyB C.Arrow) (varTyB 2)) (appTyB (constTyB maybeTc) (varTyB 2))
+  forAllTyB 11 (C.mkUnsafeSystemName "k" 0) typeB $
+    forAllTyB 12 (C.mkUnsafeSystemName "a" 0) (varTyB 11) $
+      appTyB (appTyB (constTyB C.Arrow) (varTyB 12)) (appTyB (constTyB maybeTc) (varTyB 12))
 
--- | Compare raw names too: as types of Clash Core, whose uniques are the raw
--- names
-sameType :: Type 'VoidS -> Type 'VoidS -> Assertion
-sameType t1 t2 = show (toClashType t1) @?= show (toClashType t2)
+-- | The raw name of a type variable
+varRaw :: Type n -> Maybe Int
+varRaw = \case
+  VarTy _ _ n -> Just (tyNameRaw n)
+  _ -> Nothing
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Builder"
-  [ testCase "native type builders number binders like conversion" $
-      sameType (runClosedType nativeTy) (fromClashTypeClosed emptyScope clashTy)
-  , testCase "clashTyB numbers binders like conversion" $
-      sameType (runClosedType (clashTyB clashTy)) (fromClashTypeClosed emptyScope clashTy)
-  , testCase "runDataConSig numbers binders like conversion" $
-      show (runDataConSig [] [(1, C.varName existentialTyVar, clashTyB C.liftedTypeKind)] [varTyB 1])
-        @?= show (C.dcSig existentialDataCon)
-  , testCase "runNewTyConSig numbers binders like conversion" $ do
-      let a = tyVar C.User "a" 62
-          rhs = mkNewTyConRhsFromClash existentialDataCon ([a], C.AppTy (C.ConstTy maybeTc) (C.VarTy a))
-      show (runNewTyConSig [(1, C.varName a, clashTyB C.liftedTypeKind)] (appTyB (constTyB maybeTc) (varTyB 1)))
-        @?= show (C.ntSig rhs)
-  , testCase "runTyFamEqn numbers binders like conversion" $ do
-      let tc = mkFunTyConFromClash 4400 (mkTyConName "F" 4400) C.liftedTypeKind 1
-                 [([C.VarTy aTv], C.VarTy kTv)]
-      show [runTyFamEqn
-              [(1, C.varName kTv, clashTyB C.liftedTypeKind), (2, C.varName aTv, varTyB 1)]
-              [varTyB 2] (varTyB 1)]
-        @?= show (C.tyConEqns tc)
+  [ testCase "native type builders number binders in depth-first order" $
+      case runClosedType nativeTy of
+        ForAllTy bk (ForAllTy ba (AppTy (AppTy (ConstTy C.Arrow) a1) (AppTy _ a2))) -> do
+          [tyNameRaw (tyNameOf bk), tyNameRaw (tyNameOf ba)] @?= [1, 2]
+          [varRaw (tyBinderKind ba), varRaw a1, varRaw a2] @?= [Just 1, Just 2, Just 2]
+        ty -> assertFailure ("unexpected type: " <> show ty)
+  , testCase "runDataConSig numbers binders in depth-first order" $
+      case runDataConSig [] [(11, C.mkUnsafeSystemName "b" 0, typeB)] [varTyB 11] of
+        DataConSig TNil (TCons b TNil) [t] -> do
+          tyNameRaw (tyNameOf b) @?= 1
+          varRaw t @?= Just 1
+        sig -> assertFailure ("unexpected signature: " <> show sig)
+  , testCase "runNewTyConSig numbers binders in depth-first order" $
+      case runNewTyConSig [(11, C.mkUnsafeSystemName "a" 0, typeB)] (appTyB (constTyB maybeTc) (varTyB 11)) of
+        NewTyConSig (TCons a TNil) (AppTy (ConstTy tc) t) -> do
+          tyNameRaw (tyNameOf a) @?= 1
+          tc @?= maybeTc
+          varRaw t @?= Just 1
+        sig -> assertFailure ("unexpected signature: " <> show sig)
+  , testCase "runTyFamEqn numbers binders in depth-first order" $
+      case runTyFamEqn
+             [(11, C.mkUnsafeSystemName "k" 0, typeB), (12, C.mkUnsafeSystemName "a" 0, varTyB 11)]
+             [varTyB 12] (varTyB 11) of
+        TyFamEqn (TCons k (TCons a TNil)) [lhs] rhs -> do
+          [tyNameRaw (tyNameOf k), tyNameRaw (tyNameOf a)] @?= [1, 2]
+          [varRaw (tyBinderKind a), varRaw lhs, varRaw rhs] @?= [Just 1, Just 2, Just 1]
+        eqn -> assertFailure ("unexpected equation: " <> show eqn)
   , testCase "closed types without binders are shared" $
       case appTyB (constTyB maybeTc) (litTyB (C.NumTy 3)) of
-        b -> sameType (runClosedType b) (AppTy (ConstTy maybeTc) (LitTy (C.NumTy 3)))
+        b -> show (runClosedType b) @?= show (AppTy (ConstTy maybeTc) (LitTy (C.NumTy 3)) :: Type 'VoidS)
   ]
