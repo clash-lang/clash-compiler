@@ -139,6 +139,8 @@ module Test.Clash.Scoped
     -- * Shadowing
   , withClashing
   , sunkD
+  , withTermAndSunk
+  , withTypeAndSunk
   , testScopeRaws
   , clashingBinders
   , assertClashes
@@ -424,6 +426,25 @@ withClashing ts ds tm k = extendTestScope ts ds $ \ts' -> k ts' (sink tm)
 -- the watermark of the scope, so going under it renames it. See 'sunkVar'.
 sunkD :: ScopeDecl
 sunkD = atRaw 1000000 (varD "sunk_S1000000" "Int")
+
+-- | Run an assertion on a term in the scope of its free variables (see
+-- 'withTerm'), and again sunk into that scope extended with 'sunkD', where
+-- all of its binders are below the watermark of the scope. So a function that
+-- goes under the binders of the term must rename them in the second run.
+withTermAndSunk
+  :: HasCallStack
+  => TestTerm -> (forall n. Distinct n => TestScope n -> Term n -> Assertion) -> Assertion
+withTermAndSunk t k = withTerm t $ \ts tm -> do
+  k ts tm
+  withClashing ts [sunkD] tm k
+
+-- | 'withTermAndSunk' for types
+withTypeAndSunk
+  :: HasCallStack
+  => TestType -> (forall n. Distinct n => TestScope n -> Type n -> Assertion) -> Assertion
+withTypeAndSunk t k = withType t $ \ts ty -> do
+  k ts ty
+  withClashing ts [sunkD] ty k
 
 -- | The raw names of the variables of a scope
 testScopeRaws :: TestScope n -> IntSet
@@ -1192,7 +1213,7 @@ scrambleBinders w tm0 = evalStateT (goTm IntMap.empty tm0) 1000000
 -- scope
 forAllScrambled :: Testable prop => Scope n -> Term n -> (Term n -> prop) -> Property
 forAllScrambled sc tm =
-  forAllShow (scrambleBinders (scopeWatermark sc) tm) (\t -> "scrambled:\n" <> showTerm (toClashTerm t))
+  forAllShow (scrambleBinders (scopeWatermark sc) tm) (\t -> "scrambled:\n" <> showTermT t)
 
 -- | 'scrambleBinders' with a supply of fresh names
 type Scramble = StateT Int Gen
