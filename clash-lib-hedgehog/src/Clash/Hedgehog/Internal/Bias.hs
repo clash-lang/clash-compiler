@@ -12,10 +12,8 @@ module Clash.Hedgehog.Internal.Bias
   ( Bias(..)
   ) where
 
-import Clash.Core.Subst (aeqType)
 import Clash.Core.TyCon
-import Clash.Core.Type
-import Clash.Core.TysPrim
+import Clash.Core.Scoped.TysPrim
 
 -- | Determine the bias of an item. This is used to set the weight of that item
 -- so we can sample using the 'Hedgehog.Gen.frequency' generator instead of
@@ -38,26 +36,26 @@ class Bias a where
 -- completely useless at generating the kinds / types we want to see.
 instance Bias TyCon where
   biasOf tc@PrimTyCon{}
-    | aeqType ty liftedTypeKind   = biasBy 3  -- Type
-    | aeqType ty typeNatKind      = biasBy 2  -- Nat
-    | aeqType ty typeSymbolKind   = biasBy 1  -- Symbol
+    | nm == liftedTypeKindTyConName  = biasBy 3  -- Type
+    | nm == typeNatKindTyConName     = biasBy 2  -- Nat
+    | nm == typeSymbolKindTyConName  = biasBy 1  -- Symbol
 
-    | aeqType ty integerPrimTy    = biasBy 5  -- Integer, Natural, Int#, Word#
-    | aeqType ty naturalPrimTy    = biasBy 5
-    | aeqType ty intPrimTy        = biasBy 5
-    | aeqType ty wordPrimTy       = biasBy 5
-    | aeqType ty int64PrimTy      = biasBy 4  -- Int64#, Word64#
-    | aeqType ty word64PrimTy     = biasBy 4
-    | aeqType ty floatPrimTy      = biasBy 3  -- Float#, Double#
-    | aeqType ty doublePrimTy     = biasBy 3
-    | aeqType ty charPrimTy       = biasBy 2  -- Char#, ByteArray#, Addr#
-    | aeqType ty byteArrayPrimTy  = biasBy 2
-    | aeqType ty stringPrimTy     = biasBy 2
+    | nm == integerPrimTyConName     = biasBy 5  -- Integer, Natural, Int#, Word#
+    | nm == naturalPrimTyConName     = biasBy 5
+    | nm == intPrimTyConName         = biasBy 5
+    | nm == wordPrimTyConName        = biasBy 5
+    | nm == int64PrimTyConName       = biasBy 4  -- Int64#, Word64#
+    | nm == word64PrimTyConName      = biasBy 4
+    | nm == floatPrimTyConName       = biasBy 3  -- Float#, Double#
+    | nm == doublePrimTyConName      = biasBy 3
+    | nm == charPrimTyConName        = biasBy 2  -- Char#, ByteArray#, Addr#
+    | nm == byteArrayPrimTyConName   = biasBy 2
+    | nm == stringPrimTyConName      = biasBy 2
 
-    | otherwise                   = baseBias  -- Anything else is base
+    | otherwise                      = baseBias  -- Anything else is base
    where
     baseBias = 10
-    ty       = mkTyConTy (tyConName tc)
+    nm       = tyConName tc
 
     biasBy :: Int -> Int
     biasBy n = baseBias ^ n

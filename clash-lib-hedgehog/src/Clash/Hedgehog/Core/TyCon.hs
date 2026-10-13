@@ -1,11 +1,12 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random generation of type constructors.
 -}
 
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Clash.Hedgehog.Core.TyCon
@@ -14,23 +15,20 @@ module Clash.Hedgehog.Core.TyCon
 
 import Control.Monad (forM)
 import Data.Coerce (coerce)
-import Data.Either (rights)
+import qualified Data.IntMap.Strict as IntMap
 import Hedgehog (Range)
 import qualified Hedgehog.Gen as Gen
 
 import Clash.Core.DataCon
-import Clash.Core.HasType
-import Clash.Core.Name (nameUniq)
-import Clash.Core.Subst
 import Clash.Core.TyCon
-import Clash.Core.Scoped.Convert
-  (mkAlgTyConFromClash, mkFunTyConFromClash, mkPromotedDataConFromClash)
-import Clash.Core.Type (Kind, Type(VarTy), mkTyConApp, splitFunForallTy)
-import Clash.Core.TysPrim (liftedTypeKind, tysPrimMap)
-import Clash.Core.Var
-import Clash.Core.VarEnv
-import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
+
+import Clash.Core.Scoped.Convert (mkAlgTyCon, mkFunTyCon, mkPromotedDataCon)
+import Clash.Core.Scoped.Sig (TyFamEqn(..))
+import Clash.Core.Scoped.Syntax hiding (Name)
+import Clash.Core.Scoped.Type
+  (SplitFunForall(..), mkTyConApp, piTeleTmArity, piTeleTyArity, splitFunForallTy)
+import Clash.Core.Scoped.TysPrim (liftedTypeKind, tysPrimMap)
 
 import Clash.Hedgehog.Core.DataCon
 import Clash.Hedgehog.Core.Monad
@@ -71,8 +69,9 @@ This helps ensure that generated data is well-formed, as a constrained
 generator produces random hole-fits instead of completely arbitrary values.
 -}
 
-arityOf :: Kind -> Int
-arityOf = length . fst . splitFunForallTy
+arityOf :: Kind n -> Int
+arityOf kn = case splitFunForallTy kn of
+  SplitFunForall tele _ -> piTeleTyArity tele + piTeleTmArity tele
 
 -- | A TyConMap contains all the algebraic data types and type families that
 -- are used in a program. This is typically the first thing that should be
@@ -129,7 +128,7 @@ genAlgTyConFrom range tcm = do
   -- See NOTE [finding more complex fits] in Clash.Hedgehog.Unique.
   --
   -- let argGen = genClosedKindFrom tcm liftedTypeKind
-  -- kn  <- genWithCodomain liftedTypeKind argGen
+  -- kn  <- genWithCodomain emptyEnv liftedTypeKind argGen
 
   -- All ADTs live in the kind Type
   let kn = liftedTypeKind
@@ -140,7 +139,7 @@ genAlgTyConFrom range tcm = do
              -- TODO Generate NewTyCon
            ]
 
-  let tc = mkAlgTyConFromClash (nameUniq name) name kn arity rhs False
+  let tc = mkAlgTyCon name kn arity rhs False
 
   canGenDataKinds >>= \case
     True ->
@@ -153,8 +152,7 @@ genAlgTyConFrom range tcm = do
  where
    promoteDataCon dc =
      let tcn = coerce (dcName dc)
-         arity = arityOf (dcLegacyType dc)
-      in (tcn, mkPromotedDataConFromClash (dcUniq dc) tcn (dcLegacyType dc) arity dc)
+      in (tcn, mkPromotedDataCon tcn (dcType dc) (arityOf (dcType dc)) dc)
 
 -- TODO In the future we may want to also generate indirectly recursive type
 -- families. For example:
@@ -163,6 +161,9 @@ genAlgTyConFrom range tcm = do
 --   Even n = Odd (n - 1)   Odd n = Even (n - 1)
 
 -- | Generate a new type family, using the types that are already in scope.
+--
+-- The kind of the type family is monomorphic, even with @-XPolyKinds@, so
+-- that the pattern variables of its equations have closed kinds.
 --
 genFunTyConFrom
   :: forall m
@@ -173,68 +174,108 @@ genFunTyConFrom tcm = do
   let used = fmap tyConUniq tcm
   name <- genFreshName used genTyConName
 
-  kn <- genClosedKindFrom tcm liftedTypeKind
-  let arity = arityOf kn
+  kn <- local (\r -> r { allowPolyKinds = False })
+          (genClosedKindFrom tcm liftedTypeKind)
+  let (argKns, resKn) = splitMonoFunTy kn
 
-  let (argKns, resKn) = splitFunForallTy kn
-  substs <- genSubsts name (rights argKns) resKn
+  eqns <- genEqns name argKns resKn
 
-  let tc = mkFunTyConFromClash (nameUniq name) name kn arity substs
+  let tc = mkFunTyCon name kn (length argKns) eqns
   pure (UniqMap.singleton name tc)
  where
-  genSubsts :: TyConName -> [Kind] -> Kind -> CoreGenT m [([Type], Type)]
-  genSubsts _ [] rhsKn = do
+  tcm' = UniqMap.filter (not . isPrimTc) tcm
+
+  genEqns :: TyConName -> [Kind 'VoidS] -> Kind 'VoidS -> CoreGenT m [TyFamEqn]
+  genEqns _ [] rhsKn = do
     -- Nullary type family, we only need to generate the RHS type
-    let tcm' = UniqMap.filter (not . isPrimTc) tcm
-    rhs <- genMonoTypeFrom tcm' mempty rhsKn
+    rhs <- genMonoTypeFrom tcm' emptyEnv rhsKn
 
-    pure [([], rhs)]
+    pure [TyFamEqn TNil [] rhs]
 
-  genSubsts name argKns rhsKn = do
-    let tcm' = UniqMap.filter (not . isPrimTc) tcm
+  genEqns name argKns rhsKn = do
+    let args = zipWith (\i k -> ([(i, k)], PVar i)) [0..] argKns
+    lhss <- refineArgs tcm (length argKns) args
 
-    tvs <- genVars genTyVar argKns genVarName
-    let acc = fmap (\x -> (UniqMap.singletonUnique x, VarTy x)) tvs
-
-    lhss <- refineArgs tcm acc
-
-    forM lhss $ \args -> do
-      -- The RHS of each equation can use free vars in the types, since types
+    forM lhss $ \lhs ->
+      -- The RHS of each equation can use the pattern variables, since types
       -- in the LHS of a type family are treated more like patterns.
-      let free = mconcat (fmap fst args)
+      let free = concatMap fst lhs
+       in genTyVars emptyEnv (map (sinkClosed . snd) free) genVarName $ \env tele vs -> do
+            let vars = IntMap.fromList (zip (map fst free) vs)
+                pats = fmap (patType vars . snd) lhs
 
-      -- Direct recursion in type families requires -XUndecidableInstances.
-      rhs <- canGenUndecidableInstances >>= \case
-        True -> Gen.choice
-                   [ genMonoTypeFrom tcm' free rhsKn
-                   , mkTyConApp name
-                       <$> traverse (genMonoTypeFrom tcm' free) argKns
-                   ]
-        False -> genMonoTypeFrom tcm' free rhsKn
+            -- Direct recursion in type families requires -XUndecidableInstances.
+            rhs <- canGenUndecidableInstances >>= \case
+              True -> Gen.choice
+                         [ genMonoTypeFrom tcm' env (sinkClosed rhsKn)
+                         , mkTyConApp name
+                             <$> traverse (genMonoTypeFrom tcm' env . sinkClosed) argKns
+                         ]
+              False -> genMonoTypeFrom tcm' env (sinkClosed rhsKn)
 
-      pure (fmap snd args, rhs)
+            pure (TyFamEqn tele pats rhs)
+
+-- | A pattern of the left-hand side of a type family equation, whose variables
+-- are numbered
+data PatTy
+  = PVar !Int
+  | PCon !TyConName [PatTy]
+
+-- | Substitute a pattern for a pattern variable
+substPat :: Int -> PatTy -> PatTy -> PatTy
+substPat v p = go
+ where
+  go = \case
+    PVar w | v == w -> p
+    PCon tc ps -> PCon tc (fmap go ps)
+    q -> q
+
+-- | A pattern as a type, given the pattern variables as types
+patType :: IntMap.IntMap (Type n) -> PatTy -> Type n
+patType vars = \case
+  PVar v -> IntMap.findWithDefault (error ("patType: unbound pattern variable " <> show v)) v vars
+  PCon tc ps -> mkTyConApp tc (fmap (patType vars) ps)
+
+-- | A pattern of a type family equation, with its pattern variables and their
+-- closed kinds
+type PatArg = ([(Int, Kind 'VoidS)], PatTy)
 
 refineArgs
   :: forall m
    . (Alternative m, MonadGen m)
   => TyConMap
-  -> [(UniqMap TyVar, Type)]
-  -> m [[(UniqMap TyVar, Type)]]
-refineArgs tcm args = go [args]
+  -> Int
+  -- ^ The next number of a pattern variable
+  -> [PatArg]
+  -> m [[PatArg]]
+refineArgs tcm next0 args = snd <$> go (next0, [args])
  where
   go acc =
     Gen.recursive Gen.choice
       [Gen.constant acc]
       [Gen.subtermM (refineAgain acc) go]
 
-  refineAgain acc@(xs:_) = do
+  refineAgain (next, acc@(xs:_)) = do
     -- Every arg can be refined or left alone.
-    let gen x = Gen.choice [uncurry (refineArg tcm) x, Gen.constant x]
-    refined <- traverse gen xs
-    pure (refined : acc)
+    let gen nxt x = Gen.choice [refineArg tcm nxt x, Gen.constant (nxt, x)]
+    (next', refined) <- mapAccumLM gen next xs
+    pure (next', refined : acc)
 
-  refineAgain [] =
+  refineAgain (_, []) =
     error "refineArgs: No types to refine."
+
+mapAccumLM
+  :: forall m acc x y
+   . Monad m
+  => (acc -> x -> m (acc, y))
+  -> acc
+  -> [x]
+  -> m (acc, [y])
+mapAccumLM _ acc [] = return (acc, [])
+mapAccumLM f acc (x:xs) = do
+  (acc', y) <- f acc x
+  (acc'', ys) <- mapAccumLM f acc' xs
+  return (acc'', y:ys)
 
 -- | Refine a type, selecting one of the free variables and substituting it
 -- for a type constructor of the desired kind (filling in any holes with new
@@ -246,35 +287,34 @@ refineArg
   :: forall m
    . (Alternative m, MonadGen m)
   => TyConMap
-  -> UniqMap TyVar
-  -> Type
-  -> m (UniqMap TyVar, Type)
-refineArg tcm free ty
-  | UniqMap.null free
-  = pure (free, ty)
+  -> Int
+  -- ^ The next number of a pattern variable
+  -> PatArg
+  -> m (Int, PatArg)
+refineArg tcm next (free, ty)
+  | null free
+  = pure (next, (free, ty))
 
   | otherwise
   = do -- Pick a free variable and remove it from free vars
-       fv <- fst <$> sampleAnyUniqMap free
-       let free' = UniqMap.delete fv free
+       (fv, fvKind) <- Gen.element free
+       let free' = filter ((/= fv) . fst) free
 
        -- Pick a type constructor that fits that free variable. This cannot be
        -- an unboxed primitive type, so for now all primitive types are excluded.
        -- This is slightly too strict, as Integer and Natural can be used.
-       (tc, holes) <- sampleUniqMapBiased (not . isPrimTc) (coreTypeOf fv) tcm
+       (tc, holes) <- sampleUniqMapBiased tyConKind (not . isPrimTc) fvKind tcm
 
        -- Take any holes for that constructor and make them new free variables.
-       holeVars <- genVars genTyVar holes genVarName
-       let free'' = UniqMap.insertMany (zip holeVars holeVars) free'
+       let holeVars = zip [next..] holes
+       let free'' = free' <> holeVars
 
        -- Substitute the removed free variable for the type constructor with
        -- any new free variables applied to it.
-       let inScope = extendInScopeSetList emptyInScopeSet (UniqMap.elems free'')
-       let substTv = unitVarEnv fv (mkTyConApp (tyConName tc) (fmap VarTy holeVars))
-       let subst = mkTvSubst inScope substTv
+       let ty' = substPat fv (PCon (tyConName tc) (fmap (PVar . fst) holeVars)) ty
 
        -- Return the refined type and free variable environment.
-       pure (free'', substTy subst ty)
+       pure (next + length holes, (free'', ty'))
 
 {-
 Note [generating substs]

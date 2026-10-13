@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -20,38 +20,39 @@ import qualified Hedgehog.Range as Range
 
 import Clash.Core.Literal
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Subst (aeqType)
-import Clash.Core.Type (Type)
-import Clash.Core.TysPrim
+import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Scoped.Syntax (Type)
+import Clash.Core.Scoped.TysPrim
 
 -- | Generate a 'Literal' with the specified core type. If the type does not
--- correspond to a known @PrimTyCon@ (as defined in @Clash.Core.TysPrim@) then
--- an error is returned.
+-- correspond to a known @PrimTyCon@ (as defined in
+-- @Clash.Core.Scoped.TysPrim@) then an error is returned.
 --
 genLiteralFrom
-  :: forall m
+  :: forall m n
    . MonadGen m
-  => Type
+  => Type n
   -- ^ The type of the literal to generate
   -> m Literal
 genLiteralFrom ty
-  | aeqType ty integerPrimTy = genIntegerLiteral
-  | aeqType ty intPrimTy = genIntLiteral
-  | aeqType ty wordPrimTy = genWordLiteral
-  | aeqType ty int64PrimTy = genInt64Literal
-  | aeqType ty word64PrimTy = genWord64Literal
-  | aeqType ty int8PrimTy = genInt8Literal
-  | aeqType ty int16PrimTy = genInt16Literal
-  | aeqType ty int32PrimTy = genInt32Literal
-  | aeqType ty word8PrimTy = genWord8Literal
-  | aeqType ty word16PrimTy = genWord16Literal
-  | aeqType ty word32PrimTy = genWord32Literal
-  | aeqType ty stringPrimTy = genStringLiteral
-  | aeqType ty floatPrimTy = genFloatLiteral
-  | aeqType ty doublePrimTy = genDoubleLiteral
-  | aeqType ty charPrimTy = genCharLiteral
-  | aeqType ty naturalPrimTy = genNaturalLiteral
-  | aeqType ty byteArrayPrimTy = genByteArrayLiteral
+  | aeqTy ty integerPrimTy = genIntegerLiteral
+  | aeqTy ty intPrimTy = genIntLiteral
+  | aeqTy ty wordPrimTy = genWordLiteral
+  | aeqTy ty int64PrimTy = genInt64Literal
+  | aeqTy ty word64PrimTy = genWord64Literal
+  | aeqTy ty int8PrimTy = genInt8Literal
+  | aeqTy ty int16PrimTy = genInt16Literal
+  | aeqTy ty int32PrimTy = genInt32Literal
+  | aeqTy ty word8PrimTy = genWord8Literal
+  | aeqTy ty word16PrimTy = genWord16Literal
+  | aeqTy ty word32PrimTy = genWord32Literal
+  | aeqTy ty stringPrimTy = genStringLiteral
+  | aeqTy ty floatPrimTy = genFloatLiteral
+  | aeqTy ty doublePrimTy = genDoubleLiteral
+  | aeqTy ty charPrimTy = genCharLiteral
+  | aeqTy ty naturalPrimTy = genNaturalLiteral
+  | aeqTy ty byteArrayPrimTy = genByteArrayLiteral
   | otherwise =
       error $ unlines
         [ "genLiteralFrom: No constructors for " <> showPpr ty
