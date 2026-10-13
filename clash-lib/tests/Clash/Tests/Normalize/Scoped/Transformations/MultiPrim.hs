@@ -3,78 +3,62 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.MultiPrim": agreement of
-  the port of 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
-  with that of Clash Core.
+  Tests for "Clash.Normalize.Scoped.Transformations.MultiPrim". The expected
+  results are those of the port, which agreed with
+  'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim' of Clash Core
+  up to the order of let-bindings.
 -}
 
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Scoped.Transformations.MultiPrim (tests) where
 
 import Data.Default (def)
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Text as Text
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Annotations.Primitive (PrimitiveGuard (HasBlackBox))
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term
-  ( IsMultiPrim (..), PrimInfo (..), PrimUnfolding (NoUnfolding), Term (..)
-  , WorkInfo (WorkNever) )
-import Clash.Core.TyCon (TyCon (..))
-import Clash.Core.Type (Type (ForAllTy, VarTy), mkFunTy)
+import qualified Clash.Core.DataCon as C
+import qualified Clash.Core.Term as C (IsMultiPrim (..), WorkInfo (WorkNever))
+import qualified Clash.Core.TyCon as C
+import Clash.Core.Scoped.Convert (mkPrimInfo)
+import Clash.Core.Scoped.Syntax (PrimInfo (..), PrimUnfolding (NoUnfolding), S (VoidS), Type)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Netlist.BlackBox.Types (RenderVoid (NoRenderVoid), TemplateKind (TDecl))
 import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
 import qualified Clash.Normalize.Scoped.Transformations.MultiPrim as Scoped
-import Clash.Normalize.Transformations.MultiPrim (setupMultiResultPrimWorker)
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
+import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
-import Clash.Rewrite.StrategyDSL (onPrim, toTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ)
-import Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), TransformContext (..))
-import Clash.Util.Supply (newSupply)
+import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.Types (RewriteEnv (..), RewriteState)
 
-import Test.Clash.Differential (Outcome (..), letrecOrder)
 import Test.Clash.Rewrite
-  ( assertFires, inScopeOf, intTy, mkTestAlgTyCon, mkTestDataCon, mkTyConName, testTyConMap
-  , tupleTy, tyVar, withTyConMap )
-import Test.Clash.Scoped (assertRewritesAgreeUpTo)
-import Test.Clash.Scoped.ViaFoil (viaFoil)
+  ( TestDefs (..), TestTerm, parseTestTermWith, strQQ, testAlgTyCon, testDataCon
+  , testTyConMap, tyVarD, withTyConMap )
+import Test.Clash.Scoped (assertNoRewrite, assertRewritesTo, closedType)
 
--- | 'setupMultiResultPrim' of Clash Core
-setupCurrent :: NormRewrite
-setupCurrent =
-  $(asRewriteQ (toTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)))
+-- | The pair type constructor. 'Clash.Core.TyCon.isTupleTyConLike' recognizes
+-- it by its name.
+pairTc :: C.TyCon
+pairTc = testAlgTyCon "GHC.Tuple.Tuple2_3036" ["t1", "t2"] [pairDc]
 
--- | The port, on terms of Clash Core: through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil'
-setupScoped :: NormRewrite
-setupScoped = (viaFoil "setupMultiResultPrim" $(asScopedRewriteQ Scoped.setupMultiResultPrim))
-
--- | The pair type constructor, as 'tupleTy' names it
-pairTc :: TyCon
-pairTc = mkTestAlgTyCon nm [t1, t2] [dc]
- where
-  nm = mkTyConName "GHC.Tuple.(,)" 3036
-  t1 = tyVar User "t1" 3040
-  t2 = tyVar User "t2" 3041
-  dc = mkTestDataCon "GHC.Tuple.(,)" 3042 [t1, t2] [] [VarTy t1, VarTy t2]
-         (tupleTy [VarTy t1, VarTy t2])
+pairDc :: C.DataCon
+pairDc = testDataCon "GHC.Tuple.Tuple2" 3042 1 [tyVarD "t1", tyVarD "t2"] [] ["t1", "t2"]
+  "GHC.Tuple.Tuple2_3036 t1 t2"
 
 -- | An environment with the pair type constructor, and the multi-result
 -- primitives 'monoPrim' and 'polyPrim', and the single-result 'singlePrim'
 env :: RewriteEnv
 env = withTyConMap tcm def{_clashEnv = (_clashEnv def){envPrimitives = prims}}
  where
-  tcm = UniqMap.insert (tyConName pairTc) pairTc testTyConMap
+  tcm = UniqMap.insert (C.tyConName pairTc) pairTc testTyConMap
   prims = HashMap.fromList
     [ (primName monoPrim, HasBlackBox [] (bb (primName monoPrim) True))
     , (primName polyPrim, HasBlackBox [] (bb (primName polyPrim) True))
@@ -82,7 +66,7 @@ env = withTyConMap tcm def{_clashEnv = (_clashEnv def){envPrimitives = prims}}
     ]
   bb nm multi = BlackBox
     { name = nm
-    , workInfo = WorkNever
+    , workInfo = C.WorkNever
     , renderVoid = NoRenderVoid
     , multiResult = multi
     , kind = TDecl
@@ -97,44 +81,58 @@ env = withTyConMap tcm def{_clashEnv = (_clashEnv def){envPrimitives = prims}}
     , template = BBTemplate []
     }
 
-prim :: Text.Text -> Type -> PrimInfo
-prim nm ty = PrimInfo nm ty WorkNever SingleResult NoUnfolding
+-- | @mono :: Int -> Int -> (Int, Int)@, with a single or multiple results
+monoPrim, monoMultiPrim :: PrimInfo
+monoPrim = mkPrimInfo "mono" monoTy C.WorkNever C.SingleResult NoUnfolding
+monoMultiPrim = mkPrimInfo "mono" monoTy C.WorkNever C.MultiResult NoUnfolding
 
--- | @mono :: Int -> Int -> (Int, Int)@
-monoPrim :: PrimInfo
-monoPrim = prim "mono" (mkFunTy intTy (mkFunTy intTy (tupleTy [intTy, intTy])))
+monoTy :: Type 'VoidS
+monoTy = closedType "Int -> Int -> GHC.Tuple.Tuple2_3036 Int Int"
 
 -- | @poly :: forall a. a -> (a, Int)@
 polyPrim :: PrimInfo
-polyPrim = prim "poly" (ForAllTy a (mkFunTy (VarTy a) (tupleTy [VarTy a, intTy])))
- where
-  a = tyVar User "a" 3050
+polyPrim = mkPrimInfo "poly" (closedType "forall (a :: Type). a -> GHC.Tuple.Tuple2_3036 a Int")
+  C.WorkNever C.SingleResult NoUnfolding
 
 -- | @single :: Int -> (Int, Int)@, a primitive with a single result
 singlePrim :: PrimInfo
-singlePrim = prim "single" (mkFunTy intTy (tupleTy [intTy, intTy]))
+singlePrim = mkPrimInfo "single" (closedType "Int -> GHC.Tuple.Tuple2_3036 Int Int")
+  C.WorkNever C.SingleResult NoUnfolding
 
--- | Assert that 'setupMultiResultPrim' and its port agree on a term, up to
--- the order of let-bindings. Gives the known differences.
-agree :: Bool -> Term -> IO Outcome
-agree fires tm = do
-  supply <- newSupply
-  let st = def{_uniqSupply = supply} :: RewriteState NormalizeState
-      ctx = TransformContext (inScopeOf []) []
-  assertFires fires env st ctx setupCurrent tm
-  assertRewritesAgreeUpTo [letrecOrder] env st ctx setupCurrent setupScoped tm
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [pairDc] [monoPrim, polyPrim, singlePrim] [])
+
+st :: RewriteState NormalizeState
+st = def
+
+setupS :: ScopedRewrite NormalizeState
+setupS = $(asScopedRewriteQ Scoped.setupMultiResultPrim)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.MultiPrim"
   [ testCase "a monomorphic multi-result primitive" $
-      agree True (Prim monoPrim) >>= \case
-        Different _ -> assertFailure "different"
-        KnownDifferent kds -> assertBool (show kds) ("prim-type-form" `notElem` kds)
-        Equal -> pure ()
+      assertRewritesTo env st setupS [] (tm "Prim.mono")
+        (tm [strQQ|
+          \(a1 :: Int) (a2 :: Int) ->
+            let
+              { (r :: GHC.Tuple.Tuple2_3036 Int Int) = Prim.mono a1 a2 r3 r4
+              ; (r3 :: Int) = (Core.prim @"c$multiPrimSelect") @Int @(GHC.Tuple.Tuple2_3036 Int Int) r3 r
+              ; (r4 :: Int) = (Core.prim @"c$multiPrimSelect") @Int @(GHC.Tuple.Tuple2_3036 Int Int) r4 r
+              } in GHC.Tuple.Tuple2 @Int @Int r3 r4
+        |])
   , testCase "a polymorphic multi-result primitive" $
-      () <$ agree True (Prim polyPrim)
+      assertRewritesTo env st setupS [] (tm "Prim.poly")
+        (tm [strQQ|
+          \(a :: Type) (a1 :: a) ->
+            let
+              { (r :: GHC.Tuple.Tuple2_3036 a Int) = Prim.poly @a a1 r2 r3
+              ; (r2 :: a) = (Core.prim @"c$multiPrimSelect") @a @(GHC.Tuple.Tuple2_3036 a Int) r2 r
+              ; (r3 :: Int) = (Core.prim @"c$multiPrimSelect") @Int @(GHC.Tuple.Tuple2_3036 a Int) r3 r
+              } in GHC.Tuple.Tuple2 @a @Int r2 r3
+        |])
   , testCase "doesn't fire on a primitive with a single result" $
-      () <$ agree False (Prim singlePrim)
+      assertNoRewrite env st setupS [] (tm "Prim.single")
   , testCase "doesn't fire on a primitive set up already" $
-      () <$ agree False (Prim monoPrim{primMultiResult = MultiResult})
+      assertNoRewrite env st setupS []
+        (parseTestTermWith (TestDefs [pairDc] [monoMultiPrim] []) "Prim.mono")
   ]
