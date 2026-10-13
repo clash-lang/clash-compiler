@@ -139,7 +139,6 @@ module Test.Clash.Scoped
     -- * Shadowing
   , withClashing
   , sunkD
-  , withTermAndSunk
   , withTypeAndSunk
   , testScopeRaws
   , clashingBinders
@@ -400,17 +399,6 @@ withClashing ts ds tm k = extendTestScope ts ds $ \ts' -> k ts' (sink tm)
 -- the watermark of the scope, so going under it renames it. See 'sunkVar'.
 sunkD :: ScopeDecl
 sunkD = atRaw 1000000 (varD "sunk_S1000000" "Int")
-
--- | Run an assertion on a term in the scope of its free variables (see
--- 'withTerm'), and again sunk into that scope extended with 'sunkD', where
--- all of its binders are below the watermark of the scope. So a function that
--- goes under the binders of the term must rename them in the second run.
-withTermAndSunk
-  :: HasCallStack
-  => TestTerm -> (forall n. Distinct n => TestScope n -> Term n -> Assertion) -> Assertion
-withTermAndSunk t k = withTerm t $ \ts tm -> do
-  k ts tm
-  withClashing ts [sunkD] tm k
 
 -- | 'withTermAndSunk' for types
 withTypeAndSunk

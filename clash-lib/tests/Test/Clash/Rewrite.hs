@@ -25,9 +25,8 @@ module Test.Clash.Rewrite where
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Scoped.Convert as C
-  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash,
-   mkGlobalIdFromClash, mkNewTyConRhsFromClash, mkPrimTyConFromClash)
-import qualified Clash.Core.FreeVars as C
+  ( mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash,
+    mkNewTyConRhsFromClash, mkPrimTyConFromClash )
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
@@ -37,15 +36,11 @@ import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
 import Clash.Core.Evaluator.Types
   ( Evaluator (..), Machine (..), heapDelete, heapLookup, setTerm )
-import Clash.Core.FreeVars (freeLocalIds)
-import Clash.Core.Lint (LintError, lintTerm, mkLintEnv)
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
-import Clash.Core.VarEnv
-  ( InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet, mkInScopeSet
-  , mkVarEnv, mkVarSet )
+import Clash.Core.VarEnv (InScopeSet, emptyVarSet, emptyVarEnv, emptyInScopeSet)
 import Clash.Driver.Types
-  ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), DebugOpts
-  , IsPrim (IsFun), defClashOpts, debugSilent )
+  ( Binding (..), ClashEnv (..), ClashOpts (..), DebugOpts, IsPrim (IsFun),
+    defClashOpts, debugSilent )
 import Clash.Annotations.Primitive (HDL (VHDL))
 import Clash.Backend (initBackend)
 import Clash.Backend.VHDL (VHDLState)
@@ -54,9 +49,7 @@ import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
   ( FilteredHWType (..), HWType (Signed), HWTypeTranslator (..), NetlistMonad
   , PreserveCase (PreserveCase), SomeBackend (..) )
-import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Rewrite.Types
-import Clash.Rewrite.Util (apply, changed, runRewrite)
 import Clash.Core.Scoped.Builder
   ( runDataConSig, Key, TickB, TmB, TyB, appB, appTyB, caseB, castB, constTyB, dataAltB, dataB, deDupTickB
   , defaultAltB, forAllTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB
@@ -80,7 +73,6 @@ import Clash.Unique (Unique, fromGhcUnique)
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import Control.Monad.Trans.Writer.Strict (Writer, runWriter, tell)
-import qualified Control.Lens as Lens
 import Control.DeepSeq (NFData, force)
 import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
@@ -118,7 +110,6 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Text as Text
-import qualified Data.Hashable as Hashable
 
 type TypeMap = HashMap.HashMap Unique C.Type
 
@@ -166,12 +157,6 @@ testTypeTranslator = HWTypeTranslator $ \_reprs _tenv _sc ty -> pure $ Just $
   case S.tyView ty of
     S.FunTy {} -> Left "function types are not representable"
     _ -> Right (FilteredHWType (Signed 64) [])
-
--- | Run a 'NetlistMonad' action for VHDL, with the given global bindings, in
--- the environment of the default 'RewriteEnv' (e.g. its type translator) with
--- the type constructors of 'testTyConMap'
-runNetlistTest :: BindingMap -> NetlistMonad a -> IO a
-runNetlistTest bs = runScopedNetlistTest (fromClashBindings bs)
 
 -- | Run a Netlist action with the given global bindings of scoped Core, and
 -- the environment of 'runNetlistTest'
@@ -228,23 +213,6 @@ instance Default NormalizeState where
 instance Default InScopeSet where
   def = emptyInScopeSet
 
--- | Run a single transformation given a certain context
-runSingleTransformation
-  :: RewriteEnv
-  -- ^ Rewrite environment
-  -> RewriteState extra
-  -- ^ Rewrite state
-  -> InScopeSet
-  -- ^ Variables in scope in transformation
-  -> Rewrite extra
-  -- ^ Transformation to perform
-  -> C.Term
-  -- ^ Term to transform
-  -> IO C.Term
-runSingleTransformation rwEnv rwState is trans term = do
-  (t, _, _) <- runRewriteTest rwEnv rwState (runRewrite "" is trans term)
-  pure t
-
 -- | Set the function that is being normalized ('Clash.Rewrite.Types.curFun')
 withCurFun :: GlobalId -> RewriteState extra -> RewriteState extra
 withCurFun g st = st{_curFun = (g, C.noSrcSpan)}
@@ -261,22 +229,6 @@ runRewriteTest rwEnv rwState m = do
   (a, rwState1, anyChanged) <- runR m rwEnv rwState
   pure (a, rwState1, getAny anyChanged)
 
--- | Assert that a rewrite fires on a term, i.e. signals a change, or that it
--- doesn't
-assertFires
-  :: HasCallStack
-  => Bool
-  -- ^ Whether it should fire
-  -> RewriteEnv
-  -> RewriteState extra
-  -> TransformContext
-  -> Rewrite extra
-  -> C.Term
-  -> Assertion
-assertFires expected rwEnv rwState ctx rw tm = do
-  (_, _, fired) <- runRewriteTest rwEnv rwState (rw ctx tm)
-  assertEqual "fired" expected fired
-
 -- | The default 'RewriteEnv', with the given debug options instead of
 -- 'debugSilent'
 rewriteEnvWithDebug :: DebugOpts -> RewriteEnv
@@ -288,51 +240,6 @@ rewriteEnvWithDebug opts = def{_clashEnv = clashEnv0{envOpts = opts0{opt_debug =
 -- | The default 'RewriteEnv', with the type constructors of 'testTyConMap'
 rewriteEnvWithTyCons :: RewriteEnv
 rewriteEnvWithTyCons = withTyConMap testTyConMap def
-
--- | Run a rewrite, under the given transformation name and in the given
--- context, that replaces the term it is offered by another term and signals a
--- change. The invariant checks of 'Clash.Rewrite.Util.applyDebug' then check
--- the replacement, which makes this a way to test those checks.
-replaceTerm
-  :: RewriteEnv
-  -> RewriteState NormalizeState
-  -> String
-  -- ^ Name of the transformation
-  -> TransformContext
-  -> C.Term
-  -- ^ Term offered to the transformation
-  -> C.Term
-  -- ^ Replacement
-  -> IO C.Term
-replaceTerm rwEnv rwState name ctx before after = do
-  (t, _, _) <- runRewriteTest rwEnv rwState (apply name rw ctx before)
-  pure t
- where
-  rw :: Rewrite NormalizeState
-  rw _ _ = changed after
-
--- | Lint a term with all checks of "Clash.Core.Lint" enabled. The term appears
--- in a context with the given in-scope set and binders, and the given global
--- binders exist.
-lintIn :: [C.Id] -> InScopeSet -> C.Context -> C.Term -> [LintError]
-lintIn globals is ctx =
-  lintTerm (mkLintEnv (const True) (`elem` map C.varUniq globals) is ctx)
-
--- | Lint a closed term with all checks enabled, see 'lintIn'
-lintClosed :: C.Term -> [LintError]
-lintClosed = lintIn [] emptyInScopeSet []
-
--- | Run a single transformation with an empty environment and empty
--- InScopeSet. See Default instances ^ to inspect the precise definition of
--- "empty".
---
--- Note that at the time of writing (May 2020) the default environment does not
--- include a type translator, evaluator, current function, or global heap. Maps,
--- like the primitive and tycon map, are also empty. If the transformation under
--- test needs these definitions, you should add them manually.
-runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> IO C.Term
-runSingleTransformationDef = runSingleTransformation def def def
-
 
 parseType :: (HasCallStack, Show l) => Type l -> C.Type
 parseType = \case
@@ -711,30 +618,6 @@ parseToTerm :: HasCallStack => String -> C.Term
 parseToTerm =
   expToTerm HashMap.empty . fromParseResult . parseExpWithMode termParseMode
 
--- | See documentation of 'parseToTerm'. Example usage:
---
---     letrec = [parseToTermQQ|
---        let
---          x_0, x_1 :: Int
---          x_0 = 5
---          x_1 = 6
---        in
---          x_0
---     |]
---
--- Note that this is parsed at runtime, not at compile time. There's no good
--- technical reason for this though. We'd just need to implement a Template
--- Haskell Lift instance for Term.
---
--- For more information on the format of identifiers, see 'parseName'.
-parseToTermQQ :: TH.QuasiQuoter
-parseToTermQQ = TH.QuasiQuoter{
-    TH.quoteExp = fmap (TH.AppE (TH.VarE 'parseToTerm)) . TH.lift
-  , TH.quotePat = error "parseToTerm.quotePat: NYI"
-  , TH.quoteType = error "parseToTerm.quoteType: NYI"
-  , TH.quoteDec = error "parseToTerm.quoteDec: NYI"
-  }
-
 -- * Parsing scoped Core
 --
 -- The parser of scoped Clash Core. It parses the same language as
@@ -1108,10 +991,6 @@ resolveTyConName :: HasCallStack => String -> C.TyConName
 resolveTyConName s = case lookupByOcc (C.nameOcc . C.tyConName) testTyCons s of
   Just tc -> C.tyConName tc
   Nothing -> parseName (Ident () s)
-
--- | A data constructor of 'testDataCons', see 'lookupByOcc'
-resolveDataCon :: HasCallStack => String -> C.DataCon
-resolveDataCon = resolveDataConIn []
 
 -- | A data constructor of the given ones, or else of 'testDataCons', see
 -- 'lookupByOcc'
@@ -1634,11 +1513,6 @@ nothingDataCon = mkTestDataCon "Nothing" 3020 [fxA] [] [] (maybeTy (C.VarTy fxA)
 justDataCon =
   (mkTestDataCon "Just" 3021 [fxA] [] [C.VarTy fxA] (maybeTy (C.VarTy fxA))) {C.dcTag = 2}
 
--- | A tuple type, which 'C.isTupleTyConLike' recognises, but which is not in
--- 'testTyConMap'
-tupleTy :: [C.Type] -> C.Type
-tupleTy = tcApp (mkTyConName "GHC.Tuple.(,)" 3036)
-
 -- | The tuple type constructor @TupN@ of the given arity (at most 9), with a
 -- single data constructor @MkTupN :: forall t1 .. tN. t1 -> .. -> tN -> TupN
 -- t1 .. tN@, for 'Clash.Rewrite.Types.tupleTcCache'
@@ -1676,28 +1550,6 @@ pTy a = tcApp pTyConName [a]
 wTy :: C.Type
 wTy = tcTy wTyConName
 
--- | @type family F a where F Int = Bool; F (Maybe a) = a; F a = N a@
-fTy :: C.Type -> C.Type
-fTy a = tcApp fTyConName [a]
-
--- | @type family Max a b where Max a a = a; Max a b = Maybe b@
-maxTy :: C.Type -> C.Type -> C.Type
-maxTy a b = tcApp maxTyConName [a, b]
-
--- | @type family K :: Type -> Type where K = Maybe@, which returns a type
--- constructor that is applied to the remaining arguments
-kTy :: C.Type
-kTy = tcTy kTyConName
-
--- | @type family Q a where Q a = forall b. a -> b@, whose right-hand side
--- binds a type variable
-qTy :: C.Type -> C.Type
-qTy a = tcApp qTyConName [a]
-
--- | @Signal dom a@
-signalTy :: C.Type -> C.Type -> C.Type
-signalTy dom a = tcApp signalTyConName [dom, a]
-
 -- | A natural number as a type
 numTy :: Integer -> C.Type
 numTy = C.LitTy . C.NumTy
@@ -1710,17 +1562,8 @@ addTy a b = tcApp addTyConName [a, b]
 addTyConName :: C.TyConName
 addTyConName = mkTyConName "GHC.TypeNats.+" (fromGhcUnique typeNatAddTyFamNameKey)
 
--- | GHC's @CmpNat@
-cmpNatTy :: C.Type -> C.Type -> C.Type
-cmpNatTy a b = tcApp cmpNatTyConName [a, b]
-
 cmpNatTyConName :: C.TyConName
 cmpNatTyConName = mkTyConName "GHC.TypeNats.CmpNat" (fromGhcUnique typeNatCmpTyFamNameKey)
-
--- | GHC's @UnconsSymbol :: Symbol -> Maybe (T2 Char Symbol)@, with tuple type
--- @T2@
-unconsSymbolTy :: C.Type -> C.Type
-unconsSymbolTy s = tcApp unconsSymbolTyConName [s]
 
 unconsSymbolTyConName :: C.TyConName
 unconsSymbolTyConName =
@@ -1730,12 +1573,6 @@ unconsSymbolTyConName =
 -- equality coercions that "Clash.Core.EqSolver" recognizes
 eqTy :: C.Kind -> C.Type -> C.Type -> C.Type
 eqTy k a b = foldl C.AppTy C.eqPrimTy [k, k, a, b]
-
--- | Lifted equality, @a ~ b@, of types of kind @Type@: the type of the
--- equality constraints that 'Clash.Normalize.Util.substWithTyEq' and
--- 'Clash.Normalize.Util.tvSubstWithTyEq' substitute
-liftedEqTy :: C.Type -> C.Type -> C.Type
-liftedEqTy a b = C.mkTyConApp liftedEqTyConName [C.liftedTypeKind, a, b]
 
 -- | The name of the type constructor of 'liftedEqTy'. The parser of scoped
 -- Core parses @a ~ b@ as its application to @Type@, @a@ and @b@.
@@ -1874,10 +1711,6 @@ ubpDc = mkTestDataCon "MkUBP" 2038 [ubpL, ubpN] [] [] (ubpTy (C.VarTy ubpL) (C.V
 indexTcNm :: C.TyConName
 indexTcNm = mkTyConName "Clash.Sized.Internal.Index.Index" 2039
 
--- | @Index n@
-indexTy :: C.Type -> C.Type
-indexTy n = tcApp indexTcNm [n]
-
 -- | The @Functor@ and @Applicative@ dictionaries of @traverse#@:
 --
 -- > data Functor f = CFunctor (forall a b. (a -> b) -> f a -> f b) Int
@@ -1923,11 +1756,6 @@ applicativeDc =
   f = C.VarTy dictF
   a = C.VarTy dictA
   b = C.VarTy dictB
-
--- | @KnownNat n@. The reductions of primitives only look at its value, a
--- @Natural@.
-knownNatTy :: C.Type -> C.Type
-knownNatTy n = tcApp (mkTyConName "GHC.TypeNats.KnownNat" 2050) [n]
 
 -- | GHC's boxed pairs, by the name under which "Clash.GHC.GHC2Core" gives
 -- them, and the reductions of primitives look them up
@@ -2044,14 +1872,6 @@ systemDomTy = C.LitTy (C.SymTy "System")
 clockTy :: C.Type
 clockTy = tcApp clockTcNm [systemDomTy]
 
--- | @Reset System@
-resetTy :: C.Type
-resetTy = tcApp resetTcNm [systemDomTy]
-
--- | @Enable System@
-enableTy :: C.Type
-enableTy = tcApp enableTcNm [systemDomTy]
-
 -- | @ClkPair@, a product type with a clock, which Clash splits
 clkPairTcNm :: C.TyConName
 clkPairTcNm = mkTyConName "ClkPair" 2024
@@ -2156,11 +1976,10 @@ bitVectorTyConName = mkTyConName "Clash.Sized.Internal.BitVector.BitVector" 3100
 unsignedTyConName = mkTyConName "Clash.Sized.Internal.Unsigned.Unsigned" 3101
 signedTyConName = mkTyConName "Clash.Sized.Internal.Signed.Signed" 3102
 
--- | @BitVector n@, @Unsigned n@ and @Signed n@. See 'indexTy' for @Index n@.
-bitVectorTy, unsignedTy, signedTy :: Integer -> C.Type
+-- | @BitVector n@ and @Unsigned n@
+bitVectorTy, unsignedTy :: Integer -> C.Type
 bitVectorTy n = tcApp bitVectorTyConName [numTy n]
 unsignedTy n = tcApp unsignedTyConName [numTy n]
-signedTy n = tcApp signedTyConName [numTy n]
 
 zwTyConName, proxyTyConName, tProxyTyConName, exZwTyConName, streamTyConName :: C.TyConName
 zwTyConName = mkTyConName "ZW" 3104
@@ -2238,10 +2057,6 @@ kindedTyVar nmSort nm uniq =
 tyVar :: C.NameSort -> String -> Unique -> C.TyVar
 tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
 
--- | A global binding of the given term, of a function without an inline pragma
-mkBinding :: C.Id -> C.Term -> Binding C.Term
-mkBinding i = mkGlobalBinding (C.mkGlobalIdFromClash i)
-
 -- | A global binding of the given term, of a function without an inline
 -- pragma, e.g. of a term of scoped Core
 mkGlobalBinding :: GlobalId -> a -> Binding a
@@ -2254,14 +2069,6 @@ mkGlobalBinding i t = Binding
   , bindingRecursive = False
   }
 
--- | A 'BindingMap' with the given global bindings. See 'mkBinding'.
-mkBindingMap :: [(C.Id, C.Term)] -> BindingMap
-mkBindingMap bs = mkVarEnv [(i, mkBinding i t) | (i, t) <- bs]
-
--- | An @Int@ literal
-intLit :: Integer -> C.Term
-intLit = C.Literal . C.IntLiteral
-
 -- | A reference to a local variable of type @Int@. See 'intId'.
 intVar :: C.NameSort -> String -> Unique -> C.Term
 intVar nmSort nm uniq = C.Var (intId nmSort nm uniq)
@@ -2273,10 +2080,6 @@ globalIntVar nmSort nm uniq = C.Var (globalId nmSort nm uniq intTy)
 -- | A reference to a variable without a declared type. See 'freeVarType'.
 freeVar :: C.NameSort -> String -> Unique -> C.Term
 freeVar nmSort nm uniq = C.Var (localId nmSort nm uniq freeVarType)
-
--- | An 'InScopeSet' containing exactly the given variables
-inScopeOf :: [C.Var a] -> InScopeSet
-inScopeOf = mkInScopeSet . mkVarSet
 
 -- | The first /n/ uniques a supply hands out. Tests use these to give a
 -- binder the unique a transformation would otherwise pick for a new binder.
@@ -2320,96 +2123,6 @@ assertAlphaEq expected actual =
     ("Expected (up to alpha equivalence):\n" <> showPprU expected
       <> "\nbut got:\n" <> showPprU actual)
     (expected == actual)
-
--- | Give every global variable the unique of its name, a hash of its
--- occurrence name, so that terms that refer to new globals created by
--- different runs, which get different uniques, can be compared
-globalsByName :: C.Term -> C.Term
-globalsByName = go
- where
-  go = \case
-    C.Var v | C.isGlobalId v ->
-      let u = fromIntegral (Hashable.hash (C.nameOcc (C.varName v)))
-      in  C.Var v{C.varUniq = u, C.varName = (C.varName v){C.nameUniq = u}}
-    C.Lam v e -> C.Lam v (go e)
-    C.TyLam v e -> C.TyLam v (go e)
-    C.App e1 e2 -> C.App (go e1) (go e2)
-    C.TyApp e t -> C.TyApp (go e) t
-    C.Let (C.NonRec v x) e -> C.Let (C.NonRec v (go x)) (go e)
-    C.Let (C.Rec bs) e -> C.Let (C.Rec [(v, go x) | (v, x) <- bs]) (go e)
-    C.Case e t alts -> C.Case (go e) t [(p, go a) | (p, a) <- alts]
-    C.Cast e t1 t2 -> C.Cast (go e) t1 t2
-    C.Tick t e -> C.Tick t (go e)
-    e -> e
-
--- | The uniques of the arguments of an application (see 'C.collectArgs') that
--- are variable references
-argUniques :: [Either C.Term C.Type] -> [Maybe Unique]
-argUniques = map $ \case
-  Left (C.Var v) -> Just (C.varUniq v)
-  _ -> Nothing
-
--- | The binders of a let-expression, or none for any other term
-letBinders :: C.Term -> [C.Id]
-letBinders (C.Letrec bs _) = map fst bs
-letBinders _ = []
-
--- | Term binders that shadow a binder they are in scope of, or another binder
--- of the same let-expression or pattern
-shadowingBinders :: C.Term -> [C.Id]
-shadowingBinders = go []
- where
-  go :: [Unique] -> C.Term -> [C.Id]
-  go scope = \case
-    C.Lam i e -> check scope [i] <> go (C.varUniq i : scope) e
-    C.TyLam _ e -> go scope e
-    C.App e1 e2 -> go scope e1 <> go scope e2
-    C.TyApp e _ -> go scope e
-    C.Letrec bs e ->
-      let is = map fst bs
-          scope1 = map C.varUniq is <> scope
-      in  check scope is <> concatMap (go scope1 . snd) bs <> go scope1 e
-    C.Case scrut _ alts -> go scope scrut <> concatMap (goAlt scope) alts
-    C.Cast e _ _ -> go scope e
-    C.Tick _ e -> go scope e
-    _ -> []
-
-  goAlt scope (p, e) =
-    let is = snd (C.patIds p)
-    in  check scope is <> go (map C.varUniq is <> scope) e
-
-  -- Binders that are already in scope, or bound earlier in the same group
-  check _ [] = []
-  check scope (i:is)
-    | C.varUniq i `elem` scope = i : check scope is
-    | otherwise = check (C.varUniq i : scope) is
-
--- | Assert that no binder in a term shadows another, see 'shadowingBinders'
-assertNoShadowing :: HasCallStack => C.Term -> Assertion
-assertNoShadowing tm = case shadowingBinders tm of
-  [] -> pure ()
-  bs -> assertFailure
-    ("Unexpected shadowing binders " <> showPprU bs <> " in:\n" <> showPprU tm)
-
--- | Assert that a term has no free local variables
-assertNoFreeLocals :: HasCallStack => C.Term -> Assertion
-assertNoFreeLocals tm = case Lens.toListOf freeLocalIds tm of
-  [] -> pure ()
-  fvs -> assertFailure
-    ("Unexpected free variables " <> showPprU fvs <> " in:\n" <> showPprU tm)
-
--- | Assert that a term has no free type variables, including in the kinds of
--- the type variables it binds
-assertNoFreeTyVars :: HasCallStack => C.Term -> Assertion
-assertNoFreeTyVars tm = case Lens.toListOf C.termFreeTyVars tm of
-  [] -> pure ()
-  tvs -> assertFailure
-    ("Unexpected free type variables " <> showPprU tvs <> " in:\n" <> showPprU tm)
-
--- | Assert that a term has no free local variables, and no binders that shadow
--- each other. See 'assertNoFreeLocals' and 'assertNoShadowing'.
-assertWellScoped :: HasCallStack => C.Term -> Assertion
-assertWellScoped tm = assertNoFreeLocals tm >> assertNoShadowing tm
 
 -- | Assert that two terms are structurally equal, by comparing their 'Show'
 -- output.
