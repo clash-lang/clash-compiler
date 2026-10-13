@@ -1,5 +1,8 @@
 module Main where
 
+import Control.Monad (when)
+import Data.Maybe (isNothing)
+import System.Environment (lookupEnv, setEnv)
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
@@ -59,7 +62,20 @@ tests = testGroup "Unittests"
   ]
 
 main :: IO ()
-main =
-    defaultMain
-  $ adjustOption setDefaultQuickCheckTests
-  $ tests
+main = do
+  -- Run the tests one at a time, unless asked otherwise with @-j@ or
+  -- @TASTY_NUM_THREADS@. Running them in parallel hangs about one in sixty
+  -- runs with GHC 9.12.4, because of a bug in its RTS
+  -- (https://gitlab.haskell.org/ghc/ghc/-/issues/26936): when a thread that
+  -- evaluates a CAF that other threads wait for meets a thunk that another
+  -- thread evaluated too, it wakes the waiting threads without updating the
+  -- CAF. Every thread that enters the CAF then spins without allocating, so
+  -- the program hangs at full CPU, and neither tasty's timeouts nor SIGTERM
+  -- stop it. Here, it happens to the top-level types that the evaluator
+  -- tests share. GHC 9.14.2 fixes the bug, and so will GHC 9.12.5.
+  numThreads <- lookupEnv "TASTY_NUM_THREADS"
+  when (isNothing numThreads) $
+    setEnv "TASTY_NUM_THREADS" "1"
+  defaultMain
+    $ adjustOption setDefaultQuickCheckTests
+    $ tests
