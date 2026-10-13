@@ -21,9 +21,13 @@
 
 module Clash.Tests.Core.Scoped.Subst (tests) where
 
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Writer.Strict (Writer, WriterT, runWriter, runWriterT, tell)
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.List as List
 import Data.Maybe (isJust, isNothing)
+import Data.Monoid (Any (..))
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
@@ -45,7 +49,7 @@ import Test.Clash.Scoped
   ( TestScope (..), TestType, assertLintClean, assertTermAlphaEq, assertTermIs, assertTypeIs, atRaw
   , atScope, betaTm, betaTy, binderRaws, bindersNot, clashingBinders, closedTerm, closedType
   , emptyTestScope, extendTestScope, forAllScrambled, kindedTyVarD, lintTerm
-  , reopenTerm, sinkInto, sunkD, termIn, testLintScope, tyVarD, typeIn, varD, withClashing, withTerm
+  , reopenTerm, rewriteLetRecs, sinkInto, sunkD, termIn, testLintScope, tyVarD, typeIn, varD, withClashing, withTerm
   , withTestScope, withTests)
 import Test.Clash.Scoped.Gen
   ( InScope (..), KnownCon (..), Redex (..), SomeScope (..), Sunk (..), ctxOf, genClosedSunk
@@ -511,6 +515,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
             problems === [] .&&. binderRaws tm2 === binderRaws tm .&&.
               property (aeqTm tm tm2)
       ]
+  , testGroup "rebinding variables" rebindTests
   , testGroup "closing over variables" closeOverTests
   , withTests 500 $ testGroup "closing over variables, properties"
       [ testProperty "freeVarOccs gives every free variable once, in an order independent of binders" $
@@ -573,6 +578,159 @@ applyAll sc = foldl step
   step e = \case
     Left a -> betaTm sc (App e a)
     Right ty -> betaTy sc (TyApp e ty)
+
+-- * Rebinding variables
+
+-- | A binding of an opened recursive let-expression: the human readable name
+-- and type of its binder, the variable, and the right-hand side
+type Binding l = (C.Name Term, Type l, TmName l, Term l)
+
+-- | The bindings of an opened recursive let-expression
+bindingsOf :: Distinct l => Tele IdBinder n l -> [Term l] -> [Binding l]
+bindingsOf bs xs = [(occ, ty, nm, x) | (Var occ ty nm, x) <- zip (teleIdVars bs) xs]
+
+-- | Rebuild an opened recursive let-expression with the bindings that its body
+-- uses, directly or through other bindings, in the order of the telescope:
+-- with 'rebindIds' if the first argument is 'True', and otherwise by giving
+-- the binders fresh names with a substitution ('renameKept'). Tells whether it
+-- leaves out bindings, and the problems: 'rebindIds' failing.
+keepUsed
+  :: (Distinct x, DExt x l)
+  => Bool -> Scope x -> Tele IdBinder x l -> [Term l] -> Term l -> Writer ([String], Any) (Term x)
+keepUsed rebind sc bs xs body = do
+  let bnds = bindingsOf bs xs
+      kept = [b | b@(_, _, nm, _) <- bnds, tmNameRaw nm `IntSet.member` used]
+  tell ([], Any (length kept < length bnds))
+  case kept of
+    [] -> case unsinkTerm (teleNameBinders bs) body of
+      Just e -> pure e
+      Nothing -> error "keepUsed: an unused binder occurs"
+    _ | rebind ->
+          case rebindIds sc bs [(occ, strengthenTyIds bs ty, nm) | (occ, ty, nm, _) <- kept]
+                 (body : [x | (_, _, _, x) <- kept]) rebuild of
+            Just e -> pure e
+            Nothing -> do
+              tell (["rebindIds failed on the binders " <> show [tmNameRaw nm | (_, _, nm, _) <- kept]], mempty)
+              pure (renameKept sc bs kept body)
+      | otherwise -> pure (renameKept sc bs kept body)
+ where
+  raws t = IntSet.fromList (map tmNameRaw (nameSetToList (freeTmVars t)))
+  rhsRaws = IntMap.fromList [(tmNameRaw nm, raws x) | (_, _, nm, x) <- bindingsOf bs xs]
+  used = close (IntSet.filter (`IntMap.member` rhsRaws) (raws body))
+  close s =
+    let s' = IntSet.unions (s : [IntSet.filter (`IntMap.member` rhsRaws) r | k <- IntSet.toList s, Just r <- [IntMap.lookup k rhsRaws]])
+    in  if s' == s then s else close s'
+
+  rebuild :: Scope l' -> Tele IdBinder n l' -> [Term l'] -> Term n
+  rebuild _ bs' = \case
+    body' : xs' -> Let (Rec bs' xs') body'
+    [] -> error "keepUsed: no body"
+
+-- | Rebuild an opened recursive let-expression with the given bindings, which
+-- the other binders don't occur in, giving their binders fresh names with a
+-- substitution
+renameKept
+  :: (Distinct x, Distinct l) => Scope x -> Tele IdBinder x l -> [Binding l] -> Term l -> Term x
+renameKept sc bs kept body =
+  withFreshIdBinders sc [(occ, strengthenTyIds bs ty) | (occ, ty, _, _) <- kept] $ \sc' bs' vars' ->
+    let new = IntMap.fromList (zip [tmNameRaw nm | (_, _, nm, _) <- kept] vars')
+        entries = [ IntMap.findWithDefault (Literal (IntLiteral 0)) (tmNameRaw nm) new
+                  | Var _ _ nm <- teleIdVars bs ]
+    in  case extendTmSubstTele (extendSubstScope sc' (idSubst sc)) bs entries of
+          Just s -> Let (Rec bs' [substTm s x | (_, _, _, x) <- kept]) (substTm s body)
+          Nothing -> error "renameKept: wrong number of variables"
+
+rebindTests :: [TestTree]
+rebindTests =
+  [ testCase "keeps the names of the variables, in the order of the telescope" $
+      withRec $ \sc bs bnds body -> case bnds of
+        [x, y, _] -> case rebindIds sc bs [keep bs x, keep bs y] (body : map rhs [x, y]) rebuildLet of
+          Just e -> do
+            assertBool "aeqTm" (aeqTm e (closedTerm "let { (x :: Int) = y; (y :: Int) = x } in x"))
+            case e of
+              Let (Rec bs' _) _ -> teleRaws tmNameRaw tmNameOf bs' @?= [1, 2]
+              _ -> assertFailure "not a recursive let-expression"
+          Nothing -> assertFailure "rebindIds failed"
+        _ -> assertFailure "unexpected bindings"
+  , testCase "rejects variables out of order" $
+      withRec $ \sc bs bnds body -> case bnds of
+        [x, y, _] -> assertBool "Nothing"
+          (isNothing (rebindIds sc bs [keep bs y, keep bs x] (body : map rhs [y, x]) rebuildLet))
+        _ -> assertFailure "unexpected bindings"
+  , testCase "rejects values in which another variable occurs" $
+      withRec $ \sc bs bnds body -> case bnds of
+        -- The right-hand side of x refers to y
+        [x, _, _] -> assertBool "Nothing"
+          (isNothing (rebindIds sc bs [keep bs x] [body, rhs x] rebuildLet))
+        _ -> assertFailure "unexpected bindings"
+  , testCase "rejects variables that are not fresh for the scope" $
+      withRec $ \sc bs bnds body -> case bnds of
+        [x, y, _] -> assertBool "Nothing"
+          (isNothing (rebindIds (raiseWatermark 1 sc) bs [keep bs x, keep bs y] (body : map rhs [x, y]) rebuildLet))
+        _ -> assertFailure "unexpected bindings"
+  , withTests 500 $ testProperty "rebinding the used variables of let-expressions agrees with renaming them" $
+      forAllShrink genSunk shrinkSunk $ \(Sunk _ ts1 tm) -> do
+        let sc = testScope ts1
+        forAllScrambled sc (sink tm) $ \tm1 -> do
+          let (rebound, (problems, Any dropped)) = runWriter (rewriteLetRecs (keepUsed True) sc tm1)
+              (renamed, _) = runWriter (rewriteLetRecs (keepUsed False) sc tm1)
+          cover 10 dropped "leaves out bindings" $
+            counterexample ("rebound:\n" <> showT rebound <> "\nrenamed:\n" <> showT renamed) $
+              problems === [] .&&.
+              counterexample "aeqTm" (aeqTm rebound renamed) .&&.
+              counterexample "aeqTm with the input" (dropped || aeqTm tm1 rebound) .&&.
+              lintTerm (testLintScope ts1) rebound === [] .&&.
+              fst (reopenTerm sc rebound) === []
+  , withTests 500 $ testProperty "rebindIds succeeds exactly when the left-out variables don't occur" $
+      forAllShrink genSunk shrinkSunk $ \(Sunk _ ts1 tm) -> do
+        let sc = testScope ts1
+        forAllScrambled sc (sink tm) $ \tm1 ->
+          forAllBlind (runWriterT (rewriteLetRecs keepSome sc tm1)) $ \(_, outcomes) ->
+            cover 5 (any fst outcomes) "succeeds" $
+              cover 5 (any (not . fst) outcomes) "fails" $
+                counterexample (show outcomes) (all (uncurry (==)) outcomes)
+  ]
+ where
+  -- Rebind a random subset of the variables, in the order of the telescope.
+  -- Tells whether 'rebindIds' succeeded, and whether it should have: whether
+  -- the left-out variables don't occur in the body and kept right-hand sides,
+  -- by the reference free variables. Continues with the let-expression as it
+  -- was.
+  keepSome
+    :: (Distinct x, DExt x l)
+    => Scope x -> Tele IdBinder x l -> [Term l] -> Term l -> WriterT [(Bool, Bool)] Gen (Term x)
+  keepSome sc bs xs body = do
+    let bnds = bindingsOf bs xs
+    mask <- lift (vectorOf (length bnds) arbitrary)
+    let kept = [b | (True, b) <- zip mask bnds]
+        left = IntSet.fromList [tmNameRaw nm | (False, (_, _, nm, _)) <- zip mask bnds]
+        vals = body : map rhs kept
+        expected = not (any (any (`IntSet.member` left) . refFreeTmVars) vals)
+    case kept of
+      [] -> pure ()
+      _ -> tell [(isJust (rebindIds sc bs (map (keep bs) kept) vals rebuildLet), expected)]
+    pure (renameKept sc bs bnds body)
+
+  -- The binders of x, y and z get the names 1, 2 and 3
+  withRec
+    :: (forall l. Distinct l => Scope 'VoidS -> Tele IdBinder 'VoidS l -> [Binding l] -> Term l -> Assertion)
+    -> Assertion
+  withRec k = case closedTerm "let { (x :: Int) = y; (y :: Int) = x; (z :: Int) = z } in x" of
+    Let bind@(Rec _ _) body -> openBind emptyScope bind body $ \_ bind1 body1 -> case bind1 of
+      Rec bs xs -> k emptyScope bs (bindingsOf bs xs) body1
+      NonRec {} -> assertFailure "unexpected shape"
+    _ -> assertFailure "unexpected shape"
+
+  keep :: Tele IdBinder n l -> Binding l -> (C.Name Term, Type n, TmName l)
+  keep bs (occ, ty, nm, _) = (occ, strengthenTyIds bs ty, nm)
+
+  rhs :: Binding l -> Term l
+  rhs (_, _, _, x) = x
+
+  rebuildLet :: Scope l' -> Tele IdBinder n l' -> [Term l'] -> Term n
+  rebuildLet _ bs' = \case
+    body' : xs' -> Let (Rec bs' xs') body'
+    [] -> error "rebuildLet: no body"
 
 -- * Closing over variables
 

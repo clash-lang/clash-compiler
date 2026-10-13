@@ -38,6 +38,7 @@ module Clash.Core.Scoped.FreeVars
   , anyBoundOccursIn
   , anyBoundOccursInType
   , patBindersOccurIn
+  , anyRawTmNameOccursIn
     -- * Names bound by binders
   , patNameBinders
   , bindNameBinders
@@ -367,6 +368,11 @@ patBindersOccurIn p = case p of
   isTNil :: Tele b x y -> Bool
   isTNil TNil = True
   isTNil _ = False
+
+-- | Whether any of the term variables with the given raw names occurs free in
+-- a term
+anyRawTmNameOccursIn :: IntSet -> Term n -> Bool
+anyRawTmNameOccursIn = anyFreeIn False
 
 -- | Whether any of the given raw names occurs free in a type. Accounts for
 -- shadowing: a binder with one of the names hides it in its scope.

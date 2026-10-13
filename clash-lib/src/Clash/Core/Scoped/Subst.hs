@@ -79,6 +79,19 @@
     they provide. So the binder and the values in its scope are valid in @l'@
     as they are.
 
+  * __Rebinding variables__ ('unsafeCoerce' and 'UnsafeTmNameBinder' in
+    'rebindIds'): the names of the given variables of a telescope from @n@ to
+    a t'Distinct' scope @l@ are fresh for the scope @n@ in their order, as
+    'withFreshRaws' checks, so they extend @n@ to a t'Distinct' scope @l'@.
+    Such a name is above the watermark of @n@, so it is not a name of @n@
+    but one of the distinct names that the telescope binds: the name of a
+    term variable. So the new binder doesn't give it another sort (see
+    "Clash.Core.Scoped.Internal.Names"). The type of a binder is a type of
+    @n@, sunk into the scope extended by the binders before it. A value of
+    @l@ in which none of the other variables of the telescope occur free,
+    which is checked, only mentions names of @n@ and the given variables:
+    names of @l'@. So it is a value of @l'@ as it is.
+
   * __Unsinking__ ('unsafeCoerce' in 'unsinkTerm' and friends): a value in
     scope @l@ in which none of the names bound between @n@ and @l@ occur free
     only mentions names of @n@. "Clash.Core.Scoped.FreeVars" checks this,
@@ -165,6 +178,7 @@ module Clash.Core.Scoped.Subst
   , openIdBinder
   , openAlt
   , openBind
+  , rebindIds
     -- * Fresh binders
   , withFreshTyBinder
   , withFreshIdBinder
@@ -743,6 +757,51 @@ teleRawsF raw binder tele step done = go tele
   go TNil = done
   go (TCons b bs) = step (raw (binder b)) (go bs)
 {-# INLINE teleRawsF #-}
+
+-- | Bind some of the variables of a telescope of term variable binders again,
+-- around values in the scope of the telescope, keeping their names: e.g. to
+-- rebuild an opened let-expression ('openBind') with some of its bindings.
+-- As the variables keep their names, the values need no substitution.
+--
+-- The variables are given in the order of the new telescope, with the human
+-- readable names and the types of their new binders. 'Nothing' if their names
+-- are not fresh for the scope in that order (see 'withFreshRaws'), or if
+-- another variable of the telescope occurs free in one of the values. The
+-- names of a telescope that 'openBind' gives are fresh in its order, so
+-- keeping that order succeeds whichever variables are left out.
+rebindIds
+  :: forall n l r
+   . (Distinct n, Distinct l)
+  => Scope n
+  -> Tele IdBinder n l
+  -> [(C.Name Term, Type n, TmName l)]
+  -- ^ The variables to bind, with the human readable names and types of
+  -- their binders
+  -> [Term l]
+  -> (forall l'. DExt n l' => Scope l' -> Tele IdBinder n l' -> [Term l'] -> r)
+  -> Maybe r
+rebindIds sc bs kept vals cont =
+  withFreshRaws sc
+    (\step done -> foldr (\(_, _, nm) k -> step (tmNameRaw nm) k) done kept)
+    (\sc' ->
+       if any (anyRawTmNameOccursIn dropped) vals
+         then Nothing
+         -- Trusted: see the module header
+         else Just (cont sc' (keptTele kept) (unsafeCoerce vals)))
+    Nothing
+ where
+  dropped =
+    nameBindersRaw (teleNameBinders bs) `IntSet.difference`
+      IntSet.fromList [tmNameRaw nm | (_, _, nm) <- kept]
+
+  -- Trusted: see the module header
+  keptTele :: [(C.Name Term, Type n, TmName l)] -> Tele IdBinder x y
+  keptTele [] = unsafeCoerce (TNil :: Tele IdBinder x x)
+  keptTele ((occ, ty, nm) : rest) =
+    TCons
+      (IdBinder occ (unsafeCoerce ty)
+        (UnsafeTmNameBinder (UnsafeNameBinder (UnsafeName (tmNameRaw nm)))))
+      (keptTele rest)
 
 -- * Fresh binders
 

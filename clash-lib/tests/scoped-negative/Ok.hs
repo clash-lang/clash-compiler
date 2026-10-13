@@ -85,3 +85,12 @@ appPropAlt sc fun args = case fun of
   Case scrut ty alts ->
     Case scrut ty [openAlt sc alt (\_ p e -> Alt p (foldl App e (map sink args))) | alt <- alts]
   _ -> foldl App fun args
+
+-- N14
+rebindLet
+  :: (Distinct n, Distinct l)
+  => Scope n -> Tele IdBinder n l -> [(C.Name Term, Type n, TmName l)] -> [Term l] -> Term l
+  -> Maybe (Term n)
+rebindLet sc bs kept xs body = rebindIds sc bs kept (body : xs) $ \_ bs' vals -> case vals of
+  body' : xs' -> Let (Rec bs' xs') body'
+  [] -> error "rebindLet: no body"

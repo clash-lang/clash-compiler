@@ -170,6 +170,7 @@ module Test.Clash.Scoped
   , bindersNot
   , binderRaws
   , reopenTerm
+  , rewriteLetRecs
   , scrambleBinders
   , forAllScrambled
     -- * Properties
@@ -1113,6 +1114,40 @@ reopenTerm sc0 tm0 = swap (runWriter (goTm sc0 tm0))
   teleRaws :: HasNameBinder b => Tele b x y -> [Int]
   teleRaws TNil = []
   teleRaws (TCons b bs) = binderRaw b : teleRaws bs
+
+-- | Rewrite every recursive let-expression of a term, innermost first, in the
+-- scope at it. Goes under binders with 'openIdBinder', 'openTyBinder',
+-- 'openBind' and 'openAlt', which rename binders that clash with the scope.
+-- The function gets the opened let-expression: its binders, and its
+-- right-hand sides and body, already rewritten. Doesn't go into types, nor
+-- into ticks.
+rewriteLetRecs
+  :: forall m n
+   . (Monad m, Distinct n)
+  => (forall x l. (Distinct x, DExt x l) => Scope x -> Tele IdBinder x l -> [Term l] -> Term l -> m (Term x))
+  -> Scope n
+  -> Term n
+  -> m (Term n)
+rewriteLetRecs f = goTm
+ where
+  goTm :: Distinct x => Scope x -> Term x -> m (Term x)
+  goTm sc = \case
+    Lam b e -> openIdBinder sc b e $ \sc' b' e' -> Lam b' <$> goTm sc' e'
+    TyLam b e -> openTyBinder sc b e $ \sc' b' e' -> TyLam b' <$> goTm sc' e'
+    App e1 e2 -> App <$> goTm sc e1 <*> goTm sc e2
+    TyApp e ty -> (`TyApp` ty) <$> goTm sc e
+    Let bs e -> openBind sc bs e $ \sc' bs' e' -> case bs' of
+      NonRec b x -> (\x' e'' -> Let (NonRec b x') e'') <$> goTm sc x <*> goTm sc' e'
+      Rec bndrs xs -> do
+        xs' <- mapM (goTm sc') xs
+        e'' <- goTm sc' e'
+        f sc bndrs xs' e''
+    Case e ty alts ->
+      Case <$> goTm sc e <*> pure ty
+        <*> mapM (\alt -> openAlt sc alt $ \sc' p e' -> Alt p <$> goTm sc' e') alts
+    Cast e t1 t2 -> (\e' -> Cast e' t1 t2) <$> goTm sc e
+    Tick t e -> Tick t <$> goTm sc e
+    tm -> pure tm
 
 -- * Scrambling binders
 
