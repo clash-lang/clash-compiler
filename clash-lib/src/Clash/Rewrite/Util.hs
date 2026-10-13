@@ -214,10 +214,12 @@ applyDebug ctx name exprOld hasChanged exprNew = do
   let from = fromMaybe 0 (dbg_transformationsFrom opts)
   let limit = fromMaybe maxBound (dbg_transformationsLimit opts)
 
-  if | nTrans - from > limit ->
-         error "-fclash-debug-transformations-limit exceeded"
-     | nTrans <= from ->
+  -- NB: check 'from' first, as 'nTrans - from' wraps around while
+  -- 'nTrans < from'
+  if | nTrans <= from ->
          pure exprNew
+     | nTrans - from > limit ->
+         error "-fclash-debug-transformations-limit exceeded"
      | otherwise ->
          go opts
  where
