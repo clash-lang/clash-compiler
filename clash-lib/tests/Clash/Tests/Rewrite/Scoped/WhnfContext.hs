@@ -33,7 +33,7 @@ import Clash.Rewrite.Types (RewriteState (..))
 
 import Test.Clash.Rewrite (TestTerm)
 import Test.Clash.Scoped
-  ( ScopeDecl, Step (..), assertLintClean, assertTermIs, runScopedAt, termIn, tyVarD, varD
+  ( ScopeDecl, Step (..), assertLintClean, assertTermIs, runRewriteAt, termIn, tyVarD, varD
   , withBinderClashes, withTestScope )
 
 -- | Replace a term by its WHNF
@@ -49,7 +49,7 @@ whnfAt path decls input expected = withTestScope decls $ \ts0 -> do
   withBinderClashes ts0 e0 check
  where
   check ts e = do
-    (e', _, _) <- runScopedAt env st ts path whnfS e
+    (e', _, _) <- runRewriteAt env st ts path whnfS e
     assertLintClean ts e'
     assertTermIs ts expected e'
   env = def

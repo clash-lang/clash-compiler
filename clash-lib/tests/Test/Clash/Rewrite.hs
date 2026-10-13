@@ -142,8 +142,8 @@ testTypeTranslator = HWTypeTranslator $ \_reprs _tenv _sc ty -> pure $ Just $
 -- | Run a 'NetlistMonad' action for VHDL, with the given global bindings of
 -- scoped Core, in the environment of the default 'RewriteEnv' (e.g. its type
 -- translator) with the type constructors of 'testTyConMap'
-runScopedNetlistTest :: GlobalEnv (Binding (ST.Term 'ST.VoidS)) -> NetlistMonad a -> IO a
-runScopedNetlistTest bs act =
+runNetlistTest :: GlobalEnv (Binding (ST.Term 'ST.VoidS)) -> NetlistMonad a -> IO a
+runNetlistTest bs act =
   fst <$>
     runNetlistMonad
       (_clashEnv env) False
@@ -306,7 +306,7 @@ parseName = fst . parseNameScope
 freeVarType :: C.TyConName
 freeVarType = C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan
 
--- | The base of the parse mode of 'parseTestTerm', see 'scopedParseMode'.
+-- | The base of the parse mode of 'parseTestTerm', see 'parseMode'.
 -- Enables:
 --
 --   * @ScopedTypeVariables@, so lambda binders can spell out their type:
@@ -520,7 +520,7 @@ instance Monoid TestDefs where
 parseTestTermWith :: HasCallStack => TestDefs -> String -> TestTerm
 parseTestTermWith defs s = TestTerm b (freeDecls fr)
  where
-  (b, fr) = runWriter (spTm emptyPEnv {_peDefs = defs} (fromParseResult (parseExpWithMode scopedParseMode s)))
+  (b, fr) = runWriter (spTm emptyPEnv {_peDefs = defs} (fromParseResult (parseExpWithMode parseMode s)))
 
 -- | A quasiquoter for strings that span several lines, e.g. for
 -- 'parseTestTermWith'
@@ -531,7 +531,7 @@ strQQ = stringQQ 'id
 parseTestType :: HasCallStack => String -> TestType
 parseTestType s = TestType b (freeDecls fr)
  where
-  (b, fr) = runWriter (spTy emptyPEnv (fromParseResult (parseTypeWithMode scopedParseMode s)))
+  (b, fr) = runWriter (spTy emptyPEnv (fromParseResult (parseTypeWithMode parseMode s)))
 
 -- | 'parseTestTerm' as a quasiquoter, for terms that span several lines:
 --
@@ -561,8 +561,8 @@ stringQQ f = TH.QuasiQuoter
 -- @BangPatterns@ for non-recursive let-bindings, @DataKinds@ for type-level
 -- literals, @KindSignatures@ for kinded type binders, and @MagicHash@ for
 -- names like @Int#@
-scopedParseMode :: ParseMode
-scopedParseMode = termParseMode
+parseMode :: ParseMode
+parseMode = termParseMode
   { extensions =
       map EnableExtension [BangPatterns, DataKinds, EmptyCase, GADTs, KindSignatures, MagicHash]
         <> extensions termParseMode

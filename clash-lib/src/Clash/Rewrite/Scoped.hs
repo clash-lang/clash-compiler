@@ -126,8 +126,8 @@
   compiles them into fused traversals that open the binders they go under.
 
   Tests: "Test.Clash.Scoped" has test scopes to write the inputs and the
-  expected results, and runs scoped transformations in them (@runScopedIn@,
-  @runScopedClosed@).
+  expected results, and runs scoped transformations in them (@runRewriteIn@,
+  @runRewriteClosed@).
 
   = Common type errors
 

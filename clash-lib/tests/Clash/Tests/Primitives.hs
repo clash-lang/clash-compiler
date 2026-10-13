@@ -32,7 +32,7 @@ import Clash.Primitives.Scoped.Util (getFunctionPlurality)
 import Clash.Primitives.Sized.Vector (foldBBF, iterateBBF)
 import Clash.Primitives.Verification (bindMaybe)
 
-import Test.Clash.Rewrite (addTyConName, runScopedNetlistTest)
+import Test.Clash.Rewrite (addTyConName, runNetlistTest)
 import Test.Clash.Scoped
   ( TestType (..), builtType, termIn, testScope, testTypeEnv, tyVarD, typeIn, varD
   , withTestScope )
@@ -53,7 +53,7 @@ functionPlurality = do
   sequence_
     [ withTestScope [tyVarD "a"] $ \ts -> do
         let ctx = compCtxFromList (testScope ts) testTypeEnv []
-        plurality <- runScopedNetlistTest emptyGlobalEnv $
+        plurality <- runNetlistTest emptyGlobalEnv $
           getFunctionPlurality ctx (bbfPrim f) (map (Right . typeIn ts) args) [typeIn ts "a"] i
         assertEqual nm expected plurality
     | (nm, f, args, i, expected) <- cases ]
@@ -82,11 +82,11 @@ bindMaybeTest =
       let ctx =
             compCtxFromList (testScope ts) testTypeEnv
               [(LocalId o ty nm, Id.unsafeMake "x_hdl")]
-      (i0, decls0) <- runScopedNetlistTest emptyGlobalEnv (bindMaybe ctx (Just "p") xVar)
+      (i0, decls0) <- runNetlistTest emptyGlobalEnv (bindMaybe ctx (Just "p") xVar)
       assertEqual "identifier of a variable" "x_hdl" (Id.toText i0)
       assertEqual "declarations of a variable" 0 (length decls0)
       (i1, decls1) <-
-        runScopedNetlistTest emptyGlobalEnv (bindMaybe ctx (Just "p") (Literal (C.IntLiteral 3)))
+        runNetlistTest emptyGlobalEnv (bindMaybe ctx (Just "p") (Literal (C.IntLiteral 3)))
       assertEqual "identifier of a literal" "p" (Id.toText i1)
       case decls1 of
         [NetDecl _ d _, Assignment l _ _] -> do

@@ -35,7 +35,7 @@ import Test.Clash.Rewrite
   , rewriteEnvWithDebug, rewriteEnvWithTyCons, runRewriteTest, strQQ, testGlobalId )
 import Test.Clash.Scoped
   ( ScopeDecl, Step (..), TestScope, assertClashes, assertLintClean, assertNoRewrite
-  , assertNoRewriteAt, assertRewritesAt, assertRewritesTo, assertTermAlphaEq, assertTermIs, runScopedIn
+  , assertNoRewriteAt, assertRewritesAt, assertRewritesTo, assertTermAlphaEq, assertTermIs, runRewriteIn
   , termIn, termQQ, varD, withClashing, withCurFun, withTerm )
 
 -- * Definitions
@@ -92,13 +92,13 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Letrec"
 -- whether a change was signaled.
 deadCodeAt :: Distinct n => TestScope n -> Term n -> IO (Term n, Bool)
 deadCodeAt ts e = do
-  (t, _, ch) <- runScopedIn def st ts $(asRewriteQ S.deadCode) e
+  (t, _, ch) <- runRewriteIn def st ts $(asRewriteQ S.deadCode) e
   pure (t, ch)
 
 -- | 'deadCode' in a bottom-up traversal
 deadCodeBottomup :: Distinct n => TestScope n -> Term n -> IO (Term n)
 deadCodeBottomup ts e = do
-  (t, _, _) <- runScopedIn def st ts (SC.bottomupR $(asRewriteQ S.deadCode)) e
+  (t, _, _) <- runRewriteIn def st ts (SC.bottomupR $(asRewriteQ S.deadCode)) e
   pure t
 
 deadCodeTests :: TestTree
@@ -240,7 +240,7 @@ flattenLetTests = testGroup "flattenLet"
         in y
       |] $ \ts0 e0 -> withClashing ts0 [varD "z" "Int"] e0 $ \ts e -> do
         assertClashes ts e
-        (t, _, ch) <- runScopedIn rewriteEnvWithTyCons def ts flattenLetSc e
+        (t, _, ch) <- runRewriteIn rewriteEnvWithTyCons def ts flattenLetSc e
         assertLintClean ts t
         assertTermIs ts "g_G10 x_1" t
         ch @?= True
