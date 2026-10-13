@@ -880,14 +880,17 @@ instance NFDataX a => NFDataX (Signal domain a) where
   deepErrorX = pure . deepErrorX
   -- The simulation implementation pattern matches on ':-', which Clash cannot
   -- translate to HDL: exposing the constructor crashes Clash with an internal
-  -- error (#3432). In HDL spines do not exist, so returning the original arg
-  -- is fine.
+  -- error (#3432). Only the stream spine disappears in HDL: each sample still
+  -- needs 'ensureSpine', for example to restore fixed constructor bits in a
+  -- custom bit representation (#3434).
   ensureSpine s0
     | clashSimulation = go s0
-    | otherwise = s0
+    | otherwise = fmap ensureSpine s0
    where
     go s = case isX s of
-      Left e -> deepErrorX e
+      -- Recover the stream spine using the sample's own ensureSpine. Its
+      -- deepErrorX need not equal ensureSpine . errorX (e.g. for functions).
+      Left e -> pure (ensureSpine (errorX e))
       Right (a :- s') -> ensureSpine a :- go s'
   hasUndefined = error "hasUndefined on (Signal domain a): No sensible implementation exists"
   rnfX = error "rnfX on (Signal domain a): No sensible implementation exists"
