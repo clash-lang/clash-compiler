@@ -84,13 +84,8 @@ import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)
 
-import           Data.Binary                      (encode)
-import qualified Data.ByteString                  as BS
-import qualified Data.ByteString.Lazy             as BL
+import           Clash.Rewrite.Scoped.History (recordRewriteStep)
 
-import           Clash.Rewrite.Types (RewriteStep(..))
-
-import           Clash.Core.Scoped.Convert        (toClashTerm)
 import           Clash.Core.Scoped.FreeVars       (termGlobalIds, teleNameBinders)
 import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Pretty         ()
@@ -500,20 +495,8 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
      _  -> do
        let tm1 = substGlobals (globalEnvFromList toInline) tm
 
-       -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-       opts <- Lens.view debugOpts
-       let rewriteHistFile = dbg_historyFile opts
-       when (Maybe.isJust rewriteHistFile) $
-         liftIO
-           $ BS.appendFile (Maybe.fromJust rewriteHistFile)
-           $ BL.toStrict
-           $ encode RewriteStep
-               { t_ctx    = []
-               , t_name   = "INLINE"
-               , t_bndrS  = showPpr (globalIdName nm')
-               , t_before = toClashTerm tm
-               , t_after  = toClashTerm tm1
-               }
+       -- NB: When -fclash-debug-history is on, record the inlining
+       recordRewriteStep "INLINE" (showPpr (globalIdName nm')) tm tm1
        rewriteExpr ("flattenExpr",flatten) (showPpr (globalIdName nm'), tm1) (nm, sp)
    let allUsed = newUsed ++ concat il_used
    -- inline all components when the resulting expression after flattening

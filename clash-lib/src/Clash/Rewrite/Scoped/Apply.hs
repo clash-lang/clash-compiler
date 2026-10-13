@@ -27,12 +27,8 @@ module Clash.Rewrite.Scoped.Apply
 import           Control.Lens                ((+=))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
-import           Control.Monad.IO.Class      (liftIO)
 import qualified Control.Monad.Writer        as Writer
-import           Data.Binary                 (encode)
-import qualified Data.ByteString             as BS
-import qualified Data.ByteString.Lazy        as BL
-import           Data.Maybe                  (fromJust, fromMaybe, isJust)
+import           Data.Maybe                  (fromMaybe, isJust)
 import qualified Data.Monoid                 as Monoid
 
 import           Clash.Core.Pretty           (showPpr)
@@ -40,19 +36,19 @@ import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (DebugOpts (..), TransformationInfo (..), hasDebugInfo, isDebugging)
 import           Clash.Rewrite.Types
-  (RewriteMonad, RewriteStep (..), curFun, debugOpts, scopedTypeEnv,
+  (RewriteMonad, curFun, debugOpts, scopedTypeEnv,
    transformAppliedCounters, transformCounter, transformTriedCounters)
 import           Clash.Rewrite.Util          (bumpCounter)
 import           Clash.Util                  (curLoc)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
-import           Clash.Core.Scoped.Convert   (toClashTerm)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.Pretty    ()
 import           Clash.Core.Scoped.Subst     (Closure (..), freeVarOccs)
 import           Clash.Core.Scoped.Syntax
 import           Clash.Core.Scoped.Type      (normalizeType)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
+import           Clash.Rewrite.Scoped.History (recordRewriteStep)
 import           Clash.Rewrite.Scoped.Types
 import           Clash.Rewrite.Scoped.Util   (closeOverOrError, dependencySortTyVars)
 
@@ -90,22 +86,10 @@ applyWith = \s _ctx expr0 action -> do
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged (transformCounter += 1)
 
-  -- NB: When -fclash-debug-history is on, emit binary data holding the
-  -- recorded rewrite steps. The terms are converted to Clash Core, with the
-  -- raw names of their variables as uniques. The context is not recorded.
-  let rewriteHistFile = dbg_historyFile opts
-  Monad.when (isJust rewriteHistFile && hasChanged) $ do
+  -- NB: When -fclash-debug-history is on, record the rewrite step
+  Monad.when (isJust (dbg_historyFile opts) && hasChanged) $ do
     (curBndr, _) <- Lens.use curFun
-    liftIO
-      $ BS.appendFile (fromJust rewriteHistFile)
-      $ BL.toStrict
-      $ encode RewriteStep
-          { t_ctx    = []
-          , t_name   = s
-          , t_bndrS  = showPpr (globalIdName curBndr)
-          , t_before = toClashTerm expr0
-          , t_after  = toClashTerm expr1
-          }
+    recordRewriteStep s (showPpr (globalIdName curBndr)) expr0 expr1
 
   if isDebugging opts
     then (, hasChanged) <$> applyDebug s expr0 hasChanged expr1

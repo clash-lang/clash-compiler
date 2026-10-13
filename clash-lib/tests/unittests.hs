@@ -80,6 +80,7 @@ import qualified Clash.Tests.Normalize.Util
 import qualified Clash.Tests.Rewrite.Capture
 import qualified Clash.Tests.Rewrite.Combinators
 import qualified Clash.Tests.Rewrite.Scoped.Combinators
+import qualified Clash.Tests.Rewrite.Scoped.History
 import qualified Clash.Tests.Rewrite.Scoped.StrategyDSL
 import qualified Clash.Tests.Rewrite.Scoped.Util
 import qualified Clash.Tests.Rewrite.Scoped.ViaFoil
@@ -177,6 +178,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Rewrite.Capture.tests
   , Clash.Tests.Rewrite.Combinators.tests
   , Clash.Tests.Rewrite.Scoped.Combinators.tests
+  , Clash.Tests.Rewrite.Scoped.History.tests
   , Clash.Tests.Rewrite.Scoped.StrategyDSL.tests
   , Clash.Tests.Rewrite.Scoped.Util.tests
   , Clash.Tests.Rewrite.Scoped.ViaFoil.tests

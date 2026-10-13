@@ -49,9 +49,6 @@ import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text)
 import qualified Data.Text                   as Text
-import           Data.Binary                 (encode)
-import qualified Data.ByteString             as BS
-import qualified Data.ByteString.Lazy        as BL
 
 import           GHC.Exts                    (Any)
 import           GHC.Types.Basic             (InlineSpec (..))
@@ -204,20 +201,9 @@ applyWithCapture = \capture s ctx expr0 action -> do
     Just st | hasChanged -> liftIO (recordCapture s ctx expr0 expr1 st)
     _ -> pure ()
 
-  -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
-  let rewriteHistFile = dbg_historyFile opts
-  Monad.when (isJust rewriteHistFile && hasChanged) $ do
-    (curBndr, _) <- Lens.use curFunLegacy
-    liftIO
-      $ BS.appendFile (fromJust rewriteHistFile)
-      $ BL.toStrict
-      $ encode RewriteStep
-          { t_ctx    = tfContext ctx
-          , t_name   = s
-          , t_bndrS  = showPpr (varName curBndr)
-          , t_before = expr0
-          , t_after  = expr1
-          }
+  -- NB: The rewrite history of -fclash-debug-history is recorded by the
+  -- transformations of scoped Clash Core ("Clash.Rewrite.Scoped.Apply"),
+  -- which is what Clash runs.
 
   if isDebugging opts
     then (, hasChanged) <$> applyDebug ctx s expr0 hasChanged expr1
