@@ -31,7 +31,9 @@ and `package clash-lib` / `flags: -debug`.
   `clash-profile-normalization-prepare` (see `../README.profiling.md`);
 * `*.net.bin`: normalized bindings, written by `clash-profile-netlist-prepare`.
 
-Both are files of scoped Clash Core, see `Clash.Core.Scoped.Binary`.
+Both are files of scoped Clash Core, see `Clash.Core.Scoped.Binary`. Files
+written before it, which have no header, can be converted, see
+[Converting old files](#converting-old-files).
 
 It prints the first `--show` (default 3) differences of every design, then a
 summary per design:
@@ -388,3 +390,18 @@ a negative number, such as `slice#` with an `n` larger than its `m + 1`,
 calls of `quotRemWord2#` whose quotient doesn't fit a word, which make GHC's
 implementation raise `SIGFPE`, and calls of `decodeDouble_2Int#` on zero,
 whose sign GHC's implementation leaves undefined.
+
+## Converting old files
+
+The serialized designs are files of scoped Clash Core
+(`Clash.Core.Scoped.Binary`). Those written before it, whose bindings are
+terms of Clash Core, can be converted:
+
+```
+clash-differential convert-inputs DIR FILE... +RTS -M16g -RTS
+```
+
+converts inputs of normalization (`*.bin`), of netlist generation
+(`*.net.bin`) and normalized bindings (`*.norm.bin`), and writes them to `DIR`
+with the same names. See `Legacy.hs`. This command only exists until Clash Core
+is removed.

@@ -13,6 +13,8 @@
 
 module Comparisons (comparisons, siteComparisons) where
 
+import Data.Binary (decode, encode)
+
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Util as Current
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ, asScopedRewriteQ, compileStrategy)
@@ -53,6 +55,15 @@ comparisons =
           \from scoped Core on the scoped side"
       , cmpCurrent = pureSide (toClashTerm . fromClashTermClosed)
       , cmpScoped = pureSide (fromClashTermClosed . toClashTerm)
+      , cmpKnownDifferences = []
+      }
+  , Comparison
+      { cmpName = "binary"
+      , cmpDescription =
+          "Identity: the round trip through the Binary instance of scoped Core on the \
+          \scoped side"
+      , cmpCurrent = pureSide id
+      , cmpScoped = pureSide (decode . encode)
       , cmpKnownDifferences = []
       }
 

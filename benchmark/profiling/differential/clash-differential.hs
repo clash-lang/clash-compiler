@@ -52,6 +52,7 @@ import Clash.GHC.NetlistTypes (ghcTypeToHWType)
 import Clash.Rewrite.Scoped.Globals (toClashBindings)
 import qualified Clash.Util.Supply as Supply
 
+import Legacy (convertInputs)
 import SerialiseInstances
   (NetlistInputs, NormalizationInputs, decodeCorpus, readInputs, unremoveBBfunc)
 
@@ -89,6 +90,7 @@ usage = unlines
   , "       clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] [--open] DESIGN.bin..."
   , "       clash-differential normalized [--show N] DIR_A DIR_B DESIGN.bin..."
   , "       clash-differential pretty [--show N] DESIGN.bin..."
+  , "       clash-differential convert-inputs DIR FILE..."
   , ""
   , "Runs COMPARISON on every binding of the serialized designs FILE..., which"
   , "are *.bin files written by clash-profile-normalization-prepare, or"
@@ -132,6 +134,11 @@ usage = unlines
   , "printing the conversion to Clash Core, on every binding of DESIGN.bin...,"
   , "which may be *.bin, *.net.bin or *.norm.bin files. See Pretty.hs."
   , ""
+  , "The convert-inputs command converts the serialized designs FILE... (*.bin,"
+  , "*.net.bin and *.norm.bin) of before the native encoding of scoped Clash"
+  , "Core, i.e. of before clash-lib's Clash.Core.Scoped.Binary had a header, to"
+  , "the current encoding, and writes them to DIR. See Legacy.hs."
+  , ""
   , "The prims command compares every ported reduction of a primitive with the"
   , "reduction of Clash Core, through the adapter, on --count N (default 100)"
   , "calls generated from the type of the primitive in the designs. With"
@@ -167,6 +174,7 @@ main = getArgs >>= \case
           (dirA </> base <> ".norm.bin") (dirB </> base <> ".norm.bin")
       unless (and oks) exitFailure
     _ -> die usage
+  "convert-inputs" : dir : files@(_:_) -> convertInputs dir files
   ["--list"] -> do
     putStrLn "Comparisons on bindings:"
     forM_ comparisons $ \(Comparison nm desc _ _ kds) -> do

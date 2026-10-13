@@ -7,7 +7,7 @@
   instances of scoped Clash Core ("Clash.Core.Scoped.Binary"): files without
   its header, whose bindings are terms of Clash Core, and whose global
   variables, data constructors and type constructors are encoded as those of
-  Clash Core.
+  Clash Core. And converts them to the current files (@convert-inputs@).
 
   The decoders here follow the encoding of the instances of then, which were
   derived ('GHC.Generics') for the terms of Clash Core: a constructor is
@@ -18,6 +18,7 @@
 -}
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Legacy
   ( -- * Reading
@@ -26,13 +27,18 @@ module Legacy
   , readLegacyBindingMap
   , readBindingMap
   , getLegacyTerm
+    -- * Converting
+  , convertInputs
   ) where
 
-import Control.Monad (replicateM)
+import Control.Monad (forM_, replicateM)
 import Data.Binary (Binary (..), Get)
 import Data.Binary.Get (getWord8, runGetOrFail)
 import qualified Data.ByteString.Lazy as BL
 import Data.IntMap.Strict (IntMap)
+import qualified Data.List as List
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath ((</>), takeFileName)
 
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 -- For the orphan instances of 'Binary' of top entity annotations
@@ -52,9 +58,10 @@ import Clash.Core.Scoped.Binary (hasHeader)
 import Clash.Core.Scoped.Convert
   (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash, mkGlobalIdFromClash,
    mkNewTyConRhsFromClash, mkPrimTyConFromClash, mkPromotedDataConFromClash)
-import Clash.Rewrite.Scoped.Globals (toClashBindings)
+import Clash.Rewrite.Scoped.Globals (fromClashBindings, toClashBindings)
 
-import SerialiseInstances (CompiledPrimMap', readInputs)
+import SerialiseInstances
+  (CompiledPrimMap', NetlistInputs, NormalizationInputs, readInputs, writeInputs)
 
 -- * Decoders
 
@@ -199,3 +206,34 @@ readBindingMap f = do
       supply <- Supply.newSupply
       toClashBindings supply <$> readInputs f
     else pure (runLegacy f getBindingMap bs)
+
+-- * Converting
+
+-- | Convert serialized designs of before the native encoding: inputs of
+-- normalization (@*.bin@), of netlist generation (@*.net.bin@), and
+-- normalized bindings (@*.norm.bin@). Writes the converted files to the given
+-- directory, with the same names. Skips files that are already converted.
+convertInputs :: FilePath -> [FilePath] -> IO ()
+convertInputs dir files = do
+  createDirectoryIfMissing True dir
+  forM_ files $ \f -> do
+    bs <- BL.readFile f
+    let out = dir </> takeFileName f
+    if
+      | hasHeader bs -> putStrLn (f <> ": already converted, skipped")
+      | ".net.bin" `List.isSuffixOf` f -> do
+          let (bm, tops, prims, tcm, reprs, top, domains) = runLegacy f getNetlistInputs bs
+          writeInputs out
+            (( fromClashBindings bm, tops, prims, tcm, reprs, mkGlobalIdFromClash top
+             , domains ) :: NetlistInputs)
+          putStrLn (f <> ": converted to " <> out)
+      | ".norm.bin" `List.isSuffixOf` f -> do
+          writeInputs out (fromClashBindings (runLegacy f getBindingMap bs))
+          putStrLn (f <> ": converted to " <> out)
+      | otherwise -> do
+          let (bm, tcm, tupTcm, prims, reprs, tops, top, domains) =
+                runLegacy f getNormalizationInputs bs
+          writeInputs out
+            (( fromClashBindings bm, tcm, tupTcm, prims, reprs, map mkGlobalIdFromClash tops
+             , mkGlobalIdFromClash top, domains ) :: NormalizationInputs)
+          putStrLn (f <> ": converted to " <> out)
