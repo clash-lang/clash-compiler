@@ -18,10 +18,9 @@
 
   = Types
 
-  The types in terms are types of scoped Core, which
-  'Clash.GHC.GHC2Core.coreToTypeB' builds from GHC's types directly. The
-  types of global variables, data constructors and primitives stay types of
-  Clash Core.
+  The types in terms, and those of global variables and primitives, are types
+  of scoped Core, which 'Clash.GHC.GHC2Core.coreToTypeB' builds from GHC's
+  types directly. The types of data constructors stay types of Clash Core.
 
   = Primitives
 
@@ -54,7 +53,6 @@ module Clash.GHC.Scoped.GHC2Core
   ) where
 
 import           Control.Lens                ((^.), (<>=), view)
-import qualified Control.Lens                as Lens
 import qualified Control.Monad.RWS.Strict    as RWS
 import           Data.Bifunctor              (second)
 import qualified Data.HashMap.Strict         as HashMap
@@ -94,30 +92,32 @@ import GHC.Core.TyCon
   , isUnaryClassTyCon
 #endif
   )
+import GHC.Core.TyCo.Rep (Type (..))
+import GHC.Core.Type (coreView, tyConAppFunTy_maybe)
 import GHC.Types.Var
-  (Id, Var, isTyVar, varName, varType, idInfo,
+  (Id, TyVar, Var, VarBndr (..), isTyVar, varName, varType, idInfo,
    isGlobalId)
 import GHC.Types.Var.Set (VarSet, elemVarSet, isEmptyVarSet)
 import GHC.Utils.Outputable (showPprUnsafe)
 
 -- Local imports
 import           Clash.Annotations.Primitive (extractPrim)
-import qualified Clash.Core.FreeVars         as C
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Type             as C
-import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash, mkPrimInfoFromClash)
-import           Clash.Core.Scoped.Syntax (PrimInfo (..))
+import qualified Clash.Core.Util             as C (undefinedXPrims)
+import           Clash.Core.Scoped.Convert (mkPrimInfo)
+import qualified Clash.Core.Scoped.Syntax    as S
+import           Clash.Core.Scoped.TysPrim   (undefinedTy)
 import           Clash.Driver.Types          (HasClashOpts(..))
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreEnv (..), SrcSpanRB (..), addUsefull, addUsefullR,
-   coreToDataCon, coreToId, coreToLiteral, coreToType, coreToTyVarB,
-   coreToTypeB, coreToPrimVar, coreToVar, coreToVarType, emptyGHC2CoreState,
-   hasPrimCo, isDataConWrapId, isSizedCast, pendingWarnings,
-   qualifiedNameString, srcSpan, varKey)
+   convertedTyVars, coreToDataCon, coreToGlobalIdB, coreToLiteral,
+   coreToTyVarB, coreToTypeB, coreToPrimVar, coreToVar, coreToVarTypeB,
+   emptyGHC2CoreState, famInstEnvs, hasPrimCo, isDataConWrapId,
+   isSizedCast, pendingWarnings, qualifiedNameString, srcSpan, varKey,
+   withoutSrcSpan)
 import           Clash.Core.Scoped.Builder
-import qualified Clash.Normalize.Primitives  as C
+import qualified Clash.Normalize.Scoped.Primitives as NP
 import           Clash.Primitives.Types      hiding (name)
 import           Clash.Util                  (curLoc)
 
@@ -249,12 +249,13 @@ coreToTermB primMap unlocs recLocals = term
 
     term' (Var x)                 = var x
     term' (Lit l@LitRubbish{}) = do
-      let rubbish ty = mkPrimInfoFromClash $ C.PrimInfo (pack "_RUBBISH_") ty C.WorkNever C.SingleResult C.NoUnfolding
-      ty <- coreToType (literalType l)
+      let rubbish ty = mkPrimInfo (pack "_RUBBISH_") ty C.WorkNever C.SingleResult S.NoUnfolding
+      envs <- view famInstEnvs
+      ty <- coreToTypeB (literalType l)
       -- The shape of 'Clash.Core.Scoped.Util.primAtType', see the module header
-      if Lens.notNullOf C.typeFreeVars ty
-        then tyAppB (primB (rubbish C.undefinedTy)) <$> coreToTypeB (literalType l)
-        else pure (primB (rubbish ty))
+      if null (convertedTyVars envs (literalType l))
+        then pure (primB (rubbish (runClosedType ty)))
+        else pure (tyAppB (primB (rubbish undefinedTy)) ty)
     term' (Lit l)                 = return $ literalB (coreToLiteral l)
     term' (App eFun (Type tyArg)) = tyAppB <$> term eFun <*> coreToTypeB tyArg
     term' (App eFun eArg)         = appB   <$> term eFun <*> term eArg
@@ -288,11 +289,11 @@ coreToTermB primMap unlocs recLocals = term
       s'  <- term' s
       ty' <- coreToTypeB ty
       case tmbHead s' of
-        Just p | primName p `elem` C.undefinedXPrims ->
+        Just p | S.primName p `elem` C.undefinedXPrims ->
           -- See 'Clash.GHC.GHC2Core.coreToTerm'
-          return (tyAppB (primB (mkPrimInfoFromClash C.undefinedX)) ty')
+          return (tyAppB (primB NP.undefinedX) ty')
         _ ->
-          return (tyAppB (primB (mkPrimInfoFromClash C.undefined)) ty')
+          return (tyAppB (primB NP.undefined) ty')
 
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
@@ -320,12 +321,8 @@ coreToTermB primMap unlocs recLocals = term
       tickB (srcSpanTickB (RealSrcSpan rsp GHC.Nothing)) <$>
              addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
     term' (Tick _ e) = term e
-    term' (Type t) =
-      tyAppB (primB (mkPrimInfoFromClash $ C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
-        <$> coreToTypeB t
-    term' (Coercion co) =
-      tyAppB (primB (mkPrimInfoFromClash $ C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
-        <$> coreToTypeB (coercionType co)
+    term' (Type t) = tyAppB (primB tyPrim) <$> coreToTypeB t
+    term' (Coercion co) = tyAppB (primB coPrim) <$> coreToTypeB (coercionType co)
 
     termSP sp = fmap (second unSrcSpanRB) . RWS.listen . addUsefullR sp . term
     coreToIdSP sp = addUsefullR sp . coreToIdB
@@ -335,17 +332,24 @@ coreToTermB primMap unlocs recLocals = term
 
     var x = do
         xPrim <- if isGlobalId x then coreToPrimVar x else coreToVar x
-        let xNameS = C.nameOcc xPrim
         -- Converted for every variable, as 'coreToTerm' does, although only
         -- primitives use it: converting it caches the names in it, see
-        -- 'coreToTypeB'.
-        xType  <- coreToVarType x
+        -- 'coreToTypeB'. Its closed type is only built when used.
+        xType  <- coreToVarTypeB x
+        let xNameS = C.nameOcc xPrim
+            -- The builder terms split the GHC type
+            xTy = varType x
+            prim wi unf = primB (mkPrimInfo xNameS xType wi C.SingleResult unf)
+            primVar wi =
+              if x `elem` unlocs
+                then return (prim wi S.NoUnfolding)
+                else prim wi . S.Unfolding <$> coreToGlobalIdB x
         case isDataConId_maybe x of
           Just dc -> case lookupPrim xNameS of
             Just p  ->
               -- Primitive will be marked MultiResult in Transformations if it
               -- is a multi result primitive.
-              return $ primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p) C.SingleResult C.NoUnfolding)
+              return $ prim (maybe C.WorkVariable workInfo p) S.NoUnfolding
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -358,57 +362,50 @@ coreToTermB primMap unlocs recLocals = term
               else dataB <$> coreToDataCon dc
           Nothing -> case lookupPrim xNameS of
             Just (Just (Primitive f wi _))
-              | Just n <- parseBundle "bundle" f        -> return (bundleUnbundleB (n+1) xType)
-              | Just n <- parseBundle "unbundle" f      -> return (bundleUnbundleB (n+1) xType)
-              | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalB xType)
-              | f == "Clash.Signal.Internal.signal#"    -> return (signalB xType)
-              | f == "Clash.Signal.Internal.appSignal#" -> return (appSignalB xType)
-              | f == "Clash.Signal.Internal.traverse#"  -> return (traverseB xType)
-              | f == "Clash.Signal.Internal.joinSignal#" -> return (joinB xType)
-              | f == "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapB xType)
-              | f == showt '($)                           -> return (dollarB xType)
-              | f == showt 'GHC.Stack.withFrozenCallStack -> return (withFrozenCallStackB xType)
-              | f == showt 'GHC.Magic.noinline            -> return (idB xType)
-              | f == showt 'GHC.Magic.lazy                -> return (idB xType)
+              | Just n <- parseBundle "bundle" f        -> bundleUnbundleB (n+1) xTy
+              | Just n <- parseBundle "unbundle" f      -> bundleUnbundleB (n+1) xTy
+              | f == "Clash.Signal.Internal.mapSignal#" -> mapSignalB xTy
+              | f == "Clash.Signal.Internal.signal#"    -> signalB xTy
+              | f == "Clash.Signal.Internal.appSignal#" -> appSignalB xTy
+              | f == "Clash.Signal.Internal.traverse#"  -> traverseB xTy
+              | f == "Clash.Signal.Internal.joinSignal#" -> joinB xTy
+              | f == "Clash.Signal.Bundle.vecBundle#"   -> vecUnwrapB xTy
+              | f == showt '($)                           -> dollarB xTy
+              | f == showt 'GHC.Stack.withFrozenCallStack -> withFrozenCallStackB xTy
+              | f == showt 'GHC.Magic.noinline            -> idB xTy
+              | f == showt 'GHC.Magic.lazy                -> idB xTy
               -- See 'Clash.GHC.GHC2Core.coreToTerm'
-              | f == "GHC.Magic.nospec"                   -> return (idB xType)
-              | f == "GHC.Internal.Magic.nospec"          -> return (idB xType)
-              | f == showt 'GHC.Magic.runRW#              -> return (runRWB xType)
-              | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefB xType)
+              | f == "GHC.Magic.nospec"                   -> idB xTy
+              | f == "GHC.Internal.Magic.nospec"          -> idB xTy
+              | f == showt 'GHC.Magic.runRW#              -> runRWB xTy
+              | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> checkUnpackUndefB xTy
               | f == "Clash.Magic.prefixName"
-              -> return (nameModB C.PrefixName xType)
+              -> nameModB C.PrefixName xTy
               | f == "Clash.Magic.postfixName"
-              -> return (nameModB C.SuffixName xType)
+              -> nameModB C.SuffixName xTy
               | f == "Clash.Magic.setName"
-              -> return (nameModB C.SetName xType)
+              -> nameModB C.SetName xTy
               | f == "Clash.XException.xToErrorCtx"
-              -> return (xToErrorCtxB xType)
+              -> xToErrorCtxB xTy
               | f == "Clash.Annotations.SynthesisAttributes.annotateReg"
-              -> return (annotateRegB xType)
+              -> annotateRegB xTy
               | otherwise
-              -> primVar xNameS xType wi
+              -> primVar wi
             Just (Just (BlackBox {workInfo = wi}))
-              -> primVar xNameS xType wi
+              -> primVar wi
             Just (Just (BlackBoxHaskell {workInfo = wi}))
-              -> primVar xNameS xType wi
+              -> primVar wi
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding)
+              return $ prim C.WorkVariable S.NoUnfolding
             Nothing
               | x `elem` unlocs ->
-                  return (primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding))
+                  return (prim C.WorkVariable S.NoUnfolding)
               | isGlobalId x, not (x `elemVarSet` recLocals)
-              -> globalB . mkGlobalIdFromClash <$> coreToId x
+              -> globalB <$> coreToGlobalIdB x
               | otherwise
               -> return (varB (varKey x))
-      where
-        primVar xNameS xType wi =
-          if x `elem` unlocs
-            then return (primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType wi C.SingleResult C.NoUnfolding))
-            else do
-              bndr <- coreToId x
-              return (primB (mkPrimInfoFromClash $ C.PrimInfo xNameS xType wi C.SingleResult (C.Unfolding bndr)))
 
     alt _   (Alt DEFAULT      _  e) = defaultAltB <$> term e
     alt _   (Alt (LitAlt l)   _  e) = litAltB (coreToLiteral l) <$> term e
@@ -426,170 +423,276 @@ coreToTermB primMap unlocs recLocals = term
 coreToIdB :: Id -> C2C (TyB, C.Name C.Term)
 coreToIdB i = (,) <$> coreToTypeB (varType i) <*> coreToVar i
 
+-- | The primitives that stand in for a type and a coercion, see the module
+-- header
+tyPrim, coPrim :: S.PrimInfo
+tyPrim = mkPrimInfo (pack "_TY_") undefinedTy C.WorkNever C.SingleResult S.NoUnfolding
+coPrim = mkPrimInfo (pack "_CO_") undefinedTy C.WorkNever C.SingleResult S.NoUnfolding
+
 -- * Builder terms
 --
--- Closed terms for primitives that GHC2Core replaces, given the (closed) type
--- of the primitive. Their bodies only refer to their own binders, so the keys
+-- Closed terms for primitives that GHC2Core replaces, given the GHC type of
+-- the primitive. Their bodies only refer to their own binders, so the keys
 -- of their term variables are arbitrary, see "Clash.Core.Scoped.Builder".
+--
+-- They split the GHC type as 'Clash.GHC.GHC2Core' splits its conversion to
+-- Clash Core, and convert the parts. These are part of the conversion of the
+-- whole type, which the caller converts first, so this looks up no new names.
+
+-- | Split a forall-type, like matching 'C.ForAllTy' on the conversion of the
+-- type
+forAllView :: Type -> Maybe (TyVar, Type)
+forAllView ty | Just ty' <- coreView ty = forAllView ty'
+forAllView (ForAllTy (Bndr tv _) ty) = Just (tv, ty)
+forAllView _ = Nothing
+
+-- | Split a function type, like matching 'C.FunTy' of 'C.tyView' on the
+-- conversion of the type
+funView :: Type -> Maybe (Type, Type)
+funView ty | Just ty' <- coreView ty = funView ty'
+funView (FunTy _ _ a r) = Just (a, r)
+funView (TyConApp tc args)
+  | Just (FunTy _ _ a r) <- tyConAppFunTy_maybe tc args = Just (a, r)
+funView _ = Nothing
+
+-- | Type lambdas binding the given type variables. Their names are those of
+-- the conversion of the type they come from, which runs without a source
+-- span, see 'coreToTypeB'.
+tyLamsB :: [TyVar] -> TmB -> C2C TmB
+tyLamsB tvs body = foldr tyLam (pure body) tvs
+ where
+  tyLam tv r = do
+    (key, occ, k) <- withoutSrcSpan (coreToTyVarB tv)
+    tyLamB key occ k <$> r
 
 -- | See 'Clash.GHC.GHC2Core.bundleUnbundleTerm'
-bundleUnbundleB :: Int -> C.Type -> TmB
+bundleUnbundleB :: Int -> Type -> C2C TmB
 bundleUnbundleB nTyVarsExpected = go []
  where
-  go :: [C.TyVar] -> C.Type -> TmB
-  go tvs (C.ForAllTy tv typ) = go (tv:tvs) typ
-  go tvs (C.tyView -> C.FunTy argTy _resTy) =
-    if length tvs /= nTyVarsExpected then
-      error $ $(curLoc) ++ show (length tvs) ++ " vs " ++ show nTyVarsExpected
-    else
-      foldr tyLamClashB (lamB 0 (C.mkUnsafeSystemName "c$s" 0) (clashTyB argTy) (varB 0)) (reverse tvs)
-  go tvs ty = error $ $(curLoc) ++ show ty ++ " " ++ show tvs
+  go tvs ty
+    | Just (tv, ty') <- forAllView ty = go (tv:tvs) ty'
+    | Just (argTy, _resTy) <- funView ty =
+        if length tvs /= nTyVarsExpected then
+          error $ $(curLoc) ++ show (length tvs) ++ " vs " ++ show nTyVarsExpected
+        else do
+          argTyB <- coreToTypeB argTy
+          tyLamsB (reverse tvs) (lamB 0 (C.mkUnsafeSystemName "c$s" 0) argTyB (varB 0))
+    | otherwise = error $ $(curLoc) ++ showPprUnsafe ty ++ " " ++ showPprUnsafe tvs
 
 -- | @\\f x -> f x@, for 'mapSignalB', 'appSignalB' and 'dollarB'
-applyB :: C.Type -> C.Type -> TmB
+applyB :: TyB -> TyB -> TmB
 applyB fTy xTy =
-  lamB 0 (C.mkUnsafeSystemName "f" 0) (clashTyB fTy) $
-  lamB 1 (C.mkUnsafeSystemName "x" 1) (clashTyB xTy) $
+  lamB 0 (C.mkUnsafeSystemName "f" 0) fTy $
+  lamB 1 (C.mkUnsafeSystemName "x" 1) xTy $
   appB (varB 0) (varB 1)
 
 -- | See 'Clash.GHC.GHC2Core.mapSignalTerm'
-mapSignalB :: C.Type -> TmB
-mapSignalB (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy)))
-  | (C.FunTy _ funTy'') <- C.tyView funTy
-  , (C.FunTy aTy bTy)   <- C.tyView funTy''
-  = tyLamClashB aTV $ tyLamClashB bTV $ tyLamClashB clkTV $
-    applyB (C.mkFunTy aTy bTy) aTy
-mapSignalB ty = error $ $(curLoc) ++ show ty
+mapSignalB :: Type -> C2C TmB
+mapSignalB ty
+  | Just (aTV, ty1) <- forAllView ty
+  , Just (bTV, ty2) <- forAllView ty1
+  , Just (clkTV, funTy) <- forAllView ty2
+  , Just (_, funTy'') <- funView funTy
+  , Just (aTy, bTy) <- funView funTy''
+  = do
+    aTyB <- coreToTypeB aTy
+    bTyB <- coreToTypeB bTy
+    tyLamsB [aTV, bTV, clkTV] (applyB (funTyB [aTyB] bTyB) aTyB)
+mapSignalB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.signalTerm'
-signalB :: C.Type -> TmB
-signalB (C.ForAllTy aTV (C.ForAllTy domTV funTy))
-  | (C.FunTy _ saTy) <- C.tyView funTy
-  = tyLamClashB aTV $ tyLamClashB domTV $
-    lamB 0 (C.mkUnsafeSystemName "x" 0) (clashTyB saTy) (varB 0)
-signalB ty = error $ $(curLoc) ++ show ty
+signalB :: Type -> C2C TmB
+signalB ty
+  | Just (aTV, ty1) <- forAllView ty
+  , Just (domTV, funTy) <- forAllView ty1
+  , Just (_, saTy) <- funView funTy
+  = do
+    saTyB <- coreToTypeB saTy
+    tyLamsB [aTV, domTV] (lamB 0 (C.mkUnsafeSystemName "x" 0) saTyB (varB 0))
+signalB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.appSignalTerm'
-appSignalB :: C.Type -> TmB
-appSignalB (C.ForAllTy domTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
-  | (C.FunTy _ funTy'') <- C.tyView funTy
-  , (C.FunTy saTy sbTy) <- C.tyView funTy''
-  = tyLamClashB domTV $ tyLamClashB aTV $ tyLamClashB bTV $
-    applyB (C.mkFunTy saTy sbTy) saTy
-appSignalB ty = error $ $(curLoc) ++ show ty
+appSignalB :: Type -> C2C TmB
+appSignalB ty
+  | Just (domTV, ty1) <- forAllView ty
+  , Just (aTV, ty2) <- forAllView ty1
+  , Just (bTV, funTy) <- forAllView ty2
+  , Just (_, funTy'') <- funView funTy
+  , Just (saTy, sbTy) <- funView funTy''
+  = do
+    saTyB <- coreToTypeB saTy
+    sbTyB <- coreToTypeB sbTy
+    tyLamsB [domTV, aTV, bTV] (applyB (funTyB [saTyB] sbTyB) saTyB)
+appSignalB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.vecUnwrapTerm'
-vecUnwrapB :: C.Type -> TmB
-vecUnwrapB (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy)))
-  | (C.FunTy _ vsTy) <- C.tyView funTy
-  = tyLamClashB tTV $ tyLamClashB nTV $ tyLamClashB aTV $
-    lamB 0 (C.mkUnsafeSystemName "vs" 0) (clashTyB vsTy) (varB 0)
-vecUnwrapB ty = error $ $(curLoc) ++ show ty
+vecUnwrapB :: Type -> C2C TmB
+vecUnwrapB ty
+  | Just (tTV, ty1) <- forAllView ty
+  , Just (nTV, ty2) <- forAllView ty1
+  , Just (aTV, funTy) <- forAllView ty2
+  , Just (_, vsTy) <- funView funTy
+  = do
+    vsTyB <- coreToTypeB vsTy
+    tyLamsB [tTV, nTV, aTV] (lamB 0 (C.mkUnsafeSystemName "vs" 0) vsTyB (varB 0))
+vecUnwrapB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.traverseTerm'
-traverseB :: C.Type -> TmB
-traverseB (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy domTV funTy))))
-    | (C.FunTy dictTy funTy1) <- C.tyView funTy
-    , (C.FunTy gTy    funTy2) <- C.tyView funTy1
-    , (C.FunTy xTy    _)      <- C.tyView funTy2
-    = tyLamClashB fTV $ tyLamClashB aTV $ tyLamClashB bTV $ tyLamClashB domTV $
-      lamB 0 (C.mkUnsafeSystemName "dict" 0) (clashTyB dictTy) $
-      lamB 1 (C.mkUnsafeSystemName "g" 1) (clashTyB gTy) $
-      lamB 2 (C.mkUnsafeSystemName "x" 2) (clashTyB xTy) $
+traverseB :: Type -> C2C TmB
+traverseB ty
+  | Just (fTV, ty1) <- forAllView ty
+  , Just (aTV, ty2) <- forAllView ty1
+  , Just (bTV, ty3) <- forAllView ty2
+  , Just (domTV, funTy) <- forAllView ty3
+  , Just (dictTy, funTy1) <- funView funTy
+  , Just (gTy, funTy2) <- funView funTy1
+  , Just (xTy, _) <- funView funTy2
+  = do
+    dictTyB <- coreToTypeB dictTy
+    gTyB <- coreToTypeB gTy
+    xTyB <- coreToTypeB xTy
+    tyLamsB [fTV, aTV, bTV, domTV] $
+      lamB 0 (C.mkUnsafeSystemName "dict" 0) dictTyB $
+      lamB 1 (C.mkUnsafeSystemName "g" 1) gTyB $
+      lamB 2 (C.mkUnsafeSystemName "x" 2) xTyB $
       appB (varB 1) (varB 2)
-traverseB ty = error $ $(curLoc) ++ show ty
+traverseB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.dollarTerm'
-dollarB :: C.Type -> TmB
+dollarB :: Type -> C2C TmB
 #if MIN_VERSION_ghc(9,8,0)
-dollarB (C.ForAllTy raTV (C.ForAllTy rbTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))))
-  | (C.FunTy fTy funTy'') <- C.tyView funTy
-  , (C.FunTy aTy _)       <- C.tyView funTy''
-  = tyLamClashB raTV $ tyLamClashB rbTV $ tyLamClashB aTV $ tyLamClashB bTV $
-    applyB fTy aTy
+dollarB ty
+  | Just (raTV, ty1) <- forAllView ty
+  , Just (rbTV, ty2) <- forAllView ty1
+  , Just (aTV, ty3) <- forAllView ty2
+  , Just (bTV, funTy) <- forAllView ty3
+  , Just (fTy, funTy'') <- funView funTy
+  , Just (aTy, _) <- funView funTy''
+  = do
+    fTyB <- coreToTypeB fTy
+    aTyB <- coreToTypeB aTy
+    tyLamsB [raTV, rbTV, aTV, bTV] (applyB fTyB aTyB)
 #else
-dollarB (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
-  | (C.FunTy fTy funTy'') <- C.tyView funTy
-  , (C.FunTy aTy _)       <- C.tyView funTy''
-  = tyLamClashB rTV $ tyLamClashB aTV $ tyLamClashB bTV $
-    applyB fTy aTy
+dollarB ty
+  | Just (rTV, ty1) <- forAllView ty
+  , Just (aTV, ty2) <- forAllView ty1
+  , Just (bTV, funTy) <- forAllView ty2
+  , Just (fTy, funTy'') <- funView funTy
+  , Just (aTy, _) <- funView funTy''
+  = do
+    fTyB <- coreToTypeB fTy
+    aTyB <- coreToTypeB aTy
+    tyLamsB [rTV, aTV, bTV] (applyB fTyB aTyB)
 #endif
-dollarB ty = error $ $(curLoc) ++ show ty
+dollarB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.joinTerm'
-joinB :: C.Type -> TmB
-joinB ty@(C.ForAllTy {}) = signalB ty
-joinB ty = error $ $(curLoc) ++ show ty
+joinB :: Type -> C2C TmB
+joinB ty
+  | Just _ <- forAllView ty = signalB ty
+  | otherwise = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.withFrozenCallStackTerm'
-withFrozenCallStackB :: C.Type -> TmB
-withFrozenCallStackB (C.ForAllTy aTV funTy)
-  | (C.FunTy callStackTy fTy) <- C.tyView funTy
-  = tyLamClashB aTV $
-    lamB 0 (C.mkUnsafeSystemName "callStack" 0) (clashTyB callStackTy) $
-    lamB 1 (C.mkUnsafeSystemName "f" 1) (clashTyB fTy) $
-    appB (varB 1) (varB 0)
-withFrozenCallStackB ty = error $ $(curLoc) ++ show ty
+withFrozenCallStackB :: Type -> C2C TmB
+withFrozenCallStackB ty
+  | Just (aTV, funTy) <- forAllView ty
+  , Just (callStackTy, fTy) <- funView funTy
+  = do
+    callStackTyB <- coreToTypeB callStackTy
+    fTyB <- coreToTypeB fTy
+    tyLamsB [aTV] $
+      lamB 0 (C.mkUnsafeSystemName "callStack" 0) callStackTyB $
+      lamB 1 (C.mkUnsafeSystemName "f" 1) fTyB $
+      appB (varB 1) (varB 0)
+withFrozenCallStackB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.idTerm'
-idB :: C.Type -> TmB
-idB (C.ForAllTy aTV funTy)
-  | (C.FunTy xTy _) <- C.tyView funTy
-  = tyLamClashB aTV $
-    lamB 0 (C.mkUnsafeSystemName "x" 0) (clashTyB xTy) (varB 0)
-idB ty = error $ $(curLoc) ++ show ty
+idB :: Type -> C2C TmB
+idB ty
+  | Just (aTV, funTy) <- forAllView ty
+  , Just (xTy, _) <- funView funTy
+  = do
+    xTyB <- coreToTypeB xTy
+    tyLamsB [aTV] (lamB 0 (C.mkUnsafeSystemName "x" 0) xTyB (varB 0))
+idB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.runRWTerm'
-runRWB :: C.Type -> TmB
-runRWB (C.ForAllTy rTV (C.ForAllTy oTV funTy))
-  | (C.FunTy fTy _)  <- C.tyView funTy
-  , (C.FunTy rwTy _) <- C.tyView fTy
-  = tyLamClashB rTV $ tyLamClashB oTV $
-    lamB 0 (C.mkUnsafeSystemName "f" 0) (clashTyB fTy) $
-    appB (varB 0)
-         (primB (mkPrimInfoFromClash $ C.PrimInfo (showt 'GHC.Prim.realWorld#) rwTy C.WorkNever C.SingleResult C.NoUnfolding))
-runRWB ty = error $ $(curLoc) ++ show ty
+runRWB :: Type -> C2C TmB
+runRWB ty
+  | Just (rTV, ty1) <- forAllView ty
+  , Just (oTV, funTy) <- forAllView ty1
+  , Just (fTy, _) <- funView funTy
+  , Just (rwTy, _) <- funView fTy
+  = do
+    fTyB <- coreToTypeB fTy
+    rwTyB <- coreToTypeB rwTy
+    let realWorld = mkPrimInfo (showt 'GHC.Prim.realWorld#) (runClosedType rwTyB)
+                      C.WorkNever C.SingleResult S.NoUnfolding
+    tyLamsB [rTV, oTV] $
+      lamB 0 (C.mkUnsafeSystemName "f" 0) fTyB $
+      appB (varB 0) (primB realWorld)
+runRWB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.checkUnpackUndefTerm'
-checkUnpackUndefB :: C.Type -> TmB
-checkUnpackUndefB (C.ForAllTy nTV (C.ForAllTy aTV funTy))
-  | C.FunTy knTy r0Ty <- C.tyView funTy
-  , C.FunTy tpTy r1Ty <- C.tyView r0Ty
-  , C.FunTy fTy _     <- C.tyView r1Ty
-  = tyLamClashB nTV $ tyLamClashB aTV $
-    lamB 0 (C.mkUnsafeSystemName "kn" 0) (clashTyB knTy) $
-    lamB 1 (C.mkUnsafeSystemName "tp" 1) (clashTyB tpTy) $
-    lamB 2 (C.mkUnsafeSystemName "f" 2) (clashTyB fTy) $
-    varB 2
-checkUnpackUndefB ty = error $ $(curLoc) ++ show ty
+checkUnpackUndefB :: Type -> C2C TmB
+checkUnpackUndefB ty
+  | Just (nTV, ty1) <- forAllView ty
+  , Just (aTV, funTy) <- forAllView ty1
+  , Just (knTy, r0Ty) <- funView funTy
+  , Just (tpTy, r1Ty) <- funView r0Ty
+  , Just (fTy, _) <- funView r1Ty
+  = do
+    knTyB <- coreToTypeB knTy
+    tpTyB <- coreToTypeB tpTy
+    fTyB <- coreToTypeB fTy
+    tyLamsB [nTV, aTV] $
+      lamB 0 (C.mkUnsafeSystemName "kn" 0) knTyB $
+      lamB 1 (C.mkUnsafeSystemName "tp" 1) tpTyB $
+      lamB 2 (C.mkUnsafeSystemName "f" 2) fTyB $
+      varB 2
+checkUnpackUndefB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.nameModTerm'
-nameModB :: C.NameMod -> C.Type -> TmB
-nameModB sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy))
-  | (C.FunTy xTy _) <- C.tyView funTy
-  = tyLamClashB nmTV $ tyLamClashB aTV $
-    lamB 0 (C.mkUnsafeSystemName "x" 0) (clashTyB xTy) $
-    tickB (nameModTickB sa (clashTyB (C.VarTy nmTV))) (varB 0)
-nameModB _ ty = error $ $(curLoc) ++ show ty
+nameModB :: C.NameMod -> Type -> C2C TmB
+nameModB sa ty
+  | Just (nmTV, ty1) <- forAllView ty
+  , Just (aTV, funTy) <- forAllView ty1
+  , Just (xTy, _) <- funView funTy
+  = do
+    xTyB <- coreToTypeB xTy
+    tyLamsB [nmTV, aTV] $
+      lamB 0 (C.mkUnsafeSystemName "x" 0) xTyB $
+      tickB (nameModTickB sa (varTyB (varKey nmTV))) (varB 0)
+nameModB _ ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.xToErrorCtxTerm'
-xToErrorCtxB :: C.Type -> TmB
-xToErrorCtxB (C.ForAllTy aTV funTy)
-  | (C.FunTy ctxTy rTy) <- C.tyView funTy
-  , (C.FunTy xTy _)     <- C.tyView rTy
-  = tyLamClashB aTV $
-    lamB 0 (C.mkUnsafeSystemName "ctx" 0) (clashTyB ctxTy) $
-    lamB 1 (C.mkUnsafeSystemName "x" 1) (clashTyB xTy) $
-    varB 1
-xToErrorCtxB ty = error $ $(curLoc) ++ show ty
+xToErrorCtxB :: Type -> C2C TmB
+xToErrorCtxB ty
+  | Just (aTV, funTy) <- forAllView ty
+  , Just (ctxTy, rTy) <- funView funTy
+  , Just (xTy, _) <- funView rTy
+  = do
+    ctxTyB <- coreToTypeB ctxTy
+    xTyB <- coreToTypeB xTy
+    tyLamsB [aTV] $
+      lamB 0 (C.mkUnsafeSystemName "ctx" 0) ctxTyB $
+      lamB 1 (C.mkUnsafeSystemName "x" 1) xTyB $
+      varB 1
+xToErrorCtxB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.annotateRegTerm'
-annotateRegB :: C.Type -> TmB
-annotateRegB (C.ForAllTy nTV (C.ForAllTy domTV (C.ForAllTy aTV funTy)))
-  | C.FunTy attrTy rTy <- C.tyView funTy
-  , C.FunTy xTy _ <- C.tyView rTy
-  = tyLamClashB nTV $ tyLamClashB domTV $ tyLamClashB aTV $
-    lamB 1 (C.mkUnsafeSystemName "attrs" 1) (clashTyB attrTy) $
-    lamB 0 (C.mkUnsafeSystemName "x" 0) (clashTyB xTy) $
-    tickB (attributesTickB (clashTyB (C.VarTy nTV)) (varB 1)) (varB 0)
-annotateRegB ty = error ($(curLoc) ++ show ty)
+annotateRegB :: Type -> C2C TmB
+annotateRegB ty
+  | Just (nTV, ty1) <- forAllView ty
+  , Just (domTV, ty2) <- forAllView ty1
+  , Just (aTV, funTy) <- forAllView ty2
+  , Just (attrTy, rTy) <- funView funTy
+  , Just (xTy, _) <- funView rTy
+  = do
+    attrTyB <- coreToTypeB attrTy
+    xTyB <- coreToTypeB xTy
+    tyLamsB [nTV, domTV, aTV] $
+      lamB 1 (C.mkUnsafeSystemName "attrs" 1) attrTyB $
+      lamB 0 (C.mkUnsafeSystemName "x" 0) xTyB $
+      tickB (attributesTickB (varTyB (varKey nTV)) (varB 1)) (varB 0)
+annotateRegB ty = error ($(curLoc) ++ showPprUnsafe ty)

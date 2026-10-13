@@ -8,8 +8,10 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -24,6 +26,7 @@ module Clash.GHC.GHC2Core
   , GHC2CoreState
   , GHC2CoreEnv (..)
   , srcSpan
+  , famInstEnvs
   , tyConMap
   , coreToTerm
   , coreToId
@@ -38,6 +41,10 @@ module Clash.GHC.GHC2Core
   , varKey
   , coreToTypeB
   , coreToTyVarB
+  , coreToVarTypeB
+  , coreToGlobalIdB
+  , convertedTyVars
+  , withoutSrcSpan
     -- * For "Clash.GHC.Scoped.GHC2Core"
   , SrcSpanRB (..)
   , coreToType
@@ -140,7 +147,7 @@ import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
 import GHC.Types.Var
   (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
    varUnique, idInfo, isGlobalId)
-import GHC.Types.Var.Set (isEmptyVarSet)
+import GHC.Types.Var.Set (elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet)
 
 -- Local imports
 import           Clash.Annotations.Primitive (extractPrim)
@@ -166,7 +173,10 @@ import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util
 import           Clash.GHC.Util
 import           Clash.Core.Scoped.Builder
-  (Key, TyB, annTyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, uniqueKey, varTyB)
+  (Key, TyB, annTyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, runClosedType,
+   uniqueKey, varTyB)
+import           Clash.Core.Scoped.Convert   (mkGlobalId)
+import qualified Clash.Core.Scoped.Syntax    as S
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
@@ -256,6 +266,9 @@ data GHC2CoreState
   , _scopedTypeCache :: HashMap StructuralType TyB
   -- ^ Cache for types converted to scoped Core, keyed on the GHC type. See
   -- 'coreToTypeB'.
+  , _scopedVarTypeMap :: HashMap Name (S.Type 'S.VoidS)
+  -- ^ Cache for the types of global variables, converted to scoped Core. See
+  -- 'coreToVarTypeB'.
   , _pendingWarnings :: Seq PendingWarning
   -- ^ Warnings collected while converting, in the order they were reported.
   -- 'C2C' is pure, so it cannot print them itself; the driver reports these
@@ -283,7 +296,8 @@ instance CanWarn C2C where
 
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState =
-  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty HashMap.empty Seq.empty
+  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty HashMap.empty
+    HashMap.empty Seq.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -1207,6 +1221,51 @@ coreToTypeB' (AppTy ty1 ty2)  = appTyB <$> coreToTypeB ty1 <*> coreToTypeB' ty2
 coreToTypeB' (CastTy t (Refl{})) = coreToTypeB' t
 coreToTypeB' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPprUnsafe t)
 coreToTypeB' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPprUnsafe t)
+
+-- | The closed type of a variable, see 'coreToVarType'. Memoized on the name
+-- for global variables, like 'coreToVarType'.
+coreToVarTypeB :: Var -> C2C (S.Type 'S.VoidS)
+coreToVarTypeB v
+  | isGlobalId v = makeCached (varName v) scopedVarTypeMap convert
+  | otherwise = convert
+ where
+  convert = runClosedType <$> coreToTypeB (varType v)
+
+-- | A global variable, see 'coreToId'
+coreToGlobalIdB :: Id -> C2C S.GlobalId
+coreToGlobalIdB i = do
+  ty <- coreToVarTypeB i
+  nm <- coreToVar i
+  pure (mkGlobalId nm ty)
+
+-- | The free type variables of the type of Clash Core that 'coreToType'
+-- converts a GHC type to, in the order of 'C.typeFreeVars': closed over the
+-- kinds of type variables, with duplicates. Mirrors 'coreToType'.
+convertedTyVars :: FamInstEnvs -> Type -> [TyVar]
+convertedTyVars envs = go emptyVarSet
+ where
+  go bound ty
+    | Just ty' <- coreView ty = go bound ty'
+    | TyConApp tc xs <- ty
+    , Just (HetReduction (Reduction _ ty') _) <- topReduceTyFamApp_maybe envs tc xs
+    = go bound ty'
+    | otherwise = go' bound ty
+
+  go' bound = \case
+    TyVarTy tv
+      -- See Note [Closing over kind variables] in "Clash.Core.FreeVars"
+      | tv `elemVarSet` bound -> go bound (varType tv)
+      | otherwise -> tv : go emptyVarSet (varType tv)
+    TyConApp tc args
+      | Just (FunTy _ _ ty1 ty2) <- tyConAppFunTy_maybe tc args -> go bound ty1 ++ go bound ty2
+      | ExpandsSyn substs synTy remArgs <- expandSynTyCon_maybe tc args
+      -> go bound (substTy (mkTvSubstPrs substs) synTy) ++ concatMap (go bound) remArgs
+      | otherwise -> concatMap (go bound) args
+    ForAllTy (Bndr tv _) ty -> go bound (varType tv) ++ go (extendVarSet bound tv) ty
+    FunTy _ _ ty1 ty2 -> go bound ty1 ++ go bound ty2
+    AppTy ty1 ty2 -> go bound ty1 ++ go' bound ty2
+    CastTy t (Refl{}) -> go' bound t
+    _ -> []
 
 -- | Convert a type variable binder: its key, name and kind. Like
 -- 'coreToTyVar', it converts the kind first.

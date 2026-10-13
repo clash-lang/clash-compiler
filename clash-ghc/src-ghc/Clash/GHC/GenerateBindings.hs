@@ -29,6 +29,7 @@ import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
 import qualified Data.IntSet             as IS
 import qualified Data.HashMap.Strict     as HashMap
+import qualified Data.HashSet            as HashSet
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List               (foldl')
 #endif
@@ -73,10 +74,10 @@ import           Clash.Core.Util         (dataConInstArgTys, mkInternalVar, mkSe
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
-  ,mkVarEnv, unionVarEnv, elemVarSet, mkVarSet)
+  ,mkVarEnv, unionVarEnv)
 import           Clash.Core.Scoped.Convert (fromClashTermClosed)
 import           Clash.Core.Scoped.NameMap (globalEnvFromList)
-import           Clash.Core.Scoped.Syntax (S (VoidS), globalIdLegacy, globalIdName)
+import           Clash.Core.Scoped.Syntax (S (VoidS), globalIdLegacy, globalIdName, globalIdType)
 import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import qualified Clash.Core.Scoped.Syntax as S (Term)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -85,13 +86,13 @@ import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.Driver.Warning    (warnAbout, warnAboutM)
 import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
+  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToGlobalIdB, coreToId, coreToName, coreToTerm,
    makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Core.Scoped.Builder
   (TmB, caseB, clashTyB, dataAltB, lamB, letrecB, runClosedTerm, tyLamClashB, varB)
-import           Clash.GHC.Scoped.Check  (Outcome (..), compareTerms, primAtTypeShape)
+import           Clash.GHC.Scoped.Check  (Outcome (..), compareTerms, compareTypes, primAtTypeShape)
 import           Clash.GHC.Scoped.GHC2Core (coreToTermB, coreToTypeB, varKey)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
@@ -246,10 +247,10 @@ setNoInlineTopEntities
 setNoInlineTopEntities bm tes =
   fmap go bm
  where
-  ids = mkVarSet (fmap (globalIdLegacy . topId) tes)
+  ids = HashSet.fromList (fmap topId tes)
 
   go b@Binding{bindingId}
-    | globalIdLegacy bindingId `elemVarSet` ids
+    | bindingId `HashSet.member` ids
     = b { bindingSpec = GHC.Opaque GHC.NoSourceText }
     | otherwise = b
 
@@ -262,7 +263,7 @@ setNoInlineTopEntities bm tes =
 -- 'processBind', and the class operations.
 mkBindings
   :: NFData a
-  => (GHC.CoreBind -> C2C [(Id, Binding a)])
+  => (GHC.CoreBind -> C2C [Binding a])
   -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]
@@ -288,7 +289,7 @@ mkBindings convBind bindings clsOps = do
     & tyConMap %~ (\tcm0 -> foldl' (\acc s -> acc <> (s ^. tyConMap)) tcm0 states)
     & pendingWarnings %~ (<> foldMap (^. pendingWarnings) states)
 
-  return ( mkVarEnv (concatMap fst bindingsList)
+  return ( UniqMap.fromList [ (globalIdName (bindingId b), b) | b <- concatMap fst bindingsList ]
          , mkVarEnv (map fst clsOpList) )
 
 -- | Convert a single (possibly recursive) binder group to bindings of scoped
@@ -301,14 +302,10 @@ processBind
   :: CompiledPrimMap
   -> [GHC.CoreBndr]
   -> GHC.CoreBind
-  -> C2C [(Id, Binding TmB)]
+  -> C2C [Binding TmB]
 processBind primMap unlocatable = \case
-  GHC.NonRec v e -> do
-    b <- convBinding GHC.emptyVarSet False v e
-    return [(globalIdLegacy (bindingId b), b)]
-  GHC.Rec [(v, e)] -> do
-    b <- convBinding GHC.emptyVarSet True v e
-    return [(globalIdLegacy (bindingId b), b)]
+  GHC.NonRec v e -> (:[]) <$> convBinding GHC.emptyVarSet False v e
+  GHC.Rec [(v, e)] -> (:[]) <$> convBinding GHC.emptyVarSet True v e
   -- A group of more than one binder refers to its binders as local variables,
   -- see NOTE [bindings in recursive groups]
   GHC.Rec bes -> do
@@ -318,19 +315,18 @@ processBind primMap unlocatable = \case
     let lbs = [ (varKey v, globalIdName (bindingId b), ty, bindingTerm b)
               | ((v, _), b, ty) <- zip3 bes bs tys ]
     return
-      [ (globalIdLegacy (bindingId b), b { bindingTerm = letrecB lbs (varB (varKey v))
-                        , bindingRecursive = False })
+      [ b { bindingTerm = letrecB lbs (varB (varKey v)), bindingRecursive = False }
       | ((v, _), b) <- zip bes bs ]
  where
   convBinding locals r v e = do
     let sp  = GHC.getSrcSpan v
         inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
     tm <- RWS.local (srcSpan .~ sp) (coreToTermB primMap unlocatable locals e)
-    v' <- coreToId v
+    v' <- coreToGlobalIdB v
     nm <- qualifiedNameString (GHC.varName v)
     let pr = if HashMap.member nm primMap then IsPrim else IsFun
     checkPrimitive primMap v
-    return (Binding (mkGlobalIdFromClash v') sp inl pr tm r)
+    return (Binding v' sp inl pr tm r)
 
 -- | Convert a single (possibly recursive) binder group to Clash Core bindings,
 -- for 'checkGHC2Core'.
@@ -338,7 +334,7 @@ processBindClash
   :: CompiledPrimMap
   -> [GHC.CoreBndr]
   -> GHC.CoreBind
-  -> C2C [(Id, Binding Term)]
+  -> C2C [Binding Term]
 processBindClash primMap unlocatable = \case
   GHC.NonRec v e -> do
     let sp = GHC.getSrcSpan v
@@ -348,7 +344,7 @@ processBindClash primMap unlocatable = \case
     nm <- qualifiedNameString (GHC.varName v)
     let pr = if HashMap.member nm primMap then IsPrim else IsFun
     checkPrimitive primMap v
-    return [(v', (Binding (mkGlobalIdFromClash v') sp inl pr tm False))]
+    return [Binding (mkGlobalIdFromClash v') sp inl pr tm False]
   GHC.Rec bs -> do
     tms <- forM bs $ \(v,e) -> do
       let sp  = GHC.getSrcSpan v
@@ -360,7 +356,7 @@ processBindClash primMap unlocatable = \case
       checkPrimitive primMap v
       return (Binding (mkGlobalIdFromClash v') sp inl pr tm True)
     case tms of
-      [b] -> return [(globalIdLegacy (bindingId b), b)]
+      [b] -> return [b]
 
       -- Rewrite the bindings to avoid triggering the recursion check.
       -- See NOTE [bindings in recursive groups]
@@ -368,7 +364,7 @@ processBindClash primMap unlocatable = \case
                vsV   = map Var vsL
                subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
                lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-               tms1  = zipWith (\b (i, _) -> (globalIdLegacy (bindingId b), b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False })) tms lbs
+               tms1  = zipWith (\b (i, _) -> b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False }) tms lbs
            in  return tms1
 
 -- | Convert a single class operation. See 'processBind'.
@@ -379,8 +375,9 @@ processClsOp (v,i) = do
 
 -- | Compare the bindings that "Clash.Core.Scoped.GHC2Core" gives with the
 -- conversion of the bindings of 'Clash.GHC.GHC2Core.coreToTerm' to scoped
--- Core, see "Clash.GHC.Scoped.Check". Also compares the maps of type
--- constructors that the two find, and the warnings they report.
+-- Core, see "Clash.GHC.Scoped.Check", and the types of their binders. Also
+-- compares the maps of type constructors that the two find, and the warnings
+-- they report.
 --
 -- Runs when the environment variable @CLASH_DEBUG_CHECK_GHC2CORE@ is set, to
 -- a file to which it appends a summary. Errors if a term is not
@@ -414,18 +411,20 @@ checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm st new
 
     outcome b1 b2
       | bindingId b1 /= bindingId b2
+        || globalIdName (bindingId b1) /= globalIdName (bindingId b2)
         || bindingLoc b1 /= bindingLoc b2
         || bindingIsPrim b1 /= bindingIsPrim b2
         || bindingRecursive b1 /= bindingRecursive b2
         || show (bindingSpec b1) /= show (bindingSpec b2)
       = Different "binding metadata"
       | otherwise
-      = compareTerms (fromClashTermClosed (primAtTypeShape (bindingTerm b1))) (bindingTerm b2)
+      = compareTypes (globalIdType (bindingId b1)) (globalIdType (bindingId b2))
+          <> compareTerms (fromClashTermClosed (primAtTypeShape (bindingTerm b1))) (bindingTerm b2)
 
     outcomes =
       [ (nameOcc (globalIdName (bindingId b1)), o)
       | b1 <- UniqMap.elems old
-      , let o = maybe (Different "missing") (outcome b1) (UniqMap.lookup (globalIdLegacy (bindingId b1)) new)
+      , let o = maybe (Different "missing") (outcome b1) (UniqMap.lookup (globalIdName (bindingId b1)) new)
       ]
     missing = length (UniqMap.keys new) - length (UniqMap.keys old)
     identical = length [ () | (_, Identical) <- outcomes ]
