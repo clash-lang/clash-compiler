@@ -89,6 +89,7 @@ import qualified Clash.Tests.Rewrite.WorkFree
 import qualified Clash.Tests.Util.Interpolate
 import qualified Clash.Tests.Warning
 import qualified Test.Clash.Rewrite
+import qualified Test.Clash.Scoped
 
 -- AFAIK there's no good way to override the default, so we just detect the
 -- default value and change it.
@@ -184,6 +185,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Util.Interpolate.tests
   , Clash.Tests.Warning.tests
   , Test.Clash.Rewrite.tests
+  , Test.Clash.Scoped.testScopeTests
   ]
 
 main :: IO ()

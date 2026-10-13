@@ -5,26 +5,158 @@
 
   Utilities to write unit tests on scoped Clash Core ("Clash.Core.Scoped").
 
-  Most tests write their inputs as Clash Core, e.g. with
-  'Test.Clash.Rewrite.parseToTermQQ', and convert them. Note that conversion
-  deshadows, so a converted input never has binders that clash with the
-  scope. To test how a function handles such binders, convert the part of the
-  input that has them in a smaller scope, and 'sink' it into a scope with more
-  variables: e.g. into the scope of 'extendSunk', which contains 'sunkVar',
-  whose unique is above the names conversion gave the binders. Sinking allows
-  binders to clash, so this is the situation that functions going under
-  binders must handle: they have to rename them.
+  = Inputs in scoped Core
+
+  Tests write their inputs, and the terms they expect, as strings in the
+  language of 'Test.Clash.Rewrite.parseTestTerm' (see its section in
+  "Test.Clash.Rewrite"), and build them in a /test scope/ ('TestScope'): a
+  scope with variables that the test declares, which the strings refer to by
+  their identifiers. Binders get names from just above the watermark of the
+  scope, in depth-first order, as conversion from Clash Core gives them.
+
+  A closed term:
+
+  > closedTerm "\\(x :: Int) -> x"
+
+  An open term: 'withTerm' declares the free local variables of a term, in
+  the order of their keys (the uniques of their identifiers), type variables
+  first, and builds the term in their scope. Here @x_2@ gets name 1 and
+  @f_3@ name 2. Terms built in the same scope with 'termIn' refer to the same
+  variables, so they can be compared with the result:
+
+  > withTerm "f_3 (x_2 :: Int)" $ \ts tm ->
+  >   assertTermIs ts "f_3 x_2" tm
+
+  An explicit scope, whose variables get the names 1, 2, ... in order, unless
+  'atRaw' gives one a name of choice:
+
+  > withTestScope [tyVarD "a_1", varD "x_2" "a_1", atRaw 10 (varD "y_3" "Int")] $ \ts ->
+  >   termIn ts "\\(z :: a_1) -> x_2"
+
+  Running a transformation in the root context of the scope ('runScopedIn'),
+  or at a subterm ('runScopedAt'), with global bindings from
+  'mkGlobalBindings' if it needs them. Results that refer to new global
+  bindings compare after 'globalsByOcc'.
+
+  > withTerm "let { !(x :: Int) = 1 } in 2" $ \ts e -> do
+  >   (e', _, changed) <- runScopedIn def def ts $(asScopedRewriteQ deadCode) e
+  >   assertTermIs ts "2" e'
+  >   changed @?= True
+
+  Evaluating it in the scope: 'Test.Clash.Scoped.Evaluator.whnfIn'. Types
+  work like terms: 'typeIn', 'closedType' and 'withType'. A Netlist test gets
+  the component context of a scope from 'testCompCtx'.
+
+  What the parser can't parse, such as primitives, is built with the builders
+  of "Clash.Core.Scoped.Builder". A parsed term is a builder too:
+
+  > termIn ts (builtTerm (appB (primB (testPrim "f" "Int -> Int")) (testTermB "x_2")))
+
+  = Shadowing
+
+  Clash Core allowed a binder to shadow a variable in scope, and many of its
+  bugs were about that. In scoped Core, a term built in a scope (or converted
+  into it) has binders with names above the names of the scope. A binder can
+  only clash with a name of its scope once the term is 'sink'ed into a larger
+  scope: that is the situation in which a function that goes under binders
+  must rename them, and so where the shadowing tests of Clash Core end up. A
+  test of shadowing:
+
+  1. builds its input in a scope;
+  2. extends the scope with variables that get the names of the first binders
+     of the input, and sinks the input into it, with 'withClashing'; or with
+     'sunkD', whose name is above the names of all binders;
+  3. asserts the precondition, that a binder clashes ('assertClashes');
+  4. runs the function, and asserts that the result only mentions variables
+     in scope ('assertLintClean'), and is alpha-equivalent to the expected
+     term.
+
+  E.g. @let x = 1 in let x = x in x@, where the inner binder shadows the outer
+  one in the source, and the outer binder clashes with the new variable @z@:
+
+  > withTerm "let { !(x :: Int) = 1 } in let { !(x :: Int) = x } in x" $ \ts0 e0 ->
+  >   withClashing ts0 [varD "z" "Int"] e0 $ \ts e -> do
+  >     assertClashes ts e
+  >     e' <- deadCodeBottomup ts e
+  >     assertLintClean ts e'
+  >     assertTermAlphaEq e e'
+
+  An identifier that is bound again, like @x@ above, refers to the inner
+  binder in its scope, as in Haskell. The builder gives the two binders
+  different names: shadowing in the source of a test is not shadowing in
+  scoped Core.
+
+  = Converting from Clash Core
+
+  The older tests write their inputs as Clash Core, e.g. with
+  'Test.Clash.Rewrite.parseToTermQQ', and convert them (see the section
+  "Converting" below). Note that conversion deshadows, so a converted input
+  never has binders that clash with the scope. To test how a function handles
+  such binders, convert the part of the input that has them in a smaller
+  scope, and 'sink' it into a scope with more variables: e.g. into the scope
+  of 'extendSunk', which contains 'sunkVar', whose unique is above the names
+  conversion gave the binders. These helpers go with Clash Core, in package B
+  of the port.
 -}
 
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Clash.Scoped
-  ( -- * Converting
-    withFreeVarsOf
+  ( -- * Test scopes
+    TestScope (..)
+  , emptyTestScope
+  , withTestScope
+  , extendTestScope
+  , termIn
+  , typeIn
+  , closedTerm
+  , closedType
+  , withTerm
+  , withTerms
+  , withType
+    -- ** Parsing, from "Test.Clash.Rewrite"
+  , TestTerm (..)
+  , TestType (..)
+  , ScopeDecl
+  , parseTestTerm
+  , parseTestType
+  , termQQ
+  , typeQQ
+  , builtTerm
+  , builtType
+  , tyVarD
+  , kindedTyVarD
+  , varD
+  , atRaw
+  , testGlobalId
+    -- * Shadowing
+  , withClashing
+  , sunkD
+  , testScopeRaws
+  , clashingBinders
+  , assertClashes
+    -- * Checking results
+  , testLintScope
+  , assertLintClean
+  , assertTermAlphaEq
+  , assertTermIs
+  , assertTypeIs
+    -- * Running scoped transformations in a test scope
+  , runScopedIn
+  , runScopedAt
+  , mkGlobalBindings
+  , globalsByOcc
+  , testCompCtx
+  , testPrim
+    -- * Converting
+  , withFreeVarsOf
   , withFreeVars
   , extendFreeVars
   , abstractFreeVars
@@ -79,6 +211,8 @@ module Test.Clash.Scoped
   , scopedWhnf
     -- * Netlist generation
   , withCompCtxOf
+    -- * Tests
+  , testScopeTests
   ) where
 
 import qualified Control.Lens as Lens
@@ -90,12 +224,15 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.Hashable as Hashable
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Text (Text)
 import GHC.Stack (HasCallStack)
-import Test.Tasty (TestTree, adjustOption)
-import Test.Tasty.HUnit (Assertion, assertBool, assertFailure)
+import Test.Tasty (TestTree, adjustOption, testGroup)
+import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
   (Gen, Property, QuickCheckTests (..), Testable, choose, forAllShow, frequency)
 
@@ -108,6 +245,9 @@ import qualified Clash.Core.Var as C
 import Clash.Core.VarEnv (unionInScope)
 import Clash.Unique (Unique)
 
+import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
+import Clash.Core.Scoped.Builder
+  (appB, primB, runClosedTerm, runClosedType, runTermIn, runTypeIn)
 import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars (HasNameBinder (..), freeTmVars, freeTyVars, freeTyVarsOfType)
 import Clash.Core.Scoped.Internal.Names
@@ -116,18 +256,21 @@ import Clash.Core.Scoped.Internal.Names
 import Clash.Core.Scoped.Internal.Scope
   (Name (UnsafeName), NameBinder (UnsafeNameBinder), nameId, nameOf, scopeWatermark)
 import Clash.Core.Scoped.NameMap
+import Clash.Core.Pretty (PrettyOptions (..), showPpr')
+import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), compCtxFromList)
 import Clash.Rewrite.Scoped
-  ( ScopedRewrite, Frame (LetBinding), pushFrame, rootContext, runScopedTransform
+  ( ScopedRewrite, ScopedTransform (..), Frame (LetBinding), pushFrame, rootContext
   , underAlt, underLam, underLet, underLetRec, underTyLam)
 import qualified Clash.Rewrite.Scoped as Scoped
 import Test.Clash.Scoped.ViaFoil (viaFoil, withGlobalBindings)
 import Clash.Rewrite.Types
   (Rewrite, RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
+import qualified Clash.Rewrite.Util as Util (changed)
 import qualified Clash.Rewrite.Types as C
 
 import Clash.Driver.Types (Binding (..))
@@ -136,10 +279,325 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Test.Clash.Differential (KnownDifference, Outcome (..))
 import Test.Clash.Differential.Sites (compareAtSite)
 import Test.Clash.Rewrite
-  ( assertAlphaEq, globalsByName, inScopeOf, intId, mkBinding, runRewriteTest
-  , testTyConMap)
-import Test.Clash.Scoped.Evaluator (scopedWhnf)
+  ( DeclVar (..), ScopeDecl (..), TestTerm (..), TestType (..), assertAlphaEq
+  , assertErrorContains, atRaw, builtTerm, builtType, freeVarType, globalsByName, inScopeOf, intId, kindedTyVarD
+  , justDataCon, mkBinding, mkGlobalBinding, nothingDataCon, parseTestTerm, parseToTerm, parseTestType, runRewriteTest, showPprU
+  , termQQ, testGlobalId, testTyConMap, tyVarD, typeQQ, varD, vecTcNm, consDc)
+import Test.Clash.Rewrite (ghcName)
+import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
+import Test.Clash.Scoped.Evaluator (scopedWhnf, whnfIn)
 import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
+
+-- * Test scopes
+
+-- | The scope of a test: a scope with the variables that the test declared
+-- ('ScopeDecl'), by key (see 'Clash.Core.Scoped.Builder.Key'), so that terms
+-- parsed from strings can refer to them, see 'termIn'.
+data TestScope n = TestScope
+  { testScope :: !(Scope n)
+  , testTyVars :: !(IntMap (Type n))
+  -- ^ The type variables, by key
+  , testVars :: !(IntMap (Term n))
+  -- ^ The term variables, by key
+  }
+
+-- | The empty scope, to build closed terms in
+emptyTestScope :: TestScope 'VoidS
+emptyTestScope = TestScope emptyScope IntMap.empty IntMap.empty
+
+-- | A scope with the given variables, in order: the kind or type of each may
+-- mention the ones before it. Each gets the next name (the first gets 1),
+-- unless it is declared 'atRaw'.
+withTestScope
+  :: HasCallStack => [ScopeDecl] -> (forall n. Distinct n => TestScope n -> r) -> r
+withTestScope = extendTestScope emptyTestScope
+
+-- | Extend a scope with more variables, see 'withTestScope'. Values built in
+-- the original scope can be 'sink'ed into the extended one, where their
+-- binders may clash with the new variables, see 'withClashing'.
+extendTestScope
+  :: forall n r
+   . (HasCallStack, Distinct n)
+  => TestScope n
+  -> [ScopeDecl]
+  -> (forall l. DExt n l => TestScope l -> r)
+  -> r
+extendTestScope ts [] k = k ts
+extendTestScope ts (d : ds) k =
+  declare ts d $ \(ts1 :: TestScope i) ->
+    extendTestScope ts1 ds $ \(ts2 :: TestScope l) ->
+      withExtTrans @n @i @l (k ts2)
+
+-- | Extend a scope with a variable
+declare
+  :: (HasCallStack, Distinct n)
+  => TestScope n -> ScopeDecl -> (forall l. DExt n l => TestScope l -> r) -> r
+declare ts@(TestScope sc tys tms) (ScopeDecl raw v) k = case v of
+  DeclTyVar key nm ki ->
+    withFreshTyBinder sc0 nm (typeIn ts ki) $ \sc' b ->
+      k (TestScope sc' (IntMap.insert key (tyBinderVar b) (sink1 tys)) (sink1 tms))
+  DeclId key nm ty ->
+    withFreshIdBinder sc0 nm (maybe freeVarTy (typeIn ts) ty) $ \sc' b ->
+      k (TestScope sc' (sink1 tys) (IntMap.insert key (idBinderVar b) (sink1 tms)))
+ where
+  sc0 = case raw of
+    Nothing -> sc
+    Just r
+      | r > scopeWatermark sc -> raiseWatermark (r - 1) sc
+      | otherwise -> error
+          ("atRaw: the raw name " <> show r <> " is not above the names in scope, up to "
+            <> show (scopeWatermark sc))
+
+  freeVarTy = ConstTy (case freeVarType of
+    C.ConstTy c -> c
+    _ -> error "declare: freeVarType is not a type constructor")
+
+-- | Build a term in a scope. Its free variables must be variables of the
+-- scope; its binders get names from just above the watermark of the scope.
+termIn :: (HasCallStack, Distinct n) => TestScope n -> TestTerm -> Term n
+termIn (TestScope sc tys tms) t = runTermIn sc tys tms (testTermB t)
+
+-- | Build a type in a scope, see 'termIn'
+typeIn :: (HasCallStack, Distinct n) => TestScope n -> TestType -> Type n
+typeIn (TestScope sc tys _) t = runTypeIn sc tys (testTypeB t)
+
+-- | Build a closed term
+closedTerm :: HasCallStack => TestTerm -> Term 'VoidS
+closedTerm = runClosedTerm . testTermB
+
+-- | Build a closed type
+closedType :: HasCallStack => TestType -> Type 'VoidS
+closedType = runClosedType . testTypeB
+
+-- | Build a term in a scope with its free variables, see 'testTermFree'
+withTerm
+  :: HasCallStack
+  => TestTerm -> (forall n. Distinct n => TestScope n -> Term n -> r) -> r
+withTerm t k = withTerms [t] $ \ts -> \case
+  [tm] -> k ts tm
+  _ -> error "withTerm: impossible"
+
+-- | Build a type in a scope with its free type variables, see 'testTypeFree'
+withType
+  :: HasCallStack
+  => TestType -> (forall n. Distinct n => TestScope n -> Type n -> r) -> r
+withType t k = withTestScope (testTypeFree t) $ \ts -> k ts (typeIn ts t)
+
+-- | Build terms in a scope with the free variables of all of them, see
+-- 'testTermFree'. A variable gets the type of the first of its occurrences
+-- that has one.
+withTerms
+  :: HasCallStack
+  => [TestTerm] -> (forall n. Distinct n => TestScope n -> [Term n] -> r) -> r
+withTerms tms k =
+  withTestScope (mergeFree (concatMap testTermFree tms)) $ \ts -> k ts (map (termIn ts) tms)
+ where
+  mergeFree ds =
+    IntMap.elems (IntMap.fromListWith (\_ d -> d) [ (key, d) | d@(ScopeDecl _ (DeclTyVar key _ _)) <- ds ]) <>
+    IntMap.elems (IntMap.fromListWith typed [ (key, d) | d@(ScopeDecl _ (DeclId key _ _)) <- ds ])
+
+  -- The first declaration with a type, given a later and an earlier one
+  typed later earlier = case earlier of
+    ScopeDecl _ (DeclId _ _ Nothing) -> later
+    _ -> earlier
+
+-- * Shadowing
+
+-- | Sink a term, or a type, into its scope extended with the given variables. Its
+-- binders keep their names, so the first ones clash with the new variables:
+-- the new variables get the names just above the watermark of the scope, and
+-- so do the first binders of a term built there ('termIn'). A function that
+-- goes under these binders in the extended scope must rename them. So this
+-- builds the scenarios in which Clash Core had shadowing, see the module
+-- header.
+withClashing
+  :: (HasCallStack, Distinct n, Sinkable e)
+  => TestScope n
+  -> [ScopeDecl]
+  -> e n
+  -> (forall l. DExt n l => TestScope l -> e l -> r)
+  -> r
+withClashing ts ds tm k = extendTestScope ts ds $ \ts' -> k ts' (sink tm)
+
+-- | A variable with a raw name above the names of the binders of the terms of
+-- the tests, of type @Int@: every binder of a term in a scope with it is below
+-- the watermark of the scope, so going under it renames it. See 'sunkVar'.
+sunkD :: ScopeDecl
+sunkD = atRaw 1000000 (varD "sunk_S1000000" "Int")
+
+-- | The raw names of the variables of a scope
+testScopeRaws :: TestScope n -> IntSet
+testScopeRaws (TestScope _ tys tms) =
+  IntSet.fromList ([tyNameRaw n | VarTy _ _ n <- IntMap.elems tys] <> [tmNameRaw n | Var _ _ n <- IntMap.elems tms])
+
+-- | The raw names of the binders of a term that are names of variables of the
+-- scope, see 'binderRaws'
+clashingBinders :: TestScope n -> Term n -> [Int]
+clashingBinders ts tm = filter (`IntSet.member` testScopeRaws ts) (binderRaws tm)
+
+-- | Assert that some binder of a term clashes with the variables of the
+-- scope: the precondition of a test of shadowing, see 'withClashing'
+assertClashes :: HasCallStack => TestScope n -> Term n -> Assertion
+assertClashes ts tm =
+  assertBool ("no binder clashes with the variables of the scope in:\n" <> showPprU tm)
+    (not (null (clashingBinders ts tm)))
+
+-- * Checking results
+
+-- | The names of the variables of a scope, for 'lintTerm'
+testLintScope :: TestScope n -> LintScope
+testLintScope (TestScope _ tys tms) =
+  LintScope
+    (IntSet.fromList [tyNameRaw n | VarTy _ _ n <- IntMap.elems tys])
+    (IntSet.fromList [tmNameRaw n | Var _ _ n <- IntMap.elems tms])
+
+-- | Assert that a term in a scope only mentions its variables, and its own
+-- bound ones, see 'lintTerm'
+assertLintClean :: HasCallStack => TestScope n -> Term n -> Assertion
+assertLintClean ts tm = case lintTerm (testLintScope ts) tm of
+  [] -> pure ()
+  errs -> assertFailure (unlines errs <> "in:\n" <> showPprU tm)
+
+-- | Assert that two terms are alpha-equivalent, see
+-- 'Clash.Core.Scoped.Alpha.aeqTm'. Shows both, with their raw names, if they
+-- aren't.
+assertTermAlphaEq :: HasCallStack => Term n -> Term n -> Assertion
+assertTermAlphaEq expected actual =
+  assertBool
+    ("Expected (up to alpha equivalence):\n" <> showTermT expected
+      <> "\nbut got:\n" <> showTermT actual)
+    (aeqTm expected actual)
+
+-- | Pretty print a term like 'showPprU', with its ticks, which
+-- 'Clash.Core.Scoped.Alpha.aeqTm' compares
+showTermT :: Term n -> String
+showTermT = showPpr' PrettyOptions
+  { displayUniques = True
+  , displayTypes = False
+  , displayQualifiers = False
+  , displayTicks = True
+  }
+
+-- | Assert that a term is alpha-equivalent to the given one, built in the
+-- same scope
+assertTermIs :: (HasCallStack, Distinct n) => TestScope n -> TestTerm -> Term n -> Assertion
+assertTermIs ts expected = assertTermAlphaEq (termIn ts expected)
+
+-- | Assert that a type is alpha-equivalent to the given one, built in the
+-- same scope
+assertTypeIs :: (HasCallStack, Distinct n) => TestScope n -> TestType -> Type n -> Assertion
+assertTypeIs ts expected0 actual =
+  assertBool
+    ("Expected (up to alpha equivalence):\n" <> showPprU expected
+      <> "\nbut got:\n" <> showPprU actual)
+    (aeqTy expected actual)
+ where
+  expected = typeIn ts expected0
+
+-- * Running transformations
+
+-- | Run a scoped transformation on a term, in the root context of its scope.
+-- Gives the result, the final state, and whether a change was signaled.
+runScopedIn
+  :: Distinct n
+  => RewriteEnv
+  -> RewriteState extra
+  -> TestScope n
+  -> ScopedRewrite extra
+  -> Term n
+  -> IO (Term n, RewriteState extra, Bool)
+runScopedIn env st ts t e =
+  runRewriteTest env st (runScopedTransform t (rootContext (testScope ts)) e)
+
+-- | Run a scoped transformation on the subterm at a path (see 'atPath'), in
+-- its context, and put the result back. Gives the whole term, the final state,
+-- and whether a change was signaled. The binders on the path are opened, so
+-- they may be renamed. E.g. to run a transformation in the body of a lambda:
+--
+-- > withTerm "\\(x :: Int) -> f_1 x" $ \ts e -> do
+-- >   (e', _, _) <- runScopedAt def def ts [LamStep] topLetR e
+-- >   assertTermIs ts "\\(x :: Int) -> let { (r :: Int) = f_1 x } in r" e'
+runScopedAt
+  :: forall n extra
+   . (HasCallStack, Distinct n)
+  => RewriteEnv
+  -> RewriteState extra
+  -> TestScope n
+  -> [Step]
+  -> ScopedRewrite extra
+  -> Term n
+  -> IO (Term n, RewriteState extra, Bool)
+runScopedAt env st ts path0 t e0 =
+  runRewriteTest env st (go path0 (rootContext (testScope ts)) e0)
+ where
+  go :: Distinct x => [Step] -> Scoped.TransformContext x -> Term x -> RewriteMonad extra (Term x)
+  go [] ctx e = runScopedTransform t ctx e
+  go (step : path) ctx e = case (step, e) of
+    (LamStep, Lam b body) -> underLam ctx b body $ \ctx' b' body' -> Lam b' <$> go path ctx' body'
+    (TyLamStep, TyLam b body) -> underTyLam ctx b body $ \ctx' b' body' -> TyLam b' <$> go path ctx' body'
+    (LetBodyStep, Let bind body) -> underLet ctx bind body $ \ctx' bind' body' -> Let bind' <$> go path ctx' body'
+    (LetRhsStep 0, Let (NonRec b x) body) ->
+      (\x' -> Let (NonRec b x') body) <$> go path (pushFrame (LetBinding b) ctx) x
+    (LetRhsStep i, Let (Rec bs xs) body) | i < length xs ->
+      underLetRec ctx bs xs body $ \_ ctxRhs bs' xs' body' -> do
+        x' <- go path (ctxRhs i) (xs' !! i)
+        pure (Let (Rec bs' (replaceAt i x' xs')) body')
+    (AltStep i, Case subj ty alts) | i < length alts -> do
+      alt' <- underAlt ctx (alts !! i) $ \ctx' p rhs -> Alt p <$> go path ctx' rhs
+      pure (Case subj ty (replaceAt i alt' alts))
+    (AppFunStep, App f a) -> (`App` a) <$> go path (pushFrame Scoped.AppFun ctx) f
+    (AppArgStep, App f a) -> App f <$> go path (pushFrame (Scoped.appArgFrame f) ctx) a
+    _ -> error ("runScopedAt: " <> show step <> " doesn't fit the term:\n" <> showPprU e)
+
+  replaceAt :: Int -> a -> [a] -> [a]
+  replaceAt i x xs = take i xs <> [x] <> drop (i + 1) xs
+
+-- | Give every global variable a unique derived from its occurrence name, so
+-- that terms that refer to new globals made by different runs, which get
+-- different uniques, can be compared. See 'Test.Clash.Rewrite.globalsByName'.
+globalsByOcc :: Term n -> Term n
+globalsByOcc = go
+ where
+  go :: Term x -> Term x
+  go = \case
+    GlobalVar g ->
+      let nm = globalIdName g
+          u = fromIntegral (Hashable.hash (C.nameOcc nm))
+      in  GlobalVar g {globalIdName = nm {C.nameUniq = u}}
+    Lam b e -> Lam b (go e)
+    TyLam b e -> TyLam b (go e)
+    App e1 e2 -> App (go e1) (go e2)
+    TyApp e ty -> TyApp (go e) ty
+    Let (NonRec b x) e -> Let (NonRec b (go x)) (go e)
+    Let (Rec bs xs) e -> Let (Rec bs (map go xs)) (go e)
+    Case e ty alts -> Case (go e) ty [Alt p (go rhs) | Alt p rhs <- alts]
+    Cast e t1 t2 -> Cast (go e) t1 t2
+    Tick (Attributes ty x) e -> Tick (Attributes ty (go x)) (go e)
+    Tick t e -> Tick t (go e)
+    e -> e
+
+-- | The context of a component whose local variables are the term variables
+-- of a test scope, with their occurrence names as their HDL identifiers. The
+-- context has the type environment 'testTypeEnv', like
+-- 'Test.Clash.Rewrite.runNetlistTest'. See 'withCompCtxOf'.
+testCompCtx :: Distinct n => TestScope n -> CompCtx n
+testCompCtx ts =
+  compCtxFromList (testScope ts) testTypeEnv
+    [ (LocalId o ty n, Id.unsafeMake (C.nameOcc o)) | Var o ty n <- IntMap.elems (testVars ts) ]
+
+-- | A primitive with the given name and closed type, which does no work, has
+-- a single result, and no unfolding. The parser doesn't parse primitives, so
+-- tests build them with 'Clash.Core.Scoped.Builder.primB':
+--
+-- > termIn ts (builtTerm (appB (primB (testPrim "f" "Int -> Int")) (testTermB "x_1")))
+testPrim :: HasCallStack => Text -> TestType -> PrimInfo
+testPrim nm ty = mkPrimInfo (ghcName nm) (closedType ty) C.WorkConstant C.SingleResult NoUnfolding
+
+-- | Global bindings of closed terms, for 'Clash.Rewrite.Types.scopedBindings'
+mkGlobalBindings :: HasCallStack => [(GlobalId, TestTerm)] -> GlobalEnv (Binding (Term 'VoidS))
+mkGlobalBindings bs = globalEnvFromList [(g, mkGlobalBinding g (closedTerm t)) | (g, t) <- bs]
+
+-- * Converting
 
 -- | A conversion environment with the free variables of the given Clash terms
 -- (both type and term variables), which keep their uniques. The type
@@ -1079,3 +1537,175 @@ withCompCtxOf tms k =
                   | v <- ids, Var o ty n <- [fromClashTerm cenv (C.Var v)] ]
         ctx = compCtxFromList (convScope cenv) testTypeEnv idNames
     in k ctx (map (fromClashTerm cenv) tms)
+
+-- * Tests of the test scopes
+
+-- | Tests of the test scopes, of 'parseTestTerm', and of the helpers for
+-- shadowing
+testScopeTests :: TestTree
+testScopeTests = testGroup "Test.Clash.Scoped"
+  [ testGroup "parseTestTerm"
+      [ -- The binders of a closed term get the names that conversion from
+        -- Clash Core gives them
+        testCase "numbers binders like conversion" $
+          sequence_
+            [ do
+                let expected = fromClashTermClosed (parseToTerm s)
+                    actual = closedTerm (parseTestTerm s)
+                assertTermAlphaEq expected actual
+                binderRaws actual @?= binderRaws expected
+            | s <-
+                [ "\\(x :: Int) (y :: Int) -> x"
+                , "\\(a :: Type) (x :: a) -> x"
+                , "\\(f :: forall a b. Pair) -> f @Int"
+                , "let { x_0, x_1 :: Int; x_0 = 5; x_1 = x_0 } in x_1"
+                , "(\\(x :: Int) -> x) ((\\(y :: Int) -> y) 1)"
+                ]
+            ]
+
+      , testCase "free variables are declared in the order of their keys" $
+          withTerm "f_5 (x_3 :: Int)" $ \ts tm -> do
+            testScopeRaws ts @?= IntSet.fromList [1, 2]
+            case (termIn ts "x_3", tm) of
+              (Var _ ty x, App (Var _ _ f) (Var _ _ x')) -> do
+                tmNameRaw x @?= 1
+                tmNameRaw f @?= 2
+                tmNameRaw x' @?= 1
+                assertTypeIs ts "Int" ty
+              _ -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "free type variables come first" $
+          withTerm "\\(y_1 :: a_7) -> y_1" $ \ts tm -> case tm of
+            Lam b (Var {}) -> do
+              assertTypeIs ts "a_7" (idBinderType b)
+              tmNameRaw (tmNameOf b) @?= 2
+            _ -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "a free variable gets the type of its first annotated occurrence" $
+          withTerms ["f_1 (x_2 :: Int)", "(f_1 :: Int -> Int) x_2"] $ \ts _ ->
+            case termIn ts "f_1" of
+              Var _ ty _ -> assertTypeIs ts "Int -> Int" ty
+              tm -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "a bang binding is non-recursive" $
+          withTerm "\\(x_1 :: Int) -> let { !(x_1 :: Int) = f_2 x_1 } in x_1" $ \ts tm ->
+            case tm of
+              Lam bx (Let (NonRec bx' (App _ (Var _ _ x))) (Var _ _ x')) -> do
+                tmNameRaw x @?= tmNameRaw (tmNameOf bx)
+                tmNameRaw x' @?= tmNameRaw (tmNameOf bx')
+                assertBool "different binders" (tmNameRaw x /= tmNameRaw x')
+                assertLintClean ts tm
+              _ -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "bang bindings bind one after the other" $
+          case closedTerm "let { !(x :: Int) = 1; !(y :: Int) = x } in y" of
+            Let (NonRec _ _) (Let (NonRec _ (Var {})) (Var {})) -> pure ()
+            tm -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "a let with some bang bindings is an error" $
+          assertErrorContains "some, but not all"
+            (closedTerm "let { !(x :: Int) = 1; (y :: Int) = x } in y")
+
+      , testCase "case-expressions" $
+          withTerm "(case (m_1 :: Maybe Int) of { Just (x_2 :: Int) -> x_2; Nothing -> 0 }) :: Int" $
+            \ts tm -> case tm of
+              Case (Var {}) ty [Alt (DataPat dcJ TNil (TCons _ TNil)) (Var {}), Alt (DataPat dcN TNil TNil) (Literal _)] -> do
+                assertTypeIs ts "Int" ty
+                dcJ @?= justDataCon
+                dcN @?= nothingDataCon
+                assertLintClean ts tm
+              _ -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "literal and default alternatives" $
+          case closedTerm "\\(x :: Int) -> (case x of { 1 -> 2; -1 -> 3; _ -> x }) :: Int" of
+            Lam _ (Case _ _ [Alt (LitPat l1) _, Alt (LitPat l2) _, Alt DefaultPat _]) -> do
+              l1 @?= C.IntLiteral 1
+              l2 @?= C.IntLiteral (-1)
+            tm -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "global variables" $
+          case closedTerm "f_G9 :: Int -> Int" of
+            GlobalVar g -> do
+              g @?= testGlobalId "f_G9" "Int -> Int"
+              assertBool "type" (aeqTy (closedType "Int -> Int") (globalIdType g))
+            tm -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "type applications of literals, and constructor operators" $
+          case closedTerm "\\(v :: Vec 0 Int) (x :: Int) (co :: Int) -> Cons @1 @Int @0 co x v" of
+            Lam _ (Lam _ (Lam _ (App (App (App (TyApp (TyApp (TyApp (Data dc) (LitTy (C.NumTy 1))) _) _) _) _) _))) ->
+              dc @?= consDc
+            tm -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "type constructors by name" $ do
+          assertBool "Vec"
+            (aeqTy (closedType "forall (n :: Nat). Vec n Int -> Clash.Sized.Vector.Vec 2 Int")
+              (closedType [typeQQ|
+                forall (n :: Nat).
+                  Clash.Sized.Vector.Vec n Int -> Clash.Sized.Vector.Vec 2 Int |]))
+          case closedType "Vec 2 Maybe_9" of
+            AppTy (AppTy (ConstTy (C.TyCon vec)) (LitTy (C.NumTy 2))) (ConstTy (C.TyCon m)) -> do
+              vec @?= vecTcNm
+              C.nameUniq m @?= 9
+            ty -> assertFailure ("unexpected shape:\n" <> showPprU ty)
+      ]
+
+  , testGroup "scopes"
+      [ testCase "declared variables get increasing names" $
+          withTestScope [tyVarD "a_1", varD "x_2" "a_1", atRaw 10 (varD "y_3" "Int")] $ \ts -> do
+            testScopeRaws ts @?= IntSet.fromList [1, 2, 10]
+            case termIn ts "x_2" of
+              Var _ ty _ -> assertTypeIs ts "a_1" ty
+              tm -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "a raw name below the watermark is an error" $
+          assertErrorContains "is not above the names in scope"
+            (withTestScope [varD "x_1" "Int", atRaw 1 (varD "y_2" "Int")] $ \ts -> toClashTerm (termIn ts "y_2"))
+
+      , testCase "a variable that is not in scope is an error" $
+          assertErrorContains "variable not in scope"
+            (withTestScope [varD "x_1" "Int"] $ \ts -> toClashTerm (termIn ts "y_2"))
+      ]
+
+  , testGroup "running transformations"
+      [ testCase "runScopedAt runs a transformation in the body of a lambda" $
+          withTerm "\\(x :: Int) -> \\(y :: Int) -> y" $ \ts e -> do
+            let inc = ScopedTransform $ \_ _ -> Util.changed (Literal (C.IntLiteral 1))
+            (e', _, ch) <- runScopedAt def (def :: RewriteState ()) ts [LamStep, LamStep] inc e
+            assertTermIs ts "\\(x :: Int) (y :: Int) -> 1" e'
+            ch @?= True
+      , testCase "whnfIn evaluates in a test scope" $
+          withTerm "(case 1 of { 1 -> (y :: Int); _ -> 2 }) :: Int" $ \ts e ->
+            assertTermIs ts "y"
+              (whnfIn (Env testTypeEnv (PrimReductions HashMap.empty Nothing))
+                emptyGlobalEnv False (testScope ts) e)
+      , testCase "testPrim" $
+          withTerm "x_1 :: Int" $ \ts x -> case termIn ts (builtTerm (appB (primB (testPrim "f" "Int -> Int")) (testTermB "x_1"))) of
+            App (Prim p) x' -> do
+              primName p @?= "f"
+              assertTermAlphaEq x x'
+            tm -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+      , testCase "globalsByOcc compares globals by name" $
+          assertTermAlphaEq
+            (globalsByOcc (closedTerm "f_G1 :: Int"))
+            (globalsByOcc (closedTerm "f_G2 :: Int"))
+      ]
+
+  , testGroup "shadowing"
+      [ testCase "withClashing gives the first binders the names of new variables" $
+          withTerm "\\(y :: Int) -> (x_1 :: Int)" $ \ts0 tm0 ->
+            withClashing ts0 [varD "z_2" "Int"] tm0 $ \ts tm -> do
+              clashingBinders ts0 tm0 @?= []
+              clashingBinders ts tm @?= [2]
+              assertClashes ts tm
+              assertLintClean ts tm
+              case tm of
+                Lam b body -> openIdBinder (testScope ts) b body $ \_ b' _ ->
+                  assertBool "renamed" (tmNameRaw (tmNameOf b') > 2)
+                _ -> assertFailure ("unexpected shape:\n" <> showPprU tm)
+
+      , testCase "in the scope of sunkD, all binders are below the watermark" $
+          withTerm "\\(x :: Int) (y :: Int) -> f_1 x y" $ \ts0 tm0 ->
+            withClashing ts0 [sunkD] tm0 $ \ts tm ->
+              lowBinders (scopeWatermark (testScope ts)) tm @?= binderRaws tm
+      ]
+  ]
