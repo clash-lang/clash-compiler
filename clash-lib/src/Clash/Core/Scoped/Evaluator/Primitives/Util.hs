@@ -151,8 +151,10 @@ module Clash.Core.Scoped.Evaluator.Primitives.Util
   , tyNatSize
   , numTy
   , primArgResTys
+  , SomeType (..)
   , funArgTys
   , tyConNameOf
+  , tyConAppOf
     -- * Lifting operations on sized types
   , liftUnsigned2
   , liftSigned2
@@ -202,6 +204,9 @@ module Clash.Core.Scoped.Evaluator.Primitives.Util
   , powImplWorker
     -- * Primitives in results
   , closedPrim
+  , tyConB
+  , forAllNatB
+  , forAllTypeB
   , bConPrim
   , bvConPrim
   , indexConPrim
@@ -220,6 +225,10 @@ module Clash.Core.Scoped.Evaluator.Primitives.Util
   , bvAppendTy
   , bvSplitPrim
   , bvSplitTy
+  , vecHeadPrim
+  , vecLastPrim
+  , vecTailPrim
+  , vecInitPrim
   , tupleTyConName
     -- * The machine
   , setTerm
@@ -265,15 +274,13 @@ import GHC.Types.Basic (Boxity (..))
 import GHC.Types.Name (getSrcSpan, nameModule_maybe, nameOccName, occNameString)
 import GHC.Unit.Module (moduleName, moduleNameString)
 
-import Clash.Core.DataCon (DataCon (..), dcLegacyType)
+import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
-import qualified Clash.Core.Var as C
 import Clash.Debug (trace)
 import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.PrimitiveReductions (typeNatAdd)
@@ -289,7 +296,12 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified Clash.Sized.Vector
 
-import Clash.Core.Scoped.Convert (fromClashTermClosedIn, toClashTerm, mkPrimInfoFromClash)
+import Clash.Core.Scoped.Builder
+  (Key, TyB, forAllTyB, funTyB, litTyB, runClosedType, tyConAppB, varTyB)
+import Clash.Core.Scoped.Convert (fromClashTermClosedIn, toClashTerm, mkPrimInfo)
+import Clash.Core.Scoped.TysPrim
+  (integerPrimTyConName, liftedTypeKindTyConName, naturalPrimTyConName,
+   typeNatKindTyConName, wordPrimTyConName)
 import Clash.Core.Scoped.Evaluator
   (integerLiteral, naturalLiteral, reduceIn, whnf, wrapSigned, wrapUnsigned)
 import qualified Clash.Core.Scoped.Evaluator as E
@@ -298,7 +310,7 @@ import Clash.Core.Scoped.HasType (piResultTys, primInfoType)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkApps)
 import Clash.Core.Scoped.Type
-  (SplitFunForall (..), TypeView (..), mkTyConApp, splitFunForallTy, tyNatSize, tyView)
+  (PiTele (..), SplitFunForall (..), TypeView (..), mkTyConApp, splitFunForallTy, tyNatSize, tyView)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Scoped.Util (appendToVec, mkRTree, mkVec)
 
@@ -828,8 +840,9 @@ mkSomeNat tenv lit resTy = case tyView resTy of
   TyConApp someNatTcNm []
     | Just someNatTc <- lookupTyCon tenv someNatTcNm
     , [someNatDc] <- tyConDataCons someNatTc
-    , (_ : _ : Right (C.tyView -> C.TyConApp proxyTcNm [natTy, _]) : _, _)
-        <- C.splitFunForallTy (dcLegacyType someNatDc)
+    -- forall n. KnownNat n => Proxy n -> SomeNat
+    , SplitFunForall (PiForall _ (PiArg _ (PiArg (tyView -> TyConApp proxyTcNm [natTy, _]) _))) _
+        <- splitFunForallTy (dcType someNatDc)
     , Just proxyTc <- lookupTyCon tenv proxyTcNm
     , [proxyDc] <- tyConDataCons proxyTc
     -> mkApps (Data someNatDc)
@@ -839,9 +852,9 @@ mkSomeNat tenv lit resTy = case tyView resTy of
   _ -> error ($(curLoc) ++ "not SomeNat: " ++ showPpr resTy)
  where
   -- The kind of the Proxy, Natural, is closed
-  closedType :: C.Type -> Type x
+  closedType :: Type y -> Type x
   closedType = \case
-    C.ConstTy c -> ConstTy c
+    ConstTy c -> ConstTy c
     t -> error ($(curLoc) ++ "not a type constructor: " ++ showPpr t)
 
 -- | A literal of a sized type, see
@@ -1050,24 +1063,43 @@ extractTySizeInfo tenv scope primTy tyArgs = case tyView resTy of
 numTy :: Integer -> Type n
 numTy = LitTy . C.NumTy
 
--- | The argument types and the result type of the type of a primitive, as
--- types of Clash Core. These are closed: a reduction that only needs the names
--- of the type constructors in the type of its primitive (e.g. that of @Vec@)
--- can take them from here, rather than from the scoped type 'ty', which is
--- converted on every call that uses it.
-primArgResTys :: PrimInfo -> ([C.Type], C.Type)
-primArgResTys p = case C.splitFunForallTy (C.primType (primLegacy p)) of
-  (args, res) -> (Either.rights args, res)
+-- | A type in some scope, e.g. to look at the names of its type constructors
+data SomeType where
+  SomeType :: Type n -> SomeType
 
--- | The argument types of a function type of Clash Core, e.g. of an argument
--- type from 'primArgResTys'
-funArgTys :: C.Type -> [C.Type]
-funArgTys = Either.rights . fst . C.splitFunForallTy
+-- | The argument types and the result type of the type of a primitive, its
+-- 'primType', each in its own scope. A reduction that only needs the names of
+-- the type constructors in the type of its primitive (e.g. that of @Vec@) can
+-- take them from here ('tyConNameOf'), rather than from its instantiated type
+-- 'ty'.
+primArgResTys :: PrimInfo -> ([SomeType], SomeType)
+primArgResTys p = funArgResTys (SomeType (primType p))
 
--- | The name of the type constructor at the head of a type of Clash Core
-tyConNameOf :: C.Type -> Maybe TyConName
-tyConNameOf t = case C.tyView t of
-  C.TyConApp nm _ -> Just nm
+-- | The argument types and the result type of a function type, e.g. of an
+-- argument type from 'primArgResTys'
+funArgResTys :: SomeType -> ([SomeType], SomeType)
+funArgResTys (SomeType ty) = case splitFunForallTy ty of
+  SplitFunForall tele res -> (teleArgs tele, SomeType res)
+ where
+  teleArgs :: PiTele x y -> [SomeType]
+  teleArgs = \case
+    PiNil -> []
+    PiForall _ rest -> teleArgs rest
+    PiArg a rest -> SomeType a : teleArgs rest
+
+-- | The argument types of a function type, e.g. of an argument type from
+-- 'primArgResTys'
+funArgTys :: SomeType -> [SomeType]
+funArgTys = fst . funArgResTys
+
+-- | The name of the type constructor at the head of a type
+tyConNameOf :: SomeType -> Maybe TyConName
+tyConNameOf = fmap fst . tyConAppOf
+
+-- | The type constructor at the head of a type, and its arguments
+tyConAppOf :: SomeType -> Maybe (TyConName, [SomeType])
+tyConAppOf (SomeType t) = case tyView t of
+  TyConApp nm args -> Just (nm, map SomeType args)
   _ -> Nothing
 
 -- * Lifting operations on sized types
@@ -1429,25 +1461,38 @@ powImplWorker PrimStepContext{..}
 
 -- * Primitives in results
 
--- | A primitive of Clash Core, which is closed
-closedPrim :: HasCallStack => C.Term -> Term n
-closedPrim = \case
-  C.Prim p -> Prim (mkPrimInfoFromClash p)
-  _ -> error ($(curLoc) ++ "not a primitive")
+-- | A primitive with the given name, work info and closed type. The types of
+-- the primitives below are built with "Clash.Core.Scoped.Builder": the keys
+-- of their type variables only need to differ within a type.
+closedPrim :: Text -> C.WorkInfo -> TyB -> Term n
+closedPrim nm wi ty = Prim (mkPrimInfo nm (runClosedType ty) wi C.SingleResult NoUnfolding)
+
+-- | A type constructor
+tyConB :: TyConName -> TyB
+tyConB tc = tyConAppB tc []
+
+-- | A type quantified over a type variable of kind 'Natural', and of kind
+-- 'Type': its key, its name, and the body
+forAllNatB, forAllTypeB :: Key -> Text -> TyB -> TyB
+forAllNatB k nm = forAllTyB k (C.mkUnsafeSystemName nm (fromIntegral k)) (tyConB typeNatKindTyConName)
+forAllTypeB k nm = forAllTyB k (C.mkUnsafeSystemName nm (fromIntegral k)) (tyConB liftedTypeKindTyConName)
+
+-- | The type-level addition of naturals
+typeNatAddB :: TyB -> TyB -> TyB
+typeNatAddB m n = tyConAppB typeNatAdd [m, n]
 
 -- | 'Clash.Sized.Internal.BitVector.fromInteger##', given the type
 -- constructor of 'Bit'
 bConPrim :: TyConName -> Term n
 bConPrim bTcNm =
-  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Internal.BitVector.fromInteger##) funTy C.WorkNever
-          C.SingleResult C.NoUnfolding)
- where
-  funTy = foldr1 C.mkFunTy [C.wordPrimTy, C.integerPrimTy, C.mkTyConApp bTcNm []]
+  closedPrim (showt 'Clash.Sized.Internal.BitVector.fromInteger##) C.WorkNever
+    (funTyB [tyConB wordPrimTyConName, tyConB integerPrimTyConName] (tyConB bTcNm))
 
 -- | 'Clash.Sized.Internal.BitVector.fromInteger#', given the type
 -- constructor of 'BitVector'
 bvConPrim :: TyConName -> Term n
-bvConPrim = sizedConPrim (showt 'Clash.Sized.Internal.BitVector.fromInteger#) [C.naturalPrimTy]
+bvConPrim =
+  sizedConPrim (showt 'Clash.Sized.Internal.BitVector.fromInteger#) [tyConB naturalPrimTyConName]
 
 -- | 'Clash.Sized.Internal.Index.fromInteger#', given the type
 -- constructor of 'Clash.Sized.Internal.Index.Index'
@@ -1466,13 +1511,12 @@ unsignedConPrim = sizedConPrim (showt 'Clash.Sized.Internal.Unsigned.fromInteger
 
 -- | The @fromInteger#@ primitive of a sized type: @forall n. Natural# ->
 -- extra args -> Integer -> sized n@
-sizedConPrim :: Text -> [C.Type] -> TyConName -> Term n
+sizedConPrim :: Text -> [TyB] -> TyConName -> Term n
 sizedConPrim nm extraArgs tcNm =
-  Prim (mkPrimInfoFromClash $ C.PrimInfo nm (C.ForAllTy nTV funTy) C.WorkNever C.SingleResult C.NoUnfolding)
- where
-  funTy = foldr1 C.mkFunTy
-    ([C.naturalPrimTy] ++ extraArgs ++ [C.integerPrimTy, C.mkTyConApp tcNm [C.VarTy nTV]])
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 0)
+  closedPrim nm C.WorkNever $ forAllNatB 0 "n" $
+    funTyB
+      ([tyConB naturalPrimTyConName] ++ extraArgs ++ [tyConB integerPrimTyConName])
+      (tyConAppB tcNm [varTyB 0])
 
 -- | 'Clash.Sized.Vector.splitAt'
 splitAtPrim
@@ -1482,40 +1526,35 @@ splitAtPrim
   -- ^ Vec TyCon name
   -> Term n
 splitAtPrim snatTcNm vecTcNm =
-  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Vector.splitAt) (splitAtTy snatTcNm vecTcNm)
-          C.WorkNever C.SingleResult C.NoUnfolding)
+  closedPrim (showt 'Clash.Sized.Vector.splitAt) C.WorkNever (splitAtTy snatTcNm vecTcNm)
 
 splitAtTy
   :: TyConName
   -- ^ SNat TyCon name
   -> TyConName
   -- ^ Vec TyCon name
-  -> C.Type
-splitAtTy snatNm = splitAtTyWith (C.mkTyConApp snatNm [C.VarTy splitAtM])
+  -> TyB
+splitAtTy snatNm = splitAtTyWith (tyConAppB snatNm [varTyB 0])
 
 -- | The type of @fold_split@: 'splitAt' with the length as a 'Natural'
 foldSplitAtTy
   :: TyConName
   -- ^ Vec TyCon name
-  -> C.Type
-foldSplitAtTy = splitAtTyWith C.naturalPrimTy
+  -> TyB
+foldSplitAtTy = splitAtTyWith (tyConB naturalPrimTyConName)
 
-splitAtM :: C.TyVar
-splitAtM = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "m" 0)
-
-splitAtTyWith :: C.Type -> TyConName -> C.Type
+-- | The type of 'splitAt', given the type of the length, which may mention the
+-- type variable @m@ (key 0)
+splitAtTyWith :: TyB -> TyConName -> TyB
 splitAtTyWith lenTy vecNm =
-  C.ForAllTy splitAtM $ C.ForAllTy nTV $ C.ForAllTy aTV $
-    C.mkFunTy lenTy $
-      C.mkFunTy
-        (C.mkTyConApp vecNm
-           [C.mkTyConApp typeNatAdd [C.VarTy splitAtM, C.VarTy nTV], C.VarTy aTV])
-        (C.mkTyConApp (tupleTyConName 2)
-           [ C.mkTyConApp vecNm [C.VarTy splitAtM, C.VarTy aTV]
-           , C.mkTyConApp vecNm [C.VarTy nTV, C.VarTy aTV] ])
+  forAllNatB 0 "m" $ forAllNatB 1 "n" $ forAllTypeB 2 "a" $
+    funTyB
+      [lenTy, tyConAppB vecNm [typeNatAddB m n, a]]
+      (tyConAppB (tupleTyConName 2) [tyConAppB vecNm [m, a], tyConAppB vecNm [n, a]])
  where
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 1)
-  aTV = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "a" 2)
+  m = varTyB 0
+  n = varTyB 1
+  a = varTyB 2
 
 -- | 'Clash.Sized.Vector.++'
 vecAppendPrim
@@ -1523,22 +1562,21 @@ vecAppendPrim
   -- ^ Vec TyCon name
   -> Term n
 vecAppendPrim vecNm =
-  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt '(Clash.Sized.Vector.++)) (vecAppendTy vecNm) C.WorkNever
-          C.SingleResult C.NoUnfolding)
+  closedPrim (showt '(Clash.Sized.Vector.++)) C.WorkNever (vecAppendTy vecNm)
 
 vecAppendTy
   :: TyConName
   -- ^ Vec TyCon name
-  -> C.Type
+  -> TyB
 vecAppendTy vecNm =
-  C.ForAllTy nTV $ C.ForAllTy aTV $ C.ForAllTy mTV $
-    C.mkFunTy (C.mkTyConApp vecNm [C.VarTy nTV, C.VarTy aTV]) $
-      C.mkFunTy (C.mkTyConApp vecNm [C.VarTy mTV, C.VarTy aTV])
-        (C.mkTyConApp vecNm [C.mkTyConApp typeNatAdd [C.VarTy nTV, C.VarTy mTV], C.VarTy aTV])
+  forAllNatB 0 "n" $ forAllTypeB 1 "a" $ forAllNatB 2 "m" $
+    funTyB
+      [tyConAppB vecNm [n, a], tyConAppB vecNm [m, a]]
+      (tyConAppB vecNm [typeNatAddB n m, a])
  where
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 0)
-  aTV = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "a" 1)
-  mTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "m" 2)
+  n = varTyB 0
+  a = varTyB 1
+  m = varTyB 2
 
 -- | 'Clash.Sized.Vector.zipWith'
 vecZipWithPrim
@@ -1546,27 +1584,22 @@ vecZipWithPrim
   -- ^ Vec TyCon name
   -> Term n
 vecZipWithPrim vecNm =
-  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Vector.zipWith) (vecZipWithTy vecNm) C.WorkNever
-          C.SingleResult C.NoUnfolding)
+  closedPrim (showt 'Clash.Sized.Vector.zipWith) C.WorkNever (vecZipWithTy vecNm)
 
 vecZipWithTy
   :: TyConName
   -- ^ Vec TyCon name
-  -> C.Type
+  -> TyB
 vecZipWithTy vecNm =
-  C.ForAllTy aTV $ C.ForAllTy bTV $ C.ForAllTy cTV $ C.ForAllTy nTV $
-    C.mkFunTy (C.mkFunTy aTy (C.mkFunTy bTy cTy)) $
-      C.mkFunTy (C.mkTyConApp vecNm [nTy, aTy]) $
-        C.mkFunTy (C.mkTyConApp vecNm [nTy, bTy]) (C.mkTyConApp vecNm [nTy, cTy])
+  forAllTypeB 0 "a" $ forAllTypeB 1 "b" $ forAllTypeB 2 "c" $ forAllNatB 3 "n" $
+    funTyB
+      [funTyB [a, b] c, tyConAppB vecNm [n, a], tyConAppB vecNm [n, b]]
+      (tyConAppB vecNm [n, c])
  where
-  aTV = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "a" 0)
-  bTV = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "b" 1)
-  cTV = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "c" 2)
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 3)
-  aTy = C.VarTy aTV
-  bTy = C.VarTy bTV
-  cTy = C.VarTy cTV
-  nTy = C.VarTy nTV
+  a = varTyB 0
+  b = varTyB 1
+  c = varTyB 2
+  n = varTyB 3
 
 -- | The type of @Clash.Sized.Vector.imap_go@
 vecImapGoTy
@@ -1574,30 +1607,27 @@ vecImapGoTy
   -- ^ Vec TyCon name
   -> TyConName
   -- ^ Index TyCon name
-  -> C.Type
+  -> TyB
 vecImapGoTy vecTcNm indexTcNm =
-  C.ForAllTy nTV $ C.ForAllTy mTV $ C.ForAllTy aTV $ C.ForAllTy bTV $
-    C.mkFunTy fTy (C.mkFunTy vecATy (C.mkFunTy indexTy vecBTy))
+  forAllNatB 0 "n" $ forAllNatB 1 "m" $ forAllTypeB 2 "a" $ forAllTypeB 3 "b" $
+    funTyB
+      [funTyB [indexTy, a] b, tyConAppB vecTcNm [m, a], indexTy]
+      (tyConAppB vecTcNm [m, b])
  where
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 0)
-  mTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "m" 1)
-  aTV = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "a" 2)
-  bTV = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "b" 3)
-  indexTy = C.mkTyConApp indexTcNm [C.VarTy nTV]
-  fTy = C.mkFunTy indexTy (C.mkFunTy (C.VarTy aTV) (C.VarTy bTV))
-  vecATy = C.mkTyConApp vecTcNm [C.VarTy mTV, C.VarTy aTV]
-  vecBTy = C.mkTyConApp vecTcNm [C.VarTy mTV, C.VarTy bTV]
+  m = varTyB 1
+  a = varTyB 2
+  b = varTyB 3
+  indexTy = tyConAppB indexTcNm [varTyB 0]
 
 -- | The type of the addition of 'Clash.Sized.Internal.Index.Index'
 indexAddTy
   :: TyConName
   -- ^ Index TyCon name
-  -> C.Type
+  -> TyB
 indexAddTy indexTcNm =
-  C.ForAllTy nTV (C.mkFunTy C.naturalPrimTy (C.mkFunTy indexTy (C.mkFunTy indexTy indexTy)))
+  forAllNatB 0 "n" (funTyB [tyConB naturalPrimTyConName, indexTy, indexTy] indexTy)
  where
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 0)
-  indexTy = C.mkTyConApp indexTcNm [C.VarTy nTV]
+  indexTy = tyConAppB indexTcNm [varTyB 0]
 
 -- | 'Clash.Sized.Internal.BitVector.++#'
 bvAppendPrim
@@ -1605,22 +1635,20 @@ bvAppendPrim
   -- ^ BitVector TyCon name
   -> Term n
 bvAppendPrim bvTcNm =
-  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt '(Clash.Sized.Internal.BitVector.++#)) (bvAppendTy bvTcNm)
-          C.WorkNever C.SingleResult C.NoUnfolding)
+  closedPrim (showt '(Clash.Sized.Internal.BitVector.++#)) C.WorkNever (bvAppendTy bvTcNm)
 
 bvAppendTy
   :: TyConName
   -- ^ BitVector TyCon name
-  -> C.Type
+  -> TyB
 bvAppendTy bvNm =
-  C.ForAllTy mTV $ C.ForAllTy nTV $
-    C.mkFunTy C.naturalPrimTy $
-      C.mkFunTy (C.mkTyConApp bvNm [C.VarTy nTV]) $
-        C.mkFunTy (C.mkTyConApp bvNm [C.VarTy mTV])
-          (C.mkTyConApp bvNm [C.mkTyConApp typeNatAdd [C.VarTy nTV, C.VarTy mTV]])
+  forAllNatB 0 "m" $ forAllNatB 1 "n" $
+    funTyB
+      [tyConB naturalPrimTyConName, tyConAppB bvNm [n], tyConAppB bvNm [m]]
+      (tyConAppB bvNm [typeNatAddB n m])
  where
-  mTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "m" 0)
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 1)
+  m = varTyB 0
+  n = varTyB 1
 
 -- | 'Clash.Sized.Internal.BitVector.split#'
 bvSplitPrim
@@ -1628,22 +1656,46 @@ bvSplitPrim
   -- ^ BitVector TyCon name
   -> Term n
 bvSplitPrim bvTcNm =
-  Prim (mkPrimInfoFromClash $ C.PrimInfo (showt 'Clash.Sized.Internal.BitVector.split#) (bvSplitTy bvTcNm)
-          C.WorkNever C.SingleResult C.NoUnfolding)
+  closedPrim (showt 'Clash.Sized.Internal.BitVector.split#) C.WorkNever (bvSplitTy bvTcNm)
 
 bvSplitTy
   :: TyConName
   -- ^ BitVector TyCon name
-  -> C.Type
+  -> TyB
 bvSplitTy bvNm =
-  C.ForAllTy nTV $ C.ForAllTy mTV $
-    C.mkFunTy C.naturalPrimTy $
-      C.mkFunTy (C.mkTyConApp bvNm [C.mkTyConApp typeNatAdd [C.VarTy mTV, C.VarTy nTV]])
-        (C.mkTyConApp (tupleTyConName 2)
-           [C.mkTyConApp bvNm [C.VarTy mTV], C.mkTyConApp bvNm [C.VarTy nTV]])
+  forAllNatB 0 "n" $ forAllNatB 1 "m" $
+    funTyB
+      [tyConB naturalPrimTyConName, tyConAppB bvNm [typeNatAddB m n]]
+      (tyConAppB (tupleTyConName 2) [tyConAppB bvNm [m], tyConAppB bvNm [n]])
  where
-  nTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 0)
-  mTV = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "m" 1)
+  n = varTyB 0
+  m = varTyB 1
+
+-- | 'Clash.Sized.Vector.head' and 'Clash.Sized.Vector.last', given the type
+-- constructor of 'Clash.Sized.Vector.Vec': @forall n a. Vec (n + 1) a -> a@.
+-- See 'Clash.Normalize.PrimitiveReductions.vecHeadPrim'.
+vecHeadPrim, vecLastPrim :: TyConName -> Term n
+vecHeadPrim = closedPrim "Clash.Sized.Vector.head" C.WorkNever . vecHeadTy
+vecLastPrim = closedPrim "Clash.Sized.Vector.last" C.WorkNever . vecHeadTy
+
+vecHeadTy :: TyConName -> TyB
+vecHeadTy vecNm =
+  forAllNatB 0 "n" $ forAllTypeB 1 "a" $
+    funTyB [tyConAppB vecNm [typeNatAddB (varTyB 0) (litTyB (C.NumTy 1)), varTyB 1]] (varTyB 1)
+
+-- | 'Clash.Sized.Vector.tail' and 'Clash.Sized.Vector.init', given the type
+-- constructor of 'Clash.Sized.Vector.Vec': @forall n a. Vec (n + 1) a -> Vec n
+-- a@. See 'Clash.Normalize.PrimitiveReductions.vecTailPrim'.
+vecTailPrim, vecInitPrim :: TyConName -> Term n
+vecTailPrim = closedPrim "Clash.Sized.Vector.tail" C.WorkNever . vecTailTy
+vecInitPrim = closedPrim "Clash.Sized.Vector.init" C.WorkNever . vecTailTy
+
+vecTailTy :: TyConName -> TyB
+vecTailTy vecNm =
+  forAllNatB 0 "n" $ forAllTypeB 1 "a" $
+    funTyB
+      [tyConAppB vecNm [typeNatAddB (varTyB 0) (litTyB (C.NumTy 1)), varTyB 1]]
+      (tyConAppB vecNm [varTyB 0, varTyB 1])
 
 -- | The name of the type constructor of boxed tuples of the given arity, as
 -- "Clash.GHC.GHC2Core" names it. See

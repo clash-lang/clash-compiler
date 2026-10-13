@@ -11,9 +11,8 @@
   See "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
 
   Most reductions only need the names of the type constructors in the type of
-  their primitive (e.g. that of @Vec@). They take them from its type in Clash
-  Core ('primArgResTys'), rather than from its scoped type 'ty', which is
-  converted on every call that uses it.
+  their primitive (e.g. that of @Vec@). They take them from its declared type
+  ('primArgResTys'), rather than from its instantiated type 'ty'.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -42,7 +41,7 @@ import qualified Clash.Core.Type as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.PrimitiveReductions
-  (typeNatMul, typeNatSub, vecHeadPrim, vecInitPrim, vecLastPrim, vecTailPrim)
+  (typeNatMul, typeNatSub)
 import Clash.Util (curLoc, textNameLit)
 
 import qualified Clash.Sized.Internal.Index
@@ -55,7 +54,6 @@ import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.HasType (piResultTy, piResultTys)
 import Clash.Core.Scoped.Subst (withFreshIdBinder, withFreshIdBinders)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (mkApps)
 import Clash.Core.Scoped.Type
   ( PiTele (..), SplitFunForall (..), TypeView (..), mkFunTy, mkTyConApp, normalizeType
@@ -485,9 +483,9 @@ primitives =
                                  , Right (numTy (d3 - 1))
                                  , Left (valToTerm kn)
                                  , Left (mkVecCons te sc dc aTy n
-                                           (mkApps (closedPrim (vecLastPrim vecTcNm))
+                                           (mkApps ((vecLastPrim vecTcNm))
                                               [Right (numTy (n' - 1)), Right aTy, Left (valToTerm xs)])
-                                           (mkApps (closedPrim (vecInitPrim vecTcNm))
+                                           (mkApps ((vecInitPrim vecTcNm))
                                               [Right (numTy (n' - 1)), Right aTy, Left (valToTerm xs)]))
                                  , Left (snatTerm snatDc (d3 - 1)) ]
                             | otherwise -> Nothing
@@ -529,8 +527,7 @@ primitives =
         , Just indexTcNm <- tyConNameOf indexTy
         , Right n <- runExcept (tyNatSize te sc nTy)
         -> reduceWHNF $
-           mkApps (Prim (mkPrimInfoFromClash $ CT.PrimInfo "Clash.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm)
-                           CT.WorkNever CT.SingleResult CT.NoUnfolding))
+           mkApps (closedPrim "Clash.Sized.Vector.imap_go" CT.WorkNever (vecImapGoTy vecTcNm indexTcNm))
              [ Right nTy
              , Right nTy
              , Right aTy
@@ -559,9 +556,8 @@ primitives =
                          bTy1 = sink bTy
                          f1 = sink (valToTerm f)
                          indexAdd =
-                           Prim (mkPrimInfoFromClash $ CT.PrimInfo (showt '(Clash.Sized.Internal.Index.+#))
-                                   (indexAddTy indexTcNm) CT.WorkVariable CT.SingleResult
-                                   CT.NoUnfolding)
+                           closedPrim (showt '(Clash.Sized.Internal.Index.+#)) CT.WorkVariable
+                             (indexAddTy indexTcNm)
                      in Just $ Next mach1
                           { mTerm =
                               mkVecCons te (mScope mach1) dc bTy1 m'
@@ -613,7 +609,7 @@ primitives =
         | isSubj
         , aTy : bTy : cTy : nTy : _ <- tys
         , [f, DC dc vArgs, ys] <- args
-        , (_, C.tyView -> C.TyConApp vecTcNm _) <- C.splitFunForallTy (CT.primType (primLegacy pInfo))
+        , Just vecTcNm <- tyConNameOf (snd (primArgResTys pInfo))
         , Right n <- runExcept (tyNatSize te sc nTy)
         -> case n of
              0 -> reduce (mkVecNil te sc dc cTy)
@@ -627,12 +623,12 @@ primitives =
                      in reduceWith m2 $ mkVecCons te (mScope m2) dc (sink cTy) n
                           (mkApps fT
                              [ Left (sink x)
-                             , Left (mkApps (closedPrim (vecHeadPrim vecTcNm))
+                             , Left (mkApps ((vecHeadPrim vecTcNm))
                                        [Right n1, Right bTy', Left ysT]) ])
                           (mkApps (Prim pInfo)
                              [ Right (sink aTy), Right bTy', Right (sink cTy), Right n1, Left fT
                              , Left (sink xs)
-                             , Left (mkApps (closedPrim (vecTailPrim vecTcNm))
+                             , Left (mkApps ((vecTailPrim vecTcNm))
                                        [Right n1, Right bTy', Left ysT]) ])
                | otherwise -> Nothing
       _ -> Nothing
@@ -677,9 +673,8 @@ primitives =
                       mVecTy = mkTyConApp vecTcNm [numTy m, aTy]
                       n1VecTy = mkTyConApp vecTcNm [numTy n1, aTy]
                       splitAtCall =
-                        mkApps (Prim (mkPrimInfoFromClash $ CT.PrimInfo "Clash.Sized.Vector.fold_split"
-                                        (foldSplitAtTy vecTcNm) CT.WorkNever CT.SingleResult
-                                        CT.NoUnfolding))
+                        mkApps (closedPrim "Clash.Sized.Vector.fold_split" CT.WorkNever
+                                  (foldSplitAtTy vecTcNm))
                           [ Right (numTy m), Right (numTy n1), Right aTy
                           , Left (natLit m), Left (valToTerm vs) ]
                       sel first = selectPair sc tupDc ("as", mVecTy) ("bs", n1VecTy) first splitAtCall
@@ -833,13 +828,13 @@ primitives =
              0 -> reduce (mkVecNil te sc nilCon aTy)
              n' -> reduce $
                    mkVecCons te sc consCon aTy n'
-                     (mkApps (closedPrim (vecHeadPrim vecTcNm))
+                     (mkApps ((vecHeadPrim vecTcNm))
                         [Right (numTy (n' - 1)), Right aTy, Left (valToTerm xs)])
                      (mkApps (Prim pInfo)
                         [ Right (numTy (n' - 1))
                         , Right aTy
                         , Left (natLit (n' - 1))
-                        , Left (mkApps (closedPrim (vecTailPrim vecTcNm))
+                        , Left (mkApps ((vecTailPrim vecTcNm))
                                   [Right (numTy (n' - 1)), Right aTy, Left (valToTerm xs)]) ])
       _ -> Nothing
 
@@ -918,7 +913,7 @@ primitives =
         | isSubj
         , nTy : mTy : _ <- tys
         , _ : km : bv : _ <- args
-        , C.TyConApp vecTcNm [_, bvMTy] <- C.tyView (snd (primArgResTys pInfo))
+        , Just (vecTcNm, [_, bvMTy]) <- tyConAppOf (snd (primArgResTys pInfo))
         , Just bvTcNm <- tyConNameOf bvMTy
         , Right n <- runExcept (tyNatSize te sc nTy)
         , Just (nilCon, consCon) <- vecDataCons te vecTcNm
