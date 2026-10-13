@@ -9,7 +9,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Clash.Tests.Core.Scoped.TermInfo (tests) where
@@ -17,118 +16,93 @@ module Clash.Tests.Core.Scoped.TermInfo (tests) where
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.HasFreeVars as C (isClosed)
-import qualified Clash.Core.Literal as C
-import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.TermInfo as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Netlist.BlackBox as C (isLiteral)
-
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Builder (TmB, castB, deDupTickB, tickB)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TermInfo
 
-import Test.Clash.Rewrite
-  ( globalId, intId, intTy, justDataCon, localId, pairDataCon, parseToTermQQ
-  , testTyConMap, tyVar )
-import Test.Clash.Scoped (assertScopedAlphaEq, testTypeEnv, withFreeVarsOf)
+import Test.Clash.Rewrite (TestTerm (..), TestType (..))
+import Test.Clash.Scoped
+  ( TestScope (..), assertTermAlphaEq, termIn, testTypeEnv, typeIn, varD
+  , withTerms, withTestScope)
 
 -- | Terms of all shapes
-examples :: [C.Term]
+examples :: [TestTerm]
 examples =
-  [ [parseToTermQQ| \(x :: Int) (y :: Int) -> x |]
-  , [parseToTermQQ| \(x :: Int) -> let (y :: Int) = x in y |]
-  , [parseToTermQQ| \(x :: Int) -> let { (y :: Int) = f y; (z :: Int) = y } in z |]
-  , C.TyLam a (C.Lam ax (C.Var ax))
-  , C.Var x
-  , C.Var g
-  , C.App (C.Var g) (C.Var x)
-  , C.Tick C.DeDup (C.Var x)
-  , C.Cast (C.Var x) intTy intTy
-  , C.Lam ax (C.Var x)
+  [ "\\(x :: Int) (y :: Int) -> x"
+  , "\\(x :: Int) -> let (y :: Int) = x in y"
+  , "\\(x :: Int) -> let { (y :: Int) = f y; (z :: Int) = y } in z"
+  , "\\(a :: Type) (ax :: a) -> ax"
+  , "(x :: Int)"
+  , "(g_G53 :: Int -> Int)"
+  , "(g_G53 :: Int -> Int) (x :: Int)"
+  , wrapB (tickB deDupTickB) "(x :: Int)"
+  , wrapB (\e -> castB e (testTypeB "Int") (testTypeB "Int")) "(x :: Int)"
+  , "\\(ax :: a) -> (x :: Int)"
   ]
- where
-  a = tyVar C.User "a" 50
-  ax = localId C.User "ax" 51 (C.VarTy a)
-  x = intId C.User "x" 52
-  g = globalId C.User "g" 53 (C.mkFunTy intTy intTy)
+
+-- | A term around a parsed one, with its free variables
+wrapB :: (TmB -> TmB) -> TestTerm -> TestTerm
+wrapB f t = t {testTermB = f (testTermB t)}
 
 -- | Literals, and data constructors applied to literals or not
-literalExamples :: [C.Term]
+literalExamples :: [TestTerm]
 literalExamples =
-  [ lit 3
-  , C.Tick C.DeDup (lit 3)
-  , C.mkApps (C.Data pairDataCon) [Left (lit 1), Left (lit 2)]
-  , C.mkApps (C.Data pairDataCon) [Left (lit 1), Left (C.Var x)]
-  , C.mkApps (C.Data justDataCon) [Right intTy, Left (lit 1)]
-  , C.mkApps (C.Data justDataCon)
-      [Right intTy, Left (C.mkApps (C.Data justDataCon) [Right intTy, Left (lit 1)])]
-  , C.App (C.Var g) (lit 1)
+  [ "3"
+  , wrapB (tickB deDupTickB) "3"
+  , "MkPair 1 2"
+  , "MkPair 1 (x :: Int)"
+  , "Just @Int 1"
+  , "Just @Int (Just @Int 1)"
+  , "(g_G53 :: Int -> Int) 1"
   ]
- where
-  lit = C.Literal . C.IntLiteral
-  x = intId C.User "x" 52
-  g = globalId C.User "g" 53 (C.mkFunTy intTy intTy)
 
--- | Assert that a function on scoped terms agrees with one on Clash terms on
--- all 'examples'
-assertAgreesOnExamples
+-- | Assert that a function on terms gives the expected results on terms, each
+-- built in the scope of its free variables. The expected results are those
+-- of the functions of Clash Core that the functions of scoped Core replace.
+assertResults
   :: (Eq a, Show a)
-  => (C.Term -> a) -> (forall n. Distinct n => Scope n -> Term n -> a) -> Assertion
-assertAgreesOnExamples = assertAgreesOn examples
-
--- | Assert that a function on scoped terms agrees with one on Clash terms on
--- the given terms
-assertAgreesOn
-  :: (Eq a, Show a)
-  => [C.Term]
-  -> (C.Term -> a) -> (forall n. Distinct n => Scope n -> Term n -> a) -> Assertion
-assertAgreesOn tms f g =
-  sequence_
-    [ withFreeVarsOf [tm] $ \env -> g (convScope env) (fromClashTerm env tm) @?= f tm
-    | tm <- tms ]
+  => [TestTerm] -> (forall n. Distinct n => Scope n -> Term n -> a) -> [a] -> Assertion
+assertResults tms f expected =
+  [ withTerms [tm] $ \ts -> \case
+      [e] -> f (testScope ts) e
+      _ -> error "impossible"
+  | tm <- tms ] @?= expected
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.TermInfo"
-  [ testCase "termSize" $ assertAgreesOnExamples C.termSize (const termSize)
+  [ testCase "termSize" $ assertResults examples (const termSize) [3, 3, 5, 2, 1, 1, 2, 1, 1, 2]
   , testCase "termSizeSmallerThan" $
       sequence_
-        [ assertAgreesOnExamples (C.termSizeSmallerThan k) (const (termSizeSmallerThan k))
+        [ assertResults examples (const (termSizeSmallerThan k)) (map (< k) [3, 3, 5, 2, 1, 1, 2, 1, 1, 2])
         | k <- [0..6] ]
   , testCase "isFun" $
-      assertAgreesOnExamples (C.isFun testTyConMap) (isFun testTypeEnv)
+      assertResults examples (isFun testTypeEnv) [True, True, True, False, False, True, False, False, False, True]
   , testCase "isPolyFun" $
-      assertAgreesOnExamples (C.isPolyFun testTyConMap) (isPolyFun testTypeEnv)
-  , testCase "isLet" $ assertAgreesOnExamples C.isLet (const isLet)
-  , testCase "isVar" $ assertAgreesOnExamples C.isVar (const isVar)
-  , testCase "isLocalVar" $ assertAgreesOnExamples C.isLocalVar (const isLocalVar)
+      assertResults examples (isPolyFun testTypeEnv) [True, True, True, True, False, True, False, False, False, True]
+  , testCase "isLet" $ assertResults examples (const isLet) (replicate 10 False)
+  , testCase "isVar" $
+      assertResults examples (const isVar) [False, False, False, False, True, True, False, False, False, False]
+  , testCase "isLocalVar" $
+      assertResults examples (const isLocalVar) [False, False, False, False, True, False, False, False, False, False]
   , testCase "isGlobalVar" $
-      assertAgreesOnExamples
-        (\case C.Var v -> not (C.isLocalVar (C.Var v)); _ -> False)
-        (const isGlobalVar)
+      assertResults examples (const isGlobalVar) [False, False, False, False, False, True, False, False, False, False]
   , testCase "isCon, isPrim, isTick, isCast" $ do
-      assertAgreesOnExamples C.isCon (const isCon)
-      assertAgreesOnExamples C.isPrim (const isPrim)
-      assertAgreesOnExamples C.isTick (const isTick)
-      assertAgreesOnExamples C.isCast (const isCast)
+      assertResults examples (const isCon) (replicate 10 False)
+      assertResults examples (const isPrim) (replicate 10 False)
+      assertResults examples (const isTick) [False, False, False, False, False, False, False, True, False, False]
+      assertResults examples (const isCast) [False, False, False, False, False, False, False, False, True, False]
   , testCase "isLiteral" $
-      assertAgreesOn (examples <> literalExamples) C.isLiteral (const isLiteral)
+      assertResults (examples <> literalExamples) (const isLiteral)
+        (replicate 10 False <> [True, True, True, False, True, True, False])
   , testCase "isClosed" $
-      assertAgreesOnExamples C.isClosed (const isClosed)
+      assertResults examples (const isClosed) [True, True, False, True, False, True, False, False, False, False]
   , testCase "splitMultiPrimArgs" $ do
-      let mpiC = C.MultiPrimInfo undefined undefined [intTy, intTy]
-          mpi = MultiPrimInfo undefined undefined 2
-          r1 = intId C.User "r1" 1
-          r2 = intId C.User "r2" 2
-          i = intId C.User "i" 3
-          args = [Right intTy, Left (C.Var i), Left (C.Var r1), Left (C.Var r2)]
-          (argsC, resC) = C.splitMultiPrimArgs mpiC args
-      withFreeVarsOf [C.Var r1, C.Var r2, C.Var i] $ \env -> do
-        let (args1, res) =
-              splitMultiPrimArgs mpi
-                (map (either (Left . fromClashTerm env) (Right . fromClashType env)) args)
-        length args1 @?= length argsC
-        length res @?= length resC
-        sequence_ [assertScopedAlphaEq (C.Var v) t | (v, t) <- zip resC res]
+      -- Only the number of result types matters
+      let mpi = MultiPrimInfo (error "unused") (error "unused") 2
+      withTestScope [varD "r1" "Int", varD "r2" "Int", varD "i" "Int"] $ \ts -> do
+        let args = [Right (typeIn ts "Int"), Left (termIn ts "i"), Left (termIn ts "r1"), Left (termIn ts "r2")]
+            (args1, res) = splitMultiPrimArgs mpi args
+        length args1 @?= 2
+        length res @?= 2
+        sequence_ (zipWith assertTermAlphaEq [termIn ts "r1", termIn ts "r2"] res)
   ]
