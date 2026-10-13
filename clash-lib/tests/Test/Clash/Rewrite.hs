@@ -24,9 +24,6 @@ module Test.Clash.Rewrite where
 
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
-import qualified Clash.Core.Scoped.Convert as C
-  ( mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash,
-    mkNewTyConRhsFromClash, mkPrimTyConFromClash )
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
@@ -52,10 +49,12 @@ import Clash.Netlist.Types
 import Clash.Rewrite.Types
 import Clash.Core.Scoped.Builder
   ( runDataConSig, Key, TickB, TmB, TyB, appB, appTyB, caseB, castB, constTyB, dataAltB, dataB, deDupTickB
-  , defaultAltB, forAllTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB
-  , nameModTickB, noDeDupTickB, primB, runClosedType, srcSpanTickB, tickB, tyAppB
-  , tyLamB, uniqueKey, varB, varTyB )
-import qualified Clash.Core.Scoped.Convert as S (mkAlgTyCon, mkDataCon, mkGlobalId, mkPrimInfo)
+  , defaultAltB, forAllTyB, funTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB
+  , nameModTickB, noDeDupTickB, primB, runClosedType, runNewTyConSig, runTyFamEqn
+  , srcSpanTickB, tickB, tyAppB, tyConAppB, tyLamB, uniqueKey, varB, varTyB )
+import qualified Clash.Core.Scoped.Convert as S
+  ( mkAlgTyCon, mkDataCon, mkFunTyCon, mkGlobalId, mkNewTyConRhs, mkPrimInfo, mkPrimTyCon )
+import qualified Clash.Core.Scoped.TysPrim as P
 import Clash.Core.Scoped.Syntax (PrimInfo (..), PrimUnfolding (NoUnfolding))
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.Sig (DataConSig (..))
@@ -914,10 +913,6 @@ liftedTypeKindB = constTyB (constOf C.liftedTypeKind)
 freeVarTyB :: TyB
 freeVarTyB = constTyB (constOf freeVarType)
 
--- | The function type
-funTyB :: TyB -> TyB -> TyB
-funTyB t1 = appTyB (appTyB (constTyB C.Arrow) t1)
-
 -- | A qualified or unqualified name as a string
 qNameString :: (HasCallStack, Show l) => QName l -> String
 qNameString = \case
@@ -1021,7 +1016,7 @@ spTy env@(PEnv tvs _ _ _) = \case
       body <- spTy env' t
       pure (foldr (\(k, nm, ki) -> forAllTyB k nm ki) body bs)
   TyApp _ t1 t2 -> appTyB <$> spTy env t1 <*> spTy env t2
-  TyFun _ t1 t2 -> funTyB <$> spTy env t1 <*> spTy env t2
+  TyFun _ t1 t2 -> (\a r -> funTyB [a] r) <$> spTy env t1 <*> spTy env t2
   TyEquals _ t1 t2 -> do
     a <- spTy env t1
     b <- spTy env t2
@@ -1332,14 +1327,14 @@ testDataCon nm u tag univ ext args res =
     ScopeDecl _ (DeclTyVar k n ki) -> (k, n, testTypeB ki)
     _ -> error ("testDataCon: not a type variable in the signature of " <> nm)
   ty = runClosedType
-    (foldr (\(k, n, ki) -> forAllTyB k n ki) (foldr (funTyB . testTypeB) (testTypeB res) args) tvs)
+    (foldr (\(k, n, ki) -> forAllTyB k n ki) (funTyB (map testTypeB args) (testTypeB res)) tvs)
   sig = runDataConSig (map tvOf univ) (map tvOf ext) (map testTypeB args)
 
 -- | A data type of scoped Core, with the given name (see 'resolveTyConName'),
 -- type variables of kind @Type@, by their identifiers, and data constructors
 testAlgTyCon :: HasCallStack => String -> [String] -> [C.DataCon] -> C.TyCon
 testAlgTyCon nm tvs dcs =
-  S.mkAlgTyCon tcNm (runClosedType (foldr (\_ -> funTyB liftedTypeKindB) liftedTypeKindB tvs))
+  S.mkAlgTyCon tcNm (runClosedType (funTyB (map (const liftedTypeKindB) tvs) liftedTypeKindB))
     (length tvs) (C.DataTyCon dcs) False
  where
   tcNm = resolveTyConName nm
@@ -1360,9 +1355,7 @@ intTy = parseTyConTy "Int"
 
 -- | The type constructor of 'intTy'. The default 'RewriteEnv' knows it.
 intTyCon :: C.TyCon
-intTyCon = C.mkPrimTyConFromClash (C.nameUniq nm) nm C.liftedTypeKind 0
- where
-  nm = parseTyConName "Int"
+intTyCon = S.mkPrimTyCon (parseTyConName "Int") (runClosedType typeB) 0
 
 -- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
 -- type
@@ -1386,49 +1379,98 @@ intId nmSort nm uniq = localId nmSort nm uniq intTy
 intFunTy :: Int -> C.Type
 intFunTy n = foldr C.mkFunTy intTy (replicate n intTy)
 
--- | A data constructor with the given name, unique, universally quantified type
--- variables, existentially quantified type variables, (lazy) field types, and
--- result type. Its tag is 1, i.e. it is the first constructor of its type.
-mkTestDataCon
-  :: String -> Unique -> [C.TyVar] -> [C.TyVar] -> [C.Type] -> C.Type
-  -> C.DataCon
-mkTestDataCon nm uniq univTvs extTvs argTys resTy = C.mkDataConFromClash
-  (C.mkUnsafeName C.User (Text.pack nm) uniq)
-  uniq
-  1
-  (foldr C.ForAllTy (foldr C.mkFunTy resTy argTys) (univTvs <> extTvs))
-  univTvs
-  extTvs
-  argTys
-  (map (const C.Lazy) argTys)
-  []
+-- * Fixtures
+--
+-- The data and type constructors of the tests, built with the builders of
+-- "Clash.Core.Scoped.Builder". A type variable of a fixture is a 'FxTyVar',
+-- whose key is its unique.
+
+-- | A type variable of a fixture: its key, name and kind
+type FxTyVar = (Key, C.Name C.Type, TyB)
+
+-- | A type variable with the given name, unique and kind
+fxTyVar :: String -> Unique -> TyB -> FxTyVar
+fxTyVar nm u k = (fromIntegral u, C.mkUnsafeName C.User (Text.pack nm) u, k)
+
+-- | A type variable of kind @Type@
+fxTyVarT :: String -> Unique -> FxTyVar
+fxTyVarT nm u = fxTyVar nm u typeB
+
+-- | An occurrence of a type variable of a fixture
+fxVarB :: FxTyVar -> TyB
+fxVarB (k, _, _) = varTyB k
+
+-- | A type quantified over a type variable of a fixture
+fxForAllB :: FxTyVar -> TyB -> TyB
+fxForAllB (k, n, ki) = forAllTyB k n ki
+
+-- | The kinds @Type@, @Nat@ and @Symbol@
+typeB, natB, symbolB :: TyB
+typeB = constTyB (C.TyCon P.liftedTypeKindTyConName)
+natB = constTyB (C.TyCon P.typeNatKindTyConName)
+symbolB = constTyB (C.TyCon P.typeSymbolKindTyConName)
+
+-- | @Int@
+intB :: TyB
+intB = tcAppB (parseTyConName "Int") []
+
+-- | A type constructor, applied to types
+tcAppB :: C.TyConName -> [TyB] -> TyB
+tcAppB = tyConAppB
+
+-- | A natural number as a type
+numB :: Integer -> TyB
+numB = litTyB . C.NumTy
+
+-- | GHC's @+@ on type-level naturals
+addB :: TyB -> TyB -> TyB
+addB a b = tcAppB addTyConName [a, b]
+
+-- | Unlifted equality of naturals, @a ~# b@
+eqNatB :: TyB -> TyB -> TyB
+eqNatB a b = tcAppB P.eqPrimTyConName [natB, natB, a, b]
+
+-- | A data constructor with the given name, unique, tag (1 for the first
+-- constructor of its type), universally and existentially quantified type
+-- variables, (lazy) field types, and result type
+fxDataCon
+  :: String -> Unique -> C.ConTag -> [FxTyVar] -> [FxTyVar] -> [TyB] -> TyB -> C.DataCon
+fxDataCon nm u tag univ ext args res =
+  S.mkDataCon (C.mkUnsafeName C.User (ghcName (Text.pack nm)) u) tag ty sig (map (const C.Lazy) args) []
+ where
+  ty = runClosedType (foldr fxForAllB (funTyB args res) (univ <> ext))
+  sig = runDataConSig univ ext args
+
+-- | The kind @k1 -> .. -> kn -> Type@ of a type constructor with type
+-- variables of kinds @k1 .. kn@
+fxTyConKind :: [FxTyVar] -> TyB
+fxTyConKind tvs = funTyB [k | (_, _, k) <- tvs] typeB
+
+-- | A data type with the given name, type variables and data constructors
+fxAlgTyCon :: C.TyConName -> [FxTyVar] -> [C.DataCon] -> C.TyCon
+fxAlgTyCon nm tvs dcs =
+  S.mkAlgTyCon nm (runClosedType (fxTyConKind tvs)) (length tvs) (C.DataTyCon dcs) False
+
+-- | A newtype with the given name, type variables, data constructor, and the
+-- type variables and representation type of its eta-reduced signature
+fxNewTyCon :: C.TyConName -> [FxTyVar] -> C.DataCon -> ([FxTyVar], TyB) -> C.TyCon
+fxNewTyCon nm tvs dc (etaTvs, rhs) =
+  S.mkAlgTyCon nm (runClosedType (fxTyConKind tvs)) (length tvs)
+    (S.mkNewTyConRhs dc (runNewTyConSig etaTvs rhs)) False
+
+-- | A type family with the given name, kind, arity, and equations: their
+-- pattern variables, left-hand sides and right-hand side
+fxFunTyCon :: C.TyConName -> TyB -> Int -> [([FxTyVar], [TyB], TyB)] -> C.TyCon
+fxFunTyCon nm k ar eqns =
+  S.mkFunTyCon nm (runClosedType k) ar [runTyFamEqn tvs lhs rhs | (tvs, lhs, rhs) <- eqns]
+
+-- | A primitive type constructor with the given name, kind and arity
+fxPrimTyCon :: C.TyConName -> TyB -> Int -> C.TyCon
+fxPrimTyCon nm k = S.mkPrimTyCon nm (runClosedType k)
 
 -- | A type constructor name with the given human readable name and unique
 mkTyConName :: String -> Unique -> C.TyConName
 mkTyConName nm = C.mkUnsafeName C.User (ghcName (Text.pack nm))
-
--- | The kind @Type -> .. -> Type@ of a type constructor with the given type
--- variables, which must be of kind 'C.liftedTypeKind'
-tyConKindFor :: [C.TyVar] -> C.Kind
-tyConKindFor tvs = foldr (C.mkFunTy . C.varType) C.liftedTypeKind tvs
-
--- | A data type with the given name, type variables (of kind
--- 'C.liftedTypeKind'), and data constructors
-mkTestAlgTyCon :: C.TyConName -> [C.TyVar] -> [C.DataCon] -> C.TyCon
-mkTestAlgTyCon nm tvs dcs =
-  C.mkAlgTyConFromClash (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.DataTyCon dcs) False
-
--- | A newtype with the given name, type variables (of kind
--- 'C.liftedTypeKind'), data constructor, and eta-reduced representation type,
--- see 'C.ntLegacyEtadRhs'
-mkTestNewTyCon :: C.TyConName -> [C.TyVar] -> C.DataCon -> ([C.TyVar], C.Type) -> C.TyCon
-mkTestNewTyCon nm tvs dc rhs =
-  C.mkAlgTyConFromClash (C.nameUniq nm) nm (tyConKindFor tvs) (length tvs) (C.mkNewTyConRhsFromClash dc rhs) False
-
--- | A type family with the given name, kind, arity, and equations, see
--- 'C.tyConLegacySubst'
-mkTestFunTyCon :: C.TyConName -> C.Kind -> Int -> [([C.Type], C.Type)] -> C.TyCon
-mkTestFunTyCon nm = C.mkFunTyConFromClash (C.nameUniq nm) nm
 
 -- | @Pair@, a data type with a single constructor 'pairDataCon'
 pairTy :: C.Type
@@ -1436,21 +1478,22 @@ pairTy = parseTyConTy "Pair"
 
 -- | @MkPair :: Int -> Int -> Pair@
 pairDataCon :: C.DataCon
-pairDataCon = mkTestDataCon "MkPair" 100 [] [] [intTy, intTy] pairTy
+pairDataCon = fxDataCon "MkPair" 100 1 [] [] [intB, intB] (tcAppB (parseTyConName "Pair") [])
 
 -- | @E@, a data type with a single constructor 'existentialDataCon'
 existentialTy :: C.Type
 existentialTy = parseTyConTy "E"
 
 -- | The existentially quantified type variable @b@ of 'existentialDataCon'
-existentialTyVar :: C.TyVar
-existentialTyVar = tyVar C.User "b" 50
+existentialTyVar :: FxTyVar
+existentialTyVar = fxTyVarT "b" 50
 
 -- | @MkE :: forall b. b -> E@, a data constructor with an existentially
 -- quantified type variable
 existentialDataCon :: C.DataCon
 existentialDataCon =
-  mkTestDataCon "MkE" 1002 [] [existentialTyVar] [C.VarTy existentialTyVar] existentialTy
+  fxDataCon "MkE" 1002 1 [] [existentialTyVar] [fxVarB existentialTyVar]
+    (tcAppB (parseTyConName "E") [])
 
 -- * Type constructors
 --
@@ -1458,9 +1501,9 @@ existentialDataCon =
 -- and type families, to test functions that look through them.
 
 -- | Type variables of the type constructors
-fxA, fxB :: C.TyVar
-fxA = tyVar C.User "a" 3001
-fxB = tyVar C.User "b" 3002
+fxA, fxB :: FxTyVar
+fxA = fxTyVarT "a" 3001
+fxB = fxTyVarT "b" 3002
 
 -- | The type of a type constructor
 tcTy :: C.TyConName -> C.Type
@@ -1500,29 +1543,29 @@ ghcBoolTy :: C.Type
 ghcBoolTy = tcTy ghcBoolTyConName
 
 ghcFalseDataCon, ghcTrueDataCon :: C.DataCon
-ghcFalseDataCon = mkTestDataCon "GHC.Types.False" (fromGhcUnique falseDataConKey) [] [] [] ghcBoolTy
+ghcFalseDataCon =
+  fxDataCon "GHC.Types.False" (fromGhcUnique falseDataConKey) 1 [] [] [] (tcAppB ghcBoolTyConName [])
 ghcTrueDataCon =
-  (mkTestDataCon "GHC.Types.True" (fromGhcUnique trueDataConKey) [] [] [] ghcBoolTy) {C.dcTag = 2}
+  fxDataCon "GHC.Types.True" (fromGhcUnique trueDataConKey) 2 [] [] [] (tcAppB ghcBoolTyConName [])
 
 -- | @data Maybe a = Nothing | Just a@
 maybeTy :: C.Type -> C.Type
 maybeTy a = tcApp maybeTyConName [a]
 
 nothingDataCon, justDataCon :: C.DataCon
-nothingDataCon = mkTestDataCon "Nothing" 3020 [fxA] [] [] (maybeTy (C.VarTy fxA))
-justDataCon =
-  (mkTestDataCon "Just" 3021 [fxA] [] [C.VarTy fxA] (maybeTy (C.VarTy fxA))) {C.dcTag = 2}
+nothingDataCon = fxDataCon "Nothing" 3020 1 [fxA] [] [] (tcAppB maybeTyConName [fxVarB fxA])
+justDataCon = fxDataCon "Just" 3021 2 [fxA] [] [fxVarB fxA] (tcAppB maybeTyConName [fxVarB fxA])
 
 -- | The tuple type constructor @TupN@ of the given arity (at most 9), with a
 -- single data constructor @MkTupN :: forall t1 .. tN. t1 -> .. -> tN -> TupN
 -- t1 .. tN@, for 'Clash.Rewrite.Types.tupleTcCache'
 tupleTyCon :: Int -> C.TyCon
-tupleTyCon n = mkTestAlgTyCon nm tvs [dc]
+tupleTyCon n = fxAlgTyCon nm tvs [dc]
  where
   nm = mkTyConName ("Tup" <> show n) (3500 + fromIntegral n)
-  tvs = [tyVar C.User ("t" <> show i) (3600 + 10 * fromIntegral n + fromIntegral i) | i <- [1 .. n]]
-  dc = mkTestDataCon ("MkTup" <> show n) (3700 + fromIntegral n) tvs []
-         (map C.VarTy tvs) (tcApp nm (map C.VarTy tvs))
+  tvs = [fxTyVarT ("t" <> show i) (3600 + 10 * fromIntegral n + fromIntegral i) | i <- [1 .. n]]
+  dc = fxDataCon ("MkTup" <> show n) (3700 + fromIntegral n) 1 tvs []
+         (map fxVarB tvs) (tcAppB nm (map fxVarB tvs))
 
 -- | Add the tuple type constructors of arity 2 up to the given one
 -- ('tupleTyCon') to a 'RewriteEnv': to its type constructors, and to its
@@ -1585,20 +1628,19 @@ liftedEqTyConName = C.mkUnsafeName C.User (Text.pack "~") (fromGhcUnique eqTyCon
 vTy :: C.Type -> C.Type
 vTy n = tcApp vTyConName [n]
 
-fxN, fxM :: C.TyVar
-fxN = kindedTyVar C.User "n" 3026 C.typeNatKind
-fxM = kindedTyVar C.User "m" 3027 C.typeNatKind
+fxN, fxM :: FxTyVar
+fxN = fxTyVar "n" 3026 natB
+fxM = fxTyVar "m" 3027 natB
 
 vNilDataCon, vConsDataCon :: C.DataCon
 vNilDataCon =
-  mkTestDataCon "VNil" 3028 [fxN] [] [eqTy C.typeNatKind (C.VarTy fxN) (numTy 0)]
-    (vTy (C.VarTy fxN))
+  fxDataCon "VNil" 3028 1 [fxN] [] [eqNatB (fxVarB fxN) (numB 0)] (tcAppB vTyConName [fxVarB fxN])
 vConsDataCon =
-  (mkTestDataCon "VCons" 3029 [fxN] [fxM]
-    [ eqTy C.typeNatKind (C.VarTy fxN) (addTy (C.VarTy fxM) (numTy 1))
-    , intTy
-    , vTy (C.VarTy fxM) ]
-    (vTy (C.VarTy fxN))) {C.dcTag = 2}
+  fxDataCon "VCons" 3029 2 [fxN] [fxM]
+    [ eqNatB (fxVarB fxN) (addB (fxVarB fxM) (numB 1))
+    , intB
+    , tcAppB vTyConName [fxVarB fxM] ]
+    (tcAppB vTyConName [fxVarB fxN])
 
 -- | The name of @Vec@. The primitive reductions recognize vectors by this name.
 vecTcNm :: C.TyConName
@@ -1610,27 +1652,26 @@ vecTy n a = tcApp vecTcNm [n, a]
 
 -- | The universally quantified type variables of the constructors of @Vec@,
 -- and the existentially quantified one of 'consDc'
-vecN, vecA, vecM :: C.TyVar
-vecN = tyVar C.User "n" 2001
-vecA = tyVar C.User "a" 2002
-vecM = tyVar C.User "m" 2003
+vecN, vecA, vecM :: FxTyVar
+vecN = fxTyVarT "n" 2001
+vecA = fxTyVarT "a" 2002
+vecM = fxTyVarT "m" 2003
 
 -- | @Nil :: forall n a. (n ~ 0) => Vec n a@
 nilDc :: C.DataCon
 nilDc =
-  mkTestDataCon "Nil" 2005 [vecN, vecA] []
-    [eqTy C.typeNatKind (C.VarTy vecN) (numTy 0)]
-    (vecTy (C.VarTy vecN) (C.VarTy vecA))
+  fxDataCon "Nil" 2005 1 [vecN, vecA] []
+    [eqNatB (fxVarB vecN) (numB 0)]
+    (tcAppB vecTcNm [fxVarB vecN, fxVarB vecA])
 
 -- | @Cons :: forall n a. forall m. (n ~ m + 1) => a -> Vec m a -> Vec n a@
 consDc :: C.DataCon
 consDc =
-  (mkTestDataCon "Cons" 2006 [vecN, vecA] [vecM]
-    [ eqTy C.typeNatKind (C.VarTy vecN) (addTy (C.VarTy vecM) (numTy 1))
-    , C.VarTy vecA
-    , vecTy (C.VarTy vecM) (C.VarTy vecA) ]
-    (vecTy (C.VarTy vecN) (C.VarTy vecA)))
-  { C.dcTag = 2 }
+  fxDataCon "Cons" 2006 2 [vecN, vecA] [vecM]
+    [ eqNatB (fxVarB vecN) (addB (fxVarB vecM) (numB 1))
+    , fxVarB vecA
+    , tcAppB vecTcNm [fxVarB vecM, fxVarB vecA] ]
+    (tcAppB vecTcNm [fxVarB vecN, fxVarB vecA])
 
 -- | The name of @RTree@. The primitive reductions recognize trees by this
 -- name.
@@ -1643,28 +1684,27 @@ rtreeTy d a = tcApp rtreeTcNm [d, a]
 
 -- | The universally quantified type variables of the constructors of @RTree@,
 -- and the existentially quantified one of 'brDc'
-rtreeD, rtreeA, rtreeD1 :: C.TyVar
-rtreeD = tyVar C.User "d" 2011
-rtreeA = tyVar C.User "a" 2012
-rtreeD1 = tyVar C.User "d1" 2013
+rtreeD, rtreeA, rtreeD1 :: FxTyVar
+rtreeD = fxTyVarT "d" 2011
+rtreeA = fxTyVarT "a" 2012
+rtreeD1 = fxTyVarT "d1" 2013
 
 -- | @LR :: forall d a. (d ~ 0) => a -> RTree d a@
 lrDc :: C.DataCon
 lrDc =
-  mkTestDataCon "LR" 2014 [rtreeD, rtreeA] []
-    [eqTy C.typeNatKind (C.VarTy rtreeD) (numTy 0), C.VarTy rtreeA]
-    (rtreeTy (C.VarTy rtreeD) (C.VarTy rtreeA))
+  fxDataCon "LR" 2014 1 [rtreeD, rtreeA] []
+    [eqNatB (fxVarB rtreeD) (numB 0), fxVarB rtreeA]
+    (tcAppB rtreeTcNm [fxVarB rtreeD, fxVarB rtreeA])
 
 -- | @BR :: forall d a. forall d1. (d ~ d1 + 1) => RTree d1 a -> RTree d1 a ->
 -- RTree d a@
 brDc :: C.DataCon
 brDc =
-  (mkTestDataCon "BR" 2015 [rtreeD, rtreeA] [rtreeD1]
-    [ eqTy C.typeNatKind (C.VarTy rtreeD) (addTy (C.VarTy rtreeD1) (numTy 1))
-    , rtreeTy (C.VarTy rtreeD1) (C.VarTy rtreeA)
-    , rtreeTy (C.VarTy rtreeD1) (C.VarTy rtreeA) ]
-    (rtreeTy (C.VarTy rtreeD) (C.VarTy rtreeA)))
-  { C.dcTag = 2 }
+  fxDataCon "BR" 2015 2 [rtreeD, rtreeA] [rtreeD1]
+    [ eqNatB (fxVarB rtreeD) (addB (fxVarB rtreeD1) (numB 1))
+    , tcAppB rtreeTcNm [fxVarB rtreeD1, fxVarB rtreeA]
+    , tcAppB rtreeTcNm [fxVarB rtreeD1, fxVarB rtreeA] ]
+    (tcAppB rtreeTcNm [fxVarB rtreeD, fxVarB rtreeA])
 
 -- | @SNat n@, with @SNat :: forall n. Natural -> SNat n@. The primitive
 -- reductions find this constructor through the types of the functions that
@@ -1675,11 +1715,13 @@ snatTcNm = mkTyConName "Clash.Promoted.Nat.SNat" 2030
 snatTy :: C.Type -> C.Type
 snatTy n = tcApp snatTcNm [n]
 
-snatN :: C.TyVar
-snatN = kindedTyVar C.User "n" 2031 C.typeNatKind
+snatN :: FxTyVar
+snatN = fxTyVar "n" 2031 natB
 
 snatDc :: C.DataCon
-snatDc = mkTestDataCon "SNat" 2032 [snatN] [] [C.naturalPrimTy] (snatTy (C.VarTy snatN))
+snatDc =
+  fxDataCon "SNat" 2032 1 [snatN] [] [tcAppB P.naturalPrimTyConName []]
+    (tcAppB snatTcNm [fxVarB snatN])
 
 -- | GHC's boxed @Int@: @data Int = I# Int#@, unlike 'intTy'. The primitive
 -- reductions of @replace_int@ and @index_int@ compare the index with boxed
@@ -1691,21 +1733,21 @@ hIntTy :: C.Type
 hIntTy = tcTy hIntTcNm
 
 iHashDc :: C.DataCon
-iHashDc = mkTestDataCon "GHC.Types.I#" 2034 [] [] [C.intPrimTy] hIntTy
+iHashDc = fxDataCon "GHC.Types.I#" 2034 1 [] [] [tcAppB P.intPrimTyConName []] (tcAppB hIntTcNm [])
 
 -- | A proof of an upper bound, as @dfold@ takes one: @data UBP l n = MkUBP@
 ubpTcNm :: C.TyConName
 ubpTcNm = mkTyConName "UBP" 2035
 
-ubpL, ubpN :: C.TyVar
-ubpL = kindedTyVar C.User "l" 2036 C.typeNatKind
-ubpN = kindedTyVar C.User "n" 2037 C.typeNatKind
+ubpL, ubpN :: FxTyVar
+ubpL = fxTyVar "l" 2036 natB
+ubpN = fxTyVar "n" 2037 natB
 
 ubpTy :: C.Type -> C.Type -> C.Type
 ubpTy l n = tcApp ubpTcNm [l, n]
 
 ubpDc :: C.DataCon
-ubpDc = mkTestDataCon "MkUBP" 2038 [ubpL, ubpN] [] [] (ubpTy (C.VarTy ubpL) (C.VarTy ubpN))
+ubpDc = fxDataCon "MkUBP" 2038 1 [ubpL, ubpN] [] [] (tcAppB ubpTcNm [fxVarB ubpL, fxVarB ubpN])
 
 -- | The name of @Index@, as the function @imap@ takes indexes it
 indexTcNm :: C.TyConName
@@ -1724,10 +1766,10 @@ functorTcNm, applicativeTcNm :: C.TyConName
 functorTcNm = mkTyConName "GHC.Base.Functor" 2040
 applicativeTcNm = mkTyConName "GHC.Base.Applicative" 2041
 
-dictF, dictA, dictB :: C.TyVar
-dictF = kindedTyVar C.User "f" 2042 (C.mkFunTy C.liftedTypeKind C.liftedTypeKind)
-dictA = tyVar C.User "a" 2043
-dictB = tyVar C.User "b" 2044
+dictF, dictA, dictB :: FxTyVar
+dictF = fxTyVar "f" 2042 (funTyB [typeB] typeB)
+dictA = fxTyVarT "a" 2043
+dictB = fxTyVarT "b" 2044
 
 functorTy, applicativeTy :: C.Type -> C.Type
 functorTy f = tcApp functorTcNm [f]
@@ -1735,27 +1777,27 @@ applicativeTy f = tcApp applicativeTcNm [f]
 
 functorDc, applicativeDc :: C.DataCon
 functorDc =
-  mkTestDataCon "CFunctor" 2045 [dictF] []
-    [ C.ForAllTy dictA (C.ForAllTy dictB
-        (C.mkFunTy (C.mkFunTy a b) (C.mkFunTy (C.AppTy f a) (C.AppTy f b))))
-    , intTy ]
-    (functorTy f)
+  fxDataCon "CFunctor" 2045 1 [dictF] []
+    [ fxForAllB dictA (fxForAllB dictB
+        (funTyB [funTyB [a] b, appTyB f a] (appTyB f b)))
+    , intB ]
+    (tcAppB functorTcNm [f])
  where
-  f = C.VarTy dictF
-  a = C.VarTy dictA
-  b = C.VarTy dictB
+  f = fxVarB dictF
+  a = fxVarB dictA
+  b = fxVarB dictB
 applicativeDc =
-  mkTestDataCon "CApplicative" 2046 [dictF] []
-    [ functorTy f
-    , C.ForAllTy dictA (C.mkFunTy a (C.AppTy f a))
-    , C.ForAllTy dictA (C.ForAllTy dictB
-        (C.mkFunTy (C.AppTy f (C.mkFunTy a b)) (C.mkFunTy (C.AppTy f a) (C.AppTy f b))))
-    , intTy, intTy, intTy ]
-    (applicativeTy f)
+  fxDataCon "CApplicative" 2046 1 [dictF] []
+    [ tcAppB functorTcNm [f]
+    , fxForAllB dictA (funTyB [a] (appTyB f a))
+    , fxForAllB dictA (fxForAllB dictB
+        (funTyB [appTyB f (funTyB [a] b), appTyB f a] (appTyB f b)))
+    , intB, intB, intB ]
+    (tcAppB applicativeTcNm [f])
  where
-  f = C.VarTy dictF
-  a = C.VarTy dictA
-  b = C.VarTy dictB
+  f = fxVarB dictF
+  a = fxVarB dictA
+  b = fxVarB dictB
 
 -- | GHC's boxed pairs, by the name under which "Clash.GHC.GHC2Core" gives
 -- them, and the reductions of primitives look them up
@@ -1770,12 +1812,12 @@ ghcPairTy a b = tcApp ghcPairTcNm [a, b]
 -- | @(,) :: forall a b. a -> b -> (a, b)@
 ghcPairDc :: C.DataCon
 ghcPairDc =
-  mkTestDataCon "GHC.Tuple.(,)" 2051 [pairA, pairB] [] [C.VarTy pairA, C.VarTy pairB]
-    (ghcPairTy (C.VarTy pairA) (C.VarTy pairB))
+  fxDataCon "GHC.Tuple.(,)" 2051 1 [pairA, pairB] [] [fxVarB pairA, fxVarB pairB]
+    (tcAppB ghcPairTcNm [fxVarB pairA, fxVarB pairB])
 
-pairA, pairB :: C.TyVar
-pairA = tyVar C.User "a" 2052
-pairB = tyVar C.User "b" 2053
+pairA, pairB :: FxTyVar
+pairA = fxTyVarT "a" 2052
+pairB = fxTyVarT "b" 2053
 
 -- | @Ordering@, which reductions of comparisons of numbers return
 orderingTcNm :: C.TyConName
@@ -1785,9 +1827,9 @@ orderingTy :: C.Type
 orderingTy = tcTy orderingTcNm
 
 ltDc, eqDc, gtDc :: C.DataCon
-ltDc = mkTestDataCon "GHC.Types.LT" 2061 [] [] [] orderingTy
-eqDc = (mkTestDataCon "GHC.Types.EQ" 2062 [] [] [] orderingTy) { C.dcTag = 2 }
-gtDc = (mkTestDataCon "GHC.Types.GT" 2063 [] [] [] orderingTy) { C.dcTag = 3 }
+ltDc = fxDataCon "GHC.Types.LT" 2061 1 [] [] [] (tcAppB orderingTcNm [])
+eqDc = fxDataCon "GHC.Types.EQ" 2062 2 [] [] [] (tcAppB orderingTcNm [])
+gtDc = fxDataCon "GHC.Types.GT" 2063 3 [] [] [] (tcAppB orderingTcNm [])
 
 -- | The boxed @Double@
 doubleTcNm :: C.TyConName
@@ -1798,7 +1840,8 @@ doubleTy = tcTy doubleTcNm
 
 -- | @D# :: Double# -> Double@
 doubleDc :: C.DataCon
-doubleDc = mkTestDataCon "GHC.Types.D#" 2065 [] [] [C.doublePrimTy] doubleTy
+doubleDc =
+  fxDataCon "GHC.Types.D#" 2065 1 [] [] [tcAppB P.doublePrimTyConName []] (tcAppB doubleTcNm [])
 
 -- | @T3@, a product of three types, like an unboxed triple
 t3TyConName :: C.TyConName
@@ -1809,11 +1852,11 @@ t3Ty a b c = tcApp t3TyConName [a, b, c]
 
 -- | @MkT3 :: a -> b -> c -> T3 a b c@
 t3DataCon :: C.DataCon
-t3DataCon = mkTestDataCon "MkT3" 2067 [fxA, fxB, t3C] [] [C.VarTy fxA, C.VarTy fxB, C.VarTy t3C]
-  (t3Ty (C.VarTy fxA) (C.VarTy fxB) (C.VarTy t3C))
+t3DataCon = fxDataCon "MkT3" 2067 1 [fxA, fxB, t3C] [] [fxVarB fxA, fxVarB fxB, fxVarB t3C]
+  (tcAppB t3TyConName [fxVarB fxA, fxVarB fxB, fxVarB t3C])
 
-t3C :: C.TyVar
-t3C = tyVar C.User "c" 2068
+t3C :: FxTyVar
+t3C = fxTyVarT "c" 2068
 
 -- | @T2@ applied to two types
 t2Ty :: C.Type -> C.Type -> C.Type
@@ -1821,8 +1864,8 @@ t2Ty a b = tcApp t2TyConName [a, b]
 
 -- | @MkT2 :: a -> b -> T2 a b@
 t2DataCon :: C.DataCon
-t2DataCon = mkTestDataCon "MkT2" 3033 [fxA, fxB] [] [C.VarTy fxA, C.VarTy fxB]
-  (t2Ty (C.VarTy fxA) (C.VarTy fxB))
+t2DataCon = fxDataCon "MkT2" 3033 1 [fxA, fxB] [] [fxVarB fxA, fxVarB fxB]
+  (tcAppB t2TyConName [fxVarB fxA, fxVarB fxB])
 
 -- | @SomeNat@, a type-level natural hidden behind an existential
 someNatTcNm :: C.TyConName
@@ -1834,11 +1877,12 @@ someNatTy = tcTy someNatTcNm
 -- | @SomeNat :: forall n. KnownNat n => Proxy n -> SomeNat@
 someNatDc :: C.DataCon
 someNatDc =
-  mkTestDataCon "GHC.TypeNats.SomeNat" 2070 [] [someNatN]
-    [C.naturalPrimTy, kindedProxyTy C.typeNatKind (C.VarTy someNatN)] someNatTy
+  fxDataCon "GHC.TypeNats.SomeNat" 2070 1 [] [someNatN]
+    [tcAppB P.naturalPrimTyConName [], tcAppB proxyTcNm [natB, fxVarB someNatN]]
+    (tcAppB someNatTcNm [])
 
-someNatN :: C.TyVar
-someNatN = kindedTyVar C.User "n" 2071 C.typeNatKind
+someNatN :: FxTyVar
+someNatN = fxTyVar "n" 2071 natB
 
 -- | @Proxy@, poly-kinded
 proxyTcNm :: C.TyConName
@@ -1851,11 +1895,13 @@ kindedProxyTy k a = tcApp proxyTcNm [k, a]
 -- rather than @k@, because the kind of a type constructor can't mention its
 -- type variables.
 proxyDc :: C.DataCon
-proxyDc = mkTestDataCon "Data.Proxy.Proxy" 2073 [proxyK, proxyA] [] [] (kindedProxyTy (C.VarTy proxyK) (C.VarTy proxyA))
+proxyDc =
+  fxDataCon "Data.Proxy.Proxy" 2073 1 [proxyK, proxyA] [] []
+    (tcAppB proxyTcNm [fxVarB proxyK, fxVarB proxyA])
 
-proxyK, proxyA :: C.TyVar
-proxyK = tyVar C.User "k" 2074
-proxyA = tyVar C.User "a" 2075
+proxyK, proxyA :: FxTyVar
+proxyK = fxTyVarT "k" 2074
+proxyA = fxTyVarT "a" 2075
 
 -- | The names of the types of clock, reset and enable lines. Clash recognizes
 -- them by their names.
@@ -1881,72 +1927,74 @@ clkPairTy = tcTy clkPairTcNm
 
 -- | @MkClkPair :: Clock System -> Int -> ClkPair@
 clkPairDc :: C.DataCon
-clkPairDc = mkTestDataCon "MkClkPair" 2025 [] [] [clockTy, intTy] clkPairTy
+clkPairDc =
+  fxDataCon "MkClkPair" 2025 1 [] [] [tcAppB clockTcNm [litTyB (C.SymTy "System")], intB]
+    (tcAppB clkPairTcNm [])
 
 -- | The type constructors of the types above, and those of 'C.tysPrimMap',
 -- 'intTyCon' and 'pairTy'
 testTyConMap :: C.TyConMap
 testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
  where
-  tcs = UniqMap.elems C.tysPrimMap <>
+  tcs = UniqMap.elems P.tysPrimMap <>
     [ intTyCon
-    , mkTestAlgTyCon (parseTyConName "Pair") [] [pairDataCon]
-    , mkTestAlgTyCon boolTyConName [] [falseDc, trueDc]
-    , mkTestAlgTyCon ghcBoolTyConName [] [ghcFalseDataCon, ghcTrueDataCon]
-    , mkTestAlgTyCon maybeTyConName [fxA] [nothingDataCon, justDataCon]
-    , mkTestNewTyCon nTyConName [fxA]
-        (mkTestDataCon "MkN" 3030 [fxA] [] [maybeTy (C.VarTy fxA)] (nTy (C.VarTy fxA)))
-        ([fxA], maybeTy (C.VarTy fxA))
-    , mkTestNewTyCon pTyConName [fxA]
-        (mkTestDataCon "MkP" 3031 [fxA] [] [pRhs] (pTy (C.VarTy fxA)))
+    , fxAlgTyCon (parseTyConName "Pair") [] [pairDataCon]
+    , fxAlgTyCon boolTyConName [] [falseDc, trueDc]
+    , fxAlgTyCon ghcBoolTyConName [] [ghcFalseDataCon, ghcTrueDataCon]
+    , fxAlgTyCon maybeTyConName [fxA] [nothingDataCon, justDataCon]
+    , fxNewTyCon nTyConName [fxA]
+        (fxDataCon "MkN" 3030 1 [fxA] [] [maybeA] (tcAppB nTyConName [a]))
+        ([fxA], maybeA)
+    , fxNewTyCon pTyConName [fxA]
+        (fxDataCon "MkP" 3031 1 [fxA] [] [pRhs] (tcAppB pTyConName [a]))
         ([fxA], pRhs)
-    , mkTestNewTyCon wTyConName []
-        (mkTestDataCon "MkW" 3032 [] [] [C.mkFunTy intTy intTy] wTy)
-        ([], C.mkFunTy intTy intTy)
-    , mkTestFunTyCon fTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
-        [ ([intTy], boolTy)
-        , ([maybeTy (C.VarTy fxA)], C.VarTy fxA)
-        , ([C.VarTy fxA], nTy (C.VarTy fxA)) ]
-    , mkTestFunTyCon maxTyConName (C.mkFunTy C.liftedTypeKind (C.mkFunTy C.liftedTypeKind C.liftedTypeKind)) 2
-        [ ([C.VarTy fxA, C.VarTy fxA], C.VarTy fxA)
-        , ([C.VarTy fxA, C.VarTy fxB], maybeTy (C.VarTy fxB)) ]
-    , mkTestFunTyCon kTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 0
-        [ ([], tcTy maybeTyConName) ]
-    , mkTestFunTyCon qTyConName (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
-        [ ([C.VarTy fxA], pRhs) ]
-    , mkTestAlgTyCon signalTyConName [fxA, fxB] []
-    , mkTestFunTyCon addTyConName natNatNat 2 []
-    , mkTestFunTyCon cmpNatTyConName natNatNat 2 []
-    , mkTestFunTyCon unconsSymbolTyConName
-        (C.mkFunTy C.typeSymbolKind (maybeTy (tcApp t2TyConName [C.charPrimTy, C.typeSymbolKind])))
+    , fxNewTyCon wTyConName []
+        (fxDataCon "MkW" 3032 1 [] [] [funTyB [intB] intB] (tcAppB wTyConName []))
+        ([], funTyB [intB] intB)
+    , fxFunTyCon fTyConName (funTyB [typeB] typeB) 1
+        [ ([], [intB], tcAppB boolTyConName [])
+        , ([fxA], [maybeA], a)
+        , ([fxA], [a], tcAppB nTyConName [a]) ]
+    , fxFunTyCon maxTyConName (funTyB [typeB, typeB] typeB) 2
+        [ ([fxA], [a, a], a)
+        , ([fxA, fxB], [a, b], tcAppB maybeTyConName [b]) ]
+    , fxFunTyCon kTyConName (funTyB [typeB] typeB) 0
+        [ ([], [], tcAppB maybeTyConName []) ]
+    , fxFunTyCon qTyConName (funTyB [typeB] typeB) 1
+        [ ([fxA], [a], pRhs) ]
+    , fxAlgTyCon signalTyConName [fxA, fxB] []
+    , fxFunTyCon addTyConName natNatNat 2 []
+    , fxFunTyCon cmpNatTyConName natNatNat 2 []
+    , fxFunTyCon unconsSymbolTyConName
+        (funTyB [symbolB]
+          (tcAppB maybeTyConName [tcAppB t2TyConName [tcAppB P.charPrimTyConName [], symbolB]]))
         1 []
-    , mkTestAlgTyCon t2TyConName [fxA, fxB] [t2DataCon]
-    , C.mkAlgTyConFromClash (C.nameUniq vTyConName) vTyConName
-        (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
+    , fxAlgTyCon t2TyConName [fxA, fxB] [t2DataCon]
+    , S.mkAlgTyCon vTyConName (runClosedType (funTyB [natB] typeB)) 1
         (C.DataTyCon [vNilDataCon, vConsDataCon]) False
-    , mkTestAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
-    , mkTestAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
-    , mkTestAlgTyCon snatTcNm [snatN] [snatDc]
-    , mkTestAlgTyCon hIntTcNm [] [iHashDc]
-    , mkTestAlgTyCon ubpTcNm [ubpL, ubpN] [ubpDc]
-    , C.mkPrimTyConFromClash (C.nameUniq indexTcNm) indexTcNm (C.mkFunTy C.typeNatKind C.liftedTypeKind) 1
-    , mkTestAlgTyCon functorTcNm [dictF] [functorDc]
-    , mkTestAlgTyCon applicativeTcNm [dictF] [applicativeDc]
-    , mkTestAlgTyCon ghcPairTcNm [pairA, pairB] [ghcPairDc]
-    , C.mkPrimTyConFromClash (C.nameUniq clockTcNm) clockTcNm C.liftedTypeKind 1
-    , C.mkPrimTyConFromClash (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
-    , C.mkPrimTyConFromClash (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
-    , mkTestAlgTyCon clkPairTcNm [] [clkPairDc]
-    , mkTestAlgTyCon (parseTyConName "E") [] [existentialDataCon]
-    , mkTestAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
-    , mkTestAlgTyCon doubleTcNm [] [doubleDc]
-    , mkTestAlgTyCon t3TyConName [fxA, fxB, t3C] [t3DataCon]
-    , mkTestAlgTyCon someNatTcNm [] [someNatDc]
-    , mkTestAlgTyCon proxyTcNm [proxyK, proxyA] [proxyDc]
+    , fxAlgTyCon vecTcNm [vecN, vecA] [nilDc, consDc]
+    , fxAlgTyCon rtreeTcNm [rtreeD, rtreeA] [lrDc, brDc]
+    , fxAlgTyCon snatTcNm [snatN] [snatDc]
+    , fxAlgTyCon hIntTcNm [] [iHashDc]
+    , fxAlgTyCon ubpTcNm [ubpL, ubpN] [ubpDc]
+    , fxPrimTyCon indexTcNm (funTyB [natB] typeB) 1
+    , fxAlgTyCon functorTcNm [dictF] [functorDc]
+    , fxAlgTyCon applicativeTcNm [dictF] [applicativeDc]
+    , fxAlgTyCon ghcPairTcNm [pairA, pairB] [ghcPairDc]
+    , fxPrimTyCon clockTcNm typeB 1
+    , fxPrimTyCon resetTcNm typeB 1
+    , fxPrimTyCon enableTcNm typeB 1
+    , fxAlgTyCon clkPairTcNm [] [clkPairDc]
+    , fxAlgTyCon (parseTyConName "E") [] [existentialDataCon]
+    , fxAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
+    , fxAlgTyCon doubleTcNm [] [doubleDc]
+    , fxAlgTyCon t3TyConName [fxA, fxB, t3C] [t3DataCon]
+    , fxAlgTyCon someNatTcNm [] [someNatDc]
+    , fxAlgTyCon proxyTcNm [proxyK, proxyA] [proxyDc]
     ] <>
     -- Promoted data constructors that type families return. Their kinds don't
     -- matter here.
-    [ C.mkPrimTyConFromClash (C.nameUniq nm) nm C.liftedTypeKind 0
+    [ fxPrimTyCon nm typeB 0
     | nm <-
         [ mkTyConName "GHC.Types.LT" (fromGhcUnique ordLTDataConKey)
         , mkTyConName "GHC.Types.EQ" (fromGhcUnique ordEQDataConKey)
@@ -1957,20 +2005,18 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
         ]
     ]
 
-  natNatNat = C.mkFunTy C.typeNatKind (C.mkFunTy C.typeNatKind C.typeNatKind)
+  natNatNat = funTyB [natB, natB] natB
 
-  falseDc = mkTestDataCon "False" 3034 [] [] [] boolTy
-  trueDc = (mkTestDataCon "True" 3035 [] [] [] boolTy) {C.dcTag = 2}
+  falseDc = fxDataCon "False" 3034 1 [] [] [] (tcAppB boolTyConName [])
+  trueDc = fxDataCon "True" 3035 2 [] [] [] (tcAppB boolTyConName [])
+
+  a = fxVarB fxA
+  b = fxVarB fxB
+  maybeA = tcAppB maybeTyConName [a]
 
   -- forall b. a -> b
-  pRhs = C.ForAllTy fxB (C.mkFunTy (C.VarTy fxA) (C.VarTy fxB))
+  pRhs = fxForAllB fxB (funTyB [a] b)
 
--- * Zero-width types
---
--- Types of which a value has no bits, for 'Clash.Normalize.Transformations.Specialize.zeroWidthSpec'.
-
--- | The sized number types of @clash-prelude@, which 'zeroWidthTyConMap'
--- knows, besides 'indexTcNm'. Only their names matter.
 bitVectorTyConName, unsignedTyConName, signedTyConName :: C.TyConName
 bitVectorTyConName = mkTyConName "Clash.Sized.Internal.BitVector.BitVector" 3100
 unsignedTyConName = mkTyConName "Clash.Sized.Internal.Unsigned.Unsigned" 3101
@@ -1993,14 +2039,17 @@ zwTy :: C.Type
 zwTy = tcTy zwTyConName
 
 zwDataCon :: C.DataCon
-zwDataCon = mkTestDataCon "MkZW" 3110 [] [] [bitVectorTy 0, unsignedTy 0] zwTy
+zwDataCon =
+  fxDataCon "MkZW" 3110 1 [] []
+    [tcAppB bitVectorTyConName [numB 0], tcAppB unsignedTyConName [numB 0]]
+    (tcAppB zwTyConName [])
 
 -- | @data Proxy (n :: Nat) = Proxy@
 proxyTy :: C.Type -> C.Type
 proxyTy n = tcApp proxyTyConName [n]
 
 proxyDataCon :: C.DataCon
-proxyDataCon = mkTestDataCon "Proxy" 3111 [zwN] [] [] (proxyTy (C.VarTy zwN))
+proxyDataCon = fxDataCon "Proxy" 3111 1 [zwN] [] [] (tcAppB proxyTyConName [fxVarB zwN])
 
 -- | @data TProxy (n :: Nat) = MkTProxy (Proxy n)@: a field type that mentions
 -- a type variable
@@ -2009,7 +2058,8 @@ tProxyTy n = tcApp tProxyTyConName [n]
 
 tProxyDataCon :: C.DataCon
 tProxyDataCon =
-  mkTestDataCon "MkTProxy" 3112 [zwN] [] [proxyTy (C.VarTy zwN)] (tProxyTy (C.VarTy zwN))
+  fxDataCon "MkTProxy" 3112 1 [zwN] [] [tcAppB proxyTyConName [fxVarB zwN]]
+    (tcAppB tProxyTyConName [fxVarB zwN])
 
 -- | @data ExZW = forall b. MkExZW (BitVector 0)@: a constructor with an
 -- existentially quantified type variable
@@ -2017,7 +2067,8 @@ exZwTy :: C.Type
 exZwTy = tcTy exZwTyConName
 
 exZwDataCon :: C.DataCon
-exZwDataCon = mkTestDataCon "MkExZW" 3113 [] [zwB] [bitVectorTy 0] exZwTy
+exZwDataCon =
+  fxDataCon "MkExZW" 3113 1 [] [zwB] [tcAppB bitVectorTyConName [numB 0]] (tcAppB exZwTyConName [])
 
 -- | @data Stream a = a :> Stream a@: a recursive type, like @Signal@
 streamTy :: C.Type -> C.Type
@@ -2025,25 +2076,26 @@ streamTy a = tcApp streamTyConName [a]
 
 streamDataCon :: C.DataCon
 streamDataCon =
-  mkTestDataCon ":>" 3114 [zwA] [] [C.VarTy zwA, streamTy (C.VarTy zwA)] (streamTy (C.VarTy zwA))
+  fxDataCon ":>" 3114 1 [zwA] [] [fxVarB zwA, tcAppB streamTyConName [fxVarB zwA]]
+    (tcAppB streamTyConName [fxVarB zwA])
 
 -- | Type variables of the zero-width types
-zwN, zwA, zwB :: C.TyVar
-zwN = kindedTyVar C.User "n" 3115 C.typeNatKind
-zwA = tyVar C.User "a" 3116
-zwB = tyVar C.User "b" 3117
+zwN, zwA, zwB :: FxTyVar
+zwN = fxTyVar "n" 3115 natB
+zwA = fxTyVarT "a" 3116
+zwB = fxTyVarT "b" 3117
 
 -- | 'testTyConMap', with the zero-width types
 zeroWidthTyConMap :: C.TyConMap
 zeroWidthTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
  where
   tcs = UniqMap.elems testTyConMap <>
-    [ mkTestAlgTyCon nm [zwN] [] | nm <- [bitVectorTyConName, unsignedTyConName, signedTyConName, indexTcNm] ] <>
-    [ mkTestAlgTyCon zwTyConName [] [zwDataCon]
-    , mkTestAlgTyCon proxyTyConName [zwN] [proxyDataCon]
-    , mkTestAlgTyCon tProxyTyConName [zwN] [tProxyDataCon]
-    , mkTestAlgTyCon exZwTyConName [] [exZwDataCon]
-    , mkTestAlgTyCon streamTyConName [zwA] [streamDataCon]
+    [ fxAlgTyCon nm [zwN] [] | nm <- [bitVectorTyConName, unsignedTyConName, signedTyConName, indexTcNm] ] <>
+    [ fxAlgTyCon zwTyConName [] [zwDataCon]
+    , fxAlgTyCon proxyTyConName [zwN] [proxyDataCon]
+    , fxAlgTyCon tProxyTyConName [zwN] [tProxyDataCon]
+    , fxAlgTyCon exZwTyConName [] [exZwDataCon]
+    , fxAlgTyCon streamTyConName [zwA] [streamDataCon]
     ]
 
 -- | A 'C.TyVar' with the given name sort, human readable name, unique, and
