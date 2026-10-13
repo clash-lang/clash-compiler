@@ -18,8 +18,8 @@
 
   = Types
 
-  The types in terms are types of scoped Core, built by 'coreToTypeB' from
-  the types of Clash Core that 'Clash.GHC.GHC2Core.coreToType' gives. The
+  The types in terms are types of scoped Core, which
+  'Clash.GHC.GHC2Core.coreToTypeB' builds from GHC's types directly. The
   types of global variables, data constructors and primitives stay types of
   Clash Core.
 
@@ -53,7 +53,7 @@ module Clash.GHC.Scoped.GHC2Core
   , varKey
   ) where
 
-import           Control.Lens                ((^.), (%=), (<>=), use, view)
+import           Control.Lens                ((^.), (<>=), view)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad.RWS.Strict    as RWS
 import           Data.Bifunctor              (second)
@@ -94,9 +94,8 @@ import GHC.Core.TyCon
   , isUnaryClassTyCon
 #endif
   )
-import GHC.Core.TyCo.Rep (Type (..))
 import GHC.Types.Var
-  (Id, TyVar, Var, isTyVar, varName, varType, varUnique, idInfo,
+  (Id, Var, isTyVar, varName, varType, idInfo,
    isGlobalId)
 import GHC.Types.Var.Set (VarSet, elemVarSet, isEmptyVarSet)
 import GHC.Utils.Outputable (showPprUnsafe)
@@ -112,15 +111,14 @@ import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash, mkPrimInfoFromC
 import           Clash.Core.Scoped.Syntax (PrimInfo (..))
 import           Clash.Driver.Types          (HasClashOpts(..))
 import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreEnv (..), SrcSpanRB (..), StructuralType (..), addUsefull,
-   addUsefullR, coreToDataCon, coreToId, coreToLiteral, coreToType,
-   coreToPrimVar, coreToVar, coreToVarType, emptyGHC2CoreState, hasPrimCo,
-   isDataConWrapId, isSizedCast, pendingWarnings, qualifiedNameString,
-   scopedTypeCache, srcSpan)
+  (C2C, GHC2CoreEnv (..), SrcSpanRB (..), addUsefull, addUsefullR,
+   coreToDataCon, coreToId, coreToLiteral, coreToType, coreToTyVarB,
+   coreToTypeB, coreToPrimVar, coreToVar, coreToVarType, emptyGHC2CoreState,
+   hasPrimCo, isDataConWrapId, isSizedCast, pendingWarnings,
+   qualifiedNameString, srcSpan, varKey)
 import           Clash.Core.Scoped.Builder
 import qualified Clash.Normalize.Primitives  as C
 import           Clash.Primitives.Types      hiding (name)
-import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util                  (curLoc)
 
 -- * Terms
@@ -263,8 +261,8 @@ coreToTermB primMap unlocs recLocals = term
     term' (Lam x e)
       | isTyVar x
       = do
-        (k, occ) <- coreToTyVarB x
-        tyLamB (varKey x) occ k <$> addUsefull (getSrcSpan x) (term e)
+        (key, occ, k) <- coreToTyVarB x
+        tyLamB key occ k <$> addUsefull (getSrcSpan x) (term e)
       | otherwise
       = do
         (e',sp) <- termSP (getSrcSpan x) e
@@ -418,47 +416,15 @@ coreToTermB primMap unlocs recLocals = term
       (tyvs,tmvs) -> do
         (e',sp1) <- termSP sp0 e
         dc' <- coreToDataCon dc
-        tyvs' <- mapM (\tv -> (\(k, occ) -> (varKey tv, occ, k)) <$> coreToTyVarB tv) tyvs
+        tyvs' <- mapM coreToTyVarB tyvs
         tmvs' <- mapM (\v -> (\(ty, occ) -> (varKey v, occ, ty)) <$> coreToIdSP sp1 v) tmvs
         return (dataAltB dc' tyvs' tmvs' e')
-
--- | The key of a GHC variable
-varKey :: Var -> Key
-varKey = uniqueKey . fromGhcUnique . varUnique
 
 -- | Convert a term variable binder: its type and name. Like
 -- 'Clash.GHC.GHC2Core.coreToId', which converts the type of a global through
 -- 'coreToVarType'.
 coreToIdB :: Id -> C2C (TyB, C.Name C.Term)
 coreToIdB i = (,) <$> coreToTypeB (varType i) <*> coreToVar i
-
--- | Convert a type variable binder: its kind and name. Like
--- 'Clash.GHC.GHC2Core.coreToTyVar'.
-coreToTyVarB :: TyVar -> C2C (TyB, C.Name C.Type)
-coreToTyVarB tv = (,) <$> coreToTypeB (varType tv) <*> coreToVar tv
-
--- * Types
-
--- | Convert a GHC type to a type of scoped Core: the type of Clash Core that
--- 'Clash.GHC.GHC2Core.coreToType' gives, as a builder ('clashTyB').
---
--- Converting a GHC type caches the names in it by unique (see
--- 'Clash.GHC.GHC2Core.qualifiedNameStringM'), and different GHC names can
--- share a unique. So going through 'Clash.GHC.GHC2Core.coreToType', and its
--- cache, at the same points as 'Clash.GHC.GHC2Core.coreToTerm' does, keeps
--- the names the same as those of the conversion through Clash Core.
---
--- Memoized on the GHC type, like 'Clash.GHC.GHC2Core.coreToType', which
--- shares the closed types without binders, see "Clash.Core.Scoped.Builder".
-coreToTypeB :: Type -> C2C TyB
-coreToTypeB ty = do
-  cache <- use scopedTypeCache
-  case HashMap.lookup (StructuralType ty) cache of
-    Just ty1 -> pure ty1
-    Nothing -> do
-      ty1 <- clashTyB <$> coreToType ty
-      scopedTypeCache %= HashMap.insert (StructuralType ty) ty1
-      pure ty1
 
 -- * Builder terms
 --

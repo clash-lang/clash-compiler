@@ -34,10 +34,12 @@ module Clash.GHC.GHC2Core
   , makeAllTyCons
   , emptyGHC2CoreState
   , pendingWarnings
+    -- * Types of scoped Core
+  , varKey
+  , coreToTypeB
+  , coreToTyVarB
     -- * For "Clash.GHC.Scoped.GHC2Core"
-  , StructuralType (..)
   , SrcSpanRB (..)
-  , scopedTypeCache
   , coreToType
   , coreToVar
   , coreToVarType
@@ -163,7 +165,8 @@ import           Clash.Primitives.Types      hiding (name)
 import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util
 import           Clash.GHC.Util
-import           Clash.Core.Scoped.Builder    (TyB)
+import           Clash.Core.Scoped.Builder
+  (Key, TyB, annTyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, uniqueKey, varTyB)
 
 instance Hashable Name where
   hashWithSalt s = hashWithSalt s . getKey . nameUnique
@@ -252,7 +255,7 @@ data GHC2CoreState
   -- ^ Cache for converted types, keyed on the GHC type. See 'coreToType'.
   , _scopedTypeCache :: HashMap StructuralType TyB
   -- ^ Cache for types converted to scoped Core, keyed on the GHC type. See
-  -- 'Clash.GHC.Scoped.GHC2Core.coreToTypeB'.
+  -- 'coreToTypeB'.
   , _pendingWarnings :: Seq PendingWarning
   -- ^ Warnings collected while converting, in the order they were reported.
   -- 'C2C' is pure, so it cannot print them itself; the driver reports these
@@ -1137,6 +1140,81 @@ coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
 coreToType' (CastTy t (Refl{})) = coreToType' t
 coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPprUnsafe t)
 coreToType' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPprUnsafe t)
+
+-- * Types of scoped Core
+
+-- | The key of a GHC variable in the builders of scoped Core, see
+-- "Clash.Core.Scoped.Builder"
+varKey :: Var -> Key
+varKey = uniqueKey . fromGhcUnique . varUnique
+
+-- | Converts a GHC type to a type of scoped Core, as a builder (see
+-- "Clash.Core.Scoped.Builder"). It gives the type that converting the type
+-- of Clash Core of 'coreToType' would give.
+--
+-- It looks up the same names as 'coreToType', in the same order. That
+-- matters: the names are cached by unique (see 'qualifiedNameStringM'), and
+-- different GHC names can share a unique, so the order in which names are
+-- first looked up decides their text. So it also converts the kinds of the
+-- type variables it meets, as 'coreToType' does, although the builder of an
+-- occurrence of a type variable doesn't need its kind.
+--
+-- Memoized on the GHC type, like 'coreToType', which shares the closed types
+-- without binders, see "Clash.Core.Scoped.Builder".
+coreToTypeB :: Type -> C2C TyB
+coreToTypeB ty = do
+  cache <- use scopedTypeCache
+  case HashMap.lookup (StructuralType ty) cache of
+    Just ty1 -> pure ty1
+    Nothing -> do
+      ty1 <- withoutSrcSpan convert
+      scopedTypeCache %= HashMap.insert (StructuralType ty) ty1
+      pure ty1
+  where
+    convert = do
+      ty1 <- ty''
+      attrs <- coreToAttrs ty
+      pure (if null attrs then ty1 else annTyB attrs ty1)
+
+    ty'' | Just ty' <- coreView ty = coreToTypeB ty'
+         | TyConApp tc xs <- ty = do
+             envs <- view famInstEnvs
+             case topReduceTyFamApp_maybe envs tc xs of
+               Nothing -> coreToTypeB' ty
+               Just (HetReduction (Reduction _ ty') _) -> coreToTypeB ty'
+         | otherwise = coreToTypeB' ty
+
+-- | See 'coreToType''
+coreToTypeB' :: Type -> C2C TyB
+coreToTypeB' (TyVarTy tv) = varTyB (varKey tv) <$ coreToTyVarB tv
+coreToTypeB' (TyConApp tc args)
+  | Just (FunTy _ _ ty1 ty2) <- tyConAppFunTy_maybe tc args = funTyB . pure <$> coreToTypeB ty1 <*> coreToTypeB ty2
+  | otherwise     = case expandSynTyCon_maybe tc args of
+                      ExpandsSyn substs synTy remArgs -> do
+                        let substs' = mkTvSubstPrs substs
+                            synTy'  = substTy substs' synTy
+                        foldl appTyB <$> coreToTypeB synTy' <*> mapM coreToTypeB remArgs
+                      _ -> do
+                        tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
+                        tyConMap %= C.insertIfAbsent tcName tc
+                        foldl appTyB (constTyB (C.TyCon tcName)) <$> mapM coreToTypeB args
+coreToTypeB' (ForAllTy (Bndr tv _) ty) = do
+  (key, nm, k) <- coreToTyVarB tv
+  forAllTyB key nm k <$> coreToTypeB ty
+coreToTypeB' (FunTy _ _ ty1 ty2) = funTyB . pure <$> coreToTypeB ty1 <*> coreToTypeB ty2
+coreToTypeB' (LitTy tyLit)    = return $ litTyB (coreToTyLit tyLit)
+coreToTypeB' (AppTy ty1 ty2)  = appTyB <$> coreToTypeB ty1 <*> coreToTypeB' ty2
+coreToTypeB' (CastTy t (Refl{})) = coreToTypeB' t
+coreToTypeB' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPprUnsafe t)
+coreToTypeB' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPprUnsafe t)
+
+-- | Convert a type variable binder: its key, name and kind. Like
+-- 'coreToTyVar', it converts the kind first.
+coreToTyVarB :: TyVar -> C2C (Key, C.Name C.Type, TyB)
+coreToTyVarB tv = do
+  k <- coreToTypeB (varType tv)
+  nm <- coreToVar tv
+  pure (varKey tv, nm, k)
 
 coreToTyLit :: TyLit
             -> C.LitTy
