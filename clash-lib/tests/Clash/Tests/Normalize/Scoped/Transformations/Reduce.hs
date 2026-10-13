@@ -34,7 +34,7 @@ import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 import Clash.Core.Scoped.NameMap (emptyNameMap, nameMapToList)
 import Clash.Core.Scoped.Syntax
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.Scoped.Util (LetBinding (..), openLetBindings)
 
@@ -56,8 +56,8 @@ st = def {_globalHeap = (IntMap.empty, 0)}
 -- | The 'App' worker of a scoped transformation, as a scoped rewrite
 onAppS
   :: (forall n. Distinct n => S.TransformContext n -> Term n -> Term n -> Term n -> NormalizeSession (Term n))
-  -> ScopedRewrite NormalizeState
-onAppS w = ScopedTransform $ \ctx e -> case e of
+  -> Rewrite NormalizeState
+onAppS w = Transform $ \ctx e -> case e of
   App fun arg -> w ctx e fun arg
   _ -> pure e
 
@@ -94,17 +94,17 @@ prims =
 tm :: String -> TestTerm
 tm = parseTestTermWith (TestDefs [] prims [])
 
-reducePrimS, reduceConstS :: ScopedRewrite NormalizeState
+reducePrimS, reduceConstS :: Rewrite NormalizeState
 reducePrimS = onAppS Scoped.reducePrimWorker
 reduceConstS = onAppS Scoped.reduceConstWorker
 
 -- | Assert that a transformation, at the given path, rewrites a term to the
 -- expected one
-rewritesAt :: ScopedRewrite NormalizeState -> [Step] -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+rewritesAt :: Rewrite NormalizeState -> [Step] -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
 rewritesAt rw path = assertRewritesAt env st path rw
 
 -- | Assert that a transformation, at the given path, leaves a term as it is
-keepsAt :: ScopedRewrite NormalizeState -> [Step] -> [ScopeDecl] -> TestTerm -> Assertion
+keepsAt :: Rewrite NormalizeState -> [Step] -> [ScopeDecl] -> TestTerm -> Assertion
 keepsAt rw path = assertNoRewriteAt env st path rw
 
 reducePrimTests :: TestTree

@@ -25,7 +25,7 @@ import Clash.Normalize.Types (NormalizeState)
 import Clash.Core.Scoped.Syntax (Distinct, GlobalId, Term)
 import qualified Clash.Rewrite.Scoped.Combinators as SC (bottomupR)
 import Clash.Driver.Types (DebugOpts (..), debugSilent)
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import Clash.Rewrite.Scoped.Apply (applyDebug)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
@@ -68,11 +68,11 @@ st = def
 
 -- | Assert that a transformation rewrites a term to the expected one, see
 -- 'assertRewritesTo'
-rewrites :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+rewrites :: Rewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
 rewrites = assertRewritesTo env st
 
 -- | Assert that a transformation leaves a term as it is
-keeps :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
+keeps :: Rewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
 keeps = assertNoRewrite env st
 
 tests :: TestTree
@@ -151,7 +151,7 @@ deadCodeTests = testGroup "deadCode"
 
 -- * removeUnusedExpr
 
-removeUnusedExprS :: ScopedRewrite NormalizeState
+removeUnusedExprS :: Rewrite NormalizeState
 removeUnusedExprS = $(asScopedRewriteQ S.removeUnusedExpr)
 
 removeUnusedExprTests :: TestTree
@@ -176,7 +176,7 @@ removeUnusedExprTests = testGroup "removeUnusedExpr"
 -- * flattenLet
 
 -- | The scoped 'S.flattenLet'
-flattenLetSc :: ScopedRewrite NormalizeState
+flattenLetSc :: Rewrite NormalizeState
 flattenLetSc = $(asScopedRewriteQ S.flattenLet)
 
 flattenLetTests :: TestTree
@@ -251,7 +251,7 @@ flattenLetTests = testGroup "flattenLet"
 
 -- * topLet
 
-topLetS :: ScopedRewrite NormalizeState
+topLetS :: Rewrite NormalizeState
 topLetS = $(asScopedRewriteQ S.topLet)
 
 -- | Assert that 'S.topLet', in the body of the outer lambda of a term, gives
@@ -417,7 +417,7 @@ regressionTests = testGroup "regression tests"
 
 -- * simpleCSE
 
-cseS :: ScopedRewrite NormalizeState
+cseS :: Rewrite NormalizeState
 cseS = $(asScopedRewriteQ S.simpleCSE)
 
 simpleCSETests :: TestTree
@@ -452,8 +452,8 @@ simpleCSETests = testGroup "simpleCSE"
 
 -- * recToLetRec
 
-recToLetRecS :: ScopedRewrite NormalizeState
-recToLetRecS = ScopedTransform S.recToLetRec
+recToLetRecS :: Rewrite NormalizeState
+recToLetRecS = Transform S.recToLetRec
 
 -- | A state in which the function being normalized is @rec@, of the given
 -- type

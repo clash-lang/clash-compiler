@@ -27,7 +27,7 @@ import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (Wo
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Inline as S
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.Scoped (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
@@ -89,14 +89,14 @@ topOpaque = globalEnvFromList
 -- | Assert that a transformation, in a state set up with 'topState', rewrites
 -- a term to the expected one
 rewritesInTop
-  :: GlobalEnv (Binding (Term 'VoidS)) -> ScopedRewrite NormalizeState -> [ScopeDecl]
+  :: GlobalEnv (Binding (Term 'VoidS)) -> Rewrite NormalizeState -> [ScopeDecl]
   -> TestTerm -> TestTerm -> Assertion
 rewritesInTop bs = assertRewritesTo env (topState bs)
 
 -- | Assert that a transformation, in a state set up with 'topState', leaves a
 -- term as it is
 keepsInTop
-  :: GlobalEnv (Binding (Term 'VoidS)) -> ScopedRewrite NormalizeState -> [ScopeDecl]
+  :: GlobalEnv (Binding (Term 'VoidS)) -> Rewrite NormalizeState -> [ScopeDecl]
   -> TestTerm -> Assertion
 keepsInTop bs = assertNoRewrite env (topState bs)
 

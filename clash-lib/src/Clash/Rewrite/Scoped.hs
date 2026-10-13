@@ -12,9 +12,9 @@
   A transformation works on a term in /any/ scope @n@, in its context:
 
   @
-  newtype 'ScopedTransform' m = 'ScopedTransform'
-    { 'runScopedTransform' :: forall n. Distinct n => 'TransformContext' n -> Term n -> m (Term n) }
-  type 'ScopedRewrite' extra = 'ScopedTransform' ('Clash.Rewrite.Types.RewriteMonad' extra)
+  newtype 'Transform' m = 'Transform'
+    { 'runTransform' :: forall n. Distinct n => 'TransformContext' n -> Term n -> m (Term n) }
+  type 'Rewrite' extra = 'Transform' ('Clash.Rewrite.Types.RewriteMonad' extra)
   @
 
   The rewrite monad, its state ('Clash.Rewrite.Types.bindings',

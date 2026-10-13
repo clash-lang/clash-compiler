@@ -32,7 +32,7 @@ import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import qualified Clash.Normalize.Scoped.Transformations.Inline as InlineS
 import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
 import Clash.Normalize.Types (NormalizeState, specialisationCache)
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..), extra)
 import Clash.Util.Supply (newSupply)
@@ -51,14 +51,14 @@ import Test.Clash.Scoped.Print (showTestTerm)
 -- * The transformations
 
 appPropS, constantSpecS, nonRepSpecS, typeSpecS, zeroWidthSpecS, argCastSpecS
-  , specializeS :: ScopedRewrite NormalizeState
+  , specializeS :: Rewrite NormalizeState
 appPropS = $(asScopedRewriteQ Scoped.appProp)
 constantSpecS = $(asScopedRewriteQ Scoped.constantSpec)
 nonRepSpecS = $(asScopedRewriteQ Scoped.nonRepSpec)
 typeSpecS = $(asScopedRewriteQ Scoped.typeSpec)
 zeroWidthSpecS = $(asScopedRewriteQ Scoped.zeroWidthSpec)
 argCastSpecS = $(asScopedRewriteQ Scoped.argCastSpec)
-specializeS = ScopedTransform Scoped.specialize
+specializeS = Transform Scoped.specialize
 
 -- * Fixtures
 
@@ -108,13 +108,13 @@ newFun nm body = (testGlobalId (nm <> "_G9001") "Int", body)
 
 -- | Assert that a transformation rewrites a term to the expected one, see
 -- 'assertRewritesTo'
-rewrites :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+rewrites :: Rewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
 rewrites = assertRewritesTo tcEnv st
 
 -- | Assert that a transformation creates a global function, and rewrites a
 -- term to the expected one, see 'assertSpecializesTo'
 specializes
-  :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> String -> TestTerm
+  :: Rewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> String -> TestTerm
   -> Assertion
 specializes rw decls input expected nm body =
   assertSpecializesTo tcEnv st rw decls input expected [newFun nm body]
@@ -128,7 +128,7 @@ capturing decls part new mk expected =
   assertCaptureRewritesTo tcEnv st appPropS decls (tm part) new mk (tm expected)
 
 -- | Assert that a transformation leaves a term as it is
-keeps :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
+keeps :: Rewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
 keeps = assertNoRewrite tcEnv st
 
 -- | @\\(x :: ty) -> h x@, with @h :: ty -> Int@ a free local function
@@ -549,7 +549,7 @@ fHoAndK kIdent = globalEnvFromList
 -- shares its unique with the global function @k@, given the identifier of
 -- that global. It abstracts over the local @k@ rather than inlining the body
 -- of the global @k@.
-specializeOnLocalArgHead :: ScopedRewrite NormalizeState -> String -> Assertion
+specializeOnLocalArgHead :: Rewrite NormalizeState -> String -> Assertion
 specializeOnLocalArgHead rw kIdent =
   assertSpecializesTo def (stWith (fHoAndK kIdent)) rw
     [varD "x_12" "Int", varD "k_31" "Int -> Int -> Int"]

@@ -117,7 +117,7 @@ import Clash.Normalize.Scoped.Util
   ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
   , normalizeTopLvlBndr, normalizeWorkFreeApp )
 import Clash.Rewrite.Scoped
-  ( Frame (CaseScrut), FrameKind (..), ScopedTransform (..), TransformContext, allR
+  ( Frame (CaseScrut), FrameKind (..), Transform (..), TransformContext, allR
   , changed, ctxFrames, pushFrame, tfScope, underAlt )
 import Clash.Rewrite.Scoped.Globals (isTopEntity, lookupBinding)
 import Clash.Rewrite.Scoped.Util
@@ -632,7 +632,7 @@ inlineNonRep ctx e0 = case e0 of
         _ -> error ("internal error, inlineNonRep triggered on a non-Case:" <> showPpr e1)
   -- All non-case statements are simply traversed. TODO: are there other special
   -- cases like 'Case' that would warrant an optimization like ^ ?
-  _ -> runScopedTransform (allR (ScopedTransform inlineNonRep)) ctx e0
+  _ -> runTransform (allR (Transform inlineNonRep)) ctx e0
 {-# SCC inlineNonRep #-}
 
 -- | Inline function with a non-representable result if it's the subject

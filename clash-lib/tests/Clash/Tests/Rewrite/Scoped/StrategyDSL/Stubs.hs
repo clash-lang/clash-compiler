@@ -27,7 +27,7 @@ import Clash.Core.Scoped.FreeVars (teleNameBinders)
 import Clash.Core.Scoped.Subst (unsinkTerm)
 import Clash.Core.Scoped.Syntax hiding (Name)
 import Clash.Rewrite.Scoped
-  (ScopedRewrite, ScopedTransform (..), TransformContext, changed, ctxFrames)
+  (Rewrite, Transform (..), TransformContext, changed, ctxFrames)
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
   (compileScopedStrategy, compileScopedStrategyReference)
@@ -61,8 +61,8 @@ collapseApplication :: Transformation
 collapseApplication =
   toScopedTransformation "collapseApplication" (onApp 'collapseApplicationWorker)
 
-collapseApplicationRewrite :: ScopedRewrite ()
-collapseApplicationRewrite = ScopedTransform $ \_ctx -> \case
+collapseApplicationRewrite :: Rewrite ()
+collapseApplicationRewrite = Transform $ \_ctx -> \case
   App _function argument@(Literal IntLiteral{}) -> changed argument
   term -> pure term
 
@@ -112,8 +112,8 @@ incrementBoth :: Transformation
 incrementBoth = toScopedTransformation "incrementBoth"
   (onApp 'incrementBothAppWorker <> onLiteral 'incrementBothLiteralWorker)
 
-incrementBothRewrite :: ScopedRewrite ()
-incrementBothRewrite = ScopedTransform $ \_ctx -> \case
+incrementBothRewrite :: Rewrite ()
+incrementBothRewrite = Transform $ \_ctx -> \case
   App function (Literal (IntLiteral i)) | odd i -> changed (App function (integer (i + 1)))
   Literal (IntLiteral i) | odd i -> changed (integer (i + 1))
   term -> pure term
@@ -133,8 +133,8 @@ inlineTrivialLet :: Transformation
 inlineTrivialLet =
   toScopedTransformation "inlineTrivialLet" (onLet 'inlineTrivialLetWorker)
 
-inlineTrivialLetRewrite :: ScopedRewrite ()
-inlineTrivialLetRewrite = ScopedTransform $ \ctx -> \case
+inlineTrivialLetRewrite :: Rewrite ()
+inlineTrivialLetRewrite = Transform $ \ctx -> \case
   node@(Let bind body) -> inlineTrivialLetWorker ctx node bind body
   term -> pure term
 

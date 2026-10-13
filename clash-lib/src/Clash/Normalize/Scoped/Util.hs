@@ -95,7 +95,7 @@ import           Clash.Core.Scoped.Type
   (PiTele (..), TypeView (..), isClockOrReset, mkFunTy, piTeleNameBinders, tyView)
 import           Clash.Rewrite.Scoped.Apply  (runRewrite)
 import           Clash.Rewrite.Scoped.Types
-  (FrameKind (..), ScopedRewrite, TransformContext, ctxFrames, mkDerivedName, tfScope)
+  (FrameKind (..), Rewrite, TransformContext, ctxFrames, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Globals (freshGlobalId)
 
 -- * Constant arguments of primitives
@@ -435,7 +435,7 @@ isCheapFunction tm = case classifyFunction tm of
 -- * Normalizing global binders
 
 -- | The normalization strategy ('normalizationStrategy')
-getNormalization :: NormalizeSession (ScopedRewrite NormalizeState)
+getNormalization :: NormalizeSession (Rewrite NormalizeState)
 getNormalization = Lens.use (extra.normalizationStrategy)
 
 -- | Normalize a global binder, caching the result in 'normalized'. If
@@ -540,7 +540,7 @@ normalizeWorkFreeApp f b args = do
 -- scoped Core, binders never shadow one another, and every variable is in
 -- scope.
 rewriteExpr
-  :: (String, ScopedRewrite NormalizeState)
+  :: (String, Rewrite NormalizeState)
   -- ^ Transformation to apply
   -> (String, Term 'VoidS)
   -- ^ Term to transform

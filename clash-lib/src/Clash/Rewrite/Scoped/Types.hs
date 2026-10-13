@@ -55,8 +55,8 @@
 
 module Clash.Rewrite.Scoped.Types
   ( -- * Transformations
-    ScopedTransform (..)
-  , ScopedRewrite
+    Transform (..)
+  , Rewrite
     -- * The context
   , TransformContext
   , tfScope
@@ -103,13 +103,13 @@ import Clash.Rewrite.Types (RewriteMonad)
 -- | A transformation of a term in any scope, in its context. A newtype rather
 -- than a rank-2 type synonym, so that transformations can be stored, passed to
 -- combinators and defined recursively without type signatures.
-newtype ScopedTransform m = ScopedTransform
-  { runScopedTransform
+newtype Transform m = Transform
+  { runTransform
       :: forall n. Distinct n => TransformContext n -> Term n -> m (Term n)
   }
 
--- | A 'ScopedTransform' in the 'RewriteMonad'
-type ScopedRewrite extra = ScopedTransform (RewriteMonad extra)
+-- | A 'Transform' in the 'RewriteMonad'
+type Rewrite extra = Transform (RewriteMonad extra)
 
 -- * The context
 

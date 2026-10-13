@@ -21,7 +21,7 @@ import Data.Text                  (Text)
 
 import Clash.Driver.Types (Binding)
 import Clash.Rewrite.Types (RewriteMonad)
-import Clash.Rewrite.Scoped.Types (ScopedRewrite)
+import Clash.Rewrite.Scoped.Types (Rewrite)
 import Clash.Core.Scoped.Alpha (AlphaTerm, AlphaType)
 import Clash.Core.Scoped.NameMap (GlobalEnv)
 import qualified Clash.Core.Scoped.Syntax as S
@@ -31,13 +31,13 @@ data NormalizeState
   = NormalizeState
   { _primitiveArgs :: Map Text (Set Int)
   -- ^ Cache for looking up constantness of blackbox arguments
-  , _normalizationStrategy :: ScopedRewrite NormalizeState
+  , _normalizationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.normalization' strategy. Carried
   -- in the state so transformations can normalize other binders
   -- ('Clash.Normalize.Scoped.Util.normalizeTopLvlBndr') without importing the
   -- strategy module. Breaking that import cycle would need an hs-boot file,
   -- and GHC rejects Template Haskell splices in a module cycle.
-  , _constantPropagationStrategy :: ScopedRewrite NormalizeState
+  , _constantPropagationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
   -- for "Clash.Normalize.Scoped.PrimitiveReductions". See
   -- '_normalizationStrategy'.
