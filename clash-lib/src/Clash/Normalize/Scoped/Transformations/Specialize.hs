@@ -82,7 +82,7 @@ import qualified Clash.Sized.Internal.Index  as I (Index, fromInteger#)
 import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
 import qualified Clash.Sized.Internal.Unsigned as U (Unsigned, fromInteger#)
 
-import           Clash.Core.DataCon          (dcExtTyVars)
+import           Clash.Core.DataCon          (dcExtTyVarCount)
 import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
@@ -445,8 +445,8 @@ specializeGlobal sc e f args ticks specArgIn = do
             then throw (ClashException
                         sp
                         (unlines [ "Hit specialization limit " ++ show specLim ++ " on function `" ++ showPpr (globalIdName f) ++ "'.\n"
-                                 , "The function `" ++ showPpr fV ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
-                                 , "Body of `" ++ showPpr fV ++ "':\n" ++ showPpr bodyTm ++ "\n"
+                                 , "The function `" ++ showPpr f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
+                                 , "Body of `" ++ showPpr f ++ "':\n" ++ showPpr bodyTm ++ "\n"
                                  , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ either showPpr showPpr specArg
                                  , "Run with '-fclash-spec-limit=N' to increase the specialization limit to N."
                                  ])
@@ -502,9 +502,6 @@ specializeGlobal sc e f args ticks specArgIn = do
                   -- Use specialized function
                   changed (mkApps (mkTicks (GlobalVar newf) ticks) (args ++ specVars))
  where
-  -- For the messages, which show its type
-  fV = globalIdLegacy f
-
   varName :: Term x -> Maybe (C.Name C.Term)
   varName = \case
     Var occ _ _ -> Just occ
@@ -771,7 +768,7 @@ zeroWidthTypeElemIn te sc enclosing ty = do
        tc <- lookupTyCon te tcNm
 
        case C.tyConDataCons tc of
-         [dc] | null (dcExtTyVars dc) -> do
+         [dc] | dcExtTyVarCount dc == 0 -> do
            argTys <- dataConInstArgTys te sc dc args
            zwArgs <- traverse (zeroWidthTypeElemIn te sc (tcNm : enclosing)) argTys
            return (mkApps (Data dc) (fmap Right args <> fmap Left zwArgs))

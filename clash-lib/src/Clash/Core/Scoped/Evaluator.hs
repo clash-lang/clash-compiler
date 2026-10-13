@@ -102,7 +102,7 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified Clash.Sized.Vector
 
-import Clash.Core.DataCon (DataCon (..), dcUnivTyVars)
+import Clash.Core.DataCon (DataCon (..), dcUnivTyVarCount)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
@@ -665,7 +665,7 @@ substInAlt
 substInAlt sc dc tvs xs args e =
   fromMaybe (error ($(curLoc) ++ "fields don't match the pattern")) $ do
     s1 <- extendTySubstTele (idSubst sc) tvs
-            (drop (length (dcUnivTyVars dc)) (Either.rights args))
+            (drop (dcUnivTyVarCount dc) (Either.rights args))
     s2 <- extendTmSubstTele s1 xs (Either.lefts args)
     pure (substTm s2 e)
 

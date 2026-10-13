@@ -42,16 +42,15 @@ import GHC.Word                         (Word8, Word16, Word32, Word64)
 import Language.Haskell.TH.Syntax       (showName)
 
 import Clash.Core.Basic (LitTy (..))
-import Clash.Core.DataCon               (dcArgTys)
+import Clash.Core.DataCon               (dcSig)
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (tyConDataCons)
-import qualified Clash.Core.Type as C   (TypeView (..), tyView)
-import Clash.Core.Scoped.DataCon        (dataConInstExtTyVars)
+import Clash.Core.Scoped.DataCon        (DataConSig (..), dataConInstExtTyVars)
 import Clash.Core.Scoped.Pretty         ()
 import Clash.Core.Scoped.Syntax         (Distinct, Scope, Type (..))
 import Clash.Core.Scoped.Type
-  (TypeView (..), coreView, coreView1, tyNatSize, tyView)
+  (TypeView (..), coreView, coreView1, splitTyConAppM, tyNatSize, tyView)
 import Clash.Core.Scoped.TypeEnv        (TypeEnv, findTyCon)
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
@@ -78,6 +77,11 @@ ghcTypeToHWType iw = tt
     -- returnN :: HWType ->
     returnN t = return (FilteredHWType t [])
 
+    -- The type constructors of the fields of a data constructor, for those
+    -- that are applications of type constructors
+    fieldTyCons dc = case dcSig dc of
+      DataConSig _ _ fields -> map (fmap fst . splitTyConAppM) fields
+
     go
       :: Distinct n
       => CustomReprs
@@ -97,8 +101,8 @@ ghcTypeToHWType iw = tt
          | occ == showt ''Int64                 ->
              if iw < 64
                 then case tyConDataCons (findTyCon m tc) of
-                       [dc] -> case dcArgTys dc of
-                         [C.tyView -> C.TyConApp nm _]
+                       [dc] -> case fieldTyCons dc of
+                         [Just nm]
                            | nameOcc nm == showt ''Int#   ->
                                throwE $ unlines ["Int64 not supported in forced 32-bit mode on a 64-bit machine."
                                                 ,"Run Clash with `-fclash-intwidth=64`."
@@ -114,8 +118,8 @@ ghcTypeToHWType iw = tt
          | occ == showt ''Word64                ->
              if iw < 64
                 then case tyConDataCons (findTyCon m tc) of
-                       [dc] -> case dcArgTys dc of
-                         [C.tyView -> C.TyConApp nm _]
+                       [dc] -> case fieldTyCons dc of
+                         [Just nm]
                            | nameOcc nm == showt ''Word#   ->
                                throwE $ unlines ["Word64 not supported in forced 32-bit mode on a 64-bit machine."
                                                 ,"Run Clash with `-fclash-intwidth=64`."

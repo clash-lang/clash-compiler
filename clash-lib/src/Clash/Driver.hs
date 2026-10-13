@@ -96,8 +96,6 @@ import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
-import           Clash.Core.Var
-  (varName, varUniq)
 import           Clash.Debug                      (debugIsOn)
 import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
 import           Clash.Driver.Types
@@ -119,7 +117,7 @@ import           Clash.Normalize                  (checkNonRecursive, cleanupGra
                                                    normalize, runNormalization)
 import           Clash.Core.Scoped.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
-import           Clash.Core.Scoped.Syntax (globalIdLegacy, globalIdUniq, GlobalId)
+import           Clash.Core.Scoped.Syntax (globalIdName, globalIdUniq, GlobalId)
 import           Clash.Core.Scoped.Convert (mkGlobalId)
 import           Clash.Core.Scoped.Pretty         ()
 import qualified Clash.Core.Scoped.Subst          as S (openTyBinder)
@@ -139,7 +137,7 @@ import qualified Clash.Primitives.Verification    as P
 import qualified Clash.Primitives.Xilinx.ClockGen as P
 import           Clash.Primitives.Types
 import           Clash.Signal.Internal
-import           Clash.Unique                     (Unique, getUnique, fromGhcUnique)
+import           Clash.Unique (Unique, fromGhcUnique)
 import           Clash.Util
   (ClashException(..), reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
@@ -381,21 +379,20 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
     -> TopEntityT
     -> IO ()
   go compNames seenV edamFilesV ioLockV deps topEntityMap waitTurn (TopEntityT topEntityG annM isTb) = do
-  let topEntity = globalIdLegacy topEntityG
   let domainConfs = envDomains env
   let bindingsMap = designBindings design
   let primMap = envPrimitives env
   let topEntities0 = designEntities design
   let opts = envOpts env
   prevTime <- Clock.getCurrentTime
-  let topEntityS = Data.Text.unpack (nameOcc (varName topEntity))
+  let topEntityS = Data.Text.unpack (nameOcc (globalIdName topEntityG))
 
   withMVar ioLockV . const $
     putStrLn ("Clash: Compiling " ++ topEntityS)
 
   let modName1 = filter (\c -> isAscii c && (isAlphaNum c || c == '_')) (replaceChar '.' '_' topEntityS)
 
-  let topNm = fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show topEntity))
+  let topNm = fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show topEntityG))
                 (lookupGlobalEnv topEntityG compNames)
       (modNameS, fmap Data.Text.pack -> prefixM) = prefixModuleName (hdlKind (undefined :: backend)) (opt_componentPrefix opts) annM modName1
       modNameT  = Data.Text.pack modNameS
@@ -431,7 +428,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
 
       fileNames1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
-          then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles fileNames
+          then writeEdam hdlDir (topNm, globalIdUniq topEntityG) deps edamFiles fileNames
           else pure (edamFiles, fileNames)
 
       writeManifest manPath manifest0{fileNames=fileNames1}
@@ -518,14 +515,14 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
 
       filesAndDigests1 <- modifyMVar edamFilesV $ \edamFiles ->
         if opt_edalize opts
-          then writeEdam hdlDir (topNm, varUniq topEntity) deps edamFiles filesAndDigests0
+          then writeEdam hdlDir (topNm, globalIdUniq topEntityG) deps edamFiles filesAndDigests0
           else pure (edamFiles, filesAndDigests0)
 
       let
-        depUniques = fromMaybe [] (HashMap.lookup (getUnique topEntity) deps)
+        depUniques = fromMaybe [] (HashMap.lookup (globalIdUniq topEntityG) deps)
         depIds =
           mapMaybe
-            (\u -> List.find ((== u) . varUniq) (map (globalIdLegacy . topId) (globalEnvElems topEntityMap)))
+            (\u -> List.find ((== u) . globalIdUniq) (map topId (globalEnvElems topEntityMap)))
             depUniques
 
         manifest =

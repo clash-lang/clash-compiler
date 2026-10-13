@@ -83,7 +83,6 @@ module Clash.Core.Scoped.Builder
   , annTyB
   , funTyB
   , tyConAppB
-  , clashTyB
     -- * Terms
   , TmB
   , tmbHead
@@ -96,7 +95,6 @@ module Clash.Core.Scoped.Builder
   , tyAppB
   , lamB
   , tyLamB
-  , tyLamClashB
   , letB
   , letrecB
   , caseB
@@ -144,7 +142,6 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (TyConName)
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
@@ -378,46 +375,6 @@ funTyB args res = foldr (\a r -> appTyB (appTyB (constTyB Arrow) a) r) res args
 tyConAppB :: TyConName -> [TyB] -> TyB
 tyConAppB tc = List.foldl' appTyB (constTyB (TyCon tc))
 
--- | A type of Clash Core, whose type variables are bound by the builders
--- around it, by their uniques. Unless it is closed and without binders, it
--- is converted each time it is built, like
--- 'Clash.Core.Scoped.Convert.fromClashType' does.
-clashTyB :: HasCallStack => C.Type -> TyB
-clashTyB ty0
-  | closed ty0 = TyClosed (goClosed ty0)
-  | otherwise = rnf ty0 `seq` TyOpen (Run (\env -> go env ty0))
- where
-  -- Closed, and without binders
-  closed = \case
-    C.VarTy _ -> False
-    C.ConstTy _ -> True
-    C.ForAllTy _ _ -> False
-    C.AppTy t1 t2 -> closed t1 && closed t2
-    C.LitTy _ -> True
-    C.AnnType _ t -> closed t
-
-  goClosed :: C.Type -> Type 'VoidS
-  goClosed = \case
-    C.ConstTy c -> ConstTy c
-    C.AppTy t1 t2 -> AppTy (goClosed t1) (goClosed t2)
-    C.LitTy l -> LitTy l
-    C.AnnType attrs t -> AnnType attrs (goClosed t)
-    ty -> error ("Clash.Core.Scoped.Builder.clashTyB: not closed: " ++ show ty)
-
-  go :: Distinct n => BEnv s n -> C.Type -> ST s (Type n)
-  go env@(BEnv _ tys _ _) = \case
-    C.VarTy tv -> case IntMap.lookup (uniqueKey (C.varUniq tv)) tys of
-      Just ty -> pure ty
-      Nothing -> error ("Clash.Core.Scoped.Builder: type variable not in scope: " ++ show (C.varName tv))
-    C.ConstTy c -> pure (ConstTy c)
-    C.ForAllTy tv t -> do
-      k <- go env (C.varType tv)
-      withTyBinder env (uniqueKey (C.varUniq tv)) (C.varName tv) k $ \env' b ->
-        ForAllTy b <$> go env' t
-    C.AppTy t1 t2 -> AppTy <$> go env t1 <*> go env t2
-    C.LitTy l -> pure (LitTy l)
-    C.AnnType attrs t -> AnnType attrs <$> go env t
-
 -- * Terms
 
 -- | A term under construction, see the module header
@@ -475,12 +432,6 @@ tyLamB :: Key -> C.Name C.Type -> TyB -> TmB -> TmB
 tyLamB !key !occ !k !e = term $ Run $ \env -> do
   k' <- runTyB k env
   withTyBinder env key occ k' $ \env' b -> TyLam b <$> runTmB e env'
-
--- | A type lambda binding a type variable of Clash Core, which the body
--- refers to by its unique, see 'clashTyB'
-tyLamClashB :: C.TyVar -> TmB -> TmB
-tyLamClashB tv =
-  tyLamB (uniqueKey (C.varUniq tv)) (C.varName tv) (clashTyB (C.varType tv))
 
 -- | A non-recursive let-binding: key, name and type of the variable, its
 -- right-hand side, and the body

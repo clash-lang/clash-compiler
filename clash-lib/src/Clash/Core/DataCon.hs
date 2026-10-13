@@ -24,6 +24,9 @@ module Clash.Core.DataCon
   , dcUnivTyVars
   , dcExtTyVars
   , dcArgTys
+  , dcUnivTyVarCount
+  , dcExtTyVarCount
+  , dcFieldCount
   )
 where
 
@@ -35,7 +38,7 @@ import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
 import Clash.Core.Name                        (Name (..))
-import Clash.Core.Scoped.Sig                  (DataConSig)
+import Clash.Core.Scoped.Sig                  (DataConSig (..))
 import qualified Clash.Core.Scoped.Syntax     as Scoped
 import {-# SOURCE #-} Clash.Core.Type         (Type)
 import Clash.Core.Var                         (TyVar)
@@ -107,6 +110,22 @@ dcExtTyVars = ldcExtTyVars . dcLegacy
 -- | Transitional, see 'DataCon' and 'ldcArgTys'
 dcArgTys :: DataCon -> [Type]
 dcArgTys = ldcArgTys . dcLegacy
+
+-- | The number of universally quantified type variables of a data constructor
+dcUnivTyVarCount :: DataCon -> Int
+dcUnivTyVarCount dc = case dcSig dc of
+  DataConSig univ _ _ -> Scoped.teleLength univ
+
+-- | The number of existentially quantified type variables of a data
+-- constructor
+dcExtTyVarCount :: DataCon -> Int
+dcExtTyVarCount dc = case dcSig dc of
+  DataConSig _ ext _ -> Scoped.teleLength ext
+
+-- | The number of fields of a data constructor
+dcFieldCount :: DataCon -> Int
+dcFieldCount dc = case dcSig dc of
+  DataConSig _ _ fields -> length fields
 
 instance Show DataCon where
   show = show . dcName

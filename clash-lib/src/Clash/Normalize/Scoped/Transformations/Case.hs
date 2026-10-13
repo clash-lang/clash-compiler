@@ -76,7 +76,7 @@ import Clash.Sized.Internal.Index as I (Index, eq#)
 import Clash.Sized.Internal.Signed as S (Signed, eq#)
 import Clash.Sized.Internal.Unsigned as U (Unsigned, eq#)
 
-import Clash.Core.DataCon (DataCon(..), dcUnivTyVars)
+import Clash.Core.DataCon (DataCon(..), dcUnivTyVarCount)
 import Clash.Core.Literal (Literal(..))
 import qualified Clash.Core.Name as C (nameOcc)
 import Clash.Core.Pretty (showPpr)
@@ -228,7 +228,7 @@ caseCon' ctx e subj ty alts = do
       DataPat _ tvs xs -> do
         let
           -- Substitute the existential type variables
-          exTys = drop (length (dcUnivTyVars dc)) (rights args)
+          exTys = drop (dcUnivTyVarCount dc) (rights args)
           s0 = substExistentials (idSubst sc) tvs exTys
           -- Only the fields used in the alternative need to be substituted
           -- or let-bound

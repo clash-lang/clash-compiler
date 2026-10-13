@@ -12,6 +12,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -24,7 +25,6 @@
 
 module Clash.Netlist.Util where
 
-import           Data.Coerce             (coerce)
 import           Control.Exception       (throw)
 import           Control.Lens            ((.=), (%=))
 import qualified Control.Lens            as Lens
@@ -65,28 +65,25 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Annotations.SynthesisAttributes (Attr)
 import           Clash.Annotations.Primitive (HDL(VHDL))
 import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
-import           Clash.Core.DataCon      (DataCon (..), dcArgTys, dcExtTyVars, dcUnivTyVars)
-import           Clash.Core.EqSolver     (typeEq)
-import           Clash.Core.FreeVars (typeFreeVars')
+import           Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name (Name (..), nameOcc)
 import           Clash.Core.Pretty (showPpr)
-import           Clash.Core.TyCon
-  (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
-import           Clash.Core.Type
-  ( Type (..), TyVar, TypeView (..), normalizeType, splitTyConAppM, tyView )
+import           Clash.Core.TyCon (TyCon (FunTyCon), TyConName, tyConDataCons)
 import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax (GlobalId)
-import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Core.Scoped.Alpha (AlphaType (..))
-import           Clash.Core.Scoped.DataCon (dataConInstExtTyVars)
+import           Clash.Core.Scoped.DataCon (dataConInstExtTyVars, openDataConSig)
+import qualified Clash.Core.Scoped.EqSolver as S (typeEq)
+import qualified Data.IntSet as IntSet
 import           Clash.Core.Scoped.Pretty ()
 import           Clash.Core.Scoped.Subst (closeType, openTyBinder)
 import           Clash.Core.Scoped.Syntax (Distinct)
 import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Core.Scoped.Type as S (TypeView (..), coreView1, tyView)
+import qualified Clash.Core.Scoped.Type as S
+  (TypeView (..), coreView1, normalizeType, splitTyConAppM, tyView)
 import qualified Clash.Core.Scoped.Util as S (splitShouldSplit)
-import           Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, typeEnvTyConMap)
+import           Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, lookupTyCon)
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types     as HW
@@ -257,8 +254,9 @@ maybeConvertToCustomRepr reprs (typeToType' -> Right tyName) (FilteredHWType hwT
                                 | (fields, constr) <- zip filtered (drConstrs dRepr)]
 maybeConvertToCustomRepr _reprs _ty hwTy = hwTy
 
--- | Convert a type to a bit representation type, see
--- 'Clash.Annotations.BitRepresentation.ClashLib.coreToType''
+-- | Convert a type to the type of a custom bit representation
+-- ('Clash.Annotations.BitRepresentation.Internal.Type''): applications of
+-- type constructors and type-level literals
 typeToType' :: S.Type n -> Either String Type'
 typeToType' = \case
   S.AppTy t1 t2 -> AppTy' <$> typeToType' t1 <*> typeToType' t2
@@ -354,14 +352,13 @@ mkADT
   -- ^ An error string or a tuple with the type and possibly a list of
   -- removed arguments.
 mkADT _ _ te _ tyString tc _
-  | isRecursiveTy (typeEnvTyConMap te) tc
+  | isRecursiveTy te tc
   = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
 mkADT builtInTranslation reprs te sc tyString tc args = case tyConDataCons (findTyCon te tc) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
-        m                = typeEnvTyConMap te
         -- The types of the fields, in the scope of the existentially
         -- quantified type variables of the data constructor
         fieldHWTys dc    = fromMaybe (error ($(curLoc) ++ "Wrong number of type arguments for: " ++ tyString)) $
@@ -374,7 +371,7 @@ mkADT builtInTranslation reprs te sc tyString tc args = case tyConDataCons (find
 
     -- Every alternative is annotated with some examples. Be sure to read them.
     case (dcs, filteredArgHTyss) of
-      _ | any (hasUnconstrainedExistential m) dcs ->
+      _ | any (hasUnconstrainedExistential te) dcs ->
         throwE $ $(curLoc) ++
                  "Can't translate data types with unconstrained existentials: " ++
                  tyString
@@ -475,38 +472,35 @@ mkADT builtInTranslation reprs te sc tyString tc args = case tyConDataCons (find
 -- with an unconstrained existential type prevents us from achieving a fully
 -- monomorphic term.
 hasUnconstrainedExistential
-  :: TyConMap
+  :: TypeEnv
   -> DataCon
   -> Bool
-hasUnconstrainedExistential tcm dc =
-  let eTVs        = dcExtTyVars dc
-      uTVs        = dcUnivTyVars dc
-      constraints = mapMaybe (typeEq tcm) (dcArgTys dc)
+hasUnconstrainedExistential te dc =
+  openDataConSig dc $ \sc univ ext argTys ->
+  let uTVs        = IntSet.fromList (teleTyRaws univ)
+      eTVs        = teleTyRaws ext
+      constraints = mapMaybe (S.typeEq te sc) argTys
 
       -- Is the existential `eTV` constrained by the constraint `(ty1,ty2)`
       isConstrainedBy eTV (ty1,ty2) =
         let -- Free FVs in the LHS and RHS of the constraint that are not the
             -- in the set of universal type variables of the constructor.
-            ty1FEVs = Lens.toListOf (typeFreeVars' ((`notElem` uTVs) . coerce)
-                                                   mempty)
-                                    ty1
-            ty2FEVs = Lens.toListOf (typeFreeVars' ((`notElem` uTVs) . coerce)
-                                                   mempty)
-                                    ty2
+            ty1FEVs = filter (`IntSet.notMember` uTVs) (freeTyVarOccs ty1)
+            ty2FEVs = filter (`IntSet.notMember` uTVs) (freeTyVarOccs ty2)
 
             -- Determine whether `eTV` can be generated from one side of a
             -- constraint, under the assumption that the other side of the
             -- constraint mentions no existential type variables.
             isGenerative ::
               -- Side (LHS or RHS) of a constraint
-              Type ->
-              -- Its free type variables (that are no in the set of universal
-              -- type variables)
-              [TyVar] ->
+              S.Type x ->
+              -- The raw names of its free type variables (that are no in the
+              -- set of universal type variables)
+              [Int] ->
               Bool
-            isGenerative t efvs = case tyView t of
-              TyConApp tcNm _
-                | Just (FunTyCon {}) <- UniqMap.lookup tcNm tcm
+            isGenerative t efvs = case S.tyView t of
+              S.TyConApp tcNm _
+                | Just (FunTyCon {}) <- lookupTyCon te tcNm
                 -- For type families we can only "calculate" the `eTV` if it is
                 -- the only free variable. e.g. we can work out from `n + 1 ~ 4`
                 -- that `n ~ 3`, but can't do anything for `n + m ~ 4`.
@@ -517,12 +511,12 @@ hasUnconstrainedExistential tcm dc =
                 --
                 -- we can infer both `a ~ "System"` and `b ~ 10000`
                 -> eTV `elem` efvs
-              FunTy {}
+              S.FunTy {}
                 -- Functions are also fully generative
                 -> eTV `elem` efvs
-              OtherType other -> case other of
-                VarTy v -> v == eTV
-                LitTy _ -> False
+              S.OtherType other -> case other of
+                S.VarTy _ _ v -> S.tyNameRaw v == eTV
+                S.LitTy _ -> False
                 -- Anything else, like some higher-kinded quantified type we
                 -- just give up for now. TODO: implement this
                 _ -> False
@@ -537,6 +531,29 @@ hasUnconstrainedExistential tcm dc =
         filter (\v -> not (any (isConstrainedBy v) constraints)) eTVs
 
   in  not (null unconstrainedETVs)
+ where
+  -- The raw names of the type variables a telescope binds
+  teleTyRaws :: S.Tele S.TyBinder x y -> [Int]
+  teleTyRaws = \case
+    S.TNil -> []
+    S.TCons b bs -> S.tyNameRaw (S.tyNameOf b) : teleTyRaws bs
+
+  -- The raw names of the free type variables of a type, in order, as often as
+  -- they occur, and those of the kinds of the free type variables
+  freeTyVarOccs :: S.Type x -> [Int]
+  freeTyVarOccs = go IntSet.empty
+   where
+    go :: IntSet.IntSet -> S.Type y -> [Int]
+    go bound = \case
+      S.VarTy _ k v ->
+        let r = S.tyNameRaw v
+            isBound = r `IntSet.member` bound
+        in [r | not isBound] <> go (if isBound then bound else IntSet.empty) k
+      S.ForAllTy b t ->
+        go bound (S.tyBinderKind b) <> go (IntSet.insert (S.tyNameRaw (S.tyNameOf b)) bound) t
+      S.AppTy l r -> go bound l <> go bound r
+      S.AnnType _ t -> go bound t
+      _ -> []
 
 -- | Simple check if a TyCon is recursively defined.
 --
@@ -554,16 +571,15 @@ hasUnconstrainedExistential tcm dc =
 --
 -- Without looking through type families, we would think that /SList/ is not
 -- recursive. This lead to issue #1921
-isRecursiveTy :: TyConMap -> TyConName -> Bool
-isRecursiveTy m tc = case tyConDataCons (UniqMap.find tc m) of
+isRecursiveTy :: TypeEnv -> TyConName -> Bool
+isRecursiveTy te tc = case tyConDataCons (findTyCon te tc) of
     []  -> False
-    dcs -> let argTyss   = map dcArgTys dcs
-               argTycons = (map fst . catMaybes)
-                         $ (concatMap . map)
-                               -- Note [Look through type families in recursivity check]
-                               (splitTyConAppM . normalizeType m)
-                               argTyss
+    dcs -> let argTycons = concatMap fieldTyCons dcs
            in tc `elem` argTycons
+ where
+  fieldTyCons dc = openDataConSig dc $ \sc _ _ argTys ->
+    -- Note [Look through type families in recursivity check]
+    map fst (mapMaybe (S.splitTyConAppM . S.normalizeType te sc) argTys)
 
 -- | Determines if a type is translatable to a HWType given a function that
 -- translates certain builtin types.
