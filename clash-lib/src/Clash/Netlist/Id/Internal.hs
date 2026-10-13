@@ -8,8 +8,6 @@
 module Clash.Netlist.Id.Internal where
 
 import           Clash.Annotations.Primitive (HDL (..))
-import           Clash.Core.Name (Name(nameOcc))
-import           Clash.Core.Var (Id, varName)
 import           Clash.Debug (debugIsOn)
 import           Clash.Netlist.Types
   (PreserveCase(..), IdentifierSet(..), Identifier(..), FreshCache,
@@ -252,11 +250,6 @@ toBasicId# hdl lw id0 =
     SystemVerilog -> SystemVerilog.toBasic id1
  where
   id1 = case lw of {PreserveCase -> id0; ToLower -> Text.toLower id0}
-
--- | Convert a Clash Core Id to an identifier. Makes sure returned identifier
--- is unique.
-fromCoreId# :: IdentifierSet -> Id -> (IdentifierSet, Identifier)
-fromCoreId# is0 id0 = make# is0 (nameOcc (varName id0))
 
 instance PP.Pretty Identifier where
   pretty = PP.pretty . toText#

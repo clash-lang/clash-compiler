@@ -14,7 +14,7 @@ import Clash.Annotations.Primitive (Primitive (InlineYamlPrimitive))
 import GHC.Magic (lazy)
 import Clash.Netlist.Types (BlackBox (BBTemplate))
 
-import qualified Clash.Netlist.BlackBox.Types as BB hiding (BlackBoxFunction)
+import qualified Clash.Netlist.BlackBox.Types as BB
 import qualified Clash.Netlist.Scoped.Types as BB (BlackBoxFunction)
 
 class Vio (dom :: Domain) a res | a -> res where

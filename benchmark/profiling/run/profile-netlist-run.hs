@@ -7,8 +7,7 @@ import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Core.Name
 import           Clash.Core.Scoped.Syntax     (globalIdName)
 import           Clash.Driver.Types
-import           Clash.Netlist
-import           Clash.Netlist.Scoped (genNetlist)
+import           Clash.Netlist.Scoped (genNetlist, genTopNames, topEntityEnv)
 import           Clash.Netlist.Types          hiding (backend, hdlDir)
 
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)

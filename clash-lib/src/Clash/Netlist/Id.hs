@@ -24,7 +24,6 @@ module Clash.Netlist.Id
   , Identifier
   , IdentifierType (..)
   , unsafeMake
-  , unsafeFromCoreId
   , toText
   , toLazyText
   , toList
@@ -44,7 +43,6 @@ module Clash.Netlist.Id
   , nextN
   , prefix
   , suffix
-  , fromCoreId
 
   -- * Misc. and internals
   , VHDL.stripDollarPrefixes
@@ -55,8 +53,6 @@ module Clash.Netlist.Id
 where
 
 import           Clash.Annotations.Primitive (HDL (..))
-import           Clash.Core.Name (nameOcc)
-import           Clash.Core.Var (Id, varName)
 import           Clash.Debug (debugIsOn)
 import           Clash.Netlist.Types
   (PreserveCase(..), HasIdentifierSet(..), IdentifierSet(..), Identifier(..),
@@ -230,15 +226,3 @@ suffix id0 suffix_ = withIdentifierSetM (\is id1 -> suffix# is id1 suffix_) id0
 -- rules of 'nextIdentifier'.
 prefix :: (HasCallStack, IdentifierSetMonad m) => Identifier -> Text -> m Identifier
 prefix id0 prefix_ = withIdentifierSetM (\is id1 -> prefix# is id1 prefix_) id0
-
--- | Convert a Clash Core Id to an identifier. Makes sure returned identifier
--- is unique.
-fromCoreId :: (HasCallStack, IdentifierSetMonad m) => Id -> m Identifier
-fromCoreId = withIdentifierSetM fromCoreId#
-
--- | Like 'fromCoreId, 'unsafeFromCoreId' creates an identifier that will be
--- spliced at verbatim in the HDL. As opposed to 'fromCoreId', the resulting
--- Identifier might be generated at a later point as it is NOT added to an
--- IdentifierSet.
-unsafeFromCoreId :: HasCallStack => Id -> Identifier
-unsafeFromCoreId = unsafeMake . nameOcc . varName

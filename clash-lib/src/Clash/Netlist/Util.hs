@@ -28,30 +28,21 @@ import           Data.Coerce             (coerce)
 import           Control.Exception       (throw)
 import           Control.Lens            ((.=), (%=))
 import qualified Control.Lens            as Lens
-import           Control.Monad           (when, zipWithM)
-import           Control.Monad.Extra     (concatMapM)
-import           Control.Monad.Reader    (ask, local)
+import           Control.Monad (zipWithM)
+import           Control.Monad.Reader (ask)
 import qualified Control.Monad.State as State
-import           Control.Monad.State.Strict
-  (State, evalState, get, modify, runState)
-import           Control.Monad.Trans.Except
-  (ExceptT (..), runExcept, runExceptT, throwE)
-import           Data.Bifunctor          (second)
+import           Control.Monad.State.Strict (State, evalState, get, modify)
+import           Control.Monad.Trans.Except (ExceptT (..), runExceptT, throwE)
 import           Data.Char               (ord)
-import           Data.Either             (lefts, partitionEithers)
 import           Data.Foldable           (Foldable(toList))
 import           Data.Functor            (($>))
 import           Data.Hashable           (Hashable)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Primitive.ByteArray (ByteArray (..))
-import           Control.Applicative     (Alternative((<|>)))
 import           Data.List               (unzip4, partition)
-import qualified Data.List               as List
-import           Data.List.NonEmpty      (NonEmpty((:|)))
 import qualified Data.Map                as Map
-import           Data.Maybe
-  (catMaybes, fromMaybe, isNothing, mapMaybe, isJust, listToMaybe, maybeToList)
+import           Data.Maybe (catMaybes, fromMaybe, mapMaybe, isJust)
 import           Text.Printf             (printf)
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
@@ -64,9 +55,8 @@ import           GHC.Num.Integer                  (Integer (..))
 import           GHC.Stack               (HasCallStack)
 
 import           GHC.Utils.Monad         (zipWith3M)
-import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
 
-import Clash.Core.Basic (ConstTy (..), IsMultiPrim (..), LitTy (..), NameMod (..))
+import Clash.Core.Basic (ConstTy (..), LitTy (..), NameMod (..))
 import           Clash.Annotations.TopEntity
   (TopEntity(..), PortName(..), defSyn)
 import           Clash.Annotations.BitRepresentation.Internal
@@ -77,36 +67,18 @@ import           Clash.Annotations.Primitive (HDL(VHDL))
 import           Clash.Backend           (HasUsageMap (..), HWKind(..), hdlHWTypeKind, hdlKind)
 import           Clash.Core.DataCon      (DataCon (..), dcArgTys, dcExtTyVars, dcUnivTyVars)
 import           Clash.Core.EqSolver     (typeEq)
-import           Clash.Core.FreeVars     (dependencySortTyVars, typeFreeVars, typeFreeVars')
-import           Clash.Core.HasFreeVars  (elemFreeVars, freeVarsOf)
-import           Clash.Core.HasType
+import           Clash.Core.FreeVars (typeFreeVars')
 import qualified Clash.Core.Literal      as C
-import           Clash.Core.Name
-  (Name (..), appendToName, nameOcc)
-import           Clash.Core.Pretty       (PrettyPrec, showPpr, showPprDiag)
-import           Clash.Core.Subst
-  (Subst (..), deshadowLetExpr, extendIdSubst, extendIdSubstList,
-   extendInScopeId, extendInScopeIdList, mkSubst, substTm)
-import           Clash.Core.Term
-  (primMultiResult, MultiPrimInfo(..), Alt, Bind (..), LetBinding, Pat (..), Term (..), TickInfo (..), bindToList, collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
-import           Clash.Core.TermInfo
+import           Clash.Core.Name (Name (..), nameOcc)
+import           Clash.Core.Pretty (showPpr)
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (Type (..), TyVar, TypeView (..), normalizeType, splitTyConAppM, stripAnnTypes, tyView)
-import           Clash.Core.Util
-  (tyLitShow)
-import           Clash.Core.Var
-  (Id, Var (..), mkLocalId, modifyVarName)
-import           Clash.Core.VarEnv
-  (InScopeSet, elemInScopeSet, extendInScopeSetList, uniqAway,
-   emptyInScopeSet, mkInScopeSet, unionInScope)
+  ( Type (..), TyVar, TypeView (..), normalizeType, splitTyConAppM, tyView )
 import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax (GlobalId)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Core.Scoped.Alpha (AlphaType (..))
-import           Clash.Core.Scoped.Convert
-  (convScope, fromClashType, fromClashTypeClosed, withConvEnv)
 import           Clash.Core.Scoped.DataCon (dataConInstExtTyVars)
 import           Clash.Core.Scoped.Pretty ()
 import           Clash.Core.Scoped.Subst (closeType, openTyBinder)
@@ -115,14 +87,9 @@ import qualified Clash.Core.Scoped.Syntax as S
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), coreView1, tyView)
 import qualified Clash.Core.Scoped.Util as S (splitShouldSplit)
 import           Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, typeEnvTyConMap)
-import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
-import           Clash.Netlist.BlackBox.Types
-  (BlackBoxFunction, bbResultNames, BlackBoxMeta(BlackBoxMeta))
 import qualified Clash.Netlist.Id as Id
-import           Clash.Netlist.Scoped.Types (SomeBlackBoxFunction)
 import           Clash.Netlist.Types     as HW
-import           Clash.Primitives.Types
 import           Clash.Util
 import qualified Clash.Util.Interpolate  as I
 
@@ -173,50 +140,6 @@ isVoid _       = False
 isFilteredVoid :: FilteredHWType -> Bool
 isFilteredVoid = isVoid . stripFiltered
 
--- | Merge nested let-expressions into a single group of bindings. Their
--- binders are then in scope of all bindings, so a binder is renamed when that
--- would capture a variable: when it shadows a variable that is in scope, or
--- when the right-hand side of its 'NonRec' binding refers to a variable it
--- shadows, as in:
---
--- > \x -> let x = g x in x
---
--- Merging as is would turn this into the loop @x = g x@.
-squashLets :: InScopeSet -> Term -> Term
-squashLets is0 (Let bind0 body0) =
-  case squashLets (extendInScopeSetList is0 (fmap fst binds1)) body1 of
-    Letrec binds2 body2 -> Letrec (binds1 <> binds2) body2
-    body2 -> Letrec binds1 body2
- where
-  (bindToList -> binds1, body1)
-    | captures = deshadowLetExpr is1 bind0 body0
-    | otherwise = (bind0, body0)
-  captures = case bind0 of
-    NonRec x e -> x `elemInScopeSet` is0 || x `elemFreeVars` e
-    Rec xes -> any ((`elemInScopeSet` is0) . fst) xes
-  is1 = unionInScope is0 (mkInScopeSet (freeVarsOf (Let bind0 body0)))
-squashLets _ e = e
-
--- | Split a normalized term into: a list of arguments, a list of let-bindings,
--- and a variable reference that is the body of the let-binding. Returns a
--- String containing the error if the term was not in a normalized form.
-splitNormalized
-  :: TyConMap
-  -> Term
-  -> (Either String ([Id],[LetBinding],Id))
-splitNormalized tcm expr = case collectBndrs expr of
-  (args, collectTicks -> (squashLets (inScopeArgs args) -> Letrec xes e, ticks))
-    | (tmArgs,[]) <- partitionEithers args -> case stripTicks e of
-        Var v -> Right (tmArgs, fmap (second (`mkTicks` ticks)) xes,v)
-        t     -> Left ($(curLoc) ++ "Not in normal form: res not simple var: " ++ showPpr t)
-    | otherwise -> Left ($(curLoc) ++ "Not in normal form: tyArgs")
-  _ ->
-    Left ($(curLoc) ++ "Not in normal form: no Letrec:\n\n" ++ showPpr expr ++
-          "\n\nWhich has type:\n\n" ++ showPpr ty)
- where
-  ty = inferCoreTypeOf tcm expr
-  inScopeArgs = extendInScopeSetList emptyInScopeSet . lefts
-
 -- | Converts a type to a HWType given a function that translates certain
 -- builtin types. Errors if the type is not translatable.
 unsafeCoreTypeToHWType
@@ -233,67 +156,6 @@ unsafeCoreTypeToHWType
 unsafeCoreTypeToHWType sp loc builtInTranslation reprs te sc ty =
   either (\msg -> throw (ClashException sp (loc ++ msg) Nothing)) id <$>
     coreTypeToHWType builtInTranslation reprs te sc ty
-
--- | Run a function on scoped types on a type of Clash Core: its free type
--- variables become the variables of the scope.
---
--- Only the code for Clash Core uses this: its transformations and netlist
--- generation. It goes together with them (package B of the port).
-withLegacyType
-  :: HasCallStack
-  => Type
-  -> (forall n. Distinct n => S.Scope n -> S.Type n -> r)
-  -> r
-withLegacyType ty k =
-  case List.nubBy (\a b -> varUniq a == varUniq b) (Lens.toListOf typeFreeVars ty) of
-    [] -> k S.emptyScope (fromClashTypeClosed S.emptyScope ty)
-    tvs -> withConvEnv (dependencySortTyVars tvs) [] (\env -> k (convScope env) (fromClashType env ty))
-
--- | Same as @unsafeCoreTypeToHWTypeM@, but discards void filter information
-unsafeCoreTypeToHWTypeM'
-  :: String
-  -> Type
-  -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM' loc ty = stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
-
--- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
-unsafeCoreTypeToHWTypeM
-  :: String
-  -> Type
-  -> NetlistMonad FilteredHWType
-unsafeCoreTypeToHWTypeM loc ty = do
-  (_,cmpNm) <- Lens.use curCompNm
-  tt        <- Lens.use typeTranslator
-  reprs     <- Lens.view customReprs
-  te        <- Lens.view typeEnv
-  htm0      <- Lens.use htyCache
-  let (hty,htm1) =
-        runState (withLegacyType ty (unsafeCoreTypeToHWType cmpNm loc tt reprs te)) htm0
-  htyCache Lens..= htm1
-  return hty
-
--- | Same as @coreTypeToHWTypeM@, but discards void filter information
-coreTypeToHWTypeM'
-  :: Type
-  -- ^ Type to convert to HWType
-  -> NetlistMonad (Maybe HWType)
-coreTypeToHWTypeM' ty =
-  fmap stripFiltered <$> coreTypeToHWTypeM ty
-
-
--- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
-coreTypeToHWTypeM
-  :: Type
-  -- ^ Type to convert to HWType
-  -> NetlistMonad (Maybe FilteredHWType)
-coreTypeToHWTypeM ty = do
-  tt    <- Lens.use typeTranslator
-  reprs <- Lens.view customReprs
-  te    <- Lens.view typeEnv
-  htm0  <- Lens.use htyCache
-  let (hty,htm1) = runState (withLegacyType ty (coreTypeToHWType tt reprs te)) htm0
-  htyCache Lens..= htm1
-  return (either (const Nothing) Just hty)
 
 -- | Constructs error message for unexpected projections out of a type annotated
 -- with a custom bit representation.
@@ -417,7 +279,6 @@ coreTypeToHWType'
   -> State HWMap (Either String HWType)
 coreTypeToHWType' builtInTranslation reprs te sc ty =
   fmap stripFiltered <$> coreTypeToHWType builtInTranslation reprs te sc ty
-
 
 -- | Converts a type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the type
@@ -677,7 +538,6 @@ hasUnconstrainedExistential tcm dc =
 
   in  not (null unconstrainedETVs)
 
-
 -- | Simple check if a TyCon is recursively defined.
 --
 -- Note [Look through type families in recursivity check]
@@ -788,27 +648,6 @@ conSize :: HWType
 conSize (SP _ cons) = fromMaybe 0 . clogBase 2 . toInteger $ length cons
 conSize t           = typeSize t
 
--- | Gives the HWType corresponding to a term. Returns an error if the term has
--- a Core type that is not translatable to a HWType.
-termHWType :: String
-           -> Term
-           -> NetlistMonad HWType
-termHWType loc e = do
-  m <- Lens.view tcCache
-  let ty = inferCoreTypeOf m e
-  stripFiltered <$> unsafeCoreTypeToHWTypeM loc ty
-
--- | Gives the HWType corresponding to a term. Returns 'Nothing' if the term has
--- a Core type that is not translatable to a HWType.
-termHWTypeM
-  :: Term
-  -- ^ Term to convert to HWType
-  -> NetlistMonad (Maybe FilteredHWType)
-termHWTypeM e = do
-  m  <- Lens.view tcCache
-  let ty = inferCoreTypeOf m e
-  coreTypeToHWTypeM ty
-
 isBiSignalIn :: HWType -> Bool
 isBiSignalIn (BiDirectional In _) = True
 isBiSignalIn (Annotated _ ty)     = isBiSignalIn ty
@@ -830,217 +669,10 @@ containsBiSignalIn (RTree _ ty)      = containsBiSignalIn ty
 containsBiSignalIn (Annotated _ ty)  = containsBiSignalIn ty
 containsBiSignalIn _                 = False
 
--- | Uniquely rename all the variables and their references in a normalized
--- term
-mkUniqueNormalized
-  :: HasCallStack
-  => InScopeSet
-  -> Maybe (Maybe TopEntity)
-  -- ^ Top entity annotation where:
-  --
-  --     * Nothing: term is not a top entity
-  --     * Just Nothing: term is a top entity, but has no explicit annotation
-  --     * Just (Just ..): term is a top entity, and has an explicit annotation
-  -> ( [Id]
-     , [LetBinding]
-     , Id
-     )
-  -> NetlistMonad
-      ([Bool]
-      ,[(Identifier,HWType)]
-      ,[Declaration]
-      ,[(Identifier,HWType)]
-      ,[Declaration]
-      ,[LetBinding]
-      ,Maybe Id)
-mkUniqueNormalized is0 topMM (args, binds, res) = do
-  -- Generate port names and add them to set of seen identifiers
-  argHwtys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) . coreTypeOf) args
-  resHwty <- unsafeCoreTypeToHWTypeM $(curLoc) (coreTypeOf res)
-  etopM <-
-    mapM
-      (expandTopEntityOrErrM
-         (zip (map (Just . nameOcc . varName) args) argHwtys)
-         (Just (nameOcc (varName res)), resHwty))
-      topMM
-
-  -- Make arguments unique
-  let (bndrs, exprs) = unzip binds
-  let is1 = is0 `extendInScopeSetList` (args ++ bndrs)
-  (wereVoids, iports, iwrappers, substArgs) <-
-    mkUniqueArguments (mkSubst is1) etopM args
-
-  -- Make result unique. This might yield 'Nothing' in which case the result
-  -- was a single BiSignalOut. This is superfluous in the HDL, as the argument
-  -- will already contain a bidirectional signal complementing the BiSignalOut.
-  resM <- mkUniqueResult substArgs etopM res
-  case resM of
-    Just (oports, owrappers, res1, subst0) -> do
-      -- Collect new names, see 'renameBinder' for more information
-      (listToMaybe -> resRenameM0, HashMap.fromList -> renames0) <-
-        partition ((== res) . fst) <$> concatMapM (renameBinder binds) binds
-
-      let
-        -- Is the result variable read by any of the other binders? In that case
-        -- we need to add a redirection as most synthesis tools don't allow reads
-        -- from output ports. Note that if the result is renamed anyway, we don't
-        -- have to do anything here.
-        resultRead = any (elemFreeVars res) exprs
-        recResult = modifyVarName (`appendToName` "_rec") res
-        resRenameM1 = resRenameM0 <|> orNothing resultRead (res, recResult)
-
-      (resN, extraBind, subst1) <-
-        case resRenameM1 of
-          Nothing ->
-            -- Result binder was not renamed, so we can assign result expression
-            -- directly to new name given by 'res1'
-            pure (res1, Nothing, subst0)
-          Just (_, newName0) -> do
-            -- Result binder was renamed. We cannot rename 'res1', so we need
-            -- to create an indirection. The indirection binder is an internal
-            -- signal, so it must not inherit any 'AnnType' synthesis attributes
-            -- attached to the top entity's return type; those belong on the
-            -- output port only. See #3224.
-            let newName0' = newName0 { varType = stripAnnTypes (coreTypeOf newName0) }
-            ([newName1], s) <- mkUnique subst0 [newName0']
-            pure (newName1, Just (res1, Var newName1), s)
-
-      let
-        -- Result binder is already unique, so don't rename that
-        renames1 = [(b, hmFindWithDefault b b renames0) | b <- bndrs]
-        (renamesL0, renamesR0) = case break ((==res) . fst) renames1 of
-          (ls,_:rs) -> (ls,rs)
-          _ -> error (concat [ "internal error: unable to find: "
-                             , show res , " in: "
-                             , show renames1 ])
-
-      (renamesL1, subst2) <- mkUnique subst1 (map snd renamesL0)
-      (renamesR1, subst3) <- mkUnique subst2 (map snd renamesR0)
-
-      let
-        exprs1 = map (substTm "mkUniqueNormalized1" subst3) exprs
-        binds0 = zip (renamesL1 <> [resN] <> renamesR1) exprs1
-        binds1 = binds0 <> maybeToList extraBind
-
-      -- Return the uniquely named arguments, let-binders, and result
-      return (wereVoids, iports, iwrappers, oports, owrappers, binds1, Just res1)
-
-    Nothing -> do
-      (bndrs1, substArgs1) <- mkUnique substArgs bndrs
-      let binds1 = zip bndrs1 (map (substTm "mkUniqueNormalized2" substArgs1) exprs)
-      return (wereVoids, iports, iwrappers, [], [], binds1, Nothing)
-
 -- | Produce a 'Just' when predicate is True, else Nothing
 orNothing :: Bool -> a -> Maybe a
 orNothing True a = Just a
 orNothing False _ = Nothing
-
--- | Build the extra context 'extractPrimWarnOrFail' adds to a \"Dubious
--- primitive instantiation\" warning: which binder the primitive's result is
--- assigned to, and what the primitive is applied to. Without it a warning only
--- names the primitive, which for a primitive as common as
--- @GHC.Num.Integer.integerToInt#@ is not enough to find the offending code.
---
--- Arguments that reference one of the given sibling bindings are resolved (up
--- to a fixed depth), because on its own a generated name like @c$app_arg@ says
--- very little.
-primWarnContext
-  :: [(Id, Term)]
-  -- ^ Sibling bindings, used to resolve variable references. Pass @[]@ if they
-  -- are not available.
-  -> String
-  -- ^ Name of the binder the primitive's result is assigned to
-  -> [Either Term Type]
-  -- ^ Arguments the primitive is applied to
-  -> String
-primWarnContext binds dst args =
-  "result assigned to: " <> dst <> ", applied to: "
-    <> unwords (map (either (showArg maxResolveDepth) showDiag) args)
- where
-  showArg :: Int -> Term -> String
-  showArg depth (stripTicks -> Var v)
-    | depth > 0
-    , Just rhs <- lookup v binds
-    , (h, rhsArgs, _) <- collectArgsTicks rhs
-    = "(" <> showPpr (varName v) <> " = "
-        <> unwords (showDiag h : map (either (showArg (depth - 1)) showDiag) rhsArgs)
-        <> ")"
-  showArg _ tm = showDiag tm
-
-  showDiag :: PrettyPrec p => p -> String
-  showDiag = showPprDiag maxArgLen
-
-  -- How deep to resolve variable references into sibling bindings
-  maxResolveDepth = 5
-
-  -- Longest rendering of a single argument
-  maxArgLen = 160
-
--- | Blackbox functions are on scoped Clash Core (see
--- 'Clash.Netlist.Scoped.Types.BlackBoxFunction'), so Netlist generation on
--- Clash Core can't call them.
---
--- TODO(Phase 7): remove, together with Netlist generation on Clash Core.
-unsupportedBlackBoxFunction :: HasCallStack => SomeBlackBoxFunction -> BlackBoxFunction
-unsupportedBlackBoxFunction _ _ nm _ _ =
-  error ($(curLoc) ++ "Netlist generation on Clash Core can't call the blackbox function of "
-         ++ Text.unpack nm ++ ": blackbox functions run on scoped Clash Core")
-
--- | Set the name of the binder if the given term is a blackbox requesting
--- a specific name for the result binder. It might return multiple names in
--- case of a multi result primitive.
---
-renameBinder :: [(Id, Term)] -> (Id, Term) -> NetlistMonad [(Id, Id)]
-renameBinder binds (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $ \_ -> do
-  case k of
-    Prim p ->
-      case primMultiResult p of
-        SingleResult -> extractPrimWarnOrFail context (primName p) >>= goSingle p
-        MultiResult -> extractPrimWarnOrFail context (primName p) >>= goMulti p
-    _ -> pure []
- where
-  context = primWarnContext binds (showPpr (varName i)) args
-
-  -- Routine for multi result primitives. For more info:
-  -- 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'.
-  goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
-  goMulti pInfo (BlackBoxHaskell{function=(_, function)}) = do
-    tcm <- Lens.view tcCache
-    let mpInfo@MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
-    let (args1, resIds) = splitMultiPrimArgs mpInfo args
-    funRes <- preserveVarEnv (unsupportedBlackBoxFunction function False (primName pInfo) args1 mpi_resultTypes)
-    let BlackBoxMeta{bbResultNames} = either error fst funRes
-    go (primName pInfo) resIds args1 bbResultNames
-  goMulti _ _ = pure []
-
-  -- Routine for single result primitives (the default kind of primitive)
-  goSingle :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
-  goSingle pInfo (BlackBoxHaskell{function=(_, function)}) = do
-    funRes <- preserveVarEnv (unsupportedBlackBoxFunction function False (primName pInfo) args [coreTypeOf i])
-    case either error fst funRes of
-      BlackBoxMeta{bbResultNames=[bbResultName]} ->
-        go (primName pInfo) [i] args [bbResultName]
-      _ -> pure []
-  goSingle pInfo (BlackBox{resultNames=[resultName]}) = do
-    go (primName pInfo) [i] args [resultName]
-  goSingle _ _ = pure []
-
-  go :: Text -> [Id] -> [Either Term Type] -> [BlackBox] -> NetlistMonad [(Id, Id)]
-  go nm is0 bbArgs bbResultTemplates = do
-    (bbCtx, _) <- preserveVarEnv (mkBlackBoxContext nm Concurrent is0 bbArgs)
-    be <- Lens.use backend
-    let
-      _sameName i0 i1 = nameOcc (varName i0) == nameOcc (varName i1)
-      newNames = map (evalBlackBox be bbCtx) bbResultTemplates
-      modName newRetName = modifyVarName (\n -> n {nameOcc = newRetName})
-      is1 = zipWith modName newNames is0
-
-    -- TODO: _sameName check disabled due to
-    --       https://github.com/clash-lang/clash-compiler/issues/1566
-    -- Don't rename if we didn't change any names, it will cause superfluous
-    -- redirections in 'mkUniqueNormalized'.
-    -- pure (if and (zipWith sameName is0 is1) then [] else zip is0 is1)
-    pure (zip is0 is1)
 
 -- | Render a blackbox given its context. Renders _just_ the blackbox, not any
 -- corresponding includes, libraries, and so forth.
@@ -1052,127 +684,8 @@ evalBlackBox (SomeBackend s) bbCtx bb
   | BBTemplate bbt <- bb =
     toStrict ((State.evalState (renderTemplate bbCtx bbt) s) 0)
 
-mkUniqueArguments
-  :: Subst
-  -> Maybe (ExpandedTopEntity Identifier)
-  -- ^ Top entity annotation where:
-  --
-  --     * Nothing: term is not a top entity
-  --     * Just ..: term is a top entity
-  -> [Id]
-  -> NetlistMonad
-       ( [Bool]                 -- Were voids
-       , [(Identifier,HWType)]  -- Arguments and their types
-       , [Declaration]          -- Extra declarations
-       , Subst                  -- Substitution with new vars in scope
-       )
-mkUniqueArguments subst0 Nothing args = do
-  (args', subst1) <- mkUnique subst0 args
-  ports <- mapM idToInPort args'
-  return (map isNothing ports, catMaybes ports, [], subst1)
-
-mkUniqueArguments subst0 (Just (ExpandedTopEntity{..})) args = do
-  (ports, decls, subst1) <- (unzip3 . catMaybes) <$> zipWithM go et_inputs args
-  return ( map isNothing et_inputs
-         , concat ports
-         , concat decls
-         , extendInScopeIdList (extendIdSubstList subst0 (map snd subst1))
-                               (map fst subst1))
-  where
-    go Nothing _var =
-      pure Nothing
-    go (Just port) var = do
-      (ports, decls, _, portI) <- mkTopInput port
-      let portName = Id.toText portI
-          pId  = mkLocalId (coreTypeOf var) (setRepName portName (varName var))
-      return (Just (ports, decls, (pId, (var, Var pId))))
-
-
-mkUniqueResult
-  :: Subst
-  -> Maybe (ExpandedTopEntity Identifier)
-  -- ^ Top entity annotation where:
-  --
-  --     * Nothing: term is not a top entity
-  --     * Just ..: term is a top entity
-  -> Id
-  -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Id,Subst))
-mkUniqueResult subst0 Nothing res = do
-  ([res'],subst1) <- mkUnique subst0 [res]
-  portM <- idToOutPort res'
-  case portM of
-    Just port -> return (Just ([port],[],res',subst1))
-    _         -> return Nothing
-
-mkUniqueResult _subst0 (Just (ExpandedTopEntity{et_output=Nothing})) _res =
-  pure Nothing
-mkUniqueResult subst0 (Just (ExpandedTopEntity{et_output=Just iPort})) res = do
-  (_, sp) <- Lens.use curCompNm
-  (FilteredHWType hwty _) <- unsafeCoreTypeToHWTypeM $(curLoc) (coreTypeOf res)
-  when (containsBiSignalIn hwty)
-    (throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
-  (ports, decls, portI) <- mkTopOutput iPort
-  let pO = setRepName (Id.toText portI) (varName res)
-      pOId = mkLocalId (coreTypeOf res) pO
-      subst1 = extendInScopeId (extendIdSubst subst0 res (Var pOId)) pOId
-  return (Just (ports, decls, pOId, subst1))
-
--- | Same as idToPort, but
---    * Throws an error if the port is a composite type with a BiSignalIn
-idToInPort :: Id -> NetlistMonad (Maybe (Identifier, HWType))
-idToInPort var = do
-  (_, sp) <- Lens.use curCompNm
-  portM <- idToPort var
-  case portM of
-    Just (_,hty) -> do
-      when (containsBiSignalIn hty && not (isBiSignalIn hty))
-        (throw (ClashException sp ($(curLoc) ++ "BiSignalIn currently cannot be part of a composite type when it's a function's argument") Nothing))
-      return portM
-    _ -> return Nothing
-
--- | Same as idToPort, but:
---    * Throws an error if port is of type BiSignalIn
-idToOutPort :: Id -> NetlistMonad (Maybe (Identifier,HWType))
-idToOutPort var = do
-  (_, srcspan) <- Lens.use curCompNm
-  portM <- idToPort var
-  case portM of
-    Just (_,hty) -> do
-      when (containsBiSignalIn hty)
-        (throw (ClashException srcspan ($(curLoc) ++ "BiSignalIn cannot be part of a function's result. Use 'readFromBiSignal'.") Nothing))
-      return portM
-    _ -> return Nothing
-
-idToPort :: Id -> NetlistMonad (Maybe (Identifier, HWType))
-idToPort var = do
-  hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (coreTypeOf var)
-  if isVoid hwTy
-    then return Nothing
-    else return (Just (Id.unsafeFromCoreId var, hwTy))
-
 setRepName :: Text -> Name a -> Name a
 setRepName s (Name sort' _ i loc) = Name sort' s i loc
-
--- | Make a set of IDs unique; also returns a substitution from old ID to new
--- updated unique ID.
-mkUnique
-  :: Subst
-  -- ^ Existing substitution
-  -> [Id]
-  -- ^ IDs to make unique
-  -> NetlistMonad ([Id],Subst)
-  -- ^ (Unique IDs, update substitution)
-mkUnique = go []
-  where
-    go :: [Id] -> Subst -> [Id] -> NetlistMonad ([Id],Subst)
-    go processed subst []     = return (reverse processed,subst)
-    go processed subst@(Subst isN _ _ _) (i:is) = do
-      iN <- Id.toText <$> Id.fromCoreId i
-      let i' = uniqAway isN (modifyVarName (setRepName iN) i)
-          subst' = extendInScopeId (extendIdSubst subst i (Var i')) i'
-      go (i':processed)
-         subst'
-         is
 
 -- | Preserve the complete state before running an action, and restore it
 -- afterwards.
@@ -1569,13 +1082,13 @@ genComponentName
   -- ^ New inline strategy enabled
   -> Maybe Text
   -- ^ Component name prefix
-  -> Id
-  -- ^ Create component name based on this Core Id
+  -> GlobalId
+  -- ^ Create component name based on this global
   -> Text
-genComponentName newInlineStrat prefixM nm =
+genComponentName newInlineStrat prefixM g =
   Text.intercalate "_" (prefix ++ [fn1])
  where
-  nm0 = Text.splitOn "." (nameOcc (varName nm))
+  nm0 = Text.splitOn "." (nameOcc (S.globalIdName g))
   fn0 = Id.stripDollarPrefixes (last nm0)
   fn1 = if Text.null fn0 then "Component" else fn0
   prefix = fromMaybe (if newInlineStrat then [] else init nm0) (pure <$> prefixM)
@@ -1824,7 +1337,6 @@ mkTopInstInput epp@(ExpandedPortProduct pNameHint hwty0 ps) = do
     _ ->
       portProductError $(curLoc) hwty0 epp
 
-
 -- | Consider the following type signature:
 --
 -- @
@@ -1951,80 +1463,6 @@ nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
   = Just (Indexed (RTree d t1,10,l+k))
 
 nestM _ _ = Nothing
-
-
--- | Determines if any type variables (exts) are bound in any of the given
--- type or term variables (tms). It's currently only used to detect bound
--- existentials, hence the name.
-bindsExistentials
-  :: [TyVar]
-  -> [Var a]
-  -> Bool
-bindsExistentials exts tms = any (`elem` freeVars) exts
- where
-  freeVars = concatMap (Lens.toListOf typeFreeVars) (map coreTypeOf tms)
-
--- | Attempt to make an if-then-else construction out of this Case
-iteAlts :: HWType -> NonEmpty Alt -> Maybe (Term,Term)
-iteAlts sHTy ((pat0,alt0) :| [(pat1,alt1)]) | validIteSTy sHTy = case pat0 of
-  DataPat dc _ _ -> case dcTag dc of
-    2 -> Just (alt0,alt1)
-    _ -> Just (alt1,alt0)
-  LitPat (C.IntegerLiteral l) -> case l of
-    1 -> Just (alt0,alt1)
-    _ -> Just (alt1,alt0)
-  DefaultPat -> case pat1 of
-    DataPat dc _ _ -> case dcTag dc of
-      2 -> Just (alt1,alt0)
-      _ -> Just (alt0,alt1)
-    LitPat (C.IntegerLiteral l) -> case l of
-      1 -> Just (alt1,alt0)
-      _ -> Just (alt0,alt1)
-    _ -> Nothing
-  _ -> Nothing
- where
-  validIteSTy Bool          = True
-  validIteSTy Bit           = True
-  validIteSTy (Sum _ [_,_]) = True
-  validIteSTy (SP _ [_,_])  = True
-  validIteSTy (Unsigned 1)  = True
-  validIteSTy (Index 2)     = True
-  validIteSTy _             = False
-
-iteAlts _ _ = Nothing
-
--- | Run a NetlistMonad computation in the context of the given source ticks and
--- name modifier ticks
-withTicks
-  :: [TickInfo]
-  -> ([Declaration] -> NetlistMonad a)
-  -- ^ The source ticks are turned into 'TickDecl's and are passed as an argument
-  -- to the NetlistMonad computation. Name modifier ticks will change the local
-  -- environment for the NetlistMonad computation.
-  -> NetlistMonad a
-withTicks ticks0 k = do
-  let ticks1 = List.nub ticks0
-  go [] (reverse ticks1)
- where
-  go decls [] = k (reverse decls)
-
-  go decls (DeDup:ticks) = go decls ticks
-
-  go decls (NoDeDup:ticks) = go decls ticks
-
-  go decls (SrcSpan sp:ticks) =
-    go (TickDecl (Comment (Text.pack (showSDocUnsafe (ppr sp)))):decls) ticks
-
-  go _ (Attributes _ _:_) =
-    -- TODO(Phase 7): remove, together with Netlist generation on Clash Core
-    error ($(curLoc) ++ "Attributes ticks are only supported on scoped Clash Core, see "
-           ++ "'Clash.Netlist.Scoped.Util.withTicks'")
-
-  go decls (NameMod m nm0:ticks) = do
-    tcm <- Lens.view tcCache
-    case runExcept (tyLitShow tcm nm0) of
-      Right nm1 -> local (applyNameMod m (Text.pack nm1)) (go decls ticks)
-      _ -> go decls ticks
 
 -- | Apply a name modifier to the names of the environment, see 'withTicks'
 applyNameMod :: NameMod -> Text -> NetlistEnv -> NetlistEnv

@@ -32,8 +32,7 @@ import           Clash.Driver.Types
 
 import           Clash.GHC.GenerateBindings
 import           Clash.GHC.NetlistTypes
-import           Clash.Netlist
-import           Clash.Netlist.Scoped (genNetlist)
+import           Clash.Netlist.Scoped (genNetlist, genTopNames, topEntityEnv)
 import           Clash.Netlist.Types hiding (backend, hdlDir)
 import qualified Clash.Util.Supply as Supply
 

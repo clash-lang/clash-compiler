@@ -15,7 +15,6 @@
 module Clash.Netlist.BlackBox.Types
  ( BlackBoxMeta(..)
  , emptyBlackBoxMeta
- , BlackBoxFunction
  , BlackBoxTemplate
  , TemplateKind (..)
  , Element(..)
@@ -33,10 +32,7 @@ import                Data.Text.Lazy             (Text)
 import qualified      Data.Text                  as S
 import                GHC.Generics               (Generic)
 
-import                Clash.Core.Term            (Term)
-import                Clash.Core.Type            (Type)
-import {-# SOURCE #-} Clash.Netlist.Types
-  (BlackBox, NetlistMonad, Usage(Cont))
+import {-# SOURCE #-} Clash.Netlist.Types (BlackBox, Usage (Cont))
 
 import qualified      Clash.Signal.Internal      as Signal
 
@@ -72,22 +68,6 @@ data BlackBoxMeta =
 -- accept the defaults as documented in 'Clash.Primitives.Types.BlackBox'.
 emptyBlackBoxMeta :: BlackBoxMeta
 emptyBlackBoxMeta = BlackBoxMeta Cont TExpr [] [] [] [] NoRenderVoid [] []
-
--- | A BlackBox function generates a blackbox template, given the inputs and
--- result type of the function it should provide a blackbox for. This is useful
--- when having a need for blackbox functions, ... TODO: docs
-type BlackBoxFunction
-   = Bool
-  -- ^ Indicates whether caller needs a declaration. If set, the function is
-  -- still free to return an expression, but the caller will convert it to a
-  -- declaration.
-  -> S.Text
-  -- ^ Name of primitive
-  -> [Either Term Type]
-  -- ^ Arguments
-  -> [Type]
-  -- ^ Result types
-  -> NetlistMonad (Either String (BlackBoxMeta, BlackBox))
 
 -- | A BlackBox Template is a List of Elements
 -- TODO: Add name of function for better error messages
