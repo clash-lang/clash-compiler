@@ -6,7 +6,7 @@
   'viaFoil' runs a scoped transformation as a transformation of Clash Core.
   The normalizer runs on scoped Core, so only the tests use it: to run the
   ports on the regression tests of the transformations of Clash Core, and to
-  compare them with those (see "Test.Clash.Differential.Sites"). Phase 7 of
+  compare them with those. Phase 7 of
   the port deletes it, together with the transformations of Clash Core.
 
   = Global bindings
