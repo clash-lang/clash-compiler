@@ -60,7 +60,7 @@ import           Clash.Annotations.Primitive (HDL, extractPrim)
 import           Clash.Core.Name (mkUnsafeInternalName)
 import           Clash.Core.TyCon (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.Scoped.TysPrim (tysPrimMap)
-import           Clash.Core.VarEnv (VarEnv, unionVarEnv)
+import           Clash.Data.UniqMap (UniqMap)
 import           Clash.Core.Scoped.NameMap (globalEnvFromList)
 import           Clash.Core.Scoped.Syntax
   ( GlobalId, S (VoidS), globalIdName, globalIdType )
@@ -143,7 +143,7 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
                                (mkClassSelector allTcCache (globalIdType v) i) False)
           | (v, i) <- clsOps' ]
       -- Build the bodies lazily: most bindings are never looked at
-      allBindings                   = fmap (fmap runClosedTerm) bindingsMap `unionVarEnv` clsMap
+      allBindings                   = fmap (fmap runClosedTerm) bindingsMap <> clsMap
       topEntities'                  =
         (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts) tcMap')) $
           mapM (\(topEnt,annM,isTb) -> do
@@ -187,9 +187,9 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
     )
 
 setNoInlineTopEntities
-  :: VarEnv (Binding a)
+  :: UniqMap (Binding a)
   -> [TopEntityT]
-  -> VarEnv (Binding a)
+  -> UniqMap (Binding a)
 setNoInlineTopEntities bm tes =
   fmap go bm
  where
@@ -216,7 +216,7 @@ mkBindings
   -- Binders
   -> [(GHC.CoreBndr,Int)]
   -- Class operations
-  -> C2C ( VarEnv (Binding a)
+  -> C2C ( UniqMap (Binding a)
          , [c]
          )
 mkBindings convBind convClsOp bindings clsOps = do

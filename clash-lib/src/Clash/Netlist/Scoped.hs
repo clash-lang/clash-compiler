@@ -311,9 +311,9 @@ genComponent compName = do
   case compExprM of
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
-      throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show (globalIdLegacy compName)) Nothing)
+      throw (ClashException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
     Just b -> do
-      makeCachedO (globalIdLegacy compName) components $ genComponentT compName (bindingTerm b)
+      makeCachedO compName components $ genComponentT compName (bindingTerm b)
 
 -- | Generate a component for a given function
 genComponentT
@@ -325,11 +325,10 @@ genComponentT
   -> NetlistMonad (ComponentMeta, Component)
 genComponentT compName0 componentExpr = do
   tenv <- Lens.view typeEnv
-  let compVar = globalIdLegacy compName0
   compName1 <-
-    fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show compVar))
+    fromMaybe (error ($(curLoc) ++ "No component name for: " ++ show compName0))
       . lookupGlobalEnv compName0 <$> Lens.use componentNames
-  sp <- maybe (error ($(curLoc) ++ "No normalized expression found for: " ++ show compVar)) bindingLoc
+  sp <- maybe (error ($(curLoc) ++ "No normalized expression found for: " ++ show compName0)) bindingLoc
           . lookupGlobalEnv compName0 <$> Lens.use bindings
   curCompNm .= (compName1, sp)
   usages .= mempty
@@ -1004,7 +1003,7 @@ reorderCustom ctx reprs ty alts =
       NE.sortOn (patPos reprs) alts
     _ -> alts
  where
-  -- See 'Clash.Annotations.BitRepresentation.ClashLib.coreToType''
+  -- See 'Clash.Netlist.Util.typeToType''
   typeName :: Type n -> Either String Type'
   typeName = \case
     AppTy t1 t2 -> AppTy' <$> typeName t1 <*> typeName t2

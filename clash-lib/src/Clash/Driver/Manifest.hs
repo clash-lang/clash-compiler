@@ -60,7 +60,7 @@ import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Warning (defWarningOpts)
-import           Clash.Core.Var (Id, varName)
+import           Clash.Core.Scoped.Syntax (globalIdName)
 import           Clash.Netlist.Types
   (TopEntityT, Component(..), HWType (Clock, ClockN), hwTypeDomain)
 import qualified Clash.Netlist.Types as Netlist
@@ -358,7 +358,7 @@ mkManifest ::
   -- | All other entities
   [Component] ->
   -- | Names of dependencies (transitive closure)
-  [Id] ->
+  [GlobalId] ->
   -- | Files and  their hashes
   [(FilePath, ByteString)] ->
   -- | Hash and per-input subhashes returned by 'readFreshManifest'
@@ -374,7 +374,7 @@ mkManifest backend domains ClashOpts{..} Component{..} components deps files (to
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit)
   , domains = domains
-  , transitiveDependencies = map (nameOcc . varName) deps
+  , transitiveDependencies = map (nameOcc . globalIdName) deps
   }
  where
   compNames = map Netlist.componentName components

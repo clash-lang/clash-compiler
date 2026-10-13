@@ -319,7 +319,6 @@ Library
                       Clash.Netlist.Util
 
                       Clash.Normalize
-                      Clash.Normalize.Primitives
                       Clash.Normalize.Scoped.Primitives
                       Clash.Normalize.Scoped.PrimitiveReductions
                       Clash.Normalize.Scoped.Transformations

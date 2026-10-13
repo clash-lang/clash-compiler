@@ -11,40 +11,11 @@ due to its dependencies.
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Annotations.BitRepresentation.ClashLib
-  ( coreToType'
-  , bitsToBits
+  ( bitsToBits
   ) where
 
-import Clash.Core.Basic (ConstTy (..), LitTy (..))
-import           Clash.Annotations.BitRepresentation.Internal
-  (Type'(..))
 import qualified Clash.Annotations.BitRepresentation.Util as BitRepresentation
-import qualified Clash.Core.Type                          as C
-import           Clash.Core.Name                          (nameOcc)
 import qualified Clash.Netlist.Types                      as Netlist
-import           Clash.Util                               (curLoc)
-import qualified Data.Text as T                           (pack)
-
--- Convert Core type to BitRepresentation type
-coreToType'
-  :: C.Type
-  -- ^ Type to convert to bit representation type
-  -> Either
-       String
-       -- Error message
-       Type'
-       -- Bit representation type
-coreToType' (C.AppTy t1 t2) =
-  AppTy' <$> coreToType' t1 <*> coreToType' t2
-coreToType' (C.ConstTy (TyCon name)) =
-  return $ ConstTy' (nameOcc name)
-coreToType' (C.LitTy (NumTy n)) =
-  return $ LitTy' n
-coreToType' (C.LitTy (SymTy lit)) =
-  return $ SymLitTy' (T.pack lit)
-coreToType' e =
-  Left $ $(curLoc) ++ "Unexpected type: " ++ show e
-
 
 bitToBit
   :: BitRepresentation.Bit

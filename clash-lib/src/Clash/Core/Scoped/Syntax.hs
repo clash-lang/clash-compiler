@@ -181,7 +181,7 @@ import qualified Clash.Core.Name as C
 import {-# SOURCE #-} qualified Clash.Core.Term as C
 import {-# SOURCE #-} qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
-import Clash.Unique (Unique)
+import Clash.Unique (Uniquable (..), Unique)
 
 import Clash.Core.Scoped.Internal.Names
 import Clash.Core.Scoped.Internal.Scope
@@ -232,6 +232,10 @@ instance Hashable GlobalId where
 -- of local variables (see the module header)
 instance NFData GlobalId where
   rnf g = rnf (globalIdName g)
+
+instance Uniquable GlobalId where
+  getUnique = globalIdUniq
+  setUnique g u = g {globalIdName = (globalIdName g) {C.nameUniq = u}}
 
 -- | The unique of a global variable
 globalIdUniq :: GlobalId -> Unique

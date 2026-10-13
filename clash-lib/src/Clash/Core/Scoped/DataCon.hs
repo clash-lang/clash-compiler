@@ -25,6 +25,7 @@ module Clash.Core.Scoped.DataCon
   , dataConInstArgTys
   , dataConInstExtTyVars
   , withDataConPat
+  , openDataConSig
   ) where
 
 import GHC.Stack (HasCallStack)
@@ -95,3 +96,17 @@ withDataConPat env sc dc univTys names cont = do
       Just $ withFreshIdBinders sc1 (zip names argTys) $ \sc2 fields vars ->
         cont sc2 (DataPat dc ext fields) vars
   res
+
+-- | The signature of a data constructor, with fresh binders: its universally
+-- and existentially quantified type variables, and the types of its fields in
+-- their scope
+openDataConSig
+  :: DataCon
+  -> (forall u e. (DExt 'VoidS u, DExt u e)
+        => Scope e -> Tele TyBinder 'VoidS u -> Tele TyBinder u e -> [Type e] -> r)
+  -> r
+openDataConSig dc k = case dcSig dc of
+  DataConSig univ ext argTys ->
+    substTele substTyBinder (closedSubst emptyScope) univ $ \s1 univ' ->
+      substTele substTyBinder s1 ext $ \s2 ext' ->
+        k (substScope s2) univ' ext' (map (substTy s2) argTys)

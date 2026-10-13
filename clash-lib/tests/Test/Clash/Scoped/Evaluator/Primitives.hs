@@ -111,7 +111,7 @@ import Clash.Core.DataCon (DataCon, DcStrictness (Lazy))
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (TyConName)
-import qualified Clash.Normalize.Primitives as NP
+import Clash.Core.Basic (undefinedName)
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Builder
@@ -254,9 +254,9 @@ conPrim = \case
   Prim p -> primB p
   _ -> error "conPrim: not a primitive"
 
--- | 'Clash.Normalize.Primitives.undefined' at a type, as reductions give it
+-- | 'Clash.Normalize.Scoped.Primitives.undefined' at a type, as reductions give it
 undefinedAt :: TyB -> TmB
-undefinedAt = tyAppB (prim (Text.pack (show 'NP.undefined)) (forAll "a_1" typeKind id))
+undefinedAt = tyAppB (prim undefinedName (forAll "a_1" typeKind id))
 
 -- * Literals
 

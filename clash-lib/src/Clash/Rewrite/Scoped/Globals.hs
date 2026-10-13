@@ -35,14 +35,10 @@ module Clash.Rewrite.Scoped.Globals
   , isTopEntity
   , isWorkFreeTerm
     -- * The boundary with Clash Core
-  , fromClashBindings
-  , toClashBindings
-  , toClashTermFresh
   ) where
 
 import           Control.Lens                ((%=))
 import qualified Control.Lens                as Lens
-import qualified Control.Monad.State.Strict  as State
 import           Data.List                   (find)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.Basic             (InlineSpec)
@@ -51,22 +47,19 @@ import           GHC.Types.SrcLoc            (SrcSpan)
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
 import           Clash.Core.VarEnv (uniqAway')
-import qualified Clash.Data.UniqMap          as UniqMap
-import           Clash.Driver.Types          (Binding (..), BindingMap, IsPrim (IsFun))
+import           Clash.Driver.Types (Binding (..), IsPrim (IsFun))
 import           Clash.Rewrite.Types
-  (RewriteMonad, scopedBindings, scopedTypeEnv, scopedWorkFreeBinders, topEntities,
-   uniqSupply)
+  ( RewriteMonad, scopedBindings, scopedTypeEnv, scopedWorkFreeBinders,
+    topEntities )
 import           Clash.Unique                (setUnique)
 import           Clash.Util                  (MonadUnique (..))
-import           Clash.Util.Supply           (Supply, splitSupply)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm)
-import           Clash.Core.Scoped.Convert   (fromClashTermClosed, mkGlobalId)
+import           Clash.Core.Scoped.Convert (mkGlobalId)
 import           Clash.Core.Scoped.FreeVars  (termGlobalIds)
 import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
 import           Clash.Core.Scoped.NameMap
 import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Convert.Fresh (toClashTermFreshClosed)
 import qualified Clash.Rewrite.Scoped.WorkFree as WorkFree
 
 -- | The binding of a global, as a closed term
@@ -133,36 +126,3 @@ isWorkFreeTerm e = do
   WorkFree.isWorkFree scopedWorkFreeBinders bndrs e
 
 -- * The boundary with Clash Core
-
--- | The global bindings of Clash Core as closed terms of scoped Clash Core.
--- A body is converted when it is first used: most bindings that GHC2Core
--- produces are never looked at.
-fromClashBindings :: HasCallStack => BindingMap -> GlobalEnv (Binding (Term 'VoidS))
-fromClashBindings bm =
-  globalEnvFromList
-    [ (bindingId b, fromClashTermClosed <$> b) | b <- UniqMap.elems bm ]
-
--- | Global bindings of scoped Clash Core as bindings of Clash Core. Every
--- binder gets a fresh unique from the supply, so that a local binder never
--- shares its unique with a global one, see
--- "Clash.Core.Scoped.Convert.Fresh".
-toClashBindings :: HasCallStack => Supply -> GlobalEnv (Binding (Term 'VoidS)) -> BindingMap
-toClashBindings sup bndrs =
-  UniqMap.fromList [ (globalIdLegacy g, b') | (g, b') <- State.evalState (mapM conv (globalEnvToList bndrs)) sup ]
- where
-  conv (g, b) = do
-    tm <- toClashTermFreshClosed (bindingTerm b)
-    pure (g, b {bindingTerm = tm})
-
--- | A closed term as a term of Clash Core whose binders get fresh uniques
--- from the unique supply of the rewrite state, see "Clash.Core.Scoped.Convert.Fresh"
-toClashTermFresh :: HasCallStack => Term 'VoidS -> RewriteMonad extra C.Term
-toClashTermFresh e = State.evalState (toClashTermFreshClosed e) <$> splitUniqSupply
-
--- | A split of the unique supply of the rewrite state
-splitUniqSupply :: RewriteMonad extra Supply
-splitUniqSupply = do
-  sup <- Lens.use uniqSupply
-  let (sup1, sup2) = splitSupply sup
-  uniqSupply Lens..= sup2
-  pure sup1

@@ -144,7 +144,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
         forM_ (zip [(dc, inst) | dc <- [vNilDataCon, vConsDataCon], inst <- vInsts] expectedIsAbsurdPat) $
           \((dc, inst), expected) -> withTestScope decls $ \ts -> do
             let sc = testScope ts
-                r = withDataConPat testTypeEnv sc dc [typeIn ts inst] (fieldNames (length (C.dcArgTys dc))) $
+                r = withDataConPat testTypeEnv sc dc [typeIn ts inst] (fieldNames (C.dcFieldCount dc)) $
                       \_ pat _ -> isAbsurdPat tenv sc pat
             r @?= Just expected
     , testCase "dataConInstArgTysE" $
@@ -158,7 +158,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.EqSolver"
   , testCase "isAbsurdPat" $
       forM_ [(vNilDataCon, 3, True), (vNilDataCon, 0, False), (vConsDataCon, 0, True), (vConsDataCon, 3, False)] $
         \(dc, i, absurd) -> do
-          let r = withDataConPat testTypeEnv emptyScope dc [LitTy (C.NumTy i)] (fieldNames (length (C.dcArgTys dc))) $
+          let r = withDataConPat testTypeEnv emptyScope dc [LitTy (C.NumTy i)] (fieldNames (C.dcFieldCount dc)) $
                     \_ pat _ -> isAbsurdPat tenv emptyScope pat
           assertEqual (show (C.dcName dc) <> " at " <> show i) (Just absurd) r
 
